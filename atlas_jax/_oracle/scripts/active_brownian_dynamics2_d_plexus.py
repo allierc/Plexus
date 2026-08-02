@@ -1,6 +1,6 @@
 """Differential test for `reorient` -- the PLEXUS side.
 
-Runs the same free active-Brownian gas (config/atlas/active_brownian_dynamics2_d.yaml: reorient +
+Runs the same free active-Brownian gas (config/atlas_jax/active_brownian_dynamics2_d.yaml: reorient +
 glide, NoForce, no translational noise) through the Plexus engine and measures the SAME ensemble
 orientational autocorrelation the oracle side measures, C(t) = <e(t).e(0)> over all N cells, then
 diffs the two curves.
@@ -18,7 +18,7 @@ Two things this script does that run_spec cannot:
 
 Run with the plexus env:
   /workspace/.conda_envs/neural-graph-linux/bin/python \
-      atlas_jax_morph/_oracle/scripts/active_brownian_dynamics2_d_plexus.py
+      atlas_jax/_oracle/scripts/active_brownian_dynamics2_d_plexus.py
 Writes diff_plexus_summary.json into log/atlas_jax/active_brownian_dynamics2_d/ (beside run_spec's
 evidence), and prints the PASS/FAIL verdict against the pre-registered threshold 0.05.
 """
@@ -30,7 +30,7 @@ import torch
 HERE = os.path.dirname(os.path.abspath(__file__))
 PLEXUS = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 sys.path.insert(0, os.path.join(PLEXUS, "src"))
-sys.path.insert(0, os.path.join(PLEXUS, "atlas_jax_morph"))
+sys.path.insert(0, os.path.join(PLEXUS, "atlas_jax"))
 
 from run_spec import load_atlas_candidates             # registers `reorient`
 import plexus.operators                                # noqa: F401
@@ -38,7 +38,7 @@ load_atlas_candidates()
 from plexus import engine
 from plexus.schema import load
 
-SPEC = os.path.join(PLEXUS, "config", "atlas", "active_brownian_dynamics2_d.yaml")
+SPEC = os.path.join(PLEXUS, "config", "atlas_jax", "active_brownian_dynamics2_d.yaml")
 ORACLE_DIR = os.path.join(HERE, "..", "runs", "diff_active_brownian_dynamics2_d")
 OUT = os.path.join(PLEXUS, "log", "atlas_jax", "active_brownian_dynamics2_d")
 DT, D_R, THRESHOLD = 1.0, 0.1, 0.05

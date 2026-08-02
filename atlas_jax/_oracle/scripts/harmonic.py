@@ -50,7 +50,7 @@ from jax_morph.physics import BrownianDynamics, Harmonic, SoftSphere
 
 OUT = os.environ["OUT"]
 
-# --- parameters (must match config/atlas/harmonic.yaml exactly) ------------------------------ #
+# --- parameters (must match config/atlas_jax/harmonic.yaml exactly) ------------------------------ #
 N = 19                       # live cells
 CAP = 24                     # capacity: 19 live + 5 dead padding slots (dead-pair mask + sigma=0)
 K = 1.0                      # spring stiffness (Harmonic k) -- also the SoftSphere epsilon (matched core)
@@ -246,7 +246,7 @@ with open(os.path.join(OUT, "summary.json"), "w") as f:
 print(json.dumps(summary, indent=2))
 
 # --- the ready-to-paste YAML `start:` block (byte-identical float32 IC for the Plexus spec) --- #
-print("\n# ---- paste into config/atlas/harmonic.yaml sets.cell.start (LIVE cells only) ----")
+print("\n# ---- paste into config/atlas_jax/harmonic.yaml sets.cell.start (LIVE cells only) ----")
 print("    start:")
 for x, y in P0_live:
     print(f"    - [{x:.6f}, {y:.6f}]")

@@ -245,7 +245,7 @@ evidence:
   value: 7.610894538878732e-08
   passed: true
   plexus_run: log/atlas_jax/virial_stress/
-  scorer: atlas_jax_morph/_oracle/scripts/_compare_virial_stress.py
+  scorer: atlas_jax/_oracle/scripts/_compare_virial_stress.py
   acted_ledger: |
     From log/atlas_jax/virial_stress/diag.json: mechanosense calls 5 / acted 1, moved 0.0, kind
     lateral, structural true -- it ACTED (wrote the stress field) but moved nothing, exactly a pure

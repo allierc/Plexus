@@ -441,7 +441,7 @@
       "contract": "morphogen",
       "prior": true,
       "of": "fmottes/jax-morph:free_screened_diffusion",
-      "status": "normalized"
+      "status": "inspected"
     },
     {
       "n": 27,

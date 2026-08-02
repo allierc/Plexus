@@ -196,7 +196,7 @@ mechanisms:
 
       run_spec.py engine trajectory, NOT an operator-level probe. Driver
 
-      atlas_jax_morph/diff_gene_network_connectionist.py; artefact
+      atlas_jax/diff_gene_network_connectionist.py; artefact
 
       _oracle/runs/diff_gene_network_connectionist/diff.json.
 
@@ -442,7 +442,7 @@ mechanisms:
 
       at rtol=1e-4/atol=1e-6 from the same g0, u0 over [0, dt]. Computed in float64 so that float32
 
-      roundoff cannot masquerade as a defect. Driver: atlas_jax_morph/diff_neural_ode.py; artefact
+      roundoff cannot masquerade as a defect. Driver: atlas_jax/diff_neural_ode.py; artefact
 
       log/atlas_jax/neural_ode/diff.json.
 
@@ -910,7 +910,7 @@ mechanisms:
 
       gene trajectory is out["sets"]["cell"]["state"]["gene"] from the engine run of
 
-      config/atlas/odecontroller.yaml; the reference is reference.npz:y_uniform. Reported in
+      config/atlas_jax/odecontroller.yaml; the reference is reference.npz:y_uniform. Reported in
 
       evidence.value. Corroborated (not the primary number) by D_inf on a DISTINCT-drive run (a
 
@@ -947,7 +947,7 @@ mechanisms:
       '
     value: 2.44e-06
     passed: true
-    value_note: '2.44e-06 is the PRIMARY D_inf on the uniform run (the spec config/atlas/odecontroller.yaml
+    value_note: '2.44e-06 is the PRIMARY D_inf on the uniform run (the spec config/atlas_jax/odecontroller.yaml
 
       that run_spec.py executes). The DISTINCT-drive corroboration run (per-cell u, stepped through
 
@@ -1297,7 +1297,7 @@ mechanisms:
 
       live cells at uniform death_rate lambda=0.05, dt=1.0, 40 macro-steps
 
-      (atlas_jax_morph/_oracle/runs/diff_death). Plexus: config/atlas/death.yaml, identical
+      (atlas_jax/_oracle/runs/diff_death). Plexus: config/atlas_jax/death.yaml, identical
 
       N0/lambda/dt/frame-count (log/atlas_jax/death). The estimator is invariant to the engine''s
 
@@ -1337,7 +1337,7 @@ mechanisms:
 
       Acted ledger: apoptose calls 41, acted 41, inert_operators [] -> valid_evidence true.
 
-      Analysis: atlas_jax_morph/_oracle/scripts/_analyze_death.py.
+      Analysis: atlas_jax/_oracle/scripts/_analyze_death.py.
 
       '
 - id: free_screened_diffusion
@@ -1805,7 +1805,7 @@ mechanisms:
 
       48 jax PRNG keys (_oracle/runs/diff_division: reference.npz + summary.json; script
 
-      _oracle/scripts/division.py). Plexus: config/atlas/division.yaml run through the engine with
+      _oracle/scripts/division.py). Plexus: config/atlas_jax/division.yaml run through the engine with
 
       cell_divide''s occupancy tapped before/after every call to count (elig = live cells at the
 
@@ -2059,7 +2059,7 @@ mechanisms:
       trajectory and the jax-morph SaturatingCellGrowth reference, over EVERY recorded frame\n(t = 0..20:\
       \ the seeded IC plus 20 macro-steps at dt = 2.0) and EVERY live cell, in\ndimensionless simulation-length\
       \ (radius) units. Reported as value = max(D_max_A, D_max_B):\n  D_max_A -- the 4-cell engine run\
-      \ of config/atlas/saturating_cell_growth.yaml exactly as\n    run_spec runs it (r0 = 0.30, growth_rate\
+      \ of config/atlas_jax/saturating_cell_growth.yaml exactly as\n    run_spec runs it (r0 = 0.30, growth_rate\
       \ = 0.40, max_radius = 0.6), diffed against\n    oracle scenario A over the 4 live cells (acted\
       \ ledger: grow_radius acted 13/20 calls,\n    the later 7 emitting a sub-float delta once radius\
       \ has reached R -- correct saturation).\n  D_max_B -- a heterogeneous 6x6 (r0 x growth_rate) grid\
@@ -2576,9 +2576,9 @@ mechanisms:
 
       None), N=20000 cells seeded at ONE point, kT=0.1, gamma=1.0, n_dim=2
 
-      (atlas_jax_morph/_oracle/runs/diff_brownian_dynamics). Plexus:
+      (atlas_jax/_oracle/runs/diff_brownian_dynamics). Plexus:
 
-      config/atlas/brownian_dynamics{,_dt05,_dt025}.yaml, identical N/kT/gamma/dim and matched IC
+      config/atlas_jax/brownian_dynamics{,_dt05,_dt025}.yaml, identical N/kT/gamma/dim and matched IC
 
       (Rg is translation-invariant, so the (20,20) world offset from the oracle origin is not a
 
@@ -3485,7 +3485,7 @@ mechanisms:
     value: 2.6973983046972182e-06
     passed: true
     plexus_run: log/atlas_jax/soft_sphere/
-    scorer: atlas_jax_morph/_oracle/scripts/_analyze_soft_sphere.py
+    scorer: atlas_jax/_oracle/scripts/_analyze_soft_sphere.py
     acted_ledger: 'adhere: calls 60 / acted 60, max|delta| 0.37996304 (== oracle force_ic_max 0.37996307
       to
 
@@ -3803,7 +3803,7 @@ mechanisms:
 
       (adhere gated after_frame:1 so recorded frame 0 is the pristine shared IC and frame t is the
 
-      IC after t overdamped steps). Computed by atlas_jax_morph/diff_hertzian.py into
+      IC after t overdamped steps). Computed by atlas_jax/diff_hertzian.py into
 
       log/atlas_jax/hertzian/diff.json. evidence.value is the PRIMARY.
 
@@ -3847,7 +3847,7 @@ mechanisms:
     value: 1.894631743528317e-06
     passed: true
     plexus_run: log/atlas_jax/hertzian/
-    scorer: atlas_jax_morph/diff_hertzian.py
+    scorer: atlas_jax/diff_hertzian.py
     acted_ledger: 'adhere: calls 40 / acted 40, moved 0.69977516 (max live-cell displacement, == the oracle''s
       own
 
@@ -4220,7 +4220,7 @@ mechanisms:
     value: 7.864199877963372e-06
     passed: true
     plexus_run: log/atlas_jax/harmonic/
-    scorer: atlas_jax_morph/_oracle/scripts/_analyze_harmonic.py
+    scorer: atlas_jax/_oracle/scripts/_analyze_harmonic.py
     acted_ledger: 'adhere: calls 160 / acted 160, moved 8.451 (cumulative), kind lateral; inert_operators
       [];
 
@@ -4579,7 +4579,7 @@ mechanisms:
     value: 0.0
     passed: true
     plexus_run: log/atlas_jax/lennard_jones/
-    scorer: atlas_jax_morph/_oracle/scripts/_analyze_lennard_jones.py
+    scorer: atlas_jax/_oracle/scripts/_analyze_lennard_jones.py
     acted_ledger: 'adhere: calls 100 / acted 47, moved 2.679448 (cumulative max-cell displacement), kind
       lateral,
 
@@ -4933,9 +4933,9 @@ mechanisms:
 
       D_eq, fixed-point idempotence of the post-frame-1 plateau, frame-0 == IC on both sides, and
 
-      dead-slot immobility. Oracle: atlas_jax_morph/_oracle/runs/diff_mechanical_relaxation
+      dead-slot immobility. Oracle: atlas_jax/_oracle/runs/diff_mechanical_relaxation
 
-      (reference.npz + summary.json). Plexus: config/atlas/mechanical_relaxation.yaml ->
+      (reference.npz + summary.json). Plexus: config/atlas_jax/mechanical_relaxation.yaml ->
 
       log/atlas_jax/mechanical_relaxation. Analysis: _oracle/scripts/_analyze_mechanical_relaxation.py ->
 
@@ -5272,7 +5272,7 @@ mechanisms:
     value: 7.610894538878732e-08
     passed: true
     plexus_run: log/atlas_jax/virial_stress/
-    scorer: atlas_jax_morph/_oracle/scripts/_compare_virial_stress.py
+    scorer: atlas_jax/_oracle/scripts/_compare_virial_stress.py
     acted_ledger: 'From log/atlas_jax/virial_stress/diag.json: mechanosense calls 5 / acted 1, moved 0.0,
       kind
 

@@ -122,7 +122,7 @@ written scalar on ONE frozen configuration. Oracle (`_oracle/scripts/virial_stre
 `_oracle/runs/diff_virial_stress/`) builds one rich byte-identical float32 IC: 5 *isolated* pairs
 at r = 0.7 / 1.0 / 1.3 / 2.0 / 3.0 (compression / well-min / tension / tapered / beyond-cutoff),
 one dense 8-cell sunflower cluster (the multi-neighbour sum), 4 dead padding slots (masking), all
-radius 0.5 so sigma = r_i + r_j = 1.0. The spec `config/atlas/virial_stress.yaml` shares that IC
+radius 0.5 so sigma = r_i + r_j = 1.0. The spec `config/atlas_jax/virial_stress.yaml` shares that IC
 cell-for-cell (`seed_state` sets radius 0.5; `mechanosense` reduces Morse eps 3.0 alpha 2.8) and
 run through `plexus.engine` -> `log/atlas_jax/virial_stress/`. Metric = peak-normalized relative stress
 error over the 18 live cells on frame 0, plus a dead-slot |stress| guard and a frames-identical

@@ -92,6 +92,6 @@
       0.8958904147148132
     ]
   ],
-  "reference_run": "atlas_jax_morph/_oracle/runs/diff_odecontroller",
+  "reference_run": "atlas_jax/_oracle/runs/diff_odecontroller",
   "engine_evidence": "log/atlas/odecontroller/"
 }

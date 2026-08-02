@@ -1,7 +1,7 @@
 # `agitate` pure Brownian bath, Plexus side, dt = 0.25 (160 frames): same total time T = 40.
 # This is the DISCRIMINATING point -- a quarter step, 4x the steps. Only a correct Wiener sqrt(dt)
 # displacement scaling holds D at kT/gamma here; a dt-scaled noise (the frozen operators' bolt-on
-# jitter) would collapse to D = dt*kT/gamma = 0.025. See config/atlas/brownian_dynamics.yaml.
+# jitter) would collapse to D = dt*kT/gamma = 0.025. See config/atlas_jax/brownian_dynamics.yaml.
 general:
   name: brownian_dynamics_dt025
   seed: 0

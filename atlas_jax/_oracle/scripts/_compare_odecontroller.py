@@ -4,7 +4,7 @@ jax-morph GeneNetworkConnectionist reference (_oracle/runs/diff_odecontroller/re
 Runs in the PLEXUS (torch) env, NOT the oracle venv -- it diffs the reference arrays against
 the Plexus engine's own recorded gene block. Two comparisons:
 
-  UNIFORM   -- the real engine.run of config/atlas/odecontroller.yaml (the spec run_spec.py
+  UNIFORM   -- the real engine.run of config/atlas_jax/odecontroller.yaml (the spec run_spec.py
                executes). Primary metric D_inf over 22 frames x 4 live cells x 3 genes.
   DISTINCT  -- a per-cell frozen drive (u_distinct), stepped through the engine's own
                _integrate (gene += dt*delta) exactly as engine.run does, since seed_state
@@ -21,7 +21,7 @@ import numpy as np
 import torch
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-ATLAS = os.path.abspath(os.path.join(HERE, "..", ".."))            # .../atlas_jax_morph
+ATLAS = os.path.abspath(os.path.join(HERE, "..", ".."))            # .../atlas_jax
 sys.path.insert(0, ATLAS)                                          # for run_spec (adds src to path)
 
 import run_spec                                                    # noqa: E402  (inserts src on import)
@@ -33,7 +33,7 @@ from plexus.engine import build, _integrate, _resolve_emit        # noqa: E402
 from plexus.models.registry import get_operator                   # noqa: E402
 
 RUN = os.path.join(ATLAS, "_oracle", "runs", "diff_odecontroller")
-SPEC = os.path.join(ATLAS, "..", "config", "atlas", "odecontroller.yaml")
+SPEC = os.path.join(ATLAS, "..", "config", "atlas_jax", "odecontroller.yaml")
 
 REF = np.load(os.path.join(RUN, "reference.npz"), allow_pickle=True)
 y_uniform = REF["y_uniform"].astype(np.float64)                   # [22, 8, 3]
@@ -99,7 +99,7 @@ diff = {
     "ref_gene_last_cell0": y_uniform[-1, 0].tolist(),
     "distinct_engine_last": rec[-1].tolist(),
     "distinct_ref_last": y_distinct[-1, :n_live].tolist(),
-    "reference_run": "atlas_jax_morph/_oracle/runs/diff_odecontroller",
+    "reference_run": "atlas_jax/_oracle/runs/diff_odecontroller",
     "engine_evidence": "log/atlas_jax/odecontroller/",
 }
 with open(os.path.join(RUN, "diff.json"), "w") as f:

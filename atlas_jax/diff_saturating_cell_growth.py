@@ -11,7 +11,7 @@ observable (grow_radius returns delta = dr/dt; the engine recovers radius += dt*
 
 Three comparisons on the reference's exact per-cell IC (radius r0, growth_rate k):
 
-  PRIMARY  (D_max_A): the engine trajectory. Load config/atlas/saturating_cell_growth.yaml, run it
+  PRIMARY  (D_max_A): the engine trajectory. Load config/atlas_jax/saturating_cell_growth.yaml, run it
       through plexus.engine.run (out_path=None), read the recorded `radius` block
       out["sets"]["cell"]["state"]["radius"] and diff it against the reference scenario A over every
       frame, every live cell. This is grow_radius AS THE ENGINE RUNS IT.
@@ -42,7 +42,7 @@ sys.path.insert(0, os.path.join(PLEXUS, "src"))
 
 THRESHOLD = 1.0e-5
 REF = os.path.join(HERE, "_oracle", "runs", "diff_saturating_cell_growth", "reference.npz")
-SPEC_A = os.path.join(PLEXUS, "config", "atlas", "saturating_cell_growth.yaml")
+SPEC_A = os.path.join(PLEXUS, "config", "atlas_jax", "saturating_cell_growth.yaml")
 SPEC_B = os.path.join(HERE, "saturating_cell_growth_gridB.yaml")
 
 # --- load the atlas anti-chamber so the specs can name grow_radius / seed_state -------------- #

@@ -125,7 +125,7 @@ def gyration(H):
 
 
 def main():
-    spec = os.path.join(PLEXUS, "config", "atlas", "jax_morph_proliferation.yaml")
+    spec = os.path.join(PLEXUS, "config", "atlas_jax", "jax_morph_proliferation.yaml")
 
     # Which operators can a gradient pass through? Add them one at a time: an in-place write
     # anywhere in the schedule poisons the whole tape, so the only way to attribute the damage is

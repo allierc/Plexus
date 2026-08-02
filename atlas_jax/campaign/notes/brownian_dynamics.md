@@ -169,7 +169,7 @@ Result: **value = 0.010859** (max, at dt=0.5) <= 0.03 -> **PASS**.
   Rg is translation-invariant, so the (20,20) offset is not a mismatch).
 
 Paths:
-- oracle:  atlas_jax_morph/_oracle/runs/diff_brownian_dynamics/ (script _oracle/scripts/diff_brownian_dynamics.py)
-- plexus:  log/atlas_jax/brownian_dynamics/{diag,metrics,diff}.json (specs config/atlas/brownian_dynamics{,_dt05,_dt025}.yaml)
+- oracle:  atlas_jax/_oracle/runs/diff_brownian_dynamics/ (script _oracle/scripts/diff_brownian_dynamics.py)
+- plexus:  log/atlas_jax/brownian_dynamics/{diag,metrics,diff}.json (specs config/atlas_jax/brownian_dynamics{,_dt05,_dt025}.yaml)
 
 Verdict: `new` -> `agitate` (motion family, cell set), **status: validated**.

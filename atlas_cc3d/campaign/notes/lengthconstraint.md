@@ -48,12 +48,18 @@ contract (`reorient` is polarity direction, not shape magnitude; `relax`'s meani
 
 **Strongest argument AGAINST `new`.** Length and the Volume constraint are the SAME functional
 object — a quadratic Hookean spring, lambda·(moment − target)², on a per-cell geometric moment
-(Volume on the 0th, Length on the 2nd). One could argue the language should register ONE contract,
-say `constrain_moment(cell, order, target, lambda)`, of which Volume and Length are interchangeable
-IMPLEMENTATIONS differing only in which moment they read — making `elongate` `implementation_of`
-that, not `new`, and inflating yield if I call it new. I reject the lump because the moments carry
-different biology (size homeostasis vs elongation) and a different home in the language: Volume's
-size-target maps onto the existing `cell_grow` rest-volume machinery, while shape has no home at
-all — so collapsing them would erase a real distinction rather than reveal a shared one. But it is
-a genuine call, not a fact: if Volume normalizes as a `constrain_moment`-style contract, `elongate`
-should be revisited as a second implementation of it.
+(Volume on the 0th, Length on the 2nd), and BOTH are Potts ENERGY terms (return dE, write nothing).
+One could argue the language should register ONE contract, say `constrain_moment(cell, order,
+target, lambda)`, of which Volume and Length are interchangeable IMPLEMENTATIONS differing only in
+which moment they read — making `elongate` `implementation_of` that, not `new`, and inflating yield
+if I call it new. CROSS-ENTRY CHECK (corrects an earlier draft of this note): the Volume constraint
+in this same batch did NOT normalize onto `cell_grow` — for the very mechanism reason above
+(`cell_grow` is an integrated state update; the constraint is a Metropolis-gating dE) it normalized
+as its OWN new contract `volume_elasticity` (lateral/mechanics, set=cell). So the honest picture is
+two sibling energy-spring contracts, not one-homed-onto-`cell_grow` and one homeless. I still reject
+the lump into `constrain_moment`: Morse/SoftSphere are interchangeable because they compute the SAME
+quantity (a pair force) by different formulae, whereas `volume_elasticity` and `elongate` compute
+DIFFERENT quantities (site count vs inertia-major-axis) by the same formula — non-swappable,
+different biology — so `elongate` is NOT `implementation_of: volume_elasticity`. But it is a genuine
+call, not a fact: if the language later grows a deliberate `constrain_moment(order)` abstraction,
+`elongate` and `volume_elasticity` should be revisited together as its two implementations.

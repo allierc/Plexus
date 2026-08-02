@@ -5524,11 +5524,11 @@ leave C(t)==1 for all t). `glide` (which run_spec CAN see) acted 41/41, moving p
 0.3 -- a real spreading ABP cloud (gyration 0.30->7.48).
 
 **Runs.**
-- Oracle: `atlas_jax_morph/_oracle/runs/diff_active_brownian_dynamics2_d/` (reference.npz +
+- Oracle: `atlas_jax/_oracle/runs/diff_active_brownian_dynamics2_d/` (reference.npz +
   summary.json); script `_oracle/scripts/active_brownian_dynamics2_d.py`.
 - Plexus (run_spec evidence): `log/atlas_jax/active_brownian_dynamics2_d/` (spec_run.yaml, diag.json,
   metrics.json, metrics.npz, strip.png, movie.mp4); spec
-  `config/atlas/active_brownian_dynamics2_d.yaml`.
+  `config/atlas_jax/active_brownian_dynamics2_d.yaml`.
 - Plexus differential (heading tap + C(t) metric):
   `_oracle/scripts/active_brownian_dynamics2_d_plexus.py` ->
   `log/atlas_jax/active_brownian_dynamics2_d/diff_plexus_summary.json`.
@@ -5712,8 +5712,8 @@ Result: **value = 0.010859** (max, at dt=0.5) <= 0.03 -> **PASS**.
   Rg is translation-invariant, so the (20,20) offset is not a mismatch).
 
 Paths:
-- oracle:  atlas_jax_morph/_oracle/runs/diff_brownian_dynamics/ (script _oracle/scripts/diff_brownian_dynamics.py)
-- plexus:  log/atlas_jax/brownian_dynamics/{diag,metrics,diff}.json (specs config/atlas/brownian_dynamics{,_dt05,_dt025}.yaml)
+- oracle:  atlas_jax/_oracle/runs/diff_brownian_dynamics/ (script _oracle/scripts/diff_brownian_dynamics.py)
+- plexus:  log/atlas_jax/brownian_dynamics/{diag,metrics,diff}.json (specs config/atlas_jax/brownian_dynamics{,_dt05,_dt025}.yaml)
 
 Verdict: `new` -> `agitate` (motion family, cell set), **status: validated**.
 
@@ -5841,7 +5841,7 @@ not just as a sampling interval but by discrimination -- it is tighter than the 
 hazard `1-exp(-lambda*dt)=0.048771` and the linear-approx bug `lambda*dt=0.05` (gap 0.00123), so an
 operator that wrote `p=rate*dt` instead of the source's `-expm1(-rate*dt)` would FAIL this test.
 
-**Matched IC.** Oracle `Model([Death])` and Plexus `config/atlas/death.yaml` both start N0=50000
+**Matched IC.** Oracle `Model([Death])` and Plexus `config/atlas_jax/death.yaml` both start N0=50000
 live cells at uniform `death_rate = lambda = 0.05`, `dt=1.0`, 40 macro-steps, death the only
 operator. (Death reads no position, so scattered positions in the Plexus box are irrelevant to the
 survival metric.) One caveat handled explicitly: Plexus records AFTER applying each op, so its first
@@ -5860,8 +5860,8 @@ hazard is stationary and unbiased on any consecutive-frame window, so it sideste
 with the exact hazard within 1 SE. Acted ledger: `apoptose` calls 41 / acted 41 / inert []
 => `valid_evidence: true` (checked before any metric).
 
-**Paths.** oracle run `atlas_jax_morph/_oracle/runs/diff_death/` (script
-`_oracle/scripts/death.py`); Plexus evidence `log/atlas_jax/death/` (spec `config/atlas/death.yaml`);
+**Paths.** oracle run `atlas_jax/_oracle/runs/diff_death/` (script
+`_oracle/scripts/death.py`); Plexus evidence `log/atlas_jax/death/` (spec `config/atlas_jax/death.yaml`);
 differential computed by `_oracle/scripts/_analyze_death.py`.
 
 **Scope (unchanged from implemented).** This validates the forward EFFECT (the source's `replay`):
@@ -6007,13 +6007,13 @@ every live-count increment is one committed division).
   placement (not exercised by the count-based hazard) corroborated by the anchor gyration agreeing to
   ~9% (Plexus 3.52 vs reference 3.23).
 
-Runs: oracle `atlas_jax_morph/_oracle/runs/diff_division/` (script `_oracle/scripts/division.py`);
+Runs: oracle `atlas_jax/_oracle/runs/diff_division/` (script `_oracle/scripts/division.py`);
 Plexus engine evidence `log/atlas_jax/division/` (`diag.json` acted ledger: `cell_divide` 41 calls /
 acted 33, `grow_radius` 41/41, `relax` 41/33, `seed_state` 1/1, `inert_operators []` ->
 `valid_evidence true`) plus the pooled-hazard summary `log/atlas_jax/division/diff_plexus_summary.json`
 (script `_oracle/scripts/division_plexus.py`, which also proves the division-only reduction is
 count-neutral at seed 0: full and division-only both give 124, since only `cell_divide` draws
-`H.rng` in this spec). Spec `config/atlas/division.yaml`.
+`H.rng` in this spec). Spec `config/atlas_jax/division.yaml`.
 
 
 ---
@@ -6212,7 +6212,7 @@ is to prove the operator SCHEDULES and ACTS in the real engine on the matched IC
 - Oracle (jax venv): `_oracle/runs/diff_free_screened_diffusion/` (reference.npz + summary.json;
   script `_oracle/scripts/free_screened_diffusion.py`). dt/key-invariance asserted (quasistatic).
 - Score (torch): `diff_free_screened_diffusion.py` -> `.../diff.json`.
-- Engine (torch): spec `config/atlas/free_screened_diffusion.yaml`; evidence
+- Engine (torch): spec `config/atlas_jax/free_screened_diffusion.yaml`; evidence
   `log/atlas_jax/free_screened_diffusion/` (diag.json, metrics.json/.npz, spec_run.yaml, strip.png).
 
 **Verdict stands: `new`, `implementation_of: morphogen`.** The reproduction confirms the FREE-SPACE
@@ -6378,7 +6378,7 @@ is not inert.
 - Oracle (reference `f`, jax/diffrax venv): `_oracle/runs/diff_gene_network_connectionist/`
   (`reference.npz` + `summary.json`; deterministic at fixed input, `u` frozen across the rollout;
   script `_oracle/scripts/gene_network_connectionist.py`).
-- Engine (Plexus torch): spec `config/atlas/gene_network_connectionist.yaml`; evidence
+- Engine (Plexus torch): spec `config/atlas_jax/gene_network_connectionist.yaml`; evidence
   `log/atlas_jax/gene_network_connectionist/` (diag.json, metrics.json/.npz, spec_run.yaml, strip.png);
   gene trajectory in `graphs_data/atlas/gene_network_connectionist/simulation.zarr`.
 - Score: `python diff_gene_network_connectionist.py score` ->
@@ -6525,7 +6525,7 @@ acted, moved 1.754 (nonzero -> the ODE genuinely evolved the gene block); `seed_
 **Runs**
 - Oracle (reference `f`, jax/diffrax venv): `_oracle/runs/diff_gene_network_mwc/`
   (`reference.npz` + `summary.json`; script `_oracle/scripts/gene_network_mwc.py`).
-- Engine (Plexus torch): spec `config/atlas/gene_network_mwc.yaml`; evidence
+- Engine (Plexus torch): spec `config/atlas_jax/gene_network_mwc.yaml`; evidence
   `log/atlas_jax/gene_network_mwc/` (diag.json, metrics.json/.npz, spec_run.yaml, strip.png).
 - Score: `diff_gene_network_mwc.py score` -> `_oracle/runs/diff_gene_network_mwc/diff.json`.
 
@@ -6715,10 +6715,10 @@ Harmonic.forces vs the analytic k(σ−r)|_{r<r_c} matches to **6e-8**, with for
 deepest adhesive pull −1.45 — the reference implements the law the operator claims.
 
 **Numbers & paths.**
-- oracle : `atlas_jax_morph/_oracle/runs/diff_harmonic/` (reference.npz + summary.json + reference.png);
+- oracle : `atlas_jax/_oracle/runs/diff_harmonic/` (reference.npz + summary.json + reference.png);
   script `_oracle/scripts/harmonic.py`. Model = BrownianDynamics(Harmonic(k=1.0, r_cutoff_frac=2.5), γ=1, kT=0).
 - plexus : `log/atlas_jax/harmonic/` (diag.json valid_evidence=true, adhere acted 160/160 max|Δ| 8.45;
-  metrics.json/.npz, strip.png, diff.json); spec `config/atlas/harmonic.yaml`; trajectory
+  metrics.json/.npz, strip.png, diff.json); spec `config/atlas_jax/harmonic.yaml`; trajectory
   `graphs_data/atlas/harmonic/trajectory.npz`.
 - scorer : `_oracle/scripts/_analyze_harmonic.py` → `log/atlas_jax/harmonic/diff.json`. value 7.8642e-06, passed true.
 - record : evidence.oracle_run=diff_harmonic, evidence.value=7.8642e-06, evidence.passed=true, status=validated.
@@ -6877,7 +6877,7 @@ on — that soft_sphere's uniform test could NOT.
   emitted velocity at mobility=1 (= its autodiff force), radii/epsilon registered as per-cell
   buffers, IC = the same POS7 translated by +[20,20]. Metric = `max_{7 cells, both components}
   |F_plx - F_ref| / max|F_ref|`. One forward() call, NO integrator confound.
-- **SECONDARY — deterministic overdamped trajectory (`traj_pos_max_abs`).** `config/atlas/hertzian.yaml`
+- **SECONDARY — deterministic overdamped trajectory (`traj_pos_max_abs`).** `config/atlas_jax/hertzian.yaml`
   (uniform radius 0.5, epsilon 2.0, dt 0.1, 40 frames) run through `plexus.engine`, centroid-aligned
   and diffed per-cell per-frame vs the reference `BrownianDynamics(Hertzian, kT=0, gamma=1)` history
   (kT=0 → `dx = dt*forces` deterministic). `adhere` gated `after_frame:1` so frame 0 = shared IC.
@@ -6922,11 +6922,11 @@ itself decide the verdict/dispute (`new → adhere`), which rests on the signatu
 Re-ran the scorer this pass — numbers reproduce exactly; `status: implemented → validated`.
 
 **Paths.**
-- Oracle: `atlas_jax_morph/_oracle/runs/diff_hertzian/` (reference.npz + summary.json + reference.png);
-  script `atlas_jax_morph/_oracle/scripts/hertzian.py`.
-- Plexus: `config/atlas/hertzian.yaml` → `log/atlas_jax/hertzian/` (diag.json, metrics.json, metrics.npz,
+- Oracle: `atlas_jax/_oracle/runs/diff_hertzian/` (reference.npz + summary.json + reference.png);
+  script `atlas_jax/_oracle/scripts/hertzian.py`.
+- Plexus: `config/atlas_jax/hertzian.yaml` → `log/atlas_jax/hertzian/` (diag.json, metrics.json, metrics.npz,
   strip.png, movie.mp4).
-- Scorer: `atlas_jax_morph/diff_hertzian.py` → `log/atlas_jax/hertzian/diff.json`
+- Scorer: `atlas_jax/diff_hertzian.py` → `log/atlas_jax/hertzian/diff.json`
   (thresholds PRE-REGISTERED at lines 38-39).
 
 
@@ -7159,7 +7159,7 @@ VirialStress mechanism). This validates the IMPLEMENTATION reproduces the refere
 overdamped dynamics to byte equality; it does not touch the verdict (new -> adhere), which stands
 on the signature argument in `why`.
 
-**Runs.** oracle `atlas_jax_morph/_oracle/runs/diff_lennard_jones/` (reference.npz + summary.json);
+**Runs.** oracle `atlas_jax/_oracle/runs/diff_lennard_jones/` (reference.npz + summary.json);
 plexus `log/atlas_jax/lennard_jones/` (spec_run.yaml, diag.json, metrics.json/.npz, strip.png,
 movie.mp4); diff `log/atlas_jax/lennard_jones/diff.json`. **Verdict: status validated, D_pos 0.0 <
 1e-3, passed.**
@@ -7303,8 +7303,8 @@ Summary observables agree: gyration ref-equilibrium `0.6858 ==` plexus final `0.
 signature), `seed_state` acted, `inert_operators []`, `valid_evidence true`. The IC is BYTE-IDENTICAL
 (4-cell diamond, oracle-printed 6-decimal float32; buffer 8 with 4 dead slots at the origin).
 
-*Runs.* Oracle `atlas_jax_morph/_oracle/runs/diff_mechanical_relaxation/` (reference.npz + summary.json);
-Plexus `config/atlas/mechanical_relaxation.yaml` -> `log/atlas_jax/mechanical_relaxation/`
+*Runs.* Oracle `atlas_jax/_oracle/runs/diff_mechanical_relaxation/` (reference.npz + summary.json);
+Plexus `config/atlas_jax/mechanical_relaxation.yaml` -> `log/atlas_jax/mechanical_relaxation/`
 (diag.json, metrics.json/.npz, spec_run.yaml, strip.png) + `graphs_data/atlas/mechanical_relaxation/`;
 analysis `_oracle/scripts/_analyze_mechanical_relaxation.py` -> `log/atlas_jax/mechanical_relaxation/diff.json`.
 
@@ -7435,8 +7435,8 @@ Result:
 - Determinism of the reference confirmed in the oracle (fixed key gives fixed endpoint) before anything was recorded.
 
 Runs:
-- oracle (JAX reference): `atlas_jax_morph/_oracle/runs/diff_neural_ode/` (reference.npz + summary.json + _provenance.json); built by `_oracle/scripts/neural_ode.py`.
-- plexus differential driver: `atlas_jax_morph/diff_neural_ode.py` -> artefact `log/atlas_jax/neural_ode/diff.json`.
+- oracle (JAX reference): `atlas_jax/_oracle/runs/diff_neural_ode/` (reference.npz + summary.json + _provenance.json); built by `_oracle/scripts/neural_ode.py`.
+- plexus differential driver: `atlas_jax/diff_neural_ode.py` -> artefact `log/atlas_jax/neural_ode/diff.json`.
 
 Caveat recorded (not a defect): this is an operator-level differential, not a `run_spec.py`
 trajectory, and NeuralODE appears in no reference composition and no paper equation — so the delta
@@ -7590,7 +7590,7 @@ float32 radius trajectories** over all 20 macro-steps in both scenarios (`D_max_
 
 **Metric.** `D_max` = max absolute per-cell radius deviation over every recorded frame (t=0..20,
 dt=2.0) and every live cell, in radius units, reported as `max(D_max_A, D_max_B)`:
-- `D_max_A` -- the 4-cell engine run of `config/atlas/saturating_cell_growth.yaml` exactly as
+- `D_max_A` -- the 4-cell engine run of `config/atlas_jax/saturating_cell_growth.yaml` exactly as
   `run_spec` runs it (r0=0.30, k=0.40, R=0.6) vs oracle scenario A.
 - `D_max_B` -- a 6x6 (r0 x k) 36-cell grid rolled through the real engine `radius += dt*delta` vs
   oracle scenario B; spans k=0 no-op, small-k near-linear, large-k saturation (Euler would
@@ -7616,11 +7616,11 @@ Acted ledger valid: `grow_radius` acted 13/20 calls (the later 7 emit a sub-floa
 radius has reached R -- correct saturation), `seed_state` 1/1.
 
 **Paths.**
-- oracle run: `atlas_jax_morph/_oracle/runs/diff_saturating_cell_growth/` (reference.npz, summary.json)
-- oracle script: `atlas_jax_morph/_oracle/scripts/saturating_cell_growth.py`
-- engine spec A: `config/atlas/saturating_cell_growth.yaml` -> evidence `log/atlas_jax/saturating_cell_growth/`
-- grid spec B: `atlas_jax_morph/saturating_cell_growth_gridB.yaml`
-- diff driver: `atlas_jax_morph/diff_saturating_cell_growth.py` -> `log/atlas_jax/saturating_cell_growth/diff.json`
+- oracle run: `atlas_jax/_oracle/runs/diff_saturating_cell_growth/` (reference.npz, summary.json)
+- oracle script: `atlas_jax/_oracle/scripts/saturating_cell_growth.py`
+- engine spec A: `config/atlas_jax/saturating_cell_growth.yaml` -> evidence `log/atlas_jax/saturating_cell_growth/`
+- grid spec B: `atlas_jax/saturating_cell_growth_gridB.yaml`
+- diff driver: `atlas_jax/diff_saturating_cell_growth.py` -> `log/atlas_jax/saturating_cell_growth/diff.json`
 
 **Verdict unchanged.** The differential does not touch the `refinement`-of-`cell_grow` verdict --
 either reading is still cell growth toward a maximum size. What it establishes is that the
@@ -7913,11 +7913,11 @@ mean-instead-of-sum contact rule would then diverge by O(sigma). This does not t
 verdict/dispute (that is the normalizer's axis); it validates the IMPLEMENTATION.
 
 **Paths.**
-- Oracle: `atlas_jax_morph/_oracle/runs/diff_soft_sphere/` (reference.npz + summary.json);
-  script `atlas_jax_morph/_oracle/scripts/soft_sphere.py`.
-- Plexus: `config/atlas/soft_sphere.yaml` -> `log/atlas_jax/soft_sphere/` (diag.json, metrics.json,
+- Oracle: `atlas_jax/_oracle/runs/diff_soft_sphere/` (reference.npz + summary.json);
+  script `atlas_jax/_oracle/scripts/soft_sphere.py`.
+- Plexus: `config/atlas_jax/soft_sphere.yaml` -> `log/atlas_jax/soft_sphere/` (diag.json, metrics.json,
   strip.png) + `graphs_data/atlas/soft_sphere/trajectory.npz`.
-- Scorer: `atlas_jax_morph/_oracle/scripts/_analyze_soft_sphere.py` -> `log/atlas_jax/soft_sphere/diff.json`.
+- Scorer: `atlas_jax/_oracle/scripts/_analyze_soft_sphere.py` -> `log/atlas_jax/soft_sphere/diff.json`.
 
 
 ---
@@ -8048,7 +8048,7 @@ written scalar on ONE frozen configuration. Oracle (`_oracle/scripts/virial_stre
 `_oracle/runs/diff_virial_stress/`) builds one rich byte-identical float32 IC: 5 *isolated* pairs
 at r = 0.7 / 1.0 / 1.3 / 2.0 / 3.0 (compression / well-min / tension / tapered / beyond-cutoff),
 one dense 8-cell sunflower cluster (the multi-neighbour sum), 4 dead padding slots (masking), all
-radius 0.5 so sigma = r_i + r_j = 1.0. The spec `config/atlas/virial_stress.yaml` shares that IC
+radius 0.5 so sigma = r_i + r_j = 1.0. The spec `config/atlas_jax/virial_stress.yaml` shares that IC
 cell-for-cell (`seed_state` sets radius 0.5; `mechanosense` reduces Morse eps 3.0 alpha 2.8) and
 run through `plexus.engine` -> `log/atlas_jax/virial_stress/`. Metric = peak-normalized relative stress
 error over the 18 live cells on frame 0, plus a dead-slot |stress| guard and a frames-identical

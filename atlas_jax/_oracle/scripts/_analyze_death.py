@@ -16,8 +16,8 @@ import os
 
 import numpy as np
 
-HERE = os.path.dirname(os.path.abspath(__file__))            # .../atlas_jax_morph/_oracle/scripts
-ATLAS = os.path.abspath(os.path.join(HERE, "..", ".."))      # .../atlas_jax_morph
+HERE = os.path.dirname(os.path.abspath(__file__))            # .../atlas_jax/_oracle/scripts
+ATLAS = os.path.abspath(os.path.join(HERE, "..", ".."))      # .../atlas_jax
 PLEXUS = os.path.abspath(os.path.join(ATLAS, ".."))          # .../Plexus
 
 # --- oracle -------------------------------------------------------------------------------- #

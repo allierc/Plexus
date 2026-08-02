@@ -55,5 +55,5 @@
   "n_cells": 6,
   "n_gene": 5,
   "engine_trajectory": "/groups/saalfeld/home/allierc/GraphData/graphs_data/atlas/gene_network_connectionist/simulation.zarr",
-  "reference_npz": "/workspace/Plexus/atlas_jax_morph/_oracle/runs/diff_gene_network_connectionist/reference.npz"
+  "reference_npz": "/workspace/Plexus/atlas_jax/_oracle/runs/diff_gene_network_connectionist/reference.npz"
 }

@@ -49,6 +49,14 @@ representation does not even possess. Aliasing to cohesion would require cohesio
 which is a refinement that breaks every current cohesion user, not a free alias. The honest call is
 that `stay_connected` is a genuinely missing contract and this is a second implementation of it.
 
+**Signature aligned to the canonical `stay_connected`:** rewrote this entry's `contract:` block to the
+same typed-token shape the defining sibling uses ([[connectivityglobal]], order 8) — inputs
+`site`/`connectivity_on`/`strength`, reads `site.cell_id` + `lattice adjacency / NeighborOrder`, output
+`dE`, writes `none`, maps `none`. The legacy-distinguishing facts (constraint always-on for every cell,
+one GLOBAL Penalty default 1e7, LOCAL-only check, 2D/square/NeighborOrder≤2) now live INSIDE those tokens
+rather than in a divergent signature. `implementation_of` only counts once if the two implementations
+present the SAME signature; a differently-shaped `contract:` would have re-counted the family.
+
 **Could NOT establish:** the exact `changeEnergy` body — whether `f` is a boolean gate or scales with
 the number of connected components introduced, its sign convention — is not readable (no SWIG wrapper,
 C++ source absent from this install); reconstructed from the CC3DML comments + standard local-check

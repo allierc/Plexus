@@ -125,10 +125,10 @@ language is incomplete. Inflating the yield destroys the measurement.
 THE TARGET. `papers/jax-morph` -- Deshpande, Mottes et al., "Engineering morphogenesis of cell
 clusters with differentiable programming" (Nat Comput Sci 2025). Apache-2.0, Python/JAX. The
 paper is extracted to PLAIN TEXT WITH PAGE MARKERS at
-`atlas_jax_morph/_state/paper/Deshpande_2025_jax_morph.txt` -- Read that, do not try to render
-the PDF; `python atlas_jax_morph/paper.py --grep <term>` finds a term with its page number. The
-library's own guides are under `papers/jax-morph/jax_morph/guides/`. It RUNS: `atlas_jax_morph/oracle.py` drives it in an
-isolated venv, and `atlas_jax_morph/_oracle/runs/smoke/` already holds a deterministic reference trajectory.
+`atlas_jax/_state/paper/Deshpande_2025_jax_morph.txt` -- Read that, do not try to render
+the PDF; `python atlas_jax/paper.py --grep <term>` finds a term with its page number. The
+library's own guides are under `papers/jax-morph/jax_morph/guides/`. It RUNS: `atlas_jax/oracle.py` drives it in an
+isolated venv, and `atlas_jax/_oracle/runs/smoke/` already holds a deterministic reference trajectory.
 
 THE RULES OF THIS LOOP.
 1. The product is the record entry. Prose that is not written into it does not exist.
@@ -146,7 +146,7 @@ THE RULES OF THIS LOOP.
    lost to an unquoted `... it is NOT a constructor param: it ...`. Equations and prose always go
    in a block scalar.
 7. Do not run the reference by importing jax in the Plexus environment. It is not installed
-   there, deliberately. Use `cd atlas_jax_morph && python oracle.py run <script>`.
+   there, deliberately. Use `cd atlas_jax && python oracle.py run <script>`.
 """
 
 
@@ -179,11 +179,11 @@ def _mech_json(mech_id) -> str:
 
 
 def _where(mech_id) -> str:
-    return (f"YOUR WORKING COPY: `atlas_jax_morph/_work/{mech_id}.yaml` -- this file holds this "
+    return (f"YOUR WORKING COPY: `atlas_jax/_work/{mech_id}.yaml` -- this file holds this "
             f"ONE mechanism entry and nothing else. EDIT THAT FILE. Do not open or edit "
-            f"`atlas_jax_morph/atlas_record.yaml`: the driver merges your entry back into it "
+            f"`atlas_jax/atlas_record.yaml`: the driver merges your entry back into it "
             f"after validating it, and an edit there is reverted.\n"
-            f"YOUR NOTE: `atlas_jax_morph/campaign/notes/{mech_id}.md` -- create or append; the "
+            f"YOUR NOTE: `atlas_jax/campaign/notes/{mech_id}.md` -- create or append; the "
             f"driver merges the notes into `campaign/analysis.md` at the end of the phase.")
 
 
@@ -345,11 +345,11 @@ def differ_prompt(mech_id):
 ROLE: DIFFER. Decide whether our operator actually reproduces the reference's behaviour.
 
 WHAT ALREADY EXISTS -- do not rebuild it.
-  * `config/atlas/jax_morph_proliferation.yaml` is the ANCHOR spec: the authors' own
+  * `config/atlas_jax/jax_morph_proliferation.yaml` is the ANCHOR spec: the authors' own
     proliferation composition (relax + grow_radius + cell_divide) on their four founders, and it
     RUNS. Its evidence folder is `log/atlas_jax/jax_morph_proliferation/`. Start from it: copy it,
     change the one thing your mechanism needs, keep everything else identical.
-  * The matching oracle run is `atlas_jax_morph/_oracle/runs/smoke/` (reference.npz +
+  * The matching oracle run is `atlas_jax/_oracle/runs/smoke/` (reference.npz +
     summary.json), same initial condition, 40 macro-steps at dt=1.0.
   * `run_spec.py` auto-loads the anti-chamber, so a spec may name any atlas operator without
     promoting it. Non-spatial state blocks start at ZERO: use the `seed_state` harness operator
@@ -374,11 +374,11 @@ THE ORDER OF OPERATIONS IS THE WHOLE TEST. Do it in exactly this order:
         sentence on why that number and not a looser one
    A threshold chosen after seeing the result is not a test, and this loop has already been
    burned by a criterion that could not be met by any valid configuration.
-2. Write the oracle script under `atlas_jax_morph/_oracle/scripts/<id>.py`; run it with
-   `cd atlas_jax_morph && python oracle.py run _oracle/scripts/<id>.py --name diff_<id>`. It must write a `.npz` and
+2. Write the oracle script under `atlas_jax/_oracle/scripts/<id>.py`; run it with
+   `cd atlas_jax && python oracle.py run _oracle/scripts/<id>.py --name diff_<id>`. It must write a `.npz` and
    a `summary.json` into its run directory.
-3. Write the matching Plexus spec under `config/atlas/<id>.yaml` and RUN IT THROUGH THE ENGINE
-   with `python atlas_jax_morph/run_spec.py <id>`, which writes a real evidence folder at
+3. Write the matching Plexus spec under `config/atlas_jax/<id>.yaml` and RUN IT THROUGH THE ENGINE
+   with `python atlas_jax/run_spec.py <id>`, which writes a real evidence folder at
    `log/atlas_jax/<id>/` in the same shape as `log/okuda/coral_fixed_ball/`:
        spec_run.yaml   the spec exactly as run
        diag.json       config, summary numbers, the ACTED LEDGER, wall clock, run id
@@ -423,7 +423,7 @@ If you promote:
    `PYTHONPATH=src python -c "import plexus.operators"` still imports cleanly.
 2. Add the library page `library/<name>.qmd` in the house style of its neighbours, and its card
    in `library_operators.qmd` under the right family.
-3. Write a spec in `config/atlas/` that composes it with at least one operator Plexus already
+3. Write a spec in `config/atlas_jax/` that composes it with at least one operator Plexus already
    had, and run it with `run_spec.py` so it leaves an evidence folder under `log/atlas_jax/`. A
    vocabulary item that only works beside its own siblings has not joined the language, and one
    with no run behind it has not been demonstrated at all.

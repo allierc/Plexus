@@ -9,7 +9,7 @@ THIS operator's contract -- the per-cell radius ODE.
 
 Two scenarios, both max_radius R = 0.6, dt = 2.0 (dt != 1 makes the mean-rate convention
 observable), T = 20 macro-steps:
-  A UNIFORM -- 4 cells, r0 = 0.30, k = 0.40      (matches config/atlas/saturating_cell_growth.yaml)
+  A UNIFORM -- 4 cells, r0 = 0.30, k = 0.40      (matches config/atlas_jax/saturating_cell_growth.yaml)
   B GRID    -- 36 cells, r0 x k over a 6x6 grid   (spans k=0 no-op, saturation, r0==R, r0>R)
 
 The reference is jax-morph SaturatingCellGrowth run ALONE via jxm.simulate(history=True); its

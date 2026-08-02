@@ -25,7 +25,7 @@ ONE FRAME SIZE FOR THE WHOLE RUN. The strip is drawn on a single spatial scale t
 frame. The discovery campaign spent a day reading growth as shrinkage because each panel was
 auto-scaled to its own contents.
 
-    python run_spec.py <name>              # config/atlas/<name>.yaml
+    python run_spec.py <name>              # config/atlas_jax/<name>.yaml
     python run_spec.py <path.yaml> --device cuda:0 --no-movie
 """
 from __future__ import annotations
@@ -44,7 +44,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PLEXUS = os.path.abspath(os.path.join(HERE, ".."))
 sys.path.insert(0, os.path.join(PLEXUS, "src"))
 
-CONFIG_DIR = os.path.join(PLEXUS, "config", "atlas")
+CONFIG_DIR = os.path.join(PLEXUS, "config", "atlas_jax")
 LOG_DIR = os.path.join(PLEXUS, "log", "atlas_jax")
 
 
@@ -232,7 +232,7 @@ def strip(pos, occ, out_png, n_panels=6, title=None):
 # ------------------------------------------------------------------------------------------- #
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("name", help="config/atlas/<name>.yaml, or a path to a spec")
+    ap.add_argument("name", help="config/atlas_jax/<name>.yaml, or a path to a spec")
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--no-movie", action="store_true")
     a = ap.parse_args()

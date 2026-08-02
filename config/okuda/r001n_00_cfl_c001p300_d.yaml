@@ -12,9 +12,9 @@ general:
   - 50.0
 sets:
   vertex:
-    n: 30000
+    n: 41604
   cell:
-    n: 16000
+    n: 20804
     state:
       chem:
         width: 2

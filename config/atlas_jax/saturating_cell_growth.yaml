@@ -1,6 +1,6 @@
 # Differential for grow_radius (SaturatingCellGrowth), ISOLATED -- Scenario A (uniform IC).
 #
-# The oracle run this mirrors is atlas_jax_morph/_oracle/runs/diff_saturating_cell_growth/
+# The oracle run this mirrors is atlas_jax/_oracle/runs/diff_saturating_cell_growth/
 # (scenario A): jax-morph SaturatingCellGrowth run ALONE (no relaxation, no division) on 4 cells
 # with radius 0.30 and growth_rate 0.40, max_radius 0.6, 20 macro-steps at dt = 2.0. Growth is
 # isolated so the two sides keep the SAME cells in the SAME slots and the radius trajectories align

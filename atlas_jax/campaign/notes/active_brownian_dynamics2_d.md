@@ -147,11 +147,11 @@ leave C(t)==1 for all t). `glide` (which run_spec CAN see) acted 41/41, moving p
 0.3 -- a real spreading ABP cloud (gyration 0.30->7.48).
 
 **Runs.**
-- Oracle: `atlas_jax_morph/_oracle/runs/diff_active_brownian_dynamics2_d/` (reference.npz +
+- Oracle: `atlas_jax/_oracle/runs/diff_active_brownian_dynamics2_d/` (reference.npz +
   summary.json); script `_oracle/scripts/active_brownian_dynamics2_d.py`.
 - Plexus (run_spec evidence): `log/atlas_jax/active_brownian_dynamics2_d/` (spec_run.yaml, diag.json,
   metrics.json, metrics.npz, strip.png, movie.mp4); spec
-  `config/atlas/active_brownian_dynamics2_d.yaml`.
+  `config/atlas_jax/active_brownian_dynamics2_d.yaml`.
 - Plexus differential (heading tap + C(t) metric):
   `_oracle/scripts/active_brownian_dynamics2_d_plexus.py` ->
   `log/atlas_jax/active_brownian_dynamics2_d/diff_plexus_summary.json`.

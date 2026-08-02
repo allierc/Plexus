@@ -121,7 +121,7 @@ def prior_digest() -> str:
     proposed `adhere` will write a `why:` claiming novelty that the ledger then contradicts."""
     import os as _os
     import yaml as _yaml
-    prior = _os.path.join(PLEXUS, "atlas_jax_morph", "atlas_record.yaml")
+    prior = _os.path.join(PLEXUS, "atlas_jax", "atlas_record.yaml")
     if not _os.path.exists(prior):
         return "(no earlier atlas record found)"
     doc = _yaml.safe_load(open(prior))

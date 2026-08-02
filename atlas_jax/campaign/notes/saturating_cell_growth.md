@@ -140,7 +140,7 @@ float32 radius trajectories** over all 20 macro-steps in both scenarios (`D_max_
 
 **Metric.** `D_max` = max absolute per-cell radius deviation over every recorded frame (t=0..20,
 dt=2.0) and every live cell, in radius units, reported as `max(D_max_A, D_max_B)`:
-- `D_max_A` -- the 4-cell engine run of `config/atlas/saturating_cell_growth.yaml` exactly as
+- `D_max_A` -- the 4-cell engine run of `config/atlas_jax/saturating_cell_growth.yaml` exactly as
   `run_spec` runs it (r0=0.30, k=0.40, R=0.6) vs oracle scenario A.
 - `D_max_B` -- a 6x6 (r0 x k) 36-cell grid rolled through the real engine `radius += dt*delta` vs
   oracle scenario B; spans k=0 no-op, small-k near-linear, large-k saturation (Euler would
@@ -166,11 +166,11 @@ Acted ledger valid: `grow_radius` acted 13/20 calls (the later 7 emit a sub-floa
 radius has reached R -- correct saturation), `seed_state` 1/1.
 
 **Paths.**
-- oracle run: `atlas_jax_morph/_oracle/runs/diff_saturating_cell_growth/` (reference.npz, summary.json)
-- oracle script: `atlas_jax_morph/_oracle/scripts/saturating_cell_growth.py`
-- engine spec A: `config/atlas/saturating_cell_growth.yaml` -> evidence `log/atlas_jax/saturating_cell_growth/`
-- grid spec B: `atlas_jax_morph/saturating_cell_growth_gridB.yaml`
-- diff driver: `atlas_jax_morph/diff_saturating_cell_growth.py` -> `log/atlas_jax/saturating_cell_growth/diff.json`
+- oracle run: `atlas_jax/_oracle/runs/diff_saturating_cell_growth/` (reference.npz, summary.json)
+- oracle script: `atlas_jax/_oracle/scripts/saturating_cell_growth.py`
+- engine spec A: `config/atlas_jax/saturating_cell_growth.yaml` -> evidence `log/atlas_jax/saturating_cell_growth/`
+- grid spec B: `atlas_jax/saturating_cell_growth_gridB.yaml`
+- diff driver: `atlas_jax/diff_saturating_cell_growth.py` -> `log/atlas_jax/saturating_cell_growth/diff.json`
 
 **Verdict unchanged.** The differential does not touch the `refinement`-of-`cell_grow` verdict --
 either reading is still cell growth toward a maximum size. What it establishes is that the

@@ -4,7 +4,7 @@ jax-morph GeneNetworkConnectionist reference trajectory.
 Runs in the PLEXUS (torch) environment, NOT the oracle venv. Two comparisons, both on the
 IDENTICAL circuit / initial condition / frozen drive the oracle used:
 
-  PRIMARY  (D_max_uniform): the engine trajectory. Load config/atlas/odecontroller.yaml and
+  PRIMARY  (D_max_uniform): the engine trajectory. Load config/atlas_jax/odecontroller.yaml and
       run it through plexus.engine.run (out_path=None -> no zarr); read the recorded `gene`
       block out["sets"]["cell"]["state"]["gene"] [22, 8, 3] and diff it against the reference
       y_uniform over every recorded frame, every LIVE cell, every gene component. This is the
@@ -33,7 +33,7 @@ sys.path.insert(0, os.path.join(PLEXUS, "src"))
 
 THRESHOLD = 5.0e-3
 REF = os.path.join(HERE, "_oracle", "runs", "diff_odecontroller", "reference.npz")
-SPEC = os.path.join(PLEXUS, "config", "atlas", "odecontroller.yaml")
+SPEC = os.path.join(PLEXUS, "config", "atlas_jax", "odecontroller.yaml")
 
 # --- load the atlas anti-chamber so the spec can name `regulate` / `seed_state` ------------- #
 import plexus.operators  # noqa: F401  self-registers the core library

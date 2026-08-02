@@ -8,7 +8,7 @@ it into the Plexus operator algebra, and measures whether that algebra is conver
 
 ```bash
 export PY=/workspace/.conda_envs/neural-graph-linux/bin/python
-cd /workspace/Plexus/atlas_jax_morph
+cd /workspace/Plexus/atlas_jax
 ```
 
 ## The gates — run these before trusting anything

@@ -228,7 +228,7 @@ evidence:
     the reference BrownianDynamics(Hertzian(epsilon=2.0), gamma=1, kT=0) overdamped-Euler
     trajectory (uniform radius 0.5, dt=0.1) and x_plx is the same spec run through plexus.engine
     (adhere gated after_frame:1 so recorded frame 0 is the pristine shared IC and frame t is the
-    IC after t overdamped steps). Computed by atlas_jax_morph/diff_hertzian.py into
+    IC after t overdamped steps). Computed by atlas_jax/diff_hertzian.py into
     log/atlas_jax/hertzian/diff.json. evidence.value is the PRIMARY.
   threshold: 0.0001
   threshold_why: |
@@ -252,7 +252,7 @@ evidence:
   value: 1.894631743528317e-06
   passed: true
   plexus_run: log/atlas_jax/hertzian/
-  scorer: atlas_jax_morph/diff_hertzian.py
+  scorer: atlas_jax/diff_hertzian.py
   acted_ledger: |
     adhere: calls 40 / acted 40, moved 0.69977516 (max live-cell displacement, == the oracle's own
     relaxation: gyration 0.799 -> 0.984 on both sides); inert_operators []; unverifiable_operators

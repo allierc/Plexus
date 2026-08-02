@@ -1,5 +1,5 @@
 import yaml
-d = yaml.safe_load(open("/workspace/Plexus/atlas_jax_morph/_work/division.yaml"))
+d = yaml.safe_load(open("/workspace/Plexus/atlas_jax/_work/division.yaml"))
 print("OK parsed. top keys:", list(d.keys()))
 print("verdict:", d["verdict"], "| of:", d["of"], "| impl_of:", d.get("implementation_of"))
 print("status:", d["status"])

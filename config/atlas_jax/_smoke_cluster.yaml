@@ -1,6 +1,6 @@
 # A deliberately boring spec, built only from operators Plexus ALREADY has.
 #
-# Its job is to prove `atlas_jax_morph/run_spec.py` -- the engine run, the acted ledger, the
+# Its job is to prove `atlas_jax/run_spec.py` -- the engine run, the acted ledger, the
 # common-scale strip, the evidence folder -- before Phase 4 depends on it. Verifying the
 # instrument on a known-good composition is cheaper than debugging it under a new operator.
 general:

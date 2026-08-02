@@ -122,7 +122,7 @@ acted, moved 1.754 (nonzero -> the ODE genuinely evolved the gene block); `seed_
 **Runs**
 - Oracle (reference `f`, jax/diffrax venv): `_oracle/runs/diff_gene_network_mwc/`
   (`reference.npz` + `summary.json`; script `_oracle/scripts/gene_network_mwc.py`).
-- Engine (Plexus torch): spec `config/atlas/gene_network_mwc.yaml`; evidence
+- Engine (Plexus torch): spec `config/atlas_jax/gene_network_mwc.yaml`; evidence
   `log/atlas_jax/gene_network_mwc/` (diag.json, metrics.json/.npz, spec_run.yaml, strip.png).
 - Score: `diff_gene_network_mwc.py score` -> `_oracle/runs/diff_gene_network_mwc/diff.json`.
 

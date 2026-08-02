@@ -23,7 +23,7 @@ rolled through the identical engine integration at dt=0.25. Its D collapses to d
 (a 75% error, ~25x the threshold), proving the metric rejects a mis-scaled bath, AND a Wiener-
 scaled roll on the SAME harness recovers D ~ 0.1, proving the failure is the scaling, not the roll.
 
-  /workspace/.conda_envs/neural-graph-linux/bin/python atlas_jax_morph/diff_brownian_dynamics.py
+  /workspace/.conda_envs/neural-graph-linux/bin/python atlas_jax/diff_brownian_dynamics.py
 """
 import json
 import math
@@ -42,7 +42,7 @@ NDIM = 2
 KT, GAMMA = 0.1, 1.0
 D_THEORY = KT / GAMMA
 REF = os.path.join(HERE, "_oracle", "runs", "diff_brownian_dynamics", "reference.npz")
-SPECS = {                                   # dt -> spec name (config/atlas/<name>.yaml)
+SPECS = {                                   # dt -> spec name (config/atlas_jax/<name>.yaml)
     1.0: "brownian_dynamics",
     0.5: "brownian_dynamics_dt05",
     0.25: "brownian_dynamics_dt025",
@@ -108,7 +108,7 @@ for dt in SPECS:
 plx_D = {}
 per_dt = {}
 for dt, name in SPECS.items():
-    sim = load(os.path.join(PLEXUS, "config", "atlas", name + ".yaml"))
+    sim = load(os.path.join(PLEXUS, "config", "atlas_jax", name + ".yaml"))
     assert abs(float(sim.dt) - dt) < 1e-12, (sim.dt, dt)
     _, out = run(sim, out_path=None, device="cpu", progress=False)
     pos = np.asarray(out["sets"]["cell"]["pos"], float)      # [n_rec, N, D]
@@ -146,7 +146,7 @@ def roll(spec_name, wiener):
     Hierarchy. wiener=True  -> v = sqrt(2 kT/(gamma dt)) * xi  (agitate's correct 1/sqrt(dt)),
     wiener=False -> v = sqrt(2 kT/gamma)      * xi  (dt-INDEPENDENT amplitude -> displacement ~ dt,
     the mis-scaled `noise*randn` bug). Returns (t, Rg^2(t))."""
-    sim = load(os.path.join(PLEXUS, "config", "atlas", spec_name + ".yaml"))
+    sim = load(os.path.join(PLEXUS, "config", "atlas_jax", spec_name + ".yaml"))
     H = build(sim, "cpu")
     cell = H.level("cell")
     px0, px1 = cell.state_schema["pos"]
@@ -191,7 +191,7 @@ result = {
     },
     "oracle_run": "diff_brownian_dynamics",
     "N_cells": 20000, "kT": KT, "gamma": GAMMA,
-    "specs": {str(dt): f"config/atlas/{n}.yaml" for dt, n in SPECS.items()},
+    "specs": {str(dt): f"config/atlas_jax/{n}.yaml" for dt, n in SPECS.items()},
 }
 
 out_dir = os.path.join(PLEXUS, "log", "atlas_jax", "brownian_dynamics")

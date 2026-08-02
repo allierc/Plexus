@@ -53,3 +53,12 @@ this because the operator's signature is identical (same output type, same set-o
 same boundary-pair sum, same J-matrix read) and only the *predicate selecting which pairs count* differs
 — a filter over the same reads, not new content — but it is the one place a reviewer could reasonably
 land on `new`-without-implementation_of.
+
+**Addendum (steerability).** Re-reading the chain at source: the immediate parent is
+`ContactLocalFlexPlugin(ContactPlugin, _PyCoreSteerableInterface)` (L3339-3347), documented as
+"A steerable version of ContactPlugin". So ContactInternal inherits STEERABILITY — its J_int
+matrix can be rewritten at runtime by a Python steppable, not fixed once at setup. This does not
+change the verdict (the reads/output/signature are unchanged; steerability is a property of when
+the coefficients may change, not of the contract), but a reimplementer treating J_int as a static
+per-run constant would be wrong. Recorded as a surprise. Confirmed from the class declaration, not
+from exercising an actual steer.

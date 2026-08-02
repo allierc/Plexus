@@ -6,17 +6,27 @@ code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/
 paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
   CompuCell3D'
 summary: Contact Plugin
-equations: |
-  E_contact = sum over adjacent site pairs (i,j) with sigma_i != sigma_j of J(tau(sigma_i), tau(sigma_j))
+equations: 'E_contact = sum over adjacent site pairs (i,j) with sigma_i != sigma_j of J(tau(sigma_i),
+  tau(sigma_j))
+
   J is a symmetric matrix over cell TYPES, Medium included. Differential adhesion is J_heterotypic > J_homotypic.
+
+  '
 params:
   neighbor_order: adjacency_range
+  depth: adjacency_range (float alternative; when set it takes precedence over neighbor_order in the emitted
+    CC3DML -- L3217-3220)
+  weight_energy_by_distance: distance_weighting flag
   energy: adhesion_matrix
-state_io: |
-  reads: the cell-type of the owner of each lattice site, over the neighbor_order adjacency shell.
+state_io: 'reads: the cell-type of the owner of each lattice site, over the neighbor_order adjacency shell.
+
   writes: nothing. This is an ENERGY term, not an update -- it contributes E_contact to the Potts
+
   Hamiltonian and only changes the probability that a proposed pixel copy is accepted. It never
+
   returns a state delta the way a Plexus operator does; that gap is the point of interest here.
+
+  '
 surprises:
 - Adhesion is an energy per adjacent SITE PAIR, so it scales with shared boundary length, not with a pair
   distance. There is no cutoff and no pair potential.
@@ -24,47 +34,68 @@ surprises:
   energies. The sign of the effect reverses.'
 - The Medium is a first-class type in J, so a cell-Medium entry is a surface tension against empty space;
   adhesion and de-adhesion (spreading) are the same knob at different signs.
-- weight_energy_by_distance optionally scales each pair term by the site-site distance, so the same J can
-  act as a range-graded contact energy across the neighbor shell.
+- weight_energy_by_distance optionally scales each pair term by the site-site distance, so the same J
+  can act as a range-graded contact energy across the neighbor shell.
 contract:
   name: adhere
   kind: lateral
   family: interaction
   set: cells (each cell is a SET of lattice sites sharing an id; the Medium is a set too)
-  inputs: 'adhesion_matrix J[type,type] (symmetric, Medium included); adjacency_range (neighbor_order/depth);
-    weight_energy_by_distance flag'
-  outputs: 'a scalar energy contribution to the Potts Hamiltonian; no state delta'
-  reads: 'the cell-type of the owner of each lattice site, and the site-adjacency graph'
+  inputs: adhesion_matrix J[type,type] (symmetric, Medium included); adjacency_range (neighbor_order/depth);
+    weight_energy_by_distance flag
+  outputs: a scalar energy contribution to the Potts Hamiltonian; no state delta
+  reads: the cell-type of the owner of each lattice site, and the site-adjacency graph
   writes: nothing
-  maps: 'each pair of adjacent sites with differing owners -> J(type_i, type_j), summed over the boundary;
-    differential J (heterotypic > homotypic) drives type sorting / demixing'
+  maps: each pair of adjacent sites with differing owners -> J(type_i, type_j), summed over the boundary;
+    differential J (heterotypic > homotypic) drives type sorting / demixing
 verdict: new
 of: null
 implementation_of: adhere
-why: |
-  No registered contract covers type-indexed differential adhesion. This is a SECOND SIGHTING of
+why: 'No registered contract covers type-indexed differential adhesion. This is a SECOND SIGHTING of
+
   `adhere`, first proposed from jax-morph (in the proposed-but-not-promoted list); set
+
   implementation_of: adhere so the ledger counts the contract once across repositories. Against the
+
   frozen baseline of 42 registered contracts the verdict is still `new` -- that baseline has not
+
   changed and has no adhesion contract.
 
+
   The closest REGISTERED contracts are the interaction pair-potentials: cohesion,
+
   attraction_repulsion, separation, stillinger_weber, squared_law. Widening one of them would do
+
   violence to its biology on two counts. First, those are pair potentials over agent CENTRES: they
+
   read a scalar distance between two point-particles and return a force delta the engine integrates.
+
   Contact adhesion has no pair distance and no cutoff -- its energy scales with the length of the
+
   shared BOUNDARY between two cells-as-site-sets, and it returns nothing (it only reweights pixel-copy
+
   acceptance). Second, adhesion is keyed on cell TYPE via a symmetric matrix J that includes Medium;
+
   differential J (heterotypic > homotypic) is what sorts types. None of the registered interaction
+
   contracts carry a type-by-type coupling matrix. Forcing this into e.g. attraction_repulsion would
+
   overload distance with boundary-length and scalar strength with a type matrix -- that is a new
+
   contract wearing an old name, not a refinement anyone costed.
 
+
   Argument AGAINST this verdict: one could call adhesion an ALIAS of cohesion, since both make like
+
   cells stick. But cohesion in the registry is a homotypic, distance-based attraction with no Medium
+
   term and no heterotypic control; it cannot express J_heterotypic > J_homotypic, the exact term
+
   whose sign the ablation shows reverses the boundary length (290 -> 167 vs 290 -> 388). Aliasing to
+
   it would erase the differential structure that is the whole biological content here.
+
+  '
 status: normalized
 module: null
 test: null

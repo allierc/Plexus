@@ -181,7 +181,7 @@ evidence:
     Model([MechanicalRelaxation(Morse), SaturatingCellGrowth, Division(n_space_dim=2)]) -- the
     authors' own anchor proliferation composition -- p_hat from the pooled count trajectory over
     48 jax PRNG keys (_oracle/runs/diff_division: reference.npz + summary.json; script
-    _oracle/scripts/division.py). Plexus: config/atlas/division.yaml run through the engine with
+    _oracle/scripts/division.py). Plexus: config/atlas_jax/division.yaml run through the engine with
     cell_divide's occupancy tapped before/after every call to count (elig = live cells at the
     decision, committed = daughters woken that call); measured on the division-ONLY reduction,
     PROVEN count-neutral at seed 0 (full composition and division-only both give 124) because only

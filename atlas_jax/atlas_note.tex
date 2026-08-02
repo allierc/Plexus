@@ -656,7 +656,7 @@ the last campaign most lacked.
 \begin{enumerate}[leftmargin=1.4em]
 \item \textbf{Twenty-three mechanisms are unread}, and until Phase 1 runs, the paper's own claims
 are unchecked against its code everywhere except in the division step.
-\item \textbf{No Plexus-side spec exists for any jax-morph composition.} \code{config/atlas/} is
+\item \textbf{No Plexus-side spec exists for any jax-morph composition.} \code{config/atlas_jax/} is
 empty; Phase 4 cannot start until a spec can express their initial condition exactly.
 \item \textbf{The differential metric is unwritten, and it is not obvious.} Their macro-step is an
 operator split; ours is a schedule. Two integrators of the same equations diverge trajectory-wise
@@ -974,7 +974,7 @@ assertion, because \code{Operator.DIFFERENTIABLE} defaults to \code{True} on all
 implementations and nothing had ever checked it. Two independent instruments now do, and they
 answer deliberately different questions: \code{diff/audit.py} injects a tensor \emph{past} the
 constructor, so it measures whether the \textbf{maths} is differentiable in a knob;
-\code{diff/certify.py} runs a real \code{config/atlas/} spec through \code{engine.run(grad=True)},
+\code{diff/certify.py} runs a real \code{config/atlas_jax/} spec through \code{engine.run(grad=True)},
 so it measures whether a knob is learnable \textbf{as the language can express it today}.
 
 \begin{center}
@@ -1231,7 +1231,7 @@ framing and exactly what Figure~5 optimises. And the chain is differentiable end
 (\S\ref{sec:p6now}): loss $\to$ positions $\to$ division draw $\to$ \code{division\_rate} $\to$
 gene $\to$ \code{regulate}. The loop is not merely runnable, it is \emph{designable}.
 
-\textbf{It runs, and the loop is real.} \code{config/atlas/regulated\_growth.yaml} ---
+\textbf{It runs, and the loop is real.} \code{config/atlas_jax/regulated\_growth.yaml} ---
 \code{[seed\_state, morphogen, regulate, grow\_radius, cell\_divide, relax]}, six operators, all
 previously validated against the authors' code, none new. 40 macro-steps, 4 cells $\to$ 68, every
 operator acting.

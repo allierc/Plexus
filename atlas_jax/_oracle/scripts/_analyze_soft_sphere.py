@@ -1,8 +1,8 @@
 """Score the adhere/soft_sphere differential: Plexus engine trajectory vs the jax-morph SoftSphere
 overdamped reference, per cell, per frame. Runs in the Plexus (torch) env; no re-simulation.
 
-  reference : atlas_jax_morph/_oracle/runs/diff_soft_sphere/reference.npz  (jxm BrownianDynamics kT=0)
-  plexus    : graphs_data/atlas/soft_sphere/trajectory.npz                 (config/atlas/soft_sphere.yaml)
+  reference : atlas_jax/_oracle/runs/diff_soft_sphere/reference.npz  (jxm BrownianDynamics kT=0)
+  plexus    : graphs_data/atlas/soft_sphere/trajectory.npz                 (config/atlas_jax/soft_sphere.yaml)
 
 Primary metric  D_pos = max over frames t=0..60 and LIVE cells i of ||x_plx-x_ref||_2 / sigma.
 Threshold       1.0e-3 (sigma).  Corroborators: single-step IC force residual, gyration rel-err,

@@ -13,7 +13,7 @@ Two economies, both proven here rather than assumed:
      and of the initial condition -- the right invariant to diff a stochastic operator on.
 
 Run with the plexus env, e.g.
-  /workspace/.conda_envs/neural-graph-linux/bin/python atlas_jax_morph/_oracle/scripts/division_plexus.py
+  /workspace/.conda_envs/neural-graph-linux/bin/python atlas_jax/_oracle/scripts/division_plexus.py
 Writes summary.json into log/atlas_jax/division/ alongside the run_spec evidence.
 """
 import copy, json, os, sys, time
@@ -24,7 +24,7 @@ import torch
 HERE = os.path.dirname(os.path.abspath(__file__))
 PLEXUS = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 sys.path.insert(0, os.path.join(PLEXUS, "src"))
-sys.path.insert(0, os.path.join(PLEXUS, "atlas_jax_morph"))
+sys.path.insert(0, os.path.join(PLEXUS, "atlas_jax"))
 
 from run_spec import load_atlas_candidates             # registers cell_divide:volume_conserving
 import plexus.operators                                # noqa: F401
@@ -33,7 +33,7 @@ from plexus import engine
 from plexus.schema import load
 
 M = int(os.environ.get("M_SEEDS", "48"))
-SPEC = os.path.join(PLEXUS, "config", "atlas", "division.yaml")
+SPEC = os.path.join(PLEXUS, "config", "atlas_jax", "division.yaml")
 OUT = os.path.join(PLEXUS, "log", "atlas_jax", "division")
 
 _real_get_operator = engine.get_operator

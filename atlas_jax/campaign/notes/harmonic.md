@@ -169,10 +169,10 @@ Harmonic.forces vs the analytic k(σ−r)|_{r<r_c} matches to **6e-8**, with for
 deepest adhesive pull −1.45 — the reference implements the law the operator claims.
 
 **Numbers & paths.**
-- oracle : `atlas_jax_morph/_oracle/runs/diff_harmonic/` (reference.npz + summary.json + reference.png);
+- oracle : `atlas_jax/_oracle/runs/diff_harmonic/` (reference.npz + summary.json + reference.png);
   script `_oracle/scripts/harmonic.py`. Model = BrownianDynamics(Harmonic(k=1.0, r_cutoff_frac=2.5), γ=1, kT=0).
 - plexus : `log/atlas_jax/harmonic/` (diag.json valid_evidence=true, adhere acted 160/160 max|Δ| 8.45;
-  metrics.json/.npz, strip.png, diff.json); spec `config/atlas/harmonic.yaml`; trajectory
+  metrics.json/.npz, strip.png, diff.json); spec `config/atlas_jax/harmonic.yaml`; trajectory
   `graphs_data/atlas/harmonic/trajectory.npz`.
 - scorer : `_oracle/scripts/_analyze_harmonic.py` → `log/atlas_jax/harmonic/diff.json`. value 7.8642e-06, passed true.
 - record : evidence.oracle_run=diff_harmonic, evidence.value=7.8642e-06, evidence.passed=true, status=validated.
