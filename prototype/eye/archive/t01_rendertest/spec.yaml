@@ -1,0 +1,175 @@
+# Plexus2 spec -- zebrafish eyeball in its orbit, moved by six extraocular
+# muscles.  Sets: eye (organ) / mpm_particle (material points) / muscle (x6) /
+# orbit (socket).  The six eye operators are registered by prototype/eye/eye_ops.py.
+general:
+  name: eye_probe_rendertest
+  seed: 0
+  n_frames: 80
+  dt: 0.003
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+  record_cap: 4000
+  field_record_cap: 1
+sets:
+  eye:
+    n: 1
+    start:
+    - - 0.5
+      - 0.5
+      - 0.46
+    state:
+      pos:
+        width: 3
+        integration: second_order_coordinate
+        boundary: world
+      vel:
+        width: 3
+        integration: second_order_rate
+        boundary: free
+        record: false
+      gaze:
+        width: 3
+        integration: none
+        boundary: free
+    types:
+      globe:
+        fraction: 1.0
+        youngs: 300.0
+        layers:
+        - frac: 0.6
+          youngs: 9.0
+        - frac: 0.88
+          youngs: 40.0
+        - frac: 1.0
+          youngs: 300.0
+  mpm_particle:
+    parent: eye
+    per_parent: 8000
+    radius: 0.115
+    density: 1.0
+  muscle:
+    n: 6
+    state:
+      act:
+        width: 1
+        integration: first_order
+        boundary: free
+      tension:
+        width: 1
+        integration: none
+        boundary: free
+  orbit:
+    n: 1
+    start:
+    - - 0.5
+      - 0.5
+      - 0.46
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 64
+operators:
+- op: eye_anatomy
+  at: mpm_particle
+  before_frame: 1
+  center:
+  - 0.5
+  - 0.5
+  - 0.46
+  a_eq: 0.115
+  axial_ratio: 0.82
+  lens_youngs: 520.0
+  cornea_youngs: 260.0
+- op: muscle_insertion
+  at: muscle
+  before_frame: 1
+  particles: mpm_particle
+  patch_deg: 22.0
+- op: eye_pose
+  at: eye
+  child: mpm_particle
+  shell_min: 0.86
+- op: oculomotor_drive
+  at: muscle
+  eye: eye
+  program:
+  - - 0
+    - 0
+    - 0
+    - 0
+  - - 40
+    - 25
+    - 0
+    - 0
+  - - 110
+    - 0
+    - 18
+    - 0
+  - - 180
+    - 0
+    - 0
+    - 14
+  - - 250
+    - 0
+    - 0
+    - 0
+  kp: 0.1
+  kd: 0.01
+  tonic: 0.2
+  gain: 1.2
+  tau: 0.02
+- op: muscle_traction
+  at: mpm_particle
+  muscles: muscle
+  amplitude: 0.03
+  wrap: 0.85
+- op: orbit_socket
+  at: mpm_particle
+  orbit: orbit
+  k: 5000.0
+  damp: 12.0
+  radius: 0.12200000000000001
+  aperture: 62.0
+  k_fat: 4000.0
+  c_fat: 18.0
+- op: drag
+  at: mpm_particle
+  k: 5.0
+  emit: mpm_acceleration
+- op: mpm_strain
+  at: mpm_particle
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 200
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 1.0
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 1.0
+  wall_contact: 0.02
+  vmax: 1000000000.0
+schedule:
+- eye_anatomy
+- muscle_insertion
+- eye_pose
+- oculomotor_drive
+- muscle_traction
+- orbit_socket
+- drag
+- substep_dt: 0.00015
+  steps:
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+plotting:
+  background: black
+  fps: 30

@@ -74,3 +74,7 @@
 [loop] terminal also written to /workspace/Plexus/discovery_okuda/campaign/campaign.log
 [loop] CLEAN START -- removed 5 campaign file(s); the next round is 1
 [loop] plan: 1 recon round(s) to build the frontier, then 19 composition round(s) that can pose a hypothesis
+
+------------------------------------------------------------------------------------------------
+[loop] round 1/20  mode=recon   spent so far: 0.0 agent-min over 0 calls
+------------------------------------------------------------------------------------------------

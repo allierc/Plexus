@@ -6695,11 +6695,22 @@ mechanisms:
   raw_kind: representation (not a class)
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PySteppables.py
   paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366
-  summary: A cell is not a point with a radius but a connected set of lattice sites sharing one id. Volume
-    is a site count, surface a boundary count, position a derived centre of mass. Every other mechanism
-    is defined in terms of this.
-  equations: 'sigma: lattice site -> cell id. A cell is {x : sigma(x) = id}. V = |{x}|, S = |{(x,y) adjacent
-    : sigma(x) != sigma(y)}|, COM = mean of its sites.'
+  summary: 'A cell is not a point with a radius but a connected set of lattice sites sharing one id. Volume
+
+    is a site count, surface a boundary count, position a derived centre of mass. Every other
+
+    mechanism is defined in terms of this.
+
+    '
+  equations: 'sigma: lattice site -> cell id. A cell is {x : sigma(x) = id}.
+
+    V   = |{x : sigma(x) = id}|
+
+    S   = |{(x,y) adjacent : sigma(x) = id, sigma(y) != id}|   (boundary adjacencies to OTHER cells)
+
+    COM = mean of {x : sigma(x) = id}
+
+    '
   params: {}
   state_io: 'Architectural, not an update. The framework does not run this as a step; it is the standing
     data
@@ -6727,55 +6738,58 @@ mechanisms:
     notion of.'
   - 'Membership is a mutable field, not a fixed hierarchy: which cell owns a site is rewritten every MC
     step, and the cell has no existence apart from sigma -- it IS its sites, deformable and possibly disconnected.'
+  - 'The novelty is a SET TYPE, not an operator: every promoted Plexus set is a cloud of point-agents,
+    and none can carry a concave, exact, area-counted boundary. That missing primitive is what makes this
+    new.'
   verdict: new
   of: null
   implementation_of: null
   collision_note: null
   why: 'The closest registered contract is `aggregate` (aggregate/hierarchy), whose sole implementation
 
-    (Centroid) already reduces a cell''s contained children onto the parent and writes the parent''s COM
-    as
+    (Centroid) reduces a cell''s contained children onto the parent and writes the parent''s COM as an
 
-    an occupancy-weighted mean -- exactly the COM half of this representation (COM = mean of sites). So
-    the
+    occupancy-weighted mean -- exactly the COM half of this representation (COM = mean of sites). I do
 
-    overlap is real and I do not hide it: a cell''s position, as a derived centroid over its members,
-    IS the
+    not hide that overlap: a cell''s position as a derived centroid over its members IS the aggregate
 
-    aggregate contract.
+    contract, and volume (a member count) is a reduction of the same shape.
 
-    But the representation as a whole is `new`, and widening `aggregate` to admit it would do violence
-    in
 
-    two ways. (1) SUBSTRATE. aggregate''s member set is a set of persistent point children joined to the
+    But the representation as a whole is `new`, because the thing it introduces is not an operator, it
 
-    parent by a fixed `parent` containment map (INPUTS=["particle"], MAPS=["parent"]). Here there are
-    no
+    is a SET TYPE the promoted algebra does not have. Every registered set is a cloud of point-agents
 
-    child entities: members are cells of a shared grid, and membership is the mutable label field sigma,
+    (a particle/cell is a point with a position, joined to a parent by a fixed containment map); here
 
-    rewritten one site at a time by Metropolis dynamics. To widen aggregate you would change its `set`
-    and
+    the `cell` is an extended, deformable DOMAIN of a shared lattice, existing only as the mutable label
 
-    `reads` from "a parent''s member list" to "a partition of a field," which is not a widening but a
+    field sigma, rewritten one site at a time by Metropolis dynamics. No registered set can carry a
 
-    different substrate, and it would break every current aggregate user (point agents with a fixed parent).
+    concave, exact, area-counted boundary: neither a point-with-radius (`radius_graph`) nor a particle
 
-    (2) SURFACE is not a member reduction at all. S counts a cell''s boundary adjacencies to OTHER cells,
-    so
+    cloud has a surface at all. That missing primitive -- the extended lattice domain whose volume and
 
-    it reads neighbouring parents'' labels; aggregate reduces a parent''s OWN children and has no term
-    that
+    exact surface are first-class -- is what the Plexus algebra, whose agents are points, lacks.
 
-    crosses between parents. And neither a point-with-radius (`radius_graph`) nor a particle cloud can
-    carry
 
-    a concave, exact, area-counted boundary. This representation is the substrate the whole target stands
+    Widening `aggregate` to admit it would do violence twice. (1) SUBSTRATE. aggregate''s members are
 
-    on -- an extended, deformable lattice domain whose volume and exact surface are first-class -- and
-    the
+    persistent point children joined by a fixed `parent` map (INPUTS=["particle"], MAPS=["parent"]); to
 
-    Plexus algebra, whose agents are points, has no primitive for it.
+    admit this you would redefine its `set`/`reads`/`maps` from "a parent''s member list" to "a partition
+
+    of a field", which is a different substrate, not a widening, and would break every current aggregate
+
+    user (point agents with a fixed parent). (2) SURFACE is not a member reduction at all: S counts a
+
+    cell''s boundary adjacencies to OTHER cells, so it reads neighbouring parents'' labels -- an
+
+    inter-parent quantity aggregate has no term for, since it reduces a parent''s OWN children only. This
+
+    representation is the substrate the whole target stands on, and the Plexus algebra has no primitive
+
+    for it.
 
     '
   contract:
