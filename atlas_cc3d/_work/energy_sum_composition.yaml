@@ -1,0 +1,102 @@
+id: energy_sum_composition
+order: 33
+raw_name: the Hamiltonian as a sum of plugin terms
+raw_kind: composition contract (not a class)
+code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py
+paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366
+summary: Mechanisms compose by ADDING energy terms to one Hamiltonian and interact only through the accept/reject
+  decision. Nothing is applied in sequence and nothing returns a delta.
+equations: E = sum_plugins E_plugin. Mechanisms interact ONLY through dE in the acceptance test.
+params: {}
+state_io: |
+  Architectural, not an update -- the standing composition law of the framework, not a step the engine
+  runs. Every enabled plugin registers a term E_plugin(configuration); on each proposed pixel copy the
+  Potts core asks each term for its contribution to dE and SUMS them into a single scalar dE, which is
+  the only channel through which mechanisms interact (see the metropolis_acceptance entry for the
+  accept/reject rule that consumes that sum). It writes no state itself; it holds no parameters; it
+  constrains every other mechanism by fixing HOW their terms combine (additively, simultaneously, into
+  one energy) rather than in sequence.
+surprises:
+- 'ADDED BY HAND: the direct counterpart of jax-morph''s Lie-Trotter operator split, and the contrast
+  is itself a finding: operator splitting versus energy summation are two different answers to how mechanisms
+  compose'
+- |
+  Composition here is SIMULTANEOUS and NON-SEQUENTIAL. No plugin sees the effect of another before the
+  copy is decided; all terms are evaluated against the SAME candidate configuration and only their sum
+  matters. There is no notion of "plugin A runs, then plugin B runs on A's output" -- the order in which
+  plugins are listed is irrelevant to dE. This is the opposite of an operator pipeline.
+- |
+  Because the terms combine additively into one scalar and are resolved by a single stochastic
+  accept/reject, mechanisms can TRADE OFF against each other inside one step: a copy that raises volume
+  energy can still be accepted if it lowers contact energy more. In an operator-splitting scheme each
+  operator's delta is applied unconditionally and such trade-offs must be engineered by hand; here they
+  are automatic and emergent from the sum.
+verdict: out_of_scope
+of: null
+implementation_of: null
+collision_note: null
+why: |
+  out_of_scope: this is not an operator over any biological set or field -- it is the framework's
+  COMPOSITION LAW, the meta-rule that says how the per-mechanism energy terms combine. It has no
+  biological content of its own (it constrains volume, adhesion, chemotaxis alike but IS none of them),
+  it holds no parameters, and it returns no per-set delta. What it fixes is the semantics of the
+  interpreter, not a mechanism in the tissue.
+
+  Crucially, there is no registered contract to alias or widen, because Plexus's OWN composition law
+  lives at the same architectural layer and is likewise NOT a member of the operator vocabulary. Plexus
+  composes by operator splitting: each registered operator returns a delta and the engine applies /
+  integrates those deltas in sequence (the Lie-Trotter split the surprise names). That splitting is a
+  property of the engine, not an entry in src/plexus/operators/ -- so the frozen baseline has nothing
+  named for "how operators compose". You cannot alias a vocabulary item that does not exist, and you
+  cannot widen a signature (`name, kind, family, set, inputs, outputs, reads, writes, maps`) to express
+  "sum every term into one scalar and resolve by one accept/reject": that is not a signature field, it
+  is the calling convention the signatures presuppose.
+
+  This is deliberately the SAME cut the celltype entry made (a schema is not a per-step operator ->
+  out_of_scope) and NOT the cut cell_as_lattice_domain made. That entry earned `new` because the
+  extended, deformable lattice DOMAIN is a substrate primitive that operators read and write over and
+  that the point-agent algebra genuinely cannot represent -- a thing in the state. Energy summation is
+  not a thing in the state; it is how the engine resolves competing terms. The campaign measures whether
+  the operator VOCABULARY converges (contracts over sets/fields). Counting the composition scheme as a
+  `new` contract would measure our engine's calling convention, not the biological language -- it would
+  inflate the yield with a non-vocabulary item and corrupt the very saturation curve this exercise
+  exists to read. So the finding is recorded LOUDLY here and in the note (energy summation vs operator
+  splitting, two answers to how mechanisms compose) rather than smuggled into the contract count.
+
+  The contract below is recorded only to document the honest typed shape IF one insisted the composition
+  law belonged inside the algebra -- an additive superposition of simultaneous energy terms. Its
+  `kind: structural` / `family: hierarchy` is a forced fit (and the reason it is exempt from the
+  writes-nothing no-op rule), not a claim that the Hamiltonian sum is an operator.
+contract:
+  name: superpose
+  kind: structural
+  family: hierarchy
+  set: energy_term
+  inputs:
+  - the set of enabled per-mechanism energy terms, each a function E_plugin(configuration) that scores a
+    candidate lattice configuration
+  - the single proposed pixel copy shared by every term (all terms score the SAME candidate)
+  outputs:
+  - a single scalar dE = sum_plugins (E_plugin(after) - E_plugin(before)), the only channel through which
+    the terms interact; consumed by the metropolis_acceptance rule, never written to state
+  reads:
+  - each enabled plugin's energy contribution for the candidate copy
+  writes: |
+    NONE. It integrates no delta and mutates no cell/field property; it only combines the terms into the
+    scalar the acceptance test reads. (structural kind, so exempt from the no-op rule -- the honest fact
+    is that a composition law writes nothing.)
+  maps: |
+    (a set of independent energy terms, one candidate copy) -> one additive scalar dE that couples them
+    simultaneously. Additive and order-independent: no term sees another's effect, and their sum is the
+    sole interaction. This is the SUM-OF-ENERGIES answer to composition; the Plexus engine's answer is
+    the SUM-OF-DELTAS (operator splitting), and the two are not inter-expressible -- energy summation
+    permits within-step trade-offs resolved by one stochastic accept/reject that a sequential delta
+    pipeline cannot represent.
+status: normalized
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

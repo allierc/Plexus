@@ -174,14 +174,66 @@ surprises:
   (which is excluded anyway), so E_internal is identically 0. The energy matrix alone is inert.
 
   '
-status: inspected
+status: normalized
 module: null
 test: null
-verdict: null
+verdict: new
 of: null
-implementation_of: null
-why: null
-contract: null
+implementation_of: adhere
+why: "A FOURTH sighting of `adhere`, first proposed from the jax-morph atlas (2nd here from\nAdhesionFlex,\
+  \ 3rd from its parent ContactLocalFlex); it is NOT among the 52 promoted\ncontracts, so measured against\
+  \ the FROZEN baseline the verdict is `new`.\nimplementation_of is set to `adhere` so the ledger counts\
+  \ the contract ONCE across\nrepositories rather than re-introducing it here.\n\nContactInternal is a\
+  \ differential-adhesion energy: the biology is \"cells of given types\npay a type-pair-specific boundary\
+  \ cost where they touch\", which is exactly what an\nadhesion contract expresses. Its one distinguishing\
+  \ feature over the base Contact energy\nis a same-clusterId gate, so it scores only boundaries BETWEEN\
+  \ COMPARTMENTS of one\ncomposite cell -- intra-cluster differential adhesion. That is a restriction\
+  \ on WHICH\nboundaries the same `adhere` term sums over, not a new biological verb, so it is an\nimplementation\
+  \ of `adhere`, not a distinct contract.\n\nClosest REGISTERED contracts and why none is widened here:\n\
+  - cohesion / attraction_repulsion / separation / stillinger_weber / squared_law are\n  pair potentials\
+  \ over POINT particles separated by a distance r; they output a force\n  from a smooth radial law. ContactInternal\
+  \ has no r-dependence in the core term (a flat\n  per-type-pair J at a lattice contact), operates on\
+  \ cells-as-site-sets not points, and\n  outputs an energy delta that biases Metropolis acceptance rather\
+  \ than a force the\n  engine integrates. Widening any of them to admit a surface-contact adhesion matrix\n\
+  \  over compartmentalized Potts cells would do violence to their point-particle,\n  force-returning\
+  \ biology -- it would no longer be one recognizable law.\n- `adhere` (jax-morph, unpromoted) is the\
+  \ honest home: it already names the differential\n  boundary-adhesion verb without committing to the\
+  \ point-particle radial form.\n\nCAVEAT: this maps a Potts ENERGY TERM (returns delta-E, writes nothing)\
+  \ onto a contract\nwhose Plexus implementations return an integrable force -- the very gap loop rule\
+  \ 8\nflags. Whether `adhere` can honestly host BOTH a force-returning and an\nenergy-term implementation,\
+  \ or must itself widen, is a real open question this sighting\nraises; recorded here rather than papered\
+  \ over. This is not unique to ContactInternal:\nit is the SAME return-type gap every Potts adhesion\
+  \ energy in this atlas (Contact,\nContactLocalFlex, AdhesionFlex) surfaces, so it is a property of the\
+  \ Cellular-Potts\ntarget, not of this one plugin.\n"
+contract:
+  name: adhere
+  kind: lateral
+  family: interaction
+  set: cell
+  inputs:
+  - cell
+  outputs:
+  - contact_energy (a scalar dE contribution to the Metropolis acceptance of a proposed pixel copy; NOT
+    a cell state and NOT a force -- this operator writes nothing back to the lattice)
+  reads:
+  - cell_id (sigma at each of two neighbouring lattice sites, to keep only cross-boundary pairs via 1-delta)
+  - cell_type (tau of each owner; indexes the per-type-pair internal-adhesion matrix J_int)
+  - cluster_id (the same-cluster guard; the DEFINING read -- energy fires only when the two owners share
+    a clusterId, i.e. are compartments of the same composite cell)
+  - internal_adhesion_matrix (J_int, the per-type-pair energy coefficients; symmetric, one triangle stored,
+    lookup symmetrized)
+  - neighbour shells (site pairs within neighbor_order adjacency, or a Euclidean depth radius that overrides
+    it)
+  writes:
+  - nothing to the lattice (energy term). changeEnergy() returns a scalar dE that only biases Metropolis
+    acceptance; no cell attribute and no field is mutated.
+  maps:
+  - a cell is a SET of lattice sites sharing an id; internal adhesion energy is summed over neighbouring
+    cross-boundary site pairs whose owners DIFFER but share a clusterId
+  - per boundary pair, energy = J_int(tau_i, tau_j) gated by different-cell AND same-clusterId AND non-Medium;
+    negative J is adhesive (lowers boundary cost), positive is repulsive
+  - additive with the plain Contact term (both score an intra-cluster boundary), so this realises intra-compartment
+    differential adhesion / compartment sorting within one cell
 evidence:
   oracle_run: null
   diff_metric: null

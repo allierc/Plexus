@@ -37,6 +37,28 @@ Re-checked the two specific citations in this entry against source, both hold:
   combines two different co-named sources; entry surprise #3 was corrected to say so. The negative
   ActivationEnergy default (-50) corroborates "negative promotes link formation."
 
+### Normalization — verdict `new` → contract `bond`
+Verdict **`new`** against the frozen 42. Contract `bond`: a persistent, plastic, load-ruptured
+cell-cell link network — junctions self-assemble on contact under a per-cell coordination cap
+(paying a one-time ActivationEnergy), persist as identified per-pair state, and rupture when their
+CoM-CoM distance exceeds a break length. Classified `rewire`/`topology`/set `cell`. NOT
+`implementation_of` anything: it is distinct from `adhere` (continuum surface-contact energy; the
+CC3D Contact/AdhesionFlex mechanisms are `adhere`), because `bond` is a discrete centroid-pair link
+graph, not a boundary-site energy. The restoring spring `lambda*(d-target)^2` is charged separately
+to the registered `squared_law`, so only ONE new contract is credited — the plastic topology, not
+the spring.
+
+**Strongest argument AGAINST `new`:** FPP may be nothing but a COMPOSITION of two things already in
+hand — `radius_graph` (proximity edges) + `squared_law` (a quadratic pair spring) — with no new
+atomic contract at all; on that reading it should be recorded as two existing contracts, and minting
+`bond` inflates the yield. The rebuttal I rest on: `radius_graph` is deliberately memoryless and
+symmetric-threshold (it rebuilds every edge from scratch each tick), so it cannot produce FPP's
+hysteresis (form within ~1–2 contact sites, break only past distance ~20), its persistent per-link
+identity/attributes, its per-cell coordination cap, or its once-paid formation energy — the
+composition genuinely fails to reproduce the dynamics. If that rebuttal is wrong (e.g. a stateful
+variant of `radius_graph` is considered fair game to widen into), `bond` collapses to a
+`refinement` of `radius_graph` and the honest record is one fewer new contract.
+
 ### Re-read pass (LinkConstituentLaw variables)
 Resolved part of the `law` UNKNOWN by reading `LinkConstituentLaw` (`PyCoreSpecs.py:L4512`) more
 closely: Lambda/Length/TargetLength are the built-in default variables, and ARBITRARY extra

@@ -4,5 +4,11 @@
     "problems": [
       "atlas_record.yaml was edited outside the driver during this call -- restored, and this call is not trusted"
     ]
+  },
+  "connectivityglobal": {
+    "role": "normalizer",
+    "problems": [
+      "the agent changed nothing -- the record is the product, and a call that produces no record change produced nothing"
+    ]
   }
 }

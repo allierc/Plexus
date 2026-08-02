@@ -305,7 +305,7 @@ whole framework, and it is what Phase 2 will have to normalize against a languag
 return deltas.
 \end{phasebox}
 
-\begin{phasebox}{Phase 2 --- Normalize, and let the skeptic attack \hfill \ns}
+\begin{phasebox}{Phase 2 --- Normalize, and let the skeptic attack \hfill \done}
 Each mechanism becomes a typed Plexus contract with a verdict, then the skeptic tries to break it.
 
 \textbf{The prediction is already on the record} (\code{TRANSFER.md}): the \emph{biological}
@@ -359,6 +359,60 @@ dynamics forward but not inversely, that is a real and reportable limit of the l
 \begin{phasebox}{Phase 7 --- Promotion, and the joint ledger \hfill \ns}
 The measurement only becomes an argument here: the cumulative-new curve across \emph{two}
 repositories. Flat means the language is saturating; still climbing means it is not.
+\end{phasebox}
+
+\begin{phasebox}{Phase 2 --- what actually happened \hfill \done\ (35 of 35)}
+\textbf{The measurement, against the same frozen 52-contract baseline the first atlas used:}
+
+\begin{center}
+\small
+\begin{tabular}{@{}l r r@{}}
+\toprule
+& \textbf{jax-morph} & \textbf{CompuCell3D}\\
+\midrule
+mechanisms scored & 18 & 24\\
+alias & 2 & 4\\
+refinement & 2 & 6\\
+implementation & 6 & 6\\
+out of scope & 6 & 11\\
+\textbf{genuinely new} & \textbf{8} & \textbf{8}\\
+\midrule
+yield (new per scored mechanism) & 0.44 & \textbf{0.33}\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{The second repository yields FEWER new contracts per mechanism than the first} --- 0.33
+against 0.44 --- which is the direction the saturation hypothesis predicts and was not guaranteed.
+It is one data point, not a curve.
+
+\textbf{The cross-repository fix earned itself immediately.} Without \code{-{}-prior}, CompuCell3D
+scores \textbf{9} new contracts and re-counts \code{adhere} as a first sighting. With it, the four
+contact plugins (\code{Contact}, \code{ContactLocalFlex}, \code{ContactInternal},
+\code{AdhesionFlex}) are correctly classified as \emph{implementations} of the \code{adhere}
+contract jax-morph already proposed. \textbf{One contract, double-counted, is a 12\% error on the
+headline} --- and it would have grown with every further repository.
+
+\textbf{The normalizer found the strongest case itself.} On the last mechanism it reported that
+CompuCell3D's \code{SteadyStateDiffusionSolver} solves \emph{the identical equation} as
+jax-morph's \code{morphogen} --- $D\nabla^2 c - kc + S = 0$ --- and classified it as a second
+sighting rather than new vocabulary. That is the convergence claim showing up as a concrete
+match between two unrelated codebases, not as an assertion.
+
+\textbf{What is genuinely new here is representational, as predicted.} \code{occupy} --- a cell as
+a set of lattice sites --- is new, and so are \code{volume\_elasticity},
+\code{membrane\_tension}, \code{elongate}, \code{stiffen}, \code{bond}, \code{stay\_connected} and
+\code{react}. \textbf{The prediction in \code{TRANSFER.md} was half right}: the biological
+mechanisms did collapse into contracts the first atlas already had, and the representation did
+yield something new. But three of the five architectural entries --- the Metropolis rule, the
+energy-sum composition and the MCS time unit --- came back \emph{out of scope} rather than new:
+the normalizer judged them framework mechanics with no biology, exactly as jax-morph's four
+architectural entries were judged. \textbf{Two frameworks, two very different architectures, and
+both times the architecture scored zero new biological vocabulary.}
+
+\textbf{Eleven out-of-scope is nearly half the framework}, against six of twenty-four for
+jax-morph. A Potts framework carries far more machinery that models no biology --- trackers,
+initialisers, dumpers, the acceptance rule itself.
 \end{phasebox}
 
 %======================================================================

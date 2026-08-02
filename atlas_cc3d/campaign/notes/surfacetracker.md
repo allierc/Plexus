@@ -77,3 +77,39 @@ owner cells are written). Still honest that the four-branch structure is the can
 CC3D form RECONSTRUCTED from header + `.so` symbols + cluster analogue, not transcribed;
 `neighbor_order` vs `max_neighbor_order` operational difference and the None-default order
 remain UNKNOWN.
+
+---
+
+## Normalizer verdict — refinement of `aggregate` (implementation_of: aggregate)
+
+`surface` is a per-cell scalar reduction — the cell PERIMETER: reduce the cell's own lattice
+sites (via their hetero-owner boundary links) onto ONE per-cell number, incrementally, read-only,
+no energy / acceptance delta. That is the same children→parent reduction shape (along the
+containment map) as its two siblings: CenterOfMass was **aliased** to `aggregate` (first moment),
+MomentOfInertia **refined** `aggregate` (second-moment tensor). So this is the aggregate family,
+not a new contract — hence `implementation_of: aggregate`, and the ledger counts aggregate ONCE
+across the three, not thrice.
+
+**Refinement, not alias**, because two signature fields widen past the registered centroid (which
+writes cell.pos and reads only its own children + occupancy): (1) WRITES — a scalar boundary-link
+count / perimeter, not a position vector; (2) READS — and this is the genuinely new edge, stronger
+than MomentOfInertia's — the summand reads the cell_id **partition** (the OWNER of each neighbour
+site: is it c or non-c, Medium counting as non-c) to decide which links are hetero faces. The
+centroid depends only on the child set's coordinates; surface depends on the surrounding partition.
+Incremental maintenance and the `lmf.surfaceMF` weight are implementation/kernel, not contract.
+
+**Strongest argument AGAINST:** surface(c) is exactly the weighted node-degree of NeighborTracker's
+contact graph — surface(c) = Σ_b A_cb over ALL neighbours b (Medium included), modulo the lmf
+weighting. NeighborTracker was ruled a refinement of `radius_graph` (contact graph, edge weight =
+commonSurfaceArea). If a cell's interface with its non-self surroundings is fundamentally
+*relational*, then SurfaceTracker is the degree-marginal of that graph — a reduction OVER incident
+contact edges — and belongs to the `radius_graph`/contact-graph rewire contract as its
+weighted-degree readout, not to `aggregate`. Under that framing the true children are edges, not
+sites, and the operator consumes topology rather than being a fresh aggregate variant. I reject it
+on two grounds: (1) at source SurfaceTracker is INDEPENDENT of NeighborTracker — it computes
+`surface` directly from the pixel partition via `field3DChange` and never reads the neighbour table,
+so the graph-marginal identity is a numerical coincidence, not a dependency; and (2) a scalar
+node-marginal is a *reduction* (aggregate/hierarchy) whereas building who-touches-whom is
+*rewire/topology* — a different kind. But the coincidence is real: if the algebra ever unifies
+"per-cell interface scalar" with "sum of incident contact-graph weights," surface and NeighborTracker
+collapse onto one object and this refinement folds into that.

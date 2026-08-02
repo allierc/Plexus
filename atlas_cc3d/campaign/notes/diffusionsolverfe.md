@@ -51,3 +51,30 @@ the "could not establish" items:
 (finite_difference + spectral), `decay`, `deposit`, `prescribed_field`, `scalar_field`. CC3D fuses
 diffusion+decay+source+BC+cell-type-coupling+mass-compensation into ONE solver; the open question is
 whether that fusion and its Potts-field coupling are expressible by composing the existing operators.
+
+---
+
+**NORMALIZER — verdict: refinement of `diffuse`** (implementation_of: `diffuse`; the FTCS/
+forward-Euler scheme is a third implementation beside finite_difference and spectral). The
+mechanism as a whole is a *composite* of three registered contracts — `diffuse` (transport) +
+`decay` (turnover) + `deposit` (secretion source): in Plexus you would write it as diffuse→decay→
+deposit on one field. That composability is a positive saturation signal — CC3D's flagship PDE
+solver adds no new biological verb. It is not a clean alias because its defining capability,
+spatially-heterogeneous D_i/λ_i keyed to the moving cell-type lattice, forces `diffuse`/`decay` to
+widen `rate` from scalar to a set-coupled coefficient field; that widening breaks the central-D
+box-blur (must use the two-half-sum face-average stencil or compute heterotypic diffusion wrong)
+and the spectral `exp(-Dk²dt)` implementation (assumes constant D), so it is load-bearing, not a
+knob. Two smaller widenings are flagged in `why:` but not elected as the primary verdict: per-face
+boundary conditions (fields carry only a `periodic` flag today) and deposit's `mode: add|set` for
+the ConstantConcentration Dirichlet clamp.
+
+**Strongest argument AGAINST (that it is `alias`, not `refinement`):** the biology is plain
+Fickian diffusion, which `diffuse` already names in full; making D spatial is arguably "a
+parameter made spatial" — the same reasoning by which the sibling Chemotaxis entry ruled CC3D's
+per-type λ and Michaelis–Menten saturation to be *response-curve choices, not new contracts* and
+stayed `alias`. If a per-type coefficient is parameterization rather than signature, then this is
+an alias and I am inflating the yield by one refinement. Rebuttal: chemotax *already* reads
+`cell.type`, so per-type λ was in its signature; `diffuse` is a pure field→field op with
+`set: field` and **no set input at all**, and its variable-diffusion stencil is dead code unless
+D genuinely varies in space — so coupling D to the cell lattice is a real signature change. This
+is nonetheless the one call in the entry a reasonable reviewer could downgrade to `alias`.

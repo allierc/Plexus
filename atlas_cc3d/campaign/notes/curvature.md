@@ -37,3 +37,35 @@ triples" is complete for every geometry; I read the five triple-blocks in each b
 prove they exhaust all triples touched by a COM shift. Left `verdict`/`contract` unset (normalizer's
 call); set `status: inspected`.
 
+## curvature — NORMALIZED
+
+Verdict `new`, contract **`stiffen`** (lateral/interaction, set cell) — a BENDING STIFFNESS: an
+angular energy over an ORDERED chain of junction-linked compartmental cells that penalises
+curvature (Menger `kappa = 2 sin(theta)/|chord| = 1/R_circ`, linear, zero for straight) and drives
+a linked filament toward straight. `implementation_of` left null. Consistent with the excavator's
+read, this is a HYBRID: the primary term is the bending stiffness (a Potts `changeEnergy`, writes
+nothing); a SECOND stateful half GROWS the junction graph (biases a bond-forming move by
+`activation_energy`, commits the bond in the accepted-move watcher) — a topology rewire near
+[[radius_graph]] that builds the chain the stiffness acts on. That rewire half is recorded in
+writes:/maps:/surprises, not the verdict.
+
+STRONGEST ARGUMENT AGAINST: this should be `implementation_of: stillinger_weber`, not a new
+contract. SW is the registry's only three-body angular term, `(cos - cos0)^2`; set `cos0 = -1`
+(theta0 = 180°) and SW *is* a straightness/bending penalty — same "angular energy, preferred
+angle" idea, and the Menger-vs-cosine functional difference is "just an implementation." Rebuttal
+(why I still chose `new`): SW builds its OWN isotropic min-image neighbour list and sums over ALL
+geometric triples within a cutoff — it has no ordered backbone. Filament bending requires selecting
+only CONSECUTIVE triples along a MAINTAINED 1D bond graph (left/mid/right, ≤3 hops each side);
+SW-with-cos0=-1 on a blob would penalise every bent geometric triple, not straighten a defined
+chain. Covering Curvature forces SW to take an EXTERNAL ordered bond graph it does not maintain — a
+new required input that breaks every current SW user (mW water, silicon) and changes its output
+from an integrated Newtonian force to a Metropolis accept/reject energy. That is a signature-
+breaking refinement, not a free implementation slot, so `stiffen` is the honest call. (If a
+reviewer rules SW's contract already means "any three-body angular stiffness," the fallback is
+`implementation_of: stillinger_weber` with `cos0=-1` — and the disagreement is exactly the
+maintained-topology axis this campaign exists to surface.)
+
+Not a second sighting of any jax-morph-proposed contract (adhere, agitate, apoptose, mechanosense,
+morphogen, regulate, relax, reorient) — none is an angular/bending stiffness. All excavator caveats
+(no ablation run, no paper text, C++ read-not-run) carry forward unchanged.
+

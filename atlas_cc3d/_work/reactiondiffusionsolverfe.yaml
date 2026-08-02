@@ -168,13 +168,19 @@ surprises:
   autoscaling per field; following PyCoreSpecs, globally.
 
   '
-- |
-  from_xml can IMPORT a CC3DML this spec can never re-emit -- reader and writer disagree about
+- 'from_xml can IMPORT a CC3DML this spec can never re-emit -- reader and writer disagree about
+
   whether Dirichlet clamps exist. from_xml (L7016-7019) explicitly parses <ConstantConcentration>
+
   elements and forwards each to field.secretion_data_new(..., constant=True); but that very method
+
   (L6892-6893) RAISES SpecValueError "does not support constant concentrations" on the "constant"
+
   kwarg. So round-tripping a legacy ReactionDiffusion CC3DML that pinned a source via
+
   ConstantConcentration crashes on the IMPORT read, not on write -- a self-contradiction inside one class.
+
+  '
 - 'I did NOT read the compiled core, so the exact FE integration of the reaction term (DeltaT scaling,
 
   pre- vs post-diffusion evaluation order, and whether AutoscaleDiffusion also rescales the reaction)
@@ -184,12 +190,94 @@ surprises:
   spec xml and the FitzHugh-Nagumo example; the discretisation of R is not.
 
   '
-status: inspected
-verdict: null
+status: normalized
+verdict: new
 of: null
-implementation_of: null
-why: null
-contract: null
+implementation_of: react
+why: |
+  WHAT THIS ENTRY IS ABOUT. Strip ReactionDiffusionSolverFE down and it is the SAME
+  diffuse-decay-secrete forward-Euler solver as DiffusionSolverFE (order 14) plus ONE extra
+  emitted element, <AdditionalTerm> (L6772-6773). The sibling DiffusionSolverFE entry already
+  resolved the diffusion/decay/secretion substrate: the FTCS Laplacian is a third
+  implementation of `diffuse`, the -lambda*c term is `decay`, the secretion source is
+  `deposit`, and the per-cell-type coefficient heterogeneity is a costed refinement of
+  diffuse/decay. I do NOT re-litigate that here. The ONLY marginal content of this mechanism
+  over its sibling is the reaction term, so the verdict is about the reaction term. As a whole
+  the mechanism is diffuse + decay + deposit + REACT; `react` is the sole verb the sibling
+  composite does not already contain.
+
+  WHAT REACT IS. AdditionalTerm is a per-field muParser expression added to that field's update
+  each step; crucially it may reference the OTHER fields BY NAME (and the cell type at the site).
+  That is the classic "reaction" half of a reaction-diffusion system: an arbitrary, in general
+  NONLINEAR, kinetics law that couples M concentration fields, producing and consuming species
+  as a function of the local field values. The FitzHugh-Nagumo example is exactly this -- field
+  F's term "F-F*F*F/3+0.3-H" reads H, H's term "0.08*F-0.064*H+0.056" reads F: an
+  activator-inhibitor pair whose cross-coupling IS the reaction. It is a genuine field->field
+  write (adds R_f*dt into the grid in place), kind=field / family=fields / set=field, the same
+  typing as diffuse and decay.
+
+  WHY NEW AND NOT A WIDENING OF decay. The closest REGISTERED contract is `decay`
+  (field/fields/field): c <- c - lambda*dt*c. decay is exactly ONE degenerate instance of a
+  reaction term -- a single-field, linear, sign-fixed (monotone-down) sink with no production
+  and no coupling. `react` is the general case: multi-field, nonlinear, either sign (a reaction
+  can grow a field -- indeed a BLANK AdditionalTerm defaults to R = c, exponential growth, not
+  R = 0, per the surprises), and cross-coupled. To widen `decay` to admit AdditionalTerm you
+  would have to let its coefficient become an arbitrary nonlinear function of every other field
+  -- at which point "decay" no longer decays: it is a general kinetics operator wearing decay's
+  name. That does violence to decay's biology (guaranteed turnover of one species), so this is
+  `new`, not a refinement of decay. No other registered contract is a candidate: diffuse is
+  transport, deposit is a set->field source, `sense`/`chemotax` couple fields to MOTION not to
+  each other's chemistry, `pacemaker`/`activation_pulse`/`playback` are prescribed single-field
+  drivers with no inter-field coupling.
+
+  RELATION TO THE jax-morph PROPOSAL `regulate` (the anti-inflation call). jax-morph already
+  proposed `regulate` for reaction kinetics: dg/dt = f(g, drivers), an arbitrary user/learned
+  law integrated per step. Mathematically react and regulate share the reaction-network shape
+  dx/dt = f(x_1..x_n). I therefore RECORD the kinship explicitly so the ledger does not treat
+  them as unrelated. But I do NOT collapse this into `regulate`, and here is why they are
+  distinct typed contracts rather than one: `regulate` is set=cell / kind=exchange -- an
+  INTERNAL per-cell gene-regulatory network, the genotype->phenotype decision function reading a
+  cell's own gene state and sensed drivers and writing its gene state. `react` here is
+  set=field / kind=field -- EXTRACELLULAR chemistry over the pixel lattice, with no cell, no
+  gene state, no heritability; the cell field enters only as an optional type label inside the
+  expression. Unifying them would force `regulate` to widen BOTH its set (cell->field) and its
+  kind (exchange->field), which strips out precisely what makes regulate regulate (an internal
+  cell decision). Plexus types by set -- diffuse-on-a-field and a would-be spread-among-cells
+  are separate contracts even sharing math -- so a field reaction and a cell gene network are
+  correctly two sibling contracts in family=fields, not one. I set implementation_of: react
+  (this FTCS + muParser scheme is ONE implementation of the react contract, as GeneNetwork*/
+  NeuralODE are implementations of regulate), NOT implementation_of: regulate, so the ledger
+  counts a genuinely new field-substrate reaction verb once -- while this paragraph flags that a
+  future pass electing a single set-polymorphic reaction-kinetics contract would merge react
+  and regulate. That is a call for the ledger-keeper to make deliberately, not one to bury by
+  silently forcing the merge now.
+
+  CAVEAT CARRIED FROM INSPECTION. The continuous coupled form and the named-field coupling are
+  established from the spec xml and the FitzHugh-Nagumo test; the exact DISCRETISATION of R
+  (DeltaT scaling, pre- vs post-diffusion evaluation order, whether AutoscaleDiffusion rescales
+  it) lives in the compiled core, which was not read. This does not change the verdict -- the
+  contract is about WHICH quantities R reads and writes and that it is an arbitrary coupled
+  reaction law, all of which are source-established -- but the numeric ordering of react vs the
+  diffuse step is inferred.
+contract:
+  name: react
+  kind: field
+  family: fields
+  set: field
+  inputs:
+  - field
+  outputs: []
+  reads:
+  - the value at each pixel of EVERY declared concentration field (a field's reaction term reads
+    the OTHER fields at the same site -- the cross-field read is the coupling that makes M
+    diffusants into one reaction-diffusion system; this is the read `diffuse`/`decay` lack)
+  - 'OPTIONAL: the CPM cell-type occupying the pixel, when the AdditionalTerm expression
+    references cell type (a set-lattice read that keeps the operator field-kind: type enters only
+    as a scalar label in the local reaction law, not as a gather over the set)'
+  writes:
+  - each concentration field, in place -- adds the evaluated reaction R_f (dt-scaled) to the
+    field's forward-Euler update each step (a real field write, not an energy delta)
+  maps: []
 module: null
 test: null
 evidence:

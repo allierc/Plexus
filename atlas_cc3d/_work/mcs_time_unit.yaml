@@ -1,0 +1,66 @@
+id: mcs_time_unit
+order: 34
+raw_name: Monte Carlo Step as the time unit
+raw_kind: time-scale contract (not a class)
+code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py
+paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366
+summary: One MCS is one attempted copy per lattice site, not a duration. There is no dt and no integrator;
+  a rate must be expressed as a per-MCS probability.
+equations: 1 MCS = one attempted copy per lattice site. No dt and no integrator; a rate must be expressed
+  as a per-MCS probability.
+params: {}
+state_io: 'architectural: constrains every other mechanism; writes no state itself except the integer
+  step counter (the simulation clock)'
+surprises:
+- 'ADDED BY HAND: a time-scale taxonomy with no dt at all -- the sharpest possible contrast with an ODE-integrating
+  framework'
+- 'The unit is STOCHASTIC and lattice-size-dependent: 1 MCS = N_sites attempted copies (a "sweep"), so
+  a single tick does an amount of work proportional to the domain area/volume, and the physical meaning
+  of a tick shifts if the lattice is rescaled. There is no time constant to anchor it to seconds.'
+verdict: out_of_scope
+of: null
+implementation_of: null
+why: |
+  Not an operator over sets/fields -- it is the ENGINE's temporal-integration contract, the definition
+  of the clock itself. It carries no biological content of its own: it does not compute a force, an
+  energy term, a flux, or a division; it defines what "one step" MEANS for every mechanism that does.
+  None of the seven Plexus kinds describes a scheduler, and none of the 42 registered contracts is a
+  time unit -- the whole vocabulary is operators, and a clock is orthogonal to it. The kind/family/set
+  below are assigned only to satisfy the schema (a global tick is least-badly a `broadcast`); that no
+  kind genuinely fits is itself the evidence for `out_of_scope`.
+
+  This entry's real value is the CONTRADICTION it records, and it is the sharpest in the whole atlas:
+  the Plexus engine advances state by INTEGRATING operator deltas against a real-valued dt (an operator
+  returns d/dt of some quantity and the engine accumulates dt * delta). CompuCell3D has no dt and no
+  integrator at all. Time is the Monte Carlo Step -- one attempted pixel copy per lattice site, accepted
+  with probability 1 if dE < 0 else exp(-dE/T). Consequently a RATE cannot be a per-second coefficient
+  here; it must be re-expressed as a per-MCS acceptance PROBABILITY, and any Plexus operator ported to
+  this target would have its `emit: velocity`/dt-scaled delta silently mismatched -- the two frameworks
+  disagree on the meaning of the time axis, not merely its units. This gap is exactly the question the
+  campaign exists to measure and must not be papered over: the Plexus algebra can express the energy
+  TERMS of a Potts model, but the promoted engine cannot express its TIME.
+contract:
+  name: advance_time
+  kind: broadcast
+  family: hierarchy
+  set: lattice_site
+  inputs:
+  - temperature (Potts T, sets the Metropolis acceptance probability exp(-dE/T))
+  - total_energy_delta (the summed dE from every registered energy-term plugin for a proposed copy)
+  outputs:
+  - one attempted copy per lattice site per tick (a full sweep = 1 MCS), each accepted or rejected by
+    the Metropolis rule
+  reads:
+  - cell_id_lattice (to pick a source site and a random neighbour target for each attempted copy)
+  writes:
+  - simulation_clock (the integer MCS counter -- the ONLY state the time unit itself owns; it writes no
+    cell state and no field, and there is no real-valued dt to advance)
+  maps: []
+status: normalized
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

@@ -58,3 +58,35 @@ a user Python steppable each MCS instead of the declared per-type rates — a re
 only the SecretionData path would miss that the source term can be externally driven. This is a
 declaration-layer branch; whether the compiled core honours the semantics identically is unverified
 (the .so was not read).
+
+---
+
+**NORMALIZER verdict: `new` (frozen baseline), `implementation_of: morphogen`.** This solver
+computes the t=infinity equilibrium of the screened-diffusion (modified-Helmholtz) equation
+`D grad^2 c - k c + S = 0` and overwrites the whole field with it — a constraint solve, not a
+time step. That is *exactly* the `morphogen` contract the jax-morph atlas already proposed
+(candidate `jax_morph_free_screened_diffusion.py:102`, the identical equation). CC3D is a third
+sibling implementation of the same biological verb (the quasi-static SDD morphogen gradient,
+screening length `sqrt(D/k)`), discretised on the CPM pixel lattice as a grid boundary-value
+problem rather than as jax-morph's free-space Green's-function / graph-Laplacian *cell* kernels.
+So the ledger should count `morphogen` ONCE across the two atlases; the verdict is `new` only
+because `morphogen` is not yet among the 52 promoted contracts. Distinct from `diffuse` (and its
+refinement DiffusionSolverFE in this same atlas): `diffuse` is a transient per-step Laplacian
+delta the engine integrates over time; this returns the fixed point in a single global implicit
+solve and cannot be decomposed into diffuse -> decay -> deposit — the three terms are solved
+*simultaneously* as one coupled elliptic system.
+
+**Strongest argument AGAINST (the verdict a stricter reviewer would defend).** The honest
+alternative is `refinement of diffuse`, mirroring how the sibling DiffusionSolverFE was normalized
+here. One could argue "steady state" is merely a THIRD numerical implementation of `diffuse`
+(alongside finite_difference and spectral) — solve the heat equation to t=infinity instead of
+stepping it — and that minting a separate `morphogen` verb splits one diffusion contract on a
+purely numerical distinction (transient vs. converged), inflating the new-contract count. If one
+holds that `diffuse` already *means* "the diffusion field" regardless of whether you read it
+mid-transient or at equilibrium, this is a refinement (widen diffuse with `solve: step|steady_state`),
+not a new verb. I rejected this because the two encode genuinely different biological idealisations
+(finite-rate transport integrated over developmental time vs. a gradient assumed always-equilibrated
+relative to cell motion), the source/decay terms are *inseparably coupled* in the elliptic solve
+(not the commuting explicit composite FE reduces to), and — decisively — the jax-morph atlas
+independently reached for a distinct `morphogen` contract for the identical equation rather than
+folding it into diffusion. But the pull toward `refinement of diffuse` is real.

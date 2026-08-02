@@ -47,10 +47,22 @@ PLEXUS = os.path.abspath(os.path.join(ATLAS, ".."))
 CAMPAIGN = os.path.join(ATLAS, "campaign")
 
 sys.path.insert(0, ATLAS)
-sys.path.insert(0, os.path.join(PLEXUS, "discovery"))
-sys.path.insert(0, os.path.join(PLEXUS, "discovery", "agents"))
 
-from agents import llm as _llm   # noqa: E402  the discovery loop's metered Claude-CLI wrapper
+# The metered Claude-CLI wrapper lives in the DISCOVERY campaign, which has been reorganised
+# (discovery/ -> discovery_okuda/, discovery_cardio_mpm/, ...). Hard-coding `discovery/agents`
+# broke both atlases silently the moment that happened, and the failure surfaced as an
+# unrelated-looking ImportError. Find it instead of assuming where it lives.
+import glob as _glob
+_cands = sorted(_glob.glob(os.path.join(PLEXUS, "discovery*", "agents", "llm.py")))
+if not _cands:
+    raise ImportError(
+        f"no discovery*/agents/llm.py under {PLEXUS} -- the atlas drives its agents through the "
+        f"discovery loop's metered wrapper and cannot run without it")
+_AGENTS_DIR = os.path.dirname(_cands[0])
+sys.path.insert(0, os.path.dirname(_AGENTS_DIR))
+sys.path.insert(0, _AGENTS_DIR)
+
+import llm as _llm               # noqa: E402  the discovery loop's metered Claude-CLI wrapper
 
 run_agent = _llm.run_agent
 BudgetLedger = _llm.BudgetLedger
@@ -99,6 +111,25 @@ def baseline_digest(max_names=400) -> str:
             f"KINDS: lateral, aggregate, broadcast, exchange, field, structural, rewire\n"
             f"FAMILIES: motion, interaction, polarity, fields, mechanics, mpm, coupling, "
             f"hierarchy, growth, topology\n")
+
+
+
+def prior_digest() -> str:
+    """Contracts an EARLIER atlas already proposed, so a second sighting is not mistaken for a
+    first. The frozen baseline stays the 52 PROMOTED contracts -- changing it per campaign would
+    make the two measurements incomparable -- but a normalizer who does not know jax-morph already
+    proposed `adhere` will write a `why:` claiming novelty that the ledger then contradicts."""
+    import os as _os
+    import yaml as _yaml
+    prior = _os.path.join(PLEXUS, "atlas_jax_morph", "atlas_record.yaml")
+    if not _os.path.exists(prior):
+        return "(no earlier atlas record found)"
+    doc = _yaml.safe_load(open(prior))
+    names = sorted({(m.get("contract") or {}).get("name")
+                    for m in doc.get("mechanisms", [])
+                    if m.get("verdict") == "new" and (m.get("contract") or {}).get("name")})
+    return (f"PROPOSED BY THE jax-morph ATLAS (not yet promoted, so NOT in the frozen baseline): "
+            f"{', '.join(names)}")
 
 
 PREAMBLE = f"""You are one role in the Plexus ATLAS loop, working in {ATLAS}.
@@ -248,8 +279,10 @@ ROLE: NORMALIZER. Translate one inspected mechanism into the Plexus operator alg
 THE ENTRY, as it stands:
 {_mech_json(mech_id)}
 
-THE FROZEN BASELINE:
+THE FROZEN BASELINE (the 52 PROMOTED contracts -- this is what `new` is measured against):
 {baseline_digest()}
+
+{prior_digest()}
 
 DO THIS
 1. Write `contract:` -- the typed signature, exactly the fields Plexus registers:
@@ -272,7 +305,13 @@ DO THIS
    `implementation_of:` to the contract name. Plexus's registry supports several
    implementations per contract -- that is the shape most of a mature framework should take,
    and finding a lot of it is a GOOD result, not a disappointing one.
-4. Set `status: normalized`.
+4. IF YOUR MECHANISM MATCHES A CONTRACT THE EARLIER ATLAS ALREADY PROPOSED (the line above),
+   the verdict against the frozen baseline is still `new` -- that baseline has not changed. But
+   say so explicitly in `why:` ("a second sighting of `adhere`, first proposed from jax-morph")
+   and set `implementation_of:` to that contract name. The ledger uses it to count the contract
+   ONCE across repositories; without it the second atlas re-counts everything the first
+   introduced and the saturation curve measures our naming habits instead of the language.
+5. Set `status: normalized`.
 
 One paragraph in your note file: the verdict and the single strongest argument AGAINST it. If you cannot construct an argument against your own verdict,
 you have not understood the alternative.

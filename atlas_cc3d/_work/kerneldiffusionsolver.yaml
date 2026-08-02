@@ -73,9 +73,9 @@ params:
     role: 'source_term -- per-cell-type source: additive rate (Secretion), Dirichlet-clamp of the cell
       interior (ConstantConcentration), or additive only on contact with a named type (SecretionOnContact)'
   boundary_conditions (x/y/z _min/_max _type):
-    role: 'boundary_condition -- CONSTRAINED to PERIODIC on every face (read-only, L6477-6530; all
-      six *_type set to BOUNDARYTYPESPDE[2] in __init__ and check_dict rejects any non-periodic value).
-      Not a tunable knob here: the convolution assumes a torus; Dirichlet/Neumann are rejected.'
+    role: 'boundary_condition -- CONSTRAINED to PERIODIC on every face (read-only, L6477-6530; all six
+      *_type set to BOUNDARYTYPESPDE[2] in __init__ and check_dict rejects any non-periodic value). Not
+      a tunable knob here: the convolution assumes a torus; Dirichlet/Neumann are rejected.'
   fluc_comp:
     role: 'UNKNOWN: inherited from the _PDESolverSpecs base spec_dict (L1159, mass-conservation flag for
       FluctuationCompensator); this solver''s xml (L6657-6666) never emits it, so via THIS python spec
@@ -118,12 +118,77 @@ surprises:
   (not steerable), and xml (L6657-6666) just walks child field specs. Every physical parameter lives on
   child DiffusionData / SecretionData / BoundaryConditions specs, and the convolution integrator itself
   is compiled. No update logic is in this file.'
-status: inspected
-verdict: null
-of: null
-implementation_of: null
-why: null
-contract: null
+status: normalized
+verdict: alias
+of: diffuse
+implementation_of: diffuse
+why: |
+  WHAT IT IS. Strip the plumbing and KernelDiffusionSolver is one step of dc/dt = D grad^2 c
+  - lambda c + S on a scalar concentration field, exactly like DiffusionSolverFE -- but it
+  realises the transport term by CONVOLUTION with a precomputed diffusion kernel (the Green's
+  function of the diffusion equation) over a periodic torus, instead of a local FTCS stencil.
+  That transport core is EXACTLY the registered `diffuse` contract (field->field, advances the
+  grid in place). `diffuse` already carries a `spectral` implementation whose kernel is
+  exp(-D k^2 dt) -- and by the convolution theorem a Fourier multiply by exp(-D k^2 dt) IS a
+  real-space convolution with a Gaussian on the torus, which is precisely what this solver
+  does. So KernelDiffusionSolver is the same mathematical operation as diffuse's spectral
+  implementation, done in real space with a truncated kernel (the `kernel` knob) and optional
+  lattice coarsening (`cgfactor`); at most it is a fourth numerical implementation of the SAME
+  contract. As a whole the mechanism is a COMPOSITE of three existing contracts -- `diffuse`
+  (transport), `decay` (the multiplicative exp(-lambda*dt) turnover), and `deposit` (the
+  per-cell-type secretion source S) -- exactly as its FE sibling. It introduces no new
+  biological verb.
+
+  WHY ALIAS AND NOT REFINEMENT. This is the key contrast with DiffusionSolverFE, which I made
+  a `refinement` of `diffuse` because its D_i / lambda_i are SPATIALLY HETEROGENEOUS (read per
+  pixel from the moving CPM cell-type lattice), forcing `diffuse`'s scalar `rate` to widen to a
+  coefficient-field. KernelDiffusionSolver has NO such demand: it emits ONLY GlobalDiffusionConstant
+  / GlobalDecayConstant (L6416-6431); diff_types / decay_types are never written and are in fact
+  IMPOSSIBLE here, because a single convolution kernel has exactly one width. A spatially UNIFORM
+  scalar D is precisely what `diffuse` already binds (self.rate = float(...)), so the contract
+  admits this solver with no field-widening at all. Its other hard constraint -- PERIODIC-ONLY
+  boundaries -- is not a widening either: the existing `spectral` implementation of `diffuse`
+  already assumes a periodic domain (exp(-D k^2 dt) is a torus operation), and Plexus fields
+  already carry a `periodic` flag, so periodic-only is a NARROWING that selects the spectral-family
+  implementation, not a new signature. Hence the signature is unchanged: same set (field), same
+  inputs/outputs/reads/writes as base `diffuse`. Nothing breaks for existing users; nothing must
+  widen. That is an alias, not a refinement.
+
+  WHAT THE TWO IMPLEMENTATIONS DO DIFFERENTLY (the alias detail R-rule asks for). diffuse's
+  finite_difference / DiffusionSolverFE's FTCS advance the field by a LOCAL nearest-neighbour
+  stencil (stable only at small D, moving/mixed boundaries allowed, per-type D possible).
+  KernelDiffusionSolver advances it by a GLOBAL periodic convolution with a truncated diffusion
+  kernel: fast and stable for LARGE D where FTCS chokes, but restricted to uniform D and a torus,
+  and APPROXIMATE (legacy; accuracy degrades at small `kernel` / large `cgfactor`). Same contract,
+  opposite numerical regime -- which is exactly the shape a mature framework should show: several
+  interchangeable implementations behind one biological verb, so implementation_of: diffuse and
+  the ledger counts `diffuse` once more, not a new contract.
+
+  CLOSEST-CONTRACT / not-new. Emphatically not `new`: diffuse + decay + deposit already cover
+  transport, turnover, and source, and unlike the FE solver this one needs not even the
+  coefficient-heterogeneity widening. The kernel / cgfactor knobs are numeric truncation /
+  coarse-graining accuracy dials with no biological content -- they do not change inputs,
+  outputs, reads, or writes -- so they justify neither a refinement nor a new contract.
+contract:
+  name: diffuse
+  kind: field
+  family: fields
+  set: field
+  inputs:
+  - field
+  outputs: []
+  reads:
+  - the scalar concentration field c (the grid advanced in place)
+  - the single global diffusion coefficient D and decay rate lambda (spatially UNIFORM -- no
+    per-cell-type coefficient field, unlike the FE solver; this solver cannot express one)
+  - the CPM cell-type set lattice, only to locate secreting cell interiors for the composed
+    deposit source S (not for a per-site coefficient)
+  - the t=0 initial condition (expression or file); boundaries are required PERIODIC, not read
+    as a tunable
+  writes:
+  - the concentration field c, in place -- replaced each MCS by the periodic convolution result
+    (a real field write, not an energy delta)
+  maps: []
 module: null
 test: null
 evidence:

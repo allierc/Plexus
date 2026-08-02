@@ -1,0 +1,575 @@
+{
+  "repository": "CompuCell3D/CompuCell3D",
+  "commit": "conda compucell3d 4.10.0 py312",
+  "baseline_contracts": 52,
+  "counts": {
+    "alias": 4,
+    "refinement": 6,
+    "new": 8,
+    "implementation": 6,
+    "out_of_scope": 11,
+    "unclassified": 0
+  },
+  "scored": 24,
+  "yield_new_per_mechanism": 0.3333333333333333,
+  "priors": [
+    "adhere",
+    "agitate",
+    "apoptose",
+    "mechanosense",
+    "morphogen",
+    "regulate",
+    "relax",
+    "reorient"
+  ],
+  "new_contracts": [
+    "adhere",
+    "agitate",
+    "apoptose",
+    "bond",
+    "elongate",
+    "mechanosense",
+    "membrane_tension",
+    "morphogen",
+    "occupy",
+    "react",
+    "regulate",
+    "relax",
+    "reorient",
+    "stay_connected",
+    "stiffen",
+    "volume_elasticity"
+  ],
+  "curve": [
+    {
+      "n": 1,
+      "cum_new": 0
+    },
+    {
+      "n": 2,
+      "cum_new": 0
+    },
+    {
+      "n": 3,
+      "cum_new": 0
+    },
+    {
+      "n": 4,
+      "cum_new": 0
+    },
+    {
+      "n": 5,
+      "cum_new": 0
+    },
+    {
+      "n": 6,
+      "cum_new": 0
+    },
+    {
+      "n": 7,
+      "cum_new": 0
+    },
+    {
+      "n": 8,
+      "cum_new": 1
+    },
+    {
+      "n": 9,
+      "cum_new": 1
+    },
+    {
+      "n": 10,
+      "cum_new": 1
+    },
+    {
+      "n": 11,
+      "cum_new": 1
+    },
+    {
+      "n": 12,
+      "cum_new": 1
+    },
+    {
+      "n": 13,
+      "cum_new": 2
+    },
+    {
+      "n": 14,
+      "cum_new": 2
+    },
+    {
+      "n": 15,
+      "cum_new": 2
+    },
+    {
+      "n": 16,
+      "cum_new": 3
+    },
+    {
+      "n": 17,
+      "cum_new": 3
+    },
+    {
+      "n": 18,
+      "cum_new": 4
+    },
+    {
+      "n": 19,
+      "cum_new": 4
+    },
+    {
+      "n": 20,
+      "cum_new": 4
+    },
+    {
+      "n": 21,
+      "cum_new": 4
+    },
+    {
+      "n": 22,
+      "cum_new": 4
+    },
+    {
+      "n": 23,
+      "cum_new": 4
+    },
+    {
+      "n": 24,
+      "cum_new": 5
+    },
+    {
+      "n": 25,
+      "cum_new": 5
+    },
+    {
+      "n": 26,
+      "cum_new": 5
+    },
+    {
+      "n": 27,
+      "cum_new": 6
+    },
+    {
+      "n": 28,
+      "cum_new": 6
+    },
+    {
+      "n": 29,
+      "cum_new": 6
+    },
+    {
+      "n": 30,
+      "cum_new": 7
+    },
+    {
+      "n": 31,
+      "cum_new": 8
+    },
+    {
+      "n": 32,
+      "cum_new": 8
+    },
+    {
+      "n": 33,
+      "cum_new": 8
+    },
+    {
+      "n": 34,
+      "cum_new": 8
+    },
+    {
+      "n": 35,
+      "cum_new": 8
+    }
+  ],
+  "rows": [
+    {
+      "n": 1,
+      "id": "adhesionflex",
+      "raw_name": "AdhesionFlex",
+      "class": "implementation",
+      "contract": "adhere",
+      "prior": true,
+      "of": "fmottes/jax-morph:soft_sphere",
+      "status": "normalized"
+    },
+    {
+      "n": 2,
+      "id": "blobinitializer",
+      "raw_name": "BlobInitializer",
+      "class": "out_of_scope",
+      "contract": "seed",
+      "prior": false,
+      "of": null,
+      "status": "normalized"
+    },
+    {
+      "n": 3,
+      "id": "boundarypixeltracker",
+      "raw_name": "BoundaryPixelTracker",
+      "class": "out_of_scope",
+      "contract": "boundary_index",
+      "prior": false,
+      "of": null,
+      "status": "normalized"
+    },
+    {
+      "n": 4,
+      "id": "boxwatcher",
+      "raw_name": "BoxWatcher",
+      "class": "out_of_scope",
+      "contract": "sweep_scope",
+      "prior": false,
+      "of": null,
+      "status": "normalized"
+    },
+    {
+      "n": 5,
+      "id": "celltype",
+      "raw_name": "CellType",
+      "class": "out_of_scope",
+      "contract": "differentiate",
+      "prior": false,
+      "of": null,
+      "status": "normalized"
+    },
+    {
+      "n": 6,
+      "id": "centerofmass",
+      "raw_name": "CenterOfMass",
+      "class": "alias",
+      "contract": "aggregate",
+      "prior": false,
+      "of": "aggregate",
+      "status": "normalized"
+    },
+    {
+      "n": 7,
+      "id": "chemotaxis",
+      "raw_name": "Chemotaxis",
+      "class": "alias",
+      "contract": "chemotax",
+      "prior": false,
+      "of": "chemotax",
+      "status": "normalized"
+    },
+    {
+      "n": 8,
+      "id": "connectivityglobal",
+      "raw_name": "ConnectivityGlobal",
+      "class": "new",
+      "contract": "stay_connected",
+      "prior": false,
+      "of": null,
+      "status": "normalized"
+    },
+    {
+      "n": 9,
+      "id": "connectivity",
+      "raw_name": "Connectivity",
+      "class": "implementation",
+      "contract": "stay_connected",
+      "prior": false,
+      "of": "connectivityglobal",
+      "status": "normalized"
+    },
+    {
+      "n": 10,
+      "id": "contactinternal",
+      "raw_name": "ContactInternal",
+      "class": "implementation",
+      "contract": "adhere",
+      "prior": true,
+      "of": "fmottes/jax-morph:soft_sphere",
+      "status": "normalized"
+    },
+    {
+      "n": 11,
+      "id": "contactlocalflex",
+      "raw_name": "ContactLocalFlex",
+      "class": "implementation",
+      "contract": "adhere",
+      "prior": true,
+      "of": "fmottes/jax-morph:soft_sphere",
+      "status": "normalized"
+    },
+    {
+      "n": 12,
+      "id": "contact",
+      "raw_name": "Contact",
+      "class": "implementation",
+      "contract": "adhere",
+      "prior": true,
+      "of": "fmottes/jax-morph:soft_sphere",
+      "status": "normalized"
+    },
+    {
+      "n": 13,
+      "id": "curvature",
+      "raw_name": "Curvature",
+      "class": "new",
+      "contract": "stiffen",
+      "prior": false,
+      "of": null,
+      "status": "normalized"
+    },
+    {
+      "n": 14,
+      "id": "diffusionsolverfe",
+      "raw_name": "DiffusionSolverFE",
+      "class": "refinement",
+      "contract": "diffuse",
+      "prior": false,
+      "of": "diffuse",
+      "status": "normalized"
+    },
+    {
+      "n": 15,
+      "id": "externalpotential",
+      "raw_name": "ExternalPotential",
+      "class": "alias",
+      "contract": "sediment",
+      "prior": false,
+      "of": "sediment",
+      "status": "normalized"
+    },
+    {
+      "n": 16,
+      "id": "focalpointplasticity",
+      "raw_name": "FocalPointPlasticity",
+      "class": "new",
+      "contract": "bond",
+      "prior": false,
+      "of": null,
+      "status": "normalized"
+    },
+    {
+      "n": 17,
+      "id": "kerneldiffusionsolver",
+      "raw_name": "KernelDiffusionSolver",
+      "class": "alias",
+      "contract": "diffuse",
+      "prior": false,
+      "of": "diffuse",
+      "status": "normalized"
+    },
+    {
+      "n": 18,
+      "id": "lengthconstraint",
+      "raw_name": "LengthConstraint",
+      "class": "new",
+      "contract": "elongate",
+      "prior": false,
+      "of": null,
+      "status": "normalized"
+    },
+    {
+      "n": 19,
+      "id": "momentofinertia",
+      "raw_name": "MomentOfInertia",
+      "class": "refinement",
+      "contract": "aggregate",
+      "prior": false,
+      "of": "aggregate",
+      "status": "normalized"
+    },
+    {
+      "n": 20,
+      "id": "neighbortracker",
+      "raw_name": "NeighborTracker",
+      "class": "refinement",
+      "contract": "contact_graph",
+      "prior": false,
+      "of": "radius_graph",
+      "status": "normalized"
+    },
+    {
+      "n": 21,
+      "id": "pifdumper",
+      "raw_name": "PIFDumper",
+      "class": "out_of_scope",
+      "contract": "checkpoint",
+      "prior": false,
+      "of": null,
+      "status": "normalized"
+    },
+    {
+      "n": 22,
+      "id": "pifinitializer",
+      "raw_name": "PIFInitializer",
+      "class": "out_of_scope",
+      "contract": "seed",
+      "prior": false,
+      "of": null,
+      "status": "normalized"
+    },
+    {
+      "n": 23,
+      "id": "pixeltracker",
+      "raw_name": "PixelTracker",
+      "class": "out_of_scope",
+      "contract": "pixel_index",
+      "prior": false,
+      "of": null,
+      "status": "normalized"
+    },
+    {
+      "n": 24,
+      "id": "reactiondiffusionsolverfe",
+      "raw_name": "ReactionDiffusionSolverFE",
+      "class": "new",
+      "contract": "react",
+      "prior": false,
+      "of": null,
+      "status": "normalized"
+    },
+    {
+      "n": 25,
+      "id": "secretion",
+      "raw_name": "Secretion",
+      "class": "refinement",
+      "contract": "deposit",
+      "prior": false,
+      "of": "deposit",
+      "status": "normalized"
+    },
+    {
+      "n": 26,
+      "id": "steadystatediffusionsolver",
+      "raw_name": "SteadyStateDiffusionSolver",
+      "class": "implementation",
+      "contract": "morphogen",
+      "prior": true,
+      "of": "fmottes/jax-morph:free_screened_diffusion",
+      "status": "normalized"
+    },
+    {
+      "n": 27,
+      "id": "surface",
+      "raw_name": "Surface",
+      "class": "new",
+      "contract": "membrane_tension",
+      "prior": false,
+      "of": null,
+      "status": "normalized"
+    },
+    {
+      "n": 28,
+      "id": "surfacetracker",
+      "raw_name": "SurfaceTracker",
+      "class": "refinement",
+      "contract": "aggregate",
+      "prior": false,
+      "of": "aggregate",
+      "status": "normalized"
+    },
+    {
+      "n": 29,
+      "id": "uniforminitializer",
+      "raw_name": "UniformInitializer",
+      "class": "out_of_scope",
+      "contract": "seed",
+      "prior": false,
+      "of": null,
+      "status": "normalized"
+    },
+    {
+      "n": 30,
+      "id": "volume",
+      "raw_name": "Volume",
+      "class": "new",
+      "contract": "volume_elasticity",
+      "prior": false,
+      "of": null,
+      "status": "normalized"
+    },
+    {
+      "n": 31,
+      "id": "cell_as_lattice_domain",
+      "raw_name": "cell as a set of lattice sites",
+      "class": "new",
+      "contract": "occupy",
+      "prior": false,
+      "of": null,
+      "status": "normalized"
+    },
+    {
+      "n": 32,
+      "id": "metropolis_acceptance",
+      "raw_name": "Metropolis acceptance of pixel copies",
+      "class": "out_of_scope",
+      "contract": "metropolis_step",
+      "prior": false,
+      "of": null,
+      "status": "normalized"
+    },
+    {
+      "n": 33,
+      "id": "energy_sum_composition",
+      "raw_name": "the Hamiltonian as a sum of plugin terms",
+      "class": "out_of_scope",
+      "contract": "superpose",
+      "prior": false,
+      "of": null,
+      "status": "normalized"
+    },
+    {
+      "n": 34,
+      "id": "mcs_time_unit",
+      "raw_name": "Monte Carlo Step as the time unit",
+      "class": "out_of_scope",
+      "contract": "advance_time",
+      "prior": false,
+      "of": null,
+      "status": "normalized"
+    },
+    {
+      "n": 35,
+      "id": "pixel_neighbourhood",
+      "raw_name": "neighbour order / pixel-copy neighbourhood",
+      "class": "refinement",
+      "contract": "radius_graph",
+      "prior": false,
+      "of": "radius_graph",
+      "status": "normalized"
+    }
+  ],
+  "disputed": [
+    {
+      "id": "adhesionflex",
+      "recorded": "new",
+      "ledger": "implementation",
+      "name": "adhere"
+    },
+    {
+      "id": "connectivity",
+      "recorded": "new",
+      "ledger": "implementation",
+      "name": "stay_connected"
+    },
+    {
+      "id": "contactinternal",
+      "recorded": "new",
+      "ledger": "implementation",
+      "name": "adhere"
+    },
+    {
+      "id": "contactlocalflex",
+      "recorded": "new",
+      "ledger": "implementation",
+      "name": "adhere"
+    },
+    {
+      "id": "contact",
+      "recorded": "new",
+      "ledger": "implementation",
+      "name": "adhere"
+    },
+    {
+      "id": "steadystatediffusionsolver",
+      "recorded": "new",
+      "ledger": "implementation",
+      "name": "morphogen"
+    }
+  ]
+}

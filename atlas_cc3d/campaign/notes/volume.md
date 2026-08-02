@@ -31,3 +31,25 @@ available** — `paper_section` names the chapter's known home for the term but 
 have read; I did not invent a page/equation number. Confirmed there is NO VolumeFlex/steerable
 variant in PyCoreSpecs — VolumePlugin (L2033) is the sole volume energy spec.
 
+## Normalizer verdict — `new`: `volume_elasticity` (lateral/mechanics, set: cell)
+
+Verdict **new**. Volume is the direct sibling of `surface`→`membrane_tension`: the same
+quadratic Hookean, two-cell-incremental, writes-nothing energy shape, but on the cell's bulk
+site COUNT instead of its boundary count. No registered contract covers an elastic set-point on
+cell SIZE — cell_grow only *writes* the target volume forward (a state-writing structural
+update), the opposite state_io — so widening it would fuse writer and energy term and erase the
+read/write distinction the campaign measures. Named `volume_elasticity` (parallel to
+`membrane_tension`, `elongate`); implementation_of null (first sighting — jax-morph's
+`relax`/`regulate` are generic homeostasis verbs, not this energy).
+
+**Strongest argument AGAINST `new`:** `volume_elasticity`, `membrane_tension`, and `elongate`
+are arguably three implementations of ONE generic contract — a quadratic penalty on a scalar
+geometric descriptor of a cell relative to a set-point (bulk count / boundary count /
+inertia-axis length). Minting a fresh `new` contract per descriptor is exactly the yield
+inflation this exercise warns against: it would measure our naming habits, not the language, and
+push the saturation curve up by three when the real novelty may be one. The counter is that each
+reads a *different* tracker and encodes a *distinct* biophysical force (bulk incompressibility vs
+surface tension vs axial spring), and collapsing them hides that — but the tension is real, and
+if a fourth "quadratic-constraint-on-geometry" plugin appears we should seriously consider
+retro-fitting a single `geometric_setpoint` contract with these as implementations.
+

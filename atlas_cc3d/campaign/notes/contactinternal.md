@@ -37,3 +37,19 @@ Contact's `changeEnergy` before relying on that. (c) The exact `WeightEnergyByDi
 available; `paper_section` is anchored to the CC3D reference manual heading I actually read, not
 a Swat et al. page. No oracle/ablation run exists for this mechanism (not among the six evidence
 runs).
+
+**Verdict (normalizer).** `new` against the frozen 42/52 baseline (nothing there is a Cellular-Potts
+adhesion energy), with `implementation_of: adhere` — the pure-adhesion contract proposed by jax-morph
+and already hosted in this atlas by AdhesionFlex; plain Contact is its canonical implementation and
+ContactInternal is that same energy re-scoped by a clusterId guard to compartment-vs-compartment
+boundaries. **Strongest argument AGAINST.** The clusterId gate is not obviously "just a domain filter":
+sub-cellular compartment adhesion — holding the organelle-like domains of ONE composite cell together
+while a separate matrix handles cell-cell contact — is arguably a distinct biological content
+(intracellular structural cohesion) from cell-cell sorting, and CompuCell3D ships it as a SEPARATE
+plugin run *additively* alongside Contact precisely because the two act on disjoint boundary sets with
+independent J matrices. If one takes "adhere" to mean cell–cell adhesion specifically, then a
+compartment-scoped adhesion energy is a genuinely new contract, not an implementation of it. I rejected
+this because the operator's signature is identical (same output type, same set-of-sites representation,
+same boundary-pair sum, same J-matrix read) and only the *predicate selecting which pairs count* differs
+— a filter over the same reads, not new content — but it is the one place a reviewer could reasonably
+land on `new`-without-implementation_of.

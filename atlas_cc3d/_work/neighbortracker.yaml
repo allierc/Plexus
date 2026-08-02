@@ -3,19 +3,15 @@ order: 20
 raw_name: NeighborTracker
 raw_kind: Plugin (NeighborTrackerPlugin)
 code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L2393
-paper_section: |
-  Source anchors (verified 2026-08-02):
-    - Spec class: PyCoreSpecs.py:L2393 (NeighborTrackerPlugin, name "neighbor_tracker").
-    - Python aggregates: core/iterators.py:L366 (CellNeighborListFlex) and its
-      common_surface_area_by_type / neighbor_count_by_type at L415/L429; the null->type-0
-      mapping is at L410, L425, L440.
-    - Accessor entry point: core/PySteppables.py:L1498 (get_cell_neighbor_data_list).
-  Library "doc": doc/code_ref/.../plugins/NeighborTrackerPlugin.rst is a BARE autodoc
-  stub (7 non-blank lines: `.. autoclass:: NeighborSurfaceData` + `.. autoclass::
-  NeighborTrackerPlugin`, no members documented, no prose, no equation). So the docs add
-  nothing beyond the compiled class. No dedicated equation/section for it in Swat et al.
-  (2012) Methods Cell Biol 110:325-366 -- it is bookkeeping, not a named energy term; the
-  source is the only evidence.
+paper_section: "Source anchors (verified 2026-08-02):\n  - Spec class: PyCoreSpecs.py:L2393 (NeighborTrackerPlugin,\
+  \ name \"neighbor_tracker\").\n  - Python aggregates: core/iterators.py:L366 (CellNeighborListFlex)\
+  \ and its\n    common_surface_area_by_type / neighbor_count_by_type at L415/L429; the null->type-0\n\
+  \    mapping is at L410, L425, L440.\n  - Accessor entry point: core/PySteppables.py:L1498 (get_cell_neighbor_data_list).\n\
+  Library \"doc\": doc/code_ref/.../plugins/NeighborTrackerPlugin.rst is a BARE autodoc\nstub (7 non-blank\
+  \ lines: `.. autoclass:: NeighborSurfaceData` + `.. autoclass::\nNeighborTrackerPlugin`, no members\
+  \ documented, no prose, no equation). So the docs add\nnothing beyond the compiled class. No dedicated\
+  \ equation/section for it in Swat et al.\n(2012) Methods Cell Biol 110:325-366 -- it is bookkeeping,\
+  \ not a named energy term; the\nsource is the only evidence.\n"
 summary: 'A pure TRACKER plugin: it contributes nothing to the Potts energy and returns no
 
   delta. For every cell it maintains a set of its current neighbours and, for each
@@ -94,12 +90,62 @@ surprises:
   to insertion or geometry -- code that assumes geometric ordering of neighbours is wrong.
 
   '
-verdict: null
-of: null
-implementation_of: null
-why: null
-contract: null
-status: inspected
+verdict: refinement
+of: radius_graph
+implementation_of: radius_graph
+why: |
+  This builds the RELATION among cells -- for each cell c, the set of cells it currently
+  touches -- which is precisely what a rewire/topology operator earns its place doing: it
+  leaves a live who-interacts-with-whom graph on the set that lateral operators (here the
+  CC3D contact/adhesion energy terms) read. That distinguishes it sharply from its sibling
+  BoundaryPixelTracker (ruled out_of_scope): that plugin classifies a single cell's OWN
+  sub-elements (boundary vs interior pixel) and builds NO relation among cells, so it
+  collapses to nothing in the point-particle representation. NeighborTracker does not
+  collapse -- its output IS the interaction graph, so it is in scope and it is the
+  neighbour-graph contract, i.e. `radius_graph` (src/plexus/operators/graph.py, the only
+  registered rewire/topology op: set `edge_index` to the live within-set relation, emit no
+  delta).
+
+  It is not an ALIAS of radius_graph because radius_graph's registered output is a bare,
+  unweighted `edge_index`: NeighborTracker's defining product is a WEIGHTED relation, each
+  edge carrying commonSurfaceArea = the integer count of shared lattice-boundary links, a
+  first-class physical quantity the contact/adhesion terms consume (contact energy scales
+  with it). radius_graph structurally cannot represent that weight, so it does not already
+  cover this mechanism.
+
+  Hence REFINEMENT, and the signature field that must widen is `outputs` (and correspondingly
+  `writes`): from `[edge_index]` to `[edge_index, edge_weight]`, the per-edge contact area.
+  What that breaks for existing users: every current radius_graph consumer assumes edges are
+  weightless and purely metric. A rewire contract that now promises an edge weight either
+  forces radius_graph to synthesise a contact-area value it has no basis for (point particles
+  share no boundary, only a distance), or the weight becomes OPTIONAL -- in which case any
+  lateral operator that begins to REQUIRE the weight silently fails on the distance-based
+  implementation with no crash. That is a costed widening of the contract, not a free add.
+
+  It is not NEW: the "rebuild the within-set relation, emit no delta, others read the edges"
+  biology is identical to radius_graph's, so spinning up a separate contract would inflate the
+  count for what is the same rewire/topology slot merely widened. The two differences beyond
+  the weight are IMPLEMENTATION, not contract, so implementation_of is set to radius_graph:
+  (a) the edge criterion is shared-lattice-boundary contact rather than a Euclidean radius
+  cutoff -- an interchangeable way to build the same relation; (b) it is maintained
+  INCREMENTALLY (increment/decrement on each accepted pixel copy) rather than by a full
+  per-tick rescan -- a numerics optimisation of the same output, not a new capability.
+contract:
+  name: contact_graph
+  kind: rewire
+  family: topology
+  set: cell
+  inputs: []
+  outputs:
+  - edge_index
+  - edge_weight
+  reads:
+  - cell_id_lattice
+  writes:
+  - cell.neighbors
+  - edge.common_surface_area
+  maps: []
+status: normalized
 module: null
 test: null
 evidence:

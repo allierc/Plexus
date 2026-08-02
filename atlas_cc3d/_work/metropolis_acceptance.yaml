@@ -1,0 +1,111 @@
+id: metropolis_acceptance
+order: 32
+raw_name: Metropolis acceptance of pixel copies
+raw_kind: core dynamics (not a class)
+code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L1383
+paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366
+summary: |
+  Time advances by attempting to copy one lattice site's cell-id into a neighbouring site,
+  accepted with probability 1 if the total energy falls and exp(-dE/T) otherwise, where T is
+  the fluctuation amplitude. This is the Cellular Potts Model's modified-Metropolis Monte Carlo
+  update -- the ENGINE, not a plugin. No plugin implements it; every plugin only contributes a
+  term to dE, and this rule is what turns that summed energy into a stochastic accept/reject.
+  It is declared on PottsCore (the simulation root), not as an energy plugin.
+equations: |
+  For a proposed copy of source site s's cell-id into target site t:
+
+    dE = sum over every enabled plugin p of  E_p(after copy) - E_p(before copy)
+    P(accept) = 1                      if dE <= 0
+              = exp(-(dE + offset) / T) if dE > 0
+
+  T = fluctuation_amplitude. When source and target cells carry different per-type
+  fluctuation amplitudes, the scalar T for that attempt is combined by
+  fluctuation_amplitude_function in {Min, Max, ArithmeticAverage} (default Min). `offset`
+  shifts the acceptance exponent (default 0); its exact sign/placement in the compiled core
+  was NOT read -- only the Boltzmann canonical form and the documented parameter roles in
+  PyCoreSpecs were. One Monte Carlo Step (MCS) is one such attempt per lattice site on average.
+  dE carries NO pathwise derivative: it is a finite energy difference between two discrete
+  lattice configurations, evaluated per proposed flip, not a force or a rate.
+params:
+  fluctuation_amplitude: |
+    the Metropolis temperature T -- amplitude of energy-increasing fluctuations the sweep will
+    accept; larger T => more membrane agitation / less rigid energy descent. Default 10.
+  fluctuation_amplitude_function: |
+    rule (Min/Max/ArithmeticAverage) for combining two cells' per-type fluctuation amplitudes
+    into the scalar T of a heterotypic copy attempt. Default Min.
+  offset: |
+    additive shift in the Boltzmann acceptance exponent; biases the accept probability of
+    energy-raising copies. Default 0.
+state_io: |
+  architectural / the integrator itself. READS the summed energy change dE contributed by
+  every enabled plugin for one proposed source->target pixel copy, plus T and offset. On accept,
+  WRITES exactly one lattice site's cell-id (the target site is reassigned to the source cell:
+  the source cell gains a site, the neighbour cell loses one), which is how volume, surface,
+  centre of mass and every derived quantity actually change. It returns NO energy term and NO
+  delta of its own -- it is the consumer of every operator's contribution, not a contributor.
+  This is the exact inverse of a Plexus operator: a Plexus operator returns a delta and the
+  engine integrates it deterministically; here the "operators" (plugins) return energies and
+  THIS rule stochastically integrates them by accept/reject.
+surprises:
+- |
+  ADDED BY HAND: the dynamics themselves -- discrete, stochastic, accept/reject, with no
+  pathwise derivative. This is the deepest architectural finding of the CC3D atlas: the target
+  framework's time evolution is energy-minimizing Monte Carlo, while every Plexus operator
+  returns a delta the engine integrates continuously. The two integration paradigms are
+  orthogonal, and this entry is where that orthogonality lives.
+- |
+  It is declared on PottsCore -- the simulation ROOT / config object -- alongside lattice
+  dimensions, boundary conditions and RNG seed, not as a plugin. The acceptance rule is not
+  a mechanism you add; it is the substrate every mechanism is expressed against.
+- |
+  Heterotypic temperature: T is not necessarily one global scalar. Per-cell-type fluctuation
+  amplitudes are legal, reconciled per attempt by fluctuation_amplitude_function -- so even the
+  "temperature" of the dynamics can be a set-indexed field, not a constant.
+verdict: out_of_scope
+of: null
+implementation_of: null
+why: |
+  The Metropolis acceptance carries NO biological content of its own: it is the CPM's core
+  numerical integrator -- a modified-Metropolis Monte Carlo sampler that turns a summed energy
+  change into a stochastic accept/reject on one pixel copy. Every biological term lives in the
+  per-plugin dE contributions (volume, adhesion, chemotaxis, ...), each catalogued as its own
+  mechanism; this rule only decides whether a proposed copy is kept. In Plexus terms its
+  counterpart is not any registered operator but the ENGINE's time-integration loop, which is
+  deliberately OUTSIDE the operator algebra -- Plexus registers no operator for "advance time",
+  and the RK-style integrator that consumes operator deltas is not itself a contract. The
+  closest registered contract is `cell_divide`/`cell_grow` (structural growth) because an
+  accepted copy is a structural change to which cell owns a lattice site; but treating the
+  sampler as a growth operator would be a category error -- growth is a biological program a
+  cell runs, whereas this is the mechanism BY WHICH any such program is realized. Minting it as
+  a `new` operator, or aliasing it to a structural contract, would inflate the yield with pure
+  framework mechanics and -- worse -- would miscount the integrator as an operator, corrupting
+  the saturation measurement this campaign exists to produce. Recording it as out_of_scope,
+  with the paradigm gap stated plainly (energies + stochastic accept/reject vs deltas +
+  deterministic integration), is the honest reduction. The contract below is a FORCED FIT
+  recorded only to document the site-reassignment shape; `kind: structural` / `family: growth`
+  is not a claim that Metropolis acceptance is biological growth.
+contract:
+  name: metropolis_step
+  kind: structural
+  family: growth
+  set: cell
+  inputs:
+  - fluctuation_amplitude
+  - fluctuation_amplitude_function
+  - offset
+  outputs:
+  - accepted
+  reads:
+  - energy.dE_total
+  - cell.lattice_sites
+  writes:
+  - cell.lattice_sites
+  maps: []
+status: normalized
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

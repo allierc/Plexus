@@ -51,3 +51,33 @@ Checked the `.rst`: it is a bare autoclass stub (no members, no prose, no equati
 the library docs add nothing over the compiled class — tightened `paper_section` to name
 the exact source anchors and record that the doc is content-free. Unchanged open gap:
 the increment/decrement arithmetic still lives in compiled C++ absent from this env.
+
+---
+
+**NORMALIZER (2026-08-02): verdict = refinement of `radius_graph`** (rewire/topology),
+`implementation_of: radius_graph`, contract name `contact_graph`.
+
+NeighborTracker maintains, per cell, the set of cells it currently touches plus each edge's
+common surface area (integer shared-boundary-link count). That is the *relation among cells*
+a rewire operator exists to leave on the set for lateral (contact/adhesion) terms to read —
+so unlike its sibling BoundaryPixelTracker (ruled out_of_scope: it classifies one cell's own
+pixels and builds no cell-to-cell relation), it does not collapse in the point-particle
+representation. Not an alias: radius_graph's registered output is a bare unweighted
+`edge_index` and cannot carry the contact-area weight, which is a first-class physical
+quantity contact energy scales with. Hence the contract must WIDEN `outputs` from
+`[edge_index]` to `[edge_index, edge_weight]` (breaking cost: current radius_graph consumers
+assume weightless, purely metric edges; a promised edge weight either forces the distance-based
+implementation to synthesise a contact area it has no basis for, or the weight becomes optional
+and any lateral op that starts to require it silently fails on radius_graph). The edge criterion
+(shared boundary vs Euclidean radius) and incremental-vs-full-rescan maintenance are
+implementation, not contract — hence `implementation_of: radius_graph`.
+
+**Strongest argument against (for `out_of_scope`):** the plugin has zero parameters, returns
+no energy delta, and on its own changes no dynamics — a run is bit-identical with or without it,
+exactly the profile that got BoundaryPixelTracker ruled out_of_scope. One could call it a pure
+neighbour-list acceleration cache with no biological content, arguing the "contact graph" is
+really owned by whichever contact-energy plugin consumes it. Rebuttal: BoundaryPixelTracker
+builds no cell-to-cell relation, whereas this plugin's sole product *is* the tissue adjacency
+graph with contact weights — the very substrate radius_graph was promoted to provide — so
+treating it as plumbing would discard a real, reusable topology capability (weighted adjacency)
+the language currently lacks.

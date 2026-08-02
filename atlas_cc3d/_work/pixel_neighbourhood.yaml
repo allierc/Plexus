@@ -1,0 +1,62 @@
+id: pixel_neighbourhood
+order: 35
+raw_name: neighbour order / pixel-copy neighbourhood
+raw_kind: relation contract (not a class)
+code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py
+paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366
+summary: Which lattice sites count as adjacent, for both the copy attempt and every contact energy. It
+  is the relation E of the model, chosen by an integer.
+equations: neighbor_order n fixes the adjacency used for both the copy attempt and every contact term.
+params: {}
+state_io: 'architectural: constrains every other mechanism; writes no state itself'
+surprises:
+- 'ADDED BY HAND: the model''s relation is a lattice adjacency, not an edge set built from positions'
+verdict: refinement
+of: radius_graph
+implementation_of: null
+why: |
+  A second relation-builder, but against a lattice not a point cloud. The pixel
+  neighbourhood plays radius_graph's exact architectural role -- the rewire/topology
+  operator that fixes the within-set relation E, emits no integrable delta, and lets
+  every lateral/contact term (Contact, Adhesion, Surface, FocalPointPlasticity) and the
+  Metropolis copy attempt itself read the neighbourhood it leaves. That a promoted
+  contract already covers "build the interaction relation" rules out `new`; that Plexus
+  promoted radius_graph at all means relation-building is in-scope, so this is not
+  out_of_scope either.
+  It is a refinement, not an alias, because admitting it must WIDEN three signature
+  fields and relax one invariant:
+    - set: particle -> also a lattice site-set (a cell is a set of sites sharing an id,
+      not a point with a position).
+    - reads: pos -> {} (the adjacency is static lattice structure; it reads no dynamic
+      state, whereas radius_graph reads live positions every tick).
+    - inputs: radius (continuous cutoff) -> neighbor_order (a discrete integer selecting
+      a compiled adjacency shell) + lattice_type (square/hex geometry).
+  What that breaks: the current contract's invariant is "all live pairs within a
+  continuous radius, rebuilt each tick, edge length = a meaningful Euclidean distance."
+  Any downstream user that reads edge length as a continuous distance, or relies on the
+  per-tick rebuild to track motion, gets neither from a static integer-offset lattice
+  adjacency. That is a real cost a widening imposes on existing callers -- the definition
+  of a refinement rather than a free-of-charge alias.
+  No cross-atlas dedup: no jax-morph proposal (adhere, agitate, apoptose, mechanosense,
+  morphogen, regulate, relax, reorient) is a relation-builder, so this is not a second
+  sighting of anything.
+contract:
+  name: radius_graph
+  kind: rewire
+  family: topology
+  set: lattice_site
+  inputs: [neighbor_order, lattice_type]
+  outputs: []
+  reads: []
+  writes: [edge_index]
+  maps:
+    neighbor_order: adjacency_shell_order
+    lattice_type: lattice_geometry
+status: normalized
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

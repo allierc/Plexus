@@ -32,3 +32,27 @@ overlapping multi-region blobs resolve painting order. **No paper text available
 names the chapter's home for initializers plus checkable *library* anchors (PyCoreSpecs.rst:294/299,
 the generator comment at L1235); I invented no page/figure. This mechanism is NOT one of the six
 with reference runs, so there is no measured evidence — source-read only.
+
+## blobinitializer — normalized
+
+**Verdict: `out_of_scope`.** BlobInitializer runs once at MCS 0 and CONSTRUCTS the initial
+partition (the sets themselves) from an empty lattice + a geometric region + a type palette.
+Plexus operators are per-step maps returning a delta over state that already exists; the initial
+partition is supplied by config/seeding, not by any operator. So this is IC/framework mechanics
+for establishing the starting state — out of scope for the OPERATOR algebra whose completeness
+we measure. It is one of a family (Blob / Uniform / PIF initializers), three interchangeable ways
+to build the same starting partition. I still filled a descriptive `seed` contract
+(structural/growth) so the ledger has the typed shape it WOULD take if IC construction were
+in-scope — counted as ONE `seed` with those three as implementations, never three separate `new`s.
+
+**Strongest argument AGAINST (i.e. for `new`):** this is the *only* mechanism in the campaign so
+far that genuinely writes state and creates sets — literally "how cells come to exist." The
+registered algebra has no way to construct sets de-novo: `cell_divide` splits an existing parent
+(conserving material, one→two), and nothing seeds a population out of Medium with no parent. If a
+cell-based framework must express "instantiate the initial partition," declaring it out_of_scope
+hides the single most load-bearing structural gap, and the honest verdict is `new` (a `seed`
+contract, Uniform/PIF as co-implementations). I land on out_of_scope because Plexus
+*architecturally* seeds initial state via configuration rather than an operator, so there is no
+operator here to alias/refine/introduce — but the line between "IC construction is config" and
+"IC construction is a missing operator" is the genuine judgement call, and a reasonable normalizer
+could put it the other way.

@@ -32,3 +32,30 @@ unverified); the exact per-copy neighbour re-test ordering; and how 2nd+-order s
 `pixelSetMap` relate to the default-order `pixelSet`. The incremental-watcher model itself is
 inferred from CC3D's CellGChangeWatcher architecture, not read line-by-line. No evidence run
 exists for this mechanism (not among evidence.py's six), so all of the above is source-only.
+
+## boundarypixeltracker -- normalized (NORMALIZER pass)
+
+**Verdict: out_of_scope.** It maintains a per-cell acceleration cache (the set of a cell's own
+lattice sites that touch a foreign owner / medium, out to `neighbor_order`) so downstream plugins
+avoid rescanning every pixel. No energy delta, no lattice/field write, bit-identical simulation
+without it -- a spatial index, the cellular-Potts analog of a neighbour-list / cell-list, not a
+biological process. It exists only because a CC3D cell IS a set of sites; Plexus cells are points
+with a derived radius and carry no per-cell pixel set, so the concept has nothing to bind to in
+the promoted representation. Contract recorded descriptively (name `boundary_index`,
+rewire/topology, set cell, writes `cell.boundary_pixels`) to satisfy the schema; the verdict, not
+the contract fields, carries the judgment. `of` and `implementation_of` left null.
+
+**Strongest argument against my verdict.** Plexus already promoted `radius_graph`
+(rewire/topology, src/plexus/operators/graph.py), which ALSO maintains a pure index and ALSO
+emits no integrable delta -- by the exact test I applied it too "looks like plumbing," yet it is
+first-class. Consistency could therefore demand I treat BoundaryPixelTracker the same (alias of
+`radius_graph`, or a new rewire/topology contract), and dismissing it as plumbing risks
+special-pleading. Rebuttal: `radius_graph` builds the RELATION over the elements of a set
+(who-interacts-with-whom), the substrate every lateral message-passing operator consumes;
+BoundaryPixelTracker builds no relation among cells -- it classifies a single cell's sub-elements
+(boundary vs interior pixel), a distinction that vanishes when a cell is a point. It is
+representation-specific bookkeeping, not a topology contract. The tension is genuine, though: if
+the algebra ever adopts a pixel-set cell representation, this stops being out_of_scope and becomes
+a real rewire/topology candidate. I deliberately did NOT alias it to `radius_graph`, because
+letting acceleration caches count toward the vocabulary would inflate the saturation measurement
+this campaign exists to protect.
