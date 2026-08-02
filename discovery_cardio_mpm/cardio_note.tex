@@ -569,7 +569,7 @@ at the depth the loop will really use, where it becomes one of the two noise flo
 only become irreproducible \emph{on purpose}.
 \end{phasebox}
 
-\begin{phasebox}{Phase 1 --- Freeze the recording, seal the test \hfill \prog\ (4 of 7)}
+\begin{phasebox}{Phase 1 --- Freeze the recording, seal the test \hfill \prog\ (6 of 7)}
 \textbf{Goal.} Decide, once and in writing, what a run is allowed to see --- \emph{before} anything
 is fitted. A split invented later is a split negotiated with the result already in hand.
 
@@ -630,18 +630,74 @@ thing Phase~1 could have found, it cost an afternoon, and it is much better foun
 Phase~7. \emph{One honest caveat: this measures how much the two trackings disagree, not which one
 is right. For deciding whether a spatial claim is admissible, disagreement is the relevant number.}
 
-\textbf{4. Does the answer depend on the grid?} \ns\ Finer resolution, more particles, smaller
-sub-steps. The real motion is smaller than one grid cell, so this is not a formality. The only
-Phase-1 item that needs a GPU.
+\textbf{4. Does the answer depend on the grid?} \dn\ \emph{Partly, and it separates cleanly.}
 
-\textbf{5. Freeze the split, seal the diseased sheet.} \ns\ By content, not by filename --- the
-same diseased recording sits on disk under three different names. A run that touches it aborts and
-every read is logged. \emph{Irreversible, so it goes last.}
+\emph{Time is fine.} Halving or doubling the sub-steps changes the measured beat by under 1\% ---
+\emph{once the length of a frame is held fixed}. Which brings the first finding: it was not.
+\code{-{}-substeps} multiplies \code{dt\_sub} to give the duration of one recorded frame, so
+changing it alone changes how much simulated time one frame of the microscope corresponds to.
+Varying it that way moves the enclosed area by a factor of 2.2, and every one of those batches
+would have read that as physics. \textbf{The inherited \code{-{}-substeps 10} is a statement about
+the timescale of the tissue, and was never identified as one.}
 
-\textbf{Exit gate.} All five above, plus Phase~1b green: the split file exists with disjoint frame
-sets and the sealed checksums; the ceiling and the tracker number are in this note (they are); the
-resolution check is reported against the noise floor; and a test proves a run reading the sealed
-specimen aborts.
+\emph{Space is not fine.} Across grids of 96, 128 and 192 and particle counts of 8k, 16k and 32k,
+the two knobs turn out to move one derived quantity --- how many particles share a grid cell --- and
+the enclosure axis follows it \textbf{perfectly monotonically, over a factor of 1.56, with no sign
+of a plateau}:
+
+\begin{center}\small
+\begin{tabular}{@{}l r r r@{}}
+\toprule
+& \textbf{particles per cell} & \textbf{enclosure} & \textbf{magnitude}\\
+\midrule
+32k particles & 2.00 & 0.622 & 1.959\\
+grid 96 & 1.78 & 0.643 & 1.946\\
+\textbf{the inherited point} & \textbf{1.00} & \textbf{0.731} & \textbf{1.828}\\
+8k particles & 0.50 & 0.930 & 1.655\\
+grid 192 & 0.44 & 0.969 & 1.502\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Two independent knobs landing on one curve is what a real numerical dependence looks like, not
+noise. \textbf{So the quantity the objective weights most heavily --- how much area the loop
+encloses --- is substantially set by how finely the sheet is discretised.} Direction and orientation
+are untouched by it, which is worth as much: those two axes are robust to the grid and enclosure is
+not.
+
+\textbf{5. Freeze the split, seal the diseased sheet.} \dn\ Fit beat $[152, 204]$, three held-out
+beats, 147 held-out frames, disjoint by construction and asserted. \textbf{17{,}499 scored nodes,
+and the evaluation mask is frozen from the recording alone} --- never derived from a model setting,
+because the inherited mask was defined through the boundary width, so sweeping the boundary moved
+the model and the ruler together. The diseased sheet is sealed \textbf{by content across all three
+files that carry it}, and the seal was watched refusing.
+
+\textbf{6. And the premises --- what the loop is allowed to call a tissue.} \fl\ Written from the
+Okuda folder's experience, where a great deal had to be fixed before the loop could run at all.
+Eight claims, each one something a computer can \emph{fail}. Six hold. \textbf{Two do not, and both
+were invisible before:}
+
+\begin{itemize}
+\item \textbf{Four operators in the recipe never run.} \code{activation\_pulse}, \code{aggregate},
+\code{apply\_material\_map} and \code{pacemaker} are built and then never stepped --- the trainer
+hand-rolls its own loop. \emph{Both material maps are among them.} Sixty batches of runs list those
+operators in their specification and none of them acted.
+\item \textbf{The model barely rests, and the tissue rests most of the time.} Over the same window,
+the recording is quiescent \textbf{77\%} of the beat --- a sharp squeeze and a long relaxation ---
+and the simulation is quiescent \textbf{8\%}. It contracts almost continuously. \emph{And the
+objective cannot see this at all}, being invariant to timing by construction.
+\end{itemize}
+
+The six that hold are worth stating too, because they were assumptions until this afternoon: a
+resting sheet rests \emph{exactly} (interior displacement is bit-zero with the muscle off); nothing
+leaves the dish and nothing goes non-finite; the solver sits \textbf{30 times inside} its own
+stability bound; the seed reaches the engine's own generator, not just the global one; and the
+recorded beat is a beat --- 0.48\,Hz, quiescent for over half the record.
+
+\textbf{Exit gate.} All of the above, plus Phase~1b green: the split file exists with disjoint frame
+sets and the sealed checksums; the ceiling, the tracker number and the resolution table are in this
+note; a test proves a run reading the sealed specimen aborts; and the premise checks run, with
+whatever they refuse recorded rather than waived.
 \end{phasebox}
 
 \begin{phasebox}{Phase 1b --- The corpus we already own \hfill \prog}

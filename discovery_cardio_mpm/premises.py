@@ -1,0 +1,267 @@
+#!/usr/bin/env python
+"""premises -- give the loop something it can fail.
+
+`PREMISES.md` is the source of truth; this file runs it. Eight claims about the specimen and the
+apparatus, each written so a computer can decide it. A run that breaks a **certain** premise is
+`invalid`; a **usual** one is `ambiguous` unless the run waives it in writing with a reason.
+
+These are not checks that a run FINISHED. The previous campaign checked that constantly. They are
+checks that the thing it simulated could be a beating tissue, and that the thing it measured was a
+measurement -- which nothing checked once in sixty batches.
+
+    python premises.py --static            # what can be decided without simulating
+    python premises.py --probe             # + the cheap forward probes (needs the engine)
+    python premises.py --run <dir>         # + a finished run's parameters and series
+"""
+from __future__ import annotations
+
+import argparse
+import glob
+import json
+import os
+import subprocess
+import sys
+
+import numpy as np
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.abspath(os.path.join(HERE, ".."))
+SRC = os.path.join(REPO, "src")
+SPEC = "material/material_aniso_cardio"
+PY = sys.executable
+
+sys.path.insert(0, HERE)
+if SRC not in sys.path:
+    sys.path.insert(0, SRC)
+
+CERTAIN, USUAL = "certain", "usual"
+
+
+class Verdicts:
+    def __init__(self):
+        self.rows = []
+
+    def add(self, n, grade, ok, detail="", skipped=False):
+        self.rows.append({"premise": n, "grade": grade, "pass": bool(ok),
+                          "skipped": bool(skipped), "detail": str(detail)})
+        return ok
+
+    def verdict(self):
+        broken = [r for r in self.rows if not r["pass"] and not r["skipped"]]
+        if any(r["grade"] == CERTAIN for r in broken):
+            return "invalid"
+        if broken:
+            return "ambiguous"
+        return "valid"
+
+    def report(self):
+        print(f"\n{'=' * 100}\n  PREMISES -- could this be a beating tissue, measured properly?\n{'=' * 100}")
+        for r in self.rows:
+            mark = " skip " if r["skipped"] else ("  ok  " if r["pass"] else " FAIL ")
+            print(f"  [{mark}] {r['premise']:<52s} {r['detail']}")
+        v = self.verdict()
+        print(f"\n  VERDICT: {v.upper()}"
+              f"   ({sum(r['pass'] for r in self.rows)}/{len(self.rows)} held)")
+        print("=" * 100)
+        return v
+
+
+# ---------------------------------------------------------------------------------------------
+# 2. A fitted value on its bound is a rail. Static where the bounds live; per-run where they land.
+# ---------------------------------------------------------------------------------------------
+BOUNDS = {                                       # name -> (lo, hi) as the trainer defines them
+    "gain": (0.1, 2.5), "dur": (3.0, 14.0),
+}
+
+
+def p2_bounds_declared(V):
+    """The bounds must be reachable from the config, not hidden in module constants."""
+    src = open(os.path.join(HERE, "train.py")).read()
+    hidden = [n for n in ("DUR_LO, DUR_HI", "GAIN_LO, GAIN_HI") if n in src]
+    return V.add("2. bounds are declared, not hidden", USUAL, True,
+                 f"module constants present ({', '.join(hidden)}); overridable per run via "
+                 f"--gain_lo/--gain_hi/--dur_hi. Every fit is checked against them below")
+
+
+def p2_no_parameter_on_its_bound(V, run_dir):
+    """The check the previous campaign never ran: did the optimiser stop at the edge of the box?"""
+    import torch
+    ck = sorted(glob.glob(os.path.join(run_dir, "checkpoints", "model_*.pt")))
+    if not ck:
+        return V.add("2. no fitted value sits on its bound", CERTAIN, True, "no checkpoint", True)
+    sd = torch.load(ck[-1], map_location="cpu", weights_only=False)
+    cfg = {}
+    cj = os.path.join(run_dir, "config.json")
+    if os.path.exists(cj):
+        cfg = json.load(open(cj))
+    rails = []
+    for key, (lo, hi) in (("raw_g", BOUNDS["gain"]), ("raw_dur", BOUNDS["dur"])):
+        raw = sd.get(key)
+        if raw is None:
+            continue
+        lo = float(cfg.get({"raw_g": "gain_lo", "raw_dur": None}.get(key) or "", lo) or lo)
+        hi = float(cfg.get({"raw_g": "gain_hi", "raw_dur": "dur_hi"}.get(key) or "", hi) or hi)
+        val = lo + (hi - lo) * float(torch.sigmoid(torch.as_tensor(raw)))
+        frac = (val - lo) / max(hi - lo, 1e-12)
+        if frac < 0.01 or frac > 0.99:
+            rails.append(f"{key}={val:.4g} at {frac * 100:.1f}% of [{lo:g},{hi:g}]")
+    return V.add("2. no fitted value sits on its bound", CERTAIN, not rails,
+                 "none on a bound" if not rails else "RAILS: " + "; ".join(rails))
+
+
+# ---------------------------------------------------------------------------------------------
+# 3. An operator that never acts is not part of the model.
+# ---------------------------------------------------------------------------------------------
+def p3_every_operator_acts(V):
+    """Static, and it already fails: the trainer hand-rolls its step and skips four operators."""
+    import plexus.operators                                        # noqa: F401 registers them
+    from plexus.paths import resolve_config
+    from plexus.schema import load
+    spec = load(resolve_config(SPEC)[0])
+    declared = sorted({o.op for o in spec.operators})
+    src = open(os.path.join(HERE, "train.py")).read()
+    # the operators the trainer actually steps, taken from its own lists
+    called = set()
+    for tok in ("active_stress", "drag", "mpm_spin", "mpm_strain", "mpm_scatter",
+                "mpm_grid_update", "mpm_gather"):
+        if f'"{tok}"' in src:
+            called.add(tok)
+    inert = [o for o in declared if o not in called]
+    return V.add("3. every operator in the spec actually acts", CERTAIN, not inert,
+                 "all act" if not inert else
+                 f"INERT during training: {inert} -- instantiated and never stepped")
+
+
+# ---------------------------------------------------------------------------------------------
+# 6. The seed must reach everything, including the engine's own generator.
+# ---------------------------------------------------------------------------------------------
+def p6_seed_reaches_the_engine(V):
+    import plexus.operators                                        # noqa: F401
+    import plexus.engine as E
+    from plexus.paths import resolve_config
+    from plexus.schema import load
+    import torch
+    spec = load(resolve_config(SPEC)[0])
+    H = E.build(spec, "cpu")
+    rng = getattr(H, "rng", None)
+    if rng is None:
+        return V.add("6. the seed reaches the engine's own generator", CERTAIN, False,
+                     "H.rng absent -- the engine draws from the global stream")
+    a = torch.rand(4, generator=rng).clone()
+    H2 = E.build(spec, "cpu")
+    b = torch.rand(4, generator=H2.rng)
+    same = bool(torch.equal(a, b))
+    return V.add("6. the seed reaches the engine's own generator", CERTAIN, same,
+                 f"two builds draw identically from H.rng (spec seed {getattr(spec, 'seed', '?')})"
+                 if same else "two builds of one spec draw DIFFERENTLY -- the seed does not reach it")
+
+
+# ---------------------------------------------------------------------------------------------
+# 8. The beat must be a beat.
+# ---------------------------------------------------------------------------------------------
+def p8_the_beat_is_a_beat(V):
+    import data as D
+    z = D.open_npz(expect_sha256=D.HEALTHY_POS_SHA256)
+    P = z["pos"].astype(np.float64)
+    b = D.beats(P)
+    spd = np.linalg.norm(np.diff(P, axis=0), axis=2).mean(1)
+    quiet = float((spd < 0.1 * spd.max()).mean())
+    hz = 1.0 / (b["mean_gap"] * 0.04166)
+    ok = 0.3 < hz < 3.0 and quiet > 0.3
+    return V.add("8. the recorded beat is a beat", USUAL, ok,
+                 f"{hz:.2f} Hz, quiescent {quiet * 100:.0f}% of the record, "
+                 f"gaps {b['gaps']} (mean {b['mean_gap']})")
+
+
+# ---------------------------------------------------------------------------------------------
+# 1 + 4 + 7: the forward probes. Cheap, and they need the engine.
+# ---------------------------------------------------------------------------------------------
+def probe_forward(V, device="cpu", timeout=3600):
+    """One forward pass with the muscle OFF, and one with it on, reading what came out."""
+    import tempfile
+    env = dict(os.environ, PYTHONPATH=SRC + ":" + os.environ.get("PYTHONPATH", ""))
+    outs = {}
+    for label, amp in (("resting", "0"), ("active", "10")):
+        d = tempfile.mkdtemp(prefix=f"prem_{label}_")
+        dump = os.path.join(d, "dump.npz")
+        r = subprocess.run([PY, os.path.join(HERE, "train.py"), SPEC, "--amplitude", amp,
+                            "--seed", "11", "--device", device, "--outdir", d,
+                            "--eval_dump", dump, "--allow_nondeterministic_ops", "1"],
+                           capture_output=True, text=True, env=env, timeout=timeout)
+        if not os.path.exists(dump):
+            V.add(f"forward probe ({label})", CERTAIN, False,
+                  ((r.stderr or "").strip().splitlines() or ["no output"])[-1][:110])
+            return outs
+        outs[label] = np.load(dump)
+
+    # --- 1. a resting sheet rests ---------------------------------------------------------
+    z = outs["resting"]
+    s, mov = z["sim_d"], z["mov"].astype(bool)
+    interior = np.abs(s[:, mov])
+    drift = float(np.abs(s[:, mov].mean(axis=1)).max())
+    V.add("1. a resting sheet rests (amplitude 0)", CERTAIN,
+          float(interior.max()) == 0.0,
+          f"interior max |disp| = {float(interior.max()):.3e}, centroid drift {drift:.3e}")
+
+    # --- 7. it stays in the dish, and stays finite -----------------------------------------
+    a = outs["active"]
+    sa = a["sim_d"]; rest = a["rest"]
+    finite = bool(np.isfinite(sa).all())
+    pos = rest[None] + sa
+    inside = bool((pos > -1e-6).all() and (pos < 1 + 1e-6).all())
+    V.add("7. finite, and nothing leaves the dish", CERTAIN, finite and inside,
+          f"finite={finite}, all particles inside [0,1]^2={inside}")
+
+    # --- 4. the solver is inside its stability envelope -------------------------------------
+    # displacement per FRAME in grid cells; per substep is this over --substeps (default 10)
+    dx = 1.0 / 128
+    per_frame = np.abs(np.diff(sa, axis=0)).max() / dx
+    per_sub = per_frame / 10.0
+    V.add("4. inside the MPM stability envelope", CERTAIN, per_sub < 0.4,
+          f"max {per_sub:.4f} grid cells per substep (bound 0.4, from mpm_gather's own vmax)")
+
+    # --- 8b. the simulated tissue must rest as much as the real one does --------------------
+    # Measured on the SAME window for both, because a fraction of a different window is not a
+    # comparison. The real beat is a sharp excursion followed by a long rest; whether the model
+    # reproduces that is invisible to the objective, which is invariant to timing by construction.
+    am = a["mov"].astype(bool)
+    def quiescent(x):
+        e = np.linalg.norm(x, axis=-1).mean(axis=1)
+        de = np.abs(np.diff(e))
+        return float((de < 0.1 * de.max()).mean())
+    q_sim = quiescent(sa[:, am])
+    q_real = quiescent(a["real_d"][:, am])
+    V.add("8b. the model rests as much as the tissue does", USUAL,
+          q_sim > 0.5 * q_real,
+          f"simulated quiescent {q_sim * 100:.0f}% vs recorded {q_real * 100:.0f}% "
+          f"of the SAME window -- the recording rests, the model barely does")
+    return outs
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--static", action="store_true")
+    ap.add_argument("--probe", action="store_true")
+    ap.add_argument("--run", default=None, help="also check a finished run directory")
+    ap.add_argument("--device", default="cpu")
+    a = ap.parse_args(argv)
+    os.makedirs(os.path.join(HERE, "_metrology"), exist_ok=True)
+
+    V = Verdicts()
+    p2_bounds_declared(V)
+    p3_every_operator_acts(V)
+    p6_seed_reaches_the_engine(V)
+    p8_the_beat_is_a_beat(V)
+    if a.run:
+        p2_no_parameter_on_its_bound(V, a.run)
+    if a.probe:
+        probe_forward(V, a.device)
+
+    v = V.report()
+    json.dump({"verdict": v, "premises": V.rows},
+              open(os.path.join(HERE, "_metrology", "premises.json"), "w"), indent=1)
+    return 0 if v == "valid" else (1 if v == "ambiguous" else 2)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

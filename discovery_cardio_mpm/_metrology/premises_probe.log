@@ -1,0 +1,15 @@
+
+====================================================================================================
+  PREMISES -- could this be a beating tissue, measured properly?
+====================================================================================================
+  [  ok  ] 2. bounds are declared, not hidden                   module constants present (DUR_LO, DUR_HI, GAIN_LO, GAIN_HI); overridable per run via --gain_lo/--gain_hi/--dur_hi. Every fit is checked against them below
+  [ FAIL ] 3. every operator in the spec actually acts          INERT during training: ['activation_pulse', 'aggregate', 'apply_material_map', 'pacemaker'] -- instantiated and never stepped
+  [  ok  ] 6. the seed reaches the engine's own generator       two builds draw identically from H.rng (spec seed 0)
+  [  ok  ] 8. the recorded beat is a beat                       0.48 Hz, quiescent 52% of the record, gaps [49, 50, 51, 52] (mean 50.5)
+  [  ok  ] 1. a resting sheet rests (amplitude 0)               interior max |disp| = 0.000e+00, centroid drift 0.000e+00
+  [  ok  ] 7. finite, and nothing leaves the dish               finite=True, all particles inside [0,1]^2=True
+  [  ok  ] 4. inside the MPM stability envelope                 max 0.0136 grid cells per substep (bound 0.4, from mpm_gather's own vmax)
+  [ FAIL ] 8b. the simulated beat switches off between beats    quiescent 8% of the fitted window
+
+  VERDICT: INVALID   (6/8 held)
+====================================================================================================

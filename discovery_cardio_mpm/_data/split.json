@@ -1,0 +1,116 @@
+{
+ "beats": {
+  "common_length": 49,
+  "complete_spans": [
+   [
+    2,
+    51
+   ],
+   [
+    51,
+    101
+   ],
+   [
+    101,
+    152
+   ],
+   [
+    152,
+    204
+   ]
+  ],
+  "excluded_tail": [
+   204,
+   239
+  ],
+  "gaps": [
+   49,
+   50,
+   51,
+   52
+  ],
+  "mean_gap": 50.5,
+  "note": "the stretch after the last onset is not a beat and is excluded",
+  "onsets": [
+   2,
+   51,
+   101,
+   152,
+   204
+  ]
+ },
+ "ceiling": {
+  "loopscore_beat_to_beat_median": 0.7054,
+  "note": "measured by data_report.py; no model may be scored above it"
+ },
+ "disjoint": {
+  "ok": true,
+  "overlap_frames": []
+ },
+ "eval_mask": {
+  "n_nodes": 17499,
+  "n_total": 18769,
+  "note": "frozen from the RECORDING alone. Never derive it from a model setting: the inherited mask was defined through the band width, so sweeping the band moved the model and the ruler together.",
+  "rule": "amplitude > 0.2 * p99(amplitude), over the whole recording",
+  "sha256": "13836b50c24f4cd22a3796c7cf82d82643d9b9377b8bb1ed5c317f647e973599",
+  "threshold": 0.0010752922711411146
+ },
+ "fit": {
+  "beat_index": 3,
+  "frames": [
+   152,
+   200
+  ],
+  "n_frames": 49,
+  "span": [
+   152,
+   204
+  ]
+ },
+ "heldout_beats": {
+  "caveat": "leave-one-beat-out R2 is 0.978-0.986: the beats are near-copies. These may NOT be cited as evidence of generalisation. They measure absorbed beat-to-beat variation.",
+  "n_frames": 147,
+  "spans": [
+   [
+    2,
+    51
+   ],
+   [
+    51,
+    101
+   ],
+   [
+    101,
+    152
+   ]
+  ]
+ },
+ "recording": {
+  "path": "/workspace/Plexus/prototype/cardio_mpm/cardio_real.npz",
+  "pos_sha256": "e5fb1774286545923e6dd97f62e9f64891686d8080c43fee09d9fc2ba8ecc725",
+  "specimen_id": "2de5cd27470d92f149b5f57c2e8251b68571c84177d674556fe3828e71c7a5cf"
+ },
+ "sealed": {
+  "files": [
+   {
+    "bytes": 269372816,
+    "content_id": "3dd59432fc53fb8866ae0018ac798525c2b084ad28ac18af1a05bd3de56ddb16",
+    "path": "/groups/saalfeld/home/allierc/GraphData/graphs_data/cardiomyocytes_real_data/Cardio_1/1_HCM_15kPa_MR44_W3_1_MMStack_Pos0.ome.tif.derivatives.npy"
+   },
+   {
+    "bytes": 269372816,
+    "content_id": "ebce00455307d82ed1c54f37b43a110b6f8554968a209d59a4fa08fdafabce68",
+    "path": "/groups/saalfeld/home/allierc/GraphData/graphs_data/cardiomyocytes_real_data/Cardio_0/derivatives.npy"
+   },
+   {
+    "bytes": 12288128,
+    "content_id": "f3d50cb6f0b98c2ba868414ec57520aca372215f547bc8d16c4845287e271fd9",
+    "path": "/groups/saalfeld/home/allierc/GraphData/graphs_data/cardiomyocytes_real_data/diseased.npy"
+   }
+  ],
+  "opened": false,
+  "rule": "sealed by CONTENT. Two specimens sit on disk under five filenames; sealing a path would seal nothing.",
+  "specimen": "diseased sheet (HCM)"
+ },
+ "written": "frozen by split.py --freeze"
+}
