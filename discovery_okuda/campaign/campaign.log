@@ -83,3 +83,5 @@
 ------------------------------------------------------------------------------------------------
 [loop] round 2/20  mode=composition   spent so far: 4.9 agent-min over 12 calls
 ------------------------------------------------------------------------------------------------
+  ✗ [loop] round 2 exited 3 after 55.1 min wall, 7.6 min of agents
+  ✗ [loop] STOPPING -- two aborted rounds in a row -- the refusal reasons are not actionable. Read campaign/round_records.jsonl and decide; do not retry.

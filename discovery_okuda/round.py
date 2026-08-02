@@ -1366,7 +1366,13 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
             rec["steer"] = f"APPARATUS FAULT: {dg.get('cause')} -- guard: {dg.get('guard_to_add')}"
             COL.write(rec)
             print("\n[round] STOPPING: the apparatus is at fault, not the biology. Add the guard.")
-            return bk.finish(rid, "apparatus_fault", 3)
+            # EXIT 4, NOT 3. Exit 3 means "two aborted rounds, the refusals are not actionable" --
+            # a fact about the SEARCH. An apparatus fault is a fact about the CODE, it names
+            # the guard to add, and it is fixed in one edit. Sharing a code made the driver
+            # print "the refusal reasons are not actionable" for a diagnosis that was
+            # precise and actionable, which is the same collision that once made a NameError
+            # read as "a problem with the batch or the instruments".
+            return bk.finish(rid, "apparatus_fault", 4)
 
     act("ACT 3 - DECIDE", f"{len(rows)} run(s) admitted, {len(refused)} refused")
     step("Collector: building the round record from the files on disk")

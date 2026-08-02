@@ -26,3 +26,30 @@ Specimens: unchecked 1
 Frontier after: MISSING
 Diagnosis: not called
 Steer: no resolved hypotheses yet -- start at the 70/30 default
+
+## Round 2 — ABORTED, no admissible evidence
+
+## Round 2 — slot 0: refuted
+
+Node: id=MISSING, parent=none
+Track: MISSING
+Hypothesis tested: "protr_peak >= 3.0"
+Config: r002c_11_e08ef7
+Measured: protr_peak=1.295, protr_final=1.295, ta_n_tubes_final=2, mech_p_ratio=0.641
+Reservoir: 2766 of 104004 cells (3%) — not limiting.
+Specimen: unchecked — all hold
+Reader: phenotype=bud, specimen=MISSING
+Eye-check: DISAGREES — The movie shows a distinct, elongated bulbous protrusion growing prominently at the apex — the opposite of the claimed reduced/broken protrusion.
+Mutation: ('add_op', 'vesicle_growth', 'uniform_ramp')
+Verdict: falsified — measured protr_peak=1.29, protr_final=1.29, ta_n_tubes_final=2, mech_p_ratio=0.641 against "protr_peak >= 3.0"
+Next: parent=MISSING
+
+## Round 2 — summary
+
+Posed: 12   Evidence: 1   Refused: 7 (critic post-hoc: [<P3_CHEMISTRY_DIVERGED; no diag.json -- the run produced no reco; critic post-hoc: [<P3_CHEMISTRY_DIVERGED; critic post-hoc: [<P3_CHEMISTRY_DIVERGED; critic post-hoc: [<P3_CHEMISTRY_DIVERGED; critic post-hoc: [<P3_CHEMISTRY_DIVERGED; no diag.json -- the run produced no reco)
+Surprise: 0/1 — a round that only confirms has bought coverage and no knowledge
+Tracks: 0 Track A, 0 Track B
+Specimens: unchecked 1
+Frontier after: MISSING
+Diagnosis: Explicit-Euler dt=1.0 is unstable for the gierer_meinhardt autocatalytic term (a²/h); the reaction ODE — not diffusion — blows up. shape=uniform confirms every cell moved together, an ODE signature. — guard: refuse gierer_meinhardt unless dt*rate <= 0.5 (explicit-Euler stability for autocatalytic kinetics); dt=1.0 fails.
+Steer: APPARATUS FAULT: Explicit-Euler dt=1.0 is unstable for the gierer_meinhardt autocatalytic term (a²/h); the reaction ODE — not diffusion — blows up. shape=uniform confirms every cell moved together, an ODE signature. -- guard: refuse gierer_meinhardt unless dt*rate <= 0.5 (explicit-Euler stability for autocatalytic kinetics); dt=1.0 fails.
