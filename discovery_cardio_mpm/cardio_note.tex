@@ -568,39 +568,57 @@ at the depth the loop will really use, where it becomes one of the two noise flo
 only become irreproducible \emph{on purpose}.
 \end{phasebox}
 
-\begin{phasebox}{Phase 1 --- Freeze the recording, seal the test \hfill \todo}
+\begin{phasebox}{Phase 1 --- Freeze the recording, seal the test \hfill \prog\ (2 of 7)}
 \textbf{Goal.} Decide, once and in writing, what a run is allowed to see --- \emph{before} anything
 is fitted. A split invented later is a split negotiated with the result already in hand.
 
+\textbf{Done.}
 \begin{itemize}
-\item \textbf{The beat inventory}, from the files: onsets, periods, which beats are complete, and
-which stretch at the end is not a beat at all and must not be treated as one.
-\item \textbf{The ceiling the data sets on itself.} Score each real beat against each other real
-beat. \textbf{No model may be scored better than the data agrees with itself}, and that number goes
-on the front page of everything afterwards.
-\item \textbf{How much of the pattern is the tracker.} The healthy sheet was tracked twice, the
-diseased sheet three times. Comparing one tracking against another is the cleanest measurement of
-what part of the spatial detail belongs to the tissue. \textbf{This is the number that decides
-whether learned maps across the sheet are a legitimate product of this project.}
-\item \textbf{Does the answer depend on the grid?} Run at finer resolutions, more particles, smaller
-sub-steps. The real motion is smaller than one grid cell, so this is not a formality.
-\item \textbf{Use the simulations we already own} --- see the separate task list below. Ten of
-the seventy-one MPM runs in \code{graphs\_data/material} drive tissue with active traction of a
-\emph{pattern we chose}, each with its full trajectory and its spec. These are loops whose ground
-truth is their own recipe, and they are already computed.
-\item \textbf{Freeze the split, and seal the diseased sheet.} Fit frames, held-out frames, held-out
-specimen, written down and checksummed. The seal is \textbf{by content, not by filename} --- the
-same diseased recording sits on disk under three different names, and sealing one path would seal
-nothing. A
-run that touches sealed data aborts, and every read of it is logged.
+\item[\dn] \textbf{The instruments were read before being rebuilt} --- \code{METRICS.md}. What each
+inherited measurement was built to answer, when, and whether it still works. The short version: on
+4~July a human audit re-computed the morphology from scratch and found \emph{every} secondary
+number wrong in the same way --- computed on the simulation alone, over a hundred points of which
+thirty-six were pinned to the answer, uncentred. The campaign had chased ``size'' for four rounds
+with a diagnostic that could not see the residual at all. \code{enclosure\_row}, the audit's own
+remedy, is the one inherited instrument left standing.
+\item[\dn] \textbf{Track B has a measurement} --- \code{descriptors.py}: magnitude, opening,
+direction and \emph{orientation}, real-referenced, interior only. Orientation is the one that was
+never reported: it lives inside the objective and nobody could see it move. \code{shape} is left
+explicitly unimplemented rather than faked --- it needs a learned descriptor, and there is no
+image-embedding model anywhere in this project. Its self-test watches every axis move when it
+should and hold still when it should not, and it caught my own peak not being rotation-invariant.
 \end{itemize}
 
-\textbf{Exit gate.} The split file exists with disjoint frame sets and the sealed checksums; the
-self-agreement number and the tracker-reproducibility number are measured and written into this note;
-the resolution check is reported as a number against the noise floor; and a test proves that a run
-reading the sealed specimen aborts.
+\textbf{Still to do, and this is what closing Phase 1 means.}
+\begin{itemize}
+\item[\ns] \textbf{The beat inventory}, from the files: onsets, periods, which beats are complete,
+and which stretch at the end is not a beat and must not be treated as one. \emph{Half-known
+already} --- the onsets are $[2, 51, 101, 152, 204]$, the gaps $49/50/51/52$, and the reported
+``period'' of 50 is not the mean of 50.5 but the result of rounding it. The tail from 204 is not a
+beat.
+\item[\ns] \textbf{The ceiling the recording sets on itself.} Score each real beat against each
+other real beat. \textbf{No model may be scored better than the data agrees with itself}, and that
+number goes on the front page of everything afterwards. This is the single most useful number
+Phase~1 can produce, and it costs minutes.
+\item[\ns] \textbf{How much of the pattern is the tracker.} The healthy sheet was tracked twice,
+the diseased three times. \textbf{This is the number that decides whether learned maps across the
+sheet are a legitimate product of this project at all}, and it is the one most likely to redirect
+the programme.
+\item[\ns] \textbf{Does the answer depend on the grid?} Finer resolution, more particles, smaller
+sub-steps. The real motion is smaller than one grid cell, so this is not a formality.
+\item[\ns] \textbf{Freeze the split, and seal the diseased sheet.} Fit frames, held-out frames,
+held-out specimen, written down and checksummed. The seal is \textbf{by content, not by
+filename} --- the same diseased recording sits on disk under three different names, and sealing one
+path would seal nothing. A run that touches sealed data aborts, and every read is logged.
+\end{itemize}
 
-\textbf{Cost.} About a day, no GPU.
+\textbf{Exit gate --- five things, each one a command that prints a number or refuses.} The split
+file exists with disjoint frame sets and the sealed checksums; the self-agreement number and the
+tracker-reproducibility number are measured and written into \emph{this note}; the resolution check
+is reported against the noise floor; a test proves a run reading the sealed specimen aborts; and
+Phase~1b's corpus check is green.
+
+\textbf{Cost.} About a day. Only the resolution check needs a GPU.
 \end{phasebox}
 
 \begin{phasebox}{Phase 1b --- The corpus we already own \hfill \prog}
