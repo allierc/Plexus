@@ -1,2 +1,0 @@
-{"round": 1, "t": 1785673017.7832346, "action": "opened stage gate -> 3"}
-{"action": "exhausted", "detail": "1 operator request(s) already open and no new region is reachable; waiting on the language, not on compute", "open_requests": ["OR001"]}
