@@ -72,6 +72,25 @@ EMPTY_EXIT = 5
 MAX_CRASHES = 2
 
 
+def _preserve(rnd, mode):
+    """Copy the campaign's state at the moment of death, before anything else touches it.
+
+    Every crash today was diagnosed from evidence that the next attempt's tidy-up nearly
+    deleted -- the trace breadcrumbs most of all, since a process killed from outside leaves
+    nothing else.
+    """
+    import shutil
+    dst = os.path.join(CAMP, f"_failed_r{rnd:03d}_{mode}")
+    os.makedirs(dst, exist_ok=True)
+    for f in ("trace.log", "round_records.jsonl", "analysis.md", "memory.md", "state.json",
+              "proposal.json", "hypotheses.jsonl"):
+        try:
+            shutil.copyfile(os.path.join(CAMP, f), os.path.join(dst, f))
+        except Exception:
+            pass
+    print(f"[loop] state at death preserved in {os.path.relpath(dst, HERE)}")
+
+
 def _log(rec):
     os.makedirs(CAMP, exist_ok=True)
     with open(JOURNAL, "a") as fh:
@@ -158,7 +177,28 @@ def _already_running():
     return live or None
 
 
-def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None):
+def plan(n_rounds, recon_rounds=1):
+    """Which mode each round runs in. RECON IS A ONE-SHOT and must not be the whole campaign.
+
+    Rolled as the mode for every round, recon re-measured the SAME SIX SPECS four times over --
+    r001n through r004n differ by a swap or two and nothing else. Three things made that
+    inevitable and none of them is a bug:
+
+      the Archivist's ranked table is STATIC. It ranks by pattern quality, which does not change
+      when you re-measure a run, so the top six are the top six every time.
+      nothing told the Proposer what it had already replayed.
+      and recon poses NO PREDICTIONS, so the surprise rate stays null and the map cannot grow --
+      the Archivist said it outright: "Sole branch".
+
+    Recon's job is to establish a frontier of compositions we have SEEN WORK, measured with
+    instruments we now trust. One round does that. Everything after it must be `composition`,
+    which is the mode that proposes an edit, predicts a number and can be wrong about it.
+    """
+    return ["recon"] * min(recon_rounds, n_rounds) + \
+           ["composition"] * max(0, n_rounds - recon_rounds)
+
+
+def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None, recon_rounds=1):
     other = _already_running()
     if other:
         print("[campaign] REFUSING TO START -- another campaign loop is already running:")
@@ -172,8 +212,12 @@ def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None):
     print("=" * 96)
     _log({"event": "start", "rounds": n_rounds, "batch": batch, "frames": frames})
 
+    modes = plan(n_rounds, recon_rounds)
+    print(f"[loop] plan: {modes.count('recon')} recon round(s) to build the frontier, then "
+          f"{modes.count('composition')} composition round(s) that can pose a hypothesis")
     consecutive_empty, done, crashes = 0, 0, 0
     for i in range(n_rounds):
+        mode = modes[i]
         ok, why = _gates_open()
         if not ok:
             print(f"\n[loop] STOPPING -- the gates are closed, and a closed gate is a finding:\n"
@@ -187,9 +231,9 @@ def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None):
             _log({"event": "stop", "why": "budget", "cost": cost, "rounds_done": done})
             return 0
 
-        print(f"\n{'-' * 96}\n[loop] round {i + 1}/{n_rounds}   "
+        print(f"\n{'-' * 96}\n[loop] round {i + 1}/{n_rounds}  mode={mode}   "
               f"spent so far: ${cost.get('usd', 0)} over {cost.get('calls', 0)} calls\n{'-' * 96}")
-        code, minutes, note = run_round(batch, frames)
+        code, minutes, note = run_round(batch, frames, mode=mode)
         done += 1
         after = _cost_so_far()
         spent = round(after.get("usd", 0) - cost.get("usd", 0), 2)
@@ -221,6 +265,7 @@ def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None):
             # is often a bad slot rather than a bad build; bounded, because retrying a genuine
             # bug forever is how a week is spent re-raising one exception.
             crashes += 1
+            _preserve(i + 1, mode)
             print(f"[loop] round {i + 1} CRASHED ({note or 'uncaught exception'}). That is a bug "
                   f"in the code, not a finding about the batch -- crash {crashes}/{MAX_CRASHES}.")
             if crashes >= MAX_CRASHES:
@@ -257,9 +302,13 @@ if __name__ == "__main__":
     ap.add_argument("--frames", type=int, default=None)
     ap.add_argument("--usd-ceiling", type=float, default=None,
                     help="stop once measured agent spend reaches this")
+    ap.add_argument("--recon-rounds", type=int, default=1,
+                    help="rounds of reconnaissance before switching to composition (default 1; "
+                         "recon is a one-shot and rolling it re-measures the same specs)")
     ap.add_argument("--status", action="store_true")
     a = ap.parse_args()
     if a.status:
         status()
         raise SystemExit(0)
-    raise SystemExit(loop(a.rounds, a.batch, a.frames, usd_ceiling=a.usd_ceiling))
+    raise SystemExit(loop(a.rounds, a.batch, a.frames, usd_ceiling=a.usd_ceiling,
+         recon_rounds=a.recon_rounds))
