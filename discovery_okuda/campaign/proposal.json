@@ -1,66 +1,18 @@
 {
- "reasoning": "Round 2 established morphogen_growth and divide_3d as necessary on the forced recipe but left the rest of the operator map blank and produced only 4 admissible runs. This batch builds the necessity map around the two sound buds (P2 driven+forced 1.19, P3 mechanics-only 1.05) via single-op removals, tests whether division amplifies the driven bud, and runs adversarial excursions that ask if removing the destabiliser recovers a physical run from the diverged/exploded branches. Avoids the refused gierer+divide move and exhausted uniform_ramp baseline.",
+ "reasoning": "Amplification on this body is exhausted (removal/inflation/morphogen-up all diverge); parameter down-tuning is Loop II. So this batch maps STRUCTURE on the growth-driven monolayer parents and opens the one untested region: set_impl shape_energy_3d:default -> 'growth-driven emergent (target mechanism)', which is Okuda's patterning<->deformation coupling. Slot 0 anchors parent 0; single-op removals re-confirm necessity/inertness; two adversarial adds (double-division, uniform_ramp) probe the divergence wall.",
  "mode": "explore",
  "slots": [
-  {"parent_index": 2, "edit": null, "intent": "control",
-   "claim": "the parent driven+forced recipe, unchanged -- the control",
-   "track": "B", "territory": "in_paper", "metric": "protr_peak",
-   "predicted": "protr_peak 1.1-1.3",
-   "why": "control: Cad4767 sound bud baseline, protr_peak 1.19 round 2"},
-
-  {"parent_index": 2, "edit": ["remove_op", "reconnect_t1_3d0"],
-   "intent": "adversarial", "track": "A", "territory": "in_paper", "metric": "protr_peak",
-   "predicted": "protr_peak >= 1.1",
-   "why": "unknown if T1 topology relaxation carries the forced bud; if the bud survives without it, reconnect is not necessary -- an unmapped verdict either way"},
-
-  {"parent_index": 2, "edit": ["remove_op", "cell_geometry_3d0"],
-   "intent": "confirmatory", "track": "A", "territory": "in_paper", "metric": "protr_peak",
-   "predicted": "protr_peak <= 1.05",
-   "why": "cell_geometry_3d recomputes the deforming mesh geometry; expect the bud to collapse to sphere without it, mapping it as necessary"},
-
-  {"parent_index": 2, "edit": ["remove_op", "cell_adjacency0"],
-   "intent": "confirmatory", "track": "A", "territory": "in_paper", "metric": "protr_peak",
-   "predicted": "protr_peak <= 1.1",
-   "why": "adjacency maintains neighbour topology for the forced protrusion; removing it should weaken the bud -- untested necessity claim"},
-
-  {"parent_index": 2, "edit": ["add_op", "divide_3d", "hertwig"],
-   "intent": "adversarial", "track": "B", "territory": "in_paper", "metric": "protr_peak",
-   "predicted": "protr_peak >= 1.3",
-   "why": "division is established necessary; adding it to the divide-free driven recipe (cell_rd_seed, not the refused gierer+divide) should AMPLIFY the bud past 1.3 -- or reveal it cannot, staying physical"},
-
-  {"parent_index": 3, "edit": ["remove_op", "extrude0"],
-   "intent": "confirmatory", "track": "A", "territory": "in_paper", "metric": "protr_peak",
-   "predicted": "protr_peak <= 1.05",
-   "why": "extrude is the direct protrusion driver on the mechanics-only bud; removing it should flatten to sphere, mapping it necessary"},
-
-  {"parent_index": 3, "edit": ["remove_op", "cell_geometry_3d0"],
-   "intent": "confirmatory", "track": "A", "territory": "in_paper", "metric": "protr_peak",
-   "predicted": "protr_peak <= 1.05",
-   "why": "robustness of the geometry-necessity verdict across a second parent (P3 mechanics-only) -- confirms the finding is operator-intrinsic, not recipe-specific"},
-
-  {"parent_index": 3, "edit": ["add_op", "vesicle_growth", "uniform_ramp"],
-   "intent": "adversarial", "track": "B", "territory": "excursion", "metric": "protr_peak",
-   "predicted": "protr_peak >= 1.3",
-   "why": "adds growth to mechanics-only to reconstruct the driven+forced regime; excursion because uniform_ramp diverged on the uniform-inflation body -- here it may either amplify the divide-backed bud or diverge, distinguishing body-dependence"},
-
-  {"parent_index": 3, "edit": ["remove_op", "reconnect_t1_3d0"],
-   "intent": "adversarial", "track": "A", "territory": "in_paper", "metric": "protr_peak",
-   "predicted": "protr_peak >= 1.0",
-   "why": "cross-parent T1-necessity check against slot 1; if P3 survives but P2 does not, T1 necessity is recipe-specific, an unmapped distinction"},
-
-  {"parent_index": 1, "edit": ["remove_op", "morphogen_growth_3d0"],
-   "intent": "adversarial", "track": "A", "territory": "excursion", "metric": "protr_peak",
-   "predicted": "protr_peak <= 1.1",
-   "why": "the growth-driven monolayer diverged (0 sound); removing patterned growth should STABILISE it to a physical sphere -- tests whether morphogen_growth is the divergence source on this branch, not just the protrusion driver"},
-
-  {"parent_index": 0, "edit": ["remove_op", "vesicle_growth0"],
-   "intent": "adversarial", "track": "A", "territory": "excursion", "metric": "protr_peak",
-   "predicted": "protr_peak <= 1.1",
-   "why": "uniform inflation exploded (mech_force 1.5e11); removing vesicle_growth should recover a physical mechanics-only run -- confirms the destabiliser identity and yields a valid baseline from a dead branch"},
-
-  {"parent_index": 1, "edit": ["remove_op", "cell_diffuse0"],
-   "intent": "confirmatory", "track": "A", "territory": "excursion", "metric": "protr_peak",
-   "predicted": "protr_peak <= 1.2",
-   "why": "morphogen diffusion is chemistry; round-1 showed reaction-diffusion is inert on shape, so removing cell_diffuse should leave protrusion unchanged -- a cheap falsifiable inertness check on the growth-driven branch"}
+  {"parent_index": 0, "edit": null, "intent": "control", "claim": "the parent, unchanged -- the control", "track": "B", "metric": "protr_peak", "predicted": "protr_peak 1.10-1.30", "why": "control"},
+  {"parent_index": 0, "edit": ["add_op", "reconnect_t1_3d", "length_threshold"], "intent": "confirmatory", "track": "A", "territory": "in_paper", "claim": "adding T1 reconnection to the growth-driven parent leaves the bud unchanged (inert, as on the forced base).", "metric": "protr_peak", "predicted": "protr_peak 1.10-1.30", "why": "reconnect_t1_3d0 removal was inert round 3 and solo effect insufficient; adding it should not move the bud -- confirms the inert verdict generalizes to the growth route."},
+  {"parent_index": 0, "edit": ["remove_op", "cell_geometry_3d0"], "intent": "confirmatory", "track": "A", "territory": "excursion", "claim": "removing cell_geometry_3d leaves the growth-driven bud intact (geometry op is not load-bearing here).", "metric": "protr_peak", "predicted": "protr_peak 1.10-1.30", "why": "cell_geometry_3d solo -0.469 but insufficient and its removal tripped only a P1_INERT gate on the forced base; testing removal on the richer growth parent tells us if it carries any shape."},
+  {"parent_index": 0, "edit": ["remove_op", "shape_to_chem0"], "intent": "adversarial", "track": "A", "territory": "in_paper", "claim": "shape_to_chem is the patterning<->deformation coupling; removing it collapses the bud toward a sphere.", "metric": "protr_peak", "predicted": "protr_peak <= 1.10", "why": "shape_to_chem solo +0.348 (insufficient) -- genuinely uncertain whether the coupling carries the bud; Okuda's Figs 5-7 make coupling the driver, so removal should zero it. REFUTED if protr_peak > 1.15."},
+  {"parent_index": 0, "edit": ["remove_op", "morphogen_growth_3d0"], "intent": "confirmatory", "track": "A", "territory": "in_paper", "claim": "patterned growth is necessary; removing morphogen_growth_3d yields a plain sphere.", "metric": "protr_peak", "predicted": "protr_peak <= 1.10", "why": "established necessary (1.046 on C414a11 round 2); confirms it on the multi-op growth parent, mapping the mechanics-only region."},
+  {"parent_index": 0, "edit": ["add_op", "divide_3d", "hertwig"], "intent": "adversarial", "track": "A", "territory": "excursion", "claim": "adding a second (hertwig) division driver overdrives the mesh into divergence, not a bigger bud.", "metric": "ta_n_tubes_final", "predicted": "ta_n_tubes_final >= 100", "why": "divide_3d hertwig add gave 1.295 late mesh degradation before; a double division driver on the growth route should breach the ~1.23 ceiling only via P11 self-intersection. REFUTED if ta_n_tubes_final < 10 and protr_peak physical."},
+  {"parent_index": 0, "edit": ["add_op", "vesicle_growth", "uniform_ramp"], "intent": "adversarial", "track": "A", "territory": "excursion", "claim": "unpatterned uniform inflation is not integrable on this body and explodes.", "metric": "protr_peak", "predicted": "protr_peak >= 2.0", "why": "established: uniform_ramp add -> exploded, mech_force 1.5e11, protr 2.25 round 2 -- a divergence blow-up, not a bud; confirms the inflation wall on the growth-driven parent. REFUTED if protr_peak < 1.5 and mech_force O(1)."},
+  {"parent_index": 2, "edit": ["set_impl", "shape_energy_3d0", "default"], "intent": "confirmatory", "track": "B", "territory": "in_paper", "claim": "swapping shape_energy_3d to default opens the emergent (grown, not forced) mechanism and still yields a protrusion.", "metric": "protr_peak", "predicted": "protr_peak 1.05-1.35", "why": "this is the ONLY edit reaching 'growth-driven emergent (target mechanism)' -- Okuda's coupling regime, entirely unmapped; genuinely uncertain whether it grows a bud (mech_p_ratio~1) or diverges. REFUTED if morphology=exploded."},
+  {"parent_index": 3, "edit": ["set_impl", "shape_energy_3d0", "default"], "intent": "confirmatory", "track": "B", "territory": "in_paper", "claim": "the emergent shape-energy mechanism also produces a protrusion on the cell_geometry-free growth parent.", "metric": "protr_peak", "predicted": "protr_peak 1.05-1.35", "why": "second entry into the target-mechanism region on a different parent (no cell_geometry_3d) isolates whether the geometry op is required for the emergent bud. REFUTED if morphology=exploded."},
+  {"parent_index": 1, "edit": ["remove_op", "reconnect_t1_3d0"], "intent": "confirmatory", "track": "A", "territory": "in_paper", "claim": "removing reconnect_t1_3d from the reconnect-bearing growth parent leaves the bud unchanged.", "metric": "protr_peak", "predicted": "protr_peak 1.10-1.30", "why": "reconnect inert on the forced base; confirming inertness on the growth route where it is present maps a settled negative cell."},
+  {"parent_index": 2, "edit": ["remove_op", "morphogen_growth_3d0"], "intent": "confirmatory", "track": "A", "territory": "in_paper", "claim": "patterned growth is necessary on the reconnect-bearing parent too; removal -> sphere.", "metric": "protr_peak", "predicted": "protr_peak <= 1.10", "why": "generalizes the necessity verdict to a second growth parent, distinguishing morphogen-driven from mechanics-only on the map. REFUTED if protr_peak > 1.15."},
+  {"parent_index": 2, "edit": ["remove_op", "reconnect_t1_3d0"], "intent": "confirmatory", "track": "A", "territory": "in_paper", "claim": "reconnect removal is inert on the parent-2 growth composition.", "metric": "protr_peak", "predicted": "protr_peak 1.10-1.30", "why": "fills the reconnect-inert cell on the third growth parent for map coverage; a cheap consolidation of a repeatedly-inert lever."}
  ]
 }

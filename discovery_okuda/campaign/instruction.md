@@ -28,45 +28,42 @@ Also available and NOT part of scoring, but informative: mech_p_ratio (tube/body
 ~3 = a FORCED protrusion, ~1 = a growth-driven equilibrium).
 
 <!-- LEARNED PATTERNS -->
-## Learned patterns (updated round 2 meta-review)
+## Learned patterns (updated round 4 meta-review)
 
-**BIGGEST TRAP — protr_peak is a LIE under numerical divergence.** Round 2's two largest protr_peak
-readings (1.317, 2.255) were NOT protrusions — they were the mesh folding through itself. High protr_peak
-co-occurred with premise breaks: **P11** self-intersection (folded-frac ~0.8, ta_n_tubes 1477/1673 = a
-crumpled surface, not tubes), **P5b** non-quasistatic (residual force lags, relax_iters pinned), **P4/P12**
-non-finite chemistry (act_max −2220; mech_force_mean up to 1.5e11). protr_peak/morphology past the divergence
-frame describe a diverging configuration, not tissue. The scorecard admits protr_peak but does NOT gate on
-divergence — that check is YOURS. **Before trusting any protr_peak, confirm the run stayed physical:**
-mech_force_mean O(1) (not 100s–1e11), act_max finite & ~[0,2], ta_n_tubes single-digit, morphology≠exploded.
-A "surprise" that is really a blow-up teaches nothing.
+**THE CENTRAL RESULT — the ~1.19–1.23 bud is a HARD CEILING and every lever that tries to exceed it
+DIVERGES.** Three lever families have now been driven to divergence, not to a bigger bud: op-REMOVAL, uniform
+INFLATION, and (round 4) TUNING the morphogen driver up. Amplification on THIS body is exhausted. A larger
+Okuda morphology needs a DIFFERENT BASE GEOMETRY, not a bigger push here. Stop proposing "make the bud
+bigger" edits; if you must test the ceiling, do it once with a ≤1.25 clause and expect divergence.
 
-**Division is NECESSARY — stop proposing "division-independent protrusion".** Two `remove_op divide_3d0`
-edits both failed (protr_peak 1.317 and 1.19, both < the 1.4 predicted; one also diverged), and the eye read
-the surviving bud as division-DRIVEN. divide_3d0 is load-bearing for the forced protrusion. Do not re-test
-its dispensability.
+**ROUND-4 TRAP (new) — turning morphogen amplitude / gradient / reaction rate UP runs the chemistry away.**
+4/7 runs broke P4+P12+P5b together: growth MANUFACTURES morphogen instead of diluting it (P4 — the growth
+term is a SOURCE), so growth→more morphogen→more growth is positive feedback; the activator went
+0.01→1.41e6→NaN while spatially UNIFORM (P12 non-finite, and uniform = no patterned bud at all), with the
+reaction ~50× faster than mechanics can follow (P5b). This is the round-3 "next action" and it FAILED — do
+NOT re-propose raising morphogen amplitude/sharpness. The only way this family could help is turning the
+reaction DOWN or clamping the source, not up.
 
-**Patterned growth is NECESSARY [ESTABLISHED].** `remove_op morphogen_growth_3d0` on the forced round-33
-recipe collapses protr_peak 1.05 (valid, intact sphere). The forced protrusion needs the morphogen pattern;
-uniform growth cannot substitute (next point).
+**protr_peak is a LIE above ~1.25.** EVERY reading ≥1.29 (1.317×2, 2.255, 1.295, and the round-4 blowups) was
+the mesh folding through itself, never a bud. Fixed SYNDROME: **P11** self-intersection (ta_n_tubes 1000s /
+folded-frac ~0.8), **P5b** non-quasistatic (residual force lags 50–100×), **P4/P12** non-finite chemistry
+(act_max −2220 / 1.4e6; mech_force 100s–1.5e11). The scorecard admits protr_peak but does NOT gate divergence
+— that check is YOURS. **Trust protr_peak only if: mech_force_mean O(1), act_max finite ~[0,2], ta_n_tubes
+single-digit, morphology≠exploded.** morphology="sphere" and mech_p_ratio~1 BOTH lie under divergence. A
+"surprise" that is really a blow-up teaches nothing. STOP predicting ≥1.3 — WRONG-HIGH every time.
 
-**The uniform_ramp inflation family is EXHAUSTED.** `add_op vesicle_growth uniform_ramp` does NOT give a
-gentle spherical null — it diverges/explodes (P11+P5b+P12, mech_force 1.5e11, morphology "exploded"). Unpatterned
-uniform inflation is not integrable on this body. Do not propose it again as a baseline.
-
-**Prediction calibration — the map over-predicts protrusion magnitude.** protr_peak thresholds of ≥1.4
-were WRONG-HIGH twice; real forced/grown buds top out **1.15–1.35** without divergence. Set adversarial
-thresholds around 1.2–1.35, not 1.5+.
-
-**no diag.json still recurs (2/6 round 2)** — `set_impl shape_energy_3d0 monolayer` and one uniform_ramp add
-returned `{}`. These are EXECUTION failures (edit did not compile/run), not biology; they buy nothing and do
-not count in surprise. If an edit family keeps returning `{}`, surface it as an apparatus gap rather than
-re-issuing it.
+**Map of ops (settled, do not re-probe by removal).** NECESSARY: morphogen_growth_3d0, divide_3d0 (removal →
+sphere ~1.05 or divergence). INERT: reconnect_t1_3d0, cell_adjacency0 (bud unchanged 1.19–1.23). SHAPE-ZEROING:
+extrude0, vesicle_growth0 removal → sphere 1.003. DESTABILISING: cell_diffuse0 removal (strips damping →
+diverges), vesicle_growth uniform_ramp add (explodes). cell_geometry_3d0 removal → P1_INERT gate, not evidence.
+Removal only holds/shrinks/diverges — never amplifies.
 
 **Every prediction = ONE clause** `<metric> <op> <value>` on an ADMITTED metric ∈ {protr_peak,
-ta_n_tubes_final, protr_final}. "unstated"/trend-words/REJECTED metrics = not checkable = zero info.
-NEVER propose a control (`replay`/`re-measure`/naming a RECON_ node) — returns bit-identical nulls.
+ta_n_tubes_final, protr_final}. "unstated"/trend-words/rejected metrics = zero info (all 5 round-1 controls
+lost this way). NEVER propose a control (`replay`/`re-measure`/RECON_) — bit-identical nulls.
 
-**Apparatus artefacts — never spend a slot chasing either:** (1) trajectory classifier ValueError on the
-'sphere' string → analysts read metrics.png, verdict unaffected. (2) shape_idx p95 tail trips the P7
-solid→fluid flag on non-deforming spheres — cosmetic. mech_p_ratio ~3 = FORCED, ~1 = GROWN (only trust it
-when the run stayed physical).
+**Apparatus — never spend a slot on these:** (1) `{}`/no-diag = edit did not compile — execution failure, not
+biology; surface as an apparatus gap, don't re-issue. (2) trajectory-classifier ValueError on 'sphere' EVERY
+run → analysts read metrics.png, verdict unaffected. (3) shape_idx p95 tail 3.8–4.2 trips P7 on non-deforming
+buds — cosmetic unless force also blows up. (4) honor the Q_stale quarantine flag on Q_protr_after_relax.
+mech_p_ratio ~3=FORCED / ~1=GROWN only when the run stayed physical.

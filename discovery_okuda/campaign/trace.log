@@ -32,3 +32,64 @@
 14:39:09  Collector done
 15:19:06  about to import caption_wave
 15:19:06  caption_wave imported; calling it
+15:22:25  caption_wave RETURNED
+15:22:25  past captioning; entering the reading loop
+15:22:25  reading r003c_00_ad4767
+15:23:16  read r003c_00_ad4767 OK
+15:23:16  reading r003c_01_dbe707
+15:23:59  read r003c_01_dbe707 OK
+15:23:59  reading r003c_03_f00c83
+15:24:45  read r003c_03_f00c83 OK
+15:24:45  reading r003c_04_dcf832
+15:25:38  read r003c_04_dcf832 OK
+15:25:38  reading r003c_05_a15030
+15:26:10  read r003c_05_a15030 OK
+15:26:10  reading r003c_08_d91830
+15:26:55  read r003c_08_d91830 OK
+15:26:55  reading r003c_10_93160b
+15:27:27  read r003c_10_93160b OK
+15:27:27  reading r003c_11_29eb5f
+15:28:13  read r003c_11_29eb5f OK
+15:28:13  reading loop done; entering Act 3
+15:28:13  Collector: building the record
+15:28:13  Collector done
+16:16:09  about to import caption_wave
+16:16:09  caption_wave imported; calling it
+16:18:58  caption_wave RETURNED
+16:18:58  past captioning; entering the reading loop
+16:18:58  reading r004c_00_29eb5f
+16:19:44  read r004c_00_29eb5f OK
+16:19:44  reading r004c_01_131c61
+16:20:24  read r004c_01_131c61 OK
+16:20:24  reading r004c_03_9848be
+16:21:08  read r004c_03_9848be OK
+16:21:08  reading r004c_04_6c060c
+16:21:48  read r004c_04_6c060c OK
+16:21:48  reading r004c_05_bad8d6
+16:22:32  read r004c_05_bad8d6 OK
+16:22:32  reading r004c_06_eb5a08
+16:23:10  read r004c_06_eb5a08 OK
+16:23:10  reading r004c_07_f2ac86
+16:23:58  read r004c_07_f2ac86 OK
+16:23:58  reading loop done; entering Act 3
+16:23:58  Collector: building the record
+16:23:58  Collector done
+16:43:42  about to import caption_wave
+16:43:42  caption_wave imported; calling it
+16:46:37  caption_wave RETURNED
+16:46:37  past captioning; entering the reading loop
+16:46:37  reading r005c_00_9848be
+16:47:18  read r005c_00_9848be OK
+16:47:18  reading r005c_01_886ccc
+16:48:02  read r005c_01_886ccc OK
+16:48:02  reading r005c_02_46848a
+16:48:53  read r005c_02_46848a OK
+16:48:53  reading r005c_04_56cb49
+16:49:38  read r005c_04_56cb49 OK
+16:49:38  reading r005c_05_ede471
+16:50:19  read r005c_05_ede471 OK
+16:50:19  reading r005c_06_dd0c7a
+16:50:55  read r005c_06_dd0c7a OK
+16:50:56  reading loop done; entering Act 3
+16:50:56  Collector: building the record
+16:50:56  Collector done

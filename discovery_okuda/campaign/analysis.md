@@ -156,3 +156,248 @@ Specimens: valid 2, invalid 2
 Frontier after: C414a11f60c8, C855e6bdbedd, Ca230941a0b1, Cad4767d855d
 Diagnosis: not called
 Steer: surprise 0.50 in the productive band -- hold 70/30
+
+## Round 3 — slot 0: refuted
+
+Node: id=C29eb5fda87d, parent=none
+Track: MISSING
+Hypothesis tested: "protr_peak <= 1.2"
+Config: r003c_11_29eb5f
+Measured: protr_peak=1.317, protr_final=1.287, ta_n_tubes_final=5, mech_p_ratio=1.113
+Reservoir: 2000 of 104004 cells (2%) — not limiting.
+Specimen: invalid — P4, P11, P12, P5b
+Reader: phenotype=degenerate, specimen=MISSING
+Eye-check: DISAGREES — The vesicle grows increasingly irregular, bumpy and jagged, indicating high surface protrusion, which contradicts the predicted low protr_peak <= 1.2.
+Mutation: ('remove_op', 'cell_diffuse0')
+Verdict: inconclusive — specimen invalid, so protr_peak=1.32, protr_final=1.29, ta_n_tubes_final=5, mech_p_ratio=1.11 describe the configuration and not a tissue
+Next: parent=C29eb5fda87d
+
+## Round 3 — slot 1: refuted
+
+Node: id=Cdcf832a5061, parent=none
+Track: MISSING
+Hypothesis tested: "protr_peak >= 1.3"
+Config: r003c_04_dcf832
+Measured: protr_peak=1.295, protr_final=1.295, ta_n_tubes_final=2, mech_p_ratio=0.641
+Reservoir: 2766 of 104004 cells (3%) — not limiting.
+Specimen: valid — all hold
+Reader: phenotype=bud, specimen=MISSING
+Eye-check: supports
+Mutation: ('add_op', 'divide_3d', 'hertwig')
+Verdict: falsified — measured protr_peak=1.29, protr_final=1.29, ta_n_tubes_final=2, mech_p_ratio=0.641 against "protr_peak >= 1.3"
+Next: parent=Cdcf832a5061
+
+## Round 3 — slot 2: confirmed
+
+Node: id=Cdbe70783c06, parent=none
+Track: MISSING
+Hypothesis tested: "protr_peak >= 1.1"
+Config: r003c_01_dbe707
+Measured: protr_peak=1.227, protr_final=1.227, ta_n_tubes_final=2, mech_p_ratio=4.928
+Reservoir: 2000 of 104004 cells (2%) — not limiting.
+Specimen: valid — all hold
+Reader: phenotype=bud, specimen=MISSING
+Eye-check: supports
+Mutation: ('remove_op', 'reconnect_t1_3d0')
+Verdict: supported — measured protr_peak=1.23, protr_final=1.23, ta_n_tubes_final=2, mech_p_ratio=4.93 against "protr_peak >= 1.1"
+Next: parent=Cdbe70783c06
+
+## Round 3 — slot 3: confirmed
+
+Node: id=Cad4767d855d, parent=none
+Track: MISSING
+Hypothesis tested: "protr_peak 1.1-1.3"
+Config: r003c_00_ad4767
+Measured: protr_peak=1.19, protr_final=1.19, ta_n_tubes_final=1, mech_p_ratio=5.776
+Reservoir: 2000 of 104004 cells (2%) — not limiting.
+Specimen: valid — all hold
+Reader: phenotype=bud, specimen=MISSING
+Eye-check: supports
+Mutation: none (control)
+Verdict: supported — measured protr_peak=1.19, protr_final=1.19, ta_n_tubes_final=1, mech_p_ratio=5.78 against "protr_peak 1.1-1.3"
+Next: parent=Cad4767d855d
+
+## Round 3 — slot 4: refuted
+
+Node: id=Cf00c830ceca, parent=none
+Track: MISSING
+Hypothesis tested: "protr_peak <= 1.1"
+Config: r003c_03_f00c83
+Measured: protr_peak=1.19, protr_final=1.19, ta_n_tubes_final=1, mech_p_ratio=5.776
+Reservoir: 2000 of 104004 cells (2%) — not limiting.
+Specimen: valid — all hold
+Reader: phenotype=bud, specimen=MISSING
+Eye-check: DISAGREES — The movie shows a distinct bulging protrusion and elongated pear/neck shape, contradicting the predicted protr_peak <= 1.1 (i.e. little to no protrusion).
+Mutation: ('remove_op', 'cell_adjacency0')
+Verdict: falsified — measured protr_peak=1.19, protr_final=1.19, ta_n_tubes_final=1, mech_p_ratio=5.78 against "protr_peak <= 1.1"
+Next: parent=Cf00c830ceca
+
+## Round 3 — slot 5: confirmed
+
+Node: id=Cd91830c9090, parent=none
+Track: MISSING
+Hypothesis tested: "protr_peak >= 1.0"
+Config: r003c_08_d91830
+Measured: protr_peak=1.052, protr_final=1.051, ta_n_tubes_final=1, mech_p_ratio=1.384
+Reservoir: 2000 of 104004 cells (2%) — not limiting.
+Specimen: valid — all hold
+Reader: phenotype=bud, specimen=MISSING
+Eye-check: supports
+Mutation: ('remove_op', 'reconnect_t1_3d0')
+Verdict: supported — measured protr_peak=1.05, protr_final=1.05, ta_n_tubes_final=1, mech_p_ratio=1.38 against "protr_peak >= 1.0"
+Next: parent=Cd91830c9090
+
+## Round 3 — slot 6: confirmed
+
+Node: id=Ca15030d7ab2, parent=none
+Track: MISSING
+Hypothesis tested: "protr_peak <= 1.05"
+Config: r003c_05_a15030
+Measured: protr_peak=1.003, protr_final=1.003, ta_n_tubes_final=0, mech_p_ratio=0
+Reservoir: 2000 of 104004 cells (2%) — not limiting.
+Specimen: valid — all hold
+Reader: phenotype=sphere, specimen=MISSING
+Eye-check: supports
+Mutation: ('remove_op', 'extrude0')
+Verdict: supported — measured protr_peak=1, protr_final=1, ta_n_tubes_final=0, mech_p_ratio=0 against "protr_peak <= 1.05"
+Next: parent=Ca15030d7ab2
+
+## Round 3 — slot 7: confirmed
+
+Node: id=C93160bc7edb, parent=none
+Track: MISSING
+Hypothesis tested: "protr_peak <= 1.1"
+Config: r003c_10_93160b
+Measured: protr_peak=1.003, protr_final=1.003, ta_n_tubes_final=0, mech_p_ratio=0
+Reservoir: 2000 of 104004 cells (2%) — not limiting.
+Specimen: valid — all hold
+Reader: phenotype=sphere, specimen=MISSING
+Eye-check: supports
+Mutation: ('remove_op', 'vesicle_growth0')
+Verdict: supported — measured protr_peak=1, protr_final=1, ta_n_tubes_final=0, mech_p_ratio=0 against "protr_peak <= 1.1"
+Next: parent=C93160bc7edb
+
+## Round 3 — summary
+
+Posed: 12   Evidence: 8   Refused: 4 (critic post-hoc: [<P1_INERT_OPERATOR: rd; critic post-hoc: [<P1_INERT_OPERATOR: rd; no diag.json -- the run produced no reco; critic post-hoc: [<P3_CHEMISTRY_DIVERGED)
+Surprise: 5/8
+Tracks: 0 Track A, 0 Track B
+Specimens: valid 7, invalid 1
+Frontier after: C29eb5fda87d, C93160bc7edb, Ca15030d7ab2, Cad4767d855d, Cd91830c9090, Cdbe70783c06, Cdcf832a5061, Cf00c830ceca
+Diagnosis: not called
+Steer: surprise 0.71 > 0.5: almost everything breaks (drifting to 0/100, no map accumulates). Push CONFIRMATORY.
+
+## Round 4 — slot 0: refuted
+
+Node: id=C9848beadaf6, parent=none
+Track: MISSING
+Hypothesis tested: "protr_peak 1.10-1.25"
+Config: r004c_03_9848be
+Measured: protr_peak=1.34, protr_final=1.34, ta_n_tubes_final=10, mech_p_ratio=1.153
+Reservoir: 2000 of 104004 cells (2%) — not limiting.
+Specimen: invalid — P4, P11, P12, P5b
+Reader: phenotype=degenerate, specimen=MISSING
+Eye-check: supports
+Mutation: ('remove_op', 'reconnect_t1_3d0')
+Verdict: inconclusive — specimen invalid, so protr_peak=1.34, protr_final=1.34, ta_n_tubes_final=10, mech_p_ratio=1.15 describe the configuration and not a tissue
+Next: parent=C9848beadaf6
+
+## Round 4 — slot 1: refuted
+
+Node: id=C29eb5fda87d, parent=none
+Track: MISSING
+Hypothesis tested: "protr_peak 1.10-1.25"
+Config: r004c_00_29eb5f
+Measured: protr_peak=1.317, protr_final=1.287, ta_n_tubes_final=5, mech_p_ratio=1.113
+Reservoir: 2000 of 104004 cells (2%) — not limiting.
+Specimen: invalid — P4, P11, P12, P5b
+Reader: phenotype=sphere, specimen=MISSING
+Eye-check: supports
+Mutation: none (control)
+Verdict: inconclusive — specimen invalid, so protr_peak=1.32, protr_final=1.29, ta_n_tubes_final=5, mech_p_ratio=1.11 describe the configuration and not a tissue
+Next: parent=C29eb5fda87d
+
+## Round 4 — slot 2: refuted
+
+Node: id=C131c610a03f, parent=none
+Track: MISSING
+Hypothesis tested: "protr_peak <= 1.10"
+Config: r004c_01_131c61
+Measured: protr_peak=1.317, protr_final=1.287, ta_n_tubes_final=5, mech_p_ratio=1.113
+Reservoir: 2000 of 104004 cells (2%) — not limiting.
+Specimen: invalid — P4, P11, P12, P5b
+Reader: phenotype=sphere, specimen=MISSING
+Eye-check: DISAGREES — The movie shows the surface growing increasingly bumpy and jagged rather than relaxing to a smooth low-protrusion body.
+Mutation: ('remove_op', 'shape_to_chem0')
+Verdict: inconclusive — specimen invalid, so protr_peak=1.32, protr_final=1.29, ta_n_tubes_final=5, mech_p_ratio=1.11 describe the configuration and not a tissue
+Next: parent=C131c610a03f
+
+## Round 4 — slot 3: refuted
+
+Node: id=C6c060c3f8fd, parent=none
+Track: MISSING
+Hypothesis tested: "protr_peak 1.10-1.25"
+Config: r004c_04_6c060c
+Measured: protr_peak=1.317, protr_final=1.287, ta_n_tubes_final=5, mech_p_ratio=1.113
+Reservoir: 2000 of 104004 cells (2%) — not limiting.
+Specimen: invalid — P4, P11, P12, P5b
+Reader: phenotype=undulation, specimen=MISSING
+Eye-check: DISAGREES — The movie shows generalized surface roughening/bumpiness, not a single discrete intact bud protrusion.
+Mutation: ('remove_op', 'cell_geometry_3d0')
+Verdict: inconclusive — specimen invalid, so protr_peak=1.32, protr_final=1.29, ta_n_tubes_final=5, mech_p_ratio=1.11 describe the configuration and not a tissue
+Next: parent=C6c060c3f8fd
+
+## Round 4 — slot 4: refuted
+
+Node: id=Cbad8d602b01, parent=none
+Track: MISSING
+Hypothesis tested: "protr_peak <= 1.06"
+Config: r004c_05_bad8d6
+Measured: protr_peak=1.286, protr_final=1.286, ta_n_tubes_final=1, mech_p_ratio=0.465
+Reservoir: 2706 of 104004 cells (3%) — not limiting.
+Specimen: valid — all hold
+Reader: phenotype=bud, specimen=MISSING
+Eye-check: supports
+Mutation: ('remove_op', 'extrude0')
+Verdict: falsified — measured protr_peak=1.29, protr_final=1.29, ta_n_tubes_final=1, mech_p_ratio=0.465 against "protr_peak <= 1.06"
+Next: parent=Cbad8d602b01
+
+## Round 4 — slot 5: confirmed
+
+Node: id=Ceb5a08335c1, parent=none
+Track: MISSING
+Hypothesis tested: "protr_peak >= 1.12"
+Config: r004c_06_eb5a08
+Measured: protr_peak=1.264, protr_final=1.219, ta_n_tubes_final=0, mech_p_ratio=4.484
+Reservoir: 2545 of 104004 cells (2%) — not limiting.
+Specimen: ambiguous — P7
+Reader: phenotype=bud, specimen=MISSING
+Eye-check: supports
+Mutation: ('add_op', 'divide_3d', 'hertwig')
+Verdict: inconclusive — specimen ambiguous, so protr_peak=1.26, protr_final=1.22, ta_n_tubes_final=0, mech_p_ratio=4.48 describe the configuration and not a tissue
+Next: parent=Ceb5a08335c1
+
+## Round 4 — slot 6: refuted
+
+Node: id=Cf2ac86789d3, parent=none
+Track: MISSING
+Hypothesis tested: "protr_peak >= 1.15"
+Config: r004c_07_f2ac86
+Measured: protr_peak=1.052, protr_final=1.051, ta_n_tubes_final=1, mech_p_ratio=1.384
+Reservoir: 2000 of 104004 cells (2%) — not limiting.
+Specimen: valid — all hold
+Reader: phenotype=bud, specimen=MISSING
+Eye-check: supports
+Mutation: ('remove_op', 'morphogen_growth_3d0')
+Verdict: falsified — measured protr_peak=1.05, protr_final=1.05, ta_n_tubes_final=1, mech_p_ratio=1.38 against "protr_peak >= 1.15"
+Next: parent=Cf2ac86789d3
+
+## Round 4 — summary
+
+Posed: 9   Evidence: 7   Refused: 2 (critic post-hoc: [<P3_CHEMISTRY_DIVERGED; no diag.json -- the run produced no reco)
+Surprise: 3/7
+Tracks: 0 Track A, 0 Track B
+Specimens: valid 2, invalid 4, ambiguous 1
+Frontier after: C131c610a03f, C29eb5fda87d, C6c060c3f8fd, C9848beadaf6, Cbad8d602b01, Ceb5a08335c1, Cf2ac86789d3
+Diagnosis: not called
+Steer: surprise 0.50 in the productive band -- hold 70/30
