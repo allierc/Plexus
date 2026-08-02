@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  2 AUG 2026 06:22
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  2 AUG 2026 06:41
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -852,7 +852,7 @@ b></usr/share/texmf/fonts/type1/public/cm-super/sfti1095.pfb></usr/share/texmf/
 fonts/type1/public/cm-super/sftt0900.pfb></usr/share/texmf/fonts/type1/public/c
 m-super/sftt1000.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt1095.pfb
 >
-Output written on discovery_note.pdf (21 pages, 2277831 bytes).
+Output written on discovery_note.pdf (21 pages, 2214485 bytes).
 PDF statistics:
  286 PDF objects out of 1000 (max. 8388607)
  208 compressed objects within 3 object streams

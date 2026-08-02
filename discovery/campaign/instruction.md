@@ -28,43 +28,40 @@ Also available and NOT part of scoring, but informative: mech_p_ratio (tube/body
 ~3 = a FORCED protrusion, ~1 = a growth-driven equilibrium).
 
 <!-- LEARNED PATTERNS -->
-## Learned patterns (updated round 21)
+## Learned patterns (updated round 1, fresh start)
 
-**21 straight rounds, ZERO valid non-control evidence** (~120 slots, all controls or uncheckable
-"unstated"). THE MOVE (a wk_ config + a raised pool + a checkable clause) has been ORDERED for ~6
-consecutive rounds and NEVER emitted — the proposer keeps emitting controls instead. That behaviour is
-now itself the datum: escalating the exhortation does nothing, so this round FLIPS the priority. B is
-the DEFAULT; A is the exception you take only if you can literally write the pool line into the edit.
+**Round 1 (post-reset) reproduced the pre-reset failure verbatim: 6/6 slots were controls, 0 carried a
+checkable prediction, all 4 wk_ slots saturated.** No valid non-control morphogenesis evidence exists
+yet; 0 of 4 Okuda morphologies attempted. The two failure modes below are the whole story so far.
 
-**OPTION B — surface the gap (DEFAULT this round).** The instant you are not writing `sets.cell.n` into
-this edit — including the instant you notice you are about to emit a replay / re-measure / "fresh" CFL
-point (that reflex IS the signal A is blocked) — emit exactly the string
-`APPARATUS GAP: cannot raise growth reserve` and STOP. Do NOT fall back to a control (the 21-round
-trap). This is a Diagnostician trigger; the Diagnostician has NEVER been called, and if the pool is
-truly unsettable, calling it IS the finding. Surfacing the gap beats a 22nd flat round.
+**FAILURE 1 — controls carry zero info; never propose one.** A `replay` / `re-measure` / "fresh" CFL
+(c,d) point / naming a characterised RECON_ node as object-of-study returns bit-identical null numbers
+(CFL: protr_peak 1.006, mech_force_mean 2.4378, sphere across c∈[0.01,1.3] d∈[0.42,10]). CFL = Turing
+chemistry on a rigid ball with NO growth/division operator (P1/P2/P3 na) → sphere is the expected NULL,
+not a result. All 6 round-1 slots were this. Catching yourself about to emit a re-measure IS the signal
+the real move is blocked — surface the gap instead of retreating (see FALLBACK).
 
-**OPTION A — emit THE MOVE (only if you can actually write the pool line).** One wk_ growth config
-(curvature/tension/apical_area/pressure) + the single line `sets.cell.n: 2400` + a one-clause prediction
-on an ADMITTED metric. Start `wk_pressure_pos`, predict `protr_peak > 1.10` (pressure peaks highest:
-1.11 > curvature 1.085 > apical/tension ~1.07). The gap has NEVER been "add a wk_ operator" — it is
-*pool-line + checkable-clause together on one slot.*
-- WHY the pool line: wk_ growth is mechanically ACTIVE (force ~28, migration ~0.49) but drives final n
-  to 1766 into pool `sets.cell.n`(=1800) → P2_BUFFER_SATURATED voids the ENTIRE scorecard (30+ runs,
-  NOT driver-specific). Raise ≥2400 (≥ expected final n) so it never hits the cap.
-- WHY a clause: bare "unstated" / trend word / REJECTED metric = NOT CHECKABLE = zero info (rounds
-  1–21). Prediction = ONE clause `<metric> <op> <value>`, metric ∈ {protr_peak, ta_n_tubes_final,
-  protr_final}. If a raised-pool run comes back n_cells_final=1766, the reserve is inexpressible → B.
+**FAILURE 2 — an "unstated" / trend-word / REJECTED-metric prediction is NOT CHECKABLE = zero info.**
+Every prediction is ONE clause `<metric> <op> <value>` or `<metric> <lo>-<hi>` naming an ADMITTED metric
+∈ {protr_peak, ta_n_tubes_final, protr_final}. Round 1: all 6 predictions were "unstated" → inconclusive.
 
-**NEVER propose a control** — the DOMINANT failure (~114 slots). A replay / re-measure / "fresh" CFL c,d
-point / naming a characterised RECON_ node as object-of-study all return bit-identical numbers
-(mech_force_mean 2.4378; CFL null across c∈[0.01,1.3] d∈[0.42,10]) → zero info. CFL is background.
+**THE MOVE (never yet emitted — do this).** ONE wk_ growth config (curvature / tension / apical_area /
+pressure) + the single line `sets.cell.n: 2400` + one checkable clause. Suggested first:
+`wk_pressure_pos`, predict `protr_peak > 1.10` (pressure peaks highest: 1.11 > curvature 1.071 >
+apical/tension ~1.074). The gap has NEVER been "add a wk_ operator" — it is *pool-line AND
+checkable-clause together on one slot.*
+- WHY the pool line: wk_ growth IS mechanically active (force ~28, migration ~0.49) but drives final n
+  to 1766 into pool `sets.cell.n`(=1800) → P2_BUFFER_SATURATED sets valid_evidence=false and voids the
+  ENTIRE scorecard, not driver-specific. All 4 round-1 wk_ slots saturated. Raise sets.cell.n ≥2400
+  (> expected final n) so it never caps. If a raised-pool run STILL returns n_cells_final=1766 the
+  reserve is inexpressible → FALLBACK.
 
-**Do NOT chase the round-15 P4 break.** It fired on `cfl_c004p000` — an EXTREME out-of-range CFL config
-with INERT-sphere metrics (protr 1.006, no growth), NOT a growth run; it does NOT show "growth adds
-volume without diluting." Ignore.
+**FALLBACK — surface the gap, do not retreat to a control.** The instant you cannot write `sets.cell.n`
+into the edit, emit exactly `APPARATUS GAP: cannot raise growth reserve` and STOP. This triggers the
+Diagnostician (never yet called); if the pool is truly unsettable, calling it IS the finding.
 
-**mech_p_ratio is 0 everywhere** (no tube exists) → cannot separate FORCED from GROWN protrusion until
-one valid tube lands. 0 of 4 Okuda morphologies attempted.
+**mech_p_ratio = 0 everywhere** (no tube exists) → cannot separate FORCED (ratio ~3) from GROWN
+(ratio ~1) protrusion until one valid tube lands.
 
 **Two apparatus artefacts — never spend a slot on either:** (1) trajectory classifier ValueError
 'sphere' → analysts fall back to metrics.png, verdict unaffected. (2) shape_idx p95 tail ~3.845 trips
