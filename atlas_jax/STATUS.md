@@ -1,9 +1,12 @@
 # Atlas — jax-morph: status
 
-*Written 2026-08-01, at the point where Phases 0–6 are done and the question becomes whether any
-of this transfers to a second repository.*
+*(This directory was `atlas_jax_morph/` until 2026-08-02; it is now `atlas_jax/`, with `config/atlas_jax/`, `log/atlas_jax/` and `graphs_data/atlas_jax/` alongside.)*
 
-The full narrative is `atlas_note.pdf` (27 pages). This file is the operational summary: what was
+*Written 2026-08-01 at the close of Phase 6; updated 2026-08-02. Programme-level view:
+`../ATLAS_STATUS.md`. A second campaign (`atlas_cc3d`) now exists and the transfer question is
+answered — see `TRANSFER.md` there.*
+
+The full narrative is `atlas_note.pdf` (28 pages). This file is the operational summary: what was
 done, what it cost, what is reusable, and what is not.
 
 ---
@@ -138,9 +141,12 @@ Recorded because they are the argument for the whole apparatus.
 
 ## 7. What is deliberately not done
 
-- **Phase 7 / promotion.** 16 mechanisms sit at `validated`, none promoted. The curator should
-  probably not live in this folder at all — it writes into `src/plexus/operators/` and belongs
-  with the language, not with one repository's atlas.
+- **Phase 7 / promotion.** 16 mechanisms sit at `validated`, none promoted — and this is now
+  programme policy rather than an open task. `plexus2.tex` requires *"evidence that the mechanism
+  is reusable beyond its originating prototype"* before promotion, which is exactly what
+  `../catalog.py` measures; of these 16 contracts only `adhere` and `morphogen` have so far been
+  sighted in a second repository. The curator should also not live in this folder — it writes into
+  `src/plexus/operators/` and belongs with the language, not with one repository's atlas.
 - **The `regulate × growth` composition is not a fourth contract**, and must not be registered as
   one — that would be exactly the inflated `new` the ledger exists to prevent.
 - **Figure 5 proper**: the inverse result is two parameters and a response target, not a gene
