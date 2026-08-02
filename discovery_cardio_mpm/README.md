@@ -41,7 +41,10 @@ marker, which is why it looks empty.) Ten drive tissue with active traction of a
     PYTHONPATH=…/src python corpus.py --descriptors # read all ten with the Track B descriptors
     PYTHONPATH=…/src python corpus.py --figure OUT  # the visual instrument, rebuilt
 
-Two findings so far: **LoopScore scores a coordination-destroyed tissue at exactly 1.0000 on all
+    PYTHONPATH=…/src python reproduce.py --check    # migrate the stale recipes
+    PYTHONPATH=…/src python reproduce.py --run NAME # regenerate into _repro/ (archive untouched)
+
+Findings so far: **LoopScore scores a coordination-destroyed tissue at exactly 1.0000 on all
 ten runs**, while its zero-motion null ranges +0.033…+0.124; and **7 of 10 specs no longer run**,
 because `pulse_stimulus` and `phase_delay_pulse` were merged into `activation_pulse` (commit
 `0acb0de`) — the same rename defect that destroyed six batches of the previous campaign.
