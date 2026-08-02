@@ -556,3 +556,69 @@ class MPMScatterAccumulate(Exchange):
         g.m = g.m + gm                                    # ACCUMULATE (the one real difference)
         g.mv = g.mv + gmv
         return {}
+
+
+# --------------------------------------------------------------------------- #
+#  6. muscle_sleeve (lateral): the connective-tissue pulley
+# --------------------------------------------------------------------------- #
+@register_operator("muscle_sleeve", family="mechanics", set="muscle_particle", kind="lateral")
+class MuscleSleeve(Lateral):
+    """The orbital PULLEY: a connective-tissue sleeve that holds a muscle's path in place
+    sideways while leaving it free to shorten.
+
+    A free-floating strap is a column in compression the moment it contracts, and a slender
+    column buckles: in this prototype the obliques -- short, sharply curved, unsupported --
+    folded to 55-70% of their length while the fibre stretch stayed near 0.75, so the
+    force-length limiter never engaged and the buckled tissue crushed the globe. The missing
+    mechanism is not numerical. Each extraocular muscle passes through a sleeve of collagen
+    and smooth muscle fixed to the orbital wall (Demer's active-pulley hypothesis), and that
+    sleeve is exactly a transverse constraint: it fixes where the muscle path RUNS without
+    resisting how much it SHORTENS.
+
+    So the restoring force is applied only to the component of the displacement PERPENDICULAR
+    to the local fibre:
+
+        d = pos - rest ,   d_par = (d . f) f ,   acc = -k (d - d_par) - c v_perp
+
+    Sliding along the fibre is untouched, so contraction is free; sideways excursion is
+    penalised, so the strap cannot fold. The sleeve is strong proximally and tapers to zero
+    over the distal third (`free_from` -> `free_to`), because the pulleys sit in mid-orbit:
+    the tendon end must stay free to follow the globe as it rotates, or the sleeve would
+    fight the very rotation the muscle is producing.
+    """
+
+    EMIT = "mpm_acceleration"
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = ["k"]
+    INPUTS = ["muscle_particle"]
+    OUTPUTS = ["muscle_particle"]
+    READS = ["pos", "vel"]
+    WRITES = []
+    MECHANISM_TAGS = ["muscle_pulley", "transverse_constraint", "path_stabilisation",
+                      "anti_buckling"]
+    PARAM_ROLES = {"k": "sleeve_stiffness", "c": "sleeve_damping",
+                   "free_from": "taper_start_along_fibre", "free_to": "fully_free_along_fibre"}
+    REFERENCE = "Demer, J. L. et al. (1995). Invest. Ophthalmol. Vis. Sci. 36:1125; Demer, J. L. (2002). Invest. Ophthalmol. Vis. Sci. 43:2179 (active pulleys)."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "muscle_particle")
+        self.k = float(params["k"])
+        self.c = float(params.get("c", 30.0))
+        self.free_from = float(params.get("free_from", 0.70))
+        self.free_to = float(params.get("free_to", 0.88))
+
+    def forward(self, H, mask=None):
+        p = H.level(self.at)
+        if not hasattr(p, "rest") or not hasattr(p, "fibre"):
+            return {}
+        f = p.fibre
+        d = p.get("pos") - p.rest
+        v = p.get("vel")
+        d_perp = d - (d * f).sum(1, keepdim=True) * f          # sideways only: shortening is free
+        v_perp = v - (v * f).sum(1, keepdim=True) * f
+        w = 1.0 - ((p.s - self.free_from) / max(self.free_to - self.free_from, 1e-6)).clamp(0.0, 1.0)
+        acc = (-self.k * d_perp - self.c * v_perp) * w[:, None]
+        if mask is not None:
+            acc = acc * mask[:, None].float()
+        return {self.at: acc}
