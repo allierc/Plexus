@@ -198,7 +198,43 @@ def plan(n_rounds, recon_rounds=1):
            ["composition"] * max(0, n_rounds - recon_rounds)
 
 
-def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None, recon_rounds=1):
+CAMPAIGN_STATE = ("analysis.md", "memory.md", "knowledge.md", "lever_map.md",
+                  "causal_descriptions.md", "proposal.json", "state.json", "frontier.json",
+                  "hypotheses.jsonl", "round_records.jsonl", "archivist.jsonl",
+                  "llm_timing.jsonl", "peer_review.jsonl", "diagnoses.jsonl",
+                  "supervisor.jsonl", "lever_map.jsonl", "trace.log")
+
+
+def clean_start():
+    """Delete the campaign's state so the next round is ROUND 1. Never the research record.
+
+    THE DEFAULT, because the alternative bit twice. state.json holds the round counter, and it
+    survived every restart today -- so a driver launched as a fresh 20-round campaign printed
+    `[supervisor] resumed: round 21` and opened at ROUND 22, silently inheriting a campaign whose
+    analysis.md and memory.md were written by a different design. A run that says "round 1/20"
+    and starts at 22 is lying to whoever reads the terminal.
+
+    `_archive*`, `q_quarantine.jsonl`, the TEMPLATE files and `user_input.md` are NOT campaign
+    state -- they are the research record and the instructions -- and are never touched.
+    """
+    import glob
+    removed = []
+    for f in CAMPAIGN_STATE:
+        p = os.path.join(CAMP, f)
+        if os.path.exists(p):
+            os.remove(p)
+            removed.append(f)
+    for pat in ("log/okuda/r0??n_*", "log/okuda/r0??c_*",
+                "config/okuda/r0*.yaml", "config/okuda/r0*.composition.json"):
+        for p in glob.glob(os.path.join(os.path.dirname(HERE), pat)):
+            import shutil
+            shutil.rmtree(p, ignore_errors=True) if os.path.isdir(p) else os.remove(p)
+    print(f"[loop] CLEAN START -- removed {len(removed)} campaign file(s); the next round is 1")
+    return removed
+
+
+def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None, recon_rounds=1,
+         resume=False):
     other = _already_running()
     if other:
         print("[campaign] REFUSING TO START -- another campaign loop is already running:")
@@ -212,6 +248,10 @@ def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None, recon_rounds=
     print("=" * 96)
     _log({"event": "start", "rounds": n_rounds, "batch": batch, "frames": frames})
 
+    if resume:
+        print("[loop] --resume: continuing the campaign already in campaign/")
+    else:
+        clean_start()
     modes = plan(n_rounds, recon_rounds)
     print(f"[loop] plan: {modes.count('recon')} recon round(s) to build the frontier, then "
           f"{modes.count('composition')} composition round(s) that can pose a hypothesis")
@@ -227,19 +267,22 @@ def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None, recon_rounds=
 
         cost = _cost_so_far()
         if usd_ceiling and cost.get("usd", 0) >= usd_ceiling:
-            print(f"\n[loop] STOPPING -- ${cost['usd']} spent against a ${usd_ceiling} ceiling")
+            print(f"\n[loop] STOPPING -- {cost.get('minutes', 0)} agent-min spent against a "
+                  f"{usd_ceiling} ceiling")
             _log({"event": "stop", "why": "budget", "cost": cost, "rounds_done": done})
             return 0
 
         print(f"\n{'-' * 96}\n[loop] round {i + 1}/{n_rounds}  mode={mode}   "
-              f"spent so far: ${cost.get('usd', 0)} over {cost.get('calls', 0)} calls\n{'-' * 96}")
+              f"spent so far: {cost.get('minutes', 0)} agent-min over "
+              f"{cost.get('calls', 0)} calls\n{'-' * 96}")
         code, minutes, note = run_round(batch, frames, mode=mode)
         done += 1
         after = _cost_so_far()
-        spent = round(after.get("usd", 0) - cost.get("usd", 0), 2)
+        spent = round(after.get("minutes", 0) - cost.get("minutes", 0), 2)
         _log({"event": "round", "n": i + 1, "exit": code, "minutes": minutes,
               "usd_this_round": spent, "note": note, "cost_total": after})
-        print(f"[loop] round {i + 1} exited {code} after {minutes} min, ${spent} of agents")
+        print(f"[loop] round {i + 1} exited {code} after {minutes} min wall, "
+              f"{spent} min of agents")
 
         if code in TERMINAL_EXITS:
             print(f"[loop] STOPPING -- {TERMINAL_EXITS[code]}")
@@ -286,7 +329,7 @@ def status():
         print("no campaign_loop journal yet")
         return
     rows = [json.loads(l) for l in open(JOURNAL) if l.strip()]
-    print(f"{'when':>9}  {'event':10} {'round':>6} {'exit':>5} {'min':>7} {'$ round':>8}")
+    print(f"{'when':>9}  {'event':10} {'round':>6} {'exit':>5} {'wall min':>9} {'agent min':>10}")
     for r in rows[-30:]:
         print(f"{time.strftime('%H:%M:%S', time.localtime(r['t'])):>9}  "
               f"{r.get('event',''):10} {str(r.get('n','')):>6} {str(r.get('exit','')):>5} "
@@ -300,15 +343,22 @@ if __name__ == "__main__":
     ap.add_argument("--rounds", type=int, default=3)
     ap.add_argument("--batch", type=int, default=4)
     ap.add_argument("--frames", type=int, default=None)
-    ap.add_argument("--usd-ceiling", type=float, default=None,
-                    help="stop once measured agent spend reaches this")
+    ap.add_argument("--minutes-ceiling", type=float, default=None, dest="usd_ceiling",
+                    help="stop once measured AGENT MINUTES reach this. Time, not money: a "
+                         "dollar figure says nothing about whether a week-long run will "
+                         "finish, and it was the only unit the driver reported.")
     ap.add_argument("--recon-rounds", type=int, default=1,
                     help="rounds of reconnaissance before switching to composition (default 1; "
                          "recon is a one-shot and rolling it re-measures the same specs)")
+    ap.add_argument("--resume", action="store_true",
+                    help="continue the campaign in campaign/ instead of starting clean. The "
+                         "DEFAULT is a clean start at round 1: state.json holds the round "
+                         "counter and inheriting it silently opened a '20-round campaign' at "
+                         "round 22.")
     ap.add_argument("--status", action="store_true")
     a = ap.parse_args()
     if a.status:
         status()
         raise SystemExit(0)
     raise SystemExit(loop(a.rounds, a.batch, a.frames, usd_ceiling=a.usd_ceiling,
-         recon_rounds=a.recon_rounds))
+         recon_rounds=a.recon_rounds, resume=a.resume))
