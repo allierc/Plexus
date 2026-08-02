@@ -48,7 +48,7 @@ from plexus.models.state import (
 from plexus.engine import _integrate
 
 ORACLE = os.path.join(HERE, "_oracle", "runs", "diff_neural_ode")
-OUTDIR = os.path.join(PLEXUS, "log", "atlas", "neural_ode")
+OUTDIR = os.path.join(PLEXUS, "log", "atlas_jax", "neural_ode")
 DTYPE = torch.float64
 DTS = [0.5, 1.0, 2.0]
 CONFIGS = [("A", 0, 3), ("B", 2, 2)]           # (tag, hidden_size, n_out)  -- must match the oracle

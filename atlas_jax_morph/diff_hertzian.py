@@ -136,7 +136,7 @@ result = {
     "spec": os.path.relpath(SPEC, PLEXUS),
 }
 
-out_dir = os.path.join(PLEXUS, "log", "atlas", "hertzian")
+out_dir = os.path.join(PLEXUS, "log", "atlas_jax", "hertzian")
 os.makedirs(out_dir, exist_ok=True)
 with open(os.path.join(out_dir, "diff.json"), "w") as f:
     json.dump(result, f, indent=2)

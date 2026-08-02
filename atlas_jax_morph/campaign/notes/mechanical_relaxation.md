@@ -127,15 +127,15 @@ both (`0.0`); misaligned-vs-IC `0.1135 =` relaxation displacement (equilibrium g
 Summary observables agree: gyration ref-equilibrium `0.6858 ==` plexus final `0.68575`; mean_nn
 `0.9698 == 0.9698`.
 
-*Acted ledger* (`log/atlas/mechanical_relaxation/diag.json`): `relax` calls 6 / **acted 1** / moved
+*Acted ledger* (`log/atlas_jax/mechanical_relaxation/diag.json`): `relax` calls 6 / **acted 1** / moved
 0.1123 (acts once, then idempotently emits ~0 on the held equilibrium -- the quasistatic fixed-point
 signature), `seed_state` acted, `inert_operators []`, `valid_evidence true`. The IC is BYTE-IDENTICAL
 (4-cell diamond, oracle-printed 6-decimal float32; buffer 8 with 4 dead slots at the origin).
 
 *Runs.* Oracle `atlas_jax_morph/_oracle/runs/diff_mechanical_relaxation/` (reference.npz + summary.json);
-Plexus `config/atlas/mechanical_relaxation.yaml` -> `log/atlas/mechanical_relaxation/`
+Plexus `config/atlas/mechanical_relaxation.yaml` -> `log/atlas_jax/mechanical_relaxation/`
 (diag.json, metrics.json/.npz, spec_run.yaml, strip.png) + `graphs_data/atlas/mechanical_relaxation/`;
-analysis `_oracle/scripts/_analyze_mechanical_relaxation.py` -> `log/atlas/mechanical_relaxation/diff.json`.
+analysis `_oracle/scripts/_analyze_mechanical_relaxation.py` -> `log/atlas_jax/mechanical_relaxation/diff.json`.
 
 *What the diff DOES and does not settle.* It validates the **forward equilibration** -- the FIRE-to-
 tolerance solver plus the quasistatic `(x*-x0)/dt` emit reproduce the reference equilibrium to float32

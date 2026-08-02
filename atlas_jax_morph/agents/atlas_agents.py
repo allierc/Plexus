@@ -335,7 +335,7 @@ ROLE: DIFFER. Decide whether our operator actually reproduces the reference's be
 WHAT ALREADY EXISTS -- do not rebuild it.
   * `config/atlas/jax_morph_proliferation.yaml` is the ANCHOR spec: the authors' own
     proliferation composition (relax + grow_radius + cell_divide) on their four founders, and it
-    RUNS. Its evidence folder is `log/atlas/jax_morph_proliferation/`. Start from it: copy it,
+    RUNS. Its evidence folder is `log/atlas_jax/jax_morph_proliferation/`. Start from it: copy it,
     change the one thing your mechanism needs, keep everything else identical.
   * The matching oracle run is `atlas_jax_morph/_oracle/runs/smoke/` (reference.npz +
     summary.json), same initial condition, 40 macro-steps at dt=1.0.
@@ -367,7 +367,7 @@ THE ORDER OF OPERATIONS IS THE WHOLE TEST. Do it in exactly this order:
    a `summary.json` into its run directory.
 3. Write the matching Plexus spec under `config/atlas/<id>.yaml` and RUN IT THROUGH THE ENGINE
    with `python atlas_jax_morph/run_spec.py <id>`, which writes a real evidence folder at
-   `log/atlas/<id>/` in the same shape as `log/okuda/coral_fixed_ball/`:
+   `log/atlas_jax/<id>/` in the same shape as `log/okuda/coral_fixed_ball/`:
        spec_run.yaml   the spec exactly as run
        diag.json       config, summary numbers, the ACTED LEDGER, wall clock, run id
        metrics.json    summary + the per-frame series
@@ -412,7 +412,7 @@ If you promote:
 2. Add the library page `library/<name>.qmd` in the house style of its neighbours, and its card
    in `library_operators.qmd` under the right family.
 3. Write a spec in `config/atlas/` that composes it with at least one operator Plexus already
-   had, and run it with `run_spec.py` so it leaves an evidence folder under `log/atlas/`. A
+   had, and run it with `run_spec.py` so it leaves an evidence folder under `log/atlas_jax/`. A
    vocabulary item that only works beside its own siblings has not joined the language, and one
    with no run behind it has not been demonstrated at all.
 4. Set `status: promoted` and fill `test:`.

@@ -186,7 +186,7 @@ evidence:
     decision, committed = daughters woken that call); measured on the division-ONLY reduction,
     PROVEN count-neutral at seed 0 (full composition and division-only both give 124) because only
     cell_divide draws H.rng in this spec, so dropping relax/grow_radius leaves the division RNG
-    stream bit-identical (log/atlas/division/diff_plexus_summary.json; script
+    stream bit-identical (log/atlas_jax/division/diff_plexus_summary.json; script
     _oracle/scripts/division_plexus.py). The hazard is a per-cell-step rate, so relax and growth --
     which move cells and grow radii but neither add nor remove cells -- cannot perturb it; both
     sides measure the SAME hazard map. Scope: this differ tests the HAZARD map (the one the open
@@ -225,7 +225,7 @@ evidence:
     never separate a wrong hazard from noise -- the pooled hazard can, and it agrees. The
     volume-conservation/placement maps (not exercised by the count-based hazard) are corroborated
     by the anchor gyration agreeing to ~9% (Plexus 3.52 vs reference 3.23). Acted ledger
-    (log/atlas/division/diag.json): cell_divide calls 41 / acted 33, grow_radius 41/41, relax
+    (log/atlas_jax/division/diag.json): cell_divide calls 41 / acted 33, grow_radius 41/41, relax
     41/33, seed_state 1/1, inert_operators [] -> valid_evidence true.
 state_io_notes:
   reads:

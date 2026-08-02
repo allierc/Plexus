@@ -244,10 +244,10 @@ evidence:
     would fail on float32 reassociation between the two stacks alone.
   value: 7.610894538878732e-08
   passed: true
-  plexus_run: log/atlas/virial_stress/
+  plexus_run: log/atlas_jax/virial_stress/
   scorer: atlas_jax_morph/_oracle/scripts/_compare_virial_stress.py
   acted_ledger: |
-    From log/atlas/virial_stress/diag.json: mechanosense calls 5 / acted 1, moved 0.0, kind
+    From log/atlas_jax/virial_stress/diag.json: mechanosense calls 5 / acted 1, moved 0.0, kind
     lateral, structural true -- it ACTED (wrote the stress field) but moved nothing, exactly a pure
     sensor; seed_state calls 1 / acted 1 (sets the uniform radius 0.5 that V_i and sigma need).
     inert_operators []; valid_evidence true ("every scheduled operator acted at least once").

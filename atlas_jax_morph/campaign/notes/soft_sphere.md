@@ -281,6 +281,6 @@ verdict/dispute (that is the normalizer's axis); it validates the IMPLEMENTATION
 **Paths.**
 - Oracle: `atlas_jax_morph/_oracle/runs/diff_soft_sphere/` (reference.npz + summary.json);
   script `atlas_jax_morph/_oracle/scripts/soft_sphere.py`.
-- Plexus: `config/atlas/soft_sphere.yaml` -> `log/atlas/soft_sphere/` (diag.json, metrics.json,
+- Plexus: `config/atlas/soft_sphere.yaml` -> `log/atlas_jax/soft_sphere/` (diag.json, metrics.json,
   strip.png) + `graphs_data/atlas/soft_sphere/trajectory.npz`.
-- Scorer: `atlas_jax_morph/_oracle/scripts/_analyze_soft_sphere.py` -> `log/atlas/soft_sphere/diff.json`.
+- Scorer: `atlas_jax_morph/_oracle/scripts/_analyze_soft_sphere.py` -> `log/atlas_jax/soft_sphere/diff.json`.

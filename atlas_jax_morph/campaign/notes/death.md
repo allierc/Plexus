@@ -137,7 +137,7 @@ with the exact hazard within 1 SE. Acted ledger: `apoptose` calls 41 / acted 41 
 => `valid_evidence: true` (checked before any metric).
 
 **Paths.** oracle run `atlas_jax_morph/_oracle/runs/diff_death/` (script
-`_oracle/scripts/death.py`); Plexus evidence `log/atlas/death/` (spec `config/atlas/death.yaml`);
+`_oracle/scripts/death.py`); Plexus evidence `log/atlas_jax/death/` (spec `config/atlas/death.yaml`);
 differential computed by `_oracle/scripts/_analyze_death.py`.
 
 **Scope (unchanged from implemented).** This validates the forward EFFECT (the source's `replay`):

@@ -33,8 +33,8 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PLEXUS = os.path.abspath(os.path.join(HERE, ".."))
-LOG_DIR = os.path.join(PLEXUS, "log", "atlas")
-DATA_DIR = os.path.join(PLEXUS, "graphs_data", "atlas")
+LOG_DIR = os.path.join(PLEXUS, "log", "atlas_jax")
+DATA_DIR = os.path.join(PLEXUS, "graphs_data", "atlas_jax")
 
 SKIP_FIELDS = {"vel", "pos", "occ"}          # kinematics, already in the position movie
 BG, FG = "black", "white"

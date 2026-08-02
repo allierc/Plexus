@@ -12,7 +12,7 @@ soft_sphere/hertzian). Corroborators: single-step IC force residual, gyration re
 (adhesion CONTRACTS the cluster vs soft_sphere's expansion), dead-slot immobility, frame-0 == IC on
 both sides, misaligned-frame control. NEGATIVE CONTROL (from the oracle): a purely-repulsive
 SoftSphere with the matched core diverges the trajectory by O(1) sigma -- reported here to show the
-metric resolves the adhesive tail. Writes diff.json into log/atlas/harmonic/.
+metric resolves the adhesive tail. Writes diff.json into log/atlas_jax/harmonic/.
 """
 import json
 import os
@@ -23,7 +23,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PLEXUS = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 REF = os.path.join(HERE, "..", "runs", "diff_harmonic", "reference.npz")
 PLX = os.path.join(PLEXUS, "graphs_data", "atlas", "harmonic", "trajectory.npz")
-LOG = os.path.join(PLEXUS, "log", "atlas", "harmonic")
+LOG = os.path.join(PLEXUS, "log", "atlas_jax", "harmonic")
 
 r = np.load(REF)
 p = np.load(PLX)

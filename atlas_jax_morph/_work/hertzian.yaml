@@ -229,7 +229,7 @@ evidence:
     trajectory (uniform radius 0.5, dt=0.1) and x_plx is the same spec run through plexus.engine
     (adhere gated after_frame:1 so recorded frame 0 is the pristine shared IC and frame t is the
     IC after t overdamped steps). Computed by atlas_jax_morph/diff_hertzian.py into
-    log/atlas/hertzian/diff.json. evidence.value is the PRIMARY.
+    log/atlas_jax/hertzian/diff.json. evidence.value is the PRIMARY.
   threshold: 0.0001
   threshold_why: |
     Two thresholds, BOTH PRE-REGISTERED in the scorer before any diff was computed
@@ -251,7 +251,7 @@ evidence:
     tighter would fail on float32 reassociation alone.
   value: 1.894631743528317e-06
   passed: true
-  plexus_run: log/atlas/hertzian/
+  plexus_run: log/atlas_jax/hertzian/
   scorer: atlas_jax_morph/diff_hertzian.py
   acted_ledger: |
     adhere: calls 40 / acted 40, moved 0.69977516 (max live-cell displacement, == the oracle's own
@@ -260,7 +260,7 @@ evidence:
     not a still life. (The PRIMARY force-field metric is a direct forward() call, not gated by the
     schedule; the ledger validates the SECONDARY trajectory run.)
   corroborators: |
-    All from log/atlas/hertzian/diff.json unless noted. (1) Peak force magnitudes agree
+    All from log/atlas_jax/hertzian/diff.json unless noted. (1) Peak force magnitudes agree
     independently of the rel-err normalization: |F_ref|_max 0.86514318 vs |F_plx|_max 0.86514449
     (~1.3e-6). (2) Newton's third law holds on BOTH sides -- the summed internal force is ~0
     (ref 6.7e-8, plexus 3.7e-8): a momentum-conserving pair force, no phantom net drift. (3) The

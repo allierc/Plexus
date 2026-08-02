@@ -172,7 +172,7 @@ cannot express a per-cell drive, so this run was stepped through the engine's ow
 
 **Paths.**
   * oracle:  `atlas_jax_morph/_oracle/runs/diff_odecontroller/` (reference.npz, summary.json, diff.json)
-  * engine:  `log/atlas/odecontroller/` (diag.json acted ledger: regulate acted 19/21 -- the last two
+  * engine:  `log/atlas_jax/odecontroller/` (diag.json acted ledger: regulate acted 19/21 -- the last two
     near-fixed-point ticks emit a delta below the float32 ledger threshold; convergence, not a
     no-op; `valid_evidence: true`, no inert operators).
   * comparison script: `atlas_jax_morph/_oracle/scripts/_compare_odecontroller.py` (torch env).

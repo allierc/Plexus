@@ -49,7 +49,7 @@ def load_reference():
 def load_plexus():
     """Positions/occupancy from the npz; radius from the zarr, which keeps the full state."""
     import zarr
-    dd = os.path.join(PLEXUS, "graphs_data", "atlas", "jax_morph_proliferation")
+    dd = os.path.join(PLEXUS, "graphs_data", "atlas_jax", "jax_morph_proliferation")
     z = zarr.open(os.path.join(dd, "simulation.zarr"), mode="r")
     g = dict(z.groups())["cell"]
     arrs = dict(g.arrays())

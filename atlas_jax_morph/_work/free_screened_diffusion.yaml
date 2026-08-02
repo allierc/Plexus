@@ -202,7 +202,7 @@ evidence:
     3-D branch), C1 9.7e-08. All fields finite; every dead slot exactly 0.0 on both sides (the S=99
     source parked on a DEAD slot emits nothing). The ported A&S Bessel K0/K1, the r_eff=max(r,a)
     self/near clamp, the per-species vmap-vs-loop, and the twice-applied alive mask all reproduce to
-    float32 rounding. The engine leg (log/atlas/free_screened_diffusion, diag.json) confirms the
+    float32 rounding. The engine leg (log/atlas_jax/free_screened_diffusion, diag.json) confirms the
     operator ACTS: `morphogen` writes the `chemical` block from zero on the matched 4-founder geometry
     (acted 1/5, inert_operators []); run_spec's position-only metrics are field-invariant here because
     the solve moves no cell, so the field itself is scored by this isolated differ. This certifies the

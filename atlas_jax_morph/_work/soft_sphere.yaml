@@ -177,7 +177,7 @@ evidence:
     makes the reference deterministic (verified identical across two PRNG keys) and its
     Euler-Maruyama update reduces to dx = dt*forces, the trajectory is a PURE function of the
     force law, so D_pos isolates the SoftSphere force F = -grad (eps/2)(1 - r/sigma)^2.
-    Computed by _oracle/scripts/_analyze_soft_sphere.py into log/atlas/soft_sphere/diff.json.
+    Computed by _oracle/scripts/_analyze_soft_sphere.py into log/atlas_jax/soft_sphere/diff.json.
   threshold: 0.001
   threshold_why: |
     1.0e-3 sigma, PRE-REGISTERED in the scorer (_analyze_soft_sphere.py:77) before the diff was
@@ -192,14 +192,14 @@ evidence:
     alone.
   value: 2.6973983046972182e-06
   passed: true
-  plexus_run: log/atlas/soft_sphere/
+  plexus_run: log/atlas_jax/soft_sphere/
   scorer: atlas_jax_morph/_oracle/scripts/_analyze_soft_sphere.py
   acted_ledger: |
     adhere: calls 60 / acted 60, max|delta| 0.37996304 (== oracle force_ic_max 0.37996307 to
     ~3e-8); inert_operators []; valid_evidence true. The one scheduled operator moved cells every
     frame -- this is a run, not a still life.
   corroborators: |
-    All from log/atlas/soft_sphere/diff.json. (1) Frame 0 == pristine IC on BOTH sides (residual
+    All from log/atlas_jax/soft_sphere/diff.json. (1) Frame 0 == pristine IC on BOTH sides (residual
     0.0 / 0.0) -- the aligned convention is real. (2) Deliberately MISALIGNED comparison
     x_plx(t) vs x_ref(t-1) scores 0.0788 sigma, ~29000x D_pos -> the frame alignment is genuinely
     correct, not an accidental match to a shifted trajectory. (3) Single-step IC force residual

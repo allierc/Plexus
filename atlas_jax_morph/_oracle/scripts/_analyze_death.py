@@ -28,7 +28,7 @@ oc = np.asarray(oref["counts"], dtype=np.float64)
 LAM, DT = osum["lambda"], osum["dt"]
 
 # --- plexus -------------------------------------------------------------------------------- #
-pnpz = np.load(os.path.join(PLEXUS, "log", "atlas", "death", "metrics.npz"))
+pnpz = np.load(os.path.join(PLEXUS, "log", "atlas_jax", "death", "metrics.npz"))
 pc = np.asarray(pnpz["cell__n_active"], dtype=np.float64)
 
 

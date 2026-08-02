@@ -194,11 +194,11 @@ evidence:
     discriminators, run in that same numpy harness, blow past the threshold: the WRONG logistic
     sigmoid lands 1.31 from the reference and the paper's input-OUTSIDE-sigmoid form lands 2.38
     (~2.5 orders over 5e-3), so the metric genuinely catches the SOURCE-WINS mechanism choices.
-    Acted ledger checked FIRST (log/atlas/gene_network_connectionist/diag.json): regulate 20/20
+    Acted ledger checked FIRST (log/atlas_jax/gene_network_connectionist/diag.json): regulate 20/20
     calls acted, moved 0.823 (the ODE really evolved the gene block), seed_state 1/1,
     inert_operators [], valid_evidence true -- the metric is on a live operator, not an inert one.
     Score driver _oracle/runs/diff_gene_network_connectionist/diff.json; engine evidence
-    log/atlas/gene_network_connectionist/.
+    log/atlas_jax/gene_network_connectionist/.
 state_io_notes:
   reads:
   - gene_state (per-cell hidden + output gene concentrations, the ODE initial condition y0)

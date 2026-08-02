@@ -139,7 +139,7 @@ evidence:
     Bernoulli hazard pooled over every eligible live-cell-step). Oracle: Model([Death]), N0=50000
     live cells at uniform death_rate lambda=0.05, dt=1.0, 40 macro-steps
     (atlas_jax_morph/_oracle/runs/diff_death). Plexus: config/atlas/death.yaml, identical
-    N0/lambda/dt/frame-count (log/atlas/death). The estimator is invariant to the engine's
+    N0/lambda/dt/frame-count (log/atlas_jax/death). The estimator is invariant to the engine's
     record-after-apply off-by-one -- Plexus' first RECORDED frame is already post-step-1 (47506,
     not the pristine 50000; apoptose acted 41x over 41 frames per the acted ledger) -- because a
     constant-hazard process is stationary, so any consecutive-frame window is unbiased for p.

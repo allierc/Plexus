@@ -224,6 +224,6 @@ overdamped dynamics to byte equality; it does not touch the verdict (new -> adhe
 on the signature argument in `why`.
 
 **Runs.** oracle `atlas_jax_morph/_oracle/runs/diff_lennard_jones/` (reference.npz + summary.json);
-plexus `log/atlas/lennard_jones/` (spec_run.yaml, diag.json, metrics.json/.npz, strip.png,
-movie.mp4); diff `log/atlas/lennard_jones/diff.json`. **Verdict: status validated, D_pos 0.0 <
+plexus `log/atlas_jax/lennard_jones/` (spec_run.yaml, diag.json, metrics.json/.npz, strip.png,
+movie.mp4); diff `log/atlas_jax/lennard_jones/diff.json`. **Verdict: status validated, D_pos 0.0 <
 1e-3, passed.**

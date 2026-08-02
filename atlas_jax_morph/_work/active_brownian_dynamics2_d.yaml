@@ -190,4 +190,4 @@ evidence:
     C(t) == 1 for every t. glide (which run_spec CAN see) acted 41/41, moving positions at speed
     0.3, so the run is a real spreading ABP cloud (gyration 0.30 -> 7.48). Oracle:
     _oracle/runs/diff_active_brownian_dynamics2_d (reference.npz + summary.json). Plexus:
-    log/atlas/active_brownian_dynamics2_d (run_spec evidence) + its companion diff_plexus_summary.json.
+    log/atlas_jax/active_brownian_dynamics2_d (run_spec evidence) + its companion diff_plexus_summary.json.

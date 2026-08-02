@@ -9,7 +9,7 @@ Primary metric  D_pos = max over frames t=0..100 and LIVE cells i of ||x_plx-x_r
 Threshold       1.0e-3 (sigma).  Corroborators: single-step IC force residual, pair-separation
 trajectory agreement, the SoftSphere negative control (LJ diverges from it), dead-slot immobility,
 frame-0 == IC on both sides, and the oracle's own scan-vs-analytic guard. Writes diff.json into
-log/atlas/lennard_jones/.
+log/atlas_jax/lennard_jones/.
 """
 import json
 import os
@@ -21,7 +21,7 @@ PLEXUS = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 REF = os.path.join(HERE, "..", "runs", "diff_lennard_jones", "reference.npz")
 PLX = os.path.join(PLEXUS, "graphs_data", "atlas", "lennard_jones", "trajectory.npz")
 ORC_SUMMARY = os.path.join(HERE, "..", "runs", "diff_lennard_jones", "summary.json")
-LOG = os.path.join(PLEXUS, "log", "atlas", "lennard_jones")
+LOG = os.path.join(PLEXUS, "log", "atlas_jax", "lennard_jones")
 
 r = np.load(REF)
 p = np.load(PLX)

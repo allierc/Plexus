@@ -115,7 +115,7 @@ both the vector-field scale (max|dg|~5-7) and the Dopri-vs-Euler gap (0.482). Pa
 same `f`; immune to the integrator. Looser 1e-2 would stop distinguishing `f`-agreement from a
 small drive-law error; tighter 1e-8 is below float32 rounding and unmeetable.
 
-**The acted ledger checked first** (`log/atlas/gene_network_mwc/diag.json`): `regulate` 25/25 calls
+**The acted ledger checked first** (`log/atlas_jax/gene_network_mwc/diag.json`): `regulate` 25/25 calls
 acted, moved 1.754 (nonzero -> the ODE genuinely evolved the gene block); `seed_state` 1/1;
 `valid_evidence: true`. A metric on an inert operator would be worthless — it is not inert.
 
@@ -123,7 +123,7 @@ acted, moved 1.754 (nonzero -> the ODE genuinely evolved the gene block); `seed_
 - Oracle (reference `f`, jax/diffrax venv): `_oracle/runs/diff_gene_network_mwc/`
   (`reference.npz` + `summary.json`; script `_oracle/scripts/gene_network_mwc.py`).
 - Engine (Plexus torch): spec `config/atlas/gene_network_mwc.yaml`; evidence
-  `log/atlas/gene_network_mwc/` (diag.json, metrics.json/.npz, spec_run.yaml, strip.png).
+  `log/atlas_jax/gene_network_mwc/` (diag.json, metrics.json/.npz, spec_run.yaml, strip.png).
 - Score: `diff_gene_network_mwc.py score` -> `_oracle/runs/diff_gene_network_mwc/diff.json`.
 
 **Note for a re-run.** `diff_gene_network_mwc.py` loads the candidate operator by file path and

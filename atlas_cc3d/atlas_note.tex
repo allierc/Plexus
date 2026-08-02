@@ -1,0 +1,189 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.4cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{tcolorbox}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{longtable}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{good}{HTML}{1B7F3B}
+\definecolor{warn}{HTML}{B26B00}
+\definecolor{bad}{HTML}{B3261E}
+\definecolor{grey}{HTML}{666666}
+\definecolor{rule}{HTML}{2B4C7E}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\dn}{\textcolor{good}{\textbf{done}}}
+\newcommand{\fl}{\textcolor{warn}{\textbf{in flight}}}
+\newcommand{\ns}{\textcolor{grey}{not started}}
+\newcommand{\done}{\textcolor{good}{\textbf{DONE}}}
+\newcommand{\prog}{\textcolor{warn}{\textbf{IN PROGRESS}}}
+\newcommand{\todo}{\textcolor{grey}{\textbf{NOT STARTED}}}
+\newcommand{\solid}{\textcolor{good}{\textbf{solid}}}
+\newcommand{\weak}{\textcolor{warn}{\textbf{weak}}}
+\newcommand{\unsup}{\textcolor{bad}{\textbf{unsupported}}}
+
+% the five outcomes a mechanism can have against the promoted language (see the contract box, S2)
+\newcommand{\cNew}{\textcolor{good}{\textbf{new word}}}
+\newcommand{\cImpl}{\textcolor{rule}{\textbf{another way}}}
+\newcommand{\cAlias}{\textcolor{grey}{\textbf{already had it}}}
+\newcommand{\cRef}{\textcolor{warn}{\textbf{widen a word}}}
+\newcommand{\cOut}{\textcolor{grey}{no biology}}
+\newcommand{\cUnk}{\textcolor{bad}{\textbf{unclassified}}}
+
+\titleformat{\section}{\large\bfseries\color{rule}}{\thesection.}{0.6em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{}{0em}{}
+\setlist[itemize]{leftmargin=1.1em,itemsep=2pt,topsep=3pt}
+\setlength{\parskip}{5pt}
+\setlength{\parindent}{0pt}
+\renewcommand{\arraystretch}{1.25}
+
+\newtcolorbox{phasebox}[1]{colback=white,colframe=rule!55,boxrule=0.7pt,
+  arc=2pt,left=8pt,right=8pt,top=6pt,bottom=6pt,title={\bfseries #1},
+  fonttitle=\color{white},colbacktitle=rule}
+
+\title{\textbf{Plexus Atlas --- CompuCell3D}\\[6pt]
+\large The second repository, and the first test of whether any of this transfers}
+\author{}
+\date{1 August 2026}
+
+\begin{document}
+\maketitle
+\vspace{-2.2\baselineskip}
+
+\begin{center}\small\color{grey}
+The twin of \texttt{atlas\_jax\_morph/atlas\_note.pdf}. That one asked whether Plexus can say what
+one framework says. This one asks whether the \emph{procedure} is a procedure.
+\end{center}
+
+\vspace{4pt}
+\hrule
+\vspace{10pt}
+
+%======================================================================
+\section{Why a second repository, and why this one}
+
+One repository cannot show saturation. The measurement \texttt{plexus2.tex} App.~E.1 asks for ---
+\emph{does decomposing a broad collection of frameworks converge on a compact reusable
+vocabulary?} --- is a claim about what happens \emph{across} frameworks. With $n=1$ the curve is a
+shape, not an argument.
+
+\textbf{Target: CompuCell3D (Cellular Potts).} Nominated by the jax-morph note before any of this
+work, on the grounds that it is \emph{the biggest step away from everything we have}: a cell is not
+a point with per-cell state, it is a \textbf{set of lattice sites}. Its position is a derived
+centroid. Its dynamics are Metropolis flips of site ownership. There is no per-cell equation to
+subtract.
+
+That is the point. Every measurement in the jax-morph atlas rested on cells being points and a
+differential test being a subtraction. \textbf{If the procedure is general it survives this; if it
+is secretly a particle-framework procedure, this is where it breaks.}
+
+The prediction --- made before running anything, and the reason this note exists --- is in
+\code{TRANSFER.md}.
+
+%======================================================================
+\section{Phase 0 --- what transferred, measured rather than asserted}
+
+\code{STATUS.md} in the jax-morph atlas claimed $\sim$60\% of the Python was instrument and would
+copy as-is. Forking it is the test of that claim, and it came out slightly better than claimed.
+
+\begin{center}
+\small
+\begin{tabular}{@{}l l p{7.6cm}@{}}
+\toprule
+\textbf{file} & \textbf{edits} & \textbf{why}\\
+\midrule
+\code{record.py} & \textcolor{good}{none} & schema, ladder and the twelve rules are about the
+record, not the target. Self-test passes unchanged.\\
+\code{saturation.py} & \textcolor{good}{none} & the ledger scores against the frozen baseline;
+nothing in it knows what a cell is. Self-test passes.\\
+\code{atlas.py} & \textcolor{good}{none} & blast radius, rung, commit-or-revert --- all
+\code{HERE}-relative.\\
+\code{registry\_view.py} & \textcolor{good}{none} & reads \code{plexus.operators}. Produced the
+same 52-contract baseline from the new folder.\\
+\code{agents/} & \textcolor{good}{none} & the six roles describe a job, not a repository.\\
+\code{run\_spec.py} & \textcolor{warn}{5 lines} & output paths only
+(\code{log/atlas\_cc3d/}, \code{graphs\_data/atlas\_cc3d/}).\\
+\code{oracle.py}, \code{inventory.py}, \code{paper.py} & \textcolor{bad}{rewrite} & target-specific
+by construction: the reference, its mechanism scan, its PDF.\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{Five of the seven instruments needed zero edits.} That is the strongest evidence so far
+that the apparatus is a method rather than a one-off, and it cost about ten minutes to establish.
+
+%======================================================================
+\section{The oracle --- where the risk actually is}
+
+\code{TRANSFER.md} predicted the oracle would be the largest risk and a \emph{target} risk rather
+than a \emph{procedure} risk. It is, and here is the state of it.
+
+\begin{center}
+\small
+\begin{tabular}{@{}l l p{8.2cm}@{}}
+\toprule
+\textbf{gate} & \textbf{state} & \\
+\midrule
+installs & \dn & CompuCell3D 4.10.0 from its own conda channel into an isolated environment
+(\code{/workspace/.conda\_envs/cc3d-oracle}), py312.\\
+imports & \dn & after supplying \code{libGL} (conda-forge \code{libgl-devel}); the container is
+headless and CompuCell3D links its graphics stack unconditionally.\\
+pure-Python model definition & \dn & \code{cc3d.core.PyCoreSpecs} --- a simulation can be built
+without XML, which is what makes a scriptable oracle possible at all.\\
+seed exposed & \dn & \code{PottsCore(random\_seed=...)}, so determinism is at least
+\emph{expressible}.\\
+headless run & \textcolor{bad}{\textbf{BLOCKED}} & see below.\\
+deterministic at a fixed seed & \ns & cannot be tested until it runs.\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{The blocker is a bug in CompuCell3D 4.10.0, not in the plan.} Driving it from
+\code{PyCoreSpecs} through \code{service\_cc3d} reaches
+\code{persistent\_globals.get\_custom\_settings\_path()}, which does
+\code{Path(custom\_settings\_source)} where \code{custom\_settings\_source} is the \emph{list of
+specs} rather than a simulation file path:
+
+\begin{center}
+\small\code{TypeError: argument should be a str or an os.PathLike object ... not 'list'}
+\end{center}
+
+Three ways out, in the order they will be tried: an earlier release (4.9.0 / 4.8.0) where the
+pure-Python path may predate the regression; the \code{.cc3d} project-file route via
+\code{cc3d\_runScript.sh}, which is the officially supported headless entry point and does not
+touch that code path; or setting the custom-settings path explicitly before the call.
+
+\textbf{Nothing downstream can be trusted until this gate passes}, and that is the whole
+discipline: jax-morph was chosen \emph{because} it ran, and the note said so. A target that cannot
+be run reduces the atlas to the Okuda situation --- wrong operator, wrong parameter or wrong
+reading, with no way to tell which.
+
+%======================================================================
+\section{What is not started}
+
+Phases 1--7. The mechanism inventory, the specs, the differential tests and the ledger all wait on
+the oracle gate. \textbf{The one thing worth doing before it passes} is the instrument gap
+\code{TRANSFER.md} identifies: the ledger's \code{implementation} class detects a contract claimed
+twice \emph{within} one run, not \emph{across} runs --- so a CompuCell3D mechanism matching a
+jax-morph \emph{candidate} would read as \code{new} when it is really a second sighting. That is a
+defect that only becomes visible at the second repository, which is exactly the kind of thing this
+exercise exists to surface.
+
+\vspace{6pt}
+\hrule
+\vspace{6pt}
+{\small\color{grey}
+\textbf{Where things are.} \code{TRANSFER.md} --- the prediction, written first.
+\code{../atlas\_jax\_morph/STATUS.md} --- what the first atlas produced and what was reusable.
+\code{\_state/registry\_baseline.json} --- the same frozen 52 contracts, so the two measurements
+are comparable.}
+
+\end{document}

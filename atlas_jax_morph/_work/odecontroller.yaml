@@ -171,7 +171,7 @@ evidence:
     ~80x under the 2e-4 bar. Per-frame error peaks at 2.44e-06 mid-trajectory and decays to 0 as
     the circuit reaches its fixed point (two accurate adaptive Dopri5 integrations of a contracting
     ODE, NOT accumulating disagreement). Full breakdown in
-    _oracle/runs/diff_odecontroller/diff.json. Engine evidence: log/atlas/odecontroller/ (acted
+    _oracle/runs/diff_odecontroller/diff.json. Engine evidence: log/atlas_jax/odecontroller/ (acted
     ledger: regulate acted 19/21 -- the last two near-fixed-point ticks emit a delta below the
     float32 ledger threshold; genuine convergence, not a no-op; valid_evidence true).
 disputed:

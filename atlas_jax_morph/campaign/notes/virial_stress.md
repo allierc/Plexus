@@ -124,7 +124,7 @@ at r = 0.7 / 1.0 / 1.3 / 2.0 / 3.0 (compression / well-min / tension / tapered /
 one dense 8-cell sunflower cluster (the multi-neighbour sum), 4 dead padding slots (masking), all
 radius 0.5 so sigma = r_i + r_j = 1.0. The spec `config/atlas/virial_stress.yaml` shares that IC
 cell-for-cell (`seed_state` sets radius 0.5; `mechanosense` reduces Morse eps 3.0 alpha 2.8) and
-run through `plexus.engine` -> `log/atlas/virial_stress/`. Metric = peak-normalized relative stress
+run through `plexus.engine` -> `log/atlas_jax/virial_stress/`. Metric = peak-normalized relative stress
 error over the 18 live cells on frame 0, plus a dead-slot |stress| guard and a frames-identical
 guard; pre-registered at 1e-4 / 1e-6 in `_oracle/scripts/_compare_virial_stress.py` (lines 72, 81,
 82).
@@ -133,7 +133,7 @@ guard; pre-registered at 1e-4 / 1e-6 in `_oracle/scripts/_compare_virial_stress.
 
 - PRIMARY engine Morse: **rel 7.61e-8** (max_abs 1.9e-6 on peak 25.06) — 3+ orders under the 1e-4 bar.
 - Dead slots: **0.0 on both sides**; **frames_identical true** (sensor is a still life across all 4 frames).
-- Acted ledger (`log/atlas/virial_stress/diag.json`): `mechanosense` calls 5 / acted 1, moved 0.0;
+- Acted ledger (`log/atlas_jax/virial_stress/diag.json`): `mechanosense` calls 5 / acted 1, moved 0.0;
   `seed_state` acted; `inert_operators []`; `valid_evidence true`.
 - Oracle internal gates: STEP == `PairwisePotential.virial_pressure` bit-for-bit; PRNG-key-independent.
 - Analytic cross-check (by-hand single-neighbour Morse): max|dev| 3.2e-6 — r=0.7 -> +11.414
@@ -143,7 +143,7 @@ guard; pre-registered at 1e-4 / 1e-6 in `_oracle/scripts/_compare_virial_stress.
   points pass — 4 other pair laws on the uniform IC (rel <= 1.3e-7) and all 5 laws on a second
   UNEQUAL-RADII IC (rel <= 3.3e-7), exercising sigma = r_i + r_j and per-cell d-ball V_i.
 
-**Runs:** oracle `_oracle/runs/diff_virial_stress/` · plexus `log/atlas/virial_stress/` · scorer
+**Runs:** oracle `_oracle/runs/diff_virial_stress/` · plexus `log/atlas_jax/virial_stress/` · scorer
 `_oracle/scripts/_compare_virial_stress.py` · value 7.610894538878732e-08 · threshold 1e-4 · **passed**.
 
 **Scope / not settled.** Validates the written VALUE across five laws, equal + unequal radii, masking,

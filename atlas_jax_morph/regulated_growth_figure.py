@@ -32,7 +32,7 @@ C_ABL = "#FF6B6B"      # ablated control
 
 def load(name):
     import zarr
-    z = zarr.open(os.path.join(PLEXUS, "graphs_data", "atlas", name, "simulation.zarr"), mode="r")
+    z = zarr.open(os.path.join(PLEXUS, "graphs_data", "atlas_jax", name, "simulation.zarr"), mode="r")
     g = dict(z.groups())["cell"]
     a = dict(g.arrays())
     st = dict(dict(g.groups())["state"].arrays())
