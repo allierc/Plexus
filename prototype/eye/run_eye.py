@@ -66,11 +66,17 @@ def _scalars(p, sel):
     return strain, vm
 
 
+def eye_c_now(H):
+    """The globe's live centroid (the pose readout has already written it this tick)."""
+    return H.levels["eye"].get("pos")[0]
+
+
 def capture_run(sim, device, stride=3, n_shell=26000, n_cut=16000, n_mus=14000,
                 n_grid_pts=9000, seed=0):
     keys = ("frame", "shell", "cut_pos", "cut_strain", "cut_vm",
             "mus_pos", "mus_strain", "mus_vm", "act", "tension", "length",
-            "ins", "pull", "axis", "gaze", "target", "centre", "gpos", "gvel")
+            "ins", "pull", "axis", "gaze", "target", "centre", "gpos", "gvel",
+            "radius", "radius_spread")
     rec = {k: [] for k in keys}
     idx = {}
     rng = np.random.default_rng(seed)
@@ -98,10 +104,18 @@ def capture_run(sim, device, stride=3, n_shell=26000, n_cut=16000, n_mus=14000,
             idx["tissue"] = p.tissue[idx["shell"]].cpu().numpy()
             idx["mus_parent"] = q.parent[idx["mus"]].cpu().numpy()
             idx["mus_s"] = q.s[idx["mus"]].cpu().numpy()
+            idx["r_rest"] = p.rest[idx["shell"]].norm(dim=1).clamp(min=1e-9)
         s, cu, mu_i = idx["shell"], idx["cut"], idx["mus"]
         X, Y = p.get("pos"), q.get("pos")
         c_strain, c_vm = _scalars(p, cu)
         m_strain, m_vm = _scalars(q, mu_i)
+
+        # THE GLOBE'S RADIUS, per shell point, as a ratio to its own rest radius. The globe is
+        # an ovoid, so an absolute radius means nothing; the ratio is shape-agnostic. Its MEAN
+        # says whether the eye is being squeezed or inflated, its SPREAD whether it is still a
+        # smooth body of revolution or is being pulled out of shape -- which is how "the muscles
+        # dismantled the eye" shows up as a number rather than as a look at the movie.
+        r_now = (X[s] - eye_c_now(H)).norm(dim=1) / idx["r_rest"]
 
         m, eye = H.levels["muscle"], H.levels["eye"]
         g = H.fields["mpm_grid"]
@@ -134,6 +148,8 @@ def capture_run(sim, device, stride=3, n_shell=26000, n_cut=16000, n_mus=14000,
         rec["target"].append(np.asarray(cmd.target(frame), np.float32))
         rec["gpos"].append(f32(gp))
         rec["gvel"].append(f32(gm))
+        rec["radius"].append(float(r_now.mean()))
+        rec["radius_spread"].append(float(r_now.std()))
 
     H, _ = engine_run(sim, out_path=None, device=device, on_frame=hook, progress=False)
     out = {k: (np.asarray(v) if k not in ("gpos", "gvel") else v) for k, v in rec.items()}
@@ -215,6 +231,9 @@ def diagnose(cap, sim):
         "max_settle_error_deg": round(float(np.max(errs)), 2) if errs else None,
         "recruitment_correct": f"{ok_recruit}/{n_recruit}" if n_recruit else "n/a",
         "centroid_drift_max_frac_radius": round(float(drift.max() / EA.A_EQ), 4),
+        "radius_mean_pct": round(float(100.0 * (np.mean(cap["radius"]) - 1.0)), 2),
+        "radius_worst_pct": round(float(100.0 * np.max(np.abs(cap["radius"] - 1.0))), 2),
+        "radius_spread_pct": round(float(100.0 * np.max(cap["radius_spread"])), 2),
         "strain_p99": round(float(np.percentile(cap["cut_strain"], 99)), 4),
         "strain_max": round(float(cap["cut_strain"].max()), 4),
         "vonmises_p99": round(float(np.percentile(cap["cut_vm"], 99)), 3),
@@ -227,10 +246,30 @@ def diagnose(cap, sim):
     }
 
 
+def objective(d):
+    """One scalar to rank configurations by. Tracking error is the goal; the radius terms are
+    the constraint that the goal must not be met by destroying the eye -- a muscle strong enough
+    to hit any commanded angle can also squeeze the globe out of shape, and without the radius
+    in the objective that trade reads as an improvement."""
+    if not np.isfinite(d["strain_p99"]):
+        return float("inf")
+    track = float(np.mean(d["tracking_settled_rms_deg"]))          # degrees
+    r_mean = abs(d["radius_mean_pct"]) / 3.0                        # 3% off-radius == 1 deg
+    r_spread = max(d["radius_spread_pct"] - 4.0, 0.0) / 2.0         # 4% spread is free
+    buckle = max(d["peak_shortening_pct"] - 35.0, 0.0) / 3.0
+    return round(track + r_mean + r_spread + buckle, 3)
+
+
 def verdict(d):
+    """A run that produced NaN is not a result, whatever the other numbers say."""
+    if any(np.isnan(x) for x in ([d["strain_p99"], d["strain_max"], d["vonmises_p99"]]
+                                 + list(d["range_hvt_deg"]))):
+        return {"finite": False}, False
+
     """The acceptance test. A run is convincing when the eye reaches its commands, the
     right muscles do it, the globe stays in its socket, and it deforms a LITTLE."""
     checks = {
+        "finite": True,
         "reaches_commands": (d["max_settle_error_deg"] is not None
                              and d["max_settle_error_deg"] < 6.0),
         "torsion_demonstrated": d["range_hvt_deg"][2] > 6.0,
@@ -240,6 +279,8 @@ def verdict(d):
                                 == d["recruitment_correct"].split("/")[1]),
         "stays_in_socket": d["centroid_drift_max_frac_radius"] < 0.06,
         "deformable_not_floppy": 0.004 < d["strain_p99"] < 0.12,
+        # the eye is still an eye: neither squeezed/inflated nor pulled out of shape
+        "globe_keeps_shape": d["radius_worst_pct"] < 6.0 and d["radius_spread_pct"] < 9.0,
         "muscles_contract": 4.0 < d["peak_shortening_pct"] < 38.0,   # below 38%: not buckled
     }
     return checks, all(checks.values())
@@ -276,6 +317,7 @@ def trial(label, device="cuda:0", stride=3, movie=True, note="", **kw):
     _, cap = capture_run(sim, device, stride=stride)
     d = diagnose(cap, sim)
     checks, passed = verdict(d)
+    d["objective"] = objective(d)
     d["checks"], d["passed"], d["note"] = checks, passed, note
     d["config"] = {k: v for k, v in kw.items()}
     d["config"]["preset"] = preset
@@ -292,7 +334,9 @@ def trial(label, device="cuda:0", stride=3, movie=True, note="", **kw):
           f"recruit {d['recruitment_correct']}   drift {d['centroid_drift_max_frac_radius']}   "
           f"strain_p99 {d['strain_p99']}   shorten% {d['max_shortening_pct']}\n"
           f"  tracking rms h/v/t = {d['tracking_rms_deg']}   settled = "
-          f"{d['tracking_settled_rms_deg']} deg", flush=True)
+          f"{d['tracking_settled_rms_deg']} deg\n"
+          f"  radius mean {d['radius_mean_pct']}%  worst {d['radius_worst_pct']}%  "
+          f"spread {d['radius_spread_pct']}%   =>  objective {d['objective']}", flush=True)
     for h in d["holds"]:
         flag = "" if h["recruit_ok"] is None else (" ok" if h["recruit_ok"] else " MISS")
         print(f"    {str(h['frames']):<12} {h['kind']:<11} {h['command_hvt']} -> "

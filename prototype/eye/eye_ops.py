@@ -155,7 +155,7 @@ class EyeAnatomy(Rewire):
         self.a_eq = float(params.get("a_eq", EA.A_EQ))
         self.axial_ratio = float(params.get("axial_ratio", EA.AXIAL_RATIO))
         self.lens_youngs = float(params.get("lens_youngs", EA.LENS_YOUNGS))
-        self.cornea_youngs = float(params.get("cornea_youngs", 260.0))
+        self.cornea_youngs = float(params.get("cornea_youngs", 320.0))
         self.nu = float(params.get("poisson", 0.2))
         self._done = False
 
