@@ -422,6 +422,42 @@ def _last_review():
     return "\n".join(out)
 
 
+# Per-run ceiling on the recorded trajectory. The instantaneous state is a rounding error; this
+# is the array that scales with frames, and twelve slots share one GPU.
+TRAJECTORY_BUDGET_GB = 1.5
+
+
+def _times_censored(run, log_dir=None):
+    """How often THIS composition has been stopped by its array, across every replay of it.
+
+    Sizing that ignores its own history repeats it. The wk_* family was capped at 1778, resized,
+    and capped again at 7686 -- and the second estimate was built from the same seed as the first,
+    so it could not have known better. Counting the censorings makes the next estimate strictly
+    larger than the one that just failed.
+    """
+    import glob
+    log_dir = log_dir or LOG
+    n = 0
+    tail = run.split("_", 2)[-1][:12]
+    for d in glob.glob(os.path.join(log_dir, f"*{tail}*")):
+        try:
+            j = json.load(open(os.path.join(d, "diag.json")))
+            s = j.get("summary") or {}
+            if s.get("buf_full") or s.get("div_blocked"):
+                n += 1
+                continue
+            # ... and the plateau, because the engine's own flags are absent from every run made
+            # before they existed, and were written from the LAST FRAME by every run made between
+            # then and now. Counting only the flags read 0 censorings for a composition that has
+            # visibly been stopped twice, and handed it the same ceiling that had just failed.
+            import archivist as _AR
+            if _AR._capped(d):
+                n += 1
+        except Exception:
+            continue
+    return min(n, 4)          # 8 * 2^4 = 128x; beyond that the composition, not the array, is wrong
+
+
 def _reached_before(run):
     """(cells the run reached, whether it was CAPPED there). Measurement, not estimate."""
     try:
@@ -433,7 +469,7 @@ def _reached_before(run):
         return None, True          # unknown: treat as censored and be generous
 
 
-def _resize_reservoir(spec_path, name, run=None):
+def _resize_reservoir(spec_path, name, run=None, frames=None):
     """Give a replayed spec a buffer sized for where it is going. NOT a change to the experiment.
 
     THE VERTEX BUFFER IS AN ARRAY SIZE, NOT A MODEL PARAMETER. It sets how many cells the mesh
@@ -465,10 +501,42 @@ def _resize_reservoir(spec_path, name, run=None):
         n_seed = int(seed.get("n_cells") or 0)
         reached, was_capped = _reached_before(run or name)
         if reached and not was_capped:
+            # OBSERVED DESTINATION. It stopped on its own, so we know where it was going.
             want_v, want_c, target = T._reservoirs(max(int(reached / 2), n_seed), 0,
                                                    growth_headroom=8.0)
+        elif reached:
+            # CENSORED: it was STOPPED at `reached`, so that is a lower bound on where it was
+            # going, not the destination. Sizing from the SEED is what failed -- wk_tension_pos
+            # was capped at 1778, an estimate from its 150-cell seed gave a 7804 ceiling, and it
+            # grew to 7686 and hit that too. Two stops, and the second estimate knew nothing the
+            # first did not, because both were built from the same seed.
+            #
+            # So size from where it was stopped, and escalate every time the same composition is
+            # censored again. That makes the sizing self-correcting instead of a fresh guess each
+            # round: the next ceiling is always strictly above the one that just failed. Being
+            # too generous costs memory, which is a fraction of a GB; being too tight costs the
+            # entire run.
+            n_cens = _times_censored(run or name)
+            want_v, want_c, target = T._reservoirs(int(reached), 0,
+                                                   growth_headroom=8.0 * (2 ** n_cens))
         else:
             want_v, want_c, target = T._reservoirs(n_seed, 0)
+        # BOUNDED BY MEMORY, and hitting the bound is itself a finding. Escalation alone reached
+        # 295,863 cells and 6.4 GB of trajectory per run -- 45 GB across a batch of seven, on a
+        # 49 GB card. A composition that still saturates at this size is not going to be
+        # understood by making the array bigger; the growth itself is the thing to question,
+        # which is a Proposer's problem and not a buffer's.
+        # THE FRAMES THE ROUND WILL RUN, not the ones the spec was written with. --frames
+        # overrides the spec, so budgeting from the spec's count under-counts the trajectory: a
+        # 400-frame spec run at 900 frames costs 2.25x what the budget was told.
+        frames_est = int(frames or (c.get("general") or {}).get("n_frames") or 900)
+        max_v = int(TRAJECTORY_BUDGET_GB * 1e9 / (max(frames_est, 1) * 3 * 4))
+        if want_v > max_v:
+            print(T_.warn(f"[recon] {name}: reservoir clamped to the "
+                          f"{TRAJECTORY_BUDGET_GB} GB trajectory budget "
+                          f"({(want_v + 4) // 2} -> {(max_v + 4) // 2} cells). If it saturates "
+                          f"again, the composition's growth is the problem, not the array."))
+            want_v, want_c = max_v, min(want_c or max_v, max_v)
         have = ((c.get("sets") or {}).get("vertex") or {}).get("n") or 0
         if want_v <= have:
             return
@@ -1007,7 +1075,7 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
             nm = f"r{rid:03d}n_{i:02d}_{run[:14]}"
             dst = os.path.join(ROOT, "config", "okuda", f"{nm}.yaml")
             shutil.copyfile(src, dst)
-            _resize_reservoir(dst, nm, run=run)
+            _resize_reservoir(dst, nm, run=run, frames=frames)
             h = Hypothesis(hid=f"R{rid}.{i}.recon", comp_hash=f"RECON_{run[:20]}",
                            parent_hash=None, edit=f"replay {run}",
                            # A replay IS a control in the strict sense -- the composition
