@@ -422,7 +422,18 @@ def _last_review():
     return "\n".join(out)
 
 
-def _resize_reservoir(spec_path, name):
+def _reached_before(run):
+    """(cells the run reached, whether it was CAPPED there). Measurement, not estimate."""
+    try:
+        j = json.load(open(os.path.join(LOG, run, "diag.json")))
+        s = j.get("summary") or {}
+        import archivist as _AR
+        return s.get("n_cells_final"), bool(_AR._capped(os.path.join(LOG, run)))
+    except Exception:
+        return None, True          # unknown: treat as censored and be generous
+
+
+def _resize_reservoir(spec_path, name, run=None):
     """Give a replayed spec a buffer sized for where it is going. NOT a change to the experiment.
 
     THE VERTEX BUFFER IS AN ARRAY SIZE, NOT A MODEL PARAMETER. It sets how many cells the mesh
@@ -441,7 +452,23 @@ def _resize_reservoir(spec_path, name):
         seed = next((o for o in c.get("operators", []) if o["op"] == "seed_mesh_3d"), None)
         if not seed:
             return
-        want_v, want_c, target = T._reservoirs(int(seed.get("n_cells") or 0), 0)
+        # SIZE IT FROM WHAT THE RUN ACTUALLY REACHED, not from seed x 40.
+        #
+        # The blind headroom put 208,004 vertices behind the cfl_* specs -- a 104,004-cell ceiling
+        # for runs that go 2000 -> 2000 and never divide at all. That is ~2.25 GB of recorded
+        # trajectory each, for tissue that does not grow.
+        #
+        # We have measured every one of these runs, so the destination is known rather than
+        # guessed: take what it reached last time and give it 4x room. A run that stopped AT its
+        # ceiling reached an unknown destination, so that one keeps the generous estimate -- it is
+        # the only case where the measurement is censored.
+        n_seed = int(seed.get("n_cells") or 0)
+        reached, was_capped = _reached_before(run or name)
+        if reached and not was_capped:
+            want_v, want_c, target = T._reservoirs(max(int(reached / 2), n_seed), 0,
+                                                   growth_headroom=8.0)
+        else:
+            want_v, want_c, target = T._reservoirs(n_seed, 0)
         have = ((c.get("sets") or {}).get("vertex") or {}).get("n") or 0
         if want_v <= have:
             return
@@ -980,7 +1007,7 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
             nm = f"r{rid:03d}n_{i:02d}_{run[:14]}"
             dst = os.path.join(ROOT, "config", "okuda", f"{nm}.yaml")
             shutil.copyfile(src, dst)
-            _resize_reservoir(dst, nm)
+            _resize_reservoir(dst, nm, run=run)
             h = Hypothesis(hid=f"R{rid}.{i}.recon", comp_hash=f"RECON_{run[:20]}",
                            parent_hash=None, edit=f"replay {run}",
                            # A replay IS a control in the strict sense -- the composition
