@@ -1081,8 +1081,10 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     trace("Collector: building the record")
     record = COL.collect_round(rid, mode, rows, refused=refused, posed=posed)
     trace("Collector done")
-    for hole in COL.holes(record):
-        print(f"  [collector] HOLE: {hole}")
+    # The holes are reported at WRITE time, not here. Checked here, the record has not yet been
+    # given the round's steer -- that is set after the Supervisor observes, further down -- so
+    # every round reported `HOLE: no steer recorded` by construction. A check that always fires
+    # is a check nobody reads, and it would have buried a real hole among the noise.
 
     # THE INTERPRETER HAS NOTHING TO SAY ABOUT A REPLAY. A recon slot carries no graph -- it is a
     # spec re-run verbatim -- so there is no edit, no parent and no causal claim to write. It
@@ -1136,6 +1138,8 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
           + f" -- {arch.get('why','')[:120]}")
     record["archivist"] = arch
     record["steer"] = rep.get("mix_why", COL.MISSING)
+    for hole in COL.holes(record):
+        print(f"  [collector] HOLE: {hole}")
     COL.write(record)
     # THE CONTROL IS ALWAYS RETAINED, whatever it scored.
     # `kept` is a RANKING product, and a Watcher veto sets the score to -inf -- so in round 2 the
