@@ -1,5 +1,37 @@
-20:11:49  about to import caption_wave
-20:11:49  caption_wave imported; calling it
-20:14:22  caption_wave RETURNED
-20:14:22  past captioning; entering the reading loop
-20:14:22  reading r001n_00_cfl_c001p300_d
+22:29:15  about to import caption_wave
+22:29:15  caption_wave imported; calling it
+22:31:42  caption_wave RETURNED
+22:31:42  past captioning; entering the reading loop
+22:31:42  reading r001n_00_cfl_c001p300_d
+22:32:40  read r001n_00_cfl_c001p300_d OK
+22:32:40  reading r001n_01_cfl_c000p080_d
+22:33:37  read r001n_01_cfl_c000p080_d OK
+22:33:37  reading r001n_02_cfl_c000p010_d
+22:34:24  read r001n_02_cfl_c000p010_d OK
+22:34:24  reading loop done; entering Act 3
+22:34:24  Collector: building the record
+22:34:24  Collector done
+22:51:37  about to import caption_wave
+22:51:37  caption_wave imported; calling it
+22:54:03  caption_wave RETURNED
+22:54:03  past captioning; entering the reading loop
+22:54:03  reading r002n_00_cfl_c001p300_d
+22:54:49  read r002n_00_cfl_c001p300_d OK
+22:54:49  reading r002n_01_cfl_c000p010_d
+22:55:52  read r002n_01_cfl_c000p010_d OK
+22:55:52  reading loop done; entering Act 3
+22:55:52  Collector: building the record
+22:55:52  Collector done
+23:12:03  about to import caption_wave
+23:12:03  caption_wave imported; calling it
+23:14:25  caption_wave RETURNED
+23:14:25  past captioning; entering the reading loop
+23:14:25  reading r003n_00_cfl_c001p300_d
+23:15:23  read r003n_00_cfl_c001p300_d OK
+23:15:23  reading r003n_01_cfl_c000p080_d
+23:16:01  read r003n_01_cfl_c000p080_d OK
+23:16:01  reading r003n_02_cfl_c000p010_d
+23:16:50  read r003n_02_cfl_c000p010_d OK
+23:16:50  reading loop done; entering Act 3
+23:16:50  Collector: building the record
+23:16:50  Collector done
