@@ -53,6 +53,19 @@ COLOUR: cells are shaded white (low) to red (high) by the activator chemical the
   measurement painted on the tissue, not a material."""
 
 
+def _wrap(t, w):
+    out, line = [], ""
+    for word in str(t).split():
+        if len(line) + len(word) + 1 > w:
+            out.append(line)
+            line = word
+        else:
+            line = (line + " " + word).strip()
+    if line:
+        out.append(line)
+    return out
+
+
 def caption_wave(names, n_frames=8, force=False):
     """Caption every named run. Returns {name: 'ok' | 'skipped' | 'no_movie' | reason}."""
     todo = []
@@ -96,8 +109,15 @@ def caption_wave(names, n_frames=8, force=False):
             with open(dst, "w") as f:
                 f.write(txt if txt else "UNAVAILABLE -- the model returned nothing.\n")
             out[n] = "ok" if txt else "empty"
-            first = (txt or "").replace("\n", " ")[:88]
-            print(f"  [{i}/{len(todo)}] {n}: {first}...", flush=True)
+            # THE WHOLE FIRST SECTION, not 88 characters of it. The caption is the only
+            # description of SHAPE the loop produces, and it was being cut mid-sentence -- so the
+            # terminal showed that a caption existed and none of what it said. The full text is
+            # in description.txt either way; this is what a person watching actually reads.
+            body = " ".join((txt or "").split())
+            body = body.split("OBJECTS:")[0].strip()          # the DESCRIPTION section
+            print(f"  [{i}/{len(todo)}] {n}:", flush=True)
+            for ln in _wrap(body, 108):
+                print(f"        {ln}", flush=True)
         except Exception as e:
             out[n] = f"failed: {type(e).__name__}"
             print(f"  [{i}/{len(todo)}] {n}: FAILED {type(e).__name__}", flush=True)
