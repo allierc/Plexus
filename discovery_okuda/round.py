@@ -509,7 +509,7 @@ def _ground_starting_conditions(g, sl):
 
 
 
-def _read_one(nm, out_dir, ledger):
+def _read_one(nm, out_dir, ledger, claim=None):
     """Three analysts and the eye-check for one run. The analysts run CONCURRENTLY.
 
     PHASE 3(c). Twenty of a round's twenty-six agent calls are per-run, and they are completely
@@ -524,7 +524,17 @@ def _read_one(nm, out_dir, ledger):
     """
     from concurrent.futures import ThreadPoolExecutor
     an = A.analyse(nm, out_dir, ledger=ledger, parallel=True)
-    wa = A.watch(nm, out_dir, an["analyst_consensus"], ledger=ledger)
+    # AGAINST THE REGISTERED PREDICTION, not against the Reader's label.
+    #
+    # It was handed `analyst_consensus` -- a label derived from the same caption it then reads --
+    # so it could catch a summariser drifting from a caption and could NOT catch the numbers
+    # disagreeing with reality, which is the thing it has been credited with. It was checking a
+    # reading against itself.
+    #
+    # Given the hypothesis's claim instead, it compares a picture with what was committed to
+    # BEFORE the run, by a different agent, from different evidence. That is an independent
+    # check, and it is the only one in the loop that looks at shape rather than at number.
+    wa = A.watch(nm, out_dir, claim or an["analyst_consensus"], ledger=ledger)
     return an, wa
 
 
@@ -563,7 +573,7 @@ def build_composition_batch(sup, cfg, n_slots, ledger):
     # Critic's refusals went nowhere, and the Grounder wrote into a config the Proposer never
     # reads. Handed over here, in the words their authors used.
     steer = _steer_for(sup)
-    refusals = _refusal_summary(sup)
+    refusals = "\n\n".join(x for x in (_refusal_summary(sup), _batch_refusals()) if x)
     setup = _paper_setup()
     hist = ARCH.table()
     prior_review = _last_review()
@@ -575,7 +585,7 @@ def build_composition_batch(sup, cfg, n_slots, ledger):
               "A round with no reasoned proposal is a failed round, not a random one.")
         return []
 
-    out, rejected = [], []
+    out, rejected, in_batch = [], [], {}
     for i, sl in enumerate(slots):
         pi = int(sl.get("parent_index", 0))
         if not (0 <= pi < len(frontier)):
@@ -625,9 +635,40 @@ def build_composition_batch(sup, cfg, n_slots, ledger):
         if not adm:
             rejected.append((i, f"CRITIC: {rej}"))
             continue
+        # THE SAME COMPOSITION TWICE IN ONE BATCH IS ONE EXPERIMENT, NOT TWO.
+        #
+        # `seen` holds compositions from PREVIOUS rounds, so a slot duplicated inside this batch
+        # passes every gate: it is type-legal, its preconditions are met, and it is genuinely
+        # unseen. Measured on round 2 of the batch-12 campaign -- only SEVEN distinct edits across
+        # twelve slots, with `remove_op divide_3d0` proposed three times carrying MUTUALLY
+        # CONTRADICTORY predictions on one composition:
+        #
+        #     slot 5  protr_peak 1.0-1.4      slot 7  protr_peak >= 1.3      slot 10  >= 1.5
+        #
+        # Five of twelve GPU runs would have bought nothing, and worse: two of those three resolve
+        # `refuted` purely because the Proposer contradicted itself, which feeds a FALSE surprise
+        # signal into the mixture the Supervisor sets from it. A replicate is a legitimate
+        # experiment, but it is one the proposer must ASK for -- and it would carry one prediction.
+        h = comp_hash(g)
+        if h in in_batch:
+            rejected.append((i, f"DUPLICATE_IN_BATCH: identical to slot {in_batch[h]} "
+                                f"({h}). Same composition, so at most one prediction about it "
+                                f"can be right; the others are the same experiment re-run under "
+                                f"a different guess. Vary the EDIT, not the number."))
+            continue
+        in_batch[h] = i
         out.append((g, lbl, sl))
     for i, why in rejected:
-        print(f"  [critic] slot {i} rejected -- {why}")
+        print(T_.no(f"[critic] slot {i} rejected -- {why}"))
+    # PERSISTED, so the next Proposer is told. A refusal that reaches only the terminal is the
+    # exact defect this campaign spent a day removing: the Proposer repeats the mistake because
+    # nothing carried the reason back. These are the PRE-COMPUTE refusals -- the ones that cost
+    # nothing to make and everything to repeat.
+    if rejected:
+        os.makedirs(CAMP, exist_ok=True)
+        with open(os.path.join(CAMP, "batch_refusals.jsonl"), "a") as fh:
+            fh.write(json.dumps({"round": sup.round + 1,
+                                 "refused": [{"slot": i, "why": w} for i, w in rejected]}) + "\n")
 
     review = A.reflect([{k: v for k, v in s.items() if k != "edit"} for _, _, s in out],
                        ledger=ledger)
@@ -1010,7 +1051,8 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
             continue
         out_dir = os.path.join(LOG, nm)
         trace(f"reading {nm}")
-        an, wa = _read_one(nm, out_dir, ledger)
+        an, wa = _read_one(nm, out_dir, ledger,
+                           claim=f"{h.claim} (predicted: {h.predicted})" if h.claim else None)
         try:
             import biologist as _B
             _pv = summ.get("premises") or []
@@ -1391,6 +1433,27 @@ def _cap(nm):
 def _m(s):
     return {k: s.get(k) for k in ("protr_peak", "protr_final", "ta_n_tubes_final",
                                   "mech_p_ratio")}
+
+
+def _batch_refusals(n=8):
+    """What the Critic refused BEFORE any compute, last round. Cheap mistakes, expensive to repeat."""
+    p = os.path.join(CAMP, "batch_refusals.jsonl")
+    if not os.path.exists(p):
+        return ""
+    rows = []
+    for line in open(p):
+        try:
+            rows.append(json.loads(line))
+        except Exception:
+            continue
+    if not rows:
+        return ""
+    last = rows[-1]
+    out = [f"Last round the Critic refused {len(last['refused'])} slot(s) BEFORE they cost "
+           f"anything. These are free to avoid and expensive to repeat:"]
+    for r in last["refused"][:n]:
+        out.append(f"  slot {r['slot']}: {r['why']}")
+    return "\n".join(out)
 
 
 def _refusal_summary(sup, n=12):
