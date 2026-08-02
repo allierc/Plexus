@@ -30,6 +30,9 @@ import argparse
 import glob
 import os
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import term as _T                       # noqa: E402
 import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -91,7 +94,8 @@ def caption_wave(names, n_frames=8, force=False):
         import describe_video as DV
         from transformers import AutoModelForMultimodalLM, AutoProcessor
         dev = "cuda:0" if torch.cuda.is_available() else "cpu"
-        print(f"[caption] loading the VLM ONCE for {len(todo)} run(s) on {dev} ...", flush=True)
+        print(_T.dim(f"[caption] loading the VLM ONCE for {len(todo)} run(s) on {dev} ..."),
+              flush=True)
         proc = AutoProcessor.from_pretrained(DV.GEMMA)
         model = AutoModelForMultimodalLM.from_pretrained(DV.GEMMA, dtype="bfloat16",
                                                          device_map=dev)
@@ -115,9 +119,12 @@ def caption_wave(names, n_frames=8, force=False):
             # in description.txt either way; this is what a person watching actually reads.
             body = " ".join((txt or "").split())
             body = body.split("OBJECTS:")[0].strip()          # the DESCRIPTION section
-            print(f"  [{i}/{len(todo)}] {n}:", flush=True)
+            # THE EYE-CHECK'S COLOUR, because this is the eye-check's evidence. The caption is
+            # what the VLM saw; the eye-check then judges it. Colouring them alike says they are
+            # one channel -- the only one in the loop that looks at SHAPE rather than at number.
+            print(f"  {_T.VOICE['eye-check'](f'[{i}/{len(todo)}] {n}')}:", flush=True)
             for ln in _wrap(body, 108):
-                print(f"        {ln}", flush=True)
+                print(_T.VOICE["eye-check"](f"        {ln}"), flush=True)
         except Exception as e:
             out[n] = f"failed: {type(e).__name__}"
             print(f"  [{i}/{len(todo)}] {n}: FAILED {type(e).__name__}", flush=True)
@@ -141,8 +148,8 @@ def caption_wave(names, n_frames=8, force=False):
               flush=True)
     except Exception as e:
         print(f"[caption] could not release the model: {type(e).__name__}", flush=True)
-    print(f"[caption] {len(todo)} run(s) in {time.time() - t0:.0f}s "
-          f"(one model load, not {len(todo)})", flush=True)
+    print(_T.dim(f"[caption] {len(todo)} run(s) in {time.time() - t0:.0f}s "
+                 f"(one model load, not {len(todo)})"), flush=True)
     return out
 
 

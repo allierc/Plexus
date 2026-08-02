@@ -672,9 +672,12 @@ def build_composition_batch(sup, cfg, n_slots, ledger):
 
     review = A.reflect([{k: v for k, v in s.items() if k != "edit"} for _, _, s in out],
                        ledger=ledger)
-    print(f"  [reflection] batch_ok={review.get('batch_ok')} :: {review.get('verdict','')[:200]}")
+    print(T_.say("peer-review", f"batch_ok={review.get('batch_ok')}. {review.get('verdict','')}",
+                 sentences=2))
     for iss in review.get("issues", []):
-        print(f"     slot {iss.get('slot')}: [{iss.get('severity')}] {iss.get('problem')}")
+        _sev = iss.get("severity", "minor")
+        _line = f"     slot {iss.get('slot')}: [{_sev}] {iss.get('problem')}"
+        print(T_.yellow(_line) if _sev == "serious" else T_.dim(_line))
     # THE REVIEW IS KEPT, so the next round's Proposer can be handed it. It was printed and
     # dropped, and the cost of that was measured across the first two batches of the rebuilt
     # loop: Peer-review raised the SAME serious issue both times -- a confirmatory floor sitting
@@ -708,7 +711,7 @@ def build_recon_batch(sup, cfg, n_slots, ledger):
     ok, choice = P.choose_specs(tab, n=n_slots, ledger=ledger)
     names = choice.get("runs") or []
     print(f"  [recon] the Proposer chose {len(names)}: {', '.join(names)}")
-    print(f"  [recon] why: {choice.get('why','')[:200]}")
+    print(T_.say("proposer", choice.get("why", ""), sentences=2))
 
     out = []
     for i, run in enumerate(names[:n_slots]):
@@ -1084,6 +1087,11 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         # observation, not a verdict.
         if wa.get("watcher_headline"):
             print(T_.say(f"eye-check {nm[-12:]}", wa["watcher_headline"], sentences=1))
+    if an.get("analyst_consensus"):
+        print(T_.say(f"reader {nm[-12:]}",
+                     f"Phenotype {an['analyst_consensus']}"
+                     + (f", {an.get('forced_or_grown')}" if an.get("forced_or_grown") else "")
+                     + (f". {an.get('concern')}" if an.get("concern") else "."), sentences=2))
         print(T_.say("", wa.get("watcher_describe") or wa.get("watcher_why"), sentences=4))
         sc = score_run(summ, cfg)
         if wa.get("watcher_blocks"):
