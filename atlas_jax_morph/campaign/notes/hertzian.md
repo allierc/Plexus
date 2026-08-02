@@ -186,7 +186,7 @@ Re-ran the scorer this pass — numbers reproduce exactly; `status: implemented 
 **Paths.**
 - Oracle: `atlas_jax_morph/_oracle/runs/diff_hertzian/` (reference.npz + summary.json + reference.png);
   script `atlas_jax_morph/_oracle/scripts/hertzian.py`.
-- Plexus: `config/atlas/hertzian.yaml` → `log/atlas/hertzian/` (diag.json, metrics.json, metrics.npz,
+- Plexus: `config/atlas/hertzian.yaml` → `log/atlas_jax/hertzian/` (diag.json, metrics.json, metrics.npz,
   strip.png, movie.mp4).
-- Scorer: `atlas_jax_morph/diff_hertzian.py` → `log/atlas/hertzian/diff.json`
+- Scorer: `atlas_jax_morph/diff_hertzian.py` → `log/atlas_jax/hertzian/diff.json`
   (thresholds PRE-REGISTERED at lines 38-39).

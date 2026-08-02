@@ -19,7 +19,7 @@ Two things this script does that run_spec cannot:
 Run with the plexus env:
   /workspace/.conda_envs/neural-graph-linux/bin/python \
       atlas_jax_morph/_oracle/scripts/active_brownian_dynamics2_d_plexus.py
-Writes diff_plexus_summary.json into log/atlas/active_brownian_dynamics2_d/ (beside run_spec's
+Writes diff_plexus_summary.json into log/atlas_jax/active_brownian_dynamics2_d/ (beside run_spec's
 evidence), and prints the PASS/FAIL verdict against the pre-registered threshold 0.05.
 """
 import json, os, sys, time
@@ -40,7 +40,7 @@ from plexus.schema import load
 
 SPEC = os.path.join(PLEXUS, "config", "atlas", "active_brownian_dynamics2_d.yaml")
 ORACLE_DIR = os.path.join(HERE, "..", "runs", "diff_active_brownian_dynamics2_d")
-OUT = os.path.join(PLEXUS, "log", "atlas", "active_brownian_dynamics2_d")
+OUT = os.path.join(PLEXUS, "log", "atlas_jax", "active_brownian_dynamics2_d")
 DT, D_R, THRESHOLD = 1.0, 0.1, 0.05
 
 

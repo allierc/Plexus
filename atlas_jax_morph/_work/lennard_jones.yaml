@@ -178,7 +178,7 @@ evidence:
     function of the force law, so D_pos isolates the LJ r_min 12-6 force F = -grad
     eps((sigma/r)^12 - 2(sigma/r)^6) -- its ADHESIVE tail, equilibrium AT contact, and sigma-relative
     smooth C1 cutoff -- the feature distinguishing it from the purely-repulsive soft_sphere/hertzian.
-    Computed by _oracle/scripts/_analyze_lennard_jones.py into log/atlas/lennard_jones/diff.json.
+    Computed by _oracle/scripts/_analyze_lennard_jones.py into log/atlas_jax/lennard_jones/diff.json.
   threshold: 0.001
   threshold_why: |
     1.0e-3 sigma, PRE-REGISTERED in the scorer (_analyze_lennard_jones.py:83, THRESHOLD = 1.0e-3)
@@ -202,7 +202,7 @@ evidence:
     is moot here (the result is exactly 0) but for the family would fail on float32 reassociation.
   value: 0.0
   passed: true
-  plexus_run: log/atlas/lennard_jones/
+  plexus_run: log/atlas_jax/lennard_jones/
   scorer: atlas_jax_morph/_oracle/scripts/_analyze_lennard_jones.py
   acted_ledger: |
     adhere: calls 100 / acted 47, moved 2.679448 (cumulative max-cell displacement), kind lateral,
@@ -213,7 +213,7 @@ evidence:
     nn-distance 1.5917 -> 1.2667 and both flatline thereafter), exactly the overdamped fixed point,
     NOT a still life. Frame-0 == pristine IC on both sides (residual 0.0/0.0).
   corroborators: |
-    All from log/atlas/lennard_jones/diff.json unless noted. (1) Frame 0 == pristine IC on BOTH
+    All from log/atlas_jax/lennard_jones/diff.json unless noted. (1) Frame 0 == pristine IC on BOTH
     sides (residual 0.0/0.0) -- the aligned convention is real; and the whole float32 trajectory is
     BYTE-EQUAL (np.array_equal True over 101x16x2), so D_pos = 0.0 is exact, not rounded. (2)
     Deliberately MISALIGNED comparison x_plx(t) vs x_ref(t-1) scores 0.0268 sigma (27x the bar and

@@ -179,7 +179,7 @@ condition). Passing certifies the two methods compute the SAME free-space field;
 graph-Laplacian re-implementation. Tighter 1e-6 is below the two-library float32 floor and unmeetable;
 looser 1e-1 stops distinguishing a faithful port from a ~10% kernel-form error.
 
-**The acted ledger checked first** (`log/atlas/free_screened_diffusion/diag.json`): `morphogen` acted
+**The acted ledger checked first** (`log/atlas_jax/free_screened_diffusion/diag.json`): `morphogen` acted
 1/5 (structural write of `chemical` from zero at frame 0; recomputed identically after, so no further
 state change — acted>=1, NOT inert), `seed_state` 1/1; `inert_operators: []`, `valid_evidence: true`.
 run_spec's position metrics (gyration, nn_distance) are field-INVARIANT here by construction (the solve
@@ -191,7 +191,7 @@ is to prove the operator SCHEDULES and ACTS in the real engine on the matched IC
   script `_oracle/scripts/free_screened_diffusion.py`). dt/key-invariance asserted (quasistatic).
 - Score (torch): `diff_free_screened_diffusion.py` -> `.../diff.json`.
 - Engine (torch): spec `config/atlas/free_screened_diffusion.yaml`; evidence
-  `log/atlas/free_screened_diffusion/` (diag.json, metrics.json/.npz, spec_run.yaml, strip.png).
+  `log/atlas_jax/free_screened_diffusion/` (diag.json, metrics.json/.npz, spec_run.yaml, strip.png).
 
 **Verdict stands: `new`, `implementation_of: morphogen`.** The reproduction confirms the FREE-SPACE
 Green's-function method is a faithful implementation of the `morphogen` contract to float32 precision

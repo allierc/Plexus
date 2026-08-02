@@ -1,6 +1,6 @@
 """render_movies -- give every atlas evidence folder its movie, WITHOUT re-simulating.
 
-Most `log/atlas/<name>/` folders were produced by a differ in a hurry, with `--no-movie`. The
+Most `log/atlas_jax/<name>/` folders were produced by a differ in a hurry, with `--no-movie`. The
 movie is the one artefact a human actually looks at, and it is missing from 13 of 19 folders.
 
 THE POINT OF THIS SCRIPT IS WHAT IT DOES NOT DO. Re-running `run_spec.py` would remake the movie,
@@ -33,7 +33,7 @@ PLEXUS = os.path.abspath(os.path.join(HERE, ".."))
 sys.path.insert(0, os.path.join(PLEXUS, "src"))
 sys.path.insert(0, HERE)
 
-LOG_DIR = os.path.join(PLEXUS, "log", "atlas")
+LOG_DIR = os.path.join(PLEXUS, "log", "atlas_jax")
 
 from run_spec import load_atlas_candidates  # noqa: E402  -- the anti-chamber, so a spec can load
 
@@ -48,7 +48,7 @@ def targets(only, force):
         if os.path.isfile(os.path.join(d, "movie.mp4")) and not force:
             continue
         out.append((name, os.path.join(d, "spec_run.yaml"),
-                    os.path.join(PLEXUS, "graphs_data", "atlas", name, "trajectory.npz")))
+                    os.path.join(PLEXUS, "graphs_data", "atlas_jax", name, "trajectory.npz")))
     return out
 
 
@@ -77,7 +77,7 @@ def main():
             continue
         try:
             sim = load(spec_path)
-            data_dir = plot_dataset(sim, "atlas", movie=True)
+            data_dir = plot_dataset(sim, "atlas_jax", movie=True)
             mp4 = next((f for f in sorted(os.listdir(data_dir)) if f.endswith(".mp4")), None)
             if mp4 is None:
                 failed.append((name, "plot_dataset wrote no .mp4 (a set with no positions?)"))

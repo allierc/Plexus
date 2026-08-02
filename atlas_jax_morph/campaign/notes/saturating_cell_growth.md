@@ -168,9 +168,9 @@ radius has reached R -- correct saturation), `seed_state` 1/1.
 **Paths.**
 - oracle run: `atlas_jax_morph/_oracle/runs/diff_saturating_cell_growth/` (reference.npz, summary.json)
 - oracle script: `atlas_jax_morph/_oracle/scripts/saturating_cell_growth.py`
-- engine spec A: `config/atlas/saturating_cell_growth.yaml` -> evidence `log/atlas/saturating_cell_growth/`
+- engine spec A: `config/atlas/saturating_cell_growth.yaml` -> evidence `log/atlas_jax/saturating_cell_growth/`
 - grid spec B: `atlas_jax_morph/saturating_cell_growth_gridB.yaml`
-- diff driver: `atlas_jax_morph/diff_saturating_cell_growth.py` -> `log/atlas/saturating_cell_growth/diff.json`
+- diff driver: `atlas_jax_morph/diff_saturating_cell_growth.py` -> `log/atlas_jax/saturating_cell_growth/diff.json`
 
 **Verdict unchanged.** The differential does not touch the `refinement`-of-`cell_grow` verdict --
 either reading is still cell growth toward a maximum size. What it establishes is that the

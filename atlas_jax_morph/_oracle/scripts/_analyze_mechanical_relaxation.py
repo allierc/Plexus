@@ -13,7 +13,7 @@ Corroborators   force-balance cross-check (the operator's OWN Morse energy evalu
                 equilibrium -> |grad U|_inf, a gauge-free test that both are force balances of the
                 SAME energy), rigid-gauge-removed (Kabsch) D_eq, fixed-point idempotence of the
                 Plexus no-op plateau, frame-0 == IC on both sides, dead-slot immobility, and the
-                misaligned x_plx(1) vs IC magnitude. Writes diff.json into log/atlas/mechanical_relaxation/.
+                misaligned x_plx(1) vs IC magnitude. Writes diff.json into log/atlas_jax/mechanical_relaxation/.
 """
 import json
 import os
@@ -27,7 +27,7 @@ PLEXUS = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 sys.path.insert(0, os.path.join(PLEXUS, "src"))
 REF = os.path.join(HERE, "..", "runs", "diff_mechanical_relaxation", "reference.npz")
 PLX = os.path.join(PLEXUS, "graphs_data", "atlas", "mechanical_relaxation", "trajectory.npz")
-LOG = os.path.join(PLEXUS, "log", "atlas", "mechanical_relaxation")
+LOG = os.path.join(PLEXUS, "log", "atlas_jax", "mechanical_relaxation")
 
 # the operator's OWN Morse energy helpers -- so the force cross-check uses the identical energy the
 # `relax` operator relaxes, not a re-derivation.

@@ -14,7 +14,7 @@ Two economies, both proven here rather than assumed:
 
 Run with the plexus env, e.g.
   /workspace/.conda_envs/neural-graph-linux/bin/python atlas_jax_morph/_oracle/scripts/division_plexus.py
-Writes summary.json into log/atlas/division/ alongside the run_spec evidence.
+Writes summary.json into log/atlas_jax/division/ alongside the run_spec evidence.
 """
 import copy, json, os, sys, time
 
@@ -34,7 +34,7 @@ from plexus.schema import load
 
 M = int(os.environ.get("M_SEEDS", "48"))
 SPEC = os.path.join(PLEXUS, "config", "atlas", "division.yaml")
-OUT = os.path.join(PLEXUS, "log", "atlas", "division")
+OUT = os.path.join(PLEXUS, "log", "atlas_jax", "division")
 
 _real_get_operator = engine.get_operator
 _tap = {"elig": 0, "committed": 0, "calls": 0, "overflow": 0.0}

@@ -256,7 +256,7 @@ mechanisms:
 
       (~2.5 orders over 5e-3), so the metric genuinely catches the SOURCE-WINS mechanism choices.
 
-      Acted ledger checked FIRST (log/atlas/gene_network_connectionist/diag.json): regulate 20/20
+      Acted ledger checked FIRST (log/atlas_jax/gene_network_connectionist/diag.json): regulate 20/20
 
       calls acted, moved 0.823 (the ODE really evolved the gene block), seed_state 1/1,
 
@@ -264,7 +264,7 @@ mechanisms:
 
       Score driver _oracle/runs/diff_gene_network_connectionist/diff.json; engine evidence
 
-      log/atlas/gene_network_connectionist/.
+      log/atlas_jax/gene_network_connectionist/.
 
       '
   state_io_notes:
@@ -444,7 +444,7 @@ mechanisms:
 
       roundoff cannot masquerade as a defect. Driver: atlas_jax_morph/diff_neural_ode.py; artefact
 
-      log/atlas/neural_ode/diff.json.
+      log/atlas_jax/neural_ode/diff.json.
 
       '
     threshold: '3.0e-3 (max-abs, gene-concentration units). Chosen BEFORE the cross-run comparison from
@@ -496,7 +496,7 @@ mechanisms:
 
       dt=2 -- >100x the threshold -- confirming the metric would catch a genuine wiring error. Driver
 
-      log/atlas/neural_ode/diff.json; oracle _oracle/runs/diff_neural_ode/ (reference.npz, provenance).
+      log/atlas_jax/neural_ode/diff.json; oracle _oracle/runs/diff_neural_ode/ (reference.npz, provenance).
 
       CAVEAT (recorded, not a defect): this is an OPERATOR-LEVEL differential, not a run_spec.py
 
@@ -961,7 +961,7 @@ mechanisms:
 
       ODE, NOT accumulating disagreement). Full breakdown in
 
-      _oracle/runs/diff_odecontroller/diff.json. Engine evidence: log/atlas/odecontroller/ (acted
+      _oracle/runs/diff_odecontroller/diff.json. Engine evidence: log/atlas_jax/odecontroller/ (acted
 
       ledger: regulate acted 19/21 -- the last two near-fixed-point ticks emit a delta below the
 
@@ -1299,7 +1299,7 @@ mechanisms:
 
       (atlas_jax_morph/_oracle/runs/diff_death). Plexus: config/atlas/death.yaml, identical
 
-      N0/lambda/dt/frame-count (log/atlas/death). The estimator is invariant to the engine''s
+      N0/lambda/dt/frame-count (log/atlas_jax/death). The estimator is invariant to the engine''s
 
       record-after-apply off-by-one -- Plexus'' first RECORDED frame is already post-step-1 (47506,
 
@@ -1580,7 +1580,7 @@ mechanisms:
 
       self/near clamp, the per-species vmap-vs-loop, and the twice-applied alive mask all reproduce to
 
-      float32 rounding. The engine leg (log/atlas/free_screened_diffusion, diag.json) confirms the
+      float32 rounding. The engine leg (log/atlas_jax/free_screened_diffusion, diag.json) confirms the
 
       operator ACTS: `morphogen` writes the `chemical` block from zero on the matched 4-founder geometry
 
@@ -1815,7 +1815,7 @@ mechanisms:
 
       cell_divide draws H.rng in this spec, so dropping relax/grow_radius leaves the division RNG
 
-      stream bit-identical (log/atlas/division/diff_plexus_summary.json; script
+      stream bit-identical (log/atlas_jax/division/diff_plexus_summary.json; script
 
       _oracle/scripts/division_plexus.py). The hazard is a per-cell-step rate, so relax and growth --
 
@@ -1889,7 +1889,7 @@ mechanisms:
 
       by the anchor gyration agreeing to ~9% (Plexus 3.52 vs reference 3.23). Acted ledger
 
-      (log/atlas/division/diag.json): cell_divide calls 41 / acted 33, grow_radius 41/41, relax
+      (log/atlas_jax/division/diag.json): cell_divide calls 41 / acted 33, grow_radius 41/41, relax
 
       41/33, seed_state 1/1, inert_operators [] -> valid_evidence true.
 
@@ -2358,7 +2358,7 @@ mechanisms:
 
       _oracle/runs/diff_active_brownian_dynamics2_d (reference.npz + summary.json). Plexus:
 
-      log/atlas/active_brownian_dynamics2_d (run_spec evidence) + its companion diff_plexus_summary.json.
+      log/atlas_jax/active_brownian_dynamics2_d (run_spec evidence) + its companion diff_plexus_summary.json.
 
       '
 - id: brownian_dynamics
@@ -2620,13 +2620,13 @@ mechanisms:
 
       bug lands D 0.0250 at dt=0.25, rel_err 0.75, REJECTED -- the metric discriminates the correct
 
-      scheme from the bolt-on jitter. Acted ledger (log/atlas/brownian_dynamics/diag.json): agitate
+      scheme from the bolt-on jitter. Acted ledger (log/atlas_jax/brownian_dynamics/diag.json): agitate
 
       calls 41, acted 41, moved 2.16, inert_operators [] -> valid_evidence true; gyration grew
 
       0.63 -> 4.05 (free spreading). Diff script: _oracle/scripts/diff_brownian_dynamics.py; engine
 
-      evidence: log/atlas/brownian_dynamics/{diag,metrics,diff}.json.
+      evidence: log/atlas_jax/brownian_dynamics/{diag,metrics,diff}.json.
 
       '
   state_io_notes:
@@ -3456,7 +3456,7 @@ mechanisms:
 
       force law, so D_pos isolates the SoftSphere force F = -grad (eps/2)(1 - r/sigma)^2.
 
-      Computed by _oracle/scripts/_analyze_soft_sphere.py into log/atlas/soft_sphere/diff.json.
+      Computed by _oracle/scripts/_analyze_soft_sphere.py into log/atlas_jax/soft_sphere/diff.json.
 
       '
     threshold: 0.001
@@ -3484,7 +3484,7 @@ mechanisms:
       '
     value: 2.6973983046972182e-06
     passed: true
-    plexus_run: log/atlas/soft_sphere/
+    plexus_run: log/atlas_jax/soft_sphere/
     scorer: atlas_jax_morph/_oracle/scripts/_analyze_soft_sphere.py
     acted_ledger: 'adhere: calls 60 / acted 60, max|delta| 0.37996304 (== oracle force_ic_max 0.37996307
       to
@@ -3494,7 +3494,7 @@ mechanisms:
       frame -- this is a run, not a still life.
 
       '
-    corroborators: 'All from log/atlas/soft_sphere/diff.json. (1) Frame 0 == pristine IC on BOTH sides
+    corroborators: 'All from log/atlas_jax/soft_sphere/diff.json. (1) Frame 0 == pristine IC on BOTH sides
       (residual
 
       0.0 / 0.0) -- the aligned convention is real. (2) Deliberately MISALIGNED comparison
@@ -3805,7 +3805,7 @@ mechanisms:
 
       IC after t overdamped steps). Computed by atlas_jax_morph/diff_hertzian.py into
 
-      log/atlas/hertzian/diff.json. evidence.value is the PRIMARY.
+      log/atlas_jax/hertzian/diff.json. evidence.value is the PRIMARY.
 
       '
     threshold: 0.0001
@@ -3846,7 +3846,7 @@ mechanisms:
       '
     value: 1.894631743528317e-06
     passed: true
-    plexus_run: log/atlas/hertzian/
+    plexus_run: log/atlas_jax/hertzian/
     scorer: atlas_jax_morph/diff_hertzian.py
     acted_ledger: 'adhere: calls 40 / acted 40, moved 0.69977516 (max live-cell displacement, == the oracle''s
       own
@@ -3860,7 +3860,7 @@ mechanisms:
       schedule; the ledger validates the SECONDARY trajectory run.)
 
       '
-    corroborators: 'All from log/atlas/hertzian/diff.json unless noted. (1) Peak force magnitudes agree
+    corroborators: 'All from log/atlas_jax/hertzian/diff.json unless noted. (1) Peak force magnitudes agree
 
       independently of the rel-err normalization: |F_ref|_max 0.86514318 vs |F_plx|_max 0.86514449
 
@@ -4185,7 +4185,7 @@ mechanisms:
 
       -- the feature distinguishing it from the purely-repulsive soft_sphere/hertzian.
 
-      Computed by _oracle/scripts/_analyze_harmonic.py into log/atlas/harmonic/diff.json.
+      Computed by _oracle/scripts/_analyze_harmonic.py into log/atlas_jax/harmonic/diff.json.
 
       '
     threshold: 0.001
@@ -4219,7 +4219,7 @@ mechanisms:
       '
     value: 7.864199877963372e-06
     passed: true
-    plexus_run: log/atlas/harmonic/
+    plexus_run: log/atlas_jax/harmonic/
     scorer: atlas_jax_morph/_oracle/scripts/_analyze_harmonic.py
     acted_ledger: 'adhere: calls 160 / acted 160, moved 8.451 (cumulative), kind lateral; inert_operators
       [];
@@ -4233,7 +4233,7 @@ mechanisms:
       to a residual of 4.0e-05 (raw force law, pre-compounding).
 
       '
-    corroborators: 'All from log/atlas/harmonic/diff.json. (1) Frame 0 == pristine IC on BOTH sides (residual
+    corroborators: 'All from log/atlas_jax/harmonic/diff.json. (1) Frame 0 == pristine IC on BOTH sides (residual
 
       0.0 / 0.0) -- the aligned convention is real. (2) Deliberately MISALIGNED comparison
 
@@ -4532,7 +4532,7 @@ mechanisms:
 
       smooth C1 cutoff -- the feature distinguishing it from the purely-repulsive soft_sphere/hertzian.
 
-      Computed by _oracle/scripts/_analyze_lennard_jones.py into log/atlas/lennard_jones/diff.json.
+      Computed by _oracle/scripts/_analyze_lennard_jones.py into log/atlas_jax/lennard_jones/diff.json.
 
       '
     threshold: 0.001
@@ -4578,7 +4578,7 @@ mechanisms:
       '
     value: 0.0
     passed: true
-    plexus_run: log/atlas/lennard_jones/
+    plexus_run: log/atlas_jax/lennard_jones/
     scorer: atlas_jax_morph/_oracle/scripts/_analyze_lennard_jones.py
     acted_ledger: 'adhere: calls 100 / acted 47, moved 2.679448 (cumulative max-cell displacement), kind
       lateral,
@@ -4596,7 +4596,7 @@ mechanisms:
       NOT a still life. Frame-0 == pristine IC on both sides (residual 0.0/0.0).
 
       '
-    corroborators: 'All from log/atlas/lennard_jones/diff.json unless noted. (1) Frame 0 == pristine IC
+    corroborators: 'All from log/atlas_jax/lennard_jones/diff.json unless noted. (1) Frame 0 == pristine IC
       on BOTH
 
       sides (residual 0.0/0.0) -- the aligned convention is real; and the whole float32 trajectory is
@@ -4937,9 +4937,9 @@ mechanisms:
 
       (reference.npz + summary.json). Plexus: config/atlas/mechanical_relaxation.yaml ->
 
-      log/atlas/mechanical_relaxation. Analysis: _oracle/scripts/_analyze_mechanical_relaxation.py ->
+      log/atlas_jax/mechanical_relaxation. Analysis: _oracle/scripts/_analyze_mechanical_relaxation.py ->
 
-      log/atlas/mechanical_relaxation/diff.json.
+      log/atlas_jax/mechanical_relaxation/diff.json.
 
       '
     threshold: '1.0e-3 (sigma), pre-registered in _analyze_mechanical_relaxation.py before the diff was
@@ -4978,7 +4978,7 @@ mechanisms:
       \  - frame 0 == pristine IC on both sides (resid 0.0); dead slots immobile on both (0.0);\n  - misaligned\
       \ x_plx(eq) vs IC = 0.1135 = relaxation_displacement -> the equilibrium is\n    genuinely reached,\
       \ not an accidental IC match.\nSummary observables agree: gyration ref-equilibrium 0.6858 == plexus\
-      \ final 0.68575;\nmean_nn ref 0.9698 == plexus 0.9698. Acted ledger\n(log/atlas/mechanical_relaxation/diag.json):\
+      \ final 0.68575;\nmean_nn ref 0.9698 == plexus 0.9698. Acted ledger\n(log/atlas_jax/mechanical_relaxation/diag.json):\
       \ relax calls 6 / acted 1 / moved 0.1123 (== the\nrelaxation displacement; it acts once then idempotently\
       \ emits ~0 on the held equilibrium),\nseed_state acted, inert_operators [], valid_evidence true\
       \ -> the scheduled solver genuinely\nacted.\n"
@@ -5271,9 +5271,9 @@ mechanisms:
       '
     value: 7.610894538878732e-08
     passed: true
-    plexus_run: log/atlas/virial_stress/
+    plexus_run: log/atlas_jax/virial_stress/
     scorer: atlas_jax_morph/_oracle/scripts/_compare_virial_stress.py
-    acted_ledger: 'From log/atlas/virial_stress/diag.json: mechanosense calls 5 / acted 1, moved 0.0,
+    acted_ledger: 'From log/atlas_jax/virial_stress/diag.json: mechanosense calls 5 / acted 1, moved 0.0,
       kind
 
       lateral, structural true -- it ACTED (wrote the stress field) but moved nothing, exactly a pure

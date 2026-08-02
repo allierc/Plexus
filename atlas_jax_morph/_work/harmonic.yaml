@@ -225,7 +225,7 @@ evidence:
     Euler-Maruyama update reduces to dx = dt*forces, the trajectory is a PURE function of the
     force law, so D_pos isolates the Harmonic force INCLUDING its adhesive tail and hard C0 cutoff
     -- the feature distinguishing it from the purely-repulsive soft_sphere/hertzian.
-    Computed by _oracle/scripts/_analyze_harmonic.py into log/atlas/harmonic/diff.json.
+    Computed by _oracle/scripts/_analyze_harmonic.py into log/atlas_jax/harmonic/diff.json.
   threshold: 0.001
   threshold_why: |
     1.0e-3 sigma, PRE-REGISTERED in the scorer (_analyze_harmonic.py:98) before the diff was
@@ -243,7 +243,7 @@ evidence:
     tighter would fail on float32 reassociation alone.
   value: 7.864199877963372e-06
   passed: true
-  plexus_run: log/atlas/harmonic/
+  plexus_run: log/atlas_jax/harmonic/
   scorer: atlas_jax_morph/_oracle/scripts/_analyze_harmonic.py
   acted_ledger: |
     adhere: calls 160 / acted 160, moved 8.451 (cumulative), kind lateral; inert_operators [];
@@ -252,7 +252,7 @@ evidence:
     magnitude peaks at 6.96 (k*sigma units) and the single-step recovered Plexus force matches it
     to a residual of 4.0e-05 (raw force law, pre-compounding).
   corroborators: |
-    All from log/atlas/harmonic/diff.json. (1) Frame 0 == pristine IC on BOTH sides (residual
+    All from log/atlas_jax/harmonic/diff.json. (1) Frame 0 == pristine IC on BOTH sides (residual
     0.0 / 0.0) -- the aligned convention is real. (2) Deliberately MISALIGNED comparison
     x_plx(t) vs x_ref(t-1) scores 0.260 sigma, ~33000x D_pos -> the frame alignment is genuinely
     correct, not an accidental match to a shifted trajectory. (3) Single-step IC force residual

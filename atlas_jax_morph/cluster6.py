@@ -40,8 +40,8 @@ import cluster as C  # noqa: E402  the hardened primitives; see the module docst
 # Our own prefix, so `status`/`kill` here never touch a discovery job (and vice versa). C's queue
 # helpers filter on the module-level PREFIX, so it is set once, here, for every call we make.
 C.PREFIX = "at6_"
-LOGDIR = os.path.join(PLEXUS, "log", "atlas", "_cluster6")
-RUNS = os.path.join(PLEXUS, "log", "atlas", "_phase6")
+LOGDIR = os.path.join(PLEXUS, "log", "atlas_jax", "_cluster6")
+RUNS = os.path.join(PLEXUS, "log", "atlas_jax", "_phase6")
 TAG = ""
 
 
@@ -55,8 +55,8 @@ def use_tag(tag):
     if not tag:
         return
     TAG = tag
-    LOGDIR = os.path.join(PLEXUS, "log", "atlas", f"_cluster6_{tag}")
-    RUNS = os.path.join(PLEXUS, "log", "atlas", f"_phase6_{tag}")
+    LOGDIR = os.path.join(PLEXUS, "log", "atlas_jax", f"_cluster6_{tag}")
+    RUNS = os.path.join(PLEXUS, "log", "atlas_jax", f"_phase6_{tag}")
     # the WHOLE tag, not its first letter: two tags starting with the same letter
     # would share a job-name prefix and each would see the other's jobs in `status`.
     C.PREFIX = f"at6{tag}_"

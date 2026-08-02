@@ -194,7 +194,7 @@ result = {
     "specs": {str(dt): f"config/atlas/{n}.yaml" for dt, n in SPECS.items()},
 }
 
-out_dir = os.path.join(PLEXUS, "log", "atlas", "brownian_dynamics")
+out_dir = os.path.join(PLEXUS, "log", "atlas_jax", "brownian_dynamics")
 os.makedirs(out_dir, exist_ok=True)
 with open(os.path.join(out_dir, "diff.json"), "w") as f:
     json.dump(result, f, indent=2)

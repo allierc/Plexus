@@ -100,7 +100,7 @@ diff = {
     "distinct_engine_last": rec[-1].tolist(),
     "distinct_ref_last": y_distinct[-1, :n_live].tolist(),
     "reference_run": "atlas_jax_morph/_oracle/runs/diff_odecontroller",
-    "engine_evidence": "log/atlas/odecontroller/",
+    "engine_evidence": "log/atlas_jax/odecontroller/",
 }
 with open(os.path.join(RUN, "diff.json"), "w") as f:
     json.dump(diff, f, indent=2)

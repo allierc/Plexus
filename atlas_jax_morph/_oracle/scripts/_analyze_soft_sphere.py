@@ -6,7 +6,7 @@ overdamped reference, per cell, per frame. Runs in the Plexus (torch) env; no re
 
 Primary metric  D_pos = max over frames t=0..60 and LIVE cells i of ||x_plx-x_ref||_2 / sigma.
 Threshold       1.0e-3 (sigma).  Corroborators: single-step IC force residual, gyration rel-err,
-dead-slot immobility, frame-0 == IC on both sides. Writes diff.json into log/atlas/soft_sphere/.
+dead-slot immobility, frame-0 == IC on both sides. Writes diff.json into log/atlas_jax/soft_sphere/.
 """
 import json
 import os
@@ -17,7 +17,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PLEXUS = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 REF = os.path.join(HERE, "..", "runs", "diff_soft_sphere", "reference.npz")
 PLX = os.path.join(PLEXUS, "graphs_data", "atlas", "soft_sphere", "trajectory.npz")
-LOG = os.path.join(PLEXUS, "log", "atlas", "soft_sphere")
+LOG = os.path.join(PLEXUS, "log", "atlas_jax", "soft_sphere")
 
 r = np.load(REF)
 p = np.load(PLX)

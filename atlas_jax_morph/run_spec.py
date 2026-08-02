@@ -5,7 +5,7 @@ that WORKS. A record entry cannot carry that claim; only a run can. So every cla
 ends here, in an evidence folder shaped exactly like the discovery track's
 (`log/okuda/coral_fixed_ball/`), so the two campaigns can be read side by side:
 
-    log/atlas/<name>/
+    log/atlas_jax/<name>/
         spec_run.yaml   the spec exactly as it ran
         diag.json       config, summary, the ACTED LEDGER, wall clock, run id
         metrics.json    summary + the per-frame series
@@ -45,7 +45,7 @@ PLEXUS = os.path.abspath(os.path.join(HERE, ".."))
 sys.path.insert(0, os.path.join(PLEXUS, "src"))
 
 CONFIG_DIR = os.path.join(PLEXUS, "config", "atlas")
-LOG_DIR = os.path.join(PLEXUS, "log", "atlas")
+LOG_DIR = os.path.join(PLEXUS, "log", "atlas_jax")
 
 
 # ------------------------------------------------------------------------------------------- #
@@ -253,7 +253,7 @@ def main():
     shutil.copyfile(path, os.path.join(out_dir, "spec_run.yaml"))
 
     t0 = time.time()
-    data_dir, out = data_generate(sim, "atlas", device=a.device, erase=True)
+    data_dir, out = data_generate(sim, "atlas_jax", device=a.device, erase=True)
     wall = time.time() - t0
 
     all_series, arrays = {}, {}
@@ -292,7 +292,7 @@ def main():
 
     if not a.no_movie:
         from plexus.plot import plot_dataset
-        plot_dataset(sim, "atlas", movie=True)
+        plot_dataset(sim, "atlas_jax", movie=True)
         for fn in sorted(os.listdir(data_dir)):
             if fn.endswith(".mp4"):
                 shutil.copyfile(os.path.join(data_dir, fn), os.path.join(out_dir, "movie.mp4"))

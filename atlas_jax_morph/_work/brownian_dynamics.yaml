@@ -223,10 +223,10 @@ evidence:
     sqrt(dt) scaling survives the engine's pos += dt*v integrator (agitate emits v = sqrt(2kT/
     (gamma*dt))*xi so dt*v is the sqrt(dt) increment). NEGATIVE CONTROL fires: the dt-scaled-noise
     bug lands D 0.0250 at dt=0.25, rel_err 0.75, REJECTED -- the metric discriminates the correct
-    scheme from the bolt-on jitter. Acted ledger (log/atlas/brownian_dynamics/diag.json): agitate
+    scheme from the bolt-on jitter. Acted ledger (log/atlas_jax/brownian_dynamics/diag.json): agitate
     calls 41, acted 41, moved 2.16, inert_operators [] -> valid_evidence true; gyration grew
     0.63 -> 4.05 (free spreading). Diff script: _oracle/scripts/diff_brownian_dynamics.py; engine
-    evidence: log/atlas/brownian_dynamics/{diag,metrics,diff}.json.
+    evidence: log/atlas_jax/brownian_dynamics/{diag,metrics,diff}.json.
 state_io_notes:
   reads:
   - position (POSITION) -- fixes the per-cell shape/mask of the kicks and the point where the drift is

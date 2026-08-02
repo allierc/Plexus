@@ -132,7 +132,7 @@ result = {
     "distinct_engine_last": G_dist[-1].tolist(),
     "distinct_ref_last": y_distinct[-1][:n_live].tolist(),
     "reference_run": os.path.relpath(os.path.dirname(REF), PLEXUS),
-    "engine_evidence": "log/atlas/odecontroller/",
+    "engine_evidence": "log/atlas_jax/odecontroller/",
 }
 OUT = os.path.join(HERE, "_oracle", "runs", "diff_odecontroller", "diff.json")
 with open(OUT, "w") as f:

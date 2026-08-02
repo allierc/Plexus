@@ -32,7 +32,7 @@ RUNS = [("regulated_growth", "hand-written activator", "$W_{in}=+0.35$", "#4FA3F
 
 def load(name):
     import zarr
-    z = zarr.open(os.path.join(PLEXUS, "graphs_data", "atlas", name, "simulation.zarr"), mode="r")
+    z = zarr.open(os.path.join(PLEXUS, "graphs_data", "atlas_jax", name, "simulation.zarr"), mode="r")
     g = dict(z.groups())["cell"]
     a = dict(g.arrays())
     st = dict(dict(g.groups())["state"].arrays())

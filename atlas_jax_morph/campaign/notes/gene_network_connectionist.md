@@ -141,7 +141,7 @@ genuinely exercise the recurrent gene->gene coupling, the `W_in` input inside th
 algebraic sigmoid and per-gene decay — a wrong choice on any of the SOURCE-WINS points would have
 diverged by O(1), not sat at 7e-6.
 
-**Acted ledger checked FIRST** (`log/atlas/gene_network_connectionist/diag.json`): `regulate` 20/20
+**Acted ledger checked FIRST** (`log/atlas_jax/gene_network_connectionist/diag.json`): `regulate` 20/20
 calls acted, `moved` 0.823 (nonzero -> the ODE really evolved the gene block); `seed_state` 1/1;
 `inert_operators: []`; `valid_evidence: true`. A metric on an inert operator would be worthless — it
 is not inert.
@@ -151,7 +151,7 @@ is not inert.
   (`reference.npz` + `summary.json`; deterministic at fixed input, `u` frozen across the rollout;
   script `_oracle/scripts/gene_network_connectionist.py`).
 - Engine (Plexus torch): spec `config/atlas/gene_network_connectionist.yaml`; evidence
-  `log/atlas/gene_network_connectionist/` (diag.json, metrics.json/.npz, spec_run.yaml, strip.png);
+  `log/atlas_jax/gene_network_connectionist/` (diag.json, metrics.json/.npz, spec_run.yaml, strip.png);
   gene trajectory in `graphs_data/atlas/gene_network_connectionist/simulation.zarr`.
 - Score: `python diff_gene_network_connectionist.py score` ->
   `_oracle/runs/diff_gene_network_connectionist/diff.json` (value 6.676e-06, passed true).
@@ -183,7 +183,7 @@ engine/score cannot be re-executed here — they ran on the user's machine, date
 - Oracle `_oracle/runs/diff_gene_network_connectionist/` — `reference.npz` [21,6,5], `summary.json`,
   `_provenance.json` (real venv: jax 0.11.0, diffrax 0.7.2, jax-morph 0.4.0 @ sha ace08b8),
   `diff.json` (value 6.67572e-06, passed true, threshold 0.005, argmax frame17/cell0/gene4).
-- Engine `log/atlas/gene_network_connectionist/` — `diag.json` acted ledger: `regulate` 20/20
+- Engine `log/atlas_jax/gene_network_connectionist/` — `diag.json` acted ledger: `regulate` 20/20
   acted, moved 0.823, `seed_state` 1/1, `inert_operators: []`, `valid_evidence: true`.
 - IC matched: `spec_run.yaml` seed_state gene == oracle `summary.json` gene0_cell0 (float32).
 
