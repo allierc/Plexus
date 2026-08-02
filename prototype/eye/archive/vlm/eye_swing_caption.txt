@@ -1,0 +1,4 @@
+- video name: eye_swing
+- description: The simulation shows a central ring-like structure with various colored appendages attached to its exterior. Over time, the color of the appendage on the right side shifts from a dark olive green to a bright yellow. The other colored appendages, including blue, purple, red, and green, remain relatively stable in their positions and colors. The internal speckled pattern and the central black void remain constant throughout the sequence.
+- objects: The central object is a large, thick ring with a black core and a speckled grey and light blue outer layer. Four small yellow clusters are arranged symmetrically around the inner edge of this ring. Six distinct colored appendages are attached to the outer perimeter, including blue, purple, red, olive, orange, and green. The appendages vary in shape, with some appearing as simple lobes and others as more complex, curved structures.
+

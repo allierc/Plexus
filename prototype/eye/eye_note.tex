@@ -385,6 +385,56 @@ across the black pupil. \textbf{The gold flecks are load-bearing:} a round pupil
 torsion, so the iridophore specks are what make the roll visible at all.
 
 %======================================================================
+\section{The dynamics-watching critic, tested --- and it fails}
+
+Plexus\,2 names a ``dynamics-watching critic'' as a \emph{required} agent, on the grounds that a
+worker agent reads a static strip but cannot watch a movie. That is cheap to test here, so it
+was tested: the local Gemma-4-12B captioner was shown the anterior panel of the atlas run,
+cropped so no axis label, no legend and no title could give the answer away, and asked what
+happens.
+
+\textbf{First attempt, the whole 1830-frame run.} It read the anatomy well --- ``a large,
+light-grey circular ring'', ``four small yellow clusters arranged symmetrically around the inner
+black core'', ``elongated appendages in blue, red, purple and green'', even the dashed cup
+outline --- and then concluded: \emph{``The overall configuration remains static throughout the
+sequence of keyframes.''} It never used the word eye.
+
+That could have been a sampling artefact: the captioner takes evenly-spaced keyframes, and the
+programme returns to primary position between oscillation blocks, so the samples may all have
+landed on the same pose.
+
+\textbf{Second attempt, one excursion only.} A 1.8\,s clip over a single abduction--adduction
+swing, verified from the recorded trace to span $0 \to +14.8 \to -16.3^\circ$. This time it
+counted \emph{six} appendages correctly, and it did report a change --- the wrong one:
+
+\begin{quote}
+``Over time, the color of the appendage on the right side shifts from a dark olive green to a
+bright yellow. The other colored appendages \ldots\ remain relatively stable in their positions
+and colors. The internal speckled pattern and the central black void remain constant throughout
+the sequence.''
+\end{quote}
+
+The colour shift it caught is the medial rectus brightening with activation --- a cue encoded
+\emph{within} each frame. The $31^\circ$ rotation, encoded \emph{across} frames, it did not see
+at all, and it declared the pupil stationary while the pupil was sweeping across a third of the
+globe.
+
+\begin{tcolorbox}[colback=bad!4,colframe=bad!45,boxrule=0.7pt,arc=2pt]
+\textbf{This is the paper's claim, isolated.} The failure is not competence at seeing --- the
+model got the anatomy right, counted the muscles right, and picked up an activation cue we
+deliberately encoded as colour. It is competence at seeing \emph{change}: what a per-frame
+description can carry, it carried; what only a comparison between frames can carry, it lost.
+A caption pipeline built on keyframes is structurally unable to referee a rotation, and no
+prompt fixes that. Captions saved in \code{archive/vlm/}.
+\end{tcolorbox}
+
+Two consequences for this prototype. The gold iridophore flecks were added precisely because a
+round pupil on a rotating sphere has almost no per-frame signature --- the flecks are the only
+thing that makes torsion visible at all --- and the VLM saw the flecks but never tracked their
+angle. And the acceptance test in \code{run\_eye.verdict} is doing exactly the job the critic
+could not: the rotation is refereed by the Kabsch fit and the tracking metrics, in numbers.
+
+%======================================================================
 \section{Where it stands, and what is next}
 
 \textbf{Settled.} The decomposition into sets; the emergent muscle-action table; the two-body
@@ -407,9 +457,10 @@ $35^\circ$, recruitment 4/4, centroid drift below 6\% of the globe radius, globe
 \begin{enumerate}
 \item Finish the working point, then render the long \code{atlas} program (each antagonist pair
 driven back and forth three times) and the zebrafish \code{okr} program at movie resolution.
-\item Let the video-captioning VLM watch the result cold and see whether it reports a rolling
-eye. That is the dynamics-watching critic the Plexus\,2 paper names as a required agent, and
-this is a cheap, honest test of it.
+\item Give the dynamics-watching critic something it can actually use: a difference or
+optical-flow strip rather than raw keyframes, and re-run the test of \S7. The hypothesis is
+explicit --- if the change is moved into the per-frame appearance, a per-frame captioner can
+report it --- and it is falsifiable in one afternoon.
 \item Repair the surrogate identification (\S6): sweep excitation, explicit steady-state fit.
 Only then is controller tuning a question worth asking.
 \item A real inverse pass: given only the observed gaze trace, recover the six insertion

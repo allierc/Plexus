@@ -1,0 +1,10 @@
+- video name: eye_only
+- description: The simulation shows a central ring-like structure with internal and external components.
+Small yellow clusters are positioned symmetrically around the inner perimeter of the ring.
+Various colored appendages extend outward from the main circular body in different directions.
+The overall configuration remains static throughout the sequence of keyframes.
+- objects: A large, light-grey circular ring forms the primary structure of the scene.
+Four small yellow clusters are arranged in a symmetrical pattern around the inner black core.
+Several elongated appendages in colors like blue, red, purple, and green protrude from the ring's exterior.
+A dashed black line outlines the outer boundary of the main circular body.
+
