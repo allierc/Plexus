@@ -1084,8 +1084,16 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     for hole in COL.holes(record):
         print(f"  [collector] HOLE: {hole}")
 
-    step(f"Interpreter: writing the causal record for {len(kept)} kept run(s)")
-    for nm, g, s, sc, oc, h in kept:
+    # THE INTERPRETER HAS NOTHING TO SAY ABOUT A REPLAY. A recon slot carries no graph -- it is a
+    # spec re-run verbatim -- so there is no edit, no parent and no causal claim to write. It
+    # crashed here on `g.name_region()` with g None, which is the honest signature of asking a
+    # role a question its input cannot answer.
+    interpretable = [r for r in kept if r[1] is not None]
+    if interpretable:
+        step(f"Interpreter: writing the causal record for {len(interpretable)} kept run(s)")
+    else:
+        step("Interpreter: skipped -- a replay has no edit and no causal story to tell")
+    for nm, g, s, sc, oc, h in interpretable:
         A.interpret(comp_hash(g), g.name_region(), h.edit, s,
                     {k: s.get(k) for k in ("analyst_consensus", "analyst_agreement")},
                     os.path.join(CAMP, "causal_descriptions.md"), ledger=ledger)
