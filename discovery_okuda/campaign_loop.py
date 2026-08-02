@@ -344,6 +344,15 @@ def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None, recon_rounds=
               "(spend is counted over the whole ledger)")
     else:
         clean_start()
+    # RECON IS A ONE-SHOT FOR THE CAMPAIGN, NOT FOR THE INVOCATION. On --resume the plan was
+    # recomputed from scratch, so a campaign already five rounds deep opened its sixth in recon
+    # mode: replaying old specs verbatim instead of breeding from the frontier, and choosing what
+    # to replay from a ranked table that would happily hand back the very runs the resume was
+    # meant to move away from. A frontier that exists has already been built.
+    if resume and os.path.exists(os.path.join(CAMP, "frontier.json")):
+        recon_rounds = 0
+        print("[loop] --resume: a frontier already exists, so NO recon round. Recon builds a "
+              "frontier; it does not rebuild one that is already there.")
     modes = plan(n_rounds, recon_rounds)
     print(f"[loop] plan: {modes.count('recon')} recon round(s) to build the frontier, then "
           f"{modes.count('composition')} composition round(s) that can pose a hypothesis")

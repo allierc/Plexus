@@ -112,3 +112,75 @@
 ------------------------------------------------------------------------------------------------
 [loop] round 5/20  mode=composition   spent so far: 47.7 agent-min over 77 calls
 ------------------------------------------------------------------------------------------------
+[loop] terminal also written to /workspace/Plexus/discovery_okuda/campaign/campaign.log
+[loop] --resume: continuing the campaign already in campaign/ (spend is counted over the whole ledger)
+[loop] plan: 1 recon round(s) to build the frontier, then 19 composition round(s) that can pose a hypothesis
+
+------------------------------------------------------------------------------------------------
+[loop] round 1/20  mode=recon   spent so far: 372.5 agent-min over 532 calls
+------------------------------------------------------------------------------------------------
+[supervisor] resumed: round 5, 25 runs spent, 8 clusters (8 active), dry 0, stage_gate 2
+================================================================================================
+ROUND 6   mode=recon   campaign=okuda_growth_driven
+================================================================================================
+
+================================================================================================
+▶ ACT 1 - PROPOSE   [+00:00]   before a second of compute is spent
+================================================================================================
+{"runs": ["cfl_c001p300_d000p420", "cfl_c000p080_d002p000", "cfl_c000p010_d010p000", "cfl_c000p020_d005p000", "cfl_c001p300_d000p280", "cfl_c001p300_d000p220", "wk_tension_pos_s0", "wk_curvature_pos_s0", "wk_apical_area_pos_s0", "wk_pressure_pos_s0", "wk_curvature_neg_s0", "wk_pressure_neg_s0"], "why": "Spans the cfl c/d advection-diffusion regime (high-c/low-d through low-c/high-d) plus four dist
+  [recon] the Proposer chose 12: cfl_c001p300_d000p420, cfl_c000p080_d002p000, cfl_c000p010_d010p000, cfl_c000p020_d005p000, cfl_c001p300_d000p280, cfl_c001p300_d000p220, wk_tension_pos_s0, wk_curvature_pos_s0, wk_apical_area_pos_s0, wk_pressure_pos_s0, wk_curvature_neg_s0, wk_pressure_neg_s0
+  ◉ proposer: Spans the cfl c/d advection-diffusion regime (high-c/low-d through low-c/high-d) plus four distinct 
+      wk membrane operators (tension, curvature, apical_area, pressure) in pos and neg. Prefers the liveli
+      est patterns (wk chem 1.07).
+  ⚠ [recon] r006n_00_cfl_c001p300_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r006n_00_cfl_c001p300_d  replay cfl_c001p300_d000p420    track A  control       no prediction
+  ⚠ [recon] r006n_01_cfl_c000p080_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r006n_01_cfl_c000p080_d  replay cfl_c000p080_d002p000    track A  control       no prediction
+  ⚠ [recon] r006n_02_cfl_c000p010_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r006n_02_cfl_c000p010_d  replay cfl_c000p010_d010p000    track A  control       no prediction
+  ⚠ [recon] r006n_03_cfl_c000p020_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r006n_03_cfl_c000p020_d  replay cfl_c000p020_d005p000    track A  control       no prediction
+  ⚠ [recon] r006n_04_cfl_c001p300_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r006n_04_cfl_c001p300_d  replay cfl_c001p300_d000p280    track A  control       no prediction
+  ⚠ [recon] r006n_05_cfl_c001p300_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r006n_05_cfl_c001p300_d  replay cfl_c001p300_d000p220    track A  control       no prediction
+  ⚠ [recon] r006n_06_wk_tension_pos: reservoir 3552 -> 138888 (cap 1778 -> 69446 cells), CLAMPED from 295863 by the 1.5 GB budget -- if it saturates again the composition's growth is the problem, not the array. A buffer is an array size, not a model parameter.
+  r006n_06_wk_tension_pos  replay wk_tension_pos_s0        track A  control       no prediction
+  ⚠ [recon] r006n_07_wk_curvature_p: reservoir 3552 -> 138888 (cap 1778 -> 69446 cells), CLAMPED from 295863 by the 1.5 GB budget -- if it saturates again the composition's growth is the problem, not the array. A buffer is an array size, not a model parameter.
+  r006n_07_wk_curvature_p  replay wk_curvature_pos_s0      track A  control       no prediction
+  ⚠ [recon] r006n_08_wk_apical_area: reservoir 3552 -> 73968 (cap 1778 -> 36986 cells). A buffer is an array size, not a model parameter.
+  r006n_08_wk_apical_area  replay wk_apical_area_pos_s0    track A  control       no prediction
+  ⚠ [recon] r006n_09_wk_pressure_po: reservoir 3552 -> 138888 (cap 1778 -> 69446 cells), CLAMPED from 295863 by the 1.5 GB budget -- if it saturates again the composition's growth is the problem, not the array. A buffer is an array size, not a model parameter.
+  r006n_09_wk_pressure_po  replay wk_pressure_pos_s0       track A  control       no prediction
+  ⚠ [recon] r006n_10_wk_curvature_n: reservoir 3552 -> 138888 (cap 1778 -> 69446 cells), CLAMPED from 295863 by the 1.5 GB budget -- if it saturates again the composition's growth is the problem, not the array. A buffer is an array size, not a model parameter.
+  r006n_10_wk_curvature_n  replay wk_curvature_neg_s0      track A  control       no prediction
+  ⚠ [recon] r006n_11_wk_pressure_ne: reservoir 3552 -> 138888 (cap 1778 -> 69446 cells), CLAMPED from 295863 by the 1.5 GB budget -- if it saturates again the composition's growth is the problem, not the array. A buffer is an array size, not a model parameter.
+  r006n_11_wk_pressure_ne  replay wk_pressure_neg_s0       track A  control       no prediction
+[preflight] cluster job env: OK
+[preflight] PASS
+
+================================================================================================
+▶ ACT 2 - MEASURE   [+00:33]   submitting 12 simulation(s) -- the only expensive step
+================================================================================================
+[cluster] fired 12 bsub(s) DETACHED on allierc@login1: pg_r006n_00_cfl_c001p300_d, pg_r006n_01_cfl_c000p080_d, pg_r006n_02_cfl_c000p010_d, pg_r006n_03_cfl_c000p020_d, pg_r006n_04_cfl_c001p300_d, pg_r006n_05_cfl_c001p300_d, pg_r006n_06_wk_tension_pos, pg_r006n_07_wk_curvature_p, pg_r006n_08_wk_apical_area, pg_r006n_09_wk_pressure_po, pg_r006n_10_wk_curvature_n, pg_r006n_11_wk_pressure_ne
+  the ssh returns BEFORE bsub lands -- the queue is the only ground truth.
+  verify: python cluster.py --status   (remote submit log: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda/_cluster/_submit.log)
+    [+00:36] ◌ 12 job(s) on the cluster; waiting. Check with `bjobs`.
+  [16:59] run/pend=12 done=0 exit=0 of 12
+  [17:00] run/pend=11 done=0 exit=1 of 12
+[loop] terminal also written to /workspace/Plexus/discovery_okuda/campaign/campaign.log
+[loop] --resume: continuing the campaign already in campaign/ (spend is counted over the whole ledger)
+[loop] --resume: a frontier already exists, so NO recon round. Recon builds a frontier; it does not rebuild one that is already there.
+[loop] plan: 0 recon round(s) to build the frontier, then 20 composition round(s) that can pose a hypothesis
+
+------------------------------------------------------------------------------------------------
+[loop] round 1/20  mode=composition   spent so far: 372.9 agent-min over 533 calls
+------------------------------------------------------------------------------------------------
+[supervisor] resumed: round 6, 25 runs spent, 8 clusters (8 active), dry 0, stage_gate 2
+================================================================================================
+ROUND 7   mode=composition   campaign=okuda_growth_driven
+================================================================================================
+
+================================================================================================
+▶ ACT 1 - PROPOSE   [+00:00]   before a second of compute is spent
+================================================================================================

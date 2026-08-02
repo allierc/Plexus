@@ -28,21 +28,25 @@ Also available and NOT part of scoring, but informative: mech_p_ratio (tube/body
 ~3 = a FORCED protrusion, ~1 = a growth-driven equilibrium).
 
 <!-- LEARNED PATTERNS -->
-## Learned patterns (updated round 4 meta-review)
+## Learned patterns (updated round 5 meta-review)
 
 **THE CENTRAL RESULT — the ~1.19–1.23 bud is a HARD CEILING and every lever that tries to exceed it
-DIVERGES.** Three lever families have now been driven to divergence, not to a bigger bud: op-REMOVAL, uniform
-INFLATION, and (round 4) TUNING the morphogen driver up. Amplification on THIS body is exhausted. A larger
-Okuda morphology needs a DIFFERENT BASE GEOMETRY, not a bigger push here. Stop proposing "make the bud
-bigger" edits; if you must test the ceiling, do it once with a ≤1.25 clause and expect divergence.
+DIVERGES.** Four lever families have now been driven to divergence, not to a bigger bud: op-REMOVAL, uniform
+INFLATION, morphogen-tune UP (round 4), and morphogen-tune / reaction-touch (round 5). Amplification on THIS
+body is EXHAUSTED. A larger Okuda morphology needs a DIFFERENT BASE GEOMETRY, not a bigger push here. Stop
+proposing "make the bud bigger" edits; if you must test the ceiling, do it once with a ≤1.25 clause and
+expect divergence.
 
-**ROUND-4 TRAP (new) — turning morphogen amplitude / gradient / reaction rate UP runs the chemistry away.**
-4/7 runs broke P4+P12+P5b together: growth MANUFACTURES morphogen instead of diluting it (P4 — the growth
-term is a SOURCE), so growth→more morphogen→more growth is positive feedback; the activator went
-0.01→1.41e6→NaN while spatially UNIFORM (P12 non-finite, and uniform = no patterned bud at all), with the
-reaction ~50× faster than mechanics can follow (P5b). This is the round-3 "next action" and it FAILED — do
-NOT re-propose raising morphogen amplitude/sharpness. The only way this family could help is turning the
-reaction DOWN or clamping the source, not up.
+**THE MORPHOGEN REACTION INTEGRATOR IS THE WALL — do not touch it in ANY direction (rounds 4+5, now 10+
+runs).** Round 5 spent 6/6 runs re-hitting the exact round-4 signature: P4+P12+P5b broke together every run
+(P11 in 4/6). Mechanism, settled: growth MANUFACTURES morphogen (P4 — the growth term is a SOURCE, not a
+sink), so growth→more morphogen→more growth is positive feedback that the explicit integrator cannot hold;
+the activator runs 0.01→1.41e6→NaN while spatially UNIFORM (P12 non-finite AND uniform = no patterned bud at
+all), reaction ~50× faster than mechanics can follow (P5b), then the mesh folds through itself (P11).
+The round-3 hope "turn the reaction DOWN / clamp the source" was the round-5 test and it ALSO diverged — the
+instability is in the integrator, not the sign of the push. CLOSE the whole morphogen-tune family (amplitude,
+gradient, sharpness, rate, up or down). The P12 non-negativity/finiteness check is the fastest divergence
+detector — read act_max FIRST.
 
 **protr_peak is a LIE above ~1.25.** EVERY reading ≥1.29 (1.317×2, 2.255, 1.295, and the round-4 blowups) was
 the mesh folding through itself, never a bud. Fixed SYNDROME: **P11** self-intersection (ta_n_tubes 1000s /
