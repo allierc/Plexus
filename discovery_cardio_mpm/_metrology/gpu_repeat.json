@@ -1,0 +1,11 @@
+{
+ "device": "cuda:0",
+ "runs": 3,
+ "params": 198407,
+ "max_abs_pairwise": 3.016553819179535e-06,
+ "relative": 7.541015615128463e-08,
+ "identical_pairs": 1,
+ "iterations": 2,
+ "blocked_by": "grid_sampler_2d_backward_cuda (plexus.models.base.Field.sample, called by active_stress)",
+ "note": "measured at 2 iterations; it will grow with optimisation depth, and Phase 2 must re-measure it at the depth the loop actually uses"
+}

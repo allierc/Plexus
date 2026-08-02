@@ -376,7 +376,7 @@ Everything else may be renegotiated if it runs over budget --- \textbf{those two
 gate with a waiver attached is not a gate, and a stop that can be waived would be waived at exactly
 the moment it was doing its job.
 
-\begin{phasebox}{Phase 0 --- Make it run, make it repeat, publish the empty register \hfill \todo}
+\begin{phasebox}{Phase 0 --- Make it run, make it repeat, publish the empty register \hfill \dn\ (18 of 18)}
 \textbf{Goal.} Get from ``nothing executes'' to ``the same command twice gives the same answer, and
 we can say exactly what we believe''. None of this is science; each item makes a question askable.
 
@@ -651,6 +651,81 @@ could not, the surprise rate, and the retraction rate. Alongside it the honest c
 batches, no error bars, nothing held out, no surviving claim --- against whatever this campaign
 actually earns.
 \end{phasebox}
+
+%======================================================================
+\section{Phase 0 report --- 2 August}\label{sec:p0report}
+
+\emph{This is a phase boundary. The gate prints \textbf{PASS, 18 of 18}, the canaries catch
+\textbf{6 of 6}, and one thing is deliberately \textbf{not} certified and is recorded as a number
+rather than a footnote. I have stopped here.}
+
+\textbf{What now exists.} A folder that runs: \code{ingest.py} (rebuild the recording),
+\code{data.py} (one path, no fallback), \code{determinism.py} (fix the dice),
+\code{provenance.py} (a run carries its own source), \code{train.py} (the repaired apparatus),
+\code{certify\_apparatus.py} (the gate, with canaries), and the two registers.
+
+\textbf{The gate, in one line each.}
+
+\footnotesize
+\begin{tabular}{@{}l p{11.0cm}@{}}
+\toprule
+\textbf{what} & \textbf{what happened}\\
+\midrule
+it runs at all & The inherited trainer died on every invocation, on a function one branch had
+deleted from under another. Repaired; a short fit now completes end to end.\\
+the recording rebuilds & It was not in the repository and the script that made it was gone. It is
+now rebuilt from the microscope derivatives by committed code and matches the existing file
+\textbf{bit for bit}, every array.\\
+one path, no fallback & The loader used to try three locations and take whichever existed --- a
+cure that turns ``file missing'' into ``fitted the wrong recording''. Now one explicit path, and
+both refusals were watched firing.\\
+the dice are fixed & \textbf{Two fits at one seed are now bit-identical over 198{,}407
+parameters}; two seeds differ. Neither was true of anything in the previous sixty rounds.\\
+a run carries its source & Every run copies the bytes of every module it imported into its own
+folder, with hashes. A branch switch or a concurrent campaign in the same tree cannot reach
+backwards into a finished run --- which is exactly how two batches were lost before.\\
+the ledger is out of the code & Nine phrases from the retired ledger were compiled into comments,
+help strings and one default. The scan is clean, and the canary proves the scan still fires.\\
+the registers exist & 38 inherited claims, every one carrying an open status. \textbf{The belief
+register has zero entries.}\\
+\bottomrule
+\end{tabular}
+\normalsize
+
+\textbf{Three things found while doing it, none of them planned.}
+
+\begin{itemize}
+\item \textbf{The default setting was a retired belief.} \code{-{}-stiff\_src} still defaulted to
+an image-sourced field whose implementation had been deleted, so the default invocation trained a
+two-parameter stub against a synthetic blob --- and the dashboard's ``correlation with the
+microscope'' panel correlated against that same blob. The path is removed \emph{because the code
+is gone}, not because the claim about it was accepted; the claim is an open question like the
+rest.
+\item \textbf{A silent bug in the pulse.} The learnable duration was initialised against a
+hard-coded bound while the simulation used the one on the command line, so
+\code{-{}-dur0 10 -{}-dur\_hi 11} actually started at 8.09. Every duration claim in the previous
+campaign was made through that.
+\item \textbf{My own first fix was wrong, and the check caught it.} Making the arithmetic
+deterministic meant replacing a sampling routine with an explicit equivalent. The first version
+had the two axes swapped --- and disagreed with the original by \emph{more than the size of the
+signal}. It was caught because the replacement was checked against the thing it replaced before
+being used, which is the rule this whole phase exists to install: \emph{the instrument lies before
+the physics does.}
+\end{itemize}
+
+\textbf{The one thing that is not certified, stated as a number.} Determinism is complete on the
+processor and \textbf{not} on the graphics card. The blocker is named:
+\code{grid\_sampler\_2d\_backward\_cuda} has no deterministic implementation, and it is reached
+from inside the shared Plexus library --- \code{Field.sample}, called by the active-stress
+operator every frame. Fixing that changes a library three other projects are using, so it is not
+Phase~0 work.
+
+Rather than relax the gate, the spread was \emph{measured}: three identical runs on the card agree
+to \textbf{3.0e-6}, a relative $7.5 \times 10^{-8}$, and only one of the three pairs was actually
+identical. That is small, it is not zero, and it will grow with the length of the optimisation ---
+so Phase~2 re-measures it at the depth the loop will really use, where it becomes one of the two
+noise floors the campaign is built on. A run may only become irreproducible on purpose: the flag
+that permits it is off by default and is recorded in the run's own manifest.
 
 %======================================================================
 \section{The lesson we are starting from, in three lines}

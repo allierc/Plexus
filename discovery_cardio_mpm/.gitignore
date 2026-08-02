@@ -1,0 +1,6 @@
+# run outputs: archives, checkpoints, dashboards. Everything a run needs to be re-derived is in
+# its own folder (see provenance.py) and those folders are large; the campaign's conclusions live
+# in BELIEFS.md and the note, not in the archive.
+archive/
+__pycache__/
+*.pyc
