@@ -37,6 +37,22 @@ ROOT = os.path.abspath(os.path.join(HERE, ".."))
 LOG = os.path.join(ROOT, "log", "okuda")
 
 
+# WHAT THE MOVIE ACTUALLY CONTAINS, told to the model because it cannot know. run_one lays out
+# two 3D viewpoints of the SAME vesicle side by side, with a cross-section inset bottom-right.
+# Unwarned, the model reads three panels as three objects: the inset becomes a second body beside
+# the tissue, and the two viewpoints become two balls. The eye-check is the only role that looks
+# at SHAPE, so a layout it misreads corrupts the one channel that is not a number.
+OKUDA_LAYOUT = """PANELS, left to right:
+  LEFT   a 3D view of the cell vesicle, from the side.
+  RIGHT  the SAME vesicle from a second viewpoint (roughly from above). It is not a second object.
+  BOTTOM-RIGHT INSET, small  a CROSS-SECTION cut through the middle of that same vesicle, showing
+         the cells in the cut plane. Its rectangular border is the inset frame and not a
+         structure. What looks like a flat sheet or a ring there is the interior of the ball.
+COLOUR: cells are shaded white (low) to red (high) by the activator chemical they carry. A green
+  tint means the cell divided recently; magenta means the cell is broken. The colour is a
+  measurement painted on the tissue, not a material."""
+
+
 def caption_wave(names, n_frames=8, force=False):
     """Caption every named run. Returns {name: 'ok' | 'skipped' | 'no_movie' | reason}."""
     todo = []
@@ -76,7 +92,7 @@ def caption_wave(names, n_frames=8, force=False):
     out = {}
     for i, (n, mp4, dst) in enumerate(todo, 1):
         try:
-            txt = DV.describe_one(proc, model, mp4, n_frames)
+            txt = DV.describe_one(proc, model, mp4, n_frames, layout=OKUDA_LAYOUT)
             with open(dst, "w") as f:
                 f.write(txt if txt else "UNAVAILABLE -- the model returned nothing.\n")
             out[n] = "ok" if txt else "empty"

@@ -78,11 +78,25 @@ def _split_sections(text):
     return desc.strip(), objs.strip()
 
 
-def describe_one(proc, model, video, n_frames):
+def describe_one(proc, model, video, n_frames, layout=None):
+    """`layout` describes the PANELS, when the caller knows them.
+
+    Without it the model reads a multi-panel figure as one scene, and every panel boundary
+    becomes a feature of the specimen: a cross-section inset is described as a separate object
+    beside the tissue, and two viewpoints of one ball are described as two balls. Caught by
+    Cedric watching the eye-check's output -- it was reading the inset as part of the sample.
+
+    Kept as an argument rather than baked into PROMPT because this module captions several
+    prototypes with different figures, and a layout asserted for the wrong one is worse than none.
+    """
     frames = keyframes(video, n_frames)
     if not frames:
         return None
-    content = [{"type": "image", "image": f} for f in frames] + [{"type": "text", "text": PROMPT}]
+    text = PROMPT if not layout else (
+        "THE FRAME IS A MULTI-PANEL FIGURE. Read the panels as views OF ONE SPECIMEN, not as "
+        "separate objects, and never describe a panel boundary or an inset frame as a feature of "
+        "the sample.\n" + layout.strip() + "\n\n" + PROMPT)
+    content = [{"type": "image", "image": f} for f in frames] + [{"type": "text", "text": text}]
     msgs = [{"role": "system", "content": "You are a precise scientific assistant."},
             {"role": "user", "content": content}]
     inputs = proc.apply_chat_template(msgs, add_generation_prompt=True, tokenize=True,
