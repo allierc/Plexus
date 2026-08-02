@@ -1,0 +1,196 @@
+[
+ {
+  "name": "material_active_horizontal",
+  "dir": "/workspace/Plexus/graphs_data/material/material_active_horizontal",
+  "has_trajectory": true,
+  "spec": "/workspace/Plexus/graphs_data/material/material_active_horizontal/spec.yaml",
+  "movies": [
+   "movie_activation.mp4",
+   "movie_cell.mp4",
+   "movie_mpm_particle.mp4"
+  ],
+  "frames": 251,
+  "particles": 16384,
+  "arrays": 13,
+  "spec_error": "ValueError: operator 'pulse_stimulus' not in registry. Available: ['activation_pulse', 'active_force', 'active_stress', 'agent_gather', 'agent_remodel', 'agent_scatter', 'agent_to_mpm', 'aggregate', 'alignment', 'apply_material_map', 'attraction_repulsion', 'attractor_flow', 'bounce', 'broadcast', 'cell_divide', 'cell_grow', 'chemotax', 'cohesion', 'cruise', 'decay', 'deposit', 'diffuse', 'drag', 'flow_align', 'g2p', 'glide', 'gravity', 'heading_align', 'mls_mpm_mechanics', 'mpm_anchor', 'mpm_gather', 'mpm_grid_update', 'mpm_scatter', 'mpm_spin', 'mpm_strain', 'mpm_to_agent', 'p2g', 'pacemaker', 'playback', 'polarity_align', 'polarity_flow_align', 'pulse_to_active_stress', 'pulse_to_contraction', 'radius_graph', 'sediment', 'sense', 'separation', 'signal', 'squared_law', 'stillinger_weber', 'velocity_align', 'velocity_cruise']",
+  "runs_today": false
+ },
+ {
+  "name": "material_active_phase_horizontal",
+  "dir": "/workspace/Plexus/graphs_data/material/material_active_phase_horizontal",
+  "has_trajectory": true,
+  "spec": "/workspace/Plexus/graphs_data/material/material_active_phase_horizontal/spec.yaml",
+  "movies": [
+   "movie_activation.mp4",
+   "movie_cell.mp4",
+   "movie_mpm_particle.mp4"
+  ],
+  "frames": 251,
+  "particles": 16384,
+  "arrays": 15,
+  "spec_error": "ValueError: operator 'phase_delay_pulse' not in registry. Available: ['activation_pulse', 'active_force', 'active_stress', 'agent_gather', 'agent_remodel', 'agent_scatter', 'agent_to_mpm', 'aggregate', 'alignment', 'apply_material_map', 'attraction_repulsion', 'attractor_flow', 'bounce', 'broadcast', 'cell_divide', 'cell_grow', 'chemotax', 'cohesion', 'cruise', 'decay', 'deposit', 'diffuse', 'drag', 'flow_align', 'g2p', 'glide', 'gravity', 'heading_align', 'mls_mpm_mechanics', 'mpm_anchor', 'mpm_gather', 'mpm_grid_update', 'mpm_scatter', 'mpm_spin', 'mpm_strain', 'mpm_to_agent', 'p2g', 'pacemaker', 'playback', 'polarity_align', 'polarity_flow_align', 'pulse_to_active_stress', 'pulse_to_contraction', 'radius_graph', 'sediment', 'sense', 'separation', 'signal', 'squared_law', 'stillinger_weber', 'velocity_align', 'velocity_cruise']",
+  "runs_today": false
+ },
+ {
+  "name": "material_active_phase_quadrants",
+  "dir": "/workspace/Plexus/graphs_data/material/material_active_phase_quadrants",
+  "has_trajectory": true,
+  "spec": "/workspace/Plexus/graphs_data/material/material_active_phase_quadrants/spec.yaml",
+  "movies": [
+   "movie_activation.mp4",
+   "movie_cell.mp4",
+   "movie_mpm_particle.mp4"
+  ],
+  "frames": 251,
+  "particles": 16384,
+  "arrays": 15,
+  "spec_error": "ValueError: operator 'phase_delay_pulse' not in registry. Available: ['activation_pulse', 'active_force', 'active_stress', 'agent_gather', 'agent_remodel', 'agent_scatter', 'agent_to_mpm', 'aggregate', 'alignment', 'apply_material_map', 'attraction_repulsion', 'attractor_flow', 'bounce', 'broadcast', 'cell_divide', 'cell_grow', 'chemotax', 'cohesion', 'cruise', 'decay', 'deposit', 'diffuse', 'drag', 'flow_align', 'g2p', 'glide', 'gravity', 'heading_align', 'mls_mpm_mechanics', 'mpm_anchor', 'mpm_gather', 'mpm_grid_update', 'mpm_scatter', 'mpm_spin', 'mpm_strain', 'mpm_to_agent', 'p2g', 'pacemaker', 'playback', 'polarity_align', 'polarity_flow_align', 'pulse_to_active_stress', 'pulse_to_contraction', 'radius_graph', 'sediment', 'sense', 'separation', 'signal', 'squared_law', 'stillinger_weber', 'velocity_align', 'velocity_cruise']",
+  "runs_today": false
+ },
+ {
+  "name": "material_active_phase_radial",
+  "dir": "/workspace/Plexus/graphs_data/material/material_active_phase_radial",
+  "has_trajectory": true,
+  "spec": "/workspace/Plexus/graphs_data/material/material_active_phase_radial/spec.yaml",
+  "movies": [
+   "movie_activation.mp4",
+   "movie_cell.mp4",
+   "movie_mpm_particle.mp4"
+  ],
+  "frames": 251,
+  "particles": 16384,
+  "arrays": 15,
+  "spec_error": "ValueError: operator 'phase_delay_pulse' not in registry. Available: ['activation_pulse', 'active_force', 'active_stress', 'agent_gather', 'agent_remodel', 'agent_scatter', 'agent_to_mpm', 'aggregate', 'alignment', 'apply_material_map', 'attraction_repulsion', 'attractor_flow', 'bounce', 'broadcast', 'cell_divide', 'cell_grow', 'chemotax', 'cohesion', 'cruise', 'decay', 'deposit', 'diffuse', 'drag', 'flow_align', 'g2p', 'glide', 'gravity', 'heading_align', 'mls_mpm_mechanics', 'mpm_anchor', 'mpm_gather', 'mpm_grid_update', 'mpm_scatter', 'mpm_spin', 'mpm_strain', 'mpm_to_agent', 'p2g', 'pacemaker', 'playback', 'polarity_align', 'polarity_flow_align', 'pulse_to_active_stress', 'pulse_to_contraction', 'radius_graph', 'sediment', 'sense', 'separation', 'signal', 'squared_law', 'stillinger_weber', 'velocity_align', 'velocity_cruise']",
+  "runs_today": false
+ },
+ {
+  "name": "material_active_phase_swirl",
+  "dir": "/workspace/Plexus/graphs_data/material/material_active_phase_swirl",
+  "has_trajectory": true,
+  "spec": "/workspace/Plexus/graphs_data/material/material_active_phase_swirl/spec.yaml",
+  "movies": [
+   "movie_activation.mp4",
+   "movie_cell.mp4",
+   "movie_mpm_particle.mp4"
+  ],
+  "frames": 251,
+  "particles": 16384,
+  "arrays": 15,
+  "spec_error": "ValueError: operator 'phase_delay_pulse' not in registry. Available: ['activation_pulse', 'active_force', 'active_stress', 'agent_gather', 'agent_remodel', 'agent_scatter', 'agent_to_mpm', 'aggregate', 'alignment', 'apply_material_map', 'attraction_repulsion', 'attractor_flow', 'bounce', 'broadcast', 'cell_divide', 'cell_grow', 'chemotax', 'cohesion', 'cruise', 'decay', 'deposit', 'diffuse', 'drag', 'flow_align', 'g2p', 'glide', 'gravity', 'heading_align', 'mls_mpm_mechanics', 'mpm_anchor', 'mpm_gather', 'mpm_grid_update', 'mpm_scatter', 'mpm_spin', 'mpm_strain', 'mpm_to_agent', 'p2g', 'pacemaker', 'playback', 'polarity_align', 'polarity_flow_align', 'pulse_to_active_stress', 'pulse_to_contraction', 'radius_graph', 'sediment', 'sense', 'separation', 'signal', 'squared_law', 'stillinger_weber', 'velocity_align', 'velocity_cruise']",
+  "runs_today": false
+ },
+ {
+  "name": "material_active_radial_in",
+  "dir": "/workspace/Plexus/graphs_data/material/material_active_radial_in",
+  "has_trajectory": true,
+  "spec": "/workspace/Plexus/graphs_data/material/material_active_radial_in/spec.yaml",
+  "movies": [
+   "movie_activation.mp4",
+   "movie_cell.mp4",
+   "movie_mpm_particle.mp4"
+  ],
+  "frames": 251,
+  "particles": 16384,
+  "arrays": 13,
+  "spec_error": "ValueError: operator 'pulse_stimulus' not in registry. Available: ['activation_pulse', 'active_force', 'active_stress', 'agent_gather', 'agent_remodel', 'agent_scatter', 'agent_to_mpm', 'aggregate', 'alignment', 'apply_material_map', 'attraction_repulsion', 'attractor_flow', 'bounce', 'broadcast', 'cell_divide', 'cell_grow', 'chemotax', 'cohesion', 'cruise', 'decay', 'deposit', 'diffuse', 'drag', 'flow_align', 'g2p', 'glide', 'gravity', 'heading_align', 'mls_mpm_mechanics', 'mpm_anchor', 'mpm_gather', 'mpm_grid_update', 'mpm_scatter', 'mpm_spin', 'mpm_strain', 'mpm_to_agent', 'p2g', 'pacemaker', 'playback', 'polarity_align', 'polarity_flow_align', 'pulse_to_active_stress', 'pulse_to_contraction', 'radius_graph', 'sediment', 'sense', 'separation', 'signal', 'squared_law', 'stillinger_weber', 'velocity_align', 'velocity_cruise']",
+  "runs_today": false
+ },
+ {
+  "name": "material_active_swirl",
+  "dir": "/workspace/Plexus/graphs_data/material/material_active_swirl",
+  "has_trajectory": true,
+  "spec": "/workspace/Plexus/graphs_data/material/material_active_swirl/spec.yaml",
+  "movies": [
+   "movie_activation.mp4",
+   "movie_cell.mp4",
+   "movie_mpm_particle.mp4"
+  ],
+  "frames": 251,
+  "particles": 16384,
+  "arrays": 13,
+  "operators": [
+   "activation_pulse",
+   "aggregate",
+   "drag",
+   "g2p",
+   "mpm_grid_update",
+   "mpm_strain",
+   "p2g",
+   "pacemaker",
+   "pulse_to_active_stress"
+  ],
+  "operators_missing": [],
+  "runs_today": true
+ },
+ {
+  "name": "material_active_vertical",
+  "dir": "/workspace/Plexus/graphs_data/material/material_active_vertical",
+  "has_trajectory": true,
+  "spec": "/workspace/Plexus/graphs_data/material/material_active_vertical/spec.yaml",
+  "movies": [
+   "movie_activation.mp4",
+   "movie_cell.mp4",
+   "movie_mpm_particle.mp4"
+  ],
+  "frames": 251,
+  "particles": 16384,
+  "arrays": 13,
+  "spec_error": "ValueError: operator 'pulse_stimulus' not in registry. Available: ['activation_pulse', 'active_force', 'active_stress', 'agent_gather', 'agent_remodel', 'agent_scatter', 'agent_to_mpm', 'aggregate', 'alignment', 'apply_material_map', 'attraction_repulsion', 'attractor_flow', 'bounce', 'broadcast', 'cell_divide', 'cell_grow', 'chemotax', 'cohesion', 'cruise', 'decay', 'deposit', 'diffuse', 'drag', 'flow_align', 'g2p', 'glide', 'gravity', 'heading_align', 'mls_mpm_mechanics', 'mpm_anchor', 'mpm_gather', 'mpm_grid_update', 'mpm_scatter', 'mpm_spin', 'mpm_strain', 'mpm_to_agent', 'p2g', 'pacemaker', 'playback', 'polarity_align', 'polarity_flow_align', 'pulse_to_active_stress', 'pulse_to_contraction', 'radius_graph', 'sediment', 'sense', 'separation', 'signal', 'squared_law', 'stillinger_weber', 'velocity_align', 'velocity_cruise']",
+  "runs_today": false
+ },
+ {
+  "name": "material_aniso_cardio",
+  "dir": "/workspace/Plexus/graphs_data/material/material_aniso_cardio",
+  "has_trajectory": true,
+  "spec": "/workspace/Plexus/graphs_data/material/material_aniso_cardio/spec.yaml",
+  "movies": [
+   "movie_activation.mp4",
+   "movie_cell.mp4",
+   "movie_mpm_particle.mp4"
+  ],
+  "frames": 301,
+  "particles": 16384,
+  "arrays": 17,
+  "operators": [
+   "activation_pulse",
+   "active_stress",
+   "aggregate",
+   "apply_material_map",
+   "drag",
+   "mpm_gather",
+   "mpm_grid_update",
+   "mpm_scatter",
+   "mpm_strain",
+   "pacemaker"
+  ],
+  "operators_missing": [],
+  "runs_today": true
+ },
+ {
+  "name": "material_central_contraction",
+  "dir": "/workspace/Plexus/graphs_data/material/material_central_contraction",
+  "has_trajectory": true,
+  "spec": "/workspace/Plexus/graphs_data/material/material_central_contraction/spec.yaml",
+  "movies": [
+   "movie_activation.mp4",
+   "movie_cell.mp4",
+   "movie_mpm_particle.mp4"
+  ],
+  "frames": 451,
+  "particles": 16384,
+  "arrays": 11,
+  "operators": [
+   "activation_pulse",
+   "active_force",
+   "aggregate",
+   "drag",
+   "mpm_gather",
+   "mpm_grid_update",
+   "mpm_scatter",
+   "mpm_strain",
+   "pacemaker"
+  ],
+  "operators_missing": [],
+  "runs_today": true
+ }
+]

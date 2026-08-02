@@ -26,7 +26,25 @@ empty. Apparatus may be reused only after it re-passes a gate here. Defaults cou
     PYTHONPATH=/workspace/Plexus/src python certify_apparatus.py --canary   # break it 6 ways
     PYTHONPATH=/workspace/Plexus/src python certify_apparatus.py --fit      # + real fits (slow)
 
-Phase 1 (freeze the recording, seal the diseased specimen) is next and has not started.
+**Phase 1 in progress.** Done: `METRICS.md` (the archaeology of the inherited instruments — what
+each was built to answer, when, and whether it still works) and `descriptors.py` (Track B's
+measurement: the loop residual on magnitude / opening / direction / orientation, real-referenced,
+interior only, with a self-test that watches every axis move and hold still). Still to do: the beat
+inventory, the data's self-agreement ceiling, the tracker-reproducibility number, the resolution
+check, and freezing + sealing the split.
+
+**Phase 1b — the corpus.** `graphs_data/material` is intact: 45 GB, 71 MPM runs with
+trajectories, specs and movies. (`log/material/<name>/` holds only the config and a completion
+marker, which is why it looks empty.) Ten drive tissue with active traction of a *known* pattern.
+
+    PYTHONPATH=…/src python corpus.py               # inventory + does each spec still run?
+    PYTHONPATH=…/src python corpus.py --descriptors # read all ten with the Track B descriptors
+    PYTHONPATH=…/src python corpus.py --figure OUT  # the visual instrument, rebuilt
+
+Two findings so far: **LoopScore scores a coordination-destroyed tissue at exactly 1.0000 on all
+ten runs**, while its zero-motion null ranges +0.033…+0.124; and **7 of 10 specs no longer run**,
+because `pulse_stimulus` and `phase_delay_pulse` were merged into `activation_pulse` (commit
+`0acb0de`) — the same rename defect that destroyed six batches of the previous campaign.
 
 **Recorded, not certified:** determinism is complete on CPU and partial on GPU —
 `grid_sampler_2d_backward_cuda` has no deterministic implementation and is reached from
