@@ -15,72 +15,79 @@
 
 ## Abstract
 
-The campaign is building the causal lever-map of the Okuda mechanism space — what each operator
-does alone and in combination — and after round 1 it has NO valid morphogenesis evidence: 0 of 4
-Okuda morphologies attempted and every operator still uncharted. Round 1 spent all 12 slots on
-controls with unstated predictions, so both failures were Proposer defects, not biology. The
-campaign is blocked on emitting its FIRST real edit: one wk_ growth config whose cell-array reserve
-is raised above the buffer cap so the scorecard is not voided, carrying one checkable clause.
+The campaign is building the causal lever-map of the Okuda mechanism space; round 2 landed its first
+valid mechanism evidence on the forced round-33 recipe (C-hash family, parent C414a11) and dissected
+which operators the forced protrusion needs. ESTABLISHED so far: patterned growth (morphogen_growth_3d0)
+and cell division (divide_3d0) are BOTH necessary -- removing either collapses the protrusion -- and
+unpatterned uniform inflation is not integrable on this body (it diverges). The campaign is blocked on
+one recurring apparatus hazard: big protr_peak readings keep turning out to be numerical divergence
+(mesh self-intersection), so the frontier now needs a positive protrusion that stays physical.
 
 ## What is ESTABLISHED
 
-- "CFL (reaction-diffusion) nodes are Turing chemistry on a RIGID ball with no growth/division
-  operator; sphere is their expected NULL, not a finding." — SUPPORTED by all 5 cfl_* replays,
-  protr_peak=1.006 & mech_p_ratio=0 & ta_n_tubes=0, round 1. Falsifiable by: any cfl run showing
-  protr_peak > 1.02 or a non-sphere morphology.
-- "wk_ growth operators are mechanically active but drive final cell count straight into the
-  cell-array cap, saturating the buffer and voiding the scorecard." — SUPPORTED by
-  wk_apical_area_pos_s0 & _neg_s2, n_cells_final=36749, div_blocked=865, buf_full=true,
-  valid_evidence=false, round 1. Falsifiable by: a wk_ run with a raised reserve that ends
-  below cap with valid_evidence=true.
+- "Patterned growth is NECESSARY for the forced protrusion." -- SUPPORTED by remove_op
+  morphogen_growth_3d0 on C414a11, protr_peak=1.046 (valid, intact sphere), round 2. Falsifiable by:
+  a morphogen_growth-free recipe reaching protr_peak > 1.2 while staying physical.
+- "Cell division is NECESSARY for the forced protrusion." -- SUPPORTED by two remove_op divide_3d0
+  edits (Ca230941 -> 1.317 & diverged; Cad4767 -> 1.19, eye reads bud as division-driven), both < the
+  1.4 predicted, round 2. Falsifiable by: a divide-free recipe holding protr_peak >= 1.4 while physical.
+- "Unpatterned uniform_ramp inflation is NOT integrable on this body." -- SUPPORTED by add_op
+  vesicle_growth uniform_ramp on C855e6, morphology=exploded, mech_force_mean=1.5e11; the protr_peak=2.255
+  is a P11 fold, not a bud, round 2. Do not re-propose.
+- "CFL / reaction-diffusion nodes are chemistry on a RIGID ball; sphere is their NULL." -- SUPPORTED by
+  5 cfl_* runs, protr_peak=1.006, mech_p_ratio=0, ta_n_tubes=0, round 1. Falsifiable by: a cfl run > 1.02.
 
 ## What is OPEN
 
-- Does ANY wk_ growth config (curvature / tension / apical_area / pressure) produce a valid
-  protrusion? NEVER cleanly measured — every wk_ slot either returned `{}` (no diag.json) or
-  saturated the buffer (valid_evidence=false). The blocker is a raiseable pool line, not the
-  operator.
-- FORCED (mech_p_ratio ~3) vs GROWN (~1) protrusion — undecidable: mech_p_ratio=0 everywhere
-  because no tube has ever formed.
+- Can the forced round-33 recipe make a protrusion that is BOTH large (protr_peak >= ~1.3) AND stays
+  physical (no P11 fold, mech_force O(1), act_max finite)? Every large reading so far was divergence.
+- FORCED (mech_p_ratio ~3) vs GROWN (~1): mech_p_ratio is 2.1-5.8 on the intact valid buds -- usable now,
+  but only on runs that stayed physical. Not yet mapped across the recipe family.
+- Two round-2 edits (set_impl shape_energy_3d0 monolayer; uniform_ramp add on Ce08ef7) returned `{}` --
+  never measured. Likely edit-did-not-compile, not biology.
 
 ## Known traps
 
-- Controls carry zero info: `replay` / `re-measure … under current instruments` / naming a RECON_
-  node as object-of-study returns bit-identical null numbers. Never propose one (all 12 slots, rd 1).
-- A prediction that is "unstated", a trend-word, or on a REJECTED metric is NOT CHECKABLE = zero
-  info; use ONE clause `<metric> <op> <value>` on an ADMITTED metric (all predictions, rd 1).
-- wk_ growth WITHOUT a raised pool line → P2_BUFFER_SATURATED at n≈36749 voids the scorecard.
-  Guard: set the reserve above the LIVE cap (re-verify it) and confirm the run ends below it.
-- APPARATUS artefacts, cosmetic, never spend a slot: (1) trajectory-classifier ValueError on the
-  'sphere' string → analysts read metrics.png instead, verdict unaffected; (2) shape_idx p95 tail
-  trips the P7 solid→fluid flag on non-deforming spheres.
+- protr_peak LIES under divergence: high protr_peak (1.317, 2.255) = mesh folding through itself (P11,
+  folded-frac ~0.8, ta_n_tubes 1477/1673), not tubes. Guard: trust protr_peak only if mech_force_mean
+  O(1), act_max finite ~[0,2], ta_n_tubes single-digit, morphology != exploded (round 2).
+- Removing divide_3d0 to show "division-independent protrusion" -- fails, division is necessary (round 2).
+- Unpatterned uniform_ramp inflation -- diverges/explodes, never a gentle sphere (round 2).
+- Controls (`replay` / `re-measure` / naming a RECON_ node) return bit-identical nulls; never propose one
+  (all 12 slots, round 1).
+- Prediction NOT CHECKABLE unless ONE clause `<metric> <op> <value>` on an ADMITTED metric (round 1).
+- APPARATUS artefacts, cosmetic: (1) trajectory classifier ValueError on 'sphere' string -> read
+  metrics.png; (2) shape_idx p95 tail trips P7 solid->fluid on non-deforming spheres.
 
 ## Frontier and parent
 
-No valid parent exists — nothing has produced admissible morphogenesis evidence. Breed the first
-real edit from a wk_ growth base (start wk_pressure_pos) with a raised reserve, NOT from any cfl or
-RECON_ node (those are characterised nulls). No comp hash yet earns a frontier.
+Breed from the forced round-33 recipe family, parent **C414a11** (the intact valid base: morphogen_growth_3d0
++ divide_3d0 both present, protr_peak ~1.3 with both intact, valid). Do NOT breed from cfl/RECON_ nulls, nor
+from the diverged C855e6 / Ca230941 branches. Goal: a large protrusion that stays physical.
 
 ## Stability envelope
 
-Only measured numbers so far are apparatus, not biology: non-growing cfl runs settle at
-n_cells_final=2000, wall ~205 s. wk_ growth runs saturate at n≈36749 (div_blocked=865, buf_full),
-wall ~1600–1720 s. The reserve must be set above the live cap to keep valid_evidence=true.
+Physical runs settle at n_cells_final ~ 2000-2001, mech_force_mean O(1) (0.47-164), act_max ~[0,1].
+Divergence signature: mech_force_mean 100s-1.5e11, act_max non-finite/negative (-2220), ta_n_tubes 1000s,
+morphology=exploded. The round-1 wk_ growth saturation at n~36749 is RETIRED -- round-2 C-hash recipes stay
+at n~2000 and do not saturate. cfl chemistry-only wall ~205 s; forced recipes 95-720 s.
 
-## Track A — the map
+## Track A -- the map
 
-Operator landscape essentially uncharted. cfl / reaction-diffusion = chemistry only, INERT on
-shape (no morphogenesis). wk_ growth operators (curvature, tension, apical_area, pressure) are
-mechanically active but UNCHARTED because they saturate or emit no diag. mech_p_ratio is unusable
-(0 everywhere). Every combination cell is blank.
+morphogen_growth_3d0 NECESSARY, divide_3d0 NECESSARY (both for the forced protrusion). vesicle_growth
+uniform_ramp = destabilising (not inert, not usable). cfl / reaction-diffusion = chemistry only, INERT on
+shape. mech_p_ratio now non-zero on valid buds (2.1-5.8). Untested: curvature/tension/apical_area/pressure
+levers ALONE (round-1 wk_ attempts saturated, never cleanly measured); shape_energy_3d0 monolayer impl
+(returned {}). Combination cells largely blank.
 
-## Track B — the figure
+## Track B -- the figure
 
-0 of 4 Okuda morphologies attempted. None started.
+0 of 4 Okuda morphologies achieved. Attempted: a forced round-33 protrusion recipe (division-driven bud,
+protr_peak ~1.3, valid but not yet matched to a named Okuda target). "Attempted" is not "not attempted".
 
 ## Next action
 
-Emit ONE non-control wk_ growth edit — start `wk_pressure_pos` — with a pool line raising the
-cell-array reserve above the live cap AND one checkable clause (`protr_peak > 1.10`). Changes only
-if the pool line proves inexpressible, in which case emit `APPARATUS GAP: cannot raise growth
-reserve` and STOP (calls the Diagnostician).
+Breed from C414a11: an edit that AMPLIFIES the protrusion while keeping the run physical, with ONE checkable
+clause calibrated to the real ceiling (protr_peak >= 1.3, NOT >= 1.4). Verify the result stayed physical
+(mech_force O(1), act_max finite) before trusting protr_peak. Changes if a diverging branch is chosen --
+reject it and re-breed from the intact parent.

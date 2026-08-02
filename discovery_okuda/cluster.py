@@ -249,6 +249,7 @@ def status(verbose=True, include_done=True):
     return jobs
 
 
+HEARTBEAT_STALE_S = 600     # no beat for ten minutes: the process is wedged, not slow
 _BEATS = {}                       # job_id -> (frame, elapsed) at the previous poll
 
 
@@ -293,19 +294,29 @@ def _is_working(job_id, ids, min_frac=0.5):
                 _BEATS[job_id] = (-1, 0)          # first look: give it one poll to write a beat
                 return True
             return False                          # two polls, still no heartbeat: stuck in setup
+        # LIVENESS FIRST, PROGRESS SECOND. The run writes this file on a clock, so a fresh
+        # mtime proves the process is running even when the frame counter has not moved -- and
+        # for a big run it will not move for many minutes at a time. Comparing frames alone
+        # would kill the largest runs in the batch, which are the ones worth having.
+        age = time.time() - os.path.getmtime(p)
         b = _j.load(open(p))
         cur = (int(b.get("frame") or 0), b.get("n_cells"))
         prev = _BEATS.get(job_id)
         _BEATS[job_id] = cur
+        if age > HEARTBEAT_STALE_S:
+            print(f"[cluster] {job_id} wrote no heartbeat for {age / 60:.0f} min (frame "
+                  f"{cur[0]}) -- wedged, not slow.", flush=True)
+            return False
         if prev is None or cur[0] > prev[0]:
             print(f"[cluster] {job_id} is slow but WORKING (frame {cur[0]}"
                   + (f", {cur[1]} cells" if cur[1] else "")
                   + ") -- not a straggler. Slow and productive is a big run, not a stuck one.",
                   flush=True)
             return True
-        print(f"[cluster] {job_id} has not advanced past frame {cur[0]} since the last poll.",
-              flush=True)
-        return False
+        print(f"[cluster] {job_id} is at frame {cur[0]}"
+              + (f", {cur[1]} cells" if cur[1] else "")
+              + f", heartbeat {age:.0f}s old -- alive, so not a straggler.", flush=True)
+        return True
     except Exception:
         return False
 

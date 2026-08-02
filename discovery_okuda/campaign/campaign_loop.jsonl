@@ -25,3 +25,4 @@
 {"t": 1785688723.4348276, "event": "stop", "why": "two aborted rounds in a row -- the refusal reasons are not actionable. Read campaign/round_records.jsonl and decide; do not retry.", "rounds_done": 2}
 {"t": 1785690144.987619, "event": "start", "rounds": 20, "batch": 12, "frames": null}
 {"t": 1785693459.8988624, "event": "round", "n": 1, "exit": 0, "minutes": 55.1, "usd_this_round": 5.4, "note": "", "cost_total": {"calls": 12, "usd": 3.77, "tok_in": 34226, "tok_out": 20678, "turns": 49, "minutes": 5.4}}
+{"t": 1785696405.2978587, "event": "round", "n": 2, "exit": 0, "minutes": 48.9, "usd_this_round": 12.9, "note": "", "cost_total": {"calls": 29, "usd": 9.86, "tok_in": 83356, "tok_out": 71087, "turns": 116, "minutes": 18.3}}
