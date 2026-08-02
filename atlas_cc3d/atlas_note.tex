@@ -227,7 +227,7 @@ and were reported as hangs at import. They were not: piping an unbuffered proces
 existed; the pipe ate them.
 \end{phasebox}
 
-\begin{phasebox}{Phase 1 --- Read every mechanism \hfill \prog}
+\begin{phasebox}{Phase 1 --- Read every mechanism \hfill \done}
 The excavator on each mechanism: what it does to the state, its equations, the role of every knob,
 and the \code{surprises} a reimplementer gets wrong.
 
@@ -239,7 +239,7 @@ the most interesting things the first atlas found}; expecting an automatic scan 
 here would be repeating a mistake we already know about.
 \end{phasebox}
 
-\begin{phasebox}{Phase 1 --- what actually happened \hfill \prog\ (11 of 35)}
+\begin{phasebox}{Phase 1 --- what actually happened \hfill \done\ (35 of 35)}
 \textbf{The inventory is complete and it is bigger than the first atlas's:} \textbf{35
 mechanisms}, against jax-morph's 24. Thirty come from \code{cc3d.core.PyCoreSpecs} --- the
 framework's \emph{own} registry of what a model can switch on, which is a better source than a
@@ -267,12 +267,36 @@ from positions\\
 \end{tabular}
 \end{center}
 
-\textbf{Eleven are at \emph{inspected}; twenty-four are not, and the record says so.} A mechanism
-is only moved off \code{candidate} where there is something to point at: the six with a measured
-run \emph{and} an ablation in \code{log/atlas\_cc3d/}, plus the five architectural entries. Naming
-a plugin is not reading it. The validator agrees --- 0 violations, and
-\code{R3\_code\_path} is checkable because every entry carries a real \code{file:line} rather than
-a dotted module name.
+\textbf{All 35 are now at \emph{inspected}}: 0 candidates, 0 validator violations, 0 blocked. The
+excavator read each mechanism at source in the installed package --- 25 agent calls at roughly 4
+minutes each, none reverted for a bad verdict.
+
+\textbf{The prompts had to be retargeted first, and that is the part worth recording.} The forked
+\code{agents/} still described jax-morph: its paper, its extracted text, its guides directory.
+Running it unchanged would have sent 24 agents looking for \code{papers/jax-morph}. The preamble
+now describes a Cellular Potts framework, says where the source actually is (an absolute
+\code{file:Lnn} into the installed package), states plainly that \textbf{we have no extracted
+paper text} --- ``do not cite page numbers you have not read'' --- and adds a rule the first
+campaign never needed: \emph{most CC3D mechanisms are energy terms, not updates; say so in
+\code{state\_io} rather than forcing them into read/write language that does not fit.}
+
+\textbf{The record is checkable.} \code{R3\_code\_path} resolves for every entry because each
+carries a real \code{file:line}. The first seeding used dotted module names and R3 rejected all 11
+--- correctly, and that is the rule doing its job rather than a nuisance.
+
+\textbf{Eight mechanisms were BLOCKED and then unblocked, with the reason logged.} Three agents
+changed nothing (a call that produces no record change produced nothing), one wrote YAML that
+stopped parsing, one timed out, and two touched \code{atlas\_record.yaml} outside the driver and
+were restored. Every one was completed on a later call. A stale block is its own kind of lie ---
+\code{status} keeps reporting work outstanding that is done --- so each clearance is written to
+\code{\_state/unblocked.jsonl} with the evidence that justified it (equations, \code{state\_io},
+and a note file all present), rather than quietly deleted.
+
+\textbf{The excavations are real work, not summaries.} \code{diffusionsolverfe}'s update is
+transcribed from the OpenCL kernel at L954--L1054; \code{curvature} is identified as the Menger
+curvature $\kappa = 2\sin\theta/|R-L|$ of three junction-linked centres of mass;
+\code{contactlocalflex} is traced through the compiled core to a per-cell
+\code{ContactLocalFlexDataContainer} that the identical Python constructor does not reveal.
 
 \textbf{What the six runs already establish}, each with its control (see \S\ref{sec:demos}): every
 CPM mechanism here is an \emph{energy term}, not an update. None of them writes state; they change

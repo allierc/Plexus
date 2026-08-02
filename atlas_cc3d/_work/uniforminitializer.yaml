@@ -1,0 +1,123 @@
+id: uniforminitializer
+order: 29
+raw_name: UniformInitializer
+raw_kind: Steppable (UniformInitializer)
+code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L5833
+paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366 (chapter ref only -- no paper text extracted
+
+  for this target). Checkable SOURCE anchors instead: class PyCoreSpecs.py:L5833, region
+
+  PyCoreSpecs.py:L5742; CC3DMLGeneratorBase.py comment names it "Initial layout of cells in the
+
+  form of rectangular slab" (L1189-1226). No page/figure cited that I have not read.
+
+  '
+summary: 'An initialization steppable, run once before the Metropolis dynamics start. It fills one or
+
+  more axis-aligned boxes (pt_min..pt_max) of the lattice with a regular grid of identical cubic
+
+  cells of edge `width` lattice sites, leaving `gap` empty (medium) sites between adjacent cells,
+
+  and stamps each cell with a type drawn from `cell_types`. It WRITES the cell-id field and the
+
+  cell-type field of the lattice; it does not run every MCS and contributes nothing to the energy.
+
+  '
+equations: "Not a numeric update -- a tiling of the lattice (RECONSTRUCTED from the emitted CC3DML\nfields + standard CC3D semantics; the Python spec only serializes, the tiling itself is compiled\ncore and UNVERIFIED here). For a region with box [pt_min, pt_max],\n\
+  cell edge w = `width`, spacing g = `gap`, each cubic cell occupies a block of sites\n  { (x0+i, y0+j,\
+  \ z0+k) : 0 <= i,j,k < w }\nand the blocks are laid on a regular grid with stride (w + g) along each\
+  \ axis, so cell\norigins are at pt_min + m*(w+g) for integer m, while the block+its trailing gap stays\
+  \ inside\nthe box. Every site of a block shares one new cell id (a cell = a set of lattice sites sharing\n\
+  an id); each new cell is assigned a type from `cell_types`. The exact type-assignment rule\n(round-robin\
+  \ vs. uniform-random over the list) is decided in the compiled core and is NOT\nvisible in this Python\
+  \ spec -- see surprises.\n"
+params:
+  pt_min:
+    role: region_bound_min -- minimum corner (x,y,z lattice sites) of the box to be tiled
+  pt_max:
+    role: region_bound_max -- maximum corner (x,y,z lattice sites) of the box to be tiled
+  width:
+    role: cell_size -- edge length (in lattice sites) of each cubic cell; guarded width >= 1
+  gap:
+    role: cell_spacing -- number of empty (medium) sites left between adjacent cells; guarded gap >= 0
+  cell_types:
+    role: type_palette -- list of cell-type names each newly stamped cell is assigned from
+  regions:
+    role: region_list -- UniformInitializer takes any number of UniformInitializerRegion specs, each with
+      its own box/width/gap/types
+state_io:
+  reads: []
+  writes:
+  - cell_id_field (lattice site -> cell id; new cells created as blocks of sites)
+  - cell_type_field (each new cell -> a type from cell_types)
+surprises:
+- 'This is an INITIALIZER, not a per-MCS plugin: it runs exactly once at start and produces the
+
+  initial cell configuration. Every other CC3D "mechanism" so far reads/perturbs an existing
+
+  field; this one CREATES the cells the rest of the model then evolves. Reimplementers who model
+
+  it as a stepping operator get the cadence wrong.
+
+  '
+- 'A cell here is a SET OF LATTICE SITES sharing an id, laid down as a w*w*w block -- not a point
+
+  with a radius. `width` is an integer site count, `gap` an integer site count; there are no
+
+  physical-length units, only lattice sites.
+
+  '
+- 'The type-assignment rule is NOT in this file. The Python spec only serializes Types as a
+
+  comma-joined list into CC3DML (L5808); how the compiled UniformInitializer walks that list
+
+  (cyclic round-robin vs. random draw per cell) is in the core and could not be determined from
+
+  the spec. A reimplementer must not assume round-robin.
+
+  '
+- 'Geometry vs. Potts box: pt_min/pt_max are validated against PottsCore dimensions (L5829-5830),
+
+  but nothing here clips a partial cell that would straddle the box edge -- whether a trailing
+
+  block narrower than `width` is emitted or skipped is a core-side decision not exposed here.
+
+  '
+- '`gap` is documented as "blob gap" in the docstring (copy-pasted from BlobInitializer); for the
+
+  uniform tiling it is the inter-cell spacing along each axis, not a blob radius. Do not read the
+
+  docstring literally.
+
+  '
+- 'Guard vs. default mismatch on the Region: __init__ defaults width=0 (L5754) but the check_dict
+
+  guard rejects width < 1 (L5747), so a region constructed without an explicit width fails
+
+  validation -- width has no usable default and must always be set. gap defaults to 0 and its
+
+  guard only rejects gap < 0, so gap=0 (cells touching) is the valid default. from_xml (L5905)
+
+  reads Width as required and makes Gap optional, matching this.
+
+  '
+- 'Types round-trips through CC3DML as a comma-joined string (L5808) and is re-parsed by splitting
+
+  on commas with spaces stripped (from_xml L5911); the ordered Python list is flattened to text,
+
+  so any ordering the core relies on for type assignment survives only as list order in that string.
+
+  '
+verdict: null
+of: null
+implementation_of: null
+why: null
+contract: null
+status: inspected
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

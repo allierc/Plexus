@@ -1,0 +1,107 @@
+id: adhesionflex
+order: 1
+raw_name: AdhesionFlex
+raw_kind: Plugin (AdhesionFlexPlugin)
+code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L3525
+paper_section: |
+  CC3D Reference Manual guide heading 'AdhesionFlex Plugin'
+  (compucell3dreferencemanual.readthedocs.io/en/latest/adhesion_flex_plugin.html); energy
+  formula transcribed from the library's own descriptor
+  cc3d/twedit5/Plugins/CC3DProject/adhesion_descr.py:get_adhesion_flex_description_html().
+  No specific Swat et al. (2012) page was read for this plugin.
+summary: |
+  A flexible generalisation of the Contact adhesion energy. Instead of a fixed J(type,type')
+  matrix, every cell AND Medium carries its own vector of adhesion-molecule densities, and the
+  contact energy across a cell boundary is a double sum over molecule pairs of a binding
+  parameter k_mn times a formula (default min) of the two cells' densities. Like Contact it
+  writes nothing to the lattice -- it only returns a dE that biases which pixel-copy attempts are
+  accepted -- but unlike Contact it OWNS mutable per-cell state (the density vector), which a
+  steppable can change at runtime and which mitosis must copy to daughters.
+equations: |
+  E_adhesion = sum over neighbouring site pairs (i,j), owners differ, of
+     [ - sum over molecule pairs (m,n) of  k_mn * AdhesionFunc( N_m(sigma_i), N_n(sigma_j) ) ]
+     * (1 - delta(sigma_i, sigma_j))
+
+  i, j       : neighbouring lattice sites, within NeighborOrder shells
+  sigma_i    : the cell (id) owning site i; the (1 - delta) factor keeps only cross-boundary
+               site pairs (cell-cell or cell-Medium)
+  m, n       : adhesion-molecule labels
+  N_m(sigma) : density of molecule m carried by cell sigma -- PER-CELL state, seeded from the
+               per-TYPE AdhesionMoleculeDensity declaration, then mutable/steerable
+  k_mn       : binding parameter between molecules m and n (the AdhesionInteractionMatrix;
+               user-supplied, symmetric in intent, may be negative)
+  AdhesionFunc: the BindingFormula -- a muParser expression in variables Molecule1, Molecule2;
+               default "min(Molecule1,Molecule2)". Evaluated per site pair
+               (compiled entry point adhesionFlexEnergyCustom).
+
+  Note the explicit LEADING MINUS: a larger positive k_mn LOWERS energy (is adhesive), the
+  opposite sign sense from the plain Contact J matrix where larger J is repulsive.
+
+  Source-vs-convention discrepancy: the library HTML writes the restriction as a delta over
+  "cell types at i and j", but the standard CPM contact term and the plugin's changeEnergy
+  operate on cell id sigma, so two neighbouring cells of the SAME type still contribute. Left
+  as a discrepancy I could not resolve without running the compiled core.
+params:
+  neighbor_order: |
+    adjacency_range -- the ONLY constructor argument (default 1). Number of neighbour shells of
+    lattice sites summed in the contact-energy sum; larger order counts more distant boundary
+    site-pairs. Guard check_dict rejects neighbor_order < 1 (message says "must be positive").
+  density: |
+    adhesion_molecule_concentration -- NOT a constructor param; declared per (molecule,
+    cell TYPE) via density_new / AdhesionMoleculeDensity in XML, guarded non-negative. Seeds
+    each cell's density vector at init, after which it is mutable per-cell state.
+  binding_parameter: |
+    pairwise_binding_affinity -- NOT a constructor param; entry k_mn of the
+    AdhesionInteractionMatrix, set via a BindingFormula (formula_new / param_set). May be
+    negative.
+  formula: |
+    binding_kernel -- NOT a constructor param; the muParser expression string that combines two
+    densities (AdhesionFunc). Default "min(Molecule1,Molecule2)". The energy kernel itself is
+    user data, chosen at runtime.
+state_io: |
+  reads: for each attempted pixel copy, the cell id and type at the two sites across the
+    boundary, and both owner cells' adhesion-molecule-density vectors.
+  writes: nothing to the lattice -- returns a dE via changeEnergy; a Potts energy term, not an
+    update.
+  owns: a MUTABLE per-cell (and per-Medium) density vector, initialised from the per-type
+    AdhesionMoleculeDensity, changed at runtime by steppables (setAdhesionMoleculeDensity /
+    ...ByIndex / ...Vector), and inherited across mitosis (assignNewAdhesionMoleculeDensityVector,
+    which skips the size check precisely so a daughter cell can be seeded). This per-cell
+    continuous state is what plain Contact does not have.
+surprises:
+- |
+  Unlike plain Contact (a static J(type,type') lookup with NO per-cell state), AdhesionFlex
+  attaches a mutable density VECTOR to every cell and to Medium. That per-cell continuous field
+  is the whole point: a steppable can retune a single cell's adhesion mid-run, and mitosis must
+  copy the vector to daughters. A reimplementer who models it as just another type-matrix loses
+  the per-cell state entirely.
+- |
+  Sign convention is inverted relative to Contact. The energy has an explicit leading minus
+  (E = sum of -sum k*f), so a POSITIVE binding parameter is ADHESIVE (energy-lowering). The
+  shipped example matrix even uses negative k's (NCad-NCad = -1.0, NCad-NCam = -10.0).
+- |
+  The binding kernel AdhesionFunc is an arbitrary muParser expression string (variables
+  Molecule1, Molecule2), default min(Molecule1,Molecule2). The combining function is DATA, not
+  a fixed operation -- adhesionFlexEnergyCustom evaluates it per site pair.
+- |
+  The (1 - delta) restriction is written in the library HTML as delta over "cell types", but
+  the CPM contact term and changeEnergy operate on cell id sigma; same-type neighbouring cells
+  still contribute. I could not confirm which by running the core (cc3d is deliberately not
+  importable here).
+- |
+  Densities are DECLARED per cell TYPE in XML but STORED per cell -- the type value only seeds
+  each cell's vector at initialisation; Medium gets a vector too. Molecules are indexed in XML
+  listing order, and the by-name and by-index accessors must agree on that order.
+verdict: null
+of: null
+implementation_of: null
+why: null
+contract: null
+status: inspected
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

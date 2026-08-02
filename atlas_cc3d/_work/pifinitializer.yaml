@@ -1,0 +1,157 @@
+id: pifinitializer
+order: 22
+raw_name: PIFInitializer
+raw_kind: Steppable (PIFInitializer)
+code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L5956
+paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366 discusses cell-field
+
+  initialization in general; no page verified (no extracted paper text for this
+
+  target). Checkable library anchor: cc3d/core/PyCoreSpecs.py:L5956 (class
+
+  PIFInitializer) and cc3d/doc/code_ref/user/build/core/PyCoreSpecs.rst:314
+
+  (autoclass PIFInitializer). Format examples READ (both header modes verified):
+
+  cluster-mode cc3d/tests/plugin_test_suite/CompartmentExample_test_run/Simulation/3D_LINE_BASE.piff
+  (9 tokens; clusterId 1 groups cells 1-5, so clusterId != cellId) and
+  AdhesionFlexPython_test_run/.../initial_configuration.piff; headerless
+  cc3d/tests/plugin_test_suite/ExternalPotential_test_run/Simulation/FocalPointInit.piff and
+  amoebae_2D_secretion_test_run/Simulation/amoebae_2D.piff (8 tokens, no leading clusterId).
+
+  '
+summary: 'An initialization steppable that runs ONCE at the start of a simulation. It
+
+  reads a PIF ("Potts Initial File", .piff) whose name is given by pif_name, and
+
+  paints the cell-id lattice directly: each line of the file names a cell and an
+
+  axis-aligned box of lattice sites, and every site in that box is assigned to
+
+  that cell (creating the cell on first mention). It does not evolve anything --
+
+  it stamps the initial cell configuration onto the field, then is done. This is
+
+  the most literal expression of the CC3D representation: a cell IS the set of
+
+  lattice sites that share its id, built up here box-by-box.
+
+  '
+equations: "No physics equation; a file-driven lattice-painting rule. The .py spec\n(PyCoreSpecs.py:5956)\
+  \ only carries the file name and emits the CC3DML element\n<PIFName>{pif_name}</PIFName>; the actual\
+  \ reading/painting is in the compiled\ncore (cpp/CompuCell3DSteppables/libCC3DPIFInitializer.so, not\
+  \ readable here).\nBehaviour reconstructed from the .piff format observed in the test suite:\n\nOptional\
+  \ first line:  \"Include Clusters\"\n  - if present  -> per-line token layout is:\n      clusterId \
+  \ cellId  cellType  x1 x2  y1 y2  z1 z2\n  - if absent   -> per-line token layout is:\n      cellId\
+  \  cellType  x1 x2  y1 y2  z1 z2\n\nFor each data line, for every lattice site (x,y,z) with\n      x1\
+  \ <= x <= x2,  y1 <= y <= y2,  z1 <= z <= z2   (inclusive box)\nassign  cellField[x,y,z] := cell(cellId),\
+  \  the cell's type := cellType,\nand (cluster mode) the cell's clusterId := clusterId. A cell is created\
+  \ the\nfirst time its id appears; later lines with the same cellId ADD sites to the\nsame set, so a\
+  \ cell is the UNION of its boxes and need not be a single\nrectangle. Single-site lines are the common\
+  \ case (x1==x2, etc.), i.e. the\nfile can enumerate the lattice pixel-by-pixel.\n"
+params:
+  pif_name: 'initial_configuration_source -- filesystem path to the .piff file that
+
+    defines the entire initial cell layout. This is the only constructor
+
+    parameter and the only tunable; there is no numeric physics here.
+
+    check_dict rejects only the empty string (''PIF needs a name'') at construction;
+
+    validate() then raises SpecValueError unless os.path.isfile(pif_name) is true.
+
+    '
+state_io: "This is an INITIALIZER (a one-shot Steppable at t=0), not an energy term and\nnot a per-step\
+  \ update. In Plexus terms it neither returns a delta the engine\nintegrates nor participates in the\
+  \ Metropolis accept/reject -- it seeds the\nstate the rest of the simulation then evolves.\nreads:\n\
+  \  - external file pif_name (.piff text), NOT simulation state\nwrites:\n  - cell-id field over the\
+  \ lattice (the sigma field mapping site to cell id)\n  - cell TYPE for each cell id named in the file\n\
+  \  - cell clusterId for each cell (only when \"Include Clusters\" header present)\n  - implicitly the\
+  \ roster of existing cells (cells are created as ids appear)\n"
+surprises:
+- 'A cell is NOT required to be a connected box. Multiple lines sharing a cellId
+
+  accrete sites into one cell, so the initial cell can be an arbitrary union of
+
+  boxes (or even disconnected). A reimplementer who keys on "one line = one
+
+  cell" or "cell = rectangle" gets it wrong.
+
+  '
+- 'The box bounds are INCLUSIVE on both ends: x1..x2 covers x2-x1+1 sites. Both
+
+  forms occur in the test suite: single-site rows (AdhesionFlex
+
+  initial_configuration.piff, "8 8 Cell2 119 119 53 53 0 0") enumerate the
+
+  lattice pixel-by-pixel, while multi-site boxes (CompartmentExample
+
+  3D_LINE_BASE.piff, "1 1 Side1 23 25 47 56 10 14" = a 3x10x5 box) fill a region
+
+  in one line. A reimplementer must handle both, not assume single-site rows.
+
+  '
+- 'The optional "Include Clusters" first line SILENTLY changes the column count:
+
+  with header a data line is 9 tokens (clusterId cellId cellType x1 x2 y1 y2 z1 z2),
+
+  without header it is 8 (cellId cellType ...). Parse the header before the columns;
+
+  guessing column meaning from the first data row is unsafe. clusterId is genuinely
+
+  independent of cellId -- verified in 3D_LINE_BASE.piff where clusterId 1 groups
+
+  cellIds 1-5 -- so a parser that assumes clusterId==cellId corrupts compartment models.
+
+  '
+- '2D vs 3D: files still carry z1 z2 columns; 2D simulations use z1==z2==0
+
+  (see AdhesionFlex .piff). The z columns are always present, not optional.
+
+  '
+- 'Internal spec name has a typo: name = "pif_initiazer" (missing ''l''). The
+
+  CC3DML/registered name is "PIFInitializer"; code that keys off the internal
+
+  name string must reproduce the typo. registered_name drives the emitted
+
+  Steppable element with Type="PIFInitializer".
+
+  '
+- 'check_dict for pif_name is (lambda x: len(x) == 0, "PIF needs a name"): it
+
+  rejects only the EMPTY string at construction. Real file existence is
+
+  deferred to validate() (os.path.isfile), which runs later; a nonexistent but
+
+  non-empty path passes construction and fails only at validation time.
+
+  '
+- 'Contrast with the sibling initializers this shares "order" space with:
+
+  UniformInitializer / BlobInitializer generate cells procedurally from a few
+
+  numeric params (box, gap, width, radius); PIFInitializer instead REPLAYS an
+
+  explicit, fully-specified layout from disk. Same end state (a seeded cell
+
+  field), opposite information source -- procedural vs. recorded.
+
+  PIFDumperSteppable (PyCoreSpecs.py:6012) is the inverse op that WRITES this
+
+  same format.
+
+  '
+verdict: null
+of: null
+implementation_of: null
+why: null
+contract: null
+status: inspected
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

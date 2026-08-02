@@ -1,0 +1,143 @@
+id: momentofinertia
+order: 19
+raw_name: MomentOfInertia
+raw_kind: Plugin (MomentOfInertiaPlugin)
+code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L5350
+paper_section: |
+  No extracted paper text for this target. CHECKABLE anchors are the source only: class docstring
+  "MomentOfInertia Plugin" (PyCoreSpecs.py:5351) and the compiled MomentOfInertiaPlugin
+  (cpp/CompuCell.py:9002, a CellGChangeWatcher). Swat et al. (2012) Methods Cell Biol 110:325-366
+  is the framework reference, but the specific page/section describing this plugin is UNREAD --
+  not cited to a page I have not seen.
+summary: 'A bookkeeping tracker, not an energy term and not an update the modeller writes. Registered
+  as a
+
+  CellGChangeWatcher (CompuCell.py:9002): the Potts solver calls it after every ACCEPTED pixel copy,
+
+  and it incrementally updates the six second-moment / inertia-tensor components stored on each cell
+
+  (CellG.iXX, iYY, iZZ, iXY, iXZ, iYZ), measured relative to that cell''s centre of mass. From those
+
+  components it derives the cell''s shape observables: eccentricity (CellG.ecc), the equivalent-ellipsoid
+
+  semiaxis lengths (getSemiaxes / getSemiaxesXY/XZ/YZ / getSemiaxes3D) and the principal-axis
+
+  orientation angle (cellOrientation_xy/xz/yz). It changes no cell type, volume or position -- it only
+
+  makes cell SHAPE and ORIENTATION queryable, which shape-dependent plugins (e.g. oriented growth,
+
+  the oriented-cellsort example) then consume.
+
+  '
+equations: "A cell is a set S of lattice sites {r_i}, all sharing one id. Let the centre of mass be\n\
+  \  r_CM = (1/N) * sum_i r_i,   N = |S| = cell volume (site count).\nThe plugin maintains the second-moment\
+  \ (inertia) tensor of S about r_CM. Writing\nx' = x - x_CM, y' = y - y_CM, z' = z - z_CM, the physicist's\
+  \ inertia tensor is\n  I_XX = sum_i (y'^2 + z'^2)      I_XY = - sum_i x' y'\n  I_YY = sum_i (x'^2 +\
+  \ z'^2)      I_XZ = - sum_i x' z'\n  I_ZZ = sum_i (x'^2 + y'^2)      I_YZ = - sum_i y' z'\nstored on\
+  \ CellG as iXX, iYY, iZZ, iXY, iXZ, iYZ.\n(SIGN/DIAGONAL CONVENTION -- physicist form above vs the raw\
+  \ central second moment\nM_XX = sum x'^2 etc. -- is set in the compiled core and is NOT verifiable from\
+  \ the Python layer;\nsee surprises. The derived quantities below are convention-independent up to that\
+  \ choice.)\n\nIt is maintained INCREMENTALLY, never recomputed from scratch: on an accepted copy of\
+  \ site p from\ncell A into cell B, helper precalculateInertiaTensorComponentsAfterFlip (CompuCell.py:4235)\
+  \ returns\nthe updated tensors for the gaining/losing cells given the single-site delta and the CM shift,\
+  \ so the\nper-step cost is O(1) per cell, not O(N).\n\nShape observables (2D principal case, tensor\
+  \ T = [[iXX, iXY],[iXY, iYY]]):\n  eigenvalues  lambda_min <= lambda_max  of T\n  semiaxes     a, b\
+  \  proportional to functions of the eigenvalues (equivalent uniform ellipsoid)\n  eccentricity ecc =\
+  \ sqrt(1 - lambda_min/lambda_max)    (via eccFromComps, CompuCell.py:8994)\n  orientation  theta = cellOrientation_xy\
+  \  = angle of the major principal axis\nIn 3D the full 3x3 tensor is diagonalised and getSemiaxes3D\
+  \ returns the three semiaxis lengths.\n"
+params: {}
+state_io:
+  reads: 'Per accepted pixel copy: the copied site coordinate p = (x,y,z), the source cell A and target
+
+    cell B (CellG*), and each affected cell''s current volume N and centre of mass r_CM (so it reads
+
+    xCM/yCM/zCM, which the CenterOfMass tracker must also maintain) plus the pre-flip tensor
+
+    components it is about to update.
+
+    '
+  writes: 'Per affected cell, in place on CellG: iXX, iYY, iZZ, iXY, iXZ, iYZ (the maintained tensor)
+    and,
+
+    on demand from those, the derived shape fields ecc and the semiaxes/orientation returned by the
+
+    getSemiaxes*/cellOrientation_* accessors. It writes NO field, NO type, NO volume, NO position,
+
+    and returns no energy delta -- it does not participate in the Metropolis acceptance at all.
+
+    '
+surprises:
+- 'NOT an energy term and NOT a modeller-written update. It is a CellGChangeWatcher -- a passive
+
+  observer the Potts solver invokes AFTER a copy is accepted. This is a third category next to
+
+  ''energy plugin'' and ''stepper'': a per-accepted-flip incremental REDUCTION that keeps a derived
+
+  statistic (here the inertia tensor) in sync with the pixel set. A reimplementer who models it as
+
+  an energy or as a batch recompute-every-MCS gets the coupling and the O(1) cost wrong.
+
+  '
+- 'Zero constructor parameters -- the spec''s __init__ takes nothing and emits a bare
+
+  <Plugin Name="MomentOfInertia"/> element. There is nothing to tune; its only ''parameter'' is the
+
+  implicit dependency that a CenterOfMass tracker be present so xCM/yCM/zCM are valid, otherwise the
+
+  r_CM the tensor is measured about is stale.
+
+  '
+- 'The exact diagonal/sign convention (physicist inertia tensor sum(y''^2+z''^2) on the diagonal, vs
+
+  the raw central second moment sum(x''^2)) lives in the compiled C++ (MomentOfInertiaPlugin,
+
+  not readable here) and could not be verified from the Python bindings. I inferred the physicist
+
+  form from the attribute names and the physics; the eccentricity/semiaxis DERIVATIONS
+
+  (eccFromComps, getSemiaxes) are what downstream code actually reads and are robust to the choice.
+
+  '
+- 'Incremental maintenance means round-off can accumulate over a long run: the tensor is updated by
+
+  deltas after every accepted flip rather than re-summed, so a reimplementer comparing against a
+
+  from-scratch recompute should expect small drift, not bit-identity.
+
+  '
+- 'Dimensionality-branched accessors: getSemiaxesXY / XZ / YZ give 2D principal analyses in each
+
+  coordinate plane, while getSemiaxes3D diagonalises the full 3x3 tensor. Picking the wrong one for
+
+  the lattice dimension yields a degenerate (flat) ellipsoid.
+
+  '
+- 'The maintained fields are READ-ONLY from the modeller side: the Python binding overrides the
+  setter for iXX/iYY/iZZ/iXY/iXZ/iYZ (and ecc) to raise AttributeError -- e.g. set_iXX at
+  cpp/CompuCell.py:649 raises "iXX is read only variable" (CellG_ecc_set exists but the derived
+  fields cannot be assigned this way). Only the plugin, via the Potts change-watcher callback,
+  may update them. This hard-enforces the observer characterisation: a modeller cannot inject or
+  override cell shape, only read it. A Plexus reimplementation that exposes the tensor as a
+  writable state field would be a category error -- it is a computed reduction, not modeller state.
+  '
+- 'The watcher hook is field3DChange (CellGChangeWatcher interface, cpp/CompuCell.py:9016 for this
+  plugin; base at 3000), NOT a per-MCS stepper: the Potts solver calls field3DChange when a lattice
+  site''s cell id changes (an accepted copy), passing the site and the before/after cells. The
+  helper returns an InertiaTensorComponents struct (cpp/CompuCell.py:4200) carrying the six updated
+  components. A reimplementer who hooks a fixed per-step or per-MCS schedule rather than the
+  per-accepted-change event will mis-sync the tensor with the pixel set.
+  '
+verdict: null
+of: null
+implementation_of: null
+why: null
+contract: null
+status: inspected
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

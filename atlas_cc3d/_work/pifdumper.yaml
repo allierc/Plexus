@@ -1,0 +1,156 @@
+id: pifdumper
+order: 21
+raw_name: PIFDumper
+raw_kind: Steppable (PIFDumperSteppable)
+code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L6012
+paper_section: |
+  No extracted paper text for this target. Swat et al. (2012) Methods Cell Biol
+  110:325-366 discusses the PIFF (Potts Initial File) cell-layout format used by
+  PIFInitializer / BlobInitializer, but no page was read. CHECKABLE source
+  anchors for the format and CC3DML used here instead: the canonical dumper
+  snippet generatePIFDumperSteppable at
+  cc3d/twedit5/Plugins/CC3DMLGenerator/CC3DMLGeneratorBase.py:1271, and a real
+  dumped file at
+  cc3d/tests/plugin_test_suite/AdhesionFlexPython_test_generate/Simulation/initial_configuration.piff:1.
+summary: 'A pure-output Steppable, not a physics term. Every `frequency` Monte Carlo
+
+  steps it READS the entire cell lattice (each site''s cell id, cluster id and
+  type) and
+
+  WRITES a snapshot to disk as a PIF (Potts Initial File): one plain-text line
+
+  per lattice site (voxel). It changes NOTHING in the
+
+  simulation state -- it is a serialization sink whose output can later be fed
+
+  back to a PIFInitializer as an initial condition. In Plexus terms it is an
+
+  observer/sink over the cell-id field: reads state, emits no delta.
+
+  '
+equations: |
+  No dynamics. The step is a serialization pass over the lattice, emitted only on
+  steps where (mcs % frequency == 0). CONFIRMED PIF line format, read from a real
+  .piff written by the same core
+  (tests/.../AdhesionFlexPython_test_generate/Simulation/initial_configuration.piff):
+
+      [header line]  Include Clusters        (present when cluster ids are dumped)
+      clusterId  cellId  cellTypeNAME  xLow xHigh  yLow yHigh  zLow zHigh
+
+  e.g. the literal line `8  8  Cell2  119 119  53 53  0 0`. Three corrections to
+  the library-guide sketch that the earlier draft copied:
+    (1) the FIRST column is the CLUSTER id, not the cell id (cell id is second);
+    (2) the type is written as its NAME string ("Cell2"), NOT a numeric type index;
+    (3) the dumper emits ONE LINE PER VOXEL (xLow==xHigh, yLow==yHigh, zLow==zHigh
+        in the sample) -- the box form xLow..xHigh is what the PIF grammar ALLOWS,
+        but the dumper does not run-length-compress into boxes.
+  This file is the inverse of what PIFInitializer reads back in. The Python spec
+  here only declares the steppable and its CC3DML; the actual traversal +
+  per-voxel write live in the compiled core (PlayerPython.FieldWriter also exposes
+  generatePIFFileFromVTKOutput as the offline equivalent).
+params:
+  pif_name:
+    role: output_file_path
+    note: 'Name/path of the PIF file to write. check_dict rejects it as invalid when
+
+      len(pif_name) == 0 (the lambda is the INVALID predicate). NOTE: the same
+
+      field name `pif_name` is reused by the sibling PIFInitializer (L5960) as an
+
+      INPUT file that must already exist (its validate() calls os.path.isfile);
+
+      here it is an OUTPUT target and is NOT existence-checked.
+
+      '
+  frequency:
+    role: output_interval_mcs
+    note: |
+      Integer Monte-Carlo-step interval between dumps; PyCoreSpecs default is 1
+      (dump every MCS), but the canonical twedit-generated CC3DML defaults it to
+      100. check_dict rejects frequency < 1. Its canonical home is a "Frequency"
+      ATTRIBUTE on the <Steppable> header (that is where both from_xml and the
+      core read it) -- but PyCoreSpecs.generate_header never writes that
+      attribute, so this spec stores/validates it yet drops it on serialization.
+      See surprises.
+state_io:
+  reads:
+  - cell.id field (every lattice site's owning cell id -- second PIF column)
+  - cell.cluster_id field (dumped as the FIRST PIF column when clusters are included)
+  - cell.type field (every lattice site's cell type, written as a NAME string)
+  - lattice dimensions (implicit, to bound the traversal)
+  writes:
+  - external file (PIF text on disk) -- NOT simulation state
+  note: 'No simulation-state field is written. This is the clean case of the
+
+    "energy term vs update" distinction pushed one step further: it is neither.
+
+    It returns no delta and biases no pixel-copy acceptance; it is a read-only
+
+    tap on the cell-id field with a side effect outside the state vector.
+
+    '
+surprises:
+- |
+  ROUND-TRIP LOSS OF `frequency` (a real bug, now localized). from_xml reads
+  frequency from a "Frequency" ATTRIBUTE ON THE <Steppable> HEADER
+  (findAttribute("Frequency") / getAttributeAsInt, L6062-6063) -- and that is
+  exactly where the canonical CC3DML puts it: twedit's
+  generatePIFDumperSteppable (CC3DMLGeneratorBase.py:1271) emits
+  <Steppable Type="PIFDumper" Frequency="100">. But generate_header (L525) emits
+  ONLY {"Type": registered_name} and the `xml` property (L6037) adds only a
+  PIFName child; neither writes the Frequency attribute. So a spec built with
+  frequency=10 serializes to CC3DML with no Frequency and reloads as the default
+  1. __getstate__ (L6048) drops it too. The datum lives in hand-written XML but
+  is destroyed by any Python round-trip through this spec.
+- |
+  The library-guide line sketch the earlier draft copied
+  ("cellId cellType xLow..") is WRONG on three counts, confirmed against a real
+  dumped .piff (see equations): the real line LEADS with a clusterId column
+  (cell id is second), writes the cell TYPE AS A NAME string not a numeric
+  index, and is prefixed by an "Include Clusters" header line -- and the dumper
+  writes one voxel per line rather than run-length boxes.
+- |
+  The canonical dumper CC3DML also carries a <PIFFileExtension> element (twedit
+  emits "piff", CC3DMLGeneratorBase.py:1280) and names the file after the
+  SimulationName, with the MCS appended by the core to make per-dump filenames.
+  PyCoreSpecs's PIFDumperSteppable emits NEITHER a PIFFileExtension element NOR
+  any MCS-suffix logic -- it declares only PIFName, so this spec under-specifies
+  the actual on-disk file naming/extension.
+- 'The `xml` property is byte-identical to sibling PIFInitializer''s `xml`
+
+  (both emit just a PIFName element under the Steppable header). The only
+
+  XML-level distinguisher between "write a PIF" and "read a PIF" is the
+
+  Steppable Type attribute (generate_header -> Type="PIFDumper" vs the
+
+  initializer''s registered_name), not the element body.
+
+  '
+- '`pif_name` semantics flip between the two classes that share the field:
+
+  INPUT-must-exist for PIFInitializer, OUTPUT-target for PIFDumper. A
+
+  reimplementer copying the validate() logic across would wrongly demand the
+
+  dumper''s target already exist.
+
+  '
+- '__getstate__ returns (xml string, (), {"pif_name": ...}) -- pickling drops
+
+  frequency too, consistent with the xml omission above.
+
+  '
+verdict: null
+of: null
+implementation_of: null
+why: null
+contract: null
+status: inspected
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

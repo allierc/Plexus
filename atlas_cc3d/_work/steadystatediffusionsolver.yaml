@@ -1,0 +1,164 @@
+id: steadystatediffusionsolver
+order: 26
+raw_name: SteadyStateDiffusionSolver
+raw_kind: Steppable (SteadyStateDiffusionSolver)
+code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L7223
+paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366 -- PDE-solver / chemical-field-diffusion
+
+  section (exact page NOT verifiable: no paper text was extracted for this target). Primary
+
+  evidence is the source at PyCoreSpecs.py:L7223 and the in-tree guide string in
+
+  cc3d/twedit5/Plugins/CC3DProject/diffusion_solvers_descr.py:23-24 (heading at :23
+
+  "SteadyStateDiffusionSolver", body at :24 "Solves Diffusion equation at the steady state i.e. at
+
+  time= infinity ... Technically this solver solves Helmholtz Equation"), plus the reference
+
+  manual page steady_state_diffusion_solver.html linked from that guide string. (The
+
+  Secretion-Plugin restriction is separately anchored at
+
+  cc3d/twedit5/Plugins/CC3DMLGenerator/CC3DMLGeneratorBase.py:2456.)
+
+  '
+summary: 'A PDE-solver Steppable that, given the current cell configuration and per-cell-type secretion
+
+  sources, computes the STEADY-STATE (t = infinity) concentration field by solving an elliptic
+
+  boundary-value problem and OVERWRITES the whole concentration field with that equilibrium
+
+  solution. Unlike DiffusionSolverFE it does not take a forward-Euler time step -- there is no
+
+  dt; each invocation is a single global implicit solve of the Helmholtz equation.
+
+  '
+equations: "Steady state of the reaction-diffusion equation  dc/dt = D grad^2 c - k c + S(x)\nis obtained\
+  \ by setting dc/dt = 0:\n\n    D grad^2 c  -  k c  +  S(x)  =  0\n\nequivalently the modified-Helmholtz\
+  \ / screened-Poisson form the guide names explicitly:\n\n    grad^2 c  -  (k/D) c  =  - S(x)/D\n\nSymbols:\n\
+  \  c(x)  concentration field over lattice sites (the thing written)\n  D     diff_global, global diffusion\
+  \ coefficient (spatially UNIFORM here)\n  k     decay_global, global decay rate; sets screening length\
+  \  L = sqrt(D/k)\n  S(x)  secretion source: per-cell-type rate, deposited at the sites of cells of that\
+  \ type\nSolved as a global linear BVP subject to the declared boundary conditions (Dirichlet value /\n\
+  Neumann flux / periodic per face). The actual linear-solver method is compiled in\nlibCC3DPDESolvers.so\
+  \ and is NOT readable from the Python layer. No time step, no dt.\n"
+params:
+  three_d:
+    role: spatial_dimension_selector -- flag choosing the 2D vs 3D compiled solver; default False registers
+      core name "SteadyStateDiffusionSolver2D", True registers "SteadyStateDiffusionSolver". Must be declared
+      by the user; from_xml flips it if the guessed dimensionality is wrong.
+  diff_global:
+    role: diffusion_coefficient D (global, spatially uniform; per-cell-type diff_types are NOT exposed
+      by this solver's DiffusionData, unlike DiffusionSolverFE)
+  decay_global:
+    role: decay_rate k -- with D sets the screening length sqrt(D/k); also acts as the well-posedness
+      regularizer of the elliptic operator (template default 0.00001, non-zero)
+  init_expression:
+    role: initial_field_guess as a coordinate expression (e.g. "x*y"); seeds the field / iterative solver.
+      For a converged implicit steady-state solve its effect on the answer is expected to be negligible
+      except through solver convergence -- NOT verified against the compiled solver.
+  init_filename:
+    role: initial_field_source -- path to a file of initial concentrations (alternative to init_expression)
+  secretion_value_per_type:
+    role: source_rate S -- per-cell-type constant secretion rate (SecretionParameters(cell_type, value));
+      the ONLY channel through which cell geometry/type enters the solve. constant=True (ConstantConcentration
+      clamp) and contact_type (SecretionOnContact) are REJECTED for this solver (PyCoreSpecs.py:L7204-L7207).
+  boundary_conditions:
+    role: boundary_condition_type_and_value per face (x/y/z, min/max) -- one of ConstantValue (Dirichlet,
+      default 0.0), ConstantDerivative (Neumann/flux), or Periodic. For an elliptic BVP at least one Dirichlet
+      face is needed for a unique solution.
+state_io:
+  reads: "- the cell lattice (which cell id / cell type occupies each site) -- used ONLY to place the\n\
+    \  per-type secretion source S(x); the diffusion medium itself is homogeneous (global D, k)\n- per-cell-type\
+    \ secretion rates (SecretionData on the field)\n- global diffusion constant D and decay constant k\n\
+    - boundary conditions on each domain face\n- optionally an initial concentration field (init_expression\
+    \ / init_filename) as a guess\nNOTE: this is a Steppable / PDE solver, not a Potts energy-term plugin\
+    \ -- it returns a field,\nnot an acceptance bias. And unlike DiffusionSolverFE it does not read the\
+    \ previous field to\nadvance it one dt: the previous field is at most an initial guess for a global\
+    \ solve.\n"
+  writes: "- the concentration field c over ALL lattice sites: OVERWRITTEN in place with the steady-state\n\
+    \  (equilibrium) solution of the Helmholtz BVP. This is a whole-field REPLACE from a global\n  implicit\
+    \ solve, not a local finite-difference delta the engine integrates.\n"
+surprises:
+- 'It is an ELLIPTIC (boundary-value) solve, not a time integrator. There is no dt and no per-MCS
+
+  stability limit; it returns the t=infinity field directly. The guide (diffusion_solvers_descr.py:24)
+
+  warns it is "not a direct substitution for Diffusion Solver FE and you have to check the
+
+  quality of the approximation" -- a reimplementer who models it as "many FE steps" gets the
+
+  transient, not what this solver returns.
+
+  '
+- 'Secretion MUST be declared inside the solver''s own SecretionData; the general Secretion Plugin
+
+  does NOT work with this solver (guide twedit5/Plugins/CC3DMLGenerator/CC3DMLGeneratorBase.py:2456,
+
+  the addComment "Secretion has to be defined inside SteadyStateDiffusion solver"). And ConstantConcentration
+
+  and SecretionOnContact are actively rejected (PyCoreSpecs.py:L7204-L7207) -- so the rich
+
+  "three secretion semantics" of DiffusionSolverFE collapse here to a single per-type additive
+
+  source term.
+
+  '
+- 'Only GLOBAL D and k are exposed (diff_global, decay_global). The base DiffusionData carries
+
+  per-cell-type diff_types/decay_types, but this solver''s DiffusionData class surfaces neither
+
+  -- the medium is homogeneous and cell type enters only through the secretion source. A
+
+  reimplementer copying DiffusionSolverFE''s heterogeneous-D stencil would be wrong here.
+
+  '
+- 'Default DecayConstant in the template is 0.00001, deliberately non-zero. With k = 0 the
+
+  modified-Helmholtz operator degenerates to Poisson (grad^2 c = -S/D), which under all-Neumann
+
+  (flux) boundaries is singular / ill-posed. The tiny decay is (I believe) a regularizer that
+
+  keeps the linear system solvable; I did NOT confirm the solver''s behaviour at exactly k = 0.
+
+  '
+- 'Dimensionality is user-declared via three_d (default 2D -> registered name
+
+  "SteadyStateDiffusionSolver2D"), not auto-detected from the lattice. from_xml (L7281-L7285)
+
+  catches a mismatched guess by flipping the flag and retrying. Pick the wrong flag at build
+
+  time and the core registration silently changes.
+
+  '
+- 'Default boundary condition is ConstantValue 0.0 on every face (Dirichlet sink), inherited from
+
+  PDEBoundaryConditions (L824-L829) -- same silent absorbing default noted for DiffusionSolverFE,
+
+  but here it is also what makes the elliptic problem well-posed rather than merely "leaky".
+
+  '
+- 'A per-field pymanage flag (ManageSecretionInPython) short-circuits the source declaration: when
+
+  set, the field xml EMITS a bare <ManageSecretionInPython/> element and DROPS the whole SecretionData
+
+  block (SteadyStateDiffusionSolverField.xml, L7156-L7159). So S(x) is then supplied by a user Python
+
+  steppable each MCS rather than by the declared per-type rates -- a reimplementer reading only the
+
+  SecretionData path would miss that the source term can be externally driven.
+
+  '
+verdict: null
+of: null
+implementation_of: null
+why: null
+contract: null
+status: inspected
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

@@ -1,0 +1,161 @@
+id: curvature
+order: 13
+raw_name: Curvature
+raw_kind: Plugin (CurvaturePlugin)
+code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L5043
+paper_section: 'Not locatable in the extractable Swat et al. (2012) Methods Cell Biol 110:325-366 text
+  (no
+
+  page verified). The only checkable anchor is the source: CurvaturePlugin.cpp changeEnergy
+
+  (L347) and calculateInverseCurvatureSquare (L336), mirrored in the installed binary
+
+  libCC3DCurvature.so. Concept documented as the CC3D reference-manual "Curvature Plugin"
+
+  (used with compartmental cells / FocalPointPlasticity to stiffen chains of cells).
+
+  '
+summary: 'A Cellular-Potts ENERGY TERM that penalizes bending of chains of compartmental cells linked
+
+  by junctions the plugin maintains itself. For every three consecutive linked cells it adds
+
+  lambda * kappa to the Hamiltonian, where kappa is the Menger curvature (1/circumradius) of
+
+  the three cells'' centers of mass -- zero for a straight chain, larger the more it bends -- so
+
+  the constraint drives linked chains toward straight lines. changeEnergy writes NO cell state
+
+  (it returns dE for a proposed pixel copy, recomputing affected COMs with +/-1 volume). It
+
+  ALSO grows the junction graph: when a proposed copy could form a new within-cluster junction
+
+  it biases that move by activation_energy, and the bond is actually committed (or an emptied
+
+  cell''s bonds erased) in the field3DChange watcher on accepted moves.
+
+  '
+equations: "Per triple of consecutive junction-linked cells with COMs L (left), M (mid), R (right):\n\n\
+  \  kappa(L,M,R) = 2 * sin(theta_M) / |R - L|\n  sin(theta_M) = |(L-M) x (R-M)| / (|L-M| * |R-M|)   \
+  \       # cross-product magnitude\n\ntheta_M is the chain angle at the middle cell; kappa is the Menger\
+  \ curvature of the three\npoints = 1/R_circ (reciprocal circumradius). Straight -> theta_M=0 -> sin=0\
+  \ -> kappa=0.\n(Source calls this calculateInverseCurvatureSquare -- a MISNOMER: it is neither inverted\
+  \ nor\nsquared; it is the plain curvature. CurvaturePlugin.cpp:L336-345.)\n\nBending energy of the whole\
+  \ chain:  E = sum over triples of  lambda * kappa(L,M,R)\nwith lambda = internalCurvatureParamsArray[first-pair\
+  \ types].lambdaCurvature (symmetric).\n\nWhat changeEnergy actually returns (CurvaturePlugin.cpp:L347-829)\
+  \ is the DELTA for one\nproposed pixel copy at pt (gaining cell volume+1, losing cell volume-1, COMs\
+  \ recomputed via\nprecalculateCentroid):\n  dE = sum over affected triples of  lambda * ( kappa_after\
+  \ - kappa_before )\nwhere the affected triples are the up-to-5 triples spanning 3 hops each side of\
+  \ the changed\ncell along the junction chain.\n\nJunction-creation term (CurvaturePlugin.cpp:L233-334,\
+  \ L373-383): if newCell at pt can form a\nnew within-cluster junction (partner cell same clusterId,\
+  \ both types listed, both with\nfewer than max_junctions bonds, no existing bond, partner within neighbor_order\
+  \ lattice\nshells) then instead of a curvature delta,\n  dE = activation_energy      # a fixed offset,\
+  \ typically negative to favour bonding\nand the bond is inserted symmetrically in field3DChange only\
+  \ if the move is accepted.\n\nDEAD CODE (defined, never called): potentialFunction(lambda,offset,d0,d)\
+  \ = offset +\nlambda*(d-d0)^2 (harmonic spring), and diffEnergyByType/diffEnergyLocal/diffEnergyGlobal\
+  \ all\n`return 0.0`. Constructor members targetDistance(0) and maxDistance(1000) are never read.\nThese\
+  \ are vestiges of the FocalPointPlasticity template this plugin was cloned from.\n"
+params:
+  lambda_curve: 'bending_stiffness -- curvature modulus lambda, multiplies the Menger curvature of each
+
+    chain triple (per cell-type pair). Zero disables the bending penalty.
+
+    '
+  activation_energy: 'junction_formation_energy -- fixed dE offset added to a move that creates a new
+
+    within-cluster junction (per type pair); negative values favour bond formation.
+
+    '
+  type1: type_pair_selector -- first cell type the lambda/activation apply to (symmetric with type2)
+  type2: type_pair_selector -- second cell type of the pair
+  cell_type: type_selector -- which cell type the junction limits below apply to
+  max_junctions: 'max_connectivity -- cap on junctions a cell of this type may hold (2 = interior of a
+    chain,
+
+    1 = chain endpoint, 0 = never bonds).
+
+    '
+  neighbor_order: interaction_range -- lattice neighbor-shell order searched for junction partners
+state_io:
+  reads: "- cell center of mass and volume (xCM/yCM/zCM, volume) of the changed cell and of its\n  junction\
+    \ neighbors up to 3 hops each side along the chain\n- each cell's junction set (CurvatureTracker.internalCurvatureNeighbors,\
+    \ in extra attributes)\n- cell type, clusterId\n- the cell lattice field around pt (getNeighborDirect\
+    \ up to neighbor_order) when scouting\n  a new junction partner\n"
+  writes: "- changeEnergy writes NO cell state; it returns a dE (energy term, not an update).\n- field3DChange\
+    \ (accepted-move watcher) DOES mutate topological state: inserts a new\n  junction into both cells'\
+    \ internalCurvatureNeighbors sets on an accepted bond-forming\n  move, and erases all references to\
+    \ a cell whose volume reached 0.\n"
+surprises:
+- 'MISNOMER: calculateInverseCurvatureSquare returns neither an inverse nor a square. It is
+
+  the Menger curvature kappa = 2*sin(theta)/|chord| = 1/R_circ (linear in curvature), and the
+
+  energy is lambda*kappa, zero for a straight chain. A reimplementer trusting the name would
+
+  invert or square it and get the physics backwards.
+
+  '
+- 'Junctions are the plugin''s OWN topological state, not read from FocalPointPlasticity (the
+
+  two are separate plugins that happen to be used together). Bonds form only WITHIN a cluster
+
+  (same clusterId = compartmental cells), only between listed types, only up to max_junctions,
+
+  only if none already exists. So Curvature is a hybrid: a Potts energy term PLUS a stateful
+
+  bond-graph watcher -- not a pure energy plugin.
+
+  '
+- 'Vestigial code changes the physics you would guess: potentialFunction (harmonic
+
+  offset+lambda*(d-d0)^2), targetDistance, maxDistance, and diffEnergyBy* are all present but
+
+  inert (never called / return 0). ONLY lambda_curve and activation_energy affect dynamics;
+
+  targetDistance/maxDistance from the CC3DML are silently ignored.
+
+  '
+- 'APPARENT BUG in the "middle cell about to disappear" branch (volume 1->0): three
+
+  reconnection terms add curvature WITHOUT the lambda factor (CurvaturePlugin.cpp:L674, L682,
+
+  L687 -- `energy += calculateInverseCurvatureSquare(...)` with no `lambda *`), inconsistent
+
+  with every other branch. To match the oracle a faithful port must reproduce the missing
+
+  factor, not "fix" it.
+
+  '
+- 'lambda for a triple (A,B,C) is looked up by the FIRST pair''s types
+
+  (internalCurvatureParamsArray[A.type][B.type]), not the mid-vertex pair; the index is a
+
+  symmetric bit-pack (min+1)|((max+1)<<16), so [a][b]==[b][a]. Matters only when types differ
+
+  along the chain.
+
+  '
+- 'The two bonds of a cell are labelled left/right by std::set ordering on the neighbor
+
+  POINTER (CurvatureTracker.h:L40-42), i.e. arbitrary, not geometric. Chain traversal walks up
+
+  to 3 hops each side; only cells with <=2 junctions form a proper chain.
+
+  '
+- 'Source comment (CurvaturePlugin.cpp:L349) states it does NOT work correctly under periodic
+
+  boundary conditions. The plugin also force-loads the CenterOfMass plugin on init.
+
+  '
+verdict: null
+of: null
+implementation_of: null
+why: null
+contract: null
+status: inspected
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

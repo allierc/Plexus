@@ -1,0 +1,149 @@
+id: contactlocalflex
+order: 11
+raw_name: ContactLocalFlex
+raw_kind: Plugin (ContactLocalFlexPlugin)
+code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L3339
+paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366, contact/adhesion energy term
+
+  (the boundary-energy sum J(tau,tau'')(1-delta)). NOTE: no paper text is available in
+
+  this environment, so no page/eq number is verified. Checkable source anchors:
+
+  PyCoreSpecs.py:L3339 (class docstring "A steerable version of ContactPlugin");
+
+  parent ContactPlugin at L3141; C++ doc cpp/CompuCell/plugins/ContactLocalFlexPlugin.rst;
+
+  compiled classes in cpp/CompuCell.py L6379-6591.
+
+  '
+summary: 'A steerable, per-cell variant of the Contact adhesion plugin. It contributes the
+
+  standard Potts boundary/adhesion energy to the Metropolis acceptance of a proposed
+
+  pixel copy, but the pairwise contact energy J is not read from a static cell-TYPE
+
+  matrix -- it is stored on EACH CELL as an attribute (a ContactLocalFlexDataContainer
+
+  holding per-neighbour J values plus a local default-energy table). The type-pair
+
+  energies given in the spec seed those per-cell defaults; setContactEnergy() can then
+
+  override J for an individual cell (or cell-cell pair) at runtime, so adhesion is
+
+  locally adjustable/"flexible" and steerable while the simulation runs. Writes no
+
+  lattice state; as a change-watcher it maintains the per-cell contact data as pixels flip.
+
+  '
+equations: "Contact (boundary) energy, summed over neighbouring lattice-site pairs within the\ninteraction\
+  \ range:\n\n    E_contact = sum over neighbour pairs (i,j) of  J(sigma_i, sigma_j) * (1 - delta(sigma_i,\
+  \ sigma_j))\n\nwhere\n  sigma_i        = cell id occupying site i,\n  delta(a,b)     = Kronecker delta\
+  \ (1 if same cell id, else 0) -- so only pairs\n                   straddling a cell boundary contribute,\n\
+  \  neighbour pairs = sites j within neighbor_order (adjacency shell) or, if depth is\n             \
+  \      set, within Euclidean distance depth of site i,\n  J(sigma_i,sigma_j) = contact energy for that\
+  \ specific pair.\n\nDifference from plain Contact (this is the whole point of \"LocalFlex\"):\n  plain\
+  \ Contact:  J = J_matrix[type(sigma_i)][type(sigma_j)]   (global TYPE-pair table)\n  ContactLocalFlex:\
+  \ J = contactEnergy(sigma_i, sigma_j), looked up from cell sigma_i's\n                    per-cell ContactLocalFlexDataContainer\
+  \ -- its per-neighbour map,\n                    falling back to that cell's localDefaultContactEnergies\
+  \ (seeded from\n                    the spec's type-pair energies). Modifiable per cell at runtime.\n\
+  \nIf weight_energy_by_distance is set, each pair term is divided by the site-site\ndistance d(i,j) so\
+  \ more distant neighbours in higher-order shells contribute less.\n\nchangeEnergy() returns the delta:\
+  \  dE = E_contact(after copy) - E_contact(before copy).\nThe proposed copy is accepted with probability\
+  \ 1 if dE <= 0, else exp(-dE / T).\n"
+params:
+  neighbor_order:
+    role: interaction_range (integer adjacency shell; how many rings of lattice neighbours the boundary-energy
+      sum reaches over; 1 = nearest neighbours)
+  depth:
+    role: interaction_range (continuous alternative -- max Euclidean neighbour distance; when set it overrides
+      neighbor_order in the emitted CC3DML)
+  weight_energy_by_distance:
+    role: distance_weighting flag (divide each neighbour-pair energy by site-site distance so farther
+      neighbours contribute less)
+  ContactEnergyParameter(type_1, type_2, energy):
+    role: adhesion_energy per cell-type pair -- these values SEED the per-cell default contact-energy
+      table (localDefaultContactEnergies) that the local per-cell J's start from; higher J = weaker adhesion
+      / higher boundary cost
+state_io:
+  reads: "- the cell-id lattice sigma (to identify each site's owning cell and evaluate delta)\n- each\
+    \ cell's ContactLocalFlexDataContainer extra-attribute: contactDataContainer\n  (per-neighbour-cell\
+    \ J values) and localDefaultContactEnergies (per-type default J),\n  accessed via the contactlocalflex\
+    \ container accessor\n- neighbour lattice sites within neighbor_order / depth\n- Potts temperature\
+    \ T (for the acceptance function, applied by the engine)\n"
+  writes: "- NO lattice/cell state. This is an ENERGY TERM: changeEnergy() returns a scalar dE\n  that\
+    \ only changes the probability the engine accepts a proposed pixel copy.\n- side channel: as a CellGChangeWatcher\
+    \ it maintains its own per-cell contact-data\n  bookkeeping when pixels flip; setContactEnergy()/steering\
+    \ writes per-cell (or\n  per-pair) J into that container -- state internal to the plugin, not a field\
+    \ others read.\n"
+surprises:
+- 'It is NOT a new mechanism: the energy functional is identical to plain Contact. The
+
+  only difference is WHERE J lives -- a per-cell attribute instead of a global
+
+  type-pair matrix -- which makes adhesion individually settable and runtime-steerable.
+
+  A reimplementer who copies Contact will get the same equation but miss the per-cell
+
+  storage and the setContactEnergy() runtime override that is the entire purpose.
+
+  '
+- 'The Python spec (PyCoreSpecs.py) is a bare subclass of ContactPlugin with ZERO extra
+
+  fields -- same __init__, same xml, same ContactEnergyParameter entries. The type-pair
+
+  energies you pass are therefore only INITIAL DEFAULTS; nothing in the Python API sets
+
+  a per-cell J. The local override lives entirely in the C++ core (setContactEnergy)
+
+  and must be driven from a steppable, so the "flex" is invisible if you read only the spec.
+
+  Even _PyCoreSteerableInterface is redundant here: ContactPlugin (L3141) already
+
+  inherits it, so at the Python-spec level ONLY name/registered_name
+
+  ("contact_local_flex"/"ContactLocalFlex") distinguish this from plain Contact; the
+
+  registered_name is what binds it to the different C++ plugin that stores per-cell J.
+
+  '
+- 'ContactInternal (PyCoreSpecs.py:L3350) is the SAME class, subclassed only to change
+
+  registered_name -- it applies the identical per-cell contact energy but between
+
+  COMPARTMENTS of a single cluster cell rather than between whole cells.
+
+  '
+- 'delta(sigma_i, sigma_j) uses cell IDS, not types: two adjacent cells of the same type
+
+  still incur boundary energy (they are different ids). Only sites inside one cell cancel.
+
+  '
+- 'weight_energy_by_distance only matters for neighbor_order > 1 / depth > 1; at nearest-
+
+  neighbour range every pair is at the same distance and the flag is a no-op.
+
+  '
+- 'The base class in the compiled core is CellGChangeWatcher (cpp/CompuCell.py:L6543),
+
+  not a plain energy function -- ordering matters: the per-cell contact-data container
+
+  must be kept in sync as pixels flip, so this plugin both watches changes AND scores
+
+  energy. No standalone ablation run exists for it (contact_adhesion evidence covers the
+
+  plain Contact energy; the LocalFlex per-cell behaviour is unmeasured here).
+
+  '
+status: inspected
+module: null
+test: null
+verdict: null
+of: null
+implementation_of: null
+why: null
+contract: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

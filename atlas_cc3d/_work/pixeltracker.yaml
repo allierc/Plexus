@@ -1,0 +1,158 @@
+id: pixeltracker
+order: 23
+raw_name: PixelTracker
+raw_kind: Plugin (PixelTrackerPlugin)
+code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L5311
+paper_section: 'No dedicated paper section — PixelTracker is an infrastructure plugin, not a
+
+  physics term, and is not individually described in Swat et al. (2012) Methods
+
+  Cell Biol 110:325-366. Checkable source anchors: PyCoreSpecs.py:L5311
+
+  (spec), cc3d/cpp/CompuCell.py:6002 (class PixelTrackerPlugin(CellGChangeWatcher);
+  field3DChange def at :6010, enableMediumTracker at :6031 -- verified at source),
+
+  doc/code_ref cpp/CompuCell/plugins/PixelTrackerPlugin.rst, and the consumer
+
+  PySteppables.get_cell_pixel_list (PySteppables.py:2465) + iterators.py:700
+
+  (class CellPixelList).
+
+  '
+summary: 'Bookkeeping/observer plugin. For every cell it maintains an explicit container
+
+  (a set of PixelTrackerData, each wrapping a Point3D) of the lattice sites that
+
+  currently belong to that cell — i.e. it materialises the inverse of the
+
+  cell_field: the CPM lattice stores site -> cell id, and PixelTracker builds and
+
+  keeps live the cell id -> {sites} map. It contributes NO energy and changes no
+
+  acceptance probability; it is a CellGChangeWatcher that reacts to each accepted
+
+  pixel copy and edits the two affected cells'' pixel sets. Its purpose is O(1)
+
+  enumeration of a cell''s pixels for downstream consumers (moment of inertia,
+
+  whole-cell deletion/translation, per-cell secretion, custom steppables).
+
+  '
+equations: "Not a Hamiltonian term: Delta H = 0, always. It is a state-mirroring update\ntriggered on\
+  \ each ACCEPTED spin/pixel copy at site pt where oldCell -> newCell.\n\nLet PS(c) be the pixel set attached\
+  \ to cell c. On field3DChange(pt, newCell, oldCell)\n(CompuCell.py:6010, PixelTrackerPlugin_field3DChange):\n\
+  \    if oldCell is not medium (or track_medium):  PS(oldCell).erase(pt)\n    if newCell is not medium\
+  \ (or track_medium):  PS(newCell).insert(pt)\nSo after any accepted copy, PS(c) = { pt : cell_field[pt]\
+  \ == c }, kept exactly\nconsistent with the lattice. Consumers read it as an iterator (CellPixelList,\n\
+  iterators.py:700) yielding PixelTrackerData with a .pixel Point3D.\nThe medium (cell id 0) is tracked\
+  \ only if track_medium is set (enableMediumTracker,\nCompuCell.py:6031); by default the medium's sites\
+  \ are NOT indexed.\n"
+params:
+  track_medium: 'role = index_scope_toggle. If True, also maintain the pixel set for the
+
+    medium (cell id 0 / null cell) via enableMediumTracker; default False.
+
+    Off by default because the medium spans most of the lattice, so indexing it
+
+    is expensive and rarely needed. Boolean; emitted as a bare <TrackMedium/>
+
+    child element only when True (PyCoreSpecs.py:5333).
+
+    '
+state_io:
+  reads: "- the accepted pixel-copy event: the changed site pt (Point3D), its new owner\n  newCell, and\
+    \ its previous owner oldCell (arguments of field3DChange).\n- implicitly, the cell_field, since it\
+    \ is a watcher registered on lattice changes.\n"
+  writes: "- PS(c): the per-cell pixel set (concretely `pixelSet`, extra-member data\n  attached to each\
+    \ CellG via PixelTrackerAccessor; reached as\n  pixelTrackerAccessor.get(cell.extraAttribPtr).pixelSet,\
+    \ iterators.py:703/724).\n  erase(pt) on the old owner, insert(pt) on the new owner.\n- optionally\
+    \ the medium's pixel set when track_medium is True.\n- writes NOTHING to the Hamiltonian / no dE contribution;\
+    \ does not touch cell\n  volume, surface, or field concentrations.\n"
+surprises:
+- 'It is NOT a physics mechanism at all — it writes no energy and never changes an
+
+  acceptance probability. A reimplementer who slots it next to Volume/Surface/
+
+  Adhesion as "another energy plugin" is wrong: it is a pure derived-index /
+
+  observer that mirrors lattice state. In Plexus terms a cell already IS a set of
+
+  sites, so this plugin materialises a representation Plexus treats as primitive —
+
+  the interesting question is whether the algebra needs an explicit "index/inverse-map
+
+  over a field partition" contract or gets it for free.
+
+  '
+- 'Redundancy is the point and the hazard: PS(c) is fully derivable from cell_field
+
+  at any instant, but CC3D keeps it live incrementally so that enumerating a cell''s
+
+  pixels is O(|cell|) instead of O(|lattice|). Rebuilding it from scratch each read
+
+  would be correct but defeats the purpose.
+
+  '
+- 'It is a hard dependency, not an optimisation, for several downstream tools —
+
+  but the failure mode is NOT uniform, and a reimplementer will get this wrong.
+
+  The low-level accessor get_cell_pixel_list SILENTLY returns None when
+
+  PixelTracker is not loaded (PySteppables.py:2473-2476, `if self.pixelTrackerPlugin:
+
+  ... return None`), it does NOT raise. The AttributeError(''Could not find
+
+  PixelTracker Plugin'') is raised by the consumers that wrap it: get_copy_of_cell_pixels
+
+  (PySteppables.py:2603) and move_cell (2534); delete_cell (2636) inherits that raise
+
+  via get_copy_of_cell_pixels; merge_cells (469) raises its own "did you load
+
+  PixelTracker plugin?". So code that calls the
+
+  raw accessor and forgets the None-check fails downstream with a confusing
+
+  NoneType error, not a clear "plugin missing" one. MomentOfInertia-style per-cell
+
+  geometry and whole-cell translation both iterate PS(c).
+
+  '
+- 'The medium is excluded by default. Anyone iterating "all tracked pixels" and
+
+  expecting medium sites will silently get nothing unless track_medium=True. The
+
+  default is a performance guard, not a semantic statement that the medium has no
+
+  pixels.
+
+  '
+- 'Two-sided edit ordering: on a copy the SAME pt is erased from oldCell and inserted
+
+  into newCell. A naive single-sided implementation (only add to new owner) leaks
+
+  stale membership; the erase on the old owner is mandatory for consistency.
+
+  '
+- 'track_medium is the ONLY parameter. In particular there is no neighbor_order here
+
+  — that belongs to the sibling BoundaryPixelTrackerPlugin (PyCoreSpecs.py:~5260),
+
+  which tracks only boundary/surface pixels. PixelTracker tracks the FULL interior
+
+  pixel set of every cell.
+
+  '
+verdict: null
+of: null
+implementation_of: null
+why: null
+contract: null
+status: inspected
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

@@ -1,0 +1,109 @@
+id: neighbortracker
+order: 20
+raw_name: NeighborTracker
+raw_kind: Plugin (NeighborTrackerPlugin)
+code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L2393
+paper_section: |
+  Source anchors (verified 2026-08-02):
+    - Spec class: PyCoreSpecs.py:L2393 (NeighborTrackerPlugin, name "neighbor_tracker").
+    - Python aggregates: core/iterators.py:L366 (CellNeighborListFlex) and its
+      common_surface_area_by_type / neighbor_count_by_type at L415/L429; the null->type-0
+      mapping is at L410, L425, L440.
+    - Accessor entry point: core/PySteppables.py:L1498 (get_cell_neighbor_data_list).
+  Library "doc": doc/code_ref/.../plugins/NeighborTrackerPlugin.rst is a BARE autodoc
+  stub (7 non-blank lines: `.. autoclass:: NeighborSurfaceData` + `.. autoclass::
+  NeighborTrackerPlugin`, no members documented, no prose, no equation). So the docs add
+  nothing beyond the compiled class. No dedicated equation/section for it in Swat et al.
+  (2012) Methods Cell Biol 110:325-366 -- it is bookkeeping, not a named energy term; the
+  source is the only evidence.
+summary: 'A pure TRACKER plugin: it contributes nothing to the Potts energy and returns no
+
+  delta. For every cell it maintains a set of its current neighbours and, for each
+
+  neighbour, the common surface area (the number of shared lattice-site boundary
+
+  links between the two cells). This per-cell adjacency+contact-area table is derived
+
+  state that OTHER plugins/steppables read (e.g. contact-style or type-composition
+
+  queries); the plugin itself never changes any cell''s volume, surface, or position.
+
+  '
+equations: "State per cell c is a set N(c) of NeighborSurfaceData records, each a pair\n    (neighborAddress\
+  \ = pointer to neighbour cell b,  commonSurfaceArea = A_cb)\nwhere A_cb = number of lattice-site boundary\
+  \ links whose two sides belong to cells\nc and b respectively (medium counts as the null neighbour,\
+  \ type 0).\n\nThe table is NOT recomputed by full scan; it is updated INCREMENTALLY on every\nACCEPTED\
+  \ pixel copy. When a boundary site flips its cell id, for each affected\nneighbour pair the tracker\
+  \ calls, in the compiled core:\n    incrementCommonSurfaceArea(...)   -> A_cb += (links gained)\n  \
+  \  decrementCommonSurfaceArea(...)   -> A_cb -= (links lost)\nA neighbour record is pruned when its\
+  \ area reaches the removable state\n(NeighborSurfaceData.OKToRemove, i.e. A_cb == 0). Records are kept\
+  \ in an ordered\nset (operator< / operator== defined on the data) keyed by neighbour identity.\n\nPython-side\
+  \ aggregates built on top of the raw table (iterators.py CellNeighborListFlex):\n    common_surface_area_by_type[t]\
+  \ = sum over neighbours b of A_cb  where type(b)=t\n    neighbor_count_by_type[t]      = count of neighbours\
+  \ b with type(b)=t\n(a null neighbourAddress is reported as type 0 = medium.)\n\nThere is no energy\
+  \ term: dE_NeighborTracker == 0 by construction.\n"
+params: {}
+state_io:
+  reads: "- The cell-id lattice at accepted-copy boundaries (which cell owns each site and\n  its neighbours),\
+    \ supplied by the Potts boundary machinery -- the plugin listens\n  to accepted pixel copies rather\
+    \ than reading a Plexus field.\n- Each cell's extra-attribute storage slot (ExtraMembersGroupAccessor)\
+    \ where its\n  own NeighborTracker record lives.\n"
+  writes: "- Per-cell derived state cellNeighbors: a set of (neighborAddress, commonSurfaceArea)\n  records.\
+    \ This is the ONLY thing it writes; it writes no energy delta and no\n  volume/surface/COM field.\
+    \ In Plexus terms it emits neither an energy contribution\n  nor a per-cell update to a canonical\
+    \ field -- it maintains an auxiliary adjacency\n  relation over the set of cells, keyed and pruned\
+    \ by shared-boundary count.\n"
+surprises:
+- 'commonSurfaceArea is an INTEGER site-boundary COUNT, not a real area. In 2D it is a
+
+  count of shared pixel edges; in 3D a count of shared faces. A reimplementer who
+
+  stores a float "area" or a Euclidean contact length will diverge from the oracle.
+
+  '
+- 'Updated INCREMENTALLY (increment/decrement on each accepted copy), never by a full
+
+  neighbourhood rescan. Getting the increment/decrement bookkeeping wrong silently
+
+  corrupts the table without any error; there is no periodic recompute to self-heal.
+
+  '
+- 'Medium is a first-class neighbour: a null neighborAddress is reported as cell type 0.
+
+  Aggregates that skip null neighbours will undercount the medium-facing surface.
+
+  '
+- 'Neighbour records are pruned exactly when commonSurfaceArea hits 0 (OKToRemove), so
+
+  "is b a neighbour of c" means "currently shares >=1 boundary link", not "was ever
+
+  adjacent". The relation is symmetric in principle but each cell stores its own copy.
+
+  '
+- 'The plugin has NO constructor parameters and nothing to tune. It is a PREREQUISITE
+
+  dependency loaded so that other plugins/steppables can query neighbours; its presence
+
+  changes no dynamics on its own. Loading it or not is the only "knob".
+
+  '
+- 'The neighbour set is ordered (operator< / operator== on NeighborSurfaceData) and keyed
+
+  by neighbour identity; iteration order is deterministic but tied to that ordering, not
+
+  to insertion or geometry -- code that assumes geometric ordering of neighbours is wrong.
+
+  '
+verdict: null
+of: null
+implementation_of: null
+why: null
+contract: null
+status: inspected
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

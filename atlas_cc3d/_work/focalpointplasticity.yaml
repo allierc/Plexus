@@ -1,0 +1,100 @@
+id: focalpointplasticity
+order: 16
+raw_name: FocalPointPlasticity
+raw_kind: Plugin (FocalPointPlasticityPlugin)
+code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L4680
+paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, sec. 'Focal Point Plasticity' (energy
+  term of the form lambda*(d-L_target)^2 over dynamically formed cell-cell junctions)
+summary: 'Maintains a set of dynamically formed pairwise "junctions" (focal-point links) between cells
+  of
+
+  two named types, and adds, per link, a spring energy on the distance between the two linked cells''
+
+  centers of mass. It is an energy term that ALSO mutates persistent auxiliary state: links form when
+
+  two eligible cells come into contact (each below its max-junction count), pay an ActivationEnergy
+
+  bias at formation, and are deleted once their CoM distance exceeds MaxDistance. The rest length,
+
+  stiffness and break length of individual links can be steered from Python at runtime (plasticity);
+
+  ActivationEnergy cannot (XML-only).
+
+  '
+equations: "Per existing link between linked cells i, j (default LinkConstituentLaw):\n  E_link = lambda_fpp\
+  \ * (d_ij - target_distance)^2\nwhere d_ij = || CoM_i - CoM_j ||  (Euclidean distance between the two\
+  \ cells' centers of mass).\nA cell may carry up to max_junctions such links for the given type pair.\n\
+  \nContribution to the Metropolis acceptance test for an attempted pixel copy is the change dE this\n\
+  copy induces:\n  dE = sum_over_affected_links [ E_link(d_after) - E_link(d_before) ]\n       + activation_energy\
+  \   (added ONCE, only on the copy that CREATES a new junction)\nLink lifecycle (not an energy, a state\
+  \ mutation):\n  - form:  when a copy brings two eligible cells (types type1/type2) into contact within\n\
+  \           neighbor_order AND both have < max_junctions links -> a junction is created.\n  - break:\
+  \ when d_ij > max_distance -> the junction is deleted (no energy, removal only).\nThe LinkConstituentLaw\
+  \ `law` (optional) replaces the default quadratic with a user formula over\nthe variables Lambda, Length\
+  \ (=d_ij), TargetLength (=target_distance), e.g.\n\"LambdaExtra*Lambda*(Length-TargetLength)^2\". The\
+  \ quadratic above is the default when law is None.\nNOTE: the exact functional form is read from the\
+  \ LinkConstituentLaw default and the Swat et al.\ndescription; the compiled FPP core itself is not readable\
+  \ in this environment (see surprises).\n"
+params:
+  neighbor_order (Plugin): contact_range -- global default lattice-neighbor order used to detect candidate
+    link partners when scanning for new junctions.
+  type1 (Parameters): link_type_selector -- first cell-type name the link law applies to.
+  type2 (Parameters): link_type_selector -- second cell-type name of the (ordered) pair.
+  lambda_fpp (Parameters): link_stiffness -- spring constant on (d - target_distance)^2.
+  activation_energy (Parameters): link_formation_bias -- energy added once when a NEW junction is created
+    (negative promotes link formation); NOT steerable at runtime, XML-only.
+  target_distance (Parameters): link_rest_length -- preferred CoM-CoM distance L_target.
+  max_distance (Parameters): link_break_length -- CoM distance above which the junction is deleted.
+  max_junctions (Parameters): coordination_number -- max simultaneous links per cell for this pair.
+  neighbor_order (Parameters): contact_range -- per-pair override of the contact neighbor order for detecting
+    candidate partners.
+  internal (Parameters): link_scope -- flag selecting intra-cluster links (InternalParameters, links between
+    compartments of one compartmental cell) vs inter-cluster links (Parameters).
+  law (Parameters): link_energy_law -- optional LinkConstituentLaw (PyCoreSpecs.py:L4512) whose `formula`
+    string replaces the default quadratic. Beyond the built-in variables Lambda, Length, TargetLength,
+    ARBITRARY named variables are bindable via its `variable[name] = value` accessor (each emitted as a
+    <Variable Name=.. Value=..> child of <LinkConstituentLaw>). UNKNOWN: how the compiled FPP core parses/
+    evaluates the Formula string -- only the XML emission is readable in this env, not the evaluator.
+state_io: "reads: centers of mass of each pair of linked cells (to compute d_ij), each cell's type, and\
+  \ the\n  per-cell junction registry (how many links it already holds).\nwrites: nothing to the CPM pixel\
+  \ lattice -- it returns an energy delta to the Metropolis\n  acceptance test (like other Potts plugins).\
+  \ BUT unlike a pure energy term it also mutates a\n  persistent auxiliary structure: it CREATES junction\
+  \ records on link formation and DELETES them\n  on break. So it carries pairwise state between steps,\
+  \ it is not stateless.\n"
+surprises:
+- The exact energy form is inferred from the default LinkConstituentLaw formula ("...*(Length-TargetLength)^2")
+  and the Swat et al. description; the compiled FocalPointPlasticity core is not readable in this env,
+  so lambda*(d-target)^2 is the best-evidenced form, not one I read line-by-line.
+- ActivationEnergy is applied ONCE, only on the copy that creates a link -- it is a formation threshold,
+  not a per-step energy. The twedit generator explicitly warns (CC3DMLGeneratorBase.py L882-884) that
+  lambdaDistance/targetDistance/maxDistance are Python-steerable but ActivationEnergy must still be set
+  from XML. A reimplementer who makes activation_energy runtime-tunable is wrong.
+- d is the distance between CENTERS OF MASS of whole cells, not a pixel-boundary distance; it can and
+  does exceed the cells' own radii. The twedit default template (CC3DMLGeneratorBase.py L894-898) ships
+  Lambda 10, ActivationEnergy -50, TargetDistance 7, MaxDistance 20, MaxNumberOfJunctions 1 -- on cells
+  whose Volume plugin target is 25 (radius ~2.8), so target_distance 7 already exceeds a cell radius and
+  max_distance 20 spans several cell widths. This is a long-range term coupling non-adjacent cell centroids.
+  (NB -- the volume-25 value and the 7/20 link values come from two different co-named files, the Volume
+  test XML and the twedit generator template respectively.)
+- Two channels: Parameters (inter-cluster) vs InternalParameters (intra-cluster, for compartmental cells).
+    Same energy, different link scope selected by the `internal` flag.
+- max_junctions is a per-cell coordination cap enforced at formation time, not an energy penalty -- a
+  hard combinatorial guard on how many links a cell may hold.
+- The Plugin carries a global neighbor_order AND each Parameters block carries its own; the per-pair one
+  (via the MaxNumberOfJunctions NeighborOrder attribute) overrides for that pair.
+- A junction, once formed, persists across MCS until its CoM distance exceeds max_distance -- it is NOT
+  re-evaluated for contact each step, so links can stretch far beyond neighbor_order before breaking.
+  Purely-contact reasoning would get the dynamics wrong.
+verdict: null
+of: null
+implementation_of: null
+why: null
+contract: null
+status: inspected
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null
