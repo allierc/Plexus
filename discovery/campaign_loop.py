@@ -112,6 +112,15 @@ def _gates_open():
 
 _T_START = [None]     # set when a campaign begins; entries before it belong to other runs
 
+# The roles THIS loop runs, from the same budget table the agents are dispatched through, so a
+# role added or dropped cannot leave the accounting behind.
+try:
+    from llm import AGENT_BUDGETS as _AB
+    OUR_AGENTS = set(_AB) | {"grounder"}
+except Exception:
+    OUR_AGENTS = {"proposer", "reflection", "reader", "watcher", "interpreter", "meta_review",
+                  "grounder", "archivist", "diagnostician", "operator_request"}
+
 
 def _cost_so_far():
     """What THIS campaign has spent. Measured, not projected.
@@ -132,6 +141,14 @@ def _cost_so_far():
             continue
         if _T_START[0] is not None and (e.get("t") or e.get("ts_epoch") or 0) < _T_START[0]:
             continue                      # an earlier campaign's call, not this one's
+        # ... AND ONLY THIS CAMPAIGN'S ROLES. _metrology/llm_usage.jsonl is shared across every
+        # project in the repo, so the driver was totalling agents that have nothing to do with
+        # this loop: it reported "99.2 min of agents" for a 22.9-minute round whose own ledger
+        # said 5.08, because `excavator` -- another campaign's agent -- had made 59 calls in the
+        # same hour. A spend figure that counts somebody else's work is worse than none, because
+        # it is the number a budget ceiling would act on.
+        if e.get("agent") not in OUR_AGENTS:
+            continue
         tot["calls"] += 1
         tot["usd"] += e.get("cost_usd") or 0.0
         tot["tok_in"] += e.get("input_tokens") or 0
@@ -247,8 +264,37 @@ def clean_start():
     return removed
 
 
+class _Tee:
+    """Everything the terminal shows, also on disk. THE TERMINAL IS NOT A RECORD.
+
+    A round's most interesting output is the part nothing else keeps: the eye-check's four
+    sentences on what the movie actually shows, the Critic's refusal reasons, the Meta-review's
+    headline. analysis.md holds the measurements and hypotheses.jsonl the verdicts, but none of
+    them holds what the agents SAID -- so a scrollback lost to a closed window is the only copy.
+
+    Tee rather than redirect, because watching it live is the point of the colour.
+    """
+
+    def __init__(self, path):
+        self.f = open(path, "a", buffering=1)
+        self.out = sys.stdout
+
+    def write(self, s):
+        self.out.write(s)
+        # strip the escape codes: colour in a log breaks grep and breaks pasting into the note
+        import re
+        self.f.write(re.sub(r"\x1b\[[0-9;]*m", "", s))
+
+    def flush(self):
+        self.out.flush()
+        self.f.flush()
+
+    def isatty(self):
+        return self.out.isatty()
+
+
 def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None, recon_rounds=1,
-         resume=False):
+         resume=False, log=None):
     other = _already_running()
     if other:
         print("[campaign] REFUSING TO START -- another campaign loop is already running:")
@@ -262,6 +308,9 @@ def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None, recon_rounds=
     print("=" * 96)
     _log({"event": "start", "rounds": n_rounds, "batch": batch, "frames": frames})
 
+    if log:
+        sys.stdout = _Tee(log)
+        print(f"[loop] terminal also written to {log}")
     _T_START[0] = time.time() if not resume else None
     if resume:
         print("[loop] --resume: continuing the campaign already in campaign/ "
@@ -373,10 +422,15 @@ if __name__ == "__main__":
                          "DEFAULT is a clean start at round 1: state.json holds the round "
                          "counter and inheriting it silently opened a '20-round campaign' at "
                          "round 22.")
+    ap.add_argument("--log", default=None,
+                    help="also write the terminal to this file, colour stripped. The terminal is "
+                         "not a record: the eye-check's readings and the agents' headlines are "
+                         "kept nowhere else.")
     ap.add_argument("--status", action="store_true")
     a = ap.parse_args()
     if a.status:
         status()
         raise SystemExit(0)
     raise SystemExit(loop(a.rounds, a.batch, a.frames, usd_ceiling=a.usd_ceiling,
-         recon_rounds=a.recon_rounds, resume=a.resume))
+         recon_rounds=a.recon_rounds, resume=a.resume,
+         log=a.log or os.path.join(CAMP, 'campaign.log')))
