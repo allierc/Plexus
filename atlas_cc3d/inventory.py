@@ -1,184 +1,172 @@
-"""inventory -- the mechanism list, extracted from the clone rather than remembered.
+"""inventory -- seed the record from CompuCell3D's own machine-readable spec registry.
 
-The first thing an agent wants to do with a paper is *list what is in it*. That list is also the
-first place a reproduction goes wrong: a mechanism nobody wrote down is a mechanism nobody
-ablates, and the reproduction then differs from the reference for a reason that is invisible in
-the record. (The Okuda track lost two days to exactly this shape of omission -- an emitter that
-never passed its implementation through, so an ablation reported "no effect" without ever running
-the new code.)
+The jax-morph atlas scanned its clone's syntax tree for classes. CompuCell3D offers something
+better and more honest: `cc3d.core.PyCoreSpecs` IS the framework's declaration of what a mechanism
+is. Every plugin, solver and initialiser a model can switch on appears there with a
+`registered_name` and a `type` (Plugin or Steppable). Enumerating it is not an interpretation of
+the source, it is reading the source's own index -- and a human can check it against
+`dir(cc3d.core.PyCoreSpecs)` in ten seconds.
 
-So the inventory is mechanical: walk the clone's AST, take every class that subclasses a step or
-potential base, record its module, its line, its docstring's first line, its constructor
-parameters, and the state fields it declares. No LLM, no judgement -- an enumeration a human can
-check against `git grep class` in ten seconds.
+AND THE PART A SCAN CANNOT SEE, which the first atlas learned the hard way: 4 of jax-morph's 24
+mechanisms were not classes, and they were among the most interesting entries in the record. The
+same is true here, more so. A Cellular Potts model's defining commitments -- what a cell IS, how
+time advances, how energies compose, how a move is accepted -- are not plugins. They are the
+framework. They are added here BY HAND, and the record says so in each one's `surprises`.
 
-What it produces is a record at status `candidate`: named, located, and NOT yet believed.
-Inspection, normalization and the verdict are the agent's work in later phases.
-
-    python inventory.py                # print
-    python inventory.py --write        # seed atlas_record.yaml (refuses to clobber)
+    python inventory.py                 # print what would be seeded
+    python inventory.py --write         # seed atlas_record.yaml at `candidate`
 """
 from __future__ import annotations
 
 import argparse
-import ast
+import json
 import os
 import subprocess
-
-import yaml
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PLEXUS = os.path.abspath(os.path.join(HERE, ".."))
-CLONE = os.path.join(PLEXUS, "papers", "jax-morph")
-PKG = os.path.join(CLONE, "jax_morph")
 RECORD = os.path.join(HERE, "atlas_record.yaml")
+ENV = os.environ.get("CC3D_ENV", "/workspace/.conda_envs/cc3d-oracle")
+PY = os.path.join(ENV, "bin", "python")
 
-# Base classes that mark "this is a mechanism", in the reference's own vocabulary.
-STEP_BASES = {"SimulationStep", "StochasticStep", "ODEController"}
-POTENTIAL_BASES = {"Potential", "PairwisePotential"}
+# Configuration objects rather than mechanisms: `Metadata` is bookkeeping and `PottsCore` is the
+# lattice/dynamics declaration itself, which enters the record as the architectural entries below
+# rather than as a plugin. Excluded by NAME so the exclusion is auditable.
+NOT_MECHANISMS = {"Metadata", "PottsCore"}
 
+SCAN_SRC = '''
+import warnings, inspect, json; warnings.filterwarnings("ignore")
+import cc3d, cc3d.core.PyCoreSpecs as S
+from cc3d.core.PyCoreSpecs import _PyCoreSpecsBase
+out = []
+for name in sorted(dir(S)):
+    o = getattr(S, name)
+    if not (inspect.isclass(o) and issubclass(o, _PyCoreSpecsBase)) or name.startswith("_"):
+        continue
+    if getattr(o, "type", None) not in ("Plugin", "Steppable"):
+        continue
+    reg = getattr(o, "registered_name", None)
+    if not isinstance(reg, str):
+        reg = name          # a couple expose it as a property object; fall back to the class name
+    doc = (o.__doc__ or "").strip().split("\\n")[0][:200]
+    try:
+        src_file, lineno = inspect.getsourcefile(o), inspect.getsourcelines(o)[1]
+    except (OSError, TypeError):
+        src_file, lineno = inspect.getsourcefile(S), 1
+    out.append({"class": name, "registered": reg, "kind": o.type,
+                "module": inspect.getmodule(o).__name__, "doc": doc,
+                "file": src_file, "line": lineno})
+print(json.dumps({"cc3d_version": cc3d.__version__, "specs": out}))
+'''
 
-def _first_doc_line(node):
-    d = ast.get_docstring(node) or ""
-    return d.strip().splitlines()[0] if d else None
-
-
-def _init_params(node):
-    """Constructor parameters, which are the tunables the atlas has to give roles to."""
-    for item in node.body:
-        if isinstance(item, ast.FunctionDef) and item.name == "__init__":
-            args = [a.arg for a in item.args.args if a.arg != "self"]
-            args += [a.arg for a in item.args.kwonlyargs]
-            return args
-    return []
-
-
-def _bases(node):
-    out = []
-    for b in node.bases:
-        if isinstance(b, ast.Name):
-            out.append(b.id)
-        elif isinstance(b, ast.Attribute):
-            out.append(b.attr)
-    return out
-
-
-def scan() -> list:
-    found = []
-    for dirpath, dirnames, filenames in os.walk(PKG):
-        dirnames[:] = [d for d in dirnames if d not in ("__pycache__", "guides")]
-        for fn in sorted(filenames):
-            if not fn.endswith(".py"):
-                continue
-            path = os.path.join(dirpath, fn)
-            rel = os.path.relpath(path, PLEXUS)
-            with open(path, errors="replace") as f:
-                src = f.read()
-            try:
-                tree = ast.parse(src)
-            except SyntaxError:
-                continue
-            for node in ast.walk(tree):
-                if not isinstance(node, ast.ClassDef):
-                    continue
-                bases = _bases(node)
-                if STEP_BASES & set(bases):
-                    role = "step"
-                elif POTENTIAL_BASES & set(bases):
-                    role = "potential"
-                else:
-                    continue
-                found.append({
-                    "raw_name": node.name,
-                    "raw_kind": f"{role} ({', '.join(bases)})",
-                    "code_path": f"{rel}:L{node.lineno}",
-                    "summary": _first_doc_line(node),
-                    "params": {p: None for p in _init_params(node)},
-                })
-    found.sort(key=lambda m: (m["code_path"]))
-    return found
-
-
-def _slug(name):
-    out = []
-    for i, ch in enumerate(name):
-        if ch.isupper() and i and not name[i - 1].isupper():
-            out.append("_")
-        out.append(ch.lower())
-    return "".join(out)
-
-
-# Mechanisms that are NOT classes: architectural contracts stated in the guides. They are the
-# most interesting entries in this whole record -- the reference's operator-composition semantics
-# -- and an AST walk cannot see them, so they are listed explicitly with their source.
+# --------------------------------------------------------------------------------------------- #
+#  The mechanisms that are NOT classes -- the framework itself. For a Cellular Potts model this is
+#  exactly where the interesting vocabulary question lives: jax-morph's cells are points carrying
+#  state, CompuCell3D's are regions of a lattice, and none of that difference is a plugin.
+# --------------------------------------------------------------------------------------------- #
 ARCHITECTURAL = [
-    {"raw_name": "Lie-Trotter macro-step split",
-     "raw_kind": "integration contract",
-     "code_path": "papers/jax-morph/jax_morph/core/step.py:L1",
-     "paper_section": "guides/concepts.md, 'A simulation integrates a hybrid dynamical system'",
-     "summary": "One macro-step = discrete o dynamic o quasistatic, each advancing the shared "
-                "state over dt; first-order accurate operator splitting."},
-    {"raw_name": "step type: quasistatic / dynamic / discrete",
-     "raw_kind": "step taxonomy",
-     "code_path": "papers/jax-morph/jax_morph/core/step.py:L1",
-     "paper_section": "guides/concepts.md, 'Models are ordered step pipelines'",
-     "summary": "A step is classified by its TIME-SCALE SEMANTICS (fast constraint / finite rate "
-                "/ instantaneous event), orthogonal to what part of the state it touches."},
-    {"raw_name": "declared field dataflow validation",
-     "raw_kind": "composition contract",
-     "code_path": "papers/jax-morph/jax_morph/core/state.py:L1",
-     "paper_section": "guides/concepts.md, 'Physics and control compose through fields'",
-     "summary": "Steps couple ONLY through named state fields; reads/writes are declared and "
-                "cross-validated when the model is built, so recomposition is add/remove/reorder."},
-    {"raw_name": "stochastic trace / replay / score",
-     "raw_kind": "stochasticity contract",
-     "code_path": "papers/jax-morph/jax_morph/core/logp.py:L1",
-     "paper_section": "guides/concepts.md, 'Differentiability -- score-based'",
-     "summary": "A stochastic step samples parameter-free noise, records an ephemeral trace, "
-                "replays the trace to produce the effect, and scores the same trace in logp -- "
-                "which is what makes a discrete event (division, death) differentiable."},
+    dict(id="cell_as_lattice_domain",
+         raw_name="cell as a set of lattice sites",
+         raw_kind="representation (not a class)",
+         summary="A cell is not a point with a radius but a connected set of lattice sites sharing "
+                 "one id. Volume is a site count, surface a boundary count, position a derived "
+                 "centre of mass. Every other mechanism is defined in terms of this.",
+         code_path="SITE/cc3d/core/PySteppables.py",
+         why_hand="not a plugin -- it is the framework's data model, and the single largest "
+                  "difference from the first atlas's target"),
+    dict(id="metropolis_acceptance",
+         raw_name="Metropolis acceptance of pixel copies",
+         raw_kind="core dynamics (not a class)",
+         summary="Time advances by attempting to copy one lattice site's id into a neighbour, "
+                 "accepted with probability 1 if the total energy falls and exp(-dE/T) otherwise, "
+                 "where T is the fluctuation amplitude. No plugin implements this; every plugin "
+                 "only contributes a term to dE.",
+         code_path="SITE/cc3d/core/PyCoreSpecs.py",
+         why_hand="the dynamics themselves -- discrete, stochastic, accept/reject, with no "
+                  "pathwise derivative"),
+    dict(id="energy_sum_composition",
+         raw_name="the Hamiltonian as a sum of plugin terms",
+         raw_kind="composition contract (not a class)",
+         summary="Mechanisms compose by ADDING energy terms to one Hamiltonian and interact only "
+                 "through the accept/reject decision. Nothing is applied in sequence and nothing "
+                 "returns a delta.",
+         code_path="SITE/cc3d/core/PyCoreSpecs.py",
+         why_hand="the direct counterpart of jax-morph's Lie-Trotter operator split, and the "
+                  "contrast is itself a finding: operator splitting versus energy summation are "
+                  "two different answers to how mechanisms compose"),
+    dict(id="mcs_time_unit",
+         raw_name="Monte Carlo Step as the time unit",
+         raw_kind="time-scale contract (not a class)",
+         summary="One MCS is one attempted copy per lattice site, not a duration. There is no dt "
+                 "and no integrator; a rate must be expressed as a per-MCS probability.",
+         code_path="SITE/cc3d/core/PyCoreSpecs.py",
+         why_hand="a time-scale taxonomy with no dt at all -- the sharpest possible contrast with "
+                  "an ODE-integrating framework"),
+    dict(id="pixel_neighbourhood",
+         raw_name="neighbour order / pixel-copy neighbourhood",
+         raw_kind="relation contract (not a class)",
+         summary="Which lattice sites count as adjacent, for both the copy attempt and every "
+                 "contact energy. It is the relation E of the model, chosen by an integer.",
+         code_path="SITE/cc3d/core/PyCoreSpecs.py",
+         why_hand="the model's relation is a lattice adjacency, not an edge set built from "
+                  "positions"),
 ]
 
+BLANK_EVIDENCE = {"oracle_run": None, "diff_metric": None, "threshold": None, "passed": None}
 
-def build() -> dict:
-    sha = subprocess.run(["git", "-C", CLONE, "rev-parse", "HEAD"],
-                         capture_output=True, text=True).stdout.strip() or None
-    mechs = []
-    for i, m in enumerate(scan() + ARCHITECTURAL, 1):
+
+def scan():
+    r = subprocess.run([PY, "-c", SCAN_SRC], capture_output=True, text=True, timeout=600)
+    line = [x for x in r.stdout.strip().split("\n") if x.startswith("{")]
+    if not line:
+        raise RuntimeError(f"spec scan failed:\n{r.stdout[-800:]}\n{r.stderr[-800:]}")
+    return json.loads(line[-1])
+
+
+def build(data):
+    mechs, order = [], 0
+    for s in data["specs"]:
+        if s["class"] in NOT_MECHANISMS:
+            continue
+        order += 1
         mechs.append({
-            "id": _slug(m["raw_name"].replace(" ", "_").replace("/", "_").replace("-", "_")),
-            "order": i,
-            "raw_name": m["raw_name"],
-            "raw_kind": m["raw_kind"],
-            "code_path": m["code_path"],
-            "paper_section": m.get("paper_section"),
-            "summary": m["summary"],
-            "params": m.get("params", {}),
-            "verdict": None,
-            "of": None,
-            "why": None,
-            "contract": None,
-            "status": "candidate",
-            "module": None,
-            "test": None,
-            "evidence": {"oracle_run": None, "diff_metric": None,
-                         "threshold": None, "passed": None},
+            "id": s["registered"].lower(), "order": order, "raw_name": s["registered"],
+            "raw_kind": f"{s['kind']} ({s['class']})",
+            # a real file:line, so R3_code_path can CHECK it rather than take a dotted name on trust
+            "code_path": f"{s['file']}:L{s['line']}",
+            "paper_section": "Swat et al. (2012) Methods Cell Biol 110:325-366, "
+                             "'Multi-Scale Modeling of Tissues Using CompuCell3D'",
+            "summary": s["doc"] or None,
+            "equations": None, "params": {}, "state_io": None, "surprises": None,
+            "verdict": None, "of": None, "implementation_of": None, "why": None,
+            "contract": None, "status": "candidate", "module": None, "test": None,
+            "evidence": dict(BLANK_EVIDENCE),
+        })
+    for a in ARCHITECTURAL:
+        order += 1
+        mechs.append({
+            "id": a["id"], "order": order, "raw_name": a["raw_name"], "raw_kind": a["raw_kind"],
+            "code_path": a["code_path"].replace(
+                "SITE", os.path.join(ENV, "lib", "python3.12", "site-packages")),
+            "paper_section": "Swat et al. (2012) Methods Cell Biol 110:325-366",
+            "summary": a["summary"], "equations": None, "params": {}, "state_io": None,
+            "surprises": [f"ADDED BY HAND: {a['why_hand']}"],
+            "verdict": None, "of": None, "implementation_of": None, "why": None,
+            "contract": None, "status": "candidate", "module": None, "test": None,
+            "evidence": dict(BLANK_EVIDENCE),
         })
     return {
-        "repository": "fmottes/jax-morph",
-        "paper": "10.1038/s43588-025-00851-4  (Deshpande, Mottes et al., "
-                 "Engineering morphogenesis of cell clusters with differentiable programming, "
-                 "Nat Comput Sci 2025);  local: papers/Deshpande_2025_jax_morph.pdf",
-        "model_family": "off_lattice_particle_multicellular_differentiable",
-        "commit": sha,
-        "license": "Apache-2.0",
-        "clone": "papers/jax-morph",
-        "scale": ["cell", "cluster"],
-        "sets": ["cell"],
-        "fields": ["chemical (per-cell concentration, screened free-space kernel)"],
-        "maps": ["cell_cell_pairwise"],
-        "note": "Seeded mechanically by inventory.py. Every entry is at status `candidate`: "
-                "named and located, nothing inspected, nothing believed.",
+        "repository": "CompuCell3D/CompuCell3D",
+        "paper": "10.1016/B978-0-12-388403-9.00013-8",
+        "model_family": "cellular_potts",
+        "commit": f"conda compucell3d {data['cc3d_version']} py312",
+        "license": "MIT (CompuCell3D core)",
+        "clone": ENV,
+        "scale": "cell (lattice domain)",
+        "sets": ["cell"], "fields": ["chemical"], "maps": [],
+        "note": "Seeded by inventory.py from cc3d.core.PyCoreSpecs -- the framework's own registry "
+                "-- plus 5 architectural mechanisms added BY HAND that no scan can see. Every "
+                "entry is at `candidate`: nothing has been read at source yet.",
         "mechanisms": mechs,
     }
 
@@ -187,21 +175,23 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--write", action="store_true")
     a = ap.parse_args()
-    doc = build()
-    mechs = doc["mechanisms"]
-    print(f"{doc['repository']} @ {doc['commit'][:8] if doc['commit'] else '?'}   "
-          f"{len(mechs)} candidate mechanisms\n")
-    w = max(len(m["raw_name"]) for m in mechs)
-    for m in mechs:
-        print(f"  {m['order']:>3}  {m['raw_name']:<{w}}  {m['raw_kind']:<34} {m['code_path']}")
+    doc = build(scan())
+    hand = sum(1 for m in doc["mechanisms"] if m["surprises"])
+    print(f"[inventory] CompuCell3D {doc['commit']}")
+    print(f"[inventory] {len(doc['mechanisms'])} mechanisms: "
+          f"{len(doc['mechanisms']) - hand} scanned from PyCoreSpecs, {hand} added by hand")
+    for m in doc["mechanisms"]:
+        print(f"  {m['order']:>2} [{'hand' if m['surprises'] else 'scan'}] "
+              f"{m['raw_name']:<34} {m['raw_kind']}")
     if a.write:
-        if os.path.exists(RECORD):
-            raise SystemExit(f"\n{RECORD} exists -- refusing to clobber a record that may carry "
-                             f"inspected entries. Delete it deliberately if you mean to reseed.")
+        import yaml
         with open(RECORD, "w") as f:
-            yaml.safe_dump(doc, f, sort_keys=False, width=100, allow_unicode=True)
-        print(f"\nwrote {RECORD}")
+            yaml.safe_dump(doc, f, sort_keys=False, width=100)
+        print(f"\n-> {os.path.relpath(RECORD, HERE)}")
+    else:
+        print("\n(dry run; pass --write to seed the record)")
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

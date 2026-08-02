@@ -1,0 +1,2452 @@
+{
+  "registered": {
+    "activation_pulse": {
+      "name": "activation_pulse",
+      "canonical": "activation_pulse",
+      "alias_of": null,
+      "kind": "field",
+      "family": "fields",
+      "set": "field",
+      "signature": {
+        "inputs": [
+          "field"
+        ],
+        "outputs": [
+          "field"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "activation_field",
+        "gaussian_source",
+        "phase_delay",
+        "travelling_wave",
+        "spatial_clock"
+      ],
+      "param_roles": {
+        "radius": "stimulus_width",
+        "center": "stimulus_site",
+        "clock": "pacemaker_signal",
+        "period": "beat_interval",
+        "duration": "active_width",
+        "max_delay": "phase_delay_gain",
+        "delay_from": "delay_map"
+      },
+      "requires_params": [],
+      "reference": "Plexus (this work).",
+      "module": "plexus.operators.activation_pulse",
+      "doc": null
+    },
+    "active_force": {
+      "name": "active_force",
+      "canonical": "active_force",
+      "alias_of": null,
+      "kind": "exchange",
+      "family": "mechanics",
+      "set": "particle",
+      "signature": {
+        "inputs": [
+          "particle"
+        ],
+        "outputs": [
+          "particle"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "active_contraction",
+        "field_gradient_force",
+        "directed_active_stress"
+      ],
+      "param_roles": {
+        "amplitude": "contraction_strength",
+        "mode": "gradient_or_directional"
+      },
+      "requires_params": [
+        "from"
+      ],
+      "reference": "Marchetti, M. C. et al. (2013). Hydrodynamics of soft active matter. Rev. Mod. Phys. 85:1143-1189.",
+      "module": "plexus.operators.active_force",
+      "doc": null
+    },
+    "active_stress": {
+      "name": "active_stress",
+      "canonical": "active_stress",
+      "alias_of": null,
+      "kind": "exchange",
+      "family": "mechanics",
+      "set": "particle",
+      "signature": {
+        "inputs": [
+          "particle"
+        ],
+        "outputs": [
+          "particle"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "active_contraction",
+        "active_stress_tensor",
+        "directed_active_stress"
+      ],
+      "param_roles": {
+        "amplitude": "active_stress_gain",
+        "direction_from": "contraction_axis_field"
+      },
+      "requires_params": [
+        "from",
+        "direction_from"
+      ],
+      "reference": "Simha, R. A. & Ramaswamy, S. (2002). Phys. Rev. Lett. 89:058101; Marchetti, M. C. et al. (2013). Rev. Mod. Phys. 85:1143.",
+      "module": "plexus.operators.active_stress",
+      "doc": null
+    },
+    "agent_gather": {
+      "name": "agent_gather",
+      "canonical": "agent_gather",
+      "alias_of": null,
+      "kind": "exchange",
+      "family": "coupling",
+      "set": "cell",
+      "signature": {
+        "inputs": [
+          "cell"
+        ],
+        "outputs": [
+          "cell"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "grid_to_agent",
+        "fluid_drag",
+        "surface_confinement"
+      ],
+      "param_roles": {
+        "k": "fluid_drag_gain",
+        "confine": "surface_tension_confinement"
+      },
+      "requires_params": [
+        "from"
+      ],
+      "reference": "Plexus (this work).",
+      "module": "plexus.operators.agent_gather",
+      "doc": null
+    },
+    "agent_remodel": {
+      "name": "agent_remodel",
+      "canonical": "agent_remodel",
+      "alias_of": null,
+      "kind": "exchange",
+      "family": "coupling",
+      "set": "cell",
+      "signature": {
+        "inputs": [
+          "cell"
+        ],
+        "outputs": [
+          "cell"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "tissue_remodelling",
+        "stiffening",
+        "fluidisation"
+      ],
+      "param_roles": {
+        "gain": "remodel_gain",
+        "rate_attr": "per_type_remodel_rate"
+      },
+      "requires_params": [
+        "to",
+        "target"
+      ],
+      "reference": "Plexus (this work).",
+      "module": "plexus.operators.agent_remodel",
+      "doc": null
+    },
+    "agent_scatter": {
+      "name": "agent_scatter",
+      "canonical": "agent_scatter",
+      "alias_of": null,
+      "kind": "exchange",
+      "family": "coupling",
+      "set": "cell",
+      "signature": {
+        "inputs": [
+          "cell"
+        ],
+        "outputs": [
+          "cell"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "agent_to_grid",
+        "active_stress_source"
+      ],
+      "param_roles": {
+        "agent_mass": "effective_agent_mass",
+        "k": "push_gain"
+      },
+      "requires_params": [
+        "to"
+      ],
+      "reference": "Plexus (this work).",
+      "module": "plexus.operators.agent_scatter",
+      "doc": null
+    },
+    "agent_to_mpm": {
+      "name": "agent_to_mpm",
+      "canonical": "agent_scatter",
+      "alias_of": "agent_scatter",
+      "kind": "exchange",
+      "family": "coupling",
+      "set": "cell",
+      "signature": {
+        "inputs": [
+          "cell"
+        ],
+        "outputs": [
+          "cell"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "agent_to_grid",
+        "active_stress_source"
+      ],
+      "param_roles": {
+        "agent_mass": "effective_agent_mass",
+        "k": "push_gain"
+      },
+      "requires_params": [
+        "to"
+      ],
+      "reference": "Plexus (this work).",
+      "module": "plexus.operators.agent_scatter",
+      "doc": null
+    },
+    "aggregate": {
+      "name": "aggregate",
+      "canonical": "aggregate",
+      "alias_of": null,
+      "kind": "aggregate",
+      "family": "hierarchy",
+      "set": "cell",
+      "signature": {
+        "inputs": [
+          "particle"
+        ],
+        "outputs": [
+          "cell"
+        ],
+        "reads": [
+          "pos"
+        ],
+        "writes": [
+          "pos"
+        ],
+        "maps": [
+          "parent"
+        ]
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "centroid",
+        "reduction",
+        "hierarchical_readout"
+      ],
+      "param_roles": {
+        "child": "source_child_set"
+      },
+      "requires_params": [],
+      "reference": "Battaglia, P. W. et al. (2018). Relational inductive biases, deep learning, and graph networks. arXiv:1806.01261.",
+      "module": "plexus.operators.aggregate",
+      "doc": null
+    },
+    "alignment": {
+      "name": "alignment",
+      "canonical": "velocity_align",
+      "alias_of": "velocity_align",
+      "kind": "lateral",
+      "family": "interaction",
+      "set": "particle",
+      "signature": {
+        "inputs": [
+          "particle"
+        ],
+        "outputs": [
+          "particle"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "velocity_alignment",
+        "collective_motion",
+        "vicsek"
+      ],
+      "param_roles": {
+        "a": "alignment_strength",
+        "gate": "neighbour_weighting",
+        "r": "contact_radius",
+        "noise": "orientation_noise"
+      },
+      "requires_params": [],
+      "reference": "Vicsek, T. et al. (1995). Novel type of phase transition in a system of self-driven particles. Phys. Rev. Lett. 75:1226-1229.",
+      "module": "plexus.operators.velocity_align",
+      "doc": null
+    },
+    "apply_material_map": {
+      "name": "apply_material_map",
+      "canonical": "apply_material_map",
+      "alias_of": null,
+      "kind": "exchange",
+      "family": "mpm",
+      "set": "particle",
+      "signature": {
+        "inputs": [
+          "particle"
+        ],
+        "outputs": [
+          "particle"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "material_map",
+        "heterogeneous_stiffness",
+        "symmetry_breaking"
+      ],
+      "param_roles": {
+        "min": "param_lo",
+        "max": "param_hi",
+        "target": "material_parameter"
+      },
+      "requires_params": [
+        "from",
+        "target"
+      ],
+      "reference": "Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM material model).",
+      "module": "plexus.operators.material_map",
+      "doc": "field -> set: sample the map at each particle and write a per-particle material"
+    },
+    "attraction_repulsion": {
+      "name": "attraction_repulsion",
+      "canonical": "attraction_repulsion",
+      "alias_of": null,
+      "kind": "lateral",
+      "family": "interaction",
+      "set": "particle",
+      "signature": {
+        "inputs": [
+          "particle"
+        ],
+        "outputs": [
+          "particle"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "long_range_attraction",
+        "short_range_repulsion",
+        "coarsening",
+        "lattice_forming"
+      ],
+      "param_roles": {
+        "sigma": "interaction_length",
+        "noise": "exploration_noise",
+        "p": "[pull_strength, pull_range, push_strength, push_range] per type"
+      },
+      "requires_params": [
+        "sigma"
+      ],
+      "reference": "D'Orsogna, M. R. et al. (2006). Self-propelled particles with soft-core interactions. Phys. Rev. Lett. 96:104302.",
+      "module": "plexus.operators.attraction_repulsion",
+      "doc": null
+    },
+    "attractor_flow": {
+      "name": "attractor_flow",
+      "canonical": "attractor_flow",
+      "alias_of": null,
+      "kind": "lateral",
+      "family": "motion",
+      "set": "particle",
+      "signature": {
+        "inputs": [
+          "particle"
+        ],
+        "outputs": [
+          "particle"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "strange_attractor",
+        "deterministic_chaos",
+        "dissipative_flow",
+        "sensitive_dependence",
+        "phase_space_contraction",
+        "dynamical_system"
+      ],
+      "param_roles": {
+        "system": "which attractor: one of ['halvorsen', 'lorenz', 'aizawa', 'sprott_b', 'thomas', 'rossler', 'dadras', 'chen', 'chua', 'rabinovich_fabrikant']",
+        "scale": "time-rescale the flow (f -> scale*f); >1 = faster",
+        "clamp": "max |velocity| safety cap (0 = off)"
+      },
+      "requires_params": [
+        "system"
+      ],
+      "reference": "Lorenz, E. N. (1963). Deterministic nonperiodic flow. J. Atmos. Sci. 20:130-141.",
+      "module": "plexus.operators.attractor_flow",
+      "doc": "Advect every particle along a strange-attractor vector field dx/dt = f(x) (see module"
+    },
+    "bounce": {
+      "name": "bounce",
+      "canonical": "bounce",
+      "alias_of": null,
+      "kind": "lateral",
+      "family": "motion",
+      "set": "cell",
+      "signature": {
+        "inputs": [
+          "cell"
+        ],
+        "outputs": [
+          "cell"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "boundary_condition",
+        "wall_reflection",
+        "obstacle_avoidance",
+        "steering"
+      ],
+      "param_roles": {
+        "noise": "obstacle_reheading_randomness"
+      },
+      "requires_params": [],
+      "reference": "Plexus (this work).",
+      "module": "plexus.operators.bounce",
+      "doc": null
+    },
+    "broadcast": {
+      "name": "broadcast",
+      "canonical": "broadcast",
+      "alias_of": null,
+      "kind": "broadcast",
+      "family": "hierarchy",
+      "set": "particle",
+      "signature": {
+        "inputs": [
+          "cell"
+        ],
+        "outputs": [
+          "particle"
+        ],
+        "reads": [
+          "pos"
+        ],
+        "writes": [
+          "pos"
+        ],
+        "maps": [
+          "parent"
+        ]
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "containment",
+        "hierarchical_coupling",
+        "spring"
+      ],
+      "param_roles": {
+        "stiffness": "containment_strength"
+      },
+      "requires_params": [
+        "stiffness"
+      ],
+      "reference": "Battaglia, P. W. et al. (2018). arXiv:1806.01261 (graph-network broadcast).",
+      "module": "plexus.operators.broadcast",
+      "doc": null
+    },
+    "cell_divide": {
+      "name": "cell_divide",
+      "canonical": "cell_divide",
+      "alias_of": null,
+      "kind": "structural",
+      "family": "growth",
+      "set": "cell",
+      "signature": {
+        "inputs": [
+          "cell"
+        ],
+        "outputs": [
+          "cell"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "proliferation",
+        "mitosis",
+        "growth"
+      ],
+      "param_roles": {
+        "rate": "division_rate",
+        "max_occ": "homeostatic_ceiling"
+      },
+      "requires_params": [],
+      "reference": "Okuda, S. et al. (2015). Reversible network reconnection model for simulating large deformation in dynamic tissue morphogenesis. Biomech. Model. Mechanobiol. 12:627-644.",
+      "module": "plexus.operators.cell_divide",
+      "doc": null
+    },
+    "cell_grow": {
+      "name": "cell_grow",
+      "canonical": "cell_grow",
+      "alias_of": null,
+      "kind": "structural",
+      "family": "growth",
+      "set": "cell",
+      "signature": {
+        "inputs": [
+          "cell"
+        ],
+        "outputs": [
+          "cell"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "tissue_growth",
+        "rest_volume_growth",
+        "anisotropic_growth",
+        "budding"
+      ],
+      "param_roles": {
+        "rate": "growth_rate",
+        "target": "size_inhibition",
+        "aniso": "growth_anisotropy",
+        "tip": "tip_localization",
+        "stress_gain": "mechano_inhibition"
+      },
+      "requires_params": [],
+      "reference": "Okuda, S. et al. (2015). Biomech. Model. Mechanobiol. 12:627-644.",
+      "module": "plexus.operators.cell_grow",
+      "doc": null
+    },
+    "chemotax": {
+      "name": "chemotax",
+      "canonical": "chemotax",
+      "alias_of": null,
+      "kind": "exchange",
+      "family": "fields",
+      "set": "particle",
+      "signature": {
+        "inputs": [
+          "particle"
+        ],
+        "outputs": [
+          "particle"
+        ],
+        "reads": [
+          "pos"
+        ],
+        "writes": [
+          "pos"
+        ],
+        "maps": [
+          "field"
+        ]
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "gradient_following",
+        "field_templated_aggregation",
+        "field_templated_flow"
+      ],
+      "param_roles": {
+        "gain": "field_sensitivity",
+        "noise": "exploration_noise"
+      },
+      "requires_params": [
+        "from"
+      ],
+      "reference": "Keller, E. F. & Segel, L. A. (1971). Model for chemotaxis. J. Theor. Biol. 30:225-234.",
+      "module": "plexus.operators.chemotax",
+      "doc": null
+    },
+    "cohesion": {
+      "name": "cohesion",
+      "canonical": "cohesion",
+      "alias_of": null,
+      "kind": "lateral",
+      "family": "interaction",
+      "set": "particle",
+      "signature": {
+        "inputs": [
+          "particle"
+        ],
+        "outputs": [
+          "particle"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "cohesion",
+        "collective_motion"
+      ],
+      "param_roles": {
+        "scale": "cohesion_strength"
+      },
+      "requires_params": [],
+      "reference": "Reynolds, C. W. (1987). Flocks, herds and schools: a distributed behavioral model. SIGGRAPH Comput. Graph. 21(4):25-34.",
+      "module": "plexus.operators.cohesion",
+      "doc": null
+    },
+    "cruise": {
+      "name": "cruise",
+      "canonical": "velocity_cruise",
+      "alias_of": "velocity_cruise",
+      "kind": "lateral",
+      "family": "motion",
+      "set": "particle",
+      "signature": {
+        "inputs": [
+          "particle"
+        ],
+        "outputs": [
+          "particle"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "self_propulsion",
+        "vicsek",
+        "active_matter"
+      ],
+      "param_roles": {
+        "v0": "cruising_speed",
+        "noise": "orientation_noise",
+        "chirality": "rotational_bias"
+      },
+      "requires_params": [
+        "v0"
+      ],
+      "reference": "Schweitzer, F., Ebeling, W. & Tilch, B. (1998). Complex motion of Brownian particles with energy depots. Phys. Rev. Lett. 80:5044-5047.",
+      "module": "plexus.operators.velocity_cruise",
+      "doc": null
+    },
+    "decay": {
+      "name": "decay",
+      "canonical": "decay",
+      "alias_of": null,
+      "kind": "field",
+      "family": "fields",
+      "set": "field",
+      "signature": {
+        "inputs": [
+          "field"
+        ],
+        "outputs": [
+          "field"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "evaporation",
+        "field_decay",
+        "stigmergy"
+      ],
+      "param_roles": {
+        "rate": "evaporation_rate"
+      },
+      "requires_params": [],
+      "reference": "Plexus (this work).",
+      "module": "plexus.operators.decay",
+      "doc": "field -> field: acts on the field named by `at:` (no set involved)."
+    },
+    "deposit": {
+      "name": "deposit",
+      "canonical": "deposit",
+      "alias_of": null,
+      "kind": "exchange",
+      "family": "fields",
+      "set": "cell",
+      "signature": {
+        "inputs": [
+          "cell"
+        ],
+        "outputs": [
+          "cell"
+        ],
+        "reads": [
+          "pos"
+        ],
+        "writes": [],
+        "maps": [
+          "field"
+        ]
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "deposition",
+        "stigmergy",
+        "field_write"
+      ],
+      "param_roles": {
+        "amount": "deposit_rate"
+      },
+      "requires_params": [
+        "to"
+      ],
+      "reference": "Grasse, P.-P. (1959). La reconstruction du nid et les coordinations interindividuelles (stigmergy). Insectes Sociaux 6:41-80.",
+      "module": "plexus.operators.deposit",
+      "doc": "object -> field. Writes `to:` field in place; returns {}."
+    },
+    "diffuse": {
+      "name": "diffuse",
+      "canonical": "diffuse",
+      "alias_of": null,
+      "kind": "field",
+      "family": "fields",
+      "set": "field",
+      "signature": {
+        "inputs": [
+          "field"
+        ],
+        "outputs": [
+          "field"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "finite_difference",
+        "spectral"
+      ],
+      "capabilities": {
+        "finite_difference": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        },
+        "spectral": {
+          "dims": [
+            2
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "diffusion",
+        "field_smoothing",
+        "laplacian"
+      ],
+      "param_roles": {
+        "rate": "diffusion_rate"
+      },
+      "requires_params": [],
+      "reference": "Fick, A. (1855). Ueber Diffusion. Ann. Phys. 170:59-86; Turing, A. M. (1952). Phil. Trans. R. Soc. B 237:37-72.",
+      "module": "plexus.operators.diffuse",
+      "doc": "field -> field: acts on the field named by `at:` (no set involved)."
+    },
+    "drag": {
+      "name": "drag",
+      "canonical": "drag",
+      "alias_of": null,
+      "kind": "lateral",
+      "family": "motion",
+      "set": "particle",
+      "signature": {
+        "inputs": [
+          "particle"
+        ],
+        "outputs": [
+          "particle"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "viscous_drag",
+        "friction",
+        "damping"
+      ],
+      "param_roles": {
+        "k": "drag_coefficient",
+        "noise": "thermal_noise"
+      },
+      "requires_params": [
+        "k"
+      ],
+      "reference": "Stokes, G. G. (1851). On the effect of the internal friction of fluids on the motion of pendulums. Trans. Camb. Phil. Soc. 9:8-106.",
+      "module": "plexus.operators.drag",
+      "doc": null
+    },
+    "flow_align": {
+      "name": "flow_align",
+      "canonical": "polarity_flow_align",
+      "alias_of": "polarity_flow_align",
+      "kind": "exchange",
+      "family": "polarity",
+      "set": "cell",
+      "signature": {
+        "inputs": [
+          "cell"
+        ],
+        "outputs": [
+          "cell"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "polarity_velocity_alignment",
+        "flow_alignment"
+      ],
+      "param_roles": {
+        "gain": "flow_alignment_rate"
+      },
+      "requires_params": [
+        "from"
+      ],
+      "reference": "Toner, J. & Tu, Y. (1995). Long-range order in a two-dimensional dynamical XY model. Phys. Rev. Lett. 75:4326-4329.",
+      "module": "plexus.operators.polarity_flow_align",
+      "doc": null
+    },
+    "g2p": {
+      "name": "g2p",
+      "canonical": "mpm_gather",
+      "alias_of": "mpm_gather",
+      "kind": "exchange",
+      "family": "mpm",
+      "set": "particle",
+      "signature": {
+        "inputs": [
+          "particle"
+        ],
+        "outputs": [
+          "particle"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "grid_to_particle",
+        "advection"
+      ],
+      "param_roles": {
+        "dt_sub": "substep_timestep",
+        "wall_damp": "wall_restitution",
+        "wall_contact": "contact_layer_thickness",
+        "vmax": "speed_cap"
+      },
+      "requires_params": [],
+      "reference": "Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM G2P); Sulsky, D. et al. (1994).",
+      "module": "plexus.operators.mpm_gather",
+      "doc": null
+    },
+    "glide": {
+      "name": "glide",
+      "canonical": "glide",
+      "alias_of": null,
+      "kind": "lateral",
+      "family": "motion",
+      "set": "cell",
+      "signature": {
+        "inputs": [
+          "cell"
+        ],
+        "outputs": [
+          "cell"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "self_propulsion",
+        "motility",
+        "active_brownian"
+      ],
+      "param_roles": {
+        "noise": "translational_noise"
+      },
+      "requires_params": [],
+      "reference": "Plexus (this work).",
+      "module": "plexus.operators.glide",
+      "doc": null
+    },
+    "gravity": {
+      "name": "gravity",
+      "canonical": "gravity",
+      "alias_of": null,
+      "kind": "lateral",
+      "family": "mechanics",
+      "set": "cell",
+      "signature": {
+        "inputs": [
+          "cell"
+        ],
+        "outputs": [
+          "cell"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "body_force",
+        "uniform_acceleration"
+      ],
+      "param_roles": {
+        "g": "gravity_magnitude",
+        "gx": "gravity_x",
+        "gy": "gravity_y"
+      },
+      "requires_params": [],
+      "reference": "Newton, I. (1687). Philosophiae Naturalis Principia Mathematica.",
+      "module": "plexus.operators.gravity",
+      "doc": null
+    },
+    "heading_align": {
+      "name": "heading_align",
+      "canonical": "polarity_align",
+      "alias_of": "polarity_align",
+      "kind": "exchange",
+      "family": "polarity",
+      "set": "cell",
+      "signature": {
+        "inputs": [
+          "cell"
+        ],
+        "outputs": [
+          "cell"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "vicsek",
+        "polar_alignment",
+        "collective_motion",
+        "flocking"
+      ],
+      "param_roles": {
+        "gain": "alignment_rate",
+        "noise": "orientation_noise"
+      },
+      "requires_params": [],
+      "reference": "Vicsek, T. et al. (1995). Phys. Rev. Lett. 75:1226-1229.",
+      "module": "plexus.operators.polarity_align",
+      "doc": null
+    },
+    "mls_mpm_mechanics": {
+      "name": "mls_mpm_mechanics",
+      "canonical": "mls_mpm_mechanics",
+      "alias_of": null,
+      "kind": "exchange",
+      "family": "mpm",
+      "set": "particle",
+      "signature": {
+        "inputs": [
+          "particle"
+        ],
+        "outputs": [
+          "particle"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "elastic_mechanics",
+        "material_point_method",
+        "fixed_corotated_stress",
+        "incompressible_volume",
+        "surface_tension",
+        "plastic_flow"
+      ],
+      "param_roles": {
+        "n_grid": "background_grid_resolution",
+        "substeps": "cfl_subcycling",
+        "dt_sub": "substep_timestep",
+        "drag": "overdamped_friction",
+        "wall_damp": "wall_restitution",
+        "surface_tension": "interface_cohesion",
+        "vmax": "speed_cap"
+      },
+      "requires_params": [],
+      "reference": "Hu, Y. et al. (2018). A moving least squares material point method with displacement discontinuity and two-way rigid body coupling. ACM Trans. Graph. 37(4):150; Sulsky, D., Chen, Z. & Schreyer, H. L. (1994). Comput. Methods Appl. Mech. Eng. 118:179-196.",
+      "module": "plexus.operators.mpm",
+      "doc": "Compound MLS-MPM mechanics at the particle level (P2G -> grid solve -> G2P ->"
+    },
+    "mpm_anchor": {
+      "name": "mpm_anchor",
+      "canonical": "mpm_anchor",
+      "alias_of": null,
+      "kind": "lateral",
+      "family": "mechanics",
+      "set": "particle",
+      "signature": {
+        "inputs": [
+          "particle"
+        ],
+        "outputs": [
+          "particle"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "substrate_anchor",
+        "boundary_condition",
+        "rest_restoring"
+      ],
+      "param_roles": {
+        "k": "anchor_stiffness",
+        "ring": "boundary_width",
+        "mode": "anchor_extent"
+      },
+      "requires_params": [
+        "k"
+      ],
+      "reference": "Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM).",
+      "module": "plexus.operators.mpm_anchor",
+      "doc": null
+    },
+    "mpm_gather": {
+      "name": "mpm_gather",
+      "canonical": "mpm_gather",
+      "alias_of": null,
+      "kind": "exchange",
+      "family": "mpm",
+      "set": "particle",
+      "signature": {
+        "inputs": [
+          "particle"
+        ],
+        "outputs": [
+          "particle"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "grid_to_particle",
+        "advection"
+      ],
+      "param_roles": {
+        "dt_sub": "substep_timestep",
+        "wall_damp": "wall_restitution",
+        "wall_contact": "contact_layer_thickness",
+        "vmax": "speed_cap"
+      },
+      "requires_params": [],
+      "reference": "Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM G2P); Sulsky, D. et al. (1994).",
+      "module": "plexus.operators.mpm_gather",
+      "doc": null
+    },
+    "mpm_grid_update": {
+      "name": "mpm_grid_update",
+      "canonical": "mpm_grid_update",
+      "alias_of": null,
+      "kind": "field",
+      "family": "mpm",
+      "set": "field",
+      "signature": {
+        "inputs": [
+          "field"
+        ],
+        "outputs": [
+          "field"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "grid_solve",
+        "surface_tension",
+        "boundary_conditions"
+      ],
+      "param_roles": {
+        "dt_sub": "substep_timestep",
+        "surface_tension": "interface_cohesion",
+        "wall_damp": "wall_restitution"
+      },
+      "requires_params": [],
+      "reference": "Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150; Sulsky, D. et al. (1994).",
+      "module": "plexus.operators.mpm_grid_update",
+      "doc": null
+    },
+    "mpm_scatter": {
+      "name": "mpm_scatter",
+      "canonical": "mpm_scatter",
+      "alias_of": null,
+      "kind": "exchange",
+      "family": "mpm",
+      "set": "particle",
+      "signature": {
+        "inputs": [
+          "particle"
+        ],
+        "outputs": [
+          "particle"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "particle_to_grid",
+        "fixed_corotated_stress"
+      ],
+      "param_roles": {
+        "dt_sub": "MLS-MPM substep dt",
+        "drag": "Stokes drag coefficient",
+        "a_max": "external-acceleration clamp"
+      },
+      "requires_params": [],
+      "reference": "Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM P2G); Sulsky, D. et al. (1994).",
+      "module": "plexus.operators.mpm_scatter",
+      "doc": null
+    },
+    "mpm_spin": {
+      "name": "mpm_spin",
+      "canonical": "mpm_spin",
+      "alias_of": null,
+      "kind": "lateral",
+      "family": "mechanics",
+      "set": "particle",
+      "signature": {
+        "inputs": [
+          "particle"
+        ],
+        "outputs": [
+          "particle"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "solid_body_rotation",
+        "swirl"
+      ],
+      "param_roles": {
+        "omega": "angular_velocity",
+        "spin_k": "spin_gain"
+      },
+      "requires_params": [
+        "omega"
+      ],
+      "reference": "Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM).",
+      "module": "plexus.operators.mpm_spin",
+      "doc": null
+    },
+    "mpm_strain": {
+      "name": "mpm_strain",
+      "canonical": "mpm_strain",
+      "alias_of": null,
+      "kind": "lateral",
+      "family": "mpm",
+      "set": "particle",
+      "signature": {
+        "inputs": [
+          "particle"
+        ],
+        "outputs": [
+          "particle"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "elastic_strain",
+        "plastic_flow",
+        "incompressible_volume"
+      ],
+      "param_roles": {
+        "dt_sub": "MLS-MPM substep dt"
+      },
+      "requires_params": [],
+      "reference": "Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM); Sulsky, D. et al. (1994). Comput. Methods Appl. Mech. Eng. 118:179-196.",
+      "module": "plexus.operators.mpm_strain",
+      "doc": null
+    },
+    "mpm_to_agent": {
+      "name": "mpm_to_agent",
+      "canonical": "agent_gather",
+      "alias_of": "agent_gather",
+      "kind": "exchange",
+      "family": "coupling",
+      "set": "cell",
+      "signature": {
+        "inputs": [
+          "cell"
+        ],
+        "outputs": [
+          "cell"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "grid_to_agent",
+        "fluid_drag",
+        "surface_confinement"
+      ],
+      "param_roles": {
+        "k": "fluid_drag_gain",
+        "confine": "surface_tension_confinement"
+      },
+      "requires_params": [
+        "from"
+      ],
+      "reference": "Plexus (this work).",
+      "module": "plexus.operators.agent_gather",
+      "doc": null
+    },
+    "p2g": {
+      "name": "p2g",
+      "canonical": "mpm_scatter",
+      "alias_of": "mpm_scatter",
+      "kind": "exchange",
+      "family": "mpm",
+      "set": "particle",
+      "signature": {
+        "inputs": [
+          "particle"
+        ],
+        "outputs": [
+          "particle"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "particle_to_grid",
+        "fixed_corotated_stress"
+      ],
+      "param_roles": {
+        "dt_sub": "MLS-MPM substep dt",
+        "drag": "Stokes drag coefficient",
+        "a_max": "external-acceleration clamp"
+      },
+      "requires_params": [],
+      "reference": "Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM P2G); Sulsky, D. et al. (1994).",
+      "module": "plexus.operators.mpm_scatter",
+      "doc": null
+    },
+    "pacemaker": {
+      "name": "pacemaker",
+      "canonical": "pacemaker",
+      "alias_of": null,
+      "kind": "field",
+      "family": "fields",
+      "set": "field",
+      "signature": {
+        "inputs": [
+          "field"
+        ],
+        "outputs": [
+          "field"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "periodic_source",
+        "clock",
+        "pacemaker"
+      ],
+      "param_roles": {
+        "period": "beat_interval",
+        "duration": "active_width",
+        "phase": "beat_offset"
+      },
+      "requires_params": [],
+      "reference": "Plexus (this work).",
+      "module": "plexus.operators.pacemaker",
+      "doc": null
+    },
+    "playback": {
+      "name": "playback",
+      "canonical": "playback",
+      "alias_of": null,
+      "kind": "field",
+      "family": "fields",
+      "set": "field",
+      "signature": {
+        "inputs": [
+          "field"
+        ],
+        "outputs": [
+          "field"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "prescribed_field",
+        "video_playback",
+        "data_driven_field"
+      ],
+      "param_roles": {},
+      "requires_params": [],
+      "reference": "Plexus (this work).",
+      "module": "plexus.operators.prescribed_field",
+      "doc": "field <- data: set the field grid to the current tick's video frame (looping)."
+    },
+    "polarity_align": {
+      "name": "polarity_align",
+      "canonical": "polarity_align",
+      "alias_of": null,
+      "kind": "exchange",
+      "family": "polarity",
+      "set": "cell",
+      "signature": {
+        "inputs": [
+          "cell"
+        ],
+        "outputs": [
+          "cell"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "vicsek",
+        "polar_alignment",
+        "collective_motion",
+        "flocking"
+      ],
+      "param_roles": {
+        "gain": "alignment_rate",
+        "noise": "orientation_noise"
+      },
+      "requires_params": [],
+      "reference": "Vicsek, T. et al. (1995). Phys. Rev. Lett. 75:1226-1229.",
+      "module": "plexus.operators.polarity_align",
+      "doc": null
+    },
+    "polarity_flow_align": {
+      "name": "polarity_flow_align",
+      "canonical": "polarity_flow_align",
+      "alias_of": null,
+      "kind": "exchange",
+      "family": "polarity",
+      "set": "cell",
+      "signature": {
+        "inputs": [
+          "cell"
+        ],
+        "outputs": [
+          "cell"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "polarity_velocity_alignment",
+        "flow_alignment"
+      ],
+      "param_roles": {
+        "gain": "flow_alignment_rate"
+      },
+      "requires_params": [
+        "from"
+      ],
+      "reference": "Toner, J. & Tu, Y. (1995). Long-range order in a two-dimensional dynamical XY model. Phys. Rev. Lett. 75:4326-4329.",
+      "module": "plexus.operators.polarity_flow_align",
+      "doc": null
+    },
+    "pulse_to_active_stress": {
+      "name": "pulse_to_active_stress",
+      "canonical": "active_stress",
+      "alias_of": "active_stress",
+      "kind": "exchange",
+      "family": "mechanics",
+      "set": "particle",
+      "signature": {
+        "inputs": [
+          "particle"
+        ],
+        "outputs": [
+          "particle"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "active_contraction",
+        "active_stress_tensor",
+        "directed_active_stress"
+      ],
+      "param_roles": {
+        "amplitude": "active_stress_gain",
+        "direction_from": "contraction_axis_field"
+      },
+      "requires_params": [
+        "from",
+        "direction_from"
+      ],
+      "reference": "Simha, R. A. & Ramaswamy, S. (2002). Phys. Rev. Lett. 89:058101; Marchetti, M. C. et al. (2013). Rev. Mod. Phys. 85:1143.",
+      "module": "plexus.operators.active_stress",
+      "doc": null
+    },
+    "pulse_to_contraction": {
+      "name": "pulse_to_contraction",
+      "canonical": "active_force",
+      "alias_of": "active_force",
+      "kind": "exchange",
+      "family": "mechanics",
+      "set": "particle",
+      "signature": {
+        "inputs": [
+          "particle"
+        ],
+        "outputs": [
+          "particle"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "active_contraction",
+        "field_gradient_force",
+        "directed_active_stress"
+      ],
+      "param_roles": {
+        "amplitude": "contraction_strength",
+        "mode": "gradient_or_directional"
+      },
+      "requires_params": [
+        "from"
+      ],
+      "reference": "Marchetti, M. C. et al. (2013). Hydrodynamics of soft active matter. Rev. Mod. Phys. 85:1143-1189.",
+      "module": "plexus.operators.active_force",
+      "doc": null
+    },
+    "radius_graph": {
+      "name": "radius_graph",
+      "canonical": "radius_graph",
+      "alias_of": null,
+      "kind": "rewire",
+      "family": "topology",
+      "set": "particle",
+      "signature": {
+        "inputs": [
+          "particle"
+        ],
+        "outputs": [
+          "particle"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "radius_graph",
+        "neighbor_search",
+        "rewire"
+      ],
+      "param_roles": {
+        "min_radius": "inner_cutoff_radius",
+        "block": "block_size",
+        "compile": "torch.compile the O(N^2) block distance+mask kernel"
+      },
+      "requires_params": [
+        "radius"
+      ],
+      "reference": "Plexus (this work).",
+      "module": "plexus.operators.graph",
+      "doc": "Set `Level.edge_index` to all live pairs within `radius` (optionally beyond"
+    },
+    "sediment": {
+      "name": "sediment",
+      "canonical": "sediment",
+      "alias_of": null,
+      "kind": "lateral",
+      "family": "motion",
+      "set": "cell",
+      "signature": {
+        "inputs": [
+          "cell"
+        ],
+        "outputs": [
+          "cell"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "body_force",
+        "differential_sedimentation"
+      ],
+      "param_roles": {
+        "g": "sediment_magnitude",
+        "gx": "sediment_x",
+        "gy": "sediment_y"
+      },
+      "requires_params": [],
+      "reference": "Stokes, G. G. (1851). Trans. Camb. Phil. Soc. 9:8-106 (Stokes settling).",
+      "module": "plexus.operators.sediment",
+      "doc": null
+    },
+    "sense": {
+      "name": "sense",
+      "canonical": "sense",
+      "alias_of": null,
+      "kind": "exchange",
+      "family": "fields",
+      "set": "cell",
+      "signature": {
+        "inputs": [
+          "cell"
+        ],
+        "outputs": [
+          "cell"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "trail_following",
+        "stigmergy",
+        "physarum_sensing"
+      ],
+      "param_roles": {
+        "cross": "inter_species_coupling_sign",
+        "noise": "steer_noise"
+      },
+      "requires_params": [
+        "from"
+      ],
+      "reference": "Plexus (this work).",
+      "module": "plexus.operators.sense",
+      "doc": null
+    },
+    "separation": {
+      "name": "separation",
+      "canonical": "separation",
+      "alias_of": null,
+      "kind": "lateral",
+      "family": "interaction",
+      "set": "particle",
+      "signature": {
+        "inputs": [
+          "particle"
+        ],
+        "outputs": [
+          "particle"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "short_range_repulsion",
+        "collision_avoidance"
+      ],
+      "param_roles": {
+        "scale": "separation_strength"
+      },
+      "requires_params": [],
+      "reference": "Reynolds, C. W. (1987). Flocks, herds and schools. SIGGRAPH Comput. Graph. 21(4):25-34.",
+      "module": "plexus.operators.separation",
+      "doc": null
+    },
+    "signal": {
+      "name": "signal",
+      "canonical": "signal",
+      "alias_of": null,
+      "kind": "lateral",
+      "family": "interaction",
+      "set": "neuron",
+      "signature": {
+        "inputs": [
+          "neuron",
+          "synapse"
+        ],
+        "outputs": [
+          "neuron"
+        ],
+        "reads": [
+          "voltage",
+          "w"
+        ],
+        "writes": [
+          "voltage"
+        ],
+        "maps": [
+          "pre",
+          "post"
+        ]
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "signal_propagation",
+        "connectome",
+        "recurrent"
+      ],
+      "param_roles": {
+        "tau": "membrane_time_constant",
+        "edge_set": "connectome_synapse_set",
+        "activation": "presynaptic_nonlinearity",
+        "bias": "resting_drive",
+        "weight": "synapse_weight_block"
+      },
+      "requires_params": [
+        "tau",
+        "edge_set"
+      ],
+      "reference": "Plexus (this work).",
+      "module": "plexus.operators.signal",
+      "doc": null
+    },
+    "squared_law": {
+      "name": "squared_law",
+      "canonical": "squared_law",
+      "alias_of": null,
+      "kind": "lateral",
+      "family": "interaction",
+      "set": "particle",
+      "signature": {
+        "inputs": [
+          "particle"
+        ],
+        "outputs": [
+          "particle"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "inverse_square",
+        "electrostatics",
+        "gravity",
+        "newtonian_gravity",
+        "long_range",
+        "self_gravity"
+      ],
+      "param_roles": {
+        "law": "coulomb (signed charge, like-repel) | gravity (mass, attract)",
+        "k": "strength constant (Coulomb constant / Newton's G)",
+        "coupling": "per-type source property (charge|mass)",
+        "softening": "Plummer softening length eps (0 = pure 1/r^3)",
+        "all_pairs": "sum over ALL pairs (O(N^2), long-range) vs the neighbour graph",
+        "compile": "torch.compile the all-pairs kernel (big N)",
+        "clamp": "max |acceleration| (0 = unbounded)"
+      },
+      "requires_params": [],
+      "reference": "Newton, I. (1687). Principia (inverse-square law); Coulomb, C.-A. (1785).",
+      "module": "plexus.operators.squared_law",
+      "doc": null
+    },
+    "stillinger_weber": {
+      "name": "stillinger_weber",
+      "canonical": "stillinger_weber",
+      "alias_of": null,
+      "kind": "lateral",
+      "family": "interaction",
+      "set": "particle",
+      "signature": {
+        "inputs": [
+          "particle"
+        ],
+        "outputs": [
+          "particle"
+        ],
+        "reads": [
+          "pos"
+        ],
+        "writes": [
+          "vel"
+        ],
+        "maps": []
+      },
+      "implementations": [
+        "autograd"
+      ],
+      "capabilities": {
+        "autograd": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "tetrahedral_network",
+        "three_body",
+        "angular_interaction",
+        "stillinger_weber",
+        "monatomic_water",
+        "directional_bonding",
+        "mechanical_interaction"
+      ],
+      "param_roles": {
+        "lam": "tetrahedral_strength",
+        "cos0": "preferred_cos_angle",
+        "gamma": "three_body_range",
+        "a": "cutoff_over_sigma",
+        "eps": "energy_scale",
+        "maxnb": "neighbour_buffer"
+      },
+      "requires_params": [],
+      "reference": "Stillinger, F. H. & Weber, T. A. (1985). Phys. Rev. B 31:5262; mW water: Molinero, V. & Moore, E. B. (2009). J. Phys. Chem. B 113:4008. Promoted from plexus prototype/ice (mw_forces).",
+      "module": "plexus.operators.stillinger_weber",
+      "doc": null
+    },
+    "velocity_align": {
+      "name": "velocity_align",
+      "canonical": "velocity_align",
+      "alias_of": null,
+      "kind": "lateral",
+      "family": "interaction",
+      "set": "particle",
+      "signature": {
+        "inputs": [
+          "particle"
+        ],
+        "outputs": [
+          "particle"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "velocity_alignment",
+        "collective_motion",
+        "vicsek"
+      ],
+      "param_roles": {
+        "a": "alignment_strength",
+        "gate": "neighbour_weighting",
+        "r": "contact_radius",
+        "noise": "orientation_noise"
+      },
+      "requires_params": [],
+      "reference": "Vicsek, T. et al. (1995). Novel type of phase transition in a system of self-driven particles. Phys. Rev. Lett. 75:1226-1229.",
+      "module": "plexus.operators.velocity_align",
+      "doc": null
+    },
+    "velocity_cruise": {
+      "name": "velocity_cruise",
+      "canonical": "velocity_cruise",
+      "alias_of": null,
+      "kind": "lateral",
+      "family": "motion",
+      "set": "particle",
+      "signature": {
+        "inputs": [
+          "particle"
+        ],
+        "outputs": [
+          "particle"
+        ],
+        "reads": [],
+        "writes": [],
+        "maps": []
+      },
+      "implementations": [
+        "default"
+      ],
+      "capabilities": {
+        "default": {
+          "dims": [
+            2,
+            3
+          ],
+          "differentiable": true
+        }
+      },
+      "mechanism_tags": [
+        "self_propulsion",
+        "vicsek",
+        "active_matter"
+      ],
+      "param_roles": {
+        "v0": "cruising_speed",
+        "noise": "orientation_noise",
+        "chirality": "rotational_bias"
+      },
+      "requires_params": [
+        "v0"
+      ],
+      "reference": "Schweitzer, F., Ebeling, W. & Tilch, B. (1998). Complex motion of Brownian particles with energy depots. Phys. Rev. Lett. 80:5044-5047.",
+      "module": "plexus.operators.velocity_cruise",
+      "doc": null
+    }
+  },
+  "builtins": [],
+  "counts": {
+    "contracts": 52,
+    "canonical": 42,
+    "aliases": 10
+  },
+  "families": [
+    "coupling",
+    "fields",
+    "growth",
+    "hierarchy",
+    "interaction",
+    "mechanics",
+    "motion",
+    "mpm",
+    "polarity",
+    "topology"
+  ],
+  "kinds": [
+    "aggregate",
+    "broadcast",
+    "exchange",
+    "field",
+    "lateral",
+    "rewire",
+    "structural"
+  ],
+  "sets": [
+    "cell",
+    "field",
+    "neuron",
+    "particle"
+  ]
+}

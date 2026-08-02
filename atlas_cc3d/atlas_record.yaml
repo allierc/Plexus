@@ -1,0 +1,953 @@
+repository: CompuCell3D/CompuCell3D
+paper: 10.1016/B978-0-12-388403-9.00013-8
+model_family: cellular_potts
+commit: conda compucell3d 4.10.0 py312
+license: MIT (CompuCell3D core)
+clone: /workspace/.conda_envs/cc3d-oracle
+scale: cell (lattice domain)
+sets:
+- cell
+fields:
+- chemical
+maps: []
+note: 'Seeded by inventory.py from cc3d.core.PyCoreSpecs -- the framework''s own registry -- plus 5 architectural
+  mechanisms added BY HAND that no scan can see. Every entry is at `candidate`: nothing has been read
+  at source yet. PHASE 1 (partial): 11 mechanisms at `inspected` -- the 6 with a measured run AND ablation
+  in log/atlas_cc3d/, plus the 5 architectural entries. The other 24 remain `candidate`: not yet read
+  at source.'
+mechanisms:
+- id: adhesionflex
+  order: 1
+  raw_name: AdhesionFlex
+  raw_kind: Plugin (AdhesionFlexPlugin)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L3525
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: AdhesionFlex Plugin
+  equations: null
+  params: {}
+  state_io: null
+  surprises: null
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: blobinitializer
+  order: 2
+  raw_name: BlobInitializer
+  raw_kind: Steppable (BlobInitializer)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L5620
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: BlobInitializer
+  equations: null
+  params: {}
+  state_io: null
+  surprises: null
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: boundarypixeltracker
+  order: 3
+  raw_name: BoundaryPixelTracker
+  raw_kind: Plugin (BoundaryPixelTrackerPlugin)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L5270
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: BoundaryPixelTracker Plugin
+  equations: null
+  params: {}
+  state_io: null
+  surprises: null
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: boxwatcher
+  order: 4
+  raw_name: BoxWatcher
+  raw_kind: Steppable (BoxWatcherSteppable)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L5490
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: BoxWatcher Steppable
+  equations: null
+  params: {}
+  state_io: null
+  surprises: null
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: celltype
+  order: 5
+  raw_name: CellType
+  raw_kind: Plugin (CellTypePlugin)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L1793
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: CellType Plugin specs
+  equations: 'A labelling: each cell id sigma carries a type tau(sigma). Medium is type 0 and is not a
+    cell.'
+  params:
+    cell_types: type_labels
+  state_io: 'reads/writes: the per-cell type label'
+  surprises:
+  - 'Medium being a TYPE rather than the absence of a cell is load-bearing: contact energies with Medium
+    are what set a tissue''s surface tension against empty space.'
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: inspected
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: centerofmass
+  order: 6
+  raw_name: CenterOfMass
+  raw_kind: Plugin (CenterOfMassPlugin)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L3056
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: CenterOfMass Plugin
+  equations: null
+  params: {}
+  state_io: null
+  surprises: null
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: chemotaxis
+  order: 7
+  raw_name: Chemotaxis
+  raw_kind: Plugin (ChemotaxisPlugin)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L2653
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: Chemotaxis Plugin
+  equations: 'dE_chemo = -lambda_chemo * (c(x_new) - c(x_old))
+
+    Evaluated per attempted copy on the field value at the two sites; it biases the accept/reject rather
+    than applying a force.'
+  params:
+    lambda_chemo: gradient_sensitivity
+    field_name: sensed_field
+  state_io: 'reads: a PDE field at two lattice sites; writes: nothing (an energy term)'
+  surprises:
+  - 'It is a bias on a discrete move, not a velocity: there is no drift term anywhere.'
+  - 'lambda_chemo = 3000 transported cells into the boundary and destroyed them (9 -> 0 cells). At 200
+    they climb and survive: mean x 15 -> 18 vs 15 -> 14.8.'
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: inspected
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: connectivityglobal
+  order: 8
+  raw_name: ConnectivityGlobal
+  raw_kind: Plugin (ConnectivityGlobalPlugin)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L4088
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: ConnectivityGlobal Plugin
+  equations: null
+  params: {}
+  state_io: null
+  surprises: null
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: connectivity
+  order: 9
+  raw_name: Connectivity
+  raw_kind: Plugin (ConnectivityPlugin)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L4059
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: Connectivity Plugin
+  equations: null
+  params: {}
+  state_io: null
+  surprises: null
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: contactinternal
+  order: 10
+  raw_name: ContactInternal
+  raw_kind: Plugin (ContactInternalPlugin)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L3350
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: ContactInternal Plugin
+  equations: null
+  params: {}
+  state_io: null
+  surprises: null
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: contactlocalflex
+  order: 11
+  raw_name: ContactLocalFlex
+  raw_kind: Plugin (ContactLocalFlexPlugin)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L3339
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: ContactLocalFlex Plugin
+  equations: null
+  params: {}
+  state_io: null
+  surprises: null
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: contact
+  order: 12
+  raw_name: Contact
+  raw_kind: Plugin (ContactPlugin)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L3141
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: Contact Plugin
+  equations: 'E_contact = sum over adjacent site pairs (i,j) with sigma_i != sigma_j of J(tau(sigma_i),
+    tau(sigma_j))
+
+    J is a symmetric matrix over cell TYPES, Medium included. Differential adhesion is J_heterotypic >
+    J_homotypic.'
+  params:
+    neighbor_order: adjacency_range
+    energy: adhesion_matrix
+  state_io: 'reads: the type of each site''s owner; writes: nothing (an energy term)'
+  surprises:
+  - Adhesion is an energy per adjacent SITE PAIR, so it scales with shared boundary length, not with a
+    pair distance. There is no cutoff and no pair potential.
+  - 'Measured ablation: heterotypic boundary 290 -> 167 with differential adhesion, 290 -> 388 with equal
+    energies. The sign of the effect reverses.'
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: inspected
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: curvature
+  order: 13
+  raw_name: Curvature
+  raw_kind: Plugin (CurvaturePlugin)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L5043
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: Curvature Plugin
+  equations: null
+  params: {}
+  state_io: null
+  surprises: null
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: diffusionsolverfe
+  order: 14
+  raw_name: DiffusionSolverFE
+  raw_kind: Steppable (DiffusionSolverFE)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L6242
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: DiffusionSolverFE
+  equations: null
+  params: {}
+  state_io: null
+  surprises: null
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: externalpotential
+  order: 15
+  raw_name: ExternalPotential
+  raw_kind: Plugin (ExternalPotentialPlugin)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L2874
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: ExternalPotential Plugin
+  equations: 'dE_ext = -lambda . (x_new - x_old): a constant body force per attempted copy.'
+  params:
+    x: force_x
+    y: force_y
+    z: force_z
+  state_io: 'reads: the attempted copy direction; writes: nothing (an energy term)'
+  surprises:
+  - 'Measured ablation: mean x 32 -> 57.6 driven vs 32 -> 32.2 undriven.'
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: inspected
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: focalpointplasticity
+  order: 16
+  raw_name: FocalPointPlasticity
+  raw_kind: Plugin (FocalPointPlasticityPlugin)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L4680
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: FocalPointPlasticity Plugin
+  equations: null
+  params: {}
+  state_io: null
+  surprises: null
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: kerneldiffusionsolver
+  order: 17
+  raw_name: KernelDiffusionSolver
+  raw_kind: Steppable (KernelDiffusionSolver)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L6642
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: KernelDiffusionSolver
+  equations: null
+  params: {}
+  state_io: null
+  surprises: null
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: lengthconstraint
+  order: 18
+  raw_name: LengthConstraint
+  raw_kind: Plugin (LengthConstraintPlugin)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L3924
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: LengthConstraint Plugin
+  equations: null
+  params: {}
+  state_io: null
+  surprises: null
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: momentofinertia
+  order: 19
+  raw_name: MomentOfInertia
+  raw_kind: Plugin (MomentOfInertiaPlugin)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L5350
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: MomentOfInertia Plugin
+  equations: null
+  params: {}
+  state_io: null
+  surprises: null
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: neighbortracker
+  order: 20
+  raw_name: NeighborTracker
+  raw_kind: Plugin (NeighborTrackerPlugin)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L2393
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: NeighborTracker Plugin
+  equations: null
+  params: {}
+  state_io: null
+  surprises: null
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: pifdumper
+  order: 21
+  raw_name: PIFDumper
+  raw_kind: Steppable (PIFDumperSteppable)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L6012
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: PIFDumper Steppable
+  equations: null
+  params: {}
+  state_io: null
+  surprises: null
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: pifinitializer
+  order: 22
+  raw_name: PIFInitializer
+  raw_kind: Steppable (PIFInitializer)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L5956
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: PIF Initializer
+  equations: null
+  params: {}
+  state_io: null
+  surprises: null
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: pixeltracker
+  order: 23
+  raw_name: PixelTracker
+  raw_kind: Plugin (PixelTrackerPlugin)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L5311
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: PixelTracker Plugin
+  equations: null
+  params: {}
+  state_io: null
+  surprises: null
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: reactiondiffusionsolverfe
+  order: 24
+  raw_name: ReactionDiffusionSolverFE
+  raw_kind: Steppable (ReactionDiffusionSolverFE)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L6911
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: ReactionDiffusionSolverFE
+  equations: null
+  params: {}
+  state_io: null
+  surprises: null
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: secretion
+  order: 25
+  raw_name: Secretion
+  raw_kind: Plugin (SecretionPlugin)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L4306
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: Secretion Plugin
+  equations: null
+  params: {}
+  state_io: null
+  surprises: null
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: steadystatediffusionsolver
+  order: 26
+  raw_name: SteadyStateDiffusionSolver
+  raw_kind: Steppable (SteadyStateDiffusionSolver)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L7223
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: SteadyStateDiffusionSolver Specs
+  equations: null
+  params: {}
+  state_io: null
+  surprises: null
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: surface
+  order: 27
+  raw_name: Surface
+  raw_kind: Plugin (SurfacePlugin)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L2225
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: Surface Plugin
+  equations: 'E_surf = sum_cells lambda_S * (S(sigma) - S_target(sigma))^2
+
+    S(sigma) = number of adjacent site-pairs where the id changes -- a perimeter COUNT.'
+  params:
+    target_surface: target_perimeter
+    lambda_surface: perimeter_stiffness
+  state_io: 'reads: cell boundary count; writes: nothing (an energy term)'
+  surprises:
+  - '`cell.surface` silently reads 0 unless SurfaceTracker is enabled -- a flat zero line that looks like
+    a measurement.'
+  - 'Measured ablation: perimeter 20 -> 19.3 constrained vs 20 -> 22.8 unconstrained.'
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: inspected
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: surfacetracker
+  order: 28
+  raw_name: SurfaceTracker
+  raw_kind: Plugin (SurfaceTrackerPlugin)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L5382
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: SurfaceTracker Plugin
+  equations: null
+  params: {}
+  state_io: null
+  surprises: null
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: uniforminitializer
+  order: 29
+  raw_name: UniformInitializer
+  raw_kind: Steppable (UniformInitializer)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L5833
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: Uniform Initializer Specs
+  equations: null
+  params: {}
+  state_io: null
+  surprises: null
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: candidate
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: volume
+  order: 30
+  raw_name: Volume
+  raw_kind: Plugin (VolumePlugin)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L2033
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+    CompuCell3D'
+  summary: Volume Plugin
+  equations: 'E_vol = sum_cells lambda_V * (V(sigma) - V_target(sigma))^2
+
+    V(sigma) = number of lattice sites carrying id sigma -- a COUNT, not a real volume.
+
+    Contributes dE to an attempted copy; never moves anything directly.'
+  params:
+    target_volume: target_size
+    lambda_volume: size_stiffness
+  state_io: 'reads: cell site count; writes: nothing (an energy term)'
+  surprises:
+  - Declaring per-TYPE VolumeEnergyParameters in CC3DML makes CC3D IGNORE the per-cell `cell.targetVolume`.
+    A growth steppable writing the per-cell value then has no effect and the cells quietly shrink -- measured
+    25 -> 20.9 over 400 MCS with zero divisions, while the run reported success. Declare the plugin bare
+    to use per-cell values.
+  - 'Ablating it (lambda_volume = 0) does not merely relax the size: the cells DISSOLVE (mean volume 25
+    -> 0). Volume is what makes a cell an object here.'
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: inspected
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: cell_as_lattice_domain
+  order: 31
+  raw_name: cell as a set of lattice sites
+  raw_kind: representation (not a class)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PySteppables.py
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366
+  summary: A cell is not a point with a radius but a connected set of lattice sites sharing one id. Volume
+    is a site count, surface a boundary count, position a derived centre of mass. Every other mechanism
+    is defined in terms of this.
+  equations: 'sigma: lattice site -> cell id. A cell is {x : sigma(x) = id}. V = |{x}|, S = |{(x,y) adjacent
+    : sigma(x) != sigma(y)}|, COM = mean of its sites.'
+  params: {}
+  state_io: 'architectural: constrains every other mechanism; writes no state itself'
+  surprises:
+  - 'ADDED BY HAND: not a plugin -- it is the framework''s data model, and the single largest difference
+    from the first atlas''s target'
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: inspected
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: metropolis_acceptance
+  order: 32
+  raw_name: Metropolis acceptance of pixel copies
+  raw_kind: core dynamics (not a class)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366
+  summary: Time advances by attempting to copy one lattice site's id into a neighbour, accepted with probability
+    1 if the total energy falls and exp(-dE/T) otherwise, where T is the fluctuation amplitude. No plugin
+    implements this; every plugin only contributes a term to dE.
+  equations: 'P(accept) = 1 if dE <= 0 else exp(-dE / T), with T = fluctuation_amplitude.
+
+    dE is the SUM of every enabled plugin''s term for the proposed copy.'
+  params: {}
+  state_io: 'architectural: constrains every other mechanism; writes no state itself'
+  surprises:
+  - 'ADDED BY HAND: the dynamics themselves -- discrete, stochastic, accept/reject, with no pathwise derivative'
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: inspected
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: energy_sum_composition
+  order: 33
+  raw_name: the Hamiltonian as a sum of plugin terms
+  raw_kind: composition contract (not a class)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366
+  summary: Mechanisms compose by ADDING energy terms to one Hamiltonian and interact only through the
+    accept/reject decision. Nothing is applied in sequence and nothing returns a delta.
+  equations: E = sum_plugins E_plugin. Mechanisms interact ONLY through dE in the acceptance test.
+  params: {}
+  state_io: 'architectural: constrains every other mechanism; writes no state itself'
+  surprises:
+  - 'ADDED BY HAND: the direct counterpart of jax-morph''s Lie-Trotter operator split, and the contrast
+    is itself a finding: operator splitting versus energy summation are two different answers to how mechanisms
+    compose'
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: inspected
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: mcs_time_unit
+  order: 34
+  raw_name: Monte Carlo Step as the time unit
+  raw_kind: time-scale contract (not a class)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366
+  summary: One MCS is one attempted copy per lattice site, not a duration. There is no dt and no integrator;
+    a rate must be expressed as a per-MCS probability.
+  equations: 1 MCS = one attempted copy per lattice site. No dt and no integrator; a rate must be expressed
+    as a per-MCS probability.
+  params: {}
+  state_io: 'architectural: constrains every other mechanism; writes no state itself'
+  surprises:
+  - 'ADDED BY HAND: a time-scale taxonomy with no dt at all -- the sharpest possible contrast with an
+    ODE-integrating framework'
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: inspected
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
+- id: pixel_neighbourhood
+  order: 35
+  raw_name: neighbour order / pixel-copy neighbourhood
+  raw_kind: relation contract (not a class)
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366
+  summary: Which lattice sites count as adjacent, for both the copy attempt and every contact energy.
+    It is the relation E of the model, chosen by an integer.
+  equations: neighbor_order n fixes the adjacency used for both the copy attempt and every contact term.
+  params: {}
+  state_io: 'architectural: constrains every other mechanism; writes no state itself'
+  surprises:
+  - 'ADDED BY HAND: the model''s relation is a lattice adjacency, not an edge set built from positions'
+  verdict: null
+  of: null
+  implementation_of: null
+  why: null
+  contract: null
+  status: inspected
+  module: null
+  test: null
+  evidence:
+    oracle_run: null
+    diff_metric: null
+    threshold: null
+    passed: null
