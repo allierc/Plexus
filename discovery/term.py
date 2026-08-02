@@ -90,6 +90,28 @@ def verdict(word):
     return str(word)
 
 
+def say(who, text, sentences=1, width=100):
+    """What an agent actually said, trimmed to N sentences. Quoted, never paraphrased.
+
+    A round prints what every role DID and almost nothing of what any of them THOUGHT. The
+    reasoning is in the ledger and in analysis.md, which nobody reads while a round is running --
+    so the one line that would tell you whether an agent is being sensible never reaches the
+    terminal at all.
+    """
+    import re
+    t = " ".join(str(text or "").split())
+    if not t:
+        return f"  {dim(I['think'])} {dim(who + ': (said nothing)')}"
+    parts = [x for x in re.split(r"(?<=[.!?])\s+", t) if x.strip()][:sentences]
+    t = " ".join(parts)
+    out = [f'  {I["read"]} {bold(who)}: {t[:width]}' + ("" if len(t) <= width else "")]
+    rest = t[width:]
+    while rest:
+        out.append(f"      {rest[:width]}")
+        rest = rest[width:]
+    return "\n".join(out)
+
+
 if __name__ == "__main__":
     print(f"colour {'ON' if _ON else 'OFF (not a tty, or NO_COLOR)'}")
     print(act("ACT 2 - MEASURE", "the only expensive step", "[+03:12]"))

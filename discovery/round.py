@@ -422,6 +422,30 @@ def _last_review():
     return "\n".join(out)
 
 
+def _tail_of(path, chars=600):
+    """The last paragraph of an append-only file -- what the agent just added to it."""
+    try:
+        txt = open(path).read().rstrip()
+    except Exception:
+        return ""
+    blocks = [b.strip() for b in txt.split("\n\n") if b.strip() and not b.strip().startswith("#")]
+    return " ".join(blocks[-1].split())[:chars] if blocks else ""
+
+
+def _abstract_of(path):
+    """memory.md's Abstract section: three sentences, rewritten every round by the Meta-review."""
+    try:
+        txt = open(path).read()
+    except Exception:
+        return ""
+    import re as _re
+    m = _re.search(r"^##\s+Abstract\s*$(.*?)(?=^##|\Z)", txt, _re.M | _re.S)
+    if not m:
+        return ""
+    body = _re.sub(r"<!--.*?-->", "", m.group(1), flags=_re.S)
+    return " ".join(body.split())[:600]
+
+
 def _steer_for(sup):
     """The Supervisor's own words about what the next batch should be, or None.
 
@@ -987,6 +1011,16 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         out_dir = os.path.join(LOG, nm)
         trace(f"reading {nm}")
         an, wa = _read_one(nm, out_dir, ledger)
+        try:
+            import biologist as _B
+            _pv = summ.get("premises") or []
+            print(T_.say(f"biologist {nm[-12:]}",
+                         f"Specimen {_B.specimen_verdict(_pv)}"
+                         + (f"; broken: {', '.join(summ.get('premises_broken') or [])}."
+                            if summ.get("premises_broken") else "; every applicable premise holds."),
+                         sentences=1))
+        except Exception:
+            pass
         trace(f"read {nm} OK")
         summ.update({k: v for k, v in an.items() if k != "analyst_reads"})
         summ.update(wa)
@@ -1006,6 +1040,8 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         # A disagreement between the picture and the numbers is still worth having -- it is the
         # only thing in the loop that looks at SHAPE rather than at numbers. It is now an
         # observation, not a verdict.
+        print(T_.say(f"eye-check {nm[-12:]}",
+                     wa.get("watcher_describe") or wa.get("watcher_why"), sentences=4))
         sc = score_run(summ, cfg)
         if wa.get("watcher_blocks"):
             print(T_.warn(f"[eye] {nm} DISAGREES with the numbers -- recorded, not vetoed: "
@@ -1096,9 +1132,15 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     else:
         step("Interpreter: skipped -- a replay has no edit and no causal story to tell")
     for nm, g, s, sc, oc, h in interpretable:
-        A.interpret(comp_hash(g), g.name_region(), h.edit, s,
+        _iok, _isaid = A.interpret(comp_hash(g), g.name_region(), h.edit, s,
                     {k: s.get(k) for k in ("analyst_consensus", "analyst_agreement")},
                     os.path.join(CAMP, "causal_descriptions.md"), ledger=ledger)
+        # READ WHAT IT WROTE, not what it replied. An agent with Write tools puts its substance
+        # in the file and returns a receipt -- "Wrote the entry" -- so printing the return value
+        # shows that it ran and nothing of what it thought.
+        print(T_.say(f"interpreter {nm[-12:]}",
+                     _tail_of(os.path.join(CAMP, "causal_descriptions.md")) or _isaid,
+                     sentences=1))
 
     # EVOLUTION WAS REMOVED on 1 August. It was asked "what should change next?" and so was the
     # Meta-review, and two agents answering the same question is not redundancy that costs a call
@@ -1127,15 +1169,20 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
                              ledger={"kept": len(kept), "dropped": len(dropped)}, round_id=rid)
     lm.render(os.path.join(CAMP, "lever_map.md"))
     step("Meta-review: prompt write-back + memory.md")
-    A.meta_review(rid, ledger=ledger, runs=[nm for nm, _, _, _, _, _ in rows])
+    _mok, _msaid = A.meta_review(rid, ledger=ledger,
+                                 runs=[nm for nm, _, _, _, _, _ in rows])
+    # The Meta-review's product is memory.md, whose HEAD is a three-sentence abstract written
+    # for exactly this: the campaign's position, stated so it can be read in one line.
+    print(T_.say("meta-review", _abstract_of(os.path.join(CAMP, "memory.md")) or _msaid,
+                 sentences=1))
     step("Archivist: reading the whole history")
 
     # THE ARCHIVIST, over the whole history rather than this batch. It advises; the Supervisor
     # decides. Its recommendation is recorded either way, so an override is visible.
     arch = ARCH.decide(reason=f"end of round {rid}", ledger=ledger)
     print(f"  {T_.I['think']} [archivist] {T_.verdict(arch['decision'])}"
-          + (f" -> {arch.get('target')}" if arch.get("target") else "")
-          + f" -- {arch.get('why','')[:120]}")
+          + (f" -> {arch.get('target')}" if arch.get("target") else ""))
+    print(T_.say("archivist", arch.get("why", ""), sentences=1))
     record["archivist"] = arch
     record["steer"] = rep.get("mix_why", COL.MISSING)
     for hole in COL.holes(record):
@@ -1168,8 +1215,10 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
                          indent=1))
 
     cov = lm.coverage()["overall"]
-    print(f"\n[supervisor] {json.dumps({k: v for k, v in rep.items() if k != 'mix_why'})}")
-    print(f"  mix: {rep['mix_why']}")
+    print(T_.say("supervisor",
+                 f"{rep.get('reason', '?')}; next batch {rep.get('next_confirmatory_frac', 0.7):.0%} "
+                 f"confirmatory. {rep.get('mix_why', '')}", sentences=1))
+    print(T_.quiet(f"[supervisor] {json.dumps({k: v for k, v in rep.items() if k != 'mix_why'})}"))
     print(f"[map] coverage {cov['frac']:.0%} ({cov['covered']}/{cov['total']} cells, "
           f"{cov['n_runs']} runs)")
     return bk.finish(rid, "complete", 0)

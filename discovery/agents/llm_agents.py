@@ -245,13 +245,17 @@ Does the description support the claim? Be strict: 'a small bud' does NOT suppor
 'a chaotic cluster of shards' does NOT support any clean morphology.
 
 Reply with ONLY: {{"supports": true|false, "seen": "<what it actually shows, 6 words>",
-                  "why": "<one sentence>"}}"""
+                  "why": "<one sentence>",
+                  "describe": "<FOUR SENTENCES on what the movie actually shows: the shape and
+                   how it changes, whether anything protrudes, what the colour is doing, and
+                   anything that looks like an artefact rather than tissue>"}}"""
     ok, out = run_agent("watcher", prompt, ledger=ledger, timeout_min=timeout_min,
                         allowed_tools=[], quiet=True)
     j = _first_json(out) or {}
     supports = bool(j.get("supports", True))
     return {"watcher_verdict": "supports" if supports else "CONTRADICTS",
             "watcher_seen": j.get("seen", ""), "watcher_why": j.get("why", ""),
+            "watcher_describe": j.get("describe", ""),
             "watcher_blocks": not supports}
 
 
@@ -287,7 +291,10 @@ Be honest about uncertainty. If the route is not determined by the evidence, say
 additional measurement would determine it."""
     ok, out = run_agent("interpreter", prompt, ledger=ledger, timeout_min=timeout_min,
                         allowed_tools=["Read", "Edit", "Write"], quiet=True)
-    return ok
+    # RETURN WHAT IT SAID, not merely whether it ran. `return ok` meant the causal record -- the
+    # one sentence explaining why a composition did what it did -- reached a file and never the
+    # terminal, so nobody watching a round could tell whether it was reasoning or reciting.
+    return ok, " ".join((out or "").split())[:400]
 
 
 # ============================================================================ 10. META-REVIEW
@@ -360,7 +367,7 @@ shape prevents.
 {_templates()}"""
     ok, out = run_agent("meta_review", prompt, ledger=ledger, timeout_min=timeout_min,
                         allowed_tools=["Read", "Edit", "Write"], quiet=True)
-    return ok
+    return ok, " ".join((out or "").split())[:400]
 
 
 # ============================================================================ REFLECTION (new)
