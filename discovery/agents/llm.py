@@ -61,8 +61,13 @@ USAGE_LOG = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file_
 # Agents that only read text and emit JSON get NO tools at all, so they cannot loop.
 AGENT_BUDGETS = {
     #                 min  turns  tools
-    "proposer":      (10,   40,  ["Read", "Edit", "Write"]),   # reads evidence, writes proposal + log
-    "reflection":    ( 5,   10,  ["Read"]),                    # reads a batch, emits one review
+    # TIME IS OUTPUT VOLUME. Measured at 64-77 tok/s across every agent, so an agent is slow in
+    # exact proportion to what it writes -- and the two Act 1 agents were writing 7,432 and 6,140
+    # output tokens for JSON payloads that need about 200. The turn caps below are set just above
+    # what the agents actually use (proposer peaked at 12, reflection at 1), so a runaway loop is
+    # bounded without constraining the work.
+    "proposer":      ( 5,   14,  ["Read", "Edit", "Write"]),   # reads evidence, writes proposal
+    "reflection":    ( 3,    3,  ["Read"]),                    # reads a batch, emits one review
     # READER, not "analyst": it does not analyse. By the time it is called, every number has
     # been computed by an instrument the Metrologist certified. It reads those numbers, the
     # movie caption and the strip, and returns a LABEL. Naming it for a job it does not do is
