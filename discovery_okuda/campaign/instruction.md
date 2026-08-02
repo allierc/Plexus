@@ -28,41 +28,45 @@ Also available and NOT part of scoring, but informative: mech_p_ratio (tube/body
 ~3 = a FORCED protrusion, ~1 = a growth-driven equilibrium).
 
 <!-- LEARNED PATTERNS -->
-## Learned patterns (updated round 1 meta-review)
+## Learned patterns (updated round 2 meta-review)
 
-**Round 1 = 12 controls, 0 mechanism hypotheses, 0 checkable predictions → the loop learned NOTHING
-about tissue.** Both failure modes are PROPOSER defects, not biology. No valid morphogenesis evidence
-exists yet; 0 of 4 Okuda morphologies attempted. Of the 12 slots, 10 returned `{}` (no diag.json) and 2
-produced a scorecard — both SATURATED (n_cells_final=36749, P2_BUFFER_SATURATED, valid_evidence=false,
-sphere). Buffer-cap = an APPARATUS wall, not a growth result (biologist P13).
+**BIGGEST TRAP — protr_peak is a LIE under numerical divergence.** Round 2's two largest protr_peak
+readings (1.317, 2.255) were NOT protrusions — they were the mesh folding through itself. High protr_peak
+co-occurred with premise breaks: **P11** self-intersection (folded-frac ~0.8, ta_n_tubes 1477/1673 = a
+crumpled surface, not tubes), **P5b** non-quasistatic (residual force lags, relax_iters pinned), **P4/P12**
+non-finite chemistry (act_max −2220; mech_force_mean up to 1.5e11). protr_peak/morphology past the divergence
+frame describe a diverging configuration, not tissue. The scorecard admits protr_peak but does NOT gate on
+divergence — that check is YOURS. **Before trusting any protr_peak, confirm the run stayed physical:**
+mech_force_mean O(1) (not 100s–1e11), act_max finite & ~[0,2], ta_n_tubes single-digit, morphology≠exploded.
+A "surprise" that is really a blow-up teaches nothing.
 
-**FAILURE 1 — controls carry ZERO info; NEVER propose one.** `replay` / `re-measure … under current
-instruments` / naming a characterised RECON_ node as object-of-study returns bit-identical null numbers
-(sphere, protr_peak 1.006, mech_p_ratio 0, ta_n_tubes 0). All 12 round-1 slots were this. CFL nodes =
-Turing chemistry on a RIGID ball with NO growth/division operator → sphere is the expected NULL, never a
-finding. Catching yourself about to emit a re-measure IS the signal the real move is blocked — surface
-the gap (FALLBACK), do not retreat.
+**Division is NECESSARY — stop proposing "division-independent protrusion".** Two `remove_op divide_3d0`
+edits both failed (protr_peak 1.317 and 1.19, both < the 1.4 predicted; one also diverged), and the eye read
+the surviving bud as division-DRIVEN. divide_3d0 is load-bearing for the forced protrusion. Do not re-test
+its dispensability.
 
-**FAILURE 2 — a prediction that is "unstated" / a trend-word / on a REJECTED metric is NOT CHECKABLE =
-zero info.** Every prediction is ONE clause `<metric> <op> <value>` or `<metric> <lo>-<hi>` on an
-ADMITTED metric ∈ {protr_peak, ta_n_tubes_final, protr_final}. Round 1: all "unstated" → all inconclusive.
+**Patterned growth is NECESSARY [ESTABLISHED].** `remove_op morphogen_growth_3d0` on the forced round-33
+recipe collapses protr_peak 1.05 (valid, intact sphere). The forced protrusion needs the morphogen pattern;
+uniform growth cannot substitute (next point).
 
-**THE MOVE (never yet emitted — do this next).** ONE wk_ growth config (curvature / tension /
-apical_area / pressure) + a pool line raising the cell-array reserve ABOVE the saturation n + ONE
-checkable clause. Start `wk_pressure_pos`, predict `protr_peak > 1.10`. The gap has NEVER been "add a wk_
-operator" — it is *raise-the-pool AND write a checkable clause on one non-control slot.*
-- WHY the pool line: wk_ growth IS mechanically active but drives final n straight into the cell-array
-  cap → P2_BUFFER_SATURATED voids the WHOLE scorecard (valid_evidence=false). Verify the LIVE cap and set
-  the reserve above it — do not trust the remembered 36749. If the run still returns the saturation n, the
-  reserve is inexpressible → FALLBACK.
+**The uniform_ramp inflation family is EXHAUSTED.** `add_op vesicle_growth uniform_ramp` does NOT give a
+gentle spherical null — it diverges/explodes (P11+P5b+P12, mech_force 1.5e11, morphology "exploded"). Unpatterned
+uniform inflation is not integrable on this body. Do not propose it again as a baseline.
 
-**FALLBACK — surface the gap, never retreat to a control.** The instant you cannot write the pool line
-into the edit, emit exactly `APPARATUS GAP: cannot raise growth reserve` and STOP. This calls the
-Diagnostician (never yet invoked); if the pool is truly unsettable, that call IS the finding.
+**Prediction calibration — the map over-predicts protrusion magnitude.** protr_peak thresholds of ≥1.4
+were WRONG-HIGH twice; real forced/grown buds top out **1.15–1.35** without divergence. Set adversarial
+thresholds around 1.2–1.35, not 1.5+.
 
-**mech_p_ratio = 0 everywhere** (no tube exists yet) → cannot separate FORCED (~3) from GROWN (~1)
-protrusion until one valid tube lands.
+**no diag.json still recurs (2/6 round 2)** — `set_impl shape_energy_3d0 monolayer` and one uniform_ramp add
+returned `{}`. These are EXECUTION failures (edit did not compile/run), not biology; they buy nothing and do
+not count in surprise. If an edit family keeps returning `{}`, surface it as an apparatus gap rather than
+re-issuing it.
 
-**Two apparatus artefacts — never spend a slot chasing either:** (1) trajectory classifier ValueError
-on the 'sphere' string → analysts fall back to metrics.png, verdict unaffected. (2) shape_idx p95 tail
-trips the P7 solid→fluid flag on non-deforming spheres — cosmetic, not flow.
+**Every prediction = ONE clause** `<metric> <op> <value>` on an ADMITTED metric ∈ {protr_peak,
+ta_n_tubes_final, protr_final}. "unstated"/trend-words/REJECTED metrics = not checkable = zero info.
+NEVER propose a control (`replay`/`re-measure`/naming a RECON_ node) — returns bit-identical nulls.
+
+**Apparatus artefacts — never spend a slot chasing either:** (1) trajectory classifier ValueError on the
+'sphere' string → analysts read metrics.png, verdict unaffected. (2) shape_idx p95 tail trips the P7
+solid→fluid flag on non-deforming spheres — cosmetic. mech_p_ratio ~3 = FORCED, ~1 = GROWN (only trust it
+when the run stayed physical).

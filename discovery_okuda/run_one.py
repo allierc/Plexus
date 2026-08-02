@@ -68,6 +68,9 @@ def _lazy_engine():
     return S, engine_run
 
 
+HEARTBEAT_SECONDS = 30      # write at least this often, however slow the frames are
+
+
 def _heartbeat(name, t0, every=10):
     """Write `progress.json` while the run is ALIVE, so a watcher can tell working from stuck.
 
@@ -85,9 +88,18 @@ def _heartbeat(name, t0, every=10):
     os.makedirs(d, exist_ok=True)
     path = os.path.join(d, "progress.json")
 
+    last = [0.0]
+
     def beat(H, tick):
-        if tick % every and tick:
+        # TIME-BASED AS WELL AS FRAME-BASED. A run that grows 2000 -> 55,521 cells takes ~30x
+        # longer per frame than it did at the start, so a beat every 10 frames became a beat
+        # every ~2200s -- and a watcher polling each minute saw an unchanged frame number for
+        # thirty-six consecutive polls. Writing on a clock as well means the file's mtime tracks
+        # LIVENESS, which is the thing the watcher actually needs to know.
+        now = time.time()
+        if (tick % every and tick) and (now - last[0] < HEARTBEAT_SECONDS):
             return
+        last[0] = now
         try:
             # THE LIVE COUNT, from the mesh -- `H.level("cell").n` is the RESERVOIR SIZE, so the
             # first heartbeats reported 138888 cells for a run holding a few thousand. A progress
