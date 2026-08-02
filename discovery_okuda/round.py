@@ -498,6 +498,7 @@ def _resize_reservoir(spec_path, name, run=None, frames=None):
         # guessed: take what it reached last time and give it 4x room. A run that stopped AT its
         # ceiling reached an unknown destination, so that one keeps the generous estimate -- it is
         # the only case where the measurement is censored.
+        clamped = None
         n_seed = int(seed.get("n_cells") or 0)
         reached, was_capped = _reached_before(run or name)
         if reached and not was_capped:
@@ -532,10 +533,7 @@ def _resize_reservoir(spec_path, name, run=None, frames=None):
         frames_est = int(frames or (c.get("general") or {}).get("n_frames") or 900)
         max_v = int(TRAJECTORY_BUDGET_GB * 1e9 / (max(frames_est, 1) * 3 * 4))
         if want_v > max_v:
-            print(T_.warn(f"[recon] {name}: reservoir clamped to the "
-                          f"{TRAJECTORY_BUDGET_GB} GB trajectory budget "
-                          f"({(want_v + 4) // 2} -> {(max_v + 4) // 2} cells). If it saturates "
-                          f"again, the composition's growth is the problem, not the array."))
+            clamped = ((want_v + 4) // 2, (max_v + 4) // 2)
             want_v, want_c = max_v, min(want_c or max_v, max_v)
         have = ((c.get("sets") or {}).get("vertex") or {}).get("n") or 0
         if want_v <= have:
@@ -544,9 +542,15 @@ def _resize_reservoir(spec_path, name, run=None, frames=None):
         if want_c:
             c["sets"].setdefault("cell", {})["n"] = want_c
         yaml.safe_dump(c, open(spec_path, "w"), sort_keys=False)
-        print(T_.warn(f"[recon] {name}: vertex reservoir {have} -> {want_v} "
-                      f"(cap {(have + 4) // 2} -> {(want_v + 4) // 2} cells). The buffer is an "
-                      f"array size, not a model parameter; the rest of the spec is untouched."))
+        # ONE LINE PER DECISION. A clamp printed a second warning beside the resize, so a single
+        # choice read as two problems -- and a warning that fires twice for one thing is how a
+        # reader learns to skim warnings.
+        msg = (f"[recon] {name}: reservoir {have} -> {want_v} "
+               f"(cap {(have + 4) // 2} -> {(want_v + 4) // 2} cells)")
+        if clamped:
+            msg += (f", CLAMPED from {clamped[0]} by the {TRAJECTORY_BUDGET_GB} GB budget -- if "
+                    f"it saturates again the composition's growth is the problem, not the array")
+        print(T_.warn(msg + ". A buffer is an array size, not a model parameter."))
     except Exception as e:
         print(T_.warn(f"[recon] {name}: could not resize the reservoir "
                       f"({type(e).__name__}) -- replaying verbatim, it may saturate"))
