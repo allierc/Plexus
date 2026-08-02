@@ -168,6 +168,61 @@ numbers, arranged so they cannot mean anything. A mechanism that does not beat i
 mechanism.
 
 %======================================================================
+\section{How the two tracks are judged --- and they are judged differently}
+
+A method that scores itself the same way it scores its subject cannot tell the two apart. So the
+two tracks have \emph{different} success rules, and one of them has none at all.
+
+\textbf{Track A has no success rule, and that is deliberate.} There is no number that says the
+method worked. Its product is a \emph{map} --- which mechanism moves which part of the error, with
+what confidence, and which parts nothing we have can move --- and a map gets better by being
+filled in, including with negatives. A dose-confirmed nothing is a result. What can be counted is
+the \emph{rate of knowledge}: how much of the mechanism space has been measured rather than merely
+proposed, and how often a written prediction turned out \textbf{wrong}. A campaign that is never
+surprised has bought coverage and learned nothing; a campaign that is surprised every time was
+predicting carelessly. Track A is reported as a growing map with a surprise rate beside it, never
+as a score to be beaten.
+
+\textbf{Track B has a sharp one: the difference between the simulated and the recorded loop.} Each
+tracked point traces a closed path over a beat, and the question is how far the simulated path is
+from the real one --- \emph{decomposed}, never as a single number, because a single number
+collapses failures that have nothing to do with each other. The axes are the ones this project
+already spent months learning to measure:
+
+\begin{center}\small
+\begin{tabular}{@{}l p{6.9cm} l@{}}
+\toprule
+\textbf{axis} & \textbf{the question it answers} & \textbf{state}\\
+\midrule
+\textbf{magnitude} & is the tissue doing about the right amount of motion? & exists, uncertified\\
+\textbf{opening} & does the path enclose area, or is it a flattened sliver? & exists, uncertified\\
+\textbf{direction} & does it circulate the same way round? & exists, uncertified\\
+\textbf{orientation} & is the long axis of the loop pointing the same way? & \textbf{inside the
+objective, never reported} --- so it could have been moving all along unseen\\
+\textbf{shape} & everything the four above do not capture & \textbf{does not exist}\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Every one is measured \emph{against the recording}, per point, on the interior only --- not on the
+simulation alone. That distinction is not pedantry: the previous campaign's shape numbers were
+computed on the simulation by itself over a set of points a third of which were pinned to the
+answer, and it chased the wrong residual for four rounds as a result.
+
+\textbf{The fifth axis is the interesting one.} A path can match on magnitude, opening, direction
+and orientation and still be visibly the wrong shape, and no hand-designed number will catch that,
+because a hand-designed number presupposes the axis. The natural instrument is a \emph{learned}
+one: render the real path and the simulated path, push both through an image network, and measure
+the distance between what it sees. That does not require anyone to name the failure first.
+
+We had thought something like this already existed here. It does not --- searched, and there is no
+image-embedding model anywhere in Plexus. The only neural network in this project that reads shape
+is the local vision-language model that captions movies, which observes and never scores. So the
+learned shape descriptor is a thing to \emph{build}, in Phase~2, and it is held to exactly the same
+admission rule as everything else: it must reproduce a known ordering on distortions we constructed
+ourselves, and have a measured zero and a measured noise floor, before a single claim may cite it.
+
+%======================================================================
 \section{What the recording can and cannot support}
 
 This section did not exist in the Okuda note and it is the most important one here. Okuda's target
@@ -412,6 +467,64 @@ A gate that has never been seen to refuse is not a gate.
 \textbf{Cost.} About half a day, no GPU.
 \end{phasebox}
 
+\begin{phasebox}{Phase 0 --- what actually happened \hfill \dn\ (18 of 18, canaries 6 of 6)}
+\textbf{Closed 2 August.} The gate is \code{certify\_apparatus.py}; it prints \textbf{PASS 18/18},
+and \code{-{}-canary} breaks the apparatus six ways and catches \textbf{6 of 6}.
+
+\footnotesize
+\begin{tabular}{@{}l p{10.6cm}@{}}
+\toprule
+\textbf{item} & \textbf{what actually happened}\\
+\midrule
+it runs at all & The inherited trainer died on \emph{every} invocation, on a function one branch
+had deleted from under another. A short fit now completes end to end.\\
+the recording rebuilds & It was not in the repository and the script that made it was gone.
+\code{ingest.py} rebuilds it from the microscope derivatives and it matches the existing file
+\textbf{bit for bit}, every array, including the frame interval.\\
+one path, no fallback & The loader tried three locations and took whichever existed --- a cure
+that turns ``file missing'' into ``fitted the wrong recording''. Now one explicit path, and both
+refusals were \emph{watched firing}.\\
+the dice are fixed & \textbf{Two fits at one seed are bit-identical over 198{,}407 parameters};
+two seeds differ. Neither was true of anything in the previous sixty rounds.\\
+a run carries its source & Every run copies the bytes of every module it imported into its own
+folder, with hashes --- so a branch switch or a concurrent campaign in the same tree cannot reach
+backwards into a finished number. That is exactly how two batches were lost before.\\
+the ledger is out of the code & Nine phrases from the retired ledger were compiled into comments,
+help strings and one \emph{default}. The scan is clean, and canary six proves it still fires.\\
+the registers exist & \textbf{38} inherited claims, every one carrying an open status.
+\textbf{The belief register has zero entries.}\\
+\bottomrule
+\end{tabular}
+\normalsize
+
+\textbf{Three things found while doing it, none of them planned.}
+\begin{itemize}
+\item \textbf{A default was a retired belief.} \code{-{}-stiff\_src} defaulted to an image-sourced
+field whose implementation had been deleted, so the default invocation trained a two-parameter
+stub against a synthetic blob --- and the dashboard's ``correlation with the microscope'' panel
+correlated against that same blob. Removed \emph{because the code is gone}, not because the claim
+was accepted.
+\item \textbf{A silent bug in the pulse.} The learnable duration initialised against a hard-coded
+bound while the simulation used the one on the command line, so \code{-{}-dur0 10 -{}-dur\_hi 11}
+actually started at 8.09. Every duration claim in the previous campaign was made through that.
+\item \textbf{My own first repair was wrong, and the check caught it.} Pinning the arithmetic
+meant replacing a sampling routine with an explicit equivalent; the first version had its two axes
+swapped and disagreed with the original by \emph{more than the size of the signal}. It was caught
+only because the replacement was checked against the thing it replaced before being used.
+\emph{The instrument lies before the physics does.}
+\end{itemize}
+
+\textbf{One thing deliberately not certified, recorded as a number.} Determinism is complete on
+the processor and \textbf{not} on the graphics card:
+\code{grid\_sampler\_2d\_backward\_cuda} has no deterministic implementation and is reached from
+inside the shared Plexus library, called by the active-stress operator every frame. Fixing that
+changes a library two other projects are using, so it is not Phase~0 work. Rather than relax the
+gate, the spread was \emph{measured}: three identical runs agree to \textbf{3.0e-6} (relative
+$7.5\times10^{-8}$) and only one of the three pairs was actually identical. Phase~2 re-measures it
+at the depth the loop will really use, where it becomes one of the two noise floors. A run may
+only become irreproducible \emph{on purpose}.
+\end{phasebox}
+
 \begin{phasebox}{Phase 1 --- Freeze the recording, seal the test \hfill \todo}
 \textbf{Goal.} Decide, once and in writing, what a run is allowed to see --- \emph{before} anything
 is fitted. A split invented later is a split negotiated with the result already in hand.
@@ -428,6 +541,10 @@ what part of the spatial detail belongs to the tissue. \textbf{This is the numbe
 whether learned maps across the sheet are a legitimate product of this project.}
 \item \textbf{Does the answer depend on the grid?} Run at finer resolutions, more particles, smaller
 sub-steps. The real motion is smaller than one grid cell, so this is not a formality.
+\item \textbf{Use the simulations we already own} --- see the separate task list below. Ten of
+the seventy-one MPM runs in \code{graphs\_data/material} drive tissue with active traction of a
+\emph{pattern we chose}, each with its full trajectory and its spec. These are loops whose ground
+truth is their own recipe, and they are already computed.
 \item \textbf{Freeze the split, and seal the diseased sheet.} Fit frames, held-out frames, held-out
 specimen, written down and checksummed. The seal is \textbf{by content, not by filename} --- the
 same diseased recording sits on disk under three different names, and sealing one path would seal
@@ -441,6 +558,59 @@ the resolution check is reported as a number against the noise floor; and a test
 reading the sealed specimen aborts.
 
 \textbf{Cost.} About a day, no GPU.
+\end{phasebox}
+
+\begin{phasebox}{Phase 1b --- The corpus we already own \hfill \prog}
+\textbf{Why this is worth its own list.} Seventy-one MPM runs sit finished in
+\code{graphs\_data/material} --- trajectories, specs and movies, 45\,GB. (They look lost because
+\code{log/material/} keeps only the recipe and a completion marker; the data is in
+\code{graphs\_data/}.) Ten of them drive tissue with active traction of a pattern \emph{we chose}:
+horizontal, vertical, swirl, radial, four quadrants, three travelling phase patterns, a central
+spot, and the cardio recipe itself.
+
+That makes them the thing an instrument is supposed to be certified against --- \textbf{loops whose
+ground truth is their own recipe} --- at the real particle count, through the real forward model,
+for no compute at all. Until now the only known-answer cases available were ellipses drawn by hand.
+
+\textbf{Already done, and two of them found something.}
+\begin{itemize}
+\item \textbf{The descriptors read all ten}, and pass the cross-talk test on real output: rotate a
+16{,}000-particle trajectory against itself and \emph{only} the orientation axis moves, by exactly
+the angle applied, while magnitude, opening and direction hold at 1.0000. The first version failed
+that check --- it used a peak that was not rotation-invariant, so turning a loop on the spot
+changed its ``magnitude''. Caught by the check, not by inspection.
+\item \textbf{The coordination blindness is now demonstrated on the real forward model, not a
+toy.} Give every particle an independent random timing offset --- destroy the synchrony
+completely --- and the objective the previous campaign ranked on returns \textbf{exactly 1.0000, on
+all ten runs}, identical to a perfect match. Meanwhile its zero-motion null ranges from
+\textbf{+0.033 to +0.124} depending on the run, so even the origin is not a constant.
+\item \textbf{The visual instrument is rebuilt.} Both inherited picture-makers crash today on a
+module deleted with a sibling directory, so the campaign's primary figure could not be drawn at
+all. The replacement depends on nothing outside this folder, and it draws each run's beat beside
+the same beat with its coordination destroyed --- two rows that no number in the inherited
+apparatus can tell apart.
+\item \textbf{Seven of the ten specs no longer run}, and the cause is exactly the defect that
+destroyed six batches: \code{pulse\_stimulus} and \code{phase\_delay\_pulse} were \emph{merged}
+into \code{activation\_pulse}. The trajectories remain valid evidence --- they are outputs --- but
+the corpus is not reproducible until the specs are migrated.
+\end{itemize}
+
+\textbf{Still to do.}
+\begin{itemize}
+\item \textbf{Migrate the seven stale specs and re-run them}, then check the new trajectory against
+the archived one. This does three things at once: it makes the corpus reproducible, it tests
+whether that operator merge was actually behaviour-preserving --- nobody has ever checked --- and
+it exercises the rename defect on a case where we know the answer.
+\item \textbf{Write down what each recipe predicts, before reading the measurement}, and see
+whether the descriptors reproduce it: swirl should enclose more than a fixed axis; horizontal and
+vertical should differ \emph{only} in orientation; radial should barely enclose anything. The
+predictions go on the record first.
+\item \textbf{Use the four phase-delayed runs as the coordination test set.} They were built to
+carry travelling-wave structure, so they are the natural benchmark for any measure claiming to see
+coordination --- including the one Phase~2 has to invent.
+\item \textbf{Render the movies beside the loops}, so the eye and the number are looking at the
+same specimen.
+\end{itemize}
 \end{phasebox}
 
 \begin{phasebox}{Phase 2 --- Certify the ruler, and find the floor \hfill \todo\ \ \stopp}

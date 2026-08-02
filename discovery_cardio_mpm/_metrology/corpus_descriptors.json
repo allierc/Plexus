@@ -1,0 +1,299 @@
+[
+ {
+  "name": "material_active_horizontal",
+  "expected": "one fixed contraction axis; paths near-linear along it",
+  "onset": 18,
+  "length": 16,
+  "peaks": [
+   18,
+   28,
+   46,
+   168,
+   180,
+   196
+  ],
+  "frames": 251,
+  "particles": 16384,
+  "nodes_scored": 13753,
+  "area": 2.54066952365406e-06,
+  "loopiness": 0.22358397653815518,
+  "minor": 0.0032231174497318734,
+  "peak": 0.008194409329213252,
+  "axis_angle_median_rad": 2.6788536784339185,
+  "scramble_moves_descriptors": {
+   "magnitude": 1.0,
+   "opening": 1.0,
+   "direction": 1.0
+  },
+  "loopscore_self": 1.0,
+  "loopscore_scrambled": 1.0,
+  "loopscore_zero_motion": 0.12271273881196976
+ },
+ {
+  "name": "material_active_vertical",
+  "expected": "one fixed contraction axis, orthogonal to horizontal -- the orientation axis must separate these two and nothing else should",
+  "onset": 20,
+  "length": 28,
+  "peaks": [
+   20,
+   46,
+   168,
+   196
+  ],
+  "frames": 251,
+  "particles": 16384,
+  "nodes_scored": 15102,
+  "area": 6.829657554829893e-06,
+  "loopiness": 0.43919194837486725,
+  "minor": 0.026788197790967645,
+  "peak": 0.007611874012684577,
+  "axis_angle_median_rad": 1.5668735419790365,
+  "scramble_moves_descriptors": {
+   "magnitude": 1.0,
+   "opening": 1.0,
+   "direction": 1.0
+  },
+  "loopscore_self": 1.0,
+  "loopscore_scrambled": 1.0,
+  "loopscore_zero_motion": 0.03612707182765007
+ },
+ {
+  "name": "material_active_swirl",
+  "expected": "a rotating direction field; paths should enclose MORE area than the fixed-axis runs",
+  "onset": 14,
+  "length": 18,
+  "peaks": [
+   14,
+   32,
+   164,
+   182
+  ],
+  "frames": 251,
+  "particles": 16384,
+  "nodes_scored": 14020,
+  "area": 5.159353784867093e-06,
+  "loopiness": 0.3162758495910255,
+  "minor": 0.028572345914918276,
+  "peak": 0.007462955390132126,
+  "axis_angle_median_rad": 1.4512916173344772,
+  "scramble_moves_descriptors": {
+   "magnitude": 1.0,
+   "opening": 1.0,
+   "direction": 1.0
+  },
+  "loopscore_self": 1.0,
+  "loopscore_scrambled": 1.0,
+  "loopscore_zero_motion": 0.05572649836540222
+ },
+ {
+  "name": "material_active_radial_in",
+  "expected": "radial: contraction toward a centre; paths should be close to straight lines, so LITTLE enclosed area",
+  "onset": 12,
+  "length": 18,
+  "peaks": [
+   12,
+   31,
+   45,
+   163,
+   181,
+   196
+  ],
+  "frames": 251,
+  "particles": 16384,
+  "nodes_scored": 15721,
+  "area": 4.095853113561532e-06,
+  "loopiness": 0.3458447982537879,
+  "minor": 0.033929340934070844,
+  "peak": 0.005356142066033428,
+  "axis_angle_median_rad": 1.573439422906929,
+  "scramble_moves_descriptors": {
+   "magnitude": 1.0,
+   "opening": 1.0,
+   "direction": 1.0
+  },
+  "loopscore_self": 1.0,
+  "loopscore_scrambled": 1.0,
+  "loopscore_zero_motion": 0.04441039264202118
+ },
+ {
+  "name": "material_active_phase_horizontal",
+  "expected": "a travelling phase delay along x -- ditto",
+  "onset": 57,
+  "length": 18,
+  "peaks": [
+   57,
+   75,
+   199,
+   208,
+   226
+  ],
+  "frames": 251,
+  "particles": 16384,
+  "nodes_scored": 9338,
+  "area": 4.632088227207731e-06,
+  "loopiness": 0.3604624522864727,
+  "minor": 0.012096272329076747,
+  "peak": 0.008205004524223222,
+  "axis_angle_median_rad": 2.1130487448637094,
+  "scramble_moves_descriptors": {
+   "magnitude": 1.0,
+   "opening": 1.0,
+   "direction": 1.0
+  },
+  "loopscore_self": 1.0,
+  "loopscore_scrambled": 1.0,
+  "loopscore_zero_motion": 0.1096968948841095
+ },
+ {
+  "name": "material_active_phase_quadrants",
+  "expected": "four regions out of phase -- ditto",
+  "onset": 35,
+  "length": 20,
+  "peaks": [
+   35,
+   56,
+   73,
+   93,
+   185,
+   206,
+   223,
+   242
+  ],
+  "frames": 251,
+  "particles": 16384,
+  "nodes_scored": 7484,
+  "area": 4.45499712187214e-06,
+  "loopiness": 0.2585307731684934,
+  "minor": 0.013384690761508184,
+  "peak": 0.007256611866236917,
+  "axis_angle_median_rad": 1.6600993836126756,
+  "scramble_moves_descriptors": {
+   "magnitude": 1.0,
+   "opening": 1.0,
+   "direction": 1.0
+  },
+  "loopscore_self": 1.0,
+  "loopscore_scrambled": 1.0,
+  "loopscore_zero_motion": 0.10305634140968323
+ },
+ {
+  "name": "material_active_phase_radial",
+  "expected": "a radial phase DELAY: neighbouring points contract at different times -- coordination structure, invisible to LoopScore",
+  "onset": 34,
+  "length": 17,
+  "peaks": [
+   34,
+   51,
+   67,
+   183,
+   201,
+   217
+  ],
+  "frames": 251,
+  "particles": 16384,
+  "nodes_scored": 4612,
+  "area": 4.802308531559607e-06,
+  "loopiness": 0.16825930721297228,
+  "minor": 0.008379754727937968,
+  "peak": 0.00737964938710722,
+  "axis_angle_median_rad": 1.607775371547587,
+  "scramble_moves_descriptors": {
+   "magnitude": 1.0,
+   "opening": 1.0,
+   "direction": 1.0
+  },
+  "loopscore_self": 1.0,
+  "loopscore_scrambled": 1.0,
+  "loopscore_zero_motion": 0.1243562325835228
+ },
+ {
+  "name": "material_active_phase_swirl",
+  "expected": "a swirling phase delay -- ditto",
+  "onset": 64,
+  "length": 31,
+  "peaks": [
+   64,
+   95,
+   126,
+   139,
+   160,
+   173,
+   214,
+   246
+  ],
+  "frames": 251,
+  "particles": 16384,
+  "nodes_scored": 7383,
+  "area": 4.294924416115009e-06,
+  "loopiness": 0.28138691229951507,
+  "minor": 0.015737802178602815,
+  "peak": 0.008318777482552931,
+  "axis_angle_median_rad": 1.9988017208570033,
+  "scramble_moves_descriptors": {
+   "magnitude": 1.0,
+   "opening": 1.0,
+   "direction": 1.0
+  },
+  "loopscore_self": 1.0,
+  "loopscore_scrambled": 1.0,
+  "loopscore_zero_motion": 0.11653616279363632
+ },
+ {
+  "name": "material_central_contraction",
+  "expected": "a central contractile spot",
+  "onset": 18,
+  "length": 28,
+  "peaks": [
+   18,
+   46,
+   167,
+   195,
+   317,
+   345
+  ],
+  "frames": 451,
+  "particles": 16384,
+  "nodes_scored": 16249,
+  "area": 5.493570188974672e-06,
+  "loopiness": 0.15317107510904587,
+  "minor": 0.0054142382278132995,
+  "peak": 0.01012249776419851,
+  "axis_angle_median_rad": 1.5962297240688477,
+  "scramble_moves_descriptors": {
+   "magnitude": 1.0,
+   "opening": 1.0,
+   "direction": 1.0
+  },
+  "loopscore_self": 1.0,
+  "loopscore_scrambled": 1.0,
+  "loopscore_zero_motion": 0.09704484045505524
+ },
+ {
+  "name": "material_aniso_cardio",
+  "expected": "the cardio recipe: anisotropic active stress on a fibre field",
+  "onset": 19,
+  "length": 24,
+  "peaks": [
+   19,
+   43,
+   169,
+   193
+  ],
+  "frames": 301,
+  "particles": 16384,
+  "nodes_scored": 16078,
+  "area": 3.5819609289777787e-06,
+  "loopiness": 0.408678532635672,
+  "minor": 0.05998109995446531,
+  "peak": 0.004757702030449076,
+  "axis_angle_median_rad": 1.6413302520304924,
+  "scramble_moves_descriptors": {
+   "magnitude": 1.0,
+   "opening": 1.0,
+   "direction": 1.0
+  },
+  "loopscore_self": 1.0,
+  "loopscore_scrambled": 1.0,
+  "loopscore_zero_motion": 0.0333784855902195
+ }
+]
