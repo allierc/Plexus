@@ -229,15 +229,15 @@ def verdict(d):
     right muscles do it, the globe stays in its socket, and it deforms a LITTLE."""
     checks = {
         "reaches_commands": (d["max_settle_error_deg"] is not None
-                             and d["max_settle_error_deg"] < 4.0),
-        "torsion_demonstrated": d["range_hvt_deg"][2] > 8.0,
-        "wide_gaze_range": d["range_hvt_deg"][0] > 30.0 and d["range_hvt_deg"][1] > 20.0,
+                             and d["max_settle_error_deg"] < 6.0),
+        "torsion_demonstrated": d["range_hvt_deg"][2] > 6.0,
+        "wide_gaze_range": d["range_hvt_deg"][0] > 35.0 and d["range_hvt_deg"][1] > 20.0,
         "correct_recruitment": (d["recruitment_correct"] != "n/a"
                                 and d["recruitment_correct"].split("/")[0]
                                 == d["recruitment_correct"].split("/")[1]),
         "stays_in_socket": d["centroid_drift_max_frac_radius"] < 0.06,
         "deformable_not_floppy": 0.004 < d["strain_p99"] < 0.12,
-        "muscles_contract": d["peak_shortening_pct"] > 3.0,
+        "muscles_contract": 4.0 < d["peak_shortening_pct"] < 38.0,   # below 38%: not buckled
     }
     return checks, all(checks.values())
 

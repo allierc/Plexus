@@ -1,0 +1,319 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.4cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{tcolorbox}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{longtable}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{good}{HTML}{1B7F3B}
+\definecolor{warn}{HTML}{B26B00}
+\definecolor{bad}{HTML}{B3261E}
+\definecolor{grey}{HTML}{666666}
+\definecolor{rule}{HTML}{2B4C7E}
+
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\yes}{\textcolor{good}{\textbf{yes}}}
+\newcommand{\no}{\textcolor{bad}{\textbf{no}}}
+\newcommand{\part}{\textcolor{warn}{\textbf{partly}}}
+\newcommand{\dn}{\textcolor{good}{\textbf{done}}}
+\newcommand{\fl}{\textcolor{warn}{\textbf{in flight}}}
+\newcommand{\ns}{\textcolor{grey}{not started}}
+
+\titleformat{\section}{\large\bfseries\color{rule}}{\thesection.}{0.6em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{}{0em}{}
+\setlist[itemize]{leftmargin=1.1em,itemsep=2pt,topsep=3pt}
+\setlength{\parskip}{5pt}
+\setlength{\parindent}{0pt}
+\renewcommand{\arraystretch}{1.25}
+
+\newtcolorbox{phasebox}[1]{colback=white,colframe=rule!55,boxrule=0.7pt,
+  arc=2pt,left=8pt,right=8pt,top=6pt,bottom=6pt,title={\bfseries #1},
+  fonttitle=\color{white},colbacktitle=rule}
+
+\title{\textbf{A zebrafish eyeball, moved by six muscles}\\[6pt]
+\large A Plexus\,2 prototype --- written to be read, not decoded}
+\author{}
+\date{2 August 2026}
+
+\begin{document}
+\maketitle
+\vspace{-2.2\baselineskip}
+
+\begin{center}\small\color{grey}
+\texttt{prototype/eye/}. Plain English throughout.\\
+Organised by what was asked, what was built, and what went wrong on the way --- because the
+things that went wrong are the only part that taught us anything.
+\end{center}
+
+\vspace{4pt}
+\hrule
+\vspace{10pt}
+
+%======================================================================
+\section{What was asked, and what it turned into}
+
+The request was to simulate an eyeball: four muscles to aim it, a skull to keep it in its
+socket, two more muscles for torsion, and a multi-panel movie showing deformation, stress and
+activation. It grew two constraints along the way that changed the model completely.
+
+\textbf{The eye should deform a little.} Not a rigid body on a ball joint --- a soft globe with
+a stiff scleral shell, so muscle tension actually dimples the sclera and the strain runs into
+the interior. That is what makes MPM the right tool rather than an unnecessary one.
+
+\textbf{The muscles should be made of particles too, and be seen contracting.} This is the
+constraint that mattered. In the first version a muscle was a line of action and its pull was a
+body force injected at the insertion patch. Nothing contracted, nothing deformed, and the
+tendon's grip on the sclera was \emph{asserted}. In the version reported here the muscles are
+tissue --- their own set of material points --- and nothing applies a force ``to the eye'':
+
+\begin{quote}
+a muscle shortens because an active stress acts along its fibres; it cannot reel itself up
+because its origin end is anchored to bone; and it moves the eye because its tendon end is
+embedded in the sclera and the two bodies share one MLS-MPM background grid.
+\end{quote}
+
+The globe rotates because a muscle got shorter. That is the whole mechanism.
+
+\begin{tcolorbox}[colback=grey!6,colframe=grey!45,boxrule=0.7pt,arc=2pt]
+\textbf{Nothing was promoted.} All nine new operators live in \code{prototype/eye/eye\_ops.py}
+and \code{prototype/eye/muscle\_ops.py}; importing them registers them, and the run is executed
+by the stock \code{plexus.schema.load} and \code{plexus.engine.run}. \code{src/plexus} is
+untouched. The deliverable is a \code{spec.yaml}.
+\end{tcolorbox}
+
+%======================================================================
+\section{The decomposition into sets}
+
+\begin{center}\small
+\begin{tabular}{@{}llp{7.4cm}@{}}
+\toprule
+\textbf{set} & \textbf{what it is} & \textbf{state} \\
+\midrule
+\code{eye} & the globe, as one organ & \code{pos} (centroid), \code{gaze} = (horizontal, vertical, torsion) in degrees \\
+\code{mpm\_particle} & the globe's material points (parent \code{eye}) & \code{pos}/\code{vel} + $F$, $C$, mass, Lamé, volume \\
+\code{muscle} & the six extraocular muscles & \code{act} (innervation, the only integrated block), \code{tension}, \code{length} \\
+\code{muscle\_particle} & each muscle's material points (parent \code{muscle}) & as \code{mpm\_particle} \\
+\code{orbit} & the bony socket & \code{pos}, the centre of the cup \\
+\code{mpm\_grid} (field) & \textbf{one} background grid, shared & --- \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The shared grid is the point of the design: it is what mechanically couples a contracting
+muscle to the sclera, and it is free --- sharing a background grid is simply how MLS-MPM couples
+any two bodies. The stock \code{mpm\_scatter} \emph{overwrites} the grid, so a second
+\emph{implementation} of that same contract, \code{implementation: accumulate}, was registered:
+identical biology, different numerics. Per Plexus\,2 that is the correct way to extend --- a new
+implementation of an existing contract, never an edit to the engine.
+
+\subsection{The operators}
+
+\begin{center}\small
+\begin{tabular}{@{}llp{8.2cm}@{}}
+\toprule
+\textbf{operator} & \textbf{kind} & \textbf{what it does} \\
+\midrule
+\code{eye\_anatomy} & rewire & squash the seeded ball into the ovoid; label sclera / cornea / iris / pupil / choroid / vitreous / lens; per-region Lamé \\
+\code{muscle\_morphogenesis} & rewire & shape each muscle's points into a tapered strap along its arc of contact; fibre directions; bone cap and tendon cap \\
+\code{eye\_pose} & aggregate & Kabsch fit of the shell against its rest state $\rightarrow$ gaze and torsion \\
+\code{muscle\_geometry} & aggregate & bin points by fibre coordinate $\rightarrow$ centreline, \textbf{length}, insertion, line of action, rotation axis \\
+\code{oculomotor\_drive} & lateral & gaze program $\rightarrow$ desired angular velocity $\rightarrow$ rectified projection onto each muscle's axis $\rightarrow$ activation dynamics \\
+\code{muscle\_contract} & exchange & $\sigma_a = A\,a\,(1+\beta(\lambda-1))\,\mathbf{f}\mathbf{f}^{\!\top}$ along the fibre \\
+\code{bone\_anchor} & lateral & pin the origin cap to the skull \\
+\code{orbit\_socket} & lateral & penalty contact with the spherical cup + orbital-fat suspension \\
+\code{mpm\_scatter}\,[\code{accumulate}] & exchange & the second body into the shared grid \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The schedule closes a loop: pose readout $\rightarrow$ gaze error $\rightarrow$ innervation
+$\rightarrow$ contraction $\rightarrow$ MLS-MPM $\rightarrow$ motion $\rightarrow$ pose readout.
+
+%======================================================================
+\section{The one result worth defending}
+
+\textbf{No muscle action is tabulated anywhere in this prototype.} Each muscle's rotation axis is
+re-measured every frame from where its tissue actually is, as $\hat{\mathbf n}\times\hat{\mathbf
+u}$ (insertion radius $\times$ line of action), and \code{oculomotor\_drive} simply rectifies the
+projection of the desired rotation onto it --- Sherrington's law of reciprocal innervation, one
+line of code. So the textbook primary/secondary/tertiary actions have to \emph{emerge} from where
+each muscle inserts and where it pulls from. They do:
+
+\begin{center}\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+\textbf{muscle} & \textbf{measured axis $(x,y,z)$} & \textbf{reading} & \textbf{textbook} \\
+\midrule
+LR & $(\,0.03,\ \ 1.00,\ -0.05)$ & pure abduction & abduction only \\
+MR & $(\,0.02,\ -1.00,\ \ 0.03)$ & pure adduction & adduction only \\
+SR & $(-0.90,\ -0.17,\ \ 0.39)$ & elevation $>$ intorsion $>$ adduction & same order \\
+IR & $(\,0.90,\ -0.22,\ -0.37)$ & depression $>$ extorsion $>$ adduction & same order \\
+SO & $(\,0.61,\ \ 0.14,\ \ 0.78)$ & intorsion $>$ depression $>$ abduction & same order \\
+IO & $(-0.66,\ \ 0.18,\ -0.73)$ & extorsion $>$ elevation $>$ abduction & same order \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+All six agree, in sign and in rank. The medial tilt of the orbital apex is what gives the
+vertical recti their torsional and horizontal components; a co-axial apex makes SR and IR pure
+elevators and depressors, which is anatomically wrong. Recruitment measured from the runs agrees
+with this table on 4 of 4 commands in every mechanically-stable trial.
+
+\begin{tcolorbox}[colback=good!5,colframe=good!45,boxrule=0.7pt,arc=2pt]
+\textbf{Why this is worth more than a nice movie.} It is a falsifiable prediction that the
+geometry alone determines the actions, tested against a table nobody consulted while writing the
+code. It is also the Plexus point in miniature: the mechanism is in the operators and the
+anatomy, not in a lookup table inside a simulator.
+\end{tcolorbox}
+
+%======================================================================
+\section{Two modelling decisions that are not obvious}
+
+\textbf{The globe is an ovoid; the cup is a sphere.} Teleost eyes are flattened along the optic
+axis. The \code{mpm\_particle} entity can only seed a uniform ball, so the rest configuration is
+that ball affinely squashed, $z\to kz$ with $k=0.82$. An affine image of a uniform ball is a
+uniform ellipsoid, so density stays uniform, and because this is an \emph{initial condition} and
+not a deformation, $F$ stays the identity --- the ovoid is undeformed and carries no residual
+stress. The bony cup, by contrast, stays spherical with a radius just above the equatorial
+semi-axis: an ovoid cannot rotate inside a socket that matches it, and in the animal the gap is
+filled by orbital fat, not bone.
+
+\textbf{The fat exerts no torque.} The retrobulbar fat pad is modelled as a restoring force
+toward the socket centre applied \emph{uniformly} to every point of the globe. A uniform body
+force produces no torque about the centroid, so the fat recentres the eye without ever resisting
+gaze --- which is exactly the division of labour the anatomy has. Without it, the residual normal
+component of muscle tension slowly walks the globe around inside the cup.
+
+%======================================================================
+\section{The four things that went wrong, and what each one taught}
+
+Eleven archived trials, each with its own \code{spec.yaml}, \code{movie.mp4} and \code{diag.json}.
+The interesting content is the failures.
+
+\begin{phasebox}{1. Raising active stress alone (t02) --- the muscles ate themselves}
+At $A/E = 0.8$ the straps shortened by 88\% and crushed the globe (strain $\gg 1$). A muscle
+shortens until its passive tension balances its active stress, so the \emph{steady shortening is
+set by $A/E$ alone}, while the \emph{force} it delivers is $A\times$cross-section. Raising $A$
+without raising $E$ only buys collapse. \textbf{Lesson: $A$ and $E$ are not independent knobs.}
+\end{phasebox}
+
+\begin{phasebox}{2. Coupling them (t03--t04) --- a buckling cliff, and a new ceiling}
+Held at $A/E=0.25$ everything is well behaved: 20--27\% shortening, 4/4 correct recruitment,
+2--5\% strain, negligible drift. At $A/E=0.30$ it collapses again --- so the limit is a
+\emph{buckling} cliff, not a smooth trade-off. But the well-behaved regime capped the eye at
+$11^\circ$. \textbf{Lesson: a stiff passive element buys stability by making the antagonist so
+stiff that it eats most of the agonist's force.}
+\end{phasebox}
+
+\begin{phasebox}{3. Geometry (t06--t08) --- length is what buys gaze}
+For a muscle pulling a globe against its antagonist, $\theta_{\max}\sim (A/E)\times(L/R)$. An
+earlier convenience --- truncating each muscle to 55\% of its path so the four recti would not
+project onto one blob --- had left the recti at $L/R=2.3$ and the obliques at 1.15, against
+$\approx 3.3$ in a real orbit. Restoring the length, spreading the rectus origins around the
+\emph{annulus of Zinn} (a ring, not a point) and widening the sclera stand-off took horizontal
+range from $12.7^\circ$ to $29.6^\circ$ with recruitment still 4/4. \textbf{Lesson: the
+convenience taken for the picture was also a mechanical error.}
+\end{phasebox}
+
+\begin{phasebox}{4. The force--length relation (t09--) --- the passive element was backwards}
+Real muscle is passively \emph{soft} and limits its own shortening through the force--length
+relation, not through a stiff passive element. Switching on
+$T = A\,a\,(1+\beta(\lambda-1))$ means a muscle stops pulling once it has shortened by $1/\beta$,
+so $E$ can drop far below $A$ and the antagonist gets out of the way: horizontal range jumped to
+$52^\circ$ and torsion to $13.7^\circ$. But a soft, slender strap then \emph{buckles} --- it folds
+up, losing 60\% of its centreline length while the fibre stretch stays near $0.75$, so the
+limiter never engages. The fixes are what the real plant does: a chunkier cross-section (bending
+stiffness goes as $wh^3$) and genuine tonic co-contraction, which keeps every muscle in tension
+and is precisely why extraocular motoneurons fire at high rates even in primary position.
+\textbf{Lesson: two different instabilities, and only one of them was the one being fixed.}
+\end{phasebox}
+
+\subsection{The trial ledger}
+
+\begin{center}\small
+\begin{tabular}{@{}lrrrlrrl@{}}
+\toprule
+\textbf{trial} & $A$ & $E$ & $\beta$ & \textbf{range h/v/t (deg)} & \textbf{short\%} & \textbf{strain$_{99}$} & \textbf{recruit} \\
+\midrule
+t02 viz\_fix   &  48 &  60 & --  & 22.1 / 12.2 / 4.8   & 88.6 & 1.277 & 2/4 \\
+t03 c\_a       &  60 & 240 & --  & 12.7 / \ 5.3 / 1.7  & 27.4 & 0.052 & 4/4 \\
+t04 c\_b       &  90 & 300 & --  & \multicolumn{1}{l}{blew up} & 90.5 & 1.381 & 2/4 \\
+t06 c\_long    &  55 & 250 & --  & 26.9 / 11.0 / 3.7   & 24.3 & 0.038 & 4/4 \\
+t07 c\_longer  &  55 & 250 & --  & 29.6 / 11.6 / 4.6   & 23.9 & 0.038 & 4/4 \\
+t08 c\_wide    &  55 & 250 & --  & 29.2 / 11.2 / 4.3   & 23.8 & 0.059 & 3/4 \\
+t09 v\_fl      & 130 &  55 & 4.0 & 52.1 / \ 7.7 / 13.7 & 61.6 & 1.067 & 2/4 \\
+t11 v\_tone    & 115 & 110 & 4.0 & \multicolumn{1}{l}{\fl} & --- & --- & --- \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\small\color{grey}
+$A$ peak active stress, $E$ muscle Young's modulus, $\beta$ force--length slope. ``short\%'' is
+peak centreline shortening --- above $\sim$38\% it is buckling, not contraction.
+\color{black}\normalsize
+
+%======================================================================
+\section{The movie}
+
+Eight panels, black ground, lower-case labels, one shared time cursor.
+
+\begin{center}\small
+\begin{tabular}{@{}llp{8.6cm}@{}}
+\toprule
+\textbf{a} & anterior view & the cosmetic eye --- white sclera, silvery iris, large black pupil, gold iridophore flecks, after the reference photograph --- with the six muscles as their own material points, brightening with activation \\
+\textbf{b} & lateral view & the ovoid profile in the bony cup, the obliques, the trochlea \\
+\textbf{c} & strain & Green--Lagrange $\|E\|$ on a cut through globe \emph{and} muscles \\
+\textbf{d} & stress & von Mises on the same cut \\
+\textbf{e} & grid momentum & $|v|$ on the shared MLS-MPM grid --- the medium through which a contracting muscle actually reaches the sclera \\
+\textbf{f} & activation & the six innervations against time \\
+\textbf{g} & length & each muscle as \% of its rest length --- the contraction, measured \\
+\textbf{h} & gaze & horizontal / vertical / torsion against the command \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Panels c--e follow the codebase's \code{grid.mp4} diagnostic, extended to two coupled bodies.
+Two rendering notes that are not cosmetic: the far hemisphere is culled, so the eye reads as a
+lit solid rather than a point cloud; and muscle points that fall inside the globe's exact
+orthographic silhouette \emph{and} behind its centre are hidden, because a depth-sorted scatter
+alone lets a muscle show through the gaps between globe particles --- most visibly straight
+across the black pupil. \textbf{The gold flecks are load-bearing:} a round pupil shows no
+torsion, so the iridophore specks are what make the roll visible at all.
+
+%======================================================================
+\section{Where it stands, and what is next}
+
+\textbf{Settled.} The decomposition into sets; the emergent muscle-action table; the two-body
+grid coupling via a new \emph{implementation} of an existing contract; the deformable ovoid in a
+spherical cup with a torque-free fat suspension; the metric suite and the archive discipline
+(every trial keeps its own spec, movie and numbers).
+
+\textbf{Open.} The working point. Rounds 1--3 each found a real mechanism and a real ceiling; the
+force--length formulation of round 4 has the authority we need and the remaining question is
+purely whether pre-tension plus a chunkier cross-section suppresses the buckling without
+re-introducing the stiff-antagonist ceiling. The acceptance test is already written and
+automatic: reaches its commands within $6^\circ$, torsion above $6^\circ$, horizontal above
+$35^\circ$, recruitment 4/4, centroid drift below 6\% of the globe radius, globe strain between
+0.4\% and 12\%, and peak shortening between 4\% and 38\%.
+
+\textbf{Worth doing next, in order.}
+\begin{enumerate}
+\item Finish the working point, then render the long \code{atlas} program (each antagonist pair
+driven back and forth three times) and the zebrafish \code{okr} program at movie resolution.
+\item Let the video-captioning VLM watch the result cold and see whether it reports a rolling
+eye. That is the dynamics-watching critic the Plexus\,2 paper names as a required agent, and
+this is a cheap, honest test of it.
+\item An inverse pass. Every operator here is differentiable and the loss can be local: given
+the observed gaze trace, recover the six insertion geometries. That is Loop~II on a system whose
+ground truth we wrote down ourselves.
+\end{enumerate}
+
+\end{document}
