@@ -15,79 +15,89 @@
 
 ## Abstract
 
-The campaign is building the causal lever-map of the Okuda mechanism space; round 2 landed its first
-valid mechanism evidence on the forced round-33 recipe (C-hash family, parent C414a11) and dissected
-which operators the forced protrusion needs. ESTABLISHED so far: patterned growth (morphogen_growth_3d0)
-and cell division (divide_3d0) are BOTH necessary -- removing either collapses the protrusion -- and
-unpatterned uniform inflation is not integrable on this body (it diverges). The campaign is blocked on
-one recurring apparatus hazard: big protr_peak readings keep turning out to be numerical divergence
-(mesh self-intersection), so the frontier now needs a positive protrusion that stays physical.
+The campaign is building the causal lever-map of the Okuda forced-protrusion recipe (C-hash family, parent
+Cad4767/C414a11), whose physical bud tops out at protr_peak ~1.19–1.23. Rounds 2–3 mapped every single-op
+REMOVAL (morphogen_growth_3d0 + divide_3d0 NECESSARY, rest inert/destabilising, none amplify); round 4 tried
+the last untested amplifier — TUNING the morphogen driver UP — and it ran the chemistry away (P4+P12+P5b, 4/7
+runs). All three lever families (removal, inflation, morphogen-tune) now hit the SAME divergence wall, so the
+~1.23 ceiling is looking fundamental to this body and a larger morphology needs a different base geometry.
 
 ## What is ESTABLISHED
 
-- "Patterned growth is NECESSARY for the forced protrusion." -- SUPPORTED by remove_op
-  morphogen_growth_3d0 on C414a11, protr_peak=1.046 (valid, intact sphere), round 2. Falsifiable by:
-  a morphogen_growth-free recipe reaching protr_peak > 1.2 while staying physical.
-- "Cell division is NECESSARY for the forced protrusion." -- SUPPORTED by two remove_op divide_3d0
-  edits (Ca230941 -> 1.317 & diverged; Cad4767 -> 1.19, eye reads bud as division-driven), both < the
-  1.4 predicted, round 2. Falsifiable by: a divide-free recipe holding protr_peak >= 1.4 while physical.
-- "Unpatterned uniform_ramp inflation is NOT integrable on this body." -- SUPPORTED by add_op
-  vesicle_growth uniform_ramp on C855e6, morphology=exploded, mech_force_mean=1.5e11; the protr_peak=2.255
-  is a P11 fold, not a bud, round 2. Do not re-propose.
-- "CFL / reaction-diffusion nodes are chemistry on a RIGID ball; sphere is their NULL." -- SUPPORTED by
-  5 cfl_* runs, protr_peak=1.006, mech_p_ratio=0, ta_n_tubes=0, round 1. Falsifiable by: a cfl run > 1.02.
+- "Patterned growth is NECESSARY for the bud." — SUPPORTED, remove_op morphogen_growth_3d0 on C414a11,
+  protr_peak=1.046 (valid intact sphere), round 2. Falsifiable by: a morphogen-free recipe >1.2 physical.
+- "Cell division is NECESSARY for the bud." — SUPPORTED, remove_op divide_3d0 (1.317 diverged; 1.19 eye-read
+  division-driven), round 2. Falsifiable by: a divide-free recipe ≥1.3 physical.
+- "reconnect_t1_3d0 and cell_adjacency0 are INERT on the bud." — SUPPORTED, removal leaves 1.19–1.227
+  (=control), round 3. Do not re-remove to chase a change.
+- "extrude0 and vesicle_growth0 removal → plain sphere 1.003." — SUPPORTED round 3. Shape-zeroing, not the
+  driver.
+- "Raising the morphogen driver DIVERGES via chemistry runaway, not a bigger bud." — SUPPORTED round 4:
+  growth is a morphogen SOURCE not a sink (P4 broken 4/7), activator 0.01→1.41e6→NaN while spatially uniform
+  (P12), reaction ~50× too fast (P5b). Do not re-propose raising amplitude/sharpness/rate.
+- "Unpatterned uniform_ramp inflation is NOT integrable on this body." — SUPPORTED, add_op vesicle_growth
+  uniform_ramp → exploded, mech_force 1.5e11, round 2.
+- "CFL/reaction-diffusion nodes are chemistry on a RIGID ball; sphere is their NULL." — SUPPORTED, 5 cfl_*
+  runs protr_peak=1.006, mech_p_ratio=0, round 1. Falsifiable by: a cfl run >1.02.
 
 ## What is OPEN
 
-- Can the forced round-33 recipe make a protrusion that is BOTH large (protr_peak >= ~1.3) AND stays
-  physical (no P11 fold, mech_force O(1), act_max finite)? Every large reading so far was divergence.
-- FORCED (mech_p_ratio ~3) vs GROWN (~1): mech_p_ratio is 2.1-5.8 on the intact valid buds -- usable now,
-  but only on runs that stayed physical. Not yet mapped across the recipe family.
-- Two round-2 edits (set_impl shape_energy_3d0 monolayer; uniform_ramp add on Ce08ef7) returned `{}` --
-  never measured. Likely edit-did-not-compile, not biology.
+- Is the ~1.23 ceiling FUNDAMENTAL to this body, or beatable by a lever not yet tried (turning the reaction
+  DOWN / clamping the morphogen source, or a different base geometry)? Every amplifier tried so far diverges.
+- FORCED (mech_p_ratio ~3–5.8) vs GROWN (~1) on physical buds is usable but not yet mapped across the family.
 
 ## Known traps
 
-- protr_peak LIES under divergence: high protr_peak (1.317, 2.255) = mesh folding through itself (P11,
-  folded-frac ~0.8, ta_n_tubes 1477/1673), not tubes. Guard: trust protr_peak only if mech_force_mean
-  O(1), act_max finite ~[0,2], ta_n_tubes single-digit, morphology != exploded (round 2).
-- Removing divide_3d0 to show "division-independent protrusion" -- fails, division is necessary (round 2).
-- Unpatterned uniform_ramp inflation -- diverges/explodes, never a gentle sphere (round 2).
-- Controls (`replay` / `re-measure` / naming a RECON_ node) return bit-identical nulls; never propose one
-  (all 12 slots, round 1).
-- Prediction NOT CHECKABLE unless ONE clause `<metric> <op> <value>` on an ADMITTED metric (round 1).
-- APPARATUS artefacts, cosmetic: (1) trajectory classifier ValueError on 'sphere' string -> read
-  metrics.png; (2) shape_idx p95 tail trips P7 solid->fluid on non-deforming spheres.
+- protr_peak LIES ≥~1.25: every reading ≥1.29 (1.317×2, 2.255, 1.295, round-4 blowups) was P11 mesh
+  self-intersection, not a bud. Guard: trust it only if mech_force O(1), act_max finite ~[0,2], ta_n_tubes
+  single-digit, morphology≠exploded. morphology="sphere" and mech_p_ratio~1 also lie under divergence.
+- Raising morphogen amplitude/gradient/reaction-rate → chemistry runaway (round 4). Down, not up.
+- remove_op cell_diffuse0 → DIVERGES (strips damping, breaks quasistatics), round 3.
+- remove_op divide_3d0 / morphogen_growth_3d0 to show independence — both NECESSARY (round 2).
+- add_op vesicle_growth uniform_ramp — explodes (round 2).
+- Predicting protr_peak ≥1.3/1.4/1.5 — WRONG-HIGH every time; physical ceiling ~1.23.
+- Controls (replay / re-measure / RECON_) return bit-identical nulls (round 1). Never propose one.
+- Prediction not checkable unless ONE clause `<metric> <op> <value>` on an ADMITTED metric (round 1).
+- APPARATUS: (1) `{}`/no-diag = edit did not compile. (2) trajectory classifier ValueError on 'sphere' → read
+  metrics.png. (3) shape_idx p95 tail 3.8–4.2 trips P7 on non-deforming buds — cosmetic. (4) honor the Q_stale
+  flag on Q_protr_after_relax. (5) P1_INERT (rd_interface_tension), P2_BUFFER_SATURATED (n~36749),
+  P3_CHEMISTRY_DIVERGED (act_max>1000) gates = NOT EVIDENCE.
 
 ## Frontier and parent
 
-Breed from the forced round-33 recipe family, parent **C414a11** (the intact valid base: morphogen_growth_3d0
-+ divide_3d0 both present, protr_peak ~1.3 with both intact, valid). Do NOT breed from cfl/RECON_ nulls, nor
-from the diverged C855e6 / Ca230941 branches. Goal: a large protrusion that stays physical.
+Breed from the intact forced base, parent **Cad4767d855d** (control clean, protr_peak 1.19, valid bud;
+morphogen_growth_3d0 + divide_3d0 present). C414a11 is an equivalent valid base. Do NOT breed from cfl/RECON_
+nulls nor the diverged C855e6 / Ca230941 / cell_diffuse0 / round-4 morphogen-tune branches. Amplification via
+tuning up is now closed — the productive frontier is either DOWN-tuning the reaction (test whether a slower/
+clamped chemistry still buds and stays physical) or accepting the ceiling and switching Track-B base geometry.
 
 ## Stability envelope
 
-Physical runs settle at n_cells_final ~ 2000-2001, mech_force_mean O(1) (0.47-164), act_max ~[0,1].
-Divergence signature: mech_force_mean 100s-1.5e11, act_max non-finite/negative (-2220), ta_n_tubes 1000s,
-morphology=exploded. The round-1 wk_ growth saturation at n~36749 is RETIRED -- round-2 C-hash recipes stay
-at n~2000 and do not saturate. cfl chemistry-only wall ~205 s; forced recipes 95-720 s.
+Physical runs settle at n_cells_final ~2000, mech_force_mean O(1) (0.46–164 borderline), act_max ~[0,1],
+ta_n_tubes single-digit. Divergence signature: mech_force 100s–1.5e11, act_max non-finite/negative (−2220) or
+1.4e6 (round 4: 0.01→1.41e6→NaN), ta_n_tubes 1000s, morphology=exploded. Buffer P2 saturates only on the
+retired round-1 wk_ runs (n~36749); C-hash recipes stay at n~2000. Physical bud protr_peak span 1.05–1.23.
+Wall: cfl ~205 s; forced recipes 95–743 s (the long ones are usually diverging).
 
-## Track A -- the map
+## Track A — the map
 
-morphogen_growth_3d0 NECESSARY, divide_3d0 NECESSARY (both for the forced protrusion). vesicle_growth
-uniform_ramp = destabilising (not inert, not usable). cfl / reaction-diffusion = chemistry only, INERT on
-shape. mech_p_ratio now non-zero on valid buds (2.1-5.8). Untested: curvature/tension/apical_area/pressure
-levers ALONE (round-1 wk_ attempts saturated, never cleanly measured); shape_energy_3d0 monolayer impl
-(returned {}). Combination cells largely blank.
+NECESSARY: morphogen_growth_3d0, divide_3d0. INERT on bud: reconnect_t1_3d0, cell_adjacency0, cell_geometry_3d0
+(rd_interface_tension inert). SHAPE-ZEROING when removed: extrude0, vesicle_growth0. DESTABILISING: vesicle_growth
+uniform_ramp (explodes), cell_diffuse0 removal (diverges), divide_3d hertwig add (1.295 late mesh degradation),
+morphogen driver tuned UP (chemistry runaway, round 4). cfl/RD = chemistry only, inert on shape. Single-op
+REMOVAL and morphogen-AMPLIFY coverage are both EXHAUSTED. BLANK cells: morphogen driver tuned DOWN/clamped;
+tension/curvature/pressure levers ALONE (round-1 wk_ attempts saturated, never clean).
 
-## Track B -- the figure
+## Track B — the figure
 
-0 of 4 Okuda morphologies achieved. Attempted: a forced round-33 protrusion recipe (division-driven bud,
-protr_peak ~1.3, valid but not yet matched to a named Okuda target). "Attempted" is not "not attempted".
+0 of 4 Okuda morphologies achieved. ATTEMPTED: the forced round-33 division-driven bud (protr_peak ~1.19,
+valid, not yet matched to a named Okuda target). Larger/tube/branched morphologies only ever appeared under
+divergence, so NOT legitimately attempted. "Attempted" ≠ "not attempted".
 
 ## Next action
 
-Breed from C414a11: an edit that AMPLIFIES the protrusion while keeping the run physical, with ONE checkable
-clause calibrated to the real ceiling (protr_peak >= 1.3, NOT >= 1.4). Verify the result stayed physical
-(mech_force O(1), act_max finite) before trusting protr_peak. Changes if a diverging branch is chosen --
-reject it and re-breed from the intact parent.
+The tune-up amplifier is closed (round 4 diverged). Either (a) test the opposite direction — a graded DOWN-tune
+of the morphogen reaction rate / a clamped source — with ONE clause calibrated to the ceiling (protr_peak
+1.2–1.25, NEVER ≥1.3), verifying physical (mech_force O(1), act_max finite, ta_n_tubes single-digit) BEFORE
+trusting it; or (b) if that also fails to exceed 1.23, declare the ceiling fundamental to this body and open
+Track B on a different base geometry rather than spending more slots pushing this one.

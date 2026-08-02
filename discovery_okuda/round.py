@@ -319,6 +319,13 @@ def refuse_stale_q(summary, source=""):
     return summary
 
 
+def _read_json_quiet(path):
+    try:
+        return json.load(open(path))
+    except Exception:
+        return None
+
+
 def read_diag_summary(path, source=None, quiet=False):
     """Read a run's diag.json `summary` with the stale-Q quarantine already applied."""
     d = json.load(open(path)).get("summary", {})
@@ -1239,6 +1246,15 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         # the seed-sphere constant. Scrub at the read, so score_run / meets_success /
         # predict.score cannot reach it. The diag.json itself is untouched.
         summ = read_diag_summary(d, source=nm)
+        # THE VERDICT TRAVELS WITH THE NUMBERS. `premises_broken` lives at the TOP LEVEL of
+        # diag.json, and every consumer here reads the `summary` sub-dict -- so the rank key
+        # below asked summ for it, got None, and sorted an extinct-chemistry run as if its
+        # premises held. That is how the search came to breed from a dead field: the runs whose
+        # activator had blown up to 1.4e6 and gone negative had the highest protr_peak, nothing
+        # demoted them, and they became the frontier five rounds running.
+        _dg = _read_json_quiet(d) or {}
+        summ.setdefault("premises_broken", _dg.get("premises_broken") or [])
+        summ.setdefault("premises", _dg.get("premises") or [])
         post = C.check_posthoc(summ)
         if post:
             if h.hid not in resolved:
@@ -1458,7 +1474,22 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     # subsequent diff would be measured against a parent that is not in the pool. A veto is a
     # statement about what the MOVIE SHOWS, not about whether the composition is a useful parent;
     # it must not silently delete the reference the round's own diffs were taken against.
-    front = [g for _, g, _, _, _, _ in kept if g is not None]
+    # AN INVALID SPECIMEN IS NOT A PARENT. Its numbers describe the configuration and not a
+    # tissue (ROLES.md), so breeding from it propagates a measurement of a dead field. Round 5
+    # spent six of eight runs climbing exactly that gradient -- 1.317/5 tubes -> 1.340/10 ->
+    # 1.529/30 -- while the activator was extinct in every one of them.
+    front, barred = [], []
+    for nm_k, g, s_k, _, _, _ in kept:
+        if g is None:
+            continue
+        if (s_k.get("premises_broken") or []):
+            barred.append((nm_k, s_k["premises_broken"]))
+            continue
+        front.append(g)
+    for nm_k, br in barred:
+        print(T_.warn(f"[frontier] {nm_k} is NOT a parent: specimen invalid ({', '.join(br)}). "
+                      f"A high score on a broken specimen is a measurement of the configuration, "
+                      f"not of a tissue."))
     ctrl = [g for _, g, _, _, _, h in graph_rows if h.intent == "control"]
     for g in ctrl:
         if not any(comp_hash(g) == comp_hash(x) for x in front):
