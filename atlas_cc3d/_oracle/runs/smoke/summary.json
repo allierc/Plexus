@@ -1,0 +1,10 @@
+{
+ "n_cells": 45,
+ "by_type": {
+  "2": 25,
+  "1": 20
+ },
+ "volume_mean": 22.77777777777778,
+ "volume_min": 19.0,
+ "volume_max": 28.0
+}
