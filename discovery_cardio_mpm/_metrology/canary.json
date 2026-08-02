@@ -1,0 +1,32 @@
+[
+ {
+  "canary": "missing recording",
+  "caught": true,
+  "detail": "refused"
+ },
+ {
+  "canary": "substituted recording",
+  "caught": true,
+  "detail": "content hash refused it"
+ },
+ {
+  "canary": "renamed operator",
+  "caught": true,
+  "detail": "gate refused"
+ },
+ {
+  "canary": "run source deleted after the fact",
+  "caught": true,
+  "detail": "manifest check refused"
+ },
+ {
+  "canary": "no seed recorded",
+  "caught": true,
+  "detail": "refused"
+ },
+ {
+  "canary": "retired conclusion re-enters the source",
+  "caught": true,
+  "detail": "gate refused"
+ }
+]

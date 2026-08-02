@@ -1,0 +1,95 @@
+{
+ "checks": [
+  {
+   "check": "operators in the spec resolve in the registry",
+   "pass": true,
+   "detail": "10/10 resolve: activation_pulse, active_stress, aggregate, apply_material_map, drag, mpm_gather, mpm_grid_update, mpm_scatter, mpm_strain, pacemaker"
+  },
+  {
+   "check": "recording opens and matches its declared content",
+   "pass": true,
+   "detail": "239 frames, 18769 nodes, onsets [2, 51, 101, 152, 204]"
+  },
+  {
+   "check": "beat detector is reproducible",
+   "pass": true,
+   "detail": "gaps [49, 50, 51, 52], mean 50.5, reported period 50"
+  },
+  {
+   "check": "loader refuses: missing file",
+   "pass": true,
+   "detail": "raised DataRefusal"
+  },
+  {
+   "check": "loader refuses: wrong content",
+   "pass": true,
+   "detail": "raised DataRefusal"
+  },
+  {
+   "check": "loader has no fallback search order",
+   "pass": true,
+   "detail": "one explicit path"
+  },
+  {
+   "check": "recording rebuilds bit-exactly from the microscope derivatives",
+   "pass": true,
+   "detail": "pos bit_exact=True, dt equal=True"
+  },
+  {
+   "check": "seed controls the draw, and only the seed does",
+   "pass": true,
+   "detail": "same seed identical, other seed differs"
+  },
+  {
+   "check": "same, on the GPU",
+   "pass": true,
+   "detail": ""
+  },
+  {
+   "check": "no module sets the arithmetic flags behind our back",
+   "pass": true,
+   "detail": "determinism.enforce is the only place they are set"
+  },
+  {
+   "check": "a run archives its own source and hashes its inputs",
+   "pass": true,
+   "detail": "5 source files archived"
+  },
+  {
+   "check": "no retired conclusion is compiled into the source",
+   "pass": true,
+   "detail": "clean"
+  },
+  {
+   "check": "every inherited claim carries an open status",
+   "pass": true,
+   "detail": "38 hypotheses, all statused"
+  },
+  {
+   "check": "no inherited claim is recorded as established",
+   "pass": true,
+   "detail": "nothing confirmed yet"
+  },
+  {
+   "check": "the belief register is EMPTY",
+   "pass": true,
+   "detail": "0 entries"
+  },
+  {
+   "check": "a short fit runs end to end",
+   "pass": true,
+   "detail": "2 runs on cpu"
+  },
+  {
+   "check": "two fits at one seed are bit-identical (cpu)",
+   "pass": true,
+   "detail": "198407 params, max|d|=0.000e+00"
+  },
+  {
+   "check": "GPU same-seed spread measured and recorded",
+   "pass": true,
+   "detail": "max|d|=3.02e-06 (rel 7.5e-08) over 3 runs -- NOT bit-identical"
+  }
+ ],
+ "pass": true
+}

@@ -20,8 +20,22 @@ empty. Apparatus may be reused only after it re-passes a gate here. Defaults cou
 
 ## Status
 
-Phase 0 not started. Nothing runs yet: the inherited trainer crashes on every invocation, and the
-Plexus operator path is not differentiable (measured — see the note, §2 and Phase 3).
+**Phase 0 CLOSED (2026-08-02).** The gate passes 18/18, the canaries catch 6/6.
+
+    PYTHONPATH=/workspace/Plexus/src python certify_apparatus.py            # the gate
+    PYTHONPATH=/workspace/Plexus/src python certify_apparatus.py --canary   # break it 6 ways
+    PYTHONPATH=/workspace/Plexus/src python certify_apparatus.py --fit      # + real fits (slow)
+
+Phase 1 (freeze the recording, seal the diseased specimen) is next and has not started.
+
+**Recorded, not certified:** determinism is complete on CPU and partial on GPU —
+`grid_sampler_2d_backward_cuda` has no deterministic implementation and is reached from
+`plexus.models.base.Field.sample` via `active_stress`. The same-seed spread is measured
+(`_metrology/gpu_repeat.json`, 3.0e-6 at 2 iterations) rather than assumed to be zero.
+`--allow_nondeterministic_ops` is off by default.
+
+The Plexus operator path is still not differentiable end-to-end (measured — see the note §2 and
+Phase 3); the trainer hand-rolls its own step, as the inherited one did.
 
 ## Related
 
