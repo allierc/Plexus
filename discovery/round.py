@@ -1107,7 +1107,20 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     # weakest of the three jobs and is the one dropped. See ROLES.md.
 
     sup.round = rid - 1          # observe() increments; the claim above already moved it
-    rep = sup.observe([(g, s, h.hid) for _, g, s, _, _, h in rows])
+    # EVERY DOWNSTREAM CONSUMER OF A ROW WANTS ITS GRAPH, and a recon row has none -- it is a
+    # spec replayed verbatim, with no composition object behind it. Rather than guard each call
+    # site as it crashes (this is the second), the graphless rows are separated ONCE, here, and
+    # every graph-consuming step below reads `graph_rows`.
+    #
+    # What the Supervisor, the lever map and the frontier all do with a row is place its
+    # COMPOSITION in the search space -- cluster it, map it, breed from it. A replay has nothing
+    # to place: its composition is already in the space, which is why it was chosen. Excluding it
+    # is not losing evidence, it is declining to file the same composition twice.
+    graph_rows = [r for r in rows if r[1] is not None]
+    if len(graph_rows) != len(rows):
+        print(f"  [round] {len(rows) - len(graph_rows)} replayed run(s) carry no composition "
+              f"graph -- recorded as evidence, excluded from clustering and the frontier")
+    rep = sup.observe([(g, s, h.hid) for _, g, s, _, _, h in graph_rows])
     sup.reg.render_knowledge(os.path.join(CAMP, "knowledge.md"),
                              ledger={"kept": len(kept), "dropped": len(dropped)}, round_id=rid)
     lm.render(os.path.join(CAMP, "lever_map.md"))
@@ -1132,8 +1145,8 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     # subsequent diff would be measured against a parent that is not in the pool. A veto is a
     # statement about what the MOVIE SHOWS, not about whether the composition is a useful parent;
     # it must not silently delete the reference the round's own diffs were taken against.
-    front = [g for _, g, _, _, _, _ in kept]
-    ctrl = [g for _, g, _, _, _, h in rows if h.intent == "control"]
+    front = [g for _, g, _, _, _, _ in kept if g is not None]
+    ctrl = [g for _, g, _, _, _, h in graph_rows if h.intent == "control"]
     for g in ctrl:
         if not any(comp_hash(g) == comp_hash(x) for x in front):
             front.append(g)
