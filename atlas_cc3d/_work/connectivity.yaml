@@ -24,7 +24,8 @@ summary: 'A Cellular-Potts ENERGY term (Potts plugin), NOT a state update. Per a
 
   compiled default penalty (10000000) this "soft" term behaves as a near-hard topological guard
 
-  that keeps every cell a single connected blob (one connected component). Fast/local variant: 2D square lattice only,
+  that keeps every cell a single connected blob (one connected component). Fast/local variant: 2D square
+  lattice only,
 
   requiring Potts NeighborOrder 1 or 2.
 
@@ -169,25 +170,29 @@ contract:
   kind: lateral
   family: topology
   set: cell
-  inputs: '- the affected cell (a set of lattice sites sharing one cell id)
-
-    - the proposed single-pixel copy at target site t (source id overwrites t''s id)
-
-    - the cell-id lattice restricted to the Moore neighbourhood of t
-
-    '
-  outputs: "- a scalar energy contribution dE_conn added to the Potts total dE; it is NOT an integrated\n\
-    \  state delta. dE_conn = 0 if the copy leaves the affected cell locally connected, and a\n  large\
-    \ positive Penalty (default 10000000) if the copy would fragment the cell's site-set\n  into disconnected\
-    \ pieces.\n"
-  reads: "- the cell-id lattice (site -> cellId) in the Moore neighbourhood of the proposed target\n \
-    \ pixel, for the cell(s) whose connectedness the copy could change\n- the Potts NeighborOrder (must\
-    \ be 1 or 2) and a 2D square lattice as implicit preconditions\n"
-  writes: "- none. This is a Potts energy plugin. It writes no field and no cell property; it only\n \
-    \ contributes dE_conn to the Metropolis accept/reject of the proposed copy.\n"
-  maps: "- connectivity indicator f(local topology change of the affected cell around t) -> energy\n \
-    \ penalty Penalty * f, one global scalar Penalty shared by every cell. With Penalty >> T the\n  map\
-    \ is an effectively hard gate: fragmenting copies are never accepted.\n"
+  inputs:
+  - site (the affected cell's owned lattice sites, each carrying its cell id, for the cell whose connectedness
+    the proposed single-pixel copy at target t would change)
+  - connectivity_on (whether the constraint is active on the cell; in THIS legacy implementation it is
+    ON for EVERY cell unconditionally -- one global scalar, no per-type or per-cell opt-in, unlike the
+    ConnectivityGlobal sibling that first defined this contract)
+  - strength (the veto magnitude; here a single GLOBAL Penalty shared by all cells, CC3DML / twedit-generator
+    default 10000000, not exposed by the Python spec and un-tunable through it)
+  outputs:
+  - dE (a positive energy penalty added to the Metropolis total when the copy would fragment the cell
+    into more than one connected component within the Moore neighbourhood of t; 0 otherwise -- NOT an
+    integrated state delta)
+  reads:
+  - site.cell_id (the cell's set of lattice sites and their adjacency in the Moore neighbourhood of the
+    proposed target pixel, scanned LOCALLY -- this legacy variant does no whole-cell flood fill -- to
+    test connectedness after the proposed copy)
+  - lattice adjacency / Potts NeighborOrder (defines which sites count as connected; must be 1 or 2 on
+    a 2D square lattice, an implicit external precondition -- a Potts param, not a plugin param)
+  writes:
+  - none (a Potts effective-energy term that returns a scalar dE and mutates no state; it changes only
+    the acceptance probability of the proposed pixel copy, integrating no delta)
+  maps:
+  - none
 status: normalized
 module: null
 test: null
@@ -196,3 +201,12 @@ evidence:
   diff_metric: null
   threshold: null
   passed: null
+disputed:
+  by: skeptic
+  was: new
+  claimed: alias
+  evidence: PyCoreSpecs.py:4059 (Connectivity) and :4088 (ConnectivityGlobal, which introduced stay_connected
+    at order 8) implement the same site-set connectedness veto. This legacy variant is strictly narrower
+    (2D-only, un-tunable global Penalty), adding no capability — an alias, not a new contract.
+  what_would_settle_it: Confirm the order-8 ConnectivityGlobal entry already registered contract stay_connected
+    in atlas_record.yaml; if so, this entry must count as alias-of stay_connected, not new.

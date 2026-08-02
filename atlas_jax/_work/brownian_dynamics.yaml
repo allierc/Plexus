@@ -199,8 +199,8 @@ evidence:
     2 kT dt/gamma over T/dt steps -> dt-free total variance 2 kT T/gamma); a noise scaled by dt
     instead gives D = dt*kT/gamma and BREAKS the invariance. Oracle: BrownianDynamics(potential=
     None), N=20000 cells seeded at ONE point, kT=0.1, gamma=1.0, n_dim=2
-    (atlas_jax_morph/_oracle/runs/diff_brownian_dynamics). Plexus:
-    config/atlas/brownian_dynamics{,_dt05,_dt025}.yaml, identical N/kT/gamma/dim and matched IC
+    (atlas_jax/_oracle/runs/diff_brownian_dynamics). Plexus:
+    config/atlas_jax/brownian_dynamics{,_dt05,_dt025}.yaml, identical N/kT/gamma/dim and matched IC
     (Rg is translation-invariant, so the (20,20) world offset from the oracle origin is not a
     mismatch), `agitate` scheduled ALONE, boundary free (no wall clamp).
   threshold: |

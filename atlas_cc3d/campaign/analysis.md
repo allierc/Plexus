@@ -3420,3 +3420,441 @@ reads a *different* tracker and encodes a *distinct* biophysical force (bulk inc
 surface tension vs axial spring), and collapsing them hides that — but the tension is real, and
 if a fourth "quadratic-constraint-on-geometry" plugin appears we should seriously consider
 retro-fitting a single `geometric_setpoint` contract with these as implementations.
+
+
+---
+
+## adhesionflex
+
+<!-- adhesionflex -- append below; the driver merges this into campaign/analysis.md -->
+
+# AdhesionFlex (Plugin) — excavation note
+
+**What I read.** `PyCoreSpecs.py:L3525` (`AdhesionFlexPlugin`) plus its helpers
+`AdhesionFlexMoleculeDensity` (L3461) and `AdhesionFlexBindingFormula` (L3380); the compiled
+interface `cpp/CompuCell.py` (`AdhesionFlexData.adhesionMoleculeDensityVec`, `changeEnergy`,
+`adhesionFlexEnergyCustom`, the `set/getAdhesionMoleculeDensity*` family); the library's own
+energy descriptor `twedit5/.../adhesion_descr.py`; and the shipped test
+`tests/plugin_test_suite/AdhesionFlexPython_test_run/` (XML matrix + a steppable that mutates
+densities per cell). The Python spec is a CC3DML emitter only; the physics is compiled.
+
+**The mechanism.** A flexible Contact energy. Sum over neighbouring site pairs whose owners
+differ: `E = Σ_ij [ -Σ_mn k_mn · AdhesionFunc(N_m(σ_i), N_n(σ_j)) ] · (1-δ)`. Each cell (and
+Medium) carries a *vector* of adhesion-molecule densities `N_m`; `k_mn` is a user interaction
+matrix; `AdhesionFunc` is a muParser formula string, default `min(Molecule1,Molecule2)`. Writes
+nothing to the lattice — returns dE, a Potts energy term.
+
+**What surprised me.**
+- It is not just Contact-with-more-numbers: it introduces genuine **per-cell mutable state** (the
+  density vector), seeded from a per-TYPE declaration but thereafter steerable per cell and
+  inherited across mitosis (`assignNewAdhesionMoleculeDensityVector` deliberately skips the size
+  check for daughter seeding). Plain Contact has no per-cell state.
+- **Inverted sign** vs Contact: an explicit leading minus makes positive `k_mn` adhesive; the
+  shipped example even uses negative k's.
+- The combining kernel is **data** — an arbitrary muParser expression, not a fixed op.
+
+**What I could NOT establish.**
+- The (1-δ) restriction: the library HTML says δ is over "cell *types*", but the standard CPM
+  contact term and `changeEnergy` are over cell **id** σ. I recorded both readings and flagged
+  it; I could not run the compiled core to settle it (cc3d is deliberately not importable in the
+  Plexus env), so which governs same-type neighbouring cells is still open.
+- No ablation/oracle run exists for this mechanism yet (not among the six with `evidence.py`
+  outputs), so every claim here is source-read, not measured.
+- No specific Swat et al. (2012) page was read; `paper_section` points to the checkable CC3D
+  reference-manual heading + the in-repo descriptor, not a page number I have not seen.
+
+---
+
+## Normalizer verdict
+
+**`new` (against the frozen baseline), `implementation_of: adhere` — a second sighting of
+`adhere`, first proposed from the jax-morph atlas.**
+
+AdhesionFlex is the pure differential-adhesion energy of the Cellular Potts framework: contacting
+cells (and Medium) lower the boundary energy by a double sum over their carried adhesion-molecule
+densities, so a positive binding parameter is adhesive. That is the same biology as jax-morph's
+proposed `adhere` (cadherin-like surface molecules setting cell-cell stickiness and sorting). No
+REGISTERED contract covers it — the nearest, `cohesion` / `attraction_repulsion`, emit a force
+(`acceleration`) on point particles and write `position`, whereas AdhesionFlex writes nothing and
+only returns a Metropolis `dE` over cross-boundary lattice-site pairs of a cell that IS a set of
+sites. Set `implementation_of: adhere` so the ledger counts `adhere` once across repositories, not
+twice.
+
+**Strongest argument AGAINST this verdict:** that I should have called it `alias` /
+`implementation_of: attraction_repulsion`, exactly as the jax-morph Morse potential was —
+"adhesion" is arguably just the attractive tail of the one radial pair interaction, and
+`attraction_repulsion` already IS registered whereas `adhere` is not, so mapping to it would avoid
+minting fresh yield. The rebuttal: Morse carries BOTH a repulsive core (excluded volume) and an
+adhesive tail, so it maps to the combined `attraction_repulsion`; AdhesionFlex carries ONLY
+adhesion — excluded volume in CPM lives in the separate Volume constraint, not here — and it is an
+energy over shared boundary counts of a site-set cell, not a centre-distance force that integrates
+to move a point. Collapsing pure molecule-mediated adhesion into the repulsion-bearing point-force
+contract would erase precisely the biology (surface-molecule differential adhesion, per-cell
+mutable density vector, no self-repulsion) the campaign exists to measure. If the loop later
+PROMOTES `adhere` and it turns out to be defined force-first, the energy-term-vs-force
+representational gap recorded in `state_io`/`why` is where this entry should be revisited.
+
+**Update (re-pass).** Narrowed the one open item — the (1-δ) type-vs-id discrepancy. Read the
+descriptor source directly (`twedit5/.../adhesion_descr.py:get_adhesion_flex_description_html`) and
+confirmed the "cell types at i and j" wording is verbatim there, and that the SAME descriptor keys
+the density `N` on "cell type of pixel where it is located" — so the type-language is the descriptor
+author's internally-consistent framing, not a transcription slip. The compiled `changeEnergy` (cc3d
+not importable here) is now the only unchecked side, so which of type/id the core enforces is the
+sole remaining discrepancy. Also re-verified `neighbor_order` is the sole constructor arg
+(`PyCoreSpecs.py:L3561`). Verdict unchanged.
+
+**Update (normalization pass, answering the skeptic).** The skeptic caught a real
+inconsistency and I fixed the reasoning (verdict stands: `new` + `implementation_of: adhere`).
+The charge: the entry rejected `cohesion`/`attraction_repulsion` on the output-type gap
+("they emit a force and write position; AdhesionFlex writes nothing"), yet merged into
+jax-morph's `adhere`, which ITSELF emits a force and writes position (soft_sphere.yaml:143-160,
+reads pos/radius/epsilon, writes pos) — so by that standard AdhesionFlex is a distinct new
+contract. Correct. I withdrew the output-type argument: the `adhere` merge is BIOLOGICAL (the
+contract name is a biological relation — molecular surface adhesion setting per-cell stickiness
+and driving sorting — realized as a force in jax-morph and as a boundary-site energy in CPM),
+and the reject of `cohesion`/`attraction_repulsion` is BIOLOGICAL too (Reynolds boids
+centre-of-mass steering; D'Orsogna self-propelled particles — neither carries a surface-adhesion
+molecule or a physical contact, so widening one deletes the model that IS it). Both hold
+independent of the energy-vs-force axis; conflating them was the error. **Now-strongest argument
+AGAINST the verdict:** if a Plexus contract IS its typed signature (as the algebra's whole premise
+implies), then force→position and energy→nothing simply cannot be one contract, and I am hiding a
+genuine second contract behind a biological name to keep the `new` count down. Rebuttal — and it is
+the headline finding, not a dodge: the signature gap here is the CELLULAR-POTTS PARADIGM gap (rule 8:
+nearly every CC3D mechanism is an energy-bias term that writes nothing), which will recur for every
+CPM energy term (Contact, Volume, Surface…). Minting a fresh contract each time a KNOWN biology
+reappears in that paradigm makes the saturation curve count the paradigm, not the vocabulary — the
+exact inflation the campaign exists to prevent. So `adhere` is recorded as the first contract seen in
+two computationally INCOMPATIBLE signatures across the two atlases, and whether the promoted algebra
+hosts it as one paradigm-polymorphic contract or splits the energy-term paradigm off is flagged as a
+promotion/analysis-phase decision — not decided by minting here.
+
+
+---
+
+## connectivity
+
+<!-- connectivity -- append below; the driver merges this into campaign/analysis.md -->
+
+## connectivity (ConnectivityPlugin, plain/legacy) — excavated
+
+Read the whole class `PyCoreSpecs.py:L4059-4085` + base `_PyCorePluginSpecs` (L471-509), the
+compiled bindings `cpp/CompuCell.py` (grep), and BOTH twedit CC3DML generators
+(`CC3DMLGeneratorBase.py:614-632`, `CC3DXMLGenerator.py:656-677`) plus the `Connectivity*` tests.
+
+- **Topological energy term, effectively HARD, like its ConnectivityGlobal sibling** ([[connectivityglobal]]).
+  On a proposed pixel copy it penalizes flips that would break a cell's LOCAL connectivity; default
+  penalty 10000000 >> T ⇒ Metropolis never accepts a fragmenting copy. Writes no state; only lowers
+  acceptance probability. It reads TOPOLOGY (connected-component structure of a lattice site set),
+  not a continuous property — no differentiable field exists to read.
+- **Zero parameters in the Python spec.** `ConnectivityPlugin()` takes no args; `xml` emits a bare
+  `<Plugin Name="Connectivity"/>`. But CC3DML supports one GLOBAL `<Penalty>` (default 1e7), shared
+  by ALL cells — confirmed by two independent generators. So via the Python spec the strength is
+  pinned at the compiled default and cannot be tuned. Granularity ladder across the family:
+  Connectivity = one global scalar; ConnectivityGlobal = per-type; ConnectivityLocalFlex = per-cell
+  ([[connectivitylocalflex]]).
+- **RESOLVED the sibling note's open question:** the connectivityglobal note "did not confirm the
+  folklore that the old Connectivity plugin is 2D-only." Both generators state it plainly:
+  "works in 2D and on square lattice only!" AND "requires <NeighborOrder> 1 or 2." Now recorded as a
+  surprise (a silent, un-validated applicability restriction), not folklore.
+- **NOT SWIG-exposed:** `cc3d.cpp.CompuCell` has ConnectivityGlobalPlugin and
+  ConnectivityLocalFlexPlugin but no plain ConnectivityPlugin — it's a compiled Potts plugin
+  registered internally (`Potts3D.registerConnectivityConstraint`).
+
+## NORMALIZED — verdict: new, implementation_of `stay_connected` (lateral/topology)
+
+Verdict `new` against the frozen baseline (no promoted contract reads a body's connected-component
+structure and vetoes moves that would split it), but `implementation_of: stay_connected` — the
+contract the ConnectivityGlobal sibling ([[connectivityglobal]]) introduced in THIS atlas. The
+ledger must count the connectivity family ONCE: Connectivity (one global scalar, this entry),
+ConnectivityGlobal (per-type flood fill), ConnectivityLocalFlex (per-cell soft) are three
+implementations of one contract. What THIS legacy implementation adds beyond the sibling: zero
+tunable params (bare `<Plugin Name="Connectivity"/>`, strength pinned at 1e7), one GLOBAL scalar
+for all cells (not per-type), 2D/square-lattice/NeighborOrder≤2 only, and a LOCAL check (never the
+whole-cell flood fill). Same typed signature as the sibling — reads site-set topology, writes
+nothing, kind lateral / family topology.
+
+STRONGEST ARGUMENT AGAINST: this should be `alias` of the registered `cohesion`, not a `new`
+contract — both "keep a body together," and a reviewer could argue connectivity is just cohesion
+taken to its hard limit. Rebuttal (why I still chose new+implementation_of stay_connected):
+cohesion is a metric attractive FORCE between point agents returning an integrable gradient delta;
+stay_connected returns no force, is inert until a copy would fragment the SET, then vetoes — a
+combinatorial topological rejection rule over an explicit lattice site-set the point-agent
+representation does not even possess. Aliasing to cohesion would require cohesion to widen from
+"pairwise force between positioned points" to "connected-components indicator over a site-set,"
+which is a refinement that breaks every current cohesion user, not a free alias. The honest call is
+that `stay_connected` is a genuinely missing contract and this is a second implementation of it.
+
+**Signature aligned to the canonical `stay_connected`:** rewrote this entry's `contract:` block to the
+same typed-token shape the defining sibling uses ([[connectivityglobal]], order 8) — inputs
+`site`/`connectivity_on`/`strength`, reads `site.cell_id` + `lattice adjacency / NeighborOrder`, output
+`dE`, writes `none`, maps `none`. The legacy-distinguishing facts (constraint always-on for every cell,
+one GLOBAL Penalty default 1e7, LOCAL-only check, 2D/square/NeighborOrder≤2) now live INSIDE those tokens
+rather than in a divergent signature. `implementation_of` only counts once if the two implementations
+present the SAME signature; a differently-shaped `contract:` would have re-counted the family.
+
+**Could NOT establish:** the exact `changeEnergy` body — whether `f` is a boolean gate or scales with
+the number of connected components introduced, its sign convention — is not readable (no SWIG wrapper,
+C++ source absent from this install); reconstructed from the CC3DML comments + standard local-check
+behavior, not verified byte-for-byte. **No paper text available**, so `paper_section` cites the Swat
+chapter but anchors to in-source generator lines, not a page/eq I read. Not one of the six mechanisms
+with reference ablations under `log/atlas_cc3d/`, so behavioural claims are unmeasured.
+
+
+---
+
+## contactinternal
+
+<!-- contactinternal -- append below; the driver merges this into campaign/analysis.md -->
+
+# ContactInternal (ContactInternalPlugin) — excavation note
+
+**What I read.** `PyCoreSpecs.py:L3350` — `ContactInternalPlugin` is a *one-line* subclass:
+`ContactInternalPlugin(ContactLocalFlexPlugin)` -> `ContactLocalFlexPlugin(ContactPlugin)` ->
+`ContactPlugin(_PyCorePluginSpecs, _PyCoreSteerableInterface)`. The subclass changes only
+`name`/`registered_name`; ALL behavior and every tunable are inherited from `ContactPlugin`
+(neighbor_order, depth, weight_energy_by_distance, and a list of `ContactEnergyParameter`
+type-pair energies). Also read: `ContactEnergyParameter` (L3088), the InternalContact GUI
+description (`InternalContactPlugin_descr.py`), and the compartment example deck
+(`CompartmentExampleNewStyle.xml`, which runs `<Contact>` and `<ContactInternal>` together).
+
+**What surprised me.** (1) It writes nothing — it is a Potts EnergyFunction; `changeEnergy()`
+returns a scalar delta-E that only biases Metropolis acceptance. (2) The ENTIRE difference from
+the ordinary Contact plugin is a same-cluster guard: the internal energy fires only between two
+*different* cells sharing the same `clusterId` (compartments of one composite cell); it is
+silently 0 across clusters and against Medium. (3) It is additive with Contact, not a
+replacement — intra-cluster boundaries appear to be scored by both terms. (4) Only one triangle
+of the symmetric J matrix is stored (`param_append` rejects the mirror pair). (5) `Depth`
+(Euclidean radius) silently overrides `NeighborOrder` (integer shells).
+
+**Source-vs-binary evidence.** The `.cpp` is not on disk (only `libCC3DContactInternal.so`).
+I confirmed the same-cluster semantics three ways beyond the Python: the `.so` symbol table
+(`internalEnergy(CellG*,CellG*)`, `changeEnergy(Point3D,CellG*,CellG*)`,
+`setContactInternalEnergy`, `getMaxNeighborIndexFromDepth/NeighborOrder`,
+`Potts3D::getCellFieldG`); the `.so`'s own embedded docstring — *"Handles internal adhesion
+energy between members of the same cluster (i.e. between compartments)"*; and the reference
+manual heading.
+
+**What I could NOT establish.** (a) I did not read the C++ energy loop line-by-line, so the
+exact delta form and the same-cluster/Medium guard ordering are inferred from symbols + docs,
+not verified in C++. (b) I did NOT confirm that the ordinary Contact plugin ignores `clusterId`
+(the basis for the "additive / double-counted intra-cluster" claim) — a reader should verify
+Contact's `changeEnergy` before relying on that. (c) The exact `WeightEnergyByDistance` weight
+(assumed 1/d per pair) is inherited-from-Contact and not read at source. (d) No paper text is
+available; `paper_section` is anchored to the CC3D reference manual heading I actually read, not
+a Swat et al. page. No oracle/ablation run exists for this mechanism (not among the six evidence
+runs).
+
+**Verdict (normalizer).** `new` against the frozen 42/52 baseline (nothing there is a Cellular-Potts
+adhesion energy), with `implementation_of: adhere` — the pure-adhesion contract proposed by jax-morph
+and already hosted in this atlas by AdhesionFlex; plain Contact is its canonical implementation and
+ContactInternal is that same energy re-scoped by a clusterId guard to compartment-vs-compartment
+boundaries. **Strongest argument AGAINST.** The clusterId gate is not obviously "just a domain filter":
+sub-cellular compartment adhesion — holding the organelle-like domains of ONE composite cell together
+while a separate matrix handles cell-cell contact — is arguably a distinct biological content
+(intracellular structural cohesion) from cell-cell sorting, and CompuCell3D ships it as a SEPARATE
+plugin run *additively* alongside Contact precisely because the two act on disjoint boundary sets with
+independent J matrices. If one takes "adhere" to mean cell–cell adhesion specifically, then a
+compartment-scoped adhesion energy is a genuinely new contract, not an implementation of it. I rejected
+this because the operator's signature is identical (same output type, same set-of-sites representation,
+same boundary-pair sum, same J-matrix read) and only the *predicate selecting which pairs count* differs
+— a filter over the same reads, not new content — but it is the one place a reviewer could reasonably
+land on `new`-without-implementation_of.
+
+**Addendum (steerability).** Re-reading the chain at source: the immediate parent is
+`ContactLocalFlexPlugin(ContactPlugin, _PyCoreSteerableInterface)` (L3339-3347), documented as
+"A steerable version of ContactPlugin". So ContactInternal inherits STEERABILITY — its J_int
+matrix can be rewritten at runtime by a Python steppable, not fixed once at setup. This does not
+change the verdict (the reads/output/signature are unchanged; steerability is a property of when
+the coefficients may change, not of the contract), but a reimplementer treating J_int as a static
+per-run constant would be wrong. Recorded as a surprise. Confirmed from the class declaration, not
+from exercising an actual steer.
+
+
+---
+
+## curvature
+
+<!-- curvature -- append below; the driver merges this into campaign/analysis.md -->
+
+## curvature (EXCAVATOR)
+
+Read the actual C++ (found on disk at `papers/CompuCell3D/.../plugins/Curvature/CurvaturePlugin.cpp`,
+`.h`, `CurvatureTracker.h`), cross-checked against the installed binary `libCC3DCurvature.so`
+(demangled symbols) and the shipped `Curvature_test_generate` XML. Web fetch/search were blocked,
+so the on-disk source is the sole evidence — but it is the real thing, not a guess.
+
+What it does: a **Cellular-Potts energy term** that penalizes bending of chains of compartmental
+cells linked by junctions it maintains itself. Per triple of consecutive linked cells it adds
+`lambda * kappa` where `kappa` is the **Menger curvature (1/circumradius)** of the three centers
+of mass — zero when straight. `changeEnergy` returns the dE over affected triples (COMs recomputed
++/-1 volume); it writes no cell state. It ALSO grows a junction graph (activation_energy biases a
+bond-forming move; the bond is committed in the `field3DChange` watcher on accepted moves).
+
+Surprises worth the record:
+- The function `calculateInverseCurvatureSquare` is a **misnomer** — it returns the plain curvature
+  (2*sin(theta)/|chord| = 1/R_circ), neither inverted nor squared. Trust the name and you invert
+  the physics.
+- Half the plugin is **dead code**: `potentialFunction` (harmonic spring), `targetDistance`,
+  `maxDistance`, and all three `diffEnergy*` (return 0). Only `lambda_curve` and `activation_energy`
+  matter. Clearly cloned from FocalPointPlasticity and left half-gutted.
+- Junctions are the plugin's OWN state (within-cluster only), NOT FPP's — the two are separate
+  plugins that merely co-occur in the demo. So Curvature is a **hybrid**: energy term + stateful
+  bond-graph watcher. This is the interesting bit for the algebra: `changeEnergy` fits "return a
+  delta the engine integrates," but `field3DChange` is a genuine write-on-accept side effect that
+  the pure-energy framing does not cover.
+- Apparent BUG: the volume-1->0 branch adds three curvature terms WITHOUT the `lambda` factor
+  (L674/L682/L687). A faithful port must reproduce it to match the oracle.
+
+Could NOT establish: no oracle/ablation run exists for curvature under `log/atlas_cc3d/` (not one
+of the six evidenced mechanisms), so the dynamical magnitudes (does lambda=1000 in the demo
+actually straighten the chain, how strong is the activation-energy bias vs Temperature=10) are
+unmeasured here — inferred from the formula only. I did not confirm the exact set of "affected
+triples" is complete for every geometry; I read the five triple-blocks in each branch but did not
+prove they exhaust all triples touched by a COM shift. Left `verdict`/`contract` unset (normalizer's
+call); set `status: inspected`.
+
+## curvature — NORMALIZED
+
+Verdict `new`, contract **`stiffen`** (lateral/interaction, set cell) — a BENDING STIFFNESS: an
+angular energy over an ORDERED chain of junction-linked compartmental cells that penalises
+curvature (Menger `kappa = 2 sin(theta)/|chord| = 1/R_circ`, linear, zero for straight) and drives
+a linked filament toward straight. `implementation_of` left null. Consistent with the excavator's
+read, this is a HYBRID: the primary term is the bending stiffness (a Potts `changeEnergy`, writes
+nothing); a SECOND stateful half GROWS the junction graph (biases a bond-forming move by
+`activation_energy`, commits the bond in the accepted-move watcher) — a topology rewire near
+[[radius_graph]] that builds the chain the stiffness acts on. That rewire half is recorded in
+writes:/maps:/surprises, not the verdict.
+
+STRONGEST ARGUMENT AGAINST: this should be `implementation_of: stillinger_weber`, not a new
+contract. SW is the registry's only three-body angular term, `(cos - cos0)^2`; set `cos0 = -1`
+(theta0 = 180°) and SW *is* a straightness/bending penalty — same "angular energy, preferred
+angle" idea, and the Menger-vs-cosine functional difference is "just an implementation." Rebuttal
+(why I still chose `new`): SW builds its OWN isotropic min-image neighbour list and sums over ALL
+geometric triples within a cutoff — it has no ordered backbone. Filament bending requires selecting
+only CONSECUTIVE triples along a MAINTAINED 1D bond graph (left/mid/right, ≤3 hops each side);
+SW-with-cos0=-1 on a blob would penalise every bent geometric triple, not straighten a defined
+chain. Covering Curvature forces SW to take an EXTERNAL ordered bond graph it does not maintain — a
+new required input that breaks every current SW user (mW water, silicon) and changes its output
+from an integrated Newtonian force to a Metropolis accept/reject energy. That is a signature-
+breaking refinement, not a free implementation slot, so `stiffen` is the honest call. (If a
+reviewer rules SW's contract already means "any three-body angular stiffness," the fallback is
+`implementation_of: stillinger_weber` with `cos0=-1` — and the disagreement is exactly the
+maintained-topology axis this campaign exists to surface.)
+
+Not a second sighting of any jax-morph-proposed contract (adhere, agitate, apoptose, mechanosense,
+morphogen, regulate, relax, reorient) — none is an angular/bending stiffness. All excavator caveats
+(no ablation run, no paper text, C++ read-not-run) carry forward unchanged.
+
+## curvature — SOURCE GROUNDING (this pass)
+
+Grounded `paper_section` in the evidence ACTUALLY present in this environment: the `.cpp` the
+entry cites (`CurvaturePlugin.cpp:Lnn`) is NOT shipped here — only `libCC3DCurvature.so` and the
+C++ HEADERS (`include/.../plugins/Curvature/CurvaturePlugin.h`, `CurvatureTracker.h`). Read both
+headers; they independently corroborate every structural claim the verdict rests on:
+`calculateInverseCurvatureSquare(leftVec, middleVec, rightVec)` is a THREE-vector (per-triple)
+call (`.h:L92-93`); `potentialFunction`/`diffEnergy{Local,Global,ByType}` are declared but are
+the vestigial family (`.h:L55,L78-85`; header comment L13 "target distance from xml is ignored");
+`CurvatureTracker::internalCurvatureNeighbors` is a `std::set<CurvatureTrackerData>` ordered by
+`neighborAddress` (a `CellG*` POINTER, `.h:L40-42`) — the arbitrary left/right labelling; and
+`class CurvaturePlugin : public Plugin, public EnergyFunction, public CellGChangeWatcher` (`.h:L24`)
+confirms the plugin IS BOTH energy function and accepted-move watcher — the exact hybrid the
+`stiffen` verdict describes. The `.cpp` line numbers are retained as UPSTREAM anchors, flagged as
+not re-readable here rather than presented as fresh reads. Verdict/contract unchanged.
+
+
+---
+
+## steadystatediffusionsolver
+
+<!-- steadystatediffusionsolver -- append below; the driver merges this into campaign/analysis.md -->
+
+# SteadyStateDiffusionSolver (order 26)
+
+Read the class at PyCoreSpecs.py:L7223 (`SteadyStateDiffusionSolver`), its diffusion-data
+child `SteadyStateDiffusionSolverDiffusionData` (L7054), the field spec (L7130), the secretion
+override (L7194), the base `_PDESolverSpecs`/`_PDESolverFieldSpecs`/`_PDEDiffusionDataSpecs`
+(L1150/L1057/L554), and `PDEBoundaryConditions` (L820). In-tree behaviour anchor:
+`diffusion_solvers_descr.py` — "Solves Diffusion equation at the steady state i.e. at
+time= infinity ... Technically this solver solves Helmholtz Equation." Wizard defaults in
+CC3DXMLGenerator.py:997-1054.
+
+What it does to state: unlike DiffusionSolverFE (one explicit forward-Euler step per MCS),
+this DISCARDS the transient and writes the equilibrium field — the solution of the Helmholtz
+BVP `D∇²c − λc + S = 0` under the per-face boundary conditions. Field->field write, global
+(every site depends on every boundary), no timestep, no FTCS limit.
+
+Surprised me:
+- λ (decay_global) is structurally load-bearing (screening length √(D/λ)); the wizard default
+  decay is 1e-5, NOT 0 — a near-singular guard against the all-Neumann/λ=0 singular case.
+- Per-cell-type coefficients (diff_types/decay_types) exist in the base spec_dict but are NOT
+  emitted by this solver's DiffusionData.xml → D and λ are uniform through this API (contrast FE).
+- Secretion is restricted: secretion_data_new RAISES for ConstantConcentration and
+  SecretionOnContact — only additive-rate secretion allowed. Porting an FE spec with a
+  constant/Dirichlet secretion crashes at spec time.
+- Two registered names via `three_d` (default 2D): SteadyStateDiffusionSolver2D vs …Solver.
+
+Could NOT establish (someone's future false belief if I don't say it):
+- The compiled linear-solve kernel is a .so I did not read: exact method (SOR / CG / BiCGSTAB),
+  tolerance, iteration cap, and how Neumann/Periodic faces are discretised are UNVERIFIED. I take
+  "Helmholtz at steady state" from the guide, not from the numerics.
+- Whether init_expression/init_filename are actually consumed as a solver SEED or ignored — I
+  inferred "seed, not physical IC" from the steady-state framing but did not confirm in the core.
+- No evidence run for this mechanism (not among the six with metrics.json); all above is source-read.
+
+**Addendum (re-excavation, verified anchors).** Confirmed the substance above from source. The
+exact guide string I could locate is `CC3DMLGeneratorBase.py:24` ("Solves Diffusion equation at
+the steady state i.e. at time= infinity ... Technically this solver solves Helmholtz Equation");
+`core/diffusion_solvers_descr.py` has no `steady` hit in this build, so treat that as the anchor.
+The "secretion must live inside the solver, Secretion Plugin does not work" restriction is stated
+verbatim at `CC3DMLGeneratorBase.py:2456`, and the near-singular default `DecayConstant 0.00001`
+is the template default at `CC3DMLGeneratorBase.py:2444`. Everything else stands as written.
+
+**Correction to the addendum (anchor verified by direct read).** The Helmholtz guide quote is
+NOT at `CC3DMLGeneratorBase.py:24` — line 24 there is decorator code (`obj = args[0]`). The
+verbatim quote ("Solves Diffusion equation at the steady state i.e. at time= infinity ...
+Technically this solver solves Helmholtz Equation") lives at
+`cc3d/twedit5/Plugins/CC3DProject/diffusion_solvers_descr.py:23-24` (heading at 23, sentence at
+24). The addendum's "`core/diffusion_solvers_descr.py` has no `steady` hit" is a wrong-path
+grep: the file is under `twedit5/Plugins/CC3DProject/`, not `core/`, and it does contain the
+string (also at line 7). `paper_section:` in the entry now points at the correct file. The
+`:2456` Secretion-Plugin anchor is confirmed correct.
+
+**Addendum (pymanage).** Added one surprise from direct source read: the field spec's `pymanage`
+flag emits a bare `<ManageSecretionInPython/>` element and DROPS the whole SecretionData block
+(`SteadyStateDiffusionSolverField.xml`, PyCoreSpecs.py:L7156-L7159). When set, S(x) is supplied by
+a user Python steppable each MCS instead of the declared per-type rates — a reimplementer reading
+only the SecretionData path would miss that the source term can be externally driven. This is a
+declaration-layer branch; whether the compiled core honours the semantics identically is unverified
+(the .so was not read).
+
+---
+
+**NORMALIZER verdict: `new` (frozen baseline), `implementation_of: morphogen`.** This solver
+computes the t=infinity equilibrium of the screened-diffusion (modified-Helmholtz) equation
+`D grad^2 c - k c + S = 0` and overwrites the whole field with it — a constraint solve, not a
+time step. That is *exactly* the `morphogen` contract the jax-morph atlas already proposed
+(candidate `jax_morph_free_screened_diffusion.py:102`, the identical equation). CC3D is a third
+sibling implementation of the same biological verb (the quasi-static SDD morphogen gradient,
+screening length `sqrt(D/k)`), discretised on the CPM pixel lattice as a grid boundary-value
+problem rather than as jax-morph's free-space Green's-function / graph-Laplacian *cell* kernels.
+So the ledger should count `morphogen` ONCE across the two atlases; the verdict is `new` only
+because `morphogen` is not yet among the 52 promoted contracts. Distinct from `diffuse` (and its
+refinement DiffusionSolverFE in this same atlas): `diffuse` is a transient per-step Laplacian
+delta the engine integrates over time; this returns the fixed point in a single global implicit
+solve and cannot be decomposed into diffuse -> decay -> deposit — the three terms are solved
+*simultaneously* as one coupled elliptic system.
+
+**Strongest argument AGAINST (the verdict a stricter reviewer would defend).** The honest
+alternative is `refinement of diffuse`, mirroring how the sibling DiffusionSolverFE was normalized
+here. One could argue "steady state" is merely a THIRD numerical implementation of `diffuse`
+(alongside finite_difference and spectral) — solve the heat equation to t=infinity instead of
+stepping it — and that minting a separate `morphogen` verb splits one diffusion contract on a
+purely numerical distinction (transient vs. converged), inflating the new-contract count. If one
+holds that `diffuse` already *means* "the diffusion field" regardless of whether you read it
+mid-transient or at equilibrium, this is a refinement (widen diffuse with `solve: step|steady_state`),
+not a new verb. I rejected this because the two encode genuinely different biological idealisations
+(finite-rate transport integrated over developmental time vs. a gradient assumed always-equilibrated
+relative to cell motion), the source/decay terms are *inseparably coupled* in the elliptic solve
+(not the commuting explicit composite FE reduces to), and — decisively — the jax-morph atlas
+independently reached for a distinct `morphogen` contract for the identical equation rather than
+folding it into diffusion. But the pull toward `refinement of diffuse` is real.

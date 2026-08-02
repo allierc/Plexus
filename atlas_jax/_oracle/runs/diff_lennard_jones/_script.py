@@ -47,7 +47,7 @@ from jax_morph.physics import BrownianDynamics, LennardJones, SoftSphere
 
 OUT = os.environ["OUT"]
 
-# --- parameters (must match config/atlas/lennard_jones.yaml exactly) -------------------------- #
+# --- parameters (must match config/atlas_jax/lennard_jones.yaml exactly) -------------------------- #
 R0 = 0.5                      # uniform cell radius -> sigma = r_i + r_j = 1.0
 SIGMA = 2.0 * R0
 EPS = 1.0                     # LJ well depth
@@ -212,7 +212,7 @@ with open(os.path.join(OUT, "summary.json"), "w") as f:
 print(json.dumps(summary, indent=2))
 
 # --- ready-to-paste YAML `start:` block (byte-identical float32 IC for the Plexus spec) -------- #
-print("\n# ---- paste into config/atlas/lennard_jones.yaml sets.cell.start (LIVE cells only) ----")
+print("\n# ---- paste into config/atlas_jax/lennard_jones.yaml sets.cell.start (LIVE cells only) ----")
 print("    start:")
 for x, y in P0_live:
     print(f"    - [{x:.6f}, {y:.6f}]")

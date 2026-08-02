@@ -69,3 +69,19 @@ Not a second sighting of any jax-morph-proposed contract (adhere, agitate, apopt
 morphogen, regulate, relax, reorient) — none is an angular/bending stiffness. All excavator caveats
 (no ablation run, no paper text, C++ read-not-run) carry forward unchanged.
 
+## curvature — SOURCE GROUNDING (this pass)
+
+Grounded `paper_section` in the evidence ACTUALLY present in this environment: the `.cpp` the
+entry cites (`CurvaturePlugin.cpp:Lnn`) is NOT shipped here — only `libCC3DCurvature.so` and the
+C++ HEADERS (`include/.../plugins/Curvature/CurvaturePlugin.h`, `CurvatureTracker.h`). Read both
+headers; they independently corroborate every structural claim the verdict rests on:
+`calculateInverseCurvatureSquare(leftVec, middleVec, rightVec)` is a THREE-vector (per-triple)
+call (`.h:L92-93`); `potentialFunction`/`diffEnergy{Local,Global,ByType}` are declared but are
+the vestigial family (`.h:L55,L78-85`; header comment L13 "target distance from xml is ignored");
+`CurvatureTracker::internalCurvatureNeighbors` is a `std::set<CurvatureTrackerData>` ordered by
+`neighborAddress` (a `CellG*` POINTER, `.h:L40-42`) — the arbitrary left/right labelling; and
+`class CurvaturePlugin : public Plugin, public EnergyFunction, public CellGChangeWatcher` (`.h:L24`)
+confirms the plugin IS BOTH energy function and accepted-move watcher — the exact hybrid the
+`stiffen` verdict describes. The `.cpp` line numbers are retained as UPSTREAM anchors, flagged as
+not re-readable here rather than presented as fresh reads. Verdict/contract unchanged.
+

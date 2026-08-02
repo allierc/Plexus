@@ -1,6 +1,6 @@
 general:
-  name: wk_curvature_pos_s2
-  seed: 2
+  name: wk_curvature_neg_s0
+  seed: 0
   n_frames: 400
   dt: 1.0
   record_cap: 402
@@ -12,9 +12,9 @@ general:
   - 50.0
 sets:
   vertex:
-    n: 3552
+    n: 15604
   cell:
-    n: 1800
+    n: 7804
     state:
       chem:
         width: 2
@@ -32,7 +32,7 @@ operators:
   radius: 5.0
   jitter: 0.18
   p0: 3.5
-  seed: 2
+  seed: 0
   before_frame: 1
   vseed_cv: 0.15
 - op: cell_geometry_3d
@@ -41,7 +41,7 @@ operators:
   at: cell
 - op: cell_rd_seed
   at: cell
-  seed: 2
+  seed: 0
   before_frame: 3
   mode: scatter
   seed_frac: 0.06
@@ -60,7 +60,7 @@ operators:
   at: cell
   implementation: curvature
   vertex_set: vertex
-  beta: 1.5
+  beta: -1.5
   F0: 0.046
   rate: 1.0
 - op: morphogen_growth_3d
@@ -122,5 +122,5 @@ schedule:
 - divide_3d
 - topo_snapshot_3d
 _discovery:
-  comp_hash: WK_wk_curvature_pos_s2
+  comp_hash: WK_wk_curvature_neg_s0
   region: shape->chemistry feedback

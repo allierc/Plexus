@@ -150,7 +150,7 @@ is not inert.
 - Oracle (reference `f`, jax/diffrax venv): `_oracle/runs/diff_gene_network_connectionist/`
   (`reference.npz` + `summary.json`; deterministic at fixed input, `u` frozen across the rollout;
   script `_oracle/scripts/gene_network_connectionist.py`).
-- Engine (Plexus torch): spec `config/atlas/gene_network_connectionist.yaml`; evidence
+- Engine (Plexus torch): spec `config/atlas_jax/gene_network_connectionist.yaml`; evidence
   `log/atlas_jax/gene_network_connectionist/` (diag.json, metrics.json/.npz, spec_run.yaml, strip.png);
   gene trajectory in `graphs_data/atlas/gene_network_connectionist/simulation.zarr`.
 - Score: `python diff_gene_network_connectionist.py score` ->

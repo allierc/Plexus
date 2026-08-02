@@ -82,7 +82,7 @@ def observables(H):
 
 
 def main():
-    spec = os.path.join(PLEXUS, "config", "atlas", "jax_morph_proliferation.yaml")
+    spec = os.path.join(PLEXUS, "config", "atlas_jax", "jax_morph_proliferation.yaml")
     n_frames = 12
     target = 0.42                       # a target mean cell radius, chosen away from the default
 

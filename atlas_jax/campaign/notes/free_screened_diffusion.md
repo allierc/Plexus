@@ -190,7 +190,7 @@ is to prove the operator SCHEDULES and ACTS in the real engine on the matched IC
 - Oracle (jax venv): `_oracle/runs/diff_free_screened_diffusion/` (reference.npz + summary.json;
   script `_oracle/scripts/free_screened_diffusion.py`). dt/key-invariance asserted (quasistatic).
 - Score (torch): `diff_free_screened_diffusion.py` -> `.../diff.json`.
-- Engine (torch): spec `config/atlas/free_screened_diffusion.yaml`; evidence
+- Engine (torch): spec `config/atlas_jax/free_screened_diffusion.yaml`; evidence
   `log/atlas_jax/free_screened_diffusion/` (diag.json, metrics.json/.npz, spec_run.yaml, strip.png).
 
 **Verdict stands: `new`, `implementation_of: morphogen`.** The reproduction confirms the FREE-SPACE

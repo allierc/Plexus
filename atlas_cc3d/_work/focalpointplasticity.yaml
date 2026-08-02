@@ -32,8 +32,11 @@ equations: "Per existing link between linked cells i, j (default LinkConstituent
   \ when d_ij > max_distance -> the junction is deleted (no energy, removal only).\nThe LinkConstituentLaw\
   \ `law` (optional) replaces the default quadratic with a user formula over\nthe variables Lambda, Length\
   \ (=d_ij), TargetLength (=target_distance), e.g.\n\"LambdaExtra*Lambda*(Length-TargetLength)^2\". The\
-  \ quadratic above is the default when law is None.\nNOTE: the exact functional form is read from the\
-  \ LinkConstituentLaw default and the Swat et al.\ndescription; the compiled FPP core itself is not readable\
+  \ quadratic above is the default when law is None.\nNOTE: the LinkConstituentLaw class has NO default\
+  \ formula (its __init__ REQUIRES a formula string, PyCoreSpecs.py:L4526); the quadratic above is the\
+  \ compiled core's fallback applied when law is None, and the \"*(Length-TargetLength)^2\" shape appears\
+  \ only as an EXAMPLE in the LinkConstituentLaw docstring (L4521). So lambda*(d-target)^2 is evidenced by\
+  \ that example plus Swat et al., not read from a stored default; the compiled FPP core is not readable\
   \ in this environment (see surprises).\n"
 params:
   neighbor_order (Plugin): contact_range -- global default lattice-neighbor order used to detect candidate
@@ -50,9 +53,14 @@ params:
     candidate partners.
   internal (Parameters): link_scope -- flag selecting intra-cluster links (InternalParameters, links between
     compartments of one compartmental cell) vs inter-cluster links (Parameters).
-  law (Parameters): link_energy_law -- optional LinkConstituentLaw formula replacing the default quadratic;
-    UNKNOWN in detail -- which variables beyond Lambda/Length/TargetLength are bindable, and how the compiled
-    core parses the formula, I could not determine from the Python layer.
+  law (Parameters): link_energy_law -- optional LinkConstituentLaw (PyCoreSpecs.py:L4512) replacing the
+    default quadratic with a user formula string. The variable-binding model IS readable from the Python
+    layer -- three variables Lambda, Length, TargetLength are bound by the core from cell/link properties
+    (docstring L4523), and the user may register any number of ADDITIONAL named scalar constants via
+    `lcl.variable["Name"] = value` (L4550-4556), each emitted as a `<Variable Name= Value=>` child
+    (L4545-4546) and referenced by name in the formula (e.g. "LambdaExtra*Lambda*(Length-TargetLength)^2").
+    What remains unreadable is only how the compiled core PARSES/evaluates the formula string, not which
+    variables are bindable.
 state_io: "reads: centers of mass of each pair of linked cells (to compute d_ij), each cell's type, and\
   \ the\n  per-cell junction registry (how many links it already holds).\nwrites: nothing to the CPM pixel\
   \ lattice -- it returns an energy delta to the Metropolis\n  acceptance test (like other Potts plugins).\
@@ -60,9 +68,11 @@ state_io: "reads: centers of mass of each pair of linked cells (to compute d_ij)
   \ records on link formation and DELETES them\n  on break. So it carries pairwise state between steps,\
   \ it is not stateless.\n"
 surprises:
-- The exact energy form is inferred from the default LinkConstituentLaw formula ("...*(Length-TargetLength)^2")
-  and the Swat et al. description; the compiled FocalPointPlasticity core is not readable in this env,
-  so lambda*(d-target)^2 is the best-evidenced form, not one I read line-by-line.
+- The exact energy form is inferred from the LinkConstituentLaw docstring EXAMPLE ("...*(Length-TargetLength)^2",
+  PyCoreSpecs.py:L4521) and the Swat et al. description, NOT from a stored default -- LinkConstituentLaw
+  has no default formula (its __init__ requires one, L4526); the quadratic is the compiled core's fallback
+  when law is None. The compiled FocalPointPlasticity core is not readable in this env, so lambda*(d-target)^2
+  is the best-evidenced form, not one I read line-by-line.
 - ActivationEnergy is applied ONCE, only on the copy that creates a link -- it is a formation threshold,
   not a per-step energy. The twedit generator explicitly warns (CC3DMLGeneratorBase.py L882-884) that
   lambdaDistance/targetDistance/maxDistance are Python-steerable but ActivationEnergy must still be set
@@ -86,54 +96,97 @@ surprises:
 verdict: new
 of: null
 implementation_of: null
-why: |
-  `new` against the FROZEN baseline (all 42 registered contracts). The genuinely-new content is a
+why: '`new` against the FROZEN baseline (all 42 registered contracts). The genuinely-new content is a
+
   PERSISTENT, PLASTIC, LOAD-RUPTURED cell-cell LINK NETWORK: junctions self-assemble on contact
+
   (only while both cells are under a per-cell coordination cap, paying a one-time formation energy),
+
   persist as identified per-pair state across MCS, and rupture when their CoM-CoM distance exceeds a
+
   break length. I name the contract `bond` -- a load-bearing cell-cell junction (focal adhesion /
+
   adherens-junction / slip-bond biology). It is NOT proposed by the jax-morph atlas either (that
+
   list is adhere/agitate/apoptose/mechanosense/morphogen/regulate/relax/reorient), so
+
   implementation_of is null.
 
+
   WHY NOT `adhere`. `adhere` (jax-morph, unpromoted; the CC3D Contact/AdhesionFlex mechanisms are its
+
   sightings) is CONTINUUM DIFFERENTIAL ADHESION: a boundary-contact energy summed over shared
+
   cross-boundary lattice-site pairs, driving cell sorting by surface energy. FPP is a DISCRETE LINK
+
   set on cell CENTROIDS (CoM-CoM distance, target 7 / break 20 on volume-25 cells -- far beyond the
+
   contact boundary), with persistent per-link identity, a coordination cap, and load-dependent
+
   rupture. Mapping FPP onto `adhere` would conflate a continuum surface-energy field with a discrete
+
   plastic link graph -- different biology, different `set` semantics (boundary site-pairs vs an
+
   identified centroid-pair link). So this is a distinct contract, not a second sighting of `adhere`.
 
+
   WHY NOT a refinement/alias of the closest REGISTERED contract, `radius_graph` (rewire/topology).
+
   radius_graph rebuilds `edge_index` from scratch each tick by a single symmetric proximity
+
   threshold and keeps NO per-edge memory (its docstring: "rebuilds the live configuration ... emits
+
   no delta"). `bond` needs exactly what radius_graph deliberately refuses: (a) HYSTERESIS -- a link
+
   forms only within neighbor_order contact (~1-2 sites) but breaks only past max_distance (~20), an
+
   order of magnitude larger, so a formed junction stretches far beyond any range that could have
+
   formed it; (b) persistent per-link IDENTITY and per-link constitutive attributes; (c) a per-node
+
   COORDINATION CAP (max_junctions) enforced at formation; (d) a once-paid ActivationEnergy at
+
   formation. Widening radius_graph to admit these turns a stateless neighbour-search into a stateful
+
   load-bearing junction model -- that is replacing its biology (who-is-near) with a different one
+
   (which bonds have latched and not yet ruptured), i.e. violence, not a costed field widening.
 
+
   THE ALGEBRA-FIT TENSION, stated plainly (rule 8). FPP bundles two things Plexus deliberately keeps
+
   apart -- "who interacts" (rewire) and "how they interact" (a lateral energy). The RESTORING ENERGY
+
   itself, lambda*(d - target_distance)^2, is NOT new: it is a quadratic pair spring already
-  expressible by the registered `squared_law` (or `attraction_repulsion`) read over `bond`'s edges.
+
+  expressible by the registered `squared_law` (or `attraction_repulsion`) read over `bond`''s edges.
+
   The measurement-honest decomposition of the whole plugin is therefore `bond` (new: the plastic
+
   hysteretic topology + formation energy + coordination cap) COMPOSED WITH an existing pairwise
+
   spring on the links it maintains. What resists that clean split is that the rupture criterion
+
   (max_distance) is a strain threshold on the SAME link the spring loads, so the topology remodeling
+
   is mechanically coupled -- which is precisely why `bond` is a rewire that, unlike radius_graph,
+
   also carries a formation-energy delta rather than emitting a pure `{}`. That coupling is the new
-  contract's whole content, and it is what the Plexus separation-of-concerns cannot currently name.
+
+  contract''s whole content, and it is what the Plexus separation-of-concerns cannot currently name.
+
 
   SCOPE / CAVEATS. Only ONE new contract is credited (the plastic link topology), not two -- the
+
   spring is charged to `squared_law`. The compiled FPP core is unreadable here, so the quadratic form
+
   and the exact form/break scan cadence are inferred from the default LinkConstituentLaw + Swat et
+
   al., not read line-by-line; a user LinkConstituentLaw can replace the quadratic with an arbitrary
+
   formula (implementation freedom below the contract). No oracle/ablation run exists yet.
+
+  '
 contract:
   name: bond
   kind: rewire
@@ -145,28 +198,32 @@ contract:
   - a PERSISTENT link set E over eligible cell pairs -- the operator's primary product is this stateful,
     identified edge set (created on contact, deleted on rupture), NOT an integrable delta
   - a scalar dE contribution to the Metropolis acceptance test -- the ActivationEnergy formation bias,
-    paid ONCE only on the pixel copy that CREATES a junction (negative promotes formation). The link
-    RESTORING energy lambda*(d-target)^2 is charged separately to a pairwise spring (squared_law) read
-    over these edges; see why.
+    paid ONCE only on the pixel copy that CREATES a junction (negative promotes formation). The link RESTORING
+    energy lambda*(d-target)^2 is charged separately to a pairwise spring (squared_law) read over these
+    edges; see why.
   reads:
   - cell CoM (link length d_ij = ||CoM_i - CoM_j||, used to test rupture d_ij > max_distance)
   - cell_type (the ordered type1/type2 pair selects which cells are eligible to link)
   - the persistent per-link registry (which pairs are already linked; per-link rest/stiffness/break attrs)
   - per-cell link count (coordination; tested against max_junctions at formation time)
-  - neighbour shells within neighbor_order (contact test for candidate NEW links only, not for existing ones)
+  - neighbour shells within neighbor_order (contact test for candidate NEW links only, not for existing
+    ones)
   writes:
   - the persistent link set only -- CREATE a junction when two eligible cells contact while BOTH are under
-    the coordination cap; DELETE it when d_ij exceeds max_distance. Nothing is written to the CPM pixel lattice.
+    the coordination cap; DELETE it when d_ij exceeds max_distance. Nothing is written to the CPM pixel
+    lattice.
   maps:
-  - HYSTERESIS -- a link FORMS only within neighbor_order contact but BREAKS only past max_distance (>> contact
-    range), so a formed junction persists and stretches far beyond the range that could form it; memoryless
-    symmetric-threshold proximity (radius_graph) cannot express this, which is why `bond` is a distinct contract
+  - HYSTERESIS -- a link FORMS only within neighbor_order contact but BREAKS only past max_distance (>>
+    contact range), so a formed junction persists and stretches far beyond the range that could form it;
+    memoryless symmetric-threshold proximity (radius_graph) cannot express this, which is why `bond` is
+    a distinct contract
   - per type-pair (type1,type2) -> (lambda_fpp stiffness, target_distance rest length, max_distance rupture
     length, activation_energy one-time formation bias, max_junctions per-cell coordination cap, neighbor_order
     contact range); the `internal` flag selects inter-cluster vs intra-cluster (compartment) link scope
-  - plastic cell junctions / focal adhesions -- load-bearing links that self-assemble on contact, resist stretch
-    as springs, and rupture under load; distinct from continuum surface adhesion (`adhere`, the CC3D
-    Contact/AdhesionFlex mechanisms), which sums a boundary-site contact energy rather than an identified link
+  - plastic cell junctions / focal adhesions -- load-bearing links that self-assemble on contact, resist
+    stretch as springs, and rupture under load; distinct from continuum surface adhesion (`adhere`, the
+    CC3D Contact/AdhesionFlex mechanisms), which sums a boundary-site contact energy rather than an identified
+    link
 status: normalized
 module: null
 test: null

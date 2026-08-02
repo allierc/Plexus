@@ -3,7 +3,7 @@
 Two modes, keyed off the single oracle artefact `_oracle/runs/diff_gene_network_mwc/reference.npz`
 so the two runs cannot drift apart:
 
-    python diff_gene_network_mwc.py emit-spec   # write config/atlas/gene_network_mwc.yaml from the npz
+    python diff_gene_network_mwc.py emit-spec   # write config/atlas_jax/gene_network_mwc.yaml from the npz
     python diff_gene_network_mwc.py score       # after run_spec.py: read the engine trajectory,
                                                 # compute Metric_P (trajectory) + Metric_A (adversarial
                                                 # vector field), write diff.json, print PASS/FAIL
@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.join(PLEXUS, "src"))
 
 ORACLE_RUN = os.path.join(HERE, "_oracle", "runs", "diff_gene_network_mwc")
 REF_NPZ = os.path.join(ORACLE_RUN, "reference.npz")
-SPEC = os.path.join(PLEXUS, "config", "atlas", "gene_network_mwc.yaml")
+SPEC = os.path.join(PLEXUS, "config", "atlas_jax", "gene_network_mwc.yaml")
 THRESHOLD = 1.0e-4
 
 

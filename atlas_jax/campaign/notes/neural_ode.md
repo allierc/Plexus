@@ -114,8 +114,8 @@ Result:
 - Determinism of the reference confirmed in the oracle (fixed key gives fixed endpoint) before anything was recorded.
 
 Runs:
-- oracle (JAX reference): `atlas_jax_morph/_oracle/runs/diff_neural_ode/` (reference.npz + summary.json + _provenance.json); built by `_oracle/scripts/neural_ode.py`.
-- plexus differential driver: `atlas_jax_morph/diff_neural_ode.py` -> artefact `log/atlas_jax/neural_ode/diff.json`.
+- oracle (JAX reference): `atlas_jax/_oracle/runs/diff_neural_ode/` (reference.npz + summary.json + _provenance.json); built by `_oracle/scripts/neural_ode.py`.
+- plexus differential driver: `atlas_jax/diff_neural_ode.py` -> artefact `log/atlas_jax/neural_ode/diff.json`.
 
 Caveat recorded (not a defect): this is an operator-level differential, not a `run_spec.py`
 trajectory, and NeuralODE appears in no reference composition and no paper equation — so the delta

@@ -1,5 +1,5 @@
 import yaml
-d = yaml.safe_load(open('/workspace/Plexus/atlas_jax_morph/_work/hertzian.yaml'))
+d = yaml.safe_load(open('/workspace/Plexus/atlas_jax/_work/hertzian.yaml'))
 print('OK top keys:', list(d.keys()))
 print('verdict:', d['verdict'], '| of:', d['of'], '| implementation_of:', d['implementation_of'], '| status:', d['status'])
 c = d['contract']

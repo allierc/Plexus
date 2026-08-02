@@ -37,7 +37,7 @@ PLEXUS = os.path.abspath(os.path.join(HERE, ".."))
 sys.path.insert(0, os.path.join(PLEXUS, "src"))
 sys.path.insert(0, HERE)
 
-SPEC = os.path.join(PLEXUS, "config", "atlas", "jax_morph_proliferation.yaml")
+SPEC = os.path.join(PLEXUS, "config", "atlas_jax", "jax_morph_proliferation.yaml")
 
 # knob -> (operator it belongs to, start value, floor). The start is deliberately AWAY from the
 # value that hits the target, so a fit that "succeeds" cannot be the initial condition.

@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  1 AUG 2026 20:14
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  2 AUG 2026 08:29
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -819,8 +819,122 @@ Overfull \vbox (1.62663pt too high) has occurred while \output is active []
 [10]
 
 [11]
+! Missing $ inserted.
+<inserted text> 
+                $
+l.659 ...ph composition.} \code{config/atlas_jax/}
+                                                   is
+I've inserted a begin-math/end-math symbol since I think
+you left one out. Proceed, with fingers crossed.
 
-[12] (./_state/phase1_operators.tex
+! Extra }, or forgotten $.
+<recently read> \egroup 
+                        
+l.659 ...ph composition.} \code{config/atlas_jax/}
+                                                   is
+I've deleted a group-closing symbol because it seems to be
+spurious, as in `$x}$'. But perhaps the } is legitimate and
+you forgot something else, as in `\hbox{$x}'. In such cases
+the way to recover is to insert both the forgotten and the
+deleted material, e.g., by typing `I$}'.
+
+
+! LaTeX Error: Command \item invalid in math mode.
+
+See the LaTeX manual or LaTeX Companion for explanation.
+Type  H <return>  for immediate help.
+ ...                                              
+                                                  
+l.661 \item
+            \textbf{The differential metric is unwritten, and it is not obvi...
+
+Try typing  <return>  to proceed.
+If that doesn't work, type  X <return>  to quit.
+
+! Missing $ inserted.
+<inserted text> 
+                $
+l.661 \item \textbf
+                   {The differential metric is unwritten, and it is not obvi...
+I've inserted a begin-math/end-math symbol since I think
+you left one out. Proceed, with fingers crossed.
+
+
+Overfull \hbox (340.94237pt too wide) in paragraph at lines 659--661
+[]\T1/cmr/bx/n/10.95 No Plexus-side spec ex-ists for any jax-morph com-po-si-ti
+on. \T1/cmtt/m/n/10.95 config/atlas$[]\OML/cmm/m/it/10.95 ax=isempty\OT1/cmr/m/
+n/10.95 ; \OML/cmm/m/it/10.95 Phase\OT1/cmr/m/n/10.95 4\OML/cmm/m/it/10.95 cann
+otstartuntilaspeccanexpresstheirinitialconditionexactly:
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 659--661
+
+ []
+
+
+Overfull \hbox (12.636pt too wide) in paragraph at lines 661--665
+[]\T1/cmtt/m/n/10.95 The differential metric is unwritten, and it is not obviou
+s. Their macro-step is
+ []
+
+
+Overfull \hbox (35.26949pt too wide) in paragraph at lines 661--665
+\T1/cmtt/m/n/10.95 an operator split; ours is a schedule. Two integrators of th
+e same equations diverge
+ []
+
+
+Overfull \hbox (23.95274pt too wide) in paragraph at lines 661--665
+\T1/cmtt/m/n/10.95 trajectory-wise while agreeing on everything that matters. T
+he metric must measure
+ []
+
+
+Overfull \hbox (6.97763pt too wide) in paragraph at lines 665--667
+[]\T1/cmtt/m/n/10.95 Two mechanisms have no torch equivalent yet: their screene
+d-diffusion solve and
+ []
+
+
+Overfull \hbox (35.26949pt too wide) in paragraph at lines 665--667
+\T1/cmtt/m/n/10.95 their neural-ODE controller. Either may be more work than th
+e rest of the repository
+ []
+
+
+Overfull \hbox (12.636pt too wide) in paragraph at lines 667--671
+[]\T1/cmtt/m/n/10.95 The agent could not run record.py itself --- it is approva
+l-gated in this image ---
+ []
+
+
+Overfull \hbox (12.636pt too wide) in paragraph at lines 667--671
+\T1/cmtt/m/n/10.95 so it checked the rules by hand and the driver validated aft
+erwards. That is the
+ []
+
+
+Overfull \hbox (23.95274pt too wide) in paragraph at lines 667--671
+\T1/cmtt/m/n/10.95 design, but it means an agent cannot iterate against the val
+idator inside one call,
+ []
+
+
+
+[12]
+! Missing } inserted.
+<inserted text> 
+                }
+l.671 \end{enumerate}
+                     
+I've inserted something that you may have forgotten.
+(See the <inserted text> above.)
+With luck, this will get me unwedged. But if you
+really didn't forget anything, try typing `2' now; then
+my insertion and my current dilemma will both disappear.
+
+(./_state/phase1_operators.tex
 Overfull \hbox (3.84822pt too wide) in alignment at lines 4--7
  [] [] [] [] 
  []
@@ -880,7 +994,7 @@ Underfull \hbox (badness 10000) in paragraph at lines 743--744
 
 
 [16]
-<_state/phase5_forward.png, id=280, 1019.007pt x 650.43pt>
+<_state/phase5_forward.png, id=279, 1019.007pt x 650.43pt>
 File: _state/phase5_forward.png Graphic file (type png)
 <use _state/phase5_forward.png>
 Package pdftex.def Info: _state/phase5_forward.png  used on input line 818.
@@ -901,15 +1015,311 @@ Overfull \hbox (2.81102pt too wide) in paragraph at lines 866--874
 LaTeX Font Info:    Font shape `T1/cmtt/bx/n' in size <10> not available
 (Font)              Font shape `T1/cmtt/m/n' tried instead on input line 950.
 
-Overfull \hbox (49.55377pt too wide) in paragraph at lines 1009--1020
-\T1/cmr/m/n/10.95 sions ac-tu-ally fire, both im-ple-men-ta-tions pass a gra-di
--ent back to the per-cell rate ($\OMS/cmsy/m/n/10.95 j\OML/cmm/m/it/10.95 @ []=
-@ []\OMS/cmsy/m/n/10.95 j \OT1/cmr/m/n/10.95 =
+! Missing $ inserted.
+<inserted text> 
+                $
+l.977 ....py} runs a real \code{config/atlas_jax/}
+                                                   spec through \code{engine...
+I've inserted a begin-math/end-math symbol since I think
+you left one out. Proceed, with fingers crossed.
+
+! Extra }, or forgotten $.
+<recently read> \egroup 
+                        
+l.977 ....py} runs a real \code{config/atlas_jax/}
+                                                   spec through \code{engine...
+I've deleted a group-closing symbol because it seems to be
+spurious, as in `$x}$'. But perhaps the } is legitimate and
+you forgot something else, as in `\hbox{$x}'. In such cases
+the way to recover is to insert both the forgotten and the
+deleted material, e.g., by typing `I$}'.
+
+! Missing $ inserted.
+<inserted text> 
+                $
+l.979 
+      
+I've inserted a begin-math/end-math symbol since I think
+you left one out. Proceed, with fingers crossed.
+
+
+Overfull \hbox (207.07404pt too wide) in paragraph at lines 972--979
+\T1/cmtt/m/n/10.95 config/atlas$[]\OML/cmm/m/it/10.95 ax=specthrough[]; soitmea
+sureswhetheraknobislearnable[]:$ 
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 987--990
+[]|\T1/cmtt/m/n/10 end to end through a real
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 987--990
+\T1/cmtt/m/n/10 spec: grow_radius.max_radius,
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 987--990
+\T1/cmtt/m/n/10 morphogen.diffusion/degradation, regulate.gamma
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 987--990
+\T1/cmtt/m/n/10 --- precisely the operators that already store a
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 991--993
+[]|\T1/cmtt/m/n/10 the adhere family. The maths is differentiable;
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 991--993
+\T1/cmtt/m/n/10 self.eps = float(params.get(...)) drops the tape
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 994--996
+[]|\T1/cmtt/m/n/10 agitate (math.sqrt on a tensor), apoptose,
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 997--998
+[]|\T1/cmtt/m/n/10 one source only --- reported as unknown, never as
+ []
+
+
+Overfull \hbox (25.6849pt too wide) in paragraph at lines 1002--1008
+[]\T1/cmtt/m/n/10.95 The two-instrument design earned itself. The synthetic har
+ness invented three defects
+ []
+
+
+Overfull \hbox (14.36816pt too wide) in paragraph at lines 1002--1008
+\T1/cmtt/m/n/10.95 that were its own: an empty neighbour graph condemned the wh
+ole interaction family,
+ []
+
+
+Overfull \hbox (14.36816pt too wide) in paragraph at lines 1002--1008
+\T1/cmtt/m/n/10.95 a division that never fired condemned cell_divide, and makin
+g the level's own tensor
+ []
+
+
+Overfull \hbox (3.05142pt too wide) in paragraph at lines 1002--1008
+\T1/cmtt/m/n/10.95 the leaf condemned every structural operator. Each was caugh
+t by the second route
+ []
+
+
+Overfull \hbox (95.48593pt too wide) in paragraph at lines 1002--1008
+\T1/cmtt/m/n/10.95 disagreeing. And where they still disagree, the disagreement
+ \T1/cmtt/m/it/10.95 is \T1/cmtt/m/n/10.95 the finding: constructor-blocked
+ []
+
+
+Overfull \hbox (21.92711pt too wide) in paragraph at lines 1009--1020
+[]\T1/cmtt/m/n/10.95 Two corrections to what this note said before. cell_divide
+ is \T1/cmtt/m/it/10.95 not \T1/cmtt/m/n/10.95 a dead end --- once
+ []
+
+
+Overfull \hbox (3.05142pt too wide) in paragraph at lines 1009--1020
+\T1/cmtt/m/n/10.95 divisions actually fire, both implementations pass a gradien
+t back to the per-cell
+ []
+
+
+Overfull \hbox (14.42429pt too wide) in paragraph at lines 1009--1020
+\T1/cmtt/m/n/10.95 rate ($\OMS/cmsy/m/n/10.95 j\OML/cmm/m/it/10.95 @ []=@ []\OM
+S/cmsy/m/n/10.95 j \OT1/cmr/m/n/10.95 = 46\OML/cmm/m/it/10.95 :\OT1/cmr/m/n/10.
+95 8$\T1/cmtt/m/n/10.95 ), because the straight-through estimator works and
+ []
+
+
+Overfull \hbox (25.6849pt too wide) in paragraph at lines 1009--1020
+\T1/cmtt/m/n/10.95 because jax-morph drives division from a state block the gen
+e network writes, not from
+ []
+
+
+Overfull \hbox (52.87662pt too wide) in paragraph at lines 1009--1020
+\T1/cmtt/m/n/10.95 the operator's own parameter. The Figure 5 path loss $\OMS/c
+msy/m/n/10.95 !$ \T1/cmtt/m/n/10.95 positions $\OMS/cmsy/m/n/10.95 !$ \T1/cmtt/
+m/n/10.95 draw $\OMS/cmsy/m/n/10.95 !$ \T1/cmtt/m/n/10.95 division_rate
+ []
+
+
+Overfull \hbox (77.77739pt too wide) in paragraph at lines 1009--1020
+\OMS/cmsy/m/n/10.95 !$ \T1/cmtt/m/n/10.95 gene $\OMS/cmsy/m/n/10.95 !$ \T1/cmtt
+/m/n/10.95 regulate is intact. What remains true is the \T1/cmtt/m/it/10.95 var
+iance \T1/cmtt/m/n/10.95 argument: a straight-through
+ []
+
+
+Overfull \hbox (25.6849pt too wide) in paragraph at lines 1009--1020
+\T1/cmtt/m/n/10.95 gradient through one sampled rollout still optimises against
+ that sample's luck, which
+ []
+
+
+Overfull \hbox (53.97676pt too wide) in paragraph at lines 1009--1020
+\T1/cmtt/m/n/10.95 is what the trace contract addresses. And relax gives no par
+ameter gradient by \T1/cmtt/m/it/10.95 declaration
+ []
+
+
+Overfull \hbox (20.02654pt too wide) in paragraph at lines 1009--1020
+\T1/cmtt/m/n/10.95 --- it sets DIFFERENTIABLE = False and says why: the FIRE pa
+th runs detached, and the
  []
 
 
 
 [20]
+Overfull \hbox (3.05142pt too wide) in paragraph at lines 1022--1025
+[]\T1/cmtt/m/n/10.95 So the single highest-value next step is now scoped by two
+ instruments rather than
+ []
+
+
+Overfull \hbox (25.6849pt too wide) in paragraph at lines 1022--1025
+\T1/cmtt/m/n/10.95 by opinion: promote the _tunable helper --- today a one-off 
+inside one atlas candidate
+ []
+
+
+Overfull \hbox (3.05142pt too wide) in paragraph at lines 1022--1025
+\T1/cmtt/m/n/10.95 --- onto the operator base class, which converts constructor
+-blocked into learnable
+ []
+
+
+Overfull \hbox (20.02654pt too wide) in paragraph at lines 1028--1033
+\T1/cmtt/m/n/10.95 That step is taken. Operator.tunable() now lives on the base
+ class: a tensor handed
+ []
+
+
+Overfull \hbox (3.05142pt too wide) in paragraph at lines 1028--1033
+\T1/cmtt/m/n/10.95 in by a spec passes through untouched, anything else is coer
+ced to a float exactly
+ []
+
+
+Overfull \hbox (59.63513pt too wide) in paragraph at lines 1028--1033
+\T1/cmtt/m/n/10.95 as before. Applied to the adhere family's fifteen knobs, the
+ independent route re-certifies
+ []
+
+
+Overfull \hbox (13.63474pt too wide) in paragraph at lines 1028--1033
+\T1/cmtt/m/n/10.95 learnable 4 $\OMS/cmsy/m/n/10.95 !$ \T1/cmtt/m/n/10.95 8 and
+ constructor-blocked 4 $\OMS/cmsy/m/n/10.95 !$ \T1/cmtt/m/n/10.95 1. All 141 te
+sts still pass, which is
+ []
+
+
+Overfull \hbox (3.05142pt too wide) in paragraph at lines 1034--1039
+[]\T1/cmtt/m/n/10.95 So the blocker is no longer mechanical, and the real quest
+ion is the one this note
+ []
+
+
+Overfull \hbox (87.92699pt too wide) in paragraph at lines 1034--1039
+\T1/cmtt/m/n/10.95 has carried since the first gradient probe. The division dra
+w is discrete, so a straight-through
+ []
+
+
+Overfull \hbox (14.36816pt too wide) in paragraph at lines 1034--1039
+\T1/cmtt/m/n/10.95 gradient taken through one sampled rollout is a gradient thr
+ough that sample's \T1/cmtt/m/it/10.95 luck\T1/cmtt/m/n/10.95 .
+ []
+
+
+Overfull \hbox (14.36816pt too wide) in paragraph at lines 1034--1039
+\T1/cmtt/m/n/10.95 Optimising against it may be optimising noise --- and that i
+s a measurable claim, not
+ []
+
+
+Overfull \hbox (6.24254pt too wide) in paragraph at lines 1042--1044
+\T1/cmtt/m/n/10.95 Fit the same target $\OML/cmm/m/it/10.95 K$ \T1/cmtt/m/n/10.
+95 times over, averaging the loss over $\OML/cmm/m/it/10.95 K$ \T1/cmtt/m/n/10.
+95 independent seeds per
+ []
+
+
+Overfull \hbox (3.05142pt too wide) in paragraph at lines 1042--1044
+\T1/cmtt/m/n/10.95 Adam step, across independent replicates with disjoint seed 
+bases, and look at the
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 1049--1051
+[]|\T1/cmtt/m/n/10 the estimator is noisy but consistent; the fix is simply mor
+e
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 1051--1053
+[]|\T1/cmtt/m/n/10 the pathwise gradient is biased, and the reference's
+ []
+
+
+Overfull \hbox (37.00165pt too wide) in paragraph at lines 1057--1065
+[]\T1/cmtt/m/n/10.95 Why the cluster, with numbers rather than preference. A 40
+-frame differentiable rollout
+ []
+
+
+Overfull \hbox (1.04099pt too wide) in paragraph at lines 1057--1065
+\T1/cmtt/m/n/10.95 takes 52.9s on the devcontainer's CPU and 32.5s on an A6000 
+--- only $\OT1/cmr/m/n/10.95 1\OML/cmm/m/it/10.95 :\OT1/cmr/m/n/10.95 6\OMS/cms
+y/m/n/10.95 ^^B$\T1/cmtt/m/n/10.95 , because
+ []
+
+
+Overfull \hbox (65.2935pt too wide) in paragraph at lines 1057--1065
+\T1/cmtt/m/n/10.95 146 cells is not enough work to hide Python and kernel-launc
+h overhead. Per-run acceleration
+ []
+
+
+Overfull \hbox (53.97676pt too wide) in paragraph at lines 1057--1065
+\T1/cmtt/m/n/10.95 is therefore nearly pointless, while the replicates are comp
+letely independent: wall-clock
+ []
+
+
+Overfull \hbox (14.36816pt too wide) in paragraph at lines 1057--1065
+\T1/cmtt/m/n/10.95 comes from running 32 fits at once, which is what gpu_l4 is 
+for. cluster6.py reuses
+ []
+
+
+Overfull \hbox (25.6849pt too wide) in paragraph at lines 1057--1065
+\T1/cmtt/m/n/10.95 discovery/cluster.py's hardened primitives --- detached subm
+ission, job IDs as the only
+ []
+
+
+Overfull \hbox (20.02654pt too wide) in paragraph at lines 1057--1065
+\T1/cmtt/m/n/10.95 ground truth, ssh wall-timeout, completion only on positive 
+evidence --- under its own
+ []
+
+
+Overfull \hbox (20.24234pt too wide) in paragraph at lines 1066--1068
+[]\T1/cmtt/m/n/10.95 The answer. 32 jobs, $\OML/cmm/m/it/10.95 K \OMS/cmsy/m/n/
+10.95 2 f\OT1/cmr/m/n/10.95 1\OML/cmm/m/it/10.95 ; \OT1/cmr/m/n/10.95 2\OML/cmm
+/m/it/10.95 ; \OT1/cmr/m/n/10.95 4\OML/cmm/m/it/10.95 ; \OT1/cmr/m/n/10.95 8\OM
+S/cmsy/m/n/10.95 g$ $^^B$ \T1/cmtt/m/n/10.95 8 replicates, 24 frames, 20 Adam s
+teps, fitting
+ []
+
 <_state/phase6_variance.png, id=307, 896.148pt x 353.85533pt>
 File: _state/phase6_variance.png Graphic file (type png)
 <use _state/phase6_variance.png>
@@ -918,6 +1328,137 @@ Package pdftex.def Info: _state/phase6_variance.png  used on input line 1070.
 
 
 [21]
+Overfull \hbox (39.39545pt too wide) in paragraph at lines 1087--1093
+[]\T1/cmtt/m/n/10.95 Precision: fixable, exactly as hoped. $\OML/cmm/m/it/10.95
+ ^^[ \OMS/cmsy/m/n/10.95 / \OML/cmm/m/it/10.95 K[]$\T1/cmtt/m/n/10.95 , against
+ the $\OML/cmm/m/it/10.95 K[]$ \T1/cmtt/m/n/10.95 a plain Monte-Carlo
+ []
+
+
+Overfull \hbox (46.67403pt too wide) in paragraph at lines 1087--1093
+\T1/cmtt/m/n/10.95 average would give --- and with $\OML/cmm/m/it/10.95 n \OT1/
+cmr/m/n/10.95 = 8$ \T1/cmtt/m/n/10.95 the standard error on an estimated standa
+rd deviation
+ []
+
+
+Overfull \hbox (19.40959pt too wide) in paragraph at lines 1087--1093
+\T1/cmtt/m/n/10.95 is about 27%, so $\OMS/cmsy/m/n/10.95 ^^@\OT1/cmr/m/n/10.95 
+0\OML/cmm/m/it/10.95 :\OT1/cmr/m/n/10.95 58$ \T1/cmtt/m/n/10.95 and $\OMS/cmsy/
+m/n/10.95 ^^@\OT1/cmr/m/n/10.95 0\OML/cmm/m/it/10.95 :\OT1/cmr/m/n/10.95 50$ \T
+1/cmtt/m/n/10.95 are the same number. Averaging seeds buys precision
+ []
+
+
+Overfull \hbox (37.00165pt too wide) in paragraph at lines 1087--1093
+\T1/cmtt/m/n/10.95 at the ordinary rate. The straight-through gradient through 
+a discrete division behaves
+ []
+
+
+Overfull \hbox (3.05142pt too wide) in paragraph at lines 1087--1093
+\T1/cmtt/m/n/10.95 like a noisy estimator, not a broken one, which is the good 
+half of the result and
+ []
+
+
+Overfull \hbox (20.02654pt too wide) in paragraph at lines 1094--1099
+[]\T1/cmtt/m/n/10.95 Correctness: the centre moves, and that is the finding. Th
+e right-hand panel is the
+ []
+
+
+Overfull \hbox (5.3751pt too wide) in paragraph at lines 1094--1099
+\T1/cmtt/m/n/10.95 one to read. A $\OML/cmm/m/it/10.95 K \OT1/cmr/m/n/10.95 = 1
+$ \T1/cmtt/m/n/10.95 fit lands at $\OT1/cmr/m/n/10.95 1\OML/cmm/m/it/10.95 :\OT
+1/cmr/m/n/10.95 2072$ \T1/cmtt/m/n/10.95 and a $\OML/cmm/m/it/10.95 K \OT1/cmr/
+m/n/10.95 = 8$ \T1/cmtt/m/n/10.95 fit at $\OT1/cmr/m/n/10.95 1\OML/cmm/m/it/10.
+95 :\OT1/cmr/m/n/10.95 2885$ \T1/cmtt/m/n/10.95 --- a difference
+ []
+
+
+Overfull \hbox (8.93835pt too wide) in paragraph at lines 1094--1099
+\T1/cmtt/m/n/10.95 of $\OT1/cmr/m/n/10.95 +0\OML/cmm/m/it/10.95 :\OT1/cmr/m/n/1
+0.95 081$ \T1/cmtt/m/n/10.95 against a combined standard error of $\OT1/cmr/m/n
+/10.95 0\OML/cmm/m/it/10.95 :\OT1/cmr/m/n/10.95 028$\T1/cmtt/m/n/10.95 , $\OML/
+cmm/m/it/10.95 t \OT1/cmr/m/n/10.95 = 2\OML/cmm/m/it/10.95 :\OT1/cmr/m/n/10.95 
+90$\T1/cmtt/m/n/10.95 . A single-seed fit is
+ []
+
+
+Overfull \hbox (8.7098pt too wide) in paragraph at lines 1094--1099
+\T1/cmtt/m/n/10.95 not merely imprecise; it is systematically wrong, by about 6
+%. And the sequence is
+ []
+
+
+Overfull \hbox (6.78378pt too wide) in paragraph at lines 1094--1099
+\T1/cmtt/m/n/10.95 still climbing at $\OML/cmm/m/it/10.95 K \OT1/cmr/m/n/10.95 
+= 8$\T1/cmtt/m/n/10.95 , so we cannot claim the $\OML/cmm/m/it/10.95 K \OT1/cmr
+/m/n/10.95 = 8$ \T1/cmtt/m/n/10.95 answer has converged either. 
+ []
+
+
+Overfull \hbox (25.6849pt too wide) in paragraph at lines 1100--1106
+[]\T1/cmtt/m/n/10.95 That is precisely the failure this note predicted --- ``op
+timising against that sample's
+ []
+
+
+Overfull \hbox (37.00165pt too wide) in paragraph at lines 1100--1106
+\T1/cmtt/m/n/10.95 luck'' --- caught by measurement rather than by argument, an
+d it would have been invisible
+ []
+
+
+Overfull \hbox (33.24385pt too wide) in paragraph at lines 1100--1106
+\T1/cmtt/m/n/10.95 to anyone who ran one fit and believed it. \T1/cmtt/m/it/10.
+95 It is also not the end of the story: \T1/cmtt/m/n/10.95 Ÿ[]13.4[]
+ []
+
+
+Overfull \hbox (20.02654pt too wide) in paragraph at lines 1100--1106
+\T1/cmtt/m/n/10.95 runs the same grid four times longer and finds the drift was
+ the step budget, not the
+ []
+
+
+Overfull \hbox (20.02654pt too wide) in paragraph at lines 1100--1106
+\T1/cmtt/m/n/10.95 estimator. The paragraph above is kept as it stood, because 
+the intermediate reading
+ []
+
+
+Overfull \hbox (14.36816pt too wide) in paragraph at lines 1109--1113
+\T1/cmtt/m/n/10.95 The 20-step drift had two possible causes and that sweep cou
+ld not separate them. A
+ []
+
+
+Overfull \hbox (16.26874pt too wide) in paragraph at lines 1109--1113
+\T1/cmtt/m/it/10.95 biased \T1/cmtt/m/n/10.95 estimator points somewhere other 
+than downhill and no step budget fixes it ---
+ []
+
+
+Overfull \hbox (4.952pt too wide) in paragraph at lines 1109--1113
+\T1/cmtt/m/n/10.95 the trace contract would then be required. A \T1/cmtt/m/it/1
+0.95 truncated \T1/cmtt/m/n/10.95 budget means the estimator
+ []
+
+
+Overfull \hbox (30.10965pt too wide) in paragraph at lines 1109--1113
+\T1/cmtt/m/n/10.95 is fine but a noisier gradient converges more slowly, so at 
+a fixed 20 steps the low-$\OML/cmm/m/it/10.95 K$
+ []
+
+
+Overfull \hbox (3.05142pt too wide) in paragraph at lines 1114--1116
+[]\T1/cmtt/m/n/10.95 The discriminator is to run the same grid four times longe
+r and Polyak-average the
+ []
+
+
 
 [22 <./_state/phase6_variance.png>]
 <_state/phase6_verdict.png, id=319, 549.252pt x 361.35pt>
@@ -926,8 +1467,221 @@ File: _state/phase6_verdict.png Graphic file (type png)
 Package pdftex.def Info: _state/phase6_verdict.png  used on input line 1138.
 (pdftex.def)             Requested size: 331.87375pt x 218.33347pt.
 
+Overfull \hbox (53.97676pt too wide) in paragraph at lines 1144--1150
+[]\T1/cmtt/m/n/10.95 And the mechanism is identifiable, not merely inferred. Re
+ading the trajectories directly:
+ []
+
+
+Overfull \hbox (4.49275pt too wide) in paragraph at lines 1144--1150
+\T1/cmtt/m/n/10.95 in every $\OML/cmm/m/it/10.95 K[]\OT1/cmr/m/n/10.95 8$ \T1/c
+mtt/m/n/10.95 run the parameter rises past its target, peaks at step 22--26 (me
+dian
+ []
+
+
+Overfull \hbox (31.34328pt too wide) in paragraph at lines 1144--1150
+\T1/cmtt/m/n/10.95 24.5), and settles back. \T1/cmtt/m/it/10.95 A 20-step budge
+t stops on the rising edge of Adam's overshoot
+ []
+
+
+Overfull \hbox (20.02654pt too wide) in paragraph at lines 1144--1150
+\T1/cmtt/m/n/10.95 --- it samples a transient rather than an optimum. That is a
+lso why the apparent bias
+ []
+
+
+Overfull \hbox (23.21765pt too wide) in paragraph at lines 1144--1150
+\T1/cmtt/m/n/10.95 was $\OML/cmm/m/it/10.95 K$\T1/cmtt/m/n/10.95 -dependent: mi
+d-climb, a noisier gradient has climbed less far, so low $\OML/cmm/m/it/10.95 K
+$ \T1/cmtt/m/n/10.95 reads
+ []
+
+
+Overfull \hbox (20.02654pt too wide) in paragraph at lines 1151--1156
+[]\T1/cmtt/m/n/10.95 So: truncation, not bias. The straight-through gradient th
+rough a discrete division
+ []
+
+
+Overfull \hbox (30.18126pt too wide) in paragraph at lines 1151--1156
+\T1/cmtt/m/n/10.95 is a sound estimator --- noisy, converging at the ordinary $
+\OT1/cmr/m/n/10.95 1\OML/cmm/m/it/10.95 =[]$ \T1/cmtt/m/n/10.95 rate ($\OML/cmm
+/m/it/10.95 ^^[ \OMS/cmsy/m/n/10.95 / \OML/cmm/m/it/10.95 K[]$ \T1/cmtt/m/n/10.
+95 here),
+ []
+
+
+Overfull \hbox (20.02654pt too wide) in paragraph at lines 1151--1156
+\T1/cmtt/m/n/10.95 and unbiased as far as this can measure. Figure 5 is an engi
+neering problem, and the
+ []
+
+
+Overfull \hbox (25.6849pt too wide) in paragraph at lines 1151--1156
+\T1/cmtt/m/n/10.95 reference's trace/replay/score contract is an optimisation r
+ather than a prerequisite.
+ []
+
+
+Overfull \hbox (3.05142pt too wide) in paragraph at lines 1151--1156
+\T1/cmtt/m/n/10.95 That is the opposite of what this note assumed two sections 
+ago, and the reason to
+ []
+
+
+Overfull \hbox (7.12198pt too wide) in paragraph at lines 1157--1162
+[]\T1/cmtt/m/n/10.95 What is still not proven. $\OML/cmm/m/it/10.95 t \OT1/cmr/
+m/n/10.95 = 1\OML/cmm/m/it/10.95 :\OT1/cmr/m/n/10.95 54$ \T1/cmtt/m/n/10.95 is 
+not significance, but it is not a strong null
+ []
+
+
+Overfull \hbox (34.88979pt too wide) in paragraph at lines 1157--1162
+\T1/cmtt/m/n/10.95 either: $\OML/cmm/m/it/10.95 K[]\OT1/cmr/m/n/10.95 1$ \T1/cm
+tt/m/n/10.95 still sits $\OT1/cmr/m/n/10.95 0\OML/cmm/m/it/10.95 :\OT1/cmr/m/n/
+10.95 045$ \T1/cmtt/m/n/10.95 below $\OML/cmm/m/it/10.95 K[]\OT1/cmr/m/n/10.95 
+8$\T1/cmtt/m/n/10.95 , and with $\OML/cmm/m/it/10.95 n \OT1/cmr/m/n/10.95 = 8$ 
+\T1/cmtt/m/n/10.95 the power to detect a residual
+ []
+
+
+Overfull \hbox (3.05142pt too wide) in paragraph at lines 1157--1162
+\T1/cmtt/m/n/10.95 bias that size is poor. What the data support is that any re
+maining bias is small
+ []
+
+
+Overfull \hbox (3.05142pt too wide) in paragraph at lines 1157--1162
+\T1/cmtt/m/n/10.95 compared with the one truncation produced. And this is one p
+arameter, one target,
+ []
+
+
+Overfull \hbox (13.13454pt too wide) in paragraph at lines 1163--1165
+[]\T1/cmtt/m/n/10.95 The operational rule survives either way: average $\OML/cm
+m/m/it/10.95 K$ \T1/cmtt/m/n/10.95 seeds per step, never one, and
+ []
+
+
+Overfull \hbox (59.63513pt too wide) in paragraph at lines 1168--1172
+\T1/cmtt/m/n/10.95 With the tunable stored as a tensor rather than a float --- 
+the torch form of the reference's
+ []
+
+
+Overfull \hbox (25.6849pt too wide) in paragraph at lines 1168--1172
+\T1/cmtt/m/n/10.95 own rule, ``store as an array anything you want to learn'' -
+-- the loop closes. A target
+ []
+
+
+Overfull \hbox (3.05142pt too wide) in paragraph at lines 1168--1172
+\T1/cmtt/m/n/10.95 mean cell radius, a squared-error loss on the final state, t
+welve Adam steps, each
+ []
+
+
+Overfull \hbox (31.34328pt too wide) in paragraph at lines 1168--1172
+\T1/cmtt/m/n/10.95 one a full differentiable rollout of the real engine with gr
+owth, adhesion and division
+ []
+
+
 
 [23 <./_state/phase6_verdict.png>]
+Overfull \hbox (42.66002pt too wide) in paragraph at lines 1187--1189
+[]\T1/cmtt/m/n/10.95 Three orders of magnitude, and the overshoot-and-return in
+ the middle is Adam's momentum,
+ []
+
+
+Overfull \hbox (3.05142pt too wide) in paragraph at lines 1187--1189
+\T1/cmtt/m/n/10.95 not noise. Inverse design through the Plexus engine works to
+day, for a continuous
+ []
+
+
+Overfull \hbox (37.00165pt too wide) in paragraph at lines 1190--1196
+[]\T1/cmtt/m/n/10.95 What Figure 5 still needs, stated precisely so it is not a
+ surprise later: the division
+ []
+
+
+Overfull \hbox (10.61037pt too wide) in paragraph at lines 1190--1196
+\T1/cmtt/m/it/10.95 draw \T1/cmtt/m/n/10.95 is discrete, and a gradient through
+ one sampled rollout optimises against that
+ []
+
+
+Overfull \hbox (20.02654pt too wide) in paragraph at lines 1190--1196
+\T1/cmtt/m/n/10.95 sample's luck. The reference's answer is exactly the mechani
+sm this atlas catalogued
+ []
+
+
+Overfull \hbox (20.02654pt too wide) in paragraph at lines 1190--1196
+\T1/cmtt/m/n/10.95 and set aside as ``not biology'' --- record the sampled acti
+on, replay it, score it, and
+ []
+
+
+Overfull \hbox (20.02654pt too wide) in paragraph at lines 1190--1196
+\T1/cmtt/m/n/10.95 take a score-function gradient over recorded histories. That
+ contract is the largest
+ []
+
+
+Overfull \hbox (14.36816pt too wide) in paragraph at lines 1190--1196
+\T1/cmtt/m/n/10.95 single thing the language is missing, and it is now specifie
+d, in our own record, by
+ []
+
+
+Overfull \hbox (65.2935pt too wide) in paragraph at lines 1197--1204
+[]\T1/cmtt/m/n/10.95 And here the two halves of the atlas meet. Phase 2 classif
+ied jax-morph's four architectural
+ []
+
+
+Overfull \hbox (20.02654pt too wide) in paragraph at lines 1197--1204
+\T1/cmtt/m/n/10.95 mechanisms --- the operator split, the time-scale taxonomy, 
+the declared dataflow, the
+ []
+
+
+Overfull \hbox (25.6849pt too wide) in paragraph at lines 1197--1204
+\T1/cmtt/m/n/10.95 stochastic trace/replay/score contract --- as \T1/cmtt/m/it/
+10.95 out of scope\T1/cmtt/m/n/10.95 , because none of them models
+ []
+
+
+Overfull \hbox (14.36816pt too wide) in paragraph at lines 1197--1204
+\T1/cmtt/m/n/10.95 any biology. That was the right call and it is only half the
+ story: those four are
+ []
+
+
+Overfull \hbox (21.92711pt too wide) in paragraph at lines 1197--1204
+\T1/cmtt/m/n/10.95 precisely the infrastructure the \T1/cmtt/m/it/10.95 inverse
+ \T1/cmtt/m/n/10.95 half of Plexus turns out to need. The trace
+ []
+
+
+Overfull \hbox (31.34328pt too wide) in paragraph at lines 1197--1204
+\T1/cmtt/m/n/10.95 contract in particular is how the reference gets a gradient 
+through a discrete division
+ []
+
+
+Overfull \hbox (14.36816pt too wide) in paragraph at lines 1205--1207
+[]\T1/cmtt/m/n/10.95 So the atlas's first repository has produced, unprompted, 
+a shortlist of what to add
+ []
+
+LaTeX Font Info:    Font shape `T1/cmtt/bx/n' in size <12> not available
+(Font)              Font shape `T1/cmtt/m/n' tried instead on input line 1209.
 
 Package hyperref Warning: Token not allowed in a PDF string (Unicode):
 (hyperref)                removing `math shift' on input line 1209.
@@ -941,79 +1695,624 @@ Package hyperref Warning: Token not allowed in a PDF string (Unicode):
 (hyperref)                removing `math shift' on input line 1209.
 
 
+Overfull \hbox (25.6849pt too wide) in paragraph at lines 1211--1216
+\T1/cmtt/m/n/10.95 Three of the eight new contracts --- regulate, morphogen, me
+chanosense --- are the \T1/cmtt/m/it/10.95 sense
+ []
+
+
+Overfull \hbox (1.1942pt too wide) in paragraph at lines 1211--1216
+\T1/cmtt/m/it/10.95 and decide \T1/cmtt/m/n/10.95 half of a cell. grow_radius a
+nd cell_divide are the \T1/cmtt/m/it/10.95 act \T1/cmtt/m/n/10.95 half, and the
+
+ []
+
+
+Overfull \hbox (48.31839pt too wide) in paragraph at lines 1211--1216
+\T1/cmtt/m/n/10.95 language already had those. What regulate adds is the piece 
+that was missing: a per-cell
+ []
+
+
+Overfull \hbox (8.7098pt too wide) in paragraph at lines 1211--1216
+\T1/cmtt/m/n/10.95 internal dynamical state, heritable and integrated. Before i
+t, a Plexus cell was a
+ []
+
+
+Overfull \hbox (25.6849pt too wide) in paragraph at lines 1217--1221
+[]\T1/cmtt/m/n/10.95 The coupling needs no new machinery, which is the point. r
+egulate reads sensed fields
+ []
+
+
+Overfull \hbox (14.36816pt too wide) in paragraph at lines 1217--1221
+\T1/cmtt/m/n/10.95 and writes the same per-cell blocks --- growth_rate, divisio
+n_rate, secretion_rate ---
+ []
+
+
+Overfull \hbox (14.36816pt too wide) in paragraph at lines 1217--1221
+\T1/cmtt/m/n/10.95 that growth, division and secretion already consume. So the 
+loop closes through the
+ []
+
+
+Overfull \hbox (14.36816pt too wide) in paragraph at lines 1229--1233
+[]\T1/cmtt/m/n/10.95 Direct morphogen-to-growth is Turing-shaped: the field dec
+ides. Inserting regulate
+ []
+
+
+Overfull \hbox (14.36816pt too wide) in paragraph at lines 1229--1233
+\T1/cmtt/m/n/10.95 makes it programmable --- the network's weights become the d
+esign variables, which is
+ []
+
+
+Overfull \hbox (31.34328pt too wide) in paragraph at lines 1229--1233
+\T1/cmtt/m/n/10.95 Hiscock's framing and exactly what Figure 5 optimises. And t
+he chain is differentiable
+ []
+
+
+Overfull \hbox (6.87622pt too wide) in paragraph at lines 1229--1233
+\T1/cmtt/m/n/10.95 end to end (Ÿ[]13.1[]): loss $\OMS/cmsy/m/n/10.95 !$ \T1/cmt
+t/m/n/10.95 positions $\OMS/cmsy/m/n/10.95 !$ \T1/cmtt/m/n/10.95 division draw 
+$\OMS/cmsy/m/n/10.95 !$ \T1/cmtt/m/n/10.95 division_rate $\OMS/cmsy/m/n/10.95 !
+$ \T1/cmtt/m/n/10.95 gene $\OMS/cmsy/m/n/10.95 !$
+ []
+
+
 
 [24]
-<_state/regulated_growth.png, id=334, 982.872pt x 592.614pt>
+! Missing $ inserted.
+<inserted text> 
+                $
+l.1234 ...config/atlas_jax/regulated\_growth.yaml}
+                                                   ---
+I've inserted a begin-math/end-math symbol since I think
+you left one out. Proceed, with fingers crossed.
+
+! Extra }, or forgotten $.
+<recently read> \egroup 
+                        
+l.1234 ...config/atlas_jax/regulated\_growth.yaml}
+                                                   ---
+I've deleted a group-closing symbol because it seems to be
+spurious, as in `$x}$'. But perhaps the } is legitimate and
+you forgot something else, as in `\hbox{$x}'. In such cases
+the way to recover is to insert both the forgotten and the
+deleted material, e.g., by typing `I$}'.
+
+! Missing $ inserted.
+<inserted text> 
+                $
+l.1236 ..., none new. 40 macro-steps, 4 cells $\to
+                                                  $ 68, every
+I've inserted a begin-math/end-math symbol since I think
+you left one out. Proceed, with fingers crossed.
+
+
+Overfull \hbox (718.68005pt too wide) in paragraph at lines 1234--1238
+[]\T1/cmtt/m/n/10.95 It runs, and the loop is real. config/atlas$[]\OML/cmm/m/i
+t/10.95 ax=regulated[]growth:yaml \OMS/cmsy/m/n/10.95 ^^@ ^^@ ^^@ []\OML/cmm/m/
+it/10.95 ; sixoperators; allpreviouslyvalidatedagainsttheauthors[]code; nonenew
+:\OT1/cmr/m/n/10.95 40\OML/cmm/m/it/10.95 macro \OMS/cmsy/m/n/10.95 ^^@
+ []
+
+<_state/regulated_growth.png, id=335, 982.872pt x 592.614pt>
 File: _state/regulated_growth.png Graphic file (type png)
 <use _state/regulated_growth.png>
 Package pdftex.def Info: _state/regulated_growth.png  used on input line 1240.
 (pdftex.def)             Requested size: 460.935pt x 277.92276pt.
 
+Overfull \hbox (14.36816pt too wide) in paragraph at lines 1243--1249
+[]\T1/cmtt/m/n/10.95 The pattern is emergent, and nothing in the spec asks for 
+it. growth_rate is seeded
+ []
+
+
+Overfull \hbox (20.02654pt too wide) in paragraph at lines 1243--1249
+\T1/cmtt/m/n/10.95 at \T1/cmtt/m/it/10.95 zero\T1/cmtt/m/n/10.95 , so every bit
+ of growth in the run is something regulate decided. What comes
+ []
+
+
+Overfull \hbox (14.36816pt too wide) in paragraph at lines 1243--1249
+\T1/cmtt/m/n/10.95 out is a radial gradient: cells in the crowded interior read
+ a higher concentration
+ []
+
+
+Overfull \hbox (5.543pt too wide) in paragraph at lines 1243--1249
+\T1/cmtt/m/n/10.95 (the field is a superposition over live sources) and grow at
+ $\OT1/cmr/m/n/10.95 0\OML/cmm/m/it/10.95 :\OT1/cmr/m/n/10.95 96$\T1/cmtt/m/n/1
+0.95 , cells on the rim
+ []
+
+
+Overfull \hbox (36.21217pt too wide) in paragraph at lines 1243--1249
+\T1/cmtt/m/n/10.95 at $\OT1/cmr/m/n/10.95 0\OML/cmm/m/it/10.95 :\OT1/cmr/m/n/10
+.95 63$ \T1/cmtt/m/n/10.95 --- a 41% range, correlated with what each cell sens
+ed at $\OML/cmm/m/it/10.95 r \OT1/cmr/m/n/10.95 = +0\OML/cmm/m/it/10.95 :\OT1/c
+mr/m/n/10.95 995$\T1/cmtt/m/n/10.95 . No operator
+ []
+
+
+Overfull \hbox (14.36816pt too wide) in paragraph at lines 1250--1257
+[]\T1/cmtt/m/n/10.95 And the control is what makes that a claim rather than a p
+icture. Ablate one number
+ []
+
+
+Overfull \hbox (19.38596pt too wide) in paragraph at lines 1250--1257
+\T1/cmtt/m/n/10.95 --- $\OML/cmm/m/it/10.95 W[] \OT1/cmr/m/n/10.95 = 0$\T1/cmtt
+/m/n/10.95 , the single weight that lets a cell read the field --- and \T1/cmtt
+/m/it/10.95 everything still
+ []
+
+
+Overfull \hbox (16.26874pt too wide) in paragraph at lines 1250--1257
+\T1/cmtt/m/it/10.95 runs\T1/cmtt/m/n/10.95 : morphogen still computes a field, 
+regulate still integrates, cells still grow
+ []
+
+
+Overfull \hbox (8.7098pt too wide) in paragraph at lines 1250--1257
+\T1/cmtt/m/n/10.95 and divide, the same 68 of them, and the acted ledger is unc
+hanged. What collapses
+ []
+
+
+Overfull \hbox (22.15138pt too wide) in paragraph at lines 1250--1257
+\T1/cmtt/m/n/10.95 is the spatial structure: growth_rate becomes uniform to mac
+hine precision at $\OT1/cmr/m/n/10.95 0\OML/cmm/m/it/10.95 :\OT1/cmr/m/n/10.95 
+3034$\T1/cmtt/m/n/10.95 ,
+ []
+
+
+Overfull \hbox (39.66417pt too wide) in paragraph at lines 1250--1257
+\T1/cmtt/m/n/10.95 which is exactly the autonomous fixed point $\OML/cmm/m/it/1
+0.95 ^^[[]\OT1/cmr/m/n/10.95 (\OML/cmm/m/it/10.95 b\OT1/cmr/m/n/10.95 )\OML/cmm
+/m/it/10.95 =^^M \OT1/cmr/m/n/10.95 = 0\OML/cmm/m/it/10.95 :\OT1/cmr/m/n/10.95 
+30342$ \T1/cmtt/m/n/10.95 the operator's own equation
+ []
+
+
+Overfull \hbox (31.34328pt too wide) in paragraph at lines 1270--1274
+[]\T1/cmtt/m/n/10.95 That ablation also exposes a limit of this campaign's own 
+discipline. The acted ledger
+ []
+
+
+Overfull \hbox (14.36816pt too wide) in paragraph at lines 1270--1274
+\T1/cmtt/m/n/10.95 --- ``did this operator ever do anything?'' --- is what caug
+ht the silent zero-division
+ []
+
+
+Overfull \hbox (8.7098pt too wide) in paragraph at lines 1270--1274
+\T1/cmtt/m/n/10.95 bug in Ÿ[]11[], and it passes the ablated run without compla
+int. \T1/cmtt/m/it/10.95 Acted is not coupled.
+ []
+
+
 
 [25 <./_state/regulated_growth.png>]
-<_state/phase6_invert.png, id=345, 1026.234pt x 607.068pt>
+Overfull \hbox (25.6849pt too wide) in paragraph at lines 1276--1281
+[]\T1/cmtt/m/n/10.95 One thing had to be tuned, and it is worth recording as a 
+modelling lesson rather than
+ []
+
+
+Overfull \hbox (16.58589pt too wide) in paragraph at lines 1276--1281
+\T1/cmtt/m/n/10.95 a detail. The first attempt used $\OML/cmm/m/it/10.95 W[] \O
+T1/cmr/m/n/10.95 = 2\OML/cmm/m/it/10.95 :\OT1/cmr/m/n/10.95 5$\T1/cmtt/m/n/10.9
+5 . The loop closed --- per-cell correlation
+ []
+
+
+Overfull \hbox (2.55957pt too wide) in paragraph at lines 1276--1281
+\OT1/cmr/m/n/10.95 0\OML/cmm/m/it/10.95 :\OT1/cmr/m/n/10.95 97$ \T1/cmtt/m/n/10
+.95 --- and was biologically pointless: with a sensed concentration around $\OT
+1/cmr/m/n/10.95 2\OML/cmm/m/it/10.95 :\OT1/cmr/m/n/10.95 7$ \T1/cmtt/m/n/10.95 
+the
+ []
+
+
+Overfull \hbox (12.40945pt too wide) in paragraph at lines 1276--1281
+\T1/cmtt/m/n/10.95 sigmoid sits at $\OML/cmm/m/it/10.95 x \OMS/cmsy/m/n/10.95 ^
+^Y \OT1/cmr/m/n/10.95 6$\T1/cmtt/m/n/10.95 , deep in saturation, where a cell r
+eading twice as much signal
+ []
+
+
+Overfull \hbox (48.31839pt too wide) in paragraph at lines 1276--1281
+\T1/cmtt/m/n/10.95 grows 1% faster. A coupling can be statistically perfect and
+ dynamically inert. Choosing
+ []
+
+
+Overfull \hbox (14.36816pt too wide) in paragraph at lines 1276--1281
+\T1/cmtt/m/n/10.95 the gain so the drive lands in the responsive band is what t
+urned a correlation into
+ []
+
+
+Overfull \hbox (25.6849pt too wide) in paragraph at lines 1282--1289
+[]\T1/cmtt/m/n/10.95 What this does not do is optimise anything. The gene circu
+it here is written by hand,
+ []
+
+
+Overfull \hbox (14.36816pt too wide) in paragraph at lines 1282--1289
+\T1/cmtt/m/n/10.95 not fitted; it is Figure 5's forward half, and the inverse h
+alf is Ÿ[]13.4[]'s business.
+ []
+
+
+Overfull \hbox (42.66002pt too wide) in paragraph at lines 1282--1289
+\T1/cmtt/m/n/10.95 And it remains a composition, not a fourth contract --- regi
+stering ``gene--growth coupling''
+ []
+
+
+Overfull \hbox (27.58548pt too wide) in paragraph at lines 1282--1289
+\T1/cmtt/m/n/10.95 as new vocabulary would be exactly the inflated \T1/cmtt/m/i
+t/10.95 new \T1/cmtt/m/n/10.95 the ledger exists to prevent. The
+ []
+
+
+Overfull \hbox (42.66002pt too wide) in paragraph at lines 1282--1289
+\T1/cmtt/m/n/10.95 claim is the narrower and stronger one: \T1/cmtt/m/it/10.95 
+three new contracts plus the growth the language
+ []
+
+
+Overfull \hbox (7.97636pt too wide) in paragraph at lines 1282--1289
+\T1/cmtt/m/it/10.95 already had close a sense $\OMS/cmsy/m/n/10.95 !$ \T1/cmtt/
+m/it/10.95 regulate $\OMS/cmsy/m/n/10.95 !$ \T1/cmtt/m/it/10.95 grow loop that 
+Plexus previously could not
+ []
+
+
+Overfull \hbox (33.24385pt too wide) in paragraph at lines 1293--1296
+\T1/cmtt/m/n/10.95 Ÿ[]14[] wrote the circuit by hand. This asks for the \T1/cmt
+t/m/it/10.95 opposite \T1/cmtt/m/n/10.95 morphology and lets gradient
+ []
+
+
+Overfull \hbox (42.66002pt too wide) in paragraph at lines 1293--1296
+\T1/cmtt/m/n/10.95 descent find the circuit --- Figure 5's structure, at two pa
+rameters instead of a network. 
+ []
+
+
+Overfull \hbox (31.34328pt too wide) in paragraph at lines 1297--1301
+[]\T1/cmtt/m/n/10.95 The target is chosen so the answer cannot be a tweak. The 
+hand-written activator grows
+ []
+
+
+Overfull \hbox (20.02654pt too wide) in paragraph at lines 1297--1301
+\T1/cmtt/m/n/10.95 the crowded interior fastest. Ask instead that the rim grow 
+fastest, and a cell must
+ []
+
+
+Overfull \hbox (0.55362pt too wide) in paragraph at lines 1297--1301
+\T1/cmtt/m/n/10.95 grow \T1/cmtt/m/it/10.95 less \T1/cmtt/m/n/10.95 where it se
+nses \T1/cmtt/m/it/10.95 more \T1/cmtt/m/n/10.95 --- an inhibitor, $\OML/cmm/m/
+it/10.95 W[] < \OT1/cmr/m/n/10.95 0$\T1/cmtt/m/n/10.95 . The fit starts from th
+e
+ []
+
+<_state/phase6_invert.png, id=346, 1026.234pt x 607.068pt>
 File: _state/phase6_invert.png Graphic file (type png)
 <use _state/phase6_invert.png>
 Package pdftex.def Info: _state/phase6_invert.png  used on input line 1303.
 (pdftex.def)             Requested size: 460.935pt x 272.6686pt.
 
+Overfull \hbox (56.87973pt too wide) in paragraph at lines 1308--1318
+ [] 
+ []
+
+
 
 [26 <./_state/phase6_invert.png>]
+Overfull \hbox (3.05142pt too wide) in paragraph at lines 1320--1326
+[]\T1/cmtt/m/n/10.95 It crossed zero on its own. 50 Adam steps, two seeds avera
+ged per step, each step
+ []
 
-[27] (./atlas_note.aux)
+
+Overfull \hbox (8.7098pt too wide) in paragraph at lines 1320--1326
+\T1/cmtt/m/n/10.95 a full differentiable rollout of the real engine --- growth,
+ adhesion, the morphogen
+ []
+
+
+Overfull \hbox (9.8856pt too wide) in paragraph at lines 1320--1326
+\T1/cmtt/m/n/10.95 solve, the intracellular ODE and the discrete division draw.
+ $\OML/cmm/m/it/10.95 W[]$\T1/cmtt/m/n/10.95 : $\OT1/cmr/m/n/10.95 +0\OML/cmm/m
+/it/10.95 :\OT1/cmr/m/n/10.95 35 \OMS/cmsy/m/n/10.95 ! ^^@\OT1/cmr/m/n/10.95 0\
+OML/cmm/m/it/10.95 :\OT1/cmr/m/n/10.95 253$\T1/cmtt/m/n/10.95 .
+ []
+
+
+Overfull \hbox (20.02654pt too wide) in paragraph at lines 1320--1326
+\T1/cmtt/m/n/10.95 three orders of magnitude. Nobody told it the sign had to ch
+ange; that is simply the
+ []
+
+
+Overfull \hbox (48.31839pt too wide) in paragraph at lines 1320--1326
+\T1/cmtt/m/n/10.95 answer to the morphology it was given, and the middle panel 
+is the morphology it produced. 
+ []
+
+
+Overfull \hbox (8.7098pt too wide) in paragraph at lines 1328--1336
+[]\T1/cmtt/m/n/10.95 Getting there required fixing a differentiability bug that
+ only a COMPOSITION could
+ []
+
+
+Overfull \hbox (20.02654pt too wide) in paragraph at lines 1328--1336
+\T1/cmtt/m/n/10.95 expose. cell_divide copies the mother's state into the daugh
+ter slot by looping over
+ []
+
+
+Overfull \hbox (3.05142pt too wide) in paragraph at lines 1328--1336
+\T1/cmtt/m/n/10.95 the set's per-node buffers --- and state is itself a registe
+red per-node buffer, so
+ []
+
+
+Overfull \hbox (44.5606pt too wide) in paragraph at lines 1328--1336
+\T1/cmtt/m/n/10.95 that loop wrote \T1/cmtt/m/it/10.95 in place \T1/cmtt/m/n/10
+.95 into the very tensor the operator had just cloned. Forward-only
+ []
+
+
+Overfull \hbox (42.66002pt too wide) in paragraph at lines 1328--1336
+\T1/cmtt/m/n/10.95 it is invisible (the write is superseded two lines later) an
+d the jax_morph_proliferation
+ []
+
+
+Overfull \hbox (48.31839pt too wide) in paragraph at lines 1328--1336
+\T1/cmtt/m/n/10.95 run never noticed. It becomes fatal the moment an upstream o
+perator holds a live gradient
+ []
+
+
+Overfull \hbox (14.36816pt too wide) in paragraph at lines 1328--1336
+\T1/cmtt/m/n/10.95 on a slice of state across a division --- which is exactly w
+hat regulate does when it
+ []
+
+
+Overfull \hbox (20.02654pt too wide) in paragraph at lines 1328--1336
+\T1/cmtt/m/n/10.95 integrates growth_rate. Six mechanisms each validated in iso
+lation; the defect lived
+ []
+
+
+Overfull \hbox (53.97676pt too wide) in paragraph at lines 1337--1343
+[]\T1/cmtt/m/n/10.95 And one modelling lesson, recorded because the loss lied c
+onvincingly. The first objective
+ []
+
+
+Overfull \hbox (15.23373pt too wide) in paragraph at lines 1337--1343
+\T1/cmtt/m/n/10.95 asked for a pointwise target $\OML/cmm/m/it/10.95 k[] \OT1/c
+mr/m/n/10.95 = \OML/cmm/m/it/10.95 k[] \OMS/cmsy/m/n/10.95 ^^@ \OML/cmm/m/it/10
+.95 g\OT1/cmr/m/n/10.95 (\OML/cmm/m/it/10.95 c[] \OMS/cmsy/m/n/10.95 ^^@ []\OT1
+/cmr/m/n/10.95 )$\T1/cmtt/m/n/10.95 , which \T1/cmtt/m/it/10.95 looks \T1/cmtt/
+m/n/10.95 like it asks for a negative
+ []
+
+
+Overfull \hbox (8.7098pt too wide) in paragraph at lines 1337--1343
+\T1/cmtt/m/n/10.95 slope. It does not: the population-mean term dominates it, a
+nd the fit cheerfully
+ []
+
+
+Overfull \hbox (0.34554pt too wide) in paragraph at lines 1337--1343
+\T1/cmtt/m/n/10.95 drove $\OML/cmm/m/it/10.95 W[]$ \T1/cmtt/m/it/10.95 upward \
+T1/cmtt/m/n/10.95 --- the wrong sign --- because that moved the mean toward $\O
+ML/cmm/m/it/10.95 k[]$\T1/cmtt/m/n/10.95 . The
+ []
+
+
+Overfull \hbox (8.7098pt too wide) in paragraph at lines 1337--1343
+\T1/cmtt/m/n/10.95 loss improved while the morphology got worse. Regressing the
+ slope explicitly, and
+ []
+
+
+Overfull \hbox (31.34328pt too wide) in paragraph at lines 1344--1351
+[]\T1/cmtt/m/n/10.95 What this is not. Two parameters, not a gene network; a ta
+rget on the growth \T1/cmtt/m/it/10.95 response\T1/cmtt/m/n/10.95 ,
+ []
+
+
+Overfull \hbox (20.02654pt too wide) in paragraph at lines 1344--1351
+\T1/cmtt/m/n/10.95 not on a shape directly (the current loss cannot tell a sphe
+re from a dumbbell of the
+ []
+
+
+Overfull \hbox (3.05142pt too wide) in paragraph at lines 1344--1351
+\T1/cmtt/m/n/10.95 same profile). Figure 5 proper is this with more genes and a
+ spatial objective ---
+ []
+
+
+Overfull \hbox (70.95187pt too wide) in paragraph at lines 1344--1351
+\T1/cmtt/m/n/10.95 but every piece of the path is now measured rather than assu
+med: the engine is differentiable
+ []
+
+
+Overfull \hbox (20.02654pt too wide) in paragraph at lines 1344--1351
+\T1/cmtt/m/n/10.95 (Ÿ[]13.1[]), the straight-through gradient through division 
+is a sound estimator (Ÿ[]13.4[]),
+ []
+
+
+Overfull \hbox (48.31839pt too wide) in paragraph at lines 1344--1351
+\T1/cmtt/m/n/10.95 and the loop it optimises through is a composition of valida
+ted operators with an ablation
+ []
+
+
+Overfull \hbox (31.34328pt too wide) in paragraph at lines 1355--1360
+\T1/cmtt/m/n/10.95 Decided (31 July). Run Phases 1--3 straight through, and sto
+p for a joint review before
+ []
+
+
+Overfull \hbox (25.6849pt too wide) in paragraph at lines 1355--1360
+\T1/cmtt/m/n/10.95 any figure work. Then the figure in two steps: forward only 
+in Phase 5, and Figure 5
+ []
+
+
+Overfull \hbox (37.00165pt too wide) in paragraph at lines 1355--1360
+\T1/cmtt/m/n/10.95 proper in Phase 6, through differentiability --- treated as 
+an expected feature of Plexus
+ []
+
+
+Overfull \hbox (53.97676pt too wide) in paragraph at lines 1355--1360
+\T1/cmtt/m/n/10.95 2 rather than an optional extra, building on prototype/inver
+se_slime/ and the ParticleGraph
+ []
+
+
+Overfull \hbox (13.23642pt too wide) in paragraph at lines 1364--1368
+[]\T1/cmtt/m/n/10.95 After this repository, which one? A saturation curve only 
+becomes an argument at
+ []
+
+
+Overfull \hbox (13.23642pt too wide) in paragraph at lines 1364--1368
+\T1/cmtt/m/n/10.95 the second and third framework. Cellular Potts (CompuCell3D)
+ is the biggest step
+ []
+
+
+Overfull \hbox (18.89479pt too wide) in paragraph at lines 1364--1368
+\T1/cmtt/m/n/10.95 away from everything we have --- cells as lattice domains ra
+ther than points --- and
+ []
+
+
+Overfull \hbox (13.23642pt too wide) in paragraph at lines 1368--1372
+[]\T1/cmtt/m/n/10.95 What happens to a refinement that breaks an existing user?
+ Widening a registered
+ []
+
+
+Overfull \hbox (1.91968pt too wide) in paragraph at lines 1368--1372
+\T1/cmtt/m/n/10.95 signature to admit a jax-morph mechanism can invalidate spec
+s that already run.
+ []
+
+
+Overfull \hbox (35.8699pt too wide) in paragraph at lines 1368--1372
+\T1/cmtt/m/n/10.95 The record forces the cost to be stated; it does not say who
+ pays it. I would rather
+ []
+
+
+
+[27]
+Overfull \hbox (6.20093pt too wide) in paragraph at lines 1378--1382
+[]\T1/cmtt/m/n/10 Where things are. atlas_record.yaml --- the record, the produ
+ct. campaign/analysis.md ---
+ []
+
+
+Overfull \hbox (16.69836pt too wide) in paragraph at lines 1378--1382
+\T1/cmtt/m/n/10 the append-only log. _oracle/runs/ --- reference artefacts with
+ provenance. _state/ --- the
+ []
+
+
+Overfull \hbox (32.44452pt too wide) in paragraph at lines 1378--1382
+\T1/cmtt/m/n/10 frozen baseline, the extracted paper, the ledger, the reverts a
+nd the blocked list. README.md
+ []
+
+
+
+[28] (./atlas_note.aux)
  ***********
 LaTeX2e <2024-11-01> patch level 2
 L3 programming layer <2025-01-18>
  ***********
 Package rerunfilecheck Info: File `atlas_note.out' has not changed.
 (rerunfilecheck)             Checksum: AA750CD43DFAC3CE83CF6F4166ED6A2D;8742.
- ) 
+ )
+(\end occurred inside a group at level 2)
+
+### simple group (level 2) entered at line 1234 ({)
+### simple group (level 1) entered at line 977 ({)
+### bottom level 
 Here is how much of TeX's memory you used:
- 24038 strings out of 475102
- 452650 string characters out of 5764878
+ 24047 strings out of 475102
+ 452763 string characters out of 5764878
  870544 words of memory out of 5000000
- 46548 multiletter control sequences out of 15000+600000
- 585805 words of font info for 105 fonts, out of 8000000 for 9000
+ 46555 multiletter control sequences out of 15000+600000
+ 586434 words of font info for 107 fonts, out of 8000000 for 9000
  59 hyphenation exceptions out of 8191
- 116i,11n,121p,650b,611s stack positions out of 10000i,1000n,20000p,200000b,200000s
-</usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></us
-r/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx7.pfb></usr/share
-/texlive/texmf-dist/fonts/type1/public/amsfonts/cmextra/cmex9.pfb></usr/share/t
-exlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/share/texlive
-/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/share/texlive/texmf-
-dist/fonts/type1/public/amsfonts/cm/cmmi6.pfb></usr/share/texlive/texmf-dist/fo
-nts/type1/public/amsfonts/cm/cmmi7.pfb></usr/share/texlive/texmf-dist/fonts/typ
-e1/public/amsfonts/cm/cmmi8.pfb></usr/share/texlive/texmf-dist/fonts/type1/publ
-ic/amsfonts/cm/cmmi9.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsf
-onts/cm/cmr10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm
-/cmr5.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr6.pf
-b></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/
-share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/share/te
-xlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></usr/share/texlive/te
-xmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/texmf-di
-st/fonts/type1/public/amsfonts/cm/cmsy6.pfb></usr/share/texlive/texmf-dist/font
-s/type1/public/amsfonts/cm/cmsy7.pfb></usr/share/texlive/texmf-dist/fonts/type1
-/public/amsfonts/cm/cmsy8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public
-/amsfonts/cm/cmsy9.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfon
-ts/symbols/msbm10.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbi1095.pf
-b></usr/share/texmf/fonts/type1/public/cm-super/sfbx0900.pfb></usr/share/texmf/
-fonts/type1/public/cm-super/sfbx1000.pfb></usr/share/texmf/fonts/type1/public/c
-m-super/sfbx1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1200.pfb
-></usr/share/texmf/fonts/type1/public/cm-super/sfbx1728.pfb></usr/share/texmf/f
-onts/type1/public/cm-super/sfrm0800.pfb></usr/share/texmf/fonts/type1/public/cm
--super/sfrm0900.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm1000.pfb>
-</usr/share/texmf/fonts/type1/public/cm-super/sfrm1095.pfb></usr/share/texmf/fo
-nts/type1/public/cm-super/sfrm1200.pfb></usr/share/texmf/fonts/type1/public/cm-
-super/sfti0800.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfti0900.pfb><
-/usr/share/texmf/fonts/type1/public/cm-super/sfti1000.pfb></usr/share/texmf/fon
-ts/type1/public/cm-super/sfti1095.pfb></usr/share/texmf/fonts/type1/public/cm-s
-uper/sftt0800.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt0900.pfb></
-usr/share/texmf/fonts/type1/public/cm-super/sftt1000.pfb></usr/share/texmf/font
-s/type1/public/cm-super/sftt1095.pfb>
-Output written on atlas_note.pdf (27 pages, 1602086 bytes).
+ 116i,11n,121p,650b,866s stack positions out of 10000i,1000n,20000p,200000b,200000s
+</usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/c
+mbx10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx7.p
+fb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cmextra/cmex9.pfb
+></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr
+/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/share/
+texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi6.pfb></usr/share/texlive
+/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb></usr/share/texlive/texmf-
+dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/share/texlive/texmf-dist/fo
+nts/type1/public/amsfonts/cm/cmmi9.pfb></usr/share/texlive/texmf-dist/fonts/typ
+e1/public/amsfonts/cm/cmr10.pfb></usr/share/texlive/texmf-dist/fonts/type1/publ
+ic/amsfonts/cm/cmr5.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfo
+nts/cm/cmr6.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/c
+mr7.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb>
+</usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></usr/sh
+are/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/te
+xlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy6.pfb></usr/share/texlive/t
+exmf-dist/fonts/type1/public/amsfonts/cm/cmsy7.pfb></usr/share/texlive/texmf-di
+st/fonts/type1/public/amsfonts/cm/cmsy8.pfb></usr/share/texlive/texmf-dist/font
+s/type1/public/amsfonts/cm/cmsy9.pfb></usr/share/texlive/texmf-dist/fonts/type1
+/public/amsfonts/symbols/msbm10.pfb></usr/share/texmf/fonts/type1/public/cm-sup
+er/sfbi1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx0900.pfb></us
+r/share/texmf/fonts/type1/public/cm-super/sfbx1000.pfb></usr/share/texmf/fonts/
+type1/public/cm-super/sfbx1095.pfb></usr/share/texmf/fonts/type1/public/cm-supe
+r/sfbx1200.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1728.pfb></usr
+/share/texmf/fonts/type1/public/cm-super/sfit1095.pfb></usr/share/texmf/fonts/t
+ype1/public/cm-super/sfrm0800.pfb></usr/share/texmf/fonts/type1/public/cm-super
+/sfrm0900.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm1000.pfb></usr/
+share/texmf/fonts/type1/public/cm-super/sfrm1095.pfb></usr/share/texmf/fonts/ty
+pe1/public/cm-super/sfrm1200.pfb></usr/share/texmf/fonts/type1/public/cm-super/
+sfti0800.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfti0900.pfb></usr/s
+hare/texmf/fonts/type1/public/cm-super/sfti1000.pfb></usr/share/texmf/fonts/typ
+e1/public/cm-super/sfti1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/s
+ftt0800.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt0900.pfb></usr/sh
+are/texmf/fonts/type1/public/cm-super/sftt1000.pfb></usr/share/texmf/fonts/type
+1/public/cm-super/sftt1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sf
+tt1200.pfb>
+Output written on atlas_note.pdf (28 pages, 1659153 bytes).
 PDF statistics:
- 552 PDF objects out of 1000 (max. 8388607)
- 423 compressed objects within 5 object streams
+ 565 PDF objects out of 1000 (max. 8388607)
+ 431 compressed objects within 5 object streams
  101 named destinations out of 1000 (max. 500000)
  304 words of extra memory for PDF output out of 10000 (max. 10000000)
 

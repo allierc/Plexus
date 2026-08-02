@@ -18,7 +18,7 @@ the frozen drive INSIDE the sigmoid (the paper-vs-code fork; source wins), the b
 degradation, the self-solved adaptive Dopri5 increment, and the hidden/output split.
 
 Two runs are recorded:
-  * UNIFORM   -- one shared drive for all 4 cells. This is the run the Plexus spec (config/atlas/
+  * UNIFORM   -- one shared drive for all 4 cells. This is the run the Plexus spec (config/atlas_jax/
                  odecontroller.yaml, seeded by the uniform `seed_state` harness op) reproduces, so
                  it is the run the scalar diff_metric is computed on.
   * DISTINCT  -- a different frozen drive per cell. All parameters are shared; only the per-cell

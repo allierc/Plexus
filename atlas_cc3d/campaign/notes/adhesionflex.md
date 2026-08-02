@@ -65,3 +65,37 @@ contract would erase precisely the biology (surface-molecule differential adhesi
 mutable density vector, no self-repulsion) the campaign exists to measure. If the loop later
 PROMOTES `adhere` and it turns out to be defined force-first, the energy-term-vs-force
 representational gap recorded in `state_io`/`why` is where this entry should be revisited.
+
+**Update (re-pass).** Narrowed the one open item — the (1-δ) type-vs-id discrepancy. Read the
+descriptor source directly (`twedit5/.../adhesion_descr.py:get_adhesion_flex_description_html`) and
+confirmed the "cell types at i and j" wording is verbatim there, and that the SAME descriptor keys
+the density `N` on "cell type of pixel where it is located" — so the type-language is the descriptor
+author's internally-consistent framing, not a transcription slip. The compiled `changeEnergy` (cc3d
+not importable here) is now the only unchecked side, so which of type/id the core enforces is the
+sole remaining discrepancy. Also re-verified `neighbor_order` is the sole constructor arg
+(`PyCoreSpecs.py:L3561`). Verdict unchanged.
+
+**Update (normalization pass, answering the skeptic).** The skeptic caught a real
+inconsistency and I fixed the reasoning (verdict stands: `new` + `implementation_of: adhere`).
+The charge: the entry rejected `cohesion`/`attraction_repulsion` on the output-type gap
+("they emit a force and write position; AdhesionFlex writes nothing"), yet merged into
+jax-morph's `adhere`, which ITSELF emits a force and writes position (soft_sphere.yaml:143-160,
+reads pos/radius/epsilon, writes pos) — so by that standard AdhesionFlex is a distinct new
+contract. Correct. I withdrew the output-type argument: the `adhere` merge is BIOLOGICAL (the
+contract name is a biological relation — molecular surface adhesion setting per-cell stickiness
+and driving sorting — realized as a force in jax-morph and as a boundary-site energy in CPM),
+and the reject of `cohesion`/`attraction_repulsion` is BIOLOGICAL too (Reynolds boids
+centre-of-mass steering; D'Orsogna self-propelled particles — neither carries a surface-adhesion
+molecule or a physical contact, so widening one deletes the model that IS it). Both hold
+independent of the energy-vs-force axis; conflating them was the error. **Now-strongest argument
+AGAINST the verdict:** if a Plexus contract IS its typed signature (as the algebra's whole premise
+implies), then force→position and energy→nothing simply cannot be one contract, and I am hiding a
+genuine second contract behind a biological name to keep the `new` count down. Rebuttal — and it is
+the headline finding, not a dodge: the signature gap here is the CELLULAR-POTTS PARADIGM gap (rule 8:
+nearly every CC3D mechanism is an energy-bias term that writes nothing), which will recur for every
+CPM energy term (Contact, Volume, Surface…). Minting a fresh contract each time a KNOWN biology
+reappears in that paradigm makes the saturation curve count the paradigm, not the vocabulary — the
+exact inflation the campaign exists to prevent. So `adhere` is recorded as the first contract seen in
+two computationally INCOMPATIBLE signatures across the two atlases, and whether the promoted algebra
+hosts it as one paradigm-polymorphic contract or splits the energy-term paradigm off is flagged as a
+promotion/analysis-phase decision — not decided by minting here.

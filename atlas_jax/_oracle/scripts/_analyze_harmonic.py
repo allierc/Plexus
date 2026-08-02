@@ -1,9 +1,9 @@
 """Score the adhere/harmonic differential: Plexus engine trajectory vs the jax-morph Harmonic
 overdamped reference, per cell, per frame. Runs in the Plexus (torch) env; no re-simulation.
 
-  reference : atlas_jax_morph/_oracle/runs/diff_harmonic/reference.npz  (jxm BrownianDynamics kT=0,
+  reference : atlas_jax/_oracle/runs/diff_harmonic/reference.npz  (jxm BrownianDynamics kT=0,
               Harmonic(k=1.0, r_cutoff_frac=2.5))
-  plexus    : graphs_data/atlas/harmonic/trajectory.npz                 (config/atlas/harmonic.yaml)
+  plexus    : graphs_data/atlas/harmonic/trajectory.npz                 (config/atlas_jax/harmonic.yaml)
 
 PRIMARY metric  D_pos = max over frames t=0..160 and LIVE cells i of ||x_plx-x_ref||_2 / sigma.
 Threshold       1.0e-3 (sigma).  This tests the FORCE LAW including the ADHESIVE TAIL and the hard

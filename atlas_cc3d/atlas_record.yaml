@@ -132,9 +132,17 @@ mechanisms:
 
     the CPM contact term and changeEnergy operate on cell id sigma; same-type neighbouring cells
 
-    still contribute. I could not confirm which by running the core (cc3d is deliberately not
+    still contribute. I have now READ the descriptor source (twedit5 CC3DProject adhesion_descr.py,
 
-    importable here).
+    get_adhesion_flex_description_html) and confirmed the "cell types at i and j" wording is verbatim
+
+    there, and that the same descriptor keys the density N on "cell type of pixel where it is located"
+
+    -- so the type-language is the descriptor author''s consistent framing, not a transcription slip.
+
+    The compiled changeEnergy (cc3d deliberately not importable here) is the only side I could not
+
+    inspect, so which of type or id the core actually enforces stays the one open discrepancy.
 
     '
   - 'Densities are DECLARED per cell TYPE in XML but STORED per cell -- the type value only seeds
@@ -147,81 +155,141 @@ mechanisms:
   verdict: new
   of: null
   implementation_of: adhere
-  why: '`new` against the FROZEN baseline (no registered contract covers molecule-mediated cell-cell
+  why: 'VERDICT: `new` against the FROZEN 42 (no registered contract covers molecule-mediated
 
-    adhesion), and `implementation_of: adhere` -- this is a SECOND SIGHTING of `adhere`, a contract
+    cell-cell adhesion), with `implementation_of: adhere` -- a SECOND SIGHTING of `adhere`,
 
-    first PROPOSED by the jax-morph atlas (still unpromoted, so not in the frozen 42/52). Setting
+    the contract minted by the jax-morph atlas (Morse/SoftSphere/Hertzian/Harmonic/LennardJones,
 
-    implementation_of lets the ledger count `adhere` ONCE across the two repositories instead of
+    still unpromoted, so not in the frozen 42/52). Setting implementation_of lets the ledger
 
-    re-minting it here; without it the saturation curve would double-count and measure our naming
+    count `adhere` ONCE across the two repositories; without it the saturation curve double-counts
 
-    habits, not the language.
-
-
-    WHAT IT IS. AdhesionFlex is the pure differential-adhesion energy of the Cellular Potts model.
-
-    Across every cross-boundary lattice-site pair it adds a contact energy that is a double sum over
-
-    the two owners'' carried adhesion-molecule densities times a user binding matrix k_mn (with an
-
-    explicit leading minus, so a positive k is ADHESIVE). Biologically that is cadherin-style
-
-    surface-molecule adhesion driving cell sorting -- exactly `adhere`''s content. It owns a mutable
-
-    per-cell (and per-Medium) density VECTOR seeded from a per-type declaration, retunable by a
-
-    steppable mid-run and copied to daughters at mitosis; that per-cell coupling is the `adhere`
-
-    read, the CPM analogue of a per-cell cadherin concentration feeding a pair''s well depth.
+    the same biology and measures our naming habits, not the language.
 
 
-    WHY NOT alias/refinement of a REGISTERED contract. The closest registered contracts are the
+    WHAT IT IS. AdhesionFlex is the differential-adhesion energy of the Cellular Potts model.
 
-    lateral/interaction pair rules `cohesion` and `attraction_repulsion`. Both EMIT a force
+    Across every cross-boundary lattice-site pair it adds a contact energy that is a double sum
 
-    (`acceleration`) on a point particle and WRITE `position` after the engine integrates it.
+    over the two owners'' carried adhesion-molecule densities times a user binding matrix k_mn
 
-    AdhesionFlex writes NOTHING: it is a Potts energy term whose changeEnergy() returns a scalar dE
+    (explicit leading minus, so a positive k is ADHESIVE). That is cadherin-style surface-molecule
 
-    that only biases which proposed pixel-copy the Metropolis engine accepts (rule 8). Its `set` is a
+    adhesion driving cell sorting -- the textbook differential-adhesion hypothesis, and exactly
 
-    cell that IS a set of lattice sites, its interaction is counted over shared BOUNDARY site-pairs
+    `adhere`''s biological content. It owns a mutable per-cell (and per-Medium) density VECTOR
 
-    (not centre distance), and there is no repulsive core at all (excluded volume is CompuCell3D''s
+    seeded from a per-type declaration, retunable by a steppable mid-run and copied to daughters
 
-    separate Volume constraint). To host it, cohesion/attraction_repulsion would not merely widen a
+    at mitosis: the CPM analogue of a per-cell cadherin concentration setting a pair''s binding
 
-    field -- they would have to swap their output type (energy bias, not force), their set
+    strength, which is the same per-cell adhesion coupling jax-morph''s `adhere` carries as its
 
-    representation (site-set, boundary counting), and drop position writes: that is replacing the
-
-    contract''s semantics, i.e. violence, not a costed widening.
+    per-cell epsilon.
 
 
-    WHY NOT alias attraction_repulsion the way jax-morph''s Morse was. Morse maps to
+    ANSWERING THE SKEPTIC (the internal-consistency charge). The skeptic is right about the facts
 
-    `attraction_repulsion` because it carries BOTH a repulsive core (excluded volume) and an adhesive
+    and I withdraw the sloppy framing it caught. jax-morph''s `adhere` is a Lateral FORCE law:
 
-    tail. AdhesionFlex carries ONLY the adhesion, so it maps to the pure-adhesion contract `adhere`.
+    set=cell-as-point, reads [pos, radius, alive, epsilon], EMIT=velocity/force, writes [pos]
 
-    Plain Contact is the canonical `adhere` implementation (a static J(type,type'') table);
+    (jax_morph_soft_sphere.yaml:143-160). AdhesionFlex is a Potts ENERGY term: set=cell-as-site-set,
 
-    AdhesionFlex is the per-cell-state, data-kernel generalisation of that same contract, so it is
+    reads [cell_id, cell_type, molecule densities, binding matrix, kernel], writes NOTHING, emits a
 
-    `implementation_of: adhere`, not a distinct contract.
+    scalar dE that only biases Metropolis acceptance (rule 8). Those two signatures share almost no
+
+    field -- the output-type/writes gap between them is LARGER than the gap I used against cohesion.
+
+    So I do NOT (and the entry must not) rest the `adhere` match on a shared signature, and I do NOT
+
+    reject cohesion on the output-type gap alone. The reject and the merge run on DIFFERENT axes,
+
+    spelled out below; conflating them was the error.
 
 
-    SCOPE / OPEN. The muParser binding kernel (AdhesionFunc, default min) makes the combining
+    WHY the merge is BIOLOGICAL, not signature-based. `adhere` is a BIOLOGICAL name (rule 1): the
 
-    function DATA rather than a fixed op -- an implementation freedom below the contract, not a new
+    contract is the RELATION -- surface-molecule / physical cell-cell adhesion whose strength is set
 
-    contract. The (1-delta) restriction is written over cell TYPES in the library HTML but over cell
+    per cell and whose differential across types drives sorting. Both atlases realize THAT relation:
 
-    IDs in changeEnergy; I could not run the compiled core to settle it, so it is recorded as an
+    jax-morph as an autodiff force with a size-consistent contact distance sigma=r_i+r_j, CompuCell3D
 
-    unresolved source discrepancy, not folded into the signature. No oracle/ablation run exists yet.
+    as a boundary-site energy with a per-cell molecule vector and binding matrix. Same biology, and
+
+    it is the biology the contract names.
+
+
+    WHY the reject of registered contracts is BIOLOGICAL, not the output-type gap. The two closest
+
+    registered lateral/interaction laws are behavioural/pattern-forming particle models, not
+
+    adhesion: `cohesion` is Reynolds boids centre-of-mass steering (REQUIRES_TYPE_PROPS=["cohesion"],
+
+    a behavioural weight; cohesion.py:14-21) and `attraction_repulsion` is the D''Orsogna
+
+    self-propelled-particle law (fixed global width sigma, per-TYPE [pull,pull_range,push,push_range];
+
+    attraction_repulsion.py:28-33). Neither carries a surface-adhesion-molecule density, a physical
+
+    cell radius, or a size-consistent contact -- widening one to host molecular differential adhesion
+
+    would delete the flocking / pattern-forming model that IS that contract. That rejection stands on
+
+    BIOLOGY and survives regardless of the energy-vs-force axis. (It is NOT `attraction_repulsion` the
+
+    way jax-morph''s Morse was argued to be, either: Morse carries BOTH a repulsive core and an adhesive
+
+    tail; AdhesionFlex carries ONLY adhesion -- excluded volume is CompuCell3D''s separate Volume
+
+    constraint -- so it maps to the pure-adhesion contract `adhere`, not the attraction+repulsion one.)
+
+
+    WHY NOT mint a distinct new contract on the signature gap (the skeptic''s proposed resolution).
+
+    Because the gap is a FRAMEWORK-PARADIGM gap, not a biology gap. CompuCell3D is Cellular Potts:
+
+    almost every mechanism is an energy term whose changeEnergy returns a dE and writes nothing, where
+
+    jax-morph mechanisms emit forces that write position (rule 8). That same energy-vs-update divide
+
+    will recur for EVERY CPM energy term this campaign normalizes (Contact, Volume, Surface, ...). If
+
+    we mint a new contract each time a KNOWN biology reappears in the energy paradigm, the saturation
+
+    curve counts the PARADIGM, not the vocabulary -- precisely the inflation the campaign exists to
+
+    avoid. So the paradigm divergence is recorded as a cross-cutting AXIS on this entry, not folded
+
+    into a new contract name. This IS the measurement: `adhere` is the first contract confirmed to
+
+    appear in two computationally INCOMPATIBLE signatures across the two atlases (force->position vs
+
+    energy->nothing), and that is a finding worth more than a second tick on the `new` count.
+
+
+    SCOPE / OPEN. (1) Whether the FROZEN algebra can host `adhere` as ONE paradigm-polymorphic contract
+
+    (one biology, two signature realizations) or whether the Potts energy-term paradigm needs its own
+
+    contract/output type is a PROMOTION/analysis-phase decision, flagged here, not made in this entry.
+
+    (2) The muParser binding kernel (AdhesionFunc, default min) makes the combining function DATA, an
+
+    implementation freedom below the contract. (3) The (1-delta) restriction is written over cell TYPES
+
+    in the twedit5 descriptor HTML (verified verbatim; the descriptor also keys density on the pixel''s
+
+    cell type, so it is internally type-consistent) while the standard CPM contact term operates over
+
+    cell IDs; only the compiled changeEnergy -- deliberately not importable here -- could settle which
+
+    the core enforces, so it stays the one unresolved source discrepancy, not folded into the signature.
+
+    No oracle/ablation run exists yet.
 
     '
   contract:
@@ -261,6 +329,21 @@ mechanisms:
     diff_metric: null
     threshold: null
     passed: null
+  disputed:
+    by: skeptic
+    was: new
+    claimed: new
+    evidence: "The record picks `implementation_of: adhere` on the premise adhere is the 'pure-adhesion\
+      \ contract' \u2014 but adhere was MINTED by pure-repulsion SoftSphere as a radius-based FORCE law:\
+      \ reads [position,radius,epsilon], EMIT=velocity, writes [position] (jax_morph_soft_sphere.py:62-71,125-128;\
+      \ phase2b.log:62). AdhesionFlex reads no radius and writes NOTHING (energy bias). The record wields\
+      \ exactly this output-type gap to reject cohesion as 'violence' (why:), yet ignores it when merging\
+      \ into the force-emitting adhere \u2014 so by its own standard AdhesionFlex is a distinct new contract,\
+      \ not an implementation_of adhere."
+    what_would_settle_it: "Diff the two `adhere` signatures: jax adhere writes [position]/reads [radius]\
+      \ and emits a force; AdhesionFlex writes [] and reads no radius. If output-type/writes is contract-defining\
+      \ (as the entry asserts against cohesion), the two cannot be one contract \u2014 strip implementation_of\
+      \ or justify why force\u2192position and energy\u2192nothing share a signature."
 - id: blobinitializer
   order: 2
   raw_name: BlobInitializer
@@ -1754,25 +1837,29 @@ mechanisms:
     kind: lateral
     family: topology
     set: cell
-    inputs: '- the affected cell (a set of lattice sites sharing one cell id)
-
-      - the proposed single-pixel copy at target site t (source id overwrites t''s id)
-
-      - the cell-id lattice restricted to the Moore neighbourhood of t
-
-      '
-    outputs: "- a scalar energy contribution dE_conn added to the Potts total dE; it is NOT an integrated\n\
-      \  state delta. dE_conn = 0 if the copy leaves the affected cell locally connected, and a\n  large\
-      \ positive Penalty (default 10000000) if the copy would fragment the cell's site-set\n  into disconnected\
-      \ pieces.\n"
-    reads: "- the cell-id lattice (site -> cellId) in the Moore neighbourhood of the proposed target\n\
-      \  pixel, for the cell(s) whose connectedness the copy could change\n- the Potts NeighborOrder (must\
-      \ be 1 or 2) and a 2D square lattice as implicit preconditions\n"
-    writes: "- none. This is a Potts energy plugin. It writes no field and no cell property; it only\n\
-      \  contributes dE_conn to the Metropolis accept/reject of the proposed copy.\n"
-    maps: "- connectivity indicator f(local topology change of the affected cell around t) -> energy\n\
-      \  penalty Penalty * f, one global scalar Penalty shared by every cell. With Penalty >> T the\n\
-      \  map is an effectively hard gate: fragmenting copies are never accepted.\n"
+    inputs:
+    - site (the affected cell's owned lattice sites, each carrying its cell id, for the cell whose connectedness
+      the proposed single-pixel copy at target t would change)
+    - connectivity_on (whether the constraint is active on the cell; in THIS legacy implementation it
+      is ON for EVERY cell unconditionally -- one global scalar, no per-type or per-cell opt-in, unlike
+      the ConnectivityGlobal sibling that first defined this contract)
+    - strength (the veto magnitude; here a single GLOBAL Penalty shared by all cells, CC3DML / twedit-generator
+      default 10000000, not exposed by the Python spec and un-tunable through it)
+    outputs:
+    - dE (a positive energy penalty added to the Metropolis total when the copy would fragment the cell
+      into more than one connected component within the Moore neighbourhood of t; 0 otherwise -- NOT an
+      integrated state delta)
+    reads:
+    - site.cell_id (the cell's set of lattice sites and their adjacency in the Moore neighbourhood of
+      the proposed target pixel, scanned LOCALLY -- this legacy variant does no whole-cell flood fill
+      -- to test connectedness after the proposed copy)
+    - lattice adjacency / Potts NeighborOrder (defines which sites count as connected; must be 1 or 2
+      on a 2D square lattice, an implicit external precondition -- a Potts param, not a plugin param)
+    writes:
+    - none (a Potts effective-energy term that returns a scalar dE and mutates no state; it changes only
+      the acceptance probability of the proposed pixel copy, integrating no delta)
+    maps:
+    - none
   status: normalized
   module: null
   test: null
@@ -1781,6 +1868,15 @@ mechanisms:
     diff_metric: null
     threshold: null
     passed: null
+  disputed:
+    by: skeptic
+    was: new
+    claimed: alias
+    evidence: "PyCoreSpecs.py:4059 (Connectivity) and :4088 (ConnectivityGlobal, which introduced stay_connected\
+      \ at order 8) implement the same site-set connectedness veto. This legacy variant is strictly narrower\
+      \ (2D-only, un-tunable global Penalty), adding no capability \u2014 an alias, not a new contract."
+    what_would_settle_it: Confirm the order-8 ConnectivityGlobal entry already registered contract stay_connected
+      in atlas_record.yaml; if so, this entry must count as alias-of stay_connected, not new.
 - id: contactinternal
   order: 10
   raw_name: ContactInternal
@@ -1958,6 +2054,19 @@ mechanisms:
     (which is excluded anyway), so E_internal is identically 0. The energy matrix alone is inert.
 
     '
+  - 'Its immediate parent is NOT the plain Contact plugin but ContactLocalFlexPlugin
+
+    (PyCoreSpecs.py L3339-3347: `class ContactLocalFlexPlugin(ContactPlugin, _PyCoreSteerableInterface)`,
+
+    docstring "A steerable version of ContactPlugin"). So ContactInternal silently inherits
+
+    STEERABILITY: the J_int matrix can be rewritten at runtime by a Python steppable, not only
+
+    fixed at setup. A reimplementer treating J_int as a static per-run constant (as the base
+
+    Contact energy would suggest) misses that the coefficients this energy reads may change
+
+    between Monte-Carlo steps -- confirmed at source by the class chain, not by exercising a steer.'
   status: normalized
   module: null
   test: null
@@ -2133,11 +2242,15 @@ mechanisms:
     registered_name is what binds it to the different C++ plugin that stores per-cell J.
 
     '
-  - 'ContactInternal (PyCoreSpecs.py:L3350) is the SAME class, subclassed only to change
+  - 'ContactInternal (PyCoreSpecs.py:L3350) subclasses ContactLocalFlexPlugin (L3339), NOT
 
-    registered_name -- it applies the identical per-cell contact energy but between
+    ContactPlugin -- so it INHERITS the per-cell-J storage and steerability verbatim and
 
-    COMPARTMENTS of a single cluster cell rather than between whole cells.
+    changes ONLY registered_name. It applies the identical per-cell contact energy but
+
+    between COMPARTMENTS of a single cluster cell rather than between whole cells; i.e.
+
+    ContactInternal is LocalFlex restricted to intra-cluster boundaries, not a Contact variant.
 
     '
   - 'delta(sigma_i, sigma_j) uses cell IDS, not types: two adjacent cells of the same type
@@ -2264,8 +2377,11 @@ mechanisms:
     - cell_id (sigma at each of two neighbouring lattice sites, to keep only cross-boundary pairs via
       1-delta)
     - cell_type (seeds each cell's localDefaultContactEnergies table at init)
-    - contact_energy_J (the per-cell/per-pair adhesion energy attribute -- ContactLocalFlexDataContainer;
-      the pairwise J(sigma_i, sigma_j), higher J = weaker adhesion, steerable at runtime via setContactEnergy)
+    - per_cell_contact_J (the per-cell/per-pair adhesion energy attribute -- ContactLocalFlexDataContainer,
+      distinct from the output dE; the pairwise J(sigma_i, sigma_j) looked up from cell sigma_i's own
+      table rather than a global type matrix, higher J = weaker adhesion, steerable at runtime via setContactEnergy.
+      This per-cell J store is exactly what plain Contact lacks and is the sole difference from the canonical
+      `adhere` implementation)
     - neighbour shells (site pairs within neighbor_order adjacency, or Euclidean depth if set)
     - distance_weighting (optional -- divide each pair term by site-site distance so farther neighbours
       count less)
@@ -2302,6 +2418,9 @@ mechanisms:
     '
   params:
     neighbor_order: adjacency_range
+    depth: adjacency_range (float alternative; when set it takes precedence over neighbor_order in the
+      emitted CC3DML -- L3217-3220)
+    weight_energy_by_distance: distance_weighting flag
     energy: adhesion_matrix
   state_io: 'reads: the cell-type of the owner of each lattice site, over the neighbor_order adjacency
     shell.
@@ -2395,18 +2514,27 @@ mechanisms:
   raw_name: Curvature
   raw_kind: Plugin (CurvaturePlugin)
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L5043
-  paper_section: 'Not locatable in the extractable Swat et al. (2012) Methods Cell Biol 110:325-366 text
-    (no
-
-    page verified). The only checkable anchor is the source: CurvaturePlugin.cpp changeEnergy
-
-    (L347) and calculateInverseCurvatureSquare (L336), mirrored in the installed binary
-
-    libCC3DCurvature.so. Concept documented as the CC3D reference-manual "Curvature Plugin"
-
-    (used with compartmental cells / FocalPointPlasticity to stiffen chains of cells).
-
-    '
+  paper_section: "Not locatable in the extractable Swat et al. (2012) Methods Cell Biol 110:325-366 text\
+    \ (no\npage verified). The concept is documented as the CC3D reference-manual \"Curvature Plugin\"\
+    \n(used with compartmental cells / FocalPointPlasticity to stiffen chains of cells).\n\nSOURCE ACTUALLY\
+    \ PRESENT IN THIS ENVIRONMENT: the .cpp (CurvaturePlugin.cpp) is NOT shipped\nhere -- only the compiled\
+    \ binary libCC3DCurvature.so and the C++ HEADERS under\ninclude/CompuCell3D/.../plugins/Curvature/\
+    \ (CurvaturePlugin.h, CurvatureTracker.h). The\n.cpp:Lnn citations below and elsewhere in this entry\
+    \ reference the upstream CC3D source at\nthose line numbers, not a file readable here; treat them\
+    \ as upstream anchors, not\nre-verified reads. The HEADERS, which ARE readable here, independently\
+    \ corroborate every\nstructural claim the verdict rests on:\n  - calculateInverseCurvatureSquare(leftVec,\
+    \ middleVec, rightVec) takes THREE vectors ->\n    it is a per-TRIPLE quantity (CurvaturePlugin.h:L92-93),\
+    \ consistent with a Menger\n    curvature over (L,M,R), not a pairwise term.\n  - potentialFunction(lambda,\
+    \ offset, targetDistance, distance) and the trio\n    diffEnergyLocal/diffEnergyGlobal/diffEnergyByType\
+    \ are DECLARED (CurvaturePlugin.h:L55,\n    L78-85) -- the vestigial/dead-code family the \"surprises\"\
+    \ flag. Header comment L13\n    \"target distance from xml is ignored\" corroborates that targetDistance/maxDistance\
+    \ are\n    inert.\n  - CurvatureTracker::internalCurvatureNeighbors is a std::set<CurvatureTrackerData>\
+    \ whose\n    operator< compares neighborAddress, a CellG* POINTER (CurvatureTracker.h:L40-42, L46,\n\
+    \    L60) -- confirming junctions are the plugin's own extra-attribute bond state, ordered\n    arbitrarily\
+    \ by pointer (the left/right-labelling surprise).\n  - class CurvaturePlugin : public Plugin, public\
+    \ EnergyFunction, public CellGChangeWatcher\n    (CurvaturePlugin.h:L24) -- the plugin IS BOTH an\
+    \ energy function (changeEnergy) AND an\n    accepted-move watcher (field3DChange), which is exactly\
+    \ the hybrid energy-term +\n    stateful bond-grower shape the verdict describes.\n"
   summary: 'A Cellular-Potts ENERGY TERM that penalizes bending of chains of compartmental cells linked
 
     by junctions the plugin maintains itself. For every three consecutive linked cells it adds
@@ -2620,6 +2748,12 @@ mechanisms:
     diff_metric: null
     threshold: null
     passed: null
+  disputed:
+    by: skeptic
+    was: new
+    claimed: null
+    evidence: the skeptic returned no JSON; refusing to read that as assent
+    what_would_settle_it: null
 - id: diffusionsolverfe
   order: 14
   raw_name: DiffusionSolverFE
@@ -3686,6 +3820,12 @@ mechanisms:
     diff_metric: null
     threshold: null
     passed: null
+  disputed:
+    by: skeptic
+    was: new
+    claimed: null
+    evidence: null
+    what_would_settle_it: null
 - id: momentofinertia
   order: 19
   raw_name: MomentOfInertia
@@ -5584,7 +5724,7 @@ mechanisms:
       solution of D grad^2 c - k c + S = 0 (a whole-field REPLACE, not an integrable delta)
     maps:
     - grid_bvp
-  status: normalized
+  status: inspected
   module: null
   test: null
   evidence:
@@ -5592,6 +5732,12 @@ mechanisms:
     diff_metric: null
     threshold: null
     passed: null
+  disputed:
+    by: skeptic
+    was: new
+    claimed: null
+    evidence: null
+    what_would_settle_it: null
 - id: surface
   order: 27
   raw_name: Surface
@@ -5825,6 +5971,12 @@ mechanisms:
     diff_metric: null
     threshold: null
     passed: null
+  disputed:
+    by: skeptic
+    was: new
+    claimed: null
+    evidence: the skeptic returned no JSON; refusing to read that as assent
+    what_would_settle_it: null
 - id: surfacetracker
   order: 28
   raw_name: SurfaceTracker
@@ -6487,6 +6639,12 @@ mechanisms:
     diff_metric: null
     threshold: null
     passed: null
+  disputed:
+    by: skeptic
+    was: new
+    claimed: null
+    evidence: null
+    what_would_settle_it: null
 - id: cell_as_lattice_domain
   order: 31
   raw_name: cell as a set of lattice sites

@@ -56,7 +56,7 @@ from jax_morph.physics import Morse, MechanicalRelaxation, relax_equilibrium
 
 OUT = os.environ["OUT"]
 
-# --- parameters (must match config/atlas/mechanical_relaxation.yaml exactly) ------------------ #
+# --- parameters (must match config/atlas_jax/mechanical_relaxation.yaml exactly) ------------------ #
 N = 4                         # live cells (a rigid 4-cell diamond: two equilateral triangles)
 CAP = 8                       # capacity: 4 live + 4 dead padding slots (dead-pair mask + sigma=0)
 EPS = 3.0                     # Morse well depth (anchor value)
@@ -230,7 +230,7 @@ with open(os.path.join(OUT, "summary.json"), "w") as f:
 print(json.dumps(summary, indent=2))
 
 # --- the ready-to-paste YAML `start:` block (byte-identical float32 IC for the Plexus spec) --- #
-print("\n# ---- paste into config/atlas/mechanical_relaxation.yaml sets.cell.start (LIVE only) ----")
+print("\n# ---- paste into config/atlas_jax/mechanical_relaxation.yaml sets.cell.start (LIVE only) ----")
 print("    start:")
 for x, y in P0_live:
     print(f"    - [{x:.6f}, {y:.6f}]")

@@ -44,7 +44,7 @@ from jax_morph.physics import (VirialStress, Morse, SoftSphere, Hertzian, Harmon
 
 OUT = os.environ["OUT"]
 
-# --- parameters (must match config/atlas/virial_stress.yaml exactly) ------------------------- #
+# --- parameters (must match config/atlas_jax/virial_stress.yaml exactly) ------------------------- #
 R0 = 0.5                       # uniform cell radius -> sigma = r_i + r_j = 1.0
 EPS = 3.0                      # Morse well depth (the paper / anchor mechanics)
 ALPHA = 2.8                    # Morse well steepness (the paper / anchor mechanics)
@@ -207,7 +207,7 @@ with open(os.path.join(OUT, "summary.json"), "w") as f:
 print(json.dumps(summary, indent=2))
 
 # --- the ready-to-paste YAML `start:` block (byte-identical float32 IC for the Plexus spec) ---- #
-print("\n# ---- paste into config/atlas/virial_stress.yaml sets.cell.start (LIVE cells only) ----")
+print("\n# ---- paste into config/atlas_jax/virial_stress.yaml sets.cell.start (LIVE cells only) ----")
 print("    start:")
 for x, y in P_live:
     print(f"    - [{x:.6f}, {y:.6f}]")

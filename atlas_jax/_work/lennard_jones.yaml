@@ -203,7 +203,7 @@ evidence:
   value: 0.0
   passed: true
   plexus_run: log/atlas_jax/lennard_jones/
-  scorer: atlas_jax_morph/_oracle/scripts/_analyze_lennard_jones.py
+  scorer: atlas_jax/_oracle/scripts/_analyze_lennard_jones.py
   acted_ledger: |
     adhere: calls 100 / acted 47, moved 2.679448 (cumulative max-cell displacement), kind lateral,
     structural false; inert_operators []; unverifiable_operators []; valid_evidence true ("every

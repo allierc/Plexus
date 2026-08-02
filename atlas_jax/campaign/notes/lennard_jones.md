@@ -223,7 +223,7 @@ VirialStress mechanism). This validates the IMPLEMENTATION reproduces the refere
 overdamped dynamics to byte equality; it does not touch the verdict (new -> adhere), which stands
 on the signature argument in `why`.
 
-**Runs.** oracle `atlas_jax_morph/_oracle/runs/diff_lennard_jones/` (reference.npz + summary.json);
+**Runs.** oracle `atlas_jax/_oracle/runs/diff_lennard_jones/` (reference.npz + summary.json);
 plexus `log/atlas_jax/lennard_jones/` (spec_run.yaml, diag.json, metrics.json/.npz, strip.png,
 movie.mp4); diff `log/atlas_jax/lennard_jones/diff.json`. **Verdict: status validated, D_pos 0.0 <
 1e-3, passed.**

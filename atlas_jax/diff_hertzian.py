@@ -5,14 +5,14 @@ isolates the force. Two comparisons on the reference's exact initial conditions,
 control:
 
   PRIMARY (force_field_rel_err): the heterogeneous force FIELD. Build the 7-cell cluster from
-      config/atlas/hertzian.yaml (positions POS7 + [20,20]), register HETEROGENEOUS radius (0.40-0.70)
+      config/atlas_jax/hertzian.yaml (positions POS7 + [20,20]), register HETEROGENEOUS radius (0.40-0.70)
       and PER-CELL epsilon as buffers, and call adhere:hertzian.forward(H) ONCE. The emitted velocity
       at mobility=1 IS the operator's autodiff force. Diff vs the reference Hertzian(epsilon).forces
       over the 7 live cells and both components, relative to max|F_ref|. Exercises sigma = r_i + r_j
       (size-consistency) and the arithmetic-mean per-cell epsilon mix. No integrator confound.
 
   SECONDARY (traj_pos_max_abs): the deterministic overdamped-Euler trajectory. Load
-      config/atlas/hertzian.yaml (uniform radius 0.5, epsilon 2.0, dt=0.1, 40 frames), run it through
+      config/atlas_jax/hertzian.yaml (uniform radius 0.5, epsilon 2.0, dt=0.1, 40 frames), run it through
       plexus.engine.run (out_path=None) exactly as run_spec does, centroid-align, and diff the
       per-cell per-frame positions vs the reference BrownianDynamics(Hertzian, kT=0) trajectory.
 
@@ -38,7 +38,7 @@ sys.path.insert(0, os.path.join(PLEXUS, "src"))
 THRESHOLD_FORCE = 1.0e-4
 THRESHOLD_TRAJ = 1.0e-3
 REF = os.path.join(HERE, "_oracle", "runs", "diff_hertzian", "reference.npz")
-SPEC = os.path.join(PLEXUS, "config", "atlas", "hertzian.yaml")
+SPEC = os.path.join(PLEXUS, "config", "atlas_jax", "hertzian.yaml")
 
 # --- load the atlas anti-chamber so the spec can name adhere:hertzian ------------------------ #
 import plexus.operators  # noqa: F401

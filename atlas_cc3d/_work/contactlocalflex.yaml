@@ -106,11 +106,15 @@ surprises:
   registered_name is what binds it to the different C++ plugin that stores per-cell J.
 
   '
-- 'ContactInternal (PyCoreSpecs.py:L3350) is the SAME class, subclassed only to change
+- 'ContactInternal (PyCoreSpecs.py:L3350) subclasses ContactLocalFlexPlugin (L3339), NOT
 
-  registered_name -- it applies the identical per-cell contact energy but between
+  ContactPlugin -- so it INHERITS the per-cell-J storage and steerability verbatim and
 
-  COMPARTMENTS of a single cluster cell rather than between whole cells.
+  changes ONLY registered_name. It applies the identical per-cell contact energy but
+
+  between COMPARTMENTS of a single cluster cell rather than between whole cells; i.e.
+
+  ContactInternal is LocalFlex restricted to intra-cluster boundaries, not a Contact variant.
 
   '
 - 'delta(sigma_i, sigma_j) uses cell IDS, not types: two adjacent cells of the same type
@@ -140,50 +144,89 @@ test: null
 verdict: new
 of: null
 implementation_of: adhere
-why: |
-  `new` against the FROZEN baseline (no registered contract covers cell-cell contact/adhesion
+why: '`new` against the FROZEN baseline (no registered contract covers cell-cell contact/adhesion
+
   energy in a Cellular Potts model), and `implementation_of: adhere` -- a THIRD SIGHTING of
+
   `adhere`, the pure-adhesion contract first PROPOSED by the jax-morph atlas (still unpromoted,
+
   so not in the frozen 42/52) and already logged in this CC3D atlas from AdhesionFlex. Setting
+
   implementation_of lets the ledger count `adhere` ONCE across repositories; without it the
+
   saturation curve double-counts and measures our naming habits, not the language.
 
+
   WHAT IT IS. ContactLocalFlex contributes the standard Cellular Potts boundary/adhesion energy
+
   E = sum over cross-boundary site pairs of J(sigma_i, sigma_j)(1 - delta) -- the SAME functional
-  as plain Contact, which is the canonical `adhere` implementation (a static J(type,type') table).
+
+  as plain Contact, which is the canonical `adhere` implementation (a static J(type,type'') table).
+
   Biologically that boundary-energy term IS differential adhesion: higher J = higher boundary cost
-  = weaker adhesion, and type-dependent J drives cell sorting. That is `adhere`'s content exactly.
+
+  = weaker adhesion, and type-dependent J drives cell sorting. That is `adhere`''s content exactly.
+
 
   WHAT MAKES IT ITS OWN IMPLEMENTATION, NOT A DUPLICATE OF Contact. The single difference is WHERE
+
   J lives: not a global type-pair matrix but a per-cell attribute (a ContactLocalFlexDataContainer
-  holding per-neighbour J values plus a localDefaultContactEnergies table, seeded from the spec's
-  type-pair energies). setContactEnergy() can override an individual cell's (or pair's) J at
+
+  holding per-neighbour J values plus a localDefaultContactEnergies table, seeded from the spec''s
+
+  type-pair energies). setContactEnergy() can override an individual cell''s (or pair''s) J at
+
   runtime, so adhesion is locally steerable. This is the SAME per-cell-state generalisation move as
+
   AdhesionFlex -- but ContactLocalFlex keeps the plain scalar-J energy (one J per pair) rather than
-  AdhesionFlex's molecule-density double sum. All three (Contact, ContactLocalFlex, AdhesionFlex)
-  are interchangeable implementations of `adhere`; that Plexus's registry hosts several
+
+  AdhesionFlex''s molecule-density double sum. All three (Contact, ContactLocalFlex, AdhesionFlex)
+
+  are interchangeable implementations of `adhere`; that Plexus''s registry hosts several
+
   implementations per contract is the expected shape, not a disappointment.
 
+
   WHY NOT alias/refinement of a REGISTERED contract. The closest registered contracts are the
+
   lateral/interaction pair rules `cohesion` and `attraction_repulsion`. Both EMIT a force
+
   (`acceleration`) on a point particle and WRITE `position` after the engine integrates it.
+
   ContactLocalFlex writes NOTHING: changeEnergy() returns a scalar dE that only biases which
+
   proposed pixel-copy the Metropolis engine accepts (rule 8). Its `set` is a cell that IS a set of
+
   lattice sites, its interaction is counted over shared BOUNDARY site-pairs (not centre distance),
-  and it has no repulsive core (excluded volume is CompuCell3D's separate Volume constraint). To
+
+  and it has no repulsive core (excluded volume is CompuCell3D''s separate Volume constraint). To
+
   host it, cohesion/attraction_repulsion would have to swap output type (energy bias, not force),
+
   set representation (site-set, boundary counting), and drop position writes -- replacing the
-  contract's semantics, i.e. violence, not a costed widening. And unlike Morse (which maps to
+
+  contract''s semantics, i.e. violence, not a costed widening. And unlike Morse (which maps to
+
   `attraction_repulsion` because it carries BOTH an excluded-volume core and an adhesive tail),
+
   this term carries ONLY adhesion, so it maps to the pure-adhesion contract `adhere`.
 
+
   SCOPE / OPEN. The per-cell steerable J and the setContactEnergy() runtime override are an
+
   implementation freedom below the contract, not a new contract -- the same freedom AdhesionFlex
+
   exercises with density vectors. weight_energy_by_distance (divide each pair term by site-site
+
   distance) and neighbor_order/depth (interaction range) are likewise implementation parameters of
+
   the same energy. The (1-delta) restriction is over cell IDs, so same-type neighbouring cells
+
   still contribute. No standalone oracle/ablation run exists for the per-cell LocalFlex behaviour
+
   (the contact_adhesion evidence covers the plain-Contact energy only).
+
+  '
 contract:
   name: adhere
   kind: lateral
@@ -192,26 +235,30 @@ contract:
   inputs:
   - cell
   outputs:
-  - contact_energy (a scalar dE contribution to the Metropolis acceptance of a proposed pixel copy;
-    NOT a cell state and NOT a force -- this operator writes nothing back to the lattice)
+  - contact_energy (a scalar dE contribution to the Metropolis acceptance of a proposed pixel copy; NOT
+    a cell state and NOT a force -- this operator writes nothing back to the lattice)
   reads:
   - cell_id (sigma at each of two neighbouring lattice sites, to keep only cross-boundary pairs via 1-delta)
   - cell_type (seeds each cell's localDefaultContactEnergies table at init)
-  - contact_energy_J (the per-cell/per-pair adhesion energy attribute -- ContactLocalFlexDataContainer;
-    the pairwise J(sigma_i, sigma_j), higher J = weaker adhesion, steerable at runtime via setContactEnergy)
+  - per_cell_contact_J (the per-cell/per-pair adhesion energy attribute -- ContactLocalFlexDataContainer,
+    distinct from the output dE; the pairwise J(sigma_i, sigma_j) looked up from cell sigma_i's own table
+    rather than a global type matrix, higher J = weaker adhesion, steerable at runtime via setContactEnergy.
+    This per-cell J store is exactly what plain Contact lacks and is the sole difference from the canonical
+    `adhere` implementation)
   - neighbour shells (site pairs within neighbor_order adjacency, or Euclidean depth if set)
-  - distance_weighting (optional -- divide each pair term by site-site distance so farther neighbours count less)
+  - distance_weighting (optional -- divide each pair term by site-site distance so farther neighbours
+    count less)
   writes:
-  - nothing to the lattice (energy term). Side channel only -- the plugin maintains its own per-cell
-    contact-data container, into which steppables write per-cell/per-pair J at runtime.
+  - nothing to the lattice (energy term). Side channel only -- the plugin maintains its own per-cell contact-data
+    container, into which steppables write per-cell/per-pair J at runtime.
   maps:
-  - a cell is a SET of lattice sites sharing an id; adhesion energy is summed over neighbouring
-    cross-boundary site pairs (owners differ), so contact area emerges from boundary site counts
-  - per boundary pair, energy = J(sigma_i, sigma_j) * (1 - delta(sigma_i, sigma_j)); the SAME
-    functional as plain Contact, but J is read from cell sigma_i's per-cell attribute rather than a
-    global type-pair matrix, so adhesion is individually settable and runtime-steerable
-  - differential adhesion / cell sorting emerges from type- and cell-dependent J; the per-cell J
-    storage makes adhesion locally flexible while the simulation runs
+  - a cell is a SET of lattice sites sharing an id; adhesion energy is summed over neighbouring cross-boundary
+    site pairs (owners differ), so contact area emerges from boundary site counts
+  - per boundary pair, energy = J(sigma_i, sigma_j) * (1 - delta(sigma_i, sigma_j)); the SAME functional
+    as plain Contact, but J is read from cell sigma_i's per-cell attribute rather than a global type-pair
+    matrix, so adhesion is individually settable and runtime-steerable
+  - differential adhesion / cell sorting emerges from type- and cell-dependent J; the per-cell J storage
+    makes adhesion locally flexible while the simulation runs
 evidence:
   oracle_run: null
   diff_metric: null

@@ -139,7 +139,7 @@ on — that soft_sphere's uniform test could NOT.
   emitted velocity at mobility=1 (= its autodiff force), radii/epsilon registered as per-cell
   buffers, IC = the same POS7 translated by +[20,20]. Metric = `max_{7 cells, both components}
   |F_plx - F_ref| / max|F_ref|`. One forward() call, NO integrator confound.
-- **SECONDARY — deterministic overdamped trajectory (`traj_pos_max_abs`).** `config/atlas/hertzian.yaml`
+- **SECONDARY — deterministic overdamped trajectory (`traj_pos_max_abs`).** `config/atlas_jax/hertzian.yaml`
   (uniform radius 0.5, epsilon 2.0, dt 0.1, 40 frames) run through `plexus.engine`, centroid-aligned
   and diffed per-cell per-frame vs the reference `BrownianDynamics(Hertzian, kT=0, gamma=1)` history
   (kT=0 → `dx = dt*forces` deterministic). `adhere` gated `after_frame:1` so frame 0 = shared IC.
@@ -184,9 +184,9 @@ itself decide the verdict/dispute (`new → adhere`), which rests on the signatu
 Re-ran the scorer this pass — numbers reproduce exactly; `status: implemented → validated`.
 
 **Paths.**
-- Oracle: `atlas_jax_morph/_oracle/runs/diff_hertzian/` (reference.npz + summary.json + reference.png);
-  script `atlas_jax_morph/_oracle/scripts/hertzian.py`.
-- Plexus: `config/atlas/hertzian.yaml` → `log/atlas_jax/hertzian/` (diag.json, metrics.json, metrics.npz,
+- Oracle: `atlas_jax/_oracle/runs/diff_hertzian/` (reference.npz + summary.json + reference.png);
+  script `atlas_jax/_oracle/scripts/hertzian.py`.
+- Plexus: `config/atlas_jax/hertzian.yaml` → `log/atlas_jax/hertzian/` (diag.json, metrics.json, metrics.npz,
   strip.png, movie.mp4).
-- Scorer: `atlas_jax_morph/diff_hertzian.py` → `log/atlas_jax/hertzian/diff.json`
+- Scorer: `atlas_jax/diff_hertzian.py` → `log/atlas_jax/hertzian/diff.json`
   (thresholds PRE-REGISTERED at lines 38-39).

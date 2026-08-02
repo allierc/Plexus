@@ -43,7 +43,7 @@ PLEXUS = os.path.abspath(os.path.join(HERE, ".."))
 sys.path.insert(0, os.path.join(PLEXUS, "src"))
 sys.path.insert(0, HERE)
 
-SPEC = os.path.join(PLEXUS, "config", "atlas", "regulated_growth.yaml")
+SPEC = os.path.join(PLEXUS, "config", "atlas_jax", "regulated_growth.yaml")
 
 
 def rollout(W_in, b, seed, frames, device):

@@ -3,198 +3,223 @@ order: 27
 raw_name: Surface
 raw_kind: Plugin (SurfacePlugin)
 code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L2225
-paper_section: |
-  Swat et al. (2012) Methods Cell Biol 110:325-366 -- the GGH/CPM effective-energy (Hamiltonian)
+paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366 -- the GGH/CPM effective-energy (Hamiltonian)
+
   discussion, where the surface constraint is one term of E, the standard partner of the volume
-  term. NOTE: no paper text was available in this environment, so this anchor is the chapter's
+
+  term. NOTE: no paper text was available in this environment, so this anchor is the chapter''s
+
   known home for the term, NOT a page I have read. The equation below is reconstructed from the
+
   CC3D source declaration (SurfaceEnergyParameter / SurfacePlugin) plus standard CPM convention;
+
   the compiled changeEnergy was not read.
-summary: |
-  A per-cell-type (or, in bare mode, per-cell) quadratic penalty on the deviation of a cell's
+
+  '
+summary: 'A per-cell-type (or, in bare mode, per-cell) quadratic penalty on the deviation of a cell''s
+
   BOUNDARY count -- its perimeter (2D) / surface (3D) -- from a target. It writes no state: on
-  every proposed pixel copy it returns a dE that makes copies pushing a cell's perimeter away from
+
+  every proposed pixel copy it returns a dE that makes copies pushing a cell''s perimeter away from
+
   its target energetically costly, so the Metropolis rule rejects most of them. Where the Volume
-  term sets a cell's SIZE (0th geometric moment, a site count), the Surface term sets its MEMBRANE
+
+  term sets a cell''s SIZE (0th geometric moment, a site count), the Surface term sets its MEMBRANE
+
   AREA / roughness (the 1st-order boundary count): below target it favours ruffling out, above
+
   target it favours smoothing in -- an effective surface / cortical tension. Volume + Surface
+
   together are the two terms that give a set-of-sites a rounded, incompressible cell shape.
-equations: |
-  Effective-energy surface term, summed over all real cells sigma (Medium, id 0, is exempt):
 
-    E_surf = sum_{sigma>0} lambda_S(sigma) * ( S(sigma) - S_target(sigma) )^2
-
-  where
-    S(sigma)        = the cell's surface: the number of adjacent site-pairs, counted out to
-                      NeighborOrder, where the id changes across the pair (a boundary / perimeter
-                      COUNT), so it grows with both spread AND membrane roughness. It is a COUNT,
-                      not a physical area.
-    S_target(sigma) = the cell's rest / target boundary count.
-    lambda_S(sigma) = quadratic stiffness (energy per (site-pair)^2); lambda_S = 0 removes the term.
-
-  The plugin never integrates this. On each attempted pixel copy (a source site's id is proposed to
-  overwrite a neighbour site) it returns dE = E_surf(after) - E_surf(before). A single copy is a
-  TWO-cell event -- the gaining cell and the losing cell each change their boundary count (either may
-  be Medium, which contributes 0) -- so dE couples both quadratics and is NOT symmetric. The
-  Metropolis rule accepts with P = 1 if the TOTAL dE (this term + all others) <= 0, else
-  exp(-dE / T), where T = the Potts fluctuation_amplitude. Standard CPM convention has no leading
-  1/2 on the quadratic. Measured reference ablation (log/atlas_cc3d/surface_constraint, target 16,
-  lambda_S 2.0, seed 42): mean perimeter 20 -> 19.33 constrained vs 20 -> 22.8 unconstrained
-  (lambda_S = 0) -- the penalty rounds and compacts cells toward target, the ablation lets them
-  spread/ruffle.
+  '
+equations: "Effective-energy surface term, summed over all real cells sigma (Medium, id 0, is exempt):\n\
+  \n  E_surf = sum_{sigma>0} lambda_S(sigma) * ( S(sigma) - S_target(sigma) )^2\n\nwhere\n  S(sigma) \
+  \       = the cell's surface: the number of adjacent site-pairs, counted out to\n                  \
+  \  NeighborOrder, where the id changes across the pair (a boundary / perimeter\n                   \
+  \ COUNT), so it grows with both spread AND membrane roughness. It is a COUNT,\n                    not\
+  \ a physical area.\n  S_target(sigma) = the cell's rest / target boundary count.\n  lambda_S(sigma)\
+  \ = quadratic stiffness (energy per (site-pair)^2); lambda_S = 0 removes the term.\n\nThe plugin never\
+  \ integrates this. On each attempted pixel copy (a source site's id is proposed to\noverwrite a neighbour\
+  \ site) it returns dE = E_surf(after) - E_surf(before). A single copy is a\nTWO-cell event -- the gaining\
+  \ cell and the losing cell each change their boundary count (either may\nbe Medium, which contributes\
+  \ 0) -- so dE couples both quadratics and is NOT symmetric. The\nMetropolis rule accepts with P = 1\
+  \ if the TOTAL dE (this term + all others) <= 0, else\nexp(-dE / T), where T = the Potts fluctuation_amplitude.\
+  \ Standard CPM convention has no leading\n1/2 on the quadratic. Measured reference ablation (log/atlas_cc3d/surface_constraint,\
+  \ target 16,\nlambda_S 2.0, seed 42): mean perimeter 20 -> 19.33 constrained vs 20 -> 22.8 unconstrained\n\
+  (lambda_S = 0) -- the penalty rounds and compacts cells toward target, the ablation lets them\nspread/ruffle.\n"
 params:
-  target_surface: |
-    target_perimeter -- the boundary count a cell of this type relaxes toward
+  target_surface: 'target_perimeter -- the boundary count a cell of this type relaxes toward
+
     (SurfaceEnergyParameter.target_surface; CC3DML attribute TargetSurface). Guarded >= 0
+
     (check_dict, PyCoreSpecs.py:L2170).
-  lambda_surface: |
-    perimeter_stiffness / constraint_stiffness -- the quadratic energy penalty per (site-pair)^2 of
+
+    '
+  lambda_surface: 'perimeter_stiffness / constraint_stiffness -- the quadratic energy penalty per (site-pair)^2
+    of
+
     deviation from target (CC3DML attribute LambdaSurface). NOT guarded on the parameter: lambda_S = 0
+
     is legal and is exactly the ablation that unconstrains the perimeter.
-  neighbor_order: |
-    plugin-level int (SurfacePlugin.__init__, PyCoreSpecs.py:L2248), guarded >= 1
+
+    '
+  neighbor_order: 'plugin-level int (SurfacePlugin.__init__, PyCoreSpecs.py:L2248), guarded >= 1
+
     (check_dict L2244). Sets how far out the id-change pairs are counted, i.e. WHAT COUNTS AS the
+
     boundary -- so it changes the numeric meaning of S, not just its precision. Optional; if a
+
     SurfaceTracker with its own order is present, that order overrides this (per the docstring L2253).
-  scale_surface: |
-    plugin-level float (PyCoreSpecs.py:L2249), guarded >= 0 (check_dict L2245). A surface scaling
+
+    '
+  scale_surface: 'plugin-level float (PyCoreSpecs.py:L2249), guarded >= 0 (check_dict L2245). A surface
+    scaling
+
     coefficient applied to the measured S (a lattice-geometry normalization); does not change the
+
     quadratic FORM.
-  _params: |
-    (plugin constructor, SurfacePlugin(neighbor_order, scale_surface, *_params),
+
+    '
+  _params: '(plugin constructor, SurfacePlugin(neighbor_order, scale_surface, *_params),
+
     PyCoreSpecs.py:L2247) zero or more SurfaceEnergyParameter, one per cell type. Zero param args =
+
     "bare" mode: target_surface / lambda_surface are then read PER-CELL from cell.targetSurface /
+
     cell.lambdaSurface instead of per-type (the same per-type-silences-per-cell split as Volume).
-state_io: |
-  reads: S(sigma), the per-cell boundary count -- maintained incrementally by a SEPARATE plugin,
-    SurfaceTrackerPlugin (see the surfacetracker sibling entry), NOT recomputed by this plugin; and,
-    per cell, its targetSurface + lambdaSurface, taken EITHER from per-type SurfaceEnergyParameters
-    OR, in bare mode, from the per-cell cell.targetSurface / cell.lambdaSurface attributes. Also
-    reads neighbor_order (which id-change pairs constitute the boundary) and scale_surface.
-  writes: nothing. It is an energy term -- it only changes the acceptance probability of a proposed
-    pixel copy, never moves or writes state directly. (This is the campaign-flagged shape: a Potts
-    plugin returns a scalar dE and mutates no cell field; it does not fit read/write update language.)
+
+    '
+state_io: "reads: S(sigma), the per-cell boundary count -- maintained incrementally by a SEPARATE plugin,\n\
+  \  SurfaceTrackerPlugin (see the surfacetracker sibling entry), NOT recomputed by this plugin; and,\n\
+  \  per cell, its targetSurface + lambdaSurface, taken EITHER from per-type SurfaceEnergyParameters\n\
+  \  OR, in bare mode, from the per-cell cell.targetSurface / cell.lambdaSurface attributes. Also\n  reads\
+  \ neighbor_order (which id-change pairs constitute the boundary) and scale_surface.\nwrites: nothing.\
+  \ It is an energy term -- it only changes the acceptance probability of a proposed\n  pixel copy, never\
+  \ moves or writes state directly. (This is the campaign-flagged shape: a Potts\n  plugin returns a scalar\
+  \ dE and mutates no cell field; it does not fit read/write update language.)\n"
 surprises:
-- |
-  `cell.surface` silently reads 0 unless SurfaceTrackerPlugin is enabled -- a flat zero line that
+- '`cell.surface` silently reads 0 unless SurfaceTrackerPlugin is enabled -- a flat zero line that
+
   looks like a valid measurement. The COUNT and the ENERGY are two different plugins: SurfacePlugin
+
   only reads S(sigma); SurfaceTracker keeps it up to date on each accepted copy. A reimplementer who
+
   folds "recount the boundary" into the energy term, or forgets the tracker, gets a plugin reading a
+
   stale or zero surface and a silently inert constraint.
-- |
-  Measured ablation (log/atlas_cc3d/surface_constraint): perimeter 20 -> 19.3 constrained (target 16,
+
+  '
+- 'Measured ablation (log/atlas_cc3d/surface_constraint): perimeter 20 -> 19.3 constrained (target 16,
+
   lambda_S 2.0) vs 20 -> 22.8 unconstrained (lambda_S 0). The effect is real but far milder than the
+
   Volume ablation -- unconstraining surface lets cells spread/ruffle, it does NOT dissolve them
+
   (Volume still holds their size). Surface shapes the membrane; Volume anchors the object.
-- |
-  S is a boundary-PAIR count, and neighbor_order decides which pairs count. So the SAME cell has a
+
+  '
+- 'S is a boundary-PAIR count, and neighbor_order decides which pairs count. So the SAME cell has a
+
   different S at different neighbor orders, and target_surface is only meaningful relative to the
+
   order used to measure it -- a target tuned for order 1 is wrong for order 2. neighbor_order is part
-  of the constraint's definition, not a free knob.
-- |
-  A single pixel copy is a TWO-cell event: both the gaining and the losing cell change their boundary
+
+  of the constraint''s definition, not a free knob.
+
+  '
+- 'A single pixel copy is a TWO-cell event: both the gaining and the losing cell change their boundary
+
   count, and because the term is quadratic the two contributions do not cancel -- dE depends on how
+
   far each cell already is from its own target. Treating perimeter relaxation as an independent
+
   per-cell update misses this coupling. Medium (id 0) has no surface constraint and contributes 0.
-- |
-  Only target_surface is guarded (>= 0). lambda_surface on the parameter is unchecked, so the zero
-  that unconstrains the perimeter passes validation silently. As with Volume, the constraint's
+
+  '
+- 'Only target_surface is guarded (>= 0). lambda_surface on the parameter is unchecked, so the zero
+
+  that unconstrains the perimeter passes validation silently. As with Volume, the constraint''s
+
   strength is inseparable from the Potts temperature T (fluctuation_amplitude), which is a Potts
+
   param, not a Surface param: a large lambda_S with fixed T can freeze the boundary short of target.
+
+  '
 verdict: new
 of: null
 implementation_of: null
-why: |
-  NEW against the frozen baseline: no PROMOTED contract reads a cell's own BOUNDARY / perimeter
-  count and returns a restoring energy that grows with its deviation from a rest value. This is a
-  quadratic (Hookean) spring, lambda_S*(S - S_target)^2, on the 1st-order geometric descriptor of a
-  set of sites -- an effective membrane / cortical tension homeostasis -- evaluated as a Potts
-  ENERGY term (returns dE for a proposed pixel copy, writes nothing). I name the missing contract
-  `membrane_tension`.
-
-  CLOSEST PROMOTED contract = cell_grow (structural/growth): the nearest because it, too, is a
-  per-cell, target-driven geometric homeostasis. But widening cell_grow to admit this does violence
-  on three counts:
-    1. QUANTITY. cell_grow targets the 0th moment -- SIZE (rest volume / site count), isotropic and
-       area-like. membrane_tension targets the boundary count -- membrane AREA / roughness, which is
-       independent of size: at fixed volume a cell can raise its perimeter by ruffling and lower it
-       by rounding (the ablation shows exactly this, 20 -> 22.8 with volume held by the Volume term).
-       Size homeostasis and membrane-area homeostasis are different biology.
-    2. MECHANISM. cell_grow is a STATE UPDATE -- the engine integrates a rest-volume delta and the
-       cell physically grows. membrane_tension is a Potts ENERGY term: changeEnergy returns a scalar
-       dE and mutates NOTHING; it only re-weights the acceptance probability of a proposed pixel
-       copy. Forcing an integrated growth update to also mean "return a dE that gates a Metropolis
-       accept" changes cell_grow's output contract and breaks every current user.
-    3. DEPENDENCY. membrane_tension's S is maintained by a separate tracker (SurfaceTracker) and is
-       read, not owned; cell_grow reads a scalar target it owns.
-
-  NOT an alias/refinement of the interaction family (attraction_repulsion, cohesion, separation,
-  squared_law, stillinger_weber, ...): those are pairwise and metric over neighbours; this reads a
-  SINGLE cell's own boundary, no partner. It is filed lateral/mechanics with gravity as the
-  precedent for a single-body mechanics energy, but gravity is a uniform body force, not a
-  restoring shape spring.
-
-  RELATIONSHIP TO ITS SIBLINGS (Volume, order 30; LengthConstraint, order 18 = `elongate`),
-  recorded honestly: all three are the same functional object -- a quadratic Hookean spring on a
-  per-cell geometric moment, contributing dE to the Metropolis accept -- differing only in WHICH
-  descriptor they read (Volume the 0th moment / site count, Surface the 1st-order boundary count,
-  Length the 2nd moment / inertia-axis). One could lump them as a single
-  `constrain_moment(cell, order, target, lambda)` contract of which each is an implementation (see
-  the note's counter-argument, and the same argument raised in the elongate sibling). I keep them
-  DISTINCT because the descriptors carry distinct biology and distinct homes in the language: size
-  homeostasis (Volume) maps onto cell_grow's rest-volume machinery; anisotropy (Length) has no home
-  (`elongate`); and membrane-area / cortical-tension homeostasis (Surface) likewise has no home.
-  Collapsing "any quadratic on any moment" into one contract would erase those distinctions -- the
-  naming DEflation this campaign must equally avoid. Since `elongate` is only PROPOSED this phase
-  and is NOT in the frozen baseline, and since perimeter (an isoperimetric boundary count) is a
-  DIFFERENT descriptor from the inertia-tensor major axis, this is NOT a second sighting of
-  `elongate`: distinct contract, implementation_of: null.
-
-  NOT a second sighting of any jax-morph-proposed contract (adhere, agitate, apoptose,
-  mechanosense, morphogen, regulate, relax, reorient): none is a surface-area / membrane-tension
-  energy. `adhere` is a pairwise interfacial energy between two cells (CC3D's Contact term), not a
-  single cell's self-boundary spring; `relax` (meaning unread) is not evidenced to be an
-  isoperimetric membrane spring, so I do not claim it.
+why: "NEW against the frozen baseline: no PROMOTED contract reads a cell's own BOUNDARY / perimeter\n\
+  count and returns a restoring energy that grows with its deviation from a rest value. This is a\nquadratic\
+  \ (Hookean) spring, lambda_S*(S - S_target)^2, on the 1st-order geometric descriptor of a\nset of sites\
+  \ -- an effective membrane / cortical tension homeostasis -- evaluated as a Potts\nENERGY term (returns\
+  \ dE for a proposed pixel copy, writes nothing). I name the missing contract\n`membrane_tension`.\n\n\
+  CLOSEST PROMOTED contract = cell_grow (structural/growth): the nearest because it, too, is a\nper-cell,\
+  \ target-driven geometric homeostasis. But widening cell_grow to admit this does violence\non three\
+  \ counts:\n  1. QUANTITY. cell_grow targets the 0th moment -- SIZE (rest volume / site count), isotropic\
+  \ and\n     area-like. membrane_tension targets the boundary count -- membrane AREA / roughness, which\
+  \ is\n     independent of size: at fixed volume a cell can raise its perimeter by ruffling and lower\
+  \ it\n     by rounding (the ablation shows exactly this, 20 -> 22.8 with volume held by the Volume term).\n\
+  \     Size homeostasis and membrane-area homeostasis are different biology.\n  2. MECHANISM. cell_grow\
+  \ is a STATE UPDATE -- the engine integrates a rest-volume delta and the\n     cell physically grows.\
+  \ membrane_tension is a Potts ENERGY term: changeEnergy returns a scalar\n     dE and mutates NOTHING;\
+  \ it only re-weights the acceptance probability of a proposed pixel\n     copy. Forcing an integrated\
+  \ growth update to also mean \"return a dE that gates a Metropolis\n     accept\" changes cell_grow's\
+  \ output contract and breaks every current user.\n  3. DEPENDENCY. membrane_tension's S is maintained\
+  \ by a separate tracker (SurfaceTracker) and is\n     read, not owned; cell_grow reads a scalar target\
+  \ it owns.\n\nNOT an alias/refinement of the interaction family (attraction_repulsion, cohesion, separation,\n\
+  squared_law, stillinger_weber, ...): those are pairwise and metric over neighbours; this reads a\nSINGLE\
+  \ cell's own boundary, no partner. It is filed lateral/mechanics with gravity as the\nprecedent for\
+  \ a single-body mechanics energy, but gravity is a uniform body force, not a\nrestoring shape spring.\n\
+  \nRELATIONSHIP TO ITS SIBLINGS (Volume, order 30; LengthConstraint, order 18 = `elongate`),\nrecorded\
+  \ honestly: all three are the same functional object -- a quadratic Hookean spring on a\nper-cell geometric\
+  \ moment, contributing dE to the Metropolis accept -- differing only in WHICH\ndescriptor they read\
+  \ (Volume the 0th moment / site count, Surface the 1st-order boundary count,\nLength the 2nd moment\
+  \ / inertia-axis). One could lump them as a single\n`constrain_moment(cell, order, target, lambda)`\
+  \ contract of which each is an implementation (see\nthe note's counter-argument, and the same argument\
+  \ raised in the elongate sibling). I keep them\nDISTINCT because the descriptors carry distinct biology\
+  \ and distinct homes in the language: size\nhomeostasis (Volume) maps onto cell_grow's rest-volume machinery;\
+  \ anisotropy (Length) has no home\n(`elongate`); and membrane-area / cortical-tension homeostasis (Surface)\
+  \ likewise has no home.\nCollapsing \"any quadratic on any moment\" into one contract would erase those\
+  \ distinctions -- the\nnaming DEflation this campaign must equally avoid. Since `elongate` is only PROPOSED\
+  \ this phase\nand is NOT in the frozen baseline, and since perimeter (an isoperimetric boundary count)\
+  \ is a\nDIFFERENT descriptor from the inertia-tensor major axis, this is NOT a second sighting of\n\
+  `elongate`: distinct contract, implementation_of: null.\n\nNOT a second sighting of any jax-morph-proposed\
+  \ contract (adhere, agitate, apoptose,\nmechanosense, morphogen, regulate, relax, reorient): none is\
+  \ a surface-area / membrane-tension\nenergy. `adhere` is a pairwise interfacial energy between two cells\
+  \ (CC3D's Contact term), not a\nsingle cell's self-boundary spring; `relax` (meaning unread) is not\
+  \ evidenced to be an\nisoperimetric membrane spring, so I do not claim it.\n"
 contract:
   name: membrane_tension
   kind: lateral
   family: mechanics
   set: cell
-  inputs: |
-    - one cell's boundary count S(sigma) -- the number of id-change site-pairs out to
-      neighbor_order (supplied/maintained by the SurfaceTracker plugin, read not recomputed);
-      grows with both spread and membrane roughness, independent of the cell's volume.
-    - the proposed single-pixel copy (source/target site, the two involved cells), used to obtain
-      the incremental change in each cell's boundary count for the two cells the copy touches.
-    - the target and stiffness: target_surface S_target, lambda_surface -- taken from the per-cell
-      cell.targetSurface / cell.lambdaSurface in bare mode, else the per-cell-type
-      SurfaceEnergyParameter default.
-    - neighbor_order (which id-change pairs constitute the boundary; part of S's definition) and
-      scale_surface (a lattice-geometry normalization on S).
-  outputs: |
-    - a scalar energy contribution dE added to the Potts total, NOT an integrated state delta:
-      dE = E_after - E_before, with E(cell) = lambda_S*(S - S_target)^2, summed over the two cells
-      the candidate copy changes (Medium contributes 0). The delta only re-weights the Metropolis
-      acceptance probability (P=1 if total dE<=0 else exp(-dE/T)); the operator writes no cell
-      property.
-  reads: |
-    - the cell's boundary count S(sigma) (maintained by SurfaceTracker; reads 0 / inert without it)
-      and neighbor_order + scale_surface that define it.
-    - per-cell cell.targetSurface / cell.lambdaSurface (bare mode) OR the per-type
-      SurfaceEnergyParameter default.
-    - the candidate pixel copy and the two involved cells, for the incremental boundary-count change.
-  writes: |
-    - NONE. changeEnergy returns dE (an energy term) and mutates no cell field; it changes only the
-      acceptance probability of the proposed pixel copy.
-    - (out of band, not part of this contract) a host steppable may set the per-cell targetSurface /
-      lambdaSurface; that is host-driven state-setting, not the energy evaluation.
-  maps: |
-    - cell pixel set -> boundary count S = number of id-change site-pairs out to neighbor_order,
-      scaled by scale_surface (the tracker's job; read here, not computed).
-    - surface deviation (S - S_target) -> quadratic Hookean energy lambda_S*(dev)^2 per cell ->
-      summed over the two cells a candidate copy touches -> dE that gates the Metropolis accept.
-      At target -> low energy; over-spread/ruffled or over-compact -> higher energy (a two-sided
-      restoring membrane / surface tension).
+  inputs: "- one cell's boundary count S(sigma) -- the number of id-change site-pairs out to\n  neighbor_order\
+    \ (supplied/maintained by the SurfaceTracker plugin, read not recomputed);\n  grows with both spread\
+    \ and membrane roughness, independent of the cell's volume.\n- the proposed single-pixel copy (source/target\
+    \ site, the two involved cells), used to obtain\n  the incremental change in each cell's boundary\
+    \ count for the two cells the copy touches.\n- the target and stiffness: target_surface S_target,\
+    \ lambda_surface -- taken from the per-cell\n  cell.targetSurface / cell.lambdaSurface in bare mode,\
+    \ else the per-cell-type\n  SurfaceEnergyParameter default.\n- neighbor_order (which id-change pairs\
+    \ constitute the boundary; part of S's definition) and\n  scale_surface (a lattice-geometry normalization\
+    \ on S).\n"
+  outputs: "- a scalar energy contribution dE added to the Potts total, NOT an integrated state delta:\n\
+    \  dE = E_after - E_before, with E(cell) = lambda_S*(S - S_target)^2, summed over the two cells\n\
+    \  the candidate copy changes (Medium contributes 0). The delta only re-weights the Metropolis\n \
+    \ acceptance probability (P=1 if total dE<=0 else exp(-dE/T)); the operator writes no cell\n  property.\n"
+  reads: "- the cell's boundary count S(sigma) (maintained by SurfaceTracker; reads 0 / inert without\
+    \ it)\n  and neighbor_order + scale_surface that define it.\n- per-cell cell.targetSurface / cell.lambdaSurface\
+    \ (bare mode) OR the per-type\n  SurfaceEnergyParameter default.\n- the candidate pixel copy and the\
+    \ two involved cells, for the incremental boundary-count change.\n"
+  writes: "- NONE. changeEnergy returns dE (an energy term) and mutates no cell field; it changes only\
+    \ the\n  acceptance probability of the proposed pixel copy.\n- (out of band, not part of this contract)\
+    \ a host steppable may set the per-cell targetSurface /\n  lambdaSurface; that is host-driven state-setting,\
+    \ not the energy evaluation.\n"
+  maps: "- cell pixel set -> boundary count S = number of id-change site-pairs out to neighbor_order,\n\
+    \  scaled by scale_surface (the tracker's job; read here, not computed).\n- surface deviation (S -\
+    \ S_target) -> quadratic Hookean energy lambda_S*(dev)^2 per cell ->\n  summed over the two cells\
+    \ a candidate copy touches -> dE that gates the Metropolis accept.\n  At target -> low energy; over-spread/ruffled\
+    \ or over-compact -> higher energy (a two-sided\n  restoring membrane / surface tension).\n"
 status: normalized
 module: null
 test: null
@@ -203,3 +228,9 @@ evidence:
   diff_metric: null
   threshold: null
   passed: null
+disputed:
+  by: skeptic
+  was: new
+  claimed: null
+  evidence: the skeptic returned no JSON; refusing to read that as assent
+  what_would_settle_it: null

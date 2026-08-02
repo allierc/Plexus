@@ -1,10 +1,10 @@
 """Score the relax differential: the Plexus `relax` equilibrium vs the jax-morph MechanicalRelaxation
 reference, per cell. Runs in the Plexus (torch) env; no re-simulation.
 
-  reference : atlas_jax_morph/_oracle/runs/diff_mechanical_relaxation/reference.npz
+  reference : atlas_jax/_oracle/runs/diff_mechanical_relaxation/reference.npz
               (jxm MechanicalRelaxation(Morse), FIRE to f_tol, quasistatic x*)
   plexus    : graphs_data/atlas/mechanical_relaxation/trajectory.npz
-              (config/atlas/mechanical_relaxation.yaml, engine `relax` operator)
+              (config/atlas_jax/mechanical_relaxation.yaml, engine `relax` operator)
 
 Primary metric  D_eq = max over LIVE cells i of ||x*_plx,i - x*_ref,i||_2 / sigma at the relaxed
                 equilibrium (frame 1). sigma = r_i + r_j = 1.0.

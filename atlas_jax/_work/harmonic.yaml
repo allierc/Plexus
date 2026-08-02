@@ -244,7 +244,7 @@ evidence:
   value: 7.864199877963372e-06
   passed: true
   plexus_run: log/atlas_jax/harmonic/
-  scorer: atlas_jax_morph/_oracle/scripts/_analyze_harmonic.py
+  scorer: atlas_jax/_oracle/scripts/_analyze_harmonic.py
   acted_ledger: |
     adhere: calls 160 / acted 160, moved 8.451 (cumulative), kind lateral; inert_operators [];
     valid_evidence true ("every scheduled operator acted at least once"). The one scheduled

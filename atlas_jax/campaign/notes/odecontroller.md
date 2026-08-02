@@ -171,11 +171,11 @@ cannot express a per-cell drive, so this run was stepped through the engine's ow
 (`_integrate`) exactly as `engine.run` does -- the operator as the engine runs it, not a bench rig.
 
 **Paths.**
-  * oracle:  `atlas_jax_morph/_oracle/runs/diff_odecontroller/` (reference.npz, summary.json, diff.json)
+  * oracle:  `atlas_jax/_oracle/runs/diff_odecontroller/` (reference.npz, summary.json, diff.json)
   * engine:  `log/atlas_jax/odecontroller/` (diag.json acted ledger: regulate acted 19/21 -- the last two
     near-fixed-point ticks emit a delta below the float32 ledger threshold; convergence, not a
     no-op; `valid_evidence: true`, no inert operators).
-  * comparison script: `atlas_jax_morph/_oracle/scripts/_compare_odecontroller.py` (torch env).
+  * comparison script: `atlas_jax/_oracle/scripts/_compare_odecontroller.py` (torch env).
 
 **What this validates and what it does NOT.** It validates the BASE ODEController contract end to
 end: the coupled hidden+output `y=concat(hidden,outputs)` block, the frozen-drive quasistatic

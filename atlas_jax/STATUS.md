@@ -130,7 +130,7 @@ Recorded because they are the argument for the whole apparatus.
 - `inventory.py` — the mechanism scan, *plus* the architectural contracts a scan cannot see (4 of
   jax-morph's 24 were added by hand and were among the most interesting).
 - `paper.py` — PDF → greppable text.
-- `config/atlas/*.yaml` (22 specs), `_oracle/scripts/*` (differential tests), `campaign/notes/*`.
+- `config/atlas_jax/*.yaml` (22 specs), `_oracle/scripts/*` (differential tests), `campaign/notes/*`.
 
 **Rough split:** ~60% of the Python is instrument and transfers; ~40% is target-specific.
 

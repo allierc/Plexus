@@ -317,51 +317,7 @@ splits as predicted, the conclusion is that \emph{the biological vocabulary is c
 the representational vocabulary is not}.
 \end{phasebox}
 
-\begin{phasebox}{Phase 3 --- Implement what is missing \hfill \ns}
-Every \code{new} and every \code{refinement} becomes a Plexus operator in the anti-chamber, with a
-test of one property statable without the reference: a conservation law, a sign, a limit, a
-symmetry.
-
-\textbf{The open question this phase will force.} Plexus's \code{cell} set is points with per-cell
-state. A Potts cell is a \emph{set of lattice sites}. Either that is expressible as an existing
-set with a different map, or the language needs a representation it does not have --- and finding
-out which is worth more than any individual operator here.
-\end{phasebox}
-
-\begin{phasebox}{Phase 4 --- Differential validation \hfill \ns}
-Metric and threshold written down \emph{first}; then the same initial condition through both
-implementations; then subtract.
-
-\textbf{This is the phase most likely to break, and the reason this target was chosen.} Every
-differential test in the first atlas was a subtraction of per-cell arrays. Here there is no
-per-cell equation to compare and the dynamics are a Metropolis chain, so a matched trajectory is
-not even meaningful --- the same argument that made the division differ compare a pooled
-\emph{hazard} instead of cell counts, but now applying to the whole framework rather than one
-operator. The tests will have to be \textbf{distributional}: equilibrium sorted-boundary length,
-volume distribution, contact-energy spectrum.
-\end{phasebox}
-
-\begin{phasebox}{Phase 5 --- The forward figure \hfill \ns}
-One headline result of the paper reproduced inside Plexus out of normalized operators, and set
-\emph{beside} the reference rather than described next to it. Cell sorting is the obvious
-candidate: it is CompuCell3D's canonical demonstration and its outcome is a topology, not a
-trajectory.
-\end{phasebox}
-
-\begin{phasebox}{Phase 6 --- Differentiability \hfill \ns}
-\textbf{Probably not applicable, and saying why is the result.} The first atlas's Phase 6 rested on
-the forward model being differentiable. A Metropolis acceptance is a discrete accept/reject on an
-energy difference --- there is no pathwise gradient through it at all, and the straight-through
-trick that carried the division draw does not obviously transfer. If Plexus can express Potts
-dynamics forward but not inversely, that is a real and reportable limit of the language.
-\end{phasebox}
-
-\begin{phasebox}{Phase 7 --- Promotion, and the joint ledger \hfill \ns}
-The measurement only becomes an argument here: the cumulative-new curve across \emph{two}
-repositories. Flat means the language is saturating; still climbing means it is not.
-\end{phasebox}
-
-\begin{phasebox}{Phase 2 --- what actually happened \hfill \done\ (35 of 35)}
+\begin{phasebox}{Phase 2 --- what actually happened \hfill \done\ (35 normalized, 14 challenged)}
 \textbf{The measurement, against the same frozen 52-contract baseline the first atlas used:}
 
 \begin{center}
@@ -410,10 +366,69 @@ the normalizer judged them framework mechanics with no biology, exactly as jax-m
 architectural entries were judged. \textbf{Two frameworks, two very different architectures, and
 both times the architecture scored zero new biological vocabulary.}
 
+\textbf{The skeptic earned its place again.} Every \code{new} claim was challenged --- 14
+mechanisms, since the record held more \code{new} verdicts than the ledger counts distinct
+contracts. \textbf{Five were refuted and sent back to the normalizer}: \code{adhesionflex},
+\code{connectivity}, \code{lengthconstraint}, \code{surface} and \code{volume}. \code{connectivity}
+was demoted outright from \code{new} to \code{alias}. Nine survived, at confidences of 0.65--0.85.
+
+\textbf{And a driver lesson worth recording.} The first attempt ran
+\code{step -{}-role normalizer -{}-skeptic} over the already-normalized entries, which re-runs the
+NORMALIZER first --- and a call that changes nothing counts as a failure. Nothing was corrupted
+(the guard rejected the no-op edits and the measurement was unchanged), but only one challenge
+actually landed. \code{-{}-skeptic} belongs \emph{during} the normalizing pass; afterwards, the
+skeptic must be invoked as its own role.
+
 \textbf{Eleven out-of-scope is nearly half the framework}, against six of twenty-four for
 jax-morph. A Potts framework carries far more machinery that models no biology --- trackers,
 initialisers, dumpers, the acceptance rule itself.
 \end{phasebox}
+
+\begin{phasebox}{Phase 3 --- Implement what is missing \hfill \ns}
+Every \code{new} and every \code{refinement} becomes a Plexus operator in the anti-chamber, with a
+test of one property statable without the reference: a conservation law, a sign, a limit, a
+symmetry.
+
+\textbf{The open question this phase will force.} Plexus's \code{cell} set is points with per-cell
+state. A Potts cell is a \emph{set of lattice sites}. Either that is expressible as an existing
+set with a different map, or the language needs a representation it does not have --- and finding
+out which is worth more than any individual operator here.
+\end{phasebox}
+
+\begin{phasebox}{Phase 4 --- Differential validation \hfill \ns}
+Metric and threshold written down \emph{first}; then the same initial condition through both
+implementations; then subtract.
+
+\textbf{This is the phase most likely to break, and the reason this target was chosen.} Every
+differential test in the first atlas was a subtraction of per-cell arrays. Here there is no
+per-cell equation to compare and the dynamics are a Metropolis chain, so a matched trajectory is
+not even meaningful --- the same argument that made the division differ compare a pooled
+\emph{hazard} instead of cell counts, but now applying to the whole framework rather than one
+operator. The tests will have to be \textbf{distributional}: equilibrium sorted-boundary length,
+volume distribution, contact-energy spectrum.
+\end{phasebox}
+
+\begin{phasebox}{Phase 5 --- The forward figure \hfill \ns}
+One headline result of the paper reproduced inside Plexus out of normalized operators, and set
+\emph{beside} the reference rather than described next to it. Cell sorting is the obvious
+candidate: it is CompuCell3D's canonical demonstration and its outcome is a topology, not a
+trajectory.
+\end{phasebox}
+
+\begin{phasebox}{Phase 6 --- Differentiability \hfill \ns}
+\textbf{Probably not applicable, and saying why is the result.} The first atlas's Phase 6 rested on
+the forward model being differentiable. A Metropolis acceptance is a discrete accept/reject on an
+energy difference --- there is no pathwise gradient through it at all, and the straight-through
+trick that carried the division draw does not obviously transfer. If Plexus can express Potts
+dynamics forward but not inversely, that is a real and reportable limit of the language.
+\end{phasebox}
+
+\begin{phasebox}{Phase 7 --- Promotion, and the joint ledger \hfill \ns}
+The measurement only becomes an argument here: the cumulative-new curve across \emph{two}
+repositories. Flat means the language is saturating; still climbing means it is not.
+\end{phasebox}
+
+
 
 %======================================================================
 \section{Six mechanisms, each beside its ablation}\label{sec:demos}

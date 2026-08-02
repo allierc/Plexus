@@ -163,7 +163,7 @@ evidence:
     all emitted by ONE generator (_gen_gene_network_connectionist.py) so the two sides cannot drift
     apart. Arrays are 21 frames x 6 cells x 5 genes; frame k = g(k*dt); this is a full end-to-end
     run_spec.py engine trajectory, NOT an operator-level probe. Driver
-    atlas_jax_morph/diff_gene_network_connectionist.py; artefact
+    atlas_jax/diff_gene_network_connectionist.py; artefact
     _oracle/runs/diff_gene_network_connectionist/diff.json.
   threshold: |
     5.0e-3 (max-abs, gene-concentration units). Chosen BEFORE the run from integrator physics, not

@@ -193,7 +193,7 @@ evidence:
   value: 2.6973983046972182e-06
   passed: true
   plexus_run: log/atlas_jax/soft_sphere/
-  scorer: atlas_jax_morph/_oracle/scripts/_analyze_soft_sphere.py
+  scorer: atlas_jax/_oracle/scripts/_analyze_soft_sphere.py
   acted_ledger: |
     adhere: calls 60 / acted 60, max|delta| 0.37996304 (== oracle force_ic_max 0.37996307 to
     ~3e-8); inert_operators []; valid_evidence true. The one scheduled operator moved cells every

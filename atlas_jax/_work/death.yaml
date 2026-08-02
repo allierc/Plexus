@@ -138,7 +138,7 @@ evidence:
     births, so every live-count decrement is one committed death and p_hat is the maximum-likelihood
     Bernoulli hazard pooled over every eligible live-cell-step). Oracle: Model([Death]), N0=50000
     live cells at uniform death_rate lambda=0.05, dt=1.0, 40 macro-steps
-    (atlas_jax_morph/_oracle/runs/diff_death). Plexus: config/atlas/death.yaml, identical
+    (atlas_jax/_oracle/runs/diff_death). Plexus: config/atlas_jax/death.yaml, identical
     N0/lambda/dt/frame-count (log/atlas_jax/death). The estimator is invariant to the engine's
     record-after-apply off-by-one -- Plexus' first RECORDED frame is already post-step-1 (47506,
     not the pristine 50000; apoptose acted 41x over 41 frames per the acted ledger) -- because a
@@ -160,4 +160,4 @@ evidence:
     diff = 5.66e-05 = 0.17 * SE_pooled  <=  threshold 0.000986  -> PASS.
     Both match the exact hazard 1-exp(-0.05)=0.048771: oracle 0.69 SE, plexus 0.91 SE (both < 3 SE).
     Acted ledger: apoptose calls 41, acted 41, inert_operators [] -> valid_evidence true.
-    Analysis: atlas_jax_morph/_oracle/scripts/_analyze_death.py.
+    Analysis: atlas_jax/_oracle/scripts/_analyze_death.py.

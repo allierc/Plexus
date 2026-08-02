@@ -124,68 +124,55 @@ surprises:
 verdict: new
 of: null
 implementation_of: null
-why: |
-  new: no registered contract covers an elastic set-point on a cell's SIZE. The closest
-  registered operators are cell_grow (structural/growth) and this term's geometric twin
-  membrane_tension (the `surface` entry, itself normalized `new` in this same atlas).
-  - cell_grow operates on volume but from the opposite direction: it WRITES the rest/target
-    volume forward by a logistic law (a state-writing update, kind structural). volume_elasticity
-    writes nothing -- it returns the energy dE that resists any deviation of the CURRENT site
-    count from that target. Widening cell_grow to absorb it would fuse a state-writing growth
-    rule with a non-writing energy term (incompatible state_io) and erase the very read/write
-    distinction this campaign is measuring.
-  - membrane_tension is the structural sibling (same quadratic Hookean form, same two-cell
-    incremental-delta / no-write energy shape, same lateral/mechanics home) but constrains a
-    DIFFERENT geometric quantity: boundary count vs bulk site count. They are two distinct
-    biophysical forces (surface tension vs bulk incompressibility), read two different trackers,
-    and Plexus already keeps them apart, so volume_elasticity is its own contract, NOT an
-    implementation_of membrane_tension. (One COULD argue both are implementations of a single
-    generic "quadratic geometric set-point" contract; the note records the argument for
-    collapsing them.)
-  - The jax-morph proposals `relax` / `regulate` are generic relaxation / homeostasis verbs,
-    not a volume-elasticity energy; no prior atlas proposed this specific contract, so this is
-    its FIRST sighting (implementation_of: null).
+why: "new: no registered contract covers an elastic set-point on a cell's SIZE. The closest\nregistered\
+  \ operators are cell_grow (structural/growth) and this term's geometric twin\nmembrane_tension (the\
+  \ `surface` entry, itself normalized `new` in this same atlas).\n- cell_grow operates on volume but\
+  \ from the opposite direction: it WRITES the rest/target\n  volume forward by a logistic law (a state-writing\
+  \ update, kind structural). volume_elasticity\n  writes nothing -- it returns the energy dE that resists\
+  \ any deviation of the CURRENT site\n  count from that target. Widening cell_grow to absorb it would\
+  \ fuse a state-writing growth\n  rule with a non-writing energy term (incompatible state_io) and erase\
+  \ the very read/write\n  distinction this campaign is measuring.\n- membrane_tension is the structural\
+  \ sibling (same quadratic Hookean form, same two-cell\n  incremental-delta / no-write energy shape,\
+  \ same lateral/mechanics home) but constrains a\n  DIFFERENT geometric quantity: boundary count vs bulk\
+  \ site count. They are two distinct\n  biophysical forces (surface tension vs bulk incompressibility),\
+  \ read two different trackers,\n  and Plexus already keeps them apart, so volume_elasticity is its own\
+  \ contract, NOT an\n  implementation_of membrane_tension. (One COULD argue both are implementations\
+  \ of a single\n  generic \"quadratic geometric set-point\" contract; the note records the argument for\n\
+  \  collapsing them.)\n- The jax-morph proposals `relax` / `regulate` are generic relaxation / homeostasis\
+  \ verbs,\n  not a volume-elasticity energy; no prior atlas proposed this specific contract, so this\
+  \ is\n  its FIRST sighting (implementation_of: null).\n"
 contract:
   name: volume_elasticity
   kind: lateral
   family: mechanics
   set: cell
-  inputs: |
-    - one cell's site COUNT V(sigma) -- the number of lattice sites carrying the cell id
-      (maintained incrementally by a separate, auto-loaded VolumeTrackerPlugin, a
-      CellGChangeWatcher; read here, not recomputed). This is the cell's discrete "volume":
-      a count, not a physical length^3.
-    - the proposed single-pixel copy (source/target site, the two cells it touches), used to
-      obtain the incremental change (+1 to the gaining cell, -1 to the losing cell) in each
-      involved cell's count.
-    - the target and stiffness: target_volume V_target, lambda_volume -- taken from the per-cell
-      cell.targetVolume / cell.lambdaVolume in bare mode, else the per-cell-type
-      VolumeEnergyParameter default (the two modes are mutually exclusive).
-  outputs: |
-    - a scalar energy contribution dE added to the Potts total, NOT an integrated state delta:
-      dE = E_after - E_before, with E(cell) = lambda_V*(V - V_target)^2, summed over the two
-      cells the candidate copy changes (gainer V->V+1, loser V->V-1; Medium, id 0, contributes 0).
-      The delta only re-weights the Metropolis acceptance probability (P=1 if total dE<=0 else
-      exp(-dE/T)); the operator writes no cell property.
-  reads: |
-    - the cell's site count V(sigma) (maintained by VolumeTracker; reads 0 / inert without it).
-    - per-cell cell.targetVolume / cell.lambdaVolume (bare mode) OR the per-type
-      VolumeEnergyParameter default.
-    - the candidate pixel copy and its two involved cells, for the incremental +1/-1 count change.
-  writes: |
-    - NONE. changeEnergy returns dE (an energy term) and mutates no cell field; it changes only
-      the acceptance probability of the proposed pixel copy.
-    - (out of band, not part of this contract) a host steppable may set the per-cell targetVolume /
-      lambdaVolume (e.g. a growth or division rule); that is host-driven state-setting, not the
-      energy evaluation.
-  maps: |
-    - cell pixel set -> site count V = number of sites carrying the cell id (the tracker's job;
-      read here, not computed).
-    - volume deviation (V - V_target) -> quadratic Hookean energy lambda_V*(dev)^2 per cell ->
-      summed over the two cells a candidate copy touches -> dE that gates the Metropolis accept.
-      At target -> low energy; over-inflated or over-compressed -> higher energy (a two-sided
-      restoring bulk elasticity / incompressibility that gives the set-of-sites an object-like
-      size -- ablate lambda_V and the cells dissolve into medium).
+  inputs: "- one cell's site COUNT V(sigma) -- the number of lattice sites carrying the cell id\n  (maintained\
+    \ incrementally by a separate, auto-loaded VolumeTrackerPlugin, a\n  CellGChangeWatcher; read here,\
+    \ not recomputed). This is the cell's discrete \"volume\":\n  a count, not a physical length^3.\n\
+    - the proposed single-pixel copy (source/target site, the two cells it touches), used to\n  obtain\
+    \ the incremental change (+1 to the gaining cell, -1 to the losing cell) in each\n  involved cell's\
+    \ count.\n- the target and stiffness: target_volume V_target, lambda_volume -- taken from the per-cell\n\
+    \  cell.targetVolume / cell.lambdaVolume in bare mode, else the per-cell-type\n  VolumeEnergyParameter\
+    \ default (the two modes are mutually exclusive).\n"
+  outputs: "- a scalar energy contribution dE added to the Potts total, NOT an integrated state delta:\n\
+    \  dE = E_after - E_before, with E(cell) = lambda_V*(V - V_target)^2, summed over the two\n  cells\
+    \ the candidate copy changes (gainer V->V+1, loser V->V-1; Medium, id 0, contributes 0).\n  The delta\
+    \ only re-weights the Metropolis acceptance probability (P=1 if total dE<=0 else\n  exp(-dE/T)); the\
+    \ operator writes no cell property.\n"
+  reads: "- the cell's site count V(sigma) (maintained by VolumeTracker; reads 0 / inert without it).\n\
+    - per-cell cell.targetVolume / cell.lambdaVolume (bare mode) OR the per-type\n  VolumeEnergyParameter\
+    \ default.\n- the candidate pixel copy and its two involved cells, for the incremental +1/-1 count\
+    \ change.\n"
+  writes: "- NONE. changeEnergy returns dE (an energy term) and mutates no cell field; it changes only\n\
+    \  the acceptance probability of the proposed pixel copy.\n- (out of band, not part of this contract)\
+    \ a host steppable may set the per-cell targetVolume /\n  lambdaVolume (e.g. a growth or division\
+    \ rule); that is host-driven state-setting, not the\n  energy evaluation.\n"
+  maps: "- cell pixel set -> site count V = number of sites carrying the cell id (the tracker's job;\n\
+    \  read here, not computed).\n- volume deviation (V - V_target) -> quadratic Hookean energy lambda_V*(dev)^2\
+    \ per cell ->\n  summed over the two cells a candidate copy touches -> dE that gates the Metropolis\
+    \ accept.\n  At target -> low energy; over-inflated or over-compressed -> higher energy (a two-sided\n\
+    \  restoring bulk elasticity / incompressibility that gives the set-of-sites an object-like\n  size\
+    \ -- ablate lambda_V and the cells dissolve into medium).\n"
 status: normalized
 module: null
 test: null
@@ -194,3 +181,9 @@ evidence:
   diff_metric: null
   threshold: null
   passed: null
+disputed:
+  by: skeptic
+  was: new
+  claimed: null
+  evidence: null
+  what_would_settle_it: null

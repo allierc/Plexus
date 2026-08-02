@@ -130,10 +130,10 @@ every live-count increment is one committed division).
   placement (not exercised by the count-based hazard) corroborated by the anchor gyration agreeing to
   ~9% (Plexus 3.52 vs reference 3.23).
 
-Runs: oracle `atlas_jax_morph/_oracle/runs/diff_division/` (script `_oracle/scripts/division.py`);
+Runs: oracle `atlas_jax/_oracle/runs/diff_division/` (script `_oracle/scripts/division.py`);
 Plexus engine evidence `log/atlas_jax/division/` (`diag.json` acted ledger: `cell_divide` 41 calls /
 acted 33, `grow_radius` 41/41, `relax` 41/33, `seed_state` 1/1, `inert_operators []` ->
 `valid_evidence true`) plus the pooled-hazard summary `log/atlas_jax/division/diff_plexus_summary.json`
 (script `_oracle/scripts/division_plexus.py`, which also proves the division-only reduction is
 count-neutral at seed 0: full and division-only both give 124, since only `cell_divide` draws
-`H.rng` in this spec). Spec `config/atlas/division.yaml`.
+`H.rng` in this spec). Spec `config/atlas_jax/division.yaml`.

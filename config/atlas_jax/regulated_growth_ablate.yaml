@@ -8,7 +8,7 @@
 # (Original header follows.)
 # regulated_growth -- the composition the atlas was for, and the one jax-morph never runs.
 #
-# Every other spec in config/atlas/ exercises ONE mechanism against the oracle. This one closes
+# Every other spec in config/atlas_jax/ exercises ONE mechanism against the oracle. This one closes
 # the loop between three of them, using only operators that have already passed a differential
 # test, and adding no new vocabulary:
 #

@@ -2,8 +2,8 @@
 LennardJones overdamped reference, per cell, per frame. Runs in the Plexus (torch) env; no
 re-simulation.
 
-  reference : atlas_jax_morph/_oracle/runs/diff_lennard_jones/reference.npz  (jxm BrownianDynamics kT=0)
-  plexus    : graphs_data/atlas/lennard_jones/trajectory.npz                 (config/atlas/lennard_jones.yaml)
+  reference : atlas_jax/_oracle/runs/diff_lennard_jones/reference.npz  (jxm BrownianDynamics kT=0)
+  plexus    : graphs_data/atlas/lennard_jones/trajectory.npz                 (config/atlas_jax/lennard_jones.yaml)
 
 Primary metric  D_pos = max over frames t=0..100 and LIVE cells i of ||x_plx-x_ref||_2 / sigma.
 Threshold       1.0e-3 (sigma).  Corroborators: single-step IC force residual, pair-separation

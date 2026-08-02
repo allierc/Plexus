@@ -132,8 +132,8 @@ Summary observables agree: gyration ref-equilibrium `0.6858 ==` plexus final `0.
 signature), `seed_state` acted, `inert_operators []`, `valid_evidence true`. The IC is BYTE-IDENTICAL
 (4-cell diamond, oracle-printed 6-decimal float32; buffer 8 with 4 dead slots at the origin).
 
-*Runs.* Oracle `atlas_jax_morph/_oracle/runs/diff_mechanical_relaxation/` (reference.npz + summary.json);
-Plexus `config/atlas/mechanical_relaxation.yaml` -> `log/atlas_jax/mechanical_relaxation/`
+*Runs.* Oracle `atlas_jax/_oracle/runs/diff_mechanical_relaxation/` (reference.npz + summary.json);
+Plexus `config/atlas_jax/mechanical_relaxation.yaml` -> `log/atlas_jax/mechanical_relaxation/`
 (diag.json, metrics.json/.npz, spec_run.yaml, strip.png) + `graphs_data/atlas/mechanical_relaxation/`;
 analysis `_oracle/scripts/_analyze_mechanical_relaxation.py` -> `log/atlas_jax/mechanical_relaxation/diff.json`.
 

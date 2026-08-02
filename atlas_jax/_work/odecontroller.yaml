@@ -144,7 +144,7 @@ evidence:
     (W_gene, W_in, b; gamma = 1.0), the SAME dt = 1.0 and 21 macro-steps. Units: gene
     concentration (dimensionless; the circuit's fixed points here are O(0.3-0.85)). The engine
     gene trajectory is out["sets"]["cell"]["state"]["gene"] from the engine run of
-    config/atlas/odecontroller.yaml; the reference is reference.npz:y_uniform. Reported in
+    config/atlas_jax/odecontroller.yaml; the reference is reference.npz:y_uniform. Reported in
     evidence.value. Corroborated (not the primary number) by D_inf on a DISTINCT-drive run (a
     different frozen u per cell) vs reference.npz:y_distinct, which further checks that the
     operator leaks NO cell-to-cell coupling -- the maps=[] intracellular identity on which the
@@ -164,7 +164,7 @@ evidence:
   value: 2.44e-06
   passed: true
   value_note: |
-    2.44e-06 is the PRIMARY D_inf on the uniform run (the spec config/atlas/odecontroller.yaml
+    2.44e-06 is the PRIMARY D_inf on the uniform run (the spec config/atlas_jax/odecontroller.yaml
     that run_spec.py executes). The DISTINCT-drive corroboration run (per-cell u, stepped through
     the engine's own gene += dt*delta) gives D_inf 2.56e-06 vs reference.npz:y_distinct, so BOTH
     the uniform and the four-distinct-drive trajectories reproduce the reference to ~2.5e-06 --

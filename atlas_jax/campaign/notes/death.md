@@ -117,7 +117,7 @@ not just as a sampling interval but by discrimination -- it is tighter than the 
 hazard `1-exp(-lambda*dt)=0.048771` and the linear-approx bug `lambda*dt=0.05` (gap 0.00123), so an
 operator that wrote `p=rate*dt` instead of the source's `-expm1(-rate*dt)` would FAIL this test.
 
-**Matched IC.** Oracle `Model([Death])` and Plexus `config/atlas/death.yaml` both start N0=50000
+**Matched IC.** Oracle `Model([Death])` and Plexus `config/atlas_jax/death.yaml` both start N0=50000
 live cells at uniform `death_rate = lambda = 0.05`, `dt=1.0`, 40 macro-steps, death the only
 operator. (Death reads no position, so scattered positions in the Plexus box are irrelevant to the
 survival metric.) One caveat handled explicitly: Plexus records AFTER applying each op, so its first
@@ -136,8 +136,8 @@ hazard is stationary and unbiased on any consecutive-frame window, so it sideste
 with the exact hazard within 1 SE. Acted ledger: `apoptose` calls 41 / acted 41 / inert []
 => `valid_evidence: true` (checked before any metric).
 
-**Paths.** oracle run `atlas_jax_morph/_oracle/runs/diff_death/` (script
-`_oracle/scripts/death.py`); Plexus evidence `log/atlas_jax/death/` (spec `config/atlas/death.yaml`);
+**Paths.** oracle run `atlas_jax/_oracle/runs/diff_death/` (script
+`_oracle/scripts/death.py`); Plexus evidence `log/atlas_jax/death/` (spec `config/atlas_jax/death.yaml`);
 differential computed by `_oracle/scripts/_analyze_death.py`.
 
 **Scope (unchanged from implemented).** This validates the forward EFFECT (the source's `replay`):
