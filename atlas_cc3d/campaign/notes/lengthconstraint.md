@@ -37,3 +37,23 @@ binary. (2) `_get_non_nan_energy(double)` — an explicit NaN guard on the energ
 `dE` and silently corrupts the Metropolis test. A reimplementer would almost certainly miss it.
 Also: per-cell state is a `LengthConstraintData` ExtraMember, so the plugin carries per-cell (not
 just per-type) targets — the local-flex scope `setLengthConstraintData` writes into.
+
+**Verdict (normalizer): `new` → contract `elongate` (lateral/mechanics, set=cell).** No promoted
+contract constrains an emergent SHAPE descriptor: this is a quadratic restoring spring on a cell's
+inertia-tensor major-axis length toward a target, an ENERGY term (returns dE, writes nothing).
+Closest promoted is `cell_grow`, rejected because it targets SIZE (0th moment, isotropic, an
+integrated state update) not ANISOTROPY (2nd moment, at fixed volume, a Metropolis-gating energy) —
+widening it would break its output contract and its biology. Not a second sighting of any jax-morph
+contract (`reorient` is polarity direction, not shape magnitude; `relax`'s meaning is unread).
+
+**Strongest argument AGAINST `new`.** Length and the Volume constraint are the SAME functional
+object — a quadratic Hookean spring, lambda·(moment − target)², on a per-cell geometric moment
+(Volume on the 0th, Length on the 2nd). One could argue the language should register ONE contract,
+say `constrain_moment(cell, order, target, lambda)`, of which Volume and Length are interchangeable
+IMPLEMENTATIONS differing only in which moment they read — making `elongate` `implementation_of`
+that, not `new`, and inflating yield if I call it new. I reject the lump because the moments carry
+different biology (size homeostasis vs elongation) and a different home in the language: Volume's
+size-target maps onto the existing `cell_grow` rest-volume machinery, while shape has no home at
+all — so collapsing them would erase a real distinction rather than reveal a shared one. But it is
+a genuine call, not a fact: if Volume normalizes as a `constrain_moment`-style contract, `elongate`
+should be revisited as a second implementation of it.

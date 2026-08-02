@@ -57,3 +57,26 @@ Still NOT established: the C++/SWIG writer itself is unread, so traversal order,
 MCS→filename suffix rule, and whether the `Include Clusters` header is conditional
 are inferred from one sample + the template, not from the writer code. Still no
 evidence.py run (a disk sink has no meaningful ablation).
+
+## Normalizer pass — verdict: out_of_scope
+
+PIFDumper is a serializer, the archetypal out_of_scope mechanism the loop's rules
+name explicitly. Zero biological content, zero dynamics: it walks the cell-id lattice
+every `frequency` MCS and writes one PIF line per voxel to disk. No delta, no energy
+term, no pixel-copy bias — a run with it loaded is bit-identical to one without. I
+record a shape-only `checkpoint` contract (whole cell-set read → external bytes) purely
+to document the sink's type, borrowing `playback`'s field/fields neighbourhood as an
+admitted forced fit.
+
+**Strongest argument AGAINST out_of_scope.** The honest challenger is `playback`:
+PIFDumper is its exact inverse (state→disk vs disk→state), and a PIF file round-trips —
+PIFInitializer reads it straight back as an initial condition. So one could argue that
+dump + init form a single serialization contract with two directions, and the write
+direction deserves a promoted name the way `deposit`/`sense` split a field write from a
+field read. I reject it because `playback`, `deposit`, and `sense` all produce something
+the engine integrates *within the same run*; the dumper produces inert disk state whose
+only consumer is a *future, separate* run's initializer — the running model never reads
+it back. Admitting it would let checkpoint I/O inflate the operator count without adding
+any process the algebra must express, which is exactly the measurement this campaign
+protects. If a future framework showed a sink whose output re-enters the *same* running
+model, I would reopen this.

@@ -34,3 +34,34 @@ nothing to the lattice — returns dE, a Potts energy term.
   outputs), so every claim here is source-read, not measured.
 - No specific Swat et al. (2012) page was read; `paper_section` points to the checkable CC3D
   reference-manual heading + the in-repo descriptor, not a page number I have not seen.
+
+---
+
+## Normalizer verdict
+
+**`new` (against the frozen baseline), `implementation_of: adhere` — a second sighting of
+`adhere`, first proposed from the jax-morph atlas.**
+
+AdhesionFlex is the pure differential-adhesion energy of the Cellular Potts framework: contacting
+cells (and Medium) lower the boundary energy by a double sum over their carried adhesion-molecule
+densities, so a positive binding parameter is adhesive. That is the same biology as jax-morph's
+proposed `adhere` (cadherin-like surface molecules setting cell-cell stickiness and sorting). No
+REGISTERED contract covers it — the nearest, `cohesion` / `attraction_repulsion`, emit a force
+(`acceleration`) on point particles and write `position`, whereas AdhesionFlex writes nothing and
+only returns a Metropolis `dE` over cross-boundary lattice-site pairs of a cell that IS a set of
+sites. Set `implementation_of: adhere` so the ledger counts `adhere` once across repositories, not
+twice.
+
+**Strongest argument AGAINST this verdict:** that I should have called it `alias` /
+`implementation_of: attraction_repulsion`, exactly as the jax-morph Morse potential was —
+"adhesion" is arguably just the attractive tail of the one radial pair interaction, and
+`attraction_repulsion` already IS registered whereas `adhere` is not, so mapping to it would avoid
+minting fresh yield. The rebuttal: Morse carries BOTH a repulsive core (excluded volume) and an
+adhesive tail, so it maps to the combined `attraction_repulsion`; AdhesionFlex carries ONLY
+adhesion — excluded volume in CPM lives in the separate Volume constraint, not here — and it is an
+energy over shared boundary counts of a site-set cell, not a centre-distance force that integrates
+to move a point. Collapsing pure molecule-mediated adhesion into the repulsion-bearing point-force
+contract would erase precisely the biology (surface-molecule differential adhesion, per-cell
+mutable density vector, no self-repulsion) the campaign exists to measure. If the loop later
+PROMOTES `adhere` and it turns out to be defined force-first, the energy-term-vs-force
+representational gap recorded in `state_io`/`why` is where this entry should be revisited.

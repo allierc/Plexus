@@ -13,10 +13,9 @@ paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366 discusses cell-
 
   (autoclass PIFInitializer). Format examples READ (both header modes verified):
 
-  cluster-mode cc3d/tests/plugin_test_suite/CompartmentExample_test_run/Simulation/3D_LINE_BASE.piff
-  (9 tokens; clusterId 1 groups cells 1-5, so clusterId != cellId) and
-  AdhesionFlexPython_test_run/.../initial_configuration.piff; headerless
-  cc3d/tests/plugin_test_suite/ExternalPotential_test_run/Simulation/FocalPointInit.piff and
+  cluster-mode cc3d/tests/plugin_test_suite/CompartmentExample_test_run/Simulation/3D_LINE_BASE.piff (9
+  tokens; clusterId 1 groups cells 1-5, so clusterId != cellId) and AdhesionFlexPython_test_run/.../initial_configuration.piff;
+  headerless cc3d/tests/plugin_test_suite/ExternalPotential_test_run/Simulation/FocalPointInit.piff and
   amoebae_2D_secretion_test_run/Simulation/amoebae_2D.piff (8 tokens, no leading clusterId).
 
   '
@@ -142,12 +141,68 @@ surprises:
   same format.
 
   '
-verdict: null
+verdict: out_of_scope
 of: null
-implementation_of: null
-why: null
-contract: null
-status: inspected
+implementation_of: seed
+why: |
+  INITIAL-CONDITION CONSTRUCTION by DESERIALIZATION, not a dynamical operator. Plexus
+  operators transform state that already exists -- each returns a per-step delta the engine
+  integrates over a set/field that is already present. PIFInitializer is the opposite shape:
+  a one-shot that runs once at t=0 and CONSTRUCTS the starting partition (the sets
+  themselves) by reading an external recorded file and painting cell ids onto an empty
+  lattice, box by box. In Plexus that starting partition is supplied by configuration/seeding,
+  not by any registered operator; there is nothing in the algebra to alias, and nothing that
+  could widen to admit set-construction-from-a-file without ceasing to be a per-step operator.
+  So this is framework mechanics for establishing the initial state -- out of scope for the
+  OPERATOR algebra whose completeness this campaign measures.
+
+  It is doubly out-of-scope: beyond being IC construction, it is specifically a DESERIALIZER
+  whose exact inverse is PIFDumperSteppable (a serializer, PyCoreSpecs.py:6012). The two are a
+  read/write pair over the PIF text format; a serializer/deserializer pair is the canonical
+  example of plumbing with no biological content. The biology here -- "a cell is the SET of
+  lattice sites that share its id" -- lives in the REPRESENTATION, not in this operator, which
+  only parses text and stamps boxes.
+
+  implementation_of: seed. PIFInitializer is the third member of the Blob / Uniform / PIF
+  initializer family -- three interchangeable ways to build the SAME thing, the initial cell
+  partition. The `seed` contract was already typed by the blobinitializer normalizer (order 2)
+  with these three named as its implementations; recording implementation_of: seed here keeps
+  the ledger counting `seed` ONCE rather than re-introducing it. Blob/Uniform generate the
+  partition PROCEDURALLY from a few numeric params; PIF REPLAYS a fully-specified layout from
+  disk -- same end state, opposite information source (procedural vs. recorded).
+
+  The closest REGISTERED contract is cell_divide (structural/growth); widening it to cover
+  de-novo population seeding would do violence to its biology -- division is mitosis, one
+  parent set -> two daughters, conserving material and requiring a pre-existing cell, whereas
+  seeding creates a whole population out of Medium with no parent. It is also NOT `playback`
+  (field/fields): playback replays a recorded time-series to DRIVE a field DURING the run;
+  PIFInitializer is a single t=0 read that establishes cell identities and then is done.
+contract:
+  name: seed
+  kind: structural
+  family: growth
+  set: cell
+  inputs:
+  - recorded_layout_file (.piff path; the fully-specified initial partition, not numeric params)
+  outputs:
+  - initial_cell_partition
+  reads:
+  - external file pif_name (.piff text) -- NOT simulation state
+  - cell_type_registry (to resolve type-name strings from the file to type ids)
+  writes:
+  - cell_field (each site in a named box assigned to that cell id -- building the SETS)
+  - cell_type (per cell id, from the file's cellType column)
+  - cell_cluster_id (per cell, only when the "Include Clusters" header is present)
+  maps: |
+    (empty lattice, recorded .piff layout)
+      -> a partition of the lattice into cell ids exactly as enumerated in the file: for each
+         data line assign every site in the inclusive box (x1..x2, y1..y2, z1..z2) to cell(cellId),
+         creating the cell on first mention and ADDING sites on later mentions (a cell is the
+         UNION of its boxes, need not be a single rectangle). Type and, in cluster mode,
+         clusterId are set per cell from the line. A one-shot deserialization executed once at
+         t=0, not a per-step delta. Same seed contract as the procedural Blob/Uniform variants;
+         the only difference is the information source (recorded file vs. numeric region params).
+status: normalized
 module: null
 test: null
 evidence:

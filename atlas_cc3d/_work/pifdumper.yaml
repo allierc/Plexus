@@ -3,19 +3,26 @@ order: 21
 raw_name: PIFDumper
 raw_kind: Steppable (PIFDumperSteppable)
 code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L6012
-paper_section: |
-  No extracted paper text for this target. Swat et al. (2012) Methods Cell Biol
+paper_section: 'No extracted paper text for this target. Swat et al. (2012) Methods Cell Biol
+
   110:325-366 discusses the PIFF (Potts Initial File) cell-layout format used by
+
   PIFInitializer / BlobInitializer, but no page was read. CHECKABLE source
+
   anchors for the format and CC3DML used here instead: the canonical dumper
+
   snippet generatePIFDumperSteppable at
+
   cc3d/twedit5/Plugins/CC3DMLGenerator/CC3DMLGeneratorBase.py:1271, and a real
+
   dumped file at
+
   cc3d/tests/plugin_test_suite/AdhesionFlexPython_test_generate/Simulation/initial_configuration.piff:1.
+
+  '
 summary: 'A pure-output Steppable, not a physics term. Every `frequency` Monte Carlo
 
-  steps it READS the entire cell lattice (each site''s cell id, cluster id and
-  type) and
+  steps it READS the entire cell lattice (each site''s cell id, cluster id and type) and
 
   WRITES a snapshot to disk as a PIF (Potts Initial File): one plain-text line
 
@@ -28,26 +35,19 @@ summary: 'A pure-output Steppable, not a physics term. Every `frequency` Monte C
   observer/sink over the cell-id field: reads state, emits no delta.
 
   '
-equations: |
-  No dynamics. The step is a serialization pass over the lattice, emitted only on
-  steps where (mcs % frequency == 0). CONFIRMED PIF line format, read from a real
-  .piff written by the same core
-  (tests/.../AdhesionFlexPython_test_generate/Simulation/initial_configuration.piff):
-
-      [header line]  Include Clusters        (present when cluster ids are dumped)
-      clusterId  cellId  cellTypeNAME  xLow xHigh  yLow yHigh  zLow zHigh
-
-  e.g. the literal line `8  8  Cell2  119 119  53 53  0 0`. Three corrections to
-  the library-guide sketch that the earlier draft copied:
-    (1) the FIRST column is the CLUSTER id, not the cell id (cell id is second);
-    (2) the type is written as its NAME string ("Cell2"), NOT a numeric type index;
-    (3) the dumper emits ONE LINE PER VOXEL (xLow==xHigh, yLow==yHigh, zLow==zHigh
-        in the sample) -- the box form xLow..xHigh is what the PIF grammar ALLOWS,
-        but the dumper does not run-length-compress into boxes.
-  This file is the inverse of what PIFInitializer reads back in. The Python spec
-  here only declares the steppable and its CC3DML; the actual traversal +
-  per-voxel write live in the compiled core (PlayerPython.FieldWriter also exposes
-  generatePIFFileFromVTKOutput as the offline equivalent).
+equations: "No dynamics. The step is a serialization pass over the lattice, emitted only on\nsteps where\
+  \ (mcs % frequency == 0). CONFIRMED PIF line format, read from a real\n.piff written by the same core\n\
+  (tests/.../AdhesionFlexPython_test_generate/Simulation/initial_configuration.piff):\n\n    [header line]\
+  \  Include Clusters        (present when cluster ids are dumped)\n    clusterId  cellId  cellTypeNAME\
+  \  xLow xHigh  yLow yHigh  zLow zHigh\n\ne.g. the literal line `8  8  Cell2  119 119  53 53  0 0`. Three\
+  \ corrections to\nthe library-guide sketch that the earlier draft copied:\n  (1) the FIRST column is\
+  \ the CLUSTER id, not the cell id (cell id is second);\n  (2) the type is written as its NAME string\
+  \ (\"Cell2\"), NOT a numeric type index;\n  (3) the dumper emits ONE LINE PER VOXEL (xLow==xHigh, yLow==yHigh,\
+  \ zLow==zHigh\n      in the sample) -- the box form xLow..xHigh is what the PIF grammar ALLOWS,\n  \
+  \    but the dumper does not run-length-compress into boxes.\nThis file is the inverse of what PIFInitializer\
+  \ reads back in. The Python spec\nhere only declares the steppable and its CC3DML; the actual traversal\
+  \ +\nper-voxel write live in the compiled core (PlayerPython.FieldWriter also exposes\ngeneratePIFFileFromVTKOutput\
+  \ as the offline equivalent).\n"
 params:
   pif_name:
     role: output_file_path
@@ -64,14 +64,21 @@ params:
       '
   frequency:
     role: output_interval_mcs
-    note: |
-      Integer Monte-Carlo-step interval between dumps; PyCoreSpecs default is 1
+    note: 'Integer Monte-Carlo-step interval between dumps; PyCoreSpecs default is 1
+
       (dump every MCS), but the canonical twedit-generated CC3DML defaults it to
+
       100. check_dict rejects frequency < 1. Its canonical home is a "Frequency"
+
       ATTRIBUTE on the <Steppable> header (that is where both from_xml and the
+
       core read it) -- but PyCoreSpecs.generate_header never writes that
+
       attribute, so this spec stores/validates it yet drops it on serialization.
+
       See surprises.
+
+      '
 state_io:
   reads:
   - cell.id field (every lattice site's owning cell id -- second PIF column)
@@ -90,32 +97,55 @@ state_io:
 
     '
 surprises:
-- |
-  ROUND-TRIP LOSS OF `frequency` (a real bug, now localized). from_xml reads
+- 'ROUND-TRIP LOSS OF `frequency` (a real bug, now localized). from_xml reads
+
   frequency from a "Frequency" ATTRIBUTE ON THE <Steppable> HEADER
+
   (findAttribute("Frequency") / getAttributeAsInt, L6062-6063) -- and that is
-  exactly where the canonical CC3DML puts it: twedit's
+
+  exactly where the canonical CC3DML puts it: twedit''s
+
   generatePIFDumperSteppable (CC3DMLGeneratorBase.py:1271) emits
+
   <Steppable Type="PIFDumper" Frequency="100">. But generate_header (L525) emits
+
   ONLY {"Type": registered_name} and the `xml` property (L6037) adds only a
+
   PIFName child; neither writes the Frequency attribute. So a spec built with
+
   frequency=10 serializes to CC3DML with no Frequency and reloads as the default
+
   1. __getstate__ (L6048) drops it too. The datum lives in hand-written XML but
+
   is destroyed by any Python round-trip through this spec.
-- |
-  The library-guide line sketch the earlier draft copied
+
+  '
+- 'The library-guide line sketch the earlier draft copied
+
   ("cellId cellType xLow..") is WRONG on three counts, confirmed against a real
+
   dumped .piff (see equations): the real line LEADS with a clusterId column
+
   (cell id is second), writes the cell TYPE AS A NAME string not a numeric
+
   index, and is prefixed by an "Include Clusters" header line -- and the dumper
+
   writes one voxel per line rather than run-length boxes.
-- |
-  The canonical dumper CC3DML also carries a <PIFFileExtension> element (twedit
+
+  '
+- 'The canonical dumper CC3DML also carries a <PIFFileExtension> element (twedit
+
   emits "piff", CC3DMLGeneratorBase.py:1280) and names the file after the
+
   SimulationName, with the MCS appended by the core to make per-dump filenames.
-  PyCoreSpecs's PIFDumperSteppable emits NEITHER a PIFFileExtension element NOR
+
+  PyCoreSpecs''s PIFDumperSteppable emits NEITHER a PIFFileExtension element NOR
+
   any MCS-suffix logic -- it declares only PIFName, so this spec under-specifies
+
   the actual on-disk file naming/extension.
+
+  '
 - 'The `xml` property is byte-identical to sibling PIFInitializer''s `xml`
 
   (both emit just a PIFName element under the Steppable header). The only
@@ -141,12 +171,47 @@ surprises:
   frequency too, consistent with the xml omission above.
 
   '
-verdict: null
+verdict: out_of_scope
 of: null
 implementation_of: null
-why: null
-contract: null
-status: inspected
+why: |
+  PIFDumper is a serializer -- the archetypal out_of_scope mechanism named in this loop's own
+  rules. It carries ZERO biological content and ZERO dynamics: every `frequency` MCS it traverses
+  the cell-id lattice and writes one plain-text line per voxel (clusterId cellId typeNAME + voxel
+  extents) to a PIF file on disk. It returns no energy delta, biases no pixel-copy acceptance, and
+  writes no cell, field, or Hamiltonian term -- a run with it loaded is bit-identical to one
+  without (the only effect is a file appearing on disk). It is a read-only tap on the cell set with
+  a side effect entirely outside the state vector.
+
+  The closest registered contract is `playback` (field/fields), and the relationship is exactly
+  inversion: playback READS recorded frames off external storage and drives them INTO a field;
+  PIFDumper reads live state OUT to external storage. But that inversion is precisely why it cannot
+  alias `playback` -- playback earns its place by producing an integrable field the engine consumes
+  each step (it is a source of dynamics), whereas the dumper consumes nothing and produces nothing
+  the engine ever reads back within the run. Promoting a sink whose only product is a disk artifact
+  -- as `new` or as a `playback` alias -- would let I/O plumbing count toward the operator
+  vocabulary and corrupt the saturation measurement. There is no biological process here to name.
+  The contract below is recorded ONLY to document the sink's typed shape (whole-cell-set read ->
+  external bytes); its `kind: field / family: fields` is a forced fit borrowed from `playback`'s
+  neighbourhood, not a claim that the dumper is a field operator.
+contract:
+  name: checkpoint
+  kind: field
+  family: fields
+  set: cell
+  inputs:
+  - pif_name
+  - frequency
+  outputs:
+  - pif_file
+  reads:
+  - cell.id
+  - cell.cluster_id
+  - cell.type
+  writes:
+  - external.pif_file
+  maps: []
+status: normalized
 module: null
 test: null
 evidence:

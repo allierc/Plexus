@@ -34,3 +34,32 @@ independent of cellId (clusterId 1 groups cellIds 1-5 — earlier notes asserted
 Headerless mode = 8 tokens, seen in `ExternalPotential/.../FocalPointInit.piff` and
 `amoebae_2D_secretion/.../amoebae_2D.piff`. Made the entry's checkable anchors concrete with these
 exact paths. Overlap/last-writer semantics remain the one unresolved gap (still in the `.so`).
+
+## pifinitializer — normalized
+
+**Verdict: `out_of_scope`, `implementation_of: seed`.** PIFInitializer runs once at t=0 and
+CONSTRUCTS the initial cell partition by reading an external `.piff` file and painting cell ids
+onto the lattice box-by-box. That is initial-condition construction, which Plexus supplies via
+configuration/seeding rather than any per-step operator — nothing in the registered algebra
+transforms state here, so there is nothing to alias or widen. It is doubly out-of-scope because
+it is specifically a DESERIALIZER whose exact inverse is the PIFDumper serializer (a read/write
+pair over the PIF text format is textbook plumbing). It is the third of the Blob / Uniform / PIF
+initializer family — three interchangeable ways to build the same starting partition — so I set
+`implementation_of: seed`, the descriptive contract the blobinitializer normalizer already typed
+with these three as its implementations, keeping the ledger counting `seed` ONCE. Blob/Uniform
+seed procedurally from numeric params; PIF replays a recorded layout — same end state, opposite
+information source.
+
+**Strongest argument AGAINST (i.e. for `new`):** this and the sibling initializers are the ONLY
+mechanisms in the campaign that genuinely write state and CREATE sets — literally how cells come
+to exist. The registered algebra has no way to construct a population de-novo: `cell_divide`
+splits a pre-existing parent (conserving material, one→two) and nothing seeds cells out of Medium
+with no parent. If a cell-based framework must express "instantiate the initial partition,"
+calling it out_of_scope hides the single most load-bearing structural gap, and the honest verdict
+would be `new` (a `seed` contract, PIF/Blob/Uniform as co-implementations). PIF sharpens the
+tension: unlike a procedural blob it carries genuine INFORMATION (an arbitrary,
+possibly-disconnected recorded configuration) that no numeric param set can regenerate, which
+reads more like a first-class "load a configuration" operator than mere plumbing. I still land on
+out_of_scope because Plexus *architecturally* seeds initial state through configuration, not an
+operator — but the line between "IC construction is config" and "IC construction is a missing
+operator" is the real judgement call, and a reasonable normalizer could put it the other way.

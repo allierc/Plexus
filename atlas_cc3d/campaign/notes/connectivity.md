@@ -15,7 +15,8 @@ compiled bindings `cpp/CompuCell.py` (grep), and BOTH twedit CC3DML generators
   `<Plugin Name="Connectivity"/>`. But CC3DML supports one GLOBAL `<Penalty>` (default 1e7), shared
   by ALL cells — confirmed by two independent generators. So via the Python spec the strength is
   pinned at the compiled default and cannot be tuned. Granularity ladder across the family:
-  Connectivity = one global scalar; ConnectivityGlobal = per-type; ConnectivityLocalFlex = per-cell.
+  Connectivity = one global scalar; ConnectivityGlobal = per-type; ConnectivityLocalFlex = per-cell
+  ([[connectivitylocalflex]]).
 - **RESOLVED the sibling note's open question:** the connectivityglobal note "did not confirm the
   folklore that the old Connectivity plugin is 2D-only." Both generators state it plainly:
   "works in 2D and on square lattice only!" AND "requires <NeighborOrder> 1 or 2." Now recorded as a
@@ -23,6 +24,30 @@ compiled bindings `cpp/CompuCell.py` (grep), and BOTH twedit CC3DML generators
 - **NOT SWIG-exposed:** `cc3d.cpp.CompuCell` has ConnectivityGlobalPlugin and
   ConnectivityLocalFlexPlugin but no plain ConnectivityPlugin — it's a compiled Potts plugin
   registered internally (`Potts3D.registerConnectivityConstraint`).
+
+## NORMALIZED — verdict: new, implementation_of `stay_connected` (lateral/topology)
+
+Verdict `new` against the frozen baseline (no promoted contract reads a body's connected-component
+structure and vetoes moves that would split it), but `implementation_of: stay_connected` — the
+contract the ConnectivityGlobal sibling ([[connectivityglobal]]) introduced in THIS atlas. The
+ledger must count the connectivity family ONCE: Connectivity (one global scalar, this entry),
+ConnectivityGlobal (per-type flood fill), ConnectivityLocalFlex (per-cell soft) are three
+implementations of one contract. What THIS legacy implementation adds beyond the sibling: zero
+tunable params (bare `<Plugin Name="Connectivity"/>`, strength pinned at 1e7), one GLOBAL scalar
+for all cells (not per-type), 2D/square-lattice/NeighborOrder≤2 only, and a LOCAL check (never the
+whole-cell flood fill). Same typed signature as the sibling — reads site-set topology, writes
+nothing, kind lateral / family topology.
+
+STRONGEST ARGUMENT AGAINST: this should be `alias` of the registered `cohesion`, not a `new`
+contract — both "keep a body together," and a reviewer could argue connectivity is just cohesion
+taken to its hard limit. Rebuttal (why I still chose new+implementation_of stay_connected):
+cohesion is a metric attractive FORCE between point agents returning an integrable gradient delta;
+stay_connected returns no force, is inert until a copy would fragment the SET, then vetoes — a
+combinatorial topological rejection rule over an explicit lattice site-set the point-agent
+representation does not even possess. Aliasing to cohesion would require cohesion to widen from
+"pairwise force between positioned points" to "connected-components indicator over a site-set,"
+which is a refinement that breaks every current cohesion user, not a free alias. The honest call is
+that `stay_connected` is a genuinely missing contract and this is a second implementation of it.
 
 **Could NOT establish:** the exact `changeEnergy` body — whether `f` is a boolean gate or scales with
 the number of connected components introduced, its sign convention — is not readable (no SWIG wrapper,

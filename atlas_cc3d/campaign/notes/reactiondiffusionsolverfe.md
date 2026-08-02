@@ -34,3 +34,29 @@ term -- DeltaT scaling, evaluation order relative to the diffusion sweep, and wh
 AutoscaleDiffusion rescales R -- all live in the compiled core, which I did not read. The continuous
 form and named-field coupling are solid (spec xml + FN example); the discretisation of R is inferred.
 DeltaX/DeltaT/ExtraTimesPerMCS remain unreachable from this python spec, same gap as DiffusionSolverFE.
+
+---
+
+## Normalizer verdict (this pass)
+
+**`new` — contract `react` (kind=field, family=fields, set=field), `implementation_of: react`.**
+The diffuse/decay/deposit substrate is already resolved by the sibling `diffusionsolverfe` entry
+(refinement of `diffuse`); the sole marginal verb here is the `AdditionalTerm` reaction term — an
+arbitrary, generally nonlinear kinetics law coupling M concentration fields (FitzHugh-Nagumo:
+F reads H, H reads F). Closest registered contract is `decay`, which is exactly the linear,
+single-field, sign-fixed degenerate case of a reaction; widening it to arbitrary multi-field
+coupling erases what makes decay decay, so `new`.
+
+**Strongest argument AGAINST it.** That `react` and jax-morph's proposed `regulate` are the SAME
+contract, so I should have set `implementation_of: regulate` and let the ledger count the
+reaction-kinetics verb once — keeping them separate risks INFLATION, the exact failure this loop
+exists to avoid. Both are `dx/dt = f(x_1..x_n)` with a user-supplied law integrated per step; a
+maximalist reasonably says the substrate (extracellular pixel field vs per-cell gene vector) is a
+parameter, not a new verb, and that FitzHugh-Nagumo chemistry and a gene network are one abstract
+reaction network. My rebuttal: Plexus types by set — `regulate` is set=cell/kind=exchange (an
+internal genotype→phenotype decision reading a cell's own state), `react` is set=field/kind=field
+(pure-grid chemistry, no cell/gene/heritability). Unifying forces `regulate` to widen BOTH its set
+(cell→field) and its kind (exchange→field), stripping its defining "internal cell decision"
+character — the same violence test rule 2 uses. If that rebuttal is wrong, the right fix is a single
+set-polymorphic reaction contract, which is why the entry's `why` flags the merge as a deliberate
+ledger-keeper call rather than forcing it silently either way.

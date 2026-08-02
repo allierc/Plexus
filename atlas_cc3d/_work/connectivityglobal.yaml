@@ -3,118 +3,259 @@ order: 8
 raw_name: ConnectivityGlobal
 raw_kind: Plugin (ConnectivityGlobalPlugin)
 code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L4088
-paper_section: |
-  Swat et al. (2012) Methods Cell Biol 110:325-366 -- the plugins / effective-energy chapter, in
+paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366 -- the plugins / effective-energy chapter,
+  in
+
   the discussion of connectivity constraints that keep a cell a single connected object. NOTE: no
-  paper text was available in this environment, so this anchor is the chapter's known home for the
+
+  paper text was available in this environment, so this anchor is the chapter''s known home for the
+
   term, NOT a page I have read. The checkable source evidence is the class at PyCoreSpecs.py:L4088
+
   (the CC3DML it emits), the compiled plugin method list at CompuCell.py:L5106-5178, and the test
+
   XML at tests/plugin_test_suite/connectivity_global_fast_test_generate/Simulation/
+
   connectivity_global_fast.xml.
-summary: |
-  A per-cell-type opt-in Cellular-Potts constraint that keeps each enabled cell a SINGLE CONNECTED
+
+  '
+summary: 'A per-cell-type opt-in Cellular-Potts constraint that keeps each enabled cell a SINGLE CONNECTED
+
   BLOB of lattice sites. It writes no state: on every proposed pixel copy it checks whether the copy
-  would split the target cell's site set into disconnected fragments and, if so, returns a large
+
+  would split the target cell''s site set into disconnected fragments and, if so, returns a large
+
   positive energy penalty so the Metropolis rule rejects the copy. It is a TOPOLOGICAL (effectively
+
   hard) constraint on the SET, not on its size or shape -- ablate it and a cell may pinch off islands
+
   or shed pixels into medium; keep it and the cell stays simply one piece.
-equations: |
-  ConnectivityGlobal is a Cellular-Potts effective-energy term whose job is TOPOLOGICAL, not metric.
-  It writes nothing. On each proposed pixel copy (the id at a source site is proposed to overwrite a
-  neighbour site) the plugin's changeEnergy asks whether the copy would FRAGMENT the target cell --
-  split its set of lattice sites into more than one connected piece -- and returns
 
-    dE_conn = S     if the copy would fragment the cell (connected-components-after > 1)
-            = 0     otherwise
-
-  where
-    S = connectivityStrength, a per-cell magnitude held in ConnectivityGlobalData
-        (CompuCell.py:L5106-5112; get/setConnectivityStrength, L5144-5148). It is added as a
-        POSITIVE penalty, so with S large the Metropolis rule (accept if total dE <= 0, else
-        exp(-dE / T), T = Potts fluctuation_amplitude) ALWAYS rejects a fragmenting copy -- the
-        constraint is effectively HARD, not a soft quadratic.
-
-  Connectedness is judged by checkIfCellIsFragmented -- a whole-cell flood fill over the cell's site
-  set -- in the default "global" mode. With <FastAlgorithm/> set (fast=True) it instead uses
-  check_local_connectivity / changeEnergyFast, a cheaper LOCAL-neighbourhood test that approximates
-  the same veto. "Connected" is defined by the Potts lattice adjacency (NeighborOrder), which is a
-  Potts param, NOT a plugin param. NOTE: the exact returned value (fixed constant vs S scaled by the
-  number of extra components, the sign, the default S) is reconstructed from the compiled method
-  names + the CC3DML the spec emits; the C++ changeEnergy body was NOT read (cc3d is not importable
-  in this environment).
+  '
+equations: "ConnectivityGlobal is a Cellular-Potts effective-energy term whose job is TOPOLOGICAL, not\
+  \ metric.\nIt writes nothing. On each proposed pixel copy (the id at a source site is proposed to overwrite\
+  \ a\nneighbour site) the plugin's changeEnergy asks whether the copy would FRAGMENT the target cell\
+  \ --\nsplit its set of lattice sites into more than one connected piece -- and returns\n\n  dE_conn\
+  \ = S     if the copy would fragment the cell (connected-components-after > 1)\n          = 0     otherwise\n\
+  \nwhere\n  S = connectivityStrength, a per-cell magnitude held in ConnectivityGlobalData\n      (CompuCell.py:L5106-5112;\
+  \ get/setConnectivityStrength, L5144-5148). It is added as a\n      POSITIVE penalty, so with S large\
+  \ the Metropolis rule (accept if total dE <= 0, else\n      exp(-dE / T), T = Potts fluctuation_amplitude)\
+  \ ALWAYS rejects a fragmenting copy -- the\n      constraint is effectively HARD, not a soft quadratic.\n\
+  \nConnectedness is judged by checkIfCellIsFragmented -- a whole-cell flood fill over the cell's site\n\
+  set -- in the default \"global\" mode. With <FastAlgorithm/> set (fast=True) it instead uses\ncheck_local_connectivity\
+  \ / changeEnergyFast, a cheaper LOCAL-neighbourhood test that approximates\nthe same veto. \"Connected\"\
+  \ is defined by the Potts lattice adjacency (NeighborOrder), which is a\nPotts param, NOT a plugin param.\
+  \ NOTE: the exact returned value (fixed constant vs S scaled by the\nnumber of extra components, the\
+  \ sign, the default S) is reconstructed from the compiled method\nnames + the CC3DML the spec emits;\
+  \ the C++ changeEnergy body was NOT read (cc3d is not importable\nin this environment).\n"
 params:
-  fast: |
-    algorithm_selector (performance / approximation-fidelity flag), ConnectivityGlobalPlugin(fast=...)
+  fast: 'algorithm_selector (performance / approximation-fidelity flag), ConnectivityGlobalPlugin(fast=...)
+
     at PyCoreSpecs.py:L4094; emits <FastAlgorithm/> when True (xml, L4119-4120). False = the "global"
+
     whole-cell flood-fill connectivity check (checkIfCellIsFragmented; exact but O(cell size) per
+
     attempted copy). True = changeEnergyFast / check_local_connectivity, a LOCAL-neighbourhood
+
     approximation that is much cheaper but can miss some global fragmentations. Same physical intent,
+
     different fidelity/cost -- see surprises.
-  _cell_types: |
-    per_type_enable_set (opt-in whitelist), ConnectivityGlobalPlugin(fast, *_cell_types) at
+
+    '
+  _cell_types: 'per_type_enable_set (opt-in whitelist), ConnectivityGlobalPlugin(fast, *_cell_types) at
+
     PyCoreSpecs.py:L4094-4106; each type name emits <ConnectivityOn Type="NAME"/> (xml, L4121-4122).
+
     Only listed cell types have connectivity enforced; unlisted types -- and Medium -- are free to
+
     fragment. Connectivity can ALSO be toggled on an individual cell from a steppable via
+
     cell.connectivityOn = True, bypassing the type list (see the connectivity_global_fast_python
+
     test steppable).
-  connectivityStrength: |
-    UNKNOWN (intended role = penalty magnitude / veto stiffness S). The actual size of the energy
+
+    '
+  connectivityStrength: 'UNKNOWN (intended role = penalty magnitude / veto stiffness S). The actual size
+    of the energy
+
     penalty is a per-cell field, ConnectivityGlobalData.connectivityStrength
+
     (get/setConnectivityStrength, CompuCell.py:L5112,L5144-5148), and is NOT exposed by this Python
+
     spec AT ALL. The PyCoreSpecs constructor lets you turn connectivity ON per type but gives no way
+
     to set its strength or its default -- a magnitude nobody can tune from the spec. Its default
+
     value, and whether the returned penalty is a fixed constant or scales with connectivityStrength,
+
     were not determined from source.
-state_io: |
-  reads: the target cell's SET of lattice sites (its pixels and their adjacency under the Potts
-    NeighborOrder) in order to test connectedness after the proposed copy -- via a whole-cell flood
-    fill (global mode) or a local neighbourhood scan (fast mode); the per-type ConnectivityOn
-    whitelist and/or the per-cell cell.connectivityOn flag; and the per-cell connectivityStrength
-    magnitude.
-  writes: nothing. It is a Potts effective-energy term -- it only returns a dE that changes the
-    acceptance probability of a proposed pixel copy (vetoing fragmenting ones); it never moves,
-    relabels, or writes cell state directly.
+
+    '
+state_io: "reads: the target cell's SET of lattice sites (its pixels and their adjacency under the Potts\n\
+  \  NeighborOrder) in order to test connectedness after the proposed copy -- via a whole-cell flood\n\
+  \  fill (global mode) or a local neighbourhood scan (fast mode); the per-type ConnectivityOn\n  whitelist\
+  \ and/or the per-cell cell.connectivityOn flag; and the per-cell connectivityStrength\n  magnitude.\n\
+  writes: nothing. It is a Potts effective-energy term -- it only returns a dE that changes the\n  acceptance\
+  \ probability of a proposed pixel copy (vetoing fragmenting ones); it never moves,\n  relabels, or writes\
+  \ cell state directly.\n"
 surprises:
-- |
-  The penalty MAGNITUDE is unreachable from the Python spec. The constructor exposes only fast
+- 'The penalty MAGNITUDE is unreachable from the Python spec. The constructor exposes only fast
+
   (bool) and an on/off list of cell types; the strength S lives entirely in the C++ per-cell
+
   ConnectivityGlobalData and can only be set programmatically (setConnectivityStrength). A user
+
   configuring via PyCoreSpecs gets a constraint whose stiffness they cannot tune and whose default
+
   they cannot see from the spec.
-- |
-  It is a HARD / topological constraint dressed as an energy term. Most CPM plugins here are soft
+
+  '
+- 'It is a HARD / topological constraint dressed as an energy term. Most CPM plugins here are soft
+
   quadratics (volume, surface); this one instead returns a large veto penalty ONLY when a copy would
+
   break the cell into pieces, so it behaves as a rejection rule rather than a gradient. A
+
   reimplementer treating it as a tunable soft energy, or expecting it to gently pull toward
+
   compactness, misreads it -- it does nothing at all until a copy threatens to fragment the cell.
-- |
-  fast != global. <FastAlgorithm/> selects check_local_connectivity, a LOCAL neighbourhood
+
+  '
+- 'fast != global. <FastAlgorithm/> selects check_local_connectivity, a LOCAL neighbourhood
+
   approximation; it can miss connectivity breaks that the whole-cell flood fill would catch, so the
+
   two modes are not guaranteed to give identical topology. Choosing fast is a correctness/speed
+
   trade, not a free speedup.
-- |
-  "Connected" is defined by the Potts NeighborOrder (lattice adjacency), which is NOT a plugin
+
+  '
+- '"Connected" is defined by the Potts NeighborOrder (lattice adjacency), which is NOT a plugin
+
   parameter. The same plugin yields different topology under different neighbor orders (the test XML
+
   uses NeighborOrder 2). A reimplementer must fix the adjacency definition explicitly; it is not
+
   carried in this spec.
-- |
-  Three sibling plugins are easy to confuse and are NOT interchangeable: Connectivity
+
+  '
+- 'Three sibling plugins are easy to confuse and are NOT interchangeable: Connectivity
+
   (PyCoreSpecs.py:L4059 -- no params, no per-type list, the legacy whole-cell constraint),
+
   ConnectivityGlobal (this one -- per-type opt-in, global-flood-fill or fast-local), and
+
   ConnectivityLocalFlex (a SOFT local-energy variant with a tunable per-cell connectivityStrength,
+
   ConnectivityLocalFlexData at CompuCell.py:L5051). The "Global"/"LocalFlex" naming is about the
+
   connectivity ALGORITHM (whole-cell flood fill vs local energy), not about a spatial region.
-- |
-  Per-cell override: cell.connectivityOn set from a steppable enables connectivity on individual
+
+  '
+- 'Per-cell override: cell.connectivityOn set from a steppable enables connectivity on individual
+
   cells regardless of the type whitelist (connectivity_global_fast_python steppable turns it on for
+
   cell.id < 100). So the declared spec is not the full story -- connectivity may be active on cells
+
   the emitted XML never lists.
-verdict: null
+
+  '
+verdict: new
 of: null
-implementation_of: null
-why: null
-contract: null
-status: inspected
+implementation_of: stay_connected
+why: 'The FIRST sighting of a new contract I name `stay_connected`: a per-cell TOPOLOGICAL
+
+  constraint that reads a body''s connected-component structure and vetoes any move that would
+
+  split its set of parts into disconnected pieces. Against the FROZEN baseline this is `new` --
+
+  none of the 52 promoted contracts does this. The 42 registered contracts are metric forces
+
+  (cohesion, separation, attraction_repulsion), diffusive fields, count-changing structural ops
+
+  (cell_divide, cell_grow), or index/rewire builders (radius_graph); not one reads connected
+
+  components and rejects a fragmenting move. None of the 8 jax-morph proposals (adhere, agitate,
+
+  apoptose, mechanosense, morphogen, regulate, relax, reorient) is a connectivity guard either,
+
+  so this is a genuinely NEW contract, not a second sighting of an earlier one.
+
+
+  I set implementation_of stay_connected so the ledger counts the connectivity FAMILY ONCE.
+
+  Three CompuCell3D siblings are three IMPLEMENTATIONS of this one contract, not three
+
+  contracts: Connectivity (one global scalar, 2D-only, local check -- [[connectivity]]),
+
+  ConnectivityGlobal (THIS -- per-type opt-in, whole-cell flood-fill or fast-local, works in
+
+  3D), and ConnectivityLocalFlex (per-cell soft strength). What THIS implementation adds over
+
+  the plain sibling: (1) a per-type opt-in whitelist (each enabled type emits ConnectivityOn),
+
+  plus a per-cell cell.connectivityOn override from a steppable; (2) a per-cell strength S in the
+
+  C++ ConnectivityGlobalData (setConnectivityStrength) -- though the Python spec exposes only the
+
+  on/off list and the fast flag, never S; (3) a whole-cell flood-fill (checkIfCellIsFragmented)
+
+  in default mode, degradable to a cheaper LOCAL check via fast=True. None of these change the
+
+  typed signature -- same reads (site-set topology), same write (none, a Potts energy veto),
+
+  same kind/family (lateral/topology).
+
+
+  Closest registered contract is `cohesion` (lateral/interaction): both keep a body together.
+
+  But widening cohesion to admit this does violence to its biology. Cohesion is a metric
+
+  attractive FORCE between point agents that returns an integrable delta pulling neighbours
+
+  closer; stay_connected returns no force and no gradient -- it is a combinatorial TOPOLOGICAL
+
+  veto over one cell''s lattice-site set that does nothing at all until a proposed pixel copy
+
+  would fragment the set into more than one connected component, whereupon it adds a near-hard
+
+  energy penalty the Metropolis rule almost never accepts. Cohesion presupposes point agents
+
+  with positions and a differentiable pair potential; stay_connected presupposes an explicit
+
+  site-set with lattice adjacency that the point-agent representation does not have, and it is a
+
+  rejection rule, not a gradient. Widening cohesion to cover a connected-components indicator
+
+  would erase the force/veto and the point/site distinctions that make cohesion what it is.
+
+  '
+contract:
+  name: stay_connected
+  kind: lateral
+  family: topology
+  set: cell
+  inputs:
+  - site (the affected cell's owned lattice sites, each carrying its cell id, for the cell whose connectedness
+    the proposed pixel copy would change)
+  - connectivity_on (per-type opt-in whitelist and/or a per-cell flag; only enabled cells are constrained)
+  - strength (a per-cell magnitude S in ConnectivityGlobalData; not exposed by the Python spec, settable
+    only via setConnectivityStrength)
+  outputs:
+  - dE (a positive energy penalty added to the Metropolis total when the copy would fragment the cell
+    into more than one connected component; 0 otherwise)
+  reads:
+  - site.cell_id (the cell's set of lattice sites and their adjacency, flood-filled whole-cell in global
+    mode or scanned in a local neighbourhood in fast mode, to test connectedness after the proposed copy)
+  - lattice adjacency / Potts NeighborOrder (defines which sites count as connected; a Potts param, not
+    a plugin param -- an implicit external precondition)
+  writes:
+  - none (a Potts effective-energy term that returns a scalar dE and mutates no state; it changes only
+    the acceptance probability of the proposed pixel copy, integrating no delta)
+  maps:
+  - none
+status: normalized
 module: null
 test: null
 evidence:

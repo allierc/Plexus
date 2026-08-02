@@ -3,125 +3,216 @@ order: 2
 raw_name: BlobInitializer
 raw_kind: Steppable (BlobInitializer)
 code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L5620
-paper_section: |
-  Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
-  CompuCell3D' -- the chapter's known home for lattice initializers; NO paper page was read
+paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366, ''Multi-Scale Modeling of Tissues Using
+
+  CompuCell3D'' -- the chapter''s known home for lattice initializers; NO paper page was read
+
   (no extracted text available), so no page/figure is cited. Checkable library anchors instead:
+
   PyCoreSpecs.rst:294 (autoclass BlobInitializerRegion) and :299 (autoclass BlobInitializer);
-  the CC3DMLGeneratorBase.py:1235 comment 'Initial layout of cells in the form of spherical
-  (circular in 2D) blob'.
-summary: |
-  A one-shot STEPPABLE that runs once at initialization (MCS 0) and WRITES the cell field:
+
+  the CC3DMLGeneratorBase.py:1235 comment ''Initial layout of cells in the form of spherical
+
+  (circular in 2D) blob''.
+
+  '
+summary: 'A one-shot STEPPABLE that runs once at initialization (MCS 0) and WRITES the cell field:
+
   it paints a solid circular (2D) / spherical (3D) blob of freshly-created cells onto the
+
   lattice. The region is tiled with a grid of square/cubic cells of edge `width` (separated
+
   by `gap` medium sites), and every tile whose sites fall within `radius` of `center` becomes
+
   a new cell -- a new SET of lattice sites sharing a unique id -- assigned a random type from
+
   `cell_types`. This is the initial partition of the lattice into cells; sites outside the
+
   blob or in a gap remain Medium (id 0). Unlike the energy-term plugins, it genuinely writes
+
   state, and only at t=0.
-equations: |
-  Construction rule (compiled BlobInitializer steppable, executed once at initialization;
-  the PyCoreSpecs class only EMITS the CC3DML that parameterizes it -- it paints nothing):
 
-    Tile the plane/space with a regular grid of square (2D) / cubic (3D) cells of edge = width,
-    each adjacent pair separated by `gap` medium sites (pitch = width + gap). Assign lattice
-    site s to a new cell -- a fresh unique id sigma, i.e. a new SET -- iff s lies inside the blob
-        || s - center ||_2  <=  radius        (Euclidean; circle in 2D, sphere in 3D)
-    and s is not in a gap lane. Each generated cell sigma is given a type tau(sigma) drawn at
-    RANDOM (uniform) from `cell_types`, seeded by the Potts random_seed. Sites outside the
-    sphere or inside a gap stay Medium (id 0).
-
-    Initial per-cell volume V(sigma) = site count ~= width^2 (2D) / width^3 (3D) for gap = 0,
-    truncated where a tile straddles the circle/sphere boundary.
-
-  Symbols: s = lattice site (x,y,z); sigma = cell id (a SET of sites); tau = cell type label;
-  center = blob center point; radius = blob radius; width = cell edge; gap = inter-cell medium.
-
-  NOTE: the exact clip predicate (site-in-sphere vs tile-center-in-sphere), the uniform RNG
-  draw, and multi-region overlap resolution are the COMPILED core's behavior, inferred from
-  CC3D convention + the emitted CC3DML fields -- NOT read from source (cc3d C++ is not
-  importable in this environment).
+  '
+equations: "Construction rule (compiled BlobInitializer steppable, executed once at initialization;\n\
+  the PyCoreSpecs class only EMITS the CC3DML that parameterizes it -- it paints nothing):\n\n  Tile the\
+  \ plane/space with a regular grid of square (2D) / cubic (3D) cells of edge = width,\n  each adjacent\
+  \ pair separated by `gap` medium sites (pitch = width + gap). Assign lattice\n  site s to a new cell\
+  \ -- a fresh unique id sigma, i.e. a new SET -- iff s lies inside the blob\n      || s - center ||_2\
+  \  <=  radius        (Euclidean; circle in 2D, sphere in 3D)\n  and s is not in a gap lane. Each generated\
+  \ cell sigma is given a type tau(sigma) drawn at\n  RANDOM (uniform) from `cell_types`, seeded by the\
+  \ Potts random_seed. Sites outside the\n  sphere or inside a gap stay Medium (id 0).\n\n  Initial per-cell\
+  \ volume V(sigma) = site count ~= width^2 (2D) / width^3 (3D) for gap = 0,\n  truncated where a tile\
+  \ straddles the circle/sphere boundary.\n\nSymbols: s = lattice site (x,y,z); sigma = cell id (a SET\
+  \ of sites); tau = cell type label;\ncenter = blob center point; radius = blob radius; width = cell\
+  \ edge; gap = inter-cell medium.\n\nNOTE: the exact clip predicate (site-in-sphere vs tile-center-in-sphere),\
+  \ the uniform RNG\ndraw, and multi-region overlap resolution are the COMPILED core's behavior, inferred\
+  \ from\nCC3D convention + the emitted CC3DML fields -- NOT read from source (cc3d C++ is not\nimportable\
+  \ in this environment).\n"
 params:
-  gap: |
-    cell_separation_gap -- number of Medium lattice sites inserted between adjacent tiled
+  gap: 'cell_separation_gap -- number of Medium lattice sites inserted between adjacent tiled
+
     cells (units: lattice sites). Default 0 => cells are face-adjacent, a fully packed disk;
+
     gap>0 opens medium lanes between cells. Optional in from_xml (defaults 0). check_dict:
+
     gap<0 rejected.
-  width: |
-    cell_edge_length / initial_cell_size -- edge length of each square/cubic tile that becomes
+
+    '
+  width: 'cell_edge_length / initial_cell_size -- edge length of each square/cubic tile that becomes
+
     one cell (units: lattice sites); sets the initial per-cell volume (~= width^d). Constructor
+
     default 0 is a deliberately-invalid sentinel; check_dict rejects width<1 at validate() time.
-  radius: |
-    blob_radius -- Euclidean radius of the clipping circle/sphere centred on `center` (units:
+
+    '
+  radius: 'blob_radius -- Euclidean radius of the clipping circle/sphere centred on `center` (units:
+
     lattice sites); tiles outside it are dropped, giving the blob its round shape. Constructor
+
     default 0 is an invalid sentinel; check_dict rejects radius<1 at validate() time.
-  center: |
-    blob_center_position -- integer lattice coordinates (x,y,z) of the blob centroid. Coordinates
+
+    '
+  center: 'blob_center_position -- integer lattice coordinates (x,y,z) of the blob centroid. Coordinates
+
     must be non-negative (check_dict) and, in validate(), center +/- radius must stay in the Potts
+
     domain on all three axes.
-  cell_types: |
-    cell_type_palette -- list of type-name strings; each generated cell is assigned one drawn at
+
+    '
+  cell_types: 'cell_type_palette -- list of type-name strings; each generated cell is assigned one drawn
+    at
+
     random from this list. A categorical label set resolved against CellTypePlugin, NOT a physical
+
     scalar. Empty list => all cells take the first available type (compiled-core default).
+
+    '
 state_io:
-  reads: |
-    - Potts lattice geometry (dim_x/y/z and bounds) to place/clip the grid and, in validate(),
-      to bounds-check center +/- radius.
-    - the cell-type registry (CellTypePlugin) to resolve `cell_types` name strings -> integer
-      type ids.
-    No dynamic simulation state is read; all inputs are static configuration.
-  writes: |
-    - the CELL FIELD (cellField): assigns a unique cell id sigma to each in-blob lattice site,
-      CREATING the initial sets -- the partition of the lattice into cells. This is a real WRITE
-      of state, unlike the energy-term plugins that write nothing.
-    - each cell's type tau(sigma).
-    - implicitly the initial per-cell volume/surface (site/boundary counts) that downstream
-      trackers (VolumeTrackerPlugin, CenterOfMassPlugin) then maintain.
-    Executes ONCE at initialization, not per-MCS.
+  reads: "- Potts lattice geometry (dim_x/y/z and bounds) to place/clip the grid and, in validate(),\n\
+    \  to bounds-check center +/- radius.\n- the cell-type registry (CellTypePlugin) to resolve `cell_types`\
+    \ name strings -> integer\n  type ids.\nNo dynamic simulation state is read; all inputs are static\
+    \ configuration.\n"
+  writes: "- the CELL FIELD (cellField): assigns a unique cell id sigma to each in-blob lattice site,\n\
+    \  CREATING the initial sets -- the partition of the lattice into cells. This is a real WRITE\n  of\
+    \ state, unlike the energy-term plugins that write nothing.\n- each cell's type tau(sigma).\n- implicitly\
+    \ the initial per-cell volume/surface (site/boundary counts) that downstream\n  trackers (VolumeTrackerPlugin,\
+    \ CenterOfMassPlugin) then maintain.\nExecutes ONCE at initialization, not per-MCS.\n"
 surprises:
-  - |
-    It is a SET CONSTRUCTOR, not an energy term or a per-step update. It runs exactly once (MCS 0)
-    and genuinely writes the cell field, creating the sets -- the opposite of most CC3D mechanisms,
-    which are energy terms returning a dE and writing nothing. A reimplementer who models it as a
-    per-step operator returning a delta has the wrong shape; it is a one-shot initializer of the
-    partition.
-  - |
-    The Python class does NO painting. BlobInitializer / BlobInitializerRegion in PyCoreSpecs.py
-    are pure CC3DML serializers (they emit <Region> with Gap/Width/Radius/Center/Types). Every bit
-    of geometry -- the circle clip, the grid tiling, the random type draw -- lives in the compiled
-    core, unreadable here. Reading only the Python gives you the parameters, never the algorithm.
-  - |
-    Constructor defaults width=0 and radius=0 are DELIBERATELY-INVALID sentinels: check_dict rejects
-    width<1 and radius<1, but only at validate() time, not at construction. A region built with the
-    dataclass defaults constructs fine and fails later -- or, if validate() is skipped, silently
-    emits a degenerate <Width>0</Width>/<Radius>0</Radius>.
-  - |
-    validate() would REJECT a legitimate 2D blob. BlobInitializerRegion.validate iterates
-    itertools.product(['x','y','z'], [-radius, +radius]) and bounds-checks center +/- radius on ALL
-    THREE axes; for a 2D sim (dim_z=1) with center.z=0 and radius>0, the z-radius term = -radius < 0
-    trips validate_point's 'c_val < 0' guard (raises 'z-min'). The oracle's own blob (center z=0,
-    radius=dim//3) would fail validate() -- but the XML-emission path (.xml.getCC3DXMLElementString())
-    never calls validate(), so 2D blobs work in practice. A declared-validation vs working-use
-    contradiction.
-  - |
-    Type assignment is SEED-DEPENDENT and random. Types are drawn (uniformly, in the compiled core)
-    per cell from `cell_types`, seeded by the Potts random_seed -- two types in a list is NOT a
-    deterministic checkerboard. A reimplementer who assigns by position/round-robin produces a
-    different, non-reproducing initial condition. (Inferred CC3D behavior; not read from source.)
-  - |
-    from_xml makes Gap OPTIONAL (defaults 0) while Width and Radius are REQUIRED (getFirstElement
-    throws if absent). Center defaults to (0,0,0) and reads only the axes present as attributes;
-    Types is optional. So the minimal valid <Region> is Width + Radius.
-  - |
-    A single BlobInitializer holds a LIST of regions (region_new / region_append / region_pop); the
-    emitted steppable has one <Region> child per blob. How overlapping regions resolve (does a later
-    region overwrite an earlier one's sites?) is compiled-core behavior, NOT established here.
-verdict: null
+- 'It is a SET CONSTRUCTOR, not an energy term or a per-step update. It runs exactly once (MCS 0)
+
+  and genuinely writes the cell field, creating the sets -- the opposite of most CC3D mechanisms,
+
+  which are energy terms returning a dE and writing nothing. A reimplementer who models it as a
+
+  per-step operator returning a delta has the wrong shape; it is a one-shot initializer of the
+
+  partition.
+
+  '
+- 'The Python class does NO painting. BlobInitializer / BlobInitializerRegion in PyCoreSpecs.py
+
+  are pure CC3DML serializers (they emit <Region> with Gap/Width/Radius/Center/Types). Every bit
+
+  of geometry -- the circle clip, the grid tiling, the random type draw -- lives in the compiled
+
+  core, unreadable here. Reading only the Python gives you the parameters, never the algorithm.
+
+  '
+- 'Constructor defaults width=0 and radius=0 are DELIBERATELY-INVALID sentinels: check_dict rejects
+
+  width<1 and radius<1, but only at validate() time, not at construction. A region built with the
+
+  dataclass defaults constructs fine and fails later -- or, if validate() is skipped, silently
+
+  emits a degenerate <Width>0</Width>/<Radius>0</Radius>.
+
+  '
+- 'validate() would REJECT a legitimate 2D blob. BlobInitializerRegion.validate iterates
+
+  itertools.product([''x'',''y'',''z''], [-radius, +radius]) and bounds-checks center +/- radius on ALL
+
+  THREE axes; for a 2D sim (dim_z=1) with center.z=0 and radius>0, the z-radius term = -radius < 0
+
+  trips validate_point''s ''c_val < 0'' guard (raises ''z-min''). The oracle''s own blob (center z=0,
+
+  radius=dim//3) would fail validate() -- but the XML-emission path (.xml.getCC3DXMLElementString())
+
+  never calls validate(), so 2D blobs work in practice. A declared-validation vs working-use
+
+  contradiction.
+
+  '
+- 'Type assignment is SEED-DEPENDENT and random. Types are drawn (uniformly, in the compiled core)
+
+  per cell from `cell_types`, seeded by the Potts random_seed -- two types in a list is NOT a
+
+  deterministic checkerboard. A reimplementer who assigns by position/round-robin produces a
+
+  different, non-reproducing initial condition. (Inferred CC3D behavior; not read from source.)
+
+  '
+- 'from_xml makes Gap OPTIONAL (defaults 0) while Width and Radius are REQUIRED (getFirstElement
+
+  throws if absent). Center defaults to (0,0,0) and reads only the axes present as attributes;
+
+  Types is optional. So the minimal valid <Region> is Width + Radius.
+
+  '
+- 'A single BlobInitializer holds a LIST of regions (region_new / region_append / region_pop); the
+
+  emitted steppable has one <Region> child per blob. How overlapping regions resolve (does a later
+
+  region overwrite an earlier one''s sites?) is compiled-core behavior, NOT established here.
+
+  '
+verdict: out_of_scope
 of: null
 implementation_of: null
-why: null
-contract: null
-status: inspected
+why: |
+  INITIAL-CONDITION CONSTRUCTION, not a dynamical operator. Plexus operators transform state
+  that already exists -- each returns a delta the engine integrates every step over a set/field
+  that is already there. BlobInitializer is the opposite shape: a one-shot that runs once at
+  MCS 0 and CONSTRUCTS the starting partition (the sets themselves) from an empty lattice plus a
+  geometric region and a type palette. In Plexus that starting partition is supplied by
+  configuration/seeding, not by any registered operator; there is nothing in the algebra to
+  alias, and nothing that could widen to admit set-construction without ceasing to be a per-step
+  operator. So this is framework mechanics for establishing the initial state -- out of scope for
+  the OPERATOR algebra whose completeness this campaign measures. Counting each of a framework's
+  lattice initializers as a contract would measure how many ways CC3D can lay out a starting
+  configuration, not whether the dynamical vocabulary is converging.
+
+  It is NOT a mere serializer: the compiled steppable genuinely writes the cell field, and it is
+  one of a FAMILY -- BlobInitializer (this, a blob), UniformInitializer (a box grid),
+  PIFInitializer (from a PIF file) -- three interchangeable ways to build the same thing: the
+  initial partition. If one insisted IC construction belongs inside the algebra, the honest
+  reading is a SINGLE `seed` contract (typed below) with those three as implementations, counted
+  once -- never three separate `new` contracts. The closest registered contract is `cell_divide`
+  (structural/growth), but widening it to cover de-novo population seeding would do violence to
+  its biology: division is mitosis, one parent set -> two daughters, conserving material and
+  requiring a pre-existing cell; seeding creates a whole population out of Medium with no parent.
+contract:
+  name: seed
+  kind: structural
+  family: growth
+  set: cell
+  inputs:
+  - region_geometry (center, radius, cell width, gap)
+  - cell_type_palette
+  outputs:
+  - initial_cell_partition
+  reads:
+  - lattice_geometry (domain bounds, to place and clip the grid)
+  - cell_type_registry (to resolve type-name strings)
+  writes:
+  - cell_field (fresh unique id per in-blob tile -- a new SET of sites)
+  - cell_type (random draw from the palette per created cell)
+  maps: |
+    (empty lattice, blob region {center, radius, width, gap}, type palette)
+      -> a partition of the in-blob, non-gap sites into fresh cell ids, each id a SET of
+         width^d sites (truncated at the sphere boundary), each assigned a type drawn uniformly
+         at random (Potts-seed dependent) from the palette. Sites outside the sphere or in a gap
+         lane stay Medium. A one-shot construction executed once at t=0, not a per-step delta.
+status: normalized
 module: null
 test: null
 evidence:

@@ -35,3 +35,22 @@ distance vs a tabulated weight is assumed from the name/parent, not confirmed in
 `ContactPlugin` (L3141) already inherits it. So at the Python level the *only* thing that changes
 between plain Contact and LocalFlex is `name`/`registered_name`; `registered_name="ContactLocalFlex"`
 is the sole hook that binds the spec to the different C++ plugin holding the per-cell J container.
+
+**Normalizer verdict.** `new` (frozen baseline has no cell-cell contact/adhesion energy) with
+`implementation_of: adhere` -- a THIRD sighting of `adhere`, after jax-morph proposed it and
+AdhesionFlex logged the first CC3D sighting. The energy is *identical* to plain Contact, the
+canonical `adhere` implementation; ContactLocalFlex, plain Contact, and AdhesionFlex are three
+interchangeable implementations of the one pure-adhesion contract, which is exactly the many-impls
+shape a mature framework should show. Contract mirrors AdhesionFlex's: `set: cell` (a set of lattice
+sites), output is a scalar `contact_energy` dE biasing Metropolis acceptance (writes NOTHING to the
+lattice, rule 8), interaction counted over cross-boundary site-pairs rather than centre distance.
+
+**Strongest argument AGAINST.** One could push for `alias: adhere` rather than a distinct
+implementation -- ContactLocalFlex adds *zero* to the energy functional over plain Contact, so is
+the per-cell J storage really a different implementation or just a runtime knob on the same one? If
+you weight only the Hamiltonian, plain Contact and LocalFlex are the SAME implementation and this
+entry is a duplicate the ledger should collapse. I keep them distinct because the per-cell/per-pair
+J container and `setContactEnergy` steering change the READ side of the contract (a per-cell
+adhesion attribute, heritable/steerable like AdhesionFlex's density vector) even though the write
+side is unchanged -- but that is a genuinely arguable line, and if the ledger counts implementations
+by energy form alone, LocalFlex folds into Contact and only `adhere` (once) survives either way.

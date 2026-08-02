@@ -37,3 +37,29 @@ constraint but is not a page I read; no page/eq number invented. Also did not co
 that the old `Connectivity` plugin is 2D-only while `ConnectivityGlobal` is the 3D-capable
 replacement — left out of the entry rather than asserted. This mechanism is NOT one of the six with
 reference ablations under `log/atlas_cc3d/`, so its behavioural claims are unmeasured.
+
+## NORMALIZED — verdict: new (contract `stay_connected`, lateral/topology)
+
+Verdict `new`: no registered contract, and no jax-morph proposal (adhere/agitate/apoptose/
+mechanosense/morphogen/regulate/relax/reorient), expresses a TOPOLOGICAL constraint on a set — one
+that reads a body's connected-component structure and vetoes moves that would split it. The 42/52
+promoted contracts are metric forces, fields, count-changing structural ops, or index/rewire; none
+keeps a body a single connected piece. Contract name `stay_connected` (biological content = cell
+integrity: a cell is a single cohesive body and does not spontaneously fragment). It writes nothing
+— a Potts energy veto (dE = S on fragmentation, else 0). A second finding: family `topology` only
+ever pairs with kind `rewire` in the registry (those BUILD a relation); this is a topology-READING
+energy term (kind lateral) that rewires nothing, so the (lateral, topology) slot it needs does not
+yet exist.
+
+STRONGEST ARGUMENT AGAINST: it is out_of_scope, collapsing to nothing in the promoted
+representation exactly as boundary_index did — a Plexus cell is a POINT, and a point cannot
+fragment, so there is literally nothing here to constrain; the constraint is an artifact of CC3D's
+site-set representation. My rebuttal (why I still chose `new`): (1) out_of_scope is reserved for
+mechanics with NO biological content and NO trajectory effect — boundary_index is bit-identical
+with/without and writes only a cache, whereas connectivity changes reachable states and encodes cell
+integrity, which is biological; (2) "points can't fragment" is Plexus's representation gap, not
+proof the contract is vacuous — the MPM/deformable-body direction (mls_mpm_mechanics, mpm_strain,
+cell_grow's woken material points) gives cells extended bodies that CAN tear, and that is precisely
+where a connectivity/integrity term becomes the missing contract. If one weights the point-particle
+representation as fixed, out_of_scope is defensible; I weight the biological content and the
+already-in-flight deformable representation, so `new` is the honest measurement of a real gap.

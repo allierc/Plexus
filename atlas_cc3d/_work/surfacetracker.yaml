@@ -199,12 +199,81 @@ surprises:
   diverge in order breaks the scale silently.
 
   '
-verdict: null
-of: null
-implementation_of: null
-why: null
-contract: null
-status: inspected
+verdict: refinement
+of: aggregate
+implementation_of: aggregate
+why: |
+  SurfaceTracker is the PERIMETER sibling of CenterOfMass and MomentOfInertia. All three are
+  CellGChangeWatchers that keep a per-cell derived scalar/tensor in sync with the pixel
+  partition, return no energy / acceptance delta, and expose a READ-ONLY readout the modeller
+  cannot write (set_surface raises AttributeError, cpp/CompuCell.py:L589 -- the same hard
+  read-only enforcement CenterOfMass and MomentOfInertia carry). CenterOfMass was aliased to
+  `aggregate` (the first-moment reduction: children=lattice sites, parent=cell, reduce site
+  positions to a per-cell scalar/vector) and MomentOfInertia refined `aggregate` (the
+  second-moment reduction to a tensor). SurfaceTracker is the same children -> parent reduction
+  shape along the containment map -- reduce a cell's own sites onto ONE per-cell scalar,
+  incrementally, no delta -- so it is squarely the aggregate family and NOT a new contract:
+  hence implementation_of: aggregate, and the ledger must count aggregate ONCE across these
+  siblings, not thrice.
+
+  It is a REFINEMENT and not an ALIAS because two signature fields must widen past the
+  registered centroid signature (which writes cell.pos and reads only child positions +
+  occupancy):
+  (1) WRITES / OUTPUTS. Centroid writes a first-moment mean position (a D-vector). SurfaceTracker
+      writes cell.surface -- a weighted boundary-LINK COUNT (a perimeter/area scalar). A position
+      readout and a perimeter readout are different output fields; the contract's writes must
+      admit a scalar boundary-count, not only cell.pos or MomentOfInertia's shape tensor.
+  (2) READS. This is the genuinely new edge, and it is stronger than MomentOfInertia's. The
+      centroid reduction is a pure function of the cell's OWN child positions; MomentOfInertia
+      additionally reads the parent's own cell.pos (the COM it measures about). SurfaceTracker's
+      summand reads the OWNER of each neighbour-shell site -- i.e. it reads the cell_id PARTITION
+      itself (is this neighbour c or non-c, Medium counting as non-c) to decide whether a link is
+      a hetero face. So the reduction depends not just on the child set's coordinates but on the
+      surrounding partition. That is an input edge no prior aggregate variant has.
+  What widening costs: any consumer or validator that assumed `aggregate` reduces a child set to a
+  position (or an intra-cell tensor) and reads nothing but its own children must now account for a
+  reduction that (a) emits a scalar interface count and (b) reads the neighbour partition. A
+  dependency graph that treated aggregate as purely local-to-the-cell is no longer sound; that is a
+  costed change, not a free add.
+
+  Two properties are IMPLEMENTATION, not contract, so they do not add a fourth verdict axis:
+  (a) surface is maintained INCREMENTALLY via the four-branch field3DChange (old loses/gains,
+      new gains/loses, third-party neighbours invariant) rather than re-summed -- an O(shell)
+      efficiency choice with the same result, exactly as CenterOfMass's incremental moment was
+      ruled implementation. (b) The lattice multiplicative weight w = lmf.surfaceMF and the
+      neighbour-order-dependent absolute scale are properties of the reduction's kernel/domain
+      (which links, weighted how), not new inputs/outputs -- the perimeter of a cell on a
+      hex/3D lattice is still the same aggregate, differently weighted.
+
+  Why not NEW: the entire children -> parent, per-cell, read-only, no-delta reduction structure is
+  already the promoted aggregate contract; spinning a fresh contract for "the scalar perimeter
+  reduction" would inflate the count for what is the aggregate slot merely widened, corrupting the
+  saturation measurement the campaign exists to make. The closest OTHER contract is CenterOfMass's
+  `aggregate` itself (its first-moment sibling), of which this is the boundary-count refinement.
+contract:
+  name: aggregate
+  kind: aggregate
+  family: hierarchy
+  set: cell
+  inputs:
+  - site (the contained lattice-site child set; each owned site contributes its links to
+    neighbour-shell sites that are NOT owned by the same cell)
+  outputs:
+  - cell (the parent whose derived surface/perimeter scalar is published)
+  reads:
+  - site.pos (the coordinate of each owned lattice site, to enumerate its neighbour shell up
+    to maxNeighborIndex)
+  - cell_id_lattice (the owner of each neighbour-shell site -- to decide which links are
+    hetero-owner, Medium/id 0 counting as non-c; a NEW partition read relative to the
+    centroid signature, which reads only its own children)
+  - lmf.surfaceMF (the per-link lattice multiplicative weight w, fixed by the neighbour order)
+  writes:
+  - cell.surface (the weighted count of hetero-owner boundary links = the cell perimeter/area;
+    a read-only derived readout, no energy / acceptance delta -- the WIDENED scalar write field
+    relative to the centroid's cell.pos and MomentOfInertia's tensor)
+  maps:
+  - parent
+status: normalized
 module: null
 test: null
 evidence:

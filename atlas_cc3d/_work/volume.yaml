@@ -3,93 +3,190 @@ order: 30
 raw_name: Volume
 raw_kind: Plugin (VolumePlugin)
 code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L2033
-paper_section: |
-  Swat et al. (2012) Methods Cell Biol 110:325-366 -- the GGH/CPM effective-energy (Hamiltonian)
+paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366 -- the GGH/CPM effective-energy (Hamiltonian)
+
   discussion, where the volume constraint is one term of E. NOTE: no paper text was available in
-  this environment, so this anchor is the chapter's known home for the term, NOT a page I have
+
+  this environment, so this anchor is the chapter''s known home for the term, NOT a page I have
+
   read. The equation below is reconstructed from the CC3D source declaration plus standard CPM
+
   convention; the compiled changeEnergy was not read.
-summary: |
-  A per-cell-type (or, in bare mode, per-cell) quadratic penalty on the deviation of a cell's
+
+  '
+summary: 'A per-cell-type (or, in bare mode, per-cell) quadratic penalty on the deviation of a cell''s
+
   site COUNT from a target count. It writes no state: on every proposed pixel copy it returns a
+
   dE that makes copies pushing a cell away from its target volume energetically costly, so the
+
   Metropolis rule rejects most of them. It is what gives a set-of-sites an incompressible "size",
+
   and thus its objecthood -- ablate it and the cells dissolve into medium.
-equations: |
-  Effective-energy volume term, summed over all real cells sigma (Medium, id 0, is exempt):
 
-    E_vol = sum_{sigma>0} lambda_V(sigma) * ( V(sigma) - V_target(sigma) )^2
-
-  where
-    V(sigma)        = number of lattice sites carrying id sigma -- a COUNT, not a physical volume
-    V_target(sigma) = the cell's rest / target site count
-    lambda_V(sigma) = quadratic stiffness (energy per site^2); lambda_V = 0 removes the term
-
-  The plugin never integrates this. On each attempted pixel copy (the id at a source site is
-  proposed to overwrite a neighbour site) it returns dE = E_vol(after) - E_vol(before). A single
-  copy touches TWO cells at once: the gaining cell V -> V+1 and the losing cell V -> V-1 (either
-  may be Medium, which contributes 0), so dE couples both quadratics and is NOT symmetric in V.
-  The Metropolis rule then accepts the copy with P = 1 if the TOTAL dE (this term + all others)
-  <= 0, else exp(-dE / T), where T = the Potts fluctuation_amplitude (T = 10 in the reference
-  runs). Standard CPM convention has no leading 1/2 on the quadratic.
+  '
+equations: "Effective-energy volume term, summed over all real cells sigma (Medium, id 0, is exempt):\n\
+  \n  E_vol = sum_{sigma>0} lambda_V(sigma) * ( V(sigma) - V_target(sigma) )^2\n\nwhere\n  V(sigma)  \
+  \      = number of lattice sites carrying id sigma -- a COUNT, not a physical volume\n  V_target(sigma)\
+  \ = the cell's rest / target site count\n  lambda_V(sigma) = quadratic stiffness (energy per site^2);\
+  \ lambda_V = 0 removes the term\n\nThe plugin never integrates this. On each attempted pixel copy (the\
+  \ id at a source site is\nproposed to overwrite a neighbour site) it returns dE = E_vol(after) - E_vol(before).\
+  \ A single\ncopy touches TWO cells at once: the gaining cell V -> V+1 and the losing cell V -> V-1 (either\n\
+  may be Medium, which contributes 0), so dE couples both quadratics and is NOT symmetric in V.\nThe Metropolis\
+  \ rule then accepts the copy with P = 1 if the TOTAL dE (this term + all others)\n<= 0, else exp(-dE\
+  \ / T), where T = the Potts fluctuation_amplitude (T = 10 in the reference\nruns). Standard CPM convention\
+  \ has no leading 1/2 on the quadratic.\n"
 params:
-  target_volume: |
-    rest_volume / target_size -- the site count a cell of this type relaxes toward
+  target_volume: 'rest_volume / target_size -- the site count a cell of this type relaxes toward
+
     (VolumeEnergyParameter.target_volume; CC3DML attribute TargetVolume). Guarded >= 0
+
     (check_dict, PyCoreSpecs.py:L1978).
-  lambda_volume: |
-    constraint_stiffness -- the quadratic energy penalty per (site)^2 of deviation from target
+
+    '
+  lambda_volume: 'constraint_stiffness -- the quadratic energy penalty per (site)^2 of deviation from
+    target
+
     (CC3DML attribute LambdaVolume). NOT guarded: lambda_volume = 0 is legal, and is exactly the
+
     dissolving ablation.
-  _params: |
-    (plugin constructor, VolumePlugin(*_params), PyCoreSpecs.py:L2052) zero or more
+
+    '
+  _params: '(plugin constructor, VolumePlugin(*_params), PyCoreSpecs.py:L2052) zero or more
+
     VolumeEnergyParameter, one per cell type. Zero args = "bare" mode: target_volume /
+
     lambda_volume are then read PER-CELL from the cell.targetVolume / cell.lambdaVolume attributes
+
     instead of per-type. The two modes are mutually exclusive (per-type silences per-cell -- see
+
     surprises).
-state_io: |
-  reads: V(sigma), the per-cell site count -- maintained incrementally by a SEPARATE, auto-loaded
-    plugin, VolumeTrackerPlugin (a CellGChangeWatcher; cpp/CompuCell.py:L5554), NOT recomputed by
-    this plugin; and, per cell, its targetVolume + lambdaVolume, taken EITHER from per-type
-    VolumeEnergyParameters OR, in bare mode, from the per-cell cell.targetVolume /
-    cell.lambdaVolume attributes.
-  writes: nothing. It is an energy term -- it only changes the acceptance probability of a
-    proposed pixel copy, never moves or writes state directly.
+
+    '
+state_io: "reads: V(sigma), the per-cell site count -- maintained incrementally by a SEPARATE, auto-loaded\n\
+  \  plugin, VolumeTrackerPlugin (a CellGChangeWatcher; cpp/CompuCell.py:L5554), NOT recomputed by\n \
+  \ this plugin; and, per cell, its targetVolume + lambdaVolume, taken EITHER from per-type\n  VolumeEnergyParameters\
+  \ OR, in bare mode, from the per-cell cell.targetVolume /\n  cell.lambdaVolume attributes.\nwrites:\
+  \ nothing. It is an energy term -- it only changes the acceptance probability of a\n  proposed pixel\
+  \ copy, never moves or writes state directly.\n"
 surprises:
-- |
-  Declaring per-TYPE VolumeEnergyParameters (calling param_new / passing params to the
+- 'Declaring per-TYPE VolumeEnergyParameters (calling param_new / passing params to the
+
   constructor) makes CC3D IGNORE the per-cell cell.targetVolume. A growth steppable that writes
+
   the per-cell value then has no effect and the cells quietly shrink -- measured 25 -> 20.9 over
+
   400 MCS with zero divisions, while the run reported success. Declare the plugin BARE
+
   (VolumePlugin() with no param_new) to use per-cell values. The two modes are mutually exclusive.
-- |
-  Ablating it (lambda_volume = 0) does not merely relax the size: the cells DISSOLVE. Measured in
+
+  '
+- 'Ablating it (lambda_volume = 0) does not merely relax the size: the cells DISSOLVE. Measured in
+
   the reference ablation (log/atlas_cc3d/volume_constraint, OFF run): mean volume 25 -> 0 and cell
+
   count n 45 -> 0 by MCS 200, versus the ON run relaxing 25 -> 59.4 toward target 60. With no
+
   volume penalty and all contact energies positive (16), the system minimises boundary by erasing
+
   cells into medium. Volume is what makes a cell an object here.
-- |
-  The energy penalty and the volume COUNT are TWO different plugins. VolumePlugin only reads
+
+  '
+- 'The energy penalty and the volume COUNT are TWO different plugins. VolumePlugin only reads
+
   V(sigma); the count is kept up to date by VolumeTrackerPlugin, an incremental CellGChangeWatcher
+
   that adjusts the count on each accepted copy. A reimplementer who folds "recount the cell" into
+
   the energy term, or forgets the tracker, gets a plugin reading a stale or zero volume.
-- |
-  A single pixel copy is a TWO-cell event: gaining cell V->V+1, losing cell V->V-1. Because the
+
+  '
+- 'A single pixel copy is a TWO-cell event: gaining cell V->V+1, losing cell V->V-1. Because the
+
   term is quadratic, the two contributions do not cancel and dE depends on how far each cell
+
   already is from its target -- treating volume relaxation as an independent per-cell update
+
   misses this coupling. Medium (id 0) has no volume constraint and contributes 0 to either side.
-- |
-  Only target_volume is guarded (>= 0). lambda_volume is unchecked, so the zero that dissolves
+
+  '
+- 'Only target_volume is guarded (>= 0). lambda_volume is unchecked, so the zero that dissolves
+
   the cells passes validation silently. There is also no upper guard: a large lambda_volume with
+
   the fixed Potts temperature T freezes the boundary and the cell cannot reach its target at all
-  -- the constraint's effect is inseparable from fluctuation_amplitude, which is a Potts param,
+
+  -- the constraint''s effect is inseparable from fluctuation_amplitude, which is a Potts param,
+
   not a Volume param.
-verdict: null
+
+  '
+verdict: new
 of: null
 implementation_of: null
-why: null
-contract: null
-status: inspected
+why: |
+  new: no registered contract covers an elastic set-point on a cell's SIZE. The closest
+  registered operators are cell_grow (structural/growth) and this term's geometric twin
+  membrane_tension (the `surface` entry, itself normalized `new` in this same atlas).
+  - cell_grow operates on volume but from the opposite direction: it WRITES the rest/target
+    volume forward by a logistic law (a state-writing update, kind structural). volume_elasticity
+    writes nothing -- it returns the energy dE that resists any deviation of the CURRENT site
+    count from that target. Widening cell_grow to absorb it would fuse a state-writing growth
+    rule with a non-writing energy term (incompatible state_io) and erase the very read/write
+    distinction this campaign is measuring.
+  - membrane_tension is the structural sibling (same quadratic Hookean form, same two-cell
+    incremental-delta / no-write energy shape, same lateral/mechanics home) but constrains a
+    DIFFERENT geometric quantity: boundary count vs bulk site count. They are two distinct
+    biophysical forces (surface tension vs bulk incompressibility), read two different trackers,
+    and Plexus already keeps them apart, so volume_elasticity is its own contract, NOT an
+    implementation_of membrane_tension. (One COULD argue both are implementations of a single
+    generic "quadratic geometric set-point" contract; the note records the argument for
+    collapsing them.)
+  - The jax-morph proposals `relax` / `regulate` are generic relaxation / homeostasis verbs,
+    not a volume-elasticity energy; no prior atlas proposed this specific contract, so this is
+    its FIRST sighting (implementation_of: null).
+contract:
+  name: volume_elasticity
+  kind: lateral
+  family: mechanics
+  set: cell
+  inputs: |
+    - one cell's site COUNT V(sigma) -- the number of lattice sites carrying the cell id
+      (maintained incrementally by a separate, auto-loaded VolumeTrackerPlugin, a
+      CellGChangeWatcher; read here, not recomputed). This is the cell's discrete "volume":
+      a count, not a physical length^3.
+    - the proposed single-pixel copy (source/target site, the two cells it touches), used to
+      obtain the incremental change (+1 to the gaining cell, -1 to the losing cell) in each
+      involved cell's count.
+    - the target and stiffness: target_volume V_target, lambda_volume -- taken from the per-cell
+      cell.targetVolume / cell.lambdaVolume in bare mode, else the per-cell-type
+      VolumeEnergyParameter default (the two modes are mutually exclusive).
+  outputs: |
+    - a scalar energy contribution dE added to the Potts total, NOT an integrated state delta:
+      dE = E_after - E_before, with E(cell) = lambda_V*(V - V_target)^2, summed over the two
+      cells the candidate copy changes (gainer V->V+1, loser V->V-1; Medium, id 0, contributes 0).
+      The delta only re-weights the Metropolis acceptance probability (P=1 if total dE<=0 else
+      exp(-dE/T)); the operator writes no cell property.
+  reads: |
+    - the cell's site count V(sigma) (maintained by VolumeTracker; reads 0 / inert without it).
+    - per-cell cell.targetVolume / cell.lambdaVolume (bare mode) OR the per-type
+      VolumeEnergyParameter default.
+    - the candidate pixel copy and its two involved cells, for the incremental +1/-1 count change.
+  writes: |
+    - NONE. changeEnergy returns dE (an energy term) and mutates no cell field; it changes only
+      the acceptance probability of the proposed pixel copy.
+    - (out of band, not part of this contract) a host steppable may set the per-cell targetVolume /
+      lambdaVolume (e.g. a growth or division rule); that is host-driven state-setting, not the
+      energy evaluation.
+  maps: |
+    - cell pixel set -> site count V = number of sites carrying the cell id (the tracker's job;
+      read here, not computed).
+    - volume deviation (V - V_target) -> quadratic Hookean energy lambda_V*(dev)^2 per cell ->
+      summed over the two cells a candidate copy touches -> dE that gates the Metropolis accept.
+      At target -> low energy; over-inflated or over-compressed -> higher energy (a two-sided
+      restoring bulk elasticity / incompressibility that gives the set-of-sites an object-like
+      size -- ablate lambda_V and the cells dissolve into medium).
+status: normalized
 module: null
 test: null
 evidence:

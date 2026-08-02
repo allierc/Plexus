@@ -118,12 +118,76 @@ surprises:
 - The class at L6242 is a thin CC3DML EMITTER; every physical parameter lives on the child DiffusionData
   / SecretionData / BoundaryConditions specs (L6070, L6160, L820), and the integrator itself is compiled.
   No update logic is in this file.
-status: inspected
-verdict: null
-of: null
-implementation_of: null
-why: null
-contract: null
+status: normalized
+verdict: refinement
+of: diffuse
+implementation_of: diffuse
+why: |
+  WHAT IT IS. Strip the plumbing and DiffusionSolverFE is one explicit forward-Euler (FTCS)
+  step of dc/dt = D grad^2 c - lambda c + S on a scalar concentration field. The pure
+  diffusion core is EXACTLY the registered `diffuse` contract (field->field, one Laplacian
+  step, writes the grid in place; diffuse already carries two implementations,
+  finite_difference and spectral -- this is a THIRD, the FTCS/forward-Euler scheme on the
+  CPM lattice, hence implementation_of: diffuse). The linear -lambda*c term is the registered
+  `decay` contract verbatim (c <- c - lambda*dt*c, field->field). The secretion source S is
+  the registered `deposit` contract (a set->field scatter: a cell of type t adds a rate into
+  the field at its own pixels). So as a whole this mechanism is a COMPOSITE of three existing
+  contracts -- in Plexus you would express it as diffuse then decay then deposit on the same
+  field. That composability is itself a positive saturation result: CC3D's flagship PDE
+  solver introduces no new biological verb.
+
+  WHY REFINEMENT AND NOT ALIAS. It is not a clean alias because CC3D's DEFINING capability
+  cannot be expressed by `diffuse` as currently registered. `diffuse` binds `rate` to a single
+  scalar (self.rate = float(params.get("rate"))) and both its implementations apply a spatially
+  UNIFORM coefficient. DiffusionSolverFE's D_i and lambda_i are SPATIALLY HETEROGENEOUS, read
+  per pixel from the moving CPM cell-type lattice (diff_types/decay_types). This is not an
+  incidental knob -- the whole two-half-sum "variable diffusion" stencil (isoSum with the
+  centre cell's D_i + varSum with each neighbour's own D_j, each /2) exists precisely to
+  symmetrise flux across a cell-type interface, and it only collapses to diffuse's central-D
+  Laplacian D*(SUM_j c_j - N c_i) when D is uniform. To admit CC3D, `diffuse` must WIDEN its
+  `rate` param from scalar to scalar|coefficient-field (PARAM_ROLES rate: diffusion_rate ->
+  diffusion_rate_field), and its `reads` gains that coefficient field. What this BREAKS for
+  existing users: (a) the numerics obligation -- an implementation given a field-valued rate
+  can no longer use a single central-D box-blur; it must use the symmetric face-average
+  stencil or it computes heterotypic diffusion wrong, so the finite_difference/spectral
+  implementations do not transparently generalise; (b) the spectral implementation cannot
+  support a spatially-varying D at all (exp(-D k^2 dt) assumes constant D), so a field-valued
+  rate silently narrows the set of valid implementations. `decay` needs the identical widening
+  for lambda_i (scalar -> coefficient-field keyed to the cell-type set). Both are the same
+  refinement: a field->field operator's coefficient becoming a set-coupled field.
+
+  A SECOND, SMALLER REFINEMENT the record should note but that I am NOT electing as the primary
+  verdict (one contract per entry): per-face BOUNDARY CONDITIONS (Dirichlet Value / Neumann
+  Flux / Periodic, per x/y/z min/max) are a field-level concept that neither diffuse nor decay
+  currently expresses -- Plexus fields carry only a single `periodic` flag. And the secretion
+  ConstantConcentration mode is a genuine gap in `deposit`: deposit ADDS (min(1, c+amt)),
+  whereas ConstantConcentration OVERWRITES/CLAMPS c := value on the cell interior (a Dirichlet
+  pin, re-applied each step). A reimplementer routing ConstantConcentration through `deposit`
+  would be wrong; deposit would need a `mode: add|set` widening to cover it. I flag these here
+  rather than splitting the entry.
+
+  CLOSEST-CONTRACT / not-new argument. This is emphatically not `new`: `diffuse` plus `decay`
+  plus `deposit` cover the biology (transport, turnover, source) with only the coefficient-
+  heterogeneity widening missing. Calling it `new` would double-count a verb the language
+  already has. See the sibling ReactionDiffusionSolverFE for the case where the AdditionalTerm
+  reaction expression genuinely exceeds this composite.
+contract:
+  name: diffuse
+  kind: field
+  family: fields
+  set: field
+  inputs:
+  - field
+  outputs: []
+  reads:
+  - the scalar concentration field c (the grid advanced in place)
+  - 'REFINEMENT: a per-site diffusion coefficient field D_i (and, for the composed decay term,
+    a per-site lambda_i), sourced by indexing diff_types/decay_types with the cell type
+    occupying each pixel -- i.e. the CPM cell-type set lattice, which base diffuse never reads'
+  - per-face boundary values and the t=0 initial condition (expression or file)
+  writes:
+  - the concentration field c, in place (a real field write, not an energy delta)
+  maps: []
 module: null
 test: null
 evidence:

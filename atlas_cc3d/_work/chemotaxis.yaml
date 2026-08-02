@@ -1,0 +1,73 @@
+id: chemotaxis
+order: 7
+raw_name: Chemotaxis
+raw_kind: Plugin (ChemotaxisPlugin)
+code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L2653
+paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+  CompuCell3D'
+summary: Chemotaxis Plugin
+equations: 'dE_chemo = -lambda_chemo * (c(x_new) - c(x_old))
+
+  Evaluated per attempted copy on the field value at the two sites; it biases the accept/reject rather
+  than applying a force.'
+params:
+  lambda_chemo: gradient_sensitivity
+  field_name: sensed_field
+state_io: 'reads: a PDE field at two lattice sites; writes: nothing (an energy term)'
+surprises:
+- 'It is a bias on a discrete move, not a velocity: there is no drift term anywhere.'
+- 'lambda_chemo = 3000 transported cells into the boundary and destroyed them (9 -> 0 cells). At 200 they
+  climb and survive: mean x 15 -> 18 vs 15 -> 14.8.'
+verdict: alias
+of: chemotax
+implementation_of: chemotax
+why: |
+  Same biology as the registered `chemotax` (a cell follows -- or, with lambda<0, flees --
+  the local gradient of a diffusible field): the Keller-Segel coupling. So this is an ALIAS,
+  and `implementation_of: chemotax` so the ledger counts the contract once.
+
+  The interesting part is HOW the two implementations realize that biology, because they sit
+  on opposite sides of the "is an energy term expressible in the Plexus algebra?" question
+  this campaign exists to measure. Plexus `chemotax` EMITS a velocity `gain*grad(field)` that
+  the engine integrates into `pos`. CC3D's ChemotaxisPlugin emits NOTHING: it adds a term
+  dE_chemo = -lambda * (c(x_new) - c(x_old)) to the Potts energy of an attempted pixel copy,
+  biasing the Metropolis accept/reject toward the higher-concentration site. There is no
+  velocity and no drift anywhere in the source -- the cell's centre of mass climbs the
+  gradient only as the STATISTICAL consequence of biased copies accumulated over many attempts
+  (state_io records this honestly: the plugin writes nothing directly).
+
+  The two therefore share a contract but not a numeric routing: -lambda*(c_new - c_old) is a
+  finite-difference of the field across one lattice step, i.e. a discretized -lambda*grad(c)
+  scored per move -- the same quantity Plexus emits as a velocity, only consumed as an energy
+  bias instead of an integrated drift. Recorded as the contradiction the loop wants: Plexus has
+  no energy-term / acceptance-bias routing, so a faithful port would have to translate the
+  energy bias back into the equivalent velocity `+lambda*grad(c)`, losing the Metropolis
+  temperature-and-neighbourhood dependence (at lambda=3000 the bias overwhelmed T and drove
+  cells into the boundary until they vanished 9->0 -- a failure mode a pure velocity emitter
+  would not reproduce identically).
+
+  ARGUMENT AGAINST this verdict (the refinement I am rejecting): one could argue the acceptance
+  -bias routing is a genuinely different OUTPUT type -- an energy scalar, not a `pos` delta --
+  and that widening `chemotax` to admit an `emit: energy_bias` mode is a REFINEMENT, not a
+  free alias. I reject it because the contract is named by biology and by observable write
+  (position moves along grad(field)); the accept/reject machinery is Potts substrate shared by
+  EVERY CC3D plugin, not a property of chemotaxis, so it belongs to a future energy-routing
+  question about the engine, not to a widening of this one contract.
+contract:
+  name: chemotax
+  kind: exchange
+  family: fields
+  set: cell
+  inputs: [cell, field]
+  outputs: [cell]
+  reads: [pos, field]
+  writes: [pos]
+  maps: [field]
+status: normalized
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

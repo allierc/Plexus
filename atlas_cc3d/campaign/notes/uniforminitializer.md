@@ -44,3 +44,24 @@ Confirmed two more source-readable facts and added them to `surprises:`:
 - **Types round-trips as a comma-joined string** (`xml` L5808 → `from_xml` L5911 split-on-comma,
   spaces stripped): the ordered Python list survives only as text order, which is the only place
   any assignment ordering could live. Still does not resolve random-vs-cyclic — the draw is core-side.
+
+### normalization
+
+**Verdict: `out_of_scope`, `implementation_of: seed`.** A one-shot that runs once at MCS 0 and
+CONSTRUCTS the initial cell partition (tiles axis-aligned boxes with cubic cells of edge `width`,
+`gap` medium between them, each stamped with a palette type). It is not a per-step operator
+returning a delta over pre-existing state, so it is out of scope for the dynamical operator
+algebra whose completeness this campaign measures. It is the SAME `seed` contract its sibling
+BlobInitializer introduced — box-grid clip vs spherical-blob clip is the only difference — so it is
+counted once via `implementation_of: seed`, NOT a second `new` (BlobInitializer, this, and
+PIFInitializer are three interchangeable implementations of one initial-partition builder).
+
+**Strongest argument AGAINST:** one could hold that population seeding IS a real capability the
+algebra is simply missing — every model needs an initial partition, and CC3D exposes three
+first-class, validated, parameterized ways to build one, which is exactly the multiplicity a
+genuine contract shows; calling it "plumbing" then understates a real gap. I still favor
+`out_of_scope` because a Plexus operator is defined by returning a per-step delta the engine
+integrates over an EXISTING set/field, and IC construction has no such shape — but I typed and
+logged the `seed` contract and marked this `implementation_of` it, so that if the campaign later
+rules initialization in, the accounting is already correct and does not re-inflate on the second
+and third sightings.

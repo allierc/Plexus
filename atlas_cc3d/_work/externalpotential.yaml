@@ -1,0 +1,124 @@
+id: externalpotential
+order: 15
+raw_name: ExternalPotential
+raw_kind: Plugin (ExternalPotentialPlugin)
+code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L2874
+paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+  CompuCell3D'
+summary: |
+  A constant external body force. Each cell type carries a lambda vector (lambda_x, lambda_y,
+  lambda_z); a global lambda (applied to all types) is the fallback. Per attempted pixel copy the
+  plugin contributes an energy dE = -lambda . (x_new - x_old), which biases the Metropolis
+  acceptance so cells drift along lambda. It writes nothing to the lattice -- a Potts energy term.
+  With com_based=False (default) the force is applied per candidate pixel; with com_based=True it
+  is evaluated against the cell's centre of mass, so the whole cell is translated as a rigid drift.
+equations: |
+  dE_ext = -lambda . (x_new - x_old)
+
+  lambda        : a constant force vector, either global (lambda_x, lambda_y, lambda_z) or per
+                  cell type (ExternalPotentialParameter accessed by spec.cell_type[name]).
+  x_new, x_old  : the pixel gained vs lost by the attempted copy (com_based=False), i.e. Delta x
+                  is the copy direction; OR the change in the cell's centre of mass (com_based=True).
+  The term lowers energy for copies that move a cell down the potential gradient (along lambda),
+  so a constant lambda produces a persistent directed drift. It returns a scalar dE only -- the
+  Metropolis engine turns that bias into motion; the plugin writes no cell state.
+params:
+  lambda_x: force_x -- global x-component of the external-potential lambda vector (constructor arg).
+  lambda_y: force_y -- global y-component of the external-potential lambda vector (constructor arg).
+  lambda_z: force_z -- global z-component of the external-potential lambda vector (constructor arg).
+  cell_type: |
+    per-type lambda -- NOT a constructor arg; an ExternalPotentialParameter(cell_type, x, y, z)
+    appended via param_new / cell_type accessor. Lets each cell type carry its OWN constant force
+    vector, so different types drift in different directions -- the differential-force mode.
+  com_based: |
+    algorithm flag (default False). False = apply the force per attempted pixel copy (can spread /
+    reshape a cell along lambda, not only translate it); True = evaluate against the cell centre of
+    mass, translating the whole cell as a rigid drift.
+state_io: |
+  reads: for each attempted pixel copy, the copy direction Delta x = x_new - x_old (or the cell
+    centre of mass when com_based), and the lambda vector for the owning cell's type.
+  writes: nothing to the lattice -- changeEnergy returns a scalar dE that only biases which
+    proposed pixel copy the Metropolis engine accepts (rule 8). A constant body force, not an update.
+surprises:
+- |
+  Measured ablation: with a driving lambda the population mean x moves 32 -> 57.6, versus 32 -> 32.2
+  undriven -- a constant lambda produces a persistent directed drift of the cell centres, exactly a
+  body force / sedimentation, not a diffusive wander.
+- |
+  The force is per-CELL-TYPE: each type carries its own lambda vector (ExternalPotentialParameter),
+  so two types can be driven in OPPOSITE directions from one plugin. That differential mode is the
+  substance -- a global-only reading (lambda_x/y/z alone) misses that this is the CPM's native way
+  to impose a per-type directed drift.
+- |
+  com_based toggles WHAT the force acts on: the default (False) biases every candidate pixel, so a
+  strong field can spread or reshape a cell as well as move it; True acts on the centre of mass and
+  translates the cell rigidly. Plexus's sediment only ever translates -- the per-pixel spreading of
+  the default mode is a shape effect the drift contract does not carry.
+verdict: alias
+of: sediment
+implementation_of: null
+why: |
+  `alias` of the REGISTERED contract `sediment` (lateral/motion): a per-type constant directional
+  body force. ExternalPotential's biology IS sediment's -- attach a constant force vector to a cell
+  type and it drifts persistently along that vector; give two types opposite vectors and they
+  settle to opposite poles (the differential-sedimentation / oriented-drift use). sediment's own
+  docstring frames itself as exactly this: "a per-agent constant directional drift ... the
+  type-selectable sibling of gravity", instantiated per type via `at: 'agent[type=a]' gy: -0.1`.
+  ExternalPotential's per-type ExternalPotentialParameter(cell_type, x, y, z) is the same construct;
+  its global lambda_x/y/z mode is the degenerate all-types-equal case, which is the REGISTERED
+  contract `gravity` (a type-blind uniform body force). So this one CC3D plugin spans the pair that
+  Plexus splits into sediment (per-type) and gravity (uniform); I alias it to sediment because
+  per-type configurability is the plugin's defining, non-degenerate capability, and sediment
+  subsumes the uniform case as equal params.
+
+  WHAT DIFFERS BETWEEN THE IMPLEMENTATIONS. sediment returns a velocity delta {agent: v} that the
+  engine integrates into position; ExternalPotential returns NOTHING -- it is a Potts energy term,
+  dE = -lambda . (x_new - x_old), that only biases which proposed pixel copy the Metropolis engine
+  accepts (rule 8). Same directed-drift semantics, different mechanics (velocity delta vs
+  acceptance-probability bias). Two secondary differences, neither of which changes the contract:
+  (1) the lambda vector is 3D and sediment ships gx/gy with SUPPORTED_DIMS [2,3], so 3D is already
+  in-signature; (2) com_based=False applies the force PER PIXEL, so a strong field can spread or
+  reshape a cell, whereas sediment (and com_based=True) only translate the centre of mass. That
+  per-pixel shape effect is an artefact of the CPM's site-set representation, not a distinct
+  biological contract -- the mechanism's intent and its measured effect (mean-x drift of the cell
+  centres) are pure directed body force.
+
+  WHY NOT `new` or `refinement`. Nothing here needs a contract the registered vocabulary lacks: a
+  constant per-type directional force is precisely sediment, and its uniform special case is
+  gravity -- both already promoted. Refinement is unwarranted because no signature field of sediment
+  has to widen to admit this: direction is already a free vector, per-type selection is already the
+  intended usage, and 2D/3D is already supported. The only feature outside sediment's reach is the
+  default per-pixel (non-COM) shape spreading, and that is CPM plumbing, not a costed widening of
+  the drift contract.
+contract:
+  name: sediment
+  kind: lateral
+  family: motion
+  set: cell
+  inputs:
+  - cell (selected by type, so each type may carry its own lambda vector)
+  outputs:
+  - directed_drift (a constant directional body force along lambda; realised in CC3D as a scalar dE
+    contribution to Metropolis acceptance, NOT a written cell state and NOT engine-integrated here)
+  reads:
+  - copy_direction (Delta x = x_new - x_old of the attempted pixel copy; or the cell centre of mass
+    when com_based=True)
+  - cell_type (selects which lambda vector applies)
+  - lambda (the constant force vector, global or per type; may point any direction in 2D/3D)
+  writes:
+  - nothing to the lattice (energy term); the directed drift emerges from biased pixel-copy acceptance
+  maps:
+  - a cell is a SET of lattice sites sharing an id; a constant lambda lowers the energy of copies
+    that advance the cell along lambda, so the cell centre of mass drifts persistently in that direction
+  - per-type lambda vectors give DIFFERENTIAL drift -- two types driven oppositely settle to opposite
+    poles, the CPM analogue of differential sedimentation / an oriented symmetry break
+  - the global lambda_x/y/z mode (one vector for all types) is the type-blind degenerate case, which
+    is the sibling contract `gravity`; sediment recovers it as equal per-type params
+status: normalized
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

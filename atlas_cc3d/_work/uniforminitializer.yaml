@@ -23,14 +23,15 @@ summary: 'An initialization steppable, run once before the Metropolis dynamics s
   cell-type field of the lattice; it does not run every MCS and contributes nothing to the energy.
 
   '
-equations: "Not a numeric update -- a tiling of the lattice (RECONSTRUCTED from the emitted CC3DML\nfields + standard CC3D semantics; the Python spec only serializes, the tiling itself is compiled\ncore and UNVERIFIED here). For a region with box [pt_min, pt_max],\n\
-  cell edge w = `width`, spacing g = `gap`, each cubic cell occupies a block of sites\n  { (x0+i, y0+j,\
-  \ z0+k) : 0 <= i,j,k < w }\nand the blocks are laid on a regular grid with stride (w + g) along each\
-  \ axis, so cell\norigins are at pt_min + m*(w+g) for integer m, while the block+its trailing gap stays\
-  \ inside\nthe box. Every site of a block shares one new cell id (a cell = a set of lattice sites sharing\n\
-  an id); each new cell is assigned a type from `cell_types`. The exact type-assignment rule\n(round-robin\
-  \ vs. uniform-random over the list) is decided in the compiled core and is NOT\nvisible in this Python\
-  \ spec -- see surprises.\n"
+equations: "Not a numeric update -- a tiling of the lattice (RECONSTRUCTED from the emitted CC3DML\nfields\
+  \ + standard CC3D semantics; the Python spec only serializes, the tiling itself is compiled\ncore and\
+  \ UNVERIFIED here). For a region with box [pt_min, pt_max],\ncell edge w = `width`, spacing g = `gap`,\
+  \ each cubic cell occupies a block of sites\n  { (x0+i, y0+j, z0+k) : 0 <= i,j,k < w }\nand the blocks\
+  \ are laid on a regular grid with stride (w + g) along each axis, so cell\norigins are at pt_min + m*(w+g)\
+  \ for integer m, while the block+its trailing gap stays inside\nthe box. Every site of a block shares\
+  \ one new cell id (a cell = a set of lattice sites sharing\nan id); each new cell is assigned a type\
+  \ from `cell_types`. The exact type-assignment rule\n(round-robin vs. uniform-random over the list)\
+  \ is decided in the compiled core and is NOT\nvisible in this Python spec -- see surprises.\n"
 params:
   pt_min:
     role: region_bound_min -- minimum corner (x,y,z lattice sites) of the box to be tiled
@@ -108,12 +109,64 @@ surprises:
   so any ordering the core relies on for type assignment survives only as list order in that string.
 
   '
-verdict: null
+verdict: out_of_scope
 of: null
-implementation_of: null
-why: null
-contract: null
-status: inspected
+implementation_of: seed
+why: |
+  INITIAL-CONDITION CONSTRUCTION, not a dynamical operator -- the same shape and the same
+  verdict as its sibling BlobInitializer. Plexus operators transform state that already exists:
+  each returns a delta the engine integrates every step over a set/field that is already there.
+  UniformInitializer is the opposite shape -- a one-shot run once at MCS 0 that CONSTRUCTS the
+  starting partition (the sets themselves) from an empty lattice plus one or more axis-aligned
+  boxes, a cell `width`, a `gap`, and a type palette. In Plexus that starting partition is
+  supplied by configuration/seeding, not by any registered operator; there is nothing in the
+  frozen algebra to alias and nothing that could widen to admit set-construction without ceasing
+  to be a per-step operator. So this is framework mechanics for establishing the initial state --
+  out of scope for the OPERATOR algebra whose completeness this campaign measures.
+
+  Crucially this is NOT a new contract: it is the SAME `seed` contract the BlobInitializer entry
+  introduced, with a different tiling geometry. BlobInitializer (spherical clip), this
+  UniformInitializer (a rectangular box grid), and PIFInitializer (from a PIF file) are three
+  INTERCHANGEABLE implementations of one thing -- building the initial cell partition -- and must
+  be counted ONCE. So `implementation_of: seed`, NOT a second `new`. Counting each of a
+  framework's lattice initializers as its own contract would measure how many ways CC3D can lay
+  out a starting configuration, not whether the dynamical vocabulary is converging.
+
+  What separates this implementation from the blob one, purely as construction geometry: the clip
+  is a box (pt_min..pt_max) rather than a Euclidean sphere, so ALL non-gap tiles inside the box
+  become cells (no round boundary truncation), and there is no `center`/`radius`. One further
+  contradiction to record: unlike the blob's type draw, which CC3D convention says is a uniform
+  RANDOM per-cell draw, the UniformInitializer's type-assignment rule (round-robin vs random) is
+  NOT visible in this Python spec and lives in the compiled core -- a reimplementer of `seed`'s
+  box variant must not assume either. The closest registered contract remains `cell_divide`
+  (structural/growth); widening it to cover de-novo population seeding would do violence to its
+  biology -- division is mitosis, one parent set -> two daughters conserving material and
+  requiring a pre-existing cell, whereas seeding creates a whole population out of Medium with no
+  parent.
+contract:
+  name: seed
+  kind: structural
+  family: growth
+  set: cell
+  inputs:
+  - region_geometry (one or more axis-aligned boxes {pt_min, pt_max}, cell width, gap)
+  - cell_type_palette
+  outputs:
+  - initial_cell_partition
+  reads:
+  - lattice_geometry (Potts domain bounds, to place and validate the box grid)
+  - cell_type_registry (to resolve type-name strings)
+  writes:
+  - cell_field (fresh unique id per in-box, non-gap tile -- a new SET of width^d sites)
+  - cell_type (assigned per created cell from the palette; rule core-side, see surprises)
+  maps: |
+    (empty lattice, list of box regions {pt_min, pt_max, width, gap}, type palette)
+      -> a partition of the in-box, non-gap sites into fresh cell ids, each id a SET of
+         width^d sites laid on a regular grid with stride (width + gap) along each axis, each
+         assigned a type from the palette. Sites outside every box or in a gap lane stay Medium.
+         A one-shot construction executed once at t=0, not a per-step delta. Same `seed` contract
+         as BlobInitializer, differing only in the clip geometry (box grid vs spherical blob).
+status: normalized
 module: null
 test: null
 evidence:

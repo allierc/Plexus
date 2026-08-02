@@ -149,12 +149,73 @@ surprises:
   SecretionData path would miss that the source term can be externally driven.
 
   '
-verdict: null
+verdict: new
 of: null
-implementation_of: null
-why: null
-contract: null
-status: inspected
+implementation_of: morphogen
+why: |
+  WHAT IT IS, BIOLOGICALLY. Strip the plumbing and this solver computes ONE thing: the
+  quasi-static equilibrium concentration of a secreted, diffusible, degradable signal --
+  the developmental MORPHOGEN gradient. Its equation is the modified-Helmholtz / screened-
+  diffusion steady state D grad^2 c - k c + S = 0 (dc/dt = 0), and its screening length
+  L = sqrt(D/k) IS the classic synthesis-diffusion-degradation (SDD) morphogen decay length.
+  Given per-cell-type sources it overwrites the whole field with its t=infinity solution in a
+  single global implicit solve -- a CONSTRAINT solve, not a time step.
+
+  A SECOND SIGHTING OF `morphogen`, FIRST PROPOSED FROM jax-morph. The earlier jax-morph atlas
+  already isolated exactly this operator as the `morphogen` contract (candidate
+  jax_morph_free_screened_diffusion.py:102, "the steady-state morphogen field", solving the
+  SAME D grad^2 c - K c + S = 0). That candidate's own docstring notes TWO jax-morph numerical
+  methods for it -- a free-space Green's-function superposition (the code it runs) and the
+  paper's graph-Laplacian inverse c = (K I - D L)^{-1} S. CC3D's SteadyStateDiffusionSolver is
+  a THIRD sibling implementation of the identical biological verb: the same screened-Helmholtz
+  equilibrium, but discretised on the CPM PIXEL LATTICE and solved as a grid boundary-value
+  problem (Dirichlet/Neumann/periodic per face) by the compiled libCC3DPDESolvers.so, rather
+  than as a cell-to-cell kernel. Same contract, different substrate and boundary treatment --
+  exactly the multi-implementation shape Plexus expects. So `implementation_of: morphogen`, and
+  the verdict against the FROZEN baseline is `new` only because `morphogen` is not among the 52
+  promoted contracts yet; the ledger must count it ONCE across the two atlases, not twice.
+
+  CLOSEST REGISTERED CONTRACT, AND WHY WIDENING IT DOES VIOLENCE. The nearest promoted contract
+  is `diffuse` (field->field, one explicit Laplacian step; its sibling DiffusionSolverFE in this
+  atlas is correctly a refinement/implementation_of diffuse). But `diffuse` cannot be widened to
+  admit this without breaking what it IS. `diffuse` is a TRANSIENT operator: it returns one
+  local finite-difference/heat-kernel step of dc/dt = D grad^2 c that the engine INTEGRATES over
+  time; the transient IS its meaning, and DiffusionSolverFE decomposes cleanly into the sequential
+  composite diffuse -> decay -> deposit because those explicit updates commute step-to-step. The
+  steady-state solver is the OPPOSITE temporal semantics: no dt, no per-step delta, no integration
+  -- it returns the t=infinity FIXED POINT in one global implicit solve, and the three terms
+  (transport, decay, source) are solved SIMULTANEOUSLY as one coupled elliptic system, not applied
+  in sequence. You cannot express "solve the coupled Helmholtz BVP for its equilibrium" as
+  diffuse-then-decay-then-deposit; running diffuse to convergence would give the transient
+  approach, and the guide (diffusion_solvers_descr.py:24) explicitly warns it is "not a direct
+  substitution for Diffusion Solver FE". Forcing a "solve-to-steady-state" mode into `diffuse`
+  would overload a per-step transport verb with a global equilibration verb -- two different
+  biological idealisations (finite-rate transport vs. quasi-static gradient). `morphogen` is the
+  right home precisely because it names the equilibrium-field idealisation directly.
+contract:
+  name: morphogen
+  kind: exchange
+  family: fields
+  set: cell
+  inputs:
+  - cell
+  - field
+  outputs:
+  - field
+  reads:
+  - per-cell-type secretion rate S (the SecretionData source term -- the only channel through
+    which cell geometry/type enters the solve)
+  - the CPM cell-id / cell-type lattice, used ONLY to place S(x) at the pixels of secreting cells
+  - global diffusion coefficient D (diff_global) and global decay/degradation rate k (decay_global);
+    the medium is homogeneous (no per-type D_i/k_i here, unlike DiffusionSolverFE)
+  - per-face boundary conditions (Dirichlet value / Neumann flux / periodic) and an optional
+    initial-field guess (init_expression / init_filename)
+  writes:
+  - the concentration field c over ALL lattice sites, OVERWRITTEN in place with the t=infinity
+    equilibrium solution of D grad^2 c - k c + S = 0 (a whole-field REPLACE, not an integrable delta)
+  maps:
+  - grid_bvp
+status: normalized
 module: null
 test: null
 evidence:

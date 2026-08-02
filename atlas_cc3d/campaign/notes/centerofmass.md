@@ -36,3 +36,28 @@ the precise ordering of the gaining-vs-losing-cell moment updates within one acc
 incremental-watcher model is inferred from CC3D's CellGChangeWatcher architecture and the CellG
 data members, not read line-by-line. No evidence run exists (not among evidence.py's six), so
 all of the above is source-only -- no measured ablation backs it.
+
+## centerofmass -- normalized
+
+**Verdict: alias of `aggregate`** (implementation_of: aggregate). CC3D's CenterOfMass is the
+centroid reduction applied per cell: reduce a cell's owned lattice sites (children) onto the
+cell (parent) by the occupancy-weighted mean of their positions, publishing that mean as the
+cell's read-only derived position. Same typed shape as the registered `aggregate` centroid
+(aggregate.py: children -> parent along the containment map, reads child `pos` + occupancy as
+the weight, writes parent `pos`, returns no integrable delta); with occupancy 1 per site the
+weighted mean degenerates to CC3D's plain coordinate mean, so no signature field widens.
+Incremental accumulation and the raw first moment `xCM` are implementation/intermediate detail;
+`xCOMPrev` is side bookkeeping (a cell-velocity readout is a separate concern). The nearest
+OTHER contract, `momentofinertia`, is the sibling second-moment reduction -- a different
+aggregate output, not this one.
+
+**Strongest argument against (that this is a `refinement`, not an alias):** the periodic-boundary
+unwrap. CC3D unwraps coordinates against the BoundaryStrategy before summing and re-wraps `xCOM`
+into [0, L); the Plexus `aggregate` does a naive weighted mean that would place a seam-straddling
+cell's COM near the lattice centre. One could argue the centroid contract must WIDEN to carry a
+boundary/topology parameter to admit periodic domains, making this a refinement that breaks the
+current topology-blind implementation. I booked it alias because that correction changes the
+reduction's *domain*, not its typed signature (inputs/outputs/reads/writes/maps untouched) -- an
+implementation obligation of the same contract on a wrapped lattice. But honestly, "silent
+wrong/stale COM on a periodic lattice" is exactly the unspecified precondition a refinement is
+meant to force into the open, and a reviewer could book it that way.

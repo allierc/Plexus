@@ -9,8 +9,8 @@ paper_section: 'No dedicated paper section — PixelTracker is an infrastructure
 
   Cell Biol 110:325-366. Checkable source anchors: PyCoreSpecs.py:L5311
 
-  (spec), cc3d/cpp/CompuCell.py:6002 (class PixelTrackerPlugin(CellGChangeWatcher);
-  field3DChange def at :6010, enableMediumTracker at :6031 -- verified at source),
+  (spec), cc3d/cpp/CompuCell.py:6002 (class PixelTrackerPlugin(CellGChangeWatcher); field3DChange def
+  at :6010, enableMediumTracker at :6031 -- verified at source),
 
   doc/code_ref cpp/CompuCell/plugins/PixelTrackerPlugin.rst, and the consumer
 
@@ -143,12 +143,55 @@ surprises:
   pixel set of every cell.
 
   '
-verdict: null
+verdict: out_of_scope
 of: null
 implementation_of: null
-why: null
-contract: null
-status: inspected
+why: |
+  Pure derived-index / observer, no biological content. The plugin returns no energy delta,
+  writes no cell-id lattice site and no field, and touches no term of the Hamiltonian: Delta H
+  = 0 always, so a simulation with it loaded is bit-identical to one without (confirmed at
+  source -- PyCoreSpecs.py:5311 is a spec whose only effect is emitting an optional
+  <TrackMedium/> element; the incremental update is a CellGChangeWatcher, CompuCell.py:6002,
+  that only edits a per-cell cache on each ACCEPTED copy). Its sole product is the inverse of
+  the cell_field: the CPM lattice stores site -> cell id, and PixelTracker materialises and
+  keeps live the cell id -> {sites} map so downstream tools (MomentOfInertia, whole-cell
+  move/delete, per-cell secretion) can enumerate a cell's pixels in O(|cell|) rather than
+  rescanning the whole lattice. That is a spatial index, not a process.
+
+  The closest registered contract is `radius_graph` (also rewire/topology, also index-only,
+  also emits no integrable delta -- src/plexus/operators/graph.py), and this entry is ruled the
+  same way its direct sibling BoundaryPixelTracker was (also out_of_scope). But radius_graph
+  earns its place by building the RELATION over the elements of a set (who-interacts-with-whom),
+  the substrate every lateral message-passing operator runs on. PixelTracker builds no relation
+  among cells; it merely reifies set membership -- which of the lattice's sites belong to which
+  cell id -- a distinction that exists only because a CC3D cell IS a set of lattice sites and
+  the lattice alone gives you only site -> id, not id -> {sites}.
+
+  The genuine temptation here (flagged in surprises) is that PixelTracker reifies the ATLAS's
+  OWN framing of a cell as a set of sites, so one could argue the algebra is MISSING an explicit
+  "index / inverse-map over a field partition" contract and this is `new`. I reject that: in the
+  promoted Plexus representation a cell is a first-class element (a point/particle with a set
+  identity), and set membership is PRIMITIVE -- there is no scalar cell-id field to invert,
+  because the partition IS the data structure, not a derived view of a lattice. An operator
+  whose whole job is to reconstruct the primitive representation from a lower-level encoding has
+  no biological content the language could name; it is representation-specific plumbing that
+  collapses to nothing once the representation is a partition rather than a labelled lattice.
+  Hence out_of_scope, not new (and deliberately not aliased to radius_graph, which would let
+  acceleration caches inflate the vocabulary count).
+contract:
+  name: pixel_index
+  kind: rewire
+  family: topology
+  set: cell
+  inputs: []
+  outputs:
+  - pixel_set
+  reads:
+  - cell_id_lattice
+  writes:
+  - cell.pixels
+  maps: []
+status: normalized
 module: null
 test: null
 evidence:

@@ -1,0 +1,103 @@
+id: celltype
+order: 5
+raw_name: CellType
+raw_kind: Plugin (CellTypePlugin)
+code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L1793
+paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
+  CompuCell3D'
+summary: CellType Plugin specs
+equations: 'A labelling: each cell id sigma carries a type tau(sigma). Medium is type 0 and is not a cell.'
+params:
+  cell_types: |
+    the enumerated PALETTE of cell-type names paired with integer ids -- the closed vocabulary
+    of tau values a simulation may use. Medium is always (Medium, 0) and cannot be renumbered.
+    NOT a per-cell assignment: this lists the valid types, it does not say which cell is which.
+  frozen: |
+    per-type boolean (emitted as the <Freeze/> attribute); a frozen type's cells are excluded
+    from the Metropolis pixel-copy sweep, i.e. an immovable boundary condition / obstacle.
+    (Inferred CC3D semantics; the Python spec only writes the flag, the effect is compiled-core.)
+state_io: |
+  Writes nothing dynamical. CellTypePlugin DECLARES a registry: the (name, id, frozen) triples
+  for the type palette, plus the fixed (Medium, 0, False) entry. It contributes no term to the
+  Hamiltonian and returns no delta. The actual per-cell tau(sigma) assignment is performed
+  elsewhere (BlobInitializer / UniformInitializer draw a type per created cell -- see the
+  blobinitializer entry's "SEED-DEPENDENT random type draw" surprise); this plugin only fixes
+  the set of legal values those draws select from. Almost every other plugin (contact/adhesion,
+  chemotaxis-by-type, volume/surface targets keyed by type) READS this registry to resolve a
+  type-name string to the id it keys its per-type parameters on.
+surprises:
+- 'Medium being a TYPE rather than the absence of a cell is load-bearing: contact energies with Medium
+  are what set a tissue''s surface tension against empty space.'
+- |
+  CellTypePlugin does NOT assign types to cells -- it only enumerates the legal types. A reader
+  expecting an operator that sets tau(sigma) finds instead a pure schema declaration; the
+  assignment lives in the initializers and is seed-dependent and random. So the "mechanism" is a
+  vocabulary table, not a process, and it is bit-for-bit dynamics-neutral on its own.
+- |
+  Type ids auto-increment from max(existing)+1 when omitted (PyCoreSpecs.py:L1902-1903), so the
+  numeric tau of a type depends on DECLARATION ORDER unless every id is given explicitly. Two
+  models that list the same type names in a different order can key their per-type contact matrix
+  on different integers -- a silent reproducibility trap when parameters are indexed by id.
+- |
+  The per-type Freeze flag (PyCoreSpecs.py:L1825-1826) smuggles a genuine dynamical effect into
+  what is otherwise a declaration: freezing a type turns its cells into fixed obstacles the Potts
+  sweep never updates. That effect is a boundary condition, not a property of "being typed" --
+  further evidence the plugin bundles schema with an unrelated mechanic.
+verdict: out_of_scope
+of: null
+implementation_of: null
+why: |
+  CellTypePlugin carries no dynamical, integrable content: it declares the PALETTE of legal cell
+  types -- (name, id, frozen) triples, with (Medium, 0) fixed -- and nothing more. It returns no
+  energy delta, touches no term of the Hamiltonian, and does not even perform the per-cell type
+  assignment (the initializers do that, randomly and seed-dependently -- see blobinitializer). A
+  simulation's dynamics are unchanged by WHICH names label the types; only downstream plugins that
+  read the registry to resolve type-keyed parameters (contact energy, per-type chemotaxis, volume
+  targets) give the labels their effect. So this is the type SCHEMA -- the closed vocabulary of
+  tau values -- which the promoted Plexus algebra already presupposes as a first-class per-agent
+  attribute: selectors like `agent[type=a]` read `type` directly, and no registered operator
+  creates, changes, or declares it. There is therefore nothing to alias (no operator types cells)
+  and nothing to widen (a schema is not a per-step operator). Counting a framework's type-registry
+  declaration as a contract would measure how CC3D names its cell classes, not whether the
+  dynamical vocabulary is converging.
+
+  The genuinely biological concept adjacent to this is DIFFERENTIATION -- a cell acquiring or
+  changing its fate/type over time. The closest thing the language has to that is the jax-morph
+  proposal `regulate` (gene/fate-state update), not any registered contract. But CellTypePlugin
+  implements no such dynamic: it never changes a cell's type, it only enumerates the legal ones.
+  Aliasing it to a (still-unpromoted) `regulate`, or minting a `new` `differentiate`, would put a
+  contract behind a verb this mechanism does not perform -- the opposite error from missing a real
+  operator. If and when a CC3D mechanism that MUTATES tau(sigma) at runtime appears, THAT is where
+  `differentiate`/`regulate` should be earned; this static declaration is not it.
+
+  The contract below is recorded only to document the honest typed shape IF one insisted the type
+  labelling belonged inside the algebra -- a structural partition of the cell set into typed
+  subpopulations. Its `kind: structural` / `family: hierarchy` is a forced fit (and the reason it
+  is exempt from the writes-nothing no-op rule), not a claim that CellType is an operator.
+contract:
+  name: differentiate
+  kind: structural
+  family: hierarchy
+  set: cell
+  inputs:
+  - type_palette (list of (name, id) with Medium=0 fixed)
+  - frozen_flags (per-type immovability)
+  outputs:
+  - typed_partition_of_the_cell_set
+  reads:
+  - cell_id_field (the set of cells to be labelled)
+  writes:
+  - cell.type (the per-cell tau label -- the attribute every type-keyed operator selects on)
+  maps: |
+    (a set of cells, a closed palette of type names/ids) -> a labelling that assigns each cell id
+    exactly one tau in the palette, partitioning the set into typed subpopulations, with tau=0
+    (Medium) reserved for empty lattice. A one-shot declaration/labelling, not a per-step delta;
+    downstream operators read cell.type but this contract never updates it once set.
+status: normalized
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

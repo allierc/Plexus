@@ -43,3 +43,23 @@
 - Made `paper_section` honest: no extracted paper text exists; anchored to the docstring
   (PyCoreSpecs.py:5351) and compiled class (cpp/CompuCell.py:9002), and explicitly flagged the
   Swat page/section as UNREAD rather than citing a page I have not seen.
+
+## Normalizer verdict
+- **`refinement` of `aggregate`** (`of: aggregate`, `implementation_of: aggregate`). CenterOfMass
+  was aliased to `aggregate` as the centroid (first-moment) reduction; MomentOfInertia is the
+  SECOND-moment sibling of the *same* children→parent reduction (identical kind/family/set/input/
+  map). It is not a plain alias because two signature fields must widen: WRITES (position →
+  second-moment shape tensor + ecc/semiaxes/orientation) and READS (it takes the moment ABOUT the
+  COM, so it newly reads `cell.pos`). Not `new` because that would double-count the same reduction
+  family and corrupt the saturation curve — the whole point CenterOfMass's alias was protecting.
+- **Strongest argument AGAINST refinement (for `new`):** the OUTPUT is qualitatively different in
+  kind, not degree. Centroid publishes a location; MomentOfInertia publishes cell SHAPE and
+  ORIENTATION — an observable no promoted contract produces, consumed by a distinct downstream class
+  (oriented growth/cellsort). One could argue "shape reduction" is its own biological contract
+  (measuring cell morphology) rather than a widened `aggregate`, since widening aggregate to cover
+  any statistical moment risks turning it into a catch-all "reduce children to anything" bucket that
+  measures our naming laziness rather than the language. I rejected `new` because the children→parent
+  reduction structure IS aggregate and both outputs are literally moments of the same site set (0th/
+  1st → mean position, 2nd → shape tensor); the honest refinement is to admit higher moments, not to
+  fork a near-identical contract. But this is the closest call in the campaign and a reasonable
+  reviewer could land on `new`.

@@ -3,98 +3,184 @@ order: 6
 raw_name: CenterOfMass
 raw_kind: Plugin (CenterOfMassPlugin)
 code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L3056
-paper_section: |
-  Swat et al. (2012) Methods Cell Biol 110:325-366. NO dedicated section: CenterOfMass is
-  plumbing, not a named mechanism in the chapter; the paper only invokes a cell's centre of
+paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366. NO dedicated section: CenterOfMass is
+
+  plumbing, not a named mechanism in the chapter; the paper only invokes a cell''s centre of
+
   mass indirectly, via COM-based chemotaxis and the "CenterOfMassBased" external-potential
+
   algorithm. We have no extracted paper text for this target, so the only anchors I could
+
   actually check are in the source: the class docstring at PyCoreSpecs.py:3056 and the
+
   autoclass stub at doc/code_ref/user/build/core/PyCoreSpecs.rst:169.
-summary: |
-  A per-cell lattice monitor (a CellGChangeWatcher), NOT an energy term. It maintains each
-  cell's centre of mass. It has no dynamics of its own and contributes nothing to the Potts
+
+  '
+summary: 'A per-cell lattice monitor (a CellGChangeWatcher), NOT an energy term. It maintains each
+
+  cell''s centre of mass. It has no dynamics of its own and contributes nothing to the Potts
+
   Hamiltonian: it never changes the probability that a proposed pixel copy is accepted. On
+
   every accepted spin-flip it updates, for the gaining and losing cell, the accumulated first
-  moment of the cell's lattice sites and divides by the live site count (volume) to store the
+
+  moment of the cell''s lattice sites and divides by the live site count (volume) to store the
+
   centre of mass on the CellG struct. Its whole purpose is to publish derived state that OTHER
+
   mechanisms read (COM-based chemotaxis, CenterOfMassBased external potential, mitosis split
+
   orientation, connectivity).
-equations: |
-  A cell is a set S of lattice sites r = (x, y, z) sharing one cell id; volume V = |S| is the
-  site count. The plugin maintains two distinct fields per cell (both live on CellG):
 
-    first moment (raw coordinate sum):   xCM = sum over r in S of x   (likewise yCM, zCM)
-    centre of mass (normalized):         xCOM = xCM / V               (likewise yCOM, zCOM)
-
-  These are updated INCREMENTALLY, not recomputed. When an accepted copy adds site r to a cell
-  and removes it from its neighbour, the watcher does, per affected cell:
-
-    add a site r:     xCM += x ;  V += 1 ;  then  xCOM = xCM / V
-    remove a site r:  xCM -= x ;  V -= 1 ;  then  xCOM = xCM / V   (guard V == 0)
-
-  A third field, xCOMPrev/yCOMPrev/zCOMPrev, holds the centre of mass from the previous update
-  so that consumers can form a per-MCS cell displacement d = COM - COMPrev (cell velocity).
-
-  Symbols: xCM = code field CellG.xCM (first moment); xCOM = code field CellG.xCOM (= moment /
-  volume). The two names are NOT interchangeable.
-
-  Periodic-boundary caveat: for a cell straddling a wrap seam the naive coordinate sum is
-  wrong; the core unwraps coordinates against the BoundaryStrategy before accumulating, then
-  re-wraps xCOM back into [0, L). That correction lives in the compiled C++ core (see
-  surprises); I could NOT read its exact form, so the formulae above are the ordinary
-  (non-periodic) case as the data model implies it, not a transcription of the wrap arithmetic.
+  '
+equations: "A cell is a set S of lattice sites r = (x, y, z) sharing one cell id; volume V = |S| is the\n\
+  site count. The plugin maintains two distinct fields per cell (both live on CellG):\n\n  first moment\
+  \ (raw coordinate sum):   xCM = sum over r in S of x   (likewise yCM, zCM)\n  centre of mass (normalized):\
+  \         xCOM = xCM / V               (likewise yCOM, zCOM)\n\nThese are updated INCREMENTALLY, not\
+  \ recomputed. When an accepted copy adds site r to a cell\nand removes it from its neighbour, the watcher\
+  \ does, per affected cell:\n\n  add a site r:     xCM += x ;  V += 1 ;  then  xCOM = xCM / V\n  remove\
+  \ a site r:  xCM -= x ;  V -= 1 ;  then  xCOM = xCM / V   (guard V == 0)\n\nA third field, xCOMPrev/yCOMPrev/zCOMPrev,\
+  \ holds the centre of mass from the previous update\nso that consumers can form a per-MCS cell displacement\
+  \ d = COM - COMPrev (cell velocity).\n\nSymbols: xCM = code field CellG.xCM (first moment); xCOM = code\
+  \ field CellG.xCOM (= moment /\nvolume). The two names are NOT interchangeable.\n\nPeriodic-boundary\
+  \ caveat: for a cell straddling a wrap seam the naive coordinate sum is\nwrong; the core unwraps coordinates\
+  \ against the BoundaryStrategy before accumulating, then\nre-wraps xCOM back into [0, L). That correction\
+  \ lives in the compiled C++ core (see\nsurprises); I could NOT read its exact form, so the formulae\
+  \ above are the ordinary\n(non-periodic) case as the data model implies it, not a transcription of the\
+  \ wrap arithmetic.\n"
 params: {}
 state_io:
-  reads: |
-    - the location r = (x, y, z) of the pixel whose id changed on the accepted copy
-    - the affected cells' current volume V (site count) and current xCM/yCM/zCM
+  reads: '- the location r = (x, y, z) of the pixel whose id changed on the accepted copy
+
+    - the affected cells'' current volume V (site count) and current xCM/yCM/zCM
+
     (No CC3DML parameters: the plugin is parameterless. It emits only
+
     <Plugin Name="CenterOfMass"/> with no child elements or attributes.)
-  writes: |
-    - CellG.xCM, yCM, zCM  -- first moments (accumulated coordinate sums)
+
+    '
+  writes: '- CellG.xCM, yCM, zCM  -- first moments (accumulated coordinate sums)
+
     - CellG.xCOM, yCOM, zCOM  -- centre of mass ( = moment / volume )
+
     - CellG.xCOMPrev, yCOMPrev, zCOMPrev  -- previous-update centre of mass (for displacement)
+
     Writes NO energy / acceptance delta -- it is a pure state-derivation monitor.
+
     Does NOT write the inertia tensor iXX..iZZ; that is the separate MomentOfInertia plugin
+
     (PyCoreSpecs.py:5350). From Python these COM fields are READ-ONLY: the SWIG setters
+
     (CompuCell.py:595-628) raise AttributeError on assignment.
+
+    '
 surprises:
-  - |
-    Not a Hamiltonian term. Almost every CC3D plugin in this inventory is an energy contribution
-    that only tilts the acceptance probability. CenterOfMass returns no delta-E and never
-    influences which pixel copies are accepted; it is a CellGChangeWatcher that only derives
-    per-cell bookkeeping. A reimplementer expecting an energy contract will find none -- in the
-    Plexus algebra this reads more like a REDUCE over a set (moment, then divide) that publishes
-    a derived field, not an operator that returns a force/energy delta.
-  - |
-    Two different fields, easy to conflate: xCM (raw first moment = coordinate sum) versus xCOM
-    (= xCM / volume). The moment must be carried incrementally; dividing a stored sum by a stale
-    volume gives the wrong COM. xCOM is derived and read-only.
-  - |
-    Periodic-boundary correction. For a cell that straddles a periodic seam a plain coordinate
-    sum places the COM in the middle of the lattice instead of at the cell. CC3D unwraps
-    coordinates against the BoundaryStrategy before summing and re-wraps xCOM into the lattice.
-    This is the single subtlety most likely to be gotten wrong, and it lives in the unshipped
-    compiled core -- I could not read the exact arithmetic, only infer that it happens.
-  - |
-    Unguarded prerequisite. The Python spec makes CenterOfMass depend only on
-    [PottsCore, CellTypePlugin] (the base depends_on, PyCoreSpecs.py:305) and NOTHING in the
-    spec framework declares a depends_on CenterOfMass. Yet COM-based Chemotaxis and the
-    "CenterOfMassBased" ExternalPotential algorithm (PyCoreSpecs.py:2939) silently READ xCOM.
-    Omitting this plugin passes spec validation but yields zero/stale COM at runtime.
-  - |
-    xCOMPrev means the tracker also underwrites cell velocity: displacement per MCS is
-    COM - COMPrev. There is no separate "velocity" mechanism; that state is a side effect of
-    this plugin keeping a one-step history.
-  - |
-    Division-by-zero guard: when a cell loses its final pixel V hits 0 and the cell is slated
-    for removal; the xCOM = xCM / V step must be guarded or skipped for that cell.
-verdict: null
-of: null
-implementation_of: null
-why: null
-contract: null
-status: inspected
+- 'Not a Hamiltonian term. Almost every CC3D plugin in this inventory is an energy contribution
+
+  that only tilts the acceptance probability. CenterOfMass returns no delta-E and never
+
+  influences which pixel copies are accepted; it is a CellGChangeWatcher that only derives
+
+  per-cell bookkeeping. A reimplementer expecting an energy contract will find none -- in the
+
+  Plexus algebra this reads more like a REDUCE over a set (moment, then divide) that publishes
+
+  a derived field, not an operator that returns a force/energy delta.
+
+  '
+- 'Two different fields, easy to conflate: xCM (raw first moment = coordinate sum) versus xCOM
+
+  (= xCM / volume). The moment must be carried incrementally; dividing a stored sum by a stale
+
+  volume gives the wrong COM. xCOM is derived and read-only.
+
+  '
+- 'Periodic-boundary correction. For a cell that straddles a periodic seam a plain coordinate
+
+  sum places the COM in the middle of the lattice instead of at the cell. CC3D unwraps
+
+  coordinates against the BoundaryStrategy before summing and re-wraps xCOM into the lattice.
+
+  This is the single subtlety most likely to be gotten wrong, and it lives in the unshipped
+
+  compiled core -- I could not read the exact arithmetic, only infer that it happens.
+
+  '
+- 'Unguarded prerequisite. The Python spec makes CenterOfMass depend only on
+
+  [PottsCore, CellTypePlugin] (the base depends_on, PyCoreSpecs.py:305) and NOTHING in the
+
+  spec framework declares a depends_on CenterOfMass. Yet COM-based Chemotaxis and the
+
+  "CenterOfMassBased" ExternalPotential algorithm (PyCoreSpecs.py:2939) silently READ xCOM.
+
+  Omitting this plugin passes spec validation but yields zero/stale COM at runtime.
+
+  '
+- 'xCOMPrev means the tracker also underwrites cell velocity: displacement per MCS is
+
+  COM - COMPrev. There is no separate "velocity" mechanism; that state is a side effect of
+
+  this plugin keeping a one-step history.
+
+  '
+- 'Division-by-zero guard: when a cell loses its final pixel V hits 0 and the cell is slated
+
+  for removal; the xCOM = xCM / V step must be guarded or skipped for that cell.
+
+  '
+verdict: alias
+of: aggregate
+implementation_of: aggregate
+why: |
+  CenterOfMass IS the `aggregate` centroid reduction, applied per cell. In the Plexus
+  registry `aggregate` (aggregate.py) reduces a contained child set onto its parent by the
+  occupancy-weighted mean of the children's positions -- "a cell's position = the centroid of
+  its particles" -- and writes that mean back as the parent's derived `pos`, returning no
+  integrable delta (MAY_MUTATE_INTEGRATED_STATE, returns {}). CC3D's CenterOfMass does exactly
+  this with the Cellular-Potts identification child=lattice site, parent=cell: it accumulates
+  the coordinate sum over a cell's sites and divides by the site count (volume) to publish
+  xCOM on the CellG struct, writing no energy / acceptance delta. Same typed shape
+  (children -> parent along the containment map), same reads (child positions + occupancy as
+  the weight), same write (parent position as a read-only derived readout), same kind/family
+  (aggregate / hierarchy). Every site carries occupancy 1, so the occupancy-weighted mean of
+  the aggregate contract degenerates to the plain coordinate mean CC3D computes -- no signature
+  field has to widen, so this is an alias, not a refinement.
+
+  It is a genuinely distinct IMPLEMENTATION of that one contract, hence implementation_of:
+  aggregate. Two implementation differences, neither of which touches the typed signature:
+  (1) CC3D maintains the moment INCREMENTALLY on each accepted spin-flip (xCM += x; V += 1;
+  xCOM = xCM/V) rather than recomputing the full index_add each forward pass -- an efficiency
+  choice, identical result. (2) CC3D unwraps coordinates against the BoundaryStrategy so a cell
+  straddling a periodic seam gets a COM at the cell and not at the lattice centre; the Plexus
+  centroid does a plain weighted mean with no periodic-topology awareness. That periodic
+  correction is a property of the reduction's domain, not a change to its inputs/outputs/reads/
+  writes/maps, so it is an implementation obligation of the aggregate contract on a wrapped
+  lattice, not a new or widened contract. Likewise the raw first moment xCM is just the
+  un-normalized intermediate of the same reduction, and xCOMPrev (one-step COM history, from
+  which consumers form a per-MCS displacement = cell velocity) is a side bookkeeping field; a
+  velocity readout is a separate concern and does not oblige the centroid contract to grow a
+  history slot. The closest OTHER contract is `momentofinertia` (the sibling second-moment
+  reduction), but that reduces to a tensor about the COM and is a different aggregate output,
+  not this one.
+contract:
+  name: aggregate
+  kind: aggregate
+  family: hierarchy
+  set: cell
+  inputs:
+  - site (the contained lattice-site child set; each site carries occupancy 1)
+  outputs:
+  - cell (the parent whose derived position is published)
+  reads:
+  - site.pos (the (x, y, z) coordinate of each lattice site the cell owns)
+  - site.occupancy / cell.volume (the site count, the reduction weight and the divisor)
+  writes:
+  - cell.pos (centre of mass = coordinate sum / volume; a read-only derived readout, no
+    energy / acceptance delta)
+  maps:
+  - parent
+status: normalized
 module: null
 test: null
 evidence:

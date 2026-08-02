@@ -57,3 +57,24 @@ get_copy_of_cell_pixels (def 2584, raises 2603) and move_cell (def 2509, raises
 delete_cell (def 2636) raises only INDIRECTLY through get_copy_of_cell_pixels; and
 line 469 is merge_cells (def 458), which raises its own Exception "…did you load
 PixelTracker plugin?" — NOT move_cell. Entry's third surprise updated to match.
+
+## Normalizer verdict
+
+Verdict: **out_of_scope**, contract `pixel_index` (rewire/topology, set=cell). PixelTracker
+is a pure derived-index/observer: Delta H = 0, bit-identical simulation with or without it, its
+only product the live cell id -> {sites} inverse of the cell_field. Ruled the same way its
+direct sibling BoundaryPixelTracker was (that one indexes only the boundary subset; this one the
+full interior set) — a spatial index / acceleration cache, not a process, so it must not count
+toward the language's vocabulary.
+
+Strongest argument AGAINST out_of_scope: this is the one tracker plugin that reifies the ATLAS's
+OWN premise — "a cell is a set of lattice sites sharing an id." So unlike a neighbour-list cache,
+one can argue Plexus really is MISSING a first-class "invert a field partition into per-element
+membership sets" contract, and that inverse-map IS a nameable topological operation (it is what
+lets any per-cell geometry operator exist at all). If Plexus ever represented cells AS labelled
+lattice/voxel fields rather than as particles, this operator would be load-bearing and `new`, not
+plumbing. I reject it only because in the PROMOTED representation the partition is primitive (a
+cell already is a set with identity; there is no scalar cell-id field to invert), so the operator
+reconstructs something the representation gives for free and carries no biological content the
+language could name. That rejection is contingent on the representation, not on the mechanism —
+worth flagging, because a future voxel-based Plexus backend would flip this verdict.

@@ -3,69 +3,189 @@ order: 18
 raw_name: LengthConstraint
 raw_kind: Plugin (LengthConstraintPlugin)
 code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L3924
-paper_section: |
-  Swat et al. (2012) Methods Cell Biol 110:325-366, sec. "Cell Length / Elongation
+paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366, sec. "Cell Length / Elongation
+
   constraint". No extracted paper text available; the checkable anchors are the compiled
-  plugin's symbol table (libCC3DLengthConstraint.so) and the CC3DML-generator description at
+
+  plugin''s symbol table (libCC3DLengthConstraint.so) and the CC3DML-generator description at
+
   twedit5/Plugins/CC3DMLGenerator/CC3DMLGeneratorBase.py:L340-346.
-summary: |
-  An energy term (Cellular-Potts plugin), not a state update. It penalises the deviation of a
-  cell's ELONGATION (the length of its equivalent-ellipse major axis, derived from the cell's
+
+  '
+summary: 'An energy term (Cellular-Potts plugin), not a state update. It penalises the deviation of a
+
+  cell''s ELONGATION (the length of its equivalent-ellipse major axis, derived from the cell''s
+
   moments of inertia about its centre of mass) from a per-cell-type target length, so that a
+
   proposed pixel copy that stretches a cell toward its target length is favoured and one that
+
   over/under-stretches it is opposed. In 3D (or when MinorTargetLength is set) the minor axis is
+
   independently constrained to a second target. Combined with a Volume constraint it drives cells
+
   into elongated / rod shapes. The plugin returns a delta energy for the acceptance test; it
+
   writes no cell field.
-equations: |
-  Metropolis acceptance (Potts core, unchanged by this plugin):
-    P(accept copy) = 1 if dE <= 0 else exp(-dE / T)
-  This plugin contributes to dE only. For a cell whose current major-axis length is L and target
-  L0, with stiffness lambda_L (symbol spring_energy(d,d,d) in the .so; toString/getTargetLength/
-  getLambdaLength accessors), the length-constraint energy is a quadratic (Hookean) spring:
-    E_length(cell) = lambda_L * (L - L0)^2
-  and, when a minor target l0 is set (3D):
-    E_length(cell) = lambda_L * (L - L0)^2  +  lambda_L * (l - l0)^2
-  where L (and l) is the length of the semi-major (semi-minor) axis of the ellipse/ellipsoid with
-  the SAME moments of inertia as the cell's pixel set about its centre of mass. The plugin
-  computes dE = E_after - E_before over the two cells touched by the candidate pixel copy, using
-  the incremental change in the inertia tensor from adding/removing that one pixel.
-  CAVEAT: the exact eigenvalue->length conversion (how L is read off the inertia-tensor
-  eigenvalues) lives in the compiled core; no C++/paper source was available here, so the
-  quadratic FORM above is confirmed (spring_energy symbol + generator text) but the length
-  formula itself is inferred, not read.
+
+  '
+equations: "Metropolis acceptance (Potts core, unchanged by this plugin):\n  P(accept copy) = 1 if dE\
+  \ <= 0 else exp(-dE / T)\nThis plugin contributes to dE only. For a cell whose current major-axis length\
+  \ is L and target\nL0, with stiffness lambda_L (symbol spring_energy(d,d,d) in the .so; toString/getTargetLength/\n\
+  getLambdaLength accessors), the length-constraint energy is a quadratic (Hookean) spring:\n  E_length(cell)\
+  \ = lambda_L * (L - L0)^2\nand, when a minor target l0 is set (3D):\n  E_length(cell) = lambda_L * (L\
+  \ - L0)^2  +  lambda_L * (l - l0)^2\nwhere L (and l) is the length of the semi-major (semi-minor) axis\
+  \ of the ellipse/ellipsoid with\nthe SAME moments of inertia as the cell's pixel set about its centre\
+  \ of mass. The plugin\ncomputes dE = E_after - E_before over the two cells touched by the candidate\
+  \ pixel copy, using\nthe incremental change in the inertia tensor from adding/removing that one pixel.\n\
+  CAVEAT: the exact eigenvalue->length conversion (how L is read off the inertia-tensor\neigenvalues)\
+  \ lives in the compiled core; no C++/paper source was available here, so the\nquadratic FORM above is\
+  \ confirmed (spring_energy symbol + generator text) but the length\nformula itself is inferred, not\
+  \ read.\n"
 params:
   cell_type:
-    role: "target_selector: name of the cell type this constraint applies to (validated against CellTypePlugin)"
+    role: 'target_selector: name of the cell type this constraint applies to (validated against CellTypePlugin)'
   target_length:
-    role: "target_length: rest length L0 of the cell's MAJOR axis (equivalent-ellipse), in lattice units"
+    role: 'target_length: rest length L0 of the cell''s MAJOR axis (equivalent-ellipse), in lattice units'
   lambda_length:
-    role: "constraint_stiffness: coefficient lambda_L of the quadratic length-deviation penalty (spring constant)"
+    role: 'constraint_stiffness: coefficient lambda_L of the quadratic length-deviation penalty (spring
+      constant)'
   minor_target_length:
-    role: "target_length_minor: rest length l0 of the MINOR axis; Optional. Per the CC3DML generator this is intended for/emitted only in 3D simulations (CC3DMLGeneratorBase.py:L376-377); None => minor axis unconstrained"
+    role: 'target_length_minor: rest length l0 of the MINOR axis; Optional. Per the CC3DML generator this
+      is intended for/emitted only in 3D simulations (CC3DMLGeneratorBase.py:L376-377); None => minor
+      axis unconstrained'
 state_io:
   reads:
-    - "cell pixel set (volume) and its moments of inertia about the centre of mass (requires the CenterOfMass plugin; present in every LengthConstraint test XML)"
-    - "the candidate pixel copy (source/target Point3D and the two involved Cell*), to compute the incremental inertia-tensor change"
-    - "per-cell LengthConstraintData extra member (targetLength, lambdaLength, minorTargetLength) OR the per-cell-type defaults; local-flex values can be set at runtime via setLengthConstraintData(cell, lambda, target[, minor])"
-    - "lattice dimensionality/orientation, to dispatch changeEnergy_xy / _xz / _yz / _3D"
+  - cell pixel set (volume) and its moments of inertia about the centre of mass (requires the CenterOfMass
+    plugin; present in every LengthConstraint test XML)
+  - the candidate pixel copy (source/target Point3D and the two involved Cell*), to compute the incremental
+    inertia-tensor change
+  - per-cell LengthConstraintData extra member (targetLength, lambdaLength, minorTargetLength) OR the
+    per-cell-type defaults; local-flex values can be set at runtime via setLengthConstraintData(cell,
+    lambda, target[, minor])
+  - lattice dimensionality/orientation, to dispatch changeEnergy_xy / _xz / _yz / _3D
   writes:
-    - "none from changeEnergy: this is an energy term, it only returns dE and changes the acceptance probability, it does not write any cell field"
-    - "(out of band) a steppable may WRITE the per-cell LengthConstraintData via setLengthConstraintData; that is host-driven state, not part of the energy evaluation"
+  - 'none from changeEnergy: this is an energy term, it only returns dE and changes the acceptance probability,
+    it does not write any cell field'
+  - (out of band) a steppable may WRITE the per-cell LengthConstraintData via setLengthConstraintData;
+    that is host-driven state, not part of the energy evaluation
 surprises:
-  - "This is an ENERGY term, not an update: changeEnergy returns a delta and mutates nothing. Forcing it into read/write update language misrepresents it."
-  - "It depends on the CenterOfMass plugin (moments of inertia). Length is a DERIVED quantity from the inertia tensor, not a stored field; without CenterOfMass the length is undefined."
-  - "The .so exports _get_non_nan_energy(double): there is an explicit NaN guard on the energy. Degenerate cells (single pixel, zero/undefined inertia) give a NaN length; a naive reimplementation that skips this guard will inject NaN into dE and corrupt the acceptance test."
-  - "Dispatch by lattice geometry: separate changeEnergy_xy / changeEnergy_xz / changeEnergy_yz / changeEnergy_3D functions are selected by which plane a 2D lattice lies in (or 3D). A reimplementer assuming a single formula misses that the length is measured in the active plane."
-  - "MinorTargetLength is documented as a 3D (minor-axis) parameter (generator emits it only when sim_3d_flag), but the Python spec and the C++ setter accept it in 2D too. The Python API is more permissive than the intended physics."
-  - "Fragmentation guard is external, not built in: the CC3DML generator warns 'to prevent cell fragmentation for large elongations you need to also use connectivity constraint' (CC3DMLGeneratorBase.py:L345). LengthConstraint alone can tear a cell apart; correctness depends on co-running Connectivity/ConnectivityGlobal (present in the elongationFlex test XML)."
-  - "Two parameter scopes: values can be per-cell-type (LengthEnergyParameters via the plugin) OR per-cell (LengthConstraintData extra member set from Python). setLengthConstraintData signature is (cell, lambdaLength, targetLength[, minor]) -- lambda FIRST, target SECOND, which is the reverse of the constructor's (target_length, lambda_length) order (see PyCoreSpecs.py:L3853 vs the steppable call in elongationFlexSteppables.py:L12). Easy to transpose."
-verdict: null
+- 'This is an ENERGY term, not an update: changeEnergy returns a delta and mutates nothing. Forcing it
+  into read/write update language misrepresents it.'
+- It depends on the CenterOfMass plugin (moments of inertia). Length is a DERIVED quantity from the inertia
+  tensor, not a stored field; without CenterOfMass the length is undefined.
+- 'The .so exports _get_non_nan_energy(double): there is an explicit NaN guard on the energy. Degenerate
+  cells (single pixel, zero/undefined inertia) give a NaN length; a naive reimplementation that skips
+  this guard will inject NaN into dE and corrupt the acceptance test.'
+- 'Dispatch by lattice geometry: separate changeEnergy_xy / changeEnergy_xz / changeEnergy_yz / changeEnergy_3D
+  functions are selected by which plane a 2D lattice lies in (or 3D). A reimplementer assuming a single
+  formula misses that the length is measured in the active plane.'
+- MinorTargetLength is documented as a 3D (minor-axis) parameter (generator emits it only when sim_3d_flag),
+  but the Python spec and the C++ setter accept it in 2D too. The Python API is more permissive than the
+  intended physics.
+- 'Fragmentation guard is external, not built in: the CC3DML generator warns ''to prevent cell fragmentation
+  for large elongations you need to also use connectivity constraint'' (CC3DMLGeneratorBase.py:L345).
+  LengthConstraint alone can tear a cell apart; correctness depends on co-running Connectivity/ConnectivityGlobal
+  (present in the elongationFlex test XML).'
+- 'Two parameter scopes: values can be per-cell-type (LengthEnergyParameters via the plugin) OR per-cell
+  (LengthConstraintData extra member set from Python). setLengthConstraintData signature is (cell, lambdaLength,
+  targetLength[, minor]) -- lambda FIRST, target SECOND, which is the reverse of the constructor''s (target_length,
+  lambda_length) order (see PyCoreSpecs.py:L3853 vs the steppable call in elongationFlexSteppables.py:L12).
+  Easy to transpose.'
+verdict: new
 of: null
 implementation_of: null
-why: null
-contract: null
-status: inspected
+why: |
+  NEW against the frozen baseline: no PROMOTED contract constrains a cell's SHAPE. This is a
+  quadratic restoring spring on a cell's ELONGATION -- the length of the semi-major axis of the
+  equivalent ellipse (read off the eigenvalues of the cell's inertia tensor about its COM) --
+  toward a per-type or per-cell target. Nothing in the 42 registered contracts reads a
+  second-moment shape descriptor of a set and returns an energy that grows with its deviation
+  from a rest value. I name the missing contract `elongate`.
+
+  CLOSEST PROMOTED contract = cell_grow (structural/growth). It is the nearest because it, too,
+  is a per-cell, target-driven geometric homeostasis. But widening cell_grow to admit this does
+  violence on three independent counts:
+    1. QUANTITY. cell_grow targets the 0th moment -- SIZE (rest volume / site count), isotropic.
+       elongate targets the 2nd moment -- the ANISOTROPY / aspect (major-axis extent), which is
+       independent of area: a cell can hit its target length by thinning to a filament at fixed
+       volume (indeed the reference sim must add Volume + Connectivity to stop exactly that).
+       Size homeostasis and shape homeostasis are different biology.
+    2. MECHANISM. cell_grow is a STATE UPDATE: the engine integrates a rest-volume delta and the
+       cell physically grows. elongate is a Potts ENERGY term -- changeEnergy returns a scalar dE
+       and mutates NOTHING; it only re-weights the acceptance probability of a proposed pixel
+       copy. Forcing an integrated growth update to also mean "return a dE that gates a Metropolis
+       accept" changes cell_grow's output contract and breaks every current user.
+    3. DEPENDENCY. elongate's length is a DERIVED quantity requiring the inertia tensor (the
+       CenterOfMass plugin); it has no stored field. cell_grow reads a scalar target it owns.
+
+  NOT an alias/refinement of anything else in the baseline. The interaction family
+  (attraction_repulsion, cohesion, separation, squared_law, stillinger_weber, ...) is pairwise
+  and metric over neighbours; elongate reads a SINGLE cell's own pixel set, no partner. gravity
+  (lateral/mechanics) is the precedent for a single-body mechanics energy, which is why the
+  contract is filed lateral/mechanics, but gravity is a uniform body force, not a shape spring.
+
+  RELATIONSHIP TO THE VOLUME CONSTRAINT (its normalized-later sibling) recorded honestly: both
+  are quadratic springs on a per-cell geometric moment -- Volume on the 0th, Length on the 2nd.
+  One could lump them as a single "geometric target spring" contract parameterised by moment
+  order (see the note's counter-argument). I keep them distinct: the Volume constraint's biology
+  (size homeostasis) maps onto the existing cell_grow rest-volume target, whereas shape/elongation
+  has no home in the language at all. Collapsing "any quadratic on any moment" into one contract
+  would erase that distinction -- the naming inflation this campaign exists to avoid, in reverse.
+
+  NOT a second sighting of any jax-morph-proposed contract (adhere, agitate, apoptose,
+  mechanosense, morphogen, regulate, relax, reorient): none is a shape/elongation energy.
+  `reorient` concerns polarity DIRECTION, not shape magnitude; `relax` (meaning unread) is not
+  evidenced to be an inertia-tensor shape spring, so I do not claim it. implementation_of: null.
+
+  The campaign-flagged shape stands: this is a Potts ENERGY term, not a state update. Whether the
+  Plexus algebra can express a restoring energy over a set's emergent second-moment shape
+  descriptor whose output gates a Metropolis accept rather than integrating is the open question
+  `elongate` leaves standing.
+contract:
+  name: elongate
+  kind: lateral
+  family: mechanics
+  set: cell
+  inputs: |
+    - one cell's pixel set and its moments of inertia about the centre of mass (supplied by the
+      CenterOfMass plugin); the semi-major axis length L is read off the inertia-tensor
+      eigenvalues, and the semi-minor axis length l when a minor target is set (3D / plane).
+    - the proposed single-pixel copy (source/target Point3D, the two involved cells), used to
+      recompute the inertia tensor incrementally at +/-1 volume for the two cells it touches.
+    - the target(s) and stiffness: target_length L0, optional minor_target_length l0,
+      lambda_length -- taken from the per-cell LengthConstraintData extra member if present, else
+      the per-cell-type default.
+    - the lattice dimensionality / active plane, selecting changeEnergy_xy/_xz/_yz/_3D.
+  outputs: |
+    - a scalar energy contribution dE added to the Potts total, NOT an integrated state delta:
+      dE = E_after - E_before, with E(cell) = lambda_L*(L - L0)^2 (+ lambda_L*(l - l0)^2 when a
+      minor target is set), summed over the two cells the candidate copy changes. A NaN-guarded
+      length is used so degenerate (single-pixel / undefined-inertia) cells do not corrupt dE.
+      The delta only re-weights the Metropolis acceptance probability; the operator writes no
+      cell property.
+  reads: |
+    - the cell's pixel set / volume and its inertia tensor about the COM (xCM/yCM/zCM); length is
+      derived from this, not stored.
+    - per-cell LengthConstraintData (targetLength, lambdaLength, minorTargetLength) OR the per-type
+      LengthEnergyParameters default.
+    - the candidate pixel copy and the involved cells, for the incremental inertia-tensor change.
+    - lattice dimensionality / active plane.
+  writes: |
+    - NONE. changeEnergy returns dE (an energy term) and mutates no cell field; it changes only
+      the acceptance probability of the proposed pixel copy.
+    - (out of band, not part of this contract) a host steppable may WRITE per-cell
+      LengthConstraintData via setLengthConstraintData(cell, lambda, target[, minor]) -- note
+      lambda-first, target-second, the reverse of the CC3DML attribute order. That is host-driven
+      state-setting, not the energy evaluation.
+  maps: |
+    - cell inertia tensor about COM -> eigenvalues -> semi-major axis length L (and semi-minor l);
+      the exact eigenvalue->length scale factor lives in compiled core and is unread (form
+      confirmed, constant inferred).
+    - shape deviation (L - L0) [and (l - l0)] -> quadratic Hookean energy lambda_L*(dev)^2 per
+      cell -> summed over the two cells a candidate copy touches -> dE that gates the Metropolis
+      accept. Straight-to-target -> low energy; over/under-stretched -> higher energy.
+status: normalized
 module: null
 test: null
 evidence:

@@ -146,12 +146,102 @@ surprises:
   boundary conditions. The plugin also force-loads the CenterOfMass plugin on init.
 
   '
-verdict: null
+verdict: new
 of: null
 implementation_of: null
-why: null
-contract: null
-status: inspected
+why: |
+  NEW against the frozen baseline: no PROMOTED contract is a BENDING STIFFNESS -- an angular
+  energy over an ORDERED chain of cells that penalises curvature and drives a linked filament
+  toward straight. The registered interaction family (attraction_repulsion, cohesion,
+  separation, squared_law, signal, velocity_align) is pairwise and metric; none reads a triple
+  of consecutive bonded cells and returns an energy that grows with how much the chain bends.
+
+  CLOSEST PROMOTED contract = stillinger_weber (lateral/interaction), the ONLY registered
+  three-body angular term. It is genuinely close: SW penalises deviation of a bond angle from a
+  preferred cosine, (cos_jik - cos0)^2, and with cos0 = -1 (theta0 = 180 deg) that IS a
+  straightness/bending penalty. So the raw functional idea -- "angular energy with a preferred
+  angle" -- overlaps. But widening stillinger_weber to admit Curvature does violence to its
+  biology and its signature on two independent counts:
+    1. TOPOLOGY. SW builds its OWN isotropic min-image neighbour list each tick and sums over
+       ALL geometric triples i-j-k within a cutoff -- it has no notion of an ordered backbone.
+       Bending stiffness of a FILAMENT requires selecting only the CONSECUTIVE triples along a
+       maintained, ordered 1D bond graph (left/mid/right, up to 3 hops each side). Applied to a
+       blob, SW-with-cos0=-1 would penalise every bent geometric triple everywhere, not
+       straighten a defined chain. To cover Curvature, SW's signature must change from "reads
+       pos, builds own neighbours" to "reads an EXTERNAL ordered bond graph it does not
+       maintain" -- a new required input that breaks every current SW user (mW water, silicon).
+    2. FORM + OUTPUT. Curvature's per-triple energy is the Menger curvature
+       kappa = 2 sin(theta)/|chord| = 1/R_circ (LINEAR in curvature), not SW's squared cosine;
+       and it is a Potts changeEnergy (a Metropolis accept/reject contribution) rather than an
+       autograd Newtonian force. The form difference alone would be "just an implementation,"
+       but combined with the maintained-chain requirement it is a different contract.
+  So this is not an interchangeable implementation of stillinger_weber; implementation_of is
+  left null. The biology SW captures is a tetrahedral-network directional bond angle over
+  geometric neighbours; the biology here is the flexural rigidity of a semiflexible chain over
+  a defined backbone -- a distinct, missing contract I name `stiffen`.
+
+  NOT a second sighting of any jax-morph-proposed contract (adhere, agitate, apoptose,
+  mechanosense, morphogen, regulate, relax, reorient): none is an angular/bending stiffness.
+
+  HYBRID CAVEAT recorded honestly: this ONE plugin fuses TWO mechanisms. The primary one, and
+  the one this contract captures, is the bending stiffness. The SECOND is a stateful junction
+  GROWER -- a topology REWIRE that biases a bond-forming move by activation_energy and commits
+  the bond in the accepted-move watcher (within-cluster, listed types, under max_junctions, no
+  existing bond, within neighbor_order). That half resembles radius_graph (rewire/topology) but
+  is energy-biased and cluster-gated; it is the machinery that BUILDS the chain the stiffness
+  acts on, not the stiffness itself, so it is noted in writes:/maps: and surprises rather than
+  driving the verdict. A faithful port needs both halves, but the new CONTRACT the language is
+  missing is `stiffen`.
+
+  The campaign-flagged shape stands: changeEnergy is a Potts ENERGY term, not a state update --
+  it returns a scalar dE (recomputing affected COMs at +/-1 volume) and mutates no cell
+  property; only the accepted-move watcher mutates topology. Whether the algebra can express a
+  bending energy over a maintained ordered chain whose output gates a Metropolis accept rather
+  than integrating is the open question `stiffen` leaves standing.
+contract:
+  name: stiffen
+  kind: lateral
+  family: interaction
+  set: cell
+  inputs: |
+    - a triple of three CONSECUTIVE junction-linked cells of a chain (COMs L, M, R) with their
+      volumes, drawn from the cell's maintained bond graph (up to 3 hops each side of a change)
+    - the proposed single-pixel copy at target site t (gaining cell volume+1, losing cell
+      volume-1; affected COMs recomputed via precalculateCentroid)
+    - for a bond-forming move: the cell-id lattice around t and the partner cell's type,
+      clusterId and current junction count
+  outputs: |
+    - a scalar energy contribution dE added to the Potts total, NOT an integrated state delta:
+      dE = sum over affected triples of lambda * (kappa_after - kappa_before), where
+      kappa = 2 sin(theta_M)/|R-L| is the Menger curvature of the triple (0 for a straight
+      chain). lambda = per-type-pair curvature modulus, looked up by the triple's FIRST pair.
+    - ALTERNATIVELY, for a move that would create a new within-cluster junction, a fixed offset
+      dE = activation_energy (typically negative, favouring bond formation) in place of the
+      curvature delta.
+  reads: |
+    - center of mass (xCM/yCM/zCM) and volume of the changed cell and of its junction neighbours
+      up to 3 hops each side along the chain
+    - each cell's junction set (CurvatureTracker.internalCurvatureNeighbors, extra attributes)
+    - cell type and clusterId
+    - the cell-id lattice around pt (getNeighborDirect up to neighbor_order) when scouting a
+      new junction partner
+  writes: |
+    - the bending-energy contract itself writes NO cell state; changeEnergy returns dE (an
+      energy term), changing only the acceptance probability of the proposed pixel copy.
+    - the plugin's accepted-move watcher (field3DChange) DOES mutate TOPOLOGY as a side effect
+      distinct from this contract: it inserts a new junction into both cells'
+      internalCurvatureNeighbors sets on an accepted bond-forming move, and erases all bonds of
+      a cell whose volume reached 0. This is a rewire aspect (near radius_graph), not part of
+      the stiffness signature.
+  maps: |
+    - chain angle theta_M at the middle cell -> Menger curvature kappa = 2 sin(theta_M)/|chord|
+      -> per-triple energy lambda * kappa (straight -> 0, more bent -> larger); the whole-chain
+      bending energy is the sum over consecutive triples, and the move delta is the sum over the
+      up-to-5 affected triples spanning 3 hops each side of the change.
+    - junction-partner candidacy (same clusterId, both types listed, both under max_junctions,
+      no existing bond, partner within neighbor_order lattice shells) -> a fixed activation_energy
+      bias on the bond-forming move.
+status: normalized
 module: null
 test: null
 evidence:

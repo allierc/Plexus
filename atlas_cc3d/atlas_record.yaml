@@ -144,12 +144,116 @@ mechanisms:
     listing order, and the by-name and by-index accessors must agree on that order.
 
     '
-  verdict: null
+  verdict: new
   of: null
-  implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  implementation_of: adhere
+  why: '`new` against the FROZEN baseline (no registered contract covers molecule-mediated cell-cell
+
+    adhesion), and `implementation_of: adhere` -- this is a SECOND SIGHTING of `adhere`, a contract
+
+    first PROPOSED by the jax-morph atlas (still unpromoted, so not in the frozen 42/52). Setting
+
+    implementation_of lets the ledger count `adhere` ONCE across the two repositories instead of
+
+    re-minting it here; without it the saturation curve would double-count and measure our naming
+
+    habits, not the language.
+
+
+    WHAT IT IS. AdhesionFlex is the pure differential-adhesion energy of the Cellular Potts model.
+
+    Across every cross-boundary lattice-site pair it adds a contact energy that is a double sum over
+
+    the two owners'' carried adhesion-molecule densities times a user binding matrix k_mn (with an
+
+    explicit leading minus, so a positive k is ADHESIVE). Biologically that is cadherin-style
+
+    surface-molecule adhesion driving cell sorting -- exactly `adhere`''s content. It owns a mutable
+
+    per-cell (and per-Medium) density VECTOR seeded from a per-type declaration, retunable by a
+
+    steppable mid-run and copied to daughters at mitosis; that per-cell coupling is the `adhere`
+
+    read, the CPM analogue of a per-cell cadherin concentration feeding a pair''s well depth.
+
+
+    WHY NOT alias/refinement of a REGISTERED contract. The closest registered contracts are the
+
+    lateral/interaction pair rules `cohesion` and `attraction_repulsion`. Both EMIT a force
+
+    (`acceleration`) on a point particle and WRITE `position` after the engine integrates it.
+
+    AdhesionFlex writes NOTHING: it is a Potts energy term whose changeEnergy() returns a scalar dE
+
+    that only biases which proposed pixel-copy the Metropolis engine accepts (rule 8). Its `set` is a
+
+    cell that IS a set of lattice sites, its interaction is counted over shared BOUNDARY site-pairs
+
+    (not centre distance), and there is no repulsive core at all (excluded volume is CompuCell3D''s
+
+    separate Volume constraint). To host it, cohesion/attraction_repulsion would not merely widen a
+
+    field -- they would have to swap their output type (energy bias, not force), their set
+
+    representation (site-set, boundary counting), and drop position writes: that is replacing the
+
+    contract''s semantics, i.e. violence, not a costed widening.
+
+
+    WHY NOT alias attraction_repulsion the way jax-morph''s Morse was. Morse maps to
+
+    `attraction_repulsion` because it carries BOTH a repulsive core (excluded volume) and an adhesive
+
+    tail. AdhesionFlex carries ONLY the adhesion, so it maps to the pure-adhesion contract `adhere`.
+
+    Plain Contact is the canonical `adhere` implementation (a static J(type,type'') table);
+
+    AdhesionFlex is the per-cell-state, data-kernel generalisation of that same contract, so it is
+
+    `implementation_of: adhere`, not a distinct contract.
+
+
+    SCOPE / OPEN. The muParser binding kernel (AdhesionFunc, default min) makes the combining
+
+    function DATA rather than a fixed op -- an implementation freedom below the contract, not a new
+
+    contract. The (1-delta) restriction is written over cell TYPES in the library HTML but over cell
+
+    IDs in changeEnergy; I could not run the compiled core to settle it, so it is recorded as an
+
+    unresolved source discrepancy, not folded into the signature. No oracle/ablation run exists yet.
+
+    '
+  contract:
+    name: adhere
+    kind: lateral
+    family: interaction
+    set: cell
+    inputs:
+    - cell
+    outputs:
+    - contact_energy (a scalar dE contribution to the Metropolis acceptance of a proposed pixel copy;
+      NOT a cell state and NOT a force -- this operator writes nothing back to the lattice)
+    reads:
+    - cell_id (sigma at each of two neighbouring lattice sites, to keep only cross-boundary pairs via
+      1-delta)
+    - cell_type (seeds the per-cell density vector at init)
+    - adhesion_molecule_density (the per-cell/per-Medium mutable density VECTOR N_m(sigma); the adhesion
+      coupling)
+    - binding_matrix (k_mn pairwise binding affinities; may be negative)
+    - binding_kernel (the muParser combining formula AdhesionFunc over the two densities; default min)
+    - neighbour shells (site pairs within neighbor_order adjacency)
+    writes:
+    - nothing to the lattice (energy term). Side channel only -- the plugin maintains its own per-cell
+      density vector, which steppables set at runtime and mitosis copies to daughters.
+    maps:
+    - a cell is a SET of lattice sites sharing an id; adhesion energy is summed over neighbouring cross-boundary
+      site pairs (owners differ), so contact area emerges from boundary site counts
+    - per boundary pair, energy = -sum over molecule pairs (m,n) of k_mn * AdhesionFunc(N_m(sigma_i),
+      N_n(sigma_j)); positive k lowers energy (adhesive), opposite sign sense to the plain Contact J matrix
+    - differential adhesion / cell sorting emerges from type- and molecule-dependent binding, with the
+      per-cell density vector making adhesion individually steerable and heritable across division
+  status: normalized
   module: null
   test: null
   evidence:
@@ -327,12 +431,73 @@ mechanisms:
     region overwrite an earlier one''s sites?) is compiled-core behavior, NOT established here.
 
     '
-  verdict: null
+  verdict: out_of_scope
   of: null
   implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  why: 'INITIAL-CONDITION CONSTRUCTION, not a dynamical operator. Plexus operators transform state
+
+    that already exists -- each returns a delta the engine integrates every step over a set/field
+
+    that is already there. BlobInitializer is the opposite shape: a one-shot that runs once at
+
+    MCS 0 and CONSTRUCTS the starting partition (the sets themselves) from an empty lattice plus a
+
+    geometric region and a type palette. In Plexus that starting partition is supplied by
+
+    configuration/seeding, not by any registered operator; there is nothing in the algebra to
+
+    alias, and nothing that could widen to admit set-construction without ceasing to be a per-step
+
+    operator. So this is framework mechanics for establishing the initial state -- out of scope for
+
+    the OPERATOR algebra whose completeness this campaign measures. Counting each of a framework''s
+
+    lattice initializers as a contract would measure how many ways CC3D can lay out a starting
+
+    configuration, not whether the dynamical vocabulary is converging.
+
+
+    It is NOT a mere serializer: the compiled steppable genuinely writes the cell field, and it is
+
+    one of a FAMILY -- BlobInitializer (this, a blob), UniformInitializer (a box grid),
+
+    PIFInitializer (from a PIF file) -- three interchangeable ways to build the same thing: the
+
+    initial partition. If one insisted IC construction belongs inside the algebra, the honest
+
+    reading is a SINGLE `seed` contract (typed below) with those three as implementations, counted
+
+    once -- never three separate `new` contracts. The closest registered contract is `cell_divide`
+
+    (structural/growth), but widening it to cover de-novo population seeding would do violence to
+
+    its biology: division is mitosis, one parent set -> two daughters, conserving material and
+
+    requiring a pre-existing cell; seeding creates a whole population out of Medium with no parent.
+
+    '
+  contract:
+    name: seed
+    kind: structural
+    family: growth
+    set: cell
+    inputs:
+    - region_geometry (center, radius, cell width, gap)
+    - cell_type_palette
+    outputs:
+    - initial_cell_partition
+    reads:
+    - lattice_geometry (domain bounds, to place and clip the grid)
+    - cell_type_registry (to resolve type-name strings)
+    writes:
+    - cell_field (fresh unique id per in-blob tile -- a new SET of sites)
+    - cell_type (random draw from the palette per created cell)
+    maps: "(empty lattice, blob region {center, radius, width, gap}, type palette)\n  -> a partition of\
+      \ the in-blob, non-gap sites into fresh cell ids, each id a SET of\n     width^d sites (truncated\
+      \ at the sphere boundary), each assigned a type drawn uniformly\n     at random (Potts-seed dependent)\
+      \ from the palette. Sites outside the sphere or in a gap\n     lane stay Medium. A one-shot construction\
+      \ executed once at t=0, not a per-step delta.\n"
+  status: normalized
   module: null
   test: null
   evidence:
@@ -456,12 +621,65 @@ mechanisms:
     and how 2nd+-order sets in pixelSetMap relate to the default-order pixelSet.
 
     '
-  verdict: null
+  verdict: out_of_scope
   of: null
   implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  why: 'Pure acceleration structure, no biological content. The plugin returns no energy delta,
+
+    writes no cell-id lattice site and no field, and touches no term of the Hamiltonian -- a
+
+    simulation with it loaded is bit-identical to one without (confirmed at source: PyCoreSpecs.py
+
+    L5270-5308 is a spec whose only effect is emitting an optional <NeighborOrder> element; the
+
+    incremental update lives in the compiled tracker and only maintains the index). Its sole
+
+    product is a per-cell cache of which of that cell''s own lattice sites lie on its surface, so
+
+    that OTHER mechanisms (Curvature, FocalPointPlasticity, contact/surface queries) can avoid
+
+    rescanning every pixel of every cell. That is a spatial index -- the cellular-Potts analog of a
+
+    neighbour-list / cell-list -- not a process.
+
+
+    The closest registered contract is `radius_graph` (also rewire/topology, also index-only,
+
+    also emits no integrable delta -- src/plexus/operators/graph.py). But radius_graph earns its
+
+    place by building the RELATION over the elements of a set (who-interacts-with-whom), which is
+
+    the substrate every lateral message-passing operator runs on. BoundaryPixelTracker builds no
+
+    relation among cells; it classifies a single cell''s OWN sub-elements (boundary pixel vs
+
+    interior pixel), a distinction that exists only because a CC3D cell IS a set of lattice sites.
+
+    Plexus cells are points/particles with a derived radius and have no per-cell pixel set, so
+
+    there is nothing here to alias, refine, or promote -- the concept collapses to nothing in the
+
+    promoted representation. It is representation-specific plumbing, hence out_of_scope. (Not
+
+    aliased to radius_graph precisely because calling it that would let acceleration caches count
+
+    toward the language''s vocabulary.)
+
+    '
+  contract:
+    name: boundary_index
+    kind: rewire
+    family: topology
+    set: cell
+    inputs: []
+    outputs:
+    - boundary_pixel_set
+    reads:
+    - cell_id_lattice
+    writes:
+    - cell.boundary_pixels
+    maps: []
+  status: normalized
   module: null
   test: null
   evidence:
@@ -566,12 +784,40 @@ mechanisms:
     default is -- unknown from this environment -- not 7.
 
     '
-  verdict: null
+  verdict: out_of_scope
   of: null
   implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  why: 'BoxWatcher carries NO biological content: it recomputes the axis-aligned bounding box of all non-medium
+    cells (plus fixed per-axis margins) each step and hands it to the Potts solver so pixel-copy attempts
+    are drawn only from the occupied region -- the docstring''s own justification is "May speed up calculations".
+    It writes the Metropolis SAMPLER''s spatial support, not any cell, field, or energy delta, and is
+    meant to be dynamics-preserving. The closest registered contract is `aggregate` (both reduce the whole
+    cell set to one global quantity) and the TYPED SHAPE here genuinely is a set-to-global reduction;
+    but the reduced quantity is a solver control parameter with no biological referent (a hierarchy `aggregate`
+    produces a parent tissue node, not a sampling window). Admitting it as a biological operator -- `new`
+    or an `aggregate` alias -- would inflate the yield with framework mechanics and corrupt the saturation
+    measurement, so it is out_of_scope. The contract below is recorded only to document the reduction
+    shape; its `family: hierarchy` is a forced fit, not a claim that BoxWatcher builds a hierarchy.
+
+    '
+  contract:
+    name: sweep_scope
+    kind: aggregate
+    family: hierarchy
+    set: cell
+    inputs:
+    - XMargin
+    - YMargin
+    - ZMargin
+    outputs:
+    - box_min
+    - box_max
+    reads:
+    - cell.lattice_site_extents
+    writes:
+    - potts.sweep_bounds
+    maps: []
+  status: normalized
   module: null
   test: null
   evidence:
@@ -590,17 +836,148 @@ mechanisms:
   equations: 'A labelling: each cell id sigma carries a type tau(sigma). Medium is type 0 and is not a
     cell.'
   params:
-    cell_types: type_labels
-  state_io: 'reads/writes: the per-cell type label'
+    cell_types: 'the enumerated PALETTE of cell-type names paired with integer ids -- the closed vocabulary
+
+      of tau values a simulation may use. Medium is always (Medium, 0) and cannot be renumbered.
+
+      NOT a per-cell assignment: this lists the valid types, it does not say which cell is which.
+
+      '
+    frozen: 'per-type boolean (emitted as the <Freeze/> attribute); a frozen type''s cells are excluded
+
+      from the Metropolis pixel-copy sweep, i.e. an immovable boundary condition / obstacle.
+
+      (Inferred CC3D semantics; the Python spec only writes the flag, the effect is compiled-core.)
+
+      '
+  state_io: 'Writes nothing dynamical. CellTypePlugin DECLARES a registry: the (name, id, frozen) triples
+
+    for the type palette, plus the fixed (Medium, 0, False) entry. It contributes no term to the
+
+    Hamiltonian and returns no delta. The actual per-cell tau(sigma) assignment is performed
+
+    elsewhere (BlobInitializer / UniformInitializer draw a type per created cell -- see the
+
+    blobinitializer entry''s "SEED-DEPENDENT random type draw" surprise); this plugin only fixes
+
+    the set of legal values those draws select from. Almost every other plugin (contact/adhesion,
+
+    chemotaxis-by-type, volume/surface targets keyed by type) READS this registry to resolve a
+
+    type-name string to the id it keys its per-type parameters on.
+
+    '
   surprises:
   - 'Medium being a TYPE rather than the absence of a cell is load-bearing: contact energies with Medium
     are what set a tissue''s surface tension against empty space.'
-  verdict: null
+  - 'CellTypePlugin does NOT assign types to cells -- it only enumerates the legal types. A reader
+
+    expecting an operator that sets tau(sigma) finds instead a pure schema declaration; the
+
+    assignment lives in the initializers and is seed-dependent and random. So the "mechanism" is a
+
+    vocabulary table, not a process, and it is bit-for-bit dynamics-neutral on its own.
+
+    '
+  - 'Type ids auto-increment from max(existing)+1 when omitted (PyCoreSpecs.py:L1902-1903), so the
+
+    numeric tau of a type depends on DECLARATION ORDER unless every id is given explicitly. Two
+
+    models that list the same type names in a different order can key their per-type contact matrix
+
+    on different integers -- a silent reproducibility trap when parameters are indexed by id.
+
+    '
+  - 'The per-type Freeze flag (PyCoreSpecs.py:L1825-1826) smuggles a genuine dynamical effect into
+
+    what is otherwise a declaration: freezing a type turns its cells into fixed obstacles the Potts
+
+    sweep never updates. That effect is a boundary condition, not a property of "being typed" --
+
+    further evidence the plugin bundles schema with an unrelated mechanic.
+
+    '
+  verdict: out_of_scope
   of: null
   implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  why: 'CellTypePlugin carries no dynamical, integrable content: it declares the PALETTE of legal cell
+
+    types -- (name, id, frozen) triples, with (Medium, 0) fixed -- and nothing more. It returns no
+
+    energy delta, touches no term of the Hamiltonian, and does not even perform the per-cell type
+
+    assignment (the initializers do that, randomly and seed-dependently -- see blobinitializer). A
+
+    simulation''s dynamics are unchanged by WHICH names label the types; only downstream plugins that
+
+    read the registry to resolve type-keyed parameters (contact energy, per-type chemotaxis, volume
+
+    targets) give the labels their effect. So this is the type SCHEMA -- the closed vocabulary of
+
+    tau values -- which the promoted Plexus algebra already presupposes as a first-class per-agent
+
+    attribute: selectors like `agent[type=a]` read `type` directly, and no registered operator
+
+    creates, changes, or declares it. There is therefore nothing to alias (no operator types cells)
+
+    and nothing to widen (a schema is not a per-step operator). Counting a framework''s type-registry
+
+    declaration as a contract would measure how CC3D names its cell classes, not whether the
+
+    dynamical vocabulary is converging.
+
+
+    The genuinely biological concept adjacent to this is DIFFERENTIATION -- a cell acquiring or
+
+    changing its fate/type over time. The closest thing the language has to that is the jax-morph
+
+    proposal `regulate` (gene/fate-state update), not any registered contract. But CellTypePlugin
+
+    implements no such dynamic: it never changes a cell''s type, it only enumerates the legal ones.
+
+    Aliasing it to a (still-unpromoted) `regulate`, or minting a `new` `differentiate`, would put a
+
+    contract behind a verb this mechanism does not perform -- the opposite error from missing a real
+
+    operator. If and when a CC3D mechanism that MUTATES tau(sigma) at runtime appears, THAT is where
+
+    `differentiate`/`regulate` should be earned; this static declaration is not it.
+
+
+    The contract below is recorded only to document the honest typed shape IF one insisted the type
+
+    labelling belonged inside the algebra -- a structural partition of the cell set into typed
+
+    subpopulations. Its `kind: structural` / `family: hierarchy` is a forced fit (and the reason it
+
+    is exempt from the writes-nothing no-op rule), not a claim that CellType is an operator.
+
+    '
+  contract:
+    name: differentiate
+    kind: structural
+    family: hierarchy
+    set: cell
+    inputs:
+    - type_palette (list of (name, id) with Medium=0 fixed)
+    - frozen_flags (per-type immovability)
+    outputs:
+    - typed_partition_of_the_cell_set
+    reads:
+    - cell_id_field (the set of cells to be labelled)
+    writes:
+    - cell.type (the per-cell tau label -- the attribute every type-keyed operator selects on)
+    maps: '(a set of cells, a closed palette of type names/ids) -> a labelling that assigns each cell
+      id
+
+      exactly one tau in the palette, partitioning the set into typed subpopulations, with tau=0
+
+      (Medium) reserved for empty lattice. A one-shot declaration/labelling, not a per-step delta;
+
+      downstream operators read cell.type but this contract never updates it once set.
+
+      '
+  status: normalized
   module: null
   test: null
   evidence:
@@ -740,12 +1117,87 @@ mechanisms:
     for removal; the xCOM = xCM / V step must be guarded or skipped for that cell.
 
     '
-  verdict: null
-  of: null
-  implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  verdict: alias
+  of: aggregate
+  implementation_of: aggregate
+  why: 'CenterOfMass IS the `aggregate` centroid reduction, applied per cell. In the Plexus
+
+    registry `aggregate` (aggregate.py) reduces a contained child set onto its parent by the
+
+    occupancy-weighted mean of the children''s positions -- "a cell''s position = the centroid of
+
+    its particles" -- and writes that mean back as the parent''s derived `pos`, returning no
+
+    integrable delta (MAY_MUTATE_INTEGRATED_STATE, returns {}). CC3D''s CenterOfMass does exactly
+
+    this with the Cellular-Potts identification child=lattice site, parent=cell: it accumulates
+
+    the coordinate sum over a cell''s sites and divides by the site count (volume) to publish
+
+    xCOM on the CellG struct, writing no energy / acceptance delta. Same typed shape
+
+    (children -> parent along the containment map), same reads (child positions + occupancy as
+
+    the weight), same write (parent position as a read-only derived readout), same kind/family
+
+    (aggregate / hierarchy). Every site carries occupancy 1, so the occupancy-weighted mean of
+
+    the aggregate contract degenerates to the plain coordinate mean CC3D computes -- no signature
+
+    field has to widen, so this is an alias, not a refinement.
+
+
+    It is a genuinely distinct IMPLEMENTATION of that one contract, hence implementation_of:
+
+    aggregate. Two implementation differences, neither of which touches the typed signature:
+
+    (1) CC3D maintains the moment INCREMENTALLY on each accepted spin-flip (xCM += x; V += 1;
+
+    xCOM = xCM/V) rather than recomputing the full index_add each forward pass -- an efficiency
+
+    choice, identical result. (2) CC3D unwraps coordinates against the BoundaryStrategy so a cell
+
+    straddling a periodic seam gets a COM at the cell and not at the lattice centre; the Plexus
+
+    centroid does a plain weighted mean with no periodic-topology awareness. That periodic
+
+    correction is a property of the reduction''s domain, not a change to its inputs/outputs/reads/
+
+    writes/maps, so it is an implementation obligation of the aggregate contract on a wrapped
+
+    lattice, not a new or widened contract. Likewise the raw first moment xCM is just the
+
+    un-normalized intermediate of the same reduction, and xCOMPrev (one-step COM history, from
+
+    which consumers form a per-MCS displacement = cell velocity) is a side bookkeeping field; a
+
+    velocity readout is a separate concern and does not oblige the centroid contract to grow a
+
+    history slot. The closest OTHER contract is `momentofinertia` (the sibling second-moment
+
+    reduction), but that reduces to a tensor about the COM and is a different aggregate output,
+
+    not this one.
+
+    '
+  contract:
+    name: aggregate
+    kind: aggregate
+    family: hierarchy
+    set: cell
+    inputs:
+    - site (the contained lattice-site child set; each site carries occupancy 1)
+    outputs:
+    - cell (the parent whose derived position is published)
+    reads:
+    - site.pos (the (x, y, z) coordinate of each lattice site the cell owns)
+    - site.occupancy / cell.volume (the site count, the reduction weight and the divisor)
+    writes:
+    - cell.pos (centre of mass = coordinate sum / volume; a read-only derived readout, no energy / acceptance
+      delta)
+    maps:
+    - parent
+  status: normalized
   module: null
   test: null
   evidence:
@@ -773,12 +1225,87 @@ mechanisms:
   - 'It is a bias on a discrete move, not a velocity: there is no drift term anywhere.'
   - 'lambda_chemo = 3000 transported cells into the boundary and destroyed them (9 -> 0 cells). At 200
     they climb and survive: mean x 15 -> 18 vs 15 -> 14.8.'
-  verdict: null
-  of: null
-  implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  verdict: alias
+  of: chemotax
+  implementation_of: chemotax
+  why: 'Same biology as the registered `chemotax` (a cell follows -- or, with lambda<0, flees --
+
+    the local gradient of a diffusible field): the Keller-Segel coupling. So this is an ALIAS,
+
+    and `implementation_of: chemotax` so the ledger counts the contract once.
+
+
+    The interesting part is HOW the two implementations realize that biology, because they sit
+
+    on opposite sides of the "is an energy term expressible in the Plexus algebra?" question
+
+    this campaign exists to measure. Plexus `chemotax` EMITS a velocity `gain*grad(field)` that
+
+    the engine integrates into `pos`. CC3D''s ChemotaxisPlugin emits NOTHING: it adds a term
+
+    dE_chemo = -lambda * (c(x_new) - c(x_old)) to the Potts energy of an attempted pixel copy,
+
+    biasing the Metropolis accept/reject toward the higher-concentration site. There is no
+
+    velocity and no drift anywhere in the source -- the cell''s centre of mass climbs the
+
+    gradient only as the STATISTICAL consequence of biased copies accumulated over many attempts
+
+    (state_io records this honestly: the plugin writes nothing directly).
+
+
+    The two therefore share a contract but not a numeric routing: -lambda*(c_new - c_old) is a
+
+    finite-difference of the field across one lattice step, i.e. a discretized -lambda*grad(c)
+
+    scored per move -- the same quantity Plexus emits as a velocity, only consumed as an energy
+
+    bias instead of an integrated drift. Recorded as the contradiction the loop wants: Plexus has
+
+    no energy-term / acceptance-bias routing, so a faithful port would have to translate the
+
+    energy bias back into the equivalent velocity `+lambda*grad(c)`, losing the Metropolis
+
+    temperature-and-neighbourhood dependence (at lambda=3000 the bias overwhelmed T and drove
+
+    cells into the boundary until they vanished 9->0 -- a failure mode a pure velocity emitter
+
+    would not reproduce identically).
+
+
+    ARGUMENT AGAINST this verdict (the refinement I am rejecting): one could argue the acceptance
+
+    -bias routing is a genuinely different OUTPUT type -- an energy scalar, not a `pos` delta --
+
+    and that widening `chemotax` to admit an `emit: energy_bias` mode is a REFINEMENT, not a
+
+    free alias. I reject it because the contract is named by biology and by observable write
+
+    (position moves along grad(field)); the accept/reject machinery is Potts substrate shared by
+
+    EVERY CC3D plugin, not a property of chemotaxis, so it belongs to a future energy-routing
+
+    question about the engine, not to a widening of this one contract.
+
+    '
+  contract:
+    name: chemotax
+    kind: exchange
+    family: fields
+    set: cell
+    inputs:
+    - cell
+    - field
+    outputs:
+    - cell
+    reads:
+    - pos
+    - field
+    writes:
+    - pos
+    maps:
+    - field
+  status: normalized
   module: null
   test: null
   evidence:
@@ -951,12 +1478,102 @@ mechanisms:
     the emitted XML never lists.
 
     '
-  verdict: null
+  verdict: new
   of: null
-  implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  implementation_of: stay_connected
+  why: 'The FIRST sighting of a new contract I name `stay_connected`: a per-cell TOPOLOGICAL
+
+    constraint that reads a body''s connected-component structure and vetoes any move that would
+
+    split its set of parts into disconnected pieces. Against the FROZEN baseline this is `new` --
+
+    none of the 52 promoted contracts does this. The 42 registered contracts are metric forces
+
+    (cohesion, separation, attraction_repulsion), diffusive fields, count-changing structural ops
+
+    (cell_divide, cell_grow), or index/rewire builders (radius_graph); not one reads connected
+
+    components and rejects a fragmenting move. None of the 8 jax-morph proposals (adhere, agitate,
+
+    apoptose, mechanosense, morphogen, regulate, relax, reorient) is a connectivity guard either,
+
+    so this is a genuinely NEW contract, not a second sighting of an earlier one.
+
+
+    I set implementation_of stay_connected so the ledger counts the connectivity FAMILY ONCE.
+
+    Three CompuCell3D siblings are three IMPLEMENTATIONS of this one contract, not three
+
+    contracts: Connectivity (one global scalar, 2D-only, local check -- [[connectivity]]),
+
+    ConnectivityGlobal (THIS -- per-type opt-in, whole-cell flood-fill or fast-local, works in
+
+    3D), and ConnectivityLocalFlex (per-cell soft strength). What THIS implementation adds over
+
+    the plain sibling: (1) a per-type opt-in whitelist (each enabled type emits ConnectivityOn),
+
+    plus a per-cell cell.connectivityOn override from a steppable; (2) a per-cell strength S in the
+
+    C++ ConnectivityGlobalData (setConnectivityStrength) -- though the Python spec exposes only the
+
+    on/off list and the fast flag, never S; (3) a whole-cell flood-fill (checkIfCellIsFragmented)
+
+    in default mode, degradable to a cheaper LOCAL check via fast=True. None of these change the
+
+    typed signature -- same reads (site-set topology), same write (none, a Potts energy veto),
+
+    same kind/family (lateral/topology).
+
+
+    Closest registered contract is `cohesion` (lateral/interaction): both keep a body together.
+
+    But widening cohesion to admit this does violence to its biology. Cohesion is a metric
+
+    attractive FORCE between point agents that returns an integrable delta pulling neighbours
+
+    closer; stay_connected returns no force and no gradient -- it is a combinatorial TOPOLOGICAL
+
+    veto over one cell''s lattice-site set that does nothing at all until a proposed pixel copy
+
+    would fragment the set into more than one connected component, whereupon it adds a near-hard
+
+    energy penalty the Metropolis rule almost never accepts. Cohesion presupposes point agents
+
+    with positions and a differentiable pair potential; stay_connected presupposes an explicit
+
+    site-set with lattice adjacency that the point-agent representation does not have, and it is a
+
+    rejection rule, not a gradient. Widening cohesion to cover a connected-components indicator
+
+    would erase the force/veto and the point/site distinctions that make cohesion what it is.
+
+    '
+  contract:
+    name: stay_connected
+    kind: lateral
+    family: topology
+    set: cell
+    inputs:
+    - site (the affected cell's owned lattice sites, each carrying its cell id, for the cell whose connectedness
+      the proposed pixel copy would change)
+    - connectivity_on (per-type opt-in whitelist and/or a per-cell flag; only enabled cells are constrained)
+    - strength (a per-cell magnitude S in ConnectivityGlobalData; not exposed by the Python spec, settable
+      only via setConnectivityStrength)
+    outputs:
+    - dE (a positive energy penalty added to the Metropolis total when the copy would fragment the cell
+      into more than one connected component; 0 otherwise)
+    reads:
+    - site.cell_id (the cell's set of lattice sites and their adjacency, flood-filled whole-cell in global
+      mode or scanned in a local neighbourhood in fast mode, to test connectedness after the proposed
+      copy)
+    - lattice adjacency / Potts NeighborOrder (defines which sites count as connected; a Potts param,
+      not a plugin param -- an implicit external precondition)
+    writes:
+    - none (a Potts effective-energy term that returns a scalar dE and mutates no state; it changes only
+      the acceptance probability of the proposed pixel copy, integrating no delta)
+    maps:
+    - none
+  status: normalized
   module: null
   test: null
   evidence:
@@ -990,7 +1607,8 @@ mechanisms:
 
     compiled default penalty (10000000) this "soft" term behaves as a near-hard topological guard
 
-    that keeps every cell a single connected blob. Fast/local variant: 2D square lattice only,
+    that keeps every cell a single connected blob (one connected component). Fast/local variant: 2D square
+    lattice only,
 
     requiring Potts NeighborOrder 1 or 2.
 
@@ -1098,12 +1716,64 @@ mechanisms:
     explicit lattice / site-set (e.g. a point-with-radius cell) cannot compute this at all.
 
     '
-  verdict: null
+  verdict: new
   of: null
-  implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  implementation_of: stay_connected
+  why: "NEW against the frozen baseline: no PROMOTED contract computes, or acts on, the\nconnected-component\
+    \ TOPOLOGY of a set of lattice sites. The whole registered vocabulary treats\na cell as a point (position,\
+    \ velocity, radius, polarity, type) and its operators return\ncontinuous deltas over those quantities;\
+    \ nothing reads \"is this cell's site-set one connected\nblob\" and penalises a change that would\
+    \ split it.\n\nBUT this is a second implementation of a contract THIS atlas already introduced, not\
+    \ a new\ncontract -- so implementation_of: stay_connected. The connectivity family is three\ninterchangeable\
+    \ implementations of one biology (\"keep a cell a single connected object\"):\n  - Connectivity (this\
+    \ entry, order 9): legacy, one GLOBAL scalar Penalty for all cells, a\n    LOCAL neighbourhood check,\
+    \ 2D / square-lattice / NeighborOrder<=2 only, zero tunable params.\n  - ConnectivityGlobal (order\
+    \ 8, which introduced stay_connected in this atlas): per-type\n    opt-in, whole-cell flood fill (or\
+    \ fast-local), any lattice.\n  - ConnectivityLocalFlex: a soft per-cell variant with tunable connectivityStrength.\n\
+    Same typed signature -- reads a cell's site-set topology, writes nothing, returns an energy\nveto\
+    \ on fragmenting copies. The ledger must count stay_connected ONCE across the three, or the\nsaturation\
+    \ curve measures how many CC3D connectivity plugins ship, not how many contracts the\nlanguage is\
+    \ missing. This legacy implementation's distinguishing traits (global scalar, local\ncheck, 2D-only,\
+    \ un-tunable) are recorded in params/surprises, not a reason to re-count.\n\nClosest PROMOTED contract,\
+    \ and why widening it does violence to its biology: cohesion\n(lateral/interaction) is the nearest\
+    \ by intent -- it keeps material together -- but cohesion is\na pairwise ATTRACTIVE FORCE between\
+    \ distinct agent centres returning an integrable gradient\ndelta; stay_connected returns no force,\
+    \ is inert until a copy would fragment ONE cell's\nsite-set, then vetoes it combinatorially. Aliasing\
+    \ to cohesion would require cohesion to widen\nfrom \"pairwise force between positioned points\" to\
+    \ \"connected-components indicator over a\nsite-set\", a refinement that breaks every current cohesion\
+    \ user -- not a free alias.\nradius_graph (rewire/topology) is the only other topology-family contract,\
+    \ but it BUILDS a\nneighbour graph from centre distances and writes edges; it neither reads a site-set\
+    \ nor\nenforces connectedness.\n\nThe campaign-flagged shape stands: this is a Potts ENERGY term,\
+    \ not a state update. It returns\na scalar dE and mutates nothing; it changes only the acceptance\
+    \ probability of a proposed\nlattice copy. No registered operator's output is \"an energy contribution\
+    \ to a Metropolis\naccept/reject\", and whether the algebra can express a set-topology energy penalty\
+    \ at all (no\ncontinuous field, needs an explicit site-set, output gates acceptance rather than integrating)\n\
+    is the open question stay_connected leaves standing.\n"
+  contract:
+    name: stay_connected
+    kind: lateral
+    family: topology
+    set: cell
+    inputs: '- the affected cell (a set of lattice sites sharing one cell id)
+
+      - the proposed single-pixel copy at target site t (source id overwrites t''s id)
+
+      - the cell-id lattice restricted to the Moore neighbourhood of t
+
+      '
+    outputs: "- a scalar energy contribution dE_conn added to the Potts total dE; it is NOT an integrated\n\
+      \  state delta. dE_conn = 0 if the copy leaves the affected cell locally connected, and a\n  large\
+      \ positive Penalty (default 10000000) if the copy would fragment the cell's site-set\n  into disconnected\
+      \ pieces.\n"
+    reads: "- the cell-id lattice (site -> cellId) in the Moore neighbourhood of the proposed target\n\
+      \  pixel, for the cell(s) whose connectedness the copy could change\n- the Potts NeighborOrder (must\
+      \ be 1 or 2) and a 2D square lattice as implicit preconditions\n"
+    writes: "- none. This is a Potts energy plugin. It writes no field and no cell property; it only\n\
+      \  contributes dE_conn to the Metropolis accept/reject of the proposed copy.\n"
+    maps: "- connectivity indicator f(local topology change of the affected cell around t) -> energy\n\
+      \  penalty Penalty * f, one global scalar Penalty shared by every cell. With Penalty >> T the\n\
+      \  map is an effectively hard gate: fragmenting copies are never accepted.\n"
+  status: normalized
   module: null
   test: null
   evidence:
@@ -1288,14 +1958,68 @@ mechanisms:
     (which is excluded anyway), so E_internal is identically 0. The energy matrix alone is inert.
 
     '
-  status: inspected
+  status: normalized
   module: null
   test: null
-  verdict: null
+  verdict: new
   of: null
-  implementation_of: null
-  why: null
-  contract: null
+  implementation_of: adhere
+  why: "A FOURTH sighting of `adhere`, first proposed from the jax-morph atlas (2nd here from\nAdhesionFlex,\
+    \ 3rd from its parent ContactLocalFlex); it is NOT among the 52 promoted\ncontracts, so measured against\
+    \ the FROZEN baseline the verdict is `new`.\nimplementation_of is set to `adhere` so the ledger counts\
+    \ the contract ONCE across\nrepositories rather than re-introducing it here.\n\nContactInternal is\
+    \ a differential-adhesion energy: the biology is \"cells of given types\npay a type-pair-specific\
+    \ boundary cost where they touch\", which is exactly what an\nadhesion contract expresses. Its one\
+    \ distinguishing feature over the base Contact energy\nis a same-clusterId gate, so it scores only\
+    \ boundaries BETWEEN COMPARTMENTS of one\ncomposite cell -- intra-cluster differential adhesion. That\
+    \ is a restriction on WHICH\nboundaries the same `adhere` term sums over, not a new biological verb,\
+    \ so it is an\nimplementation of `adhere`, not a distinct contract.\n\nClosest REGISTERED contracts\
+    \ and why none is widened here:\n- cohesion / attraction_repulsion / separation / stillinger_weber\
+    \ / squared_law are\n  pair potentials over POINT particles separated by a distance r; they output\
+    \ a force\n  from a smooth radial law. ContactInternal has no r-dependence in the core term (a flat\n\
+    \  per-type-pair J at a lattice contact), operates on cells-as-site-sets not points, and\n  outputs\
+    \ an energy delta that biases Metropolis acceptance rather than a force the\n  engine integrates.\
+    \ Widening any of them to admit a surface-contact adhesion matrix\n  over compartmentalized Potts\
+    \ cells would do violence to their point-particle,\n  force-returning biology -- it would no longer\
+    \ be one recognizable law.\n- `adhere` (jax-morph, unpromoted) is the honest home: it already names\
+    \ the differential\n  boundary-adhesion verb without committing to the point-particle radial form.\n\
+    \nCAVEAT: this maps a Potts ENERGY TERM (returns delta-E, writes nothing) onto a contract\nwhose Plexus\
+    \ implementations return an integrable force -- the very gap loop rule 8\nflags. Whether `adhere`\
+    \ can honestly host BOTH a force-returning and an\nenergy-term implementation, or must itself widen,\
+    \ is a real open question this sighting\nraises; recorded here rather than papered over. This is not\
+    \ unique to ContactInternal:\nit is the SAME return-type gap every Potts adhesion energy in this atlas\
+    \ (Contact,\nContactLocalFlex, AdhesionFlex) surfaces, so it is a property of the Cellular-Potts\n\
+    target, not of this one plugin.\n"
+  contract:
+    name: adhere
+    kind: lateral
+    family: interaction
+    set: cell
+    inputs:
+    - cell
+    outputs:
+    - contact_energy (a scalar dE contribution to the Metropolis acceptance of a proposed pixel copy;
+      NOT a cell state and NOT a force -- this operator writes nothing back to the lattice)
+    reads:
+    - cell_id (sigma at each of two neighbouring lattice sites, to keep only cross-boundary pairs via
+      1-delta)
+    - cell_type (tau of each owner; indexes the per-type-pair internal-adhesion matrix J_int)
+    - cluster_id (the same-cluster guard; the DEFINING read -- energy fires only when the two owners share
+      a clusterId, i.e. are compartments of the same composite cell)
+    - internal_adhesion_matrix (J_int, the per-type-pair energy coefficients; symmetric, one triangle
+      stored, lookup symmetrized)
+    - neighbour shells (site pairs within neighbor_order adjacency, or a Euclidean depth radius that overrides
+      it)
+    writes:
+    - nothing to the lattice (energy term). changeEnergy() returns a scalar dE that only biases Metropolis
+      acceptance; no cell attribute and no field is mutated.
+    maps:
+    - a cell is a SET of lattice sites sharing an id; internal adhesion energy is summed over neighbouring
+      cross-boundary site pairs whose owners DIFFER but share a clusterId
+    - per boundary pair, energy = J_int(tau_i, tau_j) gated by different-cell AND same-clusterId AND non-Medium;
+      negative J is adhesive (lowers boundary cost), positive is repulsive
+    - additive with the plain Contact term (both score an intra-cluster boundary), so this realises intra-compartment
+      differential adhesion / compartment sorting within one cell
   evidence:
     oracle_run: null
     diff_metric: null
@@ -1437,14 +2161,125 @@ mechanisms:
     plain Contact energy; the LocalFlex per-cell behaviour is unmeasured here).
 
     '
-  status: inspected
+  status: normalized
   module: null
   test: null
-  verdict: null
+  verdict: new
   of: null
-  implementation_of: null
-  why: null
-  contract: null
+  implementation_of: adhere
+  why: '`new` against the FROZEN baseline (no registered contract covers cell-cell contact/adhesion
+
+    energy in a Cellular Potts model), and `implementation_of: adhere` -- a THIRD SIGHTING of
+
+    `adhere`, the pure-adhesion contract first PROPOSED by the jax-morph atlas (still unpromoted,
+
+    so not in the frozen 42/52) and already logged in this CC3D atlas from AdhesionFlex. Setting
+
+    implementation_of lets the ledger count `adhere` ONCE across repositories; without it the
+
+    saturation curve double-counts and measures our naming habits, not the language.
+
+
+    WHAT IT IS. ContactLocalFlex contributes the standard Cellular Potts boundary/adhesion energy
+
+    E = sum over cross-boundary site pairs of J(sigma_i, sigma_j)(1 - delta) -- the SAME functional
+
+    as plain Contact, which is the canonical `adhere` implementation (a static J(type,type'') table).
+
+    Biologically that boundary-energy term IS differential adhesion: higher J = higher boundary cost
+
+    = weaker adhesion, and type-dependent J drives cell sorting. That is `adhere`''s content exactly.
+
+
+    WHAT MAKES IT ITS OWN IMPLEMENTATION, NOT A DUPLICATE OF Contact. The single difference is WHERE
+
+    J lives: not a global type-pair matrix but a per-cell attribute (a ContactLocalFlexDataContainer
+
+    holding per-neighbour J values plus a localDefaultContactEnergies table, seeded from the spec''s
+
+    type-pair energies). setContactEnergy() can override an individual cell''s (or pair''s) J at
+
+    runtime, so adhesion is locally steerable. This is the SAME per-cell-state generalisation move as
+
+    AdhesionFlex -- but ContactLocalFlex keeps the plain scalar-J energy (one J per pair) rather than
+
+    AdhesionFlex''s molecule-density double sum. All three (Contact, ContactLocalFlex, AdhesionFlex)
+
+    are interchangeable implementations of `adhere`; that Plexus''s registry hosts several
+
+    implementations per contract is the expected shape, not a disappointment.
+
+
+    WHY NOT alias/refinement of a REGISTERED contract. The closest registered contracts are the
+
+    lateral/interaction pair rules `cohesion` and `attraction_repulsion`. Both EMIT a force
+
+    (`acceleration`) on a point particle and WRITE `position` after the engine integrates it.
+
+    ContactLocalFlex writes NOTHING: changeEnergy() returns a scalar dE that only biases which
+
+    proposed pixel-copy the Metropolis engine accepts (rule 8). Its `set` is a cell that IS a set of
+
+    lattice sites, its interaction is counted over shared BOUNDARY site-pairs (not centre distance),
+
+    and it has no repulsive core (excluded volume is CompuCell3D''s separate Volume constraint). To
+
+    host it, cohesion/attraction_repulsion would have to swap output type (energy bias, not force),
+
+    set representation (site-set, boundary counting), and drop position writes -- replacing the
+
+    contract''s semantics, i.e. violence, not a costed widening. And unlike Morse (which maps to
+
+    `attraction_repulsion` because it carries BOTH an excluded-volume core and an adhesive tail),
+
+    this term carries ONLY adhesion, so it maps to the pure-adhesion contract `adhere`.
+
+
+    SCOPE / OPEN. The per-cell steerable J and the setContactEnergy() runtime override are an
+
+    implementation freedom below the contract, not a new contract -- the same freedom AdhesionFlex
+
+    exercises with density vectors. weight_energy_by_distance (divide each pair term by site-site
+
+    distance) and neighbor_order/depth (interaction range) are likewise implementation parameters of
+
+    the same energy. The (1-delta) restriction is over cell IDs, so same-type neighbouring cells
+
+    still contribute. No standalone oracle/ablation run exists for the per-cell LocalFlex behaviour
+
+    (the contact_adhesion evidence covers the plain-Contact energy only).
+
+    '
+  contract:
+    name: adhere
+    kind: lateral
+    family: interaction
+    set: cell
+    inputs:
+    - cell
+    outputs:
+    - contact_energy (a scalar dE contribution to the Metropolis acceptance of a proposed pixel copy;
+      NOT a cell state and NOT a force -- this operator writes nothing back to the lattice)
+    reads:
+    - cell_id (sigma at each of two neighbouring lattice sites, to keep only cross-boundary pairs via
+      1-delta)
+    - cell_type (seeds each cell's localDefaultContactEnergies table at init)
+    - contact_energy_J (the per-cell/per-pair adhesion energy attribute -- ContactLocalFlexDataContainer;
+      the pairwise J(sigma_i, sigma_j), higher J = weaker adhesion, steerable at runtime via setContactEnergy)
+    - neighbour shells (site pairs within neighbor_order adjacency, or Euclidean depth if set)
+    - distance_weighting (optional -- divide each pair term by site-site distance so farther neighbours
+      count less)
+    writes:
+    - nothing to the lattice (energy term). Side channel only -- the plugin maintains its own per-cell
+      contact-data container, into which steppables write per-cell/per-pair J at runtime.
+    maps:
+    - a cell is a SET of lattice sites sharing an id; adhesion energy is summed over neighbouring cross-boundary
+      site pairs (owners differ), so contact area emerges from boundary site counts
+    - per boundary pair, energy = J(sigma_i, sigma_j) * (1 - delta(sigma_i, sigma_j)); the SAME functional
+      as plain Contact, but J is read from cell sigma_i's per-cell attribute rather than a global type-pair
+      matrix, so adhesion is individually settable and runtime-steerable
+    - differential adhesion / cell sorting emerges from type- and cell-dependent J; the per-cell J storage
+      makes adhesion locally flexible while the simulation runs
   evidence:
     oracle_run: null
     diff_metric: null
@@ -1462,22 +2297,92 @@ mechanisms:
     tau(sigma_j))
 
     J is a symmetric matrix over cell TYPES, Medium included. Differential adhesion is J_heterotypic >
-    J_homotypic.'
+    J_homotypic.
+
+    '
   params:
     neighbor_order: adjacency_range
     energy: adhesion_matrix
-  state_io: 'reads: the type of each site''s owner; writes: nothing (an energy term)'
+  state_io: 'reads: the cell-type of the owner of each lattice site, over the neighbor_order adjacency
+    shell.
+
+    writes: nothing. This is an ENERGY term, not an update -- it contributes E_contact to the Potts
+
+    Hamiltonian and only changes the probability that a proposed pixel copy is accepted. It never
+
+    returns a state delta the way a Plexus operator does; that gap is the point of interest here.
+
+    '
   surprises:
   - Adhesion is an energy per adjacent SITE PAIR, so it scales with shared boundary length, not with a
     pair distance. There is no cutoff and no pair potential.
   - 'Measured ablation: heterotypic boundary 290 -> 167 with differential adhesion, 290 -> 388 with equal
     energies. The sign of the effect reverses.'
-  verdict: null
+  - The Medium is a first-class type in J, so a cell-Medium entry is a surface tension against empty space;
+    adhesion and de-adhesion (spreading) are the same knob at different signs.
+  - weight_energy_by_distance optionally scales each pair term by the site-site distance, so the same
+    J can act as a range-graded contact energy across the neighbor shell.
+  contract:
+    name: adhere
+    kind: lateral
+    family: interaction
+    set: cells (each cell is a SET of lattice sites sharing an id; the Medium is a set too)
+    inputs: adhesion_matrix J[type,type] (symmetric, Medium included); adjacency_range (neighbor_order/depth);
+      weight_energy_by_distance flag
+    outputs: a scalar energy contribution to the Potts Hamiltonian; no state delta
+    reads: the cell-type of the owner of each lattice site, and the site-adjacency graph
+    writes: nothing
+    maps: each pair of adjacent sites with differing owners -> J(type_i, type_j), summed over the boundary;
+      differential J (heterotypic > homotypic) drives type sorting / demixing
+  verdict: new
   of: null
-  implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  implementation_of: adhere
+  why: 'No registered contract covers type-indexed differential adhesion. This is a SECOND SIGHTING of
+
+    `adhere`, first proposed from jax-morph (in the proposed-but-not-promoted list); set
+
+    implementation_of: adhere so the ledger counts the contract once across repositories. Against the
+
+    frozen baseline of 42 registered contracts the verdict is still `new` -- that baseline has not
+
+    changed and has no adhesion contract.
+
+
+    The closest REGISTERED contracts are the interaction pair-potentials: cohesion,
+
+    attraction_repulsion, separation, stillinger_weber, squared_law. Widening one of them would do
+
+    violence to its biology on two counts. First, those are pair potentials over agent CENTRES: they
+
+    read a scalar distance between two point-particles and return a force delta the engine integrates.
+
+    Contact adhesion has no pair distance and no cutoff -- its energy scales with the length of the
+
+    shared BOUNDARY between two cells-as-site-sets, and it returns nothing (it only reweights pixel-copy
+
+    acceptance). Second, adhesion is keyed on cell TYPE via a symmetric matrix J that includes Medium;
+
+    differential J (heterotypic > homotypic) is what sorts types. None of the registered interaction
+
+    contracts carry a type-by-type coupling matrix. Forcing this into e.g. attraction_repulsion would
+
+    overload distance with boundary-length and scalar strength with a type matrix -- that is a new
+
+    contract wearing an old name, not a refinement anyone costed.
+
+
+    Argument AGAINST this verdict: one could call adhesion an ALIAS of cohesion, since both make like
+
+    cells stick. But cohesion in the registry is a homotypic, distance-based attraction with no Medium
+
+    term and no heterotypic control; it cannot express J_heterotypic > J_homotypic, the exact term
+
+    whose sign the ablation shows reverses the boundary length (290 -> 167 vs 290 -> 388). Aliasing to
+
+    it would erase the differential structure that is the whole biological content here.
+
+    '
+  status: normalized
   module: null
   test: null
   evidence:
@@ -1633,12 +2538,81 @@ mechanisms:
     boundary conditions. The plugin also force-loads the CenterOfMass plugin on init.
 
     '
-  verdict: null
+  verdict: new
   of: null
   implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  why: "NEW against the frozen baseline: no PROMOTED contract is a BENDING STIFFNESS -- an angular\nenergy\
+    \ over an ORDERED chain of cells that penalises curvature and drives a linked filament\ntoward straight.\
+    \ The registered interaction family (attraction_repulsion, cohesion,\nseparation, squared_law, signal,\
+    \ velocity_align) is pairwise and metric; none reads a triple\nof consecutive bonded cells and returns\
+    \ an energy that grows with how much the chain bends.\n\nCLOSEST PROMOTED contract = stillinger_weber\
+    \ (lateral/interaction), the ONLY registered\nthree-body angular term. It is genuinely close: SW penalises\
+    \ deviation of a bond angle from a\npreferred cosine, (cos_jik - cos0)^2, and with cos0 = -1 (theta0\
+    \ = 180 deg) that IS a\nstraightness/bending penalty. So the raw functional idea -- \"angular energy\
+    \ with a preferred\nangle\" -- overlaps. But widening stillinger_weber to admit Curvature does violence\
+    \ to its\nbiology and its signature on two independent counts:\n  1. TOPOLOGY. SW builds its OWN isotropic\
+    \ min-image neighbour list each tick and sums over\n     ALL geometric triples i-j-k within a cutoff\
+    \ -- it has no notion of an ordered backbone.\n     Bending stiffness of a FILAMENT requires selecting\
+    \ only the CONSECUTIVE triples along a\n     maintained, ordered 1D bond graph (left/mid/right, up\
+    \ to 3 hops each side). Applied to a\n     blob, SW-with-cos0=-1 would penalise every bent geometric\
+    \ triple everywhere, not\n     straighten a defined chain. To cover Curvature, SW's signature must\
+    \ change from \"reads\n     pos, builds own neighbours\" to \"reads an EXTERNAL ordered bond graph\
+    \ it does not\n     maintain\" -- a new required input that breaks every current SW user (mW water,\
+    \ silicon).\n  2. FORM + OUTPUT. Curvature's per-triple energy is the Menger curvature\n     kappa\
+    \ = 2 sin(theta)/|chord| = 1/R_circ (LINEAR in curvature), not SW's squared cosine;\n     and it is\
+    \ a Potts changeEnergy (a Metropolis accept/reject contribution) rather than an\n     autograd Newtonian\
+    \ force. The form difference alone would be \"just an implementation,\"\n     but combined with the\
+    \ maintained-chain requirement it is a different contract.\nSo this is not an interchangeable implementation\
+    \ of stillinger_weber; implementation_of is\nleft null. The biology SW captures is a tetrahedral-network\
+    \ directional bond angle over\ngeometric neighbours; the biology here is the flexural rigidity of\
+    \ a semiflexible chain over\na defined backbone -- a distinct, missing contract I name `stiffen`.\n\
+    \nNOT a second sighting of any jax-morph-proposed contract (adhere, agitate, apoptose,\nmechanosense,\
+    \ morphogen, regulate, relax, reorient): none is an angular/bending stiffness.\n\nHYBRID CAVEAT recorded\
+    \ honestly: this ONE plugin fuses TWO mechanisms. The primary one, and\nthe one this contract captures,\
+    \ is the bending stiffness. The SECOND is a stateful junction\nGROWER -- a topology REWIRE that biases\
+    \ a bond-forming move by activation_energy and commits\nthe bond in the accepted-move watcher (within-cluster,\
+    \ listed types, under max_junctions, no\nexisting bond, within neighbor_order). That half resembles\
+    \ radius_graph (rewire/topology) but\nis energy-biased and cluster-gated; it is the machinery that\
+    \ BUILDS the chain the stiffness\nacts on, not the stiffness itself, so it is noted in writes:/maps:\
+    \ and surprises rather than\ndriving the verdict. A faithful port needs both halves, but the new CONTRACT\
+    \ the language is\nmissing is `stiffen`.\n\nThe campaign-flagged shape stands: changeEnergy is a Potts\
+    \ ENERGY term, not a state update --\nit returns a scalar dE (recomputing affected COMs at +/-1 volume)\
+    \ and mutates no cell\nproperty; only the accepted-move watcher mutates topology. Whether the algebra\
+    \ can express a\nbending energy over a maintained ordered chain whose output gates a Metropolis accept\
+    \ rather\nthan integrating is the open question `stiffen` leaves standing.\n"
+  contract:
+    name: stiffen
+    kind: lateral
+    family: interaction
+    set: cell
+    inputs: "- a triple of three CONSECUTIVE junction-linked cells of a chain (COMs L, M, R) with their\n\
+      \  volumes, drawn from the cell's maintained bond graph (up to 3 hops each side of a change)\n-\
+      \ the proposed single-pixel copy at target site t (gaining cell volume+1, losing cell\n  volume-1;\
+      \ affected COMs recomputed via precalculateCentroid)\n- for a bond-forming move: the cell-id lattice\
+      \ around t and the partner cell's type,\n  clusterId and current junction count\n"
+    outputs: "- a scalar energy contribution dE added to the Potts total, NOT an integrated state delta:\n\
+      \  dE = sum over affected triples of lambda * (kappa_after - kappa_before), where\n  kappa = 2 sin(theta_M)/|R-L|\
+      \ is the Menger curvature of the triple (0 for a straight\n  chain). lambda = per-type-pair curvature\
+      \ modulus, looked up by the triple's FIRST pair.\n- ALTERNATIVELY, for a move that would create\
+      \ a new within-cluster junction, a fixed offset\n  dE = activation_energy (typically negative, favouring\
+      \ bond formation) in place of the\n  curvature delta.\n"
+    reads: "- center of mass (xCM/yCM/zCM) and volume of the changed cell and of its junction neighbours\n\
+      \  up to 3 hops each side along the chain\n- each cell's junction set (CurvatureTracker.internalCurvatureNeighbors,\
+      \ extra attributes)\n- cell type and clusterId\n- the cell-id lattice around pt (getNeighborDirect\
+      \ up to neighbor_order) when scouting a\n  new junction partner\n"
+    writes: "- the bending-energy contract itself writes NO cell state; changeEnergy returns dE (an\n\
+      \  energy term), changing only the acceptance probability of the proposed pixel copy.\n- the plugin's\
+      \ accepted-move watcher (field3DChange) DOES mutate TOPOLOGY as a side effect\n  distinct from this\
+      \ contract: it inserts a new junction into both cells'\n  internalCurvatureNeighbors sets on an\
+      \ accepted bond-forming move, and erases all bonds of\n  a cell whose volume reached 0. This is\
+      \ a rewire aspect (near radius_graph), not part of\n  the stiffness signature.\n"
+    maps: "- chain angle theta_M at the middle cell -> Menger curvature kappa = 2 sin(theta_M)/|chord|\n\
+      \  -> per-triple energy lambda * kappa (straight -> 0, more bent -> larger); the whole-chain\n \
+      \ bending energy is the sum over consecutive triples, and the move delta is the sum over the\n \
+      \ up-to-5 affected triples spanning 3 hops each side of the change.\n- junction-partner candidacy\
+      \ (same clusterId, both types listed, both under max_junctions,\n  no existing bond, partner within\
+      \ neighbor_order lattice shells) -> a fixed activation_energy\n  bias on the bond-forming move.\n"
+  status: normalized
   module: null
   test: null
   evidence:
@@ -1767,12 +2741,121 @@ mechanisms:
   - The class at L6242 is a thin CC3DML EMITTER; every physical parameter lives on the child DiffusionData
     / SecretionData / BoundaryConditions specs (L6070, L6160, L820), and the integrator itself is compiled.
     No update logic is in this file.
-  status: inspected
-  verdict: null
-  of: null
-  implementation_of: null
-  why: null
-  contract: null
+  status: normalized
+  verdict: refinement
+  of: diffuse
+  implementation_of: diffuse
+  why: 'WHAT IT IS. Strip the plumbing and DiffusionSolverFE is one explicit forward-Euler (FTCS)
+
+    step of dc/dt = D grad^2 c - lambda c + S on a scalar concentration field. The pure
+
+    diffusion core is EXACTLY the registered `diffuse` contract (field->field, one Laplacian
+
+    step, writes the grid in place; diffuse already carries two implementations,
+
+    finite_difference and spectral -- this is a THIRD, the FTCS/forward-Euler scheme on the
+
+    CPM lattice, hence implementation_of: diffuse). The linear -lambda*c term is the registered
+
+    `decay` contract verbatim (c <- c - lambda*dt*c, field->field). The secretion source S is
+
+    the registered `deposit` contract (a set->field scatter: a cell of type t adds a rate into
+
+    the field at its own pixels). So as a whole this mechanism is a COMPOSITE of three existing
+
+    contracts -- in Plexus you would express it as diffuse then decay then deposit on the same
+
+    field. That composability is itself a positive saturation result: CC3D''s flagship PDE
+
+    solver introduces no new biological verb.
+
+
+    WHY REFINEMENT AND NOT ALIAS. It is not a clean alias because CC3D''s DEFINING capability
+
+    cannot be expressed by `diffuse` as currently registered. `diffuse` binds `rate` to a single
+
+    scalar (self.rate = float(params.get("rate"))) and both its implementations apply a spatially
+
+    UNIFORM coefficient. DiffusionSolverFE''s D_i and lambda_i are SPATIALLY HETEROGENEOUS, read
+
+    per pixel from the moving CPM cell-type lattice (diff_types/decay_types). This is not an
+
+    incidental knob -- the whole two-half-sum "variable diffusion" stencil (isoSum with the
+
+    centre cell''s D_i + varSum with each neighbour''s own D_j, each /2) exists precisely to
+
+    symmetrise flux across a cell-type interface, and it only collapses to diffuse''s central-D
+
+    Laplacian D*(SUM_j c_j - N c_i) when D is uniform. To admit CC3D, `diffuse` must WIDEN its
+
+    `rate` param from scalar to scalar|coefficient-field (PARAM_ROLES rate: diffusion_rate ->
+
+    diffusion_rate_field), and its `reads` gains that coefficient field. What this BREAKS for
+
+    existing users: (a) the numerics obligation -- an implementation given a field-valued rate
+
+    can no longer use a single central-D box-blur; it must use the symmetric face-average
+
+    stencil or it computes heterotypic diffusion wrong, so the finite_difference/spectral
+
+    implementations do not transparently generalise; (b) the spectral implementation cannot
+
+    support a spatially-varying D at all (exp(-D k^2 dt) assumes constant D), so a field-valued
+
+    rate silently narrows the set of valid implementations. `decay` needs the identical widening
+
+    for lambda_i (scalar -> coefficient-field keyed to the cell-type set). Both are the same
+
+    refinement: a field->field operator''s coefficient becoming a set-coupled field.
+
+
+    A SECOND, SMALLER REFINEMENT the record should note but that I am NOT electing as the primary
+
+    verdict (one contract per entry): per-face BOUNDARY CONDITIONS (Dirichlet Value / Neumann
+
+    Flux / Periodic, per x/y/z min/max) are a field-level concept that neither diffuse nor decay
+
+    currently expresses -- Plexus fields carry only a single `periodic` flag. And the secretion
+
+    ConstantConcentration mode is a genuine gap in `deposit`: deposit ADDS (min(1, c+amt)),
+
+    whereas ConstantConcentration OVERWRITES/CLAMPS c := value on the cell interior (a Dirichlet
+
+    pin, re-applied each step). A reimplementer routing ConstantConcentration through `deposit`
+
+    would be wrong; deposit would need a `mode: add|set` widening to cover it. I flag these here
+
+    rather than splitting the entry.
+
+
+    CLOSEST-CONTRACT / not-new argument. This is emphatically not `new`: `diffuse` plus `decay`
+
+    plus `deposit` cover the biology (transport, turnover, source) with only the coefficient-
+
+    heterogeneity widening missing. Calling it `new` would double-count a verb the language
+
+    already has. See the sibling ReactionDiffusionSolverFE for the case where the AdditionalTerm
+
+    reaction expression genuinely exceeds this composite.
+
+    '
+  contract:
+    name: diffuse
+    kind: field
+    family: fields
+    set: field
+    inputs:
+    - field
+    outputs: []
+    reads:
+    - the scalar concentration field c (the grid advanced in place)
+    - 'REFINEMENT: a per-site diffusion coefficient field D_i (and, for the composed decay term, a per-site
+      lambda_i), sourced by indexing diff_types/decay_types with the cell type occupying each pixel --
+      i.e. the CPM cell-type set lattice, which base diffuse never reads'
+    - per-face boundary values and the t=0 initial condition (expression or file)
+    writes:
+    - the concentration field c, in place (a real field write, not an energy delta)
+    maps: []
   module: null
   test: null
   evidence:
@@ -1787,21 +2870,167 @@ mechanisms:
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L2874
   paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
     CompuCell3D'
-  summary: ExternalPotential Plugin
-  equations: 'dE_ext = -lambda . (x_new - x_old): a constant body force per attempted copy.'
+  summary: 'A constant external body force. Each cell type carries a lambda vector (lambda_x, lambda_y,
+
+    lambda_z); a global lambda (applied to all types) is the fallback. Per attempted pixel copy the
+
+    plugin contributes an energy dE = -lambda . (x_new - x_old), which biases the Metropolis
+
+    acceptance so cells drift along lambda. It writes nothing to the lattice -- a Potts energy term.
+
+    With com_based=False (default) the force is applied per candidate pixel; with com_based=True it
+
+    is evaluated against the cell''s centre of mass, so the whole cell is translated as a rigid drift.
+
+    '
+  equations: "dE_ext = -lambda . (x_new - x_old)\n\nlambda        : a constant force vector, either global\
+    \ (lambda_x, lambda_y, lambda_z) or per\n                cell type (ExternalPotentialParameter accessed\
+    \ by spec.cell_type[name]).\nx_new, x_old  : the pixel gained vs lost by the attempted copy (com_based=False),\
+    \ i.e. Delta x\n                is the copy direction; OR the change in the cell's centre of mass\
+    \ (com_based=True).\nThe term lowers energy for copies that move a cell down the potential gradient\
+    \ (along lambda),\nso a constant lambda produces a persistent directed drift. It returns a scalar\
+    \ dE only -- the\nMetropolis engine turns that bias into motion; the plugin writes no cell state.\n"
   params:
-    x: force_x
-    y: force_y
-    z: force_z
-  state_io: 'reads: the attempted copy direction; writes: nothing (an energy term)'
+    lambda_x: force_x -- global x-component of the external-potential lambda vector (constructor arg).
+    lambda_y: force_y -- global y-component of the external-potential lambda vector (constructor arg).
+    lambda_z: force_z -- global z-component of the external-potential lambda vector (constructor arg).
+    cell_type: 'per-type lambda -- NOT a constructor arg; an ExternalPotentialParameter(cell_type, x,
+      y, z)
+
+      appended via param_new / cell_type accessor. Lets each cell type carry its OWN constant force
+
+      vector, so different types drift in different directions -- the differential-force mode.
+
+      '
+    com_based: 'algorithm flag (default False). False = apply the force per attempted pixel copy (can
+      spread /
+
+      reshape a cell along lambda, not only translate it); True = evaluate against the cell centre of
+
+      mass, translating the whole cell as a rigid drift.
+
+      '
+  state_io: "reads: for each attempted pixel copy, the copy direction Delta x = x_new - x_old (or the\
+    \ cell\n  centre of mass when com_based), and the lambda vector for the owning cell's type.\nwrites:\
+    \ nothing to the lattice -- changeEnergy returns a scalar dE that only biases which\n  proposed pixel\
+    \ copy the Metropolis engine accepts (rule 8). A constant body force, not an update.\n"
   surprises:
-  - 'Measured ablation: mean x 32 -> 57.6 driven vs 32 -> 32.2 undriven.'
-  verdict: null
-  of: null
+  - 'Measured ablation: with a driving lambda the population mean x moves 32 -> 57.6, versus 32 -> 32.2
+
+    undriven -- a constant lambda produces a persistent directed drift of the cell centres, exactly a
+
+    body force / sedimentation, not a diffusive wander.
+
+    '
+  - 'The force is per-CELL-TYPE: each type carries its own lambda vector (ExternalPotentialParameter),
+
+    so two types can be driven in OPPOSITE directions from one plugin. That differential mode is the
+
+    substance -- a global-only reading (lambda_x/y/z alone) misses that this is the CPM''s native way
+
+    to impose a per-type directed drift.
+
+    '
+  - 'com_based toggles WHAT the force acts on: the default (False) biases every candidate pixel, so a
+
+    strong field can spread or reshape a cell as well as move it; True acts on the centre of mass and
+
+    translates the cell rigidly. Plexus''s sediment only ever translates -- the per-pixel spreading of
+
+    the default mode is a shape effect the drift contract does not carry.
+
+    '
+  verdict: alias
+  of: sediment
   implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  why: '`alias` of the REGISTERED contract `sediment` (lateral/motion): a per-type constant directional
+
+    body force. ExternalPotential''s biology IS sediment''s -- attach a constant force vector to a cell
+
+    type and it drifts persistently along that vector; give two types opposite vectors and they
+
+    settle to opposite poles (the differential-sedimentation / oriented-drift use). sediment''s own
+
+    docstring frames itself as exactly this: "a per-agent constant directional drift ... the
+
+    type-selectable sibling of gravity", instantiated per type via `at: ''agent[type=a]'' gy: -0.1`.
+
+    ExternalPotential''s per-type ExternalPotentialParameter(cell_type, x, y, z) is the same construct;
+
+    its global lambda_x/y/z mode is the degenerate all-types-equal case, which is the REGISTERED
+
+    contract `gravity` (a type-blind uniform body force). So this one CC3D plugin spans the pair that
+
+    Plexus splits into sediment (per-type) and gravity (uniform); I alias it to sediment because
+
+    per-type configurability is the plugin''s defining, non-degenerate capability, and sediment
+
+    subsumes the uniform case as equal params.
+
+
+    WHAT DIFFERS BETWEEN THE IMPLEMENTATIONS. sediment returns a velocity delta {agent: v} that the
+
+    engine integrates into position; ExternalPotential returns NOTHING -- it is a Potts energy term,
+
+    dE = -lambda . (x_new - x_old), that only biases which proposed pixel copy the Metropolis engine
+
+    accepts (rule 8). Same directed-drift semantics, different mechanics (velocity delta vs
+
+    acceptance-probability bias). Two secondary differences, neither of which changes the contract:
+
+    (1) the lambda vector is 3D and sediment ships gx/gy with SUPPORTED_DIMS [2,3], so 3D is already
+
+    in-signature; (2) com_based=False applies the force PER PIXEL, so a strong field can spread or
+
+    reshape a cell, whereas sediment (and com_based=True) only translate the centre of mass. That
+
+    per-pixel shape effect is an artefact of the CPM''s site-set representation, not a distinct
+
+    biological contract -- the mechanism''s intent and its measured effect (mean-x drift of the cell
+
+    centres) are pure directed body force.
+
+
+    WHY NOT `new` or `refinement`. Nothing here needs a contract the registered vocabulary lacks: a
+
+    constant per-type directional force is precisely sediment, and its uniform special case is
+
+    gravity -- both already promoted. Refinement is unwarranted because no signature field of sediment
+
+    has to widen to admit this: direction is already a free vector, per-type selection is already the
+
+    intended usage, and 2D/3D is already supported. The only feature outside sediment''s reach is the
+
+    default per-pixel (non-COM) shape spreading, and that is CPM plumbing, not a costed widening of
+
+    the drift contract.
+
+    '
+  contract:
+    name: sediment
+    kind: lateral
+    family: motion
+    set: cell
+    inputs:
+    - cell (selected by type, so each type may carry its own lambda vector)
+    outputs:
+    - directed_drift (a constant directional body force along lambda; realised in CC3D as a scalar dE
+      contribution to Metropolis acceptance, NOT a written cell state and NOT engine-integrated here)
+    reads:
+    - copy_direction (Delta x = x_new - x_old of the attempted pixel copy; or the cell centre of mass
+      when com_based=True)
+    - cell_type (selects which lambda vector applies)
+    - lambda (the constant force vector, global or per type; may point any direction in 2D/3D)
+    writes:
+    - nothing to the lattice (energy term); the directed drift emerges from biased pixel-copy acceptance
+    maps:
+    - a cell is a SET of lattice sites sharing an id; a constant lambda lowers the energy of copies that
+      advance the cell along lambda, so the cell centre of mass drifts persistently in that direction
+    - per-type lambda vectors give DIFFERENTIAL drift -- two types driven oppositely settle to opposite
+      poles, the CPM analogue of differential sedimentation / an oriented symmetry break
+    - the global lambda_x/y/z mode (one vector for all types) is the type-blind degenerate case, which
+      is the sibling contract `gravity`; sediment recovers it as equal per-type params
+  status: normalized
   module: null
   test: null
   evidence:
@@ -1894,12 +3123,141 @@ mechanisms:
   - A junction, once formed, persists across MCS until its CoM distance exceeds max_distance -- it is
     NOT re-evaluated for contact each step, so links can stretch far beyond neighbor_order before breaking.
     Purely-contact reasoning would get the dynamics wrong.
-  verdict: null
+  verdict: new
   of: null
   implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  why: '`new` against the FROZEN baseline (all 42 registered contracts). The genuinely-new content is
+    a
+
+    PERSISTENT, PLASTIC, LOAD-RUPTURED cell-cell LINK NETWORK: junctions self-assemble on contact
+
+    (only while both cells are under a per-cell coordination cap, paying a one-time formation energy),
+
+    persist as identified per-pair state across MCS, and rupture when their CoM-CoM distance exceeds a
+
+    break length. I name the contract `bond` -- a load-bearing cell-cell junction (focal adhesion /
+
+    adherens-junction / slip-bond biology). It is NOT proposed by the jax-morph atlas either (that
+
+    list is adhere/agitate/apoptose/mechanosense/morphogen/regulate/relax/reorient), so
+
+    implementation_of is null.
+
+
+    WHY NOT `adhere`. `adhere` (jax-morph, unpromoted; the CC3D Contact/AdhesionFlex mechanisms are its
+
+    sightings) is CONTINUUM DIFFERENTIAL ADHESION: a boundary-contact energy summed over shared
+
+    cross-boundary lattice-site pairs, driving cell sorting by surface energy. FPP is a DISCRETE LINK
+
+    set on cell CENTROIDS (CoM-CoM distance, target 7 / break 20 on volume-25 cells -- far beyond the
+
+    contact boundary), with persistent per-link identity, a coordination cap, and load-dependent
+
+    rupture. Mapping FPP onto `adhere` would conflate a continuum surface-energy field with a discrete
+
+    plastic link graph -- different biology, different `set` semantics (boundary site-pairs vs an
+
+    identified centroid-pair link). So this is a distinct contract, not a second sighting of `adhere`.
+
+
+    WHY NOT a refinement/alias of the closest REGISTERED contract, `radius_graph` (rewire/topology).
+
+    radius_graph rebuilds `edge_index` from scratch each tick by a single symmetric proximity
+
+    threshold and keeps NO per-edge memory (its docstring: "rebuilds the live configuration ... emits
+
+    no delta"). `bond` needs exactly what radius_graph deliberately refuses: (a) HYSTERESIS -- a link
+
+    forms only within neighbor_order contact (~1-2 sites) but breaks only past max_distance (~20), an
+
+    order of magnitude larger, so a formed junction stretches far beyond any range that could have
+
+    formed it; (b) persistent per-link IDENTITY and per-link constitutive attributes; (c) a per-node
+
+    COORDINATION CAP (max_junctions) enforced at formation; (d) a once-paid ActivationEnergy at
+
+    formation. Widening radius_graph to admit these turns a stateless neighbour-search into a stateful
+
+    load-bearing junction model -- that is replacing its biology (who-is-near) with a different one
+
+    (which bonds have latched and not yet ruptured), i.e. violence, not a costed field widening.
+
+
+    THE ALGEBRA-FIT TENSION, stated plainly (rule 8). FPP bundles two things Plexus deliberately keeps
+
+    apart -- "who interacts" (rewire) and "how they interact" (a lateral energy). The RESTORING ENERGY
+
+    itself, lambda*(d - target_distance)^2, is NOT new: it is a quadratic pair spring already
+
+    expressible by the registered `squared_law` (or `attraction_repulsion`) read over `bond`''s edges.
+
+    The measurement-honest decomposition of the whole plugin is therefore `bond` (new: the plastic
+
+    hysteretic topology + formation energy + coordination cap) COMPOSED WITH an existing pairwise
+
+    spring on the links it maintains. What resists that clean split is that the rupture criterion
+
+    (max_distance) is a strain threshold on the SAME link the spring loads, so the topology remodeling
+
+    is mechanically coupled -- which is precisely why `bond` is a rewire that, unlike radius_graph,
+
+    also carries a formation-energy delta rather than emitting a pure `{}`. That coupling is the new
+
+    contract''s whole content, and it is what the Plexus separation-of-concerns cannot currently name.
+
+
+    SCOPE / CAVEATS. Only ONE new contract is credited (the plastic link topology), not two -- the
+
+    spring is charged to `squared_law`. The compiled FPP core is unreadable here, so the quadratic form
+
+    and the exact form/break scan cadence are inferred from the default LinkConstituentLaw + Swat et
+
+    al., not read line-by-line; a user LinkConstituentLaw can replace the quadratic with an arbitrary
+
+    formula (implementation freedom below the contract). No oracle/ablation run exists yet.
+
+    '
+  contract:
+    name: bond
+    kind: rewire
+    family: topology
+    set: cell
+    inputs:
+    - cell
+    outputs:
+    - a PERSISTENT link set E over eligible cell pairs -- the operator's primary product is this stateful,
+      identified edge set (created on contact, deleted on rupture), NOT an integrable delta
+    - a scalar dE contribution to the Metropolis acceptance test -- the ActivationEnergy formation bias,
+      paid ONCE only on the pixel copy that CREATES a junction (negative promotes formation). The link
+      RESTORING energy lambda*(d-target)^2 is charged separately to a pairwise spring (squared_law) read
+      over these edges; see why.
+    reads:
+    - cell CoM (link length d_ij = ||CoM_i - CoM_j||, used to test rupture d_ij > max_distance)
+    - cell_type (the ordered type1/type2 pair selects which cells are eligible to link)
+    - the persistent per-link registry (which pairs are already linked; per-link rest/stiffness/break
+      attrs)
+    - per-cell link count (coordination; tested against max_junctions at formation time)
+    - neighbour shells within neighbor_order (contact test for candidate NEW links only, not for existing
+      ones)
+    writes:
+    - the persistent link set only -- CREATE a junction when two eligible cells contact while BOTH are
+      under the coordination cap; DELETE it when d_ij exceeds max_distance. Nothing is written to the
+      CPM pixel lattice.
+    maps:
+    - HYSTERESIS -- a link FORMS only within neighbor_order contact but BREAKS only past max_distance
+      (>> contact range), so a formed junction persists and stretches far beyond the range that could
+      form it; memoryless symmetric-threshold proximity (radius_graph) cannot express this, which is why
+      `bond` is a distinct contract
+    - per type-pair (type1,type2) -> (lambda_fpp stiffness, target_distance rest length, max_distance
+      rupture length, activation_energy one-time formation bias, max_junctions per-cell coordination cap,
+      neighbor_order contact range); the `internal` flag selects inter-cluster vs intra-cluster (compartment)
+      link scope
+    - plastic cell junctions / focal adhesions -- load-bearing links that self-assemble on contact, resist
+      stretch as springs, and rupture under load; distinct from continuum surface adhesion (`adhere`,
+      the CC3D Contact/AdhesionFlex mechanisms), which sums a boundary-site contact energy rather than
+      an identified link
+  status: normalized
   module: null
   test: null
   evidence:
@@ -2029,12 +3387,120 @@ mechanisms:
     (not steerable), and xml (L6657-6666) just walks child field specs. Every physical parameter lives
     on child DiffusionData / SecretionData / BoundaryConditions specs, and the convolution integrator
     itself is compiled. No update logic is in this file.'
-  status: inspected
-  verdict: null
-  of: null
-  implementation_of: null
-  why: null
-  contract: null
+  status: normalized
+  verdict: alias
+  of: diffuse
+  implementation_of: diffuse
+  why: 'WHAT IT IS. Strip the plumbing and KernelDiffusionSolver is one step of dc/dt = D grad^2 c
+
+    - lambda c + S on a scalar concentration field, exactly like DiffusionSolverFE -- but it
+
+    realises the transport term by CONVOLUTION with a precomputed diffusion kernel (the Green''s
+
+    function of the diffusion equation) over a periodic torus, instead of a local FTCS stencil.
+
+    That transport core is EXACTLY the registered `diffuse` contract (field->field, advances the
+
+    grid in place). `diffuse` already carries a `spectral` implementation whose kernel is
+
+    exp(-D k^2 dt) -- and by the convolution theorem a Fourier multiply by exp(-D k^2 dt) IS a
+
+    real-space convolution with a Gaussian on the torus, which is precisely what this solver
+
+    does. So KernelDiffusionSolver is the same mathematical operation as diffuse''s spectral
+
+    implementation, done in real space with a truncated kernel (the `kernel` knob) and optional
+
+    lattice coarsening (`cgfactor`); at most it is a fourth numerical implementation of the SAME
+
+    contract. As a whole the mechanism is a COMPOSITE of three existing contracts -- `diffuse`
+
+    (transport), `decay` (the multiplicative exp(-lambda*dt) turnover), and `deposit` (the
+
+    per-cell-type secretion source S) -- exactly as its FE sibling. It introduces no new
+
+    biological verb.
+
+
+    WHY ALIAS AND NOT REFINEMENT. This is the key contrast with DiffusionSolverFE, which I made
+
+    a `refinement` of `diffuse` because its D_i / lambda_i are SPATIALLY HETEROGENEOUS (read per
+
+    pixel from the moving CPM cell-type lattice), forcing `diffuse`''s scalar `rate` to widen to a
+
+    coefficient-field. KernelDiffusionSolver has NO such demand: it emits ONLY GlobalDiffusionConstant
+
+    / GlobalDecayConstant (L6416-6431); diff_types / decay_types are never written and are in fact
+
+    IMPOSSIBLE here, because a single convolution kernel has exactly one width. A spatially UNIFORM
+
+    scalar D is precisely what `diffuse` already binds (self.rate = float(...)), so the contract
+
+    admits this solver with no field-widening at all. Its other hard constraint -- PERIODIC-ONLY
+
+    boundaries -- is not a widening either: the existing `spectral` implementation of `diffuse`
+
+    already assumes a periodic domain (exp(-D k^2 dt) is a torus operation), and Plexus fields
+
+    already carry a `periodic` flag, so periodic-only is a NARROWING that selects the spectral-family
+
+    implementation, not a new signature. Hence the signature is unchanged: same set (field), same
+
+    inputs/outputs/reads/writes as base `diffuse`. Nothing breaks for existing users; nothing must
+
+    widen. That is an alias, not a refinement.
+
+
+    WHAT THE TWO IMPLEMENTATIONS DO DIFFERENTLY (the alias detail R-rule asks for). diffuse''s
+
+    finite_difference / DiffusionSolverFE''s FTCS advance the field by a LOCAL nearest-neighbour
+
+    stencil (stable only at small D, moving/mixed boundaries allowed, per-type D possible).
+
+    KernelDiffusionSolver advances it by a GLOBAL periodic convolution with a truncated diffusion
+
+    kernel: fast and stable for LARGE D where FTCS chokes, but restricted to uniform D and a torus,
+
+    and APPROXIMATE (legacy; accuracy degrades at small `kernel` / large `cgfactor`). Same contract,
+
+    opposite numerical regime -- which is exactly the shape a mature framework should show: several
+
+    interchangeable implementations behind one biological verb, so implementation_of: diffuse and
+
+    the ledger counts `diffuse` once more, not a new contract.
+
+
+    CLOSEST-CONTRACT / not-new. Emphatically not `new`: diffuse + decay + deposit already cover
+
+    transport, turnover, and source, and unlike the FE solver this one needs not even the
+
+    coefficient-heterogeneity widening. The kernel / cgfactor knobs are numeric truncation /
+
+    coarse-graining accuracy dials with no biological content -- they do not change inputs,
+
+    outputs, reads, or writes -- so they justify neither a refinement nor a new contract.
+
+    '
+  contract:
+    name: diffuse
+    kind: field
+    family: fields
+    set: field
+    inputs:
+    - field
+    outputs: []
+    reads:
+    - the scalar concentration field c (the grid advanced in place)
+    - the single global diffusion coefficient D and decay rate lambda (spatially UNIFORM -- no per-cell-type
+      coefficient field, unlike the FE solver; this solver cannot express one)
+    - the CPM cell-type set lattice, only to locate secreting cell interiors for the composed deposit
+      source S (not for a per-site coefficient)
+    - the t=0 initial condition (expression or file); boundaries are required PERIODIC, not read as a
+      tunable
+    writes:
+    - the concentration field c, in place -- replaced each MCS by the periodic convolution result (a real
+      field write, not an energy delta)
+    maps: []
   module: null
   test: null
   evidence:
@@ -2138,12 +3604,81 @@ mechanisms:
     targetLength[, minor]) -- lambda FIRST, target SECOND, which is the reverse of the constructor''s
     (target_length, lambda_length) order (see PyCoreSpecs.py:L3853 vs the steppable call in elongationFlexSteppables.py:L12).
     Easy to transpose.'
-  verdict: null
+  verdict: new
   of: null
   implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  why: "NEW against the frozen baseline: no PROMOTED contract constrains a cell's SHAPE. This is a\nquadratic\
+    \ restoring spring on a cell's ELONGATION -- the length of the semi-major axis of the\nequivalent\
+    \ ellipse (read off the eigenvalues of the cell's inertia tensor about its COM) --\ntoward a per-type\
+    \ or per-cell target. Nothing in the 42 registered contracts reads a\nsecond-moment shape descriptor\
+    \ of a set and returns an energy that grows with its deviation\nfrom a rest value. I name the missing\
+    \ contract `elongate`.\n\nCLOSEST PROMOTED contract = cell_grow (structural/growth). It is the nearest\
+    \ because it, too,\nis a per-cell, target-driven geometric homeostasis. But widening cell_grow to\
+    \ admit this does\nviolence on three independent counts:\n  1. QUANTITY. cell_grow targets the 0th\
+    \ moment -- SIZE (rest volume / site count), isotropic.\n     elongate targets the 2nd moment -- the\
+    \ ANISOTROPY / aspect (major-axis extent), which is\n     independent of area: a cell can hit its\
+    \ target length by thinning to a filament at fixed\n     volume (indeed the reference sim must add\
+    \ Volume + Connectivity to stop exactly that).\n     Size homeostasis and shape homeostasis are different\
+    \ biology.\n  2. MECHANISM. cell_grow is a STATE UPDATE: the engine integrates a rest-volume delta\
+    \ and the\n     cell physically grows. elongate is a Potts ENERGY term -- changeEnergy returns a scalar\
+    \ dE\n     and mutates NOTHING; it only re-weights the acceptance probability of a proposed pixel\n\
+    \     copy. Forcing an integrated growth update to also mean \"return a dE that gates a Metropolis\n\
+    \     accept\" changes cell_grow's output contract and breaks every current user.\n  3. DEPENDENCY.\
+    \ elongate's length is a DERIVED quantity requiring the inertia tensor (the\n     CenterOfMass plugin);\
+    \ it has no stored field. cell_grow reads a scalar target it owns.\n\nNOT an alias/refinement of anything\
+    \ else in the baseline. The interaction family\n(attraction_repulsion, cohesion, separation, squared_law,\
+    \ stillinger_weber, ...) is pairwise\nand metric over neighbours; elongate reads a SINGLE cell's own\
+    \ pixel set, no partner. gravity\n(lateral/mechanics) is the precedent for a single-body mechanics\
+    \ energy, which is why the\ncontract is filed lateral/mechanics, but gravity is a uniform body force,\
+    \ not a shape spring.\n\nRELATIONSHIP TO THE VOLUME CONSTRAINT (its normalized-later sibling) recorded\
+    \ honestly: both\nare quadratic springs on a per-cell geometric moment -- Volume on the 0th, Length\
+    \ on the 2nd.\nOne could lump them as a single \"geometric target spring\" contract parameterised\
+    \ by moment\norder (see the note's counter-argument). I keep them distinct: the Volume constraint's\
+    \ biology\n(size homeostasis) maps onto the existing cell_grow rest-volume target, whereas shape/elongation\n\
+    has no home in the language at all. Collapsing \"any quadratic on any moment\" into one contract\n\
+    would erase that distinction -- the naming inflation this campaign exists to avoid, in reverse.\n\n\
+    NOT a second sighting of any jax-morph-proposed contract (adhere, agitate, apoptose,\nmechanosense,\
+    \ morphogen, regulate, relax, reorient): none is a shape/elongation energy.\n`reorient` concerns polarity\
+    \ DIRECTION, not shape magnitude; `relax` (meaning unread) is not\nevidenced to be an inertia-tensor\
+    \ shape spring, so I do not claim it. implementation_of: null.\n\nThe campaign-flagged shape stands:\
+    \ this is a Potts ENERGY term, not a state update. Whether the\nPlexus algebra can express a restoring\
+    \ energy over a set's emergent second-moment shape\ndescriptor whose output gates a Metropolis accept\
+    \ rather than integrating is the open question\n`elongate` leaves standing.\n"
+  contract:
+    name: elongate
+    kind: lateral
+    family: mechanics
+    set: cell
+    inputs: "- one cell's pixel set and its moments of inertia about the centre of mass (supplied by the\n\
+      \  CenterOfMass plugin); the semi-major axis length L is read off the inertia-tensor\n  eigenvalues,\
+      \ and the semi-minor axis length l when a minor target is set (3D / plane).\n- the proposed single-pixel\
+      \ copy (source/target Point3D, the two involved cells), used to\n  recompute the inertia tensor\
+      \ incrementally at +/-1 volume for the two cells it touches.\n- the target(s) and stiffness: target_length\
+      \ L0, optional minor_target_length l0,\n  lambda_length -- taken from the per-cell LengthConstraintData\
+      \ extra member if present, else\n  the per-cell-type default.\n- the lattice dimensionality / active\
+      \ plane, selecting changeEnergy_xy/_xz/_yz/_3D.\n"
+    outputs: "- a scalar energy contribution dE added to the Potts total, NOT an integrated state delta:\n\
+      \  dE = E_after - E_before, with E(cell) = lambda_L*(L - L0)^2 (+ lambda_L*(l - l0)^2 when a\n \
+      \ minor target is set), summed over the two cells the candidate copy changes. A NaN-guarded\n  length\
+      \ is used so degenerate (single-pixel / undefined-inertia) cells do not corrupt dE.\n  The delta\
+      \ only re-weights the Metropolis acceptance probability; the operator writes no\n  cell property.\n"
+    reads: "- the cell's pixel set / volume and its inertia tensor about the COM (xCM/yCM/zCM); length\
+      \ is\n  derived from this, not stored.\n- per-cell LengthConstraintData (targetLength, lambdaLength,\
+      \ minorTargetLength) OR the per-type\n  LengthEnergyParameters default.\n- the candidate pixel copy\
+      \ and the involved cells, for the incremental inertia-tensor change.\n- lattice dimensionality /\
+      \ active plane.\n"
+    writes: "- NONE. changeEnergy returns dE (an energy term) and mutates no cell field; it changes only\n\
+      \  the acceptance probability of the proposed pixel copy.\n- (out of band, not part of this contract)\
+      \ a host steppable may WRITE per-cell\n  LengthConstraintData via setLengthConstraintData(cell,\
+      \ lambda, target[, minor]) -- note\n  lambda-first, target-second, the reverse of the CC3DML attribute\
+      \ order. That is host-driven\n  state-setting, not the energy evaluation.\n"
+    maps: "- cell inertia tensor about COM -> eigenvalues -> semi-major axis length L (and semi-minor\
+      \ l);\n  the exact eigenvalue->length scale factor lives in compiled core and is unread (form\n\
+      \  confirmed, constant inferred).\n- shape deviation (L - L0) [and (l - l0)] -> quadratic Hookean\
+      \ energy lambda_L*(dev)^2 per\n  cell -> summed over the two cells a candidate copy touches -> dE\
+      \ that gates the Metropolis\n  accept. Straight-to-target -> low energy; over/under-stretched ->\
+      \ higher energy.\n"
+  status: normalized
   module: null
   test: null
   evidence:
@@ -2285,12 +3820,63 @@ mechanisms:
     an InertiaTensorComponents struct (cpp/CompuCell.py:4200) carrying the six updated components. A reimplementer
     who hooks a fixed per-step or per-MCS schedule rather than the per-accepted-change event will mis-sync
     the tensor with the pixel set. '
-  verdict: null
-  of: null
-  implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  verdict: refinement
+  of: aggregate
+  implementation_of: aggregate
+  why: "MomentOfInertia is the SECOND-MOMENT sibling of CenterOfMass, and CenterOfMass was\nalready aliased\
+    \ to `aggregate` (the centroid = first-moment reduction of a cell's\nlattice sites). The reduction\
+    \ machinery is bit-for-bit the same shape: reduce the\ncontained lattice-site child set onto its parent\
+    \ cell along the `parent` (containment)\nmap, per cell, publishing a READ-ONLY derived readout and\
+    \ returning no energy /\nacceptance delta (aggregate.py: EMIT=None, MAY_MUTATE_INTEGRATED_STATE, returns\
+    \ {}).\nSame kind (aggregate), same family (hierarchy), same set (cell), same input\n(the site child\
+    \ set, each site occupancy 1), same map (parent). So this is squarely the\naggregate contract, not\
+    \ a new one -- hence implementation_of: aggregate, and the ledger\nshould count aggregate ONCE across\
+    \ the two siblings, not twice.\n\nIt is a REFINEMENT and not an alias because two SIGNATURE fields\
+    \ must widen; the current\nregistered `aggregate` (its sole implementation, Centroid) cannot admit\
+    \ this reduction as\nwritten:\n(1) WRITES / OUTPUTS. Centroid writes the parent's `pos` (a first-moment\
+    \ mean, a D-vector).\n    MomentOfInertia writes a SECOND-moment TENSOR -- the six components iXX,iYY,iZZ,iXY,\n\
+    \    iXZ,iYZ -- and the shape observables derived from it (eccentricity, equivalent-ellipsoid\n  \
+    \  semiaxes, principal-axis orientation angle). A position readout and a shape/orientation\n    readout\
+    \ are different output fields; the contract's `writes` must widen from {pos} to\n    also admit a\
+    \ derived shape/inertia field.\n(2) READS. Centroid reads only child positions and occupancy (the\
+    \ weight/divisor). The\n    second moment is taken ABOUT the centre of mass (x' = x - x_CM), so this\
+    \ reduction also\n    READS the parent's `pos` -- i.e. it depends on the centroid aggregate having\
+    \ already run.\n    That is a genuinely new input edge the centroid signature does not have.\nWidening\
+    \ the aggregate contract this way is additive: existing centroid users are not broken\nfunctionally\
+    \ (a new reduction/output variant does not change what centroid computes), but the\nCOST that must\
+    \ be costed is that `aggregate`'s declared reads/writes are no longer just\n{pos}->{pos}; any consumer\
+    \ or validator that assumed aggregate reduces only to a position, and\nany dependency-ordering that\
+    \ assumed aggregate has no parent-state input, must now account for\na moment reduction that reads\
+    \ parent.pos and writes a shape tensor (an intra-aggregate ordering\nconstraint: centroid before second-moment).\n\
+    \nWhy not `new`: the only thing separating this from the promoted contract is the reduction\nkernel\
+    \ and its output field; the entire children->parent reduction structure is already the\naggregate\
+    \ contract, so calling it new would double-count the same operator family and\ncorrupt the saturation\
+    \ measurement -- exactly what CenterOfMass's alias was guarding against.\nWhy not `alias`: aggregate's\
+    \ registered signature writes a position and reads no parent state;\na tensor/shape readout measured\
+    \ about the COM is not expressible without changing those fields.\nThe closest OTHER contract is CenterOfMass's\
+    \ `aggregate` (centroid) itself -- this is its\nhigher-moment refinement, not a distinct mechanism.\n"
+  contract:
+    name: aggregate
+    kind: aggregate
+    family: hierarchy
+    set: cell
+    inputs:
+    - site (the contained lattice-site child set; each site carries occupancy 1)
+    outputs:
+    - cell (the parent whose derived shape tensor / orientation is published)
+    reads:
+    - site.pos (the (x, y, z) coordinate of each lattice site the cell owns)
+    - site.occupancy / cell.volume (the site count, the reduction weight and the divisor)
+    - cell.pos (the centre of mass the second moment is measured about; supplied by the sibling centroid
+      aggregate -- a NEW parent-state input relative to the centroid signature)
+    writes:
+    - cell.inertia (the six second-moment components iXX,iYY,iZZ,iXY,iXZ,iYZ about the COM, and the shape
+      observables derived from them -- eccentricity, equivalent-ellipsoid semiaxes, principal-axis orientation;
+      a read-only derived readout, no energy / acceptance delta -- the WIDENED write field relative to
+      the centroid's cell.pos)
+    maps:
+    - parent
+  status: normalized
   module: null
   test: null
   evidence:
@@ -2390,12 +3976,95 @@ mechanisms:
     to insertion or geometry -- code that assumes geometric ordering of neighbours is wrong.
 
     '
-  verdict: null
-  of: null
-  implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  verdict: refinement
+  of: radius_graph
+  implementation_of: radius_graph
+  why: 'This builds the RELATION among cells -- for each cell c, the set of cells it currently
+
+    touches -- which is precisely what a rewire/topology operator earns its place doing: it
+
+    leaves a live who-interacts-with-whom graph on the set that lateral operators (here the
+
+    CC3D contact/adhesion energy terms) read. That distinguishes it sharply from its sibling
+
+    BoundaryPixelTracker (ruled out_of_scope): that plugin classifies a single cell''s OWN
+
+    sub-elements (boundary vs interior pixel) and builds NO relation among cells, so it
+
+    collapses to nothing in the point-particle representation. NeighborTracker does not
+
+    collapse -- its output IS the interaction graph, so it is in scope and it is the
+
+    neighbour-graph contract, i.e. `radius_graph` (src/plexus/operators/graph.py, the only
+
+    registered rewire/topology op: set `edge_index` to the live within-set relation, emit no
+
+    delta).
+
+
+    It is not an ALIAS of radius_graph because radius_graph''s registered output is a bare,
+
+    unweighted `edge_index`: NeighborTracker''s defining product is a WEIGHTED relation, each
+
+    edge carrying commonSurfaceArea = the integer count of shared lattice-boundary links, a
+
+    first-class physical quantity the contact/adhesion terms consume (contact energy scales
+
+    with it). radius_graph structurally cannot represent that weight, so it does not already
+
+    cover this mechanism.
+
+
+    Hence REFINEMENT, and the signature field that must widen is `outputs` (and correspondingly
+
+    `writes`): from `[edge_index]` to `[edge_index, edge_weight]`, the per-edge contact area.
+
+    What that breaks for existing users: every current radius_graph consumer assumes edges are
+
+    weightless and purely metric. A rewire contract that now promises an edge weight either
+
+    forces radius_graph to synthesise a contact-area value it has no basis for (point particles
+
+    share no boundary, only a distance), or the weight becomes OPTIONAL -- in which case any
+
+    lateral operator that begins to REQUIRE the weight silently fails on the distance-based
+
+    implementation with no crash. That is a costed widening of the contract, not a free add.
+
+
+    It is not NEW: the "rebuild the within-set relation, emit no delta, others read the edges"
+
+    biology is identical to radius_graph''s, so spinning up a separate contract would inflate the
+
+    count for what is the same rewire/topology slot merely widened. The two differences beyond
+
+    the weight are IMPLEMENTATION, not contract, so implementation_of is set to radius_graph:
+
+    (a) the edge criterion is shared-lattice-boundary contact rather than a Euclidean radius
+
+    cutoff -- an interchangeable way to build the same relation; (b) it is maintained
+
+    INCREMENTALLY (increment/decrement on each accepted pixel copy) rather than by a full
+
+    per-tick rescan -- a numerics optimisation of the same output, not a new capability.
+
+    '
+  contract:
+    name: contact_graph
+    kind: rewire
+    family: topology
+    set: cell
+    inputs: []
+    outputs:
+    - edge_index
+    - edge_weight
+    reads:
+    - cell_id_lattice
+    writes:
+    - cell.neighbors
+    - edge.common_surface_area
+    maps: []
+  status: normalized
   module: null
   test: null
   evidence:
@@ -2576,12 +4245,65 @@ mechanisms:
     frequency too, consistent with the xml omission above.
 
     '
-  verdict: null
+  verdict: out_of_scope
   of: null
   implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  why: 'PIFDumper is a serializer -- the archetypal out_of_scope mechanism named in this loop''s own
+
+    rules. It carries ZERO biological content and ZERO dynamics: every `frequency` MCS it traverses
+
+    the cell-id lattice and writes one plain-text line per voxel (clusterId cellId typeNAME + voxel
+
+    extents) to a PIF file on disk. It returns no energy delta, biases no pixel-copy acceptance, and
+
+    writes no cell, field, or Hamiltonian term -- a run with it loaded is bit-identical to one
+
+    without (the only effect is a file appearing on disk). It is a read-only tap on the cell set with
+
+    a side effect entirely outside the state vector.
+
+
+    The closest registered contract is `playback` (field/fields), and the relationship is exactly
+
+    inversion: playback READS recorded frames off external storage and drives them INTO a field;
+
+    PIFDumper reads live state OUT to external storage. But that inversion is precisely why it cannot
+
+    alias `playback` -- playback earns its place by producing an integrable field the engine consumes
+
+    each step (it is a source of dynamics), whereas the dumper consumes nothing and produces nothing
+
+    the engine ever reads back within the run. Promoting a sink whose only product is a disk artifact
+
+    -- as `new` or as a `playback` alias -- would let I/O plumbing count toward the operator
+
+    vocabulary and corrupt the saturation measurement. There is no biological process here to name.
+
+    The contract below is recorded ONLY to document the sink''s typed shape (whole-cell-set read ->
+
+    external bytes); its `kind: field / family: fields` is a forced fit borrowed from `playback`''s
+
+    neighbourhood, not a claim that the dumper is a field operator.
+
+    '
+  contract:
+    name: checkpoint
+    kind: field
+    family: fields
+    set: cell
+    inputs:
+    - pif_name
+    - frequency
+    outputs:
+    - pif_file
+    reads:
+    - cell.id
+    - cell.cluster_id
+    - cell.type
+    writes:
+    - external.pif_file
+    maps: []
+  status: normalized
   module: null
   test: null
   evidence:
@@ -2732,12 +4454,96 @@ mechanisms:
     same format.
 
     '
-  verdict: null
+  verdict: out_of_scope
   of: null
-  implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  implementation_of: seed
+  why: 'INITIAL-CONDITION CONSTRUCTION by DESERIALIZATION, not a dynamical operator. Plexus
+
+    operators transform state that already exists -- each returns a per-step delta the engine
+
+    integrates over a set/field that is already present. PIFInitializer is the opposite shape:
+
+    a one-shot that runs once at t=0 and CONSTRUCTS the starting partition (the sets
+
+    themselves) by reading an external recorded file and painting cell ids onto an empty
+
+    lattice, box by box. In Plexus that starting partition is supplied by configuration/seeding,
+
+    not by any registered operator; there is nothing in the algebra to alias, and nothing that
+
+    could widen to admit set-construction-from-a-file without ceasing to be a per-step operator.
+
+    So this is framework mechanics for establishing the initial state -- out of scope for the
+
+    OPERATOR algebra whose completeness this campaign measures.
+
+
+    It is doubly out-of-scope: beyond being IC construction, it is specifically a DESERIALIZER
+
+    whose exact inverse is PIFDumperSteppable (a serializer, PyCoreSpecs.py:6012). The two are a
+
+    read/write pair over the PIF text format; a serializer/deserializer pair is the canonical
+
+    example of plumbing with no biological content. The biology here -- "a cell is the SET of
+
+    lattice sites that share its id" -- lives in the REPRESENTATION, not in this operator, which
+
+    only parses text and stamps boxes.
+
+
+    implementation_of: seed. PIFInitializer is the third member of the Blob / Uniform / PIF
+
+    initializer family -- three interchangeable ways to build the SAME thing, the initial cell
+
+    partition. The `seed` contract was already typed by the blobinitializer normalizer (order 2)
+
+    with these three named as its implementations; recording implementation_of: seed here keeps
+
+    the ledger counting `seed` ONCE rather than re-introducing it. Blob/Uniform generate the
+
+    partition PROCEDURALLY from a few numeric params; PIF REPLAYS a fully-specified layout from
+
+    disk -- same end state, opposite information source (procedural vs. recorded).
+
+
+    The closest REGISTERED contract is cell_divide (structural/growth); widening it to cover
+
+    de-novo population seeding would do violence to its biology -- division is mitosis, one
+
+    parent set -> two daughters, conserving material and requiring a pre-existing cell, whereas
+
+    seeding creates a whole population out of Medium with no parent. It is also NOT `playback`
+
+    (field/fields): playback replays a recorded time-series to DRIVE a field DURING the run;
+
+    PIFInitializer is a single t=0 read that establishes cell identities and then is done.
+
+    '
+  contract:
+    name: seed
+    kind: structural
+    family: growth
+    set: cell
+    inputs:
+    - recorded_layout_file (.piff path; the fully-specified initial partition, not numeric params)
+    outputs:
+    - initial_cell_partition
+    reads:
+    - external file pif_name (.piff text) -- NOT simulation state
+    - cell_type_registry (to resolve type-name strings from the file to type ids)
+    writes:
+    - cell_field (each site in a named box assigned to that cell id -- building the SETS)
+    - cell_type (per cell id, from the file's cellType column)
+    - cell_cluster_id (per cell, only when the "Include Clusters" header is present)
+    maps: "(empty lattice, recorded .piff layout)\n  -> a partition of the lattice into cell ids exactly\
+      \ as enumerated in the file: for each\n     data line assign every site in the inclusive box (x1..x2,\
+      \ y1..y2, z1..z2) to cell(cellId),\n     creating the cell on first mention and ADDING sites on\
+      \ later mentions (a cell is the\n     UNION of its boxes, need not be a single rectangle). Type\
+      \ and, in cluster mode,\n     clusterId are set per cell from the line. A one-shot deserialization\
+      \ executed once at\n     t=0, not a per-step delta. Same seed contract as the procedural Blob/Uniform\
+      \ variants;\n     the only difference is the information source (recorded file vs. numeric region\
+      \ params).\n"
+  status: normalized
   module: null
   test: null
   evidence:
@@ -2838,12 +4644,84 @@ mechanisms:
   - "track_medium is the ONLY parameter. In particular there is no neighbor_order here\n\u2014 that belongs\
     \ to the sibling BoundaryPixelTrackerPlugin (PyCoreSpecs.py:~5260),\nwhich tracks only boundary/surface\
     \ pixels. PixelTracker tracks the FULL interior\npixel set of every cell.\n"
-  verdict: null
+  verdict: out_of_scope
   of: null
   implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  why: 'Pure derived-index / observer, no biological content. The plugin returns no energy delta,
+
+    writes no cell-id lattice site and no field, and touches no term of the Hamiltonian: Delta H
+
+    = 0 always, so a simulation with it loaded is bit-identical to one without (confirmed at
+
+    source -- PyCoreSpecs.py:5311 is a spec whose only effect is emitting an optional
+
+    <TrackMedium/> element; the incremental update is a CellGChangeWatcher, CompuCell.py:6002,
+
+    that only edits a per-cell cache on each ACCEPTED copy). Its sole product is the inverse of
+
+    the cell_field: the CPM lattice stores site -> cell id, and PixelTracker materialises and
+
+    keeps live the cell id -> {sites} map so downstream tools (MomentOfInertia, whole-cell
+
+    move/delete, per-cell secretion) can enumerate a cell''s pixels in O(|cell|) rather than
+
+    rescanning the whole lattice. That is a spatial index, not a process.
+
+
+    The closest registered contract is `radius_graph` (also rewire/topology, also index-only,
+
+    also emits no integrable delta -- src/plexus/operators/graph.py), and this entry is ruled the
+
+    same way its direct sibling BoundaryPixelTracker was (also out_of_scope). But radius_graph
+
+    earns its place by building the RELATION over the elements of a set (who-interacts-with-whom),
+
+    the substrate every lateral message-passing operator runs on. PixelTracker builds no relation
+
+    among cells; it merely reifies set membership -- which of the lattice''s sites belong to which
+
+    cell id -- a distinction that exists only because a CC3D cell IS a set of lattice sites and
+
+    the lattice alone gives you only site -> id, not id -> {sites}.
+
+
+    The genuine temptation here (flagged in surprises) is that PixelTracker reifies the ATLAS''s
+
+    OWN framing of a cell as a set of sites, so one could argue the algebra is MISSING an explicit
+
+    "index / inverse-map over a field partition" contract and this is `new`. I reject that: in the
+
+    promoted Plexus representation a cell is a first-class element (a point/particle with a set
+
+    identity), and set membership is PRIMITIVE -- there is no scalar cell-id field to invert,
+
+    because the partition IS the data structure, not a derived view of a lattice. An operator
+
+    whose whole job is to reconstruct the primitive representation from a lower-level encoding has
+
+    no biological content the language could name; it is representation-specific plumbing that
+
+    collapses to nothing once the representation is a partition rather than a labelled lattice.
+
+    Hence out_of_scope, not new (and deliberately not aliased to radius_graph, which would let
+
+    acceleration caches inflate the vocabulary count).
+
+    '
+  contract:
+    name: pixel_index
+    kind: rewire
+    family: topology
+    set: cell
+    inputs: []
+    outputs:
+    - pixel_set
+    reads:
+    - cell_id_lattice
+    writes:
+    - cell.pixels
+    maps: []
+  status: normalized
   module: null
   test: null
   evidence:
@@ -3047,12 +4925,154 @@ mechanisms:
     spec xml and the FitzHugh-Nagumo example; the discretisation of R is not.
 
     '
-  status: inspected
-  verdict: null
+  status: normalized
+  verdict: new
   of: null
-  implementation_of: null
-  why: null
-  contract: null
+  implementation_of: react
+  why: 'WHAT THIS ENTRY IS ABOUT. Strip ReactionDiffusionSolverFE down and it is the SAME
+
+    diffuse-decay-secrete forward-Euler solver as DiffusionSolverFE (order 14) plus ONE extra
+
+    emitted element, <AdditionalTerm> (L6772-6773). The sibling DiffusionSolverFE entry already
+
+    resolved the diffusion/decay/secretion substrate: the FTCS Laplacian is a third
+
+    implementation of `diffuse`, the -lambda*c term is `decay`, the secretion source is
+
+    `deposit`, and the per-cell-type coefficient heterogeneity is a costed refinement of
+
+    diffuse/decay. I do NOT re-litigate that here. The ONLY marginal content of this mechanism
+
+    over its sibling is the reaction term, so the verdict is about the reaction term. As a whole
+
+    the mechanism is diffuse + decay + deposit + REACT; `react` is the sole verb the sibling
+
+    composite does not already contain.
+
+
+    WHAT REACT IS. AdditionalTerm is a per-field muParser expression added to that field''s update
+
+    each step; crucially it may reference the OTHER fields BY NAME (and the cell type at the site).
+
+    That is the classic "reaction" half of a reaction-diffusion system: an arbitrary, in general
+
+    NONLINEAR, kinetics law that couples M concentration fields, producing and consuming species
+
+    as a function of the local field values. The FitzHugh-Nagumo example is exactly this -- field
+
+    F''s term "F-F*F*F/3+0.3-H" reads H, H''s term "0.08*F-0.064*H+0.056" reads F: an
+
+    activator-inhibitor pair whose cross-coupling IS the reaction. It is a genuine field->field
+
+    write (adds R_f*dt into the grid in place), kind=field / family=fields / set=field, the same
+
+    typing as diffuse and decay.
+
+
+    WHY NEW AND NOT A WIDENING OF decay. The closest REGISTERED contract is `decay`
+
+    (field/fields/field): c <- c - lambda*dt*c. decay is exactly ONE degenerate instance of a
+
+    reaction term -- a single-field, linear, sign-fixed (monotone-down) sink with no production
+
+    and no coupling. `react` is the general case: multi-field, nonlinear, either sign (a reaction
+
+    can grow a field -- indeed a BLANK AdditionalTerm defaults to R = c, exponential growth, not
+
+    R = 0, per the surprises), and cross-coupled. To widen `decay` to admit AdditionalTerm you
+
+    would have to let its coefficient become an arbitrary nonlinear function of every other field
+
+    -- at which point "decay" no longer decays: it is a general kinetics operator wearing decay''s
+
+    name. That does violence to decay''s biology (guaranteed turnover of one species), so this is
+
+    `new`, not a refinement of decay. No other registered contract is a candidate: diffuse is
+
+    transport, deposit is a set->field source, `sense`/`chemotax` couple fields to MOTION not to
+
+    each other''s chemistry, `pacemaker`/`activation_pulse`/`playback` are prescribed single-field
+
+    drivers with no inter-field coupling.
+
+
+    RELATION TO THE jax-morph PROPOSAL `regulate` (the anti-inflation call). jax-morph already
+
+    proposed `regulate` for reaction kinetics: dg/dt = f(g, drivers), an arbitrary user/learned
+
+    law integrated per step. Mathematically react and regulate share the reaction-network shape
+
+    dx/dt = f(x_1..x_n). I therefore RECORD the kinship explicitly so the ledger does not treat
+
+    them as unrelated. But I do NOT collapse this into `regulate`, and here is why they are
+
+    distinct typed contracts rather than one: `regulate` is set=cell / kind=exchange -- an
+
+    INTERNAL per-cell gene-regulatory network, the genotype->phenotype decision function reading a
+
+    cell''s own gene state and sensed drivers and writing its gene state. `react` here is
+
+    set=field / kind=field -- EXTRACELLULAR chemistry over the pixel lattice, with no cell, no
+
+    gene state, no heritability; the cell field enters only as an optional type label inside the
+
+    expression. Unifying them would force `regulate` to widen BOTH its set (cell->field) and its
+
+    kind (exchange->field), which strips out precisely what makes regulate regulate (an internal
+
+    cell decision). Plexus types by set -- diffuse-on-a-field and a would-be spread-among-cells
+
+    are separate contracts even sharing math -- so a field reaction and a cell gene network are
+
+    correctly two sibling contracts in family=fields, not one. I set implementation_of: react
+
+    (this FTCS + muParser scheme is ONE implementation of the react contract, as GeneNetwork*/
+
+    NeuralODE are implementations of regulate), NOT implementation_of: regulate, so the ledger
+
+    counts a genuinely new field-substrate reaction verb once -- while this paragraph flags that a
+
+    future pass electing a single set-polymorphic reaction-kinetics contract would merge react
+
+    and regulate. That is a call for the ledger-keeper to make deliberately, not one to bury by
+
+    silently forcing the merge now.
+
+
+    CAVEAT CARRIED FROM INSPECTION. The continuous coupled form and the named-field coupling are
+
+    established from the spec xml and the FitzHugh-Nagumo test; the exact DISCRETISATION of R
+
+    (DeltaT scaling, pre- vs post-diffusion evaluation order, whether AutoscaleDiffusion rescales
+
+    it) lives in the compiled core, which was not read. This does not change the verdict -- the
+
+    contract is about WHICH quantities R reads and writes and that it is an arbitrary coupled
+
+    reaction law, all of which are source-established -- but the numeric ordering of react vs the
+
+    diffuse step is inferred.
+
+    '
+  contract:
+    name: react
+    kind: field
+    family: fields
+    set: field
+    inputs:
+    - field
+    outputs: []
+    reads:
+    - the value at each pixel of EVERY declared concentration field (a field's reaction term reads the
+      OTHER fields at the same site -- the cross-field read is the coupling that makes M diffusants into
+      one reaction-diffusion system; this is the read `diffuse`/`decay` lack)
+    - 'OPTIONAL: the CPM cell-type occupying the pixel, when the AdditionalTerm expression references
+      cell type (a set-lattice read that keeps the operator field-kind: type enters only as a scalar label
+      in the local reaction law, not as a gather over the set)'
+    writes:
+    - each concentration field, in place -- adds the evaluated reaction R_f (dt-scaled) to the field's
+      forward-Euler update each step (a real field write, not an energy delta)
+    maps: []
   module: null
   test: null
   evidence:
@@ -3234,12 +5254,74 @@ mechanisms:
     is a per-site term, not one deposit per cell.
 
     '
-  verdict: null
-  of: null
-  implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  verdict: refinement
+  of: deposit
+  implementation_of: deposit
+  why: "WHAT IT IS. Strip the plumbing and Secretion is the registered `deposit` contract: a\nset->field\
+    \ scatter in which a cell adds to a scalar concentration field at the lattice\nsites it owns (plain\
+    \ Secretion: phi(x) += s_T for x in cell). deposit's own biology is\nstigmergy -- an ant depositing\
+    \ pheromone into the field at its position (deposit.py\nREFERENCE = Grasse 1959); a cell secreting\
+    \ a chemical into a co-registered field at its\npixels is the same verb. The transport/spread is NOT\
+    \ part of this mechanism (that is the\nseparate `diffuse` solver on the same field), so there is no\
+    \ composite here as there was\nin the sibling DiffusionSolverFE entry -- the standalone Secretion\
+    \ plugin is deposit and\nonly deposit, in its plain mode.\n\nWHY REFINEMENT AND NOT ALIAS. Plain additive\
+    \ Secretion alone would be a clean alias\n(implementation) of deposit. But the plugin is ONE mechanism\
+    \ with THREE modes, and two of\nthem cannot be routed through `deposit` as registered:\n(1) ConstantConcentration\
+    \ OVERWRITES: phi(x) := k_T, a Dirichlet clamp re-pinned every\n    step. deposit only ADDS -- its\
+    \ forward() does fld.grid.index_add_(...) then\n    clamp_(max=1.0); it has no set/overwrite path\
+    \ and no way to pin a value (it would also\n    wrongly cap at 1.0). Admitting ConstantConcentration\
+    \ requires widening deposit with a\n    param `mode: add|set` (default add). What this BREAKS for\
+    \ existing users: the WRITES\n    obligation grows -- an implementation can no longer be a bare index_add_\
+    \ scatter; it\n    must branch on mode and, in set-mode, assign (clamp being inappropriate for an\
+    \ absolute\n    pin). The stigmergy min(1, c+amt) clamp is specific to add-mode and cannot apply to\
+    \ a\n    set-mode pin.\n(2) SecretionOnContact restricts the write to a cell's BOUNDARY sites that\
+    \ touch a named\n    OTHER cell type: phi(x) += r_{T,U} only for x in boundary(c) with a neighbour\
+    \ of type U.\n    deposit writes unconditionally at every agent pixel; it reads only `pos`. Admitting\n\
+    \    on-contact requires deposit to gain (a) an optional write-domain restriction to\n    boundary\
+    \ sites, and (b) a neighbour-TYPE predicate -- so its `reads` must widen to\n    include the boundary-pixel\
+    \ index and the neighbouring sites' cell types (the set-\n    membership lattice). This BREAKS the\
+    \ \"reads: [pos]\" minimal signature and the \"one\n    pixel per point-agent\" assumption baked into\
+    \ deposit's shader.\nBoth widenings are the same shape: deposit's write, currently an unconditional\
+    \ additive\nscatter at a point-agent's single pixel, must become a mode-selectable (add|set), optionally\n\
+    domain-restricted (interior | boundary-on-heterotypic-contact) write over a cell's pixel\nSET. I elect\
+    \ the mode/domain widening as the primary refinement; I do NOT split the entry.\n\nA REPRESENTATION\
+    \ NOTE (not itself a widening). deposit's `set: cell` already permits a cell,\nbut its implementation\
+    \ treats an agent as a POINT (writes at `pos`, one pixel). CC3D cells\nare pixel-SETS, so plain/constant\
+    \ Secretion writes EVERY owned site and total injected mass\nscales with cell VOLUME. This is the\
+    \ set-vs-point primitive gap this campaign keeps meeting,\nnot a new contract field: deposit's `set`\
+    \ primitive would carry the pixel membership; the\ncontract signature is unchanged by it. I record\
+    \ it because a reimplementer folding CC3D\nsecretion into a point-source deposit would lose the volume\
+    \ coupling.\n\nCLOSEST-CONTRACT / not-new argument. This is emphatically not `new`: deposit covers\
+    \ the\nsource biology exactly, needing only the mode/domain widening. Calling it `new` would\ndouble-count\
+    \ a verb the language already has. Nor is it a fresh sighting of a jax-morph\nproposal: jax-morph's\
+    \ `morphogen` may name a secrete-and-diffuse bundle, but the registered\n`deposit` is the tighter,\
+    \ source-only anchor and is what this plugin actually is, so\nimplementation_of points at deposit,\
+    \ not morphogen. (The uptake/outside-cell/COM-source\nFieldSecretor variants noted in surprises are\
+    \ NOT reachable from this XML plugin; a SINK\nwould be `deposit` with a negative amount or a distinct\
+    \ uptake verb, but it is out of scope\nfor the declarative Secretion surface inspected here.)\n"
+  contract:
+    name: deposit
+    kind: exchange
+    family: fields
+    set: cell
+    inputs:
+    - cell
+    outputs: []
+    reads:
+    - the cell-id / cell-type lattice sigma(x), to select which sites (owned by a named type) secrete
+    - the per-cell interior pixel-membership index (PixelTracker) -- the sites a cell owns and writes
+      at; volumetric, not a single point
+    - the scalar concentration field phi (read-modify-write in additive and on-contact modes)
+    - 'REFINEMENT (for SecretionOnContact only): the per-cell BOUNDARY pixel index (BoundaryPixelTracker)
+      and the cell types of neighbouring sites -- deposit as registered reads only pos and never a neighbour-type
+      predicate'
+    writes:
+    - the concentration field phi at the cell's owned sites -- += rate (plain / on-contact) or := level
+      (ConstantConcentration, a Dirichlet clamp). A genuine field write, not an energy delta; deposit
+      returns {} (no integrable set-state output)
+    maps:
+    - field
+  status: normalized
   module: null
   test: null
   evidence:
@@ -3399,12 +5481,110 @@ mechanisms:
     SecretionData path would miss that the source term can be externally driven.
 
     '
-  verdict: null
+  verdict: new
   of: null
-  implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  implementation_of: morphogen
+  why: 'WHAT IT IS, BIOLOGICALLY. Strip the plumbing and this solver computes ONE thing: the
+
+    quasi-static equilibrium concentration of a secreted, diffusible, degradable signal --
+
+    the developmental MORPHOGEN gradient. Its equation is the modified-Helmholtz / screened-
+
+    diffusion steady state D grad^2 c - k c + S = 0 (dc/dt = 0), and its screening length
+
+    L = sqrt(D/k) IS the classic synthesis-diffusion-degradation (SDD) morphogen decay length.
+
+    Given per-cell-type sources it overwrites the whole field with its t=infinity solution in a
+
+    single global implicit solve -- a CONSTRAINT solve, not a time step.
+
+
+    A SECOND SIGHTING OF `morphogen`, FIRST PROPOSED FROM jax-morph. The earlier jax-morph atlas
+
+    already isolated exactly this operator as the `morphogen` contract (candidate
+
+    jax_morph_free_screened_diffusion.py:102, "the steady-state morphogen field", solving the
+
+    SAME D grad^2 c - K c + S = 0). That candidate''s own docstring notes TWO jax-morph numerical
+
+    methods for it -- a free-space Green''s-function superposition (the code it runs) and the
+
+    paper''s graph-Laplacian inverse c = (K I - D L)^{-1} S. CC3D''s SteadyStateDiffusionSolver is
+
+    a THIRD sibling implementation of the identical biological verb: the same screened-Helmholtz
+
+    equilibrium, but discretised on the CPM PIXEL LATTICE and solved as a grid boundary-value
+
+    problem (Dirichlet/Neumann/periodic per face) by the compiled libCC3DPDESolvers.so, rather
+
+    than as a cell-to-cell kernel. Same contract, different substrate and boundary treatment --
+
+    exactly the multi-implementation shape Plexus expects. So `implementation_of: morphogen`, and
+
+    the verdict against the FROZEN baseline is `new` only because `morphogen` is not among the 52
+
+    promoted contracts yet; the ledger must count it ONCE across the two atlases, not twice.
+
+
+    CLOSEST REGISTERED CONTRACT, AND WHY WIDENING IT DOES VIOLENCE. The nearest promoted contract
+
+    is `diffuse` (field->field, one explicit Laplacian step; its sibling DiffusionSolverFE in this
+
+    atlas is correctly a refinement/implementation_of diffuse). But `diffuse` cannot be widened to
+
+    admit this without breaking what it IS. `diffuse` is a TRANSIENT operator: it returns one
+
+    local finite-difference/heat-kernel step of dc/dt = D grad^2 c that the engine INTEGRATES over
+
+    time; the transient IS its meaning, and DiffusionSolverFE decomposes cleanly into the sequential
+
+    composite diffuse -> decay -> deposit because those explicit updates commute step-to-step. The
+
+    steady-state solver is the OPPOSITE temporal semantics: no dt, no per-step delta, no integration
+
+    -- it returns the t=infinity FIXED POINT in one global implicit solve, and the three terms
+
+    (transport, decay, source) are solved SIMULTANEOUSLY as one coupled elliptic system, not applied
+
+    in sequence. You cannot express "solve the coupled Helmholtz BVP for its equilibrium" as
+
+    diffuse-then-decay-then-deposit; running diffuse to convergence would give the transient
+
+    approach, and the guide (diffusion_solvers_descr.py:24) explicitly warns it is "not a direct
+
+    substitution for Diffusion Solver FE". Forcing a "solve-to-steady-state" mode into `diffuse`
+
+    would overload a per-step transport verb with a global equilibration verb -- two different
+
+    biological idealisations (finite-rate transport vs. quasi-static gradient). `morphogen` is the
+
+    right home precisely because it names the equilibrium-field idealisation directly.
+
+    '
+  contract:
+    name: morphogen
+    kind: exchange
+    family: fields
+    set: cell
+    inputs:
+    - cell
+    - field
+    outputs:
+    - field
+    reads:
+    - per-cell-type secretion rate S (the SecretionData source term -- the only channel through which
+      cell geometry/type enters the solve)
+    - the CPM cell-id / cell-type lattice, used ONLY to place S(x) at the pixels of secreting cells
+    - global diffusion coefficient D (diff_global) and global decay/degradation rate k (decay_global);
+      the medium is homogeneous (no per-type D_i/k_i here, unlike DiffusionSolverFE)
+    - per-face boundary conditions (Dirichlet value / Neumann flux / periodic) and an optional initial-field
+      guess (init_expression / init_filename)
+    writes:
+    - the concentration field c over ALL lattice sites, OVERWRITTEN in place with the t=infinity equilibrium
+      solution of D grad^2 c - k c + S = 0 (a whole-field REPLACE, not an integrable delta)
+    maps:
+    - grid_bvp
+  status: normalized
   module: null
   test: null
   evidence:
@@ -3417,26 +5597,227 @@ mechanisms:
   raw_name: Surface
   raw_kind: Plugin (SurfacePlugin)
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L2225
-  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
-    CompuCell3D'
-  summary: Surface Plugin
-  equations: 'E_surf = sum_cells lambda_S * (S(sigma) - S_target(sigma))^2
+  paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366 -- the GGH/CPM effective-energy (Hamiltonian)
 
-    S(sigma) = number of adjacent site-pairs where the id changes -- a perimeter COUNT.'
+    discussion, where the surface constraint is one term of E, the standard partner of the volume
+
+    term. NOTE: no paper text was available in this environment, so this anchor is the chapter''s
+
+    known home for the term, NOT a page I have read. The equation below is reconstructed from the
+
+    CC3D source declaration (SurfaceEnergyParameter / SurfacePlugin) plus standard CPM convention;
+
+    the compiled changeEnergy was not read.
+
+    '
+  summary: 'A per-cell-type (or, in bare mode, per-cell) quadratic penalty on the deviation of a cell''s
+
+    BOUNDARY count -- its perimeter (2D) / surface (3D) -- from a target. It writes no state: on
+
+    every proposed pixel copy it returns a dE that makes copies pushing a cell''s perimeter away from
+
+    its target energetically costly, so the Metropolis rule rejects most of them. Where the Volume
+
+    term sets a cell''s SIZE (0th geometric moment, a site count), the Surface term sets its MEMBRANE
+
+    AREA / roughness (the 1st-order boundary count): below target it favours ruffling out, above
+
+    target it favours smoothing in -- an effective surface / cortical tension. Volume + Surface
+
+    together are the two terms that give a set-of-sites a rounded, incompressible cell shape.
+
+    '
+  equations: "Effective-energy surface term, summed over all real cells sigma (Medium, id 0, is exempt):\n\
+    \n  E_surf = sum_{sigma>0} lambda_S(sigma) * ( S(sigma) - S_target(sigma) )^2\n\nwhere\n  S(sigma)\
+    \        = the cell's surface: the number of adjacent site-pairs, counted out to\n               \
+    \     NeighborOrder, where the id changes across the pair (a boundary / perimeter\n              \
+    \      COUNT), so it grows with both spread AND membrane roughness. It is a COUNT,\n             \
+    \       not a physical area.\n  S_target(sigma) = the cell's rest / target boundary count.\n  lambda_S(sigma)\
+    \ = quadratic stiffness (energy per (site-pair)^2); lambda_S = 0 removes the term.\n\nThe plugin never\
+    \ integrates this. On each attempted pixel copy (a source site's id is proposed to\noverwrite a neighbour\
+    \ site) it returns dE = E_surf(after) - E_surf(before). A single copy is a\nTWO-cell event -- the\
+    \ gaining cell and the losing cell each change their boundary count (either may\nbe Medium, which\
+    \ contributes 0) -- so dE couples both quadratics and is NOT symmetric. The\nMetropolis rule accepts\
+    \ with P = 1 if the TOTAL dE (this term + all others) <= 0, else\nexp(-dE / T), where T = the Potts\
+    \ fluctuation_amplitude. Standard CPM convention has no leading\n1/2 on the quadratic. Measured reference\
+    \ ablation (log/atlas_cc3d/surface_constraint, target 16,\nlambda_S 2.0, seed 42): mean perimeter\
+    \ 20 -> 19.33 constrained vs 20 -> 22.8 unconstrained\n(lambda_S = 0) -- the penalty rounds and compacts\
+    \ cells toward target, the ablation lets them\nspread/ruffle.\n"
   params:
-    target_surface: target_perimeter
-    lambda_surface: perimeter_stiffness
-  state_io: 'reads: cell boundary count; writes: nothing (an energy term)'
+    target_surface: 'target_perimeter -- the boundary count a cell of this type relaxes toward
+
+      (SurfaceEnergyParameter.target_surface; CC3DML attribute TargetSurface). Guarded >= 0
+
+      (check_dict, PyCoreSpecs.py:L2170).
+
+      '
+    lambda_surface: 'perimeter_stiffness / constraint_stiffness -- the quadratic energy penalty per (site-pair)^2
+      of
+
+      deviation from target (CC3DML attribute LambdaSurface). NOT guarded on the parameter: lambda_S =
+      0
+
+      is legal and is exactly the ablation that unconstrains the perimeter.
+
+      '
+    neighbor_order: 'plugin-level int (SurfacePlugin.__init__, PyCoreSpecs.py:L2248), guarded >= 1
+
+      (check_dict L2244). Sets how far out the id-change pairs are counted, i.e. WHAT COUNTS AS the
+
+      boundary -- so it changes the numeric meaning of S, not just its precision. Optional; if a
+
+      SurfaceTracker with its own order is present, that order overrides this (per the docstring L2253).
+
+      '
+    scale_surface: 'plugin-level float (PyCoreSpecs.py:L2249), guarded >= 0 (check_dict L2245). A surface
+      scaling
+
+      coefficient applied to the measured S (a lattice-geometry normalization); does not change the
+
+      quadratic FORM.
+
+      '
+    _params: '(plugin constructor, SurfacePlugin(neighbor_order, scale_surface, *_params),
+
+      PyCoreSpecs.py:L2247) zero or more SurfaceEnergyParameter, one per cell type. Zero param args =
+
+      "bare" mode: target_surface / lambda_surface are then read PER-CELL from cell.targetSurface /
+
+      cell.lambdaSurface instead of per-type (the same per-type-silences-per-cell split as Volume).
+
+      '
+  state_io: "reads: S(sigma), the per-cell boundary count -- maintained incrementally by a SEPARATE plugin,\n\
+    \  SurfaceTrackerPlugin (see the surfacetracker sibling entry), NOT recomputed by this plugin; and,\n\
+    \  per cell, its targetSurface + lambdaSurface, taken EITHER from per-type SurfaceEnergyParameters\n\
+    \  OR, in bare mode, from the per-cell cell.targetSurface / cell.lambdaSurface attributes. Also\n\
+    \  reads neighbor_order (which id-change pairs constitute the boundary) and scale_surface.\nwrites:\
+    \ nothing. It is an energy term -- it only changes the acceptance probability of a proposed\n  pixel\
+    \ copy, never moves or writes state directly. (This is the campaign-flagged shape: a Potts\n  plugin\
+    \ returns a scalar dE and mutates no cell field; it does not fit read/write update language.)\n"
   surprises:
-  - '`cell.surface` silently reads 0 unless SurfaceTracker is enabled -- a flat zero line that looks like
-    a measurement.'
-  - 'Measured ablation: perimeter 20 -> 19.3 constrained vs 20 -> 22.8 unconstrained.'
-  verdict: null
+  - '`cell.surface` silently reads 0 unless SurfaceTrackerPlugin is enabled -- a flat zero line that
+
+    looks like a valid measurement. The COUNT and the ENERGY are two different plugins: SurfacePlugin
+
+    only reads S(sigma); SurfaceTracker keeps it up to date on each accepted copy. A reimplementer who
+
+    folds "recount the boundary" into the energy term, or forgets the tracker, gets a plugin reading a
+
+    stale or zero surface and a silently inert constraint.
+
+    '
+  - 'Measured ablation (log/atlas_cc3d/surface_constraint): perimeter 20 -> 19.3 constrained (target 16,
+
+    lambda_S 2.0) vs 20 -> 22.8 unconstrained (lambda_S 0). The effect is real but far milder than the
+
+    Volume ablation -- unconstraining surface lets cells spread/ruffle, it does NOT dissolve them
+
+    (Volume still holds their size). Surface shapes the membrane; Volume anchors the object.
+
+    '
+  - 'S is a boundary-PAIR count, and neighbor_order decides which pairs count. So the SAME cell has a
+
+    different S at different neighbor orders, and target_surface is only meaningful relative to the
+
+    order used to measure it -- a target tuned for order 1 is wrong for order 2. neighbor_order is part
+
+    of the constraint''s definition, not a free knob.
+
+    '
+  - 'A single pixel copy is a TWO-cell event: both the gaining and the losing cell change their boundary
+
+    count, and because the term is quadratic the two contributions do not cancel -- dE depends on how
+
+    far each cell already is from its own target. Treating perimeter relaxation as an independent
+
+    per-cell update misses this coupling. Medium (id 0) has no surface constraint and contributes 0.
+
+    '
+  - 'Only target_surface is guarded (>= 0). lambda_surface on the parameter is unchecked, so the zero
+
+    that unconstrains the perimeter passes validation silently. As with Volume, the constraint''s
+
+    strength is inseparable from the Potts temperature T (fluctuation_amplitude), which is a Potts
+
+    param, not a Surface param: a large lambda_S with fixed T can freeze the boundary short of target.
+
+    '
+  verdict: new
   of: null
   implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  why: "NEW against the frozen baseline: no PROMOTED contract reads a cell's own BOUNDARY / perimeter\n\
+    count and returns a restoring energy that grows with its deviation from a rest value. This is a\n\
+    quadratic (Hookean) spring, lambda_S*(S - S_target)^2, on the 1st-order geometric descriptor of a\n\
+    set of sites -- an effective membrane / cortical tension homeostasis -- evaluated as a Potts\nENERGY\
+    \ term (returns dE for a proposed pixel copy, writes nothing). I name the missing contract\n`membrane_tension`.\n\
+    \nCLOSEST PROMOTED contract = cell_grow (structural/growth): the nearest because it, too, is a\nper-cell,\
+    \ target-driven geometric homeostasis. But widening cell_grow to admit this does violence\non three\
+    \ counts:\n  1. QUANTITY. cell_grow targets the 0th moment -- SIZE (rest volume / site count), isotropic\
+    \ and\n     area-like. membrane_tension targets the boundary count -- membrane AREA / roughness, which\
+    \ is\n     independent of size: at fixed volume a cell can raise its perimeter by ruffling and lower\
+    \ it\n     by rounding (the ablation shows exactly this, 20 -> 22.8 with volume held by the Volume\
+    \ term).\n     Size homeostasis and membrane-area homeostasis are different biology.\n  2. MECHANISM.\
+    \ cell_grow is a STATE UPDATE -- the engine integrates a rest-volume delta and the\n     cell physically\
+    \ grows. membrane_tension is a Potts ENERGY term: changeEnergy returns a scalar\n     dE and mutates\
+    \ NOTHING; it only re-weights the acceptance probability of a proposed pixel\n     copy. Forcing an\
+    \ integrated growth update to also mean \"return a dE that gates a Metropolis\n     accept\" changes\
+    \ cell_grow's output contract and breaks every current user.\n  3. DEPENDENCY. membrane_tension's\
+    \ S is maintained by a separate tracker (SurfaceTracker) and is\n     read, not owned; cell_grow reads\
+    \ a scalar target it owns.\n\nNOT an alias/refinement of the interaction family (attraction_repulsion,\
+    \ cohesion, separation,\nsquared_law, stillinger_weber, ...): those are pairwise and metric over neighbours;\
+    \ this reads a\nSINGLE cell's own boundary, no partner. It is filed lateral/mechanics with gravity\
+    \ as the\nprecedent for a single-body mechanics energy, but gravity is a uniform body force, not a\n\
+    restoring shape spring.\n\nRELATIONSHIP TO ITS SIBLINGS (Volume, order 30; LengthConstraint, order\
+    \ 18 = `elongate`),\nrecorded honestly: all three are the same functional object -- a quadratic Hookean\
+    \ spring on a\nper-cell geometric moment, contributing dE to the Metropolis accept -- differing only\
+    \ in WHICH\ndescriptor they read (Volume the 0th moment / site count, Surface the 1st-order boundary\
+    \ count,\nLength the 2nd moment / inertia-axis). One could lump them as a single\n`constrain_moment(cell,\
+    \ order, target, lambda)` contract of which each is an implementation (see\nthe note's counter-argument,\
+    \ and the same argument raised in the elongate sibling). I keep them\nDISTINCT because the descriptors\
+    \ carry distinct biology and distinct homes in the language: size\nhomeostasis (Volume) maps onto\
+    \ cell_grow's rest-volume machinery; anisotropy (Length) has no home\n(`elongate`); and membrane-area\
+    \ / cortical-tension homeostasis (Surface) likewise has no home.\nCollapsing \"any quadratic on any\
+    \ moment\" into one contract would erase those distinctions -- the\nnaming DEflation this campaign\
+    \ must equally avoid. Since `elongate` is only PROPOSED this phase\nand is NOT in the frozen baseline,\
+    \ and since perimeter (an isoperimetric boundary count) is a\nDIFFERENT descriptor from the inertia-tensor\
+    \ major axis, this is NOT a second sighting of\n`elongate`: distinct contract, implementation_of:\
+    \ null.\n\nNOT a second sighting of any jax-morph-proposed contract (adhere, agitate, apoptose,\n\
+    mechanosense, morphogen, regulate, relax, reorient): none is a surface-area / membrane-tension\nenergy.\
+    \ `adhere` is a pairwise interfacial energy between two cells (CC3D's Contact term), not a\nsingle\
+    \ cell's self-boundary spring; `relax` (meaning unread) is not evidenced to be an\nisoperimetric membrane\
+    \ spring, so I do not claim it.\n"
+  contract:
+    name: membrane_tension
+    kind: lateral
+    family: mechanics
+    set: cell
+    inputs: "- one cell's boundary count S(sigma) -- the number of id-change site-pairs out to\n  neighbor_order\
+      \ (supplied/maintained by the SurfaceTracker plugin, read not recomputed);\n  grows with both spread\
+      \ and membrane roughness, independent of the cell's volume.\n- the proposed single-pixel copy (source/target\
+      \ site, the two involved cells), used to obtain\n  the incremental change in each cell's boundary\
+      \ count for the two cells the copy touches.\n- the target and stiffness: target_surface S_target,\
+      \ lambda_surface -- taken from the per-cell\n  cell.targetSurface / cell.lambdaSurface in bare mode,\
+      \ else the per-cell-type\n  SurfaceEnergyParameter default.\n- neighbor_order (which id-change pairs\
+      \ constitute the boundary; part of S's definition) and\n  scale_surface (a lattice-geometry normalization\
+      \ on S).\n"
+    outputs: "- a scalar energy contribution dE added to the Potts total, NOT an integrated state delta:\n\
+      \  dE = E_after - E_before, with E(cell) = lambda_S*(S - S_target)^2, summed over the two cells\n\
+      \  the candidate copy changes (Medium contributes 0). The delta only re-weights the Metropolis\n\
+      \  acceptance probability (P=1 if total dE<=0 else exp(-dE/T)); the operator writes no cell\n  property.\n"
+    reads: "- the cell's boundary count S(sigma) (maintained by SurfaceTracker; reads 0 / inert without\
+      \ it)\n  and neighbor_order + scale_surface that define it.\n- per-cell cell.targetSurface / cell.lambdaSurface\
+      \ (bare mode) OR the per-type\n  SurfaceEnergyParameter default.\n- the candidate pixel copy and\
+      \ the two involved cells, for the incremental boundary-count change.\n"
+    writes: "- NONE. changeEnergy returns dE (an energy term) and mutates no cell field; it changes only\
+      \ the\n  acceptance probability of the proposed pixel copy.\n- (out of band, not part of this contract)\
+      \ a host steppable may set the per-cell targetSurface /\n  lambdaSurface; that is host-driven state-setting,\
+      \ not the energy evaluation.\n"
+    maps: "- cell pixel set -> boundary count S = number of id-change site-pairs out to neighbor_order,\n\
+      \  scaled by scale_surface (the tracker's job; read here, not computed).\n- surface deviation (S\
+      \ - S_target) -> quadratic Hookean energy lambda_S*(dev)^2 per cell ->\n  summed over the two cells\
+      \ a candidate copy touches -> dE that gates the Metropolis accept.\n  At target -> low energy; over-spread/ruffled\
+      \ or over-compact -> higher energy (a two-sided\n  restoring membrane / surface tension).\n"
+  status: normalized
   module: null
   test: null
   evidence:
@@ -3555,7 +5936,7 @@ mechanisms:
     '
   - 'The three constructor params are MUTUALLY EXCLUSIVE: each setter nulls the other
 
-    two (PyCoreSpecs.py:L5450-5485), and the XML emitter is an if/elif chain
+    two (PyCoreSpecs.py:L5450-5451 / L5467-5468 / L5484-5485), and the XML emitter is an if/elif chain
 
     (L5407-5412) that writes exactly ONE element with priority neighbor_order >
 
@@ -3646,12 +6027,71 @@ mechanisms:
     diverge in order breaks the scale silently.
 
     '
-  verdict: null
-  of: null
-  implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  verdict: refinement
+  of: aggregate
+  implementation_of: aggregate
+  why: "SurfaceTracker is the PERIMETER sibling of CenterOfMass and MomentOfInertia. All three are\nCellGChangeWatchers\
+    \ that keep a per-cell derived scalar/tensor in sync with the pixel\npartition, return no energy /\
+    \ acceptance delta, and expose a READ-ONLY readout the modeller\ncannot write (set_surface raises\
+    \ AttributeError, cpp/CompuCell.py:L589 -- the same hard\nread-only enforcement CenterOfMass and MomentOfInertia\
+    \ carry). CenterOfMass was aliased to\n`aggregate` (the first-moment reduction: children=lattice sites,\
+    \ parent=cell, reduce site\npositions to a per-cell scalar/vector) and MomentOfInertia refined `aggregate`\
+    \ (the\nsecond-moment reduction to a tensor). SurfaceTracker is the same children -> parent reduction\n\
+    shape along the containment map -- reduce a cell's own sites onto ONE per-cell scalar,\nincrementally,\
+    \ no delta -- so it is squarely the aggregate family and NOT a new contract:\nhence implementation_of:\
+    \ aggregate, and the ledger must count aggregate ONCE across these\nsiblings, not thrice.\n\nIt is\
+    \ a REFINEMENT and not an ALIAS because two signature fields must widen past the\nregistered centroid\
+    \ signature (which writes cell.pos and reads only child positions +\noccupancy):\n(1) WRITES / OUTPUTS.\
+    \ Centroid writes a first-moment mean position (a D-vector). SurfaceTracker\n    writes cell.surface\
+    \ -- a weighted boundary-LINK COUNT (a perimeter/area scalar). A position\n    readout and a perimeter\
+    \ readout are different output fields; the contract's writes must\n    admit a scalar boundary-count,\
+    \ not only cell.pos or MomentOfInertia's shape tensor.\n(2) READS. This is the genuinely new edge,\
+    \ and it is stronger than MomentOfInertia's. The\n    centroid reduction is a pure function of the\
+    \ cell's OWN child positions; MomentOfInertia\n    additionally reads the parent's own cell.pos (the\
+    \ COM it measures about). SurfaceTracker's\n    summand reads the OWNER of each neighbour-shell site\
+    \ -- i.e. it reads the cell_id PARTITION\n    itself (is this neighbour c or non-c, Medium counting\
+    \ as non-c) to decide whether a link is\n    a hetero face. So the reduction depends not just on the\
+    \ child set's coordinates but on the\n    surrounding partition. That is an input edge no prior aggregate\
+    \ variant has.\nWhat widening costs: any consumer or validator that assumed `aggregate` reduces a\
+    \ child set to a\nposition (or an intra-cell tensor) and reads nothing but its own children must now\
+    \ account for a\nreduction that (a) emits a scalar interface count and (b) reads the neighbour partition.\
+    \ A\ndependency graph that treated aggregate as purely local-to-the-cell is no longer sound; that\
+    \ is a\ncosted change, not a free add.\n\nTwo properties are IMPLEMENTATION, not contract, so they\
+    \ do not add a fourth verdict axis:\n(a) surface is maintained INCREMENTALLY via the four-branch field3DChange\
+    \ (old loses/gains,\n    new gains/loses, third-party neighbours invariant) rather than re-summed\
+    \ -- an O(shell)\n    efficiency choice with the same result, exactly as CenterOfMass's incremental\
+    \ moment was\n    ruled implementation. (b) The lattice multiplicative weight w = lmf.surfaceMF and\
+    \ the\n    neighbour-order-dependent absolute scale are properties of the reduction's kernel/domain\n\
+    \    (which links, weighted how), not new inputs/outputs -- the perimeter of a cell on a\n    hex/3D\
+    \ lattice is still the same aggregate, differently weighted.\n\nWhy not NEW: the entire children ->\
+    \ parent, per-cell, read-only, no-delta reduction structure is\nalready the promoted aggregate contract;\
+    \ spinning a fresh contract for \"the scalar perimeter\nreduction\" would inflate the count for what\
+    \ is the aggregate slot merely widened, corrupting the\nsaturation measurement the campaign exists\
+    \ to make. The closest OTHER contract is CenterOfMass's\n`aggregate` itself (its first-moment sibling),\
+    \ of which this is the boundary-count refinement.\n"
+  contract:
+    name: aggregate
+    kind: aggregate
+    family: hierarchy
+    set: cell
+    inputs:
+    - site (the contained lattice-site child set; each owned site contributes its links to neighbour-shell
+      sites that are NOT owned by the same cell)
+    outputs:
+    - cell (the parent whose derived surface/perimeter scalar is published)
+    reads:
+    - site.pos (the coordinate of each owned lattice site, to enumerate its neighbour shell up to maxNeighborIndex)
+    - cell_id_lattice (the owner of each neighbour-shell site -- to decide which links are hetero-owner,
+      Medium/id 0 counting as non-c; a NEW partition read relative to the centroid signature, which reads
+      only its own children)
+    - lmf.surfaceMF (the per-link lattice multiplicative weight w, fixed by the neighbour order)
+    writes:
+    - cell.surface (the weighted count of hetero-owner boundary links = the cell perimeter/area; a read-only
+      derived readout, no energy / acceptance delta -- the WIDENED scalar write field relative to the
+      centroid's cell.pos and MomentOfInertia's tensor)
+    maps:
+    - parent
+  status: normalized
   module: null
   test: null
   evidence:
@@ -3772,12 +6212,91 @@ mechanisms:
     so any ordering the core relies on for type assignment survives only as list order in that string.
 
     '
-  verdict: null
+  verdict: out_of_scope
   of: null
-  implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  implementation_of: seed
+  why: 'INITIAL-CONDITION CONSTRUCTION, not a dynamical operator -- the same shape and the same
+
+    verdict as its sibling BlobInitializer. Plexus operators transform state that already exists:
+
+    each returns a delta the engine integrates every step over a set/field that is already there.
+
+    UniformInitializer is the opposite shape -- a one-shot run once at MCS 0 that CONSTRUCTS the
+
+    starting partition (the sets themselves) from an empty lattice plus one or more axis-aligned
+
+    boxes, a cell `width`, a `gap`, and a type palette. In Plexus that starting partition is
+
+    supplied by configuration/seeding, not by any registered operator; there is nothing in the
+
+    frozen algebra to alias and nothing that could widen to admit set-construction without ceasing
+
+    to be a per-step operator. So this is framework mechanics for establishing the initial state --
+
+    out of scope for the OPERATOR algebra whose completeness this campaign measures.
+
+
+    Crucially this is NOT a new contract: it is the SAME `seed` contract the BlobInitializer entry
+
+    introduced, with a different tiling geometry. BlobInitializer (spherical clip), this
+
+    UniformInitializer (a rectangular box grid), and PIFInitializer (from a PIF file) are three
+
+    INTERCHANGEABLE implementations of one thing -- building the initial cell partition -- and must
+
+    be counted ONCE. So `implementation_of: seed`, NOT a second `new`. Counting each of a
+
+    framework''s lattice initializers as its own contract would measure how many ways CC3D can lay
+
+    out a starting configuration, not whether the dynamical vocabulary is converging.
+
+
+    What separates this implementation from the blob one, purely as construction geometry: the clip
+
+    is a box (pt_min..pt_max) rather than a Euclidean sphere, so ALL non-gap tiles inside the box
+
+    become cells (no round boundary truncation), and there is no `center`/`radius`. One further
+
+    contradiction to record: unlike the blob''s type draw, which CC3D convention says is a uniform
+
+    RANDOM per-cell draw, the UniformInitializer''s type-assignment rule (round-robin vs random) is
+
+    NOT visible in this Python spec and lives in the compiled core -- a reimplementer of `seed`''s
+
+    box variant must not assume either. The closest registered contract remains `cell_divide`
+
+    (structural/growth); widening it to cover de-novo population seeding would do violence to its
+
+    biology -- division is mitosis, one parent set -> two daughters conserving material and
+
+    requiring a pre-existing cell, whereas seeding creates a whole population out of Medium with no
+
+    parent.
+
+    '
+  contract:
+    name: seed
+    kind: structural
+    family: growth
+    set: cell
+    inputs:
+    - region_geometry (one or more axis-aligned boxes {pt_min, pt_max}, cell width, gap)
+    - cell_type_palette
+    outputs:
+    - initial_cell_partition
+    reads:
+    - lattice_geometry (Potts domain bounds, to place and validate the box grid)
+    - cell_type_registry (to resolve type-name strings)
+    writes:
+    - cell_field (fresh unique id per in-box, non-gap tile -- a new SET of width^d sites)
+    - cell_type (assigned per created cell from the palette; rule core-side, see surprises)
+    maps: "(empty lattice, list of box regions {pt_min, pt_max, width, gap}, type palette)\n  -> a partition\
+      \ of the in-box, non-gap sites into fresh cell ids, each id a SET of\n     width^d sites laid on\
+      \ a regular grid with stride (width + gap) along each axis, each\n     assigned a type from the\
+      \ palette. Sites outside every box or in a gap lane stay Medium.\n     A one-shot construction executed\
+      \ once at t=0, not a per-step delta. Same `seed` contract\n     as BlobInitializer, differing only\
+      \ in the clip geometry (box grid vs spherical blob).\n"
+  status: normalized
   module: null
   test: null
   evidence:
@@ -3908,12 +6427,59 @@ mechanisms:
     not a Volume param.
 
     '
-  verdict: null
+  verdict: new
   of: null
   implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  why: "new: no registered contract covers an elastic set-point on a cell's SIZE. The closest\nregistered\
+    \ operators are cell_grow (structural/growth) and this term's geometric twin\nmembrane_tension (the\
+    \ `surface` entry, itself normalized `new` in this same atlas).\n- cell_grow operates on volume but\
+    \ from the opposite direction: it WRITES the rest/target\n  volume forward by a logistic law (a state-writing\
+    \ update, kind structural). volume_elasticity\n  writes nothing -- it returns the energy dE that resists\
+    \ any deviation of the CURRENT site\n  count from that target. Widening cell_grow to absorb it would\
+    \ fuse a state-writing growth\n  rule with a non-writing energy term (incompatible state_io) and erase\
+    \ the very read/write\n  distinction this campaign is measuring.\n- membrane_tension is the structural\
+    \ sibling (same quadratic Hookean form, same two-cell\n  incremental-delta / no-write energy shape,\
+    \ same lateral/mechanics home) but constrains a\n  DIFFERENT geometric quantity: boundary count vs\
+    \ bulk site count. They are two distinct\n  biophysical forces (surface tension vs bulk incompressibility),\
+    \ read two different trackers,\n  and Plexus already keeps them apart, so volume_elasticity is its\
+    \ own contract, NOT an\n  implementation_of membrane_tension. (One COULD argue both are implementations\
+    \ of a single\n  generic \"quadratic geometric set-point\" contract; the note records the argument\
+    \ for\n  collapsing them.)\n- The jax-morph proposals `relax` / `regulate` are generic relaxation\
+    \ / homeostasis verbs,\n  not a volume-elasticity energy; no prior atlas proposed this specific contract,\
+    \ so this is\n  its FIRST sighting (implementation_of: null).\n"
+  contract:
+    name: volume_elasticity
+    kind: lateral
+    family: mechanics
+    set: cell
+    inputs: "- one cell's site COUNT V(sigma) -- the number of lattice sites carrying the cell id\n  (maintained\
+      \ incrementally by a separate, auto-loaded VolumeTrackerPlugin, a\n  CellGChangeWatcher; read here,\
+      \ not recomputed). This is the cell's discrete \"volume\":\n  a count, not a physical length^3.\n\
+      - the proposed single-pixel copy (source/target site, the two cells it touches), used to\n  obtain\
+      \ the incremental change (+1 to the gaining cell, -1 to the losing cell) in each\n  involved cell's\
+      \ count.\n- the target and stiffness: target_volume V_target, lambda_volume -- taken from the per-cell\n\
+      \  cell.targetVolume / cell.lambdaVolume in bare mode, else the per-cell-type\n  VolumeEnergyParameter\
+      \ default (the two modes are mutually exclusive).\n"
+    outputs: "- a scalar energy contribution dE added to the Potts total, NOT an integrated state delta:\n\
+      \  dE = E_after - E_before, with E(cell) = lambda_V*(V - V_target)^2, summed over the two\n  cells\
+      \ the candidate copy changes (gainer V->V+1, loser V->V-1; Medium, id 0, contributes 0).\n  The\
+      \ delta only re-weights the Metropolis acceptance probability (P=1 if total dE<=0 else\n  exp(-dE/T));\
+      \ the operator writes no cell property.\n"
+    reads: "- the cell's site count V(sigma) (maintained by VolumeTracker; reads 0 / inert without it).\n\
+      - per-cell cell.targetVolume / cell.lambdaVolume (bare mode) OR the per-type\n  VolumeEnergyParameter\
+      \ default.\n- the candidate pixel copy and its two involved cells, for the incremental +1/-1 count\
+      \ change.\n"
+    writes: "- NONE. changeEnergy returns dE (an energy term) and mutates no cell field; it changes only\n\
+      \  the acceptance probability of the proposed pixel copy.\n- (out of band, not part of this contract)\
+      \ a host steppable may set the per-cell targetVolume /\n  lambdaVolume (e.g. a growth or division\
+      \ rule); that is host-driven state-setting, not the\n  energy evaluation.\n"
+    maps: "- cell pixel set -> site count V = number of sites carrying the cell id (the tracker's job;\n\
+      \  read here, not computed).\n- volume deviation (V - V_target) -> quadratic Hookean energy lambda_V*(dev)^2\
+      \ per cell ->\n  summed over the two cells a candidate copy touches -> dE that gates the Metropolis\
+      \ accept.\n  At target -> low energy; over-inflated or over-compressed -> higher energy (a two-sided\n\
+      \  restoring bulk elasticity / incompressibility that gives the set-of-sites an object-like\n  size\
+      \ -- ablate lambda_V and the cells dissolve into medium).\n"
+  status: normalized
   module: null
   test: null
   evidence:
@@ -3933,16 +6499,101 @@ mechanisms:
   equations: 'sigma: lattice site -> cell id. A cell is {x : sigma(x) = id}. V = |{x}|, S = |{(x,y) adjacent
     : sigma(x) != sigma(y)}|, COM = mean of its sites.'
   params: {}
-  state_io: 'architectural: constrains every other mechanism; writes no state itself'
+  state_io: 'Architectural, not an update. The framework does not run this as a step; it is the standing
+    data
+
+    model. sigma is a label field over the shared substrate lattice (site -> cell id), mutated one site
+
+    at a time by Metropolis pixel copies. From sigma three per-cell aggregates are DERIVED and exposed
+    as
+
+    read-only cell attributes (CC3D''s Python API cell.volume / cell.surface / cell.xCOM,yCOM,zCOM):
+
+    V = |sites|, S = count of adjacencies to differently-labelled sites, COM = mean site position. It
+
+    writes only these derived readouts; it integrates no delta. Every other CC3D mechanism reads V, S
+    or
+
+    COM off this representation.
+
+    '
   surprises:
   - 'ADDED BY HAND: not a plugin -- it is the framework''s data model, and the single largest difference
     from the first atlas''s target'
-  verdict: null
+  - 'Surface is NOT a reduction over a cell''s own members: it counts boundary adjacencies to OTHER cells,
+    so it reads neighbouring parents'' labels -- an inter-parent quantity the aggregate contract has no
+    notion of.'
+  - 'Membership is a mutable field, not a fixed hierarchy: which cell owns a site is rewritten every MC
+    step, and the cell has no existence apart from sigma -- it IS its sites, deformable and possibly disconnected.'
+  verdict: new
   of: null
   implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  collision_note: null
+  why: 'The closest registered contract is `aggregate` (aggregate/hierarchy), whose sole implementation
+
+    (Centroid) already reduces a cell''s contained children onto the parent and writes the parent''s COM
+    as
+
+    an occupancy-weighted mean -- exactly the COM half of this representation (COM = mean of sites). So
+    the
+
+    overlap is real and I do not hide it: a cell''s position, as a derived centroid over its members,
+    IS the
+
+    aggregate contract.
+
+    But the representation as a whole is `new`, and widening `aggregate` to admit it would do violence
+    in
+
+    two ways. (1) SUBSTRATE. aggregate''s member set is a set of persistent point children joined to the
+
+    parent by a fixed `parent` containment map (INPUTS=["particle"], MAPS=["parent"]). Here there are
+    no
+
+    child entities: members are cells of a shared grid, and membership is the mutable label field sigma,
+
+    rewritten one site at a time by Metropolis dynamics. To widen aggregate you would change its `set`
+    and
+
+    `reads` from "a parent''s member list" to "a partition of a field," which is not a widening but a
+
+    different substrate, and it would break every current aggregate user (point agents with a fixed parent).
+
+    (2) SURFACE is not a member reduction at all. S counts a cell''s boundary adjacencies to OTHER cells,
+    so
+
+    it reads neighbouring parents'' labels; aggregate reduces a parent''s OWN children and has no term
+    that
+
+    crosses between parents. And neither a point-with-radius (`radius_graph`) nor a particle cloud can
+    carry
+
+    a concave, exact, area-counted boundary. This representation is the substrate the whole target stands
+
+    on -- an extended, deformable lattice domain whose volume and exact surface are first-class -- and
+    the
+
+    Plexus algebra, whose agents are points, has no primitive for it.
+
+    '
+  contract:
+    name: occupy
+    kind: aggregate
+    family: hierarchy
+    set: cell
+    inputs:
+    - lattice_site
+    outputs:
+    - cell
+    reads:
+    - sigma
+    writes:
+    - volume
+    - surface
+    - centroid
+    maps:
+    - sigma
+  status: normalized
   module: null
   test: null
   evidence:
@@ -3954,24 +6605,154 @@ mechanisms:
   order: 32
   raw_name: Metropolis acceptance of pixel copies
   raw_kind: core dynamics (not a class)
-  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py
+  code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L1383
   paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366
-  summary: Time advances by attempting to copy one lattice site's id into a neighbour, accepted with probability
-    1 if the total energy falls and exp(-dE/T) otherwise, where T is the fluctuation amplitude. No plugin
-    implements this; every plugin only contributes a term to dE.
-  equations: 'P(accept) = 1 if dE <= 0 else exp(-dE / T), with T = fluctuation_amplitude.
+  summary: 'Time advances by attempting to copy one lattice site''s cell-id into a neighbouring site,
 
-    dE is the SUM of every enabled plugin''s term for the proposed copy.'
-  params: {}
-  state_io: 'architectural: constrains every other mechanism; writes no state itself'
+    accepted with probability 1 if the total energy falls and exp(-dE/T) otherwise, where T is
+
+    the fluctuation amplitude. This is the Cellular Potts Model''s modified-Metropolis Monte Carlo
+
+    update -- the ENGINE, not a plugin. No plugin implements it; every plugin only contributes a
+
+    term to dE, and this rule is what turns that summed energy into a stochastic accept/reject.
+
+    It is declared on PottsCore (the simulation root), not as an energy plugin.
+
+    '
+  equations: "For a proposed copy of source site s's cell-id into target site t:\n\n  dE = sum over every\
+    \ enabled plugin p of  E_p(after copy) - E_p(before copy)\n  P(accept) = 1                      if\
+    \ dE <= 0\n            = exp(-(dE + offset) / T) if dE > 0\n\nT = fluctuation_amplitude. When source\
+    \ and target cells carry different per-type\nfluctuation amplitudes, the scalar T for that attempt\
+    \ is combined by\nfluctuation_amplitude_function in {Min, Max, ArithmeticAverage} (default Min). `offset`\n\
+    shifts the acceptance exponent (default 0); its exact sign/placement in the compiled core\nwas NOT\
+    \ read -- only the Boltzmann canonical form and the documented parameter roles in\nPyCoreSpecs were.\
+    \ One Monte Carlo Step (MCS) is one such attempt per lattice site on average.\ndE carries NO pathwise\
+    \ derivative: it is a finite energy difference between two discrete\nlattice configurations, evaluated\
+    \ per proposed flip, not a force or a rate.\n"
+  params:
+    fluctuation_amplitude: 'the Metropolis temperature T -- amplitude of energy-increasing fluctuations
+      the sweep will
+
+      accept; larger T => more membrane agitation / less rigid energy descent. Default 10.
+
+      '
+    fluctuation_amplitude_function: 'rule (Min/Max/ArithmeticAverage) for combining two cells'' per-type
+      fluctuation amplitudes
+
+      into the scalar T of a heterotypic copy attempt. Default Min.
+
+      '
+    offset: 'additive shift in the Boltzmann acceptance exponent; biases the accept probability of
+
+      energy-raising copies. Default 0.
+
+      '
+  state_io: 'architectural / the integrator itself. READS the summed energy change dE contributed by
+
+    every enabled plugin for one proposed source->target pixel copy, plus T and offset. On accept,
+
+    WRITES exactly one lattice site''s cell-id (the target site is reassigned to the source cell:
+
+    the source cell gains a site, the neighbour cell loses one), which is how volume, surface,
+
+    centre of mass and every derived quantity actually change. It returns NO energy term and NO
+
+    delta of its own -- it is the consumer of every operator''s contribution, not a contributor.
+
+    This is the exact inverse of a Plexus operator: a Plexus operator returns a delta and the
+
+    engine integrates it deterministically; here the "operators" (plugins) return energies and
+
+    THIS rule stochastically integrates them by accept/reject.
+
+    '
   surprises:
-  - 'ADDED BY HAND: the dynamics themselves -- discrete, stochastic, accept/reject, with no pathwise derivative'
-  verdict: null
+  - 'ADDED BY HAND: the dynamics themselves -- discrete, stochastic, accept/reject, with no
+
+    pathwise derivative. This is the deepest architectural finding of the CC3D atlas: the target
+
+    framework''s time evolution is energy-minimizing Monte Carlo, while every Plexus operator
+
+    returns a delta the engine integrates continuously. The two integration paradigms are
+
+    orthogonal, and this entry is where that orthogonality lives.
+
+    '
+  - 'It is declared on PottsCore -- the simulation ROOT / config object -- alongside lattice
+
+    dimensions, boundary conditions and RNG seed, not as a plugin. The acceptance rule is not
+
+    a mechanism you add; it is the substrate every mechanism is expressed against.
+
+    '
+  - 'Heterotypic temperature: T is not necessarily one global scalar. Per-cell-type fluctuation
+
+    amplitudes are legal, reconciled per attempt by fluctuation_amplitude_function -- so even the
+
+    "temperature" of the dynamics can be a set-indexed field, not a constant.
+
+    '
+  verdict: out_of_scope
   of: null
   implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  why: 'The Metropolis acceptance carries NO biological content of its own: it is the CPM''s core
+
+    numerical integrator -- a modified-Metropolis Monte Carlo sampler that turns a summed energy
+
+    change into a stochastic accept/reject on one pixel copy. Every biological term lives in the
+
+    per-plugin dE contributions (volume, adhesion, chemotaxis, ...), each catalogued as its own
+
+    mechanism; this rule only decides whether a proposed copy is kept. In Plexus terms its
+
+    counterpart is not any registered operator but the ENGINE''s time-integration loop, which is
+
+    deliberately OUTSIDE the operator algebra -- Plexus registers no operator for "advance time",
+
+    and the RK-style integrator that consumes operator deltas is not itself a contract. The
+
+    closest registered contract is `cell_divide`/`cell_grow` (structural growth) because an
+
+    accepted copy is a structural change to which cell owns a lattice site; but treating the
+
+    sampler as a growth operator would be a category error -- growth is a biological program a
+
+    cell runs, whereas this is the mechanism BY WHICH any such program is realized. Minting it as
+
+    a `new` operator, or aliasing it to a structural contract, would inflate the yield with pure
+
+    framework mechanics and -- worse -- would miscount the integrator as an operator, corrupting
+
+    the saturation measurement this campaign exists to produce. Recording it as out_of_scope,
+
+    with the paradigm gap stated plainly (energies + stochastic accept/reject vs deltas +
+
+    deterministic integration), is the honest reduction. The contract below is a FORCED FIT
+
+    recorded only to document the site-reassignment shape; `kind: structural` / `family: growth`
+
+    is not a claim that Metropolis acceptance is biological growth.
+
+    '
+  contract:
+    name: metropolis_step
+    kind: structural
+    family: growth
+    set: cell
+    inputs:
+    - fluctuation_amplitude
+    - fluctuation_amplitude_function
+    - offset
+    outputs:
+    - accepted
+    reads:
+    - energy.dE_total
+    - cell.lattice_sites
+    writes:
+    - cell.lattice_sites
+    maps: []
+  status: normalized
   module: null
   test: null
   evidence:
@@ -3989,17 +6770,158 @@ mechanisms:
     accept/reject decision. Nothing is applied in sequence and nothing returns a delta.
   equations: E = sum_plugins E_plugin. Mechanisms interact ONLY through dE in the acceptance test.
   params: {}
-  state_io: 'architectural: constrains every other mechanism; writes no state itself'
+  state_io: 'Architectural, not an update -- the standing composition law of the framework, not a step
+    the engine
+
+    runs. Every enabled plugin registers a term E_plugin(configuration); on each proposed pixel copy the
+
+    Potts core asks each term for its contribution to dE and SUMS them into a single scalar dE, which
+    is
+
+    the only channel through which mechanisms interact (see the metropolis_acceptance entry for the
+
+    accept/reject rule that consumes that sum). It writes no state itself; it holds no parameters; it
+
+    constrains every other mechanism by fixing HOW their terms combine (additively, simultaneously, into
+
+    one energy) rather than in sequence.
+
+    '
   surprises:
   - 'ADDED BY HAND: the direct counterpart of jax-morph''s Lie-Trotter operator split, and the contrast
     is itself a finding: operator splitting versus energy summation are two different answers to how mechanisms
     compose'
-  verdict: null
+  - 'Composition here is SIMULTANEOUS and NON-SEQUENTIAL. No plugin sees the effect of another before
+    the
+
+    copy is decided; all terms are evaluated against the SAME candidate configuration and only their sum
+
+    matters. There is no notion of "plugin A runs, then plugin B runs on A''s output" -- the order in
+    which
+
+    plugins are listed is irrelevant to dE. This is the opposite of an operator pipeline.
+
+    '
+  - 'Because the terms combine additively into one scalar and are resolved by a single stochastic
+
+    accept/reject, mechanisms can TRADE OFF against each other inside one step: a copy that raises volume
+
+    energy can still be accepted if it lowers contact energy more. In an operator-splitting scheme each
+
+    operator''s delta is applied unconditionally and such trade-offs must be engineered by hand; here
+    they
+
+    are automatic and emergent from the sum.
+
+    '
+  verdict: out_of_scope
   of: null
   implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  collision_note: null
+  why: 'out_of_scope: this is not an operator over any biological set or field -- it is the framework''s
+
+    COMPOSITION LAW, the meta-rule that says how the per-mechanism energy terms combine. It has no
+
+    biological content of its own (it constrains volume, adhesion, chemotaxis alike but IS none of them),
+
+    it holds no parameters, and it returns no per-set delta. What it fixes is the semantics of the
+
+    interpreter, not a mechanism in the tissue.
+
+
+    Crucially, there is no registered contract to alias or widen, because Plexus''s OWN composition law
+
+    lives at the same architectural layer and is likewise NOT a member of the operator vocabulary. Plexus
+
+    composes by operator splitting: each registered operator returns a delta and the engine applies /
+
+    integrates those deltas in sequence (the Lie-Trotter split the surprise names). That splitting is
+    a
+
+    property of the engine, not an entry in src/plexus/operators/ -- so the frozen baseline has nothing
+
+    named for "how operators compose". You cannot alias a vocabulary item that does not exist, and you
+
+    cannot widen a signature (`name, kind, family, set, inputs, outputs, reads, writes, maps`) to express
+
+    "sum every term into one scalar and resolve by one accept/reject": that is not a signature field,
+    it
+
+    is the calling convention the signatures presuppose.
+
+
+    This is deliberately the SAME cut the celltype entry made (a schema is not a per-step operator ->
+
+    out_of_scope) and NOT the cut cell_as_lattice_domain made. That entry earned `new` because the
+
+    extended, deformable lattice DOMAIN is a substrate primitive that operators read and write over and
+
+    that the point-agent algebra genuinely cannot represent -- a thing in the state. Energy summation
+    is
+
+    not a thing in the state; it is how the engine resolves competing terms. The campaign measures whether
+
+    the operator VOCABULARY converges (contracts over sets/fields). Counting the composition scheme as
+    a
+
+    `new` contract would measure our engine''s calling convention, not the biological language -- it would
+
+    inflate the yield with a non-vocabulary item and corrupt the very saturation curve this exercise
+
+    exists to read. So the finding is recorded LOUDLY here and in the note (energy summation vs operator
+
+    splitting, two answers to how mechanisms compose) rather than smuggled into the contract count.
+
+
+    The contract below is recorded only to document the honest typed shape IF one insisted the composition
+
+    law belonged inside the algebra -- an additive superposition of simultaneous energy terms. Its
+
+    `kind: structural` / `family: hierarchy` is a forced fit (and the reason it is exempt from the
+
+    writes-nothing no-op rule), not a claim that the Hamiltonian sum is an operator.
+
+    '
+  contract:
+    name: superpose
+    kind: structural
+    family: hierarchy
+    set: energy_term
+    inputs:
+    - the set of enabled per-mechanism energy terms, each a function E_plugin(configuration) that scores
+      a candidate lattice configuration
+    - the single proposed pixel copy shared by every term (all terms score the SAME candidate)
+    outputs:
+    - a single scalar dE = sum_plugins (E_plugin(after) - E_plugin(before)), the only channel through
+      which the terms interact; consumed by the metropolis_acceptance rule, never written to state
+    reads:
+    - each enabled plugin's energy contribution for the candidate copy
+    writes: 'NONE. It integrates no delta and mutates no cell/field property; it only combines the terms
+      into the
+
+      scalar the acceptance test reads. (structural kind, so exempt from the no-op rule -- the honest
+      fact
+
+      is that a composition law writes nothing.)
+
+      '
+    maps: '(a set of independent energy terms, one candidate copy) -> one additive scalar dE that couples
+      them
+
+      simultaneously. Additive and order-independent: no term sees another''s effect, and their sum is
+      the
+
+      sole interaction. This is the SUM-OF-ENERGIES answer to composition; the Plexus engine''s answer
+      is
+
+      the SUM-OF-DELTAS (operator splitting), and the two are not inter-expressible -- energy summation
+
+      permits within-step trade-offs resolved by one stochastic accept/reject that a sequential delta
+
+      pipeline cannot represent.
+
+      '
+  status: normalized
   module: null
   test: null
   evidence:
@@ -4018,16 +6940,72 @@ mechanisms:
   equations: 1 MCS = one attempted copy per lattice site. No dt and no integrator; a rate must be expressed
     as a per-MCS probability.
   params: {}
-  state_io: 'architectural: constrains every other mechanism; writes no state itself'
+  state_io: 'architectural: constrains every other mechanism; writes no state itself except the integer
+    step counter (the simulation clock)'
   surprises:
   - 'ADDED BY HAND: a time-scale taxonomy with no dt at all -- the sharpest possible contrast with an
     ODE-integrating framework'
-  verdict: null
+  - 'The unit is STOCHASTIC and lattice-size-dependent: 1 MCS = N_sites attempted copies (a "sweep"),
+    so a single tick does an amount of work proportional to the domain area/volume, and the physical meaning
+    of a tick shifts if the lattice is rescaled. There is no time constant to anchor it to seconds.'
+  verdict: out_of_scope
   of: null
   implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  why: 'Not an operator over sets/fields -- it is the ENGINE''s temporal-integration contract, the definition
+
+    of the clock itself. It carries no biological content of its own: it does not compute a force, an
+
+    energy term, a flux, or a division; it defines what "one step" MEANS for every mechanism that does.
+
+    None of the seven Plexus kinds describes a scheduler, and none of the 42 registered contracts is a
+
+    time unit -- the whole vocabulary is operators, and a clock is orthogonal to it. The kind/family/set
+
+    below are assigned only to satisfy the schema (a global tick is least-badly a `broadcast`); that no
+
+    kind genuinely fits is itself the evidence for `out_of_scope`.
+
+
+    This entry''s real value is the CONTRADICTION it records, and it is the sharpest in the whole atlas:
+
+    the Plexus engine advances state by INTEGRATING operator deltas against a real-valued dt (an operator
+
+    returns d/dt of some quantity and the engine accumulates dt * delta). CompuCell3D has no dt and no
+
+    integrator at all. Time is the Monte Carlo Step -- one attempted pixel copy per lattice site, accepted
+
+    with probability 1 if dE < 0 else exp(-dE/T). Consequently a RATE cannot be a per-second coefficient
+
+    here; it must be re-expressed as a per-MCS acceptance PROBABILITY, and any Plexus operator ported
+    to
+
+    this target would have its `emit: velocity`/dt-scaled delta silently mismatched -- the two frameworks
+
+    disagree on the meaning of the time axis, not merely its units. This gap is exactly the question the
+
+    campaign exists to measure and must not be papered over: the Plexus algebra can express the energy
+
+    TERMS of a Potts model, but the promoted engine cannot express its TIME.
+
+    '
+  contract:
+    name: advance_time
+    kind: broadcast
+    family: hierarchy
+    set: lattice_site
+    inputs:
+    - temperature (Potts T, sets the Metropolis acceptance probability exp(-dE/T))
+    - total_energy_delta (the summed dE from every registered energy-term plugin for a proposed copy)
+    outputs:
+    - one attempted copy per lattice site per tick (a full sweep = 1 MCS), each accepted or rejected by
+      the Metropolis rule
+    reads:
+    - cell_id_lattice (to pick a source site and a random neighbour target for each attempted copy)
+    writes:
+    - simulation_clock (the integer MCS counter -- the ONLY state the time unit itself owns; it writes
+      no cell state and no field, and there is no real-valued dt to advance)
+    maps: []
+  status: normalized
   module: null
   test: null
   evidence:
@@ -4048,12 +7026,44 @@ mechanisms:
   state_io: 'architectural: constrains every other mechanism; writes no state itself'
   surprises:
   - 'ADDED BY HAND: the model''s relation is a lattice adjacency, not an edge set built from positions'
-  verdict: null
-  of: null
+  verdict: refinement
+  of: radius_graph
   implementation_of: null
-  why: null
-  contract: null
-  status: inspected
+  why: "A second relation-builder, but against a lattice not a point cloud. The pixel\nneighbourhood plays\
+    \ radius_graph's exact architectural role -- the rewire/topology\noperator that fixes the within-set\
+    \ relation E, emits no integrable delta, and lets\nevery lateral/contact term (Contact, Adhesion,\
+    \ Surface, FocalPointPlasticity) and the\nMetropolis copy attempt itself read the neighbourhood it\
+    \ leaves. That a promoted\ncontract already covers \"build the interaction relation\" rules out `new`;\
+    \ that Plexus\npromoted radius_graph at all means relation-building is in-scope, so this is not\n\
+    out_of_scope either.\nIt is a refinement, not an alias, because admitting it must WIDEN three signature\n\
+    fields and relax one invariant:\n  - set: particle -> also a lattice site-set (a cell is a set of\
+    \ sites sharing an id,\n    not a point with a position).\n  - reads: pos -> {} (the adjacency is\
+    \ static lattice structure; it reads no dynamic\n    state, whereas radius_graph reads live positions\
+    \ every tick).\n  - inputs: radius (continuous cutoff) -> neighbor_order (a discrete integer selecting\n\
+    \    a compiled adjacency shell) + lattice_type (square/hex geometry).\nWhat that breaks: the current\
+    \ contract's invariant is \"all live pairs within a\ncontinuous radius, rebuilt each tick, edge length\
+    \ = a meaningful Euclidean distance.\"\nAny downstream user that reads edge length as a continuous\
+    \ distance, or relies on the\nper-tick rebuild to track motion, gets neither from a static integer-offset\
+    \ lattice\nadjacency. That is a real cost a widening imposes on existing callers -- the definition\n\
+    of a refinement rather than a free-of-charge alias.\nNo cross-atlas dedup: no jax-morph proposal (adhere,\
+    \ agitate, apoptose, mechanosense,\nmorphogen, regulate, relax, reorient) is a relation-builder, so\
+    \ this is not a second\nsighting of anything.\n"
+  contract:
+    name: radius_graph
+    kind: rewire
+    family: topology
+    set: lattice_site
+    inputs:
+    - neighbor_order
+    - lattice_type
+    outputs: []
+    reads: []
+    writes:
+    - edge_index
+    maps:
+      neighbor_order: adjacency_shell_order
+      lattice_type: lattice_geometry
+  status: normalized
   module: null
   test: null
   evidence:

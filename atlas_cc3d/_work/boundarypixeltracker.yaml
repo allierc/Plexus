@@ -3,83 +3,155 @@ order: 3
 raw_name: BoundaryPixelTracker
 raw_kind: Plugin (BoundaryPixelTrackerPlugin)
 code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L5270
-paper_section: |
-  No dedicated paper section -- Swat et al. (2012) Methods Cell Biol 110:325-366 does not
+paper_section: 'No dedicated paper section -- Swat et al. (2012) Methods Cell Biol 110:325-366 does not
+
   document the pixel trackers separately. Checkable source anchors instead: PyCoreSpecs.py:L5270
+
   (the Python spec class BoundaryPixelTrackerPlugin) and the C++ code-ref guide heading
+
   cc3d/doc/code_ref/user/build/cpp/CompuCell/plugins/BoundaryPixelTrackerPlugin.rst
+
   (autoclass CompuCell.BoundaryPixelTrackerData / BoundaryPixelTrackerPlugin).
-summary: |
-  A per-cell BOOKKEEPING plugin, not an energy term and not a state update. For every cell it
-  maintains the SET of that cell's boundary lattice sites -- sites the cell owns that also have at
+
+  '
+summary: 'A per-cell BOOKKEEPING plugin, not an energy term and not a state update. For every cell it
+
+  maintains the SET of that cell''s boundary lattice sites -- sites the cell owns that also have at
+
   least one neighbour (out to neighbor_order) belonging to a different cell or to the medium -- and
+
   keeps that set current as pixel copies are accepted. It changes no energy, no cell-id lattice and
+
   no field; its only product is an auxiliary index (pixelSet / pixelSetMap) that OTHER mechanisms
+
   query, e.g. Curvature, FocalPointPlasticity, or the steppable helper get_cell_boundary_pixel_list.
-equations: |
-  No update law and no energy term. The plugin maintains, per cell c, a set of boundary pixels
-    B_k(c) = { x in c : there exists y in N_k(x) with cellId(y) != cellId(x) }
-  where
-    x, y    : lattice sites (Point3D)
-    c       : a cell = the set of sites sharing one cell id
-    N_k(x)  : the k-th-order lattice neighbourhood of site x
-    k       : neighbor_order (>= 1); the medium (null cell) counts as a different id.
-  The C++ core stores this per cell as pixelSet (the default-order set) and pixelSetMap
-  (order k -> set), each element a BoundaryPixelTrackerData whose `pixel` is one coordinate.
-  On each ACCEPTED pixel copy the plugin updates B_k for the site(s) that changed owner and for
-  their neighbours (add / remove / re-test membership) so the sets stay exact without a full
-  rescan. That incremental re-test is compiled C++ (libCC3DBoundaryPixelTracker.so) and was NOT
-  read directly here; the watcher / incremental-update model is inferred from the per-cell
-  pixelSetMap + BoundaryPixelTrackerAccessor structure and CC3D's CellGChangeWatcher architecture.
+
+  '
+equations: "No update law and no energy term. The plugin maintains, per cell c, a set of boundary pixels\n\
+  \  B_k(c) = { x in c : there exists y in N_k(x) with cellId(y) != cellId(x) }\nwhere\n  x, y    : lattice\
+  \ sites (Point3D)\n  c       : a cell = the set of sites sharing one cell id\n  N_k(x)  : the k-th-order\
+  \ lattice neighbourhood of site x\n  k       : neighbor_order (>= 1); the medium (null cell) counts\
+  \ as a different id.\nThe C++ core stores this per cell as pixelSet (the default-order set) and pixelSetMap\n\
+  (order k -> set), each element a BoundaryPixelTrackerData whose `pixel` is one coordinate.\nOn each\
+  \ ACCEPTED pixel copy the plugin updates B_k for the site(s) that changed owner and for\ntheir neighbours\
+  \ (add / remove / re-test membership) so the sets stay exact without a full\nrescan. That incremental\
+  \ re-test is compiled C++ (libCC3DBoundaryPixelTracker.so) and was NOT\nread directly here; the watcher\
+  \ / incremental-update model is inferred from the per-cell\npixelSetMap + BoundaryPixelTrackerAccessor\
+  \ structure and CC3D's CellGChangeWatcher architecture.\n"
 params:
-  neighbor_order: |
-    boundary_detection_range -- the lattice neighbour-shell order k used to decide whether a cell
+  neighbor_order: 'boundary_detection_range -- the lattice neighbour-shell order k used to decide whether
+    a cell
+
     site is a boundary site, and which orders are tracked and therefore queryable. Integer >= 1
+
     (check_dict rejects x < 1 as "Neighbor order must be positive"); default 1. The <NeighborOrder>
+
     CC3DML element is emitted only when k > 1.
+
+    '
 state_io:
-  reads: |
-    The cell-id lattice in the neighbourhood of each changed site (which cell owns each neighbouring
+  reads: 'The cell-id lattice in the neighbourhood of each changed site (which cell owns each neighbouring
+
     site, medium included). It reads no PDE field and no energy.
-  writes: |
-    A per-cell auxiliary index ONLY: pixelSet / pixelSetMap (neighbour order -> set of boundary-pixel
+
+    '
+  writes: 'A per-cell auxiliary index ONLY: pixelSet / pixelSetMap (neighbour order -> set of boundary-pixel
+
     coordinates), attached to each cell through BoundaryPixelTrackerAccessor. It writes NOTHING to the
+
     cell-id lattice, to any field, or to the Hamiltonian -- a simulation with this plugin loaded is
-    bit-identical to one without it. The plugin exists solely so other mechanisms can read a cell's
+
+    bit-identical to one without it. The plugin exists solely so other mechanisms can read a cell''s
+
     boundary sites cheaply.
+
+    '
 surprises:
-- |
-  Pure index / monitor: it returns no energy delta and performs no field write, so unlike a Plexus
+- 'Pure index / monitor: it returns no energy delta and performs no field write, so unlike a Plexus
+
   operator it changes no simulated state at all. Modelling it as a state update makes it look like a
+
   phantom no-op (record.py R7 exists precisely because three such no-ops shipped undetected). The
+
   honest statement is that this "mechanism" is auxiliary state that other mechanisms consume.
-- |
-  Boundary pixels != all pixels. This is the sibling of PixelTracker, which keeps EVERY site of a
+
+  '
+- 'Boundary pixels != all pixels. This is the sibling of PixelTracker, which keeps EVERY site of a
+
   cell; BoundaryPixelTracker keeps only sites adjacent to a different owner. Reimplementing it as
+
   "track all pixels" is the obvious wrong turn and silently changes what downstream queries see.
-- |
-  neighbor_order is 1-based and must be >= 1; the <NeighborOrder> XML element is written ONLY when
+
+  '
+- 'neighbor_order is 1-based and must be >= 1; the <NeighborOrder> XML element is written ONLY when
+
   > 1 (the default 1 stays implicit). Emitting it at order 1 yields different CC3DML than the
+
   reference even though it is semantically equivalent.
-- |
-  The declared neighbor_order bounds what is queryable: asking the plugin for a boundary set at an
+
+  '
+- 'The declared neighbor_order bounds what is queryable: asking the plugin for a boundary set at an
+
   order it was not told to track returns a null set and the Python iterator raises LookupError
+
   (getPixelSetForNeighborOrderPtr). So the parameter is a declaration of which neighbour shells to
+
   maintain, not merely a detection radius applied at query time.
-- |
-  Medium (cell id 0 / the null cell) counts as a "different cell" for boundary membership, so a cell
+
+  '
+- 'Medium (cell id 0 / the null cell) counts as a "different cell" for boundary membership, so a cell
+
   touching only medium still has a full boundary set.
-- |
-  What I could NOT establish from the readable sources (the update lives in the compiled .so):
+
+  '
+- 'What I could NOT establish from the readable sources (the update lives in the compiled .so):
+
   whether the medium itself is given a tracked boundary set (BoundaryPixelTracker has no track_medium
+
   flag, unlike PixelTracker, suggesting not), the exact neighbour re-test ordering per accepted copy,
+
   and how 2nd+-order sets in pixelSetMap relate to the default-order pixelSet.
-verdict: null
+
+  '
+verdict: out_of_scope
 of: null
 implementation_of: null
-why: null
-contract: null
-status: inspected
+why: |
+  Pure acceleration structure, no biological content. The plugin returns no energy delta,
+  writes no cell-id lattice site and no field, and touches no term of the Hamiltonian -- a
+  simulation with it loaded is bit-identical to one without (confirmed at source: PyCoreSpecs.py
+  L5270-5308 is a spec whose only effect is emitting an optional <NeighborOrder> element; the
+  incremental update lives in the compiled tracker and only maintains the index). Its sole
+  product is a per-cell cache of which of that cell's own lattice sites lie on its surface, so
+  that OTHER mechanisms (Curvature, FocalPointPlasticity, contact/surface queries) can avoid
+  rescanning every pixel of every cell. That is a spatial index -- the cellular-Potts analog of a
+  neighbour-list / cell-list -- not a process.
+
+  The closest registered contract is `radius_graph` (also rewire/topology, also index-only,
+  also emits no integrable delta -- src/plexus/operators/graph.py). But radius_graph earns its
+  place by building the RELATION over the elements of a set (who-interacts-with-whom), which is
+  the substrate every lateral message-passing operator runs on. BoundaryPixelTracker builds no
+  relation among cells; it classifies a single cell's OWN sub-elements (boundary pixel vs
+  interior pixel), a distinction that exists only because a CC3D cell IS a set of lattice sites.
+  Plexus cells are points/particles with a derived radius and have no per-cell pixel set, so
+  there is nothing here to alias, refine, or promote -- the concept collapses to nothing in the
+  promoted representation. It is representation-specific plumbing, hence out_of_scope. (Not
+  aliased to radius_graph precisely because calling it that would let acceleration caches count
+  toward the language's vocabulary.)
+contract:
+  name: boundary_index
+  kind: rewire
+  family: topology
+  set: cell
+  inputs: []
+  outputs:
+  - boundary_pixel_set
+  reads:
+  - cell_id_lattice
+  writes:
+  - cell.boundary_pixels
+  maps: []
+status: normalized
 module: null
 test: null
 evidence:

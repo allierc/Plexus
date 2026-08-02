@@ -47,10 +47,22 @@ PLEXUS = os.path.abspath(os.path.join(ATLAS, ".."))
 CAMPAIGN = os.path.join(ATLAS, "campaign")
 
 sys.path.insert(0, ATLAS)
-sys.path.insert(0, os.path.join(PLEXUS, "discovery"))
-sys.path.insert(0, os.path.join(PLEXUS, "discovery", "agents"))
 
-from agents import llm as _llm   # noqa: E402  the discovery loop's metered Claude-CLI wrapper
+# The metered Claude-CLI wrapper lives in the DISCOVERY campaign, which has been reorganised
+# (discovery/ -> discovery_okuda/, discovery_cardio_mpm/, ...). Hard-coding `discovery/agents`
+# broke both atlases silently the moment that happened, and the failure surfaced as an
+# unrelated-looking ImportError. Find it instead of assuming where it lives.
+import glob as _glob
+_cands = sorted(_glob.glob(os.path.join(PLEXUS, "discovery*", "agents", "llm.py")))
+if not _cands:
+    raise ImportError(
+        f"no discovery*/agents/llm.py under {PLEXUS} -- the atlas drives its agents through the "
+        f"discovery loop's metered wrapper and cannot run without it")
+_AGENTS_DIR = os.path.dirname(_cands[0])
+sys.path.insert(0, os.path.dirname(_AGENTS_DIR))
+sys.path.insert(0, _AGENTS_DIR)
+
+import llm as _llm               # noqa: E402  the discovery loop's metered Claude-CLI wrapper
 
 run_agent = _llm.run_agent
 BudgetLedger = _llm.BudgetLedger

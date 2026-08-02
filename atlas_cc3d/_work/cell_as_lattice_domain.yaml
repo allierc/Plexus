@@ -1,0 +1,77 @@
+id: cell_as_lattice_domain
+order: 31
+raw_name: cell as a set of lattice sites
+raw_kind: representation (not a class)
+code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PySteppables.py
+paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366
+summary: A cell is not a point with a radius but a connected set of lattice sites sharing one id. Volume
+  is a site count, surface a boundary count, position a derived centre of mass. Every other mechanism
+  is defined in terms of this.
+equations: 'sigma: lattice site -> cell id. A cell is {x : sigma(x) = id}. V = |{x}|, S = |{(x,y) adjacent
+  : sigma(x) != sigma(y)}|, COM = mean of its sites.'
+params: {}
+state_io: |
+  Architectural, not an update. The framework does not run this as a step; it is the standing data
+  model. sigma is a label field over the shared substrate lattice (site -> cell id), mutated one site
+  at a time by Metropolis pixel copies. From sigma three per-cell aggregates are DERIVED and exposed as
+  read-only cell attributes (CC3D's Python API cell.volume / cell.surface / cell.xCOM,yCOM,zCOM):
+  V = |sites|, S = count of adjacencies to differently-labelled sites, COM = mean site position. It
+  writes only these derived readouts; it integrates no delta. Every other CC3D mechanism reads V, S or
+  COM off this representation.
+surprises:
+- 'ADDED BY HAND: not a plugin -- it is the framework''s data model, and the single largest difference
+  from the first atlas''s target'
+- 'Surface is NOT a reduction over a cell''s own members: it counts boundary adjacencies to OTHER cells,
+  so it reads neighbouring parents'' labels -- an inter-parent quantity the aggregate contract has no
+  notion of.'
+- 'Membership is a mutable field, not a fixed hierarchy: which cell owns a site is rewritten every MC
+  step, and the cell has no existence apart from sigma -- it IS its sites, deformable and possibly
+  disconnected.'
+verdict: new
+of: null
+implementation_of: null
+collision_note: null
+why: |
+  The closest registered contract is `aggregate` (aggregate/hierarchy), whose sole implementation
+  (Centroid) already reduces a cell's contained children onto the parent and writes the parent's COM as
+  an occupancy-weighted mean -- exactly the COM half of this representation (COM = mean of sites). So the
+  overlap is real and I do not hide it: a cell's position, as a derived centroid over its members, IS the
+  aggregate contract.
+  But the representation as a whole is `new`, and widening `aggregate` to admit it would do violence in
+  two ways. (1) SUBSTRATE. aggregate's member set is a set of persistent point children joined to the
+  parent by a fixed `parent` containment map (INPUTS=["particle"], MAPS=["parent"]). Here there are no
+  child entities: members are cells of a shared grid, and membership is the mutable label field sigma,
+  rewritten one site at a time by Metropolis dynamics. To widen aggregate you would change its `set` and
+  `reads` from "a parent's member list" to "a partition of a field," which is not a widening but a
+  different substrate, and it would break every current aggregate user (point agents with a fixed parent).
+  (2) SURFACE is not a member reduction at all. S counts a cell's boundary adjacencies to OTHER cells, so
+  it reads neighbouring parents' labels; aggregate reduces a parent's OWN children and has no term that
+  crosses between parents. And neither a point-with-radius (`radius_graph`) nor a particle cloud can carry
+  a concave, exact, area-counted boundary. This representation is the substrate the whole target stands
+  on -- an extended, deformable lattice domain whose volume and exact surface are first-class -- and the
+  Plexus algebra, whose agents are points, has no primitive for it.
+contract:
+  name: occupy
+  kind: aggregate
+  family: hierarchy
+  set: cell
+  inputs:
+  - lattice_site
+  outputs:
+  - cell
+  reads:
+  - sigma
+  writes:
+  - volume
+  - surface
+  - centroid
+  maps:
+  - sigma
+status: normalized
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

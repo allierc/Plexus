@@ -83,3 +83,29 @@ Re-verified `code_path` L4306 = `class SecretionPlugin` (unmoved) and the `from_
 anchor now says so and names the source (PyCoreSpecs.py + amoebae_2D XML) as the only evidence,
 rather than implying I read a paper section. No analytical claims changed.
 
+### NORMALIZER
+
+**Verdict: refinement of `deposit`** (implementation_of: deposit). Secretion is the stigmergy
+`deposit` verb — a cell adds to a scalar field at the sites it owns (deposit.py REFERENCE =
+Grasse 1959, an ant depositing pheromone at its position). Transport is left to the separate
+`diffuse` solver, so there is no composite: the standalone plugin is deposit and only deposit.
+Plain additive mode alone would be a clean alias/implementation; the refinement is forced by the
+plugin's other two modes. ConstantConcentration OVERWRITES/pins (phi := k) whereas deposit only
+adds and clamps to 1 — needs a `mode: add|set` widening. SecretionOnContact gates the write on a
+heterotypic-boundary predicate — needs an optional boundary write-domain + a neighbour-type read,
+where deposit as registered reads only `pos`. Both are the same shape: deposit's unconditional
+additive point-scatter must become mode-selectable and optionally domain-restricted over a cell's
+pixel SET. The volume-scaled volumetric write is a set-vs-point primitive gap, not a contract
+field, so it does not move the verdict.
+
+**Strongest argument against.** You can read ConstantConcentration and SecretionOnContact as
+*different verbs* wearing one plugin's name — in which case the honest verdict is `alias` for
+plain Secretion plus possibly one `new` contract for the Dirichlet field-pin, not a single
+refinement. A pin (phi := k re-applied each step) is arguably not "depositing" at all: it is a
+boundary condition ON the field, closer to a field-level clamp than to an agent adding mass, and
+folding it into deposit via a `mode` flag risks papering over exactly the source-vs-clamp gap the
+loop warns against. I chose refinement because all three modes share one declarative surface, one
+per-(field,type) value, and one set->field write target, so they read as a single contract with a
+mode axis. But if the ledger prefers clamp/pin kept distinct from additive source, this should
+split into alias(deposit) + one `new` Dirichlet-pin contract.
+
