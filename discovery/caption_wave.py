@@ -85,6 +85,26 @@ def caption_wave(names, n_frames=8, force=False):
         except Exception as e:
             out[n] = f"failed: {type(e).__name__}"
             print(f"  [{i}/{len(todo)}] {n}: FAILED {type(e).__name__}", flush=True)
+    # FREE THE MODEL. This is the difference between here and VLLM/describe_video.py, and it is
+    # not cosmetic: that one is a standalone script, so it exits and the OS reclaims. This runs
+    # INSIDE a round, and without the release below the 23 GB stays pinned on cuda:0 for the
+    # remaining ten minutes while Act 2's readers and the whole of Act 3 execute. Measured after
+    # the recon round: 24,565 MiB still held on GPU 0 with no compute process listed.
+    #
+    # A round holding a fifth of a GPU it has finished with is a round that can be killed by the
+    # next thing that needs one, and a death from outside leaves no traceback -- which is exactly
+    # the failure that has not been explained. This does not prove that was the cause. It removes
+    # a real way for it to happen, which is the most that can honestly be claimed.
+    try:
+        del model, proc
+        import gc
+        gc.collect()
+        torch.cuda.empty_cache()
+        free = torch.cuda.memory_reserved(0) / 1e9 if torch.cuda.is_available() else 0
+        print(f"[caption] model released; {free:.1f} GB still reserved by this process",
+              flush=True)
+    except Exception as e:
+        print(f"[caption] could not release the model: {type(e).__name__}", flush=True)
     print(f"[caption] {len(todo)} run(s) in {time.time() - t0:.0f}s "
           f"(one model load, not {len(todo)})", flush=True)
     return out
