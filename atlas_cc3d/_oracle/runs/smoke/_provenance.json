@@ -1,0 +1,11 @@
+{
+ "cc3d_version": "4.10.0",
+ "python": "3.12.2",
+ "env": "/workspace/.conda_envs/cc3d-oracle",
+ "run_script": "/workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/run_script.py",
+ "seed": 42,
+ "steps": 1000,
+ "dim": 60,
+ "model": "cell_sorting",
+ "xml_sha1": "47414120e51d3925ef69aa7e4f0826e8d87618f2"
+}

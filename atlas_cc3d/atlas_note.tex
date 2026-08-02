@@ -125,7 +125,7 @@ that the apparatus is a method rather than a one-off, and it cost about ten minu
 \section{The oracle --- where the risk actually is}\label{sec:oracle}
 
 \code{TRANSFER.md} predicted the oracle would be the largest risk, and a \emph{target} risk rather
-than a \emph{procedure} risk. It is.
+than a \emph{procedure} risk. It was both, and \textbf{it now passes}.
 
 \begin{center}
 \small
@@ -135,36 +135,45 @@ than a \emph{procedure} risk. It is.
 \midrule
 installs & \dn & CompuCell3D 4.10.0 from its own conda channel into an isolated environment
 (\code{/workspace/.conda\_envs/cc3d-oracle}), py312.\\
-imports & \dn & after supplying \code{libGL} (conda-forge \code{libgl-devel}) --- the container is
-headless and CompuCell3D links its graphics stack unconditionally.\\
-model definable in Python & \dn & \code{cc3d.core.PyCoreSpecs}: a simulation can be built without
-XML, which is what makes a scriptable oracle possible at all.\\
-seed exposed & \dn & \code{PottsCore(random\_seed=...)}, so determinism is at least
-\emph{expressible}.\\
-runs headless & \textcolor{bad}{\textbf{BLOCKED}} & a bug in 4.10.0, below.\\
-deterministic at a fixed seed & \ns & untestable until it runs.\\
+imports & \dn & after supplying \code{libGL} --- the container is headless and CompuCell3D links
+its graphics stack unconditionally.\\
+model definable in Python & \dn & \code{cc3d.core.PyCoreSpecs}, so the model is written in Python
+and never hand-typed as XML.\\
+\textbf{isolation} & \dn & the Plexus interpreter \emph{cannot} \code{import cc3d}. Checked, not
+assumed: a process that can reach the reference can borrow its answer.\\
+\textbf{runs headless} & \dn & 9 cells at $30^2$, 45 at $60^2$; artefacts with provenance in
+\code{\_oracle/runs/smoke/}.\\
+\textbf{deterministic at a fixed seed} & \dn & two runs at seed 42 are \emph{bit-identical} across
+id, type, volume, surface and centre of mass; seed 7 differs.\\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\textbf{The blocker is in CompuCell3D, not in the plan.} Driving it from \code{PyCoreSpecs} through
-\code{service\_cc3d} reaches \code{persistent\_globals.get\_custom\_settings\_path()}, which calls
-\code{Path(custom\_settings\_source)} where that value is the \emph{list of specs} rather than a
-simulation file path:
+\textbf{Getting there meant routing around three defects in CompuCell3D 4.10.0}, none of them
+configuration:
 
-\begin{center}
-\small\code{TypeError: argument should be a str or an os.PathLike object ... not 'list'}
-\end{center}
+\begin{enumerate}[leftmargin=1.4em,itemsep=1pt]
+\item The advertised pure-Python route (\code{PyCoreSpecs} $\to$ \code{service\_cc3d}) passes the
+\emph{list of specs} where a simulation file is expected:
+\code{get\_custom\_settings\_path()} does \code{Path(<list>)}. Shimming that only exposes the next
+one --- \code{CC3DSimService.\_run} asserts \code{os.path.isfile(<list>)}. \textbf{That route
+simply does not work in this release.}
+\item CC3D \code{exec}s the project's Python script with its own globals, so a steppable class
+defined in the same file raises \code{NameError: SteppableBasePy is not defined} at registration.
+The class must live in a separate importable module.
+\item The output directory may not sit inside the project folder.
+\end{enumerate}
 
-Three routes, in the order they will be tried: an earlier release (4.9.0 / 4.8.0) that may predate
-the regression; the \code{.cc3d} project-file route via \code{cc3d\_runScript.sh}, which is the
-officially supported headless entry point and never touches that code path; or setting the
-custom-settings path explicitly before the call.
+\textbf{The way through} is to use \code{PyCoreSpecs} for what it is genuinely good at ---
+generating correct CC3DML, \code{<RandomSeed>} included --- write a real \code{.cc3d} project, and
+run it through \code{cc3d/run\_script.py}, the officially supported headless entry point, which
+never touches the broken path. The model stays defined in Python; only the transport is a file.
 
-\textbf{Nothing downstream can be trusted until this gate passes.} jax-morph was chosen
-\emph{because} it ran, and the first note said so in its own Phase 0: a target that cannot be run
-reduces the atlas to the Okuda situation --- wrong operator, wrong parameter or wrong reading of a
-figure, with no way to tell which.
+\textbf{Why this mattered enough to spend the time on.} jax-morph was chosen \emph{because} it ran,
+and the first note said so in its own Phase 0. A target that cannot be run reduces the atlas to the
+Okuda situation --- wrong operator, wrong parameter or wrong reading of a figure, with no way to
+tell which. \textbf{Determinism is the gate behind the gate}: without it, every later disagreement
+is unattributable between their noise and our error. Both now hold, so Phase 1 is unblocked.
 
 %======================================================================
 \section{The phases}
@@ -173,16 +182,15 @@ Seven stages, the same ladder as the first atlas. \textbf{I stop at the end of e
 for you.} What differs is not the procedure but what each stage has to mean when a cell is a
 region of a lattice rather than a point.
 
-\begin{phasebox}{Phase 0 --- Instruments and the oracle \hfill \prog}
+\begin{phasebox}{Phase 0 --- Instruments and the oracle \hfill \done}
 \textbf{Goal.} Make every later measurement trustworthy before taking one.
 
-The instruments came across for free (\S2). \textbf{The oracle is the phase}, and it is where the
-risk always was: install, import, run headless, and be deterministic at a fixed seed. Four of
-those six gates pass; the fifth blocks (\S\ref{sec:oracle}) and the sixth cannot be tested until it does.
+The instruments came across for free (\S2). \textbf{The oracle was the phase}, and it is where the
+risk always was: install, import, isolate, run headless, and be deterministic at a fixed seed.
 
-\textbf{Stop condition:} the authors' own model runs twice from one seed and is bit-identical.
-Until that holds, a later disagreement is unattributable --- their noise or our error, with no way
-to separate them.
+\textbf{All six gates now pass} (\S\ref{sec:oracle}), including the stop condition --- the authors'
+own cell-sorting model runs twice from one seed and is bit-identical. Until that held, a later
+disagreement would have been unattributable between their noise and our error. It holds.
 \end{phasebox}
 
 \begin{phasebox}{Phase 1 --- Read every mechanism \hfill \ns}

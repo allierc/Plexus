@@ -1,203 +1,209 @@
-"""oracle -- the reference implementation, isolated, pinned, and RUNNABLE.
+"""oracle -- CompuCell3D in its own interpreter, with provenance on every artefact.
 
-This is the one thing the Okuda track never had. Okuda et al. published a paper with no code,
-so every disagreement between our simulation and theirs was unfalsifiable: we could not tell a
-wrong operator from a wrong parameter from a wrong reading of a figure. Here the authors'
-own code exists, so we can put our reconstruction and their implementation on the SAME initial
-condition and diff the trajectories. Faithfulness stops being a judgement call.
+The rule the first atlas earned and this one inherits: **`import cc3d` must never succeed in a
+Plexus process.** A process that can reach the reference implementation can borrow its answer, and
+a differential test that can be contaminated is not a test. CompuCell3D lives in
+`/workspace/.conda_envs/cc3d-oracle` (4.10.0, py312); Plexus lives in `neural-graph-linux`.
 
-Three rules, all learned from the discovery loop.
+HOW CC3D IS DRIVEN, and why not the obvious way. CompuCell3D 4.x advertises a pure-Python route
+(`PyCoreSpecs` + `service_cc3d`) that would be the natural fit for a scriptable oracle. In 4.10.0
+it does not work: passing a list of specs where a simulation *file* is expected reaches
+`persistent_globals.get_custom_settings_path()` -> `Path(<list>)` (TypeError), and past that
+`CC3DSimService._run` asserts `os.path.isfile(<list>)`. Both are upstream bugs, not configuration.
 
-  1. THE ORACLE LIVES IN ITS OWN INTERPRETER.  jax-morph wants JAX; Plexus wants torch. They
-     share a filesystem and nothing else. Every oracle call is a subprocess into `_oracle/venv`,
-     never an import. A Plexus process that can `import jax_morph` is a Plexus process that can
-     silently borrow the reference implementation's answer -- which is exactly the contamination
-     a differential test exists to detect.
+So the oracle uses `PyCoreSpecs` for what it is good at -- GENERATING correct CC3DML, including
+`<RandomSeed>` -- writes a real `.cc3d` project, and runs it through `cc3d/run_script.py`, the
+officially supported headless entry point, which never touches that code path. The model is still
+defined in Python; only the transport is a file.
 
-  2. NOTHING IS AN ORACLE UNTIL ITS PROVENANCE IS WRITTEN DOWN.  Every artefact carries the
-     clone's git SHA, the resolved package versions, the interpreter, and the script that made
-     it. A reference trajectory with no provenance is a number of unknown origin, and the
-     campaign has already been burned once by trusting one of those.
-
-  3. FAIL LOUDLY.  No try/except around an artefact. If the reference will not run, the Atlas
-     stops -- it does not proceed on a remembered figure.
-
-Usage
------
-    python oracle.py setup            # build the venv, install the pinned reference, record it
-    python oracle.py verify           # provenance + import + a 3-line physics check
-    python oracle.py smoke            # a real short simulation -> _oracle/runs/smoke/
-    python oracle.py run  <script>    # any script, inside the venv, artefacts under _oracle/runs/
+    python oracle.py verify           # isolation + headless run + determinism
+    python oracle.py smoke            # the cell-sorting reference -> _oracle/runs/smoke/
 """
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import subprocess
 import sys
-import textwrap
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-PLEXUS = os.path.abspath(os.path.join(HERE, ".."))
-CLONE = os.path.join(PLEXUS, "papers", "jax-morph")
-
 ORACLE = os.path.join(HERE, "_oracle")
-VENV = os.path.join(ORACLE, "venv")
-PY = os.path.join(VENV, "bin", "python")
 RUNS = os.path.join(ORACLE, "runs")
-PROVENANCE = os.path.join(ORACLE, "provenance.json")
+ENV = os.environ.get("CC3D_ENV", "/workspace/.conda_envs/cc3d-oracle")
+PY = os.path.join(ENV, "bin", "python")
+RUN_SCRIPT = os.path.join(ENV, "lib", "python3.12", "site-packages", "cc3d", "run_script.py")
+PLEXUS_PY = "/workspace/.conda_envs/neural-graph-linux/bin/python"
 
-# The reference's own declared dependencies (pyproject) plus what a reference RUN needs.
-# Deliberately not pinned to exact versions on first build: we record what pip resolved, which
-# is the honest thing, and pin from that record afterwards.
-REQUIREMENTS = ["jax>=0.4.35", "equinox>=0.11.7", "diffrax>=0.6.0", "numpy", "matplotlib"]
+# The steppable that makes a run READABLE. CC3D writes VTK for its player; an oracle needs the
+# per-cell state as data, so a steppable dumps it at `finish()`.
+STEPPABLE = '''
+import os, json
+from cc3d.core.PySteppables import *
+
+class DumpSteppable(SteppableBasePy):
+    """Write every live cell's state at the end of the run."""
+    def __init__(self, frequency=1):
+        SteppableBasePy.__init__(self, frequency)
+
+    def finish(self):
+        rows = sorted((int(c.id), int(c.type), float(c.volume), float(c.surface),
+                       round(float(c.xCOM), 6), round(float(c.yCOM), 6))
+                      for c in self.cell_list)
+        with open(os.environ["CC3D_DUMP"], "w") as f:
+            json.dump({"n": len(rows),
+                       "columns": ["id", "type", "volume", "surface", "xCOM", "yCOM"],
+                       "cells": rows}, f, indent=1)
+'''
+
+# CC3D execs the PythonScript with its own globals, so the steppable CLASS must live in a separate
+# importable module and only the registration goes here. A single-file version raises
+# `NameError: SteppableBasePy is not defined` at registration -- found the hard way.
+MAIN = '''
+from cc3d import CompuCellSetup
+from sortSteppables import DumpSteppable
+CompuCellSetup.register_steppable(steppable=DumpSteppable(frequency=1))
+CompuCellSetup.run()
+'''
+
+PROJECT = '''<Simulation version="4.10.0">
+   <XMLScript Type="XMLScript">Simulation/model.xml</XMLScript>
+   <PythonScript Type="PythonScript">Simulation/main.py</PythonScript>
+</Simulation>
+'''
+
+# The reference model: cell sorting, CompuCell3D's canonical demonstration. Two adhesive cell types
+# whose contact energies drive one to engulf the other -- an outcome that is a TOPOLOGY rather than
+# a trajectory, which is the kind of observable a Potts differential test can actually use.
+SORT_SPECS = '''
+import warnings, sys; warnings.filterwarnings("ignore")
+from cc3d.core.PyCoreSpecs import (PottsCore, CellTypePlugin, VolumePlugin, ContactPlugin,
+                                   BlobInitializer, CenterOfMassPlugin)
+seed, steps, dim = int(sys.argv[1]), int(sys.argv[2]), int(sys.argv[3])
+potts = PottsCore(dim_x=dim, dim_y=dim, dim_z=1, steps=steps, fluctuation_amplitude=10.0,
+                  neighbor_order=2, random_seed=seed)
+ct = CellTypePlugin("Condensing", "NonCondensing")
+vol = VolumePlugin()
+vol.param_new("Condensing", target_volume=25, lambda_volume=2.0)
+vol.param_new("NonCondensing", target_volume=25, lambda_volume=2.0)
+con = ContactPlugin(neighbor_order=2)
+con.param_new("Medium", "Condensing", 16); con.param_new("Medium", "NonCondensing", 16)
+con.param_new("Condensing", "Condensing", 2); con.param_new("NonCondensing", "NonCondensing", 11)
+con.param_new("Condensing", "NonCondensing", 11)
+com = CenterOfMassPlugin()
+blob = BlobInitializer()
+blob.region_new(width=5, radius=dim // 3, center=(dim // 2, dim // 2, 0),
+                cell_types=("Condensing", "NonCondensing"))
+body = "\\n".join(s.xml.getCC3DXMLElementString() for s in (potts, ct, vol, con, com, blob))
+sys.stdout.write('<CompuCell3D Revision="0" Version="4.10.0">\\n' + body + '\\n</CompuCell3D>\\n')
+'''
 
 
-# ------------------------------------------------------------------------------------------- #
-#  setup
-# ------------------------------------------------------------------------------------------- #
-def _run(cmd, **kw):
-    print("+", " ".join(cmd), flush=True)
-    return subprocess.run(cmd, check=True, **kw)
+def _sh(cmd, **kw):
+    return subprocess.run(cmd, capture_output=True, text=True, timeout=1800, **kw)
 
 
-def _git_sha(path):
-    out = subprocess.run(["git", "-C", path, "rev-parse", "HEAD"],
-                         capture_output=True, text=True)
-    return out.stdout.strip() if out.returncode == 0 else None
+def build_project(dest, seed, steps, dim):
+    """Write a complete .cc3d project. The CC3DML is GENERATED from PyCoreSpecs, never hand-typed."""
+    os.makedirs(os.path.join(dest, "Simulation"), exist_ok=True)
+    open(os.path.join(dest, "model.cc3d"), "w").write(PROJECT)
+    open(os.path.join(dest, "Simulation", "sortSteppables.py"), "w").write(STEPPABLE)
+    open(os.path.join(dest, "Simulation", "main.py"), "w").write(MAIN)
+    gen = os.path.join(dest, "_gen_specs.py")
+    open(gen, "w").write(SORT_SPECS)
+    r = _sh([PY, "-u", gen, str(seed), str(steps), str(dim)])
+    if r.returncode != 0 or "<CompuCell3D" not in r.stdout:
+        raise RuntimeError(f"CC3DML generation failed:\n{r.stderr[-1200:]}")
+    open(os.path.join(dest, "Simulation", "model.xml"), "w").write(r.stdout)
+    return dest
 
 
-def setup(force=False):
-    """Build `_oracle/venv` and install the reference from the LOCAL clone.
-
-    Installed from `papers/jax-morph`, not from PyPI, so the atlas record's `code_path`
-    evidence points at bytes we can read. Non-editable: the clone stays read-only.
-    """
-    if os.path.isdir(VENV) and not force:
-        print(f"venv exists: {VENV}   (use --force to rebuild)")
-    else:
-        if force and os.path.isdir(VENV):
-            import shutil
-            shutil.rmtree(VENV)
-        os.makedirs(ORACLE, exist_ok=True)
-        _run([sys.executable if sys.version_info >= (3, 11) else "python3", "-m", "venv", VENV])
-
-    _run([PY, "-m", "pip", "install", "--quiet", "--upgrade", "pip"])
-    _run([PY, "-m", "pip", "install", "--quiet", *REQUIREMENTS])
-    _run([PY, "-m", "pip", "install", "--quiet", "--no-deps", CLONE])
-
-    freeze = subprocess.run([PY, "-m", "pip", "freeze"], capture_output=True, text=True).stdout
-    ver = subprocess.run(
-        [PY, "-c", "import jax, jax_morph as j; print(jax.__version__); print(j.__version__); "
-                   "print([d.platform for d in jax.devices()])"],
-        capture_output=True, text=True)
-    if ver.returncode != 0:
-        raise SystemExit(f"reference will not import:\n{ver.stdout}\n{ver.stderr}")
-    jax_v, jm_v, devices = ver.stdout.strip().splitlines()
-
-    prov = {
-        "clone": CLONE,
-        "clone_git_sha": _git_sha(CLONE),
-        "interpreter": subprocess.run([PY, "-V"], capture_output=True, text=True).stdout.strip(),
-        "jax": jax_v,
-        "jax_morph": jm_v,
-        "devices": devices,
-        "requirements_asked": REQUIREMENTS,
-        "pip_freeze": freeze.splitlines(),
-    }
-    with open(PROVENANCE, "w") as f:
-        json.dump(prov, f, indent=2)
-    print(f"\noracle ready:  jax {jax_v} · jax-morph {jm_v} · devices {devices}")
-    print(f"provenance  -> {PROVENANCE}")
-    return prov
+def run_project(dest, dump_path):
+    if os.path.exists(dump_path):
+        os.remove(dump_path)          # never read a stale dump as if it were this run's
+    # CC3D refuses an output directory inside the project folder, so it goes in a sibling.
+    out_dir = os.path.join(ORACLE, "_out", os.path.basename(dest.rstrip("/")))
+    env = dict(os.environ, CC3D_DUMP=dump_path)
+    r = _sh([PY, "-u", RUN_SCRIPT, "-i", os.path.join(dest, "model.cc3d"),
+             "-o", out_dir, f"--current-dir={dest}"], env=env)
+    if not os.path.exists(dump_path):
+        raise RuntimeError(f"run produced no dump.\nstdout:\n{r.stdout[-1500:]}\n"
+                           f"stderr:\n{r.stderr[-1500:]}")
+    return json.load(open(dump_path))
 
 
 def provenance():
-    if not os.path.exists(PROVENANCE):
-        raise SystemExit("no provenance -- run `python oracle.py setup` first")
-    with open(PROVENANCE) as f:
-        return json.load(f)
+    r = _sh([PY, "-c", "import warnings;warnings.filterwarnings('ignore');"
+                       "import cc3d,sys;print(cc3d.__version__);print(sys.version.split()[0])"])
+    lines = [x for x in r.stdout.strip().split("\n") if x][-2:]
+    ver, pyver = (lines + ["?", "?"])[:2]
+    return {"cc3d_version": ver, "python": pyver, "env": ENV, "run_script": RUN_SCRIPT}
 
 
-# ------------------------------------------------------------------------------------------- #
-#  run
-# ------------------------------------------------------------------------------------------- #
-def run_script(src, name, env=None):
-    """Execute `src` (python source text) inside the oracle venv.
-
-    The script gets `OUT` in its environment: a per-run directory under `_oracle/runs/<name>/`
-    where every artefact must be written. A copy of the script and the provenance are dropped
-    beside the artefacts, so a trajectory can always be traced to the code and the versions
-    that produced it.
-    """
-    out = os.path.join(RUNS, name)
-    os.makedirs(out, exist_ok=True)
-    script = os.path.join(out, "_script.py")
-    with open(script, "w") as f:
-        f.write(src)
-    with open(os.path.join(out, "_provenance.json"), "w") as f:
-        json.dump(provenance(), f, indent=2)
-
-    e = dict(os.environ, OUT=out, JAX_PLATFORMS=os.environ.get("JAX_PLATFORMS", "cpu"))
-    e.update(env or {})
-    print(f"+ {PY} {script}   (OUT={out})", flush=True)
-    p = subprocess.run([PY, script], env=e)
-    if p.returncode != 0:
-        raise SystemExit(f"oracle run '{name}' FAILED (exit {p.returncode}) -- see above. "
-                         f"Nothing is recorded as reference.")
-    print(f"artefacts -> {out}")
-    return out
+def isolation_ok():
+    """The Plexus interpreter must NOT be able to import cc3d -- the contamination guarantee,
+    checked rather than assumed."""
+    return _sh([PLEXUS_PY, "-c", "import cc3d"]).returncode != 0
 
 
-# ------------------------------------------------------------------------------------------- #
-#  verify  --  the reference is imported, its physics answers a question with a known sign
-# ------------------------------------------------------------------------------------------- #
-VERIFY_SRC = textwrap.dedent("""
-    import json, os
-    import jax, jax.numpy as jnp
-    import jax_morph as jxm
-
-    out = {}
-    out["jax"] = jax.__version__
-    out["jax_morph"] = jxm.__version__
-    out["public_api"] = sorted(n for n in dir(jxm) if not n.startswith("_"))
-    print(json.dumps(out, indent=2))
-    with open(os.path.join(os.environ["OUT"], "verify.json"), "w") as f:
-        json.dump(out, f, indent=2)
-""")
-
-
-def verify():
+def cmd_verify(a):
     prov = provenance()
-    print(json.dumps({k: prov[k] for k in
-                      ("clone_git_sha", "interpreter", "jax", "jax_morph", "devices")}, indent=2))
-    return run_script(VERIFY_SRC, "verify")
+    print(f"[oracle] CompuCell3D {prov['cc3d_version']} · python {prov['python']}")
+    iso = isolation_ok()
+    print(f"[oracle] isolation (Plexus cannot import cc3d): {'OK' if iso else 'FAILED'}")
+
+    work = os.path.join(ORACLE, "_verify")
+    build_project(work, seed=42, steps=100, dim=30)
+    a1 = run_project(work, os.path.join(work, "d1.json"))
+    a2 = run_project(work, os.path.join(work, "d2.json"))
+    build_project(work, seed=7, steps=100, dim=30)
+    b1 = run_project(work, os.path.join(work, "d3.json"))
+
+    det, seedy = (a1 == a2), (a1 != b1)
+    print(f"[oracle] headless run: OK ({a1['n']} cells)")
+    print(f"[oracle] deterministic at a fixed seed: {'OK' if det else 'FAILED'}")
+    print(f"[oracle] a different seed differs:      {'OK' if seedy else 'FAILED'}")
+    ok = iso and det and seedy
+    print(f"[oracle] {'PASS' if ok else 'FAIL'}")
+    return 0 if ok else 1
 
 
-# ------------------------------------------------------------------------------------------- #
+def cmd_smoke(a):
+    dest = os.path.join(RUNS, "smoke")
+    build_project(dest, seed=a.seed, steps=a.steps, dim=a.dim)
+    data = run_project(dest, os.path.join(dest, "reference.json"))
+    prov = provenance()
+    prov.update({"seed": a.seed, "steps": a.steps, "dim": a.dim, "model": "cell_sorting",
+                 "xml_sha1": hashlib.sha1(
+                     open(os.path.join(dest, "Simulation", "model.xml"), "rb").read()).hexdigest()})
+    json.dump(prov, open(os.path.join(dest, "_provenance.json"), "w"), indent=1)
+    vols = [c[2] for c in data["cells"]]
+    types = {}
+    for c in data["cells"]:
+        types[c[1]] = types.get(c[1], 0) + 1
+    summary = {"n_cells": data["n"], "by_type": types,
+               "volume_mean": sum(vols) / len(vols),
+               "volume_min": min(vols), "volume_max": max(vols)}
+    json.dump(summary, open(os.path.join(dest, "summary.json"), "w"), indent=1)
+    print(f"[oracle] smoke: {data['n']} cells {types}, volume "
+          f"{summary['volume_min']:.0f}-{summary['volume_max']:.0f} "
+          f"(mean {summary['volume_mean']:.1f}) -> {os.path.relpath(dest, HERE)}")
+    return 0
+
+
 def main():
-    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("cmd", choices=["setup", "verify", "smoke", "run"])
-    ap.add_argument("script", nargs="?", help="path to a python script (cmd=run)")
-    ap.add_argument("--name", default=None, help="run name (cmd=run)")
-    ap.add_argument("--force", action="store_true", help="rebuild the venv (cmd=setup)")
+    ap = argparse.ArgumentParser()
+    sub = ap.add_subparsers(dest="cmd", required=True)
+    sub.add_parser("verify")
+    s = sub.add_parser("smoke")
+    s.add_argument("--seed", type=int, default=42)
+    s.add_argument("--steps", type=int, default=1000)
+    s.add_argument("--dim", type=int, default=60)
     a = ap.parse_args()
-
-    if a.cmd == "setup":
-        setup(force=a.force)
-    elif a.cmd == "verify":
-        verify()
-    elif a.cmd == "smoke":
-        from smoke import SMOKE_SRC          # kept beside this file, edited often
-        run_script(SMOKE_SRC, "smoke")
-    elif a.cmd == "run":
-        if not a.script:
-            raise SystemExit("cmd=run needs a script path")
-        with open(a.script) as f:
-            src = f.read()
-        run_script(src, a.name or os.path.splitext(os.path.basename(a.script))[0])
+    os.makedirs(RUNS, exist_ok=True)
+    return {"verify": cmd_verify, "smoke": cmd_smoke}[a.cmd](a)
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

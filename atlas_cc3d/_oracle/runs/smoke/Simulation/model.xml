@@ -1,0 +1,42 @@
+<CompuCell3D Revision="0" Version="4.10.0">
+<Potts>
+   <Dimensions x="60" y="60" z="1"/>
+   <Steps>1000</Steps>
+   <Temperature>10.0</Temperature>
+   <NeighborOrder>2</NeighborOrder>
+   <RandomSeed>42</RandomSeed>
+</Potts>
+
+<Plugin Name="CellType">
+   <CellType TypeId="0" TypeName="Medium"/>
+   <CellType TypeId="1" TypeName="Condensing"/>
+   <CellType TypeId="2" TypeName="NonCondensing"/>
+</Plugin>
+
+<Plugin Name="Volume">
+   <VolumeEnergyParameters CellType="Condensing" LambdaVolume="2.0" TargetVolume="25"/>
+   <VolumeEnergyParameters CellType="NonCondensing" LambdaVolume="2.0" TargetVolume="25"/>
+</Plugin>
+
+<Plugin Name="Contact">
+   <Energy Type1="Medium" Type2="Condensing">16</Energy>
+   <Energy Type1="Medium" Type2="NonCondensing">16</Energy>
+   <Energy Type1="Condensing" Type2="Condensing">2</Energy>
+   <Energy Type1="Condensing" Type2="NonCondensing">11</Energy>
+   <Energy Type1="NonCondensing" Type2="NonCondensing">11</Energy>
+   <NeighborOrder>2</NeighborOrder>
+</Plugin>
+
+<Plugin Name="CenterOfMass"/>
+
+<Steppable Type="BlobInitializer">
+   <Region>
+      <Gap>0</Gap>
+      <Width>5</Width>
+      <Radius>20</Radius>
+      <Center x="30" y="30" z="0"/>
+      <Types>Condensing,NonCondensing</Types>
+   </Region>
+</Steppable>
+
+</CompuCell3D>
