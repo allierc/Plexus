@@ -332,6 +332,30 @@ refused.
 
 ---
 
+## Where engine output goes
+
+The engine is an **instrument, not an agent**. Its output is measurement, so it enters the loop
+exactly where every other measurement does: **the Collector reads it first**, and it reaches the
+Interpreter, Meta-review, Supervisor and Archivist through the round record — not through a
+terminal line addressed to nobody.
+
+Two engine facts, both collected:
+
+| fact | who produces it | where it lands |
+|---|---|---|
+| divisions refused, array full, the frame it first bit | `divide_3d` → `run_one` summary | `reservoir` block → the `Reservoir:` line |
+| buffer enlarged, or clamped at the memory budget | the launcher, before the run | same block, same line |
+
+A run stopped by its array is a **censored measurement** — a lower bound, not a destination. The
+record says that in words, because `n_cells_final` alone cannot distinguish a composition that
+stopped growing from one that was stopped.
+
+When the fault is the *apparatus* rather than the biology, the **Diagnostician** reads these
+fields directly; it is the role whose question they answer. And when a composition has been
+clamped at the memory budget and saturates anyway, that conclusion — *no buffer will fix this,
+the growth is unbounded* — is addressed to the **Proposer**, the only role that can change a
+composition.
+
 ## Who writes the two records
 
 Both were written by the **Proposer**, which is a defect: the agent under evaluation was writing

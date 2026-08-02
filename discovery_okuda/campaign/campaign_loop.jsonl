@@ -13,3 +13,10 @@
 {"t": 1785673296.940982, "event": "round", "n": 3, "exit": 5, "minutes": 4.5, "usd_this_round": 3.6, "note": "", "cost_total": {"calls": 19, "usd": 5.07, "tok_in": 48731, "tok_out": 39820, "turns": 55, "minutes": 10.7}}
 {"t": 1785673296.9499476, "event": "stop", "why": "two empty rounds", "rounds_done": 3}
 {"t": 1785673685.1448753, "event": "start", "rounds": 20, "batch": 12, "frames": null}
+{"t": 1785675147.6798363, "event": "round", "n": 1, "exit": 0, "minutes": 24.2, "usd_this_round": 5.2, "note": "", "cost_total": {"calls": 12, "usd": 3.49, "tok_in": 34095, "tok_out": 18210, "turns": 49, "minutes": 5.2}}
+{"t": 1785675418.41909, "event": "start", "rounds": 20, "batch": 12, "frames": null}
+{"t": 1785675789.050849, "event": "start", "rounds": 20, "batch": 12, "frames": null}
+{"t": 1785677249.5261903, "event": "start", "rounds": 20, "batch": 12, "frames": null}
+{"t": 1785680379.5253837, "event": "round", "n": 1, "exit": 0, "minutes": 52.0, "usd_this_round": 5.5, "note": "", "cost_total": {"calls": 12, "usd": 3.5, "tok_in": 34095, "tok_out": 20759, "turns": 48, "minutes": 5.5}}
+{"t": 1785680817.932691, "event": "start", "rounds": 20, "batch": 12, "frames": null}
+{"t": 1785682069.9959362, "event": "start", "rounds": 20, "batch": 12, "frames": null}

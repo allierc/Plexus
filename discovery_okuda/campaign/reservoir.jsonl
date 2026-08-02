@@ -1,0 +1,2 @@
+{"run": "wk_tension_pos_s2", "slot": "zz_wk_tension_pos_s2", "from": 3552, "to": 138888, "cap_cells": 69446, "clamped_from_cells": 295863, "times_censored": 4}
+{"run": "cfl_c001p300_d000p420", "slot": "zz_cfl_c001p300_d000p420", "from": 30000, "to": 41604, "cap_cells": 20804, "clamped_from_cells": null, "times_censored": 0}

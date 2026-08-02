@@ -551,6 +551,19 @@ def _resize_reservoir(spec_path, name, run=None, frames=None):
             msg += (f", CLAMPED from {clamped[0]} by the {TRAJECTORY_BUDGET_GB} GB budget -- if "
                     f"it saturates again the composition's growth is the problem, not the array")
         print(T_.warn(msg + ". A buffer is an array size, not a model parameter."))
+        # RECORDED, so an agent can read it. Until now the resize existed only as a printed line
+        # and a local variable, which means the clamp's own conclusion -- "if it saturates again
+        # the composition's growth is the problem, not the array" -- was a finding addressed to
+        # nobody. That is the exact defect this campaign spent days removing everywhere else.
+        try:
+            os.makedirs(CAMP, exist_ok=True)
+            with open(os.path.join(CAMP, "reservoir.jsonl"), "a") as fh:
+                fh.write(json.dumps({"run": run or name, "slot": name, "from": have, "to": want_v,
+                                     "cap_cells": (want_v + 4) // 2,
+                                     "clamped_from_cells": clamped[0] if clamped else None,
+                                     "times_censored": _times_censored(run or name)}) + "\n")
+        except Exception:
+            pass
     except Exception as e:
         print(T_.warn(f"[recon] {name}: could not resize the reservoir "
                       f"({type(e).__name__}) -- replaying verbatim, it may saturate"))
@@ -716,7 +729,8 @@ def build_composition_batch(sup, cfg, n_slots, ledger):
     # Critic's refusals went nowhere, and the Grounder wrote into a config the Proposer never
     # reads. Handed over here, in the words their authors used.
     steer = _steer_for(sup)
-    refusals = "\n\n".join(x for x in (_refusal_summary(sup), _batch_refusals()) if x)
+    refusals = "\n\n".join(x for x in (_refusal_summary(sup), _batch_refusals(),
+                                        _reservoir_note()) if x)
     setup = _paper_setup()
     hist = ARCH.table()
     prior_review = _last_review()
@@ -1628,6 +1642,42 @@ def _cap(nm):
 def _m(s):
     return {k: s.get(k) for k in ("protr_peak", "protr_final", "ta_n_tubes_final",
                                   "mech_p_ratio")}
+
+
+def _reservoir_note(n=6):
+    """What was done to the reservoirs, and what it means, for the Proposer.
+
+    A composition CLAMPED at the memory budget has been given every array we can afford. If it
+    saturates at that size the growth is unbounded, and no buffer will fix it -- that is a
+    proposal problem, and the Proposer is the only one who can act on it.
+    """
+    p = os.path.join(CAMP, "reservoir.jsonl")
+    if not os.path.exists(p):
+        return ""
+    rows, seen = [], set()
+    for line in open(p):
+        try:
+            r = json.loads(line)
+        except Exception:
+            continue
+        if r["run"] not in seen:
+            seen.add(r["run"])
+            rows.append(r)
+    rows = [r for r in rows if r.get("times_censored")][-n:]
+    if not rows:
+        return ""
+    out = ["RESERVOIRS. The vertex buffer is an array size, not a model parameter, so a replay "
+           "may enlarge it -- that removes an artefact rather than changing the experiment. "
+           "These compositions have been stopped by their array before:"]
+    for r in rows:
+        line = (f"  {r['run']}: censored {r['times_censored']}x, buffer raised to "
+                f"{r['cap_cells']} cells")
+        if r.get("clamped_from_cells"):
+            line += (f" -- CLAMPED from {r['clamped_from_cells']} by the memory budget. If this "
+                     f"one saturates AGAIN, its growth is unbounded and no buffer will fix it: "
+                     f"that is a composition to change, not an array")
+        out.append(line)
+    return "\n".join(out)
 
 
 def _batch_refusals(n=8):

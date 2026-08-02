@@ -84,6 +84,20 @@ def collect_run(name, hyp=None, summary=None):
         "eye_why": (s.get("watcher_why") or "")[:200] or MISSING,
         # --- the CRITIC ------------------------------------------------------------------
         "acted": diag.get("acted", MISSING),
+        # --- the ENGINE, which is an instrument and not an agent --------------------------
+        # Its output is measurement, so it is collected exactly as the Biologist's verdicts and
+        # the Critic's refusals are. It reached nobody before this: divide_3d counted the
+        # divisions it refused and flagged a full array, run_one recorded them, and the round
+        # record -- the one thing every downstream role reads -- did not carry them. A run that
+        # stopped at 98.5% of its buffer looked, to every agent, exactly like a run that stopped.
+        "reservoir": {
+            "cells_final": s.get("n_cells_final"),
+            "buf_full": bool(s.get("buf_full")),
+            "div_blocked": s.get("div_blocked") or 0,
+            "first_refused_frame": s.get("div_blocked_first_frame"),
+            "cap_cells": _cap_of(name),
+            **_resize_of(name),
+        },
     }
     if hyp is not None:
         rec.update({                      # QUOTED: what was believed BEFORE the run
@@ -95,6 +109,72 @@ def collect_run(name, hyp=None, summary=None):
             "rationale": (getattr(hyp, "rationale", "") or "")[:300] or MISSING,
         })
     return rec
+
+
+def _resize_of(name):
+    """What the launcher DID to this run's array before it ran, from campaign/reservoir.jsonl.
+
+    Distinct from what the engine observed: this is the enlargement decision. It lived as a local
+    variable and a printed warning, so a composition on its third enlargement looked identical to
+    one on its first.
+    """
+    p = os.path.join(CAMP, "reservoir.jsonl")
+    if not os.path.exists(p):
+        return {}
+    hit = None
+    for line in open(p):
+        try:
+            r = json.loads(line)
+        except Exception:
+            continue
+        if r.get("run") == name or r.get("slot") == name:
+            hit = r
+    if not hit:
+        return {}
+    return {"resized_from": hit.get("from"), "clamped_from_cells": hit.get("clamped_from_cells"),
+            "times_censored": hit.get("times_censored") or 0}
+
+
+def _reservoir_line(rv):
+    """What the ENGINE said about the array, in the block every downstream role reads.
+
+    A run stopped by its buffer is a CENSORED measurement -- a lower bound, not a destination --
+    and the difference is invisible in `n_cells_final` alone. Written as a line rather than a
+    field because the Interpreter, Meta-review, Supervisor and Archivist all read the rendered
+    record, and a number nobody can see is a number nobody uses.
+    """
+    rv = rv or {}
+    cap, fin = rv.get("cap_cells"), rv.get("cells_final")
+    if not cap or fin is None:
+        return "Reservoir: " + MISSING
+    frac = fin / cap
+    if rv.get("buf_full") or rv.get("div_blocked") or frac >= 0.97:
+        where = (f", first refused division at frame {rv['first_refused_frame']}"
+                 if rv.get("first_refused_frame") is not None else "")
+        again = ""
+        if rv.get("times_censored"):
+            again = (f" This composition has been censored {rv['times_censored']}x before and its "
+                     f"array was already enlarged")
+            if rv.get("clamped_from_cells"):
+                again += (f", then CLAMPED by the memory budget — no buffer will fix it, so its "
+                          f"growth is unbounded and the composition is what must change")
+            again += "."
+        return (f"Reservoir: **CAPPED** — {fin} of {cap} cells ({frac:.0%}), "
+                f"{rv.get('div_blocked') or 0} divisions refused{where}. This growth is a LOWER "
+                f"BOUND: the array stopped it, not the biology. Do not read the final cell count "
+                f"or any metric that depends on it as the composition's outcome." + again)
+    return f"Reservoir: {fin} of {cap} cells ({frac:.0%}) — not limiting."
+
+
+def _cap_of(name):
+    """How many cells this run's array could hold, from its own spec. Euler: V = 2F - 4."""
+    try:
+        import yaml
+        c = yaml.safe_load(open(os.path.join(LOG, name, "spec_run.yaml")))
+        v = ((c.get("sets") or {}).get("vertex") or {}).get("n")
+        return (int(v) + 4) // 2 if v else None
+    except Exception:
+        return None
 
 
 def _specimen(premises, broken):
@@ -147,6 +227,12 @@ def collect_round(rid, mode, rows, refused=(), posed=(), steer=None, aborted=Fal
         "n_checkable": sum(1 for r in runs if r.get("outcome") in ("confirmed", "refuted")),
         "n_surprise": sum(1 for r in runs if r.get("surprise")),
         "eye_disagreements": [r["run"] for r in runs if r["eye_disagrees"]],
+        # Runs the ARRAY stopped, not the biology. A reader of the record should not have to
+        # infer this from a cell count that happens to sit near a buffer size.
+        "reservoir_capped": [r["run"] for r in runs
+                             if (r.get("reservoir") or {}).get("buf_full")
+                             or ((r.get("reservoir") or {}).get("cells_final") or 0) >=
+                             0.97 * ((r.get("reservoir") or {}).get("cap_cells") or 1e18)],
     }
     return rec
 
@@ -181,6 +267,7 @@ def render(rec):
                  if r.get("config") else ""),
               f"Measured: " + (", ".join(f"{k}={v:.4g}" for k, v in (r["metrics"] or {}).items()
                                          if isinstance(v, (int, float))) or "no admitted metric"),
+              _reservoir_line(r.get("reservoir")),
               f"Specimen: {r['specimen']}" + (f" — {', '.join(r['premises_broken'])}"
                                               if r["premises_broken"] else " — all hold"),
               f"Reader: phenotype={r['analyst_consensus']}, "
