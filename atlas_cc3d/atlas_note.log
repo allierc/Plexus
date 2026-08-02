@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  2 AUG 2026 09:14
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  2 AUG 2026 09:27
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -848,18 +848,24 @@ Overfull \vbox (25.67451pt too high) has occurred while \output is active []
 
 
 [7]
-
-[8]
 <../log/atlas_cc3d/contact_adhesion/strip.png, id=99, 1018.73933pt x 397.21733p
 t>
 File: ../log/atlas_cc3d/contact_adhesion/strip.png Graphic file (type png)
 <use ../log/atlas_cc3d/contact_adhesion/strip.png>
 Package pdftex.def Info: ../log/atlas_cc3d/contact_adhesion/strip.png  used on 
-input line 457.
+input line 447.
 (pdftex.def)             Requested size: 460.935pt x 179.72197pt.
 
 
-[9 <../log/atlas_cc3d/contact_adhesion/strip.png>]
+[8]
+<../log/catalog.png, id=108, 607.068pt x 375.804pt>
+File: ../log/catalog.png Graphic file (type png)
+<use ../log/catalog.png>
+Package pdftex.def Info: ../log/catalog.png  used on input line 473.
+(pdftex.def)             Requested size: 396.40437pt x 245.39363pt.
+
+
+[9 <../log/atlas_cc3d/contact_adhesion/strip.png> <../log/catalog.png>]
 
 [10] (./atlas_note.aux)
  ***********
@@ -867,13 +873,13 @@ LaTeX2e <2024-11-01> patch level 2
 L3 programming layer <2025-01-18>
  ***********
 Package rerunfilecheck Info: File `atlas_note.out' has not changed.
-(rerunfilecheck)             Checksum: 9D783E819E3EF75C15DAC1F4DC213F76;1594.
+(rerunfilecheck)             Checksum: 089F42D6DF39DA8A8B38ED4E10DBC262;1904.
  ) 
 Here is how much of TeX's memory you used:
- 23831 strings out of 475102
- 449398 string characters out of 5764878
- 833655 words of memory out of 5000000
- 46438 multiletter control sequences out of 15000+600000
+ 23834 strings out of 475102
+ 449419 string characters out of 5764878
+ 833729 words of memory out of 5000000
+ 46437 multiletter control sequences out of 15000+600000
  580009 words of font info for 92 fonts, out of 8000000 for 9000
  59 hyphenation exceptions out of 8191
  116i,12n,121p,461b,610s stack positions out of 10000i,1000n,20000p,200000b,200000s
@@ -900,10 +906,10 @@ super/sfrm1200.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfti0900.pfb><
 ts/type1/public/cm-super/sfti1095.pfb></usr/share/texmf/fonts/type1/public/cm-s
 uper/sftt0900.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt1000.pfb></
 usr/share/texmf/fonts/type1/public/cm-super/sftt1095.pfb>
-Output written on atlas_note.pdf (10 pages, 587379 bytes).
+Output written on atlas_note.pdf (10 pages, 631384 bytes).
 PDF statistics:
- 234 PDF objects out of 1000 (max. 8388607)
- 162 compressed objects within 2 object streams
- 20 named destinations out of 1000 (max. 500000)
- 66 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 243 PDF objects out of 1000 (max. 8388607)
+ 169 compressed objects within 2 object streams
+ 24 named destinations out of 1000 (max. 500000)
+ 79 words of extra memory for PDF output out of 10000 (max. 10000000)
 

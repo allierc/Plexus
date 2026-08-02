@@ -53,3 +53,23 @@ surface tension vs axial spring), and collapsing them hides that — but the ten
 if a fourth "quadratic-constraint-on-geometry" plugin appears we should seriously consider
 retro-fitting a single `geometric_setpoint` contract with these as implementations.
 
+## Discharging the constrain_moment crux (linchpin for surface + elongate)
+
+The `surface` and `elongate` entries both make their `new` verdict *contingent on Volume*: if
+Volume registered a generic `constrain_moment(cell, order, target, λ)`, the three would collapse
+to one contract counted once. I resolve it here against the criterion Plexus uses for
+`implementation_of`: implementations are INTERCHANGEABLE alternatives (Morse/SoftSphere/Hertzian
+— you pick one) reading the same inputs and encoding the same biology. Volume/Surface/Length are
+not interchangeable — they read different trackers (site count / boundary count / inertia tensor),
+encode different biophysics (incompressibility / cortical tension / anisotropy), and COMPOSE (a
+cell runs all three at once). Shared quadratic *form* ≠ shared contract; the promoted language
+already keeps gravity, mpm_spin, mpm_anchor, active_force, active_stress distinct on exactly this
+principle. So `volume_elasticity` is `new`, distinct, implementation_of null — which under the
+surface skeptic's own rule leaves `membrane_tension` `new` too. **Strongest argument against this
+resolution:** the interchangeability test is my import, not a written Plexus rule; if the registry's
+actual convention is "same math shape + same kind/family ⇒ one contract with implementations,"
+then lateral/mechanics quadratic-moment springs SHOULD lump, and I have split what the language
+would keep whole — inflating the yield by two. Settled only by an explicit registry policy on
+what makes two mechanics energies one contract; until then I take composability-not-substitution
+as the honest line.
+

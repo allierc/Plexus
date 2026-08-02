@@ -384,48 +384,38 @@ jax-morph. A Potts framework carries far more machinery that models no biology -
 initialisers, dumpers, the acceptance rule itself.
 \end{phasebox}
 
-\begin{phasebox}{Phase 3 --- Implement what is missing \hfill \ns}
-Every \code{new} and every \code{refinement} becomes a Plexus operator in the anti-chamber, with a
-test of one property statable without the reference: a conservation law, a sign, a limit, a
-symmetry.
+\begin{phasebox}{Phase 3--7 --- DEFERRED, deliberately \hfill \todo}
+\textbf{The order changed, and this is the reason.} The original plan ran all seven phases per
+repository: read, normalize, implement, validate, figure, differentiate, promote. That is the
+right order for \emph{one} target and the wrong order for the programme.
 
-\textbf{The open question this phase will force.} Plexus's \code{cell} set is points with per-cell
-state. A Potts cell is a \emph{set of lattice sites}. Either that is expressible as an existing
-set with a different map, or the language needs a representation it does not have --- and finding
-out which is worth more than any individual operator here.
-\end{phasebox}
+\textbf{Extraction is cheap and reversible; committing the language is not.} Phases 1--2 only read
+and classify --- they write a record and nothing else. Phase 3 writes operator modules into
+\code{src/plexus/operators/candidates/}, and Phase 7 promotes them into the language proper.
+Implementing CompuCell3D's sixteen candidates now would shape the anti-chamber around \emph{one}
+framework before we know what the next three need --- and the catalog is precisely the instrument
+that tells us that.
 
-\begin{phasebox}{Phase 4 --- Differential validation \hfill \ns}
-Metric and threshold written down \emph{first}; then the same initial condition through both
-implementations; then subtract.
+\textbf{So the revised programme is:}
 
-\textbf{This is the phase most likely to break, and the reason this target was chosen.} Every
-differential test in the first atlas was a subtraction of per-cell arrays. Here there is no
-per-cell equation to compare and the dynamics are a Metropolis chain, so a matched trajectory is
-not even meaningful --- the same argument that made the division differ compare a pooled
-\emph{hazard} instead of cell counts, but now applying to the whole framework rather than one
-operator. The tests will have to be \textbf{distributional}: equilibrium sorted-boundary length,
-volume distribution, contact-energy spectrum.
-\end{phasebox}
+\begin{enumerate}[leftmargin=1.5em,itemsep=1pt]
+\item \textbf{Extract} (Phases 0--2) across many repositories. Each yields a record and a
+contribution to the ledger. Cheap, parallel, and nothing is committed.
+\item \textbf{Catalog} (\code{catalog.py}) --- merge every record, count each contract ONCE across
+repositories, and read the cumulative-new curve. This is the only place the App.~E.1 claim can
+actually be tested.
+\item \textbf{Then} implement, validate and promote --- on the contracts the catalog says survive
+contact with more than one framework.
+\end{enumerate}
 
-\begin{phasebox}{Phase 5 --- The forward figure \hfill \ns}
-One headline result of the paper reproduced inside Plexus out of normalized operators, and set
-\emph{beside} the reference rather than described next to it. Cell sorting is the obvious
-candidate: it is CompuCell3D's canonical demonstration and its outcome is a topology, not a
-trajectory.
-\end{phasebox}
+\textbf{What defers with them.} Phase 4's differential tests need implementations, so they wait
+too. Phase 6 (differentiability) was in any case likely inapplicable here --- a Metropolis
+accept/reject has no pathwise derivative --- and saying so is a finding rather than a gap.
 
-\begin{phasebox}{Phase 6 --- Differentiability \hfill \ns}
-\textbf{Probably not applicable, and saying why is the result.} The first atlas's Phase 6 rested on
-the forward model being differentiable. A Metropolis acceptance is a discrete accept/reject on an
-energy difference --- there is no pathwise gradient through it at all, and the straight-through
-trick that carried the division draw does not obviously transfer. If Plexus can express Potts
-dynamics forward but not inversely, that is a real and reportable limit of the language.
-\end{phasebox}
-
-\begin{phasebox}{Phase 7 --- Promotion, and the joint ledger \hfill \ns}
-The measurement only becomes an argument here: the cumulative-new curve across \emph{two}
-repositories. Flat means the language is saturating; still climbing means it is not.
+\textbf{What this costs.} The record's \code{status} ladder will sit at \emph{normalized} for every
+repository, and the ledger's verdicts stay unvalidated against the reference. That is a real
+limitation and it is the price of not guessing: \textbf{a verdict of `new' that no differential
+test has checked is a claim about our reading of the source, not about the source.}
 \end{phasebox}
 
 
@@ -475,6 +465,60 @@ applying to an entire framework.
 volume parameters silently disabling per-cell growth; type-colouring hiding every cell; a
 chemotaxis strength that transported cells into the wall and destroyed them; and the
 \code{PyCoreSpecs} API not being spelled like CC3DML.
+
+%======================================================================
+\section{The catalog --- where the claim is actually tested}\label{sec:catalog}
+
+\begin{center}
+\includegraphics[width=0.86\textwidth]{../log/catalog.png}
+\end{center}
+
+\begin{center}
+\small
+\begin{tabular}{@{}l r r r r r r r@{}}
+\toprule
+\textbf{repository} & \textbf{mech} & \textbf{scored} & \textbf{new} & \textbf{impl} &
+\textbf{alias} & \textbf{refine} & \textbf{yield}\\
+\midrule
+\code{atlas\_jax} & 24 & 18 & 8 & 6 & 2 & 2 & 0.44\\
+\code{atlas\_cc3d} & 35 & 24 & 8 & 6 & 4 & 6 & \textbf{0.33}\\
+\midrule
+total & 59 & 42 & \textbf{16} & & & &\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Two repositories, 59 mechanisms, \textbf{16 distinct new contracts}. The curve sits far below the
+diagonal on which every mechanism is new vocabulary, and it flattens \emph{within} each
+repository --- but two points do not make a trend, and the honest reading is that the instrument
+now exists and the measurement has begun.
+
+\textbf{The number that matters is not 16, it is 5.} Five contracts have been sighted in a
+repository other than the one that introduced them:
+
+\begin{center}
+\small
+\begin{tabular}{@{}l l l@{}}
+\toprule
+\textbf{CompuCell3D mechanism} & \textbf{contract} & \textbf{first seen in}\\
+\midrule
+\code{Contact}, \code{ContactLocalFlex}, \code{ContactInternal}, \code{AdhesionFlex}
+ & \code{adhere} & jax-morph\\
+\code{SteadyStateDiffusionSolver} & \code{morphogen} & jax-morph\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{A contract that only ever appears in the repository that introduced it is a description of
+that repository. One that reappears independently is evidence the vocabulary is real.} The
+\code{morphogen} case is the sharpest: two unrelated codebases, one written in JAX around point
+particles and one a C++ lattice framework, solving the same equation
+$D\nabla^2 c - kc + S = 0$ --- and the normalizer identified the match itself.
+
+\textbf{What would refute the programme} is the curve failing to flatten as repositories are
+added: if each new framework keeps contributing 8 contracts nobody else needs, the algebra is
+cataloguing our naming habits rather than converging on biology. That is measurable, and it is
+what the next few extractions are for.
 
 %======================================================================
 \section{An instrument defect only the second repository could reveal --- fixed}\label{sec:gap}

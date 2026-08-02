@@ -252,7 +252,7 @@ contract:
     solution of D grad^2 c - k c + S = 0 (a whole-field REPLACE, not an integrable delta)
   maps:
   - grid_bvp
-status: inspected
+status: normalized
 module: null
 test: null
 evidence:
