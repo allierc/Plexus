@@ -1,0 +1,76 @@
+{
+ "reasoning": "No valid morphogenesis evidence yet; round 1 was all controls. Move: ablate the Okuda growth-driven monolayer recipe (parent 2) one operator at a time to find which carries any protrusion, and cross-check the forced round-33 recipe (parent 1). Removals also lower growth, reducing buffer-saturation risk. Excursions probe uniform inflation with/without patterning. Every prediction is one checkable protr_peak clause.",
+ "mode": "explore",
+ "slots": [
+  {"parent_index": 2, "edit": null, "intent": "control",
+   "claim": "the Okuda coupling recipe (patterning + growth + division + T1) makes a non-sphere protrusion (undulation/tubulation), unchanged", "track": "B",
+   "territory": "in_paper", "metric": "protr_peak", "predicted": "protr_peak >= 1.5",
+   "why": "control; paper Figs 5-7 couple patterning and deformation to drive undulation/tubulation"},
+
+  {"parent_index": 2, "edit": ["remove_op", "reconnect_t1_3d0"], "intent": "confirmatory", "track": "A",
+   "territory": "in_paper",
+   "claim": "removing T1 topology transitions blocks necking so protrusion collapses", "metric": "protr_peak",
+   "predicted": "protr_peak < 1.3",
+   "why": "T1 reconnection is the only op that changes neighbour topology; without it a tube cannot neck"},
+
+  {"parent_index": 2, "edit": ["remove_op", "cell_diffuse0"], "intent": "confirmatory", "track": "A",
+   "territory": "in_paper",
+   "claim": "removing morphogen diffusion kills the Turing pattern that seeds deformation", "metric": "protr_peak",
+   "predicted": "protr_peak < 1.3",
+   "why": "chi/gamma coupling needs a pattern; no diffusion, no spatial pattern to couple to"},
+
+  {"parent_index": 2, "edit": ["remove_op", "morphogen_growth_3d0"], "intent": "confirmatory", "track": "A",
+   "territory": "in_paper",
+   "claim": "removing patterned growth reverts to a mechanics-only sphere", "metric": "protr_peak",
+   "predicted": "protr_peak < 1.2",
+   "why": "growth is the deformation driver; its removal should erase the protrusion (necessity test)"},
+
+  {"parent_index": 2, "edit": ["remove_op", "divide_3d0"], "intent": "adversarial", "track": "A",
+   "territory": "in_paper",
+   "claim": "cell division is dispensable; protrusion persists from growth+patterning alone", "metric": "protr_peak",
+   "predicted": "protr_peak >= 1.4",
+   "why": "if the shape is growth-driven not proliferation-driven, removing division should not kill it"},
+
+  {"parent_index": 2, "edit": ["remove_op", "cell_geometry_3d0"], "intent": "adversarial", "track": "A",
+   "territory": "in_paper",
+   "claim": "cell_geometry_3d is bookkeeping, not causal; protrusion survives its removal", "metric": "protr_peak",
+   "predicted": "protr_peak >= 1.4",
+   "why": "tests whether geometry recompute carries mechanism or is passive accounting"},
+
+  {"parent_index": 2, "edit": ["add_op", "vesicle_growth", "uniform_ramp"], "intent": "adversarial", "track": "A",
+   "territory": "excursion",
+   "claim": "adding uniform inflation swamps the patterned deformation, smoothing toward a sphere", "metric": "protr_peak",
+   "predicted": "protr_peak < 1.3",
+   "why": "excursion: superposing isotropic growth on anisotropic patterning should compete and flatten protrusions"},
+
+  {"parent_index": 1, "edit": ["remove_op", "morphogen_growth_3d0"], "intent": "confirmatory", "track": "A",
+   "territory": "in_paper",
+   "claim": "the forced round-33 recipe loses its protrusion without patterned growth", "metric": "protr_peak",
+   "predicted": "protr_peak < 1.2",
+   "why": "necessity test of growth op in the second (forced) parent, cross-checking slot 3"},
+
+  {"parent_index": 1, "edit": ["add_op", "vesicle_growth", "uniform_ramp"], "intent": "confirmatory", "track": "B",
+   "territory": "in_paper",
+   "claim": "forced recipe plus uniform inflation reaches an Okuda-scale protrusion", "metric": "protr_peak",
+   "predicted": "protr_peak >= 1.5",
+   "why": "adds bulk volume to the forced recipe to push toward a tubulation-scale outgrowth"},
+
+  {"parent_index": 1, "edit": ["remove_op", "divide_3d0"], "intent": "confirmatory", "track": "A",
+   "territory": "in_paper",
+   "claim": "forced protrusion is division-independent", "metric": "protr_peak",
+   "predicted": "protr_peak >= 1.4",
+   "why": "if the forced recipe protrudes by mechanics not proliferation, removing division leaves it intact"},
+
+  {"parent_index": 3, "edit": ["set_impl", "shape_energy_3d0", "monolayer"], "intent": "confirmatory", "track": "B",
+   "territory": "excursion",
+   "claim": "a monolayer-energy sheet under uniform inflation buckles into undulations", "metric": "protr_peak",
+   "predicted": "protr_peak >= 1.3",
+   "why": "excursion: monolayer bending energy plus inflation is the classic buckling route to undulation without patterning"},
+
+  {"parent_index": 0, "edit": ["add_op", "vesicle_growth", "uniform_ramp"], "intent": "confirmatory", "track": "A",
+   "territory": "excursion",
+   "claim": "uniform inflation with NO patterning stays a sphere (null baseline for inflation)", "metric": "protr_peak",
+   "predicted": "protr_peak < 1.2",
+   "why": "excursion baseline: isolates inflation alone so slots 6/8/10 can be read against a patternless reference"}
+ ]
+}
