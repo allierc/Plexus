@@ -105,9 +105,9 @@ MUSCLES = [
     dict(key="IR", name="inferior rectus",  theta=60.0, phi=270.0,   origin=ORBIT_APEX,
          tension=1.00, cn="III", color="#7ee081"),
     dict(key="SO", name="superior oblique", theta=122.0, phi=52.0,   origin=TROCHLEA,
-         tension=0.85, cn="IV",  color="#c58cff"),
+         tension=1.30, cn="IV",  color="#c58cff"),
     dict(key="IO", name="inferior oblique", theta=128.0, phi=-48.0,  origin=IO_ORIGIN,
-         tension=0.85, cn="III", color="#ff9c42"),
+         tension=1.30, cn="III", color="#ff9c42"),
 ]
 
 MUSCLE_KEYS = [m["key"] for m in MUSCLES]
@@ -132,10 +132,27 @@ def insertion_dirs() -> np.ndarray:
     return np.stack([unit_from_spherical(m["theta"], m["phi"]) for m in MUSCLES])
 
 
+ANNULUS_RING = 0.42          # radius of the annulus of Zinn, in units of A_EQ
+
+
 def origins_world() -> np.ndarray:
-    """[6, 3] effective origin (apex / trochlea / maxilla) in WORLD coordinates."""
+    """[6, 3] effective origin in WORLD coordinates.
+
+    The four recti do not arise from a point: they arise from the ANNULUS OF ZINN, a fibrous
+    RING at the orbital apex, each from the sector facing its own insertion. Offsetting each
+    rectus origin by `ANNULUS_RING` in its own azimuthal direction is both more accurate and
+    what stops all four from projecting onto a single blob. The obliques keep their own
+    origins (trochlea, orbital floor)."""
     c = np.asarray(GLOBE_CENTER, float)
-    return np.stack([c + A_EQ * np.asarray(m["origin"], float) for m in MUSCLES])
+    out = []
+    for m in MUSCLES:
+        o = c + A_EQ * np.asarray(m["origin"], float)
+        if m["origin"] is ORBIT_APEX:
+            ph = math.radians(m["phi"])
+            out.append(o + A_EQ * ANNULUS_RING * np.array([math.cos(ph), math.sin(ph), 0.0]))
+        else:
+            out.append(o)
+    return np.stack(out)
 
 
 def peak_tensions() -> np.ndarray:

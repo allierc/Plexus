@@ -189,8 +189,8 @@ class MuscleMorphogenesis(Rewire):
         self.width = float(params.get("width", 0.034))
         self.thickness = float(params.get("thickness", 0.021))
         self.arc_deg = float(params.get("arc_deg", 30.0))
-        self.frac = float(params.get("frac", 0.55))     # distal fraction kept (pulley origin)
-        self.gap = float(params.get("gap", 0.024))
+        self.frac = float(params.get("frac", 0.88))     # distal fraction kept (pulley origin)
+        self.gap = float(params.get("gap", 0.038))
         self.embed = float(params.get("embed", -0.013))
         self.cap = float(params.get("cap", 0.10))          # fraction of the length that is a cap
         self.youngs = float(params.get("youngs", 60.0))
@@ -378,7 +378,7 @@ class MuscleContract(Exchange):
     WRITES = []
     MAPS = ["parent"]
     MECHANISM_TAGS = ["active_contraction", "active_stress_tensor", "length_tension"]
-    PARAM_ROLES = {"amplitude": "peak_active_stress",
+    PARAM_ROLES = {"amplitude": "peak_active_stress", "strength": "per_muscle_strength",
                    "stretch_activation": "length_tension_slope",
                    "taper": "tendon_passivity"}
     REFERENCE = "Hill, A. V. (1938). Proc. R. Soc. B 126:136; Niederer, S. A. et al. (2006). Biophys. J. 90:1697 (active-stress formulation)."
@@ -390,18 +390,35 @@ class MuscleContract(Exchange):
         self.amplitude = float(params["amplitude"])
         self.stretch_activation = float(params.get("stretch_activation", 0.0))
         self.taper = bool(params.get("taper", True))
+        # per-muscle strength. The obliques reach the globe over a much shorter post-pulley
+        # path than the recti (L/R ~ 2.0 against ~3.3), and a muscle's reachable rotation
+        # scales as (A/E) x (L/R), so at equal active stress they are the weak pair. Their
+        # real compliance lives in the long belly BEHIND the trochlea, which this model
+        # truncates; a per-muscle strength factor is how that is paid back.
+        self.strength = params.get("strength") or list(EA.peak_tensions())
 
     def forward(self, H, mask=None):
         p = H.level(self.at)
         m = H.level(self.muscles)
         if not hasattr(p, "fibre"):
             return {}
+        if not hasattr(self, "_strength_t"):
+            self._strength_t = torch.as_tensor(self.strength, dtype=torch.float32,
+                                               device=p.state.device)
         act = m.get("act")[:, 0].clamp(min=0.0)[p.parent]         # broadcast along `parent`
         f = p.fibre
-        gate = self.amplitude * act
+        gate = self.amplitude * self._strength_t[p.parent] * act
         if self.taper:                                            # tendons are passive, the belly pulls
             gate = gate * torch.sin(math.pi * p.s.clamp(0, 1)).clamp(min=0.0) ** 0.5
         if self.stretch_activation != 0.0:
+            # THE FORCE-LENGTH RELATION, and the thing that makes this model stable.
+            # lambda = |F f| is the fibre stretch; tension falls off as the sarcomere shortens,
+            #     T = A a (1 + beta (lambda - 1)) ,   clamped at zero,
+            # so a muscle stops pulling once it has shortened by 1/beta and CANNOT reel itself
+            # up. That is what lets the passive modulus be far SOFTER than the peak active
+            # stress, as it is in real muscle. Coupling A to a stiff passive element instead
+            # (the earlier attempt) bought stability at the cost of an antagonist so stiff that
+            # it ate most of the agonist's force, and capped the eye at ~11 degrees.
             lam = torch.bmm(p.F, f[:, :, None]).squeeze(-1).norm(dim=1).clamp(min=1e-6)
             gate = gate * (1.0 + self.stretch_activation * (lam - 1.0)).clamp(min=0.0)
         if mask is not None:

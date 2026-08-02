@@ -103,7 +103,7 @@ def _cup(ax, view, centre, **kw):
 # --------------------------------------------------------------------------- #
 #  A / B: the cosmetic eye and its muscles, both made of particles
 # --------------------------------------------------------------------------- #
-def draw_scene(ax, k, cap, view, label, span=0.245, dot=5.0, mdot=3.0):
+def draw_scene(ax, k, cap, view, label, span=0.245, dot=7.0, mdot=3.4):
     centre = cap["centre"][k]
     _, _, f = camera(view)
 
@@ -111,9 +111,24 @@ def draw_scene(ax, k, cap, view, label, span=0.245, dot=5.0, mdot=3.0):
     Y = cap["mus_pos"][k]
     par = cap["mus_parent"]
     act = np.clip(cap["act"][k], 0, 1)
+    msx, msy, mdep = proj(Y, view)
+    # HIDE the muscle points that the globe occludes. A depth-sorted scatter alone cannot do
+    # this: the globe is drawn as points, so a muscle behind it shows through the gaps -- most
+    # visibly straight across the black pupil. The globe is an ellipsoid, so its orthographic
+    # silhouette is exactly the ellipse  p^T (A A^T)^-1 p <= 1  with A = [r.M ; u.M],
+    # M = diag(a, a, c); anything inside that ellipse and farther than the centre is behind it.
+    r_c, u_c, _ = camera(view)
+    M = np.array([EA.A_EQ, EA.A_EQ, EA.C_AX])
+    A2 = np.stack([r_c * M, u_c * M])                      # [2,3]
+    Sinv = np.linalg.inv(A2 @ A2.T)
+    ccx, ccy, cdep = proj(np.atleast_2d(centre), view)
+    d = np.stack([msx - ccx[0], msy - ccy[0]], 1)
+    inside = np.einsum("ij,jk,ik->i", d, Sinv, d) <= 1.0
+    vis = ~(inside & (mdep > cdep[0]))
+    Y, par = Y[vis], par[vis]
+    msx, msy, mdep = msx[vis], msy[vis], mdep[vis]
     base = MUS_RGB[par]
     glow = (0.34 + 0.66 * act[par])[:, None]
-    msx, msy, mdep = proj(Y, view)
 
     # --- the globe shell, far hemisphere culled
     X = cap["shell"][k]
@@ -136,16 +151,15 @@ def draw_scene(ax, k, cap, view, label, span=0.245, dot=5.0, mdot=3.0):
     o = np.argsort(dep)[::-1]
     ax.scatter(sx[o], sy[o], s=sz[o], c=rgb[o], edgecolors="none", linewidths=0, zorder=3)
 
+    mus_s_vis = cap["mus_s"][vis]
     for i, m in enumerate(EA.MUSCLES):                     # key at the proximal end
         sel = par == i
         if not sel.any():
             continue
-        j = np.argmin(cap["mus_s"][sel])
+        j = np.argmin(mus_s_vis[sel])
         tx, ty = msx[sel][j], msy[sel][j]
         ax.text(tx, ty, f" {m['key']}", color=m["color"], fontsize=8.5, va="center",
                 alpha=0.55 + 0.45 * float(act[i]), zorder=6)
-    ox, oy, _ = proj(cap["origins"][4:5], view)             # the trochlea (SO pulley)
-    ax.scatter(ox, oy, s=48, facecolors="none", edgecolors=EA.MUSCLES[4]["color"], lw=1.1, zorder=6)
     _frame(ax, centre, view, span)
     _label(ax, label)
 

@@ -45,12 +45,12 @@ PROGRAMS = {
         [P]
         + _oscillate((26, 0, 0), (-26, 0, 0), 3)        # abduction  <-> adduction   LR / MR
         + [P]
-        + _oscillate((0, 19, 0), (0, -19, 0), 3)        # elevation  <-> depression  SR+IO / IR+SO
+        + _oscillate((0, 16, 0), (0, -16, 0), 3)        # elevation  <-> depression  SR+IO / IR+SO
         + [P]
-        + _oscillate((0, 0, 15), (0, 0, -15), 3)        # intorsion  <-> extorsion   SO / IO
-        + [P]
-        + _oscillate((22, 15, 0), (-22, -15, 0), 2)     # oblique gaze, both diagonals
-        + _oscillate((22, -15, 0), (-22, 15, 0), 2)
+        + _oscillate((0, 0, 9), (0, 0, -9), 3)          # intorsion  <-> extorsion   SO / IO
+        + [P]                                           # (+-9 deg: ocular torsion really is
+        + _oscillate((22, 14, 0), (-22, -14, 0), 2)     #  a small excursion, unlike gaze)
+        + _oscillate((22, -14, 0), (-22, 14, 0), 2)
         + [P]),
     # the zebrafish optokinetic response: slow tracking ramps with fast reset saccades
     "okr": [[0, 0, 0, 0]] + [
@@ -60,7 +60,7 @@ PROGRAMS = {
                     [130 * i + 98, 18, 0, 0], [130 * i + 112, -18, 0, 0])
     ],
     # a short calibration run: abduction, adduction, elevation, intorsion, back
-    "probe": _sequence([P, (25, 0, 0), (-25, 0, 0), (0, 18, 0), (0, 0, 14), P], hold=65),
+    "probe": _sequence([P, (25, 0, 0), (-25, 0, 0), (0, 16, 0), (0, 0, 9), P], hold=65),
 }
 
 PRESETS = {
@@ -77,7 +77,7 @@ def build_spec(name="eye_zebrafish", preset="atlas", n_particles=45000, n_muscle
                k_socket=5000.0, k_fat=4000.0, c_fat=90.0, k_bone=9000.0, c_bone=60.0,
                n_frames=None, sclera_youngs=300.0, vitreous_youngs=9.0, choroid_youngs=40.0,
                muscle_youngs=60.0, mus_width=0.034, mus_thickness=0.021, mus_arc=30.0,
-               mus_gap=0.020, mus_embed=-0.013, mus_frac=0.55, program=None, seed=0):
+               mus_gap=0.038, mus_embed=-0.014, mus_frac=0.88, program=None, seed=0):
     """The full spec as a plain dict, ready for `yaml.safe_dump` + `plexus.schema.load`."""
     p = dict(PRESETS.get(preset, PRESETS["atlas"]))
     n_frames = int(n_frames if n_frames is not None else p["n_frames"])
@@ -166,7 +166,8 @@ def build_spec(name="eye_zebrafish", preset="atlas", n_particles=45000, n_muscle
              "kp": float(kp), "kd": float(kd), "tonic": float(tonic), "gain": float(gain),
              "tau": float(tau)},
             {"op": "muscle_contract", "at": "muscle_particle", "muscles": "muscle",
-             "amplitude": float(contract), "stretch_activation": float(stretch_activation)},
+             "amplitude": float(contract), "stretch_activation": float(stretch_activation),
+             "strength": [float(x) for x in EA.peak_tensions()]},
             # boundary conditions
             {"op": "bone_anchor", "at": "muscle_particle", "k": float(k_bone), "c": float(c_bone)},
             {"op": "orbit_socket", "at": "mpm_particle", "orbit": "orbit",
