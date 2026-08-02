@@ -1,0 +1,308 @@
+{
+ "self_agreement": {
+  "n_complete_beats": 4,
+  "beat_length_frames": 49,
+  "onsets": [
+   2,
+   51,
+   101,
+   152,
+   204
+  ],
+  "gaps": [
+   49,
+   50,
+   51,
+   52
+  ],
+  "mean_gap": 50.5,
+  "reported_period": 50,
+  "nodes_scored": 17499,
+  "n_pairs": 6,
+  "pairs": [
+   {
+    "pair": [
+     0,
+     1
+    ],
+    "magnitude_peak": 0.9548218289086473,
+    "magnitude_energy": 1.002315338796557,
+    "opening_area": 1.0318541146134188,
+    "opening_loopiness": 1.0371910108212934,
+    "direction_chirality": 0.9451968683924795,
+    "orientation_rad": 0.05940762945409617,
+    "shape_minor": 0.939913119486783
+   },
+   {
+    "pair": [
+     0,
+     2
+    ],
+    "magnitude_peak": 0.9782351635798467,
+    "magnitude_energy": 1.0050413292056843,
+    "opening_area": 1.1007307398095854,
+    "opening_loopiness": 1.027844601231499,
+    "direction_chirality": 0.9479970284016229,
+    "orientation_rad": 0.0859414639527456,
+    "shape_minor": 0.9843235810031852
+   },
+   {
+    "pair": [
+     0,
+     3
+    ],
+    "magnitude_peak": 0.9915515293488864,
+    "magnitude_energy": 0.9832288288875369,
+    "opening_area": 1.0423503573343296,
+    "opening_loopiness": 0.9937200133371963,
+    "direction_chirality": 0.93536773529916,
+    "orientation_rad": 0.022573813088589967,
+    "shape_minor": 1.0818974493743163
+   },
+   {
+    "pair": [
+     1,
+     2
+    ],
+    "magnitude_peak": 1.0245211556358746,
+    "magnitude_energy": 1.0027196933974893,
+    "opening_area": 1.0667503518382255,
+    "opening_loopiness": 0.9909887286986866,
+    "direction_chirality": 0.941882393279616,
+    "orientation_rad": 0.03130434209934485,
+    "shape_minor": 1.0472495389155239
+   },
+   {
+    "pair": [
+     1,
+     3
+    ],
+    "magnitude_peak": 1.038467596077292,
+    "magnitude_energy": 0.9809575797453757,
+    "opening_area": 1.010172215793163,
+    "opening_loopiness": 0.9580877610483003,
+    "direction_chirality": 0.9017086690668038,
+    "orientation_rad": 0.05586933094041213,
+    "shape_minor": 1.1510611214417992
+   },
+   {
+    "pair": [
+     2,
+     3
+    ],
+    "magnitude_peak": 1.0136126427108882,
+    "magnitude_energy": 0.9782969120927728,
+    "opening_area": 0.9469621585335621,
+    "opening_loopiness": 0.9667998568524688,
+    "direction_chirality": 0.9321675524315676,
+    "orientation_rad": 0.08249286749421661,
+    "shape_minor": 1.0991278378921772
+   }
+  ],
+  "ceiling": {
+   "magnitude_peak": {
+    "median": 1.0025820860298873,
+    "min": 0.9548218289086473,
+    "max": 1.038467596077292,
+    "sd": 0.02843781222323484
+   },
+   "magnitude_energy": {
+    "median": 0.9927720838420471,
+    "min": 0.9782969120927728,
+    "max": 1.0050413292056843,
+    "sd": 0.011387018976924922
+   },
+   "opening_area": {
+    "median": 1.0371022359738742,
+    "min": 0.9469621585335621,
+    "max": 1.1007307398095854,
+    "sd": 0.04785183285631981
+   },
+   "opening_loopiness": {
+    "median": 0.9923543710179414,
+    "min": 0.9580877610483003,
+    "max": 1.0371910108212934,
+    "sd": 0.02895618380906219
+   },
+   "direction_chirality": {
+    "median": 0.938625064289388,
+    "min": 0.9017086690668038,
+    "max": 0.9479970284016229,
+    "sd": 0.015445389355489118
+   },
+   "orientation_rad": {
+    "median": 0.05763848019725415,
+    "min": 0.022573813088589967,
+    "max": 0.0859414639527456,
+    "sd": 0.023582326497490317
+   },
+   "shape_minor": {
+    "median": 1.06457349414492,
+    "min": 0.939913119486783,
+    "max": 1.1510611214417992,
+    "sd": 0.07080759493956226
+   }
+  },
+  "loopscore_beat_to_beat": {
+   "values": [
+    0.6267322301864624,
+    0.7840229272842407,
+    0.8045649528503418,
+    0.584058940410614,
+    0.46861299872398376,
+    0.8501894474029541
+   ],
+   "median": 0.7053775787353516,
+   "min": 0.46861299872398376,
+   "max": 0.8501894474029541
+  }
+ },
+ "tracker_reproducibility": {
+  "second_tracking": "/groups/saalfeld/home/allierc/GraphData/graphs_data/cardiomyocytes_real_data/healthy.npy",
+  "overlap_nodes": "80x80",
+  "frame_offset": -1,
+  "frames_compared": 239,
+  "time_course_corr": 0.9961789618055099,
+  "peak_frame": 8,
+  "smoothing": [
+   {
+    "box_nodes": 1,
+    "box_px": 15.0,
+    "corr_x": 0.26961331096427876,
+    "corr_y": -0.06548532156426741,
+    "rel_l2": 1.2678636756794497
+   },
+   {
+    "box_nodes": 3,
+    "box_px": 45.0,
+    "corr_x": 0.29054402953081815,
+    "corr_y": -0.07536934592973962,
+    "rel_l2": 1.23650297221061
+   },
+   {
+    "box_nodes": 5,
+    "box_px": 75.0,
+    "corr_x": 0.3104833357045479,
+    "corr_y": -0.08807149680999536,
+    "rel_l2": 1.2123990424003728
+   },
+   {
+    "box_nodes": 9,
+    "box_px": 135.0,
+    "corr_x": 0.35141483888990993,
+    "corr_y": -0.12138934268566161,
+    "rel_l2": 1.169023079912864
+   },
+   {
+    "box_nodes": 17,
+    "box_px": 255.0,
+    "corr_x": 0.4341529529167395,
+    "corr_y": -0.1899307364514768,
+    "rel_l2": 1.098982568403802
+   }
+  ],
+  "per_beat": [
+   {
+    "beat": 0,
+    "window": [
+     2,
+     51
+    ],
+    "peak_frame": 8,
+    "corr_x": 0.26961331096427876,
+    "corr_y": -0.06548532156426741,
+    "whole_field_mean_A": [
+     -0.2704198489297414,
+     1.6726992966183751
+    ],
+    "whole_field_mean_B": [
+     1.1123213076591492,
+     1.3766211366653442
+    ]
+   },
+   {
+    "beat": 1,
+    "window": [
+     51,
+     101
+    ],
+    "peak_frame": 57,
+    "corr_x": 0.2852751102341014,
+    "corr_y": -0.06432144310649407,
+    "whole_field_mean_A": [
+     -0.30780736075546883,
+     1.8896737743257837
+    ],
+    "whole_field_mean_B": [
+     1.2474845036864282,
+     1.513895364999771
+    ]
+   },
+   {
+    "beat": 2,
+    "window": [
+     101,
+     152
+    ],
+    "peak_frame": 107,
+    "corr_x": 0.28871058830828444,
+    "corr_y": -0.05052585881645664,
+    "whole_field_mean_A": [
+     -0.30770010454012664,
+     1.7464418766361631
+    ],
+    "whole_field_mean_B": [
+     1.1770142608880996,
+     1.4105755060911178
+    ]
+   },
+   {
+    "beat": 3,
+    "window": [
+     152,
+     204
+    ],
+    "peak_frame": 158,
+    "corr_x": 0.27969761365029555,
+    "corr_y": -0.04692043664323234,
+    "whole_field_mean_A": [
+     -0.26465486011467876,
+     1.6523663176465198
+    ],
+    "whole_field_mean_B": [
+     1.1357482212781906,
+     1.3817868685722352
+    ]
+   }
+  ],
+  "axis_conventions_tested": {
+   "as_given": [
+    0.26961331096427876,
+    -0.06548532156426741
+   ],
+   "channels_swapped": [
+    -0.014927839515131838,
+    0.29091455017510404
+   ],
+   "grid_transposed": [
+    0.3012968703658937,
+    0.001205294230235395
+   ],
+   "y_sign_flipped": [
+    0.26961331096427876,
+    0.06548532156426741
+   ]
+  },
+  "as_a_model_of_the_other": {
+   "nodes_scored": 6211,
+   "beat_frames": 49,
+   "magnitude_peak": 1.2567066210875295,
+   "opening_area": 1.3483381363549876,
+   "opening_loopiness": 1.0887884074892904,
+   "direction_chirality": 0.4963773949444534,
+   "orientation_rad": 0.7660200079963322,
+   "shape_minor": 1.1640948336218833,
+   "loopscore": -0.5305397510528564
+  }
+ }
+}
