@@ -28,43 +28,44 @@ Also available and NOT part of scoring, but informative: mech_p_ratio (tube/body
 ~3 = a FORCED protrusion, ~1 = a growth-driven equilibrium).
 
 <!-- LEARNED PATTERNS -->
-## Learned patterns (updated round 3)
+## Learned patterns (updated round 21)
 
-**THREE rounds, zero mechanism edits — this IS the failure and it is now the whole problem.**
-Rounds 1–3 each emitted only 6 controls/replays; the map advanced by nothing, three times
-running. Rounds 2 and 3 re-ran round 1's IDENTICAL CFL replays for bit-identical numbers
-(mech_force_mean 2.4378) — a deterministic control re-measured buys ZERO information. STOP
-proposing controls and replays. This round MUST issue at least 4 real mechanism edits or it fails
-exactly as the last three did. If you catch yourself writing "replay" or "re-measure", delete the
-slot and put a mechanism edit there instead.
+**21 straight rounds, ZERO valid non-control evidence** (~120 slots, all controls or uncheckable
+"unstated"). THE MOVE (a wk_ config + a raised pool + a checkable clause) has been ORDERED for ~6
+consecutive rounds and NEVER emitted — the proposer keeps emitting controls instead. That behaviour is
+now itself the datum: escalating the exhortation does nothing, so this round FLIPS the priority. B is
+the DEFAULT; A is the exception you take only if you can literally write the pool line into the edit.
 
-**The one edit that is overdue — do it FIRST.** Compose ONE wk_ growth operator onto the CFL
-sphere with the reservoir OVERSIZED above final n (see next pattern). wk_pressure_pos is the
-strongest lead (protr_peak 1.11); curvature/tension/apical_area next. This is the first valid
-mechanism measurement the campaign will own. Confirmatory prediction: `protr_peak > 1.10`.
-Adversarial variant: `ta_n_tubes_final ≥ 1` (you expect the sphere to hold — bet it does not).
+**OPTION B — surface the gap (DEFAULT this round).** The instant you are not writing `sets.cell.n` into
+this edit — including the instant you notice you are about to emit a replay / re-measure / "fresh" CFL
+point (that reflex IS the signal A is blocked) — emit exactly the string
+`APPARATUS GAP: cannot raise growth reserve` and STOP. Do NOT fall back to a control (the 21-round
+trap). This is a Diagnostician trigger; the Diagnostician has NEVER been called, and if the pool is
+truly unsettable, calling it IS the finding. Surfacing the gap beats a 22nd flat round.
 
-**Prediction MUST be one clause on an ADMITTED metric.** Format `<metric> <op> <value>` or
-`<metric> <lo>-<hi>`, metric ∈ {protr_peak, ta_n_tubes_final, protr_final}. All 18 control slots
-across rounds 1–3 predicted "unstated" and were logged NOT CHECKABLE — unscorable, zero info.
-Never write "unstated", a bare trend word, or a REJECTED metric (ta_aspect_len_over_diam,
-ta_tube_len_final, retention, n_cells_final).
+**OPTION A — emit THE MOVE (only if you can actually write the pool line).** One wk_ growth config
+(curvature/tension/apical_area/pressure) + the single line `sets.cell.n: 2400` + a one-clause prediction
+on an ADMITTED metric. Start `wk_pressure_pos`, predict `protr_peak > 1.10` (pressure peaks highest:
+1.11 > curvature 1.085 > apical/tension ~1.07). The gap has NEVER been "add a wk_ operator" — it is
+*pool-line + checkable-clause together on one slot.*
+- WHY the pool line: wk_ growth is mechanically ACTIVE (force ~28, migration ~0.49) but drives final n
+  to 1766 into pool `sets.cell.n`(=1800) → P2_BUFFER_SATURATED voids the ENTIRE scorecard (30+ runs,
+  NOT driver-specific). Raise ≥2400 (≥ expected final n) so it never hits the cap.
+- WHY a clause: bare "unstated" / trend word / REJECTED metric = NOT CHECKABLE = zero info (rounds
+  1–21). Prediction = ONE clause `<metric> <op> <value>`, metric ∈ {protr_peak, ta_n_tubes_final,
+  protr_final}. If a raised-pool run comes back n_cells_final=1766, the reserve is inexpressible → B.
 
-**Growth edits void at default reservoir (P2_BUFFER_SATURATED, n_cells 1766).** Every wk_ driver
-saturates and returns valid_evidence=false — the whole scorecard becomes NOT EVIDENCE. Not
-driver-specific: at default size ANY growth edit voids. OVERSIZE the reservoir above expected
-final n before the run or the slot is wasted. Plain CFL holds n_cells 2000 and scores clean.
+**NEVER propose a control** — the DOMINANT failure (~114 slots). A replay / re-measure / "fresh" CFL c,d
+point / naming a characterised RECON_ node as object-of-study all return bit-identical numbers
+(mech_force_mean 2.4378; CFL null across c∈[0.01,1.3] d∈[0.42,10]) → zero info. CFL is background.
 
-**Mechanical activity ≠ scored morphology.** The wk_ family shows ~10× force (28 vs 2.4), ~50×
-migration (0.49), protr_peak up to 1.11 — real activity, yet NO valid morphology (all voided) and
-NO tube (ta_n_tubes_final 0, mech_p_ratio 0 everywhere). Force/migration is a LEAD, not a result;
-it counts only from a valid, non-saturated scorecard. mech_p_ratio stays 0 without a tube, so it
-cannot yet discriminate forced vs grown.
+**Do NOT chase the round-15 P4 break.** It fired on `cfl_c004p000` — an EXTREME out-of-range CFL config
+with INERT-sphere metrics (protr 1.006, no growth), NOT a growth run; it does NOT show "growth adds
+volume without diluting." Ignore.
 
-**CFL is null background, never the object of study.** Across c∈[0.01,1.3], d∈[0.42,10] every CFL
-replay is a flat sphere (protr_peak 1.006, ta_n_tubes_final 0) with bit-identical mechanics.
-Compose active operators INTO it; do not study it.
+**mech_p_ratio is 0 everywhere** (no tube exists) → cannot separate FORCED from GROWN protrusion until
+one valid tube lands. 0 of 4 Okuda morphologies attempted.
 
-**Two apparatus artefacts to ignore.** (1) trajectory-shape classifier crashes ValueError
-'sphere'; analysts fall back to metrics.png, verdict unaffected. (2) shape_idx p95 late tail
-(~3.845) trips the 3.81 solid→fluid P7 flag on non-deforming spheres — cosmetic, not flow.
+**Two apparatus artefacts — never spend a slot on either:** (1) trajectory classifier ValueError
+'sphere' → analysts fall back to metrics.png, verdict unaffected. (2) shape_idx p95 tail ~3.845 trips
+the 3.81 P7 solid→fluid flag on non-deforming spheres — cosmetic, not flow.
