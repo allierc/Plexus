@@ -31,6 +31,34 @@ def _c(code):
 
 red, green, yellow, blue, dim, bold = (_c("31"), _c("32"), _c("33"), _c("36"),
                                        _c("2"), _c("1"))
+magenta, cyan, orange, violet, teal = _c("35"), _c("36"), _c("38;5;208"), _c("38;5;141"), _c("38;5;79")
+
+# A COLOUR PER VOICE, so a wall of agent text can be read by who is speaking without reading it.
+# Grouped by what the role is FOR rather than picked at random: the two that look at the SPECIMEN
+# are green-ish, the two that look at the RECORD are violet, the two that look ACROSS rounds are
+# orange, and the eye-check -- the only one that looks at a picture -- is the one that stands out.
+VOICE = {
+    "biologist":     teal,       # is it a tissue
+    "metrologist":   teal,       # is the instrument sound
+    "eye-check":     magenta,    # the only role that looks at SHAPE
+    "reader":        cyan,       # what happened in this run
+    "interpreter":   violet,     # what happened this round, and why
+    "meta-review":   violet,     # what should change next round
+    "supervisor":    orange,     # what runs next, and how much
+    "archivist":     orange,     # across the whole history
+    "diagnostician": red,        # why the apparatus failed
+    "proposer":      blue,       # what to test next
+    "peer-review":   blue,       # is it worth testing
+}
+
+
+def voice(who):
+    """The colour for a speaker, matched on the role name however it is decorated."""
+    w = str(who).lower()
+    for k, f in VOICE.items():
+        if w.startswith(k):
+            return f
+    return bold
 
 # One icon per KIND of event, not per line. They are here to be recognised at a glance in a wall
 # of text; a different picture on every line is the same as no pictures.
@@ -130,10 +158,11 @@ def say(who, text, sentences=1, width=100):
         return f"  {dim(I['think'])} {dim(who + ': (said nothing)')}"
     parts = [x for x in re.split(r"(?<=[.!?])\s+", t) if x.strip()][:sentences]
     t = " ".join(parts)
-    out = [f'  {I["read"]} {bold(who)}: {t[:width]}' + ("" if len(t) <= width else "")]
+    col = voice(who)
+    out = [f'  {col(I["read"])} {col(bold(who))}: {t[:width]}']
     rest = t[width:]
     while rest:
-        out.append(f"      {rest[:width]}")
+        out.append(dim(f"      {rest[:width]}"))
         rest = rest[width:]
     return "\n".join(out)
 
