@@ -42,6 +42,9 @@ import subprocess
 import sys
 import time
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import term as T_        # noqa: E402
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(HERE, "agents"))
@@ -294,11 +297,12 @@ def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None, recon_rounds=
         spent = round(after.get("minutes", 0) - cost.get("minutes", 0), 2)
         _log({"event": "round", "n": i + 1, "exit": code, "minutes": minutes,
               "usd_this_round": spent, "note": note, "cost_total": after})
-        print(f"[loop] round {i + 1} exited {code} after {minutes} min wall, "
-              f"{spent} min of agents")
+        _mark = T_.ok if code == 0 else (T_.warn if code == EMPTY_EXIT else T_.no)
+        print(_mark(f"[loop] round {i + 1} exited {code} after {minutes} min wall, "
+                    f"{spent} min of agents"))
 
         if code in TERMINAL_EXITS:
-            print(f"[loop] STOPPING -- {TERMINAL_EXITS[code]}")
+            print(T_.no(f"[loop] STOPPING -- {TERMINAL_EXITS[code]}"))
             _log({"event": "stop", "why": TERMINAL_EXITS[code], "rounds_done": done})
             return code
         if code == EMPTY_EXIT:
@@ -322,8 +326,9 @@ def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None, recon_rounds=
             # bug forever is how a week is spent re-raising one exception.
             crashes += 1
             _preserve(i + 1, mode)
-            print(f"[loop] round {i + 1} CRASHED ({note or 'uncaught exception'}). That is a bug "
-                  f"in the code, not a finding about the batch -- crash {crashes}/{MAX_CRASHES}.")
+            print(T_.no(f"[loop] round {i + 1} CRASHED ({note or 'uncaught exception'}). That is "
+                        f"a bug in the CODE, not a finding about the batch -- "
+                        f"crash {crashes}/{MAX_CRASHES}."))
             if crashes >= MAX_CRASHES:
                 print("[loop] STOPPING -- the same round keeps crashing. Read the traceback.")
                 _log({"event": "stop", "why": "repeated crash", "rounds_done": done})

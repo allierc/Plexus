@@ -62,6 +62,7 @@ import proposer as P                                                      # noqa
 from metrologist import Certification                                     # noqa: E402
 import archivist as ARCH                                                  # noqa: E402
 import collector as COL                                                   # noqa: E402
+import term as T_                                                         # noqa: E402
 import diagnostician as DIAG                                              # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
@@ -108,13 +109,12 @@ def act(title, detail=""):
     if _T0[0] is None:
         _T0[0] = time.time()
     el = time.time() - _T0[0]
-    print(f"\n{'=' * 96}\n>>> {title}   [+{int(el // 60):02d}:{int(el % 60):02d}]"
-          + (f"   {detail}" if detail else "") + f"\n{'=' * 96}", flush=True)
+    print(T_.act(title, detail, f"[+{int(el // 60):02d}:{int(el % 60):02d}]"), flush=True)
 
 
 def step(msg):
     el = 0 if _T0[0] is None else time.time() - _T0[0]
-    print(f"    [+{int(el // 60):02d}:{int(el % 60):02d}] {msg}", flush=True)
+    print(T_.step(msg, f"[+{int(el // 60):02d}:{int(el % 60):02d}]"), flush=True)
 
 
 # --------------------------------------------------------------------------- frontier
@@ -981,7 +981,7 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         post = C.check_posthoc(summ)
         if post:
             sup.reg.resolve(h.hid, summ, "inconclusive", note=f"NOT EVIDENCE: {post}")
-            print(f"  [critic] {nm} is not evidence: {post}")
+            print(T_.no(f"[critic] {nm} is not evidence: {post}"))
             refused.append((nm, f"critic post-hoc: {post}"))
             continue
         out_dir = os.path.join(LOG, nm)
@@ -1008,8 +1008,8 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         # observation, not a verdict.
         sc = score_run(summ, cfg)
         if wa.get("watcher_blocks"):
-            print(f"  [eye] {nm} DISAGREES with the numbers -- recorded, not vetoed: "
-                  f"{wa.get('watcher_why','')[:100]}")
+            print(T_.warn(f"[eye] {nm} DISAGREES with the numbers -- recorded, not vetoed: "
+                          f"{wa.get('watcher_why','')[:100]}"))
         # `predict.score` refuses to guess: a prediction it cannot check resolves `inconclusive`
         # and drops out of the surprise denominator, rather than being recorded as `confirmed`
         # (which is what the old first-match regex did -- see predict.py P1/P2/P3).
@@ -1039,7 +1039,7 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     # number, and the Eye-check is now an observation that does not score. See ROLES.md.
     rows = sorted(rows, key=lambda r: (bool(r[2].get("premises_broken")), -r[3]))
     kept, dropped = truncate(rows, cfg.keep_truncate)
-    print(f"\n[rank] kept {len(kept)}, dropped {len(dropped)} (never refined)")
+    print(T_.ok(f"[rank] kept {len(kept)}, dropped {len(dropped)} (never refined)"))
     for nm, g, s, sc, oc, h in rows:
         tag = "KEEP" if (nm, g, s, sc, oc, h) in kept else "drop"
         print(f"  [{tag}] {nm}  score {sc:6.2f}  protr_peak {s.get('protr_peak',0):5.2f} "
@@ -1133,13 +1133,13 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     # THE ARCHIVIST, over the whole history rather than this batch. It advises; the Supervisor
     # decides. Its recommendation is recorded either way, so an override is visible.
     arch = ARCH.decide(reason=f"end of round {rid}", ledger=ledger)
-    print(f"  [archivist] {arch['decision']}"
+    print(f"  {T_.I['think']} [archivist] {T_.verdict(arch['decision'])}"
           + (f" -> {arch.get('target')}" if arch.get("target") else "")
           + f" -- {arch.get('why','')[:120]}")
     record["archivist"] = arch
     record["steer"] = rep.get("mix_why", COL.MISSING)
     for hole in COL.holes(record):
-        print(f"  [collector] HOLE: {hole}")
+        print(T_.warn(f"[collector] HOLE: {hole}"))
     COL.write(record)
     # THE CONTROL IS ALWAYS RETAINED, whatever it scored.
     # `kept` is a RANKING product, and a Watcher veto sets the score to -inf -- so in round 2 the
