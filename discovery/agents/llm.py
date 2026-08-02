@@ -405,8 +405,12 @@ def run_agent(agent, prompt, ledger=None, **over):
                           usage=last_usage())
         # ONE LINE PER CALL, not one per tool use. What is worth knowing is that the Proposer
         # reached for Bash eight times -- a fact about how it works -- not eight identical lines.
+        # `quiet` is not a parameter of run_agent -- it is one of the passthrough kwargs in
+        # `over`, and reaching for it as a bare name crashed round 2 with a NameError AFTER the
+        # proposer's 4.4 minutes were spent. The ledger recorded the cost correctly (that is what
+        # the `finally` is for) and the round still died.
         tools = tool_summary()
-        if tools and not quiet:
+        if tools and not over.get("quiet"):
             print(f"  [{agent}] {(time.time() - t0) / 60.0:.1f} min, tools: {tools}", flush=True)
     return ok, out
 
