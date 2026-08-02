@@ -295,6 +295,7 @@ def survey_log(log_dir=None, min_protr=None):
             "broken": j.get("premises_broken") or [],
             "horizon": s.get("horizon_frame"),
             "spec_path": sy,
+            "capped": _capped(d),
             **_chemistry(d),
             **_mechanics(d, s),
         })
@@ -310,6 +311,45 @@ def survey_log(log_dir=None, min_protr=None):
 
 def _num(v):
     return round(float(v), 3) if isinstance(v, (int, float)) else None
+
+
+def _capped(run_dir):
+    """Did this run hit its vertex reservoir? A capped run cannot be replayed usefully.
+
+    The Archivist kept choosing the `wk_*` specs -- they pattern, they are sound, they rank well
+    -- and every one was refused P2_BUFFER_SATURATED afterwards, because their buffers were sized
+    for a 150-cell start and they grow to the 1778-cell ceiling. Ranking on pattern and soundness
+    alone cannot see that; the run looks excellent right up to the moment it is thrown away.
+    """
+    import json as _j
+    try:
+        j = _j.load(open(os.path.join(run_dir, "diag.json")))
+    except Exception:
+        return None
+    s = j.get("summary") or {}
+    if s.get("buf_full"):
+        return True
+    n = s.get("n_cells_final")
+    ser = None
+    try:
+        ser = _j.load(open(os.path.join(run_dir, "metrics.json"))).get("series")
+    except Exception:
+        pass
+    if not (ser and isinstance(n, (int, float))):
+        return None
+    import numpy as np
+    c = np.array([e.get("cells") if isinstance(e.get("cells"), (int, float)) else np.nan
+                  for e in ser], float)
+    if not np.isfinite(c).any():
+        return None
+    # a flat ceiling held for the last quarter of the run, after having grown
+    i = int(np.nanargmax(c))
+    # >= 0.15, not > 0.25. wk_pressure_pos_s0 plateaus for EXACTLY a quarter of its frames and
+    # was missed by a hair -- 150 -> 1778 cells, flat for the last ten of forty, and reported as
+    # a fine starting point. A threshold that a real case sits exactly on is a threshold chosen
+    # without looking at the data.
+    return bool(c[-1] > c[0] * 1.05 and (len(c) - i) / len(c) >= 0.15
+                and np.allclose(c[i:], np.nanmax(c), atol=0.5))
 
 
 def _chemistry(run_dir):
@@ -404,6 +444,11 @@ def _tag_tracks(rows):
     for r in rows:
         pat = (r.get("patterned") or 0) > 0.01 and r.get("chem_ok")
         snd = r["specimen"] in ("valid", "valid (declared)")
+        # A CAPPED RUN SERVES NEITHER TRACK. It will be refused P2_BUFFER_SATURATED the moment
+        # it is replayed, so choosing it spends a slot to be told something already known.
+        if r.get("capped"):
+            r["serves"] = "capped"
+            continue
         r["serves"] = ("B" if (pat and snd and (r.get("n_protruding_max") or 0) > 0)
                        else "A" if (pat and snd) else "-")
     return rows

@@ -414,6 +414,16 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     except Exception as e:
         print(f"[{name}] premise check unavailable: {type(e).__name__}: {e}", flush=True)
 
+    # THE RESERVOIR'S OWN REPORT. divide_3d counts the divisions it REFUSED for want of vertex
+    # buffer and flags when the array is full, and until now both died on the mesh: the only way
+    # anyone learned a run was capped was the Critic inferring it from n_cells afterwards, or a
+    # human noticing the green stop two seconds into a movie.
+    _last = hist[-1] if hist else {}
+    summary["div_blocked"] = int(_last.get("div_blocked") or 0)
+    summary["buf_full"] = bool(_last.get("buf_full"))
+    if summary["buf_full"]:
+        print(f"[{name}] RESERVOIR FULL at {summary.get('n_cells_final')} cells -- this run is "
+              f"capped by its array, not by its biology.", flush=True)
     json.dump({"config": name, "comp_hash": disc.get("comp_hash"),
                "region": disc.get("region"), "summary": summary, "acted": acted,
                "premises": [p.as_dict() for p in prem],

@@ -422,6 +422,41 @@ def _last_review():
     return "\n".join(out)
 
 
+def _resize_reservoir(spec_path, name):
+    """Give a replayed spec a buffer sized for where it is going. NOT a change to the experiment.
+
+    THE VERTEX BUFFER IS AN ARRAY SIZE, NOT A MODEL PARAMETER. It sets how many cells the mesh
+    CAN hold, and nothing about what the tissue does. The old specs were sized from a 150-cell
+    start, so they cap at 1778 -- and 37 of the 75 runs on disk hit that ceiling and grew no
+    further. Replaying one verbatim reproduces the ceiling, the Critic refuses it
+    P2_BUFFER_SATURATED, and the slot is spent confirming an array is full.
+
+    So the buffer is resized and everything else is copied untouched. This is the same experiment
+    without the artefact -- and it is the one edit a replay may make, precisely because it is not
+    part of the model. The specs on disk are NOT rewritten: they are the research record.
+    """
+    try:
+        import yaml
+        c = yaml.safe_load(open(spec_path))
+        seed = next((o for o in c.get("operators", []) if o["op"] == "seed_mesh_3d"), None)
+        if not seed:
+            return
+        want_v, want_c, target = T._reservoirs(int(seed.get("n_cells") or 0), 0)
+        have = ((c.get("sets") or {}).get("vertex") or {}).get("n") or 0
+        if want_v <= have:
+            return
+        c.setdefault("sets", {}).setdefault("vertex", {})["n"] = want_v
+        if want_c:
+            c["sets"].setdefault("cell", {})["n"] = want_c
+        yaml.safe_dump(c, open(spec_path, "w"), sort_keys=False)
+        print(T_.warn(f"[recon] {name}: vertex reservoir {have} -> {want_v} "
+                      f"(cap {(have + 4) // 2} -> {(want_v + 4) // 2} cells). The buffer is an "
+                      f"array size, not a model parameter; the rest of the spec is untouched."))
+    except Exception as e:
+        print(T_.warn(f"[recon] {name}: could not resize the reservoir "
+                      f"({type(e).__name__}) -- replaying verbatim, it may saturate"))
+
+
 def _tail_of(path, chars=600):
     """The last paragraph of an append-only file -- what the agent just added to it."""
     try:
@@ -945,6 +980,7 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
             nm = f"r{rid:03d}n_{i:02d}_{run[:14]}"
             dst = os.path.join(ROOT, "config", "okuda", f"{nm}.yaml")
             shutil.copyfile(src, dst)
+            _resize_reservoir(dst, nm)
             h = Hypothesis(hid=f"R{rid}.{i}.recon", comp_hash=f"RECON_{run[:20]}",
                            parent_hash=None, edit=f"replay {run}",
                            # A replay IS a control in the strict sense -- the composition
