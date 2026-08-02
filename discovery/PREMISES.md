@@ -177,6 +177,36 @@ state it produces is not a tissue. Likely cause: the radial spring's target radi
 seed value while cell target volumes grow sixteenfold, so the shell is held at radius 5 while its
 cells demand far more area than that sphere has. It has nowhere to go but through itself.
 
+## 12. A concentration is non-negative and finite — **certain**
+
+Amount over volume. Neither term can be negative and neither can be infinite, so a concentration
+that goes negative or non-finite is arithmetic failing, not chemistry happening.
+
+*Constrains:* `cell_diffuse`, `cell_react` — the integrator, not the model.
+*Check:* every recorded concentration is finite and >= 0.
+*If violated:* every downstream number is about the integrator. This is the check that caught the
+reaction running 50x too fast: the activator went 0.01 -> 1.41e6 -> NaN while spatially uniform.
+
+## 13. A tissue that stops growing because the ARRAY filled is not evidence about growth — **certain**
+
+The mesh lives in a fixed vertex buffer, and when it fills, division stops. The tissue did not
+decide anything; it was refused. The distinction between *"the tissue stopped dividing"* and
+*"the tissue was not allowed to divide"* is invisible in every number we record, and it is the
+difference between a result and an artefact.
+
+*Constrains:* the vertex reservoir against the growth a composition asks for. For a trivalent
+closed mesh `V = 2F - 4`, so a buffer of `V` vertices caps the tissue at `(V+4)/2` cells.
+*Check:* the cell count must not reach a constant and hold it for a large tail of the run. The
+engine also reports it directly — `div_blocked` counts divisions refused for want of buffer, and
+`buf_full` says the array is at its ceiling.
+*Caught:* `wk_pressure_pos_s0` grew 150 -> 1778 cells by frame 323 of 900 and then added **zero**
+for the remaining 575 frames. 1778 is exactly the cap of a buffer sized for a 150-cell start. Two
+thirds of the run measured a full array, every other premise passed it, and the only thing that
+noticed was a human watching cell division stop two seconds into a six-second movie.
+*Grade of the verdict:* **ambiguous**, not invalid — the phase before the cap is real evidence.
+What is inadmissible is everything after it, and any endpoint metric that reads the plateau as a
+biological steady state.
+
 ---
 
 ## Why this document exists

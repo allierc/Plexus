@@ -304,6 +304,40 @@ def p1_tissue_gains_material(cfg, s):
              f"somewhere else in the same tissue.", dict(V_start=float(v[0]), V_end=float(v[-1])))
 
 
+def p13_growth_not_capped_by_the_array(cfg, s):
+    """A tissue that stopped growing because the BUFFER filled is not evidence about growth.
+
+    The distinction this draws is between "the tissue stopped dividing" and "the tissue was not
+    ALLOWED to divide", and they look identical in every number the campaign records. Measured on
+    wk_pressure_pos_s0: 150 -> 1778 cells by frame 323 of 900, then ZERO new cells for the
+    remaining 575 frames. 1778 is exactly the (V+4)/2 cap of a vertex buffer sized for a 150-cell
+    start. Two thirds of the run measured a full array; every existing premise passed it; the only
+    thing that noticed was a human watching the green stop two seconds into a six-second movie.
+
+    AMBIGUOUS, not invalid. The phase before the cap is real evidence and should not be thrown
+    away -- what is inadmissible is everything after it, and any endpoint metric that reads the
+    plateau as a biological steady state.
+    """
+    cells = _col(s, "cells")
+    if cells is None or cells.size < 6:
+        return R("P13", "passive", "growth is not capped by the array", "na", "")
+    final = float(np.nanmax(cells))
+    # the plateau: the first frame at the maximum, and how much of the run sits on it
+    idx = int(np.argmax(cells >= final))
+    frac_after = 1.0 - idx / max(cells.size - 1, 1)
+    grew = final > float(cells[0]) * 1.05
+    flat_tail = frac_after > 0.15 and np.allclose(cells[idx:], final, rtol=0, atol=0.5)
+    if grew and flat_tail:
+        return R("P13", "passive", "growth is not capped by the array", "fail",
+                 f"cell count reached {final:.0f} at frame index {idx} of {cells.size - 1} and "
+                 f"then did not change for the remaining {frac_after:.0%} of the run. A tissue "
+                 f"that stops dividing at a constant is a tissue that ran out of ARRAY, not out "
+                 f"of biology -- check div_blocked/buf_full in the run record. Everything measured "
+                 f"after that frame describes the reservoir.", measured=final)
+    return R("P13", "passive", "growth is not capped by the array", "pass",
+             f"cell count ends at {final:.0f} with no flat ceiling")
+
+
 def p3b_mean_cell_volume_holds(cfg, s):
     """#3, measured. Growth doubles a cell and division halves it, so in a healthy proliferating
     epithelium the MEAN cell volume returns to itself. A monotone collapse means the tissue is
@@ -600,6 +634,7 @@ def p6_resting_vesicle_rests(cfg, device="cpu", frames=40, tol=0.03):
 # --------------------------------------------------------------------------- driver
 STATIC = [p2_gate_implies_baseline, p3_ceiling_above_trigger, p5_biology_advances_in_biological_time]
 PASSIVE = [p1_tissue_gains_material, p3b_mean_cell_volume_holds, p4_chemistry_not_extinguished,
+           p13_growth_not_capped_by_the_array,
            p7_no_absorbing_area_by_stretching, p8_shape_index_floor, p9_closed_sphere,
            p11_tissue_does_not_pass_through_itself, p12_concentrations_are_physical]
 

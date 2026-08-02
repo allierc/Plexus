@@ -61,13 +61,30 @@ from agents.grounder import buffer_for, max_cells_for                       # no
 VBUF_FALLBACK, CBUF_FALLBACK = 30000, 16000    # only when no target can be inferred
 
 
-def _reservoirs(n_cells_seed, frames, growth_headroom=8.0):
+def _reservoirs(n_cells_seed, frames, growth_headroom=40.0):
     """How big must the reservoirs be for a run that STARTS at n_cells_seed?
 
     A growing vesicle roughly doubles every cell cycle, so the destination is the seed times
     however many doublings the run has time for. `growth_headroom` is deliberately generous: the
     cost of an oversized reservoir is memory, and the cost of an undersized one is a batch of
-    runs that measure the array. We have now paid the second cost twice.
+    runs that measure the array. We have now paid the second cost three times.
+
+    RAISED FROM 8 TO 40, and the arithmetic says it should have been done long ago. Measured on
+    an A6000 (49 GB), for a 2000-cell seed over 900 frames:
+
+        headroom  8   cap  20,804 cells   0.45 GB of recorded trajectory
+        headroom 40   cap 104,004 cells   2.25 GB
+
+    The instantaneous state is 0.4 MB either way -- a rounding error. The only cost that scales is
+    the trajectory, it scales linearly, and 2.25 GB against 49 GB is not a constraint. Against
+    that: `wk_pressure_pos_s0` grew 150 -> 1778 cells by frame 323 of 900 and then added ZERO for
+    the remaining 575 frames, because 1778 is exactly the (V+4)/2 cap of a buffer sized for a
+    150-cell start. Two thirds of that run measured a full array. Cedric saw it as division
+    stopping two seconds into a six-second movie.
+
+    THIS DOES NOT HELP A RECON REPLAY. Those re-run a spec VERBATIM, stale reservoir included --
+    that is what verbatim means, and rewriting the buffer would make the replay a different
+    experiment. It applies to every composition the loop builds from here.
     """
     target = max(int(n_cells_seed) * growth_headroom, 2000)
     b = buffer_for(target)
