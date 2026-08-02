@@ -425,17 +425,22 @@ class OculomotorDrive(Lateral):
     READS = ["gaze", "act"]
     WRITES = ["act"]
     MECHANISM_TAGS = ["motor_command", "reciprocal_innervation", "feedback_control",
-                      "activation_dynamics"]
-    PARAM_ROLES = {"kp": "position_gain", "kd": "rate_damping", "tonic": "resting_innervation",
+                      "neural_integrator", "activation_dynamics"]
+    PARAM_ROLES = {"kp": "position_gain", "ki": "neural_integrator_gain",
+                   "i_leak": "integrator_leak", "kd": "rate_damping",
+                   "tonic": "resting_innervation",
                    "gain": "recruitment_gain", "tau": "activation_time_constant",
                    "program": "gaze_waypoints"}
-    REFERENCE = "Sherrington, C. S. (1893). Proc. R. Soc. Lond. 53:407 (reciprocal innervation); Robinson, D. A. (1975). Basic Mech. Ocular Motility, 337-374 (oculomotor plant)."
+    REFERENCE = "Sherrington, C. S. (1893). Proc. R. Soc. Lond. 53:407 (reciprocal innervation); Robinson, D. A. (1975). Basic Mech. Ocular Motility, 337-374 (oculomotor plant); Cannon, S. C. & Robinson, D. A. (1987). J. Neurophysiol. 57:1383 (the neural integrator)."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.at = params.get("_at", "muscle")
         self.eye = params.get("eye", "eye")
         self.kp = float(params.get("kp", 0.09))
+        self.ki = float(params.get("ki", 0.0))          # the oculomotor neural integrator
+        self.i_leak = float(params.get("i_leak", 0.004))  # leak per frame (a leaky integrator)
+        self.i_clip = float(params.get("i_clip", 260.0))  # anti-windup bound (deg-frames)
         self.kd = float(params.get("kd", 0.014))
         self.tonic = float(params.get("tonic", 0.22))
         self.gain = float(params.get("gain", 1.0))
@@ -443,6 +448,7 @@ class OculomotorDrive(Lateral):
         prog = params["program"]
         self.program = np.asarray([[float(x) for x in row] for row in prog], float)
         self._prev = None                                   # previous (h, v, t) for the rate estimate
+        self._acc = np.zeros(3)                             # integrator state
         self.last = {}                                      # diagnostics for the renderer
 
     def target(self, frame: int) -> np.ndarray:
@@ -463,7 +469,15 @@ class OculomotorDrive(Lateral):
         self._prev = gaze.copy()
 
         # desired angular velocity in the head frame (see eye_anatomy for the axis mapping)
-        e = self.kp * err - self.kd * rate / max(float(getattr(H.config, "dt", 1.0)), 1e-9)
+        # PID in rotation space. The integral term is the OCULOMOTOR NEURAL INTEGRATOR (the
+        # nucleus prepositus hypoglossi / interstitial nucleus of Cajal): a proportional drive
+        # alone leaves a standing error against the elastic restoring torque of the antagonist,
+        # and the real plant nulls it with exactly this leaky integration of the error. It is
+        # leaky (gaze drifts back toward primary when the drive stops) and clipped (anti-windup).
+        if self.ki > 0.0:
+            self._acc = (self._acc * (1.0 - self.i_leak) + err).clip(-self.i_clip, self.i_clip)
+        e = (self.kp * err + self.ki * self._acc
+             - self.kd * rate / max(float(getattr(H.config, "dt", 1.0)), 1e-9))
         omega = np.array([-e[1], e[0], e[2]])                # -x elevation, +y abduction, +z intorsion
 
         axis = m.axis.detach().cpu().numpy().astype(np.float64) if hasattr(m, "axis") else np.zeros((m.n, 3))

@@ -70,14 +70,27 @@ PRESETS = {
 }
 
 
+def _strengths(oblique_strength=None):
+    """Per-muscle strength factor for `muscle_contract`. The obliques reach the globe over a
+    much shorter post-pulley path than the recti, so they were given a boost -- but a short,
+    sharply curved strap is also the one that BUCKLES first, so the boost is a knob, not a
+    constant."""
+    w = [float(x) for x in EA.peak_tensions()]
+    if oblique_strength is not None:
+        w[4] = w[5] = float(oblique_strength)
+    return w
+
+
 def build_spec(name="eye_zebrafish", preset="atlas", n_particles=45000, n_muscle_particles=2600,
                n_grid=128, dt=0.003, substep_dt=None, drag=5.0, muscle_drag=6.0,
                contract=26.0, stretch_activation=0.0,
-               kp=0.10, kd=0.010, tonic=0.20, gain=1.2, tau=0.020,
+               kp=0.10, ki=0.0, kd=0.010, tonic=0.20, gain=1.2, tau=0.020,
                k_socket=5000.0, k_fat=4000.0, c_fat=90.0, k_bone=9000.0, c_bone=60.0,
+               k_sleeve=2600.0, c_sleeve=30.0, sleeve_free=(0.70, 0.88),
                n_frames=None, sclera_youngs=300.0, vitreous_youngs=9.0, choroid_youngs=40.0,
                muscle_youngs=60.0, mus_width=0.034, mus_thickness=0.021, mus_arc=30.0,
-               mus_gap=0.038, mus_embed=-0.014, mus_frac=0.88, program=None, seed=0):
+               mus_gap=0.038, mus_embed=-0.014, mus_frac=0.88, oblique_strength=None,
+               program=None, seed=0):
     """The full spec as a plain dict, ready for `yaml.safe_dump` + `plexus.schema.load`."""
     p = dict(PRESETS.get(preset, PRESETS["atlas"]))
     n_frames = int(n_frames if n_frames is not None else p["n_frames"])
@@ -163,13 +176,17 @@ def build_spec(name="eye_zebrafish", preset="atlas", n_particles=45000, n_muscle
             {"op": "muscle_geometry", "at": "muscle", "child": "muscle_particle", "eye": "eye"},
             # command -> contraction
             {"op": "oculomotor_drive", "at": "muscle", "eye": "eye", "program": prog,
-             "kp": float(kp), "kd": float(kd), "tonic": float(tonic), "gain": float(gain),
+             "kp": float(kp), "ki": float(ki), "kd": float(kd), "tonic": float(tonic),
+             "gain": float(gain),
              "tau": float(tau)},
             {"op": "muscle_contract", "at": "muscle_particle", "muscles": "muscle",
              "amplitude": float(contract), "stretch_activation": float(stretch_activation),
-             "strength": [float(x) for x in EA.peak_tensions()]},
+             "strength": _strengths(oblique_strength)},
             # boundary conditions
             {"op": "bone_anchor", "at": "muscle_particle", "k": float(k_bone), "c": float(c_bone)},
+            {"op": "muscle_sleeve", "at": "muscle_particle", "k": float(k_sleeve),
+             "c": float(c_sleeve), "free_from": float(sleeve_free[0]),
+             "free_to": float(sleeve_free[1])},
             {"op": "orbit_socket", "at": "mpm_particle", "orbit": "orbit",
              "k": float(k_socket), "damp": 12.0, "radius": EA.CUP_RADIUS,
              "aperture": EA.CUP_APERTURE_DEG, "k_fat": float(k_fat), "c_fat": float(c_fat)},
@@ -199,6 +216,7 @@ def build_spec(name="eye_zebrafish", preset="atlas", n_particles=45000, n_muscle
             "oculomotor_drive",
             "muscle_contract",
             "bone_anchor",
+            "muscle_sleeve",
             "orbit_socket",
             "drag",
             {"substep_dt": float(substep_dt or 1.2e-4),

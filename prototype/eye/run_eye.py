@@ -200,6 +200,7 @@ def diagnose(cap, sim):
             "recruited": top, "recruit_ok": good,
             "activation": {EA.MUSCLE_KEYS[j]: round(float(a[j]), 3) for j in range(EA.N_MUSCLE)},
         })
+    tm = render_eye.tracking_metrics(cap)
     c = cap["centre"]
     drift = np.linalg.norm(c - c[0], axis=1)
     errs = [h["error_deg"] for h in holds]
@@ -209,6 +210,8 @@ def diagnose(cap, sim):
         "n_frames": int(sim.n_frames),
         "range_hvt_deg": [round(float(np.ptp(g[:, k])), 2) for k in range(3)],
         "mean_settle_error_deg": round(float(np.mean(errs)), 2) if errs else None,
+        "tracking_rms_deg": [round(float(x), 2) for x in tm["rms_deg"]],
+        "tracking_settled_rms_deg": [round(float(x), 2) for x in tm["settled_rms_deg"]],
         "max_settle_error_deg": round(float(np.max(errs)), 2) if errs else None,
         "recruitment_correct": f"{ok_recruit}/{n_recruit}" if n_recruit else "n/a",
         "centroid_drift_max_frac_radius": round(float(drift.max() / EA.A_EQ), 4),
@@ -287,7 +290,9 @@ def trial(label, device="cuda:0", stride=3, movie=True, note="", **kw):
     print(f"  range h/v/t = {d['range_hvt_deg']}   err mean/max = "
           f"{d['mean_settle_error_deg']}/{d['max_settle_error_deg']} deg   "
           f"recruit {d['recruitment_correct']}   drift {d['centroid_drift_max_frac_radius']}   "
-          f"strain_p99 {d['strain_p99']}   shorten% {d['max_shortening_pct']}", flush=True)
+          f"strain_p99 {d['strain_p99']}   shorten% {d['max_shortening_pct']}\n"
+          f"  tracking rms h/v/t = {d['tracking_rms_deg']}   settled = "
+          f"{d['tracking_settled_rms_deg']} deg", flush=True)
     for h in d["holds"]:
         flag = "" if h["recruit_ok"] is None else (" ok" if h["recruit_ok"] else " MISS")
         print(f"    {str(h['frames']):<12} {h['kind']:<11} {h['command_hvt']} -> "
@@ -314,8 +319,16 @@ def main():
     ap.add_argument("--drag", type=float, default=5.0)
     ap.add_argument("--muscle_drag", type=float, default=6.0)
     ap.add_argument("--k_bone", type=float, default=9000.0)
-    ap.add_argument("--muscle_youngs", type=float, default=60.0)
+    ap.add_argument("--k_sleeve", type=float, default=2600.0)
+    ap.add_argument("--muscle_youngs", type=float, default=110.0)
+    ap.add_argument("--beta", type=float, default=3.0)
+    ap.add_argument("--oblique_strength", type=float, default=0.70)
+    ap.add_argument("--mus_width", type=float, default=0.044)
+    ap.add_argument("--mus_thickness", type=float, default=0.030)
+    ap.add_argument("--mus_frac", type=float, default=0.95)
+    ap.add_argument("--mus_gap", type=float, default=0.042)
     ap.add_argument("--kp", type=float, default=0.10)
+    ap.add_argument("--ki", type=float, default=0.0)
     ap.add_argument("--kd", type=float, default=0.010)
     ap.add_argument("--gain", type=float, default=1.2)
     ap.add_argument("--tonic", type=float, default=0.20)
@@ -331,7 +344,10 @@ def main():
           preset=a.preset, n_particles=a.particles, n_muscle_particles=a.mparticles,
           n_grid=a.n_grid, n_frames=a.frames, dt=a.dt, contract=a.contract, drag=a.drag,
           muscle_drag=a.muscle_drag, muscle_youngs=a.muscle_youngs, k_bone=a.k_bone,
-          kp=a.kp, kd=a.kd, gain=a.gain, tonic=a.tonic, tau=a.tau,
+          stretch_activation=a.beta, oblique_strength=a.oblique_strength, k_sleeve=a.k_sleeve,
+          mus_width=a.mus_width, mus_thickness=a.mus_thickness,
+          mus_frac=a.mus_frac, mus_gap=a.mus_gap,
+          kp=a.kp, ki=a.ki, kd=a.kd, gain=a.gain, tonic=a.tonic, tau=a.tau,
           k_socket=a.k_socket, k_fat=a.k_fat)
 
 

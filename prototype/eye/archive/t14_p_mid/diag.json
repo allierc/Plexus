@@ -1,0 +1,255 @@
+{
+  "n_frames": 395,
+  "range_hvt_deg": [
+    27.83,
+    7.12,
+    13.41
+  ],
+  "mean_settle_error_deg": 21.42,
+  "max_settle_error_deg": 39.22,
+  "recruitment_correct": "2/4",
+  "centroid_drift_max_frac_radius": 0.0106,
+  "strain_p99": 0.7557,
+  "strain_max": 23.1421,
+  "vonmises_p99": 123.239,
+  "activation_range": [
+    0.021,
+    1.0
+  ],
+  "max_shortening_pct": {
+    "LR": 30.28,
+    "SR": 24.22,
+    "MR": 12.46,
+    "IR": 12.63,
+    "SO": 43.99,
+    "IO": 43.66
+  },
+  "peak_shortening_pct": 43.99,
+  "muscle_strain_p99": NaN,
+  "holds": [
+    {
+      "frames": [
+        0,
+        65
+      ],
+      "kind": "primary",
+      "command_hvt": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "achieved_hvt": [
+        0.05,
+        -0.1,
+        -0.2
+      ],
+      "error_deg": 0.24,
+      "recruited": [
+        "SO",
+        "SR"
+      ],
+      "recruit_ok": null,
+      "activation": {
+        "LR": 0.188,
+        "SR": 0.191,
+        "MR": 0.18,
+        "IR": 0.148,
+        "SO": 0.198,
+        "IO": 0.164
+      }
+    },
+    {
+      "frames": [
+        65,
+        130
+      ],
+      "kind": "abduction",
+      "command_hvt": [
+        25.0,
+        0.0,
+        0.0
+      ],
+      "achieved_hvt": [
+        10.98,
+        0.42,
+        -0.56
+      ],
+      "error_deg": 14.04,
+      "recruited": [
+        "LR",
+        "IO"
+      ],
+      "recruit_ok": true,
+      "activation": {
+        "LR": 0.974,
+        "SR": 0.197,
+        "MR": 0.162,
+        "IR": 0.238,
+        "SO": 0.413,
+        "IO": 0.471
+      }
+    },
+    {
+      "frames": [
+        130,
+        195
+      ],
+      "kind": "adduction",
+      "command_hvt": [
+        -25.0,
+        0.0,
+        0.0
+      ],
+      "achieved_hvt": [
+        14.09,
+        -1.69,
+        2.72
+      ],
+      "error_deg": 39.22,
+      "recruited": [
+        "SR",
+        "MR"
+      ],
+      "recruit_ok": false,
+      "activation": {
+        "LR": 0.14,
+        "SR": 0.966,
+        "MR": 0.743,
+        "IR": 0.685,
+        "SO": 0.14,
+        "IO": 0.413
+      }
+    },
+    {
+      "frames": [
+        195,
+        260
+      ],
+      "kind": "elevation",
+      "command_hvt": [
+        0.0,
+        16.0,
+        0.0
+      ],
+      "achieved_hvt": [
+        14.66,
+        1.17,
+        -0.02
+      ],
+      "error_deg": 20.85,
+      "recruited": [
+        "SR",
+        "IO"
+      ],
+      "recruit_ok": true,
+      "activation": {
+        "LR": 0.14,
+        "SR": 1.0,
+        "MR": 0.152,
+        "IR": 0.169,
+        "SO": 0.162,
+        "IO": 0.999
+      }
+    },
+    {
+      "frames": [
+        260,
+        325
+      ],
+      "kind": "intorsion",
+      "command_hvt": [
+        0.0,
+        0.0,
+        9.0
+      ],
+      "achieved_hvt": [
+        18.52,
+        3.63,
+        -8.89
+      ],
+      "error_deg": 26.0,
+      "recruited": [
+        "IO",
+        "SO"
+      ],
+      "recruit_ok": false,
+      "activation": {
+        "LR": 0.14,
+        "SR": 0.979,
+        "MR": 0.398,
+        "IR": 0.145,
+        "SO": 0.991,
+        "IO": 1.0
+      }
+    },
+    {
+      "frames": [
+        325,
+        395
+      ],
+      "kind": "primary",
+      "command_hvt": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "achieved_hvt": [
+        26.63,
+        1.83,
+        -9.0
+      ],
+      "error_deg": 28.17,
+      "recruited": [
+        "IO",
+        "SO"
+      ],
+      "recruit_ok": null,
+      "activation": {
+        "LR": 0.14,
+        "SR": 0.849,
+        "MR": 0.157,
+        "IR": 0.313,
+        "SO": 0.925,
+        "IO": 1.0
+      }
+    }
+  ],
+  "checks": {
+    "reaches_commands": false,
+    "torsion_demonstrated": true,
+    "wide_gaze_range": false,
+    "correct_recruitment": false,
+    "stays_in_socket": true,
+    "deformable_not_floppy": false,
+    "muscles_contract": false
+  },
+  "passed": false,
+  "note": "",
+  "config": {
+    "n_particles": 45000,
+    "n_muscle_particles": 2200,
+    "n_grid": 128,
+    "n_frames": null,
+    "dt": 0.003,
+    "contract": 70.0,
+    "drag": 5.0,
+    "muscle_drag": 6.0,
+    "muscle_youngs": 200.0,
+    "k_bone": 9000.0,
+    "stretch_activation": 3.0,
+    "oblique_strength": 1.0,
+    "mus_width": 0.044,
+    "mus_thickness": 0.03,
+    "mus_frac": 0.95,
+    "mus_gap": 0.042,
+    "kp": 0.1,
+    "kd": 0.01,
+    "gain": 1.9,
+    "tonic": 0.14,
+    "tau": 0.02,
+    "k_socket": 5000.0,
+    "k_fat": 4000.0,
+    "preset": "probe"
+  },
+  "substep_dt": 0.00012
+}

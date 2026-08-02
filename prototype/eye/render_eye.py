@@ -28,7 +28,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.animation import FFMpegWriter
-from matplotlib.colors import to_rgb, Normalize
+from matplotlib.colors import to_rgb
 try:                                    # ffmpeg is not on PATH in this container
     import imageio_ffmpeg
     matplotlib.rcParams["animation.ffmpeg_path"] = imageio_ffmpeg.get_ffmpeg_exe()
@@ -151,15 +151,6 @@ def draw_scene(ax, k, cap, view, label, span=0.245, dot=7.0, mdot=3.4):
     o = np.argsort(dep)[::-1]
     ax.scatter(sx[o], sy[o], s=sz[o], c=rgb[o], edgecolors="none", linewidths=0, zorder=3)
 
-    mus_s_vis = cap["mus_s"][vis]
-    for i, m in enumerate(EA.MUSCLES):                     # key at the proximal end
-        sel = par == i
-        if not sel.any():
-            continue
-        j = np.argmin(mus_s_vis[sel])
-        tx, ty = msx[sel][j], msy[sel][j]
-        ax.text(tx, ty, f" {m['key']}", color=m["color"], fontsize=8.5, va="center",
-                alpha=0.55 + 0.45 * float(act[i]), zorder=6)
     _frame(ax, centre, view, span)
     _label(ax, label)
 
@@ -198,14 +189,17 @@ def _style_trace(ax, t, k, xlabel=True):
     if xlabel:
         ax.set_xlabel("sim time", color="0.8", fontsize=8)
     ax.set_facecolor(BG)
-    for sp in ax.spines.values():
-        sp.set_color("0.35")
+    for side in ("top", "right"):                # no bounding box, just the two axes
+        ax.spines[side].set_visible(False)
+    for side in ("left", "bottom"):
+        ax.spines[side].set_color("0.55")
+        ax.spines[side].set_linewidth(0.8)
     ax.tick_params(colors="0.7", labelsize=7)
 
 
 def _muscle_legend(ax):
-    leg = ax.legend(ncol=6, fontsize=7.5, frameon=False, loc="upper center",
-                    handlelength=1.0, columnspacing=1.0, bbox_to_anchor=(0.5, 1.15))
+    leg = ax.legend(ncol=6, fontsize=7.5, frameon=False, loc="lower center",
+                    handlelength=1.0, columnspacing=1.0, borderaxespad=0.3)
     for txt, m in zip(leg.get_texts(), EA.MUSCLES):
         txt.set_color(m["color"])
 
@@ -214,7 +208,7 @@ def draw_act(ax, k, cap, label, dt):
     t = cap["frame"] * dt
     for i, m in enumerate(EA.MUSCLES):
         ax.plot(t, cap["act"][:, i], color=m["color"], lw=1.4, label=m["key"])
-    ax.set_ylim(-0.03, 1.05)
+    ax.set_ylim(-0.22, 1.06)
     ax.set_ylabel("activation", color="0.8", fontsize=8)
     _muscle_legend(ax)
     _style_trace(ax, t, k)
@@ -227,10 +221,30 @@ def draw_length(ax, k, cap, label, dt):
     for i, m in enumerate(EA.MUSCLES):
         ax.plot(t, pct[:, i], color=m["color"], lw=1.4, label=m["key"])
     ax.axhline(100.0, color="0.45", lw=0.8, ls=":")
+    lo = float(np.nanmin(pct))
+    ax.set_ylim(lo - 0.22 * (102.0 - lo), 102.0)
     ax.set_ylabel("length (% of rest)", color="0.8", fontsize=8)
     _muscle_legend(ax)
     _style_trace(ax, t, k)
     _label(ax, label)
+
+
+def tracking_metrics(cap):
+    """How well the eye follows its command: per-axis RMS error, and the same in the settled
+    tail of each hold (which is what a standing error looks like), all in degrees."""
+    g, c, fr = cap["gaze"], cap["target"], cap["frame"]
+    err = g - c
+    rms = np.sqrt((err ** 2).mean(0))
+    change = np.r_[True, np.any(np.diff(c, axis=0) != 0, axis=1)]
+    seg = np.cumsum(change) - 1
+    settled = np.zeros(len(fr), bool)
+    for sgi in np.unique(seg):
+        idx = np.nonzero(seg == sgi)[0]
+        if idx.size >= 4:
+            settled[idx[int(0.6 * idx.size):]] = True
+    st = np.sqrt((err[settled] ** 2).mean(0)) if settled.any() else rms
+    return {"rms_deg": rms, "settled_rms_deg": st,
+            "abs_err_deg": np.abs(err).sum(1) / 3.0}
 
 
 def draw_gaze(ax, k, cap, label, dt):
@@ -239,53 +253,52 @@ def draw_gaze(ax, k, cap, label, dt):
     for i in range(3):
         ax.plot(t, cap["target"][:, i], color=cols[i], lw=1.0, ls="--", alpha=0.5)
         ax.plot(t, cap["gaze"][:, i], color=cols[i], lw=1.7, label=names[i])
+    m = cap.get("_metrics") or tracking_metrics(cap)
+    hi = float(np.nanmax(np.abs(np.concatenate([cap["gaze"], cap["target"]])))) * 1.1 + 1.0
+    # the two control curves: the running tracking error, and its cumulative mean, so the
+    # panel says how well the loop is doing and not just where the eye is
+    ax.plot(t, m["abs_err_deg"] - hi * 0.78, color="#ff8f4d", lw=1.1, alpha=0.9,
+            label="|error|")
+    run = np.cumsum(m["abs_err_deg"]) / np.arange(1, len(t) + 1)
+    ax.plot(t, run - hi * 0.78, color="#ff8f4d", lw=1.0, ls=":", alpha=0.75)
+    ax.axhline(-hi * 0.78, color="0.4", lw=0.6, ls="-")
+    ax.set_ylim(-hi - 0.22 * 2 * hi, hi)
+    ax.text(0.985, 0.965,
+            "rms h/v/t  {:.1f} / {:.1f} / {:.1f}°\nsettled    {:.1f} / {:.1f} / {:.1f}°".format(
+                *m["rms_deg"], *m["settled_rms_deg"]),
+            transform=ax.transAxes, color="0.85", fontsize=7.5, ha="right", va="top",
+            family="monospace")
     ax.set_ylabel("degrees", color="0.8", fontsize=8)
-    leg = ax.legend(ncol=3, fontsize=7.5, frameon=False, loc="upper center",
-                    handlelength=1.0, columnspacing=1.0, bbox_to_anchor=(0.5, 1.15))
-    for txt, cc in zip(leg.get_texts(), cols):
+    leg = ax.legend(ncol=4, fontsize=7.5, frameon=False, loc="lower center",
+                    handlelength=1.0, columnspacing=1.0, borderaxespad=0.3)
+    for txt, cc in zip(leg.get_texts(), cols + ["#ff8f4d"]):
         txt.set_color(cc)
     _style_trace(ax, t, k)
     _label(ax, label)
 
 
 # --------------------------------------------------------------------------- #
-def _figure(ranges=None):
-    """The 2x4 grid. Colour bars live on their OWN axes, created once here: a colorbar made
-    inside the frame loop is a new axes every frame, and a few hundred of those stacked on
-    top of each other is what wrecks the figure."""
+def _figure():
+    """The 2x4 grid. No colour bars: the field panels are read as fields, and a colorbar made
+    inside the frame loop is a new axes on every frame -- a few hundred of those stacked on
+    each other is what wrecked the first version of this figure."""
     fig = plt.figure(figsize=(19.2, 8.6), facecolor=BG)
     gs = fig.add_gridspec(2, 4, wspace=0.06, hspace=0.16,
                           left=0.010, right=0.990, top=0.950, bottom=0.075)
-    axes = [fig.add_subplot(gs[r, c]) for r in range(2) for c in range(4)]
-    if ranges is None:
-        return fig, axes
-    s_hi, v_hi, g_hi = ranges
-    for i, (hi, cmap, lab) in zip((2, 3, 4),
-                                  ((s_hi, "magma", "‖E‖"), (v_hi, "inferno", "σ_vM"),
-                                   (g_hi, "viridis", "|v| grid"))):
-        pos = axes[i].get_position()
-        cax = fig.add_axes([pos.x1 - 0.011, pos.y0 + 0.26 * pos.height,
-                            0.0045, 0.44 * pos.height])
-        sm = plt.cm.ScalarMappable(norm=Normalize(0.0, hi), cmap=cmap)
-        cb = fig.colorbar(sm, cax=cax)
-        cb.ax.tick_params(labelsize=6, colors=FG, length=2, width=0.4, pad=1.5)
-        cb.ax.locator_params(nbins=4)
-        cb.outline.set_edgecolor("0.45"); cb.outline.set_linewidth(0.4)
-        cb.set_label(lab, color=FG, fontsize=7)
-    return fig, axes
+    return fig, [fig.add_subplot(gs[r, c]) for r in range(2) for c in range(4)]
 
 
 def _draw_all(axes, k, cap, dt, s_hi, v_hi, g_hi):
     for a in axes:
         a.clear()
-    draw_scene(axes[0], k, cap, "anterior", "a   anterior view — right eye, six extraocular muscles")
-    draw_scene(axes[1], k, cap, "lateral", "b   lateral view — ovoid globe in the bony cup")
-    draw_field(axes[2], k, cap, "strain", "c   green–lagrange strain ‖E‖", s_hi, "magma")
-    draw_field(axes[3], k, cap, "vm", "d   von mises stress", v_hi, "inferno")
-    draw_grid(axes[4], k, cap, "e   mls-mpm grid momentum — the coupling", g_hi)
-    draw_act(axes[5], k, cap, "f   muscle activation", dt)
-    draw_length(axes[6], k, cap, "g   muscle length — the contraction", dt)
-    draw_gaze(axes[7], k, cap, "h   gaze (solid) vs command (dashed)", dt)
+    draw_scene(axes[0], k, cap, "anterior", "a)  anterior view — right eye, six extraocular muscles")
+    draw_scene(axes[1], k, cap, "lateral", "b)  lateral view — ovoid globe in the bony cup")
+    draw_field(axes[2], k, cap, "strain", "c)  green–lagrange strain ‖E‖", s_hi, "magma")
+    draw_field(axes[3], k, cap, "vm", "d)  von mises stress", v_hi, "inferno")
+    draw_grid(axes[4], k, cap, "e)  mls-mpm grid momentum — the coupling", g_hi)
+    draw_act(axes[5], k, cap, "f)  muscle activation", dt)
+    draw_length(axes[6], k, cap, "g)  muscle length — the contraction", dt)
+    draw_gaze(axes[7], k, cap, "h)  gaze (solid) vs command (dashed), and the tracking error", dt)
 
 
 def render(cap, dt, out_mp4, out_strip, fps=30):
@@ -297,7 +310,7 @@ def render(cap, dt, out_mp4, out_strip, fps=30):
     g_hi = float(np.percentile(gv, 99.0)) if gv.size else 1.0
     n = len(cap["frame"])
 
-    fig, axes = _figure((s_hi, v_hi, g_hi))
+    fig, axes = _figure()
     writer = FFMpegWriter(fps=fps, bitrate=8000,
                           metadata={"title": "zebrafish oculomotor plant (Plexus2)"})
     with writer.saving(fig, out_mp4, dpi=100):
