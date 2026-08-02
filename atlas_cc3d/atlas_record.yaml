@@ -5179,6 +5179,33 @@ mechanisms:
     silently forcing the merge now.
 
 
+    AND NOT A SECOND SIGHTING OF jax-morph `morphogen`. The OTHER standing jax-morph proposal in
+
+    family=fields is `morphogen` (kind=exchange, set=cell, reads secretion_rate/pos/radius/alive,
+
+    writes chemical, maps: pairwise): it MANUFACTURES a concentration field FROM CELL SOURCES by a
+
+    dense all-pairs distance-kernel superposition -- the cells are the sources, the field is the
+
+    product. That is exactly the CC3D SECRETION source term S_f, which the sibling DiffusionSolverFE
+
+    entry already resolved to `deposit`; it is NOT the reaction term this entry is about. `react`
+
+    has no cell sources, no pairwise map, and no set gather at all -- it is a purely local, on-lattice
+
+    field->field kinetics law that reads the co-located values of the OTHER GRID fields at the same
+
+    pixel. So react is neither `morphogen` (cell->field source manufacture) nor `regulate` (internal
+
+    cell gene network): it is the third, field-substrate member of family=fields, separated from BOTH
+
+    jax-morph proposals by set (field, not cell) and by what it reads (co-located grid-field values,
+
+    not cell sources or a cell''s own gene state). This closes the anti-inflation check against BOTH
+
+    standing fields-family proposals, not just regulate.
+
+
     CAVEAT CARRIED FROM INSPECTION. The continuous coupled form and the named-field coupling are
 
     established from the spec xml and the FitzHugh-Nagumo test; the exact DISCRETISATION of R
@@ -5724,7 +5751,7 @@ mechanisms:
       solution of D grad^2 c - k c + S = 0 (a whole-field REPLACE, not an integrable delta)
     maps:
     - grid_bvp
-  status: inspected
+  status: normalized
   module: null
   test: null
   evidence:
@@ -5963,7 +5990,7 @@ mechanisms:
       \ - S_target) -> quadratic Hookean energy lambda_S*(dev)^2 per cell ->\n  summed over the two cells\
       \ a candidate copy touches -> dE that gates the Metropolis accept.\n  At target -> low energy; over-spread/ruffled\
       \ or over-compact -> higher energy (a two-sided\n  restoring membrane / surface tension).\n"
-  status: normalized
+  status: inspected
   module: null
   test: null
   evidence:
@@ -5975,7 +6002,7 @@ mechanisms:
     by: skeptic
     was: new
     claimed: null
-    evidence: the skeptic returned no JSON; refusing to read that as assent
+    evidence: null
     what_would_settle_it: null
 - id: surfacetracker
   order: 28

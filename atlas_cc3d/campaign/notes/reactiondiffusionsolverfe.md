@@ -60,3 +60,13 @@ internal genotype→phenotype decision reading a cell's own state), `react` is s
 character — the same violence test rule 2 uses. If that rebuttal is wrong, the right fix is a single
 set-polymorphic reaction contract, which is why the entry's `why` flags the merge as a deliberate
 ledger-keeper call rather than forcing it silently either way.
+
+**Second fields-family check (added this pass): NOT `morphogen`.** jax-morph's other standing
+fields-family proposal is `morphogen` (kind=exchange, set=cell, maps=pairwise): it manufactures a
+concentration field FROM CELL SOURCES via a dense all-pairs distance kernel — cells are sources, the
+field is product. That is the CC3D secretion term S_f, already resolved to `deposit` in the sibling
+entry, NOT the reaction term. `react` has no cell sources, no pairwise map, no set gather; it reads
+co-located OTHER grid-field values at the same pixel. So `react` is separated from BOTH jax-morph
+fields proposals by set (field, not cell) — from `regulate` by not being an internal cell decision,
+from `morphogen` by not being cell→field source manufacture. The `why` now closes the anti-inflation
+check against both, not just `regulate`.

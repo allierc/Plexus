@@ -233,4 +233,21 @@ disputed:
   was: new
   claimed: null
   evidence: the skeptic returned no JSON; refusing to read that as assent
-  what_would_settle_it: null
+  what_would_settle_it: "The verdict does not turn on the physics (the source is unambiguous: a per-cell\
+    \ quadratic on the\nboundary count, returned as dE into the Metropolis accept, writing nothing). It\
+    \ turns on ONE\ndownstream naming fact this phase will produce: how the sibling Volume (order 30)\
+    \ normalizes.\nSurface, Volume, and Length are the SAME functional object -- lambda*(moment - target)^2\
+    \ on a\nper-cell geometric moment, all contributing dE to the same acceptance test -- differing only\
+    \ in\nWHICH moment they read (0th = site count, 1st = boundary count, 2nd = inertia axis). So:\n \
+    \ - IF the campaign registers a single generic `constrain_moment(cell, order, target, lambda)`\n \
+    \   contract when it normalizes Volume, then membrane_tension is the 1st-moment\n    IMPLEMENTATION\
+    \ of it (implementation_of that contract, NOT standalone `new`), elongate is\n    the 2nd-moment implementation,\
+    \ and the ledger must count the trio ONCE. That is the outcome\n    that would overturn this `new`.\n\
+    \  - IF instead Volume normalizes onto cell_grow's rest-volume machinery (a state update it owns)\n\
+    \    and elongate stands alone as its own contract -- as the current sibling entries have them --\n\
+    \    then the three moments have DISTINCT homes in the language and membrane_tension is `new` as\n\
+    \    recorded, because no promoted contract reads a cell's own boundary count and returns a\n    restoring\
+    \ energy.\nConcretely settling it: read the promoted contract that the normalized Volume entry lands\
+    \ on. If\nit is a moment-generic energy term, revisit membrane_tension AND elongate as implementations\
+    \ of\nit. Until that entry exists the honest verdict is `new` with the constrain_moment lump flagged\
+    \ as\nthe live alternative, not silently assumed away.\n"
