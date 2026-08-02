@@ -269,9 +269,22 @@ def _is_working(job_id, ids, min_frac=0.5):
     not moved in two polls is stuck. No peer group is needed, and none can mislead it.
     """
     import json as _j
-    name = ids.get(job_id) if isinstance(ids, dict) else None
+    # `ids` MUST be a mapping of job id -> run name. It was called with the bare SET of job ids
+    # that wait_for_ids keeps, so this lookup produced None for every job and the guard refused
+    # them all -- five runs at frame ~790 of 900, killed by the guard written to save them. The
+    # first version failed for a different reason (it read a file written only at the end); a
+    # guard that cannot spare anything is worse than no guard, because the kill message claims a
+    # judgement was made.
+    if not isinstance(ids, dict):
+        print(f"[cluster] _is_working needs a job-id -> name MAP, got {type(ids).__name__}. "
+              f"Sparing {job_id}: a straggler test that cannot look up a run must not kill it.",
+              flush=True)
+        return True
+    name = ids.get(job_id)
     if not name:
-        return False
+        print(f"[cluster] no run name for job {job_id} -- sparing it rather than killing on an "
+              f"unresolved id.", flush=True)
+        return True
     try:
         p = os.path.join(LOG_ROOT, name, "progress.json")
         if not os.path.exists(p):
@@ -327,8 +340,12 @@ def wait_for_ids(ids, poll=60, timeout_h=24, straggler_factor=4.0, min_straggler
     t0 = time.time()
     finished_at = {}
     killed = set()
+    id_to_name = {}                 # job id -> run name, filled from the queue on every poll
     while time.time() - t0 < timeout_h * 3600:
-        out = _ssh_retry('bjobs -a -o "JOBID STAT" -noheader 2>/dev/null || true')
+        # JOB_NAME is polled because the straggler test needs to find a job's run directory,
+        # and a set of job ids cannot say which run wrote which heartbeat. Without it
+        # `_is_working` had no name to look up and refused every job it was asked about.
+        out = _ssh_retry('bjobs -a -o "JOBID STAT JOB_NAME" -noheader 2>/dev/null || true')
         if out is None:
             print("  queue unreachable -- waiting, not concluding", flush=True)
         else:
@@ -337,6 +354,9 @@ def wait_for_ids(ids, poll=60, timeout_h=24, straggler_factor=4.0, min_straggler
                 p = line.split()
                 if len(p) >= 2 and p[0] in ids:
                     st[p[0]] = p[1]
+                    if len(p) >= 3:
+                        nm = p[2][len(PREFIX):] if p[2].startswith(PREFIX) else p[2]
+                        id_to_name[p[0]] = nm
             active = [i for i in ids if st.get(i) in ("RUN", "PEND")]
             done = [i for i in ids if st.get(i) == "DONE"]
             bad = [i for i in ids if st.get(i) == "EXIT"]
@@ -373,7 +393,7 @@ def wait_for_ids(ids, poll=60, timeout_h=24, straggler_factor=4.0, min_straggler
                     for i in active:
                         if i in killed:
                             continue
-                        if _is_working(i, ids):
+                        if _is_working(i, id_to_name):
                             continue
                         print(f"[cluster] ⏱ STRAGGLER {i}: {(now - t0) / 60:.0f} min vs median "
                               f"{med / 60:.0f} min for the batch -- killing it. A degenerate "

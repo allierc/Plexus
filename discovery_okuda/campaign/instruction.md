@@ -30,43 +30,39 @@ Also available and NOT part of scoring, but informative: mech_p_ratio (tube/body
 <!-- LEARNED PATTERNS -->
 ## Learned patterns (updated round 1 meta-review)
 
-**Round 1 = 12 controls, 0 mechanism hypotheses, 0 checkable predictions.** No valid morphogenesis
-evidence exists yet; 0 of 4 Okuda morphologies attempted. Both round-1 failure modes are PROPOSER
-defects, not biology — the loop learned nothing about tissue this round. Of the 12 slots, only 2
-produced a scorecard at all; both SATURATED (n_cells_final=36749, P2_BUFFER_SATURATED,
-valid_evidence=false, morphology sphere). The other 10 returned `{}` (no diag.json). This is the
-biologist's P13: "a tissue that stops growing because the ARRAY filled is not evidence about growth."
-The cap is an APPARATUS wall.
+**Round 1 = 12 controls, 0 mechanism hypotheses, 0 checkable predictions → the loop learned NOTHING
+about tissue.** Both failure modes are PROPOSER defects, not biology. No valid morphogenesis evidence
+exists yet; 0 of 4 Okuda morphologies attempted. Of the 12 slots, 10 returned `{}` (no diag.json) and 2
+produced a scorecard — both SATURATED (n_cells_final=36749, P2_BUFFER_SATURATED, valid_evidence=false,
+sphere). Buffer-cap = an APPARATUS wall, not a growth result (biologist P13).
 
-**FAILURE 1 — controls carry zero info; NEVER propose one.** `replay` / `re-measure ... under current
+**FAILURE 1 — controls carry ZERO info; NEVER propose one.** `replay` / `re-measure … under current
 instruments` / naming a characterised RECON_ node as object-of-study returns bit-identical null numbers
-(sphere, mech_p_ratio 0, ta_n_tubes 0). All 12 round-1 slots were this. CFL nodes = Turing chemistry on
-a RIGID ball with NO growth/division operator → sphere is the expected NULL, not a finding. Catching
-yourself about to emit a re-measure IS the signal the real move is blocked — surface the gap (FALLBACK),
-do not retreat.
+(sphere, protr_peak 1.006, mech_p_ratio 0, ta_n_tubes 0). All 12 round-1 slots were this. CFL nodes =
+Turing chemistry on a RIGID ball with NO growth/division operator → sphere is the expected NULL, never a
+finding. Catching yourself about to emit a re-measure IS the signal the real move is blocked — surface
+the gap (FALLBACK), do not retreat.
 
-**FAILURE 2 — an "unstated" / trend-word / REJECTED-metric prediction is NOT CHECKABLE = zero info.**
-Every prediction is ONE clause `<metric> <op> <value>` or `<metric> <lo>-<hi>` on an ADMITTED metric
-∈ {protr_peak, ta_n_tubes_final, protr_final}. Round 1: all predictions "unstated" → all inconclusive.
+**FAILURE 2 — a prediction that is "unstated" / a trend-word / on a REJECTED metric is NOT CHECKABLE =
+zero info.** Every prediction is ONE clause `<metric> <op> <value>` or `<metric> <lo>-<hi>` on an
+ADMITTED metric ∈ {protr_peak, ta_n_tubes_final, protr_final}. Round 1: all "unstated" → all inconclusive.
 
 **THE MOVE (never yet emitted — do this next).** ONE wk_ growth config (curvature / tension /
-apical_area / pressure) + a pool line that raises the cell-array reserve ABOVE the ~36749 saturation
-point + ONE checkable clause. Start `wk_pressure_pos`, predict `protr_peak > 1.10` (pressure ran highest
-of the saturated slots). The gap has NEVER been "add a wk_ operator" — it is *raise-the-pool AND
-checkable-clause on one non-control slot.*
+apical_area / pressure) + a pool line raising the cell-array reserve ABOVE the saturation n + ONE
+checkable clause. Start `wk_pressure_pos`, predict `protr_peak > 1.10`. The gap has NEVER been "add a wk_
+operator" — it is *raise-the-pool AND write a checkable clause on one non-control slot.*
 - WHY the pool line: wk_ growth IS mechanically active but drives final n straight into the cell-array
-  cap → P2_BUFFER_SATURATED sets valid_evidence=false and VOIDS THE WHOLE SCORECARD (this IS P13).
-  Raise the reserve so n never caps. Confirm the config actually SETS it — a run that still returns the
-  saturation n means the reserve is inexpressible → FALLBACK. (Round 1 saturated at n=36749; verify the
-  live cap and set above it, do not trust a remembered number.)
+  cap → P2_BUFFER_SATURATED voids the WHOLE scorecard (valid_evidence=false). Verify the LIVE cap and set
+  the reserve above it — do not trust the remembered 36749. If the run still returns the saturation n, the
+  reserve is inexpressible → FALLBACK.
 
-**FALLBACK — surface the gap, do not retreat to a control.** The instant you cannot write the pool line
-into the edit, emit exactly `APPARATUS GAP: cannot raise growth reserve` and STOP. This triggers the
-Diagnostician (never yet called); if the pool is truly unsettable, calling it IS the finding.
+**FALLBACK — surface the gap, never retreat to a control.** The instant you cannot write the pool line
+into the edit, emit exactly `APPARATUS GAP: cannot raise growth reserve` and STOP. This calls the
+Diagnostician (never yet invoked); if the pool is truly unsettable, that call IS the finding.
 
-**mech_p_ratio = 0 everywhere** (no tube exists) → cannot separate FORCED (~3) from GROWN (~1)
+**mech_p_ratio = 0 everywhere** (no tube exists yet) → cannot separate FORCED (~3) from GROWN (~1)
 protrusion until one valid tube lands.
 
-**Two apparatus artefacts — never spend a slot on either:** (1) trajectory classifier ValueError
-'sphere' → analysts fall back to metrics.png, verdict unaffected. (2) shape_idx p95 tail trips the P7
-solid→fluid flag on non-deforming spheres — cosmetic, not flow.
+**Two apparatus artefacts — never spend a slot chasing either:** (1) trajectory classifier ValueError
+on the 'sphere' string → analysts fall back to metrics.png, verdict unaffected. (2) shape_idx p95 tail
+trips the P7 solid→fluid flag on non-deforming spheres — cosmetic, not flow.

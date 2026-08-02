@@ -1,7 +1,7 @@
 {
- "round": 1,
+ "round": 2,
  "spent": 0,
- "dry": 0,
+ "dry": 1,
  "best": null,
  "stage_gate": 2,
  "prox": {
@@ -9,5 +9,5 @@
   "centroids": [],
   "clusters": {}
  },
- "t": 1785690187.9725718
+ "t": 1785693611.0958602
 }
