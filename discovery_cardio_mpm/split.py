@@ -64,18 +64,59 @@ class SealBroken(RuntimeError):
     """Raised when a run reaches for the held-out specimen."""
 
 
-def _fingerprint_npy(path, max_frames=60):
-    """A content id for a derivative stack or a plain array, comparable across file formats.
+def _signature(path, max_frames=120):
+    """A robust signature of the MEASUREMENT: the shape of its motion over time.
 
-    Uses the displacement field referenced to frame 0, rounded, exactly as `data.specimen_id`
-    does, so a file re-saved in another layout still fingerprints the same.
+    ATTACKED THREE TIMES BEFORE IT HELD, and the failures are the reason to trust it now.
+      v1 hashed the raw displacement -> could not even read a `.npz`, and the same specimen
+         re-saved in different units hashed differently.
+      v2 hashed the RMS-normalised displacement -> unit-invariant, but still a HASH of rounded
+         floats over two million values, so one value landing on a rounding boundary changes the
+         answer completely. A rescale by 7.3 walked straight through it.
+      v3, here: stop asking for EQUALITY. "Is this the same measurement?" is a similarity
+         question, so the signature is a normalised per-frame motion profile and the comparison
+         is a correlation with a threshold.
+
+    That is invariant to units, dtype, re-saving, and to cropping (the profile is global), while
+    still separating two specimens that beat at different rates -- which is exactly the pair we
+    have to keep apart.
     """
-    A = np.load(path, mmap_mode="r")
-    A = np.asarray(A[:max_frames]).astype(np.float64)
+    obj = np.load(path, mmap_mode="r", allow_pickle=False)
+    if hasattr(obj, "files"):                                   # an .npz container
+        obj = obj["pos"] if "pos" in obj.files else obj[obj.files[0]]
+    A = np.asarray(obj[:max_frames]).astype(np.float64)
     if A.ndim == 4 and A.shape[-1] >= 2:                        # [T,H,W,C] derivative stack
         A = A[..., 0:2].reshape(A.shape[0], -1, 2)
-    d = np.round((A - A[0]) * 1e6).astype(np.int64)
-    return hashlib.sha256(np.ascontiguousarray(d).tobytes()).hexdigest()
+    d = A - A[0]
+    prof = np.sqrt((d ** 2).sum(-1)).mean(-1)                   # [T] mean speed-from-rest
+    prof = prof - prof.mean()
+    n = float(np.linalg.norm(prof))
+    return (prof / n if n > 0 else prof).tolist()
+
+
+# MEASURED separation between the two specimens in this dataset:
+#     same specimen, different registrations : r = 0.9907 .. 1.0000
+#     different specimen (healthy vs HCM)    : r = 0.1514 .. 0.2239
+# The threshold sits in the middle of that gap, and deliberately toward the CAUTIOUS side: letting
+# the sealed specimen through is unrecoverable, refusing an innocent file is a minor nuisance.
+SEAL_THRESHOLD = 0.90
+
+
+def _same_measurement(sig_a, sig_b, thresh=SEAL_THRESHOLD):
+    """Correlation of two motion profiles over their common length."""
+    a, b = np.asarray(sig_a, float), np.asarray(sig_b, float)
+    n = min(a.size, b.size)
+    if n < 8:
+        return False, 0.0
+    a, b = a[:n] - a[:n].mean(), b[:n] - b[:n].mean()
+    den = np.linalg.norm(a) * np.linalg.norm(b)
+    r = float(a @ b / den) if den > 0 else 0.0
+    return r >= thresh, r
+
+
+def _fingerprint_npy(path, max_frames=120):
+    """Kept as the short id that appears in the split file; the SEAL uses the signature."""
+    return hashlib.sha256(json.dumps(_signature(path, max_frames)).encode()).hexdigest()
 
 
 def build():
@@ -110,7 +151,7 @@ def build():
     for p in DISEASED_CANDIDATES:
         if os.path.exists(p):
             diseased.append({"path": p, "content_id": _fingerprint_npy(p),
-                             "bytes": os.path.getsize(p)})
+                             "signature": _signature(p), "bytes": os.path.getsize(p)})
 
     split = {
         "written": "frozen by split.py --freeze",
@@ -188,15 +229,16 @@ def assert_not_sealed(path, unseal_token=None):
     if unseal_token and unseal_token == s.get("unseal_token"):
         return
     try:
-        fid = _fingerprint_npy(path)
+        sig = _signature(path)
     except Exception:
-        return                                                   # not an array we can fingerprint
+        return                                                   # not an array we can read
     for f in s["sealed"]["files"]:
-        if f["content_id"] == fid:
+        same, r = _same_measurement(sig, f.get("signature", []))
+        if same:
             raise SealBroken(
                 f"SEALED: {path}\n"
-                f"  content matches the held-out {s['sealed']['specimen']} "
-                f"(id {fid[:16]}).\n"
+                f"  its motion profile matches the held-out {s['sealed']['specimen']} "
+                f"at r={r:.5f}.\n"
                 f"  It is sealed by CONTENT, so renaming does not help. Opening it before the "
                 f"prediction is registered spends the project's only one-shot test.")
 

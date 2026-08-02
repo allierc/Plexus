@@ -53,7 +53,7 @@
   {
    "check": "a run archives its own source and hashes its inputs",
    "pass": true,
-   "detail": "5 source files archived"
+   "detail": "6 source files archived"
   },
   {
    "check": "no retired conclusion is compiled into the source",
@@ -74,21 +74,6 @@
    "check": "the belief register is EMPTY",
    "pass": true,
    "detail": "0 entries"
-  },
-  {
-   "check": "a short fit runs end to end",
-   "pass": true,
-   "detail": "2 runs on cpu"
-  },
-  {
-   "check": "two fits at one seed are bit-identical (cpu)",
-   "pass": true,
-   "detail": "198407 params, max|d|=0.000e+00"
-  },
-  {
-   "check": "GPU same-seed spread measured and recorded",
-   "pass": true,
-   "detail": "max|d|=3.02e-06 (rel 7.5e-08) over 3 runs -- NOT bit-identical"
   }
  ],
  "pass": true

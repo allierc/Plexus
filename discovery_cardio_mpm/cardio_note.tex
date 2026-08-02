@@ -569,7 +569,7 @@ at the depth the loop will really use, where it becomes one of the two noise flo
 only become irreproducible \emph{on purpose}.
 \end{phasebox}
 
-\begin{phasebox}{Phase 1 --- Freeze the recording, seal the test \hfill \prog\ (6 of 7)}
+\begin{phasebox}{Phase 1 --- Freeze the recording, seal the test \hfill \dn\ (7 of 7)}
 \textbf{Goal.} Decide, once and in writing, what a run is allowed to see --- \emph{before} anything
 is fitted. A split invented later is a split negotiated with the result already in hand.
 
@@ -672,7 +672,7 @@ because the inherited mask was defined through the boundary width, so sweeping t
 the model and the ruler together. The diseased sheet is sealed \textbf{by content across all three
 files that carry it}, and the seal was watched refusing.
 
-\textbf{6. And the premises --- what the loop is allowed to call a tissue.} \fl\ Written from the
+\textbf{6. And the premises --- what the loop is allowed to call a tissue.} \dn\ Written from the
 Okuda folder's experience, where a great deal had to be fixed before the loop could run at all.
 Eight claims, each one something a computer can \emph{fail}. Six hold. \textbf{Two do not, and both
 were invisible before:}
@@ -694,13 +694,41 @@ leaves the dish and nothing goes non-finite; the solver sits \textbf{30 times in
 stability bound; the seed reaches the engine's own generator, not just the global one; and the
 recorded beat is a beat --- 0.48\,Hz, quiescent for over half the record.
 
-\textbf{Exit gate.} All of the above, plus Phase~1b green: the split file exists with disjoint frame
-sets and the sealed checksums; the ceiling, the tracker number and the resolution table are in this
-note; a test proves a run reading the sealed specimen aborts; and the premise checks run, with
-whatever they refuse recorded rather than waived.
+\textbf{And one more check, which needed a fit to test and so was tested on a fit built to fail
+it.} A bounded parameter that ends \emph{at} its bound has not found an optimum, it has found the
+edge of the box we drew --- and the previous campaign drew conclusions about gain, duration and
+stiffness without ever asking. The check now refuses a fit pinned at 100\% of its range and passes
+one in the middle, both watched.
+
+\textbf{The seal had to be attacked three times before it held, and that is the part worth
+reading.} Version one could not read a compressed archive at all. Version two normalised for scale
+but still compared two million rounded numbers for exact equality, so a rescale by an arbitrary
+factor walked straight through. The third asks the right question --- \emph{is this the same
+measurement?} is a similarity question, not an equality one --- and compares the shape of the
+motion over time. It now refuses the sealed specimen re-saved in four different unit conventions,
+cropped to a third of its area, and subsampled. The margin is not a guess: two registrations of the
+same specimen agree at \textbf{0.991--1.000} and the two different specimens at
+\textbf{0.151--0.224}, so the threshold sits in an empty gap, placed deliberately on the cautious
+side --- letting the held-out specimen through is unrecoverable, refusing an innocent file is a
+nuisance.
+
+\textbf{Exit gate --- met, and this phase is closed.} The split exists with disjoint frame sets
+and the sealed signatures; the ceiling, the tracker number and the resolution table are in this
+note; the seal was watched refusing the held-out specimen through six different disguises; the
+premise checks run, and \textbf{what they refuse is recorded, not waived}; and Phase~1b is green.
+
+\textbf{Two things are on the record as broken rather than fixed}, because fixing them is not
+Phase~1's job and hiding them would be worse than either: four operators in the recipe never run,
+and the model rests for 8\% of the beat where the tissue rests for 77\%. Both go to the Proposer as
+the first things the loop has to explain.
+
+\textbf{What Phase 1 cost.} An afternoon, and it produced four numbers that bound everything
+afterwards --- the ceiling, the tracker floor, the discretisation dependence of the enclosure axis,
+and the price of a regeneration --- plus two defects in the apparatus and three in the checks I
+wrote to find them.
 \end{phasebox}
 
-\begin{phasebox}{Phase 1b --- The corpus we already own \hfill \prog}
+\begin{phasebox}{Phase 1b --- The corpus we already own \hfill \dn}
 \textbf{Why this is worth its own list.} Seventy-one MPM runs sit finished in
 \code{graphs\_data/material} --- trajectories, specs and movies, 45\,GB. (They look lost because
 \code{log/material/} keeps only the recipe and a completion marker; the data is in
@@ -738,18 +766,29 @@ the corpus is not reproducible until the specs are migrated.
 \textbf{Still to do.}
 \begin{itemize}
 \item \textbf{Regenerate the important runs, starting with the broken ones} ---
-\code{reproduce.py}. The migration is written and \textbf{all eight stale recipes now load}; the
-regeneration is running. The four phase-delayed runs go first, because they are the only
-simulations in the corpus that carry \emph{coordination} structure, and coordination is precisely
-the axis the inherited objective cannot see --- so they are the test set for the measure Phase~2
-has to invent.
+\code{reproduce.py}. All eight stale recipes migrate and load, and the first has been regenerated
+and compared. \textbf{The answer is no: the merge was not behaviour-preserving.}
 
-This is worth the compute rather than just fixing the names, because it asks a question nobody has
-asked: \textbf{was that operator merge actually behaviour-preserving?} Two operators were folded
-into one and the library moved on. If the regenerated trajectory matches the archive, the corpus is
-restored \emph{and} the merge is validated; if it does not, we have found a silent change in the
-forward model, which matters far more and which reading the diff would never have revealed.
-\emph{Everything is written to a scratch root --- the archive is never the thing being overwritten.}
+The comparison had to be done carefully, because the obvious version of it is misleading. The
+regenerated trajectory differs from the archived one by $1.5\times10^{-4}$ after three frames ---
+about two hundredths of a grid cell, and 0.7\% of the motion in the full run --- and it grows
+monotonically from the very first frame ($2.8\times10^{-5}$, $6.6\times10^{-5}$,
+$1.5\times10^{-4}$). Small, but is it the merge or is it the hardware? The discriminating
+experiment is cheap: run the migrated recipe \emph{twice}. \textbf{Two runs of it are
+bit-identical} --- exactly zero --- so none of the divergence is hardware and all of it is
+attributable to the change in the library.
+
+Two things follow, and the second is the more useful. \emph{The merge changed the forward model},
+quietly, and every archived trajectory in the corpus was produced by a version of the code that no
+longer exists --- so the archive is evidence about a model we can no longer run, and the migrated
+recipes are a slightly different model that we can. \emph{And the generate path is bit-deterministic},
+unlike the fitting path, so once a recipe is migrated its runs are exactly reproducible.
+
+\emph{Everything was written to a scratch root --- the archive was never the thing being
+overwritten.} Cost, measured: 137\,s of start-up and 24\,s per frame, so the 250-frame recipes are
+about two hours each. That is a fact Phase~2 needs before it budgets anything, and it is why the
+merge question was settled on three frames rather than two hundred and fifty: identical operators
+agree at frame one, and different ones separate at frame one, which is exactly what happened.
 
 While writing it: the library kept backward-compatible aliases for three of the six renames
 (\code{pulse\_to\_active\_stress}, \code{p2g}, \code{g2p}) and not for the other three

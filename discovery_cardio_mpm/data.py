@@ -51,9 +51,20 @@ class DataRefusal(RuntimeError):
     """Raised instead of guessing. Carries the path it wanted."""
 
 
-def open_npz(path=None, expect_sha256=None):
-    """Open the recording. Raises DataRefusal rather than searching or falling back."""
+def open_npz(path=None, expect_sha256=None, unseal_token=None):
+    """Open the recording. Raises DataRefusal rather than searching or falling back.
+
+    Also refuses the SEALED specimen. The seal lives in `split.py` and is by CONTENT, so this
+    check cannot be evaded by renaming a file. It is enforced HERE, at the single door every run
+    goes through, rather than left to each caller to remember -- a check that has to be remembered
+    is a check that will one day be forgotten, and this one can only be spent once.
+    """
     p = os.path.abspath(path or DEFAULT_NPZ)
+    try:
+        import split as _split                        # imported late: split.py imports this module
+        _split.assert_not_sealed(p, unseal_token)
+    except ImportError:                               # pragma: no cover - split not present yet
+        pass
     if not os.path.exists(p):
         raise DataRefusal(
             f"recording not found: {p}\n"

@@ -238,6 +238,33 @@ def probe_forward(V, device="cpu", timeout=3600):
     return outs
 
 
+def canary_rail(V):
+    """Watch the rail check FAIL, on a checkpoint built to sit on its bound.
+
+    The check exists because the previous campaign drew conclusions about gain, duration and
+    stiffness without ever asking whether the optimiser had simply stopped at the edge of the box
+    we drew. A check nobody has seen refuse is a check nobody should trust -- so it is shown
+    refusing here, on a fit we constructed to be a rail, and passing on one we did not.
+    """
+    import tempfile
+    import torch
+    ok = True
+    for label, raw, want_rail in (("a fit pinned to its upper bound", 12.0, True),
+                                  ("a fit in the middle of its range", 0.0, False)):
+        d = tempfile.mkdtemp(prefix="canary_rail_")
+        os.makedirs(os.path.join(d, "checkpoints"))
+        torch.save({"raw_g": torch.tensor(raw), "raw_dur": torch.tensor(0.0)},
+                   os.path.join(d, "checkpoints", "model_00000.pt"))
+        json.dump({"gain_lo": 0.1, "gain_hi": 2.5, "dur_hi": 14.0},
+                  open(os.path.join(d, "config.json"), "w"))
+        probe = Verdicts()
+        p2_no_parameter_on_its_bound(probe, d)
+        fired = not probe.rows[-1]["pass"]
+        ok = V.add(f"canary: rail check refuses {label}", CERTAIN, fired == want_rail,
+                   probe.rows[-1]["detail"]) and ok
+    return ok
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
     ap.add_argument("--static", action="store_true")
@@ -252,6 +279,7 @@ def main(argv=None):
     p3_every_operator_acts(V)
     p6_seed_reaches_the_engine(V)
     p8_the_beat_is_a_beat(V)
+    canary_rail(V)
     if a.run:
         p2_no_parameter_on_its_bound(V, a.run)
     if a.probe:
