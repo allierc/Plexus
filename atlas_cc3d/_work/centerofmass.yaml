@@ -1,0 +1,104 @@
+id: centerofmass
+order: 6
+raw_name: CenterOfMass
+raw_kind: Plugin (CenterOfMassPlugin)
+code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L3056
+paper_section: |
+  Swat et al. (2012) Methods Cell Biol 110:325-366. NO dedicated section: CenterOfMass is
+  plumbing, not a named mechanism in the chapter; the paper only invokes a cell's centre of
+  mass indirectly, via COM-based chemotaxis and the "CenterOfMassBased" external-potential
+  algorithm. We have no extracted paper text for this target, so the only anchors I could
+  actually check are in the source: the class docstring at PyCoreSpecs.py:3056 and the
+  autoclass stub at doc/code_ref/user/build/core/PyCoreSpecs.rst:169.
+summary: |
+  A per-cell lattice monitor (a CellGChangeWatcher), NOT an energy term. It maintains each
+  cell's centre of mass. It has no dynamics of its own and contributes nothing to the Potts
+  Hamiltonian: it never changes the probability that a proposed pixel copy is accepted. On
+  every accepted spin-flip it updates, for the gaining and losing cell, the accumulated first
+  moment of the cell's lattice sites and divides by the live site count (volume) to store the
+  centre of mass on the CellG struct. Its whole purpose is to publish derived state that OTHER
+  mechanisms read (COM-based chemotaxis, CenterOfMassBased external potential, mitosis split
+  orientation, connectivity).
+equations: |
+  A cell is a set S of lattice sites r = (x, y, z) sharing one cell id; volume V = |S| is the
+  site count. The plugin maintains two distinct fields per cell (both live on CellG):
+
+    first moment (raw coordinate sum):   xCM = sum over r in S of x   (likewise yCM, zCM)
+    centre of mass (normalized):         xCOM = xCM / V               (likewise yCOM, zCOM)
+
+  These are updated INCREMENTALLY, not recomputed. When an accepted copy adds site r to a cell
+  and removes it from its neighbour, the watcher does, per affected cell:
+
+    add a site r:     xCM += x ;  V += 1 ;  then  xCOM = xCM / V
+    remove a site r:  xCM -= x ;  V -= 1 ;  then  xCOM = xCM / V   (guard V == 0)
+
+  A third field, xCOMPrev/yCOMPrev/zCOMPrev, holds the centre of mass from the previous update
+  so that consumers can form a per-MCS cell displacement d = COM - COMPrev (cell velocity).
+
+  Symbols: xCM = code field CellG.xCM (first moment); xCOM = code field CellG.xCOM (= moment /
+  volume). The two names are NOT interchangeable.
+
+  Periodic-boundary caveat: for a cell straddling a wrap seam the naive coordinate sum is
+  wrong; the core unwraps coordinates against the BoundaryStrategy before accumulating, then
+  re-wraps xCOM back into [0, L). That correction lives in the compiled C++ core (see
+  surprises); I could NOT read its exact form, so the formulae above are the ordinary
+  (non-periodic) case as the data model implies it, not a transcription of the wrap arithmetic.
+params: {}
+state_io:
+  reads: |
+    - the location r = (x, y, z) of the pixel whose id changed on the accepted copy
+    - the affected cells' current volume V (site count) and current xCM/yCM/zCM
+    (No CC3DML parameters: the plugin is parameterless. It emits only
+    <Plugin Name="CenterOfMass"/> with no child elements or attributes.)
+  writes: |
+    - CellG.xCM, yCM, zCM  -- first moments (accumulated coordinate sums)
+    - CellG.xCOM, yCOM, zCOM  -- centre of mass ( = moment / volume )
+    - CellG.xCOMPrev, yCOMPrev, zCOMPrev  -- previous-update centre of mass (for displacement)
+    Writes NO energy / acceptance delta -- it is a pure state-derivation monitor.
+    Does NOT write the inertia tensor iXX..iZZ; that is the separate MomentOfInertia plugin
+    (PyCoreSpecs.py:5350). From Python these COM fields are READ-ONLY: the SWIG setters
+    (CompuCell.py:595-628) raise AttributeError on assignment.
+surprises:
+  - |
+    Not a Hamiltonian term. Almost every CC3D plugin in this inventory is an energy contribution
+    that only tilts the acceptance probability. CenterOfMass returns no delta-E and never
+    influences which pixel copies are accepted; it is a CellGChangeWatcher that only derives
+    per-cell bookkeeping. A reimplementer expecting an energy contract will find none -- in the
+    Plexus algebra this reads more like a REDUCE over a set (moment, then divide) that publishes
+    a derived field, not an operator that returns a force/energy delta.
+  - |
+    Two different fields, easy to conflate: xCM (raw first moment = coordinate sum) versus xCOM
+    (= xCM / volume). The moment must be carried incrementally; dividing a stored sum by a stale
+    volume gives the wrong COM. xCOM is derived and read-only.
+  - |
+    Periodic-boundary correction. For a cell that straddles a periodic seam a plain coordinate
+    sum places the COM in the middle of the lattice instead of at the cell. CC3D unwraps
+    coordinates against the BoundaryStrategy before summing and re-wraps xCOM into the lattice.
+    This is the single subtlety most likely to be gotten wrong, and it lives in the unshipped
+    compiled core -- I could not read the exact arithmetic, only infer that it happens.
+  - |
+    Unguarded prerequisite. The Python spec makes CenterOfMass depend only on
+    [PottsCore, CellTypePlugin] (the base depends_on, PyCoreSpecs.py:305) and NOTHING in the
+    spec framework declares a depends_on CenterOfMass. Yet COM-based Chemotaxis and the
+    "CenterOfMassBased" ExternalPotential algorithm (PyCoreSpecs.py:2939) silently READ xCOM.
+    Omitting this plugin passes spec validation but yields zero/stale COM at runtime.
+  - |
+    xCOMPrev means the tracker also underwrites cell velocity: displacement per MCS is
+    COM - COMPrev. There is no separate "velocity" mechanism; that state is a side effect of
+    this plugin keeping a one-step history.
+  - |
+    Division-by-zero guard: when a cell loses its final pixel V hits 0 and the cell is slated
+    for removal; the xCOM = xCM / V step must be guarded or skipped for that cell.
+verdict: null
+of: null
+implementation_of: null
+why: null
+contract: null
+status: inspected
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

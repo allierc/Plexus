@@ -1,0 +1,75 @@
+id: lengthconstraint
+order: 18
+raw_name: LengthConstraint
+raw_kind: Plugin (LengthConstraintPlugin)
+code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L3924
+paper_section: |
+  Swat et al. (2012) Methods Cell Biol 110:325-366, sec. "Cell Length / Elongation
+  constraint". No extracted paper text available; the checkable anchors are the compiled
+  plugin's symbol table (libCC3DLengthConstraint.so) and the CC3DML-generator description at
+  twedit5/Plugins/CC3DMLGenerator/CC3DMLGeneratorBase.py:L340-346.
+summary: |
+  An energy term (Cellular-Potts plugin), not a state update. It penalises the deviation of a
+  cell's ELONGATION (the length of its equivalent-ellipse major axis, derived from the cell's
+  moments of inertia about its centre of mass) from a per-cell-type target length, so that a
+  proposed pixel copy that stretches a cell toward its target length is favoured and one that
+  over/under-stretches it is opposed. In 3D (or when MinorTargetLength is set) the minor axis is
+  independently constrained to a second target. Combined with a Volume constraint it drives cells
+  into elongated / rod shapes. The plugin returns a delta energy for the acceptance test; it
+  writes no cell field.
+equations: |
+  Metropolis acceptance (Potts core, unchanged by this plugin):
+    P(accept copy) = 1 if dE <= 0 else exp(-dE / T)
+  This plugin contributes to dE only. For a cell whose current major-axis length is L and target
+  L0, with stiffness lambda_L (symbol spring_energy(d,d,d) in the .so; toString/getTargetLength/
+  getLambdaLength accessors), the length-constraint energy is a quadratic (Hookean) spring:
+    E_length(cell) = lambda_L * (L - L0)^2
+  and, when a minor target l0 is set (3D):
+    E_length(cell) = lambda_L * (L - L0)^2  +  lambda_L * (l - l0)^2
+  where L (and l) is the length of the semi-major (semi-minor) axis of the ellipse/ellipsoid with
+  the SAME moments of inertia as the cell's pixel set about its centre of mass. The plugin
+  computes dE = E_after - E_before over the two cells touched by the candidate pixel copy, using
+  the incremental change in the inertia tensor from adding/removing that one pixel.
+  CAVEAT: the exact eigenvalue->length conversion (how L is read off the inertia-tensor
+  eigenvalues) lives in the compiled core; no C++/paper source was available here, so the
+  quadratic FORM above is confirmed (spring_energy symbol + generator text) but the length
+  formula itself is inferred, not read.
+params:
+  cell_type:
+    role: "target_selector: name of the cell type this constraint applies to (validated against CellTypePlugin)"
+  target_length:
+    role: "target_length: rest length L0 of the cell's MAJOR axis (equivalent-ellipse), in lattice units"
+  lambda_length:
+    role: "constraint_stiffness: coefficient lambda_L of the quadratic length-deviation penalty (spring constant)"
+  minor_target_length:
+    role: "target_length_minor: rest length l0 of the MINOR axis; Optional. Per the CC3DML generator this is intended for/emitted only in 3D simulations (CC3DMLGeneratorBase.py:L376-377); None => minor axis unconstrained"
+state_io:
+  reads:
+    - "cell pixel set (volume) and its moments of inertia about the centre of mass (requires the CenterOfMass plugin; present in every LengthConstraint test XML)"
+    - "the candidate pixel copy (source/target Point3D and the two involved Cell*), to compute the incremental inertia-tensor change"
+    - "per-cell LengthConstraintData extra member (targetLength, lambdaLength, minorTargetLength) OR the per-cell-type defaults; local-flex values can be set at runtime via setLengthConstraintData(cell, lambda, target[, minor])"
+    - "lattice dimensionality/orientation, to dispatch changeEnergy_xy / _xz / _yz / _3D"
+  writes:
+    - "none from changeEnergy: this is an energy term, it only returns dE and changes the acceptance probability, it does not write any cell field"
+    - "(out of band) a steppable may WRITE the per-cell LengthConstraintData via setLengthConstraintData; that is host-driven state, not part of the energy evaluation"
+surprises:
+  - "This is an ENERGY term, not an update: changeEnergy returns a delta and mutates nothing. Forcing it into read/write update language misrepresents it."
+  - "It depends on the CenterOfMass plugin (moments of inertia). Length is a DERIVED quantity from the inertia tensor, not a stored field; without CenterOfMass the length is undefined."
+  - "The .so exports _get_non_nan_energy(double): there is an explicit NaN guard on the energy. Degenerate cells (single pixel, zero/undefined inertia) give a NaN length; a naive reimplementation that skips this guard will inject NaN into dE and corrupt the acceptance test."
+  - "Dispatch by lattice geometry: separate changeEnergy_xy / changeEnergy_xz / changeEnergy_yz / changeEnergy_3D functions are selected by which plane a 2D lattice lies in (or 3D). A reimplementer assuming a single formula misses that the length is measured in the active plane."
+  - "MinorTargetLength is documented as a 3D (minor-axis) parameter (generator emits it only when sim_3d_flag), but the Python spec and the C++ setter accept it in 2D too. The Python API is more permissive than the intended physics."
+  - "Fragmentation guard is external, not built in: the CC3DML generator warns 'to prevent cell fragmentation for large elongations you need to also use connectivity constraint' (CC3DMLGeneratorBase.py:L345). LengthConstraint alone can tear a cell apart; correctness depends on co-running Connectivity/ConnectivityGlobal (present in the elongationFlex test XML)."
+  - "Two parameter scopes: values can be per-cell-type (LengthEnergyParameters via the plugin) OR per-cell (LengthConstraintData extra member set from Python). setLengthConstraintData signature is (cell, lambdaLength, targetLength[, minor]) -- lambda FIRST, target SECOND, which is the reverse of the constructor's (target_length, lambda_length) order (see PyCoreSpecs.py:L3853 vs the steppable call in elongationFlexSteppables.py:L12). Easy to transpose."
+verdict: null
+of: null
+implementation_of: null
+why: null
+contract: null
+status: inspected
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

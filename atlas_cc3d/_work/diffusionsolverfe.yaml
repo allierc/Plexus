@@ -1,0 +1,133 @@
+id: diffusionsolverfe
+order: 14
+raw_name: DiffusionSolverFE
+raw_kind: Steppable (DiffusionSolverFE)
+code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L6242
+paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366, sec. "PDE Solvers" (DiffusionSolverFE).
+
+  Checkable in-tree anchor for the algorithm: cc3d/twedit5/Plugins/CC3DProject/diffusion_solvers_descr.py:7
+
+  ("Uses Forward Euler method and handles moving boundary conditions. May be slow for large
+
+  diffusion constants."); FTCS stability limits at CC3DXMLGenerator.py:884.
+
+  '
+summary: 'A steppable that advances one or more scalar concentration FIELDS defined over the CPM
+
+  pixel lattice by one explicit forward-Euler (FTCS) step per Monte Carlo Step: reaction-
+
+  diffusion-decay with a secretion source, cell-type-dependent coefficients, and per-face
+
+  boundary conditions. It is a genuine field->field WRITE (unlike the energy-term plugins in
+
+  this atlas): it overwrites the concentration grid c in place. The physics lives in the
+
+  compiled core; PyCoreSpecs.py only declares the CC3DML the solver reads.
+
+  '
+equations: "Per site i and field, one step (transcribed from the OpenCL uniDiff kernel L954-L1054;\nDeltaX\
+  \ = DeltaT = 1 by default). NN(i) is the diffusion neighbourhood (N sites, set by the\nfield NeighborOrder);\
+  \ D_i, lambda_i are the coefficients of the cell type occupying i.\n\n  isoSum_i  = D_i * ( SUM_{j in\
+  \ NN(i)} c_j^t  -  N * c_i^t ) / 2\n  varSum_i  = ( SUM_{j in NN(i)} D_j * ( c_j^t - c_i^t ) ) / 2\n\
+  \  c_i^{t+1} = (dt / dx^2) * ( isoSum_i + varSum_i )  +  ( 1 - dt*lambda_i ) * c_i^t   + S_i\n\nThe\
+  \ TWO half-sums (centre-cell D_i, plus each neighbour's own D_j, each /2) are a symmetric\naverage of\
+  \ the face flux -- the variable-diffusion scheme, needed when D differs across a\nface. For UNIFORM\
+  \ D they recombine exactly to the plain discrete Laplacian:\n  isoSum + varSum = D * ( SUM_j c_j - N\
+  \ c_i )\nso  c_i^{t+1} = c_i + (dt/dx^2) D grad^2_discrete c - dt*lambda*c + S = explicit FE for\ndc/dt\
+  \ = D grad^2 c - lambda c + S.\n\nSymbols:\n  c_i        concentration at pixel i (a field value, not\
+  \ cell state)\n  NN(i)/N    diffusion-neighbour pixels and their count (von Neumann-style; 1st shell\
+  \ = 4 in 2D,\n             6 in 3D; widened by the field NeighborOrder)\n  D_i        diffusion coefficient\
+  \ at i = diff_types[type(cell at i)] if set, else diff_global\n  lambda_i   decay coefficient at i \
+  \   = decay_types[type(cell at i)] if set, else decay_global\n  S_i        secretion (SEPARATE sweep,\
+  \ order-dependent): for a cell of type t occupying i, add\n             value (mode Secretion, optional\
+  \ relative/max uptake sink), or CLAMP c_i := value\n             (mode ConstantConcentration / Dirichlet,\
+  \ re-pinned each step), or add only when a\n             neighbour site holds a different cell id of\
+  \ a named type (SecretionOnContact)\nThis is the SOURCE's method (\"Forward Euler\", FE); the continuous\
+  \ PDE is the paper's, the\nper-cell-type D_i/lambda_i, the two-half-sum symmetrisation and moving-boundary\
+  \ coupling are\nthe code's realisation.\n"
+params:
+  fluc_comp:
+    role: mass_conservation_flag -- enable FluctuationCompensator, corrects c when a pixel changes cell
+      id so cell moves conserve total field mass
+  gpu:
+    role: backend_selector -- swaps the registered solver to DiffusionSolverFE_OpenCL; numerics-only,
+      no physics change
+  diff_global:
+    role: diffusion_coefficient (global default D; validated >= 0)
+  decay_global:
+    role: decay_rate (global default lambda; validated >= 0)
+  diff_types:
+    role: diffusion_coefficient_by_cell_type -- per-cell-type override D_t, keyed to the CPM cell occupying
+      the pixel
+  decay_types:
+    role: decay_rate_by_cell_type -- per-cell-type override lambda_t
+  init_expression:
+    role: initial_condition -- muParser math expression evaluated per site at t=0
+  init_filename:
+    role: initial_condition -- file to load the t=0 field from
+  secretion (SecretionParameters cell_type/value/constant/contact_type):
+    role: 'source_term -- per-cell-type source: additive rate, Dirichlet-clamp (constant), or on-contact'
+  boundary_conditions (x/y/z _min/_max _type + _val):
+    role: 'boundary_condition -- per face: Value=Dirichlet (default 0.0, absorbing sink), Flux=Neumann/ConstantDerivative,
+      Periodic'
+  additional_term:
+    role: 'UNKNOWN: reaction_term expression is present in the base spec_dict (line 580) but DiffusionSolverFEDiffusionData.xml
+      (L6086) never emits it -- so via THIS python spec it is dead; only the ReactionDiffusion variant
+      writes AdditionalTerm (L6773)'
+  DeltaX / DeltaT / ExtraTimesPerMCS:
+    role: 'UNKNOWN via this API: timestep / grid spacing / sub-cycling count exist in the core CC3DML
+      (CC3DXMLGenerator.py:950,991) and set FTCS stability, but DiffusionSolverFE''s python spec exposes
+      NO setter -- a tuner using PyCoreSpecs cannot change them; they fall back to core defaults 1.0/1.0/0'
+state_io:
+  reads: "- the concentration field c (the grid it advances)\n- the CPM cell-id / cell-type lattice at\
+    \ every pixel, to pick D_i and lambda_i and to\n  locate secreting cell interiors -- this is the coupling\
+    \ to the Potts, not a field of its own\n- boundary values / initial-condition expression or file\n"
+  writes: "- the concentration field c, IN PLACE (overwrites the grid each MCS). This is an actual\n \
+    \ field write, not an energy delta -- contrast the Potts plugins in this atlas that return\n  nothing\
+    \ and only bias pixel-copy acceptance.\n"
+surprises:
+- 'Forward Euler is only conditionally stable: the guide (CC3DXMLGenerator.py:884) flags D > 0.16 (3D)
+  or D > 0.25 (2D) at DeltaX=DeltaT=1 as unstable. The core auto/manually sub-cycles via ExtraTimesPerMCS,
+  but the DiffusionSolverFE python spec exposes NO way to set it -- so a reimplementer driving from PyCoreSpecs
+  gets silent blow-up at high D with no knob to fix it. These thresholds are magic constants.'
+- 'D and lambda are SPATIALLY HETEROGENEOUS, keyed to the moving CPM cell field: diff_types/decay_types
+  override the global value per cell type at each pixel. Plexus `diffuse`/`decay` carry a single scalar
+  rate -- they have no cell-type-indexed coefficient nor any coupling to a set-membership lattice.'
+- 'Secretion has three DISTINCT semantics under one name: Secretion ADDS a rate, ConstantConcentration
+  OVERWRITES (Dirichlet clamp on the cell interior -- a set, not an add), SecretionOnContact adds only
+  on heterotypic contact. A reimplementer treating ConstantConcentration as a source would be wrong --
+  it pins the value.'
+- Default boundary condition is Value 0.0 on every face = an ABSORBING sink (Dirichlet), not no-flux.
+  Silence here means the field leaks out the walls; Neumann/no-flux must be requested explicitly (Flux
+  type).
+- '''Handles moving boundary conditions'' + FluctuationCompensator: because cells move on the CPM lattice
+  under the field, a pixel changing cell id would spuriously dilute/concentrate c; the compensator (off
+  by default) rescales to conserve mass. Off-by-default means naive runs are NOT mass-conserving under
+  motion.'
+- 'The diffusion stencil is written as TWO half-sums (isoSum with the CENTRE cell''s D_i, plus varSum
+  with each NEIGHBOUR''s own D_j, each /2), NOT one D*Laplacian. That split is the variable-diffusion
+  scheme: it symmetrises the flux across a cell-type interface and only collapses to the familiar D*(SUM
+  - N c) when D is spatially uniform. A reimplementer using a single central-D Laplacian gets heterotypic
+  diffusion -- the whole point of per-type coefficients -- wrong.'
+- 'I read the OpenCL (GPU) kernel (DiffusionKernel.cl, uniDiff L821-L1057) for the exact arithmetic: neighbour
+  loop, the two-half-sum D average, the (1 - dt*lambda) decay factor, and the ghost-cell boundary handling.
+  The compiled CPU solver (the gpu=False default) is a .so I could NOT read; the kernel''s own comments
+  cross-reference the CPU code and the CC3DML is shared, so I believe the update is identical, but I did
+  not verify the CPU path byte-for-byte (cc3d is deliberately not importable here). Note also DeltaX/DeltaT
+  are unreachable via PyCoreSpecs, so dt/dx^2 defaults are fixed there.'
+- The class at L6242 is a thin CC3DML EMITTER; every physical parameter lives on the child DiffusionData
+  / SecretionData / BoundaryConditions specs (L6070, L6160, L820), and the integrator itself is compiled.
+  No update logic is in this file.
+status: inspected
+verdict: null
+of: null
+implementation_of: null
+why: null
+contract: null
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

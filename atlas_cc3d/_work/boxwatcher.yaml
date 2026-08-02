@@ -1,0 +1,79 @@
+id: boxwatcher
+order: 4
+raw_name: BoxWatcher
+raw_kind: Steppable (BoxWatcherSteppable)
+code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L5490
+paper_section: |
+  Not covered by Swat et al. (2012) Methods Cell Biol 110:325-366. BoxWatcher is a
+  computational-optimization steppable, absent from the modeling-methods text; the only
+  source anchor is the CC3DML generator docstring "Module tracing boundaries of the minimal
+  box enclosing all the cells. May speed up calculations. May have no effect for parallel
+  version" (twedit5 CC3DMLGenerator/CC3DMLGeneratorBase.py:L1288-1290, echoed at
+  CC3DProject/CC3DXMLGenerator.py:L1071). No paper page/figure has been read for this entry.
+summary: |
+  A bookkeeping / performance steppable, NOT a physics term. Each step it traces the minimal
+  axis-aligned bounding box enclosing all non-medium cells, pads it per-axis by fixed margins,
+  and hands that box to the Potts solver so the Metropolis pixel-copy sweep samples only sites
+  inside it. It touches no cell state and no energy: it scopes WHERE flips are attempted, to
+  avoid sweeping empty lattice on domains much larger than the occupied region.
+equations: |
+  There is no energy term and no state update. The per-step bookkeeping (reconstructed from
+  the docstring + margin semantics; the compiled core was not read) is, for each axis d in {x,y,z}:
+
+    lo_d = min over all lattice sites s belonging to any non-medium cell of s_d
+    hi_d = max over all lattice sites s belonging to any non-medium cell of s_d
+    BoxMin_d = clamp(lo_d - Margin_d, 0, Dim_d)
+    BoxMax_d = clamp(hi_d + Margin_d, 0, Dim_d)
+
+  where Margin_d is XMargin/YMargin/ZMargin and Dim_d the lattice dimension. The Potts sweep
+  then draws candidate source pixels uniformly from [BoxMin, BoxMax] instead of the whole
+  lattice. No dE is returned; no cell field is written. The clamp form and recompute cadence
+  are inferred, not verified byte-for-byte.
+params:
+  XMargin: 'sweep_padding_x -- lattice sites of buffer added around the tight occupied box in x; default 7 (set only by the twedit generators, see surprises)'
+  YMargin: 'sweep_padding_y -- same, y axis; default 7'
+  ZMargin: 'sweep_padding_z -- same, z axis; default 7'
+state_io: |
+  reads: the occupied lattice-site extents of every non-medium cell -- a global reduction over
+  the whole cell set to one axis-aligned bounding box. writes: a GLOBAL BoxMin/BoxMax on the
+  Potts simulator that scopes the flip-attempt sampler's spatial support. It writes NO cell
+  state and NO field, and returns NO energy delta -- it is neither an energy term nor a
+  per-cell update, but a modifier of the sampler's domain.
+surprises:
+- |
+  It is neither of the two categories this campaign expects (energy term / state update). It
+  writes the SAMPLER's spatial support -- a global box -- not any cell, field, or dE. In Plexus
+  terms nothing returns a delta the engine integrates; it is a domain-scoping / control
+  construct with no obvious operator analogue.
+- |
+  The PyCoreSpecs wrapper is parameterless and LOSSY. `xml` emits only
+  `<Steppable Type="BoxWatcher"/>` via generate_header (no children); `from_xml` (L5509) calls
+  find_xml_by_attr then returns a bare `cls()`, so any XMargin/YMargin/ZMargin present in loaded
+  CC3DML is SILENTLY DROPPED on round-trip. Meanwhile the twedit5 snippet/project generators DO
+  emit XMargin=YMargin=ZMargin=7. Source-vs-source discrepancy on whether margins exist at all.
+- |
+  The docstring warns it "may have no effect for parallel version": the optimization is bypassed
+  under the parallel/multithreaded Potts sweep, so the mechanism's realized effect is
+  implementation/threading-dependent rather than a property of the model.
+- |
+  Intended as a pure speedup, but restricting the sweep's support changes which sites the sampler
+  visits, so a fixed-seed serial run WITH vs WITHOUT BoxWatcher is not obviously bit-identical
+  (the RNG/attempt sequence differs). Whether the core guarantees identical dynamics I could not
+  verify -- flagged as inference, not fact.
+- |
+  The margin default of 7 is a magic constant living ONLY in the twedit generators. A
+  reimplementer following PyCoreSpecs (which sets nothing) would inherit whatever the compiled
+  default is -- unknown from this environment -- not 7.
+verdict: null
+of: null
+implementation_of: null
+why: null
+contract: null
+status: inspected
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

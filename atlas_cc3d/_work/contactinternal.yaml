@@ -1,0 +1,189 @@
+id: contactinternal
+order: 10
+raw_name: ContactInternal
+raw_kind: Plugin (ContactInternalPlugin)
+code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L3350
+paper_section: 'CC3D Reference Manual, "Compartmentalized Cells (ContactInternal Plugin)"
+
+  (compucell3dreferencemanual.readthedocs.io/en/latest/compartments.html), the checkable
+
+  anchor I actually read; underlying adhesion Hamiltonian in Swat et al. (2012) Methods Cell
+
+  Biol 110:325-366. NO extracted paper text is available for this target, so the
+
+  ContactInternal-specific behavior below is anchored to the source + reference manual, NOT to
+
+  a paper page number.
+
+  '
+summary: 'A Cellular-Potts adhesion ENERGY TERM (an EnergyFunction), not a state update, for
+
+  compartmentalized cells. At every lattice boundary between two DIFFERENT sub-cells that share
+
+  the SAME cluster id (i.e. two compartments of one composite cell), it contributes a contact
+
+  energy J_int(type_i, type_j). It is the intra-cluster complement of the ordinary Contact
+
+  plugin, and is typically run alongside it. It writes no state: the engine calls
+
+  changeEnergy() for a proposed pixel copy and gets back a scalar delta-E that only biases the
+
+  Metropolis acceptance probability. In the source it is a one-line subclass
+
+  (ContactInternalPlugin -> ContactLocalFlexPlugin -> ContactPlugin) whose only addition over
+
+  the base Contact energy is the same-cluster restriction; all tunables are inherited unchanged.
+
+  '
+equations: "ContactInternal is a Potts EnergyFunction (an additive term of the effective Hamiltonian),\n\
+  not an update that writes state. Conceptually it adds an intra-cluster adhesion energy:\n\n  E_internal\
+  \ = SUM over neighbor-pixel pairs (i,j) of\n                 J_int( tau(sigma_i), tau(sigma_j) )\n \
+  \                * [ 1 - delta(sigma_i, sigma_j) ]          # different cells only\n               \
+  \  * [ clusterId(sigma_i) == clusterId(sigma_j) ]   # same cluster only\n                 * w(d_ij)\
+  \                                   # optional distance weight\n\nSymbols: sigma_k = id of the cell\
+  \ owning pixel k; tau(sigma) = cell type of that cell;\nclusterId(sigma) = compartment/cluster id of\
+  \ that cell; delta = Kronecker delta (=1 iff the\ntwo pixels belong to the SAME cell, so a cell's own\
+  \ interior boundary contributes 0);\nJ_int = the symmetric per-type-pair internal contact-energy matrix\
+  \ (the <Energy Type1 Type2>\nentries); w(d_ij) = 1 normally, or 1/d_ij when WeightEnergyByDistance is\
+  \ set. Medium (null\ncell / clusterId 0) never satisfies the same-cluster test, so it contributes 0.\n\
+  \nWhat the code actually computes (confirmed by the .so symbols changeEnergy(Point3D, CellG*,\nCellG*),\
+  \ internalEnergy(CellG*, CellG*), setContactInternalEnergy(str,str,double),\ngetMaxNeighborIndexFromNeighborOrder\
+  \ / getMaxNeighborIndexFromDepth, Potts3D::getCellFieldG)\nis the DELTA for a proposed pixel copy at\
+  \ point pt from oldCell to newCell:\n\n  delta_E = SUM over n in neighbors(pt) within range of\n   \
+  \           internalEnergy(newCell, cell_n) - internalEnergy(oldCell, cell_n)\n\nwhere internalEnergy(a,\
+  \ b) = J_int(tau_a, tau_b) if a != b AND clusterId(a)==clusterId(b)\nAND neither is Medium, else 0.\
+  \ delta_E enters the Metropolis rule: accept with prob 1 if\ndelta_E <= 0, else exp(-delta_E / T). Nothing\
+  \ on the lattice or on any cell is written.\n\nInteraction range = neighbor shells up to NeighborOrder,\
+  \ OR a Euclidean radius Depth when\nDepth is given (Depth overrides NeighborOrder).\n\nNOTE ON EVIDENCE:\
+  \ the .cpp (build path CompuCell3D/plugins/ContactInternal/\nContactInternalPlugin.cpp) is NOT on disk\
+  \ -- only the compiled .so. The same-cluster guard\nand the delta form above are read from the Python\
+  \ class chain in code_path, the .so symbol\ntable, the .so's own embedded description string (\"Handles\
+  \ internal adhesion energy between\nmembers of the same cluster (i.e. between compartments)\"), the\
+  \ reference manual, and the\nexample XML -- not from a line-by-line reading of the C++ energy loop.\n"
+params:
+  neighbor_order: 'interaction_range, in lattice neighbor shells (int, default 1). Sets how many rings
+    of
+
+    neighbor pixels around the change point are summed. Superseded by depth when depth is set.
+
+    '
+  depth: 'interaction_range, as a Euclidean radius (float, default null/None). When set it overrides
+
+    neighbor_order; the range comes from getMaxNeighborIndexFromDepth.
+
+    '
+  weight_energy_by_distance: 'distance_weighting_flag (bool, default False). When True, each neighbor
+    pair''s energy is
+
+    divided by the inter-pixel distance, down-weighting farther shells. Inherited from Contact.
+
+    '
+  energy: 'adhesion_energy coefficient J_int for one unordered cell-type pair, supplied per pair via
+
+    ContactEnergyParameter(type_1, type_2, energy). Units of Potts energy; negative = adhesion
+
+    (lower boundary cost), positive = repulsion. Only one triangle of the matrix is stored, so
+
+    lookup must be symmetrized (see surprises).
+
+    '
+  type_1: 'identity label (not a tunable): first cell-type name of the pair the energy applies to.
+
+    '
+  type_2: 'identity label (not a tunable): second cell-type name of the pair the energy applies to.
+
+    '
+state_io:
+  reads:
+  - cell.type (tau) of the source pixel's cell and of each neighbor cell -- indexes J_int
+  - cell.id (sigma) of both cells, to evaluate the different-cell guard delta(sigma_i,sigma_j)
+  - cell.clusterId of both cells -- the same-cluster guard; the defining read of this plugin
+  - the lattice cell field (Potts3D::getCellFieldG) and neighbor geometry (BoundaryStrategy)
+  - the proposed flip at the change point -- newCell (candidate) and oldCell (current)
+  - the internal-energy matrix J_int (a plugin parameter, not lattice state)
+  writes:
+  - NONE. ContactInternal is a Potts EnergyFunction; changeEnergy() returns a scalar delta-E
+  - that only biases Metropolis acceptance. It mutates no cell attribute and no field.
+  - (Per loop rule 8, this is an energy term, not an update -- forcing it into write language
+  - would misrepresent it.)
+surprises:
+- 'Writes nothing. A reimplementer expecting a read/modify/write step will build the wrong
+
+  thing: this returns a delta-E that only changes the ACCEPTANCE PROBABILITY of a proposed
+
+  pixel copy. It has no effect except through the Metropolis rule with temperature T.
+
+  '
+- 'The energy fires ONLY between DIFFERENT cells in the SAME cluster. It is silently zero for
+
+  same-cell interior boundaries, for cross-cluster boundaries, and for any pair touching
+
+  Medium. This same-cluster restriction is the entire difference from the ordinary Contact
+
+  plugin -- the Python class adds literally nothing else (just name/registered_name).
+
+  '
+- 'ContactInternal is ADDITIVE with, not a replacement for, the Contact plugin: real decks run
+
+  both (see the example XML with a <Contact> and a <ContactInternal> block). Contact keys off
+
+  cell id only and does not check clusterId, so an intra-cluster boundary is scored by BOTH
+
+  terms (J_contact + J_int). A reimplementer who assumes ContactInternal supersedes Contact
+
+  inside a cluster will double-remove or mis-total the intra-cluster adhesion. (I did not read
+
+  Contact''s C++ changeEnergy line-by-line to confirm it ignores clusterId -- verify before
+
+  relying on the additive claim.)
+
+  '
+- 'The J matrix is symmetric and order-independent, but only ONE triangle is stored:
+
+  param_append raises if (t1,t2) OR (t2,t1) is already present (types_specified checks both
+
+  directions). Lookup must be symmetrized; iterating the stored dict alone misses the mirror
+
+  entries.
+
+  '
+- 'Depth (a Euclidean radius, float) SILENTLY OVERRIDES NeighborOrder (integer shells) when
+
+  both are provided -- confirmed at source in the inherited ContactPlugin.xml (PyCoreSpecs.py
+
+  L3217-3220): it emits <Depth> if depth is not None and only ELSE emits <NeighborOrder>, so a
+
+  set depth silently drops the neighbor_order. Two different notions of "range" with an
+
+  undocumented precedence.
+
+  '
+- 'WeightEnergyByDistance changes the effective magnitude of every J_int by dividing each pair
+
+  by its inter-pixel distance, so the same numeric energy means different physics at different
+
+  neighbor orders. Off by default.
+
+  '
+- 'The plugin does nothing without the compartment machinery: sub-cells must be given matching
+
+  clusterId values via Python steppables ("Cluster Id" / "Cluster Id Reassignment"). With no
+
+  clusters assigned, every same-cluster test is trivially satisfied only within a single cell
+
+  (which is excluded anyway), so E_internal is identically 0. The energy matrix alone is inert.
+
+  '
+status: inspected
+module: null
+test: null
+verdict: null
+of: null
+implementation_of: null
+why: null
+contract: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

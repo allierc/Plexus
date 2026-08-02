@@ -1,0 +1,199 @@
+id: reactiondiffusionsolverfe
+order: 24
+raw_name: ReactionDiffusionSolverFE
+raw_kind: Steppable (ReactionDiffusionSolverFE)
+code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L6911
+paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366, sec. "PDE Solvers". Checkable in-tree
+
+  anchor for this specific solver: cc3d/twedit5/Plugins/CC3DProject/diffusion_solvers_descr.py:11
+
+  ("ReactionDiffusion: Solves coupled reaction-diffusion equations. Uses the Forward-Euler
+
+  Method and allows flexibility in specifying reaction terms."). Reference-manual page:
+
+  reaction_diffusion_solver.html.
+
+  '
+summary: 'A steppable that advances one OR MORE scalar concentration FIELDS over the CPM pixel lattice
+
+  by one explicit forward-Euler (FTCS) step per Monte Carlo Step -- the same diffuse-decay-secrete
+
+  update as DiffusionSolverFE, but each field additionally carries a user-supplied REACTION term
+
+  (AdditionalTerm): a muParser math expression that may reference the OTHER fields by name (and
+
+  the cell type at the site). The fields therefore form a COUPLED reaction-diffusion system, not
+
+  independent diffusants. Like DiffusionSolverFE it is a genuine field->field WRITE (it overwrites
+
+  the concentration grids in place), unlike the energy-term Potts plugins in this atlas. The
+
+  numerics live in the compiled core; PyCoreSpecs.py only declares the CC3DML the solver reads.
+
+  '
+equations: "Continuous coupled system (the paper's PDE), for a set of fields f = 1..M:\n\n  d c_f / dt\
+  \  =  D_f * grad^2 c_f  -  lambda_f * c_f  +  S_f  +  R_f( c_1, ..., c_M, type )\n\nCode's realisation,\
+  \ per pixel i and field f, one explicit forward-Euler step (DeltaX = DeltaT\n= 1 by default). The diffusion+decay\
+  \ half is the SAME FTCS scheme transcribed for DiffusionSolverFE\n(see that entry, order 14): a symmetric\
+  \ two-half-sum face-flux Laplacian with per-cell-type\nD_i, lambda_i, plus the secretion sweep S_i.\
+  \ On top of that, the reaction term is added each step:\n\n  c_f,i^{t+1}  =  [ DiffusionSolverFE FE\
+  \ update of field f at i ]  +  DeltaT * R_f,i\n\n  R_f,i = additional_term_f evaluated at i, using the\
+  \ CURRENT-step values of ALL fields at i\n          and the cell type occupying i.\n\nWorked example\
+  \ -- FitzHugh-Nagumo (cc3d/tests/pde_solvers/.../ReactionDiffusion_2D_FN.xml):\n  field F:  D=0.01,\
+  \ AdditionalTerm = \"F-F*F*F/3+0.3-H\"\n  field H:  D=0.01, AdditionalTerm = \"0.08*F-0.064*H+0.056\"\
+  \nso F's reaction reads H and H's reaction reads F -- the named-field cross reference is the coupling.\n\
+  \nSymbols:\n  c_f,i      value of field f at pixel i (a field value, not cell state)\n  D_f        diffusion\
+  \ coefficient of f = diff_types[type(cell at i)] if set, else diff_global\n  lambda_f   decay coefficient\
+  \ of f     = decay_types[type(cell at i)] if set, else decay_global\n  S_f        secretion source for\
+  \ f (additive rate, or on-contact; NOT Dirichlet-clamp here)\n  R_f        the muParser AdditionalTerm\
+  \ expression for field f (the reaction)\n\nNOT ESTABLISHED FROM SOURCE: the exact integration of R_f\
+  \ -- whether it is scaled by DeltaT,\nevaluated before or after the diffusion sweep, and whether AutoscaleDiffusion\
+  \ rescales it -- lives\nin the compiled core, which was not read. The continuous form and the named-field\
+  \ coupling ARE\nfrom the source (spec xml + the FN example); the discretisation detail of R is inferred.\n"
+params:
+  additional_term:
+    role: 'reaction_term -- THE defining feature. A muParser math expression (per field) added to that
+
+      field''s update each step; it may reference the OTHER fields BY NAME and the cell type, which
+
+      is how the solver couples fields into a reaction-diffusion system. Emitted as <AdditionalTerm>
+
+      by this solver''s DiffusionData.xml (L6772-6773). (In DiffusionSolverFE the identical spec_dict
+
+      key exists but is never emitted -- dead there, live here.)
+
+      '
+  autoscale:
+    role: 'numerical_rescaling_flag -- emits <AutoscaleDiffusion>; auto-rescales the diffusion constant
+      /
+
+      timestep to keep the forward-Euler step stable at large D. Default False, set explicitly in
+
+      __init__ (L6925), NOT inherited from the base solver dict. This is the FE-stability knob that
+
+      DiffusionSolverFE''s python spec did not expose.
+
+      '
+  fluc_comp:
+    role: mass_conservation_flag -- emits <FluctuationCompensator>, corrects field values when a pixel
+      changes cell id so cell motion conserves total field mass.
+  diff_global:
+    role: diffusion_coefficient (global default D_f; validated >= 0)
+  decay_global:
+    role: decay_rate (global default lambda_f; validated >= 0)
+  diff_types:
+    role: diffusion_coefficient_by_cell_type -- per-cell-type override D_t, keyed to the CPM cell occupying
+      the pixel
+  decay_types:
+    role: decay_rate_by_cell_type -- per-cell-type override lambda_t
+  init_filename:
+    role: initial_condition -- file to load the t=0 field from (emitted as <ConcentrationFileName>)
+  secretion (SecretionParameters cell_type/value/contact_type):
+    role: 'source_term -- per-cell-type additive source (Secretion) or heterotypic-contact source
+
+      (SecretionOnContact). ConstantConcentration (Dirichlet clamp) is REFUSED: secretion_data_new
+
+      raises SpecValueError "ReactionDiffusionSolverFE does not support constant concentrations"
+
+      (L6892-6893).
+
+      '
+  boundary_conditions (x/y/z _min/_max _type + _val):
+    role: 'boundary_condition -- per face: Value=Dirichlet, ConstantDerivative=Neumann/flux, Periodic
+      (read back in from_xml L7028-7047)'
+  init_expression:
+    role: 'UNKNOWN via this API: present in the base DiffusionData dict (L581) and read back by from_xml
+      (L7000-7001), but this solver''s DiffusionData.xml (L6756-6774) NEVER emits <InitialConcentrationExpression>
+      -- so an init expression set on the python object is silently dropped on write; only init_filename
+      survives. Effectively dead on the write path.'
+  DeltaX / DeltaT / ExtraTimesPerMCS:
+    role: 'UNKNOWN via this API: grid spacing / timestep / sub-cycling exist in the core CC3DML and set
+      FE stability, but this python spec exposes NO setter (same gap as DiffusionSolverFE); they fall
+      back to core defaults. autoscale is the only stability knob reachable from here.'
+state_io:
+  reads: "- the concentration field of EVERY declared field (the reaction term of one field reads the\n\
+    \  current values of the others at the same site -- this cross-field read is what DiffusionSolverFE\n\
+    \  does not have)\n- the CPM cell-id / cell-type lattice at every pixel, to pick D_i, lambda_i, evaluate\
+    \ the cell-type\n  terms in the reaction expression, and locate secreting cell interiors\n- boundary\
+    \ values / the initial-condition file\n"
+  writes: "- every concentration field, IN PLACE (overwrites the grids each MCS). An actual field write,\
+    \ not\n  an energy delta -- contrast the Potts plugins in this atlas that return nothing and only\
+    \ bias\n  pixel-copy acceptance.\n"
+surprises:
+- 'The whole difference from DiffusionSolverFE is one emitted element: <AdditionalTerm> (L6772-6773),
+
+  a muParser reaction expression that may reference OTHER fields BY NAME. That turns M independent
+
+  diffusants into ONE coupled reaction-diffusion system. The SAME python attribute (additional_term)
+
+  exists on DiffusionSolverFE''s spec but its DiffusionData.xml never writes it, so it is dead there and
+
+  live here -- a reimplementer comparing the two python specs by attribute list would miss the coupling.
+
+  '
+- 'ConstantConcentration (Dirichlet clamp / pinned source) is explicitly FORBIDDEN here:
+
+  secretion_data_new raises SpecValueError "ReactionDiffusionSolverFE does not support constant
+
+  concentrations" (L6892-6893). A model ported from DiffusionSolverFE that pinned a boundary via a
+
+  constant-concentration cell must be reworked -- the clamp semantics simply do not exist on this solver.
+
+  '
+- 'A BLANK reaction term does NOT mean "no reaction". twedit''s generator writes AdditionalTerm =
+
+  "1*<fieldname>" when the term is empty (CC3DMLGeneratorBase.py:2007 and :2011), i.e. an unset
+
+  reaction defaults to R = c (exponential growth), not R = 0. A magic default a reimplementer would
+
+  not guess from the field being blank.
+
+  '
+- 'Asymmetric field spec: this solver''s DiffusionData.xml (L6756-6774) emits <ConcentrationFileName>
+
+  (init_filename) but NOT <InitialConcentrationExpression>, even though init_expression is in the base
+
+  dict and from_xml reads it back (L7000-7001). An init expression set on the object is silently lost
+  on
+
+  write; only a file initial condition round-trips.
+
+  '
+- 'AutoscaleDiffusion scope discrepancy between the two code paths: PyCoreSpecs emits it at the STEPPABLE
+
+  level (one <AutoscaleDiffusion> for the whole solver, L6943-6944), while twedit''s generator emits it
+
+  per <DiffusionField> (CC3DMLGeneratorBase.py:1990-1991). A reimplementer following twedit would scope
+
+  autoscaling per field; following PyCoreSpecs, globally.
+
+  '
+- |
+  from_xml can IMPORT a CC3DML this spec can never re-emit -- reader and writer disagree about
+  whether Dirichlet clamps exist. from_xml (L7016-7019) explicitly parses <ConstantConcentration>
+  elements and forwards each to field.secretion_data_new(..., constant=True); but that very method
+  (L6892-6893) RAISES SpecValueError "does not support constant concentrations" on the "constant"
+  kwarg. So round-tripping a legacy ReactionDiffusion CC3DML that pinned a source via
+  ConstantConcentration crashes on the IMPORT read, not on write -- a self-contradiction inside one class.
+- 'I did NOT read the compiled core, so the exact FE integration of the reaction term (DeltaT scaling,
+
+  pre- vs post-diffusion evaluation order, and whether AutoscaleDiffusion also rescales the reaction)
+
+  is inferred, not verified. The named-field coupling and the continuous form are established from the
+
+  spec xml and the FitzHugh-Nagumo example; the discretisation of R is not.
+
+  '
+status: inspected
+verdict: null
+of: null
+implementation_of: null
+why: null
+contract: null
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

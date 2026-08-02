@@ -21,19 +21,135 @@ mechanisms:
   raw_name: AdhesionFlex
   raw_kind: Plugin (AdhesionFlexPlugin)
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L3525
-  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
-    CompuCell3D'
-  summary: AdhesionFlex Plugin
-  equations: null
-  params: {}
-  state_io: null
-  surprises: null
+  paper_section: 'CC3D Reference Manual guide heading ''AdhesionFlex Plugin''
+
+    (compucell3dreferencemanual.readthedocs.io/en/latest/adhesion_flex_plugin.html); energy
+
+    formula transcribed from the library''s own descriptor
+
+    cc3d/twedit5/Plugins/CC3DProject/adhesion_descr.py:get_adhesion_flex_description_html().
+
+    No specific Swat et al. (2012) page was read for this plugin.
+
+    '
+  summary: 'A flexible generalisation of the Contact adhesion energy. Instead of a fixed J(type,type'')
+
+    matrix, every cell AND Medium carries its own vector of adhesion-molecule densities, and the
+
+    contact energy across a cell boundary is a double sum over molecule pairs of a binding
+
+    parameter k_mn times a formula (default min) of the two cells'' densities. Like Contact it
+
+    writes nothing to the lattice -- it only returns a dE that biases which pixel-copy attempts are
+
+    accepted -- but unlike Contact it OWNS mutable per-cell state (the density vector), which a
+
+    steppable can change at runtime and which mitosis must copy to daughters.
+
+    '
+  equations: "E_adhesion = sum over neighbouring site pairs (i,j), owners differ, of\n   [ - sum over\
+    \ molecule pairs (m,n) of  k_mn * AdhesionFunc( N_m(sigma_i), N_n(sigma_j) ) ]\n   * (1 - delta(sigma_i,\
+    \ sigma_j))\n\ni, j       : neighbouring lattice sites, within NeighborOrder shells\nsigma_i    :\
+    \ the cell (id) owning site i; the (1 - delta) factor keeps only cross-boundary\n             site\
+    \ pairs (cell-cell or cell-Medium)\nm, n       : adhesion-molecule labels\nN_m(sigma) : density of\
+    \ molecule m carried by cell sigma -- PER-CELL state, seeded from the\n             per-TYPE AdhesionMoleculeDensity\
+    \ declaration, then mutable/steerable\nk_mn       : binding parameter between molecules m and n (the\
+    \ AdhesionInteractionMatrix;\n             user-supplied, symmetric in intent, may be negative)\n\
+    AdhesionFunc: the BindingFormula -- a muParser expression in variables Molecule1, Molecule2;\n   \
+    \          default \"min(Molecule1,Molecule2)\". Evaluated per site pair\n             (compiled entry\
+    \ point adhesionFlexEnergyCustom).\n\nNote the explicit LEADING MINUS: a larger positive k_mn LOWERS\
+    \ energy (is adhesive), the\nopposite sign sense from the plain Contact J matrix where larger J is\
+    \ repulsive.\n\nSource-vs-convention discrepancy: the library HTML writes the restriction as a delta\
+    \ over\n\"cell types at i and j\", but the standard CPM contact term and the plugin's changeEnergy\n\
+    operate on cell id sigma, so two neighbouring cells of the SAME type still contribute. Left\nas a\
+    \ discrepancy I could not resolve without running the compiled core.\n"
+  params:
+    neighbor_order: 'adjacency_range -- the ONLY constructor argument (default 1). Number of neighbour
+      shells of
+
+      lattice sites summed in the contact-energy sum; larger order counts more distant boundary
+
+      site-pairs. Guard check_dict rejects neighbor_order < 1 (message says "must be positive").
+
+      '
+    density: 'adhesion_molecule_concentration -- NOT a constructor param; declared per (molecule,
+
+      cell TYPE) via density_new / AdhesionMoleculeDensity in XML, guarded non-negative. Seeds
+
+      each cell''s density vector at init, after which it is mutable per-cell state.
+
+      '
+    binding_parameter: 'pairwise_binding_affinity -- NOT a constructor param; entry k_mn of the
+
+      AdhesionInteractionMatrix, set via a BindingFormula (formula_new / param_set). May be
+
+      negative.
+
+      '
+    formula: 'binding_kernel -- NOT a constructor param; the muParser expression string that combines
+      two
+
+      densities (AdhesionFunc). Default "min(Molecule1,Molecule2)". The energy kernel itself is
+
+      user data, chosen at runtime.
+
+      '
+  state_io: "reads: for each attempted pixel copy, the cell id and type at the two sites across the\n\
+    \  boundary, and both owner cells' adhesion-molecule-density vectors.\nwrites: nothing to the lattice\
+    \ -- returns a dE via changeEnergy; a Potts energy term, not an\n  update.\nowns: a MUTABLE per-cell\
+    \ (and per-Medium) density vector, initialised from the per-type\n  AdhesionMoleculeDensity, changed\
+    \ at runtime by steppables (setAdhesionMoleculeDensity /\n  ...ByIndex / ...Vector), and inherited\
+    \ across mitosis (assignNewAdhesionMoleculeDensityVector,\n  which skips the size check precisely\
+    \ so a daughter cell can be seeded). This per-cell\n  continuous state is what plain Contact does\
+    \ not have.\n"
+  surprises:
+  - 'Unlike plain Contact (a static J(type,type'') lookup with NO per-cell state), AdhesionFlex
+
+    attaches a mutable density VECTOR to every cell and to Medium. That per-cell continuous field
+
+    is the whole point: a steppable can retune a single cell''s adhesion mid-run, and mitosis must
+
+    copy the vector to daughters. A reimplementer who models it as just another type-matrix loses
+
+    the per-cell state entirely.
+
+    '
+  - 'Sign convention is inverted relative to Contact. The energy has an explicit leading minus
+
+    (E = sum of -sum k*f), so a POSITIVE binding parameter is ADHESIVE (energy-lowering). The
+
+    shipped example matrix even uses negative k''s (NCad-NCad = -1.0, NCad-NCam = -10.0).
+
+    '
+  - 'The binding kernel AdhesionFunc is an arbitrary muParser expression string (variables
+
+    Molecule1, Molecule2), default min(Molecule1,Molecule2). The combining function is DATA, not
+
+    a fixed operation -- adhesionFlexEnergyCustom evaluates it per site pair.
+
+    '
+  - 'The (1 - delta) restriction is written in the library HTML as delta over "cell types", but
+
+    the CPM contact term and changeEnergy operate on cell id sigma; same-type neighbouring cells
+
+    still contribute. I could not confirm which by running the core (cc3d is deliberately not
+
+    importable here).
+
+    '
+  - 'Densities are DECLARED per cell TYPE in XML but STORED per cell -- the type value only seeds
+
+    each cell''s vector at initialisation; Medium gets a vector too. Molecules are indexed in XML
+
+    listing order, and the by-name and by-index accessors must agree on that order.
+
+    '
   verdict: null
   of: null
   implementation_of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -46,19 +162,177 @@ mechanisms:
   raw_name: BlobInitializer
   raw_kind: Steppable (BlobInitializer)
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L5620
-  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
-    CompuCell3D'
-  summary: BlobInitializer
-  equations: null
-  params: {}
-  state_io: null
-  surprises: null
+  paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366, ''Multi-Scale Modeling of Tissues
+    Using
+
+    CompuCell3D'' -- the chapter''s known home for lattice initializers; NO paper page was read
+
+    (no extracted text available), so no page/figure is cited. Checkable library anchors instead:
+
+    PyCoreSpecs.rst:294 (autoclass BlobInitializerRegion) and :299 (autoclass BlobInitializer);
+
+    the CC3DMLGeneratorBase.py:1235 comment ''Initial layout of cells in the form of spherical
+
+    (circular in 2D) blob''.
+
+    '
+  summary: 'A one-shot STEPPABLE that runs once at initialization (MCS 0) and WRITES the cell field:
+
+    it paints a solid circular (2D) / spherical (3D) blob of freshly-created cells onto the
+
+    lattice. The region is tiled with a grid of square/cubic cells of edge `width` (separated
+
+    by `gap` medium sites), and every tile whose sites fall within `radius` of `center` becomes
+
+    a new cell -- a new SET of lattice sites sharing a unique id -- assigned a random type from
+
+    `cell_types`. This is the initial partition of the lattice into cells; sites outside the
+
+    blob or in a gap remain Medium (id 0). Unlike the energy-term plugins, it genuinely writes
+
+    state, and only at t=0.
+
+    '
+  equations: "Construction rule (compiled BlobInitializer steppable, executed once at initialization;\n\
+    the PyCoreSpecs class only EMITS the CC3DML that parameterizes it -- it paints nothing):\n\n  Tile\
+    \ the plane/space with a regular grid of square (2D) / cubic (3D) cells of edge = width,\n  each adjacent\
+    \ pair separated by `gap` medium sites (pitch = width + gap). Assign lattice\n  site s to a new cell\
+    \ -- a fresh unique id sigma, i.e. a new SET -- iff s lies inside the blob\n      || s - center ||_2\
+    \  <=  radius        (Euclidean; circle in 2D, sphere in 3D)\n  and s is not in a gap lane. Each generated\
+    \ cell sigma is given a type tau(sigma) drawn at\n  RANDOM (uniform) from `cell_types`, seeded by\
+    \ the Potts random_seed. Sites outside the\n  sphere or inside a gap stay Medium (id 0).\n\n  Initial\
+    \ per-cell volume V(sigma) = site count ~= width^2 (2D) / width^3 (3D) for gap = 0,\n  truncated where\
+    \ a tile straddles the circle/sphere boundary.\n\nSymbols: s = lattice site (x,y,z); sigma = cell\
+    \ id (a SET of sites); tau = cell type label;\ncenter = blob center point; radius = blob radius; width\
+    \ = cell edge; gap = inter-cell medium.\n\nNOTE: the exact clip predicate (site-in-sphere vs tile-center-in-sphere),\
+    \ the uniform RNG\ndraw, and multi-region overlap resolution are the COMPILED core's behavior, inferred\
+    \ from\nCC3D convention + the emitted CC3DML fields -- NOT read from source (cc3d C++ is not\nimportable\
+    \ in this environment).\n"
+  params:
+    gap: 'cell_separation_gap -- number of Medium lattice sites inserted between adjacent tiled
+
+      cells (units: lattice sites). Default 0 => cells are face-adjacent, a fully packed disk;
+
+      gap>0 opens medium lanes between cells. Optional in from_xml (defaults 0). check_dict:
+
+      gap<0 rejected.
+
+      '
+    width: 'cell_edge_length / initial_cell_size -- edge length of each square/cubic tile that becomes
+
+      one cell (units: lattice sites); sets the initial per-cell volume (~= width^d). Constructor
+
+      default 0 is a deliberately-invalid sentinel; check_dict rejects width<1 at validate() time.
+
+      '
+    radius: 'blob_radius -- Euclidean radius of the clipping circle/sphere centred on `center` (units:
+
+      lattice sites); tiles outside it are dropped, giving the blob its round shape. Constructor
+
+      default 0 is an invalid sentinel; check_dict rejects radius<1 at validate() time.
+
+      '
+    center: 'blob_center_position -- integer lattice coordinates (x,y,z) of the blob centroid. Coordinates
+
+      must be non-negative (check_dict) and, in validate(), center +/- radius must stay in the Potts
+
+      domain on all three axes.
+
+      '
+    cell_types: 'cell_type_palette -- list of type-name strings; each generated cell is assigned one drawn
+      at
+
+      random from this list. A categorical label set resolved against CellTypePlugin, NOT a physical
+
+      scalar. Empty list => all cells take the first available type (compiled-core default).
+
+      '
+  state_io:
+    reads: "- Potts lattice geometry (dim_x/y/z and bounds) to place/clip the grid and, in validate(),\n\
+      \  to bounds-check center +/- radius.\n- the cell-type registry (CellTypePlugin) to resolve `cell_types`\
+      \ name strings -> integer\n  type ids.\nNo dynamic simulation state is read; all inputs are static\
+      \ configuration.\n"
+    writes: "- the CELL FIELD (cellField): assigns a unique cell id sigma to each in-blob lattice site,\n\
+      \  CREATING the initial sets -- the partition of the lattice into cells. This is a real WRITE\n\
+      \  of state, unlike the energy-term plugins that write nothing.\n- each cell's type tau(sigma).\n\
+      - implicitly the initial per-cell volume/surface (site/boundary counts) that downstream\n  trackers\
+      \ (VolumeTrackerPlugin, CenterOfMassPlugin) then maintain.\nExecutes ONCE at initialization, not\
+      \ per-MCS.\n"
+  surprises:
+  - 'It is a SET CONSTRUCTOR, not an energy term or a per-step update. It runs exactly once (MCS 0)
+
+    and genuinely writes the cell field, creating the sets -- the opposite of most CC3D mechanisms,
+
+    which are energy terms returning a dE and writing nothing. A reimplementer who models it as a
+
+    per-step operator returning a delta has the wrong shape; it is a one-shot initializer of the
+
+    partition.
+
+    '
+  - 'The Python class does NO painting. BlobInitializer / BlobInitializerRegion in PyCoreSpecs.py
+
+    are pure CC3DML serializers (they emit <Region> with Gap/Width/Radius/Center/Types). Every bit
+
+    of geometry -- the circle clip, the grid tiling, the random type draw -- lives in the compiled
+
+    core, unreadable here. Reading only the Python gives you the parameters, never the algorithm.
+
+    '
+  - 'Constructor defaults width=0 and radius=0 are DELIBERATELY-INVALID sentinels: check_dict rejects
+
+    width<1 and radius<1, but only at validate() time, not at construction. A region built with the
+
+    dataclass defaults constructs fine and fails later -- or, if validate() is skipped, silently
+
+    emits a degenerate <Width>0</Width>/<Radius>0</Radius>.
+
+    '
+  - 'validate() would REJECT a legitimate 2D blob. BlobInitializerRegion.validate iterates
+
+    itertools.product([''x'',''y'',''z''], [-radius, +radius]) and bounds-checks center +/- radius on
+    ALL
+
+    THREE axes; for a 2D sim (dim_z=1) with center.z=0 and radius>0, the z-radius term = -radius < 0
+
+    trips validate_point''s ''c_val < 0'' guard (raises ''z-min''). The oracle''s own blob (center z=0,
+
+    radius=dim//3) would fail validate() -- but the XML-emission path (.xml.getCC3DXMLElementString())
+
+    never calls validate(), so 2D blobs work in practice. A declared-validation vs working-use
+
+    contradiction.
+
+    '
+  - 'Type assignment is SEED-DEPENDENT and random. Types are drawn (uniformly, in the compiled core)
+
+    per cell from `cell_types`, seeded by the Potts random_seed -- two types in a list is NOT a
+
+    deterministic checkerboard. A reimplementer who assigns by position/round-robin produces a
+
+    different, non-reproducing initial condition. (Inferred CC3D behavior; not read from source.)
+
+    '
+  - 'from_xml makes Gap OPTIONAL (defaults 0) while Width and Radius are REQUIRED (getFirstElement
+
+    throws if absent). Center defaults to (0,0,0) and reads only the axes present as attributes;
+
+    Types is optional. So the minimal valid <Region> is Width + Radius.
+
+    '
+  - 'A single BlobInitializer holds a LIST of regions (region_new / region_append / region_pop); the
+
+    emitted steppable has one <Region> child per blob. How overlapping regions resolve (does a later
+
+    region overwrite an earlier one''s sites?) is compiled-core behavior, NOT established here.
+
+    '
   verdict: null
   of: null
   implementation_of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -71,19 +345,123 @@ mechanisms:
   raw_name: BoundaryPixelTracker
   raw_kind: Plugin (BoundaryPixelTrackerPlugin)
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L5270
-  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
-    CompuCell3D'
-  summary: BoundaryPixelTracker Plugin
-  equations: null
-  params: {}
-  state_io: null
-  surprises: null
+  paper_section: 'No dedicated paper section -- Swat et al. (2012) Methods Cell Biol 110:325-366 does
+    not
+
+    document the pixel trackers separately. Checkable source anchors instead: PyCoreSpecs.py:L5270
+
+    (the Python spec class BoundaryPixelTrackerPlugin) and the C++ code-ref guide heading
+
+    cc3d/doc/code_ref/user/build/cpp/CompuCell/plugins/BoundaryPixelTrackerPlugin.rst
+
+    (autoclass CompuCell.BoundaryPixelTrackerData / BoundaryPixelTrackerPlugin).
+
+    '
+  summary: 'A per-cell BOOKKEEPING plugin, not an energy term and not a state update. For every cell it
+
+    maintains the SET of that cell''s boundary lattice sites -- sites the cell owns that also have at
+
+    least one neighbour (out to neighbor_order) belonging to a different cell or to the medium -- and
+
+    keeps that set current as pixel copies are accepted. It changes no energy, no cell-id lattice and
+
+    no field; its only product is an auxiliary index (pixelSet / pixelSetMap) that OTHER mechanisms
+
+    query, e.g. Curvature, FocalPointPlasticity, or the steppable helper get_cell_boundary_pixel_list.
+
+    '
+  equations: "No update law and no energy term. The plugin maintains, per cell c, a set of boundary pixels\n\
+    \  B_k(c) = { x in c : there exists y in N_k(x) with cellId(y) != cellId(x) }\nwhere\n  x, y    :\
+    \ lattice sites (Point3D)\n  c       : a cell = the set of sites sharing one cell id\n  N_k(x)  :\
+    \ the k-th-order lattice neighbourhood of site x\n  k       : neighbor_order (>= 1); the medium (null\
+    \ cell) counts as a different id.\nThe C++ core stores this per cell as pixelSet (the default-order\
+    \ set) and pixelSetMap\n(order k -> set), each element a BoundaryPixelTrackerData whose `pixel` is\
+    \ one coordinate.\nOn each ACCEPTED pixel copy the plugin updates B_k for the site(s) that changed\
+    \ owner and for\ntheir neighbours (add / remove / re-test membership) so the sets stay exact without\
+    \ a full\nrescan. That incremental re-test is compiled C++ (libCC3DBoundaryPixelTracker.so) and was\
+    \ NOT\nread directly here; the watcher / incremental-update model is inferred from the per-cell\n\
+    pixelSetMap + BoundaryPixelTrackerAccessor structure and CC3D's CellGChangeWatcher architecture.\n"
+  params:
+    neighbor_order: 'boundary_detection_range -- the lattice neighbour-shell order k used to decide whether
+      a cell
+
+      site is a boundary site, and which orders are tracked and therefore queryable. Integer >= 1
+
+      (check_dict rejects x < 1 as "Neighbor order must be positive"); default 1. The <NeighborOrder>
+
+      CC3DML element is emitted only when k > 1.
+
+      '
+  state_io:
+    reads: 'The cell-id lattice in the neighbourhood of each changed site (which cell owns each neighbouring
+
+      site, medium included). It reads no PDE field and no energy.
+
+      '
+    writes: 'A per-cell auxiliary index ONLY: pixelSet / pixelSetMap (neighbour order -> set of boundary-pixel
+
+      coordinates), attached to each cell through BoundaryPixelTrackerAccessor. It writes NOTHING to the
+
+      cell-id lattice, to any field, or to the Hamiltonian -- a simulation with this plugin loaded is
+
+      bit-identical to one without it. The plugin exists solely so other mechanisms can read a cell''s
+
+      boundary sites cheaply.
+
+      '
+  surprises:
+  - 'Pure index / monitor: it returns no energy delta and performs no field write, so unlike a Plexus
+
+    operator it changes no simulated state at all. Modelling it as a state update makes it look like a
+
+    phantom no-op (record.py R7 exists precisely because three such no-ops shipped undetected). The
+
+    honest statement is that this "mechanism" is auxiliary state that other mechanisms consume.
+
+    '
+  - 'Boundary pixels != all pixels. This is the sibling of PixelTracker, which keeps EVERY site of a
+
+    cell; BoundaryPixelTracker keeps only sites adjacent to a different owner. Reimplementing it as
+
+    "track all pixels" is the obvious wrong turn and silently changes what downstream queries see.
+
+    '
+  - 'neighbor_order is 1-based and must be >= 1; the <NeighborOrder> XML element is written ONLY when
+
+    > 1 (the default 1 stays implicit). Emitting it at order 1 yields different CC3DML than the
+
+    reference even though it is semantically equivalent.
+
+    '
+  - 'The declared neighbor_order bounds what is queryable: asking the plugin for a boundary set at an
+
+    order it was not told to track returns a null set and the Python iterator raises LookupError
+
+    (getPixelSetForNeighborOrderPtr). So the parameter is a declaration of which neighbour shells to
+
+    maintain, not merely a detection radius applied at query time.
+
+    '
+  - 'Medium (cell id 0 / the null cell) counts as a "different cell" for boundary membership, so a cell
+
+    touching only medium still has a full boundary set.
+
+    '
+  - 'What I could NOT establish from the readable sources (the update lives in the compiled .so):
+
+    whether the medium itself is given a tracked boundary set (BoundaryPixelTracker has no track_medium
+
+    flag, unlike PixelTracker, suggesting not), the exact neighbour re-test ordering per accepted copy,
+
+    and how 2nd+-order sets in pixelSetMap relate to the default-order pixelSet.
+
+    '
   verdict: null
   of: null
   implementation_of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -96,19 +474,104 @@ mechanisms:
   raw_name: BoxWatcher
   raw_kind: Steppable (BoxWatcherSteppable)
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L5490
-  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
-    CompuCell3D'
-  summary: BoxWatcher Steppable
-  equations: null
-  params: {}
-  state_io: null
-  surprises: null
+  paper_section: 'Not covered by Swat et al. (2012) Methods Cell Biol 110:325-366. BoxWatcher is a
+
+    computational-optimization steppable, absent from the modeling-methods text; the only
+
+    source anchor is the CC3DML generator docstring "Module tracing boundaries of the minimal
+
+    box enclosing all the cells. May speed up calculations. May have no effect for parallel
+
+    version" (twedit5 CC3DMLGenerator/CC3DMLGeneratorBase.py:L1288-1290, echoed at
+
+    CC3DProject/CC3DXMLGenerator.py:L1071). No paper page/figure has been read for this entry.
+
+    '
+  summary: 'A bookkeeping / performance steppable, NOT a physics term. Each step it traces the minimal
+
+    axis-aligned bounding box enclosing all non-medium cells, pads it per-axis by fixed margins,
+
+    and hands that box to the Potts solver so the Metropolis pixel-copy sweep samples only sites
+
+    inside it. It touches no cell state and no energy: it scopes WHERE flips are attempted, to
+
+    avoid sweeping empty lattice on domains much larger than the occupied region.
+
+    '
+  equations: "There is no energy term and no state update. The per-step bookkeeping (reconstructed from\n\
+    the docstring + margin semantics; the compiled core was not read) is, for each axis d in {x,y,z}:\n\
+    \n  lo_d = min over all lattice sites s belonging to any non-medium cell of s_d\n  hi_d = max over\
+    \ all lattice sites s belonging to any non-medium cell of s_d\n  BoxMin_d = clamp(lo_d - Margin_d,\
+    \ 0, Dim_d)\n  BoxMax_d = clamp(hi_d + Margin_d, 0, Dim_d)\n\nwhere Margin_d is XMargin/YMargin/ZMargin\
+    \ and Dim_d the lattice dimension. The Potts sweep\nthen draws candidate source pixels uniformly from\
+    \ [BoxMin, BoxMax] instead of the whole\nlattice. No dE is returned; no cell field is written. The\
+    \ clamp form and recompute cadence\nare inferred, not verified byte-for-byte.\n"
+  params:
+    XMargin: sweep_padding_x -- lattice sites of buffer added around the tight occupied box in x; default
+      7 (set only by the twedit generators, see surprises)
+    YMargin: sweep_padding_y -- same, y axis; default 7
+    ZMargin: sweep_padding_z -- same, z axis; default 7
+  state_io: 'reads: the occupied lattice-site extents of every non-medium cell -- a global reduction over
+
+    the whole cell set to one axis-aligned bounding box. writes: a GLOBAL BoxMin/BoxMax on the
+
+    Potts simulator that scopes the flip-attempt sampler''s spatial support. It writes NO cell
+
+    state and NO field, and returns NO energy delta -- it is neither an energy term nor a
+
+    per-cell update, but a modifier of the sampler''s domain.
+
+    '
+  surprises:
+  - 'It is neither of the two categories this campaign expects (energy term / state update). It
+
+    writes the SAMPLER''s spatial support -- a global box -- not any cell, field, or dE. In Plexus
+
+    terms nothing returns a delta the engine integrates; it is a domain-scoping / control
+
+    construct with no obvious operator analogue.
+
+    '
+  - 'The PyCoreSpecs wrapper is parameterless and LOSSY. `xml` emits only
+
+    `<Steppable Type="BoxWatcher"/>` via generate_header (no children); `from_xml` (L5509) calls
+
+    find_xml_by_attr then returns a bare `cls()`, so any XMargin/YMargin/ZMargin present in loaded
+
+    CC3DML is SILENTLY DROPPED on round-trip. Meanwhile the twedit5 snippet/project generators DO
+
+    emit XMargin=YMargin=ZMargin=7. Source-vs-source discrepancy on whether margins exist at all.
+
+    '
+  - 'The docstring warns it "may have no effect for parallel version": the optimization is bypassed
+
+    under the parallel/multithreaded Potts sweep, so the mechanism''s realized effect is
+
+    implementation/threading-dependent rather than a property of the model.
+
+    '
+  - 'Intended as a pure speedup, but restricting the sweep''s support changes which sites the sampler
+
+    visits, so a fixed-seed serial run WITH vs WITHOUT BoxWatcher is not obviously bit-identical
+
+    (the RNG/attempt sequence differs). Whether the core guarantees identical dynamics I could not
+
+    verify -- flagged as inference, not fact.
+
+    '
+  - 'The margin default of 7 is a magic constant living ONLY in the twedit generators. A
+
+    reimplementer following PyCoreSpecs (which sets nothing) would inherit whatever the compiled
+
+    default is -- unknown from this environment -- not 7.
+
+    '
   verdict: null
   of: null
   implementation_of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -150,19 +613,139 @@ mechanisms:
   raw_name: CenterOfMass
   raw_kind: Plugin (CenterOfMassPlugin)
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L3056
-  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
-    CompuCell3D'
-  summary: CenterOfMass Plugin
-  equations: null
+  paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366. NO dedicated section: CenterOfMass
+    is
+
+    plumbing, not a named mechanism in the chapter; the paper only invokes a cell''s centre of
+
+    mass indirectly, via COM-based chemotaxis and the "CenterOfMassBased" external-potential
+
+    algorithm. We have no extracted paper text for this target, so the only anchors I could
+
+    actually check are in the source: the class docstring at PyCoreSpecs.py:3056 and the
+
+    autoclass stub at doc/code_ref/user/build/core/PyCoreSpecs.rst:169.
+
+    '
+  summary: 'A per-cell lattice monitor (a CellGChangeWatcher), NOT an energy term. It maintains each
+
+    cell''s centre of mass. It has no dynamics of its own and contributes nothing to the Potts
+
+    Hamiltonian: it never changes the probability that a proposed pixel copy is accepted. On
+
+    every accepted spin-flip it updates, for the gaining and losing cell, the accumulated first
+
+    moment of the cell''s lattice sites and divides by the live site count (volume) to store the
+
+    centre of mass on the CellG struct. Its whole purpose is to publish derived state that OTHER
+
+    mechanisms read (COM-based chemotaxis, CenterOfMassBased external potential, mitosis split
+
+    orientation, connectivity).
+
+    '
+  equations: "A cell is a set S of lattice sites r = (x, y, z) sharing one cell id; volume V = |S| is\
+    \ the\nsite count. The plugin maintains two distinct fields per cell (both live on CellG):\n\n  first\
+    \ moment (raw coordinate sum):   xCM = sum over r in S of x   (likewise yCM, zCM)\n  centre of mass\
+    \ (normalized):         xCOM = xCM / V               (likewise yCOM, zCOM)\n\nThese are updated INCREMENTALLY,\
+    \ not recomputed. When an accepted copy adds site r to a cell\nand removes it from its neighbour,\
+    \ the watcher does, per affected cell:\n\n  add a site r:     xCM += x ;  V += 1 ;  then  xCOM = xCM\
+    \ / V\n  remove a site r:  xCM -= x ;  V -= 1 ;  then  xCOM = xCM / V   (guard V == 0)\n\nA third\
+    \ field, xCOMPrev/yCOMPrev/zCOMPrev, holds the centre of mass from the previous update\nso that consumers\
+    \ can form a per-MCS cell displacement d = COM - COMPrev (cell velocity).\n\nSymbols: xCM = code field\
+    \ CellG.xCM (first moment); xCOM = code field CellG.xCOM (= moment /\nvolume). The two names are NOT\
+    \ interchangeable.\n\nPeriodic-boundary caveat: for a cell straddling a wrap seam the naive coordinate\
+    \ sum is\nwrong; the core unwraps coordinates against the BoundaryStrategy before accumulating, then\n\
+    re-wraps xCOM back into [0, L). That correction lives in the compiled C++ core (see\nsurprises); I\
+    \ could NOT read its exact form, so the formulae above are the ordinary\n(non-periodic) case as the\
+    \ data model implies it, not a transcription of the wrap arithmetic.\n"
   params: {}
-  state_io: null
-  surprises: null
+  state_io:
+    reads: '- the location r = (x, y, z) of the pixel whose id changed on the accepted copy
+
+      - the affected cells'' current volume V (site count) and current xCM/yCM/zCM
+
+      (No CC3DML parameters: the plugin is parameterless. It emits only
+
+      <Plugin Name="CenterOfMass"/> with no child elements or attributes.)
+
+      '
+    writes: '- CellG.xCM, yCM, zCM  -- first moments (accumulated coordinate sums)
+
+      - CellG.xCOM, yCOM, zCOM  -- centre of mass ( = moment / volume )
+
+      - CellG.xCOMPrev, yCOMPrev, zCOMPrev  -- previous-update centre of mass (for displacement)
+
+      Writes NO energy / acceptance delta -- it is a pure state-derivation monitor.
+
+      Does NOT write the inertia tensor iXX..iZZ; that is the separate MomentOfInertia plugin
+
+      (PyCoreSpecs.py:5350). From Python these COM fields are READ-ONLY: the SWIG setters
+
+      (CompuCell.py:595-628) raise AttributeError on assignment.
+
+      '
+  surprises:
+  - 'Not a Hamiltonian term. Almost every CC3D plugin in this inventory is an energy contribution
+
+    that only tilts the acceptance probability. CenterOfMass returns no delta-E and never
+
+    influences which pixel copies are accepted; it is a CellGChangeWatcher that only derives
+
+    per-cell bookkeeping. A reimplementer expecting an energy contract will find none -- in the
+
+    Plexus algebra this reads more like a REDUCE over a set (moment, then divide) that publishes
+
+    a derived field, not an operator that returns a force/energy delta.
+
+    '
+  - 'Two different fields, easy to conflate: xCM (raw first moment = coordinate sum) versus xCOM
+
+    (= xCM / volume). The moment must be carried incrementally; dividing a stored sum by a stale
+
+    volume gives the wrong COM. xCOM is derived and read-only.
+
+    '
+  - 'Periodic-boundary correction. For a cell that straddles a periodic seam a plain coordinate
+
+    sum places the COM in the middle of the lattice instead of at the cell. CC3D unwraps
+
+    coordinates against the BoundaryStrategy before summing and re-wraps xCOM into the lattice.
+
+    This is the single subtlety most likely to be gotten wrong, and it lives in the unshipped
+
+    compiled core -- I could not read the exact arithmetic, only infer that it happens.
+
+    '
+  - 'Unguarded prerequisite. The Python spec makes CenterOfMass depend only on
+
+    [PottsCore, CellTypePlugin] (the base depends_on, PyCoreSpecs.py:305) and NOTHING in the
+
+    spec framework declares a depends_on CenterOfMass. Yet COM-based Chemotaxis and the
+
+    "CenterOfMassBased" ExternalPotential algorithm (PyCoreSpecs.py:2939) silently READ xCOM.
+
+    Omitting this plugin passes spec validation but yields zero/stale COM at runtime.
+
+    '
+  - 'xCOMPrev means the tracker also underwrites cell velocity: displacement per MCS is
+
+    COM - COMPrev. There is no separate "velocity" mechanism; that state is a side effect of
+
+    this plugin keeping a one-step history.
+
+    '
+  - 'Division-by-zero guard: when a cell loses its final pixel V hits 0 and the cell is slated
+
+    for removal; the xCOM = xCM / V step must be guarded or skipped for that cell.
+
+    '
   verdict: null
   of: null
   implementation_of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -208,19 +791,172 @@ mechanisms:
   raw_name: ConnectivityGlobal
   raw_kind: Plugin (ConnectivityGlobalPlugin)
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L4088
-  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
-    CompuCell3D'
-  summary: ConnectivityGlobal Plugin
-  equations: null
-  params: {}
-  state_io: null
-  surprises: null
+  paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366 -- the plugins / effective-energy chapter,
+    in
+
+    the discussion of connectivity constraints that keep a cell a single connected object. NOTE: no
+
+    paper text was available in this environment, so this anchor is the chapter''s known home for the
+
+    term, NOT a page I have read. The checkable source evidence is the class at PyCoreSpecs.py:L4088
+
+    (the CC3DML it emits), the compiled plugin method list at CompuCell.py:L5106-5178, and the test
+
+    XML at tests/plugin_test_suite/connectivity_global_fast_test_generate/Simulation/
+
+    connectivity_global_fast.xml.
+
+    '
+  summary: 'A per-cell-type opt-in Cellular-Potts constraint that keeps each enabled cell a SINGLE CONNECTED
+
+    BLOB of lattice sites. It writes no state: on every proposed pixel copy it checks whether the copy
+
+    would split the target cell''s site set into disconnected fragments and, if so, returns a large
+
+    positive energy penalty so the Metropolis rule rejects the copy. It is a TOPOLOGICAL (effectively
+
+    hard) constraint on the SET, not on its size or shape -- ablate it and a cell may pinch off islands
+
+    or shed pixels into medium; keep it and the cell stays simply one piece.
+
+    '
+  equations: "ConnectivityGlobal is a Cellular-Potts effective-energy term whose job is TOPOLOGICAL, not\
+    \ metric.\nIt writes nothing. On each proposed pixel copy (the id at a source site is proposed to\
+    \ overwrite a\nneighbour site) the plugin's changeEnergy asks whether the copy would FRAGMENT the\
+    \ target cell --\nsplit its set of lattice sites into more than one connected piece -- and returns\n\
+    \n  dE_conn = S     if the copy would fragment the cell (connected-components-after > 1)\n       \
+    \   = 0     otherwise\n\nwhere\n  S = connectivityStrength, a per-cell magnitude held in ConnectivityGlobalData\n\
+    \      (CompuCell.py:L5106-5112; get/setConnectivityStrength, L5144-5148). It is added as a\n    \
+    \  POSITIVE penalty, so with S large the Metropolis rule (accept if total dE <= 0, else\n      exp(-dE\
+    \ / T), T = Potts fluctuation_amplitude) ALWAYS rejects a fragmenting copy -- the\n      constraint\
+    \ is effectively HARD, not a soft quadratic.\n\nConnectedness is judged by checkIfCellIsFragmented\
+    \ -- a whole-cell flood fill over the cell's site\nset -- in the default \"global\" mode. With <FastAlgorithm/>\
+    \ set (fast=True) it instead uses\ncheck_local_connectivity / changeEnergyFast, a cheaper LOCAL-neighbourhood\
+    \ test that approximates\nthe same veto. \"Connected\" is defined by the Potts lattice adjacency (NeighborOrder),\
+    \ which is a\nPotts param, NOT a plugin param. NOTE: the exact returned value (fixed constant vs S\
+    \ scaled by the\nnumber of extra components, the sign, the default S) is reconstructed from the compiled\
+    \ method\nnames + the CC3DML the spec emits; the C++ changeEnergy body was NOT read (cc3d is not importable\n\
+    in this environment).\n"
+  params:
+    fast: 'algorithm_selector (performance / approximation-fidelity flag), ConnectivityGlobalPlugin(fast=...)
+
+      at PyCoreSpecs.py:L4094; emits <FastAlgorithm/> when True (xml, L4119-4120). False = the "global"
+
+      whole-cell flood-fill connectivity check (checkIfCellIsFragmented; exact but O(cell size) per
+
+      attempted copy). True = changeEnergyFast / check_local_connectivity, a LOCAL-neighbourhood
+
+      approximation that is much cheaper but can miss some global fragmentations. Same physical intent,
+
+      different fidelity/cost -- see surprises.
+
+      '
+    _cell_types: 'per_type_enable_set (opt-in whitelist), ConnectivityGlobalPlugin(fast, *_cell_types)
+      at
+
+      PyCoreSpecs.py:L4094-4106; each type name emits <ConnectivityOn Type="NAME"/> (xml, L4121-4122).
+
+      Only listed cell types have connectivity enforced; unlisted types -- and Medium -- are free to
+
+      fragment. Connectivity can ALSO be toggled on an individual cell from a steppable via
+
+      cell.connectivityOn = True, bypassing the type list (see the connectivity_global_fast_python
+
+      test steppable).
+
+      '
+    connectivityStrength: 'UNKNOWN (intended role = penalty magnitude / veto stiffness S). The actual
+      size of the energy
+
+      penalty is a per-cell field, ConnectivityGlobalData.connectivityStrength
+
+      (get/setConnectivityStrength, CompuCell.py:L5112,L5144-5148), and is NOT exposed by this Python
+
+      spec AT ALL. The PyCoreSpecs constructor lets you turn connectivity ON per type but gives no way
+
+      to set its strength or its default -- a magnitude nobody can tune from the spec. Its default
+
+      value, and whether the returned penalty is a fixed constant or scales with connectivityStrength,
+
+      were not determined from source.
+
+      '
+  state_io: "reads: the target cell's SET of lattice sites (its pixels and their adjacency under the Potts\n\
+    \  NeighborOrder) in order to test connectedness after the proposed copy -- via a whole-cell flood\n\
+    \  fill (global mode) or a local neighbourhood scan (fast mode); the per-type ConnectivityOn\n  whitelist\
+    \ and/or the per-cell cell.connectivityOn flag; and the per-cell connectivityStrength\n  magnitude.\n\
+    writes: nothing. It is a Potts effective-energy term -- it only returns a dE that changes the\n  acceptance\
+    \ probability of a proposed pixel copy (vetoing fragmenting ones); it never moves,\n  relabels, or\
+    \ writes cell state directly.\n"
+  surprises:
+  - 'The penalty MAGNITUDE is unreachable from the Python spec. The constructor exposes only fast
+
+    (bool) and an on/off list of cell types; the strength S lives entirely in the C++ per-cell
+
+    ConnectivityGlobalData and can only be set programmatically (setConnectivityStrength). A user
+
+    configuring via PyCoreSpecs gets a constraint whose stiffness they cannot tune and whose default
+
+    they cannot see from the spec.
+
+    '
+  - 'It is a HARD / topological constraint dressed as an energy term. Most CPM plugins here are soft
+
+    quadratics (volume, surface); this one instead returns a large veto penalty ONLY when a copy would
+
+    break the cell into pieces, so it behaves as a rejection rule rather than a gradient. A
+
+    reimplementer treating it as a tunable soft energy, or expecting it to gently pull toward
+
+    compactness, misreads it -- it does nothing at all until a copy threatens to fragment the cell.
+
+    '
+  - 'fast != global. <FastAlgorithm/> selects check_local_connectivity, a LOCAL neighbourhood
+
+    approximation; it can miss connectivity breaks that the whole-cell flood fill would catch, so the
+
+    two modes are not guaranteed to give identical topology. Choosing fast is a correctness/speed
+
+    trade, not a free speedup.
+
+    '
+  - '"Connected" is defined by the Potts NeighborOrder (lattice adjacency), which is NOT a plugin
+
+    parameter. The same plugin yields different topology under different neighbor orders (the test XML
+
+    uses NeighborOrder 2). A reimplementer must fix the adjacency definition explicitly; it is not
+
+    carried in this spec.
+
+    '
+  - 'Three sibling plugins are easy to confuse and are NOT interchangeable: Connectivity
+
+    (PyCoreSpecs.py:L4059 -- no params, no per-type list, the legacy whole-cell constraint),
+
+    ConnectivityGlobal (this one -- per-type opt-in, global-flood-fill or fast-local), and
+
+    ConnectivityLocalFlex (a SOFT local-energy variant with a tunable per-cell connectivityStrength,
+
+    ConnectivityLocalFlexData at CompuCell.py:L5051). The "Global"/"LocalFlex" naming is about the
+
+    connectivity ALGORITHM (whole-cell flood fill vs local energy), not about a spatial region.
+
+    '
+  - 'Per-cell override: cell.connectivityOn set from a steppable enables connectivity on individual
+
+    cells regardless of the type whitelist (connectivity_global_fast_python steppable turns it on for
+
+    cell.id < 100). So the declared spec is not the full story -- connectivity may be active on cells
+
+    the emitted XML never lists.
+
+    '
   verdict: null
   of: null
   implementation_of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -233,19 +969,141 @@ mechanisms:
   raw_name: Connectivity
   raw_kind: Plugin (ConnectivityPlugin)
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L4059
-  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
-    CompuCell3D'
-  summary: Connectivity Plugin
-  equations: null
-  params: {}
-  state_io: null
-  surprises: null
+  paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366. No extracted paper text is available
+
+    for this target, so no page/figure could be verified. The CHECKABLE anchors used here are
+
+    in-source: the class at PyCoreSpecs.py:4059 and the two CC3DML generators that document the
+
+    real mechanism -- CC3DMLGeneratorBase.py:614-632 and CC3DXMLGenerator.py:656-677.
+
+    '
+  summary: 'A Cellular-Potts ENERGY term (Potts plugin), NOT a state update. Per attempted single-pixel
+
+    copy it inspects the cell-id lattice around the target site and adds an energy penalty if the
+
+    copy would break the LOCAL connectivity of the affected cell -- i.e. split its set of lattice
+
+    sites into disconnected fragments (or fuse fragments). It writes no state; it only raises the
+
+    energy of, and therefore suppresses the acceptance of, connectivity-breaking flips. With the
+
+    compiled default penalty (10000000) this "soft" term behaves as a near-hard topological guard
+
+    that keeps every cell a single connected blob. Fast/local variant: 2D square lattice only,
+
+    requiring Potts NeighborOrder 1 or 2.
+
+    '
+  equations: "Potts acceptance uses total dE = sum over plugins of dE_p; Connectivity contributes dE_conn.\n\
+    For a proposed copy (a source pixel overwrites target pixel t's cell id):\n\n    dE_conn = Penalty\
+    \ * f(local connectivity change of the affected cell around t)\n    Penalty = 10000000           \
+    \ (compiled/CC3DML-generator default; one global scalar)\n    f = 0   if every affected cell stays\
+    \ locally connected after the copy\n    f > 0   (>= 1) if the copy would fragment a cell into disconnected\
+    \ pieces\n            within the Moore neighbourhood of t\n\nMetropolis acceptance:  p_accept = 1\
+    \ if dE_total <= 0 else exp(-dE_total / T).\nBecause Penalty (1e7) >> typical T (5-100), any fragmenting\
+    \ copy gets p ~ exp(-1e7/T) ~ 0,\nso the term acts as an effectively hard constraint (cells cannot\
+    \ disconnect).\n\nCAVEAT (could not verify at source): the exact form of f -- a boolean gate vs. a\
+    \ count of the\nconnected components introduced -- lives in the compiled C++ ConnectivityPlugin, which\
+    \ is NOT\nSWIG-exposed and whose C++ source is not in this install. Verified from source: the single\n\
+    global Penalty (default 1e7), and the 2D / square-lattice / NeighborOrder<=2 restriction.\n"
+  params:
+    penalty:
+      role: connectivity_constraint_strength
+      detail: 'Global energy penalty added for a pixel copy that breaks a cell''s local connectivity.
+
+        Compiled and CC3DML-generator default 10000000. It is ONE value shared by EVERY cell
+
+        (not per-type, not per-cell). NOT a PyCoreSpecs constructor argument: the Python
+
+        ConnectivityPlugin takes no arguments and emits a bare <Plugin Name="Connectivity"/>, so
+
+        through the Python spec the penalty is pinned at the compiled default and cannot be tuned.
+
+        Per-cell strength requires the ConnectivityLocalFlex sibling (setConnectivityStrength);
+
+        per-type strength requires ConnectivityGlobal (<Penalty Type=...>).
+
+        '
+    neighbor_order:
+      role: interaction_neighborhood_order
+      detail: 'Not a plugin parameter -- read from the Potts <NeighborOrder>. This plugin REQUIRES it
+        to
+
+        be 1 or 2 (and a 2D square lattice); outside that regime its local connectivity check is
+
+        undefined. An implicit external precondition, silently assumed, not validated by the spec.
+
+        '
+  state_io:
+    reads: "- the cell-id lattice (site -> cellId field) in the Moore neighbourhood of the proposed\n\
+      \  target pixel, for the cell(s) whose connectivity the copy could change\n- Potts <NeighborOrder>\
+      \ (must be 1 or 2) and a 2D square lattice (implicit preconditions)\n"
+    writes: "- none. This is a Potts ENERGY plugin: its changeEnergy returns a scalar dE and mutates no\n\
+      \  state. It changes only the probability that the proposed pixel copy is accepted.\n"
+  surprises:
+  - 'The Python spec exposes NO parameter at all: ConnectivityPlugin() takes no args and its xml
+
+    emits only <Plugin Name="Connectivity"/>. A reimplementer reading the Python declaration
+
+    would conclude the mechanism is parameter-free -- but CC3DML (and BOTH twedit generators)
+
+    support a global <Penalty> whose default is 10000000. Via the Python spec you silently get
+
+    that default and cannot change it.
+
+    '
+  - 'The default penalty (1e7) is ~5-6 orders of magnitude larger than a typical Potts
+
+    temperature (5-100). So this nominally SOFT energy term behaves as a HARD topological
+
+    constraint: connectivity-breaking flips are essentially never accepted. Reimplementing it
+
+    with a modest penalty gives a qualitatively different, leaky constraint.
+
+    '
+  - 'Silent applicability restriction: works ONLY in 2D, ONLY on a square lattice, and ONLY with
+
+    NeighborOrder 1 or 2. None of this is enforced by the Python spec. For 3D / non-square
+
+    lattices use ConnectivityGlobal (BFS-based, per-type Penalty); for per-cell strength use
+
+    ConnectivityLocalFlex. The three are easy to conflate.
+
+    '
+  - '"Penalty specified globally for each cell" means ONE scalar for ALL cells, not per-type as
+
+    with Contact/Volume/Surface. Contrast the siblings: ConnectivityGlobal is per-type, and
+
+    ConnectivityLocalFlex is per-individual-cell. Easy to wrongly assume per-type granularity.
+
+    '
+  - 'The plain plugin is NOT SWIG-exposed: cc3d.cpp.CompuCell defines ConnectivityGlobalPlugin
+
+    and ConnectivityLocalFlexPlugin but no plain ConnectivityPlugin. It is a compiled Potts
+
+    energy plugin registered internally (Potts3D.registerConnectivityConstraint /
+
+    getConnectivityConstraint). Its changeEnergy cannot be inspected or overridden from Python,
+
+    and the exact local-connectivity formula is not readable in this install.
+
+    '
+  - 'The quantity read is cell TOPOLOGY -- the connected-component structure of a set of lattice
+
+    sites -- not a continuous cell property. There is no differentiable field; the "energy" is a
+
+    combinatorial indicator over the lattice neighbourhood. Any representation without an
+
+    explicit lattice / site-set (e.g. a point-with-radius cell) cannot compute this at all.
+
+    '
   verdict: null
   of: null
   implementation_of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -258,21 +1116,186 @@ mechanisms:
   raw_name: ContactInternal
   raw_kind: Plugin (ContactInternalPlugin)
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L3350
-  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
-    CompuCell3D'
-  summary: ContactInternal Plugin
-  equations: null
-  params: {}
-  state_io: null
-  surprises: null
+  paper_section: 'CC3D Reference Manual, "Compartmentalized Cells (ContactInternal Plugin)"
+
+    (compucell3dreferencemanual.readthedocs.io/en/latest/compartments.html), the checkable
+
+    anchor I actually read; underlying adhesion Hamiltonian in Swat et al. (2012) Methods Cell
+
+    Biol 110:325-366. NO extracted paper text is available for this target, so the
+
+    ContactInternal-specific behavior below is anchored to the source + reference manual, NOT to
+
+    a paper page number.
+
+    '
+  summary: 'A Cellular-Potts adhesion ENERGY TERM (an EnergyFunction), not a state update, for
+
+    compartmentalized cells. At every lattice boundary between two DIFFERENT sub-cells that share
+
+    the SAME cluster id (i.e. two compartments of one composite cell), it contributes a contact
+
+    energy J_int(type_i, type_j). It is the intra-cluster complement of the ordinary Contact
+
+    plugin, and is typically run alongside it. It writes no state: the engine calls
+
+    changeEnergy() for a proposed pixel copy and gets back a scalar delta-E that only biases the
+
+    Metropolis acceptance probability. In the source it is a one-line subclass
+
+    (ContactInternalPlugin -> ContactLocalFlexPlugin -> ContactPlugin) whose only addition over
+
+    the base Contact energy is the same-cluster restriction; all tunables are inherited unchanged.
+
+    '
+  equations: "ContactInternal is a Potts EnergyFunction (an additive term of the effective Hamiltonian),\n\
+    not an update that writes state. Conceptually it adds an intra-cluster adhesion energy:\n\n  E_internal\
+    \ = SUM over neighbor-pixel pairs (i,j) of\n                 J_int( tau(sigma_i), tau(sigma_j) )\n\
+    \                 * [ 1 - delta(sigma_i, sigma_j) ]          # different cells only\n            \
+    \     * [ clusterId(sigma_i) == clusterId(sigma_j) ]   # same cluster only\n                 * w(d_ij)\
+    \                                   # optional distance weight\n\nSymbols: sigma_k = id of the cell\
+    \ owning pixel k; tau(sigma) = cell type of that cell;\nclusterId(sigma) = compartment/cluster id\
+    \ of that cell; delta = Kronecker delta (=1 iff the\ntwo pixels belong to the SAME cell, so a cell's\
+    \ own interior boundary contributes 0);\nJ_int = the symmetric per-type-pair internal contact-energy\
+    \ matrix (the <Energy Type1 Type2>\nentries); w(d_ij) = 1 normally, or 1/d_ij when WeightEnergyByDistance\
+    \ is set. Medium (null\ncell / clusterId 0) never satisfies the same-cluster test, so it contributes\
+    \ 0.\n\nWhat the code actually computes (confirmed by the .so symbols changeEnergy(Point3D, CellG*,\n\
+    CellG*), internalEnergy(CellG*, CellG*), setContactInternalEnergy(str,str,double),\ngetMaxNeighborIndexFromNeighborOrder\
+    \ / getMaxNeighborIndexFromDepth, Potts3D::getCellFieldG)\nis the DELTA for a proposed pixel copy\
+    \ at point pt from oldCell to newCell:\n\n  delta_E = SUM over n in neighbors(pt) within range of\n\
+    \              internalEnergy(newCell, cell_n) - internalEnergy(oldCell, cell_n)\n\nwhere internalEnergy(a,\
+    \ b) = J_int(tau_a, tau_b) if a != b AND clusterId(a)==clusterId(b)\nAND neither is Medium, else 0.\
+    \ delta_E enters the Metropolis rule: accept with prob 1 if\ndelta_E <= 0, else exp(-delta_E / T).\
+    \ Nothing on the lattice or on any cell is written.\n\nInteraction range = neighbor shells up to NeighborOrder,\
+    \ OR a Euclidean radius Depth when\nDepth is given (Depth overrides NeighborOrder).\n\nNOTE ON EVIDENCE:\
+    \ the .cpp (build path CompuCell3D/plugins/ContactInternal/\nContactInternalPlugin.cpp) is NOT on\
+    \ disk -- only the compiled .so. The same-cluster guard\nand the delta form above are read from the\
+    \ Python class chain in code_path, the .so symbol\ntable, the .so's own embedded description string\
+    \ (\"Handles internal adhesion energy between\nmembers of the same cluster (i.e. between compartments)\"\
+    ), the reference manual, and the\nexample XML -- not from a line-by-line reading of the C++ energy\
+    \ loop.\n"
+  params:
+    neighbor_order: 'interaction_range, in lattice neighbor shells (int, default 1). Sets how many rings
+      of
+
+      neighbor pixels around the change point are summed. Superseded by depth when depth is set.
+
+      '
+    depth: 'interaction_range, as a Euclidean radius (float, default null/None). When set it overrides
+
+      neighbor_order; the range comes from getMaxNeighborIndexFromDepth.
+
+      '
+    weight_energy_by_distance: 'distance_weighting_flag (bool, default False). When True, each neighbor
+      pair''s energy is
+
+      divided by the inter-pixel distance, down-weighting farther shells. Inherited from Contact.
+
+      '
+    energy: 'adhesion_energy coefficient J_int for one unordered cell-type pair, supplied per pair via
+
+      ContactEnergyParameter(type_1, type_2, energy). Units of Potts energy; negative = adhesion
+
+      (lower boundary cost), positive = repulsion. Only one triangle of the matrix is stored, so
+
+      lookup must be symmetrized (see surprises).
+
+      '
+    type_1: 'identity label (not a tunable): first cell-type name of the pair the energy applies to.
+
+      '
+    type_2: 'identity label (not a tunable): second cell-type name of the pair the energy applies to.
+
+      '
+  state_io:
+    reads:
+    - cell.type (tau) of the source pixel's cell and of each neighbor cell -- indexes J_int
+    - cell.id (sigma) of both cells, to evaluate the different-cell guard delta(sigma_i,sigma_j)
+    - cell.clusterId of both cells -- the same-cluster guard; the defining read of this plugin
+    - the lattice cell field (Potts3D::getCellFieldG) and neighbor geometry (BoundaryStrategy)
+    - the proposed flip at the change point -- newCell (candidate) and oldCell (current)
+    - the internal-energy matrix J_int (a plugin parameter, not lattice state)
+    writes:
+    - NONE. ContactInternal is a Potts EnergyFunction; changeEnergy() returns a scalar delta-E
+    - that only biases Metropolis acceptance. It mutates no cell attribute and no field.
+    - (Per loop rule 8, this is an energy term, not an update -- forcing it into write language
+    - would misrepresent it.)
+  surprises:
+  - 'Writes nothing. A reimplementer expecting a read/modify/write step will build the wrong
+
+    thing: this returns a delta-E that only changes the ACCEPTANCE PROBABILITY of a proposed
+
+    pixel copy. It has no effect except through the Metropolis rule with temperature T.
+
+    '
+  - 'The energy fires ONLY between DIFFERENT cells in the SAME cluster. It is silently zero for
+
+    same-cell interior boundaries, for cross-cluster boundaries, and for any pair touching
+
+    Medium. This same-cluster restriction is the entire difference from the ordinary Contact
+
+    plugin -- the Python class adds literally nothing else (just name/registered_name).
+
+    '
+  - 'ContactInternal is ADDITIVE with, not a replacement for, the Contact plugin: real decks run
+
+    both (see the example XML with a <Contact> and a <ContactInternal> block). Contact keys off
+
+    cell id only and does not check clusterId, so an intra-cluster boundary is scored by BOTH
+
+    terms (J_contact + J_int). A reimplementer who assumes ContactInternal supersedes Contact
+
+    inside a cluster will double-remove or mis-total the intra-cluster adhesion. (I did not read
+
+    Contact''s C++ changeEnergy line-by-line to confirm it ignores clusterId -- verify before
+
+    relying on the additive claim.)
+
+    '
+  - 'The J matrix is symmetric and order-independent, but only ONE triangle is stored:
+
+    param_append raises if (t1,t2) OR (t2,t1) is already present (types_specified checks both
+
+    directions). Lookup must be symmetrized; iterating the stored dict alone misses the mirror
+
+    entries.
+
+    '
+  - 'Depth (a Euclidean radius, float) SILENTLY OVERRIDES NeighborOrder (integer shells) when
+
+    both are provided -- confirmed at source in the inherited ContactPlugin.xml (PyCoreSpecs.py
+
+    L3217-3220): it emits <Depth> if depth is not None and only ELSE emits <NeighborOrder>, so a
+
+    set depth silently drops the neighbor_order. Two different notions of "range" with an
+
+    undocumented precedence.
+
+    '
+  - 'WeightEnergyByDistance changes the effective magnitude of every J_int by dividing each pair
+
+    by its inter-pixel distance, so the same numeric energy means different physics at different
+
+    neighbor orders. Off by default.
+
+    '
+  - 'The plugin does nothing without the compartment machinery: sub-cells must be given matching
+
+    clusterId values via Python steppables ("Cluster Id" / "Cluster Id Reassignment"). With no
+
+    clusters assigned, every same-cluster test is trivially satisfied only within a single cell
+
+    (which is excluded anyway), so E_internal is identically 0. The energy matrix alone is inert.
+
+    '
+  status: inspected
+  module: null
+  test: null
   verdict: null
   of: null
   implementation_of: null
   why: null
   contract: null
-  status: candidate
-  module: null
-  test: null
   evidence:
     oracle_run: null
     diff_metric: null
@@ -283,21 +1306,145 @@ mechanisms:
   raw_name: ContactLocalFlex
   raw_kind: Plugin (ContactLocalFlexPlugin)
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L3339
-  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
-    CompuCell3D'
-  summary: ContactLocalFlex Plugin
-  equations: null
-  params: {}
-  state_io: null
-  surprises: null
+  paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366, contact/adhesion energy term
+
+    (the boundary-energy sum J(tau,tau'')(1-delta)). NOTE: no paper text is available in
+
+    this environment, so no page/eq number is verified. Checkable source anchors:
+
+    PyCoreSpecs.py:L3339 (class docstring "A steerable version of ContactPlugin");
+
+    parent ContactPlugin at L3141; C++ doc cpp/CompuCell/plugins/ContactLocalFlexPlugin.rst;
+
+    compiled classes in cpp/CompuCell.py L6379-6591.
+
+    '
+  summary: 'A steerable, per-cell variant of the Contact adhesion plugin. It contributes the
+
+    standard Potts boundary/adhesion energy to the Metropolis acceptance of a proposed
+
+    pixel copy, but the pairwise contact energy J is not read from a static cell-TYPE
+
+    matrix -- it is stored on EACH CELL as an attribute (a ContactLocalFlexDataContainer
+
+    holding per-neighbour J values plus a local default-energy table). The type-pair
+
+    energies given in the spec seed those per-cell defaults; setContactEnergy() can then
+
+    override J for an individual cell (or cell-cell pair) at runtime, so adhesion is
+
+    locally adjustable/"flexible" and steerable while the simulation runs. Writes no
+
+    lattice state; as a change-watcher it maintains the per-cell contact data as pixels flip.
+
+    '
+  equations: "Contact (boundary) energy, summed over neighbouring lattice-site pairs within the\ninteraction\
+    \ range:\n\n    E_contact = sum over neighbour pairs (i,j) of  J(sigma_i, sigma_j) * (1 - delta(sigma_i,\
+    \ sigma_j))\n\nwhere\n  sigma_i        = cell id occupying site i,\n  delta(a,b)     = Kronecker delta\
+    \ (1 if same cell id, else 0) -- so only pairs\n                   straddling a cell boundary contribute,\n\
+    \  neighbour pairs = sites j within neighbor_order (adjacency shell) or, if depth is\n           \
+    \        set, within Euclidean distance depth of site i,\n  J(sigma_i,sigma_j) = contact energy for\
+    \ that specific pair.\n\nDifference from plain Contact (this is the whole point of \"LocalFlex\"):\n\
+    \  plain Contact:  J = J_matrix[type(sigma_i)][type(sigma_j)]   (global TYPE-pair table)\n  ContactLocalFlex:\
+    \ J = contactEnergy(sigma_i, sigma_j), looked up from cell sigma_i's\n                    per-cell\
+    \ ContactLocalFlexDataContainer -- its per-neighbour map,\n                    falling back to that\
+    \ cell's localDefaultContactEnergies (seeded from\n                    the spec's type-pair energies).\
+    \ Modifiable per cell at runtime.\n\nIf weight_energy_by_distance is set, each pair term is divided\
+    \ by the site-site\ndistance d(i,j) so more distant neighbours in higher-order shells contribute less.\n\
+    \nchangeEnergy() returns the delta:  dE = E_contact(after copy) - E_contact(before copy).\nThe proposed\
+    \ copy is accepted with probability 1 if dE <= 0, else exp(-dE / T).\n"
+  params:
+    neighbor_order:
+      role: interaction_range (integer adjacency shell; how many rings of lattice neighbours the boundary-energy
+        sum reaches over; 1 = nearest neighbours)
+    depth:
+      role: interaction_range (continuous alternative -- max Euclidean neighbour distance; when set it
+        overrides neighbor_order in the emitted CC3DML)
+    weight_energy_by_distance:
+      role: distance_weighting flag (divide each neighbour-pair energy by site-site distance so farther
+        neighbours contribute less)
+    ContactEnergyParameter(type_1, type_2, energy):
+      role: adhesion_energy per cell-type pair -- these values SEED the per-cell default contact-energy
+        table (localDefaultContactEnergies) that the local per-cell J's start from; higher J = weaker
+        adhesion / higher boundary cost
+  state_io:
+    reads: "- the cell-id lattice sigma (to identify each site's owning cell and evaluate delta)\n- each\
+      \ cell's ContactLocalFlexDataContainer extra-attribute: contactDataContainer\n  (per-neighbour-cell\
+      \ J values) and localDefaultContactEnergies (per-type default J),\n  accessed via the contactlocalflex\
+      \ container accessor\n- neighbour lattice sites within neighbor_order / depth\n- Potts temperature\
+      \ T (for the acceptance function, applied by the engine)\n"
+    writes: "- NO lattice/cell state. This is an ENERGY TERM: changeEnergy() returns a scalar dE\n  that\
+      \ only changes the probability the engine accepts a proposed pixel copy.\n- side channel: as a CellGChangeWatcher\
+      \ it maintains its own per-cell contact-data\n  bookkeeping when pixels flip; setContactEnergy()/steering\
+      \ writes per-cell (or\n  per-pair) J into that container -- state internal to the plugin, not a\
+      \ field others read.\n"
+  surprises:
+  - 'It is NOT a new mechanism: the energy functional is identical to plain Contact. The
+
+    only difference is WHERE J lives -- a per-cell attribute instead of a global
+
+    type-pair matrix -- which makes adhesion individually settable and runtime-steerable.
+
+    A reimplementer who copies Contact will get the same equation but miss the per-cell
+
+    storage and the setContactEnergy() runtime override that is the entire purpose.
+
+    '
+  - 'The Python spec (PyCoreSpecs.py) is a bare subclass of ContactPlugin with ZERO extra
+
+    fields -- same __init__, same xml, same ContactEnergyParameter entries. The type-pair
+
+    energies you pass are therefore only INITIAL DEFAULTS; nothing in the Python API sets
+
+    a per-cell J. The local override lives entirely in the C++ core (setContactEnergy)
+
+    and must be driven from a steppable, so the "flex" is invisible if you read only the spec.
+
+    Even _PyCoreSteerableInterface is redundant here: ContactPlugin (L3141) already
+
+    inherits it, so at the Python-spec level ONLY name/registered_name
+
+    ("contact_local_flex"/"ContactLocalFlex") distinguish this from plain Contact; the
+
+    registered_name is what binds it to the different C++ plugin that stores per-cell J.
+
+    '
+  - 'ContactInternal (PyCoreSpecs.py:L3350) is the SAME class, subclassed only to change
+
+    registered_name -- it applies the identical per-cell contact energy but between
+
+    COMPARTMENTS of a single cluster cell rather than between whole cells.
+
+    '
+  - 'delta(sigma_i, sigma_j) uses cell IDS, not types: two adjacent cells of the same type
+
+    still incur boundary energy (they are different ids). Only sites inside one cell cancel.
+
+    '
+  - 'weight_energy_by_distance only matters for neighbor_order > 1 / depth > 1; at nearest-
+
+    neighbour range every pair is at the same distance and the flag is a no-op.
+
+    '
+  - 'The base class in the compiled core is CellGChangeWatcher (cpp/CompuCell.py:L6543),
+
+    not a plain energy function -- ordering matters: the per-cell contact-data container
+
+    must be kept in sync as pixels flip, so this plugin both watches changes AND scores
+
+    energy. No standalone ablation run exists for it (contact_adhesion evidence covers the
+
+    plain Contact energy; the LocalFlex per-cell behaviour is unmeasured here).
+
+    '
+  status: inspected
+  module: null
+  test: null
   verdict: null
   of: null
   implementation_of: null
   why: null
   contract: null
-  status: candidate
-  module: null
-  test: null
   evidence:
     oracle_run: null
     diff_metric: null
@@ -343,19 +1490,155 @@ mechanisms:
   raw_name: Curvature
   raw_kind: Plugin (CurvaturePlugin)
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L5043
-  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
-    CompuCell3D'
-  summary: Curvature Plugin
-  equations: null
-  params: {}
-  state_io: null
-  surprises: null
+  paper_section: 'Not locatable in the extractable Swat et al. (2012) Methods Cell Biol 110:325-366 text
+    (no
+
+    page verified). The only checkable anchor is the source: CurvaturePlugin.cpp changeEnergy
+
+    (L347) and calculateInverseCurvatureSquare (L336), mirrored in the installed binary
+
+    libCC3DCurvature.so. Concept documented as the CC3D reference-manual "Curvature Plugin"
+
+    (used with compartmental cells / FocalPointPlasticity to stiffen chains of cells).
+
+    '
+  summary: 'A Cellular-Potts ENERGY TERM that penalizes bending of chains of compartmental cells linked
+
+    by junctions the plugin maintains itself. For every three consecutive linked cells it adds
+
+    lambda * kappa to the Hamiltonian, where kappa is the Menger curvature (1/circumradius) of
+
+    the three cells'' centers of mass -- zero for a straight chain, larger the more it bends -- so
+
+    the constraint drives linked chains toward straight lines. changeEnergy writes NO cell state
+
+    (it returns dE for a proposed pixel copy, recomputing affected COMs with +/-1 volume). It
+
+    ALSO grows the junction graph: when a proposed copy could form a new within-cluster junction
+
+    it biases that move by activation_energy, and the bond is actually committed (or an emptied
+
+    cell''s bonds erased) in the field3DChange watcher on accepted moves.
+
+    '
+  equations: "Per triple of consecutive junction-linked cells with COMs L (left), M (mid), R (right):\n\
+    \n  kappa(L,M,R) = 2 * sin(theta_M) / |R - L|\n  sin(theta_M) = |(L-M) x (R-M)| / (|L-M| * |R-M|)\
+    \          # cross-product magnitude\n\ntheta_M is the chain angle at the middle cell; kappa is the\
+    \ Menger curvature of the three\npoints = 1/R_circ (reciprocal circumradius). Straight -> theta_M=0\
+    \ -> sin=0 -> kappa=0.\n(Source calls this calculateInverseCurvatureSquare -- a MISNOMER: it is neither\
+    \ inverted nor\nsquared; it is the plain curvature. CurvaturePlugin.cpp:L336-345.)\n\nBending energy\
+    \ of the whole chain:  E = sum over triples of  lambda * kappa(L,M,R)\nwith lambda = internalCurvatureParamsArray[first-pair\
+    \ types].lambdaCurvature (symmetric).\n\nWhat changeEnergy actually returns (CurvaturePlugin.cpp:L347-829)\
+    \ is the DELTA for one\nproposed pixel copy at pt (gaining cell volume+1, losing cell volume-1, COMs\
+    \ recomputed via\nprecalculateCentroid):\n  dE = sum over affected triples of  lambda * ( kappa_after\
+    \ - kappa_before )\nwhere the affected triples are the up-to-5 triples spanning 3 hops each side of\
+    \ the changed\ncell along the junction chain.\n\nJunction-creation term (CurvaturePlugin.cpp:L233-334,\
+    \ L373-383): if newCell at pt can form a\nnew within-cluster junction (partner cell same clusterId,\
+    \ both types listed, both with\nfewer than max_junctions bonds, no existing bond, partner within neighbor_order\
+    \ lattice\nshells) then instead of a curvature delta,\n  dE = activation_energy      # a fixed offset,\
+    \ typically negative to favour bonding\nand the bond is inserted symmetrically in field3DChange only\
+    \ if the move is accepted.\n\nDEAD CODE (defined, never called): potentialFunction(lambda,offset,d0,d)\
+    \ = offset +\nlambda*(d-d0)^2 (harmonic spring), and diffEnergyByType/diffEnergyLocal/diffEnergyGlobal\
+    \ all\n`return 0.0`. Constructor members targetDistance(0) and maxDistance(1000) are never read.\n\
+    These are vestiges of the FocalPointPlasticity template this plugin was cloned from.\n"
+  params:
+    lambda_curve: 'bending_stiffness -- curvature modulus lambda, multiplies the Menger curvature of each
+
+      chain triple (per cell-type pair). Zero disables the bending penalty.
+
+      '
+    activation_energy: 'junction_formation_energy -- fixed dE offset added to a move that creates a new
+
+      within-cluster junction (per type pair); negative values favour bond formation.
+
+      '
+    type1: type_pair_selector -- first cell type the lambda/activation apply to (symmetric with type2)
+    type2: type_pair_selector -- second cell type of the pair
+    cell_type: type_selector -- which cell type the junction limits below apply to
+    max_junctions: 'max_connectivity -- cap on junctions a cell of this type may hold (2 = interior of
+      a chain,
+
+      1 = chain endpoint, 0 = never bonds).
+
+      '
+    neighbor_order: interaction_range -- lattice neighbor-shell order searched for junction partners
+  state_io:
+    reads: "- cell center of mass and volume (xCM/yCM/zCM, volume) of the changed cell and of its\n  junction\
+      \ neighbors up to 3 hops each side along the chain\n- each cell's junction set (CurvatureTracker.internalCurvatureNeighbors,\
+      \ in extra attributes)\n- cell type, clusterId\n- the cell lattice field around pt (getNeighborDirect\
+      \ up to neighbor_order) when scouting\n  a new junction partner\n"
+    writes: "- changeEnergy writes NO cell state; it returns a dE (energy term, not an update).\n- field3DChange\
+      \ (accepted-move watcher) DOES mutate topological state: inserts a new\n  junction into both cells'\
+      \ internalCurvatureNeighbors sets on an accepted bond-forming\n  move, and erases all references\
+      \ to a cell whose volume reached 0.\n"
+  surprises:
+  - 'MISNOMER: calculateInverseCurvatureSquare returns neither an inverse nor a square. It is
+
+    the Menger curvature kappa = 2*sin(theta)/|chord| = 1/R_circ (linear in curvature), and the
+
+    energy is lambda*kappa, zero for a straight chain. A reimplementer trusting the name would
+
+    invert or square it and get the physics backwards.
+
+    '
+  - 'Junctions are the plugin''s OWN topological state, not read from FocalPointPlasticity (the
+
+    two are separate plugins that happen to be used together). Bonds form only WITHIN a cluster
+
+    (same clusterId = compartmental cells), only between listed types, only up to max_junctions,
+
+    only if none already exists. So Curvature is a hybrid: a Potts energy term PLUS a stateful
+
+    bond-graph watcher -- not a pure energy plugin.
+
+    '
+  - 'Vestigial code changes the physics you would guess: potentialFunction (harmonic
+
+    offset+lambda*(d-d0)^2), targetDistance, maxDistance, and diffEnergyBy* are all present but
+
+    inert (never called / return 0). ONLY lambda_curve and activation_energy affect dynamics;
+
+    targetDistance/maxDistance from the CC3DML are silently ignored.
+
+    '
+  - 'APPARENT BUG in the "middle cell about to disappear" branch (volume 1->0): three
+
+    reconnection terms add curvature WITHOUT the lambda factor (CurvaturePlugin.cpp:L674, L682,
+
+    L687 -- `energy += calculateInverseCurvatureSquare(...)` with no `lambda *`), inconsistent
+
+    with every other branch. To match the oracle a faithful port must reproduce the missing
+
+    factor, not "fix" it.
+
+    '
+  - 'lambda for a triple (A,B,C) is looked up by the FIRST pair''s types
+
+    (internalCurvatureParamsArray[A.type][B.type]), not the mid-vertex pair; the index is a
+
+    symmetric bit-pack (min+1)|((max+1)<<16), so [a][b]==[b][a]. Matters only when types differ
+
+    along the chain.
+
+    '
+  - 'The two bonds of a cell are labelled left/right by std::set ordering on the neighbor
+
+    POINTER (CurvatureTracker.h:L40-42), i.e. arbitrary, not geometric. Chain traversal walks up
+
+    to 3 hops each side; only cells with <=2 junctions form a proper chain.
+
+    '
+  - 'Source comment (CurvaturePlugin.cpp:L349) states it does NOT work correctly under periodic
+
+    boundary conditions. The plugin also force-loads the CenterOfMass plugin on init.
+
+    '
   verdict: null
   of: null
   implementation_of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -368,19 +1651,128 @@ mechanisms:
   raw_name: DiffusionSolverFE
   raw_kind: Steppable (DiffusionSolverFE)
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L6242
-  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
-    CompuCell3D'
-  summary: DiffusionSolverFE
-  equations: null
-  params: {}
-  state_io: null
-  surprises: null
+  paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366, sec. "PDE Solvers" (DiffusionSolverFE).
+
+    Checkable in-tree anchor for the algorithm: cc3d/twedit5/Plugins/CC3DProject/diffusion_solvers_descr.py:7
+
+    ("Uses Forward Euler method and handles moving boundary conditions. May be slow for large
+
+    diffusion constants."); FTCS stability limits at CC3DXMLGenerator.py:884.
+
+    '
+  summary: 'A steppable that advances one or more scalar concentration FIELDS defined over the CPM
+
+    pixel lattice by one explicit forward-Euler (FTCS) step per Monte Carlo Step: reaction-
+
+    diffusion-decay with a secretion source, cell-type-dependent coefficients, and per-face
+
+    boundary conditions. It is a genuine field->field WRITE (unlike the energy-term plugins in
+
+    this atlas): it overwrites the concentration grid c in place. The physics lives in the
+
+    compiled core; PyCoreSpecs.py only declares the CC3DML the solver reads.
+
+    '
+  equations: "Per site i and field, one step (transcribed from the OpenCL uniDiff kernel L954-L1054;\n\
+    DeltaX = DeltaT = 1 by default). NN(i) is the diffusion neighbourhood (N sites, set by the\nfield\
+    \ NeighborOrder); D_i, lambda_i are the coefficients of the cell type occupying i.\n\n  isoSum_i \
+    \ = D_i * ( SUM_{j in NN(i)} c_j^t  -  N * c_i^t ) / 2\n  varSum_i  = ( SUM_{j in NN(i)} D_j * ( c_j^t\
+    \ - c_i^t ) ) / 2\n  c_i^{t+1} = (dt / dx^2) * ( isoSum_i + varSum_i )  +  ( 1 - dt*lambda_i ) * c_i^t\
+    \   + S_i\n\nThe TWO half-sums (centre-cell D_i, plus each neighbour's own D_j, each /2) are a symmetric\n\
+    average of the face flux -- the variable-diffusion scheme, needed when D differs across a\nface. For\
+    \ UNIFORM D they recombine exactly to the plain discrete Laplacian:\n  isoSum + varSum = D * ( SUM_j\
+    \ c_j - N c_i )\nso  c_i^{t+1} = c_i + (dt/dx^2) D grad^2_discrete c - dt*lambda*c + S = explicit\
+    \ FE for\ndc/dt = D grad^2 c - lambda c + S.\n\nSymbols:\n  c_i        concentration at pixel i (a\
+    \ field value, not cell state)\n  NN(i)/N    diffusion-neighbour pixels and their count (von Neumann-style;\
+    \ 1st shell = 4 in 2D,\n             6 in 3D; widened by the field NeighborOrder)\n  D_i        diffusion\
+    \ coefficient at i = diff_types[type(cell at i)] if set, else diff_global\n  lambda_i   decay coefficient\
+    \ at i    = decay_types[type(cell at i)] if set, else decay_global\n  S_i        secretion (SEPARATE\
+    \ sweep, order-dependent): for a cell of type t occupying i, add\n             value (mode Secretion,\
+    \ optional relative/max uptake sink), or CLAMP c_i := value\n             (mode ConstantConcentration\
+    \ / Dirichlet, re-pinned each step), or add only when a\n             neighbour site holds a different\
+    \ cell id of a named type (SecretionOnContact)\nThis is the SOURCE's method (\"Forward Euler\", FE);\
+    \ the continuous PDE is the paper's, the\nper-cell-type D_i/lambda_i, the two-half-sum symmetrisation\
+    \ and moving-boundary coupling are\nthe code's realisation.\n"
+  params:
+    fluc_comp:
+      role: mass_conservation_flag -- enable FluctuationCompensator, corrects c when a pixel changes cell
+        id so cell moves conserve total field mass
+    gpu:
+      role: backend_selector -- swaps the registered solver to DiffusionSolverFE_OpenCL; numerics-only,
+        no physics change
+    diff_global:
+      role: diffusion_coefficient (global default D; validated >= 0)
+    decay_global:
+      role: decay_rate (global default lambda; validated >= 0)
+    diff_types:
+      role: diffusion_coefficient_by_cell_type -- per-cell-type override D_t, keyed to the CPM cell occupying
+        the pixel
+    decay_types:
+      role: decay_rate_by_cell_type -- per-cell-type override lambda_t
+    init_expression:
+      role: initial_condition -- muParser math expression evaluated per site at t=0
+    init_filename:
+      role: initial_condition -- file to load the t=0 field from
+    secretion (SecretionParameters cell_type/value/constant/contact_type):
+      role: 'source_term -- per-cell-type source: additive rate, Dirichlet-clamp (constant), or on-contact'
+    boundary_conditions (x/y/z _min/_max _type + _val):
+      role: 'boundary_condition -- per face: Value=Dirichlet (default 0.0, absorbing sink), Flux=Neumann/ConstantDerivative,
+        Periodic'
+    additional_term:
+      role: 'UNKNOWN: reaction_term expression is present in the base spec_dict (line 580) but DiffusionSolverFEDiffusionData.xml
+        (L6086) never emits it -- so via THIS python spec it is dead; only the ReactionDiffusion variant
+        writes AdditionalTerm (L6773)'
+    DeltaX / DeltaT / ExtraTimesPerMCS:
+      role: 'UNKNOWN via this API: timestep / grid spacing / sub-cycling count exist in the core CC3DML
+        (CC3DXMLGenerator.py:950,991) and set FTCS stability, but DiffusionSolverFE''s python spec exposes
+        NO setter -- a tuner using PyCoreSpecs cannot change them; they fall back to core defaults 1.0/1.0/0'
+  state_io:
+    reads: "- the concentration field c (the grid it advances)\n- the CPM cell-id / cell-type lattice\
+      \ at every pixel, to pick D_i and lambda_i and to\n  locate secreting cell interiors -- this is\
+      \ the coupling to the Potts, not a field of its own\n- boundary values / initial-condition expression\
+      \ or file\n"
+    writes: "- the concentration field c, IN PLACE (overwrites the grid each MCS). This is an actual\n\
+      \  field write, not an energy delta -- contrast the Potts plugins in this atlas that return\n  nothing\
+      \ and only bias pixel-copy acceptance.\n"
+  surprises:
+  - 'Forward Euler is only conditionally stable: the guide (CC3DXMLGenerator.py:884) flags D > 0.16 (3D)
+    or D > 0.25 (2D) at DeltaX=DeltaT=1 as unstable. The core auto/manually sub-cycles via ExtraTimesPerMCS,
+    but the DiffusionSolverFE python spec exposes NO way to set it -- so a reimplementer driving from
+    PyCoreSpecs gets silent blow-up at high D with no knob to fix it. These thresholds are magic constants.'
+  - 'D and lambda are SPATIALLY HETEROGENEOUS, keyed to the moving CPM cell field: diff_types/decay_types
+    override the global value per cell type at each pixel. Plexus `diffuse`/`decay` carry a single scalar
+    rate -- they have no cell-type-indexed coefficient nor any coupling to a set-membership lattice.'
+  - 'Secretion has three DISTINCT semantics under one name: Secretion ADDS a rate, ConstantConcentration
+    OVERWRITES (Dirichlet clamp on the cell interior -- a set, not an add), SecretionOnContact adds only
+    on heterotypic contact. A reimplementer treating ConstantConcentration as a source would be wrong
+    -- it pins the value.'
+  - Default boundary condition is Value 0.0 on every face = an ABSORBING sink (Dirichlet), not no-flux.
+    Silence here means the field leaks out the walls; Neumann/no-flux must be requested explicitly (Flux
+    type).
+  - '''Handles moving boundary conditions'' + FluctuationCompensator: because cells move on the CPM lattice
+    under the field, a pixel changing cell id would spuriously dilute/concentrate c; the compensator (off
+    by default) rescales to conserve mass. Off-by-default means naive runs are NOT mass-conserving under
+    motion.'
+  - 'The diffusion stencil is written as TWO half-sums (isoSum with the CENTRE cell''s D_i, plus varSum
+    with each NEIGHBOUR''s own D_j, each /2), NOT one D*Laplacian. That split is the variable-diffusion
+    scheme: it symmetrises the flux across a cell-type interface and only collapses to the familiar D*(SUM
+    - N c) when D is spatially uniform. A reimplementer using a single central-D Laplacian gets heterotypic
+    diffusion -- the whole point of per-type coefficients -- wrong.'
+  - 'I read the OpenCL (GPU) kernel (DiffusionKernel.cl, uniDiff L821-L1057) for the exact arithmetic:
+    neighbour loop, the two-half-sum D average, the (1 - dt*lambda) decay factor, and the ghost-cell boundary
+    handling. The compiled CPU solver (the gpu=False default) is a .so I could NOT read; the kernel''s
+    own comments cross-reference the CPU code and the CC3DML is shared, so I believe the update is identical,
+    but I did not verify the CPU path byte-for-byte (cc3d is deliberately not importable here). Note also
+    DeltaX/DeltaT are unreachable via PyCoreSpecs, so dt/dx^2 defaults are fixed there.'
+  - The class at L6242 is a thin CC3DML EMITTER; every physical parameter lives on the child DiffusionData
+    / SecretionData / BoundaryConditions specs (L6070, L6160, L820), and the integrator itself is compiled.
+    No update logic is in this file.
+  status: inspected
   verdict: null
   of: null
   implementation_of: null
   why: null
   contract: null
-  status: candidate
   module: null
   test: null
   evidence:
@@ -422,19 +1814,92 @@ mechanisms:
   raw_name: FocalPointPlasticity
   raw_kind: Plugin (FocalPointPlasticityPlugin)
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L4680
-  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
-    CompuCell3D'
-  summary: FocalPointPlasticity Plugin
-  equations: null
-  params: {}
-  state_io: null
-  surprises: null
+  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, sec. 'Focal Point Plasticity' (energy
+    term of the form lambda*(d-L_target)^2 over dynamically formed cell-cell junctions)
+  summary: 'Maintains a set of dynamically formed pairwise "junctions" (focal-point links) between cells
+    of
+
+    two named types, and adds, per link, a spring energy on the distance between the two linked cells''
+
+    centers of mass. It is an energy term that ALSO mutates persistent auxiliary state: links form when
+
+    two eligible cells come into contact (each below its max-junction count), pay an ActivationEnergy
+
+    bias at formation, and are deleted once their CoM distance exceeds MaxDistance. The rest length,
+
+    stiffness and break length of individual links can be steered from Python at runtime (plasticity);
+
+    ActivationEnergy cannot (XML-only).
+
+    '
+  equations: "Per existing link between linked cells i, j (default LinkConstituentLaw):\n  E_link = lambda_fpp\
+    \ * (d_ij - target_distance)^2\nwhere d_ij = || CoM_i - CoM_j ||  (Euclidean distance between the\
+    \ two cells' centers of mass).\nA cell may carry up to max_junctions such links for the given type\
+    \ pair.\n\nContribution to the Metropolis acceptance test for an attempted pixel copy is the change\
+    \ dE this\ncopy induces:\n  dE = sum_over_affected_links [ E_link(d_after) - E_link(d_before) ]\n\
+    \       + activation_energy   (added ONCE, only on the copy that CREATES a new junction)\nLink lifecycle\
+    \ (not an energy, a state mutation):\n  - form:  when a copy brings two eligible cells (types type1/type2)\
+    \ into contact within\n           neighbor_order AND both have < max_junctions links -> a junction\
+    \ is created.\n  - break: when d_ij > max_distance -> the junction is deleted (no energy, removal\
+    \ only).\nThe LinkConstituentLaw `law` (optional) replaces the default quadratic with a user formula\
+    \ over\nthe variables Lambda, Length (=d_ij), TargetLength (=target_distance), e.g.\n\"LambdaExtra*Lambda*(Length-TargetLength)^2\"\
+    . The quadratic above is the default when law is None.\nNOTE: the exact functional form is read from\
+    \ the LinkConstituentLaw default and the Swat et al.\ndescription; the compiled FPP core itself is\
+    \ not readable in this environment (see surprises).\n"
+  params:
+    neighbor_order (Plugin): contact_range -- global default lattice-neighbor order used to detect candidate
+      link partners when scanning for new junctions.
+    type1 (Parameters): link_type_selector -- first cell-type name the link law applies to.
+    type2 (Parameters): link_type_selector -- second cell-type name of the (ordered) pair.
+    lambda_fpp (Parameters): link_stiffness -- spring constant on (d - target_distance)^2.
+    activation_energy (Parameters): link_formation_bias -- energy added once when a NEW junction is created
+      (negative promotes link formation); NOT steerable at runtime, XML-only.
+    target_distance (Parameters): link_rest_length -- preferred CoM-CoM distance L_target.
+    max_distance (Parameters): link_break_length -- CoM distance above which the junction is deleted.
+    max_junctions (Parameters): coordination_number -- max simultaneous links per cell for this pair.
+    neighbor_order (Parameters): contact_range -- per-pair override of the contact neighbor order for
+      detecting candidate partners.
+    internal (Parameters): link_scope -- flag selecting intra-cluster links (InternalParameters, links
+      between compartments of one compartmental cell) vs inter-cluster links (Parameters).
+    law (Parameters): link_energy_law -- optional LinkConstituentLaw formula replacing the default quadratic;
+      UNKNOWN in detail -- which variables beyond Lambda/Length/TargetLength are bindable, and how the
+      compiled core parses the formula, I could not determine from the Python layer.
+  state_io: "reads: centers of mass of each pair of linked cells (to compute d_ij), each cell's type,\
+    \ and the\n  per-cell junction registry (how many links it already holds).\nwrites: nothing to the\
+    \ CPM pixel lattice -- it returns an energy delta to the Metropolis\n  acceptance test (like other\
+    \ Potts plugins). BUT unlike a pure energy term it also mutates a\n  persistent auxiliary structure:\
+    \ it CREATES junction records on link formation and DELETES them\n  on break. So it carries pairwise\
+    \ state between steps, it is not stateless.\n"
+  surprises:
+  - The exact energy form is inferred from the default LinkConstituentLaw formula ("...*(Length-TargetLength)^2")
+    and the Swat et al. description; the compiled FocalPointPlasticity core is not readable in this env,
+    so lambda*(d-target)^2 is the best-evidenced form, not one I read line-by-line.
+  - ActivationEnergy is applied ONCE, only on the copy that creates a link -- it is a formation threshold,
+    not a per-step energy. The twedit generator explicitly warns (CC3DMLGeneratorBase.py L882-884) that
+    lambdaDistance/targetDistance/maxDistance are Python-steerable but ActivationEnergy must still be
+    set from XML. A reimplementer who makes activation_energy runtime-tunable is wrong.
+  - d is the distance between CENTERS OF MASS of whole cells, not a pixel-boundary distance; it can and
+    does exceed the cells' own radii. The twedit default template (CC3DMLGeneratorBase.py L894-898) ships
+    Lambda 10, ActivationEnergy -50, TargetDistance 7, MaxDistance 20, MaxNumberOfJunctions 1 -- on cells
+    whose Volume plugin target is 25 (radius ~2.8), so target_distance 7 already exceeds a cell radius
+    and max_distance 20 spans several cell widths. This is a long-range term coupling non-adjacent cell
+    centroids. (NB -- the volume-25 value and the 7/20 link values come from two different co-named files,
+    the Volume test XML and the twedit generator template respectively.)
+  - Two channels: Parameters (inter-cluster) vs InternalParameters (intra-cluster, for compartmental cells).
+      Same energy, different link scope selected by the `internal` flag.
+  - max_junctions is a per-cell coordination cap enforced at formation time, not an energy penalty --
+    a hard combinatorial guard on how many links a cell may hold.
+  - The Plugin carries a global neighbor_order AND each Parameters block carries its own; the per-pair
+    one (via the MaxNumberOfJunctions NeighborOrder attribute) overrides for that pair.
+  - A junction, once formed, persists across MCS until its CoM distance exceeds max_distance -- it is
+    NOT re-evaluated for contact each step, so links can stretch far beyond neighbor_order before breaking.
+    Purely-contact reasoning would get the dynamics wrong.
   verdict: null
   of: null
   implementation_of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -447,19 +1912,129 @@ mechanisms:
   raw_name: KernelDiffusionSolver
   raw_kind: Steppable (KernelDiffusionSolver)
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L6642
-  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
-    CompuCell3D'
-  summary: KernelDiffusionSolver
-  equations: null
-  params: {}
-  state_io: null
-  surprises: null
+  paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366, sec. "PDE Solvers" (diffusion solvers).
+
+    No page verified -- no extracted paper text for this target. Checkable in-tree anchors:
+
+    cc3d/twedit5/Plugins/CC3DProject/diffusion_solvers_descr.py:36 ("Legacy Solver that provides an
+
+    approximate solution to Diffusion Equations for large diffusion constants ... significantly
+
+    faster than Diffusion Solver FE ... does not provide the same level of flexibility"); the
+
+    periodic-only constraint at PyCoreSpecs.py:6477-6505; Kernel/CoarseGrainFactor emitted at
+
+    PyCoreSpecs.py:6568-6571.
+
+    '
+  summary: 'A steppable diffusion solver that advances one or more scalar concentration FIELDS on the
+    CPM
+
+    pixel lattice by CONVOLUTION with a precomputed diffusion kernel (the Green''s function of the
+
+    diffusion equation) rather than by a local finite-difference stencil. It is a genuine field->
+
+    field WRITE like the other PDE solvers -- it overwrites the concentration grid c each step --
+
+    but the update is GLOBAL (a convolution), not a per-site neighbour sum. It only supports
+
+    periodic boundary conditions and a single spatially-uniform diffusion constant, is fast for
+
+    LARGE diffusion constants (where the forward-Euler solver is slow/unstable), and is marked a
+
+    legacy/approximate solver. The physics lives in the compiled core; PyCoreSpecs.py only declares
+
+    the CC3DML the solver reads.
+
+    '
+  equations: "Continuous PDE (the paper's): dc/dt = D grad^2 c - lambda c + S.\n\nThis solver's METHOD\
+    \ (the code's): instead of the FTCS stencil, it advances the field by\nconvolution with the diffusion\
+    \ kernel. For the pure diffusion equation the Green's function is\na Gaussian, so one step is\n\n\
+    \  c(x, t+DeltaT) = ( K_{D,DeltaT} * c(., t) )(x)          [periodic convolution over the torus]\n\
+    \nwhere K is the diffusion kernel with spatial variance ~ 2*D*DeltaT, tiled periodically. Decay\n\
+    is a multiplicative factor exp(-lambda*DeltaT) and secretion S is added as a source per step.\n\n\
+    Symbols:\n  c(x,t)     concentration at pixel x (a field value, not cell state)\n  D          global\
+    \ diffusion coefficient (diff_global); sets the kernel width. UNIFORM in space.\n  lambda     global\
+    \ decay rate (decay_global)\n  S          secretion source from secreting cells (see params)\n  K_{D,DeltaT}\
+    \   the (periodic) diffusion kernel; `kernel` truncates its expansion, `cgfactor`\n              \
+    \   coarsens the lattice used for the convolution -- see surprises, meaning is\n                 INFERRED\
+    \ from method, not stated in source.\nThe convolution/kernel is the SOURCE's realisation; the continuous\
+    \ PDE is the paper's. The\nintegrator itself is compiled -- this file only emits CC3DML.\n"
+  params:
+    diff_global:
+      role: diffusion_coefficient (global default D; sets the diffusion-kernel width ~sqrt(2*D*DeltaT);
+        validated >= 0). UNIFORM -- no per-cell-type override is emitted (see surprises).
+    decay_global:
+      role: decay_rate (global lambda; validated >= 0). Also global-only.
+    init_expression:
+      role: initial_condition -- muParser math expression evaluated per site at t=0 (emitted as InitialConcentrationExpression)
+    init_filename:
+      role: initial_condition -- file to load the t=0 field from (ConcentrationFileName)
+    kernel:
+      role: kernel_truncation / interaction_length -- integer >= 1 ('Kernal must be positive', L6538);
+        emitted as <Kernel> only when > 1 (L6568). Docstring says only 'kernel of diffusion solver'; INFERRED
+        to be the number of terms/periodic images retained in the diffusion-kernel expansion. Precise
+        semantics are in the compiled core, not read.
+    cgfactor:
+      role: coarse_grain_factor -- integer >= 1 ('Coarse grain factor must be positive', L6539); emitted
+        as <CoarseGrainFactor> only when > 1 (L6570). Downsamples the lattice used for the convolution
+        (speed vs accuracy trade-off). Meaning INFERRED; core does the coarsening.
+    secretion (SecretionParameters cell_type/value/constant/contact_type):
+      role: 'source_term -- per-cell-type source: additive rate (Secretion), Dirichlet-clamp of the cell
+        interior (ConstantConcentration), or additive only on contact with a named type (SecretionOnContact)'
+    boundary_conditions (x/y/z _min/_max _type):
+      role: 'boundary_condition -- CONSTRAINED to PERIODIC on every face (read-only, L6477-6530; all six
+        *_type set to BOUNDARYTYPESPDE[2] in __init__ and check_dict rejects any non-periodic value).
+        Not a tunable knob here: the convolution assumes a torus; Dirichlet/Neumann are rejected.'
+    fluc_comp:
+      role: 'UNKNOWN: inherited from the _PDESolverSpecs base spec_dict (L1159, mass-conservation flag
+        for FluctuationCompensator); this solver''s xml (L6657-6666) never emits it, so via THIS python
+        spec it is dead.'
+  state_io:
+    reads: "- the concentration field c (the grid it convolves forward)\n- the CPM cell-id / cell-type\
+      \ lattice, to locate secreting cell interiors for the source S --\n  this is the coupling to the\
+      \ Potts, not a field of its own\n- the global diffusion constant D and decay lambda, initial-condition\
+      \ expression or file\n- (implicitly) that boundaries are periodic -- required, not optional\n"
+    writes: "- the concentration field c, replaced each MCS by the convolution result. An actual field\n\
+      \  write, not an energy delta -- but a GLOBAL convolution, not the local per-site stencil of\n \
+      \ DiffusionSolverFE, so it cannot be expressed as a nearest-neighbour sum.\n"
+  surprises:
+  - 'PERIODIC-ONLY: unlike DiffusionSolverFE, KernelDiffusionSolver hard-constrains every boundary face
+    to Periodic (KernelDiffusionSolverBoundaryConditions, L6477-6505, all six *_type are read-only and
+    set to BOUNDARYTYPESPDE[2]). The convolution assumes a torus. A reimplementer offering Dirichlet/Neumann/absorbing
+    walls would be wrong -- they are rejected at validation.'
+  - 'SPATIALLY UNIFORM D and lambda: KernelDiffusionSolverDiffusionData.xml (L6416-6431) emits ONLY GlobalDiffusionConstant
+    / GlobalDecayConstant. The diff_types / decay_types dicts present in the base _PDEDiffusionDataSpecs
+    (L578-579) are NEVER written here -- so per-cell-type diffusion/decay is IMPOSSIBLE with this solver,
+    necessarily so because a single convolution kernel has one width. This is the opposite of DiffusionSolverFE,
+    which does support per-type coefficients.'
+  - 'OPPOSITE PERFORMANCE REGIME to the FE solver: this is the tool for LARGE diffusion constants (where
+    FTCS is slow/unstable and would need heavy sub-cycling); the guide (diffusion_solvers_descr.py:36)
+    calls it ''significantly faster than Diffusion Solver FE'' for that regime. A reimplementer must not
+    treat it as interchangeable with the FE stencil solver -- it trades flexibility for speed at high
+    D.'
+  - 'LEGACY and APPROXIMATE: the same guide line marks it a ''Legacy Solver that provides an APPROXIMATE
+    solution''. It is not the exact diffusion solution; approximation quality depends on kernel and cgfactor.
+    Silence about accuracy means a naive run may be visibly wrong at small kernel / large cgfactor.'
+  - kernel and cgfactor are the ONLY parameters distinguishing this solver's declaration from the other
+    PDE solvers, yet the source documents them only as 'kernel of diffusion solver' and 'coarse grain
+    factor'. Their precise effect on the convolution (how many expansion terms / how much lattice coarsening)
+    is in the compiled core -- I did NOT read the .so. The roles above are INFERRED from the kernel/convolution
+    method, not verified.
+  - kernel and cgfactor are emitted at the SOLVER-FIELD level and only when > 1 (L6568-6571, `if self.kernel
+    > 1` / `if self.cgfactor > 1`), while D and decay sit on the child DiffusionData spec. Defaults kernel=1,
+    cgfactor=1 emit no XML at all, so the core defaults are what actually run in a default setup -- a
+    tuner who never sets them gets unstated core behaviour.
+  - 'Like DiffusionSolverFE (L6242) this class is a thin CC3DML EMITTER: __init__ (L6652) only sets steer=None
+    (not steerable), and xml (L6657-6666) just walks child field specs. Every physical parameter lives
+    on child DiffusionData / SecretionData / BoundaryConditions specs, and the convolution integrator
+    itself is compiled. No update logic is in this file.'
+  status: inspected
   verdict: null
   of: null
   implementation_of: null
   why: null
   contract: null
-  status: candidate
   module: null
   test: null
   evidence:
@@ -472,19 +2047,103 @@ mechanisms:
   raw_name: LengthConstraint
   raw_kind: Plugin (LengthConstraintPlugin)
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L3924
-  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
-    CompuCell3D'
-  summary: LengthConstraint Plugin
-  equations: null
-  params: {}
-  state_io: null
-  surprises: null
+  paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366, sec. "Cell Length / Elongation
+
+    constraint". No extracted paper text available; the checkable anchors are the compiled
+
+    plugin''s symbol table (libCC3DLengthConstraint.so) and the CC3DML-generator description at
+
+    twedit5/Plugins/CC3DMLGenerator/CC3DMLGeneratorBase.py:L340-346.
+
+    '
+  summary: 'An energy term (Cellular-Potts plugin), not a state update. It penalises the deviation of
+    a
+
+    cell''s ELONGATION (the length of its equivalent-ellipse major axis, derived from the cell''s
+
+    moments of inertia about its centre of mass) from a per-cell-type target length, so that a
+
+    proposed pixel copy that stretches a cell toward its target length is favoured and one that
+
+    over/under-stretches it is opposed. In 3D (or when MinorTargetLength is set) the minor axis is
+
+    independently constrained to a second target. Combined with a Volume constraint it drives cells
+
+    into elongated / rod shapes. The plugin returns a delta energy for the acceptance test; it
+
+    writes no cell field.
+
+    '
+  equations: "Metropolis acceptance (Potts core, unchanged by this plugin):\n  P(accept copy) = 1 if dE\
+    \ <= 0 else exp(-dE / T)\nThis plugin contributes to dE only. For a cell whose current major-axis\
+    \ length is L and target\nL0, with stiffness lambda_L (symbol spring_energy(d,d,d) in the .so; toString/getTargetLength/\n\
+    getLambdaLength accessors), the length-constraint energy is a quadratic (Hookean) spring:\n  E_length(cell)\
+    \ = lambda_L * (L - L0)^2\nand, when a minor target l0 is set (3D):\n  E_length(cell) = lambda_L *\
+    \ (L - L0)^2  +  lambda_L * (l - l0)^2\nwhere L (and l) is the length of the semi-major (semi-minor)\
+    \ axis of the ellipse/ellipsoid with\nthe SAME moments of inertia as the cell's pixel set about its\
+    \ centre of mass. The plugin\ncomputes dE = E_after - E_before over the two cells touched by the candidate\
+    \ pixel copy, using\nthe incremental change in the inertia tensor from adding/removing that one pixel.\n\
+    CAVEAT: the exact eigenvalue->length conversion (how L is read off the inertia-tensor\neigenvalues)\
+    \ lives in the compiled core; no C++/paper source was available here, so the\nquadratic FORM above\
+    \ is confirmed (spring_energy symbol + generator text) but the length\nformula itself is inferred,\
+    \ not read.\n"
+  params:
+    cell_type:
+      role: 'target_selector: name of the cell type this constraint applies to (validated against CellTypePlugin)'
+    target_length:
+      role: 'target_length: rest length L0 of the cell''s MAJOR axis (equivalent-ellipse), in lattice
+        units'
+    lambda_length:
+      role: 'constraint_stiffness: coefficient lambda_L of the quadratic length-deviation penalty (spring
+        constant)'
+    minor_target_length:
+      role: 'target_length_minor: rest length l0 of the MINOR axis; Optional. Per the CC3DML generator
+        this is intended for/emitted only in 3D simulations (CC3DMLGeneratorBase.py:L376-377); None =>
+        minor axis unconstrained'
+  state_io:
+    reads:
+    - cell pixel set (volume) and its moments of inertia about the centre of mass (requires the CenterOfMass
+      plugin; present in every LengthConstraint test XML)
+    - the candidate pixel copy (source/target Point3D and the two involved Cell*), to compute the incremental
+      inertia-tensor change
+    - per-cell LengthConstraintData extra member (targetLength, lambdaLength, minorTargetLength) OR the
+      per-cell-type defaults; local-flex values can be set at runtime via setLengthConstraintData(cell,
+      lambda, target[, minor])
+    - lattice dimensionality/orientation, to dispatch changeEnergy_xy / _xz / _yz / _3D
+    writes:
+    - 'none from changeEnergy: this is an energy term, it only returns dE and changes the acceptance probability,
+      it does not write any cell field'
+    - (out of band) a steppable may WRITE the per-cell LengthConstraintData via setLengthConstraintData;
+      that is host-driven state, not part of the energy evaluation
+  surprises:
+  - 'This is an ENERGY term, not an update: changeEnergy returns a delta and mutates nothing. Forcing
+    it into read/write update language misrepresents it.'
+  - It depends on the CenterOfMass plugin (moments of inertia). Length is a DERIVED quantity from the
+    inertia tensor, not a stored field; without CenterOfMass the length is undefined.
+  - 'The .so exports _get_non_nan_energy(double): there is an explicit NaN guard on the energy. Degenerate
+    cells (single pixel, zero/undefined inertia) give a NaN length; a naive reimplementation that skips
+    this guard will inject NaN into dE and corrupt the acceptance test.'
+  - 'Dispatch by lattice geometry: separate changeEnergy_xy / changeEnergy_xz / changeEnergy_yz / changeEnergy_3D
+    functions are selected by which plane a 2D lattice lies in (or 3D). A reimplementer assuming a single
+    formula misses that the length is measured in the active plane.'
+  - MinorTargetLength is documented as a 3D (minor-axis) parameter (generator emits it only when sim_3d_flag),
+    but the Python spec and the C++ setter accept it in 2D too. The Python API is more permissive than
+    the intended physics.
+  - 'Fragmentation guard is external, not built in: the CC3DML generator warns ''to prevent cell fragmentation
+    for large elongations you need to also use connectivity constraint'' (CC3DMLGeneratorBase.py:L345).
+    LengthConstraint alone can tear a cell apart; correctness depends on co-running Connectivity/ConnectivityGlobal
+    (present in the elongationFlex test XML).'
+  - 'Two parameter scopes: values can be per-cell-type (LengthEnergyParameters via the plugin) OR per-cell
+    (LengthConstraintData extra member set from Python). setLengthConstraintData signature is (cell, lambdaLength,
+    targetLength[, minor]) -- lambda FIRST, target SECOND, which is the reverse of the constructor''s
+    (target_length, lambda_length) order (see PyCoreSpecs.py:L3853 vs the steppable call in elongationFlexSteppables.py:L12).
+    Easy to transpose.'
   verdict: null
   of: null
   implementation_of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -497,19 +2156,141 @@ mechanisms:
   raw_name: MomentOfInertia
   raw_kind: Plugin (MomentOfInertiaPlugin)
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L5350
-  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
-    CompuCell3D'
-  summary: MomentOfInertia Plugin
-  equations: null
+  paper_section: 'No extracted paper text for this target. CHECKABLE anchors are the source only: class
+    docstring
+
+    "MomentOfInertia Plugin" (PyCoreSpecs.py:5351) and the compiled MomentOfInertiaPlugin
+
+    (cpp/CompuCell.py:9002, a CellGChangeWatcher). Swat et al. (2012) Methods Cell Biol 110:325-366
+
+    is the framework reference, but the specific page/section describing this plugin is UNREAD --
+
+    not cited to a page I have not seen.
+
+    '
+  summary: 'A bookkeeping tracker, not an energy term and not an update the modeller writes. Registered
+    as a
+
+    CellGChangeWatcher (CompuCell.py:9002): the Potts solver calls it after every ACCEPTED pixel copy,
+
+    and it incrementally updates the six second-moment / inertia-tensor components stored on each cell
+
+    (CellG.iXX, iYY, iZZ, iXY, iXZ, iYZ), measured relative to that cell''s centre of mass. From those
+
+    components it derives the cell''s shape observables: eccentricity (CellG.ecc), the equivalent-ellipsoid
+
+    semiaxis lengths (getSemiaxes / getSemiaxesXY/XZ/YZ / getSemiaxes3D) and the principal-axis
+
+    orientation angle (cellOrientation_xy/xz/yz). It changes no cell type, volume or position -- it only
+
+    makes cell SHAPE and ORIENTATION queryable, which shape-dependent plugins (e.g. oriented growth,
+
+    the oriented-cellsort example) then consume.
+
+    '
+  equations: "A cell is a set S of lattice sites {r_i}, all sharing one id. Let the centre of mass be\n\
+    \  r_CM = (1/N) * sum_i r_i,   N = |S| = cell volume (site count).\nThe plugin maintains the second-moment\
+    \ (inertia) tensor of S about r_CM. Writing\nx' = x - x_CM, y' = y - y_CM, z' = z - z_CM, the physicist's\
+    \ inertia tensor is\n  I_XX = sum_i (y'^2 + z'^2)      I_XY = - sum_i x' y'\n  I_YY = sum_i (x'^2\
+    \ + z'^2)      I_XZ = - sum_i x' z'\n  I_ZZ = sum_i (x'^2 + y'^2)      I_YZ = - sum_i y' z'\nstored\
+    \ on CellG as iXX, iYY, iZZ, iXY, iXZ, iYZ.\n(SIGN/DIAGONAL CONVENTION -- physicist form above vs\
+    \ the raw central second moment\nM_XX = sum x'^2 etc. -- is set in the compiled core and is NOT verifiable\
+    \ from the Python layer;\nsee surprises. The derived quantities below are convention-independent up\
+    \ to that choice.)\n\nIt is maintained INCREMENTALLY, never recomputed from scratch: on an accepted\
+    \ copy of site p from\ncell A into cell B, helper precalculateInertiaTensorComponentsAfterFlip (CompuCell.py:4235)\
+    \ returns\nthe updated tensors for the gaining/losing cells given the single-site delta and the CM\
+    \ shift, so the\nper-step cost is O(1) per cell, not O(N).\n\nShape observables (2D principal case,\
+    \ tensor T = [[iXX, iXY],[iXY, iYY]]):\n  eigenvalues  lambda_min <= lambda_max  of T\n  semiaxes\
+    \     a, b  proportional to functions of the eigenvalues (equivalent uniform ellipsoid)\n  eccentricity\
+    \ ecc = sqrt(1 - lambda_min/lambda_max)    (via eccFromComps, CompuCell.py:8994)\n  orientation  theta\
+    \ = cellOrientation_xy  = angle of the major principal axis\nIn 3D the full 3x3 tensor is diagonalised\
+    \ and getSemiaxes3D returns the three semiaxis lengths.\n"
   params: {}
-  state_io: null
-  surprises: null
+  state_io:
+    reads: 'Per accepted pixel copy: the copied site coordinate p = (x,y,z), the source cell A and target
+
+      cell B (CellG*), and each affected cell''s current volume N and centre of mass r_CM (so it reads
+
+      xCM/yCM/zCM, which the CenterOfMass tracker must also maintain) plus the pre-flip tensor
+
+      components it is about to update.
+
+      '
+    writes: 'Per affected cell, in place on CellG: iXX, iYY, iZZ, iXY, iXZ, iYZ (the maintained tensor)
+      and,
+
+      on demand from those, the derived shape fields ecc and the semiaxes/orientation returned by the
+
+      getSemiaxes*/cellOrientation_* accessors. It writes NO field, NO type, NO volume, NO position,
+
+      and returns no energy delta -- it does not participate in the Metropolis acceptance at all.
+
+      '
+  surprises:
+  - 'NOT an energy term and NOT a modeller-written update. It is a CellGChangeWatcher -- a passive
+
+    observer the Potts solver invokes AFTER a copy is accepted. This is a third category next to
+
+    ''energy plugin'' and ''stepper'': a per-accepted-flip incremental REDUCTION that keeps a derived
+
+    statistic (here the inertia tensor) in sync with the pixel set. A reimplementer who models it as
+
+    an energy or as a batch recompute-every-MCS gets the coupling and the O(1) cost wrong.
+
+    '
+  - 'Zero constructor parameters -- the spec''s __init__ takes nothing and emits a bare
+
+    <Plugin Name="MomentOfInertia"/> element. There is nothing to tune; its only ''parameter'' is the
+
+    implicit dependency that a CenterOfMass tracker be present so xCM/yCM/zCM are valid, otherwise the
+
+    r_CM the tensor is measured about is stale.
+
+    '
+  - 'The exact diagonal/sign convention (physicist inertia tensor sum(y''^2+z''^2) on the diagonal, vs
+
+    the raw central second moment sum(x''^2)) lives in the compiled C++ (MomentOfInertiaPlugin,
+
+    not readable here) and could not be verified from the Python bindings. I inferred the physicist
+
+    form from the attribute names and the physics; the eccentricity/semiaxis DERIVATIONS
+
+    (eccFromComps, getSemiaxes) are what downstream code actually reads and are robust to the choice.
+
+    '
+  - 'Incremental maintenance means round-off can accumulate over a long run: the tensor is updated by
+
+    deltas after every accepted flip rather than re-summed, so a reimplementer comparing against a
+
+    from-scratch recompute should expect small drift, not bit-identity.
+
+    '
+  - 'Dimensionality-branched accessors: getSemiaxesXY / XZ / YZ give 2D principal analyses in each
+
+    coordinate plane, while getSemiaxes3D diagonalises the full 3x3 tensor. Picking the wrong one for
+
+    the lattice dimension yields a degenerate (flat) ellipsoid.
+
+    '
+  - 'The maintained fields are READ-ONLY from the modeller side: the Python binding overrides the setter
+    for iXX/iYY/iZZ/iXY/iXZ/iYZ (and ecc) to raise AttributeError -- e.g. set_iXX at cpp/CompuCell.py:649
+    raises "iXX is read only variable" (CellG_ecc_set exists but the derived fields cannot be assigned
+    this way). Only the plugin, via the Potts change-watcher callback, may update them. This hard-enforces
+    the observer characterisation: a modeller cannot inject or override cell shape, only read it. A Plexus
+    reimplementation that exposes the tensor as a writable state field would be a category error -- it
+    is a computed reduction, not modeller state. '
+  - 'The watcher hook is field3DChange (CellGChangeWatcher interface, cpp/CompuCell.py:9016 for this plugin;
+    base at 3000), NOT a per-MCS stepper: the Potts solver calls field3DChange when a lattice site''s
+    cell id changes (an accepted copy), passing the site and the before/after cells. The helper returns
+    an InertiaTensorComponents struct (cpp/CompuCell.py:4200) carrying the six updated components. A reimplementer
+    who hooks a fixed per-step or per-MCS schedule rather than the per-accepted-change event will mis-sync
+    the tensor with the pixel set. '
   verdict: null
   of: null
   implementation_of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -522,19 +2303,99 @@ mechanisms:
   raw_name: NeighborTracker
   raw_kind: Plugin (NeighborTrackerPlugin)
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L2393
-  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
-    CompuCell3D'
-  summary: NeighborTracker Plugin
-  equations: null
+  paper_section: "Source anchors (verified 2026-08-02):\n  - Spec class: PyCoreSpecs.py:L2393 (NeighborTrackerPlugin,\
+    \ name \"neighbor_tracker\").\n  - Python aggregates: core/iterators.py:L366 (CellNeighborListFlex)\
+    \ and its\n    common_surface_area_by_type / neighbor_count_by_type at L415/L429; the null->type-0\n\
+    \    mapping is at L410, L425, L440.\n  - Accessor entry point: core/PySteppables.py:L1498 (get_cell_neighbor_data_list).\n\
+    Library \"doc\": doc/code_ref/.../plugins/NeighborTrackerPlugin.rst is a BARE autodoc\nstub (7 non-blank\
+    \ lines: `.. autoclass:: NeighborSurfaceData` + `.. autoclass::\nNeighborTrackerPlugin`, no members\
+    \ documented, no prose, no equation). So the docs add\nnothing beyond the compiled class. No dedicated\
+    \ equation/section for it in Swat et al.\n(2012) Methods Cell Biol 110:325-366 -- it is bookkeeping,\
+    \ not a named energy term; the\nsource is the only evidence.\n"
+  summary: 'A pure TRACKER plugin: it contributes nothing to the Potts energy and returns no
+
+    delta. For every cell it maintains a set of its current neighbours and, for each
+
+    neighbour, the common surface area (the number of shared lattice-site boundary
+
+    links between the two cells). This per-cell adjacency+contact-area table is derived
+
+    state that OTHER plugins/steppables read (e.g. contact-style or type-composition
+
+    queries); the plugin itself never changes any cell''s volume, surface, or position.
+
+    '
+  equations: "State per cell c is a set N(c) of NeighborSurfaceData records, each a pair\n    (neighborAddress\
+    \ = pointer to neighbour cell b,  commonSurfaceArea = A_cb)\nwhere A_cb = number of lattice-site boundary\
+    \ links whose two sides belong to cells\nc and b respectively (medium counts as the null neighbour,\
+    \ type 0).\n\nThe table is NOT recomputed by full scan; it is updated INCREMENTALLY on every\nACCEPTED\
+    \ pixel copy. When a boundary site flips its cell id, for each affected\nneighbour pair the tracker\
+    \ calls, in the compiled core:\n    incrementCommonSurfaceArea(...)   -> A_cb += (links gained)\n\
+    \    decrementCommonSurfaceArea(...)   -> A_cb -= (links lost)\nA neighbour record is pruned when\
+    \ its area reaches the removable state\n(NeighborSurfaceData.OKToRemove, i.e. A_cb == 0). Records\
+    \ are kept in an ordered\nset (operator< / operator== defined on the data) keyed by neighbour identity.\n\
+    \nPython-side aggregates built on top of the raw table (iterators.py CellNeighborListFlex):\n    common_surface_area_by_type[t]\
+    \ = sum over neighbours b of A_cb  where type(b)=t\n    neighbor_count_by_type[t]      = count of\
+    \ neighbours b with type(b)=t\n(a null neighbourAddress is reported as type 0 = medium.)\n\nThere\
+    \ is no energy term: dE_NeighborTracker == 0 by construction.\n"
   params: {}
-  state_io: null
-  surprises: null
+  state_io:
+    reads: "- The cell-id lattice at accepted-copy boundaries (which cell owns each site and\n  its neighbours),\
+      \ supplied by the Potts boundary machinery -- the plugin listens\n  to accepted pixel copies rather\
+      \ than reading a Plexus field.\n- Each cell's extra-attribute storage slot (ExtraMembersGroupAccessor)\
+      \ where its\n  own NeighborTracker record lives.\n"
+    writes: "- Per-cell derived state cellNeighbors: a set of (neighborAddress, commonSurfaceArea)\n \
+      \ records. This is the ONLY thing it writes; it writes no energy delta and no\n  volume/surface/COM\
+      \ field. In Plexus terms it emits neither an energy contribution\n  nor a per-cell update to a canonical\
+      \ field -- it maintains an auxiliary adjacency\n  relation over the set of cells, keyed and pruned\
+      \ by shared-boundary count.\n"
+  surprises:
+  - 'commonSurfaceArea is an INTEGER site-boundary COUNT, not a real area. In 2D it is a
+
+    count of shared pixel edges; in 3D a count of shared faces. A reimplementer who
+
+    stores a float "area" or a Euclidean contact length will diverge from the oracle.
+
+    '
+  - 'Updated INCREMENTALLY (increment/decrement on each accepted copy), never by a full
+
+    neighbourhood rescan. Getting the increment/decrement bookkeeping wrong silently
+
+    corrupts the table without any error; there is no periodic recompute to self-heal.
+
+    '
+  - 'Medium is a first-class neighbour: a null neighborAddress is reported as cell type 0.
+
+    Aggregates that skip null neighbours will undercount the medium-facing surface.
+
+    '
+  - 'Neighbour records are pruned exactly when commonSurfaceArea hits 0 (OKToRemove), so
+
+    "is b a neighbour of c" means "currently shares >=1 boundary link", not "was ever
+
+    adjacent". The relation is symmetric in principle but each cell stores its own copy.
+
+    '
+  - 'The plugin has NO constructor parameters and nothing to tune. It is a PREREQUISITE
+
+    dependency loaded so that other plugins/steppables can query neighbours; its presence
+
+    changes no dynamics on its own. Loading it or not is the only "knob".
+
+    '
+  - 'The neighbour set is ordered (operator< / operator== on NeighborSurfaceData) and keyed
+
+    by neighbour identity; iteration order is deterministic but tied to that ordering, not
+
+    to insertion or geometry -- code that assumes geometric ordering of neighbours is wrong.
+
+    '
   verdict: null
   of: null
   implementation_of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -547,19 +2408,180 @@ mechanisms:
   raw_name: PIFDumper
   raw_kind: Steppable (PIFDumperSteppable)
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L6012
-  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
-    CompuCell3D'
-  summary: PIFDumper Steppable
-  equations: null
-  params: {}
-  state_io: null
-  surprises: null
+  paper_section: 'No extracted paper text for this target. Swat et al. (2012) Methods Cell Biol
+
+    110:325-366 discusses the PIFF (Potts Initial File) cell-layout format used by
+
+    PIFInitializer / BlobInitializer, but no page was read. CHECKABLE source
+
+    anchors for the format and CC3DML used here instead: the canonical dumper
+
+    snippet generatePIFDumperSteppable at
+
+    cc3d/twedit5/Plugins/CC3DMLGenerator/CC3DMLGeneratorBase.py:1271, and a real
+
+    dumped file at
+
+    cc3d/tests/plugin_test_suite/AdhesionFlexPython_test_generate/Simulation/initial_configuration.piff:1.
+
+    '
+  summary: 'A pure-output Steppable, not a physics term. Every `frequency` Monte Carlo
+
+    steps it READS the entire cell lattice (each site''s cell id, cluster id and type) and
+
+    WRITES a snapshot to disk as a PIF (Potts Initial File): one plain-text line
+
+    per lattice site (voxel). It changes NOTHING in the
+
+    simulation state -- it is a serialization sink whose output can later be fed
+
+    back to a PIFInitializer as an initial condition. In Plexus terms it is an
+
+    observer/sink over the cell-id field: reads state, emits no delta.
+
+    '
+  equations: "No dynamics. The step is a serialization pass over the lattice, emitted only on\nsteps where\
+    \ (mcs % frequency == 0). CONFIRMED PIF line format, read from a real\n.piff written by the same core\n\
+    (tests/.../AdhesionFlexPython_test_generate/Simulation/initial_configuration.piff):\n\n    [header\
+    \ line]  Include Clusters        (present when cluster ids are dumped)\n    clusterId  cellId  cellTypeNAME\
+    \  xLow xHigh  yLow yHigh  zLow zHigh\n\ne.g. the literal line `8  8  Cell2  119 119  53 53  0 0`.\
+    \ Three corrections to\nthe library-guide sketch that the earlier draft copied:\n  (1) the FIRST column\
+    \ is the CLUSTER id, not the cell id (cell id is second);\n  (2) the type is written as its NAME string\
+    \ (\"Cell2\"), NOT a numeric type index;\n  (3) the dumper emits ONE LINE PER VOXEL (xLow==xHigh,\
+    \ yLow==yHigh, zLow==zHigh\n      in the sample) -- the box form xLow..xHigh is what the PIF grammar\
+    \ ALLOWS,\n      but the dumper does not run-length-compress into boxes.\nThis file is the inverse\
+    \ of what PIFInitializer reads back in. The Python spec\nhere only declares the steppable and its\
+    \ CC3DML; the actual traversal +\nper-voxel write live in the compiled core (PlayerPython.FieldWriter\
+    \ also exposes\ngeneratePIFFileFromVTKOutput as the offline equivalent).\n"
+  params:
+    pif_name:
+      role: output_file_path
+      note: 'Name/path of the PIF file to write. check_dict rejects it as invalid when
+
+        len(pif_name) == 0 (the lambda is the INVALID predicate). NOTE: the same
+
+        field name `pif_name` is reused by the sibling PIFInitializer (L5960) as an
+
+        INPUT file that must already exist (its validate() calls os.path.isfile);
+
+        here it is an OUTPUT target and is NOT existence-checked.
+
+        '
+    frequency:
+      role: output_interval_mcs
+      note: 'Integer Monte-Carlo-step interval between dumps; PyCoreSpecs default is 1
+
+        (dump every MCS), but the canonical twedit-generated CC3DML defaults it to
+
+        100. check_dict rejects frequency < 1. Its canonical home is a "Frequency"
+
+        ATTRIBUTE on the <Steppable> header (that is where both from_xml and the
+
+        core read it) -- but PyCoreSpecs.generate_header never writes that
+
+        attribute, so this spec stores/validates it yet drops it on serialization.
+
+        See surprises.
+
+        '
+  state_io:
+    reads:
+    - cell.id field (every lattice site's owning cell id -- second PIF column)
+    - cell.cluster_id field (dumped as the FIRST PIF column when clusters are included)
+    - cell.type field (every lattice site's cell type, written as a NAME string)
+    - lattice dimensions (implicit, to bound the traversal)
+    writes:
+    - external file (PIF text on disk) -- NOT simulation state
+    note: 'No simulation-state field is written. This is the clean case of the
+
+      "energy term vs update" distinction pushed one step further: it is neither.
+
+      It returns no delta and biases no pixel-copy acceptance; it is a read-only
+
+      tap on the cell-id field with a side effect outside the state vector.
+
+      '
+  surprises:
+  - 'ROUND-TRIP LOSS OF `frequency` (a real bug, now localized). from_xml reads
+
+    frequency from a "Frequency" ATTRIBUTE ON THE <Steppable> HEADER
+
+    (findAttribute("Frequency") / getAttributeAsInt, L6062-6063) -- and that is
+
+    exactly where the canonical CC3DML puts it: twedit''s
+
+    generatePIFDumperSteppable (CC3DMLGeneratorBase.py:1271) emits
+
+    <Steppable Type="PIFDumper" Frequency="100">. But generate_header (L525) emits
+
+    ONLY {"Type": registered_name} and the `xml` property (L6037) adds only a
+
+    PIFName child; neither writes the Frequency attribute. So a spec built with
+
+    frequency=10 serializes to CC3DML with no Frequency and reloads as the default
+
+    1. __getstate__ (L6048) drops it too. The datum lives in hand-written XML but
+
+    is destroyed by any Python round-trip through this spec.
+
+    '
+  - 'The library-guide line sketch the earlier draft copied
+
+    ("cellId cellType xLow..") is WRONG on three counts, confirmed against a real
+
+    dumped .piff (see equations): the real line LEADS with a clusterId column
+
+    (cell id is second), writes the cell TYPE AS A NAME string not a numeric
+
+    index, and is prefixed by an "Include Clusters" header line -- and the dumper
+
+    writes one voxel per line rather than run-length boxes.
+
+    '
+  - 'The canonical dumper CC3DML also carries a <PIFFileExtension> element (twedit
+
+    emits "piff", CC3DMLGeneratorBase.py:1280) and names the file after the
+
+    SimulationName, with the MCS appended by the core to make per-dump filenames.
+
+    PyCoreSpecs''s PIFDumperSteppable emits NEITHER a PIFFileExtension element NOR
+
+    any MCS-suffix logic -- it declares only PIFName, so this spec under-specifies
+
+    the actual on-disk file naming/extension.
+
+    '
+  - 'The `xml` property is byte-identical to sibling PIFInitializer''s `xml`
+
+    (both emit just a PIFName element under the Steppable header). The only
+
+    XML-level distinguisher between "write a PIF" and "read a PIF" is the
+
+    Steppable Type attribute (generate_header -> Type="PIFDumper" vs the
+
+    initializer''s registered_name), not the element body.
+
+    '
+  - '`pif_name` semantics flip between the two classes that share the field:
+
+    INPUT-must-exist for PIFInitializer, OUTPUT-target for PIFDumper. A
+
+    reimplementer copying the validate() logic across would wrongly demand the
+
+    dumper''s target already exist.
+
+    '
+  - '__getstate__ returns (xml string, (), {"pif_name": ...}) -- pickling drops
+
+    frequency too, consistent with the xml omission above.
+
+    '
   verdict: null
   of: null
   implementation_of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -572,19 +2594,150 @@ mechanisms:
   raw_name: PIFInitializer
   raw_kind: Steppable (PIFInitializer)
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L5956
-  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
-    CompuCell3D'
-  summary: PIF Initializer
-  equations: null
-  params: {}
-  state_io: null
-  surprises: null
+  paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366 discusses cell-field
+
+    initialization in general; no page verified (no extracted paper text for this
+
+    target). Checkable library anchor: cc3d/core/PyCoreSpecs.py:L5956 (class
+
+    PIFInitializer) and cc3d/doc/code_ref/user/build/core/PyCoreSpecs.rst:314
+
+    (autoclass PIFInitializer). Format examples READ (both header modes verified):
+
+    cluster-mode cc3d/tests/plugin_test_suite/CompartmentExample_test_run/Simulation/3D_LINE_BASE.piff
+    (9 tokens; clusterId 1 groups cells 1-5, so clusterId != cellId) and AdhesionFlexPython_test_run/.../initial_configuration.piff;
+    headerless cc3d/tests/plugin_test_suite/ExternalPotential_test_run/Simulation/FocalPointInit.piff
+    and amoebae_2D_secretion_test_run/Simulation/amoebae_2D.piff (8 tokens, no leading clusterId).
+
+    '
+  summary: 'An initialization steppable that runs ONCE at the start of a simulation. It
+
+    reads a PIF ("Potts Initial File", .piff) whose name is given by pif_name, and
+
+    paints the cell-id lattice directly: each line of the file names a cell and an
+
+    axis-aligned box of lattice sites, and every site in that box is assigned to
+
+    that cell (creating the cell on first mention). It does not evolve anything --
+
+    it stamps the initial cell configuration onto the field, then is done. This is
+
+    the most literal expression of the CC3D representation: a cell IS the set of
+
+    lattice sites that share its id, built up here box-by-box.
+
+    '
+  equations: "No physics equation; a file-driven lattice-painting rule. The .py spec\n(PyCoreSpecs.py:5956)\
+    \ only carries the file name and emits the CC3DML element\n<PIFName>{pif_name}</PIFName>; the actual\
+    \ reading/painting is in the compiled\ncore (cpp/CompuCell3DSteppables/libCC3DPIFInitializer.so, not\
+    \ readable here).\nBehaviour reconstructed from the .piff format observed in the test suite:\n\nOptional\
+    \ first line:  \"Include Clusters\"\n  - if present  -> per-line token layout is:\n      clusterId\
+    \  cellId  cellType  x1 x2  y1 y2  z1 z2\n  - if absent   -> per-line token layout is:\n      cellId\
+    \  cellType  x1 x2  y1 y2  z1 z2\n\nFor each data line, for every lattice site (x,y,z) with\n    \
+    \  x1 <= x <= x2,  y1 <= y <= y2,  z1 <= z <= z2   (inclusive box)\nassign  cellField[x,y,z] := cell(cellId),\
+    \  the cell's type := cellType,\nand (cluster mode) the cell's clusterId := clusterId. A cell is created\
+    \ the\nfirst time its id appears; later lines with the same cellId ADD sites to the\nsame set, so\
+    \ a cell is the UNION of its boxes and need not be a single\nrectangle. Single-site lines are the\
+    \ common case (x1==x2, etc.), i.e. the\nfile can enumerate the lattice pixel-by-pixel.\n"
+  params:
+    pif_name: 'initial_configuration_source -- filesystem path to the .piff file that
+
+      defines the entire initial cell layout. This is the only constructor
+
+      parameter and the only tunable; there is no numeric physics here.
+
+      check_dict rejects only the empty string (''PIF needs a name'') at construction;
+
+      validate() then raises SpecValueError unless os.path.isfile(pif_name) is true.
+
+      '
+  state_io: "This is an INITIALIZER (a one-shot Steppable at t=0), not an energy term and\nnot a per-step\
+    \ update. In Plexus terms it neither returns a delta the engine\nintegrates nor participates in the\
+    \ Metropolis accept/reject -- it seeds the\nstate the rest of the simulation then evolves.\nreads:\n\
+    \  - external file pif_name (.piff text), NOT simulation state\nwrites:\n  - cell-id field over the\
+    \ lattice (the sigma field mapping site to cell id)\n  - cell TYPE for each cell id named in the file\n\
+    \  - cell clusterId for each cell (only when \"Include Clusters\" header present)\n  - implicitly\
+    \ the roster of existing cells (cells are created as ids appear)\n"
+  surprises:
+  - 'A cell is NOT required to be a connected box. Multiple lines sharing a cellId
+
+    accrete sites into one cell, so the initial cell can be an arbitrary union of
+
+    boxes (or even disconnected). A reimplementer who keys on "one line = one
+
+    cell" or "cell = rectangle" gets it wrong.
+
+    '
+  - 'The box bounds are INCLUSIVE on both ends: x1..x2 covers x2-x1+1 sites. Both
+
+    forms occur in the test suite: single-site rows (AdhesionFlex
+
+    initial_configuration.piff, "8 8 Cell2 119 119 53 53 0 0") enumerate the
+
+    lattice pixel-by-pixel, while multi-site boxes (CompartmentExample
+
+    3D_LINE_BASE.piff, "1 1 Side1 23 25 47 56 10 14" = a 3x10x5 box) fill a region
+
+    in one line. A reimplementer must handle both, not assume single-site rows.
+
+    '
+  - 'The optional "Include Clusters" first line SILENTLY changes the column count:
+
+    with header a data line is 9 tokens (clusterId cellId cellType x1 x2 y1 y2 z1 z2),
+
+    without header it is 8 (cellId cellType ...). Parse the header before the columns;
+
+    guessing column meaning from the first data row is unsafe. clusterId is genuinely
+
+    independent of cellId -- verified in 3D_LINE_BASE.piff where clusterId 1 groups
+
+    cellIds 1-5 -- so a parser that assumes clusterId==cellId corrupts compartment models.
+
+    '
+  - '2D vs 3D: files still carry z1 z2 columns; 2D simulations use z1==z2==0
+
+    (see AdhesionFlex .piff). The z columns are always present, not optional.
+
+    '
+  - 'Internal spec name has a typo: name = "pif_initiazer" (missing ''l''). The
+
+    CC3DML/registered name is "PIFInitializer"; code that keys off the internal
+
+    name string must reproduce the typo. registered_name drives the emitted
+
+    Steppable element with Type="PIFInitializer".
+
+    '
+  - 'check_dict for pif_name is (lambda x: len(x) == 0, "PIF needs a name"): it
+
+    rejects only the EMPTY string at construction. Real file existence is
+
+    deferred to validate() (os.path.isfile), which runs later; a nonexistent but
+
+    non-empty path passes construction and fails only at validation time.
+
+    '
+  - 'Contrast with the sibling initializers this shares "order" space with:
+
+    UniformInitializer / BlobInitializer generate cells procedurally from a few
+
+    numeric params (box, gap, width, radius); PIFInitializer instead REPLAYS an
+
+    explicit, fully-specified layout from disk. Same end state (a seeded cell
+
+    field), opposite information source -- procedural vs. recorded.
+
+    PIFDumperSteppable (PyCoreSpecs.py:6012) is the inverse op that WRITES this
+
+    same format.
+
+    '
   verdict: null
   of: null
   implementation_of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -597,19 +2750,100 @@ mechanisms:
   raw_name: PixelTracker
   raw_kind: Plugin (PixelTrackerPlugin)
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L5311
-  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
-    CompuCell3D'
-  summary: PixelTracker Plugin
-  equations: null
-  params: {}
-  state_io: null
-  surprises: null
+  paper_section: "No dedicated paper section \u2014 PixelTracker is an infrastructure plugin, not a\n\
+    physics term, and is not individually described in Swat et al. (2012) Methods\nCell Biol 110:325-366.\
+    \ Checkable source anchors: PyCoreSpecs.py:L5311\n(spec), cc3d/cpp/CompuCell.py:6002 (class PixelTrackerPlugin(CellGChangeWatcher);\
+    \ field3DChange def at :6010, enableMediumTracker at :6031 -- verified at source),\ndoc/code_ref cpp/CompuCell/plugins/PixelTrackerPlugin.rst,\
+    \ and the consumer\nPySteppables.get_cell_pixel_list (PySteppables.py:2465) + iterators.py:700\n(class\
+    \ CellPixelList).\n"
+  summary: "Bookkeeping/observer plugin. For every cell it maintains an explicit container\n(a set of\
+    \ PixelTrackerData, each wrapping a Point3D) of the lattice sites that\ncurrently belong to that cell\
+    \ \u2014 i.e. it materialises the inverse of the\ncell_field: the CPM lattice stores site -> cell\
+    \ id, and PixelTracker builds and\nkeeps live the cell id -> {sites} map. It contributes NO energy\
+    \ and changes no\nacceptance probability; it is a CellGChangeWatcher that reacts to each accepted\n\
+    pixel copy and edits the two affected cells' pixel sets. Its purpose is O(1)\nenumeration of a cell's\
+    \ pixels for downstream consumers (moment of inertia,\nwhole-cell deletion/translation, per-cell secretion,\
+    \ custom steppables).\n"
+  equations: "Not a Hamiltonian term: Delta H = 0, always. It is a state-mirroring update\ntriggered on\
+    \ each ACCEPTED spin/pixel copy at site pt where oldCell -> newCell.\n\nLet PS(c) be the pixel set\
+    \ attached to cell c. On field3DChange(pt, newCell, oldCell)\n(CompuCell.py:6010, PixelTrackerPlugin_field3DChange):\n\
+    \    if oldCell is not medium (or track_medium):  PS(oldCell).erase(pt)\n    if newCell is not medium\
+    \ (or track_medium):  PS(newCell).insert(pt)\nSo after any accepted copy, PS(c) = { pt : cell_field[pt]\
+    \ == c }, kept exactly\nconsistent with the lattice. Consumers read it as an iterator (CellPixelList,\n\
+    iterators.py:700) yielding PixelTrackerData with a .pixel Point3D.\nThe medium (cell id 0) is tracked\
+    \ only if track_medium is set (enableMediumTracker,\nCompuCell.py:6031); by default the medium's sites\
+    \ are NOT indexed.\n"
+  params:
+    track_medium: 'role = index_scope_toggle. If True, also maintain the pixel set for the
+
+      medium (cell id 0 / null cell) via enableMediumTracker; default False.
+
+      Off by default because the medium spans most of the lattice, so indexing it
+
+      is expensive and rarely needed. Boolean; emitted as a bare <TrackMedium/>
+
+      child element only when True (PyCoreSpecs.py:5333).
+
+      '
+  state_io:
+    reads: "- the accepted pixel-copy event: the changed site pt (Point3D), its new owner\n  newCell,\
+      \ and its previous owner oldCell (arguments of field3DChange).\n- implicitly, the cell_field, since\
+      \ it is a watcher registered on lattice changes.\n"
+    writes: "- PS(c): the per-cell pixel set (concretely `pixelSet`, extra-member data\n  attached to\
+      \ each CellG via PixelTrackerAccessor; reached as\n  pixelTrackerAccessor.get(cell.extraAttribPtr).pixelSet,\
+      \ iterators.py:703/724).\n  erase(pt) on the old owner, insert(pt) on the new owner.\n- optionally\
+      \ the medium's pixel set when track_medium is True.\n- writes NOTHING to the Hamiltonian / no dE\
+      \ contribution; does not touch cell\n  volume, surface, or field concentrations.\n"
+  surprises:
+  - "It is NOT a physics mechanism at all \u2014 it writes no energy and never changes an\nacceptance\
+    \ probability. A reimplementer who slots it next to Volume/Surface/\nAdhesion as \"another energy\
+    \ plugin\" is wrong: it is a pure derived-index /\nobserver that mirrors lattice state. In Plexus\
+    \ terms a cell already IS a set of\nsites, so this plugin materialises a representation Plexus treats\
+    \ as primitive \u2014\nthe interesting question is whether the algebra needs an explicit \"index/inverse-map\n\
+    over a field partition\" contract or gets it for free.\n"
+  - 'Redundancy is the point and the hazard: PS(c) is fully derivable from cell_field
+
+    at any instant, but CC3D keeps it live incrementally so that enumerating a cell''s
+
+    pixels is O(|cell|) instead of O(|lattice|). Rebuilding it from scratch each read
+
+    would be correct but defeats the purpose.
+
+    '
+  - "It is a hard dependency, not an optimisation, for several downstream tools \u2014\nbut the failure\
+    \ mode is NOT uniform, and a reimplementer will get this wrong.\nThe low-level accessor get_cell_pixel_list\
+    \ SILENTLY returns None when\nPixelTracker is not loaded (PySteppables.py:2473-2476, `if self.pixelTrackerPlugin:\n\
+    ... return None`), it does NOT raise. The AttributeError('Could not find\nPixelTracker Plugin') is\
+    \ raised by the consumers that wrap it: get_copy_of_cell_pixels\n(PySteppables.py:2603) and move_cell\
+    \ (2534); delete_cell (2636) inherits that raise\nvia get_copy_of_cell_pixels; merge_cells (469) raises\
+    \ its own \"did you load\nPixelTracker plugin?\". So code that calls the\nraw accessor and forgets\
+    \ the None-check fails downstream with a confusing\nNoneType error, not a clear \"plugin missing\"\
+    \ one. MomentOfInertia-style per-cell\ngeometry and whole-cell translation both iterate PS(c).\n"
+  - 'The medium is excluded by default. Anyone iterating "all tracked pixels" and
+
+    expecting medium sites will silently get nothing unless track_medium=True. The
+
+    default is a performance guard, not a semantic statement that the medium has no
+
+    pixels.
+
+    '
+  - 'Two-sided edit ordering: on a copy the SAME pt is erased from oldCell and inserted
+
+    into newCell. A naive single-sided implementation (only add to new owner) leaks
+
+    stale membership; the erase on the old owner is mandatory for consistency.
+
+    '
+  - "track_medium is the ONLY parameter. In particular there is no neighbor_order here\n\u2014 that belongs\
+    \ to the sibling BoundaryPixelTrackerPlugin (PyCoreSpecs.py:~5260),\nwhich tracks only boundary/surface\
+    \ pixels. PixelTracker tracks the FULL interior\npixel set of every cell.\n"
   verdict: null
   of: null
   implementation_of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -622,19 +2856,203 @@ mechanisms:
   raw_name: ReactionDiffusionSolverFE
   raw_kind: Steppable (ReactionDiffusionSolverFE)
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L6911
-  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
-    CompuCell3D'
-  summary: ReactionDiffusionSolverFE
-  equations: null
-  params: {}
-  state_io: null
-  surprises: null
+  paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366, sec. "PDE Solvers". Checkable in-tree
+
+    anchor for this specific solver: cc3d/twedit5/Plugins/CC3DProject/diffusion_solvers_descr.py:11
+
+    ("ReactionDiffusion: Solves coupled reaction-diffusion equations. Uses the Forward-Euler
+
+    Method and allows flexibility in specifying reaction terms."). Reference-manual page:
+
+    reaction_diffusion_solver.html.
+
+    '
+  summary: 'A steppable that advances one OR MORE scalar concentration FIELDS over the CPM pixel lattice
+
+    by one explicit forward-Euler (FTCS) step per Monte Carlo Step -- the same diffuse-decay-secrete
+
+    update as DiffusionSolverFE, but each field additionally carries a user-supplied REACTION term
+
+    (AdditionalTerm): a muParser math expression that may reference the OTHER fields by name (and
+
+    the cell type at the site). The fields therefore form a COUPLED reaction-diffusion system, not
+
+    independent diffusants. Like DiffusionSolverFE it is a genuine field->field WRITE (it overwrites
+
+    the concentration grids in place), unlike the energy-term Potts plugins in this atlas. The
+
+    numerics live in the compiled core; PyCoreSpecs.py only declares the CC3DML the solver reads.
+
+    '
+  equations: "Continuous coupled system (the paper's PDE), for a set of fields f = 1..M:\n\n  d c_f /\
+    \ dt  =  D_f * grad^2 c_f  -  lambda_f * c_f  +  S_f  +  R_f( c_1, ..., c_M, type )\n\nCode's realisation,\
+    \ per pixel i and field f, one explicit forward-Euler step (DeltaX = DeltaT\n= 1 by default). The\
+    \ diffusion+decay half is the SAME FTCS scheme transcribed for DiffusionSolverFE\n(see that entry,\
+    \ order 14): a symmetric two-half-sum face-flux Laplacian with per-cell-type\nD_i, lambda_i, plus\
+    \ the secretion sweep S_i. On top of that, the reaction term is added each step:\n\n  c_f,i^{t+1}\
+    \  =  [ DiffusionSolverFE FE update of field f at i ]  +  DeltaT * R_f,i\n\n  R_f,i = additional_term_f\
+    \ evaluated at i, using the CURRENT-step values of ALL fields at i\n          and the cell type occupying\
+    \ i.\n\nWorked example -- FitzHugh-Nagumo (cc3d/tests/pde_solvers/.../ReactionDiffusion_2D_FN.xml):\n\
+    \  field F:  D=0.01, AdditionalTerm = \"F-F*F*F/3+0.3-H\"\n  field H:  D=0.01, AdditionalTerm = \"\
+    0.08*F-0.064*H+0.056\"\nso F's reaction reads H and H's reaction reads F -- the named-field cross\
+    \ reference is the coupling.\n\nSymbols:\n  c_f,i      value of field f at pixel i (a field value,\
+    \ not cell state)\n  D_f        diffusion coefficient of f = diff_types[type(cell at i)] if set, else\
+    \ diff_global\n  lambda_f   decay coefficient of f     = decay_types[type(cell at i)] if set, else\
+    \ decay_global\n  S_f        secretion source for f (additive rate, or on-contact; NOT Dirichlet-clamp\
+    \ here)\n  R_f        the muParser AdditionalTerm expression for field f (the reaction)\n\nNOT ESTABLISHED\
+    \ FROM SOURCE: the exact integration of R_f -- whether it is scaled by DeltaT,\nevaluated before or\
+    \ after the diffusion sweep, and whether AutoscaleDiffusion rescales it -- lives\nin the compiled\
+    \ core, which was not read. The continuous form and the named-field coupling ARE\nfrom the source\
+    \ (spec xml + the FN example); the discretisation detail of R is inferred.\n"
+  params:
+    additional_term:
+      role: 'reaction_term -- THE defining feature. A muParser math expression (per field) added to that
+
+        field''s update each step; it may reference the OTHER fields BY NAME and the cell type, which
+
+        is how the solver couples fields into a reaction-diffusion system. Emitted as <AdditionalTerm>
+
+        by this solver''s DiffusionData.xml (L6772-6773). (In DiffusionSolverFE the identical spec_dict
+
+        key exists but is never emitted -- dead there, live here.)
+
+        '
+    autoscale:
+      role: 'numerical_rescaling_flag -- emits <AutoscaleDiffusion>; auto-rescales the diffusion constant
+        /
+
+        timestep to keep the forward-Euler step stable at large D. Default False, set explicitly in
+
+        __init__ (L6925), NOT inherited from the base solver dict. This is the FE-stability knob that
+
+        DiffusionSolverFE''s python spec did not expose.
+
+        '
+    fluc_comp:
+      role: mass_conservation_flag -- emits <FluctuationCompensator>, corrects field values when a pixel
+        changes cell id so cell motion conserves total field mass.
+    diff_global:
+      role: diffusion_coefficient (global default D_f; validated >= 0)
+    decay_global:
+      role: decay_rate (global default lambda_f; validated >= 0)
+    diff_types:
+      role: diffusion_coefficient_by_cell_type -- per-cell-type override D_t, keyed to the CPM cell occupying
+        the pixel
+    decay_types:
+      role: decay_rate_by_cell_type -- per-cell-type override lambda_t
+    init_filename:
+      role: initial_condition -- file to load the t=0 field from (emitted as <ConcentrationFileName>)
+    secretion (SecretionParameters cell_type/value/contact_type):
+      role: 'source_term -- per-cell-type additive source (Secretion) or heterotypic-contact source
+
+        (SecretionOnContact). ConstantConcentration (Dirichlet clamp) is REFUSED: secretion_data_new
+
+        raises SpecValueError "ReactionDiffusionSolverFE does not support constant concentrations"
+
+        (L6892-6893).
+
+        '
+    boundary_conditions (x/y/z _min/_max _type + _val):
+      role: 'boundary_condition -- per face: Value=Dirichlet, ConstantDerivative=Neumann/flux, Periodic
+        (read back in from_xml L7028-7047)'
+    init_expression:
+      role: 'UNKNOWN via this API: present in the base DiffusionData dict (L581) and read back by from_xml
+        (L7000-7001), but this solver''s DiffusionData.xml (L6756-6774) NEVER emits <InitialConcentrationExpression>
+        -- so an init expression set on the python object is silently dropped on write; only init_filename
+        survives. Effectively dead on the write path.'
+    DeltaX / DeltaT / ExtraTimesPerMCS:
+      role: 'UNKNOWN via this API: grid spacing / timestep / sub-cycling exist in the core CC3DML and
+        set FE stability, but this python spec exposes NO setter (same gap as DiffusionSolverFE); they
+        fall back to core defaults. autoscale is the only stability knob reachable from here.'
+  state_io:
+    reads: "- the concentration field of EVERY declared field (the reaction term of one field reads the\n\
+      \  current values of the others at the same site -- this cross-field read is what DiffusionSolverFE\n\
+      \  does not have)\n- the CPM cell-id / cell-type lattice at every pixel, to pick D_i, lambda_i,\
+      \ evaluate the cell-type\n  terms in the reaction expression, and locate secreting cell interiors\n\
+      - boundary values / the initial-condition file\n"
+    writes: "- every concentration field, IN PLACE (overwrites the grids each MCS). An actual field write,\
+      \ not\n  an energy delta -- contrast the Potts plugins in this atlas that return nothing and only\
+      \ bias\n  pixel-copy acceptance.\n"
+  surprises:
+  - 'The whole difference from DiffusionSolverFE is one emitted element: <AdditionalTerm> (L6772-6773),
+
+    a muParser reaction expression that may reference OTHER fields BY NAME. That turns M independent
+
+    diffusants into ONE coupled reaction-diffusion system. The SAME python attribute (additional_term)
+
+    exists on DiffusionSolverFE''s spec but its DiffusionData.xml never writes it, so it is dead there
+    and
+
+    live here -- a reimplementer comparing the two python specs by attribute list would miss the coupling.
+
+    '
+  - 'ConstantConcentration (Dirichlet clamp / pinned source) is explicitly FORBIDDEN here:
+
+    secretion_data_new raises SpecValueError "ReactionDiffusionSolverFE does not support constant
+
+    concentrations" (L6892-6893). A model ported from DiffusionSolverFE that pinned a boundary via a
+
+    constant-concentration cell must be reworked -- the clamp semantics simply do not exist on this solver.
+
+    '
+  - 'A BLANK reaction term does NOT mean "no reaction". twedit''s generator writes AdditionalTerm =
+
+    "1*<fieldname>" when the term is empty (CC3DMLGeneratorBase.py:2007 and :2011), i.e. an unset
+
+    reaction defaults to R = c (exponential growth), not R = 0. A magic default a reimplementer would
+
+    not guess from the field being blank.
+
+    '
+  - 'Asymmetric field spec: this solver''s DiffusionData.xml (L6756-6774) emits <ConcentrationFileName>
+
+    (init_filename) but NOT <InitialConcentrationExpression>, even though init_expression is in the base
+
+    dict and from_xml reads it back (L7000-7001). An init expression set on the object is silently lost
+    on
+
+    write; only a file initial condition round-trips.
+
+    '
+  - 'AutoscaleDiffusion scope discrepancy between the two code paths: PyCoreSpecs emits it at the STEPPABLE
+
+    level (one <AutoscaleDiffusion> for the whole solver, L6943-6944), while twedit''s generator emits
+    it
+
+    per <DiffusionField> (CC3DMLGeneratorBase.py:1990-1991). A reimplementer following twedit would scope
+
+    autoscaling per field; following PyCoreSpecs, globally.
+
+    '
+  - 'from_xml can IMPORT a CC3DML this spec can never re-emit -- reader and writer disagree about
+
+    whether Dirichlet clamps exist. from_xml (L7016-7019) explicitly parses <ConstantConcentration>
+
+    elements and forwards each to field.secretion_data_new(..., constant=True); but that very method
+
+    (L6892-6893) RAISES SpecValueError "does not support constant concentrations" on the "constant"
+
+    kwarg. So round-tripping a legacy ReactionDiffusion CC3DML that pinned a source via
+
+    ConstantConcentration crashes on the IMPORT read, not on write -- a self-contradiction inside one
+    class.
+
+    '
+  - 'I did NOT read the compiled core, so the exact FE integration of the reaction term (DeltaT scaling,
+
+    pre- vs post-diffusion evaluation order, and whether AutoscaleDiffusion also rescales the reaction)
+
+    is inferred, not verified. The named-field coupling and the continuous form are established from the
+
+    spec xml and the FitzHugh-Nagumo example; the discretisation of R is not.
+
+    '
+  status: inspected
   verdict: null
   of: null
   implementation_of: null
   why: null
   contract: null
-  status: candidate
   module: null
   test: null
   evidence:
@@ -647,19 +3065,181 @@ mechanisms:
   raw_name: Secretion
   raw_kind: Plugin (SecretionPlugin)
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L4306
-  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
-    CompuCell3D'
-  summary: Secretion Plugin
-  equations: null
-  params: {}
-  state_io: null
-  surprises: null
+  paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366 -- the chemical-fields / PDE-solver
+    material (Secretion is a source term for diffusing fields). NO extracted paper text is available for
+    this target, so I cannot cite a page/figure I have read: the SOURCE (PyCoreSpecs.py + the amoebae_2D
+    test XML) is the only evidence anchoring this entry.'
+  summary: 'A per-Monte-Carlo-step SOURCE/CLAMP term for a chemical concentration field. Each step it
+
+    walks the lattice sites owned by cells of a named type and writes to the co-registered
+
+    scalar field at those sites: plain Secretion ADDS a fixed rate (field[x] += rate);
+
+    ConstantConcentration OVERWRITES (field[x] = const, a Dirichlet clamp); SecretionOnContact
+
+    ADDS a rate only at a cell''s boundary sites that touch a cell of a specified other type.
+
+    It does NOT move or diffuse the chemical -- transport is a separate PDE solver; Secretion
+
+    only injects (or pins) mass at cell-occupied pixels. It writes the field, not cell state.
+
+    '
+  equations: "Let sigma(x) be the cell id at lattice site x, tau(c) the type of cell c, and phi the\n\
+    scalar concentration field named by field_name. Per secretion call (repeated\nExtraTimesPerMC times\
+    \ per MCS), for every cell c and every site x in c:\n\n  plain Secretion (type tau(c)=T has rate s_T):\n\
+    \      phi(x) <- phi(x) + s_T                       for all x in c\n\n  ConstantConcentration (type\
+    \ T pinned to level k_T):\n      phi(x) <- k_T                                for all x in c   (overwrite,\
+    \ not +=)\n\n  SecretionOnContact (type T secretes r_{T,U} where it touches type U):\n      phi(x)\
+    \ <- phi(x) + r_{T,U}                   for x in boundary(c) with a\n                            \
+    \                       neighbour site y, sigma(y)=c', tau(c')=U\n\n`value` (_val) is the single per-type\
+    \ magnitude: it is a RATE (added) for Secretion and\nSecretionOnContact, but an absolute CONCENTRATION\
+    \ (assigned) for ConstantConcentration --\nsame field, different physical meaning by mode. The compiled\
+    \ FieldSecretor also exposes\n...TotalCount / ...TotalAmount variants returning the summed mass injected\
+    \ (tot_amount) for\nbookkeeping; the XML-driven plugin path uses the non-counting forms.\n"
+  params:
+    pixel_tracker:
+      role: 'enable/disable the PixelTracker dependency = the per-cell interior-pixel index the
+
+        inside-cell secretion iterates over. Disabling removes the source of "which sites does
+
+        this cell own", so plain/constant secretion has no pixels to write.
+
+        '
+    boundary_pixel_tracker:
+      role: 'enable/disable the BoundaryPixelTracker dependency = the per-cell BOUNDARY-pixel index.
+
+        Required for SecretionOnContact (which acts only on contact/boundary sites); disabling
+
+        it removes on-contact capability.
+
+        '
+    field_specs (SecretionField, one per chemical field):
+      field_name:
+        role: field_identifier -- names the concentration field (owned by a PDE solver) to write.
+      frequency:
+        role: 'secretion_repeat_count (XML ExtraTimesPerMC) -- how many extra times per MCS the
+
+          secretion is applied; effective per-step rate is multiplied by this. Must be >= 1
+
+          (check_dict fails when frequency < 1).
+
+          '
+      param_specs (SecretionParameters, one per cell type):
+        cell_type:
+          role: source_cell_type -- which type's sites secrete/pin.
+        value:
+          role: secretion_rate_or_pinned_concentration (rate if additive, level if constant).
+        constant:
+          role: mode_flag -- if true, OVERWRITE mode (Dirichlet ConstantConcentration) instead of additive;
+            mutually exclusive with contact_type.
+        contact_type:
+          role: 'heterotypic_contact_target -- if set, restrict secretion to boundary sites touching
+
+            this other type (SecretionOnContact); mutually exclusive with constant.
+
+            '
+  state_io:
+    reads:
+    - cell field sigma(x) -- lattice site -> cell id -> cell type (to select which sites secrete)
+    - PixelTracker / BoundaryPixelTracker pixel-membership indices (interior and boundary sites of each
+      cell)
+    - the concentration field phi (read-modify-write for additive/on-contact modes)
+    - site neighbourhood (for on-contact: the types of neighbouring sites)
+    writes:
+    - 'the concentration field phi at cell-occupied sites (+= rate, or = constant). This is a genuine
+      field WRITE -- unlike most CC3D plugins, Secretion is NOT an energy term: it mutates the PDE field
+      directly, once per MCS, rather than returning an accept/reject energy delta. (The Python scripting
+      counterpart SecretionBasePy sets runBeforeMCS=1, i.e. secretion is applied before the pixel-copy
+      sweep; the compiled SecretionPlugin lives in libCC3DSecretion.so and I could not read its intra-MCS
+      ordering relative to the diffusion solve from Python -- see surprises.)'
+  surprises:
+  - 'Secretion does NOT diffuse or transport anything. It is only a source (or clamp) term;
+
+    the actual spatial spread is done by a separate PDE/diffusion solver on the same
+
+    field_name. A reimplementer who folds "secretion" and "diffusion" into one op is wrong.
+
+    '
+  - '`value` overloads meaning by mode: it is a per-step RATE for Secretion/SecretionOnContact
+
+    (additive) but an absolute CONCENTRATION for ConstantConcentration (overwrite). The same
+
+    number does different things depending on the `constant` flag.
+
+    '
+  - 'ConstantConcentration is a Dirichlet clamp: it OVERWRITES phi at the cell''s sites every
+
+    step, so it also acts as a sink/ceiling, not just a source. constant and contact_type are
+
+    mutually exclusive -- constructing with both raises SpecValueError.
+
+    '
+  - 'ExtraTimesPerMC (frequency) silently multiplies the effective rate: frequency=3 applies
+
+    the write three extra times per MCS. Easy to miss; not a schedule of distinct events.
+
+    '
+  - 'Depends on PixelTracker (interior sites) and BoundaryPixelTracker (boundary sites);
+
+    on-contact secretion is impossible without the boundary tracker. Disabling a tracker is
+
+    allowed but quietly removes the pixel set the write iterates over.
+
+    '
+  - 'The same physics can be declared TWO ways with identical effect: as this standalone
+
+    Secretion Plugin, or inline as <SecretionData> inside a DiffusionField block of the PDE
+
+    solver (see the amoebae_2D test XML). Two spec surfaces, one mechanism.
+
+    '
+  - 'A duplicate SecretionParameters for the same cell_type with no contact_type raises
+
+    (params_append guard) -- one additive rate per (field, type), but multiple distinct
+
+    contact_type entries for a type are allowed.
+
+    '
+  - 'The declarative XML plugin is a STRICT SUBSET of the compiled FieldSecretor API. from_xml (PyCoreSpecs.py:L4435-L4451)
+    maps only three element names -- Secretion, ConstantConcentration, SecretionOnContact -- onto the
+    three INSIDE-cell secretion variants. But FieldSecretor (cpp/CompuCell.py:L9082) also exposes: UPTAKE
+    variants (uptakeInsideCell*, a SINK that subtracts, with absolute/relative-to-max forms), OUTSIDE-cell
+    secretion at the boundary (secreteOutsideCellAtBoundary, writing the MEDIUM sites just outside the
+    cell), and COM-only secretion (secreteInsideCellAtCOM, a single point source at the centre of mass).
+    None of these are reachable from the Secretion plugin/XML -- they are Python-scripting-only. A reimplementer
+    treating this plugin as the whole of CC3D "secretion" would miss the sink, the exterior source, and
+    the point source.'
+  - Intra-MCS ordering of the compiled plugin is NOT establishable from the Python layer. The physics
+    is in libCC3DSecretion.so; whether the write lands before or after the diffusion solver steps the
+    field within a single MCS, and whether it reads/writes the old or new field buffer, is invisible here.
+    The Python steppable SecretionBasePy uses runBeforeMCS=1 (before the pixel-copy sweep) but that is
+    a different code path and is only a hint, not proof, for the plugin. No evidence run exists for this
+    mechanism, so additive-vs-overwrite, rate-vs-level, and the neighbour-iteration order for on-contact
+    are inferred from method names + the amoebae_2D test XML, not verified by measurement.
+  - 'Zero is a no-op guard, not a clamp-to-zero. The GPU secrete kernels wrap every mode in
+
+    if (value) { ... } (DiffusionKernel.cl:L216,L262,L314), so an EXACT 0.0 is SKIPPED --
+
+    constant-mode value=0 does NOT pin the field to zero, it does nothing that step. Verified
+
+    in the OpenCL path; assumed (not disassembled) to mirror the standalone plugin.
+
+    '
+  - 'Volumetric source, not per-cell. Plain/constant modes write EVERY lattice site the cell owns,
+
+    so total injected (or clamped) mass scales with cell VOLUME -- a large cell secretes
+
+    proportionally more, coupling secretion output to the volume/growth machinery implicitly. It
+
+    is a per-site term, not one deposit per cell.
+
+    '
   verdict: null
   of: null
   implementation_of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -672,19 +3252,159 @@ mechanisms:
   raw_name: SteadyStateDiffusionSolver
   raw_kind: Steppable (SteadyStateDiffusionSolver)
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L7223
-  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
-    CompuCell3D'
-  summary: SteadyStateDiffusionSolver Specs
-  equations: null
-  params: {}
-  state_io: null
-  surprises: null
+  paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366 -- PDE-solver / chemical-field-diffusion
+
+    section (exact page NOT verifiable: no paper text was extracted for this target). Primary
+
+    evidence is the source at PyCoreSpecs.py:L7223 and the in-tree guide string in
+
+    cc3d/twedit5/Plugins/CC3DProject/diffusion_solvers_descr.py:23-24 (heading at :23
+
+    "SteadyStateDiffusionSolver", body at :24 "Solves Diffusion equation at the steady state i.e. at
+
+    time= infinity ... Technically this solver solves Helmholtz Equation"), plus the reference
+
+    manual page steady_state_diffusion_solver.html linked from that guide string. (The
+
+    Secretion-Plugin restriction is separately anchored at
+
+    cc3d/twedit5/Plugins/CC3DMLGenerator/CC3DMLGeneratorBase.py:2456.)
+
+    '
+  summary: 'A PDE-solver Steppable that, given the current cell configuration and per-cell-type secretion
+
+    sources, computes the STEADY-STATE (t = infinity) concentration field by solving an elliptic
+
+    boundary-value problem and OVERWRITES the whole concentration field with that equilibrium
+
+    solution. Unlike DiffusionSolverFE it does not take a forward-Euler time step -- there is no
+
+    dt; each invocation is a single global implicit solve of the Helmholtz equation.
+
+    '
+  equations: "Steady state of the reaction-diffusion equation  dc/dt = D grad^2 c - k c + S(x)\nis obtained\
+    \ by setting dc/dt = 0:\n\n    D grad^2 c  -  k c  +  S(x)  =  0\n\nequivalently the modified-Helmholtz\
+    \ / screened-Poisson form the guide names explicitly:\n\n    grad^2 c  -  (k/D) c  =  - S(x)/D\n\n\
+    Symbols:\n  c(x)  concentration field over lattice sites (the thing written)\n  D     diff_global,\
+    \ global diffusion coefficient (spatially UNIFORM here)\n  k     decay_global, global decay rate;\
+    \ sets screening length  L = sqrt(D/k)\n  S(x)  secretion source: per-cell-type rate, deposited at\
+    \ the sites of cells of that type\nSolved as a global linear BVP subject to the declared boundary\
+    \ conditions (Dirichlet value /\nNeumann flux / periodic per face). The actual linear-solver method\
+    \ is compiled in\nlibCC3DPDESolvers.so and is NOT readable from the Python layer. No time step, no\
+    \ dt.\n"
+  params:
+    three_d:
+      role: spatial_dimension_selector -- flag choosing the 2D vs 3D compiled solver; default False registers
+        core name "SteadyStateDiffusionSolver2D", True registers "SteadyStateDiffusionSolver". Must be
+        declared by the user; from_xml flips it if the guessed dimensionality is wrong.
+    diff_global:
+      role: diffusion_coefficient D (global, spatially uniform; per-cell-type diff_types are NOT exposed
+        by this solver's DiffusionData, unlike DiffusionSolverFE)
+    decay_global:
+      role: decay_rate k -- with D sets the screening length sqrt(D/k); also acts as the well-posedness
+        regularizer of the elliptic operator (template default 0.00001, non-zero)
+    init_expression:
+      role: initial_field_guess as a coordinate expression (e.g. "x*y"); seeds the field / iterative solver.
+        For a converged implicit steady-state solve its effect on the answer is expected to be negligible
+        except through solver convergence -- NOT verified against the compiled solver.
+    init_filename:
+      role: initial_field_source -- path to a file of initial concentrations (alternative to init_expression)
+    secretion_value_per_type:
+      role: source_rate S -- per-cell-type constant secretion rate (SecretionParameters(cell_type, value));
+        the ONLY channel through which cell geometry/type enters the solve. constant=True (ConstantConcentration
+        clamp) and contact_type (SecretionOnContact) are REJECTED for this solver (PyCoreSpecs.py:L7204-L7207).
+    boundary_conditions:
+      role: boundary_condition_type_and_value per face (x/y/z, min/max) -- one of ConstantValue (Dirichlet,
+        default 0.0), ConstantDerivative (Neumann/flux), or Periodic. For an elliptic BVP at least one
+        Dirichlet face is needed for a unique solution.
+  state_io:
+    reads: "- the cell lattice (which cell id / cell type occupies each site) -- used ONLY to place the\n\
+      \  per-type secretion source S(x); the diffusion medium itself is homogeneous (global D, k)\n- per-cell-type\
+      \ secretion rates (SecretionData on the field)\n- global diffusion constant D and decay constant\
+      \ k\n- boundary conditions on each domain face\n- optionally an initial concentration field (init_expression\
+      \ / init_filename) as a guess\nNOTE: this is a Steppable / PDE solver, not a Potts energy-term plugin\
+      \ -- it returns a field,\nnot an acceptance bias. And unlike DiffusionSolverFE it does not read\
+      \ the previous field to\nadvance it one dt: the previous field is at most an initial guess for a\
+      \ global solve.\n"
+    writes: "- the concentration field c over ALL lattice sites: OVERWRITTEN in place with the steady-state\n\
+      \  (equilibrium) solution of the Helmholtz BVP. This is a whole-field REPLACE from a global\n  implicit\
+      \ solve, not a local finite-difference delta the engine integrates.\n"
+  surprises:
+  - 'It is an ELLIPTIC (boundary-value) solve, not a time integrator. There is no dt and no per-MCS
+
+    stability limit; it returns the t=infinity field directly. The guide (diffusion_solvers_descr.py:24)
+
+    warns it is "not a direct substitution for Diffusion Solver FE and you have to check the
+
+    quality of the approximation" -- a reimplementer who models it as "many FE steps" gets the
+
+    transient, not what this solver returns.
+
+    '
+  - 'Secretion MUST be declared inside the solver''s own SecretionData; the general Secretion Plugin
+
+    does NOT work with this solver (guide twedit5/Plugins/CC3DMLGenerator/CC3DMLGeneratorBase.py:2456,
+
+    the addComment "Secretion has to be defined inside SteadyStateDiffusion solver"). And ConstantConcentration
+
+    and SecretionOnContact are actively rejected (PyCoreSpecs.py:L7204-L7207) -- so the rich
+
+    "three secretion semantics" of DiffusionSolverFE collapse here to a single per-type additive
+
+    source term.
+
+    '
+  - 'Only GLOBAL D and k are exposed (diff_global, decay_global). The base DiffusionData carries
+
+    per-cell-type diff_types/decay_types, but this solver''s DiffusionData class surfaces neither
+
+    -- the medium is homogeneous and cell type enters only through the secretion source. A
+
+    reimplementer copying DiffusionSolverFE''s heterogeneous-D stencil would be wrong here.
+
+    '
+  - 'Default DecayConstant in the template is 0.00001, deliberately non-zero. With k = 0 the
+
+    modified-Helmholtz operator degenerates to Poisson (grad^2 c = -S/D), which under all-Neumann
+
+    (flux) boundaries is singular / ill-posed. The tiny decay is (I believe) a regularizer that
+
+    keeps the linear system solvable; I did NOT confirm the solver''s behaviour at exactly k = 0.
+
+    '
+  - 'Dimensionality is user-declared via three_d (default 2D -> registered name
+
+    "SteadyStateDiffusionSolver2D"), not auto-detected from the lattice. from_xml (L7281-L7285)
+
+    catches a mismatched guess by flipping the flag and retrying. Pick the wrong flag at build
+
+    time and the core registration silently changes.
+
+    '
+  - 'Default boundary condition is ConstantValue 0.0 on every face (Dirichlet sink), inherited from
+
+    PDEBoundaryConditions (L824-L829) -- same silent absorbing default noted for DiffusionSolverFE,
+
+    but here it is also what makes the elliptic problem well-posed rather than merely "leaky".
+
+    '
+  - 'A per-field pymanage flag (ManageSecretionInPython) short-circuits the source declaration: when
+
+    set, the field xml EMITS a bare <ManageSecretionInPython/> element and DROPS the whole SecretionData
+
+    block (SteadyStateDiffusionSolverField.xml, L7156-L7159). So S(x) is then supplied by a user Python
+
+    steppable each MCS rather than by the declared per-type rates -- a reimplementer reading only the
+
+    SecretionData path would miss that the source term can be externally driven.
+
+    '
   verdict: null
   of: null
   implementation_of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -729,19 +3449,209 @@ mechanisms:
   raw_name: SurfaceTracker
   raw_kind: Plugin (SurfaceTrackerPlugin)
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L5382
-  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
-    CompuCell3D'
-  summary: SurfaceTracker Plugin
-  equations: null
-  params: {}
-  state_io: null
-  surprises: null
+  paper_section: 'Python spec class PyCoreSpecs.py:L5382 (one-line docstring stub, no physics). The
+
+    actual interface is the INSTALLED C++ header
+
+    include/CompuCell3D/CompuCell3D/plugins/SurfaceTracker/SurfaceTrackerPlugin.h
+
+    (class decl L21; members lmf / maxNeighborIndex L25-27; field3DChange decl L45). The
+
+    maintained store is the compiled CellG.surface (cpp/CompuCell.py:L527 getter, L589
+
+    read-only setter). The SWIG-exposed sibling ClusterSurfaceTrackerPlugin
+
+    (cpp/CompuCell.py:L10270, CellGChangeWatcher) is the closest readable analogue. NO
+
+    extracted paper text exists; the Swat et al. (2012) Methods Cell Biol 110:325-366
+
+    Surface-constraint discussion is UNREAD -- do not cite a page.
+
+    '
+  summary: 'Bookkeeping plugin, not an energy term. It maintains each cell''s scalar `surface`
+
+    (a weighted boundary-site/link count) incrementally as the Potts solver accepts
+
+    pixel copies, so that the Surface energy plugin has a live perimeter/area to
+
+    penalise against its target. It changes no energy and writes only the derived
+
+    per-cell `surface` field; from Python that field is read-only.
+
+    '
+  equations: "For a cell c occupying site set S_c, its surface is the lattice-weighted count of\nboundary\
+    \ links from its own sites to sites NOT belonging to c, over a neighbour shell\nfixed by (neighbor_order\
+    \ | max_neighbor_order | max_neighbor_distance):\n\n    surface(c) = sum_{p in S_c} sum_{n in N(p),\
+    \ id(n) != c} w\n\nN(p) = the lattice-neighbour shell of site p up to maxNeighborIndex; id(n) = owner\
+    \ of\nneighbour site n (0 = Medium, which counts as a non-c neighbour); w = lmf.surfaceMF,\nthe LatticeMultiplicativeFactor\
+    \ for the lattice/order (header L27). On a square lattice\nat order 1, w = 1 and surface reduces to\
+    \ the raw boundary-face count.\n\nMaintained INCREMENTALLY, never recomputed. On an accepted copy\
+    \ that changes site pt\nfrom oldCell to newCell, the Potts solver invokes the watcher\nfield3DChange(pt,\
+    \ newCell, oldCell) (header L45). Reconstructed update (canonical CC3D\nform; the .cpp does not ship,\
+    \ see surprises) -- loop the shell of pt, touch ONLY the\ntwo owner cells:\n\n    if newCell == oldCell:\
+    \ return                  # no-op self copy\n    for nIdx in 0 .. maxNeighborIndex:\n        nb =\
+    \ boundaryStrategy.getNeighborDirect(pt, nIdx)\n        if nb.distance == 0: continue            \
+    \  # off-lattice neighbour -> skip\n        nCell = cellField[nb.pt]\n        # pt is leaving oldCell:\n\
+    \        if nCell != oldCell: oldCell.surface -= w  # a hetero face of oldCell is destroyed\n    \
+    \    else:                oldCell.surface += w  # an internal face becomes exposed\n        # pt is\
+    \ joining newCell:\n        if nCell != newCell: newCell.surface += w  # a new hetero face of newCell\
+    \ appears\n        else:                newCell.surface -= w  # a hetero face becomes internal\n\n\
+    Cost is O(shell size) per flip. maxNeighborIndex is derived from the XML param via\nBoundaryStrategy::getMaxNeighborIndexFromNeighborOrder\
+    \ (the two order params) or\ngetMaxNeighborIndexFromDepth (the distance param) -- both symbols confirmed\
+    \ in the\nlibCC3DSurfaceTracker.so symbol table, together with getNeighborDirect and the\nplugin's\
+    \ own field3DChange / setNeighborOrder.\n"
+  params:
+    neighbor_order: 'surface_measurement_range -- the boundary neighbour-shell order counted into
+
+      surface, given as a neighbour-ring index. Sets how "thick"/how-far-out the
+
+      perimeter is measured; larger order gives a smoother, larger surface number.
+
+      '
+    max_neighbor_order: 'surface_measurement_range (alternate encoding) -- same measurement shell given
+
+      as a maximum neighbour-ring index rather than an exact order.
+
+      '
+    max_neighbor_distance: 'surface_measurement_range (alternate encoding) -- same measurement shell given
+
+      as a real lattice-distance cutoff rather than a ring index.
+
+      '
+  state_io:
+    reads: "- cell_field (site -> cell id) over the configured neighbour shell of each\n  boundary site,\
+      \ to decide which links are hetero-owner (Medium counts).\n- the two affected cells' current `surface`\
+      \ values, for the incremental delta.\n- the pixel just changed (field3DChange argument): its old\
+      \ and new owner ids.\n"
+    writes: "- CellG.surface for the (at most two) cells touched by the accepted copy.\n  This field is\
+      \ READ-ONLY from Python (set_surface raises AttributeError,\n  cpp/CompuCell.py:L589) -- only this\
+      \ watcher may mutate it.\n- No energy delta; returns nothing to the Potts acceptance test.\n"
+  surprises:
+  - 'Only TWO cells are ever written, and this is the subtlest trap. A reimplementer who
+
+    loops the neighbour shell and also updates each neighbour cell''s surface DOUBLE-COUNTS:
+
+    a third-party neighbour (owner is neither oldCell nor newCell) keeps a hetero face with
+
+    pt both before and after the flip, so its surface is INVARIANT. Correctness also rides
+
+    on the two ELSE branches -- oldCell can GAIN surface (an internal face becomes exposed)
+
+    and newCell can LOSE surface (a hetero face becomes internal) -- so "old loses, new
+
+    gains" is only half the update.
+
+    '
+  - 'Off-lattice guard: getNeighborDirect returns a Neighbor whose .distance is 0 for a
+
+    neighbour outside the lattice, and that entry MUST be skipped
+
+    (`if nb.distance == 0: continue`). Without periodic wrap, cells at a wall count fewer
+
+    neighbours and read a smaller surface near the boundary -- a deliberate edge effect the
+
+    Surface energy inherits, not a bug.
+
+    '
+  - 'The three constructor params are MUTUALLY EXCLUSIVE: each setter nulls the other
+
+    two (PyCoreSpecs.py:L5450-5485), and the XML emitter is an if/elif chain
+
+    (L5407-5412) that writes exactly ONE element with priority neighbor_order >
+
+    max_neighbor_order > max_neighbor_distance. Passing more than one is silently
+
+    collapsed to the highest-priority set value, not an error.
+
+    '
+  - '`surface` is a WEIGHTED count (lattice multiplicative factors), not a raw
+
+    boundary-link count -- so it differs numerically from NeighborTracker''s integer
+
+    commonSurfaceArea and from a naive face count on non-square lattices. Its
+
+    absolute scale also depends on the chosen neighbour order, so target_surface in
+
+    the Surface energy plugin is only meaningful relative to the SAME order the
+
+    tracker used. A reimplementer who counts raw faces gets a self-consistent but
+
+    differently-scaled energy.
+
+    '
+  - 'Unlike its siblings PixelTracker and ClusterSurfaceTracker, the plain SurfaceTracker is
+
+    NOT exposed as a Python/SWIG class (no getSurfaceTrackerPlugin, no entry in
+
+    cpp/CompuCell.py) -- it is a pure internal core plugin, auto-loaded as the dependency of
+
+    the Surface energy plugin rather than declared directly, so you cannot introspect its
+
+    update from Python. Its compiled .cpp is likewise not installed in this env; only the
+
+    INSTALLED HEADER (SurfaceTrackerPlugin.h) and the stripped .so ship. The four-branch
+
+    field3DChange in `equations` is therefore the canonical CC3D form RECONSTRUCTED from the
+
+    header members (lmf, maxNeighborIndex), the .so symbol table
+
+    (getNeighborDirect / getMaxNeighborIndexFromNeighborOrder / ...FromDepth) and the
+
+    ClusterSurfaceTracker analogue -- NOT a transcription of shipped source. The lmf weight
+
+    and the neighbour-shell derivation are grounded in the header/symbols; the exact
+
+    branch structure is inferred.
+
+    '
+  - 'Steerable (_PyCoreSteerableInterface): the neighbour order can be changed mid-run
+
+    via steer(). Nothing in the spec recomputes already-stored surfaces on such a
+
+    change, so a mid-run reorder would leave the incremental bookkeeping keyed to the
+
+    old shell until each cell''s boundary next moves -- an ordering hazard.
+
+    '
+  - 'Category note for the algebra: like MomentOfInertia and NeighborTracker this is a
+
+    CellGChangeWatcher -- a passive incremental-reduction observer invoked per
+
+    accepted flip (field3DChange), NOT an energy term and NOT a scheduled stepper. It
+
+    returns no delta and reads no field on a fixed clock; it keeps a derived per-cell
+
+    scalar in sync with the pixel partition. Whether Plexus needs a "tracker /
+
+    incremental observable" contract distinct from delta-returning operators is the
+
+    open question (normalizer''s call).
+
+    '
+  - 'The consumer keeps its OWN order. The Surface ENERGY plugin (SurfacePlugin,
+
+    PyCoreSpecs.py:L2225) carries its own neighbor_order, and its docstring
+
+    (L2253) states "if SurfacePlugin is specified, its order overrides this" --
+
+    so the energy term''s measurement shell can OVERRIDE the tracker''s. This is the
+
+    mechanism that keeps target_surface and the tracked surface on the SAME order
+
+    (the weighted-count / order-dependent-scale surprise above): consistency is
+
+    enforced by that override coupling, not left to the two configs matching by hand. A reimplementer
+    who lets tracker and energy
+
+    diverge in order breaks the scale silently.
+
+    '
   verdict: null
   of: null
   implementation_of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -754,19 +3664,120 @@ mechanisms:
   raw_name: UniformInitializer
   raw_kind: Steppable (UniformInitializer)
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L5833
-  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
-    CompuCell3D'
-  summary: Uniform Initializer Specs
-  equations: null
-  params: {}
-  state_io: null
-  surprises: null
+  paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366 (chapter ref only -- no paper text
+    extracted
+
+    for this target). Checkable SOURCE anchors instead: class PyCoreSpecs.py:L5833, region
+
+    PyCoreSpecs.py:L5742; CC3DMLGeneratorBase.py comment names it "Initial layout of cells in the
+
+    form of rectangular slab" (L1189-1226). No page/figure cited that I have not read.
+
+    '
+  summary: 'An initialization steppable, run once before the Metropolis dynamics start. It fills one or
+
+    more axis-aligned boxes (pt_min..pt_max) of the lattice with a regular grid of identical cubic
+
+    cells of edge `width` lattice sites, leaving `gap` empty (medium) sites between adjacent cells,
+
+    and stamps each cell with a type drawn from `cell_types`. It WRITES the cell-id field and the
+
+    cell-type field of the lattice; it does not run every MCS and contributes nothing to the energy.
+
+    '
+  equations: "Not a numeric update -- a tiling of the lattice (RECONSTRUCTED from the emitted CC3DML\n\
+    fields + standard CC3D semantics; the Python spec only serializes, the tiling itself is compiled\n\
+    core and UNVERIFIED here). For a region with box [pt_min, pt_max],\ncell edge w = `width`, spacing\
+    \ g = `gap`, each cubic cell occupies a block of sites\n  { (x0+i, y0+j, z0+k) : 0 <= i,j,k < w }\n\
+    and the blocks are laid on a regular grid with stride (w + g) along each axis, so cell\norigins are\
+    \ at pt_min + m*(w+g) for integer m, while the block+its trailing gap stays inside\nthe box. Every\
+    \ site of a block shares one new cell id (a cell = a set of lattice sites sharing\nan id); each new\
+    \ cell is assigned a type from `cell_types`. The exact type-assignment rule\n(round-robin vs. uniform-random\
+    \ over the list) is decided in the compiled core and is NOT\nvisible in this Python spec -- see surprises.\n"
+  params:
+    pt_min:
+      role: region_bound_min -- minimum corner (x,y,z lattice sites) of the box to be tiled
+    pt_max:
+      role: region_bound_max -- maximum corner (x,y,z lattice sites) of the box to be tiled
+    width:
+      role: cell_size -- edge length (in lattice sites) of each cubic cell; guarded width >= 1
+    gap:
+      role: cell_spacing -- number of empty (medium) sites left between adjacent cells; guarded gap >=
+        0
+    cell_types:
+      role: type_palette -- list of cell-type names each newly stamped cell is assigned from
+    regions:
+      role: region_list -- UniformInitializer takes any number of UniformInitializerRegion specs, each
+        with its own box/width/gap/types
+  state_io:
+    reads: []
+    writes:
+    - cell_id_field (lattice site -> cell id; new cells created as blocks of sites)
+    - cell_type_field (each new cell -> a type from cell_types)
+  surprises:
+  - 'This is an INITIALIZER, not a per-MCS plugin: it runs exactly once at start and produces the
+
+    initial cell configuration. Every other CC3D "mechanism" so far reads/perturbs an existing
+
+    field; this one CREATES the cells the rest of the model then evolves. Reimplementers who model
+
+    it as a stepping operator get the cadence wrong.
+
+    '
+  - 'A cell here is a SET OF LATTICE SITES sharing an id, laid down as a w*w*w block -- not a point
+
+    with a radius. `width` is an integer site count, `gap` an integer site count; there are no
+
+    physical-length units, only lattice sites.
+
+    '
+  - 'The type-assignment rule is NOT in this file. The Python spec only serializes Types as a
+
+    comma-joined list into CC3DML (L5808); how the compiled UniformInitializer walks that list
+
+    (cyclic round-robin vs. random draw per cell) is in the core and could not be determined from
+
+    the spec. A reimplementer must not assume round-robin.
+
+    '
+  - 'Geometry vs. Potts box: pt_min/pt_max are validated against PottsCore dimensions (L5829-5830),
+
+    but nothing here clips a partial cell that would straddle the box edge -- whether a trailing
+
+    block narrower than `width` is emitted or skipped is a core-side decision not exposed here.
+
+    '
+  - '`gap` is documented as "blob gap" in the docstring (copy-pasted from BlobInitializer); for the
+
+    uniform tiling it is the inter-cell spacing along each axis, not a blob radius. Do not read the
+
+    docstring literally.
+
+    '
+  - 'Guard vs. default mismatch on the Region: __init__ defaults width=0 (L5754) but the check_dict
+
+    guard rejects width < 1 (L5747), so a region constructed without an explicit width fails
+
+    validation -- width has no usable default and must always be set. gap defaults to 0 and its
+
+    guard only rejects gap < 0, so gap=0 (cells touching) is the valid default. from_xml (L5905)
+
+    reads Width as required and makes Gap optional, matching this.
+
+    '
+  - 'Types round-trips through CC3DML as a comma-joined string (L5808) and is re-parsed by splitting
+
+    on commas with spaces stripped (from_xml L5911); the ordered Python list is flattened to text,
+
+    so any ordering the core relies on for type assignment survives only as list order in that string.
+
+    '
   verdict: null
   of: null
   implementation_of: null
   why: null
   contract: null
-  status: candidate
+  status: inspected
   module: null
   test: null
   evidence:
@@ -779,25 +3790,124 @@ mechanisms:
   raw_name: Volume
   raw_kind: Plugin (VolumePlugin)
   code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L2033
-  paper_section: Swat et al. (2012) Methods Cell Biol 110:325-366, 'Multi-Scale Modeling of Tissues Using
-    CompuCell3D'
-  summary: Volume Plugin
-  equations: 'E_vol = sum_cells lambda_V * (V(sigma) - V_target(sigma))^2
+  paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366 -- the GGH/CPM effective-energy (Hamiltonian)
 
-    V(sigma) = number of lattice sites carrying id sigma -- a COUNT, not a real volume.
+    discussion, where the volume constraint is one term of E. NOTE: no paper text was available in
 
-    Contributes dE to an attempted copy; never moves anything directly.'
+    this environment, so this anchor is the chapter''s known home for the term, NOT a page I have
+
+    read. The equation below is reconstructed from the CC3D source declaration plus standard CPM
+
+    convention; the compiled changeEnergy was not read.
+
+    '
+  summary: 'A per-cell-type (or, in bare mode, per-cell) quadratic penalty on the deviation of a cell''s
+
+    site COUNT from a target count. It writes no state: on every proposed pixel copy it returns a
+
+    dE that makes copies pushing a cell away from its target volume energetically costly, so the
+
+    Metropolis rule rejects most of them. It is what gives a set-of-sites an incompressible "size",
+
+    and thus its objecthood -- ablate it and the cells dissolve into medium.
+
+    '
+  equations: "Effective-energy volume term, summed over all real cells sigma (Medium, id 0, is exempt):\n\
+    \n  E_vol = sum_{sigma>0} lambda_V(sigma) * ( V(sigma) - V_target(sigma) )^2\n\nwhere\n  V(sigma)\
+    \        = number of lattice sites carrying id sigma -- a COUNT, not a physical volume\n  V_target(sigma)\
+    \ = the cell's rest / target site count\n  lambda_V(sigma) = quadratic stiffness (energy per site^2);\
+    \ lambda_V = 0 removes the term\n\nThe plugin never integrates this. On each attempted pixel copy\
+    \ (the id at a source site is\nproposed to overwrite a neighbour site) it returns dE = E_vol(after)\
+    \ - E_vol(before). A single\ncopy touches TWO cells at once: the gaining cell V -> V+1 and the losing\
+    \ cell V -> V-1 (either\nmay be Medium, which contributes 0), so dE couples both quadratics and is\
+    \ NOT symmetric in V.\nThe Metropolis rule then accepts the copy with P = 1 if the TOTAL dE (this\
+    \ term + all others)\n<= 0, else exp(-dE / T), where T = the Potts fluctuation_amplitude (T = 10 in\
+    \ the reference\nruns). Standard CPM convention has no leading 1/2 on the quadratic.\n"
   params:
-    target_volume: target_size
-    lambda_volume: size_stiffness
-  state_io: 'reads: cell site count; writes: nothing (an energy term)'
+    target_volume: 'rest_volume / target_size -- the site count a cell of this type relaxes toward
+
+      (VolumeEnergyParameter.target_volume; CC3DML attribute TargetVolume). Guarded >= 0
+
+      (check_dict, PyCoreSpecs.py:L1978).
+
+      '
+    lambda_volume: 'constraint_stiffness -- the quadratic energy penalty per (site)^2 of deviation from
+      target
+
+      (CC3DML attribute LambdaVolume). NOT guarded: lambda_volume = 0 is legal, and is exactly the
+
+      dissolving ablation.
+
+      '
+    _params: '(plugin constructor, VolumePlugin(*_params), PyCoreSpecs.py:L2052) zero or more
+
+      VolumeEnergyParameter, one per cell type. Zero args = "bare" mode: target_volume /
+
+      lambda_volume are then read PER-CELL from the cell.targetVolume / cell.lambdaVolume attributes
+
+      instead of per-type. The two modes are mutually exclusive (per-type silences per-cell -- see
+
+      surprises).
+
+      '
+  state_io: "reads: V(sigma), the per-cell site count -- maintained incrementally by a SEPARATE, auto-loaded\n\
+    \  plugin, VolumeTrackerPlugin (a CellGChangeWatcher; cpp/CompuCell.py:L5554), NOT recomputed by\n\
+    \  this plugin; and, per cell, its targetVolume + lambdaVolume, taken EITHER from per-type\n  VolumeEnergyParameters\
+    \ OR, in bare mode, from the per-cell cell.targetVolume /\n  cell.lambdaVolume attributes.\nwrites:\
+    \ nothing. It is an energy term -- it only changes the acceptance probability of a\n  proposed pixel\
+    \ copy, never moves or writes state directly.\n"
   surprises:
-  - Declaring per-TYPE VolumeEnergyParameters in CC3DML makes CC3D IGNORE the per-cell `cell.targetVolume`.
-    A growth steppable writing the per-cell value then has no effect and the cells quietly shrink -- measured
-    25 -> 20.9 over 400 MCS with zero divisions, while the run reported success. Declare the plugin bare
-    to use per-cell values.
-  - 'Ablating it (lambda_volume = 0) does not merely relax the size: the cells DISSOLVE (mean volume 25
-    -> 0). Volume is what makes a cell an object here.'
+  - 'Declaring per-TYPE VolumeEnergyParameters (calling param_new / passing params to the
+
+    constructor) makes CC3D IGNORE the per-cell cell.targetVolume. A growth steppable that writes
+
+    the per-cell value then has no effect and the cells quietly shrink -- measured 25 -> 20.9 over
+
+    400 MCS with zero divisions, while the run reported success. Declare the plugin BARE
+
+    (VolumePlugin() with no param_new) to use per-cell values. The two modes are mutually exclusive.
+
+    '
+  - 'Ablating it (lambda_volume = 0) does not merely relax the size: the cells DISSOLVE. Measured in
+
+    the reference ablation (log/atlas_cc3d/volume_constraint, OFF run): mean volume 25 -> 0 and cell
+
+    count n 45 -> 0 by MCS 200, versus the ON run relaxing 25 -> 59.4 toward target 60. With no
+
+    volume penalty and all contact energies positive (16), the system minimises boundary by erasing
+
+    cells into medium. Volume is what makes a cell an object here.
+
+    '
+  - 'The energy penalty and the volume COUNT are TWO different plugins. VolumePlugin only reads
+
+    V(sigma); the count is kept up to date by VolumeTrackerPlugin, an incremental CellGChangeWatcher
+
+    that adjusts the count on each accepted copy. A reimplementer who folds "recount the cell" into
+
+    the energy term, or forgets the tracker, gets a plugin reading a stale or zero volume.
+
+    '
+  - 'A single pixel copy is a TWO-cell event: gaining cell V->V+1, losing cell V->V-1. Because the
+
+    term is quadratic, the two contributions do not cancel and dE depends on how far each cell
+
+    already is from its target -- treating volume relaxation as an independent per-cell update
+
+    misses this coupling. Medium (id 0) has no volume constraint and contributes 0 to either side.
+
+    '
+  - 'Only target_volume is guarded (>= 0). lambda_volume is unchecked, so the zero that dissolves
+
+    the cells passes validation silently. There is also no upper guard: a large lambda_volume with
+
+    the fixed Potts temperature T freezes the boundary and the cell cannot reach its target at all
+
+    -- the constraint''s effect is inseparable from fluctuation_amplitude, which is a Potts param,
+
+    not a Volume param.
+
+    '
   verdict: null
   of: null
   implementation_of: null

@@ -1,0 +1,107 @@
+id: connectivity
+order: 9
+raw_name: Connectivity
+raw_kind: Plugin (ConnectivityPlugin)
+code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L4059
+paper_section: |
+  Swat et al. (2012) Methods Cell Biol 110:325-366. No extracted paper text is available
+  for this target, so no page/figure could be verified. The CHECKABLE anchors used here are
+  in-source: the class at PyCoreSpecs.py:4059 and the two CC3DML generators that document the
+  real mechanism -- CC3DMLGeneratorBase.py:614-632 and CC3DXMLGenerator.py:656-677.
+summary: |
+  A Cellular-Potts ENERGY term (Potts plugin), NOT a state update. Per attempted single-pixel
+  copy it inspects the cell-id lattice around the target site and adds an energy penalty if the
+  copy would break the LOCAL connectivity of the affected cell -- i.e. split its set of lattice
+  sites into disconnected fragments (or fuse fragments). It writes no state; it only raises the
+  energy of, and therefore suppresses the acceptance of, connectivity-breaking flips. With the
+  compiled default penalty (10000000) this "soft" term behaves as a near-hard topological guard
+  that keeps every cell a single connected blob. Fast/local variant: 2D square lattice only,
+  requiring Potts NeighborOrder 1 or 2.
+equations: |
+  Potts acceptance uses total dE = sum over plugins of dE_p; Connectivity contributes dE_conn.
+  For a proposed copy (a source pixel overwrites target pixel t's cell id):
+
+      dE_conn = Penalty * f(local connectivity change of the affected cell around t)
+      Penalty = 10000000            (compiled/CC3DML-generator default; one global scalar)
+      f = 0   if every affected cell stays locally connected after the copy
+      f > 0   (>= 1) if the copy would fragment a cell into disconnected pieces
+              within the Moore neighbourhood of t
+
+  Metropolis acceptance:  p_accept = 1 if dE_total <= 0 else exp(-dE_total / T).
+  Because Penalty (1e7) >> typical T (5-100), any fragmenting copy gets p ~ exp(-1e7/T) ~ 0,
+  so the term acts as an effectively hard constraint (cells cannot disconnect).
+
+  CAVEAT (could not verify at source): the exact form of f -- a boolean gate vs. a count of the
+  connected components introduced -- lives in the compiled C++ ConnectivityPlugin, which is NOT
+  SWIG-exposed and whose C++ source is not in this install. Verified from source: the single
+  global Penalty (default 1e7), and the 2D / square-lattice / NeighborOrder<=2 restriction.
+params:
+  penalty:
+    role: connectivity_constraint_strength
+    detail: |
+      Global energy penalty added for a pixel copy that breaks a cell's local connectivity.
+      Compiled and CC3DML-generator default 10000000. It is ONE value shared by EVERY cell
+      (not per-type, not per-cell). NOT a PyCoreSpecs constructor argument: the Python
+      ConnectivityPlugin takes no arguments and emits a bare <Plugin Name="Connectivity"/>, so
+      through the Python spec the penalty is pinned at the compiled default and cannot be tuned.
+      Per-cell strength requires the ConnectivityLocalFlex sibling (setConnectivityStrength);
+      per-type strength requires ConnectivityGlobal (<Penalty Type=...>).
+  neighbor_order:
+    role: interaction_neighborhood_order
+    detail: |
+      Not a plugin parameter -- read from the Potts <NeighborOrder>. This plugin REQUIRES it to
+      be 1 or 2 (and a 2D square lattice); outside that regime its local connectivity check is
+      undefined. An implicit external precondition, silently assumed, not validated by the spec.
+state_io:
+  reads: |
+    - the cell-id lattice (site -> cellId field) in the Moore neighbourhood of the proposed
+      target pixel, for the cell(s) whose connectivity the copy could change
+    - Potts <NeighborOrder> (must be 1 or 2) and a 2D square lattice (implicit preconditions)
+  writes: |
+    - none. This is a Potts ENERGY plugin: its changeEnergy returns a scalar dE and mutates no
+      state. It changes only the probability that the proposed pixel copy is accepted.
+surprises:
+  - |
+    The Python spec exposes NO parameter at all: ConnectivityPlugin() takes no args and its xml
+    emits only <Plugin Name="Connectivity"/>. A reimplementer reading the Python declaration
+    would conclude the mechanism is parameter-free -- but CC3DML (and BOTH twedit generators)
+    support a global <Penalty> whose default is 10000000. Via the Python spec you silently get
+    that default and cannot change it.
+  - |
+    The default penalty (1e7) is ~5-6 orders of magnitude larger than a typical Potts
+    temperature (5-100). So this nominally SOFT energy term behaves as a HARD topological
+    constraint: connectivity-breaking flips are essentially never accepted. Reimplementing it
+    with a modest penalty gives a qualitatively different, leaky constraint.
+  - |
+    Silent applicability restriction: works ONLY in 2D, ONLY on a square lattice, and ONLY with
+    NeighborOrder 1 or 2. None of this is enforced by the Python spec. For 3D / non-square
+    lattices use ConnectivityGlobal (BFS-based, per-type Penalty); for per-cell strength use
+    ConnectivityLocalFlex. The three are easy to conflate.
+  - |
+    "Penalty specified globally for each cell" means ONE scalar for ALL cells, not per-type as
+    with Contact/Volume/Surface. Contrast the siblings: ConnectivityGlobal is per-type, and
+    ConnectivityLocalFlex is per-individual-cell. Easy to wrongly assume per-type granularity.
+  - |
+    The plain plugin is NOT SWIG-exposed: cc3d.cpp.CompuCell defines ConnectivityGlobalPlugin
+    and ConnectivityLocalFlexPlugin but no plain ConnectivityPlugin. It is a compiled Potts
+    energy plugin registered internally (Potts3D.registerConnectivityConstraint /
+    getConnectivityConstraint). Its changeEnergy cannot be inspected or overridden from Python,
+    and the exact local-connectivity formula is not readable in this install.
+  - |
+    The quantity read is cell TOPOLOGY -- the connected-component structure of a set of lattice
+    sites -- not a continuous cell property. There is no differentiable field; the "energy" is a
+    combinatorial indicator over the lattice neighbourhood. Any representation without an
+    explicit lattice / site-set (e.g. a point-with-radius cell) cannot compute this at all.
+verdict: null
+of: null
+implementation_of: null
+why: null
+contract: null
+status: inspected
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

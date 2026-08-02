@@ -1,0 +1,133 @@
+id: kerneldiffusionsolver
+order: 17
+raw_name: KernelDiffusionSolver
+raw_kind: Steppable (KernelDiffusionSolver)
+code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L6642
+paper_section: 'Swat et al. (2012) Methods Cell Biol 110:325-366, sec. "PDE Solvers" (diffusion solvers).
+
+  No page verified -- no extracted paper text for this target. Checkable in-tree anchors:
+
+  cc3d/twedit5/Plugins/CC3DProject/diffusion_solvers_descr.py:36 ("Legacy Solver that provides an
+
+  approximate solution to Diffusion Equations for large diffusion constants ... significantly
+
+  faster than Diffusion Solver FE ... does not provide the same level of flexibility"); the
+
+  periodic-only constraint at PyCoreSpecs.py:6477-6505; Kernel/CoarseGrainFactor emitted at
+
+  PyCoreSpecs.py:6568-6571.
+
+  '
+summary: 'A steppable diffusion solver that advances one or more scalar concentration FIELDS on the CPM
+
+  pixel lattice by CONVOLUTION with a precomputed diffusion kernel (the Green''s function of the
+
+  diffusion equation) rather than by a local finite-difference stencil. It is a genuine field->
+
+  field WRITE like the other PDE solvers -- it overwrites the concentration grid c each step --
+
+  but the update is GLOBAL (a convolution), not a per-site neighbour sum. It only supports
+
+  periodic boundary conditions and a single spatially-uniform diffusion constant, is fast for
+
+  LARGE diffusion constants (where the forward-Euler solver is slow/unstable), and is marked a
+
+  legacy/approximate solver. The physics lives in the compiled core; PyCoreSpecs.py only declares
+
+  the CC3DML the solver reads.
+
+  '
+equations: "Continuous PDE (the paper's): dc/dt = D grad^2 c - lambda c + S.\n\nThis solver's METHOD (the\
+  \ code's): instead of the FTCS stencil, it advances the field by\nconvolution with the diffusion kernel.\
+  \ For the pure diffusion equation the Green's function is\na Gaussian, so one step is\n\n  c(x, t+DeltaT)\
+  \ = ( K_{D,DeltaT} * c(., t) )(x)          [periodic convolution over the torus]\n\nwhere K is the diffusion\
+  \ kernel with spatial variance ~ 2*D*DeltaT, tiled periodically. Decay\nis a multiplicative factor exp(-lambda*DeltaT)\
+  \ and secretion S is added as a source per step.\n\nSymbols:\n  c(x,t)     concentration at pixel x\
+  \ (a field value, not cell state)\n  D          global diffusion coefficient (diff_global); sets the\
+  \ kernel width. UNIFORM in space.\n  lambda     global decay rate (decay_global)\n  S          secretion\
+  \ source from secreting cells (see params)\n  K_{D,DeltaT}   the (periodic) diffusion kernel; `kernel`\
+  \ truncates its expansion, `cgfactor`\n                 coarsens the lattice used for the convolution\
+  \ -- see surprises, meaning is\n                 INFERRED from method, not stated in source.\nThe convolution/kernel\
+  \ is the SOURCE's realisation; the continuous PDE is the paper's. The\nintegrator itself is compiled\
+  \ -- this file only emits CC3DML.\n"
+params:
+  diff_global:
+    role: diffusion_coefficient (global default D; sets the diffusion-kernel width ~sqrt(2*D*DeltaT);
+      validated >= 0). UNIFORM -- no per-cell-type override is emitted (see surprises).
+  decay_global:
+    role: decay_rate (global lambda; validated >= 0). Also global-only.
+  init_expression:
+    role: initial_condition -- muParser math expression evaluated per site at t=0 (emitted as InitialConcentrationExpression)
+  init_filename:
+    role: initial_condition -- file to load the t=0 field from (ConcentrationFileName)
+  kernel:
+    role: kernel_truncation / interaction_length -- integer >= 1 ('Kernal must be positive', L6538); emitted
+      as <Kernel> only when > 1 (L6568). Docstring says only 'kernel of diffusion solver'; INFERRED to
+      be the number of terms/periodic images retained in the diffusion-kernel expansion. Precise semantics
+      are in the compiled core, not read.
+  cgfactor:
+    role: coarse_grain_factor -- integer >= 1 ('Coarse grain factor must be positive', L6539); emitted
+      as <CoarseGrainFactor> only when > 1 (L6570). Downsamples the lattice used for the convolution (speed
+      vs accuracy trade-off). Meaning INFERRED; core does the coarsening.
+  secretion (SecretionParameters cell_type/value/constant/contact_type):
+    role: 'source_term -- per-cell-type source: additive rate (Secretion), Dirichlet-clamp of the cell
+      interior (ConstantConcentration), or additive only on contact with a named type (SecretionOnContact)'
+  boundary_conditions (x/y/z _min/_max _type):
+    role: 'boundary_condition -- CONSTRAINED to PERIODIC on every face (read-only, L6477-6530; all
+      six *_type set to BOUNDARYTYPESPDE[2] in __init__ and check_dict rejects any non-periodic value).
+      Not a tunable knob here: the convolution assumes a torus; Dirichlet/Neumann are rejected.'
+  fluc_comp:
+    role: 'UNKNOWN: inherited from the _PDESolverSpecs base spec_dict (L1159, mass-conservation flag for
+      FluctuationCompensator); this solver''s xml (L6657-6666) never emits it, so via THIS python spec
+      it is dead.'
+state_io:
+  reads: "- the concentration field c (the grid it convolves forward)\n- the CPM cell-id / cell-type lattice,\
+    \ to locate secreting cell interiors for the source S --\n  this is the coupling to the Potts, not\
+    \ a field of its own\n- the global diffusion constant D and decay lambda, initial-condition expression\
+    \ or file\n- (implicitly) that boundaries are periodic -- required, not optional\n"
+  writes: "- the concentration field c, replaced each MCS by the convolution result. An actual field\n\
+    \  write, not an energy delta -- but a GLOBAL convolution, not the local per-site stencil of\n  DiffusionSolverFE,\
+    \ so it cannot be expressed as a nearest-neighbour sum.\n"
+surprises:
+- 'PERIODIC-ONLY: unlike DiffusionSolverFE, KernelDiffusionSolver hard-constrains every boundary face
+  to Periodic (KernelDiffusionSolverBoundaryConditions, L6477-6505, all six *_type are read-only and set
+  to BOUNDARYTYPESPDE[2]). The convolution assumes a torus. A reimplementer offering Dirichlet/Neumann/absorbing
+  walls would be wrong -- they are rejected at validation.'
+- 'SPATIALLY UNIFORM D and lambda: KernelDiffusionSolverDiffusionData.xml (L6416-6431) emits ONLY GlobalDiffusionConstant
+  / GlobalDecayConstant. The diff_types / decay_types dicts present in the base _PDEDiffusionDataSpecs
+  (L578-579) are NEVER written here -- so per-cell-type diffusion/decay is IMPOSSIBLE with this solver,
+  necessarily so because a single convolution kernel has one width. This is the opposite of DiffusionSolverFE,
+  which does support per-type coefficients.'
+- 'OPPOSITE PERFORMANCE REGIME to the FE solver: this is the tool for LARGE diffusion constants (where
+  FTCS is slow/unstable and would need heavy sub-cycling); the guide (diffusion_solvers_descr.py:36) calls
+  it ''significantly faster than Diffusion Solver FE'' for that regime. A reimplementer must not treat
+  it as interchangeable with the FE stencil solver -- it trades flexibility for speed at high D.'
+- 'LEGACY and APPROXIMATE: the same guide line marks it a ''Legacy Solver that provides an APPROXIMATE
+  solution''. It is not the exact diffusion solution; approximation quality depends on kernel and cgfactor.
+  Silence about accuracy means a naive run may be visibly wrong at small kernel / large cgfactor.'
+- kernel and cgfactor are the ONLY parameters distinguishing this solver's declaration from the other
+  PDE solvers, yet the source documents them only as 'kernel of diffusion solver' and 'coarse grain factor'.
+  Their precise effect on the convolution (how many expansion terms / how much lattice coarsening) is
+  in the compiled core -- I did NOT read the .so. The roles above are INFERRED from the kernel/convolution
+  method, not verified.
+- kernel and cgfactor are emitted at the SOLVER-FIELD level and only when > 1 (L6568-6571, `if self.kernel
+  > 1` / `if self.cgfactor > 1`), while D and decay sit on the child DiffusionData spec. Defaults kernel=1,
+  cgfactor=1 emit no XML at all, so the core defaults are what actually run in a default setup -- a tuner
+  who never sets them gets unstated core behaviour.
+- 'Like DiffusionSolverFE (L6242) this class is a thin CC3DML EMITTER: __init__ (L6652) only sets steer=None
+  (not steerable), and xml (L6657-6666) just walks child field specs. Every physical parameter lives on
+  child DiffusionData / SecretionData / BoundaryConditions specs, and the convolution integrator itself
+  is compiled. No update logic is in this file.'
+status: inspected
+verdict: null
+of: null
+implementation_of: null
+why: null
+contract: null
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null

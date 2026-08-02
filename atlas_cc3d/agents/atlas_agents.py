@@ -110,13 +110,29 @@ the point: if framework after framework yields only implementations of contracts
 have, the algebra is a real intermediate representation. If it keeps yielding new contracts, the
 language is incomplete. Inflating the yield destroys the measurement.
 
-THE TARGET. `papers/jax-morph` -- Deshpande, Mottes et al., "Engineering morphogenesis of cell
-clusters with differentiable programming" (Nat Comput Sci 2025). Apache-2.0, Python/JAX. The
-paper is extracted to PLAIN TEXT WITH PAGE MARKERS at
-`atlas_cc3d/_state/paper/Deshpande_2025_jax_morph.txt` -- Read that, do not try to render
-the PDF; `python atlas_cc3d/paper.py --grep <term>` finds a term with its page number. The
-library's own guides are under `papers/jax-morph/jax_morph/guides/`. It RUNS: `atlas_cc3d/oracle.py` drives it in an
-isolated venv, and `atlas_cc3d/_oracle/runs/smoke/` already holds a deterministic reference trajectory.
+THE TARGET. CompuCell3D 4.10.0 -- Swat et al., "Multi-Scale Modeling of Tissues Using
+CompuCell3D", Methods in Cell Biology 110:325-366 (2012). A CELLULAR POTTS framework, and the
+representation is the point: a cell is not a point with a radius, it is a SET OF LATTICE SITES
+sharing an id. Volume is a site count, surface a boundary count, position a derived centre of
+mass. Time advances by attempting to copy one site's id into a neighbour and accepting it with
+probability 1 if the total energy falls, else exp(-dE/T). Almost every "mechanism" here is a term
+in that energy, NOT an update that writes state.
+
+WHERE THE SOURCE IS. The package is installed in its own environment; the record's `code_path`
+for each mechanism is an absolute `file:Lnn` into
+`/workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/`. Read that file. The
+Python-facing declaration of every mechanism is `cc3d/core/PyCoreSpecs.py`, which is where the
+inventory came from; the physics itself is in the compiled core and is documented in the class
+docstrings and the CC3DML each spec emits (`spec.xml.getCC3DXMLElementString()`).
+
+WE HAVE NO EXTRACTED PAPER TEXT for this target. Do not cite page numbers you have not read, and
+do not invent a `paper_section` beyond the Swat et al. reference already in the entry. An honest
+"the source is the only evidence I have" is worth more than a fabricated citation.
+
+IT RUNS: `atlas_cc3d/oracle.py verify` passes (headless, deterministic at a fixed seed) and
+`atlas_cc3d/evidence.py` has already produced six mechanisms' reference runs WITH ABLATIONS under
+`log/atlas_cc3d/<mechanism>/` -- strip.png, movie.mp4, metrics.png, metrics.json. If your
+mechanism is one of those, READ ITS metrics.json: it is measured evidence, not a guess.
 
 THE RULES OF THIS LOOP.
 1. The product is the record entry. Prose that is not written into it does not exist.
@@ -133,8 +149,14 @@ THE RULES OF THIS LOOP.
    quotes. One entry was
    lost to an unquoted `... it is NOT a constructor param: it ...`. Equations and prose always go
    in a block scalar.
-7. Do not run the reference by importing jax in the Plexus environment. It is not installed
-   there, deliberately. Use `cd atlas_cc3d && python oracle.py run <script>`.
+7. Do not import cc3d in the Plexus environment. It is not installed there, deliberately -- a
+   process that can reach the reference can borrow its answer. Use
+   `cd atlas_cc3d && python oracle.py verify` or `python evidence.py --name <mech>`.
+8. MOST CC3D MECHANISMS ARE ENERGY TERMS, not updates. Plexus operators return a delta and the
+   engine integrates it; a Potts plugin returns nothing and only changes the probability that a
+   proposed pixel copy is accepted. Say so plainly in `state_io:` rather than forcing it into
+   read/write language that does not fit. Whether that gap is expressible in the Plexus algebra
+   is the question this whole campaign exists to answer -- do not paper over it.
 """
 
 
@@ -309,7 +331,7 @@ DO THIS
    BIOLOGY and the routing, `@register_operator(name, family=..., set=..., kind=...)`, the typed
    class attributes (INPUTS/OUTPUTS/READS/WRITES/MAPS/SUPPORTED_DIMS/REQUIRES_PARAMS/
    MECHANISM_TAGS/PARAM_ROLES/REFERENCE), and a `forward` that returns a delta.
-2. Write it to `src/plexus/operators/candidates/jax_morph_<id>.py`. The ANTI-CHAMBER, not the
+2. Write it to `src/plexus/operators/candidates/cc3d_<id>.py`. The ANTI-CHAMBER, not the
    validated package: promotion is the curator's decision after the differential test, and an
    operator that reaches `plexus.operators` without one has skipped the only evidence that
    matters.
@@ -317,8 +339,8 @@ DO THIS
 4. Torch, not JAX. Plexus's engine is torch; the reference's JAX stays in the oracle venv.
 5. Verify it imports and registers:
    `PYTHONPATH=src /workspace/.conda_envs/neural-graph-linux/bin/python -c "import
-    plexus.operators.candidates.jax_morph_<id> as m; print(m)"`
-6. Write a test at `tests/test_jax_morph_<id>.py` that checks ONE property you can state without
+    plexus.operators.candidates.cc3d_<id> as m; print(m)"`
+6. Write a test at `tests/test_cc3d_<id>.py` that checks ONE property you can state without
    the reference: a conservation law, a sign, a limit, a symmetry. Run it.
 7. Update the entry: `module:`, `test:`, `status: implemented`.
 
@@ -333,9 +355,9 @@ def differ_prompt(mech_id):
 ROLE: DIFFER. Decide whether our operator actually reproduces the reference's behaviour.
 
 WHAT ALREADY EXISTS -- do not rebuild it.
-  * `config/atlas_cc3d/jax_morph_proliferation.yaml` is the ANCHOR spec: the authors' own
+  * `log/atlas_cc3d/contact_adhesion/` is the ANCHOR evidence: the reference's own
     proliferation composition (relax + grow_radius + cell_divide) on their four founders, and it
-    RUNS. Its evidence folder is `log/atlas_cc3d/jax_morph_proliferation/`. Start from it: copy it,
+    cell-sorting model, run WITH an ablation. Start from its metrics.json: copy the observable,
     change the one thing your mechanism needs, keep everything else identical.
   * The matching oracle run is `atlas_cc3d/_oracle/runs/smoke/` (reference.npz +
     summary.json), same initial condition, 40 macro-steps at dt=1.0.

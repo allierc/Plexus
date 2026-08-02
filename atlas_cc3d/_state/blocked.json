@@ -1,0 +1,8 @@
+{
+  "steadystatediffusionsolver": {
+    "role": "excavator",
+    "problems": [
+      "atlas_record.yaml was edited outside the driver during this call -- restored, and this call is not trusted"
+    ]
+  }
+}

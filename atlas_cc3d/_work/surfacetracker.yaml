@@ -1,0 +1,214 @@
+id: surfacetracker
+order: 28
+raw_name: SurfaceTracker
+raw_kind: Plugin (SurfaceTrackerPlugin)
+code_path: /workspace/.conda_envs/cc3d-oracle/lib/python3.12/site-packages/cc3d/core/PyCoreSpecs.py:L5382
+paper_section: 'Python spec class PyCoreSpecs.py:L5382 (one-line docstring stub, no physics). The
+
+  actual interface is the INSTALLED C++ header
+
+  include/CompuCell3D/CompuCell3D/plugins/SurfaceTracker/SurfaceTrackerPlugin.h
+
+  (class decl L21; members lmf / maxNeighborIndex L25-27; field3DChange decl L45). The
+
+  maintained store is the compiled CellG.surface (cpp/CompuCell.py:L527 getter, L589
+
+  read-only setter). The SWIG-exposed sibling ClusterSurfaceTrackerPlugin
+
+  (cpp/CompuCell.py:L10270, CellGChangeWatcher) is the closest readable analogue. NO
+
+  extracted paper text exists; the Swat et al. (2012) Methods Cell Biol 110:325-366
+
+  Surface-constraint discussion is UNREAD -- do not cite a page.
+
+  '
+summary: 'Bookkeeping plugin, not an energy term. It maintains each cell''s scalar `surface`
+
+  (a weighted boundary-site/link count) incrementally as the Potts solver accepts
+
+  pixel copies, so that the Surface energy plugin has a live perimeter/area to
+
+  penalise against its target. It changes no energy and writes only the derived
+
+  per-cell `surface` field; from Python that field is read-only.
+
+  '
+equations: "For a cell c occupying site set S_c, its surface is the lattice-weighted count of\nboundary\
+  \ links from its own sites to sites NOT belonging to c, over a neighbour shell\nfixed by (neighbor_order\
+  \ | max_neighbor_order | max_neighbor_distance):\n\n    surface(c) = sum_{p in S_c} sum_{n in N(p),\
+  \ id(n) != c} w\n\nN(p) = the lattice-neighbour shell of site p up to maxNeighborIndex; id(n) = owner\
+  \ of\nneighbour site n (0 = Medium, which counts as a non-c neighbour); w = lmf.surfaceMF,\nthe LatticeMultiplicativeFactor\
+  \ for the lattice/order (header L27). On a square lattice\nat order 1, w = 1 and surface reduces to\
+  \ the raw boundary-face count.\n\nMaintained INCREMENTALLY, never recomputed. On an accepted copy that\
+  \ changes site pt\nfrom oldCell to newCell, the Potts solver invokes the watcher\nfield3DChange(pt,\
+  \ newCell, oldCell) (header L45). Reconstructed update (canonical CC3D\nform; the .cpp does not ship,\
+  \ see surprises) -- loop the shell of pt, touch ONLY the\ntwo owner cells:\n\n    if newCell == oldCell:\
+  \ return                  # no-op self copy\n    for nIdx in 0 .. maxNeighborIndex:\n        nb = boundaryStrategy.getNeighborDirect(pt,\
+  \ nIdx)\n        if nb.distance == 0: continue              # off-lattice neighbour -> skip\n      \
+  \  nCell = cellField[nb.pt]\n        # pt is leaving oldCell:\n        if nCell != oldCell: oldCell.surface\
+  \ -= w  # a hetero face of oldCell is destroyed\n        else:                oldCell.surface += w \
+  \ # an internal face becomes exposed\n        # pt is joining newCell:\n        if nCell != newCell:\
+  \ newCell.surface += w  # a new hetero face of newCell appears\n        else:                newCell.surface\
+  \ -= w  # a hetero face becomes internal\n\nCost is O(shell size) per flip. maxNeighborIndex is derived\
+  \ from the XML param via\nBoundaryStrategy::getMaxNeighborIndexFromNeighborOrder (the two order params)\
+  \ or\ngetMaxNeighborIndexFromDepth (the distance param) -- both symbols confirmed in the\nlibCC3DSurfaceTracker.so\
+  \ symbol table, together with getNeighborDirect and the\nplugin's own field3DChange / setNeighborOrder.\n"
+params:
+  neighbor_order: 'surface_measurement_range -- the boundary neighbour-shell order counted into
+
+    surface, given as a neighbour-ring index. Sets how "thick"/how-far-out the
+
+    perimeter is measured; larger order gives a smoother, larger surface number.
+
+    '
+  max_neighbor_order: 'surface_measurement_range (alternate encoding) -- same measurement shell given
+
+    as a maximum neighbour-ring index rather than an exact order.
+
+    '
+  max_neighbor_distance: 'surface_measurement_range (alternate encoding) -- same measurement shell given
+
+    as a real lattice-distance cutoff rather than a ring index.
+
+    '
+state_io:
+  reads: "- cell_field (site -> cell id) over the configured neighbour shell of each\n  boundary site,\
+    \ to decide which links are hetero-owner (Medium counts).\n- the two affected cells' current `surface`\
+    \ values, for the incremental delta.\n- the pixel just changed (field3DChange argument): its old and\
+    \ new owner ids.\n"
+  writes: "- CellG.surface for the (at most two) cells touched by the accepted copy.\n  This field is\
+    \ READ-ONLY from Python (set_surface raises AttributeError,\n  cpp/CompuCell.py:L589) -- only this\
+    \ watcher may mutate it.\n- No energy delta; returns nothing to the Potts acceptance test.\n"
+surprises:
+- 'Only TWO cells are ever written, and this is the subtlest trap. A reimplementer who
+
+  loops the neighbour shell and also updates each neighbour cell''s surface DOUBLE-COUNTS:
+
+  a third-party neighbour (owner is neither oldCell nor newCell) keeps a hetero face with
+
+  pt both before and after the flip, so its surface is INVARIANT. Correctness also rides
+
+  on the two ELSE branches -- oldCell can GAIN surface (an internal face becomes exposed)
+
+  and newCell can LOSE surface (a hetero face becomes internal) -- so "old loses, new
+
+  gains" is only half the update.
+
+  '
+- 'Off-lattice guard: getNeighborDirect returns a Neighbor whose .distance is 0 for a
+
+  neighbour outside the lattice, and that entry MUST be skipped
+
+  (`if nb.distance == 0: continue`). Without periodic wrap, cells at a wall count fewer
+
+  neighbours and read a smaller surface near the boundary -- a deliberate edge effect the
+
+  Surface energy inherits, not a bug.
+
+  '
+- 'The three constructor params are MUTUALLY EXCLUSIVE: each setter nulls the other
+
+  two (PyCoreSpecs.py:L5450-5485), and the XML emitter is an if/elif chain
+
+  (L5407-5412) that writes exactly ONE element with priority neighbor_order >
+
+  max_neighbor_order > max_neighbor_distance. Passing more than one is silently
+
+  collapsed to the highest-priority set value, not an error.
+
+  '
+- '`surface` is a WEIGHTED count (lattice multiplicative factors), not a raw
+
+  boundary-link count -- so it differs numerically from NeighborTracker''s integer
+
+  commonSurfaceArea and from a naive face count on non-square lattices. Its
+
+  absolute scale also depends on the chosen neighbour order, so target_surface in
+
+  the Surface energy plugin is only meaningful relative to the SAME order the
+
+  tracker used. A reimplementer who counts raw faces gets a self-consistent but
+
+  differently-scaled energy.
+
+  '
+- 'Unlike its siblings PixelTracker and ClusterSurfaceTracker, the plain SurfaceTracker is
+
+  NOT exposed as a Python/SWIG class (no getSurfaceTrackerPlugin, no entry in
+
+  cpp/CompuCell.py) -- it is a pure internal core plugin, auto-loaded as the dependency of
+
+  the Surface energy plugin rather than declared directly, so you cannot introspect its
+
+  update from Python. Its compiled .cpp is likewise not installed in this env; only the
+
+  INSTALLED HEADER (SurfaceTrackerPlugin.h) and the stripped .so ship. The four-branch
+
+  field3DChange in `equations` is therefore the canonical CC3D form RECONSTRUCTED from the
+
+  header members (lmf, maxNeighborIndex), the .so symbol table
+
+  (getNeighborDirect / getMaxNeighborIndexFromNeighborOrder / ...FromDepth) and the
+
+  ClusterSurfaceTracker analogue -- NOT a transcription of shipped source. The lmf weight
+
+  and the neighbour-shell derivation are grounded in the header/symbols; the exact
+
+  branch structure is inferred.
+
+  '
+- 'Steerable (_PyCoreSteerableInterface): the neighbour order can be changed mid-run
+
+  via steer(). Nothing in the spec recomputes already-stored surfaces on such a
+
+  change, so a mid-run reorder would leave the incremental bookkeeping keyed to the
+
+  old shell until each cell''s boundary next moves -- an ordering hazard.
+
+  '
+- 'Category note for the algebra: like MomentOfInertia and NeighborTracker this is a
+
+  CellGChangeWatcher -- a passive incremental-reduction observer invoked per
+
+  accepted flip (field3DChange), NOT an energy term and NOT a scheduled stepper. It
+
+  returns no delta and reads no field on a fixed clock; it keeps a derived per-cell
+
+  scalar in sync with the pixel partition. Whether Plexus needs a "tracker /
+
+  incremental observable" contract distinct from delta-returning operators is the
+
+  open question (normalizer''s call).
+
+  '
+- 'The consumer keeps its OWN order. The Surface ENERGY plugin (SurfacePlugin,
+
+  PyCoreSpecs.py:L2225) carries its own neighbor_order, and its docstring
+
+  (L2253) states "if SurfacePlugin is specified, its order overrides this" --
+
+  so the energy term''s measurement shell can OVERRIDE the tracker''s. This is the
+
+  mechanism that keeps target_surface and the tracked surface on the SAME order
+
+  (the weighted-count / order-dependent-scale surprise above): consistency is
+
+  enforced by that override coupling, not left to the two configs matching by hand. A reimplementer who
+  lets tracker and energy
+
+  diverge in order breaks the scale silently.
+
+  '
+verdict: null
+of: null
+implementation_of: null
+why: null
+contract: null
+status: inspected
+module: null
+test: null
+evidence:
+  oracle_run: null
+  diff_metric: null
+  threshold: null
+  passed: null
