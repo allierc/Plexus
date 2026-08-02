@@ -85,7 +85,7 @@ def identify(curves, dt, ridge=1e-3):
 # --------------------------------------------------------------------------- #
 #  stage 2: tune
 # --------------------------------------------------------------------------- #
-def rollout(gains, plant, axes0, program, n_frames, h, tau, dev="cpu"):
+def rollout(gains, plant, axes0, program, n_frames, h, tau, dev="cpu", w_act=2.0):
     """Differentiable rollout of the identified plant under the real control law.
 
     Deliberately the SAME law as `oculomotor_drive`: a PID on the gaze error, projected onto
@@ -121,19 +121,25 @@ def rollout(gains, plant, axes0, program, n_frames, h, tau, dev="cpu"):
         thdd = B * u - C * thd - K * th
         thd = thd + h * thdd
         th = th + h * thd
-        loss = loss + ((th - tgt) ** 2).sum()
+        # tracking error, plus an activation-energy term. The surrogate is rotational and has
+        # no globe in it, so it cannot see the radius directly -- but what deforms the globe is
+        # sustained co-activation squeezing it, so penalising activation is the surrogate's
+        # stand-in for the radius constraint that `run_eye.objective` measures for real. Without
+        # it the tuner is free to hold every muscle at 1.0 and call the resulting crush a win.
+        loss = loss + ((th - tgt) ** 2).sum() + w_act * (a ** 2).sum()
         traj.append(th)
     return loss / n_frames, torch.stack(traj)
 
 
-def tune(plant, axes0, program, n_frames, h, tau, init, steps=600, lr=0.05):
+def tune(plant, axes0, program, n_frames, h, tau, init, steps=600, lr=0.05, w_act=2.0):
     raw = torch.tensor(np.log(np.asarray(init, float)), requires_grad=True)   # positive gains
     opt = torch.optim.Adam([raw], lr=lr)
     hist = []
     for i in range(steps):
         opt.zero_grad()
         g = torch.exp(raw)
-        loss, _ = rollout((g[0], g[1], g[2], g[3], g[4]), plant, axes0, program, n_frames, h, tau)
+        loss, _ = rollout((g[0], g[1], g[2], g[3], g[4]), plant, axes0, program,
+                          n_frames, h, tau, w_act=w_act)
         loss.backward()
         opt.step()
         with torch.no_grad():
@@ -152,6 +158,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("run_dir")
     ap.add_argument("--steps", type=int, default=600)
+    ap.add_argument("--w_act", type=float, default=2.0,
+                    help="activation-energy weight: the surrogate's stand-in for the "
+                         "globe-radius constraint (see rollout)")
     ap.add_argument("--verify", action="store_true", help="re-run the full MPM sim with the result")
     ap.add_argument("--device", default="cuda:0")
     a = ap.parse_args()
@@ -175,7 +184,8 @@ def main():
     init = [drv.get("kp", 0.11), max(drv.get("ki", 0.0), 1e-4), max(drv.get("kd", 0.01), 1e-4),
             drv.get("gain", 1.9), max(drv.get("tonic", 0.12), 1e-3)]
     l0, tr0 = rollout([torch.tensor(x) for x in init], plant, axes0, program, n_frames, h, tau)
-    gains, hist = tune(plant, axes0, program, n_frames, h, tau, init, steps=a.steps)
+    gains, hist = tune(plant, axes0, program, n_frames, h, tau, init, steps=a.steps,
+                       w_act=a.w_act)
     l1, tr1 = rollout([torch.tensor(x) for x in gains], plant, axes0, program, n_frames, h, tau)
 
     names = ["kp", "ki", "kd", "gain", "tonic"]

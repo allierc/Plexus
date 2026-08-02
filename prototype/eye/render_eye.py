@@ -197,11 +197,12 @@ def _style_trace(ax, t, k, xlabel=True):
     ax.tick_params(colors="0.7", labelsize=7)
 
 
-def _muscle_legend(ax):
-    leg = ax.legend(ncol=6, fontsize=7.5, frameon=False, loc="lower center",
+def _muscle_legend(ax, extra=None):
+    leg = ax.legend(ncol=7 if extra else 6, fontsize=7.5, frameon=False, loc="lower center",
                     handlelength=1.0, columnspacing=1.0, borderaxespad=0.3)
-    for txt, m in zip(leg.get_texts(), EA.MUSCLES):
-        txt.set_color(m["color"])
+    cols = [m["color"] for m in EA.MUSCLES] + ([extra] if extra else [])
+    for txt, c in zip(leg.get_texts(), cols):
+        txt.set_color(c)
 
 
 def draw_act(ax, k, cap, label, dt):
@@ -220,11 +221,17 @@ def draw_length(ax, k, cap, label, dt):
     pct = 100.0 * cap["length"] / cap["rest_length"][None, :]
     for i, m in enumerate(EA.MUSCLES):
         ax.plot(t, pct[:, i], color=m["color"], lw=1.4, label=m["key"])
+    if "radius" in cap:                       # the globe's own size, on the same % axis: the
+        ax.plot(t, 100.0 * np.asarray(cap["radius"]), color="0.92", lw=1.5,
+                label="globe radius")         # muscles shorten, the eye must NOT
+        ax.fill_between(t, 100.0 * (np.asarray(cap["radius"]) - np.asarray(cap["radius_spread"])),
+                        100.0 * (np.asarray(cap["radius"]) + np.asarray(cap["radius_spread"])),
+                        color="0.92", alpha=0.16, lw=0)
     ax.axhline(100.0, color="0.45", lw=0.8, ls=":")
     lo = float(np.nanmin(pct))
     ax.set_ylim(lo - 0.22 * (102.0 - lo), 102.0)
     ax.set_ylabel("length (% of rest)", color="0.8", fontsize=8)
-    _muscle_legend(ax)
+    _muscle_legend(ax, extra="0.92")
     _style_trace(ax, t, k)
     _label(ax, label)
 
@@ -297,7 +304,7 @@ def _draw_all(axes, k, cap, dt, s_hi, v_hi, g_hi):
     draw_field(axes[3], k, cap, "vm", "d)  von mises stress", v_hi, "inferno")
     draw_grid(axes[4], k, cap, "e)  mls-mpm grid momentum — the coupling", g_hi)
     draw_act(axes[5], k, cap, "f)  muscle activation", dt)
-    draw_length(axes[6], k, cap, "g)  muscle length — the contraction", dt)
+    draw_length(axes[6], k, cap, "g)  muscle length, and the globe radius that must not move", dt)
     draw_gaze(axes[7], k, cap, "h)  gaze (solid) vs command (dashed), and the tracking error", dt)
 
 

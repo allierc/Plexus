@@ -125,9 +125,10 @@ implementation of an existing contract, never an edit to the engine.
 \code{muscle\_morphogenesis} & rewire & shape each muscle's points into a tapered strap along its arc of contact; fibre directions; bone cap and tendon cap \\
 \code{eye\_pose} & aggregate & Kabsch fit of the shell against its rest state $\rightarrow$ gaze and torsion \\
 \code{muscle\_geometry} & aggregate & bin points by fibre coordinate $\rightarrow$ centreline, \textbf{length}, insertion, line of action, rotation axis \\
-\code{oculomotor\_drive} & lateral & gaze program $\rightarrow$ desired angular velocity $\rightarrow$ rectified projection onto each muscle's axis $\rightarrow$ activation dynamics \\
+\code{oculomotor\_drive} & lateral & gaze program $\rightarrow$ PID (the integral term is the oculomotor \emph{neural integrator}) $\rightarrow$ rectified projection onto each muscle's axis $\rightarrow$ activation dynamics \\
 \code{muscle\_contract} & exchange & $\sigma_a = A\,a\,(1+\beta(\lambda-1))\,\mathbf{f}\mathbf{f}^{\!\top}$ along the fibre \\
 \code{bone\_anchor} & lateral & pin the origin cap to the skull \\
+\code{muscle\_sleeve} & lateral & the orbital pulley: a purely \emph{transverse} restoring force, so the path is held but shortening is free \\
 \code{orbit\_socket} & lateral & penalty contact with the spherical cup + orbital-fat suspension \\
 \code{mpm\_scatter}\,[\code{accumulate}] & exchange & the second body into the shared grid \\
 \bottomrule
@@ -223,7 +224,7 @@ range from $12.7^\circ$ to $29.6^\circ$ with recruitment still 4/4. \textbf{Less
 convenience taken for the picture was also a mechanical error.}
 \end{phasebox}
 
-\begin{phasebox}{4. The force--length relation (t09--) --- the passive element was backwards}
+\begin{phasebox}{4. The force--length relation (t09--t16) --- the passive element was backwards}
 Real muscle is passively \emph{soft} and limits its own shortening through the force--length
 relation, not through a stiff passive element. Switching on
 $T = A\,a\,(1+\beta(\lambda-1))$ means a muscle stops pulling once it has shortened by $1/\beta$,
@@ -234,6 +235,28 @@ limiter never engages. The fixes are what the real plant does: a chunkier cross-
 stiffness goes as $wh^3$) and genuine tonic co-contraction, which keeps every muscle in tension
 and is precisely why extraocular motoneurons fire at high rates even in primary position.
 \textbf{Lesson: two different instabilities, and only one of them was the one being fixed.}
+\end{phasebox}
+
+\begin{phasebox}{5. The orbital pulley (t15--t22) --- the mechanism that was actually missing}
+A free-floating strap is a column in compression the moment it contracts, and the fix is not
+numerical: every extraocular muscle passes through a sleeve of collagen and smooth muscle fixed
+to the orbital wall (Demer's active-pulley hypothesis), and that sleeve is exactly a
+\emph{transverse} constraint --- it fixes where the path runs without resisting how much the
+muscle shortens. \code{muscle\_sleeve} applies a restoring force to only the component of
+displacement perpendicular to the local fibre, tapering to zero over the distal third so the
+tendon end stays free to follow the rotating globe. Held at everything else constant, it raises
+the $A/E$ buckling ceiling from $\approx0.25$ to between $0.28$ and $0.38$ --- $A/E=0.28$ runs
+clean (20--30\% shortening, finite, strain $0.051$), $A/E=0.38$ still folds.
+\end{phasebox}
+
+\begin{phasebox}{6. The globe came apart (t18) --- absolute stiffness, not just contrast}
+Under the strongest drives the globe stopped being a globe. The vitreous had been set at
+$E=9$, a shear modulus of $3.8$ --- very nearly a fluid. The fixed-corotated law has no failure
+criterion, so under a hard tendon pull the interior simply flowed and the shell separated from
+it. Raising the interior to $E=45$ (vitreous) and $130$ (choroid) against a $420$ sclera keeps
+the $\approx 9\times$ core-to-shell contrast the strain panel is there to show, while giving
+every region enough shear modulus to hold together. \textbf{Lesson: ``deformable'' is a
+statement about the ratio; ``stays in one piece'' is a statement about the absolute value.}
 \end{phasebox}
 
 \subsection{The trial ledger}
@@ -250,14 +273,22 @@ t06 c\_long    &  55 & 250 & --  & 26.9 / 11.0 / 3.7   & 24.3 & 0.038 & 4/4 \\
 t07 c\_longer  &  55 & 250 & --  & 29.6 / 11.6 / 4.6   & 23.9 & 0.038 & 4/4 \\
 t08 c\_wide    &  55 & 250 & --  & 29.2 / 11.2 / 4.3   & 23.8 & 0.059 & 3/4 \\
 t09 v\_fl      & 130 &  55 & 4.0 & 52.1 / \ 7.7 / 13.7 & 61.6 & 1.067 & 2/4 \\
-t11 v\_tone    & 115 & 110 & 4.0 & \multicolumn{1}{l}{\fl} & --- & --- & --- \\
+t11 v\_tone    & 115 & 110 & 4.0 & 31.9 / 29.3 / 38.9  & 75.1 & 1.679 & 0/4 \\
+t15 s\_a (sleeve) &  90 & 150 & 3.0 & 22.8 / 33.9 / \ 9.4 & 56.5 & 1.684 & 3/4 \\
+t18 q\_b       & 120 & 190 & 3.0 & \multicolumn{1}{l}{globe came apart} & 54.6 & NaN & 0/4 \\
+\midrule
+\textbf{t21 r\_sleeve70} & \textbf{70} & \textbf{250} & -- & \textbf{33.2 / 10.1 / \ 4.2} & \textbf{30.2} & \textbf{0.051} & \textbf{3/4} \\
+t22 r\_sleeve95 &  95 & 250 & --  & \multicolumn{1}{l}{buckled, NaN} & 73.6 & NaN & 1/4 \\
 \bottomrule
 \end{tabular}
 \end{center}
 
 \small\color{grey}
 $A$ peak active stress, $E$ muscle Young's modulus, $\beta$ force--length slope. ``short\%'' is
-peak centreline shortening --- above $\sim$38\% it is buckling, not contraction.
+peak centreline shortening --- above $\sim$38\% it is buckling, not contraction. From t21 the
+\code{muscle\_sleeve} pulley is present and the globe interior is the stiffened one; t21 is the
+working point the final runs use. Its settled tracking error is $7.3/3.4/2.9^\circ$ in
+horizontal / vertical / torsion, against $10$--$20^\circ$ for every earlier configuration.
 \color{black}\normalsize
 
 %======================================================================
@@ -296,10 +327,11 @@ grid coupling via a new \emph{implementation} of an existing contract; the defor
 spherical cup with a torque-free fat suspension; the metric suite and the archive discipline
 (every trial keeps its own spec, movie and numbers).
 
-\textbf{Open.} The working point. Rounds 1--3 each found a real mechanism and a real ceiling; the
-force--length formulation of round 4 has the authority we need and the remaining question is
-purely whether pre-tension plus a chunkier cross-section suppresses the buckling without
-re-introducing the stiff-antagonist ceiling. The acceptance test is already written and
+\textbf{Open.} Reaching the commanded angle rather than about 60\% of it. Six rounds each found a real mechanism and a real ceiling, and the
+configuration that survives all of them (t21) is stable, holds together, contracts realistically
+and tracks three times better than anything before it --- but it still settles at roughly 60\% of
+a $25^\circ$ command. The remaining authority has to come from the pulley ceiling, which is known
+to lie between $A/E=0.28$ and $0.38$ and has not been bisected. The acceptance test is written and
 automatic: reaches its commands within $6^\circ$, torsion above $6^\circ$, horizontal above
 $35^\circ$, recruitment 4/4, centroid drift below 6\% of the globe radius, globe strain between
 0.4\% and 12\%, and peak shortening between 4\% and 38\%.
@@ -311,9 +343,14 @@ driven back and forth three times) and the zebrafish \code{okr} program at movie
 \item Let the video-captioning VLM watch the result cold and see whether it reports a rolling
 eye. That is the dynamics-watching critic the Plexus\,2 paper names as a required agent, and
 this is a cheap, honest test of it.
-\item An inverse pass. Every operator here is differentiable and the loss can be local: given
-the observed gaze trace, recover the six insertion geometries. That is Loop~II on a system whose
-ground truth we wrote down ourselves.
+\item \code{tune\_gaze.py} --- gradient descent on the rotation controller, built but not yet
+swept. Differentiating the MPM rollout is exactly the cost Plexus\,2 warns about (memory scales
+as points $\times$ steps), so it takes the \code{inverse\_slime} route instead: identify the
+second-order rotational plant by ridge least squares from an archived run (teacher-forced, one
+step, no rollout), run Adam on $(k_p,k_i,k_d,\text{gain},\text{tonic})$ over that
+differentiable surrogate, and verify the result back in the full simulation.
+\item A real inverse pass: given only the observed gaze trace, recover the six insertion
+geometries. Loop~II on a system whose ground truth we wrote down ourselves.
 \end{enumerate}
 
 \end{document}

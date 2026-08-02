@@ -87,7 +87,7 @@ def build_spec(name="eye_zebrafish", preset="atlas", n_particles=45000, n_muscle
                kp=0.10, ki=0.0, kd=0.010, tonic=0.20, gain=1.2, tau=0.020,
                k_socket=5000.0, k_fat=4000.0, c_fat=90.0, k_bone=9000.0, c_bone=60.0,
                k_sleeve=2600.0, c_sleeve=30.0, sleeve_free=(0.70, 0.88),
-               n_frames=None, sclera_youngs=300.0, vitreous_youngs=9.0, choroid_youngs=40.0,
+               n_frames=None, sclera_youngs=420.0, vitreous_youngs=45.0, choroid_youngs=130.0,
                muscle_youngs=60.0, mus_width=0.034, mus_thickness=0.021, mus_arc=30.0,
                mus_gap=0.038, mus_embed=-0.014, mus_frac=0.88, oblique_strength=None,
                program=None, seed=0):
@@ -117,9 +117,14 @@ def build_spec(name="eye_zebrafish", preset="atlas", n_particles=45000, n_muscle
                             "record": False},
                     "gaze": {"width": 3, "integration": "none", "boundary": "free"},
                 },
-                # radial bands: a soft vitreous gel inside a stiff scleral shell. This is what
-                # makes the eye DEFORMABLE but not floppy -- the tendon dimples the sclera and
-                # the strain runs on into the interior.
+                # Radial bands: a soft vitreous gel inside a stiff scleral shell -- what makes
+                # the eye DEFORMABLE but not floppy. The ~9x contrast from core to shell is what
+                # the strain panel shows; the ABSOLUTE values matter just as much. An earlier
+                # version had the vitreous at E = 9, a shear modulus of 3.8, which is very nearly
+                # a fluid: under a strong tendon pull the interior simply flowed and the globe
+                # came apart (archive/t18_q_b). The fixed-corotated law has no failure criterion,
+                # so "holds together" is entirely a matter of having enough shear modulus
+                # EVERYWHERE, not only in the shell.
                 "types": {
                     "globe": {
                         "fraction": 1.0, "youngs": float(sclera_youngs),
@@ -164,7 +169,7 @@ def build_spec(name="eye_zebrafish", preset="atlas", n_particles=45000, n_muscle
             # anatomy: once, at frame 0
             {"op": "eye_anatomy", "at": "mpm_particle", "before_frame": 1,
              "center": [cx, cy, cz], "a_eq": EA.A_EQ, "axial_ratio": EA.AXIAL_RATIO,
-             "lens_youngs": EA.LENS_YOUNGS, "cornea_youngs": 260.0},
+             "lens_youngs": EA.LENS_YOUNGS, "cornea_youngs": 320.0},
             {"op": "muscle_morphogenesis", "at": "muscle_particle", "before_frame": 1,
              "center": [cx, cy, cz], "a_eq": EA.A_EQ, "c_ax": EA.C_AX,
              "width": float(mus_width), "thickness": float(mus_thickness),
