@@ -1,26 +1,18 @@
 #!/usr/bin/env python
-"""run_eye -- run the zebrafish oculomotor spec and render the multi-panel movie.
+"""run_eye -- run the zebrafish oculomotor spec, score it, and render the movie.
 
-    python run_eye.py --preset probe --label calib --particles 20000
-    python run_eye.py --preset atlas --label final
+    python run_eye.py --preset probe --label calib --particles 45000
+    python run_eye.py --preset atlas --label final --particles 110000
 
-Every run is archived to `archive/tNN_<label>/` (NN auto-increments) containing
+Every run is archived to `archive/tNN_<label>/` (NN auto-increments):
 
-    spec.yaml    the Plexus2 spec that produced it (the deliverable)
+    spec.yaml    the Plexus2 spec that produced it -- the deliverable
     movie.mp4    the six-panel movie
-    strip.png    four key frames, for a glance
-    curves.npz   the captured traces (gaze, command, activation, tension, strain, stress)
-    diag.json    the pass/fail metrics -- so "convincing" is a test, not an impression
+    strip.png    five key frames, for a glance
+    curves.npz   the captured traces
+    diag.json    the metrics, so "convincing" is a test and not an impression
 
-The movie panels
-    A  anterior view (as in the anatomical plate): the cosmetic eye -- white sclera, silver
-       iris, big black pupil, gold iridophore flecks -- with the six muscles drawn from
-       origin to insertion, brightness and width by activation
-    B  lateral view: the ovoid profile, the bony cup, the obliques and the trochlea
-    C  cut half-globe, coloured by Green-Lagrange strain  ||E||,  E = (F^T F - I)/2
-    D  the same cut, coloured by von Mises stress
-    E  the six muscle activations against time
-    F  gaze (horizontal / vertical / torsion) against its command
+`trial()` is importable: `sweep_eye.py` calls it once per configuration.
 """
 from __future__ import annotations
 
@@ -28,7 +20,6 @@ import os
 import sys
 import json
 import glob
-import math
 import argparse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -37,71 +28,54 @@ sys.path.insert(0, HERE)
 
 import numpy as np
 import torch
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
-from matplotlib.animation import FFMpegWriter
-try:
-    import imageio_ffmpeg
-    matplotlib.rcParams["animation.ffmpeg_path"] = imageio_ffmpeg.get_ffmpeg_exe()
-except Exception:
-    pass
 
 import plexus.operators            # noqa: F401  stock operator library
-import eye_ops                     # noqa: F401  the six eye operators (prototype-local)
+import eye_ops                     # noqa: F401  eye operators (prototype-local)
+import muscle_ops                  # noqa: F401  muscle-as-tissue operators (prototype-local)
 import eye_anatomy as EA
 import eye_spec as ES
+import render_eye
 from plexus.schema import load as load_spec
 from plexus.engine import run as engine_run
 
 ARCHIVE = os.path.join(HERE, "archive")
-BG = "black"
-FG = "white"
-
-TISSUE_RGB = {                       # the cosmetic zebrafish eye of the reference photo
-    eye_ops.EyeAnatomy.PUPIL:    (0.03, 0.03, 0.05),      # big round black pupil
-    eye_ops.EyeAnatomy.IRIS:     (0.72, 0.78, 0.76),      # silvery iridophore ring
-    eye_ops.EyeAnatomy.FLECK:    (0.92, 0.80, 0.25),      # gold flecks (they reveal TORSION)
-    eye_ops.EyeAnatomy.CORNEA:   (0.86, 0.88, 0.90),
-    eye_ops.EyeAnatomy.SCLERA:   (0.93, 0.93, 0.90),      # white sclera
-    eye_ops.EyeAnatomy.CHOROID:  (0.55, 0.45, 0.45),
-    eye_ops.EyeAnatomy.VITREOUS: (0.35, 0.45, 0.55),
-    eye_ops.EyeAnatomy.LENS:     (0.75, 0.85, 0.95),
-}
 
 
 # --------------------------------------------------------------------------- #
-#  projection
+#  capture: one pass of the sim, snapshotting what the trajectory has no room for
 # --------------------------------------------------------------------------- #
-def proj(P, view):
-    """World points [N,3] -> (screen_x, screen_y, depth) for a named view.
-    depth increases AWAY from the camera, so `argsort(depth)[::-1]` draws far-first."""
-    x, y, z = P[:, 0], P[:, 1], P[:, 2]
-    if view == "anterior":            # camera at +z: temporal (+x) falls on the viewer's LEFT,
-        return -x, y, -z              # exactly as in an anterior-view anatomical plate
-    if view == "lateral":             # camera at +x (the temporal side): anterior points right
-        return z, y, -x
-    if view == "oblique":             # a 3/4 view for the strain / stress cuts
-        az, el = math.radians(38.0), math.radians(20.0)
-        ca, sa, ce, se = math.cos(az), math.sin(az), math.cos(el), math.sin(el)
-        x1 = ca * x - sa * z
-        z1 = sa * x + ca * z
-        y2 = ce * y - se * z1
-        return x1, y2, -(se * y + ce * z1)
-    raise ValueError(view)
+def _scalars(p, sel):
+    """(Green-Lagrange strain, von Mises stress) for a subset of a particle set -- the two
+    continuum fields the generic trajectory has no room for."""
+    F = p.F[sel]
+    Ft = F.transpose(-2, -1)
+    I3 = torch.eye(3, device=F.device)
+    E = 0.5 * (Ft @ F - I3.expand_as(F))                      # rotation-free strain
+    strain = E.reshape(F.shape[0], -1).norm(dim=1)
+    U, S, Vh = torch.linalg.svd(F)                            # polar rotation, as mpm_scatter
+    U = U.clone(); Vh = Vh.clone()
+    U[torch.det(U) < 0, :, -1] *= -1
+    Vh[torch.det(Vh) < 0, -1, :] *= -1
+    R = U @ Vh
+    J = torch.linalg.det(F)
+    sig = 2 * p.mu[sel][:, None, None] * ((F - R) @ Ft) \
+        + I3 * (p.la[sel] * J * (J - 1))[:, None, None]
+    sig = 0.5 * (sig + sig.transpose(-2, -1))
+    dev = sig - I3 * (sig.diagonal(dim1=-2, dim2=-1).sum(-1) / 3)[:, None, None]
+    vm = torch.sqrt(1.5 * dev.reshape(F.shape[0], -1).pow(2).sum(1))
+    return strain, vm
 
 
-# --------------------------------------------------------------------------- #
-#  capture: one pass of the sim, snapshotting what the trajectory does not store
-# --------------------------------------------------------------------------- #
-def capture_run(sim, device, stride=3, n_shell=9000, n_cut=13000, seed=0):
-    """Run the spec once, snapshotting the fields the generic trajectory has no room for
-    (per-particle F -> strain and stress, the live muscle geometry, the pose readout)."""
-    rec = {"frame": [], "shell": [], "cut_strain": [], "cut_vm": [], "cut_pos": [],
-           "act": [], "tension": [], "ins": [], "pull": [], "axis": [],
-           "gaze": [], "target": [], "centre": []}
+def capture_run(sim, device, stride=3, n_shell=26000, n_cut=16000, n_mus=14000,
+                n_grid_pts=9000, seed=0):
+    keys = ("frame", "shell", "cut_pos", "cut_strain", "cut_vm",
+            "mus_pos", "mus_strain", "mus_vm", "act", "tension", "length",
+            "ins", "pull", "axis", "gaze", "target", "centre", "gpos", "gvel")
+    rec = {k: [] for k in keys}
     idx = {}
     rng = np.random.default_rng(seed)
+    prog = next(o.params["program"] for o in sim.operators if o.op == "oculomotor_drive")
+    cmd = eye_ops.OculomotorDrive({"program": prog}, "cpu")     # evaluates the COMMAND per frame
 
     def _pick(mask_t, k):
         ii = torch.nonzero(mask_t, as_tuple=False).flatten().cpu().numpy()
@@ -113,277 +87,166 @@ def capture_run(sim, device, stride=3, n_shell=9000, n_cut=13000, seed=0):
         if frame % stride and frame != sim.n_frames:
             return
         p = H.levels["mpm_particle"]
+        q = H.levels["muscle_particle"]
         if not idx:
-            if not hasattr(p, "rest_rn"):
+            if not hasattr(p, "rest_rn") or not hasattr(q, "s"):
                 return
             dev = p.state.device
-            idx["shell"] = _pick(p.rest_rn > 0.955, n_shell).to(dev)
-            # a cut half-globe: drop the nasal half so the interior is exposed
-            idx["cut"] = _pick(p.rest[:, 0] < 0.01 * EA.A_EQ, n_cut).to(dev)
+            idx["shell"] = _pick(p.rest_rn > 0.94, n_shell).to(dev)
+            idx["cut"] = _pick(p.rest[:, 0] < 0.012 * EA.A_EQ, n_cut).to(dev)
+            idx["mus"] = _pick(torch.ones(q.n, dtype=torch.bool, device=dev), n_mus).to(dev)
             idx["tissue"] = p.tissue[idx["shell"]].cpu().numpy()
-        s, cu = idx["shell"], idx["cut"]
-        X = p.get("pos")
-        F = p.F[cu]
-        Ft = F.transpose(-2, -1)
-        E = 0.5 * (Ft @ F - torch.eye(3, device=F.device).expand_as(F))
-        strain = E.reshape(F.shape[0], -1).norm(dim=1)
-        # the fixed-corotated stress the MPM scatter actually forms, as von Mises
-        U, S, Vh = torch.linalg.svd(F)
-        U = U.clone(); Vh = Vh.clone()
-        U[torch.det(U) < 0, :, -1] *= -1
-        Vh[torch.det(Vh) < 0, -1, :] *= -1
-        R = U @ Vh
-        J = torch.linalg.det(F)
-        mu, la = p.mu[cu], p.la[cu]
-        sig = 2 * mu[:, None, None] * ((F - R) @ Ft) \
-            + torch.eye(3, device=F.device) * (la * J * (J - 1))[:, None, None]
-        sig = 0.5 * (sig + sig.transpose(-2, -1))
-        dev_s = sig - torch.eye(3, device=F.device) * (sig.diagonal(dim1=-2, dim2=-1).sum(-1) / 3)[:, None, None]
-        vm = torch.sqrt(1.5 * dev_s.reshape(F.shape[0], -1).pow(2).sum(1))
+            idx["mus_parent"] = q.parent[idx["mus"]].cpu().numpy()
+            idx["mus_s"] = q.s[idx["mus"]].cpu().numpy()
+        s, cu, mu_i = idx["shell"], idx["cut"], idx["mus"]
+        X, Y = p.get("pos"), q.get("pos")
+        c_strain, c_vm = _scalars(p, cu)
+        m_strain, m_vm = _scalars(q, mu_i)
 
-        m = H.levels["muscle"]
-        eye = H.levels["eye"]
+        m, eye = H.levels["muscle"], H.levels["eye"]
+        g = H.fields["mpm_grid"]
+        gv = g.v.reshape(*g.shape, 3)
+        gmag = gv.norm(dim=-1)
+        act_cells = torch.nonzero(gmag > 1e-5, as_tuple=False)
+        if act_cells.shape[0] > n_grid_pts:
+            keep = torch.randperm(act_cells.shape[0], device=act_cells.device)[:n_grid_pts]
+            act_cells = act_cells[keep]
+        gp = (act_cells.float() + 0.5) * g.dx
+        gm = gmag[act_cells[:, 0], act_cells[:, 1], act_cells[:, 2]]
+
+        f32 = lambda t: t.detach().cpu().numpy().astype(np.float32)
         rec["frame"].append(frame)
-        rec["shell"].append(X[s].detach().cpu().numpy().astype(np.float32))
-        rec["cut_pos"].append(X[cu].detach().cpu().numpy().astype(np.float32))
-        rec["cut_strain"].append(strain.detach().cpu().numpy().astype(np.float32))
-        rec["cut_vm"].append(vm.detach().cpu().numpy().astype(np.float32))
-        rec["act"].append(m.get("act")[:, 0].detach().cpu().numpy().astype(np.float32))
-        rec["tension"].append(m.get("tension")[:, 0].detach().cpu().numpy().astype(np.float32))
-        rec["ins"].append(m.ins_pos.detach().cpu().numpy().astype(np.float32))
-        rec["pull"].append(m.pull.detach().cpu().numpy().astype(np.float32))
-        rec["axis"].append(m.axis.detach().cpu().numpy().astype(np.float32))
-        rec["gaze"].append(eye.get("gaze")[0].detach().cpu().numpy().astype(np.float32))
-        rec["centre"].append(eye.get("pos")[0].detach().cpu().numpy().astype(np.float32))
-        rec["target"].append(np.asarray(TARGET_OF[0].target(frame), np.float32))
+        rec["shell"].append(f32(X[s]))
+        rec["cut_pos"].append(f32(X[cu]))
+        rec["cut_strain"].append(f32(c_strain))
+        rec["cut_vm"].append(f32(c_vm))
+        rec["mus_pos"].append(f32(Y[mu_i]))
+        rec["mus_strain"].append(f32(m_strain))
+        rec["mus_vm"].append(f32(m_vm))
+        rec["act"].append(f32(m.get("act")[:, 0]))
+        rec["tension"].append(f32(m.get("tension")[:, 0]))
+        rec["length"].append(f32(m.get("length")[:, 0]))
+        rec["ins"].append(f32(m.ins_pos))
+        rec["pull"].append(f32(m.pull))
+        rec["axis"].append(f32(m.axis))
+        rec["gaze"].append(f32(eye.get("gaze")[0]))
+        rec["centre"].append(f32(eye.get("pos")[0]))
+        rec["target"].append(np.asarray(cmd.target(frame), np.float32))
+        rec["gpos"].append(f32(gp))
+        rec["gvel"].append(f32(gm))
 
-    TARGET_OF = []
-
-    # instantiate one drive purely to evaluate the COMMAND at each captured frame
-    prog = next(o.params["program"] for o in sim.operators if o.op == "oculomotor_drive")
-    TARGET_OF.append(eye_ops.OculomotorDrive({"program": prog}, "cpu"))
-
-    H, _ = engine_run(sim, out_path=None, device=device, on_frame=hook, progress=True)
-    out = {k: np.asarray(v) for k, v in rec.items()}
+    H, _ = engine_run(sim, out_path=None, device=device, on_frame=hook, progress=False)
+    out = {k: (np.asarray(v) if k not in ("gpos", "gvel") else v) for k, v in rec.items()}
     out["tissue"] = idx["tissue"]
+    out["mus_parent"] = idx["mus_parent"]
+    out["mus_s"] = idx["mus_s"]
+    out["rest_length"] = H.levels["muscle"].rest_length.detach().cpu().numpy()
     out["origins"] = EA.origins_world().astype(np.float32)
     return H, out
 
 
 # --------------------------------------------------------------------------- #
-#  metrics: "convincing" as a test, not an impression
+#  metrics: "convincing" as a test
 # --------------------------------------------------------------------------- #
+# what the anatomy says SHOULD be recruited for each kind of command; the drive never
+# tabulates this -- it projects onto axes computed from the geometry -- so agreement is
+# a real check that the plant is wired right.
+EXPECTED = {
+    "abduction": {"LR"}, "adduction": {"MR"},
+    "elevation": {"SR", "IO"}, "depression": {"IR", "SO"},
+    "intorsion": {"SO", "SR"}, "extorsion": {"IO", "IR"},
+}
+
+
+def classify(cmd):
+    h, v, t = cmd
+    if abs(t) > max(abs(h), abs(v)):
+        return "intorsion" if t > 0 else "extorsion"
+    if abs(v) > abs(h):
+        return "elevation" if v > 0 else "depression"
+    if abs(h) > 1e-6:
+        return "abduction" if h > 0 else "adduction"
+    return "primary"
+
+
 def diagnose(cap, sim):
-    """Per-command settling accuracy, recruitment, deformation and socket retention."""
-    g = cap["gaze"]; t = cap["target"]; fr = cap["frame"]; act = cap["act"]
-    prog = np.asarray(next(o.params["program"] for o in sim.operators if o.op == "oculomotor_drive"), float)
-    holds = []
+    g, t, fr, act = cap["gaze"], cap["target"], cap["frame"], cap["act"]
+    prog = np.asarray(next(o.params["program"] for o in sim.operators
+                           if o.op == "oculomotor_drive"), float)
+    holds, ok_recruit, n_recruit = [], 0, 0
     for i in range(len(prog)):
         f0 = prog[i, 0]
         f1 = prog[i + 1, 0] if i + 1 < len(prog) else sim.n_frames
-        if f1 - f0 < 25:
+        if f1 - f0 < 30:
             continue
-        sel = (fr >= f0 + 0.55 * (f1 - f0)) & (fr <= f1)      # the settled tail of the hold
+        sel = (fr >= f0 + 0.6 * (f1 - f0)) & (fr <= f1)
         if sel.sum() < 2:
             continue
         cmd = prog[i, 1:4]
         got = g[sel].mean(0)
-        top = np.argsort(-act[sel].mean(0))[:2]
+        a = act[sel].mean(0)
+        kind = classify(cmd)
+        top = [EA.MUSCLE_KEYS[j] for j in np.argsort(-a)[:2]]
+        good = None
+        if kind in EXPECTED:
+            n_recruit += 1
+            good = bool(set(top) & EXPECTED[kind]) and top[0] in EXPECTED[kind]
+            ok_recruit += int(good)
         holds.append({
-            "frames": [int(f0), int(f1)],
+            "frames": [int(f0), int(f1)], "kind": kind,
             "command_hvt": [round(float(x), 2) for x in cmd],
             "achieved_hvt": [round(float(x), 2) for x in got],
             "error_deg": round(float(np.linalg.norm(got - cmd)), 2),
-            "recruited": [EA.MUSCLE_KEYS[j] for j in top],
-            "activation": {EA.MUSCLE_KEYS[j]: round(float(act[sel].mean(0)[j]), 3)
-                           for j in range(EA.N_MUSCLE)},
+            "recruited": top, "recruit_ok": good,
+            "activation": {EA.MUSCLE_KEYS[j]: round(float(a[j]), 3) for j in range(EA.N_MUSCLE)},
         })
     c = cap["centre"]
     drift = np.linalg.norm(c - c[0], axis=1)
-    moving = np.abs(np.asarray([h["command_hvt"] for h in holds])).sum() > 0
+    errs = [h["error_deg"] for h in holds]
+    L, L0 = cap["length"], cap["rest_length"][None, :]
+    shorten = 100.0 * (1.0 - L / L0)                       # % shortening per muscle over time
     return {
         "n_frames": int(sim.n_frames),
-        "max_abs_gaze_deg": [round(float(np.abs(g[:, k]).max()), 2) for k in range(3)],
-        "mean_settle_error_deg": round(float(np.mean([h["error_deg"] for h in holds])), 2) if holds else None,
-        "max_settle_error_deg": round(float(np.max([h["error_deg"] for h in holds])), 2) if holds else None,
+        "range_hvt_deg": [round(float(np.ptp(g[:, k])), 2) for k in range(3)],
+        "mean_settle_error_deg": round(float(np.mean(errs)), 2) if errs else None,
+        "max_settle_error_deg": round(float(np.max(errs)), 2) if errs else None,
+        "recruitment_correct": f"{ok_recruit}/{n_recruit}" if n_recruit else "n/a",
         "centroid_drift_max_frac_radius": round(float(drift.max() / EA.A_EQ), 4),
         "strain_p99": round(float(np.percentile(cap["cut_strain"], 99)), 4),
         "strain_max": round(float(cap["cut_strain"].max()), 4),
         "vonmises_p99": round(float(np.percentile(cap["cut_vm"], 99)), 3),
         "activation_range": [round(float(cap["act"].min()), 3), round(float(cap["act"].max()), 3)],
+        "max_shortening_pct": {EA.MUSCLE_KEYS[j]: round(float(shorten[:, j].max()), 2)
+                               for j in range(EA.N_MUSCLE)},
+        "peak_shortening_pct": round(float(shorten.max()), 2),
+        "muscle_strain_p99": round(float(np.percentile(cap["mus_strain"], 99)), 4),
         "holds": holds,
-        "_moving": bool(moving),
     }
 
 
-# --------------------------------------------------------------------------- #
-#  the six-panel figure
-# --------------------------------------------------------------------------- #
-def _sphere_outline(ax, view, centre, radius, **kw):
-    th = np.linspace(0, 2 * np.pi, 180)
-    P = np.stack([centre[0] + radius * np.cos(th), centre[1] + radius * np.sin(th),
-                  np.full_like(th, centre[2])], 1)
-    if view == "anterior":
-        ax.plot(-(P[:, 0]), P[:, 1], **kw)
-    else:
-        Q = np.stack([np.full_like(th, centre[0]), centre[1] + radius * np.sin(th),
-                      centre[2] + radius * np.cos(th)], 1)
-        ax.plot(Q[:, 2], Q[:, 1], **kw)
-
-
-def _label(ax, s):
-    ax.text(0.02, 0.965, s, transform=ax.transAxes, color=FG, fontsize=11,
-            ha="left", va="top", fontweight="bold")
-
-
-def _style_scene(ax, span, centre_xy):
-    ax.set_xlim(centre_xy[0] - span, centre_xy[0] + span)
-    ax.set_ylim(centre_xy[1] - span, centre_xy[1] + span)
-    ax.set_aspect("equal"); ax.set_facecolor(BG); ax.axis("off")
-
-
-def draw_scene(ax, k, cap, view, label, span=0.30, show_muscles=True, dot=1.6):
-    """The cosmetic eye + the six muscles, from `view`."""
-    X = cap["shell"][k]
-    rgb = np.array([TISSUE_RGB[int(t)] for t in cap["tissue"]], np.float32)
-    sx, sy, dep = proj(X, view)
-    order = np.argsort(dep)[::-1]
-    shade = 0.35 + 0.65 * (1.0 - (dep - dep.min()) / (np.ptp(dep) + 1e-9))
-    ax.scatter(sx[order], sy[order], s=dot, c=np.clip(rgb[order] * shade[order, None], 0, 1),
-               edgecolors="none", zorder=2)
-
-    c = cap["centre"][k]
-    _sphere_outline(ax, view, c, EA.CUP_RADIUS, color="0.42", lw=1.1, ls="--", zorder=1)
-
-    if show_muscles:
-        act = cap["act"][k]
-        ins = cap["ins"][k]
-        org = cap["origins"]
-        for i, m in enumerate(EA.MUSCLES):
-            a = float(np.clip(act[i], 0, 1))
-            P = np.stack([org[i], ins[i]])
-            px, py, pd = proj(P, view)
-            behind = pd.mean() > 0                     # muscle running behind the globe
-            ax.plot(px, py, color=m["color"], lw=1.2 + 5.5 * a,
-                    alpha=(0.35 + 0.65 * a) * (0.45 if behind else 1.0),
-                    solid_capstyle="round", zorder=1 if behind else 3)
-            ax.scatter(px[1], py[1], s=16, color=m["color"], zorder=4,
-                       alpha=0.5 + 0.5 * a, edgecolors="none")
-            if not behind:
-                ax.text(px[0], py[0], f" {m['key']}", color=m["color"], fontsize=7.5,
-                        va="center", zorder=5)
-        tx, ty, _ = proj(np.asarray(EA.origins_world())[4:5], view)   # the trochlea (SO pulley)
-        ax.scatter(tx, ty, s=42, facecolors="none", edgecolors=EA.MUSCLES[4]["color"],
-                   lw=1.0, zorder=5)
-
-    cxy = proj(c[None, :], view)
-    _style_scene(ax, span, (float(cxy[0][0]), float(cxy[1][0])))
-    _label(ax, label)
-
-
-def draw_field(ax, k, cap, key, label, vmin, vmax, cmap, cbar_label):
-    X = cap["cut_pos"][k]
-    v = cap[key][k]
-    sx, sy, dep = proj(X, "oblique")
-    order = np.argsort(dep)[::-1]
-    sc = ax.scatter(sx[order], sy[order], s=2.0, c=v[order], cmap=cmap, vmin=vmin, vmax=vmax,
-                    edgecolors="none")
-    c = cap["centre"][k]
-    cxy = proj(c[None, :], "oblique")
-    _style_scene(ax, 0.19, (float(cxy[0][0]), float(cxy[1][0])))
-    _label(ax, label)
-    cb = plt.colorbar(sc, ax=ax, fraction=0.035, pad=0.01)
-    cb.ax.tick_params(labelsize=6, colors=FG, length=2, width=0.4)
-    cb.outline.set_edgecolor("0.5"); cb.outline.set_linewidth(0.4)
-    cb.set_label(cbar_label, color=FG, fontsize=7)
-
-
-def draw_traces(ax, k, cap, label, kind, dt):
-    t = cap["frame"] * dt
-    if kind == "act":
-        for i, m in enumerate(EA.MUSCLES):
-            ax.plot(t, cap["act"][:, i], color=m["color"], lw=1.3, label=m["key"])
-        ax.set_ylim(-0.03, 1.05)
-        ax.set_ylabel("activation", color=FG, fontsize=8)
-        leg = ax.legend(ncol=6, fontsize=7, frameon=False, loc="upper center",
-                        handlelength=1.1, columnspacing=0.9, bbox_to_anchor=(0.5, 1.14))
-        for txt, m in zip(leg.get_texts(), EA.MUSCLES):
-            txt.set_color(m["color"])
-    else:
-        names = ["horizontal", "vertical", "torsion"]
-        cols = ["#4da3ff", "#7ee081", "#c58cff"]
-        for i in range(3):
-            ax.plot(t, cap["target"][:, i], color=cols[i], lw=1.0, ls="--", alpha=0.55)
-            ax.plot(t, cap["gaze"][:, i], color=cols[i], lw=1.6, label=names[i])
-        ax.set_ylabel("degrees", color=FG, fontsize=8)
-        leg = ax.legend(ncol=3, fontsize=7, frameon=False, loc="upper center",
-                        handlelength=1.1, columnspacing=0.9, bbox_to_anchor=(0.5, 1.14))
-        for txt, cc in zip(leg.get_texts(), cols):
-            txt.set_color(cc)
-    ax.axvline(t[k], color="0.75", lw=0.9, alpha=0.8)
-    ax.set_xlim(t[0], t[-1])
-    ax.set_xlabel("sim time", color=FG, fontsize=8)
-    ax.set_facecolor(BG)
-    for sp in ax.spines.values():
-        sp.set_color("0.4")
-    ax.tick_params(colors="0.75", labelsize=7)
-    _label(ax, label)
-
-
-def make_figure(cap, dt):
-    fig = plt.figure(figsize=(16.5, 9.2), facecolor=BG)
-    gs = fig.add_gridspec(2, 3, wspace=0.06, hspace=0.10,
-                          left=0.015, right=0.985, top=0.965, bottom=0.075)
-    axes = [fig.add_subplot(gs[r, c]) for r in range(2) for c in range(3)]
-    return fig, axes
-
-
-def render(cap, sim, out_mp4, out_strip, fps=30):
-    dt = float(sim.dt)
-    s_hi = float(np.percentile(cap["cut_strain"], 99.5))
-    v_hi = float(np.percentile(cap["cut_vm"], 99.5))
-    n = len(cap["frame"])
-
-    def draw(fig, axes, k):
-        for a in axes:
-            a.clear()
-        draw_scene(axes[0], k, cap, "anterior",
-                   "A   anterior view — right eye, six extraocular muscles")
-        draw_scene(axes[1], k, cap, "lateral",
-                   "B   lateral view — ovoid globe in the bony cup")
-        draw_field(axes[2], k, cap, "cut_strain",
-                   "C   Green–Lagrange strain ‖E‖ (cut globe)", 0.0, s_hi, "magma", "‖E‖")
-        draw_field(axes[3], k, cap, "cut_vm",
-                   "D   von Mises stress (cut globe)", 0.0, v_hi, "inferno", "σ_vM")
-        draw_traces(axes[4], k, cap, "E   muscle activation", "act", dt)
-        draw_traces(axes[5], k, cap, "F   gaze (solid) vs command (dashed)", "gaze", dt)
-        fig.suptitle("", color=FG)
-
-    fig, axes = make_figure(cap, dt)
-    writer = FFMpegWriter(fps=fps, bitrate=6000, metadata={"title": "zebrafish oculomotor plant"})
-    with writer.saving(fig, out_mp4, dpi=110):
-        for k in range(n):
-            draw(fig, axes, k)
-            writer.grab_frame(facecolor=BG)
-            if k % 25 == 0:
-                print(f"  [render] {k}/{n}", flush=True)
-    plt.close(fig)
-
-    fig, axes = make_figure(cap, dt)
-    ks = [int(x) for x in np.linspace(0, n - 1, 4)]
-    fig2 = plt.figure(figsize=(19, 5.0), facecolor=BG)
-    for j, k in enumerate(ks):
-        ax = fig2.add_subplot(1, 4, j + 1)
-        draw_scene(ax, k, cap, "anterior", f"frame {int(cap['frame'][k])}")
-    fig2.subplots_adjust(left=0.005, right=0.995, top=0.97, bottom=0.02, wspace=0.02)
-    fig2.savefig(out_strip, dpi=110, facecolor=BG)
-    plt.close(fig2); plt.close(fig)
+def verdict(d):
+    """The acceptance test. A run is convincing when the eye reaches its commands, the
+    right muscles do it, the globe stays in its socket, and it deforms a LITTLE."""
+    checks = {
+        "reaches_commands": (d["max_settle_error_deg"] is not None
+                             and d["max_settle_error_deg"] < 4.0),
+        "torsion_demonstrated": d["range_hvt_deg"][2] > 8.0,
+        "wide_gaze_range": d["range_hvt_deg"][0] > 30.0 and d["range_hvt_deg"][1] > 20.0,
+        "correct_recruitment": (d["recruitment_correct"] != "n/a"
+                                and d["recruitment_correct"].split("/")[0]
+                                == d["recruitment_correct"].split("/")[1]),
+        "stays_in_socket": d["centroid_drift_max_frac_radius"] < 0.06,
+        "deformable_not_floppy": 0.004 < d["strain_p99"] < 0.12,
+        "muscles_contract": d["peak_shortening_pct"] > 3.0,
+    }
+    return checks, all(checks.values())
 
 
 # --------------------------------------------------------------------------- #
 def next_archive_dir(label):
     os.makedirs(ARCHIVE, exist_ok=True)
-    used = [int(os.path.basename(d)[1:3]) for d in glob.glob(os.path.join(ARCHIVE, "t[0-9][0-9]_*"))
+    used = [int(os.path.basename(d)[1:3])
+            for d in glob.glob(os.path.join(ARCHIVE, "t[0-9][0-9]_*"))
             if os.path.basename(d)[1:3].isdigit()]
     n = (max(used) + 1) if used else 1
     d = os.path.join(ARCHIVE, f"t{n:02d}_{label}")
@@ -391,64 +254,85 @@ def next_archive_dir(label):
     return d
 
 
+def trial(label, device="cuda:0", stride=3, movie=True, note="", **kw):
+    """One archived trial: build the spec -> run -> score -> render. Returns (dir, diag)."""
+    preset = kw.pop("preset", "atlas")
+    spec = ES.build_spec(name=f"eye_{preset}_{label}", preset=preset, **kw)
+    limit = ES.cfl_limit(spec)
+    sub = kw.get("substep_dt") or min(1.2e-4, limit * 0.95)
+    if sub > limit:
+        sub = limit * 0.95
+    spec["schedule"][-1]["substep_dt"] = float(f"{sub:.3e}")
+
+    outdir = next_archive_dir(label)
+    spec_path = ES.write_spec(spec, os.path.join(outdir, "spec.yaml"))
+    sim = load_spec(spec_path)
+    print(f"[trial] {os.path.basename(outdir)}  preset={preset}  N={sim.sets['mpm_particle']['per_parent']} "
+          f"frames={sim.n_frames}  substep_dt={sub:.2e} ({round(sim.dt / sub)}/frame)", flush=True)
+
+    _, cap = capture_run(sim, device, stride=stride)
+    d = diagnose(cap, sim)
+    checks, passed = verdict(d)
+    d["checks"], d["passed"], d["note"] = checks, passed, note
+    d["config"] = {k: v for k, v in kw.items()}
+    d["config"]["preset"] = preset
+    d["substep_dt"] = sub
+    with open(os.path.join(outdir, "diag.json"), "w") as f:
+        json.dump(d, f, indent=2)
+    np.savez_compressed(os.path.join(outdir, "curves.npz"),
+                        **{k: v for k, v in cap.items()
+                           if k in ("frame", "act", "tension", "length", "rest_length",
+                                    "gaze", "target", "centre", "ins", "pull", "axis")})
+
+    print(f"  range h/v/t = {d['range_hvt_deg']}   err mean/max = "
+          f"{d['mean_settle_error_deg']}/{d['max_settle_error_deg']} deg   "
+          f"recruit {d['recruitment_correct']}   drift {d['centroid_drift_max_frac_radius']}   "
+          f"strain_p99 {d['strain_p99']}   shorten% {d['max_shortening_pct']}", flush=True)
+    for h in d["holds"]:
+        flag = "" if h["recruit_ok"] is None else (" ok" if h["recruit_ok"] else " MISS")
+        print(f"    {str(h['frames']):<12} {h['kind']:<11} {h['command_hvt']} -> "
+              f"{h['achieved_hvt']}  err {h['error_deg']:>5}  {h['recruited']}{flag}", flush=True)
+    print(f"  checks: " + "  ".join(f"{k}={'Y' if v else 'N'}" for k, v in checks.items())
+          + f"   => {'PASS' if passed else 'fail'}", flush=True)
+
+    if movie:
+        render_eye.render(cap, float(sim.dt), os.path.join(outdir, "movie.mp4"),
+                          os.path.join(outdir, "strip.png"))
+    print(f"[trial] -> {outdir}\n", flush=True)
+    return outdir, d
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--preset", default="atlas", choices=list(ES.PRESETS))
     ap.add_argument("--label", default="run")
     ap.add_argument("--particles", type=int, default=45000)
-    ap.add_argument("--n_grid", type=int, default=96)
+    ap.add_argument("--n_grid", type=int, default=128)
     ap.add_argument("--frames", type=int, default=None)
-    ap.add_argument("--amplitude", type=float, default=0.030)
+    ap.add_argument("--mparticles", type=int, default=2600)
+    ap.add_argument("--contract", type=float, default=26.0)
     ap.add_argument("--drag", type=float, default=5.0)
+    ap.add_argument("--muscle_drag", type=float, default=6.0)
+    ap.add_argument("--k_bone", type=float, default=9000.0)
+    ap.add_argument("--muscle_youngs", type=float, default=60.0)
     ap.add_argument("--kp", type=float, default=0.10)
     ap.add_argument("--kd", type=float, default=0.010)
     ap.add_argument("--gain", type=float, default=1.2)
     ap.add_argument("--tonic", type=float, default=0.20)
     ap.add_argument("--tau", type=float, default=0.020)
     ap.add_argument("--k_socket", type=float, default=5000.0)
-    ap.add_argument("--k_fat", type=float, default=260.0)
+    ap.add_argument("--k_fat", type=float, default=4000.0)
     ap.add_argument("--dt", type=float, default=0.003)
-    ap.add_argument("--substep_dt", type=float, default=0.0)
     ap.add_argument("--stride", type=int, default=3)
     ap.add_argument("--device", default="cuda:0")
     ap.add_argument("--no-movie", action="store_true")
-    args = ap.parse_args()
-
-    spec = ES.build_spec(name=f"eye_{args.preset}_{args.label}", preset=args.preset,
-                         n_particles=args.particles, n_grid=args.n_grid, dt=args.dt,
-                         amplitude=args.amplitude, drag=args.drag, kp=args.kp, kd=args.kd,
-                         gain=args.gain, tonic=args.tonic, tau=args.tau,
-                         k_socket=args.k_socket, k_fat=args.k_fat, n_frames=args.frames)
-    limit = ES.cfl_limit(spec)
-    sub = args.substep_dt if args.substep_dt > 0 else min(1.5e-4, limit * 0.95)
-    if sub > limit:
-        print(f"[cfl] substep_dt {sub:.2e} exceeds the Courant limit {limit:.2e}; lowering")
-        sub = limit * 0.95
-    spec["schedule"][-1]["substep_dt"] = float(f"{sub:.3e}")
-    print(f"[cfl] substep_dt={sub:.3e} (limit {limit:.3e}) -> "
-          f"{round(args.dt / sub)} substeps/frame", flush=True)
-
-    outdir = next_archive_dir(args.label)
-    spec_path = ES.write_spec(spec, os.path.join(outdir, "spec.yaml"))
-    sim = load_spec(spec_path)
-
-    H, cap = capture_run(sim, args.device, stride=args.stride)
-    diag = diagnose(cap, sim)
-    diag["args"] = vars(args)
-    diag["substep_dt"] = sub
-    with open(os.path.join(outdir, "diag.json"), "w") as f:
-        json.dump(diag, f, indent=2)
-    np.savez_compressed(os.path.join(outdir, "curves.npz"),
-                        **{k: v for k, v in cap.items() if k not in ("shell", "cut_pos")})
-
-    print(json.dumps({k: v for k, v in diag.items() if k not in ("holds", "args")}, indent=2))
-    for h in diag["holds"]:
-        print(f"  {h['frames']}  cmd {h['command_hvt']} -> {h['achieved_hvt']} "
-              f"(err {h['error_deg']} deg)  recruited {h['recruited']}")
-
-    if not args.no_movie:
-        render(cap, sim, os.path.join(outdir, "movie.mp4"), os.path.join(outdir, "strip.png"))
-    print(f"[eye] archived -> {outdir}", flush=True)
+    a = ap.parse_args()
+    trial(a.label, device=a.device, stride=a.stride, movie=not a.no_movie,
+          preset=a.preset, n_particles=a.particles, n_muscle_particles=a.mparticles,
+          n_grid=a.n_grid, n_frames=a.frames, dt=a.dt, contract=a.contract, drag=a.drag,
+          muscle_drag=a.muscle_drag, muscle_youngs=a.muscle_youngs, k_bone=a.k_bone,
+          kp=a.kp, kd=a.kd, gain=a.gain, tonic=a.tonic, tau=a.tau,
+          k_socket=a.k_socket, k_fat=a.k_fat)
 
 
 if __name__ == "__main__":

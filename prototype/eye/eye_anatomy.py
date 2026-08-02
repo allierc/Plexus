@@ -147,3 +147,12 @@ def squash(v: np.ndarray) -> np.ndarray:
     out = np.asarray(v, float).copy()
     out[..., 2] *= AXIAL_RATIO
     return out
+
+
+def belly_centers() -> np.ndarray:
+    """[6, 3] a rough world position for each muscle BELLY -- only used to seed the
+    `muscle` parent set, since `muscle_morphogenesis` then places every point exactly."""
+    c = np.asarray(GLOBE_CENTER, float)
+    ins = insertion_dirs() * A_EQ + c
+    org = origins_world()
+    return 0.5 * (ins + org)
