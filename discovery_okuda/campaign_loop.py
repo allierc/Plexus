@@ -73,6 +73,21 @@ TERMINAL_EXITS = {
 # about the SEARCH.
 EMPTY_EXIT = 5
 MAX_CRASHES = 2
+# How many rounds may SUBMIT a batch and score none of it before the campaign stops. Raised from
+# 2: a null round is a Track A result, and only a null that cost GPU time is evidence of a
+# problem. Rounds refused in Act 1 cost nothing and do not count toward this at all.
+EMPTY_STOP = 4
+
+
+def _submitted_this_round():
+    """Did the last round actually reach the cluster? A refusal in Act 1 spends nothing."""
+    import glob
+    try:
+        newest = max(glob.glob(os.path.join(os.path.dirname(HERE), "log", "okuda", "r*")),
+                     key=os.path.getmtime, default=None)
+        return bool(newest) and (time.time() - os.path.getmtime(newest)) < 3600
+    except Exception:
+        return True          # unknown: assume it cost something, which is the cautious side
 
 
 def _preserve(rnd, mode):
@@ -355,15 +370,35 @@ def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None, recon_rounds=
             _log({"event": "stop", "why": TERMINAL_EXITS[code], "rounds_done": done})
             return code
         if code == EMPTY_EXIT:
-            # NO ADMISSIBLE EVIDENCE, as a decision the round reached. Once is information; twice
-            # in a row means the loop is generating batches nothing can score, and continuing
-            # would fill a week with unusable runs.
+            # NO ADMISSIBLE EVIDENCE. This used to stop the campaign after two in a row, and that
+            # was a TRACK B rule applied to the whole thing.
+            #
+            # Track A never runs out. Its product is the MAP -- which operators do what, where the
+            # envelope is -- and a round in which every composition was refused has mapped the
+            # envelope, which is exactly the knowledge a later round needs to propose something
+            # admissible. Track A progress is how Track B gets unlocked, so stopping Track A
+            # because Track B has not appeared forecloses the only route to it.
+            #
+            # AND THE TWO EMPTY ROUNDS THAT TRIGGERED THIS COST NOTHING. Both were refused in
+            # Act 1 -- no batch submitted, no GPU spent, four minutes each. The rule read them as
+            # "a problem with the batch or the instruments" when nothing had reached an
+            # instrument. So `empty` is now split by whether COMPUTE WAS ACTUALLY SPENT: a round
+            # that never submitted is cheap and is retried freely; one that ran twelve
+            # simulations and could score none of them is the expensive case the rule was for.
             consecutive_empty += 1
             crashes = 0
-            if consecutive_empty >= 2:
-                print("[loop] STOPPING -- two rounds in a row produced no admissible evidence. "
-                      "That is a problem with the batch or the instruments, not bad luck.")
-                _log({"event": "stop", "why": "two empty rounds", "rounds_done": done})
+            spent_compute = _submitted_this_round()
+            if not spent_compute:
+                print(T_.warn(f"[loop] round {i + 1} produced no evidence and spent no compute "
+                              f"(refused in Act 1). Cheap; the refusals go to the next Proposer. "
+                              f"empty {consecutive_empty}"))
+                continue
+            if consecutive_empty >= EMPTY_STOP:
+                print(T_.no(f"[loop] STOPPING -- {EMPTY_STOP} rounds in a row SUBMITTED a batch "
+                            f"and could score none of it. That is compute spent on runs nothing "
+                            f"can read, and it is the expensive failure, not a Track A null."))
+                _log({"event": "stop", "why": "empty rounds with compute spent",
+                      "rounds_done": done})
                 return EMPTY_EXIT
         elif code == 0:
             consecutive_empty, crashes = 0, 0

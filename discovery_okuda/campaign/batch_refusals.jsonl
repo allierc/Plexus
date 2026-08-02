@@ -1,0 +1,1 @@
+{"round": 2, "refused": [{"slot": 11, "why": "DUPLICATE_IN_BATCH: identical to slot 9 (C855e6bdbedd). Same composition, so at most one prediction about it can be right; the others are the same experiment re-run under a different guess. Vary the EDIT, not the number."}]}
