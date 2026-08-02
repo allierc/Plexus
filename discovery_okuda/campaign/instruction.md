@@ -32,10 +32,11 @@ Also available and NOT part of scoring, but informative: mech_p_ratio (tube/body
 
 **Round 1 = 12 controls, 0 mechanism hypotheses, 0 checkable predictions.** No valid morphogenesis
 evidence exists yet; 0 of 4 Okuda morphologies attempted. Both round-1 failure modes are PROPOSER
-defects, not biology — the loop learned nothing about tissue this round. Every wk_ slot that produced
-output SATURATED (n_cells_final=36749, P2_BUFFER_SATURATED, valid_evidence=false, morphology sphere);
-the rest returned `{}` (no diag.json). This is the biologist's P13: "a tissue that stops growing because
-the ARRAY filled is not evidence about growth." The cap is an APPARATUS wall.
+defects, not biology — the loop learned nothing about tissue this round. Of the 12 slots, only 2
+produced a scorecard at all; both SATURATED (n_cells_final=36749, P2_BUFFER_SATURATED,
+valid_evidence=false, morphology sphere). The other 10 returned `{}` (no diag.json). This is the
+biologist's P13: "a tissue that stops growing because the ARRAY filled is not evidence about growth."
+The cap is an APPARATUS wall.
 
 **FAILURE 1 — controls carry zero info; NEVER propose one.** `replay` / `re-measure ... under current
 instruments` / naming a characterised RECON_ node as object-of-study returns bit-identical null numbers
