@@ -486,7 +486,9 @@ if __name__ == "__main__":
                          "halts one that is being debugged. A repeated crash still stops.")
     ap.add_argument("--status", action="store_true")
     a = ap.parse_args()
-    global KEEP_GOING
+    # Module scope (this is inside `if __name__ == "__main__"`), so a plain rebind is
+    # correct and a `global` here is a SyntaxError -- one that ast.parse does NOT catch,
+    # because it is a symbol-table error rather than a grammar one. Verify with import.
     KEEP_GOING = bool(getattr(a, 'keep_going', False))
     if a.status:
         status()
