@@ -1,7 +1,7 @@
 # Discovery — cardiomyocytes: status
 
-*Written 2026-08-02, at the point where Phase 0 is closed, Phase 1 is two items in, and the next
-work is measurement rather than construction.*
+*Written 2026-08-02. **Phases 0, 1 and 1b are closed.** The next work is Phase 2 — certifying the
+ruler and finding the floor — which is a STOP point.*
 
 The full narrative is `cardio_note.pdf` (18 pages) and it is what Cedric reads. This file is the
 operational summary: what was done, what it cost, what is measured, and what is not.
@@ -43,8 +43,8 @@ in `HYPOTHESES.md` as open questions; `BELIEFS.md` has zero entries. Defaults co
 | phase | state | what it produced |
 |---|---|---|
 | 0 — make it run, make it repeat | **done** | gate 18/18, canaries 6/6; seeded, provenanced, ledger stripped from the source |
-| 1 — freeze the recording, seal the test | **6 of 7** | + the resolution ladder, the frozen+sealed split, and `PREMISES.md` (2 of 8 premises fail) |
-| 1b — the corpus we already own | **in progress** | 8 stale recipes migrated and loading; first regeneration running |
+| 1 — freeze the recording, seal the test | **done (7 of 7)** | the ceiling, the tracker floor, the resolution ladder, the frozen+sealed split, `PREMISES.md` (2 of 8 fail, recorded not waived) |
+| 1b — the corpus we already own | **done** | 8 recipes migrated; **the operator merge is NOT behaviour-preserving** |
 | 2 — certify the ruler, find the floor | not started | **STOP point** |
 | 3 — certify the gradient | not started | the language-vs-switches decision |
 | 4 — what a fit may claim, build the gate | not started | **STOP point** |
@@ -80,7 +80,10 @@ Every number below was measured in this folder, not inherited.
 | **`--substeps` is not a numerics knob** | it multiplies `dt_sub` to give the frame duration; varying it alone moves enclosed area **2.2×**. The inherited `10` is a claim about the tissue's timescale |
 | **spatial discretisation** | **NOT converged.** Enclosure follows particles-per-cell monotonically over **1.56×** across two independent knobs, no plateau. Direction and orientation are untouched |
 | **premises** | 6 of 8 hold. **Four operators in the spec never run** (`activation_pulse`, `aggregate`, `apply_material_map`, `pacemaker`). **The model is quiescent 8% of the beat where the tissue is 77%** |
-| the split | frozen: fit beat [152,204], 3 held-out beats, 17,499 scored nodes, mask frozen from the recording alone; diseased sheet sealed by content across all 3 files, seal watched refusing |
+| the split | frozen: fit beat [152,204], 3 held-out beats, 17,499 scored nodes, mask frozen from the recording alone; diseased sheet sealed by content across all 3 files |
+| **the seal** | attacked 3 times before it held. Now refuses the sealed specimen in 4 unit conventions, cropped, and subsampled. Same specimen r=0.991–1.000, different specimen r=0.151–0.224, threshold 0.90 in the gap |
+| **the operator merge** | **NOT behaviour-preserving.** Two runs of the migrated recipe are BIT-IDENTICAL (0.0); the archive differs by 1.5e-4 after 3 frames, growing monotonically from frame 1. So the archive is evidence about a model we can no longer run |
+| generate-path cost | 137 s start-up + **24 s per frame** → the 250-frame recipes are ~2 h each. The fitting path is ~5.5 h per fit |
 
 ---
 
@@ -129,38 +132,30 @@ Recorded because they are the argument for the apparatus.
 
 ---
 
-## 6. To resume — the five things that close Phase 1
+## 6. To resume — Phase 2, and it is a STOP point
 
-In this order. The first two are cheap and pure measurement; the third can redirect the programme;
-the last is irreversible and goes last.
+Phase 1 is closed. Everything below is Phase 2: **certify the ruler and find the floor.** Its gates
+are already written in the note; the work is:
 
-1. ~~**The beat inventory.**~~ **DONE.** Onsets `[2, 51, 101, 152, 204]`, gaps `49/50/51/52`, four
-   complete beats, and a truncated tail that is not a beat. The reported "period" of 50 is what
-   rounding 50.5 gives, not the mean.
-2. ~~**The self-agreement ceiling.**~~ **DONE** (`data_report.py`). LoopScore beat-vs-beat median
-   **0.705**. No model may score above it. And even two real beats agree on circulation direction
-   only 93.9% of the time — the previous campaign read 0.85 as a deficit against an implicit 1.0.
-3. ~~**The tracker-reproducibility number.**~~ **DONE, and it settles the question.** Time course
-   0.996; per-node spatial maps 0.27–0.29 / −0.06 at every beat peak; as a model of each other,
-   circulation right 50% of the time and LoopScore −0.53. **Learned spatial maps across the sheet
-   are not a product of this project.** Aim the loop at whole-sheet mechanisms.
-4. ~~**The resolution check.**~~ **DONE** (`resolution.py`). Time converged; space not. And
-   `--substeps` turned out to be a physics knob, not a numerics one.
-5. ~~**Freeze the split, seal the diseased sheet.**~~ **DONE** (`split.py --freeze`, `--check`
-   passes 7/7, seal watched refusing).
-6. **The premises** (`PREMISES.md` + `premises.py`) — **in flight, 6 of 8 hold.** The two failures
-   are real and neither is waived. Remaining: wire the premise gate into the loop's step 2, and add
-   the per-run rail check (no fitted value on its bound) once there are fits to check.
+1. **Where is zero.** Score the trivial models — no motion, mean motion, **copy the previous beat**,
+   interpolate from the pinned edge, muscle off, fields present but untrained. Everything afterwards
+   is reported as a *difference from that floor*, never as a bare number.
+2. **How big is nothing.** Same config, several seeds, at the depth the loop will use. That spread
+   becomes the unit of the campaign. Note both floors are needed: across-seed *and* same-seed
+   (the GPU path is not bit-deterministic; the generate path is).
+3. **Teach the ruler to see coordination.** It currently scores a timing-scrambled tissue at exactly
+   1.0000. Until a certified measure can tell coordination from incoherence, no claim about timing,
+   waves or rotation is scoreable — and the model-rests-8%-vs-77% failure is invisible to it.
+4. **Is the model in the right regime.** Set the mass to zero and see whether the loop survives.
+5. **The anchoring ladder**, scored on the one frozen mask.
+6. **Build the error decomposition** so step 3 of the loop returns *where* the model is wrong.
 
-Plus **Phase 1b green**: the eight migrated recipes regenerate and match their archives.
+**THE STOP:** at the end, we know whether the active model beats the best trivial baseline by more
+than the noise. On the evidence already on disk — copying the previous beat outscores every fit the
+previous campaign produced — this is a live outcome, not a formality.
 
-**In flight right now:** `reproduce.py --run material_active_phase_radial` (started 09:31, ~12 s per
-frame on `cuda:0`, 250 frames). When it lands:
-`python reproduce.py --compare material_active_phase_radial` — a match restores the corpus *and*
-validates the operator merge; a mismatch is a silent change in the forward model, which matters
-more.
-
----
+**Two carried-over defects go to the Proposer as the first things the loop must explain:** four
+operators in the recipe never run, and the model rests 8% of the beat where the tissue rests 77%.
 
 ## 7. Two decisions waiting on Cedric
 

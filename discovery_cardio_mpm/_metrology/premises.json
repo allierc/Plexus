@@ -30,32 +30,18 @@
    "detail": "0.48 Hz, quiescent 52% of the record, gaps [49, 50, 51, 52] (mean 50.5)"
   },
   {
-   "premise": "1. a resting sheet rests (amplitude 0)",
+   "premise": "canary: rail check refuses a fit pinned to its upper bound",
    "grade": "certain",
    "pass": true,
    "skipped": false,
-   "detail": "interior max |disp| = 0.000e+00, centroid drift 0.000e+00"
+   "detail": "RAILS: raw_g=2.5 at 100.0% of [0.1,2.5]"
   },
   {
-   "premise": "7. finite, and nothing leaves the dish",
+   "premise": "canary: rail check refuses a fit in the middle of its range",
    "grade": "certain",
    "pass": true,
    "skipped": false,
-   "detail": "finite=True, all particles inside [0,1]^2=True"
-  },
-  {
-   "premise": "4. inside the MPM stability envelope",
-   "grade": "certain",
-   "pass": true,
-   "skipped": false,
-   "detail": "max 0.0136 grid cells per substep (bound 0.4, from mpm_gather's own vmax)"
-  },
-  {
-   "premise": "8b. the model rests as much as the tissue does",
-   "grade": "usual",
-   "pass": false,
-   "skipped": false,
-   "detail": "simulated quiescent 8% vs recorded 77% of the SAME window -- the recording rests, the model barely does"
+   "detail": "none on a bound"
   }
  ]
 }

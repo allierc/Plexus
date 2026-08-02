@@ -1,0 +1,22 @@
+[reproduce] /workspace/.conda_envs/neural-graph-linux/bin/python /workspace/Plexus/Plexus_Main.py -o generate /workspace/Plexus/discovery_cardio_mpm/_repro/config/material/material_active_phase_radial.yaml --force --output_root /workspace/Plexus/discovery_cardio_mpm/_repro --device cuda:0 --no-describe
+Traceback (most recent call last):
+  File "/workspace/Plexus/discovery_cardio_mpm/reproduce.py", line 275, in <module>
+    sys.exit(main())
+             ^^^^^^
+  File "/workspace/Plexus/discovery_cardio_mpm/reproduce.py", line 263, in main
+    rc = run(a.run, a.device)
+         ^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/Plexus/discovery_cardio_mpm/reproduce.py", line 210, in run
+    r = subprocess.run(cmd, cwd=REPO, env=env, capture_output=True, text=True, timeout=timeout)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/.conda_envs/neural-graph-linux/lib/python3.12/subprocess.py", line 550, in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/.conda_envs/neural-graph-linux/lib/python3.12/subprocess.py", line 1209, in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/.conda_envs/neural-graph-linux/lib/python3.12/subprocess.py", line 2116, in _communicate
+    self._check_timeout(endtime, orig_timeout, stdout, stderr)
+  File "/workspace/.conda_envs/neural-graph-linux/lib/python3.12/subprocess.py", line 1253, in _check_timeout
+    raise TimeoutExpired(
+subprocess.TimeoutExpired: Command '['/workspace/.conda_envs/neural-graph-linux/bin/python', '/workspace/Plexus/Plexus_Main.py', '-o', 'generate', '/workspace/Plexus/discovery_cardio_mpm/_repro/config/material/material_active_phase_radial.yaml', '--force', '--output_root', '/workspace/Plexus/discovery_cardio_mpm/_repro', '--device', 'cuda:0', '--no-describe']' timed out after 7200 seconds

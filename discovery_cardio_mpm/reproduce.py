@@ -90,6 +90,19 @@ PRIORITY = [
 ]
 
 
+def _shorten(yml, n_frames):
+    """Cut the run to `n_frames`. The merge question does not need 250 of them: if the two operator
+    sets behave identically, frame five already agrees; if they do not, the trajectories separate
+    immediately. A short run is the RIGHT experiment here, not a compromise -- and the full run
+    costs over two hours per recipe, which would put the answer out of reach entirely."""
+    with open(yml) as f:
+        spec = yaml.safe_load(f)
+    spec.setdefault("general", {})["n_frames"] = int(n_frames)
+    with open(yml, "w") as f:
+        yaml.safe_dump(spec, f, sort_keys=False)
+    return yml
+
+
 def load_spec_raw(name):
     p = os.path.join(DATA, name, "spec.yaml")
     if not os.path.exists(p):
@@ -186,7 +199,7 @@ def check(names=None, verbose=True):
     return rows
 
 
-def run(name, device="cuda:0", timeout=7200):
+def run(name, device="cuda:0", timeout=7200, frames=None):
     """Regenerate ONE run into the scratch root. The archive is not written to."""
     os.makedirs(REPRO, exist_ok=True)
     # The recipes read their field maps (fibre directions, delay maps, stiffness) as .tif files
@@ -204,6 +217,8 @@ def run(name, device="cuda:0", timeout=7200):
     spec_yaml = os.path.join(REPRO, "config", "material", f"{name}.yaml")
     if not os.path.exists(spec_yaml):
         raise FileNotFoundError(f"migrated spec not written yet: {spec_yaml} (run --check first)")
+    if frames:
+        _shorten(spec_yaml, frames)
     cmd = [PY, os.path.join(REPO, "Plexus_Main.py"), "-o", "generate", spec_yaml,
            "--force", "--output_root", REPRO, "--device", device, "--no-describe"]
     print(f"[reproduce] {' '.join(cmd)}")
@@ -224,7 +239,7 @@ def compare(name):
     with np.load(a) as za, np.load(b) as zb:
         pa = za["mpm_particle__pos"].astype(np.float64)
         pb = zb["mpm_particle__pos"].astype(np.float64)
-    n = min(pa.shape[0], pb.shape[0])
+    n = min(pa.shape[0], pb.shape[0])           # a shortened rerun compares over its own length
     if pa.shape[1:] != pb.shape[1:]:
         print(f"[reproduce] SHAPE CHANGED  archived {pa.shape}  regenerated {pb.shape}")
         return 1
@@ -253,6 +268,9 @@ def main(argv=None):
     ap.add_argument("--compare", metavar="NAME", default=None)
     ap.add_argument("--all", action="store_true", help="run every priority spec, in order")
     ap.add_argument("--device", default="cuda:0")
+    ap.add_argument("--frames", type=int, default=None,
+                    help="cut the rerun to N frames. The merge question is answered in the first "
+                         "few: identical operators agree at frame 5, different ones separate at once")
     a = ap.parse_args(argv)
     os.makedirs(os.path.join(HERE, "_metrology"), exist_ok=True)
 
@@ -260,12 +278,12 @@ def main(argv=None):
         return compare(a.compare)
     if a.run:
         check([a.run], verbose=False)
-        rc = run(a.run, a.device)
+        rc = run(a.run, a.device, frames=a.frames)
         return compare(a.run) if rc == 0 else rc
     if a.all:
         check(verbose=True)
         for n in PRIORITY:
-            if run(n, a.device) == 0:
+            if run(n, a.device, frames=a.frames) == 0:
                 compare(n)
         return 0
     return 0 if all(r.get("status") == "LOADS" for r in check()) else 1
