@@ -1282,12 +1282,15 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         # observation, not a verdict.
         if wa.get("watcher_headline"):
             print(T_.say(f"eye-check {nm[-12:]}", wa["watcher_headline"], sentences=1))
-    if an.get("analyst_consensus"):
-        print(T_.say(f"reader {nm[-12:]}",
-                     f"Phenotype {an['analyst_consensus']}"
-                     + (f", {an.get('forced_or_grown')}" if an.get("forced_or_grown") else "")
-                     + (f". {an.get('concern')}" if an.get("concern") else "."), sentences=2))
-        print(T_.say("", wa.get("watcher_describe") or wa.get("watcher_why"), sentences=4))
+        if an.get("analyst_consensus"):
+            print(T_.say(f"reader {nm[-12:]}",
+                         f"Phenotype {an['analyst_consensus']}"
+                         + (f", {an.get('forced_or_grown')}" if an.get("forced_or_grown") else "")
+                         + (f". {an.get('concern')}" if an.get("concern") else "."), sentences=2))
+            print(T_.say("", wa.get("watcher_describe") or wa.get("watcher_why"), sentences=4))
+        # THE RECORD DOES NOT DEPEND ON THE READER HAVING SPOKEN. Everything below
+        # scores, resolves and RECORDS the run; it sat inside the `if` above, so a run
+        # whose reader returned no label was dropped without a word.
         sc = score_run(summ, cfg)
         if wa.get("watcher_blocks"):
             print(T_.warn(f"[eye] {nm} DISAGREES with the numbers -- recorded, not vetoed: "
@@ -1311,7 +1314,8 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
             sup.reg.resolve(h.hid, summ, outcome, run_ids=[nm], note=why)
             resolved.add(h.hid)
         if g is not None:
-            lm.add(comp_hash(g), g, an["analyst_consensus"], sc if np.isfinite(sc) else -1.0,
+            lm.add(comp_hash(g), g, an.get("analyst_consensus") or "unlabelled",
+                   sc if np.isfinite(sc) else -1.0,
                    summ, nm)
         rows.append((nm, g, summ, sc, outcome, h))
 
