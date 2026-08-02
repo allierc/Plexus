@@ -178,6 +178,16 @@ anatomy, not in a lookup table inside a simulator.
 %======================================================================
 \section{Two modelling decisions that are not obvious}
 
+\textbf{The globe stays the size it started.} Local deformation is the point of using MPM here;
+changing size or going out of round is not, and the difference is now measured rather than
+eyeballed. Each shell point's radius is tracked as a ratio to its own rest radius (shape-agnostic,
+since the globe is an ovoid): the mean says whether the eye is being squeezed or inflated, the
+spread whether it is still a smooth body of revolution. Over the full 1830-frame \code{atlas}
+run the mean moves by $-0.04\%$, the worst excursion is $0.22\%$ and the spread stays under
+$0.86\%$ --- while the strain at the tendon insertions reaches $0.11$. The eye deforms locally
+and holds its shape globally. Those terms are in \code{run\_eye.objective}, so a configuration
+cannot buy tracking accuracy by crushing the globe and have it read as an improvement.
+
 \textbf{The globe is an ovoid; the cup is a sphere.} Teleost eyes are flattened along the optic
 axis. The \code{mpm\_particle} entity can only seed a uniform ball, so the rest configuration is
 that ball affinely squashed, $z\to kz$ with $k=0.82$. An affine image of a uniform ball is a
@@ -281,7 +291,7 @@ t18 q\_b       & 120 & 190 & 3.0 & \multicolumn{1}{l}{globe came apart} & 54.6 &
 t22 r\_sleeve95 &  95 & 250 & --  & \multicolumn{1}{l}{buckled, NaN} & 73.6 & NaN & 1/4 \\
 t24 r\_sleeve80 &  80 & 250 & --  & \multicolumn{1}{l}{buckled, NaN} & 63.2 & NaN & 2/4 \\
 \midrule
-\textbf{t23 atlas} & \textbf{70} & \textbf{250} & -- & \textbf{33.5 / 18.3 / \ 7.5} & \textbf{30.9} & \textbf{0.112} & \textbf{14/26} \\
+\textbf{t23/t25 atlas} & \textbf{70} & \textbf{250} & -- & \textbf{33.5 / 18.3 / \ 7.5} & \textbf{30.9} & \textbf{0.112} & \textbf{14/26} \\
 \bottomrule
 \end{tabular}
 \end{center}
