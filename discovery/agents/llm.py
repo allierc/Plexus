@@ -398,6 +398,11 @@ def run_agent(agent, prompt, ledger=None, **over):
         if ledger is not None:
             ledger.record(agent, (time.time() - t0) / 60.0, ok=ok,
                           usage=last_usage())
+        # ONE LINE PER CALL, not one per tool use. What is worth knowing is that the Proposer
+        # reached for Bash eight times -- a fact about how it works -- not eight identical lines.
+        tools = tool_summary()
+        if tools and not quiet:
+            print(f"  [{agent}] {(time.time() - t0) / 60.0:.1f} min, tools: {tools}", flush=True)
     return ok, out
 
 
@@ -475,9 +480,28 @@ def _absorb_event(line, quiet):
         for blk in (ev.get("message", {}) or {}).get("content", []) or []:
             if blk.get("type") == "text" and blk.get("text", "").strip():
                 print(blk["text"][:400], flush=True)
+            # A BARE TOOL NAME IS NOISE. `[tool] Bash` eight times running says only that the
+            # agent used a tool, which is not information -- it does not say which file, which
+            # command, or why, and it buries the agent's actual reasoning in a column of
+            # identical lines. Tools are counted for the ledger and the count is reported once
+            # per call; the individual uses are not narrated.
             elif blk.get("type") == "tool_use":
-                print(f"  [tool] {blk.get('name')}", flush=True)
+                _TOOL_COUNT[blk.get("name", "?")] = _TOOL_COUNT.get(blk.get("name", "?"), 0) + 1
     return ""
+
+
+_TOOL_COUNT = {}
+
+
+def tool_summary(reset=True):
+    """What the last call actually reached for, as one line instead of a column."""
+    global _TOOL_COUNT
+    if not _TOOL_COUNT:
+        return ""
+    out = ", ".join(f"{k}x{v}" for k, v in sorted(_TOOL_COUNT.items(), key=lambda kv: -kv[1]))
+    if reset:
+        _TOOL_COUNT = {}
+    return out
 
 
 def last_usage():
