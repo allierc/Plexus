@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  2 AUG 2026 08:29
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  2 AUG 2026 09:31
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -1001,15 +1001,15 @@ Package pdftex.def Info: _state/phase5_forward.png  used on input line 818.
 (pdftex.def)             Requested size: 460.935pt x 294.20927pt.
 
 
-[17 <./_state/phase5_forward.png>]
+[17]
+
+[18 <./_state/phase5_forward.png>]
 Overfull \hbox (2.81102pt too wide) in paragraph at lines 866--874
 \T1/cmr/m/n/10.95 with a big-ger bud-get rather than qui-etly dropped, and both
  landed: \T1/cmtt/m/n/10.95 gene_network_connectionist
  []
 
 
-
-[18]
 
 [19]
 LaTeX Font Info:    Font shape `T1/cmtt/bx/n' in size <10> not available
@@ -1089,6 +1089,8 @@ Underfull \hbox (badness 10000) in paragraph at lines 997--998
  []
 
 
+
+[20]
 Overfull \hbox (25.6849pt too wide) in paragraph at lines 1002--1008
 []\T1/cmtt/m/n/10.95 The two-instrument design earned itself. The synthetic har
 ness invented three defects
@@ -1176,8 +1178,6 @@ th runs detached, and the
  []
 
 
-
-[20]
 Overfull \hbox (3.05142pt too wide) in paragraph at lines 1022--1025
 []\T1/cmtt/m/n/10.95 So the single highest-value next step is now scoped by two
  instruments rather than
@@ -1258,6 +1258,8 @@ bases, and look at the
  []
 
 
+
+[21]
 Underfull \hbox (badness 10000) in paragraph at lines 1049--1051
 []|\T1/cmtt/m/n/10 the estimator is noisy but consistent; the fix is simply mor
 e
@@ -1320,14 +1322,12 @@ S/cmsy/m/n/10.95 g$ $^^B$ \T1/cmtt/m/n/10.95 8 replicates, 24 frames, 20 Adam s
 teps, fitting
  []
 
-<_state/phase6_variance.png, id=307, 896.148pt x 353.85533pt>
+<_state/phase6_variance.png, id=311, 896.148pt x 353.85533pt>
 File: _state/phase6_variance.png Graphic file (type png)
 <use _state/phase6_variance.png>
 Package pdftex.def Info: _state/phase6_variance.png  used on input line 1070.
 (pdftex.def)             Requested size: 460.935pt x 182.00806pt.
 
-
-[21]
 Overfull \hbox (39.39545pt too wide) in paragraph at lines 1087--1093
 []\T1/cmtt/m/n/10.95 Precision: fixable, exactly as hoped. $\OML/cmm/m/it/10.95
  ^^[ \OMS/cmsy/m/n/10.95 / \OML/cmm/m/it/10.95 K[]$\T1/cmtt/m/n/10.95 , against
@@ -1399,6 +1399,8 @@ Overfull \hbox (6.78378pt too wide) in paragraph at lines 1094--1099
  []
 
 
+
+[22 <./_state/phase6_variance.png>]
 Overfull \hbox (25.6849pt too wide) in paragraph at lines 1100--1106
 []\T1/cmtt/m/n/10.95 That is precisely the failure this note predicted --- ``op
 timising against that sample's
@@ -1458,9 +1460,6 @@ Overfull \hbox (3.05142pt too wide) in paragraph at lines 1114--1116
 r and Polyak-average the
  []
 
-
-
-[22 <./_state/phase6_variance.png>]
 <_state/phase6_verdict.png, id=319, 549.252pt x 361.35pt>
 File: _state/phase6_verdict.png Graphic file (type png)
 <use _state/phase6_verdict.png>
@@ -1499,6 +1498,8 @@ $ \T1/cmtt/m/n/10.95 reads
  []
 
 
+
+[23 <./_state/phase6_verdict.png>]
 Overfull \hbox (20.02654pt too wide) in paragraph at lines 1151--1156
 []\T1/cmtt/m/n/10.95 So: truncation, not bias. The straight-through gradient th
 rough a discrete division
@@ -1589,8 +1590,6 @@ owth, adhesion and division
  []
 
 
-
-[23 <./_state/phase6_verdict.png>]
 Overfull \hbox (42.66002pt too wide) in paragraph at lines 1187--1189
 []\T1/cmtt/m/n/10.95 Three orders of magnitude, and the overshoot-and-return in
  the middle is Adam's momentum,
@@ -1675,6 +1674,8 @@ through a discrete division
  []
 
 
+
+[24]
 Overfull \hbox (14.36816pt too wide) in paragraph at lines 1205--1207
 []\T1/cmtt/m/n/10.95 So the atlas's first repository has produced, unprompted, 
 a shortlist of what to add
@@ -1763,9 +1764,6 @@ $\OMS/cmsy/m/n/10.95 !$ \T1/cmtt/m/n/10.95 division_rate $\OMS/cmsy/m/n/10.95 !
 $ \T1/cmtt/m/n/10.95 gene $\OMS/cmsy/m/n/10.95 !$
  []
 
-
-
-[24]
 ! Missing $ inserted.
 <inserted text> 
                 $
@@ -1801,7 +1799,7 @@ it/10.95 ; sixoperators; allpreviouslyvalidatedagainsttheauthors[]code; nonenew
 :\OT1/cmr/m/n/10.95 40\OML/cmm/m/it/10.95 macro \OMS/cmsy/m/n/10.95 ^^@
  []
 
-<_state/regulated_growth.png, id=335, 982.872pt x 592.614pt>
+<_state/regulated_growth.png, id=334, 982.872pt x 592.614pt>
 File: _state/regulated_growth.png Graphic file (type png)
 <use _state/regulated_growth.png>
 Package pdftex.def Info: _state/regulated_growth.png  used on input line 1240.
@@ -1840,6 +1838,8 @@ mr/m/n/10.95 995$\T1/cmtt/m/n/10.95 . No operator
  []
 
 
+
+[25 <./_state/regulated_growth.png>]
 Overfull \hbox (14.36816pt too wide) in paragraph at lines 1250--1257
 []\T1/cmtt/m/n/10.95 And the control is what makes that a claim rather than a p
 icture. Ablate one number
@@ -1898,8 +1898,6 @@ int. \T1/cmtt/m/it/10.95 Acted is not coupled.
  []
 
 
-
-[25 <./_state/regulated_growth.png>]
 Overfull \hbox (25.6849pt too wide) in paragraph at lines 1276--1281
 []\T1/cmtt/m/n/10.95 One thing had to be tuned, and it is worth recording as a 
 modelling lesson rather than
@@ -2008,19 +2006,19 @@ it/10.95 W[] < \OT1/cmr/m/n/10.95 0$\T1/cmtt/m/n/10.95 . The fit starts from th
 e
  []
 
-<_state/phase6_invert.png, id=346, 1026.234pt x 607.068pt>
+<_state/phase6_invert.png, id=345, 1026.234pt x 607.068pt>
 File: _state/phase6_invert.png Graphic file (type png)
 <use _state/phase6_invert.png>
 Package pdftex.def Info: _state/phase6_invert.png  used on input line 1303.
 (pdftex.def)             Requested size: 460.935pt x 272.6686pt.
 
+
+[26]
 Overfull \hbox (56.87973pt too wide) in paragraph at lines 1308--1318
  [] 
  []
 
 
-
-[26 <./_state/phase6_invert.png>]
 Overfull \hbox (3.05142pt too wide) in paragraph at lines 1320--1326
 []\T1/cmtt/m/n/10.95 It crossed zero on its own. 50 Adam steps, two seeds avera
 ged per step, each step
@@ -2171,6 +2169,8 @@ ted operators with an ablation
  []
 
 
+
+[27 <./_state/phase6_invert.png>]
 Overfull \hbox (31.34328pt too wide) in paragraph at lines 1355--1360
 \T1/cmtt/m/n/10.95 Decided (31 July). Run Phases 1--3 straight through, and sto
 p for a joint review before
@@ -2231,8 +2231,6 @@ Overfull \hbox (35.8699pt too wide) in paragraph at lines 1368--1372
  []
 
 
-
-[27]
 Overfull \hbox (6.20093pt too wide) in paragraph at lines 1378--1382
 []\T1/cmtt/m/n/10 Where things are. atlas_record.yaml --- the record, the produ
 ct. campaign/analysis.md ---
@@ -2272,7 +2270,7 @@ Here is how much of TeX's memory you used:
  46555 multiletter control sequences out of 15000+600000
  586434 words of font info for 107 fonts, out of 8000000 for 9000
  59 hyphenation exceptions out of 8191
- 116i,11n,121p,650b,866s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 116i,11n,121p,650b,791s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/c
 mbx10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx7.p
 fb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cmextra/cmex9.pfb
@@ -2309,7 +2307,7 @@ ftt0800.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt0900.pfb></usr/sh
 are/texmf/fonts/type1/public/cm-super/sftt1000.pfb></usr/share/texmf/fonts/type
 1/public/cm-super/sftt1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sf
 tt1200.pfb>
-Output written on atlas_note.pdf (28 pages, 1659153 bytes).
+Output written on atlas_note.pdf (28 pages, 1659297 bytes).
 PDF statistics:
  565 PDF objects out of 1000 (max. 8388607)
  431 compressed objects within 5 object streams

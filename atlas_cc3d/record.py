@@ -1,6 +1,6 @@
 """record -- the atlas record, and the twelve rules that decide whether it may be believed.
 
-`plexus2.tex` Lst. E.1 specifies one record per repository: raw mechanisms as the project names
+`plexus2.tex` App. "Building the Plexus operator atlas" ("Building the Plexus operator atlas") calls for one atlas entry per mechanism: raw mechanisms as the project names
 them, separated from their normalized Plexus contracts, with evidence and a status. This module
 is that record made executable -- a schema, a status ladder, and a validator.
 

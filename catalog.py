@@ -1,7 +1,7 @@
 """catalog -- the cross-repository measurement, which is the only place the claim can be tested.
 
 One atlas answers "can Plexus say what THIS framework says". That is a shape, not an argument. The
-claim `plexus2.tex` App. E.1 actually makes is about what happens ACROSS frameworks:
+claim `plexus2.tex` App. "Building the Plexus operator atlas" actually makes is about what happens ACROSS frameworks:
 
     if decomposing a sufficiently broad collection of biological simulation frameworks converges
     toward a compact and reusable operator vocabulary, the algebra is a meaningful intermediate

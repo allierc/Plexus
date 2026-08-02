@@ -1,6 +1,6 @@
 """registry_view -- what Plexus can already say, written down before we read the paper.
 
-Saturation is the atlas's actual claim (plexus2.tex, App. E.1 "Validation of the operator
+Saturation is the atlas's actual claim (plexus2.tex, App. "Building the Plexus operator atlas" "Validation of the operator
 algebra"): if decomposing framework after framework yields mostly *implementations of contracts
 we already have*, the operator algebra is a real intermediate representation; if it keeps
 yielding new contracts, the language is incomplete. That claim is only measurable against a
@@ -38,7 +38,7 @@ sys.path.insert(0, SRC)
 
 def registered() -> dict:
     """Every registered operator contract, with the full typed signature and metadata the
-    atlas record needs (App. E.1 "Operator metadata")."""
+    atlas record needs (App. "Building the Plexus operator atlas", "Operator metadata")."""
     import plexus.operators  # noqa: F401  -- self-registration
     from plexus.models import registry as R
 

@@ -8,7 +8,7 @@ clusters with differentiable programming*, Nat Comput Sci 2025. Apache-2.0, Pyth
 1. **The figure.** One headline result of the paper reproduced inside Plexus, from operators that
    were normalized from the reference rather than fitted to its output.
 2. **The saturation ledger.** For every mechanism in the repository: alias, refinement, genuinely
-   new, or our own unpromoted backlog. This is the measurement `plexus2.tex` App. E.1 says the
+   new, or our own unpromoted backlog. This is the measurement `plexus2.tex` App. "Building the Plexus operator atlas" says the
    atlas exists to make, and it is destroyed by an inflated count of "new".
 
 **Why this target and not another.** The Okuda track reproduces a paper with *no code*. Every

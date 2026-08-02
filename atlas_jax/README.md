@@ -25,7 +25,7 @@ $PY atlas.py status                # the record, rung by rung
 
 | file | what it is |
 |---|---|
-| `atlas_record.yaml` | **the product.** One record per repository, one entry per mechanism (Lst. E.1 of `paper/plexus2.tex`). |
+| `atlas_record.yaml` | **the product.** One record per repository, one entry per mechanism (App. "Building the Plexus operator atlas" of `paper/plexus2.tex`). |
 | `record.py` | the schema, the status ladder, and the twelve rules that decide whether the record may be believed. |
 | `registry_view.py` | the frozen baseline: what the **promoted** language can already say. Nothing in `prototype/` or `candidates/` counts. |
 | `saturation.py` | the measurement — alias / refinement / new, and the cumulative-new curve. |

@@ -70,7 +70,7 @@ one framework says. This one asks whether the \emph{procedure} is a procedure.
 %======================================================================
 \section{Why a second repository, and why this one}
 
-One repository cannot show saturation. The measurement \texttt{plexus2.tex} App.~E.1 asks for ---
+One repository cannot show saturation. The measurement \texttt{plexus2.tex} App.~"Building the Plexus operator atlas" asks for ---
 \emph{does decomposing a broad collection of frameworks converge on a compact reusable
 vocabulary?} --- is a claim about what happens \emph{across} frameworks. With $n=1$ the curve is a
 shape, not an argument.
@@ -402,7 +402,7 @@ that tells us that.
 \item \textbf{Extract} (Phases 0--2) across many repositories. Each yields a record and a
 contribution to the ledger. Cheap, parallel, and nothing is committed.
 \item \textbf{Catalog} (\code{catalog.py}) --- merge every record, count each contract ONCE across
-repositories, and read the cumulative-new curve. This is the only place the App.~E.1 claim can
+repositories, and read the cumulative-new curve. This is the only place the App.~"Building the Plexus operator atlas" claim can
 actually be tested.
 \item \textbf{Then} implement, validate and promote --- on the contracts the catalog says survive
 contact with more than one framework.
@@ -514,6 +514,24 @@ that repository. One that reappears independently is evidence the vocabulary is 
 \code{morphogen} case is the sharpest: two unrelated codebases, one written in JAX around point
 particles and one a C++ lattice framework, solving the same equation
 $D\nabla^2 c - kc + S = 0$ --- and the normalizer identified the match itself.
+
+\textbf{And the paper already specifies this as the promotion gate}, which we found only after
+reading it. \code{plexus2.tex}, ``Implementing new operators / Promotion'':
+
+\begin{quote}\small
+Prototype implementations should not enter the core registry directly. Promotion requires a
+stable operator contract, at least one validated implementation, clear scientific provenance, and
+\textbf{evidence that the mechanism is reusable beyond its originating prototype}. \\[3pt]
+\emph{Prototype freely; promote biological mechanisms conservatively.}
+\end{quote}
+
+That last criterion is precisely what the ``sighted in more than one repository'' column measures.
+\textbf{The catalog is not merely a progress report; it is the instrument the promotion rule
+requires.} Of the 16 contracts, only \code{adhere} and \code{morphogen} currently satisfy it ---
+which is a much sharper statement of where the programme stands than ``16 new contracts''.
+
+It also means the deferral of Phases 3--7 was not merely prudent, it was the paper's stated
+policy. Extraction is the prototype; the catalog is the evidence of reuse; promotion comes last.
 
 \textbf{What would refute the programme} is the curve failing to flatten as repositories are
 added: if each new framework keeps contributing 8 contracts nobody else needs, the algebra is

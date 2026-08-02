@@ -25,7 +25,7 @@ questions:
    per-cell equation to compare. If the procedure is really general, it survives that. If it is
    secretly a particle-framework procedure, this is where it breaks.
 
-2. **Is the operator algebra converging?** That is the whole point (plexus2.tex App. E.1), and it
+2. **Is the operator algebra converging?** That is the whole point (plexus2.tex App. "Building the Plexus operator atlas"), and it
    is unanswerable with one repository.
 
 ---
