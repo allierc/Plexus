@@ -28,11 +28,12 @@ Also available and NOT part of scoring, but informative: mech_p_ratio (tube/body
 ~3 = a FORCED protrusion, ~1 = a growth-driven equilibrium).
 
 <!-- LEARNED PATTERNS -->
-## Learned patterns (updated round 1, fresh start)
+## Learned patterns (updated round 1)
 
-**Round 1 (post-reset) reproduced the pre-reset failure verbatim: 6/6 slots were controls, 0 carried a
-checkable prediction, all 4 wk_ slots saturated.** No valid non-control morphogenesis evidence exists
-yet; 0 of 4 Okuda morphologies attempted. The two failure modes below are the whole story so far.
+**The SAME null round has now recurred: every slot a control, 0 checkable predictions, every wk_ slot
+saturated. No valid non-control morphogenesis evidence exists yet; 0 of 4 Okuda morphologies attempted.**
+The loop is spending rounds re-learning nothing. The two failure modes below are the whole story so far,
+and BOTH are proposer defects, not biology — the biologist reports all premises held every run.
 
 **FAILURE 1 — controls carry zero info; never propose one.** A `replay` / `re-measure` / "fresh" CFL
 (c,d) point / naming a characterised RECON_ node as object-of-study returns bit-identical null numbers

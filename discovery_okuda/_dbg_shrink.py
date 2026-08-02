@@ -1,6 +1,6 @@
 """bisect the shrink: strip the op list down and watch the radius."""
 import sys, copy, numpy as np
-sys.path.insert(0,'/workspace/Plexus/discovery'); sys.path.insert(0,'/workspace/Plexus/prototype/Tyssue')
+sys.path.insert(0,'/workspace/Plexus/discovery_okuda'); sys.path.insert(0,'/workspace/Plexus/prototype/Tyssue')
 sys.path.insert(0,'/workspace/Plexus/src')
 import plexus.operators, tyssue_ops3d, tyssue_rd_ops, tyssue_t1_ops3d, tyssue_monolayer, ckpt  # noqa
 import plexus.schema as S

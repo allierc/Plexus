@@ -1,0 +1,29 @@
+{
+ "ops": [
+  {
+   "id": "seed_mesh_3d0",
+   "op": "seed_mesh_3d",
+   "impl": "fibonacci_sphere"
+  },
+  {
+   "id": "shape_energy_3d0",
+   "op": "shape_energy_3d",
+   "impl": "default"
+  },
+  {
+   "id": "reconnect_t1_3d0",
+   "op": "reconnect_t1_3d",
+   "impl": "length_threshold"
+  },
+  {
+   "id": "vesicle_growth0",
+   "op": "vesicle_growth",
+   "impl": "uniform_ramp"
+  }
+ ],
+ "conns": [],
+ "params": {
+  "vesicle_growth0.rate": 0.006,
+  "seed_mesh_3d0.n_cells": 2000
+ }
+}

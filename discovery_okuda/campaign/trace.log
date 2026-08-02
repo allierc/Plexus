@@ -1,0 +1,17 @@
+07:05:32  about to import caption_wave
+07:05:32  caption_wave imported; calling it
+07:09:05  caption_wave RETURNED
+07:09:05  past captioning; entering the reading loop
+07:09:05  reading r001n_00_cfl_c001p300_d
+07:09:35  read r001n_00_cfl_c001p300_d OK
+07:09:35  reading r001n_01_cfl_c001p300_d
+07:10:15  read r001n_01_cfl_c001p300_d OK
+07:10:15  reading r001n_02_cfl_c000p080_d
+07:10:45  read r001n_02_cfl_c000p080_d OK
+07:10:45  reading r001n_03_cfl_c000p010_d
+07:11:20  read r001n_03_cfl_c000p010_d OK
+07:11:20  reading r001n_04_cfl_c000p020_d
+07:11:58  read r001n_04_cfl_c000p020_d OK
+07:11:58  reading loop done; entering Act 3
+07:11:58  Collector: building the record
+07:11:58  Collector done

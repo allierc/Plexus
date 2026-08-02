@@ -1,9 +1,9 @@
 general:
-  name: wk_tension_pos_s1
-  seed: 1
-  n_frames: 400
+  name: cfl_c0p02_d5
+  seed: 0
+  n_frames: 300
   dt: 1.0
-  record_cap: 402
+  record_cap: 302
   boundary: free
   dim: 3
   world:
@@ -12,9 +12,9 @@ general:
   - 50.0
 sets:
   vertex:
-    n: 3552
+    n: 30000
   cell:
-    n: 1800
+    n: 16000
     state:
       chem:
         width: 2
@@ -28,11 +28,11 @@ operators:
 - op: seed_mesh_3d
   at: vertex
   cell_set: cell
-  n_cells: 150
+  n_cells: 2000
   radius: 5.0
   jitter: 0.18
   p0: 3.5
-  seed: 1
+  seed: 0
   before_frame: 1
   vseed_cv: 0.15
 - op: cell_geometry_3d
@@ -41,37 +41,21 @@ operators:
   at: cell
 - op: cell_rd_seed
   at: cell
-  seed: 1
+  seed: 0
   before_frame: 3
   mode: scatter
   seed_frac: 0.06
 - op: cell_diffuse
   at: cell
   d_a: 0.08
-  d_h: 0.16
-  chi: 1.3
+  d_h: 5.0
+  chi: 0.02
 - op: cell_react
   at: cell
   implementation: gray_scott
   F: 0.046
   kk: 0.062
   rate: 1.0
-- op: shape_to_chem
-  at: cell
-  implementation: tension
-  vertex_set: vertex
-  beta: 1.5
-  F0: 0.046
-  rate: 1.0
-- op: morphogen_growth_3d
-  at: vertex
-  cell_set: cell
-  rate: 0.03
-  a_sw: 0.25
-  hill: 4.0
-  rho: 0.35
-  vth_frac: 2.5
-  conserve_amount: false
 - op: shape_energy_3d
   at: vertex
   p0: 3.5
@@ -83,7 +67,7 @@ operators:
   K_R: 0.4
   mu: 1.0
   dt: 1.0
-  relax_iters: 60
+  relax_iters: 30
   eta: 0.08
   cap_frac: 0.12
 - op: reconnect_t1_3d
@@ -91,19 +75,6 @@ operators:
   l_th_frac: 0.35
   every: 4
   max_flips: 30
-  engine_clock: true
-- op: divide_3d
-  at: vertex
-  factor: 2.0
-  reset_noise: 0.12
-  cycle_cv: 0.15
-  p0: 3.5
-  every: 4
-  max_div: 12
-  max_div_frac: 0.03
-  cell_set: cell
-  min_cycle: 4
-  max_cycle: 12
   engine_clock: true
 - op: topo_snapshot_3d
   at: vertex
@@ -115,12 +86,9 @@ schedule:
 - cell_rd_seed
 - cell_diffuse
 - cell_react
-- shape_to_chem
-- morphogen_growth_3d
 - shape_energy_3d
 - reconnect_t1_3d
-- divide_3d
 - topo_snapshot_3d
 _discovery:
-  comp_hash: WK_wk_tension_pos_s1
-  region: shape->chemistry feedback
+  comp_hash: MINI_coral_fixed
+  region: Turing chemistry alone on a rigid 2000-cell ball
