@@ -415,7 +415,9 @@ class OculomotorDrive(Lateral):
     engine integrates it (EMIT=velocity) and the activation can never step discontinuously.
     """
 
-    EMIT = "velocity"                        # delta is da/dt for the muscle's `act` block
+    EMIT = "velocity"                        # delta is da/dt ...
+    INTEGRAND = "act"                        # ... integrated into the `act` block, not the
+                                             # muscle's coordinate (its points carry pos/vel)
     SUPPORTED_DIMS = [3]
     REQUIRES_PARAMS = ["program"]
     INPUTS = ["eye", "muscle"]
