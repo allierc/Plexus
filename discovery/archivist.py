@@ -205,7 +205,8 @@ Reply with ONLY:
 {{"decision": "continue|roll_back|stop",
   "target": "<comp hash, or null>",
   "why": "<<=40 words, citing the numbers above>",
-  "confidence": 0.0-1.0}}"""
+  "confidence": 0.0-1.0,
+  "headline": "<at most 90 characters: the ONE thing a person watching the terminal should know>"}}"""
     ok, out = run_agent("archivist", prompt, ledger=ledger, timeout_min=timeout_min,
                         allowed_tools=["Read"], quiet=True)
     dec = _first_json(out) or {}

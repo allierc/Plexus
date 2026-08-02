@@ -48,6 +48,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import llm                                                              # noqa: E402
+import term as _T                                                       # noqa: E402
 from llm import budget_note, ensure_files, read_file, run_agent         # noqa: E402
 
 CAMP = llm.CAMPAIGN
@@ -248,7 +249,9 @@ Reply with ONLY: {{"supports": true|false, "seen": "<what it actually shows, 6 w
                   "why": "<one sentence>",
                   "describe": "<FOUR SENTENCES on what the movie actually shows: the shape and
                    how it changes, whether anything protrudes, what the colour is doing, and
-                   anything that looks like an artefact rather than tissue>"}}"""
+                   anything that looks like an artefact rather than tissue>",
+                  "headline": "<at most 90 characters: the ONE thing a person watching the
+                   terminal should know about this run>"}}"""
     ok, out = run_agent("watcher", prompt, ledger=ledger, timeout_min=timeout_min,
                         allowed_tools=[], quiet=True)
     j = _first_json(out) or {}
@@ -256,6 +259,7 @@ Reply with ONLY: {{"supports": true|false, "seen": "<what it actually shows, 6 w
     return {"watcher_verdict": "supports" if supports else "CONTRADICTS",
             "watcher_seen": j.get("seen", ""), "watcher_why": j.get("why", ""),
             "watcher_describe": j.get("describe", ""),
+            "watcher_headline": j.get("headline", ""),
             "watcher_blocks": not supports}
 
 
@@ -289,12 +293,13 @@ APPEND to {out_path} a markdown entry of exactly this shape:
 
 Be honest about uncertainty. If the route is not determined by the evidence, say which
 additional measurement would determine it."""
+    prompt += _T.HEADLINE_ASK
     ok, out = run_agent("interpreter", prompt, ledger=ledger, timeout_min=timeout_min,
                         allowed_tools=["Read", "Edit", "Write"], quiet=True)
     # RETURN WHAT IT SAID, not merely whether it ran. `return ok` meant the causal record -- the
     # one sentence explaining why a composition did what it did -- reached a file and never the
     # terminal, so nobody watching a round could tell whether it was reasoning or reciting.
-    return ok, " ".join((out or "").split())[:400]
+    return ok, _T.headline(out)
 
 
 # ============================================================================ 10. META-REVIEW
@@ -365,9 +370,10 @@ been used as a log and reached 1904 words across six appended blocks; that is th
 shape prevents.
 
 {_templates()}"""
+    prompt += _T.HEADLINE_ASK
     ok, out = run_agent("meta_review", prompt, ledger=ledger, timeout_min=timeout_min,
                         allowed_tools=["Read", "Edit", "Write"], quiet=True)
-    return ok, " ".join((out or "").split())[:400]
+    return ok, _T.headline(out)
 
 
 # ============================================================================ REFLECTION (new)
