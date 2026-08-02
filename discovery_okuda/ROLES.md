@@ -250,6 +250,13 @@ certified is not evidence, however sophisticated the code that produced it.
 
 ### Eye-check — agent — BUILT
 **Asks:** what does the movie show?
+**It is given the hypothesis's REGISTERED PREDICTION**, not the Reader's label. It used to be
+handed `analyst_consensus` — a label derived from the same caption it then read — so it could
+catch a summariser drifting from a caption and structurally could *not* catch the numbers
+disagreeing with reality, which is the thing it has been credited with. It was checking a reading
+against itself. Compared with what was committed to *before* the run, by a different agent, from
+different evidence, it is an independent check.
+
 **Observation only. No veto, no score.** It is not trustworthy enough to rank with, and it was not
 trustworthy when it vetoed the top two runs of round 2 while reading a camera that showed growth as
 shrinkage. Its dissent is *recorded as a disagreement*, which is worth reading.
