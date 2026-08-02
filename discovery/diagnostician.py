@@ -197,7 +197,8 @@ Reply with ONLY:
   "evidence": "<the numbers above that show it, <=30 words>",
   "guard_to_add": "<a check that would have refused this batch, <=30 words>",
   "action": "stop|continue",
-  "confidence": 0.0-1.0}}
+  "confidence": 0.0-1.0,
+  "headline": "<at most 90 characters: the ONE thing a person watching the terminal should know>"}}
 
 `action` is `stop` when the apparatus is broken and further rounds would re-measure the same
 fault. It is `continue` when the failure is specific to these compositions."""

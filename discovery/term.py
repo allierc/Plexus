@@ -90,6 +90,32 @@ def verdict(word):
     return str(word)
 
 
+HEADLINE_ASK = """
+END YOUR REPLY WITH ONE LINE, exactly this shape and nothing after it:
+
+    HEADLINE: <at most 90 characters, the ONE thing a person watching the terminal should know>
+
+It is read by a human while the round is still running, so make it the finding and not a
+description of your task. "Chemistry extinct in 4 of 6; the activator went non-finite by frame
+115" is a headline. "Analysed the runs and recorded the results" is not."""
+
+
+def headline(text, fallback="", who=""):
+    """The agent's own one-line summary, if it gave one.
+
+    ASKED FOR, not extracted. Parsing an agent's prose for a summary means guessing which
+    sentence mattered, and the guess is wrong exactly when the agent had something unexpected to
+    say. A field it fills itself cannot be misread that way -- and an agent that writes its
+    product to a FILE returns only a receipt, so without this there is nothing to print at all.
+    """
+    import re
+    m = re.search(r"^\s*HEADLINE:\s*(.+?)\s*$", str(text or ""), re.M)
+    if m:
+        return m.group(1)[:120]
+    t = " ".join(str(fallback or text or "").split())
+    return t[:120]
+
+
 def say(who, text, sentences=1, width=100):
     """What an agent actually said, trimmed to N sentences. Quoted, never paraphrased.
 

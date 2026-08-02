@@ -1040,8 +1040,9 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         # A disagreement between the picture and the numbers is still worth having -- it is the
         # only thing in the loop that looks at SHAPE rather than at numbers. It is now an
         # observation, not a verdict.
-        print(T_.say(f"eye-check {nm[-12:]}",
-                     wa.get("watcher_describe") or wa.get("watcher_why"), sentences=4))
+        if wa.get("watcher_headline"):
+            print(T_.say(f"eye-check {nm[-12:]}", wa["watcher_headline"], sentences=1))
+        print(T_.say("", wa.get("watcher_describe") or wa.get("watcher_why"), sentences=4))
         sc = score_run(summ, cfg)
         if wa.get("watcher_blocks"):
             print(T_.warn(f"[eye] {nm} DISAGREES with the numbers -- recorded, not vetoed: "
@@ -1100,7 +1101,7 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         step(f"Diagnostician: {len(_bad)} run(s) diverged, {len(_sick)} specimen(s) broken")
         dg = DIAG.diagnose(_names, ledger=ledger,
                            reason=f"round {rid}: {len(_bad)} diverged, {len(_sick)} unsound")
-        print(f"  [diagnostician] {dg.get('cause','?')}")
+        print(T_.say("diagnostician", dg.get("headline") or dg.get("cause", "?"), sentences=1))
         print(f"      evidence : {dg.get('evidence','')}")
         print(f"      guard    : {dg.get('guard_to_add','')}")
         print(f"      action   : {dg.get('action')}")
@@ -1139,7 +1140,7 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         # in the file and returns a receipt -- "Wrote the entry" -- so printing the return value
         # shows that it ran and nothing of what it thought.
         print(T_.say(f"interpreter {nm[-12:]}",
-                     _tail_of(os.path.join(CAMP, "causal_descriptions.md")) or _isaid,
+                     _isaid or _tail_of(os.path.join(CAMP, "causal_descriptions.md")),
                      sentences=1))
 
     # EVOLUTION WAS REMOVED on 1 August. It was asked "what should change next?" and so was the
@@ -1173,7 +1174,7 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
                                  runs=[nm for nm, _, _, _, _, _ in rows])
     # The Meta-review's product is memory.md, whose HEAD is a three-sentence abstract written
     # for exactly this: the campaign's position, stated so it can be read in one line.
-    print(T_.say("meta-review", _abstract_of(os.path.join(CAMP, "memory.md")) or _msaid,
+    print(T_.say("meta-review", _msaid or _abstract_of(os.path.join(CAMP, "memory.md")),
                  sentences=1))
     step("Archivist: reading the whole history")
 
@@ -1182,7 +1183,7 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     arch = ARCH.decide(reason=f"end of round {rid}", ledger=ledger)
     print(f"  {T_.I['think']} [archivist] {T_.verdict(arch['decision'])}"
           + (f" -> {arch.get('target')}" if arch.get("target") else ""))
-    print(T_.say("archivist", arch.get("why", ""), sentences=1))
+    print(T_.say("archivist", arch.get("headline") or arch.get("why", ""), sentences=1))
     record["archivist"] = arch
     record["steer"] = rep.get("mix_why", COL.MISSING)
     for hole in COL.holes(record):
