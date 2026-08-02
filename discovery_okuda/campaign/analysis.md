@@ -401,3 +401,103 @@ Specimens: valid 2, invalid 4, ambiguous 1
 Frontier after: C131c610a03f, C29eb5fda87d, C6c060c3f8fd, C9848beadaf6, Cbad8d602b01, Ceb5a08335c1, Cf2ac86789d3
 Diagnosis: not called
 Steer: surprise 0.50 in the productive band -- hold 70/30
+
+## Round 5 — slot 0: refuted
+
+Node: id=C56cb49ebc40, parent=none
+Track: MISSING
+Hypothesis tested: "protr_peak >= 2.0"
+Config: r005c_04_56cb49
+Measured: protr_peak=1.529, protr_final=1.526, ta_n_tubes_final=30, mech_p_ratio=1.159
+Reservoir: 2000 of 104004 cells (2%) — not limiting.
+Specimen: invalid — P4, P11, P12, P5b
+Reader: phenotype=sphere, specimen=MISSING
+Eye-check: DISAGREES — The movie shows uniform expansion into a jagged faceted sphere, not a discrete explosive protrusion of the magnitude the claim asserts.
+Mutation: ('add_op', 'vesicle_growth', 'uniform_ramp')
+Verdict: inconclusive — specimen invalid, so protr_peak=1.53, protr_final=1.53, ta_n_tubes_final=30, mech_p_ratio=1.16 describe the configuration and not a tissue
+Next: parent=C56cb49ebc40
+
+## Round 5 — slot 1: refuted
+
+Node: id=C9848beadaf6, parent=none
+Track: MISSING
+Hypothesis tested: "protr_peak 1.10-1.30"
+Config: r005c_00_9848be
+Measured: protr_peak=1.34, protr_final=1.34, ta_n_tubes_final=10, mech_p_ratio=1.153
+Reservoir: 2000 of 104004 cells (2%) — not limiting.
+Specimen: invalid — P4, P11, P12, P5b
+Reader: phenotype=undulation, specimen=MISSING
+Eye-check: DISAGREES — The run claims an unchanged parent control, but the movie shows the sphere growing outward into a highly irregular, multi-lobed, faceted mass — the opposite of unchanged.
+Mutation: none (control)
+Verdict: inconclusive — specimen invalid, so protr_peak=1.34, protr_final=1.34, ta_n_tubes_final=10, mech_p_ratio=1.15 describe the configuration and not a tissue
+Next: parent=C9848beadaf6
+
+## Round 5 — slot 2: refuted
+
+Node: id=C886cccf4969, parent=none
+Track: MISSING
+Hypothesis tested: "protr_peak 1.10-1.30"
+Config: r005c_01_886ccc
+Measured: protr_peak=1.34, protr_final=1.34, ta_n_tubes_final=10, mech_p_ratio=1.153
+Reservoir: 2000 of 104004 cells (2%) — not limiting.
+Specimen: invalid — P4, P11, P12, P5b
+Reader: phenotype=undulation, specimen=MISSING
+Eye-check: DISAGREES — The movie shows a chaotic irregular multi-lobed faceted mass, not a single intact growth-driven bud protrusion.
+Mutation: ('remove_op', 'cell_geometry_3d0')
+Verdict: inconclusive — specimen invalid, so protr_peak=1.34, protr_final=1.34, ta_n_tubes_final=10, mech_p_ratio=1.15 describe the configuration and not a tissue
+Next: parent=C886cccf4969
+
+## Round 5 — slot 3: refuted
+
+Node: id=C46848adf0a3, parent=none
+Track: MISSING
+Hypothesis tested: "protr_peak <= 1.10"
+Config: r005c_02_46848a
+Measured: protr_peak=1.34, protr_final=1.34, ta_n_tubes_final=10, mech_p_ratio=1.153
+Reservoir: 2000 of 104004 cells (2%) — not limiting.
+Specimen: invalid — P4, P11, P12, P5b
+Reader: phenotype=degenerate, specimen=MISSING
+Eye-check: DISAGREES — The claim predicts collapse toward a sphere (protr_peak≤1.10), but the movie shows the vesicle growing MORE irregular, bumpy and multi-lobed over time — the opposite of a sphere.
+Mutation: ('remove_op', 'shape_to_chem0')
+Verdict: inconclusive — specimen invalid, so protr_peak=1.34, protr_final=1.34, ta_n_tubes_final=10, mech_p_ratio=1.15 describe the configuration and not a tissue
+Next: parent=C46848adf0a3
+
+## Round 5 — slot 4: refuted
+
+Node: id=Cede4710e55e, parent=none
+Track: MISSING
+Hypothesis tested: "protr_peak 1.05-1.35"
+Config: r005c_05_ede471
+Measured: protr_peak=1.014, protr_final=1.013, ta_n_tubes_final=0, mech_p_ratio=0
+Reservoir: 2000 of 104004 cells (2%) — not limiting.
+Specimen: invalid — P4, P12, P5b
+Reader: phenotype=sphere, specimen=MISSING
+Eye-check: DISAGREES — The movie shows only a uniformly expanding spherical vesicle turning red with no protrusion, bud, or shape asymmetry of any kind.
+Mutation: ('set_impl', 'shape_energy_3d0', 'default')
+Verdict: inconclusive — specimen invalid, so protr_peak=1.01, protr_final=1.01, ta_n_tubes_final=0, mech_p_ratio=0 describe the configuration and not a tissue
+Next: parent=Cede4710e55e
+
+## Round 5 — slot 5: refuted
+
+Node: id=Cdd0c7a088cd, parent=none
+Track: MISSING
+Hypothesis tested: "protr_peak 1.05-1.35"
+Config: r005c_06_dd0c7a
+Measured: protr_peak=1.014, protr_final=1.013, ta_n_tubes_final=0, mech_p_ratio=0
+Reservoir: 2000 of 104004 cells (2%) — not limiting.
+Specimen: invalid — P4, P12, P5b
+Reader: phenotype=sphere, specimen=MISSING
+Eye-check: DISAGREES — The description shows a smooth spherical vesicle expanding uniformly with no protrusion, bud, or tip anywhere on its surface.
+Mutation: ('set_impl', 'shape_energy_3d0', 'default')
+Verdict: inconclusive — specimen invalid, so protr_peak=1.01, protr_final=1.01, ta_n_tubes_final=0, mech_p_ratio=0 describe the configuration and not a tissue
+Next: parent=Cdd0c7a088cd
+
+## Round 5 — summary
+
+Posed: 8   Evidence: 6   Refused: 2 (critic post-hoc: [<P3_CHEMISTRY_DIVERGED; critic post-hoc: [<P3_CHEMISTRY_DIVERGED)
+Surprise: 3/6
+Tracks: 0 Track A, 0 Track B
+Specimens: invalid 6
+Frontier after: C46848adf0a3, C56cb49ebc40, C886cccf4969, C9848beadaf6, Cdd0c7a088cd, Cede4710e55e
+Diagnosis: not called
+Steer: surprise 0.60 > 0.5: almost everything breaks (drifting to 0/100, no map accumulates). Push CONFIRMATORY.

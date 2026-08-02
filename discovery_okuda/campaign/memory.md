@@ -17,10 +17,11 @@
 
 The campaign is building the causal lever-map of the Okuda forced-protrusion recipe (C-hash family, parent
 Cad4767/C414a11), whose physical bud tops out at protr_peak ~1.19–1.23. Rounds 2–3 mapped every single-op
-REMOVAL (morphogen_growth_3d0 + divide_3d0 NECESSARY, rest inert/destabilising, none amplify); round 4 tried
-the last untested amplifier — TUNING the morphogen driver UP — and it ran the chemistry away (P4+P12+P5b, 4/7
-runs). All three lever families (removal, inflation, morphogen-tune) now hit the SAME divergence wall, so the
-~1.23 ceiling is looking fundamental to this body and a larger morphology needs a different base geometry.
+REMOVAL (morphogen_growth_3d0 + divide_3d0 NECESSARY, rest inert/destabilising, none amplify); rounds 4–5
+drove the morphogen reaction integrator in BOTH directions and it diverged the same way every run (P4+P12+P5b,
+round-5 6/6), so the ceiling is fundamental to THIS body. All four amplifier families (removal, inflation,
+morphogen-tune-up, morphogen-tune-down) are exhausted; the campaign is now blocked on Track B — a larger
+Okuda morphology requires a DIFFERENT base geometry, not a bigger push on this one.
 
 ## What is ESTABLISHED
 
@@ -32,9 +33,13 @@ runs). All three lever families (removal, inflation, morphogen-tune) now hit the
   (=control), round 3. Do not re-remove to chase a change.
 - "extrude0 and vesicle_growth0 removal → plain sphere 1.003." — SUPPORTED round 3. Shape-zeroing, not the
   driver.
-- "Raising the morphogen driver DIVERGES via chemistry runaway, not a bigger bud." — SUPPORTED round 4:
-  growth is a morphogen SOURCE not a sink (P4 broken 4/7), activator 0.01→1.41e6→NaN while spatially uniform
-  (P12), reaction ~50× too fast (P5b). Do not re-propose raising amplitude/sharpness/rate.
+- "Touching the morphogen reaction integrator DIVERGES via chemistry runaway, not a bigger bud — in BOTH
+  directions." — SUPPORTED rounds 4+5 (10+ runs; round-5 6/6 broke P4+P12+P5b, P11 4/6): growth is a morphogen
+  SOURCE not a sink (P4), activator 0.01→1.41e6→NaN while spatially UNIFORM (P12), reaction ~50× too fast for
+  mechanics (P5b), mesh then self-intersects (P11). Tuning DOWN / clamping the source (round-5 test) diverged
+  the same — the instability is in the integrator, not the sign. Do NOT re-propose ANY morphogen-tune edit
+  (amplitude/gradient/sharpness/rate, up or down). Falsifiable by: a morphogen-touching run that stays physical
+  (mech_force O(1), act_max finite) AND exceeds 1.25.
 - "Unpatterned uniform_ramp inflation is NOT integrable on this body." — SUPPORTED, add_op vesicle_growth
   uniform_ramp → exploded, mech_force 1.5e11, round 2.
 - "CFL/reaction-diffusion nodes are chemistry on a RIGID ball; sphere is their NULL." — SUPPORTED, 5 cfl_*
@@ -42,16 +47,19 @@ runs). All three lever families (removal, inflation, morphogen-tune) now hit the
 
 ## What is OPEN
 
-- Is the ~1.23 ceiling FUNDAMENTAL to this body, or beatable by a lever not yet tried (turning the reaction
-  DOWN / clamping the morphogen source, or a different base geometry)? Every amplifier tried so far diverges.
-- FORCED (mech_p_ratio ~3–5.8) vs GROWN (~1) on physical buds is usable but not yet mapped across the family.
+- The ~1.23 ceiling is now judged FUNDAMENTAL to this body: all four amplifier families diverge, and both
+  directions of the morphogen-tune family are closed (rounds 4+5). The only remaining route to a larger
+  morphology is a DIFFERENT base geometry (Track B) — no untried lever on THIS body is expected to help.
+- FORCED (mech_p_ratio ~3–5.8) vs GROWN (~1) on physical buds is usable but not yet mapped across the family
+  (secondary; only meaningful once a physical body survives).
 
 ## Known traps
 
 - protr_peak LIES ≥~1.25: every reading ≥1.29 (1.317×2, 2.255, 1.295, round-4 blowups) was P11 mesh
   self-intersection, not a bud. Guard: trust it only if mech_force O(1), act_max finite ~[0,2], ta_n_tubes
   single-digit, morphology≠exploded. morphology="sphere" and mech_p_ratio~1 also lie under divergence.
-- Raising morphogen amplitude/gradient/reaction-rate → chemistry runaway (round 4). Down, not up.
+- ANY morphogen-tune (amplitude/gradient/rate, UP or DOWN, or clamping the source) → integrator runaway
+  (rounds 4+5). The family is closed in both directions; the down-tune was tried in round 5 and diverged too.
 - remove_op cell_diffuse0 → DIVERGES (strips damping, breaks quasistatics), round 3.
 - remove_op divide_3d0 / morphogen_growth_3d0 to show independence — both NECESSARY (round 2).
 - add_op vesicle_growth uniform_ramp — explodes (round 2).
@@ -67,9 +75,9 @@ runs). All three lever families (removal, inflation, morphogen-tune) now hit the
 
 Breed from the intact forced base, parent **Cad4767d855d** (control clean, protr_peak 1.19, valid bud;
 morphogen_growth_3d0 + divide_3d0 present). C414a11 is an equivalent valid base. Do NOT breed from cfl/RECON_
-nulls nor the diverged C855e6 / Ca230941 / cell_diffuse0 / round-4 morphogen-tune branches. Amplification via
-tuning up is now closed — the productive frontier is either DOWN-tuning the reaction (test whether a slower/
-clamped chemistry still buds and stays physical) or accepting the ceiling and switching Track-B base geometry.
+nulls nor the diverged C855e6 / Ca230941 / cell_diffuse0 / round-4 AND round-5 morphogen-tune branches.
+Morphogen amplification is now closed in BOTH directions (rounds 4+5) — the productive frontier is Track B:
+open a DIFFERENT base geometry rather than spend more slots pushing this body past 1.23.
 
 ## Stability envelope
 
@@ -84,9 +92,10 @@ Wall: cfl ~205 s; forced recipes 95–743 s (the long ones are usually diverging
 NECESSARY: morphogen_growth_3d0, divide_3d0. INERT on bud: reconnect_t1_3d0, cell_adjacency0, cell_geometry_3d0
 (rd_interface_tension inert). SHAPE-ZEROING when removed: extrude0, vesicle_growth0. DESTABILISING: vesicle_growth
 uniform_ramp (explodes), cell_diffuse0 removal (diverges), divide_3d hertwig add (1.295 late mesh degradation),
-morphogen driver tuned UP (chemistry runaway, round 4). cfl/RD = chemistry only, inert on shape. Single-op
-REMOVAL and morphogen-AMPLIFY coverage are both EXHAUSTED. BLANK cells: morphogen driver tuned DOWN/clamped;
-tension/curvature/pressure levers ALONE (round-1 wk_ attempts saturated, never clean).
+morphogen driver tuned UP (chemistry runaway, round 4) AND DOWN/clamped (round 5, same runaway). cfl/RD =
+chemistry only, inert on shape. Single-op REMOVAL and the full morphogen-TUNE family (both directions) are
+EXHAUSTED. BLANK cells: tension/curvature/pressure levers ALONE (round-1 wk_ attempts saturated, never clean —
+low-value); a different base geometry is the only cell expected to move the ceiling.
 
 ## Track B — the figure
 
@@ -96,8 +105,9 @@ divergence, so NOT legitimately attempted. "Attempted" ≠ "not attempted".
 
 ## Next action
 
-The tune-up amplifier is closed (round 4 diverged). Either (a) test the opposite direction — a graded DOWN-tune
-of the morphogen reaction rate / a clamped source — with ONE clause calibrated to the ceiling (protr_peak
-1.2–1.25, NEVER ≥1.3), verifying physical (mech_force O(1), act_max finite, ta_n_tubes single-digit) BEFORE
-trusting it; or (b) if that also fails to exceed 1.23, declare the ceiling fundamental to this body and open
-Track B on a different base geometry rather than spending more slots pushing this one.
+Both morphogen-tune directions are now closed (round 4 up, round 5 down — both diverged). Declare the ~1.23
+ceiling FUNDAMENTAL to this body and OPEN TRACK B: propose a different base geometry (not the Cad4767/C414a11
+sphere) and check whether it admits a larger physical protrusion. Every prediction still ONE clause on an
+admitted metric, calibrated to physical bounds (protr_peak ≤1.25, NEVER ≥1.3), verified physical (mech_force
+O(1), act_max finite ~[0,2], ta_n_tubes single-digit) BEFORE trusting it. This changes only if a Track-B
+geometry survives and exceeds 1.25 — then map ITS levers from scratch.
