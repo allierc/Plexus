@@ -1,5 +1,5 @@
 general:
-  name: wk_pressure_pos_s0
+  name: wk_pressure_neg_s0
   seed: 0
   n_frames: 400
   dt: 1.0
@@ -60,7 +60,7 @@ operators:
   at: cell
   implementation: pressure
   vertex_set: vertex
-  beta: 1.5
+  beta: -1.5
   F0: 0.046
   rate: 1.0
 - op: morphogen_growth_3d
@@ -122,5 +122,5 @@ schedule:
 - divide_3d
 - topo_snapshot_3d
 _discovery:
-  comp_hash: WK_wk_pressure_pos_s0
+  comp_hash: WK_wk_pressure_neg_s0
   region: shape->chemistry feedback

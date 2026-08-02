@@ -108,7 +108,7 @@ surprises:
   '
 - 'The three constructor params are MUTUALLY EXCLUSIVE: each setter nulls the other
 
-  two (PyCoreSpecs.py:L5450-5485), and the XML emitter is an if/elif chain
+  two (PyCoreSpecs.py:L5450-5451 / L5467-5468 / L5484-5485), and the XML emitter is an if/elif chain
 
   (L5407-5412) that writes exactly ONE element with priority neighbor_order >
 

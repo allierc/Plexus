@@ -33,7 +33,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PLEXUS = os.path.abspath(os.path.join(HERE, ".."))
-sys.path.insert(0, os.path.join(PLEXUS, "discovery"))
+sys.path.insert(0, os.path.join(PLEXUS, "discovery_okuda"))
 
 import cluster as C  # noqa: E402  the hardened primitives; see the module docstring
 
