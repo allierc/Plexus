@@ -1,0 +1,65 @@
+{
+ "reasoning": "Round 1 bought no tissue: all controls, saturated or dead. The wk_ family is not in the legal set anymore; the type system now offers structural edits on two growth-capable spines. Anchor the Okuda coupling route (parent 2) and the round-33 forced recipe (parent 1) as controls, then knock out one operator at a time to learn which carries tubulation. Two adds probe whether extra uniform inflation amplifies or washes out the pattern. Nothing here saturated the array before.",
+ "mode": "explore",
+ "slots": [
+  {"parent_index": 2, "edit": null, "intent": "control",
+   "claim": "Okuda coupling route (patterning + growth + division + T1) reproduces tubulation/undulation, unchanged", "track": "B", "territory": "in_paper",
+   "metric": "protr_peak", "predicted": "protr_peak >= 2.0",
+   "why": "control and Track-B reproduction target: the full coupled monolayer is Okuda's tubulation recipe"},
+
+  {"parent_index": 2, "edit": ["remove_op","cell_diffuse0"], "intent": "confirmatory", "track": "A", "territory": "in_paper",
+   "claim": "removing morphogen diffusion kills the Turing prepattern, so growth is uniform and no tubes form",
+   "metric": "ta_n_tubes_final", "predicted": "ta_n_tubes_final <= 1",
+   "why": "coupling (chi) needs a patterned field; without diffusion no spatial gradient can localize a tube"},
+
+  {"parent_index": 2, "edit": ["remove_op","morphogen_growth_3d0"], "intent": "confirmatory", "track": "A", "territory": "in_paper",
+   "claim": "removing patterned growth leaves mechanics-only, collapsing to the sphere null",
+   "metric": "protr_peak", "predicted": "protr_peak < 1.3",
+   "why": "growth is the presumed driver of protrusion; its removal should return the rigid-ball null"},
+
+  {"parent_index": 2, "edit": ["remove_op","reconnect_t1_3d0"], "intent": "adversarial", "track": "A", "territory": "in_paper",
+   "claim": "without T1 reconnection the sheet cannot remodel topology, so tubes cannot elongate or branch",
+   "metric": "ta_n_tubes_final", "predicted": "ta_n_tubes_final <= 1",
+   "why": "tests whether topological remodeling is necessary for the Okuda morphology or merely cosmetic"},
+
+  {"parent_index": 2, "edit": ["remove_op","divide_3d0"], "intent": "adversarial", "track": "A", "territory": "in_paper",
+   "claim": "growth without cell division still bulges into a protrusion",
+   "metric": "protr_peak", "predicted": "protr_peak >= 1.8",
+   "why": "genuinely uncertain: does area growth alone deform the sheet, or is division required to add cells into the tube"},
+
+  {"parent_index": 2, "edit": ["remove_op","cell_geometry_3d0"], "intent": "confirmatory", "track": "A", "territory": "in_paper",
+   "claim": "removing the cell-geometry operator degrades the force integration and suppresses protrusion",
+   "metric": "protr_peak", "predicted": "protr_peak < 1.5",
+   "why": "maps whether cell_geometry_3d is load-bearing for deformation in the coupled route"},
+
+  {"parent_index": 2, "edit": ["add_op","vesicle_growth","uniform_ramp"], "intent": "adversarial", "track": "A", "territory": "excursion",
+   "claim": "superimposing uniform inflation on the patterned route inflates the whole vesicle and amplifies peak protrusion",
+   "metric": "protr_peak", "predicted": "protr_peak >= 2.5",
+   "why": "combination Okuda never tried: does uniform pressure add to or wash out the patterned tube"},
+
+  {"parent_index": 1, "edit": null, "intent": "control", "track": "B", "territory": "in_paper",
+   "claim": "the round-33 driven+forced recipe reproduces a forced thick tube (mech_p_ratio ~3)",
+   "metric": "protr_peak", "predicted": "protr_peak >= 2.5",
+   "why": "second control/Track-B anchor: a distinct forced-protrusion recipe, unmeasured soundly, anchors the parent-1 knockouts"},
+
+  {"parent_index": 1, "edit": ["remove_op","morphogen_growth_3d0"], "intent": "confirmatory", "track": "A", "territory": "in_paper",
+   "claim": "removing patterned growth from the forced recipe drops it to mechanics-only, no protrusion",
+   "metric": "protr_peak", "predicted": "protr_peak < 1.5",
+   "why": "isolates whether growth or the forcing carries the parent-1 protrusion"},
+
+  {"parent_index": 1, "edit": ["remove_op","reconnect_t1_3d0"], "intent": "confirmatory", "track": "A", "territory": "in_paper",
+   "claim": "without T1 the forced recipe cannot form a discrete tube",
+   "metric": "ta_n_tubes_final", "predicted": "ta_n_tubes_final <= 1",
+   "why": "cross-checks the T1 necessity claim on a second, forced spine"},
+
+  {"parent_index": 1, "edit": ["remove_op","cell_adjacency0"], "intent": "confirmatory", "track": "A", "territory": "in_paper",
+   "claim": "removing neighbor tracking breaks the mechanical coupling and reduces peak protrusion",
+   "metric": "protr_peak", "predicted": "protr_peak < 2.0",
+   "why": "maps whether cell_adjacency is necessary for coherent force transmission in the forced recipe"},
+
+  {"parent_index": 1, "edit": ["add_op","vesicle_growth","uniform_ramp"], "intent": "confirmatory", "track": "A", "territory": "excursion",
+   "claim": "adding uniform inflation to the already-forced recipe raises peak protrusion further",
+   "metric": "protr_peak", "predicted": "protr_peak >= 3.0",
+   "why": "extremum: stacks two protrusion drivers to test whether the forcing saturates or adds"}
+ ]
+}

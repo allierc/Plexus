@@ -61,6 +61,23 @@ def collect_run(name, hyp=None, summary=None):
     diag = _read_json(os.path.join(d, "diag.json")) or {}
     s = summary if summary is not None else (diag.get("summary") or {})
 
+    # PROVENANCE. A summary handed in by the caller is trusted only if this run actually wrote a
+    # diag.json. On 2 August the round record credited `r001n_11_wk_pressure_ne` -- a job killed
+    # as a straggler, whose directory holds nothing but spec_run.yaml -- with protr_peak=1.055 and
+    # 36749 cells, which are another run's numbers. Whatever upstream path allowed that, a record
+    # that names a run must describe THAT run: measurements with no diag.json behind them are a
+    # hole, and a hole says so.
+    if summary is not None and not os.path.exists(os.path.join(d, "diag.json")):
+        return {"run": name, "exists": os.path.isdir(d), "comp_hash": MISSING,
+                "region": MISSING, "metrics": {}, "specimen": "unchecked",
+                "premises_broken": [], "analyst_consensus": MISSING,
+                "analyst_agreement": MISSING, "analyst_specimen": MISSING,
+                "eye_verdict": MISSING, "eye_disagrees": False, "eye_why": MISSING,
+                "acted": MISSING, "reservoir": {},
+                "provenance": "NO diag.json -- a summary was supplied for this run but the run "
+                              "wrote no record. Its numbers belong to some other run and are "
+                              "withheld."}
+
     prem = diag.get("premises") or []
     broken = diag.get("premises_broken") or []
     rec = {
@@ -262,6 +279,7 @@ def render(rec):
               f"Node: id={r.get('comp_hash', MISSING)}, parent={r.get('parent', 'none')}",
               f"Track: {r.get('track', '-')}",
               f'Hypothesis tested: "{r.get("predicted", MISSING)}"',
+              *( [f"PROVENANCE: {r['provenance']}"] if r.get("provenance") else [] ),
               f"Config: {r['run']}"
               + (f", {', '.join(f'{k}={v}' for k, v in (r.get('config') or {}).items())}"
                  if r.get("config") else ""),
