@@ -5,13 +5,23 @@
   "counts": {
     "alias": 2,
     "refinement": 2,
-    "new": 8,
-    "implementation": 6,
+    "new": 0,
+    "implementation": 14,
     "out_of_scope": 6,
     "unclassified": 0
   },
   "scored": 18,
-  "yield_new_per_mechanism": 0.4444444444444444,
+  "yield_new_per_mechanism": 0.0,
+  "priors": [
+    "adhere",
+    "agitate",
+    "apoptose",
+    "mechanosense",
+    "morphogen",
+    "regulate",
+    "relax",
+    "reorient"
+  ],
   "new_contracts": [
     "adhere",
     "agitate",
@@ -25,99 +35,99 @@
   "curve": [
     {
       "n": 1,
-      "cum_new": 1
+      "cum_new": 0
     },
     {
       "n": 2,
-      "cum_new": 1
+      "cum_new": 0
     },
     {
       "n": 3,
-      "cum_new": 1
+      "cum_new": 0
     },
     {
       "n": 4,
-      "cum_new": 1
+      "cum_new": 0
     },
     {
       "n": 5,
-      "cum_new": 1
+      "cum_new": 0
     },
     {
       "n": 6,
-      "cum_new": 2
+      "cum_new": 0
     },
     {
       "n": 7,
-      "cum_new": 3
+      "cum_new": 0
     },
     {
       "n": 8,
-      "cum_new": 3
+      "cum_new": 0
     },
     {
       "n": 9,
-      "cum_new": 3
+      "cum_new": 0
     },
     {
       "n": 10,
-      "cum_new": 4
+      "cum_new": 0
     },
     {
       "n": 11,
-      "cum_new": 5
+      "cum_new": 0
     },
     {
       "n": 12,
-      "cum_new": 5
+      "cum_new": 0
     },
     {
       "n": 13,
-      "cum_new": 5
+      "cum_new": 0
     },
     {
       "n": 14,
-      "cum_new": 5
+      "cum_new": 0
     },
     {
       "n": 15,
-      "cum_new": 6
+      "cum_new": 0
     },
     {
       "n": 16,
-      "cum_new": 6
+      "cum_new": 0
     },
     {
       "n": 17,
-      "cum_new": 6
+      "cum_new": 0
     },
     {
       "n": 18,
-      "cum_new": 6
+      "cum_new": 0
     },
     {
       "n": 19,
-      "cum_new": 7
+      "cum_new": 0
     },
     {
       "n": 20,
-      "cum_new": 8
+      "cum_new": 0
     },
     {
       "n": 21,
-      "cum_new": 8
+      "cum_new": 0
     },
     {
       "n": 22,
-      "cum_new": 8
+      "cum_new": 0
     },
     {
       "n": 23,
-      "cum_new": 8
+      "cum_new": 0
     },
     {
       "n": 24,
-      "cum_new": 8
+      "cum_new": 0
     }
   ],
   "rows": [
@@ -125,9 +135,10 @@
       "n": 1,
       "id": "gene_network_connectionist",
       "raw_name": "GeneNetworkConnectionist",
-      "class": "new",
+      "class": "implementation",
       "contract": "regulate",
-      "of": null,
+      "prior": true,
+      "of": "fmottes/jax-morph:gene_network_connectionist",
       "status": "validated"
     },
     {
@@ -136,7 +147,8 @@
       "raw_name": "NeuralODE",
       "class": "implementation",
       "contract": "regulate",
-      "of": "gene_network_connectionist",
+      "prior": true,
+      "of": "fmottes/jax-morph:gene_network_connectionist",
       "status": "validated"
     },
     {
@@ -145,7 +157,8 @@
       "raw_name": "GeneNetworkMWC",
       "class": "implementation",
       "contract": "regulate",
-      "of": "gene_network_connectionist",
+      "prior": true,
+      "of": "fmottes/jax-morph:gene_network_connectionist",
       "status": "validated"
     },
     {
@@ -154,7 +167,8 @@
       "raw_name": "ODEController",
       "class": "implementation",
       "contract": "regulate",
-      "of": "gene_network_connectionist",
+      "prior": true,
+      "of": "fmottes/jax-morph:gene_network_connectionist",
       "status": "validated"
     },
     {
@@ -163,6 +177,7 @@
       "raw_name": "StochasticStep",
       "class": "out_of_scope",
       "contract": "sample_score",
+      "prior": false,
       "of": null,
       "status": "normalized"
     },
@@ -170,18 +185,20 @@
       "n": 6,
       "id": "death",
       "raw_name": "Death",
-      "class": "new",
+      "class": "implementation",
       "contract": "apoptose",
-      "of": null,
+      "prior": true,
+      "of": "fmottes/jax-morph:death",
       "status": "validated"
     },
     {
       "n": 7,
       "id": "free_screened_diffusion",
       "raw_name": "FreeScreenedDiffusion",
-      "class": "new",
+      "class": "implementation",
       "contract": "morphogen",
-      "of": null,
+      "prior": true,
+      "of": "fmottes/jax-morph:free_screened_diffusion",
       "status": "validated"
     },
     {
@@ -190,6 +207,7 @@
       "raw_name": "Division",
       "class": "refinement",
       "contract": "cell_divide",
+      "prior": false,
       "of": "cell_divide",
       "status": "validated"
     },
@@ -199,6 +217,7 @@
       "raw_name": "SaturatingCellGrowth",
       "class": "refinement",
       "contract": "grow_radius",
+      "prior": false,
       "of": "cell_grow",
       "status": "validated"
     },
@@ -206,18 +225,20 @@
       "n": 10,
       "id": "active_brownian_dynamics2_d",
       "raw_name": "ActiveBrownianDynamics2D",
-      "class": "new",
+      "class": "implementation",
       "contract": "reorient",
-      "of": null,
+      "prior": true,
+      "of": "fmottes/jax-morph:active_brownian_dynamics2_d",
       "status": "validated"
     },
     {
       "n": 11,
       "id": "brownian_dynamics",
       "raw_name": "BrownianDynamics",
-      "class": "new",
+      "class": "implementation",
       "contract": "agitate",
-      "of": null,
+      "prior": true,
+      "of": "fmottes/jax-morph:brownian_dynamics",
       "status": "validated"
     },
     {
@@ -226,6 +247,7 @@
       "raw_name": "NoForce",
       "class": "out_of_scope",
       "contract": "no_interaction",
+      "prior": false,
       "of": null,
       "status": "normalized"
     },
@@ -235,6 +257,7 @@
       "raw_name": "PairwisePotential",
       "class": "alias",
       "contract": "attraction_repulsion",
+      "prior": false,
       "of": "attraction_repulsion",
       "status": "normalized"
     },
@@ -244,6 +267,7 @@
       "raw_name": "Morse",
       "class": "alias",
       "contract": "attraction_repulsion",
+      "prior": false,
       "of": "attraction_repulsion",
       "status": "normalized"
     },
@@ -251,9 +275,10 @@
       "n": 15,
       "id": "soft_sphere",
       "raw_name": "SoftSphere",
-      "class": "new",
+      "class": "implementation",
       "contract": "adhere",
-      "of": null,
+      "prior": true,
+      "of": "fmottes/jax-morph:soft_sphere",
       "status": "validated"
     },
     {
@@ -262,7 +287,8 @@
       "raw_name": "Hertzian",
       "class": "implementation",
       "contract": "adhere",
-      "of": "soft_sphere",
+      "prior": true,
+      "of": "fmottes/jax-morph:soft_sphere",
       "status": "validated"
     },
     {
@@ -271,7 +297,8 @@
       "raw_name": "Harmonic",
       "class": "implementation",
       "contract": "adhere",
-      "of": "soft_sphere",
+      "prior": true,
+      "of": "fmottes/jax-morph:soft_sphere",
       "status": "validated"
     },
     {
@@ -280,25 +307,28 @@
       "raw_name": "LennardJones",
       "class": "implementation",
       "contract": "adhere",
-      "of": "soft_sphere",
+      "prior": true,
+      "of": "fmottes/jax-morph:soft_sphere",
       "status": "validated"
     },
     {
       "n": 19,
       "id": "mechanical_relaxation",
       "raw_name": "MechanicalRelaxation",
-      "class": "new",
+      "class": "implementation",
       "contract": "relax",
-      "of": null,
+      "prior": true,
+      "of": "fmottes/jax-morph:mechanical_relaxation",
       "status": "validated"
     },
     {
       "n": 20,
       "id": "virial_stress",
       "raw_name": "VirialStress",
-      "class": "new",
+      "class": "implementation",
       "contract": "mechanosense",
-      "of": null,
+      "prior": true,
+      "of": "fmottes/jax-morph:virial_stress",
       "status": "validated"
     },
     {
@@ -307,6 +337,7 @@
       "raw_name": "Lie-Trotter macro-step split",
       "class": "out_of_scope",
       "contract": "integrate",
+      "prior": false,
       "of": null,
       "status": "normalized"
     },
@@ -316,6 +347,7 @@
       "raw_name": "step type: quasistatic / dynamic / discrete",
       "class": "out_of_scope",
       "contract": "timescale",
+      "prior": false,
       "of": null,
       "status": "normalized"
     },
@@ -325,6 +357,7 @@
       "raw_name": "declared field dataflow validation",
       "class": "out_of_scope",
       "contract": "couple",
+      "prior": false,
       "of": null,
       "status": "normalized"
     },
@@ -334,11 +367,18 @@
       "raw_name": "stochastic trace / replay / score",
       "class": "out_of_scope",
       "contract": "sample_score",
+      "prior": false,
       "of": null,
       "status": "normalized"
     }
   ],
   "disputed": [
+    {
+      "id": "gene_network_connectionist",
+      "recorded": "new",
+      "ledger": "implementation",
+      "name": "regulate"
+    },
     {
       "id": "neural_ode",
       "recorded": "new",
@@ -358,6 +398,36 @@
       "name": "regulate"
     },
     {
+      "id": "death",
+      "recorded": "new",
+      "ledger": "implementation",
+      "name": "apoptose"
+    },
+    {
+      "id": "free_screened_diffusion",
+      "recorded": "new",
+      "ledger": "implementation",
+      "name": "morphogen"
+    },
+    {
+      "id": "active_brownian_dynamics2_d",
+      "recorded": "new",
+      "ledger": "implementation",
+      "name": "reorient"
+    },
+    {
+      "id": "brownian_dynamics",
+      "recorded": "new",
+      "ledger": "implementation",
+      "name": "agitate"
+    },
+    {
+      "id": "soft_sphere",
+      "recorded": "new",
+      "ledger": "implementation",
+      "name": "adhere"
+    },
+    {
       "id": "hertzian",
       "recorded": "new",
       "ledger": "implementation",
@@ -374,6 +444,18 @@
       "recorded": "new",
       "ledger": "implementation",
       "name": "adhere"
+    },
+    {
+      "id": "mechanical_relaxation",
+      "recorded": "new",
+      "ledger": "implementation",
+      "name": "relax"
+    },
+    {
+      "id": "virial_stress",
+      "recorded": "new",
+      "ledger": "implementation",
+      "name": "mechanosense"
     }
   ]
 }
