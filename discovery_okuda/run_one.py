@@ -68,6 +68,42 @@ def _lazy_engine():
     return S, engine_run
 
 
+def _heartbeat(name, t0, every=10):
+    """Write `progress.json` while the run is ALIVE, so a watcher can tell working from stuck.
+
+    Nothing else on disk can make that distinction. `metrics.json` is written by analyze() only
+    after the loop finishes; LSF copies the job's `.out` at TERMINATION, not continuously; and the
+    run directory holds nothing but `spec_run.yaml` until the end. So a healthy 46-minute run and
+    a wedged one are byte-for-byte identical to anyone looking from outside, and the straggler
+    killer that looked at them killed five productive runs on a median set by rigid,
+    non-dividing chemistry probes that finish in seven minutes.
+
+    fsync'd, because the reader is on a different machine across a network filesystem, and a
+    heartbeat sitting in a page cache is not a heartbeat.
+    """
+    d = os.path.join(LOG_DIR, name)
+    os.makedirs(d, exist_ok=True)
+    path = os.path.join(d, "progress.json")
+
+    def beat(H, tick):
+        if tick % every and tick:
+            return
+        try:
+            nc = None
+            try:
+                nc = int(H.level("cell").n)
+            except Exception:
+                pass
+            with open(path, "w") as fh:
+                json.dump({"frame": int(tick), "n_cells": nc,
+                           "elapsed_s": round(time.time() - t0, 1)}, fh)
+                fh.flush()
+                os.fsync(fh.fileno())
+        except Exception:
+            pass                                  # a heartbeat must never take the run down
+    return beat
+
+
 # --------------------------------------------------------------------------- D3: assert alignment
 def check_alignment(posf, hist, name=""):
     """The phantom-result guard. Positions and topology MUST be the same length."""
@@ -169,7 +205,7 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     except Exception:
         pass
     sim = S.load(cfg_path)
-    Hf, out = engine_run(sim, device=device)
+    Hf, out = engine_run(sim, device=device, on_frame=_heartbeat(name, t0))
     wall = time.time() - t0
 
     vlvl = Hf.level("vertex")

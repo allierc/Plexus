@@ -249,40 +249,52 @@ def status(verbose=True, include_done=True):
     return jobs
 
 
+_BEATS = {}                       # job_id -> (frame, elapsed) at the previous poll
+
+
 def _is_working(job_id, ids, min_frac=0.5):
-    """Is this job PRODUCING, or stuck? Frames on disk, against what its siblings managed.
+    """Is this job PRODUCING, or stuck? Judged by whether it ADVANCED since the last look.
 
     The distinction the wall clock cannot make. A degenerate composition goes slow and writes
-    nothing; a big one goes slow and writes plenty. Killing on time alone cannot tell them apart,
-    and on this campaign the big ones are the interesting ones.
+    nothing; a big one goes slow and writes plenty -- and on this campaign the big ones are the
+    interesting ones.
+
+    Judged as a DELTA, not against peers. The peer comparison this replaces was doomed twice
+    over: it read `metrics.json`, which analyze() writes only AFTER the loop ends, so a running
+    job always looked empty and the guard could never spare one; and it took the median across
+    the whole batch, mixing rigid 2000-cell chemistry probes that finish in seven minutes with
+    growing meshes that take an hour. That median killed five productive runs at 46 minutes.
+
+    A frame counter that moved since the previous poll is working, however slowly. One that has
+    not moved in two polls is stuck. No peer group is needed, and none can mislead it.
     """
-    import glob
     import json as _j
     name = ids.get(job_id) if isinstance(ids, dict) else None
     if not name:
         return False
     try:
-        d = os.path.join(LOG_ROOT, name)
-        mp = os.path.join(d, "metrics.json")
-        if not os.path.exists(mp):
-            return False                      # nothing on disk after all this time: stuck
-        mine = len(_j.load(open(mp)).get("series") or [])
-        peers = []
-        for other in (ids.values() if isinstance(ids, dict) else []):
-            q = os.path.join(LOG_ROOT, other, "metrics.json")
-            if other != name and os.path.exists(q):
-                peers.append(len(_j.load(open(q)).get("series") or []))
-        if not peers:
-            return mine > 0
-        med = sorted(peers)[len(peers) // 2]
-        if mine >= min_frac * max(med, 1):
-            print(f"[cluster] {job_id} is slow but WORKING ({mine} frames vs a peer median of "
-                  f"{med}) -- not a straggler. Slow and productive is a big run, not a stuck one.",
+        p = os.path.join(LOG_ROOT, name, "progress.json")
+        if not os.path.exists(p):
+            prev = _BEATS.get(job_id)
+            if prev is None:
+                _BEATS[job_id] = (-1, 0)          # first look: give it one poll to write a beat
+                return True
+            return False                          # two polls, still no heartbeat: stuck in setup
+        b = _j.load(open(p))
+        cur = (int(b.get("frame") or 0), b.get("n_cells"))
+        prev = _BEATS.get(job_id)
+        _BEATS[job_id] = cur
+        if prev is None or cur[0] > prev[0]:
+            print(f"[cluster] {job_id} is slow but WORKING (frame {cur[0]}"
+                  + (f", {cur[1]} cells" if cur[1] else "")
+                  + ") -- not a straggler. Slow and productive is a big run, not a stuck one.",
                   flush=True)
             return True
+        print(f"[cluster] {job_id} has not advanced past frame {cur[0]} since the last poll.",
+              flush=True)
+        return False
     except Exception:
-        pass
-    return False
+        return False
 
 
 def wait_for_ids(ids, poll=60, timeout_h=24, straggler_factor=4.0, min_straggler_min=25):
