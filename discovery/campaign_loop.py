@@ -107,8 +107,17 @@ def _gates_open():
         return False, f"the admission check itself failed: {type(e).__name__}: {e}"
 
 
+_T_START = [None]     # set when a campaign begins; entries before it belong to other runs
+
+
 def _cost_so_far():
-    """Tokens and dollars spent by every agent call ever logged. Measured, not projected."""
+    """What THIS campaign has spent. Measured, not projected.
+
+    It used to total every agent call ever logged, because _metrology/llm_usage.jsonl is a
+    lifetime ledger and clean_start() does not touch it -- it lives outside campaign/ and is a
+    record, not campaign state. So a freshly-cleaned run printed "spent so far: 259.6 agent-min
+    over 341 calls" a few seconds in. The number was true and the label was a lie.
+    """
     p = os.path.join(HERE, "_metrology", "llm_usage.jsonl")
     if not os.path.exists(p):
         return {}
@@ -118,6 +127,8 @@ def _cost_so_far():
             e = json.loads(line)
         except Exception:
             continue
+        if _T_START[0] is not None and (e.get("t") or e.get("ts_epoch") or 0) < _T_START[0]:
+            continue                      # an earlier campaign's call, not this one's
         tot["calls"] += 1
         tot["usd"] += e.get("cost_usd") or 0.0
         tot["tok_in"] += e.get("input_tokens") or 0
@@ -248,8 +259,10 @@ def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None, recon_rounds=
     print("=" * 96)
     _log({"event": "start", "rounds": n_rounds, "batch": batch, "frames": frames})
 
+    _T_START[0] = time.time() if not resume else None
     if resume:
-        print("[loop] --resume: continuing the campaign already in campaign/")
+        print("[loop] --resume: continuing the campaign already in campaign/ "
+              "(spend is counted over the whole ledger)")
     else:
         clean_start()
     modes = plan(n_rounds, recon_rounds)

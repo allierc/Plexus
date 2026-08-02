@@ -246,7 +246,7 @@ premise, \emph{ambiguous} on a \textbf{usual} one. \textbf{Static} tier here (th
 \multicolumn{4}{@{}l}{\textbf{ACT 2 --- Measure.} The batch runs. The only expensive step.}\\
 \midrule
 Biologist & \textbf{check} & \emph{was} this run a tissue? The same premises, now against what
-the run recorded. \textbf{Runs after the batch and BEFORE the Analysts} --- run it after the
+the run recorded. \textbf{Runs after the batch and BEFORE the Reader} --- run it after the
 analysis and a phenotype has already been named from a specimen whose chemistry was extinct, which
 is what happened on \code{r002c\_00}. Nothing can un-name a phenotype & runs\\
 Metrologist & \textbf{check} & which metrics are admissible? Certifies instruments against known
@@ -394,11 +394,11 @@ that burns a week.
 
 \textbf{What the live run actually spent, which is how the roster was judged.} Sixteen calls,
 23.5 minutes: \textbf{Proposer 14.8 min} (63\% of all agent time), Peer-review 2.8, Meta-review
-2.4, Analysts 1.7, and one call each to the Eye-check, Interpreter and Evolution. \textbf{The
+2.4, Readers 1.7, and one call each to the Eye-check, Interpreter and Evolution. \textbf{The
 Judge and the Referee were never called at all.} That is the measurement the redesign rests on ---
 not an argument that they were redundant, but a ledger showing they had nothing to do. Timing was
 wired on 1 August; until then nine call sites bypassed the stopwatch and a round once reported
-\code{calls: 0} for a round that made about twenty-five. Six real analyst calls came in at
+\code{calls: 0} for a round that made about twenty-five. Six real reader calls came in at
 \textbf{21 seconds} each against a four-minute allowance and \textbf{7.2 turns} against a cap of
 60, so neither the timeout nor the turn cap has ever constrained anything.
 
@@ -615,11 +615,23 @@ synthetic batch: a vetoed run holding the highest score drops from first to last
 too, refining the winner rather than the loop only ever \emph{picking} from what the enumerator
 offered.
 
-\textbf{(c) The per-run calls run together} --- \emph{done, and measured}. Three analysts read one
-run concurrently, and runs are read concurrently across a batch. They are independent by design:
-three readings exist because one is not reproducible, and no analyst's prompt depends on another's
-answer. The eye-check still runs \emph{after}, because it is handed their consensus and is not
-independent --- parallelising a dependency is not an optimisation, it is a different experiment.
+\textbf{(c) The per-run calls run together} --- \emph{done, and measured}. Runs are read
+concurrently across a batch, and the machinery for reading one run $N$ ways in parallel remains,
+because no reader's prompt depends on another's answer.
+
+\textbf{$N$ is now 1, and the reason it was three did not survive being examined.} Three readings
+were justified by Robin's eight, and Robin's Finch \emph{writes the analysis code} --- it chooses
+the flow-cytometry gating and the RNA-seq filters, so its trajectories produce genuinely different
+\emph{numbers}. Ours writes none: by the time a Reader is called, \code{diag.json}, the curve shapes
+and the strip were computed by instruments the Metrologist certified, and every reader would see
+identical numbers. What varies is the \emph{label} --- phenotype, forced-or-grown, the concern
+raised --- so $N$ readings would measure \textbf{phenotype ambiguity}, a real quantity but a much
+smaller prize than the one the argument was imported for. What we give up at one, stated plainly:
+nothing records when a label was a close call. The count is a single number and raising it is one
+line.
+
+The eye-check still runs \emph{after}, because it is handed the reading and is not independent ---
+parallelising a dependency is not an optimisation, it is a different experiment.
 \end{phasebox}
 
 \begin{phasebox}{Phase 4 --- Measurements that can tell his regimes apart \hfill \dn}
@@ -831,7 +843,7 @@ the loop that comes from looking at shape rather than at numbers. What they no l
 \emph{decide}.
 
 \textbf{Two reasons beyond the call.} The veto was circular: the eye-check was handed the
-analysts' consensus --- a label derived from the same caption it then read --- so it could catch a
+reader's label --- derived from the same caption it then read --- so it could catch a
 summariser drifting from a caption and could not catch numbers disagreeing with reality, which is
 what it was credited with. And the camera was broken for the whole period the veto was trusted:
 one fixed viewpoint, and a zoom re-fitted to the tissue every frame, so growth was drawn as
@@ -946,9 +958,9 @@ drawn grey rather than white, and the count said out loud.
 \textbf{The Biologist now speaks to somebody.} It had been running on every run since it was
 written, and its verdict went to a terminal and to a field of \code{diag.json} that no prompt has
 ever mentioned. On round 2 it broke five premises on the very run whose movie came out black ---
-\emph{the activator had decayed to NaN, the chemistry was extinct} --- and an Analyst read that
+\emph{the activator had decayed to NaN, the chemistry was extinct} --- and a Reader read that
 run's numbers and named a phenotype. Two hand-offs now exist: the per-run verdict goes to the
-\textbf{Analyst} that is about to read it, in the document's own words and with a field it must
+\textbf{Reader} that is about to read it, in the document's own words and with a field it must
 fill in saying whether the specimen was sound; and the round-level tally goes to the
 \textbf{Meta-review}, whose whole job is the recurring pattern. Across round 2 that tally reads
 \emph{``P4 broken in 2 of 3 runs''} --- an edit family that cannot hold chemistry, which is a thing
