@@ -35,6 +35,7 @@ ROOT = os.path.abspath(os.path.join(HERE, ".."))
 SRC = os.path.join(ROOT, "src")
 TYSSUE = os.path.join(ROOT, "prototype", "Tyssue")
 LOGDIR = os.path.join(ROOT, "log", "okuda", "_cluster")
+LOG_ROOT = os.path.join(ROOT, "log", "okuda")   # where each run writes its own folder
 
 # the devcontainer mounts the NFS export at /workspace; the cluster mounts the SAME export here,
 # so files are shared live -- only the PATH is translated.
@@ -248,6 +249,42 @@ def status(verbose=True, include_done=True):
     return jobs
 
 
+def _is_working(job_id, ids, min_frac=0.5):
+    """Is this job PRODUCING, or stuck? Frames on disk, against what its siblings managed.
+
+    The distinction the wall clock cannot make. A degenerate composition goes slow and writes
+    nothing; a big one goes slow and writes plenty. Killing on time alone cannot tell them apart,
+    and on this campaign the big ones are the interesting ones.
+    """
+    import glob
+    import json as _j
+    name = ids.get(job_id) if isinstance(ids, dict) else None
+    if not name:
+        return False
+    try:
+        d = os.path.join(LOG_ROOT, name)
+        mp = os.path.join(d, "metrics.json")
+        if not os.path.exists(mp):
+            return False                      # nothing on disk after all this time: stuck
+        mine = len(_j.load(open(mp)).get("series") or [])
+        peers = []
+        for other in (ids.values() if isinstance(ids, dict) else []):
+            q = os.path.join(LOG_ROOT, other, "metrics.json")
+            if other != name and os.path.exists(q):
+                peers.append(len(_j.load(open(q)).get("series") or []))
+        if not peers:
+            return mine > 0
+        med = sorted(peers)[len(peers) // 2]
+        if mine >= min_frac * max(med, 1):
+            print(f"[cluster] {job_id} is slow but WORKING ({mine} frames vs a peer median of "
+                  f"{med}) -- not a straggler. Slow and productive is a big run, not a stuck one.",
+                  flush=True)
+            return True
+    except Exception:
+        pass
+    return False
+
+
 def wait_for_ids(ids, poll=60, timeout_h=24, straggler_factor=4.0, min_straggler_min=25):
     """Block until every submitted JOB ID reaches a terminal state. IDs, not names.
 
@@ -304,7 +341,18 @@ def wait_for_ids(ids, poll=60, timeout_h=24, straggler_factor=4.0, min_straggler
                         "killed": sorted(killed), "timed_out": False}
 
             # straggler check -- only once a majority has landed, so a uniformly slow batch is
-            # never mistaken for a stuck one
+            # never mistaken for a stuck one.
+            #
+            # AND ONLY AGAINST COMPARABLE WORK. The heuristic assumes slow means degenerate, and
+            # on 2 August that assumption inverted: five runs were killed at 43 minutes against a
+            # 7-minute median, and they were the five doing the MOST work. The batch held five
+            # `cfl_*` replays that never divide (2000 -> 2000 cells, minutes) beside `wk_*` runs
+            # deliberately given a 69,446-cell reservoir and growing into it. The median was set
+            # by the runs that do nothing, so the growers looked like outliers -- the killer was
+            # selecting against exactly the phenotype the campaign exists to find.
+            #
+            # A run that has produced MORE FRAMES OF EVIDENCE than the median is not stuck, it is
+            # working; only a run that is slow AND has little to show is a straggler.
             settled = [finished_at[i] - t0 for i in finished_at]
             if len(settled) >= max(2, int(0.6 * len(ids))):
                 med = sorted(settled)[len(settled) // 2]
@@ -312,6 +360,8 @@ def wait_for_ids(ids, poll=60, timeout_h=24, straggler_factor=4.0, min_straggler
                 if now - t0 > limit:
                     for i in active:
                         if i in killed:
+                            continue
+                        if _is_working(i, ids):
                             continue
                         print(f"[cluster] ⏱ STRAGGLER {i}: {(now - t0) / 60:.0f} min vs median "
                               f"{med / 60:.0f} min for the batch -- killing it. A degenerate "

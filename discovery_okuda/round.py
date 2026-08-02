@@ -552,6 +552,15 @@ def _resize_reservoir(spec_path, name, run=None, frames=None):
                       f"({type(e).__name__}) -- replaying verbatim, it may saturate"))
 
 
+def _partial_evidence(nm):
+    """How many frames a run managed before it was cut. 0 if it produced nothing."""
+    try:
+        import json as _j
+        return len(_j.load(open(os.path.join(LOG, nm, "metrics.json"))).get("series") or [])
+    except Exception:
+        return 0
+
+
 def _tail_of(path, chars=600):
     """The last paragraph of an append-only file -- what the agent just added to it."""
     try:
@@ -1195,7 +1204,17 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
             if h.hid not in resolved:
                 sup.reg.resolve(h.hid, {}, "inconclusive", note="no diag.json")
                 resolved.add(h.hid)
-            refused.append((nm, "no diag.json -- the run produced no record at all"))
+            # A KILLED RUN IS TRUNCATED, NOT EMPTY. It has no diag.json because run_one writes
+            # that at the end, but every frame it did produce is on disk in metrics.json -- and
+            # those frames are evidence up to the cut, exactly as the frames before a reservoir
+            # cap are. Five runs were killed as stragglers on 2 August and every frame they had
+            # produced was discarded with them, which is the more expensive of the two mistakes.
+            _partial = _partial_evidence(nm)
+            if _partial:
+                refused.append((nm, f"KILLED mid-run, but {_partial} frames survive on disk and "
+                                    f"are evidence up to that point -- read metrics.json"))
+            else:
+                refused.append((nm, "no diag.json -- the run produced no record at all"))
             continue
         # THE ONLY DOOR the poisoned Q can come through in a round: a run's own diag.json. A
         # re-run of round N re-reads log/okuda/rNNNc_*/diag.json, and 14 of those on disk hold
