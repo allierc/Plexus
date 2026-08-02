@@ -1081,13 +1081,61 @@ The first round \textbf{sets no hypotheses}. The Proposer picks six specs alread
 Archivist's ranked table and they are re-run \emph{verbatim} --- no edits, no predictions, intent
 \code{control}, resolving \code{inconclusive} so they leave the surprise denominator. There is
 nothing to be surprised by in a replay, and a prediction attached to one would be a prediction
-about our own past arithmetic. Every number we hold was taken with at least one instrument since
-proved wrong; the product of this round is a frontier of compositions we have \emph{seen work},
-measured with instruments we are entitled to believe. It cost one agent call and 34 seconds to
-submit.
+about our own past arithmetic. Every number we held was taken with at least one instrument since
+proved wrong; the product is a frontier of compositions we have \emph{seen work}, measured with
+instruments we are entitled to believe.
 
-\textbf{What to watch}: whether the chemistry stays finite, the Collector's holes, and whether any
-run reports a protruding cell --- which would be the first in the project's history.
+\subsection*{It ran. Three rounds, then the same six specs again}
+
+\begin{center}\small
+\begin{tabular}{@{}l l r r l@{}}
+\toprule
+& \textbf{when} & \textbf{evidence} & \textbf{refused} & \textbf{specimens}\\
+\midrule
+round 1 & 22:34 & 3 & 3 & all valid\\
+round 2 & 22:55 & 2 & 4 & all valid\\
+round 3 & 23:16 & 3 & 3 & all valid\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Three \emph{distinct} rounds --- \code{r001n}, \code{r002n}, \code{r003n} all on disk together,
+the counter advancing --- at $\sim$21 minutes each, of which $\sim$5.5 is agent time. Every act
+ran every round: Collector, Interpreter correctly declining a replay, Meta-review, Archivist. The
+refusals are \code{P2\_BUFFER\_SATURATED} on the stale-reservoir specs: the Critic working, not a
+failure.
+
+\textbf{The moment worth the day} was round~2, the first time the Archivist had history to reason
+over: \emph{``continue --- sole branch is sound 3/3, best 1.01 sphere --- \textbf{a valid Track~A
+operator point}; no better branch''}. It read a sphere at \code{protr\_peak 1.01} as a legitimate
+point on the operator map rather than a failure. Ranking exactly that number \emph{as} a failure is
+what made the cold start give up three times over.
+
+\textbf{And then Cedric asked why it kept running the same spec.} It did: four rounds, the same six
+or seven runs with a swap or two. Three things made that inevitable and none of them is a bug ---
+the Archivist's ranked table is \textbf{static}, since re-measuring a run does not change its
+pattern quality; nothing told the Proposer what it had \emph{already replayed}; and recon poses no
+predictions, so the surprise rate stays null and the map cannot grow. The Archivist had said so
+itself in round~2, in one phrase: \emph{``sole branch''}.
+
+\textbf{Reconnaissance is a one-shot and I had it rolling to forty.} One round establishes the
+frontier; every round after it must be \code{composition}, which is the mode that proposes an edit,
+predicts a number and can be \emph{wrong} about it. \code{campaign\_loop.py} is now phased ---
+\code{-{}-recon-rounds} defaults to 1 --- and the two shell drivers written beside it are deleted.
+Bash cost two errors in an evening, one of them editing a script \emph{while bash was executing
+it}, which re-reads by byte offset and corrupted the running instance.
+
+\subsection*{What is running now, and what it is a test of}
+
+Twenty rounds: one reconnaissance to rebuild the frontier, then composition. \textbf{The first
+composition round is the first time anything in this project poses a falsifiable prediction and
+can be wrong about it} --- and the first use of the parents that reconnaissance produced, now that
+\code{composition.json} ships beside every spec.
+
+\textbf{What to watch}: whether the surprise rate is ever non-null (a campaign that only confirms
+has bought coverage and no knowledge), the Collector's holes, and whether any run reports a
+protruding cell --- which would be the first in the project's history, across 63 prior runs and
+these.
 \end{phasebox}
 
 \begin{phasebox}{Phase 7 --- The demonstration \hfill \todo}
