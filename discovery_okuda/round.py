@@ -685,10 +685,25 @@ def build_composition_batch(sup, cfg, n_slots, ledger):
     # and the Proposer repeated the design error because nothing carried the criticism back.
     # A reviewer whose reviews reach nobody is a reviewer measuring its own patience.
     _save_review(sup.round + 1, review)   # the round id is claimed after this returns
-    if review.get("batch_ok") is False and any(
-            i.get("severity") == "serious" for i in review.get("issues", [])):
-        print("  [reflection] SERIOUS issues -- the batch is not run as proposed.")
-        return []
+    # PEER-REVIEW ADVISES; IT CANNOT REFUSE. ROLES.md has said so since the rebuild, and this
+    # `return []` said otherwise: an advisory role was returning "no candidates", which the round
+    # reads as nothing runnable, which escalates, which exits 5 -- and two of those in a row
+    # stopped the campaign. It was stopped by an opinion, not by a finding.
+    #
+    # The distinction is the whole reason there are two roles here. The CRITIC decides whether a
+    # batch CAN be run and its refusals are enumerable, coded and arguable-with-never. The
+    # reviewer decides whether a batch is WORTH running, which is a judgement, and a judgement
+    # that can silently cost twelve GPU-hours by returning an empty list is a veto wearing an
+    # adviser's name.
+    #
+    # Its issues are already saved and handed to the next round's Proposer, which is the
+    # mechanism by which a review is supposed to change anything. That is slower than a veto and
+    # it is accountable, which is the trade this design makes everywhere else.
+    if review.get("batch_ok") is False:
+        n_ser = sum(1 for i in review.get("issues", []) if i.get("severity") == "serious")
+        print(T_.warn(f"[reflection] batch_ok=False with {n_ser} serious issue(s) -- RUNNING IT "
+                      f"ANYWAY. Peer-review advises; only the Critic refuses. The issues are "
+                      f"carried to the next Proposer."))
     return out
 
 
@@ -1034,11 +1049,21 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     # that the ledger was broken.
     trace("past captioning; entering the reading loop")
     step("reading each run: Biologist -> Metrologist -> Reader -> Eye-check")
+    # WHICH HYPOTHESES HAVE BEEN RESOLVED THIS ROUND. The register is append-only and refuses to
+    # resolve one twice -- correctly, since a rewritten verdict is not a record. Round 1 of the
+    # 2 August campaign crashed on exactly that: `R1.11.recon already resolved as inconclusive`,
+    # after the run had been refused by the Critic AND then read. The path that let it reach the
+    # second resolve is not obvious from the code, so rather than guess, the round tracks what it
+    # has already settled and skips it -- and says so, because a hypothesis reaching this twice
+    # means a control-flow fault that should not be silent.
+    resolved = set()
     rows, refused = [], []
     for nm, g, h in posed:
         d = os.path.join(LOG, nm, "diag.json")
         if not os.path.exists(d):
-            sup.reg.resolve(h.hid, {}, "inconclusive", note="no diag.json")
+            if h.hid not in resolved:
+                sup.reg.resolve(h.hid, {}, "inconclusive", note="no diag.json")
+                resolved.add(h.hid)
             refused.append((nm, "no diag.json -- the run produced no record at all"))
             continue
         # THE ONLY DOOR the poisoned Q can come through in a round: a run's own diag.json. A
@@ -1048,7 +1073,9 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         summ = read_diag_summary(d, source=nm)
         post = C.check_posthoc(summ)
         if post:
-            sup.reg.resolve(h.hid, summ, "inconclusive", note=f"NOT EVIDENCE: {post}")
+            if h.hid not in resolved:
+                sup.reg.resolve(h.hid, summ, "inconclusive", note=f"NOT EVIDENCE: {post}")
+                resolved.add(h.hid)
             print(T_.no(f"[critic] {nm} is not evidence: {post}"))
             refused.append((nm, f"critic post-hoc: {post}"))
             continue
@@ -1108,7 +1135,13 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         # that the survival number was withheld rather than measured.
         if summ.get("Q_stale"):
             why = f"{why} | {summ['Q_stale_reason']}"
-        sup.reg.resolve(h.hid, summ, outcome, run_ids=[nm], note=why)
+        if h.hid in resolved:
+            print(T_.warn(f"[round] {h.hid} reached the resolver twice -- keeping the FIRST "
+                          f"verdict. The record is append-only and this is a control-flow fault, "
+                          f"not a re-judgement."))
+        else:
+            sup.reg.resolve(h.hid, summ, outcome, run_ids=[nm], note=why)
+            resolved.add(h.hid)
         if g is not None:
             lm.add(comp_hash(g), g, an["analyst_consensus"], sc if np.isfinite(sc) else -1.0,
                    summ, nm)

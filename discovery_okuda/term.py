@@ -31,7 +31,10 @@ def _c(code):
 
 red, green, yellow, blue, dim, bold = (_c("31"), _c("32"), _c("33"), _c("36"),
                                        _c("2"), _c("1"))
-magenta, cyan, orange, violet, teal = _c("35"), _c("36"), _c("38;5;208"), _c("38;5;141"), _c("38;5;79")
+# No magenta or violet: hard to read on Cedric's terminal, and a colour nobody can read is a
+# colour that carries nothing. The palette is bright, high-contrast hues only.
+cyan, orange, teal, gold, sky = (_c("38;5;51"), _c("38;5;208"), _c("38;5;79"),
+                                _c("38;5;220"), _c("38;5;117"))
 
 # A COLOUR PER VOICE, so a wall of agent text can be read by who is speaking without reading it.
 # Grouped by what the role is FOR rather than picked at random: the two that look at the SPECIMEN
@@ -40,10 +43,10 @@ magenta, cyan, orange, violet, teal = _c("35"), _c("36"), _c("38;5;208"), _c("38
 VOICE = {
     "biologist":     teal,       # is it a tissue
     "metrologist":   teal,       # is the instrument sound
-    "eye-check":     magenta,    # the only role that looks at SHAPE
+    "eye-check":     gold,       # the only role that looks at SHAPE
     "reader":        cyan,       # what happened in this run
-    "interpreter":   violet,     # what happened this round, and why
-    "meta-review":   violet,     # what should change next round
+    "interpreter":   sky,        # what happened this round, and why
+    "meta-review":   sky,        # what should change next round
     "supervisor":    orange,     # what runs next, and how much
     "archivist":     orange,     # across the whole history
     "diagnostician": red,        # why the apparatus failed
