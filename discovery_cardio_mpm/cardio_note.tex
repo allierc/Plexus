@@ -352,6 +352,49 @@ source as comments, help strings and defaults. Any agent that reads the trainer 
 ledger whether we like it or not. Deleting those is a Phase~0 item and it is not cosmetic.
 
 %======================================================================
+\section{Where this sits in the Plexus design}
+
+\code{paper/plexus2.tex} already specifies this kind of work, and reading it changes three things
+in the plan and corrects a fourth.
+
+\textbf{The four steps are its three loops.} The paper describes \emph{Understanding} (decompose a
+model into operators, then interrogate it causally until you have a lever-map), \emph{Fitting}
+(estimate the parameters and fields differentiably, keeping each parameter attached to the operator
+it belongs to), and \emph{Discovery} (read the residual left after fitting; a persistent mismatch
+means the composition is \emph{incomplete}, not badly tuned, so propose a new operator). Track A is
+the first, the fit is the second, and \textbf{the edge that closes our cycle --- the residual
+nothing explains --- is the third.} That is reassuring: the shape was arrived at independently and
+it is the shape the design already asks for. It also supplies the mixture we had not fixed: a
+\textbf{70/30 balance of confirmation to falsification}, on the grounds that pure confirmation
+learns nothing and pure attack never consolidates.
+
+\textbf{It states the hazard we built the sham control for, in its own words:} \emph{``optimizing
+existing parameters may improve the fit while merely compensating for missing mechanisms.''} That
+is exactly why every proposed mechanism has to beat a capacity-matched twin.
+
+\textbf{It makes the Phase~3 question a gap rather than a preference.} The paper's claim is that
+\emph{``differentiability becomes a property of the language rather than of a particular
+simulator''} --- gradients propagate through compositions of explicit operators, not through
+monolithic simulation code. Measured, that is not true today for this stack: ask for a gradient
+through a specification and it returns nothing, and the inherited trainer works only by reaching
+around the library. So making the operators differentiable is not an option we prefer; it is the
+distance between the library and its own design.
+
+\textbf{And it corrects something we had wrong.} The paper is emphatic that a loss should be
+\textbf{local in space and time} --- a subset of entities over a short rollout --- because the
+backward graph grows as entities $\times$ steps and a whole-system, whole-trajectory fit becomes
+intractable, while the evidence constraining any one operator is usually confined to a small,
+transient region anyway. The inherited fit is the opposite of that: it backpropagates through a
+\emph{whole} beat, ten substeps a frame, on \emph{all} 16{,}384 particles --- roughly 530 solver
+steps per gradient --- which is very likely why a single fit costs five and a half hours. Nobody
+chose that; it was inherited. Whether a local loss recovers the same mechanism far more cheaply is
+now a Phase~3 experiment, and if it does, every budget in this note falls.
+
+\textbf{One line worth keeping in view.} The controller that drives all this is described as
+\emph{a state machine whose guards are the metrics}. If the guards are uncertified, the machine is
+ungoverned --- which is the whole argument for Phase~2 being a stop rather than a step.
+
+%======================================================================
 \section{The team, mapped onto the four steps}
 
 The rule from the Okuda rebuild carries over unchanged: \textbf{a role exists only where it adds
@@ -597,10 +640,24 @@ the corpus is not reproducible until the specs are migrated.
 
 \textbf{Still to do.}
 \begin{itemize}
-\item \textbf{Migrate the seven stale specs and re-run them}, then check the new trajectory against
-the archived one. This does three things at once: it makes the corpus reproducible, it tests
-whether that operator merge was actually behaviour-preserving --- nobody has ever checked --- and
-it exercises the rename defect on a case where we know the answer.
+\item \textbf{Regenerate the important runs, starting with the broken ones} ---
+\code{reproduce.py}. The migration is written and \textbf{all eight stale recipes now load}; the
+regeneration is running. The four phase-delayed runs go first, because they are the only
+simulations in the corpus that carry \emph{coordination} structure, and coordination is precisely
+the axis the inherited objective cannot see --- so they are the test set for the measure Phase~2
+has to invent.
+
+This is worth the compute rather than just fixing the names, because it asks a question nobody has
+asked: \textbf{was that operator merge actually behaviour-preserving?} Two operators were folded
+into one and the library moved on. If the regenerated trajectory matches the archive, the corpus is
+restored \emph{and} the merge is validated; if it does not, we have found a silent change in the
+forward model, which matters far more and which reading the diff would never have revealed.
+\emph{Everything is written to a scratch root --- the archive is never the thing being overwritten.}
+
+While writing it: the library kept backward-compatible aliases for three of the six renames
+(\code{pulse\_to\_active\_stress}, \code{p2g}, \code{g2p}) and not for the other three
+(\code{mpm\_drag}, \code{pulse\_stimulus}, \code{phase\_delay\_pulse}). There is no rule --- which
+is how the same defect keeps recurring.
 \item \textbf{Write down what each recipe predicts, before reading the measurement}, and see
 whether the descriptors reproduce it: swirl should enclose more than a fixed axis; horizontal and
 vertical should differ \emph{only} in orientation; radial should barely enclose anything. The

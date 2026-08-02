@@ -1,0 +1,19 @@
+[
+ {
+  "name": "material_active_phase_radial",
+  "changes": [
+   "operator phase_delay_pulse -> activation_pulse",
+   "operator pulse_to_active_stress -> active_stress",
+   "operator mpm_drag -> drag",
+   "drag: emit=mpm_acceleration (was implicit)",
+   "operator p2g -> mpm_scatter",
+   "operator g2p -> mpm_gather",
+   "schedule phase_delay_pulse -> activation_pulse",
+   "schedule pulse_to_active_stress -> active_stress",
+   "schedule mpm_drag -> drag",
+   "schedule substep: dt -> substep_dt"
+  ],
+  "missing": [],
+  "status": "LOADS"
+ }
+]
