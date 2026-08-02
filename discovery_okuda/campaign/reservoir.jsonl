@@ -12,3 +12,15 @@
 {"run": "wk_apical_area_neg_s2", "slot": "r001n_09_wk_apical_area", "from": 3552, "to": 73968, "cap_cells": 36986, "clamped_from_cells": null, "times_censored": 1}
 {"run": "wk_pressure_pos_s0", "slot": "r001n_10_wk_pressure_po", "from": 3552, "to": 138888, "cap_cells": 69446, "clamped_from_cells": 295863, "times_censored": 4}
 {"run": "wk_pressure_neg_s0", "slot": "r001n_11_wk_pressure_ne", "from": 3552, "to": 138888, "cap_cells": 69446, "clamped_from_cells": 295863, "times_censored": 4}
+{"run": "cfl_c001p300_d000p420", "slot": "r001n_00_cfl_c001p300_d", "from": 30000, "to": 41604, "cap_cells": 20804, "clamped_from_cells": null, "times_censored": 0}
+{"run": "cfl_c001p300_d000p280", "slot": "r001n_01_cfl_c001p300_d", "from": 30000, "to": 41604, "cap_cells": 20804, "clamped_from_cells": null, "times_censored": 0}
+{"run": "cfl_c000p080_d002p000", "slot": "r001n_02_cfl_c000p080_d", "from": 30000, "to": 41604, "cap_cells": 20804, "clamped_from_cells": null, "times_censored": 0}
+{"run": "cfl_c000p010_d010p000", "slot": "r001n_03_cfl_c000p010_d", "from": 30000, "to": 41604, "cap_cells": 20804, "clamped_from_cells": null, "times_censored": 0}
+{"run": "cfl_c000p020_d005p000", "slot": "r001n_04_cfl_c000p020_d", "from": 30000, "to": 41604, "cap_cells": 20804, "clamped_from_cells": null, "times_censored": 0}
+{"run": "wk_curvature_pos_s2", "slot": "r001n_05_wk_curvature_p", "from": 3552, "to": 138888, "cap_cells": 69446, "clamped_from_cells": 295863, "times_censored": 4}
+{"run": "wk_curvature_neg_s0", "slot": "r001n_06_wk_curvature_n", "from": 3552, "to": 138888, "cap_cells": 69446, "clamped_from_cells": 295863, "times_censored": 4}
+{"run": "wk_tension_pos_s2", "slot": "r001n_07_wk_tension_pos", "from": 3552, "to": 138888, "cap_cells": 69446, "clamped_from_cells": 295863, "times_censored": 4}
+{"run": "wk_apical_area_pos_s0", "slot": "r001n_08_wk_apical_area", "from": 3552, "to": 73968, "cap_cells": 36986, "clamped_from_cells": null, "times_censored": 1}
+{"run": "wk_apical_area_neg_s2", "slot": "r001n_09_wk_apical_area", "from": 3552, "to": 73968, "cap_cells": 36986, "clamped_from_cells": null, "times_censored": 1}
+{"run": "wk_pressure_pos_s0", "slot": "r001n_10_wk_pressure_po", "from": 3552, "to": 138888, "cap_cells": 69446, "clamped_from_cells": 295863, "times_censored": 4}
+{"run": "wk_pressure_neg_s0", "slot": "r001n_11_wk_pressure_ne", "from": 3552, "to": 138888, "cap_cells": 69446, "clamped_from_cells": 295863, "times_censored": 4}

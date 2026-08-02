@@ -85,3 +85,10 @@
 ------------------------------------------------------------------------------------------------
   ✗ [loop] round 2 exited 3 after 55.1 min wall, 7.6 min of agents
   ✗ [loop] STOPPING -- two aborted rounds in a row -- the refusal reasons are not actionable. Read campaign/round_records.jsonl and decide; do not retry.
+[loop] terminal also written to /workspace/Plexus/discovery_okuda/campaign/campaign.log
+[loop] CLEAN START -- removed 16 campaign file(s); the next round is 1
+[loop] plan: 1 recon round(s) to build the frontier, then 19 composition round(s) that can pose a hypothesis
+
+------------------------------------------------------------------------------------------------
+[loop] round 1/20  mode=recon   spent so far: 0.0 agent-min over 0 calls
+------------------------------------------------------------------------------------------------
