@@ -63,6 +63,12 @@ TERMINAL_EXITS = {
     # guaranteed to be wrong. Without this, "route back to Act 1" burns a week.
     3: "two aborted rounds in a row -- the refusal reasons are not actionable. Read "
        "campaign/round_records.jsonl and decide; do not retry.",
+    # THE DIAGNOSTICIAN STOPPED THE ROUND, and it named the guard. This is not a fact about the
+    # search space: it is a bug with an address, and the next launch fixes it rather than
+    # re-measuring it. It had to share exit 3, so the driver announced "the refusal reasons are
+    # not actionable" for a diagnosis that was precise, actionable and correct.
+    4: "the Diagnostician found an APPARATUS fault and named the guard to add. Fix the guard, "
+       "then relaunch -- more rounds cannot re-measure a broken instrument into a working one.",
 }
 
 # A ROUND THAT PRODUCED NO EVIDENCE, as a DECISION. Distinct from exit 1, which is what Python
@@ -77,6 +83,12 @@ MAX_CRASHES = 2
 # 2: a null round is a Track A result, and only a null that cost GPU time is evidence of a
 # problem. Rounds refused in Act 1 cost nothing and do not count toward this at all.
 EMPTY_STOP = 4
+# TERMINAL EXITS ARE ADVISORY WHILE THE LOOP ITSELF IS UNDER TEST. A stop rule written for a
+# campaign that is doing science stops a campaign that is being debugged: two aborted rounds
+# means "the search is stuck" when the machinery works, and "I am still building it" when it does
+# not. --keep-going downgrades every terminal exit except a repeated crash to a warning; the
+# reason is still printed, and the journal still records it.
+KEEP_GOING = False
 
 
 def _submitted_this_round():
@@ -365,6 +377,13 @@ def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None, recon_rounds=
         print(_mark(f"[loop] round {i + 1} exited {code} after {minutes} min wall, "
                     f"{spent} min of agents"))
 
+        if code in TERMINAL_EXITS and KEEP_GOING:
+            print(T_.warn(f"[loop] round {i + 1} exited {code}: {TERMINAL_EXITS[code]}"))
+            print(T_.warn("[loop] --keep-going: continuing anyway. This stop exists for a reason; "
+                          "it is suppressed because the loop is being tested, not trusted."))
+            _log({"event": "terminal_exit_ignored", "n": i + 1, "exit": code})
+            consecutive_empty, crashes = 0, 0
+            continue
         if code in TERMINAL_EXITS:
             print(T_.no(f"[loop] STOPPING -- {TERMINAL_EXITS[code]}"))
             _log({"event": "stop", "why": TERMINAL_EXITS[code], "rounds_done": done})
@@ -461,8 +480,14 @@ if __name__ == "__main__":
                     help="also write the terminal to this file, colour stripped. The terminal is "
                          "not a record: the eye-check's readings and the agents' headlines are "
                          "kept nowhere else.")
+    ap.add_argument("--keep-going", action="store_true", dest="keep_going",
+                    help="downgrade terminal exits (2, 3, 4) to warnings and continue. For "
+                         "testing the LOOP: a stop rule written for a campaign doing science "
+                         "halts one that is being debugged. A repeated crash still stops.")
     ap.add_argument("--status", action="store_true")
     a = ap.parse_args()
+    global KEEP_GOING
+    KEEP_GOING = bool(getattr(a, 'keep_going', False))
     if a.status:
         status()
         raise SystemExit(0)

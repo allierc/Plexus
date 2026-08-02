@@ -142,6 +142,11 @@ def allowed_verb(claim_kind):
 DT_GLOBAL_DEFAULT = 0.02        # translate.DT_GLOBAL; kept local so critic imports nothing heavy
 
 
+# dt*rate for an autocatalytic kinetics. 1.0 diverged in five runs on 2 August; the bound the
+# Diagnostician derived from them is 0.5.
+AUTOCATALYTIC_STEP_LIMIT = 0.5
+
+
 def _param(graph, node_id, key):
     """A node's parameter, from the graph's params overlay or the operator's default."""
     p = (getattr(graph, "params", {}) or {}).get(f"{node_id}.{key}")
@@ -216,6 +221,60 @@ def check_static(graph, seen_hashes=()):
                     f"{REACTION_PER_FRAME_LIMIT} (chi {chi}, scaled by translate.RD_PER_FRAME). "
                     f"The engine already steps the reaction once per substep, so any scaling on "
                     f"top of that is excess. Lower chi."))
+    except Exception:
+        pass
+
+    # R1d -- AUTOCATALYSIS. R1c bounds the reaction by `chi`, the RD timescale, and that is a
+    # different axis from this one: a composition can satisfy it and still explode, because the
+    # KINETICS decide how big an explicit step may be. The Diagnostician found this unaided on
+    # 2 August, from five diverged runs -- "Gierer-Meinhardt blows up UNIFORMLY at dt=1.0,
+    # explicit-Euler reaction instability, not CFL; shape=uniform (ODE, not stencil), peak
+    # 1.41e06, react is the ONLY differing param vs stable gray_scott at identical dt/chi/d_a/
+    # d_h/rate" -- and asked for exactly this guard. Uniform blow-up is an ODE exploding; a
+    # diffusion instability would have made a checkerboard.
+    #
+    # Gierer-Meinhardt is autocatalytic (da ~ rho*a^2/h), so the step that matters is dt*rate and
+    # not the linear decay `reaction_stiffness` reports -- which is why that function is
+    # deliberately unwired. brusselator is autocatalytic too but has NOT been measured to fail,
+    # so it is left alone rather than guarded on a guess.
+    try:
+        from translate import DT_GLOBAL
+        for o in graph.ops:
+            # The implementation is read from the op itself, with impl_of only as a fallback:
+            # this whole rule sits in a try/except, so an accessor that raises would make the
+            # guard silently do nothing -- which is how it first shipped, passing every one of
+            # the seven gierer_meinhardt compositions in round 2.
+            impl = o.get("impl")
+            if impl is None:
+                try:
+                    impl = graph.impl_of(o["id"])
+                except Exception:
+                    impl = None
+            if o["op"] != "cell_react" or impl != "gierer_meinhardt":
+                continue
+            # ONLY WITH DIVISION. The Diagnostician asked for a blanket refusal of
+            # gierer_meinhardt above this step, and that guard would have refused r002c_04 --
+            # the best run the campaign has produced (protr_peak 1.317, the first non-zero tube
+            # count on record), which is gierer_meinhardt at dt*rate = 1.0 and ran all 900 frames
+            # with no damage at all. The discriminator is division, not the kinetics alone:
+            # every GM composition that also divides took damage at frame 115, five out of five,
+            # at the SAME frame; the one that does not divide is clean. A guard aimed at the
+            # kinetics would have killed the finding it was meant to protect.
+            if not any(x["op"] == "divide_3d" for x in graph.ops):
+                continue
+            rate = _param(graph, o["id"], "rate")
+            step = float(DT_GLOBAL) * float(rate if rate is not None else 1.0)
+            if step > AUTOCATALYTIC_STEP_LIMIT:
+                out.append(Rejection(
+                    "R1d_AUTOCATALYTIC_UNSTABLE",
+                    "an autocatalytic reaction stepped past its explicit-Euler limit -- the "
+                    "activator diverges uniformly and the run measures an integrator, not a "
+                    "mechanism",
+                    f"gierer_meinhardt WITH divide_3d advances dt*rate = {step:.2f} per step "
+                    f"against a limit of {AUTOCATALYTIC_STEP_LIMIT} (dt {DT_GLOBAL}, rate "
+                    f"{rate}). Five such runs took damage at frame 115, all five at the same "
+                    f"frame. Lower `rate`, use gray_scott, or drop division -- gierer_meinhardt "
+                    f"without divide_3d is stable at this step and is the best run on record."))
     except Exception:
         pass
 
