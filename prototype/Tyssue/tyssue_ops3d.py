@@ -685,7 +685,13 @@ class TopoSnapshot3D(Structural):
             # fired: a division splits a cell into two roughly equal halves, so a normal daughter
             # is ~50-70% of its neighbours while the sliver test looks below 15%. It detects
             # DEGENERATE cells, not new ones. Age is the actual event, not a proxy for it.
-            age=cp("age"), ndiv=cp("ndiv")))
+            age=cp("age"), ndiv=cp("ndiv"),
+            # THE RESERVOIR, PER FRAME. divide_3d sets these on the mesh and nothing carried them
+            # into the history, so run_one read them and always found nothing -- a run that
+            # plateaued at 98.5% of its array reported buf_full False. The flag existed, the
+            # counter existed, and the one structure anybody reads afterwards did not have them.
+            div_blocked=int(m.get("div_blocked") or 0),
+            buf_full=bool(m.get("buf_full"))))
         return {}
 
 
