@@ -1,0 +1,68 @@
+{
+ "argv": [
+  "/workspace/Plexus/discovery_cardio_mpm/train.py",
+  "/workspace/Plexus/discovery_cardio_mpm/_resolution/config/material/res_sub_5.yaml",
+  "--substeps",
+  "5",
+  "--seed",
+  "11",
+  "--device",
+  "cuda:1",
+  "--outdir",
+  "/workspace/Plexus/discovery_cardio_mpm/_resolution/sub_5",
+  "--eval_dump",
+  "/workspace/Plexus/discovery_cardio_mpm/_resolution/sub_5.npz",
+  "--allow_nondeterministic_ops",
+  "1"
+ ],
+ "cwd": "/workspace/Plexus/discovery_cardio_mpm",
+ "host": "e6217cbb65bf",
+ "python": "3.12.12",
+ "git_commit": "f4290e404421ac47598dbe90c74c72bb53bbaf48",
+ "git_branch": "main",
+ "campaign_dirty": true,
+ "campaign_dirty_paths": [
+  "discovery_cardio_mpm/PREMISES.md",
+  "discovery_cardio_mpm/_data/",
+  "discovery_cardio_mpm/_metrology/premises.json",
+  "discovery_cardio_mpm/_metrology/premises_probe.log",
+  "discovery_cardio_mpm/_metrology/resolution.json",
+  "discovery_cardio_mpm/_metrology/resolution.log",
+  "discovery_cardio_mpm/_resolution/",
+  "discovery_cardio_mpm/premises.py",
+  "discovery_cardio_mpm/resolution.py",
+  "discovery_cardio_mpm/split.py"
+ ],
+ "sources": {
+  "discovery_cardio_mpm/data.py": "442fb8127fbd75099fc38ac5904274ad4294270d205b13a5758a576c7a9c9bc6",
+  "discovery_cardio_mpm/determinism.py": "95a7fd657d24e3fbd57fa006917d7edf212af23ed9b5857c6d413dd74b671749",
+  "discovery_cardio_mpm/harmonic_inherited.py": "22c0096966298b1c7f8bdd1f147eb48dfc9bfd9051e12feb0c417da7c6e3b001",
+  "discovery_cardio_mpm/provenance.py": "afafe878ebc79822deae9ac96760b0fdaa255bb18e45351be5a41ee73be9aa5c",
+  "discovery_cardio_mpm/train.py": "27339cd93ecb005cae46aebcf8a376c67beba080b300958e7916bd8a40ddc3e8"
+ },
+ "inputs": [
+  {
+   "label": "recording",
+   "path": "/workspace/Plexus/prototype/cardio_mpm/cardio_real.npz",
+   "sha256": "4070ee2ec5875f1319ac711a0cd761638de4f051b65f2259c445a528f1162d36",
+   "bytes": 54045402,
+   "content_id": "2de5cd27470d92f149b5f57c2e8251b68571c84177d674556fe3828e71c7a5cf"
+  }
+ ],
+ "rng": {
+  "seed": 11,
+  "deterministic": true,
+  "warn_only": true,
+  "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
+  "cudnn_benchmark": false,
+  "torch": "2.9.0+cu128",
+  "cuda": "12.8"
+ },
+ "spec": "material_aniso_cardio",
+ "rng_fingerprint": "19bd34ee4de1701c",
+ "torch": "2.9.0+cu128",
+ "gpu": [
+  "NVIDIA RTX A6000",
+  "NVIDIA RTX A6000"
+ ]
+}

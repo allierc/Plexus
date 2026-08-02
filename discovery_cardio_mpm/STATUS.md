@@ -43,7 +43,7 @@ in `HYPOTHESES.md` as open questions; `BELIEFS.md` has zero entries. Defaults co
 | phase | state | what it produced |
 |---|---|---|
 | 0 — make it run, make it repeat | **done** | gate 18/18, canaries 6/6; seeded, provenanced, ledger stripped from the source |
-| 1 — freeze the recording, seal the test | **4 of 7** | `METRICS.md`, `descriptors.py`, the ceiling, **the tracker number — decisive** |
+| 1 — freeze the recording, seal the test | **6 of 7** | + the resolution ladder, the frozen+sealed split, and `PREMISES.md` (2 of 8 premises fail) |
 | 1b — the corpus we already own | **in progress** | 8 stale recipes migrated and loading; first regeneration running |
 | 2 — certify the ruler, find the floor | not started | **STOP point** |
 | 3 — certify the gradient | not started | the language-vs-switches decision |
@@ -76,6 +76,11 @@ Every number below was measured in this folder, not inherited.
 | **the tracker** | two trackings of one movie: **0.996** in time, **0.27–0.29 / −0.06** in space at every beat peak, smoothing and axis conventions tested. As a model of each other: circulation right **50%** of the time, orientation error 0.77 rad (random = 0.79), LoopScore **−0.53** |
 | the corpus | 71 MPM runs, 45 GB, intact in `graphs_data/material` — `log/material/` holds only the recipe |
 | corpus reproducibility | **7 of 10 active-traction specs would not run**; all 8 migrate and load |
+| **temporal integration** | converged: substeps 5/10/20 agree to **0.8%** — *once frame-dt is held fixed* |
+| **`--substeps` is not a numerics knob** | it multiplies `dt_sub` to give the frame duration; varying it alone moves enclosed area **2.2×**. The inherited `10` is a claim about the tissue's timescale |
+| **spatial discretisation** | **NOT converged.** Enclosure follows particles-per-cell monotonically over **1.56×** across two independent knobs, no plateau. Direction and orientation are untouched |
+| **premises** | 6 of 8 hold. **Four operators in the spec never run** (`activation_pulse`, `aggregate`, `apply_material_map`, `pacemaker`). **The model is quiescent 8% of the beat where the tissue is 77%** |
+| the split | frozen: fit beat [152,204], 3 held-out beats, 17,499 scored nodes, mask frozen from the recording alone; diseased sheet sealed by content across all 3 files, seal watched refusing |
 
 ---
 
@@ -139,11 +144,13 @@ the last is irreversible and goes last.
    0.996; per-node spatial maps 0.27–0.29 / −0.06 at every beat peak; as a model of each other,
    circulation right 50% of the time and LoopScore −0.53. **Learned spatial maps across the sheet
    are not a product of this project.** Aim the loop at whole-sheet mechanisms.
-4. **The resolution check.** Finer grid, more particles, smaller sub-steps; the real motion is
-   smaller than one grid cell. The only Phase-1 item needing a GPU.
-5. **Freeze the split, seal the diseased sheet** — by content, not by filename, since the same
-   recording sits on disk under three names. A run touching it aborts; every read is logged.
-   *Irreversible: last.*
+4. ~~**The resolution check.**~~ **DONE** (`resolution.py`). Time converged; space not. And
+   `--substeps` turned out to be a physics knob, not a numerics one.
+5. ~~**Freeze the split, seal the diseased sheet.**~~ **DONE** (`split.py --freeze`, `--check`
+   passes 7/7, seal watched refusing).
+6. **The premises** (`PREMISES.md` + `premises.py`) — **in flight, 6 of 8 hold.** The two failures
+   are real and neither is waived. Remaining: wire the premise gate into the loop's step 2, and add
+   the per-run rail check (no fitted value on its bound) once there are fits to check.
 
 Plus **Phase 1b green**: the eight migrated recipes regenerate and match their archives.
 

@@ -1,0 +1,61 @@
+{
+ "verdict": "invalid",
+ "premises": [
+  {
+   "premise": "2. bounds are declared, not hidden",
+   "grade": "usual",
+   "pass": true,
+   "skipped": false,
+   "detail": "module constants present (DUR_LO, DUR_HI, GAIN_LO, GAIN_HI); overridable per run via --gain_lo/--gain_hi/--dur_hi. Every fit is checked against them below"
+  },
+  {
+   "premise": "3. every operator in the spec actually acts",
+   "grade": "certain",
+   "pass": false,
+   "skipped": false,
+   "detail": "INERT during training: ['activation_pulse', 'aggregate', 'apply_material_map', 'pacemaker'] -- instantiated and never stepped"
+  },
+  {
+   "premise": "6. the seed reaches the engine's own generator",
+   "grade": "certain",
+   "pass": true,
+   "skipped": false,
+   "detail": "two builds draw identically from H.rng (spec seed 0)"
+  },
+  {
+   "premise": "8. the recorded beat is a beat",
+   "grade": "usual",
+   "pass": true,
+   "skipped": false,
+   "detail": "0.48 Hz, quiescent 52% of the record, gaps [49, 50, 51, 52] (mean 50.5)"
+  },
+  {
+   "premise": "1. a resting sheet rests (amplitude 0)",
+   "grade": "certain",
+   "pass": true,
+   "skipped": false,
+   "detail": "interior max |disp| = 0.000e+00, centroid drift 0.000e+00"
+  },
+  {
+   "premise": "7. finite, and nothing leaves the dish",
+   "grade": "certain",
+   "pass": true,
+   "skipped": false,
+   "detail": "finite=True, all particles inside [0,1]^2=True"
+  },
+  {
+   "premise": "4. inside the MPM stability envelope",
+   "grade": "certain",
+   "pass": true,
+   "skipped": false,
+   "detail": "max 0.0136 grid cells per substep (bound 0.4, from mpm_gather's own vmax)"
+  },
+  {
+   "premise": "8b. the model rests as much as the tissue does",
+   "grade": "usual",
+   "pass": false,
+   "skipped": false,
+   "detail": "simulated quiescent 8% vs recorded 77% of the SAME window -- the recording rests, the model barely does"
+  }
+ ]
+}

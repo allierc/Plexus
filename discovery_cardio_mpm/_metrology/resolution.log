@@ -1,0 +1,22 @@
+[resolution] inherited: n_grid=128 particles=16384 substeps=10
+[resolution] grid_96: n_grid=96 particles=16384 substeps=10
+[resolution] grid_192: n_grid=192 particles=16384 substeps=10
+[resolution] part_8k: n_grid=128 particles=8192 substeps=10
+[resolution] part_32k: n_grid=128 particles=32768 substeps=10
+[resolution] sub_5: n_grid=128 particles=16384 substeps=5
+[resolution] sub_20: n_grid=128 particles=16384 substeps=20
+
+========================================================================================================
+  RESOLUTION -- the same configuration at different discretisations
+========================================================================================================
+  variant        parts  magnitude   opening    loopy  direction  orient rad
+  inherited      16384     1.8277    1.7695   0.7312     0.6721      0.4031
+  grid_96        16384     1.9458    1.6939   0.6427     0.6574      0.3948
+  grid_192       16384     1.5018    1.7938   0.9687     0.6636      0.3937
+  part_8k         8192     1.6546    2.0185   0.9304     0.6559      0.4316
+  part_32k       32768     1.9592    1.6609   0.6216     0.6587      0.3952
+  sub_5          16384     2.0017    3.8585   1.2132     0.6774      0.4438
+  sub_20         16384     1.9278    3.5757   1.2960     0.6730      0.3882
+
+  Read as DELTA from the inherited point. A delta larger than the seed-noise
+  floor (Phase 2) means the discretisation is a lever and must be declared.
