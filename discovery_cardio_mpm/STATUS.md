@@ -52,7 +52,7 @@ in `HYPOTHESES.md` as open questions; `BELIEFS.md` has zero entries. Defaults co
 | 0 — make it run, make it repeat | **done** | gate 18/18, canaries 6/6; seeded, provenanced, ledger stripped from the source |
 | 1 — freeze the recording, seal the test | **done (7 of 7)** | the ceiling, the tracker floor, the resolution ladder, the frozen+sealed split, `PREMISES.md` (2 of 8 fail, recorded not waived) |
 | 1b — the corpus we already own | **done** | 8 recipes migrated; **the operator merge is NOT behaviour-preserving** |
-| 2 — certify the ruler, find the floor | not started | **STOP point** |
+| 2 — certify the ruler, find the floor | **1 of 7** | the null bank is measured: **the bar is +0.851 on the fit beat, +0.62 held-out** — copying the previous beat, no physics. **STOP point** |
 | 3 — certify the gradient | not started | the language-vs-switches decision |
 | 4 — what a fit may claim, build the gate | not started | **STOP point** |
 | 5–8 — first round, campaign, seal-break, method claim | not started | |
@@ -89,6 +89,8 @@ Every number below was measured in this folder, not inherited.
 | **two open defects** | **the warm-up does not settle (33% shift)** — found only because the audit noticed premise 5 had never been implemented; it underwrites every gradient. And **the model rests 8% of the beat where the tissue rests 77%**, which the objective cannot see |
 | **the fitting recipe** | four operators were declared and never stepped; there is now a fitting recipe that says what the fit runs, and the removal is **proved** harmless — fits under both are bit-identical over 198,407 parameters |
 | **premises** (after the audit) | **11 of 13 hold; verdict AMBIGUOUS.** Static set is VALID 8/8 (premise 3 closed properly, not waived; coverage check added). The two forward-probe failures are both graded *usual*: **the warm-up does not settle — one extra beat moves the fitted window 33%** (Phase 3 owes an answer), and the model rests 8% of the beat where the tissue rests 77% |
+| **the null bank** (Phase 2) | predict nothing **+0.070** · slide the sheet **−0.020** · **copy the previous beat +0.851 (fit), +0.62 (held-out)** · interpolate from the pinned edge **−0.118** · muscle off **+0.070, exactly the do-nothing score** · fields untrained **−0.880**. The previous campaign's best was 0.545 — below even the held-out bar |
+| **particle layout is DEVICE-dependent** | same seed, CPU vs GPU → positions differ by the sheet width; changing the seed changes nothing. A CPU fit and a GPU fit are not the same model. Phase 0 compared like with like and could not see it |
 | the split | frozen: fit beat [152,204], 3 held-out beats, 17,499 scored nodes, mask frozen from the recording alone; diseased sheet sealed by content across all 3 files |
 | **the seal** | attacked 3 times before it held. Now refuses the sealed specimen in 4 unit conventions, cropped, and subsampled. Same specimen r=0.991–1.000, different specimen r=0.151–0.224, threshold 0.90 in the gap |
 | **the operator merge** | **NOT behaviour-preserving.** Two runs of the migrated recipe are BIT-IDENTICAL (0.0); the archive differs by 1.5e-4 after 3 frames, growing monotonically from frame 1. So the archive is evidence about a model we can no longer run |
@@ -146,9 +148,9 @@ Recorded because they are the argument for the apparatus.
 Phase 1 is closed. Everything below is Phase 2: **certify the ruler and find the floor.** Its gates
 are already written in the note; the work is:
 
-1. **Where is zero.** Score the trivial models — no motion, mean motion, **copy the previous beat**,
-   interpolate from the pinned edge, muscle off, fields present but untrained. Everything afterwards
-   is reported as a *difference from that floor*, never as a bare number.
+1. ~~**Where is zero.**~~ **DONE** (`floors.py`). Bar = **+0.851** fit / **+0.62** held-out, set by
+   copying the previous beat. Muscle-off scores exactly the do-nothing score, so the anchoring buys
+   nothing. Everything from here is reported as a difference from the do-nothing row.
 2. **How big is nothing.** Same config, several seeds, at the depth the loop will use. That spread
    becomes the unit of the campaign. Note both floors are needed: across-seed *and* same-seed
    (the GPU path is not bit-deterministic; the generate path is).

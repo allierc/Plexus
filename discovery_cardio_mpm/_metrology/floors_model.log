@@ -1,0 +1,28 @@
+
+========================================================================================================
+  PHASE 2 ITEM 1 -- WHERE IS ZERO
+========================================================================================================
+  10516 scored particles of 16384 (5198 in the pinned band), 49-frame beats, frozen split 3952f05efed25ee4
+
+  model                  window      LoopScore    vs N0    peak  opening   chir
+  N0_zero                fit            0.0700  +0.0000   0.000    0.000  0.000
+  N0_zero                heldout0       0.0669  -0.0030   0.000    0.000  0.000
+  N0_zero                heldout1       0.0666  -0.0034   0.000    0.000  0.000
+  N0_zero                heldout2       0.0682  -0.0017   0.000    0.000  0.000
+  N1_mean_translation    fit           -0.0195  -0.0894   0.479    0.468  0.669
+  N1_mean_translation    heldout0      -0.0497  -0.1197   0.482    0.421  0.642
+  N1_mean_translation    heldout1       0.0228  -0.0471   0.517    0.319  0.610
+  N1_mean_translation    heldout2      -0.0005  -0.0705   0.489    0.329  0.624
+  N2_replay              fit            0.8514  +0.7814   1.019    0.939  0.932
+  N2_replay              heldout1       0.6350  +0.5651   0.951    1.025  0.947
+  N2_replay              heldout2       0.6121  +0.5421   1.026    1.066  0.952
+  N3_boundary            fit           -0.1175  -0.1875   0.641    0.448  0.601
+  N3_boundary            heldout0      -0.1424  -0.2124   0.646    0.449  0.579
+  N3_boundary            heldout1      -0.1837  -0.2537   0.643    0.433  0.565
+  N3_boundary            heldout2      -0.1466  -0.2166   0.622    0.432  0.561
+  N4_passive             fit            0.0700  -0.0000   0.000    0.000  0.000
+  N5_sham_fields         fit           -0.8801  -0.9500   2.530    2.247  0.518
+
+  Everything afterwards is reported as the 'vs N0' column, never as the bare score.
+  The active model has to beat the BEST of these by more than the noise (item 2).
+========================================================================================================

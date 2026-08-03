@@ -1,8 +1,9 @@
 {
- "verdict": "invalid",
+ "verdict": "ambiguous",
  "verdict_this_run": "ambiguous",
  "premises": [
   {
+   "id": "0",
    "premise": "0. every declared premise has a check",
    "grade": "certain",
    "pass": true,
@@ -10,6 +11,7 @@
    "detail": "8 declared, 8 implemented"
   },
   {
+   "id": "1",
    "premise": "1. a resting sheet rests (amplitude 0)",
    "grade": "certain",
    "pass": true,
@@ -17,6 +19,7 @@
    "detail": "interior max |disp| = 0.000e+00, centroid drift 0.000e+00"
   },
   {
+   "id": "2",
    "premise": "2. bounds are declared, not hidden",
    "grade": "usual",
    "pass": true,
@@ -24,6 +27,7 @@
    "detail": "module constants present (DUR_LO, DUR_HI, GAIN_LO, GAIN_HI); overridable per run via --gain_lo/--gain_hi/--dur_hi. Every fit is checked against them below"
   },
   {
+   "id": "3",
    "premise": "3. every operator in the fitting recipe acts",
    "grade": "certain",
    "pass": true,
@@ -31,20 +35,7 @@
    "detail": "all 6 act: active_stress, drag, mpm_gather, mpm_grid_update, mpm_scatter, mpm_strain"
   },
   {
-   "premise": "3. every operator in the spec actually acts",
-   "grade": "certain",
-   "pass": false,
-   "skipped": false,
-   "detail": "INERT during training: ['activation_pulse', 'aggregate', 'apply_material_map', 'pacemaker'] -- instantiated and never stepped"
-  },
-  {
-   "premise": "3b. the fitting recipe is equivalent to the generation recipe",
-   "grade": "certain",
-   "pass": true,
-   "skipped": false,
-   "detail": "fits under both are bit-identical over 198407 parameters (removed: pacemaker, activation_pulse, aggregate, apply_material_map)"
-  },
-  {
+   "id": "4",
    "premise": "4. inside the MPM stability envelope",
    "grade": "certain",
    "pass": true,
@@ -52,6 +43,7 @@
    "detail": "max 0.0136 grid cells per substep (bound 0.4, read from mpm_gather; n_grid=128, substeps=10)"
   },
   {
+   "id": "5",
    "premise": "5. the warm-up settles",
    "grade": "usual",
    "pass": false,
@@ -59,6 +51,7 @@
    "detail": "one extra beat of warm-up moves the fitted window by 32.67% (max |d| 2.932e-03 against a signal of 8.976e-03)"
   },
   {
+   "id": "6",
    "premise": "6. the seed reaches the engine's own generator",
    "grade": "certain",
    "pass": true,
@@ -66,6 +59,7 @@
    "detail": "two builds draw identically from H.rng (spec seed 0)"
   },
   {
+   "id": "7",
    "premise": "7. finite, and nothing leaves the dish",
    "grade": "certain",
    "pass": true,
@@ -73,6 +67,7 @@
    "detail": "finite=True, all particles inside [0,1]^2=True"
   },
   {
+   "id": "8",
    "premise": "8. the recorded beat is a beat",
    "grade": "usual",
    "pass": true,
@@ -80,6 +75,15 @@
    "detail": "0.48 Hz, quiescent 52% of the record, gaps [49, 50, 51, 52] (mean 50.5)"
   },
   {
+   "id": "3b",
+   "premise": "3b. the fitting recipe is equivalent to the generation recipe",
+   "grade": "certain",
+   "pass": true,
+   "skipped": false,
+   "detail": "fits under both are bit-identical over 198407 parameters (removed: pacemaker, activation_pulse, aggregate, apply_material_map)"
+  },
+  {
+   "id": "8b",
    "premise": "8b. the model rests as much as the tissue does",
    "grade": "usual",
    "pass": false,
@@ -87,18 +91,12 @@
    "detail": "simulated quiescent 8% vs recorded 77% of the SAME window -- the recording rests, the model barely does"
   },
   {
+   "id": "canary",
    "premise": "canary: rail check refuses a fit in the middle of its range",
    "grade": "certain",
    "pass": true,
    "skipped": false,
    "detail": "none on a bound"
-  },
-  {
-   "premise": "canary: rail check refuses a fit pinned to its upper bound",
-   "grade": "certain",
-   "pass": true,
-   "skipped": false,
-   "detail": "RAILS: raw_g=2.5 at 100.0% of [0.1,2.5]"
   }
  ]
 }

@@ -1,0 +1,233 @@
+{
+ "geometry_check": {
+  "relative_mismatch": 3.2977809412084266e-05,
+  "abs": 1.1324882509544665e-07,
+  "signal": 0.003434091806411743
+ },
+ "support": {
+  "particles": 16384,
+  "scored": 10516,
+  "band": 5198,
+  "beat_frames": 49
+ },
+ "split_sha": "3952f05efed25ee4daa132f7b1ec4997b7943e949e2f49a3946424bd3b60de3d",
+ "models": {
+  "N0_zero": {
+   "note": "predict no motion at all. THE ORIGIN: every score below is a difference from this.",
+   "windows": {
+    "fit": {
+     "magnitude_peak": 0.0,
+     "opening_area": 0.0,
+     "opening_loopiness": 0.0,
+     "direction_chirality": 0.0,
+     "shape_minor_fraction": 0.0,
+     "orientation_rad": 0.7841267922291832,
+     "loopscore": 0.069977767765522,
+     "loopscore_sd": 0.10387394577264786,
+     "interior_r2": -0.8308491706848145
+    },
+    "heldout0": {
+     "magnitude_peak": 0.0,
+     "opening_area": 0.0,
+     "opening_loopiness": 0.0,
+     "direction_chirality": 0.0,
+     "shape_minor_fraction": 0.0,
+     "orientation_rad": 0.7930764151241463,
+     "loopscore": 0.066928930580616,
+     "loopscore_sd": 0.09965300559997559,
+     "interior_r2": -0.795685887336731
+    },
+    "heldout1": {
+     "magnitude_peak": 0.0,
+     "opening_area": 0.0,
+     "opening_loopiness": 0.0,
+     "direction_chirality": 0.0,
+     "shape_minor_fraction": 0.0,
+     "orientation_rad": 0.7942340101637395,
+     "loopscore": 0.06662359833717346,
+     "loopscore_sd": 0.10093867778778076,
+     "interior_r2": -0.8396971225738525
+    },
+    "heldout2": {
+     "magnitude_peak": 0.0,
+     "opening_area": 0.0,
+     "opening_loopiness": 0.0,
+     "direction_chirality": 0.0,
+     "shape_minor_fraction": 0.0,
+     "orientation_rad": 0.7830539500542427,
+     "loopscore": 0.06822996586561203,
+     "loopscore_sd": 0.10101824253797531,
+     "interior_r2": -0.8903695344924927
+    }
+   }
+  },
+  "N1_mean_translation": {
+   "note": "the whole sheet slides by the field average: right timing, right amplitude, no shape",
+   "windows": {
+    "fit": {
+     "magnitude_peak": 0.4791483804005549,
+     "opening_area": 0.4683119574819908,
+     "opening_loopiness": 1.4180279563382632,
+     "direction_chirality": 0.6691707873716242,
+     "shape_minor_fraction": 0.8972860961875981,
+     "orientation_rad": 0.6253938178265708,
+     "loopscore": -0.019459635019302368,
+     "loopscore_sd": 0.6480457782745361,
+     "interior_r2": -0.49992525577545166
+    },
+    "heldout0": {
+     "magnitude_peak": 0.4816371688108174,
+     "opening_area": 0.4205174965064003,
+     "opening_loopiness": 1.2335750952029712,
+     "direction_chirality": 0.6422594142259415,
+     "shape_minor_fraction": 0.6795164063620267,
+     "orientation_rad": 0.6163001935902472,
+     "loopscore": -0.04973956197500229,
+     "loopscore_sd": 0.6349734663963318,
+     "interior_r2": -0.46073460578918457
+    },
+    "heldout1": {
+     "magnitude_peak": 0.51734332881718,
+     "opening_area": 0.3189870397684984,
+     "opening_loopiness": 0.9402208713150867,
+     "direction_chirality": 0.6096424496006086,
+     "shape_minor_fraction": 0.7027488433887232,
+     "orientation_rad": 0.6708270997076261,
+     "loopscore": 0.022833041846752167,
+     "loopscore_sd": 0.4457646906375885,
+     "interior_r2": -0.47879302501678467
+    },
+    "heldout2": {
+     "magnitude_peak": 0.48933489139225195,
+     "opening_area": 0.3293889553338618,
+     "opening_loopiness": 1.3162261327707951,
+     "direction_chirality": 0.6238113351084063,
+     "shape_minor_fraction": 0.9187749942673933,
+     "orientation_rad": 0.7030872862676787,
+     "loopscore": -0.0004826025397051126,
+     "loopscore_sd": 0.5541393756866455,
+     "interior_r2": -0.5858597755432129
+    }
+   }
+  },
+  "N2_replay": {
+   "note": "predict this beat by copying the previous one. No physics, no parameters, no fit.",
+   "windows": {
+    "fit": {
+     "magnitude_peak": 1.0188259358761813,
+     "opening_area": 0.9385766473636588,
+     "opening_loopiness": 0.9738283466482944,
+     "direction_chirality": 0.9321985545834918,
+     "shape_minor_fraction": 1.1248765519578114,
+     "orientation_rad": 0.0817486333411721,
+     "loopscore": 0.8514261841773987,
+     "loopscore_sd": 0.2666616141796112,
+     "interior_r2": 0.9103135466575623
+    },
+    "heldout1": {
+     "magnitude_peak": 0.9507781372444505,
+     "opening_area": 1.0249690957958884,
+     "opening_loopiness": 1.0221097016681553,
+     "direction_chirality": 0.947223278813237,
+     "shape_minor_fraction": 0.9217344679720628,
+     "orientation_rad": 0.058988283807309944,
+     "loopscore": 0.6350313425064087,
+     "loopscore_sd": 0.5415794849395752,
+     "interior_r2": 0.8468159437179565
+    },
+    "heldout2": {
+     "magnitude_peak": 1.0260326422944601,
+     "opening_area": 1.0664155845430243,
+     "opening_loopiness": 0.9937181098380617,
+     "direction_chirality": 0.951977938379612,
+     "shape_minor_fraction": 1.0257070049069867,
+     "orientation_rad": 0.030358296342286227,
+     "loopscore": 0.612076997756958,
+     "loopscore_sd": 0.5738832950592041,
+     "interior_r2": 0.9642461538314819
+    }
+   }
+  },
+  "N3_boundary": {
+   "note": "interpolate inward from the pinned band, harmonically. What the anchoring is worth.",
+   "windows": {
+    "fit": {
+     "magnitude_peak": 0.6410956003099272,
+     "opening_area": 0.44750211292974645,
+     "opening_loopiness": 0.9519316501496379,
+     "direction_chirality": 0.6010840623811335,
+     "shape_minor_fraction": 0.8767761671583657,
+     "orientation_rad": 0.8073231420744333,
+     "loopscore": -0.11749392747879028,
+     "loopscore_sd": 0.6186384558677673,
+     "interior_r2": -1.034254789352417
+    },
+    "heldout0": {
+     "magnitude_peak": 0.6463215359545058,
+     "opening_area": 0.44874335930603815,
+     "opening_loopiness": 0.8854531708676687,
+     "direction_chirality": 0.5794028147584633,
+     "shape_minor_fraction": 0.875231288318983,
+     "orientation_rad": 0.8048469255188067,
+     "loopscore": -0.1424447000026703,
+     "loopscore_sd": 0.6118763089179993,
+     "interior_r2": -0.9832333326339722
+    },
+    "heldout1": {
+     "magnitude_peak": 0.6425737860608927,
+     "opening_area": 0.4330574442505238,
+     "opening_loopiness": 0.847339473418446,
+     "direction_chirality": 0.5649486496766831,
+     "shape_minor_fraction": 0.829715026265959,
+     "orientation_rad": 0.8122587876683395,
+     "loopscore": -0.18374782800674438,
+     "loopscore_sd": 0.5910648107528687,
+     "interior_r2": -1.0443832874298096
+    },
+    "heldout2": {
+     "magnitude_peak": 0.6221546146029009,
+     "opening_area": 0.43214626523743743,
+     "opening_loopiness": 0.9372707984016376,
+     "direction_chirality": 0.5611449220235831,
+     "shape_minor_fraction": 0.8495066607756414,
+     "orientation_rad": 0.8146775485475369,
+     "loopscore": -0.14658652245998383,
+     "loopscore_sd": 0.5912039279937744,
+     "interior_r2": -1.1609902381896973
+    }
+   }
+  },
+  "N4_passive": {
+   "note": "the real model with the muscle switched off",
+   "windows": {
+    "fit": {
+     "magnitude_peak": 0.0,
+     "opening_area": 0.0,
+     "opening_loopiness": 0.0,
+     "direction_chirality": 0.0,
+     "shape_minor_fraction": 0.0,
+     "orientation_rad": 0.7841296384364507,
+     "loopscore": 0.0699775293469429,
+     "loopscore_sd": 0.10387339442968369,
+     "interior_r2": -0.8308486938476562
+    }
+   }
+  },
+  "N5_sham_fields": {
+   "note": "the real model with its fields PRESENT but never trained -- freezing a field is not removing it",
+   "windows": {
+    "fit": {
+     "magnitude_peak": 2.530332441215361,
+     "opening_area": 2.2467093458845304,
+     "opening_loopiness": 0.692139244641511,
+     "direction_chirality": 0.5178775199695702,
+     "shape_minor_fraction": 0.5168898936471815,
+     "orientation_rad": 0.7697954232502674,
+     "loopscore": -0.8800683617591858,
+     "loopscore_sd": 0.35650691390037537,
+     "interior_r2": -15.845102310180664
+    }
+   }
+  }
+ }
+}

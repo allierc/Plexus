@@ -50,7 +50,12 @@ class Verdicts:
         self.rows = []
 
     def add(self, n, grade, ok, detail="", skipped=False):
-        self.rows.append({"premise": n, "grade": grade, "pass": bool(ok),
+        # `id` is the stable key: the leading number, or the whole label for the canaries. Merging
+        # on the LABEL was wrong and bit immediately -- renaming premise 3 ("in the spec" ->
+        # "in the fitting recipe") left the old failing row in the record for ever, and it went on
+        # voting. A merge keyed on prose is a merge that accumulates zombies.
+        pid = n.split(".")[0].strip() if n[0].isdigit() else n.split(":")[0].strip()
+        self.rows.append({"id": pid, "premise": n, "grade": grade, "pass": bool(ok),
                           "skipped": bool(skipped), "detail": str(detail)})
         return ok
 
@@ -442,10 +447,13 @@ def main(argv=None):
             prev = json.load(open(out))
         except Exception:
             prev = {}
-    rows = {r["premise"]: r for r in (prev.get("premises") or [])}
+    rows = {r.get("id", r["premise"]): r for r in (prev.get("premises") or [])}
     for r in V.rows:
-        rows[r["premise"]] = r
-    merged = sorted(rows.values(), key=lambda r: r["premise"])
+        rows[r["id"]] = r
+    # and drop anything whose id no longer corresponds to a check this code produces
+    known = {r["id"] for r in V.rows} | {str(i) for i in IMPLEMENTED} | {"0", "3b", "8b", "9"}
+    merged = sorted((r for k, r in rows.items() if k in known),
+                    key=lambda r: (len(r["id"]), r["id"]))
     broken = [r for r in merged if not r["pass"] and not r["skipped"]]
     overall = ("invalid" if any(r["grade"] == CERTAIN for r in broken)
                else "ambiguous" if broken else "valid")
