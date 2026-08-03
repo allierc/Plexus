@@ -1140,7 +1140,7 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     print("=" * 96)
 
     _T0[0] = time.time()
-    act("ACT 1 - PROPOSE", "before a second of compute is spent")
+    act("ACT 1 - PROPOSE")
     _purge_round_configs(rid, mode)    # F18: stale configs must not shadow this round's
     if mode == "theta":
         cands = build_theta_batch(base, param, values, batch)
@@ -1251,8 +1251,15 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     act("ACT 2 - MEASURE", f"submitting {len(names)} simulation(s) -- the only expensive step")
     ids = cluster.submit(names, frames=frames, do_q=True, campaign=f"round{rid}")
     if not ids:
-        print("[round] submission did not land -- aborting rather than scoring nothing")
-        return bk.finish(rid, "submit_failed", 1)
+        # EXIT 6, NOT 1. A submission that did not land is a fact about the CLUSTER, not about
+        # this code, and exit 1 is what Python gives an uncaught exception -- so the driver
+        # printed "round 1 CRASHED (uncaught exception). That is a bug in the CODE, not a
+        # finding about the batch" for an ssh/queue problem, and counted it toward MAX_CRASHES.
+        # Twelve jobs were left running with nobody watching them.
+        print(T_.no("[round] submission did not land -- aborting rather than scoring nothing. "
+                    "This is a CLUSTER fact, not a crash: check ssh and the queue before "
+                    "relaunching, and check `bjobs` for orphans from this attempt."))
+        return bk.finish(rid, "submit_failed", 6)
     # The return value used to be discarded, so "all six finished" and "we waited 24 h and gave
     # up" were indistinguishable. A killed straggler is recorded and its hypothesis is resolved
     # `inconclusive` below (no diag.json), which keeps a degenerate slot out of the surprise rate

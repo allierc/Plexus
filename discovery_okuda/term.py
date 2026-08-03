@@ -23,7 +23,8 @@ import os
 import re
 import sys
 
-_ON = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
+_ON = (bool(os.environ.get("FORCE_COLOR")) or sys.stdout.isatty()) \
+      and not os.environ.get("NO_COLOR")
 
 
 def _c(code):
@@ -211,6 +212,7 @@ class _Colourise:
             return self._s.write(text)
         out = []
         for line in text.splitlines(True):
+            line = line.lstrip(" \t") if line.strip() else line
             m = self._TAG.match(line)
             if m and m.group(2) in VOICE:
                 # VOICE values are the colour FUNCTIONS built by _c(), not escape strings.
@@ -226,6 +228,11 @@ class _Colourise:
 
 
 def install_line_colour():
-    """Call once, at process start. No-op when not a terminal."""
-    if _ON and not isinstance(sys.stdout, _Colourise):
+    """Call once, at process start.
+
+    Installed even when colour is OFF, because it also strips the per-call-site indentation --
+    every print carried its own two-to-six leading spaces and the output drifted right depending
+    on which role was speaking.
+    """
+    if not isinstance(sys.stdout, _Colourise):
         sys.stdout = _Colourise(sys.stdout)
