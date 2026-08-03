@@ -1,0 +1,130 @@
+{
+ "material_active_horizontal": {
+  "magnitude_peak": {
+   "median": 0.008194409329213252,
+   "sd": 0.0028021808477047935
+  },
+  "magnitude_energy": {
+   "median": 0.021657672797099996,
+   "sd": 0.0067478440000167915
+  },
+  "opening_area": {
+   "median": 2.54066952365406e-06,
+   "sd": 2.8128985809897797e-06
+  },
+  "opening_loopiness": {
+   "median": 0.22358397653815518,
+   "sd": 0.1781751259567119
+  },
+  "orientation_rad": {
+   "median": 2.6788536784339185,
+   "sd": 1.3924554427718674
+  },
+  "shape_minor_fraction": {
+   "median": 0.0032231174497318734,
+   "sd": 0.0465138406599549
+  },
+  "direction_coherence": {
+   "median": 0.09067112629971642,
+   "sd": 0.9958808898937369,
+   "note": "1 = every node turns the same way, 0 = no net sense"
+  },
+  "n_nodes": 13753
+ },
+ "material_active_vertical": {
+  "magnitude_peak": {
+   "median": 0.007611874012684577,
+   "sd": 0.0023367723576444934
+  },
+  "magnitude_energy": {
+   "median": 0.02720017454346816,
+   "sd": 0.009639523667694973
+  },
+  "opening_area": {
+   "median": 6.829657554829893e-06,
+   "sd": 5.18238698593145e-06
+  },
+  "opening_loopiness": {
+   "median": 0.43919194837486725,
+   "sd": 0.1670482811675151
+  },
+  "orientation_rad": {
+   "median": 1.5668735419790365,
+   "sd": 0.33841162273051756
+  },
+  "shape_minor_fraction": {
+   "median": 0.026788197790967645,
+   "sd": 0.05461177238271537
+  },
+  "direction_coherence": {
+   "median": 0.14435174149119323,
+   "sd": 0.9895264396308266,
+   "note": "1 = every node turns the same way, 0 = no net sense"
+  },
+  "n_nodes": 15102
+ },
+ "material_active_swirl": {
+  "magnitude_peak": {
+   "median": 0.007462955390132126,
+   "sd": 0.0021291478377669817
+  },
+  "magnitude_energy": {
+   "median": 0.02156476684893391,
+   "sd": 0.0049857482502667924
+  },
+  "opening_area": {
+   "median": 5.159353784867093e-06,
+   "sd": 9.631076451049335e-06
+  },
+  "opening_loopiness": {
+   "median": 0.3162758495910255,
+   "sd": 0.18469074117970996
+  },
+  "orientation_rad": {
+   "median": 1.4512916173344772,
+   "sd": 0.8603420068920468
+  },
+  "shape_minor_fraction": {
+   "median": 0.028572345914918276,
+   "sd": 0.06652648838870359
+  },
+  "direction_coherence": {
+   "median": 0.022967189728958632,
+   "sd": 0.9997362193078502,
+   "note": "1 = every node turns the same way, 0 = no net sense"
+  },
+  "n_nodes": 14020
+ },
+ "material_active_radial_in": {
+  "magnitude_peak": {
+   "median": 0.005356142066033428,
+   "sd": 0.002015274222367277
+  },
+  "magnitude_energy": {
+   "median": 0.015332633352120423,
+   "sd": 0.006991432172557672
+  },
+  "opening_area": {
+   "median": 4.095853113561532e-06,
+   "sd": 3.5505767085643862e-06
+  },
+  "opening_loopiness": {
+   "median": 0.3458447982537879,
+   "sd": 0.20308426358893997
+  },
+  "orientation_rad": {
+   "median": 1.573439422906929,
+   "sd": 0.8951681213118694
+  },
+  "shape_minor_fraction": {
+   "median": 0.033929340934070844,
+   "sd": 0.07910160286767934
+  },
+  "direction_coherence": {
+   "median": 0.005279562368806056,
+   "sd": 0.9999860630134773,
+   "note": "1 = every node turns the same way, 0 = no net sense"
+  },
+  "n_nodes": 15721
+ }
+}

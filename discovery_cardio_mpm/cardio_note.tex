@@ -67,22 +67,43 @@ Plain English throughout. Organised by phase, because phases are where we stop a
 %======================================================================
 \section{What we are doing --- two things at once}
 
-\textbf{Track A --- build the method.} The same automated loop as the Okuda folder: it proposes a
-change to the \emph{mechanism}, writes down what it expects before running, runs, measures, and
-records whether it was right. One thing here is new and it changes the machine. In the Okuda loop a
-run is a simulation that is then scored. Here a run is a \emph{fit}: the simulation is
-differentiable, so the computer can be told ``make this match the recording'' and it will adjust the
-model until it does. That is a far stronger instrument and a far more dangerous one, and most of the
-pre-flight work below exists because of the second half of that sentence.
+\textbf{Track A --- understand the model on its own terms, before any data is involved.} An
+automated loop that explores what this piece of physics actually \emph{does}: switch a mechanism
+off, sweep a parameter across its range, change which operator drives which, and record where the
+system goes. It writes down what it expects before running, runs the simulation, measures, and
+records whether it was right. \textbf{No recording is consulted at all.} The product is a causal
+map --- which mechanism moves which feature of the beat, what each one buys on its own, and the
+harder part, what they do in combination, since mixtures rarely surrender their structure to
+inspection.
 
-\textbf{Track B --- reproduce the beating tissue, as the proof that Track A works.} We have a
-microscope recording of a sheet of human heart-muscle cells contracting on a soft gel, and one of a
-diseased sheet from a patient with a thickened heart muscle. The target is no longer a picture from
-someone's paper --- it is a measurement, with error bars we can compute ourselves. \emph{The
+The discipline that makes it worth building is the same one the Okuda folder uses: \emph{a change
+of numbers can never masquerade as a new idea.} A retuned parameter is not a new mechanism, and the
+loop is built so it cannot be recorded as one.
+
+Track A has no success rule and does not need one. A sweep that finds nothing has still filled in
+the map, and a mechanism shown to do nothing is a result. What can be counted is how much of the
+space has been \emph{measured} rather than merely proposed, and how often a written prediction
+turned out wrong.
+
+\textbf{Track B --- fit the real recording, using what Track A learned.} We have a microscope
+recording of a sheet of human heart-muscle cells contracting on a soft gel, and one of a diseased
+sheet from a patient with a thickened heart muscle. Here the simulation is \emph{differentiable}, so
+the computer can be told ``make this match the recording'' and it will adjust the model until it
+does. That is a far stronger instrument than a sweep, and a far more dangerous one --- and most of
+the pre-flight work below exists because of the second half of that sentence. \emph{The
 reproduction is the evidence.}
 
-The two tracks feed each other exactly as before: the reproduction is the honest test of the method,
-and the method is what makes the reproduction more than curve-fitting.
+\textbf{Why the order matters, and it is the whole argument.} A fit will always find something. Turn
+an optimiser loose on a model with two freely-shaped fields and it will match the recording without
+telling you anything about the tissue --- and the previous campaign spent sixty rounds discovering
+exactly that. Track A is what makes the fit mean something: if we already know, from the forward
+model alone, which mechanism controls which feature and which parameters the model cannot tell
+apart, then a fitted number is a statement about the tissue rather than about the optimiser. And
+Track B is the honest test of Track A --- a map that cannot explain a real measurement is a map of
+nothing.
+
+So the tracks run in that order and feed each other: \textbf{A builds the knowledge, B spends it,
+and what B cannot explain goes back to A as the next thing to sweep.}
 
 %======================================================================
 \section{Where we actually are}
@@ -104,13 +125,6 @@ hypotheses are probably right, and we will find out which in the ordinary way.}
 trainer still defaults to a path chosen because a retired ledger called the alternative harmful, and
 the reason is written into the help text. Defaults go into the register of open questions along with
 everything else.
-
-\textbf{Two facts about today, both measured this morning.} The training program does not run at
-all --- it stops immediately with a missing-function error, so the sixty-first round could not have
-happened even if we had wanted it. And the simulation, as the Plexus library currently stands, is
-\emph{not} differentiable: ask it for a gradient through a specification file and it returns
-nothing. The old program worked only by going around the library rather than through it. Both are
-fixable, both have a phase below, and both are much better to know now.
 
 %======================================================================
 \section{The loop, in four steps}
@@ -173,21 +187,31 @@ mechanism.
 A method that scores itself the same way it scores its subject cannot tell the two apart. So the
 two tracks have \emph{different} success rules, and one of them has none at all.
 
-\textbf{Track A has no success rule, and that is deliberate.} There is no number that says the
-method worked. Its product is a \emph{map} --- which mechanism moves which part of the error, with
-what confidence, and which parts nothing we have can move --- and a map gets better by being
-filled in, including with negatives. A dose-confirmed nothing is a result. What can be counted is
-the \emph{rate of knowledge}: how much of the mechanism space has been measured rather than merely
-proposed, and how often a written prediction turned out \textbf{wrong}. A campaign that is never
-surprised has bought coverage and learned nothing; a campaign that is surprised every time was
-predicting carelessly. Track A is reported as a growing map with a surprise rate beside it, never
-as a score to be beaten.
+\textbf{Track A has no success rule, and that is deliberate.} It is not being scored against
+anything, because there is nothing to score it against --- \emph{no recording enters Track A}. It
+asks what the model does when you change it: switch the muscle off, sweep the fibre orientation
+across its range, drive the contraction axis round faster, and see where the trajectories go. Its
+product is a \emph{map} --- which mechanism moves which feature of the beat, on its own and in
+combination --- and a map gets better by being filled in, including with negatives. A dose-confirmed
+nothing is a result.
+
+What can be counted is the \emph{rate of knowledge}: how much of the mechanism space has been
+measured rather than merely proposed, and how often a written prediction turned out \textbf{wrong}.
+A campaign that is never surprised has bought coverage and learned nothing; a campaign that is
+surprised every time was predicting carelessly. Track A is reported as a growing map with a
+surprise rate beside it, never as a score to be beaten.
 
 \textbf{Track B has a sharp one: the difference between the simulated and the recorded loop.} Each
 tracked point traces a closed path over a beat, and the question is how far the simulated path is
 from the real one --- \emph{decomposed}, never as a single number, because a single number
-collapses failures that have nothing to do with each other. The axes are the ones this project
-already spent months learning to measure:
+collapses failures that have nothing to do with each other.
+
+\textbf{The same axes serve both tracks, which is what lets one feed the other.} In Track A they
+describe a trajectory \emph{on its own} --- how big this loop is, how much it encloses, which way it
+turns --- so a sweep can be read as a path through that space. In Track B the same quantities are
+measured against the recording, so the map Track A drew has coordinates the fit can be placed in.
+Had they been different measurements, nothing learned in A could have been spent in B. The axes are
+the ones this project already spent months learning to measure:
 
 \begin{center}\small
 \begin{tabular}{@{}l p{6.9cm} l@{}}
@@ -221,179 +245,6 @@ is the local vision-language model that captions movies, which observes and neve
 learned shape descriptor is a thing to \emph{build}, in Phase~2, and it is held to exactly the same
 admission rule as everything else: it must reproduce a known ordering on distortions we constructed
 ourselves, and have a measured zero and a measured noise floor, before a single claim may cite it.
-
-%======================================================================
-\section{What the recording can and cannot support}
-
-This section did not exist in the Okuda note and it is the most important one here. Okuda's target
-was a drawing in a paper; ours is a measurement, and a measurement has limits that can be computed
-before you start. Everything below was measured from the files this morning.
-
-\textbf{What we have --- two specimens, under five filenames.} One healthy sheet and one diseased
-sheet, filmed on the same rig. They appear on disk as five different files, because each was tracked
-more than once: the healthy one twice, the diseased one three times, under names that do not say so.
-Two of those files looked like independent replicates and are not --- they are crops of the same two
-movies. \textbf{So the dataset is one healthy specimen and one diseased specimen, and that is the
-hard ceiling of the enterprise.} It is also why the held-out specimen will be sealed by what it
-contains rather than by where it lives: sealing a filename would seal nothing.
-
-It is a confluent \emph{sheet}, not a single cell --- there is no isolated contracting object in the
-field of view --- so the unit that could be replicated is the well, and we have one of each. No
-statistic may be computed over the tracked points as though they were independent samples.
-
-The healthy recording is 239 frames at 24 frames a second --- just under ten seconds --- of a grid
-of 18{,}769 tracked points. Five contractions, four complete cycles, one every 2.1 seconds. The
-motion is tiny: a typical point moves about 4 pixels and the largest about 15, on a 2048-pixel
-image.
-
-\textbf{The clock is trustworthy; the map is not.} Between beats the tissue is still and the
-frame-to-frame jitter is 0.017 pixels --- the beat is 155 times larger, and four independent
-estimators agree. But that is noise \emph{in time}. In space the same quiet field is essentially
-structureless at the smallest scale, and two independent trackings of the same movie disagree about
-the pattern almost completely (below). \textbf{When the beat happens, and how strong it is, are
-solid measurements. Where it happens, in fine detail, is not.}
-
-\textbf{The information content is the problem.} Written as a set of spatial patterns, the beat is
-\textbf{90\% one pattern and 99\% three patterns}. The whole recording holds roughly a hundred
-independent patches of information. The previous fit gave itself two freely-shaped fields of about
-two hundred thousand numbers each to describe it. \emph{That is not a fit, it is an interpolation},
-and no amount of good behaviour by the optimiser makes it otherwise. How big the model is allowed to
-be therefore becomes a measured quantity, not a habit.
-
-\textbf{A held-out beat is not a real test --- and it sets a bar nothing has cleared.} We measured
-it rather than assuming it: predict any one beat from the average of the other three and you already
-score 0.98. The beats are near-copies, so ``it generalises to the next beat'' would be a claim about
-almost nothing. \textbf{The only genuine held-out specimen is the diseased sheet}, and we verified
-it loads with no code changes at all.
-
-But the same fact has a much sharper edge, and it is the single most important number in this note.
-\emph{Simply copying the previous beat} --- no model, no physics, no fitting --- \textbf{scores
-higher on both available measures than the best of the 324 fits the previous campaign ever
-produced.} That is the bar. Any mechanism we propose has to beat the cheapest imaginable
-alternative, and nothing yet has.
-
-\textbf{The most serious finding, and it constrains what we may ever claim. Now measured
-properly --- see the Phase~1 report.} The same movie was independently tracked twice. The two agree
-almost perfectly on \emph{when} and \emph{how much} the tissue moves --- time-course correlation
-\textbf{0.996}. They do not agree on \emph{where}: at the peak of each of the four beats the
-per-node displacement maps correlate at \textbf{0.27--0.29} in one axis and \textbf{about $-0.06$}
-in the other, and no amount of smoothing or axis re-convention rescues it. Read as a model of each
-other, one tracking gets the circulation direction right half the time. In plain terms, \textbf{the
-rhythm and the strength of the beat are reproducible facts about the tissue; the fine spatial pattern
-is substantially a property of the tracking software.} A campaign whose product is a learned map of
-stiffness across the sheet would be measuring the tracker, so this one will not have one.
-
-\textbf{Three limits from our own simulation rather than the data.} The real motion is smaller than
-one cell of the simulation grid --- two-thirds of one cell at the peak of the beat --- so the
-simulation's internal smoothing is coarser than the thing being measured, and the numerical method
-may be doing the modelling. The model also carries fewer particles than the recording has tracked
-points, on a coarser grid, so there is a ceiling on how much of the measurement it could reproduce
-even in principle; that ceiling should be measured and printed beside the data's own. And the grid
-size, the particle count and the number of sub-steps were all inherited and never once tested. All
-three are settled by running finer and checking the answer stops moving.
-
-\textbf{And one limit that is nobody's fault.} There is a single substrate stiffness, no drug, and
-no change of pacing --- one condition, one observable, no perturbation. A mechanics model tested
-against a single unperturbed recording can be made to fit; it cannot really be challenged. Worth
-knowing now, because the cheapest fix is not more computing, it is asking the Utrecht group for
-another condition.
-
-%======================================================================
-\section{What we are not carrying forward, and why}
-
-Four measurements from the audit make the case on their own. None of them is about biology.
-
-\footnotesize
-\begin{tabular}{@{}l p{11.2cm}@{}}
-\toprule
-\textbf{what} & \textbf{what was measured}\\
-\midrule
-the dice were never fixed & No random seed was ever set. Two runs of the \emph{same command}, with
-no training at all, differ by 83\% of the size of the signal being fitted. Fix the seed and they
-agree to seven decimal places. Rankings in the old record were decided on differences of 0.003.\\
-the rulers had no zero & A model that predicts \emph{no motion at all} does not score zero on the
-measure everything was ranked by --- it scores $+0.075$, with a spread of $\pm 0.117$, while the
-code's own documentation says a do-nothing model scores zero. On the second, older measure the same
-do-nothing model scores $-0.875$ and \textbf{the best fit in the whole archive scores $-0.912$},
-which is worse. Neither number was ever read against its own null, so neither could say whether
-anything had been achieved.\\
-the ruler cannot see the
-one thing that matters & Give every one of the 18{,}769 points its own random timing offset --- destroy
-the coordination completely, so that no two points contract together --- and the measure everything
-was ranked by returns \textbf{a perfect score}. It is exactly blind to whether the tissue beats as
-one, which is the defining property of heart muscle. Several of the mechanisms the campaign
-proposed, argued about and retired were about coordination, and could never have been scored.\\
-nothing was ever held out & Sixty rounds fitted one beat of one specimen and scored the same beat of
-the same specimen. The diseased sheet was on disk the whole time and was never opened.\\
-\bottomrule
-\end{tabular}
-\normalsize
-
-\textbf{One accusation withdrawn, and a different one raised in its place.} It was reasonable to
-worry that the fit was cheating through its edges: a band around the sheet --- 31\% of it --- is
-pinned to the real recording every frame, so part of the answer is handed over. We tested it
-directly by switching the muscle off and asking how much of the interior still moves. \textbf{The
-answer is exactly none} --- not ``a little'', but bit-for-bit zero. So the pinned edge is not
-secretly driving the fit. It is, however, still pinned \emph{while the score is being computed},
-which means ``held-out'' is not yet a defined term in this apparatus. Every claim will therefore
-carry a second column: the same score with the edge released and the model left to run free. And an
-edge that transmits nothing inward raises its own question --- what is it for? --- which the
-anchoring ladder in Phase~2 answers.
-
-\textbf{Kept, on probation: the apparatus.} The ingested recording; the trainer's hand-rolled
-simulation loop; the error-decomposition code; the cluster machinery, which is genuinely
-battle-hardened. From the Okuda folder, the deterministic parts port almost unchanged --- the
-prediction scorer, the claim register, the record-builder, the cluster driver. And two pieces of
-existing Plexus machinery are exactly what this loop needs: the gradient auditor in
-\code{operators/diff/}, which already classifies whether a given knob is genuinely learnable, and
-the fitting harness from the jax-morph atlas.
-
-\textbf{One inheritance that has to be actively removed.} The old conclusions are compiled into the
-source as comments, help strings and defaults. Any agent that reads the trainer inherits the retired
-ledger whether we like it or not. Deleting those is a Phase~0 item and it is not cosmetic.
-
-%======================================================================
-\section{Where this sits in the Plexus design}
-
-\code{paper/plexus2.tex} already specifies this kind of work, and reading it changes three things
-in the plan and corrects a fourth.
-
-\textbf{The four steps are its three loops.} The paper describes \emph{Understanding} (decompose a
-model into operators, then interrogate it causally until you have a lever-map), \emph{Fitting}
-(estimate the parameters and fields differentiably, keeping each parameter attached to the operator
-it belongs to), and \emph{Discovery} (read the residual left after fitting; a persistent mismatch
-means the composition is \emph{incomplete}, not badly tuned, so propose a new operator). Track A is
-the first, the fit is the second, and \textbf{the edge that closes our cycle --- the residual
-nothing explains --- is the third.} That is reassuring: the shape was arrived at independently and
-it is the shape the design already asks for. It also supplies the mixture we had not fixed: a
-\textbf{70/30 balance of confirmation to falsification}, on the grounds that pure confirmation
-learns nothing and pure attack never consolidates.
-
-\textbf{It states the hazard we built the sham control for, in its own words:} \emph{``optimizing
-existing parameters may improve the fit while merely compensating for missing mechanisms.''} That
-is exactly why every proposed mechanism has to beat a capacity-matched twin.
-
-\textbf{It makes the Phase~3 question a gap rather than a preference.} The paper's claim is that
-\emph{``differentiability becomes a property of the language rather than of a particular
-simulator''} --- gradients propagate through compositions of explicit operators, not through
-monolithic simulation code. Measured, that is not true today for this stack: ask for a gradient
-through a specification and it returns nothing, and the inherited trainer works only by reaching
-around the library. So making the operators differentiable is not an option we prefer; it is the
-distance between the library and its own design.
-
-\textbf{And it corrects something we had wrong.} The paper is emphatic that a loss should be
-\textbf{local in space and time} --- a subset of entities over a short rollout --- because the
-backward graph grows as entities $\times$ steps and a whole-system, whole-trajectory fit becomes
-intractable, while the evidence constraining any one operator is usually confined to a small,
-transient region anyway. The inherited fit is the opposite of that: it backpropagates through a
-\emph{whole} beat, ten substeps a frame, on \emph{all} 16{,}384 particles --- roughly 530 solver
-steps per gradient --- which is very likely why a single fit costs five and a half hours. Nobody
-chose that; it was inherited. Whether a local loss recovers the same mechanism far more cheaply is
-now a Phase~3 experiment, and if it does, every budget in this note falls.
-
-\textbf{One line worth keeping in view.} The controller that drives all this is described as
-\emph{a state machine whose guards are the metrics}. If the guards are uncertified, the machine is
-ungoverned --- which is the whole argument for Phase~2 being a stop rather than a step.
 
 %======================================================================
 \section{The team, mapped onto the four steps}
@@ -616,6 +467,13 @@ only become irreproducible \emph{on purpose}.
 \textbf{Goal.} Decide, once and in writing, what a run is allowed to see --- \emph{before} anything
 is fitted. A split invented later is a split negotiated with the result already in hand.
 
+\textbf{What there is to split.} Two specimens --- one healthy sheet, one diseased --- sitting on
+disk under five filenames, because each was tracked more than once. \textbf{There is no independent
+replicate and no second condition}: one substrate stiffness, no drug, no change of pacing. A model
+tested against a single unperturbed recording can be made to fit; it cannot really be challenged.
+That is the ceiling on the whole enterprise, and the cheapest way to raise it is another dataset,
+not more computing.
+
 \textbf{Done first, because the instruments had to exist before they could measure anything.}
 \code{METRICS.md} reads what each inherited measurement was built to answer, when, and whether it
 still works; \code{descriptors.py} gives Track~B its measurement --- magnitude, opening, direction
@@ -811,6 +669,12 @@ That makes them the thing an instrument is supposed to be certified against --- 
 ground truth is their own recipe} --- at the real particle count, through the real forward model,
 for no compute at all. Until now the only known-answer cases available were ellipses drawn by hand.
 
+\textbf{And read as Track A rather than as instrument-testing, they already say something.} Reading
+each run on its own axes --- no recording involved --- the orientation of the trajectories separates
+the horizontal driver from the vertical one (2.68 versus 1.57 radians, a right angle apart), which
+is the first entry in the map: \emph{the axis you drive along is the axis the loops line up with}.
+Trivial, and that is the point --- a map has to start from things that had better be true.
+
 \textbf{Already done, and two of them found something.}
 \begin{itemize}
 \item \textbf{The descriptors read all ten}, and pass the cross-talk test on real output: rotate a
@@ -949,6 +813,15 @@ never absorbed silently.
 false as stated: asked for a gradient through a specification file the library returns
 \emph{nothing}, because nearly every operator turns its settings into plain numbers the moment it is
 built. The old trainer worked only by reaching around the library.
+
+\textbf{And one correction from the Plexus design document, which may change every budget here.} It
+is emphatic that a loss should be \textbf{local in space and time} --- a subset of points over a
+short rollout --- because the backward graph grows as points $\times$ steps, while the evidence
+constraining any one mechanism is usually confined to a small, transient region anyway. The
+inherited fit is the opposite: a whole beat, ten sub-steps a frame, all 16{,}384 points, roughly 530
+solver steps per gradient. That is very likely why one fit costs five and a half hours. Whether a
+local loss recovers the same mechanism far more cheaply is a Phase-3 experiment, and \emph{if it
+does, every compute estimate in this note falls.}
 
 \textbf{This is also a real decision for you}, which is why it is its own phase. Either we make the
 gradient work \emph{through the Plexus language} --- in which case the loop can propose genuine
