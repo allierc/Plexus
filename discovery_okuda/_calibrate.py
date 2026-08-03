@@ -5,8 +5,9 @@ either by raising diffusion or by SLOWING THE REACTION -- and raising diffusion 
 the explicit step (chi 13 saturated the integrator in the earlier sweep). Slowing the reaction moves
 the same ratio in the same direction and makes the step MORE stable, not less. So sweep rd_rate.
 """
+import os
 import sys, itertools, json, numpy as np
-sys.path.insert(0,'/workspace/Plexus/prototype/Tyssue'); sys.path.insert(0,'/workspace/Plexus/src')
+sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));sys.path.insert(0,'/workspace/Plexus/prototype/Tyssue'); sys.path.insert(0,'/workspace/Plexus/src')
 from tyssue_ops3d import build_sphere_mesh, face_geometry_3d
 from pattern_scale import cell_graph, pattern_metrics
 import torch
