@@ -1288,7 +1288,7 @@ Hence \code{LOGIC.md}, and hence Phase~7.
 \end{tcolorbox}
 \end{phasebox}
 
-\begin{phasebox}{Phase 7 --- The agentic loop update: giving the loop a logic \hfill \todo}
+\begin{phasebox}{Phase 7 --- The agentic loop update: giving the loop a logic \hfill \done}
 \textbf{Goal.} Supply the reasoning discipline that Phase~6 proved will not emerge on its own ---
 as \emph{structure and code}, not as another voice asking the others to be careful. No new agent.
 
@@ -1432,6 +1432,86 @@ record} of Phase~6 --- every one of the eight errors must be caught by replaying
 
 \textbf{What you get.} A loop whose conclusions are as good as its measurements --- and which says
 so when they are not.
+
+\subsection*{Closing Phase 7}
+
+\begin{tcolorbox}[colback=grey!6,colframe=grey!45,boxrule=0.7pt,arc=2pt,breakable,
+                  title={\textbf{What was built}},coltitle=black,colbacktitle=grey!16]
+\textbf{The phase turned out to be wiring, not construction.} Almost every mechanism it needed
+already existed in the codebase and had never run:
+
+\begin{itemize}[itemsep=1pt]
+\item \code{hypothesis.CLAIM\_KINDS} --- \code{sufficient / necessary / causal / descriptive},
+with a validator --- and all 170 hypotheses in the ledger read \code{descriptive}, because
+nothing ever passed the field. A closed set nobody populates is not a type, it is a comment.
+\item \code{critic.check\_batch} --- \code{A1\_NO\_ABLATION} already refused a necessity claim
+with no ablation in the batch, and was named only in \code{weekend.py} comments.
+\item \code{templates.check\_memory} --- called only under \code{\_\_main\_\_};
+\code{memory.md} ran 1186 words against a 900-word budget and the check never fired.
+\item \code{pattern\_scale.py} --- wavelength, domain count and spacing on the activator field,
+\textbf{already certified} (\emph{``n\_spots exact at 3/5/12, spacing within 13\% of
+$R\sqrt{4\pi/k}$''}), computed every frame --- and stopped at \code{metrics}. Not one of the six
+archived specimens carries a pattern number in the summary an agent reads.
+\end{itemize}
+
+\textbf{New:} \code{LOGIC.md}, the third source of truth beside \code{ROLES.md} and
+\code{PREMISES.md}; \code{logic.py} --- a claim register, a renderer and the checks, following
+the \code{escalation.Backlog} pattern exactly. Support is counted in \emph{distinct
+condition-signatures} computed from the cited runs' compositions, so the morphogen-closure claim's
+``ten or more runs'' --- all Gierer--Meinhardt with division --- correctly collapses to \textbf{one}
+observation, and \code{conditions:} is derived from disk rather than authored.
+
+\textbf{The ablation asymmetry}, which was Cedric's observation and became the load-bearing rule:
+the loop was never short of ablations. The same experiment supports a positive strongly and a
+negative weakly --- \emph{removing X killed the effect} says X matters \emph{here};
+\emph{removing X changed nothing} was offered as X is inert \emph{everywhere}. So a \textbf{null}
+ablation must repeat on an independent background, a \textbf{positive} one still passes on one, and
+necessity needs a \textbf{rescue attempt} --- a different experiment, and the one nobody ever ran.
+
+\textbf{Budget}, since Track A's revisit quota has to be paid for. Round 10 spent 33.4 minutes
+against a 25-minute ceiling and dropped Interpreters. \code{BREVITY} existed, was well written,
+and reached three prompts out of nine --- absent from the two roles that spend the ceiling. It is
+now applied from \code{run\_agent} with a \textbf{per-role token cap and the arithmetic that
+justifies it} (generation runs at about 70 tokens/s, so 700 tokens is ten seconds). The ceiling
+drops to ten minutes; projected generation for a round of that shape is 2.5.
+\end{tcolorbox}
+
+\begin{tcolorbox}[colback=warn!7,colframe=warn!55,boxrule=1pt,arc=2pt,breakable,
+                  title={\textbf{What the next round decides --- none of this has run}},
+                  coltitle=black,colbacktitle=warn!20]
+Ten changes rest on a single campaign's evidence, and not one has executed. \code{logic.py}'s own
+rule --- three independent signatures before a negative --- applies to the conclusions that
+produced it: \emph{``the Reader's hardcoded metric list is why agents ignore new instruments''} is
+a one-observation claim.
+
+So the exit criteria are \textbf{stated, not met}, and the next round is the measurement:
+
+\begin{center}
+\begin{tabular}{@{}p{5.4cm}p{4.3cm}p{4.3cm}@{}}
+\textbf{change} & \textbf{confirms it} & \textbf{refutes it} \\[2pt]
+token caps, 10-min ceiling & total under 10 min & agents ignore the cap \\
+fast model for the two description roles & reader 1.1 $\to$ 0.4 min/call & labels get worse \\
+Interpreter reserves first & no \code{OVER CEILING} on it & still dropped \\
+\code{A1\_NO\_ABLATION} live & fires with a sane reason & fires on every batch \\
+\code{claim\_kind} carried & values besides \code{descriptive} & all \code{descriptive} still \\
+\code{logic.py} per round & \code{unearned} count falls & errors, or reports nothing \\
+Metrologist trigger & one or two requests & a flood of operator names \\
+pattern metrics admitted & \code{n\_spots\_final} in \code{diag.json} & absent \\
+Reader told they exist & a verdict citing wavelength & never mentioned \\
+\end{tabular}
+\end{center}
+
+\textbf{Watch \code{A1\_NO\_ABLATION} hardest.} It is the only change that can refuse work, it
+has never executed on a real batch, and it already carried a false-refusal bug that surfaced only
+when it was finally exercised --- \code{add\_op} names the operator and \code{remove\_op} names
+the node, so the two directions of one experiment never matched and a necessity claim whose
+ablation sat beside it was refused anyway. It runs in report-only mode for exactly that reason,
+and starts refusing the round after its first clean pass.
+
+An independent audit of the loop's information flow --- dead ends, orphans, broken
+\textbf{Sends to:} promises --- was commissioned rather than done by the author of the changes,
+and is outstanding. \code{ROLES.md} is deliberately untouched until it reports.
+\end{tcolorbox}
 \end{phasebox}
 
 \begin{phasebox}{Phase 8 --- The demonstration \hfill \todo}
