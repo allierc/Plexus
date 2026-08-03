@@ -256,6 +256,8 @@ def plan(n_rounds, recon_rounds=1):
            ["composition"] * max(0, n_rounds - recon_rounds)
 
 
+MARKER = "<!-- LEARNED PATTERNS -->"
+
 CAMPAIGN_STATE = ("analysis.md", "memory.md", "knowledge.md", "lever_map.md",
                   "causal_descriptions.md", "proposal.json", "state.json", "frontier.json",
                   "hypotheses.jsonl", "round_records.jsonl", "archivist.jsonl",
@@ -287,6 +289,26 @@ def clean_start():
         for p in glob.glob(os.path.join(os.path.dirname(HERE), pat)):
             import shutil
             shutil.rmtree(p, ignore_errors=True) if os.path.isdir(p) else os.remove(p)
+    # THE LEARNED-PATTERNS BLOCK IS STATE, NOT INSTRUCTION. instruction.md is preserved because
+    # the standing brief above the marker is genuinely an instruction -- but everything below
+    # `<!-- LEARNED PATTERNS -->` is rewritten by the Meta-review every round
+    # (llm_agents.py:360), which makes it exactly as much campaign state as memory.md.
+    #
+    # Preserving it wiped nothing. On 3 August a fresh campaign deleted memory.md, every run and
+    # every record, and then handed its first Proposer the round-10 conclusions of the campaign
+    # just declared unsound: "THIS BODY IS CLOSED", "every amplifier family is exhausted", "STOP
+    # proposing ANY 'make the bud bigger' edit on this base". With a cold-start frontier and
+    # nothing left to propose, it emitted twelve slots carrying no edits and the Critic refused
+    # eleven as duplicates of the control. Zero experiments, from a file the clean start protected.
+    ip = os.path.join(CAMP, "instruction.md")
+    if os.path.exists(ip):
+        txt = open(ip).read()
+        if MARKER in txt:
+            open(ip, "w").write(txt.split(MARKER)[0].rstrip() + "\n\n" + MARKER + "\n")
+            removed.append("instruction.md::LEARNED PATTERNS")
+            print("[loop] CLEAN START -- cleared the LEARNED PATTERNS block: it is written by the "
+                  "Meta-review each round, so it is state. A campaign that keeps the previous "
+                  "campaign's conclusions has not started clean.")
     print(f"[loop] CLEAN START -- removed {len(removed)} campaign file(s); the next round is 1")
     return removed
 

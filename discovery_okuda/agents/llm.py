@@ -96,6 +96,14 @@ AGENT_OUTPUT_TOKENS = {
 }
 DEFAULT_OUTPUT_TOKENS = 400
 
+# MEASURED, round 10 of the 2 August campaign -- minutes per call, before the token caps landed.
+# Deliberately the PRE-brevity numbers: they are the pessimistic prior, so the projection cannot
+# under-estimate while the caps are still unproven. They are replaced by this round's own measured
+# spend as soon as the role has been called once.
+EXPECTED_MIN = {"interpreter": 3.2, "reader": 1.1, "watcher": 0.3, "meta_review": 3.3,
+                "proposer": 3.0, "archivist": 1.0, "diagnostician": 0.5, "reflection": 0.7,
+                "grounder": 0.1}
+
 
 def brevity(agent=None):
     """The budget, with its arithmetic, and a hard ceiling for this role.
@@ -258,6 +266,7 @@ class BudgetLedger:
         self.round = {}                     # role -> row, reset each round
         self.total = {}                     # role -> row, whole process lifetime
         self.round_spent = 0.0              # LLM minutes this round (budget-relevant)
+        self._spend_by_agent = []           # (agent, minutes) this round, for the projection
         self.total_spent = 0.0
         self.calls = 0
         self.events = []                    # every call, in order, for the jsonl
@@ -268,14 +277,30 @@ class BudgetLedger:
         _ROUND_LEDGER = self                # so a BYPASSING call is attributed to this round
 
     # ------------------------------------------------------------------ budget
-    def may_call(self, agent, want_min=None):
-        """Would this call breach the round ceiling? Returns (ok, why).
+    def projected(self, agent, want_min=None):
+        """What this call will PROBABLY cost, not what it is ALLOWED to cost.
 
-        `want_min` is the caller's ACTUAL timeout, not the AGENT_BUDGETS row, because the call
-        sites carry their own timeouts and the projection should reflect what will really run.
+        The two are wildly different and confusing them broke the ceiling the moment it was
+        lowered. `want_min` is a TIMEOUT -- a worst case that essentially never happens. The
+        proposer is allowed 5 minutes and used 1.17; the check added the allowance to the spend
+        and reported "0.4+10 > 10.0 min" on the FIRST call of the round, every round. A ceiling
+        that fires before anything has been spent is not a ceiling, it is noise, and noise is how
+        a real breach stops being read.
+
+        So: use what this role has actually cost IN THIS ROUND, then a measured prior, and only
+        then fall back to the allowance.
         """
-        if want_min is None:
-            want_min = AGENT_BUDGETS.get(agent, (DEFAULT_TIMEOUT_MIN, 40, None))[0]
+        seen = [m for a, m in self._spend_by_agent if a == agent]
+        if seen:
+            return sum(seen) / len(seen)
+        if agent in EXPECTED_MIN:
+            return EXPECTED_MIN[agent]
+        return min(want_min or DEFAULT_TIMEOUT_MIN,
+                   AGENT_BUDGETS.get(agent, (DEFAULT_TIMEOUT_MIN, 40, None))[0])
+
+    def may_call(self, agent, want_min=None):
+        """Would this call breach the round ceiling? Returns (ok, why)."""
+        want_min = self.projected(agent, want_min)
         if self.round_spent + want_min > ROUND_LLM_BUDGET_MIN:
             return False, (f"round LLM budget would be exceeded "
                            f"({self.round_spent:.1f}+{want_min} > {ROUND_LLM_BUDGET_MIN} min)")
@@ -306,6 +331,7 @@ class BudgetLedger:
                     r[k] = r.get(k, 0) + usage[k]
         if kind == "llm":
             self.round_spent += minutes
+            self._spend_by_agent.append((agent, minutes))
             self.total_spent += minutes
         self.calls += 1
         ev = {"agent": agent, "min": round(minutes, 3), "ok": bool(ok),
@@ -353,6 +379,7 @@ class BudgetLedger:
         _ROUND_LEDGER = self
         self.round = {}
         self.round_spent = 0.0
+        self._spend_by_agent = []
         self.overruns = []
         self.unmetered = []
         self.events = []
