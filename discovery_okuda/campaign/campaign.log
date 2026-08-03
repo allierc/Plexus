@@ -184,3 +184,1028 @@ ROUND 7   mode=composition   campaign=okuda_growth_driven
 ================================================================================================
 ▶ ACT 1 - PROPOSE   [+00:00]   before a second of compute is spent
 ================================================================================================
+  [grounder] note: phi: tabulated 10.0, but the paper's own formula (3 v_ref^1/3)^2/(4 eta_c/5 kappa_s) gives 9.000. The paper writes 'phi ~', so both are its own; which one the campaign uses is a decision and must be made explicitly, not inherited.
+Wrote `proposal.json` — 12 slots (control + 11 single-op edits). No `user_input.md` Pending items to acknowledge (empty as of 2026-08-02).
+  [proposer] 3.2 min, tools: Readx3, Writex1
+  ✗ [critic] slot 1 rejected -- CRITIC: [<R6_DUPLICATE: Cbad8d602b01 -- request a robustness test explicitly if replication is what you want>]
+  ✗ [critic] slot 3 rejected -- CRITIC: [<R6_DUPLICATE: Ceb5a08335c1 -- request a robustness test explicitly if replication is what you want>]
+  ✗ [critic] slot 6 rejected -- DUPLICATE_IN_BATCH: identical to slot 4 (C174e7675de5). Same composition, so at most one prediction about it can be right; the others are the same experiment re-run under a different guess. Vary the EDIT, not the number.
+  ✗ [critic] slot 8 rejected -- CRITIC: [<R6_DUPLICATE: Cad4767d855d -- request a robustness test explicitly if replication is what you want>]
+  ✗ [critic] slot 11 rejected -- CRITIC: [<R6_DUPLICATE: Cf2ac86789d3 -- request a robustness test explicitly if replication is what you want>]
+  ◉ peer-review: batch_ok=True. Worth running: has a control (slot0) and a genuine adversarial excursion (slot6), and
+       slots 1-3 legitimately re-test necessity on the NEW recipe.
+     slot 5: [serious] predicted 1.05-1.35 spans nearly the whole plausible range incl. the control band 1.15-1.35 -- cannot fail, teaches nothing
+     slot 4: [minor] reconnect_t1_3d inertness already settled on old bud; 1.05-1.20 re-confirm is low-information and hard to falsify
+     slot 6: [minor] only 1 of 7 slots is adversarial (~14%); batch skews confirmatory below the ~30% target
+  r007c_00_dcf832  control (parent unchanged)               track B  control       predict protr_peak 1.15-1.35
+  r007c_01_7c70bc  ('remove_op', 'divide_3d0')              track A  confirmatory  predict protr_peak <= 1.05
+  r007c_02_174e76  ('add_op', 'divide_3d', 'hertwig')       track A  confirmatory  predict protr_peak >= 1.10
+  r007c_03_4fac94  ('remove_op', 'morphogen_growth_3d0')    track A  confirmatory  predict protr_peak <= 1.05
+  r007c_04_6d3c06  ('remove_op', 'reconnect_t1_3d0')        track A  confirmatory  predict protr_peak 1.05-1.20
+  r007c_05_d5e094  ('remove_op', 'cell_adjacency0')         track A  confirmatory  predict protr_peak 1.05-1.35
+  r007c_06_cf0164  ('add_op', 'vesicle_growth', 'uniform_ra track B  adversarial   predict protr_peak >= 1.30
+[preflight] cluster job env: OK
+[preflight] PASS
+
+================================================================================================
+▶ ACT 2 - MEASURE   [+03:58]   submitting 7 simulation(s) -- the only expensive step
+================================================================================================
+[cluster] fired 7 bsub(s) DETACHED on allierc@login1: pg_r007c_00_dcf832, pg_r007c_01_7c70bc, pg_r007c_02_174e76, pg_r007c_03_4fac94, pg_r007c_04_6d3c06, pg_r007c_05_d5e094, pg_r007c_06_cf0164
+  the ssh returns BEFORE bsub lands -- the queue is the only ground truth.
+  verify: python cluster.py --status   (remote submit log: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda/_cluster/_submit.log)
+    [+04:01] ◌ 7 job(s) on the cluster; waiting. Check with `bjobs`.
+  [17:05] run/pend=7 done=0 exit=0 of 7
+  [17:06] run/pend=7 done=0 exit=0 of 7
+  [17:07] run/pend=7 done=0 exit=0 of 7
+  [17:08] run/pend=7 done=0 exit=0 of 7
+  [17:09] run/pend=7 done=0 exit=0 of 7
+  [17:10] run/pend=7 done=0 exit=0 of 7
+  [17:11] run/pend=7 done=0 exit=0 of 7
+  [17:12] run/pend=3 done=4 exit=0 of 7
+  [17:13] run/pend=1 done=6 exit=0 of 7
+  [17:14] run/pend=1 done=6 exit=0 of 7
+  [17:15] run/pend=1 done=6 exit=0 of 7
+  [17:16] run/pend=1 done=6 exit=0 of 7
+  [17:17] run/pend=1 done=6 exit=0 of 7
+  [17:18] run/pend=1 done=6 exit=0 of 7
+  [17:19] run/pend=1 done=6 exit=0 of 7
+  [17:20] run/pend=1 done=6 exit=0 of 7
+  [17:21] run/pend=1 done=6 exit=0 of 7
+  [17:22] run/pend=1 done=6 exit=0 of 7
+  [17:23] run/pend=1 done=6 exit=0 of 7
+  [17:24] run/pend=1 done=6 exit=0 of 7
+  [17:25] run/pend=1 done=6 exit=0 of 7
+  [17:26] run/pend=1 done=6 exit=0 of 7
+  [17:27] run/pend=1 done=6 exit=0 of 7
+  [17:28] run/pend=1 done=6 exit=0 of 7
+  [17:29] run/pend=1 done=6 exit=0 of 7
+  [17:30] run/pend=1 done=6 exit=0 of 7
+  [17:31] run/pend=1 done=6 exit=0 of 7
+  [17:32] run/pend=1 done=6 exit=0 of 7
+  [17:33] run/pend=1 done=6 exit=0 of 7
+  [17:34] run/pend=1 done=6 exit=0 of 7
+[cluster] 153254814 is slow but WORKING (frame 196, 62103 cells) -- not a straggler. Slow and productive is a big run, not a stuck one.
+    [+33:35] ◌ batch finished; captioning the wave (one model load for all runs)
+[round] batch did not complete cleanly: exit=[] killed=[] timed_out=False -- scoring what landed
+  [trace] about to import caption_wave
+  [trace] caption_wave imported; calling it
+[caption] loading the VLM ONCE for 6 run(s) on cuda:0 ...
+Loading weights:   0%|          | 0/677 [00:00<?, ?it/s]Loading weights:   0%|          | 3/677 [00:00<00:41, 16.08it/s]Loading weights:   3%|▎         | 22/677 [00:00<00:07, 85.08it/s]Loading weights:   7%|▋         | 48/677 [00:00<00:04, 146.84it/s]Loading weights:  10%|▉         | 65/677 [00:00<00:04, 151.37it/s]Loading weights:  13%|█▎        | 89/677 [00:00<00:03, 174.62it/s]Loading weights:  16%|█▋        | 111/677 [00:00<00:03, 187.25it/s]Loading weights:  19%|█▉        | 132/677 [00:00<00:02, 192.86it/s]Loading weights:  23%|██▎       | 156/677 [00:00<00:02, 189.91it/s]Loading weights:  27%|██▋       | 186/677 [00:01<00:02, 214.48it/s]Loading weights:  31%|███       | 208/677 [00:01<00:02, 213.97it/s]Loading weights:  34%|███▍      | 230/677 [00:01<00:02, 197.96it/s]Loading weights:  38%|███▊      | 256/677 [00:01<00:02, 198.72it/s]Loading weights:  42%|████▏     | 284/677 [00:01<00:01, 212.24it/s]Loading weights:  46%|████▌     | 311/677 [00:01<00:01, 220.82it/s]Loading weights:  49%|████▉     | 334/677 [00:01<00:01, 216.93it/s]Loading weights:  53%|█████▎    | 356/677 [00:01<00:01, 206.45it/s]Loading weights:  56%|█████▋    | 381/677 [00:01<00:01, 213.97it/s]Loading weights:  60%|██████    | 408/677 [00:02<00:01, 212.29it/s]Loading weights:  64%|██████▍   | 435/677 [00:02<00:01, 220.08it/s]Loading weights:  68%|██████▊   | 458/677 [00:02<00:01, 217.46it/s]Loading weights:  71%|███████   | 480/677 [00:02<00:00, 203.42it/s]Loading weights:  75%|███████▍  | 505/677 [00:02<00:00, 211.89it/s]Loading weights:  79%|███████▊  | 532/677 [00:02<00:00, 219.74it/s]Loading weights:  82%|████████▏ | 556/677 [00:02<00:00, 221.15it/s]Loading weights:  86%|████████▌ | 579/677 [00:02<00:00, 215.57it/s]Loading weights:  89%|████████▉ | 601/677 [00:03<00:00, 212.02it/s]Loading weights:  92%|█████████▏| 623/677 [00:03<00:00, 205.94it/s]Loading weights:  95%|█████████▌| 644/677 [00:03<00:00, 198.31it/s]Loading weights:  99%|█████████▉| 670/677 [00:03<00:00, 211.72it/s]Loading weights: 100%|██████████| 677/677 [00:03<00:00, 200.93it/s]
+  [1/6] r007c_00_dcf832:
+        DESCRIPTION: The red activator chemical initially concentrates at the bottom of the vesicle and then
+        migrates toward the top. As the chemical moves, it triggers a localized growth or protrusion at the apex of
+        the sphere. This protrusion expands and becomes more pronounced as the red signal intensifies at the top. By
+        the final frame, the vesicle has developed a distinct, elongated bulbous shape at its peak.
+  [2/6] r007c_01_7c70bc:
+        DESCRIPTION: A cluster of cells within a spherical vesicle begins to migrate and aggregate toward the top of
+        the structure. As the cells move, the concentration of the activator chemical increases, causing the red
+        shading to intensify in the localized region. The vesicle undergoes a significant morphological change,
+        bulging outward to form a protrusion or "bud" at the top. This budding process continues until a distinct,
+        elongated neck forms, preparing the structure for potential fission.
+  [3/6] r007c_02_174e76:
+        DESCRIPTION: The red activator chemical initially concentrates at the bottom of the vesicle and then
+        migrates toward the top. As the chemical moves, it triggers a localized growth or protrusion at the apex of
+        the sphere. This protrusion expands and becomes more pronounced as the red signal intensifies at the top. By
+        the final frame, the vesicle has developed a distinct, elongated bulbous shape at its peak.
+  [4/6] r007c_03_4fac94:
+        DESCRIPTION: The activator chemical initially concentrates at the bottom of the cell vesicle. Over time, the
+        chemical signal migrates toward the top of the vesicle. The red-shaded region of high concentration moves
+        from the bottom pole to the top pole. By the final frame, the chemical is localized at the apex of the
+        vesicle.
+  [5/6] r007c_04_6d3c06:
+        DESCRIPTION: A localized region of high activator concentration, shown in red, initially appears at the
+        bottom of the cell vesicle. Over time, this red region migrates around the surface of the vesicle toward the
+        side and top. As the red area moves, the underlying cellular structure undergoes a deformation, causing a
+        bulge to form on the vesicle's surface. The bulge eventually becomes prominent and slightly irregular as the
+        activator concentration shifts position.
+  [6/6] r007c_05_d5e094:
+        DESCRIPTION: The activator chemical concentration begins at a high point on the bottom of the vesicle and
+        gradually migrates toward the top. As the chemical moves, the red-shaded region shifts from the lower
+        hemisphere to the upper pole of the sphere. The concentration peak narrows and becomes more localized as it
+        reaches the apex of the vesicle. By the final frame, the activator is concentrated in a small, intense area
+        at the very top of the structure.
+[caption] model released; 0.0 GB still reserved by this process
+[caption] 6 run(s) in 146s (one model load, not 6)
+  [trace] caption_wave RETURNED
+  [trace] past captioning; entering the reading loop
+    [+36:02] ◌ reading each run: Biologist -> Metrologist -> Reader -> Eye-check
+  [trace] reading r007c_00_dcf832
+  ◉ biologist 7c_00_dcf832: Specimen valid; every applicable premise holds.
+  [trace] read r007c_00_dcf832 OK
+  ◉ reader 7c_00_dcf832: Phenotype bud.
+  ◉ : The movie shows a roughly spherical vesicle built from a dense mesh of white cells that keeps a roug
+      hly constant overall size. A red activator signal starts pooled at the bottom, then migrates to the 
+      top, and where it accumulates the apex swells into a distinct elongated bulbous protrusion by the fi
+      nal frame. The colour is a spreading red intensification tracking the activator concentration at the
+       growing tip, against an otherwise white cell field. A small cross-sectional inset (a ring of cells)
+       in the bottom-right is a diagnostic overlay, not tissue, and is the only element that could be mist
+      aken for an artefact.
+  [trace] reading r007c_01_7c70bc
+  ◉ biologist 7c_01_7c70bc: Specimen valid; every applicable premise holds.
+  [trace] read r007c_01_7c70bc OK
+  ◉ eye-check 7c_01_7c70bc: Movie shows a strong necked bud, NOT the claimed near-sphere collapse — claim contradicted
+  ◉ reader 7c_01_7c70bc: Phenotype bud.
+  ◉ : The structure starts as a smooth spherical vesicle of densely networked white cells and does not sta
+      y round. Cells migrate and aggregate toward the top, and the surface bulges outward into a distinct 
+      protrusion or bud with an elongating neck, suggesting incipient fission rather than a sphere. The co
+      lour shows deep red (high activator) concentrating in the localized budding region against the other
+      wise white tissue. A small ring-like cross-section sits in the bottom-right corner as a rendering in
+      set, which reads as a UI artefact rather than tissue deformation.
+  ⚠ [eye] r007c_01_7c70bc DISAGREES with the numbers -- recorded, not vetoed: The movie shows a pronounced outward bud with an elongating neck, the opposite of the claimed near-s
+  [trace] reading r007c_02_174e76
+  ◉ biologist 7c_02_174e76: Specimen valid; every applicable premise holds.
+  [trace] read r007c_02_174e76 OK
+  ◉ eye-check 7c_02_174e76: Apical bud DID form — activator-driven protrusion at the top, bud restored as claimed
+  ◉ reader 7c_02_174e76: Phenotype bud.
+  ◉ : The object is a spherical vesicle built from a dense mesh of interconnected cells that holds a rough
+      ly constant overall size while its surface deforms. A red activator signal starts pooled at the bott
+      om and migrates to the top, and where it concentrates a localized growth swells outward, becoming a 
+      distinct elongated bulbous protrusion at the apex by the final frame. The colour is doing the drivin
+      g: white tissue turns deep red exactly in the high-activator apical zone that then bulges. A small c
+      ross-section inset in the bottom-right shows an intact ring of cells and looks like a diagnostic ove
+      rlay rather than tissue; nothing reads as shattered or artefactual.
+  [trace] reading r007c_03_4fac94
+  ◉ biologist 7c_03_4fac94: Specimen valid; every applicable premise holds.
+  [trace] read r007c_03_4fac94 OK
+  ◉ eye-check 7c_03_4fac94: Removal run yields a plain sphere — no protrusion, consistent with protr_peak<=1.05
+  ◉ reader 7c_03_4fac94: Phenotype bud.
+  ◉ : The movie shows a spherical cell vesicle built from a dense network of white cells that keeps a cons
+      tant size and spherical topology from start to finish. Nothing protrudes — there is no bud, tube, or
+       deformation of the outline at any frame. The colour signal is a dark-red high-concentration patch t
+      hat migrates coherently from the bottom pole up to the apex over time. A small cross-sectional inset
+       shows a normal ring-like interior; nothing looks like an artefact rather than tissue.
+  [trace] reading r007c_04_6d3c06
+  ◉ biologist 7c_04_6d3c06: Specimen ambiguous; broken: P7.
+  [trace] read r007c_04_6d3c06 OK
+  ◉ eye-check 7c_04_6d3c06: Claimed 'no-extrude/inert' base actually grows a prominent surface bulge — protrusion, not flat
+  ◉ reader 7c_04_6d3c06: Phenotype sphere.
+  ◉ : The object is a spherical white cell vesicle built from a network of interconnected cells, with a sm
+      all circular cross-section inset at the bottom-right. A localized red high-activator region starts a
+      t the bottom and migrates around the surface toward the side and top. As the red signal moves, the u
+      nderlying structure deforms and a bulge grows on the surface, becoming prominent and slightly irregu
+      lar — this is a real protrusion, not a flat mid-surface. The vesicle keeps a consistent overall size
+       and nothing reads as an obvious rendering artefact, but the deforming bulge is clearly tissue-scale
+       morphology, not noise.
+  ⚠ [eye] r007c_04_6d3c06 DISAGREES with the numbers -- recorded, not vetoed: The movie shows a prominent, growing surface bulge (a clear protrusion), contradicting a 'no-extrude
+  [trace] reading r007c_05_d5e094
+  ◉ biologist 7c_05_d5e094: Specimen valid; every applicable premise holds.
+  [trace] read r007c_05_d5e094 OK
+  ◉ eye-check 7c_05_d5e094: Sphere stays smooth, no protrusion — only a red chemical wave sweeps to the pole
+  ◉ reader 7c_05_d5e094: Phenotype bud.
+  ◉ : The movie shows a spherical vesicle built from a dense mesh of small polygonal cells, viewed in a 3D
+       surface render alongside a small circular cross-section inset. The sphere holds its round shape thr
+      oughout — nothing buds, extends, or protrudes from the surface at any point. A dark-red patch markin
+      g high activator concentration starts on the lower hemisphere and migrates to the top pole, narrowin
+      g into a small intense spot at the apex. The only motion is the colour wave sweeping across a static
+       body; the mesh and cross-section read as intact tissue with no shard-like or torn artefacts.
+  ✓ [rank] kept 4, dropped 2 (never refined)
+  [KEEP] r007c_00_dcf832  score   2.43  protr_peak  1.29 phen=bud       watcher=supports   [confirmed]
+  [KEEP] r007c_02_174e76  score   2.43  protr_peak  1.29 phen=bud       watcher=supports   [confirmed]
+  [KEEP] r007c_01_7c70bc  score   2.26  protr_peak  1.17 phen=bud       watcher=CONTRADICTS [refuted]  SURPRISE
+  [KEEP] r007c_05_d5e094  score   2.18  protr_peak  1.29 phen=bud       watcher=supports   [confirmed]
+  [drop] r007c_03_4fac94  score   1.81  protr_peak  1.05 phen=bud       watcher=supports   [confirmed]
+  [drop] r007c_04_6d3c06  score   1.85  protr_peak  1.23 phen=sphere    watcher=CONTRADICTS [refuted]  SURPRISE
+  [trace] reading loop done; entering Act 3
+
+================================================================================================
+▶ ACT 3 - DECIDE   [+41:48]   6 run(s) admitted, 1 refused
+================================================================================================
+    [+41:48] ◌ Collector: building the round record from the files on disk
+  [trace] Collector: building the record
+  [trace] Collector done
+    [+41:48] ◌ Interpreter: writing the causal record for 4 kept run(s)
+  ◉ interpreter 7c_00_dcf832: Cdcf832a5061 control: growth gate OFF (rho=0), "bud" is weak division anisotropy not forced (p_ratio
+       0.64)
+  ◉ interpreter 7c_02_174e76: C174e7675de5 "bud" is a fluke — morphogen gate OFF (a_sw 1.5 > act 0.995), growth uniform, p_ratio 0
+      .641<1
+  ◉ interpreter 7c_01_7c70bc: C7c70bc4cef7 buds by mechanical buckling — growth gate OFF (rho=0), division inert (retention 1.0)
+  ◉ interpreter 7c_05_d5e094: Growth gate never opens (a_sw 1.5 > act 0.995): uniform inflation to a sphere, activator wave a pass
+      enger; cell_adjacenc
+    [+48:28] ◌ Meta-review: prompt write-back + memory.md
+[budget] OVER CEILING at meta_review: round LLM budget would be exceeded (16.2+10 > 25.0 min) -- running anyway; the round is flagged budget_exceeded
+  ◉ meta-review: This body exhausted — rounds 6-7 broke no premise (only cosmetic P7); frontier is Track B
+    [+50:14] ◌ Archivist: reading the whole history
+  ◌ [archivist] continue
+  ◉ archivist: refused a roll_back to 'Cad4767d855': not a branch in the history
+  ◉ supervisor: continue; next batch 70% confirmatory.
+  [supervisor] {"round": 7, "spent": 31, "best": 3.873, "new_clusters": 0, "frozen": ["K002"], "active_clusters": 7, "dry": 1, "surprise": 0.4, "next_confirmatory_frac": 0.7, "stop": false, "reason": "continue"}
+[map] coverage 63% (24/38 cells, 31 runs)
+
+[llm] per-role breakdown (round, round 7)
+       agent                  calls      min      %    ok/fail/skip
+       interpreter                4     6.65  35.6%     4/0   /0   
+       reader                     6     4.44  23.8%     6/0   /0   
+       proposer                   1     3.17  17.0%     1/0   /0   
+       meta_review                1     1.77   9.5%     1/0   /0   
+       watcher                    6     1.32   7.1%     6/0   /0   
+       reflection                 1     0.64   3.4%     1/0   /0   
+       archivist                  1     0.61   3.3%     1/0   /0   
+       grounder                   1     0.07   0.4%     1/0   /0      (local, not LLM)
+       TOTAL                     21    18.67   llm=18.60 min of 25.0 ceiling | wall since round start 50.85 min
+       BUDGET EXCEEDED at meta_review: round LLM budget would be exceeded (16.2+10 > 25.0 min) -- running anyway; the round is flagged budget_exceeded
+[llm] {'calls': 21, 'round_min': 18.6, 'total_min': 18.6, 'turns': 91, 'tok_in': 77965, 'tok_out': 73809, 'cache_new': 535372, 'cache_hit': 1984221, 'usd': 8.581, 'roles': 8, 'budget_exceeded': False, 'unmetered': 0}
+[llm] ROUND EXCEEDED THE 25.0 min LLM CEILING (1 breach(es)) -- this round is NOT a clean round.
+[llm] timing appended to /workspace/Plexus/discovery_okuda/campaign/llm_timing.jsonl
+  ✓ [loop] round 1 exited 0 after 51.0 min wall, 18.7 min of agents
+
+------------------------------------------------------------------------------------------------
+[loop] round 2/20  mode=composition   spent so far: 391.6 agent-min over 554 calls
+------------------------------------------------------------------------------------------------
+[supervisor] resumed: round 7, 31 runs spent, 8 clusters (7 active), dry 1, stage_gate 2
+================================================================================================
+ROUND 8   mode=composition   campaign=okuda_growth_driven
+================================================================================================
+
+================================================================================================
+▶ ACT 1 - PROPOSE   [+00:00]   before a second of compute is spent
+================================================================================================
+  [grounder] note: phi: tabulated 10.0, but the paper's own formula (3 v_ref^1/3)^2/(4 eta_c/5 kappa_s) gives 9.000. The paper writes 'phi ~', so both are its own; which one the campaign uses is a decision and must be made explicitly, not inherited.
+proposal.json written. 12 slots, control at slot 0 (parent 3, unchanged).
+
+Batch rationale: memory says the sphere ceiling is exhausted and the frontier is Track B (different geometry). The one geometry-changing legal edit — `shape_energy_3d:monolayer` (Okuda's own monolayer sheet) — is the Track-B bet (slot 1). The rest re-map necessity/inertness on the never-mapped mid-surface recipes and probe 
+  [proposer] 1.8 min, tools: Readx3, Writex1
+  ✗ [critic] slot 7 rejected -- CRITIC: [<R6_DUPLICATE: Cbad8d602b01 -- request a robustness test explicitly if replication is what you want>]
+  ✗ [critic] slot 8 rejected -- CRITIC: [<R6_DUPLICATE: Cbad8d602b01 -- request a robustness test explicitly if replication is what you want>]
+  ✗ [critic] slot 9 rejected -- CRITIC: [<R6_DUPLICATE: C174e7675de5 -- request a robustness test explicitly if replication is what you want>]
+  ✗ [critic] slot 10 rejected -- CRITIC: [<R6_DUPLICATE: Cf00c830ceca -- request a robustness test explicitly if replication is what you want>]
+  ◉ peer-review: batch_ok=True. Worth running: has a control, Track-B ceiling test and the slot-4/7 composition contr
+      ast are genuinely discriminating.
+     slot 6: [serious] predicted 1.10-1.28 spans both inert and shrinking, so it cannot fail — narrow to one regime
+     slot 5: [minor] predicted 1.15-1.28 ≈ control range and inert already shown on old body; near-settled, low information
+     slot 4: [minor] old-body explosion may have lived in extrude, which this recipe lacks; conflating recipe vs op weakens the mechanism
+  r008c_00_d5e094  control (parent unchanged)               track B  control       predict protr_peak 1.15-1.30
+  r008c_01_79b047  ('set_impl', 'shape_energy_3d0', 'monola track B  adversarial   predict protr_peak >= 1.25
+  r008c_02_cbbdfe  ('remove_op', 'divide_3d0')              track A  confirmatory  predict protr_peak <= 1.10
+  r008c_03_b00f85  ('remove_op', 'morphogen_growth_3d0')    track A  confirmatory  predict protr_peak <= 1.10
+  r008c_04_90f34f  ('add_op', 'vesicle_growth', 'uniform_ra track A  adversarial   predict ta_n_tubes_final >= 50
+  r008c_05_3c4f00  ('remove_op', 'reconnect_t1_3d0')        track A  confirmatory  predict protr_peak 1.15-1.28
+  r008c_06_dffde3  ('remove_op', 'cell_geometry_3d0')       track A  confirmatory  predict protr_peak 1.10-1.28
+  r008c_07_af9b95  ('add_op', 'vesicle_growth', 'uniform_ra track A  adversarial   predict ta_n_tubes_final >= 50
+[preflight] cluster job env: OK
+[preflight] PASS
+
+================================================================================================
+▶ ACT 2 - MEASURE   [+02:24]   submitting 8 simulation(s) -- the only expensive step
+================================================================================================
+[cluster] fired 8 bsub(s) DETACHED on allierc@login1: pg_r008c_00_d5e094, pg_r008c_01_79b047, pg_r008c_02_cbbdfe, pg_r008c_03_b00f85, pg_r008c_04_90f34f, pg_r008c_05_3c4f00, pg_r008c_06_dffde3, pg_r008c_07_af9b95
+  the ssh returns BEFORE bsub lands -- the queue is the only ground truth.
+  verify: python cluster.py --status   (remote submit log: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda/_cluster/_submit.log)
+    [+02:27] ◌ 8 job(s) on the cluster; waiting. Check with `bjobs`.
+  [17:54] run/pend=8 done=0 exit=0 of 8
+  [17:55] run/pend=8 done=0 exit=0 of 8
+  [17:56] run/pend=8 done=0 exit=0 of 8
+  [17:57] run/pend=8 done=0 exit=0 of 8
+  [17:58] run/pend=8 done=0 exit=0 of 8
+  [17:59] run/pend=7 done=1 exit=0 of 8
+  [18:00] run/pend=6 done=2 exit=0 of 8
+  [18:01] run/pend=4 done=4 exit=0 of 8
+  [18:02] run/pend=3 done=5 exit=0 of 8
+  [18:03] run/pend=3 done=5 exit=0 of 8
+  [18:04] run/pend=3 done=5 exit=0 of 8
+  [18:05] run/pend=3 done=5 exit=0 of 8
+  [18:06] run/pend=3 done=5 exit=0 of 8
+  [18:07] run/pend=3 done=5 exit=0 of 8
+  [18:08] run/pend=3 done=5 exit=0 of 8
+  [18:09] run/pend=3 done=5 exit=0 of 8
+  [18:11] run/pend=2 done=6 exit=0 of 8
+  [18:12] run/pend=2 done=6 exit=0 of 8
+  [18:13] run/pend=2 done=6 exit=0 of 8
+  [18:14] run/pend=2 done=6 exit=0 of 8
+  [18:15] run/pend=2 done=6 exit=0 of 8
+  [18:16] run/pend=2 done=6 exit=0 of 8
+  [18:17] run/pend=2 done=6 exit=0 of 8
+  [18:18] run/pend=2 done=6 exit=0 of 8
+  [18:19] run/pend=2 done=6 exit=0 of 8
+  [18:20] run/pend=2 done=6 exit=0 of 8
+  [18:21] run/pend=2 done=6 exit=0 of 8
+  [18:22] run/pend=2 done=6 exit=0 of 8
+  [18:23] run/pend=2 done=6 exit=0 of 8
+  [18:24] run/pend=2 done=6 exit=0 of 8
+[cluster] 153254848 is slow but WORKING (frame 644, 55599 cells) -- not a straggler. Slow and productive is a big run, not a stuck one.
+[cluster] 153254846 is slow but WORKING (frame 200, 63920 cells) -- not a straggler. Slow and productive is a big run, not a stuck one.
+    [+32:01] ◌ batch finished; captioning the wave (one model load for all runs)
+[round] batch did not complete cleanly: exit=[] killed=[] timed_out=False -- scoring what landed
+  [trace] about to import caption_wave
+  [trace] caption_wave imported; calling it
+[caption] loading the VLM ONCE for 6 run(s) on cuda:0 ...
+Loading weights:   0%|          | 0/677 [00:00<?, ?it/s]Loading weights:   0%|          | 3/677 [00:00<00:43, 15.52it/s]Loading weights:   3%|▎         | 21/677 [00:00<00:08, 81.39it/s]Loading weights:   7%|▋         | 48/677 [00:00<00:04, 146.39it/s]Loading weights:  10%|▉         | 65/677 [00:00<00:04, 151.38it/s]Loading weights:  13%|█▎        | 89/677 [00:00<00:03, 178.29it/s]Loading weights:  16%|█▌        | 109/677 [00:00<00:03, 180.78it/s]Loading weights:  19%|█▉        | 132/677 [00:00<00:02, 192.48it/s]Loading weights:  23%|██▎       | 156/677 [00:00<00:02, 204.00it/s]Loading weights:  26%|██▌       | 177/677 [00:01<00:02, 199.55it/s]Loading weights:  30%|██▉       | 201/677 [00:01<00:02, 208.71it/s]Loading weights:  34%|███▎      | 228/677 [00:01<00:02, 221.99it/s]Loading weights:  37%|███▋      | 251/677 [00:01<00:02, 212.51it/s]Loading weights:  40%|████      | 273/677 [00:01<00:01, 204.71it/s]Loading weights:  44%|████▍     | 298/677 [00:01<00:01, 211.74it/s]Loading weights:  48%|████▊     | 322/677 [00:01<00:01, 219.49it/s]Loading weights:  51%|█████     | 345/677 [00:01<00:01, 206.83it/s]Loading weights:  54%|█████▍    | 366/677 [00:01<00:01, 206.82it/s]Loading weights:  58%|█████▊    | 390/677 [00:02<00:01, 214.99it/s]Loading weights:  61%|██████    | 412/677 [00:02<00:01, 205.75it/s]Loading weights:  64%|██████▍   | 435/677 [00:02<00:01, 209.91it/s]Loading weights:  68%|██████▊   | 457/677 [00:02<00:01, 212.44it/s]Loading weights:  71%|███████   | 479/677 [00:02<00:00, 202.05it/s]Loading weights:  74%|███████▍  | 502/677 [00:02<00:00, 200.64it/s]Loading weights:  79%|███████▊  | 532/677 [00:02<00:00, 221.86it/s]Loading weights:  82%|████████▏ | 555/677 [00:02<00:00, 221.20it/s]Loading weights:  85%|████████▌ | 578/677 [00:02<00:00, 208.15it/s]Loading weights:  89%|████████▉ | 601/677 [00:03<00:00, 198.05it/s]Loading weights:  92%|█████████▏| 623/677 [00:03<00:00, 202.27it/s]Loading weights:  95%|█████████▌| 644/677 [00:03<00:00, 191.69it/s]Loading weights:  99%|█████████▉| 669/677 [00:03<00:00, 206.93it/s]Loading weights: 100%|██████████| 677/677 [00:03<00:00, 199.14it/s]
+  [1/6] r008c_00_d5e094:
+        DESCRIPTION: The activator chemical concentration begins at a high point on the bottom of the vesicle and
+        gradually migrates toward the top. As the chemical moves, the red-shaded region shifts from the lower
+        hemisphere to the upper pole of the sphere. The concentration peak narrows and becomes more localized as it
+        reaches the apex of the vesicle. By the final frame, the activator is concentrated in a small, intense area
+        at the very top of the structure.
+  [2/6] r008c_01_79b047:
+        DESCRIPTION: The simulation begins with a large cluster of red-shaded cells concentrated at the bottom of a
+        spherical vesicle. Over time, these red cells migrate and disperse across the surface of the sphere while
+        several green-tinted cells appear in various locations. The red concentration eventually diminishes as the
+        cells spread out, and the green cells remain scattered across the surface. By the final frames, the red
+        signal has almost entirely faded, leaving a mostly white surface with a few remaining green and red spots.
+  [3/6] r008c_02_cbbdfe:
+        DESCRIPTION: A cluster of cells within a spherical vesicle begins to migrate and aggregate toward the top of
+        the structure. As the cells move, the concentration of the activator chemical increases, causing the red
+        shading to intensify in the localized region. The vesicle undergoes a significant morphological change,
+        bulging outward to form a protrusion or "bud" at the top. This budding process continues until a distinct,
+        elongated neck forms, preparing the structure for potential fission.
+  [4/6] r008c_03_b00f85:
+        DESCRIPTION: The activator chemical concentration begins at a low level concentrated at the bottom of the
+        vesicle. Over time, the chemical signal migrates toward the top of the vesicle, increasing in intensity. The
+        red shading expands and moves upward as the concentration peaks at the top pole. By the final frame, the
+        chemical signal is concentrated in a large, intense patch at the very top of the sphere.
+  [5/6] r008c_05_3c4f00:
+        DESCRIPTION: A localized region of high activator concentration, shown in red, initially appears at the
+        bottom of the cell vesicle. Over time, this red region migrates around the surface of the vesicle toward the
+        side and top. As the red area moves, the underlying cellular structure undergoes a deformation, causing a
+        bulge to form on the vesicle's surface. The bulge eventually becomes prominent and slightly irregular as the
+        activator concentration shifts position.
+  [6/6] r008c_07_af9b95:
+        DESCRIPTION: A small cluster of red-shaded cells begins to grow and expand on the surface of a large
+        spherical vesicle. As the simulation progresses, the red region develops into a distinct protrusion that
+        extends outward from the main body. This protrusion gradually elongates and narrows, resembling a budding
+        structure or a developing neck. By the final frames, the protrusion has formed a prominent, elongated stalk
+        with a concentrated red tip.
+[caption] model released; 0.0 GB still reserved by this process
+[caption] 6 run(s) in 148s (one model load, not 6)
+  [trace] caption_wave RETURNED
+  [trace] past captioning; entering the reading loop
+    [+34:29] ◌ reading each run: Biologist -> Metrologist -> Reader -> Eye-check
+  [trace] reading r008c_00_d5e094
+  ◉ biologist 8c_00_d5e094: Specimen valid; every applicable premise holds.
+  [trace] read r008c_00_d5e094 OK
+  ◉ eye-check 8c_00_d5e094: CONTROL FAILED: sphere never protrudes — only a red activator patch drifts to the top pole
+  ◉ reader 8c_00_d5e094: Phenotype sphere.
+  ◉ : The object is a spherical vesicle built from a dense mesh of small polygonal cells, and it stays sph
+      erical from first frame to last with no deformation of its outline. Nothing protrudes — there is no 
+      bud, tube, or bump; the surface remains a smooth closed sphere throughout. The only thing that moves
+       is colour: a dark-red patch marking high activator concentration starts on the lower hemisphere and
+       migrates to the top pole, narrowing into a small intense spot at the apex. A small circular cross-s
+      ection inset in the corner and the dual-perspective layout are rendering aids, not tissue, and are t
+      he only non-tissue features visible.
+  ⚠ [eye] r008c_00_d5e094 DISAGREES with the numbers -- recorded, not vetoed: The movie shows only a chemical-concentration blob migrating to the pole on a sphere that never chan
+  [trace] reading r008c_01_79b047
+  ◉ biologist 8c_01_79b047: Specimen invalid; broken: P1, P3b, P7.
+  [trace] read r008c_01_79b047 OK
+  ◉ eye-check 8c_01_79b047: Sphere stays a sphere — no protrusion, red just disperses and fades; claim unsupported
+  ◉ reader 8c_01_79b047: Phenotype sphere.
+  ◉ : The movie shows a large spherical vesicle that stays spherical throughout, viewed from two angles wi
+      th a small circular cross-section inset. Nothing protrudes — the geometry never breaks the sphere; t
+      he only change is that a dense red-shaded cluster at the bottom migrates and disperses across the su
+      rface. The red signal steadily fades to near-white while a few scattered green (recently-divided) ce
+      lls appear. There is no bud, tube, or protrusion, and no artefact beyond the standard cross-section 
+      inset — just surface colour dynamics on an unchanging sphere.
+  ⚠ [eye] r008c_01_79b047 DISAGREES with the numbers -- recorded, not vetoed: The description shows a persistently spherical vesicle with only surface colour migration and no pro
+  [trace] reading r008c_02_cbbdfe
+  ◉ biologist 8c_02_cbbdfe: Specimen valid; every applicable premise holds.
+  [trace] read r008c_02_cbbdfe OK
+  ◉ eye-check 8c_02_cbbdfe: Movie shows a strong bud + fission neck, not the minimal ≤1.10 protrusion the claim predicts
+  ◉ reader 8c_02_cbbdfe: Phenotype bud.
+  ◉ : The movie shows a spherical vesicle built from a dense mesh of interconnected cells that starts smoo
+      th and then bulges strongly outward at the top. A distinct bud protrudes and keeps extending until a
+       clear, elongated neck forms, apparently setting up for fission — this is a large, well-defined morp
+      hological change, not a faint bump. The cells are mostly white while a concentrated patch of deep re
+      d marks rising activator chemical where the cluster migrates and aggregates near the top. The ring-l
+      ike cross-section in the bottom-right corner is a rendering inset panel rather than a real tissue st
+      ructure, and the red is a chemical-concentration overlay, not the cells themselves.
+  ⚠ [eye] r008c_02_cbbdfe DISAGREES with the numbers -- recorded, not vetoed: The movie shows a robust bud extending into an elongated fission neck, the opposite of the claim's p
+  [trace] reading r008c_03_b00f85
+  ◉ biologist 8c_03_b00f85: Specimen valid; every applicable premise holds.
+  [trace] read r008c_03_b00f85 OK
+  ◉ eye-check 8c_03_b00f85: No-patterned-growth control: sphere stays round, no bud — protrusion prediction holds
+  ◉ reader 8c_03_b00f85: Phenotype sphere.
+  ◉ : The movie shows a spherical vesicle built from a dense network of small cells that stays uniformly r
+      ound from start to finish. Nothing protrudes — no bud, tube, or bulge breaks the surface at any poin
+      t, and the structure explicitly maintains its spherical topology throughout. The only change is colo
+      ur: a dark-red patch marking high chemical concentration starts at the bottom, then migrates upward 
+      and intensifies into a large patch at the top pole. A small circular cross-section inset in the corn
+      er shows the internal cell packing and reads as a normal diagnostic panel rather than an artefact.
+  [trace] reading r008c_05_3c4f00
+  ◉ biologist 8c_05_3c4f00: Specimen ambiguous; broken: P7.
+  [trace] read r008c_05_3c4f00 OK
+  ◉ eye-check 8c_05_3c4f00: Movie shows a prominent moving bulge — NOT inert; contradicts the inertness claim
+  ◉ reader 8c_05_3c4f00: Phenotype sphere.
+  ◉ : The movie shows a spherical cell vesicle, a white network of cells, that stays roughly the same over
+      all size while its surface geometry changes. A red activator region starts at the bottom and migrate
+      s around the surface toward the side and top, and wherever it goes the underlying tissue deforms. A 
+      bulge forms and becomes prominent and slightly irregular as the red signal shifts position — this is
+       an active protrusion, not an inert body. Nothing reads as a clear artefact; the inset circular cros
+      s-section and the moving red patch appear to be genuine tissue/field, but the deformation is real, n
+      ot cosmetic.
+  ⚠ [eye] r008c_05_3c4f00 DISAGREES with the numbers -- recorded, not vetoed: The description reports a prominent, growing, irregular bulge and surface deformation tracking the a
+  [trace] reading r008c_07_af9b95
+  ◉ biologist 8c_07_af9b95: Specimen valid; every applicable premise holds.
+  [trace] read r008c_07_af9b95 OK
+  ◉ eye-check 8c_07_af9b95: Clean single bud/stalk — NOT a folded mesh; the >=50-tube fold prediction is unsupported
+  ◉ reader 8c_07_af9b95: Phenotype bud.
+  ◉ : The movie shows a large spherical vesicle of white cells with one localized red-shaded region that i
+      nflates and pushes outward. That region develops into a single distinct protrusion which elongates a
+      nd narrows into a neck-like stalk, ending in a concentrated red tip by the final frames. Only one cl
+      ean bud protrudes — there is no crumpling, buckling, or proliferation of many tubes, and the surroun
+      ding surface stays smooth and intact. Aside from the inset cross-section ring in the corner (a rende
+      ring panel, not tissue), nothing reads as a folded or shattered mesh.
+  ⚠ [eye] r008c_07_af9b95 DISAGREES with the numbers -- recorded, not vetoed: The movie shows a single clean budding protrusion/stalk, not a folded mesh with many (>=50) tubes.
+  ✓ [rank] kept 4, dropped 2 (never refined)
+  [KEEP] r008c_02_cbbdfe  score   2.26  protr_peak  1.17 phen=bud       watcher=CONTRADICTS [refuted]  SURPRISE
+  [KEEP] r008c_00_d5e094  score   2.18  protr_peak  1.29 phen=sphere    watcher=CONTRADICTS [confirmed]
+  [KEEP] r008c_07_af9b95  score   1.79  protr_peak  1.02 phen=bud       watcher=CONTRADICTS [refuted]
+  [KEEP] r008c_03_b00f85  score   1.50  protr_peak  1.00 phen=sphere    watcher=supports   [confirmed]
+  [drop] r008c_05_3c4f00  score   1.85  protr_peak  1.23 phen=sphere    watcher=CONTRADICTS [confirmed]
+  [drop] r008c_01_79b047  score   1.63  protr_peak  1.02 phen=sphere    watcher=CONTRADICTS [refuted]
+  [trace] reading loop done; entering Act 3
+
+================================================================================================
+▶ ACT 3 - DECIDE   [+43:51]   6 run(s) admitted, 2 refused
+================================================================================================
+    [+43:51] ◌ Collector: building the round record from the files on disk
+  [trace] Collector: building the record
+  [trace] Collector done
+    [+43:51] ◌ Interpreter: writing the causal record for 4 kept run(s)
+  ◉ interpreter 8c_02_cbbdfe: Bud is growth-driven, NOT division-driven: removing divide_3d0 changed nothing (retention 1.0), prot
+      r 1.173 held
+  ◉ interpreter 8c_00_d5e094: CONTROL stays a sphere — active division (n→2706) soaks up uniform growth, no buckle (p_ratio 0.47 v
+      s siblings' 8.3)
+  ◉ interpreter 8c_07_af9b95: Caf9b951cfc3: ×6.45 uniform inflation → smooth sphere + one mild bud (protr 1.024, p_ratio 3.4); no 
+      hard buckle despite
+[budget] OVER CEILING at interpreter: round LLM budget would be exceeded (18.3+8 > 25.0 min) -- running anyway; the round is flagged budget_exceeded
+  ◉ interpreter 8c_03_b00f85: No-growth control holds a perfect sphere (protr 1.003, p_tube 0); growth op is necessary for any bud
+    [+51:57] ◌ Meta-review: prompt write-back + memory.md
+[budget] OVER CEILING at meta_review: round LLM budget would be exceeded (19.7+10 > 25.0 min) -- running anyway; the round is flagged budget_exceeded
+  ◉ meta-review: The campaign is building the causal lever-map of the Okuda forced-protrusion recipe (C-hash family, 
+      parent Cad4767/C414a11), whose physical bud tops out at protr_peak ~1.19–1.23.
+    [+55:26] ◌ Archivist: reading the whole history
+[budget] OVER CEILING at archivist: round LLM budget would be exceeded (23.2+6 > 25.0 min) -- running anyway; the round is flagged budget_exceeded
+  ◌ [archivist] continue
+  ◉ archivist: Protrusion plateaued at sound-bud 1.29, but round 7 keeps minting sound branches — field still alive
+  ◉ supervisor: continue; next batch 70% confirmatory.
+  [supervisor] {"round": 8, "spent": 37, "best": 3.873, "new_clusters": 2, "frozen": [], "active_clusters": 9, "dry": 0, "surprise": 0.2, "next_confirmatory_frac": 0.7, "stop": false, "reason": "continue"}
+[map] coverage 71% (32/45 cells, 37 runs)
+
+[llm] per-role breakdown (round, round 8)
+       agent                  calls      min      %    ok/fail/skip
+       interpreter                4     8.09  33.5%     4/0   /0   
+       reader                     6     7.30  30.3%     6/0   /0   
+       meta_review                1     3.49  14.5%     0/1   /0   
+       watcher                    6     2.06   8.5%     6/0   /0   
+       proposer                   1     1.79   7.4%     1/0   /0   
+       archivist                  1     0.88   3.6%     1/0   /0   
+       reflection                 1     0.45   1.9%     1/0   /0   
+       grounder                   1     0.07   0.3%     1/0   /0      (local, not LLM)
+       TOTAL                     21    24.13   llm=24.06 min of 25.0 ceiling | wall since round start 56.33 min
+       BUDGET EXCEEDED at interpreter: round LLM budget would be exceeded (18.3+8 > 25.0 min) -- running anyway; the round is flagged budget_exceeded
+       BUDGET EXCEEDED at meta_review: round LLM budget would be exceeded (19.7+10 > 25.0 min) -- running anyway; the round is flagged budget_exceeded
+       BUDGET EXCEEDED at archivist: round LLM budget would be exceeded (23.2+6 > 25.0 min) -- running anyway; the round is flagged budget_exceeded
+[llm] {'calls': 21, 'round_min': 24.06, 'total_min': 24.06, 'turns': 91, 'tok_in': 64725, 'tok_out': 93269, 'cache_new': 555100, 'cache_hit': 2279460, 'usd': 9.346, 'roles': 8, 'budget_exceeded': False, 'unmetered': 0}
+[llm] ROUND EXCEEDED THE 25.0 min LLM CEILING (3 breach(es)) -- this round is NOT a clean round.
+[llm] timing appended to /workspace/Plexus/discovery_okuda/campaign/llm_timing.jsonl
+  ✓ [loop] round 2 exited 0 after 56.5 min wall, 24.1 min of agents
+
+------------------------------------------------------------------------------------------------
+[loop] round 3/20  mode=composition   spent so far: 415.7 agent-min over 575 calls
+------------------------------------------------------------------------------------------------
+[supervisor] resumed: round 8, 37 runs spent, 10 clusters (9 active), dry 0, stage_gate 2
+================================================================================================
+ROUND 9   mode=composition   campaign=okuda_growth_driven
+================================================================================================
+
+================================================================================================
+▶ ACT 1 - PROPOSE   [+00:00]   before a second of compute is spent
+================================================================================================
+  [grounder] note: phi: tabulated 10.0, but the paper's own formula (3 v_ref^1/3)^2/(4 eta_c/5 kappa_s) gives 9.000. The paper writes 'phi ~', so both are its own; which one the campaign uses is a decision and must be made explicitly, not inherited.
+proposal.json written — 12 slots, control + 11 single-edit experiments.
+
+**Batch shape:** centered on the Track-B opening (`shape_energy_3d:monolayer`, the Okuda sheet geometry) probed across all three applicable parents — growth (slot 1), growth+division (slot 2), mechanics-only (slot 3) — to test whether the sheet breaks the 1.23 mid-surface ceiling and whether it needs growth. The rest maps the
+  [proposer] 4.2 min, tools: Readx3, Writex1
+  ✗ [critic] slot 2 rejected -- CRITIC: [<R6_DUPLICATE: C79b0478357d -- request a robustness test explicitly if replication is what you want>]
+  ✗ [critic] slot 7 rejected -- CRITIC: [<R6_DUPLICATE: C7c70bc4cef7 -- request a robustness test explicitly if replication is what you want>]
+  ✗ [critic] slot 8 rejected -- DUPLICATE_IN_BATCH: identical to slot 6 (Cbad47f424a2). Same composition, so at most one prediction about it can be right; the others are the same experiment re-run under a different guess. Vary the EDIT, not the number.
+  ✗ [critic] slot 10 rejected -- CRITIC: [<R6_DUPLICATE: C3c4f000cb52 -- request a robustness test explicitly if replication is what you want>]
+  ◉ peer-review: batch_ok=True. Worth running — real geometry/synergy axis, proper parent-0 control, strong adversari
+      al brackets (slots 4/5, 7).
+     slot 6: [serious] 'amplifies past 1.3 OR diverges' folds a TIER-fail into confirmation — near-unfalsifiable; only a stable mid value (1.1-1.29) could refute it.
+     slot 0: [serious] Control range 1.0-1.3 overlaps the <=1.0/1.05/1.1 'flatten' predictions, so a drop can't be distinguished from a never-budding baseline.
+     slot 4: [serious] Parents 3 and 2 get only subtraction/addition slots, no in-batch baseline; drops rely on archived protr_peak, weakening synergy attribution.
+  r009c_00_cbbdfe  control (parent unchanged)               track B  control       predict protr_peak 1.0-1.3
+  r009c_01_6de516  ('set_impl', 'shape_energy_3d0', 'monola track B  confirmatory  predict protr_peak >= 1.25
+  r009c_02_3242f3  ('set_impl', 'shape_energy_3d0', 'monola track A  adversarial   predict protr_peak <= 1.1
+  r009c_03_1fdee5  ('remove_op', 'reconnect_t1_3d0')        track A  confirmatory  predict protr_peak <= 1.1
+  r009c_04_a4940b  ('remove_op', 'cell_rd_seed0')           track A  confirmatory  predict protr_peak <= 1.0
+  r009c_05_bad47f  ('remove_op', 'divide_3d0')              track A  confirmatory  predict protr_peak <= 1.05
+  r009c_06_db6608  ('add_op', 'divide_3d', 'hertwig')       track A  adversarial   predict protr_peak >= 1.3
+  r009c_07_6c1727  ('remove_op', 'cell_adjacency0')         track A  adversarial   predict protr_peak >= 1.15
+[preflight] cluster job env: OK
+[preflight] PASS
+
+================================================================================================
+▶ ACT 2 - MEASURE   [+05:41]   submitting 8 simulation(s) -- the only expensive step
+================================================================================================
+[cluster] fired 8 bsub(s) DETACHED on allierc@login1: pg_r009c_00_cbbdfe, pg_r009c_01_6de516, pg_r009c_02_3242f3, pg_r009c_03_1fdee5, pg_r009c_04_a4940b, pg_r009c_05_bad47f, pg_r009c_06_db6608, pg_r009c_07_6c1727
+  the ssh returns BEFORE bsub lands -- the queue is the only ground truth.
+  verify: python cluster.py --status   (remote submit log: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda/_cluster/_submit.log)
+    [+05:44] ◌ 8 job(s) on the cluster; waiting. Check with `bjobs`.
+  [18:54] run/pend=8 done=0 exit=0 of 8
+  [18:55] run/pend=8 done=0 exit=0 of 8
+  [18:56] run/pend=8 done=0 exit=0 of 8
+  [18:57] run/pend=8 done=0 exit=0 of 8
+  [18:58] run/pend=8 done=0 exit=0 of 8
+  [18:59] run/pend=7 done=1 exit=0 of 8
+  [19:00] run/pend=7 done=1 exit=0 of 8
+  [19:01] run/pend=3 done=5 exit=0 of 8
+  [19:02] run/pend=3 done=5 exit=0 of 8
+  [19:03] run/pend=3 done=5 exit=0 of 8
+  [19:04] run/pend=2 done=6 exit=0 of 8
+  [19:05] run/pend=2 done=6 exit=0 of 8
+  [19:06] run/pend=2 done=6 exit=0 of 8
+  [19:07] run/pend=2 done=6 exit=0 of 8
+  [19:08] run/pend=2 done=6 exit=0 of 8
+  [19:09] run/pend=2 done=6 exit=0 of 8
+  [19:10] run/pend=1 done=7 exit=0 of 8
+  [19:12] run/pend=1 done=7 exit=0 of 8
+  [19:13] run/pend=1 done=7 exit=0 of 8
+  [19:14] run/pend=1 done=7 exit=0 of 8
+  [19:15] run/pend=1 done=7 exit=0 of 8
+  [19:16] run/pend=0 done=7 exit=1 of 8
+[cluster] ⚠ 1 job(s) EXITed: ['153254941']
+    [+27:09] ◌ batch finished; captioning the wave (one model load for all runs)
+[round] batch did not complete cleanly: exit=['153254941'] killed=[] timed_out=False -- scoring what landed
+  [trace] about to import caption_wave
+  [trace] caption_wave imported; calling it
+[caption] loading the VLM ONCE for 7 run(s) on cuda:0 ...
+Loading weights:   0%|          | 0/677 [00:00<?, ?it/s]Loading weights:   0%|          | 3/677 [00:00<00:40, 16.49it/s]Loading weights:   3%|▎         | 22/677 [00:00<00:07, 85.86it/s]Loading weights:   7%|▋         | 47/677 [00:00<00:04, 143.61it/s]Loading weights:   9%|▉         | 64/677 [00:00<00:04, 150.27it/s]Loading weights:  13%|█▎        | 89/677 [00:00<00:03, 179.97it/s]Loading weights:  17%|█▋        | 113/677 [00:00<00:02, 196.57it/s]Loading weights:  20%|█▉        | 134/677 [00:00<00:02, 190.35it/s]Loading weights:  23%|██▎       | 159/677 [00:00<00:02, 207.60it/s]Loading weights:  27%|██▋       | 181/677 [00:01<00:02, 201.23it/s]Loading weights:  30%|██▉       | 202/677 [00:01<00:02, 193.13it/s]Loading weights:  34%|███▍      | 229/677 [00:01<00:02, 210.20it/s]Loading weights:  38%|███▊      | 255/677 [00:01<00:01, 214.68it/s]Loading weights:  41%|████      | 277/677 [00:01<00:01, 213.95it/s]Loading weights:  44%|████▍     | 299/677 [00:01<00:01, 201.89it/s]Loading weights:  48%|████▊     | 326/677 [00:01<00:01, 212.58it/s]Loading weights:  52%|█████▏    | 349/677 [00:01<00:01, 214.81it/s]Loading weights:  55%|█████▍    | 371/677 [00:01<00:01, 209.53it/s]Loading weights:  58%|█████▊    | 395/677 [00:02<00:01, 201.07it/s]Loading weights:  62%|██████▏   | 421/677 [00:02<00:01, 210.52it/s]Loading weights:  66%|██████▌   | 445/677 [00:02<00:01, 216.27it/s]Loading weights:  69%|██████▉   | 467/677 [00:02<00:01, 205.76it/s]Loading weights:  73%|███████▎  | 492/677 [00:02<00:00, 210.35it/s]Loading weights:  77%|███████▋  | 518/677 [00:02<00:00, 215.07it/s]Loading weights:  80%|███████▉  | 540/677 [00:02<00:00, 207.50it/s]Loading weights:  83%|████████▎ | 561/677 [00:02<00:00, 208.01it/s]Loading weights:  86%|████████▋ | 584/677 [00:02<00:00, 211.63it/s]Loading weights:  90%|████████▉ | 606/677 [00:03<00:00, 196.67it/s]Loading weights:  93%|█████████▎| 629/677 [00:03<00:00, 201.01it/s]Loading weights:  96%|█████████▌| 650/677 [00:03<00:00, 202.17it/s]Loading weights: 100%|█████████▉| 675/677 [00:03<00:00, 213.63it/s]Loading weights: 100%|██████████| 677/677 [00:03<00:00, 198.38it/s]
+  [1/7] r009c_00_cbbdfe:
+        DESCRIPTION: A cluster of cells within a spherical vesicle begins to migrate and aggregate toward the top of
+        the structure. As the cells move, the concentration of the activator chemical increases, causing the red
+        shading to intensify in the localized region. The vesicle undergoes a significant morphological change,
+        bulging outward to form a protrusion or "bud" at the top. This budding process continues until a distinct,
+        elongated neck forms, preparing the structure for potential fission.
+  [2/7] r009c_01_6de516:
+        DESCRIPTION: A small cluster of cells on the surface of a spherical vesicle begins to grow and expand. The
+        red-shaded region, representing a high concentration of an activator chemical, spreads across the surface as
+        the cells proliferate. As the cluster grows, it forms a distinct protrusion or bud that extends outward from
+        the main body of the vesicle. This budding process continues until a significant portion of the vesicle's
+        surface is involved in the localized growth.
+  [3/7] r009c_02_3242f3:
+        DESCRIPTION: The simulation begins with a large cluster of cells at the bottom of a spherical vesicle, which
+        gradually spreads across the surface. As the cells migrate, they undergo numerous divisions, indicated by
+        the appearance of green-tinted cells across the sphere. The red activator chemical eventually diffuses and
+        redistributes, while the overall shape of the vesicle remains largely spherical. By the final frames, the
+        cells have covered the entire surface, and the red signal has moved toward the top of the structure.
+  [4/7] r009c_03_1fdee5:
+        DESCRIPTION: A small cluster of cells at the bottom of a spherical vesicle begins to proliferate and expand.
+        The growing cluster pushes outward, causing the vesicle to deform into a pear-like shape. As the cells
+        continue to divide, they form a distinct protrusion that extends from the top of the sphere. The red color
+        intensity increases in the growing region, indicating a higher concentration of the activator chemical.
+  [5/7] r009c_04_a4940b:
+        DESCRIPTION: The cell vesicle maintains a spherical shape while the internal cells undergo continuous
+        division and movement. The activator chemical concentration fluctuates across the surface, causing the white
+        and red shading to shift dynamically. Over time, the internal structure of the vesicle remains dense and
+        interconnected as cells reorganize. The cross-section shows a consistent ring of cells maintaining the
+        integrity of the spherical boundary.
+  [6/7] r009c_05_bad47f:
+        DESCRIPTION: The activator chemical concentration begins at a low level concentrated at the bottom of the
+        vesicle. Over time, the chemical signal migrates toward the top of the vesicle, increasing in intensity. The
+        red shading expands and moves upward as the concentration peaks at the top pole. By the final frame, the
+        chemical signal is concentrated in a large, intense patch at the very top of the sphere.
+  [7/7] r009c_07_6c1727:
+        DESCRIPTION: A small cluster of red-shaded cells begins to grow and expand on the surface of a large
+        spherical vesicle. As the simulation progresses, the red region develops into a distinct protrusion that
+        extends outward from the main body. This protrusion gradually elongates and narrows, resembling a budding
+        structure or a developing neck. By the final frames, the protrusion has formed a prominent, elongated stalk
+        with a concentrated red tip.
+[caption] model released; 0.0 GB still reserved by this process
+[caption] 7 run(s) in 158s (one model load, not 7)
+  [trace] caption_wave RETURNED
+  [trace] past captioning; entering the reading loop
+    [+29:48] ◌ reading each run: Biologist -> Metrologist -> Reader -> Eye-check
+  [trace] reading r009c_00_cbbdfe
+  ◉ biologist 9c_00_cbbdfe: Specimen valid; every applicable premise holds.
+  [trace] read r009c_00_cbbdfe OK
+  ◉ eye-check 9c_00_cbbdfe: CONTROL IS NOT UNCHANGED: it grows a big bud with an elongated neck
+  ◉ reader 9c_00_cbbdfe: Phenotype bud.
+  ◉ : The movie shows a spherical cell-network vesicle that starts smooth but then bulges outward at the t
+      op as cells migrate and aggregate there, growing a distinct bud. A clear protrusion forms and contin
+      ues extending until an elongated neck develops, as if preparing to pinch off (fission). The colour s
+      hows the red activator concentration intensifying in the localized top region where the bud forms, w
+      hile the rest stays white. The only artefact-like element is the small cross-sectional ring inset in
+       the bottom-right, which is a diagnostic view rather than tissue.
+  ⚠ [eye] r009c_00_cbbdfe DISAGREES with the numbers -- recorded, not vetoed: The claim says the control parent is unchanged (protr_peak ~1.0-1.3), but the movie shows a large pr
+  [trace] reading r009c_01_6de516
+  ◉ biologist 9c_01_6de516: Specimen valid; every applicable premise holds.
+  [trace] read r009c_01_6de516 OK
+  ◉ eye-check 9c_01_6de516: Real outward bud protrudes from the vesicle — protrusion claim is supported
+  ◉ reader 9c_01_6de516: Phenotype bud.
+  ◉ : The movie shows a spherical multicellular vesicle whose surface hosts a localized cluster that grows
+       and expands over time. That cluster forms a distinct bud that protrudes outward from the main spher
+      e, sharing the same cellular topology, and the budding involves a growing fraction of the surface. A
+       deep-red activator region tracks the growing cluster, spreading across the surface as the cells pro
+      liferate while the rest stays white. A small circular cross-section in the bottom-right corner revea
+      ls the interior as a ring of cells, which is a diagnostic inset rather than an artefact or tissue de
+      fect.
+  [trace] reading r009c_02_3242f3
+  ◉ biologist 9c_02_3242f3: Specimen invalid; broken: P3b, P7.
+  [trace] read r009c_02_3242f3 OK
+  ◉ eye-check 9c_02_3242f3: No-growth sheet stays a sphere — nothing protrudes, confirming growth is needed to deform
+  ◉ reader 9c_02_3242f3: Phenotype sphere.
+  ◉ : A dense cluster of cells starts at the bottom of a spherical vesicle and spreads to cover the entire
+       spherical surface, and the overall shape stays largely spherical throughout. Nothing protrudes — no
+       bud, tube, or elongation forms; the geometry stays a closed sphere. The red activator chemical diff
+      uses and redistributes, drifting toward the top by the final frames, while green-tinted cells mark d
+      ivision events. A small circular cross-section inset (bottom-right) shows the interior; no obvious r
+      endering artefacts, though the numerous divisions are worth noting given the run is labelled 'withou
+      t growth'.
+  [trace] reading r009c_03_1fdee5
+  ◉ biologist 9c_03_1fdee5: Specimen valid; every applicable premise holds.
+  [trace] read r009c_03_1fdee5 OK
+  ◉ eye-check 9c_03_1fdee5: Bud NOT dropped — a distinct protrusion still forms, contradicting the drop-bud claim
+  ◉ reader 9c_03_1fdee5: Phenotype bud.
+  ◉ : The movie shows a spherical cell-network vesicle that deforms into a pear-like, elongated asymmetric
+      al shape as a bottom cluster proliferates. A distinct protrusion clearly extends outward, so the bud
+       is present rather than dropped. The colour intensifies to deep red in the growing/protruding region
+      , marking high activator concentration. The bottom-right inset shows a ring-like cross-section; noth
+      ing reads as a shard/debris artefact — the deformation looks like coherent tissue.
+  ⚠ [eye] r009c_03_1fdee5 DISAGREES with the numbers -- recorded, not vetoed: The description shows a distinct protrusion/bud forming, which contradicts the claim that removing r
+  [trace] reading r009c_04_a4940b
+  ◉ biologist 9c_04_a4940b: Specimen valid; every applicable premise holds.
+  [trace] read r009c_04_a4940b OK
+  ◉ eye-check 9c_04_a4940b: cell_rd_seed removed → vesicle stays a plain sphere, no protrusion (flattened as predicted)
+  ◉ reader 9c_04_a4940b: Phenotype sphere.
+  ◉ : The specimen is a spherical vesicle that maintains its round shape throughout while internal cells d
+      ivide, move, and reorganize into a dense interconnected network. Nothing protrudes — the boundary st
+      ays uniform and the geometric topology is described as consistent, with a cross-section showing an i
+      ntact ring of cells. The colour shifts dynamically between white and red as the activator concentrat
+      ion fluctuates across the surface, but this is a shading change, not a shape change. No artefacts (s
+      tray shards, escaper cells, or ruptured shell) are noted; the structure reads as an intact, uniform 
+      spherical body rather than a deformed or budding one.
+  [trace] reading r009c_05_bad47f
+  ◉ biologist 9c_05_bad47f: Specimen valid; every applicable premise holds.
+  [trace] read r009c_05_bad47f OK
+  ◉ eye-check 9c_05_bad47f: Division removed → stays a plain sphere; red signal just drifts bottom→top, no bud (claim holds)
+  ◉ reader 9c_05_bad47f: Phenotype sphere.
+  ◉ : The movie shows a single spherical vesicle built from a dense mesh of small white cells that keeps i
+      ts round shape and uniform size from first frame to last. Nothing protrudes — there is no bud, tube,
+       or bulge; the outline stays a clean sphere and only the colour changes. A dark-red patch (high acti
+      vator concentration) starts weak at the bottom pole and migrates upward, intensifying into a large c
+      oncentrated patch at the top by the end. The small circular cross-section inset in the corner is a r
+      endering artefact/diagnostic, not tissue, and no shard-like debris or shape distortion appears.
+  [trace] reading r009c_07_6c1727
+  ◉ biologist 9c_07_6c1727: Specimen valid; every applicable premise holds.
+  [trace] read r009c_07_6c1727 OK
+  ◉ eye-check 9c_07_6c1727: Clean red-tipped bud elongates into a stalk — a real protrusion, not a blob
+  ◉ reader 9c_07_6c1727: Phenotype bud.
+  ◉ : A large spherical vesicle of densely packed cells hosts a red-shaded activator patch that grows and 
+      pushes outward from the surface. Over time that patch develops into a distinct protrusion that elong
+      ates and narrows into a prominent stalk or neck, so something genuinely protrudes rather than just s
+      preading. The red colour tracks the growing region, staying concentrated at the advancing tip of the
+       protrusion throughout. The only non-tissue element is a small cross-sectional inset in the bottom-r
+      ight corner showing the interior ring; the main body reads as coherent tissue with no obvious shard 
+      or explosion artefact.
+  ✓ [rank] kept 4, dropped 3 (never refined)
+  [KEEP] r009c_03_1fdee5  score   2.27  protr_peak  1.18 phen=bud       watcher=CONTRADICTS [refuted]  SURPRISE
+  [KEEP] r009c_00_cbbdfe  score   2.26  protr_peak  1.17 phen=bud       watcher=CONTRADICTS [confirmed]
+  [KEEP] r009c_01_6de516  score   2.01  protr_peak  1.17 phen=bud       watcher=supports   [refuted]  SURPRISE
+  [KEEP] r009c_07_6c1727  score   1.79  protr_peak  1.02 phen=bud       watcher=supports   [refuted]
+  [drop] r009c_04_a4940b  score   1.50  protr_peak  1.00 phen=sphere    watcher=supports   [refuted]  SURPRISE
+  [drop] r009c_05_bad47f  score   1.50  protr_peak  1.00 phen=sphere    watcher=supports   [confirmed]
+  [drop] r009c_02_3242f3  score   1.57  protr_peak  1.02 phen=sphere    watcher=supports   [confirmed]  SURPRISE
+  [trace] reading loop done; entering Act 3
+
+================================================================================================
+▶ ACT 3 - DECIDE   [+38:38]   7 run(s) admitted, 1 refused
+================================================================================================
+    [+38:38] ◌ Collector: building the round record from the files on disk
+  [trace] Collector: building the record
+  [trace] Collector done
+    [+38:38] ◌ Interpreter: writing the causal record for 4 kept run(s)
+  ◉ interpreter 9c_03_1fdee5: T1-reconnect knockout does NOT drop the bud — protr holds 1.179 (retention 1.0), buckle is growth-dr
+      iven
+  ◉ interpreter 9c_00_cbbdfe: "Control unchanged" is FALSE — parent buds under uniform ungated growth (V ×1.13, p_ratio 8.3)
+[budget] OVER CEILING at interpreter: round LLM budget would be exceeded (19.0+8 > 25.0 min) -- running anyway; the round is flagged budget_exceeded
+  ◉ interpreter 9c_01_6de516: C6de51614cd6 buds by growth-buckling (p_ratio 7.18); the monolayer shape-energy swap is inert (reten
+      tion 1.0)
+[budget] OVER CEILING at interpreter: round LLM budget would be exceeded (21.1+8 > 25.0 min) -- running anyway; the round is flagged budget_exceeded
+  ◉ interpreter 9c_07_6c1727: ×6.45 inflation stays SPHERICAL (protr 1.024); watcher's 'stalk' contradicts geometry
+    [+50:07] ◌ Meta-review: prompt write-back + memory.md
+[budget] OVER CEILING at meta_review: round LLM budget would be exceeded (25.8+10 > 25.0 min) -- running anyway; the round is flagged budget_exceeded
+  ◉ meta-review: The campaign is building the causal lever-map of the Okuda forced-protrusion recipe (C-hash family, 
+      parent Cad4767/C414a11), whose physical bud tops out at protr_peak ~1.19–1.23.
+    [+52:29] ◌ Archivist: reading the whole history
+[budget] OVER CEILING at archivist: round LLM budget would be exceeded (28.2+6 > 25.0 min) -- running anyway; the round is flagged budget_exceeded
+  ◌ [archivist] continue
+  ◉ archivist: Sound protrusion stuck at 1.29; the 2.25 peak was an unsound explosion, nothing better behind
+  ◉ supervisor: continue; next batch 85% confirmatory.
+  [supervisor] {"round": 9, "spent": 44, "best": 3.873, "new_clusters": 1, "frozen": [], "active_clusters": 10, "dry": 0, "surprise": 0.6666666666666666, "next_confirmatory_frac": 0.85, "stop": false, "reason": "continue"}
+[map] coverage 71% (32/45 cells, 44 runs)
+
+[llm] per-role breakdown (round, round 9)
+       agent                  calls      min      %    ok/fail/skip
+       interpreter                4    11.49  39.1%     4/0   /0   
+       reader                     7     7.09  24.1%     7/0   /0   
+       proposer                   1     4.25  14.5%     1/0   /0   
+       meta_review                1     2.36   8.0%     0/1   /0   
+       watcher                    7     1.73   5.9%     7/0   /0   
+       reflection                 1     1.27   4.3%     1/0   /0   
+       archivist                  1     1.10   3.8%     1/0   /0   
+       grounder                   1     0.07   0.2%     1/0   /0      (local, not LLM)
+       TOTAL                     23    29.36   llm=29.29 min of 25.0 ceiling | wall since round start 53.60 min
+       BUDGET EXCEEDED at interpreter: round LLM budget would be exceeded (19.0+8 > 25.0 min) -- running anyway; the round is flagged budget_exceeded
+       BUDGET EXCEEDED at interpreter: round LLM budget would be exceeded (21.1+8 > 25.0 min) -- running anyway; the round is flagged budget_exceeded
+       BUDGET EXCEEDED at meta_review: round LLM budget would be exceeded (25.8+10 > 25.0 min) -- running anyway; the round is flagged budget_exceeded
+       BUDGET EXCEEDED at archivist: round LLM budget would be exceeded (28.2+6 > 25.0 min) -- running anyway; the round is flagged budget_exceeded
+[llm] {'calls': 23, 'round_min': 29.29, 'total_min': 29.29, 'turns': 99, 'tok_in': 70717, 'tok_out': 124446, 'cache_new': 581173, 'cache_hit': 2314456, 'usd': 10.434, 'roles': 8, 'budget_exceeded': False, 'unmetered': 0}
+[llm] ROUND EXCEEDED THE 25.0 min LLM CEILING (4 breach(es)) -- this round is NOT a clean round.
+[llm] timing appended to /workspace/Plexus/discovery_okuda/campaign/llm_timing.jsonl
+  ✓ [loop] round 3 exited 0 after 53.8 min wall, 29.4 min of agents
+
+------------------------------------------------------------------------------------------------
+[loop] round 4/20  mode=composition   spent so far: 445.1 agent-min over 598 calls
+------------------------------------------------------------------------------------------------
+[supervisor] resumed: round 9, 44 runs spent, 11 clusters (10 active), dry 0, stage_gate 2
+================================================================================================
+ROUND 10   mode=composition   campaign=okuda_growth_driven
+================================================================================================
+
+================================================================================================
+▶ ACT 1 - PROPOSE   [+00:00]   before a second of compute is spent
+================================================================================================
+  [grounder] note: phi: tabulated 10.0, but the paper's own formula (3 v_ref^1/3)^2/(4 eta_c/5 kappa_s) gives 9.000. The paper writes 'phi ~', so both are its own; which one the campaign uses is a decision and must be made explicitly, not inherited.
+Written. `proposal.json` — 12 slots, explore mode.
+
+- **Two Track-B parents, each with its own control** (slots 0 and 6), fixing round 9's missing-baseline flaw.
+- **Parent 0 (mid-surface):** tests the two cell_rd_seed synergies (+divide_3d, +reconnect_t1_3d), morphogen necessity, cell_geometry, and a uniform_ramp excursion.
+- **Parent 2 (Okuda monolayer route):** mirrors the productive edits on t
+  [proposer] 3.0 min, tools: Readx3, Writex1
+  ✗ [critic] slot 1 rejected -- CRITIC: [<R6_DUPLICATE: C3c4f000cb52 -- request a robustness test explicitly if replication is what you want>]
+  ✗ [critic] slot 2 rejected -- CRITIC: [<R6_DUPLICATE: Ccbbdfe07bc3 -- request a robustness test explicitly if replication is what you want>]
+  ✗ [critic] slot 7 rejected -- CRITIC: [<R6_DUPLICATE: C79b0478357d -- request a robustness test explicitly if replication is what you want>]
+  ◉ peer-review: batch_ok=True. Runnable: has both controls and falsifiable adversarials (1,5,7).
+     slot 3: [serious] Predicted 1.00-1.20 equals the control band, so 'essentially unchanged' cannot be distinguished from control and can't fail; same for slots 6 and 8.
+     slot 1: [minor] Confirm (<=1.10) and refute (>=1.3) leave a 1.10-1.30 dead zone teaching nothing; also slot 5. Tighten one edge.
+     slot 8: [minor] Duplicates slot 3's cell_geometry_3d removal with identical wide prediction; the cross-base 'inert on both' map is low-value given neither can fail.
+  r010c_00_1fdee5  control (parent unchanged)               track B  control       predict protr_peak 1.05-1.20
+  r010c_01_d4197d  ('add_op', 'vesicle_growth', 'uniform_ra track A  adversarial   predict protr_peak <= 1.10
+  r010c_02_4ba933  ('remove_op', 'morphogen_growth_3d0')    track A  confirmatory  predict protr_peak <= 1.05
+  r010c_03_3281fd  ('remove_op', 'cell_geometry_3d0')       track A  confirmatory  predict protr_peak 1.00-1.20
+  r010c_04_6de516  control (parent unchanged)               track B  control       predict protr_peak 1.00-1.20
+  r010c_05_1dc508  ('add_op', 'vesicle_growth', 'uniform_ra track A  adversarial   predict protr_peak <= 1.10
+  r010c_06_66fd9f  ('remove_op', 'reconnect_t1_3d0')        track A  confirmatory  predict protr_peak 1.00-1.20
+  r010c_07_a5afdb  ('remove_op', 'morphogen_growth_3d0')    track A  adversarial   predict protr_peak <= 1.05
+  r010c_08_e2be59  ('remove_op', 'cell_geometry_3d0')       track A  confirmatory  predict protr_peak 1.00-1.20
+[preflight] cluster job env: OK
+[preflight] PASS
+
+================================================================================================
+▶ ACT 2 - MEASURE   [+03:47]   submitting 9 simulation(s) -- the only expensive step
+================================================================================================
+[cluster] fired 9 bsub(s) DETACHED on allierc@login1: pg_r010c_00_1fdee5, pg_r010c_01_d4197d, pg_r010c_02_4ba933, pg_r010c_03_3281fd, pg_r010c_04_6de516, pg_r010c_05_1dc508, pg_r010c_06_66fd9f, pg_r010c_07_a5afdb, pg_r010c_08_e2be59
+  the ssh returns BEFORE bsub lands -- the queue is the only ground truth.
+  verify: python cluster.py --status   (remote submit log: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda/_cluster/_submit.log)
+    [+03:51] ◌ 9 job(s) on the cluster; waiting. Check with `bjobs`.
+  [19:46] run/pend=9 done=0 exit=0 of 9
+  [19:47] run/pend=9 done=0 exit=0 of 9
+  [19:48] run/pend=9 done=0 exit=0 of 9
+  [19:49] run/pend=9 done=0 exit=0 of 9
+  [19:50] run/pend=9 done=0 exit=0 of 9
+  [19:51] run/pend=9 done=0 exit=0 of 9
+  [19:52] run/pend=6 done=3 exit=0 of 9
+  [19:53] run/pend=5 done=4 exit=0 of 9
+  [19:54] run/pend=5 done=4 exit=0 of 9
+  [19:55] run/pend=2 done=7 exit=0 of 9
+  [19:56] run/pend=2 done=7 exit=0 of 9
+  [19:57] run/pend=1 done=8 exit=0 of 9
+  [19:58] run/pend=1 done=8 exit=0 of 9
+  [19:59] run/pend=1 done=8 exit=0 of 9
+  [20:01] run/pend=1 done=8 exit=0 of 9
+  [20:02] run/pend=0 done=9 exit=0 of 9
+    [+19:09] ◌ batch finished; captioning the wave (one model load for all runs)
+  [trace] about to import caption_wave
+  [trace] caption_wave imported; calling it
+[caption] loading the VLM ONCE for 9 run(s) on cuda:0 ...
+Loading weights:   0%|          | 0/677 [00:00<?, ?it/s]Loading weights:   0%|          | 3/677 [00:00<00:41, 16.07it/s]Loading weights:   3%|▎         | 22/677 [00:00<00:07, 86.62it/s]Loading weights:   7%|▋         | 48/677 [00:00<00:04, 149.00it/s]Loading weights:  10%|▉         | 66/677 [00:00<00:03, 159.01it/s]Loading weights:  13%|█▎        | 87/677 [00:00<00:03, 167.48it/s]Loading weights:  17%|█▋        | 114/677 [00:00<00:02, 198.54it/s]Loading weights:  20%|█▉        | 135/677 [00:00<00:02, 193.83it/s]Loading weights:  24%|██▎       | 160/677 [00:00<00:02, 202.98it/s]Loading weights:  27%|██▋       | 181/677 [00:01<00:02, 203.53it/s]Loading weights:  30%|██▉       | 202/677 [00:01<00:02, 195.39it/s]Loading weights:  34%|███▎      | 228/677 [00:01<00:02, 210.54it/s]Loading weights:  37%|███▋      | 250/677 [00:01<00:02, 204.57it/s]Loading weights:  40%|████      | 271/677 [00:01<00:02, 197.93it/s]Loading weights:  44%|████▍     | 298/677 [00:01<00:01, 209.44it/s]Loading weights:  48%|████▊     | 325/677 [00:01<00:01, 220.43it/s]Loading weights:  51%|█████▏    | 348/677 [00:01<00:01, 211.91it/s]Loading weights:  55%|█████▍    | 370/677 [00:01<00:01, 202.74it/s]Loading weights:  58%|█████▊    | 395/677 [00:02<00:01, 213.88it/s]Loading weights:  62%|██████▏   | 421/677 [00:02<00:01, 219.64it/s]Loading weights:  66%|██████▌   | 444/677 [00:02<00:01, 222.26it/s]Loading weights:  69%|██████▉   | 467/677 [00:02<00:00, 214.25it/s]Loading weights:  73%|███████▎  | 492/677 [00:02<00:00, 217.13it/s]Loading weights:  76%|███████▌  | 514/677 [00:02<00:00, 216.62it/s]Loading weights:  79%|███████▉  | 536/677 [00:02<00:00, 207.68it/s]Loading weights:  83%|████████▎ | 560/677 [00:02<00:00, 216.68it/s]Loading weights:  86%|████████▌ | 582/677 [00:02<00:00, 211.28it/s]Loading weights:  89%|████████▉ | 604/677 [00:03<00:00, 195.48it/s]Loading weights:  93%|█████████▎| 630/677 [00:03<00:00, 205.96it/s]Loading weights:  96%|█████████▋| 652/677 [00:03<00:00, 208.05it/s]Loading weights: 100%|██████████| 677/677 [00:03<00:00, 200.83it/s]
+  [1/9] r010c_00_1fdee5:
+        DESCRIPTION: A small cluster of cells at the bottom of a spherical vesicle begins to proliferate and expand.
+        The growing cluster pushes outward, causing the vesicle to deform into a pear-like shape. As the cells
+        continue to divide, they form a distinct protrusion that extends from the top of the sphere. The red color
+        intensity increases in the growing region, indicating a higher concentration of the activator chemical.
+  [2/9] r010c_01_d4197d:
+        DESCRIPTION: A small cluster of cells on the surface of a spherical vesicle begins to grow and expand. The
+        red-shaded region, representing high activator concentration, spreads across the surface as the cells
+        proliferate. Over time, the cluster develops a distinct protrusion or bud that extends outward from the main
+        body of the vesicle. This localized growth eventually forms a prominent, elongated structure on the surface
+        of the sphere.
+  [3/9] r010c_02_4ba933:
+        DESCRIPTION: The cell vesicle begins with a small cluster of cells at the bottom showing high activator
+        concentration. Over time, this red region expands and migrates upward across the surface of the sphere. The
+        activator concentration spreads as the cells interact and communicate across the spherical geometry. By the
+        final frame, the red area has significantly increased in size and moved toward the center of the visible
+        side view.
+  [4/9] r010c_03_3281fd:
+        DESCRIPTION: The cell vesicle begins as a large, white sphere composed of a dense network of interconnected
+        cells. Over time, a chemical activator spreads through the tissue, causing the cells to transition from
+        white to a deep red color. The internal structure of the vesicle remains stable as the chemical
+        concentration increases uniformly across the surface. By the final frame, the entire vesicle is saturated
+        with the red activator, while the cross-section shows a consistent internal distribution.
+  [5/9] r010c_04_6de516:
+        DESCRIPTION: A small cluster of cells on the surface of a spherical vesicle begins to grow and expand. The
+        red-shaded region, representing a high concentration of an activator chemical, spreads across the surface as
+        the cells proliferate. As the cluster grows, it forms a distinct protrusion or bud that extends outward from
+        the main body of the vesicle. This budding process continues until a significant portion of the vesicle's
+        surface is involved in the localized growth.
+  [6/9] r010c_05_1dc508:
+        DESCRIPTION: A cluster of cells within a spherical vesicle begins with a concentrated area of high activator
+        concentration at the bottom. Over time, this high-concentration region migrates upward toward the top of the
+        vesicle. As the red area moves, it gradually shrinks in size and becomes more localized. By the final
+        frames, the high-concentration region has reached the top pole and appears as a small, distinct spot.
+  [7/9] r010c_06_66fd9f:
+        DESCRIPTION: A small cluster of cells on the surface of a spherical vesicle begins to grow and expand. The
+        red color, representing a chemical activator, spreads from the initial site across the surface of the
+        sphere. As the activator spreads, the cluster of cells physically protrudes outward, forming a distinct bud.
+        This budding process continues until a large, rounded lobe is formed on one side of the vesicle.
+  [8/9] r010c_07_a5afdb:
+        DESCRIPTION: The cell vesicle begins as a nearly perfect sphere with a small concentration of activator
+        chemical at the bottom. Over time, the vesicle undergoes significant morphological deformation, developing
+        several large protrusions and lobes. The red region representing the activator chemical migrates and
+        expands, eventually concentrating in a distinct patch on the side of the vesicle. By the final frames, the
+        vesicle has transformed into a highly irregular, multi-lobed shape while the chemical concentration remains
+        localized.
+  [9/9] r010c_08_e2be59:
+        DESCRIPTION: The simulation begins with a large, spherical vesicle composed of a uniform, white-colored
+        cellular structure. Over time, the cells within the vesicle begin to change color, transitioning from white
+        to a deep red as they accumulate an activator chemical. The internal organization of the cells shifts from a
+        smooth, spherical arrangement to a more complex, irregular, and clustered morphology. By the final frames,
+        the entire vesicle is saturated with a dark red color, indicating a high concentration of the activator
+        throughout the tissue.
+[caption] model released; 0.0 GB still reserved by this process
+[caption] 9 run(s) in 182s (one model load, not 9)
+  [trace] caption_wave RETURNED
+  [trace] past captioning; entering the reading loop
+    [+22:11] ◌ reading each run: Biologist -> Metrologist -> Reader -> Eye-check
+  [trace] reading r010c_00_1fdee5
+  ◉ biologist 0c_00_1fdee5: Specimen valid; every applicable premise holds.
+  [trace] read r010c_00_1fdee5 OK
+  ◉ eye-check 0c_00_1fdee5: CONTROL claim is FALSE — this run grew a distinct pear-shaped protrusion, not an unchanged surface
+  ◉ reader 0c_00_1fdee5: Phenotype bud.
+  ◉ : The movie shows a spherical vesicle made of a dense network of white cells that starts roughly round
+      , then a cluster at one pole proliferates and pushes outward. As growth continues the sphere loses s
+      ymmetry and deforms into a pear-like, elongated shape with a distinct protrusion extending from one 
+      end. The colour shifts from mostly white toward an intensifying deep-red patch localized in the grow
+      ing/protruding region, reading as rising activator concentration. A small cross-sectional inset show
+      s a ring-like internal arrangement and there is no obvious shard/artefact — the deformation looks li
+      ke genuine tissue outgrowth, not noise.
+  ⚠ [eye] r010c_00_1fdee5 DISAGREES with the numbers -- recorded, not vetoed: The claim says the surface is UNCHANGED (control, protr_peak 1.05-1.20), but the movie shows the sph
+  [Q-stale] r010c_01_d4197d: STALE Q_protr_after_relax=1.014: this is the relaxed-seed-sphere constant produced by the pre-fix quasi_static_Q, which rebuilt the simulation from the seed instead of continuing from the end state. Quarantined -- recompute before scoring.
+  [trace] reading r010c_01_d4197d
+  ◉ biologist 0c_01_d4197d: Specimen valid; every applicable premise holds.
+  [trace] read r010c_01_d4197d OK
+  ◉ eye-check 0c_01_d4197d: Movie shows a clear bud/protrusion forming — contradicts the 'no protrusion' claim.
+  ◉ reader 0c_01_d4197d: Phenotype bud.
+  ◉ : The movie shows a spherical vesicle of interconnected cells that starts white and develops a localiz
+      ed red-shaded region where cells proliferate. That patch does not stay flat: a small cluster grows, 
+      buds outward, and extends into a prominent elongated structure on the surface. The colour tracks the
+       growing region, deepening to red where chemical/activator activity is highest, so the growth looks 
+      localized rather than uniform across the whole shell. A small circular cross-section in the bottom-r
+      ight shows interior structure and reads as a diagnostic inset rather than an artefact; the protrusio
+      n itself looks like tissue, not shards.
+  ⚠ [eye] r010c_01_d4197d DISAGREES with the numbers -- recorded, not vetoed: The movie shows a distinct bud/protrusion forming and elongating, directly contradicting the claim t
+  [trace] reading r010c_02_4ba933
+  ◉ biologist 0c_02_4ba933: Specimen valid; every applicable premise holds.
+  [trace] read r010c_02_4ba933 OK
+  ◉ eye-check 0c_02_4ba933: Sphere stays round, no protrusion — only the red activator patch spreads/migrates
+  ◉ reader 0c_02_4ba933: Phenotype sphere.
+  ◉ : The specimen is a spherical cell vesicle that keeps a consistent, near-spherical topology from the f
+      irst frame to the last, with a cross-sectional inset showing a clean circular ring. Nothing protrude
+      s — there is no bud, tube, or bump breaking the surface; the outline stays round throughout. The col
+      our is doing all the visible work: a dark-red activator patch starts as a small cluster at the botto
+      m and expands and migrates upward across the surface toward centre-view. No obvious artefacts appear
+       — the mesh reads as intact interconnected tissue rather than shards or noise.
+  [trace] reading r010c_03_3281fd
+  ◉ biologist 0c_03_3281fd: Specimen invalid; broken: P5b.
+  [trace] read r010c_03_3281fd OK
+  ◉ eye-check 0c_03_3281fd: Just a stable sphere going white→red — NO protrusion visible, so 'protrusion unchanged' is unverifia
+      ble
+  ◉ reader 0c_03_3281fd: Phenotype sphere.
+  ◉ : The movie shows a large white spherical cell vesicle built from a dense interconnected mesh of cells
+       that holds a consistent size and spherical topology from first frame to last. Nothing protrudes, bu
+      ds, or deforms — the outline stays round and the internal structure (seen in a small cross-section i
+      nset at bottom-right) stays evenly distributed and stable. The only real change is colour: a chemica
+      l activator spreads uniformly through the tissue so the cells transition from white to deep red unti
+      l the whole vesicle is saturated. The cross-section inset is the only feature that could read as a r
+      endering artefact rather than tissue, but the sphere itself looks like intact tissue with no shards 
+      or debris.
+  ⚠ [eye] r010c_03_3281fd DISAGREES with the numbers -- recorded, not vetoed: The movie shows a stable spherical vesicle with no protrusion at all — only a uniform white→red colo
+  [trace] reading r010c_04_6de516
+  ◉ biologist 0c_04_6de516: Specimen valid; every applicable premise holds.
+  [trace] read r010c_04_6de516 OK
+  ◉ eye-check 0c_04_6de516: Baseline run actually BUDS — distinct outward protrusion, not the flat monolayer control
+  ◉ reader 0c_04_6de516: Phenotype bud.
+  ◉ : The movie shows a spherical vesicle built from a dense mesh of white cells, with a localized red act
+      ivator patch on the surface. Over time that patch grows and the underlying cells proliferate, and ra
+      ther than staying flat the region pushes outward into a distinct bud/protrusion that extends off the
+       main sphere. The red colour intensifies and spreads across the growing region, tracking the site of
+       the outgrowth. A small circular inset in the bottom-right shows the internal ring cross-section; no
+      thing reads as shard-like or torn artefact — it looks like coherent tissue budding, not the near-sph
+      erical unchanged control the claim describes.
+  ⚠ [eye] r010c_04_6de516 DISAGREES with the numbers -- recorded, not vetoed: The vision model reports an active outward-budding protrusion that grows to involve much of the surf
+  [trace] reading r010c_05_1dc508
+  ◉ biologist 0c_05_1dc508: Specimen invalid; broken: P11.
+  [trace] read r010c_05_1dc508 OK
+  ◉ eye-check 0c_05_1dc508: Sphere stays round — only a red activator spot drifts to the pole; zero protrusion
+  ◉ reader 0c_05_1dc508: Phenotype undulation.
+  ◉ : The movie shows a spherical cell vesicle that keeps its round shape from start to finish, with no pa
+      rt of the surface bulging, budding, or extending outward. The only thing that changes is colour: a d
+      ark-red patch of high activator, initially concentrated at the bottom, migrates upward, shrinks, and
+       ends as a small localized red spot at the top pole. Nothing protrudes from the tissue — the geometr
+      y remains a closed sphere throughout. A small cross-sectional inset in the bottom-right shows the in
+      ternal circular cell arrangement and reads as a diagnostic overlay rather than an artefact or tissue
+       feature.
+  [trace] reading r010c_06_66fd9f
+  ◉ biologist 0c_06_66fd9f: Specimen valid; every applicable premise holds.
+  [trace] read r010c_06_66fd9f OK
+  ◉ eye-check 0c_06_66fd9f: Run shows a LARGE bud/lobe, not a near-baseline protrusion — claim contradicted
+  ◉ reader 0c_06_66fd9f: Phenotype bud.
+  ◉ : The movie shows a spherical vesicle of densely networked cells where a small surface cluster grows a
+      nd pushes outward over time. A distinct bud forms and swells into a large, rounded lobe on one side,
+       so something clearly and substantially protrudes rather than staying flat. The colour is a red chem
+      ical-activator signal that spreads from the initial site across the surface, tracking the growing bu
+      d, over a mostly white cell network. A small cross-sectional interior ring appears in the bottom-rig
+      ht corner as an inset view, not an artefact, and nothing reads as shards or broken tissue.
+  ⚠ [eye] r010c_06_66fd9f DISAGREES with the numbers -- recorded, not vetoed: The description shows a distinct, large budding lobe protruding strongly, which contradicts the clai
+  [trace] reading r010c_07_a5afdb
+  ◉ biologist 0c_07_a5afdb: Specimen valid; every applicable premise holds.
+  [trace] read r010c_07_a5afdb OK
+  ◉ eye-check 0c_07_a5afdb: CLAIM FALSE: sphere grows large protruding lobes, does not collapse to passive sphere
+  ◉ reader 0c_07_a5afdb: Phenotype undulation.
+  ◉ : The vesicle starts as a near-perfect sphere and progressively deforms into a highly irregular, multi
+      -lobed body. Several large protrusions and lobes clearly grow out of the surface, so it does NOT sta
+      y smooth or spherical. A dark-red activator patch migrates and concentrates on one side while the ov
+      erall size holds roughly constant. A small circular cross-section inset in the corner is a rendering
+       panel, not tissue, but the lobes themselves read as real morphology.
+  ⚠ [eye] r010c_07_a5afdb DISAGREES with the numbers -- recorded, not vetoed: The movie shows large protrusions and a highly irregular multi-lobed shape, the opposite of collapsi
+  [trace] reading r010c_08_e2be59
+  ◉ biologist 0c_08_e2be59: Specimen invalid; broken: P11, P5b.
+  [trace] read r010c_08_e2be59 OK
+  ◉ eye-check 0c_08_e2be59: Sphere just reddens and clumps internally — no protrusion visible, so protr_peak claim is unverifiab
+      le
+  ◉ reader 0c_08_e2be59: Phenotype undulation.
+  ◉ : The movie shows a large spherical vesicle of many small cells that keeps its overall round shape thr
+      oughout, never extending a bud, tube, or protrusion from its surface. The only structural change is 
+      internal: the cell arrangement goes from smooth to irregular and densely clustered, but the outer en
+      velope stays a closed sphere. The dominant signal is colour — cells shift uniformly from white to de
+      ep red as an activator accumulates, ending fully saturated dark red. A small cross-section inset sit
+      s in the bottom-right corner; it reveals interior packing and reads as a rendering inset rather than
+       tissue or an artefact.
+  ⚠ [eye] r010c_08_e2be59 DISAGREES with the numbers -- recorded, not vetoed: The movie shows a sphere that stays spherical while turning red and clumping internally — no monolay
+  ✓ [rank] kept 4, dropped 5 (never refined)
+  [KEEP] r010c_00_1fdee5  score   2.27  protr_peak  1.18 phen=bud       watcher=CONTRADICTS [confirmed]
+  [KEEP] r010c_04_6de516  score   2.01  protr_peak  1.17 phen=bud       watcher=CONTRADICTS [confirmed]
+  [KEEP] r010c_06_66fd9f  score   1.99  protr_peak  1.16 phen=bud       watcher=CONTRADICTS [confirmed]
+  [KEEP] r010c_01_d4197d  score   1.77  protr_peak  1.01 phen=bud       watcher=CONTRADICTS [confirmed]  SURPRISE
+  [drop] r010c_07_a5afdb  score   1.74  protr_peak  1.15 phen=undulation watcher=CONTRADICTS [refuted]
+  [drop] r010c_02_4ba933  score   1.50  protr_peak  1.00 phen=sphere    watcher=supports   [confirmed]
+  [drop] r010c_08_e2be59  score   2.55  protr_peak  1.39 phen=undulation watcher=CONTRADICTS [refuted]  SURPRISE
+  [drop] r010c_05_1dc508  score   2.06  protr_peak  1.22 phen=undulation watcher=supports   [refuted]
+  [drop] r010c_03_3281fd  score   1.52  protr_peak  1.01 phen=sphere    watcher=CONTRADICTS [confirmed]
+  [trace] reading loop done; entering Act 3
+
+================================================================================================
+▶ ACT 3 - DECIDE   [+34:41]   9 run(s) admitted, 0 refused
+================================================================================================
+    [+34:41] ◌ Collector: building the round record from the files on disk
+  [trace] Collector: building the record
+  [trace] Collector done
+    [+34:41] ◌ Interpreter: writing the causal record for 4 kept run(s)
+  ◉ interpreter 0c_00_1fdee5: C1fdee "control" is NOT unchanged — ungated growth buckles the fixed shell into a bud (p_ratio 8.73)
+[budget] OVER CEILING at interpreter: round LLM budget would be exceeded (18.6+8 > 25.0 min) -- running anyway; the round is flagged budget_exceeded
+  ◉ interpreter 0c_04_6de516: 'Unchanged' control BUDS — uniform ungated growth buckles the shell; p_ratio 7.2 not 1
+[budget] OVER CEILING at interpreter: round LLM budget would be exceeded (22.5+8 > 25.0 min) -- running anyway; the round is flagged budget_exceeded
+  ◉ interpreter 0c_06_66fd9f: C66fd9f2167e BUDS (p_ratio 9.5, biggest yet); T1-removal inert (retain 1.0); rounded lobe fools prot
+      r
+[budget] OVER CEILING at interpreter: round LLM budget would be exceeded (24.8+8 > 25.0 min) -- running anyway; the round is flagged budget_exceeded
+  ◉ interpreter 0c_01_d4197d: ×6.42 inflation stays a round blob; migration 0.18 smears the buckle, no real bud
+    [+47:40] ◌ Meta-review: prompt write-back + memory.md
+[budget] OVER CEILING at meta_review: round LLM budget would be exceeded (29.1+10 > 25.0 min) -- running anyway; the round is flagged budget_exceeded
+  ◉ meta-review: Round 10 pure churn — 9/9 slots re-ran mapped edits, 0 Track B; ceiling closed since r5
+    [+51:00] ◌ Archivist: reading the whole history
+[budget] OVER CEILING at archivist: round LLM budget would be exceeded (32.4+6 > 25.0 min) -- running anyway; the round is flagged budget_exceeded
+  ◌ [archivist] continue
+  ◉ archivist: refused a roll_back to 'Cdcf832a506': not a branch in the history
+  ◉ supervisor: continue; next batch 70% confirmatory.
+  [supervisor] {"round": 10, "spent": 53, "best": 3.873, "new_clusters": 1, "frozen": [], "active_clusters": 11, "dry": 0, "surprise": 0.2857142857142857, "next_confirmatory_frac": 0.7, "stop": false, "reason": "continue"}
+[map] coverage 68% (42/62 cells, 53 runs)
+
+[llm] per-role breakdown (round, round 10)
+       agent                  calls      min      %    ok/fail/skip
+       interpreter                4    12.98  38.8%     4/0   /0   
+       reader                     9     9.83  29.4%     9/0   /0   
+       meta_review                1     3.34  10.0%     1/0   /0   
+       proposer                   1     2.96   8.9%     1/0   /0   
+       watcher                    9     2.66   7.9%     9/0   /0   
+       archivist                  1     0.95   2.8%     1/0   /0   
+       reflection                 1     0.67   2.0%     1/0   /0   
+       grounder                   1     0.07   0.2%     1/0   /0      (local, not LLM)
+       TOTAL                     27    33.46   llm=33.39 min of 25.0 ceiling | wall since round start 51.97 min
+       BUDGET EXCEEDED at interpreter: round LLM budget would be exceeded (18.6+8 > 25.0 min) -- running anyway; the round is flagged budget_exceeded
+       BUDGET EXCEEDED at interpreter: round LLM budget would be exceeded (22.5+8 > 25.0 min) -- running anyway; the round is flagged budget_exceeded
+       BUDGET EXCEEDED at interpreter: round LLM budget would be exceeded (24.8+8 > 25.0 min) -- running anyway; the round is flagged budget_exceeded
+       BUDGET EXCEEDED at meta_review: round LLM budget would be exceeded (29.1+10 > 25.0 min) -- running anyway; the round is flagged budget_exceeded
+       BUDGET EXCEEDED at archivist: round LLM budget would be exceeded (32.4+6 > 25.0 min) -- running anyway; the round is flagged budget_exceeded
+[llm] {'calls': 27, 'round_min': 33.39, 'total_min': 33.39, 'turns': 109, 'tok_in': 82563, 'tok_out': 142139, 'cache_new': 691357, 'cache_hit': 1940699, 'usd': 11.85, 'roles': 8, 'budget_exceeded': False, 'unmetered': 0}
+[llm] ROUND EXCEEDED THE 25.0 min LLM CEILING (5 breach(es)) -- this round is NOT a clean round.
+[llm] timing appended to /workspace/Plexus/discovery_okuda/campaign/llm_timing.jsonl

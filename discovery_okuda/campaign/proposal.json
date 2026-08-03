@@ -1,0 +1,86 @@
+{
+ "reasoning": "New Track-B parents replace the exhausted sphere body: growth-driven mid-surface (P0) and the Okuda monolayer route (P2). On P0 I test the two cell_rd_seed synergies (+divide_3d +0.586, +reconnect_t1_3d +0.537) predicted to raise, morphogen necessity, cell_geometry, and a uniform_ramp excursion. I mirror the productive edits on the P2 monolayer (Okuda geometry) with its OWN in-batch control, fixing round 9's missing-baseline flaw. ~70/30 confirmatory/adversarial and in_paper/excursion.",
+ "mode": "explore",
+ "slots": [
+  {"parent_index": 0, "edit": null, "intent": "control",
+   "claim": "the parent growth-driven mid-surface, unchanged -- the control",
+   "track": "B", "territory": "in_paper", "metric": "protr_peak",
+   "predicted": "protr_peak 1.05-1.20", "why": "control"},
+
+  {"parent_index": 0,
+   "edit": {"edit": ["add_op", "divide_3d", "hertwig"], "label": "+divide_3d:hertwig", "yields": "growth-driven mid-surface"},
+   "intent": "confirmatory", "track": "A", "territory": "in_paper",
+   "claim": "adding division to a cell_rd_seed base amplifies the protrusion via the measured synergy.",
+   "metric": "protr_peak", "predicted": "protr_peak >= 1.25",
+   "why": "cell_rd_seed+divide_3d SYNERGY +0.586; P0 already carries cell_rd_seed, so the pair should raise despite divide_3d solo -0.347."},
+
+  {"parent_index": 0,
+   "edit": {"edit": ["add_op", "reconnect_t1_3d", "length_threshold"], "label": "+reconnect_t1_3d:length_threshold", "yields": "growth-driven mid-surface"},
+   "intent": "confirmatory", "track": "A", "territory": "in_paper",
+   "claim": "T1 reconnection on the cell_rd_seed base raises the protrusion via the measured synergy.",
+   "metric": "protr_peak", "predicted": "protr_peak >= 1.25",
+   "why": "cell_rd_seed+reconnect_t1_3d SYNERGY +0.537; on the old sphere reconnect was inert, so a rise here would isolate the synergy to this base."},
+
+  {"parent_index": 0,
+   "edit": {"edit": ["add_op", "vesicle_growth", "uniform_ramp"], "label": "+vesicle_growth:uniform_ramp", "yields": "growth-driven mid-surface"},
+   "intent": "adversarial", "track": "A", "territory": "excursion",
+   "claim": "unpatterned uniform inflation does NOT build a clean protrusion on the mid-surface base.",
+   "metric": "protr_peak", "predicted": "protr_peak <= 1.10",
+   "why": "vesicle_growth solo 0.77 is 'insufficient' and uniform_ramp exploded on the old body; tests whether the new base tolerates unpatterned inflation. REFUTED if a stable protr_peak >= 1.3."},
+
+  {"parent_index": 0,
+   "edit": {"edit": ["remove_op", "morphogen_growth_3d0"], "label": "-morphogen_growth_3d", "yields": "mechanics-only (no growth)"},
+   "intent": "confirmatory", "track": "A", "territory": "in_paper",
+   "claim": "removing patterned growth flattens the mid-surface base to a near-sphere.",
+   "metric": "protr_peak", "predicted": "protr_peak <= 1.05",
+   "why": "morphogen_growth_3d is established NECESSARY on the sphere body; confirms necessity carries to the new base (Okuda uncoupled_growth analogue)."},
+
+  {"parent_index": 0,
+   "edit": {"edit": ["remove_op", "cell_geometry_3d0"], "label": "-cell_geometry_3d", "yields": "growth-driven mid-surface"},
+   "intent": "confirmatory", "track": "A", "territory": "in_paper",
+   "claim": "removing cell_geometry_3d leaves the mid-surface protrusion essentially unchanged.",
+   "metric": "protr_peak", "predicted": "protr_peak 1.00-1.20",
+   "why": "cell_geometry_3d solo -0.275 'insufficient'; maps whether it is inert or load-bearing on this base."},
+
+  {"parent_index": 2, "edit": null, "intent": "control",
+   "claim": "the Okuda monolayer-route parent (shape_energy_3d monolayer + reconnect_t1_3d), unchanged -- the in-batch baseline for parent 2",
+   "track": "B", "territory": "in_paper", "metric": "protr_peak",
+   "predicted": "protr_peak 1.00-1.20",
+   "why": "control -- fixes round 9's missing parent-2 baseline so P2 edit drops attribute cleanly."},
+
+  {"parent_index": 2,
+   "edit": {"edit": ["add_op", "divide_3d", "hertwig"], "label": "+divide_3d:hertwig", "yields": "growth-driven monolayer (Okuda route)"},
+   "intent": "confirmatory", "track": "B", "territory": "in_paper",
+   "claim": "division on the Okuda monolayer sheet drives a division-scaled protrusion.",
+   "metric": "protr_peak", "predicted": "protr_peak >= 1.20",
+   "why": "Okuda's coupled growth+deformation on a ~2000-cell monolayer is the paper morphology; cell_rd_seed+divide_3d synergy should carry to the monolayer impl."},
+
+  {"parent_index": 2,
+   "edit": {"edit": ["add_op", "vesicle_growth", "uniform_ramp"], "label": "+vesicle_growth:uniform_ramp", "yields": "growth-driven monolayer (Okuda route)"},
+   "intent": "adversarial", "track": "A", "territory": "excursion",
+   "claim": "uniform inflation on the monolayer does NOT produce a clean protrusion, unlike patterned growth.",
+   "metric": "protr_peak", "predicted": "protr_peak <= 1.10",
+   "why": "isolates patterned vs unpatterned growth on the monolayer; uniform_ramp was destabilising on the sphere. REFUTED if stable protr_peak >= 1.3."},
+
+  {"parent_index": 2,
+   "edit": {"edit": ["remove_op", "reconnect_t1_3d0"], "label": "-reconnect_t1_3d", "yields": "growth-driven monolayer (Okuda route)"},
+   "intent": "confirmatory", "track": "A", "territory": "in_paper",
+   "claim": "removing T1 reconnection from the monolayer leaves the protrusion near baseline.",
+   "metric": "protr_peak", "predicted": "protr_peak 1.00-1.20",
+   "why": "reconnect_t1_3d was inert on the sphere; tests whether the monolayer's remodeling actually needs T1 transitions (Okuda uses them for tubulation)."},
+
+  {"parent_index": 2,
+   "edit": {"edit": ["remove_op", "morphogen_growth_3d0"], "label": "-morphogen_growth_3d", "yields": "mechanics-only (no growth)"},
+   "intent": "adversarial", "track": "A", "territory": "excursion",
+   "claim": "stripping patterned growth from the Okuda monolayer collapses it to a passive sphere.",
+   "metric": "protr_peak", "predicted": "protr_peak <= 1.05",
+   "why": "uncoupled_growth regime; if the monolayer still deforms without morphogen, patterning is NOT necessary on this base -- a genuine map surprise."},
+
+  {"parent_index": 2,
+   "edit": {"edit": ["remove_op", "cell_geometry_3d0"], "label": "-cell_geometry_3d", "yields": "growth-driven monolayer (Okuda route)"},
+   "intent": "confirmatory", "track": "A", "territory": "in_paper",
+   "claim": "removing cell_geometry_3d leaves the monolayer protrusion essentially unchanged.",
+   "metric": "protr_peak", "predicted": "protr_peak 1.00-1.20",
+   "why": "cell_geometry_3d solo -0.275 'insufficient'; mirrors slot 5 on the monolayer to see if it is inert on both bases."}
+ ]
+}

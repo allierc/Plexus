@@ -1,6 +1,6 @@
 # Causal lever-map
 
-_25 runs · coverage **53%** (20/38 cells)_
+_53 runs · coverage **68%** (42/62 cells)_
 
 The campaign's product. Specific questions are queries against this table.
 
@@ -8,27 +8,27 @@ The campaign's product. Specific questions are queries against this table.
 
 | block | covered | total | |
 |---|---|---|---|
-| solo | 7 | 13 | 54% |
-| pair | 10 | 21 | 48% |
+| solo | 10 | 13 | 77% |
+| pair | 29 | 45 | 64% |
 | routing | 3 | 4 | 75% |
 
 ## Solo effects — what each operator does ALONE
 
 | operator | n(with) | n(without) | Δscore | verdict | phenotypes seen |
 |---|---|---|---|---|---|
-| `vesicle_growth` | 2 | 23 | 1.745 | insufficient | exploded×1, sphere×1 |
-| `shape_to_chem` | 9 | 16 | 0.424 | raises | sphere×4, undulation×3, degenerate×2 |
-| `cell_react` | 12 | 13 | 0.346 | raises | sphere×6, degenerate×3, undulation×3 |
-| `morphogen_growth_3d` | 19 | 6 | 0.274 | raises | bud×7, sphere×6, degenerate×3, undulation×3 |
-| `cell_geometry_3d` | 20 | 5 | -0.14 | insufficient | bud×10, sphere×6, degenerate×3, undulation×1 |
-| `cell_adjacency` | 22 | 3 | -0.235 | insufficient | bud×9, sphere×7, degenerate×3, undulation×3 |
-| `reconnect_t1_3d` | 16 | 9 | -0.246 | neutral | sphere×7, bud×6, exploded×1, degenerate×1, undulation×1 |
-| `extrude` | 9 | 16 | -0.377 | lowers | bud×9 |
-| `divide_3d` | 6 | 19 | -0.432 | lowers | bud×5, sphere×1 |
-| `cell_rd_seed` | 11 | 14 | -0.487 | lowers | bud×10, sphere×1 |
-| `cell_diffuse` | 1 | 24 | — | insufficient | — |
-| `seed_mesh_3d` | 25 | 0 | — | insufficient | — |
-| `shape_energy_3d` | 25 | 0 | — | insufficient | — |
+| `shape_to_chem` | 9 | 44 | 0.523 | raises | sphere×4, undulation×3, degenerate×2 |
+| `vesicle_growth` | 6 | 47 | 0.485 | raises | bud×3, exploded×1, sphere×1, undulation×1 |
+| `cell_react` | 12 | 41 | 0.444 | raises | sphere×6, degenerate×3, undulation×3 |
+| `morphogen_growth_3d` | 40 | 13 | 0.384 | raises | bud×21, sphere×11, undulation×5, degenerate×3 |
+| `cell_adjacency` | 27 | 26 | 0.2 | neutral | bud×13, sphere×8, degenerate×3, undulation×3 |
+| `extrude` | 12 | 41 | -0.034 | neutral | bud×12 |
+| `reconnect_t1_3d` | 36 | 17 | -0.101 | neutral | bud×17, sphere×13, undulation×4, exploded×1, degenerate×1 |
+| `cell_geometry_3d` | 46 | 7 | -0.208 | neutral | bud×25, sphere×15, degenerate×3, undulation×3 |
+| `divide_3d` | 17 | 36 | -0.267 | lowers | bud×9, sphere×8 |
+| `cell_rd_seed` | 38 | 15 | -0.437 | lowers | bud×25, sphere×10, undulation×3 |
+| `cell_diffuse` | 1 | 52 | — | insufficient | — |
+| `seed_mesh_3d` | 53 | 0 | — | insufficient | — |
+| `shape_energy_3d` | 53 | 0 | — | insufficient | — |
 
 ## Interactions — where the joint effect is NOT the sum
 
@@ -36,10 +36,11 @@ _The expensive half of the map: what cannot be read off the code._
 
 | pair | n | observed | additive prediction | interaction | verdict |
 |---|---|---|---|---|---|
-| `cell_rd_seed+extrude` | 9 | 2.013 | 1.39 | **+0.622** | SYNERGY |
-| `cell_rd_seed+divide_3d` | 6 | 1.926 | 1.335 | **+0.591** | SYNERGY |
+| `cell_rd_seed+divide_3d` | 16 | 1.935 | 1.387 | **+0.548** | SYNERGY |
+| `cell_react+shape_to_chem` | 9 | 2.525 | 3.058 | **-0.532** | ANTAGONISM |
+| `cell_geometry_3d+cell_rd_seed` | 36 | 1.963 | 1.446 | **+0.518** | SYNERGY |
 
 ## Phenotypes observed
 
-bud×10, sphere×8, degenerate×3, undulation×3, exploded×1
+bud×25, sphere×18, undulation×6, degenerate×3, exploded×1
 
