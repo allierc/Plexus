@@ -52,8 +52,19 @@ OKUDA_LAYOUT = """PANELS, left to right:
          the cells in the cut plane. Its rectangular border is the inset frame and not a
          structure. What looks like a flat sheet or a ring there is the interior of the ball.
 COLOUR: cells are shaded white (low) to red (high) by the activator chemical they carry. A green
-  tint means the cell divided recently; magenta means the cell is broken. The colour is a
-  measurement painted on the tissue, not a material."""
+  tint means the cell divided recently. The colour is a measurement painted on the tissue, not a
+  material -- a red cell is not made of red, it is carrying a lot of activator.
+MAGENTA IS AN ALARM, NEVER A SHAPE. A magenta cell is either broken (no longer a cell) or its
+  chemistry is NOT A NUMBER -- the simulation produced NaN there, so nothing was measured. Two
+  cases, and the difference matters:
+    A FEW magenta cells scattered on an otherwise coloured tissue -- local damage. Say where.
+    THE WHOLE VESICLE MAGENTA -- the chemistry died. This is not a colour change of the tissue
+      and not a morphological event. It means every reading from that frame on is absent, and
+      any shape you can still see is being driven by mechanics with no live chemistry behind it.
+      Say "the chemistry is dead from about frame N" and do NOT describe it as the tissue
+      turning pink, developing pigment, or changing material.
+  If the strip carries a magenta banner reading CHEMISTRY NOT FINITE FROM FRAME N, quote that
+  frame number. It is measured, not inferred, and it is the most useful thing you can report."""
 
 
 def _wrap(t, w):
