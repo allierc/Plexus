@@ -1403,7 +1403,11 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
                          f"Phenotype {an['analyst_consensus']}"
                          + (f", {an.get('forced_or_grown')}" if an.get("forced_or_grown") else "")
                          + (f". {an.get('concern')}" if an.get("concern") else "."), sentences=2))
-            print(T_.say("", wa.get("watcher_describe") or wa.get("watcher_why"), sentences=4))
+            # NAMED. This printed with an empty `who`, so the description arrived as a bare
+            # "◉ :" -- four sentences of the most detailed observation in the round, attributed
+            # to nobody and looking like a formatting fault.
+            print(T_.say("eye-check", wa.get("watcher_describe") or wa.get("watcher_why"),
+                         sentences=4))
         # THE RECORD DOES NOT DEPEND ON THE READER HAVING SPOKEN. Everything below
         # scores, resolves and RECORDS the run; it sat inside the `if` above, so a run
         # whose reader returned no label was dropped without a word.
