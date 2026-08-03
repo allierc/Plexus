@@ -692,6 +692,18 @@ def _ground_starting_conditions(g, sl):
 
 
 
+def _short(nm):
+    """A run name a person can tell apart, for the terminal.
+
+    This was nm[-12:] -- the LAST twelve characters -- which throws away the slot id and keeps
+    the shared suffix, so r001n_02_cfl_c001p300_d and r001n_03_cfl_c001p300_d both printed as
+    "l_c001p300_d". Every cfl replay in a batch looked like the same run. The slot id is the part
+    that distinguishes them, so lead with it.
+    """
+    p = str(nm).split("_")
+    return f"{p[0]}_{p[1]}" if len(p) > 2 and p[0].startswith("r") else str(nm)[:14]
+
+
 def _read_one(nm, out_dir, ledger, claim=None):
     """Three analysts and the eye-check for one run. The analysts run CONCURRENTLY.
 
@@ -1385,7 +1397,7 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         try:
             import biologist as _B
             _pv = summ.get("premises") or []
-            print(T_.say(f"biologist {nm[-12:]}",
+            print(T_.say(f"biologist {_short(nm)}",
                          f"Specimen {_B.specimen_verdict(_pv)}"
                          + (f"; broken: {', '.join(summ.get('premises_broken') or [])}."
                             if summ.get("premises_broken") else "; every applicable premise holds."),
@@ -1412,9 +1424,9 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         # only thing in the loop that looks at SHAPE rather than at numbers. It is now an
         # observation, not a verdict.
         if wa.get("watcher_headline"):
-            print(T_.say(f"eye-check {nm[-12:]}", wa["watcher_headline"], sentences=1))
+            print(T_.say(f"eye-check {_short(nm)}", wa["watcher_headline"], sentences=1))
         if an.get("analyst_consensus"):
-            print(T_.say(f"reader {nm[-12:]}",
+            print(T_.say(f"reader {_short(nm)}",
                          f"Phenotype {an['analyst_consensus']}"
                          + (f", {an.get('forced_or_grown')}" if an.get("forced_or_grown") else "")
                          + (f". {an.get('concern')}" if an.get("concern") else "."), sentences=2))
@@ -1428,8 +1440,8 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         # whose reader returned no label was dropped without a word.
         sc = score_run(summ, cfg)
         if wa.get("watcher_blocks"):
-            print(T_.warn(f"[eye] {nm} DISAGREES with the numbers -- recorded, not vetoed: "
-                          f"{wa.get('watcher_why','')[:100]}"))
+            print(T_.warn(f"[eye] {nm} DISAGREES -- recorded, not vetoed"))
+            print(T_.quiet(T_.wrap_names([str(wa.get("watcher_why") or "")])))
         # `predict.score` refuses to guess: a prediction it cannot check resolves `inconclusive`
         # and drops out of the surprise denominator, rather than being recorded as `confirmed`
         # (which is what the old first-match regex did -- see predict.py P1/P2/P3).
@@ -1546,7 +1558,7 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         # READ WHAT IT WROTE, not what it replied. An agent with Write tools puts its substance
         # in the file and returns a receipt -- "Wrote the entry" -- so printing the return value
         # shows that it ran and nothing of what it thought.
-        print(T_.say(f"interpreter {nm[-12:]}",
+        print(T_.say(f"interpreter {_short(nm)}",
                      _isaid or _tail_of(os.path.join(CAMP, "causal_descriptions.md")),
                      sentences=1))
 

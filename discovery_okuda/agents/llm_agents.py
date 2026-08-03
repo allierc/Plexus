@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -227,7 +228,44 @@ just claimed -- an extinct chemistry beneath a "pattern" reading, a stretched sh
 
 
 # ============================================================================ 8b. WATCHER veto
-def watch(run_name, out_dir, expected_phenotype, timeout_min=5, ledger=None):
+# A CLAIM THE PICTURE CANNOT ADJUDICATE. A recon slot claims "re-measure X under the current
+# instruments" -- procedural, not morphological -- and asking a vision model whether the movie
+# supports it can only produce a false CONTRADICTS: no image shows that a run is a
+# re-measurement. Three of eight runs were flagged that way in one round, each with a reason
+# like "no visual evidence this is a re-measurement" or "does not reference the measurement
+# parameter cfl". The eye-check was right and the question was wrong.
+_UNGATEABLE = re.compile(r"^\s*(re-?measure|replay|control|baseline|unstated)\b", re.I)
+
+
+def _watch_describe_only(run_name, desc, timeout_min, ledger):
+    """Describe, do not adjudicate. For a claim no picture can settle.
+
+    The description is still the most useful thing the eye-check produces -- it is the only
+    role that looks at SHAPE -- so it is still asked for. What it is not asked for is a verdict
+    on a proposition that is not about the image.
+    """
+    prompt = f"""WATCHER. Describe what this movie shows. There is NO claim to check: this run is
+a replay or a control, and whether it is one cannot be seen in a picture.
+
+{budget_note(timeout_min, "1) the JSON")}
+This is what a vision model saw:
+---
+{desc[:2500]}
+---
+Reply with ONLY: {{"seen": "<what it shows, 6 words>",
+                  "describe": "<FOUR SENTENCES: the shape and how it changes, whether anything
+                   protrudes, what the colour is doing, and anything that looks like an artefact
+                   rather than tissue>",
+                  "headline": "<at most 90 characters: the ONE thing worth knowing>"}}"""
+    ok, out = run_agent("watcher", prompt, ledger=ledger, timeout_min=timeout_min,
+                        allowed_tools=[], quiet=True)
+    j = _first_json(out) or {}
+    return {"watcher_verdict": "described", "watcher_blocks": False,
+            "watcher_seen": j.get("seen", ""), "watcher_why": "",
+            "watcher_describe": j.get("describe", ""), "watcher_headline": j.get("headline", "")}
+
+
+def watch(run_name, out_dir, expected_phenotype, timeout_min=5, ledger=None, gate=None):
     """Compare what the movie SHOWS against what the composition CLAIMED, and gate promotion.
 
     The Watcher's eye already exists (the VLM captions every run). This is the missing half: the
@@ -238,6 +276,11 @@ def watch(run_name, out_dir, expected_phenotype, timeout_min=5, ledger=None):
     if not desc or desc.startswith("UNAVAILABLE"):
         return {"watcher_verdict": "no_caption", "watcher_blocks": False,
                 "watcher_why": "no caption was produced -- cannot gate, recorded as such"}
+    # gate=None means decide from the claim; an explicit gate= from the call site wins.
+    if gate is None:
+        gate = not _UNGATEABLE.match(str(expected_phenotype or ""))
+    if not gate:
+        return _watch_describe_only(run_name, desc, timeout_min, ledger)
     prompt = f"""WATCHER. A run CLAIMED to produce: {expected_phenotype!r}
 
 This is what a vision model saw in the rendered movie:
