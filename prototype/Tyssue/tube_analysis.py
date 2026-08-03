@@ -301,6 +301,17 @@ def frame_metrics(pt, mt, act=None, a_sw=None):
     # that can be compared with a paper: `chi` is a solver rate, not a scale (finding F009).
     if act is not None and len(act) == nF:
         try:
+            # pattern_scale now lives with the loop that owns it (discovery_okuda), not with
+            # the vertex-model prototype -- it is an INSTRUMENT of the campaign, and keeping it
+            # beside the engine is how it stayed uncertified-by-omission and unread for weeks.
+            import sys as _sys, os as _os
+            _dk = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(
+                _os.path.abspath(__file__)))), "Plexus", "discovery_okuda")
+            _dk = _dk if _os.path.isdir(_dk) else _os.path.join(
+                _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))),
+                "discovery_okuda")
+            if _os.path.isdir(_dk) and _dk not in _sys.path:
+                _sys.path.insert(0, _dk)
             from pattern_scale import pattern_metrics as _pm
             _, _, _cen, _ = face_geometry_3d(torch.as_tensor(pt), torch.as_tensor(es),
                                              torch.as_tensor(et), torch.as_tensor(ef), nF)

@@ -83,6 +83,19 @@ N_READERS = 1
 # things that grow without bound, and they are limits on PROSE, not on content -- a flag with its
 # reason in twenty words is worth the same as the same flag in sixty, and arrives four times
 # sooner. What must never be shortened is a NUMBER: a threshold, a metric name, a citation.
+def _admitted():
+    """The admissible metrics, from the registry. Never a hand-written list in a prompt."""
+    try:
+        from predict import admitted_block
+        return admitted_block(new_since=NEW_INSTRUMENTS)
+    except Exception:
+        return "  (metric registry unavailable)"
+
+
+# Announced to every role that reads numbers, until the campaign after they land.
+NEW_INSTRUMENTS = ("n_spots_final", "wavelength_cells_final", "spot_spacing_cells_final",
+                   "spot_frac_final")
+
 from llm import BREVITY  # noqa: F401  (defined in llm.py so run_agent can apply it)
 
 
@@ -173,9 +186,7 @@ Read those shapes BEFORE the final numbers, and say in your verdict when the two
 A run whose headline number came from an `exploded` or `pinned` curve is not the run its summary
 claims it is. Saying so is more useful than a phenotype label.
 
-Only these metrics are admissible (the others were MEASURED to lie and are excluded):
-  ADMITTED  protr_peak, ta_n_tubes_final, protr_final
-  REJECTED  ta_aspect_len_over_diam, ta_tube_len_final, retention
+{_admitted()}
 Informative but not scored: mech_p_ratio (~3 = FORCED protrusion, ~1 = growth-driven equilibrium).
 
 Reply with ONLY this JSON, nothing else:

@@ -8,8 +8,9 @@ spots, so the parameters must be somewhere else -- and where is a measurement, n
 STABILITY is the point. n_spots is read at two well-separated times; a pattern that is still
 coarsening is not a spot pattern, whatever it looks like at the moment you happen to stop.
 """
+import os
 import sys, itertools, json, numpy as np, torch
-sys.path.insert(0,'/workspace/Plexus/prototype/Tyssue'); sys.path.insert(0,'/workspace/Plexus/src')
+sys.path.insert(0,os.path.dirname(os.path.abspath(__file__)));sys.path.insert(0,'/workspace/Plexus/prototype/Tyssue'); sys.path.insert(0,'/workspace/Plexus/src')
 from tyssue_ops3d import build_sphere_mesh, face_geometry_3d
 from pattern_scale import cell_graph, pattern_metrics
 

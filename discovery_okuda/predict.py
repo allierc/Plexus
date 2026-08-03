@@ -67,6 +67,47 @@ KNOWN_METRICS = (
 # evidence, and saying so is the whole point of having run the gate.
 REJECTED_METRICS = ("ta_aspect_len_over_diam", "ta_tube_len_final", "retention")
 
+# WHAT THE AGENTS ARE TOLD IS ADMISSIBLE. Rendered from the registry, never hand-written into a
+# prompt. The Reader's prompt carried a HARDCODED list -- "ADMITTED protr_peak, ta_n_tubes_final,
+# protr_final" -- which was already stale against KNOWN_METRICS and, worse, meant a newly
+# certified instrument could never be mentioned to the role that reads the numbers. An instrument
+# nobody is told about is the same defect as an instrument that does not exist: pattern_scale was
+# written, certified and computed every frame, and no agent could name it.
+METRIC_NOTES = {
+    "n_spots_final": "how many distinct activator domains (a fine field has many, a bud has one)",
+    "wavelength_cells_final": "the pattern's wavelength in cell diameters",
+    "spot_spacing_cells_final": "centre-to-centre domain spacing, in cells",
+    "spot_frac_final": "fraction of cells above the activator threshold",
+    "protr_peak": "the best protrusion over the run",
+    "ta_n_tubes_final": "tube count at the end",
+}
+
+
+def admitted_block(new_since=()):
+    """The admissible-metric block for a prompt, built from the registry.
+
+    `new_since` names metrics admitted recently, so their arrival is ANNOUNCED rather than left
+    to be noticed. A role that is not told an instrument exists will keep reasoning as though the
+    property is unmeasurable -- which is how the finest Turing pattern in the campaign came to be
+    recorded as a null sphere.
+    """
+    ok = [m for m in KNOWN_METRICS if m not in REJECTED_METRICS]
+    lines = ["Only these metrics are admissible (the others were MEASURED to lie and are excluded):"]
+    lines.append("  ADMITTED  " + ", ".join(ok))
+    lines.append("  REJECTED  " + ", ".join(REJECTED_METRICS))
+    notes = [f"    {m} -- {METRIC_NOTES[m]}" for m in ok if m in METRIC_NOTES]
+    if notes:
+        lines.append("  what the less obvious ones mean:")
+        lines += notes
+    if new_since:
+        lines.append("")
+        lines.append("  NEW INSTRUMENTS, admitted since the last campaign -- USE THEM. A property "
+                     "you could not measure before is not still unmeasurable:")
+        for m in new_since:
+            lines.append(f"    {m}" + (f" -- {METRIC_NOTES[m]}" if m in METRIC_NOTES else ""))
+    return "\n".join(lines)
+
+
 _OPS = {">=": lambda a, b: a >= b, "<=": lambda a, b: a <= b,
         ">": lambda a, b: a > b, "<": lambda a, b: a < b}
 
