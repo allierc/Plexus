@@ -1001,7 +1001,7 @@ outgrew an estimate the gate then correctly refused, one step too late.
 \end{itemize}
 \end{phasebox}
 
-\begin{phasebox}{Phase 6 --- The rebuilt loop, and its first launch \hfill \prog}
+\begin{phasebox}{Phase 6 --- The rebuilt loop, and its first launch \hfill \done}
 \textbf{Goal.} Launch the three-act loop of \S\ref{sec:agents} and let it run. Phase~5 diagnosed
 why the old one could not learn; this is the one that is allowed to try.
 
@@ -1149,6 +1149,97 @@ can be wrong about it} --- and the first use of the parents that reconnaissance 
 has bought coverage and no knowledge), the Collector's holes, and whether any run reports a
 protruding cell --- which would be the first in the project's history, across 63 prior runs and
 these.
+
+\subsection*{Closing Phase 6}
+
+\begin{tcolorbox}[colback=grey!6,colframe=grey!45,boxrule=0.7pt,arc=2pt,breakable,
+                  title={\textbf{What was run}},coltitle=black,colbacktitle=grey!16]
+\textbf{2 August 2026.} One clean start at 13:02, one resume at 17:32 after an intervention, a
+clean stop at 20:35 --- driver halted at a round boundary so the last round could finish writing
+its record rather than being killed mid-write.
+
+\textbf{Nine rounds recorded}: 1--5 and 7--10. Round~6 was a reconnaissance round deliberately
+killed: on \code{--resume} the loop recomputed its plan from scratch and opened a campaign already
+five rounds deep in \emph{recon} mode, which would have replayed old specs instead of breeding from
+the frontier.
+
+\textbf{79 hypotheses posed, 58 admitted as evidence, 21 refused.} 66 simulations reached the
+cluster. Rounds cost 49--55 minutes of wall clock and 5--33 minutes of agent time.
+
+\textbf{Ten defects found and fixed while it ran}, across 26 commits. The two that mattered most
+were invisible from the terminal:
+
+\begin{itemize}[itemsep=1pt]
+\item \textbf{The reading loop recorded one run per round, and that run was a chimera.} An
+indentation de-dent put \code{rows.append} \emph{outside} the \code{for} loop, so scoring,
+prediction and recording ran once on leaked loop variables: the name of the last posed slot, the
+hypothesis of the last slot, the summary of the last run that survived the Critic, and the reader
+verdict of a third. Five clean runs were read successfully and none of them reached the record.
+\item \textbf{The ranking never saw a broken premise.} The sort key asked \code{summary} for
+\code{premises\_broken}, which lives at the top level of \code{diag.json} --- so it evaluated false
+for every run ever ranked. The invalid specimens have the highest \code{protr\_peak}, so they won
+the ranking, became the frontier, and were bred from for five rounds. The demotion existed in the
+code and had never once fired.
+\end{itemize}
+
+The remainder: a straggler killer that could never spare a run (three separate causes, in
+succession --- it read a file written only at the end; it was called with a set where it expected a
+mapping; it compared frame numbers across polls shorter than one frame); reservoir decisions that
+reached no agent; an exit code shared between ``the search is stuck'' and ``the apparatus is
+broken''; a heartbeat reporting the array size instead of the cell count.
+\end{tcolorbox}
+
+\begin{tcolorbox}[colback=grey!6,colframe=grey!45,boxrule=0.7pt,arc=2pt,breakable,
+                  title={\textbf{Results, and what we conclude}},coltitle=black,colbacktitle=grey!16]
+\textbf{The machinery works.} The surprise rate is \emph{not} null: of 53 checkable predictions,
+\textbf{30 were refuted and 23 confirmed}. The loop poses claims it can be wrong about and is wrong
+about most of them, which is the only condition under which a round buys knowledge. Records now
+close arithmetically --- posed equals evidence plus refused, every round.
+
+\textbf{Tubes appeared, on sound specimens.} 42 of 66 runs are valid specimens; the best is
+\code{r007c\_02} at \code{protr\_peak} 1.295 with two tubes, against a prior best of 1.169 with
+none. \code{ad4767} returned 1.190 with one tube in three separate rounds --- reproducible, not a
+one-off. The agents read these correctly and unprompted: \emph{``a robust bud extending into an
+elongated fission neck''}, and, of a control, \emph{```unchanged control' is FALSE --- parent buds
+under uniform ungated growth''}.
+
+\textbf{But the ceiling was set in round 3 and never moved.} Seven subsequent rounds re-found
+1.295 and never exceeded it. The reason is the finding of the phase:
+
+\begin{center}
+\emph{Two of 66 runs contained a reaction-diffusion operator. Not one edit, in 42, ever tuned or
+added one.}
+\end{center}
+
+The valid frontier carries \code{cell\_rd\_seed} and \code{morphogen\_growth\_3d} but neither
+\code{cell\_diffuse} nor \code{cell\_react}. Its activator is frozen and binary --- across 900
+frames the 95th percentile and the minimum sit at exactly 0.020 while a small patch sits at 1.0,
+with nothing in between and no gradient at any time. The patch does not grow with the bud; it
+\emph{collapses}, from 75 cells to 8, while \code{protr\_peak} rises to 1.170. What the campaign
+optimised was a mechanical instability decorated with a static red dot. The Turing half of Okuda
+was never running.
+
+\textbf{Three runs, put side by side, say what actually governs the bud} --- and no instrument in
+the loop can see it. A fine labyrinthine pattern gives a perfect sphere (1.003); a few coarse
+spots give a multi-lobed body (1.168); a single localised patch gives one clean bud with a neck
+(1.173). Localisation controls morphogenesis, because a fine pattern spreads growth evenly and
+even growth keeps a sphere spherical. There is no measure of wavelength, domain count or contrast,
+so the governing variable is not merely unmeasured --- it is \textbf{unrepresentable}, and the run
+with the finest pattern in the campaign is recorded as \code{morphology=sphere}: a null.
+
+\textbf{Conclusion.} The apparatus is sound and the epistemics are not. The loop reasons correctly
+from what it can measure, and its errors are all of one family: it converts absence of evidence
+into evidence of absence. It closed the reaction-diffusion family from a set in which every
+divergent run shared an unvaried confounder; it wrote \emph{fundamental} of a ceiling it had never
+pushed on; it kept a necessity claim after its own round refuted it; and it recorded \emph{sphere}
+where it should have recorded \emph{not measured}. In its memory, four of seven positive claims
+carry a falsifier and two of nine prohibitions carry any escape at all --- it knows how to make a
+positive refutable and does not do it for a negative. Untested territory has nowhere to live, so it
+collapses into \emph{impossible}: this is how \emph{we never tried it} became \emph{the only
+remaining route is a different geometry}.
+
+That is not a defect to patch. It is the subject of the next two phases.
+\end{tcolorbox}
 \end{phasebox}
 
 \begin{phasebox}{Phase 7 --- The demonstration \hfill \todo}
