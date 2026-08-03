@@ -1,0 +1,5 @@
+DESCRIPTION:
+The simulation shows a spherical vesicle composed of many individual cells that gradually expand in size. Over time, the distribution of the activator chemical shifts, causing the red-shaded regions to grow and merge. The cells within the vesicle reorganize their spatial arrangement as the overall structure increases in volume. The cross-section in the bottom-right corner reveals the internal density and distribution of the cells as the vesicle matures.
+
+OBJECTS:
+The primary object is a large, spherical vesicle composed of a dense cluster of small, interconnected cells. The cells are colored in a gradient from white to red, representing varying concentrations of an activator chemical. A small, circular cross-section in the bottom-right corner shows the internal arrangement of these cells in a flat plane. The entire structure occupies a central position in the frame and grows significantly larger from the first to the last keyframe.

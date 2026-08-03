@@ -1,0 +1,230 @@
+{
+ "config": "r008c_02_cbbdfe",
+ "comp_hash": "Ccbbdfe07bc3",
+ "region": "growth-driven mid-surface",
+ "summary": {
+  "saturated": false,
+  "inert_operators": [],
+  "retention": 1.0,
+  "valid_evidence": true,
+  "protr_final": 1.173,
+  "protr_peak": 1.173,
+  "elongation_at_end": 1.173,
+  "elongation_peak": 1.173,
+  "horizon_frame": 900,
+  "horizon_why": "broken_n never sustained damage to the end (max 0)",
+  "first_damage_frame": null,
+  "valid_frac": 1.0,
+  "protr_peak_untruncated": 1.173,
+  "protr_final_untruncated": 1.173,
+  "n_cells_final": 2000,
+  "red_frac_final": 0.004,
+  "act_max_final": 1.0,
+  "frames": 901,
+  "wall_s": 135.9,
+  "ta_hollow_n_peak": 0,
+  "ta_hollow_n_final": 0,
+  "ta_area_cv_final": 0.751,
+  "ta_vol_cv_final": 0.983,
+  "ta_tube_diam_final": 3.311,
+  "ta_n_tubes_final": 2,
+  "ta_tube_len_final": 2.738,
+  "ta_protr_final": 1.17,
+  "ta_red_frac_final": 0.0,
+  "ta_tip_act_final": 0.51,
+  "ta_aspect_len_over_diam": 0.827,
+  "morphology": "branched",
+  "morphology_path": "sphere -> unclear -> branched -> unclear -> branched",
+  "morphology_why": "",
+  "mech_force_mean": 0.5733,
+  "mech_p_body": 0.2908,
+  "mech_p_tube": 2.4232,
+  "mech_p_ratio": 8.332,
+  "mech_tension_mean": 0.2344,
+  "mech_migration": 0.01165,
+  "Q_protr_after_relax": 1.173,
+  "Q_drop": 0.0,
+  "div_blocked": 0,
+  "buf_full": false,
+  "div_blocked_first_frame": null
+ },
+ "acted": {
+  "seed_mesh_3d": 1,
+  "cell_geometry_3d": 900,
+  "cell_rd_seed": 599,
+  "morphogen_growth_3d": 556,
+  "shape_energy_3d": 901,
+  "reconnect_t1_3d": 840,
+  "topo_snapshot_3d": 901
+ },
+ "premises": [
+  {
+   "id": "P2",
+   "tier": "static",
+   "premise": "morphogen sets where/how fast, not whether",
+   "status": "na",
+   "detail": "a_sw=1.5 is above any reachable activator, so growth is uniform (switch off)",
+   "measured": {
+    "a_sw": 1.5,
+    "rho": 0.0
+   },
+   "grade": "usual",
+   "stated_check": "if the gate is connected at all, then `rho > 0`.",
+   "if_violated": "the tip-to-body growth ratio is infinite \u2014 a growing tip on a frozen body. No tissue does that."
+  },
+  {
+   "id": "P3",
+   "tier": "static",
+   "premise": "a cell divides because it got big",
+   "status": "na",
+   "detail": "needs both morphogen_growth_3d and divide_3d",
+   "measured": null,
+   "grade": "certain",
+   "stated_check": "**the growth ceiling must sit above the division trigger.** Mean cell volume must be roughly steady over the run, not drifting down.",
+   "if_violated": "this is defect D5b. `vth_frac` capped a cell's target at 1.5\u00d7 while `factor` demanded 2.0\u00d7 \u2014 the ceiling was *below* the trigger, so volume-triggered division was arithmetically impossible and the only divisions we ever saw came from a timeout."
+  },
+  {
+   "id": "P5",
+   "tier": "static",
+   "premise": "mechanics is fast, biology is slow",
+   "status": "na",
+   "detail": "no chemistry in this composition",
+   "measured": null,
+   "grade": "certain",
+   "stated_check": null,
+   "if_violated": null
+  },
+  {
+   "id": "P1",
+   "tier": "passive",
+   "premise": "cells grow by taking material in",
+   "status": "pass",
+   "detail": "tissue volume 508.1 -> 575.9 (x1.13)",
+   "measured": {
+    "V_start": 508.127,
+    "V_end": 575.88
+   },
+   "grade": "certain",
+   "stated_check": "total tissue volume at the end > total tissue volume when growth started.",
+   "if_violated": "a protrusion with `rho = 0` is made entirely of material taken from somewhere else in the same body. That is a deliberate ablation, not a setting \u2014 say so, and say what the rest of the body gave up."
+  },
+  {
+   "id": "P3b",
+   "tier": "passive",
+   "premise": "mean cell volume holds under proliferation",
+   "status": "na",
+   "detail": "no division in this composition",
+   "measured": null,
+   "grade": "certain",
+   "stated_check": "**the growth ceiling must sit above the division trigger.** Mean cell volume must be roughly steady over the run, not drifting down.",
+   "if_violated": "this is defect D5b. `vth_frac` capped a cell's target at 1.5\u00d7 while `factor` demanded 2.0\u00d7 \u2014 the ceiling was *below* the trigger, so volume-triggered division was arithmetically impossible and the only divisions we ever saw came from a timeout."
+  },
+  {
+   "id": "P4",
+   "tier": "passive",
+   "premise": "the chemistry must not be silently extinguished",
+   "status": "na",
+   "detail": "no chemistry in this composition",
+   "measured": null,
+   "grade": "certain",
+   "stated_check": "with the chemistry switched off and growth on, every cell's concentration must fall.",
+   "if_violated": "the tissue is manufacturing morphogen in proportion to its own growth, which feeds the tip from nothing."
+  },
+  {
+   "id": "P13",
+   "tier": "passive",
+   "premise": "growth is not capped by the array",
+   "status": "pass",
+   "detail": "cell count ends at 2000 with no flat ceiling",
+   "measured": null,
+   "grade": "certain",
+   "stated_check": "the cell count must not reach a constant and hold it for a large tail of the run. The engine also reports it directly \u2014 `div_blocked` counts divisions refused for want of buffer, and `buf_full` says the array is at its ceiling.",
+   "if_violated": "`wk_pressure_pos_s0` grew 150 -> 1778 cells by frame 323 of 900 and then added **zero** for the remaining 575 frames. 1778 is exactly the cap of a buffer sized for a 150-cell start. Two thirds of the run measured a full array, every other premise passed it, and the only thing that noticed was a human watching cell division stop two seconds into a six-second movie."
+  },
+  {
+   "id": "P7",
+   "tier": "passive",
+   "premise": "a sheet does not absorb added area by stretching",
+   "status": "pass",
+   "detail": "the stretched tail stays at shape index 3.90 over the final fifth; reduced volume 0.916",
+   "measured": {
+    "p95_late": 3.896,
+    "reduced_volume": 0.9156
+   },
+   "grade": "usual",
+   "stated_check": "mean cell volume steady, cell shape index not drifting upward, and the distribution of cell shapes not developing a long stretched tail.",
+   "if_violated": null
+  },
+  {
+   "id": "P8",
+   "tier": "passive",
+   "premise": "the shape index has a hard geometric floor",
+   "status": "pass",
+   "detail": "minimum shape index 3.6690 respects the floor 3.5449",
+   "measured": {
+    "min": 3.669,
+    "floor": 3.5449077018110318
+   },
+   "grade": "certain",
+   "stated_check": "any measured shape index below 3.545 is a **broken measurement**, not a finding.",
+   "if_violated": null
+  },
+  {
+   "id": "P9",
+   "tier": "passive",
+   "premise": "a closed epithelium is a sphere with no holes",
+   "status": "pass",
+   "detail": "genus 0 at all 40 recorded frames",
+   "measured": {
+    "frames": 40
+   },
+   "grade": "certain",
+   "stated_check": "Euler characteristic / genus constant. A cell of zero or negative volume is a solver failure, not a small cell.",
+   "if_violated": null
+  },
+  {
+   "id": "P11",
+   "tier": "passive",
+   "premise": "tissue cannot pass through itself",
+   "status": "pass",
+   "detail": "at every frame at least 100.0% of rays cross the surface exactly once",
+   "measured": {
+    "worst_single_frac": 1.0
+   },
+   "grade": "certain",
+   "stated_check": "cast rays from the tissue centroid. A simple closed shell gives **exactly one** crossing per ray.",
+   "if_violated": "the buckling transition was reported as physical on the strength of the genus check alone. The transition is not a solver artefact \u2014 it survives quadrupling the relaxation \u2014 but the state it produces is not a tissue. Likely cause: the radial spring's target radius is frozen at the seed value while cell target volumes grow sixteenfold, so the shell is held at radius 5 while its cells demand far more area than that sphere has. It has nowhere to go but through itself."
+  },
+  {
+   "id": "P12",
+   "tier": "passive",
+   "premise": "a concentration is non-negative and finite",
+   "status": "na",
+   "detail": "no chemistry in this composition",
+   "measured": null,
+   "grade": "certain",
+   "stated_check": "every recorded concentration is finite and >= 0.",
+   "if_violated": "every downstream number is about the integrator. This is the check that caught the reaction running 50x too fast: the activator went 0.01 -> 1.41e6 -> NaN while spatially uniform."
+  },
+  {
+   "id": "P5b",
+   "tier": "passive",
+   "premise": "the mechanical relaxation keeps up with the tissue",
+   "status": "pass",
+   "detail": "residual force after relaxation 0.47 -> 0.57 (x1.22) while the tissue grew from 2000 to 2000 cells",
+   "measured": {
+    "force_early": 0.4698958247900009,
+    "force_late": 0.5713358223438263,
+    "ratio": 1.2158776311731636,
+    "cells_early": 2000.0,
+    "cells_late": 2000.0
+   },
+   "grade": "certain",
+   "stated_check": null,
+   "if_violated": null
+  }
+ ],
+ "premises_broken": [],
+ "premises_ablated": [],
+ "run_id": "R29ddf7219051cb5"
+}

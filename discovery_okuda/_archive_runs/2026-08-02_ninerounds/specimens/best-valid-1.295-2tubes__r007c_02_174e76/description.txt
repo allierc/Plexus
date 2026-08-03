@@ -1,0 +1,5 @@
+DESCRIPTION:
+The red activator chemical initially concentrates at the bottom of the vesicle and then migrates toward the top. As the chemical moves, it triggers a localized growth or protrusion at the apex of the sphere. This protrusion expands and becomes more pronounced as the red signal intensifies at the top. By the final frame, the vesicle has developed a distinct, elongated bulbous shape at its peak.
+
+OBJECTS:
+The primary object is a spherical vesicle composed of a dense network of interconnected cells. The cells are primarily white but transition to a deep red color in areas with high activator concentration. A small cross-sectional view in the bottom-right shows the internal structure of the vesicle as a ring of cells. The vesicle maintains a consistent overall size while its surface geometry deforms over time.
