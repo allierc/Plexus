@@ -388,11 +388,29 @@ def regen(rundir, device="cuda:0", stride=None, movie=True):
             json.dump(d, f, indent=2)
         print(f"  range {d['range_hvt_deg']}  settled rms {d['tracking_settled_rms_deg']}  "
               f"objective {d['objective']}", flush=True)
-    np.savez_compressed(os.path.join(rundir, "curves.npz"),
-                        **{k: v for k, v in cap.items()
-                           if k in ("frame", "act", "tension", "length", "rest_length", "gaze",
-                                    "target", "centre", "ins", "pull", "axis", "radius",
-                                    "radius_spread")})
+    keep = {k: v for k, v in cap.items()
+            if k in ("frame", "act", "tension", "length", "rest_length", "gaze", "target",
+                     "centre", "ins", "pull", "axis", "radius", "radius_spread")}
+    np.savez_compressed(os.path.join(rundir, "curves.npz"), **keep)
+    if "muscle_probe" in ops:
+        # a Phase-2/3 open-loop probe: keep the shared pool the gain fitter reads in step, and
+        # re-stamp probe.json, or `probe_plant --fit` would be fitting the pre-regeneration run
+        import eye_anatomy as _EA
+        prb = next(o for o in spec["operators"] if o["op"] == "muscle_probe")
+        mi = int(prb["muscle"])
+        key = _EA.MUSCLE_KEYS[mi] if mi >= 0 else "null"
+        pool = os.path.join(ARCHIVE, "phase3_" + os.path.basename(rundir).split("_", 1)[1]) \
+            if os.path.basename(rundir).startswith("p3") else \
+            os.path.join(ARCHIVE, "phase2_stepresponse")
+        os.makedirs(pool, exist_ok=True)
+        np.savez_compressed(os.path.join(pool, f"probe_{key}.npz"), **keep)
+        with open(os.path.join(rundir, "probe.json"), "w") as f:
+            json.dump({"muscle": key, "a_hi": prb.get("a_hi"), "tonic": prb.get("tonic"),
+                       "t_on": prb.get("t_on"), "t_off": prb.get("t_off"), "n_frames": n,
+                       "regenerated": True,
+                       "gaze_range_deg": [round(float(x), 3)
+                                          for x in np.ptp(cap["gaze"], axis=0)]}, f, indent=2)
+        print(f"  {key}: gaze range {np.round(np.ptp(cap['gaze'], axis=0), 2)}", flush=True)
     if movie:
         render_eye.render(cap, float(sim.dt), os.path.join(rundir, "movie.mp4"),
                           os.path.join(rundir, "strip.png"))
