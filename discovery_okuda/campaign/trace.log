@@ -93,3 +93,87 @@
 16:50:56  reading loop done; entering Act 3
 16:50:56  Collector: building the record
 16:50:56  Collector done
+17:34:37  about to import caption_wave
+17:34:37  caption_wave imported; calling it
+17:37:03  caption_wave RETURNED
+17:37:03  past captioning; entering the reading loop
+17:37:03  reading r007c_00_dcf832
+17:38:10  read r007c_00_dcf832 OK
+17:38:10  reading r007c_01_7c70bc
+17:39:06  read r007c_01_7c70bc OK
+17:39:07  reading r007c_02_174e76
+17:40:14  read r007c_02_174e76 OK
+17:40:14  reading r007c_03_4fac94
+17:40:59  read r007c_03_4fac94 OK
+17:40:59  reading r007c_04_6d3c06
+17:41:36  read r007c_04_6d3c06 OK
+17:41:36  reading r007c_05_d5e094
+17:42:50  read r007c_05_d5e094 OK
+17:42:50  reading loop done; entering Act 3
+17:42:50  Collector: building the record
+17:42:50  Collector done
+18:24:15  about to import caption_wave
+18:24:15  caption_wave imported; calling it
+18:26:43  caption_wave RETURNED
+18:26:43  past captioning; entering the reading loop
+18:26:43  reading r008c_00_d5e094
+18:28:25  read r008c_00_d5e094 OK
+18:28:25  reading r008c_01_79b047
+18:29:39  read r008c_01_79b047 OK
+18:29:39  reading r008c_02_cbbdfe
+18:31:11  read r008c_02_cbbdfe OK
+18:31:11  reading r008c_03_b00f85
+18:32:23  read r008c_03_b00f85 OK
+18:32:23  reading r008c_05_3c4f00
+18:34:20  read r008c_05_3c4f00 OK
+18:34:20  reading r008c_07_af9b95
+18:36:05  read r008c_07_af9b95 OK
+18:36:05  reading loop done; entering Act 3
+18:36:05  Collector: building the record
+18:36:06  Collector done
+19:16:04  about to import caption_wave
+19:16:04  caption_wave imported; calling it
+19:18:43  caption_wave RETURNED
+19:18:43  past captioning; entering the reading loop
+19:18:43  reading r009c_00_cbbdfe
+19:19:59  read r009c_00_cbbdfe OK
+19:19:59  reading r009c_01_6de516
+19:21:06  read r009c_01_6de516 OK
+19:21:06  reading r009c_02_3242f3
+19:22:04  read r009c_02_3242f3 OK
+19:22:04  reading r009c_03_1fdee5
+19:23:37  read r009c_03_1fdee5 OK
+19:23:37  reading r009c_04_a4940b
+19:24:35  read r009c_04_a4940b OK
+19:24:35  reading r009c_05_bad47f
+19:25:55  read r009c_05_bad47f OK
+19:25:55  reading r009c_07_6c1727
+19:27:33  read r009c_07_6c1727 OK
+19:27:33  reading loop done; entering Act 3
+19:27:33  Collector: building the record
+19:27:33  Collector done
+20:02:02  about to import caption_wave
+20:02:02  caption_wave imported; calling it
+20:05:04  caption_wave RETURNED
+20:05:04  past captioning; entering the reading loop
+20:05:04  reading r010c_00_1fdee5
+20:06:37  read r010c_00_1fdee5 OK
+20:06:37  reading r010c_01_d4197d
+20:07:53  read r010c_01_d4197d OK
+20:07:53  reading r010c_02_4ba933
+20:08:46  read r010c_02_4ba933 OK
+20:08:46  reading r010c_03_3281fd
+20:09:51  read r010c_03_3281fd OK
+20:09:51  reading r010c_04_6de516
+20:11:34  read r010c_04_6de516 OK
+20:11:34  reading r010c_05_1dc508
+20:13:32  read r010c_05_1dc508 OK
+20:13:32  reading r010c_06_66fd9f
+20:15:04  read r010c_06_66fd9f OK
+20:15:04  reading r010c_07_a5afdb
+20:16:28  read r010c_07_a5afdb OK
+20:16:28  reading r010c_08_e2be59
+20:17:34  read r010c_08_e2be59 OK
+20:17:34  reading loop done; entering Act 3
+20:17:34  Collector: building the record
+20:17:34  Collector done
