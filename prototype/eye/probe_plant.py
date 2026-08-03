@@ -44,48 +44,58 @@ import eye_ops                     # noqa: F401
 import muscle_ops                  # noqa: F401
 import probe_ops
 import eye_anatomy as EA
+import run_eye
+import render_eye
 from plexus.schema import load as load_spec
-from plexus.engine import run as engine_run
 
-OUT = os.path.join(HERE, "archive", "phase2_stepresponse")
+ARCHIVE = os.path.join(HERE, "archive")
+OUT = os.path.join(ARCHIVE, "phase2_stepresponse")
 
 
 # --------------------------------------------------------------------------- #
 #  run one probe
 # --------------------------------------------------------------------------- #
-def run_probe(base_spec, muscle, device, a_hi, tonic, t_on, t_off, n_frames, outdir):
+def run_probe(base_spec, muscle, device, a_hi, tonic, t_on, t_off, n_frames, outdir,
+              stride=5, movie=True):
+    """One open-loop step response, archived exactly like every other trial: its own
+    `tNN_probe_<KEY>/` folder with spec.yaml, movie.mp4, strip.png and the traces."""
     spec_d = probe_ops.probe_spec(base_spec, muscle, a_hi=a_hi, tonic=tonic,
                                   t_on=t_on, t_off=t_off, n_frames=n_frames)
     key = EA.MUSCLE_KEYS[muscle] if muscle >= 0 else "null"
-    os.makedirs(outdir, exist_ok=True)
-    path = os.path.join(outdir, f"spec_{key}.yaml")
+    rundir = run_eye.next_archive_dir(f"probe_{key}")
+    path = os.path.join(rundir, "spec.yaml")
     with open(path, "w") as f:
+        f.write("# Phase 2 -- OPEN-LOOP step response. `oculomotor_drive` is replaced by\n"
+                f"# `muscle_probe`, which steps {key} from tonic to a_hi and ignores the gaze\n"
+                "# entirely, so the input is independent of the state and the closed-loop\n"
+                "# identification bias of Phase 1a is gone by construction.\n")
         yaml.safe_dump(spec_d, f, sort_keys=False, width=100)
     sim = load_spec(path)
 
-    rec = {"frame": [], "gaze": [], "act": [], "length": [], "centre": [], "cmd": []}
-
-    def hook(H, frame):
-        m, eye = H.levels["muscle"], H.levels["eye"]
-        f32 = lambda t: t.detach().cpu().numpy().astype(np.float32)
-        rec["frame"].append(frame)
-        rec["gaze"].append(f32(eye.get("gaze")[0]))
-        rec["act"].append(f32(m.get("act")[:, 0]))
-        rec["length"].append(f32(m.get("length")[:, 0]))
-        rec["centre"].append(f32(eye.get("pos")[0]))
-        rec["cmd"].append(np.float32(prb.level(frame)) if muscle >= 0 else np.float32(tonic))
-
     prb = probe_ops.MuscleProbe({"muscle": muscle, "a_hi": a_hi, "tonic": tonic,
                                  "t_on": t_on, "t_off": t_off})
-    print(f"[probe] {key}: step {tonic}->{a_hi} at frame {t_on}, release {t_off}, "
-          f"{n_frames} frames", flush=True)
-    H, _ = engine_run(sim, out_path=None, device=device, on_frame=hook, progress=False)
-    out = {k: np.asarray(v) for k, v in rec.items()}
-    out["rest_length"] = H.levels["muscle"].rest_length.detach().cpu().numpy()
+    print(f"[probe] {os.path.basename(rundir)}: {key} step {tonic}->{a_hi} at frame {t_on}, "
+          f"release {t_off}, {n_frames} frames", flush=True)
+
+    _, cap = run_eye.capture_run(sim, device, stride=stride)
+    out = {"frame": cap["frame"], "gaze": cap["gaze"], "act": cap["act"],
+           "length": cap["length"], "centre": cap["centre"],
+           "cmd": np.asarray([prb.level(f) for f in cap["frame"]], np.float32),
+           "rest_length": cap["rest_length"]}
+    os.makedirs(outdir, exist_ok=True)
     np.savez_compressed(os.path.join(outdir, f"probe_{key}.npz"), **out)
+    np.savez_compressed(os.path.join(rundir, "curves.npz"), **out)
     g = out["gaze"]
-    print(f"[probe] {key}: gaze range h/v/t = "
-          f"{np.round(np.ptp(g, axis=0), 2)}  final {np.round(g[-1], 2)}", flush=True)
+    print(f"[probe] {key}: gaze range h/v/t = {np.round(np.ptp(g, axis=0), 2)}  "
+          f"final {np.round(g[-1], 2)}", flush=True)
+    if movie:
+        render_eye.render(cap, float(sim.dt), os.path.join(rundir, "movie.mp4"),
+                          os.path.join(rundir, "strip.png"))
+    with open(os.path.join(rundir, "probe.json"), "w") as f:
+        json.dump({"muscle": key, "a_hi": a_hi, "tonic": tonic, "t_on": t_on, "t_off": t_off,
+                   "n_frames": n_frames, "baseline": os.path.basename(os.path.dirname(path)),
+                   "gaze_range_deg": [round(float(x), 3) for x in np.ptp(g, axis=0)]}, f, indent=2)
+    print(f"[probe] -> {rundir}", flush=True)
     return out
 
 
@@ -204,6 +214,8 @@ def main():
     ap.add_argument("--device", default="cuda:0")
     ap.add_argument("--outdir", default=OUT)
     ap.add_argument("--fit", action="store_true", help="skip the runs, fit what is already there")
+    ap.add_argument("--stride", type=int, default=5)
+    ap.add_argument("--no-movie", action="store_true")
     a = ap.parse_args()
 
     base = yaml.safe_load(open(os.path.join(a.base, "spec.yaml")))
@@ -213,7 +225,8 @@ def main():
 
     if not a.fit:
         for m in a.muscles:
-            run_probe(base, m, a.device, a.a_hi, tonic, a.t_on, a.t_off, a.frames, a.outdir)
+            run_probe(base, m, a.device, a.a_hi, tonic, a.t_on, a.t_off, a.frames, a.outdir,
+                      stride=a.stride, movie=not a.no_movie)
     report(a.outdir, a.t_on, a.t_off, dt)
 
 

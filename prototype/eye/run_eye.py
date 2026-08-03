@@ -80,8 +80,11 @@ def capture_run(sim, device, stride=3, n_shell=26000, n_cut=16000, n_mus=14000,
     rec = {k: [] for k in keys}
     idx = {}
     rng = np.random.default_rng(seed)
-    prog = next(o.params["program"] for o in sim.operators if o.op == "oculomotor_drive")
-    cmd = eye_ops.OculomotorDrive({"program": prog}, "cpu")     # evaluates the COMMAND per frame
+    # A Phase-2 probe run has no `oculomotor_drive` at all -- the loop is open on purpose -- so
+    # there is no gaze command to plot against. Fall back to a flat zero command rather than
+    # requiring every run to be closed-loop.
+    prog = next((o.params["program"] for o in sim.operators if o.op == "oculomotor_drive"), None)
+    cmd = eye_ops.OculomotorDrive({"program": prog}, "cpu") if prog is not None else None
 
     def _pick(mask_t, k):
         ii = torch.nonzero(mask_t, as_tuple=False).flatten().cpu().numpy()
@@ -145,7 +148,8 @@ def capture_run(sim, device, stride=3, n_shell=26000, n_cut=16000, n_mus=14000,
         rec["axis"].append(f32(m.axis))
         rec["gaze"].append(f32(eye.get("gaze")[0]))
         rec["centre"].append(f32(eye.get("pos")[0]))
-        rec["target"].append(np.asarray(cmd.target(frame), np.float32))
+        rec["target"].append(np.asarray(cmd.target(frame) if cmd is not None else (0.0, 0.0, 0.0),
+                                        np.float32))
         rec["gpos"].append(f32(gp))
         rec["gvel"].append(f32(gm))
         rec["radius"].append(float(r_now.mean()))
