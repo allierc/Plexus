@@ -1,7 +1,12 @@
+# Phase 2b baseline: t03_c_a with the CORRECTED globe material.
+# Every earlier archived run carried vitreous E=9 -- a shear modulus of 3.8, very
+# nearly a fluid -- which is the material Phase 0 identified as why the globe came
+# apart. The fix reached eye_spec's defaults but never the archived specs, so the
+# whole Phase-2 gain matrix was measured on a globe whose interior can flow.
 general:
-  name: eye_probe_c_a_probe_LR
+  name: eye_probe_baseline_fixmat
   seed: 0
-  n_frames: 900
+  n_frames: 395
   dt: 0.003
   boundary: wall
   dim: 3
@@ -35,14 +40,14 @@ sets:
     types:
       globe:
         fraction: 1.0
-        youngs: 300.0
+        youngs: 420.0
         layers:
         - frac: 0.6
-          youngs: 9.0
+          youngs: 45.0
         - frac: 0.88
-          youngs: 40.0
+          youngs: 130.0
         - frac: 1.0
-          youngs: 300.0
+          youngs: 420.0
   mpm_particle:
     parent: eye
     per_parent: 45000
@@ -121,7 +126,7 @@ operators:
   a_eq: 0.115
   axial_ratio: 0.82
   lens_youngs: 520.0
-  cornea_youngs: 260.0
+  cornea_youngs: 320.0
 - op: muscle_morphogenesis
   at: muscle_particle
   before_frame: 1
@@ -146,13 +151,38 @@ operators:
   at: muscle
   child: muscle_particle
   eye: eye
-- op: muscle_probe
+- op: oculomotor_drive
   at: muscle
-  muscle: 0
-  a_hi: 1.0
+  eye: eye
+  program:
+  - - 0
+    - 0.0
+    - 0.0
+    - 0.0
+  - - 65
+    - 25.0
+    - 0.0
+    - 0.0
+  - - 130
+    - -25.0
+    - 0.0
+    - 0.0
+  - - 195
+    - 0.0
+    - 18.0
+    - 0.0
+  - - 260
+    - 0.0
+    - 0.0
+    - 14.0
+  - - 325
+    - 0.0
+    - 0.0
+    - 0.0
+  kp: 0.1
+  kd: 0.01
   tonic: 0.14
-  t_on: 60
-  t_off: 700
+  gain: 1.7
   tau: 0.02
 - op: muscle_contract
   at: muscle_particle
@@ -215,7 +245,7 @@ schedule:
 - muscle_morphogenesis
 - eye_pose
 - muscle_geometry
-- muscle_probe
+- oculomotor_drive
 - muscle_contract
 - bone_anchor
 - orbit_socket

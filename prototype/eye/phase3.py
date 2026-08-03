@@ -53,7 +53,11 @@ import yaml
 import probe_plant
 import eye_anatomy as EA
 
-BASE = os.path.join(HERE, "archive", "t03_c_a", "spec.yaml")
+# Phase 2b baseline: t03_c_a with the corrected globe material. Every earlier archived spec
+# carried vitreous E = 9 -- a shear modulus of 3.8, very nearly a fluid -- so the original Phase-2
+# gain matrix was measured on a globe whose interior could flow, which absorbs muscle work as
+# internal shear instead of rotating the globe.
+BASE = os.path.join(HERE, "archive", "t10_baseline_fixmat", "spec.yaml")
 ARCH = os.path.join(HERE, "archive")
 
 STAGES = {
