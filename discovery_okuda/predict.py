@@ -54,6 +54,13 @@ KNOWN_METRICS = (
     # 22 times rather than inventing 22 confirmations, which is the whole point of P1. An unknown
     # metric is a missing entry here, not a licence to guess.
     "protr", "protr_p99", "corr_act_rad", "hollow_frac", "vol_cv", "act_max", "r_cv", "cells_end",
+    # THE PATTERN. Certified before this campaign began (n_spots exact at 3/5/12, spacing within
+    # 13% of the analytic value) and never admitted, so no claim could name the variable that
+    # actually governs budding: a fine field spreads growth evenly and keeps a sphere spherical,
+    # one localised patch makes a bud. Without these a conclusion about the pattern is not a
+    # weaker verdict, it is an unmeasured one.
+    "n_spots_final", "spot_cells_med_final", "spot_cells_max_final", "spot_frac_final",
+    "spot_spacing_cells_final", "wavelength_cells_final",
 )
 
 # Measured to lie by the instrument gate (F15/F16). A prediction resting on one of these is not

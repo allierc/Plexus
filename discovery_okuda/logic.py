@@ -277,7 +277,32 @@ def admitted_metrics():
         return set()
 
 
-_PROP = re.compile(r"\b([a-z][a-z0-9_]{3,})\b")
+# A PROPERTY IS NAMED IN A MEASUREMENT CONTEXT, not merely mentioned. The first version matched
+# every snake_case token and duly proposed building instruments for `remove_op`,
+# `reconnect_t1_3d0` and `vesicle_growth0` -- operator names, not measurable quantities. An
+# instrument request per operator is noise, and noise is how the operator backlog stopped being
+# read the first time.
+_PROP = re.compile(r"\b([a-z][a-z0-9_]{3,})\s*(?:=|==|>=|<=|>|<|\bof\b|\bis\b)", re.I)
+
+# Words that name a QUANTITY the campaign reasons about but may not measure. This is the vocabulary
+# the pattern gap lives in: wavelength, domain count and contrast on the activator field are the
+# variables that actually govern budding, and nothing reports any of them.
+PROPERTY_WORDS = ("wavelength", "domain", "domains", "spacing", "contrast", "pattern",
+                  "localisation", "localization", "morphology", "periodicity", "anisotropy",
+                  "curvature", "aspect", "sphericity", "roughness")
+
+
+def _operator_names():
+    """Operator identifiers, so a mechanism is never mistaken for a measurement."""
+    try:
+        from composition_space import OPERATORS
+        names = set()
+        for k in OPERATORS:
+            names.add(k)
+            names.add(re.sub(r"\d+$", "", k))
+        return names
+    except Exception:
+        return set()
 
 
 def unmeasured_properties(text, extra=()):
@@ -288,7 +313,12 @@ def unmeasured_properties(text, extra=()):
     `not measured`, and the honest next step is a request for an instrument.
     """
     ok = admitted_metrics() | set(extra)
-    named = {w for w in _PROP.findall((text or "").lower()) if "_" in w or w in ok}
+    ops = _operator_names()
+    t = (text or "").lower()
+    named = set(_PROP.findall(t))
+    named |= {w for w in PROPERTY_WORDS if re.search(rf"\b{w}\b", t)}
+    # an operator is a mechanism, and a verb-ish token is neither
+    named = {w for w in named if w not in ops and not w.startswith(("remove_", "add_", "set_"))}
     return sorted(named - ok)
 
 

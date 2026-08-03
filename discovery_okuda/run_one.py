@@ -413,6 +413,19 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
                "act_max_final": round(fm["act_max"][-1], 3),
                "frames": T, "wall_s": round(wall, 1)}
     summary.update(tube)                       # the archive's own definitions, for comparison
+    # THE PATTERN, LIFTED INTO THE SUMMARY. pattern_scale has existed and been certified for
+    # weeks -- weekend.py records it: "n_spots exact at 3/5/12, spacing within 13% of
+    # R sqrt(4pi/k)" -- and tube_analysis computes it every frame. It reached metrics and stopped
+    # there, so the summary the agents read carried no pattern number at all. The consequence is
+    # the phase's headline finding: the run with the finest Turing field in the campaign is
+    # recorded as `morphology=sphere, protr 1.003`, a null, because shape was measured and
+    # pattern was not. Identical in shape to the reservoir counters, which divide_3d also
+    # computed and nobody carried.
+    for _k in ("n_spots", "spot_cells_med", "spot_cells_max", "spot_frac",
+               "spot_spacing_cells", "wavelength_cells"):
+        if _k in fm and len(fm[_k]):
+            _v = fm[_k][-1]
+            summary[f"{_k}_final"] = (round(float(_v), 4) if isinstance(_v, float) else _v)
     if morph:
         summary["morphology"] = morph.get("morphology")
         summary["morphology_path"] = " -> ".join(morph.get("path", []))
