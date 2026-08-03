@@ -236,3 +236,15 @@ def install_line_colour():
     """
     if not isinstance(sys.stdout, _Colourise):
         sys.stdout = _Colourise(sys.stdout)
+
+
+def wrap_names(names, width=92):
+    """A list of run names across as many lines as it needs, never one long one.
+
+    Twelve names on a single line is ~250 characters: it wraps in the terminal wherever the
+    window happens to end, so the same output reads differently in two windows and no name is
+    findable by eye.
+    """
+    import textwrap
+    return textwrap.fill(", ".join(names), width=width,
+                         break_long_words=False, break_on_hyphens=False)

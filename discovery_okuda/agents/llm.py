@@ -651,9 +651,9 @@ def _absorb_event(line, quiet):
                 # narration around it -- and it arrives with the payload embedded, so a fenced
                 # ```json block of twelve run names was landing verbatim in the terminal. Strip
                 # the fences and anything that is plainly a JSON object; keep the prose, short.
-                _t = _prose_only(blk["text"])
+                _t = _clip(_prose_only(blk["text"]), 220)
                 if _t:
-                    print(f"  {_t[:220]}", flush=True)
+                    print(_t, flush=True)
             # A BARE TOOL NAME IS NOISE. `[tool] Bash` eight times running says only that the
             # agent used a tool, which is not information -- it does not say which file, which
             # command, or why, and it buries the agent's actual reasoning in a column of
@@ -662,6 +662,19 @@ def _absorb_event(line, quiet):
             elif blk.get("type") == "tool_use":
                 _TOOL_COUNT[blk.get("name", "?")] = _TOOL_COUNT.get(blk.get("name", "?"), 0) + 1
     return ""
+
+
+def _clip(text, n):
+    """Cut on a WORD boundary, not mid-token.
+
+    A hard [:n] left lines ending "...growth+division family: Rationale (" -- a dangling open
+    paren that reads like a bug in the agent rather than a truncation in the printer.
+    """
+    t = (text or "").strip()
+    if len(t) <= n:
+        return t
+    cut = t[:n].rsplit(" ", 1)[0].rstrip(" ,;:-([{")
+    return (cut or t[:n]) + " ..."
 
 
 def _prose_only(text):
@@ -689,6 +702,19 @@ def tool_summary(reset=True):
     if reset:
         _TOOL_COUNT.clear()
     return out
+
+
+def _clip(text, n):
+    """Cut on a WORD boundary, not mid-token.
+
+    A hard [:n] left lines ending "...growth+division family: Rationale (" -- a dangling open
+    paren that reads like a bug in the agent rather than a truncation in the printer.
+    """
+    t = (text or "").strip()
+    if len(t) <= n:
+        return t
+    cut = t[:n].rsplit(" ", 1)[0].rstrip(" ,;:-([{")
+    return (cut or t[:n]) + " ..."
 
 
 def _prose_only(text):
