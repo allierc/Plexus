@@ -777,7 +777,8 @@ def build_composition_batch(sup, cfg, n_slots, ledger):
                           n_slots=n_slots, ledger=ledger, steer=steer, refusals=refusals,
                           setup=setup, history=hist, review=prior_review)
     if not slots:
-        print(T_.no("[round] no usable proposal -- not falling back to random"))
+        print(T_.no(f"[round] no usable proposal ({len(slots or [])} slot(s) returned) -- "
+                    f"not falling back to random. The reason is on the [proposer] line above."))
         return []
 
     out, rejected, in_batch = [], [], {}
