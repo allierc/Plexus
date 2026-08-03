@@ -741,18 +741,57 @@ same specimen.
 \end{itemize}
 \end{phasebox}
 
-\begin{phasebox}{Phase 2 --- Certify the ruler, and find the floor \hfill \todo\ \ \stopp}
+\begin{phasebox}{Phase 2 --- Certify the ruler, and find the floor \hfill \prog\ (1 of 7) \ \stopp}
 \textbf{Goal.} Every number the loop ranks on must have a proved zero, a proved noise level, and a
 demonstrated ability to be wrong. \emph{A measure whose null and whose spread are unknown cannot
 support a finding, and the previous campaign is sixty rounds of proof.}
 
+\textbf{1. Where is zero? \dn --- and it is the number the whole project turns on.} Six trivial
+models, on the frozen split and the frozen mask, scored with the inherited ruler so the answer is
+comparable with the old record:
+
+\begin{center}\small
+\begin{tabular}{@{}l r r p{4.7cm}@{}}
+\toprule
+\textbf{model} & \textbf{fit beat} & \textbf{held-out} & \textbf{what it knows}\\
+\midrule
+predict nothing & $+0.070$ & $+0.067$ & nothing at all --- \emph{the origin}\\
+slide the whole sheet & $-0.020$ & $-0.050$ & the timing and the amount, no shape\\
+\textbf{copy the previous beat} & $\mathbf{+0.851}$ & $\mathbf{+0.62}$ & \textbf{no physics, no
+parameters, no fit}\\
+interpolate from the pinned edge & $-0.118$ & $-0.16$ & the anchoring alone, no physics\\
+the model, muscle off & $+0.070$ & --- & \emph{exactly} the do-nothing score\\
+the model, fields untrained & $-0.880$ & --- & 2.5$\times$ too much motion\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{So the bar is $+0.851$ on the beat we fit and $+0.62$ on beats we do not.} The previous
+campaign's best was $0.545$: it never cleared even the held-out bar, and the thing that clears it
+has no physics in it at all.
+
+Three of the others earn a sentence. \emph{Sliding the whole sheet scores below doing nothing} ---
+right timing, right amount, wrong shape is worse than silence, which is a good property in a ruler.
+\emph{Interpolating from the pinned edge scores $-0.118$}, so the anchoring is not quietly buying
+score. And \emph{the model with its muscle off scores exactly what predicting nothing scores},
+agreeing to the last digit --- which closes the boundary question on the frozen mask as well as on
+the one Phase~1 used.
+
+\textbf{Everything from here is reported as the difference from the first row}, never as a bare
+number and never as a ratio, because both can be made to look like anything once the origin is not
+at zero.
+
+\textbf{And a caution about how nearly this went wrong.} The first version of this measurement
+rebuilt the particle layout beside the run instead of reading it from the run's own record, and
+reported that the pinned edge drives a third of the sheet --- a dramatic finding, and false. The
+cause is worth keeping: \textbf{the initial particle layout depends on the device.} Same seed, one
+on the processor and one on the card, and the positions differ by the width of the whole sheet;
+change the seed instead and nothing moves, because the layout comes from the specification's own
+generator. So a fit on the processor and a fit on the card do not start from the same material and
+may not be compared. Phase~0's determinism check compared like with like and could not have seen
+it. The measurement now refuses to run unless its mapping reproduces the run's own recorded data.
+
 \begin{itemize}
-\item \textbf{Where is zero?} Score the trivial models: predict no motion; predict the average
-motion; \textbf{copy the previous beat}; interpolate inward from the pinned edge with no physics at
-all; run the same model with the muscle switched off; and run it with the fields present but never
-trained, because \emph{freezing a field is not the same as removing it}. Every score afterwards is
-reported as a \textbf{difference from that floor} --- never as a bare number, never as a ratio,
-because both can be made to look like anything when the floor is not at zero.
 \item \textbf{Teach the ruler to see coordination.} The current measure returns a perfect score for a
 sheet whose points beat in completely random order. Until a measure exists that can tell a
 coordinated contraction from an incoherent one, no mechanism about timing, waves or rotation can be
