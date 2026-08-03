@@ -1,11 +1,7 @@
-# Plexus2 spec -- zebrafish eyeball in its orbit, moved by six extraocular
-# muscles that are themselves contracting MPM bodies.
-# Sets: eye / mpm_particle / muscle x6 / muscle_particle / orbit.
-# Operators registered by prototype/eye/{eye_ops,muscle_ops}.py.
 general:
-  name: eye_probe_c_long
+  name: eye_probe_c_a_probe_LR
   seed: 0
-  n_frames: 395
+  n_frames: 900
   dt: 0.003
   boundary: wall
   dim: 3
@@ -55,17 +51,17 @@ sets:
   muscle:
     n: 6
     start:
-    - - 0.5117
+    - - 0.4875
       - 0.4942
       - 0.3375
     - - 0.4367
-      - 0.5709
+      - 0.5468
       - 0.3339
-    - - 0.3655
+    - - 0.3896
       - 0.4942
       - 0.3435
     - - 0.4367
-      - 0.4203
+      - 0.4445
       - 0.3393
     - - 0.4754
       - 0.6046
@@ -98,7 +94,7 @@ sets:
     types:
       muscle:
         fraction: 1.0
-        youngs: 250.0
+        youngs: 240.0
   muscle_particle:
     parent: muscle
     per_parent: 2200
@@ -113,7 +109,7 @@ sets:
 fields:
   mpm_grid:
     frame: mpm_grid
-    n_grid: 128
+    n_grid: 112
 operators:
 - op: eye_anatomy
   at: mpm_particle
@@ -138,10 +134,10 @@ operators:
   width: 0.034
   thickness: 0.021
   arc_deg: 30.0
-  gap: 0.038
-  embed: -0.014
-  frac: 0.88
-  youngs: 250.0
+  gap: 0.02
+  embed: -0.013
+  frac: 0.55
+  youngs: 240.0
 - op: eye_pose
   at: eye
   child: mpm_particle
@@ -150,43 +146,18 @@ operators:
   at: muscle
   child: muscle_particle
   eye: eye
-- op: oculomotor_drive
+- op: muscle_probe
   at: muscle
-  eye: eye
-  program:
-  - - 0
-    - 0.0
-    - 0.0
-    - 0.0
-  - - 65
-    - 25.0
-    - 0.0
-    - 0.0
-  - - 130
-    - -25.0
-    - 0.0
-    - 0.0
-  - - 195
-    - 0.0
-    - 18.0
-    - 0.0
-  - - 260
-    - 0.0
-    - 0.0
-    - 14.0
-  - - 325
-    - 0.0
-    - 0.0
-    - 0.0
-  kp: 0.1
-  kd: 0.01
-  tonic: 0.12
-  gain: 1.8
+  muscle: 0
+  a_hi: 1.0
+  tonic: 0.14
+  t_on: 60
+  t_off: 700
   tau: 0.02
 - op: muscle_contract
   at: muscle_particle
   muscles: muscle
-  amplitude: 55.0
+  amplitude: 60.0
   stretch_activation: 0.0
 - op: bone_anchor
   at: muscle_particle
@@ -244,7 +215,7 @@ schedule:
 - muscle_morphogenesis
 - eye_pose
 - muscle_geometry
-- oculomotor_drive
+- muscle_probe
 - muscle_contract
 - bone_anchor
 - orbit_socket

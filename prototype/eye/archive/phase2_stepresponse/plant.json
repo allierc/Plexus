@@ -1,0 +1,65 @@
+{
+  "gain_matrix_deg_per_act": [
+    [
+      0.9743667244911194,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      -0.06928099691867828,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      -0.028361791744828224,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ]
+  ],
+  "per_muscle": {
+    "LR": {
+      "d_act": 0.8843201398849487,
+      "gain_deg_per_act": [
+        0.9743667244911194,
+        -0.06928099691867828,
+        -0.028361791744828224
+      ],
+      "delta_theta_deg": [
+        0.861652135848999,
+        -0.06126657873392105,
+        -0.025080904364585876
+      ],
+      "dominant_axis": "horizontal",
+      "t63_s": 0.108,
+      "overshoot_pct": 60.3,
+      "offaxis_frac": 0.07683094590902328
+    }
+  },
+  "verdict": {
+    "lr_reach_deg_at_full_activation": 0.84,
+    "command_deg": 26.0,
+    "prediction_band_deg": [
+      8.0,
+      16.0
+    ],
+    "prediction_held": false,
+    "conclusion": "mechanics-limited"
+  },
+  "muscles": [
+    "LR",
+    "SR",
+    "MR",
+    "IR",
+    "SO",
+    "IO"
+  ]
+}

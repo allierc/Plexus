@@ -2,15 +2,16 @@
 \usepackage[margin=2.4cm]{geometry}
 \usepackage[T1]{fontenc}
 \usepackage{booktabs}
+\usepackage[font=small,labelformat=empty,skip=4pt]{caption}
 \usepackage{array}
 \usepackage{xcolor}
 \usepackage{titlesec}
 \usepackage{enumitem}
 \usepackage{tcolorbox}
+\tcbuselibrary{breakable}
 \usepackage{graphicx}
 \usepackage{amsmath}
 \usepackage{amssymb}
-\usepackage{longtable}
 \usepackage[hidelinks]{hyperref}
 
 \definecolor{good}{HTML}{1B7F3B}
@@ -20,12 +21,13 @@
 \definecolor{rule}{HTML}{2B4C7E}
 
 \newcommand{\code}[1]{\texttt{#1}}
-\newcommand{\yes}{\textcolor{good}{\textbf{yes}}}
-\newcommand{\no}{\textcolor{bad}{\textbf{no}}}
-\newcommand{\part}{\textcolor{warn}{\textbf{partly}}}
 \newcommand{\dn}{\textcolor{good}{\textbf{done}}}
 \newcommand{\fl}{\textcolor{warn}{\textbf{in flight}}}
 \newcommand{\ns}{\textcolor{grey}{not started}}
+\newcommand{\done}{\textcolor{good}{\textbf{DONE}}}
+\newcommand{\prog}{\textcolor{warn}{\textbf{IN PROGRESS}}}
+\newcommand{\todo}{\textcolor{grey}{\textbf{NOT STARTED}}}
+\newcommand{\wrong}{\textcolor{bad}{\textbf{FAILED, AND KEPT}}}
 
 \titleformat{\section}{\large\bfseries\color{rule}}{\thesection.}{0.6em}{}
 \titleformat{\subsection}{\normalsize\bfseries}{}{0em}{}
@@ -34,23 +36,29 @@
 \setlength{\parindent}{0pt}
 \renewcommand{\arraystretch}{1.25}
 
-\newtcolorbox{phasebox}[1]{colback=white,colframe=rule!55,boxrule=0.7pt,
+% the phase box: what we set out to do
+\newtcolorbox{phasebox}[1]{breakable,colback=white,colframe=rule!55,boxrule=0.7pt,
   arc=2pt,left=8pt,right=8pt,top=6pt,bottom=6pt,title={\bfseries #1},
   fonttitle=\color{white},colbacktitle=rule}
 
+% the run box: what came back when we ran it
+\newtcolorbox{runbox}[1]{breakable,colback=grey!4,colframe=grey!55,boxrule=0.7pt,
+  arc=2pt,left=8pt,right=8pt,top=6pt,bottom=6pt,title={\bfseries #1},
+  fonttitle=\color{white},colbacktitle=grey!75!black}
+
 \title{\textbf{A zebrafish eyeball, moved by six muscles}\\[6pt]
-\large A Plexus\,2 prototype --- written to be read, not decoded}
+\large Progress note --- written to be read, not decoded}
 \author{}
-\date{2 August 2026}
+\date{3 August 2026}
 
 \begin{document}
 \maketitle
 \vspace{-2.2\baselineskip}
 
 \begin{center}\small\color{grey}
-\texttt{prototype/eye/}. Plain English throughout. Operational summary: \texttt{STATUS.md}.\\
-Organised by what was asked, what was built, and what went wrong on the way --- because the
-things that went wrong are the only part that taught us anything.
+\texttt{prototype/eye/}. Operational summary: \texttt{STATUS.md}. Plain English throughout.\\
+Organised by phase, because phases are where we stop and you decide. Each phase is two boxes:
+what we \emph{set out} to do, and what came back when we \emph{ran} it.
 \end{center}
 
 \vspace{4pt}
@@ -58,74 +66,58 @@ things that went wrong are the only part that taught us anything.
 \vspace{10pt}
 
 %======================================================================
-\section{What was asked, and what it turned into}
+\section{What this is}
 
-The request was to simulate an eyeball: four muscles to aim it, a skull to keep it in its
-socket, two more muscles for torsion, and a multi-panel movie showing deformation, stress and
-activation. It grew two constraints along the way that changed the model completely.
+A deformable zebrafish eyeball in a bony orbit, rotated by six extraocular muscles that are
+themselves contracting MLS-MPM bodies, expressed entirely as a Plexus\,2 \code{spec.yaml}.
 
-\textbf{The eye should deform a little.} Not a rigid body on a ball joint --- a soft globe with
-a stiff scleral shell, so muscle tension actually dimples the sclera and the strain runs into
-the interior. That is what makes MPM the right tool rather than an unnecessary one.
-
-\textbf{The muscles should be made of particles too, and be seen contracting.} This is the
-constraint that mattered. In the first version a muscle was a line of action and its pull was a
-body force injected at the insertion patch. Nothing contracted, nothing deformed, and the
-tendon's grip on the sclera was \emph{asserted}. In the version reported here the muscles are
-tissue --- their own set of material points --- and nothing applies a force ``to the eye'':
-
-\begin{quote}
-a muscle shortens because an active stress acts along its fibres; it cannot reel itself up
-because its origin end is anchored to bone; and it moves the eye because its tendon end is
-embedded in the sclera and the two bodies share one MLS-MPM background grid.
-\end{quote}
-
-The globe rotates because a muscle got shorter. That is the whole mechanism.
+Nothing applies a force ``to the eye''. A muscle shortens because an active stress acts along its
+fibres; it cannot reel itself up because its origin end is anchored to bone; and it moves the globe
+because its tendon end is embedded in the sclera and the two bodies share one background grid.
+\textbf{The globe rotates because a muscle got shorter.} That is the whole mechanism.
 
 \begin{tcolorbox}[colback=grey!6,colframe=grey!45,boxrule=0.7pt,arc=2pt]
-\textbf{Nothing was promoted.} All nine new operators live in \code{prototype/eye/eye\_ops.py}
-and \code{prototype/eye/muscle\_ops.py}; importing them registers them, and the run is executed
-by the stock \code{plexus.schema.load} and \code{plexus.engine.run}. \code{src/plexus} is
-untouched. The deliverable is a \code{spec.yaml}.
+\textbf{Nothing was promoted.} Eleven operator contracts and one new \emph{implementation} of an
+existing one live in \code{eye\_ops.py} and \code{muscle\_ops.py}; importing them registers them,
+and the run is executed by the stock \code{plexus.schema.load} and \code{plexus.engine.run}.
+\code{src/plexus} is untouched. The deliverable is a \code{spec.yaml}.
 \end{tcolorbox}
 
-%======================================================================
-\section{The decomposition into sets}
+\subsection{The decomposition into sets}
 
 \begin{center}\small
-\begin{tabular}{@{}llp{7.4cm}@{}}
+\begin{tabular}{@{}llp{7.2cm}@{}}
 \toprule
 \textbf{set} & \textbf{what it is} & \textbf{state} \\
 \midrule
-\code{eye} & the globe, as one organ & \code{pos} (centroid), \code{gaze} = (horizontal, vertical, torsion) in degrees \\
+\code{eye} & the globe, as one organ & \code{pos} (centroid), \code{gaze} = (horizontal, vertical, torsion), degrees \\
 \code{mpm\_particle} & the globe's material points (parent \code{eye}) & \code{pos}/\code{vel} + $F$, $C$, mass, Lamé, volume \\
-\code{muscle} & the six extraocular muscles & \code{act} (innervation, the only integrated block), \code{tension}, \code{length} \\
+\code{muscle} & the six extraocular muscles & \code{act} (the only integrated block), \code{tension}, \code{length} \\
 \code{muscle\_particle} & each muscle's material points (parent \code{muscle}) & as \code{mpm\_particle} \\
 \code{orbit} & the bony socket & \code{pos}, the centre of the cup \\
-\code{mpm\_grid} (field) & \textbf{one} background grid, shared & --- \\
+\code{mpm\_grid} (field) & \textbf{one} background grid, shared by both bodies & --- \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-The shared grid is the point of the design: it is what mechanically couples a contracting
-muscle to the sclera, and it is free --- sharing a background grid is simply how MLS-MPM couples
-any two bodies. The stock \code{mpm\_scatter} \emph{overwrites} the grid, so a second
-\emph{implementation} of that same contract, \code{implementation: accumulate}, was registered:
-identical biology, different numerics. Per Plexus\,2 that is the correct way to extend --- a new
-implementation of an existing contract, never an edit to the engine.
+The shared grid is the design. It is what mechanically couples a contracting muscle to the sclera,
+and it is free --- sharing a background grid is simply how MLS-MPM couples any two bodies. The
+stock \code{mpm\_scatter} \emph{overwrites} the grid, so a second \emph{implementation} of that
+same contract, \code{implementation: accumulate}, was registered: identical biology, different
+numerics. Per Plexus\,2 that is the correct way to extend --- never an edit to the engine.
 
 \subsection{The operators}
 
 \begin{center}\small
-\begin{tabular}{@{}llp{8.2cm}@{}}
+\begin{tabular}{@{}llp{8.0cm}@{}}
 \toprule
 \textbf{operator} & \textbf{kind} & \textbf{what it does} \\
 \midrule
 \code{eye\_anatomy} & rewire & squash the seeded ball into the ovoid; label sclera / cornea / iris / pupil / choroid / vitreous / lens; per-region Lamé \\
-\code{muscle\_morphogenesis} & rewire & shape each muscle's points into a tapered strap along its arc of contact; fibre directions; bone cap and tendon cap \\
+\code{muscle\_morphogenesis} & rewire & shape each muscle's points into a tapered strap along its arc of contact; fibres; bone cap and tendon cap \\
 \code{eye\_pose} & aggregate & Kabsch fit of the shell against its rest state $\rightarrow$ gaze and torsion \\
 \code{muscle\_geometry} & aggregate & bin points by fibre coordinate $\rightarrow$ centreline, \textbf{length}, insertion, line of action, rotation axis \\
-\code{oculomotor\_drive} & lateral & gaze program $\rightarrow$ PID (the integral term is the oculomotor \emph{neural integrator}) $\rightarrow$ rectified projection onto each muscle's axis $\rightarrow$ activation dynamics \\
+\code{oculomotor\_drive} & lateral & gaze program $\rightarrow$ PID $\rightarrow$ rectified projection onto each muscle's axis $\rightarrow$ activation dynamics \\
 \code{muscle\_contract} & exchange & $\sigma_a = A\,a\,(1+\beta(\lambda-1))\,\mathbf{f}\mathbf{f}^{\!\top}$ along the fibre \\
 \code{bone\_anchor} & lateral & pin the origin cap to the skull \\
 \code{muscle\_sleeve} & lateral & the orbital pulley: a purely \emph{transverse} restoring force, so the path is held but shortening is free \\
@@ -139,14 +131,286 @@ The schedule closes a loop: pose readout $\rightarrow$ gaze error $\rightarrow$ 
 $\rightarrow$ contraction $\rightarrow$ MLS-MPM $\rightarrow$ motion $\rightarrow$ pose readout.
 
 %======================================================================
+\section{Where we actually are}
+
+\begin{center}\small
+\begin{tabular}{@{}llp{7.6cm}@{}}
+\toprule
+\textbf{phase} & \textbf{state} & \textbf{what it produced} \\
+\midrule
+0 --- build the plant & \dn & 25 trials, 4 named ceilings, a working point, a metric suite \\
+1a --- differentiable identification & \wrong & a surrogate that fails its own fidelity test, and refuses to report \\
+1b --- the dynamics-watching critic & \wrong & a VLM that reads a rotating eye as static \\
+2 --- PID autotune by step injection & \fl & the experiment that decides control \emph{vs} mechanics \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Two automatic instruments were built to judge the plant and \textbf{both failed}. That is why
+Phase~2 exists, and why it is an \emph{open-loop measurement} rather than another optimisation.
+
+\begin{tcolorbox}[colback=warn!6,colframe=warn!50,boxrule=0.7pt,arc=2pt]
+\textbf{The archive was pruned to the Phase-2 baseline.} Only \code{t01}, \code{t02} and
+\code{t03\_c\_a} survive on disk; the run folders from \code{t04} onward were deleted after the
+campaign closed. Their metrics are in the git history and are quoted here as the record.
+\end{tcolorbox}
+
+%======================================================================
+\section{Phase 0 --- Build the plant}
+
+\begin{phasebox}{Phase 0 --- define \hfill \dn}
+\textbf{Goal.} A globe that deforms a little but does not come apart, six muscles that visibly
+contract, a skull that keeps the eye in its socket, and a movie showing deformation, stress and
+activation --- all of it a \code{spec.yaml}, with the operators registered from the prototype
+folder and the engine untouched.
+
+\textbf{The constraint that changed the model.} The first version had a muscle as a \emph{line of
+action}, its pull a body force injected at the insertion patch. Nothing contracted, nothing
+deformed, and the tendon's grip on the sclera was \emph{asserted}. Making the muscles tissue ---
+their own particle set, coupled through the shared grid --- is what turned a picture into a
+mechanism.
+
+\textbf{What ``done'' means, written as a test.} \code{run\_eye.verdict}: finite; reaches its
+commands within $6^\circ$; torsion $>6^\circ$; horizontal range $>35^\circ$; recruitment 4/4;
+centroid drift $<6\%$ of the globe radius; globe strain$_{99}$ in $[0.004, 0.12]$; peak shortening
+in $[4\%, 38\%]$; globe radius worst $<6\%$ and roundness spread $<9\%$.
+\end{phasebox}
+
+\begin{runbox}{Phase 0 --- run \hfill 25 trials, 4 ceilings}
+Each ceiling was a real mechanism, not a tuning miss. They are worth more than the working point.
+
+\footnotesize
+\begin{tabular}{@{}p{3.0cm} p{11.0cm}@{}}
+\toprule
+\textbf{ceiling} & \textbf{what it turned out to be}\\
+\midrule
+$A$ and $E$ are not independent (t02) & A muscle shortens until passive tension balances active
+stress, so steady shortening is set by $A/E$ \emph{alone} while delivered force is
+$A\times$cross-section. Raising $A$ by itself: \textbf{88\% shortening, globe crushed.}\\
+$A/E$ is a cliff, not a trade-off (t03--t04) & 0.25 clean, 0.30 collapses --- a \emph{buckling}
+threshold. But the stiff passive element that bought stability made the antagonist so stiff it ate
+most of the agonist's force: \textbf{the eye capped at $11^\circ$.}\\
+Length buys gaze (t06--t08) & $\theta_{\max}\!\sim\!(A/E)(L/R)$. Truncating each muscle to 55\% of
+its path --- a convenience taken so the four recti would not project onto one blob --- had left the
+recti at $L/R=2.3$ and the obliques at 1.15, against $\approx3.3$ in a real orbit. Restoring the
+length and spreading the origins around the annulus of Zinn (a \emph{ring}, not a point):
+\textbf{$12.7^\circ \to 29.6^\circ$.}\\
+The missing mechanism was the pulley (t15--t24) & A free-floating strap is a column in compression
+the moment it contracts. \code{muscle\_sleeve} restores only the component \emph{perpendicular} to
+the local fibre, tapering to zero over the distal third --- Demer's active pulley, which is exactly
+a transverse constraint. Everything else held fixed, it raises the buckling ceiling from
+$\approx$0.25 to \textbf{between 0.28 (clean) and 0.32 (folds)}.\\
+\midrule
+\emph{and a material error} (t18) & The vitreous at $E=9$ is a shear modulus of 3.8 --- very nearly
+a fluid. The fixed-corotated law has no failure criterion, so under a hard tendon pull the interior
+flowed and \textbf{the globe came apart}. Interior raised to 45 / 130 against a 420 sclera: same
+$\approx9\times$ core-to-shell contrast, enough shear modulus \emph{everywhere} to hold together.\\
+\bottomrule
+\end{tabular}
+\normalsize
+
+\textbf{Working point} (t23/t25, the full 1830-frame programme): range $33.5/18.3/7.5^\circ$,
+shortening 24--31\% with no buckling, centroid drift 1.8\% of the globe radius,
+strain$_{99}$ 0.112, and the globe's own radius mean $-0.04\%$, worst $0.22\%$, roundness spread
+$0.86\%$. \emph{The eye deforms locally and holds its shape globally} --- which is the whole reason
+to use MPM here, and is now a number rather than a look at the movie.
+
+\textbf{Six of nine acceptance checks pass.} \code{reaches\_commands} fails (max settled error
+$17.1^\circ$); \code{wide\_gaze\_range} fails narrowly ($33.5^\circ$ against a $35^\circ$ bar); and
+\code{correct\_recruitment} fails \emph{on the atlas programme only}, at 14/26 --- that programme's
+26 holds include diagonal combinations for which no single muscle is ``the'' expected agonist, so a
+top-1 test is the wrong test there. On the four-hold probe programme it is 4/4 in every
+mechanically-stable trial. The real gap is the first one: the eye settles at roughly 60\% of a
+$25^\circ$ command, and everything from here is about that.
+\end{runbox}
+
+\textbf{A lesson about pictures.} The muscle truncation was made so the anatomy would \emph{render}
+well. It cost $17^\circ$ of gaze. A convenience taken for the figure was a mechanical error, and
+nothing in the pipeline would have caught it --- the movie looked better after the change.
+
+%======================================================================
+\section{Phase 1 --- Can an automatic instrument judge this?}
+
+Two were built. Both failed, and both failures are kept because they are the reason Phase~2 is
+shaped the way it is.
+
+\subsection{Phase 1a --- differentiable identification and gain tuning}
+
+\begin{phasebox}{Phase 1a --- define \hfill \dn}
+\textbf{Claim to test.} The gap between commanded and achieved gaze is a \emph{controller} problem,
+and gradient descent on the gains will close it.
+
+\textbf{Method, and why not the obvious one.} The engine can keep the tape
+(\code{run(\ldots, grad=True)}), but a rollout of 45k$+$13k material points $\times$ 25 substeps
+$\times$ hundreds of frames unrolls into a graph whose memory scales as points~$\times$~steps ---
+exactly the cost Plexus\,2 says makes a global loss impractical. \code{../inverse\_slime/} gets
+around it by refusing to roll out at all, so \code{tune\_gaze.py} does the same in two stages:
+identify $\ddot\theta = Bu - C\dot\theta - K\theta$ per axis by ridge least squares from an archived
+run, then run Adam on $(k_p,k_i,k_d,\text{gain},\text{tonic})$ over that differentiable surrogate,
+and verify back in the full simulation.
+
+\textbf{Success looks like} a surrogate that reproduces the run it was fitted to, and a tuned gain
+set that measurably improves tracking in the real simulation.
+\end{phasebox}
+
+\begin{runbox}{Phase 1a --- run \hfill the instrument failed its own check}
+\textbf{First the derivatives, not the model.} $R^2$ on $\ddot\theta$ came out 0.28--0.40.
+Differentiating a strided, noisy signal \emph{twice} amplifies its noise by $\sim h^{-2}$; reading
+the derivatives off a local Savitzky--Golay polynomial instead raised it to \textbf{0.48--0.72} with
+no change to the model at all.
+
+\textbf{Then the model.} Tuning still bought $1.008\times$. The first explanation offered --- ``the
+drive must be saturated'' --- was \emph{wrong}, and the tool's own diagnostic said so: the agonist
+sits above 0.98 on only 6\% of frames. So the surrogate was asked to reproduce the excursion the
+real eye actually made, under the gains it actually used:
+
+\begin{center}\small
+\begin{tabular}{@{}lccc@{}}
+\toprule
+peak excursion & horizontal & vertical & torsion \\
+\midrule
+real            & $17.0^\circ$ & $9.0^\circ$ & $2.8^\circ$ \\
+surrogate       & $\ \ 1.7^\circ$ & $3.0^\circ$ & $2.2^\circ$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{tcolorbox}[colback=bad!4,colframe=bad!45,boxrule=0.7pt,arc=2pt]
+\textbf{The instrument failed its own check, so the measurement was thrown away.} A good $R^2$ on
+$\ddot\theta$ certifies the \emph{transients}; the standing error we wanted to tune away lives in
+the steady state $\theta_{ss}=Bu/K$, and the fit misses the real excursion by a factor of ten in the
+horizontal. \code{tune\_gaze} now runs this fidelity test and \textbf{refuses to report a tuned
+number when it fails} --- the discipline Plexus\,2 puts first: verify the instrument before trusting
+the measurement.
+\end{tcolorbox}
+
+\textbf{Two defects in the method itself, admitted here because Phase 2 exists to fix them.}
+
+\begin{enumerate}
+\item \textbf{Closed-loop identification bias.} The fit was taken from a run \emph{with the
+controller closed}. In that data the input $u$ is a function of the state --- that is what feedback
+means --- so the regressor is correlated with the residual and least squares is biased. This is a
+textbook error and is very likely why $B/K$ predicted $1.7^\circ$ where the eye did $17^\circ$.
+\item \textbf{The saturation statistic was the wrong statistic.} ``6\% of frames'' was measured over
+\emph{all} frames, most of which are transitions or primary-position holds where the error is near
+zero. The number that matters is saturation \emph{of the agonist, during the settled tail of a
+hold}; with $k_p\,e = 0.11\times10^\circ$, times gain 1.9, clipped at 1.0, it is very likely pinned
+there. \textbf{So the conclusion ``the residual is mechanical, not control'' was not established.}
+It rested on a broken surrogate and a badly-chosen statistic, and this note previously stated it
+with more confidence than the evidence carried.
+\end{enumerate}
+\end{runbox}
+
+\subsection{Phase 1b --- the dynamics-watching critic}
+
+\begin{phasebox}{Phase 1b --- define \hfill \dn}
+Plexus\,2 names a \emph{dynamics-watching critic} as a required agent, on the grounds that a worker
+agent reads a static strip but cannot watch a movie. That is cheap to test here, so: show the local
+Gemma-4-12B captioner the anterior panel, cropped so that no axis label, legend or title can leak
+the answer, and ask what happens. \textbf{Success is the word ``rotating''.}
+\end{phasebox}
+
+\begin{runbox}{Phase 1b --- run \hfill it reads a rotating eye as static}
+\textbf{Whole 1830-frame run.} It read the anatomy well --- ``a large, light-grey circular ring'',
+``four small yellow clusters arranged symmetrically around the inner black core'', ``elongated
+appendages in blue, red, purple and green'', even the dashed cup outline --- and concluded:
+\emph{``The overall configuration remains static throughout the sequence of keyframes.''} It never
+used the word eye.
+
+That could have been a sampling artefact, since the programme returns to primary position between
+oscillation blocks and evenly-spaced keyframes may all land on one pose. So:
+
+\textbf{One excursion only} --- a 1.8\,s clip verified from the recorded trace to span
+$0 \to +14.8 \to -16.3^\circ$. This time it counted \emph{six} appendages correctly, and it did
+report a change --- the wrong one: \emph{``the color of the appendage on the right side shifts from
+a dark olive green to a bright yellow \ldots\ the other colored appendages remain relatively stable
+in their positions \ldots\ the central black void remains constant.''}
+
+\begin{tcolorbox}[colback=bad!4,colframe=bad!45,boxrule=0.7pt,arc=2pt]
+\textbf{The paper's claim, isolated.} The colour shift it caught is the medial rectus brightening
+with activation --- a cue encoded \emph{within} each frame. The $31^\circ$ rotation, encoded
+\emph{across} frames, it missed entirely, calling the pupil stationary while the pupil swept a third
+of the globe. The failure is not competence at seeing; it is competence at seeing \emph{change}. A
+keyframe caption pipeline is structurally unable to referee a rotation, and no prompt fixes it.
+Captions in \code{archive/vlm/}.
+\end{tcolorbox}
+
+Small irony worth keeping: the gold iridophore flecks exist \emph{because} a round pupil on a
+rotating sphere has almost no per-frame signature. The VLM saw the flecks and never tracked their
+angle.
+\end{runbox}
+
+%======================================================================
+\section{Phase 2 --- PID autotune by open-loop step injection}
+
+\begin{phasebox}{Phase 2 --- define \hfill \fl}
+\textbf{The question, stated so it can come out either way.} Is the standing gaze error a
+\emph{control} problem or a \emph{mechanical} one? Phase~1a asserted an answer with a broken
+instrument. This phase measures it.
+
+\textbf{Method --- the standard autotune, which is what Phase 1a should have been.} Open the loop
+and inject a step on \emph{one muscle at a time}:
+
+\begin{itemize}
+\item a new operator \code{muscle\_probe} writes activation from a prescribed waveform and ignores
+the gaze error entirely, so the input is no longer a function of the state and the
+closed-loop bias of Phase~1a is gone by construction;
+\item six runs, one per muscle: settle at tonic, step to $a_{hi}$, hold, release;
+\item each yields a 3-vector gaze response, so the six together give the full $3\times6$
+\textbf{static gain matrix} $G_{km} = \Delta\theta_{k,\infty}/\Delta a_m$ read straight off the
+plateau --- the quantity the acceleration fit had no way to see --- plus the rise time and
+overshoot per channel.
+\end{itemize}
+
+\textbf{Baseline: \code{archive/t03\_c\_a}}, loaded from its own \code{spec.yaml} rather than
+rebuilt, so the probe measures exactly the archived configuration. It is the right baseline because
+it is \emph{stable}: 4/4 recruitment, strain$_{99}$ 0.052, 17--27\% shortening, no buckling, no
+sleeve, $A=60$, $E=240$, and a modest $12.7^\circ$ range. A clean step response wants a
+well-behaved plant, not a strong one.
+
+\begin{tcolorbox}[colback=rule!5,colframe=rule!45,boxrule=0.7pt,arc=2pt]
+\textbf{The prediction, written down before the run.} Extrapolated to full activation, the lateral
+rectus static gain $\Delta\theta_{h,\infty}$ on \code{t03\_c\_a} will land in
+$\mathbf{8^\circ}$--$\mathbf{16^\circ}$ --- \emph{below} the $26^\circ$ it is being commanded to
+reach. If that holds, this configuration is mechanically incapable of the command and no PID retune
+can close the gap. \\[3pt]
+\textbf{The falsifier.} If $\Delta\theta_{h,\infty} \ge 26^\circ$, the plant has the authority and
+the loop is throwing it away --- the gap is control, Phase~1a's conclusion was wrong, and the
+autotune should recover most of it. \\[3pt]
+\textbf{Secondary prediction.} LR and MR will show a nearly pure direct-axis gain (off-axis
+$<15\%$), while SR, IR, SO and IO will show substantial cross-axis terms --- the same
+primary/secondary/tertiary structure the geometry already predicts, now measured in
+degrees-per-activation instead of as an axis direction.
+\end{tcolorbox}
+
+\textbf{Then, and only then, tune.} The identified model is a handful of numbers, so the gains come
+out in milliseconds --- no gradient through MPM needed. Two things to get right when it happens:
+the actuator saturates and the drive is rectified, so this is a \emph{Hammerstein} system (static
+nonlinearity then linear dynamics) and the nonlinearity must be fitted explicitly rather than
+absorbed into the linear part; and the integrator needs anti-windup, which \code{i\_clip} provides
+but which has never been exercised.
+
+\textbf{Where differentiability actually earns its keep.} Not here. The reduced plant is fitted, not
+differentiated. The tape is worth its cost for tuning the \emph{anatomy} --- insertion angles, arc
+of contact, pulley placement --- where there is no reduced model to fit. That is the more
+interesting inverse problem and it is untouched.
+\end{phasebox}
+
+\begin{runbox}{Phase 2 --- run \hfill \todo}
+Six step-response runs on \code{t03\_c\_a}, the static gain matrix, and the verdict on
+control-\emph{vs}-mechanics. Not yet run; this box is where the answer goes, including if it
+contradicts the prediction above.
+\end{runbox}
+
+%======================================================================
 \section{The one result worth defending}
 
 \textbf{No muscle action is tabulated anywhere in this prototype.} Each muscle's rotation axis is
-re-measured every frame from where its tissue actually is, as $\hat{\mathbf n}\times\hat{\mathbf
-u}$ (insertion radius $\times$ line of action), and \code{oculomotor\_drive} simply rectifies the
-projection of the desired rotation onto it --- Sherrington's law of reciprocal innervation, one
-line of code. So the textbook primary/secondary/tertiary actions have to \emph{emerge} from where
-each muscle inserts and where it pulls from. They do:
+re-measured every frame from where its tissue actually is, as $\hat{\mathbf n}\times\hat{\mathbf u}$
+(insertion radius $\times$ line of action), and \code{oculomotor\_drive} simply rectifies the
+projection of the desired rotation onto it --- Sherrington's law of reciprocal innervation, one line
+of code. So the textbook primary/secondary/tertiary actions have to \emph{emerge} from where each
+muscle inserts and where it pulls from. They do:
 
 \begin{center}\small
 \begin{tabular}{@{}llll@{}}
@@ -163,309 +427,88 @@ IO & $(-0.66,\ \ 0.18,\ -0.73)$ & extorsion $>$ elevation $>$ abduction & same o
 \end{tabular}
 \end{center}
 
-All six agree, in sign and in rank. The medial tilt of the orbital apex is what gives the
-vertical recti their torsional and horizontal components; a co-axial apex makes SR and IR pure
-elevators and depressors, which is anatomically wrong. Recruitment measured from the runs agrees
-with this table on 4 of 4 commands in every mechanically-stable trial.
+All six agree, in sign and in rank. The medial tilt of the orbital apex is what gives the vertical
+recti their torsional and horizontal components; a co-axial apex makes SR and IR pure elevators and
+depressors, which is anatomically wrong. Recruitment measured from the runs agrees with this table
+on 4 of 4 commands in every mechanically-stable trial of the probe programme. \emph{Not} on the
+atlas programme (14/26) --- but that is a defect of the test, not of the plant: half its holds are
+diagonal commands recruiting two muscles at once, against which a top-1 comparison is meaningless.
 
 \begin{tcolorbox}[colback=good!5,colframe=good!45,boxrule=0.7pt,arc=2pt]
-\textbf{Why this is worth more than a nice movie.} It is a falsifiable prediction that the
-geometry alone determines the actions, tested against a table nobody consulted while writing the
-code. It is also the Plexus point in miniature: the mechanism is in the operators and the
-anatomy, not in a lookup table inside a simulator.
+\textbf{Why this is worth more than a nice movie.} It is a falsifiable prediction that geometry
+alone determines the actions, tested against a table nobody consulted while writing the code. It is
+also the Plexus point in miniature: the mechanism is in the operators and the anatomy, not in a
+lookup table inside a simulator. Phase~2 sharpens it --- the same claim, in degrees per unit
+activation.
 \end{tcolorbox}
 
 %======================================================================
 \section{Two modelling decisions that are not obvious}
 
-\textbf{The globe stays the size it started.} Local deformation is the point of using MPM here;
-changing size or going out of round is not, and the difference is now measured rather than
-eyeballed. Each shell point's radius is tracked as a ratio to its own rest radius (shape-agnostic,
-since the globe is an ovoid): the mean says whether the eye is being squeezed or inflated, the
-spread whether it is still a smooth body of revolution. Over the full 1830-frame \code{atlas}
-run the mean moves by $-0.04\%$, the worst excursion is $0.22\%$ and the spread stays under
-$0.86\%$ --- while the strain at the tendon insertions reaches $0.11$. The eye deforms locally
-and holds its shape globally. Those terms are in \code{run\_eye.objective}, so a configuration
-cannot buy tracking accuracy by crushing the globe and have it read as an improvement.
-
 \textbf{The globe is an ovoid; the cup is a sphere.} Teleost eyes are flattened along the optic
 axis. The \code{mpm\_particle} entity can only seed a uniform ball, so the rest configuration is
-that ball affinely squashed, $z\to kz$ with $k=0.82$. An affine image of a uniform ball is a
-uniform ellipsoid, so density stays uniform, and because this is an \emph{initial condition} and
-not a deformation, $F$ stays the identity --- the ovoid is undeformed and carries no residual
-stress. The bony cup, by contrast, stays spherical with a radius just above the equatorial
-semi-axis: an ovoid cannot rotate inside a socket that matches it, and in the animal the gap is
-filled by orbital fat, not bone.
+that ball affinely squashed, $z\to kz$ with $k=0.82$. An affine image of a uniform ball is a uniform
+ellipsoid, so density stays uniform, and because this is an \emph{initial condition} and not a
+deformation, $F$ stays the identity --- the ovoid is undeformed and carries no residual stress. The
+bony cup stays spherical with a radius just above the equatorial semi-axis: an ovoid cannot rotate
+inside a socket that matches it, and in the animal the gap is filled by orbital fat, not bone.
 
-\textbf{The fat exerts no torque.} The retrobulbar fat pad is modelled as a restoring force
-toward the socket centre applied \emph{uniformly} to every point of the globe. A uniform body
-force produces no torque about the centroid, so the fat recentres the eye without ever resisting
-gaze --- which is exactly the division of labour the anatomy has. Without it, the residual normal
-component of muscle tension slowly walks the globe around inside the cup.
+\textbf{The fat exerts no torque.} The retrobulbar fat pad is a restoring force toward the socket
+centre applied \emph{uniformly} to every point of the globe. A uniform body force produces no torque
+about the centroid, so the fat recentres the eye without ever resisting gaze --- exactly the division
+of labour the anatomy has. Without it, the residual normal component of muscle tension slowly walks
+the globe around inside the cup.
 
-%======================================================================
-\section{The four things that went wrong, and what each one taught}
-
-Eleven archived trials, each with its own \code{spec.yaml}, \code{movie.mp4} and \code{diag.json}.
-The interesting content is the failures.
-
-\begin{phasebox}{1. Raising active stress alone (t02) --- the muscles ate themselves}
-At $A/E = 0.8$ the straps shortened by 88\% and crushed the globe (strain $\gg 1$). A muscle
-shortens until its passive tension balances its active stress, so the \emph{steady shortening is
-set by $A/E$ alone}, while the \emph{force} it delivers is $A\times$cross-section. Raising $A$
-without raising $E$ only buys collapse. \textbf{Lesson: $A$ and $E$ are not independent knobs.}
-\end{phasebox}
-
-\begin{phasebox}{2. Coupling them (t03--t04) --- a buckling cliff, and a new ceiling}
-Held at $A/E=0.25$ everything is well behaved: 20--27\% shortening, 4/4 correct recruitment,
-2--5\% strain, negligible drift. At $A/E=0.30$ it collapses again --- so the limit is a
-\emph{buckling} cliff, not a smooth trade-off. But the well-behaved regime capped the eye at
-$11^\circ$. \textbf{Lesson: a stiff passive element buys stability by making the antagonist so
-stiff that it eats most of the agonist's force.}
-\end{phasebox}
-
-\begin{phasebox}{3. Geometry (t06--t08) --- length is what buys gaze}
-For a muscle pulling a globe against its antagonist, $\theta_{\max}\sim (A/E)\times(L/R)$. An
-earlier convenience --- truncating each muscle to 55\% of its path so the four recti would not
-project onto one blob --- had left the recti at $L/R=2.3$ and the obliques at 1.15, against
-$\approx 3.3$ in a real orbit. Restoring the length, spreading the rectus origins around the
-\emph{annulus of Zinn} (a ring, not a point) and widening the sclera stand-off took horizontal
-range from $12.7^\circ$ to $29.6^\circ$ with recruitment still 4/4. \textbf{Lesson: the
-convenience taken for the picture was also a mechanical error.}
-\end{phasebox}
-
-\begin{phasebox}{4. The force--length relation (t09--t16) --- the passive element was backwards}
-Real muscle is passively \emph{soft} and limits its own shortening through the force--length
-relation, not through a stiff passive element. Switching on
-$T = A\,a\,(1+\beta(\lambda-1))$ means a muscle stops pulling once it has shortened by $1/\beta$,
-so $E$ can drop far below $A$ and the antagonist gets out of the way: horizontal range jumped to
-$52^\circ$ and torsion to $13.7^\circ$. But a soft, slender strap then \emph{buckles} --- it folds
-up, losing 60\% of its centreline length while the fibre stretch stays near $0.75$, so the
-limiter never engages. The fixes are what the real plant does: a chunkier cross-section (bending
-stiffness goes as $wh^3$) and genuine tonic co-contraction, which keeps every muscle in tension
-and is precisely why extraocular motoneurons fire at high rates even in primary position.
-\textbf{Lesson: two different instabilities, and only one of them was the one being fixed.}
-\end{phasebox}
-
-\begin{phasebox}{5. The orbital pulley (t15--t22) --- the mechanism that was actually missing}
-A free-floating strap is a column in compression the moment it contracts, and the fix is not
-numerical: every extraocular muscle passes through a sleeve of collagen and smooth muscle fixed
-to the orbital wall (Demer's active-pulley hypothesis), and that sleeve is exactly a
-\emph{transverse} constraint --- it fixes where the path runs without resisting how much the
-muscle shortens. \code{muscle\_sleeve} applies a restoring force to only the component of
-displacement perpendicular to the local fibre, tapering to zero over the distal third so the
-tendon end stays free to follow the rotating globe. Held at everything else constant, it raises
-the $A/E$ buckling ceiling from $\approx0.25$ to between $0.28$ and $0.38$ --- $A/E=0.28$ runs
-clean (20--30\% shortening, finite, strain $0.051$), $A/E=0.38$ still folds.
-\end{phasebox}
-
-\begin{phasebox}{6. The globe came apart (t18) --- absolute stiffness, not just contrast}
-Under the strongest drives the globe stopped being a globe. The vitreous had been set at
-$E=9$, a shear modulus of $3.8$ --- very nearly a fluid. The fixed-corotated law has no failure
-criterion, so under a hard tendon pull the interior simply flowed and the shell separated from
-it. Raising the interior to $E=45$ (vitreous) and $130$ (choroid) against a $420$ sclera keeps
-the $\approx 9\times$ core-to-shell contrast the strain panel is there to show, while giving
-every region enough shear modulus to hold together. \textbf{Lesson: ``deformable'' is a
-statement about the ratio; ``stays in one piece'' is a statement about the absolute value.}
-\end{phasebox}
-
-\subsection{The trial ledger}
-
-\begin{center}\small
-\begin{tabular}{@{}lrrrlrrl@{}}
-\toprule
-\textbf{trial} & $A$ & $E$ & $\beta$ & \textbf{range h/v/t (deg)} & \textbf{short\%} & \textbf{strain$_{99}$} & \textbf{recruit} \\
-\midrule
-t02 viz\_fix   &  48 &  60 & --  & 22.1 / 12.2 / 4.8   & 88.6 & 1.277 & 2/4 \\
-t03 c\_a       &  60 & 240 & --  & 12.7 / \ 5.3 / 1.7  & 27.4 & 0.052 & 4/4 \\
-t04 c\_b       &  90 & 300 & --  & \multicolumn{1}{l}{blew up} & 90.5 & 1.381 & 2/4 \\
-t06 c\_long    &  55 & 250 & --  & 26.9 / 11.0 / 3.7   & 24.3 & 0.038 & 4/4 \\
-t07 c\_longer  &  55 & 250 & --  & 29.6 / 11.6 / 4.6   & 23.9 & 0.038 & 4/4 \\
-t08 c\_wide    &  55 & 250 & --  & 29.2 / 11.2 / 4.3   & 23.8 & 0.059 & 3/4 \\
-t09 v\_fl      & 130 &  55 & 4.0 & 52.1 / \ 7.7 / 13.7 & 61.6 & 1.067 & 2/4 \\
-t11 v\_tone    & 115 & 110 & 4.0 & 31.9 / 29.3 / 38.9  & 75.1 & 1.679 & 0/4 \\
-t15 s\_a (sleeve) &  90 & 150 & 3.0 & 22.8 / 33.9 / \ 9.4 & 56.5 & 1.684 & 3/4 \\
-t18 q\_b       & 120 & 190 & 3.0 & \multicolumn{1}{l}{globe came apart} & 54.6 & NaN & 0/4 \\
-\midrule
-\textbf{t21 r\_sleeve70} & \textbf{70} & \textbf{250} & -- & \textbf{33.2 / 10.1 / \ 4.2} & \textbf{30.2} & \textbf{0.051} & \textbf{3/4} \\
-t22 r\_sleeve95 &  95 & 250 & --  & \multicolumn{1}{l}{buckled, NaN} & 73.6 & NaN & 1/4 \\
-t24 r\_sleeve80 &  80 & 250 & --  & \multicolumn{1}{l}{buckled, NaN} & 63.2 & NaN & 2/4 \\
-\midrule
-\textbf{t23/t25 atlas} & \textbf{70} & \textbf{250} & -- & \textbf{33.5 / 18.3 / \ 7.5} & \textbf{30.9} & \textbf{0.112} & \textbf{14/26} \\
-\multicolumn{8}{@{}l}{\footnotesize\color{grey}\quad t25 adds the radius instrumentation: mean $-0.04\%$, worst $0.22\%$, roundness spread $0.86\%$; objective 6.0.} \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\small\color{grey}
-$A$ peak active stress, $E$ muscle Young's modulus, $\beta$ force--length slope. ``short\%'' is
-peak centreline shortening --- above $\sim$38\% it is buckling, not contraction. From t21 the
-\code{muscle\_sleeve} pulley is present and the globe interior is the stiffened one; t21 is the
-working point the final runs use. Its settled tracking error is $7.3/3.4/2.9^\circ$ in
-horizontal / vertical / torsion, against $10$--$20^\circ$ for every earlier configuration. t24
-places the pulley's ceiling between $A/E=0.28$ (clean) and $0.32$ (folds). \textbf{t23} is the
-full 1830-frame \code{atlas} program at that working point --- 70k globe points, 15.6k muscle
-points, 459 rendered frames --- and is the movie to watch: the globe is intact from first frame
-to last, and the recruitment column is a harsher test there because 26 holds include the
-diagonal combinations, where no single muscle is ``the'' expected agonist.
-\color{black}\normalsize
-
-%======================================================================
-\section{Gradient descent on the controller --- and why it was refused}
-
-\code{tune\_gaze.py} follows \code{inverse\_slime}: differentiating the MPM rollout is exactly
-the cost Plexus\,2 warns about (memory scales as points $\times$ steps), so it never rolls out.
-It identifies a reduced plant --- $\ddot\theta = Bu - C\dot\theta - K\theta$ per axis, with
-$u=\sum_m a_m \hat{\mathbf a}_m$ read straight from the archived run --- by one ridge
-least-squares fit, then runs Adam on $(k_p,k_i,k_d,\text{gain},\text{tonic})$ over that
-differentiable surrogate.
-
-It works mechanically, and the answer is negative, twice over.
-
-\textbf{First the derivatives were the problem, not the model.} The initial fit gave
-$R^2 = 0.28$--$0.40$ on $\ddot\theta$. Differentiating a strided, noisy signal twice amplifies
-its noise by $\sim h^{-2}$; reading the derivatives off a local Savitzky--Golay polynomial
-instead raised it to $0.48$--$0.72$ with no change to the model.
-
-\textbf{Then the model was the problem.} Tuning still bought $1.008\times$. The first
-explanation offered --- ``the drive must be saturated'' --- was wrong, and the tool's own
-diagnostic said so: the agonist sits above $0.98$ on only 6\% of frames. So the surrogate was
-asked to reproduce the excursion the real eye actually made, under the gains it actually used:
-
-\begin{center}\small
-\begin{tabular}{@{}lccc@{}}
-\toprule
-peak excursion & horizontal & vertical & torsion \\
-\midrule
-real            & $17.0^\circ$ & $9.0^\circ$ & $2.8^\circ$ \\
-surrogate       & $\ \ 1.7^\circ$ & $3.0^\circ$ & $2.2^\circ$ \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\begin{tcolorbox}[colback=bad!4,colframe=bad!45,boxrule=0.7pt,arc=2pt]
-\textbf{The instrument failed its own check, so the measurement was thrown away.} A good $R^2$
-on $\ddot\theta$ certifies the \emph{transients}; the standing error we wanted to tune away
-lives in the steady state $\theta_{ss}=Bu/K$, and the fit misses the real excursion by a factor
-of ten in the horizontal. Tuning gains on it would be optimising against a model that disagrees
-with the thing it is a model of. \code{tune\_gaze} now runs this fidelity test and refuses to
-report a tuned number when it fails --- which is the discipline the Plexus\,2 paper puts first:
-verify the instrument before trusting the measurement.
-\end{tcolorbox}
-
-The fix is known and not yet done: excite the plant with a frequency sweep rather than a
-staircase, and fit the steady state explicitly instead of hoping it falls out of an
-acceleration fit.
+\textbf{Both ends of every muscle are fixed, by two different mechanisms.} The origin cap is pinned
+explicitly by \code{bone\_anchor}, a penalty force toward its frame-0 rest positions. The insertion
+is pinned by nothing: the tendon cap is given a \emph{negative} stand-off so it overlaps the sclera,
+and points that share a B-spline stencil node share one grid velocity --- a no-slip weld, for free.
+The honest caveat is that this weld is resolution-dependent and \emph{cannot slip}, whereas a real
+tendon slides in its sheath. That is why the bellies are held about five cells clear of the globe;
+otherwise the whole arc of contact would weld and freeze the rotation.
 
 %======================================================================
 \section{The movie}
 
-Eight panels, black ground, lower-case labels, one shared time cursor.
+Eight panels, black ground, lower-case parenthesised labels, one shared time cursor.
 
 \begin{center}\small
-\begin{tabular}{@{}llp{8.6cm}@{}}
+\begin{tabular}{@{}llp{8.4cm}@{}}
 \toprule
-\textbf{a} & anterior view & the cosmetic eye --- white sclera, silvery iris, large black pupil, gold iridophore flecks, after the reference photograph --- with the six muscles as their own material points, brightening with activation \\
-\textbf{b} & lateral view & the ovoid profile in the bony cup, the obliques, the trochlea \\
-\textbf{c} & strain & Green--Lagrange $\|E\|$ on a cut through globe \emph{and} muscles \\
-\textbf{d} & stress & von Mises on the same cut \\
-\textbf{e} & grid momentum & $|v|$ on the shared MLS-MPM grid --- the medium through which a contracting muscle actually reaches the sclera \\
-\textbf{f} & activation & the six innervations against time \\
-\textbf{g} & length & each muscle as \% of its rest length --- the contraction, measured \\
-\textbf{h} & gaze & horizontal / vertical / torsion against the command \\
+a) & anterior view & the cosmetic eye --- white sclera, silvery iris, large black pupil, gold iridophore flecks, after the reference photograph --- with the six muscles as their own material points, brightening with activation \\
+b) & lateral view & the ovoid profile in the bony cup, the obliques, the trochlea \\
+c) & strain & Green--Lagrange $\|E\|$ on a cut through globe \emph{and} muscles \\
+d) & stress & von Mises on the same cut \\
+e) & grid momentum & $|v|$ on the shared MLS-MPM grid --- the medium through which a contracting muscle reaches the sclera \\
+f) & activation & the six innervations against time \\
+g) & length & each muscle as \% of rest, with \textbf{the globe's own radius} on the same axis: the muscles shorten, the eye must not \\
+h) & gaze & horizontal / vertical / torsion against command, with the tracking error and its running mean, and the per-axis RMS printed \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-Panels c--e follow the codebase's \code{grid.mp4} diagnostic, extended to two coupled bodies.
-Two rendering notes that are not cosmetic: the far hemisphere is culled, so the eye reads as a
-lit solid rather than a point cloud; and muscle points that fall inside the globe's exact
-orthographic silhouette \emph{and} behind its centre are hidden, because a depth-sorted scatter
-alone lets a muscle show through the gaps between globe particles --- most visibly straight
-across the black pupil. \textbf{The gold flecks are load-bearing:} a round pupil shows no
-torsion, so the iridophore specks are what make the roll visible at all.
+Panels c--e follow the codebase's \code{grid.mp4} diagnostic, extended to two coupled bodies. Two
+rendering notes that are not cosmetic: the far hemisphere is culled, so the eye reads as a lit solid
+rather than a point cloud; and muscle points falling inside the globe's exact orthographic
+silhouette \emph{and} behind its centre are hidden, because a depth-sorted scatter alone lets a
+muscle show through the gaps between globe particles --- most visibly straight across the black
+pupil.
 
 %======================================================================
-\section{The dynamics-watching critic, tested --- and it fails}
+\section{What is deliberately not done}
 
-Plexus\,2 names a ``dynamics-watching critic'' as a \emph{required} agent, on the grounds that a
-worker agent reads a static strip but cannot watch a movie. That is cheap to test here, so it
-was tested: the local Gemma-4-12B captioner was shown the anterior panel of the atlas run,
-cropped so no axis label, no legend and no title could give the answer away, and asked what
-happens.
-
-\textbf{First attempt, the whole 1830-frame run.} It read the anatomy well --- ``a large,
-light-grey circular ring'', ``four small yellow clusters arranged symmetrically around the inner
-black core'', ``elongated appendages in blue, red, purple and green'', even the dashed cup
-outline --- and then concluded: \emph{``The overall configuration remains static throughout the
-sequence of keyframes.''} It never used the word eye.
-
-That could have been a sampling artefact: the captioner takes evenly-spaced keyframes, and the
-programme returns to primary position between oscillation blocks, so the samples may all have
-landed on the same pose.
-
-\textbf{Second attempt, one excursion only.} A 1.8\,s clip over a single abduction--adduction
-swing, verified from the recorded trace to span $0 \to +14.8 \to -16.3^\circ$. This time it
-counted \emph{six} appendages correctly, and it did report a change --- the wrong one:
-
-\begin{quote}
-``Over time, the color of the appendage on the right side shifts from a dark olive green to a
-bright yellow. The other colored appendages \ldots\ remain relatively stable in their positions
-and colors. The internal speckled pattern and the central black void remain constant throughout
-the sequence.''
-\end{quote}
-
-The colour shift it caught is the medial rectus brightening with activation --- a cue encoded
-\emph{within} each frame. The $31^\circ$ rotation, encoded \emph{across} frames, it did not see
-at all, and it declared the pupil stationary while the pupil was sweeping across a third of the
-globe.
-
-\begin{tcolorbox}[colback=bad!4,colframe=bad!45,boxrule=0.7pt,arc=2pt]
-\textbf{This is the paper's claim, isolated.} The failure is not competence at seeing --- the
-model got the anatomy right, counted the muscles right, and picked up an activation cue we
-deliberately encoded as colour. It is competence at seeing \emph{change}: what a per-frame
-description can carry, it carried; what only a comparison between frames can carry, it lost.
-A caption pipeline built on keyframes is structurally unable to referee a rotation, and no
-prompt fixes that. Captions saved in \code{archive/vlm/}.
-\end{tcolorbox}
-
-Two consequences for this prototype. The gold iridophore flecks were added precisely because a
-round pupil on a rotating sphere has almost no per-frame signature --- the flecks are the only
-thing that makes torsion visible at all --- and the VLM saw the flecks but never tracked their
-angle. And the acceptance test in \code{run\_eye.verdict} is doing exactly the job the critic
-could not: the rotation is refereed by the Kabsch fit and the tracking metrics, in numbers.
-
-%======================================================================
-\section{Where it stands, and what is next}
-
-\textbf{Settled.} The decomposition into sets; the emergent muscle-action table; the two-body
-grid coupling via a new \emph{implementation} of an existing contract; the deformable ovoid in a
-spherical cup with a torque-free fat suspension; the orbital pulley and the $A/E$ ceiling it
-raises ($0.28$ clean, $0.32$ folds); the globe radius as a metric, an acceptance check and a
-term in the objective, so ``it hit the angle'' can no longer be bought by crushing the eye; and
-the archive discipline --- twenty-five trials, each keeping its own spec, movie and numbers.
-
-\textbf{Open.} Reaching the commanded angle rather than about 60\% of it. Six rounds each found a real mechanism and a real ceiling, and the
-configuration that survives all of them (t21) is stable, holds together, contracts realistically
-and tracks three times better than anything before it --- but it still settles at roughly 60\% of
-a $25^\circ$ command. The remaining authority has to come from the pulley ceiling, which is known
-to lie between $A/E=0.28$ and $0.38$ and has not been bisected. The acceptance test is written and
-automatic: reaches its commands within $6^\circ$, torsion above $6^\circ$, horizontal above
-$35^\circ$, recruitment 4/4, centroid drift below 6\% of the globe radius, globe strain between
-0.4\% and 12\%, and peak shortening between 4\% and 38\%.
-
-\textbf{Worth doing next, in order.}
-\begin{enumerate}
-\item Finish the working point, then render the long \code{atlas} program (each antagonist pair
-driven back and forth three times) and the zebrafish \code{okr} program at movie resolution.
-\item Give the dynamics-watching critic something it can actually use: a difference or
-optical-flow strip rather than raw keyframes, and re-run the test of \S7. The hypothesis is
-explicit --- if the change is moved into the per-frame appearance, a per-frame captioner can
-report it --- and it is falsifiable in one afternoon.
-\item Repair the surrogate identification (\S6): sweep excitation, explicit steady-state fit.
-Only then is controller tuning a question worth asking.
-\item A real inverse pass: given only the observed gaze trace, recover the six insertion
-geometries. Loop~II on a system whose ground truth we wrote down ourselves.
-\end{enumerate}
+\begin{itemize}
+\item \textbf{No promotion.} Eleven contracts and one implementation sit in \code{prototype/}.
+Plexus\,2 requires evidence of reuse beyond the originating prototype first, and only
+\code{muscle\_sleeve} and \code{mpm\_scatter}\,[\code{accumulate}] look plausibly general.
+\item \textbf{\code{muscle\_traction} and \code{muscle\_insertion} are dead code, kept.} They are
+the \emph{first} version --- a line of action with a body force at the insertion. This note argues
+against them, and the argument should be checkable.
+\item \textbf{The integral term is implemented but off by default.} It is the oculomotor neural
+integrator and it is correct biology, but it was introduced in the same run as two other changes and
+contributed to a divergence. It has not been isolated since, and Phase~2 is where it should be.
+\item \textbf{No inverse pass on the anatomy.} Recovering the six insertion geometries from a gaze
+trace is the interesting Loop~II question here, and it is untouched.
+\end{itemize}
 
 \end{document}
