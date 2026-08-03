@@ -1,6 +1,14 @@
 {
  "verdict": "invalid",
+ "verdict_this_run": "invalid",
  "premises": [
+  {
+   "premise": "0. every declared premise has a check",
+   "grade": "certain",
+   "pass": true,
+   "skipped": false,
+   "detail": "8 declared, 8 implemented"
+  },
   {
    "premise": "2. bounds are declared, not hidden",
    "grade": "usual",
@@ -30,18 +38,18 @@
    "detail": "0.48 Hz, quiescent 52% of the record, gaps [49, 50, 51, 52] (mean 50.5)"
   },
   {
-   "premise": "canary: rail check refuses a fit pinned to its upper bound",
-   "grade": "certain",
-   "pass": true,
-   "skipped": false,
-   "detail": "RAILS: raw_g=2.5 at 100.0% of [0.1,2.5]"
-  },
-  {
    "premise": "canary: rail check refuses a fit in the middle of its range",
    "grade": "certain",
    "pass": true,
    "skipped": false,
    "detail": "none on a bound"
+  },
+  {
+   "premise": "canary: rail check refuses a fit pinned to its upper bound",
+   "grade": "certain",
+   "pass": true,
+   "skipped": false,
+   "detail": "RAILS: raw_g=2.5 at 100.0% of [0.1,2.5]"
   }
  ]
 }

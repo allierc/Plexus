@@ -74,6 +74,21 @@
    "check": "the belief register is EMPTY",
    "pass": true,
    "detail": "0 entries"
+  },
+  {
+   "check": "the belief register is within its length cap",
+   "pass": true,
+   "detail": "38/120 lines"
+  },
+  {
+   "check": "the retraction sink exists",
+   "pass": true,
+   "detail": "present"
+  },
+  {
+   "check": "every belief row carries its evidence columns",
+   "pass": true,
+   "detail": "n/a (register empty)"
   }
  ],
  "pass": true

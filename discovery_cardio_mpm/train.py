@@ -51,7 +51,8 @@ import data as D                                    # ONE explicit path, no fall
 # accepted. That claim is an open question in HYPOTHESES.md like every other.
 import harmonic_inherited as HARM                    # UNCERTIFIED ruler -- Phase 2 replaces it
 import determinism as DET                            # fix the dice, after every import
-import provenance as PROV                            # a run carries its own source                       # morphology-aligned loop loss (--loss harmonic)
+import provenance as PROV                            # a run carries its own source
+import descriptors as DESC                           # Track B's measurement (real-referenced)                       # morphology-aligned loop loss (--loss harmonic)
 
 # Arithmetic settings are NOT set here. The inherited file set them at module scope --
 # use_deterministic_algorithms(False), TF32 on, cudnn.benchmark on -- which silently overrode
@@ -992,7 +993,16 @@ def main():
                          f"  direction  chir_match={enc['chir_match']:.3f}|1.000|{enc['chir_match']:.3f}\n"
                          f"  shape      minor_axis={enc['minor_sim']:.3f}|{enc['minor_real']:.3f}|{enc['minor_ratio']:.3f}\n"
                          # legacy sim-only fields retained for back-compat parsing (MAGNITUDE only, NOT loop quality):
-                         f"legacy_simonly: open={op_:.3f} chir+={chir_:.2f} size={size_:.2e}")
+                         f"legacy_simonly: open={op_:.3f} chir+={chir_:.2f} size={size_:.2e}\n"
+                         # TRACK B. The instrument the campaign is actually judged by, written into
+                         # the run's own record. It was not, for the whole of Phase 1: descriptors.py
+                         # existed, had a self-test, produced every Phase-1 number -- and was imported
+                         # by three analysis scripts and by no fit. An external audit found it, and it
+                         # is the same defect okuda spent a day on: an instrument that existed, was
+                         # certified, and never reached the summary.
+                         + DESC.format_row(DESC.loop_residual(
+                             _sim_np, real_d.detach().cpu().numpy(),
+                             mov.detach().cpu().numpy(), K=args.harm_K)))
     _hm, _hsd = HARM.harmonic_stats(sim_d, real_d, mov, K=args.harm_K)
     print(f"  done -> {outdir}  (R2={1 - r2_loss.item():+.3f} LS={_hm:+.3f} LS_SD={_hsd:.3f} objective={args.loss})", flush=True)
 

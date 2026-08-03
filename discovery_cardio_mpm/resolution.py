@@ -176,12 +176,31 @@ def main(argv=None):
             errors[v["label"]] = err
             print(f"    FAILED: {err}", flush=True)
 
-    out = {"ladder": ladder, "errors": errors}
+    # Score EVERY dump that survives on disk, not just the ones this invocation ran -- and MERGE
+    # rather than overwrite. The first version wrote the whole file each time, so running the
+    # ladder with `--only` erased the rows the note was citing. The artefact stopped matching the
+    # document, and the document was the stronger of the two: exactly the defect this campaign
+    # keeps finding in other people's code.
+    for v in LADDER:
+        d = os.path.join(WORK, f"{v['label']}.npz")
+        if v["label"] not in dumps and os.path.exists(d):
+            dumps[v["label"]] = d
+    out = {"ladder": LADDER, "errors": errors}
     if "inherited" in dumps and len(dumps) > 1:
         out["rows"] = compare(dumps)
     else:
         print("[resolution] not enough variants completed to compare")
-    json.dump(out, open(os.path.join(HERE, "_metrology", "resolution.json"), "w"), indent=1)
+    path = os.path.join(HERE, "_metrology", "resolution.json")
+    if os.path.exists(path):
+        try:
+            prev = json.load(open(path))
+            keep = {r["label"]: r for r in (prev.get("rows") or [])}
+            for r in out.get("rows", []):
+                keep[r["label"]] = r
+            out["rows"] = [keep[k] for k in sorted(keep)]
+        except Exception:
+            pass
+    json.dump(out, open(path, "w"), indent=1)
     return 0 if not errors else 1
 
 
