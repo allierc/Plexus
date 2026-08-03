@@ -1,0 +1,14 @@
+{
+ "params": 198407,
+ "bit_identical": true,
+ "max_abs": 0.0,
+ "removed_operators": [
+  "pacemaker",
+  "activation_pulse",
+  "aggregate",
+  "apply_material_map"
+ ],
+ "why": "the trainer replaces them deliberately: activation comes from a LEARNABLE pulse and the material maps are set by set_maps. Removing them from the recipe changes the DESCRIPTION, not the model -- proved here rather than asserted.",
+ "progress_generation": "it=1/2 R2=-11.207 LS=-0.570 LS_SD=0.593 loss=59.172 ampL=0.025 tw=0 rot=0.00 dur=8.0 amp=10.0 drag=30.0 objective=harmonic",
+ "progress_fitting": "it=1/2 R2=-11.207 LS=-0.570 LS_SD=0.593 loss=59.172 ampL=0.025 tw=0 rot=0.00 dur=8.0 amp=10.0 drag=30.0 objective=harmonic"
+}

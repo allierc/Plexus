@@ -27,7 +27,7 @@ Run:
     --amplitude 10 --drag_k 30 --dur0 50 --lr 1e-3 --n_iter 300
 """
 from __future__ import annotations
-import os, sys, argparse, glob
+import os, sys, argparse, glob, time
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "src"))
 sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "cardio"))
@@ -51,7 +51,8 @@ import data as D                                    # ONE explicit path, no fall
 # accepted. That claim is an open question in HYPOTHESES.md like every other.
 import harmonic_inherited as HARM                    # UNCERTIFIED ruler -- Phase 2 replaces it
 import determinism as DET                            # fix the dice, after every import
-import provenance as PROV                            # a run carries its own source                       # morphology-aligned loop loss (--loss harmonic)
+import provenance as PROV                            # a run carries its own source
+import descriptors as DESC                           # Track B's measurement (real-referenced)                       # morphology-aligned loop loss (--loss harmonic)
 
 # Arithmetic settings are NOT set here. The inherited file set them at module scope --
 # use_deterministic_algorithms(False), TF32 on, cudnn.benchmark on -- which silently overrode
@@ -819,6 +820,8 @@ def main():
     canon_dom = D.DOM_LO + D.DOM * _pos0[select_grid_nodes(10, 10, side=_side) if "side" in select_grid_nodes.__code__.co_varnames else select_grid_nodes(10, 10)]
     idx = cKDTree(rest.cpu().numpy()).query(canon_dom)[1]
 
+    _n_nonfinite = [0]
+    _t_start = time.time()
     start_iter = 0
     if args.resume:
         ckpt_dir = os.path.join(outdir, "checkpoints")
@@ -940,6 +943,10 @@ def main():
         if torch.isfinite(gnorm):
             opt.step()
         else:
+            # COUNTED, not silently swallowed. Before this, a fit that discarded most of its steps
+            # was indistinguishable on disk from a healthy one -- the optimiser simply did less
+            # than the iteration count said, and nothing recorded it.
+            _n_nonfinite[0] += 1
             opt.zero_grad()
         r2 = 1 - r2_loss.item()                                        # harm_r2/harm_sd set in the loss block (always real)
         pbar.set_postfix_str(f"R2={r2:+.3f} LS={harm_r2:+.3f}±{harm_sd:.3f} ampL={amp_loss.item():.2f} dur={dur.item():.1f} "
@@ -992,9 +999,26 @@ def main():
                          f"  direction  chir_match={enc['chir_match']:.3f}|1.000|{enc['chir_match']:.3f}\n"
                          f"  shape      minor_axis={enc['minor_sim']:.3f}|{enc['minor_real']:.3f}|{enc['minor_ratio']:.3f}\n"
                          # legacy sim-only fields retained for back-compat parsing (MAGNITUDE only, NOT loop quality):
-                         f"legacy_simonly: open={op_:.3f} chir+={chir_:.2f} size={size_:.2e}")
+                         f"legacy_simonly: open={op_:.3f} chir+={chir_:.2f} size={size_:.2e}\n"
+                         # TRACK B. The instrument the campaign is actually judged by, written into
+                         # the run's own record. It was not, for the whole of Phase 1: descriptors.py
+                         # existed, had a self-test, produced every Phase-1 number -- and was imported
+                         # by three analysis scripts and by no fit. An external audit found it, and it
+                         # is the same defect okuda spent a day on: an instrument that existed, was
+                         # certified, and never reached the summary.
+                         + DESC.format_row(DESC.loop_residual(
+                             _sim_np, real_d.detach().cpu().numpy(),
+                             mov.detach().cpu().numpy(), K=args.harm_K)))
     _hm, _hsd = HARM.harmonic_stats(sim_d, real_d, mov, K=args.harm_K)
-    print(f"  done -> {outdir}  (R2={1 - r2_loss.item():+.3f} LS={_hm:+.3f} LS_SD={_hsd:.3f} objective={args.loss})", flush=True)
+    # A run must be able to say whether it FINISHED, and how much of it was real. `write_manifest`
+    # records what a run started from; nothing recorded what it ended at, so a crashed fit, a
+    # wall-clock kill and a clean finish were the same three files on disk.
+    PROV.finish(outdir, status="complete", iterations=int(args.n_iter),
+                wall_s=time.time() - _t_start, n_nonfinite_steps=int(_n_nonfinite[0]),
+                final={"R2": float(1 - r2_loss.item()), "LS": float(_hm), "LS_SD": float(_hsd),
+                       "objective": args.loss})
+    print(f"  done -> {outdir}  (R2={1 - r2_loss.item():+.3f} LS={_hm:+.3f} LS_SD={_hsd:.3f} "
+          f"objective={args.loss} steps_discarded={_n_nonfinite[0]}/{args.n_iter})", flush=True)
 
 
 if __name__ == "__main__":

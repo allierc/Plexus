@@ -76,10 +76,12 @@ Every number below was measured in this folder, not inherited.
 | **the tracker** (one condition-signature: same specimen, same movie, same algorithm pair — the four beats are repetition, not corroboration) | two trackings of one movie: **0.996** in time, **0.27–0.29 / −0.06** in space at every beat peak, smoothing and axis conventions tested. As a model of each other: circulation right **50%** of the time, orientation error 0.77 rad (random = 0.79), LoopScore **−0.53** |
 | the corpus | 71 MPM runs, 45 GB, intact in `graphs_data/material` — `log/material/` holds only the recipe |
 | corpus reproducibility | **7 of 10 active-traction specs would not run**; all 8 migrate and load |
-| **temporal integration** | converged: substeps 5/10/20 agree to **0.8%** — *once frame-dt is held fixed* |
+| **temporal integration** | converged, checked on **two** backgrounds: substeps 5/10/20 agree to 0.8% at n_grid=128 and 3.7% at n_grid=192 — once frame-dt is held fixed. Weakens as the grid refines (dx–dt coupling) but stays >10× below the 56% spatial swing |
 | **`--substeps` is not a numerics knob** | it multiplies `dt_sub` to give the frame duration; varying it alone moves enclosed area **2.2×**. The inherited `10` is a claim about the tissue's timescale |
 | **spatial discretisation** | **NOT converged.** Enclosure follows particles-per-cell monotonically over **1.56×** across two independent knobs, no plateau. Direction and orientation are untouched |
-| **premises** | 6 of 8 hold. **Four operators in the spec never run** (`activation_pulse`, `aggregate`, `apply_material_map`, `pacemaker`). **The model is quiescent 8% of the beat where the tissue is 77%** |
+| **the one open defect** | **the model rests 8% of the beat where the tissue rests 77%** — the objective cannot see it, being invariant to timing. First thing the loop must explain |
+| **the fitting recipe** | four operators were declared and never stepped; there is now a fitting recipe that says what the fit runs, and the removal is **proved** harmless — fits under both are bit-identical over 198,407 parameters |
+| **premises** (after the audit) | **VALID, 8/8** — premise 3 closed properly rather than waived; premise 5 implemented; a coverage check now fails when a declared premise has no code |
 | the split | frozen: fit beat [152,204], 3 held-out beats, 17,499 scored nodes, mask frozen from the recording alone; diseased sheet sealed by content across all 3 files |
 | **the seal** | attacked 3 times before it held. Now refuses the sealed specimen in 4 unit conventions, cropped, and subsampled. Same specimen r=0.991–1.000, different specimen r=0.151–0.224, threshold 0.90 in the gap |
 | **the operator merge** | **NOT behaviour-preserving.** Two runs of the migrated recipe are BIT-IDENTICAL (0.0); the archive differs by 1.5e-4 after 3 frames, growing monotonically from frame 1. So the archive is evidence about a model we can no longer run |
@@ -152,9 +154,9 @@ are already written in the note; the work is:
 7. **Recompute the ceiling and the tracker floor with the certified ruler.** Both Phase-1 numbers
    are LoopScore numbers, and LoopScore is not admitted. Without this the campaign runs against a
    ceiling from a retired instrument.
-8. **Settle or waive premise 3 before the first Phase-2 number.** `premises.py` returns INVALID
-   today on a premise graded *certain*; measuring the STOP under a spec our own checker rejects is
-   the most expensive thing we could do.
+8. ~~**Settle or waive premise 3.**~~ **DONE** — closed properly: a fitting recipe that declares
+   what the fit runs, proved bit-identical. `premises.verdict_for_run()` is now importable and must
+   be called by every Phase-2 script that writes a number.
 
 **THE STOP:** at the end, we know whether the active model beats the best trivial baseline by more
 than the noise. On the evidence already on disk — copying the previous beat outscores every fit the

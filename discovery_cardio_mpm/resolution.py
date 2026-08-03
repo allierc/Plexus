@@ -76,6 +76,13 @@ LADDER = [
     {"label": "sub_20_naive", **{**BASE, "substeps": 20}},
     {"label": "sub_5",        **{**BASE, "substeps": 5, "dt_sub": 4e-4}},
     {"label": "sub_20",       **{**BASE, "substeps": 20, "dt_sub": 1e-4}},
+    # A null measured on ONE background is the weakest reading there is -- okuda's ablation
+    # asymmetry, and an external audit pointed out that all three substep rungs sat at the single
+    # spatial setting this same ladder reports as NOT converged. So the substep null is repeated
+    # on an independent background before it may be called convergence.
+    {"label": "sub_5_g192",   **{**BASE, "n_grid": 192, "substeps": 5, "dt_sub": 4e-4}},
+    {"label": "sub_10_g192",  **{**BASE, "n_grid": 192}},
+    {"label": "sub_20_g192",  **{**BASE, "n_grid": 192, "substeps": 20, "dt_sub": 1e-4}},
 ]
 
 

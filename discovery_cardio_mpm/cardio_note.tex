@@ -647,8 +647,14 @@ is right. For deciding whether a spatial claim is admissible, disagreement is th
 
 \textbf{4. Does the answer depend on the grid?} \dn\ \emph{Partly, and it separates cleanly.}
 
-\emph{Time is fine.} Halving or doubling the sub-steps changes the measured beat by under 1\% ---
-\emph{once the length of a frame is held fixed}. Which brings the first finding: it was not.
+\emph{Time is fine, and it has now been checked twice.} Halving or doubling the sub-steps changes
+the measured beat by under 1\% --- \emph{once the length of a frame is held fixed}. An outside
+auditor pointed out that all three rungs sat at the one spatial setting this same ladder calls
+unconverged, which makes a null measured on a single background --- the weakest reading there is.
+Repeated at the finer grid it holds: 3.7\% rather than 0.8\%, so the independence does weaken as
+the grid refines, which is what coupling between the cell size and the time step would predict. It
+remains more than an order of magnitude below the 56\% swing the spatial setting produces, so the
+conclusion stands and now carries its own qualification. Which brings the first finding: it was not.
 \code{-{}-substeps} multiplies \code{dt\_sub} to give the duration of one recorded frame, so
 changing it alone changes how much simulated time one frame of the microscope corresponds to.
 Varying it that way moves the enclosed area by a factor of 2.2, and every one of those batches
@@ -1104,6 +1110,90 @@ identical. That is small, it is not zero, and it will grow with the length of th
 so Phase~2 re-measures it at the depth the loop will really use, where it becomes one of the two
 noise floors the campaign is built on. A run may only become irreproducible on purpose: the flag
 that permits it is off by default and is recorded in the run's own manifest.
+
+%======================================================================
+\section{An outside audit, and what it found in here}\label{sec:audit}
+
+The Okuda folder was heavily reworked on 2 August, and rather than guess at the consequences we
+had three independent auditors read both folders and answer one question: does any of it change
+what is already closed here? \emph{Every finding below was then re-verified by hand before
+anything was altered.}
+
+\textbf{The answer to the headline question is no, and the reason is worth keeping.} Of roughly
+sixty commits over there, six touch the new reasoning machinery; the rest repair a live cluster
+runner with a vision model in it --- a machine this project does not have and will not have until
+Phase~5. Porting it would mean building theirs, which is the opposite of the instruction this loop
+was given. More usefully, their own conclusion supports the shape chosen here. After nine rounds
+they found, across forty-four thousand words of agent-written reasoning, \emph{not one} occurrence
+of ``only tested once'' or ``cannot conclude'', against fifteen assertions of closure --- and
+concluded: \emph{the agents were exactly as rigorous as the structure they were given, and not one
+degree more. Logic is not an emergent property of putting capable models in a loop; it is a
+structure.} That is the argument for giving every deterministic question to code, which is what the
+five-agent, nine-check roster already does.
+
+One piece specifically does \emph{not} transfer. Their independence rule counts distinct
+combinations of switched-on operators. Ours would be seed, initialisation, beat and specimen ---
+and we have one specimen. Lifted over, it would return ``one independent observation'' for
+everything we will ever measure.
+
+\textbf{What it did find, in here, was six defects --- and none of the measured numbers is wrong.}
+
+\footnotesize
+\begin{tabular}{@{}l p{10.9cm}@{}}
+\toprule
+\textbf{what} & \textbf{what was actually the case}\\
+\midrule
+a check that did not exist & Premise~5 --- \emph{the warm-up must settle} --- was written into the
+premise list and \textbf{never implemented}, while the verdict still printed ``6 of 8 held''
+because a sub-check of premise~8 was sitting in the eighth slot. The denominator hid the gap and
+the phase read as complete. Now implemented, and a \textbf{coverage check} reads the headings out
+of the premise document and fails when a declared premise has no code behind it.\\
+the record did not match the note & Both machine-readable records were whole-file overwrites, so
+the last and narrowest run won. The resolution file held three of seven rows --- the table printed
+in this note was \emph{not} backed by what was on disk. Both now merge, and all seven rows are
+restored from the surviving arrays.\\
+a check reading its own comment & The stability premise hard-coded the grid size, the sub-step
+count and the bound as literals, so it computed the wrong number on the four ladder runs that
+varied exactly those. Its own text says the bound must be \emph{derived, not left in a comment} ---
+and it was reading the comment.\\
+\textbf{the instrument that reached nothing} & \code{descriptors.py} --- the measurement Track~B is
+judged by, with a self-test, which produced every number in Phase~1 --- was imported by three
+analysis scripts and by \textbf{no fit}. Every fit still wrote only the inherited, uncertified
+row. Found by applying their own dead-machinery test to our code, where it is word for word the
+defect they had just spent a day on.\\
+a register that described machinery it did not have & The belief register announced ``a hard length
+cap enforced by code'' and a retraction file. Neither existed anywhere. Both are now real --- a
+120-line cap, the file on disk, seven required columns per row --- and \textbf{three new canaries},
+so the register check has now been watched refusing.\\
+the recipe that misdescribed the run & Four operators were declared in the recipe and never
+stepped: the fit replaces them deliberately with a learnable pulse and its own material maps. The
+premise was right to refuse it. There is now a \emph{fitting} recipe that declares what the fit
+runs, and removing them is \textbf{proved} to change nothing --- fits under both are bit-identical
+over 198{,}407 parameters. A description was corrected, not a model.\\
+\bottomrule
+\end{tabular}
+\normalsize
+
+\textbf{Two things we had written down had to be said less strongly.}
+
+\emph{The ceiling.} ``No model may be scored above 0.705'' was stated flatly, using an instrument
+this same phase had shown returns a perfect score for a tissue whose timing has been destroyed. A
+score above the ceiling has at least two readings and we had given one. Phase~2 now carries an
+extra item: recompute the ceiling and the tracker floor with whatever ruler it certifies.
+
+\emph{The tracker.} The four beats agreeing looked like corroboration and was not. Strip the
+subject --- the tracking software --- and the same specimen, the same movie and the same pair of
+algorithms remain in all four. That is one observation repeated four times. The claim is strong for
+this specimen and untested on any other, and the second signature that would settle it sits inside
+the sealed specimen.
+
+\textbf{And two things a fit could not previously say about itself.} Whether it finished --- a
+crash, a wall-clock kill and a clean finish left the same files behind --- and how many of its
+optimiser steps were silently discarded, which could have been most of them without any trace. Both
+are now written into every run, and the premise checker is importable so that nothing in Phase~2
+can compute a number without being able to ask whether the run it came from was admissible. That
+last one is the whole point: their most expensive defect was a demotion that existed in code and
+had never once fired.
 
 %======================================================================
 \section{The lesson we are starting from, in three lines}
