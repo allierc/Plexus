@@ -484,15 +484,30 @@ and never learned what any one of them was worth. \code{t03\_c\_a} predates all 
 clean starting point:
 
 \begin{enumerate}
-\item \textbf{Length} --- \code{frac} $0.55\to0.95$, and the rectus origins spread around the
-annulus of Zinn. $\theta_{\max}\sim(A/E)(L/R)$, and this is the term the baseline is worst on.
+\item \textbf{Length} --- \code{frac} $0.55\to0.95$ and the sclera stand-off $0.020\to0.042$.
+$\theta_{\max}\sim(A/E)(L/R)$, and this is the term the baseline is worst on. Measured: $L$ goes
+$0.242\to0.449$ for LR and $0.132\to0.253$ for SO, so $L/R$ does roughly double.
 \item \textbf{The pulley} --- add \code{muscle\_sleeve}. An anti-buckling device, not a force
 multiplier.
 \item \textbf{Drive} --- $A/E$ $0.25\to0.28$, the top of the range the pulley was measured to allow
 in Phase~0.
 \end{enumerate}
 
-\textbf{One at a time, re-probing after each.} Six probe runs per intervention, $\approx$90 minutes.
+\begin{tcolorbox}[colback=bad!4,colframe=bad!45,boxrule=0.7pt,arc=2pt]
+\textbf{A fourth intervention was dropped, because it turned out to be already applied --- and
+finding that out exposed a reproducibility defect.} Spreading the rectus origins around the annulus
+of Zinn was on this list until the baseline was checked. \code{muscle\_morphogenesis} reads the
+origins from \code{eye\_anatomy.origins\_world()} at \emph{run} time, so
+\textbf{an archived \code{spec.yaml} does not fully determine its own run}: \code{t03\_c\_a} was
+generated before \code{ANNULUS\_RING} existed and recorded a rest length of $0.259$ for the lateral
+rectus, but re-running that same file today gives $0.242$. The Phase-2 baseline therefore already
+carries the spread origins, the intervention's effect was never measured, and it cannot be recovered
+without reverting the module. \emph{Geometry a spec does not carry is geometry the spec cannot
+reproduce} --- and every Phase-2 number in this note is against the re-run baseline, not against the
+original \code{t03\_c\_a}.
+\end{tcolorbox}
+
+\textbf{One at a time, re-probing after each.} Six probe runs per intervention, 18 in total.
 That is the discipline Phase~0 broke when it changed three things at once and then could not say
 which had caused a divergence.
 
