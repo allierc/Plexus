@@ -1404,7 +1404,17 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     # spec re-run verbatim -- so there is no edit, no parent and no causal claim to write. It
     # crashed here on `g.name_region()` with g None, which is the honest signature of asking a
     # role a question its input cannot answer.
+    # THE INTERPRETER RUNS BEFORE THE CHEAP ROLES CAN SPEND THE CEILING. It is the most
+    # expensive role per call (round 10: 4 calls, 13.0 min, 39% of the spend) and it ran LAST,
+    # so it was the role the budget dropped -- the loop paid for its deepest analysis and then
+    # discarded it, five times in one round. Reserving its budget first means an overrun now
+    # costs a summary rather than the causal record.
     interpretable = [r for r in kept if r[1] is not None]
+    if interpretable and ledger is not None:
+        try:
+            ledger.reserve("interpreter", len(interpretable))
+        except Exception:
+            pass
     if interpretable:
         step(f"Interpreter: writing the causal record for {len(interpretable)} kept run(s)")
     else:
