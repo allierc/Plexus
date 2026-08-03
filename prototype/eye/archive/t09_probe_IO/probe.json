@@ -5,7 +5,7 @@
   "t_on": 60,
   "t_off": 560,
   "n_frames": 650,
-  "baseline": "t09_probe_IO",
+  "regenerated": true,
   "gaze_range_deg": [
     1.013,
     0.711,

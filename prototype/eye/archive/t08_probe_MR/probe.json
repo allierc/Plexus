@@ -5,7 +5,7 @@
   "t_on": 60,
   "t_off": 560,
   "n_frames": 650,
-  "baseline": "t08_probe_MR",
+  "regenerated": true,
   "gaze_range_deg": [
     15.417,
     0.264,

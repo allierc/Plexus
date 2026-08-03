@@ -5,7 +5,7 @@
   "t_on": 60,
   "t_off": 560,
   "n_frames": 650,
-  "baseline": "t05_probe_IR",
+  "regenerated": true,
   "gaze_range_deg": [
     3.319,
     7.856,

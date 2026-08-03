@@ -84,16 +84,35 @@ def camera(view):
     raise ValueError(view)
 
 
-def check_cameras(tol=1e-9):
-    """Every view must place the same muscle on the same side of the screen.
+def check_cameras():
+    """Every view must agree with every other about left/right AND up/down.
 
-    A figure whose panels disagree about left and right is worse than no figure: it invites
-    exactly the reading that the stress is on the wrong muscle. This is cheap enough to assert."""
+    The first version of this checked only left/right, and that was not enough: the oblique camera
+    was mirrored *and* upside down, two errors that partly disguised each other. Its `up` pointed
+    at world -y, so the SUPERIOR rectus was drawn at the bottom of the frame and the inferior
+    rectus at the top -- while the left/right check it did have passed once the handedness was
+    fixed. A figure whose panels disagree about which way is up is worse than no figure, and both
+    halves are cheap enough to assert on every render.
+
+    Three assertions, each anchored to something anatomical rather than to another camera:
+      1. up really is up      -- the up vector has a positive world +y component;
+      2. superior is above inferior -- SR plots above IR, in every view;
+      3. the views agree      -- no muscle changes side between anterior and oblique.
+    """
     import eye_anatomy as _EA
     c = np.asarray(_EA.GLOBE_CENTER, float)
     ins = _EA.insertion_dirs() * _EA.A_EQ + c
+    i_sr, i_ir = _EA.MUSCLE_KEYS.index("SR"), _EA.MUSCLE_KEYS.index("IR")
     sides = {}
-    for view in ("anterior", "oblique"):
+    for view in ("anterior", "lateral", "oblique"):
+        r, u, f = camera(view)
+        if u[1] <= 0.0:
+            raise AssertionError(f"{view} camera is upside down: up = {np.round(u, 3)}")
+        sy = (ins - c) @ u
+        if sy[i_sr] <= sy[i_ir]:
+            raise AssertionError(
+                f"{view} camera draws the superior rectus below the inferior rectus "
+                f"({sy[i_sr]:+.3f} vs {sy[i_ir]:+.3f})")
         sx, _, _ = proj(ins, view)
         cx, _, _ = proj(np.atleast_2d(c), view)
         sides[view] = np.sign(sx - cx[0])
