@@ -1,44 +1,44 @@
 {
   "n_frames": 395,
   "range_hvt_deg": [
-    15.89,
-    6.0,
-    1.79
+    15.91,
+    6.03,
+    1.8
   ],
-  "mean_settle_error_deg": 12.15,
+  "mean_settle_error_deg": 12.18,
   "tracking_rms_deg": [
-    14.61,
-    6.74,
-    5.11
+    14.45,
+    6.73,
+    5.16
   ],
   "tracking_settled_rms_deg": [
-    13.31,
-    5.99,
-    5.29
+    12.81,
+    5.75,
+    5.26
   ],
-  "max_settle_error_deg": 22.92,
+  "max_settle_error_deg": 22.96,
   "recruitment_correct": "4/4",
   "centroid_drift_max_frac_radius": 0.0065,
   "radius_mean_pct": -0.11,
-  "radius_worst_pct": 0.23,
+  "radius_worst_pct": 0.24,
   "radius_spread_pct": 0.89,
-  "strain_p99": 0.0566,
-  "strain_max": 0.3297,
-  "vonmises_p99": 9.618,
+  "strain_p99": 0.0567,
+  "strain_max": 0.33,
+  "vonmises_p99": 9.61,
   "activation_range": [
     0.021,
     1.0
   ],
   "max_shortening_pct": {
-    "LR": 20.41,
+    "LR": 20.39,
     "SR": 26.15,
     "MR": 32.09,
-    "IR": 22.24,
+    "IR": 22.14,
     "SO": 22.05,
-    "IO": 19.97
+    "IO": 19.98
   },
   "peak_shortening_pct": 32.09,
-  "muscle_strain_p99": 0.2817,
+  "muscle_strain_p99": 0.2814,
   "holds": [
     {
       "frames": [
@@ -52,23 +52,23 @@
         0.0
       ],
       "achieved_hvt": [
-        -0.41,
-        -0.04,
+        -0.4,
+        -0.03,
         0.02
       ],
-      "error_deg": 0.41,
+      "error_deg": 0.4,
       "recruited": [
         "LR",
         "IO"
       ],
       "recruit_ok": null,
       "activation": {
-        "LR": 0.269,
+        "LR": 0.25,
         "SR": 0.14,
         "MR": 0.14,
         "IR": 0.14,
-        "SO": 0.161,
-        "IO": 0.187
+        "SO": 0.146,
+        "IO": 0.169
       }
     },
     {
@@ -83,23 +83,23 @@
         0.0
       ],
       "achieved_hvt": [
-        2.08,
+        2.04,
         -0.07,
         0.01
       ],
-      "error_deg": 22.92,
+      "error_deg": 22.96,
       "recruited": [
         "LR",
         "IO"
       ],
       "recruit_ok": true,
       "activation": {
-        "LR": 0.978,
-        "SR": 0.159,
-        "MR": 0.161,
-        "IR": 0.161,
-        "SO": 0.614,
-        "IO": 0.747
+        "LR": 1.0,
+        "SR": 0.14,
+        "MR": 0.14,
+        "IR": 0.14,
+        "SO": 0.626,
+        "IO": 0.763
       }
     },
     {
@@ -114,23 +114,23 @@
         0.0
       ],
       "achieved_hvt": [
-        -5.93,
+        -6.08,
         -0.35,
-        0.2
+        0.21
       ],
-      "error_deg": 19.08,
+      "error_deg": 18.93,
       "recruited": [
         "MR",
         "SR"
       ],
       "recruit_ok": true,
       "activation": {
-        "LR": 0.162,
-        "SR": 0.51,
-        "MR": 0.978,
-        "IR": 0.455,
+        "LR": 0.155,
+        "SR": 0.497,
+        "MR": 0.985,
+        "IR": 0.45,
         "SO": 0.14,
-        "IO": 0.162
+        "IO": 0.155
       }
     },
     {
@@ -145,23 +145,23 @@
         0.0
       ],
       "achieved_hvt": [
-        -8.2,
-        4.1,
-        1.43
+        -8.56,
+        3.95,
+        1.39
       ],
-      "error_deg": 16.2,
+      "error_deg": 16.51,
       "recruited": [
         "SR",
         "IO"
       ],
       "recruit_ok": true,
       "activation": {
-        "LR": 0.55,
-        "SR": 0.978,
-        "MR": 0.2,
-        "IR": 0.162,
-        "SO": 0.162,
-        "IO": 0.978
+        "LR": 0.592,
+        "SR": 1.0,
+        "MR": 0.17,
+        "IR": 0.14,
+        "SO": 0.14,
+        "IO": 1.0
       }
     },
     {
@@ -176,23 +176,23 @@
         14.0
       ],
       "achieved_hvt": [
-        -0.75,
-        1.66,
-        1.12
+        -0.73,
+        1.68,
+        1.11
       ],
-      "error_deg": 13.01,
+      "error_deg": 13.02,
       "recruited": [
         "SO",
         "SR"
       ],
       "recruit_ok": true,
       "activation": {
-        "LR": 0.201,
-        "SR": 0.877,
-        "MR": 0.223,
+        "LR": 0.192,
+        "SR": 0.9,
+        "MR": 0.221,
         "IR": 0.142,
-        "SO": 0.978,
-        "IO": 0.149
+        "SO": 1.0,
+        "IO": 0.14
       }
     },
     {
@@ -207,7 +207,7 @@
         0.0
       ],
       "achieved_hvt": [
-        -0.68,
+        -0.69,
         -0.39,
         1.0
       ],
@@ -227,7 +227,7 @@
       }
     }
   ],
-  "objective": 8.233,
+  "objective": 7.977,
   "checks": {
     "finite": true,
     "reaches_commands": false,

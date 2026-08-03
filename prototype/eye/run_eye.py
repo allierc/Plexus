@@ -32,6 +32,7 @@ import torch
 import plexus.operators            # noqa: F401  stock operator library
 import eye_ops                     # noqa: F401  eye operators (prototype-local)
 import muscle_ops                  # noqa: F401  muscle-as-tissue operators (prototype-local)
+import probe_ops                   # noqa: F401  the open-loop probe (needed to REGENERATE a probe run)
 import eye_anatomy as EA
 import eye_spec as ES
 import render_eye
