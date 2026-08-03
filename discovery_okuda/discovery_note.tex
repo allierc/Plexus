@@ -1329,6 +1329,52 @@ supporting it, the conditions held fixed, and what would refute it --- or it doe
 Necessity is held to the highest bar, because it quantifies over everything not removed. Claims
 formed before a known apparatus fix are marked \emph{provisional} and queue first for retest.
 
+\subsection*{3b. Converging observations, and what an ablation can carry}
+A negative needs \emph{converging} support, not repeated support. Rounds~4--8 produced
+bit-identical results under four different composition hashes, and the morphogen-closure claim
+cites \emph{ten or more runs} --- every one of them Gierer--Meinhardt \textbf{with} division, while
+the one run without it was stable and never counted. Ten runs, \textbf{one} observation. A rule
+demanding ``three supporting runs'' would have passed the worst claim in the file.
+
+So support is counted in \textbf{distinct condition-signatures}, computed from the cited runs'
+\code{composition.json} on disk: strip the claim's subject, and whatever remains identical across
+every supporting run is an unvaried confounder. Two consequences come free --- the
+\code{conditions:} field is \emph{computed rather than authored}, so it cannot be satisfied with
+prose; and a confounded set is visible at write time instead of five rounds later.
+
+\begin{center}
+\begin{tabular}{@{}lp{8.4cm}@{}}
+\textbf{can be} & one observation --- existence is cheap \\
+\textbf{could be} & none --- the default for untried territory \\
+\textbf{cannot be} & three independent signatures, conditions computed \\
+\textbf{cannot not be} & three independent \emph{plus} one deliberate counterexample attempt
+that failed \\
+\end{tabular}
+\end{center}
+
+\textbf{The ablation is the right instrument, read the wrong way.} The loop was never short of
+ablations --- \code{remove\_op divide\_3d0} is one, and it ran twice, six rounds apart, with
+opposite results. The asymmetry is that the \emph{same} experiment supports a positive strongly
+and a negative weakly: \emph{removing X killed the effect} says X matters \emph{here};
+\emph{removing X changed nothing} is offered as X is inert \emph{everywhere}, which is pure
+absence of evidence. Six \textsc{inert} claims rest on a single null ablation each --- the reading
+that most needs corroboration got the least. Hence: a \textbf{null} ablation must be repeated
+across independent backgrounds before it may be written as a negative, while a \textbf{positive}
+ablation still passes on one.
+
+And an ablation is \emph{not} a counterexample attempt. Ablation removes X from a working recipe;
+a counterexample asks whether the effect is reachable \emph{at all} without X, and may change other
+operators to compensate. Necessity requires the second, which is why \emph{``division is
+necessary''} survived six rounds --- nobody ever tried to build a bud without it. When round~8
+finally did, by ablating on a different parent, it produced a clean bud with a fission neck.
+
+\textbf{Under-supported claims are demoted, never deleted.} One null ablation is real evidence; it
+is simply not a universal negative. It becomes \code{could be inert (n=1, conditions: ...)} ---
+minable by Track~A, citable by nobody as a prohibition. The revisit queue is then literally
+\emph{the list of claims sitting below their support bar}, and the checker's default action is
+\emph{demote}, which costs nothing and self-corrects, rather than \emph{reject}, which stalls a
+round.
+
 \subsection*{4. The tracks become asymmetric}
 \textbf{Track A opens.} It may violate any trap, and must spend a budgeted quota of slots per round
 \emph{revisiting} claims --- preferring single-run claims and provisional ones. A revisit must vary
@@ -1336,6 +1382,11 @@ a \textbf{named confounder}, which is what would have caught a family closed on 
 shared an unvaried one, and what stops the bit-identical duplicates of rounds~4--8.
 \textbf{Track B constrains.} It cites a named Okuda morphology and settings, respects traps, and
 may not breed from an invalid specimen.
+
+The Proposer's ablations therefore gain two duties rather than a quota: repeat a \textbf{null}
+ablation on an independent background before it may harden into a negative, and for any necessity
+claim mount a \textbf{rescue attempt} --- permitted to change other operators to compensate ---
+because that is the experiment necessity actually rests on.
 
 \subsection*{5. No conclusion about an unmeasured property}
 If a conclusion needs a quantity no admitted instrument reports, the correct output is a
