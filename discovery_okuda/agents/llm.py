@@ -71,15 +71,64 @@ AGENT_MODEL = {
     "watcher": FAST_MODEL,      # text -> JSON, no tools, no judgement
 }
 
-BREVITY = """BREVITY (this is a budget, not a style note -- wall clock is generation):
-- Do not restate the evidence you were given. Assume the reader has it open.
-- No preamble, no summary of what you are about to do, no closing remarks.
-- Every free-text field has a word limit below. Exceeding it is a failure, not a flourish.
-- Never shorten a NUMBER, a metric name, or a citation to save words. Cut the prose around them.
+# PER-ROLE OUTPUT CEILINGS, in tokens. THE ARITHMETIC IS THE ARGUMENT: generation runs at
+# ~70 tok/s, so 700 tokens is ten seconds and 13,000 tokens is three minutes. Round 10 spent
+# 33.4 min against a 25 min ceiling; the interpreter averaged 3.2 min PER CALL, which is about
+# 13,000 output tokens for a causal description that is three sentences long. The target is a
+# 10-minute round, and these caps are what that costs:
+#
+#   interpreter  4 x 400   = 23 s      reader     9 x 250 = 32 s
+#   watcher      9 x 300   = 39 s      proposer   1 x 1800 = 26 s
+#   meta_review  1 x 1200  = 17 s      archivist  1 x 350  =  5 s
+#
+# -- about three minutes of generation for a round that was taking thirty-three. The rest is
+# tool use and thinking, which the turn caps bound.
+AGENT_OUTPUT_TOKENS = {
+    "interpreter": 400,     # a causal description is three sentences, not an essay
+    "reader":      250,     # a label, a phenotype, one concern
+    "watcher":     300,     # what the movie shows
+    "meta_review": 1200,    # rewrites memory.md -- the one role with a document to produce
+    "proposer":    1800,    # JSON for a whole batch
+    "archivist":   350,     # continue / roll back / stop, with the reason
+    "diagnostician": 400,   # cause, evidence, guard, action
+    "reflection":  300,
+    "grounder":    300,
+}
+DEFAULT_OUTPUT_TOKENS = 400
+
+
+def brevity(agent=None):
+    """The budget, with its arithmetic, and a hard ceiling for this role.
+
+    Written as a function rather than a constant because a cap without a number is a wish: the
+    previous version said "every free-text field has a word limit below" and the roles that were
+    burning the ceiling had no limit below, or were never shown the block at all.
+    """
+    cap = AGENT_OUTPUT_TOKENS.get(agent, DEFAULT_OUTPUT_TOKENS)
+    return f"""BREVITY -- THIS IS A HARD BUDGET, NOT A STYLE NOTE.
+
+YOUR ENTIRE REPLY MUST BE UNDER {cap} TOKENS (about {cap * 3 // 4} words).
+Generation runs at ~70 tokens/s, so every 70 tokens you write costs the round one second of
+wall clock. A round is allowed TEN MINUTES total across all agents. Exceeding your cap does not
+make the answer better; it spends someone else's budget, and the roles that overrun are the
+roles whose output gets dropped when the ceiling is hit.
+
+- No preamble. No summary of what you are about to do. No closing remarks. No restating the
+  evidence you were given -- assume the reader has it open.
+- Answer in the shortest form that is still complete and specific. Prefer a clause to a sentence
+  and a sentence to a paragraph.
+- NEVER shorten a NUMBER, a metric name, a run id or a citation to save words. Cut the prose
+  around them. Brevity is paid for out of adjectives, never out of evidence.
 - EVERYTHING OUTSIDE THE REQUESTED JSON IS DISCARDED UNREAD. The parser takes the first JSON
-  object and throws the rest away, so an explanation written around it is not read by anyone --
-  it is only paid for. Measured: the reviewer spent 6,140 output tokens on a payload needing
-  about 200, and wall clock IS generation at ~70 tokens/s. Emit the JSON. Nothing else."""
+  object and throws the rest away, so an explanation written around it is read by nobody and
+  paid for by everybody. Measured: a reviewer once spent 6,140 output tokens on a payload
+  needing about 200.
+- If you cannot fit the answer, say the one thing that matters most and stop. A short answer
+  that names the decisive fact beats a long one that buries it."""
+
+
+# Kept as a name so existing call sites that paste it directly still work.
+BREVITY = brevity()
 
 # APPLIED TO EVERY ROLE, from run_agent, not from each call site. It used to be pasted into three
 # prompts out of nine -- the proposer and the reviewer -- and was absent from the two roles that
@@ -121,7 +170,14 @@ AGENT_BUDGETS = {
 
 # Whole-round ceiling. A round is ~20 min of GPU; its LLM overhead must not exceed it, or the
 # partition idles waiting for text.
-ROUND_LLM_BUDGET_MIN = 25.0
+#
+# LOWERED FROM 25 TO 10, and the note above about "enforce once the numbers are in" is now spent:
+# the numbers are in. Round 10 measured 33.4 min against the 25 -- five breaches, Interpreters
+# dropped, several runs left with no causal record. The per-role caps in AGENT_OUTPUT_TOKENS
+# project 10,600 output tokens for a round of that shape, which is 2.5 minutes of generation; the
+# remaining budget is tool use and thinking. A ceiling of 10 is therefore roughly 4x the projected
+# generation cost, which is slack, not a squeeze.
+ROUND_LLM_BUDGET_MIN = float(os.environ.get("PLEXUS_ROUND_LLM_MIN", 10.0))
 
 # What to do when the ceiling would be breached. Default "warn": the call RUNS, the breach is
 # recorded and printed, and the round report carries `budget_exceeded: true`.
@@ -425,8 +481,11 @@ def run_agent(agent, prompt, ledger=None, **over):
         # the session default -- so this can only ever make a DESCRIPTION role cheaper, never
         # silently downgrade a role that reasons.
         over.setdefault("model", AGENT_MODEL.get(agent))
-        if over.pop("brevity", True) and agent not in BREVITY_EXEMPT and "BREVITY" not in prompt:
-            prompt = f"{prompt}\n\n{BREVITY}"
+        if over.pop("brevity", True) and agent not in BREVITY_EXEMPT:
+            # strip any statically-pasted copy so the ROLE-SPECIFIC cap is the one in force
+            if "BREVITY" in prompt:
+                prompt = prompt.split("BREVITY")[0].rstrip()
+            prompt = f"{prompt}\n\n{brevity(agent)}"
         ok, out = run_claude(prompt, timeout_min=tmin, allowed_tools=tools,
                              max_turns=turns, **over)
     finally:
