@@ -114,6 +114,56 @@ Rounds 1–5 of the 2026-08-02 campaign are provisional in their entirety: they 
 the ranking key could not see a broken premise, so mesh self-intersections outranked valid buds and
 became the frontier.
 
+## What already exists, and is dead
+
+Before building anything, the audit found the machinery for this file **already in the codebase**:
+
+| exists | state |
+|---|---|
+| `hypothesis.py:123` — `CLAIM_KINDS = ("sufficient","necessary","causal","descriptive")`, validated at `:160` | **all 170 hypotheses carry `descriptive`**; nothing ever sets another value, and the Proposer's JSON schema has no such field |
+| `critic.check_batch()` — `A1_NO_ABLATION` refuses a `necessary` claim with no ablation in the batch | **never called from the loop**; named only in `weekend.py` comments |
+| `templates.check_memory()` — section, abstract and 900-word checks | called only under `if __name__ == "__main__"`; `memory.md` currently runs **1186 words** and nothing has ever fired |
+| `round.py:1450` captures `_mok` from the Meta-review | never read — a failed Meta-review silently leaves last round's memory in place |
+
+The logic did not fail to be conceived. It failed to be **wired**. Phase 7 is therefore mostly
+connection, not construction — and the first duty of `logic.py` is to make these fire.
+
+## Three findings that change the design
+
+**1. Nothing parses `memory.md`.** It reaches the Proposer and the Meta-review as a *path inside a
+prompt*, never as parsed content. So "Track B respects traps" is enforcement that **does not exist
+anywhere**, and a checker that reads agent prose out of `memory.md` is parsing the weakest link in
+the system. Therefore: **a claim is a typed record in an append-only register, and the claim-bearing
+sections of `memory.md` are RENDERED from it** — exactly as `operator_backlog.md` is already
+rendered from `operator_requests.jsonl` by `escalation.Backlog.render()`. The agent *files* a
+claim; it does not *write* one.
+
+**2. "What is OPEN" is not `could be`, and is already contaminated.** The template defines it as
+hypotheses "posed and not yet settled" — tried and unresolved, not never attempted. And the live
+file's first OPEN entry is a universal negative: *"the ~1.23 ceiling is FUNDAMENTAL … exhaustion is
+now empirical."* `could_be` is a **new** bucket, and OPEN's contents must be re-triaged into it or
+into `cannot be` on entry.
+
+**3. The template itself taught the asymmetry.** ESTABLISHED carries an explicit two-line grammar
+ending `Falsifiable by: …`. The FALSIFIED form has **no refuter slot at all**. "Known traps" asks
+only for *"one line each, with the run that proved it"* — no conditions, no quantifier, no escape.
+The 4-of-7 versus 2-of-9 split is not agent laziness; it is the template, obeyed exactly.
+
+## Two traps to avoid while enforcing this
+
+**Do not check the refuter against the record.** A refuter that is specific gets caught violating
+something and the claim is refused; a vacuous refuter sails through. That gradient **selects for
+unfalsifiable refuters** — the opposite of the intent. So: check the refuter for *specificity*
+(it must parse to a clause over an admitted metric), and when the record already violates it, raise
+a **retraction**, never a rejection of the claim.
+
+**Route by registry tier, never by a naming convention.** A prefix rule (`dx_…` for provisional
+keys) is a convention chosen by the very author being constrained, and a new instrument declaring
+its own emitted names can step around it. Admission must be decided by the certification registry:
+anything not in `admitted_keys()` is provisional **by default**, and the prompts handed to the
+Reader, Eye-check and Interpreter are filtered through the same set — a number an agent can read is
+a number an agent will reason from.
+
 ## The claim form
 
 Every claim in `memory.md` is one block. `logic.py --check` parses these; anything it cannot parse
@@ -154,3 +204,27 @@ wrong, because they assert `NECESSARY` and `INERT` from single removals. A check
 section or on the presence of a falsifier passes them silently.
 
 A second fixture, a hand-written correct `memory.md`, must pass 100%.
+
+## The `could be` bucket may not be truncated
+
+The bucket exists so that untested territory cannot be starved. A render cap would starve it by a
+different route: an untried edit ranked ninth is exactly as invisible to the Proposer as it was
+before this file existed, and that invisibility is what produced *"the only remaining route is a
+different base geometry."*
+
+So: rank `could_be` by a **stated, computed key** — how many current frontier parents the edit is
+legal on, then how few admissible runs its operator family has, then age — and print the key beside
+the section heading, so the Proposer knows what it is *not* seeing and can ask for it. Guarantee a
+share of the rendered slots to entries never shown before. And never truncate a **live negative**:
+anything that can refuse a Track B slot must be visible in full to the agent proposing it, or a
+slot is refused for violating a rule the Proposer was never shown.
+
+## The quota must not become its own exemption
+
+If a revisit slot is inserted by code after the batch has been checked, it is the one slot in the
+batch exempt from duplicate detection and from confounder validation — a **licensed re-run** of
+exactly the bit-identical duplicates rounds 4–8 produced, recorded as compliance. A quota-filled
+slot that skips the checks the quota exists to enforce is worse than an unmet quota.
+
+So `revisits` and `confounder` are fields the **Proposer emits**, in its JSON schema, and any
+substituted slot is re-checked by the same gate as every other slot.
