@@ -37,7 +37,8 @@ through the stock `plexus.schema.load` + `plexus.engine.run`.
 | metric suite | done | tracking RMS, recruitment, drift, strain, shortening, **globe radius**, one scalar objective |
 | gradient descent on the controller | **built, refused** | surrogate fails its own fidelity test (§5) |
 | dynamics-watching critic | **tested, fails** | VLM reports a rotating eye as static (§5) |
-| reaching the commanded angle | **not done** | settles at ~60% of a 25° command |
+| open-loop plant identification | done | the 3×6 static gain matrix; **mechanics-limited by 7×** (§5) |
+| reaching the commanded angle | **not done** | settles at ~60% of a 25° command; the obliques are the binding constraint |
 
 **Acceptance test** (`run_eye.verdict`, automatic): finite · reaches commands within 6° · torsion
 > 6° · horizontal > 35° · recruitment 4/4 · drift < 6% of globe radius · strain₉₉ in [0.004, 0.12] ·
@@ -100,7 +101,41 @@ statement about the ratio; "stays in one piece" is a statement about the absolut
 
 ---
 
-## 5. Two negative results, kept because they are the honest part
+## 5. What the plant actually is, measured (Phase 2)
+
+Six open-loop step responses on `t03_c_a`, one muscle at a time, 650 frames each, archived as
+`t04_probe_LR` … `t09_probe_IO`. Static gain in degrees of gaze per unit activation:
+
+|            |    LR |    SR |     MR |    IR |    SO |    IO |
+|---|---:|---:|---:|---:|---:|---:|
+| horizontal |  4.25 | −2.18 | **−11.65** | −2.51 | −0.20 | −0.22 |
+| vertical   | −0.04 |  4.87 |   0.04 | −4.85 | −0.78 |  0.52 |
+| torsion    | −0.08 |  2.06 |  −0.07 | −2.00 | **1.10** | −0.59 |
+| off-axis   |  0.02 |  0.62 |   0.01 |  0.66 |  0.73 |  0.97 |
+| t63 (s)    | 0.180 | 0.135 |  0.165 | 0.135 | 0.210 | 0.225 |
+| overshoot  |  42%  |  45%  |   35%  |  45%  |  30%  |  35%  |
+
+**The registered prediction (8–16°) was broken: LR reaches 3.7° against a 26° command.**
+Mechanics-limited by a factor of seven — decisive, not marginal. The secondary prediction held
+sharply (LR/MR off-axis 0.02/0.01; the rest 0.62–0.97), and SR's measured torsion/elevation ratio
+of 0.42 matches the 0.43 the geometry predicted independently.
+
+Two things nobody predicted:
+
+- **MR is 2.7× stronger than LR**, on peak tensions differing by 5% — the medially-tilted apex
+  makes the medial rectus' pull far more tangential. Confirmed from data collected before the probe
+  existed: `t03_c_a` runs +2.62° to −10.05°, adducting four times further than it abducts.
+- **The obliques are the weakest muscles, and the vertical recti out-tort them** (SO 1.10 against
+  SR 2.06). Anatomically wrong, and it traces to the Phase-0 length ceiling: at `frac`=0.55 the
+  obliques' post-pulley path is 0.132 against LR's 0.242. This is why torsion was hard to command
+  all through Phase 0.
+
+**The instrument passes the check Phase 1a failed.** Assuming the closed loop saturates the agonist
+and relaxes the antagonist, the matrix predicts a closed-loop adduction of −10.61° against −10.05°
+observed — 5%, on a run it was never fitted to. Phase 1a's surrogate predicted 1.7° where the eye
+did 17.0°.
+
+## 6. Two negative results, kept because they are the honest part
 
 **The gain tuner refuses its own answer.** `tune_gaze.py` follows `../inverse_slime/`:
 differentiating the MPM rollout is exactly the cost Plexus 2 warns about (memory ∝ points × steps),
@@ -137,7 +172,7 @@ angle.)
 
 ---
 
-## 6. What is reusable, and what is not
+## 7. What is reusable, and what is not
 
 **Target-agnostic — copy as-is:**
 
@@ -147,6 +182,7 @@ angle.)
 | `sweep_eye.py` | a queue of archived trials with a summary table |
 | `render_eye.py` | 8-panel movie; front-hemisphere culling, exact ellipsoid-silhouette occlusion, colour bars built once (not per frame) |
 | `tune_gaze.py` | identify-then-tune with a **fidelity test that can veto its own output** |
+| `probe_ops.py` + `probe_plant.py` | open-loop step injection: a `muscle_probe` operator, per-actuator step responses, and the static gain matrix. The general answer to "is this control-limited or plant-limited?" |
 | `muscle_ops.py::MPMScatterAccumulate` | second body into a shared `mpm_grid` — a new *implementation* of an existing contract |
 | `muscle_ops.py::MuscleSleeve` | transverse-only constraint; the general anti-buckling device for any contractile strap |
 | `muscle_ops.py::MuscleContract` | active stress along a fibre with the force–length relation, per-set (not global side-channel) |
@@ -163,7 +199,7 @@ angle.)
 
 ---
 
-## 7. What is deliberately not done
+## 8. What is deliberately not done
 
 - **No promotion.** Eleven contracts and one implementation sit in `prototype/`. `plexus2.tex`
   requires evidence of reuse beyond the originating prototype before promotion, and only
@@ -180,7 +216,7 @@ angle.)
 
 ---
 
-## 8. Cost
+## 9. Cost
 
 ~2.8k lines of Python, 25 archived trials (19 with movies), 9 commits, one 8-page note. Wall-clock
 dominated by simulation, not by thinking: the probe configuration is ~10 min at 45k + 13k material
@@ -194,10 +230,13 @@ error worth 17° of gaze.
 
 ---
 
-## 9. The open question this file exists for
+## 10. The open question this file exists for
 
-The eye settles at ~60% of a 25° command, and the residual is **mechanical, not control** — the
-tuner says so and can prove its own surrogate is unfit to say otherwise. The remaining authority
-sits in the pulley's `A/E` ceiling, bisected to (0.28, 0.32) and not exploited. Bisect it once
-more, or raise it: a stiffer sleeve, a shorter free distal fraction, or a second sleeve at the
-tendon that follows the globe instead of the orbit.
+Answered, and replaced by a sharper one. The residual **is** mechanical — measured, not asserted:
+the lateral rectus can turn this eye 3.7° at full activation against a 26° command. So the next
+move is not a controller.
+
+The gain matrix names its own targets, in order: **lengthen the obliques** (their 1.10° torsional
+gain is the binding constraint on the one motion only they can produce), then raise `A/E` toward
+the pulley ceiling bisected in Phase 0, then re-probe. The same six runs measure whether it worked,
+and cost 90 minutes against the days the closed-loop campaign spent guessing.

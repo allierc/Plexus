@@ -141,13 +141,14 @@ $\rightarrow$ contraction $\rightarrow$ MLS-MPM $\rightarrow$ motion $\rightarro
 0 --- build the plant & \dn & 25 trials, 4 named ceilings, a working point, a metric suite \\
 1a --- differentiable identification & \wrong & a surrogate that fails its own fidelity test, and refuses to report \\
 1b --- the dynamics-watching critic & \wrong & a VLM that reads a rotating eye as static \\
-2 --- PID autotune by step injection & \fl & the experiment that decides control \emph{vs} mechanics \\
+2 --- PID autotune by step injection & \dn & the $3\times6$ static gain matrix: \textbf{mechanics-limited by $7\times$}, and the obliques named as the binding constraint \\
 \bottomrule
 \end{tabular}
 \end{center}
 
 Two automatic instruments were built to judge the plant and \textbf{both failed}. That is why
-Phase~2 exists, and why it is an \emph{open-loop measurement} rather than another optimisation.
+Phase~2 is an \emph{open-loop measurement} rather than another optimisation --- and why it is the
+first instrument in this campaign that passes a fidelity check instead of failing one.
 
 \begin{tcolorbox}[colback=warn!6,colframe=warn!50,boxrule=0.7pt,arc=2pt]
 \textbf{The archive was pruned to the Phase-2 baseline.} Only \code{t01}, \code{t02} and
@@ -396,11 +397,83 @@ of contact, pulley placement --- where there is no reduced model to fit. That is
 interesting inverse problem and it is untouched.
 \end{phasebox}
 
-\begin{runbox}{Phase 2 --- run \hfill \todo}
-Six step-response runs on \code{t03\_c\_a}, the static gain matrix, and the verdict on
-control-\emph{vs}-mechanics. Not yet run; this box is where the answer goes, including if it
-contradicts the prediction above.
+\begin{runbox}{Phase 2 --- run \hfill \dn\ (6 of 6, archived \code{t04}--\code{t09})}
+Six open-loop steps from tonic to full activation, 650 frames each, held 500. The plateau is
+reached by frame $\approx$400 after a 40\% overshoot and a ring-down, so the settled tail is a real
+static gain and not a transient sample --- which every earlier measurement in this campaign had
+been.
+
+\textbf{The static gain matrix} (degrees of gaze per unit activation, all other muscles at tonic):
+
+\begin{center}\small
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+ & \textbf{LR} & \textbf{SR} & \textbf{MR} & \textbf{IR} & \textbf{SO} & \textbf{IO}\\
+\midrule
+horizontal & $4.25$ & $-2.18$ & $\mathbf{-11.65}$ & $-2.51$ & $-0.20$ & $-0.22$\\
+vertical   & $-0.04$ & $4.87$ & $0.04$ & $-4.85$ & $-0.78$ & $0.52$\\
+torsion    & $-0.08$ & $2.06$ & $-0.07$ & $-2.00$ & $\mathbf{1.10}$ & $-0.59$\\
+\midrule
+off-axis fraction & 0.02 & 0.62 & 0.01 & 0.66 & 0.73 & 0.97\\
+$t_{63}$ (s) & 0.180 & 0.135 & 0.165 & 0.135 & 0.210 & 0.225\\
+overshoot & 42\% & 45\% & 35\% & 45\% & 30\% & 35\%\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{tcolorbox}[colback=bad!4,colframe=bad!45,boxrule=0.7pt,arc=2pt]
+\textbf{The prediction is broken, and the conclusion is stronger for it.} The registered band was
+$8$--$16^\circ$; the lateral rectus at full activation reaches $\mathbf{3.7^\circ}$ against a
+$26^\circ$ command. Not a marginal miss --- \textbf{mechanics-limited by a factor of seven}. No
+value of any gain closes that, and the Phase~1a conclusion, which happened to say the same thing,
+was right for none of the reasons it gave.
+\end{tcolorbox}
+
+\textbf{The secondary prediction held, and sharply.} LR and MR come out essentially pure
+direct-axis (off-axis 0.02 and 0.01 against a predicted $<0.15$), while SR, IR, SO and IO are all
+substantially coupled (0.62--0.97). SR and IR are near-perfect mirror images, and SR's
+torsion-to-elevation ratio of $2.06/4.87 = 0.42$ matches the ratio $0.39/0.90 = 0.43$ that the
+\emph{geometry} predicted in \S6, from a completely independent calculation.
+
+\textbf{Two things the measurement found that nobody predicted.}
+
+\begin{enumerate}
+\item \textbf{MR is 2.7$\times$ stronger than LR} ($-11.65$ against $+4.25$), though their peak
+tensions differ by 5\%. The medially-tilted apex makes the medial rectus' pull far more tangential
+than the lateral rectus', and the arc-of-contact wrap does the rest. This was confirmed
+independently, from data collected before the probe existed: \code{t03\_c\_a}'s closed-loop trace
+runs $+2.62^\circ$ to $-10.05^\circ$ --- the eye adducts four times further than it abducts, and
+nobody had noticed.
+\item \textbf{The obliques are the weakest muscles in the plant, and the vertical recti are better
+torters than they are.} SO produces $1.10^\circ$ of torsion per unit activation against SR's
+$2.06^\circ$. That is anatomically wrong, and it traces straight back to the Phase-0 length
+ceiling: at \code{frac}=0.55 the obliques' post-pulley path is 0.132 against the lateral rectus'
+0.242, so $L/R\approx1.15$. \emph{This is why torsion was so hard to command all through Phase 0},
+and it is the first quantitative statement of it.
+\end{enumerate}
+
+\begin{tcolorbox}[colback=good!5,colframe=good!45,boxrule=0.7pt,arc=2pt]
+\textbf{The instrument passes the check that Phase 1a failed.} Assume the closed loop saturates the
+agonist and relaxes the antagonist off tonic; the open-loop matrix then \emph{predicts} a
+closed-loop adduction of $-10.61^\circ$, against $-10.05^\circ$ actually observed in
+\code{t03\_c\_a} --- \textbf{5\%}, on a run the matrix was never fitted to. (The other excursions
+come in below prediction, as they must: full saturation is an upper bound and the PID rarely
+reaches it.) Phase~1a's surrogate predicted $1.7^\circ$ where the eye did $17.0^\circ$. That is the
+difference between an open-loop and a closed-loop identification, and it is the whole reason this
+phase exists.
+\end{tcolorbox}
+
+\textbf{So the PID autotune is answered before it is run:} there is nothing for it to recover on
+this configuration. The dynamics it would need are now measured anyway ($t_{63}\approx0.14$--$0.23$\,s,
+30--45\% overshoot, so $\zeta\approx0.3$), and they are worth keeping for when the plant can
+actually reach its commands.
 \end{runbox}
+
+\textbf{What Phase 3 should be.} Not a controller. The gain matrix names its own targets, in order:
+lengthen the obliques (the $1.10^\circ$ torsional gain is the binding constraint on the one motion
+only they can produce), then raise $A/E$ toward the pulley ceiling bisected in Phase~0, then
+re-probe. The same six runs measure whether it worked --- and cost 90 minutes, against the days the
+closed-loop campaign spent guessing.
 
 %======================================================================
 \section{The one result worth defending}

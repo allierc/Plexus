@@ -1,0 +1,14 @@
+{
+  "muscle": "MR",
+  "a_hi": 1.0,
+  "tonic": 0.14,
+  "t_on": 60,
+  "t_off": 560,
+  "n_frames": 650,
+  "baseline": "t08_probe_MR",
+  "gaze_range_deg": [
+    15.417,
+    0.264,
+    0.386
+  ]
+}
