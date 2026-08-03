@@ -554,12 +554,15 @@ def _resize_reservoir(spec_path, name, run=None, frames=None):
         # ONE LINE PER DECISION. A clamp printed a second warning beside the resize, so a single
         # choice read as two problems -- and a warning that fires twice for one thing is how a
         # reader learns to skim warnings.
-        msg = (f"[recon] {name}: reservoir {have} -> {want_v} "
-               f"(cap {(have + 4) // 2} -> {(want_v + 4) // 2} cells)")
+        # SHORT, AND THE CAVEAT ON ITS OWN LINE. This was one 230-character sentence per slot,
+        # twelve of them per recon round, and the number a reader wants -- the new cell cap --
+        # was buried in the middle. The reasoning is still worth having, so it goes underneath
+        # rather than away, and only when the clamp actually fired.
+        print(T_.warn(f"[recon] {name}: cap {(have + 4) // 2} -> {(want_v + 4) // 2} cells"
+                      + (" (CLAMPED)" if clamped else "")))
         if clamped:
-            msg += (f", CLAMPED from {clamped[0]} by the {TRAJECTORY_BUDGET_GB} GB budget -- if "
-                    f"it saturates again the composition's growth is the problem, not the array")
-        print(T_.warn(msg + ". A buffer is an array size, not a model parameter."))
+            print(T_.quiet(f"clamped from {clamped[0]} by the {TRAJECTORY_BUDGET_GB} GB budget; "
+                           f"saturating again means the growth, not the array"))
         # RECORDED, so an agent can read it. Until now the resize existed only as a printed line
         # and a local variable, which means the clamp's own conclusion -- "if it saturates again
         # the composition's growth is the problem, not the array" -- was a finding addressed to
