@@ -180,7 +180,13 @@ def decide(cfg, sup, backlog, n_legal_edits):
     # was unreachable. That is not escalation, it is a loop filing duplicate wishes against a
     # language nobody is extending. If a request is already open, the answer is "stop and build",
     # whatever the cluster state.
-    if backlog.open_requests():
+    # AN OPEN REQUEST IS NOT AN EXHAUSTED SPACE. This branch exists to stop `request_operator`
+    # firing every round forever -- a real bug, fixed here -- but it created the mirror image:
+    # with one request open and NOTHING in the loop able to close it (set_status is called only
+    # from this module's own __main__), every future escalation returned "exhausted" regardless
+    # of how many moves remained. Measured: 96 legal edits across the frontier, and thirteen
+    # consecutive rounds told there was no reachable region.
+    if backlog.open_requests() and n_legal_edits <= 0:
         return "exhausted", (f"{len(backlog.open_requests())} operator request(s) already open "
                              f"and no new region is reachable; waiting on the language, not on "
                              f"compute")
