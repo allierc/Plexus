@@ -96,6 +96,11 @@ AGENT_OUTPUT_TOKENS = {
 }
 DEFAULT_OUTPUT_TOKENS = 400
 
+# Tools no role gets unless its AGENT_BUDGETS row asks for them. Not a safety rail -- a BUDGET
+# rail: each of these can consume a turn without producing an answer, and turns are the scarce
+# thing. Bash is the one that actually bit.
+EXPENSIVE_TOOLS = ("Bash", "WebFetch", "WebSearch", "Task", "Agent", "NotebookEdit")
+
 # MEASURED, round 10 of the 2 August campaign -- minutes per call, before the token caps landed.
 # Deliberately the PRE-brevity numbers: they are the pessimistic prior, so the projection cannot
 # under-estimate while the caps are still unproven. They are replaced by this round's own measured
@@ -103,6 +108,23 @@ DEFAULT_OUTPUT_TOKENS = 400
 EXPECTED_MIN = {"interpreter": 3.2, "reader": 1.1, "watcher": 0.3, "meta_review": 3.3,
                 "proposer": 3.0, "archivist": 1.0, "diagnostician": 0.5, "reflection": 0.7,
                 "grounder": 0.1}
+
+
+def tool_note(agent=None):
+    """What this role may actually use. Stated, because a model that is not told will guess.
+
+    The Proposer guessed Bash, was denied fourteen times, and spent its whole turn budget on the
+    discovery. Turns are the scarce resource -- not tokens -- and a denied call costs a turn.
+    """
+    tools = (AGENT_BUDGETS.get(agent, (0, 0, None))[2] or [])
+    turns = AGENT_BUDGETS.get(agent, (0, 40, None))[1]
+    if not tools:
+        return (f"TOOLS: you have NONE. Answer from the prompt alone. Any tool call is refused "
+                f"and costs one of your {turns} turns.")
+    return (f"TOOLS: you have exactly {', '.join(tools)} -- and {turns} turns. Every other tool, "
+            f"INCLUDING Bash, is refused; a refused call still costs a turn. Do not shell out to "
+            f"read a file: use Read. If you run out of turns you produce nothing and the round "
+            f"is wasted.")
 
 
 def brevity(agent=None):
@@ -512,7 +534,7 @@ def run_agent(agent, prompt, ledger=None, **over):
             # strip any statically-pasted copy so the ROLE-SPECIFIC cap is the one in force
             if "BREVITY" in prompt:
                 prompt = prompt.split("BREVITY")[0].rstrip()
-            prompt = f"{prompt}\n\n{brevity(agent)}"
+            prompt = f"{prompt}\n\n{tool_note(agent)}\n\n{brevity(agent)}"
         ok, out = run_claude(prompt, timeout_min=tmin, allowed_tools=tools,
                              max_turns=turns, **over)
     finally:
@@ -659,6 +681,14 @@ def run_claude(prompt, timeout_min=DEFAULT_TIMEOUT_MIN, allowed_tools=None, cwd=
     # and minutes are not what a subscription is spent in.
     cmd = ["claude", "-p", prompt, "--output-format", "stream-json", "--verbose",
            "--max-turns", str(max_turns), "--allowedTools", *allowed_tools]
+    # --allowedTools AUTO-APPROVES; it does not restrict. A tool outside the list is not absent,
+    # it is REFUSED -- and an agent learns that one refusal at a time. On 3 August the Proposer
+    # called Bash fourteen times, was denied fourteen times, exhausted its turn cap and returned
+    # ok=False having written nothing. The round reported "the proposer named no runs", which is
+    # true and says nothing about why. Denying explicitly makes the refusal immediate and legible.
+    _deny = [t for t in EXPENSIVE_TOOLS if t not in (allowed_tools or ())]
+    if _deny:
+        cmd += ["--disallowedTools", *_deny]
     if model:
         cmd[1:1] = ["--model", model]
     lines, t0 = [], time.time()
