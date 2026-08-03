@@ -47,3 +47,85 @@ ROUND 1   mode=composition   campaign=okuda_growth_driven
 ================================================================================================
 ▶ ACT 1 - PROPOSE   [+00:00]   before a second of compute is spent
 ================================================================================================
+[loop] terminal also written to /workspace/Plexus/discovery_okuda/campaign/campaign.log
+[loop] CLEAN START -- cleared the LEARNED PATTERNS block: it is written by the Meta-review each round, so it is state. A campaign that keeps the previous campaign's conclusions has not started clean.
+[loop] CLEAN START -- removed 9 campaign file(s); the next round is 1
+[loop] plan: 1 recon round(s) to build the frontier, then 19 composition round(s) that can pose a hypothesis
+
+------------------------------------------------------------------------------------------------
+[loop] round 1/20  mode=recon   spent so far: 0.0 agent-min over 0 calls
+------------------------------------------------------------------------------------------------
+================================================================================================
+ROUND 1   mode=recon   campaign=okuda_growth_driven
+================================================================================================
+
+================================================================================================
+▶ ACT 1 - PROPOSE   [+00:00]   before a second of compute is spent
+================================================================================================
+No manifest was provided and `state.json` is deleted; choosing 12 canonical on-disk runs from the campaign op-points plus the current GRO batch-1 validation slots (the sensible re-measure targets for baseline-drift detection).
+
+```json
+{
+  "round": 0,
+  "action": "re-measure",
+  "runs": [
+    "embryo_GRO_ctrl_rate0",
+    "embryo_GRO_iso_rate015",
+    "embryo_GRO_iso_rate03",
+    "embryo_GRO_iso_ra
+  [proposer] 0.6 min, tools: Readx1
+  [recon] the Proposer chose 12: embryo_GRO_ctrl_rate0, embryo_GRO_iso_rate015, embryo_GRO_iso_rate03, embryo_GRO_iso_rate06, embryo_GRO_iso_rate10, embryo_GRO_anch, embryo_GRO_aniso, embryo_GRO_tip, embryo_1E_ctrl_g10, embryo_INT_g20_1p5x_move18, embryo_ORI_sed_d10, embryo_ORG_swap_anisoY_sed13
+  ◌ proposer: (said nothing)
+  [recon] embryo_GRO_ctrl_rate0: no spec on disk -- skipped
+  [recon] embryo_GRO_iso_rate015: no spec on disk -- skipped
+  [recon] embryo_GRO_iso_rate03: no spec on disk -- skipped
+  [recon] embryo_GRO_iso_rate06: no spec on disk -- skipped
+  [recon] embryo_GRO_iso_rate10: no spec on disk -- skipped
+  [recon] embryo_GRO_anch: no spec on disk -- skipped
+  [recon] embryo_GRO_aniso: no spec on disk -- skipped
+  [recon] embryo_GRO_tip: no spec on disk -- skipped
+  [recon] embryo_1E_ctrl_g10: no spec on disk -- skipped
+  [recon] embryo_INT_g20_1p5x_move18: no spec on disk -- skipped
+  [recon] embryo_ORI_sed_d10: no spec on disk -- skipped
+  [recon] embryo_ORG_swap_anisoY_sed13: no spec on disk -- skipped
+  [recon] no usable spec was chosen -- a recon round with nothing to replay
+[round] no candidates -- escalating
+[frontier] no frontier -- COLD START. Asking the Archivist what is already on disk.
+  [archivist] start from ['cfl_c001p300_d000p420', 'cfl_c000p080_d002p000'] -- Both valid, 2000 cells, serve Track A. c001p300_d000p420 is the sound peak of the high-c d-ladder (pattern 1.84). c000p080_d002p000 (pattern 1.40) samples the o
+    [archivist] cfl_c001p300_d000p420: no composition.json -- cannot be rebuilt as a graph
+    [archivist] cfl_c000p080_d002p000: no composition.json -- cannot be rebuilt as a graph
+  [archivist] named no usable run -- falling back to seed + reference recipes
+  ◉ supervisor: escalating: open_stage_gate -- stage 2 -> 3: admit the next stage's operators into the legal move se
+      t
+  ⚠ [escalate] opened stage gate -> 3
+
+[llm] per-role breakdown (round, round 1)
+       agent                  calls      min      %    ok/fail/skip
+       proposer                   1     0.64 100.0%     1/0   /0   
+       TOTAL                      1     0.64   llm=0.64 min of 10.0 ceiling | wall since round start 1.32 min
+[llm] {'calls': 1, 'round_min': 0.64, 'total_min': 0.64, 'turns': 2, 'tok_in': 2244, 'tok_out': 2425, 'cache_new': 32602, 'cache_hit': 28492, 'usd': 0.412, 'roles': 1, 'budget_exceeded': False, 'unmetered': 0}
+[llm] timing appended to /workspace/Plexus/discovery_okuda/campaign/llm_timing.jsonl
+  ⚠ [loop] round 1 exited 5 after 1.5 min wall, 0.6 min of agents
+  ⚠ [loop] round 1 produced no evidence and spent no compute (refused in Act 1). Cheap; the refusals go to the next Proposer. empty 1
+
+------------------------------------------------------------------------------------------------
+[loop] round 2/20  mode=composition   spent so far: 0.6 agent-min over 1 calls
+------------------------------------------------------------------------------------------------
+[supervisor] resumed: round 0, 0 runs spent, 0 clusters (0 active), dry 0, stage_gate 3
+================================================================================================
+ROUND 1   mode=composition   campaign=okuda_growth_driven
+================================================================================================
+
+================================================================================================
+▶ ACT 1 - PROPOSE   [+00:00]   before a second of compute is spent
+================================================================================================
+[frontier] no frontier -- COLD START. Asking the Archivist what is already on disk.
+  [archivist] start from ['cfl_c001p300_d000p420', 'cfl_c000p080_d002p000', 'wk_curvature_pos_s2'] -- d000p420 = strongest SOUND patterning (1.84, 2000 cells, valid, Track A) anchoring the c001p300·d axis. c000p080_d002p000 (1.40) reaches comparable patterning f
+    [archivist] cfl_c001p300_d000p420: no composition.json -- cannot be rebuilt as a graph
+    [archivist] cfl_c000p080_d002p000: no composition.json -- cannot be rebuilt as a graph
+    [archivist] wk_curvature_pos_s2: no composition.json -- cannot be rebuilt as a graph
+  [archivist] named no usable run -- falling back to seed + reference recipes
+  [grounder] note: phi: tabulated 10.0, but the paper's own formula (3 v_ref^1/3)^2/(4 eta_c/5 kappa_s) gives 9.000. The paper writes 'phi ~', so both are its own; which one the campaign uses is a decision and must be made explicitly, not inherited.
+Fresh campaign `okuda_growth_driven`, round 0, cold start. The Proposer keeps naming stale `embryo_*` specs that have no spec on disk. The only real on-disk frontier is the Archivist's `cfl_c*_d*` map: peak `cfl_c001p300_d000p420` (protr_peak 1.84) on a high-c/low-d ridge monotone in d (0.220→0.420). Proposing 12 `cfl` grid points that push c up / d down past the peak and bracket it.
+Wrote `proposal.json`. Batch = 12 real on-disk `cfl_c*_d*` runs mapping the high-c/low-d ridge around the anchor `cfl_c001p300_d000p420` (protr_peak 1.84): push c to 1.5/1.7 and d to 0.30/0.22 to beat the peak, corner points, past-peak brackets (d0.52/0.62), and an anchor re-measure. Falsifier: flat/lower at all four extensions → ridge crested, adopt anchor as op point.
+  [proposer] 1.2 min, tools: Readx3, Writex1

@@ -37,6 +37,17 @@ import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
+
+# WHERE AN AGENT MAY LOOK. Every call used to run in the monorepo root with Read(/workspace/**),
+# so an agent with nothing to do went exploring -- and on 3 August the Proposer wandered into
+# prototype/embryo_blastulla/archive/, found ANOTHER campaign's batches, and proposed a
+# continuation of it: "Batch 52 (GRO)", spec embryo_GRO_base.yaml, override cell_grow.rate=0.6.
+# Twelve slots in a vocabulary this campaign does not have, and the Critic refused eleven as
+# duplicates because none of them carried an edit it could parse.
+#
+# The campaign directory is the whole world an agent needs: its own configs are ../config/okuda,
+# its runs ../log/okuda, its records campaign/. Anything outside is another project's business.
+AGENT_CWD = os.path.abspath(os.path.join(HERE, ".."))
 CAMPAIGN = os.path.abspath(os.path.join(HERE, "..", "campaign"))
 
 INSTRUCTION = os.path.join(CAMPAIGN, "instruction.md")
@@ -124,7 +135,12 @@ def tool_note(agent=None):
     return (f"TOOLS: you have exactly {', '.join(tools)} -- and {turns} turns. Every other tool, "
             f"INCLUDING Bash, is refused; a refused call still costs a turn. Do not shell out to "
             f"read a file: use Read. If you run out of turns you produce nothing and the round "
-            f"is wasted.")
+            f"is wasted.\n"
+            f"WHERE TO LOOK: this campaign is {AGENT_CWD}. Its configs are ../config/okuda, its "
+            f"runs ../log/okuda, its records campaign/. The repository contains OTHER PROJECTS "
+            f"and their batches are not yours -- a proposal written in another campaign's "
+            f"vocabulary is refused wholesale. If you find nothing to build on here, say so; do "
+            f"not go looking elsewhere.")
 
 
 def brevity(agent=None):
@@ -694,7 +710,7 @@ def run_claude(prompt, timeout_min=DEFAULT_TIMEOUT_MIN, allowed_tools=None, cwd=
     lines, t0 = [], time.time()
     _LAST_USAGE.clear()
     try:
-        proc = subprocess.Popen(cmd, cwd=cwd or ROOT, stdout=subprocess.PIPE,
+        proc = subprocess.Popen(cmd, cwd=cwd or AGENT_CWD, stdout=subprocess.PIPE,
                                 stderr=subprocess.STDOUT, text=True, bufsize=1)
     except FileNotFoundError:
         return False, "claude CLI not found on PATH"

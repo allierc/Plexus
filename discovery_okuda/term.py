@@ -20,6 +20,7 @@ check is `isatty`, and NO_COLOR is honoured because it is the convention.
 from __future__ import annotations
 
 import os
+import re
 import sys
 
 _ON = sys.stdout.isatty() and not os.environ.get("NO_COLOR")
@@ -186,3 +187,45 @@ if __name__ == "__main__":
     print(quiet("[22:31] run/pend=2 done=4 of 6"))
     print("  verdicts: " + "  ".join(verdict(v) for v in
                                      ("valid", "invalid", "ambiguous", "confirmed", "refuted")))
+
+
+# ------------------------------------------------------------------ colour every [role] line
+class _Colourise:
+    """Wrap stdout so any line beginning `[role]` gets that role's colour.
+
+    THIRTEEN PRINT SITES SAID `[supervisor]`, `[proposer]`, `[archivist]` in no colour at all,
+    which is why those lines read as debug output while the `say()` lines read as a role talking.
+    Colouring them at the call sites means rewriting thirteen f-strings and missing the
+    fourteenth; doing it here catches every one, including the ones written next week.
+
+    Off when stdout is not a TTY, so the campaign log stays clean of escape codes.
+    """
+
+    _TAG = re.compile(r"^(\s*)\[([a-z][a-z-]{2,14})\]")
+
+    def __init__(self, stream):
+        self._s = stream
+
+    def write(self, text):
+        if not text.strip():
+            return self._s.write(text)
+        out = []
+        for line in text.splitlines(True):
+            m = self._TAG.match(line)
+            if m and m.group(2) in VOICE:
+                # VOICE values are the colour FUNCTIONS built by _c(), not escape strings.
+                paint = VOICE[m.group(2)]
+                nl = "\n" if line.endswith("\n") else ""
+                body = line[m.end():].rstrip("\n")
+                line = f"{m.group(1)}{paint('[' + m.group(2) + ']')}{body}{nl}"
+            out.append(line)
+        return self._s.write("".join(out))
+
+    def __getattr__(self, name):
+        return getattr(self._s, name)
+
+
+def install_line_colour():
+    """Call once, at process start. No-op when not a terminal."""
+    if _ON and not isinstance(sys.stdout, _Colourise):
+        sys.stdout = _Colourise(sys.stdout)
