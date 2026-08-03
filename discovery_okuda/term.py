@@ -211,12 +211,15 @@ class _Colourise:
     def __init__(self, stream):
         self._s = stream
 
+    WIDTH = 96          # wrap prose past this; banners and tables are left alone
+
     def write(self, text):
         if not text.strip():
             return self._s.write(text)
         out = []
         for line in text.splitlines(True):
             line = line.lstrip(" \t") if line.strip() else line
+            line = self._wrap(line)
             m = self._TAG.match(line)
             if m and m.group(2) in VOICE:
                 # VOICE values are the colour FUNCTIONS built by _c(), not escape strings.
@@ -226,6 +229,31 @@ class _Colourise:
                 line = f"{m.group(1)}{paint('[' + m.group(2) + ']')}{body}{nl}"
             out.append(line)
         return self._s.write("".join(out))
+
+    def _wrap(self, line):
+        """Fold a long line onto the next, once, for every print in the loop.
+
+        Doing it per call site means editing forty f-strings and missing the forty-first. The
+        grounder's note was 250 characters on one line; the terminal then broke it wherever the
+        window happened to end, so the same output read differently in two windows.
+
+        Left alone: banner rules, anything already short, and lines with no space to break at.
+        A tag like [grounder] is kept on the first line and continuations are indented under it,
+        so the speaker stays findable when scanning the left margin.
+        """
+        import textwrap
+        body = line.rstrip("\n")
+        nl = "\n" if line.endswith("\n") else ""
+        if len(body) <= self.WIDTH or len(set(body.strip())) <= 2:
+            return line                                  # short, or a ==== / ---- rule
+        m = re.match(r"^(\[[a-z][a-z-]*\]\s*)", body)
+        head, rest = (m.group(1), body[m.end():]) if m else ("", body)
+        wrapped = textwrap.wrap(rest, width=self.WIDTH - len(head),
+                                break_long_words=False, break_on_hyphens=False)
+        if not wrapped:
+            return line
+        pad = " " * min(len(head), 12)
+        return head + ("\n" + pad).join(wrapped) + nl
 
     def __getattr__(self, name):
         return getattr(self._s, name)
