@@ -1,2 +1,4 @@
 {"t": 1785772543.6596735, "event": "start", "rounds": 20, "batch": 12, "frames": null}
 {"t": 1785772668.1592605, "event": "round", "n": 1, "exit": 5, "minutes": 1.9, "usd_this_round": 1.4, "note": "", "cost_total": {"calls": 1, "usd": 0.79, "tok_in": 3689, "tok_out": 3969, "turns": 17, "minutes": 1.4}}
+{"t": 1785773045.0318086, "event": "start", "rounds": 20, "batch": 12, "frames": null}
+{"t": 1785773143.3108802, "event": "round", "n": 1, "exit": 5, "minutes": 1.5, "usd_this_round": 0.6, "note": "", "cost_total": {"calls": 1, "usd": 0.41, "tok_in": 2244, "tok_out": 2425, "turns": 2, "minutes": 0.6}}

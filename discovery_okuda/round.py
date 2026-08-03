@@ -62,7 +62,8 @@ import proposer as P                                                      # noqa
 from metrologist import Certification                                     # noqa: E402
 import archivist as ARCH                                                  # noqa: E402
 import collector as COL                                                   # noqa: E402
-import term as T_                                                         # noqa: E402
+import term as T_
+T_.install_line_colour()   # [role] prefixes get their voice, wherever they are printed                                                         # noqa: E402
 import diagnostician as DIAG                                              # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
