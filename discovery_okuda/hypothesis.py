@@ -142,6 +142,13 @@ class Hypothesis:
     rationale: str = ""
     territory: str = "in_paper"    # in_paper | excursion -- see TERRITORIES
     claim_kind: str = "descriptive"  # sufficient | necessary | causal -- see CLAIM_KINDS
+    # THE REVISIT FIELDS. A slot that challenges an existing claim names it, and names the thing
+    # it VARIES against the runs that established it. Both are emitted by the Proposer, never
+    # filled in by code after the batch is checked -- a code-inserted revisit would be the one
+    # slot in the batch exempt from the duplicate and confounder gates, which is a licensed
+    # re-run of exactly the bit-identical duplicates rounds 4-8 produced, recorded as compliance.
+    revisits: str = ""              # claim id being challenged, or ""
+    confounder: str = ""            # what this slot varies vs that claim's supporting runs
     grounding: list = field(default_factory=list)   # citations from the Grounder
     round_id: int = 0
     t_posed: float = field(default_factory=time.time)

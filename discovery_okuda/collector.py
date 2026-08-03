@@ -152,6 +152,18 @@ def _resize_of(name):
             "times_censored": hit.get("times_censored") or 0}
 
 
+def note_hole(rid, what, path=None):
+    """Record a named gap in the round, from anywhere. A hole must survive the terminal."""
+    p = path or os.path.join(CAMP, "holes.jsonl")
+    try:
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        with open(p, "a") as fh:
+            fh.write(json.dumps({"round": rid, "hole": what,
+                                 "when": datetime.now().strftime("%Y-%m-%d %H:%M")}) + "\n")
+    except Exception:
+        pass
+
+
 def _reservoir_line(rv):
     """What the ENGINE said about the array, in the block every downstream role reads.
 

@@ -39,6 +39,7 @@ worth doing.
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass
 
 from composition_space import OPERATORS, REQUIRED_ROLES, slots_of
@@ -56,15 +57,28 @@ class Rejection:
 
 
 # ============================================================================ BATCH rules
+def _op_identity(name):
+    """Operator identity, with the NODE INDEX stripped: divide_3d0 and divide_3d are one operator.
+
+    `add_op` names the operator (`divide_3d`) and `remove_op` names the NODE (`divide_3d0`), so
+    without this the two directions of the same experiment never matched. A1 then refused a
+    necessity claim whose ablation was sitting in the same batch -- a false refusal of a correct
+    proposal, which is the expensive way to fail. It was invisible because check_batch has never
+    been called; wiring it live without this would have started rejecting good batches.
+    """
+    n = str(name or "").split(":")[0].strip()
+    return re.sub(r"\d+$", "", n)
+
+
 def _touched_operator(edit):
     """The operator an edit acts on, or None. Edits look like ('add_op','cell_react','gray_scott')
     or a string '+cell_react' / '-cell_react' / '=cell_react:tension'."""
     if isinstance(edit, (tuple, list)) and len(edit) >= 2:
-        return str(edit[1]).split(":")[0]
+        return _op_identity(edit[1])
     e = str(edit).strip()
     for p in ("add_op ", "remove_op ", "+", "-", "="):
         if e.startswith(p):
-            return e[len(p):].split(":")[0].split()[0]
+            return _op_identity(e[len(p):].split()[0])
     return None
 
 

@@ -478,6 +478,27 @@ def check_file(memory_path, config_dir=None, log_dir=None):
     return rows
 
 
+def write_report(rid, rows, path):
+    """One line per round: the confusion matrix, so the trend is visible without re-parsing.
+
+    A check whose result is only ever printed to a terminal is a check nobody reads twice.
+    """
+    neg = [r for r in rows if r[1] in (CANNOT_BE, CANNOT_NOT_BE)]
+    pos = [r for r in rows if r[1] == CAN_BE]
+    cb = [r for r in rows if r[1] == COULD_BE]
+    rec = {"round": rid, "claims": len(rows), "negatives": len(neg),
+           "unearned": sum(1 for r in neg if not r[2]), "positives": len(pos),
+           "positives_refused": sum(1 for r in pos if not r[2]), "could_be": len(cb),
+           "unearned_text": [r[5][:90] for r in neg if not r[2]][:8]}
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "a") as fh:
+            fh.write(json.dumps(rec) + "\n")
+    except Exception:
+        pass
+    return rec
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--check", action="store_true")
