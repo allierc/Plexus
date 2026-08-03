@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  3 AUG 2026 08:10
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  3 AUG 2026 08:25
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -809,11 +809,18 @@ LaTeX Font Info:    Font shape `T1/cmtt/bx/n' in size <10.95> not available
 [20]
 
 [21]
+Underfull \hbox (badness 4378) in paragraph at lines 1316--1317
+[]|\T1/cmr/bx/n/10.95 free --- and to-day un-rep-re-
+ []
+
+
 
 [22]
 
 [23]
-Overfull \hbox (1.01701pt too wide) in paragraph at lines 1374--1376
+
+[24]
+Overfull \hbox (1.01701pt too wide) in paragraph at lines 1469--1471
 []\T1/cmr/m/n/10 My work-ing log is \T1/cmtt/m/n/10 SESSION_LOG.md\T1/cmr/m/n/1
 0 ; the find-ings reg-is-ter is \T1/cmtt/m/n/10 findings.py \T1/cmr/m/n/10 and 
 the premises are \T1/cmtt/m/n/10 PREMISES.md\T1/cmr/m/n/10 .
@@ -821,7 +828,9 @@ the premises are \T1/cmtt/m/n/10 PREMISES.md\T1/cmr/m/n/10 .
 
 
 
-[24] (./discovery_note.aux)
+[25]
+
+[26] (./discovery_note.aux)
  ***********
 LaTeX2e <2024-11-01> patch level 2
 L3 programming layer <2025-01-18>
@@ -830,10 +839,10 @@ Package rerunfilecheck Info: File `discovery_note.out' has not changed.
 (rerunfilecheck)             Checksum: 30B498BAE93BDA3D8786265F1908C952;1955.
  ) 
 Here is how much of TeX's memory you used:
- 24215 strings out of 475102
- 467996 string characters out of 5764878
- 861176 words of memory out of 5000000
- 46828 multiletter control sequences out of 15000+600000
+ 24220 strings out of 475102
+ 468058 string characters out of 5764878
+ 862177 words of memory out of 5000000
+ 46831 multiletter control sequences out of 15000+600000
  577220 words of font info for 72 fonts, out of 8000000 for 9000
  59 hyphenation exceptions out of 8191
  116i,11n,121p,454b,1066s stack positions out of 10000i,1000n,20000p,200000b,200000s
@@ -859,10 +868,10 @@ fonts/type1/public/cm-super/sfti1095.pfb></usr/share/texmf/fonts/type1/public/c
 m-super/sfti1200.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt0900.pfb
 ></usr/share/texmf/fonts/type1/public/cm-super/sftt1000.pfb></usr/share/texmf/f
 onts/type1/public/cm-super/sftt1095.pfb>
-Output written on discovery_note.pdf (24 pages, 2263499 bytes).
+Output written on discovery_note.pdf (26 pages, 2271491 bytes).
 PDF statistics:
- 311 PDF objects out of 1000 (max. 8388607)
- 226 compressed objects within 3 object streams
- 38 named destinations out of 1000 (max. 500000)
+ 320 PDF objects out of 1000 (max. 8388607)
+ 233 compressed objects within 3 object streams
+ 40 named destinations out of 1000 (max. 500000)
  98 words of extra memory for PDF output out of 10000 (max. 10000000)
 
