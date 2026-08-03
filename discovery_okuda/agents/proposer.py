@@ -272,11 +272,28 @@ RULES
     try:
         p = json.load(open(PROPOSAL_FILE))
     except Exception as e:
+        print(f"[proposer] proposal.json does not parse: {type(e).__name__}: {str(e)[:120]}")
         return False, []
     slots = p.get("slots", [])[:n_slots]
-    if not slots or slots[0].get("intent") != "control":
-        # do not silently repair the agent's design error -- report it
+    # REPORT IT, which the comment below has always promised and never done. "no usable
+    # proposal" could mean the file was never written, the JSON did not parse, or slot 0 was
+    # not the control -- three different faults with one message and no way to tell them apart.
+    # Rounds 2 to 13 of one campaign were refused here with no reason printed at all.
+    if not slots:
+        print(f"[proposer] proposal.json has no `slots` (top-level keys: "
+              f"{', '.join(sorted(p)[:8]) or 'none'})")
+        return False, []
+    if slots[0].get("intent") != "control":
+        print(f"[proposer] slot 0 is not the control: intent="
+              f"{slots[0].get('intent')!r}, edit={str(slots[0].get('edit'))[:60]!r}. "
+              f"Slot 0 MUST be the parent unchanged -- without it a difference between two "
+              f"candidates cannot be separated from seed noise.")
         return False, slots
+    # A slot the batch builder cannot use is worth naming here rather than at the far end.
+    _bad = [i for i, sl in enumerate(slots)
+            if sl.get("parent_index") is None and sl.get("intent") != "control"]
+    if _bad:
+        print(f"[proposer] {len(_bad)} slot(s) carry no parent_index: {_bad[:8]}")
     return ok, slots
 
 

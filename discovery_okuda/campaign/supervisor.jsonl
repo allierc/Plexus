@@ -1,1 +1,2 @@
 {"round": 1, "spent": 0, "best": null, "new_clusters": 0, "frozen": [], "active_clusters": 0, "dry": 1, "surprise": null, "next_confirmatory_frac": 0.7, "mix_why": "no resolved hypotheses yet -- start at the 70/30 default", "stop": false, "reason": "continue"}
+{"round": 1, "t": 1785789511.940693, "action": "opened stage gate -> 3"}
