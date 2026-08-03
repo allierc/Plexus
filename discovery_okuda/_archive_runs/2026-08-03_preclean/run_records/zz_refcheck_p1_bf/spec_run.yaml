@@ -1,0 +1,115 @@
+general:
+  name: zz_refcheck_p1_bf
+  seed: 0
+  n_frames: 60
+  dt: 0.02
+  record_cap: 62
+  record_every: 1
+  boundary: free
+  dim: 3
+  world:
+  - 80.0
+  - 80.0
+  - 80.0
+sets:
+  vertex:
+    n: 30000
+  cell:
+    n: 16000
+    state:
+      chem:
+        width: 2
+        integration: first_order
+      cen:
+        width: 3
+      area:
+        width: 1
+fields: {}
+operators:
+- op: seed_mesh_3d
+  at: vertex
+  cell_set: cell
+  before_frame: 1
+  n_cells: 2000
+  vseed_cv: 0.15
+- op: cell_geometry_3d
+  at: cell
+- op: cell_rd_seed
+  at: cell
+  mode: scatter
+  seed_frac: 0.06
+  before_frame: 1
+- op: cell_adjacency
+  at: cell
+- op: cell_diffuse
+  at: cell
+  implementation: graph_laplacian
+  d_a: 0.08
+  d_h: 0.16
+  chi: 65.0
+- op: cell_react
+  at: cell
+  implementation: gray_scott
+  rate: 50.0
+  F: 0.055
+  kk: 0.062
+- op: shape_energy_3d
+  implementation: monolayer
+  at: vertex
+  k_v: 6.0
+  kappa_s: 0.2
+  h0: 0.4
+  gamma: 0.06
+  mu: 1.0
+  dt: 0.02
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+- op: reconnect_t1_3d
+  at: vertex
+  l_th_frac: 0.28
+  every: 1
+  max_flips: 300
+- op: topo_snapshot_3d
+  at: vertex
+  every: 1
+schedule:
+- seed_mesh_3d
+- cell_geometry_3d
+- cell_rd_seed
+- cell_adjacency
+- cell_diffuse
+- cell_react
+- shape_energy_3d
+- reconnect_t1_3d
+- topo_snapshot_3d
+_discovery:
+  comp_hash: C08666c8bf72
+  structure:
+    operators:
+    - id: cell_adjacency0
+      op: cell_adjacency
+    - id: cell_diffuse0
+      op: cell_diffuse
+      impl: graph_laplacian
+    - id: cell_geometry_3d0
+      op: cell_geometry_3d
+    - id: cell_rd_seed0
+      op: cell_rd_seed
+      impl: scatter
+    - id: cell_react0
+      op: cell_react
+      impl: gray_scott
+    - id: reconnect_t1_3d0
+      op: reconnect_t1_3d
+    - id: seed_mesh_3d0
+      op: seed_mesh_3d
+    - id: shape_energy_3d0
+      op: shape_energy_3d
+      impl: monolayer
+    connections: []
+  region: mechanics-only (no growth)
+  defect_fixes:
+  - D1 engine owns the clock (every=1)
+  - D2 one global dt=0.02
+  - D3 topo_snapshot every=1 == position stride

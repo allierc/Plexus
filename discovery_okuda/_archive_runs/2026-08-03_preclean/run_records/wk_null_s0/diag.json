@@ -1,0 +1,184 @@
+{
+ "config": "wk_null_s0",
+ "comp_hash": "WK_wk_null_s0",
+ "region": "shape->chemistry feedback",
+ "summary": {
+  "saturated": true,
+  "inert_operators": [],
+  "retention": 0.966,
+  "valid_evidence": false,
+  "protr_final": 1.043,
+  "protr_peak": 1.079,
+  "horizon_frame": null,
+  "horizon_why": "no metrics.npz (tube_analysis did not run)",
+  "first_damage_frame": null,
+  "valid_frac": 1.0,
+  "protr_peak_untruncated": 1.079,
+  "protr_final_untruncated": 1.043,
+  "n_cells_final": 1778,
+  "red_frac_final": 0.306,
+  "act_max_final": 0.453,
+  "frames": 401,
+  "wall_s": 148.2,
+  "mech_force_mean": 29.113,
+  "mech_p_body": 3.5872,
+  "mech_p_tube": 0.0,
+  "mech_p_ratio": 0.0,
+  "mech_tension_mean": 6.2027,
+  "mech_migration": 0.5177
+ },
+ "acted": {
+  "seed_mesh_3d": 1,
+  "cell_geometry_3d": 401,
+  "cell_adjacency": 74,
+  "cell_rd_seed": 3,
+  "cell_diffuse": 401,
+  "cell_react": 401,
+  "shape_to_chem": 401,
+  "morphogen_growth_3d": 330,
+  "shape_energy_3d": 401,
+  "reconnect_t1_3d": 100,
+  "divide_3d": 101,
+  "topo_snapshot_3d": 401
+ },
+ "premises": [
+  {
+   "id": "P2",
+   "tier": "static",
+   "premise": "morphogen sets where/how fast, not whether",
+   "status": "pass",
+   "detail": "gated growth with a baseline floor rho=0.35",
+   "measured": {
+    "rho": 0.35,
+    "a_sw": 0.25
+   }
+  },
+  {
+   "id": "P3",
+   "tier": "static",
+   "premise": "a cell divides because it got big",
+   "status": "pass",
+   "detail": "growth ceiling 2.5 exceeds the division trigger 2.0, so cells can cross it",
+   "measured": {
+    "vth_frac": 2.5,
+    "factor": 2.0
+   }
+  },
+  {
+   "id": "P5",
+   "tier": "static",
+   "premise": "mechanics is fast, biology is slow",
+   "status": "pass",
+   "detail": "the reaction advances 1 time units per frame",
+   "measured": {
+    "dt": 1.0,
+    "rate": 1.0,
+    "per_frame": 1.0
+   }
+  },
+  {
+   "id": "P1",
+   "tier": "passive",
+   "premise": "cells grow by taking material in",
+   "status": "pass",
+   "detail": "tissue volume 427.7 -> 14404.4 (x33.68)",
+   "measured": {
+    "V_start": 427.729,
+    "V_end": 14404.425
+   }
+  },
+  {
+   "id": "P3b",
+   "tier": "passive",
+   "premise": "mean cell volume holds under proliferation",
+   "status": "pass",
+   "detail": "mean cell volume ends at 1.00 of its peak (8.10 -> 8.10)",
+   "measured": {
+    "peak": 8.10148,
+    "end": 8.10148,
+    "ratio": 1.0
+   }
+  },
+  {
+   "id": "P4",
+   "tier": "passive",
+   "premise": "the chemistry must not be silently extinguished",
+   "status": "pass",
+   "detail": "activator ends at 0.59 of its peak (0.772 -> 0.453)",
+   "measured": {
+    "peak": 0.7724,
+    "end": 0.4526,
+    "ratio": 0.5859658208182289
+   }
+  },
+  {
+   "id": "P7",
+   "tier": "passive",
+   "premise": "a sheet does not absorb added area by stretching",
+   "status": "pass",
+   "detail": "the stretched tail stays at shape index 4.12 over the final fifth; reduced volume 0.987",
+   "measured": {
+    "p95_late": 4.119,
+    "reduced_volume": 0.9872
+   }
+  },
+  {
+   "id": "P8",
+   "tier": "passive",
+   "premise": "the shape index has a hard geometric floor",
+   "status": "pass",
+   "detail": "minimum shape index 3.6540 respects the floor 3.5449",
+   "measured": {
+    "min": 3.654,
+    "floor": 3.5449077018110318
+   }
+  },
+  {
+   "id": "P9",
+   "tier": "passive",
+   "premise": "a closed epithelium is a sphere with no holes",
+   "status": "pass",
+   "detail": "genus 0 at all 40 recorded frames",
+   "measured": {
+    "frames": 40
+   }
+  },
+  {
+   "id": "P11",
+   "tier": "passive",
+   "premise": "tissue cannot pass through itself",
+   "status": "pass",
+   "detail": "at every frame at least 99.0% of rays cross the surface exactly once",
+   "measured": {
+    "worst_single_frac": 0.9896
+   }
+  },
+  {
+   "id": "P12",
+   "tier": "passive",
+   "premise": "a concentration is non-negative and finite",
+   "status": "pass",
+   "detail": "the activator stays non-negative throughout (minimum 1e-06)",
+   "measured": {
+    "min": 1e-06
+   }
+  },
+  {
+   "id": "P5b",
+   "tier": "passive",
+   "premise": "the mechanical relaxation keeps up with the tissue",
+   "status": "pass",
+   "detail": "residual force after relaxation 15.34 -> 28.01 (x1.83) while the tissue grew from 150 to 1778 cells",
+   "measured": {
+    "force_early": 15.340979099273682,
+    "force_late": 28.009560585021973,
+    "ratio": 1.8258000616367493,
+    "cells_early": 150.0,
+    "cells_late": 1778.0
+   }
+  }
+ ],
+ "premises_broken": [],
+ "premises_ablated": [],
+ "run_id": "R496cb74ce9a8553"
+}
