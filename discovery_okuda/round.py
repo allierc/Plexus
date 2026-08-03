@@ -1134,6 +1134,13 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         h = Hypothesis(hid=f"R{rid}.{i}.{comp_hash(g)[1:7]}", comp_hash=comp_hash(g),
                        parent_hash=None, edit=lbl,
                        intent=sl.get("intent", "confirmatory"),
+                       # CARRIED THROUGH AT LAST. claim_kind has existed in hypothesis.py since
+                       # the loop was built, with a validator, and all 170 hypotheses in the
+                       # ledger read "descriptive" because nothing ever passed it. A closed set
+                       # nobody populates is not a type, it is a comment.
+                       claim_kind=sl.get("claim_kind", "descriptive"),
+                       revisits=sl.get("revisits") or "",
+                       confounder=sl.get("confounder") or "",
                        claim=sl.get("claim", lbl),
                        metric=sl.get("metric", "protr_peak"),
                        predicted=sl.get("predicted", "unstated"),
@@ -1158,6 +1165,20 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     if cluster.preflight(verbose=True) is False:
         print("[round] preflight FAILED -- not submitting. Fix the job environment first.")
         return bk.finish(rid, "preflight_failed", 1)
+    # A1_NO_ABLATION, LIVE AT LAST. critic.check_batch has existed since the loop was built and
+    # was never called -- so a necessity claim has never once been required to test itself. It
+    # also had a latent false-refusal bug that only surfaced when it was finally exercised:
+    # `add_op` names the OPERATOR (divide_3d) and `remove_op` names the NODE (divide_3d0), so the
+    # two directions of the same experiment never matched and a claim whose ablation sat in the
+    # same batch was refused anyway.
+    _batch_bad = C.check_batch([h for _, _, h in posed])
+    for _r in _batch_bad:
+        print(T_.no(f"[critic] {_r.code}: {_r.detail[:150]}"))
+    if _batch_bad:
+        print(T_.warn("[critic] the batch makes a claim it does not test. Recorded, not refused: "
+                      "A1 is live for the first time and its false-refusal behaviour is unproven "
+                      "on real batches. It refuses from the round after its first clean pass."))
+
     act("ACT 2 - MEASURE", f"submitting {len(names)} simulation(s) -- the only expensive step")
     ids = cluster.submit(names, frames=frames, do_q=True, campaign=f"round{rid}")
     if not ids:
@@ -1459,6 +1480,43 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     step("Meta-review: prompt write-back + memory.md")
     _mok, _msaid = A.meta_review(rid, ledger=ledger,
                                  runs=[nm for nm, _, _, _, _, _ in rows])
+    # THE RETURN VALUE IS READ NOW. `_mok` was captured and discarded, so a Meta-review that
+    # failed or timed out left LAST round's memory in place and nothing said so -- the Proposer
+    # then opened the next round on a document describing a round that never happened.
+    if not _mok:
+        print(T_.warn("[meta-review] FAILED or timed out -- memory.md still describes the "
+                      "PREVIOUS round. The next Proposer will read a stale document."))
+        COL.note_hole(rid, "meta_review_failed")
+
+    # ------------------------------------------------------------------ LOGIC.md, enforced
+    # Nothing in this loop has ever parsed memory.md: it reaches the Proposer as a path inside a
+    # prompt, so every rule about what may be concluded was suasion. Two checks that already
+    # existed and had never once fired now run here -- templates.check_memory (defined, called
+    # only under __main__, with memory.md at 1186 words against a 900 budget) and logic.py's
+    # modality/support/refuter gate. They REPORT rather than refuse: the claim register is not
+    # yet the source memory.md is rendered from, so refusing here would stall a round over a
+    # document the Meta-review cannot yet emit in the required form. Reporting makes the gap
+    # visible every round instead of once a fortnight when somebody reads the file.
+    try:
+        import logic as LG
+        import templates as TPL
+        _mem = os.path.join(CAMP, "memory.md")
+        if os.path.exists(_mem):
+            _rows = LG.check_file(_mem)
+            _neg = [r for r in _rows if r[1] in (LG.CANNOT_BE, LG.CANNOT_NOT_BE)]
+            _bad = [r for r in _neg if not r[2]]
+            _cb = [r for r in _rows if r[1] == LG.COULD_BE]
+            print(T_.quiet(f"  [logic] {len(_rows)} claim(s): {len(_neg)} negative, "
+                           f"{len(_bad)} UNEARNED, {len(_cb)} could-be"))
+            for _n, _m, _ok, _rf, _nr, _tx, _why in _bad[:6]:
+                print(T_.warn(f"  [logic] UNEARNED [{_m}] {_why}: {_tx[:70]}"))
+            _w = len(open(_mem, errors="replace").read().split())
+            if _w > TPL.MAX_MEMORY_WORDS:
+                print(T_.warn(f"  [logic] memory.md {_w} words against a "
+                              f"{TPL.MAX_MEMORY_WORDS} budget"))
+            LG.write_report(rid, _rows, os.path.join(CAMP, "logic_report.jsonl"))
+    except Exception as _e:
+        print(T_.warn(f"  [logic] check did not run: {type(_e).__name__}: {_e}"))
     # The Meta-review's product is memory.md, whose HEAD is a three-sentence abstract written
     # for exactly this: the campaign's position, stated so it can be read in one line.
     print(T_.say("meta-review", _msaid or _abstract_of(os.path.join(CAMP, "memory.md")),

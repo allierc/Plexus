@@ -149,6 +149,10 @@ WRITE {PROPOSAL_FILE} as JSON:
      "track": "A" | "B",
      "territory": "in_paper" | "excursion",
      "claim": "<falsifiable, one sentence>",
+     "claim_kind": "sufficient" | "necessary" | "causal" | "descriptive",
+     "revisits": "<a claim id from memory.md this slot CHALLENGES, or null>",
+     "confounder": "<the named thing this slot VARIES vs the runs that established that claim,
+                     or null. Required whenever `revisits` is set.>",
      "metric": "protr_peak",
      "predicted": "<e.g. 'protr_peak >= 3.0' -- a claim you could be WRONG about>",
      "why": "<the reason this edit is worth a GPU-hour, citing the evidence or the paper>"}}
@@ -158,6 +162,23 @@ WRITE {PROPOSAL_FILE} as JSON:
 
 RULES
  - Slot 0 MUST be the control (edit: null), with intent "control".
+ - THE TRACKS ARE ASYMMETRIC. This is new, and it is the point of the round.
+     TRACK A IS OPEN. It MAY violate any trap or prohibition in memory.md. Those were written
+     from evidence that is mostly one run deep, and several are known to be wrong: "Cell division
+     is NECESSARY for the bud" was established in round 2 and REFUTED in round 8 by an edit that
+     broke its own ban. A trap is a summary of what has been tried, never a fact about nature.
+     TRACK B IS CONSTRAINED. It respects traps, cites a named Okuda morphology and its settings,
+     and may not breed from a specimen whose premises were broken.
+ - AT LEAST TWO SLOTS PER BATCH MUST SET `revisits`, challenging an existing claim. Prefer claims
+   supported by a SINGLE run, and claims marked provisional. This is the quota that keeps the map
+   honest, and it is yours to fill -- a revisit inserted by code after the batch is checked would
+   be the one slot exempt from the duplicate and confounder gates, i.e. a licensed re-run.
+ - A REVISIT MUST VARY A NAMED CONFOUNDER, and say which. Re-running the same composition is not
+   a revisit: rounds 4-8 produced bit-identical results under four different hashes and recorded
+   them as four observations. If you cannot name what you are varying, you are not revisiting.
+ - `claim_kind` IS NOT DECORATION. "necessary" means you assert the effect CANNOT occur without
+   this operator -- the most expensive claim available, and it requires an ablation in this batch.
+   Do not mark a slot `necessary` unless the batch actually tests it.
  - Aim for ~70% confirmatory / ~30% adversarial across the remaining slots. The control is not
    part of that ratio -- it is a fixed cost of the design, not one of your choices.
  - EVERY SLOT DECLARES ITS TRACK, and the batch is partitioned between them. This campaign is
