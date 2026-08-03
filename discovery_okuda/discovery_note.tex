@@ -1240,6 +1240,52 @@ remaining route is a different geometry}.
 
 That is not a defect to patch. It is the subject of the next two phases.
 \end{tcolorbox}
+
+\begin{tcolorbox}[colback=warn!7,colframe=warn!55,boxrule=1pt,arc=2pt,breakable,
+                  title={\textbf{The main conclusion: the logic did not emerge}},
+                  coltitle=black,colbacktitle=warn!20]
+\begin{center}\large
+\emph{The reasoning discipline was never in the loop. It did not appear on its own, and no
+number of capable agents produced it.}
+\end{center}
+
+This is the finding of Phase~6, and it is larger than any result about buds. The agents write
+fluently, read images honestly, diagnose an integrator instability unaided and correctly, and
+catch their own control misbehaving. What they never once do is ask whether a conclusion has been
+\emph{earned}.
+
+The record measures it exactly. Across \code{memory.md} and \code{analysis.md} --- some
+forty-four kilobytes of agent-written reasoning over nine rounds --- there is:
+
+\begin{center}
+\textbf{not one} occurrence of \emph{only tested once}, \emph{may not generalise},
+\emph{confounder}, \emph{insufficient evidence}, or \emph{cannot conclude};\\[2pt]
+against \textbf{fifteen} assertions of closure --- six \textsc{inert}, three \textsc{necessary},
+two \textsc{fundamental}, one \textsc{exhausted}, three prohibitions.
+\end{center}
+
+Fifteen universal and necessity claims, zero qualifications. Not a single hedge in the entire
+campaign. The loop has a role that asks \emph{why did the apparatus fail?} --- the Diagnostician,
+which works, and which correctly separated an explicit-Euler reaction instability from a
+diffusion one without being told. It has no role, and no rule, that asks \emph{is this inference
+sound?} So instrument faults were caught and reasoning faults were not; every one of the eight was
+found by a person reading the record afterwards.
+
+The tempting reading is that the models were careless. They were not. Where the format demanded
+rigour they supplied it --- four of seven positive claims carry an explicit falsifier, because the
+template has a \code{Falsifiable by:} field for positives. Where nothing demanded it, none
+appeared, because the template has no field for the conditions of a negative and no bucket for the
+untested. \textbf{The agents were exactly as rigorous as the structure they were given, and not one
+degree more.}
+
+That is the lesson to carry: logic is not an emergent property of putting capable models in a
+loop. It is a \emph{structure} --- modalities, quantifiers, conditions attached to negatives, a
+place for what is merely untried --- and if it is not written down and mechanically checked, the
+loop will run for nine rounds, produce a genuine refutation rate of 57\%, and still conclude that
+a region it never entered is impossible.
+
+Hence \code{LOGIC.md}, and hence the next two phases.
+\end{tcolorbox}
 \end{phasebox}
 
 \begin{phasebox}{Phase 7 --- The demonstration \hfill \todo}
