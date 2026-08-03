@@ -142,6 +142,7 @@ $\rightarrow$ contraction $\rightarrow$ MLS-MPM $\rightarrow$ motion $\rightarro
 1a --- differentiable identification & \wrong & a surrogate that fails its own fidelity test, and refuses to report \\
 1b --- the dynamics-watching critic & \wrong & a VLM that reads a rotating eye as static \\
 2 --- PID autotune by step injection & \dn & the $3\times6$ static gain matrix: \textbf{mechanics-limited by $7\times$}, and the obliques named as the binding constraint \\
+3 --- buy the authority back, one factor at a time & \fl & what each Phase-0 fix is actually worth, in degrees per activation \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -344,7 +345,7 @@ angle.
 %======================================================================
 \section{Phase 2 --- PID autotune by open-loop step injection}
 
-\begin{phasebox}{Phase 2 --- define \hfill \fl}
+\begin{phasebox}{Phase 2 --- define \hfill \dn}
 \textbf{The question, stated so it can come out either way.} Is the standing gaze error a
 \emph{control} problem or a \emph{mechanical} one? Phase~1a asserted an answer with a broken
 instrument. This phase measures it.
@@ -469,11 +470,66 @@ this configuration. The dynamics it would need are now measured anyway ($t_{63}\
 actually reach its commands.
 \end{runbox}
 
-\textbf{What Phase 3 should be.} Not a controller. The gain matrix names its own targets, in order:
-lengthen the obliques (the $1.10^\circ$ torsional gain is the binding constraint on the one motion
-only they can produce), then raise $A/E$ toward the pulley ceiling bisected in Phase~0, then
-re-probe. The same six runs measure whether it worked --- and cost 90 minutes, against the days the
-closed-loop campaign spent guessing.
+%======================================================================
+\section{Phase 3 --- Buy the authority back, one factor at a time}
+
+\begin{phasebox}{Phase 3 --- define \hfill \fl}
+\textbf{Not a controller.} Phase~2 settled that: this plant is short of authority by $7\times$, and
+no gain recovers what the mechanics does not produce. So Phase~3 goes after the mechanics --- and
+uses the Phase-2 probe as its instrument, because that probe is the first thing in this campaign
+that passed a fidelity check.
+
+\textbf{The three interventions, and why these three.} Phase~0 found them by closed-loop guessing
+and never learned what any one of them was worth. \code{t03\_c\_a} predates all three, so it is the
+clean starting point:
+
+\begin{enumerate}
+\item \textbf{Length} --- \code{frac} $0.55\to0.95$, and the rectus origins spread around the
+annulus of Zinn. $\theta_{\max}\sim(A/E)(L/R)$, and this is the term the baseline is worst on.
+\item \textbf{The pulley} --- add \code{muscle\_sleeve}. An anti-buckling device, not a force
+multiplier.
+\item \textbf{Drive} --- $A/E$ $0.25\to0.28$, the top of the range the pulley was measured to allow
+in Phase~0.
+\end{enumerate}
+
+\textbf{One at a time, re-probing after each.} Six probe runs per intervention, $\approx$90 minutes.
+That is the discipline Phase~0 broke when it changed three things at once and then could not say
+which had caused a divergence.
+
+\begin{tcolorbox}[colback=rule!5,colframe=rule!45,boxrule=0.7pt,arc=2pt]
+\textbf{The predictions, written down before the runs.}
+\begin{itemize}
+\item \textbf{Length.} $L/R$ roughly doubles for every muscle, so if $\theta_{\max}\sim L/R$ holds,
+the gains roughly double: LR horizontal $4.25 \to \mathbf{7}$--$\mathbf{9}$, SO torsion
+$1.10 \to \mathbf{1.9}$--$\mathbf{2.4}$ deg per unit activation.
+\item \textbf{The pulley, the sharp one.} If \code{muscle\_sleeve} is what this note claims it is
+--- a purely transverse constraint that prevents buckling and nothing else --- it must leave the
+\emph{static} gain matrix nearly unchanged: \textbf{under 20\% on every entry}. If instead the gains
+move a lot, the sleeve is doing something we have not described, and the Phase-0 story about it is
+wrong.
+\item \textbf{Drive.} Gains are linear in $A$, so $+12\%$, no more.
+\item \textbf{The headline, and the uncomfortable one.} Compounded, LR reaches
+$3.7 \times 2 \times 1.12 \approx \mathbf{8}$--$\mathbf{9^\circ}$ --- \textbf{still nowhere near the
+$26^\circ$ it is commanded to make}. Prediction: \emph{all three Phase-0 fixes together do not make
+this plant able to reach its commands}, and what has to change is either the command amplitude or
+something more basic than a parameter --- cross-section, globe compliance, or how the tendon
+couples.
+\end{itemize}
+\end{tcolorbox}
+
+\textbf{Why the last prediction is worth making even though it is unwelcome.} Phase~0 reported
+$29.6^\circ$ of closed-loop range after the length fix and read that as success. Phase~2 has since
+shown that a closed-loop range is roughly \emph{twice} the single-muscle static gain, because the
+antagonist relaxes as the agonist pulls --- so $29.6^\circ$ of range is about $15^\circ$ of
+authority per direction, against commands of $26^\circ$. The gap was always there. It was hidden by
+measuring the wrong quantity.
+\end{phasebox}
+
+\begin{runbox}{Phase 3 --- run \hfill \todo}
+Three interventions, six probe runs each, and the gain matrix after every one. This box is where
+the answer goes --- including, and especially, if the headline prediction above is wrong and the
+plant does reach its commands.
+\end{runbox}
 
 %======================================================================
 \section{The one result worth defending}
