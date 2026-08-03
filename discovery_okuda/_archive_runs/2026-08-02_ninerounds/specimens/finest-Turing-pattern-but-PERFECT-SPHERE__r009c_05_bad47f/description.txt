@@ -1,0 +1,5 @@
+DESCRIPTION:
+The activator chemical concentration begins at a low level concentrated at the bottom of the vesicle. Over time, the chemical signal migrates toward the top of the vesicle, increasing in intensity. The red shading expands and moves upward as the concentration peaks at the top pole. By the final frame, the chemical signal is concentrated in a large, intense patch at the very top of the sphere.
+
+OBJECTS:
+The primary object is a spherical cell vesicle composed of a dense, interconnected network of small cells. The cells are primarily white, with a specific region shaded in dark red to represent high chemical concentration. A small circular cross-section in the bottom-right shows the internal arrangement of the cells in a flat plane. The entire structure is uniform in size and maintains its spherical topology throughout the simulation.

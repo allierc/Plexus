@@ -1,0 +1,5 @@
+DESCRIPTION:
+The simulation begins with a spherical vesicle composed of a dense, uniform mesh of small cells. Over time, the cells undergo a process of growth and division, causing the overall structure to expand and become more irregular in shape. The internal organization of the cells shifts from a tight, uniform packing to a more complex, faceted arrangement of larger polygonal units. By the final frames, the vesicle has significantly increased in volume and exhibits a jagged, crystalline-like surface geometry.
+
+OBJECTS:
+The primary object is a large, spherical vesicle composed of numerous interconnected cells. These cells are initially small and white, but they evolve into larger, irregularly shaped polygonal units. A small cross-sectional view in the bottom-right corner reveals the internal arrangement of the cells within the vesicle's core. The entire structure is set against a solid black background, highlighting the white outlines of the cellular boundaries.
