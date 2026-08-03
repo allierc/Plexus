@@ -173,3 +173,31 @@ if __name__ == "__main__":
     print(f"  [provenance] {len(m['sources'])} sources archived, dirty={m['campaign_dirty']}")
     print(f"  [provenance] check {'PASS' if ok else 'FAIL ' + str(why)}  ->  {d}")
     sys.exit(0 if ok else 1)
+
+
+def finish(outdir, status="complete", **fields):
+    """Write `<outdir>/run_complete.json`. A run that cannot say whether it finished is not evidence.
+
+    `write_manifest` records what a run STARTED from. Nothing recorded what it ended at, so a fit
+    that crashed, one killed at a wall-clock limit and one that finished cleanly left the same
+    three files on disk -- and a fit whose optimiser silently discarded most of its steps looked
+    exactly like a healthy one. Both are now on the record.
+    """
+    rec = {"status": status, **fields}
+    with open(os.path.join(outdir, "run_complete.json"), "w") as f:
+        json.dump(rec, f, indent=1)
+    return rec
+
+
+def is_complete(outdir):
+    """(ok, reason). Used by anything that wants to cite a run."""
+    p = os.path.join(outdir, "run_complete.json")
+    if not os.path.exists(p):
+        return False, "no run_complete.json -- the run never said it finished"
+    r = json.load(open(p))
+    if r.get("status") != "complete":
+        return False, f"status={r.get('status')}"
+    n, it = r.get("n_nonfinite_steps", 0), r.get("iterations", 0)
+    if it and n / it > 0.1:
+        return False, f"{n}/{it} optimiser steps discarded -- the fit did less than it claims"
+    return True, f"{it} iterations, {n} discarded, {r.get('wall_s', 0):.0f}s"

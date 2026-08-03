@@ -1,6 +1,6 @@
 {
  "verdict": "invalid",
- "verdict_this_run": "invalid",
+ "verdict_this_run": "valid",
  "premises": [
   {
    "premise": "0. every declared premise has a check",
@@ -17,11 +17,25 @@
    "detail": "module constants present (DUR_LO, DUR_HI, GAIN_LO, GAIN_HI); overridable per run via --gain_lo/--gain_hi/--dur_hi. Every fit is checked against them below"
   },
   {
+   "premise": "3. every operator in the fitting recipe acts",
+   "grade": "certain",
+   "pass": true,
+   "skipped": false,
+   "detail": "all 6 act: active_stress, drag, mpm_gather, mpm_grid_update, mpm_scatter, mpm_strain"
+  },
+  {
    "premise": "3. every operator in the spec actually acts",
    "grade": "certain",
    "pass": false,
    "skipped": false,
    "detail": "INERT during training: ['activation_pulse', 'aggregate', 'apply_material_map', 'pacemaker'] -- instantiated and never stepped"
+  },
+  {
+   "premise": "3b. the fitting recipe is equivalent to the generation recipe",
+   "grade": "certain",
+   "pass": true,
+   "skipped": false,
+   "detail": "fits under both are bit-identical over 198407 parameters (removed: pacemaker, activation_pulse, aggregate, apply_material_map)"
   },
   {
    "premise": "6. the seed reaches the engine's own generator",

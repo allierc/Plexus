@@ -27,7 +27,15 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.abspath(os.path.join(HERE, ".."))
 SRC = os.path.join(REPO, "src")
-SPEC = "material/material_aniso_cardio"
+# The FITTING recipe, not the generation one. They differ by four operators the fit never steps
+# (pacemaker, activation_pulse, aggregate, apply_material_map): the trainer replaces them
+# deliberately with a learnable pulse and its own material maps. Premise 3 was right to refuse the
+# generation recipe -- it misdescribed what the fit ran. Fits under the two are BIT-IDENTICAL over
+# 198,407 parameters (_metrology/fit_spec_equivalence.json), so this is a change to the
+# description, proved rather than asserted.
+SPEC = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                    "config", "material", "material_aniso_cardio_fit.yaml")
+GENERATION_SPEC = "material/material_aniso_cardio"
 PY = sys.executable
 
 sys.path.insert(0, HERE)
@@ -127,9 +135,21 @@ def p3_every_operator_acts(V):
         if f'"{tok}"' in src:
             called.add(tok)
     inert = [o for o in declared if o not in called]
-    return V.add("3. every operator in the spec actually acts", CERTAIN, not inert,
-                 "all act" if not inert else
-                 f"INERT during training: {inert} -- instantiated and never stepped")
+    ok = V.add("3. every operator in the fitting recipe acts", CERTAIN, not inert,
+               f"all {len(declared)} act: {', '.join(declared)}" if not inert else
+               f"INERT during training: {inert} -- instantiated and never stepped")
+    # and the removal must not have changed the model -- proved, not assumed
+    eq = os.path.join(HERE, "_metrology", "fit_spec_equivalence.json")
+    if os.path.exists(eq):
+        e = json.load(open(eq))
+        ok = V.add("3b. the fitting recipe is equivalent to the generation recipe", CERTAIN,
+                   bool(e.get("bit_identical")),
+                   f"fits under both are bit-identical over {e.get('params')} parameters "
+                   f"(removed: {', '.join(e.get('removed_operators', []))})") and ok
+    else:
+        ok = V.add("3b. the fitting recipe is equivalent to the generation recipe", CERTAIN, False,
+                   "not measured -- run the equivalence check before trusting the removal")
+    return ok
 
 
 # ---------------------------------------------------------------------------------------------
@@ -360,6 +380,32 @@ def canary_rail(V):
         ok = V.add(f"canary: rail check refuses {label}", CERTAIN, fired == want_rail,
                    probe.rows[-1]["detail"]) and ok
     return ok
+
+
+def verdict_for_run(run_dir=None, device="cpu", probe=False):
+    """The importable entry point. Anything that writes a number must be able to ask this.
+
+    `premises.py` had a `--run` mode and a verdict function and was imported by NO module -- so a
+    Phase-2 measurement could have been computed from fits that this checker rejects, with nothing
+    in the pipeline that would notice. That is the shape of the most expensive defect in the
+    okuda campaign, and it cost a five-round retroactive `provisional`.
+    """
+    V = Verdicts()
+    coverage(V)
+    p2_bounds_declared(V)
+    p3_every_operator_acts(V)
+    p6_seed_reaches_the_engine(V)
+    p8_the_beat_is_a_beat(V)
+    if run_dir:
+        p2_no_parameter_on_its_bound(V, run_dir)
+        import provenance as PROV
+        ok, why = PROV.is_complete(run_dir)
+        V.add("9. the run says it finished, and did what it claims", CERTAIN, ok, why)
+    if probe:
+        probe_forward(V, device)
+        p5_warmup_settles(V, device)
+    return {"verdict": V.verdict(), "rows": V.rows,
+            "broken": [r["premise"] for r in V.rows if not r["pass"] and not r["skipped"]]}
 
 
 def main(argv=None):
