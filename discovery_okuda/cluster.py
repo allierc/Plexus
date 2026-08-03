@@ -201,6 +201,36 @@ def _wrap_names(names, width=92):
                          break_long_words=False, break_on_hyphens=False)
 
 
+def _frames_of(job_ids, id_to_name):
+    """The frame each live job has reached, from its own heartbeat."""
+    import json as _j
+    out = []
+    for i in job_ids:
+        n = (id_to_name or {}).get(i)
+        if not n:
+            continue
+        p = os.path.join(LOG_ROOT, n, "progress.json")
+        try:
+            out.append(int(_j.load(open(p)).get("frame") or 0))
+        except Exception:
+            pass
+    return out
+
+
+def _frames_total(id_to_name):
+    """How many frames a run is meant to have, read from any live spec."""
+    for n in (id_to_name or {}).values():
+        try:
+            import yaml
+            c = yaml.safe_load(open(os.path.join(LOG_ROOT, n, "spec_run.yaml")))
+            v = (c.get("general") or {}).get("n_frames")
+            if v:
+                return int(v)
+        except Exception:
+            continue
+    return 0
+
+
 def _ids_from_queue(names):
     """Job ids for THESE names, asked of the queue itself.
 
@@ -440,8 +470,17 @@ def wait_for_ids(ids, poll=60, timeout_h=24, straggler_factor=4.0, min_straggler
             now = time.time()
             for i in done + bad:
                 finished_at.setdefault(i, now)
+            # FRAME PROGRESS ON THE POLL LINE. "run/pend=10" for forty minutes says a job is
+            # alive and nothing about whether it is moving; the heartbeats already carry the
+            # frame and were only read by the straggler test, once every thirty minutes.
+            _fr = _frames_of(active, id_to_name)
+            _fp = ""
+            if _fr:
+                _lo, _hi, _tot = min(_fr), max(_fr), _frames_total(id_to_name)
+                _fp = (f"  frame {_lo}" + (f"-{_hi}" if _hi != _lo else "")
+                       + (f" of {_tot}" if _tot else ""))
             print(f"  [{time.strftime('%H:%M')}] run/pend={len(active)} done={len(done)} "
-                  f"exit={len(bad)} of {len(ids)}"
+                  f"exit={len(bad)} of {len(ids)}{_fp}"
                   + (f" killed={len(killed)}" if killed else ""), flush=True)
             if not active:
                 if bad:
