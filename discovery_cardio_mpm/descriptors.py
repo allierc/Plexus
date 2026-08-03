@@ -114,6 +114,57 @@ def _circ_diff(a, b):
     return np.minimum(d, np.pi - d)
 
 
+def describe(path, mov=None, K=4):
+    """TRACK A's instrument: what IS this trajectory, on its own terms?
+
+    Track A never sees the recording. It sweeps the model and asks where the system goes, so it
+    needs the axes as PROPERTIES of a single trajectory, not as a comparison. That is this
+    function; `loop_residual` below is Track B's, and it is built from two calls to this one.
+
+    Having them share a definition is not tidiness -- it is the reason one track can feed the
+    other. A sweep in Track A traces a path through this space; a fit in Track B lands somewhere
+    in the same space. Had the two tracks measured different quantities, nothing learned in A
+    could have been spent in B.
+
+    Returns per-node vectors, so a caller can take a median, a spread, or the whole distribution.
+    """
+    p = _as_np(path)
+    if mov is not None:
+        p = p[:, np.asarray(mov, bool)]
+    sa = _signed_area(p)
+    out = {
+        "n_nodes": int(p.shape[1]), "n_frames": int(p.shape[0]), "K": int(K),
+        "magnitude_peak": np.linalg.norm(p, axis=-1).max(axis=0),
+        "magnitude_energy": np.sqrt((p ** 2).sum(axis=(0, 2))),
+        "opening_area": np.abs(sa),
+        "opening_loopiness": np.abs(sa) / np.maximum(_bbox_area(p), 1e-30),
+        "direction_sense": np.sign(sa),                     # +1 / -1 per node: which way it turns
+        "orientation_rad": _major_axis_angle(p),
+        "shape_minor_fraction": _minor_fraction(p),
+    }
+    return out
+
+
+AXIS_KEYS = ("magnitude_peak", "magnitude_energy", "opening_area", "opening_loopiness",
+             "orientation_rad", "shape_minor_fraction")
+
+
+def summarise(desc):
+    """A single trajectory as one row: the median of each axis, with its per-node spread.
+
+    What a Track A sweep records per run. `direction_sense` is summarised as the fraction turning
+    one way, because a median of +-1 says nothing.
+    """
+    out = {k: {"median": float(np.median(desc[k])), "sd": float(np.std(desc[k]))}
+           for k in AXIS_KEYS if k in desc}
+    if "direction_sense" in desc:
+        d = np.asarray(desc["direction_sense"])
+        out["direction_coherence"] = {"median": float(np.abs(d.mean())), "sd": float(d.std()),
+                                      "note": "1 = every node turns the same way, 0 = no net sense"}
+    out["n_nodes"] = int(desc["n_nodes"])
+    return out
+
+
 def loop_residual(sim, real, mov=None, K=4):
     """The Track B measurement.
 
@@ -132,6 +183,9 @@ def loop_residual(sim, real, mov=None, K=4):
         m = np.asarray(mov, bool)
         s, r = s[:, m], r[:, m]
     n = s.shape[1]
+    # Built from two `describe` calls on purpose: Track B's residual is the difference between two
+    # Track A readings, so the two tracks cannot drift apart in what they mean by "opening".
+    ds, dr = describe(s, K=K), describe(r, K=K)
 
     out = {"n_nodes": int(n), "n_frames": int(s.shape[0]), "K": int(K)}
 
@@ -149,15 +203,13 @@ def loop_residual(sim, real, mov=None, K=4):
     # is not rotation-invariant, so merely turning a loop on the spot changed its "magnitude" and
     # the rotation check failed. A magnitude axis that moves when only the orientation axis should
     # is exactly the cross-talk this decomposition exists to prevent.
-    axis("magnitude_peak", np.linalg.norm(s, axis=-1).max(axis=0), np.linalg.norm(r, axis=-1).max(axis=0))
-    axis("magnitude_energy", np.sqrt((s ** 2).sum(axis=(0, 2))), np.sqrt((r ** 2).sum(axis=(0, 2))))
+    axis("magnitude_peak", ds["magnitude_peak"], dr["magnitude_peak"])
+    axis("magnitude_energy", ds["magnitude_energy"], dr["magnitude_energy"])
 
     # --- opening: does it enclose area --------------------------------------------------------
     sa, ra = _signed_area(s), _signed_area(r)
-    axis("opening_area", np.abs(sa), np.abs(ra))
-    sb, rb = _bbox_area(s), _bbox_area(r)
-    axis("opening_loopiness", np.abs(sa) / np.maximum(sb, 1e-30),
-         np.abs(ra) / np.maximum(rb, 1e-30))
+    axis("opening_area", ds["opening_area"], dr["opening_area"])
+    axis("opening_loopiness", ds["opening_loopiness"], dr["opening_loopiness"])
 
     # --- direction: which way round -----------------------------------------------------------
     # A fraction, so it has no sim|real pair: the real data IS the reference, by definition 1.0.
@@ -185,7 +237,7 @@ def loop_residual(sim, real, mov=None, K=4):
                 "same thing two ways and a disagreement means one of them is broken."}
 
     # --- shape: 2-D versus radial is all we have, and it is not enough ------------------------
-    axis("shape_minor_fraction", _minor_fraction(s), _minor_fraction(r))
+    axis("shape_minor_fraction", ds["shape_minor_fraction"], dr["shape_minor_fraction"])
     out["shape_learned"] = {
         "sim": None, "real": None, "ratio": None, "certified": False,
         "note": "NOT IMPLEMENTED, on purpose. Needs a learned descriptor (render both paths, "

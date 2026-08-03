@@ -17,13 +17,19 @@ decompose published code into the operator algebra. **This one fits a differenti
 a beating cardiomyocyte sheet to microscope tracking data**, and asks which mechanisms the data can
 actually support.
 
-**Two tracks, judged differently** (this is the design decision of the whole folder):
+**Two tracks, and the ORDER is the argument:**
 
-- **Track A has no success rule.** Its product is a causal map that improves by being filled in,
-  including with negatives, reported with a *surprise rate* beside it.
-- **Track B has a sharp one:** the difference between the simulated and the recorded loop
-  trajectory, **decomposed** into magnitude / opening / direction / orientation / shape — never one
-  number.
+- **Track A — understand the model on its own terms, before any data is involved.** Sweep it,
+  ablate it, change what drives what, and record where the system goes. **No recording is
+  consulted.** Product: a causal map — which mechanism moves which feature of the beat, alone and
+  in combination. No success rule; a dose-confirmed nothing is a result. Instrument:
+  `descriptors.describe()`, which reads a trajectory on its own axes.
+- **Track B — fit the real recording, spending what A learned.** Differentiable, so far stronger
+  and far more dangerous. Instrument: `descriptors.loop_residual()`, built from two `describe()`
+  calls so the two tracks cannot drift apart in what they mean by "opening".
+
+A fit will always find something; Track A is what makes it mean something. **A builds the
+knowledge, B spends it, and what B cannot explain goes back to A as the next thing to sweep.**
 
 **The loop is four steps, not thirteen roles** (Cedric's instruction: *make it brutally concrete*):
 
