@@ -64,13 +64,46 @@ def camera(view):
         return (np.array([-1., 0., 0.]), np.array([0., 1., 0.]), np.array([0., 0., -1.]))
     if view == "lateral":      # from the temporal side: anterior points right
         return (np.array([0., 0., 1.]), np.array([0., 1., 0.]), np.array([-1., 0., 0.]))
-    if view == "oblique":      # 3/4 view, used for the cut panels and the grid
-        az, el = math.radians(40.0), math.radians(18.0)
-        r = np.array([math.cos(az), 0.0, -math.sin(az)])
-        f = -np.array([math.sin(az) * math.cos(el), math.sin(el), math.cos(az) * math.cos(el)])
-        u = np.cross(f, r)
-        return r, u / np.linalg.norm(u), f
+    if view == "oblique":
+        # A 3/4 view DERIVED FROM THE ANTERIOR ONE, by swinging the camera about the world
+        # vertical and then tilting it down. This matters and was got wrong once: the anterior
+        # camera deliberately has screen-right = -x, so that temporal sits on the viewer's left
+        # as in an anatomical plate, while this view was originally written independently as a
+        # generic 3/4 with screen-right = +cos(az) x. The two disagreed in sign, so the SAME
+        # muscle appeared on the left in panel (a) and on the right in panels (c)-(e) -- the
+        # stress at the lateral rectus insertion read as if it were on the medial side. Deriving
+        # this basis from the anterior one makes the mirror impossible rather than unlikely.
+        psi, el = math.radians(40.0), math.radians(18.0)
+        cy, sy = math.cos(psi), math.sin(psi)
+        Ry = np.array([[cy, 0.0, sy], [0.0, 1.0, 0.0], [-sy, 0.0, cy]])
+        r0, u0, f0 = camera("anterior")
+        r, u, f = Ry @ r0, Ry @ u0, Ry @ f0                  # swing about world +y
+        ce, se = math.cos(el), math.sin(el)                  # then tilt down about screen-right
+        u, f = ce * u - se * f, se * u + ce * f
+        return r, u / np.linalg.norm(u), f / np.linalg.norm(f)
     raise ValueError(view)
+
+
+def check_cameras(tol=1e-9):
+    """Every view must place the same muscle on the same side of the screen.
+
+    A figure whose panels disagree about left and right is worse than no figure: it invites
+    exactly the reading that the stress is on the wrong muscle. This is cheap enough to assert."""
+    import eye_anatomy as _EA
+    c = np.asarray(_EA.GLOBE_CENTER, float)
+    ins = _EA.insertion_dirs() * _EA.A_EQ + c
+    sides = {}
+    for view in ("anterior", "oblique"):
+        sx, _, _ = proj(ins, view)
+        cx, _, _ = proj(np.atleast_2d(c), view)
+        sides[view] = np.sign(sx - cx[0])
+    bad = [k for i, k in enumerate(_EA.MUSCLE_KEYS)
+           if abs(sides["anterior"][i]) > 0.5 and abs(sides["oblique"][i]) > 0.5
+           and sides["anterior"][i] != sides["oblique"][i]]
+    if bad:
+        raise AssertionError(
+            f"anterior and oblique views disagree about which side these muscles are on: {bad}")
+    return True
 
 
 def proj(P, view):
