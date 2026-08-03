@@ -651,7 +651,7 @@ def _absorb_event(line, quiet):
                 # narration around it -- and it arrives with the payload embedded, so a fenced
                 # ```json block of twelve run names was landing verbatim in the terminal. Strip
                 # the fences and anything that is plainly a JSON object; keep the prose, short.
-                _t = _clip(_prose_only(blk["text"]), 220)
+                _t = _clip(_prose_only(blk["text"]))
                 if _t:
                     print(_t, flush=True)
             # A BARE TOOL NAME IS NOISE. `[tool] Bash` eight times running says only that the
@@ -664,17 +664,24 @@ def _absorb_event(line, quiet):
     return ""
 
 
-def _clip(text, n):
-    """Cut on a WORD boundary, not mid-token.
+def _clip(text, width=92, max_lines=4):
+    """WRAP, do not truncate. A cut sentence is worse than a second line.
 
-    A hard [:n] left lines ending "...growth+division family: Rationale (" -- a dangling open
-    paren that reads like a bug in the agent rather than a truncation in the printer.
+    This was a hard slice at 220 characters, which left lines ending "Rationale (" -- a dangling
+    open paren that reads like a bug in the agent rather than a truncation in the printer.
+    Clipping on a word boundary only moved the damage; the answer is to let it go to the next
+    line. Bounded by LINES rather than characters so a runaway reply still cannot flood the
+    terminal, and any cut lands at a line end.
     """
-    t = (text or "").strip()
-    if len(t) <= n:
-        return t
-    cut = t[:n].rsplit(" ", 1)[0].rstrip(" ,;:-([{")
-    return (cut or t[:n]) + " ..."
+    import textwrap
+    t = " ".join((text or "").split())
+    if not t:
+        return ""
+    lines = textwrap.fill(t, width=width, break_long_words=False,
+                          break_on_hyphens=False).splitlines()
+    if len(lines) <= max_lines:
+        return "\n".join(lines)
+    return "\n".join(lines[:max_lines]) + " ..."
 
 
 def _prose_only(text):
@@ -704,17 +711,24 @@ def tool_summary(reset=True):
     return out
 
 
-def _clip(text, n):
-    """Cut on a WORD boundary, not mid-token.
+def _clip(text, width=92, max_lines=4):
+    """WRAP, do not truncate. A cut sentence is worse than a second line.
 
-    A hard [:n] left lines ending "...growth+division family: Rationale (" -- a dangling open
-    paren that reads like a bug in the agent rather than a truncation in the printer.
+    This was a hard slice at 220 characters, which left lines ending "Rationale (" -- a dangling
+    open paren that reads like a bug in the agent rather than a truncation in the printer.
+    Clipping on a word boundary only moved the damage; the answer is to let it go to the next
+    line. Bounded by LINES rather than characters so a runaway reply still cannot flood the
+    terminal, and any cut lands at a line end.
     """
-    t = (text or "").strip()
-    if len(t) <= n:
-        return t
-    cut = t[:n].rsplit(" ", 1)[0].rstrip(" ,;:-([{")
-    return (cut or t[:n]) + " ..."
+    import textwrap
+    t = " ".join((text or "").split())
+    if not t:
+        return ""
+    lines = textwrap.fill(t, width=width, break_long_words=False,
+                          break_on_hyphens=False).splitlines()
+    if len(lines) <= max_lines:
+        return "\n".join(lines)
+    return "\n".join(lines[:max_lines]) + " ..."
 
 
 def _prose_only(text):
