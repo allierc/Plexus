@@ -355,8 +355,54 @@ def trial(label, device="cuda:0", stride=3, movie=True, note="", **kw):
     return outdir, d
 
 
+def regen(rundir, device="cuda:0", stride=None, movie=True):
+    """Re-run an ARCHIVED spec in place, keeping its folder name and number.
+
+    Needed whenever a rendering fix invalidates the movies already on disk -- which has now
+    happened twice (colour bars accumulating per frame, and an oblique camera mirrored against the
+    anterior one). It lives here rather than in a separate migration script on purpose: the run,
+    score and render path must have exactly ONE implementation, or the copy drifts and the next
+    person to regenerate the archive gets something subtly wrong.
+
+    Caveat worth knowing: a spec does not fully determine its own run, because
+    `muscle_morphogenesis` reads the muscle origins from `eye_anatomy` at run time. Regenerating
+    makes the archive self-consistent with the current code; it is not a reproduction of the
+    original run, and metrics may move slightly.
+    """
+    import yaml
+    path = os.path.join(rundir, "spec.yaml")
+    spec = yaml.safe_load(open(path))
+    ops = {o["op"] for o in spec["operators"]}
+    sim = load_spec(path)
+    n = int(spec["general"]["n_frames"])
+    stride = stride or (5 if n <= 700 else 8)
+    render_eye.check_cameras()                       # the class of bug this exists for
+    print(f"[regen] {os.path.basename(rundir)} ({n} frames, stride {stride})", flush=True)
+    _, cap = capture_run(sim, device, stride=stride)
+
+    if "oculomotor_drive" in ops:                    # a closed-loop trial: score it as usual
+        d = diagnose(cap, sim)
+        checks, passed = verdict(d)
+        d["objective"], d["checks"], d["passed"], d["regenerated"] = objective(d), checks, passed, True
+        with open(os.path.join(rundir, "diag.json"), "w") as f:
+            json.dump(d, f, indent=2)
+        print(f"  range {d['range_hvt_deg']}  settled rms {d['tracking_settled_rms_deg']}  "
+              f"objective {d['objective']}", flush=True)
+    np.savez_compressed(os.path.join(rundir, "curves.npz"),
+                        **{k: v for k, v in cap.items()
+                           if k in ("frame", "act", "tension", "length", "rest_length", "gaze",
+                                    "target", "centre", "ins", "pull", "axis", "radius",
+                                    "radius_spread")})
+    if movie:
+        render_eye.render(cap, float(sim.dt), os.path.join(rundir, "movie.mp4"),
+                          os.path.join(rundir, "strip.png"))
+    return rundir
+
+
 def main():
     ap = argparse.ArgumentParser()
+    ap.add_argument("--regen", nargs="*", default=None,
+                    help="re-run these archived folders in place (names under archive/)")
     ap.add_argument("--preset", default="atlas", choices=list(ES.PRESETS))
     ap.add_argument("--label", default="run")
     ap.add_argument("--particles", type=int, default=45000)
@@ -388,6 +434,15 @@ def main():
     ap.add_argument("--device", default="cuda:0")
     ap.add_argument("--no-movie", action="store_true")
     a = ap.parse_args()
+    if a.regen is not None:
+        import glob as _glob
+        names = set(a.regen)
+        dirs = sorted(d for d in _glob.glob(os.path.join(ARCHIVE, "t[0-9][0-9]_*"))
+                      if os.path.isfile(os.path.join(d, "spec.yaml"))
+                      and (not names or os.path.basename(d) in names))
+        for d in dirs:
+            regen(d, device=a.device, stride=a.stride, movie=not a.no_movie)
+        return
     trial(a.label, device=a.device, stride=a.stride, movie=not a.no_movie,
           preset=a.preset, n_particles=a.particles, n_muscle_particles=a.mparticles,
           n_grid=a.n_grid, n_frames=a.frames, dt=a.dt, contract=a.contract, drag=a.drag,

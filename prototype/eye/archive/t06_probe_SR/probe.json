@@ -5,7 +5,7 @@
   "t_on": 60,
   "t_off": 560,
   "n_frames": 650,
-  "baseline": "t06_probe_SR",
+  "regenerated": true,
   "gaze_range_deg": [
     2.94,
     7.914,
