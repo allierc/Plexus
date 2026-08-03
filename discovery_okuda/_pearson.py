@@ -33,20 +33,28 @@ def run(F, kk, chi=1.3, rate=1.0, d_a=0.08, d_h=0.16, seed_frac=0.06, seed=0, ch
         a=np.clip(a,0,10); u=np.clip(u,0,10)
     return out, float(a.max())
 
-print("PEARSON SWEEP -- looking for STABLE spots, not a moment during coarsening")
-print(f"target: ~5 spots on {nF} cells, unchanged between step 1500 and 3000\n")
-print(f"{'F':>7}{'k':>7} | {'spots@1500':>11}{'spots@3000':>11}{'cover':>8}{'spacing':>9}  verdict")
-rows=[]
-for F, kk in itertools.product((0.020,0.030,0.037,0.046,0.055), (0.055,0.060,0.062,0.065)):
-    (m1,m2), amax = run(F,kk)
-    if m1 is None or m2 is None:
-        print(f"{F:7.3f}{kk:7.3f} | {'-':>11}{'-':>11}{'-':>8}{'-':>9}  DEAD"); continue
-    n1,n2 = m1['n_spots'], m2['n_spots']
-    stable = (n2>0) and abs(n1-n2) <= max(1, 0.2*n1)
-    v = ("STABLE" if stable else "coarsening")
-    if stable and 3 <= n2 <= 9: v = "STABLE  <-- OKUDA RANGE"
-    print(f"{F:7.3f}{kk:7.3f} | {n1:11d}{n2:11d}{m2['spot_frac']:8.3f}{(m2['spot_spacing_cells'] or 0):9.2f}  {v}")
-    rows.append(dict(F=F,kk=kk,n1500=n1,n3000=n2,cover=m2['spot_frac'],
-                     spacing=m2['spot_spacing_cells'],stable=bool(stable)))
-json.dump(rows, open("_pearson.json","w"), indent=1)
-print("\n-> _pearson.json")
+
+
+# A GUARD, BECAUSE THIS FILE DOES WORK. Everything below ran AT IMPORT: a package scan,
+# an editor indexing the tree, or `import _pearson` from a sibling would silently start a
+# GPU sweep. Found during the pre-flight for the next campaign, when importing every module
+# in the package printed two full calibration tables. A script and a module are different
+# things and the difference is this line.
+if __name__ == "__main__":
+    print("PEARSON SWEEP -- looking for STABLE spots, not a moment during coarsening")
+    print(f"target: ~5 spots on {nF} cells, unchanged between step 1500 and 3000\n")
+    print(f"{'F':>7}{'k':>7} | {'spots@1500':>11}{'spots@3000':>11}{'cover':>8}{'spacing':>9}  verdict")
+    rows=[]
+    for F, kk in itertools.product((0.020,0.030,0.037,0.046,0.055), (0.055,0.060,0.062,0.065)):
+        (m1,m2), amax = run(F,kk)
+        if m1 is None or m2 is None:
+            print(f"{F:7.3f}{kk:7.3f} | {'-':>11}{'-':>11}{'-':>8}{'-':>9}  DEAD"); continue
+        n1,n2 = m1['n_spots'], m2['n_spots']
+        stable = (n2>0) and abs(n1-n2) <= max(1, 0.2*n1)
+        v = ("STABLE" if stable else "coarsening")
+        if stable and 3 <= n2 <= 9: v = "STABLE  <-- OKUDA RANGE"
+        print(f"{F:7.3f}{kk:7.3f} | {n1:11d}{n2:11d}{m2['spot_frac']:8.3f}{(m2['spot_spacing_cells'] or 0):9.2f}  {v}")
+        rows.append(dict(F=F,kk=kk,n1500=n1,n3000=n2,cover=m2['spot_frac'],
+                         spacing=m2['spot_spacing_cells'],stable=bool(stable)))
+    json.dump(rows, open("_pearson.json","w"), indent=1)
+    print("\n-> _pearson.json")

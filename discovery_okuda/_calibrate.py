@@ -29,22 +29,30 @@ def run(chi, rate, steps, F=0.055, kk=0.062, d_a=0.08, d_h=0.16, seed_frac=0.06,
         a=np.clip(a,0,10); u=np.clip(u,0,10)
     return a
 
-TARGET_SPOTS = 5
-print(f"CALIBRATING to Okuda's ~{TARGET_SPOTS} spots on a {nF}-cell ball")
-print(f"target spacing for {TARGET_SPOTS} spots = R*sqrt(4pi/k)/L")
-L=float(np.mean(np.linalg.norm(cen[dst]-cen[src],axis=1)))
-print(f"  mesh spacing {L:.4f}, target spot spacing {5.0*np.sqrt(4*np.pi/TARGET_SPOTS)/L:.1f} cells\n")
-print(f"{'chi':>6}{'rd_rate':>9}{'steps':>7} | {'a_max':>7}{'n_spots':>9}{'spacing':>9}  verdict")
-rows=[]
-for chi, rate in itertools.product((1.3, 2.6, 5.2), (1.0, 0.3, 0.1, 0.03)):
-    steps=int(3000/max(rate,0.03)) if rate<1 else 3000
-    steps=min(steps, 30000)
-    a=run(chi,rate,steps)
-    if a.max()<0.2:
-        print(f"{chi:6.1f}{rate:9.2f}{steps:7d} | {a.max():7.3f}{'-':>9}{'-':>9}  DEAD"); continue
-    m=pattern_metrics(a,es,et,ef,nF,cen=cen)
-    ns, sp = m['n_spots'], m['spot_spacing_cells']
-    v_ = "<-- TARGET" if TARGET_SPOTS-2 <= ns <= TARGET_SPOTS+3 else ""
-    print(f"{chi:6.1f}{rate:9.2f}{steps:7d} | {a.max():7.3f}{ns:9d}{(sp if sp else 0):9.2f}  {v_}")
-    rows.append(dict(chi=chi, rd_rate=rate, steps=steps, n_spots=ns, spacing=sp, a_max=float(a.max())))
-json.dump(rows, open("_calibrate.json","w"), indent=1)
+
+
+# A GUARD, BECAUSE THIS FILE DOES WORK. Everything below ran AT IMPORT: a package scan,
+# an editor indexing the tree, or `import _pearson` from a sibling would silently start a
+# GPU sweep. Found during the pre-flight for the next campaign, when importing every module
+# in the package printed two full calibration tables. A script and a module are different
+# things and the difference is this line.
+if __name__ == "__main__":
+    TARGET_SPOTS = 5
+    print(f"CALIBRATING to Okuda's ~{TARGET_SPOTS} spots on a {nF}-cell ball")
+    print(f"target spacing for {TARGET_SPOTS} spots = R*sqrt(4pi/k)/L")
+    L=float(np.mean(np.linalg.norm(cen[dst]-cen[src],axis=1)))
+    print(f"  mesh spacing {L:.4f}, target spot spacing {5.0*np.sqrt(4*np.pi/TARGET_SPOTS)/L:.1f} cells\n")
+    print(f"{'chi':>6}{'rd_rate':>9}{'steps':>7} | {'a_max':>7}{'n_spots':>9}{'spacing':>9}  verdict")
+    rows=[]
+    for chi, rate in itertools.product((1.3, 2.6, 5.2), (1.0, 0.3, 0.1, 0.03)):
+        steps=int(3000/max(rate,0.03)) if rate<1 else 3000
+        steps=min(steps, 30000)
+        a=run(chi,rate,steps)
+        if a.max()<0.2:
+            print(f"{chi:6.1f}{rate:9.2f}{steps:7d} | {a.max():7.3f}{'-':>9}{'-':>9}  DEAD"); continue
+        m=pattern_metrics(a,es,et,ef,nF,cen=cen)
+        ns, sp = m['n_spots'], m['spot_spacing_cells']
+        v_ = "<-- TARGET" if TARGET_SPOTS-2 <= ns <= TARGET_SPOTS+3 else ""
+        print(f"{chi:6.1f}{rate:9.2f}{steps:7d} | {a.max():7.3f}{ns:9d}{(sp if sp else 0):9.2f}  {v_}")
+        rows.append(dict(chi=chi, rd_rate=rate, steps=steps, n_spots=ns, spacing=sp, a_max=float(a.max())))
+    json.dump(rows, open("_calibrate.json","w"), indent=1)
