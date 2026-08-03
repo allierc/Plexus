@@ -1416,7 +1416,8 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         # (which is what the old first-match regex did -- see predict.py P1/P2/P3).
         outcome, why = PR.score(h.predicted, summ, primary_metric=h.metric)
         if outcome == "inconclusive":
-            print(f"  [predict] {nm} NOT CHECKABLE -- {why[:150]}")
+            print(f"[predict] {nm}: not checkable")
+            print(T_.quiet(T_.wrap_names([str(why)[:180]])))
         # A quarantined Q must be visible in the SCIENTIFIC record, not only in the terminal:
         # `why` is what lands in hypotheses.jsonl, so anyone reading the resolution later sees
         # that the survival number was withheld rather than measured.

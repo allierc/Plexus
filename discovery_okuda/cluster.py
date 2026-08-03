@@ -352,6 +352,14 @@ def _is_working(job_id, ids, min_frac=0.5):
         cur = (int(b.get("frame") or 0), b.get("n_cells"))
         prev = _BEATS.get(job_id)
         _BEATS[job_id] = cur
+        # A RUN THAT FINISHED ITS FRAMES IS NOT WEDGED. The heartbeat fires per frame, so it
+        # falls silent the moment the loop ends -- and analysis, the movie and the strip take
+        # minutes after that. Job 153256444 was killed as "wedged, not slow" AT FRAME 900, i.e.
+        # while it was writing the results the round was waiting for.
+        if str(b.get("phase")) == "analysing":
+            print(f"[cluster] {job_id} finished its frames and is writing results -- not a "
+                  f"straggler.", flush=True)
+            return True
         if age > HEARTBEAT_STALE_S:
             print(f"[cluster] {job_id} wrote no heartbeat for {age / 60:.0f} min (frame "
                   f"{cur[0]}) -- wedged, not slow.", flush=True)
@@ -450,18 +458,29 @@ def wait_for_ids(ids, poll=60, timeout_h=24, straggler_factor=4.0, min_straggler
                 med = sorted(settled)[len(settled) // 2]
                 limit = max(min_straggler_min * 60.0, straggler_factor * med)
                 if now - t0 > limit:
+                    spared = []
                     for i in active:
                         if i in killed:
                             continue
                         if _is_working(i, id_to_name):
+                            spared.append(i)
                             continue
                         print(f"[cluster] ⏱ STRAGGLER {i}: {(now - t0) / 60:.0f} min vs median "
                               f"{med / 60:.0f} min for the batch -- killing it. A degenerate "
                               f"composition must not hold the round.", flush=True)
                         _ssh_retry(f"bkill {i} 2>&1 || true")
                         killed.add(i)
-                    return {"ok": False, "done": sorted(done), "exit": sorted(bad),
-                            "killed": sorted(killed), "timed_out": False}
+                    # SPARING MUST MEAN WAITING. This returned unconditionally after the sweep,
+                    # so a job identified as working was spared from the kill and then ABANDONED
+                    # anyway -- the round moved to captioning while two jobs were still running,
+                    # and their results reached nobody. If anything was spared, keep polling; the
+                    # straggler window simply reopens on the next pass.
+                    if spared:
+                        print(f"[cluster] {len(spared)} job(s) still working -- waiting for them "
+                              f"rather than closing the batch.", flush=True)
+                    else:
+                        return {"ok": False, "done": sorted(done), "exit": sorted(bad),
+                                "killed": sorted(killed), "timed_out": False}
         time.sleep(poll)
     print(f"[cluster] ⚠ wait timed out after {timeout_h} h")
     return {"ok": False, "done": [], "exit": [], "killed": [], "timed_out": True}
