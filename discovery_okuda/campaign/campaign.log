@@ -6,3 +6,36 @@
 ------------------------------------------------------------------------------------------------
 [loop] round 1/20  mode=recon   spent so far: 0.0 agent-min over 0 calls
 ------------------------------------------------------------------------------------------------
+================================================================================================
+ROUND 1   mode=recon   campaign=okuda_growth_driven
+================================================================================================
+
+================================================================================================
+▶ ACT 1 - PROPOSE   [+00:00]   before a second of compute is spent
+================================================================================================
+  [proposer] 1.4 min, tools: Bashx14, Readx5
+  [recon] the Proposer chose 0: 
+  ◉ proposer: the proposer named no runs
+  [recon] no usable spec was chosen -- a recon round with nothing to replay
+[round] no candidates -- escalating
+[frontier] no frontier -- COLD START. Asking the Archivist what is already on disk.
+  [archivist] start from ['cfl_c001p300_d000p420', 'cfl_c000p080_d002p000'] -- Both SOUND, Track A, 2000 cells. c001p300_d000p420 is the strongest map point (protr_peak 1.84) and anchors the high-c/low-d cfl ridge (0.220→0.420 monotone 1.0
+    [archivist] cfl_c001p300_d000p420: no composition.json -- cannot be rebuilt as a graph
+    [archivist] cfl_c000p080_d002p000: no composition.json -- cannot be rebuilt as a graph
+  [archivist] named no usable run -- falling back to seed + reference recipes
+  ◉ supervisor: escalating: open_stage_gate -- stage 2 -> 3: admit the next stage's operators into the legal move se
+      t
+  ⚠ [escalate] opened stage gate -> 3
+
+[llm] per-role breakdown (round, round 1)
+       agent                  calls      min      %    ok/fail/skip
+       proposer                   1     1.44 100.0%     0/1   /0   
+       TOTAL                      1     1.44   llm=1.44 min of 10.0 ceiling | wall since round start 1.74 min
+[llm] {'calls': 1, 'round_min': 1.44, 'total_min': 1.44, 'turns': 17, 'tok_in': 3689, 'tok_out': 3969, 'cache_new': 39946, 'cache_hit': 543409, 'usd': 0.789, 'roles': 1, 'budget_exceeded': False, 'unmetered': 0}
+[llm] timing appended to /workspace/Plexus/discovery_okuda/campaign/llm_timing.jsonl
+  ⚠ [loop] round 1 exited 5 after 1.9 min wall, 1.4 min of agents
+  ⚠ [loop] round 1 produced no evidence and spent no compute (refused in Act 1). Cheap; the refusals go to the next Proposer. empty 1
+
+------------------------------------------------------------------------------------------------
+[loop] round 2/20  mode=composition   spent so far: 1.4 agent-min over 1 calls
+------------------------------------------------------------------------------------------------
