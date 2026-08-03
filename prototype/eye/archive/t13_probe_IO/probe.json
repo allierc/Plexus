@@ -1,0 +1,14 @@
+{
+  "muscle": "IO",
+  "a_hi": 1.0,
+  "tonic": 0.14,
+  "t_on": 60,
+  "t_off": 560,
+  "n_frames": 650,
+  "baseline": "t13_probe_IO",
+  "gaze_range_deg": [
+    1.075,
+    0.562,
+    0.54
+  ]
+}
