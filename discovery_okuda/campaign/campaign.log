@@ -677,3 +677,132 @@ ROUND 2   mode=composition   campaign=okuda_growth_driven
 ================================================================================================
 ▶ ACT 1 - PROPOSE   [+00:00]   before a second of compute is spent
 ================================================================================================
+[loop] terminal also written to /workspace/Plexus/discovery_okuda/campaign/campaign.log
+[loop] CLEAN START -- cleared the LEARNED PATTERNS block: it is written by the Meta-review each round, so it is state. A campaign that keeps the previous campaign's conclusions has not started clean.
+[loop] CLEAN START -- removed 8 campaign file(s); the next round is 1
+[loop] plan: 1 recon round(s) to build the frontier, then 19 composition round(s) that can pose a hypothesis
+
+------------------------------------------------------------------------------------------------
+[loop] round 1/20  mode=recon   spent so far: 0.0 agent-min over 0 calls
+------------------------------------------------------------------------------------------------
+================================================================================================
+ROUND 1   mode=recon   campaign=okuda_growth_driven
+================================================================================================
+
+================================================================================================
+▶ ACT 1 - PROPOSE   [+00:00]   before a second of compute is spent
+================================================================================================
+  The frontier here is **okuda_growth_driven**, not the embryo campaign in memory — cold start, 11 rounds burned because proposers keep naming stale `embryo_*`/ungenerated `cfl_*` specs. Only these `cfl_*`/`wk_*` specs are
+  [proposer] 1.0 min, tools: Readx2
+  [recon] the Proposer chose 12: cfl_c001p300_d000p420, cfl_c001p300_d000p220, cfl_c000p080_d002p000, wk_curvature_pos_s2, cfl_c001p300_d000p280, cfl_c001p300_d000p350, cfl_c000p010_d010p000, cfl_c001p300_d000p320, cfl_c000p080_d001p400, cfl_c000p080_d001p000, cfl_c000p500_d000p420, cfl_c001p000_d000p420
+  ◌ proposer: (said nothing)
+  [recon] cfl_c001p300_d000p320: no spec on disk -- skipped
+  [recon] cfl_c000p080_d001p400: no spec on disk -- skipped
+  [recon] cfl_c000p080_d001p000: no spec on disk -- skipped
+  [recon] cfl_c000p500_d000p420: no spec on disk -- skipped
+  [recon] cfl_c001p000_d000p420: no spec on disk -- skipped
+  ⚠   [recon] seeded 5 slot(s) from disk -- the Proposer named 12 and 7 were usable
+  ⚠ [recon] r001n_00_cfl_c001p300_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r001n_00_cfl_c001p300_d  replay cfl_c001p300_d000p420    track A  control       no prediction
+  ⚠ [recon] r001n_01_cfl_c001p300_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r001n_01_cfl_c001p300_d  replay cfl_c001p300_d000p220    track A  control       no prediction
+  ⚠ [recon] r001n_02_cfl_c000p080_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r001n_02_cfl_c000p080_d  replay cfl_c000p080_d002p000    track A  control       no prediction
+  ⚠ [recon] r001n_03_wk_curvature_p: reservoir 3552 -> 138888 (cap 1778 -> 69446 cells), CLAMPED from 295863 by the 1.5 GB budget -- if it saturates again the composition's growth is the problem, not the array. A buffer is an array size, not a model parameter.
+  r001n_03_wk_curvature_p  replay wk_curvature_pos_s2      track A  control       no prediction
+  ⚠ [recon] r001n_04_cfl_c001p300_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r001n_04_cfl_c001p300_d  replay cfl_c001p300_d000p280    track A  control       no prediction
+  ⚠ [recon] r001n_05_cfl_c001p300_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r001n_05_cfl_c001p300_d  replay cfl_c001p300_d000p350    track A  control       no prediction
+  ⚠ [recon] r001n_06_cfl_c000p010_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r001n_06_cfl_c000p010_d  replay cfl_c000p010_d010p000    track A  control       no prediction
+  ⚠ [recon] r001n_07_cellfix_A_old: reservoir 3552 -> 73968 (cap 1778 -> 36986 cells). A buffer is an array size, not a model parameter.
+  r001n_07_cellfix_A_old  replay cellfix_A_old            track A  control       no prediction
+  ⚠ [recon] r001n_08_cellfix_B_new: reservoir 10404 -> 43164 (cap 5204 -> 21584 cells). A buffer is an array size, not a model parameter.
+  r001n_08_cellfix_B_new  replay cellfix_B_new            track A  control       no prediction
+  ⚠ [recon] r001n_09_cfl_c000p020_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r001n_09_cfl_c000p020_d  replay cfl_c000p020_d005p000    track A  control       no prediction
+  ⚠ [recon] r001n_10_cfl_c000p050_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r001n_10_cfl_c000p050_d  replay cfl_c000p050_d010p000    track A  control       no prediction
+  ⚠ [recon] r001n_11_cfl_c001p300_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r001n_11_cfl_c001p300_d  replay cfl_c001p300_d000p160    track A  control       no prediction
+  ssh transient failure (1/6): allierc@login1: Permission denied (publickey,gssapi-keyex,gssapi-with-mic,password). -- retry in 5s
+  ssh transient failure (2/6): allierc@login1: Permission denied (publickey,gssapi-keyex,gssapi-with-mic,password). -- retry in 10s
+  ssh transient failure (3/6): allierc@login1: Permission denied (publickey,gssapi-keyex,gssapi-with-mic,password). -- retry in 20s
+  ssh transient failure (4/6): allierc@login1: Permission denied (publickey,gssapi-keyex,gssapi-with-mic,password). -- retry in 30s
+[loop] terminal also written to /workspace/Plexus/discovery_okuda/campaign/campaign.log
+[loop] CLEAN START -- cleared the LEARNED PATTERNS block: it is written by the Meta-review each round, so it is state. A campaign that keeps the previous campaign's conclusions has not started clean.
+[loop] CLEAN START -- removed 8 campaign file(s); the next round is 1
+[loop] plan: 1 recon round(s) to build the frontier, then 19 composition round(s) that can pose a hypothesis
+
+------------------------------------------------------------------------------------------------
+[loop] round 1/20  mode=recon   spent so far: 0.0 agent-min over 0 calls
+------------------------------------------------------------------------------------------------
+================================================================================================
+ROUND 1   mode=recon   campaign=okuda_growth_driven
+================================================================================================
+
+================================================================================================
+▶ ACT 1 - PROPOSE   [+00:00]   before a second of compute is spent
+================================================================================================
+  All 12 slots that seeded in the last recon (round 13, lines 713–728) are verified on-disk specs — re-measure this exact set:
+  [proposer] 1.0 min, tools: Readx3
+  [recon] the Proposer chose 12: cfl_c001p300_d000p420, cfl_c001p300_d000p350, cfl_c001p300_d000p280, cfl_c001p300_d000p220, cfl_c001p300_d000p160, cfl_c000p080_d002p000, cfl_c000p050_d010p000, cfl_c000p020_d005p000, cfl_c000p010_d010p000, cellfix_A_old, cellfix_B_new, wk_curvature_pos_s2
+  ◌ proposer: (said nothing)
+  ⚠ [recon] r001n_00_cfl_c001p300_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r001n_00_cfl_c001p300_d  replay cfl_c001p300_d000p420    track A  control       no prediction
+  ⚠ [recon] r001n_01_cfl_c001p300_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r001n_01_cfl_c001p300_d  replay cfl_c001p300_d000p350    track A  control       no prediction
+  ⚠ [recon] r001n_02_cfl_c001p300_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r001n_02_cfl_c001p300_d  replay cfl_c001p300_d000p280    track A  control       no prediction
+  ⚠ [recon] r001n_03_cfl_c001p300_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r001n_03_cfl_c001p300_d  replay cfl_c001p300_d000p220    track A  control       no prediction
+  ⚠ [recon] r001n_04_cfl_c001p300_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r001n_04_cfl_c001p300_d  replay cfl_c001p300_d000p160    track A  control       no prediction
+  ⚠ [recon] r001n_05_cfl_c000p080_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r001n_05_cfl_c000p080_d  replay cfl_c000p080_d002p000    track A  control       no prediction
+  ⚠ [recon] r001n_06_cfl_c000p050_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r001n_06_cfl_c000p050_d  replay cfl_c000p050_d010p000    track A  control       no prediction
+  ⚠ [recon] r001n_07_cfl_c000p020_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r001n_07_cfl_c000p020_d  replay cfl_c000p020_d005p000    track A  control       no prediction
+  ⚠ [recon] r001n_08_cfl_c000p010_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r001n_08_cfl_c000p010_d  replay cfl_c000p010_d010p000    track A  control       no prediction
+  ⚠ [recon] r001n_09_cellfix_A_old: reservoir 3552 -> 73968 (cap 1778 -> 36986 cells). A buffer is an array size, not a model parameter.
+  r001n_09_cellfix_A_old  replay cellfix_A_old            track A  control       no prediction
+  ⚠ [recon] r001n_10_cellfix_B_new: reservoir 10404 -> 43164 (cap 5204 -> 21584 cells). A buffer is an array size, not a model parameter.
+  r001n_10_cellfix_B_new  replay cellfix_B_new            track A  control       no prediction
+  ⚠ [recon] r001n_11_wk_curvature_p: reservoir 3552 -> 138888 (cap 1778 -> 69446 cells), CLAMPED from 295863 by the 1.5 GB budget -- if it saturates again the composition's growth is the problem, not the array. A buffer is an array size, not a model parameter.
+  r001n_11_wk_curvature_p  replay wk_curvature_pos_s2      track A  control       no prediction
+[preflight] cluster job env: OK
+[preflight] PASS
+
+================================================================================================
+▶ ACT 2 - MEASURE   [+01:10]   submitting 12 simulation(s) -- the only expensive step
+================================================================================================
+[cluster] fired 12 bsub(s) DETACHED on allierc@login1: pg_r001n_00_cfl_c001p300_d, pg_r001n_01_cfl_c001p300_d, pg_r001n_02_cfl_c001p300_d, pg_r001n_03_cfl_c001p300_d, pg_r001n_04_cfl_c001p300_d, pg_r001n_05_cfl_c000p080_d, pg_r001n_06_cfl_c000p050_d, pg_r001n_07_cfl_c000p020_d, pg_r001n_08_cfl_c000p010_d, pg_r001n_09_cellfix_A_old, pg_r001n_10_cellfix_B_new, pg_r001n_11_wk_curvature_p
+  the ssh returns BEFORE bsub lands -- the queue is the only ground truth.
+  verify: python cluster.py --status   (remote submit log: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda/_cluster/_submit.log)
+[cluster] ⚠ only 0/12 bsubs reported an ID -- the rest did NOT land. Do not treat the batch as submitted.
+[round] submission did not land -- aborting rather than scoring nothing
+
+[llm] per-role breakdown (round, round 1)
+       agent                  calls      min      %    ok/fail/skip
+       proposer                   1     1.00 100.0%     1/0   /0   
+       TOTAL                      1     1.00   llm=1.00 min of 10.0 ceiling | wall since round start 1.62 min
+[llm] {'calls': 1, 'round_min': 1.0, 'total_min': 1.0, 'turns': 4, 'tok_in': 2999, 'tok_out': 4069, 'cache_new': 53455, 'cache_hit': 97317, 'usd': 0.7, 'roles': 1, 'budget_exceeded': False, 'unmetered': 0}
+[llm] timing appended to /workspace/Plexus/discovery_okuda/campaign/llm_timing.jsonl
+  ✗ [loop] round 1 exited 1 after 1.8 min wall, 1.0 min of agents
+[loop] state at death preserved in campaign/_failed_r001_recon
+  ✗ [loop] round 1 CRASHED (uncaught exception). That is a bug in the CODE, not a finding about the batch -- crash 1/2.
+
+------------------------------------------------------------------------------------------------
+[loop] round 2/20  mode=composition   spent so far: 1.0 agent-min over 1 calls
+------------------------------------------------------------------------------------------------
+[supervisor] resumed: round 1, 0 runs spent, 0 clusters (0 active), dry 0, stage_gate 2
+================================================================================================
+ROUND 2   mode=composition   campaign=okuda_growth_driven
+================================================================================================
+
+================================================================================================
+▶ ACT 1 - PROPOSE   [+00:00]   before a second of compute is spent
+================================================================================================
