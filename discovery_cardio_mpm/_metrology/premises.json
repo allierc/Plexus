@@ -1,6 +1,6 @@
 {
  "verdict": "invalid",
- "verdict_this_run": "valid",
+ "verdict_this_run": "ambiguous",
  "premises": [
   {
    "premise": "0. every declared premise has a check",
@@ -8,6 +8,13 @@
    "pass": true,
    "skipped": false,
    "detail": "8 declared, 8 implemented"
+  },
+  {
+   "premise": "1. a resting sheet rests (amplitude 0)",
+   "grade": "certain",
+   "pass": true,
+   "skipped": false,
+   "detail": "interior max |disp| = 0.000e+00, centroid drift 0.000e+00"
   },
   {
    "premise": "2. bounds are declared, not hidden",
@@ -38,6 +45,20 @@
    "detail": "fits under both are bit-identical over 198407 parameters (removed: pacemaker, activation_pulse, aggregate, apply_material_map)"
   },
   {
+   "premise": "4. inside the MPM stability envelope",
+   "grade": "certain",
+   "pass": true,
+   "skipped": false,
+   "detail": "max 0.0136 grid cells per substep (bound 0.4, read from mpm_gather; n_grid=128, substeps=10)"
+  },
+  {
+   "premise": "5. the warm-up settles",
+   "grade": "usual",
+   "pass": false,
+   "skipped": false,
+   "detail": "one extra beat of warm-up moves the fitted window by 32.67% (max |d| 2.932e-03 against a signal of 8.976e-03)"
+  },
+  {
    "premise": "6. the seed reaches the engine's own generator",
    "grade": "certain",
    "pass": true,
@@ -45,11 +66,25 @@
    "detail": "two builds draw identically from H.rng (spec seed 0)"
   },
   {
+   "premise": "7. finite, and nothing leaves the dish",
+   "grade": "certain",
+   "pass": true,
+   "skipped": false,
+   "detail": "finite=True, all particles inside [0,1]^2=True"
+  },
+  {
    "premise": "8. the recorded beat is a beat",
    "grade": "usual",
    "pass": true,
    "skipped": false,
    "detail": "0.48 Hz, quiescent 52% of the record, gaps [49, 50, 51, 52] (mean 50.5)"
+  },
+  {
+   "premise": "8b. the model rests as much as the tissue does",
+   "grade": "usual",
+   "pass": false,
+   "skipped": false,
+   "detail": "simulated quiescent 8% vs recorded 77% of the SAME window -- the recording rests, the model barely does"
   },
   {
    "premise": "canary: rail check refuses a fit in the middle of its range",

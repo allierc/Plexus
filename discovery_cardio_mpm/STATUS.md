@@ -1,7 +1,8 @@
 # Discovery — cardiomyocytes: status
 
-*Written 2026-08-02. **Phases 0, 1 and 1b are closed.** The next work is Phase 2 — certifying the
-ruler and finding the floor — which is a STOP point.*
+*Written 2026-08-02, revised 2026-08-03 after an external audit. **Phases 0, 1 and 1b are closed.**
+Three phases stand between here and a running loop — 2, 3 and 4 — and two of them can stop the
+project. None of the loop itself is built yet, deliberately: it is Phase 4's work.*
 
 The full narrative is `cardio_note.pdf` (18 pages) and it is what Cedric reads. This file is the
 operational summary: what was done, what it cost, what is measured, and what is not.
@@ -79,9 +80,9 @@ Every number below was measured in this folder, not inherited.
 | **temporal integration** | converged, checked on **two** backgrounds: substeps 5/10/20 agree to 0.8% at n_grid=128 and 3.7% at n_grid=192 — once frame-dt is held fixed. Weakens as the grid refines (dx–dt coupling) but stays >10× below the 56% spatial swing |
 | **`--substeps` is not a numerics knob** | it multiplies `dt_sub` to give the frame duration; varying it alone moves enclosed area **2.2×**. The inherited `10` is a claim about the tissue's timescale |
 | **spatial discretisation** | **NOT converged.** Enclosure follows particles-per-cell monotonically over **1.56×** across two independent knobs, no plateau. Direction and orientation are untouched |
-| **the one open defect** | **the model rests 8% of the beat where the tissue rests 77%** — the objective cannot see it, being invariant to timing. First thing the loop must explain |
+| **two open defects** | **the warm-up does not settle (33% shift)** — found only because the audit noticed premise 5 had never been implemented; it underwrites every gradient. And **the model rests 8% of the beat where the tissue rests 77%**, which the objective cannot see |
 | **the fitting recipe** | four operators were declared and never stepped; there is now a fitting recipe that says what the fit runs, and the removal is **proved** harmless — fits under both are bit-identical over 198,407 parameters |
-| **premises** (after the audit) | **VALID, 8/8** — premise 3 closed properly rather than waived; premise 5 implemented; a coverage check now fails when a declared premise has no code |
+| **premises** (after the audit) | **11 of 13 hold; verdict AMBIGUOUS.** Static set is VALID 8/8 (premise 3 closed properly, not waived; coverage check added). The two forward-probe failures are both graded *usual*: **the warm-up does not settle — one extra beat moves the fitted window 33%** (Phase 3 owes an answer), and the model rests 8% of the beat where the tissue rests 77% |
 | the split | frozen: fit beat [152,204], 3 held-out beats, 17,499 scored nodes, mask frozen from the recording alone; diseased sheet sealed by content across all 3 files |
 | **the seal** | attacked 3 times before it held. Now refuses the sealed specimen in 4 unit conventions, cropped, and subsampled. Same specimen r=0.991–1.000, different specimen r=0.151–0.224, threshold 0.90 in the gap |
 | **the operator merge** | **NOT behaviour-preserving.** Two runs of the migrated recipe are BIT-IDENTICAL (0.0); the archive differs by 1.5e-4 after 3 frames, growing monotonically from frame 1. So the archive is evidence about a model we can no longer run |
