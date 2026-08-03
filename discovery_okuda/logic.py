@@ -287,9 +287,19 @@ _PROP = re.compile(r"\b([a-z][a-z0-9_]{3,})\s*(?:=|==|>=|<=|>|<|\bof\b|\bis\b)",
 # Words that name a QUANTITY the campaign reasons about but may not measure. This is the vocabulary
 # the pattern gap lives in: wavelength, domain count and contrast on the activator field are the
 # variables that actually govern budding, and nothing reports any of them.
-PROPERTY_WORDS = ("wavelength", "domain", "domains", "spacing", "contrast", "pattern",
-                  "localisation", "localization", "morphology", "periodicity", "anisotropy",
-                  "curvature", "aspect", "sphericity", "roughness")
+PROPERTY_WORDS = ("wavelength", "domain", "domains", "spacing", "contrast",
+                  "localisation", "localization", "periodicity", "anisotropy",
+                  "sphericity", "roughness")
+
+# Words that LOOK like properties in a measurement context but are prose. "the low-c/high-d
+# CORNER of the Turing map" and "a_sw BELOW the activator range" produced two instrument
+# requests in round 1 -- one for a region of parameter space and one for a model parameter that
+# is set, not measured. An instrument request is expensive and the backlog is the deliverable;
+# filling it with nouns from a sentence is how it stops being read.
+NOT_PROPERTIES = ("corner", "range", "box", "column", "map", "region", "family", "side",
+                  "point", "level", "state", "value", "number", "case", "part", "step",
+                  "growth", "division", "inflation", "sphere", "ceiling", "bud", "buds",
+                  "metric", "pattern", "morphology", "curvature", "aspect")
 
 
 def _operator_names():
@@ -319,6 +329,15 @@ def unmeasured_properties(text, extra=()):
     named |= {w for w in PROPERTY_WORDS if re.search(rf"\b{w}\b", t)}
     # an operator is a mechanism, and a verb-ish token is neither
     named = {w for w in named if w not in ops and not w.startswith(("remove_", "add_", "set_"))}
+    named -= set(NOT_PROPERTIES)
+    # a model PARAMETER is set, not measured: asking for an instrument to report it is a category
+    # error. Anything the composition space knows as a param name is excluded.
+    try:
+        from composition_space import OPERATORS
+        _params = {p for o in OPERATORS.values() for p in (o.get("params") or {})}
+        named -= _params
+    except Exception:
+        pass
     return sorted(named - ok)
 
 
