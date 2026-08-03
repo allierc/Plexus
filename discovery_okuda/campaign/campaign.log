@@ -806,3 +806,108 @@ ROUND 2   mode=composition   campaign=okuda_growth_driven
 ================================================================================================
 ▶ ACT 1 - PROPOSE   [+00:00]   before a second of compute is spent
 ================================================================================================
+[frontier] no frontier -- COLD START. Asking the Archivist what is already on disk.
+  [archivist] start from ['cfl_c001p300_d000p420', 'cfl_c000p080_d002p000'] -- d000p420 = strongest patterning on disk (1.84), valid 2000 cells, top of a monotone c001p300 d-gradient (0.22→1.05, 0.28→1.28, 0.35→1.54, 0.42→1.84) — the explo
+    [archivist] cfl_c001p300_d000p420: no composition.json -- cannot be rebuilt as a graph
+    [archivist] cfl_c000p080_d002p000: no composition.json -- cannot be rebuilt as a graph
+  [archivist] named no usable run -- falling back to seed + reference recipes
+  [grounder] note: phi: tabulated 10.0, but the paper's own formula (3 v_ref^1/3)^2/(4 eta_c/5 kappa_s) gives 9.000. The paper writes 'phi ~', so both are its own; which one the campaign uses is a decision and must be made explicitly, not inherited.
+  proposal.json written: 12 experiments, round 2, off the chi=1.3 d_h=0.42 protrusion anchor. 3 fresh-seed replicates (n=4 reproducibility) + chi ladder {0.7,1.0,1.6,2.0} for the coupling onset + d_h extension {0.12,0.10,0
+  [proposer] 1.5 min, tools: Readx3, Writex1
+[round] the Proposer produced no usable proposal -- NOT falling back to random. A round with no reasoned proposal is a failed round, not a random one.
+[round] no candidates -- escalating
+[frontier] no frontier -- COLD START. Asking the Archivist what is already on disk.
+  [archivist] start from ['cfl_c001p300_d000p420', 'cfl_c000p080_d002p000', 'cfl_c000p010_d010p000'] -- Three distinct chemistries that each serve A on a valid specimen: c=1.300 (pattern 1.84, top sound anchor), c=0.080/d=2.0 (pattern 1.40), c=0.010/d=10.0 (patter
+    [archivist] cfl_c001p300_d000p420: no composition.json -- cannot be rebuilt as a graph
+    [archivist] cfl_c000p080_d002p000: no composition.json -- cannot be rebuilt as a graph
+    [archivist] cfl_c000p010_d010p000: no composition.json -- cannot be rebuilt as a graph
+  [archivist] named no usable run -- falling back to seed + reference recipes
+  ◉ supervisor: escalating: open_stage_gate -- stage 2 -> 3: admit the next stage's operators into the legal move se
+      t
+  ⚠ [escalate] opened stage gate -> 3
+
+[llm] per-role breakdown (round, round 2)
+       agent                  calls      min      %    ok/fail/skip
+       proposer                   1     1.49  65.4%     1/0   /0   
+       archivist                  1     0.72  31.5%     1/0   /0   
+       grounder                   1     0.07   3.2%     1/0   /0      (local, not LLM)
+       TOTAL                      3     2.27   llm=2.20 min of 10.0 ceiling | wall since round start 3.02 min
+[llm] {'calls': 3, 'round_min': 2.2, 'total_min': 2.2, 'turns': 6, 'tok_in': 5241, 'tok_out': 9566, 'cache_new': 46203, 'cache_hit': 91473, 'usd': 0.773, 'roles': 3, 'budget_exceeded': False, 'unmetered': 0}
+[llm] timing appended to /workspace/Plexus/discovery_okuda/campaign/llm_timing.jsonl
+  ⚠ [loop] round 2 exited 5 after 3.2 min wall, 2.3 min of agents
+
+------------------------------------------------------------------------------------------------
+[loop] round 3/20  mode=composition   spent so far: 3.3 agent-min over 4 calls
+------------------------------------------------------------------------------------------------
+[supervisor] resumed: round 1, 0 runs spent, 0 clusters (0 active), dry 0, stage_gate 3
+================================================================================================
+ROUND 2   mode=composition   campaign=okuda_growth_driven
+================================================================================================
+
+================================================================================================
+▶ ACT 1 - PROPOSE   [+00:00]   before a second of compute is spent
+================================================================================================
+[frontier] no frontier -- COLD START. Asking the Archivist what is already on disk.
+  [archivist] start from ['cfl_c001p300_d000p420', 'cfl_c000p080_d002p000'] -- Both sound, 2000 cells, Track A. c001p300_d000p420 tops the fixed-c d-ladder (pattern 1.84 > 1.54 > 1.28 > 1.05) = strongest patterner. c000p080_d002p000 (patte
+    [archivist] cfl_c001p300_d000p420: no composition.json -- cannot be rebuilt as a graph
+    [archivist] cfl_c000p080_d002p000: no composition.json -- cannot be rebuilt as a graph
+  [archivist] named no usable run -- falling back to seed + reference recipes
+  [grounder] note: phi: tabulated 10.0, but the paper's own formula (3 v_ref^1/3)^2/(4 eta_c/5 kappa_s) gives 9.000. The paper writes 'phi ~', so both are its own; which one the campaign uses is a decision and must be made explicitly, not inherited.
+  No existing `proposal.json`; schema inferred from campaign vocab (MINI Turing ball, (chi,d_h) map, "pattern" score, Track A). Writing the batch.
+[loop] terminal also written to /workspace/Plexus/discovery_okuda/campaign/campaign.log
+[loop] CLEAN START -- cleared the LEARNED PATTERNS block: it is written by the Meta-review each round, so it is state. A campaign that keeps the previous campaign's conclusions has not started clean.
+[loop] CLEAN START -- removed 11 campaign file(s); the next round is 1
+[loop] plan: 1 recon round(s) to build the frontier, then 19 composition round(s) that can pose a hypothesis
+
+------------------------------------------------------------------------------------------------
+[loop] round 1/20  mode=recon   spent so far: 0.0 agent-min over 0 calls
+------------------------------------------------------------------------------------------------
+================================================================================================
+ROUND 1   mode=recon   campaign=okuda_growth_driven
+================================================================================================
+
+================================================================================================
+▶ ACT 1 - PROPOSE   [+00:00]   before a second of compute is spent
+================================================================================================
+  All 12 in the round-14 recon (campaign.log:750–775) seeded with **zero** "no spec on disk" skips and fired 12 bsubs — that is the verified on-disk set. Every other proposer's list got partially skipped. Re-measuring this
+  [proposer] 0.8 min, tools: Readx3
+  [recon] the Proposer chose 12: cfl_c001p300_d000p420, cfl_c001p300_d000p350, cfl_c001p300_d000p280, cfl_c001p300_d000p220, cfl_c001p300_d000p160, cfl_c000p080_d002p000, cfl_c000p050_d010p000, cfl_c000p020_d005p000, cfl_c000p010_d010p000, cellfix_A_old, cellfix_B_new, wk_curvature_pos_s2
+  ◌ proposer: (said nothing)
+  ⚠ [recon] r001n_00_cfl_c001p300_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r001n_00_cfl_c001p300_d  replay cfl_c001p300_d000p420    track A  control       no prediction
+  ⚠ [recon] r001n_01_cfl_c001p300_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r001n_01_cfl_c001p300_d  replay cfl_c001p300_d000p350    track A  control       no prediction
+  ⚠ [recon] r001n_02_cfl_c001p300_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r001n_02_cfl_c001p300_d  replay cfl_c001p300_d000p280    track A  control       no prediction
+  ⚠ [recon] r001n_03_cfl_c001p300_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r001n_03_cfl_c001p300_d  replay cfl_c001p300_d000p220    track A  control       no prediction
+  ⚠ [recon] r001n_04_cfl_c001p300_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r001n_04_cfl_c001p300_d  replay cfl_c001p300_d000p160    track A  control       no prediction
+  ⚠ [recon] r001n_05_cfl_c000p080_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r001n_05_cfl_c000p080_d  replay cfl_c000p080_d002p000    track A  control       no prediction
+  ⚠ [recon] r001n_06_cfl_c000p050_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r001n_06_cfl_c000p050_d  replay cfl_c000p050_d010p000    track A  control       no prediction
+  ⚠ [recon] r001n_07_cfl_c000p020_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r001n_07_cfl_c000p020_d  replay cfl_c000p020_d005p000    track A  control       no prediction
+  ⚠ [recon] r001n_08_cfl_c000p010_d: reservoir 30000 -> 41604 (cap 15002 -> 20804 cells). A buffer is an array size, not a model parameter.
+  r001n_08_cfl_c000p010_d  replay cfl_c000p010_d010p000    track A  control       no prediction
+  ⚠ [recon] r001n_09_cellfix_A_old: reservoir 3552 -> 73968 (cap 1778 -> 36986 cells). A buffer is an array size, not a model parameter.
+  r001n_09_cellfix_A_old  replay cellfix_A_old            track A  control       no prediction
+  ⚠ [recon] r001n_10_cellfix_B_new: reservoir 10404 -> 43164 (cap 5204 -> 21584 cells). A buffer is an array size, not a model parameter.
+  r001n_10_cellfix_B_new  replay cellfix_B_new            track A  control       no prediction
+  ⚠ [recon] r001n_11_wk_curvature_p: reservoir 3552 -> 138888 (cap 1778 -> 69446 cells), CLAMPED from 295863 by the 1.5 GB budget -- if it saturates again the composition's growth is the problem, not the array. A buffer is an array size, not a model parameter.
+  r001n_11_wk_curvature_p  replay wk_curvature_pos_s2      track A  control       no prediction
+[preflight] cluster job env: OK
+[preflight] PASS
+
+================================================================================================
+▶ ACT 2 - MEASURE   [+00:59]   submitting 12 simulation(s) -- the only expensive step
+================================================================================================
+[cluster] fired 12 bsub(s) DETACHED on allierc@login1: pg_r001n_00_cfl_c001p300_d, pg_r001n_01_cfl_c001p300_d, pg_r001n_02_cfl_c001p300_d, pg_r001n_03_cfl_c001p300_d, pg_r001n_04_cfl_c001p300_d, pg_r001n_05_cfl_c000p080_d, pg_r001n_06_cfl_c000p050_d, pg_r001n_07_cfl_c000p020_d, pg_r001n_08_cfl_c000p010_d, pg_r001n_09_cellfix_A_old, pg_r001n_10_cellfix_B_new, pg_r001n_11_wk_curvature_p
+  the ssh returns BEFORE bsub lands -- the queue is the only ground truth.
+  verify: python cluster.py --status   (remote submit log: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda/_cluster/_submit.log)
+    [+01:02] ◌ 12 job(s) on the cluster; waiting. Check with `bjobs`.
+  [13:40] run/pend=12 done=0 exit=0 of 12
+  [13:41] run/pend=12 done=0 exit=0 of 12
+  [13:42] run/pend=12 done=0 exit=0 of 12
+  [13:43] run/pend=12 done=0 exit=0 of 12

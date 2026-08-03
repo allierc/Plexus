@@ -69,6 +69,12 @@ TERMINAL_EXITS = {
     # not actionable" for a diagnosis that was precise, actionable and correct.
     4: "the Diagnostician found an APPARATUS fault and named the guard to add. Fix the guard, "
        "then relaunch -- more rounds cannot re-measure a broken instrument into a working one.",
+    # A SUBMISSION THAT DID NOT LAND is a fact about the cluster, not about the code. It used to
+    # exit 1, which is what Python gives an uncaught exception, so a ssh/queue problem was
+    # reported as "CRASHED -- a bug in the CODE" and counted toward MAX_CRASHES. Retrying is
+    # right here, unlike a real crash, because the next attempt may well reach the queue.
+    6: "the batch never reached the cluster. Check ssh and `bjobs` -- and check for ORPHANS from "
+       "the attempt that failed, which keep running with nobody watching them.",
 }
 
 # A ROUND THAT PRODUCED NO EVIDENCE, as a DECISION. Distinct from exit 1, which is what Python
@@ -486,6 +492,17 @@ def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None, recon_rounds=
                 return EMPTY_EXIT
         elif code == 0:
             consecutive_empty, crashes = 0, 0
+        elif code == 6:
+            # Retried, not stopped: the queue is usually reachable a minute later. Bounded by the
+            # same crash counter so a genuinely unreachable cluster cannot loop forever.
+            crashes += 1
+            print(T_.no(f"[loop] round {i + 1}: the batch never reached the cluster "
+                        f"({crashes}/{MAX_CRASHES}). Check ssh and `bjobs` for orphans."))
+            if crashes >= MAX_CRASHES:
+                print(T_.no("[loop] STOPPING -- the cluster is not reachable. This is not a code "
+                            "fault and more rounds will not fix it."))
+                _log({"event": "stop", "why": "cluster unreachable", "rounds_done": done})
+                return 1
         elif code == 1:
             # AN UNCAUGHT EXCEPTION. A fact about the code, never a fact about the search -- and
             # reading it as the latter is what stopped a launch with "a problem with the batch or

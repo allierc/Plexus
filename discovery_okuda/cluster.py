@@ -187,15 +187,44 @@ def submit(names, frames=None, do_q=False, campaign="campaign"):
           f"{', '.join(PREFIX + n for n in names)}")
     print(f"  the ssh returns BEFORE bsub lands -- the queue is the only ground truth.")
     print(f"  verify: python cluster.py --status   (remote submit log: {log})")
-    return submitted_ids(wait_s=25, expect=len(names))
+    #  is passed so the queue can be consulted when the log lags -- without it the
+    # fallback has nothing to look up and the race stands.
+    return submitted_ids(wait_s=25, expect=len(names), names=names)
 
 
-def submitted_ids(wait_s=25, expect=None):
-    """Parse the JOB IDs out of the fresh submit log.
+def _ids_from_queue(names):
+    """Job ids for THESE names, asked of the queue itself.
 
-    Names are NOT sufficient: `bjobs -a` returns historical jobs, so a previous EXIT with the
-    same name is indistinguishable from a new PEND. IDs are unique per submission, so they are
-    the only sound thing to track.
+    The submit log is a side effect of bsub; the QUEUE is the fact. This module's own comment
+    two functions up says so -- "the ssh returns BEFORE bsub lands -- the queue is the only
+    ground truth" -- and then the check that decides whether a batch landed consulted the log
+    instead. RUN and PEND only: a historical EXIT with the same name is a different job, which
+    is the reason ids are tracked rather than names.
+    """
+    if not names:
+        return {}
+    want = {f"{PREFIX}{n}" for n in names}
+    out = _ssh("bjobs -a -o 'jobid stat job_name' -noheader 2>/dev/null || true", timeout=45)
+    found = {}
+    for line in ((out.stdout if out else "") or "").splitlines():
+        p = line.split()
+        if len(p) >= 3 and p[2] in want and p[1] in ("RUN", "PEND", "PSUSP", "USUSP"):
+            found[p[2][len(PREFIX):]] = p[0]
+    return found
+
+
+def submitted_ids(wait_s=25, expect=None, names=None):
+    """The JOB IDs of a submission. The submit log first, then the QUEUE as the arbiter.
+
+    Names alone are NOT sufficient: `bjobs -a` returns historical jobs, so a previous EXIT with
+    the same name is indistinguishable from a new PEND. IDs are unique per submission.
+
+    WHY THE QUEUE IS ASKED AT ALL. Reading only the log made this a RACE with the shared
+    filesystem. On 3 August it reported "only 0/12 bsubs reported an ID -- the rest did NOT land"
+    while all twelve were RUNNING: the round aborted, twelve jobs were orphaned with nobody
+    watching them, and the driver recorded a CRASH -- "a bug in the CODE, not a finding about the
+    batch". The identical code submitted the identical batch successfully an hour later. Nothing
+    had changed but the timing of a file appearing over NFS.
     """
     import re
     logl = os.path.join(LOGDIR, "_submit.log")
@@ -205,11 +234,22 @@ def submitted_ids(wait_s=25, expect=None):
         if os.path.exists(logl):
             ids = re.findall(r"Job <(\d+)> is submitted", open(logl, errors="ignore").read())
             if expect is None or len(ids) >= expect:
-                break
+                return ids
         time.sleep(2)
+
+    # The log was short. Ask the queue before concluding anything -- a job that is RUNNING has
+    # unambiguously landed, whatever the log says.
+    if names:
+        from_queue = _ids_from_queue(names)
+        if len(from_queue) > len(ids):
+            print(f"[cluster] the submit log showed {len(ids)}/{expect or len(names)} but the "
+                  f"QUEUE shows {len(from_queue)} of these jobs live -- trusting the queue. The "
+                  f"log lags over the shared filesystem; the queue does not.")
+            return list(from_queue.values())
+
     if expect is not None and len(ids) < expect:
-        print(f"[cluster] ⚠ only {len(ids)}/{expect} bsubs reported an ID -- the rest did NOT "
-              f"land. Do not treat the batch as submitted.")
+        print(f"[cluster] ⚠ only {len(ids)}/{expect} bsubs reported an ID, and the queue shows "
+              f"none of them live. The batch did NOT land.")
     return ids
 
 
