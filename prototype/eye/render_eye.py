@@ -73,12 +73,17 @@ def camera(view):
         # muscle appeared on the left in panel (a) and on the right in panels (c)-(e) -- the
         # stress at the lateral rectus insertion read as if it were on the medial side. Deriving
         # this basis from the anterior one makes the mirror impossible rather than unlikely.
-        psi, el = math.radians(40.0), math.radians(18.0)
+        # `el` is NEGATIVE so the camera ends up ABOVE the equator looking DOWN, which is what a
+        # 3/4 view means. The first version tilted the other way and put the camera below, and
+        # combined with the near half of the globe being cut away that reads as looking at the
+        # eye from behind -- the anterior pole was in fact facing the camera the whole time, but
+        # nothing in the picture said so.
+        psi, el = math.radians(40.0), math.radians(-18.0)
         cy, sy = math.cos(psi), math.sin(psi)
         Ry = np.array([[cy, 0.0, sy], [0.0, 1.0, 0.0], [-sy, 0.0, cy]])
         r0, u0, f0 = camera("anterior")
         r, u, f = Ry @ r0, Ry @ u0, Ry @ f0                  # swing about world +y
-        ce, se = math.cos(el), math.sin(el)                  # then tilt down about screen-right
+        ce, se = math.cos(el), math.sin(el)                  # then tilt about screen-right
         u, f = ce * u - se * f, se * u + ce * f
         return r, u / np.linalg.norm(u), f / np.linalg.norm(f)
     raise ValueError(view)
@@ -97,7 +102,10 @@ def check_cameras():
     Three assertions, each anchored to something anatomical rather than to another camera:
       1. up really is up      -- the up vector has a positive world +y component;
       2. superior is above inferior -- SR plots above IR, in every view;
-      3. the views agree      -- no muscle changes side between anterior and oblique.
+      3. we are looking at the FRONT -- the anterior pole faces the camera in the views that
+         claim to (anterior, oblique). A 3/4 view that has quietly swung behind the globe shows
+         the back of the sclera and reads as a different organ;
+      4. the views agree      -- no muscle changes side between anterior and oblique.
     """
     import eye_anatomy as _EA
     c = np.asarray(_EA.GLOBE_CENTER, float)
@@ -113,6 +121,10 @@ def check_cameras():
             raise AssertionError(
                 f"{view} camera draws the superior rectus below the inferior rectus "
                 f"({sy[i_sr]:+.3f} vs {sy[i_ir]:+.3f})")
+        if view in ("anterior", "oblique") and -f[2] <= 0.25:
+            raise AssertionError(
+                f"{view} camera has swung behind the eye: the anterior pole faces it by only "
+                f"{-f[2]:+.2f} (want > 0.25)")
         sx, _, _ = proj(ins, view)
         cx, _, _ = proj(np.atleast_2d(c), view)
         sides[view] = np.sign(sx - cx[0])
@@ -131,9 +143,15 @@ def proj(P, view):
     return P @ r, P @ u, P @ f
 
 
-def _label(ax, s):
-    ax.text(0.015, 0.975, s, transform=ax.transAxes, color=FG, fontsize=10.5,
-            ha="left", va="top", zorder=10)
+def _label(ax, s, above=False):
+    """Panel label. `above` puts it OUTSIDE the axes, which is what the trace panels need --
+    inside, it sits on top of the curves and the legend."""
+    if above:
+        ax.text(0.0, 1.015, s, transform=ax.transAxes, color=FG, fontsize=10.5,
+                ha="left", va="bottom", zorder=10)
+    else:
+        ax.text(0.015, 0.975, s, transform=ax.transAxes, color=FG, fontsize=10.5,
+                ha="left", va="top", zorder=10)
 
 
 def _frame(ax, centre, view, span):
@@ -221,7 +239,7 @@ def draw_field(ax, k, cap, key, label, vmax, cmap, span=0.185):
     _label(ax, label)
 
 
-def draw_grid(ax, k, cap, label, vmax, span=0.215):
+def draw_grid(ax, k, cap, label, vmax, span=0.215, above=True):
     P, v = cap["gpos"][k], cap["gvel"][k]
     if P.size:
         sx, sy, dep = proj(P, "oblique")
@@ -229,7 +247,7 @@ def draw_grid(ax, k, cap, label, vmax, span=0.215):
         ax.scatter(sx[o], sy[o], s=2.2, c=v[o], cmap="viridis", vmin=0.0, vmax=vmax,
                    edgecolors="none", linewidths=0)
     _frame(ax, cap["centre"][k], "oblique", span)
-    _label(ax, label)
+    _label(ax, label, above=above)
 
 
 # --------------------------------------------------------------------------- #
@@ -265,7 +283,7 @@ def draw_act(ax, k, cap, label, dt):
     ax.set_ylabel("activation", color="0.8", fontsize=8)
     _muscle_legend(ax)
     _style_trace(ax, t, k)
-    _label(ax, label)
+    _label(ax, label, above=True)
 
 
 def draw_length(ax, k, cap, label, dt):
@@ -285,7 +303,7 @@ def draw_length(ax, k, cap, label, dt):
     ax.set_ylabel("length (% of rest)", color="0.8", fontsize=8)
     _muscle_legend(ax, extra="0.92")
     _style_trace(ax, t, k)
-    _label(ax, label)
+    _label(ax, label, above=True)
 
 
 def tracking_metrics(cap):
@@ -333,7 +351,7 @@ def draw_gaze(ax, k, cap, label, dt):
     for txt, cc in zip(leg.get_texts(), cols + ["#ff8f4d"]):
         txt.set_color(cc)
     _style_trace(ax, t, k)
-    _label(ax, label)
+    _label(ax, label, above=True)
 
 
 # --------------------------------------------------------------------------- #
