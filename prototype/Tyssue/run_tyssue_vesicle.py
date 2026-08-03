@@ -158,10 +158,19 @@ def _draw(ax, pos, mesh, p0, azim, act=None, inner=INNER, Lbox=None,
                1: (0.95, 0.65, 0.15, 1.0),                      # branch -- amber
                2: (0.98, 0.92, 0.25, 1.0),                      # tip    -- yellow
                -1: (0.35, 0.35, 0.35, 1.0)}                     # dead slot (should never show)
+    # NaN IS NOT A COLOUR. np.clip(nan) is nan, and cmap(nan) returns matplotlib's "bad" value --
+    # transparent, which on a black background is black. So a run whose chemistry went non-finite
+    # rendered as an EMPTY FRAME, and the movie accused the plotter instead of the run.
+    # r001n_06_cfl_c000p050_d went NaN at frame 23 and showed one visible frame out of 900;
+    # the strip looked like a broken renderer and was in fact a correct picture of a dead field.
+    # Magenta already means "not a cell any more" here, so NaN takes it too.
+    _nan = (np.isnan(np.asarray(act, dtype=float)) if act is not None
+            else np.zeros(len(polys), bool))
     faces3d, cols = [], []
     for f, ap in enumerate(polys):
         base = (C_CLASS.get(int(classes[f]), C_CLASS[-1]) if classes is not None and f < len(classes)
-                else cmap(float(np.clip(act[f], 0.0, 1.0))))
+                else (C_BROKEN if (f < len(_nan) and _nan[f])
+                      else cmap(float(np.clip(act[f], 0.0, 1.0)))))
         if divided is not None and f < len(divided) and divided[f]:
             base = tuple((1.0 - DIVIDED_ALPHA) * np.array(base[:3])
                          + DIVIDED_ALPHA * np.array(C_DIVIDED)) + (1.0,)

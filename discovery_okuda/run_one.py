@@ -745,6 +745,18 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60, movie=True):
         # project keeps being bitten by: the first version caught a TypeError from a wrong
         # signature and rendered a blank row that looked deliberate.
         _cross_screen(ax3, pt, mt, col(a), seed_dir=_cross_axis(pt, None), Lbox=L2)
+    # STAMP THE STRIP WHEN THE FIELD IS NOT FINITE. A NaN activator paints magenta per cell now,
+    # but a reader still has to infer WHY the picture changed. Say it: the frame the chemistry
+    # died, on the image, so the strip accuses the run instead of the plotter.
+    try:
+        _first_nan = next((t for t in range(T)
+                           if not np.all(np.isfinite(np.asarray(fr[t][2], dtype=float)))), None)
+    except Exception:
+        _first_nan = None
+    if _first_nan is not None:
+        fig.text(0.5, 0.985, f"CHEMISTRY NOT FINITE FROM FRAME {_first_nan} "
+                             f"-- magenta cells are NaN, not measurements",
+                 color="#ff19d9", fontsize=13, ha="center", va="top", weight="bold")
     fig.subplots_adjust(0.005, 0.005, 0.995, 0.995, wspace=0.02, hspace=0.02)
     fig.savefig(os.path.join(out_dir, "strip.png"), dpi=100, facecolor="black")
     plt.close(fig)
