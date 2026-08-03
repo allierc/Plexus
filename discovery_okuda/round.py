@@ -35,6 +35,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import glob
 import os
 import sys
 import time
@@ -915,8 +916,60 @@ def build_recon_batch(sup, cfg, n_slots, ledger):
                                "metric": "protr_peak", "predicted": "unstated",
                                "why": choice.get("why", ""), "territory": "in_paper",
                                "source_run": run}))
+    # THE FLOOR. A recon round exists to put SOMETHING measurable on the cluster; it has no
+    # hypothesis to protect and nothing to be clever about. When the Proposer names nothing --
+    # or names runs whose specs are not on disk -- the honest fallback is not an empty round, it
+    # is to replay what IS there. On 3 August this returned empty and the campaign spent thirteen
+    # rounds and 35 agent-minutes without launching a single job, while 63 runs with a spec and
+    # 96 configs sat on disk unused.
+    #
+    # Deterministic: no model is consulted, and the pick is the Archivist's own ranking where it
+    # exists, alphabetical after that, so the same disk gives the same batch.
+    if len(out) < n_slots:
+        have = {r for r, _, _ in out}
+        ranked = [r.get("run") for r in (tab or []) if isinstance(r, dict) and r.get("run")]
+        pool = [r for r in ranked if r not in have]
+        # A RUN THAT EXECUTED FIRST, then a spec that merely exists. log/okuda/<run>/spec_run.yaml
+        # is a composition we have already measured, so replaying it is a re-measurement with a
+        # known prior; config/okuda/<name>.yaml is flat (no subfolders) and may never have run,
+        # which is still far better than an empty round.
+        pool += sorted(os.path.basename(os.path.dirname(p))
+                       for p in glob.glob(os.path.join(LOG, "*", "spec_run.yaml"))
+                       # a leading underscore is a diagnostic or quarantine directory, not a run
+                       if not os.path.basename(os.path.dirname(p)).startswith("_")
+                       and os.path.basename(os.path.dirname(p)) not in have
+                       and os.path.basename(os.path.dirname(p)) not in ranked)
+        pool += sorted(os.path.basename(p)[:-5]
+                       for p in glob.glob(os.path.join(os.path.join(ROOT, "config", "okuda"), "*.yaml"))
+                       if not os.path.basename(p).startswith(("_", "r0"))
+                       and os.path.basename(p)[:-5] not in have)
+        added = 0
+        seen_pool = set()
+        for run in pool:
+            if len(out) >= n_slots:
+                break
+            if run in seen_pool:
+                continue
+            seen_pool.add(run)
+            src = os.path.join(LOG, run, "spec_run.yaml")
+            if not os.path.exists(src):
+                src = os.path.join(os.path.join(ROOT, "config", "okuda"), f"{run}.yaml")
+            if not os.path.exists(src):
+                continue
+            out.append((run, src, {"intent": "recon", "track": "A",
+                                   "claim": f"re-measure {run} under the current instruments",
+                                   "metric": "protr_peak", "predicted": "unstated",
+                                   "why": "seeded from disk: the Proposer named too few usable "
+                                          "specs, and a recon round with nothing to replay is a "
+                                          "round that teaches nothing",
+                                   "territory": "in_paper", "source_run": run}))
+            added += 1
+        if added:
+            print(T_.warn(f"  [recon] seeded {added} slot(s) from disk -- the Proposer named "
+                          f"{len(names)} and {len(out) - added} were usable"))
     if not out:
-        print("  [recon] no usable spec was chosen -- a recon round with nothing to replay")
+        print(T_.no("  [recon] nothing on disk carries a spec_run.yaml -- there is genuinely "
+                    "nothing to replay"))
     return out
 
 
