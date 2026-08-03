@@ -1,8 +1,8 @@
 # Eye — zebrafish oculomotor plant: status
 
-*Written 2026-08-02 at the close of the calibration campaign. Full narrative: `eye_note.pdf`
-(8 pages). This file is the operational summary: what was done, what it cost, what is reusable,
-and what is deliberately not done.*
+*Written 2026-08-02 at the close of the calibration campaign; updated 2026-08-03 with Phase 2.
+Full narrative: `eye_note.pdf` (10 pages, organised by phase). This file is the operational
+summary: what was done, what it cost, what is reusable, and what is deliberately not done.*
 
 ---
 
@@ -32,6 +32,7 @@ through the stock `plexus.schema.load` + `plexus.engine.run`.
 | sets + operators | done | 5 sets, 1 shared field, 11 new contracts + 1 new implementation |
 | emergent muscle actions | done | 6/6 correct in sign and rank against the clinical table |
 | calibration | done | 25 archived trials, 4 distinct ceilings found and named |
+| archive | pruned | reset to `t01`–`t03_c_a` after the campaign; Phase 2 appends `t04`–`t09`. Pruned runs' metrics survive in git history |
 | working point | done | `t21` — A/E = 0.28 with the pulley; stable, intact, best tracking |
 | the movie | done | `t23_atlas`, `t25_atlas_final` — 1830 frames, 459 rendered, 8 panels |
 | metric suite | done | tracking RMS, recruitment, drift, strain, shortening, **globe radius**, one scalar objective |
@@ -43,7 +44,10 @@ through the stock `plexus.schema.load` + `plexus.engine.run`.
 **Acceptance test** (`run_eye.verdict`, automatic): finite · reaches commands within 6° · torsion
 > 6° · horizontal > 35° · recruitment 4/4 · drift < 6% of globe radius · strain₉₉ in [0.004, 0.12] ·
 peak shortening in [4%, 38%] · globe radius worst < 6% and spread < 9%.
-The working point passes seven of nine; `reaches_commands` and `wide_gaze_range` are the two open ones.
+The working point passes **six of nine**: `reaches_commands` fails (max settled error 17.1°),
+`wide_gaze_range` fails narrowly (33.5° against a 35° bar), and `correct_recruitment` fails on the
+atlas programme only (14/26 — half its holds are diagonal commands, against which a top-1 test is
+meaningless; on the four-hold probe programme it is 4/4).
 
 ---
 
