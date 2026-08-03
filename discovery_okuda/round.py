@@ -1279,7 +1279,7 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
                       "A1 is live for the first time and its false-refusal behaviour is unproven "
                       "on real batches. It refuses from the round after its first clean pass."))
 
-    act("ACT 2 - MEASURE", f"submitting {len(names)} simulation(s) -- the only expensive step")
+    act("ACT 2 - MEASURE", f"submitting {len(names)} simulation(s)")
     ids = cluster.submit(names, frames=frames, do_q=True, campaign=f"round{rid}")
     if not ids:
         # EXIT 6, NOT 1. A submission that did not land is a fact about the CLUSTER, not about
