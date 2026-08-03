@@ -166,15 +166,19 @@ def say(who, text, sentences=1, width=100):
     import re
     t = " ".join(str(text or "").split())
     if not t:
-        return f"  {dim(I['think'])} {dim(who + ': (said nothing)')}"
+        return f"{voice(who)(I['think'])} {dim(who + ': (said nothing)')}"
     parts = [x for x in re.split(r"(?<=[.!?])\s+", t) if x.strip()][:sentences]
     t = " ".join(parts)
     col = voice(who)
-    out = [f'  {col(I["read"])} {col(bold(who))}: {t[:width]}']
-    rest = t[width:]
-    while rest:
-        out.append(dim(f"      {rest[:width]}"))
-        rest = rest[width:]
+    # WRAPPED ON WORDS, NOT SLICED. This used to cut at t[:width] and then t[width:] again, so a
+    # role's line broke mid-token -- and the continuations were indented six spaces, which put
+    # the same sentence at three different left margins depending on how long it was.
+    import textwrap
+    head = f'{col(I["read"])} {col(bold(who))}: '
+    lines = textwrap.fill(t, width=width, break_long_words=False,
+                          break_on_hyphens=False).splitlines()
+    out = [head + (lines[0] if lines else "")]
+    out += [dim(l) for l in lines[1:]]
     return "\n".join(out)
 
 
