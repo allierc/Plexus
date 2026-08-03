@@ -1698,16 +1698,22 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         print(T_.warn(f"[escalate] {_esc.get('action', 'no action')}"))
 
     cov = lm.coverage()["overall"]
-    print(T_.say("supervisor",
-                 f"{rep.get('reason', '?')}; next batch {rep.get('next_confirmatory_frac', 0.7):.0%} "
-                 f"confirmatory. {rep.get('mix_why', '')}", sentences=1))
-    # A DICT DUMPED TO A TERMINAL IS NOT A REPORT. The full record is in supervisor.jsonl;
-    # what a person reading the round needs is the decision and the two numbers behind it.
-    print(T_.say("supervisor",
-                 f"{rep.get('reason', 'continue')}; next batch "
-                 f"{int(100 * (rep.get('next_confirmatory_frac') or 0))}% confirmatory, "
-                 f"surprise {rep.get('surprise', 0):.2f}, best {rep.get('best', 0) or 0:.2f}",
-                 sentences=1))
+    # A DICT DUMPED TO A TERMINAL IS NOT A REPORT: the record is in supervisor.jsonl, and what a
+    # person reading the round needs is the decision and the numbers behind it.
+    #
+    # EVERY FIELD IS `or 0` BEFORE IT IS FORMATTED. `rep.get("surprise", 0)` returns the DEFAULT
+    # only when the key is ABSENT -- a key present and None returns None, and f"{None:.2f}" raises.
+    # It did, at 43 minutes into a round whose measurement, reading and decision were all already
+    # finished, and the driver recorded the whole round as a code crash. A terminal line must not
+    # be able to destroy a round.
+    _sup_bits = [str(rep.get("reason") or "continue")]
+    if rep.get("next_confirmatory_frac") is not None:
+        _sup_bits.append(f"next batch {int(100 * rep['next_confirmatory_frac'])}% confirmatory")
+    if rep.get("surprise") is not None:
+        _sup_bits.append(f"surprise {float(rep['surprise']):.2f}")
+    if rep.get("best") is not None:
+        _sup_bits.append(f"best {float(rep['best']):.2f}")
+    print(T_.say("supervisor", "; ".join(_sup_bits), sentences=1))
     print(f"[map] coverage {cov['frac']:.0%} ({cov['covered']}/{cov['total']} cells, "
           f"{cov['n_runs']} runs)")
     return bk.finish(rid, "complete", 0)

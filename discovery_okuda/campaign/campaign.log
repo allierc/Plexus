@@ -935,3 +935,15 @@ ROUND 1   mode=recon   campaign=okuda_growth_driven
 ------------------------------------------------------------------------------------------------
 [loop] round 1/20  mode=recon   spent so far: 0.0 agent-min over 0 calls
 ------------------------------------------------------------------------------------------------
+  ✗ [loop] round 1 exited 1 after 45.8 min wall, 10.7 min of agents
+[loop] state at death preserved in campaign/_failed_r001_recon
+  ✗ [loop] round 1 CRASHED (uncaught exception). That is a bug in the CODE, not a finding about the batch -- crash 1/2.
+
+------------------------------------------------------------------------------------------------
+[loop] round 2/20  mode=composition   spent so far: 10.7 agent-min over 19 calls
+------------------------------------------------------------------------------------------------
+  ⚠ [loop] round 2 exited 5 after 2.1 min wall, 1.9 min of agents
+
+------------------------------------------------------------------------------------------------
+[loop] round 3/20  mode=composition   spent so far: 12.6 agent-min over 21 calls
+------------------------------------------------------------------------------------------------
