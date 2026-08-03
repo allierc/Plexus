@@ -83,6 +83,10 @@ MAX_CRASHES = 2
 # 2: a null round is a Track A result, and only a null that cost GPU time is evidence of a
 # problem. Rounds refused in Act 1 cost nothing and do not count toward this at all.
 EMPTY_STOP = 4
+# How many rounds may be refused in Act 1, spending agent-minutes but never reaching the cluster,
+# before the loop stops. Lower than EMPTY_STOP because such a round produces NOTHING -- not even a
+# null result -- so repetition is pure cost.
+NO_COMPUTE_STOP = 3
 # TERMINAL EXITS ARE ADVISORY WHILE THE LOOP ITSELF IS UNDER TEST. A stop rule written for a
 # campaign that is doing science stops a campaign that is being debugged: two aborted rounds
 # means "the search is stuck" when the machinery works, and "I am still building it" when it does
@@ -271,7 +275,14 @@ CAMPAIGN_STATE = ("analysis.md", "memory.md", "knowledge.md", "lever_map.md",
                   # IS cleared, so leaving the rendering behind states a backlog that no longer
                   # exists.
                   "batch_refusals.jsonl", "campaign.json", "operator_backlog.md",
-                  "logic_report.jsonl", "holes.jsonl", "claims.jsonl", "reservoir.jsonl")
+                  "logic_report.jsonl", "holes.jsonl", "claims.jsonl", "reservoir.jsonl",
+                  # OR001 -- "apical constriction: a polarized line-tension" -- was filed by some
+                  # earlier campaign, survived every clean start, and could never be closed
+                  # because escalation.set_status is called only from escalation.py's own
+                  # __main__. escalation.decide() returns "exhausted" whenever ANY request is
+                  # open, so one unclosable request declared the space permanently exhausted and
+                  # thirteen rounds in a row produced no candidates.
+                  "operator_requests.jsonl")
 
 
 def clean_start():
@@ -451,6 +462,20 @@ def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None, recon_rounds=
                 print(T_.warn(f"[loop] round {i + 1} produced no evidence and spent no compute "
                               f"(refused in Act 1). Cheap; the refusals go to the next Proposer. "
                               f"empty {consecutive_empty}"))
+                # CHEAP IS NOT FREE. This `continue` used to skip the stop check entirely, on the
+                # reasoning that a round refused in Act 1 costs no GPU. It costs AGENT MINUTES,
+                # and when the cause is structural it never resolves: on 3 August thirteen
+                # consecutive rounds refused in Act 1, burned 35 agent-minutes over 35 calls, and
+                # launched nothing, because one unclosable operator request had declared the
+                # space exhausted. A loop that cannot spend GPU can still spend the budget.
+                if consecutive_empty >= NO_COMPUTE_STOP:
+                    print(T_.no(f"[loop] STOPPING -- {consecutive_empty} rounds in a row refused "
+                                f"in Act 1 without reaching the cluster. That is not bad luck, it "
+                                f"is a structural refusal: the same cause each time. Read the "
+                                f"escalation reason above and fix it; more rounds cannot."))
+                    _log({"event": "stop", "why": "no compute for %d rounds" % consecutive_empty,
+                          "rounds_done": done})
+                    return EMPTY_EXIT
                 continue
             if consecutive_empty >= EMPTY_STOP:
                 print(T_.no(f"[loop] STOPPING -- {EMPTY_STOP} rounds in a row SUBMITTED a batch "
