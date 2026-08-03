@@ -332,10 +332,8 @@ def clean_start():
         if MARKER in txt:
             open(ip, "w").write(txt.split(MARKER)[0].rstrip() + "\n\n" + MARKER + "\n")
             removed.append("instruction.md::LEARNED PATTERNS")
-            print("[loop] CLEAN START -- cleared the LEARNED PATTERNS block: it is written by the "
-                  "Meta-review each round, so it is state. A campaign that keeps the previous "
-                  "campaign's conclusions has not started clean.")
-    print(f"[loop] CLEAN START -- removed {len(removed)} campaign file(s); the next round is 1")
+            print("[loop] clean start: cleared the LEARNED PATTERNS block")
+    print(f"[loop] clean start: {len(removed)} file(s) removed, next round is 1")
     return removed
 
 
@@ -388,8 +386,7 @@ def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None, recon_rounds=
         print(f"[loop] terminal also written to {log}")
     _T_START[0] = time.time() if not resume else None
     if resume:
-        print("[loop] --resume: continuing the campaign already in campaign/ "
-              "(spend is counted over the whole ledger)")
+        print("[loop] resume: continuing the campaign in campaign/")
     else:
         clean_start()
     # RECON IS A ONE-SHOT FOR THE CAMPAIGN, NOT FOR THE INVOCATION. On --resume the plan was
@@ -399,11 +396,10 @@ def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None, recon_rounds=
     # meant to move away from. A frontier that exists has already been built.
     if resume and os.path.exists(os.path.join(CAMP, "frontier.json")):
         recon_rounds = 0
-        print("[loop] --resume: a frontier already exists, so NO recon round. Recon builds a "
-              "frontier; it does not rebuild one that is already there.")
+        print("[loop] resume: frontier exists, no recon round")
     modes = plan(n_rounds, recon_rounds)
-    print(f"[loop] plan: {modes.count('recon')} recon round(s) to build the frontier, then "
-          f"{modes.count('composition')} composition round(s) that can pose a hypothesis")
+    print(f"[loop] plan: {modes.count('recon')} recon + "
+          f"{modes.count('composition')} composition round(s)")
     consecutive_empty, done, crashes = 0, 0, 0
     for i in range(n_rounds):
         mode = modes[i]
@@ -436,8 +432,7 @@ def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None, recon_rounds=
 
         if code in TERMINAL_EXITS and KEEP_GOING:
             print(T_.warn(f"[loop] round {i + 1} exited {code}: {TERMINAL_EXITS[code]}"))
-            print(T_.warn("[loop] --keep-going: continuing anyway. This stop exists for a reason; "
-                          "it is suppressed because the loop is being tested, not trusted."))
+            print(T_.warn("[loop] --keep-going: continuing anyway"))
             _log({"event": "terminal_exit_ignored", "n": i + 1, "exit": code})
             consecutive_empty, crashes = 0, 0
             continue
@@ -465,9 +460,8 @@ def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None, recon_rounds=
             crashes = 0
             spent_compute = _submitted_this_round()
             if not spent_compute:
-                print(T_.warn(f"[loop] round {i + 1} produced no evidence and spent no compute "
-                              f"(refused in Act 1). Cheap; the refusals go to the next Proposer. "
-                              f"empty {consecutive_empty}"))
+                print(T_.warn(f"[loop] round {i + 1}: no evidence, no compute "
+                              f"(refused in Act 1). empty {consecutive_empty}"))
                 # CHEAP IS NOT FREE. This `continue` used to skip the stop check entirely, on the
                 # reasoning that a round refused in Act 1 costs no GPU. It costs AGENT MINUTES,
                 # and when the cause is structural it never resolves: on 3 August thirteen
@@ -475,18 +469,16 @@ def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None, recon_rounds=
                 # launched nothing, because one unclosable operator request had declared the
                 # space exhausted. A loop that cannot spend GPU can still spend the budget.
                 if consecutive_empty >= NO_COMPUTE_STOP:
-                    print(T_.no(f"[loop] STOPPING -- {consecutive_empty} rounds in a row refused "
-                                f"in Act 1 without reaching the cluster. That is not bad luck, it "
-                                f"is a structural refusal: the same cause each time. Read the "
-                                f"escalation reason above and fix it; more rounds cannot."))
+                    print(T_.no(f"[loop] STOP: {consecutive_empty} rounds refused in Act 1, "
+                                f"never reached the cluster. Same cause each time -- see the "
+                                f"escalation reason above."))
                     _log({"event": "stop", "why": "no compute for %d rounds" % consecutive_empty,
                           "rounds_done": done})
                     return EMPTY_EXIT
                 continue
             if consecutive_empty >= EMPTY_STOP:
-                print(T_.no(f"[loop] STOPPING -- {EMPTY_STOP} rounds in a row SUBMITTED a batch "
-                            f"and could score none of it. That is compute spent on runs nothing "
-                            f"can read, and it is the expensive failure, not a Track A null."))
+                print(T_.no(f"[loop] STOP: {EMPTY_STOP} rounds submitted a batch and scored "
+                            f"none of it -- compute spent on unreadable runs"))
                 _log({"event": "stop", "why": "empty rounds with compute spent",
                       "rounds_done": done})
                 return EMPTY_EXIT
@@ -496,11 +488,10 @@ def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None, recon_rounds=
             # Retried, not stopped: the queue is usually reachable a minute later. Bounded by the
             # same crash counter so a genuinely unreachable cluster cannot loop forever.
             crashes += 1
-            print(T_.no(f"[loop] round {i + 1}: the batch never reached the cluster "
-                        f"({crashes}/{MAX_CRASHES}). Check ssh and `bjobs` for orphans."))
+            print(T_.no(f"[loop] round {i + 1}: batch never reached the cluster "
+                        f"({crashes}/{MAX_CRASHES}). Check ssh and bjobs for orphans."))
             if crashes >= MAX_CRASHES:
-                print(T_.no("[loop] STOPPING -- the cluster is not reachable. This is not a code "
-                            "fault and more rounds will not fix it."))
+                print(T_.no("[loop] STOP: cluster not reachable"))
                 _log({"event": "stop", "why": "cluster unreachable", "rounds_done": done})
                 return 1
         elif code == 1:
