@@ -144,15 +144,17 @@ def load_frontier(ledger=None):
     print("[frontier] no frontier -- COLD START. Asking the Archivist what is already on disk.")
     try:
         pick = ARCH.cold_start(ledger=ledger)
-        print(f"  [archivist] start from {pick['start'] or 'nothing usable'} -- {pick.get('why','')[:160]}")
+        _st = pick.get("start") or []
+        print(f"[archivist] start from {len(_st)}: {', '.join(_st) or 'nothing usable'}")
+        if pick.get("why"):
+            print(T_.quiet(T_.wrap_names([pick["why"][:200]])))
         graphs = [g for g in (_graph_from_run(nm) for nm in pick.get("start", [])) if g]
         if graphs:
             save_frontier(graphs)
             return graphs
-        print("  [archivist] named no usable run -- falling back to seed + reference recipes")
+        print("  [archivist] no usable run -- using reference recipes")
     except Exception as e:
-        print(f"  [archivist] cold start FAILED ({type(e).__name__}: {str(e)[:90]}) "
-              f"-- falling back to seed + reference recipes")
+        print(f"[archivist] cold start failed ({type(e).__name__}) -- using reference recipes")
     return [seed("substrate")] + list(reference_recipes().values())
 
 
@@ -561,8 +563,7 @@ def _resize_reservoir(spec_path, name, run=None, frames=None):
         print(T_.warn(f"[recon] {name}: cap {(have + 4) // 2} -> {(want_v + 4) // 2} cells"
                       + (" (CLAMPED)" if clamped else "")))
         if clamped:
-            print(T_.quiet(f"clamped from {clamped[0]} by the {TRAJECTORY_BUDGET_GB} GB budget; "
-                           f"saturating again means the growth, not the array"))
+            print(T_.quiet(f"clamped from {clamped[0]} by the {TRAJECTORY_BUDGET_GB} GB budget"))
         # RECORDED, so an agent can read it. Until now the resize existed only as a printed line
         # and a local variable, which means the clamp's own conclusion -- "if it saturates again
         # the composition's growth is the problem, not the array" -- was a finding addressed to
@@ -577,8 +578,7 @@ def _resize_reservoir(spec_path, name, run=None, frames=None):
         except Exception:
             pass
     except Exception as e:
-        print(T_.warn(f"[recon] {name}: could not resize the reservoir "
-                      f"({type(e).__name__}) -- replaying verbatim, it may saturate"))
+        print(T_.warn(f"[recon] {name}: resize failed ({type(e).__name__}), replaying verbatim"))
 
 
 def _partial_evidence(nm):
@@ -750,8 +750,7 @@ def build_composition_batch(sup, cfg, n_slots, ledger):
                           n_slots=n_slots, ledger=ledger, steer=steer, refusals=refusals,
                           setup=setup, history=hist, review=prior_review)
     if not slots:
-        print("[round] the Proposer produced no usable proposal -- NOT falling back to random. "
-              "A round with no reasoned proposal is a failed round, not a random one.")
+        print(T_.no("[round] no usable proposal -- not falling back to random"))
         return []
 
     out, rejected, in_batch = [], [], {}
@@ -969,8 +968,8 @@ def build_recon_batch(sup, cfg, n_slots, ledger):
                                    "territory": "in_paper", "source_run": run}))
             added += 1
         if added:
-            print(T_.warn(f"  [recon] seeded {added} slot(s) from disk -- the Proposer named "
-                          f"{len(names)} and {len(out) - added} were usable"))
+            print(T_.warn(f"[recon] seeded {added} slot(s) from disk "
+                          f"({len(out) - added} of the Proposer's {len(names)} were usable)"))
     if not out:
         print(T_.no("  [recon] nothing on disk carries a spec_run.yaml -- there is genuinely "
                     "nothing to replay"))
