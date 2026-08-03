@@ -1,0 +1,170 @@
+{
+ "config": "cfl_c0p08_d2",
+ "comp_hash": "MINI_coral_fixed",
+ "region": "Turing chemistry alone on a rigid 2000-cell ball",
+ "summary": {
+  "saturated": false,
+  "inert_operators": [],
+  "retention": 1.0,
+  "valid_evidence": true,
+  "protr_final": 1.006,
+  "protr_peak": 1.006,
+  "elongation_at_end": 1.006,
+  "elongation_peak": 1.006,
+  "horizon_frame": null,
+  "horizon_why": "no metrics.npz (tube_analysis did not run)",
+  "first_damage_frame": null,
+  "valid_frac": 1.0,
+  "protr_peak_untruncated": 1.006,
+  "protr_final_untruncated": 1.006,
+  "n_cells_final": 2000,
+  "red_frac_final": 0.059,
+  "act_max_final": 1.379,
+  "frames": 301,
+  "wall_s": 92.0,
+  "mech_force_mean": 2.4378,
+  "mech_p_body": 0.2059,
+  "mech_p_tube": 0.0,
+  "mech_p_ratio": 0.0,
+  "mech_tension_mean": 3.7236,
+  "mech_migration": 0.01007
+ },
+ "acted": {
+  "seed_mesh_3d": 1,
+  "cell_geometry_3d": 292,
+  "cell_adjacency": 1,
+  "cell_rd_seed": 3,
+  "cell_diffuse": 301,
+  "cell_react": 301,
+  "shape_energy_3d": 301,
+  "reconnect_t1_3d": 1,
+  "topo_snapshot_3d": 301
+ },
+ "premises": [
+  {
+   "id": "P2",
+   "tier": "static",
+   "premise": "morphogen sets where/how fast, not whether",
+   "status": "na",
+   "detail": "no morphogen_growth_3d in this composition",
+   "measured": null
+  },
+  {
+   "id": "P3",
+   "tier": "static",
+   "premise": "a cell divides because it got big",
+   "status": "na",
+   "detail": "needs both morphogen_growth_3d and divide_3d",
+   "measured": null
+  },
+  {
+   "id": "P5",
+   "tier": "static",
+   "premise": "mechanics is fast, biology is slow",
+   "status": "pass",
+   "detail": "the reaction advances 1 time units per frame",
+   "measured": {
+    "dt": 1.0,
+    "rate": 1.0,
+    "per_frame": 1.0
+   }
+  },
+  {
+   "id": "P1",
+   "tier": "passive",
+   "premise": "cells grow by taking material in",
+   "status": "na",
+   "detail": "no growth operator",
+   "measured": null
+  },
+  {
+   "id": "P3b",
+   "tier": "passive",
+   "premise": "mean cell volume holds under proliferation",
+   "status": "na",
+   "detail": "no division in this composition",
+   "measured": null
+  },
+  {
+   "id": "P4",
+   "tier": "passive",
+   "premise": "the chemistry must not be silently extinguished",
+   "status": "pass",
+   "detail": "activator ends at 0.98 of its peak (1.405 -> 1.379)",
+   "measured": {
+    "peak": 1.4046,
+    "end": 1.3791,
+    "ratio": 0.9818453652285347
+   }
+  },
+  {
+   "id": "P7",
+   "tier": "passive",
+   "premise": "a sheet does not absorb added area by stretching",
+   "status": "pass",
+   "detail": "the stretched tail stays at shape index 3.85 over the final fifth; reduced volume 0.988",
+   "measured": {
+    "p95_late": 3.845,
+    "reduced_volume": 0.9877
+   }
+  },
+  {
+   "id": "P8",
+   "tier": "passive",
+   "premise": "the shape index has a hard geometric floor",
+   "status": "pass",
+   "detail": "minimum shape index 3.6620 respects the floor 3.5449",
+   "measured": {
+    "min": 3.662,
+    "floor": 3.5449077018110318
+   }
+  },
+  {
+   "id": "P9",
+   "tier": "passive",
+   "premise": "a closed epithelium is a sphere with no holes",
+   "status": "pass",
+   "detail": "genus 0 at all 40 recorded frames",
+   "measured": {
+    "frames": 40
+   }
+  },
+  {
+   "id": "P11",
+   "tier": "passive",
+   "premise": "tissue cannot pass through itself",
+   "status": "pass",
+   "detail": "at every frame at least 100.0% of rays cross the surface exactly once",
+   "measured": {
+    "worst_single_frac": 1.0
+   }
+  },
+  {
+   "id": "P12",
+   "tier": "passive",
+   "premise": "a concentration is non-negative and finite",
+   "status": "pass",
+   "detail": "the activator stays non-negative throughout (minimum 0)",
+   "measured": {
+    "min": 0.0
+   }
+  },
+  {
+   "id": "P5b",
+   "tier": "passive",
+   "premise": "the mechanical relaxation keeps up with the tissue",
+   "status": "pass",
+   "detail": "residual force after relaxation 2.44 -> 2.44 (x1.00) while the tissue grew from 2000 to 2000 cells",
+   "measured": {
+    "force_early": 2.440690279006958,
+    "force_late": 2.437799572944641,
+    "ratio": 0.9988156194634031,
+    "cells_early": 2000.0,
+    "cells_late": 2000.0
+   }
+  }
+ ],
+ "premises_broken": [],
+ "premises_ablated": [],
+ "run_id": "R496cb74ce9a8553"
+}

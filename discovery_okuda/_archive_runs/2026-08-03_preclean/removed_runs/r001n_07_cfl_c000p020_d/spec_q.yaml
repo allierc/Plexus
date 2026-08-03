@@ -1,0 +1,82 @@
+general:
+  name: cfl_c0p02_d5
+  seed: 0
+  n_frames: 60
+  dt: 1.0
+  record_cap: 62
+  boundary: free
+  dim: 3
+  world:
+  - 50.0
+  - 50.0
+  - 50.0
+sets:
+  vertex:
+    n: 41604
+  cell:
+    n: 20804
+    state:
+      chem:
+        width: 2
+        integration: first_order
+      cen:
+        width: 3
+      area:
+        width: 1
+fields: {}
+operators:
+- op: load_mesh_3d
+  at: vertex
+  cell_set: cell
+  ckpt: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda/r001n_07_cfl_c000p020_d/ckpt_end.npz
+  before_frame: 1
+- op: cell_geometry_3d
+  at: cell
+- op: cell_adjacency
+  at: cell
+- op: cell_diffuse
+  at: cell
+  d_a: 0.08
+  d_h: 5.0
+  chi: 0.02
+- op: cell_react
+  at: cell
+  implementation: gray_scott
+  F: 0.046
+  kk: 0.062
+  rate: 1.0
+- op: shape_energy_3d
+  at: vertex
+  p0: 3.5
+  K_A: 1.0
+  K_P: 1.0
+  Gamma: 0.4
+  Lambda: 3.0
+  K_V: 2.0
+  K_R: 0.4
+  mu: 1.0
+  dt: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+- op: reconnect_t1_3d
+  at: vertex
+  l_th_frac: 0.35
+  every: 4
+  max_flips: 30
+  engine_clock: true
+- op: topo_snapshot_3d
+  at: vertex
+  every: 1
+schedule:
+- load_mesh_3d
+- cell_geometry_3d
+- cell_adjacency
+- cell_diffuse
+- cell_react
+- shape_energy_3d
+- reconnect_t1_3d
+- topo_snapshot_3d
+_discovery:
+  comp_hash: MINI_coral_fixed
+  region: Turing chemistry alone on a rigid 2000-cell ball

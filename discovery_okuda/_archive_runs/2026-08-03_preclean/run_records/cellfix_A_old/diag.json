@@ -1,0 +1,169 @@
+{
+ "config": "cellfix_A_old",
+ "comp_hash": "MINI_mini_grow_divide_bigger",
+ "region": "same, vth_frac 1.4 -> 2.5 so cells can actually double before dividing [reference buffers 3552/1800]",
+ "summary": {
+  "saturated": true,
+  "inert_operators": [],
+  "retention": 0.975,
+  "valid_evidence": false,
+  "protr_final": 1.034,
+  "protr_peak": 1.061,
+  "horizon_frame": null,
+  "horizon_why": "no metrics.npz (tube_analysis did not run)",
+  "first_damage_frame": null,
+  "valid_frac": 1.0,
+  "protr_peak_untruncated": 1.061,
+  "protr_final_untruncated": 1.034,
+  "n_cells_final": 1778,
+  "red_frac_final": 0.0,
+  "act_max_final": 0.0,
+  "frames": 402,
+  "wall_s": 65.4,
+  "mech_force_mean": 28.1751,
+  "mech_p_body": 3.4985,
+  "mech_p_tube": 0.0,
+  "mech_p_ratio": 0.0,
+  "mech_tension_mean": 6.2236,
+  "mech_migration": 0.51542
+ },
+ "acted": {
+  "seed_mesh_3d": 1,
+  "cell_geometry_3d": 402,
+  "morphogen_growth_3d": 308,
+  "shape_energy_3d": 402,
+  "reconnect_t1_3d": 99,
+  "divide_3d": 101,
+  "topo_snapshot_3d": 402
+ },
+ "premises": [
+  {
+   "id": "P2",
+   "tier": "static",
+   "premise": "morphogen sets where/how fast, not whether",
+   "status": "na",
+   "detail": "a_sw=50.0 is above any reachable activator, so growth is uniform (switch off)",
+   "measured": {
+    "a_sw": 50.0,
+    "rho": 1.0
+   }
+  },
+  {
+   "id": "P3",
+   "tier": "static",
+   "premise": "a cell divides because it got big",
+   "status": "pass",
+   "detail": "growth ceiling 2.5 exceeds the division trigger 2.0, so cells can cross it",
+   "measured": {
+    "vth_frac": 2.5,
+    "factor": 2.0
+   }
+  },
+  {
+   "id": "P5",
+   "tier": "static",
+   "premise": "mechanics is fast, biology is slow",
+   "status": "na",
+   "detail": "no chemistry in this composition",
+   "measured": null
+  },
+  {
+   "id": "P1",
+   "tier": "passive",
+   "premise": "cells grow by taking material in",
+   "status": "pass",
+   "detail": "tissue volume 456.1 -> 14398.6 (x31.57)",
+   "measured": {
+    "V_start": 456.132,
+    "V_end": 14398.623
+   }
+  },
+  {
+   "id": "P3b",
+   "tier": "passive",
+   "premise": "mean cell volume holds under proliferation",
+   "status": "pass",
+   "detail": "mean cell volume ends at 1.00 of its peak (8.10 -> 8.10)",
+   "measured": {
+    "peak": 8.09821,
+    "end": 8.09821,
+    "ratio": 1.0
+   }
+  },
+  {
+   "id": "P4",
+   "tier": "passive",
+   "premise": "the chemistry must not be silently extinguished",
+   "status": "na",
+   "detail": "no chemistry in this composition",
+   "measured": null
+  },
+  {
+   "id": "P7",
+   "tier": "passive",
+   "premise": "a sheet does not absorb added area by stretching",
+   "status": "pass",
+   "detail": "the stretched tail stays at shape index 4.10 over the final fifth; reduced volume 0.989",
+   "measured": {
+    "p95_late": 4.102,
+    "reduced_volume": 0.989
+   }
+  },
+  {
+   "id": "P8",
+   "tier": "passive",
+   "premise": "the shape index has a hard geometric floor",
+   "status": "pass",
+   "detail": "minimum shape index 3.6540 respects the floor 3.5449",
+   "measured": {
+    "min": 3.654,
+    "floor": 3.5449077018110318
+   }
+  },
+  {
+   "id": "P9",
+   "tier": "passive",
+   "premise": "a closed epithelium is a sphere with no holes",
+   "status": "pass",
+   "detail": "genus 0 at all 40 recorded frames",
+   "measured": {
+    "frames": 40
+   }
+  },
+  {
+   "id": "P11",
+   "tier": "passive",
+   "premise": "tissue cannot pass through itself",
+   "status": "pass",
+   "detail": "at every frame at least 100.0% of rays cross the surface exactly once",
+   "measured": {
+    "worst_single_frac": 1.0
+   }
+  },
+  {
+   "id": "P12",
+   "tier": "passive",
+   "premise": "a concentration is non-negative and finite",
+   "status": "na",
+   "detail": "no chemistry in this composition",
+   "measured": null
+  },
+  {
+   "id": "P5b",
+   "tier": "passive",
+   "premise": "the mechanical relaxation keeps up with the tissue",
+   "status": "pass",
+   "detail": "residual force after relaxation 18.36 -> 28.11 (x1.53) while the tissue grew from 150 to 1778 cells",
+   "measured": {
+    "force_early": 18.355060577392578,
+    "force_late": 28.114859580993652,
+    "ratio": 1.5317225166569022,
+    "cells_early": 150.0,
+    "cells_late": 1778.0
+   }
+  }
+ ],
+ "premises_broken": [],
+ "premises_ablated": [],
+ "run_id": "R496cb74ce9a8553"
+}
