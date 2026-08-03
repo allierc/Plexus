@@ -1,0 +1,8 @@
+[loop] terminal also written to /workspace/Plexus/discovery_okuda/campaign/campaign.log
+[loop] CLEAN START -- cleared the LEARNED PATTERNS block: it is written by the Meta-review each round, so it is state. A campaign that keeps the previous campaign's conclusions has not started clean.
+[loop] CLEAN START -- removed 10 campaign file(s); the next round is 1
+[loop] plan: 1 recon round(s) to build the frontier, then 19 composition round(s) that can pose a hypothesis
+
+------------------------------------------------------------------------------------------------
+[loop] round 1/20  mode=recon   spent so far: 0.0 agent-min over 0 calls
+------------------------------------------------------------------------------------------------
