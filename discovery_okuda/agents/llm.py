@@ -646,7 +646,14 @@ def _absorb_event(line, quiet):
     if kind == "assistant" and not quiet:
         for blk in (ev.get("message", {}) or {}).get("content", []) or []:
             if blk.get("type") == "text" and blk.get("text", "").strip():
-                print(blk["text"][:400], flush=True)
+                # THE AGENT'S WORKING TEXT, NOT ITS ANSWER. The answer is parsed from the JSON
+                # and printed by the round in the role's own voice. What arrives here is the
+                # narration around it -- and it arrives with the payload embedded, so a fenced
+                # ```json block of twelve run names was landing verbatim in the terminal. Strip
+                # the fences and anything that is plainly a JSON object; keep the prose, short.
+                _t = _prose_only(blk["text"])
+                if _t:
+                    print(f"  {_t[:220]}", flush=True)
             # A BARE TOOL NAME IS NOISE. `[tool] Bash` eight times running says only that the
             # agent used a tool, which is not information -- it does not say which file, which
             # command, or why, and it buries the agent's actual reasoning in a column of
@@ -655,6 +662,19 @@ def _absorb_event(line, quiet):
             elif blk.get("type") == "tool_use":
                 _TOOL_COUNT[blk.get("name", "?")] = _TOOL_COUNT.get(blk.get("name", "?"), 0) + 1
     return ""
+
+
+def _prose_only(text):
+    """The sentence an agent wrote, without the payload it wrote around.
+
+    A terminal is for reading. A JSON object in it is a file that has not been written yet.
+    """
+    import re as _re
+    t = _re.sub(r"```.*?```", " ", text or "", flags=_re.S)          # fenced blocks
+    t = _re.sub(r"\{[^{}]*\"[^{}]*\}", " ", t, flags=_re.S)          # bare JSON objects
+    t = _re.sub(r"^\s*[-*]\s+", "", t, flags=_re.M)                  # bullet markers
+    t = " ".join(t.split())
+    return t if len(t) > 12 else ""
 
 
 _TOOL_COUNT = {}
@@ -667,8 +687,22 @@ def tool_summary(reset=True):
         return ""
     out = ", ".join(f"{k}x{v}" for k, v in sorted(_TOOL_COUNT.items(), key=lambda kv: -kv[1]))
     if reset:
-        _TOOL_COUNT = {}
+        _TOOL_COUNT.clear()
     return out
+
+
+def _prose_only(text):
+    """The sentence an agent wrote, without the payload it wrote around.
+
+    A terminal is for reading. A JSON object in it is a file that has not been written yet:
+    a fenced ```json block of twelve run names was landing verbatim in the round output.
+    """
+    import re as _re
+    t = _re.sub(r"```.*?```", " ", text or "", flags=_re.S)          # fenced blocks
+    t = _re.sub(r"\{[^{}]*\"[^{}]*\}", " ", t, flags=_re.S)          # bare JSON objects
+    t = _re.sub(r"^\s*[-*]\s+", "", t, flags=_re.M)                  # bullet markers
+    t = " ".join(t.split())
+    return t if len(t) > 12 else ""
 
 
 def last_usage():

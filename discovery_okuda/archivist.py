@@ -244,7 +244,8 @@ if __name__ == "__main__":
     a = ap.parse_args()
     print(table())
     if a.decide:
-        print("\n" + json.dumps(decide(), indent=1))
+        _d = decide()
+        print(f"\n[archivist] {_d.get('decision', '?')} -- {str(_d.get('why', ''))[:160]}")
 
 
 # ============================================================ COLD START -- once, at the beginning
