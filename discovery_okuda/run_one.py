@@ -90,14 +90,14 @@ def _heartbeat(name, t0, every=10):
 
     last = [0.0]
 
-    def beat(H, tick):
+    def beat(H, tick, phase="simulating", force=False):
         # TIME-BASED AS WELL AS FRAME-BASED. A run that grows 2000 -> 55,521 cells takes ~30x
         # longer per frame than it did at the start, so a beat every 10 frames became a beat
         # every ~2200s -- and a watcher polling each minute saw an unchanged frame number for
         # thirty-six consecutive polls. Writing on a clock as well means the file's mtime tracks
         # LIVENESS, which is the thing the watcher actually needs to know.
         now = time.time()
-        if (tick % every and tick) and (now - last[0] < HEARTBEAT_SECONDS):
+        if not force and (tick % every and tick) and (now - last[0] < HEARTBEAT_SECONDS):
             return
         last[0] = now
         try:
@@ -113,6 +113,7 @@ def _heartbeat(name, t0, every=10):
                 pass
             with open(path, "w") as fh:
                 json.dump({"frame": int(tick), "n_cells": nc, "n_vertices": nv,
+                           "phase": phase,
                            "elapsed_s": round(time.time() - t0, 1)}, fh)
                 fh.flush()
                 os.fsync(fh.fileno())
@@ -222,7 +223,17 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     except Exception:
         pass
     sim = S.load(cfg_path)
-    Hf, out = engine_run(sim, device=device, on_frame=_heartbeat(name, t0))
+    _beat = _heartbeat(name, t0)
+    Hf, out = engine_run(sim, device=device, on_frame=_beat)
+    # THE LAST BEAT. The heartbeat fires from on_frame, so it stopped the instant the loop ended
+    # -- and everything after this line (tube_analysis, morphology, the movie, the strip) takes
+    # minutes. A run that had FINISHED its 900 frames therefore went silent and was killed as
+    # "wedged, not slow" while it was writing its own results. Marking the phase means staleness
+    # can mean wedged again, because a run in `analysing` is never a straggler.
+    try:
+        _beat(Hf, sim.n_frames, phase="analysing", force=True)
+    except Exception:
+        pass
     wall = time.time() - t0
 
     vlvl = Hf.level("vertex")
