@@ -947,3 +947,11 @@ ROUND 1   mode=recon   campaign=okuda_growth_driven
 ------------------------------------------------------------------------------------------------
 [loop] round 3/20  mode=composition   spent so far: 12.6 agent-min over 21 calls
 ------------------------------------------------------------------------------------------------
+[loop] terminal also written to /workspace/Plexus/discovery_okuda/campaign/campaign.log
+[loop] clean start: cleared the LEARNED PATTERNS block
+[loop] clean start: 19 file(s) removed, next round is 1
+[loop] plan: 1 recon + 19 composition round(s)
+
+------------------------------------------------------------------------------------------------
+[loop] round 1/20  mode=recon   spent so far: 0.0 agent-min over 0 calls
+------------------------------------------------------------------------------------------------

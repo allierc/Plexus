@@ -299,6 +299,21 @@ def status(verbose=True, include_done=True):
 
 
 HEARTBEAT_STALE_S = 600     # no beat for ten minutes: the process is wedged, not slow
+_VERDICT = {}
+
+
+def _verdict(job_id, state, msg):
+    """Say it once per CHANGE, not once per job per poll.
+
+    Five big runs spared every sixty seconds printed thirty near-identical lines every four
+    minutes -- "slow but WORKING" repeated until it stopped being read. The state is already
+    carried by the run/pend line; what a reader needs is the moment a verdict CHANGES.
+    """
+    if _VERDICT.get(job_id) != state:
+        _VERDICT[job_id] = state
+        print(f"[cluster] {msg}", flush=True)
+
+
 _BEATS = {}                       # job_id -> (frame, elapsed) at the previous poll
 
 
@@ -357,22 +372,16 @@ def _is_working(job_id, ids, min_frac=0.5):
         # minutes after that. Job 153256444 was killed as "wedged, not slow" AT FRAME 900, i.e.
         # while it was writing the results the round was waiting for.
         if str(b.get("phase")) == "analysing":
-            print(f"[cluster] {job_id} finished its frames and is writing results -- not a "
-                  f"straggler.", flush=True)
+            _verdict(job_id, "analysing", f"{job_id} finished its frames, writing results")
             return True
         if age > HEARTBEAT_STALE_S:
-            print(f"[cluster] {job_id} wrote no heartbeat for {age / 60:.0f} min (frame "
-                  f"{cur[0]}) -- wedged, not slow.", flush=True)
+            print(f"[cluster] {job_id} wedged: no heartbeat for {age / 60:.0f} min "
+                  f"(frame {cur[0]})", flush=True)
             return False
         if prev is None or cur[0] > prev[0]:
-            print(f"[cluster] {job_id} is slow but WORKING (frame {cur[0]}"
-                  + (f", {cur[1]} cells" if cur[1] else "")
-                  + ") -- not a straggler. Slow and productive is a big run, not a stuck one.",
-                  flush=True)
+            _verdict(job_id, "working", f"{job_id} slow but working")
             return True
-        print(f"[cluster] {job_id} is at frame {cur[0]}"
-              + (f", {cur[1]} cells" if cur[1] else "")
-              + f", heartbeat {age:.0f}s old -- alive, so not a straggler.", flush=True)
+        _verdict(job_id, "alive", f"{job_id} alive, heartbeat {age:.0f}s old")
         return True
     except Exception:
         return False
@@ -476,8 +485,9 @@ def wait_for_ids(ids, poll=60, timeout_h=24, straggler_factor=4.0, min_straggler
                     # and their results reached nobody. If anything was spared, keep polling; the
                     # straggler window simply reopens on the next pass.
                     if spared:
-                        print(f"[cluster] {len(spared)} job(s) still working -- waiting for them "
-                              f"rather than closing the batch.", flush=True)
+                        _verdict("_batch", f"waiting{len(spared)}",
+                                 f"{len(spared)} job(s) still working -- waiting, not closing "
+                                 f"the batch")
                     else:
                         return {"ok": False, "done": sorted(done), "exit": sorted(bad),
                                 "killed": sorted(killed), "timed_out": False}
