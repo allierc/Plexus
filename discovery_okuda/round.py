@@ -437,6 +437,19 @@ def _last_review():
 # is the array that scales with frames, and twelve slots share one GPU.
 TRAJECTORY_BUDGET_GB = 1.5
 
+# A HARD CEILING ON CELLS, above the memory clamp and independent of it.
+#
+# The memory budget alone gave 69,446 cells, and a run at that size takes over an hour per 900
+# frames: five wk_curvature replays sat at 43k-50k cells and frame ~750 while eleven other slots
+# had finished, and the round waited on them. A 50k body is not more informative than a 20k one
+# for a map that is looking for a BUD -- Okuda's figures are hundreds of cells, not tens of
+# thousands -- and the cost is superlinear while the information is not.
+#
+# This is a BUDGET decision, not a claim about biology. A composition that saturates it has told
+# us its growth is unbounded on this recipe, which is a finding; it is not a reason to buy it a
+# bigger array.
+MAX_CELLS = int(os.environ.get("OKUDA_MAX_CELLS", 50_000))
+
 
 def _times_censored(run, log_dir=None):
     """How often THIS composition has been stopped by its array, across every replay of it.
@@ -543,6 +556,8 @@ def _resize_reservoir(spec_path, name, run=None, frames=None):
         # 400-frame spec run at 900 frames costs 2.25x what the budget was told.
         frames_est = int(frames or (c.get("general") or {}).get("n_frames") or 900)
         max_v = int(TRAJECTORY_BUDGET_GB * 1e9 / (max(frames_est, 1) * 3 * 4))
+        # whichever binds first -- the memory budget or the cell ceiling
+        max_v = min(max_v, 2 * MAX_CELLS + 4)
         if want_v > max_v:
             clamped = ((want_v + 4) // 2, (max_v + 4) // 2)
             want_v, want_c = max_v, min(want_c or max_v, max_v)
