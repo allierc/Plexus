@@ -911,3 +911,11 @@ ROUND 1   mode=recon   campaign=okuda_growth_driven
   [13:41] run/pend=12 done=0 exit=0 of 12
   [13:42] run/pend=12 done=0 exit=0 of 12
   [13:43] run/pend=12 done=0 exit=0 of 12
+[loop] terminal also written to /workspace/Plexus/discovery_okuda/campaign/campaign.log
+[loop] CLEAN START -- cleared the LEARNED PATTERNS block: it is written by the Meta-review each round, so it is state. A campaign that keeps the previous campaign's conclusions has not started clean.
+[loop] CLEAN START -- removed 8 campaign file(s); the next round is 1
+[loop] plan: 1 recon round(s) to build the frontier, then 19 composition round(s) that can pose a hypothesis
+
+------------------------------------------------------------------------------------------------
+[loop] round 1/20  mode=recon   spent so far: 0.0 agent-min over 0 calls
+------------------------------------------------------------------------------------------------
