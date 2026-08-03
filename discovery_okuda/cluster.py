@@ -183,13 +183,22 @@ def submit(names, frames=None, do_q=False, campaign="campaign"):
         os.replace(logl, logl + ".prev")     # a fresh log per submission, so IDs are unambiguous
     log = cpath(logl)
     _ssh(f"nohup bash {cpath(runner)} > {log} 2>&1 < /dev/null &", timeout=30)
-    print(f"[cluster] fired {len(names)} bsub(s) DETACHED on {SSH}: "
-          f"{', '.join(PREFIX + n for n in names)}")
-    print(f"  the ssh returns BEFORE bsub lands -- the queue is the only ground truth.")
-    print(f"  verify: python cluster.py --status   (remote submit log: {log})")
-    #  is passed so the queue can be consulted when the log lags -- without it the
+    print(f"[cluster] fired {len(names)} bsub(s) DETACHED on {SSH}:")
+    print(_wrap_names([PREFIX + n for n in names]))
+    # The two explanatory lines that used to follow are gone from the terminal. The ssh
+    # returning before bsub lands is why _ids_from_queue() exists, and that reasoning now lives
+    # in the code rather than being reprinted every submission; the remote log path is in
+    # LOGDIR for anyone who needs it.
+    # `names` is passed so the QUEUE can be consulted when the log lags. Without it the
     # fallback has nothing to look up and the race stands.
     return submitted_ids(wait_s=25, expect=len(names), names=names)
+
+
+def _wrap_names(names, width=92):
+    """Job names across as many lines as they need. Twelve of them is ~250 characters."""
+    import textwrap
+    return textwrap.fill(", ".join(names), width=width,
+                         break_long_words=False, break_on_hyphens=False)
 
 
 def _ids_from_queue(names):

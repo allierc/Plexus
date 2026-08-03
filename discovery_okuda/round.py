@@ -905,7 +905,8 @@ def build_recon_batch(sup, cfg, n_slots, ledger):
     tab = ARCH.log_table(top=24)
     ok, choice = P.choose_specs(tab, n=n_slots, ledger=ledger)
     names = choice.get("runs") or []
-    print(f"  [recon] the Proposer chose {len(names)}: {', '.join(names)}")
+    print(f"[recon] the Proposer chose {len(names)}:")
+    print(T_.wrap_names(names))
     print(T_.say("proposer", choice.get("why", ""), sentences=2))
 
     out = []
