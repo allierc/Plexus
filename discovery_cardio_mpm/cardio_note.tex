@@ -475,6 +475,49 @@ Everything else may be renegotiated if it runs over budget --- \textbf{those two
 gate with a waiver attached is not a gate, and a stop that can be waived would be waived at exactly
 the moment it was doing its job.
 
+\subsection*{Where we are, and what stands between here and a running loop}
+
+\begin{center}\footnotesize
+\begin{tabular}{@{}p{4.0cm} l p{7.5cm}@{}}
+\toprule
+\textbf{phase} & \textbf{state} & \textbf{what it still owes}\\
+\midrule
+0 --- make it run, make it repeat & \dn\ 18/18 & nothing. Canaries 8 of 8.\\
+1 --- freeze the recording, seal the test & \dn\ 7/7 & nothing. Two premises fail; recorded, not
+waived.\\
+1b --- the corpus we own & \dn & nothing. Seven more recipes can be regenerated when wanted; the
+question they answer is settled.\\
+\addlinespace
+\textbf{2 --- certify the ruler, find the floor} & \todo\ \stopp & \textbf{everything}: the zero,
+the noise, a measure that can see coordination, the regime check, the anchoring ladder, the error
+decomposition --- and recompute the ceiling, which today rests on an uncertified instrument.\\
+\textbf{3 --- certify the gradient} & \todo & the language-or-switches decision; make the operators
+carry gradients; classify every knob; recover a planted answer. \textbf{And answer the warm-up
+failure} --- the gradient is taken about a state still drifting by 33\%.\\
+\textbf{4 --- what a fit may claim, and the loop} & \todo\ \stopp & the three-way verdict for a flat
+response; the degeneracies; the honest model size; freeze-and-transfer --- \emph{then} build the
+four steps and watch every refusal fire.\\
+\addlinespace
+5 --- the first live round & \todo & \textbf{blocked on 2, 3 and 4.} None of the loop exists yet:
+no round driver, no proposer, no prediction scorer, no agent plumbing, no budget ledger.\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\emph{That the loop itself is unbuilt is deliberate, not a backlog.} It is Phase~4's work, and
+building a machine to rank numbers before the ruler is certified would be building it to rank
+numbers nobody can yet trust.
+
+\textbf{So: three phases stand between here and a running loop, and two of them can stop the
+project.} Phase~2 can conclude that the model does not beat copying the previous beat. Phase~4 can
+conclude that no model size clears the noise. Neither is a formality --- on the evidence already on
+disk, copying the previous beat outscores every fit the previous campaign produced.
+
+\textbf{What has been bought so far} is not progress toward the loop so much as the right to
+believe anything it later says: an apparatus that runs and repeats bit-for-bit, a recording that
+rebuilds from committed code, a sealed held-out specimen, four numbers that bound every future
+claim, and thirteen checks that have each been watched refusing something.
+
 \begin{phasebox}{Phase 0 --- Make it run, make it repeat, publish the empty register \hfill \dn\ (18 of 18)}
 \textbf{Goal.} Get from ``nothing executes'' to ``the same command twice gives the same answer, and
 we can say exactly what we believe''. None of this is science; each item makes a question askable.
@@ -511,9 +554,9 @@ A gate that has never been seen to refuse is not a gate.
 \textbf{Cost.} About half a day, no GPU.
 \end{phasebox}
 
-\begin{phasebox}{Phase 0 --- what actually happened \hfill \dn\ (18 of 18, canaries 6 of 6)}
+\begin{phasebox}{Phase 0 --- what actually happened \hfill \dn\ (18 of 18, canaries 8 of 8)}
 \textbf{Closed 2 August.} The gate is \code{certify\_apparatus.py}; it prints \textbf{PASS 18/18},
-and \code{-{}-canary} breaks the apparatus six ways and catches \textbf{6 of 6}.
+and \code{-{}-canary} breaks the apparatus and catches \textbf{8 of 8} --- six at the time, and two more added when the audit pointed out the register check had never been seen to refuse.
 
 \footnotesize
 \begin{tabular}{@{}l p{10.6cm}@{}}
@@ -695,25 +738,32 @@ files that carry it}, and the seal was watched refusing.
 
 \textbf{6. And the premises --- what the loop is allowed to call a tissue.} \dn\ Written from the
 Okuda folder's experience, where a great deal had to be fixed before the loop could run at all.
-Eight claims, each one something a computer can \emph{fail}. Six hold. \textbf{Two do not, and both
-were invisible before:}
+Eight claims, each one something a computer can \emph{fail}. \textbf{Two of them do fail, and one
+of the two was only discovered because an outside audit noticed the check had never been written.}
 
 \begin{itemize}
-\item \textbf{Four operators in the recipe never run.} \code{activation\_pulse}, \code{aggregate},
-\code{apply\_material\_map} and \code{pacemaker} are built and then never stepped --- the trainer
-hand-rolls its own loop. \emph{Both material maps are among them.} Sixty batches of runs list those
-operators in their specification and none of them acted.
-\item \textbf{The model barely rests, and the tissue rests most of the time.} Over the same window,
+\item \textbf{The warm-up does not settle.} The fit runs a no-gradient warm-up ``to the reproducible
+state'' and then differentiates one beat. Give it one extra beat of warm-up and \textbf{the fitted
+window moves by 33\%}. So the state the gradient is taken about is still drifting, and which beat
+gets fitted depends on how long the model was run beforehand. This premise was written down in
+Phase~1 and \emph{not implemented} --- the count read ``six of eight'' with nothing in the eighth
+slot --- so it has been failing silently the whole time. It is the premise that underwrites every
+gradient in the project, and Phase~3 is called \emph{certify the gradient}.
+\item \textbf{The model barely rests, and the tissue rests most of the time.} Over the same window
 the recording is quiescent \textbf{77\%} of the beat --- a sharp squeeze and a long relaxation ---
-and the simulation is quiescent \textbf{8\%}. It contracts almost continuously. \emph{And the
-objective cannot see this at all}, being invariant to timing by construction.
+and the simulation \textbf{8\%}. It contracts almost continuously. \emph{And the objective cannot
+see this at all}, being invariant to timing by construction.
 \end{itemize}
 
-The six that hold are worth stating too, because they were assumptions until this afternoon: a
-resting sheet rests \emph{exactly} (interior displacement is bit-zero with the muscle off); nothing
-leaves the dish and nothing goes non-finite; the solver sits \textbf{30 times inside} its own
-stability bound; the seed reaches the engine's own generator, not just the global one; and the
-recorded beat is a beat --- 0.48\,Hz, quiescent for over half the record.
+Both are graded \emph{usual} rather than \emph{certain}, so a run breaking them is
+\textbf{ambiguous}, not invalid --- but neither is waived, and both go to the loop as things it must
+explain. \textbf{Eleven of thirteen checks hold.}
+
+The eleven that do are worth stating, because they were assumptions until this phase: a resting
+sheet rests \emph{exactly} (interior displacement is bit-zero with the muscle off); nothing leaves
+the dish and nothing goes non-finite; the solver sits \textbf{30 times inside} its own stability
+bound, now read from the run rather than from a comment; the seed reaches the engine's own
+generator; every operator in the fitting recipe actually runs; and the recorded beat is a beat.
 
 \textbf{And one more check, which needed a fit to test and so was tested on a fit built to fail
 it.} A bounded parameter that ends \emph{at} its bound has not found an optimum, it has found the
@@ -739,9 +789,9 @@ note; the seal was watched refusing the held-out specimen through six different 
 premise checks run, and \textbf{what they refuse is recorded, not waived}; and Phase~1b is green.
 
 \textbf{Two things are on the record as broken rather than fixed}, because fixing them is not
-Phase~1's job and hiding them would be worse than either: four operators in the recipe never run,
-and the model rests for 8\% of the beat where the tissue rests for 77\%. Both go to the Proposer as
-the first things the loop has to explain.
+Phase~1's job and hiding them would be worse than either: \textbf{the warm-up does not settle}
+(33\% shift for one extra beat) and \textbf{the model rests for 8\% of the beat where the tissue
+rests for 77\%}. The first is Phase~3's to answer, the second the loop's.
 
 \textbf{What Phase 1 cost.} An afternoon, and it produced four numbers that bound everything
 afterwards --- the ceiling, the tracker floor, the discretisation dependence of the enclosure axis,
@@ -1040,7 +1090,7 @@ actually earns.
 \section{Phase 0 report --- 2 August}\label{sec:p0report}
 
 \emph{This is a phase boundary. The gate prints \textbf{PASS, 18 of 18}, the canaries catch
-\textbf{6 of 6}, and one thing is deliberately \textbf{not} certified and is recorded as a number
+\textbf{8 of 8}, and one thing is deliberately \textbf{not} certified and is recorded as a number
 rather than a footnote. I have stopped here.}
 
 \textbf{What now exists.} A folder that runs: \code{ingest.py} (rebuild the recording),
