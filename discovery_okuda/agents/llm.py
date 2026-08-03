@@ -59,6 +59,34 @@ USAGE_LOG = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file_
 #
 # `max_turns` is the real lever: it bounds tool-use loops, which is where a call runs away.
 # Agents that only read text and emit JSON get NO tools at all, so they cannot loop.
+# MODEL PER ROLE -- the description roles do not reason, so they do not need the reasoning model.
+# Round 10 spent 33.4 min against a 25 min ceiling and began DROPPING Interpreters; the breakdown
+# was interpreter 4 calls/13.0 min (39%) and reader 9 calls/9.8 min (29%) -- two thirds, both
+# per-run. Cutting effort everywhere would blunt the roles doing the reasoning. The Reader LABELS
+# (its own docstring below says so) and the Eye-check DESCRIBES; neither infers. So they, and only
+# they, drop to the fast model. Everything absent from this map keeps the session default.
+FAST_MODEL = os.environ.get("OKUDA_FAST_MODEL", "claude-haiku-4-5-20251001")
+AGENT_MODEL = {
+    "reader":  FAST_MODEL,      # reads numbers + caption + strip, returns a LABEL
+    "watcher": FAST_MODEL,      # text -> JSON, no tools, no judgement
+}
+
+BREVITY = """BREVITY (this is a budget, not a style note -- wall clock is generation):
+- Do not restate the evidence you were given. Assume the reader has it open.
+- No preamble, no summary of what you are about to do, no closing remarks.
+- Every free-text field has a word limit below. Exceeding it is a failure, not a flourish.
+- Never shorten a NUMBER, a metric name, or a citation to save words. Cut the prose around them.
+- EVERYTHING OUTSIDE THE REQUESTED JSON IS DISCARDED UNREAD. The parser takes the first JSON
+  object and throws the rest away, so an explanation written around it is not read by anyone --
+  it is only paid for. Measured: the reviewer spent 6,140 output tokens on a payload needing
+  about 200, and wall clock IS generation at ~70 tokens/s. Emit the JSON. Nothing else."""
+
+# APPLIED TO EVERY ROLE, from run_agent, not from each call site. It used to be pasted into three
+# prompts out of nine -- the proposer and the reviewer -- and was absent from the two roles that
+# actually spend the ceiling: interpreter (39% of round 10) and reader (29%). A budget rule that
+# reaches a third of the callers is not a budget rule. Roles may opt out with brevity=False.
+BREVITY_EXEMPT = ()
+
 AGENT_BUDGETS = {
     #                 min  turns  tools
     # TIME IS OUTPUT VOLUME. Measured at 64-77 tok/s across every agent, so an agent is slow in
@@ -393,6 +421,12 @@ def run_agent(agent, prompt, ledger=None, **over):
     _METER_DEPTH += 1
     t0, ok, out = time.time(), False, ""
     try:
+        # The role's model, unless the caller named one. A role absent from AGENT_MODEL keeps
+        # the session default -- so this can only ever make a DESCRIPTION role cheaper, never
+        # silently downgrade a role that reasons.
+        over.setdefault("model", AGENT_MODEL.get(agent))
+        if over.pop("brevity", True) and agent not in BREVITY_EXEMPT and "BREVITY" not in prompt:
+            prompt = f"{prompt}\n\n{BREVITY}"
         ok, out = run_claude(prompt, timeout_min=tmin, allowed_tools=tools,
                              max_turns=turns, **over)
     finally:
@@ -519,7 +553,7 @@ def last_usage():
 
 
 def run_claude(prompt, timeout_min=DEFAULT_TIMEOUT_MIN, allowed_tools=None, cwd=None,
-               max_turns=60, quiet=False):
+               max_turns=60, quiet=False, model=None):
     """Run the Claude CLI as a subprocess. Returns (ok, text).
 
     A timeout is NOT an error to be swallowed: it returns ok=False with whatever was produced,
@@ -539,6 +573,8 @@ def run_claude(prompt, timeout_min=DEFAULT_TIMEOUT_MIN, allowed_tools=None, cwd=
     # and minutes are not what a subscription is spent in.
     cmd = ["claude", "-p", prompt, "--output-format", "stream-json", "--verbose",
            "--max-turns", str(max_turns), "--allowedTools", *allowed_tools]
+    if model:
+        cmd[1:1] = ["--model", model]
     lines, t0 = [], time.time()
     _LAST_USAGE.clear()
     try:

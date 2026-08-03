@@ -83,15 +83,7 @@ N_READERS = 1
 # things that grow without bound, and they are limits on PROSE, not on content -- a flag with its
 # reason in twenty words is worth the same as the same flag in sixty, and arrives four times
 # sooner. What must never be shortened is a NUMBER: a threshold, a metric name, a citation.
-BREVITY = """BREVITY (this is a budget, not a style note -- wall clock is generation):
-- Do not restate the evidence you were given. Assume the reader has it open.
-- No preamble, no summary of what you are about to do, no closing remarks.
-- Every free-text field has a word limit below. Exceeding it is a failure, not a flourish.
-- Never shorten a NUMBER, a metric name, or a citation to save words. Cut the prose around them.
-- EVERYTHING OUTSIDE THE REQUESTED JSON IS DISCARDED UNREAD. The parser takes the first JSON
-  object and throws the rest away, so an explanation written around it is not read by anyone --
-  it is only paid for. Measured: the reviewer spent 6,140 output tokens on a payload needing
-  about 200, and wall clock IS generation at ~70 tokens/s. Emit the JSON. Nothing else."""
+from llm import BREVITY  # noqa: F401  (defined in llm.py so run_agent can apply it)
 
 
 def analyse(run_name, out_dir, n=N_READERS, timeout_min=6, ledger=None, parallel=True):
