@@ -262,7 +262,16 @@ CAMPAIGN_STATE = ("analysis.md", "memory.md", "knowledge.md", "lever_map.md",
                   "causal_descriptions.md", "proposal.json", "state.json", "frontier.json",
                   "hypotheses.jsonl", "round_records.jsonl", "archivist.jsonl",
                   "llm_timing.jsonl", "peer_review.jsonl", "diagnoses.jsonl",
-                  "supervisor.jsonl", "lever_map.jsonl", "trace.log")
+                  "supervisor.jsonl", "lever_map.jsonl", "trace.log",
+                  # ADDED after the 3 August false start: these three survived a clean start and
+                  # are campaign state by the same test as the rest -- written by the round,
+                  # describing the campaign just deleted. batch_refusals carries last round's
+                  # refusals into the next Proposer's prompt; campaign.json is the run's own
+                  # header; operator_backlog.md is rendered from operator_requests.jsonl, which
+                  # IS cleared, so leaving the rendering behind states a backlog that no longer
+                  # exists.
+                  "batch_refusals.jsonl", "campaign.json", "operator_backlog.md",
+                  "logic_report.jsonl", "holes.jsonl", "claims.jsonl", "reservoir.jsonl")
 
 
 def clean_start():

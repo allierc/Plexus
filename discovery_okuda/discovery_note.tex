@@ -1509,8 +1509,56 @@ ablation sat beside it was refused anyway. It runs in report-only mode for exact
 and starts refusing the round after its first clean pass.
 
 An independent audit of the loop's information flow --- dead ends, orphans, broken
-\textbf{Sends to:} promises --- was commissioned rather than done by the author of the changes,
-and is outstanding. \code{ROLES.md} is deliberately untouched until it reports.
+\textbf{Sends to:} promises --- was commissioned rather than done by the author of the changes.
+It mapped 37 nodes and 65 edges: \textbf{26 declared and wired, 16 declared with no code path,
+23 wired but undeclared} (\code{figures/loop\_graph.png}). Its sharpest findings are about work
+committed the same day --- \code{revisits} and \code{confounder} stored and read by nothing, so
+the revisit quota is unenforced; \code{logic\_report.jsonl} written with no reader, against its
+own docstring; \code{A1} promising to refuse ``from the round after its first clean pass'', a
+condition nothing computes. It also found that \code{track} was declared by the Proposer, printed
+by the round, and never passed to the constructor --- \textbf{\code{MISSING} on all 58 runs}, so
+the two-track design had never once been recorded. That one was fixed; the rest wait for data.
+\code{ROLES.md} is deliberately untouched.
+\end{tcolorbox}
+
+\begin{tcolorbox}[colback=warn!7,colframe=warn!55,boxrule=1pt,arc=2pt,breakable,
+                  title={\textbf{The false start, 3 August --- and what it taught}},
+                  coltitle=black,colbacktitle=warn!20]
+The first launch reached Act 1 and stopped. Two faults, one of them the phase's own disease
+surviving its cure.
+
+\textbf{The ceiling cried wolf.} \code{may\_call} added the agent's \emph{timeout allowance} to
+the round's spend, so with the ceiling lowered to ten it reported \emph{``OVER CEILING at
+proposer: 0.4+10 $>$ 10.0 min''} on the first call of the round, every round --- for a role
+allowed five minutes that used 1.17. A ceiling that fires before anything is spent is not a
+ceiling, it is noise, and noise is how a real breach stops being read. It now projects from what
+the role has \emph{actually} cost this round, then a measured prior, and only then the allowance.
+
+\textbf{The clean start was not clean.} The Proposer emitted twelve slots and the Critic refused
+eleven as duplicates of the control --- zero experiments. The proposal was not even in this
+campaign's vocabulary: \code{\{"id","spec","override","role"\}}, with
+\code{spec: embryo\_GRO\_base.yaml} and \code{cell\_grow.rate=0.6}, from a different project.
+
+The cause was \code{instruction.md}, which \code{clean\_start} preserved as \emph{``instructions,
+not state''}. Below its \code{<!-- LEARNED PATTERNS -->} marker sat the round-10 meta-review of
+the campaign we had just deleted:
+
+\begin{center}
+\emph{``THIS BODY IS CLOSED'' \quad ``every amplifier family is exhausted''}\\
+\emph{``STOP proposing ANY `make the bud bigger' edit on this base''}
+\end{center}
+
+We wiped \code{memory.md}, every run and every record --- and then handed the first Proposer of
+the fresh campaign the conclusions we had just declared unsound, with a cold-start frontier and
+nothing legal left to propose. That block is rewritten by the Meta-review every round, which makes
+it exactly as much state as \code{memory.md}. \code{clean\_start} now truncates at the marker,
+keeping the standing brief and dropping the beliefs, and three further files that had survived it
+(\code{batch\_refusals}, \code{campaign.json}, \code{operator\_backlog.md}) are cleared too.
+
+\textbf{The lesson is the phase's own, turned on itself.} An unearned universal negative ---
+\emph{this is closed, that is exhausted} --- outlived the deletion of every measurement that
+produced it, because it was filed as an instruction rather than as a belief. A claim that cannot
+be checked is bad enough; a claim that cannot be \emph{deleted} is worse.
 \end{tcolorbox}
 \end{phasebox}
 
