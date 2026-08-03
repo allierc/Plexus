@@ -118,7 +118,11 @@ EXPENSIVE_TOOLS = ("Bash", "WebFetch", "WebSearch", "Task", "Agent", "NotebookEd
 # spend as soon as the role has been called once.
 EXPECTED_MIN = {"interpreter": 3.2, "reader": 1.1, "watcher": 0.3, "meta_review": 3.3,
                 "proposer": 3.0, "archivist": 1.0, "diagnostician": 0.5, "reflection": 0.7,
-                "grounder": 0.1}
+                "grounder": 0.1,
+                # added after "OVER CEILING at operator_request (3.0+8 > 10.0)" fired on a role
+                # that had no entry here and so fell back to its full 8-minute ALLOWANCE. A role
+                # missing from this map is a false alarm waiting to happen.
+                "operator_request": 2.0, "watcher": 0.3, "metrologist": 1.0}
 
 
 def tool_note(agent=None):

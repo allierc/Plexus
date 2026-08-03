@@ -139,7 +139,9 @@ WRITE {PROPOSAL_FILE} as JSON:
 {{
  "reasoning": "<what the evidence suggests, <=80 words>",
  "mode": "explore" | "robustness",
- "slots": [
+ "slots": [                  <-- THIS KEY, EXACTLY. Not "candidates", not "experiments".
+   The loader reads `slots` and nothing else; a batch under any other key is discarded
+   whole, and you will be told only "no usable proposal".
    {{"parent_index": 0, "edit": null, "intent": "control",
      "claim": "the parent, unchanged -- the control", "track": "B",
      "metric": "protr_peak", "predicted": "<a number or range you expect>",
@@ -274,7 +276,16 @@ RULES
     except Exception as e:
         print(f"[proposer] proposal.json does not parse: {type(e).__name__}: {str(e)[:120]}")
         return False, []
-    slots = p.get("slots", [])[:n_slots]
+    # ACCEPT THE ALIAS. The prompt asks for "slots"; the agent has been writing "candidates",
+    # and p.get("slots", []) returned [] every round -- twelve reasoned experiments discarded on
+    # a key name, with "no usable proposal" as the only trace. Measured on a live proposal.json:
+    # top-level keys were campaign, CANDIDATES, comp_hash, metric, mode, parent_spec, rationale,
+    # round, track. Losing a batch to vocabulary is the cheapest possible failure to prevent.
+    _key = "slots" if p.get("slots") else ("candidates" if p.get("candidates") else "slots")
+    if _key != "slots":
+        print(f"[proposer] read {len(p.get(_key) or [])} experiment(s) from `candidates` -- the "
+              f"prompt asks for `slots`. Accepted; the key is not the science.")
+    slots = (p.get(_key) or [])[:n_slots]
     # REPORT IT, which the comment below has always promised and never done. "no usable
     # proposal" could mean the file was never written, the JSON did not parse, or slot 0 was
     # not the control -- three different faults with one message and no way to tell them apart.
