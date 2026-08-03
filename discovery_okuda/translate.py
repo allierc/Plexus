@@ -62,6 +62,10 @@ from agents.grounder import buffer_for, max_cells_for                       # no
 VBUF_FALLBACK, CBUF_FALLBACK = 30000, 16000    # only when no target can be inferred
 
 
+# Shared with round.MAX_CELLS -- one number, one env override, both sizing paths.
+MAX_CELLS = int(os.environ.get("OKUDA_MAX_CELLS", 50_000))
+
+
 def _reservoirs(n_cells_seed, frames, growth_headroom=40.0):
     """How big must the reservoirs be for a run that STARTS at n_cells_seed?
 
@@ -87,7 +91,11 @@ def _reservoirs(n_cells_seed, frames, growth_headroom=40.0):
     that is what verbatim means, and rewriting the buffer would make the replay a different
     experiment. It applies to every composition the loop builds from here.
     """
-    target = max(int(n_cells_seed) * growth_headroom, 2000)
+    # THE SAME CEILING AS THE RECON PATH. Two paths sized buffers -- this one for compositions
+    # the loop builds, _resize_reservoir for verbatim replays -- and a cap applied to only one of
+    # them is not a cap. A 50k body is not more informative than a 20k one for a map looking for
+    # a BUD, and the cost is superlinear while the information is not.
+    target = min(max(int(n_cells_seed) * growth_headroom, 2000), MAX_CELLS)
     b = buffer_for(target)
     return b["vertex"], b["cell"], int(target)
 # ONE dt for the whole campaign, never composition-dependent (D2) -- and its value is 1.0,
