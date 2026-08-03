@@ -35,7 +35,12 @@ ROOT = os.path.abspath(os.path.join(HERE, ".."))
 SRC = os.path.join(ROOT, "src")
 TYSSUE = os.path.join(ROOT, "prototype", "Tyssue")
 LOGDIR = os.path.join(ROOT, "log", "okuda", "_cluster")
-LOG_ROOT = os.path.join(ROOT, "log", "okuda")   # where each run writes its own folder
+LOG_ROOT = os.path.join(ROOT, "log", "okuda")
+
+# HOW OFTEN THE QUEUE IS ASKED. Every 60s printed a line a minute for the length of a batch --
+# forty near-identical lines for one forty-minute wait. Five minutes is often enough to notice a
+# job finishing and rare enough to read. Override with OKUDA_POLL_S.
+POLL_S = int(os.environ.get("OKUDA_POLL_S", 300))   # where each run writes its own folder
 
 # the devcontainer mounts the NFS export at /workspace; the cluster mounts the SAME export here,
 # so files are shared live -- only the PATH is translated.
@@ -417,7 +422,7 @@ def _is_working(job_id, ids, min_frac=0.5):
         return False
 
 
-def wait_for_ids(ids, poll=60, timeout_h=24, straggler_factor=4.0, min_straggler_min=25):
+def wait_for_ids(ids, poll=POLL_S, timeout_h=24, straggler_factor=4.0, min_straggler_min=25):
     """Block until every submitted JOB ID reaches a terminal state. IDs, not names.
 
     STRAGGLER KILL -- why this is not optional for a weeks-long campaign.
@@ -535,7 +540,7 @@ def wait_for_ids(ids, poll=60, timeout_h=24, straggler_factor=4.0, min_straggler
     return {"ok": False, "done": [], "exit": [], "killed": [], "timed_out": True}
 
 
-def wait_for(expected, poll=60, timeout_h=24):
+def wait_for(expected, poll=POLL_S, timeout_h=24):
     """Block until every EXPECTED job has reached a terminal state.
 
     Checking expected names -- not queue emptiness -- is what distinguishes "finished" from
@@ -570,7 +575,7 @@ def wait_for(expected, poll=60, timeout_h=24):
     return False
 
 
-def wait(poll=60, timeout_h=24):
+def wait(poll=POLL_S, timeout_h=24):
     """Legacy: block until no pg_* job is RUN/PEND. Prefer wait_for(expected)."""
     t0 = time.time()
     while time.time() - t0 < timeout_h * 3600:
@@ -592,7 +597,7 @@ def kill():
 
 
 # --------------------------------------------------------------------------- throttled batch
-def run_batch(names, frames=None, do_q=False, campaign="campaign", parallel=None, poll=60):
+def run_batch(names, frames=None, do_q=False, campaign="campaign", parallel=None, poll=POLL_S):
     """Submit in waves of `parallel`, waiting for the queue to drain between waves.
 
     The L4 partition is cheap, so `parallel` is a courtesy limit rather than a cost control;

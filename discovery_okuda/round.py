@@ -450,6 +450,11 @@ TRAJECTORY_BUDGET_GB = 1.5
 # bigger array.
 MAX_CELLS = int(os.environ.get("OKUDA_MAX_CELLS", 50_000))
 
+# Whether a RECON replay may have its reservoir enlarged. Off: a replay is replayed, and a run
+# that saturates is recorded as censored rather than re-run bigger. Set OKUDA_RECON_RESIZE=1 to
+# restore the old behaviour.
+RECON_RESIZE = os.environ.get("OKUDA_RECON_RESIZE", "") not in ("", "0", "no", "false")
+
 
 def _times_censored(run, log_dir=None):
     """How often THIS composition has been stopped by its array, across every replay of it.
@@ -1206,7 +1211,17 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
             nm = f"r{rid:03d}n_{i:02d}_{run[:14]}"
             dst = os.path.join(ROOT, "config", "okuda", f"{nm}.yaml")
             shutil.copyfile(src, dst)
-            _resize_reservoir(dst, nm, run=run, frames=frames)
+            # A REPLAY IS REPLAYED. Resizing the reservoir on a recon slot contradicts this
+            # function's own rule three lines up -- "the specs are copied VERBATIM ... a spec
+            # altered on the way in answers a different question" -- and it is what made recon
+            # rounds take an hour. wk_null_s0 finishes in 148 SECONDS at its original 1778 cells
+            # and was resized to 50,004, where it takes over an hour, to re-measure a spec whose
+            # saturation is itself the finding we want recorded.
+            #
+            # Saturation on a replay is a CENSORED MEASUREMENT, which the record already knows
+            # how to say. Buying it a bigger array turns a cheap fact into an expensive one.
+            if RECON_RESIZE:
+                _resize_reservoir(dst, nm, run=run, frames=frames)
             h = Hypothesis(hid=f"R{rid}.{i}.recon", comp_hash=f"RECON_{run[:20]}",
                            parent_hash=None, edit=f"replay {run}",
                            # A replay IS a control in the strict sense -- the composition
@@ -1296,7 +1311,7 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     # `inconclusive` below (no diag.json), which keeps a degenerate slot out of the surprise rate
     # instead of scoring it as evidence.
     step(f"{len(ids)} job(s) on the cluster; waiting. Check with `bjobs`.")
-    wait = cluster.wait_for_ids(ids, poll=60)
+    wait = cluster.wait_for_ids(ids, poll=cluster.POLL_S)
     step("batch finished; captioning the wave (one model load for all runs)")
     if not wait["ok"]:
         print(f"[round] batch did not complete cleanly: exit={wait['exit']} "
