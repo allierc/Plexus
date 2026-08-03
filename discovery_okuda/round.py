@@ -1116,7 +1116,7 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
                            # unmodified -- and `intent` is a closed set for good reason: it is
                            # what the confirmatory/adversarial mixture is computed from, and a
                            # fourth value would silently leave that arithmetic.
-                           intent="control",
+                           intent="control", track=sl.get("track", "A"),
                            claim=sl["claim"], metric=sl["metric"], predicted="unstated",
                            rationale=sl.get("why", ""), round_id=rid)
             if not dry:
@@ -1131,9 +1131,13 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         # name could otherwise be picked up by a job -- silently running the wrong experiment.
         nm = f"r{rid:03d}{mode[0]}_{i:02d}_{comp_hash(g)[1:7]}"
         T.write_config(g, nm, frames=frames)
+        # Defaulted BEFORE the hypothesis is built, because it is passed to it. It used to be
+        # assigned to the slot dict two lines AFTER the constructor ran, purely to feed a print.
+        sl["track"] = sl.get("track") or ("B" if sl.get("territory") == "in_paper" else "A")
         h = Hypothesis(hid=f"R{rid}.{i}.{comp_hash(g)[1:7]}", comp_hash=comp_hash(g),
                        parent_hash=None, edit=lbl,
                        intent=sl.get("intent", "confirmatory"),
+                       track=sl["track"],
                        # CARRIED THROUGH AT LAST. claim_kind has existed in hypothesis.py since
                        # the loop was built, with a validator, and all 170 hypotheses in the
                        # ledger read "descriptive" because nothing ever passed it. A closed set
@@ -1148,7 +1152,6 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         if not dry:
             sup.reg.pose(h)
         posed.append((nm, g, h))
-        sl["track"] = sl.get("track", "B" if sl.get("territory") == "in_paper" else "A")
         print(f"  {nm}  {lbl[:40]:40} track {sl['track']}  {h.intent:13} "
               f"predict {h.predicted[:34]}")
 

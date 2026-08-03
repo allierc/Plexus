@@ -147,6 +147,12 @@ class Hypothesis:
     # filled in by code after the batch is checked -- a code-inserted revisit would be the one
     # slot in the batch exempt from the duplicate and confounder gates, which is a licensed
     # re-run of exactly the bit-identical duplicates rounds 4-8 produced, recorded as compliance.
+    # THE TRACK. Declared by the Proposer, printed by round.py, and never passed to this
+    # constructor -- so `track` read MISSING for all 58 runs of the 2 August campaign and every
+    # analysis entry said "Tracks: 0 Track A, 0 Track B". The two-track design the roster devotes
+    # a section to was never once recorded. Found by an independent audit of the loop's
+    # information flow, not by the person who wrote the tracks.
+    track: str = ""                 # "A" understand the mechanism | "B" reproduce the figure
     revisits: str = ""              # claim id being challenged, or ""
     confounder: str = ""            # what this slot varies vs that claim's supporting runs
     grounding: list = field(default_factory=list)   # citations from the Grounder
