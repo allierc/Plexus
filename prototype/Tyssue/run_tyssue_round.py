@@ -616,7 +616,14 @@ def _cross_screen(ax, pos, mesh, act, seed_dir=None, inner=0.82, Lbox=None):
         if fa * fb < 0:                                          # edge crosses the plane
             fr = -fa / (fb - fa); X = pos[s] + fr * (pos[t] - pos[s])
             aps.append([X @ u, X @ v]); bas.append([(X * inner) @ u, (X * inner) @ v])
-            cols.append(plt.cm.Reds(float(np.clip(act[int(ef[e])], 0, 1))))
+            # NaN GETS ITS OWN COLOUR HERE TOO. col() upstream deliberately preserves NaN --
+            # its comment says "the renderer paints it grey rather than silently white" -- and
+            # this renderer then passed it to a colormap, which returns the transparent "bad"
+            # value and draws nothing on black. The cross-section row of a diverged run was
+            # therefore EMPTY, which reads as a missing panel rather than a dead field.
+            _av = float(act[int(ef[e])])
+            cols.append((1.00, 0.10, 0.85, 1.0) if not np.isfinite(_av)
+                        else plt.cm.Reds(float(np.clip(_av, 0, 1))))
     if aps:
         aps = np.array(aps); bas = np.array(bas); c = aps.mean(0)
         order = np.argsort(np.arctan2(aps[:, 1] - c[1], aps[:, 0] - c[0]))
