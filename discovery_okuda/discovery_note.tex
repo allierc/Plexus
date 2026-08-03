@@ -1238,7 +1238,7 @@ positive refutable and does not do it for a negative. Untested territory has now
 collapses into \emph{impossible}: this is how \emph{we never tried it} became \emph{the only
 remaining route is a different geometry}.
 
-That is not a defect to patch. It is the subject of the next two phases.
+That is not a defect to patch. It is the subject of Phase~7.
 \end{tcolorbox}
 
 \begin{tcolorbox}[colback=warn!7,colframe=warn!55,boxrule=1pt,arc=2pt,breakable,
@@ -1284,18 +1284,113 @@ place for what is merely untried --- and if it is not written down and mechanica
 loop will run for nine rounds, produce a genuine refutation rate of 57\%, and still conclude that
 a region it never entered is impossible.
 
-Hence \code{LOGIC.md}, and hence the next two phases.
+Hence \code{LOGIC.md}, and hence Phase~7.
 \end{tcolorbox}
 \end{phasebox}
 
-\begin{phasebox}{Phase 7 --- The demonstration \hfill \todo}
+\begin{phasebox}{Phase 7 --- The agentic loop update: giving the loop a logic \hfill \todo}
+\textbf{Goal.} Supply the reasoning discipline that Phase~6 proved will not emerge on its own ---
+as \emph{structure and code}, not as another voice asking the others to be careful. No new agent.
+
+\subsection*{Why this is one phase and not two}
+The two defects have one cure. \emph{Absence of evidence read as evidence of absence} and
+\emph{absence of an instrument read as absence of an effect} are the same sentence with a different
+subject, and both are fixed by the same move: make the unearned conclusion \textbf{unwritable}, and
+give the loop somewhere to put what it has not yet tried. Splitting them would build the machinery
+twice.
+
+\subsection*{1. \code{LOGIC.md}, and the checker that makes it real}
+A third source-of-truth document, beside the two that already hold. \code{ROLES.md} stays honest
+because \code{roles.py --check} compares it against the code \emph{in both directions};
+\code{PREMISES.md} stays honest because the Biologist mechanically parses it. \code{LOGIC.md}
+states what may be concluded from what, and \code{logic.py --check} \textbf{refuses a malformed
+claim at the moment the Meta-review writes it} --- so a bad claim never enters the document the
+Proposer reads. A rule agents are merely \emph{asked} to honour is the failure mode being removed.
+
+\subsection*{2. Four modalities, and a home for \emph{could be}}
+\begin{center}
+\begin{tabular}{@{}llp{6.2cm}@{}}
+\textbf{can be} & demonstrated positive & one instance suffices \\
+\textbf{cannot be} & universal negative & must carry its quantifier \\
+\textbf{cannot not be} & necessity & the most expensive claim of all \\
+\textbf{could be} & untested, open & \textbf{free --- and today unrepresentable} \\
+\end{tabular}
+\end{center}
+\code{memory.md} has exactly two buckets, so untested territory collapses into \emph{impossible}.
+That is how \emph{we never tried reaction-diffusion} became \emph{the only remaining route is a
+different geometry}. The third bucket is mineable by the Proposer and may never be cited as a
+negative.
+
+\subsection*{3. Every negative carries its conditions}
+Four of seven positive claims carry a falsifier because the template has a \code{Falsifiable by:}
+field; two of nine prohibitions carry any escape because it has no field for them. So: a trap,
+an \textsc{inert}, a \textsc{necessary}, a \emph{closed} or an \emph{exhausted} records the runs
+supporting it, the conditions held fixed, and what would refute it --- or it does not enter.
+Necessity is held to the highest bar, because it quantifies over everything not removed. Claims
+formed before a known apparatus fix are marked \emph{provisional} and queue first for retest.
+
+\subsection*{4. The tracks become asymmetric}
+\textbf{Track A opens.} It may violate any trap, and must spend a budgeted quota of slots per round
+\emph{revisiting} claims --- preferring single-run claims and provisional ones. A revisit must vary
+a \textbf{named confounder}, which is what would have caught a family closed on runs that all
+shared an unvaried one, and what stops the bit-identical duplicates of rounds~4--8.
+\textbf{Track B constrains.} It cites a named Okuda morphology and settings, respects traps, and
+may not breed from an invalid specimen.
+
+\subsection*{5. No conclusion about an unmeasured property}
+If a conclusion needs a quantity no admitted instrument reports, the correct output is a
+\textbf{request for an instrument}, not a verdict. \emph{Sphere} may not be concluded from a run
+whose pattern was never measured --- which is precisely what happened to the finest Turing pattern
+in the campaign.
+
+\subsection*{6. The Metrologist builds instruments --- on demand, not on schedule}
+The Metrologist gains the power to propose, implement and certify a new instrument against known
+answers, then admit it. It is \textbf{triggered, never scheduled}: the rule above files a request
+into the \code{Backlog} that already exists (\code{escalation.py}, \code{operator\_requests.jsonl}),
+and the Metrologist wakes only when the same gap has been requested repeatedly. It runs on its own
+budget line, outside the round ceiling, because it is not per-round work --- expect it to fire
+perhaps twice in twenty rounds. The cost amortises to nothing: certified once, the instrument is
+code that runs free forever. The first request is already known: \textbf{wavelength, domain count
+and contrast on the activator field} --- the variable that actually governs budding.
+
+\subsection*{7. Paying for it: the ceiling stops binding}
+Round~10 spent 33.4 minutes against a 25-minute ceiling and began dropping Interpreters. The
+breakdown says where it goes: \textbf{interpreter 4 calls / 13.0 min (39\%) and reader 9 calls /
+9.8 min (29\%)} --- two-thirds, both per-run. Cutting effort globally would blunt the roles doing
+the reasoning, so instead:
+\begin{itemize}[itemsep=1pt]
+\item \textbf{Lower model effort on the description roles only.} The Reader and the Eye-check
+\emph{label}; they do not infer. That is the 12.5 minutes that can be halved without touching a
+judgement.
+\item \textbf{Move the Interpreter earlier in the order.} It runs last, so it is the role
+truncated --- the loop currently pays for the most expensive analysis and then discards it.
+\end{itemize}
+Those two alone bring the round under the ceiling, and they buy the headroom Track~A's revisit
+quota will spend.
+
+\subsection*{Exit criteria}
+\begin{itemize}[itemsep=1pt]
+\item \code{logic.py --check} reports zero malformed claims, and \textbf{rejects the nine-round
+record} of Phase~6 --- every one of the eight errors must be caught by replaying the archived
+\code{memory.md} through it.
+\item A \emph{could be} entry exists, is mined by the Proposer, and is never cited as a negative.
+\item A Track~A slot violates a trap, varies a named confounder, and the result is recorded.
+\item The Metrologist certifies one new instrument, and a previously-null run is re-read with it.
+\item A round completes inside the LLM ceiling with no role skipped.
+\end{itemize}
+
+\textbf{What you get.} A loop whose conclusions are as good as its measurements --- and which says
+so when they are not.
+\end{phasebox}
+
+\begin{phasebox}{Phase 8 --- The demonstration \hfill \todo}
 \textbf{Goal.} Run the designed grid --- six to eight simulations --- that produces the figure:
 tube, undulation and branching, at Okuda's settings.
 
 \textbf{What you get.} \emph{The figure.}
 \end{phasebox}
 
-\begin{phasebox}{Phase 8 --- The method claim \hfill \todo}
+\begin{phasebox}{Phase 9 --- The method claim \hfill \todo}
 \textbf{Goal.} Write up what the loop found by itself versus what we told it, with the record of
 predictions and retractions as the evidence.
 
