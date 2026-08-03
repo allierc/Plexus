@@ -1515,6 +1515,43 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
                 print(T_.warn(f"  [logic] memory.md {_w} words against a "
                               f"{TPL.MAX_MEMORY_WORDS} budget"))
             LG.write_report(rid, _rows, os.path.join(CAMP, "logic_report.jsonl"))
+
+            # ------------------------------------------ the Metrologist, TRIGGERED not scheduled
+            # A conclusion about a property nothing measures is not a softer verdict, it is a
+            # REQUEST FOR AN INSTRUMENT. `morphology=sphere` was recorded for the run carrying the
+            # finest Turing pattern in the campaign, because the shape was measured and the
+            # pattern was not -- and no metric for wavelength, domain count or contrast exists, so
+            # the variable that actually governs budding could not be represented, let alone
+            # falsified.
+            #
+            # It files into the Backlog that ALREADY EXISTS (escalation.Backlog, duplicate_of()
+            # included) rather than waking a model. The Metrologist is expensive and this is not
+            # per-round work: it wakes only when the same gap has been asked for repeatedly, on
+            # its own budget line, outside the round ceiling. Expect it to fire perhaps twice in
+            # twenty rounds; certified once, the instrument is code that runs free forever.
+            _gaps = {}
+            for _row in _rows:
+                for _p in LG.unmeasured_properties(_row[5]):
+                    _gaps[_p] = _gaps.get(_p, 0) + 1
+            if _gaps:
+                _bl = ESC.Backlog(os.path.join(CAMP, "operator_requests.jsonl"))
+                for _p, _n in sorted(_gaps.items(), key=lambda kv: -kv[1])[:3]:
+                    _mech = f"an instrument reporting `{_p}`"
+                    if _bl.duplicate_of(_mech):
+                        continue
+                    try:
+                        _bl.file(ESC.OperatorRequest(
+                            rid=_bl.next_rid(), round_id=rid, mechanism=_mech,
+                            why_inexpressible=(
+                                f"round {rid} drew {_n} conclusion(s) naming `{_p}`, and no "
+                                f"admitted instrument reports it. The honest record is NOT "
+                                f"MEASURED; concluding anything about it is the error that "
+                                f"recorded the campaign's best Turing pattern as a null sphere."),
+                            wanted_for=f"claims mentioning {_p} cannot be checked or falsified"))
+                        print(T_.warn(f"  [metrologist] instrument requested: {_p} "
+                                      f"({_n} conclusion(s) rest on it, nothing measures it)"))
+                    except Exception:
+                        pass
     except Exception as _e:
         print(T_.warn(f"  [logic] check did not run: {type(_e).__name__}: {_e}"))
     # The Meta-review's product is memory.md, whose HEAD is a three-sentence abstract written
