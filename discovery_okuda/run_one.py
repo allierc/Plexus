@@ -432,11 +432,24 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     # recorded as `morphology=sphere, protr 1.003`, a null, because shape was measured and
     # pattern was not. Identical in shape to the reservoir counters, which divide_3d also
     # computed and nobody carried.
-    for _k in ("n_spots", "spot_cells_med", "spot_cells_max", "spot_frac",
-               "spot_spacing_cells", "wavelength_cells"):
-        if _k in fm and len(fm[_k]):
-            _v = fm[_k][-1]
-            summary[f"{_k}_final"] = (round(float(_v), 4) if isinstance(_v, float) else _v)
+    # READ FROM THE SERIES ON DISK, not from `fm`. The first wiring looked in `fm`, which does
+    # not carry them: pattern_metrics is merged into the per-frame record by tube_analysis and
+    # reaches metrics.json, so the series is where they live. Measured after that wiring shipped:
+    # nine finished runs, "pattern keys: NONE" in every summary while n_spots, spot_cells_med,
+    # spot_cells_max, spot_frac and spot_spacing_cells sat in metrics.json all along. The same
+    # defect as before -- computed, written, and never lifted to the one structure agents read.
+    try:
+        _pser = json.load(open(os.path.join(out_dir, "metrics.json"))).get("series") or []
+        if _pser:
+            _last = _pser[-1]
+            for _k in ("n_spots", "spot_cells_med", "spot_cells_max", "spot_frac",
+                       "spot_spacing_cells", "wavelength_cells"):
+                if _k in _last and _last[_k] is not None:
+                    _v = _last[_k]
+                    summary[f"{_k}_final"] = (round(float(_v), 4)
+                                              if isinstance(_v, float) else _v)
+    except Exception as _e:
+        print(f"[{name}] pattern metrics not lifted: {type(_e).__name__}", flush=True)
     if morph:
         summary["morphology"] = morph.get("morphology")
         summary["morphology_path"] = " -> ".join(morph.get("path", []))
