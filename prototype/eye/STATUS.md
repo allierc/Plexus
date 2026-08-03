@@ -39,6 +39,7 @@ through the stock `plexus.schema.load` + `plexus.engine.run`.
 | gradient descent on the controller | **built, refused** | surrogate fails its own fidelity test (§5) |
 | dynamics-watching critic | **tested, fails** | VLM reports a rotating eye as static (§5) |
 | open-loop plant identification | done | the 3×6 static gain matrix; **mechanics-limited by 7×** (§5) |
+| Phase 3 — buy the authority back | in flight | length / pulley / drive, one at a time, re-probed after each |
 | reaching the commanded angle | **not done** | settles at ~60% of a 25° command; the obliques are the binding constraint |
 
 **Acceptance test** (`run_eye.verdict`, automatic): finite · reaches commands within 6° · torsion
@@ -244,3 +245,10 @@ The gain matrix names its own targets, in order: **lengthen the obliques** (thei
 gain is the binding constraint on the one motion only they can produce), then raise `A/E` toward
 the pulley ceiling bisected in Phase 0, then re-probe. The same six runs measure whether it worked,
 and cost 90 minutes against the days the closed-loop campaign spent guessing.
+
+Phase 3 is defined in `eye_note.pdf` with its predictions registered, including an uncomfortable
+one: **compounded, all three Phase-0 fixes get LR to ~8–9°, still nowhere near the 26° commanded.**
+Phase 0 read 29.6° of closed-loop range as success, but Phase 2 has since shown a closed-loop range
+is roughly *twice* the single-muscle static gain (the antagonist relaxes as the agonist pulls) — so
+that was ~15° of authority per direction all along. The gap was always there; it was hidden by
+measuring the wrong quantity.
