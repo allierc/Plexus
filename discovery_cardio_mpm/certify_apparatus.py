@@ -54,6 +54,10 @@ RETIRED_LEDGER = [
 # the scan still fires on every other file.
 SOURCE_FILES = ["train.py", "data.py", "ingest.py", "determinism.py", "provenance.py"]
 
+# The cap BELIEFS.md declares. The previous campaign's ledger reached 1668 lines and its log 7289;
+# overflow must force a merge or a retraction, never an append.
+BELIEFS_MAX_LINES = 120
+
 
 class Check:
     def __init__(self):
@@ -227,6 +231,20 @@ def check_registers(c):
     entries = [l for l in btxt.splitlines() if re.match(r"^\|\s*B\d+\s*\|", l)]
     ok &= c.add("the belief register is EMPTY", len(entries) == 0,
                 "0 entries" if not entries else f"{len(entries)} entries -- nothing is earned yet")
+
+    # The register CLAIMED a hard length cap and a retraction sink, and neither existed -- the
+    # file asserted machinery that was not there, which is the defect this campaign keeps finding
+    # elsewhere. Both are enforced here now.
+    ok &= c.add("the belief register is within its length cap", len(btxt.splitlines()) <= BELIEFS_MAX_LINES,
+                f"{len(btxt.splitlines())}/{BELIEFS_MAX_LINES} lines")
+    rp = os.path.join(HERE, "retractions.jsonl")
+    ok &= c.add("the retraction sink exists", os.path.exists(rp),
+                "present" if os.path.exists(rp) else "MISSING -- a register that keeps only its "
+                                                    "winners teaches nothing about how it goes wrong")
+    # every belief row must carry all seven admission columns
+    bad = [l for l in entries if len([x for x in l.split("|") if x.strip()]) < 9]
+    ok &= c.add("every belief row carries its evidence columns", not bad,
+                "n/a (register empty)" if not entries else f"{len(bad)} malformed")
     return ok
 
 
@@ -377,7 +395,32 @@ def canary():
     ok2, why2 = PROV.check_manifest(d2)
     note("no seed recorded", not ok2, "refused" if not ok2 else "accepted a run with no seed")
 
-    # 6. a retired conclusion re-enters the source
+    # 6b. a malformed belief row is written into the register
+    bfile = os.path.join(HERE, "BELIEFS.md")
+    borig = open(bfile).read()
+    try:
+        open(bfile, "w").write(borig + "\n| B1 | a claim with no evidence columns |\n")
+        c4 = Check()
+        okb = check_registers(c4)
+        note("malformed belief row", not okb, "gate refused" if not okb else "gate accepted it")
+    finally:
+        open(bfile, "w").write(borig)
+
+    # 6c. an inherited claim is promoted to established without being re-tested
+    hfile = os.path.join(HERE, "HYPOTHESES.md")
+    horig = open(hfile).read()
+    try:
+        open(hfile, "w").write(horig.replace("| H01 |", "| H01 |", 1).replace(
+            "Active stress is what produces closed displacement loops at all | untested |",
+            "Active stress is what produces closed displacement loops at all | re-tested: confirmed |", 1))
+        c5 = Check()
+        okh = check_registers(c5)
+        note("inherited claim promoted without evidence", not okh,
+             "gate refused" if not okh else "gate accepted a promotion")
+    finally:
+        open(hfile, "w").write(horig)
+
+    # 7. a retired conclusion re-enters the source
     c3 = Check()
     victim = os.path.join(HERE, "data.py")
     orig = open(victim).read()

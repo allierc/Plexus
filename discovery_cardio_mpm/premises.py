@@ -157,6 +157,70 @@ def p6_seed_reaches_the_engine(V):
 
 
 # ---------------------------------------------------------------------------------------------
+# 5. The warm-up must actually settle.
+#
+# DECLARED IN PREMISES.md AND NEVER IMPLEMENTED until an external audit counted the checks against
+# the document. The verdict still printed "6 of 8 held" because a sub-check of premise 8 was
+# occupying the eighth slot -- so the denominator concealed the omission and the phase read as
+# complete. That is exactly the defect okuda spent today on: machinery declared, counted, and dead.
+# The coverage check below now makes this class of omission impossible to repeat.
+# ---------------------------------------------------------------------------------------------
+def p5_warmup_settles(V, device="cpu", timeout=3600):
+    """Extend the warm-up by a whole beat and ask whether the state at the fit onset has moved.
+
+    It matters more than it looks: the fit settles with no gradient, then backpropagates one beat.
+    If the state at the onset is still drifting, the gradient is taken about a transient and the
+    beat being fitted depends on how long the model was run beforehand.
+    """
+    import tempfile
+    env = dict(os.environ, PYTHONPATH=SRC + ":" + os.environ.get("PYTHONPATH", ""))
+    dumps = {}
+    for label, warm in (("as configured", "0"), ("one beat longer", "103")):
+        d = tempfile.mkdtemp(prefix=f"prem_warm_{warm}_")
+        dump = os.path.join(d, "dump.npz")
+        r = subprocess.run([PY, os.path.join(HERE, "train.py"), SPEC, "--warmup", warm,
+                            "--seed", "11", "--device", device, "--outdir", d,
+                            "--eval_dump", dump, "--allow_nondeterministic_ops", "1"],
+                           capture_output=True, text=True, env=env, timeout=timeout)
+        if not os.path.exists(dump):
+            return V.add("5. the warm-up settles", USUAL, False,
+                         ((r.stderr or "").strip().splitlines() or ["no output"])[-1][:110])
+        dumps[label] = np.load(dump)
+    a, b = dumps["as configured"], dumps["one beat longer"]
+    mov = a["mov"].astype(bool)
+    sa, sb = a["sim_d"][:, mov], b["sim_d"][:, mov]
+    n = min(sa.shape[0], sb.shape[0])
+    d = float(np.abs(sa[:n] - sb[:n]).max())
+    scale = float(np.abs(sa[:n]).max())
+    rel = d / scale if scale else float("nan")
+    return V.add("5. the warm-up settles", USUAL, rel < 0.05,
+                 f"one extra beat of warm-up moves the fitted window by {rel * 100:.2f}% "
+                 f"(max |d| {d:.3e} against a signal of {scale:.3e})")
+
+
+# ---------------------------------------------------------------------------------------------
+# COVERAGE. Every premise DECLARED in PREMISES.md must have a check here, or be listed as
+# unimplemented. The general form of the defect this whole file exists to catch.
+# ---------------------------------------------------------------------------------------------
+IMPLEMENTED = {1, 2, 3, 4, 5, 6, 7, 8}          # premise numbers with a check in this module
+
+
+def coverage(V):
+    md = os.path.join(HERE, "PREMISES.md")
+    declared = set()
+    if os.path.exists(md):
+        import re as _re
+        for line in open(md):
+            m = _re.match(r"^##\s+(\d+)\.", line)
+            if m:
+                declared.add(int(m.group(1)))
+    missing = sorted(declared - IMPLEMENTED)
+    return V.add("0. every declared premise has a check", CERTAIN, not missing,
+                 f"{len(declared)} declared, {len(declared & IMPLEMENTED)} implemented"
+                 + (f"; DECLARED BUT NOT CHECKED: {missing}" if missing else ""))
+
+
+# ---------------------------------------------------------------------------------------------
 # 8. The beat must be a beat.
 # ---------------------------------------------------------------------------------------------
 def p8_the_beat_is_a_beat(V):
@@ -176,6 +240,33 @@ def p8_the_beat_is_a_beat(V):
 # ---------------------------------------------------------------------------------------------
 # 1 + 4 + 7: the forward probes. Cheap, and they need the engine.
 # ---------------------------------------------------------------------------------------------
+def _stability_settings(run_cfg=None):
+    """(n_grid, substeps, cfl_bound), read from the spec, the run and the library."""
+    n_grid, substeps, bound = 128, 10, 0.4
+    try:
+        import plexus.operators                                    # noqa: F401
+        from plexus.paths import resolve_config
+        from plexus.schema import load
+        spec = load(resolve_config(SPEC)[0])
+        f = getattr(spec, "fields", {}) or {}
+        g = f.get("mpm_grid") if isinstance(f, dict) else None
+        if isinstance(g, dict) and g.get("n_grid"):
+            n_grid = int(g["n_grid"])
+    except Exception:
+        pass
+    try:                                                            # the bound the library uses
+        src = open(os.path.join(SRC, "plexus", "operators", "mpm_gather.py")).read()
+        import re as _re
+        m = _re.search(r"vmax\s*,\s*([0-9.]+)\s*\*\s*dx", src) or _re.search(r"([0-9.]+)\s*\*\s*dx\s*/", src)
+        if m:
+            bound = float(m.group(1))
+    except Exception:
+        pass
+    if run_cfg and run_cfg.get("substeps"):
+        substeps = int(run_cfg["substeps"])
+    return n_grid, substeps, bound
+
+
 def probe_forward(V, device="cpu", timeout=3600):
     """One forward pass with the muscle OFF, and one with it on, reading what came out."""
     import tempfile
@@ -213,12 +304,18 @@ def probe_forward(V, device="cpu", timeout=3600):
           f"finite={finite}, all particles inside [0,1]^2={inside}")
 
     # --- 4. the solver is inside its stability envelope -------------------------------------
-    # displacement per FRAME in grid cells; per substep is this over --substeps (default 10)
-    dx = 1.0 / 128
+    # READ from the run, not hard-coded. The first version wrote dx=1/128, /10 and <0.4 as
+    # literals -- so it computed the wrong CFL number on every run of the resolution ladder that
+    # moved the grid or the substeps, which is four of the seven Phase 1 actually produced. The
+    # premise's own text says the bound "must be DERIVED and reported, not left in a comment",
+    # and the check was reading the comment's value. Caught by an external audit.
+    n_grid, substeps, bound = _stability_settings()
+    dx = 1.0 / n_grid
     per_frame = np.abs(np.diff(sa, axis=0)).max() / dx
-    per_sub = per_frame / 10.0
-    V.add("4. inside the MPM stability envelope", CERTAIN, per_sub < 0.4,
-          f"max {per_sub:.4f} grid cells per substep (bound 0.4, from mpm_gather's own vmax)")
+    per_sub = per_frame / substeps
+    V.add("4. inside the MPM stability envelope", CERTAIN, per_sub < bound,
+          f"max {per_sub:.4f} grid cells per substep (bound {bound}, read from mpm_gather; "
+          f"n_grid={n_grid}, substeps={substeps})")
 
     # --- 8b. the simulated tissue must rest as much as the real one does --------------------
     # Measured on the SAME window for both, because a fraction of a different window is not a
@@ -275,6 +372,7 @@ def main(argv=None):
     os.makedirs(os.path.join(HERE, "_metrology"), exist_ok=True)
 
     V = Verdicts()
+    coverage(V)
     p2_bounds_declared(V)
     p3_every_operator_acts(V)
     p6_seed_reaches_the_engine(V)
@@ -284,10 +382,29 @@ def main(argv=None):
         p2_no_parameter_on_its_bound(V, a.run)
     if a.probe:
         probe_forward(V, a.device)
+        p5_warmup_settles(V, a.device)
 
     v = V.report()
-    json.dump({"verdict": v, "premises": V.rows},
-              open(os.path.join(HERE, "_metrology", "premises.json"), "w"), indent=1)
+    # MERGE, never overwrite. The first version wrote the whole file every run, so the last and
+    # narrowest invocation won and the artefact on disk stopped matching the note that cited it.
+    # The load-update-dump pattern already existed in this folder (reproduce.py); it just was not
+    # used here.
+    out = os.path.join(HERE, "_metrology", "premises.json")
+    prev = {}
+    if os.path.exists(out):
+        try:
+            prev = json.load(open(out))
+        except Exception:
+            prev = {}
+    rows = {r["premise"]: r for r in (prev.get("premises") or [])}
+    for r in V.rows:
+        rows[r["premise"]] = r
+    merged = sorted(rows.values(), key=lambda r: r["premise"])
+    broken = [r for r in merged if not r["pass"] and not r["skipped"]]
+    overall = ("invalid" if any(r["grade"] == CERTAIN for r in broken)
+               else "ambiguous" if broken else "valid")
+    json.dump({"verdict": overall, "verdict_this_run": v, "premises": merged},
+              open(out, "w"), indent=1)
     return 0 if v == "valid" else (1 if v == "ambiguous" else 2)
 
 

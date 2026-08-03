@@ -72,8 +72,8 @@ Every number below was measured in this folder, not inherited.
 | the specimen | one healthy sheet + one diseased sheet, under **five filenames**. No independent replicate exists |
 | held-out beats | leave-one-out **R² 0.978–0.986** — a held-out beat is not a real test |
 | information content | the beat is **90% one spatial pattern, 99% three**; ~109 independent patches |
-| **the ceiling** | beat vs beat: LoopScore median **0.705** (0.469–0.850). **No model may score above it.** Even two real beats agree on circulation direction only **93.9%** of the time |
-| **the tracker** | two trackings of one movie: **0.996** in time, **0.27–0.29 / −0.06** in space at every beat peak, smoothing and axis conventions tested. As a model of each other: circulation right **50%** of the time, orientation error 0.77 rad (random = 0.79), LoopScore **−0.53** |
+| **the ceiling** | beat vs beat: LoopScore median **0.705** (0.469–0.850). No model may score above it **on LoopScore** — which is not an admitted instrument, so Phase 2 must recompute it. Even two real beats agree on circulation direction only **93.9%** of the time |
+| **the tracker** (one condition-signature: same specimen, same movie, same algorithm pair — the four beats are repetition, not corroboration) | two trackings of one movie: **0.996** in time, **0.27–0.29 / −0.06** in space at every beat peak, smoothing and axis conventions tested. As a model of each other: circulation right **50%** of the time, orientation error 0.77 rad (random = 0.79), LoopScore **−0.53** |
 | the corpus | 71 MPM runs, 45 GB, intact in `graphs_data/material` — `log/material/` holds only the recipe |
 | corpus reproducibility | **7 of 10 active-traction specs would not run**; all 8 migrate and load |
 | **temporal integration** | converged: substeps 5/10/20 agree to **0.8%** — *once frame-dt is held fixed* |
@@ -149,6 +149,12 @@ are already written in the note; the work is:
 4. **Is the model in the right regime.** Set the mass to zero and see whether the loop survives.
 5. **The anchoring ladder**, scored on the one frozen mask.
 6. **Build the error decomposition** so step 3 of the loop returns *where* the model is wrong.
+7. **Recompute the ceiling and the tracker floor with the certified ruler.** Both Phase-1 numbers
+   are LoopScore numbers, and LoopScore is not admitted. Without this the campaign runs against a
+   ceiling from a retired instrument.
+8. **Settle or waive premise 3 before the first Phase-2 number.** `premises.py` returns INVALID
+   today on a premise graded *certain*; measuring the STOP under a spec our own checker rejects is
+   the most expensive thing we could do.
 
 **THE STOP:** at the end, we know whether the active model beats the best trivial baseline by more
 than the noise. On the evidence already on disk — copying the previous beat outscores every fit the

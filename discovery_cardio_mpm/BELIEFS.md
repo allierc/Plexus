@@ -20,11 +20,13 @@ So this register starts empty, and a claim enters it only by clearing every one 
 | the fit **converged** | an unfinished optimisation is a fact about the optimiser |
 | a **run directory that still re-derives it** | a number nobody can reproduce is a rumour |
 
-Entries are one line each, and the file has a hard length cap enforced by code: the previous
-campaign's ledger reached 1,668 lines and its log 7,289. Overflow forces a merge or a retraction,
-never an append.
+Entries are one line each, and the file has a **hard length cap of 120 lines, enforced by
+`certify_apparatus.check_registers`** — the previous campaign's ledger reached 1,668 lines and its
+log 7,289. Overflow forces a merge or a retraction, never an append. Every row must carry all seven
+evidence columns; a row that does not is refused, and the gate has been watched refusing one.
 
-A claim that is later contradicted moves to `retractions.jsonl` with its cause of death attached.
+A claim that is later contradicted moves to `retractions.jsonl` (present, empty) with its cause of
+death attached.
 It is never edited and never deleted — a register that keeps only its winners teaches nothing
 about how it goes wrong.
 

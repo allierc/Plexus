@@ -25,6 +25,16 @@
   "detail": "refused"
  },
  {
+  "canary": "malformed belief row",
+  "caught": true,
+  "detail": "gate refused"
+ },
+ {
+  "canary": "inherited claim promoted without evidence",
+  "caught": true,
+  "detail": "gate refused"
+ },
+ {
   "canary": "retired conclusion re-enters the source",
   "caught": true,
   "detail": "gate refused"
