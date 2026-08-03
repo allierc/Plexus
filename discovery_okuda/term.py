@@ -52,6 +52,12 @@ VOICE = {
     "diagnostician": red,        # why the apparatus failed
     "proposer":      blue,       # what to test next
     "peer-review":   blue,       # is it worth testing
+    # ADDED with Phase 7. Both speak every round and had no colour, so their lines read as
+    # debug output rather than as a role talking. Teal is the "is this sound?" family, which is
+    # what they both are: one checks the instrument, the other checks the inference.
+    "logic":         teal,       # is the conclusion earned
+    "metrologist":   teal,       # is the instrument sound
+    "escalate":      orange,     # the Supervisor changing the envelope
 }
 
 

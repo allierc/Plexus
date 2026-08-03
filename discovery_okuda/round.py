@@ -164,7 +164,7 @@ def _graph_from_run(name):
             return CS.CompositionGraph(ops=r["ops"], conns=r["conns"], params=r["params"])
         except Exception:
             pass
-    print(f"  [archivist] {name}: no composition.json -- its spec cannot be rebuilt as a graph")
+    print(T_.quiet(f"  [archivist] {name}: no composition.json -- cannot be rebuilt as a graph"))
     return None
 
 
@@ -822,8 +822,19 @@ def build_composition_batch(sup, cfg, n_slots, ledger):
             continue
         in_batch[h] = i
         out.append((g, lbl, sl))
+    # GROUPED BY REASON. Eleven consecutive lines each saying "identical to slot 0" is one
+    # finding printed eleven times, and it buries the one line that mattered. The full list still
+    # goes to batch_refusals.jsonl and into the next Proposer's prompt.
+    _by_reason = {}
     for i, why in rejected:
-        print(T_.no(f"[critic] slot {i} rejected -- {why}"))
+        _by_reason.setdefault(str(why).split(":")[0].split("(")[0].strip(), []).append((i, why))
+    for _reason, _items in _by_reason.items():
+        _slots = ", ".join(str(i) for i, _ in _items)
+        if len(_items) == 1:
+            print(T_.no(f"[critic] slot {_slots} rejected -- {_items[0][1]}"))
+        else:
+            print(T_.no(f"[critic] {len(_items)} slots rejected ({_slots}) -- {_reason}"))
+            print(T_.quiet(f"          {str(_items[0][1])[:150]}"))
     # PERSISTED, so the next Proposer is told. A refusal that reaches only the terminal is the
     # exact defect this campaign spent a day removing: the Proposer repeats the mistake because
     # nothing carried the reason back. These are the PRE-COMPUTE refusals -- the ones that cost
@@ -1085,8 +1096,9 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         cands = build_composition_batch(sup, cfg, batch, ledger)
     if not cands:
         print("[round] no candidates -- escalating")
-        print(json.dumps(run_escalation(cfg, sup, lm, rid, "the batch builder produced no "
-                                        "runnable candidate", ledger=ledger), indent=1))
+        _esc = run_escalation(cfg, sup, lm, rid, "the batch builder produced no "
+                              "runnable candidate", ledger=ledger)
+        print(T_.warn(f"[escalate] {_esc.get('action', 'no action')}"))
         return bk.finish(rid, "no_candidates", 5)
 
     # ------------------------------------------------ hypotheses FIRST, then configs
@@ -1509,10 +1521,10 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
             _neg = [r for r in _rows if r[1] in (LG.CANNOT_BE, LG.CANNOT_NOT_BE)]
             _bad = [r for r in _neg if not r[2]]
             _cb = [r for r in _rows if r[1] == LG.COULD_BE]
-            print(T_.quiet(f"  [logic] {len(_rows)} claim(s): {len(_neg)} negative, "
-                           f"{len(_bad)} UNEARNED, {len(_cb)} could-be"))
-            for _n, _m, _ok, _rf, _nr, _tx, _why in _bad[:6]:
-                print(T_.warn(f"  [logic] UNEARNED [{_m}] {_why}: {_tx[:70]}"))
+            print(T_.say("logic", f"{len(_rows)} claim(s): {len(_neg)} negative, "
+                         f"{len(_bad)} unearned, {len(_cb)} could-be", sentences=1))
+            for _n, _m, _ok, _rf, _nr, _tx, _why in _bad[:4]:
+                print(T_.quiet(f"      unearned [{_m}] {_why}: {_tx[:64]}"))
             _w = len(open(_mem, errors="replace").read().split())
             if _w > TPL.MAX_MEMORY_WORDS:
                 print(T_.warn(f"  [logic] memory.md {_w} words against a "
@@ -1551,8 +1563,9 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
                                 f"MEASURED; concluding anything about it is the error that "
                                 f"recorded the campaign's best Turing pattern as a null sphere."),
                             wanted_for=f"claims mentioning {_p} cannot be checked or falsified"))
-                        print(T_.warn(f"  [metrologist] instrument requested: {_p} "
-                                      f"({_n} conclusion(s) rest on it, nothing measures it)"))
+                        print(T_.say("metrologist", f"instrument requested: {_p} -- {_n} "
+                                 f"conclusion(s) rest on it and nothing measures it",
+                                 sentences=1))
                     except Exception:
                         pass
     except Exception as _e:
@@ -1612,14 +1625,20 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     # by a crash-like condition, never by the ordinary course of a campaign exhausting its
     # reachable space, which over weeks is the NORMAL way a mechanism search ends.
     if str(rep.get("reason", "")).startswith("ESCALATE"):
-        print(json.dumps(run_escalation(cfg, sup, lm, rid, rep["reason"], ledger=ledger),
-                         indent=1))
+        _esc = run_escalation(cfg, sup, lm, rid, rep["reason"], ledger=ledger)
+        print(T_.warn(f"[escalate] {_esc.get('action', 'no action')}"))
 
     cov = lm.coverage()["overall"]
     print(T_.say("supervisor",
                  f"{rep.get('reason', '?')}; next batch {rep.get('next_confirmatory_frac', 0.7):.0%} "
                  f"confirmatory. {rep.get('mix_why', '')}", sentences=1))
-    print(T_.quiet(f"[supervisor] {json.dumps({k: v for k, v in rep.items() if k != 'mix_why'})}"))
+    # A DICT DUMPED TO A TERMINAL IS NOT A REPORT. The full record is in supervisor.jsonl;
+    # what a person reading the round needs is the decision and the two numbers behind it.
+    print(T_.say("supervisor",
+                 f"{rep.get('reason', 'continue')}; next batch "
+                 f"{int(100 * (rep.get('next_confirmatory_frac') or 0))}% confirmatory, "
+                 f"surprise {rep.get('surprise', 0):.2f}, best {rep.get('best', 0) or 0:.2f}",
+                 sentences=1))
     print(f"[map] coverage {cov['frac']:.0%} ({cov['covered']}/{cov['total']} cells, "
           f"{cov['n_runs']} runs)")
     return bk.finish(rid, "complete", 0)
@@ -1686,7 +1705,7 @@ def run_escalation(cfg, sup, lm, rid, why, ledger=None):
     frontier = load_frontier()
     n_edits = sum(len(g.legal_edits(cfg.stage_gate)) for g in frontier)
     action, detail = ESC.decide(cfg, sup, backlog, n_edits)
-    print(f"[escalate] {action}: {detail}")
+    print(T_.say("supervisor", f"escalating: {action} -- {detail}", sentences=1))
 
     if action == "open_stage_gate":
         rec = sup.escalate()                       # advances cfg.stage_gate and checkpoints it
@@ -1696,8 +1715,7 @@ def run_escalation(cfg, sup, lm, rid, why, ledger=None):
             "\n".join(f"  {comp_hash(g)}  {g.name_region()}" for g in frontier[:8]),
             f"{why}\n{detail}", rid, ledger=ledger)
         if not req or not req.get("why_inexpressible"):
-            print("[escalate] the agent produced no usable request -- recording the fact rather "
-                  "than inventing one")
+            print(T_.warn("[escalate] no usable request -- recording the fact, not inventing one"))
             rec = sup.escalate()
         else:
             dup = backlog.duplicate_of(req["mechanism"])
