@@ -168,6 +168,33 @@ def t_truncated():
     check(len(hits) >= 1, f"the truncation of {src!r} resolves to nothing")
 
 
+@case("parameter moves are offered, and keep the composition's identity")
+def t_set_param():
+    """Track A asks two questions of a mechanism; only the first has ever been askable.
+
+    `--mode theta` existed from the first draft and plan() never emitted it, so "what does this
+    do as you turn it up" has not once been asked in a live round. As a menu move it can be, and
+    can be MIXED with structural moves in one batch.
+    """
+    import offline as O
+    O.install("clean")
+    import round as R, proposer as P, run_record as RR
+    menu = P._legal_menu(R.load_frontier(), R.CampaignConfig(batch=12, keep_truncate=4), None)
+    rows = [r for p_ in menu for r in p_["legal_edits"]]
+    kinds = {r["edit"][0] for r in rows}
+    check("set_param" in kinds, f"no parameter move is offered at all; kinds={kinds}")
+    struct = [r for r in rows if r["edit"][0] != "set_param"]
+    param = [r for r in rows if r["edit"][0] == "set_param"]
+    check(len(struct) >= len(param),
+          f"the menu is mostly dials: {len(param)} parameter vs {len(struct)} structural moves")
+    # THE DISCIPLINE, mechanically: a retune must not read as a new mechanism.
+    g = R.load_frontier()[0]
+    e = next(r["edit"] for r in rows if r["edit"][0] == "set_param")
+    child, _ = g.apply(tuple(e))
+    check(RR.comp_hash(child) == RR.comp_hash(g),
+          "a set_param move changed the composition hash -- a retune would count as a new mechanism")
+
+
 # --------------------------------------------------------------------------- the declarations
 @case("every artifact has a reader (wiring.py --check)")
 def t_wiring():

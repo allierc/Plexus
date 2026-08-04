@@ -91,8 +91,15 @@ def _legal_menu(frontier, cfg, prox, max_per_parent=24):
                 continue
             rows.append({"edit": list(e) if isinstance(e, tuple) else e, "label": lbl,
                          "yields": child.name_region()})
-            if len(rows) >= max_per_parent:
-                break
+        # STRUCTURE FIRST, AND NUMBERS RATIONED. Parameter moves outnumber structural ones about
+        # three to one -- 17 of 24 on the current frontier -- so a menu truncated at any length
+        # would show mostly numbers, and the Proposer would spend a batch turning dials. Track A
+        # asks whether a MECHANISM matters before it asks what it does as you turn it up, and the
+        # menu should read in that order. Every structural move is offered; parameter moves are
+        # capped, so they are present as a real option and cannot crowd the others out.
+        _struct = [r for r in rows if r["edit"][0] != "set_param"]
+        _param = [r for r in rows if r["edit"][0] == "set_param"]
+        rows = (_struct + _param[:max(2, max_per_parent // 4)])[:max_per_parent]
         if rows:
             menu.append({"parent_index": gi,
                          "parent": "+".join(sorted(set(g.op_names()))),
@@ -164,6 +171,19 @@ WHAT THE PAPER SAYS (from the Grounder, who read it and checked its own quotes)
 
 LEGAL MOVES (you may ONLY choose from these; the type system has already removed everything
 ill-typed, everything with an unmet precondition, and everything with a dangling slot)
+
+COPY AN `edit` TOKEN VERBATIM. An operator name that is not in this list DOES NOT EXIST in this
+system, however real the biology is. There is no `branching` operator, no `chemotaxis`, no
+`apical_constriction`: those are phenotypes you may HOPE FOR, and the way to reach for one is to
+choose the structural move you think produces it and say so in `claim`.
+
+TWO KINDS OF MOVE, and they answer different questions.
+  STRUCTURAL  add_op / remove_op / set_impl / connect -- "does this mechanism matter at all?"
+  PARAMETER   set_param                               -- "what does it do as you turn it up?"
+A `set_param` move keeps the composition's IDENTITY: it is the same mechanism at a different
+setting, and it is recorded as a point on that mechanism rather than as a new one. Both are
+legitimate and both carry a real prediction. Ask the first question of a mechanism before the
+second, and do not spend a batch turning dials on something you have not shown to matter.
 {_render_menu(menu)}
 {CAUSALITY_RULE}
 WRITE {PROPOSAL_FILE} as JSON:

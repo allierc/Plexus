@@ -853,6 +853,35 @@ class CompositionGraph:
             if role in REQUIRED_ROLES and same_role == 1:
                 continue                                       # never remove the last substrate
             edits.append((("remove_op", o["id"]), f"-{o['op']}"))
+        # PARAMETER MOVES. Two points per parameter -- one below the standing value, one above --
+        # taken from the operator's own declared (lo, hi, default) triple, so a sweep can never
+        # leave the space the Critic will admit. Two rather than a grid because a menu must stay
+        # readable: the Proposer chooses WHICH lever to lean on, and a theta round refines it.
+        #
+        # This is what makes "sweep the parameters" expressible at all. `--mode theta` has existed
+        # since the first draft and the planner never emitted it, so the question "what does this
+        # mechanism do as you turn it up" has never once been asked in a live round.
+        for o in self.ops:
+            # THE SPECIMEN IS NOT AN AXIS OF THE SEARCH. round.py grounds the starting conditions
+            # on every slot for a reason it learned the hard way: two slots once ran 500 cells
+            # against a control at 2000, so any difference between them confounded the EDIT with a
+            # fourfold change in specimen size. Offering `n_cells` as a sweepable parameter would
+            # hand that same confound back through the front door. Seeds likewise: they are forced
+            # by the pipeline so a comparison cannot be accidentally confounded.
+            if OPERATORS[o["op"]].get("role") == "substrate":
+                continue
+            for pname, tri in (OPERATORS[o["op"]].get("params") or {}).items():
+                if pname in ("seed", "n_cells", "before_frame", "after_frame"):
+                    continue
+                if not (isinstance(tri, (tuple, list)) and len(tri) == 3):
+                    continue
+                lo, hi, dflt = (float(x) for x in tri)
+                cur = float(self.params.get(f"{o['id']}.{pname}", dflt))
+                for v in (cur - (cur - lo) * 0.5, cur + (hi - cur) * 0.5):
+                    v = round(v, 6)
+                    if lo <= v <= hi and abs(v - cur) > 1e-9:
+                        edits.append((("set_param", f"{o['id']}.{pname}", v),
+                                      f"@{o['op']}.{pname}={v:g}"))
         for src, dst, slot in self._candidate_links():
             edits.append((("connect", src, dst, slot),
                           f"~{self._op_of(src)}->{self._op_of(dst)}.{slot}"))
@@ -905,6 +934,19 @@ class CompositionGraph:
         elif kind == "disconnect":
             g.conns = [c for c in g.conns if not (c["src"] == edit[1] and c["dst"] == edit[2]
                                                   and c["slot"] == edit[3])]
+        elif kind == "set_param":
+            # A PARAMETER MOVE, AND IT IS NOT A MECHANISM. Track A asks two questions about a
+            # mechanism -- does it matter, and what does it do as you turn it up -- and only the
+            # first has ever been askable. `("set_param", "morphogen_growth_3d0.rate", 0.02)` is
+            # the second, expressed as an ordinary edit so it can be chosen from the same menu and
+            # MIXED with structural moves in one batch, instead of needing a whole round of its own.
+            #
+            # The discipline survives because comp_hash EXCLUDES params: a retune yields the SAME
+            # composition identity, so it can never register as a new mechanism -- "a change of
+            # numbers can never masquerade as a new idea" holds because the identity function says
+            # so, not because an agent was asked to be careful.
+            g.params = dict(g.params)
+            g.params[edit[1]] = edit[2]
         elif kind == "set_impl":
             for o in g.ops:
                 if o["id"] == edit[1]:
