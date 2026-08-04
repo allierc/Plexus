@@ -145,34 +145,53 @@ Recorded because they are the argument for the apparatus.
 
 ## 6. To resume — Phase 2, and it is a STOP point
 
-Phase 1 is closed. Everything below is Phase 2: **certify the ruler and find the floor.** Its gates
-are already written in the note; the work is:
+**Phase 2 is about the METRICS, and it invents none of them.** They were written over three weeks
+in `prototype/cardio_mpm` and audited on 4 July; what was never done is saying which quantity is
+which. Four names existed for the same things — `loopscore_residual`, `enclosure_row`,
+`morphology_row` (withdrawn in July, still printed by every run) and `descriptors.py` (mine, added
+in Phase 1 — the same mistake one turn later). `metrics.py` is the registry that reconciles them,
+and it *proves* the shared quantities agree numerically rather than assuming it.
 
-1. ~~**Where is zero.**~~ **DONE** (`floors.py`). Bar = **+0.851** fit / **+0.62** held-out, set by
-   copying the previous beat. Muscle-off scores exactly the do-nothing score, so the anchoring buys
-   nothing. Everything from here is reported as a difference from the do-nothing row.
-2. **How big is nothing.** Same config, several seeds, at the depth the loop will use. That spread
-   becomes the unit of the campaign. Note both floors are needed: across-seed *and* same-seed
-   (the GPU path is not bit-deterministic; the generate path is).
-3. **Teach the ruler to see coordination.** It currently scores a timing-scrambled tissue at exactly
-   1.0000. Until a certified measure can tell coordination from incoherence, no claim about timing,
-   waves or rotation is scoreable — and the model-rests-8%-vs-77% failure is invisible to it.
-4. **Is the model in the right regime.** Set the mass to zero and see whether the loop survives.
-5. **The anchoring ladder**, scored on the one frozen mask.
-6. **Build the error decomposition** so step 3 of the loop returns *where* the model is wrong.
-7. **Recompute the ceiling and the tracker floor with the certified ruler.** Both Phase-1 numbers
-   are LoopScore numbers, and LoopScore is not admitted. Without this the campaign runs against a
-   ceiling from a retired instrument.
-8. ~~**Settle or waive premise 3.**~~ **DONE** — closed properly: a fitting recipe that declares
-   what the fit runs, proved bit-identical. `premises.verdict_for_run()` is now importable and must
-   be called by every Phase-2 script that writes a number.
+The campaign reads loops on a **10×10 grid of the tissue**, comparing each node's path with the
+recording's. That stays — it is what a person judges.
 
-**THE STOP:** at the end, we know whether the active model beats the best trivial baseline by more
-than the noise. On the evidence already on disk — copying the previous beat outscores every fit the
-previous campaign produced — this is a live outcome, not a formality.
+**Done, 3 of 6:**
 
-**Two carried-over defects go to the Proposer as the first things the loop must explain:** four
-operators in the recipe never run, and the model rests 8% of the beat where the tissue rests 77%.
+1. **One name, one quantity** (`metrics.py --check`, 8/8). 16 entries, each with a definition, the
+   code that computes it, and a tier. **0 certified · 12 provisional · 4 withdrawn** — the honest
+   state. Checks: every live metric has code; every one has a definition; **no live definition may
+   name a withdrawn metric**; a withdrawn metric records why; and the two implementations of each
+   shared quantity agree numerically.
+2. **The reading surface, and the defect in it.** The grid's margin was ten nodes and the pinned
+   band is wider: **36 of the 100 nodes sat on the anchor.** Found in July, never fixed — every
+   dashboard since has been read with a third of its panels showing the anchor. Corrected to twenty
+   (0/100 in the band); both reported. *My own check was wrong first — it said 0/100 against the
+   audit's 36, because the grid maps onto a sheet occupying 0.70 of the world and the factor was
+   missing. The audit was right.*
+3. **Where is zero** (`floors.py`). Bar = **+0.851** fit / **+0.62** held-out, set by copying the
+   previous beat. Muscle-off scores exactly the do-nothing score. Everything from here is reported
+   as a difference from the do-nothing row.
+
+**Remaining, 3 of 6:**
+
+4. **How big is nothing.** Several seeds at the depth the loop will use, *and* the same seed twice
+   — the GPU path is not bit-reproducible and the two are different questions. Afterwards a
+   difference below that spread is `indistinguishable` and the gate refuses to call it a finding.
+5. **Teach the ruler to see coordination.** It scores a timing-scrambled sheet at exactly 1.0000.
+   Until a certified measure can tell coordination from incoherence, no claim about timing, waves
+   or rotation is scoreable — and the model-rests-8%-vs-77% failure is invisible to everything in
+   the registry.
+6. **Deliver the decomposition per run.** The five named dimensions — size, orientation, openness,
+   chirality, shape-detail — on the corrected grid, written into every run's record, so step 3 of
+   the loop returns *where* the model is wrong rather than how much.
+
+**THE STOP:** does the fitted model beat the best trivial baseline by more than the noise, with the
+comparison and the margin written into code before the numbers exist? On the evidence already on
+disk — copying the previous beat outscores every fit the previous campaign produced — this is a
+live outcome, not a formality.
+
+**Two defects carry forward as the first things the loop must explain:** the warm-up does not
+settle (33% shift), and the model rests 8% of the beat where the tissue rests 77%.
 
 ## 7. Two decisions waiting on Cedric
 
