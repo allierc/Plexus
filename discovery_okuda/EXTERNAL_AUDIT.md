@@ -1,111 +1,90 @@
-# External audit, 4 August 2026 — the search could not reach the answer
+# External audits — the index, and how to commission one
 
-An independent reviewer was given the campaign and the two goals (Track A: search for mechanisms,
-not parameter values, predicting before running; Track B: reproduce Okuda's tubes as the proof),
-told to verify every claim by execution rather than by reading comments, and asked where the
-implementation had drifted. Nine findings were handed over as leads. It confirmed eight, corrected
-one, and found the blocking defect none of them named.
+## Why this is a standing procedure and not a one-off
 
-## The crux, proved by execution
+On 3 August the loop was debugged the usual way: watch a round, spot something wrong, fix it,
+relaunch. Ten cycles of that in a day. Every fix was correct and none of them found the blocking
+defect, because the defect was not visible from inside a round — it was a property of the search
+space, and no amount of watching rounds reveals a composition that is never proposed.
 
-    apply(("add_op", ...))   creates the node and NEVER the connection
-    is_runnable()            is false for any dangling slot
-    proposer.py:88           the menu filters on is_runnable()
-    ------------------------------------------------------------------
-    => no operator that declares a slot can EVER be added by a one-edit move
+On 4 August one independent reviewer, working read-only for fourteen minutes, found it: `add_op`
+creates a node and never its connection, so **no operator declaring a slot could ever be added by a
+one-edit move**, and the three slotted operators were the entire mechanism the campaign was looking
+for. It proved it by breadth-first search — 9,760 reachable compositions, zero containing a wire —
+rather than by reading the code and reasoning about it.
 
-Three operators declare slots, and they are the entire morphogen -> mechanics arrow:
+**The lesson is not "get a second opinion". It is that the author cannot audit the search space he
+built, because he will re-derive the same assumptions that shaped it.** Ten trial-and-error rounds
+cost a day and a campaign; one adversarial reviewer with execution rights cost a quarter of an hour.
 
-| operator | slot | what it is |
-|---|---|---|
-| `morphogen_growth_3d` | `gate` | **Okuda's actual mechanism** |
-| `extrude` | `site` | the forcing term |
-| `divide_3d:orient_iface` | `axis` | oriented division |
+## The audits
 
-Breadth-first closure of the reachable one-edit space, using the menu's own filter:
+| # | date | crux finding | status |
+|---|---|---|---|
+| [1](EXTERNAL_AUDIT_1.md) | 2026-08-04 | `add_op` never wires its slot → the morphogen→mechanics arrow was unreachable; 0 of 9,760 compositions carried a connection | remedies 1–3 implemented at `8d1bccd9`, returned to the same reviewer; 4–8 open |
 
-    REACHABLE RUNNABLE compositions from seed:  9760
-       morphogen_growth_3d                         0
-       extrude                                     0
-       reachable compositions with ANY connection: 0
+## The procedure
 
-    reference round40_mc8   runnable=True   reachable=False
-    reference okuda_route   runnable=True   reachable=False
+Six ingredients. Each was load-bearing in audit 1; dropping any of them gets a worse review.
 
-The edit set can DESTROY the coupling and can never BUILD it — a one-way ratchet toward
-decoupled compositions.
+**1. Independent, and told so.** The reviewer is not the author and is told the author cannot see
+this clearly any more. Its value is what the builders have stopped noticing.
 
-## What that makes of six rounds of findings
+**2. The goals verbatim, in the owner's words.** Not a paraphrase. Audit 1 was given the Track A /
+Track B statement exactly as written, including *"the figure is not a side quest — it is the
+evidence"*, and it used that sentence to weigh the finding that `figures/` contains 2.2 MB of
+pictures of the loop and not one image of a tissue.
 
-**"Chemistry is inert for shape" is a fact about wiring.** 20 runs returned protr_peak = 1.006,
-including runs that deleted the reaction operator outright. A subsystem with no output edge
-cannot move a shape; the loop filed it as biology.
+**3. Verify by EXECUTION, never by reading comments.** This codebase's comments are unusually good
+and that is the trap: they record what each rule was *written for*, which reads as a description of
+what it *does*. The reviewer ran the search space and measured it.
 
-**The top result is one artefact seen three times.** protr_peak 2.266 on three compositions
-differing only in their reaction block, with all 20 summary metrics bit-identical and the VLM
-captions byte-identical. Cause: 95% of vertices collapse to radius 0.08 while a few fly to 1508,
-so `protr = r95/rmed` is a ratio of two near-zero numbers. The loop read "identical across three
-independent bases" as strength of evidence; it is the signature of a disconnected subsystem.
-Those three runs received three different phenotype labels — `exploded`, `spike`, `branching` —
-from one bit-identical simulation, and those three words are now the entire phenotype inventory
-of `lever_map.md`.
+**4. Current suspicions handed over as LEADS, not facts.** Give it everything you think you know,
+explicitly marked as unverified, and require a verdict on each. Audit 1 confirmed eight, **corrected
+one** (the prediction discipline was working; I had said it was ceremonial) and found the crux none
+of them named. A reviewer told only "find problems" wanders; one given nine specific claims to
+attack goes deep.
 
-**The sweep arm was dead on arrival.** `comp_hash` excludes parameters by design, so a `set_param`
-child carries the parent's hash — and `R6_DUPLICATE` refuses any seen hash. Measured: **39 of 39
-parameter moves refused**, even against a seen-list of one. `t_set_param` passes anyway, because
-it checks the move is OFFERED and never that it is ADMITTED.
+**5. Read-only, and say it.** No file modifications, no cluster jobs, no test suite that mutates
+state. The reviewer must be free to run anything without the author policing it.
 
-**Round 7 bought nothing either.** All four `shape_to_chem` runs ran at `beta: 0.0` — the
-operator's own declared null. `add_op` seeds every parameter at its default, so an operator whose
-default is its own null can never be tested, because the only way to raise it is a `set_param`
-move and those are all refused.
+**6. Quantify or it does not count.** *"Too strict"* is worth nothing; *"refused 106 of 127"* is
+worth something. Audit 1's every finding carries a number, and the numbers are what made the
+remedies obvious.
 
-**Rounds 5 and 6 delivered one run each** — the same control composition already run in rounds
-2, 3 and 4 — because the control is exempt from the duplicate check and nothing else survived.
-Round 8 was structurally guaranteed to deliver one slot before it began: zero admissible children
-of the frontier.
+### The second pass, which matters as much
 
-**Track A's discipline is real.** 34 of 46 hypotheses carried a parseable prediction; all twelve
-`unstated` are round-1 replays where none is owed; of 29 resolved-and-stated, 29 scored confirmed
-or refuted and 0 inconclusive. The register works. The content is the problem: 19 of 34
-predictions were "nothing will happen", and 18 of 21 confirmations were *the sphere stayed a
-sphere*.
+**Send the remedies back to the same reviewer.** It keeps its context, it knows what it claimed, and
+it has no stake in the fixes being right. Ask it explicitly to *contradict* your numbers, name the
+things you are least sure of, and tell it which defects were yours — an author's own list of
+recent mistakes is the best prior a reviewer can have.
 
-**The most dangerous state.** `memory.md` asks whether the operator bank contains a localised
-force operator. It contains two. Had round 8 completed, the campaign would have ended by
-reporting a false absence as its terminal finding, while the operator sat in the bank.
+### The prompt skeleton
 
-## The drift
+    You are an EXTERNAL REVIEWER of <system>. You were brought in because the people who
+    built it cannot see it clearly any more. Be direct and adversarial.
 
-`discovery_okuda/figures/` holds `agentic_loop.png` and `loop_graph.png` — pictures of the loop —
-plus ten agent portraits. The note's single `\includegraphics` renders those portraits. **There is
-not one image of a tissue in it.** 2.2 MB of self-portraiture and zero morphology, for a project
-whose owner wrote "the figure is not a side quest — it is the evidence".
+    THE CODE: <path>          THE EVIDENCE: <campaign records, logs, run outputs>
 
-25 of 54 modules (6,064 lines, 26%) are unreachable from any entry point. `knowledge.md` reached
-391 KB for 29 composition runs — 13 KB of agent prose per simulation, describing three distinct
-numbers.
+    THE QUESTION: judge the IMPLEMENTATION against these goals, verbatim from the owner:
+      <goals, unedited>
+    Is the implementation in line with that? Where has it drifted?
 
-## The remedies, in the reviewer's priority order
+    STARTING POINTS — findings from the last few hours. VERIFY EVERY ONE; several came
+    from someone who has been inside this code all night and may be wrong. Leads, not facts.
+      1..N
 
-1. **Make `add_op` of a slotted operator atomic with its `connect`** when exactly one node
-   produces the required port. One function; turns 9,760 disconnected compositions into a space
-   that contains the answer.
-2. **Put the reference recipes on the frontier** rather than treating them as a failure fallback.
-   They are the only compositions in the repository that carry a wire.
-3. **Scope `R6_DUPLICATE` to structure**, so a retune is not refused as a duplicate of the
-   mechanism it perturbs.
-4. Fix the `shape_energy_3d:monolayer` emitter, which drops every parameter it is given.
-5. Arbitrate the phenotype: `morphology.classify` + the Biologist, not the analyst's word.
-6. `logic.py` independence: identical observables count as ONE observation, however many
-   composition hashes produced them.
-7. Record `parent_hash` (hard-coded `None` at round.py:1528, so no hypothesis knows what it was
-   an edit of) and check the control shares the batch's parent.
-8. Delete the 6,064 unreachable lines.
+    WHAT I WANT: <A..E, each demanding a number>
 
-## Corrections to the audit
+    RULES: verify by reading and RUNNING code, not by trusting comments. DO NOT MODIFY ANY
+    FILE. Quantify wherever a number is available. Where you disagree with the starting
+    points, say so plainly and show the evidence.
 
-It reported that `campaign/` was wiped at 07:49 and the ledger lost. It caught `offline.py`
-mid-cycle — `isolate()` clears and restores at exit — and the ledger is intact: 6 round records,
-87 hypothesis lines, 7 refusal batches. The observation stands as a warning about the harness
-running against a live tree; the data loss did not occur.
+## When to commission one
+
+- before a launch that will run unattended overnight
+- after any campaign that completes cleanly and produces nothing
+- when the loop's own record starts diagnosing itself and the diagnosis does not act — audit 1's
+  campaign had written *"the loop is DEGENERATING"* into its memory four rounds running
+- when a result is suspiciously clean: the three identical `protr_peak 2.266` values were read as
+  corroboration across independent bases and were one artefact seen three times
