@@ -72,6 +72,16 @@ KNOWN_METRICS = (
     # growth resting on it is a claim about a buffer. Registering them makes "the tissue saturated
     # its reservoir" a checkable prediction rather than a remark.
     "div_blocked", "buf_full", "div_blocked_first_frame",
+    # CELL SHAPE. Measured every frame, and P7 FAILS a specimen on it -- shape index 22.65 against
+    # 3.72 for a regular hexagon is what invalidated the campaign's three highest protr_peak runs.
+    # It was never admitted, so the loop could be TOLD its cells were degenerate and could not
+    # PROPOSE to fix it: no prediction may name a metric that is not here, so "this edit keeps the
+    # cells regular" was unsayable and untestable.
+    #
+    # It is also the quantity that separates a grown tube from a stretched one. round40_mc8 holds
+    # shape_idx_med at 3.83 -- near-regular -- for 900 frames while protr doubles, which is what a
+    # healthy tube looks like; a sheet being pulled apart shows it here first.
+    "shape_idx_med", "shape_idx_p95", "shape_idx_max", "shape_idx_mean",
 )
 
 # Measured to lie by the instrument gate (F15/F16). A prediction resting on one of these is not

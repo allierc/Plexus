@@ -220,16 +220,43 @@ AUTOCATALYTIC_STEP_LIMIT = 0.5
 
 
 def _param(graph, node_id, key):
-    """A node's parameter, from the graph's params overlay or the operator's default."""
-    p = (getattr(graph, "params", {}) or {}).get(f"{node_id}.{key}")
-    if p is not None:
-        return p
+    """A node's parameter: the overlay, else the DECLARED DEFAULT, under any of its names.
+
+    TWO BUGS, ONE DISEASE, and it cost weeks. Every rule that reads a parameter went through here.
+
+    1. THE DEFAULT WAS NEVER RETURNED. A declaration is a TUPLE `(lo, hi, default)` and this did
+       `.get(key, {}).get("default")` on it -- AttributeError, swallowed by the bare except, None.
+       So an unset parameter read as None for every caller, every time, and each caller then fell
+       back to its own literal. R1d's `float(rate if rate is not None else 1.0)` is what that looks
+       like downstream: a rule refusing on a hard-coded constant while printing "rate None".
+
+    2. THE NAME DIFFERED BETWEEN THE GRAPH AND THE ENGINE -- rd_rate/rate, alpha/hill,
+       mono_gamma/gamma, l_th/l_th_frac -- with an alias table nothing consulted. That is fixed by
+       RENAMING rather than translating: the declarations now use the engine's names, because the
+       engine is what runs. An alias is a workaround for two names, and the workaround is what
+       made the bug survivable and therefore permanent.
+    """
+    params = getattr(graph, "params", {}) or {}
     try:
         from composition_space import OPERATORS
         op = next(o["op"] for o in graph.ops if o["id"] == node_id)
-        return (OPERATORS[op].get("params") or {}).get(key, {}).get("default")
+        decl = OPERATORS[op].get("params") or {}
     except Exception:
-        return None
+        op, decl = None, {}
+
+    v = params.get(f"{node_id}.{key}")
+    if v is not None:
+        return v
+    if True:
+        if key in decl:
+            d = decl[key]
+            # (lo, hi, default) -- the default is the THIRD element, not a key
+            if isinstance(d, (tuple, list)) and len(d) == 3:
+                return d[2]
+            if isinstance(d, dict):
+                return d.get("default")
+            return d
+    return None
 
 
 def check_static(graph, seen_hashes=(), edit_kind=None):
@@ -397,7 +424,7 @@ def check_static(graph, seen_hashes=(), edit_kind=None):
             #
             # The rule is right; it was reading the wrong key. `rate` is kept as a fallback
             # because other kinetics use that name.
-            rate = _param(graph, o["id"], "rd_rate")
+            rate = _param(graph, o["id"], "rate")
             if rate is None:
                 rate = _param(graph, o["id"], "rate")
             step = float(DT_GLOBAL) * float(rate if rate is not None else 1.0)
