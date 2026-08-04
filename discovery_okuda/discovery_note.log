@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  3 AUG 2026 20:49
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  3 AUG 2026 20:53
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -707,92 +707,65 @@ LaTeX Font Info:    External font `cmex10' loaded for size
 {/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}{/usr/share/texmf/fonts/enc/
 dvips/cm-super/cm-super-t1.enc}]
 LaTeX Font Info:    External font `cmex10' loaded for size
-(Font)              <7> on input line 152.
+(Font)              <7> on input line 145.
 LaTeX Font Info:    External font `cmex10' loaded for size
-(Font)              <5> on input line 152.
+(Font)              <5> on input line 145.
+LaTeX Font Info:    Font shape `T1/cmtt/bx/n' in size <10.95> not available
+(Font)              Font shape `T1/cmtt/m/n' tried instead on input line 164.
+LaTeX Font Info:    External font `cmex10' loaded for size
+(Font)              <9> on input line 219.
 
 
 [2]
 LaTeX Font Info:    External font `cmex10' loaded for size
-(Font)              <10.95> on input line 218.
-<figures/agentic_loop.png, id=67, 1541.76pt x 1027.84pt>
-File: figures/agentic_loop.png Graphic file (type png)
-<use figures/agentic_loop.png>
-Package pdftex.def Info: figures/agentic_loop.png  used on input line 224.
-(pdftex.def)             Requested size: 460.935pt x 307.2879pt.
-
-
-LaTeX Warning: `h' float specifier changed to `ht'.
-
-LaTeX Font Info:    Font shape `T1/cmtt/bx/n' in size <10> not available
-(Font)              Font shape `T1/cmtt/m/n' tried instead on input line 272.
-
-Underfull \hbox (badness 2229) in paragraph at lines 276--278
-[]|\T1/cmr/m/n/10 what should change next round? \T1/cmr/bx/n/10 Owns
- []
-
+(Font)              <10.95> on input line 260.
 
 
 [3]
-Overfull \vbox (560.95242pt too high) has occurred while \output is active []
-
-
-
-[4 <./figures/agentic_loop.png (PNG copy)>]
-Underfull \hbox (badness 1796) in paragraph at lines 352--352
-[]|\T1/cmr/bx/n/10 Track A --- un-der-stand the
- []
-
-
-Underfull \hbox (badness 3942) in paragraph at lines 354--356
-[]|\T1/cmr/bx/n/10 the fig-ure\T1/cmr/m/n/10 : tube, un-du-la-tion,
- []
-
-
-Underfull \hbox (badness 4832) in paragraph at lines 358--358
-\T1/cmr/m/n/10 hap-pened), Archivist (where to
- []
-
-
-Underfull \hbox (badness 2503) in paragraph at lines 360--362
-[]|\T1/cmr/m/n/10 producing the pic-ture by hand-
- []
-
-
-
-[5]
-
-[6]
-LaTeX Font Info:    External font `cmex10' loaded for size
-(Font)              <9> on input line 458.
-
-
-[7]
-Underfull \hbox (badness 1484) in paragraph at lines 518--520
+Underfull \hbox (badness 1484) in paragraph at lines 279--281
 []|\T1/cmr/m/n/9 Done, and the new bounds are \T1/cmr/m/it/9 de-rived
  []
 
 
-Underfull \hbox (badness 3701) in paragraph at lines 520--520
+Underfull \hbox (badness 3701) in paragraph at lines 281--281
 []|\T1/cmr/m/n/9 Replace the mis-la-belled length-
  []
 
 
 
-[8]
+[4]
+
+[5]
+
+[6]
+
+[7]
+
+[8{/usr/share/texmf/fonts/enc/dvips/cm-super/cm-super-ts1.enc}]
+Underfull \hbox (badness 4378) in paragraph at lines 606--607
+[]|\T1/cmr/bx/n/10.95 free --- and to-day un-rep-re-
+ []
+
+
 
 [9]
 
 [10]
 
 [11]
+Underfull \hbox (badness 4205) in paragraph at lines 760--761
+[]|\T1/cmr/m/n/10.95 a con-tract as-serted in prose, en-forced
+ []
+
+
+LaTeX Font Warning: Font shape `T1/cmr/m/scit' undefined
+(Font)              using `T1/cmr/m/scsl' instead on input line 808.
+
+
 
 [12]
 
-[13{/usr/share/texmf/fonts/enc/dvips/cm-super/cm-super-ts1.enc}]
-LaTeX Font Info:    Font shape `T1/cmtt/bx/n' in size <10.95> not available
-(Font)              Font shape `T1/cmtt/m/n' tried instead on input line 976.
-
+[13]
 
 [14]
 
@@ -801,91 +774,7 @@ LaTeX Font Info:    Font shape `T1/cmtt/bx/n' in size <10.95> not available
 [16]
 
 [17]
-
-[18]
-
-[19]
-
-[20]
-
-[21]
-Underfull \hbox (badness 4378) in paragraph at lines 1322--1323
-[]|\T1/cmr/bx/n/10.95 free --- and to-day un-rep-re-
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 1450--1453
-[]\T1/cmtt/m/n/10.95 hypothesis.CLAIM_KINDS \T1/cmr/m/n/10.95 --- \T1/cmtt/m/n/
-10.95 sufficient / necessary / causal /
- []
-
-
-Underfull \hbox (badness 4634) in paragraph at lines 1463--1469
-\T1/cmtt/m/n/10.95 logic.py \T1/cmr/m/n/10.95 --- a claim reg-is-ter, a ren-der
-er and the checks, fol-low-ing the
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 1502--1502
-[]|\T1/cmr/m/n/10.95 values be-sides
- []
-
-
-Underfull \hbox (badness 10000) in paragraph at lines 1505--1505
-[]|\T1/cmtt/m/n/10.95 n_spots_final \T1/cmr/m/n/10.95 in
- []
-
-
-Underfull \hbox (badness 5036) in paragraph at lines 1506--1506
-[]|\T1/cmr/m/n/10.95 a ver-dict cit-ing wave-
- []
-
-
-Overfull \hbox (14.94676pt too wide) in paragraph at lines 1496--1508
- [] 
- []
-
-
-Underfull \hbox (badness 1436) in paragraph at lines 1517--1528
-\T1/cmtt/m/n/10.95 confounder \T1/cmr/m/n/10.95 stored and read by noth-ing, so
- the re-visit quota is un-en-forced;
- []
-
-
-
-[22]
-
-[23]
-
-[24]
-
-[25]
-
-[26]
-
-[27]
-Underfull \hbox (badness 4205) in paragraph at lines 1586--1587
-[]|\T1/cmr/m/n/10.95 a con-tract as-serted in prose, en-forced
- []
-
-
-LaTeX Font Warning: Font shape `T1/cmr/m/scit' undefined
-(Font)              using `T1/cmr/m/scsl' instead on input line 1634.
-
-
-
-[28]
-
-[29]
-
-[30]
-
-[31]
-
-[32]
-
-[33]
-Overfull \hbox (1.01701pt too wide) in paragraph at lines 1869--1871
+Overfull \hbox (1.01701pt too wide) in paragraph at lines 1043--1045
 []\T1/cmr/m/n/10 My work-ing log is \T1/cmtt/m/n/10 SESSION_LOG.md\T1/cmr/m/n/1
 0 ; the find-ings reg-is-ter is \T1/cmtt/m/n/10 findings.py \T1/cmr/m/n/10 and 
 the premises are \T1/cmtt/m/n/10 PREMISES.md\T1/cmr/m/n/10 .
@@ -893,50 +782,46 @@ the premises are \T1/cmtt/m/n/10 PREMISES.md\T1/cmr/m/n/10 .
 
 
 
-[34] (./discovery_note.aux)
+[18] (./discovery_note.aux)
  ***********
 LaTeX2e <2024-11-01> patch level 2
 L3 programming layer <2025-01-18>
  ***********
 Package rerunfilecheck Info: File `discovery_note.out' has not changed.
-(rerunfilecheck)             Checksum: 30B498BAE93BDA3D8786265F1908C952;1955.
+(rerunfilecheck)             Checksum: F5D40AD06ADB1B0580AB2B64C07E0CB7;1340.
  ) 
 Here is how much of TeX's memory you used:
- 24254 strings out of 475102
- 468565 string characters out of 5764878
- 867990 words of memory out of 5000000
- 46856 multiletter control sequences out of 15000+600000
- 577946 words of font info for 73 fonts, out of 8000000 for 9000
+ 24193 strings out of 475102
+ 467643 string characters out of 5764878
+ 857482 words of memory out of 5000000
+ 46816 multiletter control sequences out of 15000+600000
+ 577262 words of font info for 72 fonts, out of 8000000 for 9000
  59 hyphenation exceptions out of 8191
- 116i,12n,121p,454b,1066s stack positions out of 10000i,1000n,20000p,200000b,200000s
-</usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></us
-r/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/shar
-e/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi9.pfb></usr/share/texli
-ve/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texlive/texm
-f-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/share/texlive/texmf-dist/f
-onts/type1/public/amsfonts/cm/cmr9.pfb></usr/share/texlive/texmf-dist/fonts/typ
-e1/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/texmf-dist/fonts/type1/pub
-lic/amsfonts/cm/cmsy8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/ams
-fonts/cm/cmsy9.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbi1095.pfb><
-/usr/share/texmf/fonts/type1/public/cm-super/sfbi1200.pfb></usr/share/texmf/fon
-ts/type1/public/cm-super/sfbx0900.pfb></usr/share/texmf/fonts/type1/public/cm-s
-uper/sfbx1000.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1095.pfb></
-usr/share/texmf/fonts/type1/public/cm-super/sfbx1200.pfb></usr/share/texmf/font
-s/type1/public/cm-super/sfbx1728.pfb></usr/share/texmf/fonts/type1/public/cm-su
-per/sfcc1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm0900.pfb></u
-sr/share/texmf/fonts/type1/public/cm-super/sfrm1000.pfb></usr/share/texmf/fonts
-/type1/public/cm-super/sfrm1095.pfb></usr/share/texmf/fonts/type1/public/cm-sup
-er/sfrm1200.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfsc1095.pfb></us
-r/share/texmf/fonts/type1/public/cm-super/sfti0900.pfb></usr/share/texmf/fonts/
-type1/public/cm-super/sfti1000.pfb></usr/share/texmf/fonts/type1/public/cm-supe
-r/sfti1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfti1200.pfb></usr
-/share/texmf/fonts/type1/public/cm-super/sftt0900.pfb></usr/share/texmf/fonts/t
-ype1/public/cm-super/sftt1000.pfb></usr/share/texmf/fonts/type1/public/cm-super
-/sftt1095.pfb>
-Output written on discovery_note.pdf (34 pages, 2334743 bytes).
+ 116i,11n,121p,454b,1036s stack positions out of 10000i,1000n,20000p,200000b,200000s
+</usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></us
+r/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi9.pfb></usr/share
+/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texliv
+e/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb></usr/share/texlive/texmf-
+dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/texmf-dist/f
+onts/type1/public/amsfonts/cm/cmsy9.pfb></usr/share/texmf/fonts/type1/public/cm
+-super/sfbi1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbi1200.pfb>
+</usr/share/texmf/fonts/type1/public/cm-super/sfbx0900.pfb></usr/share/texmf/fo
+nts/type1/public/cm-super/sfbx1000.pfb></usr/share/texmf/fonts/type1/public/cm-
+super/sfbx1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1200.pfb><
+/usr/share/texmf/fonts/type1/public/cm-super/sfbx1728.pfb></usr/share/texmf/fon
+ts/type1/public/cm-super/sfcc1095.pfb></usr/share/texmf/fonts/type1/public/cm-s
+uper/sfrm0900.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm1000.pfb></
+usr/share/texmf/fonts/type1/public/cm-super/sfrm1095.pfb></usr/share/texmf/font
+s/type1/public/cm-super/sfrm1200.pfb></usr/share/texmf/fonts/type1/public/cm-su
+per/sfsc1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfti0900.pfb></u
+sr/share/texmf/fonts/type1/public/cm-super/sfti1000.pfb></usr/share/texmf/fonts
+/type1/public/cm-super/sfti1095.pfb></usr/share/texmf/fonts/type1/public/cm-sup
+er/sftt0900.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt1000.pfb></us
+r/share/texmf/fonts/type1/public/cm-super/sftt1095.pfb>
+Output written on discovery_note.pdf (18 pages, 581294 bytes).
 PDF statistics:
- 364 PDF objects out of 1000 (max. 8388607)
- 265 compressed objects within 3 object streams
- 48 named destinations out of 1000 (max. 500000)
- 98 words of extra memory for PDF output out of 10000 (max. 10000000)
+ 256 PDF objects out of 1000 (max. 8388607)
+ 183 compressed objects within 2 object streams
+ 28 named destinations out of 1000 (max. 500000)
+ 69 words of extra memory for PDF output out of 10000 (max. 10000000)
 
