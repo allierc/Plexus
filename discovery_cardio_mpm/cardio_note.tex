@@ -741,110 +741,118 @@ same specimen.
 \end{itemize}
 \end{phasebox}
 
-\begin{phasebox}{Phase 2 --- Certify the ruler, and find the floor \hfill \prog\ (1 of 7) \ \stopp}
-\textbf{Goal.} Every number the loop ranks on must have a proved zero, a proved noise level, and a
-demonstrated ability to be wrong. \emph{A measure whose null and whose spread are unknown cannot
-support a finding, and the previous campaign is sixty rounds of proof.}
+\begin{phasebox}{Phase 2 --- The loop cannot yet say what it is looking at \hfill \prog\ (2 of 6) \ \stopp}
+\textbf{Goal.} Give the loop numbers it can trust. \emph{Not new numbers} --- the measurements this
+campaign needs were written over three weeks in the old folder and audited in July, and the audit's
+own remedy survived. What was never done is the boring part: saying which quantity is which.
 
-\textbf{1. Where is zero? \dn --- and it is the number the whole project turns on.} Six trivial
-models, on the frozen split and the frozen mask, scored with the inherited ruler so the answer is
-comparable with the old record:
+\textbf{The fault, and it is one fault four times over.} The same quantity acquired \textbf{four
+names, in four places, on four different sets of nodes}, and nothing recorded which was which:
+
+\begin{center}\footnotesize
+\begin{tabular}{@{}l p{9.3cm}@{}}
+\toprule
+\code{loopscore\_residual} & size $\cdot$ orientation $\cdot$ openness/aspect $\cdot$ chirality
+$\cdot$ shape-detail\\
+\code{enclosure\_row} & energy, peak $\cdot$ area, loopiness $\cdot$ chir\_match $\cdot$ minor\\
+\code{morphology\_row} & size $\cdot$ open $\cdot$ chir+ \quad\emph{(simulation only --- withdrawn
+in July, still printed by every run today)}\\
+\code{descriptors.py} & magnitude\_peak $\cdot$ opening\_area $\cdot$ direction\_chirality $\cdot$
+orientation\_rad \quad\emph{(mine, added in Phase 1)}\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The fourth is the same mistake one turn later, and worth admitting plainly: told to measure the
+loops, I wrote a new set of names for quantities that already had them. \textbf{Phase~2 is not
+inventing a ruler. It is naming the ones that exist, pointing each at the code that computes it,
+and recording what may be believed about it.}
+
+\textbf{1. One name, one quantity. \dn} A registry of sixteen entries. Each carries a definition a
+person can check, the code that computes it, and a tier: \emph{certified} (a measured zero, a
+measured noise floor, and it moved when it should), \emph{provisional} (it computes, one of those
+is missing --- usable, never citable), or \emph{withdrawn} (a defect was demonstrated; kept with
+its cause of death, never quoted). \textbf{Nothing is certified yet}, twelve are provisional and
+four are withdrawn, and that is the honest state rather than a placeholder.
+
+Three checks, borrowed from the Okuda folder where this exact fault cost weeks: every live metric
+must have code that computes it; every one must carry a written definition; and \textbf{no live
+definition may name a withdrawn metric}. Two more were added here: a withdrawn metric must record
+why, and \emph{the two implementations of each shared quantity must agree numerically} --- proved,
+not assumed, because renaming without checking is how four names became four measurements. Eight
+checks pass.
+
+\textbf{2. The reading surface, and the defect in it. \dn} The campaign reads loops on a
+\textbf{ten-by-ten grid of the tissue}, comparing each node's path with the recording's. That is
+the picture on every dashboard and the thing a person actually judges, so it stays.
+
+But its margin is ten nodes from the edge, and \textbf{the pinned band is wider than that}: the
+outer ring of the grid --- \textbf{36 of the 100 nodes} --- sits on particles tied to the answer.
+The July audit found this and it was never fixed; every dashboard since has been read with a third
+of its panels showing the anchor. The margin is corrected to twenty, which puts all hundred outside
+the band, and both versions are reported so the change is visible rather than silent.
+
+\emph{And the check itself was wrong first.} It reported none of the hundred inside the band,
+against the audit's thirty-six, because it measured distance in the wrong units --- the grid is
+mapped onto a sheet occupying 0.70 of the world and the factor was missing. The audit was right.
+Fixed, it returns exactly 36.
+
+\textbf{3. Where is zero. \dn} Six trivial models, on the frozen split and the frozen mask:
 
 \begin{center}\small
-\begin{tabular}{@{}l r r p{4.7cm}@{}}
+\begin{tabular}{@{}l r r p{4.4cm}@{}}
 \toprule
 \textbf{model} & \textbf{fit beat} & \textbf{held-out} & \textbf{what it knows}\\
 \midrule
-predict nothing & $+0.070$ & $+0.067$ & nothing at all --- \emph{the origin}\\
+predict nothing & $+0.070$ & $+0.067$ & nothing --- \emph{the origin}\\
 slide the whole sheet & $-0.020$ & $-0.050$ & the timing and the amount, no shape\\
 \textbf{copy the previous beat} & $\mathbf{+0.851}$ & $\mathbf{+0.62}$ & \textbf{no physics, no
 parameters, no fit}\\
-interpolate from the pinned edge & $-0.118$ & $-0.16$ & the anchoring alone, no physics\\
+interpolate from the pinned edge & $-0.118$ & $-0.16$ & the anchoring alone\\
 the model, muscle off & $+0.070$ & --- & \emph{exactly} the do-nothing score\\
 the model, fields untrained & $-0.880$ & --- & 2.5$\times$ too much motion\\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\textbf{So the bar is $+0.851$ on the beat we fit and $+0.62$ on beats we do not.} The previous
-campaign's best was $0.545$: it never cleared even the held-out bar, and the thing that clears it
-has no physics in it at all.
+\textbf{The bar is $+0.851$ on the beat we fit and $+0.62$ on beats we do not}, and the previous
+campaign's best was $0.545$ --- below even the held-out bar, set by a model with no physics in it.
+Everything from here is reported as the difference from the first row, never as a bare number.
 
-Three of the others earn a sentence. \emph{Sliding the whole sheet scores below doing nothing} ---
-right timing, right amount, wrong shape is worse than silence, which is a good property in a ruler.
-\emph{Interpolating from the pinned edge scores $-0.118$}, so the anchoring is not quietly buying
-score. And \emph{the model with its muscle off scores exactly what predicting nothing scores},
-agreeing to the last digit --- which closes the boundary question on the frozen mask as well as on
-the one Phase~1 used.
+Three side results. \emph{Sliding the sheet scores below doing nothing}: right timing, wrong shape
+is worse than silence, which is a good property in a ruler. \emph{The edge interpolation scores
+$-0.118$}, so the anchoring is not quietly buying score. And \emph{the muscle-off model scores what
+predicting nothing scores}, to the last digit.
 
-\textbf{Everything from here is reported as the difference from the first row}, never as a bare
-number and never as a ratio, because both can be made to look like anything once the origin is not
-at zero.
+\emph{A caution about how nearly that went wrong.} The first version rebuilt the particle layout
+beside the run instead of reading it from the run's own record, and reported that the pinned edge
+drives a third of the sheet --- dramatic, and false. The cause is worth keeping: \textbf{the initial
+particle layout depends on the device.} Same seed, one on the processor and one on the card, and
+the positions differ by the width of the whole sheet. So a fit on the processor and a fit on the
+card do not start from the same material. The measurement now refuses to run unless its mapping
+reproduces the run's own recorded data.
 
-\textbf{And a caution about how nearly this went wrong.} The first version of this measurement
-rebuilt the particle layout beside the run instead of reading it from the run's own record, and
-reported that the pinned edge drives a third of the sheet --- a dramatic finding, and false. The
-cause is worth keeping: \textbf{the initial particle layout depends on the device.} Same seed, one
-on the processor and one on the card, and the positions differ by the width of the whole sheet;
-change the seed instead and nothing moves, because the layout comes from the specification's own
-generator. So a fit on the processor and a fit on the card do not start from the same material and
-may not be compared. Phase~0's determinism check compared like with like and could not have seen
-it. The measurement now refuses to run unless its mapping reproduces the run's own recorded data.
+\textbf{4. How big is nothing. \ns} The same configuration at several seeds, at the depth the loop
+will use --- and the same seed twice, because the graphics card is not bit-reproducible and the two
+are different questions. Afterwards, a difference smaller than that spread is reported as
+\emph{indistinguishable} and the gate refuses to let anyone call it a finding.
 
-\begin{itemize}
-\item \textbf{Teach the ruler to see coordination.} The current measure returns a perfect score for a
-sheet whose points beat in completely random order. Until a measure exists that can tell a
-coordinated contraction from an incoherent one, no mechanism about timing, waves or rotation can be
-proposed, tested or refuted --- and the gate must say so rather than scoring them anyway.
-\item \textbf{Is the model even in the right regime?} The trainer's own comments say the loop shape
-it rewards comes from \emph{inertial recoil} --- a sheet of cells on a soft gel is overwhelmingly
-dominated by drag instead. Set the mass to zero and see whether the effect survives. If it does not,
-the objective's favourite feature is an artefact of a regime the tissue is not in.
-\item \textbf{How big is nothing?} The same configuration, several seeds, at the depth the loop will
-actually use. That spread becomes \textbf{the unit of the whole campaign}: a difference smaller than
-it is reported as \emph{indistinguishable} and the gate refuses to let anyone call it a finding.
-\item \textbf{Does the ruler measure what it claims?} Take the real recording and distort it one way
-at a time --- bigger, rounder, rotated, delayed, shifted --- and confirm the measure moves when it
-should and does not move when it should not. Tests that merely restate the documentation do not
-count; the documentation is already wrong about where zero is.
-\item \textbf{Fix the defects already found in it.} The scoring window is 53 frames for a 50-frame
-heartbeat, so it is being asked to close a loop it has over-run; motion is measured from a frame
-that sits in the middle of a contraction rather than at rest; one weighting is hard-coded where it
-should be declared.
-\item \textbf{The anchoring ladder.} Vary the pinned band from nothing to wide, scoring on \emph{one
-frozen set of nodes} so the model changes and the ruler does not, and publish what the edge is worth.
-The operating width is then chosen on stability --- of the \emph{active} model --- never on score,
-because choosing it on score is how the anchor gets tuned until the model wins.
-\item \textbf{Build the error decomposition properly.} Step 3 of the loop must return \emph{where}
-the model is wrong, in named parts that add up: size, shape, orientation, timing, remainder. The
-remainder drives the next round, so it has to be real.
-\end{itemize}
+\textbf{5. Teach the ruler to see coordination. \ns} It returns a perfect score for a sheet whose
+points beat in random order. Until a certified measure can tell a coordinated contraction from an
+incoherent one, no claim about timing, waves or rotation is scoreable --- \emph{and the failure
+that says the model rests for 8\% of the beat where the tissue rests for 77\% is invisible to
+everything currently in the registry.}
+
+\textbf{6. Deliver the decomposition per run. \ns} The five named dimensions --- size, orientation,
+openness, chirality, shape-detail --- computed on the corrected grid and written into every run's
+record, so step 3 of the loop returns \emph{where} the model is wrong rather than how much.
 
 \begin{stopbox}
-\textbf{THE STOP.} At the end of this phase we know whether the active model beats \emph{the best of
-the trivial alternatives} by more than the noise --- and the comparison, the aggregation rule and
-the margin are written into code \emph{before} the numbers exist, so that the verdict cannot be
-negotiated afterwards. \textbf{If it does not, the loop is forbidden to start.}
-
-\textbf{This is a live outcome, not a formality.} On the evidence already on disk, copying the
-previous beat outscores every fit the previous campaign produced. What to do about it --- release
-the anchor and pay in fit quality, change the objective, change the forward model, or stop --- is
-your decision and not mine. It has to be agreed \emph{now} that \emph{``the model does not beat the
-null''} is a legitimate result of this phase, because otherwise the gate will be argued away at the
-exact moment it is working.
+\textbf{THE STOP.} At the end we know whether the fitted model beats \emph{the best of the trivial
+alternatives} by more than the noise, with the comparison and the margin written into code before
+the numbers exist. \textbf{If it does not, the loop is forbidden to start.} This is a live outcome:
+copying the previous beat already outscores every fit the previous campaign produced.
 \end{stopbox}
-
-\textbf{Exit gate.} Every certified measure has a floor and a spread from at least eight seeds with
-their run folders on disk; the distortion battery passes in both directions; the decomposition's
-parts sum to the total on a case whose answer is known; the prediction scorer refuses a
-below-the-noise prediction, with a test proving it; and the verdict line prints, with its margin in
-units of noise.
-
-\textbf{Cost.} The largest phase in the plan, and the only honest way to size it is from the measured
-rate: a full fit is 5.5 hours on one card. The run counts each gate demands are multiplied by that
-number and priced against the cluster \emph{before} the phase is scheduled, not after. If the price
-is unaffordable, the seed count comes down and the note says what that costs in confidence --- it is
-never absorbed silently.
 \end{phasebox}
 
 \begin{phasebox}{Phase 3 --- Certify the gradient \hfill \todo}
