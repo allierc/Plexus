@@ -1,0 +1,122 @@
+23:16:34  about to import caption_wave
+23:16:34  caption_wave imported; calling it
+23:20:03  caption_wave RETURNED
+23:20:03  past captioning; entering the reading loop
+23:20:03  reading r001n_00_cfl_c000p080_d
+23:20:58  read r001n_00_cfl_c000p080_d OK
+23:20:58  reading r001n_01_wk_apical_area
+23:21:48  read r001n_01_wk_apical_area OK
+23:21:48  reading r001n_02_wk_pressure_po
+23:23:10  read r001n_02_wk_pressure_po OK
+23:23:10  reading r001n_03_wk_curvature_p
+23:23:59  read r001n_03_wk_curvature_p OK
+23:23:59  reading r001n_04_wk_tension_neg
+23:24:57  read r001n_04_wk_tension_neg OK
+23:24:57  reading r001n_05_wk_null_s0
+23:25:51  read r001n_05_wk_null_s0 OK
+23:25:51  reading r001n_06__morphsmoke
+23:26:45  read r001n_06__morphsmoke OK
+23:26:45  reading r001n_07_cfl_c001p300_d
+23:28:04  read r001n_07_cfl_c001p300_d OK
+23:28:04  reading r001n_08_coral_fixed_ba
+23:28:46  read r001n_08_coral_fixed_ba OK
+23:28:46  reading r001n_09_cellfix_B_new
+23:29:57  read r001n_09_cellfix_B_new OK
+23:29:57  reading r001n_11_p1_ph_coral_fi
+23:31:11  read r001n_11_p1_ph_coral_fi OK
+23:31:11  reading loop done; entering Act 3
+23:31:11  Collector: building the record
+23:31:11  Collector done
+23:57:58  about to import caption_wave
+23:57:58  caption_wave imported; calling it
+00:01:23  caption_wave RETURNED
+00:01:23  past captioning; entering the reading loop
+00:01:24  reading r002c_00_138f40
+00:02:16  read r002c_00_138f40 OK
+00:02:16  reading r002c_01_a5a036
+00:03:01  read r002c_01_a5a036 OK
+00:03:01  reading r002c_02_c09d72
+00:03:54  read r002c_02_c09d72 OK
+00:03:54  reading r002c_03_25deda
+00:04:33  read r002c_03_25deda OK
+00:04:33  reading r002c_04_cff8eb
+00:06:01  read r002c_04_cff8eb OK
+00:06:01  reading r002c_05_13fd94
+00:06:45  read r002c_05_13fd94 OK
+00:06:45  reading r002c_06_d56273
+00:07:23  read r002c_06_d56273 OK
+00:07:23  reading r002c_07_a6180e
+00:08:31  read r002c_07_a6180e OK
+00:08:31  reading r002c_08_41fc9c
+00:09:28  read r002c_08_41fc9c OK
+00:09:28  reading r002c_09_484f7b
+00:10:54  read r002c_09_484f7b OK
+00:10:54  reading r002c_10_b75f00
+00:11:56  read r002c_10_b75f00 OK
+00:11:56  reading r002c_11_f14c5b
+00:12:45  read r002c_11_f14c5b OK
+00:12:45  reading loop done; entering Act 3
+00:12:45  Collector: building the record
+00:12:45  Collector done
+00:38:24  about to import caption_wave
+00:38:24  caption_wave imported; calling it
+00:40:54  caption_wave RETURNED
+00:40:54  past captioning; entering the reading loop
+00:40:54  reading r003c_00_138f40
+00:41:39  read r003c_00_138f40 OK
+00:41:39  reading r003c_01_9e3554
+00:42:29  read r003c_01_9e3554 OK
+00:42:29  reading r003c_02_33fb54
+00:43:19  read r003c_02_33fb54 OK
+00:43:19  reading r003c_03_ccf23d
+00:44:19  read r003c_03_ccf23d OK
+00:44:19  reading r003c_04_6d1b25
+00:45:22  read r003c_04_6d1b25 OK
+00:45:22  reading r003c_05_d2e4d8
+00:46:15  read r003c_05_d2e4d8 OK
+00:46:15  reading r003c_06_5a3bef
+00:47:15  read r003c_06_5a3bef OK
+00:47:15  reading loop done; entering Act 3
+00:47:15  Collector: building the record
+00:47:15  Collector done
+01:08:22  about to import caption_wave
+01:08:22  caption_wave imported; calling it
+01:10:51  caption_wave RETURNED
+01:10:51  past captioning; entering the reading loop
+01:10:51  reading r004c_00_138f40
+01:11:52  read r004c_00_138f40 OK
+01:11:52  reading r004c_01_9af60c
+01:12:32  read r004c_01_9af60c OK
+01:12:32  reading r004c_02_46475e
+01:13:47  read r004c_02_46475e OK
+01:13:47  reading r004c_03_ef3755
+01:14:24  read r004c_03_ef3755 OK
+01:14:24  reading r004c_04_30e8ba
+01:15:27  read r004c_04_30e8ba OK
+01:15:27  reading r004c_05_a7736e
+01:16:11  read r004c_05_a7736e OK
+01:16:11  reading r004c_06_a26065
+01:17:11  read r004c_06_a26065 OK
+01:17:11  reading r004c_07_3e96db
+01:17:58  read r004c_07_3e96db OK
+01:17:58  reading loop done; entering Act 3
+01:17:58  Collector: building the record
+01:17:58  Collector done
+01:38:51  about to import caption_wave
+01:38:51  caption_wave imported; calling it
+01:40:07  caption_wave RETURNED
+01:40:07  past captioning; entering the reading loop
+01:40:07  reading r005c_00_138f40
+01:40:47  read r005c_00_138f40 OK
+01:40:47  reading loop done; entering Act 3
+01:40:47  Collector: building the record
+01:40:47  Collector done
+01:59:22  about to import caption_wave
+01:59:22  caption_wave imported; calling it
+02:00:43  caption_wave RETURNED
+02:00:43  past captioning; entering the reading loop
+02:00:43  reading r006c_00_138f40
+02:01:42  read r006c_00_138f40 OK
+02:01:42  reading loop done; entering Act 3
+02:01:42  Collector: building the record
+02:01:42  Collector done

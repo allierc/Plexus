@@ -1,2 +1,9 @@
 {"t": 1785810948.273019, "event": "start", "rounds": 20, "batch": 12, "frames": null}
 {"t": 1785812744.6889071, "event": "start", "rounds": 20, "batch": 12, "frames": null}
+{"t": 1785814425.988605, "event": "round", "n": 1, "exit": 0, "minutes": 27.9, "usd_this_round": 13.0, "note": "", "cost_total": {"calls": 24, "usd": 2.12, "tok_in": 5720, "tok_out": 57121, "turns": 98, "minutes": 13.0}}
+{"t": 1785817028.1562266, "event": "round", "n": 2, "exit": 0, "minutes": 43.2, "usd_this_round": 18.9, "note": "", "cost_total": {"calls": 57, "usd": 6.99, "tok_in": 28705, "tok_out": 138707, "turns": 221, "minutes": 31.9}}
+{"t": 1785819139.4159384, "event": "round", "n": 3, "exit": 0, "minutes": 35.1, "usd_this_round": 17.2, "note": "", "cost_total": {"calls": 82, "usd": 12.56, "tok_in": 53925, "tok_out": 209973, "turns": 320, "minutes": 49.1}}
+{"t": 1785820978.1125007, "event": "round", "n": 4, "exit": 0, "minutes": 30.5, "usd_this_round": 17.6, "note": "", "cost_total": {"calls": 109, "usd": 17.85, "tok_in": 79654, "tok_out": 282622, "turns": 418, "minutes": 66.7}}
+{"t": 1785822228.6692107, "event": "round", "n": 5, "exit": 0, "minutes": 20.7, "usd_this_round": 9.1, "note": "", "cost_total": {"calls": 119, "usd": 21.59, "tok_in": 96315, "tok_out": 320686, "turns": 458, "minutes": 75.8}}
+{"t": 1785823451.9592304, "event": "round", "n": 6, "exit": 0, "minutes": 20.2, "usd_this_round": 8.5, "note": "", "cost_total": {"calls": 129, "usd": 25.06, "tok_in": 112978, "tok_out": 356575, "turns": 496, "minutes": 84.3}}
+{"t": 1785834260.2626548, "event": "round", "n": 7, "exit": 124, "minutes": 180.0, "usd_this_round": 6.0, "note": "exceeded 180 min", "cost_total": {"calls": 134, "usd": 27.04, "tok_in": 121220, "tok_out": 382623, "turns": 509, "minutes": 90.3}}
