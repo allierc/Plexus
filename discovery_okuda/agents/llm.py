@@ -346,7 +346,7 @@ class BudgetLedger:
         want_min = self.projected(agent, want_min)
         if self.round_spent + want_min > ROUND_LLM_BUDGET_MIN:
             return False, (f"round LLM budget would be exceeded "
-                           f"({self.round_spent:.1f}+{want_min} > {ROUND_LLM_BUDGET_MIN} min)")
+                           f"({self.round_spent:.1f}+{want_min:.1f} > {ROUND_LLM_BUDGET_MIN} min)")
         return True, ""
 
     def note_overrun(self, agent, why, action):
