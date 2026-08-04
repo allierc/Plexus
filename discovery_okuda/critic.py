@@ -360,8 +360,12 @@ def check_static(graph, seen_hashes=(), edit_kind=None):
     # happening once, passing all seven gierer_meinhardt compositions in round 2. The import is
     # done at module scope now (above), so the only thing left inside is per-operator arithmetic,
     # and a failure there is reported rather than swallowed.
+    #
+    # THE FIRST TIME I WROTE THIS COMMENT THE EXCEPT WAS STILL THERE. An external review proved
+    # it by making the accessor raise: the rule vanished and nothing surfaced. A limit in a
+    # comment stops describing the code -- this project's own lesson, in the fix for it.
     DT_GLOBAL = DT_GLOBAL_DEFAULT
-    try:
+    if True:
         for o in graph.ops:
             # The implementation is read from the op itself, with impl_of only as a fallback:
             # this whole rule sits in a try/except, so an accessor that raises would make the
@@ -408,8 +412,6 @@ def check_static(graph, seen_hashes=(), edit_kind=None):
                     f"{rate}). Five such runs took damage at frame 115, all five at the same "
                     f"frame. Lower `rate`, use gray_scott, or drop division -- gierer_meinhardt "
                     f"without divide_3d is stable at this step and is the best run on record."))
-    except Exception:
-        pass
 
     # R2 -- PRECONDITIONS. An operator whose required port type is produced by nothing will
     # silently no-op. This is the rule that prevents FALSE IMPOSSIBILITY claims, and it is the

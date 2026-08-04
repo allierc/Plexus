@@ -915,8 +915,24 @@ class CompositionGraph:
                 # composition without division. Halving toward an open ceiling is meaningless;
                 # doubling from the current value is the step a person would take.
                 _up = cur * 2.0 if not math.isfinite(hi) else cur + (hi - cur) * 0.5
-                for v in (cur - (cur - lo) * 0.5, _up):
-                    v = round(v, 6)
+                _cands = [cur - (cur - lo) * 0.5, _up]
+                # A COUNT IS AN INTEGER. `n_spots` is (1, 8, default 1) and the midpoint rule
+                # offered `n_spots = 4.5` -- half a seed -- while the down-move collapsed to the
+                # value itself because cur == lo, so the only multi-spot move in the space was
+                # malformed. MULTI-SPOT SEEDING IS THE PAPER'S OWN SETUP: Okuda's pattern starts
+                # as several activator peaks and the number of them is what selects tube from
+                # branch. Offering it as a fraction meant the loop has never once tested more
+                # than one seed.
+                #
+                # Integers step by whole numbers and are offered at BOTH ends of the range, so a
+                # parameter sitting on its own floor still has somewhere to go. This ENCOURAGES
+                # multi-spot rather than forcing it: the default stays 1, and 3 and 8 are moves
+                # the Proposer may choose and must justify like any other.
+                _is_int = float(lo).is_integer() and float(hi).is_integer() and float(dflt).is_integer()
+                if _is_int:
+                    _cands = [math.floor((cur + lo) / 2), math.ceil((cur + hi) / 2), hi]
+                for v in _cands:
+                    v = int(round(v)) if _is_int else round(v, 6)
                     if math.isfinite(v) and lo <= v <= hi and abs(v - cur) > 1e-9:
                         edits.append((("set_param", f"{o['id']}.{pname}", v),
                                       f"@{o['op']}.{pname}={v:g}"))
@@ -1085,7 +1101,7 @@ class CompositionGraph:
         # producer is on the other end of the growth gate.
         ops = set(self.op_names())
         impls = {o["op"]: self.impl_of(o) for o in self.ops}
-        forced = "extrude" in ops
+        _force_src = set()
         local = "morphogen_growth_3d" in ops
         mono = impls.get("shape_energy_3d") == "monolayer"
 
@@ -1098,19 +1114,38 @@ class CompositionGraph:
         _gate = _feeds("morphogen_growth_3d", "gate") if local else set()
         emergent = "cell_react" in _gate
         driven = "cell_rd_seed" in _gate
+        # `forced` READS ITS WIRE TOO. It was `"extrude" in ops`, so a composition carrying the
+        # forcing term -- the operator that made the only tube on this disk -- with its `site`
+        # slot fed by nothing was filed under the sphere control's region.
+        _force_src = _feeds("extrude", "site") if "extrude" in ops else set()
+        forced = bool(_force_src)
         # A growth operator whose gate is fed by nothing is not "growth-driven" anything: it is a
         # composition that will not run, and saying so is more useful than naming it a mechanism.
         if local and not _gate:
             return "growth present but UNGATED (nothing feeds it)"
 
         if not (local or "vesicle_growth" in ops):
-            return "mechanics-only (no growth)"
+            # A FORCING TERM IS NOT NOTHING. `extrude` is the operator that made the only tube on
+            # this disk; a composition carrying it, wired, was filed under the sphere control's
+            # own region because this branch tested growth alone.
+            return ("forced, no growth (extrusion without proliferation)" if forced
+                    else "mechanics-only (no growth)")
         if forced and driven and not emergent:
             return "driven + forced (round-33 recipe)"
         if forced and emergent:
             return "emergent RD + forced extrusion"
-        if local and mono and not forced:
+        # THE PAPER'S NAME REQUIRES THE PAPER'S MECHANISM. This branch fired before `emergent`
+        # was consulted, so a monolayer whose growth is gated by a HAND-PLACED SEED -- with no
+        # reaction-diffusion operator in the composition at all -- was labelled "Okuda route".
+        # That is the string the figure gets captioned with, and Okuda's mechanism IS a Turing
+        # pattern driving growth. An external review reached it from the live frontier in two
+        # admitted edits, the second being `-extrude`, which campaign.json names as its first
+        # query. The N5 fix, surviving in the one branch where it mattered most.
+        if local and mono and not forced and emergent:
             return "growth-driven monolayer (Okuda route)"
+        if local and mono and not forced:
+            return ("growth-driven monolayer, SEED-gated (not the Okuda route: no Turing pattern "
+                    "drives the growth)")
         if local and not forced and emergent:
             return "growth-driven emergent (target mechanism)"
         if local and not forced:

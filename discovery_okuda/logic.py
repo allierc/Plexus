@@ -268,8 +268,12 @@ def independent_support(claim, **kw):
                 obs.add(m)
         # The support is at most the number of DISTINCT outcomes. Collapsing only the all
         # identical case would still pass "three runs, two of them the same simulation".
-        if unread == 0 and obs:
-            n = min(n, len(obs))
+        # AN UNREADABLE RUN IS WORTH AT MOST ONE UNKNOWN OBSERVATION -- not full credit for all
+        # of them. Gating on `unread == 0` meant a single missing diag.json restored the maximum
+        # support to runs that are bit-identical, in exactly the case this check exists to catch.
+        # A checker whose failure mode is maximum credit is worse than no checker.
+        if obs or unread:
+            n = min(n, len(obs) + unread)
     return n, missing
 
 
@@ -289,8 +293,16 @@ def _observables(run, **kw):
         if _o.path.exists(p):
             try:
                 sm = (_j.load(open(p)).get("summary") or {})
+                # ADMITTED METRICS ONLY. Digesting every numeric key swept in wall_s and other
+                # apparatus readings, so two identical simulations on different hardware would
+                # hash differently and escape the collapse. What we compare is what we measure.
+                try:
+                    _adm = admitted_metrics()
+                except Exception:
+                    _adm = set()
                 nums = sorted((k, repr(v)) for k, v in sm.items()
-                              if isinstance(v, (int, float)) and not isinstance(v, bool))
+                              if isinstance(v, (int, float)) and not isinstance(v, bool)
+                              and (not _adm or k in _adm))
                 if not nums:
                     return None
                 return hashlib.sha1(repr(nums).encode()).hexdigest()[:12]

@@ -175,6 +175,15 @@ system, however real the biology is. There is no `branching` operator, no `chemo
 `apical_constriction`: those are phenotypes you may HOPE FOR, and the way to reach for one is to
 choose the structural move you think produces it and say so in `claim`.
 
+UNDER-EXPLORED, AND WORTH YOUR ATTENTION -- an invitation, not an instruction.
+  MULTI-SPOT SEEDING. Every run this campaign has ever made started from ONE activator peak
+  (`cell_rd_seed.n_spots` defaults to 1 and has never been moved). Okuda's own setup is several
+  peaks on the surface, and the NUMBER and SIZE of them is what selects a tube from a branch from
+  an undulation -- one seed can only ever make one thing. `n_spots` (1-8), `seed_frac` and `amp`
+  set how many and how large; `scatter` and `spot` are the implementations that place several.
+  Nothing forces you to use them and a single seed remains a legitimate control. But if you are
+  looking for branching and have only ever run one peak, this is where it is not.
+
 TWO KINDS OF MOVE, and they answer different questions.
   STRUCTURAL  add_op / remove_op / set_impl / connect -- "does this mechanism matter at all?"
   PARAMETER   set_param                               -- "what does it do as you turn it up?"
