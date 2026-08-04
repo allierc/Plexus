@@ -1,0 +1,173 @@
+{
+ "pass": true,
+ "checks": [
+  {
+   "check": "every live metric has code that computes it",
+   "pass": true,
+   "detail": "16 registered"
+  },
+  {
+   "check": "the residual decomposition returns its five named dimensions",
+   "pass": true,
+   "detail": "chirality, openness/aspect, orientation, shape-detail(k>=2), size"
+  },
+  {
+   "check": "every metric has a written definition",
+   "pass": true,
+   "detail": "all present"
+  },
+  {
+   "check": "no live definition names a withdrawn metric",
+   "pass": true,
+   "detail": "clean"
+  },
+  {
+   "check": "every withdrawn metric records why",
+   "pass": true,
+   "detail": "4 withdrawn, all with a cause"
+  },
+  {
+   "check": "nothing is cited as certified before Phase 2 certifies it",
+   "pass": true,
+   "detail": "0 certified, 12 provisional, 4 withdrawn"
+  },
+  {
+   "check": "descriptors.py and the registry agree on the shared quantities",
+   "pass": true,
+   "detail": "opening_loopiness=0.7328 vs openness=0.7328; magnitude_peak=1.397 vs peak_excursion=1.397; direction_chirality=1 vs chirality_match=1"
+  },
+  {
+   "check": "the 10x10 reading surface is outside the pinned band",
+   "pass": true,
+   "detail": "inherited margin 10: 36/100 nodes INSIDE the band; corrected margin 20: 0/100"
+  }
+ ],
+ "registry": {
+  "loopscore": {
+   "definition": "per node, the beat is a closed path; compare its low-order Fourier description with the recording's, normalised by that node's own energy, and average over nodes. 1 = the loops match.",
+   "tier": "provisional",
+   "source": "cardio_harmonic.harmonic_score (26 June, the objective shift)",
+   "null_measured": 0.07,
+   "domain": "one closed beat, >= 8 frames, on moving interior nodes",
+   "known_defects": [
+    "blind to coordination: randomise every node's timing and it returns exactly 1.0000 (measured on all 10 corpus runs)",
+    "its zero is +0.070, not 0, and its own docstring says otherwise",
+    "the area term is weighted x3, hard-coded in a signature"
+   ]
+  },
+  "loopscore_sd": {
+   "definition": "the spread of the per-node loopscore. Uniformly mediocre tissue and a few excellent nodes among wrong ones score the same mean; this separates them.",
+   "tier": "provisional",
+   "source": "cardio_harmonic.harmonic_stats",
+   "domain": "as loopscore"
+  },
+  "interior_r2": {
+   "definition": "frame-locked goodness of fit, pooled over nodes, with the temporal mean removed from the recording only.",
+   "tier": "provisional",
+   "source": "cardio_harmonic.interior_r2 (23 June, the original objective)",
+   "null_measured": -0.875,
+   "domain": "any window; blind to whether the path is a loop at all",
+   "known_defects": [
+    "every one of the 324 archived fits scores below its own null"
+   ]
+  },
+  "residual/size": {
+   "definition": "how much loopscore is recovered by scaling the simulated loops to the recording's size, leaving everything else alone.",
+   "tier": "provisional",
+   "source": "cardio_harmonic.loopscore_residual",
+   "domain": "as loopscore"
+  },
+  "residual/orientation": {
+   "definition": "how much is recovered by rotating the simulated loops onto the recording's axis.",
+   "tier": "provisional",
+   "source": "cardio_harmonic.loopscore_residual",
+   "domain": "as loopscore"
+  },
+  "residual/openness_aspect": {
+   "definition": "how much is recovered by matching the aspect ratio -- how fat the loop is against how long -- while keeping its size.",
+   "tier": "provisional",
+   "source": "cardio_harmonic.loopscore_residual",
+   "domain": "as loopscore"
+  },
+  "residual/chirality": {
+   "definition": "how much is recovered by making each loop circulate the same way round as the recording's.",
+   "tier": "provisional",
+   "source": "cardio_harmonic.loopscore_residual",
+   "domain": "as loopscore"
+  },
+  "residual/shape_detail": {
+   "definition": "how much is recovered by taking the higher harmonics from the recording -- everything the ellipse does not describe.",
+   "tier": "provisional",
+   "source": "cardio_harmonic.loopscore_residual",
+   "domain": "as loopscore"
+  },
+  "openness": {
+   "definition": "enclosed area divided by the area of the box the loop fits in. 0 is a straight line; a circle is about 0.79.",
+   "tier": "provisional",
+   "source": "cardio_mpm_train._openness (audit remedy, 4-5 July)",
+   "domain": "a closed path; undefined for a path of zero extent"
+  },
+  "path_length": {
+   "definition": "how far a node travels over the beat, summed frame to frame. A loop and a line of the same width differ here; the enclosed area alone does not say so.",
+   "tier": "provisional",
+   "source": "this file -- the one quantity the prototype named and never computed",
+   "domain": "any window"
+  },
+  "peak_excursion": {
+   "definition": "the furthest a node gets from where it started, over the beat.",
+   "tier": "provisional",
+   "source": "cardio_mpm_train.enclosure_row (peak)",
+   "domain": "any window"
+  },
+  "chirality_match": {
+   "definition": "the fraction of nodes circulating the same way round as the recording's.",
+   "tier": "provisional",
+   "source": "cardio_mpm_train.enclosure_row (chir_match)",
+   "domain": "a closed path with non-zero area"
+  },
+  "morphology_row/size": {
+   "definition": "the mean over the 10x10 grid of each node's largest displacement, computed on the SIMULATION ALONE and uncentred.",
+   "tier": "withdrawn",
+   "source": "cardio_mpm_train.morphology_row (~24 June)",
+   "domain": "none",
+   "cause_of_death": "sim-only, so it cannot see the residual at all; and 36 of its 100 nodes are pinned to the recording, so it largely reported the anchor. The campaign read it as 'size is flat against every lever, therefore a structural limit' and chased that for four rounds. (Audit, 4 July.)"
+  },
+  "morphology_row/open": {
+   "definition": "openness over the 10x10 grid, on the simulation alone.",
+   "tier": "withdrawn",
+   "source": "cardio_mpm_train.morphology_row",
+   "domain": "none",
+   "cause_of_death": "same defect as morphology_row/size"
+  },
+  "morphology_row/chir": {
+   "definition": "the fraction of grid nodes turning anticlockwise, on the simulation alone.",
+   "tier": "withdrawn",
+   "source": "cardio_mpm_train.morphology_row",
+   "domain": "none",
+   "cause_of_death": "same defect as morphology_row/size"
+  },
+  "ampL": {
+   "definition": "the ratio of total motion energy, simulated against recorded, over the whole field.",
+   "tier": "withdrawn",
+   "source": "cardio_mpm_train (23 June, Batch 1)",
+   "domain": "none",
+   "cause_of_death": "a GLOBAL ratio dominated by a few large-motion nodes. The best run on record read 0.002 -- 'the cleanest ever' -- while the median node was at 0.57 of the recorded amplitude. It was read as a shape score and is not one. (Audit, 4 July.)"
+  }
+ },
+ "grid": {
+  "inherited": {
+   "margin_nodes": 10,
+   "n": 100,
+   "in_band": 36,
+   "min_edge_distance": 0.05147058823529409,
+   "band_width": 0.06
+  },
+  "corrected": {
+   "margin_nodes": 20,
+   "n": 100,
+   "in_band": 0,
+   "min_edge_distance": 0.10294117647058823,
+   "band_width": 0.06
+  }
+ }
+}
