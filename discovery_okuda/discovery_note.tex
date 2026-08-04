@@ -1562,14 +1562,93 @@ be checked is bad enough; a claim that cannot be \emph{deleted} is worse.
 \end{tcolorbox}
 \end{phasebox}
 
-\begin{phasebox}{Phase 8 --- The demonstration \hfill \todo}
+\begin{phasebox}{Phase 8 --- Entities, edges and sweeps: the loop stops being a script \hfill \prog}
+\textbf{Goal.} Three things the 3~August runs showed cannot be patched one at a time: give the loop
+a \emph{declared structure} it can be checked against, close the audit findings that have been
+open since the graph was drawn, and schedule the parameter sweep that has been implemented and
+never run.
+
+\subsection*{Why now, and why one phase}
+Six defects were fixed on 3~August and \emph{not one of them was a logic error}:
+
+\begin{center}
+\begin{tabular}{@{}lp{7.4cm}@{}}
+\code{composition.json} & written by \code{write\_config}, never by recon: a producer with no
+consumer \\
+\code{run[:14]} & a display truncation read back as an identifier \\
+\code{batch\_ok=None} & a verdict computed, never applied \\
+menu preamble & a contract asserted in prose, enforced nowhere \\
+\code{max\_per\_parent=6} & a limit set for one purpose binding another \\
+\code{say()} vs the wrapper & two owners of one property, folding at 100 and at 96 \\
+\end{tabular}
+\end{center}
+
+\noindent Every one is an \textbf{interface defect}: the components are individually correct and
+disagree at the seam. That is the class of bug patching cannot retire, because each patch closes
+one seam and the next round exposes the next. Sixteen more declared edges are unchecked today.
+
+\subsection*{1. Settled by construction: the loop runs with no agent in it}
+Every defect above was found by \emph{launching}, which is the most expensive instrument available:
+a round costs ten agent-minutes and half an hour of cluster before it will tell you that a display
+name was read as an identifier. \textbf{The loop must be testable without an agent and without a
+cluster.} One seam --- \code{run\_agent} --- carries every model call, and one --- \code{cluster}
+--- carries every job, so both can be substituted for deterministic stubs that return
+schema-valid answers, including the \emph{wrong} answers we have actually seen: an edit that names
+a phenotype, a verdict with no flag, a caption with no JSON, a proposal under the wrong key.
+
+A full three-act round then runs offline, in seconds, for nothing, and the questions it answers are
+exactly the ones that have cost us rounds: does every declared artifact get written, does every
+gate fire, does the batch fill, is the record complete before its readers run. A regression becomes
+a failing test rather than a wasted evening. \textbf{This is built first, because it is what makes
+the rest of the phase checkable.}
+
+\subsection*{2. The entities, as classes and a registry}
+\code{ROLES.md} already declares who exists and \code{roles.py --check} keeps it honest --- but it
+checks \emph{existence only}. Each role also declares \textbf{Sends to:}, and nothing has ever
+verified that those fifteen edges correspond to a read anywhere in the code. So a \code{Role} and
+an \code{Artifact} become objects in a registry, each artifact naming its writer, its readers and
+its schema, and the checker fails the round when:
+
+\begin{itemize}\itemsep2pt
+\item an artifact is written and never read --- five exist today: \code{causal\_descriptions.md},
+      \code{diagnoses.jsonl}, \code{archivist.jsonl}, \code{holes.jsonl}, \code{logic\_report.jsonl}
+\item a declared \textbf{Sends to:} edge has no corresponding read
+\item a prompt asserts a guarantee no checker enforces
+\item a rendering is assigned to an identifier field
+\end{itemize}
+
+\noindent This is the same idiom a fourth time --- a document that is the source of truth beside a
+checker that enforces it --- applied to the one thing currently specified only in comments.
+
+\subsection*{3. The audit findings, closed}
+The round record written after its own consumers; the Archivist's \code{roll\_back} truncating at
+eleven characters against a twelve-character name; the Eye-check defaulting \code{supports=True},
+so an unparsed caption reads as agreement; recon runs that cannot seed the frontier because a
+verbatim copy carries no composition; and \code{\_dbg\_shrink.py}, which does not import.
+
+\subsection*{4. The sweep that was built and never scheduled}
+\code{--mode theta} exists, and its discipline is already mechanical: \code{comp\_hash}
+\textbf{excludes} theta, so a retune cannot register as a new mechanism --- a change of numbers
+cannot masquerade as a new idea because the identity function says so, not because an agent was
+asked to be careful. What is missing is only wiring: \code{plan()} emits
+\code{recon} and \code{composition} and never \code{theta}; nothing chooses the base composition,
+the parameter or the values; and \code{build\_theta\_batch} sweeps \emph{one} parameter of
+\emph{one} composition, so mixtures of parameters are not expressible at all. Track~A is not only
+``does this mechanism matter'' but ``what does it do as you turn it up'', and the second question
+has never been asked.
+
+\textbf{What you get.} A loop whose parts are declared and checked rather than remembered, with
+the sweep arm switched on. \emph{Nothing relaunches until the checker passes.}
+\end{phasebox}
+
+\begin{phasebox}{Phase 9 --- The demonstration \hfill \todo}
 \textbf{Goal.} Run the designed grid --- six to eight simulations --- that produces the figure:
 tube, undulation and branching, at Okuda's settings.
 
 \textbf{What you get.} \emph{The figure.}
 \end{phasebox}
 
-\begin{phasebox}{Phase 9 --- The method claim \hfill \todo}
+\begin{phasebox}{Phase 10 --- The method claim \hfill \todo}
 \textbf{Goal.} Write up what the loop found by itself versus what we told it, with the record of
 predictions and retractions as the evidence.
 

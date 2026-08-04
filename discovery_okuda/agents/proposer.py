@@ -40,7 +40,38 @@ from llm import CAUSALITY_RULE, budget_note, ensure_files, read_file, run_agent 
 PROPOSAL_FILE = os.path.join(llm.CAMPAIGN, "proposal.json")
 
 
-def _legal_menu(frontier, cfg, prox, max_per_parent=6):
+def _render_menu(menu, budget=9000):
+    """The menu as ONE LINE PER MOVE, never cut mid-structure.
+
+    It was `json.dumps(menu, indent=1)[:6000]` -- a character slice through indented JSON, which
+    ends wherever 6000 lands and hands the agent a truncated object it cannot parse. Whatever it
+    then proposed was chosen from a menu it could not read to the end of.
+
+    Dropping whole moves instead, and SAYING how many were dropped, keeps every line legal and
+    keeps the omission visible; a silently shortened menu reads as the complete space of moves.
+    """
+    lines, shown, total = [], 0, sum(len(p["legal_edits"]) for p in menu)
+    for p in menu:
+        lines.append(f'parent {p["parent_index"]}: {p["parent"]}   [{p["parent_region"]}]')
+        for r in p["legal_edits"]:
+            ln = f'  parent_index={p["parent_index"]}  edit={json.dumps(r["edit"])}  -> {r["yields"]}'
+            if sum(len(x) for x in lines) + len(ln) > budget:
+                lines.append(f'  ... {total - shown} further legal move(s) omitted for length')
+                return "\n".join(lines)
+            lines.append(ln)
+            shown += 1
+    return "\n".join(lines)
+
+
+# SIX WAS A CEILING ON CHOICE, NOT ON COST. With two parents on the frontier the menu held at
+# most twelve moves and round 2 was asked for twelve slots -- so the Proposer could not select, it
+# could only enumerate, and when twelve were not enough it invented `cell_react0` and
+# `cell_diffuse0`, which parent 0 does not contain. Eight of its twelve slots died: four on a
+# precondition, three as KeyError(None), one on the second parent.
+#
+# A menu must be larger than the batch or there is no proposing being done. Twenty-four per parent
+# against a batch of twelve leaves the agent something to reject, which is the whole of its job.
+def _legal_menu(frontier, cfg, prox, max_per_parent=24):
     """The legal move set, as a menu the agent chooses FROM.
 
     The type system decides what is POSSIBLE (ill-typed edits, unmet preconditions and dangling
@@ -133,7 +164,7 @@ WHAT THE PAPER SAYS (from the Grounder, who read it and checked its own quotes)
 
 LEGAL MOVES (you may ONLY choose from these; the type system has already removed everything
 ill-typed, everything with an unmet precondition, and everything with a dangling slot)
-{json.dumps(menu, indent=1)[:6000]}
+{_render_menu(menu)}
 {CAUSALITY_RULE}
 WRITE {PROPOSAL_FILE} as JSON:
 {{

@@ -282,7 +282,11 @@ def admitted_metrics():
 # `reconnect_t1_3d0` and `vesicle_growth0` -- operator names, not measurable quantities. An
 # instrument request per operator is noise, and noise is how the operator backlog stopped being
 # read the first time.
-_PROP = re.compile(r"\b([a-z][a-z0-9_]{3,})\s*(?:=|==|>=|<=|>|<|\bof\b|\bis\b)", re.I)
+# NOT AFTER A DOT. `\b` falls between the "." and the "j" of "metrics.json", so "metrics.json is
+# absent" named `json` as an unmeasured property and the Metrologist was asked, in round 1, to
+# build an instrument for it. A file extension is not a quantity, and an instrument request that
+# cannot mean anything is exactly the noise that stopped the operator backlog being read.
+_PROP = re.compile(r"(?<![.\w])([a-z][a-z0-9_]{3,})\s*(?:=|==|>=|<=|>|<|\bof\b|\bis\b)", re.I)
 
 # Words that name a QUANTITY the campaign reasons about but may not measure. This is the vocabulary
 # the pattern gap lives in: wavelength, domain count and contrast on the activator field are the

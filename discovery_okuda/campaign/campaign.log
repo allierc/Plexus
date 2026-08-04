@@ -1006,3 +1006,33 @@ ROUND 1   mode=recon   campaign=okuda_growth_driven
 ------------------------------------------------------------------------------------------------
 [loop] round 1/20  mode=recon   spent so far: 0.0 agent-min over 0 calls
 ------------------------------------------------------------------------------------------------
+[loop] terminal also written to /workspace/Plexus/discovery_okuda/campaign/campaign.log
+[loop] clean start: cleared the LEARNED PATTERNS block
+[loop] clean start: 8 file(s) removed, next round is 1
+[loop] plan: 1 recon + 19 composition round(s)
+[loop] terminal also written to /workspace/Plexus/discovery_okuda/campaign/campaign.log
+[loop] clean start: cleared the LEARNED PATTERNS block
+[loop] clean start: 1 file(s) removed, next round is 1
+[loop] plan: 1 recon + 19 composition round(s)
+
+------------------------------------------------------------------------------------------------
+[loop] round 1/20  mode=recon   spent so far: 0.0 agent-min over 0 calls
+------------------------------------------------------------------------------------------------
+  ✓ [loop] round 1 exited 0 after 28.4 min wall, 8.0 min of agents
+
+------------------------------------------------------------------------------------------------
+[loop] round 2/20  mode=composition   spent so far: 8.0 agent-min over 10 calls
+------------------------------------------------------------------------------------------------
+[loop] terminal also written to /workspace/Plexus/discovery_okuda/campaign/campaign.log
+[loop] clean start: cleared the LEARNED PATTERNS block
+[loop] clean start: 19 file(s) removed, next round is 1
+[loop] plan: 1 recon + 19 composition round(s)
+
+------------------------------------------------------------------------------------------------
+[loop] round 1/20  mode=recon   spent so far: 0.0 agent-min over 0 calls
+------------------------------------------------------------------------------------------------
+  ✓ [loop] round 1 exited 0 after 24.1 min wall, 7.8 min of agents
+
+------------------------------------------------------------------------------------------------
+[loop] round 2/20  mode=composition   spent so far: 7.8 agent-min over 12 calls
+------------------------------------------------------------------------------------------------
