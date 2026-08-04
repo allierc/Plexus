@@ -1,7 +1,7 @@
 # Eye — zebrafish oculomotor plant: status
 
-*Written 2026-08-02 at the close of the calibration campaign; updated 2026-08-03 with Phase 2.
-Full narrative: `eye_note.pdf` (10 pages, organised by phase). This file is the operational
+*Written 2026-08-02 at the close of the calibration campaign; updated 2026-08-03 with Phases 2, 2b and 3.
+Full narrative: `eye_note.pdf` (organised by phase; Phase 3 not yet written into it). This file is the operational
 summary: what was done, what it cost, what is reusable, and what is deliberately not done.*
 
 ---
@@ -39,7 +39,8 @@ through the stock `plexus.schema.load` + `plexus.engine.run`.
 | gradient descent on the controller | **built, refused** | surrogate fails its own fidelity test (§5) |
 | dynamics-watching critic | **tested, fails** | VLM reports a rotating eye as static (§5) |
 | open-loop plant identification | done | the 3×6 static gain matrix; **mechanics-limited by 7×** (§5) |
-| Phase 3 — buy the authority back | in flight | length / pulley / drive, one at a time, re-probed after each |
+| Phase 2b — the soft-globe confound | done | re-measured on the corrected globe; the confound is **rejected** (§5) |
+| Phase 3 — buy the authority back | done, mixed | length is a 2–6× lever; the pulley prediction is **broken**; stage c unusable (§6) |
 | reaching the commanded angle | **not done** | settles at ~60% of a 25° command; the obliques are the binding constraint |
 
 **Acceptance test** (`run_eye.verdict`, automatic): finite · reaches commands within 6° · torsion
@@ -106,31 +107,36 @@ statement about the ratio; "stays in one piece" is a statement about the absolut
 
 ---
 
-## 5. What the plant actually is, measured (Phase 2)
+## 5. What the plant actually is, measured (Phase 2 / 2b)
 
-Six open-loop step responses on `t03_c_a`, one muscle at a time, 650 frames each, archived as
-`t04_probe_LR` … `t09_probe_IO`. Static gain in degrees of gaze per unit activation:
+Six open-loop step responses, one muscle at a time, 650 frames each. Measured twice: first on
+`t03_c_a` (`t04`–`t09`), then re-measured on the corrected globe (`t10_baseline_fixmat`,
+probes `t11`–`t16`) after the near-fluid vitreous was raised as a possible confound. **The
+confound was rejected** — every entry agrees within a few percent, so the numbers below are the
+corrected ones and the conclusion is robust to the one material objection anyone would raise.
+
+Static gain, degrees of gaze per unit activation (corrected globe):
 
 |            |    LR |    SR |     MR |    IR |    SO |    IO |
 |---|---:|---:|---:|---:|---:|---:|
-| horizontal |  4.25 | −2.18 | **−11.65** | −2.51 | −0.20 | −0.22 |
-| vertical   | −0.04 |  4.87 |   0.04 | −4.85 | −0.78 |  0.52 |
-| torsion    | −0.08 |  2.06 |  −0.07 | −2.00 | **1.10** | −0.59 |
-| off-axis   |  0.02 |  0.62 |   0.01 |  0.66 |  0.73 |  0.97 |
+| horizontal |  3.99 | −2.25 | **−11.67** | −2.54 | −0.28 | −0.29 |
+| vertical   | −0.02 |  4.88 |   0.04 | −4.80 | −0.61 |  0.41 |
+| torsion    | −0.08 |  2.06 |  −0.08 | −1.96 | **0.90** | −0.45 |
+| off-axis   |  0.02 |  0.62 |   0.01 |  0.67 |  0.75 |  1.12 |
 | t63 (s)    | 0.180 | 0.135 |  0.165 | 0.135 | 0.210 | 0.225 |
-| overshoot  |  42%  |  45%  |   35%  |  45%  |  30%  |  35%  |
+| overshoot  |  42%  |  45%  |   35%  |  45%  |  29%  |  37%  |
 
-**The registered prediction (8–16°) was broken: LR reaches 3.7° against a 26° command.**
+**The registered prediction (8–16°) was broken: LR reaches 3.4° against a 26° command.**
 Mechanics-limited by a factor of seven — decisive, not marginal. The secondary prediction held
 sharply (LR/MR off-axis 0.02/0.01; the rest 0.62–0.97), and SR's measured torsion/elevation ratio
 of 0.42 matches the 0.43 the geometry predicted independently.
 
 Two things nobody predicted:
 
-- **MR is 2.7× stronger than LR**, on peak tensions differing by 5% — the medially-tilted apex
+- **MR is 2.9× stronger than LR**, on peak tensions differing by 5% — the medially-tilted apex
   makes the medial rectus' pull far more tangential. Confirmed from data collected before the probe
   existed: `t03_c_a` runs +2.62° to −10.05°, adducting four times further than it abducts.
-- **The obliques are the weakest muscles, and the vertical recti out-tort them** (SO 1.10 against
+- **The obliques are the weakest muscles, and the vertical recti out-tort them** (SO 0.90 against
   SR 2.06). Anatomically wrong, and it traces to the Phase-0 length ceiling: at `frac`=0.55 the
   obliques' post-pulley path is 0.132 against LR's 0.242. This is why torsion was hard to command
   all through Phase 0.
@@ -140,7 +146,58 @@ and relaxes the antagonist, the matrix predicts a closed-loop adduction of −10
 observed — 5%, on a run it was never fitted to. Phase 1a's surrogate predicted 1.7° where the eye
 did 17.0°.
 
-## 6. Two negative results, kept because they are the honest part
+## 6. Phase 3 — what each Phase-0 fix is actually worth
+
+Three interventions on the corrected baseline, one at a time, with the full six-muscle probe
+repeated after each (18 runs, archived `t17`–`t34` plus `archive/phase3_*`).
+
+**Every run was audited for stability before its numbers were used** — peak gaze, peak shortening,
+centroid drift. That audit is what makes this section trustworthy and it changed the reading:
+
+| stage | stable | buckled |
+|---|---|---|
+| phase 2b baseline | all six | — |
+| a — length | LR SR MR IR IO | **SO (87% shortening)** |
+| b — + pulley | LR SR MR IR IO | **SO (86%)** |
+| c — + drive | LR SR IR | **MR (46%), SO (85%, \|gaze\| 65° unphysical), IO (88%)** |
+
+**Stage c is unusable.** Half its muscles buckled, so no verdict is drawn from it.
+
+### (a) Length — the dominant lever, and the prediction is broken
+
+Dominant-axis static gain, baseline → stage a (stable muscles only):
+
+| | LR | SR | MR | IR | IO |
+|---|---:|---:|---:|---:|---:|
+| baseline | 3.99 | 4.88 | −11.67 | −4.80 | −0.45 |
+| stage a | **24.12** | **13.85** | **−24.01** | **−16.49** | **−12.26** |
+| ratio | ×6.0 | ×2.8 | ×2.1 | ×3.4 | ×27 |
+
+Registered prediction was "roughly double, LR 7–9 deg/act". **Broken** — LR is 24.1, six times
+baseline. `θ_max ≈ (A/E)(L/R)` was right about the direction and badly wrong about the size, and
+the earlier truncation to 55% of the muscle path cost far more than the note claimed.
+
+### (b) The pulley — my own claim, falsified
+
+Registered: *if `muscle_sleeve` is a purely transverse anti-buckling constraint and nothing else, it
+must leave the static gains under 20% changed on every entry.* **BROKEN, and not marginally.**
+Excluding the buckled SO entirely, every entry moves 20–225%, and every one moves **down**:
+LR horizontal 24.12 → 19.33, SR vertical 13.85 → 6.87, IR torsion −11.69 → −3.10.
+
+So the sleeve is not a passive path constraint. It removes roughly half the delivered authority —
+it is loaded, and it takes force that would otherwise reach the globe. **The account of it in the
+note and in Phase 0 is wrong and needs rewriting.**
+
+And it does not do the job it was added for: **SO buckles at 86% with the pulley on**, against 87%
+without it. The one muscle the sleeve was introduced to rescue is unrescued.
+
+### The headline
+
+LR reaches **16.6°** at full activation (stage b, stable) against a 26° command. The registered
+prediction of 8–9° is broken on the number, but its substance holds: **all the Phase-0 fixes
+together still do not let this plant reach its commands.**
+
+## 7. Two negative results, kept because they are the honest part
 
 **The gain tuner refuses its own answer.** `tune_gaze.py` follows `../inverse_slime/`:
 differentiating the MPM rollout is exactly the cost Plexus 2 warns about (memory ∝ points × steps),
@@ -177,7 +234,7 @@ angle.)
 
 ---
 
-## 7. What is reusable, and what is not
+## 8. What is reusable, and what is not
 
 **Target-agnostic — copy as-is:**
 
@@ -204,7 +261,7 @@ angle.)
 
 ---
 
-## 8. What is deliberately not done
+## 9. What is deliberately not done
 
 - **No promotion.** Eleven contracts and one implementation sit in `prototype/`. `plexus2.tex`
   requires evidence of reuse beyond the originating prototype before promotion, and only
@@ -221,7 +278,7 @@ angle.)
 
 ---
 
-## 9. Cost
+## 10. Cost
 
 ~2.8k lines of Python, 25 archived trials (19 with movies), 9 commits, one 8-page note. Wall-clock
 dominated by simulation, not by thinking: the probe configuration is ~10 min at 45k + 13k material
@@ -235,16 +292,22 @@ error worth 17° of gaze.
 
 ---
 
-## 10. The open question this file exists for
+## 11. The open question this file exists for
 
 Answered, and replaced by a sharper one. The residual **is** mechanical — measured, not asserted:
-the lateral rectus can turn this eye 3.7° at full activation against a 26° command. So the next
-move is not a controller.
+the lateral rectus reaches 3.4° at baseline and 16.6° after the length fix, against a 26° command.
+So the next move is still not a controller.
 
-The gain matrix names its own targets, in order: **lengthen the obliques** (their 1.10° torsional
-gain is the binding constraint on the one motion only they can produce), then raise `A/E` toward
-the pulley ceiling bisected in Phase 0, then re-probe. The same six runs measure whether it worked,
-and cost 90 minutes against the days the closed-loop campaign spent guessing.
+**The open question is now the pulley.** `muscle_sleeve` was introduced in Phase 0 as a purely
+transverse anti-buckling constraint, and Phase 3 falsified both halves of that: it costs ~50% of
+the delivered gain, and it does not stop the superior oblique buckling. Until that is understood
+the Phase-0 story about the `A/E` ceiling is unsafe, because that ceiling was attributed to the
+sleeve.
+
+Three things follow, in order: work out **why** SO buckles at 86% when no other muscle exceeds 33%
+(its post-pulley path is the shortest and most sharply curved — it may need a different treatment
+entirely, not a stronger sleeve); establish whether the sleeve's cost is intrinsic or a artefact of
+`k`, `free_from`, `free_to`; and only then re-run stage c, which is currently unusable.
 
 Phase 3 is defined in `eye_note.pdf` with its predictions registered, including an uncomfortable
 one: **compounded, all three Phase-0 fixes get LR to ~8–9°, still nowhere near the 26° commanded.**
