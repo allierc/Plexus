@@ -4,3 +4,7 @@
 {"round": 11, "spent": 10, "best": 1.945, "new_clusters": 0, "frozen": [], "active_clusters": 2, "dry": 0, "surprise": 0.5, "next_confirmatory_frac": 0.7, "mix_why": "surprise 0.50 in the productive band -- hold 70/30", "stop": false, "reason": "continue"}
 {"round": 12, "spent": 13, "best": 1.945, "new_clusters": 2, "frozen": [], "active_clusters": 4, "dry": 0, "surprise": 0.5, "next_confirmatory_frac": 0.7, "mix_why": "surprise 0.50 in the productive band -- hold 70/30", "stop": false, "reason": "continue"}
 {"round": 12, "t": 1785802824.3642664, "action": "opened stage gate -> 3"}
+{"round": 13, "spent": 19, "best": 1.945, "new_clusters": 0, "frozen": ["K000"], "active_clusters": 3, "dry": 1, "surprise": 0.2, "next_confirmatory_frac": 0.7, "mix_why": "surprise 0.20 in the productive band -- hold 70/30", "stop": false, "reason": "continue"}
+{"round": 14, "spent": 25, "best": 2.035, "new_clusters": 0, "frozen": [], "active_clusters": 3, "dry": 0, "surprise": 0.2, "next_confirmatory_frac": 0.7, "mix_why": "surprise 0.20 in the productive band -- hold 70/30", "stop": false, "reason": "continue"}
+{"round": 15, "spent": 31, "best": 2.05, "new_clusters": 2, "frozen": [], "active_clusters": 5, "dry": 0, "surprise": 0.2, "next_confirmatory_frac": 0.7, "mix_why": "surprise 0.20 in the productive band -- hold 70/30", "stop": false, "reason": "continue"}
+{"round": 15, "t": 1785803339.0227814, "action": "exhausted: no further stage, no operator request filed"}

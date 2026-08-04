@@ -4,3 +4,6 @@
 {"decision": "continue", "why": "archivist unreachable or unparsable (True)", "target": null, "confidence": 0.0, "reason": "end of round 10", "asked": true, "n_branches": 3, "aborts_in_a_row": 0}
 {"decision": "continue", "why": "archivist unreachable or unparsable (True)", "target": null, "confidence": 0.0, "reason": "end of round 11", "asked": true, "n_branches": 3, "aborts_in_a_row": 0}
 {"decision": "continue", "why": "archivist unreachable or unparsable (True)", "target": null, "confidence": 0.0, "reason": "end of round 12", "asked": true, "n_branches": 3, "aborts_in_a_row": 0}
+{"decision": "continue", "why": "archivist unreachable or unparsable (True)", "target": null, "confidence": 0.0, "reason": "end of round 13", "asked": true, "n_branches": 3, "aborts_in_a_row": 0}
+{"decision": "continue", "why": "archivist unreachable or unparsable (True)", "target": null, "confidence": 0.0, "reason": "end of round 14", "asked": true, "n_branches": 3, "aborts_in_a_row": 0}
+{"decision": "continue", "why": "archivist unreachable or unparsable (True)", "target": null, "confidence": 0.0, "reason": "end of round 15", "asked": true, "n_branches": 3, "aborts_in_a_row": 0}

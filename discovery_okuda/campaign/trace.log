@@ -118,3 +118,60 @@
 20:20:11  reading loop done; entering Act 3
 20:20:11  Collector: building the record
 20:20:11  Collector done
+20:28:15  about to import caption_wave
+20:28:15  caption_wave imported; calling it
+20:28:15  caption_wave RETURNED
+20:28:15  past captioning; entering the reading loop
+20:28:15  reading r013c_00_93160b
+20:28:15  read r013c_00_93160b OK
+20:28:15  reading r013c_01_fdedfd
+20:28:16  read r013c_01_fdedfd OK
+20:28:16  reading r013c_02_fde12f
+20:28:16  read r013c_02_fde12f OK
+20:28:16  reading r013c_03_c8d6c2
+20:28:16  read r013c_03_c8d6c2 OK
+20:28:16  reading r013c_04_21cf30
+20:28:16  read r013c_04_21cf30 OK
+20:28:16  reading r013c_05_423e3e
+20:28:16  read r013c_05_423e3e OK
+20:28:16  reading loop done; entering Act 3
+20:28:16  Collector: building the record
+20:28:16  Collector done
+20:28:30  about to import caption_wave
+20:28:30  caption_wave imported; calling it
+20:28:30  caption_wave RETURNED
+20:28:30  past captioning; entering the reading loop
+20:28:30  reading r014c_00_423e3e
+20:28:30  read r014c_00_423e3e OK
+20:28:30  reading r014c_01_d6f614
+20:28:30  read r014c_01_d6f614 OK
+20:28:30  reading r014c_02_e5718d
+20:28:30  read r014c_02_e5718d OK
+20:28:30  reading r014c_03_8f75b6
+20:28:30  read r014c_03_8f75b6 OK
+20:28:30  reading r014c_04_0a9ff4
+20:28:30  read r014c_04_0a9ff4 OK
+20:28:30  reading r014c_05_1bd104
+20:28:30  read r014c_05_1bd104 OK
+20:28:30  reading loop done; entering Act 3
+20:28:30  Collector: building the record
+20:28:30  Collector done
+20:28:44  about to import caption_wave
+20:28:44  caption_wave imported; calling it
+20:28:44  caption_wave RETURNED
+20:28:44  past captioning; entering the reading loop
+20:28:45  reading r015c_00_e5718d
+20:28:45  read r015c_00_e5718d OK
+20:28:45  reading r015c_01_8e812c
+20:28:45  read r015c_01_8e812c OK
+20:28:45  reading r015c_02_c6635c
+20:28:45  read r015c_02_c6635c OK
+20:28:45  reading r015c_03_c41c1c
+20:28:45  read r015c_03_c41c1c OK
+20:28:45  reading r015c_04_a3b276
+20:28:45  read r015c_04_a3b276 OK
+20:28:45  reading r015c_05_0ee0c0
+20:28:45  read r015c_05_0ee0c0 OK
+20:28:45  reading loop done; entering Act 3
+20:28:45  Collector: building the record
+20:28:45  Collector done

@@ -168,6 +168,42 @@ def t_truncated():
     check(len(hits) >= 1, f"the truncation of {src!r} resolves to nothing")
 
 
+# --------------------------------------------------------------------------- the declarations
+@case("every artifact has a reader (wiring.py --check)")
+def t_wiring():
+    """An artifact written for nobody is work the loop does every round for no one."""
+    import wiring
+    bad = wiring.check()
+    check(not bad, f"{len(bad)} wiring complaint(s); first: {bad[0] if bad else ''}")
+
+
+@case("a new orphan artifact is caught")
+def t_wiring_bites():
+    """THE RULE MUST BITE. A checker that passes because it checks nothing is worse than none.
+
+    So: declare an artifact with no reader and require the checker to object. Without this, the
+    green tick above would be indistinguishable from a parser that matched no rows at all.
+    """
+    import wiring, tempfile, os as _os
+    fd, tmp = tempfile.mkstemp(suffix=".md")
+    with _os.fdopen(fd, "w") as fh:
+        fh.write("| artifact | writer | readers |\n|---|---|---|\n"
+                 "| `orphan_test.jsonl` | `round.py` |  |\n")
+    try:
+        dec = wiring.declared(tmp)
+        check("orphan_test.jsonl" in dec, "the WIRING.md table parser matched no rows")
+        check(not dec["orphan_test.jsonl"][1], "a reader-less row was parsed as having readers")
+    finally:
+        _os.unlink(tmp)
+
+
+@case("roles.py --check still agrees with the code")
+def t_roles():
+    import roles
+    bad = roles.check()
+    check(not bad, f"{len(bad)} role complaint(s); first: {bad[0] if bad else ''}")
+
+
 # --------------------------------------------------------------------------- helpers
 def _round(scenario, batch=6):
     import subprocess

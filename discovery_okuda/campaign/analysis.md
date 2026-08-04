@@ -531,3 +531,303 @@ Specimens: valid 3
 Frontier after: MINI_coral_fixed
 Diagnosis: not called
 Steer: surprise 0.50 in the productive band -- hold 70/30
+
+## Round 13 — slot 0: confirmed
+
+Node: id=MINI_coral_fixed, parent=none
+Track: A
+Hypothesis tested: "protr_peak >= 1.30"
+Config: r013c_05_423e3e
+Measured: protr_peak=1.3, protr_final=1.28, mech_p_ratio=0
+Reservoir: MISSING
+Specimen: valid — all hold
+Reader: phenotype=unreadable, specimen=MISSING
+Eye-check: no_caption
+Mutation: ('add_op', 'cell_rd_seed', 'spot')
+Verdict: supported — measured protr_peak=1.3, protr_final=1.28, mech_p_ratio=0 against "protr_peak >= 1.30"
+Next: parent=MINI_coral_fixed
+
+## Round 13 — slot 1: refuted
+
+Node: id=MINI_coral_fixed, parent=none
+Track: A
+Hypothesis tested: "protr_peak >= 1.30"
+Config: r013c_03_c8d6c2
+Measured: protr_peak=1.24, protr_final=1.22, mech_p_ratio=0
+Reservoir: MISSING
+Specimen: valid — all hold
+Reader: phenotype=unreadable, specimen=MISSING
+Eye-check: no_caption
+Mutation: ('add_op', 'cell_rd_seed', 'tip')
+Verdict: falsified — measured protr_peak=1.24, protr_final=1.22, mech_p_ratio=0 against "protr_peak >= 1.30"
+Next: parent=MINI_coral_fixed
+
+## Round 13 — slot 2: confirmed
+
+Node: id=MINI_coral_fixed, parent=none
+Track: A
+Hypothesis tested: "protr_peak 1.0-1.2"
+Config: r013c_00_93160b
+Measured: protr_peak=1.19, protr_final=1.17, mech_p_ratio=0
+Reservoir: MISSING
+Specimen: valid — all hold
+Reader: phenotype=unreadable, specimen=MISSING
+Eye-check: no_caption
+Mutation: none (control)
+Verdict: supported — measured protr_peak=1.19, protr_final=1.17, mech_p_ratio=0 against "protr_peak 1.0-1.2"
+Next: parent=MINI_coral_fixed
+
+## Round 13 — slot 3: refuted
+
+Node: id=MINI_coral_fixed, parent=none
+Track: A
+Hypothesis tested: "protr_peak >= 1.30"
+Config: r013c_02_fde12f
+Measured: protr_peak=1.18, protr_final=1.16, mech_p_ratio=0
+Reservoir: MISSING
+Specimen: valid — all hold
+Reader: phenotype=unreadable, specimen=MISSING
+Eye-check: no_caption
+Mutation: ('add_op', 'cell_adjacency', 'shared_edge')
+Verdict: falsified — measured protr_peak=1.18, protr_final=1.16, mech_p_ratio=0 against "protr_peak >= 1.30"
+Next: parent=MINI_coral_fixed
+
+## Round 13 — slot 4: refuted
+
+Node: id=MINI_coral_fixed, parent=none
+Track: A
+Hypothesis tested: "protr_peak >= 1.30"
+Config: r013c_04_21cf30
+Measured: protr_peak=1.09, protr_final=1.07, mech_p_ratio=0
+Reservoir: MISSING
+Specimen: valid — all hold
+Reader: phenotype=unreadable, specimen=MISSING
+Eye-check: no_caption
+Mutation: ('add_op', 'cell_rd_seed', 'cone')
+Verdict: falsified — measured protr_peak=1.09, protr_final=1.07, mech_p_ratio=0 against "protr_peak >= 1.30"
+Next: parent=MINI_coral_fixed
+
+## Round 13 — slot 5: refuted
+
+Node: id=MINI_coral_fixed, parent=none
+Track: A
+Hypothesis tested: "protr_peak >= 1.30"
+Config: r013c_01_fdedfd
+Measured: protr_peak=1.09, protr_final=1.07, mech_p_ratio=0
+Reservoir: MISSING
+Specimen: valid — P13
+Reader: phenotype=unreadable, specimen=MISSING
+Eye-check: no_caption
+Mutation: ('add_op', 'cell_geometry_3d', 'scatter_add')
+Verdict: falsified — measured protr_peak=1.09, protr_final=1.07, mech_p_ratio=0 against "protr_peak >= 1.30"
+Next: parent=MINI_coral_fixed
+
+## Round 13 — summary
+
+Posed: 6   Evidence: 6   Refused: 0
+Surprise: 1/6
+Tracks: 6 Track A, 0 Track B
+Specimens: valid 6
+Frontier after: MINI_coral_fixed
+Diagnosis: not called
+Steer: surprise 0.20 in the productive band -- hold 70/30
+
+## Round 14 — slot 0: refuted
+
+Node: id=MINI_coral_fixed, parent=none
+Track: A
+Hypothesis tested: "protr_peak >= 1.30"
+Config: r014c_02_e5718d
+Measured: protr_peak=1.28, protr_final=1.26, mech_p_ratio=0
+Reservoir: MISSING
+Specimen: valid — all hold
+Reader: phenotype=unreadable, specimen=MISSING
+Eye-check: no_caption
+Mutation: ('add_op', 'divide_3d', 'hertwig')
+Verdict: falsified — measured protr_peak=1.28, protr_final=1.26, mech_p_ratio=0 against "protr_peak >= 1.30"
+Next: parent=MINI_coral_fixed
+
+## Round 14 — slot 1: confirmed
+
+Node: id=MINI_coral_fixed, parent=none
+Track: A
+Hypothesis tested: "protr_peak 1.0-1.2"
+Config: r014c_00_423e3e
+Measured: protr_peak=1.17, protr_final=1.15, mech_p_ratio=0
+Reservoir: MISSING
+Specimen: valid — all hold
+Reader: phenotype=unreadable, specimen=MISSING
+Eye-check: no_caption
+Mutation: none (control)
+Verdict: supported — measured protr_peak=1.17, protr_final=1.15, mech_p_ratio=0 against "protr_peak 1.0-1.2"
+Next: parent=MINI_coral_fixed
+
+## Round 14 — slot 2: refuted
+
+Node: id=MINI_coral_fixed, parent=none
+Track: A
+Hypothesis tested: "protr_peak >= 1.30"
+Config: r014c_05_1bd104
+Measured: protr_peak=1.15, protr_final=1.13, mech_p_ratio=0
+Reservoir: MISSING
+Specimen: valid — all hold
+Reader: phenotype=unreadable, specimen=MISSING
+Eye-check: no_caption
+Mutation: ('remove_op', 'reconnect_t1_3d0')
+Verdict: falsified — measured protr_peak=1.15, protr_final=1.13, mech_p_ratio=0 against "protr_peak >= 1.30"
+Next: parent=MINI_coral_fixed
+
+## Round 14 — slot 3: refuted
+
+Node: id=MINI_coral_fixed, parent=none
+Track: A
+Hypothesis tested: "protr_peak >= 1.30"
+Config: r014c_03_8f75b6
+Measured: protr_peak=1.14, protr_final=1.12, mech_p_ratio=0
+Reservoir: MISSING
+Specimen: valid — all hold
+Reader: phenotype=unreadable, specimen=MISSING
+Eye-check: no_caption
+Mutation: ('add_op', 'cell_geometry_3d', 'scatter_add')
+Verdict: falsified — measured protr_peak=1.14, protr_final=1.12, mech_p_ratio=0 against "protr_peak >= 1.30"
+Next: parent=MINI_coral_fixed
+
+## Round 14 — slot 4: refuted
+
+Node: id=MINI_coral_fixed, parent=none
+Track: A
+Hypothesis tested: "protr_peak >= 1.30"
+Config: r014c_04_0a9ff4
+Measured: protr_peak=1.14, protr_final=1.12, mech_p_ratio=0
+Reservoir: MISSING
+Specimen: valid — all hold
+Reader: phenotype=unreadable, specimen=MISSING
+Eye-check: no_caption
+Mutation: ('add_op', 'cell_adjacency', 'shared_edge')
+Verdict: falsified — measured protr_peak=1.14, protr_final=1.12, mech_p_ratio=0 against "protr_peak >= 1.30"
+Next: parent=MINI_coral_fixed
+
+## Round 14 — slot 5: confirmed
+
+Node: id=MINI_coral_fixed, parent=none
+Track: A
+Hypothesis tested: "protr_peak >= 1.30"
+Config: r014c_01_d6f614
+Measured: protr_peak=1.37, protr_final=1.35, mech_p_ratio=0
+Reservoir: MISSING
+Specimen: valid — P13
+Reader: phenotype=unreadable, specimen=MISSING
+Eye-check: no_caption
+Mutation: ('add_op', 'vesicle_growth', 'uniform_ramp')
+Verdict: supported — measured protr_peak=1.37, protr_final=1.35, mech_p_ratio=0 against "protr_peak >= 1.30"
+Next: parent=MINI_coral_fixed
+
+## Round 14 — summary
+
+Posed: 6   Evidence: 6   Refused: 0
+Surprise: 1/6
+Tracks: 6 Track A, 0 Track B
+Specimens: valid 6
+Frontier after: MINI_coral_fixed
+Diagnosis: not called
+Steer: surprise 0.20 in the productive band -- hold 70/30
+
+## Round 15 — slot 0: refuted
+
+Node: id=MINI_coral_fixed, parent=none
+Track: A
+Hypothesis tested: "protr_peak 1.0-1.2"
+Config: r015c_00_e5718d
+Measured: protr_peak=1.38, protr_final=1.36, mech_p_ratio=0
+Reservoir: MISSING
+Specimen: valid — all hold
+Reader: phenotype=unreadable, specimen=MISSING
+Eye-check: no_caption
+Mutation: none (control)
+Verdict: falsified — measured protr_peak=1.38, protr_final=1.36, mech_p_ratio=0 against "protr_peak 1.0-1.2"
+Next: parent=MINI_coral_fixed
+
+## Round 15 — slot 1: confirmed
+
+Node: id=MINI_coral_fixed, parent=none
+Track: A
+Hypothesis tested: "protr_peak >= 1.30"
+Config: r015c_03_c41c1c
+Measured: protr_peak=1.32, protr_final=1.3, mech_p_ratio=0
+Reservoir: MISSING
+Specimen: valid — all hold
+Reader: phenotype=unreadable, specimen=MISSING
+Eye-check: no_caption
+Mutation: ('add_op', 'cell_adjacency', 'shared_edge')
+Verdict: supported — measured protr_peak=1.32, protr_final=1.3, mech_p_ratio=0 against "protr_peak >= 1.30"
+Next: parent=MINI_coral_fixed
+
+## Round 15 — slot 2: refuted
+
+Node: id=MINI_coral_fixed, parent=none
+Track: A
+Hypothesis tested: "protr_peak >= 1.30"
+Config: r015c_05_0ee0c0
+Measured: protr_peak=1.21, protr_final=1.19, mech_p_ratio=0
+Reservoir: MISSING
+Specimen: valid — all hold
+Reader: phenotype=unreadable, specimen=MISSING
+Eye-check: no_caption
+Mutation: ('set_impl', 'shape_energy_3d0', 'monolayer')
+Verdict: falsified — measured protr_peak=1.21, protr_final=1.19, mech_p_ratio=0 against "protr_peak >= 1.30"
+Next: parent=MINI_coral_fixed
+
+## Round 15 — slot 3: refuted
+
+Node: id=MINI_coral_fixed, parent=none
+Track: A
+Hypothesis tested: "protr_peak >= 1.30"
+Config: r015c_02_c6635c
+Measured: protr_peak=1.08, protr_final=1.06, mech_p_ratio=0
+Reservoir: MISSING
+Specimen: valid — all hold
+Reader: phenotype=unreadable, specimen=MISSING
+Eye-check: no_caption
+Mutation: ('add_op', 'cell_geometry_3d', 'scatter_add')
+Verdict: falsified — measured protr_peak=1.08, protr_final=1.06, mech_p_ratio=0 against "protr_peak >= 1.30"
+Next: parent=MINI_coral_fixed
+
+## Round 15 — slot 4: refuted
+
+Node: id=MINI_coral_fixed, parent=none
+Track: A
+Hypothesis tested: "protr_peak >= 1.30"
+Config: r015c_04_a3b276
+Measured: protr_peak=1.04, protr_final=1.02, mech_p_ratio=0
+Reservoir: MISSING
+Specimen: valid — all hold
+Reader: phenotype=unreadable, specimen=MISSING
+Eye-check: no_caption
+Mutation: ('remove_op', 'reconnect_t1_3d0')
+Verdict: falsified — measured protr_peak=1.04, protr_final=1.02, mech_p_ratio=0 against "protr_peak >= 1.30"
+Next: parent=MINI_coral_fixed
+
+## Round 15 — slot 5: refuted
+
+Node: id=MINI_coral_fixed, parent=none
+Track: A
+Hypothesis tested: "protr_peak >= 1.30"
+Config: r015c_01_8e812c
+Measured: protr_peak=1.05, protr_final=1.03, mech_p_ratio=0
+Reservoir: MISSING
+Specimen: valid — P13
+Reader: phenotype=unreadable, specimen=MISSING
+Eye-check: no_caption
+Mutation: ('add_op', 'vesicle_growth', 'uniform_ramp')
+Verdict: falsified — measured protr_peak=1.05, protr_final=1.03, mech_p_ratio=0 against "protr_peak >= 1.30"
+Next: parent=MINI_coral_fixed
+
+## Round 15 — summary
+
+Posed: 6   Evidence: 6   Refused: 0
+Surprise: 1/6
+Tracks: 6 Track A, 0 Track B
+Specimens: valid 6
+Frontier after: MINI_coral_fixed
+Diagnosis: not called
+Steer: surprise 0.20 in the productive band -- hold 70/30

@@ -10,3 +10,6 @@
 {"round": 10, "asked": 8, "proposed": 12, "refused": 8, "delivered": 4, "target": 6}
 {"round": 11, "asked": 8, "proposed": 15, "refused": 12, "delivered": 3, "target": 6}
 {"round": 12, "asked": 8, "proposed": 13, "refused": 10, "delivered": 3, "target": 6}
+{"round": 13, "asked": 8, "proposed": 8, "refused": 2, "delivered": 6, "target": 6}
+{"round": 14, "asked": 8, "proposed": 15, "refused": 9, "delivered": 6, "target": 6}
+{"round": 15, "asked": 8, "proposed": 8, "refused": 2, "delivered": 6, "target": 6}
