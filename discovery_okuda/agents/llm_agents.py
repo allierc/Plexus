@@ -445,7 +445,7 @@ def reflect(slots, timeout_min=8, ledger=None):
     experiment, and this is the only agent whose job is to say so before it runs.
     """
     prompt = f"""REFLECTION. Peer-review a proposed batch BEFORE it costs cluster time.
-{budget_note(timeout_min, "1) the JSON review")}\n{BREVITY}
+{budget_note(timeout_min, "1) the JSON review")}
 proposed slots:
 {json.dumps(slots, indent=1)[:5000]}
 
