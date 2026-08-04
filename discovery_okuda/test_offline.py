@@ -276,6 +276,151 @@ def t_wiring_bites():
         _os.unlink(tmp)
 
 
+@case("every admitted metric has a producer")
+def t_metrics_have_producers():
+    """AN ADMITTED METRIC WITH NO PRODUCER IS A SILENT INCONCLUSIVE.
+
+    `predict.Clause.check` looks the metric up by EXACT KEY in the run's summary, so a name that
+    is admitted but never written scores `not measured`, the prediction falls to `inconclusive`,
+    and nothing anywhere reports a fault -- the agent wrote a perfectly good falsifiable claim
+    and the loop recorded that it had learned nothing. Measured 2026-08-04: `corr_act_rad`,
+    `r_cv` and `protr_p99` had been admitted for weeks with no producer anywhere in the codebase,
+    and `corr_act_rad` is the metric that answers the campaign's own question.
+
+    This is the metric-bank twin of WIRING.md's rule for artifacts:
+    A METRIC MUST BE ADMITTED WITH A PRODUCER.
+    """
+    import glob as _glob
+    from predict import KNOWN_METRICS
+    src = ""
+    for d in (HERE, os.path.join(os.path.dirname(HERE), "prototype", "Tyssue")):
+        for f in sorted(_glob.glob(os.path.join(d, "*.py"))):
+            if os.path.basename(f) in ("predict.py", "test_offline.py"):
+                continue
+            src += open(f).read()
+    # ASSIGNMENT, NOT MENTION. The first version of this test accepted the name appearing in
+    # quotes anywhere, and passed green while `wavelength_cells_final` had no producer at all --
+    # the string occurs in run_one's lift list, which is a CONSUMER. A test that a name is
+    # mentioned somewhere is not a test that anything writes it. So: require a real write --
+    # `out["k"] = `, `dict(k=`, `k=round(...)` -- and not membership of a tuple or list.
+    import re as _re
+    orphan = []
+    for m in KNOWN_METRICS:
+        base = m[:-6] if m.endswith("_final") else m
+        base = base[3:] if base.startswith("ta_") else base
+        e = _re.escape(base)
+        written = _re.search(rf'''\[["']{e}["']\]\s*=''', src) or \
+                  _re.search(rf'''["']{e}["']\s*:''', src) or \
+                  _re.search(rf'''(?<![\w.])(?<!["']){e}\s*=(?!=)''', src)
+        if not written:
+            orphan.append(m)
+    check(not orphan, "admitted with no producer: " + ", ".join(orphan))
+
+
+@case("a prediction naming a new metric is actually scorable")
+def t_new_metrics_scorable():
+    """The producer test proves the name is WRITTEN somewhere. This proves the scorer can READ
+    it: parse a real prediction over the new metrics and check it resolves against a summary."""
+    import predict as PR
+    pred = "act_cv > 0.3, corr_act_rad_final > 0.4, gyr_prolate_final 1.5-4.0"
+    cl = PR.parse(pred)
+    check(len(cl) == 3, f"parsed {len(cl)} of 3 clauses from {pred!r}")
+    obs = {"act_cv": 0.62, "corr_act_rad_final": 0.71, "gyr_prolate_final": 2.4}
+    out, why = PR.score(pred, obs)
+    check(out == "confirmed", f"expected confirmed, got {out}: {why}")
+    out2, _ = PR.score(pred, {**obs, "act_cv": 0.01})
+    check(out2 == "refuted", f"a dead pattern must refute, got {out2}")
+
+
+@case("every admitted metric is documented, and no note names a withdrawn one")
+def t_metrics_documented():
+    """A NAME IS NOT A DEFINITION. `METRIC_NOTES` held six entries for fifty-six admitted names,
+    so a role was handed a comma-separated list of identifiers and asked to predict against them
+    -- and one of the six documented `wavelength_cells_final`, which is not produced and was
+    withdrawn as uncalibrated. A stale note is worse than a missing one: it advertises an
+    instrument that does not exist.
+    """
+    import predict as PR
+    ok = [m for m in PR.KNOWN_METRICS if m not in PR.REJECTED_METRICS]
+    undoc = [m for m in ok if m not in PR.METRIC_NOTES and not m.endswith("_final")]
+    check(not undoc, "admitted but undocumented: " + ", ".join(undoc))
+    stale = [m for m in PR.METRIC_NOTES if m not in PR.KNOWN_METRICS]
+    check(not stale, "documented but NOT admitted (a note for a withdrawn metric): "
+                     + ", ".join(stale))
+
+
+@case("the trajectories survive a label column and reach the Reader")
+def t_trajectories_reach_the_reader():
+    """THE TIME-EVOLUTION CHANNEL DIED IN SILENCE, and stayed dead for the whole campaign.
+
+    metrics.npz carries the per-frame morphology labels as a STRING array. `classify` calls
+    np.asarray(v, float) on every column and raised `could not convert string to float: 'sphere'`
+    -- out of `report`, into llm_agents' except, and out as the single parenthesis "(trajectory
+    shapes unavailable)" in the Reader's prompt. So every run since the label column landed was
+    read with NO trajectory information: no peaked/pinned/exploded warning, no evidence horizon,
+    nothing about the activator over time.
+
+    This test builds exactly that npz -- numeric columns plus a label column -- and requires real
+    lines out, so the channel cannot go quiet again without a red tick.
+    """
+    import numpy as np, tempfile, shutil
+    import curve_shape as CS
+    d = tempfile.mkdtemp()
+    try:
+        n = 40
+        flash = np.concatenate([np.linspace(0.01, 1.8e4, 16),
+                                np.logspace(np.log10(1.8e4), np.log10(0.01), n - 16)])
+        np.savez(os.path.join(d, "metrics.npz"),
+                 frame=np.arange(n), protr=np.linspace(1.0, 1.06, n), act_max=flash,
+                 act_cv=np.concatenate([np.linspace(0, 1.2, 12), np.linspace(1.2, 0, n - 12)]),
+                 morphology=np.array(["sphere"] * n))            # <-- the column that killed it
+        rep = CS.report(d, write=False)
+        check(rep.get("metrics"), "report returned no metric classifications at all")
+        check("act_max" in rep["metrics"], "act_max was not classified")
+        check("morphology" not in rep["metrics"], "a string label column was classified as a curve")
+        txt = CS.summarise(rep)
+        check("act_max" in txt, "act_max never reached the text an agent reads")
+        check("act_cv" in txt, "the pattern amplitude never reached the text an agent reads")
+        check("over time:" in txt, "no numeric time course was rendered -- only shape words")
+        check("peaked" in txt, f"a flash-then-extinction was not called peaked:\\n{txt}")
+    finally:
+        shutil.rmtree(d, ignore_errors=True)
+
+
+@case("the harness cannot fabricate over a real run")
+def t_harness_cannot_eat_real_runs():
+    """4 AUGUST: THIS HARNESS DESTROYED ALL TWELVE FINISHED ROUND-2 RUNS.
+
+    campaign/state.json said `"round": 2`, so the offline round generated the SAME run names the
+    live round had (same frontier, same composition hashes: r002c_00_f4907e, ...). fabricate_run
+    did makedirs(exist_ok=True) over the real directories, recorded them in _FABRICATED as its
+    own, and the atexit clear_runs rmtree'd them -- an hour of A100 time, twelve movies, twelve
+    diag.json. Every component did exactly what it was written to do.
+
+    Third occurrence. The first two fixes -- "only delete what we made", "refuse while a campaign
+    is live" -- each closed the instance in front of them. This closes the class: a directory the
+    harness did not create is never opened, and a real run is one it did not create.
+    """
+    import offline as O
+    d = os.path.join(O.LOG, "r002c_00_TESTGUARD")
+    os.makedirs(d, exist_ok=True)
+    open(os.path.join(d, "diag.json"), "w").write('{"summary": {"protr_peak": 2.9}}')
+    try:
+        raised = False
+        try:
+            O.fabricate_run("r002c_00_TESTGUARD")
+        except SystemExit:
+            raised = True
+        check(raised, "fabricate_run OVERWROTE a real run directory instead of refusing")
+        check(d not in O._FABRICATED,
+              "the real run was registered as ours -- clear_runs would delete it at exit")
+        with open(os.path.join(d, "diag.json")) as fh:
+            check("2.9" in fh.read(), "the real diag.json was overwritten by the fake one")
+    finally:
+        import shutil
+        shutil.rmtree(d, ignore_errors=True)
+
+
 @case("roles.py --check still agrees with the code")
 def t_roles():
     import roles

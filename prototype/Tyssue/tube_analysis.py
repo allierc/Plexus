@@ -280,8 +280,36 @@ def frame_metrics(pt, mt, act=None, a_sw=None):
              hollow_n=int(hst["n"]), hollow_frac=round(float(hst["frac"]), 4),
              area_cv=round(float(a.std() / (a.mean() + 1e-9)), 3) if a.size else 0.0,
              vol_cv=round(float(v.std() / (v.mean() + 1e-9)), 3) if v.size else 0.0)
-    _, radl, livem = _cell_centroids(pt, mt); rad = radl[livem]
+    _cenl, radl, livem = _cell_centroids(pt, mt); rad = radl[livem]
     m["protr"] = round(protrusion_ratio(rad), 3)
+    # THE WHOLE DISTRIBUTION OF RADIUS, not one quantile of it. `protr` is p95/median: a TAIL
+    # statistic, so it reads the same for one long tube and for a broad even bulge, and it is
+    # deaf to a single thin spike that never reaches 5% of the cells. Both of these were
+    # ADMITTED metrics with NO PRODUCER -- a prediction naming `r_cv` or `protr_p99` scored
+    # `not measured` and fell to inconclusive, every time, silently.
+    if rad.size > 2 and float(np.median(rad)) > 1e-9:
+        _md = float(np.median(rad))
+        m["r_cv"] = round(float(rad.std() / (rad.mean() + 1e-12)), 4)
+        m["protr_p99"] = round(float(np.percentile(rad, 99) / _md), 3)
+        # SHAPE, not size: the gyration tensor of the live cell centroids. A TUBE is prolate --
+        # one long axis -- and an undulating or many-lobed sphere is not, however high its
+        # protrusion ratio climbs. This is exactly Okuda's phenotype axis (tube / undulation /
+        # branch) and nothing in the bank could separate the first two.
+        try:
+            _c = _cenl[livem]
+            _w = np.linalg.eigvalsh(np.cov(_c.T))[::-1]          # l1 >= l2 >= l3
+            _tr = float(_w.sum())
+            if _tr > 1e-12:
+                # 1.0 for a sphere, grows with elongation; 3 equal axes -> l1/mean(l2,l3) = 1
+                m["gyr_prolate"] = round(float(_w[0] / (0.5 * (_w[1] + _w[2]) + 1e-12)), 3)
+                # the standard asphericity: 0 for a sphere, 1 for a rod
+                m["gyr_asphere"] = round(float((_w[0] - 0.5 * (_w[1] + _w[2])) / _tr), 4)
+                # 0 for a rod or a sphere, positive for a FLATTENED (oblate) shell -- a vesicle
+                # collapsing into a disc is a failure mode that reads as "not a tube" and had
+                # no number of its own.
+                m["gyr_oblate"] = round(float(1.5 * (_w[1] - _w[2]) / _tr), 4)
+        except Exception:
+            pass
     if act is not None and len(act):
         act = np.asarray(act, float)
         if a_sw is not None:
@@ -293,6 +321,56 @@ def frame_metrics(pt, mt, act=None, a_sw=None):
         m["act_min"] = round(float(act.min()), 6)     # premise 12: a concentration cannot be negative                         # unconditional, threshold-free
         m["act_max"] = round(float(act.max()), 4)
         m["act_p95"] = round(float(np.percentile(act, 95)), 4)
+        # THE PATTERN, AS A NUMBER. A mean cannot tell a Turing pattern from a uniform field: 0.5
+        # everywhere and half-at-1/half-at-0 have the SAME mean. The SPATIAL SPREAD is the
+        # pattern's amplitude, and its collapse is the pattern dying.
+        #
+        # Cedric watching a round-2 movie: "a flash of red activity 100% red then a long period of
+        # white, no activity". That is exactly what okuda_route did -- act_max reached 17,678 at
+        # frame 350 and was 0.0105 by frame 807 -- and the loop could not SAY it, because only
+        # act_max and corr_act_rad were admitted. A peak that spikes and a field that dies look
+        # the same in a maximum.
+        m["act_sd"] = round(float(act.std()), 6)
+        # SCALE-FREE, so a claim about "the pattern" is not really a claim about its brightness.
+        # A live Turing field sits around 0.3-1.0; a uniform one goes to zero whatever its level.
+        m["act_cv"] = round(float(act.std() / abs(act.mean())), 4) if abs(act.mean()) > 1e-12 else 0.0
+        # OCCUPANCY: what fraction of the tissue is switched ON. red_frac already measures this
+        # against the growth threshold; this is the same question asked of the field's own range,
+        # so it still means something when the absolute level has collapsed or exploded.
+        _lo, _hi = float(act.min()), float(act.max())
+        m["act_occupancy"] = (round(float((act > _lo + 0.5 * (_hi - _lo)).mean()), 4)
+                              if _hi > _lo + 1e-12 else 0.0)
+        # ALIVE OR NOT, in one boolean per frame: a field with no spread and no occupancy is not
+        # patterning, whatever its mean. This is what makes "the pattern went extinct at frame N"
+        # a measurement rather than a reading of a movie.
+        m["act_alive"] = int(m["act_cv"] > 0.05 and m["act_occupancy"] > 0.01)
+        # IS THE RED WHERE THE BULGE IS? The campaign's actual question -- does the chemistry
+        # drive the shape, or is it decoration on a shape made by something else -- and
+        # `corr_act_rad` has been ADMITTED since the Turing x vertex study while being computed
+        # NOWHERE. Every prediction that named it scored `not measured`.
+        # A CORRELATION NEEDS A SIGNAL TO CORRELATE. Measured on okuda_route's end mesh while
+        # this was being written: corr_act_rad = 0.294 -- which reads as "the chemistry has some
+        # grip on the shape" -- on an activator whose ENTIRE SPREAD ACROSS 3,975 CELLS was
+        # 8.4e-05 around a mean of 0.0128. That is a correlation of round-off. Pearson is
+        # scale-free by construction, so it happily returns a confident number for a dead field,
+        # and a dead field is precisely the state this campaign keeps landing in.
+        #
+        # So the coupling is REFUSED, not reported, when there is no pattern to couple: an
+        # unmeasured metric scores `inconclusive`, which is the honest verdict on "does the
+        # pattern drive the shape" when there is no pattern. The same act_cv > 0.05 floor as
+        # act_alive, so the two cannot disagree about whether a field exists.
+        if act.size == radl.size and livem.sum() > 8 and m.get("act_cv", 0.0) > 0.05:
+            _a, _r = act[livem], radl[livem]
+            if _a.std() > 1e-12 and _r.std() > 1e-12:
+                m["corr_act_rad"] = round(float(np.corrcoef(_a, _r)[0, 1]), 4)
+                # Pearson assumes a LINE. A pattern that switches cells on only at the tips is
+                # not linear in radius, and the correlation understates it. This asks the
+                # question directly: how much more activator is in the outermost tenth of the
+                # tissue than in the tissue as a whole. 1.0 = no relation, > 1 = red at the tips.
+                _tip = _r >= np.percentile(_r, 90)
+                _mu = float(_a.mean())
+                if _tip.any() and abs(_mu) > 1e-12:
+                    m["act_at_tip"] = round(float(_a[_tip].mean() / _mu), 3)
         radc, ok = radl, livem                                 # tip_act: corr(activator, radius). +1 = activator
         if ok.sum() > 5 and act[ok].std() > 1e-9 and radc[ok].std() > 1e-9:   # sits at the protruding TIPS (Okuda gradient)
             m["tip_act"] = round(float(np.corrcoef(act[ok], radc[ok])[0, 1]), 3)
@@ -390,9 +468,21 @@ def analyze(frames, OUT, a_sw=None):
     # The labels are not dropped -- they are the Phase 4 arbiter. They are saved as their own
     # array so the trajectory keeps them without forcing a numeric cast on the rest.
     def _numeric(key):
+        # `r.get(key)` is None both for "absent this frame" and "measured as None", and both must
+        # cast to NaN rather than force the column to strings.
         return all(isinstance(r.get(key), (int, float, bool, np.floating, np.integer))
                    or r.get(key) is None for r in series)
-    keys = list(series[0].keys()) if series else []
+    # THE UNION, NOT FRAME 0. A metric that only becomes computable once the run has developed --
+    # corr_act_rad needs the activator to have some spread, act_at_tip needs live cells -- is
+    # absent from the first frame's dict, and keying off `series[0]` DROPS IT FROM THE NPZ
+    # ENTIRELY. It would then be missing from curves.json, from the agents' time courses and from
+    # the summary lift, with nothing anywhere reporting an error: computed every frame and stored
+    # on none. Ordered, so the column order stays stable across runs.
+    keys, _seen = [], set()
+    for _r in series:
+        for _k in _r:
+            if _k not in _seen:
+                _seen.add(_k); keys.append(_k)
     _cols = {k: np.asarray([r.get(k, np.nan) for r in series], dtype=float)
              for k in keys if _numeric(k)}
     for k in keys:
