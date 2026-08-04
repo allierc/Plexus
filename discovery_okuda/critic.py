@@ -191,9 +191,24 @@ def _theta_hash(graph, base=False):
 
 
 def _cell_cap(graph):
-    """Cells the vertex reservoir allows. Euler on a trivalent closed sheet: V = 2F - 4."""
+    """Cells the vertex reservoir allows. Euler on a trivalent closed sheet: V = 2F - 4.
+
+    IT ASKS THE TRANSLATOR, because the graph does not carry the reservoir -- that is decided when
+    the spec is written. Reading `_run.vertex_n` off the graph returned 0 for every composition,
+    so `_cell_cap` was 0, so R1e skipped ENTIRELY and a projection of 197,000 cells was admitted.
+    A guard that silently does nothing is worse than no guard, and this one was mine, written
+    yesterday, against exactly this failure.
+    """
     try:
         v = float(graph.params.get("_run.vertex_n", 0))
+        if v:
+            return (v + 4) / 2
+    except Exception:
+        pass
+    try:
+        from translate import to_spec
+        v = float(((to_spec(graph, name="_cap") or {}).get("sets") or {})
+                  .get("vertex", {}).get("n") or 0)
         return (v + 4) / 2 if v else 0.0
     except Exception:
         return 0.0
@@ -347,25 +362,42 @@ def check_static(graph, seen_hashes=(), edit_kind=None):
             frac = float(_p.get(f"{_div['id']}.max_div_frac", 0.0075))
             every = max(1, int(_p.get(f"{_div['id']}.every", 1)))
             start = float(_p.get(f"{_div['id']}.after_frame", 0))
+            # The frame count is a RUN property, not a graph property, so it is not in params.
+            # 900 is the campaign default and the honest fallback; being wrong high here makes the
+            # rule stricter, never laxer.
             frames = float(_p.get("_run.n_frames", 900))
             calls = max(0.0, (frames - start) / every)
             cap = float(_p.get("_run.cell_cap", 0)) or _cell_cap(graph)
-            if frac > 0 and calls > 0 and cap > 0:
-                # frames until the array fills, under pure exponential growth
-                import math
-                if n0 * (1 + frac) ** calls > cap:
-                    fill = math.log(cap / n0) / math.log(1 + frac) * every + start
+            # THE LAW IS max(max_div, frac x N), NOT frac x N. Projecting the fractional term
+            # alone made this rule blind to the very configuration that overran twice: with
+            # max_div=30 the floor delivers 30 divisions per call regardless of the fraction, and
+            # a pure-exponential projection under-estimated by an order of magnitude.
+            mdiv = float(_p.get(f"{_div['id']}.max_div", 0) or 0)
+            if calls > 0 and cap > 0 and (frac > 0 or mdiv > 0):
+                # STEP THE RECURRENCE. There is no closed form: the engine takes
+                # cap_div = max(max_div, frac x N) per call, so an absolute FLOOR competes with a
+                # fractional term and dominates it at realistic cell counts. Projecting the
+                # fraction alone made this rule blind to the configuration that overran twice --
+                # max_div=30 delivers 30 divisions per call whatever the fraction says, and the
+                # pure-exponential estimate was an order of magnitude low.
+                _n, _fill = float(n0), None
+                for _k in range(int(min(calls, 20000))):
+                    _n += max(mdiv, frac * _n)
+                    if _fill is None and _n > cap:
+                        _fill = _k * every + start
+                if _n > cap:
+                    fill = _fill if _fill is not None else 0.0
                     if fill < 0.8 * frames:
                         out.append(Rejection(
                             "R1e_TISSUE_OUTGROWS_RESERVOIR",
                             "the projected cell count fills the vertex reservoir long before the "
                             "run ends, so most of the run measures the array rather than the "
                             "tissue",
-                            f"{n0:.0f} x (1+{frac})^{calls:.0f} projects "
-                            f"{n0 * (1 + frac) ** min(calls, 400):.3g} cells against a cap of "
-                            f"{cap:.0f}; the array fills at frame {fill:.0f} of {frames:.0f}. "
-                            f"Lower max_div_frac, raise `every`, shorten the run, or size the "
-                            f"reservoir for the projection."))
+                            f"{n0:.0f} cells at max(max_div={mdiv:g}, {frac:g}xN) per call over "
+                            f"{calls:.0f} calls projects {_n:.3g} against a cap of {cap:.0f}; the "
+                            f"array fills at frame {fill:.0f} of {frames:.0f}. Lower max_div "
+                            f"(it is usually the term that governs), lower max_div_frac, raise "
+                            f"`every`, shorten the run, or size the reservoir for the projection."))
     except Exception:
         pass
 

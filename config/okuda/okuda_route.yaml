@@ -12,13 +12,13 @@ general:
   - 80.0
   - 80.0
 _run:
-  target_cells: 20000
-  seed_cells: 500
+  target_cells: 50000
+  seed_cells: 2000
 sets:
   vertex:
-    n: 52004
+    n: 130004
   cell:
-    n: 26004
+    n: 65004
     state:
       chem:
         width: 2
@@ -33,7 +33,7 @@ operators:
   at: vertex
   cell_set: cell
   before_frame: 1
-  n_cells: 500
+  n_cells: 2000
   seed: 0
   vseed_cv: 0.15
 - op: cell_geometry_3d
@@ -96,8 +96,8 @@ operators:
   cycle_cv: 0.4
   p0: 3.9
   every: 1
-  max_div: 30
-  max_div_frac: 0.0075
+  max_div: 0
+  max_div_frac: 0.000867
   vcap: 1.5
   cell_set: cell
   min_cycle: 16
