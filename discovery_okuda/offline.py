@@ -83,6 +83,8 @@ def _template_diag():
             "premises": {}, "premises_broken": [], "acted": {}, "comp_hash": "OFFLINE"}
 
 
+_FABRICATED = set()
+
 def _template_series(frames):
     """A real metrics series, retimed -- for the same reason as the diag template.
 
@@ -128,13 +130,23 @@ def fabricate_run(name, protr=None, broken=(), frames=401):
     json.dump({"series": _template_series(frames)}, open(os.path.join(d, "metrics.json"), "w"))
     for f in ("movie.mp4", "strip.png"):
         open(os.path.join(d, f), "wb").write(b"\0" * 64)
+    _FABRICATED.add(d)
     return d
 
 
+
 def clear_runs(prefix):
-    for d in glob.glob(os.path.join(LOG, f"{prefix}*")):
+    """Remove ONLY what this harness fabricated. Never a real run.
+
+    The first version was `rmtree(log/okuda/r0*)`, and it deleted the twelve recon runs from the
+    evening's live launch -- diag, metrics, movies and captions -- because they share the naming
+    the harness uses. A test fixture that destroys production data is a worse defect than any it
+    can find. The fabricator records what it created; nothing else is ever touched.
+    """
+    for d in sorted(_FABRICATED):
         if os.path.isdir(d):
             shutil.rmtree(d, ignore_errors=True)
+    _FABRICATED.clear()
 
 
 # --------------------------------------------------------------------------- the fake agents
@@ -425,9 +437,10 @@ if __name__ == "__main__":
     ap.add_argument("--batch", type=int, default=12)
     a = ap.parse_args()
 
+    import atexit
     st = install(a.scenario)
     isolate()
-    clear_runs("r0")
+    atexit.register(clear_runs, "r0")      # remove what we made, when we are done making it
     import round as R
     print(f"[offline] scenario={a.scenario} mode={a.mode} batch={a.batch} -- no agent, no GPU\n")
     code = R.run_round(mode=a.mode, batch=a.batch, frames=401)
