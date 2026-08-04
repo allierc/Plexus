@@ -1252,6 +1252,21 @@ def build_recon_batch(sup, cfg, n_slots, ledger):
     import shutil
     import composition_space as CS
     tab = ARCH.log_table(top=24)
+    # A SPEC ON DISK THAT HAS NEVER RUN IS STILL A CANDIDATE. The table is built from runs with
+    # RESULTS, so a composition placed on disk to be measured -- round40_mc8, okuda_route, the two
+    # that carry the coupling -- is invisible to the Proposer, which then reports "all 12 that
+    # exist" and means "all 12 the archive knows". Never-measured is the strongest reason to
+    # measure something, not a reason to hide it.
+    _known = set(tab or "")
+    _new = [os.path.basename(os.path.dirname(q))
+            for q in sorted(glob.glob(os.path.join(LOG, "*", "spec_run.yaml")))
+            if os.path.basename(os.path.dirname(q)) not in (tab or "")
+            and not os.path.exists(os.path.join(os.path.dirname(q), "diag.json"))]
+    if _new:
+        tab = (tab or "") + ("\n\nON DISK, NEVER MEASURED -- no row above because they have no "
+                             "results yet. These are specs someone placed here to be run:\n  "
+                             + "\n  ".join(_new))
+        print(T_.quiet(f"  [recon] {len(_new)} unmeasured spec(s) offered: {', '.join(_new)}"))
     ok, choice = P.choose_specs(tab, n=n_slots, ledger=ledger)
     names = choice.get("runs") or []
     print(f"[recon] the Proposer chose {len(names)}:")
