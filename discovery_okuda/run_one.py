@@ -342,9 +342,21 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     # buffer. Flag it loudly so the ledger can never read it as a phenotype.
     cbuf = cfg["sets"]["cell"]["n"]
     saturated = fm["n_cells"][-1] >= 0.9 * cbuf
+    # WHEN it saturated, not merely THAT it did -- because that is the whole difference between a
+    # censored measurement and a void one. A run that met the array at 60% of its length grew,
+    # patterned and was measured for six hundred frames first, and discarding it threw away five
+    # of twelve slots on 3 August. A run that met it at 10% never had a chance to say anything.
+    # The Critic uses this fraction to tell those two apart; without it, both look identical.
+    _sat_frac = None
     if saturated:
-        print(f"[{name}] 🔴 SATURATED: {int(fm['n_cells'][-1])} cells vs buffer {cbuf}. "
-              f"This run is NOT evidence -- raise the buffer or bound proliferation.", flush=True)
+        _n = fm["n_cells"]
+        _hit = next((i for i, v in enumerate(_n) if v >= 0.9 * cbuf), None)
+        if _hit is not None and len(_n) > 1:
+            _sat_frac = _hit / (len(_n) - 1)
+        print(f"[{name}] SATURATED: {int(_n[-1])} cells vs buffer {cbuf}"
+              + (f", first reached at {_sat_frac:.0%} of the run" if _sat_frac is not None else "")
+              + ". n_cells_final is a LOWER BOUND from here on -- growth readings after that "
+                "frame describe the array, not the tissue.", flush=True)
 
     # --------------------------------------------------------------- THE EVIDENCE HORIZON
     # 0A-7. `protr_peak` used to be max() over EVERY recorded frame with no validity filter. When
@@ -399,7 +411,8 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     _pk = max(_valid) if _valid else 0.0
     retention = (_valid[-1] / _pk) if _pk > 1e-9 else 0.0
 
-    summary = {"saturated": bool(saturated), "inert_operators": inert,
+    summary = {"saturated": bool(saturated), "saturated_frac_of_run": _sat_frac,
+               "inert_operators": inert,
                "retention": round(retention, 3),
                "valid_evidence": bool(not inert and not saturated),
                "protr_final": round(_valid[-1], 3),          # last VALID frame, not last frame

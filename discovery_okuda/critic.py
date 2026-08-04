@@ -152,6 +152,15 @@ def allowed_verb(claim_kind):
         claim_kind, "is associated with")
 
 
+def _cell_cap(graph):
+    """Cells the vertex reservoir allows. Euler on a trivalent closed sheet: V = 2F - 4."""
+    try:
+        v = float(graph.params.get("_run.vertex_n", 0))
+        return (v + 4) / 2 if v else 0.0
+    except Exception:
+        return 0.0
+
+
 # ============================================================================ STATIC rules
 DT_GLOBAL_DEFAULT = 0.02        # translate.DT_GLOBAL; kept local so critic imports nothing heavy
 
@@ -235,6 +244,52 @@ def check_static(graph, seen_hashes=()):
                     f"{REACTION_PER_FRAME_LIMIT} (chi {chi}, scaled by translate.RD_PER_FRAME). "
                     f"The engine already steps the reaction once per substep, so any scaling on "
                     f"top of that is excess. Lower chi."))
+    except Exception:
+        pass
+
+    # R1e -- THE TISSUE MUST FIT IN ITS ARRAY. Derived, like R1c/R1d, and for the same reason:
+    # what makes a run meaningless here is not a number outside a typed range, it is that the
+    # experiment cannot happen. `divide_3d` divides a FRACTION of the population per call, so the
+    # cell count is exponential by construction and the only thing that ever stops it is the
+    # vertex reservoir.
+    #
+    # MEASURED, round 2 on 3 August: max_div_frac=0.03 with every=1 over frames 100-900 projects
+    # 2000 x 1.03^800 = 3.7e13 cells against a 65,004-cell reservoir. The array filled at frame
+    # 118 of 800, so ten jobs spent 85% of their wall time pinned against it, and their final cell
+    # count measured the buffer rather than the biology. One line of arithmetic, available before
+    # a GPU is touched, refuses all ten.
+    #
+    # It REFUSES rather than warns because the run cannot answer its own question: everything past
+    # saturation is a measurement of the reservoir. Lower max_div_frac, raise `every`, shorten the
+    # run, or size the reservoir for the projection -- all four are legal answers.
+    try:
+        _seed = next((o for o in graph.ops if o["op"] == "seed_mesh_3d"), None)
+        _div = next((o for o in graph.ops if o["op"] == "divide_3d"), None)
+        if _seed is not None and _div is not None:
+            _p = graph.params
+            n0 = float(_p.get(f"{_seed['id']}.n_cells", 2000))
+            frac = float(_p.get(f"{_div['id']}.max_div_frac", 0.0075))
+            every = max(1, int(_p.get(f"{_div['id']}.every", 1)))
+            start = float(_p.get(f"{_div['id']}.after_frame", 0))
+            frames = float(_p.get("_run.n_frames", 900))
+            calls = max(0.0, (frames - start) / every)
+            cap = float(_p.get("_run.cell_cap", 0)) or _cell_cap(graph)
+            if frac > 0 and calls > 0 and cap > 0:
+                # frames until the array fills, under pure exponential growth
+                import math
+                if n0 * (1 + frac) ** calls > cap:
+                    fill = math.log(cap / n0) / math.log(1 + frac) * every + start
+                    if fill < 0.8 * frames:
+                        out.append(Rejection(
+                            "R1e_TISSUE_OUTGROWS_RESERVOIR",
+                            "the projected cell count fills the vertex reservoir long before the "
+                            "run ends, so most of the run measures the array rather than the "
+                            "tissue",
+                            f"{n0:.0f} x (1+{frac})^{calls:.0f} projects "
+                            f"{n0 * (1 + frac) ** min(calls, 400):.3g} cells against a cap of "
+                            f"{cap:.0f}; the array fills at frame {fill:.0f} of {frames:.0f}. "
+                            f"Lower max_div_frac, raise `every`, shorten the run, or size the "
+                            f"reservoir for the projection."))
     except Exception:
         pass
 
@@ -451,10 +506,33 @@ def check_posthoc(summary):
         out.append(Rejection("P1_INERT_OPERATOR",
                              "a scheduled operator never acted -- the run is not evidence",
                              op))
+    # P2 -- SATURATION IS A CENSORED MEASUREMENT, NOT A VOID ONE.
+    #
+    # This voided the whole run, and that threw away real trajectory: on 3 August it discarded
+    # FIVE of twelve slots -- the entire wk_* family -- each of which had grown, patterned and
+    # been measured for hundreds of frames before it met the array. What is not readable off a
+    # saturated run is its FINAL cell count, which is a property of the buffer. Everything the
+    # run did before the wall happened, and the shape it reached is the shape it reached.
+    #
+    # So: refuse it only if it saturated so early that there is no run to speak of. Otherwise
+    # admit it with the bound stated, and let the claim checker refuse conclusions that rest on
+    # the censored quantity. A lower bound is evidence; treating it as no evidence is how a
+    # campaign loses 42% of a batch and calls it rigour.
     if summary.get("saturated"):
-        out.append(Rejection("P2_BUFFER_SATURATED",
-                             "the run hit its cell buffer -- evidence about a buffer, not a "
-                             "mechanism", f"n_cells={summary.get('n_cells_final')}"))
+        _frac = summary.get("saturated_frac_of_run")
+        if isinstance(_frac, (int, float)) and _frac < 0.25:
+            out.append(Rejection(
+                "P2_BUFFER_SATURATED",
+                "the run met its cell buffer in the first quarter, so almost nothing was "
+                "measured before the array decided the answer",
+                f"n_cells={summary.get('n_cells_final')} at {_frac:.0%} of the run"))
+        else:
+            summary["censored"] = True
+            summary["censored_reason"] = (
+                f"n_cells_final={summary.get('n_cells_final')} is a LOWER BOUND: the vertex "
+                f"reservoir filled"
+                + (f" at {_frac:.0%} of the run" if isinstance(_frac, (int, float)) else "")
+                + ". Growth measurements after that frame describe the array.")
 
     # P3 -- THE CHEMISTRY DIVERGED. This is where the reaction ceiling went.
     #

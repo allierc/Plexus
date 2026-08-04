@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  3 AUG 2026 20:53
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  3 AUG 2026 22:17
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -738,43 +738,35 @@ Underfull \hbox (badness 3701) in paragraph at lines 281--281
 [5]
 
 [6]
-
-[7]
-
-[8{/usr/share/texmf/fonts/enc/dvips/cm-super/cm-super-ts1.enc}]
-Underfull \hbox (badness 4378) in paragraph at lines 606--607
+Underfull \hbox (badness 4378) in paragraph at lines 495--496
 []|\T1/cmr/bx/n/10.95 free --- and to-day un-rep-re-
  []
 
 
 
-[9]
-
-[10]
-
-[11]
-Underfull \hbox (badness 4205) in paragraph at lines 760--761
+[7]
+Underfull \hbox (badness 4205) in paragraph at lines 542--543
 []|\T1/cmr/m/n/10.95 a con-tract as-serted in prose, en-forced
  []
 
 
 LaTeX Font Warning: Font shape `T1/cmr/m/scit' undefined
-(Font)              using `T1/cmr/m/scsl' instead on input line 808.
+(Font)              using `T1/cmr/m/scsl' instead on input line 590.
 
 
+
+[8]
+
+[9]
+
+[10{/usr/share/texmf/fonts/enc/dvips/cm-super/cm-super-ts1.enc}]
+
+[11]
 
 [12]
 
 [13]
-
-[14]
-
-[15]
-
-[16]
-
-[17]
-Overfull \hbox (1.01701pt too wide) in paragraph at lines 1043--1045
+Overfull \hbox (1.01701pt too wide) in paragraph at lines 825--827
 []\T1/cmr/m/n/10 My work-ing log is \T1/cmtt/m/n/10 SESSION_LOG.md\T1/cmr/m/n/1
 0 ; the find-ings reg-is-ter is \T1/cmtt/m/n/10 findings.py \T1/cmr/m/n/10 and 
 the premises are \T1/cmtt/m/n/10 PREMISES.md\T1/cmr/m/n/10 .
@@ -782,7 +774,7 @@ the premises are \T1/cmtt/m/n/10 PREMISES.md\T1/cmr/m/n/10 .
 
 
 
-[18] (./discovery_note.aux)
+[14] (./discovery_note.aux)
  ***********
 LaTeX2e <2024-11-01> patch level 2
 L3 programming layer <2025-01-18>
@@ -791,11 +783,11 @@ Package rerunfilecheck Info: File `discovery_note.out' has not changed.
 (rerunfilecheck)             Checksum: F5D40AD06ADB1B0580AB2B64C07E0CB7;1340.
  ) 
 Here is how much of TeX's memory you used:
- 24193 strings out of 475102
- 467643 string characters out of 5764878
+ 24176 strings out of 475102
+ 467365 string characters out of 5764878
  857482 words of memory out of 5000000
- 46816 multiletter control sequences out of 15000+600000
- 577262 words of font info for 72 fonts, out of 8000000 for 9000
+ 46804 multiletter control sequences out of 15000+600000
+ 576586 words of font info for 71 fonts, out of 8000000 for 9000
  59 hyphenation exceptions out of 8191
  116i,11n,121p,454b,1036s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></us
@@ -809,19 +801,18 @@ onts/type1/public/amsfonts/cm/cmsy9.pfb></usr/share/texmf/fonts/type1/public/cm
 nts/type1/public/cm-super/sfbx1000.pfb></usr/share/texmf/fonts/type1/public/cm-
 super/sfbx1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1200.pfb><
 /usr/share/texmf/fonts/type1/public/cm-super/sfbx1728.pfb></usr/share/texmf/fon
-ts/type1/public/cm-super/sfcc1095.pfb></usr/share/texmf/fonts/type1/public/cm-s
-uper/sfrm0900.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm1000.pfb></
-usr/share/texmf/fonts/type1/public/cm-super/sfrm1095.pfb></usr/share/texmf/font
-s/type1/public/cm-super/sfrm1200.pfb></usr/share/texmf/fonts/type1/public/cm-su
-per/sfsc1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfti0900.pfb></u
-sr/share/texmf/fonts/type1/public/cm-super/sfti1000.pfb></usr/share/texmf/fonts
-/type1/public/cm-super/sfti1095.pfb></usr/share/texmf/fonts/type1/public/cm-sup
-er/sftt0900.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt1000.pfb></us
-r/share/texmf/fonts/type1/public/cm-super/sftt1095.pfb>
-Output written on discovery_note.pdf (18 pages, 581294 bytes).
+ts/type1/public/cm-super/sfrm0900.pfb></usr/share/texmf/fonts/type1/public/cm-s
+uper/sfrm1000.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm1095.pfb></
+usr/share/texmf/fonts/type1/public/cm-super/sfrm1200.pfb></usr/share/texmf/font
+s/type1/public/cm-super/sfsc1095.pfb></usr/share/texmf/fonts/type1/public/cm-su
+per/sfti0900.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfti1000.pfb></u
+sr/share/texmf/fonts/type1/public/cm-super/sfti1095.pfb></usr/share/texmf/fonts
+/type1/public/cm-super/sftt0900.pfb></usr/share/texmf/fonts/type1/public/cm-sup
+er/sftt1000.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt1095.pfb>
+Output written on discovery_note.pdf (14 pages, 541868 bytes).
 PDF statistics:
- 256 PDF objects out of 1000 (max. 8388607)
- 183 compressed objects within 2 object streams
- 28 named destinations out of 1000 (max. 500000)
+ 232 PDF objects out of 1000 (max. 8388607)
+ 165 compressed objects within 2 object streams
+ 24 named destinations out of 1000 (max. 500000)
  69 words of extra memory for PDF output out of 10000 (max. 10000000)
 
