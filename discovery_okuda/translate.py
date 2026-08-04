@@ -214,7 +214,7 @@ def _emit_shape_energy(g, n, ga):
     if g.impl_of(n) == "monolayer":
         return {"op": "shape_energy_3d", "implementation": "monolayer", "at": "vertex",
                 "k_v": float(_p(g, i, "K_V")), "kappa_s": float(_p(g, i, "kappa_s")),
-                "h0": float(_p(g, i, "h0")), "gamma": float(_p(g, i, "mono_gamma")),
+                "h0": float(_p(g, i, "h0")), "gamma": float(_p(g, i, "gamma")),
                 "mu": 1.0, "dt": DT_GLOBAL, "relax_iters": int(_p(g, i, "relax_iters")),
                 "eta": 0.08, "cap_frac": 0.12}
     return {"op": "shape_energy_3d", "at": "vertex",
@@ -260,7 +260,7 @@ def _emit_rd_seed(g, n, ga):
 def _emit_react(g, n, ga):
     i, impl = n["id"], g.impl_of(n)
     base = {"op": "cell_react", "at": "cell", "implementation": impl,
-            "rate": float(_p(g, i, "rd_rate")) * RD_PER_FRAME}   # D5: physical time, not substeps
+            "rate": float(_p(g, i, "rate")) * RD_PER_FRAME}   # D5: physical time, not substeps
     if impl == "gierer_meinhardt":
         base.update({"gm_rho": 1.0, "mu_a": 1.0, "mu_h": float(_p(g, i, "mu_h")),
                      "a0": float(_p(g, i, "a0"))})
@@ -275,7 +275,7 @@ def _emit_growth(g, n, ga):
     i = n["id"]
     return {"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell",
             "rate": float(_p(g, i, "rate")), "a_sw": float(_p(g, i, "a_sw")),
-            "hill": float(_p(g, i, "alpha")), "rho": float(_p(g, i, "rho")),
+            "hill": float(_p(g, i, "hill")), "rho": float(_p(g, i, "rho")),
             "vth_frac": GROWTH_CEILING, "after_frame": ga, "dt": DT_GLOBAL,
             "conserve_amount": g.impl_of(n) == "hill_conserve_amount"}
 
@@ -313,7 +313,7 @@ EMIT = {
     "divide_3d": _emit_divide,
     "extrude": _emit_extrude,
     "reconnect_t1_3d": lambda g, n, ga: {
-        "op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": float(_p(g, n["id"], "l_th")) * 7.0,
+        "op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": float(_p(g, n["id"], "l_th_frac")) * 7.0,
         "every": 1, "max_flips": 300},                          # D1
     "cell_geometry_3d": lambda g, n, ga: {"op": "cell_geometry_3d", "at": "cell"},
     "cell_adjacency": lambda g, n, ga: {"op": "cell_adjacency", "at": "cell"},
@@ -345,7 +345,16 @@ EMIT = {
 # --------------------------------------------------------------------------- graph -> spec
 
 # Params the emitter renames on the way out, so "set but not emitted" is not a lie about them.
-_ALIASED = {"alpha": "hill", "rd_rate": "rate", "mono_gamma": "gamma", "l_th": "l_th_frac"}
+# EMPTY, AND IT STAYS EMPTY. This mapped four graph-side names onto four engine-side names --
+# rd_rate/rate, alpha/hill, mono_gamma/gamma, l_th/l_th_frac -- and every consumer that did not
+# consult it silently read None. That is not a translation problem, it is TWO NAMES FOR ONE THING,
+# and the alias table was the workaround rather than the fix. R1d asked for `rate`, `cell_react`
+# declared `rd_rate`, and so it refused every gierer_meinhardt-with-division composition
+# unconditionally for weeks while printing "rate None".
+#
+# The declarations now use the ENGINE's names, because the engine is what actually runs. An entry
+# here would reintroduce the disease; if a rename is ever needed, rename.
+_ALIASED = {}
 
 
 def _assert_params_consumed(graph, node, spec_op):
@@ -636,7 +645,7 @@ def from_preset(p: dict) -> CompositionGraph:
         ("shape_energy_3d", "K_V", p.get("K_V")), ("shape_energy_3d", "relax_iters", p.get("relax")),
         ("shape_energy_3d", "kappa_s", p.get("kappa_s")), ("shape_energy_3d", "h0", p.get("h0")),
         ("morphogen_growth_3d", "rate", p.get("rate")), ("morphogen_growth_3d", "a_sw", p.get("a_sw")),
-        ("morphogen_growth_3d", "alpha", p.get("hill")), ("morphogen_growth_3d", "rho", p.get("rho")),
+        ("morphogen_growth_3d", "hill", p.get("hill")), ("morphogen_growth_3d", "rho", p.get("rho")),
         ("divide_3d", "cycle_cv", p.get("cycle_cv")),
         # CLOCK RE-ANCHORING: these are per-CALL in the operator and the archived configs ran
         # divide_3d once every 4 frames. Rescale so the replay preserves the archived
@@ -658,15 +667,15 @@ def from_preset(p: dict) -> CompositionGraph:
         ("cell_rd_seed", "n_spots", p.get("spots")),
         ("cell_react", "F", p.get("F")), ("cell_react", "kk", p.get("kk")),
         ("cell_react", "mu_h", p.get("mu_h")),
-        ("shape_energy_3d", "mono_gamma", p.get("mono_gamma")),
+        ("shape_energy_3d", "gamma", p.get("gamma")),
         ("cell_diffuse", "chi", p.get("chi")), ("cell_diffuse", "d_a", p.get("d_a")),
         ("cell_diffuse", "d_h", p.get("d_h")),
-        ("cell_react", "rd_rate", p.get("rd_rate")), ("cell_react", "a0", p.get("a0")),
+        ("cell_react", "rate", p.get("rate")), ("cell_react", "a0", p.get("a0")),
         ("cell_react", "gamma", p.get("gamma")),
         ("cell_rd_seed", "cone_deg", p.get("cone_deg")),
         ("cell_rd_seed", "tip_radius", p.get("tip_radius")),
         ("cell_rd_seed", "amp", p.get("amp")),
-        ("reconnect_t1_3d", "l_th", (p.get("l_th_frac") / 7.0) if p.get("l_th_frac") else None),
+        ("reconnect_t1_3d", "l_th_frac", p.get("l_th_frac")),
     ]
     for op, pname, val in mapping:
         nid = node(op)

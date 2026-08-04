@@ -258,15 +258,15 @@ def chi_ceiling(d, dt=None, stencil_gain=1.0):
 #
 # `reaction_stiffness` is kept because it is the correct linear-decay rate and is useful for
 # reporting; it is deliberately NOT wired to a blocking condition.
-def reaction_stiffness(impl, rd_rate=1.0, mu_h=1.0, F=0.055, kk=0.062, gamma=0.3):
+def reaction_stiffness(impl, rate=1.0, mu_h=1.0, F=0.055, kk=0.062, gamma=0.3):
     """Stiffest LINEAR decay rate of a kinetics implementation, in engine time units.
 
     NOT a stability criterion -- see the measurements above. Reporting only.
     """
     if impl == "gierer_meinhardt":       # da = ... - mu_a*a ;  dh = ... - mu_h*h ; scaled by rate
-        return float(rd_rate) * max(GM_MU_A, float(mu_h))
+        return float(rate) * max(GM_MU_A, float(mu_h))
     if impl == "gray_scott":             # da = ... - (F+kk)*a ; scaled by rate
-        return float(rd_rate) * (float(F) + float(kk))
+        return float(rate) * (float(F) + float(kk))
     if impl == "brusselator":            # da = gamma*(... - (B+1)*a ...); `rate` is NOT read
         return float(gamma) * (BRUSSELATOR_B + 1.0)
     return 0.0
@@ -361,12 +361,12 @@ OPERATORS = {
         impls=["default", "monolayer"], impl_structural=True,       # mid-surface vs true 3D volume
         params={"K_V": (1.0, 8.0, 6.0), "kappa_s": (0.05, 0.6, 0.2),
                 "Gamma": (0.0, 0.4, 0.05), "Lambda": (0.0, 0.3, 0.20),
-                "p0": (3.4, 4.2, 3.90), "h0": (0.05, 0.4, 0.40), "mono_gamma": (0.0, 0.3, 0.06),
+                "p0": (3.4, 4.2, 3.90), "h0": (0.05, 0.4, 0.40), "gamma": (0.0, 0.3, 0.06),
                 "relax_iters": (10, 90, 30)}),
     "reconnect_t1_3d": dict(
         stage=1, role="topology", outputs=[], slots=[], needs=[],
         impls=["length_threshold"], impl_structural=False,
-        params={"l_th": (0.01, 0.12, 0.04)}),
+        params={"l_th_frac": (0.01, 0.12, 0.04)}),
 
     # ---------------------------------------------------------------- Stage 2: growth & topology
     "vesicle_growth": dict(                                  # uniform, body-wide inflation
@@ -381,7 +381,7 @@ OPERATORS = {
         # the Hill function (see hill_alpha_ceiling). lo = 1.0 stays: below 1 the Hill switch has
         # infinite slope at the origin and stops being a switch.
         params={"rate": (0.002, 0.03, 0.010), "a_sw": (A_SW_MIN, A_SW_MAX, A_SW_DEFAULT),
-                "alpha": (1.0, ALPHA_CEIL, 4.0), "rho": (0.0, 1.0, 0.0)}),
+                "hill": (1.0, ALPHA_CEIL, 4.0), "rho": (0.0, 1.0, 0.0)}),
     "divide_3d": dict(
         # `hertwig` splits normal to the cell's OWN longest axis -> needs no morphogen input.
         # `orient_iface` stacks daughters along the bud axis -> needs the activator routed in.
@@ -446,7 +446,7 @@ OPERATORS = {
         # An absent bound is the honest state; 3.0 was a hand-written one that hid three decades.
         # gamma (brusselator): was (0.1, 100.0), equally hand-written. Also open above.
         params={"gamma": (0.0, GAMMA_CEIL, 0.3), "a0": (0.0, 0.05, 0.01),
-                "rd_rate": (0.0, RD_RATE_CEIL, 1.0),
+                "rate": (0.0, RD_RATE_CEIL, 1.0),
                 "F": (0.02, 0.06, F_DEFAULT), "kk": (0.05, 0.07, KK_DEFAULT),
                 "mu_h": (0.2, 2.0, MU_H_DEFAULT)}),
     "cell_rd_seed": dict(                                     # the prescribed activation driver
@@ -502,11 +502,11 @@ def slots_of(op: str, impl: str):
 # Listed here: sigma pinned to the width of the OLD, pre-widening box, so this change is
 # basin-preserving by construction and no existing robustness claim changes meaning.
 PARAM_BASIN = {
-    ("morphogen_growth_3d", "alpha"): 8.0 - 1.0,        # old box (1.0, 8.0)
+    ("morphogen_growth_3d", "hill"): 8.0 - 1.0,        # old box (1.0, 8.0)
     ("cell_diffuse", "d_a"): 0.2 - 0.005,               # old box (0.005, 0.2)
     ("cell_diffuse", "d_h"): 2.0 - 0.1,                 # old box (0.1, 2.0)
     ("cell_diffuse", "chi"): 10.0 - 1.0,                # old box (1.0, 10.0)
-    ("cell_react", "rd_rate"): 3.0 - 0.2,               # old box (0.2, 3.0)
+    ("cell_react", "rate"): 3.0 - 0.2,               # old box (0.2, 3.0)
     ("cell_react", "gamma"): 100.0 - 0.1,               # old box (0.1, 100.0). Inherited, not
     #   endorsed -- the box above it is now open, so a basin MUST be stated explicitly, and
     #   restating the old one is the only choice that changes nothing else.
@@ -772,7 +772,7 @@ class CompositionGraph:
             # against the real operators and refuted. See "explicit reaction" above.
 
             elif op == "morphogen_growth_3d":
-                a_sw, alpha = self.theta(nid, "a_sw"), self.theta(nid, "alpha")
+                a_sw, alpha = self.theta(nid, "a_sw"), self.theta(nid, "hill")
                 ceil = hill_alpha_ceiling(a_sw)
                 if alpha > ceil:
                     out.append(ThetaCondition(
@@ -1220,7 +1220,7 @@ def reference_recipes():
     # this recipe with 1 of its 22 parameters. The physics survived (the emitter falls back to the
     # declared defaults and the emitted spec is byte-identical), but a recipe named "the target"
     # carrying no explicit operating point is what made the theta hash non-canonical below.
-    h = h.with_params({**h.params, "cell_react0.rd_rate": 0.4})
+    h = h.with_params({**h.params, "cell_react0.rate": 0.4})
     out["okuda_route"] = h
 
     # the degenerate control the search must visit on its way: uniform inflation, no patterning.
@@ -1307,10 +1307,10 @@ if __name__ == "__main__":
     print("\n" + "-" * 88)
     print("REACHABILITY -- Okuda's published values are inside the boxes")
     print("-" * 88)
-    for op, pn, val, what in [("morphogen_growth_3d", "alpha", 10.0, "growth-switch sharpness"),
+    for op, pn, val, what in [("morphogen_growth_3d", "hill", 10.0, "growth-switch sharpness"),
                               ("cell_diffuse", "d_h", 10.0, "inhibitor spread"),
-                              ("cell_react", "rd_rate", 0.01, "chemistry speed, bottom decade"),
-                              ("cell_react", "rd_rate", 100.0, "chemistry speed, top decade")]:
+                              ("cell_react", "rate", 0.01, "chemistry speed, bottom decade"),
+                              ("cell_react", "rate", 100.0, "chemistry speed, top decade")]:
         lo, hi, d = OPERATORS[op]["params"][pn]
         assert lo <= val <= hi, f"{op}.{pn}={val} still unreachable"
         print(f"  {op}.{pn:8} = {val:<8g} in [{lo:g}, {hi:g}]  default still {d:g}   [{what}]")
