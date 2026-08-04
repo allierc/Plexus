@@ -211,7 +211,7 @@ def _graph_from_run(name):
             import yaml as _y
             import composition_space as _CS
             spec = _y.safe_load(open(sp)) or {}
-            ops, seen_op, params, skipped = [], {}, {}, []
+            ops, seen_op, params, skipped, clock_dropped = [], {}, {}, [], []
             for o in (spec.get("operators") or []):
                 nm = o.get("op")
                 if not nm:
@@ -235,8 +235,24 @@ def _graph_from_run(name):
                 ops.append({"id": oid, "op": nm,
                             "impl": _im if _im in _impls else _impls[0]})
                 for k, v in o.items():
-                    if k not in ("op", "implementation", "impl", "at"):
-                        params[f"{oid}.{k}"] = v
+                    if k in ("op", "implementation", "impl", "at"):
+                        continue
+                    # THE CLOCK-COUPLED PARAMETERS ARE NOT PORTABLE, and carrying them is what
+                    # blew up round 2. The archived specs run `every: 4`; a rebuilt graph runs
+                    # `every: 1`. `max_div_frac = 0.03` therefore means 0.03 PER CALL there and
+                    # 0.03 PER FRAME here -- FOUR TIMES the proliferation. Measured: 2000 cells
+                    # became 48,459 by frame 214, and the projection 2000 x 1.03^800 = 3.7e13
+                    # against a 65,004 reservoir, so the array filled at frame 118 of 800 and
+                    # every job spent 85% of its wall time pinned against it.
+                    #
+                    # composition_space.CLOCK_COUPLED names them and states the conversion, and
+                    # this function ignored it. Rather than apply a factor that is only exact for
+                    # the archived period, drop them: the vocabulary defaults ARE the re-anchored
+                    # working point (max_div_frac 0.0075 per frame, not 0.03 per call).
+                    if k in _CS.CLOCK_COUPLED or k == "every":
+                        clock_dropped.append(f"{oid}.{k}")
+                        continue
+                    params[f"{oid}.{k}"] = v
             if ops:
                 g = _CS.CompositionGraph(ops=ops, conns=[], params=params)
                 # WIRE WHAT IS UNAMBIGUOUS. A spec records operators, not connections, so every
@@ -314,6 +330,9 @@ def _graph_from_run(name):
                 # contain our own evidence." It is reported here, once per run, and the caller
                 # falls back rather than pretending.
                 _note = f", {len(skipped)} instrument op(s) left out" if skipped else ""
+                if clock_dropped:
+                    _note += (f", {len(clock_dropped)} clock-coupled param(s) reset to the "
+                              f"re-anchored defaults")
                 _dnote = f"; dropped {len(dropped)} param(s) the space disallows" if dropped else ""
                 _adm, _why = C.admit(g, ())
                 _snote = "" if _adm else f"; STILL REFUSED: {str(_why)[:70]}"

@@ -299,12 +299,24 @@ def _n_from_prompt(p):
 def _campaign_is_live():
     """Is a real campaign running right now? Then this harness must not touch campaign/."""
     import subprocess
+    # MATCH A PYTHON PROCESS RUNNING THE LOOP, not any command line that mentions it. The first
+    # version used `pgrep -f "campaign_loop.py|round.py --mode"` and matched the SHELL that was
+    # asking -- its own argv contained the pattern -- so the guard reported a live campaign when
+    # nothing was running and refused every test. A check that cannot distinguish a campaign from
+    # a question about one is not a check.
     try:
-        out = subprocess.run(["pgrep", "-f", "campaign_loop.py|round.py --mode"],
-                             capture_output=True, text=True, timeout=10).stdout.split()
-        return [p for p in out if p and p != str(os.getpid())]
+        out = subprocess.run(["pgrep", "-af", r"python[0-9.]*\s.*(campaign_loop\.py|round\.py)"],
+                             capture_output=True, text=True, timeout=10).stdout.strip()
     except Exception:
         return []
+    mine = {str(os.getpid()), str(os.getppid())}
+    live = []
+    for line in out.splitlines():
+        pid, _, cmd = line.partition(" ")
+        if pid in mine or "pgrep" in cmd or "offline.py" in cmd or "test_offline" in cmd:
+            continue
+        live.append(pid)
+    return live
 
 
 def isolate():
