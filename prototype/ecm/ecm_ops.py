@@ -328,3 +328,77 @@ class ECMStress(Lateral):
         ch[:] = band.to(ch.dtype).reshape(ch.shape)
         STRESS_HISTORY.append(band.detach().to("cpu", torch.uint8).numpy())
         return {}
+
+
+@register_operator("cell_to_ecm", family="mechanics", set="particle", kind="lateral",
+                   implementation="replay")
+class CellToECMReplay(Lateral):
+    """The REAL tissue's recorded surface, pushing the matrix.
+
+    `implementation: sphere` is a prescribed ball and knows nothing about cells. This one replays
+    an actual cellfix_B_new run: 200 epithelial cells growing and dividing to 300-odd under their
+    own vertex mechanics, at their own scale, with their own parameters -- none of it rescaled,
+    because rescaling was measured to break it (see combine.py).
+
+    THE SURFACE IS AN ANGULAR RADIUS MAP. Each frame carries R(theta, phi), the distance to the
+    furthest cell in that direction. A particle's own direction gives its bin, and one comparison
+    decides whether the tissue has reached it -- O(1) per particle rather than a point-in-mesh
+    test against four thousand faces, which is what makes 48,000 particles affordable per frame.
+    It assumes the vesicle is STAR-SHAPED. cellfix_B_new is; P11 is the premise that reports when
+    a tissue stops being, and a run that trips it has left this operator's domain of validity.
+
+    THE COUPLING IS ONE-WAY HERE, and the reason is scale, not modelling. The reaction force is
+    computed and returned by the `sphere` implementation for a live tissue; a replay has no live
+    tissue to return it to -- pass 1 finished before pass 2 began. So this shows how a growing
+    epithelium LOADS a matrix, and does not show the matrix shaping the epithelium back.
+    """
+    EMIT = "mpm_acceleration"
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = ["k", "surface"]
+    MECHANISM_TAGS = ["cell_matrix_contact", "moving_boundary", "recorded_tissue"]
+    PARAM_ROLES = {"k": "contact_stiffness", "scale": "surface_rescale"}
+    REFERENCE = "Okuda, S. et al. (2018) Sci. Rep. 8:2386."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        import numpy as _np
+        self.at = params.get("_at", "mpm_particle")
+        self.centre = [float(v) for v in params.get("centre", [0.5, 0.5, 0.5])]
+        self.k = float(params["k"])
+        self.scale = float(params.get("scale", 1.0))
+        z = _np.load(str(params["surface"]))
+        self.smap = torch.as_tensor(z["smap"], dtype=torch.float32) * self.scale   # [T, nth, nph]
+        self.T = int(self.smap.shape[0])
+        self._frame = -1
+        self._t = 0
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        dev, dt_ = pos.device, pos.dtype
+        f = int(getattr(H, "frame", -1) or -1)
+        if f != self._frame:
+            self._frame = f
+            self._t = min(self.T - 1, max(0, f))
+        M = self.smap[self._t].to(dev, dt_)
+        nth, nph = M.shape
+
+        c = torch.tensor(self.centre, device=dev, dtype=dt_)
+        d = pos - c
+        r = d.norm(dim=1).clamp_min(1e-9)
+        u = d / r[:, None]
+        th = torch.acos(u[:, 2].clamp(-1, 1))
+        ph = torch.atan2(u[:, 1], u[:, 0]) % (2 * math.pi)
+        it = (th / math.pi * nth).long().clamp(0, nth - 1)
+        ip = (ph / (2 * math.pi) * nph).long().clamp(0, nph - 1)
+        R = M[it, ip]
+
+        depth = R - r
+        hit = depth > 0
+        acc = torch.zeros_like(pos)
+        if hit.any():
+            acc[hit] = self.k * depth[hit][:, None] * u[hit]
+        BALL_RADIUS.append(float(M.median()))
+        if mask is not None:
+            acc = acc * mask[:, None].float()
+        return {self.at: acc * lvl.occ[:, None].float()}
