@@ -392,8 +392,12 @@ OPERATORS = {
         impls=["hertwig", "orient_iface"], impl_structural=True,   # long-axis vs bud-axis septum
         params={"cycle_cv": (0.05, 0.5, 0.40), "min_cycle": (2, 64, 16),   # 4 calls x 4
                 "max_cycle": (6, 10**9, 10**9), "vcap": (0.0, 3.0, 1.5),   # vcap: PROVISIONAL
-                "max_div_frac": (0.00125, 0.20, 0.0075),   # 0.03/call / 4 = per-frame
-                "max_div": (4, 480, 30),                   # 120/call / 4 = per-frame FLOOR
+                # FLOOR AT ZERO, for the same reason max_div's is. The box started at 0.00125 and
+                # Okuda's own doubling -- 2,000 cells to 4,000 over 900 frames -- needs 0.000867,
+                # so the declared range could not express the experiment the campaign exists to
+                # reproduce. A prior drawn around what we had been running, not around the paper.
+                "max_div_frac": (0.0, 0.20, 0.0075),   # 0.03/call / 4 = per-frame
+                "max_div": (0, 480, 30),                   # 120/call / 4 = per-frame FLOOR
                 "orient_asw": (0.2, 6.0, 1.0)}),
     "extrude": dict(                                          # THE FORCING TERM -- ablatable
         stage=2, role="forcing", outputs=[], slots=["site"], needs=["morphogen"],
@@ -1220,7 +1224,47 @@ def reference_recipes():
     # this recipe with 1 of its 22 parameters. The physics survived (the emitter falls back to the
     # declared defaults and the emitted spec is byte-identical), but a recipe named "the target"
     # carrying no explicit operating point is what made the theta hash non-canonical below.
-    h = h.with_params({**h.params, "cell_react0.rate": 0.4})
+    # OKUDA'S OWN REGIME, not an arbitrary run length. The paper is explicit and the Grounder
+    # quotes it: "a spherical vesicle of a monolayer cell sheet composed of about 2,000 cells",
+    # growing to 4,000 -- a DOUBLING, and Figs 5, 6 and 7 (tubulation, branching, undulation) are
+    # one experiment at that one starting size, differing only in chi and gamma.
+    #
+    # As written this recipe carried max_div_frac = 0.0075, which projects 2000 x 1.0075^900 =
+    # 39,700 cells: TEN TIMES his endpoint. A live run reached 25,898 by frame 655 and was killed.
+    # A composition that grows six times past the paper is not reproducing the paper, whatever it
+    # is doing. The rate below is solved from his own numbers: 2000 -> 4000 over 900 frames.
+    #
+    #     frac = (4000/2000)^(1/900) - 1 = 0.00077
+    h = h.with_params({**h.params, "cell_react0.rate": 0.4,
+                       # max_div IS THE TERM THAT GOVERNS, and setting the fraction alone did
+                       # nothing. The engine takes cap_div = max(max_div, frac x N): at 2,000
+                       # cells the fraction allows 1.5 divisions per call and max_div allowed 30,
+                       # so the rate I "set" was masked twentyfold and a run reached 8,982 cells
+                       # by frame 340 on its way past 26,000. CLOCK_COUPLED says this in as many
+                       # words -- "max_div DOMINATES at realistic nF; rescaling frac alone is
+                       # entirely masked" -- and I rescaled frac alone. Simulated against the
+                       # real recurrence, max_div=2 lands at 3,820 over 800 calls.
+                       # THE RAILS MUST NOT BE THE RATE. `morphogen_growth_3d.rate` IS the
+                       # division rate: cells inflate at it, cross DIV_FACTOR x birth volume, and
+                       # divide. That is P3 -- "a cell divides because it got big" -- and it is
+                       # the mechanism the paper is about. `max_div` and `max_div_frac` are
+                       # THROTTLES, meant as rails against one call doing something absurd.
+                       #
+                       # They bound instead. At max_div=30 the biology wanted fewer divisions
+                       # than the rail allowed early on and more later, so the observed rate was
+                       # the RAIL, not the growth -- a counter, not a tissue. Set so that the
+                       # volume trigger governs and the rails sit above it, and the pace is then
+                       # set by `rate`, where the morphogen can steer it.
+                       # ZERO MEANS NO FLOOR, and that is what makes "one rate" expressible.
+                       # `max_div` is an ABSOLUTE divisions-per-call floor; at its old minimum of
+                       # 4 it still adds 3,200 cells over 800 calls on its own, so the declared
+                       # box [4, 480] could not express Okuda's 2,000 -> 4,000 AT ALL. The range
+                       # now starts at 0, meaning "no absolute floor": the fraction governs, the
+                       # fraction follows the growth, and the growth follows the morphogen.
+                       # One rate, where the biology is.
+                       "divide_3d0.max_div": 0,
+                       "divide_3d0.max_div_frac": 0.000867,
+                       "seed_mesh_3d0.n_cells": 2000})
     out["okuda_route"] = h
 
     # the degenerate control the search must visit on its way: uniform inflation, no patterning.
