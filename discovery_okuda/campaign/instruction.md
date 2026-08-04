@@ -28,32 +28,3 @@ Also available and NOT part of scoring, but informative: mech_p_ratio (tube/body
 ~3 = a FORCED protrusion, ~1 = a growth-driven equilibrium).
 
 <!-- LEARNED PATTERNS -->
-## Learned patterns (rewritten by meta-review; distillation, not log)
-
-**PREDICTION FORMAT — the round-1 failure that wasted the whole round.** A prediction
-must contain a checkable clause `<metric> <op> <value>` (or `<metric> <lo>-<hi>`) naming
-an ADMITTED metric (protr_peak, ta_n_tubes_final, protr_final). All 12 round-1 predictions
-said `unstated` on protr_peak → every one recorded NOT CHECKABLE, the round measured
-nothing. Never submit `unstated`; a prediction with no number is not a prediction.
-
-**BUFFER-SATURATION TRAP (P13).** A growth+division config seeded at ~150 cells saturates
-the cell array at n_cells=1766 near frame 304/401 (buf_full=true, div_blocked=40) → P13
-FAILS and valid_evidence=false → the run is NOT EVIDENCE, and its 180–233 s wall is wasted.
-Killed all five wk_* runs in round 1 (wk_apical_area/wk_curvature/wk_null/wk_pressure/
-wk_tension). Before proposing any growth+division edit, size the buffer for the FINAL cell
-count. cellfix_B_new is the one growth+division parent that did NOT saturate (4151 cells,
-buf_full=false) — breed from it, not from the wk_* family.
-
-**BASELINE IS ALL SPHERES.** Across all 12 parents: protr_peak ≤ 1.11, ta_n_tubes_final=0,
-mech_p_ratio=0 — no protrusion, no tube, no forced mechanics anywhere in the seed set. So
-NO baseline parent is near an Okuda morphology; reaching one REQUIRES adding a shape-driving
-operator none of these carries. Confirmatory edits that merely re-measure a sphere buy
-nothing — round 1 already established the sphere baseline.
-
-**FIXED-BALL CORAL/CFL ARE MORPHOGENICALLY INERT.** cfl_*/coral_fixed_ball (n_cells=2000,
-no growth op) only pattern the activator into Turing spots (n_spots 9–101); morphology stays
-sphere, protr_peak=1.006. They are RD-pattern parents, not shape parents. Do not propose
-them expecting shape change.
-
-**APPARATUS.** mini_coral_nodilute and refute_coral_nocons emitted no diag.json (empty {}).
-Exclude both; do not re-propose as controls.

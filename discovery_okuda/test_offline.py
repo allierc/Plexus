@@ -195,6 +195,30 @@ def t_set_param():
           "a set_param move changed the composition hash -- a retune would count as a new mechanism")
 
 
+@case("our own measured runs can be frontier parents")
+def t_own_runs():
+    """THE STANDARD from_preset states: a space that cannot express our own evidence is wrong.
+
+    R5_PARAM_OUT_OF_RANGE was withdrawn on 3 August because the boxes were hand-written and the
+    runs fall outside them -- cell_diffuse0.d_h = 2.0 against a ceiling of 0.346, on a run that
+    produced valid evidence. Before that, ZERO of our measured runs could serve as a parent.
+    """
+    import io, contextlib
+    import offline as O
+    O.install("clean")
+    import round as R, critic as C
+    names = ("wk_null_s0", "coral_fixed_ball", "cfl_c000p080_d002p000", "wk_pressure_pos_s0")
+    ok = 0
+    for n in names:
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            g = R._graph_from_run(n)
+        if g and C.admit(g, ())[0]:
+            ok += 1
+    check(ok >= 3, f"only {ok} of {len(names)} measured runs are admissible as parents -- the "
+                   f"search space does not contain our own evidence")
+
+
 # --------------------------------------------------------------------------- the declarations
 @case("every artifact has a reader (wiring.py --check)")
 def t_wiring():
