@@ -33,7 +33,7 @@ operators:
   cell_set: cell
   hill: 4.0
   op: morphogen_growth_3d
-  rate: 0.03
+  rate: 0.003457
   rho: 1.0
   vth_frac: 2.5
 - Gamma: 0.4
@@ -62,9 +62,7 @@ operators:
   engine_clock: true
   every: 4
   factor: 2.0
-  max_cycle: 12
-  max_div: 12
-  max_div_frac: 0.03
+  max_cycle: 1000000000
   min_cycle: 4
   op: divide_3d
   p0: 3.5
@@ -82,7 +80,7 @@ schedule:
 - topo_snapshot_3d
 sets:
   cell:
-    n: 5200
+    n: 1100
     state:
       area:
         width: 1
@@ -92,4 +90,4 @@ sets:
         integration: first_order
         width: 2
   vertex:
-    n: 10404
+    n: 2196

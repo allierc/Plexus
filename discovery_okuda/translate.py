@@ -289,9 +289,7 @@ def _emit_divide(g, n, ga):
             # FLOOR that DOMINATES at realistic cell counts (at nF=1431: max(120, 42) = 120), so
             # rescaling max_div_frac alone was ENTIRELY MASKED. 120/4 = 30 restores the archived
             # per-frame budget exactly at every scale.
-            "max_div": int(_p(g, i, "max_div")),
-            "max_div_frac": float(_p(g, i, "max_div_frac")),
-            "vcap": float(_p(g, i, "vcap")), "cell_set": "cell",
+            "vcap": 0.0, "cell_set": "cell",
             "min_cycle": int(_p(g, i, "min_cycle")), "max_cycle": int(_p(g, i, "max_cycle")),
             "after_frame": ga, "orient_iface": g.impl_of(n) == "orient_iface",
             "orient_asw": float(_p(g, i, "orient_asw")), "g1_ramp": False}
@@ -658,7 +656,6 @@ def from_preset(p: dict) -> CompositionGraph:
         ("divide_3d", "max_div_frac",
          (p["mdf"] / DIVIDE_CALL_PERIOD_BEFORE_D1) if p.get("mdf") else None),
         ("divide_3d", "max_div", 120 // DIVIDE_CALL_PERIOD_BEFORE_D1),   # make() hardcodes 120
-        ("divide_3d", "vcap", p.get("vcap")),
         ("shape_energy_3d", "Gamma", p.get("Gamma")), ("shape_energy_3d", "Lambda", p.get("Lambda")),
         ("shape_energy_3d", "p0", p.get("p0")),
         ("extrude", "K_extrude", p.get("K_extrude")),

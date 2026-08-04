@@ -16,9 +16,9 @@ _run:
   seed_cells: 2000
 sets:
   vertex:
-    n: 130004
+    n: 10396
   cell:
-    n: 65004
+    n: 5200
     state:
       chem:
         width: 2
@@ -64,7 +64,7 @@ operators:
 - op: morphogen_growth_3d
   at: vertex
   cell_set: cell
-  rate: 0.01
+  rate: 0.000866
   a_sw: 1.5
   hill: 4.0
   rho: 0.0
@@ -96,9 +96,6 @@ operators:
   cycle_cv: 0.4
   p0: 3.9
   every: 1
-  max_div: 0
-  max_div_frac: 0.000867
-  vcap: 1.5
   cell_set: cell
   min_cycle: 16
   max_cycle: 1000000000
