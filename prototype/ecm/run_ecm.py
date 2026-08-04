@@ -47,10 +47,16 @@ def measure(out, spec, seeded=None):
     T = pos.shape[0]
     op = next(o for o in spec["operators"] if o["op"] == "cell_to_ecm")
     c = np.asarray(op["centre"], float)
-    r0, growth, r_max = op["r0"], op["growth"], op["r_max"]
-
     d = np.linalg.norm(pos - c, axis=2)             # [T, N]
-    radii = np.minimum(r_max, r0 + growth * np.arange(T))
+    if op.get("implementation") == "replay":
+        # THE REPLAYED TISSUE HAS NO r(t) FORMULA -- it has a recorded surface. The comparable
+        # scalar is its median radius per frame, which is what the sphere's r(t) approximates.
+        z = np.load(op["surface"])
+        M = np.asarray(z["smap"], float) * float(op.get("scale", 1.0))
+        radii = np.median(M.reshape(M.shape[0], -1), axis=1)
+        radii = np.resize(radii, T)
+    else:
+        radii = np.minimum(op["r_max"], op["r0"] + op["growth"] * np.arange(T))
     inside = d < radii[:, None]
     hits = np.where(inside.any(axis=1))[0]
     contact = int(hits[0]) if hits.size else None
