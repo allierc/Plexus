@@ -61,6 +61,17 @@ KNOWN_METRICS = (
     # weaker verdict, it is an unmeasured one.
     "n_spots_final", "spot_cells_med_final", "spot_cells_max_final", "spot_frac_final",
     "spot_spacing_cells_final", "wavelength_cells_final",
+    # THE RESERVOIR. `divide_3d` counts the divisions it refuses for want of vertex buffer and
+    # flags a full array; run_one records both in diag.json. They were never registered here, so
+    # on 3 August the Metrologist asked for an instrument to measure `div_blocked` -- a quantity
+    # ALREADY MEASURED and written to disk for every run. That is the campaign's recurring shape
+    # in its purest form: built, recorded, and never handed over.
+    #
+    # They matter because they decide what a number MEANS. A run that stops at 1766 of 1778 cells
+    # has not found where growth stops; it has found where the array ends, and a claim about
+    # growth resting on it is a claim about a buffer. Registering them makes "the tissue saturated
+    # its reservoir" a checkable prediction rather than a remark.
+    "div_blocked", "buf_full", "div_blocked_first_frame",
 )
 
 # Measured to lie by the instrument gate (F15/F16). A prediction resting on one of these is not

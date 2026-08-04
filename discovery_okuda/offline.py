@@ -296,6 +296,17 @@ def _n_from_prompt(p):
 
 
 # --------------------------------------------------------------------------- the fake cluster
+def _campaign_is_live():
+    """Is a real campaign running right now? Then this harness must not touch campaign/."""
+    import subprocess
+    try:
+        out = subprocess.run(["pgrep", "-f", "campaign_loop.py|round.py --mode"],
+                             capture_output=True, text=True, timeout=10).stdout.split()
+        return [p for p in out if p and p != str(os.getpid())]
+    except Exception:
+        return []
+
+
 def isolate():
     """Give this round a FRESH campaign, and put the real one back afterwards.
 
@@ -312,6 +323,20 @@ def isolate():
     import atexit
     import shutil
     import tempfile
+    # NEVER WHILE A CAMPAIGN IS LIVE. isolate() CLEARS campaign/ and restores a snapshot at exit.
+    # Run against a campaign that is mid-round and it deletes the loop's state underneath it, then
+    # rolls back whatever the loop wrote in between -- which on 3 August destroyed round 1's
+    # record while round 2 was on the cluster. Concurrent snapshots compound: the last restore
+    # wins, and its copy was taken after an earlier one had already cleared.
+    #
+    # This is the second time this harness has eaten real data (it also rmtree'd twelve finished
+    # run directories). A fixture that can damage production must refuse to run, not warn.
+    live = _campaign_is_live()
+    if live:
+        raise SystemExit(
+            f"[offline] REFUSING TO RUN: a campaign is live (pid {' '.join(live)}). This harness "
+            f"clears campaign/ and restores it at exit, which would delete the running loop's "
+            f"state. Stop the campaign, or run the suite before launching.")
     camp = os.path.join(HERE, "campaign")
     if not os.path.isdir(camp):
         return
