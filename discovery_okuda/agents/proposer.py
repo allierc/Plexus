@@ -32,7 +32,6 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.dirname(HERE))
 
 import llm
-from llm_agents import BREVITY
 import templates as _T
 TEMPLATES = _T.prompt_block()                                                       # noqa: E402
 from llm import CAUSALITY_RULE, budget_note, ensure_files, read_file, run_agent  # noqa: E402
@@ -141,7 +140,6 @@ def propose(frontier, cfg, prox, ledger_summary, round_id, n_slots=8, timeout_mi
 
     prompt = f"""ROUND {round_id}: propose the next batch of {n_slots} experiments.
 {budget_note(timeout_min, "1) proposal.json -- nothing else")}
-{BREVITY}
 
 YOU WRITE NO RECORD. You used to append to analysis.md and rewrite memory.md, and that put the
 agent under evaluation in charge of its own record -- which is how "parent 2 is fully PROPOSED"
@@ -266,17 +264,11 @@ RULES
    run that diverges numerically is refused as evidence, so wild settings cost compute and buy
    nothing.
  - A prediction you are certain of is nearly worthless. Prefer edits you genuinely cannot call.
- - Do NOT propose a parameter change IN THIS BATCH. That is a division of labour, NOT a
-   judgement about validity: this is Loop I, which searches over mechanism STRUCTURE, and
-   composition identity excludes parameters, so a retune could not be recorded as a distinct
-   mechanism here even if it were the right experiment. Parameter sweeps are Loop II's job and
-   they run in `--mode theta`.
-   * A Loop II sweep in the evidence above is FULLY LEGITIMATE EVIDENCE. Use it. A parameter
-     CAN carry a hypothesis ("if vcap rises to 3.0 then the tube shortens") and those
-     predictions count toward the surprise rate exactly like yours.
-   * Do NOT describe a past parameter round as forbidden, invalid, a violation or a mistake,
-     and do not write that into memory. Doing so discards real measurements -- the vcap sweep
-     is where the non-monotone response and the "forced, not grown" reading came from.
+ - A PARAMETER MOVE IS ALLOWED AND IS NOT A NEW MECHANISM. `set_param` appears in the menu when
+   it is legal; composition identity excludes parameters, so the same mechanism at a different
+   setting is recorded as a POINT ON IT, never as a discovery. Past parameter rounds are fully
+   legitimate evidence -- the vcap sweep is where the non-monotone response and the "forced, not
+   grown" reading came from. Do not describe one as forbidden or invalid.
  - Write your PREDICTIONS so they can be checked mechanically. Each must contain at least one
    clause of the form `<metric> <op> <value>` (e.g. `protr_peak >= 2.0`) or a range
    (`protr_peak 2.0-3.5`), naming a metric from the admitted list. State the metric explicitly
@@ -397,7 +389,6 @@ def choose_specs(table, n=6, timeout_min=6, ledger=None):
     prompt = f"""ROUND 0: RECONNAISSANCE. Choose {n} runs already on disk to RE-MEASURE.
 
 {budget_note(timeout_min, "1) the JSON choice")}
-{BREVITY}
 
 You are NOT proposing experiments and you will NOT write predictions. Every number below was
 taken with at least one instrument since proved wrong, so the job is to re-measure a good spread
