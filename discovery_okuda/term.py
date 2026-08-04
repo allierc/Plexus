@@ -81,8 +81,23 @@ VOICE = {
     # debug output rather than as a role talking. Teal is the "is this sound?" family, which is
     # what they both are: one checks the instrument, the other checks the inference.
     "logic":         teal,       # is the conclusion earned
-    "metrologist":   teal,       # is the instrument sound
     "escalate":      orange,     # the Supervisor changing the envelope
+    # THE REST OF THE CAST. Every one of these prints `[name] ...` somewhere and none of them had
+    # a colour, so an actual role speaking was indistinguishable from `[ckpt]` or `[preflight]`.
+    # The Grounder is the clearest case: it opens Act 1 by reporting what the PAPER says, and its
+    # line arrived in the same plain grey as a checkpoint path.
+    #
+    # Grouped by what the role is FOR, like the block above: the specimen family is teal, the
+    # record family is sky, the across-rounds family is orange, and what LOOKS at a picture is
+    # gold. Roles are coloured; subsystems (cluster, caption, ckpt, engine) deliberately are not,
+    # because the distinction the colour carries is "someone is speaking" against "something is
+    # happening".
+    "grounder":      green,      # what the paper actually says
+    "critic":        blue,       # is the batch legal (the Proposer's family)
+    "collector":     sky,        # builds the round record from the files (the record family)
+    "reflection":    sky,        # what this round means for the next
+    "eye":           gold,       # the caption wave -- the same eye as eye-check
+    "watcher":       gold,       # and the role that reads it
 }
 
 
@@ -233,10 +248,45 @@ class _Colourise:
     Off when stdout is not a TTY, so the campaign log stays clean of escape codes.
     """
 
-    _TAG = re.compile(r"^(\s*)\[([a-z][a-z-]{2,14})\]")
+    # THE ICON MAY COME FIRST. This anchored on `^\s*\[`, so `[archivist] ...` was coloured and
+    # `◌ [archivist] continue` -- the same role, one glyph further right -- was not. The Archivist
+    # IS in VOICE and always has been; what failed was the match, which is why the colour looked
+    # like a missing entry in the table. Any leading icon and any ANSI already applied are
+    # skipped, so a line that was coloured by its printer still finds its tag.
+    _TAG = re.compile(r"^((?:\x1b\[[0-9;]*m)*[\s▶✓✗⚠⚙◉◌■⏱]*)\[([a-z][a-z-]{2,14})([^\]]*)\]")
+
+    # LOWER CASE UNLESS THE WORD IS SHOUTING. A round's terminal is one voice reporting on itself,
+    # and sentence-initial capitals in it are decoration: "Phenotype degenerate", "Continue: give
+    # numeric predictions", "Round 1 bought nothing". Capitals in this loop MEAN something -- a
+    # fully upper-case word is an emphasis the code chose (NOT ROUTED, BUDGET EXCEEDED, DEGRADED)
+    # -- and when every sentence also starts with one, the emphasis stops being visible.
+    #
+    # So only a plainly Capitalised word is lowered, and the pattern is deliberately narrow:
+    #   [A-Z][a-z]+  and nothing else, so NaN, GPU, P4, r001n_09 and protr_peak are all untouched
+    #   not preceded or followed by  \w / - .x   so /workspace/Plexus/log stays a real path --
+    #                                            paths are case-sensitive and lowering one makes
+    #                                            it a path that does not exist
+    #   a trailing "." is fine when it ends a sentence ("Continue.") and blocking when it starts
+    #   an extension ("Plexus.log")
+    _CAPWORD = re.compile(r"(?<![\w/\-.])([A-Z][a-z]+)(?![\w/\-]|\.\w)")
+    _ESCSPLIT = re.compile(r"(\x1b\[[0-9;]*m)")
 
     def __init__(self, stream):
         self._s = stream
+
+    @classmethod
+    def _lower_prose(cls, body):
+        """Lower the Capitalised words in `body`, leaving colour escapes alone.
+
+        The escapes must be split out rather than matched around: `\\x1b[36mReader` puts a word
+        character ("m") immediately before the word, which any lookbehind would read as "part of
+        an identifier" and skip -- so coloured lines would keep their capitals and uncoloured
+        ones would not, and the rule would appear to work in a pipe and fail in a terminal.
+        """
+        parts = cls._ESCSPLIT.split(body)
+        for i in range(0, len(parts), 2):                 # even = text, odd = escape
+            parts[i] = cls._CAPWORD.sub(lambda m: m.group(1).lower(), parts[i])
+        return "".join(parts)
 
     WIDTH = WIDTH       # module-level, so say() and this fold at the same column
 
@@ -246,6 +296,7 @@ class _Colourise:
         out = []
         for line in text.splitlines(True):
             line = line.lstrip(" \t") if line.strip() else line
+            line = self._lower_prose(line)
             line = self._wrap(line)
             m = self._TAG.match(line)
             if m and m.group(2) in VOICE:
@@ -253,7 +304,9 @@ class _Colourise:
                 paint = VOICE[m.group(2)]
                 nl = "\n" if line.endswith("\n") else ""
                 body = line[m.end():].rstrip("\n")
-                line = f"{m.group(1)}{paint('[' + m.group(2) + ']')}{body}{nl}"
+                # group(3) is whatever rides inside the bracket after the role -- "[eye 3/11]"
+                # is the caption wave counting runs, and it is the eye speaking, not a subsystem.
+                line = f"{m.group(1)}{paint('[' + m.group(2) + m.group(3) + ']')}{body}{nl}"
             out.append(line)
         return self._s.write("".join(out))
 

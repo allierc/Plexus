@@ -1532,6 +1532,19 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
     print(f"ROUND {rid}   mode={mode}   campaign={cfg.name}")
     print("=" * 96)
 
+    # THE CHEAP MOMENT TO NOTICE. If the registry already holds this round's hypotheses, the
+    # round is being re-run -- after a crash, or because campaign state and the round counter
+    # disagree (state.json restored from git into a campaign that then RESUMED rather than
+    # reset, which is how round 2 crashed on 4 August). Saying so costs nothing here and is
+    # worth 4 agent-minutes and $1.41, which is what it cost to discover it at the end of Act 1.
+    _prior = sup.reg.rounds_present(rid)
+    if _prior:
+        print(T_.warn(f"[round] the registry ALREADY HOLDS {_prior} hypothesis(es) for round "
+                      f"{rid} -- this round is a RE-RUN. Its claims are recorded as attempt 2 "
+                      f"(hid@2) beside the originals, which are never overwritten."))
+        print(T_.quiet("        If that is not what you meant, the campaign counter and "
+                       "campaign/hypotheses.jsonl disagree about how far this campaign got."))
+
     _T0[0] = time.time()
     act("ACT 1 - PROPOSE")
     _purge_round_configs(rid, mode)    # F18: stale configs must not shadow this round's
@@ -1579,7 +1592,8 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
             # how to say. Buying it a bigger array turns a cheap fact into an expensive one.
             if RECON_RESIZE:
                 _resize_reservoir(dst, nm, run=run, frames=frames)
-            h = Hypothesis(hid=f"R{rid}.{i}.recon", comp_hash=f"RECON_{run[:20]}",
+            _hid, _att = sup.reg.free_hid(f"R{rid}.{i}.recon")      # see the note at the other site
+            h = Hypothesis(hid=_hid, comp_hash=f"RECON_{run[:20]}",
                            parent_hash=None, edit=f"replay {run}",
                            # A replay IS a control in the strict sense -- the composition
                            # unmodified -- and `intent` is a closed set for good reason: it is
@@ -1609,7 +1623,11 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         # mattered little with a single-parent frontier and matters now: the frontier holds four
         # structurally different parents, so "one edit off a shared control" is no longer
         # inferable from context and must be written down.
-        h = Hypothesis(hid=f"R{rid}.{i}.{comp_hash(g)[1:7]}", comp_hash=comp_hash(g),
+        # ATTEMPT-AWARE. See Registry.free_hid: the id is deterministic, so re-running a round
+        # regenerates every id and `pose` raised -- killing the round after Act 1 was paid for,
+        # and killing it again on every retry.
+        _hid, _att = sup.reg.free_hid(f"R{rid}.{i}.{comp_hash(g)[1:7]}")
+        h = Hypothesis(hid=_hid, comp_hash=comp_hash(g),
                        parent_hash=sl.get("_parent_hash"), edit=lbl,
                        intent=sl.get("intent", "confirmatory"),
                        track=sl["track"],

@@ -246,6 +246,43 @@ class HypothesisRegister:
         self._append(h)
         return h
 
+    def free_hid(self, hid):
+        """`(hid, attempt)` -- the given id if it is free, else the next `hid@n`.
+
+        THE ID IS DETERMINISTIC, SO A COLLISION IS PERMANENT. `R{round}.{slot}.{hash}` is built
+        from the round number, the slot index and the composition; run round 2 a second time from
+        the same frontier and every id is identical to the first attempt's. `pose` then raises,
+        `_run_round` had no handler, and the round died at the LAST line of Act 1 -- after the
+        Proposer, the Critic, the peer-review and the reflection had all been paid for. Measured
+        4 August: 4.06 agent-minutes and $1.41 spent, then `ValueError: hypothesis R2.0.f4907e
+        already posed` and twelve configs written for a round that never submitted a job. Worse,
+        it is not recoverable by retrying: the second attempt regenerates the same ids and dies in
+        the same place, so the campaign is wedged at that round forever.
+
+        `pose`'s refusal to overwrite is RIGHT and is not being relaxed -- a claim already on the
+        record must not be quietly rewritten by a later one that happens to share coordinates.
+        What was wrong is that the caller had no way to say "this is round 2 being run AGAIN".
+        The `@n` suffix says exactly that: the first attempt keeps its id, and the new claim is
+        recorded beside it as attempt n rather than replacing it or killing the round.
+        """
+        if hid not in self._items:
+            return hid, 1
+        n = 2
+        while f"{hid}@{n}" in self._items:
+            n += 1
+        return f"{hid}@{n}", n
+
+    def rounds_present(self, rid):
+        """How many hypotheses the registry already holds for round `rid`.
+
+        Asked BEFORE Act 1 spends anything. A registry that already knows round 2 while the loop
+        is about to run round 2 is a real inconsistency -- here, campaign state restored from git
+        into a campaign that then RESUMED instead of resetting -- and the cheap moment to say so
+        is before the Proposer is called, not after.
+        """
+        pre = f"R{rid}."
+        return sum(1 for k in self._items if k.startswith(pre))
+
     def resolve(self, hid, observed, outcome, run_ids=(), note=""):
         h = self._items[hid].resolve(observed, outcome, run_ids, note)
         self._append(h)                       # append the resolution; the posing line stays

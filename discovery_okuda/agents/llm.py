@@ -350,10 +350,27 @@ class BudgetLedger:
         return True, ""
 
     def note_overrun(self, agent, why, action):
-        """Record a ceiling breach LOUDLY. Requirement: never a silent skip."""
+        """Record a ceiling breach LOUDLY -- ONCE. Requirement: never a silent skip.
+
+        A ceiling is crossed exactly once per round. Every call after it also breaches, so a
+        printer that fires on each one turns a single fact -- "the round went over at the first
+        reader" -- into a line per remaining agent, and the round report then re-listed all of
+        them: six breaches, twelve identical lines. The crossing is the news; the ones after it
+        are arithmetic.
+
+        A SKIP still prints every time, because a skipped call is not the same event: it means
+        work did not happen, and which work was dropped cannot be inferred from the first line.
+        """
         self.overruns.append({"agent": agent, "why": why, "action": action,
                               "at_min": round(self.round_spent, 2)})
-        print(f"[budget] OVER CEILING at {agent}: {why} -- {action}", flush=True)
+        skipped = "SKIP" in action.upper()
+        if len(self.overruns) == 1:
+            print(f"[budget] OVER CEILING at {agent}: {why} -- {action}", flush=True)
+            if not skipped:
+                print(f"[budget] every later call this round also breaches; counted, not "
+                      f"reprinted. The tally is in the round report.", flush=True)
+        elif skipped:
+            print(f"[budget] SKIPPED {agent}: {why}", flush=True)
 
     # ------------------------------------------------------------------ recording
     def _row(self, d, agent, kind):
@@ -473,8 +490,18 @@ class BudgetLedger:
         out.append(f"       {'TOTAL':<22}{self.calls:>6}{tot:>9.2f}"
                    f"   llm={self.round_spent:.2f} min of {ROUND_LLM_BUDGET_MIN} ceiling"
                    f" | wall since round start {wall:.2f} min")
-        for o in self.overruns:
-            out.append(f"       BUDGET EXCEEDED at {o['agent']}: {o['why']} -- {o['action']}")
+        # ONE LINE FOR THE ROUND, not one per breached call. What a person needs is WHERE the
+        # ceiling was crossed and HOW FAR past it the round ran; the identity of every call that
+        # happened to come after is already in the per-agent table above.
+        if self.overruns:
+            first = self.overruns[0]
+            skipped = [o["agent"] for o in self.overruns if "SKIP" in o["action"].upper()]
+            out.append(f"       BUDGET EXCEEDED: crossed at {first['agent']} "
+                       f"({first['at_min']:.1f} min), {len(self.overruns)} call(s) over the "
+                       f"{ROUND_LLM_BUDGET_MIN} min ceiling; round ended at {self.round_spent:.1f} min")
+            if skipped:
+                out.append(f"       SKIPPED for budget: {', '.join(skipped)}  <-- work that did "
+                           f"NOT happen, not merely late")
         for u in self.unmetered:
             out.append(f"       UNMETERED CALL from {u['where']} -- it bypassed run_agent()")
         return "\n".join(out)
