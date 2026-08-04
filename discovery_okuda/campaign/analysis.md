@@ -831,3 +831,78 @@ Specimens: valid 6
 Frontier after: MINI_coral_fixed
 Diagnosis: not called
 Steer: surprise 0.20 in the productive band -- hold 70/30
+
+## Round 16 — slot 0: refuted
+
+Node: id=MINI_coral_fixed, parent=none
+Track: A
+Hypothesis tested: "protr_peak 1.0-1.2"
+Config: r016c_00_e5718d
+Measured: protr_peak=1.35, protr_final=1.33, mech_p_ratio=0
+Reservoir: MISSING
+Specimen: valid — all hold
+Reader: phenotype=unreadable, specimen=MISSING
+Eye-check: no_caption
+Mutation: none (control)
+Verdict: falsified — measured protr_peak=1.35, protr_final=1.33, mech_p_ratio=0 against "protr_peak 1.0-1.2"
+Next: parent=MINI_coral_fixed
+
+## Round 16 — summary
+
+Posed: 1   Evidence: 1   Refused: 0
+Surprise: 0/1 — a round that only confirms has bought coverage and no knowledge
+Tracks: 1 Track A, 0 Track B
+Specimens: valid 1
+Frontier after: MINI_coral_fixed
+Diagnosis: not called
+Steer: no resolved hypotheses yet -- start at the 70/30 default
+
+## Round 17 — slot 0: refuted
+
+Node: id=MINI_coral_fixed, parent=none
+Track: A
+Hypothesis tested: "protr_peak 1.0-1.2"
+Config: r017c_00_e5718d
+Measured: protr_peak=1.36, protr_final=1.34, mech_p_ratio=0
+Reservoir: MISSING
+Specimen: valid — all hold
+Reader: phenotype=unreadable, specimen=MISSING
+Eye-check: no_caption
+Mutation: none (control)
+Verdict: falsified — measured protr_peak=1.36, protr_final=1.34, mech_p_ratio=0 against "protr_peak 1.0-1.2"
+Next: parent=MINI_coral_fixed
+
+## Round 17 — summary
+
+Posed: 1   Evidence: 1   Refused: 0
+Surprise: 0/1 — a round that only confirms has bought coverage and no knowledge
+Tracks: 1 Track A, 0 Track B
+Specimens: valid 1
+Frontier after: MINI_coral_fixed
+Diagnosis: not called
+Steer: no resolved hypotheses yet -- start at the 70/30 default
+
+## Round 18 — slot 0: refuted
+
+Node: id=MINI_coral_fixed, parent=none
+Track: A
+Hypothesis tested: "protr_peak 1.0-1.2"
+Config: r018c_00_e5718d
+Measured: protr_peak=1.35, protr_final=1.33, mech_p_ratio=0
+Reservoir: MISSING
+Specimen: valid — all hold
+Reader: phenotype=unreadable, specimen=MISSING
+Eye-check: no_caption
+Mutation: none (control)
+Verdict: falsified — measured protr_peak=1.35, protr_final=1.33, mech_p_ratio=0 against "protr_peak 1.0-1.2"
+Next: parent=MINI_coral_fixed
+
+## Round 18 — summary
+
+Posed: 1   Evidence: 1   Refused: 0
+Surprise: 0/1 — a round that only confirms has bought coverage and no knowledge
+Tracks: 1 Track A, 0 Track B
+Specimens: valid 1
+Frontier after: MINI_coral_fixed
+Diagnosis: not called
+Steer: no resolved hypotheses yet -- start at the 70/30 default

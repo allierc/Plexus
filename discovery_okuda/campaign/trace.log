@@ -175,3 +175,30 @@
 20:28:45  reading loop done; entering Act 3
 20:28:45  Collector: building the record
 20:28:45  Collector done
+20:33:00  about to import caption_wave
+20:33:00  caption_wave imported; calling it
+20:33:00  caption_wave RETURNED
+20:33:00  past captioning; entering the reading loop
+20:33:00  reading r016c_00_e5718d
+20:33:01  read r016c_00_e5718d OK
+20:33:01  reading loop done; entering Act 3
+20:33:01  Collector: building the record
+20:33:01  Collector done
+20:33:14  about to import caption_wave
+20:33:14  caption_wave imported; calling it
+20:33:14  caption_wave RETURNED
+20:33:14  past captioning; entering the reading loop
+20:33:14  reading r017c_00_e5718d
+20:33:14  read r017c_00_e5718d OK
+20:33:14  reading loop done; entering Act 3
+20:33:14  Collector: building the record
+20:33:14  Collector done
+20:33:28  about to import caption_wave
+20:33:28  caption_wave imported; calling it
+20:33:28  caption_wave RETURNED
+20:33:28  past captioning; entering the reading loop
+20:33:28  reading r018c_00_e5718d
+20:33:28  read r018c_00_e5718d OK
+20:33:28  reading loop done; entering Act 3
+20:33:28  Collector: building the record
+20:33:28  Collector done

@@ -154,7 +154,27 @@ def load_frontier(ledger=None):
         print(f"[archivist] start from {len(_st)}: {', '.join(_st) or 'nothing usable'}")
         if pick.get("why"):
             print(T_.quiet(T_.wrap_names([pick["why"][:200]])))
-        graphs = [g for g in (_graph_from_run(nm) for nm in pick.get("start", [])) if g]
+        # A PARENT MUST BE RUNNABLE, or it is not a parent. Rebuilding a graph from a spec (above)
+        # recovers the operators but not the connections, and a graph missing a required role or
+        # carrying a dangling slot produces children that are all refused: the offline harness
+        # measured it immediately -- 14 of 15 slots refused, one delivered -- the moment those
+        # partial graphs reached the frontier. An unreachable parent costs one line in the log;
+        # an unrunnable one costs a whole round of the Critic saying no.
+        graphs = []
+        for nm in pick.get("start", []):
+            g = _graph_from_run(nm)
+            if not g:
+                continue
+            # ASK THE CRITIC, not is_runnable(). The Critic is the authority on what may be
+            # built, and it knows rules is_runnable() does not -- parameter ranges among them. A
+            # parent it will refuse is a parent whose every child is refused: measured offline as
+            # 16 of 16 slots rejected, control included, and a round that delivered nothing.
+            ok, why = C.admit(g, ())
+            if ok:
+                graphs.append(g)
+            else:
+                print(T_.quiet(f"  [archivist] {nm}: rebuilt but the Critic refuses it "
+                               f"({str(why)[:70]}) -- not used as a parent"))
         if graphs:
             save_frontier(graphs)
             return graphs
@@ -174,7 +194,100 @@ def _graph_from_run(name):
             return CS.CompositionGraph(ops=r["ops"], conns=r["conns"], params=r["params"])
         except Exception:
             pass
-    print(T_.quiet(f"  [archivist] {name}: no composition.json -- cannot be rebuilt as a graph"))
+    # SECOND CHANCE: REBUILD IT FROM THE SPEC. A recon slot copies its spec VERBATIM and so never
+    # gets a composition sidecar -- `write_config` is the only writer of one. The consequence was
+    # measured on 3 August: twelve replays finished cleanly, the Archivist correctly named the
+    # three best starting points on disk, could reach NONE of them, and round 2 began from the
+    # reference recipes as though round 1 had never run.
+    #
+    # The spec does carry the operator list with its implementations and every parameter. What it
+    # does not carry is `conns`, so the rebuild is HONEST ABOUT BEING PARTIAL: a graph with no
+    # explicit wiring, which is right for these pipelines (the routing is implicit in each
+    # operator's `at` / `cell_set` / `vertex_set`) and would be wrong for one that branches. A
+    # partial parent that can be edited beats a perfect parent that does not exist.
+    sp = os.path.join(LOG, name, "spec_run.yaml")
+    if os.path.exists(sp):
+        try:
+            import yaml as _y
+            import composition_space as _CS
+            spec = _y.safe_load(open(sp)) or {}
+            ops, seen_op, params, skipped = [], {}, {}, []
+            for o in (spec.get("operators") or []):
+                nm = o.get("op")
+                if not nm:
+                    continue
+                # ONLY WHAT THE SEARCH SPACE KNOWS. A spec also carries INSTRUMENTATION --
+                # `topo_snapshot_3d` and friends -- which record the run and are not moves anyone
+                # can make. Carrying them into a graph raises KeyError the moment legal_edits()
+                # asks for their role, and more importantly it would offer the Proposer edits on
+                # apparatus rather than on biology.
+                if nm not in _CS.OPERATORS:
+                    skipped.append(nm)
+                    continue
+                idx = seen_op.get(nm, 0)
+                seen_op[nm] = idx + 1
+                oid = f"{nm}{idx}"
+                # "default" IS NOT AN IMPLEMENTATION. A spec omits `implementation` when the
+                # operator has only one, so the name has to come from the space, not from a
+                # placeholder -- `seed_mesh_3d:default` compiles to nothing and refuses the parent.
+                _impls = (_CS.OPERATORS[nm].get("impls") or ["default"])
+                _im = o.get("implementation") or o.get("impl")
+                ops.append({"id": oid, "op": nm,
+                            "impl": _im if _im in _impls else _impls[0]})
+                for k, v in o.items():
+                    if k not in ("op", "implementation", "impl", "at"):
+                        params[f"{oid}.{k}"] = v
+            if ops:
+                g = _CS.CompositionGraph(ops=ops, conns=[], params=params)
+                # THE SPEC'S NUMBERS MAY BE OUTSIDE THE DECLARED SPACE. cfl_c000p080_d002p000 ran
+                # with cell_diffuse0.d_h=2.0 against a Critic ceiling of 0.346 and produced valid
+                # evidence -- so a faithful rebuild is refused as a parent by R5, and the whole
+                # frontier with it. Which of the two is wrong (the range or the run) is a real
+                # question and not this function's to settle.
+                #
+                # What it CAN do is be explicit: keep every parameter the declared space allows,
+                # drop the ones it does not, and name them. The parent is then the measured run as
+                # closely as the space permits, and the discrepancy is on the record rather than
+                # silently deciding whether the campaign has a frontier at all.
+                import re as _re
+                # TWO ROUNDS OF DROPPING, because the Critic reports one family at a time: the
+                # out-of-range values first, then the parameters an emitter does not accept
+                # ("set and then discarded makes the composition a lie about what ran").
+                dropped = []
+                for _ in range(2):
+                    adm, rej = C.admit(g, ())
+                    if adm:
+                        break
+                    fresh = [m.group(1) for m in
+                             _re.finditer(r"R5_PARAM_OUT_OF_RANGE:\s*([\w.]+)=", str(rej))]
+                    for m in _re.finditer(r"(\w+):\w+ was given ([^.]+?), and its emitter", str(rej)):
+                        oid_ = next((o["id"] for o in ops if o["op"] == m.group(1)), None)
+                        if oid_:
+                            fresh += [f"{oid_}.{w.strip()}" for w in
+                                      m.group(2).replace(" and ", ", ").split(",") if w.strip()]
+                    if not fresh:
+                        break
+                    dropped += fresh
+                    params = {k: v for k, v in params.items() if k not in dropped}
+                    g = _CS.CompositionGraph(ops=ops, conns=[], params=params)
+                # SAY WHERE IT STANDS. The rebuild recovers the operators; whether the result is
+                # ADMISSIBLE is the Critic's to say, and on the current log it usually is not --
+                # the measured runs sit outside the declared parameter ranges in several places.
+                # That is a real finding about the search space, not a defect in this function:
+                # `from_preset` warns of exactly it -- "if a recipe we already trust cannot be
+                # built from legal one-edit moves, the campaign is searching a space that does not
+                # contain our own evidence." It is reported here, once per run, and the caller
+                # falls back rather than pretending.
+                _note = f", {len(skipped)} instrument op(s) left out" if skipped else ""
+                _dnote = f"; dropped {len(dropped)} param(s) the space disallows" if dropped else ""
+                _adm, _why = C.admit(g, ())
+                _snote = "" if _adm else f"; STILL REFUSED: {str(_why)[:70]}"
+                print(T_.quiet(f"  [archivist] {name}: rebuilt from its spec "
+                               f"({len(ops)} ops{_note}){_dnote}{_snote}"))
+                return g
+        except Exception as e:
+            print(T_.quiet(f"  [archivist] {name}: spec rebuild failed ({type(e).__name__})"))
+    print(T_.quiet(f"  [archivist] {name}: no composition.json and no usable spec"))
     return None
 
 

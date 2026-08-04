@@ -1674,6 +1674,27 @@ its schema, and the checker fails the round when:
 \noindent This is the same idiom a fourth time --- a document that is the source of truth beside a
 checker that enforces it --- applied to the one thing currently specified only in comments.
 
+\begin{resultbox}{8.2 --- Built \hfill \done}
+\code{WIRING.md} declares every artifact, its writer and its readers; \code{wiring.py} derives the
+same graph from the code and reports the difference. \textbf{The rule that carries the weight needs
+no analysis at all: a new artifact must be declared, \emph{with a reader}.} It is deterministic, it
+is the rule that was broken five times, and it caught \code{batch\_attrition.jsonl} --- which I had
+added an hour earlier and nothing read --- within the hour.
+
+\smallskip
+\textbf{The derivation is a corroborating heuristic, and says so.} Writes go through class
+constructors (\code{BudgetLedger(path=...)}, \code{Register(path=REGISTER)}) and following those
+statically needs real dataflow analysis. Two rounds of sharpening --- function-scoped windows, then
+module-constant aliases --- took the false alarms from about twenty-five to none, because
+\textbf{a checker that cries wolf is one nobody runs before a launch}. Where analysis cannot reach,
+the declaration decides; that is exactly how \code{PREMISES.md} works.
+
+\smallskip
+\textbf{The suite is now 11 cases, 11 passing}, including one that exists only to make the checker
+prove it bites: a row declared with no reader \emph{must} be objected to, or a green tick is
+indistinguishable from a parser that matched no rows at all.
+\end{resultbox}
+
 \subsection*{3. The audit findings, closed}
 The round record written after its own consumers; the Archivist's \code{roll\_back} truncating at
 eleven characters against a twelve-character name; the Eye-check defaulting \code{supports=True},
