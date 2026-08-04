@@ -359,7 +359,6 @@ def check_static(graph, seen_hashes=(), edit_kind=None):
         if _seed is not None and _div is not None:
             _p = graph.params
             n0 = float(_p.get(f"{_seed['id']}.n_cells", 2000))
-            frac = float(_p.get(f"{_div['id']}.max_div_frac", 0.0075))
             every = max(1, int(_p.get(f"{_div['id']}.every", 1)))
             start = float(_p.get(f"{_div['id']}.after_frame", 0))
             # The frame count is a RUN property, not a graph property, so it is not in params.

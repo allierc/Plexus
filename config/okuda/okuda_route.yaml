@@ -16,9 +16,9 @@ _run:
   seed_cells: 2000
 sets:
   vertex:
-    n: 10396
+    n: 15996
   cell:
-    n: 5200
+    n: 8000
     state:
       chem:
         width: 2

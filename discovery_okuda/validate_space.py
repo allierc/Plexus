@@ -144,8 +144,8 @@ def main():
     # The ceiling is now derived from the trigger (2.0 x 1.25 = 2.5). The space is right and the
     # archive is wrong, so this divergence is deliberate. Listed rather than back-fitted into the
     # archived recipes: rewriting history to make a test pass is how a reference stops being one.
-    DELIBERATE = {"dt", "every", "max_cycle", "max_div", "record_every",
-                  "min_cycle", "max_div_frac", "ckpt", "vth_frac",
+    DELIBERATE = {"dt", "every", "max_cycle", "record_every",
+                  "min_cycle", "ckpt", "vth_frac",
                   # `chi`/`rate`: THE D5a FIX, guarded by V11 below exactly as V10 guards the
                   # divide clock. Both are rescaled by 1/dt because cell_react and cell_diffuse
                   # EMIT=velocity into `chem`, so the engine was integrating the chemistry with
@@ -196,13 +196,9 @@ def main():
                 bad = []
                 if h.get("min_cycle") and o.get("min_cycle") != h["min_cycle"] * P:
                     bad.append(f"min_cycle {o.get('min_cycle')} != {h['min_cycle']}x{P}")
-                if h.get("max_div_frac") and abs(o.get("max_div_frac", 0)
-                                                 - h["max_div_frac"] / P) > 1e-9:
-                    bad.append(f"max_div_frac {o.get('max_div_frac')} != {h['max_div_frac']}/{P}")
                 check(f"V10 {name}", not bad,
                       "; ".join(bad) if bad else
-                      f"min_cycle {h.get('min_cycle')}->{o.get('min_cycle')} calls->frames, "
-                      f"max_div_frac {h.get('max_div_frac')}->{o.get('max_div_frac')} per-frame")
+                      f"min_cycle {h.get('min_cycle')}->{o.get('min_cycle')} calls->frames, ")
             except Exception as e:
                 check(f"V10 {name}", False, f"{type(e).__name__}: {str(e)[:60]}")
     else:

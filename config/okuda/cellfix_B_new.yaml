@@ -80,7 +80,7 @@ schedule:
 - topo_snapshot_3d
 sets:
   cell:
-    n: 1100
+    n: 1600
     state:
       area:
         width: 1
@@ -90,4 +90,4 @@ sets:
         integration: first_order
         width: 2
   vertex:
-    n: 2196
+    n: 3196
