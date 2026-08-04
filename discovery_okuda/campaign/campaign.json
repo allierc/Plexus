@@ -1,0 +1,31 @@
+{
+ "name": "okuda_growth_driven",
+ "objective": "BUILD THE CAUSAL LEVER-MAP of the Okuda mechanism space: for every operator, every implementation and every routing, what does it do ALONE, and what does it do IN COMBINATION -- since mixtures rarely surrender their causal structure to inspection. The product is a map, not a winner. Specific questions -- which composition makes a sustained tube, which reproduces Okuda's (chi,gamma) phase diagram, which mechanism is necessary for branching -- are QUERIES AGAINST that map, and each is answered as a by-product of covering it.",
+ "queries": {
+  "sustained_tube": "a tube that survives relaxation, WITHOUT the extrude forcing node",
+  "phase_diagram": "Okuda's four (chi,gamma) morphologies from ONE composition: thin tube / thick tube / undulation / branching",
+  "necessity": "for each observed phenotype, which operators are necessary",
+  "impossibility": "which composition families provably CANNOT reach a phenotype"
+ },
+ "success": {
+  "protr_peak": ">= 1.37",
+  "protr_final": ">= 1.37",
+  "Q_protr_after_relax": ">= 1.37",
+  "n_tubes": ">= 1",
+  "no_extrude": true
+ },
+ "batch": 12,
+ "keep_tier1": 8,
+ "keep_truncate": 4,
+ "freeze_after": 6,
+ "dry_rounds_to_escalate": 2,
+ "max_rounds": 500,
+ "budget_runs": 5000,
+ "min_samples_promote": 12,
+ "stage_gate": 2,
+ "thresholds": {
+  "established_rate": 0.6,
+  "structural_rate": 0.1,
+  "necessity_drop": 0.5
+ }
+}

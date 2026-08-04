@@ -1,0 +1,8 @@
+[loop] terminal also written to /workspace/Plexus/discovery_okuda/campaign/campaign.log
+[loop] clean start: cleared the LEARNED PATTERNS block
+[loop] clean start: 13 file(s) removed, next round is 1
+[loop] plan: 1 recon + 19 composition round(s)
+
+------------------------------------------------------------------------------------------------
+[loop] round 1/20  mode=recon   spent so far: 0.0 agent-min over 0 calls
+------------------------------------------------------------------------------------------------
