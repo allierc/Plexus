@@ -176,6 +176,19 @@ def load_frontier(ledger=None):
                 print(T_.quiet(f"  [archivist] {nm}: rebuilt but the Critic refuses it "
                                f"({str(why)[:70]}) -- not used as a parent"))
         if graphs:
+            # THE REFERENCE RECIPES ARE NOT A FALLBACK. They were reached only when the Archivist
+            # FAILED -- so its success closed the door on the only compositions in the repository
+            # that carry a wire. `okuda_route` is the target this project has written down, it is
+            # runnable, the Critic admits it, and it was unreachable from every frontier the
+            # Archivist ever chose, because a spec rebuilt from disk has no conns.
+            #
+            # They are added BESIDE the Archivist's picks rather than instead of them: its
+            # judgement about which measured runs are worth breeding from is good and stays.
+            for _nm, _g in reference_recipes().items():
+                if C.admit(_g, ())[0] and comp_hash(_g) not in {comp_hash(x) for x in graphs}:
+                    graphs.append(_g)
+                    print(T_.quiet(f"  [frontier] + reference recipe {_nm} "
+                                   f"({len(_g.conns)} connection(s)) -- it carries the coupling"))
             save_frontier(graphs)
             return graphs
         print("  [archivist] no usable run -- using reference recipes")
@@ -352,9 +365,17 @@ def save_frontier(graphs):
 
 
 def seen_hashes(sup):
-    return {o["comp"] for o in LeverMap(MAP).obs} | set(sup.prox.clusters and
+    # BOTH KEYS. The composition hash answers "has this MECHANISM been evaluated" -- what R6 asks
+    # of a structural edit. The mechanism@operating-point key answers "has this EXPERIMENT been
+    # run" -- what it must ask of a parameter move, which carries its parent's comp_hash by
+    # design. Recording only the first is why 39 of 39 sweep moves were refused as duplicates of
+    # the mechanism they were perturbing.
+    _obs = LeverMap(MAP).obs
+    return ({o["comp"] for o in _obs}
+            | {f"{o['comp']}@{o['theta']}" for o in _obs if o.get("theta")}
+            | set(sup.prox.clusters and
                                                         [h for c in sup.prox.clusters.values()
-                                                         for h in c["members"]] or [])
+                                                         for h in c["members"]] or []))
 
 
 # --------------------------------------------------------------------- stale-Q quarantine (D2)
@@ -1033,7 +1054,9 @@ def build_composition_batch(sup, cfg, n_slots, ledger):
                                      else "excursion")
             sl["fidelity"] = "okuda" if sl["territory"] == "in_paper" else "free"
             g = _ground_starting_conditions(g, sl)
-            adm, rej = C.admit(g, seen if sl.get("intent") != "control" else ())
+            _ek = (e[0] if sl.get("intent") != "control" and isinstance(sl.get("edit"), (list, tuple))
+                   and sl.get("edit") else None)
+            adm, rej = C.admit(g, seen if sl.get("intent") != "control" else (), edit_kind=_ek)
             if not adm:
                 rejected.append((f"{tag}{i}", f"CRITIC: {rej}"))
                 continue
