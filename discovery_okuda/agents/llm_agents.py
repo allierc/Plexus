@@ -94,8 +94,25 @@ def _admitted():
 
 
 # Announced to every role that reads numbers, until the campaign after they land.
-NEW_INSTRUMENTS = ("n_spots_final", "spot_spacing_cells_final",
-                   "spot_frac_final")
+#
+# REWRITTEN 4 AUGUST WITH THE BANK. Three of the names this tuple carried -- act_sd,
+# act_occupancy, spot_frac_final -- were WITHDRAWN the same day, and a hand-kept announcement
+# list is exactly the thing that keeps advertising an instrument after it goes: the previous
+# METRIC_NOTES did it for `wavelength_cells_final` for weeks. `admitted_block` now resolves these
+# against the registry and prints any that no longer exist under "NO LONGER ADMITTED" instead of
+# recommending them, so a stale entry here is visible rather than misleading. It is still worth
+# keeping current.
+#
+# What is genuinely new is the SIX REDUCTIONS: every quantity now has _final _peak _floor _trend
+# _span _measured_frac, so "the field lived and then died" and "the coupling was refused for most
+# of the run" are single scorable clauses for the first time. The names below are the ones that
+# say something no admitted name could say yesterday.
+NEW_INSTRUMENTS = ("act_cv_span", "act_cv_peak", "act_cv_final",
+                   "corr_act_rad_measured_frac", "act_at_tip_peak",
+                   "n_tips_peak", "tube_diam_final", "protrusion_aspect_max_peak",
+                   "red_at_tip_final", "spot_spacing_cells_final",
+                   "reduced_volume_floor", "shape_idx_p95_peak", "cells_trend",
+                   "act_alive_frac", "act_extinct_frame")
 
 from llm import BREVITY  # noqa: F401  (defined in llm.py so run_agent can apply it)
 
@@ -127,7 +144,7 @@ def analyse(run_name, out_dir, n=N_READERS, timeout_min=6, ledger=None, parallel
     # time rather than from where the run happened to stop.
     shapes = ""
     try:
-        import curve_shape as _CS
+        import time_analysis as _CS
         _rep = _CS.report(out_dir, write=True)
         shapes = _CS.summarise(_rep) or ""
     except Exception as e:

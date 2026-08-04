@@ -336,8 +336,14 @@ def compute_conditions(claim, **kw):
 def admitted_metrics():
     """What an instrument actually reports. Reused from predict.py, never re-listed here."""
     try:
-        from predict import KNOWN_METRICS, REJECTED_METRICS
-        return set(KNOWN_METRICS) - set(REJECTED_METRICS)
+        # THE BARE QUANTITIES TOO. The bank became a PRODUCT on 4 August -- 24 quantities x 6
+        # temporal reductions -- so `act_cv` is no longer an admitted NAME (only `act_cv_peak`,
+        # `act_cv_final`, ... are). This function asks a different question: is the PROPERTY
+        # measured? It is, and without the quantities a claim written as "act_cv is low" would be
+        # read here as naming an UNMEASURED property and would raise an instrument request for an
+        # instrument that has existed for weeks -- the campaign's signature defect.
+        from predict import KNOWN_METRICS, REJECTED_METRICS, SERIES_QUANTITIES
+        return (set(KNOWN_METRICS) | set(SERIES_QUANTITIES)) - set(REJECTED_METRICS)
     except Exception:
         return set()
 
