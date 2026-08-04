@@ -390,6 +390,31 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
                     hz_i = min(hz_i, max(0, int(horizon["horizon"])))
             else:
                 horizon = {"horizon": None, "why": "metrics.npz carries no broken_n"}
+            # AND IT MUST ASK THE OTHER WITNESS. broken_n is one signature of a run that stopped
+            # being tissue; SELF-INTERSECTION is another, and the horizon was deaf to it.
+            # Measured on r003c_04_6d1b25: P11 reports the surface folds through itself AT FRAME
+            # 530 -- median 18 ray crossings -- and the record still said horizon_frame 900,
+            # valid_frac 1.0, valid_evidence True, with protr_peak 2.266 computed across the
+            # break. That run sat at the top of the leaderboard on a number measured from a
+            # folded mesh, while the premise that detected the fold was written down beside it.
+            #
+            # ray_single_frac is the same quantity P11 keys on, so the horizon and the premise
+            # can no longer disagree about when the run ended.
+            if "ray_single_frac" in _z.files:
+                _rs = np.asarray(_z["ray_single_frac"], float)
+                _bad = np.where(np.isfinite(_rs) & (_rs < 0.5))[0]
+                if _bad.size:
+                    _fold = int(_bad[0])
+                    if horizon.get("horizon") is None or _fold < int(horizon["horizon"]):
+                        horizon = {"horizon": _fold, "complete": False,
+                                   "why": (f"the surface stops being singly covered at index "
+                                           f"{_fold} (ray_single_frac < 0.5) -- the same fold P11 "
+                                           f"reports; everything after it measures a folded mesh")}
+                    # THE FOLDED FRAME IS NOT EVIDENCE. `_valid = protr[:hz_i + 1]` is
+                    # inclusive, so passing the fold index would keep the first frame at which
+                    # the surface is already through itself -- and that frame is often exactly
+                    # where the spurious peak sits. The last admissible frame is the one before.
+                    hz_i = min(hz_i, max(0, _fold - 1))
         else:
             horizon = {"horizon": None, "why": "no metrics.npz (tube_analysis did not run)"}
     except Exception as e:

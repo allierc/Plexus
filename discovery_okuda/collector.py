@@ -91,6 +91,25 @@ def collect_run(name, hyp=None, summary=None):
         # --- the BIOLOGIST, categorical --------------------------------------------------
         "specimen": _specimen(prem, broken),
         "premises_broken": broken,
+        # --- THE PHENOTYPE, ARBITRATED. The code classifier decides, not the agent's word.
+        #
+        # Three runs of ONE bit-identical simulation -- all twenty summary metrics equal, the VLM
+        # captions byte-identical -- were labelled `exploded`, `spike` and `branching` by the
+        # analyst, and those three words became the entire "Phenotypes observed" row of
+        # lever_map.md. The code classifier returned the same answer for all three, correctly,
+        # and nothing read it. This project's own convention says the arbiter is
+        # morphology.classify plus the Biologist; the record did not honour it.
+        #
+        # An INVALID specimen has no morphology to report: a crumpled shell is not a shape, and
+        # "branching" on a self-intersecting mesh is the most expensive kind of wrong.
+        "phenotype": ("invalid" if _specimen(prem, broken) == "invalid"
+                      else s.get("morphology", MISSING)),
+        "phenotype_why": s.get("morphology_why", MISSING),
+        # kept, so a disagreement between the classifier and the reader stays visible rather than
+        # being silently resolved in favour of either
+        "phenotype_disputed": bool(
+            s.get("morphology") and s.get("analyst_consensus")
+            and s.get("analyst_consensus") not in (MISSING, s.get("morphology"))),
         # --- the ANALYSTS: the label, and how much they agreed on it ---------------------
         "analyst_consensus": s.get("analyst_consensus", MISSING),
         "analyst_agreement": s.get("analyst_agreement", MISSING),
@@ -346,7 +365,9 @@ def _headline(runs):
     if not runs:
         return "NO RUNS"
     best = max(runs, key=lambda r: (r["metrics"] or {}).get("protr_peak") or -1)
-    ph = {r["analyst_consensus"] for r in runs} - {MISSING}
+    # FROM THE ARBITER, not the reader. This built the campaign's published phenotype inventory
+    # out of the agent's word, which is how one simulation contributed three morphologies.
+    ph = {r.get("phenotype", r.get("analyst_consensus")) for r in runs} - {MISSING, "invalid"}
     return (f"{len(runs)} RUNS, PHENOTYPES {'/'.join(sorted(ph)) or 'UNREAD'}, "
             f"BEST protr_peak {(best['metrics'] or {}).get('protr_peak', float('nan')):.2f}")
 

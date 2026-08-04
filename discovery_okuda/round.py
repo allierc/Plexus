@@ -1009,11 +1009,15 @@ def build_composition_batch(sup, cfg, n_slots, ledger):
                 rejected.append((f"{tag}{i}", f"parent_index {pi} out of range"))
                 continue
             parent = frontier[pi]
+            _edit_kind = None
             if sl.get("intent") == "control" or sl.get("edit") in (None, "null"):
                 g, lbl = parent, "control (parent unchanged)"
             else:
                 e = sl["edit"]
                 e = tuple(e["edit"]) if isinstance(e, dict) and "edit" in e else tuple(e)
+                # FROM THE NORMALISED EDIT. Classifying from the raw slot missed the dict form
+                # that this very line exists to accept -- see the note at the admit call below.
+                _edit_kind = e[0] if e else None
                 try:
                     g, _ = parent.apply(e)
                 except Exception as ex:
@@ -1090,6 +1094,9 @@ def build_composition_batch(sup, cfg, n_slots, ledger):
                                     f"a different guess. Vary the EDIT, not the number."))
                 continue
             in_batch[h] = i
+            # ON THE SLOT, because the Hypothesis is constructed in a different function and a
+            # dict that crosses the boundary is the only thing both ends can see.
+            sl["_parent_hash"] = comp_hash(parent)
             out.append((g, lbl, sl))
 
     _admit_slots(slots)
@@ -1140,6 +1147,31 @@ def build_composition_batch(sup, cfg, n_slots, ledger):
         with open(os.path.join(CAMP, "batch_refusals.jsonl"), "a") as fh:
             fh.write(json.dumps({"round": sup.round + 1,
                                  "refused": [{"slot": i, "why": w} for i, w in rejected]}) + "\n")
+
+    # THE CONTROL MUST BE THE BATCH'S OWN PARENT.
+    #
+    # Slot 0 exists so a difference between a candidate and the control is attributable to the ONE
+    # edit. Round 2 posed its control on parent 0 -- mechanics-only, no division, no growth, no
+    # coupling -- while all eleven experimental slots edited parent 1, so eleven experiments had
+    # no baseline they were one edit from, and any difference confounded the edit with three
+    # simultaneous structural changes. The Proposer said why: "parent-0 mechanics-only (no growth
+    # -> guaranteed admissible anchor)". It chose a control it knew would pass the gates over one
+    # that would answer the question.
+    #
+    # CAUSALITY_RULE states this in the prompt and nothing checked it. With a one-parent frontier
+    # it could not go wrong; the frontier now holds four structurally different parents.
+    _ctrl = [(k, sl) for k, (_g, _l, sl) in enumerate(out) if sl.get("intent") == "control"]
+    _majority = None
+    _ph = [sl.get("_parent_hash") for _g, _l, sl in out if sl.get("intent") != "control"]
+    if _ph:
+        _majority = max(set(_ph), key=_ph.count)
+    for k, sl in _ctrl:
+        if _majority and sl.get("_parent_hash") and sl["_parent_hash"] != _majority:
+            print(T_.warn(f"[critic] the control (slot {k}) is on a DIFFERENT parent from the "
+                          f"batch it is meant to control: {sl['_parent_hash'][:10]} vs "
+                          f"{_majority[:10]}. Every non-control slot in this batch is compared "
+                          f"against a composition it is NOT one edit from."))
+            sl["control_parent_mismatch"] = True
 
     # THE CAP THAT MAKES THE OVER-REQUEST SAFE. n_ask asked for a third more than the batch; the
     # surplus exists to absorb refusals, not to grow the batch. Survivors past n_slots are dropped
@@ -1555,8 +1587,14 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         # Defaulted BEFORE the hypothesis is built, because it is passed to it. It used to be
         # assigned to the slot dict two lines AFTER the constructor ran, purely to feed a print.
         sl["track"] = sl.get("track") or ("B" if sl.get("territory") == "in_paper" else "A")
+        # THE PARENT IS RECORDED. This was hard-coded None, so all 46 hypotheses of the last
+        # campaign carried a null parent and the ledger could not answer "what was this an edit
+        # of" -- which is the one question a one-edit search exists to make answerable. It
+        # mattered little with a single-parent frontier and matters now: the frontier holds four
+        # structurally different parents, so "one edit off a shared control" is no longer
+        # inferable from context and must be written down.
         h = Hypothesis(hid=f"R{rid}.{i}.{comp_hash(g)[1:7]}", comp_hash=comp_hash(g),
-                       parent_hash=None, edit=lbl,
+                       parent_hash=sl.get("_parent_hash"), edit=lbl,
                        intent=sl.get("intent", "confirmatory"),
                        track=sl["track"],
                        # CARRIED THROUGH AT LAST. claim_kind has existed in hypothesis.py since
