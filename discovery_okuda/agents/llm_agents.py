@@ -301,12 +301,25 @@ Reply with ONLY: {{"supports": true|false, "seen": "<what it actually shows, 6 w
     ok, out = run_agent("watcher", prompt, ledger=ledger, timeout_min=timeout_min,
                         allowed_tools=[], quiet=True)
     j = _first_json(out) or {}
-    supports = bool(j.get("supports", True))
-    return {"watcher_verdict": "supports" if supports else "CONTRADICTS",
+    # SILENCE IS NOT AGREEMENT. `j.get("supports", True)` made an unparsed reply -- a caption the
+    # model never produced, a JSON object that never appeared, a timeout -- read as the eye
+    # AGREEING with the numbers. That is the one direction this role must never fail in: it is the
+    # only channel in the loop that looks at SHAPE rather than at number, so a silent yes removes
+    # the only thing that could contradict the arithmetic, and removes it invisibly.
+    #
+    # Three states, not two. `supports` absent is UNKNOWN: it does not support and it does not
+    # block, and it is recorded as unknown so the record shows the eye was not heard from.
+    _raw = j.get("supports", None)
+    heard = _raw is not None
+    supports = bool(_raw) if heard else False
+    return {"watcher_verdict": ("supports" if supports else "CONTRADICTS") if heard
+            else "NOT SEEN -- the eye returned nothing parseable",
             "watcher_seen": j.get("seen", ""), "watcher_why": j.get("why", ""),
             "watcher_describe": j.get("describe", ""),
             "watcher_headline": j.get("headline", ""),
-            "watcher_blocks": not supports}
+            "watcher_heard": heard,
+            # An unheard eye must not veto either: it blocks only when it actually said so.
+            "watcher_blocks": heard and not supports}
 
 
 # ============================================================================ 9. INTERPRETER

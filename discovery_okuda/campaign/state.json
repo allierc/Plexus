@@ -1,6 +1,6 @@
 {
- "round": 15,
- "spent": 31,
+ "round": 18,
+ "spent": 34,
  "dry": 0,
  "best": 2.05,
  "stage_gate": 3,
@@ -214,11 +214,11 @@
   ],
   "clusters": {
    "K000": {
-    "evals": 17,
+    "evals": 20,
     "best": 2.05,
     "frozen": true,
     "why": "10 evaluations, no best-score gain in the last 7 -- budget reallocated",
-    "stale": 0,
+    "stale": 3,
     "members": [
      "C0a9ff47bff0",
      "C1bd104173a0",
@@ -294,5 +294,5 @@
    }
   }
  },
- "t": 1785803339.0324457
+ "t": 1785803754.8462868
 }

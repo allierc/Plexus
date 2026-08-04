@@ -284,6 +284,46 @@ def _n_from_prompt(p):
 
 
 # --------------------------------------------------------------------------- the fake cluster
+def isolate():
+    """Give this round a FRESH campaign, and put the real one back afterwards.
+
+    TESTS MUST NOT CONTAMINATE EACH OTHER. Every round appends to the campaign's accumulating
+    state -- the lever map, the round records, the seen-composition set -- so a harness sharing
+    that state gets steadily harder to satisfy: the fourth offline round in a row had every edit
+    refused as DUPLICATE_IN_BATCH, not because anything was wrong but because the previous three
+    had already proposed them. A test whose result depends on how many times it has been run is
+    not a test.
+
+    The real campaign is copied aside and restored at exit, so running the suite is never
+    destructive to a live campaign's record.
+    """
+    import atexit
+    import shutil
+    import tempfile
+    camp = os.path.join(HERE, "campaign")
+    if not os.path.isdir(camp):
+        return
+    keep = tempfile.mkdtemp(prefix="okuda_camp_")
+    shutil.rmtree(keep, ignore_errors=True)
+    shutil.copytree(camp, keep)
+
+    def _restore():
+        shutil.rmtree(camp, ignore_errors=True)
+        shutil.copytree(keep, camp)
+        shutil.rmtree(keep, ignore_errors=True)
+
+    atexit.register(_restore)
+    # Clear what ACCUMULATES; keep what the loop reads as its standing instructions.
+    for f in os.listdir(camp):
+        if f.endswith((".jsonl", ".log")) or f in ("state.json", "frontier.json",
+                                                   "proposal.json", "map.jsonl"):
+            try:
+                os.remove(os.path.join(camp, f))
+            except Exception:
+                pass
+    return keep
+
+
 def install(scenario="clean"):
     """Patch both seams. Idempotent; returns the state dict so a test can read the call log."""
     if scenario not in SCENARIOS:
@@ -386,6 +426,7 @@ if __name__ == "__main__":
     a = ap.parse_args()
 
     st = install(a.scenario)
+    isolate()
     clear_runs("r0")
     import round as R
     print(f"[offline] scenario={a.scenario} mode={a.mode} batch={a.batch} -- no agent, no GPU\n")

@@ -139,11 +139,20 @@ def table(rounds=None):
     d = drift(rounds)
     if not b:
         return "no history yet -- this is the first round."
+    _w = max(12, max(len(e["comp"]) for e in b.values()) + 1)
     L = [f"{len(b)} branch(es) across {d.get('n_rounds', 0)} completed round(s).", "",
-         f"{'composition':12}{'region':16}{'rounds':10}{'evidence':>9}{'sound':>7}"
+         f"{'composition':{_w}}{'region':16}{'rounds':10}{'evidence':>9}{'sound':>7}"
          f"{'best':>8}  phenotypes"]
+    # THE IDENTIFIER IS NOT TRUNCATED. `comp[:11]` fitted the column and broke the table: hashes on
+    # disk run 12 to 28 characters, and cutting them to eleven makes DISTINCT compositions
+    # identical here -- measured, it collides on the current log. The Archivist reads this table
+    # and names a branch back to the Supervisor, so a collision is not a cosmetic problem: it
+    # rolls the campaign back to the wrong composition, or to one that does not exist. Same
+    # disease as `run[:14]`, which cost six of twelve recon slots.
+    #
+    # The region is display and may be cut. The hash is identity and may not.
     for e in sorted(b.values(), key=lambda e: (-e["last_round"], -(e["best"] or -1))):
-        L.append(f"{e['comp'][:11]:12}{e['region'][:15]:16}"
+        L.append(f"{e['comp']:{_w}}{e['region'][:15]:16}"
                  f"{str(e['rounds'])[:9]:10}{e['n_evidence']:>9}{e['n_sound']:>7}"
                  f"{_fmt(e['best']):>8}  {', '.join(e['phenotypes']) or '—'}")
     if d.get("enough_history"):

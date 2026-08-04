@@ -4,94 +4,80 @@
    {
     "id": "seed_mesh_3d0",
     "op": "seed_mesh_3d",
-    "impl": "fibonacci_sphere"
-   },
-   {
-    "id": "shape_energy_3d0",
-    "op": "shape_energy_3d",
     "impl": "default"
    },
    {
-    "id": "reconnect_t1_3d0",
-    "op": "reconnect_t1_3d",
-    "impl": "length_threshold"
-   },
-   {
-    "id": "cell_rd_seed0",
-    "op": "cell_rd_seed",
-    "impl": "spot"
-   },
-   {
-    "id": "divide_3d0",
-    "op": "divide_3d",
-    "impl": "hertwig"
-   }
-  ],
-  "conns": [],
-  "params": {
-   "seed_mesh_3d0.n_cells": 2000,
-   "cell_rd_seed0.tip_radius": 2.0,
-   "cell_rd_seed0.cone_deg": 8.0,
-   "cell_rd_seed0.seed_frac": 0.06,
-   "cell_rd_seed0.amp": 2.0,
-   "cell_rd_seed0.n_spots": 1,
-   "divide_3d0.cycle_cv": 0.4,
-   "divide_3d0.min_cycle": 16,
-   "divide_3d0.max_cycle": 1000000000,
-   "divide_3d0.vcap": 1.5,
-   "divide_3d0.max_div_frac": 0.0075,
-   "divide_3d0.max_div": 30,
-   "divide_3d0.orient_asw": 1.0
-  }
- },
- {
-  "ops": [
-   {
-    "id": "seed_mesh_3d0",
-    "op": "seed_mesh_3d",
-    "impl": "fibonacci_sphere"
-   },
-   {
-    "id": "shape_energy_3d0",
-    "op": "shape_energy_3d",
+    "id": "cell_geometry_3d0",
+    "op": "cell_geometry_3d",
     "impl": "default"
-   },
-   {
-    "id": "reconnect_t1_3d0",
-    "op": "reconnect_t1_3d",
-    "impl": "length_threshold"
-   },
-   {
-    "id": "cell_rd_seed0",
-    "op": "cell_rd_seed",
-    "impl": "spot"
-   },
-   {
-    "id": "divide_3d0",
-    "op": "divide_3d",
-    "impl": "hertwig"
    },
    {
     "id": "cell_adjacency0",
     "op": "cell_adjacency",
-    "impl": "shared_edge"
+    "impl": "default"
+   },
+   {
+    "id": "cell_rd_seed0",
+    "op": "cell_rd_seed",
+    "impl": "default"
+   },
+   {
+    "id": "cell_diffuse0",
+    "op": "cell_diffuse",
+    "impl": "default"
+   },
+   {
+    "id": "cell_react0",
+    "op": "cell_react",
+    "impl": "gray_scott"
+   },
+   {
+    "id": "shape_energy_3d0",
+    "op": "shape_energy_3d",
+    "impl": "default"
+   },
+   {
+    "id": "reconnect_t1_3d0",
+    "op": "reconnect_t1_3d",
+    "impl": "default"
    }
   ],
   "conns": [],
   "params": {
+   "seed_mesh_3d0.cell_set": "cell",
    "seed_mesh_3d0.n_cells": 2000,
-   "cell_rd_seed0.tip_radius": 2.0,
-   "cell_rd_seed0.cone_deg": 8.0,
+   "seed_mesh_3d0.radius": 5.0,
+   "seed_mesh_3d0.jitter": 0.18,
+   "seed_mesh_3d0.p0": 3.5,
+   "seed_mesh_3d0.seed": 0,
+   "seed_mesh_3d0.before_frame": 1,
+   "seed_mesh_3d0.vseed_cv": 0.15,
+   "cell_rd_seed0.seed": 0,
+   "cell_rd_seed0.before_frame": 3,
+   "cell_rd_seed0.mode": "scatter",
    "cell_rd_seed0.seed_frac": 0.06,
-   "cell_rd_seed0.amp": 2.0,
-   "cell_rd_seed0.n_spots": 1,
-   "divide_3d0.cycle_cv": 0.4,
-   "divide_3d0.min_cycle": 16,
-   "divide_3d0.max_cycle": 1000000000,
-   "divide_3d0.vcap": 1.5,
-   "divide_3d0.max_div_frac": 0.0075,
-   "divide_3d0.max_div": 30,
-   "divide_3d0.orient_asw": 1.0
+   "cell_diffuse0.d_a": 0.08,
+   "cell_diffuse0.d_h": 2.0,
+   "cell_diffuse0.chi": 0.08,
+   "cell_react0.F": 0.046,
+   "cell_react0.kk": 0.062,
+   "cell_react0.rate": 1.0,
+   "shape_energy_3d0.p0": 3.5,
+   "shape_energy_3d0.K_A": 1.0,
+   "shape_energy_3d0.K_P": 1.0,
+   "shape_energy_3d0.Gamma": 0.4,
+   "shape_energy_3d0.Lambda": 3.0,
+   "shape_energy_3d0.K_V": 2.0,
+   "shape_energy_3d0.K_R": 0.4,
+   "shape_energy_3d0.mu": 1.0,
+   "shape_energy_3d0.dt": 1.0,
+   "shape_energy_3d0.relax_iters": 30,
+   "shape_energy_3d0.eta": 0.08,
+   "shape_energy_3d0.cap_frac": 0.12,
+   "reconnect_t1_3d0.l_th_frac": 0.35,
+   "reconnect_t1_3d0.every": 4,
+   "reconnect_t1_3d0.max_flips": 30,
+   "reconnect_t1_3d0.engine_clock": true
   }
  }
 ]
