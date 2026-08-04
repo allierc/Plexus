@@ -75,7 +75,6 @@
   "divide_3d0.cycle_cv": 0.4,
   "divide_3d0.min_cycle": 16,
   "divide_3d0.max_cycle": 1000000000,
-  "divide_3d0.vcap": 1.5,
   "divide_3d0.orient_asw": 1.0,
   "shape_to_chem0.beta": 0.0,
   "shape_to_chem0.F0": 0.055,

@@ -12,9 +12,9 @@ general:
   - 50.0
 sets:
   vertex:
-    n: 1596
+    n: 2596
   cell:
-    n: 800
+    n: 1300
     state:
       chem:
         width: 2
@@ -124,6 +124,6 @@ _discovery:
   region: shape->chemistry feedback
   derived_from: wk_curvature_pos_s0
   reservoir_note: 'vertex buffer sized for the DESTINATION, not the seed: 150 cells
-    growing at max_div_frac=0.03 every 4 frame(s) over 400 frames projects 2883 cells,
+    growing at the rate set on morphogen_growth_3d over 400 frames projects 2883 cells,
     so the array holds 3700 (1.25x). The original held 1778 and the tissue stopped
     dividing at 1766 -- an array ceiling read as a growth plateau.'

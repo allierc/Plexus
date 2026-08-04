@@ -28,7 +28,8 @@ explain why the clock-re-anchored tube is lost?" (Metrologist D1d). That is a PA
 The composition search structurally cannot ask it -- every vcap value is the same hypothesis --
 so a loop with only Loop I would have answered it by accident or not at all.
 
-    python round.py --mode theta --param divide_3d0.vcap --base round_40_mc8 --values 0.0,1.5,3.0
+    python round.py --mode theta --param morphogen_growth_3d0.rate --base okuda_route \
+                     --values 0.0005,0.000866,0.002
     python round.py --mode composition --batch 8
 """
 from __future__ import annotations
@@ -1372,7 +1373,7 @@ def build_theta_batch(base_name, param, values, n_slots, predictions=None, inten
     theta, so a retune cannot count as a new MECHANISM -- that rule is right and stays. But I
     wrongly inferred that a parameter cannot carry a HYPOTHESIS. It obviously can:
 
-        "if I raise vcap to 3.0, tip cells divide sooner, so the tube shortens"
+        "if I raise the growth rate, cells reach the division volume sooner"
 
     is falsifiable, predictive, and exactly the kind of claim one can be wrong about. Stamping
     these points `unknown -- sensitivity sweep` and excluding them from the surprise rate threw
@@ -2279,19 +2280,13 @@ def _purge_round_configs(rid, mode):
 def _theta_prediction(param, v, base_v):
     """A default falsifiable prediction when none was supplied.
 
-    For vcap specifically the mechanism is on record: vcap force-divides oversized cells while
-    BYPASSING the throttle, and the Tyssue notes attribute the tube tip to cells BACKLOGGING
-    behind that throttle and continuing to ramp. So a LOWER cap should split tip cells sooner,
-    remove the backlog, and SHORTEN the tube; a higher cap should restore it. That is the claim
-    under test, and it is one we can be wrong about.
+    THE vcap CASE IS GONE WITH vcap. It used to encode a real mechanism -- vcap force-divided
+    oversized cells while bypassing the throttle, so a lower cap should split tip cells sooner and
+    shorten the tube -- but both the cap and the throttle have been withdrawn: division is now
+    paced by growth alone, a cell dividing when it reaches twice its own birth volume. A default
+    prediction about a parameter that no longer exists would be a claim about nothing.
     """
-    if param.endswith("vcap"):
-        if v <= 0.5:
-            return "protr_peak < 1.5"      # no cap == no forced split of oversized tip cells
-        if base_v is not None and v > base_v:
-            return "protr_peak >= 2.0"     # a higher cap restores the backlog -> longer tube
-        return "protr_peak < 2.0"
-    return "protr_peak >= 2.0"
+    return "protr_peak >= 2.0" if (base_v is not None and v > base_v) else "protr_peak < 2.0"
 
 
 # `_pred_holds` lived here. It was a first-match regex that scored an UNPARSEABLE prediction as

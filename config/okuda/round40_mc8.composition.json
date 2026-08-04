@@ -76,9 +76,6 @@
   "divide_3d0.cycle_cv": 0.4,
   "divide_3d0.min_cycle": 16,
   "divide_3d0.max_cycle": 1000000000,
-  "divide_3d0.vcap": 1.5,
-  "divide_3d0.max_div_frac": 0.0075,
-  "divide_3d0.max_div": 30,
   "divide_3d0.orient_asw": 1.0,
   "extrude0.K_extrude": 4.0,
   "extrude0.a_sw": 0.5
