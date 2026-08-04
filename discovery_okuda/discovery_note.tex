@@ -1568,7 +1568,7 @@ be checked is bad enough; a claim that cannot be \emph{deleted} is worse.
 \end{tcolorbox}
 \end{phasebox}
 
-\begin{phasebox}{Phase 8 --- Entities, edges and sweeps: the loop stops being a script \hfill \prog}
+\begin{phasebox}{Phase 8 --- Entities, edges and sweeps: the loop stops being a script \hfill \done}
 \textbf{Goal.} Three things the 3~August runs showed cannot be patched one at a time: give the loop
 a \emph{declared structure} it can be checked against, close the audit findings that have been
 open since the graph was drawn, and schedule the parameter sweep that has been implemented and
@@ -1749,8 +1749,38 @@ the parameter or the values; and \code{build\_theta\_batch} sweeps \emph{one} pa
 ``does this mechanism matter'' but ``what does it do as you turn it up'', and the second question
 has never been asked.
 
+\begin{resultbox}{8.4 --- A parameter change is a move on the menu \hfill \done}
+Cedric's design, and better than the separate mode it replaces: \code{set\_param} becomes an edit
+kind beside \code{add\_op}, \code{remove\_op} and \code{set\_impl}, so the Proposer chooses
+structural and parameter moves from \emph{one} list and can \textbf{mix them in a single batch} ---
+instead of a whole round having to be one or the other.
+
+\smallskip
+\textbf{The discipline holds by construction, not by instruction.} \code{comp\_hash} already
+excludes parameters, so a retune yields the \emph{same} composition identity and can never register
+as a new mechanism. ``A change of numbers can never masquerade as a new idea'' is true because the
+identity function says so --- asserted as a test, not asked of an agent.
+
+\smallskip
+Two points per parameter, taken from each operator's own \code{(lo, hi, default)}, so a sweep cannot
+leave the space the Critic admits. \textbf{The specimen is not an axis}: substrate parameters,
+\code{n\_cells} and \code{seed} are excluded, because \code{round.py} grounds starting conditions
+for a reason it learned when two slots ran 500 cells against a control at 2000 --- any difference
+between them confounded the edit with a fourfold change in specimen size.
+
+\smallskip
+\textbf{Structure first, numbers rationed.} Parameter moves outnumbered structural ones seventeen to
+seven on the current frontier, so a menu of any length would have shown mostly dials and a batch
+would have gone on turning them. Every structural move is offered; parameter moves are capped at a
+quarter. Track~A asks whether a mechanism \emph{matters} before it asks what it does as you turn it
+up. The preamble now also states what an operator absent from the menu means --- \emph{it does not
+exist in this system, however real the biology} --- which is exactly what round~2 needed and was
+never told.
+\end{resultbox}
+
 \textbf{What you get.} A loop whose parts are declared and checked rather than remembered, with
-the sweep arm switched on. \emph{Nothing relaunches until the checker passes.}
+the sweep arm switched on. \emph{Nothing relaunches until the checker passes} --- and the checker is
+now \code{python test\_offline.py}: \textbf{12 cases, 12 passing, no agent and no GPU}.
 \end{phasebox}
 
 \begin{phasebox}{Phase 9 --- The demonstration \hfill \todo}
