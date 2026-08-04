@@ -80,6 +80,12 @@ def _wrap(t, w):
     return out
 
 
+# SET BEFORE ANY IMPORT OF transformers/huggingface_hub, which read it once at import time.
+# Belt and braces with disable_progress_bar() below: this one covers the hub's download bars,
+# that one covers the shard-loading bar, and they are different mechanisms.
+os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+
+
 def caption_wave(names, n_frames=8, force=False):
     """Caption every named run. Returns {name: 'ok' | 'skipped' | 'no_movie' | reason}."""
     todo = []
@@ -104,6 +110,16 @@ def caption_wave(names, n_frames=8, force=False):
         import torch
         import describe_video as DV
         from transformers import AutoModelForMultimodalLM, AutoProcessor
+        # NO PROGRESS BAR. `Loading weights: 100%|####...| 677/677` is a full terminal width of
+        # blocks, redrawn, for a load the line below already announces -- and in the campaign log
+        # it lands as a wall of carriage returns that breaks `tail -f` and every paste. It reports
+        # nothing a reader can act on: the load either finishes or the caption step says
+        # UNAVAILABLE. The env var covers the hub's own bars, which are set before import.
+        try:
+            from transformers.utils import logging as _hf_log
+            _hf_log.disable_progress_bar()
+        except Exception:
+            pass
         dev = "cuda:0" if torch.cuda.is_available() else "cpu"
         print(_T.dim(f"[caption] loading the VLM ONCE for {len(todo)} run(s) on {dev} ..."),
               flush=True)

@@ -334,6 +334,14 @@ def unmeasured_properties(text, extra=()):
     # an operator is a mechanism, and a verb-ish token is neither
     named = {w for w in named if w not in ops and not w.startswith(("remove_", "add_", "set_"))}
     named -= set(NOT_PROPERTIES)
+    # A VERB IS NOT A QUANTITY. "every composition tested is a sphere" put `tested` in front of
+    # `is`, so the pattern read it as a property and the Metrologist was asked, in round 1, to
+    # build an instrument for it. Past participles land in that position constantly -- tested,
+    # measured, observed, refused, admitted -- and none of them names anything an instrument
+    # could report. Same family as the `metrics.json is absent` -> `json` request: a token in a
+    # measurement-shaped position is not thereby a measurement.
+    named = {w for w in named
+             if not (w.endswith(("ed", "ing")) and w not in ok)}
     # a model PARAMETER is set, not measured: asking for an instrument to report it is a category
     # error. Anything the composition space knows as a param name is excluded.
     try:
