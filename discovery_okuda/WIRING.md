@@ -61,6 +61,8 @@ whole mechanism — the same one that keeps `ROLES.md` honest.
 | `operator_backlog.md` | `metrologist.py` | `round.py` |
 | `instruction.md` | `campaign_loop.py` | `llm.py` |
 | `user_input.md` | `(hand)` | `llm.py` |
+| `EXTERNAL_AUDIT.md` | `(hand)` | `(hand)` |
+| `EXTERNAL_AUDIT_1.md` | `(hand)` | `(hand)` |
 | `campaign.log` | `campaign_loop.py` | `(hand)` |
 | `trace.log` | `round.py` | `(hand)` |
 | `records.jsonl` | `collector.py` | `round.py`, `archivist.py`, `campaign_loop.py` |
