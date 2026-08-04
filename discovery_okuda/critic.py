@@ -200,7 +200,18 @@ def _cell_cap(graph):
 
 
 # ============================================================================ STATIC rules
-DT_GLOBAL_DEFAULT = 0.02        # translate.DT_GLOBAL; kept local so critic imports nothing heavy
+# THE ONE dt, IMPORTED. This said 0.02 with a comment claiming it mirrored translate.DT_GLOBAL,
+# which is 1.0 -- a FIFTY-FOLD disagreement between a constant and the comment describing it, in
+# the file whose job is to refuse compositions on numerical grounds. It is the same shape as the
+# CFL condition that was "fifty times too generous" because it lived in a comment: a number
+# written down once beside the thing it was copied from, and then the thing changed.
+#
+# Nothing is kept local to avoid an import. `translate` is already imported by every caller of
+# this module, and a wrong number costs more than a dependency.
+try:
+    from translate import DT_GLOBAL as DT_GLOBAL_DEFAULT
+except Exception:                                    # pragma: no cover -- translate must import
+    DT_GLOBAL_DEFAULT = 1.0
 
 
 # dt*rate for an autocatalytic kinetics. 1.0 diverged in five runs on 2 August; the bound the
@@ -344,8 +355,13 @@ def check_static(graph, seen_hashes=(), edit_kind=None):
     # not the linear decay `reaction_stiffness` reports -- which is why that function is
     # deliberately unwired. brusselator is autocatalytic too but has NOT been measured to fail,
     # so it is left alone rather than guarded on a guess.
+    # NO BARE EXCEPT AROUND THE WHOLE RULE. It was wrapped in `except Exception: pass`, so an
+    # accessor that raised made the guard silently do nothing -- its own comment records that
+    # happening once, passing all seven gierer_meinhardt compositions in round 2. The import is
+    # done at module scope now (above), so the only thing left inside is per-operator arithmetic,
+    # and a failure there is reported rather than swallowed.
+    DT_GLOBAL = DT_GLOBAL_DEFAULT
     try:
-        from translate import DT_GLOBAL
         for o in graph.ops:
             # The implementation is read from the op itself, with impl_of only as a fallback:
             # this whole rule sits in a try/except, so an accessor that raises would make the

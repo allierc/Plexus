@@ -468,6 +468,25 @@ OPERATORS = {
 }
 
 # Slots may depend on the chosen implementation (see divide_3d).
+def _emitted_params(graph, node):
+    """The parameter names this node's implementation actually passes to the engine, or None.
+
+    None means "could not be determined" -- the caller then offers everything, which is the old
+    behaviour and fails loudly at compile rather than silently here.
+    """
+    try:
+        from translate import EMIT, _ALIASED
+        _e = EMIT.get(node["op"])
+        if _e is None:
+            return None
+        spec_op = _e(graph, node, 0)
+        names = set(spec_op) | {_ALIASED.get(k, k) for k in spec_op}
+        names |= {k for k, v in _ALIASED.items() if v in spec_op}
+        return names
+    except Exception:
+        return None
+
+
 def slots_of(op: str, impl: str):
     spec = OPERATORS[op]
     return list(spec.get("impl_slots", {}).get(impl, spec["slots"]))
@@ -871,8 +890,20 @@ class CompositionGraph:
             # by the pipeline so a comparison cannot be accidentally confounded.
             if OPERATORS[o["op"]].get("role") == "substrate":
                 continue
+            # ONLY PARAMETERS THIS IMPLEMENTATION ACTUALLY RECEIVES. `params` in OPERATORS is a
+            # UNION over every implementation -- gamma/a0/mu_h belong to gierer_meinhardt, F/kk to
+            # gray_scott -- and this offered all of them whatever impl was chosen. Measured by an
+            # external review: 16 of 39 sweep moves refused as C2_COMPILE_FAILED, 41% of the
+            # parameter menu dead on arrival. It was invisible while R6 refused every sweep move
+            # first; fixing R6 unmasked it.
+            #
+            # The EMITTER is the authority on what a given op:impl receives, so ask it rather than
+            # hand-writing a second table that would drift. Once per node, not once per parameter.
+            _emitted = _emitted_params(self, o)
             for pname, tri in (OPERATORS[o["op"]].get("params") or {}).items():
                 if pname in ("seed", "n_cells", "before_frame", "after_frame"):
+                    continue
+                if _emitted is not None and pname not in _emitted:
                     continue
                 if not (isinstance(tri, (tuple, list)) and len(tri) == 3):
                     continue
@@ -957,7 +988,12 @@ class CompositionGraph:
                 _src = [o["id"] for o in g.ops if o["id"] != nid
                         and any((_ot, _sl) in LEGAL_LINKS
                                 for _ot in (OPERATORS[o["op"]].get("outputs") or []))]
-                if len(_src) == 1:
+                # NOT TWICE. The auto-wire fires on add_op and a recipe may then `connect` the
+                # same pair explicitly, which gave okuda_route the identical edge twice -- and a
+                # duplicated coupling is not a cosmetic problem in a graph the engine compiles.
+                if len(_src) == 1 and not any(
+                        c["src"] == _src[0] and c["dst"] == nid and c["slot"] == _sl
+                        for c in g.conns):
                     g.conns.append({"src": _src[0], "dst": nid, "slot": _sl})
         elif kind == "remove_op":
             nid = edit[1]
@@ -965,7 +1001,9 @@ class CompositionGraph:
             g.conns = [c for c in g.conns if c["src"] != nid and c["dst"] != nid]
             g.params = {k: v for k, v in g.params.items() if not k.startswith(nid + ".")}
         elif kind == "connect":
-            g.conns.append({"src": edit[1], "dst": edit[2], "slot": edit[3]})
+            if not any(c["src"] == edit[1] and c["dst"] == edit[2] and c["slot"] == edit[3]
+                       for c in g.conns):
+                g.conns.append({"src": edit[1], "dst": edit[2], "slot": edit[3]})
         elif kind == "disconnect":
             g.conns = [c for c in g.conns if not (c["src"] == edit[1] and c["dst"] == edit[2]
                                                   and c["slot"] == edit[3])]
@@ -990,6 +1028,18 @@ class CompositionGraph:
             keep = set(slots_of(g._op_of(edit[1]), edit[2]))
             g.conns = [c for c in g.conns
                        if c["dst"] != edit[1] or c["slot"] in keep]
+            # AND AN IMPLEMENTATION WITH MORE SLOTS MUST HAVE THEM FED, by the same unique-source
+            # rule add_op uses. Without this, `set_impl divide_3d0 orient_iface` left the `axis`
+            # slot dangling, so is_runnable() was false and ORIENTED DIVISION -- a named Okuda
+            # mechanism -- was unreachable by swap even after add_op learned to wire. The auto
+            # wiring lived in one of the two branches that create a slot.
+            _held = {c["slot"] for c in g.conns if c["dst"] == edit[1]}
+            for _sl in keep - _held:
+                _src = [o["id"] for o in g.ops if o["id"] != edit[1]
+                        and any((_ot, _sl) in LEGAL_LINKS
+                                for _ot in (OPERATORS[o["op"]].get("outputs") or []))]
+                if len(_src) == 1:
+                    g.conns.append({"src": _src[0], "dst": edit[1], "slot": _sl})
         else:
             raise ValueError(f"unknown edit {edit!r}")
         return g, edit
@@ -1023,13 +1073,35 @@ class CompositionGraph:
     # ---------------------------------------------------------------- post-hoc naming
     def name_region(self):
         """Label a DISCOVERED composition against the literature, never chosen a priori."""
+        # WHAT FEEDS THE GATE, not what is merely present. This classified on operator PRESENCE
+        # and never read `conns` -- so a composition whose growth is gated by a HAND-PLACED SEED,
+        # with the Turing chemistry sitting beside it as a bystander, was labelled
+        # "growth-driven emergent (target mechanism)". That is the label that would go into a
+        # Track B claim, and it would be false: the pattern would not be driving anything.
+        #
+        # It became reachable the moment `add_op` started auto-wiring, because on a parent holding
+        # both a seed and a reaction the two orders give different graphs -- and an external review
+        # constructed exactly that case. `emergent` and `driven` now mean what they say: WHICH
+        # producer is on the other end of the growth gate.
         ops = set(self.op_names())
         impls = {o["op"]: self.impl_of(o) for o in self.ops}
         forced = "extrude" in ops
         local = "morphogen_growth_3d" in ops
-        emergent = "cell_react" in ops
-        driven = "cell_rd_seed" in ops
         mono = impls.get("shape_energy_3d") == "monolayer"
+
+        def _feeds(dst_op, slot):
+            """The OPERATORS wired into <dst_op>.<slot> in this graph."""
+            dst = {o["id"] for o in self.ops if o["op"] == dst_op}
+            return {self._op_of(c["src"]) for c in self.conns
+                    if c["dst"] in dst and c["slot"] == slot}
+
+        _gate = _feeds("morphogen_growth_3d", "gate") if local else set()
+        emergent = "cell_react" in _gate
+        driven = "cell_rd_seed" in _gate
+        # A growth operator whose gate is fed by nothing is not "growth-driven" anything: it is a
+        # composition that will not run, and saying so is more useful than naming it a mechanism.
+        if local and not _gate:
+            return "growth present but UNGATED (nothing feeds it)"
 
         if not (local or "vesicle_growth" in ops):
             return "mechanics-only (no growth)"

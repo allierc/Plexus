@@ -243,7 +243,60 @@ def independent_support(claim, **kw):
             missing.append(r)
             continue
         sigs.add(s)
-    return len(sigs), missing
+    n = len(sigs)
+
+    # AND IDENTICAL OUTPUTS ARE ONE OBSERVATION, whatever their compositions.
+    #
+    # This counted DISTINCT COMPOSITIONS, which is the right question for a confounder and the
+    # wrong one for a dead edge. The campaign's flagship claim -- "uniform growth explosion is
+    # mechanical, not chemical, SUPPORTED on plain / gierer-gray / reaction-swapped bases,
+    # protr_peak=2.266 identical across all" -- passed this test with three signatures, and an
+    # external review found all TWENTY summary metrics bit-identical and the VLM captions
+    # byte-identical. Three compositions, one simulation. The loop read agreement to the third
+    # decimal as strength; it is the signature of a subsystem with no output edge.
+    #
+    # So: if the supporting runs report the SAME NUMBERS, they are one observation no matter how
+    # many hashes produced them. This is the cheapest possible detector for the failure that cost
+    # six rounds, and LOGIC.md already argues it in prose -- "Repetition is not corroboration".
+    if n > 1:
+        obs, unread = set(), 0
+        for r in claim.support:
+            m = _observables(r, **kw)
+            if m is None:
+                unread += 1
+            else:
+                obs.add(m)
+        # The support is at most the number of DISTINCT outcomes. Collapsing only the all
+        # identical case would still pass "three runs, two of them the same simulation".
+        if unread == 0 and obs:
+            n = min(n, len(obs))
+    return n, missing
+
+
+def _observables(run, **kw):
+    """A digest of what a run MEASURED, or None if it cannot be read.
+
+    Deliberately the summary metrics and not the composition: two runs agreeing here to full
+    precision did not corroborate each other, they were the same experiment twice.
+    """
+    import hashlib
+    import json as _j
+    import os as _o
+    for base in (kw.get("log_dir"), LOG):
+        if not base:
+            continue
+        p = _o.path.join(base, str(run), "diag.json")
+        if _o.path.exists(p):
+            try:
+                sm = (_j.load(open(p)).get("summary") or {})
+                nums = sorted((k, repr(v)) for k, v in sm.items()
+                              if isinstance(v, (int, float)) and not isinstance(v, bool))
+                if not nums:
+                    return None
+                return hashlib.sha1(repr(nums).encode()).hexdigest()[:12]
+            except Exception:
+                return None
+    return None
 
 
 def compute_conditions(claim, **kw):
