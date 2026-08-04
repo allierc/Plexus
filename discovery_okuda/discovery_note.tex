@@ -739,14 +739,115 @@ the sweep arm switched on. \emph{Nothing relaunches until the checker passes} --
 now \code{python test\_offline.py}: \textbf{12 cases, 12 passing, no agent and no GPU}.
 \end{phasebox}
 
-\begin{phasebox}{Phase 9 --- The demonstration \hfill \todo}
+\begin{phasebox}{Phase 9 --- The search could not reach the answer \hfill \prog}
+\textbf{Goal.} Six rounds ran cleanly overnight and produced \textbf{zero valid protrusions}. An
+external review, given the campaign and told to verify everything, found why --- and it is one
+missing line, not a hundred strict rules.
+
+\subsection*{The crux, proved by execution}
+\code{apply(("add\_op", ...))} creates the node and \emph{never the connection}.
+\code{is\_runnable()} is false for any dangling slot. The Proposer's menu filters on
+\code{is\_runnable()}. Therefore:
+
+\begin{center}\textbf{no operator that declares a slot can EVER be added by a one-edit move.}\end{center}
+
+\noindent Three operators declare slots, and they are the entire morphogen$\to$mechanics arrow:
+\code{morphogen\_growth\_3d} (\code{gate}) --- \emph{which is Okuda's own mechanism} ---
+\code{extrude} (\code{site}), and \code{divide\_3d:orient\_iface} (\code{axis}). The reviewer ran
+the breadth-first closure of the reachable space:
+
+\begin{center}\small
+\begin{tabular}{@{}lr@{}}
+\toprule
+reachable runnable compositions from the seed & \textbf{9{,}760} \\
+\ldots containing \code{morphogen\_growth\_3d} & 0 \\
+\ldots containing \code{extrude} & 0 \\
+\ldots containing \textbf{any connection at all} & \textbf{0} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent \code{reference\_recipes()["okuda\_route"]} --- the composition this repository has
+written down as its target, carrying the coupling --- is runnable, is admitted by the Critic, and
+is \textbf{unreachable}. The edit set can \emph{destroy} the coupling and can never \emph{build}
+it: a one-way ratchet toward decoupled compositions.
+
+\subsection*{What that makes of six rounds of findings}
+\textbf{The loop's flagship claim is a measurement of its own wiring.} \code{memory.md} records
+``chemistry is inert for shape --- SUPPORTED by every \code{set\_impl} react/diffuse/seed and every
+chemistry \code{remove\_op}, protr\_peak=1.006''. Twenty runs returned exactly 1.006, including runs
+that \emph{deleted the reaction operator outright}. A subsystem with no output edge cannot move a
+shape, and the loop filed that as a fact about biology.
+
+\textbf{And the three best results were one artefact seen three times.} The top \code{protr\_peak}
+in the campaign, 2.266, appears on three compositions differing only in their reaction block, with
+all twenty summary metrics \textbf{bit-identical} and byte-identical VLM captions. Its cause: 95\%
+of the vertices collapse to radius 0.08 while a handful fly to 1508, so \code{protr = r95/rmed} is
+a ratio of two near-zero numbers. The loop read ``identical across three independent bases'' as
+\emph{strength}; it is the signature of a disconnected subsystem. Those three runs also received
+three different phenotype labels --- \code{exploded}, \code{spike}, \code{branching} --- from one
+bit-identical simulation, and those three words are now the whole phenotype inventory of
+\code{lever\_map.md}.
+
+\textbf{The sweep arm was dead on arrival.} \code{comp\_hash} excludes parameters by design, so a
+retune cannot register as a new mechanism --- exactly the Track~A discipline, enforced
+structurally. But \code{R6\_DUPLICATE} refuses any graph whose hash is already seen, and a
+\code{set\_param} child has \emph{the parent's hash}. Measured: \textbf{39 of 39 parameter moves
+refused}, even against a seen-list of one. \code{t\_set\_param} passes anyway, because it checks
+that the move is \emph{offered} and never that it is \emph{admitted} --- the same interface defect
+Phase~8 was built to retire, in Phase~8's own test.
+
+\textbf{The refusal arithmetic, and what it really means.} \code{R6\_DUPLICATE} is 106 of 127
+refusals; with \code{DUPLICATE\_IN\_BATCH}, 95\%. But that is the \emph{symptom}: a search that
+cannot reach new territory keeps re-proposing the territory it has. Rounds~5 and~6 delivered
+\textbf{one run each} --- the same control composition that had already run in rounds 2, 3 and 4 ---
+because the control is exempt from the duplicate check and nothing else survived.
+
+\textbf{Track A's discipline is real, and I was wrong to doubt it.} 34 of 46 hypotheses carried a
+parseable prediction; all twelve \code{unstated} are round-1 replays where none is owed; of 29
+resolved-and-stated, \textbf{29 scored confirmed or refuted and 0 inconclusive}. The register works.
+The content is the problem: 19 of 34 predictions were ``nothing will happen'', and 18 of 21
+confirmations were \emph{the sphere stayed a sphere}.
+
+\subsection*{What Phase 9 does}
+\begin{enumerate}\itemsep2pt
+\item \textbf{Make \code{add\_op} of a slotted operator atomic with its \code{connect}}, when
+      exactly one node produces the required port --- the same unique-source rule already used to
+      rebuild parents from specs. This is the one change that opens the space.
+\item \textbf{Put the reference recipes on the frontier} rather than treating them as a failure
+      fallback. They are the only compositions in the repository that carry a wire.
+\item \textbf{Scope \code{R6\_DUPLICATE} to structure}, so a parameter move is not refused as a
+      duplicate of the mechanism it perturbs.
+\item \textbf{The evidence horizon must ask the premise that fired.} \code{r003c\_04} self-intersects
+      at frame 530 --- P11 says so --- while the record reports \code{horizon\_frame 900},
+      \code{valid\_frac 1.0}, \code{valid\_evidence True} and a peak measured across the break.
+\item \textbf{Curiosity as a first-class intent.} Track~A asks two questions of a mechanism and the
+      loop can only pose the first. An exploratory slot states what it is varying and what it will
+      \emph{report}, rather than what it expects --- ``turn $\chi$ up and describe what appears''
+      is a legitimate experiment, and a labyrinth nobody predicted is a finding, not a refutation.
+\item \textbf{The picture must accuse the run.} \code{metrics.png} plotted twelve of fifty-six
+      available series and omitted both \code{protr} --- the metric the campaign ranks on --- and
+      \code{cells}. Now $3\times2$: protrusion, cells against time with the array ceiling drawn,
+      mesh faults, activator, the Turing pattern, and the census; with the frame at which the
+      surface stops being a single closed sheet marked in magenta across all six. The camera framed
+      on \code{r.max()}, so one escaped vertex zoomed a movie out eightyfold and no two runs could
+      be compared; it now frames on a robust percentile, clamped, so a diverged run \emph{clips}
+      instead of shrinking every other run to a dot.
+\end{enumerate}
+
+\textbf{What you get.} A search space that contains the answer. Everything this project has built
+--- the specimen gate, the prediction register, the refusal log, the modality logic, the offline
+harness --- has been waiting for one.
+\end{phasebox}
+
+\begin{phasebox}{Phase 10 --- The demonstration \hfill \todo}
 \textbf{Goal.} Run the designed grid --- six to eight simulations --- that produces the figure:
 tube, undulation and branching, at Okuda's settings.
 
 \textbf{What you get.} \emph{The figure.}
 \end{phasebox}
 
-\begin{phasebox}{Phase 10 --- The method claim \hfill \todo}
+\begin{phasebox}{Phase 11 --- The method claim \hfill \todo}
 \textbf{Goal.} Write up what the loop found by itself versus what we told it, with the record of
 predictions and retractions as the evidence.
 

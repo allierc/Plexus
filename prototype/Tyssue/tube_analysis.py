@@ -399,22 +399,113 @@ def analyze(frames, OUT, a_sw=None):
         if k not in _cols:
             _cols[k] = np.asarray([str(r.get(k, "")) for r in series])
     np.savez(os.path.join(OUT, "metrics.npz"), **_cols)
-    fig, ax = plt.subplots(1, 4, figsize=(18.0, 3.4)); fig.patch.set_facecolor("white")
-    # the three modes on their own curves; the legacy blend is the faint dashed line behind them,
-    # plotted only so an old metrics.png can be compared to a new one.
-    ax[0].plot(fr, col("broken_frac"), "-", color="crimson", lw=2.0, label="broken (invalid)")
-    ax[0].plot(fr, col("folded_frac"), "-", color="darkorange", label="folded")
-    ax[0].plot(fr, col("sliver_frac"), "-", color="steelblue", label="sliver")
-    ax[0].plot(fr, col("hollow_frac"), "--", color="0.6", lw=1.0, label="hollow (derived blend)")
-    ax[0].set_title("mesh faults by mode"); ax[0].set_xlabel("frame"); ax[0].legend(fontsize=7)
-    ax[1].plot(fr, col("area_cv"), "-", color="C0", label="area"); ax[1].plot(fr, col("vol_cv"), "-", color="C2", label="vol")
-    ax[1].set_title("cell-size CV"); ax[1].set_xlabel("frame"); ax[1].legend(fontsize=8)
-    ax[2].plot(fr, col("tube_diam"), "-", color="darkorange"); ax[2].set_title("avg tube diameter"); ax[2].set_xlabel("frame")
-    bo, br, ti = col("body_frac"), col("branch_frac"), col("tip_frac")   # stacked structure census + red overlay
-    ax[3].stackplot(fr, bo, br, ti, labels=["body", "branch", "tip"], colors=["#dddddd", "#f0a080", "#c02020"])
-    ax[3].plot(fr, col("red_frac2"), "--", color="black", lw=1.4, label="red (activated)")
-    ax[3].set_title("cell census (red confined to tip = clean tube)"); ax[3].set_xlabel("frame"); ax[3].set_ylim(0, 1); ax[3].legend(fontsize=7, loc="upper left")
+    # ------------------------------------------------------------------ metrics.png, 3 x 2
+    # WHAT WAS MISSING, and it is not a small thing: the old 1x4 plotted twelve of the
+    # FIFTY-SIX series columns available, and among the forty-four it left out were `protr` --
+    # THE METRIC THE WHOLE CAMPAIGN RANKS ON -- and `cells`. So the one picture a reader gets of
+    # a run showed neither the quantity being optimised nor whether the tissue divided at all.
+    # A reader asking "did this thing grow?" had to open metrics.json by hand.
+    #
+    # THE BREAK FRAME IS DRAWN ON EVERY PANEL. r003c_04_6d1b25 recorded protr_peak 2.266 and sat
+    # at the top of the leaderboard; its trajectory is flat near 1.0 until frame ~530, jumps, and
+    # holds ~1.6 for the last third -- and P11 says the surface self-intersects AT FRAME 530, so
+    # everything after the line is a measurement of a folded mesh. The number cannot say that.
+    # A vertical line through all six panels can, at a glance, without reading anything.
+    fig, ax = plt.subplots(2, 3, figsize=(16.5, 8.0)); fig.patch.set_facecolor("white")
+    ax = ax.ravel()
+
+    # WHERE THE RUN STOPPED BEING TISSUE. First frame at which the surface stops being singly
+    # covered by rays (P11's own evidence) or a face breaks. Computed here rather than taken from
+    # the horizon, because the horizon keys on broken_n alone and missed 6d1b25 entirely.
+    _brk = None
+    try:
+        _rs, _bn = col("ray_single_frac"), col("broken_n")
+        for _k in range(len(fr)):
+            if (np.isfinite(_rs[_k]) and _rs[_k] < 0.5) or (np.isfinite(_bn[_k]) and _bn[_k] > 0):
+                _brk = float(fr[_k]); break
+    except Exception:
+        _brk = None
+
+    def _mark(a):
+        if _brk is not None:
+            a.axvline(_brk, color="magenta", lw=1.6, alpha=0.85, zorder=5)
+
+    # 1. THE HEADLINE. protr is what the campaign ranks on and was never drawn.
+    ax[0].plot(fr, col("protr"), "-", color="black", lw=2.0, label="protr (ranked on)")
+    try:
+        ax[0].plot(fr, col("protrusion_aspect_max"), "-", color="darkorange", lw=1.2,
+                   label="protrusion aspect max")
+    except Exception:
+        pass
+    ax[0].axhline(1.2, color="0.7", ls=":", lw=1.0)
+    ax[0].set_title("shape: protrusion" + (f"   (breaks at {_brk:.0f})" if _brk else ""))
+    ax[0].set_xlabel("frame"); ax[0].legend(fontsize=7); _mark(ax[0])
+
+    # 2. CELLS OVER TIME -- the panel that was asked for. A flat line means no division at all;
+    # a line that flattens against a ceiling means the ARRAY stopped it, not the biology.
+    _c = col("cells")
+    ax[1].plot(fr, _c, "-", color="seagreen", lw=2.0)
+    try:
+        _cap = float(np.nanmax(_c))
+        if np.isfinite(_cap) and _cap > 0:
+            _flat = np.allclose(_c[-max(2, len(_c) // 5):], _cap, rtol=0, atol=0.5)
+            if _flat and _cap > _c[0] * 1.05:
+                ax[1].axhline(_cap, color="crimson", ls="--", lw=1.2,
+                              label=f"plateau {_cap:.0f} -- array, not biology")
+                ax[1].legend(fontsize=7)
+    except Exception:
+        pass
+    _grew = "no division" if np.nanmax(_c) <= np.nanmin(_c) * 1.02 else \
+            f"{np.nanmin(_c):.0f} -> {np.nanmax(_c):.0f}"
+    ax[1].set_title(f"cells vs time  ({_grew})"); ax[1].set_xlabel("frame"); _mark(ax[1])
+
+    # 3. MESH FAULTS, with the self-intersection signal that P11 actually uses.
+    ax[2].plot(fr, col("broken_frac"), "-", color="crimson", lw=2.0, label="broken (invalid)")
+    ax[2].plot(fr, col("folded_frac"), "-", color="darkorange", label="folded")
+    ax[2].plot(fr, col("sliver_frac"), "-", color="steelblue", label="sliver")
+    try:
+        _t = ax[2].twinx()
+        _t.plot(fr, col("ray_single_frac"), "--", color="purple", lw=1.3)
+        _t.set_ylabel("ray single frac (P11)", color="purple", fontsize=8)
+    except Exception:
+        pass
+    ax[2].set_title("mesh faults by mode"); ax[2].set_xlabel("frame"); ax[2].legend(fontsize=7)
+    _mark(ax[2])
+
+    # 4. THE CHEMISTRY. Never plotted, and it is how a reader sees a run go non-finite or die.
+    for _k, _c2, _lw in (("act_max", "firebrick", 1.6), ("act_p95", "indianred", 1.0),
+                         ("act_mean", "0.35", 1.2), ("act_min", "steelblue", 1.0)):
+        try:
+            ax[3].plot(fr, col(_k), "-", color=_c2, lw=_lw, label=_k)
+        except Exception:
+            pass
+    ax[3].set_title("activator"); ax[3].set_xlabel("frame"); ax[3].legend(fontsize=7); _mark(ax[3])
+
+    # 5. THE TURING PATTERN. Certified before the campaign began and never once drawn -- so no
+    # reader could see the variable the paper is actually about.
+    try:
+        ax[4].plot(fr, col("n_spots"), "-", color="darkviolet", lw=1.8, label="n_spots")
+        _t2 = ax[4].twinx()
+        _t2.plot(fr, col("spot_spacing_cells"), "--", color="teal", lw=1.2)
+        _t2.set_ylabel("spacing (cells)", color="teal", fontsize=8)
+    except Exception:
+        pass
+    ax[4].set_title("Turing pattern"); ax[4].set_xlabel("frame"); ax[4].legend(fontsize=7)
+    _mark(ax[4])
+
+    # 6. THE STRUCTURE CENSUS, unchanged -- red confined to the tip is a clean tube.
+    bo, br, ti = col("body_frac"), col("branch_frac"), col("tip_frac")
+    ax[5].stackplot(fr, bo, br, ti, labels=["body", "branch", "tip"],
+                    colors=["#dddddd", "#f0a080", "#c03028"])
+    ax[5].plot(fr, col("red_frac2"), "--", color="black", lw=1.4, label="red (activated)")
+    ax[5].set_title("cell census"); ax[5].set_xlabel("frame"); ax[5].legend(fontsize=7)
+    _mark(ax[5])
+
     for a_ in ax:
         a_.grid(alpha=0.3)
+    if _brk is not None:
+        fig.suptitle(f"MAGENTA LINE = frame {_brk:.0f}: the surface stops being a single closed "
+                     f"sheet. Everything to its right measures a folded mesh.",
+                     fontsize=10, color="magenta", y=0.995)
     fig.tight_layout(); fig.savefig(os.path.join(OUT, "metrics.png"), dpi=110); plt.close(fig)
     return summ
