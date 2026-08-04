@@ -372,32 +372,32 @@ def check_static(graph, seen_hashes=(), edit_kind=None):
             # alone made this rule blind to the very configuration that overran twice: with
             # max_div=30 the floor delivers 30 divisions per call regardless of the fraction, and
             # a pure-exponential projection under-estimated by an order of magnitude.
-            mdiv = float(_p.get(f"{_div['id']}.max_div", 0) or 0)
-            if calls > 0 and cap > 0 and (frac > 0 or mdiv > 0):
-                # STEP THE RECURRENCE. There is no closed form: the engine takes
-                # cap_div = max(max_div, frac x N) per call, so an absolute FLOOR competes with a
-                # fractional term and dominates it at realistic cell counts. Projecting the
-                # fraction alone made this rule blind to the configuration that overran twice --
-                # max_div=30 delivers 30 divisions per call whatever the fraction says, and the
-                # pure-exponential estimate was an order of magnitude low.
-                _n, _fill = float(n0), None
-                for _k in range(int(min(calls, 20000))):
-                    _n += max(mdiv, frac * _n)
-                    if _fill is None and _n > cap:
-                        _fill = _k * every + start
-                if _n > cap:
-                    fill = _fill if _fill is not None else 0.0
+            # THE RATE IS THE GROWTH RATE, so that is what this projects. The division
+            # throttles are gone: every cell that reaches DIV_FACTOR x its birth volume divides.
+            # So the population doubles roughly every ln(2)/rate frames, where `rate` is how fast
+            # morphogen_growth_3d inflates a cell -- and the reservoir question becomes "how many
+            # doublings does this run get".
+            _gro = next((o for o in graph.ops if o["op"] in ("morphogen_growth_3d",
+                                                             "vesicle_growth")), None)
+            grate = float(_p.get(f"{_gro['id']}.rate", 0) or 0) if _gro else 0.0
+            if grate > 0 and calls > 0 and cap > 0:
+                import math as _m
+                doublings = (frames - start) * grate / _m.log(2.0)
+                projected = n0 * (2.0 ** doublings)
+                if projected > cap:
+                    # frames until the array fills
+                    fill = start + _m.log(cap / n0) / _m.log(2.0) * _m.log(2.0) / grate
                     if fill < 0.8 * frames:
                         out.append(Rejection(
                             "R1e_TISSUE_OUTGROWS_RESERVOIR",
                             "the projected cell count fills the vertex reservoir long before the "
                             "run ends, so most of the run measures the array rather than the "
                             "tissue",
-                            f"{n0:.0f} cells at max(max_div={mdiv:g}, {frac:g}xN) per call over "
-                            f"{calls:.0f} calls projects {_n:.3g} against a cap of {cap:.0f}; the "
-                            f"array fills at frame {fill:.0f} of {frames:.0f}. Lower max_div "
-                            f"(it is usually the term that governs), lower max_div_frac, raise "
-                            f"`every`, shorten the run, or size the reservoir for the projection."))
+                            f"{n0:.0f} cells growing at rate={grate:g} gives {doublings:.1f} "
+                            f"doublings over {frames - start:.0f} frames -> {projected:.3g} cells "
+                            f"against a cap of {cap:.0f}; the array fills at frame {fill:.0f} of "
+                            f"{frames:.0f}. Lower the growth rate, shorten the run, or size the "
+                            f"reservoir for the projection."))
     except Exception:
         pass
 

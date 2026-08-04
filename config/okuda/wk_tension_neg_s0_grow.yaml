@@ -12,9 +12,9 @@ general:
   - 50.0
 sets:
   vertex:
-    n: 7396
+    n: 1596
   cell:
-    n: 3700
+    n: 800
     state:
       chem:
         width: 2
@@ -66,7 +66,7 @@ operators:
 - op: morphogen_growth_3d
   at: vertex
   cell_set: cell
-  rate: 0.03
+  rate: 0.003466
   a_sw: 0.25
   hill: 4.0
   rho: 0.35
@@ -99,11 +99,9 @@ operators:
   cycle_cv: 0.15
   p0: 3.5
   every: 4
-  max_div: 12
-  max_div_frac: 0.03
   cell_set: cell
   min_cycle: 4
-  max_cycle: 12
+  max_cycle: 1000000000
   engine_clock: true
 - op: topo_snapshot_3d
   at: vertex

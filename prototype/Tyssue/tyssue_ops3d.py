@@ -432,17 +432,8 @@ class Divide3D(Structural):
         #   tissue proliferates -- essential at scale so max-rate division never outruns relaxation. 0 -> uniform reset_noise.
         self.p0 = float(params.get("p0", 3.72))
         self.every = _engine_owns_clock(params, default=3); self._k = 0
-        self.max_div = int(params.get("max_div", 20))            # cap divisions per call for stability (absolute floor)
-        # LIVE-scaled division cap: max_div is otherwise a FIXED absolute count set from the INITIAL cell count,
-        # so on a long run the live count grows (150->~1400) while the cap stays 10 -> ready cells backlog behind
-        # it, keep ramping v_eq while queued, then divide oversized -> tip strain -> hollow caps. A fractional cap
-        # bounds the division RATE (<= frac of live cells per call), so the cap grows with the tissue. Off (0) by
-        # default so existing presets are unchanged.
-        self.max_div_frac = float(params.get("max_div_frac", 0.0))
-        # HARD CELL-SIZE CAP: force-divide ANY cell whose current volume >= vcap x v_ref, BYPASSING the
-        # per-call throttle (max_div/max_div_frac) so oversized cells never backlog and keep growing. This
-        # bounds the maximum cell size directly (the tube-tip cells that grew "far too big"). 0 = off.
-        self.vcap = float(params.get("vcap", 0.0))
+        # max_div / max_div_frac / vcap: WITHDRAWN, and not read anywhere. An
+        # archived spec may still carry them; they are ignored, not honoured.
         # LOCAL DAUGHTER RELAX: after the septum, run a few bounded-Euler shape-energy steps on ONLY the
         # fresh daughters + their one-ring, so a division never hands the global relaxation an inverted
         # cap (the sole source of hollow cells -- growth alone never makes one). Uses the coeffs stashed
@@ -522,13 +513,26 @@ class Divide3D(Structural):
             return (vol_ok and age[f] >= self.min_cycle) or (age[f] >= self.max_cycle)
         cand = [f for f in range(nF) if _ready(f)]
         rng.shuffle(cand)                                        # unbiased when more cells are ready than the cap
-        cap_div = self.max_div if self.max_div_frac <= 0 else max(self.max_div, int(self.max_div_frac * nF))
-        if self.vcap > 0:                                        # HARD size cap: oversized cells ALWAYS divide (not throttled)
-            vref = float(m.get("v_ref", 0.0)) or (float(np.median(vf[vf > 0])) if (vf > 0).any() else 1.0)
-            over = [f for f in range(nF) if alive[f] > 0 and rings[f] is not None and len(rings[f]) >= 4 and vf[f] >= self.vcap * vref]
-            oset = set(over); cand = over + [f for f in cand if f not in oset]   # oversized first
-            cap_div = max(cap_div, len(over))                    # never throttle oversized cells
-        cand = cand[:cap_div]                                    # (else cand[:n] sweeps in pole-to-pole face order)
+        # NO THROTTLE, NO BYPASS. Every cell that is READY divides, and READY is the test two
+        # lines above: current volume >= factor x jitter x its OWN birth volume, after min_cycle
+        # (or past max_cycle, which is a backstop and must be set long or it becomes the rate).
+        # That is P3 -- "a cell divides because it got big" -- and it is the mechanism the paper
+        # is about. The pace therefore comes from how fast morphogen_growth_3d inflates cells:
+        # ONE number, and it is a growth rate, in the place where the biology is.
+        #
+        # THREE NUMERICAL SHORTCUTS USED TO OVERRIDE IT, and each in turn WAS the rate:
+        #   max_div         an absolute divisions-per-call floor. cap_div = max(max_div,
+        #                   frac x N), and the floor won at every realistic cell count -- 30 per
+        #                   call whatever the growth was doing.
+        #   max_div_frac    the same as a fraction; entirely masked by the floor above it.
+        #   vcap            force-divided any cell over 1.5 x the REFERENCE volume, bypassing the
+        #                   x2 trigger, the jitter and min_cycle. v_ref drifts DOWN as cells
+        #                   divide and shrink, so it fired earlier and earlier.
+        #
+        # Measured before removal: okuda_route (vcap on) divided 7x faster than its growth rate;
+        # cellfix_B_new (vcap off) 1.2x. Two runs overran to 25,898 and 8,982 cells against
+        # Okuda's 4,000 while the rate written in the spec was masked twentyfold. Every previous
+        # run in this campaign measured a counter rather than a tissue.
         ndone = 0
         daughter_mothers = []                                    # mother face index of each appended daughter (order)
         bud_axis = None; a_cells = None                          # ORIENTED interface division: bud axis = centre->red tip

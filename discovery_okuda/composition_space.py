@@ -77,7 +77,6 @@ DIVIDE_CALL_PERIOD_BEFORE_D1 = 4        # engine every=2  x  private self.every=
 CLOCK_COUPLED = {                       # param -> how to convert an archived value to per-frame
     "min_cycle":     "multiply by 4  (calls -> frames)",
     "max_cycle":     "multiply by 4  (calls -> frames)",
-    "max_div_frac":  "divide by 4    (per-call -> per-frame)",
     "max_div":       "divide by 4    (per-call FLOOR; cap_div = max(max_div, frac*nF), so this "
                      "DOMINATES at realistic nF -- rescaling frac alone is entirely masked)",
 }
@@ -104,7 +103,7 @@ CLOCK_COUPLED = {                       # param -> how to convert an archived va
 #   K_V      Its MEANING was never clock-coupled (a per-frame mechanical stiffness). Its
 #            OPTIMALITY was stale only because it was tuned against the division wave -- and the
 #            re-anchoring restores exactly that wave, so K_V = 6.0 is valid again.
-PROVISIONAL_THETA = ("vcap",)   # NOT settled. Metrologist D1d: the clock re-anchoring restores
+PROVISIONAL_THETA = ()   # vcap WITHDRAWN: a size bypass around the x2 trigger   # NOT settled. Metrologist D1d: the clock re-anchoring restores
 #   the CELL COUNT (2927 vs ~2700) but NOT the phenotype -- archived is a long thin tube, the
 #   replay is a small bud. vcap force-divides oversized cells bypassing the throttle, so checking
 #   4x more often splits tip cells the moment they cross instead of letting them ramp while
@@ -391,13 +390,7 @@ OPERATORS = {
         needs=[],
         impls=["hertwig", "orient_iface"], impl_structural=True,   # long-axis vs bud-axis septum
         params={"cycle_cv": (0.05, 0.5, 0.40), "min_cycle": (2, 64, 16),   # 4 calls x 4
-                "max_cycle": (6, 10**9, 10**9), "vcap": (0.0, 3.0, 1.5),   # vcap: PROVISIONAL
-                # FLOOR AT ZERO, for the same reason max_div's is. The box started at 0.00125 and
-                # Okuda's own doubling -- 2,000 cells to 4,000 over 900 frames -- needs 0.000867,
-                # so the declared range could not express the experiment the campaign exists to
-                # reproduce. A prior drawn around what we had been running, not around the paper.
-                "max_div_frac": (0.0, 0.20, 0.0075),   # 0.03/call / 4 = per-frame
-                "max_div": (0, 480, 30),                   # 120/call / 4 = per-frame FLOOR
+                "max_cycle": (6, 10**9, 10**9),   # vcap: PROVISIONAL
                 "orient_asw": (0.2, 6.0, 1.0)}),
     "extrude": dict(                                          # THE FORCING TERM -- ablatable
         stage=2, role="forcing", outputs=[], slots=["site"], needs=["morphogen"],
@@ -1235,35 +1228,13 @@ def reference_recipes():
     # is doing. The rate below is solved from his own numbers: 2000 -> 4000 over 900 frames.
     #
     #     frac = (4000/2000)^(1/900) - 1 = 0.00077
+    # THE GROWTH RATE IS THE DIVISION RATE, now that the throttle is gone: every cell reaching
+    # DIV_FACTOR x its birth volume divides, so the population doubles every ln(2)/rate frames.
+    # rate=0.01 is 11.5 doublings over 800 frames -- SIX MILLION cells -- and was only ever
+    # survivable because max_div capped it at 30 per call. That is what "the rail was the rate"
+    # means in numbers. Okuda's tissue doubles ONCE, 2,000 -> 4,000, so rate = ln(2)/800.
     h = h.with_params({**h.params, "cell_react0.rate": 0.4,
-                       # max_div IS THE TERM THAT GOVERNS, and setting the fraction alone did
-                       # nothing. The engine takes cap_div = max(max_div, frac x N): at 2,000
-                       # cells the fraction allows 1.5 divisions per call and max_div allowed 30,
-                       # so the rate I "set" was masked twentyfold and a run reached 8,982 cells
-                       # by frame 340 on its way past 26,000. CLOCK_COUPLED says this in as many
-                       # words -- "max_div DOMINATES at realistic nF; rescaling frac alone is
-                       # entirely masked" -- and I rescaled frac alone. Simulated against the
-                       # real recurrence, max_div=2 lands at 3,820 over 800 calls.
-                       # THE RAILS MUST NOT BE THE RATE. `morphogen_growth_3d.rate` IS the
-                       # division rate: cells inflate at it, cross DIV_FACTOR x birth volume, and
-                       # divide. That is P3 -- "a cell divides because it got big" -- and it is
-                       # the mechanism the paper is about. `max_div` and `max_div_frac` are
-                       # THROTTLES, meant as rails against one call doing something absurd.
-                       #
-                       # They bound instead. At max_div=30 the biology wanted fewer divisions
-                       # than the rail allowed early on and more later, so the observed rate was
-                       # the RAIL, not the growth -- a counter, not a tissue. Set so that the
-                       # volume trigger governs and the rails sit above it, and the pace is then
-                       # set by `rate`, where the morphogen can steer it.
-                       # ZERO MEANS NO FLOOR, and that is what makes "one rate" expressible.
-                       # `max_div` is an ABSOLUTE divisions-per-call floor; at its old minimum of
-                       # 4 it still adds 3,200 cells over 800 calls on its own, so the declared
-                       # box [4, 480] could not express Okuda's 2,000 -> 4,000 AT ALL. The range
-                       # now starts at 0, meaning "no absolute floor": the fraction governs, the
-                       # fraction follows the growth, and the growth follows the morphogen.
-                       # One rate, where the biology is.
-                       "divide_3d0.max_div": 0,
-                       "divide_3d0.max_div_frac": 0.000867,
+                       "morphogen_growth_3d0.rate": 0.000866,
                        "seed_mesh_3d0.n_cells": 2000})
     out["okuda_route"] = h
 
