@@ -11,3 +11,4 @@
 {"t": 1785849747.9665318, "event": "start", "rounds": 12, "batch": 12, "frames": null}
 {"t": 1785849979.9342637, "event": "start", "rounds": 12, "batch": 12, "frames": null}
 {"t": 1785854446.8000133, "event": "start", "rounds": 12, "batch": 12, "frames": null}
+{"t": 1785856775.1460032, "event": "round", "n": 1, "exit": 0, "minutes": 38.6, "usd_this_round": 14.2, "note": "", "cost_total": {"calls": 24, "usd": 2.47, "tok_in": 5722, "tok_out": 63978, "turns": 102, "minutes": 14.2}}
