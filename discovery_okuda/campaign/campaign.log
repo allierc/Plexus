@@ -50,3 +50,11 @@
 ------------------------------------------------------------------------------------------------
 [loop] round 8/20  mode=composition   spent so far: 90.3 agent-min over 134 calls
 ------------------------------------------------------------------------------------------------
+[loop] terminal also written to /workspace/Plexus/discovery_okuda/campaign/campaign.log
+[loop] clean start: cleared the LEARNED PATTERNS block
+[loop] clean start: 24 file(s) removed, next round is 1
+[loop] plan: 1 recon + 11 composition round(s)
+
+------------------------------------------------------------------------------------------------
+[loop] round 1/12  mode=recon   spent so far: 0.0 agent-min over 0 calls
+------------------------------------------------------------------------------------------------

@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import copy
 import itertools
+import math
 
 import numpy as np
 
@@ -877,9 +878,15 @@ class CompositionGraph:
                     continue
                 lo, hi, dflt = (float(x) for x in tri)
                 cur = float(self.params.get(f"{o['id']}.{pname}", dflt))
-                for v in (cur - (cur - lo) * 0.5, cur + (hi - cur) * 0.5):
+                # AN OPEN BOX IS NOT AN INFINITE STEP. Several ceilings are float("inf") -- an
+                # honest way to say "no derived limit is known" -- and the midpoint rule turned
+                # that into a literal menu entry at rd_rate = inf, which the Critic ADMITS on a
+                # composition without division. Halving toward an open ceiling is meaningless;
+                # doubling from the current value is the step a person would take.
+                _up = cur * 2.0 if not math.isfinite(hi) else cur + (hi - cur) * 0.5
+                for v in (cur - (cur - lo) * 0.5, _up):
                     v = round(v, 6)
-                    if lo <= v <= hi and abs(v - cur) > 1e-9:
+                    if math.isfinite(v) and lo <= v <= hi and abs(v - cur) > 1e-9:
                         edits.append((("set_param", f"{o['id']}.{pname}", v),
                                       f"@{o['op']}.{pname}={v:g}"))
         for src, dst, slot in self._candidate_links():
@@ -1102,7 +1109,11 @@ def reference_recipes():
     # holds Okuda's coupling, and it could not go on the frontier. Halving the rate satisfies the
     # limit without touching the mechanism: it is the same chemistry, integrated in steps the
     # solver can carry. R1d stays exactly as it is; it was right.
-    h = h.with_params({"cell_react0.rd_rate": 0.4})
+    # MERGE, do not replace: with_params() overwrites the whole dict, so passing one key shipped
+    # this recipe with 1 of its 22 parameters. The physics survived (the emitter falls back to the
+    # declared defaults and the emitted spec is byte-identical), but a recipe named "the target"
+    # carrying no explicit operating point is what made the theta hash non-canonical below.
+    h = h.with_params({**h.params, "cell_react0.rd_rate": 0.4})
     out["okuda_route"] = h
 
     # the degenerate control the search must visit on its way: uniform inflation, no patterning.

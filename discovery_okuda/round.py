@@ -1054,9 +1054,17 @@ def build_composition_batch(sup, cfg, n_slots, ledger):
                                      else "excursion")
             sl["fidelity"] = "okuda" if sl["territory"] == "in_paper" else "free"
             g = _ground_starting_conditions(g, sl)
-            _ek = (e[0] if sl.get("intent") != "control" and isinstance(sl.get("edit"), (list, tuple))
-                   and sl.get("edit") else None)
-            adm, rej = C.admit(g, seen if sl.get("intent") != "control" else (), edit_kind=_ek)
+            # N1, found by the external review of this very commit. This classified the edit
+            # from the RAW SLOT, and round.py deliberately accepts a slot whose `edit` is the
+            # whole menu ROW -- {"edit": [...], "label": ..., "yields": ...} -- because models do
+            # copy it verbatim; the normalisation two branches up exists for exactly that. On a
+            # dict the isinstance test failed, _ek came out None, and EVERY parameter move in the
+            # batch was refused as R6_DUPLICATE again with the old message and nothing saying
+            # that classification, not novelty, was the cause. Two owners of one property
+            # agreeing in the normal case and folding at the seam: the Phase 8 class, in the fix
+            # for a Phase 9 defect. `_edit_kind` is set beside `e`, from `e`.
+            adm, rej = C.admit(g, seen if sl.get("intent") != "control" else (),
+                               edit_kind=_edit_kind)
             if not adm:
                 rejected.append((f"{tag}{i}", f"CRITIC: {rej}"))
                 continue
