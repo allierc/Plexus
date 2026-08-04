@@ -1701,7 +1701,14 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
             print(T_.say(f"biologist {_short(nm)}",
                          f"Specimen {_B.specimen_verdict(_pv)}"
                          + (f"; broken: {', '.join(summ.get('premises_broken') or [])}."
-                            if summ.get("premises_broken") else "; every applicable premise holds."),
+                            if summ.get("premises_broken")
+                            # CENSORED MUST NOT READ AS CLEAN. Without this the line says "every
+                            # applicable premise holds" for a run that grew into its array -- true
+                            # of the premises and misleading about the run.
+                            else (f"; CENSORED ({', '.join(summ['premises_censored'])}): the "
+                                  f"endpoint is a lower bound, the frames before it are evidence."
+                                  if summ.get("premises_censored")
+                                  else "; every applicable premise holds.")),
                          sentences=1))
         except Exception:
             pass

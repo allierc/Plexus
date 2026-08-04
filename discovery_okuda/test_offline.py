@@ -219,6 +219,34 @@ def t_own_runs():
                    f"search space does not contain our own evidence")
 
 
+@case("a tissue that meets its array late is censored, not voided")
+def t_p13_censored():
+    """P13's own docstring says AMBIGUOUS, NOT INVALID -- and it returned `fail` anyway.
+
+    That put it in premises_broken, marked the specimen invalid, and barred the run from the
+    frontier: five of twelve slots on 3 August, the whole wk_* family, discarded on the strength
+    of where each run ENDED while the eye-check had read real trajectory in every one.
+    """
+    import numpy as np
+    import biologist as B
+
+    def series(n_grow, n_flat, top=1778.0):
+        vals = list(np.linspace(150, top, n_grow)) + [top] * n_flat
+        return [{"cells": float(v)} for v in vals]
+
+    late = B.p13_growth_not_capped_by_the_array({}, series(700, 200))
+    check(late.status == "censored",
+          f"a run that grew for 78% of its length before meeting the array is {late.status!r}, "
+          f"not censored -- its trajectory is being thrown away")
+    early = B.p13_growth_not_capped_by_the_array({}, series(200, 700))
+    check(early.status == "fail",
+          "a run whose plateau covers the whole run must still fail -- there is nothing to censor")
+    clean = B.p13_growth_not_capped_by_the_array({}, series(900, 0))
+    check(clean.status == "pass", "a run that never saturates must pass")
+    # and censored must NOT count as broken, or nothing is gained
+    check("censored" not in ("fail", "error"), "censored must not be a broken status")
+
+
 # --------------------------------------------------------------------------- the declarations
 @case("every artifact has a reader (wiring.py --check)")
 def t_wiring():
