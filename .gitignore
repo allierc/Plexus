@@ -66,3 +66,22 @@ discovery/**/traj/
 atlas_cc3d/_oracle/_verify/
 atlas_cc3d/_oracle/_out/
 atlas_cc3d/_oracle/_evidence/
+
+# CAMPAIGN STATE IS NOT SOURCE. Everything in discovery_okuda/campaign/ except the four inputs
+# below is written by a running loop and DELETED by campaign_loop.clean_start() at every launch --
+# so committing it buys nothing and costs the one thing that actually hurt: `git stash` and
+# `git restore` will happily rewrite a live campaign's registry underneath the process using it.
+# That happened twice on 4 August. The second time, a stash taken while a campaign was running
+# rolled hypotheses.jsonl back to a dead campaign's copy; round 2 then posed a hypothesis id that
+# copy already held and died with `R2.0.f4907e already posed`, and the live round's own records
+# went with the dropped stash.
+#
+# The research record is elsewhere and stays tracked: discovery_okuda/_archive/, the _failed_*
+# snapshots, and the note. What is kept here is only what a fresh clone NEEDS to run a campaign --
+# the two templates, the standing instructions, and the human's channel -- which are exactly the
+# files clean_start() preserves by name.
+discovery_okuda/campaign/*
+!discovery_okuda/campaign/TEMPLATE_analysis.md
+!discovery_okuda/campaign/TEMPLATE_memory.md
+!discovery_okuda/campaign/instruction.md
+!discovery_okuda/campaign/user_input.md
