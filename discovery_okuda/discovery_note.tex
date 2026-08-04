@@ -405,141 +405,32 @@ did not exist yesterday, and every claim made without it was comparing single sa
 \end{phasebox}
 
 
-\begin{phasebox}{Phase 5 --- The first live run: the agents do not talk to each other \hfill \prog}
-\textbf{It ran, and that is the point.} Two rounds, eight simulations, 23 agent calls, 29
-minutes of agent time. \textbf{One usable run. Map coverage 0\%.} Nothing was learned about the
-biology --- and the reason turns out to be worth more than the biology would have been.
+\begin{phasebox}{Phase 5 --- The first live run: the agents do not talk to each other \hfill \done}
+\textbf{It ran, and that is the point.} Two rounds, eight simulations, 23 agent calls --- and
+\textbf{one usable run, map coverage 0\%}. The machinery worked; the science did not, and the
+reason was the same everywhere.
 
-\textbf{What the machine got right, unprompted.} The Critic refused every bad run and named the
-reason. The straggler killer cut two runs at 46 minutes against an 11-minute batch median. The
-Supervisor diagnosed its own sterility --- \emph{``surprise 0.00: the batch is confirming what we
-already believe, near-zero information. Push adversarial''} --- and a round with nothing
-admissible said so instead of scoring what it had.
+\textbf{Not one finding reached another agent.} The Critic refused eleven slots and the Proposer
+was never told why. The Biologist judged every specimen and spoke to nobody. An audit of every
+hand-off found the same shape \textbf{seven more times}: a role produced a correct judgement, wrote
+it down, and no one read it. \emph{The campaign's defining failure was not bad judgement --- it was
+correct judgement with no recipient.} Drawing the graph is what made it obvious.
 
-Every one of those is a correct judgement. \textbf{Not one of them reached another agent.}
+\textbf{Two consequences that are now permanent.} Refusals became evidence: a slot the Critic
+rejects is written to \code{batch\_refusals.jsonl} and lands in the next Proposer's prompt, because
+a loop told only about its successes cannot avoid repeating its failures. And the Biologist reads
+\code{PREMISES.md} mechanically, so the premise gate is a document a person can argue with rather
+than a rule buried in code.
 
-\subsection*{The diagnosis: written by somebody, read by nobody}
+\textbf{The black movie}, which is the phase in miniature: frame~0 was perfectly good and was drawn
+black because frame~800 diverged --- the colour scale was normalised over the whole run, so one bad
+frame erased eight hundred readable ones. Nothing was wrong with the simulation or the plotter
+alone; they disagreed about what the scale was for.
 
-The Proposer's own reasoning for round 4, verbatim, is the whole case:
-
-\begin{quote}\small
-``Header shows round 3, 0 runs, coverage 0\% \ldots another \textbf{counter-reset artifact}; real
-record = memory.md.''\\[2pt]
-``Those two batches proposed ALL FOUR valid single-op edits on parent 2, so parent 2 is
-\textbf{fully PROPOSED} and \ldots cannot be built on further.''
-\end{quote}
-
-It was handed a summary built only from the lever map, and the lever map is filled \emph{after}
-the Critic --- so a refused run contributes nothing to it. Eight simulations had died of diverged
-chemistry and saturated buffers, and the Proposer was told ``0 runs, coverage 0\%''.
-
-It then drew the only sane conclusion available from an insane input: that the \emph{ledger} was
-broken, and its own prose memory was the real record. And it counted a family as explored because
-it had \textbf{proposed} the edits, not because it had \textbf{measured} anything --- so it moved
-on to a fresh parent believing the previous one was mapped, when nothing had been learned there
-at all.
-
-\textbf{An audit of every hand-off found the same shape seven more times:}
-
-\begin{center}\small
-\begin{tabular}{@{}l l l@{}}
-\toprule
-\textbf{who produces it} & \textbf{what} & \textbf{who receives it}\\
-\midrule
-Critic        & every refusal, with its reason      & \textcolor{bad}{nobody}\\
-Supervisor    & ``push adversarial'', the mix steer  & \textcolor{bad}{the terminal, only}\\
-Interpreter   & \code{causal\_descriptions.md}       & \textcolor{bad}{nobody}\\
-Evolution     & \code{evolution.jsonl}, its refinement & \textcolor{bad}{nobody}\\
-Grounder      & Okuda's starting conditions          & \textcolor{bad}{the config, not the Proposer}\\
-scoreboard    & \code{scoreboard.md}, the headline product & \textcolor{bad}{never written by a round}\\
-lever map     & \code{lever\_map.md}                 & \textcolor{bad}{nobody}\\
-\bottomrule
-\end{tabular}
-\end{center}
-
-And the instruction the Proposer works from names three admitted metrics, of which the
-\code{ta\_*} family is \textbf{absent from half the runs on disk} --- so it writes predictions
-that cannot be scored, which resolve \emph{inconclusive} and drop out of the surprise rate
-entirely. The loop is measuring its own information rate with a ruler that discards the
-measurements.
-
-\subsection*{The reason, stated once}
-
-The campaign was built as a set of roles, each with a job, each doing it. What was never built is
-the \emph{wiring}. Every agent writes; almost nothing reads. The result is not a loop but a fan:
-work flows outward from the Proposer and never returns, so the system cannot be corrected by its
-own findings. \textbf{A loop that is told only about its successes cannot avoid repeating its
-failures} --- and this one had no successes to be told about.
-
-That also explains the day's other defects, which looked unrelated and are not: a refusal printed
-among hundreds of lines, an evidence horizon silently absent, a buffer flag raised after the
-compute was spent, a state file grown past reading, a black movie. Each is a correct output with
-no recipient.
-
-\textbf{Drawing it is what made the shape obvious.} Every agent's output was plotted against
-whoever read it, and the picture was a fan rather than a loop: work flowed outward from the
-Proposer and almost nothing came back. Fourteen roles, and the only thing they shared was the
-direction of travel. That picture is what turned the repair from ``wire these hand-offs'' into
-``why are there so many hand-offs to wire'' --- which is \S\ref{sec:agents}, and Phase~6.
-
-\subsection*{Fixed}
-
-\textbf{Refusals are now evidence.} The Proposer receives what ran, what was refused and the
-reason code, with the distinction stated plainly: an empty map beside a non-zero attempt count is
-not a reset counter --- it means the compositions proposed so far \emph{cannot be simulated}, a
-parent is explored when its edits produced evidence and never when they were merely proposed, and
-the refusal codes say what to change.
-
-\textbf{The black movie.} The colour scale is computed once for the whole run --- correctly, since
-a per-frame rescale makes a decaying pattern and a stable one look identical --- but over samples
-including non-finite values, and one of those makes both bounds non-finite. \textbf{Frame 0 was
-perfectly good and was drawn black because frame 800 diverged.} The artefact reported ``nothing
-happened'' for a run whose first half was fine. Now: finite values only, cells that left the model
-drawn grey rather than white, and the count said out loud.
-
-\textbf{The Biologist now speaks to somebody.} It had been running on every run since it was
-written, and its verdict went to a terminal and to a field of \code{diag.json} that no prompt has
-ever mentioned. On round 2 it broke five premises on the very run whose movie came out black ---
-\emph{the activator had decayed to NaN, the chemistry was extinct} --- and a Reader read that
-run's numbers and named a phenotype. Two hand-offs now exist: the per-run verdict goes to the
-\textbf{Reader} that is about to read it, in the document's own words and with a field it must
-fill in saying whether the specimen was sound; and the round-level tally goes to the
-\textbf{Meta-review}, whose whole job is the recurring pattern. Across round 2 that tally reads
-\emph{``P4 broken in 2 of 3 runs''} --- an edit family that cannot hold chemistry, which is a thing
-to stop proposing rather than a thing to keep measuring.
-
-\textbf{And the premises are read from \code{PREMISES.md}}, not retyped beside it. Two documents
-saying the same thing in different words will disagree, and the one that drifts is always the prose
---- it is the one nothing executes. The titles, grades and stated checks now come from the
-document, and the drift is reported in both directions. It found two immediately: premise~10
-(neighbour exchange is rare) is written down and \textbf{nothing checks it}, and \code{P12} is
-checked on every run and \textbf{appears nowhere in the document}.
-
-\textbf{The two written records have a shape}, checked rather than suggested: an append-only log
-with per-round fields, beside a state document of seven named sections. \code{memory.md} had
-reached 1904 words across six appended blocks in a file whose purpose is to hold state.
-
-\subsection*{What the diagnosis led to}
-
-Wiring the hand-offs one at a time was the wrong repair, and stopping to ask \emph{why there were
-so many to wire} was the right one. The answer is in \S\ref{sec:agents}: sixteen roles copied from
-a system that runs no experiments. \textbf{The roster was rebuilt --- thirteen roles, three acts,
-Judge and Referee dropped, the Collector made code} --- and the design is written down in
-\code{ROLES.md} so that this decision cannot evaporate the way the Biologist's verdicts did.
-
-\subsection*{Still to wire}
-\begin{itemize}[itemsep=1pt]
-\item \textbf{The Collector} --- the round record, built from disk. Everything below lands on it.
-\item The Supervisor's steer into the Proposer's prompt, not the terminal.
-\item The Grounder into the Proposer's prompt, rather than into the config.
-\item The Critic's deterministic 70/30 in-distribution gate.
-\item The abort path: no evidence $\rightarrow$ back to Act 1, two in a row $\rightarrow$ stop.
-\item The Interpreter's descriptions and Evolution's refinement into the next round's evidence.
-\item The admitted-metric list rebuilt from what runs actually record.
-\item The reservoir target from the growth a composition asks for --- three of eight runs
-outgrew an estimate the gate then correctly refused, one step too late.
-\item The scoreboard written by the round that changes it.
-\end{itemize}
+\textbf{Closed by Phase 8}, which is what this phase was asking for without being able to name it.
+\code{WIRING.md} declares every hand-off and \code{wiring.py} fails the round when an artifact is
+written and never read --- the seven-times-repeated shape becomes a failing check rather than an
+audit somebody has to remember to run.
 \end{phasebox}
 
 \begin{phasebox}{Phase 6 --- The rebuilt loop, and its first launch \hfill \done}
@@ -579,25 +470,23 @@ tried'' will write ``cannot be'' instead. That is what Phase~7 exists to fix, an
 \end{phasebox}
 
 \begin{phasebox}{Phase 7 --- The agentic loop update: giving the loop a logic \hfill \done}
-\textbf{Goal.} Supply the reasoning discipline that Phase~6 proved will not emerge on its own ---
-as \emph{structure and code}, not as another voice asking the others to be careful. No new agent.
+\textbf{Goal.} Supply the reasoning discipline Phase~6 proved will not emerge on its own --- as
+\emph{structure and code}, not as another voice asking the others to be careful. No new agent.
 
-\subsection*{Why this is one phase and not two}
-The two defects have one cure. \emph{Absence of evidence read as evidence of absence} and
+\textbf{Why one phase and not two.} \emph{Absence of evidence read as evidence of absence} and
 \emph{absence of an instrument read as absence of an effect} are the same sentence with a different
-subject, and both are fixed by the same move: make the unearned conclusion \textbf{unwritable}, and
-give the loop somewhere to put what it has not yet tried. Splitting them would build the machinery
-twice.
+subject. Both are cured by the same move: make the unearned conclusion \textbf{unwritable}, and
+give the loop somewhere to put what it has not yet tried.
 
-\subsection*{1. \code{LOGIC.md}, and the checker that makes it real}
-A third source-of-truth document, beside the two that already hold. \code{ROLES.md} stays honest
-because \code{roles.py --check} compares it against the code \emph{in both directions};
-\code{PREMISES.md} stays honest because the Biologist mechanically parses it. \code{LOGIC.md}
-states what may be concluded from what, and \code{logic.py --check} \textbf{refuses a malformed
-claim at the moment the Meta-review writes it} --- so a bad claim never enters the document the
-Proposer reads. A rule agents are merely \emph{asked} to honour is the failure mode being removed.
+\textbf{\code{LOGIC.md}, and the checker that makes it real.} A third source of truth beside the
+two that already hold --- \code{ROLES.md} kept honest by \code{roles.py -{}-check},
+\code{PREMISES.md} by the Biologist. \code{logic.py -{}-check} \textbf{refuses a malformed claim at
+the moment the Meta-review writes it}, so a bad claim never enters the document the Proposer reads.
+A rule agents are merely \emph{asked} to honour is the failure mode being removed.
 
-\subsection*{2. Four modalities, and a home for \emph{could be}}
+\textbf{Four modalities, and a home for \emph{could be}} --- which was previously unrepresentable,
+so a campaign that could not say ``not yet tried'' wrote ``cannot be'' instead.
+
 \begin{center}
 \begin{tabular}{@{}llp{6.2cm}@{}}
 \textbf{can be} & demonstrated positive & one instance suffices \\
@@ -606,122 +495,20 @@ Proposer reads. A rule agents are merely \emph{asked} to honour is the failure m
 \textbf{could be} & untested, open & \textbf{free --- and today unrepresentable} \\
 \end{tabular}
 \end{center}
-\code{memory.md} has exactly two buckets, so untested territory collapses into \emph{impossible}.
-That is how \emph{we never tried reaction-diffusion} became \emph{the only remaining route is a
-different geometry}. The third bucket is mineable by the Proposer and may never be cited as a
-negative.
 
-\subsection*{3. Every negative carries its conditions}
-Four of seven positive claims carry a falsifier because the template has a \code{Falsifiable by:}
-field; two of nine prohibitions carry any escape because it has no field for them. So: a trap,
-an \textsc{inert}, a \textsc{necessary}, a \emph{closed} or an \emph{exhausted} records the runs
-supporting it, the conditions held fixed, and what would refute it --- or it does not enter.
-Necessity is held to the highest bar, because it quantifies over everything not removed. Claims
-formed before a known apparatus fix are marked \emph{provisional} and queue first for retest.
+\textbf{Independence is a distinct condition-signature, not a run count.} Ten GM-with-division runs
+collapse to \emph{one} observation. A negative needs three; \textbf{a necessity claim needs three
+and a failed rescue attempt} --- a different experiment, not a re-reading of the same one.
 
-\subsection*{3b. Converging observations, and what an ablation can carry}
-A negative needs \emph{converging} support, not repeated support. Rounds~4--8 produced
-bit-identical results under four different composition hashes, and the morphogen-closure claim
-cites \emph{ten or more runs} --- every one of them Gierer--Meinhardt \textbf{with} division, while
-the one run without it was stable and never counted. Ten runs, \textbf{one} observation. A rule
-demanding ``three supporting runs'' would have passed the worst claim in the file.
+\textbf{The ablation asymmetry}, which is Cedric's and is the sharpest idea in the phase: the same
+experiment supports a positive strongly and a negative weakly. A null ablation must repeat on an
+independent background; a positive passes on one.
 
-So support is counted in \textbf{distinct condition-signatures}, computed from the cited runs'
-\code{composition.json} on disk: strip the claim's subject, and whatever remains identical across
-every supporting run is an unvaried confounder. Two consequences come free --- the
-\code{conditions:} field is \emph{computed rather than authored}, so it cannot be satisfied with
-prose; and a confounded set is visible at write time instead of five rounds later.
-
-\begin{center}
-\begin{tabular}{@{}lp{8.4cm}@{}}
-\textbf{can be} & one observation --- existence is cheap \\
-\textbf{could be} & none --- the default for untried territory \\
-\textbf{cannot be} & three independent signatures, conditions computed \\
-\textbf{cannot not be} & three independent \emph{plus} one deliberate counterexample attempt
-that failed \\
-\end{tabular}
-\end{center}
-
-\textbf{The ablation is the right instrument, read the wrong way.} The loop was never short of
-ablations --- \code{remove\_op divide\_3d0} is one, and it ran twice, six rounds apart, with
-opposite results. The asymmetry is that the \emph{same} experiment supports a positive strongly
-and a negative weakly: \emph{removing X killed the effect} says X matters \emph{here};
-\emph{removing X changed nothing} is offered as X is inert \emph{everywhere}, which is pure
-absence of evidence. Six \textsc{inert} claims rest on a single null ablation each --- the reading
-that most needs corroboration got the least. Hence: a \textbf{null} ablation must be repeated
-across independent backgrounds before it may be written as a negative, while a \textbf{positive}
-ablation still passes on one.
-
-And an ablation is \emph{not} a counterexample attempt. Ablation removes X from a working recipe;
-a counterexample asks whether the effect is reachable \emph{at all} without X, and may change other
-operators to compensate. Necessity requires the second, which is why \emph{``division is
-necessary''} survived six rounds --- nobody ever tried to build a bud without it. When round~8
-finally did, by ablating on a different parent, it produced a clean bud with a fission neck.
-
-\textbf{Under-supported claims are demoted, never deleted.} One null ablation is real evidence; it
-is simply not a universal negative. It becomes \code{could be inert (n=1, conditions: ...)} ---
-minable by Track~A, citable by nobody as a prohibition. The revisit queue is then literally
-\emph{the list of claims sitting below their support bar}, and the checker's default action is
-\emph{demote}, which costs nothing and self-corrects, rather than \emph{reject}, which stalls a
-round.
-
-\subsection*{4. The tracks become asymmetric}
-\textbf{Track A opens.} It may violate any trap, and must spend a budgeted quota of slots per round
-\emph{revisiting} claims --- preferring single-run claims and provisional ones. A revisit must vary
-a \textbf{named confounder}, which is what would have caught a family closed on runs that all
-shared an unvaried one, and what stops the bit-identical duplicates of rounds~4--8.
-\textbf{Track B constrains.} It cites a named Okuda morphology and settings, respects traps, and
-may not breed from an invalid specimen.
-
-The Proposer's ablations therefore gain two duties rather than a quota: repeat a \textbf{null}
-ablation on an independent background before it may harden into a negative, and for any necessity
-claim mount a \textbf{rescue attempt} --- permitted to change other operators to compensate ---
-because that is the experiment necessity actually rests on.
-
-\subsection*{5. No conclusion about an unmeasured property}
-If a conclusion needs a quantity no admitted instrument reports, the correct output is a
-\textbf{request for an instrument}, not a verdict. \emph{Sphere} may not be concluded from a run
-whose pattern was never measured --- which is precisely what happened to the finest Turing pattern
-in the campaign.
-
-\subsection*{6. The Metrologist builds instruments --- on demand, not on schedule}
-The Metrologist gains the power to propose, implement and certify a new instrument against known
-answers, then admit it. It is \textbf{triggered, never scheduled}: the rule above files a request
-into the \code{Backlog} that already exists (\code{escalation.py}, \code{operator\_requests.jsonl}),
-and the Metrologist wakes only when the same gap has been requested repeatedly. It runs on its own
-budget line, outside the round ceiling, because it is not per-round work --- expect it to fire
-perhaps twice in twenty rounds. The cost amortises to nothing: certified once, the instrument is
-code that runs free forever. The first request is already known: \textbf{wavelength, domain count
-and contrast on the activator field} --- the variable that actually governs budding.
-
-\subsection*{7. Paying for it: the ceiling stops binding}
-Round~10 spent 33.4 minutes against a 25-minute ceiling and began dropping Interpreters. The
-breakdown says where it goes: \textbf{interpreter 4 calls / 13.0 min (39\%) and reader 9 calls /
-9.8 min (29\%)} --- two-thirds, both per-run. Cutting effort globally would blunt the roles doing
-the reasoning, so instead:
-\begin{itemize}[itemsep=1pt]
-\item \textbf{Lower model effort on the description roles only.} The Reader and the Eye-check
-\emph{label}; they do not infer. That is the 12.5 minutes that can be halved without touching a
-judgement.
-\item \textbf{Move the Interpreter earlier in the order.} It runs last, so it is the role
-truncated --- the loop currently pays for the most expensive analysis and then discards it.
-\end{itemize}
-Those two alone bring the round under the ceiling, and they buy the headroom Track~A's revisit
-quota will spend.
-
-\subsection*{Exit criteria}
-\begin{itemize}[itemsep=1pt]
-\item \code{logic.py --check} reports zero malformed claims, and \textbf{rejects the nine-round
-record} of Phase~6 --- every one of the eight errors must be caught by replaying the archived
-\code{memory.md} through it.
-\item A \emph{could be} entry exists, is mined by the Proposer, and is never cited as a negative.
-\item A Track~A slot violates a trap, varies a named confounder, and the result is recorded.
-\item The Metrologist certifies one new instrument, and a previously-null run is re-read with it.
-\item A round completes inside the LLM ceiling with no role skipped.
-\end{itemize}
-
-\textbf{What you get.} A loop whose conclusions are as good as its measurements --- and which says
-so when they are not.
+\textbf{No conclusion about an unmeasured property.} \code{morphology=sphere} was recorded for the
+run carrying the finest Turing pattern in the campaign, because the shape was measured and the
+pattern was not. The honest record is \emph{not measured}, and the honest next step is a request
+for an instrument --- which the Metrologist now builds \textbf{on demand rather than on schedule},
+so it costs nothing in the rounds that need nothing.
 
 \subsection*{Closing Phase 7}
 \textbf{The phase turned out to be wiring, not construction.} Almost everything it needed already
@@ -730,16 +517,11 @@ counters, the pattern-scale instrument --- already \emph{certified} --- the stat
 allowed-verb table. The external audit's closing line is the phase in one sentence:
 \emph{``writing it to a file is not the same as handing it over.''}
 
-\textbf{The ablation asymmetry}, which is Cedric's and is the sharpest idea in it: the same
-experiment supports a positive strongly and a negative weakly. A null ablation must repeat on an
-independent background; a positive passes on one. And necessity needs a \emph{rescue attempt} ---
-a different experiment, not a re-reading of the same one.
-
-\textbf{The false start of 3~August, and what it taught.} The ceiling cried wolf; the clean start
-was not clean, and handed a fresh Proposer a memory saying \code{THIS BODY IS CLOSED}. The lesson
-is the phase's own turned on itself: a rule that is written but not wired changes nothing, and that
-applies to the rules \emph{about} rules. Which is why Phase~8 begins by making the loop runnable
-with no agent in it at all --- the only way to find a broken hand-off without paying for a round.
+\textbf{The false start of 3~August.} The ceiling cried wolf; the clean start was not clean, and
+handed a fresh Proposer a memory saying \code{THIS BODY IS CLOSED}. The lesson is the phase's own
+turned on itself --- a rule written but not wired changes nothing, and that applies to the rules
+\emph{about} rules. Which is why Phase~8 begins by making the loop runnable with no agent in it at
+all: the only way to find a broken hand-off without paying for a round.
 \end{phasebox}
 
 \begin{phasebox}{Phase 8 --- Entities, edges and sweeps: the loop stops being a script \hfill \done}
