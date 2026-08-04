@@ -289,9 +289,26 @@ def t_metrics_have_producers():
 
     This is the metric-bank twin of WIRING.md's rule for artifacts:
     A METRIC MUST BE ADMITTED WITH A PRODUCER.
+
+    THE RULE DID NOT CHANGE ON 4 AUGUST; WHAT A NAME IS DID. The bank is now a PRODUCT --
+    24 quantities x 6 temporal reductions -- so `act_cv_peak` has TWO producers and needs both:
+    something must compute the per-frame column `act_cv`, and something must apply `_peak` to it.
+    Checking only the whole name would pass nothing (no file assigns `act_cv_peak`); checking only
+    the quantity would pass a bank of 144 names of which four reductions in six were never
+    written, which is 96 silent inconclusives. So both halves are checked, and
+    `predict.decompose` -- the one place that knows how a name is built -- does the splitting.
     """
     import glob as _glob
-    from predict import KNOWN_METRICS
+    from predict import KNOWN_METRICS, SUFFIXES, decompose
+    # HALF TWO FIRST, because it is one line and it fails loudest: the six reductions must all be
+    # computed, under exactly these names, by the module that owns them.
+    import time_analysis as _TA
+    check(tuple("_" + r for r in _TA.REDUCTIONS) == tuple(SUFFIXES),
+          f"predict admits {SUFFIXES} but time_analysis produces {_TA.REDUCTIONS}: every name "
+          f"built from a suffix nobody computes is a silent `not measured`")
+    _got = _TA.reduce_series([1.0, 2.0, 3.0, 4.0, 5.0], frames=[0, 1, 2, 3, 4])
+    _miss = [s for s in SUFFIXES if s[1:] not in _got]
+    check(not _miss, "reduce_series does not return: " + ", ".join(_miss))
     src = ""
     for d in (HERE, os.path.join(os.path.dirname(HERE), "prototype", "Tyssue")):
         for f in sorted(_glob.glob(os.path.join(d, "*.py"))):
@@ -304,32 +321,122 @@ def t_metrics_have_producers():
     # mentioned somewhere is not a test that anything writes it. So: require a real write --
     # `out["k"] = `, `dict(k=`, `k=round(...)` -- and not membership of a tuple or list.
     import re as _re
-    orphan = []
+    orphan, undecomposable = [], []
     for m in KNOWN_METRICS:
-        base = m[:-6] if m.endswith("_final") else m
+        base, _suf = decompose(m)
+        if base is None:
+            undecomposable.append(m)
+            continue
+        base = base[:-6] if base.endswith("_final") else base       # ta_tube_len_final
         base = base[3:] if base.startswith("ta_") else base
         e = _re.escape(base)
         written = _re.search(rf'''\[["']{e}["']\]\s*=''', src) or \
                   _re.search(rf'''["']{e}["']\s*:''', src) or \
                   _re.search(rf'''(?<![\w.])(?<!["']){e}\s*=(?!=)''', src)
         if not written:
-            orphan.append(m)
-    check(not orphan, "admitted with no producer: " + ", ".join(orphan))
+            orphan.append(base)
+    check(not undecomposable, "admitted but not <quantity><suffix> nor a declared scalar: "
+                              + ", ".join(undecomposable))
+    check(not orphan, "admitted with no producer: " + ", ".join(sorted(set(orphan))))
 
 
 @case("a prediction naming a new metric is actually scorable")
 def t_new_metrics_scorable():
     """The producer test proves the name is WRITTEN somewhere. This proves the scorer can READ
-    it: parse a real prediction over the new metrics and check it resolves against a summary."""
+    it: parse a real prediction over the new metrics and check it resolves against a summary.
+
+    NOW OVER THE PRODUCT NAMES, because that is what the bank contains. The old version of this
+    case was written against bare names (`act_cv > 0.3`) and it is kept, at the bottom, as the
+    ALIAS case: the archive is full of bare-name predictions and the convention has always been
+    that a bare name is the summary value at its last frame, so the parser resolves it to
+    `_final` rather than dropping it -- and the summary key it is checked against is the resolved
+    one, so nothing is silently reinterpreted.
+    """
     import predict as PR
-    pred = "act_cv > 0.3, corr_act_rad_final > 0.4, gyr_prolate_final 1.5-4.0"
+    pred = "act_cv_peak > 0.3, corr_act_rad_final > 0.4, gyr_prolate_span 1.5-4.0"
     cl = PR.parse(pred)
     check(len(cl) == 3, f"parsed {len(cl)} of 3 clauses from {pred!r}")
-    obs = {"act_cv": 0.62, "corr_act_rad_final": 0.71, "gyr_prolate_final": 2.4}
+    check([c.metric for c in cl] == ["gyr_prolate_span", "act_cv_peak", "corr_act_rad_final"],
+          f"a suffix was mis-split: {[c.metric for c in cl]}")
+    obs = {"act_cv_peak": 0.62, "corr_act_rad_final": 0.71, "gyr_prolate_span": 2.4}
     out, why = PR.score(pred, obs)
     check(out == "confirmed", f"expected confirmed, got {out}: {why}")
-    out2, _ = PR.score(pred, {**obs, "act_cv": 0.01})
+    out2, _ = PR.score(pred, {**obs, "act_cv_peak": 0.01})
     check(out2 == "refuted", f"a dead pattern must refute, got {out2}")
+    # A REDUCTION THE OLD BANK COULD NOT SAY: the field lived and then died, in one clause pair.
+    flash = "act_cv_peak > 0.5 and act_cv_final < 0.1"
+    check(PR.score(flash, {"act_cv_peak": 0.9, "act_cv_final": 0.02})[0] == "confirmed",
+          "a flash-then-extinction is not scorable")
+    # ...and the refusal fraction, which is what makes a null on corr_act_rad readable at all.
+    check(PR.score("corr_act_rad_measured_frac >= 0.9",
+                   {"corr_act_rad_measured_frac": 0.046})[0] == "refuted",
+          "`the coupling was measurable throughout` must be refutable")
+    # the alias, and the boundary of the alias
+    check(PR.score("act_cv > 0.3", {"act_cv_final": 0.62})[0] == "confirmed",
+          "a bare quantity name no longer resolves to anything")
+    check(PR.score("act_sd_peak > 0.3", {"act_sd_peak": 0.9})[0] == "inconclusive",
+          "a WITHDRAWN quantity must not score")
+
+
+@case("every admitted metric has exactly one group")
+def t_metrics_grouped():
+    """A FLAT LIST IS A LIST YOU READ THE FIRST ITEM OF.
+
+    Forty metric names arrived in the prompt as one comma-separated line, and round 2 wrote all
+    twelve of its predictions on `protr_peak` while act_cv, corr_act_rad and act_alive_frac sat
+    unnamed. Grouping them by the QUESTION they answer -- is it a tube, is it still cells, is
+    there a pattern, does the pattern grip the shape, is this evidence at all -- is what makes
+    "you have not asked whether there was a pattern" visible to the role writing the claim.
+
+    Exactly one group, enforced: a metric with no home is silently absent from every prompt, and
+    one in two groups is a category that is not a category.
+    """
+    import collections
+    import predict as PR
+    ok = [m for m in PR.KNOWN_METRICS if m not in PR.REJECTED_METRICS]
+    grouped = [m for v in PR.METRIC_GROUP.values() for m in v]
+    homeless = [m for m in ok if m not in grouped]
+    check(not homeless, "admitted with no group: " + ", ".join(homeless))
+    stale = [m for m in grouped if m not in ok]
+    check(not stale, "grouped but not admitted: " + ", ".join(stale))
+    twice = [m for m, n in collections.Counter(grouped).items() if n > 1]
+    check(not twice, "in more than one group: " + ", ".join(twice))
+    block = PR.admitted_block()
+    for grp in PR.METRIC_GROUP:
+        check(grp in block, f"group {grp!r} never reached the prompt")
+
+
+@case("the naming convention holds: no _final twin of a bare metric")
+def t_no_final_twins():
+    """A METRIC BANK IS A VOCABULARY. Lifting every series metric into the summary twice -- once
+    bare, once `_final` -- minted thirteen names for quantities that already had one: `act_cv`
+    and `act_cv_final` were the same number, in a list an agent must read before it can write a
+    prediction. Doubling a vocabulary without adding a quantity makes it harder to use and
+    measures nothing new.
+
+    THE EXCEPTION THAT USED TO BE ALLOWED HERE IS GONE, and its going is the point. `protr_final`
+    was carved out because it was "the horizon-truncated one, unlike bare protr" -- an exception
+    resting on a distinction that existed nowhere in the code. Every name in the bank is now a
+    quantity plus one of six reductions, all six truncated at the horizon, so the carve-out has
+    nothing left to protect: no bare quantity is admitted at all, and `protr_final` is simply
+    protr under `_final`.
+
+    Two rules, both of which have already been broken in this repo:
+      * a bare quantity may not be admitted beside its own reductions (the thirteen twins);
+      * a RUN-LEVEL SCALAR may not be SPELLED like a reduction. `n_cells_final`, `ta_n_tubes_final`
+        and `spot_frac_final` all were, and `n_cells_final` is currently written by two producers
+        with two meanings -- run_one's last frame (3,975 on okuda_route) and reduce_all's value at
+        the horizon (~2,300). A name that looks like a reduction will be read as one.
+    """
+    import predict as PR
+    ok = set(PR.KNOWN_METRICS)
+    twins = [m for m in ok for s in PR.SUFFIXES
+             if m.endswith(s) and m[: -len(s)] in ok]
+    check(not twins, "both a bare name and its reduction are admitted: " + ", ".join(twins))
+    bare = [q for q in PR.SERIES_QUANTITIES if q in ok]
+    check(not bare, "a bare quantity is admitted beside its six reductions: " + ", ".join(bare))
+    misspelt = [m for m in PR.SCALAR_QUANTITIES for s in PR.SUFFIXES if m.endswith(s)]
+    check(not misspelt, "a run-level scalar is spelled like a reduction: " + ", ".join(misspelt))
 
 
 @case("every admitted metric is documented, and no note names a withdrawn one")
@@ -339,14 +446,34 @@ def t_metrics_documented():
     -- and one of the six documented `wavelength_cells_final`, which is not produced and was
     withdrawn as uncalibrated. A stale note is worse than a missing one: it advertises an
     instrument that does not exist.
+
+    DOCUMENTED PER QUANTITY AND PER SUFFIX, NOT PER NAME. 24 + 6 notes cover 144 names, and that
+    is the whole reason the bank is a product: the alternative is 144 paragraphs, which is 144
+    chances for one of them to go stale and nobody to notice. A product name is documented iff
+    BOTH of its parts are, and `decompose` is what says which parts it has.
+
+    AND EVERY NOTE MUST STATE THE NULL. "act_cv > 0.3" is a guess unless you know a dead field
+    reads 0.00; the note is the difference between a bet and a description. Enforced literally:
+    each quantity's note has to contain a stated no-answer reading.
     """
     import predict as PR
     ok = [m for m in PR.KNOWN_METRICS if m not in PR.REJECTED_METRICS]
-    undoc = [m for m in ok if m not in PR.METRIC_NOTES and not m.endswith("_final")]
+    undoc = sorted({PR.decompose(m)[0] for m in ok} - set(PR.METRIC_NOTES) - {None})
     check(not undoc, "admitted but undocumented: " + ", ".join(undoc))
-    stale = [m for m in PR.METRIC_NOTES if m not in PR.KNOWN_METRICS]
+    undoc_s = [s for s in PR.SUFFIXES if s not in PR.SUFFIX_NOTES]
+    check(not undoc_s, "a reduction with no note: " + ", ".join(undoc_s))
+    known = set(PR.SERIES_QUANTITIES) | set(PR.SCALAR_QUANTITIES)
+    stale = [m for m in PR.METRIC_NOTES if m not in known]
     check(not stale, "documented but NOT admitted (a note for a withdrawn metric): "
                      + ", ".join(stale))
+    # WHAT IT READS WHEN THE ANSWER IS NO -- the half of a note that makes it predictable against.
+    nullless = [m for m in PR.SERIES_QUANTITIES
+                if not any(w in PR.METRIC_NOTES[m] for w in ("NO =", "NO answer", "NOT MEASURED",
+                                                             "REFUSED", "CANNOT SEE"))]
+    check(not nullless, "documented without a null reading: " + ", ".join(nullless))
+    # ...and a withdrawn metric must say WHY, or the loop keeps reaching for it.
+    silent = [m for m, why in PR.WITHDRAWN.items() if not why]
+    check(not silent, "withdrawn with no reason: " + ", ".join(silent))
 
 
 @case("the trajectories survive a label column and reach the Reader")
@@ -364,7 +491,7 @@ def t_trajectories_reach_the_reader():
     lines out, so the channel cannot go quiet again without a red tick.
     """
     import numpy as np, tempfile, shutil
-    import curve_shape as CS
+    import time_analysis as CS
     d = tempfile.mkdtemp()
     try:
         n = 40
@@ -419,6 +546,141 @@ def t_harness_cannot_eat_real_runs():
     finally:
         import shutil
         shutil.rmtree(d, ignore_errors=True)
+
+
+@case("the evidence horizon reports a FRAME, not a sample index")
+def t_horizon_units():
+    """A SAMPLE INDEX IS NOT A FRAME NUMBER.
+
+    metrics.npz holds one row per SAMPLED frame -- 37 rows at stride 25 -- while `fm` and the
+    horizon index are per-FRAME over all 901. The ray_single_frac branch of run_one read the
+    column and forgot the axis, so a fold first seen at sample 8 (frame 200) was recorded as
+    `horizon_frame 8` and truncated the evidence to eight frames of a nine-hundred-frame run:
+    protr_peak and protr_final then measured the seed sphere. Every run whose mesh ever folded was
+    scored on its opening frames.
+
+    This checks the arithmetic directly, because the defect is invisible in any output -- a
+    horizon of 8 looks exactly like an early, honest fold.
+    """
+    import numpy as np
+    stride, T = 25, 901
+    frames = np.unique(np.append(np.arange(0, T, stride), T - 1))
+    rs = np.ones(frames.size)
+    rs[8:] = 0.2                                    # folds at SAMPLE 8 == FRAME 200
+    bad = np.where(np.isfinite(rs) & (rs < 0.5))[0]
+    check(bad.size and int(bad[0]) == 8, "fixture wrong: the fold is not at sample 8")
+    fold = int(frames[int(bad[0])])
+    check(fold == 200, f"sample 8 must map to frame 200, got {fold}")
+    check(fold != int(bad[0]), "the mapping is a no-op -- the sample index is still being used")
+    src = open(os.path.join(HERE, "run_one.py")).read()
+    check("frame_numbers[fold_sample]" in src,
+          "run_one no longer maps the ray_single_frac sample index through the frame column")
+
+
+@case("the temporal reductions read the real okuda_route record correctly")
+def t_reductions_on_real_data():
+    """SIX SCALARS PER CURVE, CHECKED ON A REAL 901-FRAME RECORD -- not a fixture.
+
+    `time_analysis.classify` turns a trajectory into a WORD, and a word cannot be scored:
+    `predict.Clause.check` looks a metric up by exact key and calls float() on it. So the whole
+    time-evolution channel stops at the prompt and never reaches the record. `reduce_series`
+    turns each curve into six scalars -- final / peak / floor / trend / span / measured_frac --
+    and this case runs them over `okuda_route`'s per-frame archive.
+
+    THAT RUN IS THE REASON THE REDUCTIONS EXIST. Every shape word for it is reassuring: a clean
+    sphere, genus 0, 3,975 cells, protr `converged`. What no word says is that its activator runs
+    from 0.004 to 951,288 inside the evidence window while act_cv -- the spatial non-uniformity,
+    the thing that makes a Turing pattern a pattern -- sits at 0.035. A field that fires
+    everywhere at once grows a sphere uniformly, and `act_max_span` = 1.3e6 beside
+    `act_cv_final` = 0.035 is that sentence in two numbers.
+
+    AND IT IS THE RECORD WITH THREE SAMPLING TIERS. The mesh metrics cost 1410 ms/frame against
+    0.12 ms for the chemistry, so the mesh tier is sampled every 25 frames: 37 samples beside
+    901. The evidence horizon is a FRAME (150 here), which is row 150 in one tier and row 6 in
+    the other. Confusing the two truncated folded runs to their opening frames -- a real bug --
+    so the conversion is asserted in both directions below.
+    """
+    import json
+    import numpy as np
+    import time_analysis as TA
+
+    fz = os.path.join(os.path.dirname(HERE), "log", "okuda", "okuda_route", "frames_1.npz")
+    if not os.path.exists(fz):
+        return "skipped: no frames_1.npz archived"
+    z = np.load(fz)
+    f, mf = np.asarray(z["frame"], float), np.asarray(z["mesh_frame"], float)
+    check(f.size == 901 and mf.size == 37, f"tiers changed: {f.size} chem, {mf.size} mesh")
+
+    # Build the record the way a reader would: the every-frame tier wins any name it shares with
+    # the 25-frame tier, and each column carries its own clock.
+    cols = {k[5:]: z[k] for k in z.files if k.startswith("chem_")}
+    cols.update({k: z[k] for k in ("protr", "r_cv", "corr_act_rad", "n_cells")})
+    frames_by_col = {k: f for k in cols}
+    for k in z.files:
+        if k.startswith("mesh_") and k != "mesh_frame" and k[5:] not in cols:
+            cols[k[5:]], frames_by_col[k[5:]] = z[k], mf
+
+    h = TA.evidence_horizon({}, {"broken_n": np.asarray(z["mesh_broken_n"], float)}, mf)
+    check(h["horizon"] == 150, f"the horizon moved: {h['horizon']} (expected frame 150)")
+    R = TA.reduce_all(cols, frames_by_col, horizon_frame=h["horizon"])
+
+    # --- one horizon, two tiers, two different row indices.
+    check(R["n_cells_final"] == 2058.0,
+          f"n_cells_final={R['n_cells_final']}; the chemistry tier must be cut at ROW 150 "
+          "(cutting it at the mesh's row 6 gives 2000)")
+    check(R["broken_n_peak"] == 1.0,
+          f"broken_n_peak={R['broken_n_peak']}; the mesh tier must be cut at ROW 6 "
+          "(the untruncated column peaks at 454)")
+    bn = np.asarray(z["mesh_broken_n"], float)
+    check(TA.reduce_series(bn, np.arange(bn.size, dtype=float), 150)["peak"] == 454.0,
+          "fixture wrong: reading the horizon as a row index no longer changes the answer, so "
+          "this case can no longer tell the two apart")
+
+    # --- what okuda_route actually is: a huge, spatially uniform flash.
+    check(R["act_max_span"] > 1e5,
+          f"act_max_span={R['act_max_span']}; the activator spans 0.004 -> 951288 in the window")
+    check(R["act_cv_final"] < 0.05,
+          f"act_cv_final={R['act_cv_final']}; the field is near-uniform when it fires")
+    check(R["act_max_floor"] < 0.01 < R["act_max_peak"], "floor and peak straddle nothing")
+
+    # --- a null with a denominator. corr_act_rad is REFUSED while act_cv < 0.05, so its nulls
+    #     mean "no pattern to correlate", and measured_frac is the only thing that says so.
+    check(R["corr_act_rad_final"] is None, "corr_act_rad was finite at the horizon frame?")
+    check(R["corr_act_rad_measured_frac"] < 0.10,
+          f"corr_act_rad_measured_frac={R['corr_act_rad_measured_frac']}, expected ~0.046")
+    check(R["act_cv_measured_frac"] == 1.0, "act_cv is measured every frame and must read 1.0")
+    check(all(v is None or 0.0 <= v <= 1.0 for k, v in R.items() if k.endswith("measured_frac")),
+          "a measured_frac escaped [0,1]")
+
+    # --- constants and names.
+    check(R["genus_span"] is None, "genus is 0 for the whole run: span is 0/0, i.e. None")
+    check(R["genus_trend"] is None, "a constant series has no trend direction to report")
+    check(not any(k.endswith("_min") for k in R),
+          "a reduction is suffixed _min; predict._METRIC_ALT is a LONGEST-FIRST alternation and "
+          "shape_idx_min / act_min are admitted, so _min shadows them. It is called _floor.")
+    check("shape_idx_min_floor" in R, "the kept _min series stopped being reduced")
+
+    # --- a scalar that cannot be re-read is not in the record.
+    bad = [k for k, v in R.items() if v is not None and not np.isfinite(v)]
+    check(not bad, f"NaN/inf in the summary (json.dump writes bare NaN/Infinity): {bad[:4]}")
+    check("NaN" not in json.dumps(R) and "Infinity" not in json.dumps(R), "summary is not JSON")
+
+    # --- and the whole run, for contrast: the damage and the growth are both monotone.
+    full = TA.reduce_all(cols, frames_by_col)
+    check(full["broken_n_peak"] == 454.0, "with no horizon the whole column is read")
+    check(full["n_cells_trend"] > 0.99, f"n_cells_trend={full['n_cells_trend']}, growth is not "
+                                        "monotone any more")
+    check(full["act_cv_final"] < 0.01 and full["act_max_span"] > 1e6,
+          "the run ends with a dead, uniform field after a six-decade excursion")
+
+    # --- and the refusal that keeps the units honest.
+    try:
+        TA.reduce_all({"broken_n": bn}, None, horizon_frame=150)
+        check(False, "reduce_all applied a frame-number horizon to a column with no frame column")
+    except ValueError:
+        pass
+    return (f"horizon frame {h['horizon']} -> row 150 of 901 and row 6 of 37; "
+            f"act_max_span {R['act_max_span']:.3g} vs act_cv_final {R['act_cv_final']:.3g}")
 
 
 @case("roles.py --check still agrees with the code")

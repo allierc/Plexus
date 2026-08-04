@@ -864,15 +864,181 @@ confirmations were \emph{the sphere stayed a sphere}.
 --- the specimen gate, the prediction register, the refusal log, the modality logic, the offline
 harness --- has been waiting for one.
 \end{phasebox}
+\begin{phasebox}{Phase 10 --- The loop could not say what it was looking at \hfill \prog}
+\textbf{Goal.} Cedric, watching a round-2 movie: \emph{``a flash of red activity, 100\% red, then
+a long period of white, no activity.''} The loop had no number for that.
 
-\begin{phasebox}{Phase 10 --- The demonstration \hfill \todo}
+It had been running for weeks on a set of measurements that could not tell a real chemical pattern
+from a uniform wash of the same average brightness, could not say whether the chemistry was still
+alive at the end of a run, and --- as it turned out --- was handing the agent that reads each run
+\emph{nothing at all} about how anything changed over time.
+
+\subsection*{Four faults, all the same shape}
+Not one is a wrong formula. Each is a thing that was measured and never delivered, or a thing that
+was asked for and never measured.
+
+\paragraph{An average cannot see a pattern.} A field that is uniformly grey and a field that is
+half bright, half dark have the \emph{same average}. What tells them apart is how much the
+brightness \emph{varies from cell to cell}: near zero for the wash, large for the pattern. That
+variation was never measured. The loop could only see the brightest cell (\code{act\_max}), which
+reads high both for a healthy pattern and for a single cell blowing up, so a pattern that spiked
+and a pattern that died looked identical.
+
+On the end state of the run named \code{okuda\_route}, the activator varies by
+$8.4\times10^{-5}$ across 3{,}975 cells around an average of $0.0128$. The chemistry is dead.
+Every number the loop was allowed to quote stayed perfectly sayable while it died.
+
+\paragraph{The measurement that answers the campaign's own question was never taken.} Everything
+here turns on one thing: \emph{does the chemistry drive the shape, or is it decoration on a shape
+made by something else?} The number for that --- how strongly a cell's chemical level tracks how
+far out it sits (\code{corr\_act\_rad}) --- was on the list of things an agent was allowed to
+predict, and was computed \emph{nowhere in the codebase}. A prediction naming it scored ``not
+measured'', quietly became ``inconclusive'', and no warning was printed anywhere. The agent wrote
+a perfectly good falsifiable claim and the loop recorded that it had learned nothing. Two other
+shape measurements were in the same state.
+
+\paragraph{Nothing about time was reaching the reader --- and had not for the whole campaign.}
+The per-frame table stores each frame's shape verdict as a \emph{word} (``sphere'', ``tube'').
+The code that classifies how each measurement behaves over time tried to convert every column to
+numbers, including that one, and crashed on the word. The crash was caught one level up and
+turned into a single parenthesis in the reading agent's prompt: \emph{``(trajectory shapes
+unavailable)''}.
+
+So since the day that column was added, \textbf{every run has been read with no history at all}:
+no warning that a run peaked early and decayed, none that it was still climbing when the clock
+ran out, none that it was pinned against a buffer, and no evidence horizon. The curves were
+computed, drawn into a figure, and classified --- and the classification died on the one column
+that was never meant to be classified.
+
+\paragraph{An instrument that was withdrawn for lying was still being advertised.} One measure of
+pattern wavelength was taken off the approved list months ago because it had never been
+calibrated. The name stayed on the list, and worse, it was in the short banner that tells every
+agent \emph{``these are new, use them''}. It has been renamed to say what it is and marked as
+untrustworthy.
+
+\subsection*{What was built}
+\begin{itemize}\itemsep2pt
+\item \textbf{The pattern, as numbers.} How much the chemical varies across cells
+      (\code{act\_sd}); the same divided by the average (\code{act\_cv}), which does not care
+      whether the overall level is collapsing or exploding, so it still means something when the
+      chemistry is running away; and what fraction of the tissue is switched on
+      (\code{act\_occupancy}). A frame counts as \emph{patterned} only if \emph{both} the
+      variation and the occupancy are real --- so one cell of four thousand blowing up, which
+      makes the variation enormous but the occupancy $0.01$, is correctly not a pattern. Over a
+      whole run: what fraction of it had a pattern at all, and the frame at which the pattern
+      last died.
+\item \textbf{A correlation is refused when there is nothing to correlate.} The chemistry-drives-
+      shape number reads a confident $0.294$ on that dead field --- a correlation of rounding
+      error, because the statistic is deliberately blind to scale and will happily report on
+      noise. It is now simply \emph{not measured} when the pattern is below the liveness
+      threshold, which makes ``does the pattern drive the shape'' come out \emph{inconclusive}
+      when there is no pattern. That is the honest answer. Given a planted signal --- chemical
+      painted onto the outermost 15\% of cells --- the instrument recovers it: $0.724$, and the
+      tip-enrichment measure reads $5.19$ against a null of $1.0$.
+\item \textbf{Telling a tube from a lumpy ball.} The elongation number in use is a ratio between
+      two points of the radius distribution, so it reads the same for one long tube and for a
+      broad bumpy sphere. The shape of the whole cell cloud --- long and thin, round, or
+      flattened --- now has its own three numbers. This is Okuda's own axis: tube, undulation,
+      branch.
+\item \textbf{The history channel, revived and widened.} Word-valued columns are skipped instead
+      of crashing. The list of curves allowed into a prompt held seven entries and \emph{not one
+      about the chemistry}; it now covers shape, cells, pattern and apparatus. And each curve
+      carries eight numbers across the run beside its one-word verdict --- because ``peaked''
+      describes a gentle rise and fall \emph{and} a spike to seventeen thousand followed by
+      extinction, and only the numbers say which. That run now reads
+      \code{0 0 0 0 1 0.013 0 0} for the fraction of switched-on cells: the flash Cedric saw,
+      written down.
+\item \textbf{Three checks so this cannot recur quietly.} Every approved measurement must have
+      something that actually computes it; every one must have a written definition, and no
+      definition may name a withdrawn measurement; and the history channel must survive a
+      word-valued column. Twenty-one checks pass.
+\end{itemize}
+
+\subsection*{One name, one quantity}
+A \textbf{plain name} means a per-frame measurement: computed every sampled frame, classified over
+time, and reported at the last frame so a prediction can be scored against it. A \textbf{suffix}
+is only used when the number is \emph{not} simply the last frame, and says what it is instead ---
+the best value reached, or the last \emph{trustworthy} frame before the mesh tore.
+
+Thirteen duplicate names were deleted under that rule. They had been created by copying every
+per-frame measurement into the summary twice, so the same number appeared under two names. A set
+of measurements is a \emph{vocabulary}: doubling it without adding a quantity makes it harder to
+use and measures nothing new. The approved list went from 53 names to 40.
+
+\subsection*{Grouped by the question they answer}
+In round 2, all twelve predictions were written about elongation while every chemistry measurement
+sat unnamed. The approved list had reached the agent as one comma-separated line of fifty-three
+identifiers, and a flat list is a list you read the first entry of.
+
+Every approved measurement now sits in exactly one of five groups, phrased as questions:
+\emph{is it a tube; is it still made of cells; is there a pattern at all; does the pattern grip
+the shape; is this evidence at all}. Each is printed with the value it takes when the answer is
+\emph{no} --- because a prediction against a bare identifier is a guess. ``Variation above 0.3''
+means nothing until you know a dead field reads 0.00 and a live one reads about 1. The written
+definitions went from 6 to 38.
+
+\subsection*{How often to measure}
+The old rule gave \emph{every} run forty samples, however long it was. A 900-frame run was
+therefore sampled every 23 frames and a 300-frame run every 8 --- so ``the twelfth sample'' meant a
+different moment in each, and two runs could not be compared point by point, which is the one
+thing a history is for.
+
+It is now every 25 frames, always, with the last frame added. Measured cost: one frame of analysis
+takes $1.43$ seconds on a real 3{,}975-cell mesh, so
+
+\begin{center}\small
+\begin{tabular}{@{}lrr@{}}
+\toprule
+sampling & frames analysed & cost per run \\
+\midrule
+old rule (forty samples) & 40 & 57\,s \\
+\textbf{every 25 frames} & 37 & \textbf{53\,s} \\
+every 10 frames & 91 & 130\,s \\
+every frame & 901 & 21.4\,min \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent The new rule is \emph{cheaper} than the one it replaces. Measuring every 10 frames would
+give two and a half times the resolution in time for about 77 extra seconds a run --- roughly
+15 minutes on a twelve-run round --- which is the trade to make if ``when did the pattern die''
+needs answering to within ten frames rather than twenty-five.
+
+\subsection*{What is still open}
+\begin{enumerate}\itemsep2pt
+\item \textbf{Which measurements to keep.} The per-frame table produces 64 numbers and much of it
+      is one quantity written twice --- three spellings of ``fraction of switched-on cells'', a
+      count and a fraction of the same fault, and two different ways of asking whether the
+      chemical sits at the tips, one of which was added this week without noticing the other. A
+      cut to 24 is drafted and is being checked against every consumer --- a figure panel, a
+      biological premise, a shape classifier --- before anything is deleted. One redundancy is
+      exact and confirmed; another that looked exact is wrong by 1\% at the precision stored, so
+      that measurement stays.
+\item \textbf{What to say about time.} With a single per-frame table at a fixed spacing, separate
+      measurements for start, middle and end stop being necessary: they become \emph{summaries}
+      of one history --- last value, best value, average, spread, trend. Which summaries are
+      worth their space in a prompt carrying 24 measurements is the open design question.
+\item \textbf{Telling the agents.} Approving a measurement makes a prediction about it
+      \emph{scorable}; a separate short list is what tells an agent the measurement \emph{exists}.
+      The new chemistry measurements were approved and not announced, so round 2 wrote every
+      prediction about elongation while they were computed for the first time and named by
+      nobody. The same fault as the others, one list over.
+\end{enumerate}
+
+\textbf{What you get.} A loop that can state what it is looking at. The reviewing agent's
+objection to round 2 --- that five of its twelve experiments were reading a shape-to-chemistry
+feedback off a field that was already dead --- was, until this phase, an assertion no instrument
+could settle. It is now a number.
+\end{phasebox}
+
+\begin{phasebox}{Phase 11 --- The demonstration \hfill \todo}
 \textbf{Goal.} Run the designed grid --- six to eight simulations --- that produces the figure:
 tube, undulation and branching, at Okuda's settings.
 
 \textbf{What you get.} \emph{The figure.}
 \end{phasebox}
 
-\begin{phasebox}{Phase 11 --- The method claim \hfill \todo}
+\begin{phasebox}{Phase 12 --- The method claim \hfill \todo}
 \textbf{Goal.} Write up what the loop found by itself versus what we told it, with the record of
 predictions and retractions as the evidence.
 

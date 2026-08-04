@@ -84,6 +84,8 @@ whole mechanism — the same one that keeps `ROLES.md` honest.
 | `spec_run.yaml` | `run_one.py` | `round.py`, `translate.py` |
 | `composition.json` | `translate.py` | `round.py`, `logic.py` |
 | `description.txt` | `caption_wave.py` | `llm_agents.py` |
+| `frames_1.npz` | `measure_1frame.py` | read by hand; the every-frame record behind the sampling decision |
+| `frames_1_timing.json` | `measure_1frame.py` | read by hand; the measured cost of each analysis tier |
 
 ## Known open edges
 

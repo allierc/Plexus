@@ -29,7 +29,7 @@
   (remove the silent parameter caps; the geometry-weighted diffusion implementation; separate the
   three mesh-failure modes).
 - **Anything in `a22975a` is unverified.** Re-derive each defect before trusting it.
-- Done and verified today: `curve_shape.py` (trajectory classification + evidence horizon,
+- Done and verified today: `time_analysis.py` (trajectory classification + evidence horizon,
   self-tested), `metrics.npz` written alongside `mechanics.npz` with 24 runs backfilled.
 
 ## The next thing

@@ -141,48 +141,86 @@ def check_alignment(posf, hist, name=""):
 
 
 # --------------------------------------------------------------------------- per-frame metrics
+# The growth operator's OWN switch, read from the spec by run_config before the table is
+# built. A module-level cell because frame_metrics takes only the frames -- and thresholding
+# red_frac at anything else measures a number the growth operator does not act on.
+GROWTH_SWITCH = [1.5]
+
+
 def frame_metrics(frames):
-    """A cheap per-frame table computed on every run, so any temporal observable can be
-    re-derived later without re-simulating (D7). `frames` = [(pos, mesh, act), ...]."""
-    # NOTE the name. `protr` = percentile(r,95)/median(r) is EXACTLY tube_analysis.py:89's
-    # definition. It is NOT the report's "aspect ~7.5" for round_40_mc8, which is
-    # tube_len/tube_diam -- a different quantity. Calling this one "aspect" led me to compare
-    # 1.73 against 7.5 and invent a discrepancy that does not exist. Measure the geometric thing
-    # you mean, and NAME it the thing you measured.
-    # act_sd/act_cv/act_occupancy/act_alive: THE PATTERN, not just its peak. See the note beside
-    # them below -- and note this table is a SECOND implementation of tube_analysis.frame_metrics
-    # under the same name; both must carry these or a number means different things in the movie
-    # panel and in the record.
-    out = {"n_cells": [], "protr": [], "r95": [], "rmed": [], "act_max": [], "red_frac": [],
-           "act_mean": [], "act_sd": [], "act_cv": [], "act_occupancy": [], "act_alive": []}
+    """The EVERY-FRAME table: chemistry and centroid geometry, on all 901 frames.
+
+    THIS IS TIER 1 AND TIER 2 OF THE SAMPLING, and the split is set by measurement, not taste.
+    Timed on a real 3,975-cell mesh:
+
+        the whole mesh table   1300 ms/frame    (hollow_flags 583, face_polygons 301)
+        cell centroids         2.1 ms/frame     (vectorised; was 29.7)
+        chemistry alone        0.12 ms/frame
+
+    So the mesh metrics are sampled every 25 frames and everything here is measured on EVERY
+    frame, for about two seconds a run. That is not a refinement. `okuda_route`'s activator is a
+    LIMIT CYCLE OF PERIOD 53 FRAMES -- 17 cycles, constant amplitude, measured -- and at a stride
+    of 25 that is 2.1 samples per cycle, below Nyquist. Sampled coarsely it looked like fourteen
+    unrelated flashes whose spacings were all exact multiples of the sampling interval: a beat,
+    not a signal. The loop could not have found the period at any threshold, on any statistic.
+
+    ONE DEFINITION PER NAME. `protr` was computed here from VERTEX positions and in
+    tube_analysis from CELL CENTROIDS, and both were lifted into the same diag.json -- so one
+    summary carried two different numbers under one word. It is centroid-referenced in both
+    places now, which changes what `protr_peak` means against the archive; that is acceptable
+    because the archive is not treated as reliable evidence, and carrying two definitions of one
+    word forever is not.
+    """
+    from tube_analysis import _cell_centroids, protrusion_ratio
+    keys = ("n_cells", "protr", "protr_p99", "r_cv", "gyr_prolate", "gyr_oblate",
+            "act_mean", "act_sd", "act_cv", "act_occupancy", "act_max", "act_min",
+            "red_frac", "act_alive", "corr_act_rad", "act_at_tip")
+    out = {k: [] for k in keys}
     for pos, mt, act in frames:
-        r = np.linalg.norm(pos - pos.mean(0), axis=1)
-        r95, rmed = float(np.percentile(r, 95)), float(np.median(r) + 1e-9)
+        cen, rad, live = _cell_centroids(pos, mt)
         out["n_cells"].append(float(mt["nF"]))
-        out["r95"].append(r95)
-        out["rmed"].append(rmed)
-        out["protr"].append(r95 / rmed)
+        r = rad[live]
+        med = float(np.median(r)) if r.size else 0.0
+        if r.size > 2 and med > 1e-9:
+            out["protr"].append(float(np.percentile(r, 95) / med))
+            out["protr_p99"].append(float(np.percentile(r, 99) / med))
+            out["r_cv"].append(float(r.std() / (r.mean() + 1e-12)))
+            try:
+                w = np.linalg.eigvalsh(np.cov(cen[live].T))[::-1]
+                tr = float(w.sum())
+                out["gyr_prolate"].append(float(w[0] / (0.5 * (w[1] + w[2]) + 1e-12)) if tr > 1e-12 else np.nan)
+                out["gyr_oblate"].append(float(1.5 * (w[1] - w[2]) / tr) if tr > 1e-12 else np.nan)
+            except Exception:
+                out["gyr_prolate"].append(np.nan); out["gyr_oblate"].append(np.nan)
+        else:
+            for k in ("protr", "protr_p99", "r_cv", "gyr_prolate", "gyr_oblate"):
+                out[k].append(np.nan)
+
         a = np.asarray(act, float)
-        out["act_max"].append(float(a.max()) if a.size else 0.0)
-        out["red_frac"].append(float((a > 0.5 * a.max()).mean()) if a.size and a.max() > 0 else 0.0)
-        # A MEAN CANNOT SEE A PATTERN. 0.5 everywhere and half-at-1/half-at-0 have the same mean;
-        # only the SPATIAL SPREAD tells them apart, and its collapse IS the pattern dying.
-        # Cedric, watching a round-2 movie: "a flash of red activity, 100% red, then a long period
-        # of white, no activity". okuda_route did exactly that -- act_max 17,678 at frame 350,
-        # 0.0105 by frame 807 -- and only act_max and corr_act_rad were admitted, so the loop
-        # could see the spike and could not say the field had died.
-        _mu = float(a.mean()) if a.size else 0.0
-        _sd = float(a.std()) if a.size else 0.0
-        _lo, _hi = (float(a.min()), float(a.max())) if a.size else (0.0, 0.0)
-        _cv = _sd / abs(_mu) if abs(_mu) > 1e-12 else 0.0     # scale-free: survives a collapsing level
-        _occ = float((a > _lo + 0.5 * (_hi - _lo)).mean()) if _hi > _lo + 1e-12 else 0.0
-        out["act_mean"].append(_mu)
-        out["act_sd"].append(_sd)
-        out["act_cv"].append(_cv)
-        out["act_occupancy"].append(_occ)
-        # BOTH conditions, so a blow-up does not read as a pattern: one enormous cell among 4,000
-        # gives cv ~10 and occupancy 0.01, and that is a singularity, not a Turing field.
-        out["act_alive"].append(float(_cv > 0.05 and _occ > 0.01))
+        mu, sd = (float(a.mean()), float(a.std())) if a.size else (0.0, 0.0)
+        lo, hi = (float(a.min()), float(a.max())) if a.size else (0.0, 0.0)
+        cv = sd / abs(mu) if abs(mu) > 1e-12 else 0.0
+        occ = float((a > lo + 0.5 * (hi - lo)).mean()) if hi > lo + 1e-12 else 0.0
+        out["act_mean"].append(mu); out["act_sd"].append(sd); out["act_cv"].append(cv)
+        out["act_min"].append(lo); out["act_max"].append(hi); out["act_occupancy"].append(occ)
+        out["red_frac"].append(float((a > GROWTH_SWITCH[0]).mean()) if a.size else 0.0)
+        # BOTH conditions, so a blow-up is not a pattern: one cell of 4,000 gives cv ~10 at
+        # occupancy 0.01, and that is a singularity.
+        out["act_alive"].append(float(cv > 0.05 and occ > 0.01))
+
+        # THE COUPLING, REFUSED ON A DEAD FIELD. Pearson is scale-free by construction and
+        # returns a confident number for noise: 0.294 measured on an activator whose entire
+        # spread across 3,975 cells was 8.4e-05. NaN here means "no pattern to correlate with",
+        # which is the honest reading, and _measured_frac reports how often that happened.
+        cr = at = np.nan
+        if a.size == rad.size and live.sum() > 8 and cv > 0.05:
+            al, rl = a[live], rad[live]
+            if al.std() > 1e-12 and rl.std() > 1e-12:
+                cr = float(np.corrcoef(al, rl)[0, 1])
+                tip = rl >= np.percentile(rl, 90)
+                if tip.any() and abs(al.mean()) > 1e-12:
+                    at = float(al[tip].mean() / al.mean())
+        out["corr_act_rad"].append(cr); out["act_at_tip"].append(at)
     return out
 
 
@@ -273,7 +311,22 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
         return (posf[t][:mt["Nv"]].astype(np.float64), mt, chemf[t][:mt["nF"], 0])
 
     fr = [frame(t) for t in range(T)]
-    fm = frame_metrics(fr)
+    # THE SWITCH BEFORE THE TABLE. `red_frac` is the fraction of cells the growth operator
+    # actually acts on, so it must be thresholded at that operator's OWN a_sw -- and the table is
+    # built here, before the block below that used to read it. Read it first or every red_frac in
+    # the every-frame table is measured against a default the simulation never used.
+    GROWTH_SWITCH[0] = next((float(o["a_sw"]) for o in cfg.get("operators", [])
+                    if o.get("op") == "morphogen_growth_3d" and "a_sw" in o), 1.5)
+    per_frame = frame_metrics(fr)
+    # THE EVERY-FRAME RECORD, ON DISK. `time_analysis.report` reads it beside metrics.npz, so the
+    # trajectories an agent is shown carry the chemistry at full resolution while the mesh
+    # columns stay at their coarse stride.
+    try:
+        np.savez(os.path.join(out_dir, "frames.npz"),
+                 frame=np.arange(len(per_frame["n_cells"]), dtype=float),
+                 **{k: np.asarray(v, float) for k, v in per_frame.items()})
+    except Exception as _e:
+        print(f"[{name}] frames.npz not written: {type(_e).__name__}", flush=True)
 
     # D4: the acted-ledger. The engine does not yet report this (that fix lands in the operators);
     # until it does we record what we CAN observe and flag the rest as unknown.
@@ -284,8 +337,19 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     # --------------------------------------------------------------- Q: the quasi-static test
     q = None
     if do_q:
-        q = quasi_static_Q(cfg, cfg_path, device, protr_before=fm["protr"][-1], out_dir=out_dir,
+        q = quasi_static_Q(cfg, cfg_path, device, protr_before=per_frame["protr"][-1], out_dir=out_dir,
                            Hf=Hf)
+
+    # A FIXED STRIDE, NOT A FIXED COUNT. `min(40, T)` gave EVERY run forty samples, so a
+    # 900-frame run was sampled every 23 frames and a 300-frame run every 8 -- and "frame 12 of
+    # the series" meant a different moment in each. Two runs' trajectories were therefore not
+    # comparable point by point, which is the one thing a trajectory is for; and the resolution of
+    # "when did the pattern die" silently depended on how long the run happened to be.
+    #
+    # Every 25 frames, always. A 900-frame run yields 37 samples, a 300-frame run 13, and sample k
+    # is frame 25k in both. The cost scales with run LENGTH, which is correct: a longer run has
+    # more to say. One number, here, so the frequency is a decision rather than an accident.
+    ANALYSIS_STRIDE = 25
 
     # --------------------------------------------------------------- the REAL tube metrics
     # tube_analysis is the archive's own metric bank. Comparing against archived numbers requires
@@ -293,14 +357,13 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     tube = {}
     try:
         from tube_analysis import analyze
-        samp = np.unique(np.linspace(0, T - 1, min(40, T)).astype(int))
+        samp = np.unique(np.append(np.arange(0, T, ANALYSIS_STRIDE), T - 1))
         # red_frac must be thresholded at the GROWTH OPERATOR'S OWN switch, not at the midpoint of
         # the activator's current range. The relative version is scale-free and therefore blind --
         # it read exactly 0.070 on every one of 40 frames while the pattern changed under it.
-        a_sw = next((float(o["a_sw"]) for o in cfg.get("operators", [])
-                     if o.get("op") == "morphogen_growth_3d" and "a_sw" in o), None)
+        growth_switch = GROWTH_SWITCH[0]
         tube = analyze([(int(t), fr[t][0], fr[t][1], fr[t][2]) for t in samp], out_dir,
-                       a_sw=a_sw) or {}
+                       a_sw=growth_switch) or {}
         keep = ("tube_len_final", "tube_diam_final", "n_tubes_final", "protr_final",
                 "hollow_n_peak", "hollow_n_final", "area_cv_final", "vol_cv_final",
                 "red_frac_final", "tip_act_final")
@@ -332,7 +395,7 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
         import morphology as MP
         from tube_analysis import _cell_centroids
         series = []
-        for t in np.unique(np.linspace(0, T - 1, min(40, T)).astype(int)):
+        for t in np.unique(np.append(np.arange(0, T, ANALYSIS_STRIDE), T - 1)):
             pos, mt, _ = fr[int(t)]
             cen, rad, live = _cell_centroids(pos, mt)
             if live.sum() < 8:
@@ -354,7 +417,7 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     rec = RunRecord(graph_struct, params={}, seed=cfg["general"]["seed"],
                     backend="tyssue_avm_3d", ic="checkpoint",
                     campaign=campaign, wall_s=round(wall, 1))
-    ref = arch.save_trajectory(rec.run_id, [p for p, _, _ in fr], fm,
+    ref = arch.save_trajectory(rec.run_id, [p for p, _, _ in fr], per_frame,
                                meta={"config": name, "comp_hash": disc.get("comp_hash"),
                                      "region": disc.get("region"), "n_frames": T})
     rec.set_trajectory_ref(ref)
@@ -364,7 +427,7 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     # A run that hits its cell buffer is not evidence about a mechanism; it is evidence about a
     # buffer. Flag it loudly so the ledger can never read it as a phenotype.
     cbuf = cfg["sets"]["cell"]["n"]
-    saturated = fm["n_cells"][-1] >= 0.9 * cbuf
+    saturated = per_frame["n_cells"][-1] >= 0.9 * cbuf
     # WHEN it saturated, not merely THAT it did -- because that is the whole difference between a
     # censored measurement and a void one. A run that met the array at 60% of its length grew,
     # patterned and was measured for six hundred frames first, and discarding it threw away five
@@ -372,7 +435,7 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     # The Critic uses this fraction to tell those two apart; without it, both look identical.
     _sat_frac = None
     if saturated:
-        _n = fm["n_cells"]
+        _n = per_frame["n_cells"]
         _hit = next((i for i, v in enumerate(_n) if v >= 0.9 * cbuf), None)
         if _hit is not None and len(_n) > 1:
             _sat_frac = _hit / (len(_n) - 1)
@@ -400,9 +463,9 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     # while broken stayed at 0 for 300 frames), so thresholding it would penalise the tissue for
     # dividing, i.e. for doing the thing we want.
     horizon = {"horizon": None, "why": "not computed"}
-    hz_i = len(fm["protr"]) - 1
+    last_valid_i = len(per_frame["protr"]) - 1
     try:
-        import curve_shape as _CS
+        import time_analysis as _CS
         _mn = os.path.join(out_dir, "metrics.npz")
         if os.path.exists(_mn):
             _z = np.load(_mn)
@@ -410,7 +473,7 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
                 horizon = _CS.evidence_horizon({}, {"broken_n": _z["broken_n"]},
                                                _z["frame"] if "frame" in _z.files else None)
                 if horizon.get("horizon") is not None and not horizon.get("complete", True):
-                    hz_i = min(hz_i, max(0, int(horizon["horizon"])))
+                    last_valid_i = min(last_valid_i, max(0, int(horizon["horizon"])))
             else:
                 horizon = {"horizon": None, "why": "metrics.npz carries no broken_n"}
             # AND IT MUST ASK THE OTHER WITNESS. broken_n is one signature of a run that stopped
@@ -424,20 +487,33 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
             # ray_single_frac is the same quantity P11 keys on, so the horizon and the premise
             # can no longer disagree about when the run ended.
             if "ray_single_frac" in _z.files:
-                _rs = np.asarray(_z["ray_single_frac"], float)
-                _bad = np.where(np.isfinite(_rs) & (_rs < 0.5))[0]
-                if _bad.size:
-                    _fold = int(_bad[0])
-                    if horizon.get("horizon") is None or _fold < int(horizon["horizon"]):
-                        horizon = {"horizon": _fold, "complete": False,
+                ray_single = np.asarray(_z["ray_single_frac"], float)
+                folded_samples = np.where(np.isfinite(ray_single) & (ray_single < 0.5))[0]
+                if folded_samples.size:
+                    # A SAMPLE INDEX IS NOT A FRAME NUMBER, and this branch used one as the other.
+                    # metrics.npz has ONE ROW PER SAMPLED FRAME -- 37 rows at stride 25 -- while
+                    # `per_frame` and `last_valid_i` are per-FRAME over all 901. So a fold first seen at sample 8
+                    # (frame 200) was recorded as `horizon_frame 8` and truncated the evidence to
+                    # `per_frame["protr"][:8]`: eight frames of a nine-hundred-frame run, with protr_peak
+                    # and protr_final then computed over the seed sphere alone. Every run whose
+                    # mesh ever folds was scored on its first few frames.
+                    #
+                    # The sibling branch above never had this: it hands `_z["frame"]` to
+                    # evidence_horizon and gets a frame number back. This one read the column and
+                    # forgot the axis. Found by an external review of the metric work, not by me.
+                    frame_numbers = np.asarray(_z["frame"], float) if "frame" in _z.files else None
+                    fold_sample = int(folded_samples[0])
+                    fold_frame = int(frame_numbers[fold_sample]) if (frame_numbers is not None and fold_sample < frame_numbers.size) else fold_sample
+                    if horizon.get("horizon") is None or fold_frame < int(horizon["horizon"]):
+                        horizon = {"horizon": fold_frame, "complete": False,
                                    "why": (f"the surface stops being singly covered at index "
-                                           f"{_fold} (ray_single_frac < 0.5) -- the same fold P11 "
+                                           f"{fold_frame} (ray_single_frac < 0.5) -- the same fold P11 "
                                            f"reports; everything after it measures a folded mesh")}
-                    # THE FOLDED FRAME IS NOT EVIDENCE. `_valid = protr[:hz_i + 1]` is
+                    # THE FOLDED FRAME IS NOT EVIDENCE. `valid_protr = protr[:last_valid_i + 1]` is
                     # inclusive, so passing the fold index would keep the first frame at which
                     # the surface is already through itself -- and that frame is often exactly
                     # where the spurious peak sits. The last admissible frame is the one before.
-                    hz_i = min(hz_i, max(0, _fold - 1))
+                    last_valid_i = min(last_valid_i, max(0, fold_frame - 1))
         else:
             horizon = {"horizon": None, "why": "no metrics.npz (tube_analysis did not run)"}
     except Exception as e:
@@ -446,24 +522,24 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
         horizon = {"horizon": None, "why": f"{type(e).__name__}: {str(e)[:90]}"}
     if horizon.get("horizon") is None:
         print(f"[{name}] ⚠ no evidence horizon ({horizon['why']}) -- peak/final are taken over "
-              f"ALL {len(fm['protr'])} frames, which is the un-truncated behaviour", flush=True)
-    elif hz_i < len(fm["protr"]) - 1:
+              f"ALL {len(per_frame['protr'])} frames, which is the un-truncated behaviour", flush=True)
+    elif last_valid_i < len(per_frame["protr"]) - 1:
         print(f"[{name}] evidence horizon at frame {horizon['horizon']}: peak/final taken over "
-              f"the first {hz_i + 1} of {len(fm['protr'])} frames", flush=True)
+              f"the first {last_valid_i + 1} of {len(per_frame['protr'])} frames", flush=True)
 
-    _valid = fm["protr"][:hz_i + 1] or fm["protr"]
+    valid_protr = per_frame["protr"][:last_valid_i + 1] or per_frame["protr"]
 
     # retention = final/peak aspect. A FORCED protrusion peaks then collapses (low retention);
     # an EQUILIBRIUM one holds (high). Computable from the archived per-frame table for every
     # run without re-simulating -- the D7 payoff -- and a cheap proxy for the full Q test.
-    _pk = max(_valid) if _valid else 0.0
-    retention = (_valid[-1] / _pk) if _pk > 1e-9 else 0.0
+    _pk = max(valid_protr) if valid_protr else 0.0
+    retention = (valid_protr[-1] / _pk) if _pk > 1e-9 else 0.0
 
     # THE PATTERN'S LIFETIME, over the whole run. A per-frame number tells you the field is dead
     # NOW; these say whether it ever lived and when it stopped -- which is the difference between
     # "chemistry is inert for shape" and "the chemistry died at frame 350 and the rest of the run
     # grew on a corpse".
-    _al = fm["act_alive"]
+    _al = per_frame["act_alive"]
     _alive_frac = round(sum(_al) / len(_al), 4) if _al else None
     # The LAST time it was alive and stopped being alive -- not the first dip, so a field that
     # flickers early and recovers is not recorded as extinct.
@@ -473,7 +549,7 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
             if _al[_k - 1] > 0.5 and _al[_k] < 0.5:
                 _extinct = _k
                 break
-    _peak_f = int(max(range(len(fm["act_max"])), key=lambda i: fm["act_max"][i])) if _al else None
+    _peak_f = int(max(range(len(per_frame["act_max"])), key=lambda i: per_frame["act_max"][i])) if _al else None
 
     summary = {"saturated": bool(saturated), "saturated_frac_of_run": _sat_frac,
                "act_alive_frac": _alive_frac, "act_extinct_frame": _extinct,
@@ -481,26 +557,30 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
                "inert_operators": inert,
                "retention": round(retention, 3),
                "valid_evidence": bool(not inert and not saturated),
-               "protr_final": round(_valid[-1], 3),          # last VALID frame, not last frame
-               "protr_peak": round(max(_valid), 3),           # over VALID frames only
+               "protr_final": round(valid_protr[-1], 3),          # last VALID frame, not last frame
+               "protr_peak": round(max(valid_protr), 3),           # over VALID frames only
                # THE EXPLICIT VOCABULARY (Phase 0, item 20). `protr` reads as a length and is a
                # RATIO -- 1.0 is a sphere -- and reading 1.62 as an amount of protrusion is the
                # mistake the old name invited. Both names are written: the archive is never
                # rewritten, and 92 references cannot be cut over in one step without a window
                # where half the code reads a key the other half stopped writing. New readers
                # take `elongation*`; `vocab.canonical()` resolves either.
-               "elongation_at_end": round(_valid[-1], 3),
-               "elongation_peak": round(max(_valid), 3),
+               "elongation_at_end": round(valid_protr[-1], 3),
+               "elongation_peak": round(max(valid_protr), 3),
                "horizon_frame": horizon.get("horizon"),
                "horizon_why": horizon.get("why"),
                "first_damage_frame": horizon.get("first_damage"),
                "valid_frac": horizon.get("valid_frac", 1.0),
                # kept so the truncation is auditable and the change is visible in the record
-               "protr_peak_untruncated": round(max(fm["protr"]), 3),
-               "protr_final_untruncated": round(fm["protr"][-1], 3),
-               "n_cells_final": int(fm["n_cells"][-1]),
-               "red_frac_final": round(fm["red_frac"][-1], 3),
-               "act_max_final": round(fm["act_max"][-1], 3),
+               "protr_peak_untruncated": round(max(per_frame["protr"]), 3),
+               "protr_final_untruncated": round(per_frame["protr"][-1], 3),
+               "n_cells_final": int(per_frame["n_cells"][-1]),
+               # ONE PRODUCER PER NAME. These used to be written here from `per_frame` AND again by the
+               # lift below from tube_analysis's coarse series -- the same word, two numbers, one
+               # diag.json. They come from the every-frame table only, and the lift skips any name
+               # this table already owns.
+               "red_frac_final": round(per_frame["red_frac"][-1], 3),
+               "act_max_final": round(per_frame["act_max"][-1], 3),
                "frames": T, "wall_s": round(wall, 1)}
     summary.update(tube)                       # the archive's own definitions, for comparison
     # THE PATTERN, LIFTED INTO THE SUMMARY. pattern_scale has existed and been certified for
@@ -511,7 +591,7 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     # recorded as `morphology=sphere, protr 1.003`, a null, because shape was measured and
     # pattern was not. Identical in shape to the reservoir counters, which divide_3d also
     # computed and nobody carried.
-    # READ FROM THE SERIES ON DISK, not from `fm`. The first wiring looked in `fm`, which does
+    # READ FROM THE SERIES ON DISK, not from `per_frame`. The first wiring looked in `per_frame`, which does
     # not carry them: pattern_metrics is merged into the per-frame record by tube_analysis and
     # reaches metrics.json, so the series is where they live. Measured after that wiring shipped:
     # nine finished runs, "pattern keys: NONE" in every summary while n_spots, spot_cells_med,
@@ -528,6 +608,10 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
             # corr_act_rad has been ADMITTED since the Turing x vertex study and reached no
             # summary ever, so every prediction naming it scored `not measured`.
             from predict import KNOWN_METRICS as _KM
+            # EVERYTHING THE EVERY-FRAME TABLE OWNS. The coarse mesh series still carries these
+            # columns for metrics.png, but they must not reach the summary: the every-frame table
+            # is the producer, and a second value under the same key is the twin defect.
+            _AMBIGUOUS_BARE = tuple(per_frame.keys()) + ("protr", "act_max", "red_frac", "cells")
             _want = set(_KM) | {"n_spots", "spot_cells_med", "spot_cells_max", "spot_frac",
                                 "spot_spacing_cells", "wavelength_cells"}
             for _k, _v in _last.items():
@@ -537,7 +621,7 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
                     continue
                 _rv = round(float(_v), 4) if isinstance(_v, float) else _v
                 # FILL, NEVER OVERWRITE. `red_frac_final` and `act_max_final` are already in the
-                # summary from `fm`, measured with run_one's own definitions -- fm thresholds
+                # summary from `per_frame`, measured with run_one's own definitions -- per_frame thresholds
                 # red_frac at half the activator's current RANGE, tube_analysis at the growth
                 # operator's absolute switch `a_sw`. tube_analysis's is the better definition and
                 # replacing it here would silently redefine a metric mid-campaign, so every
@@ -549,10 +633,18 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
                 # ...and under its BARE name too when that is what is admitted, because
                 # `predict.Clause.check` looks the metric up by exact key: an admitted `r_cv`
                 # against a summary holding only `r_cv_final` is unmeasured, silently.
-                # Never overwrite: run_one's own `fm` keys are measured from VERTEX positions and
+                # Never overwrite: run_one's own `per_frame` keys are measured from VERTEX positions and
                 # tube_analysis's from CELL CENTROIDS, and letting one quietly replace the other
                 # is exactly the protr/ta_protr divergence again.
-                if _k in _KM and _k not in summary:
+                # ...EXCEPT where run_one already defines a family under that name. `protr`,
+                # `act_max` and `red_frac` are measured by BOTH: run_one's `per_frame` from VERTEX
+                # positions and an activator thresholded at half its own range, tube_analysis's
+                # from CELL CENTROIDS and the growth operator's absolute switch. The summary
+                # already carries protr_peak/protr_final, act_max_final and red_frac_final from
+                # the first; writing the bare name from the second puts two definitions of one
+                # word in one dict, which is the protr/ta_protr divergence that produced a real
+                # wrong conclusion. The `ta_` prefix exists precisely for these.
+                if _k in _KM and _k not in summary and _k not in _AMBIGUOUS_BARE:
                     summary[_k] = _rv
     except Exception as _e:
         print(f"[{name}] pattern metrics not lifted: {type(_e).__name__}", flush=True)
@@ -566,7 +658,7 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
         print(f"[{name}] mechanics FAILED: {type(e).__name__}: {str(e)[:110]}", flush=True)
     if q is not None:
         summary["Q_protr_after_relax"] = round(q, 3)          # ABSOLUTE, not a ratio (M4)
-        summary["Q_drop"] = round(fm["protr"][-1] - q, 3)     # how much did NOT survive
+        summary["Q_drop"] = round(per_frame["protr"][-1] - q, 3)     # how much did NOT survive
     rec.add_analysis("metric_v1", summary)
     arch.add(rec)
 
