@@ -94,7 +94,7 @@ def _admitted():
 
 
 # Announced to every role that reads numbers, until the campaign after they land.
-NEW_INSTRUMENTS = ("n_spots_final", "wavelength_cells_final", "spot_spacing_cells_final",
+NEW_INSTRUMENTS = ("n_spots_final", "spot_spacing_cells_final",
                    "spot_frac_final")
 
 from llm import BREVITY  # noqa: F401  (defined in llm.py so run_agent can apply it)

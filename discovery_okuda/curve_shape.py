@@ -121,6 +121,20 @@ def classify_npz(path, keys=None):
         v = z[k]
         if v.ndim != 1 or v.shape[0] < 2:
             continue
+        # A LABEL IS NOT A CURVE. metrics.npz carries the per-frame morphology labels as their own
+        # STRING array (tube_analysis saves them separately, deliberately, so the numeric columns
+        # are not forced to a string cast). `classify` calls np.asarray(v, float) and raises
+        # ValueError: could not convert string to float: 'sphere'.
+        #
+        # That exception propagated out of `report`, and llm_agents catches it and writes
+        # "(trajectory shapes unavailable)" into the Reader's prompt. So from the moment the label
+        # column was added, EVERY run has been read with no trajectory information at all -- the
+        # whole HOW EACH MEASUREMENT BEHAVED OVER TIME block, the peaked/pinned/exploded warnings,
+        # the evidence horizon -- and the failure announced itself only as one parenthesis in a
+        # prompt nobody re-read. The curves were computed, plotted to metrics.png and classified;
+        # the classification then died on a column that was never meant to be classified.
+        if v.dtype.kind not in "fiub":
+            continue
         out[k] = classify(v, t if (t is not None and len(t) == len(v)) else None)
     return out
 
@@ -258,6 +272,14 @@ def report(run_dir, write=True):
             out["metrics"] = {k: classify(v, t) for k, v in cols.items() if k != "frame"}
             series.update(cols)
 
+    # THE TIME COURSE ITSELF, not only a word for its shape. Eight samples per series is small
+    # enough to sit in every prompt and is the difference between "act_max peaked" and "act_max
+    # went 0.4 -> 17678 -> 0.01": the first is compatible with a healthy pattern, the second is a
+    # blow-up followed by extinction, and only the second explains a movie that flashes red and
+    # then goes white for the rest of the run.
+    out["over_time"] = {k: _spark(v) for k, v in series.items()
+                        if k in _CURVES and _spark(v)}
+
     out["horizon"] = evidence_horizon(out.get("metrics", {}), series, t)
 
     # The two series are sampled at DIFFERENT rates (mechanics 24, metrics 40 on the run this was
@@ -273,9 +295,43 @@ def report(run_dir, write=True):
     return out
 
 
-def summarise(rep, keys=("protr", "hollow_frac", "cells", "tube_diam", "force_mean",
-                         "tension_mean", "n_cells")):
-    """One line per interesting curve -- what goes into an agent's prompt."""
+# WHAT AN AGENT IS ALLOWED TO SEE HAPPEN OVER TIME. `report` classifies EVERY series in
+# metrics.npz; this whitelist decides which of them reach a prompt, and it held seven keys, NOT
+# ONE of them about the activator. So the chemistry's whole time course -- the thing the campaign
+# is about -- was computed, classified `peaked` or `exploded`, written to curves.json, and
+# filtered out one step before any agent could read it.
+#
+# Cedric, watching round 2: "a flash of red activity, 100% red, then a long period of white, no
+# activity". okuda_route's act_max went to 17,678 at frame 350 and 0.0105 by frame 807 -- already
+# classified `exploded` in that run's curves.json -- and no reader was ever shown the line.
+_CURVES = (
+    "protr", "protr_p99", "r_cv", "hollow_frac", "cells", "n_cells", "tube_diam",   # shape
+    "gyr_prolate", "gyr_asphere", "reduced_volume", "shape_idx_med", "ray_single_frac",
+    "act_max", "act_mean", "act_sd", "act_cv", "act_occupancy", "red_frac",         # the pattern
+    "n_spots", "spot_frac", "corr_act_rad", "act_at_tip",                           # and its grip
+    "force_mean", "tension_mean",                                                   # mechanics
+)
+
+
+def _spark(y, n=8):
+    """n evenly spaced samples of a series, as text. A SHAPE WORD IS NOT A TIME COURSE: `peaked`
+    is true of a gentle rise-and-fall and of a spike to 17,678 followed by extinction, and an
+    agent asked to reason about the chemistry needs to see WHICH. Eight numbers is small enough
+    to print for twenty series and enough to see a flash."""
+    y = np.asarray(y, float)
+    y = y[np.isfinite(y)]
+    if y.size < 2:
+        return ""
+    idx = np.linspace(0, y.size - 1, min(n, y.size)).astype(int)
+    return " ".join(f"{v:.3g}" for v in y[idx])
+
+
+def summarise(rep, keys=_CURVES):
+    """One line per interesting curve -- what goes into an agent's prompt.
+
+    The numeric time course comes from `rep["over_time"]`, which `report` fills while the series
+    are in hand; nothing here re-reads the disk.
+    """
     lines = []
     for grp in ("metrics", "mechanics"):
         for k, v in (rep.get(grp) or {}).items():
@@ -292,7 +348,10 @@ def summarise(rep, keys=("protr", "hollow_frac", "cells", "tube_diam", "force_me
                 extra = f" (still climbing at the end: {v['final']:.3g})  <-- run may be too short"
             elif v["shape"] == "exploded":
                 extra = f" (late blow-up to {v['final']:.3g})  <-- suspect the mesh, not biology"
+            sp = (rep.get("over_time") or {}).get(k) or ""
             lines.append(f"  {k:16} {v['shape']:10}{extra}")
+            if sp:
+                lines.append(f"  {'':16} over time: {sp}")
     h = rep.get("horizon") or {}
     if h.get("first_damage") is not None:
         lines.append(f"  first damaged cell at frame {h['first_damage']}")

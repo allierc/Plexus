@@ -111,9 +111,41 @@ def _template_series(frames):
 
 
 def fabricate_run(name, protr=None, broken=(), frames=401):
-    """Put a finished run on disk, so the reading loop has something to read."""
+    """Put a finished run on disk, so the reading loop has something to read.
+
+    IT MUST NOT BE ABLE TO LAND ON A REAL RUN. On 4 August this harness destroyed all twelve
+    finished round-2 runs -- an hour of A100 time, twelve movies, twelve diag.json -- and the
+    mechanism was exactly this function. `campaign/state.json` said round 2, so the offline round
+    generated the SAME names the live round had generated (same frontier, same composition
+    hashes: r002c_00_f4907e, r002c_01_5aa21d, ...); `exist_ok=True` wrote the fake diag over the
+    real one, `_FABRICATED` recorded the directory as ours, and the atexit `clear_runs` rmtree'd
+    it. Every step behaved as designed.
+
+    That is the THIRD time this harness has eaten production data, and the previous two fixes --
+    "only delete what we made", "refuse while a campaign is live" -- both addressed the instance.
+    The class is that a test fixture and the real campaign share a namespace on one filesystem.
+    Two locks, so a single wrong assumption is not enough:
+
+      1. a directory this process did not create is NEVER opened for writing, whatever it is --
+         the check is `is this ours`, not `does this look real`, because a run that died before
+         writing diag.json looks exactly like an empty fabrication;
+      2. offline rounds are FORCED onto a round id no live campaign uses (see `install`), so the
+         names cannot collide in the first place.
+
+    A fixture that can destroy the experiment is a worse defect than any it can find.
+    """
     d = os.path.join(LOG, name)
+    if os.path.exists(d) and d not in _FABRICATED:
+        raise SystemExit(
+            f"[offline] REFUSING TO FABRICATE over {d}\n"
+            f"          That directory already exists and this harness did not create it, so it "
+            f"is a REAL run.\n"
+            f"          Writing here would overwrite it and the atexit cleanup would then delete "
+            f"it outright.\n"
+            f"          This is how round 2 was destroyed on 4 August. Move the run aside, or "
+            f"raise OFFLINE_RID.")
     os.makedirs(d, exist_ok=True)
+    _FABRICATED.add(d)          # ours from the moment it exists, so a crash mid-write still cleans
     diag = json.loads(json.dumps(_template_diag()))          # deep copy
     s = diag.setdefault("summary", {})
     # DETERMINISTIC, NOT RANDOM. A harness whose numbers move cannot tell a regression from noise,
@@ -479,6 +511,24 @@ if __name__ == "__main__":
     isolate()
     atexit.register(clear_runs, "r0")      # remove what we made, when we are done making it
     import round as R
+    # LOCK 2: A ROUND ID NO LIVE CAMPAIGN WILL EVER REACH. `isolate()` restores the campaign's
+    # state.json, which said `"round": 2` -- so the offline round numbered its runs r002c_* and
+    # generated, byte for byte, the names the real round 2 had used. The collision was not a
+    # coincidence to be guarded against; it was GUARANTEED, because both rounds read the same
+    # frontier and hash the same compositions. Pushing the offline id out of reach removes the
+    # collision instead of detecting it, and fabricate_run's refusal is then a backstop that
+    # should never fire.
+    OFFLINE_RID = 900
+    _sj = os.path.join(HERE, "campaign", "state.json")
+    try:
+        _st = json.load(open(_sj)) if os.path.exists(_sj) else {}
+    except Exception:
+        _st = {}
+    _st["round"] = OFFLINE_RID
+    os.makedirs(os.path.dirname(_sj), exist_ok=True)
+    json.dump(_st, open(_sj, "w"))
+    print(f"[offline] round id forced to {OFFLINE_RID}: fabricated runs are r{OFFLINE_RID:03d}*, "
+          f"which no live campaign uses")
     print(f"[offline] scenario={a.scenario} mode={a.mode} batch={a.batch} -- no agent, no GPU\n")
     code = R.run_round(mode=a.mode, batch=a.batch, frames=401)
     print(f"\n[offline] round exited {code}; {len(st['calls'])} agent call(s) faked: "

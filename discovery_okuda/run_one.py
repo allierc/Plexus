@@ -149,7 +149,12 @@ def frame_metrics(frames):
     # tube_len/tube_diam -- a different quantity. Calling this one "aspect" led me to compare
     # 1.73 against 7.5 and invent a discrepancy that does not exist. Measure the geometric thing
     # you mean, and NAME it the thing you measured.
-    out = {"n_cells": [], "protr": [], "r95": [], "rmed": [], "act_max": [], "red_frac": []}
+    # act_sd/act_cv/act_occupancy/act_alive: THE PATTERN, not just its peak. See the note beside
+    # them below -- and note this table is a SECOND implementation of tube_analysis.frame_metrics
+    # under the same name; both must carry these or a number means different things in the movie
+    # panel and in the record.
+    out = {"n_cells": [], "protr": [], "r95": [], "rmed": [], "act_max": [], "red_frac": [],
+           "act_mean": [], "act_sd": [], "act_cv": [], "act_occupancy": [], "act_alive": []}
     for pos, mt, act in frames:
         r = np.linalg.norm(pos - pos.mean(0), axis=1)
         r95, rmed = float(np.percentile(r, 95)), float(np.median(r) + 1e-9)
@@ -160,6 +165,24 @@ def frame_metrics(frames):
         a = np.asarray(act, float)
         out["act_max"].append(float(a.max()) if a.size else 0.0)
         out["red_frac"].append(float((a > 0.5 * a.max()).mean()) if a.size and a.max() > 0 else 0.0)
+        # A MEAN CANNOT SEE A PATTERN. 0.5 everywhere and half-at-1/half-at-0 have the same mean;
+        # only the SPATIAL SPREAD tells them apart, and its collapse IS the pattern dying.
+        # Cedric, watching a round-2 movie: "a flash of red activity, 100% red, then a long period
+        # of white, no activity". okuda_route did exactly that -- act_max 17,678 at frame 350,
+        # 0.0105 by frame 807 -- and only act_max and corr_act_rad were admitted, so the loop
+        # could see the spike and could not say the field had died.
+        _mu = float(a.mean()) if a.size else 0.0
+        _sd = float(a.std()) if a.size else 0.0
+        _lo, _hi = (float(a.min()), float(a.max())) if a.size else (0.0, 0.0)
+        _cv = _sd / abs(_mu) if abs(_mu) > 1e-12 else 0.0     # scale-free: survives a collapsing level
+        _occ = float((a > _lo + 0.5 * (_hi - _lo)).mean()) if _hi > _lo + 1e-12 else 0.0
+        out["act_mean"].append(_mu)
+        out["act_sd"].append(_sd)
+        out["act_cv"].append(_cv)
+        out["act_occupancy"].append(_occ)
+        # BOTH conditions, so a blow-up does not read as a pattern: one enormous cell among 4,000
+        # gives cv ~10 and occupancy 0.01, and that is a singularity, not a Turing field.
+        out["act_alive"].append(float(_cv > 0.05 and _occ > 0.01))
     return out
 
 
@@ -436,7 +459,25 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     _pk = max(_valid) if _valid else 0.0
     retention = (_valid[-1] / _pk) if _pk > 1e-9 else 0.0
 
+    # THE PATTERN'S LIFETIME, over the whole run. A per-frame number tells you the field is dead
+    # NOW; these say whether it ever lived and when it stopped -- which is the difference between
+    # "chemistry is inert for shape" and "the chemistry died at frame 350 and the rest of the run
+    # grew on a corpse".
+    _al = fm["act_alive"]
+    _alive_frac = round(sum(_al) / len(_al), 4) if _al else None
+    # The LAST time it was alive and stopped being alive -- not the first dip, so a field that
+    # flickers early and recovers is not recorded as extinct.
+    _extinct = None
+    if _al and _al[-1] < 0.5 and any(v > 0.5 for v in _al):
+        for _k in range(len(_al) - 1, 0, -1):
+            if _al[_k - 1] > 0.5 and _al[_k] < 0.5:
+                _extinct = _k
+                break
+    _peak_f = int(max(range(len(fm["act_max"])), key=lambda i: fm["act_max"][i])) if _al else None
+
     summary = {"saturated": bool(saturated), "saturated_frac_of_run": _sat_frac,
+               "act_alive_frac": _alive_frac, "act_extinct_frame": _extinct,
+               "act_peak_frame": _peak_f,
                "inert_operators": inert,
                "retention": round(retention, 3),
                "valid_evidence": bool(not inert and not saturated),
@@ -480,12 +521,39 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
         _pser = json.load(open(os.path.join(out_dir, "metrics.json"))).get("series") or []
         if _pser:
             _last = _pser[-1]
-            for _k in ("n_spots", "spot_cells_med", "spot_cells_max", "spot_frac",
-                       "spot_spacing_cells", "wavelength_cells"):
-                if _k in _last and _last[_k] is not None:
-                    _v = _last[_k]
-                    summary[f"{_k}_final"] = (round(float(_v), 4)
-                                              if isinstance(_v, float) else _v)
+            # EVERY ADMITTED METRIC IN THE SERIES, not a hand-kept list of six. The list was
+            # written when the pattern metrics were lifted and then had to be edited by hand for
+            # every metric added afterwards -- which is the same defect one level up: computed,
+            # written to metrics.json, and never carried to the one structure the agents read.
+            # corr_act_rad has been ADMITTED since the Turing x vertex study and reached no
+            # summary ever, so every prediction naming it scored `not measured`.
+            from predict import KNOWN_METRICS as _KM
+            _want = set(_KM) | {"n_spots", "spot_cells_med", "spot_cells_max", "spot_frac",
+                                "spot_spacing_cells", "wavelength_cells"}
+            for _k, _v in _last.items():
+                if _v is None or not isinstance(_v, (int, float)) or isinstance(_v, bool):
+                    continue
+                if _k not in _want and f"{_k}_final" not in _want:
+                    continue
+                _rv = round(float(_v), 4) if isinstance(_v, float) else _v
+                # FILL, NEVER OVERWRITE. `red_frac_final` and `act_max_final` are already in the
+                # summary from `fm`, measured with run_one's own definitions -- fm thresholds
+                # red_frac at half the activator's current RANGE, tube_analysis at the growth
+                # operator's absolute switch `a_sw`. tube_analysis's is the better definition and
+                # replacing it here would silently redefine a metric mid-campaign, so every
+                # archived run would carry a number that no longer means what the new ones mean.
+                # Changing a definition is a deliberate act with a version bump, not a side
+                # effect of generalising a loop.
+                if f"{_k}_final" not in summary:
+                    summary[f"{_k}_final"] = _rv
+                # ...and under its BARE name too when that is what is admitted, because
+                # `predict.Clause.check` looks the metric up by exact key: an admitted `r_cv`
+                # against a summary holding only `r_cv_final` is unmeasured, silently.
+                # Never overwrite: run_one's own `fm` keys are measured from VERTEX positions and
+                # tube_analysis's from CELL CENTROIDS, and letting one quietly replace the other
+                # is exactly the protr/ta_protr divergence again.
+                if _k in _KM and _k not in summary:
+                    summary[_k] = _rv
     except Exception as _e:
         print(f"[{name}] pattern metrics not lifted: {type(_e).__name__}", flush=True)
     if morph:

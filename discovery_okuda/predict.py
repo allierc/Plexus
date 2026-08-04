@@ -60,7 +60,13 @@ KNOWN_METRICS = (
     # one localised patch makes a bud. Without these a conclusion about the pattern is not a
     # weaker verdict, it is an unmeasured one.
     "n_spots_final", "spot_cells_med_final", "spot_cells_max_final", "spot_frac_final",
-    "spot_spacing_cells_final", "wavelength_cells_final",
+    "spot_spacing_cells_final",
+    # `wavelength_cells_final` WAS ADMITTED HERE AND IS NOT PRODUCED. pattern_scale computes it
+    # and stores it as `autocorr_hops_uncalibrated` -- renamed deliberately, because finding F010
+    # withdrew it as uncalibrated -- so the admitted name has never once appeared in a summary,
+    # and `agents/llm_agents.py` was advertising it to every agent as a NEW INSTRUMENT. A metric
+    # that was decommissioned for lying must not be reachable through a name that survived it.
+    # It is listed as REJECTED below under its real name, which is the honest record.
     # THE RESERVOIR. `divide_3d` counts the divisions it refuses for want of vertex buffer and
     # flags a full array; run_one records both in diag.json. They were never registered here, so
     # on 3 August the Metrologist asked for an instrument to measure `div_blocked` -- a quantity
@@ -82,11 +88,39 @@ KNOWN_METRICS = (
     # shape_idx_med at 3.83 -- near-regular -- for 900 frames while protr doubles, which is what a
     # healthy tube looks like; a sheet being pulled apart shows it here first.
     "shape_idx_med", "shape_idx_p95", "shape_idx_max", "shape_idx_mean",
+    # THE PATTERN, not just its peak. Only act_max and corr_act_rad were admitted, so the loop
+    # could see a spike and could not see a field die -- and okuda_route's activator reached
+    # 17,678 at frame 350 and 0.0105 by frame 807 while every admitted number stayed sayable.
+    # act_cv is the one that matters: a uniform field and a real Turing pattern have the SAME
+    # MEAN and cv of 0.000 against 0.905.
+    "act_mean", "act_sd", "act_cv", "act_occupancy", "red_frac",
+    "act_sd_final", "act_cv_final", "act_occupancy_final", "act_mean_final",
+    # ... and over the whole run, so "the pattern went extinct" is a measurement:
+    "act_alive_frac", "act_extinct_frame", "act_peak_frame",
+    # DOES THE CHEMISTRY GRIP THE SHAPE? The campaign's actual question. `corr_act_rad` was
+    # admitted with NO PRODUCER anywhere in the codebase -- every prediction that named it scored
+    # `not measured` and fell to inconclusive -- and `act_at_tip` (activator in the outermost
+    # tenth of cells, over the tissue mean) asks it without assuming the relation is linear.
+    "corr_act_rad_final", "act_at_tip", "act_at_tip_final",
+    # SHAPE, NOT SIZE. protr is p95/median: a tail statistic, blind to whether the tissue is ONE
+    # long tube or a lumpy ball with the same tail. The gyration tensor separates them, which is
+    # Okuda's own phenotype axis (tube / undulation / branch), and r_cv and protr_p99 were both
+    # admitted with no producer too.
+    "gyr_prolate", "gyr_asphere", "gyr_oblate",
+    "gyr_prolate_final", "gyr_asphere_final", "gyr_oblate_final", "r_cv_final", "protr_p99_final",
+    # EXCESS AREA, the mechanical precondition for buckling: rv = 1 is a sphere, rv < 1 means the
+    # shell holds more area than a sphere of that volume can and MUST wrinkle. Computed every
+    # frame since the reduced-volume work and never admitted.
+    "reduced_volume", "reduced_volume_final",
+    # THE SELF-INTERSECTION FRACTION P11 KEYS ON, and which the evidence horizon now truncates at.
+    # It decided which frames count as evidence while being unnameable in a prediction.
+    "ray_single_frac", "ray_single_frac_final",
 )
 
 # Measured to lie by the instrument gate (F15/F16). A prediction resting on one of these is not
 # evidence, and saying so is the whole point of having run the gate.
-REJECTED_METRICS = ("ta_aspect_len_over_diam", "ta_tube_len_final", "retention")
+REJECTED_METRICS = ("ta_aspect_len_over_diam", "ta_tube_len_final", "retention",
+                    "autocorr_hops_uncalibrated")
 
 # WHAT THE AGENTS ARE TOLD IS ADMISSIBLE. Rendered from the registry, never hand-written into a
 # prompt. The Reader's prompt carried a HARDCODED list -- "ADMITTED protr_peak, ta_n_tubes_final,
@@ -94,13 +128,93 @@ REJECTED_METRICS = ("ta_aspect_len_over_diam", "ta_tube_len_final", "retention")
 # certified instrument could never be mentioned to the role that reads the numbers. An instrument
 # nobody is told about is the same defect as an instrument that does not exist: pattern_scale was
 # written, certified and computed every frame, and no agent could name it.
+# WHAT EACH ONE MEANS, AND WHAT IT READS ON A SPHERE. Six of these existed for fifty-six
+# admitted names, so a role was handed a comma-separated list of identifiers and asked to write a
+# falsifiable prediction over them. A metric with no stated reference value cannot be predicted
+# against: "act_cv > 0.3" is a guess unless you know a dead field reads 0.00 and a live Turing
+# field reads about 1. Every note below states the number a NULL result gives, because that is
+# what makes the prediction a bet rather than a description.
 METRIC_NOTES = {
+    # ---- shape of the tissue ------------------------------------------------------------
+    "protr_peak": "the best protrusion ratio over the run. 1.0 = a sphere",
+    "protr": "percentile(r,95)/median(r) about the tissue centroid. 1.0 = a sphere. A TAIL "
+             "statistic: blind to a single thin spike, and equal for one tube and a lumpy ball",
+    "protr_p99": "percentile(r,99)/median(r). Catches the thin spike protr's p95 misses",
+    "r_cv": "spread of cell radius over its mean. 0 = a perfect sphere; rises with ANY departure "
+            "from one, unlike protr which only sees the tail",
+    "gyr_prolate": "largest gyration eigenvalue over the mean of the other two. 1.0 = a sphere, "
+                   "> 1 = ELONGATED along one axis. This is what separates a TUBE from an "
+                   "undulating ball: both raise protr, only a tube raises this",
+    "gyr_asphere": "standard asphericity. 0 = a sphere, 1 = a rod",
+    "gyr_oblate": "0 for a sphere OR a rod, positive for a FLATTENED shell -- a vesicle "
+                  "collapsing into a disc, which reads as `not a tube` with no number of its own",
+    "reduced_volume": "6 sqrt(pi) V / A^1.5. 1.0 = a sphere; BELOW 1 the shell holds more area "
+                      "than a sphere of that volume can and MUST wrinkle, buckle or fold. The "
+                      "mechanical precondition for budding, not a consequence of it",
+    "ta_n_tubes_final": "tube count at the end",
+    # ---- the cells ----------------------------------------------------------------------
+    "shape_idx_med": "median perimeter/sqrt(area). 3.545 is a circle and is the FLOOR for any "
+                     "shape; 3.81 is the rigidity transition -- above it the tissue FLOWS and "
+                     "cannot hold a shape it is pushed into",
+    "shape_idx_p95": "the same for the worst-shaped 5% of cells",
+    # ---- the pattern --------------------------------------------------------------------
+    "act_max": "peak activator over the cells. Says NOTHING about whether a pattern exists: it "
+               "reads high for one exploding cell and for a healthy field alike",
+    "act_mean": "mean activator. CANNOT SEE A PATTERN -- 0.5 everywhere and half-at-1/half-at-0 "
+                "give the same number",
+    "act_sd": "spatial spread of the activator across cells. This IS the pattern's amplitude; "
+              "0 means the field is uniform or dead, whatever its mean",
+    "act_cv": "act_sd / act_mean -- scale-free, so it survives a collapsing or exploding level. "
+              "0.00 = uniform or dead, ~0.9-1.8 = a real Turing pattern. THE metric for `is "
+              "there a pattern at all`",
+    "act_occupancy": "fraction of cells in the upper half of the field's own range. ~0.5 for a "
+                     "coarse two-phase pattern, small for isolated spots, 0 for a dead field",
+    "red_frac": "fraction of cells above the GROWTH OPERATOR'S OWN switch a_sw -- i.e. the cells "
+                "growth actually acts on. LOW = localised spots (distinct tubes), HIGH = the "
+                "activator has spread over the shell (one fat lumpy lobe)",
+    "act_alive_frac": "fraction of frames in which a pattern existed at all (act_cv > 0.05 AND "
+                      "occupancy > 0.01). 1.0 = patterned throughout; 0.2 = a FLASH followed by "
+                      "a dead run -- the run grew on a corpse for its last 80%",
+    "act_extinct_frame": "the frame at which the pattern last stopped existing, or absent if it "
+                         "never did. Turns `the chemistry died` into a measurement",
+    "act_peak_frame": "the frame of maximum act_max. Early + extinct later = a blow-up, not a "
+                      "pattern",
     "n_spots_final": "how many distinct activator domains (a fine field has many, a bud has one)",
-    "wavelength_cells_final": "the pattern's wavelength in cell diameters",
     "spot_spacing_cells_final": "centre-to-centre domain spacing, in cells",
     "spot_frac_final": "fraction of cells above the activator threshold",
-    "protr_peak": "the best protrusion over the run",
-    "ta_n_tubes_final": "tube count at the end",
+    # ---- does the pattern GRIP the shape? -----------------------------------------------
+    "corr_act_rad": "Pearson correlation between a cell's activator and its radius. THE "
+                    "campaign's question. REFUSED (not measured) when act_cv < 0.05: a "
+                    "correlation on a dead field is a correlation of round-off, and it reads a "
+                    "confident 0.29 on an activator whose entire spread is 8e-05",
+    "act_at_tip": "mean activator in the outermost tenth of cells, over the tissue mean. 1.0 = "
+                  "no relation to shape, > 1 = the activator sits at the protrusions. Asks the "
+                  "same question as corr_act_rad without assuming the relation is a straight line",
+    # ---- is this even evidence? ---------------------------------------------------------
+    "ray_single_frac": "fraction of rays from the centroid that cross the surface EXACTLY once. "
+                       "1.0 = a simple closed shell. Below 0.5 the sheet has folded through "
+                       "itself, which a tissue cannot do -- every frame after that measures a "
+                       "broken mesh, and the evidence horizon truncates there",
+    "div_blocked": "divisions REFUSED for want of vertex buffer. Non-zero means growth stopped "
+                   "where the ARRAY ended, not where biology did",
+    "buf_full": "the vertex array filled. A run that ends here has not found a limit of growth",
+    "mech_p_ratio": "pressure in protruding cells over body cells. ~3 = a FORCED protrusion, "
+                    "~1 = a growth-driven equilibrium",
+    "Q_drop": "protrusion lost when the forces are switched off and the tissue is allowed to "
+              "relax. LARGE = the shape was being HELD by force; ~0 = an equilibrium shape",
+    "div_blocked_first_frame": "the frame at which the buffer first refused a division. "
+                               "Everything after it is a run against a wall",
+    "hollow_frac": "the frozen legacy blend of folded|sliver|under-connected cells. Prefer "
+                   "broken_frac: this cannot tell a slightly bent cell from a destroyed one",
+    "vol_cv": "spread of cell volume over its mean. Rises when division stalls while cells keep "
+              "growing -- a size distribution coming apart",
+    "shape_idx_mean": "mean perimeter/sqrt(area); see shape_idx_med for the reference values",
+    "shape_idx_max": "the single worst-shaped cell. Above ~5 that cell is a 2:1 sliver, and the "
+                     "mesh rather than the tissue is what is being measured",
+    "n_cells_final": "final cell count in the okuda loop",
+    "protr_final": "protrusion ratio at the last VALID frame (truncated at the evidence horizon)",
+    "cells_end": "final cell count. TURING x VERTEX PIPELINE ONLY -- the okuda loop produces "
+                 "`n_cells_final`, and a prediction naming this one there scores `not measured`",
 }
 
 
