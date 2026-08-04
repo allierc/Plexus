@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -516,6 +517,11 @@ class _Timed:
         return False
 
 
+# The pasted BREVITY paragraph, and only it: from the word to the next blank line. Anchored at a
+# line start so the word inside prose ("keep to the brevity budget") is not treated as a marker.
+_BREVITY_BLOCK = re.compile(r"^BREVITY\b.*?(?=\n\s*\n|\Z)", re.S | re.M)
+
+
 def run_agent(agent, prompt, ledger=None, **over):
     """Run one agent under its budget. THE ONLY SUPPORTED PATH TO run_claude().
 
@@ -551,9 +557,21 @@ def run_agent(agent, prompt, ledger=None, **over):
         # silently downgrade a role that reasons.
         over.setdefault("model", AGENT_MODEL.get(agent))
         if over.pop("brevity", True) and agent not in BREVITY_EXEMPT:
-            # strip any statically-pasted copy so the ROLE-SPECIFIC cap is the one in force
-            if "BREVITY" in prompt:
-                prompt = prompt.split("BREVITY")[0].rstrip()
+            # REMOVE THE BLOCK, DO NOT TRUNCATE AT IT.
+            #
+            # This was `prompt.split("BREVITY")[0]`, and it was the worst defect of 3 August. The
+            # Proposer's template pastes {BREVITY} at character 331 of a 16,093-character prompt,
+            # so the agent received 331 characters: no legal-move menu, no refusals, no history,
+            # no output schema. It then invented `add branching` and `add chemotaxis` because it
+            # had never been shown the operators -- and when it reported "I lack the injected
+            # LEGAL MOVES menu (this call omitted it)", that was literally true and was read here
+            # as a hallucination. The recon Proposer naming zero runs is the same cut: the JSON
+            # schema it was meant to answer in sat past character 331 too.
+            #
+            # The intent was only ever to drop a statically-pasted copy so the role-specific cap
+            # governs. So: excise the BLOCK -- the paragraph up to the next blank line -- and keep
+            # every word around it.
+            prompt = _BREVITY_BLOCK.sub("", prompt).rstrip()
             prompt = f"{prompt}\n\n{tool_note(agent)}\n\n{brevity(agent)}"
         ok, out = run_claude(prompt, timeout_min=tmin, allowed_tools=tools,
                              max_turns=turns, **over)

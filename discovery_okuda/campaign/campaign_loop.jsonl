@@ -34,3 +34,8 @@
 {"t": 1785792726.72552, "event": "start", "rounds": 20, "batch": 12, "frames": null}
 {"t": 1785793353.2739716, "event": "start", "rounds": 20, "batch": 12, "frames": null}
 {"t": 1785793715.8250914, "event": "start", "rounds": 20, "batch": 12, "frames": null}
+{"t": 1785795138.557771, "event": "start", "rounds": 20, "batch": 12, "frames": null}
+{"t": 1785795314.850862, "event": "start", "rounds": 20, "batch": 12, "frames": null}
+{"t": 1785797027.6661966, "event": "round", "n": 1, "exit": 0, "minutes": 28.4, "usd_this_round": 8.0, "note": "", "cost_total": {"calls": 10, "usd": 2.09, "tok_in": 6138, "tok_out": 34300, "turns": 46, "minutes": 8.0}}
+{"t": 1785797915.2178206, "event": "start", "rounds": 20, "batch": 12, "frames": null}
+{"t": 1785799367.116631, "event": "round", "n": 1, "exit": 0, "minutes": 24.1, "usd_this_round": 7.8, "note": "", "cost_total": {"calls": 12, "usd": 2.23, "tok_in": 6156, "tok_out": 33334, "turns": 54, "minutes": 7.8}}

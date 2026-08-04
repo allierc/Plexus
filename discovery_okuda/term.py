@@ -23,6 +23,29 @@ import os
 import re
 import sys
 
+# Escape codes take no columns. Anything that measures a line's width must not count them.
+_ANSI = re.compile(r"\x1b\[[0-9;]*m")
+
+# ONE WIDTH FOR THE WHOLE LOOP. say() used to fold at 100 and the stdout wrapper again at 96,
+# so every quoted line was folded twice at two widths. Anything that wraps reads this.
+#
+# IT FOLLOWS THE WINDOW, UP TO A POINT. A fixed 96 wastes a third of a 150-column terminal, but
+# prose set to the full 150 is genuinely harder to read -- the eye loses the line on the way back.
+# So: use the window, capped at 100, which is where typographers put the limit and near enough
+# what a round's lines already want. A log file is NOT a window and keeps the fixed 96, so the
+# campaign log reads the same wherever it is opened and diffs between rounds stay meaningful.
+def _width():
+    if not sys.stdout.isatty():
+        return 96
+    try:
+        import shutil
+        return max(72, min(100, shutil.get_terminal_size().columns - 2))
+    except Exception:
+        return 96
+
+
+WIDTH = _width()
+
 _ON = (bool(os.environ.get("FORCE_COLOR")) or sys.stdout.isatty()) \
       and not os.environ.get("NO_COLOR")
 
@@ -155,7 +178,7 @@ def headline(text, fallback="", who=""):
     return t[:120]
 
 
-def say(who, text, sentences=1, width=100):
+def say(who, text, sentences=1, width=WIDTH):
     """What an agent actually said, trimmed to N sentences. Quoted, never paraphrased.
 
     A round prints what every role DID and almost nothing of what any of them THOUGHT. The
@@ -175,9 +198,13 @@ def say(who, text, sentences=1, width=100):
     # the same sentence at three different left margins depending on how long it was.
     import textwrap
     head = f'{col(I["read"])} {col(bold(who))}: '
-    lines = textwrap.fill(t, width=width, break_long_words=False,
-                          break_on_hyphens=False).splitlines()
-    out = [head + (lines[0] if lines else "")]
+    # THE HEAD OCCUPIES COLUMNS TOO. Filling to the full width and then prepending "◉ reader: "
+    # made the first line that much longer than the rest, which the stdout wrapper then folded
+    # again -- so the first line of every quoted agent line broke, and only the first.
+    n_head = len(_ANSI.sub("", head))
+    lines = textwrap.wrap(t, width=width, break_long_words=False, break_on_hyphens=False,
+                          initial_indent=" " * n_head) or [""]
+    out = [head + lines[0][n_head:]]
     out += [dim(l) for l in lines[1:]]
     return "\n".join(out)
 
@@ -211,7 +238,7 @@ class _Colourise:
     def __init__(self, stream):
         self._s = stream
 
-    WIDTH = 96          # wrap prose past this; banners and tables are left alone
+    WIDTH = WIDTH       # module-level, so say() and this fold at the same column
 
     def write(self, text):
         if not text.strip():
@@ -244,8 +271,22 @@ class _Colourise:
         import textwrap
         body = line.rstrip("\n")
         nl = "\n" if line.endswith("\n") else ""
-        if len(body) <= self.WIDTH or len(set(body.strip())) <= 2:
+        # MEASURE WHAT IS VISIBLE. `len()` counts the escape codes, which occupy no columns, so a
+        # coloured line looked ~9 characters longer than it printed and got folded that much too
+        # early -- and by a different amount per colour, which is why one paragraph came out with
+        # breaks at 82, 88 and 94 and read as ragged. say() also pre-folded at 100 against this
+        # WIDTH of 96, guaranteeing a second fold; both are why prose arrived broken mid-phrase.
+        plain = _ANSI.sub("", body)
+        if len(plain) <= self.WIDTH or len(set(plain.strip())) <= 2:
             return line                                  # short, or a ==== / ---- rule
+        if plain != body:
+            # Coloured AND genuinely too long: fold the visible text, then re-open the colour on
+            # every piece, because an escape sequence does not survive being cut in half.
+            pre = (re.match(r"^(?:\x1b\[[0-9;]*m)+", body) or [""])[0]
+            wrapped = textwrap.wrap(plain, width=self.WIDTH,
+                                    break_long_words=False, break_on_hyphens=False)
+            return ("\n".join(pre + w + ("\x1b[0m" if pre else "") for w in wrapped) + nl
+                    if wrapped else line)
         m = re.match(r"^(\[[a-z][a-z-]*\]\s*)", body)
         head, rest = (m.group(1), body[m.end():]) if m else ("", body)
         wrapped = textwrap.wrap(rest, width=self.WIDTH - len(head),

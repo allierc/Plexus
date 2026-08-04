@@ -96,7 +96,13 @@ def trace(where):
     line per step, so the last line in trace.log is the last thing that actually ran.
     """
     line = f"{time.strftime('%H:%M:%S')}  {where}"
-    print(f"  [trace] {where}", flush=True)
+    # THE FILE IS THE POINT; THE TERMINAL IS NOT. This exists so a SIGKILL leaves a record of the
+    # last step that ran, and trace.log below does that whether or not anything is printed. On the
+    # terminal it is six lines per round of "about to import", "imported", "RETURNED" plus two per
+    # run -- my working notes, in a report meant for reading. OKUDA_TRACE=1 brings them back for
+    # the next unexplained death.
+    if os.environ.get("OKUDA_TRACE"):
+        print(f"  [trace] {where}", flush=True)
     try:
         os.makedirs(CAMP, exist_ok=True)
         with open(TRACE, "a") as fh:
@@ -778,8 +784,15 @@ def build_composition_batch(sup, cfg, n_slots, ledger):
     setup = _paper_setup()
     hist = ARCH.table()
     prior_review = _last_review()
+    # ASK FOR MORE THAN THE BATCH, BECAUSE SOME WILL BE REFUSED. Round 2 asked for twelve, the
+    # Critic refused eight, and twelve GPUs' worth of intent reached the cluster as four -- with
+    # nothing anywhere reacting to the shortfall, because n_slots was a REQUEST and the composition
+    # path (unlike recon) has no floor. A third again is sized to ordinary attrition, not to the
+    # 67% of round 2, which was a menu bug rather than a rate; survivors are capped back to
+    # n_slots below, so this cannot enlarge the batch or the GPU bill.
+    n_ask = n_slots + max(1, round(n_slots / 3))
     ok, slots = P.propose(frontier, cfg, sup.prox, ledger_summary, sup.round + 1,
-                          n_slots=n_slots, ledger=ledger, steer=steer, refusals=refusals,
+                          n_slots=n_ask, ledger=ledger, steer=steer, refusals=refusals,
                           setup=setup, history=hist, review=prior_review)
     if not slots:
         print(T_.no(f"[round] no usable proposal ({len(slots or [])} slot(s) returned) -- "
@@ -787,78 +800,126 @@ def build_composition_batch(sup, cfg, n_slots, ledger):
         return []
 
     out, rejected, in_batch = [], [], {}
-    for i, sl in enumerate(slots):
-        pi = int(sl.get("parent_index", 0))
-        if not (0 <= pi < len(frontier)):
-            rejected.append((i, f"parent_index {pi} out of range"))
-            continue
-        parent = frontier[pi]
-        if sl.get("intent") == "control" or sl.get("edit") in (None, "null"):
-            g, lbl = parent, "control (parent unchanged)"
-        else:
-            e = sl["edit"]
-            e = tuple(e["edit"]) if isinstance(e, dict) and "edit" in e else tuple(e)
-            try:
-                g, _ = parent.apply(e)
-            except Exception as ex:
-                rejected.append((i, f"edit not applicable: {ex}"))
+
+    _n_proposed = [0]
+
+    def _admit_slots(slots_in, tag=""):
+        """Every pre-compute gate, over one list of proposed slots.
+
+        EXTRACTED SO IT CAN RUN TWICE. The Critic's refusals are mechanical -- an edit either
+        builds a graph or it does not -- so unlike peer-review's judgement, which is argued and
+        rightly waits for the next round, a refusal has a RIGHT ANSWER the Proposer could have
+        given. Handing it back next round costs a whole round: on 3 August round 2 proposed
+        sixteen edits, fifteen of them phenotypes rather than operators (`add branching`,
+        `add chemotaxis`), and delivered ONE job out of twelve. Nothing was salvageable and
+        nothing was retried.
+        """
+        _n_proposed[0] += len(slots_in)
+        for i, sl in enumerate(slots_in):
+            pi = int(sl.get("parent_index", 0))
+            if not (0 <= pi < len(frontier)):
+                rejected.append((f"{tag}{i}", f"parent_index {pi} out of range"))
                 continue
-            lbl = sl.get("label") or str(e)
-        # THE GROUNDER SPEAKS HERE, and until now it never did. It is the only agent that reads
-        # Okuda's paper, it had no call site anywhere in the pipeline, and the consequence was
-        # measured rather than argued: a 27-run batch was launched at 150 cells against a paper
-        # that says 200, and every run stopped dead on the mesh reservoir.
-        #
-        # It ADVISES, it does not gate. The faithful share of a batch inherits his starting
-        # conditions; the exploratory share is free to leave them, which is the 70/30 split --
-        # a search that may only ever stand where the paper stands cannot discover that the
-        # paper is not the only place to stand. What is NOT optional is the reservoir, and that
-        # lives in the translator, where it applies to both shares alike.
-        # THE STARTING CELL COUNT IS NOT AN AXIS OF THE SEARCH, so it is grounded on every slot.
-        #
-        # This line had two defects, both found by reading round 1's own configs. It split the
-        # batch BY SLOT INDEX -- `i < 0.7 * len(slots)` -- and so ignored the `territory` the
-        # Proposer had actually declared: slot 5 said `in_paper` and was denied Okuda's starting
-        # conditions purely for being sixth. And what it varied was `n_cells`, so slots 4 and 5
-        # ran 500 cells against a control at 2000. A difference between them then confounds the
-        # EDIT with a fourfold change in specimen size, which destroys the one property the batch
-        # was designed for: every slot a single edit off one shared control.
-        #
-        # An excursion is free to leave the paper's PARAMETER REGIME -- chi, gamma, the
-        # diffusivities -- which is where "the paper is not the only place to stand" actually
-        # lives. It is not free to change how much tissue it starts with, unless cell count is
-        # itself the variable under test, and then it must be declared as the edit.
-        sl["territory"] = sl.get("territory", "in_paper" if sl.get("intent") == "control"
-                                 else "excursion")
-        sl["fidelity"] = "okuda" if sl["territory"] == "in_paper" else "free"
-        g = _ground_starting_conditions(g, sl)
-        adm, rej = C.admit(g, seen if sl.get("intent") != "control" else ())
-        if not adm:
-            rejected.append((i, f"CRITIC: {rej}"))
-            continue
-        # THE SAME COMPOSITION TWICE IN ONE BATCH IS ONE EXPERIMENT, NOT TWO.
-        #
-        # `seen` holds compositions from PREVIOUS rounds, so a slot duplicated inside this batch
-        # passes every gate: it is type-legal, its preconditions are met, and it is genuinely
-        # unseen. Measured on round 2 of the batch-12 campaign -- only SEVEN distinct edits across
-        # twelve slots, with `remove_op divide_3d0` proposed three times carrying MUTUALLY
-        # CONTRADICTORY predictions on one composition:
-        #
-        #     slot 5  protr_peak 1.0-1.4      slot 7  protr_peak >= 1.3      slot 10  >= 1.5
-        #
-        # Five of twelve GPU runs would have bought nothing, and worse: two of those three resolve
-        # `refuted` purely because the Proposer contradicted itself, which feeds a FALSE surprise
-        # signal into the mixture the Supervisor sets from it. A replicate is a legitimate
-        # experiment, but it is one the proposer must ASK for -- and it would carry one prediction.
-        h = comp_hash(g)
-        if h in in_batch:
-            rejected.append((i, f"DUPLICATE_IN_BATCH: identical to slot {in_batch[h]} "
-                                f"({h}). Same composition, so at most one prediction about it "
-                                f"can be right; the others are the same experiment re-run under "
-                                f"a different guess. Vary the EDIT, not the number."))
-            continue
-        in_batch[h] = i
-        out.append((g, lbl, sl))
+            parent = frontier[pi]
+            if sl.get("intent") == "control" or sl.get("edit") in (None, "null"):
+                g, lbl = parent, "control (parent unchanged)"
+            else:
+                e = sl["edit"]
+                e = tuple(e["edit"]) if isinstance(e, dict) and "edit" in e else tuple(e)
+                try:
+                    g, _ = parent.apply(e)
+                except Exception as ex:
+                    # NAME THE EDIT AND THE FAULT. This printed "edit not applicable: None" for three
+                    # slots in round 2 -- a KeyError(None), whose str() IS "None" -- so the message
+                    # said nothing about which move failed or why, and the Proposer that would have
+                    # to stop making it was told the same nothing on the next round.
+                    _ids = [o.get("id") for o in parent.ops]
+                    rejected.append((f"{tag}{i}", f"edit not applicable: {type(ex).__name__}({ex!s}) "
+                                        f"on edit {e!r}; parent has ops {_ids}"))
+                    continue
+                lbl = sl.get("label") or str(e)
+            # THE GROUNDER SPEAKS HERE, and until now it never did. It is the only agent that reads
+            # Okuda's paper, it had no call site anywhere in the pipeline, and the consequence was
+            # measured rather than argued: a 27-run batch was launched at 150 cells against a paper
+            # that says 200, and every run stopped dead on the mesh reservoir.
+            #
+            # It ADVISES, it does not gate. The faithful share of a batch inherits his starting
+            # conditions; the exploratory share is free to leave them, which is the 70/30 split --
+            # a search that may only ever stand where the paper stands cannot discover that the
+            # paper is not the only place to stand. What is NOT optional is the reservoir, and that
+            # lives in the translator, where it applies to both shares alike.
+            # THE STARTING CELL COUNT IS NOT AN AXIS OF THE SEARCH, so it is grounded on every slot.
+            #
+            # This line had two defects, both found by reading round 1's own configs. It split the
+            # batch BY SLOT INDEX -- `i < 0.7 * len(slots)` -- and so ignored the `territory` the
+            # Proposer had actually declared: slot 5 said `in_paper` and was denied Okuda's starting
+            # conditions purely for being sixth. And what it varied was `n_cells`, so slots 4 and 5
+            # ran 500 cells against a control at 2000. A difference between them then confounds the
+            # EDIT with a fourfold change in specimen size, which destroys the one property the batch
+            # was designed for: every slot a single edit off one shared control.
+            #
+            # An excursion is free to leave the paper's PARAMETER REGIME -- chi, gamma, the
+            # diffusivities -- which is where "the paper is not the only place to stand" actually
+            # lives. It is not free to change how much tissue it starts with, unless cell count is
+            # itself the variable under test, and then it must be declared as the edit.
+            sl["territory"] = sl.get("territory", "in_paper" if sl.get("intent") == "control"
+                                     else "excursion")
+            sl["fidelity"] = "okuda" if sl["territory"] == "in_paper" else "free"
+            g = _ground_starting_conditions(g, sl)
+            adm, rej = C.admit(g, seen if sl.get("intent") != "control" else ())
+            if not adm:
+                rejected.append((f"{tag}{i}", f"CRITIC: {rej}"))
+                continue
+            # THE SAME COMPOSITION TWICE IN ONE BATCH IS ONE EXPERIMENT, NOT TWO.
+            #
+            # `seen` holds compositions from PREVIOUS rounds, so a slot duplicated inside this batch
+            # passes every gate: it is type-legal, its preconditions are met, and it is genuinely
+            # unseen. Measured on round 2 of the batch-12 campaign -- only SEVEN distinct edits across
+            # twelve slots, with `remove_op divide_3d0` proposed three times carrying MUTUALLY
+            # CONTRADICTORY predictions on one composition:
+            #
+            #     slot 5  protr_peak 1.0-1.4      slot 7  protr_peak >= 1.3      slot 10  >= 1.5
+            #
+            # Five of twelve GPU runs would have bought nothing, and worse: two of those three resolve
+            # `refuted` purely because the Proposer contradicted itself, which feeds a FALSE surprise
+            # signal into the mixture the Supervisor sets from it. A replicate is a legitimate
+            # experiment, but it is one the proposer must ASK for -- and it would carry one prediction.
+            h = comp_hash(g)
+            if h in in_batch:
+                rejected.append((f"{tag}{i}", f"DUPLICATE_IN_BATCH: identical to slot {in_batch[h]} "
+                                    f"({h}). Same composition, so at most one prediction about it "
+                                    f"can be right; the others are the same experiment re-run under "
+                                    f"a different guess. Vary the EDIT, not the number."))
+                continue
+            in_batch[h] = i
+            out.append((g, lbl, sl))
+
+    _admit_slots(slots)
+    # THE REPAIR PASS. One, and only when it would change the batch materially -- a re-ask costs
+    # an agent call (~3 min against a 10-minute round) and must not become a loop. The Proposer is
+    # given the exact refusal text, not a summary: "unknown edit ('add', 'branching')" is the
+    # whole lesson, and paraphrasing it is how the lesson stopped arriving.
+    if len(out) < n_slots and rejected:
+        _need = n_slots - len(out)
+        _why = "\n".join(f"  slot {i}: {w}" for i, w in rejected[:12])
+        print(T_.warn(f"[critic] {len(rejected)} refused, {len(out)} of {n_slots} slots filled "
+                      f"-- asking the Proposer to correct {_need} of them"))
+        _brief = (f"YOUR LAST BATCH WAS REFUSED, THIS ROUND, BEFORE ANYTHING RAN. These are not "
+                  f"opinions -- each edit failed to build a composition:\n{_why}\n\n"
+                  f"Propose {_need} REPLACEMENT slot(s). Copy the `edit` token VERBATIM from the "
+                  f"LEGAL MOVES menu above; an edit you compose yourself will be refused again. "
+                  f"An operator name that is not in the menu does not exist in this system, "
+                  f"however biologically real the mechanism is.")
+        _ok2, _slots2 = P.propose(frontier, cfg, sup.prox, ledger_summary, sup.round + 1,
+                                  n_slots=_need + 2, ledger=ledger, steer=steer,
+                                  refusals=f"{refusals}\n\n{_brief}" if refusals else _brief,
+                                  setup=setup, history=hist, review=prior_review)
+        if _slots2:
+            _before = len(out)
+            _admit_slots(_slots2, tag="r")
+            print(T_.ok(f"[critic] repair pass recovered {len(out) - _before} slot(s)"))
+        else:
+            print(T_.no("[critic] repair pass returned nothing -- running the short batch"))
     # GROUPED BY REASON. Eleven consecutive lines each saying "identical to slot 0" is one
     # finding printed eleven times, and it buries the one line that mattered. The full list still
     # goes to batch_refusals.jsonl and into the next Proposer's prompt.
@@ -882,8 +943,34 @@ def build_composition_batch(sup, cfg, n_slots, ledger):
             fh.write(json.dumps({"round": sup.round + 1,
                                  "refused": [{"slot": i, "why": w} for i, w in rejected]}) + "\n")
 
+    # THE CAP THAT MAKES THE OVER-REQUEST SAFE. n_ask asked for a third more than the batch; the
+    # surplus exists to absorb refusals, not to grow the batch. Survivors past n_slots are dropped
+    # here, so the GPU bill is set by n_slots exactly as before.
+    if len(out) > n_slots:
+        print(T_.quiet(f"  [round] {len(out)} slots survived; keeping the first {n_slots}"))
+        out = out[:n_slots]
+    # ATTRITION AS A NUMBER, not two prints a reader has to subtract. Round 2 asked for 12 and ran
+    # 4, and nothing anywhere recorded that as a fact -- so it could not be watched across rounds.
+    print(T_.quiet(f"  [round] batch: asked {n_ask}, proposed {_n_proposed[0]}, "
+                   f"refused {len(rejected)}, delivered {len(out)} of {n_slots}"))
+    with open(os.path.join(CAMP, "batch_attrition.jsonl"), "a") as fh:
+        fh.write(json.dumps({"round": sup.round + 1, "asked": n_ask, "proposed": _n_proposed[0],
+                             "refused": len(rejected), "delivered": len(out),
+                             "target": n_slots}) + "\n")
+
     review = A.reflect([{k: v for k, v in s.items() if k != "edit"} for _, _, s in out],
                        ledger=ledger)
+    # THE VERDICT IS THE FIELD WHEN THE FIELD IS MISSING. Round 2 printed "batch_ok=None. REJECT":
+    # the reviewer said REJECT in the one place a human reads and left the flag unset, so the
+    # `batch_ok is False` branch below never fired and a rejected batch went to the cluster with
+    # nothing said about it. Peer-review still only ADVISES -- this does not add a veto -- but its
+    # advice now reaches the record it was written into.
+    if review.get("batch_ok") is None:
+        _v = str(review.get("verdict", "")).upper()
+        if "REJECT" in _v or "REVISE" in _v:
+            review["batch_ok"] = False
+        elif "ACCEPT" in _v or "APPROVE" in _v:
+            review["batch_ok"] = True
     print(T_.say("peer-review", f"batch_ok={review.get('batch_ok')}. {review.get('verdict','')}",
                  sentences=2))
     for iss in review.get("issues", []):
@@ -941,12 +1028,36 @@ def build_recon_batch(sup, cfg, n_slots, ledger):
     print(T_.wrap_names(names))
     print(T_.say("proposer", choice.get("why", ""), sentences=2))
 
+    # A TRUNCATED NAME IS STILL A CHOICE. Run directories are named `r001n_07_wk_apical_area` --
+    # `run[:14]`, a DISPLAY truncation -- and that is the form the Proposer reads back out of the
+    # log and the archive. So it asks for `wk_apical_area`, `coral_fixed_ba`, `p1_ph_coral_fi`:
+    # six of its twelve picks on 3 August, every one exactly 14 characters, every one resolving to
+    # exactly one directory. All six were dropped and replaced by a disk listing, so the round
+    # replayed what happened to be there and the Proposer's two minutes bought nothing.
+    #
+    # Resolved only when the prefix is UNAMBIGUOUS. Two matches means guessing which experiment
+    # was meant, and a silently-wrong specimen is worse than a skipped slot.
+    _dirs = sorted(d for d in os.listdir(LOG)
+                   if os.path.exists(os.path.join(LOG, d, "spec_run.yaml")))
+
+    def _resolve(run):
+        if os.path.exists(os.path.join(LOG, run, "spec_run.yaml")):
+            return run, ""
+        hits = [d for d in _dirs if d.startswith(run)]
+        if len(hits) == 1:
+            return hits[0], f"  [recon] {run} -> {hits[0]} (name was truncated to {len(run)} chars)"
+        if len(hits) > 1:
+            return None, f"  [recon] {run}: ambiguous, matches {len(hits)} runs -- skipped"
+        return None, f"  [recon] {run}: no spec on disk -- skipped"
+
     out = []
     for i, run in enumerate(names[:n_slots]):
-        src = os.path.join(LOG, run, "spec_run.yaml")
-        if not os.path.exists(src):
-            print(f"  [recon] {run}: no spec on disk -- skipped")
+        run, note = _resolve(run)
+        if note:
+            print(note)
+        if run is None:
             continue
+        src = os.path.join(LOG, run, "spec_run.yaml")
         out.append((run, src, {"intent": "recon", "track": "A",
                                "claim": f"re-measure {run} under the current instruments",
                                "metric": "protr_peak", "predicted": "unstated",
@@ -1295,7 +1406,14 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
                       "on real batches. It refuses from the round after its first clean pass."))
 
     act("ACT 2 - MEASURE", f"submitting {len(names)} simulation(s)")
-    ids = cluster.submit(names, frames=frames, do_q=True, campaign=f"round{rid}")
+    # A REPLAY REPLAYS ITS OWN LENGTH. The recon branch copies each spec VERBATIM and then this
+    # line handed `--frames 900` to every job, overriding the `n_frames` it had just preserved --
+    # so a 401-frame spec ran 901 frames, grew past the array it was sized for, and came back with
+    # P13 broken. wk_apical_area ended at 1766 of 1778 cells that way. The config says how long
+    # the run is; the command line saying otherwise is the "spec altered on the way in" that the
+    # branch above forbids in its own comment.
+    sub_frames = None if mode == "recon" else frames
+    ids = cluster.submit(names, frames=sub_frames, do_q=True, campaign=f"round{rid}")
     if not ids:
         # EXIT 6, NOT 1. A submission that did not land is a fact about the CLUSTER, not about
         # this code, and exit 1 is what Python gives an uncaught exception -- so the driver
@@ -1462,7 +1580,13 @@ def _run_round(bk, ledger, mode, frames, batch, base, param, values, dry):
         # and drops out of the surprise denominator, rather than being recorded as `confirmed`
         # (which is what the old first-match regex did -- see predict.py P1/P2/P3).
         outcome, why = PR.score(h.predicted, summ, primary_metric=h.metric)
-        if outcome == "inconclusive":
+        # NO PREDICTION IS NOT A FAILED PREDICTION. A recon slot is posed with predicted="unstated"
+        # BY DESIGN -- a replay has no hypothesis to be right or wrong about -- so this printed
+        # three lines of "not checkable" for all twelve, every recon round, describing the design
+        # as a defect. The message is worth reading in exactly one case: a prediction was actually
+        # made and could not be parsed. That one still prints.
+        if outcome == "inconclusive" and str(h.predicted or "").strip().lower() not in (
+                "", "unstated", "none", "null"):
             print(f"[predict] {nm}: not checkable")
             print(T_.quiet(T_.wrap_names([str(why)[:180]])))
         # A quarantined Q must be visible in the SCIENTIFIC record, not only in the terminal:

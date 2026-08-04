@@ -130,12 +130,16 @@ def caption_wave(names, n_frames=8, force=False):
             # in description.txt either way; this is what a person watching actually reads.
             body = " ".join((txt or "").split())
             body = body.split("OBJECTS:")[0].strip()          # the DESCRIPTION section
-            # THE EYE-CHECK'S COLOUR, because this is the eye-check's evidence. The caption is
-            # what the VLM saw; the eye-check then judges it. Colouring them alike says they are
-            # one channel -- the only one in the loop that looks at SHAPE rather than at number.
-            print(f"  {_T.VOICE['eye-check'](f'[{i}/{len(todo)}] {n}')}:", flush=True)
-            for ln in _wrap(body, 108):
-                print(_T.VOICE["eye-check"](f"        {ln}"), flush=True)
+            # DROP THE SECTION LABEL. "DESCRIPTION:" names the prompt's field, not anything the
+            # VLM saw, and it pushed the first line out of alignment with every following one.
+            if body.upper().startswith("DESCRIPTION:"):
+                body = body[len("DESCRIPTION:"):].strip()
+            # ONE WRAPPER, NOT TWO. This used to wrap at 108 and then hand the result to the
+            # stdout wrapper, which strips the indent and re-wraps at 96 -- so every line was
+            # folded twice, at two widths, and came out ragged with sentences broken mid-phrase.
+            # Emitting one long line lets the single wrapper do it once, correctly.
+            print(_T.VOICE["eye-check"](f"[eye {i}/{len(todo)}] {n}"), flush=True)
+            print(_T.VOICE["eye-check"](body), flush=True)
         except Exception as e:
             out[n] = f"failed: {type(e).__name__}"
             print(f"  [{i}/{len(todo)}] {n}: FAILED {type(e).__name__}", flush=True)
