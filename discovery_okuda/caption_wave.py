@@ -140,22 +140,16 @@ def caption_wave(names, n_frames=8, force=False):
             with open(dst, "w") as f:
                 f.write(txt if txt else "UNAVAILABLE -- the model returned nothing.\n")
             out[n] = "ok" if txt else "empty"
-            # THE WHOLE FIRST SECTION, not 88 characters of it. The caption is the only
-            # description of SHAPE the loop produces, and it was being cut mid-sentence -- so the
-            # terminal showed that a caption existed and none of what it said. The full text is
-            # in description.txt either way; this is what a person watching actually reads.
-            body = " ".join((txt or "").split())
-            body = body.split("OBJECTS:")[0].strip()          # the DESCRIPTION section
-            # DROP THE SECTION LABEL. "DESCRIPTION:" names the prompt's field, not anything the
-            # VLM saw, and it pushed the first line out of alignment with every following one.
-            if body.upper().startswith("DESCRIPTION:"):
-                body = body[len("DESCRIPTION:"):].strip()
-            # ONE WRAPPER, NOT TWO. This used to wrap at 108 and then hand the result to the
-            # stdout wrapper, which strips the indent and re-wraps at 96 -- so every line was
-            # folded twice, at two widths, and came out ragged with sentences broken mid-phrase.
-            # Emitting one long line lets the single wrapper do it once, correctly.
+            # PRINTED ONCE, WHERE IT IS READ. The caption used to be printed in full here, as the
+            # wave produced it, and then AGAIN a few minutes later in Act 2's per-run block --
+            # where it sits beside the Biologist's premises, the Metrologist's numbers and the
+            # Reader's phenotype, which is the only place it can be judged against anything.
+            # Eleven captions twice over is twenty-two paragraphs of prose to scroll past, and the
+            # second copy is the one carrying the context.
+            #
+            # The progress line stays: a wave that loads the VLM once for eleven runs takes four
+            # minutes, and a silent four minutes reads as a hang.
             print(_T.VOICE["eye-check"](f"[eye {i}/{len(todo)}] {n}"), flush=True)
-            print(_T.VOICE["eye-check"](body), flush=True)
         except Exception as e:
             out[n] = f"failed: {type(e).__name__}"
             print(f"  [{i}/{len(todo)}] {n}: FAILED {type(e).__name__}", flush=True)
