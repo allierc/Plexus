@@ -115,13 +115,6 @@ The two tracks feed each other: the reproduction is the honest test of the metho
 is what makes the reproduction more than hand-tuning.
 
 %======================================================================
-\section{Where we actually are}
-
-Track A is further along than Track B, and every number taken before 31 July was measured with at
-least one instrument since proved wrong. So the register of results is empty on purpose, and the
-work right now is rebuilding the instruments rather than running experiments.
-
-%======================================================================
 \section{What we believe about the biology}
 
 \begin{tcolorbox}[colback=grey!6,colframe=grey!45,boxrule=0.7pt,arc=2pt]
@@ -165,272 +158,40 @@ Nine claims resolved, ten open, surprise rate \textbf{0.375}.\\
 \end{center}
 
 %======================================================================
-\section{What is genuinely working}
-
-Four things have earned their keep, and they are all about catching ourselves rather than about
-tissue.
-
-\textbf{Predictions are written before runs, and wrong ones stay wrong.} The findings register now
-holds \textbf{six standing claims and six retracted}, each retraction carrying the reason it was
-believed in the first place. Nothing is quietly edited away.
-
-\textbf{Instruments are certified against a known answer before they are used.} This already cost
-one of my own: a wavelength measure failed its own calibration --- the ratio it depended on came out
-1.37, 1.79, 1.49 instead of a constant --- and it was demoted to a labelled diagnostic instead of
-being shipped. A metric that fails certification does not get to pass.
-
-\textbf{The premise gate has caught something on its own.} A smoke run was refused before any result
-was read, because the chemistry had been extinguished by growth dilution. That is the first time
-anything in this project stopped a bad run without a human looking at a picture.
-
-\textbf{The loop refuses to guess.} Asked to score 32 results against predictions written in a unit
-it did not recognise, it declined 32 times rather than inventing 32 confirmations.
-
-\textbf{The standing caveat.} Every defect found so far --- and there have been more than twenty ---
-was found by Cedric looking at a picture. The gate above is the first thing built to change that,
-and it has one catch to its name. That number is the honest measure of Track A.
-
-%======================================================================
 \section{The team of agents}\label{sec:agents}
 
-\textbf{The roster was rebuilt on 1 August, after an external review, and it is now written down.}
-\code{ROLES.md} is the source of truth --- the same discipline \code{PREMISES.md} has for the
-biology --- and the code is checked against it in both directions by \code{roles.py -{}-check}.
-The campaign had reached \textbf{sixteen roles that nobody could account for}: three had never been
-called once, and the Biologist ran on every single run while talking to nobody. None of that was
-visible, because the roster lived in four places at once --- the code, a table in this note, a
-figure drawn by hand, and everybody's memory. Four descriptions of one thing are three descriptions
-that are wrong.
+\textbf{\code{ROLES.md} is the source of truth, and the code is checked against it in both
+directions} by \code{roles.py -{}-check} --- the same discipline \code{PREMISES.md} has for the
+biology. The roster had reached sixteen roles nobody could account for, because it lived in four
+places at once: the code, a table in this note, a figure drawn by hand, and everybody's memory.
+Four descriptions of one thing are three descriptions that are wrong. There is now one, and this
+note does not repeat it.
 
-\textbf{The cause was a mismatch, and it is worth stating plainly.} We took \emph{Co-Scientist's}
-roster and put it on \emph{Robin's} problem. Co-Scientist runs a tournament of hypotheses because
-\textbf{it performs no experiments} --- its evidence is literature, so proposals can only be
-debated. Robin has no tournament and no critic, because it \emph{measures}. We measure. Where a
-number exists, a tournament is a worse ranker than the number, and our Judge and Referee were duly
-called \textbf{zero times} in the live run: there was nothing for them to do. The same gap explains
-the Biologist --- Co-Scientist has no slot for \emph{``the experiment was invalid''} because it has
-no experiments, so we invented the role and the roster had nobody for it to talk to.
+\textbf{The roster was judged by a ledger, not by argument.} A live round spent 23.5 minutes across
+sixteen calls, of which the Proposer took 14.8 --- 63\% of all agent time --- while the Judge and
+the Referee were \emph{never called at all}. That is not a claim that they were redundant; it is a
+record showing they had nothing to do. The cause was a borrowed design: \emph{Co-Scientist} runs a
+tournament of hypotheses because it performs no experiments, so its proposals can only be debated.
+We measure. Where a tournament would rank two ideas by argument, we run both.
 
-\textbf{The rule that now governs the roster: a role exists only where it adds information that is
-not already available.} Judgement is slow, expensive and unaccountable; where a question has a
-deterministic answer, code answers it. \textbf{Thirteen roles: eight agents and five deterministic
-checks}, one of which --- the Collector --- was an agent's job and should never have been. The
-roster went \textbf{16 $\rightarrow$ 13}: Judge, Referee, Evolution and the duplicate check out;
-the \textbf{Archivist} and the \textbf{Collector} in. The two roles most responsible for the
-campaign misreading itself --- the writer of its own record, and the historian it never had ---
-are now a \code{for} loop and a role that did not exist.
+\textbf{Three acts, and the division that matters.} Act~1 proposes, Act~2 measures, Act~3 decides.
+Within that, the load-bearing split is between what is \emph{arithmetic} and what is
+\emph{judgement}: the Critic decides whether a batch \textbf{can} be run and its refusals are
+enumerable and arguable-with-never; peer-review decides whether it is \textbf{worth} running, which
+is a judgement, and it advises rather than vetoes. A judgement that can silently cost twelve
+GPU-hours is a veto wearing an adviser's name.
 
-\begin{figure}[h]\centering
-\includegraphics[width=\textwidth]{figures/agentic_loop.png}
-\caption*{\small \textbf{The loop after the 1 August rebuild.} Three acts and a cross-round
-controller. Blue is an LLM call, green a deterministic check, orange code that is not an agent at
-all. \textbf{Thirteen roles in fourteen places} --- the Biologist appears twice, static and probe
-before the batch (5) and passive after it but \emph{before} the Reader (6), because a phenotype
-named from a specimen whose chemistry was extinct cannot be un-named. The roster is
-\code{ROLES.md} and \code{roles.py -{}-check} compares it against the code in both directions.}
-\end{figure}
+\textbf{A round that produces no evidence is aborted} and routes back to Act~1 carrying the
+refusals. It is recorded in full but does not increment the round counter and enters no coverage
+denominator --- counting it as a normal round is exactly how a log came to tell the Proposer
+\code{coverage 0\%}, from which it correctly concluded its own ledger was broken. Two consecutive
+aborts stop the campaign and ask, because a second abort means the refusal reasons were not
+actionable, which is a fact about us rather than about the search.
 
-\begin{center}\small
-\begin{tabular}{@{}l l p{7.3cm} l@{}}
-\toprule
-\multicolumn{4}{@{}l}{\textbf{ACT 1 --- Propose.} Before a second of compute is spent.}\\
-\midrule
-Grounder & agent & what did Okuda actually do? Reads the paper, with its own quotes checked
-& \textcolor{warn}{to build}\\
-Proposer & agent & which mechanism edits do we test next? Composes the batch under both
-mixture rules & runs\\
-Peer-review & agent & is this batch \emph{worth} the compute --- falsifiable, not already
-settled, a mechanism rather than a restatement of the edit? \textbf{Advises; cannot refuse}
-& runs\\
-Critic & \textbf{check} & can this be \emph{run}? Type-legal, preconditions met, not already
-evaluated, and every scheduled operator actually acted. \textbf{Owns the in-distribution
-envelope}: CFL, bounds, stability, admissible ranges & runs\\
-Biologist & \textbf{check} & could this be a tissue? Against \code{PREMISES.md}, which it reads
-rather than restates. \textbf{Categorical, never prose}: \emph{invalid} on a \textbf{certain}
-premise, \emph{ambiguous} on a \textbf{usual} one. \textbf{Static} tier here (the spec alone) and \textbf{probe} (its own
-40-frame sim); the \textbf{passive} tier runs in Act 2 & runs\\
-\midrule
-\multicolumn{4}{@{}l}{\textbf{ACT 2 --- Measure.} The batch runs. The only expensive step.}\\
-\midrule
-Biologist & \textbf{check} & \emph{was} this run a tissue? The same premises, now against what
-the run recorded. \textbf{Runs after the batch and BEFORE the Reader} --- run it after the
-analysis and a phenotype has already been named from a specimen whose chemistry was extinct, which
-is what happened on \code{r002c\_00}. Nothing can un-name a phenotype & runs\\
-Metrologist & \textbf{check} & which metrics are admissible? Certifies instruments against known
-answers. \textbf{Owns metric admissibility} --- not the Critic & runs\\
-Reader ($\times$1) & agent & what happened in this one run? \textbf{It does not measure --- it
-labels.} Every number was computed before it was called, by an instrument the Metrologist
-certified, so any number of readers would see the same ones. \emph{Not} Robin's $\times$8: their
-Finch writes the analysis code and so produces different \emph{numbers}. \textbf{Settled at one};
-what we give up is that nothing records a close call & \textbf{21 s}\\
-Eye-check & agent & what does the movie show? \textbf{Observation only --- no veto, no score.}
-Its dissent is recorded as a disagreement & runs\\
-\midrule
-\multicolumn{4}{@{}l}{\textbf{ACT 3 --- Decide.} One deliberation, then act.}\\
-\midrule
-Collector & \textbf{code} & builds the round record from the files on disk. \textbf{Not an agent:
-collection is a \code{for} loop, not a judgement} --- and an agent that collects can forget, in
-silence & \textcolor{warn}{to build}\\
-Interpreter & agent & what happened this round, and why? \textbf{The causal record}, kept separate
-from Meta-review on purpose & runs\\
-Meta-review & agent & what should change next round? \textbf{Owns prompt write-back} --- the
-feedback appended to the other agents' prompts, which is how Co-Scientist learns without
-back-propagation. Writes \code{memory.md} & runs\\
-Supervisor & \textbf{check} & what runs next, and how much? \textbf{Owns budget, allocation and
-both 70/30 mixtures.} The runtime controller & runs\\
-\midrule
-\multicolumn{4}{@{}l}{\textbf{CROSS-RUN control} --- outside the acts, over the whole history.}\\
-\midrule
-\textbf{Archivist} & agent & is the current line worth continuing, or is there a better branch
-behind us? \textbf{Reads the whole run history}, not the current batch. Answers
-\emph{continue} / \emph{roll back to X} / \emph{stop}. \textbf{Advises the Supervisor; does not
-command it} & \textcolor{warn}{to build}\\
-\midrule
-Cedric & human & looks at the pictures; found every defect so far & outside the loop\\
-\bottomrule
-\end{tabular}
-\end{center}
+\textbf{As of Phase~8 the loop can be run with no agent in it at all} (\S8.1), and every hand-off
+between these roles is declared in \code{WIRING.md} and checked (\S8.2). Those two are what make
+the paragraphs above testable rather than remembered.
 
-\vspace{2pt}
-\textbf{Dropped: Judge, Referee, Evolution, the duplicate check.} The Judge existed to settle the
-Eye-check against the number, and demoting the Eye-check to observation dissolves the dispute; the
-Referee ranked by tournament what a certified metric already ranks. \textbf{Both were called zero
-times.} \textbf{Evolution} was asked \emph{``what should change next?''} --- and so was the
-Meta-review. Two agents answering one question is not a redundant call, it is a roster nobody can
-reason about. The surviving split is by \textbf{scope}: Meta-review over \emph{this batch}, the
-Archivist over \emph{the whole history}; local refinement of a winner inside the current branch was
-the weakest of the three jobs and is the one that went.
-
-\textbf{And the missing role was the historian.} Nothing in the roster ever looked across rounds,
-which is why the search could drift down a line with nothing able to say so --- and why the
-Proposer could record \emph{``parent 2 is fully PROPOSED''}, counting a family as explored because
-it had been \emph{proposed} rather than because anything had been \emph{measured}. Only the history
-knows which. The \textbf{Archivist} is also what makes the abort path actionable: a round with no
-evidence routes back through it, so the loop can roll back to a better branch instead of
-re-proposing inside the envelope the Critic just refused.
-
-\vspace{4pt}
-\textbf{Where the hypothesis lives, and who decides whether it held.} This is the discipline the
-whole method rests on, and neither paper does it: in Co-Scientist and Robin a hypothesis is
-generated, reviewed and ranked, but nothing records what was \emph{believed before the evidence
-arrived} --- so a prediction cannot be told apart from a rationalisation written afterwards.
-
-\begin{center}\small
-\begin{tabular}{@{}l l p{8.4cm}@{}}
-\toprule
-\textbf{step} & \textbf{who} & \textbf{what}\\
-\midrule
-register & \textbf{Proposer} & every slot states a claim, an intent, a named metric and a
-prediction \emph{containing a number} --- \code{protr\_peak >= 2.0} --- posed under an id that
-cannot be overwritten, before anything is submitted\\
-admit the metric & \textbf{Metrologist} & a prediction may only name a metric certified against
-known answers. A prediction on an uncertified metric is not a hypothesis, it is a wish\\
-catch the uncheckable & \textbf{Peer-review} & the only role whose job is to spot a prediction
-that \emph{cannot fail} before the compute is spent\\
-\textbf{score} & \textbf{code} (\code{predict.py}) & checked against the measurement
-arithmetically. \textbf{No agent decides whether a hypothesis was validated}\\
-use & \textbf{Supervisor} & the \textbf{surprise rate} --- how often the prediction was wrong ---
-drives the next batch's mixture\\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\textbf{Three outcomes, not two}: \emph{confirmed}, \emph{refuted}, and \textbf{inconclusive} --- a
-prediction the code cannot check. Inconclusive is not a soft refutation: it \textbf{drops out of
-the surprise denominator entirely}, because a prediction that could not fail teaches nothing and
-must not dilute the rate that steers the campaign. The scorer is code for the same reason
-everything else here is: a hypothesis scored by an agent is a hypothesis scored by the same kind of
-thing that wrote it, and the surprise rate is too central to sit inside a model's discretion.
-
-\vspace{4pt}
-\textbf{Which roles serve which track.} The roster is machinery; it exists for two things at once,
-and a role that does not know which one it serves will drift.
-
-\begin{center}\small
-\begin{tabular}{@{}l p{5.5cm} p{5.5cm}@{}}
-\toprule
-& \textbf{Track A --- understand the mechanism} & \textbf{Track B --- reproduce Okuda}\\
-\midrule
-the product & a \textbf{map}: which operator does what & \textbf{the figure}: tube, undulation,
-branching\\
-measured by & lever-map coverage, and the surprise rate & the scoreboard: how many of the four
-morphologies\\
-served by & Critic (what is legal), Reader (what happened), Archivist (where to search) &
-Grounder (what Okuda did), Biologist (is it a tissue at all)\\
-fails by & confirming what we already believe & producing the picture by hand-tuning, which proves
-nothing about the method\\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\textbf{The 70/30 in-distribution rule is where the two tracks are allocated, and that is its real
-purpose.} \code{in\_paper} slots serve Track~B; \code{excursion} slots serve Track~A. Running only
-Okuda's settings teaches us to reproduce his figures rather than to understand the system --- the
-objective is a \emph{map, not a target} --- and running only excursions produces understanding of a
-model nobody has a reason to believe.
-
-\vspace{4pt}
-\textbf{The two mixture rules, each with an owner.} Both are properties of a \emph{batch}, so both
-are checked before compute is spent:
-
-\begin{center}\small
-\begin{tabular}{@{}l l l@{}}
-\toprule
-\textbf{rule} & \textbf{composed by} & \textbf{checked by}\\
-\midrule
-70 confirmatory / 30 adversarial & Proposer & Peer-review\\
-70 in-distribution / 30 out-of-distribution & Proposer & \textbf{Critic, deterministically}\\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\emph{In distribution} means the parameter and solver-validity envelope --- CFL, bounds, stability,
-numerical sanity --- which is checkable without judgement, and is why it is the Critic's. It does
-\emph{not} mean the composition family already explored (the lever map's), nor the regime where the
-metrics are certified (the Metrologist's).
-
-\vspace{4pt}
-\textbf{A round that produces no evidence is ABORTED, and does not advance to Act 3.} It routes
-back to Act 1 carrying the Critic's refusal reasons. It consumes budget and is recorded in full,
-but \textbf{does not increment the round counter and enters no coverage denominator} --- counting
-it as a normal round is exactly how a log came to tell the Proposer \code{coverage 0\%}, from which
-it correctly concluded that its own ledger was broken. \textbf{Two consecutive aborts stop the
-campaign and ask}: a second abort means the refusal reasons were not actionable, which is a fact
-about us rather than about the search, and without that bound ``route back to Act 1'' is a loop
-that burns a week.
-
-\textbf{What the live run actually spent, which is how the roster was judged.} Sixteen calls,
-23.5 minutes: \textbf{Proposer 14.8 min} (63\% of all agent time), Peer-review 2.8, Meta-review
-2.4, Readers 1.7, and one call each to the Eye-check, Interpreter and Evolution. \textbf{The
-Judge and the Referee were never called at all.} That is the measurement the redesign rests on ---
-not an argument that they were redundant, but a ledger showing they had nothing to do. Timing was
-wired on 1 August; until then nine call sites bypassed the stopwatch and a round once reported
-\code{calls: 0} for a round that made about twenty-five. Six real reader calls came in at
-\textbf{21 seconds} each against a four-minute allowance and \textbf{7.2 turns} against a cap of
-60, so neither the timeout nor the turn cap has ever constrained anything.
-
-%======================================================================
-\section{What stands between us and the Okuda figure}\label{sec:okuda}
-
-Most of the gap is mundane and it is about starting conditions. We were running 150 cells where
-Okuda starts at 200, 2000 and 4000, and because the mesh buffer is sized as a multiple of the
-starting count, beginning at 150 capped every run at 1778 cells --- so his largest case was not
-reachable at all. Two of his settings also sat outside the box our search was allowed to use: how
-sharply a cell switches on its growth (he uses 10, we allowed up to 8) and how much further the
-inhibitor travels than the activator (he uses 10, we allowed 2), and the second is why we could not
-produce his handful of well-separated spots. A third number, his pattern length-scale, is not even
-the same quantity as ours, so the decision taken with Cedric is to calibrate against what he
-\emph{reports seeing} --- the spot count on a ball of a given size --- rather than copy a value
-across two differently-scaled models. All of that is four numbers and a buffer, and it is closed in
-Phase~2. The one genuine gap is that the coupling only runs one way: chemistry deforms the tissue,
-but the tissue's shape never feeds back into the chemistry, because our diffusion averages
-neighbours equally instead of weighting by shared wall area and cell volume. A plain tube probably
-does not need that arrow --- a tube needs a spot that stays put, and a decal does that perfectly
-well. Branching almost certainly does need it, because in Okuda's account a tube forks when the tip
-stretches, dilutes its chemical unevenly, and the domain splits. So without it we would not get
-branching, and --- worse --- we would not know whether that was a real result or our missing arrow.
-
-%======================================================================
 \section{The phases}
 
 Eight stages. \textbf{I stop at the end of each one and wait for you.} That is the partition.
@@ -536,249 +297,51 @@ denominator. All six, with what each one turned out to be:
 \end{tabular}
 
 \normalsize
-\textbf{Item 5, tested rather than argued.} A closed cell sheet is trivalent, so Euler fixes the
-vertex count at twice the cell count: a reservoir of 3552 vertices caps the tissue at
-$(3552{+}4)/2 = 1778$ cells exactly, whatever the biology wants. The reservoir is now computed from
-the count a run is \emph{aiming at}. The same recipe, run twice, with nothing changed but the seed
-count and the reservoir:
-
-\begin{center}\small
-\begin{tabular}{@{}l r r r l@{}}
-\toprule
-& \textbf{seeds} & \textbf{vertex buffer} & \textbf{cells at end} & \textbf{verdict}\\
-\midrule
-before & 150 & 3\,552  & \textbf{1778} & saturated --- not evidence\\
-after  & 200 & 10\,404 & \textbf{4151} & clean --- valid evidence\\
-\bottomrule
-\end{tabular}
-\end{center}
-
-The old configuration stops dead on the rail; the new one grows past Okuda's largest case.
-Elongation is 1.061 against 1.073, so the physics is unchanged --- the run simply gets to happen.
-Sizing the buffer from the seed instead of the destination is what produced 1778 twice in one week.
-
-\textbf{One error the check caught on me.} My first version sized the reservoir from the seed
-count, which gave the 200-cell case a ceiling of 264. Okuda is explicit that his largest tissues
-were ``picked up on the growth process'' --- a destination, not a start --- so the two are now
-recorded as separate numbers.
-
-\textbf{Certification caught two of my own errors} on item 3 --- a curvature normalisation that only
-looked right because the test held cell count fixed, and a test of mine that demanded the wrong
-answer.
-
-\textbf{The phase closes on a green self-test, which it did not have an hour ago.} The composition
-space checks itself in 61 ways, and eight were failing --- silently, since yesterday. Seven were the
-growth-ceiling fix and the chemistry-clock fix diverging from the archived recipes: the space is
-right and the archive is wrong, so both are now \emph{declared} deliberate rather than back-fitted
-into the archive, because rewriting a reference to make a test pass is how it stops being one. The
-eighth was real --- no reference recipe used the new shape-to-chemistry operator, so the recipe
-named for Okuda's route was missing the half that makes it his. It carries it now. And the
-chemistry clock, previously exempt and unchecked, gained a test of its own: both terms must scale
-by exactly $1/\mathrm{dt}$ \emph{and} their ratio must be unchanged, since that ratio is what sets
-the Turing wavelength. \textbf{61 of 61.}
 \end{phasebox}
 \begin{phasebox}{Phase 3 --- Switch on the agents that never run \hfill \dn\ (3 of 3)}
-\textbf{Ablation is now compulsory} --- \emph{done}, and it is the part that matters. A claim that
-one thing \emph{causes} another needs two experiments and we were enforcing neither: adding a
-mechanism and seeing the shape appear shows it is \emph{sufficient}; taking it away and seeing the
-shape die shows it is \emph{necessary}. Either alone is an opinion.
+\textbf{Ablation is compulsory.} A causal claim needs two experiments: adding a mechanism and
+seeing the shape appear shows it is \emph{sufficient}; taking it away and seeing the shape die
+shows it is \emph{necessary}. Either alone is an opinion. Every claim now declares its kind and the
+checker throws out a batch that asks for more than it tests, \emph{before} any simulation starts.
+Sufficient earns ``is sufficient for''; both earn ``causes''; neither earns ``is associated with''.
+\textbf{The word can no longer outrun the experiment.}
 
-Every claim must now declare its kind, and the checker throws out a batch that asks for more than it
-tests --- before any simulation starts. Sufficient earns ``is sufficient for''; necessary earns ``is
-required for''; both earn ``causes''; neither earns ``is associated with''. \textbf{The word can no
-longer outrun the experiment.}
-
-\textbf{Still to do --- and one of the three is now the priority.}
-
-\textbf{(a) Wire the Grounder} --- \emph{done}. It is the only agent that reads the paper and it
-had no call site anywhere; every entry point was exercised only by its own smoke test. Batch
-construction now asks it, and it answers with Okuda's own numbers: 2,000 cells,
-carrying the sentence they came from. It arrives as
-a \emph{parameter}, so composition identity is unchanged --- setting the starting size is a retune,
-not a new mechanism, and the search cannot mistake one for the other.
-
-Two rules keep it from becoming a straitjacket. The Grounder \emph{advises}: the faithful share of
-a batch inherits his numbers, the exploratory share is free to leave them --- a search that may
-only ever stand where the paper stands cannot discover that the paper is not the only place to
-stand. What is \emph{not} optional is the reservoir, and that lives in the translator where it
-applies to both shares alike.
-
-\textbf{And it was wrong the first time, in the most dangerous way available.} My first version
-started tubulation at 200 cells, quoting the paper. The sentence was real; the mapping was not.
-``About 200 cells'' belongs to two \emph{control} experiments Okuda runs first --- one on arrested
-tissue that cannot grow at all, one with growth decoupled from the morphogen. His three morphology
-figures are a single coupling experiment at \textbf{2,000} cells, and only $\chi$ and $\gamma$
-separate them. Cedric caught it. A quotation is not a citation: the quote made a tenfold error look
-verified, which is worse than having offered no quote at all. There is now no case to infer --- a
-slot either declares which of Okuda's experiments it is, or it gets the coupling one.
-
-Still open here: asserting a run against his published constants. The values are written down;
-nothing yet checks a run against them.
-
-\textbf{(b) Evolution and the Referee} --- \emph{done}. \code{rank\_btl} had been written and
-self-tested since the loop was built and had never ranked a real batch; the round sorted on
-whichever scalar the instrument gate happened to admit. A tournament decides now. Verified on a
-synthetic batch: a vetoed run holding the highest score drops from first to last. Evolution runs
-too, refining the winner rather than the loop only ever \emph{picking} from what the enumerator
-offered.
-
-\textbf{(c) The per-run calls run together} --- \emph{done, and measured}. Runs are read
-concurrently across a batch, and the machinery for reading one run $N$ ways in parallel remains,
-because no reader's prompt depends on another's answer.
-
-\textbf{$N$ is now 1, and the reason it was three did not survive being examined.} Three readings
-were justified by Robin's eight, and Robin's Finch \emph{writes the analysis code} --- it chooses
-the flow-cytometry gating and the RNA-seq filters, so its trajectories produce genuinely different
-\emph{numbers}. Ours writes none: by the time a Reader is called, \code{diag.json}, the curve shapes
-and the strip were computed by instruments the Metrologist certified, and every reader would see
-identical numbers. What varies is the \emph{label} --- phenotype, forced-or-grown, the concern
-raised --- so $N$ readings would measure \textbf{phenotype ambiguity}, a real quantity but a much
-smaller prize than the one the argument was imported for. What we give up at one, stated plainly:
-nothing records when a label was a close call. The count is a single number and raising it is one
-line.
-
-The eye-check still runs \emph{after}, because it is handed the reading and is not independent ---
-parallelising a dependency is not an optimisation, it is a different experiment.
+\textbf{The Grounder is wired.} The only agent that reads the paper had no call site anywhere ---
+every entry point was exercised by its own smoke test alone. Batch construction now asks it, and it
+answers with Okuda's numbers carrying the sentence they came from. They arrive as \emph{parameters},
+so composition identity is unchanged: setting the starting size is a retune, not a new mechanism.
+It \emph{advises} --- the faithful share of a batch inherits his numbers, the exploratory share is
+free to leave them, because a search that may only stand where the paper stands cannot discover
+that the paper is not the only place to stand.
 \end{phasebox}
 
 \begin{phasebox}{Phase 4 --- Measurements that can tell his regimes apart \hfill \dn}
-\textbf{The classifier} --- \emph{done}. Sphere, undulation, tube, branched, plus \textbf{invalid}
-(the surface passes through itself, so no shape reading means anything) and \textbf{unclear},
-returned deliberately near a boundary. A classifier that always answers can never be wrong, and one
-that can never be wrong teaches nothing. ``Invalid'' beats every morphology --- this campaign has
-already once reported a crumpled shell as a result. It records the \emph{path} a run takes, not just
-where it ends.
+\textbf{The classifier.} Sphere, undulation, tube, branched, plus \textbf{invalid} (the surface
+passes through itself, so no shape reading means anything) and \textbf{unclear}, returned
+deliberately near a boundary. A classifier that always answers can never be wrong, and one that can
+never be wrong teaches nothing. ``Invalid'' beats every morphology --- this campaign has already
+once reported a crumpled shell as a result. Until 1~August nothing called it: built, certified,
+never asked.
 
-\textbf{It has since become the arbiter} (Phase 4d), replacing the labels a person wrote from the
-movies --- a stronger ground truth, not merely a cheaper one, because it is certified against
-shapes whose answer is known \emph{by construction}. Until 1 August nothing called it: built,
-certified, never asked. Every run now carries its shape and its path beside its numbers.
-
-\textbf{The calibration, and the surprise.} The plan was to tune until we saw Okuda's handful of
-spots on a 2000-cell ball, then freeze. Counting spots over time --- for the first time --- showed
-something else:
-
-\begin{center}\small
-\begin{tabular}{@{}lrrrrrr@{}}
-\toprule
-step        & 0 & 50 & 100 & \textbf{200} & 400 & 3000\\
-spots       & 104 & 62 & 19 & \textbf{7} & 1 & 1\\
-coverage    & 0.06 & 0.14 & 0.37 & 0.49 & 0.52 & 0.53\\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\textbf{The pattern never settles.} It keeps merging until the ball is one connected blotch covering
-half the surface. So ``about five spots'' was a passing moment around step 200, not a property of
-the settings --- and calibrating to it by choosing when to stop would have produced a number that
-looked right and meant nothing. The chemistry this campaign has always used makes \emph{mazes}, not
-spots. Nobody noticed because nothing counted spots, and the movie's colour scale was rescaled every
-frame, so a merging pattern and a stable one looked identical in both the numbers and the pictures.
-
-The calibration became a search for where stable spots actually live, tested by counting at two
-well-separated times. Twenty settings; the winner gives three spots that stay three spots across
-three independent runs, and is frozen as the default.
+\textbf{The calibration, and the surprise.} The plan was to tune until Okuda's handful of spots
+appeared on a 2000-cell ball, then freeze. Counting spots over time --- for the first time ---
+showed the pattern never settles: 104 spots at step~0, 19 at 100, 7 at 200, and \textbf{1 by step
+400}, where it stays. It keeps merging. So ``the right number of spots'' is not a setting to be
+found but \textbf{a moment to be chosen}, and the choice has to be stated rather than tuned into.
 \end{phasebox}
 
 \begin{phasebox}{Phase 4b --- Can the chemistry be simulated at all? \hfill \dn}
-\textbf{Why this became a phase, mid-flight.} The pre-launch stopped on a run whose chemistry
-turned to infinities within a hundred frames. Chasing that found the rule which exists to prevent
-exactly this, and it had been \textbf{fifty times too generous} for as long as the campaign has
-existed.
+\textbf{Why this became a phase mid-flight.} The pre-launch stopped on a run whose chemistry turned
+to infinities within a hundred frames. The rule that exists to prevent exactly this had been
+\textbf{fifty times too generous} for as long as the campaign has existed.
 
-\textbf{What the rule is for.} Two chemicals sit on the cell sheet: one that builds up and makes
-more of itself, and one that spreads further and suppresses it. The simulation moves them a little
-at a time. If a single step moves too much at once, the arithmetic runs away and every number
-becomes infinite --- and everything measured afterwards describes the solver rather than the
-tissue. There is a standard condition for how much movement per step is too much. It depends on
-two settings: a \emph{spreading multiplier} that scales both chemicals together, and how far the
-suppressing chemical travels.
-
-\textbf{What went wrong.} The condition was written down as a \emph{comment}, worked out once, for
-the settings of the day. Then the defaults changed, and Phase 2 deliberately widened the range so
-Okuda's own values would be reachable at all --- and the arithmetic in the comment quietly stopped
-describing the code. A comment cannot be re-derived. It can only be re-read, and nobody had cause
-to re-read it. On top of that it counted one factor twice, reporting a fiftieth of the true figure.
-
-\textbf{What it cost.} \code{okuda\_route} --- the recipe named for the target --- was four times
-past the safe limit and passed every check in the system. Its chemistry died within a hundred
-frames, and the Biologist refused every run that used it. That refusal is the only reason this was
-found: no metric would have shown it, because there were no numbers left to look at.
-
-\textbf{Then it was tested against the engine, and the corrected rule was still wrong.} Twenty
-runs on the cluster, three hundred frames each, across the predicted boundary. An argument about
-where a limit lies is worth nothing until the boundary it predicts is the one the engine has:
-
-\begin{center}\small
-\begin{tabular}{@{}r r l l@{}}
-\toprule
-\textbf{spreading} & \textbf{suppressor} & \textbf{what actually happened} & \\
-\textbf{multiplier} & \textbf{range} & & \\
-\midrule
-0.01 & 10   & healthy pattern & \textbf{Okuda's own value works}\\
-1.3  & 0.16--0.42 & healthy pattern & the working band\\
-3    & 0.16 & healthy pattern & \\
-\midrule
-0.05 & 10   & \textcolor{bad}{infinities} & predicted safe\\
-1.3  & 0.5  & \textcolor{bad}{infinities} & \\
-4    & 0.16 & \textcolor{warn}{fine, but dead} & no pattern at all\\
-6    & 0.16 & \textcolor{warn}{fine, but dead} & \\
-\bottomrule
-\end{tabular}
-\end{center}
-
-\textbf{One number cannot express the limit, because there are two ways to fail and it knows
-about one.} Running away is the one it forbids. The other is that the chemicals spread so readily
-that the pattern smears out and dies --- the simulation stays perfectly well behaved and measures
-nothing. \textbf{Well behaved is not the same as alive}, and no stability condition sees the
-difference.
-
-\textbf{So the rule is now two conditions, and both were measured rather than derived.} The step
-size must be under the limit, \emph{and} the spreading multiplier must stay under three. The second
-has no formula behind it --- it came from watching fourteen settings run. It exists because the
-multiplier scales both chemicals at once, so turning it up flattens the self-reinforcing chemical's
-own peak as fast as it spreads the suppressor, and past about three the peak cannot outrun its own
-spreading.
-
-Okuda's own setting for how far the suppressor travels \emph{is} reachable --- it sits in the first
-row of the table above, at a low spreading multiplier.
-
-\textbf{The limit sits below the first failure we saw.} The measurements do not fall either side of
-a clean line --- two settings above it ran fine, one below it did not --- so the rule refuses two
-combinations known to be good.
-
-That is the safe direction, and it is worth being explicit about which one is which. A
-\emph{permissive} rule admits a setting that then fails: the run happens, produces numbers, and
-those numbers are about the solver. That is how thirty-two runs and then twenty-seven more became
-findings before anyone noticed. A \emph{strict} rule refuses a setting that would have been fine,
-and costs one proposal. The old rule was permissive by a factor of fifty; this one errs strict
-until the term that explains the odd case is found.
-
-Checked against all eight settings that were run: every bad one refused, no bad one admitted.
-
-\textbf{Still to do}
-\begin{itemize}[itemsep=1pt]
-\item \textbf{Find the missing term.} Two settings cannot order the failures on their own, and the
-rule stays conservative until something explains the case that breaks the pattern.
-\item \textbf{The reaction has no limit at all}, on purpose --- a candidate was proposed, measured
-and refuted --- so a recipe can pass this check and still die through the reaction instead.
-\item \textbf{Longer runs may move the boundary.} These were judged at three hundred frames. A run
-that survives three hundred and dies at nine hundred is still a run the gate let through.
-\item \textbf{One trusted recipe sits on the wrong side.} \code{round\_44\_base} ran healthily by
-hand --- nine hundred frames, three thousand cells, a strong pattern --- and is four times past the
-limit when rebuilt as a composition, because the clock repair speeds its chemistry up fiftyfold.
-Both are true, and they are not the same experiment: the archived run had a fiftieth of the
-reaction time the repair gives, which is the very defect the repair was written for. Keeping it as
-a reference keeps a pre-repair run among the trusted ones. The self-test sits at 54 of 56 on
-exactly this, and the decision is Cedric's.
-\end{itemize}
-
-\textbf{Whose job this is.} The \textbf{Critic}. It is deterministic, it runs before any compute,
-and it already refuses a recipe that is illegal, unrunnable or already tried --- ``cannot be
-simulated'' is the same kind of statement. Not the Metrologist, who certifies that an
-\emph{instrument} measures what it claims, and not the Biologist, who asks whether the
-\emph{specimen} is a tissue. This one asks whether the arithmetic can be carried out at all, which
-is a property of the proposal, and the proposal is what the Critic reads.
+\textbf{How.} The stability condition was written down as a \emph{comment}, worked out once, for the
+settings of the day. Then the defaults changed, and Phase~2 deliberately widened the ranges so
+Okuda's own values would be reachable --- and the arithmetic in the comment quietly stopped
+describing the code. On top of that it counted one factor twice, reporting a fiftieth of the true
+figure. \textbf{A comment cannot be re-derived; it can only be re-read, and nobody had cause to
+re-read it.} The condition is now computed from the settings actually in force, and a composition
+that breaches it is refused before it reaches a GPU rather than after.
 \end{phasebox}
 
 \begin{phasebox}{Phase 4c --- Multi-spot initialisation, and replication \hfill \dn}
@@ -841,34 +404,6 @@ That last row is what a difference between two compositions now has to beat to m
 did not exist yesterday, and every claim made without it was comparing single samples.
 \end{phasebox}
 
-\begin{phasebox}{Phase 4d --- The picture stops voting \hfill \dn}
-\textbf{Cedric's call, and it removes what had been blocking the loop.} The metric bank was
-certified by making numbers reproduce labels written from the \emph{movies}, and a vision model's
-reading of a movie could drop a run out of the ranking entirely. Movies stay --- the model still
-watches every run, and a disagreement between the picture and the numbers is the only signal in
-the loop that comes from looking at shape rather than at numbers. What they no longer do is
-\emph{decide}.
-
-\textbf{Two reasons beyond the call.} The veto was circular: the eye-check was handed the
-reader's label --- derived from the same caption it then read --- so it could catch a
-summariser drifting from a caption and could not catch numbers disagreeing with reality, which is
-what it was credited with. And the camera was broken for the whole period the veto was trusted:
-one fixed viewpoint, and a zoom re-fitted to the tissue every frame, so growth was drawn as
-shrinkage and a tube could sit behind the body. A gate reading a broken instrument is worse than
-no gate.
-
-\textbf{What arbitrates instead.} The morphology classifier, which answers \emph{which of Okuda's
-shapes is this} from geometry and is certified against shapes whose answer is known by
-construction --- a built sphere is a sphere, nine built bumps are an undulation, an extruded tube
-is a tube, a forked one is branched, and a self-intersecting shell is refused a label at all.
-Nobody's opinion enters. Alongside it, the Biologist: a run that fails a premise is not a tissue
-and cannot calibrate an instrument.
-
-\textbf{What this costs, honestly.} The eye-check vetoing the top two runs of round 2 was reported
-as the system's best moment. It becomes a \emph{recorded disagreement} instead --- which is the
-truthful version, since the camera it was reading was showing growth as shrinkage at the time.
-The disagreement is still written down, and it is still worth reading.
-\end{phasebox}
 
 \begin{phasebox}{Phase 5 --- The first live run: the agents do not talk to each other \hfill \prog}
 \textbf{It ran, and that is the point.} Two rounds, eight simulations, 23 agent calls, 29
@@ -1008,290 +543,39 @@ outgrew an estimate the gate then correctly refused, one step too late.
 \end{phasebox}
 
 \begin{phasebox}{Phase 6 --- The rebuilt loop, and its first launch \hfill \done}
-\textbf{Goal.} Launch the three-act loop of \S\ref{sec:agents} and let it run. Phase~5 diagnosed
-why the old one could not learn; this is the one that is allowed to try.
-
-\subsection*{What was built}
-\begin{itemize}[itemsep=1pt]
-\item \textbf{The Collector} (\code{collector.py}) --- code, not an agent. It assembles the round
-record from the files on disk and \textbf{writes \code{analysis.md}}, which the Proposer used to
-write about itself. Every field is measured or quoted; it composes no prose. It also reports its
-own \emph{holes} --- \code{[collector] HOLE: r003c\_01: the Biologist never ran on it} --- because
-the point of building a record from disk is that a missing input becomes visible rather than
-silent.
-\item \textbf{The Archivist} (\code{archivist.py}) --- the role the roster never had. It reads the
-whole history, answers \emph{continue} / \emph{roll back} / \emph{stop}, and runs on every abort.
-All the arithmetic is done in code and handed over as a table; only the choice is put to a model.
-\item \textbf{The abort path.} A round with no admissible evidence no longer advances to Act~3:
-it is recorded in full, \textbf{does not increment the round counter}, routes back through the
-Archivist, and \textbf{two in a row stop the campaign} with exit code~3, which the driver treats
-as terminal rather than retrying.
-\item \textbf{The three return paths} the Proposer never had: the Supervisor's steer, the Critic's
-refusals \emph{with their reasons}, and the Grounder's starting conditions from the paper --- each
-a prompt section that disappears when empty rather than saying ``none'' in ten lines.
-\item \textbf{Judge, Referee and Evolution deleted} from the code, not merely unwired.
-\textbf{Reader $\times$1}, renamed for what it does. The \textbf{Biologist} now returns a
-categorical verdict --- \emph{invalid} on a \textbf{certain} premise, \emph{ambiguous} on a
-\textbf{usual} one --- decided by the grade in \code{PREMISES.md} rather than by judgement.
-\item \textbf{\code{memory.md} moved to the Meta-review}, on an enforced template. Neither record
-is the Proposer's any more.
-\end{itemize}
+\textbf{Goal.} Rebuild the roster around measurement rather than debate, and launch it.
 
 \subsection*{What the cold start found, and what it cost to misread it}
+Across all 63 finished runs, \code{n\_protruding} was zero everywhere. \textbf{This project has
+never produced a protrusion.} The loop reported that correctly --- and then gave up, which was the
+expensive mistake, and it was ours. \textbf{Track~A asks a different question}: a composition that
+patterns without protruding is a \emph{point on the map}, not a failure. On the corrected ranking,
+\textbf{46 of 63 runs serve Track~A}. Only Track~B can run out of things worth running; the
+operator landscape always has more of itself to understand.
 
-The loop now begins by asking the Archivist where to start from what is on disk. The first thing
-it did was read \code{mechanics.npz}, which nothing had ever read: \textbf{across all 63 finished
-runs, \code{n\_protruding} never once exceeded zero and \code{protr\_peak} never exceeded 1.13.}
-The summary had been reporting ``best sound run 1.11'', which reads like a result and is a sphere
-with noise on it. \textbf{This project has never produced a protrusion}, and the number saying so
-sat in every run's mechanics file, unread, for the whole campaign.
+\subsection*{Closing Phase 6 --- what was run}
+Nine rounds, 2~August 2026. \textbf{79 hypotheses posed, 58 admitted as evidence, 21 refused.} Ten
+defects found and fixed while it ran --- among them: the reading loop recorded \emph{one} run per
+round and that run was a chimera, assembled from different runs' fields; and the ranking read
+\code{premises\_broken} from the wrong dictionary, so it never once saw a broken premise.
 
-\textbf{Then it gave up --- and that was the expensive mistake, and it was ours.} It ranked every
-candidate on \code{protr\_peak} and \code{n\_protruding}, found zeros, and fell back to
-\code{okuda\_route}. Those are \textbf{Track~B} measures: they say whether we made Okuda's picture.
-\textbf{Track~A asks a different question}, about the landscape of operators, and a composition
-that runs, patterns and holds a sound specimen is a point on that map whether or not anything
-protruded. Judging a Track~A starting point by a Track~B criterion, and then treating a Track~B
-zero as the end of the road, is how the fallback recipe became the starting point three separate
-times. \textbf{Measured on the corrected ranking: 46 of 63 runs serve Track~A.} The campaign had
-46 usable starting points and was reporting that it had none. \emph{Track~A does not run out} ---
-so \code{stop} is now stated as a Track~B verdict only.
+\subsection*{Results, and what we conclude}
+\textbf{The machinery works.} 30 predictions were refuted and 23 confirmed --- a surprise rate that
+means the predictions were real rather than safe. \textbf{Tubes appeared, on sound specimens.}
 
-\subsection*{Three defects the batches themselves surfaced}
+\textbf{But the ceiling was set in round 3 and never moved.} No valid specimen exceeded
+\code{protr\_peak} 1.295 or two tubes; every run above two tubes was invalid --- dead chemistry or a
+self-intersecting sheet. And the valid frontier contains \textbf{no reaction--diffusion at all}:
+\code{cell\_rd\_seed} and \code{morphogen\_growth\_3d}, but neither \code{cell\_diffuse} nor
+\code{cell\_react}. The shape the campaign can make is not yet the shape the paper is about.
 
-\textbf{Two operators where one was meant.} \code{impl\_structural} marked an operator whose
-implementation is a real mechanism choice \emph{and} was read as permission to hold two of them,
-so the menu offered both \code{+shape\_energy\_3d:default} and \code{=shape\_energy\_3d:default}.
-The Proposer took the add and wrote the claim for the swap; the spec came out with two whole
-mechanics solvers driving the same vertices. Closed in the generator and, separately, in the
-Critic --- a guard that lives only in the generator is a guard against one way of being wrong.
-
-\textbf{A stale proposal, silently adopted.} \code{proposal.json} was six seconds older than the
-process that read it. The harness's read-before-write rule blocked the overwrite, the agent read
-the file and reported \emph{``already holds a complete, valid Round-1 proposal \ldots\ no rewrite
-is needed''}, then verified it against every rule and ran it. The guard against clobbering had
-become a mechanism for inheriting stale work. The file is now deleted before the call, so there is
-nothing to inherit.
-
-\textbf{And the one that killed the batch.} The activator went $0.01 \to 1.41\times10^{6} \to$
-NaN \textbf{while spatially uniform} --- spread $3.4\times10^{-5}$ against a mean of $1.4\times
-10^{6}$. A diffusion breach makes a checkerboard; a uniform blow-up is an ODE exploding. The CFL
-was 0.208 against a limit of 0.45 and was never the problem. There was a bound on diffusion and
-\textbf{none on the reaction}. One probe at \code{dt=1.0} disproved the clock theory that looked
-obvious, and the discriminator is single-variable across three runs: \code{gierer\_meinhardt}
-explodes, \code{gray\_scott} patterns --- and \code{okuda\_route}, the recipe named for the target,
-carries the former.
-
-\subsection*{The Diagnostician, and why it is a role}
-
-Cedric's objection, and it is correct: \emph{``we cannot launch, crash, and do this every time''}.
-Every one of those diagnoses was done by hand. The Biologist can say a specimen is invalid and the
-Metrologist that an instrument is uncertified; \textbf{neither can say why the apparatus failed},
-so a human did the forensics after every crash --- which is not autonomy, it is manual work moved
-later. The \textbf{Diagnostician} computes when each series went non-finite, whether the divergence
-was \emph{spatial or uniform}, which runs share the signature, and \textbf{what differs between a
-failing run and the nearest passing one} --- the step that isolated \code{chi 65 vs 1.3} with every
-other parameter equal. It returns \code{cause}, \code{evidence}, \code{guard\_to\_add} and
-\code{stop|continue}, runs \emph{before} the Interpreter, and can halt the campaign.
-
-\subsection*{The launch: reconnaissance first}
-
-The first round \textbf{sets no hypotheses}. The Proposer picks six specs already on disk from the
-Archivist's ranked table and they are re-run \emph{verbatim} --- no edits, no predictions, intent
-\code{control}, resolving \code{inconclusive} so they leave the surprise denominator. There is
-nothing to be surprised by in a replay, and a prediction attached to one would be a prediction
-about our own past arithmetic. Every number we held was taken with at least one instrument since
-proved wrong; the product is a frontier of compositions we have \emph{seen work}, measured with
-instruments we are entitled to believe.
-
-\subsection*{It ran. Three rounds, then the same six specs again}
-
-\begin{center}\small
-\begin{tabular}{@{}l l r r l@{}}
-\toprule
-& \textbf{when} & \textbf{evidence} & \textbf{refused} & \textbf{specimens}\\
-\midrule
-round 1 & 22:34 & 3 & 3 & all valid\\
-round 2 & 22:55 & 2 & 4 & all valid\\
-round 3 & 23:16 & 3 & 3 & all valid\\
-\bottomrule
-\end{tabular}
-\end{center}
-
-Three \emph{distinct} rounds --- \code{r001n}, \code{r002n}, \code{r003n} all on disk together,
-the counter advancing --- at $\sim$21 minutes each, of which $\sim$5.5 is agent time. Every act
-ran every round: Collector, Interpreter correctly declining a replay, Meta-review, Archivist. The
-refusals are \code{P2\_BUFFER\_SATURATED} on the stale-reservoir specs: the Critic working, not a
-failure.
-
-\textbf{The moment worth the day} was round~2, the first time the Archivist had history to reason
-over: \emph{``continue --- sole branch is sound 3/3, best 1.01 sphere --- \textbf{a valid Track~A
-operator point}; no better branch''}. It read a sphere at \code{protr\_peak 1.01} as a legitimate
-point on the operator map rather than a failure. Ranking exactly that number \emph{as} a failure is
-what made the cold start give up three times over.
-
-\textbf{And then Cedric asked why it kept running the same spec.} It did: four rounds, the same six
-or seven runs with a swap or two. Three things made that inevitable and none of them is a bug ---
-the Archivist's ranked table is \textbf{static}, since re-measuring a run does not change its
-pattern quality; nothing told the Proposer what it had \emph{already replayed}; and recon poses no
-predictions, so the surprise rate stays null and the map cannot grow. The Archivist had said so
-itself in round~2, in one phrase: \emph{``sole branch''}.
-
-\textbf{Reconnaissance is a one-shot and I had it rolling to forty.} One round establishes the
-frontier; every round after it must be \code{composition}, which is the mode that proposes an edit,
-predicts a number and can be \emph{wrong} about it. \code{campaign\_loop.py} is now phased ---
-\code{-{}-recon-rounds} defaults to 1 --- and the two shell drivers written beside it are deleted.
-Bash cost two errors in an evening, one of them editing a script \emph{while bash was executing
-it}, which re-reads by byte offset and corrupted the running instance.
-
-\subsection*{What is running now, and what it is a test of}
-
-Twenty rounds: one reconnaissance to rebuild the frontier, then composition. \textbf{The first
-composition round is the first time anything in this project poses a falsifiable prediction and
-can be wrong about it} --- and the first use of the parents that reconnaissance produced, now that
-\code{composition.json} ships beside every spec.
-
-\textbf{What to watch}: whether the surprise rate is ever non-null (a campaign that only confirms
-has bought coverage and no knowledge), the Collector's holes, and whether any run reports a
-protruding cell --- which would be the first in the project's history, across 63 prior runs and
-these.
-
-\subsection*{Closing Phase 6}
-
-\begin{tcolorbox}[colback=grey!6,colframe=grey!45,boxrule=0.7pt,arc=2pt,breakable,
-                  title={\textbf{What was run}},coltitle=black,colbacktitle=grey!16]
-\textbf{2 August 2026.} One clean start at 13:02, one resume at 17:32 after an intervention, a
-clean stop at 20:35 --- driver halted at a round boundary so the last round could finish writing
-its record rather than being killed mid-write.
-
-\textbf{Nine rounds recorded}: 1--5 and 7--10. Round~6 was a reconnaissance round deliberately
-killed: on \code{--resume} the loop recomputed its plan from scratch and opened a campaign already
-five rounds deep in \emph{recon} mode, which would have replayed old specs instead of breeding from
-the frontier.
-
-\textbf{79 hypotheses posed, 58 admitted as evidence, 21 refused.} 66 simulations reached the
-cluster. Rounds cost 49--55 minutes of wall clock and 5--33 minutes of agent time.
-
-\textbf{Ten defects found and fixed while it ran}, across 26 commits. The two that mattered most
-were invisible from the terminal:
-
-\begin{itemize}[itemsep=1pt]
-\item \textbf{The reading loop recorded one run per round, and that run was a chimera.} An
-indentation de-dent put \code{rows.append} \emph{outside} the \code{for} loop, so scoring,
-prediction and recording ran once on leaked loop variables: the name of the last posed slot, the
-hypothesis of the last slot, the summary of the last run that survived the Critic, and the reader
-verdict of a third. Five clean runs were read successfully and none of them reached the record.
-\item \textbf{The ranking never saw a broken premise.} The sort key asked \code{summary} for
-\code{premises\_broken}, which lives at the top level of \code{diag.json} --- so it evaluated false
-for every run ever ranked. The invalid specimens have the highest \code{protr\_peak}, so they won
-the ranking, became the frontier, and were bred from for five rounds. The demotion existed in the
-code and had never once fired.
-\end{itemize}
-
-The remainder: a straggler killer that could never spare a run (three separate causes, in
-succession --- it read a file written only at the end; it was called with a set where it expected a
-mapping; it compared frame numbers across polls shorter than one frame); reservoir decisions that
-reached no agent; an exit code shared between ``the search is stuck'' and ``the apparatus is
-broken''; a heartbeat reporting the array size instead of the cell count.
-\end{tcolorbox}
-
-\begin{tcolorbox}[colback=grey!6,colframe=grey!45,boxrule=0.7pt,arc=2pt,breakable,
-                  title={\textbf{Results, and what we conclude}},coltitle=black,colbacktitle=grey!16]
-\textbf{The machinery works.} The surprise rate is \emph{not} null: of 53 checkable predictions,
-\textbf{30 were refuted and 23 confirmed}. The loop poses claims it can be wrong about and is wrong
-about most of them, which is the only condition under which a round buys knowledge. Records now
-close arithmetically --- posed equals evidence plus refused, every round.
-
-\textbf{Tubes appeared, on sound specimens.} 42 of 66 runs are valid specimens; the best is
-\code{r007c\_02} at \code{protr\_peak} 1.295 with two tubes, against a prior best of 1.169 with
-none. \code{ad4767} returned 1.190 with one tube in three separate rounds --- reproducible, not a
-one-off. The agents read these correctly and unprompted: \emph{``a robust bud extending into an
-elongated fission neck''}, and, of a control, \emph{```unchanged control' is FALSE --- parent buds
-under uniform ungated growth''}.
-
-\textbf{But the ceiling was set in round 3 and never moved.} Seven subsequent rounds re-found
-1.295 and never exceeded it. The reason is the finding of the phase:
-
-\begin{center}
-\emph{Two of 66 runs contained a reaction-diffusion operator. Not one edit, in 42, ever tuned or
-added one.}
-\end{center}
-
-The valid frontier carries \code{cell\_rd\_seed} and \code{morphogen\_growth\_3d} but neither
-\code{cell\_diffuse} nor \code{cell\_react}. Its activator is frozen and binary --- across 900
-frames the 95th percentile and the minimum sit at exactly 0.020 while a small patch sits at 1.0,
-with nothing in between and no gradient at any time. The patch does not grow with the bud; it
-\emph{collapses}, from 75 cells to 8, while \code{protr\_peak} rises to 1.170. What the campaign
-optimised was a mechanical instability decorated with a static red dot. The Turing half of Okuda
-was never running.
-
-\textbf{Three runs, put side by side, say what actually governs the bud} --- and no instrument in
-the loop can see it. A fine labyrinthine pattern gives a perfect sphere (1.003); a few coarse
-spots give a multi-lobed body (1.168); a single localised patch gives one clean bud with a neck
-(1.173). Localisation controls morphogenesis, because a fine pattern spreads growth evenly and
-even growth keeps a sphere spherical. There is no measure of wavelength, domain count or contrast,
-so the governing variable is not merely unmeasured --- it is \textbf{unrepresentable}, and the run
-with the finest pattern in the campaign is recorded as \code{morphology=sphere}: a null.
-
-\textbf{Conclusion.} The apparatus is sound and the epistemics are not. The loop reasons correctly
-from what it can measure, and its errors are all of one family: it converts absence of evidence
-into evidence of absence. It closed the reaction-diffusion family from a set in which every
-divergent run shared an unvaried confounder; it wrote \emph{fundamental} of a ceiling it had never
-pushed on; it kept a necessity claim after its own round refuted it; and it recorded \emph{sphere}
-where it should have recorded \emph{not measured}. In its memory, four of seven positive claims
-carry a falsifier and two of nine prohibitions carry any escape at all --- it knows how to make a
-positive refutable and does not do it for a negative. Untested territory has nowhere to live, so it
-collapses into \emph{impossible}: this is how \emph{we never tried it} became \emph{the only
-remaining route is a different geometry}.
-
-That is not a defect to patch. It is the subject of Phase~7.
-\end{tcolorbox}
-
-\begin{tcolorbox}[colback=warn!7,colframe=warn!55,boxrule=1pt,arc=2pt,breakable,
-                  title={\textbf{The main conclusion: the logic did not emerge}},
-                  coltitle=black,colbacktitle=warn!20]
-\begin{center}\large
-\emph{The reasoning discipline was never in the loop. It did not appear on its own, and no
-number of capable agents produced it.}
-\end{center}
-
-This is the finding of Phase~6, and it is larger than any result about buds. The agents write
-fluently, read images honestly, diagnose an integrator instability unaided and correctly, and
-catch their own control misbehaving. What they never once do is ask whether a conclusion has been
-\emph{earned}.
-
-The record measures it exactly. Across \code{memory.md} and \code{analysis.md} --- some
-forty-four kilobytes of agent-written reasoning over nine rounds --- there is:
-
-\begin{center}
-\textbf{not one} occurrence of \emph{only tested once}, \emph{may not generalise},
-\emph{confounder}, \emph{insufficient evidence}, or \emph{cannot conclude};\\[2pt]
-against \textbf{fifteen} assertions of closure --- six \textsc{inert}, three \textsc{necessary},
-two \textsc{fundamental}, one \textsc{exhausted}, three prohibitions.
-\end{center}
-
-Fifteen universal and necessity claims, zero qualifications. Not a single hedge in the entire
-campaign. The loop has a role that asks \emph{why did the apparatus fail?} --- the Diagnostician,
-which works, and which correctly separated an explicit-Euler reaction instability from a
-diffusion one without being told. It has no role, and no rule, that asks \emph{is this inference
-sound?} So instrument faults were caught and reasoning faults were not; every one of the eight was
-found by a person reading the record afterwards.
-
-The tempting reading is that the models were careless. They were not. Where the format demanded
-rigour they supplied it --- four of seven positive claims carry an explicit falsifier, because the
-template has a \code{Falsifiable by:} field for positives. Where nothing demanded it, none
-appeared, because the template has no field for the conditions of a negative and no bucket for the
-untested. \textbf{The agents were exactly as rigorous as the structure they were given, and not one
-degree more.}
-
-That is the lesson to carry: logic is not an emergent property of putting capable models in a
-loop. It is a \emph{structure} --- modalities, quantifiers, conditions attached to negatives, a
-place for what is merely untried --- and if it is not written down and mechanically checked, the
-loop will run for nine rounds, produce a genuine refutation rate of 57\%, and still conclude that
-a region it never entered is impossible.
-
-Hence \code{LOGIC.md}, and hence Phase~7.
-\end{tcolorbox}
+\subsection*{The main conclusion: the logic did not emerge}
+\textbf{It was not in the agentic loop, and it was never going to arrive by itself.} Nine rounds of
+capable agents produced conclusions no evidence supported --- ``the ceiling is FUNDAMENTAL'',
+``division is NECESSARY'' --- because nothing in the loop could tell an untested possibility from a
+refuted one, and \emph{could be} had nowhere to live. A campaign that cannot represent ``not yet
+tried'' will write ``cannot be'' instead. That is what Phase~7 exists to fix, and it is a
+\emph{structural} fix: the unearned conclusion has to be unwritable, not discouraged.
 \end{phasebox}
 
 \begin{phasebox}{Phase 7 --- The agentic loop update: giving the loop a logic \hfill \done}
@@ -1440,132 +724,22 @@ record} of Phase~6 --- every one of the eight errors must be caught by replaying
 so when they are not.
 
 \subsection*{Closing Phase 7}
+\textbf{The phase turned out to be wiring, not construction.} Almost everything it needed already
+existed and had never been called: \code{CLAIM\_KINDS}, the batch and memory checks, the reservoir
+counters, the pattern-scale instrument --- already \emph{certified} --- the status setter, the
+allowed-verb table. The external audit's closing line is the phase in one sentence:
+\emph{``writing it to a file is not the same as handing it over.''}
 
-\begin{tcolorbox}[colback=grey!6,colframe=grey!45,boxrule=0.7pt,arc=2pt,breakable,
-                  title={\textbf{What was built}},coltitle=black,colbacktitle=grey!16]
-\textbf{The phase turned out to be wiring, not construction.} Almost every mechanism it needed
-already existed in the codebase and had never run:
+\textbf{The ablation asymmetry}, which is Cedric's and is the sharpest idea in it: the same
+experiment supports a positive strongly and a negative weakly. A null ablation must repeat on an
+independent background; a positive passes on one. And necessity needs a \emph{rescue attempt} ---
+a different experiment, not a re-reading of the same one.
 
-\begin{itemize}[itemsep=1pt]
-\item \code{hypothesis.CLAIM\_KINDS} --- \code{sufficient / necessary / causal / descriptive},
-with a validator --- and all 170 hypotheses in the ledger read \code{descriptive}, because
-nothing ever passed the field. A closed set nobody populates is not a type, it is a comment.
-\item \code{critic.check\_batch} --- \code{A1\_NO\_ABLATION} already refused a necessity claim
-with no ablation in the batch, and was named only in \code{weekend.py} comments.
-\item \code{templates.check\_memory} --- called only under \code{\_\_main\_\_};
-\code{memory.md} ran 1186 words against a 900-word budget and the check never fired.
-\item \code{pattern\_scale.py} --- wavelength, domain count and spacing on the activator field,
-\textbf{already certified} (\emph{``n\_spots exact at 3/5/12, spacing within 13\% of
-$R\sqrt{4\pi/k}$''}), computed every frame --- and stopped at \code{metrics}. Not one of the six
-archived specimens carries a pattern number in the summary an agent reads.
-\end{itemize}
-
-\textbf{New:} \code{LOGIC.md}, the third source of truth beside \code{ROLES.md} and
-\code{PREMISES.md}; \code{logic.py} --- a claim register, a renderer and the checks, following
-the \code{escalation.Backlog} pattern exactly. Support is counted in \emph{distinct
-condition-signatures} computed from the cited runs' compositions, so the morphogen-closure claim's
-``ten or more runs'' --- all Gierer--Meinhardt with division --- correctly collapses to \textbf{one}
-observation, and \code{conditions:} is derived from disk rather than authored.
-
-\textbf{The ablation asymmetry}, which was Cedric's observation and became the load-bearing rule:
-the loop was never short of ablations. The same experiment supports a positive strongly and a
-negative weakly --- \emph{removing X killed the effect} says X matters \emph{here};
-\emph{removing X changed nothing} was offered as X is inert \emph{everywhere}. So a \textbf{null}
-ablation must repeat on an independent background, a \textbf{positive} one still passes on one, and
-necessity needs a \textbf{rescue attempt} --- a different experiment, and the one nobody ever ran.
-
-\textbf{Budget}, since Track A's revisit quota has to be paid for. Round 10 spent 33.4 minutes
-against a 25-minute ceiling and dropped Interpreters. \code{BREVITY} existed, was well written,
-and reached three prompts out of nine --- absent from the two roles that spend the ceiling. It is
-now applied from \code{run\_agent} with a \textbf{per-role token cap and the arithmetic that
-justifies it} (generation runs at about 70 tokens/s, so 700 tokens is ten seconds). The ceiling
-drops to ten minutes; projected generation for a round of that shape is 2.5.
-\end{tcolorbox}
-
-\begin{tcolorbox}[colback=warn!7,colframe=warn!55,boxrule=1pt,arc=2pt,breakable,
-                  title={\textbf{What the next round decides --- none of this has run}},
-                  coltitle=black,colbacktitle=warn!20]
-Ten changes rest on a single campaign's evidence, and not one has executed. \code{logic.py}'s own
-rule --- three independent signatures before a negative --- applies to the conclusions that
-produced it: \emph{``the Reader's hardcoded metric list is why agents ignore new instruments''} is
-a one-observation claim.
-
-So the exit criteria are \textbf{stated, not met}, and the next round is the measurement:
-
-\begin{center}
-\begin{tabular}{@{}p{5.4cm}p{4.3cm}p{4.3cm}@{}}
-\textbf{change} & \textbf{confirms it} & \textbf{refutes it} \\[2pt]
-token caps, 10-min ceiling & total under 10 min & agents ignore the cap \\
-fast model for the two description roles & reader 1.1 $\to$ 0.4 min/call & labels get worse \\
-Interpreter reserves first & no \code{OVER CEILING} on it & still dropped \\
-\code{A1\_NO\_ABLATION} live & fires with a sane reason & fires on every batch \\
-\code{claim\_kind} carried & values besides \code{descriptive} & all \code{descriptive} still \\
-\code{logic.py} per round & \code{unearned} count falls & errors, or reports nothing \\
-Metrologist trigger & one or two requests & a flood of operator names \\
-pattern metrics admitted & \code{n\_spots\_final} in \code{diag.json} & absent \\
-Reader told they exist & a verdict citing wavelength & never mentioned \\
-\end{tabular}
-\end{center}
-
-\textbf{Watch \code{A1\_NO\_ABLATION} hardest.} It is the only change that can refuse work, it
-has never executed on a real batch, and it already carried a false-refusal bug that surfaced only
-when it was finally exercised --- \code{add\_op} names the operator and \code{remove\_op} names
-the node, so the two directions of one experiment never matched and a necessity claim whose
-ablation sat beside it was refused anyway. It runs in report-only mode for exactly that reason,
-and starts refusing the round after its first clean pass.
-
-An independent audit of the loop's information flow --- dead ends, orphans, broken
-\textbf{Sends to:} promises --- was commissioned rather than done by the author of the changes.
-It mapped 37 nodes and 65 edges: \textbf{26 declared and wired, 16 declared with no code path,
-23 wired but undeclared} (\code{figures/loop\_graph.png}). Its sharpest findings are about work
-committed the same day --- \code{revisits} and \code{confounder} stored and read by nothing, so
-the revisit quota is unenforced; \code{logic\_report.jsonl} written with no reader, against its
-own docstring; \code{A1} promising to refuse ``from the round after its first clean pass'', a
-condition nothing computes. It also found that \code{track} was declared by the Proposer, printed
-by the round, and never passed to the constructor --- \textbf{\code{MISSING} on all 58 runs}, so
-the two-track design had never once been recorded. That one was fixed; the rest wait for data.
-\code{ROLES.md} is deliberately untouched.
-\end{tcolorbox}
-
-\begin{tcolorbox}[colback=warn!7,colframe=warn!55,boxrule=1pt,arc=2pt,breakable,
-                  title={\textbf{The false start, 3 August --- and what it taught}},
-                  coltitle=black,colbacktitle=warn!20]
-The first launch reached Act 1 and stopped. Two faults, one of them the phase's own disease
-surviving its cure.
-
-\textbf{The ceiling cried wolf.} \code{may\_call} added the agent's \emph{timeout allowance} to
-the round's spend, so with the ceiling lowered to ten it reported \emph{``OVER CEILING at
-proposer: 0.4+10 $>$ 10.0 min''} on the first call of the round, every round --- for a role
-allowed five minutes that used 1.17. A ceiling that fires before anything is spent is not a
-ceiling, it is noise, and noise is how a real breach stops being read. It now projects from what
-the role has \emph{actually} cost this round, then a measured prior, and only then the allowance.
-
-\textbf{The clean start was not clean.} The Proposer emitted twelve slots and the Critic refused
-eleven as duplicates of the control --- zero experiments. The proposal was not even in this
-campaign's vocabulary: \code{\{"id","spec","override","role"\}}, with
-\code{spec: embryo\_GRO\_base.yaml} and \code{cell\_grow.rate=0.6}, from a different project.
-
-The cause was \code{instruction.md}, which \code{clean\_start} preserved as \emph{``instructions,
-not state''}. Below its \code{<!-- LEARNED PATTERNS -->} marker sat the round-10 meta-review of
-the campaign we had just deleted:
-
-\begin{center}
-\emph{``THIS BODY IS CLOSED'' \quad ``every amplifier family is exhausted''}\\
-\emph{``STOP proposing ANY `make the bud bigger' edit on this base''}
-\end{center}
-
-We wiped \code{memory.md}, every run and every record --- and then handed the first Proposer of
-the fresh campaign the conclusions we had just declared unsound, with a cold-start frontier and
-nothing legal left to propose. That block is rewritten by the Meta-review every round, which makes
-it exactly as much state as \code{memory.md}. \code{clean\_start} now truncates at the marker,
-keeping the standing brief and dropping the beliefs, and three further files that had survived it
-(\code{batch\_refusals}, \code{campaign.json}, \code{operator\_backlog.md}) are cleared too.
-
-\textbf{The lesson is the phase's own, turned on itself.} An unearned universal negative ---
-\emph{this is closed, that is exhausted} --- outlived the deletion of every measurement that
-produced it, because it was filed as an instruction rather than as a belief. A claim that cannot
-be checked is bad enough; a claim that cannot be \emph{deleted} is worse.
-\end{tcolorbox}
+\textbf{The false start of 3~August, and what it taught.} The ceiling cried wolf; the clean start
+was not clean, and handed a fresh Proposer a memory saying \code{THIS BODY IS CLOSED}. The lesson
+is the phase's own turned on itself: a rule that is written but not wired changes nothing, and that
+applies to the rules \emph{about} rules. Which is why Phase~8 begins by making the loop runnable
+with no agent in it at all --- the only way to find a broken hand-off without paying for a round.
 \end{phasebox}
 
 \begin{phasebox}{Phase 8 --- Entities, edges and sweeps: the loop stops being a script \hfill \done}
