@@ -239,6 +239,38 @@ def _graph_from_run(name):
                         params[f"{oid}.{k}"] = v
             if ops:
                 g = _CS.CompositionGraph(ops=ops, conns=[], params=params)
+                # WIRE WHAT IS UNAMBIGUOUS. A spec records operators, not connections, so every
+                # rebuilt graph arrived with its required slots dangling and was refused -- which
+                # is the last thing standing between the frontier and our own measured runs.
+                #
+                # For a dangling slot, ask which operators in THIS graph could fill it. Exactly
+                # one candidate is not a guess; it is the only wiring the composition admits, and
+                # it is what the spec must have meant. Two or more IS a guess, and is left
+                # dangling so the Critic says so -- a silently mis-wired parent would breed a
+                # whole branch of experiments about a composition nobody chose.
+                for _ in range(6):
+                    dangling = g.unrouted_slots()
+                    if not dangling:
+                        break
+                    made = False
+                    for nid, _op, slot in dangling:
+                        cands = [(a, b, sl) for a, b, sl in g._candidate_links()
+                                 if b == nid and sl == slot]
+                        if len(cands) > 1:
+                            # NOT A GUESS -- THE PIPELINE'S OWN ORDER. cell_rd_seed and cell_react
+                            # both "produce" morphogen because they both write the same shared
+                            # field; there is no choice between them in the engine, only a
+                            # sequence. The effective source for a consumer is the LAST producer
+                            # ahead of it in the spec, which is exactly what running the operators
+                            # in order does. Ordering by spec position recovers that.
+                            _pos = {o["id"]: k for k, o in enumerate(g.ops)}
+                            cands = [max((c for c in cands if _pos[c[0]] < _pos[nid]),
+                                         key=lambda c: _pos[c[0]], default=cands[0])]
+                        if len(cands) == 1:
+                            g, _ = g.apply(("connect",) + cands[0])
+                            made = True
+                    if not made:
+                        break
                 # THE SPEC'S NUMBERS MAY BE OUTSIDE THE DECLARED SPACE. cfl_c000p080_d002p000 ran
                 # with cell_diffuse0.d_h=2.0 against a Critic ceiling of 0.346 and produced valid
                 # evidence -- so a faithful rebuild is refused as a parent by R5, and the whole
@@ -250,11 +282,11 @@ def _graph_from_run(name):
                 # closely as the space permits, and the discrepancy is on the record rather than
                 # silently deciding whether the campaign has a frontier at all.
                 import re as _re
-                # TWO ROUNDS OF DROPPING, because the Critic reports one family at a time: the
-                # out-of-range values first, then the parameters an emitter does not accept
-                # ("set and then discarded makes the composition a lie about what ran").
+                # DROP UNTIL IT STOPS COMPLAINING, because the Critic reports ONE offender at a
+                # time: reconnect's engine_clock, then divide's, then the next. Two passes was an
+                # arbitrary number and it left every rebuilt run refused for the third.
                 dropped = []
-                for _ in range(2):
+                for _ in range(12):
                     adm, rej = C.admit(g, ())
                     if adm:
                         break
@@ -269,7 +301,10 @@ def _graph_from_run(name):
                         break
                     dropped += fresh
                     params = {k: v for k, v in params.items() if k not in dropped}
-                    g = _CS.CompositionGraph(ops=ops, conns=[], params=params)
+                    # KEEP THE WIRING. Rebuilding with conns=[] here silently threw away the
+                    # links inferred above, so every graph arrived at the Critic dangling again
+                    # and the auto-wiring looked like it had never run.
+                    g = _CS.CompositionGraph(ops=ops, conns=list(g.conns), params=params)
                 # SAY WHERE IT STANDS. The rebuild recovers the operators; whether the result is
                 # ADMISSIBLE is the Critic's to say, and on the current log it usually is not --
                 # the measured runs sit outside the declared parameter ranges in several places.

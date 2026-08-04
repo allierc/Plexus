@@ -325,21 +325,25 @@ def check_static(graph, seen_hashes=()):
                                  "the chosen implementation does not expose that slot",
                                  f"{dst_op}:{graph.impl_of(dst_node)} has no `{c['slot']}`"))
 
-    # R5 -- PARAMETERS IN RANGE. theta is not identity, but an out-of-range value is still a
-    # malformed experiment.
-    for k, v in graph.params.items():
-        if k.startswith("_run."):
-            continue
-        nid, _, pname = k.partition(".")
-        node = graph._node(nid)
-        if node is None:
-            continue
-        spec = OPERATORS[node["op"]]["params"].get(pname)
-        if spec and isinstance(v, (int, float)):
-            lo, hi, _ = spec
-            if not (lo <= v <= hi):
-                out.append(Rejection("R5_PARAM_OUT_OF_RANGE", "parameter outside declared range",
-                                     f"{k}={v} not in [{lo}, {hi}]"))
+    # R5 -- WITHDRAWN, 3 August (Cedric). The reason is evidence, not taste.
+    #
+    # The (lo, hi) boxes were hand-written, and THE RUNS THIS PROJECT HAS ACTUALLY MADE FALL
+    # OUTSIDE THEM: cfl_c000p080_d002p000 ran at cell_diffuse0.d_h = 2.0 against a ceiling of
+    # 0.346 and produced valid evidence. A faithful rebuild of our own best specimens was
+    # therefore refused as a parent, the frontier could not be seeded from them, and every
+    # campaign kept restarting from the reference recipes. `from_preset` states the standard this
+    # was failing, in its own docstring: "if a recipe we already trust cannot be built from legal
+    # one-edit moves, the campaign is searching a space that does not contain our own evidence."
+    #
+    # A BOX IS NOT A LAW. What makes a run meaningless is never a number outside a range somebody
+    # typed; it is an integrator that diverges, a chemistry that goes non-finite, a sheet that
+    # passes through itself. Every one of those is caught by a rule that is DERIVED rather than
+    # declared -- the CFL condition (R1d, and the whole of Phase 4b), the compile check, the
+    # premise gate, the reservoir -- and those are the rules that were ever doing the work. They
+    # all stay. This one only ever fenced the search into a box drawn before we had the evidence.
+    #
+    # The triples remain in OPERATORS as the DEFAULT and the SCALE of a parameter: where a sweep
+    # starts and how big a step should be. They no longer decide what may be run.
 
     # R6 -- ALREADY EVALUATED. Re-running a known composition is not a new hypothesis; it is a
     # replicate, and must be requested as one (a robustness test) rather than arrived at by

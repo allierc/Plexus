@@ -1,5 +1,0 @@
-{"action": "stop", "cause": "diagnostician unreachable (True); 1 run(s) diverged", "asked": true, "n_failed": 1, "n_runs": 1, "runs": ["r004c_00_93160b"]}
-{"action": "stop", "cause": "diagnostician unreachable (True); 1 run(s) diverged", "asked": true, "n_failed": 1, "n_runs": 1, "runs": ["r005c_00_93160b"]}
-{"action": "stop", "cause": "diagnostician unreachable (True); 1 run(s) diverged", "asked": true, "n_failed": 1, "n_runs": 1, "runs": ["r006c_00_93160b"]}
-{"action": "stop", "cause": "diagnostician unreachable (True); 1 run(s) diverged", "asked": true, "n_failed": 1, "n_runs": 1, "runs": ["r007c_00_93160b"]}
-{"action": "stop", "cause": "diagnostician unreachable (True); 6 run(s) diverged", "asked": true, "n_failed": 6, "n_runs": 6, "runs": ["r008c_00_93160b", "r008c_01_855e6b", "r008c_02_e8e350", "r008c_03_f59cde", "r008c_04_a4622c", "r008c_05_e08ef7"]}
