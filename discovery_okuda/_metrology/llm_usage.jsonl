@@ -1675,3 +1675,4 @@
 {"t": 1785812523.447966, "round": 1, "agent": "archivist", "min": 0.0, "ok": true, "kind": "llm", "note": ""}
 {"t": 1785812527.8328197, "round": 1, "agent": "grounder", "min": 0.068, "ok": true, "kind": "local", "note": ""}
 {"t": 1785812527.837798, "round": 1, "agent": "proposer", "min": 0.0, "ok": true, "kind": "llm", "note": ""}
+{"t": 1785812782.7607749, "round": 1, "agent": "proposer", "min": 0.334, "ok": true, "kind": "llm", "note": "", "num_turns": 1, "duration_ms": 19646, "duration_api_ms": 17127, "cost_usd": 0.21433250000000004, "input_tokens": 2242, "output_tokens": 965, "cache_creation": 17242, "cache_read": 13155, "stop_reason": "end_turn", "is_error": false, "session_id": "b6138e57-4881-40d6-b49b-2e1cfd7b8cb8"}
