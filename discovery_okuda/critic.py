@@ -152,6 +152,38 @@ def allowed_verb(claim_kind):
         claim_kind, "is associated with")
 
 
+def _run_key(graph):
+    """MECHANISM@OPERATING-POINT -- what R6 asks about, and what the lever map should record."""
+    t = _theta_hash(graph)
+    return f"{comp_hash(graph)}@{t}" if t else comp_hash(graph)
+
+
+def _theta_hash(graph, base=False):
+    """The OPERATING POINT: a stable digest of the tunable parameters, excluded from comp_hash.
+
+    comp_hash answers "is this the same mechanism". This answers "is this the same experiment on
+    it". Keeping them separate is what lets a parameter sweep run without a retune ever counting
+    as a discovery.
+    """
+    import hashlib
+    try:
+        if base:
+            # the DEFAULT operating point of this composition: every tunable at its declared
+            # default. A graph equal to this has not been retuned, so a comp_hash match IS a
+            # duplicate even when the lever map recorded no theta.
+            items = sorted((f"{o['id']}.{pn}", round(float(d), 9))
+                           for o in graph.ops
+                           for pn, (_lo, _hi, d) in (OPERATORS[o["op"]].get("params") or {}).items())
+        else:
+            items = sorted((k, round(float(v), 9)) for k, v in (graph.params or {}).items()
+                           if not k.startswith("_run.") and isinstance(v, (int, float)))
+    except Exception:
+        return ""
+    if not items:
+        return ""
+    return hashlib.sha1(repr(items).encode()).hexdigest()[:10]
+
+
 def _cell_cap(graph):
     """Cells the vertex reservoir allows. Euler on a trivalent closed sheet: V = 2F - 4."""
     try:
@@ -183,7 +215,7 @@ def _param(graph, node_id, key):
         return None
 
 
-def check_static(graph, seen_hashes=()):
+def check_static(graph, seen_hashes=(), edit_kind=None):
     """Every static rule, in order. Returns [] if the composition is well-formed."""
     out = []
 
@@ -331,7 +363,17 @@ def check_static(graph, seen_hashes=()):
             # kinetics would have killed the finding it was meant to protect.
             if not any(x["op"] == "divide_3d" for x in graph.ops):
                 continue
-            rate = _param(graph, o["id"], "rate")
+            # THE PARAMETER IS CALLED rd_rate. This asked for `rate`, always got None, and fell
+            # back to 1.0 -- so R1d refused EVERY gierer_meinhardt-with-division composition
+            # unconditionally, whatever rate it actually carried, and its own message said so
+            # ("rate None") for weeks. It refused `okuda_route`, the one recipe in the repository
+            # holding Okuda's coupling, on a number that recipe does not have.
+            #
+            # The rule is right; it was reading the wrong key. `rate` is kept as a fallback
+            # because other kinetics use that name.
+            rate = _param(graph, o["id"], "rd_rate")
+            if rate is None:
+                rate = _param(graph, o["id"], "rate")
             step = float(DT_GLOBAL) * float(rate if rate is not None else 1.0)
             if step > AUTOCATALYTIC_STEP_LIMIT:
                 out.append(Rejection(
@@ -400,11 +442,34 @@ def check_static(graph, seen_hashes=()):
     # The triples remain in OPERATORS as the DEFAULT and the SCALE of a parameter: where a sweep
     # starts and how big a step should be. They no longer decide what may be run.
 
-    # R6 -- ALREADY EVALUATED. Re-running a known composition is not a new hypothesis; it is a
-    # replicate, and must be requested as one (a robustness test) rather than arrived at by
-    # accident.
+    # R6 -- ALREADY EVALUATED AT THIS OPERATING POINT. Re-running a known composition is not a
+    # new hypothesis; it is a replicate, and must be requested as one rather than arrived at by
+    # accident. That rule is right and stays.
+    #
+    # BUT IT KEYED ON THE COMPOSITION ALONE, AND THAT KILLED THE SWEEP ARM OUTRIGHT. comp_hash
+    # EXCLUDES parameters by design -- so that a retune can never masquerade as a new mechanism,
+    # which is the discipline this project exists to enforce. A `set_param` child therefore
+    # carries its PARENT'S hash, and R6 refused it as already-evaluated. Measured by an external
+    # review: 39 of 39 parameter moves refused, even against a seen-list of one. The arm built to
+    # ask "what does this mechanism do as you turn it up" could never fire once.
+    #
+    # The two rules were written for opposite purposes and collided. Both survive if identity and
+    # novelty are separated: the COMPOSITION still decides what counts as a mechanism (comp_hash
+    # unchanged, so a retune is still not a discovery), and the OPERATING POINT decides whether
+    # this exact experiment has been run. A sweep of ten values is ten experiments on one
+    # mechanism -- which is exactly what it should be.
+    # The key is MECHANISM@OPERATING-POINT. A bare comp_hash in `seen` (which is what the lever
+    # map holds for a run whose theta was never recorded) still refuses the identical composition
+    # at its identical parameters, because that graph produces the identical key.
+    # WHICH QUESTION IS BEING ASKED decides which key. A STRUCTURAL edit proposes a new
+    # mechanism, so the composition is the identity and a repeat of it is a replicate -- the
+    # original rule, unchanged. A `set_param` edit proposes a new OPERATING POINT on a mechanism
+    # already known, which by design carries the parent's comp_hash; for that, only the exact
+    # experiment -- mechanism AND parameters -- counts as already evaluated.
     h = comp_hash(graph)
-    if h in set(seen_hashes):
+    _seen = set(seen_hashes)
+    _dup = (_run_key(graph) in _seen) if edit_kind == "set_param" else (h in _seen)
+    if _dup:
         out.append(Rejection("R6_DUPLICATE", "this composition has already been evaluated",
                              f"{h} -- request a robustness test explicitly if replication is "
                              f"what you want"))
@@ -577,9 +642,9 @@ ACT_DIVERGED = 1e3
 
 
 # ============================================================================ the gate + menu
-def admit(graph, seen_hashes=(), compile_check=True):
+def admit(graph, seen_hashes=(), compile_check=True, edit_kind=None):
     """(ok, [Rejection]). The whole static+compile gate."""
-    rej = check_static(graph, seen_hashes)
+    rej = check_static(graph, seen_hashes, edit_kind=edit_kind)
     if not rej and compile_check:
         rej = check_compile(graph)
     return (not rej), rej

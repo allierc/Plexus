@@ -924,6 +924,34 @@ class CompositionGraph:
             g.ops.append({"id": nid, "op": op, "impl": impl})
             for pn, (lo, hi, d) in OPERATORS[op]["params"].items():
                 g.params[f"{nid}.{pn}"] = d
+            # AN OPERATOR IS BORN WIRED, when there is only one way to wire it.
+            #
+            # THIS IS THE DEFECT THAT COST THE CAMPAIGN. add_op created the node and never the
+            # connection, is_runnable() is false for a dangling slot, and the Proposer's menu
+            # filters on is_runnable() -- so NO OPERATOR THAT DECLARES A SLOT COULD EVER BE ADDED
+            # BY A ONE-EDIT MOVE, from any parent, ever. An external review proved it by breadth
+            # first search: 9,760 reachable compositions, ZERO containing a single connection.
+            #
+            # The three slotted operators are the entire morphogen -> mechanics arrow:
+            #     morphogen_growth_3d.gate   -- Okuda's own mechanism
+            #     extrude.site               -- the forcing term
+            #     divide_3d:orient_iface.axis
+            # so the search could destroy the coupling and never build it, and six rounds of
+            # "chemistry is inert for shape" were a measurement of a disconnected subsystem.
+            #
+            # UNIQUE SOURCE ONLY -- the same rule already used to rebuild parents from specs. One
+            # candidate is not a guess, it is the only wiring the composition admits. Two or more
+            # is a real choice and stays dangling, so the Critic still says R3 and a `connect`
+            # edit remains available to make it deliberately.
+            # LEGAL_LINKS is the authority on what may feed what -- reuse it rather than invent
+            # a second rule, because a slot is named `gate` while the port it accepts is called
+            # `morphogen`, and matching the two by name silently wires nothing.
+            for _sl in slots_of(op, impl):
+                _src = [o["id"] for o in g.ops if o["id"] != nid
+                        and any((_ot, _sl) in LEGAL_LINKS
+                                for _ot in (OPERATORS[o["op"]].get("outputs") or []))]
+                if len(_src) == 1:
+                    g.conns.append({"src": _src[0], "dst": nid, "slot": _sl})
         elif kind == "remove_op":
             nid = edit[1]
             g.ops = [o for o in g.ops if o["id"] != nid]
@@ -1068,6 +1096,13 @@ def reference_recipes():
     # the implementation his own framing implies; the other three are the alternative hypotheses,
     # and swapping them is a legal one-edit move rather than a dial.
     h, _ = h.apply(("add_op", "shape_to_chem", "curvature"))
+    # AND IT MUST BE INTEGRABLE, or the recipe named for the target cannot be run. As written it
+    # carried rd_rate = 1.0, which with divide_3d present advances dt*rate = 1.00 per step against
+    # R1d's derived limit of 0.5 -- so the Critic refused the one composition in this file that
+    # holds Okuda's coupling, and it could not go on the frontier. Halving the rate satisfies the
+    # limit without touching the mechanism: it is the same chemistry, integrated in steps the
+    # solver can carry. R1d stays exactly as it is; it was right.
+    h = h.with_params({"cell_react0.rd_rate": 0.4})
     out["okuda_route"] = h
 
     # the degenerate control the search must visit on its way: uniform inflation, no patterning.

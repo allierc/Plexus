@@ -59,7 +59,16 @@ class LeverMap:
 
     # ---------------------------------------------------------------- record
     def add(self, comp_hash, graph, phenotype, score, metrics, run_id=None):
-        rec = {"comp": comp_hash,
+        # THE OPERATING POINT, beside the mechanism. comp_hash deliberately excludes parameters
+        # so a retune cannot count as a discovery; that means the map alone could not tell one
+        # sweep point from another, and R6 refused all of them as repeats of the parent. Recording
+        # theta costs ten characters and is what makes a sweep expressible.
+        try:
+            from critic import _theta_hash as _th
+            _theta = _th(graph)
+        except Exception:
+            _theta = ""
+        rec = {"comp": comp_hash, "theta": _theta,
                "ops": sorted(set(graph.op_names())),
                "impls": {o["op"]: graph.impl_of(o) for o in graph.ops},
                "conns": sorted(f"{graph._op_of(c['src'])}->{graph._op_of(c['dst'])}.{c['slot']}"

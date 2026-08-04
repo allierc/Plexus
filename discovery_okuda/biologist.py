@@ -57,7 +57,11 @@ EVERY CHECK IS CERTIFIED AGAINST A KNOWN-GOOD AND A KNOWN-BAD CASE
 A check that has never been seen to fail is not a check. `--certify` runs each one against real
 runs from this campaign whose answer we already know -- mini_coral (chemistry dead) against
 mini_coral_nodilute (alive), mini_grow_divide (ceiling below trigger) against
-mini_grow_divide_bigger (above). Same discipline metric_author applies to metrics.
+mini_grow_divide_bigger (above), r002c_01_a5a036 (folded through itself, force x1e9) against
+r002c_02_c09d72 (grew to 4047 cells and stayed relaxed). Same discipline metric_author applies to
+metrics. A case whose config or run is not on disk COUNTS AS A FAILURE and is named in the footer:
+a suite that skips its own fail cases and prints ALL CHECKS CERTIFIED is the thing this file
+exists to forbid, and it did exactly that between 3 August and 4 August.
 
     python biologist.py --certify                 # prove the checks catch what they claim
     python biologist.py <run_name>                # static + passive on a finished run
@@ -67,6 +71,7 @@ mini_grow_divide_bigger (above). Same discipline metric_author applies to metric
 from __future__ import annotations
 
 import argparse
+import glob
 import json
 import os
 import re
@@ -384,6 +389,39 @@ def p3b_mean_cell_volume_holds(cfg, s):
              f"trigger (P3).", dict(peak=peak, end=float(v[-1]), ratio=ratio))
 
 
+def _activator_zero_is_a_fixed_point(cfg):
+    """Why a = 0 CANNOT leave zero in this composition -- or None if it can.
+
+    DERIVED, one line of algebra per kinetics, evaluated at a = 0 with the run's own parameters
+    (tyssue_rd_ops.py, the three `cell_react` implementations). `chem` is declared with no initial
+    value, so it starts at zero; a seeding operator is the only other source of activator, and
+    shape_to_chem writes the SUBSTRATE column only (chem[:, 1]), never the activator.
+
+        gray_scott        da = u a^2 - (F + kk) a          -> da(0) = 0 for any u. ALWAYS fixed.
+        gierer_meinhardt  da = rho a^2/h - mu_a a + a0     -> da(0) = a0. Fixed ONLY at a0 == 0.
+                          Measured from a = h = 0 with the default a0 = 0.01: a reaches 209 in
+                          50 steps of dt = 0.1. A zero activator there is a DEFECT, not a null.
+        brusselator       da = gamma (A - (B+1) a + a^2 h) -> da(0) = gamma * A, and A = 1 is
+                          hard-coded in translate._emit_react. NEVER fixed. Measured from zero:
+                          a -> 0.26 in 50 steps, and on to the homogeneous steady state a = A.
+
+    So "no cell_rd_seed" is NOT the condition. Gating on it would silence this check on two of
+    the three reactions in the bank, in exactly the case it exists for.
+    """
+    ops = _ops(cfg)
+    if "cell_rd_seed" in ops:
+        return None                                    # something did seed; zero is a real failure
+    react = ops.get("cell_react") or {}
+    impl = react.get("implementation")
+    if impl == "gray_scott":
+        return ("no seeding operator, and gray_scott's da = u*a^2 - (F+kk)*a is homogeneous in a, "
+                "so a = 0 is an exact fixed point for every value of u, F and kk")
+    if impl == "gierer_meinhardt" and float(react.get("a0", 0.01)) == 0.0:
+        return ("no seeding operator, and gierer_meinhardt at a0 = 0 has da = rho*a^2/h - mu_a*a, "
+                "which vanishes at a = 0")
+    return None                                        # brusselator, or GM with a basal source
+
+
 def p4_chemistry_not_extinguished(cfg, s):
     """#4/D10 Growing a cell dilutes what is inside it -- and Gray-Scott's activator is sustained
     by a QUADRATIC term, so a steady multiplicative loss beats it. Measured: 1% dilution per step
@@ -397,6 +435,30 @@ def p4_chemistry_not_extinguished(cfg, s):
                  "act_max not recorded (run predates the threshold-free activator statistics)")
     peak = float(np.nanmax(a))
     if peak <= 1e-6:
+        why = _activator_zero_is_a_fixed_point(cfg)
+        if why:
+            # CENSORED, NOT FAILED -- and censored rather than `na`, for the P13 reason above.
+            # `chem` is declared with no initial value (translate.to_spec: sets.cell.state.chem),
+            # so it starts at zero; with no seeding operator the activator can only stay there if
+            # a = 0 is an EXACT FIXED POINT of the chosen kinetics. That is a property of the
+            # KINETICS, not of the seeding, which is why this gate reads the implementation and
+            # NOT merely `cell_rd_seed not in ops` -- see the helper: two of the three reactions
+            # leave zero on their own, and for those a peak of zero still means the reaction
+            # never ran, which is exactly what this branch was written to catch.
+            # `na` would be a lie: the premise APPLIES and its answer is that this composition
+            # cannot make chemistry at all. What is inadmissible is not the run, it is every
+            # chemistry-derived reading taken off it (act_max, red_frac, tip_act, n_spots,
+            # corr_act_rad); the mechanics of the same run happened and is evidence. `censored`
+            # is already a first-class column (run_one.py `premises_censored`) and keeps the run
+            # out of `premises_broken`, so a deliberate seeding ablation is no longer barred from
+            # the frontier (round.py) for measuring what it deliberately removed.
+            return R("P4", "passive", "the chemistry must not be silently extinguished",
+                     "censored",
+                     f"the activator is zero at every frame, and it could not have been anything "
+                     f"else: {why}. This is the composition's DEFINITION, not an extinction -- "
+                     f"but every chemistry-derived metric on this run (act_max, red_frac, "
+                     f"tip_act, n_spots, corr_act_rad) is inadmissible, and any shape it reached "
+                     f"was reached WITHOUT chemistry.", dict(peak=peak, fixed_point=True))
         return R("P4", "passive", "the chemistry must not be silently extinguished", "fail",
                  "the activator never rose above zero at any frame: the initial condition did not "
                  "take, or the reaction never ran.", dict(peak=peak))
@@ -845,13 +907,74 @@ def _wrap(t, w):
 
 
 # --------------------------------------------------------------------------- certification
+# WHERE A CASE MAY LIVE. The 3 August cleanup (84634092) moved 80 configs and 63 run directories
+# out of the live tree and into _archive_runs/ -- "Nothing deleted; the live tree is a selection."
+# Seven of this suite's fifteen cases pointed at those paths, so from that commit until now the
+# suite skipped them and still printed ALL CHECKS CERTIFIED. The cases were never lost; only the
+# lookup was too narrow. Read the archive too, rather than pushing superseded configs back into
+# config/okuda where from_preset and the campaign seed pool would see them again.
+_ARCHIVES = sorted(glob.glob(os.path.join(HERE, "_archive_runs", "*")))
+
+
+def _cert_cfg(name):
+    """A certification config, live tree first, then any archive. Returns (dict, where) or (None, )"""
+    import yaml
+    p = os.path.join(CONFIG_DIR, f"{name}.yaml")
+    if os.path.exists(p):
+        return yaml.safe_load(open(p)), "live"
+    for a in _ARCHIVES:
+        p = os.path.join(a, "removed_configs", f"{name}.yaml")
+        if os.path.exists(p):
+            return yaml.safe_load(open(p)), os.path.basename(a)
+    return None, None
+
+
+def _cert_series(name):
+    """A certification series, live tree first, then any archive. Returns (series, where)."""
+    s = _series(name)
+    if s is not None:
+        return s, "live"
+    for a in _ARCHIVES:
+        for sub in ("removed_runs", "run_records"):
+            p = os.path.join(a, sub, name, "metrics.json")
+            if os.path.exists(p):
+                return json.load(open(p)).get("series") or None, os.path.basename(a)
+    return None, None
+
+
+def _cert_mech(name):
+    m = _mech(name)
+    if m is not None:
+        return m
+    for a in _ARCHIVES:
+        p = os.path.join(a, "removed_runs", name, "mechanics.npz")
+        if os.path.exists(p):
+            z = np.load(p, allow_pickle=True)
+            return {k: np.asarray(z[k]).ravel() for k in z.files}
+    return None
+
+
 def certify():
     """Prove each check catches what it claims, on runs from this campaign whose answer we know.
 
     A check that has never been seen to FAIL is not a check -- it is a line of code that returns
     'pass'. Each case below is a real config or a real run, paired so that the same check must say
-    different things about the two."""
-    import yaml
+    different things about the two.
+
+    A CASE THAT CANNOT BE RUN IS A FAILED CERTIFICATION, not a blank line. Between 3 August and
+    now this suite skipped seven of its fifteen cases -- every FAIL case for P3, P3b, P4, P7 and
+    P1, i.e. the entire half of the test that distinguishes a check from `return pass` -- and
+    printed ALL CHECKS CERTIFIED and exited 0. P3b and P7 voided eleven runs in that window with
+    nothing live proving either of them can say `fail`. `skip` now counts as `bad`, is listed by
+    name in the footer, and reaches the exit code. This is the rule instrument_gate.py already
+    applies to itself at line ~286: "Passing on a set whose blob and sphere controls were thrown
+    out for invalidity is the gate certifying itself on the easy half of its own test."
+
+    CHOOSING AN ANCHOR. A case sitting 2% from its own threshold certifies nothing: it will flip
+    on a re-run and teach the reader to ignore the suite. P7's fail anchor is r002c_01_a5a036
+    (shape index 22.6 against a 4.5 threshold), not mini_grow_divide_bigger (4.60). P5b's pass
+    anchor is a run that GREW (r002c_02_c09d72, 2000 -> 4047 cells, force x1.13); a P5b pass on a
+    null run where the cell count never moves is the easy half of P5b's own test."""
     cases = [
         # (label, check, config, series-run or None, expected)
         ("P3 ceiling below trigger  (minisite verbatim)", p3_ceiling_above_trigger,
@@ -862,34 +985,70 @@ def certify():
          "mini_coral", "mini_coral", "fail"),
         ("P4 chemistry alive        (dilution off)", p4_chemistry_not_extinguished,
          "mini_coral_nodilute", "mini_coral_nodilute", "pass"),
-        ("P3b cells shrink          (no real growth)", p3b_mean_cell_volume_holds,
-         "mini_grow_divide", "mini_grow_divide", "fail"),
+        # P3b's fail anchor was the mini_grow_divide RUN, which was never written to disk. The
+        # campaign has since produced its own: r002c_02 divides while mean cell volume halves.
+        ("P3b cells shrink          (divide, no growth)", p3b_mean_cell_volume_holds,
+         "r002c_02_c09d72", "r002c_02_c09d72", "fail"),
         ("P3b cell volume holds     (real growth)", p3b_mean_cell_volume_holds,
          "mini_grow_divide_bigger", "mini_grow_divide_bigger", "pass"),
         ("P1 tissue gains material  (growing ball)", p1_tissue_gains_material,
          "mini_grow_divide_bigger", "mini_grow_divide_bigger", "pass"),
         ("P9 closed sphere", p9_closed_sphere, "coral_fixed_ball", "coral_fixed_ball", "pass"),
-        ("P7 cells stretched 2:1    (post-buckling)", p7_no_absorbing_area_by_stretching,
-         "mini_grow_divide_bigger", "mini_grow_divide_bigger", "fail"),
+        ("P7 cells stretched 5:1    (self-intersected)", p7_no_absorbing_area_by_stretching,
+         "r002c_01_a5a036", "r002c_01_a5a036", "fail"),
         ("P7 cells unstretched      (rigid coral)", p7_no_absorbing_area_by_stretching,
          "coral_fixed_ball", "coral_fixed_ball", "pass"),
+        # P11, P5b and P13 broke nine runs this campaign and had no case here at all.
+        ("P11 surface folds through itself", p11_tissue_does_not_pass_through_itself,
+         "r002c_01_a5a036", "r002c_01_a5a036", "fail"),
+        ("P11 every ray crosses once", p11_tissue_does_not_pass_through_itself,
+         "r002c_02_c09d72", "r002c_02_c09d72", "pass"),
+        ("P13 growth met the array   (censored, not void)", p13_growth_not_capped_by_the_array,
+         "r001n_01_wk_apical_area", "r001n_01_wk_apical_area", "censored"),
+        ("P13 growth ran free", p13_growth_not_capped_by_the_array,
+         "r002c_00_138f40", "r002c_00_138f40", "pass"),
     ]
     print("CERTIFYING the premise checks against cases whose answer we already know\n")
-    bad = 0
+    bad, missing = 0, []
     for label, fn, cfgname, runname, expect in cases:
-        p = os.path.join(CONFIG_DIR, f"{cfgname}.yaml")
-        if not os.path.exists(p):
-            print(f"  [skip] {label:48} no config {cfgname}"); continue
-        cfg = yaml.safe_load(open(p))
-        s = _series(runname) if runname else None
-        if runname and s is None:
-            print(f"  [skip] {label:48} no series for {runname}"); continue
+        cfg, cfg_where = _cert_cfg(cfgname)
+        if cfg is None:
+            print(f"  [MISS] {label:48} NO CONFIG {cfgname} -- case cannot run")
+            bad += 1; missing.append(label); continue
+        s = run_where = None
+        if runname:
+            s, run_where = _cert_series(runname)
+            if s is None:
+                print(f"  [MISS] {label:48} NO SERIES {runname} -- case cannot run")
+                bad += 1; missing.append(label); continue
         r = fn(cfg, s) if runname else fn(cfg)
         ok = r.status == expect
         bad += not ok
+        src = "" if (cfg_where == "live" and run_where in (None, "live")) \
+            else f"   [from archive {cfg_where if cfg_where != 'live' else run_where}]"
+        print(f"  [{'ok ' if ok else 'BAD'}] {label:48} -> {r.status:9} (want {expect}){src}")
+        if not ok:
+            print(f"          {r.detail[:150]}")
+    # P5b needs the mechanics series, not the metrics series, so it does not fit the tuple above.
+    for label, runname, expect in (("P5b residual force runs away (x1e9)", "r002c_01_a5a036", "fail"),
+                                   ("P5b relaxation keeps up while GROWING", "r002c_02_c09d72",
+                                    "pass")):
+        cfg, _ = _cert_cfg(runname)
+        m = _cert_mech(runname)
+        if cfg is None or m is None:
+            print(f"  [MISS] {label:48} NO MECHANICS {runname} -- case cannot run")
+            bad += 1; missing.append(label); continue
+        r = p5b_relaxation_keeps_up(cfg, _cert_series(runname)[0], m)
+        ok = r.status == expect; bad += not ok
         print(f"  [{'ok ' if ok else 'BAD'}] {label:48} -> {r.status:9} (want {expect})")
         if not ok:
             print(f"          {r.detail[:150]}")
+    # P13's `fail` branch -- the plateau covering the run -- was added on 3 August (1f92f87d) and
+    # no run on disk reaches it, so it is synthesised rather than left unproven.
+    r = p13_growth_not_capped_by_the_array({}, [{"cells": 150.0}] * 2 + [{"cells": 1778.0}] * 38)
+    ok = r.status == "fail"; bad += not ok
+    print(f"  [{'ok ' if ok else 'BAD'}] {'P13 the array decided the answer (plateau 95%)':48} -> "
+          f"{r.status:9} (want fail)")
     # P5 on the pre-fix clock, synthesised: dt=0.02 with an unscaled reaction rate
     stale = {"general": {"dt": 0.02, "n_frames": 300},
              "operators": [{"op": "cell_react", "rate": 1.0}]}
@@ -918,6 +1077,40 @@ def certify():
     ok = r.status == "fail"; bad += not ok
     print(f"  [{'ok ' if ok else 'BAD'}] {'P2 gated growth with rho=0':48} -> "
           f"{r.status:9} (want fail)")
+    # P4's seedless branch, synthesised: an activator flat at zero for the whole run. The verdict
+    # must depend on the KINETICS, because that is what decides whether zero could have moved.
+    # If any of these four ever agree, the gate has stopped reading the reaction (see
+    # _activator_zero_is_a_fixed_point) and is reading the edit instead.
+    flat = [{"frame": i, "act_max": 0.0, "act_min": 0.0} for i in range(50)]
+    for lbl, react, want in (
+            ("P4 zero activator, gray_scott, no seed",
+             {"op": "cell_react", "implementation": "gray_scott", "F": 0.046, "kk": 0.062},
+             "censored"),
+            ("P4 zero activator, GM a0=0, no seed",
+             {"op": "cell_react", "implementation": "gierer_meinhardt", "a0": 0.0}, "censored"),
+            ("P4 zero activator, GM a0=0.01, no seed",
+             {"op": "cell_react", "implementation": "gierer_meinhardt", "a0": 0.01}, "fail"),
+            ("P4 zero activator, brusselator, no seed",
+             {"op": "cell_react", "implementation": "brusselator", "gamma": 0.3}, "fail"),
+            ("P4 zero activator WITH a seed present",
+             {"op": "cell_react", "implementation": "gray_scott", "F": 0.046, "kk": 0.062},
+             "fail")):
+        ops = [react] + ([{"op": "cell_rd_seed", "mode": "scatter"}] if "WITH" in lbl else [])
+        r = p4_chemistry_not_extinguished({"operators": ops}, flat)
+        ok = r.status == want; bad += not ok
+        print(f"  [{'ok ' if ok else 'BAD'}] {lbl:48} -> {r.status:9} (want {want})")
+    # UNCERTIFIED BRANCHES, said out loud rather than left as a green line. P1 has eleven `pass`
+    # runs on disk and not one `fail` anywhere in the tree or the archive, so its fail branch --
+    # "a growth operator is running but the tissue added no material" -- has never been observed
+    # to fire. Naming it is the honest position; deleting the P1 row and calling the suite green
+    # would be the same silence in a different place.
+    print("\n  UNCERTIFIED BRANCH: P1 fail (no run on disk or in the archive has a growth "
+          "operator that added no material). The check's pass side is proven; its fail side "
+          "is not. Do not read a P1 pass as evidence that P1 would catch the case.")
+    if missing:
+        print(f"\n  {len(missing)} CASE(S) COULD NOT RUN -- these are counted as failures:")
+        for m in missing:
+            print(f"      {m}")
     print(f"\n  {'ALL CHECKS CERTIFIED' if not bad else str(bad) + ' CHECK(S) FAILED CERTIFICATION'}")
     return bad
 
