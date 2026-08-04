@@ -659,6 +659,49 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     if q is not None:
         summary["Q_protr_after_relax"] = round(q, 3)          # ABSOLUTE, not a ratio (M4)
         summary["Q_drop"] = round(per_frame["protr"][-1] - q, 3)     # how much did NOT survive
+    # THE REDUCTIONS, INTO THE ONE STRUCTURE THE SCORER READS. Everything above this line was
+    # built today -- three sampling tiers, an every-frame chemistry record, six temporal
+    # reductions in time_analysis, 152 admitted names in predict -- and NONE of it was reaching a
+    # prediction. Measured on this very run: `act_cv_peak <= 0.3`, `act_max_span >= 100` and
+    # `corr_act_rad_measured_frac <= 0.1` -- three claims that state exactly what okuda_route
+    # does -- all scored `not measured` -> inconclusive, because `reduce_all` was called by the
+    # tests and by nothing else.
+    #
+    # That is the defect this entire phase is about, reproduced one level up while fixing it: a
+    # producer with no consumer. The instrument existed, was documented, was admitted, and was
+    # not plugged in.
+    try:
+        import time_analysis as _TA
+        _cols, _fb = {}, {}
+        for _f in ("frames.npz", "metrics.npz"):
+            _pth = os.path.join(out_dir, _f)
+            if not os.path.exists(_pth):
+                continue
+            _zz = np.load(_pth)
+            _fr = np.asarray(_zz["frame"], float) if "frame" in _zz.files else None
+            for _k in _zz.files:
+                if _k == "frame" or _k in _cols:      # frames.npz first: never overwritten by
+                    continue                          # the coarse table
+                if _zz[_k].dtype.kind not in "fiub" or _zz[_k].ndim != 1:
+                    continue
+                _cols[_k] = _zz[_k]
+                _fb[_k] = _fr if _fr is not None else np.arange(_zz[_k].size, dtype=float)
+        # ONLY THE ADMITTED QUANTITIES. Reducing every column wrote 390 keys, including six
+        # suffixes of `autocorr_hops_uncalibrated` -- a metric the bank REJECTS as uncalibrated.
+        # A record that carries a withdrawn instrument under six new names has re-admitted it.
+        from predict import SERIES_QUANTITIES as _SQ
+        _red = _TA.reduce_all(_cols, _fb, horizon_frame=horizon.get("horizon"),
+                              keys=[k for k in _cols if k in set(_SQ)])
+        # FILL, NEVER OVERWRITE. protr_peak and protr_final are written above from the
+        # every-frame table with the evidence horizon already applied; a second value under the
+        # same key is the twin defect that was closed this morning.
+        _new = {k: v for k, v in _red.items() if k not in summary and v is not None}
+        summary.update(_new)
+        print(f"[{name}] {len(_new)} temporal reduction(s) written to the summary "
+              f"({len(_cols)} series x 6)", flush=True)
+    except Exception as _e:
+        print(f"[{name}] ⚠ reductions NOT written: {type(_e).__name__}: {str(_e)[:90]}", flush=True)
+
     rec.add_analysis("metric_v1", summary)
     arch.add(rec)
 

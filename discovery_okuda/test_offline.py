@@ -683,6 +683,95 @@ def t_reductions_on_real_data():
             f"act_max_span {R['act_max_span']:.3g} vs act_cv_final {R['act_cv_final']:.3g}")
 
 
+@case("every admitted metric reaches a REAL run's summary")
+def t_admitted_reaches_the_summary():
+    """ADMITTED IMPLIES PRESENT. The end-to-end contract, and the one the others could not catch.
+
+    `t_metrics_have_producers` asks whether a name is ASSIGNED somewhere in the source. It passed
+    green all day while `time_analysis.reduce_all` -- which assigns every one of them -- was
+    called by the tests and BY NOTHING ELSE. So the reductions existed, were documented, were
+    admitted, and never reached a run: `act_cv_peak <= 0.3`, `act_max_span >= 100` and
+    `corr_act_rad_measured_frac <= 0.1` -- three claims that state exactly what okuda_route does
+    -- each scored `not measured` and fell to inconclusive, silently.
+
+    That is the defect this whole phase is about, made once more while fixing it. Source-level
+    checks cannot see it, because every part was correct; only the seam was missing. So this one
+    reads a REAL diag.json and requires the admitted set to be IN it.
+
+    An absence is allowed only if it is DECLARED with a reason, exactly as WIRING.md requires of
+    an artifact with no reader. A metric that is legitimately null on some runs is not a defect;
+    a metric that is null on every run and nobody noticed is.
+    """
+    import glob
+    import predict as PR
+    # DECLARED ABSENCES, with the reason each is null rather than missing.
+    allowed = {
+        "Q_drop": "only written when the quasi-static relaxation ran (--q)",
+        "corr_act_rad_final": "refused at the horizon frame when act_cv < 0.05 -- no pattern to "
+                              "correlate; corr_act_rad_measured_frac reports how often",
+        "act_at_tip_final": "same refusal as corr_act_rad_final",
+    }
+    # ...plus any reduction of a series that is CONSTANT on this run: _trend is null on ties and
+    # _span is null on a zero median, both by design. Those are run-dependent, not bank defects.
+    degenerate = ("_trend", "_span")
+
+    diags = sorted(glob.glob(os.path.join(HERE, "..", "log", "okuda", "*", "diag.json")),
+                   key=os.path.getmtime, reverse=True)
+    if not diags:
+        return "skipped -- no finished run on disk to check against"
+    summ = json.load(open(diags[0])).get("summary", {})
+    if len(summ) < 100:
+        return (f"skipped -- {os.path.basename(os.path.dirname(diags[0]))} predates the "
+                f"reductions ({len(summ)} keys); re-run one composition to check this")
+    admitted = [m for m in PR.KNOWN_METRICS if m not in PR.REJECTED_METRICS]
+    missing = [m for m in admitted
+               if m not in summ and m not in allowed and not m.endswith(degenerate)]
+    check(not missing,
+          f"admitted but ABSENT from {os.path.basename(os.path.dirname(diags[0]))}'s summary "
+          f"({len(missing)}): " + ", ".join(missing[:12]))
+    # AND THE RULE MUST BITE: the run must actually carry the reductions, not merely lack them
+    # consistently. A summary of eighty keys would pass the check above by having no admitted
+    # names at all.
+    reduced = [k for k in summ if k.endswith(("_peak", "_floor", "_trend", "_span",
+                                              "_measured_frac"))]
+    check(len(reduced) > 50,
+          f"only {len(reduced)} reduction keys in the summary -- reduce_all is not wired in")
+
+
+@case("a withdrawn metric cannot return under a new suffix")
+def t_rejected_not_reduced():
+    """`autocorr_hops_uncalibrated` was withdrawn because it was never calibrated. Reducing EVERY
+    column of the per-frame table wrote it back under SIX new names -- a record carrying a
+    withdrawn instrument under six suffixes has re-admitted it by the back door.
+
+    THIS TESTS THE CODE PATH, NOT AN OLD FILE. The first version read the newest diag.json on
+    disk, which made it archaeology: it failed on a record written minutes before the fix and
+    would have demanded a fresh simulation before the loop -- which runs simulations -- could
+    start. A test that requires an experiment to certify the thing that runs experiments has the
+    dependency backwards. It exercises the same key selection `run_one` uses, so it is
+    deterministic, needs no GPU, and cannot be fooled by a stale artifact either way.
+    """
+    import numpy as np
+    import predict as PR
+    import time_analysis as TA
+    rej = PR.REJECTED_METRICS[0]
+    n = 40
+    cols = {"act_cv": np.linspace(0, 1, n), "protr": np.linspace(1, 1.3, n),
+            rej: np.linspace(5, 50, n)}                      # a withdrawn column, as on disk
+    fb = {k: np.arange(n, dtype=float) * 25 for k in cols}
+    wide = TA.reduce_all(cols, fb, horizon_frame=None)
+    check(any(k.startswith(rej + "_") for k in wide),
+          "fixture wrong: reducing every column did not emit the withdrawn metric")
+    # ...and now the selection run_one actually applies:
+    kept = [k for k in cols if k in set(PR.SERIES_QUANTITIES)]
+    narrow = TA.reduce_all(cols, fb, horizon_frame=None, keys=kept)
+    back_door = sorted({k for k in narrow for r in PR.REJECTED_METRICS if k.startswith(r + "_")})
+    check(not back_door, "a REJECTED metric survives run_one's key selection: "
+                         + ", ".join(back_door[:8]))
+    check(any(k.startswith("act_cv_") for k in narrow),
+          "the selection dropped an ADMITTED quantity too -- it is not selecting, it is emptying")
+
+
 @case("roles.py --check still agrees with the code")
 def t_roles():
     import roles
