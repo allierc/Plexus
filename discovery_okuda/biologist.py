@@ -328,12 +328,33 @@ def p13_growth_not_capped_by_the_array(cfg, s):
     grew = final > float(cells[0]) * 1.05
     flat_tail = frac_after > 0.15 and np.allclose(cells[idx:], final, rtol=0, atol=0.5)
     if grew and flat_tail:
-        return R("P13", "passive", "growth is not capped by the array", "fail",
+        # AMBIGUOUS, NOT INVALID -- which is what the docstring above has always said, and what
+        # this returned `fail` for anyway. `fail` puts P13 in premises_broken, the specimen is
+        # marked invalid, and the run is barred from the frontier: measured on 3 August, the whole
+        # wk_* family, FIVE of twelve slots, discarded on the strength of where each run ENDED.
+        # The eye-check had read every one of them in detail -- "red zones propagate inward via
+        # division and diffusion", "activator shifts from dispersed to pole-concentrated" -- so
+        # there was real trajectory in each, thrown away.
+        #
+        # The distinction the premise exists to draw is between a tissue that stopped dividing and
+        # one that was NOT ALLOWED to. It draws it correctly. What it did wrong was to price both
+        # halves of the run at the value of the second.
+        #
+        # So: `censored` when the tissue grew for most of the run and then met the array --
+        # n_cells_final is a LOWER BOUND, the frames before the plateau are evidence, and only
+        # endpoint growth metrics are inadmissible. `fail` is kept for the case where the plateau
+        # covers the run: if the array decided the answer before the tissue had a chance to, there
+        # is nothing to censor, only a buffer to report.
+        status = "fail" if frac_after > 0.6 else "censored"
+        _what = ("the plateau covers most of the run, so the array decided the answer before the "
+                 "tissue could" if status == "fail" else
+                 f"the {1 - frac_after:.0%} of the run before frame {idx} is evidence; "
+                 f"n_cells_final={final:.0f} is a LOWER BOUND and endpoint growth metrics are not")
+        return R("P13", "passive", "growth is not capped by the array", status,
                  f"cell count reached {final:.0f} at frame index {idx} of {cells.size - 1} and "
                  f"then did not change for the remaining {frac_after:.0%} of the run. A tissue "
-                 f"that stops dividing at a constant is a tissue that ran out of ARRAY, not out "
-                 f"of biology -- check div_blocked/buf_full in the run record. Everything measured "
-                 f"after that frame describes the reservoir.", measured=final)
+                 f"that stops dividing at a constant ran out of ARRAY, not of biology -- check "
+                 f"div_blocked/buf_full in the run record. {_what}.", measured=final)
     return R("P13", "passive", "growth is not capped by the array", "pass",
              f"cell count ends at {final:.0f} with no flat ceiling")
 

@@ -538,6 +538,11 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
                "region": disc.get("region"), "summary": summary, "acted": acted,
                "premises": [p.as_dict() for p in prem],
                "premises_broken": [p.pid for p in prem if p.status in ("fail", "error")],
+               # CENSORED IS ITS OWN COLUMN. Not broken -- the run is admissible -- but not clean
+               # either: a reader that takes n_cells_final at face value from one of these is
+               # reading the reservoir. Recorded so the claim checker can refuse a conclusion that
+               # rests on the censored quantity, which is the whole reason for keeping the run.
+               "premises_censored": [p.pid for p in prem if p.status == "censored"],
                "premises_ablated": [p.pid for p in prem if p.status == "ablation"],
                "run_id": rec.run_id},
               open(os.path.join(out_dir, "diag.json"), "w"), indent=1)
