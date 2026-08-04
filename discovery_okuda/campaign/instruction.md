@@ -28,36 +28,3 @@ Also available and NOT part of scoring, but informative: mech_p_ratio (tube/body
 ~3 = a FORCED protrusion, ~1 = a growth-driven equilibrium).
 
 <!-- LEARNED PATTERNS -->
-Distilled from the runs. Drop a line once it stops paying rent.
-
-1. A CONTROL MUST CARRY A CHECKABLE PREDICTION. Round 1 spent 12 slots re-measuring
-   existing runs with prediction `unstated` on `protr_peak`; every one was logged
-   NOT CHECKABLE ("no clause of the form <metric> <op> <value>") → zero ledger movement.
-   A replay/control earns its slot only with an explicit range, e.g. `protr_peak 1.00-1.02`,
-   `ta_n_tubes_final 0`. "unstated" is a wasted round.
-
-2. THE wk_* WEAK-DRIVER FAMILY SATURATES THE BUFFER — do not re-run as-is.
-   apical_area / pressure / curvature / tension / null all hit n_cells_final=1766,
-   buf_full=true, div_blocked=40 at frame ~304/400 → P13 fails, valid_evidence=false,
-   flagged NOT EVIDENCE (P2_BUFFER_SATURATED). Their buffer is sized for a 150-cell seed;
-   everything after saturation describes the reservoir, not tissue. Enlarge per_parent
-   (target ≥ 33× seed, they grow V ×33) BEFORE testing any driver in this family, or the
-   result is uninterpretable regardless of the mechanism.
-
-3. EVERYTHING IS STILL A SPHERE. Across all 12 runs protr_peak ≤ 1.11, ta_n_tubes_final=0,
-   mech_p_tube=0, mech_p_ratio=0, morphology=sphere. Chemistry patterns the SURFACE (spots,
-   red_frac) but produces NO deformation. No composition tested has bought a protrusion.
-   0 of 4 Okuda morphologies attempted with a forcing mechanism. The map has no positive
-   shape cell yet — the frontier is to FORCE one, not to re-measure spheres.
-
-4. THE WATCHER CAPTION OVERSTATES MORPHOLOGY. On p1_ph_coral_fixed_ball the watcher
-   reported "multi-lobed structure with prominent protrusions" on a protr_peak=1.076 sphere;
-   the analyst caught it (analyst_concerns). Trust protr_peak / ta_n_tubes_final / mech_p_ratio
-   and analyst_concerns, NEVER watcher_describe, for whether a shape formed.
-
-5. AN EMPTY DIAG IS AN APPARATUS MISS, NOT A NULL. mini_coral_nodilute returned `{}` /
-   no diag.json — the run produced nothing. Re-issue it; do not read it as evidence of no effect.
-
-6. mech_p_ratio SEPARATES FORCED FROM GROWN: ~3 = a forced protrusion, ~1 = growth-driven
-   equilibrium, 0 = no protrusion at all (the state of every run so far). Use it to tell a
-   real mechanical bud from a buffer/growth artefact.
