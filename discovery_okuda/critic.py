@@ -159,24 +159,30 @@ def _run_key(graph):
 
 
 def _theta_hash(graph, base=False):
-    """The OPERATING POINT: a stable digest of the tunable parameters, excluded from comp_hash.
+    """The OPERATING POINT, canonically: every tunable parameter at its EFFECTIVE value.
 
     comp_hash answers "is this the same mechanism". This answers "is this the same experiment on
     it". Keeping them separate is what lets a parameter sweep run without a retune ever counting
     as a discovery.
+
+    EFFECTIVE, NOT OVERLAID -- and the external review caught this. The first version hashed only
+    `graph.params`, so the SAME composition at the SAME operating point hashed two ways depending
+    on whether a value sat in the overlay or was left to its declared default. It is not
+    hypothetical: a reference recipe carries a sparse overlay while the same composition rebuilt
+    from a finished run carries every parameter explicitly, and both emit a BYTE-IDENTICAL spec.
+    R6 would not have recognised the second as a repeat of the first. Merging the declared
+    defaults under the overlay makes the hash a property of the experiment rather than of how it
+    happened to be written down.
     """
     import hashlib
     try:
-        if base:
-            # the DEFAULT operating point of this composition: every tunable at its declared
-            # default. A graph equal to this has not been retuned, so a comp_hash match IS a
-            # duplicate even when the lever map recorded no theta.
-            items = sorted((f"{o['id']}.{pn}", round(float(d), 9))
-                           for o in graph.ops
-                           for pn, (_lo, _hi, d) in (OPERATORS[o["op"]].get("params") or {}).items())
-        else:
-            items = sorted((k, round(float(v), 9)) for k, v in (graph.params or {}).items()
-                           if not k.startswith("_run.") and isinstance(v, (int, float)))
+        eff = {f"{o['id']}.{pn}": float(d)
+               for o in graph.ops
+               for pn, (_lo, _hi, d) in (OPERATORS[o["op"]].get("params") or {}).items()}
+        for k, v in (graph.params or {}).items():
+            if not k.startswith("_run.") and isinstance(v, (int, float)) and k in eff:
+                eff[k] = float(v)
+        items = sorted((k, round(v, 9)) for k, v in eff.items())
     except Exception:
         return ""
     if not items:
@@ -458,9 +464,12 @@ def check_static(graph, seen_hashes=(), edit_kind=None):
     # unchanged, so a retune is still not a discovery), and the OPERATING POINT decides whether
     # this exact experiment has been run. A sweep of ten values is ten experiments on one
     # mechanism -- which is exactly what it should be.
-    # The key is MECHANISM@OPERATING-POINT. A bare comp_hash in `seen` (which is what the lever
-    # map holds for a run whose theta was never recorded) still refuses the identical composition
-    # at its identical parameters, because that graph produces the identical key.
+    # The key is MECHANISM@OPERATING-POINT. NOTE WHAT THIS DOES NOT GUARANTEE: the lever map's
+    # historical entries carry a bare comp_hash and no theta, so a `set_param` move that lands
+    # back on one of those operating points is ADMITTED and re-runs it once. An earlier version
+    # of this comment claimed otherwise; the external review checked and it was false. Asserting
+    # a guarantee the code does not provide is the exact defect WIRING.md exists to stop, and it
+    # does not become acceptable for being in a comment I wrote.
     # WHICH QUESTION IS BEING ASKED decides which key. A STRUCTURAL edit proposes a new
     # mechanism, so the composition is the identity and a repeat of it is a replicate -- the
     # original rule, unchanged. A `set_param` edit proposes a new OPERATING POINT on a mechanism
