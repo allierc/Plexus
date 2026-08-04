@@ -813,3 +813,38 @@ if __name__ == "__main__":
             print(f"  ERROR {name}\n          {type(e).__name__}: {e}")
     print(f"\n{len(CASES) - len(FAILED)}/{len(CASES)} passed")
     sys.exit(1 if FAILED else 0)
+
+
+@case("the Proposer is shown the metrics it must predict against")
+def t_proposer_sees_the_bank():
+    """THE ROLE THAT WRITES THE PREDICTIONS WAS NEVER GIVEN THE LIST.
+
+    proposer.py's prompt says "naming a metric from the admitted list" and did not include the
+    list. The only metric names in it were the two used as EXAMPLES of the clause syntax --
+    `protr_peak` and `mech_p_ratio` -- and in round 2 the Proposer wrote ALL TWELVE predictions
+    on protr_peak. I diagnosed that as a presentation problem with a 53-name flat list; it was
+    a bank the Proposer had never been handed. The Reader, which only labels a finished run,
+    received the full registry all along.
+
+    Checked on the ASSEMBLED PROMPT, not on the source, because that is where the omission was:
+    every part was correct and the seam was missing.
+    """
+    import offline as O
+    O.install("clean")
+    import round as R, proposer as P, llm
+    cap = {}
+    real, llm.run_claude = llm.run_claude, lambda p, **k: (cap.__setitem__("p", p), (True, "{}"))[1]
+    try:
+        with quiet():
+            P.propose(R.load_frontier(), R.CampaignConfig(batch=6, keep_truncate=2),
+                      None, "", 4, n_slots=8)
+    finally:
+        llm.run_claude = real
+    prompt = cap.get("p", "")
+    check(prompt, "the proposer prompt was never captured")
+    import predict as PR
+    for m in ("act_cv_peak", "corr_act_rad_measured_frac", "act_alive_frac"):
+        check(m in prompt, f"{m} is admitted but never reaches the Proposer's prompt")
+    groups = sum(1 for g in PR.SERIES_METRICS if g in prompt)
+    check(groups >= 4, f"only {groups} of the metric groups reached the prompt")
+    check("THE SIX SUFFIXES" in prompt, "the reduction suffixes never reach the Proposer")

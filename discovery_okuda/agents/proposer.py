@@ -117,6 +117,30 @@ def _block(title, body):
     return f"\n{title.upper()}\n{str(body).strip()}\n"
 
 
+def _metric_bank():
+    """WHAT THE PROPOSER MAY PREDICT AGAINST -- which it has never once been shown.
+
+    Its own prompt says "naming a metric from the admitted list" and then does not include the
+    list. The only metric names anywhere in that prompt are the two used as EXAMPLES of the
+    syntax: `protr_peak` and `mech_p_ratio`. In round 2 the Proposer wrote all twelve predictions
+    on protr_peak, and I blamed the presentation of a bank it was never handed.
+
+    So the role that WRITES the predictions was reasoning about what is measurable from memory,
+    while the Reader -- which only labels a run -- received the full registry. That is the
+    campaign's recurring shape once more: the instrument existed, was documented, was admitted,
+    and the one role that needed it was not told.
+    """
+    try:
+        from predict import admitted_block
+        from llm_agents import NEW_INSTRUMENTS
+        return ("WHAT YOU MAY PREDICT AGAINST. Every clause must name one of these EXACTLY -- the "
+                "scorer looks the name up by exact key, and a name that is not here scores "
+                "`not measured` and buys nothing.\n\n" + admitted_block(new_since=NEW_INSTRUMENTS))
+    except Exception as e:
+        return (f"(THE METRIC BANK COULD NOT BE RENDERED: {type(e).__name__}. Say so in your "
+                f"reasoning rather than guessing at metric names.)")
+
+
 def propose(frontier, cfg, prox, ledger_summary, round_id, n_slots=8, timeout_min=10,
             ledger=None, steer=None, refusals=None, setup=None, history=None, review=None):
     """Ask the agent for a batch. Returns (ok, [slot dicts]).
@@ -286,6 +310,8 @@ RULES
    contributes nothing to the map. You may add a `REFUTED if ...` sentence; it is recorded but
    the assertion before it is what gets checked.
  - Write {PROPOSAL_FILE} and NOTHING else. The record is not yours to write.
+
+{_metric_bank()}
 """
     # THE PROPOSAL FILE IS DELETED BEFORE THE CALL, so a stale one cannot be adopted.
     #
