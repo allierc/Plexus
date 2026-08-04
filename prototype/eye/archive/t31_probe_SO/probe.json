@@ -1,0 +1,14 @@
+{
+  "muscle": "SO",
+  "a_hi": 1.0,
+  "tonic": 0.14,
+  "t_on": 60,
+  "t_off": 480,
+  "n_frames": 560,
+  "baseline": "t31_probe_SO",
+  "gaze_range_deg": [
+    73.422,
+    11.97,
+    24.59
+  ]
+}
