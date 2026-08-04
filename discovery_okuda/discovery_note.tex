@@ -41,6 +41,12 @@
   arc=2pt,left=8pt,right=8pt,top=6pt,bottom=6pt,title={\bfseries #1},
   fonttitle=\color{white},colbacktitle=rule}
 
+% A RESULT, INSIDE THE PHASE THAT ASKED FOR IT. Tinted and inset, so a reader scanning the note can
+% see at a glance which parts of a phase have been run and which are still specification.
+\newtcolorbox{resultbox}[1]{breakable,colback=rule!5,colframe=rule!35,boxrule=0.5pt,
+  arc=1pt,left=6pt,right=6pt,top=5pt,bottom=5pt,title={\bfseries\small #1},
+  fonttitle=\color{white},colbacktitle=rule!70,before skip=6pt,after skip=6pt}
+
 \title{\textbf{Plexus Discovery}\\[6pt]
 \large Progress note --- written to be read, not decoded}
 \author{}
@@ -1601,6 +1607,54 @@ exactly the ones that have cost us rounds: does every declared artifact get writ
 gate fire, does the batch fill, is the record complete before its readers run. A regression becomes
 a failing test rather than a wasted evening. \textbf{This is built first, because it is what makes
 the rest of the phase checkable.}
+
+\begin{resultbox}{8.1 --- Built, and what it found immediately \hfill \done}
+\textbf{Three seams, not two.} \code{run\_claude} (not \code{run\_agent} --- \code{agents/} is on
+\code{sys.path}, so \code{llm} and \code{agents.llm} are two module objects for one file, and
+patching either alone leaves the other live: the first ``offline'' round spent \$0.37 while
+printing that it was free), the cluster, and --- found only by running --- \textbf{the VLM}. A
+23\,GB model load is not offline by any reading, and a harness that takes five minutes will not be
+run before a launch, which is the only thing it is for.
+
+\smallskip
+\textbf{\code{offline.py}} --- a full three-act round in \textbf{$\approx$6 seconds}, no agent, no
+GPU, no VLM. \textbf{\code{test\_offline.py}} --- \textbf{8 cases, 8 passing}, each one a round we
+have already paid for: the prompt arrives whole; no path reaches the real CLI (proved with a
+\code{subprocess.Popen} tripwire); a clean round fills its batch and reaches Act~3; phenotype edits
+are refused and repaired \emph{in the same round}; a proposal under the wrong key is still read; a
+reply with no JSON does not fabricate a batch; \code{REJECT} with no flag is still a rejection; a
+truncated name resolves to its run.
+
+\smallskip
+\textbf{What it found on its first honest run --- the worst defect of the campaign.}
+\code{run\_agent} contained \code{prompt.split("BREVITY")[0]}, and the Proposer's template pastes
+\code{\{BREVITY\}} at character~331 of a 16{,}093-character prompt. \textbf{The agent received 331
+characters}: no legal-move menu, no refusals, no history, no output schema. It invented
+\code{add branching} and \code{add chemotaxis} because it had never been shown the operators --- and
+when it reported \emph{``I lack the injected \textsc{legal moves} menu (this call omitted it)''},
+that was \textbf{literally true} and was read here as a hallucination. Four rounds were spent on
+the consequences, including the recon Proposer naming zero runs, whose JSON schema sat past
+character~331 as well. Excising the \emph{block} rather than truncating at it: $331 \to 18{,}025$
+characters, 36~moves, schema present.
+
+\smallskip
+\textbf{Two faults were the harness's own} --- worth recording, because inventing failures is the
+characteristic way a fake goes wrong. Inferring the batch size with a loose regex matched
+``1~slot'' inside a pasted refusal block, so it proposed a batch of one; and a hand-written metrics
+series omitted \code{act\_mean}, so the Diagnostician read all six runs as diverged and stopped the
+round over an apparatus fault that did not exist. Both now \emph{template from real files} instead
+of being written by hand, which is the rule this box exists to state: \textbf{a fake that invents
+failures trains you to ignore the alarm.}
+
+\smallskip
+\textbf{Also landed with it.} Same-round repair when the Critic guts a batch, because its refusals
+are mechanical and have a right answer --- measured $1$ of $12 \to 12$ of $12$ on round~2's real
+proposal, one extra call, bounded at one so it cannot loop. Attrition written as a number
+(\code{asked/proposed/refused/delivered}) rather than two prints a reader must subtract.
+\code{REVISE} reads as a rejection. \code{[trace]} off by default. And ``not checkable'' no longer
+fires on recon slots, which carry no prediction \emph{by design} --- it was describing the design
+as a defect, three lines per run, twelve runs a round.
+\end{resultbox}
 
 \subsection*{2. The entities, as classes and a registry}
 \code{ROLES.md} already declares who exists and \code{roles.py --check} keeps it honest --- but it
