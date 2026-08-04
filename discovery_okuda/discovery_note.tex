@@ -99,17 +99,42 @@ Plain English throughout. Organised by phase, because phases are where we stop a
 %======================================================================
 \section{What we are doing --- two things at once}
 
-\textbf{Track A --- build the method.} An automated loop that searches for biological
-\emph{mechanisms} rather than parameter values. It proposes a change to the model's structure
-(``remove the pushing force'', ``add oriented cell division''), writes down what it expects
-\emph{before} running, runs the simulation, measures, and records whether it was right. The
-discipline that makes it worth building: a change of numbers can never masquerade as a new idea.
+\textbf{Track A --- build the method.} An automated loop whose unit of discovery is a
+\emph{mechanism}: it proposes a change to the model's \textbf{structure} --- remove the pushing
+force, add oriented cell division, wire the growth gate to the reaction instead of the seed ---
+writes down what it expects \emph{before} running, runs the simulation, measures, and records
+whether it was right.
 
-\textbf{Track B --- reproduce Okuda's result, as the proof that Track A works.} Okuda et al.\
-(2018) grew a hollow ball of cells that spontaneously forms tubes, undulations and branches,
-driven by a chemical pattern on its own surface. We are rebuilding that here. If the loop finds
-the mechanism largely by itself, the method is demonstrated. \emph{The figure is not a side quest
---- it is the evidence.}
+\textbf{Parameters are in scope; they are just not discoveries.} ``What does this mechanism do as
+you turn it up'' is the second question Track~A asks of every mechanism, and a sweep is a
+legitimate experiment. What must never happen is a retune being reported as a new idea --- and that
+is now enforced by arithmetic rather than by prohibition: \code{comp\_hash} excludes parameters, so
+a composition at a different operating point has the \emph{same identity} and is filed as a point
+on a known mechanism. The rule holds because the identity function says so, not because an agent
+was asked to be careful.
+
+\textbf{And it must be allowed to be curious.} A loop that may only test predictions will only ever
+propose things it can predict, which is how a campaign came to spend nineteen of thirty-four
+predictions on ``nothing will happen'' and count eighteen confirmations that a sphere stayed a
+sphere. An exploratory slot states what it is \emph{varying} and what it will \emph{report}, rather
+than what it expects. Turning $\chi$ up and describing what appears is an experiment; a labyrinth
+nobody forecast is a finding, not a failed prediction.
+
+\textbf{Track B --- reproduce Okuda's result, as the proof that the method is worth having.} Okuda
+et al.\ (2018) grew a hollow ball of cells that spontaneously forms tubes, undulations and branches,
+driven by a chemical pattern on its own surface. We are rebuilding that here, and \emph{the figure
+is not a side quest --- it is the evidence.}
+
+\textbf{What we may honestly claim, and what we may not.} The composition carrying Okuda's coupling
+is \textbf{supplied} to the search, as a starting point on the frontier --- it is written down in
+\code{reference\_recipes()} and the loop begins from it. So the claim is \emph{not} ``the loop found
+the mechanism by itself''. What the loop does, and what would be worth publishing, is the
+\textbf{lever map around that mechanism}: which operators are necessary, which are inert, what
+happens at the extremes, and which of the four morphologies each choice reaches --- every one of
+those a prediction made before the run and scored after it. If a composition the loop reaches by
+its own edits ever beats the supplied one, that is a stronger claim and it will be stated
+separately. Until then the honest sentence is: \emph{the mechanism was given; the map around it was
+earned.}
 
 The two tracks feed each other: the reproduction is the honest test of the method, and the method
 is what makes the reproduction more than hand-tuning.
