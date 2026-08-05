@@ -61,7 +61,10 @@ BUFFER_X = 4
 # that guarantees non-penetration; these two are what keep the force physical on the way there.
 BASE = dict(n_particles=140000, n_grid=48, youngs=15.0, k_contact=1200.0, a_max=300.0,
             cavity_r=0.095, cavity_h=0.095, axis=2, n_fibres=6000, fibre_len=0.16,
-            align=0.0, substep_dt=2.0e-4, stress_scale=0.08)
+            align=0.0, substep_dt=2.0e-4,
+            # von Mises of the stored Cauchy stress, so 43 is comparable with 47/48 rather than with the
+            # \|J-1\| runs it was first measured against -- see log/okuda_ECM/DEFECTS.md.
+            stress_scale=0.008, stress_measure="vonmises")
 
 RUNS = [
     ("39_plate_null_blk33",  18.5),      # blocks 1/3 of the box: never reached. The null.
