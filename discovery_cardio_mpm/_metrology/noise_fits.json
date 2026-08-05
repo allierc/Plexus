@@ -1,0 +1,112 @@
+{
+ "n_iter": 300,
+ "device": "cuda:0",
+ "devices": [
+  "cuda:0",
+  "cuda:1"
+ ],
+ "devices_identical": true,
+ "errors": {
+  "repeat_b": "train: torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 20.00 MiB. GPU 0 has a total capacity of 47.40 GiB of which 10.44 MiB is free."
+ },
+ "metrics": {
+  "loopscore": {
+   "seed_sd": 0.09103308987914158,
+   "seed_min": -0.21824750304222107,
+   "seed_max": -0.02511746436357498,
+   "seed_n": 4,
+   "seed_mean": -0.15560793317854404
+  },
+  "loopscore_sd": {
+   "seed_sd": 0.056238030413767556,
+   "seed_min": 0.4562947750091553,
+   "seed_max": 0.5843283534049988,
+   "seed_n": 4,
+   "seed_mean": 0.5372253507375717
+  },
+  "interior_r2": {
+   "seed_sd": 0.24915514963458588,
+   "seed_min": -2.6961448192596436,
+   "seed_max": -2.1178598403930664,
+   "seed_n": 4,
+   "seed_mean": -2.4035884737968445
+  },
+  "residual/size": {
+   "seed_sd": 0.04674935129621795,
+   "seed_min": -0.1575850173830986,
+   "seed_max": -0.04516573250293732,
+   "seed_n": 4,
+   "seed_mean": -0.10865208320319653
+  },
+  "residual/orientation": {
+   "seed_sd": 0.0074161496112832665,
+   "seed_min": 0.15671595185995102,
+   "seed_max": 0.1737876944243908,
+   "seed_n": 4,
+   "seed_mean": 0.16342739507672377
+  },
+  "residual/openness_aspect": {
+   "seed_sd": 0.04110761295699926,
+   "seed_min": 0.00995355099439621,
+   "seed_max": 0.103460393846035,
+   "seed_n": 4,
+   "seed_mean": 0.06450827233493328
+  },
+  "residual/chirality": {
+   "seed_sd": 0.02620121355835709,
+   "seed_min": 0.14902259409427643,
+   "seed_max": 0.2103063352406025,
+   "seed_n": 4,
+   "seed_mean": 0.17709344206377864
+  },
+  "residual/shape_detail": {
+   "seed_sd": 0.019470154589068752,
+   "seed_min": 0.22757006343454123,
+   "seed_max": 0.2745152786374092,
+   "seed_n": 4,
+   "seed_mean": 0.25045271473936737
+  },
+  "openness": {
+   "seed_sd": 0.034009495163194195,
+   "seed_min": 0.17311456530585256,
+   "seed_max": 0.24527094410151412,
+   "seed_n": 4,
+   "seed_mean": 0.20114224124238989
+  },
+  "path_length": {
+   "seed_sd": 0.0002104962348062635,
+   "seed_min": 0.0013152550244223782,
+   "seed_max": 0.0018230598743911018,
+   "seed_n": 4,
+   "seed_mean": 0.0015438685830472603
+  },
+  "peak_excursion": {
+   "seed_sd": 4.153914756351469e-05,
+   "seed_min": 0.0004413499749504042,
+   "seed_max": 0.0005394102360255559,
+   "seed_n": 4,
+   "seed_mean": 0.0004953137351341617
+  },
+  "chirality_match": {
+   "seed_sd": 0.017084429803802523,
+   "seed_min": 0.5690376569037657,
+   "seed_max": 0.606314187904146,
+   "seed_n": 4,
+   "seed_mean": 0.5937143400532523
+  },
+  "orientation_error": {
+   "seed_sd": 0.011600578584384432,
+   "seed_min": 0.7698917082569989,
+   "seed_max": 0.7955937281562946,
+   "seed_n": 4,
+   "seed_mean": 0.7867355037938252
+  },
+  "coordination": {
+   "seed_sd": 0.03844894468817567,
+   "seed_min": 0.6227124307583803,
+   "seed_max": 0.7152476973630598,
+   "seed_n": 4,
+   "seed_mean": 0.6652736677709131
+  }
+ }
+}
