@@ -1681,8 +1681,8 @@ Committed as \code{dc498686}. \textbf{27/27} offline checks and every \code{test
 \toprule
  & before & after \\
 \midrule
-the round runner                 & 2{,}504 & \textbf{480} \\
-\quad executable statements      & 1{,}099 & \textbf{478} (round $+$ build $+$ crew) \\
+the round runner                 & 2{,}504 & \textbf{1{,}078} \\
+\quad executable statements      & 1{,}099 & \textbf{556} \\
 \code{frame\_metrics}            &   279 & \textbf{63} \\
 \code{tissue\_analysis.py}       &   611 & \textbf{412} \\
 a metric's definition            & 6 places, 4 files & \textbf{1 class} \\
@@ -1778,7 +1778,7 @@ report is their own bug rather than the fixture's.
 \includegraphics[width=\linewidth]{figs/test_geometries.pdf}
 \end{center}
 
-\noindent \emph{The seven fixtures and what the metrics say about each. Gold marks a metric firing on
+\noindent \emph{The eight fixtures and what the metrics say about each. Gold marks a metric firing on
 the shape it is meant to fire on. Panels are at a common scale --- per-panel limits would make a tube
 and a sphere look equally elongated, hiding the difference the figure exists to show. Rendered with
 \code{run\_tyssue\_vesicle.\_draw}, the same renderer as every movie and strip the campaign produces.}
@@ -1791,7 +1791,7 @@ counts \emph{the ends}, and the greedy angular clustering splits a broad polar c
 is one of the \textbf{five headline metrics} --- ``did the instrument call it a tube'' --- answerable
 with 3 where there is no tube. Fixed by the definition rather than a constant: a tube is longer than it
 is wide, so a cluster with length $\le$ diameter is not one. After: sphere 0, prolate 0, oblate 0,
-undulated 0, self-intersecting 0, tube 1, branched 2.
+undulated 0, self-intersecting 0, tube 1, and exact counts to twelve on a many-tube fixture.
 
 \item \textbf{\code{n\_tips} has a 25-degree resolution, now measured.} Swept on the fork fixture, it
 flips $1\to2$ at a half-angle of 27$^\circ$ --- exactly where the cone predicts. A narrower fork is
@@ -1843,6 +1843,50 @@ exempt, with a reason  & 13 & 8 run-level (need a series, not a frame), 4 reject
 \bottomrule
 \end{tabular}
 \end{center}
+
+\subsection*{Second pass: did the phase keep its own discipline?}
+Cedric, 5 August: \emph{``check that we are not over-complexifying vs plan in phase 12 \dots do not
+fall into the gap `strong judge, weak learning' again.''} Measured rather than asserted.
+
+\textbf{The trap was avoided.} The refusal codes reachable from a launch are exactly the ten the phase
+planned --- \code{R1}--\code{R4}, \code{R6}, \code{C1}--\code{C3}, every one structural: can this be
+built, is it new, can it reach its own target. Not one gate was added that judges a \emph{result}. The
+eight remaining refusal paths in \code{round.py} are build failures (the parent will not rebuild, the
+edit is not applicable, the edit changed nothing, the spec will not write). Everything added since is
+an INPUT: \code{coverage}, \code{diagnosis}, the menu's \code{from}/\code{try}/\code{range}, and
+\code{range\_notes} as text on the record rather than a veto.
+
+\textbf{But the runner doubled, and this note had stopped saying so.} 343 $\to$ 556 statements,
+660 $\to$ 1{,}078 lines. The figures above said 480 until this pass corrected them --- a note that has
+stopped describing the code is the defect this campaign keeps paying for, and it does not become
+acceptable for being in a note I wrote.
+
+\begin{center}\small
+\begin{tabular}{lrl}
+\toprule
+\multicolumn{3}{l}{\textbf{+1{,}319 lines since the phase commit, and where they went}} \\
+\midrule
+\code{test\_geometries.py}   & 591 & the verification the phase said was missing \\
+\code{round.py}              & 503 & four requested features, three measured defects \\
+\code{figure\_geometries.py} & 124 & the figure \\
+\code{test\_round.py}        & 113 & regressions for the defects \\
+everything else              &  ~100 & ports, budgets, voices \\
+\midrule
+\textbf{tests and figure}    & \textbf{828} & 63\% of the growth is verification, not loop \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent Traced individually, the runner's growth is the CLI and campaign reset (78 statements), the
+coverage node (24), the menu grid (48), the spec-fidelity overlay (36), the no-op and name resolution
+(19) and the pool pre-flight (20). Each answers a request or a measured failure; none is speculative.
+One helper existed for seven statements used once and has been folded back into its caller.
+
+\textbf{What is still unbudgeted.} \code{metrics.py} is 1{,}141 lines for 67 classes, against the
+$\sim$120 lines of literal lists it replaced --- it removed the six-place edit and gave the metrics a
+tested definition, but it has not paid for itself in line count and should not be described as if it
+had. And 32\% of \code{round.py} is prose. That is a deliberate trade, not an accident, but it is the
+reason the file reads as twice the size the statement count implies.
 
 \textbf{What you get.} A loop of four roles and $\sim$11 calls a round that keeps the three things the
 control cannot have --- composition, a structural critic, and an eye --- and drops the eleven that
