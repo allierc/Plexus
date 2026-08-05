@@ -141,8 +141,19 @@ def test_menu_rows_carry_real_edits():
     import io
     import contextlib
     import round as E
-    with contextlib.redirect_stdout(io.StringIO()):
-        mn = E.menu({"parents": E.parents({"pool": ["coral_gate"]})})
+    import tempfile
+    # FORCED ONTO THE POOL PATH. `parents()` reads the campaign's records first and falls back to the
+    # pool only when there are none -- so this passed on a fresh campaign and failed the moment a round
+    # recorded anything, which is the loop working rather than breaking. A test whose result depends on
+    # how far the campaign has got is not testing the menu.
+    with tempfile.TemporaryDirectory() as td:
+        old = E.RECORDS
+        E.RECORDS = os.path.join(td, "records.jsonl")
+        try:
+            with contextlib.redirect_stdout(io.StringIO()):
+                mn = E.menu({"parents": E.parents({"pool": ["coral_gate"]})})
+        finally:
+            E.RECORDS = old
     rows = mn.get("coral_gate") or []
     check(len(rows) > 10, f"the menu has rows: {len(rows)}")
     bad = [r for r in rows if not isinstance(r, dict) or "edit" not in r
