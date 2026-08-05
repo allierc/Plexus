@@ -100,11 +100,23 @@ def build(name, tissue_npz, fit=FIT, plate_box=None, **ecm):
                 o.pop(k, None)                      # a replay has no r(t) formula to grow by
         if o["op"] == "ecm_seed" and gap_box is not None:
             o["plate_half"] = gap_box
+        if o["op"] == "basement_membrane_seed":
+            # THE SURFACE SCALE, not 1.0. `ecm_spec` cannot know it -- only `combine` computes the
+            # tissue-to-box scale -- and hardcoding 1.0 put the membrane at radius 4.66 in a unit box,
+            # i.e. entirely outside it. The wall boundary then clamped 20,000 particles onto the cube's
+            # faces, where their spacing exceeded the bond cutoff and the sheet was built with ZERO
+            # bonds: a membrane silently degenerate into stiff dust.
+            o["scale"] = s
+            o["surface"] = tissue_npz
     # NON-PENETRATION, ALWAYS. The penalty in `cell_to_ecm` punishes penetration rather than
     # preventing it, and `mpm_scatter`'s `a_max` clamp puts a ceiling on the punishment -- so matrix
     # particles were ending up inside the lumen, which is a place there is no matrix. Added after the
     # substep block so it corrects what the loop just did.
     import ecm_ops                                                   # noqa: F401  register it
+    if "basement_membrane_particle" in spec["sets"]:
+        sys.path.insert(0, os.path.join(ROOT, "prototype", "eye"))
+        import membrane_ops                                           # noqa: F401
+        import muscle_ops                                             # noqa: F401
     if "mpm_block" in spec["sets"]:
         # THE ELASTIC BLOCK's two dependencies: its own ops, and the eye prototype's
         # `mpm_scatter[accumulate]` -- the implementation that lets a second body share the grid.

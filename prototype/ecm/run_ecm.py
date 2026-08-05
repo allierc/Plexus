@@ -336,6 +336,15 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True,
     meshes = [(t, m) for t, m in Tis["meshes"] if t < T]
     plate = Tis.get("plate_gap")                        # rigid-block half-gap in TISSUE units, or None
 
+    # THE BASEMENT MEMBRANE, if this run has one: a third MPM set with its own bond-strain history.
+    import membrane_ops
+    mem_pos = (np.asarray(out["sets"]["basement_membrane_particle"]["pos"])
+               if "basement_membrane_particle" in out.get("sets", {}) else None)
+    mem_hist = membrane_ops.MEMBRANE_STRAIN if mem_pos is not None else None
+    if mem_pos is not None:
+        print(f"[{name}] basement membrane: {mem_pos.shape[1]} particles, "
+              f"{len(mem_hist or [])} strain frames", flush=True)
+
     # THE ELASTIC BLOCK, if this run has one: a second MPM set, its own strain history, its own ramp.
     import block_ops
     bpos = np.asarray(out["sets"]["mpm_block"]["pos"]) if "mpm_block" in out.get("sets", {}) else None
@@ -431,9 +440,17 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True,
     # carrying the monolayer, the lumen and the front's timing, squeezed into a fifth of the width. The
     # top-down camera exists to catch a protrusion pointing at the side camera; the tissue here is a
     # sphere or an ovoid by construction, so it was the panel with the least to say.
-    figm = plt.figure(figsize=(11.0, 5.5), facecolor="black")
-    axs = figm.add_subplot(1, 2, 1, projection="3d", computed_zorder=False, facecolor="black")
-    axc2 = figm.add_subplot(1, 2, 2, facecolor="black")
+    # THREE PANELS when there is a basement membrane or per-junction myosin to show. Both live in a
+    # shell a few percent of the tissue radius thick: at the whole-tissue framing the junction network is
+    # thinner than the line used to draw a cell and the membrane is a one-dot rim, so neither is readable
+    # in the panels the other results need. The zoom is the only place a colour scale can honestly be
+    # spent on them.
+    zoom = (mem_pos is not None) or any("myo" in m for _, m in meshes)
+    ncol = 3 if zoom else 2
+    figm = plt.figure(figsize=(5.5 * ncol, 5.5), facecolor="black")
+    axs = figm.add_subplot(1, ncol, 1, projection="3d", computed_zorder=False, facecolor="black")
+    axc2 = figm.add_subplot(1, ncol, 2, facecolor="black")
+    axz = figm.add_subplot(1, ncol, 3, facecolor="black") if zoom else None
     figm.subplots_adjust(0, 0, 1, 1, wspace=0.02)
     fps = int(spec.get("plotting", {}).get("fps", 10))
     wri = FFMpegWriter(fps=fps, metadata={"title": name})
@@ -446,6 +463,15 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True,
                        plate_gap=plate, blk=blk)
             RD.draw_cross(axc2, mt, vp, q, band, cmap, L2, axis_dir, slab, dot_scale=0.85,
                           plate_gap=plate, blk=blk)
+            if axz is not None:
+                mq = ms = None
+                if mem_pos is not None:
+                    mq = (mem_pos[min(t, mem_pos.shape[0] - 1)] - centre) / max(scale, 1e-12)
+                    if mem_hist and t < len(mem_hist):
+                        ms = np.asarray(mem_hist[t], np.float32)
+                RD.draw_zoom(axz, mt, vp, mem_q=mq, mem_s=ms, name=name)
+                axz.text(0.03, 0.97, "zoom: junction myosin (blue) + basement membrane (green->amber)",
+                         transform=axz.transAxes, color="#888", fontsize=7, va="top")
             # ONE LABEL, ON THE 3D PANEL. `_draw`/`_cross_screen` both call ax.clear(), which drops
             # any label, so it is re-stamped every frame. The camera elevation and the cut plane used
             # to be printed too and are not any more: they are fixed for the whole run and recorded in
