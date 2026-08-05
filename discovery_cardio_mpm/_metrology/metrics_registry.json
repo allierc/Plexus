@@ -37,6 +37,11 @@
    "detail": "opening_loopiness=0.7328 vs openness=0.7328; magnitude_peak=1.397 vs peak_excursion=1.397; direction_chirality=1 vs chirality_match=1"
   },
   {
+   "check": "the grid defect is measured on a real fit, not just counted",
+   "pass": true,
+   "detail": "all 36 pinned panels score 1.000; the picture reads +0.694 against +0.522 on the unpinned ones -- inflation +0.172"
+  },
+  {
    "check": "the 10x10 reading surface is outside the pinned band",
    "pass": true,
    "detail": "inherited margin 10: 36/100 nodes INSIDE the band; corrected margin 20: 0/100"

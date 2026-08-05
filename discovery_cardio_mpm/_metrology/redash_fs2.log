@@ -1,0 +1,7 @@
+/workspace/.conda_envs/neural-graph-linux/lib/python3.12/site-packages/torch/backends/__init__.py:46: UserWarning: Please use the new API settings to control TF32 behavior, such as torch.backends.cudnn.conv.fp32_precision = 'tf32' or torch.backends.cuda.matmul.fp32_precision = 'ieee'. Old settings, e.g, torch.backends.cuda.matmul.allow_tf32 = True, torch.backends.cudnn.allow_tf32 = True, allowTF32CuDNN() and allowTF32CuBLAS() will be deprecated after Pytorch 2.9. Please see https://pytorch.org/docs/main/notes/cuda.html#tensorfloat-32-tf32-on-ampere-and-later-devices (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:80.)
+  self.setter(val)
+  [determinism] PARTIAL -- nondeterministic ops permitted (grid_sample backward); this run is NOT bitwise reproducible and its spread must be measured.
+=== cardio_mpm_train material_aniso_cardio: PARAMETRIC active-stress inverse | real beats@[2, 51, 101, 152, 204] period=50 | fit onset=152 warmup[102:152](50f) grad[152:205](53f) sub=10 band=5198 N=16384 (dev=cuda:0) ===
+  interior-moving fit nodes: 11157  | learnable params: 36
+  resumed from /workspace/Plexus/prototype/cardio_mpm/archive/p3_b49_s2_fs2/checkpoints/model_02399.pt (start_iter=2400)
+  redash -> /workspace/Plexus/prototype/cardio_mpm/archive/p3_b49_s2_fs2/checkpoints/dashboard_02399.png

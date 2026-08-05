@@ -1,0 +1,45 @@
+{
+ "run": "p3_b49_s2_fs2 (the joint best of 324 archived fits, LS=+0.545)",
+ "archive_re_derives": {
+  "claimed_ls": 0.545,
+  "replayed_ls": 0.542,
+  "claimed_r2": -2.091,
+  "replayed_r2": -2.032,
+  "verdict": "the archive IS re-derivable -- within the measured GPU non-determinism band"
+ },
+ "dashboard_grid": {
+  "panels": 100,
+  "pinned_to_the_recording": 36,
+  "scoring_1.000": 36,
+  "overlap": 36,
+  "mean_all_panels": 0.694,
+  "mean_unpinned": 0.5219,
+  "inflation": 0.1721,
+  "corrected_margin20_mean": 0.4987,
+  "verdict": "every pinned panel scores a perfect 1.00 by construction, so the PICTURE the campaign judged by was +0.17 flattering. The perimeter of the grid is the anchor."
+ },
+ "learned_fields_on_their_bounds": {
+  "stiffness_[30,300]": {
+   "at_floor": 0.217,
+   "at_ceiling": 0.325,
+   "saturated": 0.543,
+   "median": 277
+  },
+  "gain_[0.2,1.5]": {
+   "at_floor": 0.19,
+   "at_ceiling": 0.021,
+   "saturated": 0.211,
+   "median": 0.337
+  },
+  "fibre_dtheta_pm0.25": {
+   "saturated": 0.04
+  },
+  "verdict": "the best fit in the archive has a stiffness field pressed against its bounds over 54% of the sheet. That is not a material property, it is the edge of the box we drew -- and every conclusion about stiffness rests on it."
+ },
+ "why_the_eye_disagreed_with_the_number": [
+  "the objective's zero is +0.070, not 0, so +0.545 is not 'half right'",
+  "it is blind to timing: a sheet whose points beat in random order scores exactly 1.0000",
+  "a third of the dashboard panels are tied to the recording and score 1.00 for free",
+  "the 'learned' stiffness structure is 54% saturation against the bounds"
+ ]
+}

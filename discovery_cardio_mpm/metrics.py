@@ -376,7 +376,17 @@ def check(verbose=True):
         add("descriptors.py and the registry agree on the shared quantities", False,
             f"{type(e).__name__}: {e}")
 
-    # 7. the reading surface, and the defect in it
+    # 7. the reading surface: the defect, MEASURED on a real model rather than by arithmetic
+    meas = os.path.join(HERE, "_metrology", "archive_metric_test.json")
+    if os.path.exists(meas):
+        m = json.load(open(meas))["dashboard_grid"]
+        add("the grid defect is measured on a real fit, not just counted",
+            m["overlap"] == m["pinned_to_the_recording"] == m["scoring_1.000"],
+            f"all {m['overlap']} pinned panels score 1.000; the picture reads "
+            f"{m['mean_all_panels']:+.3f} against {m['mean_unpinned']:+.3f} on the unpinned ones "
+            f"-- inflation {m['inflation']:+.3f}")
+
+    # 8. the reading surface, and the defect in it
     g = grid_report()
     add("the 10x10 reading surface is outside the pinned band",
         g["corrected"]["in_band"] == 0,
