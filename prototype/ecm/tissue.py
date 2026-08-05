@@ -271,6 +271,26 @@ def load_or_build(frames=401, device="cuda:0", name="cellfix_B_new", rebuild=Fal
     tag = f"{name}_f{int(frames)}" + (f"_x{int(buffer_x)}" if buffer_x != 1 else "")
     if plate_gap is not None:
         tag += f"_plate{plate_gap:g}".replace(".", "p")
+    # THE CACHE KEY IS DERIVED FROM EVERY INPUT, NOT ASSEMBLED BY THE CALLER. This is the second time
+    # the same bug shipped. First the key carried the gate's parameters but not WHICH pressure map they
+    # applied to, so the caps+plane run silently loaded the caps-only tissue and reported its semi-axes
+    # to three decimals -- a convincing null. Then the fix added the map and still left the PARAMETERS to
+    # a caller-supplied `tag_extra`, so a p_half sweep that forgot to pass one measured a single tissue
+    # three times and printed three identical rows. A key built by hand is a key that will be wrong
+    # again, so it is now a hash over the whole configuration: any argument that reaches `build` and
+    # changes the result is in it by construction.
+    import hashlib
+    cfg = {"plate_gap": plate_gap, "plate_stiff": plate_stiff,
+           "gate": None, "load": None,
+           "gate_p_half": gate_p_half, "gate_hill": gate_hill, "gate_floor": gate_floor,
+           "gate_smooth_frames": gate_smooth_frames, "gate_smooth_phi": gate_smooth_phi,
+           "load_gain": load_gain}
+    for key, path in (("gate", gate_npz), ("load", load_npz)):
+        if path is not None:
+            sz = os.path.getsize(path) if os.path.exists(path) else 0
+            cfg[key] = f"{os.path.abspath(path)}:{sz}"
+    if any(v is not None for v in (plate_gap, gate_npz, load_npz)):
+        tag += "_" + hashlib.sha1(repr(sorted(cfg.items())).encode()).hexdigest()[:10]
     tag += tag_extra
     out = os.path.join(CACHE, f"{tag}.npz")
     if rebuild or not os.path.exists(out):

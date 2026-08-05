@@ -106,11 +106,39 @@ def main():
     ap.add_argument("--device", default="cuda:0")
     ap.add_argument("--cell-frames", type=int, default=401)
     ap.add_argument("--movie-frames", type=int, default=90)
-    ap.add_argument("--p-half", type=float, default=0.10)
-    ap.add_argument("--floor", type=float, default=0.25)
+    # THE SETTLED CONFIGURATION, every number measured rather than chosen:
+    #   p_half auto      the map's own late-run median. A hand-picked fraction of the p99 put the gate on
+    #                    the flat foot of its curve: 1.7x rate difference instead of 5x.
+    #   hill 6           a 2.75x stress pattern only becomes a shape through a switch-like response,
+    #                    which is what mechanotransduction is. hill 2 gives eq/z 1.05.
+    #   floor 0.08       total suppression is a wall, not mechanosensing.
+    #   smoothing        the recorded map is a CONTACT LEDGER -- 24% of bins nonzero at frame 250, and a
+    #                    zero bin means no suppression -- so a 15x instantaneous contrast time-averaged
+    #                    to nothing. This step took eq/z from 1.07 to 1.32. Axisymmetric in longitude
+    #                    because THIS matrix is; wrong the moment an experiment puts structure there.
+    ap.add_argument("--p-half", default="auto", help='"auto" | "relative" | a float')
+    ap.add_argument("--hill", type=float, default=6.0)
+    ap.add_argument("--floor", type=float, default=0.08)
+    ap.add_argument("--smooth-frames", type=int, default=25)
+    ap.add_argument("--smooth-phi", type=float, default=360.0)
     ap.add_argument("--step0", default="49_aniso_i0_fibres")
     ap.add_argument("--step2", default="50_aniso_growth")
     ap.add_argument("--skip-step0", action="store_true")
+    # A PLANE THAT DOES NOT TOUCH THE TISSUE. `block_gap` in BOX units, so the tissue (which reaches
+    # 0.30) never reaches it and pass 1 has no plate at all -- the plane acts only on the MATRIX, by
+    # trapping it. The polar layer between tissue and plane is then thin (0.068 at a gap of 0.368) while
+    # the equatorial matrix is 0.20 thick, so the same surface advance strains the poles ~3x harder and
+    # the trapping ADDS to the dense caps instead of replacing them.
+    #
+    # WHY THIS IS THE ONE PLANE GEOMETRY THAT CAN STILL AMPLIFY. Plates that TOUCH make the stress
+    # EQUATORIAL -- measured 0.19 / 0.49 / 0.61 pole-over-equator at gaps 0.152 / 0.199 / 0.166 -- because
+    # the tissue fills up to the plate and there is barely any matrix left at the poles to load, while
+    # the equator has plenty. Gating growth on that fights the confinement: plates alone give eq/z 1.353,
+    # the gate alone 1.324, and the two together 1.090. A non-touching plane keeps the polar matrix in
+    # play. It is not a safe bet either: `44_plate_blk25_cushion` at gap 0.375 measured 0.97, FLAT,
+    # because the box wall backs the equatorial matrix just as rigidly -- but 44 had no dense caps.
+    ap.add_argument("--block-gap", type=float, default=None,
+                    help="elastic plane at +/- this in BOX units (0.368 = blocks 1/3.8 of the volume)")
     a = ap.parse_args()
 
     import combine as C
@@ -129,7 +157,10 @@ def main():
                                  rebuild=True)
     load = os.path.join(R.LOG, a.step0, "load.npz")
     if not (a.skip_step0 and os.path.exists(load)):
-        spec, info = C.build(a.step0, npz0, **dict(BASE))
+        cfg0 = dict(BASE)
+        if a.block_gap is not None:
+            cfg0["block_gap"] = a.block_gap
+        spec, info = C.build(a.step0, npz0, **cfg0)
         d = os.path.join(R.LOG, a.step0); os.makedirs(d, exist_ok=True)
         info["varied"] = {"align": BASE["align"], "align_dir": list(BASE["align_dir"]),
                           "dense_boost": BASE["dense_boost"],
@@ -182,7 +213,10 @@ def main():
           f"{rep['gated']['n_cells']}", flush=True)
 
     # ---- the artefact: the matrix against the tissue its own stress shaped ------------------------
-    spec, info = C.build(a.step2, npz1, **dict(BASE))
+    cfg2 = dict(BASE)
+    if a.block_gap is not None:
+        cfg2["block_gap"] = a.block_gap
+    spec, info = C.build(a.step2, npz1, **cfg2)
     d = os.path.join(R.LOG, a.step2); os.makedirs(d, exist_ok=True)
     info["varied"] = {"align": BASE["align"], "gate_p_half": a.p_half, "gate_floor": a.floor,
                       "iteration": 1}
