@@ -52,7 +52,7 @@ in `HYPOTHESES.md` as open questions; `BELIEFS.md` has zero entries. Defaults co
 | 0 — make it run, make it repeat | **done** | gate 18/18, canaries 6/6; seeded, provenanced, ledger stripped from the source |
 | 1 — freeze the recording, seal the test | **done (7 of 7)** | the ceiling, the tracker floor, the resolution ladder, the frozen+sealed split, `PREMISES.md` (2 of 8 fail, recorded not waived) |
 | 1b — the corpus we already own | **done** | 8 recipes migrated; **the operator merge is NOT behaviour-preserving** |
-| 2 — certify the ruler, find the floor | **1 of 7** | the null bank is measured: **the bar is +0.851 on the fit beat, +0.62 held-out** — copying the previous beat, no physics. **STOP point** |
+| 2 — certify the ruler, find the floor | **4 of 6 (+ half)** | the null bank is measured: **the bar is +0.851 on the fit beat, +0.62 held-out** — copying the previous beat, no physics. **STOP point** |
 | 3 — certify the gradient | not started | the language-vs-switches decision |
 | 4 — what a fit may claim, build the gate | not started | **STOP point** |
 | 5–8 — first round, campaign, seal-break, method claim | not started | |
@@ -155,10 +155,10 @@ and it *proves* the shared quantities agree numerically rather than assuming it.
 The campaign reads loops on a **10×10 grid of the tissue**, comparing each node's path with the
 recording's. That stays — it is what a person judges.
 
-**Done, 3 of 6:**
+**Done, 4 of 6 (item 4 half done):**
 
-1. **One name, one quantity** (`metrics.py --check`, 8/8). 16 entries, each with a definition, the
-   code that computes it, and a tier. **0 certified · 12 provisional · 4 withdrawn** — the honest
+1. **One name, one quantity** (`metrics.py --check`, 8/8). 18 entries, each with a definition, the
+   code that computes it, and a tier. **0 certified · 14 provisional · 4 withdrawn** — the honest
    state. Checks: every live metric has code; every one has a definition; **no live definition may
    name a withdrawn metric**; a withdrawn metric records why; and the two implementations of each
    shared quantity agree numerically.
@@ -172,18 +172,36 @@ recording's. That stays — it is what a person judges.
    previous beat. Muscle-off scores exactly the do-nothing score. Everything from here is reported
    as a difference from the do-nothing row.
 
-**Remaining, 3 of 6:**
+4. **How big is nothing** (`noise.py`) — *one floor of three.* **Beat to beat is measured** (no
+   fitting needed, and it is the floor that matters: no model may score better than the recording
+   agrees with itself). On 10 complete beats: openness ±0.0034 · chirality ±0.0140 · orientation
+   ±0.0232 rad · coordination ±0.0025 · loopscore ±0.1294. **Still missing:** same-seed-twice and
+   seed-to-seed, both of which need fits (`noise.py --fits`). Until they exist the promotion check
+   reports **0 of 14 eligible**, mechanically.
+5. **Teach the ruler to see coordination** (`metrics.py`). `coordination` (agreement in *when*
+   each node beats) and `orientation_error` (angle between the model's principal axis and the
+   tissue's) now exist as registry classes and pass the battery. Coordination took **three
+   attempts**: the fundamental-phase construction fails because distance-from-centre peaks *twice*
+   per beat (rigid shift scored 0.50, must score 1); peak cross-correlation lag fails the same way
+   (the two maxima are half a beat apart); mapping the lag onto the **half period** works —
+   1.0000 under rigid shift, 0.0778 under scrambled timing. **Declared defect: cannot tell
+   in-phase from exactly antiphase.**
 
-4. **How big is nothing.** Several seeds at the depth the loop will use, *and* the same seed twice
-   — the GPU path is not bit-reproducible and the two are different questions. Afterwards a
-   difference below that spread is `indistinguishable` and the gate refuses to call it a finding.
-5. **Teach the ruler to see coordination.** It scores a timing-scrambled sheet at exactly 1.0000.
-   Until a certified measure can tell coordination from incoherence, no claim about timing, waves
-   or rotation is scoreable — and the model-rests-8%-vs-77% failure is invisible to everything in
-   the registry.
+**Remaining:**
+
 6. **Deliver the decomposition per run.** The five named dimensions — size, orientation, openness,
    chirality, shape-detail — on the corrected grid, written into every run's record, so step 3 of
    the loop returns *where* the model is wrong rather than how much.
+
+**The figure Phase 2 reports into** (`figure_metrics.py` → `figures/metrics_figure.png`): nine
+single distortions across the top drawn as loops, eight readable measurements down the side, and a
+cell per pair saying whether it moved or held. **No cell is red** — every measurement moves on its
+own axis and holds on the other eight. The right-hand block is the precision, and it carries the
+result that matters most so far: **seven of the eight measurements put the best archived fit more
+than three beat-to-beat spreads outside the tissue's own variation, and the one that cannot is
+`loopscore` — the composite the entire previous campaign ranked on** (0.4987 against 0.7104 ±
+0.1294). Orientation is off by 0.431 rad where real beats vary by 0.058; coordination reads 0.582
+where real beats read 0.997. That is the argument for item 6, measured rather than asserted.
 
 **THE STOP:** does the fitted model beat the best trivial baseline by more than the noise, with the
 comparison and the margin written into code before the numbers exist? On the evidence already on

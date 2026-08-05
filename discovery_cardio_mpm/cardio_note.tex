@@ -741,7 +741,7 @@ same specimen.
 \end{itemize}
 \end{phasebox}
 
-\begin{phasebox}{Phase 2 --- The loop cannot yet say what it is looking at \hfill \prog\ (2 of 6) \ \stopp}
+\begin{phasebox}{Phase 2 --- The loop cannot yet say what it is looking at \hfill \prog\ (4 of 6) \ \stopp}
 \textbf{Goal.} Give the loop numbers it can trust. \emph{Not new numbers} --- the measurements this
 campaign needs were written over three weeks in the old folder and audited in July, and the audit's
 own remedy survived. What was never done is the boring part: saying which quantity is which.
@@ -768,11 +768,11 @@ loops, I wrote a new set of names for quantities that already had them. \textbf{
 inventing a ruler. It is naming the ones that exist, pointing each at the code that computes it,
 and recording what may be believed about it.}
 
-\textbf{1. One name, one quantity. \dn} A registry of sixteen entries. Each carries a definition a
+\textbf{1. One name, one quantity. \dn} A registry of eighteen entries, one class each. Each carries a definition a
 person can check, the code that computes it, and a tier: \emph{certified} (a measured zero, a
 measured noise floor, and it moved when it should), \emph{provisional} (it computes, one of those
 is missing --- usable, never citable), or \emph{withdrawn} (a defect was demonstrated; kept with
-its cause of death, never quoted). \textbf{Nothing is certified yet}, twelve are provisional and
+its cause of death, never quoted). \textbf{Nothing is certified yet}, fourteen are provisional and
 four are withdrawn, and that is the honest state rather than a placeholder.
 
 Three checks, borrowed from the Okuda folder where this exact fault cost weeks: every live metric
@@ -832,16 +832,61 @@ the positions differ by the width of the whole sheet. So a fit on the processor 
 card do not start from the same material. The measurement now refuses to run unless its mapping
 reproduces the run's own recorded data.
 
-\textbf{4. How big is nothing. \ns} The same configuration at several seeds, at the depth the loop
-will use --- and the same seed twice, because the graphics card is not bit-reproducible and the two
-are different questions. Afterwards, a difference smaller than that spread is reported as
-\emph{indistinguishable} and the gate refuses to let anyone call it a finding.
+\textbf{4. How big is nothing. \prog\ (one floor of three)} Three different questions, and only one
+of them is cheap. \emph{Beat to beat} --- one real beat against another real beat --- needs no
+fitting at all and is the floor that matters most, because \textbf{no model may be scored better
+than the recording agrees with itself}. Measured, on 10 complete beats: openness $\pm 0.0034$,
+chirality $\pm 0.0140$, orientation $\pm 0.0232$\,rad, coordination $\pm 0.0025$, and the composite
+loopscore $\pm 0.1294$. The two that remain both need fits and are therefore slow: the same seed
+twice (the card is not bit-reproducible) and several different seeds at the depth the loop will use.
+Until those exist \textbf{no metric is eligible for certification} --- the promotion check reports
+0 of 14, and it reports it mechanically rather than as an opinion.
 
-\textbf{5. Teach the ruler to see coordination. \ns} It returns a perfect score for a sheet whose
-points beat in random order. Until a certified measure can tell a coordinated contraction from an
-incoherent one, no claim about timing, waves or rotation is scoreable --- \emph{and the failure
-that says the model rests for 8\% of the beat where the tissue rests for 77\% is invisible to
-everything currently in the registry.}
+\textbf{5. Teach the ruler to see coordination. \dn} It returned a perfect score for a sheet whose
+points beat in random order. Two measures now exist: \code{coordination}, the agreement in when each
+node's beat happens, and \code{orientation\_error}, the angle between the model's principal axis and
+the tissue's. Both are written as classes with their own definition, response set and floor, and both
+pass the battery. \emph{The failure that mattered is now visible}: the tissue's own beats agree on
+timing to $0.9968$ with a spread of $0.0025$, and the best fit in the archive reads $0.5821$ --- more
+than a hundred times that spread away.
+
+\emph{Getting coordination right took three attempts, and the reason is worth recording.} The
+obvious construction --- the phase of the fundamental of each node's distance from its own centre
+--- fails, because that signal peaks \textbf{twice} per beat, so a rigid shift of the whole recording
+scored $0.50$ when it must score $1$. Replacing it with the lag of peak cross-correlation failed the
+same way for the same reason: the two maxima sit half a beat apart and the winner is arbitrary. What
+works is mapping the lag onto the half period, which scores $1.0000$ under a rigid shift and
+$0.0778$ under scrambled timing. \textbf{The declared cost: it cannot tell in-phase from exactly
+antiphase.} That is written into the class as a known defect, not left for someone to discover.
+
+\medskip
+\noindent\textbf{What each measurement responds to, and how finely --- drawn.} Every entry in the
+registry is a claim of the form \emph{this moves when X changes and ignores everything else}.
+Figure~1 is that claim as a picture: nine single changes to a loop across the top,
+the eight readable measurements down the side, and a cell saying whether the measurement moved or
+held.
+
+\begin{center}
+\includegraphics[width=\linewidth]{figures/metrics_figure.png}
+\end{center}
+\vspace{-0.6em}
+\begin{center}\footnotesize
+\parbox{0.94\linewidth}{\textbf{Figure~1.} \textbf{Left:} the certification
+battery. Nine changes, each made one at a time, and no cell is red --- every measurement moves on
+the axis it names and holds still on the eight it does not. Note that the two changes of
+\emph{timing} are invisible in any picture of a shape: only the dot marking the first frame has
+moved, and only two rows respond there. \textbf{Right:} the precision. Column one is what the
+measurement reads comparing one real beat with another, column two its spread --- \emph{the finest
+difference the recording itself permits} --- and column three the best fit the previous campaign
+produced. \textbf{Pink is the point of the figure.} Seven of the eight measurements put that fit
+more than three spreads outside the tissue's own variation, and the one that does not is
+\code{loopscore}, the composite the whole campaign ranked on: $0.4987$ against a beat-to-beat
+$0.7104 \pm 0.1294$, which at three spreads \textbf{cannot tell the fit from the recording's own
+noise}. The specific measurements can, and they say where: the orientation is off by $0.431$\,rad
+where real beats vary by $0.058$, and the coordination reads $0.582$ where real beats read $0.997$.
+This is the argument for the decomposition in item~6, and it is now measured rather than asserted.}
+\end{center}
+\medskip
 
 \textbf{6. Deliver the decomposition per run. \ns} The five named dimensions --- size, orientation,
 openness, chirality, shape-detail --- computed on the corrected grid and written into every run's
