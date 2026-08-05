@@ -156,24 +156,30 @@ def main():
               "than gating on it -- the gate would still make a shape, from noise.", flush=True)
 
     # ---- 3-4: the tissue, with its cell cycle gated by that pressure ------------------------------
-    print(f"\n[aniso] STEP 3-4: tissue with the growth gate (p_half {a.p_half}, floor {a.floor})",
-          flush=True)
+    print(f"\n[aniso] STEP 3-4: tissue with the growth gate (p_half {a.p_half}, hill {a.hill}, "
+          f"floor {a.floor}, smoothing {a.smooth_frames} frames / {a.smooth_phi:g} deg)", flush=True)
     npz1 = TIS.load_or_build(frames=a.cell_frames, device=a.device, buffer_x=BUFFER_X,
-                             gate_npz=load, gate_p_half=a.p_half, gate_floor=a.floor,
-                             tag_extra=f"_gate{a.p_half:g}f{a.floor:g}".replace(".", "p"))
+                             gate_npz=load, gate_p_half=a.p_half, gate_hill=a.hill,
+                             gate_floor=a.floor, gate_smooth_frames=a.smooth_frames,
+                             gate_smooth_phi=a.smooth_phi,
+                             tag_extra=f"_g{a.p_half}h{a.hill:g}f{a.floor:g}".replace(".", "p"))
     z0, z1 = np.load(npz0), np.load(npz1)
     for tag, z in (("ungated", z0), ("gated", z1)):
         x, y, zz = np.asarray(z["r_xyz"])[-1]
+        eq = float(np.sqrt(max(x * x + y * y, 1e-12) / 2.0))
         rep[tag] = {"r_x": float(x), "r_y": float(y), "r_z": float(zz),
-                    "n_cells": int(z["n_cells"][-1]),
+                    "n_cells": int(z["n_cells"][-1]), "r_eq_rms": eq,
+                    "oblateness_eq_over_z": float(eq / max(zz, 1e-9)),
                     "xy": float(x / max(y, 1e-9)), "xz": float(x / max(zz, 1e-9))}
         print(f"[aniso]   {tag:8} semi-axes x/y/z = {x:.2f} / {y:.2f} / {zz:.2f}   "
               f"x:y = {x / max(y, 1e-9):.3f}   x:z = {x / max(zz, 1e-9):.3f}   "
               f"{int(z['n_cells'][-1])} cells", flush=True)
-    rep["shape_change_xy"] = rep["gated"]["xy"] / max(rep["ungated"]["xy"], 1e-12)
-    print(f"[aniso] LINK 4 -- the gate changed the x:y ratio by "
-          f"x{rep['shape_change_xy']:.3f} ({rep['ungated']['n_cells']} -> "
-          f"{rep['gated']['n_cells']} cells)", flush=True)
+    rep["oblateness_gain"] = (rep["gated"]["oblateness_eq_over_z"]
+                              / max(rep["ungated"]["oblateness_eq_over_z"], 1e-12))
+    print(f"[aniso] LINK 4 -- OBLATENESS eq/z {rep['ungated']['oblateness_eq_over_z']:.3f} "
+          f"-> {rep['gated']['oblateness_eq_over_z']:.3f} "
+          f"(x{rep['oblateness_gain']:.3f}), cells {rep['ungated']['n_cells']} -> "
+          f"{rep['gated']['n_cells']}", flush=True)
 
     # ---- the artefact: the matrix against the tissue its own stress shaped ------------------------
     spec, info = C.build(a.step2, npz1, **dict(BASE))

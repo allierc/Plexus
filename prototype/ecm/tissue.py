@@ -114,7 +114,8 @@ def _mesh_of(hist_t, pos_t, centroid):
 
 def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap=None,
           plate_stiff=0.6, load_npz=None, load_gain=1.0, gate_npz=None,
-          gate_p_half=0.10, gate_hill=2.0, gate_floor=0.25):
+          gate_p_half="auto", gate_hill=4.0, gate_floor=0.15,
+          gate_smooth_frames=25, gate_smooth_phi=360.0):
     """Run cellfix_B_new verbatim and write the cache.
 
     `buffer_x` MULTIPLIES THE VERTEX AND CELL RESERVOIRS AND NOTHING ELSE. At the reference buffers
@@ -172,8 +173,10 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap
         # would already have been solved for the ungated targets.
         import load_ops                                               # noqa: F401  register it
         spec["operators"].append({"op": "ecm_growth_gate_3d", "at": "vertex",
-                                  "load": str(gate_npz), "p_half": float(gate_p_half),
-                                  "hill": float(gate_hill), "floor": float(gate_floor)})
+                                  "load": str(gate_npz), "p_half": gate_p_half,
+                                  "hill": float(gate_hill), "floor": float(gate_floor),
+                                  "smooth_frames": int(gate_smooth_frames),
+                                  "smooth_phi_deg": float(gate_smooth_phi)})
         i = spec["schedule"].index("morphogen_growth_3d") + 1
         spec["schedule"].insert(i, "ecm_growth_gate_3d")
         print(f"[tissue] ECM-stress growth gate from {os.path.basename(str(gate_npz))} "
@@ -259,8 +262,9 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap
 
 def load_or_build(frames=401, device="cuda:0", name="cellfix_B_new", rebuild=False,
                   buffer_x=1, plate_gap=None, plate_stiff=0.6, load_npz=None,
-                  load_gain=1.0, tag_extra="", gate_npz=None, gate_p_half=0.10,
-                  gate_hill=2.0, gate_floor=0.25):
+                  load_gain=1.0, tag_extra="", gate_npz=None, gate_p_half="auto",
+                  gate_hill=4.0, gate_floor=0.15, gate_smooth_frames=25,
+                  gate_smooth_phi=360.0):
     """The cache path, built if missing. Frames are part of the filename: a 401-frame tissue and a
     120-frame one are different tissues, and silently reusing one for the other would be a run
     whose movie stops before the thing it was testing happened."""
@@ -273,7 +277,8 @@ def load_or_build(frames=401, device="cuda:0", name="cellfix_B_new", rebuild=Fal
         build(frames, device, out, buffer_x=buffer_x, plate_gap=plate_gap,
               plate_stiff=plate_stiff, load_npz=load_npz, load_gain=load_gain,
               gate_npz=gate_npz, gate_p_half=gate_p_half, gate_hill=gate_hill,
-              gate_floor=gate_floor)
+              gate_floor=gate_floor, gate_smooth_frames=gate_smooth_frames,
+              gate_smooth_phi=gate_smooth_phi)
     else:
         z = np.load(out)
         print(f"[tissue] reusing {os.path.relpath(out, ROOT)}  "
