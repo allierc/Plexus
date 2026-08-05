@@ -21,6 +21,7 @@ import torch
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from matplotlib import colors as mcolors
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 _BG, _FG = "black", "white"      # dark theme to match the MPM_pytorch grid plots
@@ -163,6 +164,39 @@ def _capture(H, particle_set="mpm_particle", grid_field="mpm_grid"):
     return rec
 
 
+def _gamma_for(vals, lo=1.0, hi=99.0, target=0.5):
+    """The colour exponent that puts the MEDIAN of a heavy-tailed quantity at mid-scale.
+
+    Measured on material_active_horizontal, the median of ||C|| sits at 6.9% of its own p1-p99
+    range and the grid momentum's at about 2%, because both are heavy-tailed positive quantities
+    (||C||: median 1.3, p99 17.9, max 84.5). On a linear scale that puts HALF the material in the
+    bottom few per cent of the colormap -- black -- so the panel reads as nothing happening in
+    exactly the region where nearly all of the material is. It is the same defect the stress
+    colouring had, one axis over: the measure was fine and the mapping hid it.
+
+    Returns 1.0 (linear, unchanged) when the median already lands near mid-scale, so a panel that
+    was fine stays fine.
+    """
+    v = np.concatenate([np.asarray(x).ravel() for x in vals])
+    a, b = np.percentile(v, lo), np.percentile(v, hi)
+    if not np.isfinite([a, b]).all() or b - a <= 0:
+        return 1.0
+    f = float(np.clip((np.median(v) - a) / (b - a), 1e-3, 1 - 1e-3))
+    if f > 0.30:                                    # already readable on a linear scale
+        return 1.0
+    return float(np.clip(np.log(target) / np.log(f), 0.15, 1.0))
+
+
+def _is_constant(vals, tol=1e-9):
+    """True when a field does not vary at all -- e.g. Jp in a recipe with no plastic material.
+
+    Worth naming rather than drawing: a uniform panel on a physical colour band looks exactly like
+    a measurement that happens to be flat, and a reader cannot tell it from one that is broken.
+    """
+    v = np.concatenate([np.asarray(x).ravel() for x in vals])
+    return bool(np.nanmax(v) - np.nanmin(v) <= tol)
+
+
 def _rng(vals, lo=1.0, hi=99.0, pad=1e-9):
     """Robust (percentile) colour range across all captured frames, so the movie does
     not flicker and is scaled to THIS run (not MPM_pytorch's hard-coded tissue ranges)."""
@@ -285,10 +319,19 @@ def generate_grid_movie(sim, data_dir: str, device: str = "cpu", stride: int = 3
     c_lo, c_hi = _rng([f["cnorm"] for f in frames])
     f_lo, f_hi = _rng([f["fnorm"] for f in frames])
     s_lo, s_hi = _rng([f["stress"] for f in frames])
+    # ...and per-run colour EXPONENTS, so the bulk of each heavy-tailed field is visible
+    c_g = _gamma_for([f["cnorm"] for f in frames])
+    s_g = _gamma_for([f["stress"] for f in frames])
+    jp_flat = _is_constant([f["Jp"] for f in frames])
     has_grid = "grid" in frames[0]
     has_grid3 = "grid3" in frames[0]
     g_lo, g_hi = _rng([f["grid"][2] for f in frames]) if has_grid else (0.0, 1.0)
     g3_lo, g3_hi = _rng([f["grid3"][3] for f in frames]) if has_grid3 else (0.0, 1.0)
+    g_g = _gamma_for([f["grid"][2] for f in frames]) if has_grid else 1.0
+    g3_g = _gamma_for([f["grid3"][3] for f in frames]) if has_grid3 else 1.0
+    print(f"[grid] colour exponents (1.0 = linear): C {c_g:.2f}  stress {s_g:.2f}  grid "
+          f"{(g_g if has_grid else g3_g):.2f}" + ("   Jp is CONSTANT" if jp_flat else ""),
+          flush=True)
 
     grid_dir = os.path.join(data_dir, "Grid")
     os.makedirs(grid_dir, exist_ok=True)
@@ -317,10 +360,13 @@ def generate_grid_movie(sim, data_dir: str, device: str = "cpu", stride: int = 3
             ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.set_aspect("equal")
             ax.set_facecolor(_BG); ax.axis("off")          # no boundary box / ticks
 
-        def panel(sp, title, X, c, cmap, vmin, vmax):
+        def panel(sp, title, X, c, cmap, vmin, vmax, gamma=1.0):
             ax = plt.subplot(2, 3, sp)
-            sc = ax.scatter(X[:, 0], X[:, 1], c=c, s=1, cmap=cmap, vmin=vmin, vmax=vmax)
-            _style(ax, title); _cbar(ax, sc)
+            kw = ({"norm": mcolors.PowerNorm(gamma, vmin=vmin, vmax=vmax)} if gamma != 1.0
+                  else {"vmin": vmin, "vmax": vmax})
+            sc = ax.scatter(X[:, 0], X[:, 1], c=c, s=1, cmap=cmap, **kw)
+            _style(ax, title + (f"   [colour^{gamma:.2f}]" if gamma != 1.0 else ""))
+            _cbar(ax, sc)
 
         for i, fr in enumerate(frames):
             X = fr["X"]
@@ -328,14 +374,19 @@ def generate_grid_movie(sim, data_dir: str, device: str = "cpu", stride: int = 3
             ax = plt.subplot(2, 3, 1)
             _obj_scatter(ax, X[:, 0], X[:, 1], fr, obj_pal)
             _style(ax, "objects"); _cbar(ax, None)         # spacer keeps panel 1 the same size
-            panel(2, "C (Jacobian of velocity)", X, fr["cnorm"], "viridis", c_lo, c_hi)
+            panel(2, "C (Jacobian of velocity)", X, fr["cnorm"], "viridis", c_lo, c_hi, c_g)
             panel(3, "F (deformation)", X, fr["fnorm"], "coolwarm", f_lo, f_hi)
-            panel(4, "Jp (volume deformation)", X, fr["Jp"], "viridis", 0.75, 1.25)
-            panel(5, f"stress ({fr.get('stress_kind', '?')})", X, fr["stress"], "hot", s_lo, s_hi)
+            panel(4, "Jp (volume deformation)" + (" -- CONSTANT, no plastic material" if jp_flat
+                                                  else ""),
+                  X, fr["Jp"], "viridis", 0.75, 1.25)
+            panel(5, f"stress ({fr.get('stress_kind', '?')})", X, fr["stress"], "hot",
+                  s_lo, s_hi, s_g)
             ax6 = plt.subplot(2, 3, 6)
             if has_grid:
                 gx, gy, gv = fr["grid"]
-                sc = ax6.scatter(gx, gy, c=gv, s=4, cmap="viridis", vmin=g_lo, vmax=g_hi)
+                gkw = ({"norm": mcolors.PowerNorm(g_g, vmin=g_lo, vmax=g_hi)} if g_g != 1.0
+                       else {"vmin": g_lo, "vmax": g_hi})
+                sc = ax6.scatter(gx, gy, c=gv, s=4, cmap="viridis", **gkw)
                 _style(ax6, "grid momentum"); _cbar(ax6, sc)
             else:
                 _style(ax6, "grid momentum"); _cbar(ax6, None)
