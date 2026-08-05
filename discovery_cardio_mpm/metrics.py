@@ -185,17 +185,26 @@ REGISTRY = {
     "path_length": {
         "definition": "how far a node travels over the beat, summed frame to frame. A loop and a "
                       "line of the same width differ here; the enclosed area alone does not say so.",
+        "responds_to": ["size", "openness"],
+        "note": "NOT an independent axis, and the battery is what showed it: flattening an ellipse "
+                "onto its long axis changes the distance travelled (the perimeter goes from about "
+                "pi*(a+b) to 4a), so path length mixes how big the loop is with how open it is. "
+                "Useful, but it may not be quoted as a size measure on its own.",
         "tier": PROVISIONAL,
         "source": "this file -- the one quantity the prototype named and never computed",
         "compute": lambda s, r, m: float(np.median(_path_length(s, m))),
         "domain": "any window"},
     "peak_excursion": {
-        "definition": "the furthest a node gets from where it started, over the beat.",
+        "definition": "how far a node reaches from the CENTRE of its own path, at its furthest. "
+                      "Centred, so sliding the loop somewhere else does not change it.",
         "tier": PROVISIONAL,
-        "source": "cardio_mpm_train.enclosure_row (peak)",
-        "compute": lambda s, r, m: float(np.median(np.linalg.norm(
-            s[:, m] if m is not None else s, axis=-1).max(0))),
-        "domain": "any window"},
+        "source": "cardio_mpm_train.enclosure_row (peak), centred here",
+        "compute": lambda s, r, m: float(np.median(_peak_excursion(s, m))),
+        "domain": "any window",
+        "known_defects": ["the first version measured distance from the ORIGIN, so merely "
+                          "translating a loop changed it -- the same uncentred defect the July "
+                          "audit found in morphology_row/size. Caught by the certification "
+                          "battery, which is what it is for."]},
     "chirality_match": {
         "definition": "the fraction of nodes circulating the same way round as the recording's.",
         "tier": PROVISIONAL,
@@ -252,6 +261,12 @@ def _openness_pernode(a, m=None):
     return np.abs(_shoelace(p)) / (box + 1e-12)
 
 
+def _peak_excursion(a, m=None):
+    """Furthest reach from the path's own centre. Translation-invariant by construction."""
+    p = _sel(np.asarray(a, float), m)
+    return np.linalg.norm(p - p.mean(axis=0, keepdims=True), axis=-1).max(0)
+
+
 def _path_length(a, m=None):
     p = _sel(np.asarray(a, float), m)
     return np.linalg.norm(np.diff(p, axis=0), axis=-1).sum(0)
@@ -291,6 +306,113 @@ def check_aliases():
         ok = mine is not None and abs(float(mine) - float(theirs)) < 1e-6 * max(1.0, abs(theirs))
         rows.append({"descriptors": dname, "canonical": cname, "descriptors_value": float(mine),
                      "registry_value": float(theirs), "agree": bool(ok)})
+    return rows
+
+
+# ---------------------------------------------------------------------------------------------
+# THE CERTIFICATION BATTERY. A metric is admitted when it MOVES on the axis it claims to measure
+# and HOLDS STILL on the axes it claims to ignore. Both halves are required: a metric that always
+# moves is not measuring anything in particular, and one that never moves is not measuring at all.
+#
+# The distortions are applied to the RECORDING, so the answer is known by construction. This is
+# the third of the three things a tier needs; the null came from floors.py and the noise floor is
+# still outstanding, which is why nothing here can reach `certified` yet.
+# ---------------------------------------------------------------------------------------------
+def _population(G=24, M=200, seed=0):
+    """A population of ellipses standing in for the recording: random size, aspect, angle, phase."""
+    rng = np.random.default_rng(seed)
+    t = np.linspace(0, 2 * np.pi, G, endpoint=False)
+    a = rng.uniform(0.5, 1.5, M)
+    b = a * rng.uniform(0.25, 0.9, M)
+    th = rng.uniform(0, np.pi, M)
+    ph = rng.integers(0, G, M)
+    u, v = np.cos(t)[:, None] * a, np.sin(t)[:, None] * b
+    p = np.stack([u * np.cos(th) - v * np.sin(th), u * np.sin(th) + v * np.cos(th)], -1)
+    return np.stack([np.roll(p[:, j], int(ph[j]), 0) for j in range(M)], 1), th
+
+
+def distortions(real, th):
+    """(name, distorted, {axis: should_move}) -- what each distortion is supposed to touch."""
+    G, M = real.shape[0], real.shape[1]
+    rng = np.random.default_rng(1)
+    out = []
+    out.append(("identity", real.copy(), set()))
+    out.append(("scale x2", real * 2.0, {"size"}))
+    rot = np.pi / 5
+    R = np.array([[np.cos(rot), -np.sin(rot)], [np.sin(rot), np.cos(rot)]])
+    out.append(("rotate by pi/5", real @ R.T, {"orientation"}))
+    mir = real.copy(); mir[..., 1] *= -1
+    out.append(("mirror", mir, {"chirality", "orientation"}))
+    ca, sa = np.cos(th), np.sin(th)
+    proj = real[..., 0] * ca[None] + real[..., 1] * sa[None]
+    # Collapsing onto the major axis destroys the enclosed area and, with it, any sense of
+    # rotation -- a straight line has no handedness. It does NOT shorten the reach along the axis
+    # that survives, so the size axis is expected to HOLD. My first expectation had both of those
+    # backwards, and the battery reported two disagreements that were mine, not the metrics'.
+    out.append(("collapse to a line", np.stack([proj * ca[None], proj * sa[None]], -1),
+                {"openness", "chirality"}))
+    out.append(("shift the whole beat", np.stack([np.roll(real[:, j], 7, 0) for j in range(M)], 1),
+                set()))
+    out.append(("translate", real + np.array([3.0, -2.0]), set()))
+    sc = np.stack([np.roll(real[:, j], int(rng.integers(0, G)), 0) for j in range(M)], 1)
+    out.append(("scramble each node's timing", sc, {"coordination"}))
+    return out
+
+
+# which registry entry speaks for which axis
+# Which axes each metric legitimately responds to. Declared per METRIC rather than per axis,
+# because at least one of them is a composite and pretending otherwise is how a ruler acquires a
+# reputation for lying. `responds_to` in the registry is the source of truth; this mirrors it.
+METRIC_AXES = {
+    "peak_excursion": {"size"},
+    "path_length": {"size", "openness"},          # a composite -- see its registry note
+    "openness": {"openness"},
+    "chirality_match": {"chirality"},
+    "orientation_error": {"orientation"},         # not implemented yet
+    "coordination": {"coordination"},              # not implemented yet -- the known hole
+}
+
+
+def certify(verbose=True, tol=0.02):
+    real, th = _population()
+    rows = []
+    for name, sim, should in distortions(real, th):
+        rec = {"distortion": name, "should_move": sorted(should), "axes": {}}
+        for mname, axes in METRIC_AXES.items():
+            if mname not in REGISTRY or REGISTRY[mname].get("compute") is None:
+                rec["axes"][mname] = None
+                continue
+            base = REGISTRY[mname]["compute"](real, real, None)
+            got = REGISTRY[mname]["compute"](sim, real, None)
+            rel = abs(got - base) / max(abs(base), 1e-12)
+            moved = rel > tol
+            expect = bool(axes & should)
+            rec["axes"][mname] = {"base": base, "value": got, "rel_change": rel,
+                                  "moved": bool(moved), "responds_to": sorted(axes),
+                                  "expected_to_move": expect, "ok": bool(moved) == expect}
+        rows.append(rec)
+    if verbose:
+        print(f"\n{'=' * 108}\n  CERTIFICATION -- does each metric move on its own axis and hold "
+              f"still on the others?\n{'=' * 108}")
+        names = list(METRIC_AXES)
+        print(f"  {'distortion':<28s} " + " ".join(f"{m[:13]:>14s}" for m in names))
+        for r in rows:
+            cells = []
+            for m in names:
+                a = r["axes"].get(m)
+                if a is None:
+                    cells.append(f"{'--':>14s}")
+                else:
+                    cells.append(f"{('MOVE' if a['moved'] else 'hold') + ('' if a['ok'] else ' X!'):>14s}")
+            print(f"  {r['distortion']:<28s} " + " ".join(cells))
+        bad = [(r["distortion"], m) for r in rows for m, a in r["axes"].items()
+               if a is not None and not a["ok"]]
+        missing = sorted({m for r in rows for m, a in r["axes"].items() if a is None})
+        print(f"\n  X! marks a metric that moved when it should not, or held when it should have.")
+        if missing:
+            print(f"  NOT IMPLEMENTED, so untestable: {missing}")
+        print(f"  {len(bad)} disagreements" + (f": {bad[:6]}" if bad else ""))
+        print("=" * 108)
     return rows
 
 

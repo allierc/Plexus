@@ -114,15 +114,23 @@
   },
   "path_length": {
    "definition": "how far a node travels over the beat, summed frame to frame. A loop and a line of the same width differ here; the enclosed area alone does not say so.",
+   "responds_to": [
+    "size",
+    "openness"
+   ],
+   "note": "NOT an independent axis, and the battery is what showed it: flattening an ellipse onto its long axis changes the distance travelled (the perimeter goes from about pi*(a+b) to 4a), so path length mixes how big the loop is with how open it is. Useful, but it may not be quoted as a size measure on its own.",
    "tier": "provisional",
    "source": "this file -- the one quantity the prototype named and never computed",
    "domain": "any window"
   },
   "peak_excursion": {
-   "definition": "the furthest a node gets from where it started, over the beat.",
+   "definition": "how far a node reaches from the CENTRE of its own path, at its furthest. Centred, so sliding the loop somewhere else does not change it.",
    "tier": "provisional",
-   "source": "cardio_mpm_train.enclosure_row (peak)",
-   "domain": "any window"
+   "source": "cardio_mpm_train.enclosure_row (peak), centred here",
+   "domain": "any window",
+   "known_defects": [
+    "the first version measured distance from the ORIGIN, so merely translating a loop changed it -- the same uncentred defect the July audit found in morphology_row/size. Caught by the certification battery, which is what it is for."
+   ]
   },
   "chirality_match": {
    "definition": "the fraction of nodes circulating the same way round as the recording's.",
