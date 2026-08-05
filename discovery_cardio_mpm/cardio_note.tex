@@ -742,7 +742,7 @@ same specimen.
 \end{itemize}
 \end{phasebox}
 
-\begin{phasebox}{Phase 2 --- Deciding what may be believed about a number \hfill \dn\ \emph{(the instruments)} \ \stopp}
+\begin{phasebox}{Phase 2 --- Deciding what may be believed about a number \hfill \dn\ \textbf{CLOSED} \ \stopp}
 \textbf{Goal.} Give the loop numbers it can trust. \emph{Not new numbers} --- the measurements this
 campaign needs were written over three weeks in the old folder and audited in July. What was never
 done is deciding what may be believed about any of them.
@@ -927,7 +927,9 @@ beat-to-beat variation measured; and six of the seven have been read against a c
 return the right number. Every defect found along the way is recorded on the class that carries it,
 with the measurement that found it. \textbf{That was the phase, and it is done.}
 
-Two things remain, and \emph{neither can reverse a decision already taken}:
+\textbf{And the floor that was outstanding has landed.} Every test named above has now been run,
+which is what closes this phase. What remains is one small measurement and one piece of work that
+belongs to a later phase:
 
 \begin{center}\small
 \begin{tabular}{@{}l p{9.6cm}@{}}
@@ -964,14 +966,15 @@ anyway, the same silence as the captioner, now fixed to check each of the three 
 \code{chirality\_match} at $0.569$--$0.606$ against a null of $0.5$. A spread measured across models
 that have not learned is not obviously the spread across models that have.\\
 \addlinespace
-\textbf{the decomposition} & The five \code{residual/} dimensions --- size, orientation, openness,
-chirality, shape-detail --- written into every run's record so step~3 returns \emph{where} the model
-is wrong rather than how much. \textbf{They are five of the six quantities that still have no measured
-zero} --- the sixth is \code{loopscore\_sd} --- and one of them,
-\code{residual/shape\_detail}, scored its best in the whole null bank on the model that does
-nothing, because the family measures \emph{recoverability} and everything is recoverable from
-nothing. So this is not a reporting chore: it is the same admission procedure again, on five more
-quantities, and it belongs with the loop that consumes them rather than ahead of it.\\
+\textbf{the same-seed floor} & The one measurement still missing, and it is small: does the same
+command twice on the same card give the same answer? Its run died of an out-of-memory error on a
+card another session had filled, so every `same seed' cell read \code{nan} --- and the promotion
+check reported \emph{fits: yes} anyway, the same silence the captioner had, now fixed to test each
+of the three floors separately. Re-running. It cannot raise a \emph{steps} figure, only lower one.\\
+\addlinespace
+\textbf{the decomposition} & The five \code{residual/} dimensions still have no measured zero. They
+are a decomposition of the objective rather than instruments in their own right, and they belong
+with Phase~2b, which is about fields.\\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -982,6 +985,98 @@ alternatives} by more than the noise, with the comparison and the margin written
 the numbers exist. \textbf{If it does not, the loop is forbidden to start.} This is a live outcome:
 copying the previous beat already outscores every fit the previous campaign produced.
 \end{stopbox}
+\end{phasebox}
+
+\begin{phasebox}{Phase 2b --- Fields: which ones the model needs, and which it would gain from \hfill \prog\ (1 of 2)}
+\textbf{Goal.} The model learns four spatial fields --- stiffness, gain, fibre orientation and
+prestress. Each is a chance to fit well for the wrong reason. Now that there are instruments with a
+measured floor, the question is finally answerable: \emph{which of these does the tissue's motion
+actually require?}
+
+\textbf{Two different questions, and only one of them is cheap.}
+
+\begin{center}\footnotesize
+\begin{tabular}{@{}l p{10.0cm}@{}}
+\toprule
+\textbf{removal}\newline\code{ablate.py} & Take a \emph{trained} model, neutralise one field, re-measure.
+Cheap --- one forward pass each --- and it is the right test for a field the model HAS.\\
+\addlinespace
+\textbf{addition}\newline\code{add\_field.py} & Train with the field and without it, same seeds, same
+depth. The only test for a field the model does NOT have: the others were fitted around its absence,
+so there is nothing to remove and nothing to conclude. Costs a fit per seed per arm.\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{A field's null is a uniform field, not zero.} Setting stiffness to zero changes how hard the
+tissue is, and the score would then move because the material changed rather than because its
+\emph{pattern} mattered. Each field is replaced by its own mean --- magnitude held, structure
+removed --- which is the question actually being asked: does the model need this to vary in space?
+Prestress is the exception; its neutral value really is the identity tensor.
+
+\textbf{1. Removal, on the best fit in the archive. \dn} \code{p3\_b49\_s2\_fs2}, differences from
+the model as fitted:
+
+\begin{center}\small
+\begin{tabular}{@{}l r r r r@{}}
+\toprule
+\textbf{field flattened} & \textbf{loopscore} & \textbf{orient.\ err} & \textbf{chirality} &
+\textbf{coordination}\\
+\midrule
+\emph{(none --- as fitted)} & $+0.4987$ & $+0.4312$ & $+0.8300$ & $+0.5821$\\
+\midrule
+stiffness & $-0.4294$ & $+0.0909$ & $-0.0500$ & $-0.0248$\\
+gain & $\mathbf{-0.6349}$ & $\mathbf{+0.1766}$ & $\mathbf{-0.2500}$ & $\mathbf{-0.1196}$\\
+fibre & $-0.3732$ & $+0.1342$ & $-0.1600$ & $+0.0942$\\
+\midrule
+\emph{3 $\times$ the working unit} & \emph{0.3883} & \emph{0.0695} & \emph{0.0513} & \emph{0.1153}\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent Orientation error is an error, so positive is worse; the rest are scores, so negative is
+worse. Four things follow, and the last is the reason this phase exists.
+
+\textbf{Gain is the field doing the work.} Flattening it costs the most on every single instrument.
+
+\textbf{Flattening stiffness collapses the model onto the do-nothing baseline.} It scores $+0.069$,
+and predicting no motion at all scores $+0.070$. A model with a uniform stiffness is worth exactly
+nothing, which puts a floor under how much of this fit is the stiffness pattern.
+
+\textbf{No field changes the size of the loops.} \code{peak\_excursion} and \code{path\_length} do
+not move for any ablation, at all. The learned fields are shaping the loops and are not sizing them
+--- and the size was never the failure, so this is consistent and worth having in writing.
+
+\textbf{And the objective could not have told us this.} \code{loopscore} cannot resolve the fibre
+ablation --- $-0.3732$ against a three-unit threshold of $0.3883$ --- so ranking on it would have
+concluded that the fibre field does not matter. \code{orientation\_error} ($+0.1342$ against
+$0.0695$) and \code{chirality\_match} ($-0.1600$ against $0.0513$) both say clearly that it does.
+\textbf{This is the demotion of Phase~2 paying for itself on a real question}, and it is the first
+time in this project that an instrument has said something the objective could not.
+
+\textbf{2. Addition: does prestress buy anything? \prog} The checkpoint carries stiffness, gain and
+fibre and \textbf{no prestress}, so removal cannot price it. Four seeds with the field against the
+same four without, at the same depth, judged against the measured seed-to-seed spread --- the
+comparison the previous campaign made hundreds of times with nothing to make it against. Running.
+
+\begin{center}\footnotesize
+\begin{tabular}{@{}l p{10.2cm}@{}}
+\toprule
+\textbf{what it can say} & Whether prestress changes any instrument by more than three times the
+optimiser lottery, \emph{at 300 iterations}.\\
+\addlinespace
+\textbf{what it cannot} & Anything about 2400 iterations. And nothing about whether a field the
+model needs is one we have thought of --- absence of a gain from prestress is not evidence that the
+missing physics is elsewhere.\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{The movies.} \code{grid\_movie.py} draws the ten-by-ten grid as the beat happens, one
+\code{mp4} per ablation, in \code{log/cardio\_mpm/ablation\_p3\_b49\_s2\_fs2/}. A still says whether
+the shape matches; only a moving dot says \emph{when} each part of the loop was traced, which is the
+axis the objective was blind to for sixty batches and the one \code{coordination} was built for.
+
 \end{phasebox}
 
 \begin{phasebox}{Phase 3 --- Certify the gradient \hfill \todo}
