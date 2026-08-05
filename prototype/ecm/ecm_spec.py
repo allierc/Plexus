@@ -52,13 +52,32 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                # a run that says it is testing the matrix's anisotropy, not in the baseline.
                cavity_r=0.14, cavity_h=0.14, axis=2,
                n_fibres=900, fibre_len=0.16, align=0.0, align_dir=(1.0, 0.0, 0.0),
-               r0=0.05, r_max=0.30, growth=0.0009, k_contact=900.0, damp=0.0,
+               # RIGIDITY OF THE CELL-MATRIX CONTACT, raised from 900. The penalty is k * depth and
+               # `mpm_scatter` clamps the resulting acceleration at `a_max`, so k and a_max together
+               # decide how deep a particle can get before the ceiling stops helping: at k = 900 and
+               # a_max = 200 that is depth 0.22, which is most of the tissue's radius. Matrix particles
+               # were visibly ending up inside the lumen. `cell_exclude_3d` is the hard backstop; this
+               # is the soft part of the same fix, and it is the one that keeps the stress physical.
+               #
+               # AND IT CAN BE OVERDONE, WHICH WAS MEASURED. At k = 4000 with a_max = 800 the matrix
+               # stopped being pushed and started being FLICKED: a huge acceleration on the contact
+               # layer alone accelerates that layer out of the contact zone before it can transmit
+               # anything to the material behind it, so the median particle displacement collapsed from
+               # 0.085 to 0.0005 and the strained fraction from 0.97 to 0.21. A piston pushes bulk; an
+               # impulse does not. 1200/300 is firm enough to keep penetration rare and gentle enough
+               # to transmit a sustained pressure, with `cell_exclude_3d` guaranteeing the constraint.
+               r0=0.05, r_max=0.30, growth=0.0009, k_contact=1200.0, damp=0.0,
                # MEASURED, not guessed. At 0.03 the band histogram of 23_cellfix_vertex_visible
                # ended with 39% of the matrix pinned at band 7 -- saturated, so the last quarter of
                # the run showed a uniformly white matrix and the front stopped being visible exactly
                # where it was strongest. 0.05 keeps the top band for the material that is genuinely
                # at the front.
-               stress_scale=0.05, drag=0.0, wall_damp=0.6, seed=0, fps=10):
+               stress_scale=0.05, drag=0.0, wall_damp=0.6, seed=0, fps=10, a_max=300.0,
+               # AN ELASTIC BLOCK instead of a rigid plate: a SECOND MPM set, ~130x stiffer than the
+               # matrix, scattering into the same grid (`prototype/eye`'s two-body pattern). None =
+               # no block. A rigid projection cannot be seen to do anything; a material can.
+               block_gap=None, block_youngs=2000.0, block_particles=60000,
+               block_stress_scale=0.004):
     """The whole experiment as a plain dict, ready for yaml.safe_dump + schema.load."""
     types = {f"s{i}": {"fraction": 1.0 / len(STRESS_COLORS), "youngs": youngs}
              for i in range(len(STRESS_COLORS))}
@@ -92,7 +111,7 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
              "bands": len(STRESS_COLORS)},
             {"op": "mpm_strain", "at": "mpm_particle"},
             {"op": "mpm_scatter", "at": "mpm_particle", "to": "mpm_grid",
-             "drag": float(drag), "a_max": 200},
+             "drag": float(drag), "a_max": float(a_max)},
             {"op": "mpm_grid_update", "at": "mpm_grid", "wall_damp": float(wall_damp)},
             {"op": "mpm_gather", "at": "mpm_particle", "from": "mpm_grid",
              "wall_damp": float(wall_damp), "wall_contact": 0.04, "vmax": 1.0e9},
@@ -113,4 +132,34 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
             "camera_elev": 1.05, "camera_turns": 0.0, "camera_zoom": 0.0,
         },
     }
+    if block_gap is not None:
+        # ONE SET, ONE MATERIAL. The block's stiffness is a property of its TYPE, which is why it has
+        # to be a separate set rather than extra types on the matrix: `ecm_stress` rewrites
+        # `node_type` every frame to carry the stress band, so a type that meant "stiff" would have
+        # its material reassigned by the colouring. Sets are the boundary the material lives behind.
+        spec["sets"]["mpm_block"] = {
+            "parent": "cell", "per_parent": int(block_particles), "radius": 0.48,
+            "density": float(density),
+            "types": {f"b{i}": {"fraction": 1.0 / len(STRESS_COLORS),
+                                "youngs": float(block_youngs)}
+                      for i in range(len(STRESS_COLORS))}}
+        spec["operators"] += [
+            {"op": "block_seed", "at": "mpm_block", "centre": [0.5, 0.5, 0.5],
+             "axis": int(axis), "gap_half": float(block_gap), "seed": int(seed)},
+            {"op": "block_stress", "at": "mpm_block", "scale": float(block_stress_scale),
+             "bands": len(STRESS_COLORS)},
+            # APPENDED, WHICH IS WHAT PUTS THEM SECOND. One schedule token runs every operator of
+            # that name in spec order, and `mpm_scatter`'s default implementation RESETS the grid
+            # while `accumulate` adds to it -- so the matrix's scatter must come first or the block
+            # would wipe the matrix out of the grid every substep.
+            {"op": "mpm_strain", "at": "mpm_block"},
+            {"op": "mpm_scatter", "at": "mpm_block", "to": "mpm_grid",
+             "implementation": "accumulate", "drag": float(drag), "a_max": float(a_max)},
+            {"op": "mpm_gather", "at": "mpm_block", "from": "mpm_grid",
+             "wall_damp": float(wall_damp), "wall_contact": 0.04, "vmax": 1.0e9},
+        ]
+        i = spec["schedule"].index("ecm_seed") + 1
+        spec["schedule"].insert(i, "block_seed")
+        i = spec["schedule"].index("ecm_stress") + 1
+        spec["schedule"].insert(i, "block_stress")
     return copy.deepcopy(spec)

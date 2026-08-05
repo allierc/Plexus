@@ -112,7 +112,8 @@ def _mesh_of(hist_t, pos_t, centroid):
     return d
 
 
-def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1):
+def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap=None,
+          plate_stiff=0.6, load_npz=None, load_gain=1.0):
     """Run cellfix_B_new verbatim and write the cache.
 
     `buffer_x` MULTIPLIES THE VERTEX AND CELL RESERVOIRS AND NOTHING ELSE. At the reference buffers
@@ -122,6 +123,12 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1):
     stopped proliferating because of an ARRAY, not because of its biology. Every mechanical
     parameter is untouched: the reservoir is a memory allocation, so growing it changes what the run
     is ALLOWED to do, not what it is trying to do.
+
+    `plate_gap` (in TISSUE units, the 50-unit world, measured from the world origin) inserts
+    `plate_confine_3d` after the force step: two rigid blocks the vesicle cannot grow past. This is the
+    one place the tissue stops being cellfix_B_new verbatim, and it is an ADDED boundary condition
+    rather than a changed parameter -- the operator stack, the energy and every constant are still the
+    reference ones. Runs with plates are cached under their own name for exactly that reason.
     """
     import run_one as R
     S, engine_run = R._lazy_engine()
@@ -137,6 +144,31 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1):
               f"vertex {spec['sets']['vertex']['n']}", flush=True)
     # UNIQUE PER CACHE, because two builds can run at once (one per GPU) and a shared temp path
     # would have each write the other's spec out from under it.
+    if plate_gap is not None:
+        # AFTER `shape_energy_3d`, BEFORE the topology ops. The relaxation must be allowed to push
+        # into the plate first -- that push IS the pressure the confinement is resisting -- and the
+        # projection then takes it back out. Placed before divide_3d/reconnect_t1_3d so those never
+        # see a vertex outside the domain.
+        import plate_ops                                            # noqa: F401  register it
+        spec["operators"].append({"op": "plate_confine_3d", "at": "vertex", "axis": 2,
+                                  "centre": 0.0, "gap_half": float(plate_gap),
+                                  "stiff": float(plate_stiff)})
+        i = spec["schedule"].index("shape_energy_3d") + 1
+        spec["schedule"].insert(i, "plate_confine_3d")
+        print(f"[tissue] rigid plates at z = +/-{plate_gap:.3g} tissue units "
+              f"(stiff {plate_stiff})", flush=True)
+    if load_npz is not None:
+        # THE MATRIX PUSHING BACK, from a pressure map a previous pass 2 recorded. Same slot as the
+        # plates -- after the relaxation, before the topology ops -- for the same reason: the force
+        # step has to be allowed to push outward first, because that push is what the load resists.
+        import load_ops                                              # noqa: F401  register it
+        spec["operators"].append({"op": "ecm_load_3d", "at": "vertex",
+                                  "load": str(load_npz), "gain": float(load_gain),
+                                  "mu": 1.0, "dt": 1.0, "cap_frac": 0.04})
+        i = spec["schedule"].index("shape_energy_3d") + 1
+        spec["schedule"].insert(i, "ecm_load_3d")
+        print(f"[tissue] matrix load from {os.path.basename(str(load_npz))}, gain {load_gain}",
+              flush=True)
     p = os.path.join("/tmp", os.path.basename(out_npz).replace(".npz", "") + ".yaml")
     open(p, "w").write(yaml.safe_dump(spec, sort_keys=False))
     t0 = time.time()
@@ -147,7 +179,7 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1):
     posf = out["sets"]["vertex"]["pos"]
     T = min(posf.shape[0], len(hist))
 
-    maps, r_ap, r_med, ncell, cent = [], [], [], [], []
+    maps, r_ap, r_med, ncell, cent, r_eq, r_ax = [], [], [], [], [], [], []
     for t in range(T):
         mt = hist[t]
         nv = int(mt["Nv"])
@@ -160,6 +192,11 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1):
         r_med.append(float(np.median(rad[live])) if live.any() else 0.0)
         ncell.append(int(mt["nF"]))
         cent.append(c)
+        # THE TWO SEMI-AXES, so "it became an ovoid" is a number and not an impression. 98th
+        # percentile rather than max: one stray vertex should not set the shape of the tissue, and a
+        # just-divided sliver can sit briefly outside the surface.
+        r_eq.append(float(np.percentile(np.hypot(v[:, 0], v[:, 1]), 98)))
+        r_ax.append(float(np.percentile(np.abs(v[:, 2]), 98)))
 
     keep = np.unique(np.linspace(0, T - 1, min(n_render, T)).astype(int))
     mesh = {"mesh_frames": keep.astype(np.int32)}
@@ -179,23 +216,32 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1):
         # ONE camera half-width for the WHOLE run, measured over every kept frame. Per-frame
         # autofit is what hid growth in every archived movie until run_one.run_box was written:
         # a vesicle that doubles in radius renders at constant apparent size.
-        Lbox=np.float32(extent * MESH_PAD), **mesh)
+        Lbox=np.float32(extent * MESH_PAD),
+        r_eq=np.asarray(r_eq, np.float32), r_ax=np.asarray(r_ax, np.float32),
+        plate_gap=np.float32(-1.0 if plate_gap is None else plate_gap), **mesh)
+    ar = r_eq[-1] / max(r_ax[-1], 1e-9)
     print(f"[tissue] cellfix_B_new: {T} frames, {ncell[0]} -> {ncell[-1]} cells, "
           f"apical radius {r_ap[0]:.2f} -> {r_ap[-1]:.2f} (cell-centroid radius "
-          f"{r_med[0]:.2f} -> {r_med[-1]:.2f}), {len(keep)} meshes kept, "
+          f"{r_med[0]:.2f} -> {r_med[-1]:.2f}), semi-axes equatorial {r_eq[-1]:.2f} / axial "
+          f"{r_ax[-1]:.2f} = ASPECT {ar:.2f}, {len(keep)} meshes kept, "
           f"{time.time()-t0:.0f}s -> {os.path.relpath(out_npz, ROOT)}", flush=True)
     return out_npz
 
 
 def load_or_build(frames=401, device="cuda:0", name="cellfix_B_new", rebuild=False,
-                  buffer_x=1):
+                  buffer_x=1, plate_gap=None, plate_stiff=0.6, load_npz=None,
+                  load_gain=1.0, tag_extra=""):
     """The cache path, built if missing. Frames are part of the filename: a 401-frame tissue and a
     120-frame one are different tissues, and silently reusing one for the other would be a run
     whose movie stops before the thing it was testing happened."""
     tag = f"{name}_f{int(frames)}" + (f"_x{int(buffer_x)}" if buffer_x != 1 else "")
+    if plate_gap is not None:
+        tag += f"_plate{plate_gap:g}".replace(".", "p")
+    tag += tag_extra
     out = os.path.join(CACHE, f"{tag}.npz")
     if rebuild or not os.path.exists(out):
-        build(frames, device, out, buffer_x=buffer_x)
+        build(frames, device, out, buffer_x=buffer_x, plate_gap=plate_gap,
+              plate_stiff=plate_stiff, load_npz=load_npz, load_gain=load_gain)
     else:
         z = np.load(out)
         print(f"[tissue] reusing {os.path.relpath(out, ROOT)}  "
@@ -212,5 +258,9 @@ if __name__ == "__main__":
     ap.add_argument("--device", default="cuda:0")
     ap.add_argument("--rebuild", action="store_true")
     ap.add_argument("--buffer-x", type=int, default=1)
+    ap.add_argument("--plate-gap", type=float, default=None,
+                    help="rigid plates at z = +/- this, in TISSUE units (unconfined r_eq ~16.5)")
+    ap.add_argument("--plate-stiff", type=float, default=0.6)
     a = ap.parse_args()
-    load_or_build(a.frames, a.device, rebuild=a.rebuild, buffer_x=a.buffer_x)
+    load_or_build(a.frames, a.device, rebuild=a.rebuild, buffer_x=a.buffer_x,
+                  plate_gap=a.plate_gap, plate_stiff=a.plate_stiff)

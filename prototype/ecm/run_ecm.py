@@ -54,6 +54,10 @@ for p in (HERE, os.path.join(ROOT, "src"), os.path.join(ROOT, "prototype", "Tyss
 
 LOG = os.path.join(ROOT, "log", "okuda_ECM")
 
+# How close to the surface counts as touching it, in box units. One grid cell at n_grid=48 is 0.021, so
+# this is a fifth of a cell -- inside the width the MPM kernel itself smears a boundary over.
+CONTACT_SKIN = 0.004
+
 
 # --------------------------------------------------------------------------- the numbers
 def surface_radius(pos, M, centre):
@@ -98,7 +102,13 @@ def measure(out, spec, stress=None, seeded=None):
             M = S[min(t, S.shape[0] - 1)]
             r, R = surface_radius(pos[t], M, c)
             tissue_r.append(float(np.median(M)))
-            if contact is None and (r < R).any():
+            # CONTACT IS THE SURFACE REACHING A PARTICLE, not a particle being found INSIDE it. The
+            # strict test was right while penetration was the only evidence of contact, and it broke the
+            # moment `cell_exclude_3d` started preventing penetration: a run with a working
+            # non-penetration constraint has almost nothing inside the tissue ever, so the strict test
+            # reported first contact at frame 197 for a tissue that had been pressing since frame 35.
+            # A metric that fails when the physics improves is measuring the artefact.
+            if contact is None and (r - R < CONTACT_SKIN).any():
                 contact = t
         else:
             rr = min(op["r_max"], op["r0"] + op["growth"] * t)
@@ -172,6 +182,10 @@ def rerender(out_dir, **kw):
     ecm_ops.STRESS_HISTORY[:] = list(np.asarray(z["stress"]))
     ecm_ops.BALL_RADIUS[:] = list(np.asarray(z["radius"], float))
     out = {"sets": {"mpm_particle": {"pos": np.asarray(z["pos"])}}}
+    if "bpos" in z.files:
+        import block_ops
+        block_ops.BLOCK_STRESS[:] = list(np.asarray(z["bstress"]))
+        out["sets"]["mpm_block"] = {"pos": np.asarray(z["bpos"])}
     render(os.path.basename(out_dir.rstrip("/")), out, spec, out_dir, **kw)
 
 
@@ -300,6 +314,15 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True,
     scale = float(op.get("scale", 1.0))
     Tis = RD.load_tissue(op["surface"], scale)
     meshes = [(t, m) for t, m in Tis["meshes"] if t < T]
+    plate = Tis.get("plate_gap")                        # rigid-block half-gap in TISSUE units, or None
+
+    # THE ELASTIC BLOCK, if this run has one: a second MPM set, its own strain history, its own ramp.
+    import block_ops
+    bpos = np.asarray(out["sets"]["mpm_block"]["pos"]) if "mpm_block" in out.get("sets", {}) else None
+    bhist = block_ops.BLOCK_STRESS if bpos is not None else None
+    if bpos is not None:
+        print(f"[{name}] elastic block: {bpos.shape[1]} particles, "
+              f"{len(bhist or [])} strain frames", flush=True)
 
     # ---- ONE camera, computed once, held for every frame and every panel.
     Lbox_box = 0.5 / max(scale, 1e-12)                  # the MPM box half-width, in tissue units
@@ -314,6 +337,14 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True,
         """The matrix in tissue coordinates."""
         return (pos[t] - centre) / max(scale, 1e-12)
 
+    def blk_of(t):
+        """The block in tissue coordinates, with its own band -- or None if there is no block."""
+        if bpos is None:
+            return None
+        b = (np.asarray(bhist[t]) if bhist and t < len(bhist)
+             else np.zeros(bpos.shape[1], np.uint8))
+        return ((bpos[min(t, bpos.shape[0] - 1)] - centre) / max(scale, 1e-12), b)
+
     def band_of(t):
         return (np.asarray(hist[t]) if hist and t < len(hist)
                 else np.zeros(pos.shape[1], np.uint8))
@@ -322,7 +353,7 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True,
     idx = [meshes[int(round(f * (len(meshes) - 1)))] for f in np.linspace(0, 1, n_strip)]
     fig = plt.figure(figsize=(4.4 * n_strip, 18.0), facecolor="black")
     for i, (t, mt) in enumerate(idx):
-        vp, q, band = mt["pos"], q_of(t), band_of(t)
+        vp, q, band, blk = mt["pos"], q_of(t), band_of(t), blk_of(t)
         div, brk = RD.divided_mask(mt), RD.broken_mask(mt, vp, name)
         for row, (cam, tissue, cut) in enumerate([(RD.CAM_SIDE, True, False),
                                                   (RD.CAM_TOP, True, False),
@@ -330,13 +361,13 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True,
             ax = fig.add_subplot(4, n_strip, row * n_strip + i + 1, projection="3d",
                                  computed_zorder=False, facecolor="black")
             RD.draw_3d(ax, mt, vp, q, band, cmap, cam, L3, div=div, brk=brk, tissue=tissue,
-                       cutaway=cut)
+                       cutaway=cut, plate_gap=plate, blk=blk)
             if row == 0:
                 ax.text2D(0.03, 0.95, f"frame {t}   {int(mt['nF'])} cells   "
                                       f"strained {float((band > 0).mean()) * 100:.0f}%",
                           transform=ax.transAxes, color="white", fontsize=11, va="top")
         axc = fig.add_subplot(4, n_strip, 3 * n_strip + i + 1, facecolor="black")
-        RD.draw_cross(axc, mt, vp, q, band, cmap, L2, axis_dir, slab)
+        RD.draw_cross(axc, mt, vp, q, band, cmap, L2, axis_dir, slab, plate_gap=plate, blk=blk)
     fig.subplots_adjust(0.005, 0.005, 0.995, 0.995, wspace=0.02, hspace=0.02)
     fig.savefig(os.path.join(out_dir, "strip.png"), dpi=100, facecolor="black")
     plt.close(fig)
@@ -358,31 +389,33 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True,
         meshes[int(round(f * (len(meshes) - 1)))]
         for f in np.linspace(0, 1, min(movie_frames, len(meshes)))]
 
-    figm = plt.figure(figsize=(10.4, 5.4), facecolor="black")
+    # TWO FULL PANELS: the 3D view on the left, the cross-section on the right. The previous layout
+    # had two 3D cameras plus a section inset in the bottom-right corner -- and the inset was the panel
+    # carrying the monolayer, the lumen and the front's timing, squeezed into a fifth of the width. The
+    # top-down camera exists to catch a protrusion pointing at the side camera; the tissue here is a
+    # sphere or an ovoid by construction, so it was the panel with the least to say.
+    figm = plt.figure(figsize=(11.0, 5.5), facecolor="black")
     axs = figm.add_subplot(1, 2, 1, projection="3d", computed_zorder=False, facecolor="black")
-    axt = figm.add_subplot(1, 2, 2, projection="3d", computed_zorder=False, facecolor="black")
-    figm.subplots_adjust(0, 0, 1, 1, wspace=0.0)
-    axin = figm.add_axes([0.80, 0.0, 0.20, 0.38]); axin.patch.set_alpha(0.0)
+    axc2 = figm.add_subplot(1, 2, 2, facecolor="black")
+    figm.subplots_adjust(0, 0, 1, 1, wspace=0.02)
     fps = int(spec.get("plotting", {}).get("fps", 10))
     wri = FFMpegWriter(fps=fps, metadata={"title": name})
     t0 = time.time()
     with wri.saving(figm, os.path.join(out_dir, "movie.mp4"), dpi=95):
         for k, (t, mt) in enumerate(keep):
-            vp, q, band = mt["pos"], q_of(t), band_of(t)
+            vp, q, band, blk = mt["pos"], q_of(t), band_of(t), blk_of(t)
             div, brk = RD.divided_mask(mt), RD.broken_mask(mt, vp, name)
-            RD.draw_3d(axs, mt, vp, q, band, cmap, RD.CAM_SIDE, L3, div=div, brk=brk)
-            RD.draw_3d(axt, mt, vp, q, band, cmap, RD.CAM_TOP, L3, div=div, brk=brk)
-            # THE INSET IS 0.20 x 0.38 OF THE FIGURE, so its markers are scaled down to match; a
-            # size in points does not shrink with the axes it is drawn in.
-            RD.draw_cross(axin, mt, vp, q, band, cmap, L2, axis_dir, slab, dot_scale=0.30)
-            # `_draw`/`_cross_screen` both call ax.clear(), which drops any label -- re-stamp it.
+            RD.draw_3d(axs, mt, vp, q, band, cmap, RD.CAM_SIDE, L3, div=div, brk=brk,
+                       plate_gap=plate, blk=blk)
+            RD.draw_cross(axc2, mt, vp, q, band, cmap, L2, axis_dir, slab, dot_scale=0.85,
+                          plate_gap=plate, blk=blk)
+            # ONE LABEL, ON THE 3D PANEL. `_draw`/`_cross_screen` both call ax.clear(), which drops
+            # any label, so it is re-stamped every frame. The camera elevation and the cut plane used
+            # to be printed too and are not any more: they are fixed for the whole run and recorded in
+            # the spec beside the movie, so they were spending the frame's only text on constants.
             axs.text2D(0.02, 0.96, f"{name}   frame {t}   {int(mt['nF'])} cells   "
                                    f"strained {float((band > 0).mean()) * 100:.0f}%",
                        transform=axs.transAxes, color="white", fontsize=9)
-            axs.text2D(0.02, 0.92, "side  elev 18", transform=axs.transAxes, color="#888",
-                       fontsize=8)
-            axt.text2D(0.02, 0.96, "top  elev 88", transform=axt.transAxes, color="#888",
-                       fontsize=8)
             wri.grab_frame()
             if k == 0:
                 print(f"[{name}] first movie frame in {time.time()-t0:.1f}s "
@@ -400,6 +433,9 @@ def run(name, spec, device="cuda:0", movie=True, keep_traj=True, render_kw=None)
     # entirely plausible.
     ecm_ops.STRESS_HISTORY.clear()
     ecm_ops.BALL_RADIUS.clear()
+    ecm_ops.PRESSURE_HISTORY.clear()
+    import block_ops
+    block_ops.BLOCK_STRESS.clear()
     import plexus.schema as S
     from plexus.engine import run as engine_run
 
@@ -419,12 +455,30 @@ def run(name, spec, device="cuda:0", movie=True, keep_traj=True, render_kw=None)
     # because the movie was the only surviving record of where anything was.
     if keep_traj:
         try:
+            import block_ops
+            extra = {}
+            if "mpm_block" in out.get("sets", {}):
+                extra["bpos"] = np.asarray(out["sets"]["mpm_block"]["pos"], np.float32)
+                extra["bstress"] = np.asarray(block_ops.BLOCK_STRESS, np.uint8)
             np.savez_compressed(os.path.join(out_dir, "traj.npz"),
                                 pos=np.asarray(out["sets"]["mpm_particle"]["pos"], np.float32),
                                 stress=np.asarray(ecm_ops.STRESS_HISTORY, np.uint8),
-                                radius=np.asarray(ecm_ops.BALL_RADIUS, np.float32))
+                                radius=np.asarray(ecm_ops.BALL_RADIUS, np.float32), **extra)
         except Exception as e:
             print(f"[{name}] traj.npz not written: {type(e).__name__}", flush=True)
+
+    # THE REACTION, SAVED. Written whether or not anything will read it: a later tissue pass is the
+    # only place this force can go, and re-running 400 frames of MPM to recover a map that was in
+    # memory is the same defect `traj.npz` was added to fix.
+    if ecm_ops.PRESSURE_HISTORY:
+        try:
+            np.savez_compressed(os.path.join(out_dir, "load.npz"),
+                                pmap=np.asarray(ecm_ops.PRESSURE_HISTORY, np.float32),
+                                scale=np.float32(next(
+                                    (o.get("scale", 1.0) for o in spec["operators"]
+                                     if o["op"] == "cell_to_ecm"), 1.0)))
+        except Exception as e:
+            print(f"[{name}] load.npz not written: {type(e).__name__}", flush=True)
 
     m = measure(out, spec, stress=ecm_ops.STRESS_HISTORY)
     m["wall_s"] = round(wall, 1)

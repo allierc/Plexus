@@ -79,8 +79,15 @@ def load_tissue(path, scale):
             "Nv": int(z[f"m{j}_Nv"]),
             "age": np.asarray(z[f"m{j}_age"], np.float64),
             "ndiv": np.asarray(z[f"m{j}_ndiv"], np.float64)}))
+    gap = float(z["plate_gap"]) if "plate_gap" in z.files else -1.0
     return {"meshes": meshes, "Lbox": float(z["Lbox"]), "scale": float(scale),
-            "n_cells": np.asarray(z["n_cells"]), "r_apical": np.asarray(z["r_apical"])}
+            "n_cells": np.asarray(z["n_cells"]), "r_apical": np.asarray(z["r_apical"]),
+            # IN TISSUE UNITS, from the cache -- the same number pass 1 grew the tissue against.
+            # The spec carries it in BOX units; taking it from there would mean dividing by the scale
+            # and getting a plate drawn at a slightly different place than the one the cells hit.
+            "plate_gap": (None if gap <= 0 else gap),
+            "r_eq": (np.asarray(z["r_eq"]) if "r_eq" in z.files else None),
+            "r_ax": (np.asarray(z["r_ax"]) if "r_ax" in z.files else None)}
 
 
 def divided_mask(mt):
@@ -149,7 +156,43 @@ def _matrix_scatter(ax, q, band, cmap, zorder, alpha, s_rest=1.1, s_hot=2.4, thr
         ax.scatter(*xs, c=b, s=s_hot, alpha=alpha, zorder=zorder + 1, **args)
 
 
-def draw_3d(ax, mt, pos, q, band, cmap, cam, L, div=None, brk=None, tissue=True, cutaway=False):
+# THE BLOCK'S OWN RAMP, and it must not be the matrix's. Two materials in one frame coloured by the
+# same palette are indistinguishable, and the whole point of an elastic block is telling its
+# deformation apart from the matrix's. Slate to white: unstrained block is clearly SOLID (much brighter
+# than the matrix's dim rest state), and strain brightens it toward white without entering the inferno
+# hues the matrix owns.
+BLOCK_COLORS = [
+    [0.30, 0.32, 0.36], [0.39, 0.41, 0.45], [0.48, 0.50, 0.55], [0.57, 0.60, 0.65],
+    [0.66, 0.70, 0.76], [0.76, 0.81, 0.87], [0.87, 0.91, 0.96], [1.00, 1.00, 1.00],
+]
+
+PLATE_FACE = (0.62, 0.64, 0.70, 0.30)      # solid, inert, and not any colour that already means
+PLATE_EDGE = (0.85, 0.87, 0.92, 0.85)      # something: white/green are cells, the inferno ramp is stress
+
+
+def draw_plates_3d(ax, gap, L, zorder=4):
+    """The two rigid blocks, as their INNER faces -- the surfaces the tissue is actually stopped by.
+
+    Drawing the full slabs would fill a third of the frame with translucent grey at elev 18 and bury
+    the matrix behind them. The inner face IS the constraint; the material above it is inert by
+    definition, so a face plus an edge says everything the block does.
+    """
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+    import numpy as _np
+    quads = [_np.array([[-L, -L, z], [L, -L, z], [L, L, z], [-L, L, z]]) for z in (-gap, gap)]
+    pc = Poly3DCollection(quads, facecolors=[PLATE_FACE] * 2, edgecolors=[PLATE_EDGE] * 2,
+                          linewidths=0.8)
+    pc.set_zorder(zorder)
+    ax.add_collection3d(pc)
+
+
+def block_cmap():
+    from matplotlib.colors import ListedColormap
+    return ListedColormap(BLOCK_COLORS)
+
+
+def draw_3d(ax, mt, pos, q, band, cmap, cam, L, div=None, brk=None, tissue=True, cutaway=False,
+            plate_gap=None, blk=None):
     """One 3D panel: far matrix -> epithelium -> near matrix, in tissue units.
 
     `cutaway` removes the octant nearest the camera instead of drawing the tissue. A solid cube of
@@ -183,33 +226,44 @@ def draw_3d(ax, mt, pos, q, band, cmap, cam, L, div=None, brk=None, tissue=True,
     else:
         _matrix_scatter(ax, q[far], band[far], cmap, zorder=0, alpha=0.9)
         _matrix_scatter(ax, q[near], band[near], cmap, zorder=10, alpha=0.9)
+    if blk is not None:
+        # THE BLOCK, SPLIT THE SAME WAY. It is a body enclosing the tissue from two sides, so a single
+        # scatter has the same per-artist depth problem the matrix has -- and the block is opaque
+        # enough that getting it wrong hides the experiment rather than blurring it.
+        qb, bb = blk
+        db = qb @ d
+        _matrix_scatter(ax, qb[db > 0], bb[db > 0], block_cmap(), zorder=1, alpha=0.9,
+                        s_rest=1.6, s_hot=2.8)
+        _matrix_scatter(ax, qb[db <= 0], bb[db <= 0], block_cmap(), zorder=11, alpha=0.22,
+                        s_rest=1.6, s_hot=2.8)
+    elif plate_gap is not None:
+        # ONLY WHEN THERE IS NO BLOCK. A translucent quad drawn over a material that is already there
+        # would be a second, disagreeing picture of the same object.
+        draw_plates_3d(ax, plate_gap, L)
     ax.set_xlim(-L, L); ax.set_ylim(-L, L); ax.set_zlim(-L, L)
     ax.set_box_aspect((1, 1, 1)); ax.axis("off")
     ax.view_init(elev=cam["elev"], azim=cam["azim"])
 
 
-def draw_cross(ax, mt, pos, q, band, cmap, L2, axis_dir, slab, dot_scale=1.0):
-    """The monolayer in section + the matrix in the SAME plane.
+def draw_cross(ax, mt, pos, q, band, cmap, L2, axis_dir, slab, dot_scale=1.0, plate_gap=None,
+               blk=None):
+    """The monolayer in section + the matrix in the SAME plane, cut in the SCREEN plane.
 
-    The cut plane CONTAINS the cavity's pinched axis and faces the camera, and that axis runs along
-    the plot's horizontal -- the `_cross_screen` convention, where the interesting axis is the
-    horizontal one. So an anisotropic cavity reads directly: the matrix is thin left-and-right and
-    thick above-and-below, and the stress arrives on those sides at different times.
+    `seed_dir=None` on purpose, which makes `_cross_screen` fall back to the camera's own frame: the
+    cut is the plane you are looking THROUGH in the 3D panel, so its vertical is that panel's vertical.
+    The alternative -- `_cross_screen`'s tube convention, which puts `seed_dir` along the plot
+    HORIZONTAL -- is right for a tube and wrong here: it would show the confined axis lying left-to-right
+    beside a 3D view with the blocks at top and bottom, and the two panels of one figure would disagree
+    about which way is up.
+
+    `axis_dir` is kept in the signature because the CAVITY still has a pinched axis worth recording,
+    and callers pass it; the cut plane no longer depends on it.
     """
-    from run_tyssue_round import _cross_screen
-    from run_tyssue_round import _screen_basis
-    _cross_screen(ax, pos, mt, np.zeros(mt["nF"]), seed_dir=axis_dir, inner=INNER, Lbox=L2)
-    # THE SAME PLANE, DERIVED THE SAME WAY. `_cross_screen` builds its basis from `seed_dir` and
-    # the fixed side camera; recomputing it here with the same two inputs is what keeps the matrix
-    # slab and the cell ring in one picture instead of two unrelated ones.
-    dcam, su, sv = _screen_basis()
-    t = np.asarray(axis_dir, float); t /= np.linalg.norm(t) + 1e-12
-    n = dcam - (dcam @ t) * t
-    d = n / np.linalg.norm(n) if np.linalg.norm(n) > 1e-6 else sv
-    u = t if (t @ su) >= 0 else -t
-    v = np.cross(d, u); v /= np.linalg.norm(v) + 1e-12
-    if v @ sv < 0:
-        v = -v
+    from run_tyssue_round import _cross_screen, _screen_basis
+    _cross_screen(ax, pos, mt, np.zeros(mt["nF"]), seed_dir=None, inner=INNER, Lbox=L2)
+    # THE SAME PLANE, DERIVED THE SAME WAY -- `_cross_screen`'s own fallback frame, recomputed here so
+    # the matrix slab and the cell ring are one picture instead of two unrelated ones.
+    d, u, v = _screen_basis()
     sl = np.abs(q @ d) < slab
     if sl.any():
         proj = np.stack([q[sl] @ u, q[sl] @ v], axis=1)
@@ -218,10 +272,25 @@ def draw_cross(ax, mt, pos, q, band, cmap, L2, axis_dir, slab, dot_scale=1.0):
         # floating in it -- and the section is the panel where the front's TIMING is legible.
         #
         # BUT SCALED TO THE PANEL. A marker size is in POINTS, not in data units, so the same `s`
-        # that is right for a full strip panel is four times too big in the movie's small inset: the
-        # matrix buried the monolayer ring, and the section stopped showing the one thing only it can
-        # show -- where the epithelium is relative to the front. `dot_scale` is the caller's panel
-        # size, not a taste setting.
+        # that is right for a full strip panel is four times too big in a small one. `dot_scale` is
+        # the caller's panel size, not a taste setting.
         _matrix_scatter(ax, proj, band[sl], cmap, zorder=0, alpha=0.95,
                         s_rest=3.4 * dot_scale, s_hot=7.0 * dot_scale, three_d=False)
+    if blk is not None:
+        qb, bb = blk
+        sb = np.abs(qb @ d) < slab
+        if sb.any():
+            _matrix_scatter(ax, np.stack([qb[sb] @ u, qb[sb] @ v], axis=1), bb[sb], block_cmap(),
+                            zorder=1, alpha=0.95, s_rest=3.4 * dot_scale, s_hot=7.0 * dot_scale,
+                            three_d=False)
+    elif plate_gap is not None:
+        # WHERE THE PLATE ACTUALLY CROSSES THIS PLANE. The plate is the plane z = +/-gap and the cut's
+        # vertical `v` is only MOSTLY z (its z-component is 0.951 at elev 18), so the intersection sits
+        # at gap / v_z, not at gap. Drawing it at `gap` would misreport the gap by 5% -- small, and
+        # exactly the kind of small that turns a measurement into an illustration.
+        from matplotlib.patches import Rectangle
+        b = plate_gap / max(abs(float(v[2])), 1e-9)
+        for lo in (b, -L2):
+            ax.add_patch(Rectangle((-L2, lo if lo > 0 else -L2), 2 * L2, L2 - b,
+                                   facecolor=PLATE_FACE, edgecolor=PLATE_EDGE, lw=0.8, zorder=2))
     ax.set_xlim(-L2, L2); ax.set_ylim(-L2, L2); ax.set_aspect("equal"); ax.axis("off")

@@ -62,13 +62,34 @@ LOG = os.path.join(ROOT, "log", "okuda_ECM")
 FIT = 0.30
 
 
-def build(name, tissue_npz, fit=FIT, **ecm):
-    """The pass-2 spec: the matrix, coupled to the recorded epithelium."""
+def build(name, tissue_npz, fit=FIT, plate_box=None, **ecm):
+    """The pass-2 spec: the matrix, coupled to the recorded epithelium.
+
+    SCALED BY THE EQUATORIAL SEMI-AXIS, not by the median radius. A confined tissue is an OVOID, and
+    its median radius sits between its two semi-axes -- so scaling by the median puts the widest part
+    of the tissue past `fit` and, at fit 0.30, past the box wall. `fit` means "the tissue's widest
+    extent is this fraction of the box half-width", which is the only reading that keeps it inside.
+
+    IF THE TISSUE WAS GROWN AGAINST PLATES, THE SAME PLATES GO INTO THE MATRIX. They are one physical
+    object: `plate_confine_3d` holds the matrix out of them during the run and `ecm_seed` never seeds
+    into them, both at the gap the tissue was actually grown against, converted by the one scale.
+    """
     import ecm_spec as ES
     z = np.load(tissue_npz)
     r_ap = np.asarray(z["r_apical"], float)
+    r_eq = np.asarray(z["r_eq"], float) if "r_eq" in z.files else r_ap
+    r_ax = np.asarray(z["r_ax"], float) if "r_ax" in z.files else r_ap
     T = int(np.asarray(z["smap"]).shape[0])
-    s = float(fit) / max(float(r_ap.max()), 1e-9)
+    s = float(fit) / max(float(r_eq.max()), 1e-9)
+    gap_t = float(z["plate_gap"]) if "plate_gap" in z.files else -1.0
+    gap_box = None if gap_t <= 0 else gap_t * s
+    if plate_box is not None:
+        # PLATES SPECIFIED IN BOX UNITS, for the case where they are NOT what shaped the tissue. A gap
+        # wider than the tissue's own radius cannot deform it, so pass 1 has nothing to say about it --
+        # but the matrix still gets squeezed between the plate and the tissue, which is its own
+        # experiment. Overrides whatever pass 1 recorded.
+        gap_box = float(plate_box)
+        gap_t = gap_box / max(s, 1e-12)
     spec = ES.build_spec(name, n_frames=T, **ecm)
     for o in spec["operators"]:
         if o["op"] == "cell_to_ecm":
@@ -77,10 +98,41 @@ def build(name, tissue_npz, fit=FIT, **ecm):
             o["scale"] = s
             for k in ("r0", "r_max", "growth"):
                 o.pop(k, None)                      # a replay has no r(t) formula to grow by
+        if o["op"] == "ecm_seed" and gap_box is not None:
+            o["plate_half"] = gap_box
+    # NON-PENETRATION, ALWAYS. The penalty in `cell_to_ecm` punishes penetration rather than
+    # preventing it, and `mpm_scatter`'s `a_max` clamp puts a ceiling on the punishment -- so matrix
+    # particles were ending up inside the lumen, which is a place there is no matrix. Added after the
+    # substep block so it corrects what the loop just did.
+    import ecm_ops                                                   # noqa: F401  register it
+    if "mpm_block" in spec["sets"]:
+        # THE ELASTIC BLOCK's two dependencies: its own ops, and the eye prototype's
+        # `mpm_scatter[accumulate]` -- the implementation that lets a second body share the grid.
+        # Imported rather than reimplemented; it is the same contract with different numerics.
+        sys.path.insert(0, os.path.join(ROOT, "prototype", "eye"))
+        import block_ops                                              # noqa: F401
+        import muscle_ops                                             # noqa: F401
+    spec["operators"].append({"op": "cell_exclude_3d", "at": "mpm_particle",
+                              "centre": [0.5, 0.5, 0.5], "surface": tissue_npz, "scale": s,
+                              "skin": 0.004})
+    spec["schedule"].append("cell_exclude_3d")
+    if gap_box is not None:
+        import plate_ops                                            # noqa: F401  register it
+        # AFTER the substep block: the MPM loop moves the particles, and the plates then take back
+        # whatever crossed them. Inside the loop it would be applied 20 times a frame, which is a
+        # stiffer wall than the one the tissue was grown against.
+        spec["operators"].append({"op": "plate_confine_3d", "at": "mpm_particle", "axis": 2,
+                                  "centre": 0.5, "gap_half": gap_box, "stiff": 1.0})
+        spec["schedule"].append("plate_confine_3d")
     info = {"surface_scale": s, "cell_frames": T, "tissue_npz": tissue_npz,
             "cells_start": int(z["n_cells"][0]), "cells_end": int(z["n_cells"][-1]),
             "tissue_r_start": float(r_ap[0]), "tissue_r_end": float(r_ap[-1]),
-            "tissue_r_start_box": float(r_ap[0] * s), "tissue_r_end_box": float(r_ap[-1] * s)}
+            "tissue_r_eq_end": float(r_eq[-1]), "tissue_r_ax_end": float(r_ax[-1]),
+            "aspect_end": float(r_eq[-1] / max(r_ax[-1], 1e-9)),
+            "tissue_r_start_box": float(r_ap[0] * s), "tissue_r_end_box": float(r_eq[-1] * s),
+            "plate_gap_tissue": gap_t, "plate_gap_box": gap_box,
+            "block_volume_frac": (None if gap_box is None
+                                  else float(max(0.0, 1.0 - 2.0 * gap_box)))}
     return spec, info
 
 
