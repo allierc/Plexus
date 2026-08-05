@@ -1031,14 +1031,164 @@ feedback off a field that was already dead --- was, until this phase, an asserti
 could settle. It is now a number.
 \end{phasebox}
 
-\begin{phasebox}{Phase 11 --- The demonstration \hfill \todo}
+\begin{phasebox}{Phase 11 --- An outside reviewer says no, and why \hfill \prog}
+\textbf{Goal.} The loop ran for the first time with the metric work in place, and I asked three
+independent reviewers to judge it against Track A --- read-only, verify by execution, quantify or
+it does not count. The verdict is \emph{no}, and it names the sentence: \emph{``what does this
+mechanism do as you turn it up'' is the second question Track A asks of every mechanism.} That
+question was asked \textbf{zero times in 36 slots}, and not by omission.
+
+\subsection*{The number I reported was wrong}
+I told Cedric the campaign ``reached best \code{protr\_peak} 2.338, a sphere being 1.0''. It did
+not. 2.338 is the \emph{composite score} $0.5\,\code{protr\_peak} + Q + 0.25\min(\code{n\_tubes},2)$,
+and it is a \textbf{rail}: eleven runs across ten distinct compositions hold it to four significant
+figures, every one with \code{protr\_peak} $=1.022$. The best protrusion the campaign measured is
+1.185 on an exploded mesh, and 1.004 on a premise-clean specimen. \textbf{There is no protrusion in
+this campaign.} The cluster freeze --- ``no gain in 13 evaluations'' --- was the loop reading its
+own rail as an exhausted idea.
+
+\subsection*{The four faults, each with the number that makes it one}
+
+\paragraph{A sweep was arithmetically impossible.} \code{comp\_hash} is deliberately
+parameter-blind so a retune cannot be filed as a new mechanism, and it works: \textbf{107 of 107}
+parameter perturbations leave the hash bit-identical. But \code{round.py} deduped slots
+\emph{within} a batch on that same bare hash, while \code{proposer.py} \emph{requires} slot~0 to be
+the unchanged parent --- so every parameter move collided with the mandatory control.
+\textbf{48 of 48} admitted sweep slots were refused \code{DUPLICATE\_IN\_BATCH}, and the refusal
+text ``Vary the EDIT, not the number'' then entered the next Proposer's prompt as a lesson. The
+loop was teaching itself not to ask Track A's second question. Measured on the live frontier: the
+25 sweep edits available share \emph{one} composition hash and have \textbf{25 distinct run keys}.
+\code{critic.py} already keyed sweeps on the run key --- mechanism \emph{and} operating point ---
+one screen away. Two readings of one identity function disagreed about what a sweep is, and the
+stricter one won by being later in the file.
+
+\paragraph{Predictions were scored on specimens the same record called invalid.} The Biologist
+writes \code{premises\_broken}; \code{check\_posthoc} never read it. So a run that passed through
+itself (P11) or absorbed area by stretching (P7) was scored \code{confirmed} in
+\code{hypotheses.jsonl} while \code{collector.py} wrote ``specimen invalid \ldots describes the
+configuration and not a tissue'' about the \emph{same} run into \code{analysis.md}. Two records of
+one experiment disagreed, and the Supervisor reads the register --- so the surprise rate, the 70/30
+steer and the cluster freeze were all computed over runs the Biologist had already rejected.
+\textbf{24 of 35} archived runs are refused once the verdict is wired to the resolver.
+
+\paragraph{The loop could not be curious.} \code{INTENTS} held
+\code{confirmatory\,|\,adversarial\,|\,control}. \code{Hypothesis(intent="exploratory")} raised
+\code{ValueError}, and so did \code{predicted=""}. So every slot had to be a bet, and the trap the
+goal names --- \emph{a loop that may only test predictions will only ever propose things it can
+predict} --- was structural, not cultural.
+
+\paragraph{Nine of twelve runs were the same mesh under nine names.} Both frontier parents carry
+\code{conns: []} and no growth operator, so the chemistry cannot reach the mechanics and the shape
+is a \emph{constant function} of the edits being made. Re-measured here: \textbf{10 of 12} round-3
+runs share \code{gyr\_prolate\_peak} to sixteen digits across ten distinct compositions. Seven of
+them resolved \code{confirmed}.
+
+\subsection*{What the reviewers said is working, and should not be touched}
+Not everything is broken, and a review that finds only faults gives no basis for deciding what to
+keep. The prediction record is genuinely prospective and append-only: 36 posed before the run, 36
+resolved after it, none posed-and-never-resolved, and \code{resolve()} raises on a second write.
+The evidence horizon was called ``the best instrument in the repository'' --- it refused 86\% of
+one run's frames because the mesh self-intersects from frame 100. The premise battery is doing real
+work: P11 catches self-intersection that the genus check reports as a clean sphere. And the metric
+bank fix landed: the assembled Proposer prompt is 33,701 characters with the admitted list in it,
+and the batch went from twelve predictions on one metric to \textbf{eleven distinct metrics}, with
+\code{act\_cv\_peak} --- the pattern-existence test that did not exist the day before --- the
+second most used.
+
+\subsection*{And the fault none of them was asked about}
+Ten of the fifteen runs were refused as \code{P3\_CHEMISTRY\_DIVERGED}, \code{act\_max\_peak}
+$=9.51\times10^{5}$. Two thirds of the GPU budget bought no evidence, and the loop read the
+refusals as facts about the mechanisms it was testing.
+
+The cause is one unset parameter. Gierer--Meinhardt's saturation --- $a^2/(h(1+\kappa a^2))$,
+whose own comment says it ``bounds the activator peak so self-enhancement can't run away'' ---
+\textbf{defaults to $\kappa = 0$}. \code{okuda\_route}, the supplied reference recipe that the
+whole search breeds from, never set it, and \code{sat} was not in the tunable table either, so the
+loop could neither set it nor sweep it and every child inherited the divergence. Measured over 250
+frames:
+
+\begin{center}\small
+\begin{tabular}{@{}rrrr@{}}
+\toprule
+$\kappa$ & \code{act\_max\_peak} & \code{act\_cv\_peak} & \code{alive\_frac} \\
+\midrule
+0.0  & $9.51\times10^{5}$ & 0.188 & 0.052 \\
+0.02 & 2122 & 3.945 & 0.311 \\
+\textbf{0.1} & \textbf{1489} & \textbf{4.138} & \textbf{0.375} \\
+0.5  & 599 & 2.802 & 0.307 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent 0.1 is the measured knee: harder saturation caps the peak further and weakens the
+pattern. It is now the recipe's operating point \emph{and} a tunable parameter, so the loop can
+ask what the saturation does rather than inheriting one value forever.
+
+\subsection*{coral\_gate --- two half-answers in the archive}
+Cedric: \emph{``fix okuda\_route with a chemistry that works, see specs that works in the
+archive''}. Surveying all 50 archived runs, 21 have a live and bounded chemistry, and every one of
+them uses \textbf{Gray--Scott}, not Gierer--Meinhardt. Two half-answers sat side by side:
+
+\begin{itemize}\itemsep2pt
+\item \code{r002c\_09\_a23094} carries the \emph{full} Okuda coupling --- \code{cell\_react} $\to$
+      \code{morphogen\_growth\_3d} on the \code{gate} slot, plus \code{shape\_to\_chem:curvature}
+      --- and reached \code{protr\_peak} 1.185 over all 900 frames at \code{valid\_frac} 1.0. Its
+      chemistry is dead (\code{act\_cv\_peak} $1.9\times10^{-5}$), so that shape was pure
+      mechanical buckling with the growth gate closed.
+\item \code{coral\_fixed\_ball} has the opposite: Gray--Scott, alive and bounded
+      (\code{act\_max} 0.46--0.76), and \emph{no coupling at all}, so it stays a sphere at 1.006.
+\end{itemize}
+
+\noindent \code{coral\_gate} is the structure of the first with the chemistry of the second, and
+three separate checks each caught something the others could not:
+
+\begin{enumerate}\itemsep2pt
+\item \textbf{The Biologist refused it before any GPU time.} I had kept \code{rho: 0.0} so growth
+      would be purely gated, reasoning that a baseline would grow the sphere uniformly and mask the
+      mechanism. P2: \emph{``an ungated cell grows at EXACTLY zero and the tip/body growth ratio is
+      infinite. No tissue does that.''} It is the better argument --- a gate that shuts growth off
+      is a morphogen deciding \emph{whether}, which is the premise's name --- and the masking I
+      feared is measurable rather than hidden.
+\item \textbf{The new metrics caught the second.} \code{act\_max\_peak} $=0.0$,
+      \code{n\_spots} $=0$: the Gray--Scott field was never started. Its $u=1,v=0$ state is a
+      \emph{stable} fixed point, and Gierer--Meinhardt's self-starting \code{a0} baseline had gone
+      with the swap. The run still reached \code{protr} 1.096 and ``undulation'' on mechanics
+      alone --- a convincing movie of nothing.
+\item \textbf{The missing piece was an operator, not a number.} \code{cell\_rd\_seed}, present in
+      coral's spec and absent from the archived one. Each half-answer lacked exactly what the
+      other had.
+\end{enumerate}
+
+\noindent With all three: \code{act\_max\_peak} 0.789 (bounded), \code{act\_cv\_peak} 2.20,
+\code{act\_alive\_frac} \textbf{1.00} --- patterned for the whole run --- \textbf{100 spots},
+\code{corr\_act\_rad} measurable on every frame at 0.435, morphology \emph{branched}, and
+\code{valid\_frac} 1.0. All ten premises hold.
+
+\subsection*{What is in place for the next launch}
+\begin{itemize}\itemsep2pt
+\item the sweep arm: 1 admitted slot of 25 $\to$ 25;
+\item the specimen verdict gates the resolver, so the two records cannot disagree;
+\item \code{exploratory} intent, resolving \code{described}, outside the surprise arithmetic and
+      still required to state what it varies and what it will report;
+\item a null-difference gate (per slot) and a decoupled-round gate (per batch);
+\item \code{coral\_gate} in the starting pool in place of coral; \code{okuda\_route} removed at
+      Cedric's instruction and shelved under \code{\_keep/};
+\item \code{sat} fixed on the reference recipe and made tunable.
+\end{itemize}
+
+\textbf{What you get.} A loop that can ask Track A's second question, cannot score a broken
+specimen, and starts from a composition whose chemistry is alive. What it still does not have is a
+protrusion.
+\end{phasebox}
+
+\begin{phasebox}{Phase 12 --- The demonstration \hfill \todo}
 \textbf{Goal.} Run the designed grid --- six to eight simulations --- that produces the figure:
 tube, undulation and branching, at Okuda's settings.
 
 \textbf{What you get.} \emph{The figure.}
 \end{phasebox}
 
-\begin{phasebox}{Phase 12 --- The method claim \hfill \todo}
+\begin{phasebox}{Phase 13 --- The method claim \hfill \todo}
 \textbf{Goal.} Write up what the loop found by itself versus what we told it, with the record of
 predictions and retractions as the evidence.
 
