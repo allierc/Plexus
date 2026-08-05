@@ -1,29 +1,43 @@
 #!/usr/bin/env python
 """run_ecm -- run one ECM experiment and leave the movie, the strip and the numbers behind.
 
-    python run_ecm.py 01_first_contact --frames 320 --device cuda:0
+    python run_ecm.py 25_epi_ecm_E40 --frames 320 --device cuda:0     # stand-in sphere
+    python epi_sweep.py --device cuda:0                               # the real epithelium, x5
 
 Everything lands in `log/okuda_ECM/<name>/`: `movie.mp4`, `strip.png`, `spec_run.yaml` and
 `metrics.json`. The spec is written beside the result because a movie without the spec that made
-it is an anecdote -- and the sweep varies stiffness, cavity shape and growth rate, so "which run
-was this" is a question that gets asked of every frame.
+it is an anecdote -- and the sweep varies stiffness, cavity shape and fibre architecture, so "which
+run was this" is a question that gets asked of every frame.
 
 WHAT THE NUMBERS ARE FOR. The movie shows the stress front; `metrics.json` says whether it was
-real. Three things decide that, and all three are cheap:
+real, and now says it FRAME BY FRAME rather than once at the end:
 
-  contact_frame   the first frame any matrix particle is inside the ball. Before it, nothing this
-                  experiment is about has happened; a run whose contact frame is 0 was seeded
-                  wrong, and a run that never reaches contact is a null however good it looks.
-  strained_frac   the fraction of matrix carrying |J-1| above the colour floor. This is the stress
-                  FRONT as a number: it should be ~0 before contact and grow after it. If it is
-                  large at frame 0 the material is exploding, not responding.
+  contact_frame   the first frame any matrix particle is inside the tissue's apical surface. Before
+                  it, nothing this experiment is about has happened; a run whose contact frame is 0
+                  was seeded wrong -- the tissue was already overlapping the matrix when the clock
+                  started, so "first contact" is not an event it can report.
+  strained_frac   the fraction of matrix carrying |J-1| above the colour floor, PER FRAME. It
+                  should be ~0 before contact and grow after it. This used to be a single number
+                  read off `node_type`, which the recorder saves only once (its final value); the
+                  per-frame series comes from the stress history the operator keeps, so the
+                  propagation is now measured and not only watched.
+  front_r95       the 95th-percentile radius of the strained particles, per frame: WHERE the front
+                  is. Together with contact_frame this is the propagation as two curves, and a run
+                  whose front never leaves the tissue surface is a null however bright it looks.
+  front_cheb95    the same percentile in CHEBYSHEV distance -- distance to the nearest wall of the
+                  cubic domain rather than to its centre. `front_reaches_wall` is read off this,
+                  and once the front touches a wall the run's later frames describe the box.
   max_disp        the furthest any particle has moved from where it was seeded. Distinguishes a
                   matrix being pushed from a matrix falling apart.
+
+`remeasure(out_dir)` recomputes all of it from `traj.npz`, and `rerender(out_dir)` redraws from the
+same file: neither costs a re-simulation.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import sys
 import time
@@ -33,66 +47,223 @@ import yaml
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
-for p in (HERE, os.path.join(ROOT, "src")):
+for p in (HERE, os.path.join(ROOT, "src"), os.path.join(ROOT, "prototype", "Tyssue"),
+          os.path.join(ROOT, "discovery_okuda")):
     if p not in sys.path:
         sys.path.insert(0, p)
 
 LOG = os.path.join(ROOT, "log", "okuda_ECM")
 
 
-def measure(out, spec, seeded=None):
-    """The three numbers, from the recorded trajectory."""
+# --------------------------------------------------------------------------- the numbers
+def surface_radius(pos, M, centre):
+    """Per-particle tissue-surface radius, by the SAME angular lookup the operator uses.
+
+    Duplicated in numpy rather than approximated by a median, because `contact_frame` has to be the
+    same event the physics saw. The previous version compared each particle's distance against the
+    MEDIAN of the surface map, so a particle sitting beyond a bulge counted as inside and one
+    tucked into a dimple counted as outside -- and with a disc cavity thinner than the tissue's
+    starting radius that reported contact at frame 0 for every run in the folder.
+    """
+    nth, nph = M.shape
+    d = pos - centre
+    r = np.maximum(np.linalg.norm(d, axis=1), 1e-9)
+    u = d / r[:, None]
+    th = np.arccos(np.clip(u[:, 2], -1, 1))
+    ph = np.arctan2(u[:, 1], u[:, 0]) % (2 * math.pi)
+    it = np.clip((th / math.pi * nth).astype(int), 0, nth - 1)
+    ip = np.clip((ph / (2 * math.pi) * nph).astype(int), 0, nph - 1)
+    return r, M[it, ip]
+
+
+def measure(out, spec, stress=None, seeded=None):
     s = out["sets"]["mpm_particle"]
     pos = np.asarray(s["pos"])                      # [T, N, 3]
     T = pos.shape[0]
     op = next(o for o in spec["operators"] if o["op"] == "cell_to_ecm")
     c = np.asarray(op["centre"], float)
-    d = np.linalg.norm(pos - c, axis=2)             # [T, N]
-    if op.get("implementation") == "replay":
-        # THE REPLAYED TISSUE HAS NO r(t) FORMULA -- it has a recorded surface. The comparable
-        # scalar is its median radius per frame, which is what the sphere's r(t) approximates.
-        z = np.load(op["surface"])
-        M = np.asarray(z["smap"], float) * float(op.get("scale", 1.0))
-        radii = np.median(M.reshape(M.shape[0], -1), axis=1)
-        radii = np.resize(radii, T)
-    else:
-        radii = np.minimum(op["r_max"], op["r0"] + op["growth"] * np.arange(T))
-    inside = d < radii[:, None]
-    hits = np.where(inside.any(axis=1))[0]
-    contact = int(hits[0]) if hits.size else None
 
-    # `node_type` IS RECORDED ONCE, NOT PER FRAME -- it is a buffer, and the recorder saves the
-    # final state of it. So the band array is [N], the stress AT THE END, and `strained_frac` is
-    # one number rather than a series. That is a real limit of this diagnostic and it is stated
-    # rather than papered over: the MOVIE carries the propagation over time, the metric carries
-    # only where the front had reached when the run stopped.
-    band = s.get("node_type")
-    strained = None
-    if band is not None:
-        b = np.asarray(band)
-        strained = float((b > 0).mean())
+    contact, tissue_r, strained, front, cheb = None, [], [], [], []
+    if op.get("implementation") == "replay":
+        z = np.load(op["surface"])
+        S = np.asarray(z["smap"], float) * float(op.get("scale", 1.0))
+    else:
+        S = None
+    for t in range(T):
+        if S is not None:
+            # CLAMPED, NOT WRAPPED. `np.resize` was used to match the surface's frame count to the
+            # recorder's, and the recorder keeps one frame more -- so the LAST entry wrapped round
+            # to the FIRST, and every run in this folder reported `ball_r_final` equal to its
+            # INITIAL radius (0.116 for a tissue that reached 0.397).
+            M = S[min(t, S.shape[0] - 1)]
+            r, R = surface_radius(pos[t], M, c)
+            tissue_r.append(float(np.median(M)))
+            if contact is None and (r < R).any():
+                contact = t
+        else:
+            rr = min(op["r_max"], op["r0"] + op["growth"] * t)
+            tissue_r.append(rr)
+            r = np.linalg.norm(pos[t] - c, axis=1)
+            if contact is None and (r < rr).any():
+                contact = t
+        if stress is not None and t < len(stress):
+            b = np.asarray(stress[t])
+            hot = b > 0
+            strained.append(float(hot.mean()))
+            front.append(float(np.percentile(r[hot], 95)) if hot.any() else 0.0)
+            # "HAS THE FRONT REACHED THE WALL" IS NOT A RADIUS QUESTION. The domain is a CUBE: its
+            # faces are at 0.5 from the centre but its corners are at 0.866, so a radial 95th
+            # percentile passes 0.45 while the front is still nowhere near a face -- it just found a
+            # corner. Chebyshev distance is the distance to the nearest face, which is the thing
+            # being asked about. A run whose front reaches the wall is also a run whose later frames
+            # describe the BOX rather than the matrix, so this number is a validity flag.
+            cheb.append(float(np.percentile(np.abs(pos[t] - c).max(1)[hot], 95))
+                        if hot.any() else 0.0)
 
     start = pos[0] if seeded is None else seeded
     disp = np.linalg.norm(pos - start[None], axis=2)
+    q = lambda a, f: (float(np.asarray(a)[int(f * (len(a) - 1))]) if len(a) else None)
     return {"frames": int(T), "n_particles": int(pos.shape[1]),
             "contact_frame": contact,
-            "ball_r_final": float(radii[-1]),
-            "strained_frac_end": strained,
+            "tissue_r_start": tissue_r[0], "tissue_r_final": tissue_r[-1],
+            "strained_frac_end": (strained[-1] if strained else None),
+            "strained_frac_at_contact": (strained[contact] if strained and contact is not None
+                                         and contact < len(strained) else None),
+            "strained_frac_q25": q(strained, 0.25), "strained_frac_q50": q(strained, 0.50),
+            "strained_frac_q75": q(strained, 0.75),
+            "front_r95_end": (front[-1] if front else None),
+            "front_r95_q50": q(front, 0.50),
+            "front_cheb95_end": (cheb[-1] if cheb else None),
+            "front_reaches_wall": (next((t for t, f in enumerate(cheb) if f > 0.45), None)
+                                   if cheb else None),
             "max_disp": float(disp.max()), "med_disp_final": float(np.median(disp[-1])),
+            "strained_frac": [round(v, 5) for v in strained],
+            "front_r95": [round(v, 5) for v in front],
+            "front_cheb95": [round(v, 5) for v in cheb],
             "exploded": bool(np.isnan(pos).any() or float(np.abs(pos).max()) > 5.0)}
 
 
-def render(name, out, spec, out_dir, n_strip=6, max_frames=150):
-    """Two views per frame: the matrix in 3D, and a SLICE through the plane of the cavity.
+def remeasure(out_dir):
+    """Recompute `metrics.json` from `traj.npz` -- so a corrected metric never costs a re-run.
 
-    THE SLICE IS THE POINT. A 3D cloud of 48,000 dots hides its own interior -- the bright
-    particles nearest the camera occlude the front travelling behind them, and a stress wave
-    moving outward reads as "the middle got brighter". A thin slab through the cavity's mid-plane
-    has no interior to hide: the ball is a disc in the centre, the matrix is the region around it,
-    and the front is a ring you can watch move.
+    The same reason `traj.npz` exists at all: a definition that turns out to be wrong (a radial
+    threshold standing in for a distance to a wall, a wrap-around index) should be a two-second fix
+    applied to every finished run, not a reason to keep a number nobody trusts.
+    """
+    spec = yaml.safe_load(open(os.path.join(out_dir, "spec_run.yaml")))
+    z = np.load(os.path.join(out_dir, "traj.npz"))
+    out = {"sets": {"mpm_particle": {"pos": np.asarray(z["pos"])}}}
+    m = measure(out, spec, stress=list(np.asarray(z["stress"])))
+    old = os.path.join(out_dir, "metrics.json")
+    prev = json.load(open(old)) if os.path.exists(old) else {}
+    for k in ("wall_s", "name", "varied"):                       # provenance the trajectory lost
+        if k in prev:
+            m[k] = prev[k]
+    json.dump(m, open(old, "w"), indent=1)
+    return m
 
-    Both views are coloured by the SAME per-frame stress band, so the 3D panel shows the geometry
-    of the deformation and the slice shows its timing, and neither is asked to do both.
+
+# --------------------------------------------------------------------------- the pictures
+def rerender(out_dir, **kw):
+    """Redraw a finished run from `traj.npz` -- no GPU, no re-simulation."""
+    spec = yaml.safe_load(open(os.path.join(out_dir, "spec_run.yaml")))
+    z = np.load(os.path.join(out_dir, "traj.npz"))
+    import ecm_ops
+    ecm_ops.STRESS_HISTORY[:] = list(np.asarray(z["stress"]))
+    ecm_ops.BALL_RADIUS[:] = list(np.asarray(z["radius"], float))
+    out = {"sets": {"mpm_particle": {"pos": np.asarray(z["pos"])}}}
+    render(os.path.basename(out_dir.rstrip("/")), out, spec, out_dir, **kw)
+
+
+def render_sphere(name, pos, hist, spec, out_dir, cmap, ax_i, centre, T,
+                  n_strip=8, movie=True, movie_frames=80):
+    """The stand-in-sphere runs (`sweep.py` 01-20): the matrix, plus the sphere as a wireframe.
+
+    Three rows -- matrix from the side, matrix with the near octant cut away, and the mid-plane
+    section -- in BOX units, since there is no tissue frame to map into. The sphere is drawn as a
+    wireframe of the radius the operator actually used that frame, so it reads unmistakably as a
+    prescribed boundary and not as a cell ball.
+    """
+    import matplotlib.pyplot as plt
+    import ecm_ops
+    import ecm_render as RD
+    radii = ecm_ops.BALL_RADIUS
+    plane = [i for i in range(3) if i != ax_i]
+    keep = np.unique(np.linspace(0, T - 1, min(movie_frames, T)).astype(int))
+    L = 0.5
+    uu, vv = np.mgrid[0:2 * np.pi:24j, 0:np.pi:13j]
+
+    def panels(fig, n_col, i, t):
+        q = pos[t] - centre
+        band = np.asarray(hist[t]) if hist and t < len(hist) else np.zeros(pos.shape[1], np.uint8)
+        r = radii[t] if t < len(radii) else 0.0
+        for row, cut in enumerate([False, True]):
+            ax = fig.add_subplot(3, n_col, row * n_col + i + 1, projection="3d",
+                                 computed_zorder=False, facecolor="black")
+            RD.draw_3d(ax, None, None, q, band, cmap, RD.CAM_SIDE, L, tissue=False, cutaway=cut)
+            if row == 0 and r > 0:
+                ax.plot_wireframe(r * np.cos(uu) * np.sin(vv), r * np.sin(uu) * np.sin(vv),
+                                  r * np.cos(vv), color="#39d0ff", lw=0.5, alpha=0.8, zorder=5)
+                ax.text2D(0.03, 0.95, f"frame {t}   prescribed r={r:.3f}   "
+                                      f"strained {float((band > 0).mean()) * 100:.0f}%",
+                          transform=ax.transAxes, color="white", fontsize=11, va="top")
+        axc = fig.add_subplot(3, n_col, 2 * n_col + i + 1, facecolor="black")
+        sl = np.abs(q[:, ax_i]) < 0.06
+        RD._matrix_scatter(axc, q[sl][:, plane], band[sl], cmap, zorder=0, alpha=0.95,
+                           s_rest=3.4, s_hot=7.0, three_d=False)
+        if r > 0:
+            axc.add_patch(plt.Circle((0, 0), r, fill=False, ec="#39d0ff", lw=1.1, alpha=0.9))
+        axc.set_xlim(-L, L); axc.set_ylim(-L, L); axc.set_aspect("equal"); axc.axis("off")
+
+    idx = np.unique(np.linspace(0, T - 1, n_strip).astype(int))
+    fig = plt.figure(figsize=(4.4 * len(idx), 13.5), facecolor="black")
+    for i, t in enumerate(idx):
+        panels(fig, len(idx), i, int(t))
+    fig.subplots_adjust(0.005, 0.005, 0.995, 0.995, wspace=0.02, hspace=0.02)
+    fig.savefig(os.path.join(out_dir, "strip.png"), dpi=100, facecolor="black")
+    plt.close(fig)
+    print(f"[{name}] strip.png ({len(idx)} columns, prescribed-sphere layout)", flush=True)
+    if not movie:
+        return
+    from matplotlib.animation import FFMpegWriter
+    import matplotlib
+    try:
+        import imageio_ffmpeg
+        matplotlib.rcParams["animation.ffmpeg_path"] = imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        pass
+    figm = plt.figure(figsize=(5.4, 13.5), facecolor="black")
+    wri = FFMpegWriter(fps=int(spec.get("plotting", {}).get("fps", 10)), metadata={"title": name})
+    with wri.saving(figm, os.path.join(out_dir, "movie.mp4"), dpi=95):
+        for t in keep:
+            figm.clear(); figm.patch.set_facecolor("black")
+            panels(figm, 1, 0, int(t))
+            figm.subplots_adjust(0, 0, 1, 1, 0.0, 0.02)
+            wri.grab_frame()
+    plt.close(figm)
+    print(f"[{name}] movie.mp4 ({len(keep)} frames, prescribed-sphere layout)", flush=True)
+
+
+def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True,
+           strip_only=False, frame_limit=None):
+    """The okuda artefact pair, with the matrix added: a 4-row strip and a 2-camera movie.
+
+    ROWS OF THE STRIP, in the order `log/okuda/cellfix_B_new/strip.png` has them, plus one:
+
+        1  3D side   epithelium (white, green where just divided) inside the stressed matrix
+        2  3D top    the same tissue from elev 88 -- what row 1 foreshortens
+        3  3D side   THE MATRIX ALONE, near octant cut away. Row 1 shows where the tissue is
+                     relative to the front; row 3 shows the front with nothing in front of it. The
+                     reference strip uses this row for the structural cell classes, which say
+                     nothing here -- the tissue is a sphere in every frame by construction, since
+                     the coupling is one-way -- so the slot goes to the thing that does vary.
+        4  section   the monolayer in cross-section, in the plane of the cavity axis, with the
+                     matrix sliced in the same plane
+
+    Everything is drawn in TISSUE units: the mesh is not rescaled, the matrix is mapped into the
+    tissue's frame by (p - centre)/scale. The alternative -- rescaling the tissue into the unit MPM
+    box -- is what `tissue.py` refuses to do to the mechanics, and doing it in the renderer instead
+    would mean the picture and the simulation disagreed about how big a cell is.
     """
     import matplotlib
     matplotlib.use("Agg")
@@ -100,83 +271,128 @@ def render(name, out, spec, out_dir, n_strip=6, max_frames=150):
     from matplotlib.colors import ListedColormap
     import ecm_ops
     import ecm_spec as ES
+    import ecm_render as RD
 
     pos = np.asarray(out["sets"]["mpm_particle"]["pos"])            # [T, N, 3]
     hist = ecm_ops.STRESS_HISTORY
-    radii = ecm_ops.BALL_RADIUS
     T = min(pos.shape[0], len(hist)) if hist else pos.shape[0]
+    if frame_limit:
+        T = min(T, int(frame_limit))
     if not hist:
-        print(f"[{name}] no stress history -- rendering positions only", flush=True)
+        print(f"[{name}] no stress history -- the matrix cannot be stress-coloured", flush=True)
     cmap = ListedColormap(ES.STRESS_COLORS)
-    ax_i = int(next(o for o in spec["operators"] if o["op"] == "ecm_seed")["axis"])
-    plane = [i for i in range(3) if i != ax_i]                       # the two free axes
-    keep = np.arange(T)
-    if T > max_frames:
-        keep = np.unique(np.linspace(0, T - 1, max_frames).astype(int))
+    seed_op = next(o for o in spec["operators"] if o["op"] == "ecm_seed")
+    ax_i = int(seed_op["axis"])
+    axis_dir = np.eye(3)[ax_i]                                      # the cavity's pinched axis
+    op = next((o for o in spec["operators"] if o["op"] == "cell_to_ecm"), None)
+    centre = np.asarray(op["centre"], float)
 
-    frames_dir = os.path.join(out_dir, "_frames")
-    os.makedirs(frames_dir, exist_ok=True)
-    written = []
-    for j, t in enumerate(keep):
-        band = hist[t] if hist else np.zeros(pos.shape[1], np.uint8)
-        p3 = pos[t]
-        fig = plt.figure(figsize=(11, 5.4), facecolor="black")
-        # --- 3D ---
-        a1 = fig.add_subplot(1, 2, 1, projection="3d", facecolor="black")
-        srt = np.argsort(band)                       # stressed particles drawn last, on top
-        a1.scatter(p3[srt, 0], p3[srt, 2], p3[srt, 1], c=band[srt], cmap=cmap, vmin=0, vmax=7,
-                   s=1.1, marker=".", linewidths=0, alpha=0.9)
-        a1.set_xlim(0, 1); a1.set_ylim(0, 1); a1.set_zlim(0, 1)
-        a1.set_axis_off(); a1.view_init(elev=18, azim=-60)
-        # --- slice through the cavity mid-plane ---
-        a2 = fig.add_subplot(1, 2, 2, facecolor="black")
-        # A THICKER SLAB, because a thin one is not a picture of a material. At 0.035 the slice
-        # held 1,128 of 20,000 particles -- sparse enough that the matrix read as scattered dust
-        # and a front moving through it had nothing to move through.
-        sl = np.abs(p3[:, ax_i] - 0.5) < 0.06
-        a2.scatter(p3[sl][:, plane[0]], p3[sl][:, plane[1]], c=band[sl], cmap=cmap,
-                   vmin=0, vmax=7, s=4.5, marker=".", linewidths=0)
-        r = radii[t] if t < len(radii) else 0.0
-        a2.add_patch(plt.Circle((0.5, 0.5), r, fill=False, ec="#39d0ff", lw=1.1, alpha=0.9))
-        a2.set_xlim(0, 1); a2.set_ylim(0, 1); a2.set_aspect("equal"); a2.set_axis_off()
-        fig.text(0.02, 0.95, f"{name}   frame {t}   ball r={r:.3f}", color="white", fontsize=9)
-        fig.text(0.52, 0.95, "slice through the cavity plane", color="#888", fontsize=8)
-        fig.subplots_adjust(0, 0, 1, 1, 0, 0)
-        f = os.path.join(frames_dir, f"f{j:05d}.png")
-        fig.savefig(f, dpi=110, facecolor="black"); plt.close(fig)
-        written.append(f)
+    if op is None or op.get("implementation") != "replay" or "surface" not in op:
+        # THE STAND-IN SPHERE HAS NO CELLS, so it gets a renderer that does not pretend to have any.
+        # `sweep.py`'s runs 01-20 are prescribed spheres and are still worth drawing; what is not
+        # acceptable is drawing a proxy -- centroids, a dot cloud, a shaded ball -- in the slot where
+        # an epithelium belongs, which is exactly how runs 21-23 came to show cyan dots.
+        print(f"[{name}] `implementation: {op and op.get('implementation')}` -- a PRESCRIBED "
+              f"SPHERE, not a tissue. Drawing the matrix and the sphere's analytic surface; there "
+              f"are no cells in this run and none are drawn.", flush=True)
+        return render_sphere(name, pos, hist, spec, out_dir, cmap, ax_i, centre, T,
+                             n_strip=n_strip, movie=movie)
+    scale = float(op.get("scale", 1.0))
+    Tis = RD.load_tissue(op["surface"], scale)
+    meshes = [(t, m) for t, m in Tis["meshes"] if t < T]
 
-    # STRIP: a few frames side by side, so the propagation is one still image.
-    idx = np.unique(np.linspace(0, len(written) - 1, n_strip).astype(int))
-    import PIL.Image as I
-    ims = [I.open(written[i]) for i in idx]
-    w, h = ims[0].size
-    strip = I.new("RGB", (w * len(ims), h), "black")
-    for i, im in enumerate(ims):
-        strip.paste(im, (i * w, 0))
-    strip.save(os.path.join(out_dir, "strip.png"))
+    # ---- ONE camera, computed once, held for every frame and every panel.
+    Lbox_box = 0.5 / max(scale, 1e-12)                  # the MPM box half-width, in tissue units
+    L3 = min(Lbox_box, Tis["Lbox"] * 1.60)
+    L2 = L3 * 1.15                                      # the 2D section: 3D axes shrink content
+    slab = 0.055 / max(scale, 1e-12)                    # section slab half-thickness, tissue units
+    print(f"[{name}] camera: FIXED Lbox={L3:.2f} tissue units for all {len(meshes)} drawn frames "
+          f"(tissue extent {Tis['Lbox']:.2f}, MPM box {Lbox_box:.2f}); scale={scale:.5f}",
+          flush=True)
 
-    mp4 = os.path.join(out_dir, "movie.mp4")
-    fps = int(spec.get("plotting", {}).get("fps", 30))
-    # NEXT TO THE INTERPRETER, NOT ON PATH. The conda env ships ffmpeg but the shell does not see
-    # it, so a bare `ffmpeg` returns 32512 (command not found) -- and os.system reports that in a
-    # return code nobody reads, leaving a run that looks complete with no movie in it. This is
-    # plexus.plot._ffmpeg's own rule, reused rather than re-derived.
-    exe = os.path.join(os.path.dirname(sys.executable), "ffmpeg")
-    if not os.path.exists(exe):
-        import shutil as _sh
-        exe = _sh.which("ffmpeg") or exe
-    rc = os.system(f"{exe} -y -loglevel error -framerate {fps} -i "
-                   f"{frames_dir}/f%05d.png -c:v libx264 -pix_fmt yuv420p -crf 20 {mp4}")
-    if rc != 0 or not os.path.exists(mp4):
-        raise RuntimeError(f"ffmpeg failed (rc={rc}) using {exe}")
-    import shutil
-    shutil.rmtree(frames_dir, ignore_errors=True)
-    print(f"[{name}] wrote movie.mp4 ({len(written)} frames) + strip.png"
-          + ("" if rc == 0 else "  [ffmpeg rc=%d]" % rc), flush=True)
+    def q_of(t):
+        """The matrix in tissue coordinates."""
+        return (pos[t] - centre) / max(scale, 1e-12)
+
+    def band_of(t):
+        return (np.asarray(hist[t]) if hist and t < len(hist)
+                else np.zeros(pos.shape[1], np.uint8))
+
+    # ------------------------------------------------------------------ strip
+    idx = [meshes[int(round(f * (len(meshes) - 1)))] for f in np.linspace(0, 1, n_strip)]
+    fig = plt.figure(figsize=(4.4 * n_strip, 18.0), facecolor="black")
+    for i, (t, mt) in enumerate(idx):
+        vp, q, band = mt["pos"], q_of(t), band_of(t)
+        div, brk = RD.divided_mask(mt), RD.broken_mask(mt, vp, name)
+        for row, (cam, tissue, cut) in enumerate([(RD.CAM_SIDE, True, False),
+                                                  (RD.CAM_TOP, True, False),
+                                                  (RD.CAM_SIDE, False, True)]):
+            ax = fig.add_subplot(4, n_strip, row * n_strip + i + 1, projection="3d",
+                                 computed_zorder=False, facecolor="black")
+            RD.draw_3d(ax, mt, vp, q, band, cmap, cam, L3, div=div, brk=brk, tissue=tissue,
+                       cutaway=cut)
+            if row == 0:
+                ax.text2D(0.03, 0.95, f"frame {t}   {int(mt['nF'])} cells   "
+                                      f"strained {float((band > 0).mean()) * 100:.0f}%",
+                          transform=ax.transAxes, color="white", fontsize=11, va="top")
+        axc = fig.add_subplot(4, n_strip, 3 * n_strip + i + 1, facecolor="black")
+        RD.draw_cross(axc, mt, vp, q, band, cmap, L2, axis_dir, slab)
+    fig.subplots_adjust(0.005, 0.005, 0.995, 0.995, wspace=0.02, hspace=0.02)
+    fig.savefig(os.path.join(out_dir, "strip.png"), dpi=100, facecolor="black")
+    plt.close(fig)
+    print(f"[{name}] strip.png ({n_strip} columns of {len(meshes)} drawn frames)", flush=True)
+    if strip_only or not movie:
+        return
+
+    # ------------------------------------------------------------------ movie
+    # THE MOVIE DRAWS THE FRAMES THE MESH WAS KEPT FOR. Choosing its own would leave most panels
+    # with no tissue to draw, and a movie of a matrix with the epithelium missing from four frames
+    # in five is the defect this replaced, one frame at a time.
+    from matplotlib.animation import FFMpegWriter
+    try:
+        import imageio_ffmpeg
+        matplotlib.rcParams["animation.ffmpeg_path"] = imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        pass
+    keep = meshes if movie_frames is None else [
+        meshes[int(round(f * (len(meshes) - 1)))]
+        for f in np.linspace(0, 1, min(movie_frames, len(meshes)))]
+
+    figm = plt.figure(figsize=(10.4, 5.4), facecolor="black")
+    axs = figm.add_subplot(1, 2, 1, projection="3d", computed_zorder=False, facecolor="black")
+    axt = figm.add_subplot(1, 2, 2, projection="3d", computed_zorder=False, facecolor="black")
+    figm.subplots_adjust(0, 0, 1, 1, wspace=0.0)
+    axin = figm.add_axes([0.80, 0.0, 0.20, 0.38]); axin.patch.set_alpha(0.0)
+    fps = int(spec.get("plotting", {}).get("fps", 10))
+    wri = FFMpegWriter(fps=fps, metadata={"title": name})
+    t0 = time.time()
+    with wri.saving(figm, os.path.join(out_dir, "movie.mp4"), dpi=95):
+        for k, (t, mt) in enumerate(keep):
+            vp, q, band = mt["pos"], q_of(t), band_of(t)
+            div, brk = RD.divided_mask(mt), RD.broken_mask(mt, vp, name)
+            RD.draw_3d(axs, mt, vp, q, band, cmap, RD.CAM_SIDE, L3, div=div, brk=brk)
+            RD.draw_3d(axt, mt, vp, q, band, cmap, RD.CAM_TOP, L3, div=div, brk=brk)
+            # THE INSET IS 0.20 x 0.38 OF THE FIGURE, so its markers are scaled down to match; a
+            # size in points does not shrink with the axes it is drawn in.
+            RD.draw_cross(axin, mt, vp, q, band, cmap, L2, axis_dir, slab, dot_scale=0.30)
+            # `_draw`/`_cross_screen` both call ax.clear(), which drops any label -- re-stamp it.
+            axs.text2D(0.02, 0.96, f"{name}   frame {t}   {int(mt['nF'])} cells   "
+                                   f"strained {float((band > 0).mean()) * 100:.0f}%",
+                       transform=axs.transAxes, color="white", fontsize=9)
+            axs.text2D(0.02, 0.92, "side  elev 18", transform=axs.transAxes, color="#888",
+                       fontsize=8)
+            axt.text2D(0.02, 0.96, "top  elev 88", transform=axt.transAxes, color="#888",
+                       fontsize=8)
+            wri.grab_frame()
+            if k == 0:
+                print(f"[{name}] first movie frame in {time.time()-t0:.1f}s "
+                      f"({len(keep)} to draw)", flush=True)
+    plt.close(figm)
+    print(f"[{name}] movie.mp4 ({len(keep)} frames @ {fps} fps, {time.time()-t0:.0f}s)", flush=True)
 
 
-def run(name, spec, device="cuda:0", movie=True):
+# --------------------------------------------------------------------------- the run
+def run(name, spec, device="cuda:0", movie=True, keep_traj=True, render_kw=None):
     import plexus.operators                                    # noqa: F401  register the stock ops
     import ecm_ops
     # THE HISTORY IS PER RUN. A module-level list survives between runs in a sweep, so a second
@@ -198,20 +414,33 @@ def run(name, spec, device="cuda:0", movie=True):
     H, out = engine_run(sim, device=device)
     wall = time.time() - t0
 
-    m = measure(out, spec)
+    # THE TRAJECTORY, KEPT -- so a re-render never costs a re-simulation. Asked to redraw a run
+    # with the cells visible, the only honest answer was "that means running the 402 frames again",
+    # because the movie was the only surviving record of where anything was.
+    if keep_traj:
+        try:
+            np.savez_compressed(os.path.join(out_dir, "traj.npz"),
+                                pos=np.asarray(out["sets"]["mpm_particle"]["pos"], np.float32),
+                                stress=np.asarray(ecm_ops.STRESS_HISTORY, np.uint8),
+                                radius=np.asarray(ecm_ops.BALL_RADIUS, np.float32))
+        except Exception as e:
+            print(f"[{name}] traj.npz not written: {type(e).__name__}", flush=True)
+
+    m = measure(out, spec, stress=ecm_ops.STRESS_HISTORY)
     m["wall_s"] = round(wall, 1)
     m["name"] = name
     json.dump(m, open(os.path.join(out_dir, "metrics.json"), "w"), indent=1)
     print(f"[{name}] {wall:.0f}s  contact_frame={m['contact_frame']}  "
-          f"strained_frac_end={m['strained_frac_end']}  "
+          f"strained_frac end={m['strained_frac_end']}  front_r95={m['front_r95_end']}  "
           f"max_disp={m['max_disp']:.3f}  exploded={m['exploded']}", flush=True)
 
-    if movie:
-        try:
-            render(name, out, spec, out_dir)
-        except Exception as e:
-            import traceback; traceback.print_exc()
-            print(f"[{name}] render FAILED: {type(e).__name__}: {str(e)[:120]}", flush=True)
+    try:
+        render(name, out, spec, out_dir, movie=movie, **(render_kw or {}))
+    except Exception:
+        import traceback
+        traceback.print_exc()
+        print(f"[{name}] render FAILED -- traj.npz is on disk, so `rerender('{out_dir}')` "
+              f"redraws without re-simulating", flush=True)
     return m
 
 
@@ -223,13 +452,13 @@ def main():
     ap.add_argument("--device", default="cuda:0")
     ap.add_argument("--youngs", type=float, default=40.0)
     ap.add_argument("--substep", type=float, default=2.0e-4)
-    ap.add_argument("--cavity-r", type=float, default=0.22)
-    ap.add_argument("--cavity-h", type=float, default=0.07)
+    ap.add_argument("--cavity-r", type=float, default=0.14)
+    ap.add_argument("--cavity-h", type=float, default=0.14)
     ap.add_argument("--align", type=float, default=0.0)
     ap.add_argument("--growth", type=float, default=0.0009)
     ap.add_argument("--k", type=float, default=900.0)
-    ap.add_argument("--particles", type=int, default=48000)
-    ap.add_argument("--grid", type=int, default=64)
+    ap.add_argument("--particles", type=int, default=110000)
+    ap.add_argument("--grid", type=int, default=48)
     ap.add_argument("--no-movie", action="store_true")
     a = ap.parse_args()
     spec = ES.build_spec(a.name, n_frames=a.frames, substep_dt=a.substep, youngs=a.youngs,
