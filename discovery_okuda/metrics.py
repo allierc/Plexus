@@ -1014,8 +1014,11 @@ class RayCrossMed(Metric):
 
 @register
 class NSpots(Metric):
-    """How many activator spots, by connected components on the cell graph. Okuda reports "about five
-    spots on a 2000-cell ball" -- the only pattern count that can be compared with the paper. NO =
+    """How many activator spots, by connected components on the cell graph. Okuda's Fig. 5a shows about TEN
+    spots of roughly ten cells each on a 2032-cell vesicle (counts printed in its caption) -- the only
+    pattern count directly comparable with the figure. The phrase "about five spots", which this note
+    carried and round.md and grounder.md repeated, is NOT in the paper: it was a calibration target
+    chosen by eye and it hardened into a citation as it was copied between files. NO =
     0."""
     name, group = "n_spots", "pattern"
     produced_by = "pattern_scale:pattern_metrics"

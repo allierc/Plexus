@@ -58,6 +58,13 @@ report.
 
 - **Spend the round on the open problem**, not on what is already known. Read *What is still
   missing* above.
+- **The spot scale is the lever, and it has one target.** Okuda's thin tubes come from about TEN spots
+  of about TEN cells each; a spot of 100-200 cells gives a bud, not a finger. Every run so far measures
+  ONE spot of about 99 cells, so the campaign is in the budding regime and `protr` has been rewarding
+  it. An edit that moves `spot_cells_med` toward 10 and `n_spots` toward 10 is worth more than one that
+  moves `protr`, because `protr` rises for a bud as readily as for a tube. Do not copy the paper's
+  chi = 0.01: our `chi` is a per-frame mixing rate, not a length (finding F009), so aim at the measured
+  spot size and treat whichever parameter moves it as the lever.
 - **Prefer the edit whose outcome you cannot call.** If you are confident, ask what would make you
   wrong and propose *that* instead.
 - **Take the diagnosis seriously when it is offered.** A revert of a single suspect parameter, posed
