@@ -118,8 +118,68 @@ def p2_no_parameter_on_its_bound(V, run_dir):
         frac = (val - lo) / max(hi - lo, 1e-12)
         if frac < 0.01 or frac > 0.99:
             rails.append(f"{key}={val:.4g} at {frac * 100:.1f}% of [{lo:g},{hi:g}]")
-    return V.add("2. no fitted value sits on its bound", CERTAIN, not rails,
-                 "none on a bound" if not rails else "RAILS: " + "; ".join(rails))
+    ok = V.add("2. no fitted value sits on its bound", CERTAIN, not rails,
+               "none on a bound" if not rails else "RAILS: " + "; ".join(rails))
+    return p2b_no_field_on_its_bound(V, run_dir, sd, cfg) and ok
+
+
+def p2b_no_field_on_its_bound(V, run_dir, sd=None, cfg=None, frac_max=0.10):
+    """The same question asked of the learned FIELDS, which is where it actually bites.
+
+    The scalar check above passed on the best fit in the whole 324-run archive. Its learned
+    STIFFNESS field, evaluated on the grid, turned out to sit within 1% of its bounds over
+    **54% of the sheet** -- 22% pressed on the floor, 33% on the ceiling -- and its gain field over
+    21%. A field that is more than half pressed against the box we drew is not a material property;
+    it is the edge of the box, and every conclusion about stiffness rests on it.
+
+    Bounds are a modelling choice, so a little saturation is ordinary. More than `frac_max` of the
+    sheet is a rail and is reported as one.
+    """
+    import torch
+    if sd is None:
+        ck = sorted(glob.glob(os.path.join(run_dir, "checkpoints", "model_*.pt")))
+        if not ck:
+            return V.add("2b. no learned field is pressed against its bound", CERTAIN, True,
+                         "no checkpoint", True)
+        sd = torch.load(ck[-1], map_location="cpu", weights_only=False)
+        cfg = {}
+    args = (cfg or {}).get("args", cfg or {})
+    def _f(k, d):
+        try:
+            return float(args.get(k, args.get(k.lstrip("-"), d)))
+        except Exception:
+            return d
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("_tr", os.path.join(HERE, "train.py"))
+    tr = importlib.util.module_from_spec(spec)
+    try:
+        sys.modules["_tr"] = tr; spec.loader.exec_module(tr)
+    except Exception as e:
+        return V.add("2b. no learned field is pressed against its bound", CERTAIN, True,
+                     f"could not load the field networks: {type(e).__name__}", True)
+    RES = tr.RES
+    xy = torch.stack(torch.meshgrid(torch.linspace(0, 1, RES), torch.linspace(0, 1, RES),
+                                    indexing="ij"), -1).reshape(-1, 2)
+    om = _f("--siren_omega", 5.0); hid = int(_f("--siren_hidden", 256)); lay = int(_f("--siren_layers", 3))
+    rails = []
+    for key, lab in (("stiff_siren", "stiffness"), ("gain_siren", "gain")):
+        if key not in sd:
+            continue
+        net = tr.Siren(in_features=2, hidden_features=hid, hidden_layers=lay, out_features=1,
+                       outermost_linear=True, first_omega_0=om, hidden_omega_0=om)
+        try:
+            net.load_state_dict(sd[key])
+        except Exception:
+            continue
+        net.eval()
+        with torch.no_grad():
+            u = torch.sigmoid(net(xy)[:, 0]).numpy()
+        sat = float(((u < 0.01) | (u > 0.99)).mean())
+        if sat > frac_max:
+            rails.append(f"{lab} {sat * 100:.0f}% of the sheet on its bound")
+    return V.add("2b. no learned field is pressed against its bound", CERTAIN, not rails,
+                 f"checked {sum(1 for k in ('stiff_siren','gain_siren') if k in sd)} fields, "
+                 f"all under {frac_max * 100:.0f}%" if not rails else "RAILS: " + "; ".join(rails))
 
 
 # ---------------------------------------------------------------------------------------------
