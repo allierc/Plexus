@@ -58,6 +58,8 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                # a run that says it is testing the matrix's anisotropy, not in the baseline.
                cavity_r=0.14, cavity_h=0.14, axis=2,
                n_fibres=900, fibre_len=0.16, align=0.0, align_dir=(1.0, 0.0, 0.0),
+               # a DENSER cone about  -- see ecm_ops.ECMSeed
+               dense_axis=2, dense_cone_deg=0.0, dense_boost=1.0,
                # RIGIDITY OF THE CELL-MATRIX CONTACT, raised from 900. The penalty is k * depth and
                # `mpm_scatter` clamps the resulting acceleration at `a_max`, so k and a_max together
                # decide how deep a particle can get before the ceiling stops helping: at k = 900 and
@@ -110,7 +112,9 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
             {"op": "ecm_seed", "at": "mpm_particle", "centre": [0.5, 0.5, 0.5],
              "cavity_r": float(cavity_r), "cavity_h": float(cavity_h), "axis": int(axis),
              "n_fibres": int(n_fibres), "fibre_len": float(fibre_len),
-             "align": float(align), "align_dir": list(align_dir), "seed": int(seed)},
+             "align": float(align), "align_dir": list(align_dir), "seed": int(seed),
+             "dense_axis": int(dense_axis), "dense_cone_deg": float(dense_cone_deg),
+             "dense_boost": float(dense_boost)},
             {"op": "cell_to_ecm", "at": "mpm_particle", "centre": [0.5, 0.5, 0.5],
              "k": float(k_contact), "r0": float(r0), "r_max": float(r_max),
              "growth": float(growth), "damp": float(damp)},

@@ -113,7 +113,8 @@ def _mesh_of(hist_t, pos_t, centroid):
 
 
 def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap=None,
-          plate_stiff=0.6, load_npz=None, load_gain=1.0):
+          plate_stiff=0.6, load_npz=None, load_gain=1.0, gate_npz=None,
+          gate_p_half=0.10, gate_hill=2.0, gate_floor=0.25):
     """Run cellfix_B_new verbatim and write the cache.
 
     `buffer_x` MULTIPLIES THE VERTEX AND CELL RESERVOIRS AND NOTHING ELSE. At the reference buffers
@@ -132,7 +133,14 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap
     """
     import run_one as R
     S, engine_run = R._lazy_engine()
-    from tube_analysis import _cell_centroids
+    # RENAMED UPSTREAM. `tube_analysis` became `tissue_analysis` in the Phase 12 refactor, and this
+    # import is the only thing outside discovery_okuda that reached into it. Both names are tried so a
+    # checkout on either side of that commit works, and the failure says which module is missing rather
+    # than dying inside a cached-tissue path that happened not to need it.
+    try:
+        from tissue_analysis import _cell_centroids
+    except ModuleNotFoundError:
+        from tube_analysis import _cell_centroids
 
     spec = yaml.safe_load(open(CELL_SPEC))
     spec["general"]["n_frames"] = int(frames)
@@ -157,6 +165,19 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap
         spec["schedule"].insert(i, "plate_confine_3d")
         print(f"[tissue] rigid plates at z = +/-{plate_gap:.3g} tissue units "
               f"(stiff {plate_stiff})", flush=True)
+    if gate_npz is not None:
+        # AFTER `morphogen_growth_3d`, whose per-cell increment it corrects, and BEFORE the force step
+        # and the topology ops -- so `shape_energy_3d` relaxes toward the GATED targets and `divide_3d`
+        # tests a volume that grew at the gated rate. Placed anywhere later and the frame's mechanics
+        # would already have been solved for the ungated targets.
+        import load_ops                                               # noqa: F401  register it
+        spec["operators"].append({"op": "ecm_growth_gate_3d", "at": "vertex",
+                                  "load": str(gate_npz), "p_half": float(gate_p_half),
+                                  "hill": float(gate_hill), "floor": float(gate_floor)})
+        i = spec["schedule"].index("morphogen_growth_3d") + 1
+        spec["schedule"].insert(i, "ecm_growth_gate_3d")
+        print(f"[tissue] ECM-stress growth gate from {os.path.basename(str(gate_npz))} "
+              f"(p_half {gate_p_half}, hill {gate_hill}, floor {gate_floor})", flush=True)
     if load_npz is not None:
         # THE MATRIX PUSHING BACK, from a pressure map a previous pass 2 recorded. Same slot as the
         # plates -- after the relaxation, before the topology ops -- for the same reason: the force
@@ -179,7 +200,7 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap
     posf = out["sets"]["vertex"]["pos"]
     T = min(posf.shape[0], len(hist))
 
-    maps, r_ap, r_med, ncell, cent, r_eq, r_ax = [], [], [], [], [], [], []
+    maps, r_ap, r_med, ncell, cent, r_eq, r_ax, r_xyz = [], [], [], [], [], [], [], []
     for t in range(T):
         mt = hist[t]
         nv = int(mt["Nv"])
@@ -197,6 +218,10 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap
         # just-divided sliver can sit briefly outside the surface.
         r_eq.append(float(np.percentile(np.hypot(v[:, 0], v[:, 1]), 98)))
         r_ax.append(float(np.percentile(np.abs(v[:, 2]), 98)))
+        # AND THE THREE AXES SEPARATELY. `r_eq` pools x and y, so a tissue that grew along y and not
+        # along x -- which is exactly what an anisotropic matrix should produce -- has the same r_eq as
+        # a round one. The quantity the experiment is about would be invisible to its own metric.
+        r_xyz.append([float(np.percentile(np.abs(v[:, k]), 98)) for k in range(3)])
 
     keep = np.unique(np.linspace(0, T - 1, min(n_render, T)).astype(int))
     mesh = {"mesh_frames": keep.astype(np.int32)}
@@ -218,8 +243,12 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap
         # a vesicle that doubles in radius renders at constant apparent size.
         Lbox=np.float32(extent * MESH_PAD),
         r_eq=np.asarray(r_eq, np.float32), r_ax=np.asarray(r_ax, np.float32),
+        r_xyz=np.asarray(r_xyz, np.float32),
         plate_gap=np.float32(-1.0 if plate_gap is None else plate_gap), **mesh)
     ar = r_eq[-1] / max(r_ax[-1], 1e-9)
+    ax3 = r_xyz[-1]
+    print(f"[tissue] semi-axes x/y/z = {ax3[0]:.2f} / {ax3[1]:.2f} / {ax3[2]:.2f}  "
+          f"(in-plane x:y = {ax3[0] / max(ax3[1], 1e-9):.3f})", flush=True)
     print(f"[tissue] cellfix_B_new: {T} frames, {ncell[0]} -> {ncell[-1]} cells, "
           f"apical radius {r_ap[0]:.2f} -> {r_ap[-1]:.2f} (cell-centroid radius "
           f"{r_med[0]:.2f} -> {r_med[-1]:.2f}), semi-axes equatorial {r_eq[-1]:.2f} / axial "
@@ -230,7 +259,8 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap
 
 def load_or_build(frames=401, device="cuda:0", name="cellfix_B_new", rebuild=False,
                   buffer_x=1, plate_gap=None, plate_stiff=0.6, load_npz=None,
-                  load_gain=1.0, tag_extra=""):
+                  load_gain=1.0, tag_extra="", gate_npz=None, gate_p_half=0.10,
+                  gate_hill=2.0, gate_floor=0.25):
     """The cache path, built if missing. Frames are part of the filename: a 401-frame tissue and a
     120-frame one are different tissues, and silently reusing one for the other would be a run
     whose movie stops before the thing it was testing happened."""
@@ -241,7 +271,9 @@ def load_or_build(frames=401, device="cuda:0", name="cellfix_B_new", rebuild=Fal
     out = os.path.join(CACHE, f"{tag}.npz")
     if rebuild or not os.path.exists(out):
         build(frames, device, out, buffer_x=buffer_x, plate_gap=plate_gap,
-              plate_stiff=plate_stiff, load_npz=load_npz, load_gain=load_gain)
+              plate_stiff=plate_stiff, load_npz=load_npz, load_gain=load_gain,
+              gate_npz=gate_npz, gate_p_half=gate_p_half, gate_hill=gate_hill,
+              gate_floor=gate_floor)
     else:
         z = np.load(out)
         print(f"[tissue] reusing {os.path.relpath(out, ROOT)}  "

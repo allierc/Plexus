@@ -33,6 +33,7 @@ from plexus.models.registry import register_entity, register_operator
 # single module-level list, so a second `ecm_stress` instance would interleave two sets' rows into it
 # and the renderer would colour each set with the other's numbers -- silently, and looking plausible.
 BLOCK_STRESS: list = []
+BLOCK_RAW: list = []            # the un-banded scalar -- see `ecm_ops.STRESS_RAW`
 
 
 # --------------------------------------------------------------------------- the entity
@@ -175,4 +176,5 @@ class BlockStress(Lateral):
             s = (J - 1.0).abs() / max(self.scale, 1e-9)
         band = (s.clamp(0, 1) * (self.bands - 1)).round().long()
         BLOCK_STRESS.append(band.detach().to("cpu", torch.uint8).numpy())
+        BLOCK_RAW.append((s * max(self.scale, 1e-9)).detach().to("cpu", torch.float16).numpy())
         return {}

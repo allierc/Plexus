@@ -50,6 +50,14 @@ from plexus.models.registry import register_operator
 STRESS_HISTORY: list = []
 BALL_RADIUS: list = []
 
+# THE RAW SCALAR, NOT ONLY THE BAND. Banding at SIMULATION time makes the colour scale a property of
+# the run: `stress_scale` is baked into 8 levels, everything above it is clipped to the top band, and
+# changing your mind about the palette costs 400 frames of MPM. Runs 47/48 made the cost concrete --
+# the scale that resolved the front beautifully at frame 200 left 76% of the matrix saturated at frame
+# 400, and no re-render could recover the gradient because the numbers were gone. Kept as float16
+# (0.1% of a particle's trajectory) so the renderer bands it, and a LUT or a scale becomes a re-render.
+STRESS_RAW: list = []
+
 # THE REACTION THE TISSUE NEVER FELT. `cell_to_ecm` computes the force the tissue puts on the matrix
 # and, by Newton's third law, that force has an equal and opposite partner on the tissue -- which a
 # REPLAY has nowhere to put, because pass 1 finished before pass 2 began. Recording it here is what
@@ -101,6 +109,20 @@ class ECMSeed(Structural):
         # start the run with a shock the material never recovers from.
         self.plate_half = params.get("plate_half", None)
         self.plate_half = None if self.plate_half is None else float(self.plate_half)
+        # A DENSER REGION, so the matrix's ARCHITECTURE is anisotropic and not just its orientation.
+        # Fibre alignment alone gave a 1.50x directional pressure difference (measured: 1448 along the
+        # alignment axis against 2123 / 2176 across it) -- real, but small, because MPM interpolates
+        # every particle onto a continuum grid and a fibrous ARRANGEMENT of an isotropic material
+        # responds nearly isotropically. Putting MORE FIBRES in a region changes the mass and stiffness
+        # the grid actually sees, which is a difference the continuum cannot average away.
+        #
+        # The region is the pair of cones about `dense_axis` within `dense_cone_deg` of it: dense at the
+        # poles, sparse around the equator. Chosen so the suppression is AXISYMMETRIC and therefore
+        # measurable by the semi-axes already recorded -- an off-centre dense blob makes a more striking
+        # picture and needs a metric nobody has written.
+        self.dense_axis = int(params.get("dense_axis", 2))
+        self.dense_cone = float(params.get("dense_cone_deg", 0.0))     # 0 = uniform
+        self.dense_boost = float(params.get("dense_boost", 1.0))
         self.n_fibres = int(params.get("n_fibres", 900))
         self.fibre_len = float(params.get("fibre_len", 0.16))
         # 0 = isotropic directions, 1 = every fibre parallel to `align_dir`. Anything between is a
@@ -151,9 +173,23 @@ class ECMSeed(Structural):
             c = torch.rand(self.n_fibres * 2, D, generator=g) * (hi - lo) + lo
             c = c[self._outside_cavity(c.to(dev)).cpu()]
             keep.append(c)
-            if sum(x.shape[0] for x in keep) >= self.n_fibres:
+            need = self.n_fibres * (max(self.dense_boost, 1.0) if self.dense_cone > 0 else 1.0)
+            if sum(x.shape[0] for x in keep) >= need:
                 break
-        centres = torch.cat(keep)[: self.n_fibres]
+        centres = torch.cat(keep)
+        if self.dense_cone > 0 and self.dense_boost != 1.0:
+            # IMPORTANCE SAMPLING, not a second sampling pass: keep every candidate in the cone and
+            # thin the rest by 1/boost, so the ACCEPTED set has `boost` times the areal density inside
+            # the cone. The particle count is unchanged -- `per = n // n_fibres` -- so this redistributes
+            # material rather than adding it, and the sparse region really does get sparser.
+            c0 = torch.tensor(self.centre, dtype=centres.dtype)
+            v = centres - c0
+            vn = v.norm(dim=1).clamp_min(1e-9)
+            cosang = (v[:, self.dense_axis] / vn).abs()
+            in_cone = cosang > math.cos(math.radians(self.dense_cone))
+            u01 = torch.rand(centres.shape[0], generator=g)
+            centres = centres[in_cone | (u01 < 1.0 / self.dense_boost)]
+        centres = centres[: self.n_fibres]
         if centres.shape[0] < self.n_fibres:                  # cavity larger than the box
             centres = centres.repeat((self.n_fibres // max(centres.shape[0], 1)) + 1, 1)
             centres = centres[: self.n_fibres]
@@ -210,6 +246,9 @@ class ECMSeed(Structural):
               + ("" if self.plate_half is None
                  else f"; solid blocks beyond +/-{self.plate_half:.3f} "
                       f"({100 * (1 - 2 * self.plate_half):.0f}% of the box)")
+              + ("" if self.dense_cone <= 0 or self.dense_boost == 1.0
+                 else f"; density x{self.dense_boost:g} within {self.dense_cone:g} deg of axis "
+                      f"{self.dense_axis}")
               + f"; {n_in} left inside the cavity or a block", flush=True)
         return {}
 
@@ -373,6 +412,7 @@ class ECMStress(Lateral):
                 if ch is not None:
                     ch[:] = band.to(ch.dtype).reshape(ch.shape)
                 STRESS_HISTORY.append(band.detach().to("cpu", torch.uint8).numpy())
+                STRESS_RAW.append(vm.detach().to("cpu", torch.float16).numpy())
                 return {}
         J = torch.linalg.det(F)
         if self.measure == "dev":
@@ -401,6 +441,7 @@ class ECMStress(Lateral):
             return {}
         ch[:] = band.to(ch.dtype).reshape(ch.shape)
         STRESS_HISTORY.append(band.detach().to("cpu", torch.uint8).numpy())
+        STRESS_RAW.append((s * max(self.scale, 1e-9)).detach().to("cpu", torch.float16).numpy())
         return {}
 
 
