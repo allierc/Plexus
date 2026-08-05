@@ -100,6 +100,9 @@ def build(name, tissue_npz, fit=FIT, plate_box=None, **ecm):
                 o.pop(k, None)                      # a replay has no r(t) formula to grow by
         if o["op"] == "ecm_seed" and gap_box is not None:
             o["plate_half"] = gap_box
+        if o["op"] == "integrin_adhesion":
+            o["scale"] = s
+            o["surface"] = tissue_npz
         if o["op"] == "basement_membrane_seed":
             # THE SURFACE SCALE, not 1.0. `ecm_spec` cannot know it -- only `combine` computes the
             # tissue-to-box scale -- and hardcoding 1.0 put the membrane at radius 4.66 in a unit box,
