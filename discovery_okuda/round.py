@@ -695,7 +695,12 @@ def check_pool(verbose=True):
 # `instruction.md` and the TEMPLATE_* files are INPUTS a human wrote, and `round.md` lives outside
 # campaign/ entirely for the same reason: the one file that carries accumulated judgement must not be
 # reachable by a reset.
-KEEP_ON_RESET = ("instruction.md", "TEMPLATE_analysis.md", "TEMPLATE_memory.md")
+# `user_input.md` IS ON THIS LIST BECAUSE THE RESET DELETED IT. It is the human-in-the-loop channel --
+# pending instructions a person wrote for the campaign to pick up -- and it was tracked in git, which
+# is how I noticed: a `D` in git status after the first reset. An input a human wrote is exactly what a
+# reset must not be able to reach, and the rule is the same one that keeps round.md outside campaign/.
+KEEP_ON_RESET = ("instruction.md", "user_input.md",
+                 "TEMPLATE_analysis.md", "TEMPLATE_memory.md")
 
 
 def reset_campaign(quiet=False):
