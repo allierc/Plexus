@@ -124,10 +124,10 @@ def main():
          "an oblate cavity, so the tissue meets the fibres at its poles first and the matrix resists "
          "there 14.7x harder. <code>ecm_growth_gate_3d</code> slows the cell cycle where it resists, so "
          "the sphere GROWS to oblateness 1.43. Nothing presses on it"),
-        ("43_plate_blk75", "vertex_mpm_pressed", "PRESSED between two planes",
-         "the other way to the same shape: two solid planes fill 75% of the box, and blocked in one "
-         "axis the epithelium grows into the other two -- oblateness 2.08. It also divides 4,000 times "
-         "instead of 6,000: confinement suppresses proliferation"),
+        ("48_block_elastic_g40", "vertex_mpm_pressed", "PRESSED by an elastic solid",
+         "the same shape the other way. Two solid blocks -- a second MPM body, 130x stiffer than the "
+         "matrix, so they deform too -- press the tissue to oblateness 1.41, indistinguishable from "
+         "the grown 1.43 beside it. Two mechanisms, one shape"),
     ]
     runs = [(d, f"{v}.mp4", lbl, os.path.join(LOG, d, "spec_run.yaml"), cap)
             for d, v, lbl, cap in R3]

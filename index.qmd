@@ -1441,8 +1441,8 @@ plotting:
   <figure class="sim-card">
     <video src="gallery/vertex_mpm_pressed.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">PRESSED between two planes<span class="sim-spec"><pre>general:
-  name: 43_plate_blk75
+      <span class="sim-name" tabindex="0">PRESSED by an elastic solid<span class="sim-spec"><pre>general:
+  name: 48_block_elastic_g40
   seed: 0
   n_frames: 402
   dt: 0.004
@@ -1490,6 +1490,36 @@ sets:
     radius: 0.48
     density: 1.0
     types: *id001
+  mpm_block:
+    parent: cell
+    per_parent: 60000
+    radius: 0.48
+    density: 1.0
+    types:
+      b0:
+        fraction: 0.125
+        youngs: 2000.0
+      b1:
+        fraction: 0.125
+        youngs: 2000.0
+      b2:
+        fraction: 0.125
+        youngs: 2000.0
+      b3:
+        fraction: 0.125
+        youngs: 2000.0
+      b4:
+        fraction: 0.125
+        youngs: 2000.0
+      b5:
+        fraction: 0.125
+        youngs: 2000.0
+      b6:
+        fraction: 0.125
+        youngs: 2000.0
+      b7:
+        fraction: 0.125
+        youngs: 2000.0
 fields:
   mpm_grid:
     frame: mpm_grid
@@ -1514,10 +1544,7 @@ operators:
   - 0.0
   - 0.0
   seed: 0
-  dense_axis: 2
-  dense_cone_deg: 0.0
-  dense_boost: 1.0
-  plate_half: 0.126170139863746
+  plate_half: 0.1988419784711888
 - op: cell_to_ecm
   at: mpm_particle
   centre:
@@ -1527,8 +1554,8 @@ operators:
   k: 1200.0
   damp: 0.0
   implementation: replay
-  surface: /workspace/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_plate7_ef18f30ecd.npz
-  scale: 0.018024305694820858
+  surface: /workspace/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_plate11p1.npz
+  scale: 0.017913691138527744
 - op: ecm_stress
   at: mpm_particle
   scale: 0.008
@@ -1551,26 +1578,51 @@ operators:
   wall_damp: 0.6
   wall_contact: 0.04
   vmax: 1000000000.0
+- op: block_seed
+  at: mpm_block
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  axis: 2
+  gap_half: 0.1988419784711888
+  seed: 0
+- op: block_stress
+  at: mpm_block
+  scale: 0.05
+  bands: 8
+  measure: vonmises
+- op: mpm_strain
+  at: mpm_block
+- op: mpm_scatter
+  at: mpm_block
+  to: mpm_grid
+  implementation: accumulate
+  drag: 0.0
+  a_max: 300.0
+  store_stress: true
+- op: mpm_gather
+  at: mpm_block
+  from: mpm_grid
+  wall_damp: 0.6
+  wall_contact: 0.04
+  vmax: 1000000000.0
 - op: cell_exclude_3d
   at: mpm_particle
   centre:
   - 0.5
   - 0.5
   - 0.5
-  surface: /workspace/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_plate7_ef18f30ecd.npz
-  scale: 0.018024305694820858
+  surface: /workspace/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_plate11p1.npz
+  scale: 0.017913691138527744
   skin: 0.004
-- op: plate_confine_3d
-  at: mpm_particle
-  axis: 2
-  centre: 0.5
-  gap_half: 0.126170139863746
-  stiff: 1.0
 schedule:
 - aggregate
 - ecm_seed
+- block_seed
 - cell_to_ecm
 - ecm_stress
+- block_stress
 - substep_dt: 0.0002
   steps:
   - mpm_strain
@@ -1578,7 +1630,6 @@ schedule:
   - mpm_grid_update
   - mpm_gather
 - cell_exclude_3d
-- plate_confine_3d
 plotting:
   background: black
   up_axis: 1
@@ -1625,7 +1676,7 @@ plotting:
   camera_elev: 1.05
   camera_turns: 0.0
   camera_zoom: 0.0</pre></span></span>
-      <span class="sim-cap">the other way to the same shape: two solid planes fill 75% of the box, and blocked in one axis the epithelium grows into the other two -- oblateness 2.08. It also divides 4,000 times instead of 6,000: confinement suppresses proliferation</span>
+      <span class="sim-cap">the same shape the other way. Two solid blocks -- a second MPM body, 130x stiffer than the matrix, so they deform too -- press the tissue to oblateness 1.41, indistinguishable from the grown 1.43 beside it. Two mechanisms, one shape</span>
     </figcaption>
   </figure>
 </div>
