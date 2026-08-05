@@ -1757,6 +1757,93 @@ run that never grows cannot buckle from a growth radius. The real cause was the 
 \code{l\_th\_frac} 1.96 in eleven of twelve runs. Both the correction and the false diagnosis are now
 in \code{round.md}, the second so it is not proposed again.
 
+\subsection*{Testing the ruler: metrics against generated geometries}
+Cedric, 5 August: \emph{``can we test the metrics thoroughly against test geometries to be generated
+with a dedicated generator?''}, then \emph{``test all metrics against known geometry''}, then ---
+looking at the first figure --- \emph{``tube and branched gt are wrong, fix them.''}
+
+Every other test in this campaign checks that a metric \emph{exists}, is admitted, has a producer and
+reaches a summary. None checked that it is \textbf{right}. That gap is not hypothetical: four metrics
+were measured to lie outright (F15/F16), \code{corr\_act\_rad} returned a confident 0.294 on a field
+whose entire spread was $8.4\times10^{-5}$, and the classifier called \code{coral\_gate}
+\emph{branched} where the eye saw a lobed sphere with \code{n\_tubes} 0.
+
+\textbf{The generator deforms rather than builds.} A metric needs valid topology --- a closed
+trivalent sheet, every edge shared by exactly two faces --- and that is already solved for a sphere,
+so all seven fixtures are \code{build\_sphere\_mesh} with their \emph{vertices} moved. Connectivity is
+untouched, so \code{euler} and \code{genus} must stay exactly what a sphere gives and any change they
+report is their own bug rather than the fixture's.
+
+\begin{center}
+\includegraphics[width=\linewidth]{figs/test_geometries.pdf}
+\end{center}
+
+\noindent \emph{The seven fixtures and what the metrics say about each. Gold marks a metric firing on
+the shape it is meant to fire on. Panels are at a common scale --- per-panel limits would make a tube
+and a sphere look equally elongated, hiding the difference the figure exists to show. Rendered with
+\code{run\_tyssue\_vesicle.\_draw}, the same renderer as every movie and strip the campaign produces.}
+
+\subsection*{What it found, including in my own work}
+\begin{enumerate}\itemsep3pt
+\item \textbf{\code{n\_tubes} = 3 on a rugby ball.} A 2:1 ellipsoid with no protrusion at all. It
+selects cells with $r > 1.3\times$ median and clusters them by direction, so on any elongated body it
+counts \emph{the ends}, and the greedy angular clustering splits a broad polar cap into several. This
+is one of the \textbf{five headline metrics} --- ``did the instrument call it a tube'' --- answerable
+with 3 where there is no tube. Fixed by the definition rather than a constant: a tube is longer than it
+is wide, so a cluster with length $\le$ diameter is not one. After: sphere 0, prolate 0, oblate 0,
+undulated 0, self-intersecting 0, tube 1, branched 2.
+
+\item \textbf{\code{n\_tips} has a 25-degree resolution, now measured.} Swept on the fork fixture, it
+flips $1\to2$ at a half-angle of 27$^\circ$ --- exactly where the cone predicts. A narrower fork is
+\emph{one} tip as far as the instrument is concerned, which matters because that is what early
+branching looks like. Pinned in both directions: the wide fork must read 2, the 12$^\circ$ fork must
+read 1, so if the cone ever changes, past ``no branching'' results are flagged as measured with a
+different ruler.
+
+\item \textbf{Two fixtures of mine were wrong, and Cedric saw it in the figure before any metric
+complained.} The ``tube'' was a \emph{teardrop} --- a smoothstep taper from equator to pole, which has
+neither the neck nor the constant width that \code{protrusion\_aspect\_max} and \code{tube\_diameter}
+exist to measure. The ``branch'' was a \emph{spindle}: it put a finger at each pole, which is two tubes
+on opposite sides of a body rather than a fork, and it applied its deformation twice to the same array
+in place, so the second pass moved vertices the first had already moved. The tube is now a cylinder
+mapped onto the polar cap; the branch is one trunk that splits, with the saddle pulled down into a real
+crotch --- because a Y is not two tubes, it is two tubes \emph{and} the junction between them.
+
+\item \textbf{\code{gyr\_prolate} rises on an oblate disc too}, to 1.73, because $\lambda_3$ collapses
+while $\lambda_1$ and $\lambda_2$ stay large. Correct arithmetic and a real trap: an agent told
+``\code{gyr\_prolate} grows with elongation'' would read a collapsing vesicle as a tube.
+\code{gyr\_oblate} is what separates them (0.58 against 0.0002), so that is what the test asserts and
+the caveat is now in the metric's own docstring.
+
+\item \textbf{\code{ray\_single\_frac} measures star-convexity, not self-intersection.} A wide fork is
+legitimately not star-convex --- a ray grazing between the prongs can cross three times --- so the
+branched fixture reads 0.990 with no fold anywhere in it. I expected this to mean P11 refuses the
+campaign's own target morphology. It does not: the threshold is 0.95, chosen for exactly this, and a
+folded shell reads 0.000. The margin is now a test, because if it ever tightens toward 1.0 branching
+becomes unreachable and nothing would say so.
+
+\item \textbf{\code{n\_spots} counts six as six} --- but only once the fixture used maximally separated
+seeds. My first version drew six at random, got 3, and a loose bound accepted it: two random spots near
+each other legitimately merge, so that fixture could not distinguish an undercount from a merge.
+\end{enumerate}
+
+\subsection*{Coverage: every metric, or a stated reason}
+The registry declares 67 quantities and the assertions touch about half, so the untested half was
+invisible --- the shape of every defect this phase found. A metric is now either checked on a fixture
+or listed as \code{EXEMPT} \emph{with a reason}, and the list is asserted exhaustive: adding a metric
+without doing one or the other fails the suite.
+
+\begin{center}\small
+\begin{tabular}{lrl}
+\toprule
+produced on a geometry & \textbf{56} / 67 & asserted or present on at least one fixture \\
+exempt, with a reason  & 13 & 8 run-level (need a series, not a frame), 4 rejected, 1 prose \\
+\midrule
+\code{test\_geometries.py} & \textbf{57 checks} & all passing \\
+\bottomrule
+\end{tabular}
+\end{center}
+
 \textbf{What you get.} A loop of four roles and $\sim$11 calls a round that keeps the three things the
 control cannot have --- composition, a structural critic, and an eye --- and drops the eleven that
 were judging without learning.
