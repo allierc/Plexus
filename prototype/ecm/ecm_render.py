@@ -1,0 +1,227 @@
+"""ecm_render -- draw the cellfix_B_new epithelium inside its matrix, the way okuda draws it.
+
+WHAT WAS WRONG BEFORE, PLAINLY. `21`-`23` drew the tissue as a ring of CYAN DOTS: the cell
+centroids, scattered. A picture of centroids is not a picture of an epithelium -- it cannot show a
+cell, a junction, a division or a monolayer -- and asked "is this actually the vertex model or just
+a sphere?", that image has no answer. Meanwhile `log/okuda/cellfix_B_new/strip.png` already answers
+it in four rows of polygons, and every other okuda artefact in the repo is drawn by ONE routine,
+`run_tyssue_vesicle._draw`. This module calls that routine. It does not reimplement it, does not
+recolour it and does not substitute dots for it.
+
+THE CONVENTION, TAKEN FROM `discovery_okuda.run_one.render` RATHER THAN REINVENTED:
+
+    _draw               each cell is a prism -- apical face, basal face, lateral walls -- edged
+                        black. Colour is the activator on a white->red LUT; cellfix_B_new's
+                        activator is identically 0, so the cells are WHITE, which is why the
+                        reference strip is a white ball.
+    GREEN WASH          `age <= 4 and ndiv > 0`: this cell divided in the last four division
+                        calls. Benign and expected, and the reason the reference ball is
+                        white-with-green-patches rather than plain white. It is the only thing
+                        moving on the tissue's surface in this experiment, so dropping it would
+                        make a proliferating epithelium look inert.
+    MAGENTA             genuinely broken cell. An alarm; normally never appears.
+    CAM_SIDE / CAM_TOP  elev 18 and elev 88, both at azim 30. Two viewpoints because one can hide
+                        a feature that lies along its view direction.
+    ONE FIXED Lbox      computed once for the whole run. Per-frame autofit renders a tissue that
+                        triples in radius at constant apparent size -- it is what hid growth in
+                        every archived movie until `run_box` was written.
+    _cross_screen       the monolayer in section: one filled quad per cell between the apical and
+                        basal rings, so the band IS the epithelium's thickness and the hollow
+                        middle is the lumen.
+
+WHAT THIS MODULE ADDS, AND ONLY THIS: the matrix, coloured by its stress band, drawn around the
+tissue in the tissue's own frame.
+
+    THE MATRIX IS SPLIT INTO A FAR HALF AND A NEAR HALF about the tissue centre, and the epithelium
+    is drawn BETWEEN them. Matplotlib's 3D depth sort is per-ARTIST, not per-point: one scatter of
+    110,000 particles enclosing a sphere has its mean depth AT the sphere, so the whole cloud
+    lands either wholly in front of the tissue (which buries it in dust) or wholly behind it
+    (which hides the near matrix). Two scatters and `computed_zorder=False` put the tissue where it
+    belongs -- inside the material -- and the near half is drawn faint so the cells stay legible.
+
+    REST AND STRESS ARE DRAWN DIFFERENTLY. Unstrained matrix is small and dim, strained matrix is
+    larger and bright, and the strained particles are sorted so the hottest band draws last. With
+    one uniform scatter the front is a slight hue shift inside a fog of 110,000 equally loud dots;
+    the front is the measurement, so it gets the visual weight.
+"""
+from __future__ import annotations
+
+import os
+import sys
+
+import numpy as np
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
+for p in (HERE, os.path.join(ROOT, "src"), os.path.join(ROOT, "prototype", "Tyssue"),
+          os.path.join(ROOT, "discovery_okuda")):
+    if p not in sys.path:
+        sys.path.insert(0, p)
+
+CAM_SIDE = dict(elev=18, azim=30)      # the archive/minisite convention; `_draw`'s own elevation
+CAM_TOP = dict(elev=88, azim=30)       # near-polar: what the side view foreshortens is broadside here
+DIVIDED_WINDOW = 4                     # division-calls a cell counts as "just divided" for
+INNER = 0.82                           # basal radius fraction -- `_draw`'s monolayer thickness
+P0 = 3.90                              # passed through to `_draw`; it does not colour by it
+
+
+# --------------------------------------------------------------------------- the tissue, loaded
+def load_tissue(path, scale):
+    """The pass-1 cache, as the renderer wants it: per-frame meshes in TISSUE units + the camera."""
+    z = np.load(path)
+    frames = np.asarray(z["mesh_frames"])
+    meshes = []
+    for j, t in enumerate(frames):
+        meshes.append((int(t), {
+            "pos": np.asarray(z[f"m{j}_pos"], np.float64),
+            "E_srce": np.asarray(z[f"m{j}_E_srce"]), "E_trgt": np.asarray(z[f"m{j}_E_trgt"]),
+            "E_face": np.asarray(z[f"m{j}_E_face"]), "nF": int(z[f"m{j}_nF"]),
+            "Nv": int(z[f"m{j}_Nv"]),
+            "age": np.asarray(z[f"m{j}_age"], np.float64),
+            "ndiv": np.asarray(z[f"m{j}_ndiv"], np.float64)}))
+    return {"meshes": meshes, "Lbox": float(z["Lbox"]), "scale": float(scale),
+            "n_cells": np.asarray(z["n_cells"]), "r_apical": np.asarray(z["r_apical"])}
+
+
+def divided_mask(mt):
+    """`age <= 4 AND ndiv > 0` -- the green wash, from the division event itself.
+
+    BOTH CONDITIONS ARE NEEDED. `age` starts at 0 for every seeded cell, so `age <= 4` alone paints
+    the entire untouched tissue green for the opening frames -- a defect caught by watching a movie,
+    not by a check. `ndiv > 0` says the cell has actually divided at least once.
+    """
+    age, nd = mt.get("age"), mt.get("ndiv")
+    if age is None or not np.isfinite(np.asarray(age, float)).any():
+        return None                                  # older cache: say nothing rather than lie
+    div = np.asarray(age)[:mt["nF"]] <= DIVIDED_WINDOW
+    if nd is not None and np.isfinite(np.asarray(nd, float)).any():
+        div = div & (np.asarray(nd)[:mt["nF"]] > 0)
+    return div
+
+
+def broken_mask(mt, pos, name=""):
+    """Magenta: cells that are not cells any more. Loud when unavailable, never silently absent."""
+    try:
+        from tyssue_diag import mesh_faults
+        return mesh_faults(pos, mt)["broken"]
+    except Exception as e:
+        print(f"[{name}] broken-cell overlay unavailable ({type(e).__name__}) -- the movie cannot "
+              f"show a broken cell, so absence of magenta is not evidence of a healthy mesh",
+              flush=True)
+        return None
+
+
+# --------------------------------------------------------------------------- the matrix
+def screen_basis(elev, azim):
+    """(depth into screen, horizontal right, vertical up) for a matplotlib 3D camera.
+    Mirrors `run_tyssue_round._screen_basis`, which is fixed at the side camera."""
+    er, az = np.deg2rad(elev), np.deg2rad(azim)
+    d = np.array([np.cos(er) * np.cos(az), np.cos(er) * np.sin(az), np.sin(er)])
+    v = np.array([0.0, 0.0, 1.0]) - (np.array([0.0, 0.0, 1.0]) @ d) * d
+    v /= np.linalg.norm(v) + 1e-12
+    u = np.cross(v, d); u /= np.linalg.norm(u) + 1e-12
+    return d, u, v
+
+
+def _matrix_scatter(ax, q, band, cmap, zorder, alpha, s_rest=1.1, s_hot=2.4, three_d=True):
+    """Rest (band 0) dim and small, strained bright and larger, hottest band drawn last.
+
+    THE REST STATE IS DIM BUT IT IS NOT ABSENT. `ecm_spec` already made this mistake once at the
+    palette level -- band 0 at near-black on black produced a frame containing nothing, and you
+    cannot watch a front propagate into fibres you cannot see -- and drawing it at alpha 0.4 and
+    half a point wide reintroduced it at the renderer level: frame 0 of the smoke test was an empty
+    panel for a matrix of 110,000 particles.
+    """
+    rest = band == 0
+    hot = ~rest
+    args = dict(cmap=cmap, vmin=0, vmax=7, marker=".", linewidths=0)
+    if three_d:
+        args["depthshade"] = False
+    if rest.any():
+        r = q[rest]
+        xs = (r[:, 0], r[:, 1], r[:, 2]) if three_d else (r[:, 0], r[:, 1])
+        ax.scatter(*xs, c=band[rest], s=s_rest, alpha=alpha * 0.7, zorder=zorder, **args)
+    if hot.any():
+        h = q[hot]; b = band[hot]
+        o = np.argsort(b)                              # hottest last, so the front is never buried
+        h, b = h[o], b[o]
+        xs = (h[:, 0], h[:, 1], h[:, 2]) if three_d else (h[:, 0], h[:, 1])
+        ax.scatter(*xs, c=b, s=s_hot, alpha=alpha, zorder=zorder + 1, **args)
+
+
+def draw_3d(ax, mt, pos, q, band, cmap, cam, L, div=None, brk=None, tissue=True, cutaway=False):
+    """One 3D panel: far matrix -> epithelium -> near matrix, in tissue units.
+
+    `cutaway` removes the octant nearest the camera instead of drawing the tissue. A solid cube of
+    matrix hides its own interior from every angle -- the bright front is inside it, and the panel
+    reads as "the surface got warmer". With the near octant gone you look in along two cut planes
+    and the front is a shell you can see the thickness of.
+    """
+    from run_tyssue_vesicle import _draw
+    if cutaway:
+        d, u, v = screen_basis(cam["elev"], cam["azim"])
+        keep = ~(((q @ d) < 0) & ((q @ u) > 0) & ((q @ v) > 0))
+        q, band = q[keep], band[keep]
+    if tissue:
+        _draw(ax, pos, mt, P0, azim=cam["azim"], act=None, inner=INNER, Lbox=L,
+              divided=div, broken=brk, wall_shade=1.0)
+        # `_draw` ends on view_init(elev=18, ...); re-aim for the top camera. Its Poly3DCollection
+        # is the only artist on the axis at this point, and it has to sit BETWEEN the two halves of
+        # the matrix, so give it an explicit zorder rather than trusting a computed one.
+        for c in ax.collections:
+            c.set_zorder(5)
+    else:
+        ax.clear(); ax.set_facecolor("black")
+        ax.set_xlim(-L, L); ax.set_ylim(-L, L); ax.set_zlim(-L, L)
+        ax.set_box_aspect((1, 1, 1)); ax.axis("off")
+    d, _, _ = screen_basis(cam["elev"], cam["azim"])
+    depth = q @ d                                      # > 0 is deeper than the tissue centre
+    far, near = depth > 0, depth <= 0
+    if tissue:
+        _matrix_scatter(ax, q[far], band[far], cmap, zorder=0, alpha=0.85)
+        _matrix_scatter(ax, q[near], band[near], cmap, zorder=10, alpha=0.28)
+    else:
+        _matrix_scatter(ax, q[far], band[far], cmap, zorder=0, alpha=0.9)
+        _matrix_scatter(ax, q[near], band[near], cmap, zorder=10, alpha=0.9)
+    ax.set_xlim(-L, L); ax.set_ylim(-L, L); ax.set_zlim(-L, L)
+    ax.set_box_aspect((1, 1, 1)); ax.axis("off")
+    ax.view_init(elev=cam["elev"], azim=cam["azim"])
+
+
+def draw_cross(ax, mt, pos, q, band, cmap, L2, axis_dir, slab, dot_scale=1.0):
+    """The monolayer in section + the matrix in the SAME plane.
+
+    The cut plane CONTAINS the cavity's pinched axis and faces the camera, and that axis runs along
+    the plot's horizontal -- the `_cross_screen` convention, where the interesting axis is the
+    horizontal one. So an anisotropic cavity reads directly: the matrix is thin left-and-right and
+    thick above-and-below, and the stress arrives on those sides at different times.
+    """
+    from run_tyssue_round import _cross_screen
+    from run_tyssue_round import _screen_basis
+    _cross_screen(ax, pos, mt, np.zeros(mt["nF"]), seed_dir=axis_dir, inner=INNER, Lbox=L2)
+    # THE SAME PLANE, DERIVED THE SAME WAY. `_cross_screen` builds its basis from `seed_dir` and
+    # the fixed side camera; recomputing it here with the same two inputs is what keeps the matrix
+    # slab and the cell ring in one picture instead of two unrelated ones.
+    dcam, su, sv = _screen_basis()
+    t = np.asarray(axis_dir, float); t /= np.linalg.norm(t) + 1e-12
+    n = dcam - (dcam @ t) * t
+    d = n / np.linalg.norm(n) if np.linalg.norm(n) > 1e-6 else sv
+    u = t if (t @ su) >= 0 else -t
+    v = np.cross(d, u); v /= np.linalg.norm(v) + 1e-12
+    if v @ sv < 0:
+        v = -v
+    sl = np.abs(q @ d) < slab
+    if sl.any():
+        proj = np.stack([q[sl] @ u, q[sl] @ v], axis=1)
+        # BIGGER DOTS THAN THE 3D PANELS. A slab holds ~11% of the particles spread over a panel of
+        # the same size, so at the 3D dot size the section reads as an empty frame with a cell ring
+        # floating in it -- and the section is the panel where the front's TIMING is legible.
+        #
+        # BUT SCALED TO THE PANEL. A marker size is in POINTS, not in data units, so the same `s`
+        # that is right for a full strip panel is four times too big in the movie's small inset: the
+        # matrix buried the monolayer ring, and the section stopped showing the one thing only it can
+        # show -- where the epithelium is relative to the front. `dot_scale` is the caller's panel
+        # size, not a taste setting.
+        _matrix_scatter(ax, proj, band[sl], cmap, zorder=0, alpha=0.95,
+                        s_rest=3.4 * dot_scale, s_hot=7.0 * dot_scale, three_d=False)
+    ax.set_xlim(-L2, L2); ax.set_ylim(-L2, L2); ax.set_aspect("equal"); ax.axis("off")

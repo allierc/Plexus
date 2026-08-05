@@ -43,10 +43,22 @@ STRESS_COLORS = [
 
 def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                n_particles=48000, youngs=40.0, density=1.0,
-               cavity_r=0.22, cavity_h=0.07, axis=1,
+               # THE CAVITY MUST BE BIGGER THAN THE TISSUE IS WHEN THE CLOCK STARTS. Runs 21-23 had
+               # `cavity_h=0.05` against a tissue whose apical radius began at 0.088 of the box, so
+               # the epithelium was already overlapping the matrix at frame 0 and every one of them
+               # reported `contact_frame: 0` -- the "moment of first contact" the experiment exists
+               # to observe could not happen inside it. Spherical (h == r) by default: with a
+               # one-way coupling an anisotropic cavity cannot reshape the tissue, so it belongs in
+               # a run that says it is testing the matrix's anisotropy, not in the baseline.
+               cavity_r=0.14, cavity_h=0.14, axis=2,
                n_fibres=900, fibre_len=0.16, align=0.0, align_dir=(1.0, 0.0, 0.0),
                r0=0.05, r_max=0.30, growth=0.0009, k_contact=900.0, damp=0.0,
-               stress_scale=0.03, drag=0.0, wall_damp=0.6, seed=0, fps=30):
+               # MEASURED, not guessed. At 0.03 the band histogram of 23_cellfix_vertex_visible
+               # ended with 39% of the matrix pinned at band 7 -- saturated, so the last quarter of
+               # the run showed a uniformly white matrix and the front stopped being visible exactly
+               # where it was strongest. 0.05 keeps the top band for the material that is genuinely
+               # at the front.
+               stress_scale=0.05, drag=0.0, wall_damp=0.6, seed=0, fps=10):
     """The whole experiment as a plain dict, ready for yaml.safe_dump + schema.load."""
     types = {f"s{i}": {"fraction": 1.0 / len(STRESS_COLORS), "youngs": youngs}
              for i in range(len(STRESS_COLORS))}

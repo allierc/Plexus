@@ -336,16 +336,24 @@ class CellToECMReplay(Lateral):
     """The REAL tissue's recorded surface, pushing the matrix.
 
     `implementation: sphere` is a prescribed ball and knows nothing about cells. This one replays
-    an actual cellfix_B_new run: 200 epithelial cells growing and dividing to 300-odd under their
-    own vertex mechanics, at their own scale, with their own parameters -- none of it rescaled,
-    because rescaling was measured to break it (see combine.py).
+    an actual cellfix_B_new run: 200 epithelial cells growing and dividing to 3,170 under their own
+    vertex mechanics, at their own scale, with their own parameters -- none of it rescaled, because
+    rescaling was measured to break it (see `tissue.py`).
 
-    THE SURFACE IS AN ANGULAR RADIUS MAP. Each frame carries R(theta, phi), the distance to the
-    furthest cell in that direction. A particle's own direction gives its bin, and one comparison
-    decides whether the tissue has reached it -- O(1) per particle rather than a point-in-mesh
-    test against four thousand faces, which is what makes 48,000 particles affordable per frame.
-    It assumes the vesicle is STAR-SHAPED. cellfix_B_new is; P11 is the premise that reports when
-    a tissue stops being, and a run that trips it has left this operator's domain of validity.
+    THE SURFACE IS AN ANGULAR RADIUS MAP OF THE APICAL VERTICES. Each frame carries R(theta, phi),
+    the distance to the furthest apical vertex in that direction (`tissue.apical_map`; it used to be
+    the furthest cell CENTROID, which sampled the same surface with half the points). A particle's
+    own direction gives its bin, and one comparison decides whether the tissue has reached it --
+    O(1) per particle rather than a point-in-mesh test against four thousand faces, which is what
+    makes 110,000 particles affordable per frame. It assumes the vesicle is STAR-SHAPED.
+    cellfix_B_new is; P11 is the premise that reports when a tissue stops being, and a run that
+    trips it has left this operator's domain of validity.
+
+    THE MAP IS CENTROID-REFERENCED, SO `centre` PINS THE TISSUE AT THE BOX CENTRE and the vesicle's
+    own translational drift is dropped. That is deliberate: the drift is a few percent of the radius
+    and would otherwise slide the tissue off the cavity it was seeded into, turning a symmetric
+    loading experiment into an accidental one-sided one. What the matrix sees is the tissue's SHAPE
+    and GROWTH, not its wandering.
 
     THE COUPLING IS ONE-WAY HERE, and the reason is scale, not modelling. The reaction force is
     computed and returned by the `sphere` implementation for a live tissue; a replay has no live
