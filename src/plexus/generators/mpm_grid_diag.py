@@ -33,9 +33,33 @@ _TYPE_COLORS = [(0.20, 0.55, 0.95), (0.95, 0.30, 0.30), (0.25, 0.75, 0.35),
                 (0.85, 0.65, 0.15), (0.60, 0.35, 0.80)]
 
 
+def _vonmises(sig):
+    """Von Mises of a per-particle Cauchy stress [N,D,D] -- the deviatoric magnitude.
+
+    Why this and not the Frobenius norm of the whole tensor: the fixed-corotated law resists
+    volume change far more stiffly than shape change, so a sheet that is being SHEARED barely
+    moves a volumetric measure while the deviatoric part is large. A norm that mixes the two is
+    dominated by the stiff volumetric term and reads ~nothing on exactly the deformation these
+    recipes produce.
+    """
+    D = sig.shape[-1]
+    eye = torch.eye(D, device=sig.device).expand_as(sig)
+    s = 0.5 * (sig + sig.transpose(-2, -1))                       # symmetric part
+    dev = s - eye * (s.diagonal(dim1=-2, dim2=-1).mean(-1))[:, None, None]
+    return torch.sqrt(1.5 * (dev * dev).sum((-2, -1)).clamp_min(0))
+
+
 def _stress_norm(F, mu, la):
     """Per-particle ||fixed-corotated stress|| (2*mu*(F-R)F^T + la*J(J-1)I), the same law
-    p2g scatters. R = analytic 2x2 polar rotation in 2D, SVD polar U Vh in 3D."""
+    p2g scatters. R = analytic 2x2 polar rotation in 2D, SVD polar U Vh in 3D.
+
+    THE FALLBACK, NOT THE ANSWER. This re-derives the constitutive law a second time, beside the
+    solver's own, and it is wrong in a way that matters for every ACTIVE recipe: `mpm_scatter`
+    adds the active stress to the tensor it scatters, and this sees only the passive part. So the
+    panel labelled `stress` on an actively contracting sheet was showing the one component of the
+    stress the recipe does not care about. Ask for `store_stress: true` on the scatter and the
+    solver's own Cauchy stress is used instead -- see `_capture`.
+    """
     D = F.shape[-1]
     eye = torch.eye(D, device=F.device).expand_as(F)
     if D == 2:
@@ -91,12 +115,22 @@ def _capture(H, particle_set="mpm_particle", grid_field="mpm_grid"):
     nt = (p.node_type.detach().cpu().numpy() if hasattr(p, "node_type")
           else np.zeros(p.n, dtype=int))
     F, C = p.F.detach(), p.C.detach()
+    # PREFER THE STRESS THE SOLVER ALREADY CARRIES. mpm_scatter computes the stress every substep
+    # to build the affine momentum matrix; with `store_stress: true` it caches the Cauchy stress to
+    # a per-particle buffer, captured after any active stress and before the dt/p_vol rescale. That
+    # is the material's stress. Re-deriving it here from F is a second implementation of the
+    # constitutive law that cannot see the active part at all.
+    sig = getattr(p, "sigma", None)
+    if sig is not None:
+        stress, stress_kind = _vonmises(sig.detach()).cpu().numpy(), "von Mises of Cauchy"
+    else:
+        stress, stress_kind = _stress_norm(F, p.mu, p.la).cpu().numpy(), "||passive|| from F"
     rec = {
         "X": X, "nt": nt,
         "fnorm": F.reshape(p.n, -1).norm(dim=1).cpu().numpy(),
         "cnorm": C.reshape(p.n, -1).norm(dim=1).cpu().numpy(),
         "Jp": (p.Jp.detach().cpu().numpy() if hasattr(p, "Jp") else np.ones(p.n)),
-        "stress": _stress_norm(F, p.mu, p.la).cpu().numpy(),
+        "stress": stress, "stress_kind": stress_kind,
     }
     # per-particle PARENT TYPE index -> lets the objects panel colour each body by its
     # material (elastic / viscoelastic / water) via the spec's plotting palette.
@@ -190,7 +224,7 @@ def _render3d(frames, grid_dir, sim, cbar, ranges):
         panel(2, "C (Jacobian of velocity)", sx, sy, order, fr["cnorm"], "viridis", c_lo, c_hi)
         panel(3, "F (deformation)", sx, sy, order, fr["fnorm"], "coolwarm", f_lo, f_hi)
         panel(4, "Jp (volume deformation)", sx, sy, order, fr["Jp"], "viridis", 0.75, 1.25)
-        panel(5, "stress", sx, sy, order, fr["stress"], "hot", s_lo, s_hi)
+        panel(5, f"stress ({fr.get('stress_kind', '?')})", sx, sy, order, fr["stress"], "hot", s_lo, s_hi)
         ax6 = plt.subplot(2, 3, 6)
         if has_grid3:
             gx, gy, gz, gvn = fr["grid3"]
@@ -219,6 +253,20 @@ def generate_grid_movie(sim, data_dir: str, device: str = "cpu", stride: int = 3
     budget = int(style.get("movie_max_frames", 0))
     if budget > 0:
         stride = max(stride, int(np.ceil(sim.n_frames / budget)))
+
+    # ASK FOR THE STRESS RATHER THAN RE-DERIVING IT. This diagnostic re-runs the simulation, so it
+    # is the consumer and it can turn on what it needs; requiring every spec to carry a flag for the
+    # benefit of one optional plot is how a diagnostic ends up silently drawing a proxy instead. The
+    # flag is strictly additive (mpm_scatter allocates a buffer and writes it; `sigma` is never read
+    # back by the mechanics), so asking for it cannot change the trajectory this re-run produces.
+    asked = 0
+    for o in getattr(sim, "operators", []) or []:
+        if str(getattr(o, "op", "")).startswith("mpm_scatter"):
+            o.params["store_stress"] = True
+            asked += 1
+    print(f"[grid] store_stress requested on {asked} scatter op(s); "
+          f"{'the solver' if asked else 'a re-derivation from F'} will supply the stress panel",
+          flush=True)
 
     frames: list[dict] = []
 
@@ -283,7 +331,7 @@ def generate_grid_movie(sim, data_dir: str, device: str = "cpu", stride: int = 3
             panel(2, "C (Jacobian of velocity)", X, fr["cnorm"], "viridis", c_lo, c_hi)
             panel(3, "F (deformation)", X, fr["fnorm"], "coolwarm", f_lo, f_hi)
             panel(4, "Jp (volume deformation)", X, fr["Jp"], "viridis", 0.75, 1.25)
-            panel(5, "stress", X, fr["stress"], "hot", s_lo, s_hi)
+            panel(5, f"stress ({fr.get('stress_kind', '?')})", X, fr["stress"], "hot", s_lo, s_hi)
             ax6 = plt.subplot(2, 3, 6)
             if has_grid:
                 gx, gy, gv = fr["grid"]
