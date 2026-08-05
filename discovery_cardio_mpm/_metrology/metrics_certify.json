@@ -1,0 +1,1030 @@
+{
+ "rows": [
+  {
+   "distortion": "identity",
+   "should_move": [],
+   "metrics": {
+    "loopscore": {
+     "base": 1.0,
+     "value": 1.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "loopscore_sd": {
+     "skipped": true,
+     "why": "not axis-separable; held only to the heterogeneity case"
+    },
+    "interior_r2": {
+     "base": 1.0,
+     "value": 1.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "residual/size": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "residual/orientation": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "residual/openness_aspect": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "residual/chirality": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "residual/shape_detail": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "openness": {
+     "base": 0.7440193669740154,
+     "value": 0.7440193669740154,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "path_length": {
+     "base": 5.1111959483507,
+     "value": 5.1111959483507,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "peak_excursion": {
+     "base": 1.0609383597782043,
+     "value": 1.0609383597782043,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "chirality_match": {
+     "base": 1.0,
+     "value": 1.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "orientation_error": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "coordination": {
+     "base": 1.0,
+     "value": 1.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    }
+   }
+  },
+  {
+   "distortion": "scale x2",
+   "should_move": [
+    "size"
+   ],
+   "metrics": {
+    "loopscore": {
+     "base": 1.0,
+     "value": -1.0,
+     "rel_change": 2.0,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    },
+    "loopscore_sd": {
+     "skipped": true,
+     "why": "not axis-separable; held only to the heterogeneity case"
+    },
+    "interior_r2": {
+     "base": 1.0,
+     "value": 0.0,
+     "rel_change": 1.0,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    },
+    "residual/size": {
+     "base": 0.0,
+     "value": 2.0,
+     "rel_change": 2.0,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    },
+    "residual/orientation": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "residual/openness_aspect": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "residual/chirality": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "residual/shape_detail": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "openness": {
+     "base": 0.7440193669740154,
+     "value": 0.7440193669744475,
+     "rel_change": 5.807628408135266e-13,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "path_length": {
+     "base": 5.1111959483507,
+     "value": 10.2223918967014,
+     "rel_change": 1.0,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    },
+    "peak_excursion": {
+     "base": 1.0609383597782043,
+     "value": 2.1218767195564086,
+     "rel_change": 1.0,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    },
+    "chirality_match": {
+     "base": 1.0,
+     "value": 1.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "orientation_error": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "coordination": {
+     "base": 1.0,
+     "value": 1.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    }
+   }
+  },
+  {
+   "distortion": "rotate by pi/5",
+   "should_move": [
+    "orientation"
+   ],
+   "metrics": {
+    "loopscore": {
+     "base": 1.0,
+     "value": 0.7343774437904358,
+     "rel_change": 0.2656225562095642,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    },
+    "loopscore_sd": {
+     "skipped": true,
+     "why": "not axis-separable; held only to the heterogeneity case"
+    },
+    "interior_r2": {
+     "base": 1.0,
+     "value": 0.6180340051651001,
+     "rel_change": 0.3819659948348999,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    },
+    "residual/size": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "residual/orientation": {
+     "base": 0.0,
+     "value": 0.2656225562095642,
+     "rel_change": 0.2656225562095642,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    },
+    "residual/openness_aspect": {
+     "base": 0.0,
+     "value": 5.960464477539063e-08,
+     "rel_change": 5.960464477539063e-08,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "residual/chirality": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "residual/shape_detail": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "openness": {
+     "base": 0.7440193669740154,
+     "value": 0.7528822339753893,
+     "rel_change": 0.01191214556338758,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "path_length": {
+     "base": 5.1111959483507,
+     "value": 5.1111959483507,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "peak_excursion": {
+     "base": 1.0609383597782043,
+     "value": 1.0609383597782043,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "chirality_match": {
+     "base": 1.0,
+     "value": 1.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "orientation_error": {
+     "base": 0.0,
+     "value": 0.6283185307179586,
+     "rel_change": 0.6283185307179586,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    },
+    "coordination": {
+     "base": 1.0,
+     "value": 1.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    }
+   }
+  },
+  {
+   "distortion": "mirror",
+   "should_move": [
+    "chirality",
+    "orientation"
+   ],
+   "metrics": {
+    "loopscore": {
+     "base": 1.0,
+     "value": -1.0,
+     "rel_change": 2.0,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    },
+    "loopscore_sd": {
+     "skipped": true,
+     "why": "not axis-separable; held only to the heterogeneity case"
+    },
+    "interior_r2": {
+     "base": 1.0,
+     "value": -1.0708301067352295,
+     "rel_change": 2.0708301067352295,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    },
+    "residual/size": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "residual/orientation": {
+     "skipped": true,
+     "why": "outside its declared domain"
+    },
+    "residual/openness_aspect": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "residual/chirality": {
+     "base": 0.0,
+     "value": 1.6016361713409424,
+     "rel_change": 1.6016361713409424,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    },
+    "residual/shape_detail": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "openness": {
+     "base": 0.7440193669740154,
+     "value": 0.7440193669740154,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "path_length": {
+     "base": 5.1111959483507,
+     "value": 5.1111959483507,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "peak_excursion": {
+     "base": 1.0609383597782043,
+     "value": 1.0609383597782043,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "chirality_match": {
+     "base": 1.0,
+     "value": 0.0,
+     "rel_change": 1.0,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    },
+    "orientation_error": {
+     "base": 0.0,
+     "value": 0.7974990321145028,
+     "rel_change": 0.7974990321145028,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    },
+    "coordination": {
+     "base": 1.0,
+     "value": 1.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    }
+   }
+  },
+  {
+   "distortion": "collapse to a line",
+   "should_move": [
+    "chirality",
+    "openness"
+   ],
+   "metrics": {
+    "loopscore": {
+     "base": 1.0,
+     "value": 0.0992068275809288,
+     "rel_change": 0.9007931724190712,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    },
+    "loopscore_sd": {
+     "skipped": true,
+     "why": "not axis-separable; held only to the heterogeneity case"
+    },
+    "interior_r2": {
+     "base": 1.0,
+     "value": 0.7259467244148254,
+     "rel_change": 0.27405327558517456,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    },
+    "residual/size": {
+     "skipped": true,
+     "why": "outside its declared domain"
+    },
+    "residual/orientation": {
+     "skipped": true,
+     "why": "outside its declared domain"
+    },
+    "residual/openness_aspect": {
+     "skipped": true,
+     "why": "outside its declared domain"
+    },
+    "residual/chirality": {
+     "skipped": true,
+     "why": "outside its declared domain"
+    },
+    "residual/shape_detail": {
+     "skipped": true,
+     "why": "outside its declared domain"
+    },
+    "openness": {
+     "base": 0.7440193669740154,
+     "value": 1.5337498808711016e-17,
+     "rel_change": 1.0,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    },
+    "path_length": {
+     "base": 5.1111959483507,
+     "value": 4.0495771020591835,
+     "rel_change": 0.207704587540629,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    },
+    "peak_excursion": {
+     "base": 1.0609383597782043,
+     "value": 1.0609383597782043,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "chirality_match": {
+     "base": 1.0,
+     "value": 0.43,
+     "rel_change": 0.5700000000000001,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    },
+    "orientation_error": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "coordination": {
+     "base": 1.0,
+     "value": 1.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    }
+   }
+  },
+  {
+   "distortion": "shift the whole beat",
+   "should_move": [
+    "phase"
+   ],
+   "metrics": {
+    "loopscore": {
+     "base": 1.0,
+     "value": 1.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "loopscore_sd": {
+     "skipped": true,
+     "why": "not axis-separable; held only to the heterogeneity case"
+    },
+    "interior_r2": {
+     "base": 1.0,
+     "value": -1.5176382064819336,
+     "rel_change": 2.5176382064819336,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    },
+    "residual/size": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "residual/orientation": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "residual/openness_aspect": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "residual/chirality": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "residual/shape_detail": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "openness": {
+     "base": 0.7440193669740154,
+     "value": 0.7440193669740154,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "path_length": {
+     "base": 5.1111959483507,
+     "value": 5.09375568611442,
+     "rel_change": 0.003412168582953109,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "peak_excursion": {
+     "base": 1.0609383597782043,
+     "value": 1.0609383597782043,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "chirality_match": {
+     "base": 1.0,
+     "value": 1.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "orientation_error": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "coordination": {
+     "base": 1.0,
+     "value": 1.0000000000000002,
+     "rel_change": 2.220446049250313e-16,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    }
+   }
+  },
+  {
+   "distortion": "translate",
+   "should_move": [
+    "placement"
+   ],
+   "metrics": {
+    "loopscore": {
+     "base": 1.0,
+     "value": 1.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "loopscore_sd": {
+     "skipped": true,
+     "why": "not axis-separable; held only to the heterogeneity case"
+    },
+    "interior_r2": {
+     "base": 1.0,
+     "value": -15.109527587890625,
+     "rel_change": 16.109527587890625,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    },
+    "residual/size": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "residual/orientation": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "residual/openness_aspect": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "residual/chirality": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "residual/shape_detail": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "openness": {
+     "base": 0.7440193669740154,
+     "value": 0.744019366974016,
+     "rel_change": 8.953178429807708e-16,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "path_length": {
+     "base": 5.1111959483507,
+     "value": 5.1111959483507,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "peak_excursion": {
+     "base": 1.0609383597782043,
+     "value": 1.0609383597782043,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "chirality_match": {
+     "base": 1.0,
+     "value": 1.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "orientation_error": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "coordination": {
+     "base": 1.0,
+     "value": 1.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    }
+   }
+  },
+  {
+   "distortion": "double half the tissue",
+   "should_move": [
+    "heterogeneity",
+    "size"
+   ],
+   "metrics": {
+    "loopscore": {
+     "base": 1.0,
+     "value": 0.0,
+     "rel_change": 1.0,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    },
+    "loopscore_sd": {
+     "base": 0.0,
+     "value": 1.002509355545044,
+     "rel_change": 1.002509355545044,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    },
+    "interior_r2": {
+     "base": 1.0,
+     "value": 0.48391908407211304,
+     "rel_change": 0.516080915927887,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    },
+    "residual/size": {
+     "base": 0.0,
+     "value": 1.0,
+     "rel_change": 1.0,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    },
+    "residual/orientation": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "residual/openness_aspect": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "residual/chirality": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "residual/shape_detail": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "openness": {
+     "base": 0.7440193669740154,
+     "value": 0.7440193669740154,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "path_length": {
+     "base": 5.1111959483507,
+     "value": 6.587096360106971,
+     "rel_change": 0.2887583310580218,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    },
+    "peak_excursion": {
+     "base": 1.0609383597782043,
+     "value": 1.3724382083524223,
+     "rel_change": 0.2936078667561223,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    },
+    "chirality_match": {
+     "base": 1.0,
+     "value": 1.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "orientation_error": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "coordination": {
+     "base": 1.0,
+     "value": 1.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    }
+   }
+  },
+  {
+   "distortion": "scramble each node's timing",
+   "should_move": [
+    "coordination"
+   ],
+   "metrics": {
+    "loopscore": {
+     "base": 1.0,
+     "value": 1.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "loopscore_sd": {
+     "skipped": true,
+     "why": "not axis-separable; held only to the heterogeneity case"
+    },
+    "interior_r2": {
+     "base": 1.0,
+     "value": -0.932308554649353,
+     "rel_change": 1.932308554649353,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    },
+    "residual/size": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "residual/orientation": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "residual/openness_aspect": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "residual/chirality": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "residual/shape_detail": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "openness": {
+     "base": 0.7440193669740154,
+     "value": 0.7440193669740152,
+     "rel_change": 2.9843928099359023e-16,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "path_length": {
+     "base": 5.1111959483507,
+     "value": 5.070857348211419,
+     "rel_change": 0.007892203810401226,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "peak_excursion": {
+     "base": 1.0609383597782043,
+     "value": 1.0609383597782043,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "chirality_match": {
+     "base": 1.0,
+     "value": 1.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "orientation_error": {
+     "base": 0.0,
+     "value": 0.0,
+     "rel_change": 0.0,
+     "moved": false,
+     "expected_to_move": false,
+     "ok": true
+    },
+    "coordination": {
+     "base": 1.0,
+     "value": 0.09330642482297538,
+     "rel_change": 0.9066935751770246,
+     "moved": true,
+     "expected_to_move": true,
+     "ok": true
+    }
+   }
+  }
+ ],
+ "disagreements": []
+}

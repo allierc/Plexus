@@ -2,14 +2,9 @@
  "pass": true,
  "checks": [
   {
-   "check": "every live metric has code that computes it",
+   "check": "every live metric computes",
    "pass": true,
-   "detail": "16 registered"
-  },
-  {
-   "check": "the residual decomposition returns its five named dimensions",
-   "pass": true,
-   "detail": "chirality, openness/aspect, orientation, shape-detail(k>=2), size"
+   "detail": "14 live, 4 withdrawn"
   },
   {
    "check": "every metric has a written definition",
@@ -27,145 +22,326 @@
    "detail": "4 withdrawn, all with a cause"
   },
   {
+   "check": "a withdrawn metric REFUSES to be computed",
+   "pass": true,
+   "detail": "all 4 refuse"
+  },
+  {
+   "check": "every live metric declares which axes it responds to",
+   "pass": true,
+   "detail": "axes: size, openness, chirality, orientation, coordination, placement, phase, heterogeneity"
+  },
+  {
    "check": "nothing is cited as certified before Phase 2 certifies it",
    "pass": true,
-   "detail": "0 certified, 12 provisional, 4 withdrawn"
+   "detail": "0 certified, 14 provisional, 4 withdrawn"
   },
   {
-   "check": "descriptors.py and the registry agree on the shared quantities",
+   "check": "Coordination sees what the objective cannot",
    "pass": true,
-   "detail": "opening_loopiness=0.7328 vs openness=0.7328; magnitude_peak=1.397 vs peak_excursion=1.397; direction_chirality=1 vs chirality_match=1"
+   "detail": "identical 1.0000 -> scrambled 0.0778, where loopscore reads 1.0000"
   },
   {
-   "check": "the grid defect is measured on a real fit, not just counted",
+   "check": "Coordination ignores a shift of the whole beat",
    "pass": true,
-   "detail": "all 36 pinned panels score 1.000; the picture reads +0.694 against +0.522 on the unpinned ones -- inflation +0.172"
+   "detail": "1.0000 -- one global offset is not a coordination failure"
+  },
+  {
+   "check": "OrientationError agrees with itself read two ways",
+   "pass": true,
+   "detail": "covariance 0.6283 vs Fourier 0.6283 (the rotation applied was 0.6283)"
   },
   {
    "check": "the 10x10 reading surface is outside the pinned band",
    "pass": true,
-   "detail": "inherited margin 10: 36/100 nodes INSIDE the band; corrected margin 20: 0/100"
+   "detail": "inherited margin 10: 36/100 INSIDE the band; corrected margin 20: 0/100"
+  },
+  {
+   "check": "the grid defect is measured on a real fit, not just counted",
+   "pass": true,
+   "detail": "all 36 pinned panels score 1.000; the picture reads +0.694 against +0.522 unpinned"
   }
  ],
  "registry": {
   "loopscore": {
-   "definition": "per node, the beat is a closed path; compare its low-order Fourier description with the recording's, normalised by that node's own energy, and average over nodes. 1 = the loops match.",
-   "tier": "provisional",
+   "name": "loopscore",
+   "definition": "per node, the beat is a closed path; compare its low-order Fourier description with the recording's, normalised by that node's own energy, and average over nodes. 1 means the loops match.",
    "source": "cardio_harmonic.harmonic_score (26 June, the objective shift)",
-   "null_measured": 0.07,
-   "domain": "one closed beat, >= 8 frames, on moving interior nodes",
+   "tier": "provisional",
+   "responds_to": [
+    "chirality",
+    "openness",
+    "orientation",
+    "size"
+   ],
+   "domain": "one closed beat, at least 8 frames, on moving interior nodes",
    "known_defects": [
-    "blind to coordination: randomise every node's timing and it returns exactly 1.0000 (measured on all 10 corpus runs)",
-    "its zero is +0.070, not 0, and its own docstring says otherwise",
-    "the area term is weighted x3, hard-coded in a signature"
-   ]
+    "BLIND TO COORDINATION: give every node an independent random timing offset and it returns exactly 1.0000, measured on all 10 corpus runs. That is what Coordination is for.",
+    "its zero is +0.070, not 0, and its own documentation says otherwise",
+    "the area term is weighted three-to-one, hard-coded in a function signature",
+    "the scoring window is 53 frames for a beat whose onsets are 50.5 apart"
+   ],
+   "cause_of_death": "",
+   "null": 0.07,
+   "higher_is_better": true
   },
   "loopscore_sd": {
-   "definition": "the spread of the per-node loopscore. Uniformly mediocre tissue and a few excellent nodes among wrong ones score the same mean; this separates them.",
-   "tier": "provisional",
+   "name": "loopscore_sd",
+   "definition": "the spread of the per-node loopscore. Uniformly mediocre tissue and a few excellent nodes among wrong ones give the same mean; this separates them.",
    "source": "cardio_harmonic.harmonic_stats",
-   "domain": "as loopscore"
+   "tier": "provisional",
+   "responds_to": [
+    "heterogeneity"
+   ],
+   "domain": "as loopscore",
+   "known_defects": [
+    "it is a SPREAD, so a distortion applied evenly to the whole tissue moves the mean and leaves this alone -- doubling every loop does not change it.",
+    "IT IS NOT AXIS-SEPARABLE, and the battery is what established that. Its response depends on the interaction between a distortion and the variety already in the tissue: rotating every loop by one angle is uniform in the world but lands UNEVENLY on nodes whose own axes differ, so the spread moves; mirroring every loop lands evenly, so it does not. Contorting a list of axes to fit that would be a fiction. It answers one question -- is the error even across the tissue -- and that is the only thing it is held to."
+   ],
+   "cause_of_death": "",
+   "null": null,
+   "higher_is_better": false
   },
   "interior_r2": {
+   "name": "interior_r2",
    "definition": "frame-locked goodness of fit, pooled over nodes, with the temporal mean removed from the recording only.",
-   "tier": "provisional",
    "source": "cardio_harmonic.interior_r2 (23 June, the original objective)",
-   "null_measured": -0.875,
+   "tier": "provisional",
+   "responds_to": [
+    "chirality",
+    "coordination",
+    "openness",
+    "orientation",
+    "phase",
+    "placement",
+    "size"
+   ],
    "domain": "any window; blind to whether the path is a loop at all",
    "known_defects": [
-    "every one of the 324 archived fits scores below its own null"
-   ]
+    "every one of the 324 archived fits scores below its own null",
+    "NOT A SHAPE MEASURE, and the battery pinned it down: it moves when the loop is merely TRANSLATED and when the whole beat is merely SHIFTED IN TIME. Both are correct behaviour for a frame-locked residual and both disqualify it from answering a question about morphology. That is why it is a diagnostic."
+   ],
+   "cause_of_death": "",
+   "null": -0.875,
+   "higher_is_better": true
   },
   "residual/size": {
+   "name": "residual/size",
    "definition": "how much loopscore is recovered by scaling the simulated loops to the recording's size, leaving everything else alone.",
-   "tier": "provisional",
    "source": "cardio_harmonic.loopscore_residual",
-   "domain": "as loopscore"
+   "tier": "provisional",
+   "responds_to": [
+    "size"
+   ],
+   "domain": "as loopscore, and UNDEFINED on a degenerate path: the decomposition works by correcting one property of an ellipse at a time, and a loop flattened onto a line has no aspect, no handedness and no meaningful higher harmonics to correct. The battery skips it there rather than recording a failure.",
+   "known_defects": [],
+   "cause_of_death": "",
+   "null": null,
+   "higher_is_better": true
   },
   "residual/orientation": {
+   "name": "residual/orientation",
    "definition": "how much is recovered by rotating the simulated loops onto the recording's axis.",
-   "tier": "provisional",
    "source": "cardio_harmonic.loopscore_residual",
-   "domain": "as loopscore"
+   "tier": "provisional",
+   "responds_to": [
+    "orientation"
+   ],
+   "domain": "as loopscore, and UNDEFINED on a degenerate path: the decomposition works by correcting one property of an ellipse at a time, and a loop flattened onto a line has no aspect, no handedness and no meaningful higher harmonics to correct. The battery skips it there rather than recording a failure.",
+   "known_defects": [
+    "the residual family measures RECOVERABILITY, not error, and mirroring is where the two part company: a reflected loop genuinely has the wrong axis -- orientation_error sees it -- but no ROTATION undoes a reflection, so nothing is recoverable and this reads zero. The battery reported that as a failure until the distinction was written down."
+   ],
+   "cause_of_death": "",
+   "null": null,
+   "higher_is_better": true
   },
   "residual/openness_aspect": {
+   "name": "residual/openness_aspect",
    "definition": "how much is recovered by matching the aspect ratio -- how fat the loop is against how long -- while keeping its size.",
-   "tier": "provisional",
    "source": "cardio_harmonic.loopscore_residual",
-   "domain": "as loopscore"
-  },
-  "residual/chirality": {
-   "definition": "how much is recovered by making each loop circulate the same way round as the recording's.",
    "tier": "provisional",
-   "source": "cardio_harmonic.loopscore_residual",
-   "domain": "as loopscore"
-  },
-  "residual/shape_detail": {
-   "definition": "how much is recovered by taking the higher harmonics from the recording -- everything the ellipse does not describe.",
-   "tier": "provisional",
-   "source": "cardio_harmonic.loopscore_residual",
-   "domain": "as loopscore"
-  },
-  "openness": {
-   "definition": "enclosed area divided by the area of the box the loop fits in. 0 is a straight line; a circle is about 0.79.",
-   "tier": "provisional",
-   "source": "cardio_mpm_train._openness (audit remedy, 4-5 July)",
-   "domain": "a closed path; undefined for a path of zero extent"
-  },
-  "path_length": {
-   "definition": "how far a node travels over the beat, summed frame to frame. A loop and a line of the same width differ here; the enclosed area alone does not say so.",
    "responds_to": [
-    "size",
     "openness"
    ],
-   "note": "NOT an independent axis, and the battery is what showed it: flattening an ellipse onto its long axis changes the distance travelled (the perimeter goes from about pi*(a+b) to 4a), so path length mixes how big the loop is with how open it is. Useful, but it may not be quoted as a size measure on its own.",
-   "tier": "provisional",
-   "source": "this file -- the one quantity the prototype named and never computed",
-   "domain": "any window"
+   "domain": "as loopscore, and UNDEFINED on a degenerate path: the decomposition works by correcting one property of an ellipse at a time, and a loop flattened onto a line has no aspect, no handedness and no meaningful higher harmonics to correct. The battery skips it there rather than recording a failure.",
+   "known_defects": [],
+   "cause_of_death": "",
+   "null": null,
+   "higher_is_better": true
   },
-  "peak_excursion": {
-   "definition": "how far a node reaches from the CENTRE of its own path, at its furthest. Centred, so sliding the loop somewhere else does not change it.",
+  "residual/chirality": {
+   "name": "residual/chirality",
+   "definition": "how much is recovered by making each loop circulate the same way round as the recording's.",
+   "source": "cardio_harmonic.loopscore_residual",
    "tier": "provisional",
-   "source": "cardio_mpm_train.enclosure_row (peak), centred here",
+   "responds_to": [
+    "chirality"
+   ],
+   "domain": "as loopscore, and UNDEFINED on a degenerate path: the decomposition works by correcting one property of an ellipse at a time, and a loop flattened onto a line has no aspect, no handedness and no meaningful higher harmonics to correct. The battery skips it there rather than recording a failure.",
+   "known_defects": [],
+   "cause_of_death": "",
+   "null": null,
+   "higher_is_better": true
+  },
+  "residual/shape_detail": {
+   "name": "residual/shape_detail",
+   "definition": "how much is recovered by taking the higher harmonics from the recording -- everything the ellipse does not describe.",
+   "source": "cardio_harmonic.loopscore_residual",
+   "tier": "provisional",
+   "responds_to": [
+    "openness"
+   ],
+   "domain": "as loopscore, and UNDEFINED on a degenerate path: the decomposition works by correcting one property of an ellipse at a time, and a loop flattened onto a line has no aspect, no handedness and no meaningful higher harmonics to correct. The battery skips it there rather than recording a failure.",
+   "known_defects": [],
+   "cause_of_death": "",
+   "null": null,
+   "higher_is_better": true
+  },
+  "openness": {
+   "name": "openness",
+   "definition": "enclosed area divided by the area of the box the loop fits in. A straight line is 0; a circle is about 0.79.",
+   "source": "cardio_mpm_train._openness (audit remedy, 4-5 July)",
+   "tier": "provisional",
+   "responds_to": [
+    "openness"
+   ],
+   "domain": "a closed path with non-zero extent",
+   "known_defects": [],
+   "cause_of_death": "",
+   "null": null,
+   "higher_is_better": true
+  },
+  "path_length": {
+   "name": "path_length",
+   "definition": "how far a node travels over the beat, summed frame to frame. A loop and a line of the same width differ here; the enclosed area alone does not say so.",
+   "source": "this file -- the one quantity the prototype named and never computed",
+   "tier": "provisional",
+   "responds_to": [
+    "openness",
+    "size"
+   ],
    "domain": "any window",
    "known_defects": [
-    "the first version measured distance from the ORIGIN, so merely translating a loop changed it -- the same uncentred defect the July audit found in morphology_row/size. Caught by the certification battery, which is what it is for."
-   ]
+    "NOT AN INDEPENDENT AXIS, and the battery is what showed it: flattening an ellipse onto its long axis changes the distance travelled (the perimeter goes from about pi*(a+b) to 4a), so this mixes how big the loop is with how open it is. It may not be quoted as a size measure on its own."
+   ],
+   "cause_of_death": "",
+   "null": null,
+   "higher_is_better": true
+  },
+  "peak_excursion": {
+   "name": "peak_excursion",
+   "definition": "how far a node reaches from the centre of its own path, at its furthest. Centred, so sliding the loop elsewhere does not change it.",
+   "source": "cardio_mpm_train.enclosure_row (peak), centred here",
+   "tier": "provisional",
+   "responds_to": [
+    "size"
+   ],
+   "domain": "any window",
+   "known_defects": [
+    "the first version measured distance from the ORIGIN, so merely translating a loop changed it -- the same uncentred defect the July audit withdrew morphology_row/size for. Caught by the battery, which is what the battery is for."
+   ],
+   "cause_of_death": "",
+   "null": null,
+   "higher_is_better": true
   },
   "chirality_match": {
+   "name": "chirality_match",
    "definition": "the fraction of nodes circulating the same way round as the recording's.",
-   "tier": "provisional",
    "source": "cardio_mpm_train.enclosure_row (chir_match)",
-   "domain": "a closed path with non-zero area"
+   "tier": "provisional",
+   "responds_to": [
+    "chirality"
+   ],
+   "domain": "a closed path with non-zero area. A flattened loop has no handedness, so this is meaningless there and is expected to move when a loop is collapsed onto a line.",
+   "known_defects": [],
+   "cause_of_death": "",
+   "null": 0.5,
+   "higher_is_better": true
+  },
+  "orientation_error": {
+   "name": "orientation_error",
+   "definition": "the angle between the simulated and the recorded long axis of each loop, median over nodes, in radians. 0 is perfect; about 0.785 is what chance gives, because an axis has no head or tail.",
+   "source": "this file. The quantity lived inside the objective as the phase of a product of Fourier coefficients and was NEVER REPORTED, so this axis could move for a whole campaign with nobody able to see it.",
+   "tier": "provisional",
+   "responds_to": [
+    "orientation"
+   ],
+   "domain": "a path with a distinguishable long axis; degenerate for a circle",
+   "known_defects": [],
+   "cause_of_death": "",
+   "null": 0.7853981633974483,
+   "higher_is_better": false
+  },
+  "coordination": {
+   "name": "coordination",
+   "definition": "does the tissue contract TOGETHER the way the recording does? Per node, find the time shift that best lines its motion up with the recording's; then measure how tightly those shifts agree with each other. 1 means the pattern of who-moves-when matches, up to one global offset; 0 means it is unrelated.",
+   "source": "this file. Nothing measured it, which is why the objective scores a sheet whose points beat in random order at exactly 1.0000 -- whether the tissue contracts together was not a measurable property of any run in sixty batches.",
+   "tier": "provisional",
+   "responds_to": [
+    "coordination"
+   ],
+   "domain": "a periodic beat. Undefined for a node that does not move, so those must be masked out before this is read. Determined only up to HALF a beat -- see the defect below.",
+   "known_defects": [
+    "CANNOT TELL IN-PHASE FROM EXACTLY ANTIPHASE. The signal it uses is a distance from a centre, which peaks twice on a path traversed once per beat, so the alignment is only determined modulo half a beat. Two regions contracting in exact opposition therefore read as coordinated. Anything less than exact opposition is seen.",
+    "reads a whole number of frames, so on a 24-frame beat it cannot resolve better than about 15 degrees of phase"
+   ],
+   "cause_of_death": "",
+   "null": 0.0,
+   "higher_is_better": true
   },
   "morphology_row/size": {
-   "definition": "the mean over the 10x10 grid of each node's largest displacement, computed on the SIMULATION ALONE and uncentred.",
-   "tier": "withdrawn",
+   "name": "morphology_row/size",
+   "definition": "the mean over the 10x10 grid of each node's largest displacement, computed on the simulation alone and uncentred.",
    "source": "cardio_mpm_train.morphology_row (~24 June)",
+   "tier": "withdrawn",
+   "responds_to": [],
    "domain": "none",
-   "cause_of_death": "sim-only, so it cannot see the residual at all; and 36 of its 100 nodes are pinned to the recording, so it largely reported the anchor. The campaign read it as 'size is flat against every lever, therefore a structural limit' and chased that for four rounds. (Audit, 4 July.)"
+   "known_defects": [],
+   "cause_of_death": "simulation-only, so it cannot see the residual at all; and 36 of its 100 panels are pinned to the recording, so it largely reported the anchor. The campaign read it as 'size is flat against every lever, therefore a structural limit' and chased that for four rounds. (Audit, 4 July.)",
+   "null": null,
+   "higher_is_better": true
   },
   "morphology_row/open": {
+   "name": "morphology_row/open",
    "definition": "openness over the 10x10 grid, on the simulation alone.",
-   "tier": "withdrawn",
    "source": "cardio_mpm_train.morphology_row",
+   "tier": "withdrawn",
+   "responds_to": [],
    "domain": "none",
-   "cause_of_death": "same defect as morphology_row/size"
+   "known_defects": [],
+   "cause_of_death": "the same defect as morphology_row/size",
+   "null": null,
+   "higher_is_better": true
   },
   "morphology_row/chir": {
-   "definition": "the fraction of grid nodes turning anticlockwise, on the simulation alone.",
-   "tier": "withdrawn",
+   "name": "morphology_row/chir",
+   "definition": "the fraction of grid panels turning anticlockwise, on the simulation alone.",
    "source": "cardio_mpm_train.morphology_row",
+   "tier": "withdrawn",
+   "responds_to": [],
    "domain": "none",
-   "cause_of_death": "same defect as morphology_row/size"
+   "known_defects": [],
+   "cause_of_death": "the same defect as morphology_row/size",
+   "null": null,
+   "higher_is_better": true
   },
   "ampL": {
+   "name": "ampL",
    "definition": "the ratio of total motion energy, simulated against recorded, over the whole field.",
-   "tier": "withdrawn",
    "source": "cardio_mpm_train (23 June, Batch 1)",
+   "tier": "withdrawn",
+   "responds_to": [],
    "domain": "none",
-   "cause_of_death": "a GLOBAL ratio dominated by a few large-motion nodes. The best run on record read 0.002 -- 'the cleanest ever' -- while the median node was at 0.57 of the recorded amplitude. It was read as a shape score and is not one. (Audit, 4 July.)"
+   "known_defects": [],
+   "cause_of_death": "a GLOBAL ratio dominated by a few large-motion nodes. The best run on record read 0.002 -- 'the cleanest ever' -- while the median node was at 0.57 of the recorded amplitude. It was read as a shape score and is not one. (Audit, 4 July.)",
+   "null": null,
+   "higher_is_better": true
   }
+ },
+ "aliases": {
+  "opening_loopiness": "openness",
+  "magnitude_peak": "peak_excursion",
+  "direction_chirality": "chirality_match"
  },
  "grid": {
   "inherited": {
