@@ -214,10 +214,29 @@ class RunArchive:
         self.traj = os.path.join(root, "traj")
         os.makedirs(self.traj, exist_ok=True)
         self._seen = set()
+        # ONE BAD LINE MUST NOT KILL EVERY JOB. This was `json.loads(line)["run_id"]` inside the loop,
+        # and when eleven rows of a DIFFERENT schema were appended to this file -- the campaign's round
+        # records, by a reset that archived them to the wrong place -- every run in the next round died
+        # with KeyError: 'run_id'. It died AFTER several minutes of simulation, because the archive is
+        # opened at the write step, so eight of eleven jobs burned their GPU time before failing. A
+        # reader that crashes on a line it does not recognise takes the whole campaign with it.
+        skipped = 0
         if os.path.exists(self.facts):
             for line in open(self.facts):
-                if line.strip():
-                    self._seen.add(json.loads(line)["run_id"])
+                if not line.strip():
+                    continue
+                try:
+                    rid = json.loads(line).get("run_id")
+                except Exception:
+                    skipped += 1
+                    continue
+                if rid is None:
+                    skipped += 1
+                    continue
+                self._seen.add(rid)
+            if skipped:
+                print(f"[archive] skipped {skipped} line(s) in {self.facts} with no run_id -- "
+                      f"another writer is using this file")
 
     # --- D7: persist the WHOLE trajectory, not traj[-1] ---------------------------------------
     def save_trajectory(self, run_id_: str, frames, frame_metrics=None, meta=None) -> str:
