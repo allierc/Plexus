@@ -52,7 +52,7 @@ in `HYPOTHESES.md` as open questions; `BELIEFS.md` has zero entries. Defaults co
 | 0 — make it run, make it repeat | **done** | gate 18/18, canaries 6/6; seeded, provenanced, ledger stripped from the source |
 | 1 — freeze the recording, seal the test | **done (7 of 7)** | the ceiling, the tracker floor, the resolution ladder, the frozen+sealed split, `PREMISES.md` (2 of 8 fail, recorded not waived) |
 | 1b — the corpus we already own | **done** | 8 recipes migrated; **the operator merge is NOT behaviour-preserving** |
-| 2 — certify the ruler, find the floor | **4 of 6 (+ half)** | the null bank is measured: **the bar is +0.851 on the fit beat, +0.62 held-out** — copying the previous beat, no physics. **STOP point** |
+| 2 — certify the ruler, find the floor | **the instruments are DONE** | the null bank is measured: **the bar is +0.851 on the fit beat, +0.62 held-out** — copying the previous beat, no physics. **STOP point** |
 | 3 — certify the gradient | not started | the language-vs-switches decision |
 | 4 — what a fit may claim, build the gate | not started | **STOP point** |
 | 5–8 — first round, campaign, seal-break, method claim | not started | |
@@ -155,7 +155,11 @@ and it *proves* the shared quantities agree numerically rather than assuming it.
 The campaign reads loops on a **10×10 grid of the tissue**, comparing each node's path with the
 recording's. That stays — it is what a person judges.
 
-**Done, 4 of 6 (item 4 half done):**
+**THE INSTRUMENTS ARE CLOSED.** Seven measurements a claim may rest on: one name/definition/implementation each, each moves on its declared axis and holds on the other eight, each has a zero measured on six models that know nothing, each has the tissue's own beat-to-beat variation, and six of seven return the right number against a closed form. Every defect is recorded on the class that carries it, with the measurement that found it.
+
+Two things remain and **neither can reverse a decision already taken**: (a) the **fitted floor** — measuring, not deciding; it can only *lower* every `steps` figure, so it can retire an instrument and never promote one. Cost measured: 11.0 s/it alone, 72–85 s/it under a neighbouring session holding four 13 GB jobs on both cards → ~6 h. (b) the **decomposition** — the five `residual/` dimensions, which are five of the six quantities still lacking a zero (the sixth is `loopscore_sd`), and one of which scored its best in the whole null bank on the do-nothing model. That is the same admission procedure again, and it belongs with the loop that consumes it.
+
+**Done, 5 of 6:**
 
 1. **One name, one quantity** (`metrics.py --check`, 8/8). 18 entries, each with a definition, the
    code that computes it, and a tier. **0 certified · 14 provisional · 4 withdrawn** — the honest
