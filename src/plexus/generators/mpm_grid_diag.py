@@ -263,8 +263,11 @@ def _render3d(frames, grid_dir, sim, cbar, ranges):
         if has_grid3:
             gx, gy, gz, gvn = fr["grid3"]
             gsx, gsy, gdep = proj(np.stack([gx, gy, gz], 1)); go = np.argsort(gdep)[::-1]
-            sc = ax6.scatter(gsx[go], gsy[go], c=gvn[go], s=4, cmap="viridis", vmin=g3_lo, vmax=g3_hi)
-            style3(ax6, "grid momentum"); cbar(ax6, sc)
+            g3kw = ({"norm": mcolors.PowerNorm(g3_g, vmin=g3_lo, vmax=g3_hi)} if g3_g != 1.0
+                    else {"vmin": g3_lo, "vmax": g3_hi})
+            sc = ax6.scatter(gsx[go], gsy[go], c=gvn[go], s=4, cmap="viridis", **g3kw)
+            style3(ax6, "grid momentum" + (f"   [colour^{g3_g:.2f}]" if g3_g != 1.0 else ""))
+            cbar(ax6, sc)
         else:
             style3(ax6, "grid momentum"); cbar(ax6, None)
         plt.tight_layout()
@@ -387,7 +390,8 @@ def generate_grid_movie(sim, data_dir: str, device: str = "cpu", stride: int = 3
                 gkw = ({"norm": mcolors.PowerNorm(g_g, vmin=g_lo, vmax=g_hi)} if g_g != 1.0
                        else {"vmin": g_lo, "vmax": g_hi})
                 sc = ax6.scatter(gx, gy, c=gv, s=4, cmap="viridis", **gkw)
-                _style(ax6, "grid momentum"); _cbar(ax6, sc)
+                _style(ax6, "grid momentum" + (f"   [colour^{g_g:.2f}]" if g_g != 1.0 else ""))
+                _cbar(ax6, sc)
             else:
                 _style(ax6, "grid momentum"); _cbar(ax6, None)
             plt.tight_layout()
