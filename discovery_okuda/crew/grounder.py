@@ -57,5 +57,5 @@ def run(bundle):
                       f"that there is no resemblance -- both are complete answers. Write no other "
                       f"file.", {"as_json": False}),
     ])
-    ok, text = run_agent("grounder_v2", prompt, ledger=bundle.get("ledger"))
+    ok, text = run_agent("grounder", prompt, ledger=bundle.get("ledger"))
     return text if ok else ""

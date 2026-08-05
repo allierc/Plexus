@@ -118,7 +118,7 @@ EXPENSIVE_TOOLS = ("Bash", "WebFetch", "WebSearch", "Task", "Agent", "NotebookEd
 # under-estimate while the caps are still unproven. They are replaced by this round's own measured
 # spend as soon as the role has been called once.
 EXPECTED_MIN = {"interpreter": 3.2, "reader": 1.1, "watcher": 0.3, "meta_review": 3.3,
-                "eye": 0.4, "analyst": 3.0, "grounder_v2": 0.8,
+                "eye": 0.4, "analyst": 3.0,
                 "proposer": 3.0, "archivist": 1.0, "diagnostician": 0.5, "reflection": 0.7,
                 "grounder": 0.1,
                 # added after "OVER CEILING at operator_request (3.0+8 > 10.0)" fired on a role
@@ -216,12 +216,13 @@ AGENT_BUDGETS = {
     # the whole batch, writing analysis.md and knowledge.md. Bigger than any of them because it does
     # all five jobs and the comparison between runs that none of them could see.
     "analyst":       (10,   30,  ["Read", "Edit", "Write"]),
-    # `grounder` moved from Act 1 to review and now WRITES grounding.md, which the old entry's
-    # read-only tools would have made impossible.
-    "grounder_v2":   ( 5,   10,  ["Read", "Edit", "Write"]),
+    # `grounder` moved from Act 1 to review and now WRITES grounding.md, which its old read-only
+    # entry made impossible. The key is the TAG THAT GETS PRINTED, so it stays `grounder`: a line
+    # reading `[grounder_v2]` looks like debug output rather than a role speaking.
+    "grounder":      ( 5,   10,  ["Read", "Edit", "Write"]),
     "interpreter":   ( 6,   20,  ["Read", "Edit", "Write"]),   # appends the causal description
     "meta_review":   ( 8,   30,  ["Read", "Edit", "Write"]),   # rewrites the distilled section
-    "grounder":      ( 4,    8,  ["Read"]),
+
     # THE ARCHIVIST reads the whole history -- but the history is assembled by code and handed
     # over as a table, so this is a decision over a page of numbers, not a research task. Small
     # budget on purpose: an archivist that goes reading logs is re-deriving arithmetic it was
