@@ -437,22 +437,64 @@ class ResidualShapeDetail(ResidualDimension):
 # =============================================================================================
 # PER-LOOP QUANTITIES -- the July audit's remedy, and the two that were missing
 # =============================================================================================
-class Openness(Metric):
+class PairedProperty(Metric):
+    """A property of ONE set of loops, made into a test by reading it on BOTH and subtracting.
+
+    WHY THESE THREE WERE NOT MEASUREMENTS OF ANYTHING.
+    `openness`, `path_length` and `peak_excursion` all took two arguments and used only the first.
+    They described the model -- how fat its loops are, how far a node travels, how far it reaches --
+    and never compared it with the recording. A description has no right answer, so it has no score
+    for knowing nothing, so its precision divides into nothing: all three were the most precise
+    numbers in the registry and none of them could support a claim.
+
+    Subtracting the two readings turns each into a distance, which does have a right answer (zero)
+    and does have a value for a model that knows nothing. `reading()` keeps the raw property
+    available, because a run record still wants to say WHICH SIDE the model is on -- too fat or too
+    thin -- and the distance alone cannot.
+    """
+    higher_is_better = False        # it is now an error, so less of it is better
+
+    def property(self, p):                                    # pragma: no cover - interface
+        raise NotImplementedError
+
+    def compute(self, sim, real):
+        return abs(self.property(sim) - self.property(real))
+
+    def scale(self, real):
+        """The natural size of this quantity, for judging whether a change is a change.
+
+        A paired metric reads exactly 0 when nothing is wrong, so a change "relative to its own
+        value" is a division by zero and the battery was substituting 1.0 -- an arbitrary number
+        that happens to be a thousand times the real path lengths and a third of the openness.
+        """
+        return abs(self.property(real))
+
+    def reading(self, p, mask=None):
+        """The raw property on one side, signed and uncompared. Never a score."""
+        return float(self.property(_sel(p, mask)))
+
+
+class Openness(PairedProperty):
     name = "openness"
-    definition = ("enclosed area divided by the area of the box the loop fits in. A straight line "
-                  "is 0; a circle is about 0.79.")
-    source = "cardio_mpm_train._openness (audit remedy, 4-5 July)"
+    definition = ("how far the model's loops are from the recording's in fatness -- enclosed area "
+                  "over the area of the box the loop fits in, read on both and subtracted. 0 is "
+                  "perfect. A straight line reads 0 fatness, a circle about 0.79.")
+    source = "cardio_mpm_train._openness (audit remedy, 4-5 July), paired here"
     responds_to = {"openness"}
     domain = "a closed path with non-zero extent"
 
-    def compute(self, sim, real):
-        return np.median(np.abs(signed_area(sim)) / (bbox_area(sim) + 1e-12))
+    null = 0.3389                  # floors.py N0: what predicting nothing costs
+    null_source = MEASURED
+
+    def property(self, p):
+        return np.median(np.abs(signed_area(p)) / (bbox_area(p) + 1e-12))
 
 
-class PathLength(Metric):
+class PathLength(PairedProperty):
     name = "path_length"
-    definition = ("how far a node travels over the beat, summed frame to frame. A loop and a line "
-                  "of the same width differ here; the enclosed area alone does not say so.")
+    definition = ("how far the model's nodes travel over the beat against how far the recording's "
+                  "do, summed frame to frame and subtracted. 0 is perfect. A loop and a line of "
+                  "the same width differ here; the enclosed area alone does not say so.")
     source = "this file -- the one quantity the prototype named and never computed"
     responds_to = {"size", "openness"}
     domain = "any window"
@@ -462,14 +504,23 @@ class PathLength(Metric):
         "so this mixes how big the loop is with how open it is. It may not be quoted as a size "
         "measure on its own."]
 
-    def compute(self, sim, real):
-        return np.median(np.linalg.norm(np.diff(sim, axis=0), axis=-1).sum(0))
+    null = 0.0042                  # floors.py N0: what predicting nothing costs
+    null_source = MEASURED
+
+    def property(self, p):
+        # the closing segment counts. np.diff over G frames returns G-1 of them and drops the one
+        # from the last frame back to the first, so rolling a beat changed WHICH segment was missing
+        # and the total shifted by about 1% -- enough for the battery to report that path length
+        # responds to timing, which it must not. The beat is a closed path; sum all G segments.
+        d = np.diff(np.concatenate([p, p[:1]], axis=0), axis=0)
+        return np.median(np.linalg.norm(d, axis=-1).sum(0))
 
 
-class PeakExcursion(Metric):
+class PeakExcursion(PairedProperty):
     name = "peak_excursion"
-    definition = ("how far a node reaches from the centre of its own path, at its furthest. "
-                  "Centred, so sliding the loop elsewhere does not change it.")
+    definition = ("how far the model's nodes reach from the centre of their own path against how "
+                  "far the recording's do, at furthest, subtracted. 0 is perfect. Centred, so "
+                  "sliding a loop elsewhere does not change it.")
     source = "cardio_mpm_train.enclosure_row (peak), centred here"
     responds_to = {"size"}
     domain = "any window"
@@ -478,8 +529,11 @@ class PeakExcursion(Metric):
         "it -- the same uncentred defect the July audit withdrew morphology_row/size for. Caught by "
         "the battery, which is what the battery is for."]
 
-    def compute(self, sim, real):
-        return np.median(np.linalg.norm(_centred(sim), axis=-1).max(0))
+    null = 0.0011                  # floors.py N0: what predicting nothing costs
+    null_source = MEASURED
+
+    def property(self, p):
+        return np.median(np.linalg.norm(_centred(p), axis=-1).max(0))
 
 
 class ChiralityMatch(Metric):
@@ -749,7 +803,9 @@ def certify(verbose=True, tol=0.02):
             except Exception as e:
                 rec["metrics"][n] = {"error": f"{type(e).__name__}: {e}"}
                 continue
-            scale = abs(base) if abs(base) > 1e-9 else 1.0
+            own = getattr(m, "scale", None)
+            cand = max(abs(base), abs(own(real)) if callable(own) else 0.0)
+            scale = cand if cand > 1e-9 else 1.0        # 1.0 only when nothing better is declared
             rel = abs(got - base) / scale
             moved = rel > tol
             expect = bool(m.responds_to & should)

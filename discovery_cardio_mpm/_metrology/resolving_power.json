@@ -1,0 +1,198 @@
+[
+ {
+  "metric": "loopscore_sd",
+  "role": "evidence",
+  "null": null,
+  "ceiling": 0.4508473724126816,
+  "range": null,
+  "unit": 0.1421182907089086,
+  "unit_from": "beat_to_beat",
+  "floors_measured": [
+   "beat_to_beat"
+  ],
+  "levels": null,
+  "verdict": "no null -- its range is undeclared, so its precision cannot be interpreted"
+ },
+ {
+  "metric": "residual/size",
+  "role": "evidence",
+  "null": null,
+  "ceiling": 0.005639106035232544,
+  "range": null,
+  "unit": 0.022535799113271426,
+  "unit_from": "beat_to_beat",
+  "floors_measured": [
+   "beat_to_beat"
+  ],
+  "levels": null,
+  "verdict": "no null -- its range is undeclared, so its precision cannot be interpreted"
+ },
+ {
+  "metric": "residual/orientation",
+  "role": "evidence",
+  "null": null,
+  "ceiling": 0.009975329041481018,
+  "range": null,
+  "unit": 0.00515040449617238,
+  "unit_from": "beat_to_beat",
+  "floors_measured": [
+   "beat_to_beat"
+  ],
+  "levels": null,
+  "verdict": "no null -- its range is undeclared, so its precision cannot be interpreted"
+ },
+ {
+  "metric": "residual/openness_aspect",
+  "role": "evidence",
+  "null": null,
+  "ceiling": 0.10302415490150452,
+  "range": null,
+  "unit": 0.059843855301504455,
+  "unit_from": "beat_to_beat",
+  "floors_measured": [
+   "beat_to_beat"
+  ],
+  "levels": null,
+  "verdict": "no null -- its range is undeclared, so its precision cannot be interpreted"
+ },
+ {
+  "metric": "residual/chirality",
+  "role": "evidence",
+  "null": null,
+  "ceiling": 0.06391546130180359,
+  "range": null,
+  "unit": 0.047518891312368604,
+  "unit_from": "beat_to_beat",
+  "floors_measured": [
+   "beat_to_beat"
+  ],
+  "levels": null,
+  "verdict": "no null -- its range is undeclared, so its precision cannot be interpreted"
+ },
+ {
+  "metric": "residual/shape_detail",
+  "role": "evidence",
+  "null": null,
+  "ceiling": 0.036683350801467896,
+  "range": null,
+  "unit": 0.010019427224443959,
+  "unit_from": "beat_to_beat",
+  "floors_measured": [
+   "beat_to_beat"
+  ],
+  "levels": null,
+  "verdict": "no null -- its range is undeclared, so its precision cannot be interpreted"
+ },
+ {
+  "metric": "coordination",
+  "role": "evidence",
+  "null": 0.0778,
+  "ceiling": 0.9967789417711531,
+  "range": 0.9189789417711531,
+  "unit": 0.002541249627989564,
+  "unit_from": "beat_to_beat",
+  "floors_measured": [
+   "beat_to_beat"
+  ],
+  "levels": 120.54160699122615,
+  "verdict": "enough to rank on"
+ },
+ {
+  "metric": "path_length",
+  "role": "evidence",
+  "null": 0.0042,
+  "ceiling": 7.551190993474637e-05,
+  "range": 0.004124488090065253,
+  "unit": 3.476799219286048e-05,
+  "unit_from": "beat_to_beat",
+  "floors_measured": [
+   "beat_to_beat"
+  ],
+  "levels": 39.54296111575296,
+  "verdict": "enough to rank on"
+ },
+ {
+  "metric": "openness",
+  "role": "evidence",
+  "null": 0.3389,
+  "ceiling": 0.006215102438705905,
+  "range": 0.33268489756129405,
+  "unit": 0.0030274474559240975,
+  "unit_from": "beat_to_beat",
+  "floors_measured": [
+   "beat_to_beat"
+  ],
+  "levels": 36.629856494046116,
+  "verdict": "enough to rank on"
+ },
+ {
+  "metric": "peak_excursion",
+  "role": "evidence",
+  "null": 0.0011,
+  "ceiling": 2.5623354792742286e-05,
+  "range": 0.0010743766452072578,
+  "unit": 1.1852479340251812e-05,
+  "unit_from": "beat_to_beat",
+  "floors_measured": [
+   "beat_to_beat"
+  ],
+  "levels": 30.215243420522235,
+  "verdict": "enough to rank on"
+ },
+ {
+  "metric": "interior_r2",
+  "role": "evidence",
+  "null": -0.8308,
+  "ceiling": 0.8986727893352509,
+  "range": 1.7294727893352508,
+  "unit": 0.04776407288376341,
+  "unit_from": "beat_to_beat",
+  "floors_measured": [
+   "beat_to_beat"
+  ],
+  "levels": 12.06955133791334,
+  "verdict": "enough to rank on"
+ },
+ {
+  "metric": "chirality_match",
+  "role": "evidence",
+  "null": 0.5,
+  "ceiling": 0.945701787751997,
+  "range": 0.445701787751997,
+  "unit": 0.013962481467608307,
+  "unit_from": "beat_to_beat",
+  "floors_measured": [
+   "beat_to_beat"
+  ],
+  "levels": 10.640462651904791,
+  "verdict": "enough to rank on"
+ },
+ {
+  "metric": "orientation_error",
+  "role": "evidence",
+  "null": 0.7853981633974483,
+  "ceiling": 0.0581960680425906,
+  "range": 0.7272020953548577,
+  "unit": 0.02317529376865356,
+  "unit_from": "beat_to_beat",
+  "floors_measured": [
+   "beat_to_beat"
+  ],
+  "levels": 10.459444478735607,
+  "verdict": "enough to rank on"
+ },
+ {
+  "metric": "loopscore",
+  "role": "objective",
+  "null": 0.07,
+  "ceiling": 0.7103581428527832,
+  "range": 0.6403581428527831,
+  "unit": 0.1294297825300854,
+  "unit_from": "beat_to_beat",
+  "floors_measured": [
+   "beat_to_beat"
+  ],
+  "levels": 1.6491777248767674,
+  "verdict": "objective, never an instrument"
+ }
+]
