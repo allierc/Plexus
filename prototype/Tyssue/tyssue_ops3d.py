@@ -72,7 +72,7 @@ def face_geometry_3d(pos, es, et, ef, nF, eocc=None):
 
 
 def _shape_energy_core(pos, es, et, ef, nF, A0, P0, V0f, alive, R0, K_A, K_P, K_V, K_R, Lam, Gam,
-                       eocc, vocc, K_bend=0.0, twin_face=None, K_lumen=0.0):
+                       eocc, vocc, K_bend=0.0, twin_face=None, K_lumen=0.0, myo_e=None):
     """Explicit-arg AVM shape energy on a FIXED-size RESERVOIR (torch.compile-friendly: shapes never
     change, so it compiles once even under division). Dead slots are masked out: `alive` (faces),
     `eocc` (half-edges), `vocc` (vertices, for the radial term). R0 is a tensor (changes each frame);
@@ -80,7 +80,12 @@ def _shape_energy_core(pos, es, et, ef, nF, A0, P0, V0f, alive, R0, K_A, K_P, K_
     area, perim, cen, vf = face_geometry_3d(pos, es, et, ef, nF, eocc)
     E = (K_A * (area - A0) ** 2 + K_P * (perim - P0) ** 2 + 0.5 * Gam * perim ** 2) * alive
     line = (pos[et] - pos[es]).norm(dim=-1) * eocc          # line tension over live half-edges only
-    E = E.sum() + Lam * line.sum()
+    # PER-JUNCTION MYOSIN, when a junction operator has supplied it. `Lam` alone is one number for the
+    # whole tissue, so no junction can be weaker than its neighbours and myosin cannot be recruited where
+    # tension is high. `myo_e` is a per-half-edge multiplier on exactly that term -- which is where
+    # actomyosin enters an AVM -- and defaults to None, in which case this reduces to `Lam * line.sum()`
+    # exactly and every existing run is bit-identical.
+    E = E.sum() + (Lam * line.sum() if myo_e is None else Lam * (myo_e * line).sum())
     E = E + K_V * ((vf - V0f) ** 2 * alive).sum()
     E = E + K_R * (((pos.norm(dim=1) - R0) ** 2) * vocc).sum()   # radial over live vertices only
     if K_bend > 0 and twin_face is not None:
@@ -288,14 +293,27 @@ class ShapeEnergy3D(Lateral):
             scale = torch.where((badv > 0)[:, None], scale * 0.5, scale)
         return scale.detach()
 
-    def _grad(self, p, es, et, ef, nF, A0, P0, V0f, alive, R0t, eocc, vocc, twin_face=None):
+    def _grad(self, p, es, et, ef, nF, A0, P0, V0f, alive, R0t, eocc, vocc, twin_face=None,
+              myo_e=None):
         with torch.enable_grad():
             p = p.detach().requires_grad_(True)
             E = self._efn(p, es, et, ef, nF, A0, P0, V0f, alive, R0t, self.K_A, self.K_P,
                           self.K_V, self.K_R, self.Lambda, self.Gamma, eocc, vocc, self.K_bend,
-                          twin_face, self.K_lumen)
+                          twin_face, self.K_lumen, myo_e)
             g = torch.autograd.grad(E, p)[0]
         return torch.nan_to_num(g)
+
+    def _grad_myo(self, m, *a, **kw):
+        """`_grad` with the mesh's per-junction myosin, if a junction operator has supplied one.
+
+        Read through the MESH rather than passed down the call chain, because the operator that writes it
+        (`junction_ops.junction_myosin`) runs at a different point in the schedule and the two never see
+        each other. Absent -> None -> the energy reduces to the scalar-Lambda form exactly.
+        """
+        myo = m.get("myo") if isinstance(m, dict) else None
+        if myo is not None and myo.shape[0] != a[1].shape[0]:
+            myo = None                      # half-edge count changed since it was written; skip a frame
+        return self._grad(*a, myo_e=myo, **kw)
 
     @staticmethod
     def _twin_faces(es, et, ef, Nv):
@@ -350,7 +368,7 @@ class ShapeEnergy3D(Lateral):
                 _, _, _, vf0 = face_geometry_3d(x, es, et, ef, nF, eocc)
                 floor = self.antiinv * (vf0[vf0 > 0].median() if (vf0 > 0).any() else vf0.new_tensor(1e-9)).clamp(min=1e-9)
             for _ in range(max(1, self.relax_iters)):
-                step = -(self.eta * self.mu) * self._grad(x, es, et, ef, nF, m["A0"], m["P0"],
+                step = -(self.eta * self.mu) * self._grad_myo(m, x, es, et, ef, nF, m["A0"], m["P0"],
                                                           m["V0f"], m["alive"], R0t, eocc, vocc, twin)
                 step = step * torch.clamp(cap / (step.norm(dim=1, keepdim=True) + 1e-12), max=1.0)
                 if floor is not None:                            # block any substep that drives a face toward inversion
@@ -690,6 +708,10 @@ class TopoSnapshot3D(Structural):
             # is ~50-70% of its neighbours while the sliver test looks below 15%. It detects
             # DEGENERATE cells, not new ones. Age is the actual event, not a proxy for it.
             age=cp("age"), ndiv=cp("ndiv"),
+            # PER-JUNCTION MYOSIN, when a junction operator has written one. Recorded for the same
+            # reason `age`/`ndiv` are: a renderer cannot colour by a quantity that only existed inside
+            # one frame's forward pass. `cp` is None-safe, so a run without the operator records None.
+            myo=cp("myo"),
             # THE RESERVOIR, PER FRAME. divide_3d sets these on the mesh and nothing carried them
             # into the history, so run_one read them and always found nothing -- a run that
             # plateaued at 98.5% of its array reported buf_full False. The flag existed, the

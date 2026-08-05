@@ -105,6 +105,9 @@ def _mesh_of(hist_t, pos_t, centroid):
     # divisions a lineage has had; run_one paints a cell green when `age <= 4 and ndiv > 0`. Both
     # have to travel with the mesh or the ECM movie shows a tissue that never divided -- which is
     # exactly what the reference strip's first two rows are FOR.
+    myo = hist_t.get("myo")
+    if myo is not None:
+        d["myo"] = np.asarray(myo, np.float32)
     for k in ("age", "ndiv"):
         v = hist_t.get(k)
         d[k] = (np.asarray(v, np.float32) if v is not None
@@ -115,7 +118,8 @@ def _mesh_of(hist_t, pos_t, centroid):
 def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap=None,
           plate_stiff=0.6, load_npz=None, load_gain=1.0, gate_npz=None,
           gate_p_half="auto", gate_hill=4.0, gate_floor=0.15,
-          gate_smooth_frames=25, gate_smooth_phi=360.0):
+          gate_smooth_frames=25, gate_smooth_phi=360.0,
+          myosin=None, myo_tau=20.0, myo_beta=1.0, myo_new=1.0):
     """Run cellfix_B_new verbatim and write the cache.
 
     `buffer_x` MULTIPLIES THE VERTEX AND CELL RESERVOIRS AND NOTHING ELSE. At the reference buffers
@@ -166,6 +170,18 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap
         spec["schedule"].insert(i, "plate_confine_3d")
         print(f"[tissue] rigid plates at z = +/-{plate_gap:.3g} tissue units "
               f"(stiff {plate_stiff})", flush=True)
+    if myosin is not None:
+        # BEFORE `shape_energy_3d`, because the energy reads `m["myo"]` in the same frame it is written --
+        # after it, the relaxation would always use the previous frame's myosin, which for a quantity with
+        # a 20-frame timescale is a lag nobody would notice and everybody would inherit.
+        import junction_ops                                           # noqa: F401  register it
+        spec["operators"].append({"op": "junction_myosin", "at": "vertex",
+                                  "activity": float(myosin), "tau": float(myo_tau),
+                                  "beta": float(myo_beta), "myo_new": float(myo_new), "dt": 1.0})
+        i = spec["schedule"].index("shape_energy_3d")
+        spec["schedule"].insert(i, "junction_myosin")
+        print(f"[tissue] per-junction myosin: activity={myosin}, tau={myo_tau}, beta={myo_beta}, "
+              f"myo_new={myo_new}", flush=True)
     if gate_npz is not None:
         # AFTER `morphogen_growth_3d`, whose per-cell increment it corrects, and BEFORE the force step
         # and the topology ops -- so `shape_energy_3d` relaxes toward the GATED targets and `divide_3d`
@@ -264,7 +280,8 @@ def load_or_build(frames=401, device="cuda:0", name="cellfix_B_new", rebuild=Fal
                   buffer_x=1, plate_gap=None, plate_stiff=0.6, load_npz=None,
                   load_gain=1.0, tag_extra="", gate_npz=None, gate_p_half="auto",
                   gate_hill=4.0, gate_floor=0.15, gate_smooth_frames=25,
-                  gate_smooth_phi=360.0):
+                  gate_smooth_phi=360.0, myosin=None, myo_tau=20.0, myo_beta=1.0,
+                  myo_new=1.0):
     """The cache path, built if missing. Frames are part of the filename: a 401-frame tissue and a
     120-frame one are different tissues, and silently reusing one for the other would be a run
     whose movie stops before the thing it was testing happened."""
@@ -284,12 +301,13 @@ def load_or_build(frames=401, device="cuda:0", name="cellfix_B_new", rebuild=Fal
            "gate": None, "load": None,
            "gate_p_half": gate_p_half, "gate_hill": gate_hill, "gate_floor": gate_floor,
            "gate_smooth_frames": gate_smooth_frames, "gate_smooth_phi": gate_smooth_phi,
-           "load_gain": load_gain}
+           "load_gain": load_gain, "myosin": myosin, "myo_tau": myo_tau, "myo_beta": myo_beta,
+           "myo_new": myo_new}
     for key, path in (("gate", gate_npz), ("load", load_npz)):
         if path is not None:
             sz = os.path.getsize(path) if os.path.exists(path) else 0
             cfg[key] = f"{os.path.abspath(path)}:{sz}"
-    if any(v is not None for v in (plate_gap, gate_npz, load_npz)):
+    if any(v is not None for v in (plate_gap, gate_npz, load_npz, myosin)):
         tag += "_" + hashlib.sha1(repr(sorted(cfg.items())).encode()).hexdigest()[:10]
     tag += tag_extra
     out = os.path.join(CACHE, f"{tag}.npz")
@@ -298,7 +316,8 @@ def load_or_build(frames=401, device="cuda:0", name="cellfix_B_new", rebuild=Fal
               plate_stiff=plate_stiff, load_npz=load_npz, load_gain=load_gain,
               gate_npz=gate_npz, gate_p_half=gate_p_half, gate_hill=gate_hill,
               gate_floor=gate_floor, gate_smooth_frames=gate_smooth_frames,
-              gate_smooth_phi=gate_smooth_phi)
+              gate_smooth_phi=gate_smooth_phi, myosin=myosin, myo_tau=myo_tau,
+              myo_beta=myo_beta, myo_new=myo_new)
     else:
         z = np.load(out)
         print(f"[tissue] reusing {os.path.relpath(out, ROOT)}  "

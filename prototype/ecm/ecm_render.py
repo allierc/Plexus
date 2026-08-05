@@ -78,7 +78,12 @@ def load_tissue(path, scale):
             "E_face": np.asarray(z[f"m{j}_E_face"]), "nF": int(z[f"m{j}_nF"]),
             "Nv": int(z[f"m{j}_Nv"]),
             "age": np.asarray(z[f"m{j}_age"], np.float64),
-            "ndiv": np.asarray(z[f"m{j}_ndiv"], np.float64)}))
+            "ndiv": np.asarray(z[f"m{j}_ndiv"], np.float64),
+            # PER-JUNCTION MYOSIN, if the tissue was grown with `junction_myosin` AND the cache is new
+            # enough to have recorded it. Absent -> the zoom panel draws junctions grey and says nothing,
+            # rather than colouring them by a quantity it does not have.
+            **({"myo": np.asarray(z[f"m{j}_myo"], np.float64)}
+               if f"m{j}_myo" in z.files else {})}))
     gap = float(z["plate_gap"]) if "plate_gap" in z.files else -1.0
     return {"meshes": meshes, "Lbox": float(z["Lbox"]), "scale": float(scale),
             "n_cells": np.asarray(z["n_cells"]), "r_apical": np.asarray(z["r_apical"]),
@@ -294,3 +299,90 @@ def draw_cross(ax, mt, pos, q, band, cmap, L2, axis_dir, slab, dot_scale=1.0, pl
             ax.add_patch(Rectangle((-L2, lo if lo > 0 else -L2), 2 * L2, L2 - b,
                                    facecolor=PLATE_FACE, edgecolor=PLATE_EDGE, lw=0.8, zorder=2))
     ax.set_xlim(-L2, L2); ax.set_ylim(-L2, L2); ax.set_aspect("equal"); ax.axis("off")
+
+
+# --------------------------------------------------------------------------- the two new levels
+# COLOURS THAT CANNOT BE CONFUSED WITH THE THREE ALREADY IN THE FRAME. The stroma owns the warm inferno
+# ramp, the elastic block owns slate-to-white, and the cells own white-with-a-green-wash. So the two new
+# entities take the two remaining directions: myosin goes COOL (cyan -> deep blue) and the basement
+# membrane goes GREEN -> YELLOW. In the zoom panel the cells are drawn as outlines only, so nothing
+# green there is a dividing cell.
+MYOSIN_COLORS = [
+    [0.55, 0.95, 0.98], [0.42, 0.83, 0.96], [0.31, 0.70, 0.93], [0.23, 0.57, 0.88],
+    [0.18, 0.44, 0.80], [0.14, 0.32, 0.70], [0.10, 0.22, 0.58], [0.06, 0.13, 0.45],
+]
+MEMBRANE_COLORS = [
+    [0.20, 0.72, 0.35], [0.34, 0.78, 0.31], [0.50, 0.84, 0.28], [0.66, 0.88, 0.25],
+    [0.80, 0.90, 0.22], [0.90, 0.86, 0.20], [0.97, 0.78, 0.18], [1.00, 0.66, 0.15],
+]
+
+
+def _cmap(colors):
+    from matplotlib.colors import ListedColormap
+    return ListedColormap(colors)
+
+
+def draw_zoom(ax, mt, pos, mem_q=None, mem_s=None, cam=None, frac=0.34, myo_hi=None,
+              mem_hi=None, name=""):
+    """A ZOOM on one patch of the surface: junctions coloured by MYOSIN, membrane by BOND STRAIN.
+
+    WHY A SEPARATE PANEL AND NOT A COLOUR ON THE EXISTING ONES. Both new entities live in a shell a few
+    percent of the tissue radius thick. At the whole-tissue framing that is two or three pixels: the
+    junction network is smaller than the line width used to draw a cell, and the membrane is a bright rim
+    one dot wide. Neither can be read at the scale the other panels need, so they get their own frame --
+    which is also the only place a colour scale can honestly be spent on them.
+
+    THE PATCH IS FIXED IN SPACE, not re-centred per frame. It looks at the +x side of the tissue and stays
+    there, so material entering or leaving the window is a real event rather than the camera moving. The
+    window WIDTH is a fraction of the current tissue radius, so the patch shows about the same number of
+    cells throughout a run in which the radius triples -- otherwise the last frames would be a single cell.
+    """
+    import numpy as np
+    from matplotlib.collections import LineCollection
+    cam = cam or CAM_SIDE
+    d, u, v = screen_basis(cam["elev"], cam["azim"])
+    ax.clear(); ax.set_facecolor("black")
+
+    R = float(np.percentile(np.linalg.norm(pos, axis=1), 98))
+    half = frac * R
+    # the patch centre: on the surface, on the +x side, projected into the screen plane
+    ctr = np.array([R, 0.0, 0.0])
+
+    es, et, ef = np.asarray(mt["E_srce"]), np.asarray(mt["E_trgt"]), np.asarray(mt["E_face"])
+    nF = int(mt["nF"])
+    live = ef < nF
+    a, b = pos[es[live]], pos[et[live]]
+    mid = 0.5 * (a + b)
+    # keep junctions in the window AND on the near side, so the far hemisphere does not overprint it
+    near = ((mid - ctr) @ d) > -half
+    inwin = (np.abs((mid - ctr) @ u) < half) & (np.abs((mid - ctr) @ v) < half) & near
+    myo = np.asarray(mt["myo"], float)[live] if "myo" in mt else None
+    if inwin.any():
+        segs = np.stack([np.stack([(a[inwin] - ctr) @ u, (a[inwin] - ctr) @ v], 1),
+                         np.stack([(b[inwin] - ctr) @ u, (b[inwin] - ctr) @ v], 1)], axis=1)
+        if myo is None:
+            lc = LineCollection(segs, colors="#666", linewidths=0.8, zorder=3)
+        else:
+            hi = myo_hi or max(float(np.percentile(myo, 98)), 1e-9)
+            lc = LineCollection(segs, cmap=_cmap(MYOSIN_COLORS), linewidths=1.6, zorder=3)
+            lc.set_array(np.clip(myo[inwin] / hi, 0, 1))
+            lc.set_clim(0, 1)
+        ax.add_collection(lc)
+
+    if mem_q is not None:
+        mq = mem_q
+        rel = mq - ctr
+        keep = (np.abs(rel @ u) < half) & (np.abs(rel @ v) < half) & ((rel @ d) > -half)
+        if keep.any():
+            xy = np.stack([rel[keep] @ u, rel[keep] @ v], axis=1)
+            if mem_s is None:
+                ax.scatter(xy[:, 0], xy[:, 1], s=2.0, c="#3cb85a", marker=".", linewidths=0,
+                           zorder=2)
+            else:
+                s = np.asarray(mem_s, float)[keep]
+                hi = mem_hi or max(float(np.percentile(np.asarray(mem_s, float), 99)), 1e-9)
+                ax.scatter(xy[:, 0], xy[:, 1], s=3.0, c=np.clip(s / hi, 0, 1),
+                           cmap=_cmap(MEMBRANE_COLORS), vmin=0, vmax=1, marker=".",
+                           linewidths=0, zorder=2)
+    ax.set_xlim(-half, half); ax.set_ylim(-half, half)
+    ax.set_aspect("equal"); ax.axis("off")

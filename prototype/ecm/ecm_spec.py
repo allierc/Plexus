@@ -60,14 +60,20 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                n_fibres=900, fibre_len=0.16, align=0.0, align_dir=(1.0, 0.0, 0.0),
                # a DENSER cone about  -- see ecm_ops.ECMSeed
                dense_axis=2, dense_cone_deg=0.0, dense_boost=1.0,
-               # RIGIDITY OF THE CELL-MATRIX CONTACT, raised from 900. The penalty is k * depth and
-               # `mpm_scatter` clamps the resulting acceleration at `a_max`, so k and a_max together
-               # decide how deep a particle can get before the ceiling stops helping: at k = 900 and
-               # a_max = 200 that is depth 0.22, which is most of the tissue's radius. Matrix particles
-               # were visibly ending up inside the lumen. `cell_exclude_3d` is the hard backstop; this
-               # is the soft part of the same fix, and it is the one that keeps the stress physical.
+               # RIGIDITY OF THE CELL-MATRIX CONTACT, raised from 900. Matrix particles were visibly
+               # ending up inside the lumen, and `cell_exclude_3d` is the hard backstop; this is the soft
+               # part of the same fix, the one that keeps the stress physical.
                #
-               # AND IT CAN BE OVERDONE, WHICH WAS MEASURED. At k = 4000 with a_max = 800 the matrix
+               # A CORRECTION TO AN EARLIER COMMENT HERE, which said `mpm_scatter` clamps this penalty at
+               # `a_max` so that k and a_max together set a maximum useful depth. THAT WAS WRONG. Read
+               # `mpm_scatter.forward`: `a_max` clamps only the PARENT set's delta -- gravity -- while the
+               # per-particle delta this operator emits, `H.delta(p.name)`, is passed through
+               # `nan_to_num` and never clamped. So the penalty was never truncated, and the ceiling that
+               # explanation invoked does not exist. The MEASUREMENTS below stand; the mechanism offered
+               # for them did not, and a plausible mechanism fitted to a real number afterwards is the
+               # more dangerous of the two errors.
+               #
+               # WHAT IS MEASURED. At k = 4000 (with a_max = 800, which turns out to be irrelevant) the matrix
                # stopped being pushed and started being FLICKED: a huge acceleration on the contact
                # layer alone accelerates that layer out of the contact zone before it can transmit
                # anything to the material behind it, so the median particle displacement collapsed from
@@ -86,7 +92,14 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                # matrix, scattering into the same grid (`prototype/eye`'s two-body pattern). None =
                # no block. A rigid projection cannot be seen to do anything; a material can.
                block_gap=None, block_youngs=2000.0, block_particles=60000,
-               block_stress_scale=0.004, block_measure="vol"):
+               block_stress_scale=0.004, block_measure="vol",
+               # THE BASEMENT MEMBRANE: a third MPM set -- one stiff CROSSLINKED shell just outside the
+               # epithelium, between it and the stroma. `membrane` is the path to the tissue cache whose
+               # frame-0 surface it is laid on; None = absent. See membrane_ops for what it is and what
+               # this discretisation cannot claim about it.
+               membrane=None, membrane_particles=30000, membrane_youngs=400.0,
+               membrane_bond_k=4.0e4, membrane_cutoff=0.020, membrane_break=0.35,
+               membrane_offset=0.004, membrane_thickness=0.010):
     """The whole experiment as a plain dict, ready for yaml.safe_dump + schema.load."""
     types = {f"s{i}": {"fraction": 1.0 / len(STRESS_COLORS), "youngs": youngs}
              for i in range(len(STRESS_COLORS))}
@@ -144,6 +157,39 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
             "camera_elev": 1.05, "camera_turns": 0.0, "camera_zoom": 0.0,
         },
     }
+    if membrane is not None:
+        import membrane_ops                                           # noqa: F401  register it
+        spec["sets"]["basement_membrane_particle"] = {
+            "parent": "cell", "per_parent": int(membrane_particles), "radius": 0.48,
+            "density": float(density),
+            "types": {f"m{i}": {"fraction": 1.0 / len(STRESS_COLORS),
+                                "youngs": float(membrane_youngs)}
+                      for i in range(len(STRESS_COLORS))}}
+        spec["operators"] += [
+            {"op": "basement_membrane_seed", "at": "basement_membrane_particle",
+             "centre": [0.5, 0.5, 0.5], "surface": str(membrane), "scale": 1.0,
+             "offset": float(membrane_offset), "thickness": float(membrane_thickness),
+             "seed": int(seed)},
+            {"op": "basement_membrane_bond", "at": "basement_membrane_particle",
+             "k": float(membrane_bond_k), "cutoff": float(membrane_cutoff),
+             "max_neighbours": 6},
+            {"op": "basement_membrane_bond_break", "at": "basement_membrane_particle",
+             "break_strain": float(membrane_break), "components_every": 40},
+            # the MLS-MPM cycle for the third body. APPENDED, so its scatter accumulates AFTER the
+            # stroma's has reset the grid -- the ordering `mpm_scatter[accumulate]` depends on.
+            {"op": "mpm_strain", "at": "basement_membrane_particle"},
+            {"op": "mpm_scatter", "at": "basement_membrane_particle", "to": "mpm_grid",
+             "implementation": "accumulate", "drag": float(drag), "a_max": float(a_max)},
+            {"op": "mpm_gather", "at": "basement_membrane_particle", "from": "mpm_grid",
+             "wall_damp": float(wall_damp), "wall_contact": 0.04, "vmax": 1.0e9},
+        ]
+        i = spec["schedule"].index("ecm_seed") + 1
+        spec["schedule"].insert(i, "basement_membrane_seed")
+        # the bond force is a DYNAMICS operator (EMIT mpm_acceleration): it must run before the substep
+        # block so the engine has its delta to integrate, and the break check after it.
+        i = spec["schedule"].index("ecm_stress")
+        spec["schedule"].insert(i, "basement_membrane_bond")
+        spec["schedule"].insert(i + 1, "basement_membrane_bond_break")
     if block_gap is not None:
         # ONE SET, ONE MATERIAL. The block's stiffness is a property of its TYPE, which is why it has
         # to be a separate set rather than extra types on the matrix: `ecm_stress` rewrites
