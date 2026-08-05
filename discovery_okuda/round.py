@@ -46,7 +46,15 @@ for _p in (HERE, os.path.join(HERE, "agents")):
 
 import crew
 import critic as C
+import term as T_
 import translate as T
+
+# WRAPS, COLOURS AND DE-INDENTS EVERY LINE. Installed at import because a role's line arriving in the
+# same plain grey as a checkpoint path is what makes a round unreadable -- and because every print
+# carried its own two-to-six leading spaces, so the output drifted right depending on who was
+# speaking. Roles get a colour; the round, the cluster and the crew deliberately do not: the
+# distinction the colour carries is "someone is speaking" against "something is happening".
+T_.install_line_colour()
 
 LOG_ROOT = os.environ.get("OKUDA_LOG", os.path.join(os.path.dirname(HERE), "log", "okuda"))
 CAMPAIGN = os.path.join(HERE, "campaign")
@@ -332,9 +340,28 @@ def build_all(ctx):
             if s.get("comp_hash"):
                 seen.add(s["comp_hash"])          # in-batch duplicates too, not only cross-round
     if len(out) < len(slots):
-        print(f"[round] {len(slots) - len(out)} slot(s) dropped; running the short batch of "
-              f"{len(out)} -- a short round is a real round, and it cost one call")
+        print(T_.warn(f"[round] {len(slots) - len(out)} of {len(slots)} slot(s) dropped -- running "
+                      f"the short batch of {len(out)}. A short round is a real round."))
+    _report_ranges(out)
+    print(T_.ok(f"[round] {len(out)} slot(s) built: "
+                + ", ".join(f"{s['name'].split('_')[-1]}" for s in out)))
     return out
+
+
+def _report_ranges(specs):
+    """The out-of-range values in this batch, once per PARENT.
+
+    The finding itself is in round.md: all six pool parents carry values outside their declared box --
+    `l_th_frac` at 0.28-0.35 against a 0.12 ceiling, `Lambda` at 3 against 0.3 -- so the search space
+    contains no working point. That is worth knowing once a round, not once a slot.
+    """
+    by_parent = {}
+    for sp in specs:
+        for note in (sp.get("out_of_range") or []):
+            by_parent.setdefault(sp.get("parent") or "?", set()).add(note)
+    for parent, notes in by_parent.items():
+        print(T_.quiet(f"[round] {parent}: {len(notes)} value(s) outside the declared space -- "
+                       + "; ".join(sorted(notes))))
 
 
 def _resolve_edit(g, edit):
@@ -391,7 +418,7 @@ def _build_one(slot, rid, index, seen):
     try:
         g = _graph(par)
     except Exception as e:
-        print(f"[round] slot {index}: parent {par!r} cannot be rebuilt: {e}")
+        print(T_.no(f"[round] slot {index}: parent {par!r} cannot be rebuilt: {e}"))
         return None
     if index == CONTROL_SLOT or not edit:
         name, edit = f"{rid}_{index:02d}_ctrl", None
@@ -401,7 +428,7 @@ def _build_one(slot, rid, index, seen):
         try:
             g, _ = g.apply(tuple(edit))
         except Exception as e:
-            print(f"[round] slot {index}: edit {edit} not applicable: {e}")
+            print(T_.no(f"[round] slot {index}: edit {edit} not applicable: {e}"))
             return None
         # AN EDIT THAT CHANGED NOTHING IS NOT AN EXPERIMENT. One check for every silent no-op --
         # a set_param on a node that does not exist, a remove_op of an absent operator, a connect
@@ -409,8 +436,8 @@ def _build_one(slot, rid, index, seen):
         # runs as an exact copy of the parent, is recorded as evidence, and scores as a confirmation
         # of whatever it happened to predict.
         if _fingerprint(g) == before:
-            print(f"[round] slot {index} refused: {edit} changed nothing -- the target does not "
-                  f"exist in {par}, so the run would have been a copy of its parent")
+            print(T_.no(f"[round] slot {index} refused: {edit} changed nothing -- the target does "
+                        f"not exist in {par}, so the run would have been a copy of its parent"))
             return None
         name = f"{rid}_{index:02d}"
 
@@ -428,21 +455,22 @@ def _build_one(slot, rid, index, seen):
     ok, bad = C.admit(g, seen_hashes=(() if index == CONTROL_SLOT else seen),
                       edit_kind=(edit[0] if edit else None))
     if not ok:
-        print(f"[round] slot {index} refused: {[r.code for r in bad]} -- {bad[0].detail[:110]}")
+        print(T_.no(f"[round] slot {index} refused: {[r.code for r in bad]} -- {bad[0].detail}"))
         return None
     try:
         T.write_config(g, name, frames=FRAMES)
     except Exception as e:
-        print(f"[round] slot {index}: spec would not write: {e}")
+        print(T_.no(f"[round] slot {index}: spec would not write: {e}"))
         return None
     # OUT-OF-RANGE VALUES TRAVEL WITH THE SPEC. Not a refusal -- as a gate this refused 6 of 6
     # working recipes including coral_gate. But a run whose parameters sit outside the declared box
     # is a run the search space cannot account for, and that belongs on the record beside it rather
     # than nowhere: the whole reason the campaign walked to l_th_frac 1.96 is that nothing ever said
     # a value had left the box.
+    # REPORTED ONCE PER PARENT, at the end of the batch. These values are inherited, so printing them
+    # per slot printed one fact nine times -- and the nine copies pushed the two lines that differed
+    # (the compile refusal, the short batch) off the top of the screen.
     rng = C.range_notes(g)
-    if rng:
-        print(f"[round] slot {index} outside the declared space: {'; '.join(rng)}")
     h = getattr(g, "comp_hash", None)
     return {"name": name, "slot": index, "parent": par, "edit": edit, "out_of_range": rng,
             "run_key": C._run_key(g),
@@ -565,10 +593,21 @@ def _read(path, limit=None):
         return ""
 
 
+_GRAPHS = {}
+
+
 def _graph(name):
-    """Rebuild a finished run's composition from its own spec on disk."""
-    from build import graph_from_run
-    return graph_from_run(name)
+    """Rebuild a finished run's composition from its own spec on disk. Cached.
+
+    ONCE PER PARENT, NOT ONCE PER SLOT. `graph_from_run` prints a line about what it recovered and
+    what it had to drop, and a twelve-slot batch off two parents printed that line twelve times --
+    ten of them identical. It is also real work: reading the spec, rebuilding the wiring and
+    re-anchoring the clock-coupled parameters, repeated for every slot that shares a parent.
+    """
+    if name not in _GRAPHS:
+        from build import graph_from_run
+        _GRAPHS[name] = graph_from_run(name)
+    return _GRAPHS[name]
 
 
 def _spec(name):
@@ -635,6 +674,51 @@ def check_pool(verbose=True):
     return []
 
 
+# WHAT A RESET KEEPS. Everything else in campaign/ is this campaign's own output and is archived.
+# `instruction.md` and the TEMPLATE_* files are INPUTS a human wrote, and `round.md` lives outside
+# campaign/ entirely for the same reason: the one file that carries accumulated judgement must not be
+# reachable by a reset.
+KEEP_ON_RESET = ("instruction.md", "TEMPLATE_analysis.md", "TEMPLATE_memory.md")
+
+
+def reset_campaign(quiet=False):
+    """Archive this campaign's output and start clean. Cedric: a launch resets; nobody does it by hand.
+
+    ARCHIVED, NOT DELETED, and this is not caution for its own sake. I destroyed round 2's twelve run
+    directories earlier in this project by letting a test write over a live round's names, and the
+    lesson was that the loop must never be able to lose evidence it has already paid a GPU for. So the
+    records are APPENDED to `_archive/records.jsonl` -- which is the campaign's long memory across
+    resets -- before campaign/ is cleared.
+
+    IT NEVER TOUCHES log/okuda. The runs on disk are the evidence, the reference recipes are parents,
+    and a reset is about forgetting the SEARCH, not the measurements.
+    """
+    arch = os.path.join(HERE, "_archive")
+    os.makedirs(arch, exist_ok=True)
+    moved = 0
+    if os.path.exists(RECORDS):
+        with open(RECORDS) as src, open(os.path.join(arch, "records.jsonl"), "a") as dst:
+            for line in src:
+                if line.strip():
+                    dst.write(line)
+                    moved += 1
+    kept, cleared = [], 0
+    for f in sorted(os.listdir(CAMPAIGN)) if os.path.isdir(CAMPAIGN) else []:
+        path = os.path.join(CAMPAIGN, f)
+        if f in KEEP_ON_RESET or f.startswith("_") or os.path.isdir(path):
+            kept.append(f)
+            continue
+        try:
+            os.remove(path)
+            cleared += 1
+        except OSError as e:
+            print(T_.no(f"[round] could not clear {f}: {e}"))
+    if not quiet:
+        print(T_.ok(f"[round] campaign reset: {cleared} file(s) cleared, {moved} record(s) archived "
+                    f"to _archive/records.jsonl, {len(kept)} input(s) kept"))
+    return cleared
+
+
 def next_round_id():
     """The next unused round id, from the record itself. No separate counter to drift.
 
@@ -652,10 +736,10 @@ def next_round_id():
                     continue
                 if isinstance(r, str) and r.startswith("r") and r[1:].isdigit():
                     seen.add(int(r[1:]))
-    return f"r{(max(seen) + 1) if seen else 3:03d}"
+    return f"r{(max(seen) + 1) if seen else 1:03d}"
 
 
-def campaign(rounds=1, mode="composition", n_slots=N_SLOTS):
+def campaign(rounds=1, mode="composition", n_slots=N_SLOTS, fresh=True):
     """Run `rounds` rounds back to back. This is the whole campaign loop.
 
     IT IS TWENTY LINES BECAUSE THERE IS NOTHING ELSE TO DO. `campaign_loop.py` was ~600, and almost
@@ -664,6 +748,8 @@ def campaign(rounds=1, mode="composition", n_slots=N_SLOTS):
     every round, so "what to build from next" needs no memory -- and a round that produced nothing
     simply leaves the records unchanged and the next round starts from the same parents.
     """
+    if fresh:
+        reset_campaign()
     out = []
     for k in range(int(rounds)):
         rid = next_round_id()
@@ -696,6 +782,8 @@ if __name__ == "__main__":
                     help=f"slots per round, including the control (default {N_SLOTS})")
     ap.add_argument("--mode", default="composition", choices=("composition", "recon"))
     ap.add_argument("--round", default=None, help="force a round id instead of deriving it")
+    ap.add_argument("--resume", action="store_true",
+                    help="continue the campaign on disk instead of resetting it (a launch resets)")
     ap.add_argument("--check", action="store_true", help="validate the flow and the pool, then exit")
     a = ap.parse_args()
     if a.check:
@@ -719,4 +807,4 @@ if __name__ == "__main__":
     elif a.round:
         run_round(a.round, mode=a.mode, n_slots=a.batch)
     else:
-        campaign(rounds=a.rounds, mode=a.mode, n_slots=a.batch)
+        campaign(rounds=a.rounds, mode=a.mode, n_slots=a.batch, fresh=not a.resume)

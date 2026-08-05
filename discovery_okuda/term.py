@@ -98,6 +98,13 @@ VOICE = {
     "reflection":    sky,        # what this round means for the next
     "eye":           gold,       # the caption wave -- the same eye as eye-check
     "watcher":       gold,       # and the role that reads it
+    # PHASE 12. The Analyst absorbed reader + interpreter + meta-review + collector +
+    # diagnostician, so it inherits their colour: sky is the record family, and this is now the one
+    # line per round that carries the conclusion. `eye` and `proposer` already had theirs; `round`,
+    # `crew`, `metrics`, `campaign` and `cluster` deliberately do NOT -- the distinction the colour
+    # carries is "someone is speaking" against "something is happening", and the round runner is a
+    # something.
+    "analyst":       sky,        # what happened this round, and what it means
 }
 
 

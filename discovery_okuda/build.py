@@ -265,19 +265,29 @@ def _graph_from_run(name):
                 # built from legal one-edit moves, the campaign is searching a space that does not
                 # contain our own evidence." It is reported here, once per run, and the caller
                 # falls back rather than pretending.
-                _note = f", {len(skipped)} instrument op(s) left out" if skipped else ""
+                # ONE SHORT LINE. This used to spend three wrapped lines per parent saying the
+                # rebuild worked -- "rebuilt from its spec (10 ops, 1 instrument op(s) left out, 1
+                # clock-coupled param(s) reset to the re-anchored defaults); dropped 2 param(s) the
+                # space disallows" -- and with one line per parent that is still nine lines of screen
+                # for no decision. The counts are what a reader needs; the prose was for whoever
+                # wrote it. A REFUSAL still gets its full reason, because that one is actionable.
+                bits = [f"{len(ops)} ops"]
+                if skipped:
+                    bits.append(f"-{len(skipped)} instrument")
                 if clock_dropped:
-                    _note += (f", {len(clock_dropped)} clock-coupled param(s) reset to the "
-                              f"re-anchored defaults")
-                _dnote = f"; dropped {len(dropped)} param(s) the space disallows" if dropped else ""
+                    bits.append(f"{len(clock_dropped)} clock re-anchored")
+                if dropped:
+                    bits.append(f"-{len(dropped)} out-of-space")
                 _adm, _why = C.admit(g, ())
-                _snote = "" if _adm else f"; STILL REFUSED: {str(_why)[:70]}"
-                print((f"  [archivist] {name}: rebuilt from its spec "
-                               f"({len(ops)} ops{_note}){_dnote}{_snote}"))
+                # THE TAG WAS `[archivist]`, A ROLE THAT NO LONGER EXISTS. Phase 12 deleted it, and a
+                # line labelled with a dead role is worse than an unlabelled one: it tells the reader
+                # someone is speaking who is not there.
+                print(f"[build] {name}: {', '.join(bits)}"
+                      + ("" if _adm else f"  STILL REFUSED: {_why}"))
                 return g
         except Exception as e:
-            print((f"  [archivist] {name}: spec rebuild failed ({type(e).__name__})"))
-    print((f"  [archivist] {name}: no composition.json and no usable spec"))
+            print(f"[build] {name}: spec rebuild FAILED ({type(e).__name__}: {e})")
+    print(f"[build] {name}: no composition.json and no usable spec -- cannot be a parent")
     return None
 
 
