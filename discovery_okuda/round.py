@@ -635,8 +635,70 @@ def check_pool(verbose=True):
     return []
 
 
+def next_round_id():
+    """The next unused round id, from the record itself. No separate counter to drift.
+
+    `campaign_loop.py` kept the round number in `campaign/state.json`, and that file being the truth
+    is what let an offline test collide with a live round and destroy twelve run directories: both read
+    the same counter and both believed it. The records are the campaign; the id is derived.
+    """
+    seen = set()
+    if os.path.exists(RECORDS):
+        with open(RECORDS) as f:
+            for line in f:
+                try:
+                    r = json.loads(line).get("round")
+                except Exception:
+                    continue
+                if isinstance(r, str) and r.startswith("r") and r[1:].isdigit():
+                    seen.add(int(r[1:]))
+    return f"r{(max(seen) + 1) if seen else 3:03d}"
+
+
+def campaign(rounds=1, mode="composition", n_slots=N_SLOTS):
+    """Run `rounds` rounds back to back. This is the whole campaign loop.
+
+    IT IS TWENTY LINES BECAUSE THERE IS NOTHING ELSE TO DO. `campaign_loop.py` was ~600, and almost
+    all of it managed state this does not keep: a round counter, a rollback target, an escalation
+    path, a stage gate, a frontier freeze. The parent set is read from the records at the start of
+    every round, so "what to build from next" needs no memory -- and a round that produced nothing
+    simply leaves the records unchanged and the next round starts from the same parents.
+    """
+    out = []
+    for k in range(int(rounds)):
+        rid = next_round_id()
+        print(f"\n{'=' * 78}\n[campaign] round {k + 1}/{rounds}: {rid} ({mode}, {n_slots} slots)"
+              f"\n{'=' * 78}")
+        try:
+            ctx = run_round(rid, mode=mode, n_slots=n_slots)
+        except FlowError as e:
+            print(f"[campaign] the flow is not runnable: {e}")
+            break
+        except KeyboardInterrupt:
+            print("[campaign] stopped by hand")
+            break
+        out.append(ctx)
+        n = len(ctx.get("names") or [])
+        if not n:
+            # A ROUND THAT LAUNCHED NOTHING WILL LAUNCH NOTHING NEXT TIME EITHER: the parent set and
+            # the menu are unchanged, so continuing burns a Proposer call per round to no effect.
+            print("[campaign] the round launched nothing -- stopping rather than repeating it")
+            break
+        print(f"[campaign] {rid}: {n} run(s) recorded")
+    return out
+
+
 if __name__ == "__main__":
-    if "--check" in sys.argv:
+    import argparse
+    ap = argparse.ArgumentParser(description="run the okuda discovery loop")
+    ap.add_argument("--rounds", type=int, default=1, help="how many rounds, back to back")
+    ap.add_argument("--batch", type=int, default=N_SLOTS,
+                    help=f"slots per round, including the control (default {N_SLOTS})")
+    ap.add_argument("--mode", default="composition", choices=("composition", "recon"))
+    ap.add_argument("--round", default=None, help="force a round id instead of deriving it")
+    ap.add_argument("--check", action="store_true", help="validate the flow and the pool, then exit")
+    a = ap.parse_args()
+    if a.check:
         try:
             for n in load_flow():
                 kind = n.get("code") or f"crew/{n['agent']}"
@@ -654,6 +716,7 @@ if __name__ == "__main__":
         except FlowError as e:
             print(f"  flow REFUSED: {e}")
             sys.exit(1)
+    elif a.round:
+        run_round(a.round, mode=a.mode, n_slots=a.batch)
     else:
-        run_round(sys.argv[1] if len(sys.argv) > 1 else "r000",
-                  mode=sys.argv[2] if len(sys.argv) > 2 else "composition")
+        campaign(rounds=a.rounds, mode=a.mode, n_slots=a.batch)
