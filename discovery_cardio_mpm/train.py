@@ -545,6 +545,10 @@ def main():
                     help="path to the recording. Default is the one declared in data.py; there is no "
                          "search order and a missing file is an error, never a fallback.")
     ap.add_argument("--resume", default="")
+    ap.add_argument("--grad_check", type=int, default=0,
+                    help="PHASE 3 WIRING CHECK: run ONE forward+backward, report the gradient "
+                         "reaching every learnable tensor by group, and exit. `no gradient` and "
+                         "`no effect` are different statements and this settles which.")
     ap.add_argument("--ablate", default="",
                     help="EVAL: comma list of learned fields to neutralise -- stiff,gain,fibre,"
                          "prestress. A field is replaced by its own MEAN (prestress by identity), "
@@ -966,6 +970,47 @@ def main():
             else:                                                      # r2+harmonic
                 loss = r2_loss + args.w_harm * harm_loss + args.w_amp * amp_loss
         opt.zero_grad(); loss.backward()
+        if args.grad_check:
+            # BEFORE clipping, before stepping: what actually came back?
+            print(f"\n{'=' * 100}\n  GRADIENT WIRING -- one backward pass, {len(learn)} learnable "
+                  f"tensors, learn={args.learn}\n{'=' * 100}")
+            print(f"  {'group':<12s} {'tensor':<28s} {'numel':>9s} {'requires':>9s} "
+                  f"{'grad':>10s} {'norm':>12s}")
+            dead, total = [], 0
+            names = {}
+            for mod, grp in ((net, "stiff"), (stiff_siren, "stiff"), (fibre_siren, "fibre"),
+                             (gain_siren, "gain"), (residual_siren, "residual")):
+                if mod is not None:
+                    for nm, prm in mod.named_parameters():
+                        names[id(prm)] = (grp, f"{grp}_siren.{nm}")
+            for prm, nm in ((f_wl, "f_wl"), (f_ang, "f_ang"), (f_amp, "f_amp"), (f_ph, "f_ph")):
+                names[id(prm)] = ("fibre", nm)
+            names[id(raw_g)] = ("gain", "raw_g")
+            names[id(raw_dur)] = ("dur", "raw_dur")
+            for g in ("stiff", "fibre", "gain", "dur", "residual"):
+                for prm in groups.get(g, []):
+                    grp, nm = names.get(id(prm), (g, "?"))
+                    gr = prm.grad
+                    n = float(gr.norm()) if gr is not None else float("nan")
+                    live = gr is not None and n > 0
+                    total += 1
+                    if not live:
+                        dead.append(f"{g}/{nm}")
+                    print(f"  {g:<12s} {nm:<28s} {prm.numel():>9d} "
+                          f"{str(bool(prm.requires_grad)):>9s} "
+                          f"{('yes' if gr is not None else 'None'):>10s} "
+                          f"{n:>12.3e}" + ("" if live else "   <-- NO GRADIENT REACHES THIS"))
+            print(f"\n  {total - len(dead)} of {total} learnable tensors receive a non-zero "
+                  f"gradient.")
+            if dead:
+                print(f"  UNWIRED: {', '.join(dead)}")
+                print("  A setting with no gradient cannot be learned, and that is NOT the same as "
+                      "a setting\n  with no effect. Anything fitted with these in --learn was "
+                      "optimising a subset it did not declare.")
+            else:
+                print("  Every declared learnable is connected to the loss.")
+            print("=" * 100, flush=True)
+            return
         gnorm = torch.nn.utils.clip_grad_norm_(learn, 1.0)
         if torch.isfinite(gnorm):
             opt.step()
