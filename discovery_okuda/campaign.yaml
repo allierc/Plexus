@@ -1,0 +1,79 @@
+# The campaign's QUANTITIES. Everything a round obeys, in one file, so a sweep is reproducible by
+# pointing at the file that produced it.
+#
+# CEDRIC, 5 AUGUST: *"make the config parameterized so that we can easily reproduce these sweeps"*.
+#
+# WHY THIS FILE AND NOT round.py. The rule this campaign already follows is that markdown carries the
+# procedure and the judgement while config carries the numbers -- a value the round must OBEY should not
+# be parsed out of prose, where it can silently drift from the number that actually ran. The numbers had
+# followed that rule and then broken it in a different way: they were module constants in round.py, so
+# "which frame count produced this result" was answerable only by reading the git history of a source
+# file. FRAMES went 900, the parallel cap went 8 then 12, PARENT_LIMIT has always been 6, and none of
+# that is recoverable from a run's own record.
+#
+# So: the resolved config is written to `campaign/campaign_used.yaml` at the start of every campaign and
+# its hash is stamped on every record row. A row can now name the settings that produced it.
+#
+# THE POOL LIVES HERE, NOT IN flow.yaml. The flow is the DESIGN -- which roles exist and what feeds
+# what. Which recipes a campaign starts from is a decision about this campaign, and it changes far more
+# often than the wiring does. Keeping it here means a sweep over starting points is a config edit rather
+# than a change to the loop's structure.
+
+# ---------------------------------------------------------------- the round
+round:
+  frames: 900               # simulated frames per run. ~1.5 h on gpu_l4 at 2000 cells
+  slots: 12                 # per round, INCLUDING slot 0 -- the control
+  control_slot: 0           # the parent unchanged. Without it a difference cannot be separated
+                            # from seed noise, so it is a position and not an option
+  menu_limit: 40            # legal edits offered per parent. 6 parents x 40 rows is ~42k chars
+  parent_limit: 6           # how many recorded runs are offered as parents
+
+  # THE SWEEP GRID, as factors of the PARENT's own value rather than points in a declared box. The
+  # reference loop's table reads {0, 1e-3, 1e-2 *parent*, 1e-1} -- a human-chosen grid around what
+  # works. Ours cannot be hand-written for 24 quantities x 6 parents, but it can be anchored on the
+  # parent instead of on a range that no working recipe respects.
+  grid_factors: [0.5, 2.0]
+
+  parallel: 12              # jobs submitted at once. The gpu_l4 partition has many nodes; the old 8
+                            # was one card's slot count and cost a full simulation duration per round
+
+# ---------------------------------------------------------------- where a campaign starts
+# Every entry must rebuild into an admissible composition AND pass the same static premises run_one
+# checks before it touches a GPU. `round.py --check` verifies both -- it did not check the second until
+# a parent whose growth ceiling sat below its division trigger killed four runs in under a minute.
+pool:
+  # PROMOTED FROM ROUND 1 (2026-08-05), which the loop threw away and the disk kept. These carry the
+  # highest chemistry-shape coupling the campaign has measured -- corr_act_rad_peak 0.739, 0.710 --
+  # against coral_gate's 0.435, and that is the campaign's actual question. Under _keep/ so no reset
+  # can reach them.
+  - _keep/r001_02           # corr 0.739, n_tubes 1, n_tips 6, valid 1.0   <- the best on record
+  - _keep/r001_05           # corr 0.710, n_tubes 1, n_tips 6
+  - repair_l_th_frac        # corr 0.708, the one parent that ever tripped the tube instrument
+  - coral_gate              # corr 0.435, act_cv 2.20 -- the reference working chemistry
+  - coral_gate_div          # division on the working chemistry
+  - cfl_c000p080_d002p000   # a CFL-safe baseline
+
+# ---------------------------------------------------------------- named sweeps
+# A preset is a set of overrides, so a sweep is reproduced by naming it rather than by remembering
+# which flags were passed. `round.py --preset quick` merges the block into `round` above.
+#
+# Recorded on every row as `preset`, so a result carries the name of the sweep that produced it.
+presets:
+
+  quick:                    # for shaking out the pipeline: a short batch, a short run
+    frames: 200
+    slots: 4
+
+  coupling:                 # the open question: does the pattern grip the shape
+    slots: 12
+    # only the parents that HAVE measurable coupling -- the two baselines cannot speak to it
+    pool: [_keep/r001_02, _keep/r001_05, repair_l_th_frac, coral_gate]
+
+  wide:                     # coverage over starting points rather than depth on one
+    slots: 12
+    parent_limit: 6
+    menu_limit: 60
+
+  long:                     # for a mechanism that needs time to express itself
+    frames: 1800
+    slots: 8

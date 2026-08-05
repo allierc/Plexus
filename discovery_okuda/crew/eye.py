@@ -56,6 +56,20 @@ def _picture(run_dir):
     return None
 
 
+def _own(bundle, name):
+    """This run's metrics out of the batch's, whatever shape the round handed over.
+
+    THE ROLE SLICES, NOT THE ROUND. The round fans this node out over the run names and hands each
+    call the whole context, so `metrics` is {name: summary} for the entire batch. For the round to
+    slice it would have to know that `metrics` is keyed by the thing it fans out over -- exactly the
+    role knowledge it is built not to have.
+    """
+    m = bundle.get("metrics")
+    if isinstance(m, dict) and isinstance(m.get(name), dict):
+        return m[name]
+    return m
+
+
 def run(bundle):
     """-> text about ONE run. The round files it and does not read it."""
     from llm import run_agent
@@ -79,7 +93,16 @@ def run(bundle):
     prompt = _prompt.build("eye", [
         ("The run", name, {"as_json": False}),
         ("The frames -- open this with the Read tool and look at it", pic, {"as_json": False}),
-        ("What the metrics say about this run", bundle.get("metrics")),
+        # ITS OWN RUN'S METRICS, SLICED HERE. The round fans this node out over the run names and
+        # hands each call the WHOLE context, so `metrics` is {name: summary} for the entire batch --
+        # eleven summaries of 183 keys. The prompt came to 147,149 chars (~37k tokens) against a
+        # four-minute budget with an image read on top, and the call failed silently for every run:
+        # no line in the terminal, nothing in `observed`, and the Analyst never learned what the eye
+        # saw. Sliced, it is 25,768 chars.
+        #
+        # THE ROLE SLICES, NOT THE ROUND. The round would have to know that `metrics` is keyed by the
+        # thing it fans out over, which is exactly the role knowledge it is built not to have.
+        ("What the metrics say about this run", _own(bundle, name)),
     ])
     ok, text = run_agent("eye", prompt, ledger=bundle.get("ledger"))
     return text if ok else ""
