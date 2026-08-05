@@ -39,12 +39,35 @@ for p in (HERE, os.path.join(ROOT, "src"), os.path.join(ROOT, "prototype", "Tyss
 BUFFER_X = 4
 BASE = dict(n_particles=140000, n_grid=48, youngs=15.0, k_contact=1200.0, a_max=300.0,
             cavity_r=0.095, cavity_h=0.095, axis=2, n_fibres=6000, fibre_len=0.16,
-            align=0.0, substep_dt=2.0e-4, stress_scale=0.08,
-            block_youngs=2000.0, block_particles=60000, block_stress_scale=0.004)
+            # COLOURED BY VON MISES OF THE CAUCHY STRESS the solver itself computed, not by |J-1|.
+            # Measured on a 260-frame calibration run: von Mises has median 0.00094, p99 0.019,
+            # max 0.054, so at scale 0.008 the matrix runs 64% above band 0 with 7.6% saturated -- a
+            # readable field. The same run's |J-1| put 0.6% above band 0. The stress was always there;
+            # a volumetric measure cannot see a material that is being SHEARED, and MLS-MPM's
+            # fixed-corotated law resists volume change far more stiffly than shape change.
+            align=0.0, substep_dt=2.0e-4, stress_scale=0.008, stress_measure="vonmises",
+            # The block is ~130x stiffer, so the same load leaves it at a far lower stress -- its own
+            # scale, or it reads as uniformly unloaded in every frame.
+            block_youngs=2000.0, block_particles=60000, block_stress_scale=0.05,
+            block_measure="vonmises")
 
+# `block gap = None` means USE THE GAP THE TISSUE WAS GROWN AGAINST, converted to box units by the one
+# scale. That is the self-consistent choice: the elastic block then occupies exactly the region the
+# rigid plate of pass 1 occupied, so the tissue's ovoid and the block's dent are the same boundary
+# rather than two boundaries that happen to be near each other.
+#
+# THE GEOMETRY THAT MATTERS, MEASURED. `44_plate_blk25_cushion` put the blocks at 25% of the volume --
+# a free gap of 0.75 of the box against a tissue that only reaches 0.30 -- and there was nothing left
+# to compress: no stress in the matrix and no ovoid. The free gap has to be comparable to the tissue,
+# not to the box:
+#
+#     free gap (box)   0.75    0.65    0.40    0.33    0.25
+#     blocks (% vol)    25%     35%     60%     67%     75%
+#     tissue aspect    1.00    1.06    1.41    1.65    2.08
+#
 #      name                        block gap (box)   tissue plate gap (tissue units, None = free)
-RUNS = [("45_block_elastic_blk25",       0.375,      None),
-        ("46_block_elastic_ovoid",       0.126,      7.0)]
+RUNS = [("47_block_elastic_g33",         None,       8.4),    # free gap ~1/3.3 of the box, ~70% solid
+        ("48_block_elastic_g40",         None,      11.1)]    # free gap ~0.40 of the box, 60% solid
 
 
 def main():
@@ -69,10 +92,16 @@ def main():
         try:
             npz = TIS.load_or_build(frames=a.cell_frames, device=a.device, buffer_x=BUFFER_X,
                                     plate_gap=pgap)
-            cfg = dict(BASE); cfg["block_gap"] = bgap
+            cfg = dict(BASE)
             # `plate_box=None`: the ELASTIC block replaces the rigid projection in the matrix. Keeping
             # both would constrain the matrix twice, with the projection winning every time, and the
             # block would be a decoration on a rigid wall.
+            # Two passes over `build`: the first only to learn what the pass-1 plate gap maps to in box
+            # units, the second with the elastic block placed exactly there.
+            if bgap is None:
+                _, probe = C.build(name, npz, plate_box=None, **cfg)
+                bgap = float(probe["plate_gap_box"])
+            cfg["block_gap"] = bgap
             spec, info = C.build(name, npz, plate_box=None, **cfg)
             out_dir = os.path.join(R.LOG, name)
             os.makedirs(out_dir, exist_ok=True)

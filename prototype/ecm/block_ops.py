@@ -151,14 +151,28 @@ class BlockStress(Lateral):
         # operator exists to test.
         self.scale = float(params.get("scale", 0.004))
         self.bands = int(params.get("bands", 8))
+        # Same three options as `ecm_stress`; `vonmises` reads the Cauchy stress the accumulate scatter
+        # cached (`store_stress: true`) rather than re-deriving anything from F.
+        self.measure = str(params.get("measure", "vol"))
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
         F = getattr(lvl, "F", None)
         if F is None:
             return {}
-        J = torch.linalg.det(F)
-        s = (J - 1.0).abs() / max(self.scale, 1e-9)
+        sig = getattr(lvl, "sigma", None) if self.measure == "vonmises" else None
+        if sig is not None:
+            tr = sig.diagonal(dim1=-2, dim2=-1).sum(-1)
+            eye = torch.eye(sig.shape[-1], device=sig.device, dtype=sig.dtype)
+            dv = sig - (tr / 3.0)[:, None, None] * eye
+            s = torch.sqrt((1.5 * (dv * dv).sum((-1, -2))).clamp_min(0.0)) / max(self.scale, 1e-9)
+        else:
+            if self.measure == "vonmises" and not getattr(self, "_warned", False):
+                print("[block_stress] measure=vonmises but no `sigma` buffer -- falling back to "
+                      "|J-1|, a DIFFERENT quantity", flush=True)
+                self._warned = True
+            J = torch.linalg.det(F)
+            s = (J - 1.0).abs() / max(self.scale, 1e-9)
         band = (s.clamp(0, 1) * (self.bands - 1)).round().long()
         BLOCK_STRESS.append(band.detach().to("cpu", torch.uint8).numpy())
         return {}
