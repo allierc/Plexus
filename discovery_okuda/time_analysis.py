@@ -122,7 +122,7 @@ def classify_npz(path, keys=None):
         if v.ndim != 1 or v.shape[0] < 2:
             continue
         # A LABEL IS NOT A CURVE. metrics.npz carries the per-frame morphology labels as their own
-        # STRING array (tube_analysis saves them separately, deliberately, so the numeric columns
+        # STRING array (tissue_analysis saves them separately, deliberately, so the numeric columns
         # are not forced to a string cast). `classify` calls np.asarray(v, float) and raises
         # ValueError: could not convert string to float: 'sphere'.
         #

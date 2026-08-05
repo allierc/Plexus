@@ -1181,14 +1181,511 @@ specimen, and starts from a composition whose chemistry is alive. What it still 
 protrusion.
 \end{phasebox}
 
-\begin{phasebox}{Phase 12 --- The demonstration \hfill \todo}
+\begin{phasebox}{Phase 12 --- The reduction \hfill \prog}
+\textbf{Goal.} Take the one-agent loop as the control, and cut this one down to what composition
+actually requires. Not an addition. Cedric, 5 August: \emph{``my feeling is that we should not add
+at this point but remove, loose, look for a simplification.''}
+
+\subsection*{The control: 305 lines, one agent, one call}
+\code{GNN\_LLM.py} and \code{GNN\_LLM\_task.py} in \code{connectome-gnn-cx} run a discovery loop
+that has produced usable science for months. Together they are \textbf{305 lines}. One agent, one
+call per round, a free-text \code{analysis.md} and \code{knowledge.md} that the same agent writes
+and re-reads. No critic, no register, no premises, no intents, no budget ledger, no eye.
+
+Against it, measured this morning:
+
+\begin{center}\small
+\begin{tabular}{lrr}
+\toprule
+ & one-agent & discovery\_okuda \\
+\midrule
+Python driving the loop        & 305   & 23{,}725 \\
+distinct agent roles           & 1     & 15 \\
+LLM calls in the last round    & 1     & \textbf{153} \\
+LLM minutes in the last round  & $\sim$2 & \textbf{166.6} \\
+state files                    & 2     & 22 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent A factor of 78 in code and 153 in calls. The last round of the expensive one produced
+\textbf{twelve refusals and a rollback}. That comparison is the whole argument of this phase.
+
+\subsection*{What multi-agent genuinely buys, and it is one thing}
+Cedric, 5 August: \emph{``the one agent has not much but do not composition.''} That is exactly the
+line. The one-agent loop tunes the parameters of a \emph{fixed} model --- the graph, the buffers and
+the operators never change, so a proposal cannot be structurally invalid and nothing needs to check
+it. This loop \emph{composes}: it chooses which operators exist, how they wire, and how big the
+reservoirs are. That creates failure modes the control cannot have, and they are the only ones worth
+a gate:
+
+\begin{itemize}\itemsep2pt
+\item a spec that does not compile, or wires a slot that the implementation does not expose;
+\item a reservoir too small to reach the run's own target --- the arithmetic that voided
+      \textbf{59 runs} in two batches, every one ending at exactly 1778 cells;
+\item a composition already evaluated, spending a GPU on a duplicate.
+\end{itemize}
+
+\noindent Those are \emph{structural}, cheap, and decidable before a GPU is touched. Everything else
+this loop refuses, it refuses on \emph{judgement about a result} --- and that is where it went wrong.
+
+\subsection*{Premises: an input, not a gate}
+Cedric, 5 August: \emph{``I like the premise.md but as an input not a gate.''} The premise battery
+produces the best diagnostic text in the system --- \emph{``volume went 522.1 $\to$ 312.9''},
+\emph{``the top 5\% of cells reach shape index 5.83''}, \emph{``the surface folds through itself at
+frame 50''} --- and every word of it was spent on a \textbf{refusal}. I wired it into the resolver on
+4 August and it stopped the campaign: P1, P7 and P11 fail on essentially every composition-mode run,
+so 12 of 12 were refused in two consecutive rounds, both aborted, and the loop halted itself. Its own
+message was correct: \emph{``the refusal reasons are not actionable.''}
+
+There is a clean division of labour the gate was blurring, and keeping it makes the removal safe:
+
+\begin{itemize}\itemsep2pt
+\item \textbf{the evidence horizon} decides which \emph{frames} are trustworthy. Arithmetic, per
+      frame, already truncating everything measured after the mesh tears. \emph{This is the
+      mechanism that stops a number being believed, and it is untouched.}
+\item \textbf{the premises} say what is biologically wrong, in words carrying numbers. Their
+      consumer is \emph{the next proposal}.
+\end{itemize}
+
+\noindent The audit's actual finding was narrower than I read it: \code{hypotheses.jsonl} said
+\code{confirmed} while \code{analysis.md} said \emph{specimen invalid} about the same run --- two
+records \emph{disagreeing}. The fix is to write the verdict beside the outcome
+(\code{confirmed [specimen: P1, P7, P11 broken]}) so a reader can weigh it. Refusing the run instead
+threw away the diagnosis along with the evidence.
+
+\subsection*{The gates that go, and the ones that stay}
+\begin{center}\small
+\begin{tabular}{llp{6.2cm}}
+\toprule
+stays & \code{R1--R4}, \code{R6}, \code{C1}, \code{C2}, \code{C3} & structural: can this be built,
+is it new, can it reach its target. What composition requires and the control cannot need. \\
+\midrule
+goes & \code{P0\_SPECIMEN\_INVALID} & fired on 12 of 12 runs. A gate that fires on everything
+carries no information and costs the round. \\
+goes & \code{P1\_INERT\_OPERATOR} & ``\code{cell\_diffuse} did nothing at $D=0.002$'' is
+\emph{knowledge}. Refusing the run deletes it. \\
+goes & \code{P3\_CHEMISTRY\_DIVERGED} & nan cannot be scored confirmed or refuted anyway --- the
+arithmetic refuses itself, so the gate was ceremony. \\
+goes & \code{check\_null\_difference}, \code{check\_round\_decoupled} & written 4 August, called
+only from the test file. Orphans. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{Four roles. The eye is one of them.}
+\begin{center}\small
+\begin{tabular}{lp{7.4cm}}
+\toprule
+\textbf{Proposer} & unchanged, and now shown the diagnosis. 59\% of the budget
+(98.2 of 166.6 min, 44 calls) --- the expensive role, and the one doing the science. \\
+\textbf{Analyst}  & reader $+$ interpreter $+$ meta\_review $+$ collector $+$ diagnostician. One
+call over the whole batch, which is the control's shape: the agent that reads the round is the agent
+that decides what it meant. \\
+\textbf{Eye}      & \emph{kept as its own role.} \\
+\textbf{Grounder} & demoted to code that speaks only when something changes. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent \textbf{Why the eye survives a phase whose purpose is removal.} Cedric, 5 August:
+\emph{``I like the eye I think it is valuable.''} It earns it on the record. On \textbf{2 of 10} runs
+last round the Reader wrote \code{phenotype sphere} and the metric agreed with it, while the eye,
+watching the same movie, wrote \emph{``develops large protrusions and irregular lobes''}
+(\code{r001n\_07}, \code{protr\_peak} 1.10) and \emph{``transforms into an asymmetrical, bulging,
+elongated form''} (\code{r001n\_10}, 1.26). It also flagged, unprompted, that \emph{``the embedded
+circular cross-section appears to be a measurement artifact rather than tissue feature''} --- a
+rendering bug no metric was watching for.
+
+So it is not a redundant judge, it is a \emph{separate instrument}: a VLM on the movie, a capability
+no text role can substitute for, disagreeing with both the metric and the Reader on a fifth of the
+batch. And it is the \emph{cheapest} role in the loop --- 26 calls, 6.2 minutes, \textbf{3.7\%} of
+the round. Removing it would save 4\% and cost the only channel that looks at the picture.
+
+The eleven roles that go were not badly designed. They were badly \emph{wired}: each produced text
+that the next one was not shown. \code{grounder.py} is the clearest case --- \textbf{766 lines, 16
+public functions, 4 of them ever called}. The two that would answer the question Cedric asked weeks
+ago (\emph{compare the results to Okuda}) are \code{gate()} and \code{figure\_target()}, and they are
+called \textbf{zero} times. Its repeated $\phi$ note demands a decision --- \emph{``must be made
+explicitly, not inherited''} --- that no role can take, so it reprints identically every round.
+
+\subsection*{What this removes}
+\begin{center}\small
+\begin{tabular}{lr}
+\toprule
+orphaned code (written, never called)      & 1{,}690 \\
+eleven roles' prompts, parsers, state      & $\sim$2{,}900 \\
+post-hoc gates and their plumbing          & $\sim$190 \\
+\midrule
+\textbf{removable}                         & $\sim$\textbf{4{,}600} \\
+irreducible substrate (operators, engine, metrics) & $\sim$7{,}600 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection*{\code{round.py} rewritten from scratch}
+Cedric, 5 August: \emph{``should we start round from scratch --- basically it has to write four
+prompts, collect the answer and launch the simulations \dots\ but round.py if it is well written I'm
+not sure it should end up in tons of lines.''}
+
+It should not, and it does. \code{round.py} is \textbf{2{,}504 lines --- 1{,}605 code, 683 comment},
+and two functions hold most of it: \code{\_run\_round} at \textbf{657 lines} and
+\code{\_admit\_slots} at \textbf{267}. It also carries three batch modes, of which \code{theta} has
+\textbf{never run once} in six rounds (4 composition, 2 recon).
+
+The loop has nine things to do. Everything else in that file exists to manage machinery that this
+phase deletes.
+
+\begin{center}\small
+\begin{tabular}{clrr}
+\toprule
+\# & step & now & rewritten \\
+\midrule
+1 & read the parent set                                              & 71  & $\sim$15 \\
+2 & assemble one prompt: parents, metric bank, last round's diagnosis, legal menu & scattered & $\sim$40 \\
+3 & \textbf{one} Proposer call $\to$ slots                           & --- & $\sim$15 \\
+4 & per slot: parent $+$ one edit $\to$ emit $\to$ \code{critic.admit} $\to$ yaml & 428 & $\sim$60 \\
+5 & launch                                                           & \multicolumn{2}{c}{\emph{unchanged}} \\
+6 & read metrics per run                                             & \multicolumn{2}{c}{\emph{unchanged}} \\
+7 & \textbf{one} Analyst call over the batch $\to$ \code{analysis.md}, \code{knowledge.md} & 5 roles & $\sim$40 \\
+8 & the eye on each movie                                            & \multicolumn{2}{c}{\emph{unchanged}} \\
+9 & append one record row per run                                    & 22 files & $\sim$25 \\
+\midrule
+  & \textbf{total}                                                   & \textbf{2{,}504} & \textbf{481} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent Metrics, operators, \code{translate.py} and the engine are untouched. Those are the
+substrate and they have earned their size; the loop that drives them has not.
+
+\textbf{The largest single cut is step 4, and it is also the budget fix.}
+\code{\_admit\_slots} retries, re-asks, dedupes across the batch and runs a ``repair pass'' --- which
+is why the Proposer made \textbf{44 calls for 12 slots} and spent 98 of the round's 167 minutes.
+Rewritten, it admits what is legal, prints what was not, and runs the short batch. One call. That
+removes the 59\% budget line and $\sim$500 lines with the same edit, and it is the same lesson as
+the gates: the machinery was there to rescue a judgement that did not need making.
+
+Deleted along with it, because all of it exists to manage that retry loop:
+\code{run\_escalation}, \code{quarantine\_scan}, \code{stale\_q\_reason}, \code{\_abort},
+\code{\_refusal\_summary}, \code{\_last\_review}, \code{build\_theta\_batch},
+\code{\_resize\_reservoir}.
+
+\subsection*{Four roles, four scripts, four markdown files}
+Cedric, 5 August: \emph{``since we have four agents I want four script, four md file use to refine
+their role?''}
+
+This is the control's actual secret, and I had missed it. The one-agent loop's knowledge does not
+live in \code{GNN\_LLM.py} --- 305 lines that barely mention biology. It lives in
+\code{instruction\_cortex\_matrix.md}, \textbf{279 lines} of plain markdown that Cedric edits between
+rounds. Months of accumulated judgement about what to try and what a result means sits in a file that
+needs no Python to change. Ours is the opposite: \textbf{$\sim$418 lines of prompt text} are welded
+into f-strings inside \code{proposer.py} (172), \code{llm\_agents.py} (185) and \code{llm.py} (61),
+where refining a role means editing code and re-reading a docstring to find out what the role was
+told.
+
+So: one script and one markdown file per role, and nothing else in \code{agents/}.
+
+\begin{center}\small
+\begin{tabular}{llp{5.6cm}}
+\toprule
+\code{proposer.py} & \code{proposer.md} & what to try next, and what makes a good experiment \\
+\code{analyst.py}  & \code{analyst.md}  & how to read a batch: metrics, the eye's captions, the
+                                          premise diagnosis; what to write to \code{knowledge.md} \\
+\code{eye.py}      & \code{eye.md}      & what to look for in a movie, and to say plainly when the
+                                          picture contradicts the number \\
+\code{grounder.py} & \code{grounder.md} & Okuda's figures and settings, and the comparison of
+                                          \emph{this} round's result against them \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent \textbf{The split is the point.} The \code{.md} is the \emph{role} --- stable, in the
+user's hands, versioned in git, edited between rounds without a Python change. The \code{.py} is only
+\emph{plumbing}: gather the data, inject it, call, parse, validate. A prompt built as
+\code{md + injected data} also makes the prompt readable as a file, which no amount of docstring
+achieves.
+
+\textbf{And this is what makes the Grounder the fourth agent rather than dead code.} It was never
+badly designed --- 766 lines, 16 functions, 4 ever called, and the two that would compare a result to
+the paper (\code{gate()}, \code{figure\_target()}) called \textbf{zero} times. Its repeated $\phi$
+note is a decision demanded of nobody, printed forever. Moved to Act 3 with its knowledge in
+\code{grounder.md}, it answers the question Cedric asked weeks ago and the loop has never once
+asked: \emph{does this look like Okuda's figure?} When it is wrong or repetitive, the fix is to edit
+279 lines of markdown, not to re-wire 766 lines of Python.
+
+\subsection*{The engine is blind to the roles}
+Cedric, 5 August: \emph{``can we have the round engine kind of blind to the role of the agents?''}
+
+Yes --- and this is the structural cause of the 657-line function, not merely a tidier design.
+\code{\_run\_round} grew because it \emph{knows every role by name}: a retry loop written for the
+Proposer, a budget carve-out for the Reader, a repair pass for one failure mode, an escalation path
+for another. Every role that was added arrived with a special case in the engine. \textbf{An engine
+that cannot name a role cannot grow one.}
+
+So the engine knows three \emph{stages} and no roles at all:
+
+\begin{center}\small
+\begin{tabular}{llp{5.9cm}}
+\toprule
+stage & fan-out & the stage's contract \\
+\midrule
+\code{propose} & one call  & returns a list of edits \\
+\code{observe} & per run   & returns text about one run \\
+\code{review}  & one call  & returns text about the batch \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent Each role is a directory entry, not a branch in the engine. Its \code{.py} declares where
+it attaches and what it needs; its \code{.md} is the prose:
+
+\begin{verbatim}
+ROLE = {"stage": "review", "wants": ["metrics", "observations", "history"],
+        "writes": "grounding.md", "md": "grounder.md"}
+
+def run(bundle):  ...
+\end{verbatim}
+
+\noindent and the engine is the whole of this:
+
+\begin{verbatim}
+for a in roles_at("propose"): edits = a.run(bundle)
+specs = [build(e) for e in edits]          # emit, critic.admit, write yaml
+runs  = launch(specs)                      # the engine's own work
+data  = [measure(r) for r in runs]         # metrics module, unchanged
+for a in roles_at("observe"):
+    for r in runs: a.run(bundle | {"run": r})
+for a in roles_at("review"): a.run(bundle | {"metrics": data})
+\end{verbatim}
+
+\textbf{What this buys, concretely.} Adding or removing an agent is adding or removing two files.
+Dropping the eye, or adding a fifth role next month, requires \emph{no edit to the engine} --- which
+is the test this design has to pass, because the eleven roles removed in this phase were each added
+by editing the engine. The words \code{proposer}, \code{analyst}, \code{eye} and \code{grounder}
+should not appear in \code{round.py} at all, and that is checkable in one grep.
+
+\textbf{The one piece of role knowledge that cannot be removed, stated honestly.} Something must
+return \emph{edits}, because the engine has to build a spec from them. That knowledge belongs to the
+\emph{stage contract} --- \code{propose} means ``returns edits'' --- and not to any role, so any file
+may occupy that stage and a round with nothing in it is simply a no-op rather than a crash. The same
+holds for \code{observe} and \code{review}: they return text, the engine files it, and the engine
+never inspects what it says. A role that produces something no stage consumes is then impossible to
+write, which is the defect this campaign hit six times.
+
+\subsection*{And an instruction file for the round}
+Cedric, 5 August: \emph{``and an instruction file for round?''}
+
+Yes, and it half exists already --- conflated. \code{campaign/instruction.md} is 63 lines, tracked in
+git, and its third section reads \emph{``\#\# What you are --- You are the PROPOSER.''} The
+\emph{campaign's} objective and \emph{one role's} identity live in the same file. That is why the
+Proposer is the only role that has ever had standing instructions a human could edit: the campaign
+file \emph{was} its prompt, and the other fourteen roles had nothing but f-strings.
+
+Split into two layers, five files:
+
+\begin{center}\small
+\begin{tabular}{lp{7.3cm}}
+\toprule
+\code{round.md} & \textbf{shown to every role.} The objective; the discipline (a change of numbers is
+not a hypothesis; every candidate carries a falsifiable prediction; $\sim$70/30 confirmatory to
+adversarial); what is already known; what has been ruled out and must not be re-proposed. \\
+\midrule
+\code{proposer.md}, \code{analyst.md}, \code{eye.md}, \code{grounder.md} &
+\textbf{shown to one role.} How that role does its job, and nothing about the campaign. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent Every prompt is then \code{round.md} $+$ \code{<role>.md} $+$ injected data, assembled by
+the engine in that order. The engine \emph{reads} both files and interprets neither, which keeps it
+blind: it cannot behave differently for one role because it never learns which role it is holding.
+
+\textbf{One line I will not cross: the round's numbers stay in config, not in markdown.} Slots per
+round, the control slot, the launch budget, the analysis stride and the stop rule are values the
+engine must \emph{obey}; a number the engine has to parse out of prose is a number that can silently
+drift from the number that ran. \code{round.md} carries the \emph{procedure and the judgement}, and
+\code{config} carries the \emph{quantities} --- the same division that makes the metric bank
+trustworthy.
+
+\textbf{Where the knowledge accumulates, which is the whole reason the control works.} The Analyst
+writes \code{knowledge.md} each round; you fold what survives into \code{round.md} between rounds.
+That is precisely the cycle running in \code{connectome-gnn-cx}, where 279 lines of hand-edited
+markdown are carrying months of judgement, and it is the one mechanism this loop has never had:
+fifteen roles, and not one file a human could edit to make the next round smarter.
+
+\subsection*{The round is a graph, and the engine only runs it}
+Cedric, 5 August: \emph{``what about a graph provided to the round with agents and information flow so
+that it is blind ... that would be easy to modify, easy to understand instead of hardcoding?''}
+
+Better than the three hard-coded stages I had built an hour earlier, for a reason specific to this
+campaign. In the stage version each role declared a \code{wants} list --- and the engine passed the
+whole context regardless, so the declaration was decoration. Nothing could check it. As a graph the
+information flow \emph{is} the artefact, so \textbf{the defect this loop hit at least six times
+becomes arithmetic}: a node that emits something no \code{in:} names is refused at load, before a GPU
+or a token is spent.
+
+\code{crew/flow.yaml} is 120 lines and is the whole multi-agent design --- not a diagram of it:
+
+\begin{verbatim}
+  - id: diagnosis            # why last round's tissue broke, ranked
+    code: engine.diagnosis
+    in: [parents]
+
+  - id: proposer
+    agent: proposer
+    in: [parents, menu, metric_bank, diagnosis, history]
+    out: edits
+
+  - id: eye                  # one call per run, on the movie
+    agent: eye
+    in: [metrics]
+    each: names
+    out: observed
+
+  - id: analyst
+    agent: analyst
+    in: [control, metrics, predictions, observations, observed, history]
+\end{verbatim}
+
+\noindent Seventeen nodes: thirteen \code{code:} steps and the four \code{agent:} roles. The engine
+loads it, checks it, sorts it topologically and executes it, and holds no opinion about what any node
+is for. \code{engine.py} is \textbf{481 lines} and \code{test\_engine.py::blind} asserts that no
+role's name appears in its executable code, so the assertion fails the moment a special case is
+written for one of them.
+
+\textbf{Four checks at load, and the third is why the graph earns its indirection.}
+
+\begin{center}\small
+\begin{tabular}{lp{7.1cm}}
+\toprule
+every \code{in:} is emitted & otherwise a role runs on missing data and says something confident
+about nothing \\
+no cycles & arithmetic \\
+\textbf{every emission is consumed} & unless the node is terminal. \code{steer} never reached the
+Proposer; the premise diagnosis was spent on a refusal; \code{sat} was set in two places and emitted
+in none; the eye disagreed with the Reader on 2 of 10 runs and nothing compared them. All found by
+hand, weeks later. \\
+targets resolve & a typo in the flow is not a silent no-op \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent \textbf{The check fired on the flow's first load and on me twice.} First: \emph{```record'
+emits `record' and NO node consumes it''} --- correct, and the honest answer was that its output is a
+file, so a terminal node now declares \code{writes:} rather than being exempted by the engine
+guessing. Second, while writing the test that drops the eye: deleting its node left \code{observed} in
+two roles' \code{in:} lists, and the loader refused with \emph{```analyst' needs `observed', which no
+node emits.''} That is exactly the half-finished edit a human makes, so the test now asserts both
+halves --- the incomplete removal is refused, the complete one loads.
+
+\subsection*{What was built, and what it measures}
+\begin{center}\small
+\begin{tabular}{lrp{4.5cm}}
+\toprule
+\code{engine.py}       & 481 & load, check, sort, execute; thirteen code nodes \\
+\code{crew/*.py}       & 453 & four roles, $\sim$65 lines each \\
+\code{crew/flow.yaml}  & 120 & \textbf{the design} \\
+\code{round.md}        &  84 & the campaign, shown to every role \\
+\code{crew/*.md}       & 233 & four roles' judgement, yours to edit \\
+\code{test\_engine.py} & 232 & 88 checks, all passing \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent Against \code{round.py}'s 2,504. \textbf{Measured in executable statements} --- the fair
+comparison, since the old file explains in 683 \code{\#} comment lines and the new ones explain in
+docstrings that a line counter scores as code --- it is \textbf{437 against 1,099, a factor of 2.5},
+with the wiring moved out of code entirely. My earlier estimate of $\sim$350 lines for the engine was
+low by a third: the flow loader and its four checks are real code that the hard-coded version did not
+need.
+
+\textbf{Both answers, as decided.} \code{recon} is kept, and in the graph it is not even a branch ---
+it changes one argument in the \code{launch} node. The new files sit beside the old: \code{round.py}
+is untouched and still runs the campaign, and two of its functions are imported rather than copied
+(rebuilding a graph from a finished run's spec, reading a diag summary --- 240 lines of real logic)
+until it is deleted after one clean live round.
+
+\subsection*{The metrics: one class each, and a registry}
+Cedric, 5 August: \emph{``I remember we have a lot of metrics --- can we create a class for each of
+them, instead of a distributed code? add a registry to structure these classes. point the metrics
+we gonna use in the md file of the analyst?''} And: \emph{``the work on metrics should go into phase
+12 simplification.''}
+
+It belongs here because it is the same disease as the flow, one level down. Adding \emph{one} metric
+today means editing \textbf{six places}, and none of them is next to any other:
+
+\begin{center}\small
+\begin{tabular}{ll}
+\toprule
+computed              & \code{prototype/Tyssue/tube\_analysis.py} \\
+reduced over time     & \code{run\_one.py} --- \code{\_final \_peak \_floor \_trend \_span
+                        \_measured\_frac} \\
+admitted              & \code{predict.SERIES\_QUANTITIES} (24) $\times$ \code{SUFFIXES} (6) $=$ 156
+                        names \\
+documented            & \code{predict.METRIC\_NOTES} (32) \\
+grouped by question   & \code{predict.METRIC\_GROUP} (5) \\
+withdrawn / rejected  & \code{predict.WITHDRAWN} (114) / \code{REJECTED\_METRICS} (4) \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent And then consumed everywhere: \code{protr} alone appears in \textbf{eight} files ---
+biologist, critic, control, collector, archivist, logic, engine, composition\_space. \code{act\_cv},
+which I added two days ago, is in eight. A quantity whose definition is in one file and whose
+\emph{meaning} is in another is exactly how \code{spot\_spacing\_cells} came to be admitted in three
+suffixed forms that no real run's summary contains --- so a prediction naming it can never be scored,
+and that is the one failure still open in the old test suite.
+
+\begin{verbatim}
+@register
+class ActCV(Metric):
+    name   = "act_cv"
+    group  = "chemistry"                  # which question it answers
+    note   = "activity CV -- scale-free, survives a collapsing or exploding level"
+    series = True                         # -> the six temporal reductions
+    refuse_if = "act_cv <= 0.05"          # the guard that is inline today
+    def compute(self, f):
+        act = f.activity
+        return act.std() / abs(act.mean()) if abs(act.mean()) > 1e-12 else 0.0
+\end{verbatim}
+
+\noindent One class replaces six registrations, and the registry \emph{derives} what is
+hand-maintained now: \code{registry.names()} for the 156 admitted names,
+\code{registry.notes()} for the bank the Proposer is handed, the \code{group} field for
+\code{METRIC\_GROUP}, \code{@withdrawn("reason")} for the 114, \code{registry.compute\_frame(state)}
+for the \code{frame\_metrics} monolith, and \code{refuse\_if} for the guards written inline --- the
+one that says \code{corr\_act\_rad} must not be computed on a dead field.
+
+\textbf{On pointing the metrics from \code{analyst.md}, with one change.} The md should name the
+\emph{questions}, not the list. If it carried the 156 names they would drift from the registry, and a
+metric list that has stopped describing the code is this campaign's most reliable defect --- a limit
+in a comment, a paper's own $\phi$, a rail read as a result. So \code{analyst.md} says \emph{``lead
+with protrusion: \code{protr\_peak}, \code{n\_tubes}, \code{protrusion\_aspect\_max}''} and the
+registry stays the source of truth, with a test asserting that \textbf{every metric named in any
+\code{.md} exists in the registry}. Prose may point; it may never define. Same rule as the flow
+check, and the same reason.
+
+\textbf{Not while a round is live.} \code{cluster.py} maps \code{/workspace} to
+\code{/groups/.../Graph}, and \code{run\_one.py} --- which executes \emph{on the cluster} --- imports
+\code{predict} for \code{SERIES\_QUANTITIES}. So the entire metric stack is live code for the seven
+jobs now at frame 110 of 900. Editing it mid-round would reproduce the defect that broke the Table~1
+reproduction exactly: trained at one commit, evaluated at another, with the metric redefined in
+between. The refactor waits for round 3 to land.
+
+\textbf{What you get.} A loop of four roles and $\sim$5 calls a round that keeps the three things the
+control cannot have --- composition, a structural critic, and an eye --- and drops the eleven that
+were judging without learning. \emph{To be agreed before any of it is committed.}
+\end{phasebox}
+
+\begin{phasebox}{Phase 13 --- The demonstration \hfill \todo}
 \textbf{Goal.} Run the designed grid --- six to eight simulations --- that produces the figure:
 tube, undulation and branching, at Okuda's settings.
 
 \textbf{What you get.} \emph{The figure.}
 \end{phasebox}
 
-\begin{phasebox}{Phase 13 --- The method claim \hfill \todo}
+\begin{phasebox}{Phase 14 --- The method claim \hfill \todo}
 \textbf{Goal.} Write up what the loop found by itself versus what we told it, with the record of
 predictions and retractions as the evidence.
 

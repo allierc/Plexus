@@ -165,13 +165,13 @@ def frame_metrics(frames):
     not a signal. The loop could not have found the period at any threshold, on any statistic.
 
     ONE DEFINITION PER NAME. `protr` was computed here from VERTEX positions and in
-    tube_analysis from CELL CENTROIDS, and both were lifted into the same diag.json -- so one
+    tissue_analysis from CELL CENTROIDS, and both were lifted into the same diag.json -- so one
     summary carried two different numbers under one word. It is centroid-referenced in both
     places now, which changes what `protr_peak` means against the archive; that is acceptable
     because the archive is not treated as reliable evidence, and carrying two definitions of one
     word forever is not.
     """
-    from tube_analysis import _cell_centroids, protrusion_ratio
+    from tissue_analysis import _cell_centroids, protrusion_ratio
     keys = ("n_cells", "protr", "protr_p99", "r_cv", "gyr_prolate", "gyr_oblate",
             "act_mean", "act_sd", "act_cv", "act_occupancy", "act_max", "act_min",
             "red_frac", "act_alive", "corr_act_rad", "act_at_tip")
@@ -227,11 +227,11 @@ def frame_metrics(frames):
 def protr_of(pos):
     """percentile(r,95)/median(r) about the TISSUE CENTROID. NOT tube_len/tube_diam.
 
-    The formula now lives in tube_analysis.protrusion_ratio and is shared with `ta_protr`, so the
+    The formula now lives in tissue_analysis.protrusion_ratio and is shared with `ta_protr`, so the
     two cannot silently become different quantities again (they did: ta_* measured radius from the
     world origin, this one from the centroid, and both were called `protr`).
     """
-    from tube_analysis import protrusion_ratio
+    from tissue_analysis import protrusion_ratio
     return protrusion_ratio(np.linalg.norm(pos - pos.mean(0), axis=1))
 
 
@@ -287,7 +287,7 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     _beat = _heartbeat(name, t0)
     Hf, out = engine_run(sim, device=device, on_frame=_beat)
     # THE LAST BEAT. The heartbeat fires from on_frame, so it stopped the instant the loop ended
-    # -- and everything after this line (tube_analysis, morphology, the movie, the strip) takes
+    # -- and everything after this line (tissue_analysis, morphology, the movie, the strip) takes
     # minutes. A run that had FINISHED its 900 frames therefore went silent and was killed as
     # "wedged, not slow" while it was writing its own results. Marking the phase means staleness
     # can mean wedged again, because a run in `analysing` is never a straggler.
@@ -352,11 +352,11 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     ANALYSIS_STRIDE = 25
 
     # --------------------------------------------------------------- the REAL tube metrics
-    # tube_analysis is the archive's own metric bank. Comparing against archived numbers requires
+    # tissue_analysis is the archive's own metric bank. Comparing against archived numbers requires
     # ITS definitions, not look-alikes of our own.
     tube = {}
     try:
-        from tube_analysis import analyze
+        from tissue_analysis import analyze
         samp = np.unique(np.append(np.arange(0, T, ANALYSIS_STRIDE), T - 1))
         # red_frac must be thresholded at the GROWTH OPERATOR'S OWN switch, not at the midpoint of
         # the activator's current range. The relative version is scale-free and therefore blind --
@@ -371,14 +371,14 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
         if raw.get("tube_diam_final", 0) > 1e-9:
             raw["aspect_len_over_diam"] = round(
                 float(raw["tube_len_final"]) / float(raw["tube_diam_final"]), 3)
-        # NAMESPACE THEM. tube_analysis computes on 40 SAMPLED frames with its own body-median
+        # NAMESPACE THEM. tissue_analysis computes on 40 SAMPLED frames with its own body-median
         # definition; our frame_metrics computes on all 901. Merging them unprefixed produced
         # `protr_final 3.124 > protr_peak 1.732`, which is impossible -- two different quantities
         # under one name. That is the SAME defect I had just diagnosed, committed again one
         # function later. Prefix `ta_` so provenance is visible in the summary itself.
         tube = {f"ta_{k}": v for k, v in raw.items()}
     except Exception as e:
-        print(f"[{name}] tube_analysis unavailable: {type(e).__name__}: {str(e)[:80]}", flush=True)
+        print(f"[{name}] tissue_analysis unavailable: {type(e).__name__}: {str(e)[:80]}", flush=True)
 
     # ------------------------------------------------------------- WHICH OF OKUDA'S SHAPES IS IT
     # THE ARBITER, as of 2026-08-01. The instrument gate used to certify metrics by making them
@@ -393,7 +393,7 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     morph = {}
     try:
         import morphology as MP
-        from tube_analysis import _cell_centroids
+        from tissue_analysis import _cell_centroids
         series = []
         for t in np.unique(np.append(np.arange(0, T, ANALYSIS_STRIDE), T - 1)):
             pos, mt, _ = fr[int(t)]
@@ -515,7 +515,7 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
                     # where the spurious peak sits. The last admissible frame is the one before.
                     last_valid_i = min(last_valid_i, max(0, fold_frame - 1))
         else:
-            horizon = {"horizon": None, "why": "no metrics.npz (tube_analysis did not run)"}
+            horizon = {"horizon": None, "why": "no metrics.npz (tissue_analysis did not run)"}
     except Exception as e:
         # Loud, not silent: if the horizon cannot be computed we must not quietly fall back to
         # scoring the whole run, because that is the behaviour being fixed.
@@ -576,7 +576,7 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
                "protr_final_untruncated": round(per_frame["protr"][-1], 3),
                "n_cells_final": int(per_frame["n_cells"][-1]),
                # ONE PRODUCER PER NAME. These used to be written here from `per_frame` AND again by the
-               # lift below from tube_analysis's coarse series -- the same word, two numbers, one
+               # lift below from tissue_analysis's coarse series -- the same word, two numbers, one
                # diag.json. They come from the every-frame table only, and the lift skips any name
                # this table already owns.
                "red_frac_final": round(per_frame["red_frac"][-1], 3),
@@ -585,14 +585,14 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     summary.update(tube)                       # the archive's own definitions, for comparison
     # THE PATTERN, LIFTED INTO THE SUMMARY. pattern_scale has existed and been certified for
     # weeks -- weekend.py records it: "n_spots exact at 3/5/12, spacing within 13% of
-    # R sqrt(4pi/k)" -- and tube_analysis computes it every frame. It reached metrics and stopped
+    # R sqrt(4pi/k)" -- and tissue_analysis computes it every frame. It reached metrics and stopped
     # there, so the summary the agents read carried no pattern number at all. The consequence is
     # the phase's headline finding: the run with the finest Turing field in the campaign is
     # recorded as `morphology=sphere, protr 1.003`, a null, because shape was measured and
     # pattern was not. Identical in shape to the reservoir counters, which divide_3d also
     # computed and nobody carried.
     # READ FROM THE SERIES ON DISK, not from `per_frame`. The first wiring looked in `per_frame`, which does
-    # not carry them: pattern_metrics is merged into the per-frame record by tube_analysis and
+    # not carry them: pattern_metrics is merged into the per-frame record by tissue_analysis and
     # reaches metrics.json, so the series is where they live. Measured after that wiring shipped:
     # nine finished runs, "pattern keys: NONE" in every summary while n_spots, spot_cells_med,
     # spot_cells_max, spot_frac and spot_spacing_cells sat in metrics.json all along. The same
@@ -622,8 +622,8 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
                 _rv = round(float(_v), 4) if isinstance(_v, float) else _v
                 # FILL, NEVER OVERWRITE. `red_frac_final` and `act_max_final` are already in the
                 # summary from `per_frame`, measured with run_one's own definitions -- per_frame thresholds
-                # red_frac at half the activator's current RANGE, tube_analysis at the growth
-                # operator's absolute switch `a_sw`. tube_analysis's is the better definition and
+                # red_frac at half the activator's current RANGE, tissue_analysis at the growth
+                # operator's absolute switch `a_sw`. tissue_analysis's is the better definition and
                 # replacing it here would silently redefine a metric mid-campaign, so every
                 # archived run would carry a number that no longer means what the new ones mean.
                 # Changing a definition is a deliberate act with a version bump, not a side
@@ -634,11 +634,11 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
                 # `predict.Clause.check` looks the metric up by exact key: an admitted `r_cv`
                 # against a summary holding only `r_cv_final` is unmeasured, silently.
                 # Never overwrite: run_one's own `per_frame` keys are measured from VERTEX positions and
-                # tube_analysis's from CELL CENTROIDS, and letting one quietly replace the other
+                # tissue_analysis's from CELL CENTROIDS, and letting one quietly replace the other
                 # is exactly the protr/ta_protr divergence again.
                 # ...EXCEPT where run_one already defines a family under that name. `protr`,
                 # `act_max` and `red_frac` are measured by BOTH: run_one's `per_frame` from VERTEX
-                # positions and an activator thresholded at half its own range, tube_analysis's
+                # positions and an activator thresholded at half its own range, tissue_analysis's
                 # from CELL CENTROIDS and the growth operator's absolute switch. The summary
                 # already carries protr_peak/protr_final, act_max_final and red_frac_final from
                 # the first; writing the bare name from the second puts two definitions of one
@@ -983,7 +983,7 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60, movie=True):
     def classes_of(pt, mt):
         """Per-cell structural class for the cell-type row. Loud if unavailable."""
         try:
-            from tube_analysis import cell_classes
+            from tissue_analysis import cell_classes
             return cell_classes(pt, mt)
         except Exception as e:
             print(f"[{name}] cell-type row unavailable ({type(e).__name__}: {str(e)[:60]})",
@@ -1115,7 +1115,7 @@ def mechanics(name, fr, cfg, out_dir, n=24):
             x, es, et, ef, nF, A0, P0, V0, kA, kP, kV, Lam, Gam)
         cen_np = cen.numpy()
         r = np.linalg.norm(cen_np - cen_np.mean(0), axis=1)
-        prot = r > 1.3 * np.median(r)                      # the protruding cells (tube_analysis defn)
+        prot = r > 1.3 * np.median(r)                      # the protruding cells (tissue_analysis defn)
         fmag = np.linalg.norm(f.numpy(), axis=1)
         vel = (np.linalg.norm(cen_np[:len(prev_cen)] - prev_cen, axis=1).mean()
                if prev_cen is not None and len(prev_cen) else 0.0)

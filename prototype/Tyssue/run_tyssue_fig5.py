@@ -166,7 +166,7 @@ def run_all(only=None):
                     mt, pt, a = frame(int(t)); act = np.clip((a - np.percentile(a, 5)) / (np.percentile(a, 99) - np.percentile(a, 5) + 1e-9), 0, 1)
                     _draw(axm, pt, mt, 3.90, azim=(2 * j) % 360, act=act, Lbox=L3); wri.grab_frame()
             plt.close(figm)
-            from tube_analysis import analyze                # per-frame hollow count / size CV / tube diameter
+            from tissue_analysis import analyze                # per-frame hollow count / size CV / tube diameter
             mf = []
             for t in np.unique(np.linspace(0, T - 1, 40).astype(int)):
                 mt, pt, _ = frame(int(t)); mf.append((int(t), pt, mt))

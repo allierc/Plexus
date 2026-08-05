@@ -89,7 +89,7 @@ class CampaignConfig:
         #
         # `calibrate_success.py` derives them. protrusion = percentile(r,95)/median(r) is measured
         # on analytic capsules of KNOWN aspect ratio (no simulator in the loop), against the same
-        # tube_analysis.protrusion_ratio the campaign uses:
+        # tissue_analysis.protrusion_ratio the campaign uses:
         #       sphere (aspect 1, THE NULL) 1.000    aspect 1.5  1.204    aspect 2  1.378
         #       aspect 3  1.608     aspect 4  1.721     aspect -> inf  1.900 (the CEILING)
         # A capsule of aspect A has a parallel-sided barrel (A-1) diameters long; A = 2 is the

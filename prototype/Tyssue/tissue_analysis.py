@@ -147,283 +147,84 @@ def cell_census(pt, mt, act, a_sw=None):
                 red_at_tip=round(red_at_tip, 3), n_tip=int(tip.sum()), n_red=int(red.sum()))
 
 
+def _discovery_path():
+    """Put discovery_okuda on sys.path -- that is where the metric registry lives.
+
+    The registry is an INSTRUMENT OF THE CAMPAIGN, so it belongs beside the loop that owns it rather
+    than in the vertex-model prototype. `pattern_scale` was moved for the same reason, and keeping it
+    here is how it stayed uncertified-by-omission and unread for weeks.
+    """
+    import os as _os
+    import sys as _sys
+    root = _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__))))
+    for cand in (_os.path.join(root, "Plexus", "discovery_okuda"),
+                 _os.path.join(root, "discovery_okuda")):
+        if _os.path.isdir(cand):
+            if cand not in _sys.path:
+                _sys.path.insert(0, cand)
+            return cand
+    return None
+
+
 def frame_metrics(pt, mt, act=None, a_sw=None):
-    """All per-frame tube-quality metrics in one dict. `act` (per-cell activator) adds red_frac -- the
-    fraction of ACTIVATED cells: LOW == localised spots (distinct tubes), HIGH == the activator has
-    spread over the shell (one fat lumpy lobe, not tubes).
+    """All per-frame metrics in one dict, computed by the registry in `metrics.py`.
 
-    `a_sw` is the growth operator's OWN switch. Pass it. Without it the threshold falls back to the
-    midpoint of the activator's current range, which is RELATIVE and therefore blind: recomputed
-    every frame, it always selects roughly the top half of whatever is there, so it reports the same
-    number for a developing pattern, a frozen one and a dying one. Measured on p1_ko_divide_3d it sat
-    at exactly 0.070 with n_red exactly 35 for all 40 frames while the pattern visibly changed.
-    Thresholding at a_sw instead makes red_frac mean something mechanical -- the fraction of cells
-    the growth operator actually considers switched on -- and lets it move.""" 
-    es, et, ef, nF = (np.asarray(mt["E_srce"]), np.asarray(mt["E_trgt"]), np.asarray(mt["E_face"]), mt["nF"])
-    area, _, _, vf = face_geometry_3d(torch.as_tensor(pt), torch.as_tensor(es), torch.as_tensor(et), torch.as_tensor(ef), nF)
-    area, vf = area.numpy(), vf.numpy()
-    a = area[area > 1e-9]; v = np.abs(vf[np.abs(vf) > 1e-9])
-    hollow, _, hst = hollow_flags(pt, mt)
+    THIS FUNCTION WAS 278 LINES and is now this. It was long for a structural reason, not because the
+    arithmetic was hard: face areas, cell volumes, centroids, radii, the shape index and the gyration
+    eigenvalues are each needed by several metrics, so they were built in the MIDDLE of the expressions
+    that used them -- and once the arrays are mid-function, so is every metric that touches them. A
+    metric's definition, its meaning, its admission and its group therefore lived in four different
+    files, and adding one meant editing six places.
 
-    # THE TOTALS, which were being computed and thrown away. Only their COEFFICIENTS OF VARIATION
-    # were kept, so the campaign could see how UNEQUAL the cells were but never how big the tissue
-    # was. Three of the ten premises in discovery/PREMISES.md are therefore unmeasurable from our
-    # own records:
-    #     #1 cells grow by taking material in   -> needs V_total(t_end) > V_total(t_start)
-    #     #3 a cell divides because it got big  -> needs mean cell volume roughly steady
-    #     #7 a sheet does not absorb added area by stretching -> needs area against volume
-    # and so is the question Cedric asked about the transition in mini_grow_divide_bigger.
-    m_size = dict(A_total=round(float(a.sum()), 3), V_total=round(float(v.sum()), 3),
-                  v_cell_mean=round(float(v.mean()), 5), a_cell_mean=round(float(a.mean()), 5))
-    # REDUCED VOLUME, the standard dimensionless measure of EXCESS AREA for a closed shell:
-    #     rv = 6 sqrt(pi) V / A^{3/2},   rv = 1 for a sphere, rv < 1 means more area than a sphere
-    #     of that volume can hold -- i.e. the shell MUST wrinkle, buckle or fold.
-    # This is the criterion that decides whether out-of-plane bumps are a mechanism or a defect,
-    # and it is computed on the ENCLOSED volume of the shell (divergence theorem over the closed
-    # surface), not on the sum of cell volumes, because it is the enclosure that is over-covered.
-    # TOPOLOGY, every frame. V - E + F = 2 - 2g. Premise #9 (a closed epithelium is a sphere with
-    # no holes) is the test that separates a discovery from a corrupted mesh -- no operator in this
-    # substrate can fuse two surfaces, so a handle cannot be created legally. It was computable all
-    # along and simply never recorded, which is why the buckling transition needed a bespoke script
-    # to check rather than a column in the table.
-    try:
-        from tyssue_diag import mesh_genus
-        _g = mesh_genus(mt)
-        m_size["euler"] = int(_g.get("euler", 0))
-        m_size["genus"] = int(_g.get("genus", -1))
-    except Exception:
-        pass
-    # SELF-INTERSECTION. Cast rays from the tissue centroid and count how many times each pierces
-    # the surface. A simple closed shell gives EXACTLY ONE crossing per ray; more means the sheet
-    # has folded through itself, which is the one thing a physical tissue cannot do.
-    #
-    # GENUS DOES NOT SUBSTITUTE FOR THIS, and believing it did cost a wrong conclusion. Euler
-    # characteristic is COMBINATORIAL -- it reads the connectivity, not the coordinates -- so a
-    # shell crumpled seventeen layers deep through itself still reports genus 0, "sphere (as
-    # built)". Measured on mini_grow_divide_bigger: genus 0 at every frame, while the ray test goes
-    # from 100% single crossings at frame 384 to 0% (median 13) at frame 423. The buckling
-    # transition was called physical on the strength of the genus check alone.
-    try:
-        _liv = ef < nF
-        _es, _et, _ef = es[_liv], et[_liv], ef[_liv]
-        _cnt = np.bincount(_ef, minlength=nF).astype(float)
-        _cen = np.zeros((nF, 3)); np.add.at(_cen, _ef, pt[_es]); _cen /= np.maximum(_cnt, 1)[:, None]
-        _A, _B, _C = _cen[_ef], pt[_es], pt[_et]          # the same fan triangulation used below
-        _e1, _e2 = _B - _A, _C - _A
-        _o = pt.mean(0)
-        _g = np.random.default_rng(12345)
-        _d = _g.normal(size=(96, 3)); _d /= np.linalg.norm(_d, axis=1, keepdims=True)
-        _tv = _o - _A; _hits = []
-        for _k in range(_d.shape[0]):                      # Moeller-Trumbore, one ray at a time
-            _pv = np.cross(_d[_k], _e2); _det = (_e1 * _pv).sum(1)
-            _ok = np.abs(_det) > 1e-12
-            _inv = np.zeros_like(_det); _inv[_ok] = 1.0 / _det[_ok]
-            _u = (_tv * _pv).sum(1) * _inv
-            _qv = np.cross(_tv, _e1)
-            _v = (_d[_k] * _qv).sum(1) * _inv
-            _t = (_e2 * _qv).sum(1) * _inv
-            _hits.append(int((_ok & (_u >= 0) & (_u <= 1) & (_v >= 0) & (_u + _v <= 1)
-                              & (_t > 1e-9)).sum()))
-        _h = np.asarray(_hits)
-        m_size["ray_single_frac"] = round(float((_h == 1).mean()), 4)
-        m_size["ray_cross_med"] = int(np.median(_h))
-    except Exception:
-        pass
-    # Fan each face from its own centroid: for half-edge (s,t) of face f the triangle is
-    # (c_f, p_s, p_t). Needs no new vertex array and inherits the half-edges' orientation, so the
-    # signed volume comes out consistently. Dead half-edges (ef >= nF) are dropped.
-    try:
-        live = ef < nF
-        es_, et_, ef_ = es[live], et[live], ef[live]
-        cnt = np.bincount(ef_, minlength=nF).astype(float)
-        cen = np.zeros((nF, 3))
-        np.add.at(cen, ef_, pt[es_])
-        cen /= np.maximum(cnt, 1)[:, None]
-        c = cen[ef_]
-        cr = np.cross(pt[es_] - c, pt[et_] - c)
-        A_enc = 0.5 * float(np.linalg.norm(cr, axis=1).sum())
-        V_enc = abs(float((c * cr).sum()) / 6.0)
-        m_size["A_enclosing"] = round(A_enc, 3)
-        m_size["V_enclosed"] = round(V_enc, 3)
-        if A_enc > 1e-9:
-            m_size["reduced_volume"] = round(6.0 * np.sqrt(np.pi) * V_enc / A_enc ** 1.5, 4)
-    except Exception:
-        pass
-    # CELL SHAPE, not cell size. Everything else recorded here is size (area_cv, vol_cv) or
-    # tissue-level (protrusion, tube diameter). Nothing measured the SHAPE of a cell -- and
-    # `face_polygons_3d` has been computing the shape index, perimeter/sqrt(area), and throwing it
-    # away since the beginning.
-    #
-    # It matters because it has two principled reference values, not an arbitrary bar:
-    #     p0     the cells' own PREFERRED shape index (3.50 in this recipe)
-    #     3.81   the rigidity transition (Bi 2015) -- above it a tissue FLOWS and cannot hold a
-    #            shape; below it the tissue is solid and resists rearrangement
-    # Measured on the run-up end state: body cells 3.85, TUBE cells 3.97, worst 5% at 4.24 (a 2:1
-    # rectangle). So every cell is stretched past its preference and the whole tissue is above the
-    # transition -- which may be the crux of forced-versus-grown: a tissue has to be fluid to flow
-    # into a tube, and a fluid tissue cannot then hold one.
-    # Found by Cedric looking at the cross-section and saying the tube cells were too thin.
-    from tyssue_ops3d import face_polygons_3d as _fp
-    _, _a, _p, _si = _fp(pt, mt)
-    _ok = np.isfinite(_si) & (_a > 1e-9)
-    m_shape = (dict(shape_idx_mean=round(float(np.nanmean(_si[_ok])), 3),
-                    shape_idx_med=round(float(np.nanmedian(_si[_ok])), 3),
-                    shape_idx_p95=round(float(np.nanpercentile(_si[_ok], 95)), 3),
-                    shape_idx_max=round(float(np.nanmax(_si[_ok])), 3),
-                    # THE FLOOR. perimeter/sqrt(area) cannot go below 2 sqrt(pi) = 3.5449 for ANY
-                    # shape -- that is a circle, and it is geometry, not biology. A measured value
-                    # below it is a BROKEN MEASUREMENT, never a finding. Nothing recorded the
-                    # minimum, so the one statistic that can prove the ruler is lying was missing.
-                    shape_idx_min=round(float(np.nanmin(_si[_ok])), 3))
-               if _ok.any() else dict(shape_idx_mean=0.0, shape_idx_med=0.0, shape_idx_min=0.0,
-                                      shape_idx_p95=0.0, shape_idx_max=0.0))
-    # THE THREE MESH-FAILURE MODES, SEPARATELY (see tyssue_diag.mesh_faults). They used to be ORed
-    # into `hollow_frac` alone, which cannot distinguish a fifth of the cells being slightly bent
-    # from a fifth being destroyed -- and the archive has runs at hollow_frac 0.97. Only `broken`
-    # (under-connected, or the ring is not a valid polygon) invalidates the physics; a sliver is
-    # usually just a cell that divided last frame.
-    m = dict(cells=int(nF), **m_shape, **m_size,
-             broken_n=int(hst["n_broken"]), broken_frac=round(float(hst["frac_broken"]), 4),
-             folded_n=int(hst["n_folded"]), folded_frac=round(float(hst["frac_folded"]), 4),
-             sliver_n=int(hst["n_sliver"]), sliver_frac=round(float(hst["frac_sliver"]), 4),
-             # DERIVED, back-compat only: the frozen legacy blend folded|sliver|under-connected.
-             hollow_n=int(hst["n"]), hollow_frac=round(float(hst["frac"]), 4),
-             area_cv=round(float(a.std() / (a.mean() + 1e-9)), 3) if a.size else 0.0,
-             vol_cv=round(float(v.std() / (v.mean() + 1e-9)), 3) if v.size else 0.0)
-    _cenl, radl, livem = _cell_centroids(pt, mt); rad = radl[livem]
-    m["protr"] = round(protrusion_ratio(rad), 3)
-    # THE WHOLE DISTRIBUTION OF RADIUS, not one quantile of it. `protr` is p95/median: a TAIL
-    # statistic, so it reads the same for one long tube and for a broad even bulge, and it is
-    # deaf to a single thin spike that never reaches 5% of the cells. Both of these were
-    # ADMITTED metrics with NO PRODUCER -- a prediction naming `r_cv` or `protr_p99` scored
-    # `not measured` and fell to inconclusive, every time, silently.
-    if rad.size > 2 and float(np.median(rad)) > 1e-9:
-        _md = float(np.median(rad))
-        m["r_cv"] = round(float(rad.std() / (rad.mean() + 1e-12)), 4)
-        m["protr_p99"] = round(float(np.percentile(rad, 99) / _md), 3)
-        # SHAPE, not size: the gyration tensor of the live cell centroids. A TUBE is prolate --
-        # one long axis -- and an undulating or many-lobed sphere is not, however high its
-        # protrusion ratio climbs. This is exactly Okuda's phenotype axis (tube / undulation /
-        # branch) and nothing in the bank could separate the first two.
+    `metrics.Frame` now holds that shared geometry, cached, computed once per frame; each Metric
+    subclass carries its own one-line expression, its note as its docstring, and its group. Cedric,
+    5 August: *"can we create a class for each of them, instead of a distributed code? add a registry
+    to structure these classes."*
+
+    THE THREE BUNDLES BELOW STAY AS FUNCTIONS. `pattern_scale.pattern_metrics`, `morphology.classify`
+    and `tube_diameter`/`cell_census` each compute several related keys from one analysis. That is a
+    module, not spread -- splitting them into one class per key would be the same mistake in reverse --
+    so they are called once here and DECLARED in the registry, which knows their keys and their
+    producer.
+
+    `act` is the per-cell activator; `a_sw` is the growth operator's OWN switch. Pass it. Without it
+    `red_frac` falls back to the field's own midpoint, which is RELATIVE and therefore blind: measured
+    on p1_ko_divide_3d it sat at exactly 0.070 with n_red exactly 35 for all 40 frames while the
+    pattern visibly changed.
+    """
+    _discovery_path()
+    from metrics import Frame, compute_frame
+
+    f = Frame(pt, mt, act, a_sw)
+    m = compute_frame(f)
+
+    # ---- pattern scale: how many spots and how far apart, in cell diameters. Okuda's own units.
+    if act is not None and len(act) == f.nF:
         try:
-            _c = _cenl[livem]
-            _w = np.linalg.eigvalsh(np.cov(_c.T))[::-1]          # l1 >= l2 >= l3
-            _tr = float(_w.sum())
-            if _tr > 1e-12:
-                # 1.0 for a sphere, grows with elongation; 3 equal axes -> l1/mean(l2,l3) = 1
-                m["gyr_prolate"] = round(float(_w[0] / (0.5 * (_w[1] + _w[2]) + 1e-12)), 3)
-                # the standard asphericity: 0 for a sphere, 1 for a rod
-                m["gyr_asphere"] = round(float((_w[0] - 0.5 * (_w[1] + _w[2])) / _tr), 4)
-                # 0 for a rod or a sphere, positive for a FLATTENED (oblate) shell -- a vesicle
-                # collapsing into a disc is a failure mode that reads as "not a tube" and had
-                # no number of its own.
-                m["gyr_oblate"] = round(float(1.5 * (_w[1] - _w[2]) / _tr), 4)
-        except Exception:
-            pass
-    if act is not None and len(act):
-        act = np.asarray(act, float)
-        if a_sw is not None:
-            m["red_frac"] = round(float((act > float(a_sw)).mean()), 3)     # ABSOLUTE: the growth switch
-        else:
-            thr = act.min() + 0.5 * (act.max() - act.min())                 # relative fallback (blind; see above)
-            m["red_frac"] = round(float((act > thr).mean()), 3)
-        m["act_mean"] = round(float(act.mean()), 4)
-        m["act_min"] = round(float(act.min()), 6)     # premise 12: a concentration cannot be negative                         # unconditional, threshold-free
-        m["act_max"] = round(float(act.max()), 4)
-        m["act_p95"] = round(float(np.percentile(act, 95)), 4)
-        # THE PATTERN, AS A NUMBER. A mean cannot tell a Turing pattern from a uniform field: 0.5
-        # everywhere and half-at-1/half-at-0 have the SAME mean. The SPATIAL SPREAD is the
-        # pattern's amplitude, and its collapse is the pattern dying.
-        #
-        # Cedric watching a round-2 movie: "a flash of red activity 100% red then a long period of
-        # white, no activity". That is exactly what okuda_route did -- act_max reached 17,678 at
-        # frame 350 and was 0.0105 by frame 807 -- and the loop could not SAY it, because only
-        # act_max and corr_act_rad were admitted. A peak that spikes and a field that dies look
-        # the same in a maximum.
-        m["act_sd"] = round(float(act.std()), 6)
-        # SCALE-FREE, so a claim about "the pattern" is not really a claim about its brightness.
-        # A live Turing field sits around 0.3-1.0; a uniform one goes to zero whatever its level.
-        m["act_cv"] = round(float(act.std() / abs(act.mean())), 4) if abs(act.mean()) > 1e-12 else 0.0
-        # OCCUPANCY: what fraction of the tissue is switched ON. red_frac already measures this
-        # against the growth threshold; this is the same question asked of the field's own range,
-        # so it still means something when the absolute level has collapsed or exploded.
-        _lo, _hi = float(act.min()), float(act.max())
-        m["act_occupancy"] = (round(float((act > _lo + 0.5 * (_hi - _lo)).mean()), 4)
-                              if _hi > _lo + 1e-12 else 0.0)
-        # ALIVE OR NOT, in one boolean per frame: a field with no spread and no occupancy is not
-        # patterning, whatever its mean. This is what makes "the pattern went extinct at frame N"
-        # a measurement rather than a reading of a movie.
-        m["act_alive"] = int(m["act_cv"] > 0.05 and m["act_occupancy"] > 0.01)
-        # IS THE RED WHERE THE BULGE IS? The campaign's actual question -- does the chemistry
-        # drive the shape, or is it decoration on a shape made by something else -- and
-        # `corr_act_rad` has been ADMITTED since the Turing x vertex study while being computed
-        # NOWHERE. Every prediction that named it scored `not measured`.
-        # A CORRELATION NEEDS A SIGNAL TO CORRELATE. Measured on okuda_route's end mesh while
-        # this was being written: corr_act_rad = 0.294 -- which reads as "the chemistry has some
-        # grip on the shape" -- on an activator whose ENTIRE SPREAD ACROSS 3,975 CELLS was
-        # 8.4e-05 around a mean of 0.0128. That is a correlation of round-off. Pearson is
-        # scale-free by construction, so it happily returns a confident number for a dead field,
-        # and a dead field is precisely the state this campaign keeps landing in.
-        #
-        # So the coupling is REFUSED, not reported, when there is no pattern to couple: an
-        # unmeasured metric scores `inconclusive`, which is the honest verdict on "does the
-        # pattern drive the shape" when there is no pattern. The same act_cv > 0.05 floor as
-        # act_alive, so the two cannot disagree about whether a field exists.
-        if act.size == radl.size and livem.sum() > 8 and m.get("act_cv", 0.0) > 0.05:
-            _a, _r = act[livem], radl[livem]
-            if _a.std() > 1e-12 and _r.std() > 1e-12:
-                m["corr_act_rad"] = round(float(np.corrcoef(_a, _r)[0, 1]), 4)
-                # Pearson assumes a LINE. A pattern that switches cells on only at the tips is
-                # not linear in radius, and the correlation understates it. This asks the
-                # question directly: how much more activator is in the outermost tenth of the
-                # tissue than in the tissue as a whole. 1.0 = no relation, > 1 = red at the tips.
-                _tip = _r >= np.percentile(_r, 90)
-                _mu = float(_a.mean())
-                if _tip.any() and abs(_mu) > 1e-12:
-                    m["act_at_tip"] = round(float(_a[_tip].mean() / _mu), 3)
-        radc, ok = radl, livem                                 # tip_act: corr(activator, radius). +1 = activator
-        if ok.sum() > 5 and act[ok].std() > 1e-9 and radc[ok].std() > 1e-9:   # sits at the protruding TIPS (Okuda gradient)
-            m["tip_act"] = round(float(np.corrcoef(act[ok], radc[ok])[0, 1]), 3)
-    # PATTERN SCALE, in cell diameters -- how many spots and how far apart. This is what Okuda
-    # reports ("about five spots on a 2000-cell ball"), and it is the only pattern length we have
-    # that can be compared with a paper: `chi` is a solver rate, not a scale (finding F009).
-    if act is not None and len(act) == nF:
-        try:
-            # pattern_scale now lives with the loop that owns it (discovery_okuda), not with
-            # the vertex-model prototype -- it is an INSTRUMENT of the campaign, and keeping it
-            # beside the engine is how it stayed uncertified-by-omission and unread for weeks.
-            import sys as _sys, os as _os
-            _dk = _os.path.join(_os.path.dirname(_os.path.dirname(_os.path.dirname(
-                _os.path.abspath(__file__)))), "Plexus", "discovery_okuda")
-            _dk = _dk if _os.path.isdir(_dk) else _os.path.join(
-                _os.path.dirname(_os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))),
-                "discovery_okuda")
-            if _os.path.isdir(_dk) and _dk not in _sys.path:
-                _sys.path.insert(0, _dk)
-            from pattern_scale import pattern_metrics as _pm
-            _, _, _cen, _ = face_geometry_3d(torch.as_tensor(pt), torch.as_tensor(es),
-                                             torch.as_tensor(et), torch.as_tensor(ef), nF)
-            m.update(_pm(np.asarray(act, float), es, et, ef, nF, cen=_cen.numpy()))
-        except Exception:
-            pass
-    # WHICH OF OKUDA'S SHAPES IS THIS. sphere / undulation / tube / branched, or `invalid` when
-    # the surface passes through itself -- the campaign has already once reported a crumple as a
-    # morphology. This is the measurement Phase 4 exists for: without it "we reproduced the
-    # figure" can be asserted but not checked.
+            from pattern_scale import pattern_metrics
+            _, _, cen, _ = face_geometry_3d(torch.as_tensor(pt), torch.as_tensor(f.es),
+                                            torch.as_tensor(f.et), torch.as_tensor(f.ef), f.nF)
+            m.update(pattern_metrics(np.asarray(act, float), f.es, f.et, f.ef, f.nF,
+                                     cen=cen.numpy()))
+        except Exception as e:
+            print(f"[metrics] pattern_scale failed: {type(e).__name__}: {e}")
+
+    # ---- which of Okuda's shapes. `ray_single_frac` is passed in because a surface that passes
+    # through itself has no morphology, and the campaign has already once reported a crumple as one.
     try:
-        from morphology import classify as _mclass
-        _cn, _rd, _lv = _cell_centroids(pt, mt)
-        _c = _mclass(_cn, _rd, _lv, m.get("protr", 1.0),
-                     ray_single_frac=m_size.get("ray_single_frac"))
-        m["morphology"] = _c["morphology"]
-        m["morph_why"] = _c["why"]
-        m["n_protrusions"] = _c.get("n_protrusions", 0)
-        m["protrusion_aspect_max"] = round(max(_c.get("aspect") or [0.0]), 3)
-        m["n_tips"] = _c.get("n_tips", 0)
-    except Exception:
-        pass
+        from morphology import classify
+        cn, rd, lv = _cell_centroids(pt, mt)
+        c = classify(cn, rd, lv, m.get("protr", 1.0), ray_single_frac=m.get("ray_single_frac"))
+        m["morphology"] = c["morphology"]
+        m["morph_why"] = c["why"]
+        m["n_protrusions"] = c.get("n_protrusions", 0)
+        m["protrusion_aspect_max"] = round(max(c.get("aspect") or [0.0]), 3)
+        m["n_tips"] = c.get("n_tips", 0)
+    except Exception as e:
+        print(f"[metrics] morphology failed: {type(e).__name__}: {e}")
+
     m.update(tube_diameter(pt, mt))
-    m.update(cell_census(pt, mt, act, a_sw=a_sw))                          # tip/branch/body + red composition
+    m.update(cell_census(pt, mt, act, a_sw=a_sw))      # tip/branch/body + red composition
     return m
 
 
@@ -470,7 +271,7 @@ def analyze(frames, OUT, a_sw=None):
     # runs that only have it.
     # NUMERIC COLUMNS ONLY. `frame_metrics` records the per-frame morphology as a STRING, and
     # casting the whole row to float raised on the first one -- which `run_one` caught, printed as
-    # a one-line "tube_analysis unavailable", and carried on. The cost was invisible and total:
+    # a one-line "tissue_analysis unavailable", and carried on. The cost was invisible and total:
     # no metrics.npz, no metrics.png, no ta_* metrics and NO EVIDENCE HORIZON, on every run since
     # the label was added. Peak and final were then taken over all frames including any after the
     # mesh tore, which is the exact behaviour the horizon exists to prevent.

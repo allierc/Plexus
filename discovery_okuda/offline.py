@@ -510,7 +510,7 @@ if __name__ == "__main__":
     st = install(a.scenario)
     isolate()
     atexit.register(clear_runs, "r0")      # remove what we made, when we are done making it
-    import round as R
+    import round as E
     # LOCK 2: A ROUND ID NO LIVE CAMPAIGN WILL EVER REACH. `isolate()` restores the campaign's
     # state.json, which said `"round": 2` -- so the offline round numbered its runs r002c_* and
     # generated, byte for byte, the names the real round 2 had used. The collision was not a
@@ -530,7 +530,11 @@ if __name__ == "__main__":
     print(f"[offline] round id forced to {OFFLINE_RID}: fabricated runs are r{OFFLINE_RID:03d}*, "
           f"which no live campaign uses")
     print(f"[offline] scenario={a.scenario} mode={a.mode} batch={a.batch} -- no agent, no GPU\n")
-    code = R.run_round(mode=a.mode, batch=a.batch, frames=401)
+    # THE OFFLINE HARNESS DRIVES THE NEW ENGINE. `round.run_round` took (mode, batch,
+    # frames); the engine takes a round id and reads its quantities from config, so the
+    # frame count is no longer a caller's argument -- that was the point of putting
+    # numbers in config rather than in the call.
+    code = E.run_round(f"r{OFFLINE_RID:03d}", mode=a.mode)
     print(f"\n[offline] round exited {code}; {len(st['calls'])} agent call(s) faked: "
           f"{', '.join(sorted(set(st['calls'])))}")
     sys.exit(0 if code == 0 else 1)

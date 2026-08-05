@@ -57,7 +57,7 @@ names, and an agent reads THIRTY-NINE things: 24 quantities grouped by the five 
 campaign actually asks, 6 suffixes, 9 scalars.
 
   A QUANTITY is a per-frame column. Every one of the 24 is produced by
-  `tube_analysis.frame_metrics` (verified by reading it; `t_metrics_have_producers` re-verifies
+  `tissue_analysis.frame_metrics` (verified by reading it; `t_metrics_have_producers` re-verifies
   on every test run). Fourteen of them are ALSO produced every frame by `run_one.frame_metrics`
   -- the chemistry and centroid tiers -- which is where their reductions should be taken from,
   because the mesh tier is sampled every 25 frames and okuda_route's activator is a limit cycle
@@ -91,6 +91,12 @@ from __future__ import annotations
 
 import re
 
+# THE REGISTRY IS THE SOURCE OF TRUTH for what a metric is. Cedric, 5 August: one class per metric,
+# and a registry to structure them. What used to be four literal blocks in this file -- the group
+# dicts, the suffix tuple, the rejected names and 32 notes -- is now derived from `metrics.py`, so a
+# quantity is declared once. This file keeps what it is for: PARSING a prediction and SCORING it.
+import metrics
+
 # =================================================================================================
 # THE SIX REDUCTIONS. A suffix says WHICH NUMBER of a trajectory the claim is about, and the six
 # are the ones that distinguish the runs this campaign keeps confusing:
@@ -106,7 +112,7 @@ import re
 # `_floor` IS NOT CALLED `_min` because `shape_idx_min` is a QUANTITY whose name ends in `_min`,
 # the parser's alternation is longest-first, and the product would then mint `shape_idx_min_min`
 # beside `shape_idx_min` -- two names one edit apart for two different things.
-SUFFIXES = ("_final", "_peak", "_floor", "_trend", "_span", "_measured_frac")
+SUFFIXES = metrics.SUFFIXES        # declared in metrics.py, beside the Metric base
 
 # WHAT EACH REDUCTION IS, COPIED FROM ITS PRODUCER RATHER THAN IMAGINED. `time_analysis.
 # reduce_series` computes these and `REDUCTIONS` there is this tuple without the leading
@@ -142,23 +148,18 @@ SUFFIX_NOTES = {
 
 # =================================================================================================
 # THE 24 QUANTITIES, grouped by the FIVE QUESTIONS. Every one is produced by
-# `tube_analysis.frame_metrics`; fourteen are also produced every frame by `run_one.frame_metrics`.
+# `tissue_analysis.frame_metrics`; fourteen are also produced every frame by `run_one.frame_metrics`.
 #
 # The grouping is not decoration. A prediction that names only shape metrics has not asked whether
 # there was a pattern, or whether the run was evidence at all, and the group headings are what
 # makes that visible to the role writing the claim.
-SERIES_METRICS = {
-    "IS IT A TUBE -- the shape of the tissue": (
-        "protr", "protr_p99", "r_cv", "gyr_prolate", "gyr_oblate", "reduced_volume",
-        "n_tubes", "tube_diam", "n_tips", "protrusion_aspect_max"),
-    "IS IT STILL MADE OF CELLS -- or is the mesh being measured": (
-        "cells", "v_cell_mean", "shape_idx_med", "shape_idx_p95", "shape_idx_min"),
-    "IS THERE A PATTERN AT ALL -- the Turing field": (
-        "act_cv", "act_mean", "act_max", "red_frac", "n_spots", "spot_spacing_cells"),
-    "DOES THE PATTERN GRIP THE SHAPE -- the campaign's question": (
-        "corr_act_rad", "act_at_tip", "red_at_tip"),
-    "IS THIS EVIDENCE AT ALL -- the apparatus, not the biology": (),
-}
+# EVERY GROUP KEEPS ITS KEY, EVEN WITH NO SERIES MEMBERS. `METRIC_GROUP` below iterates over this
+# dict, so dropping a series-less group -- `apparatus` holds only run-level scalars -- silently left
+# its five metrics with no group at all. The original carried the key with an empty tuple; so does
+# this.
+SERIES_METRICS = {q: tuple(n for n in qs if metrics.REGISTRY[n].series
+                           and not metrics.REGISTRY[n].withdrawn)
+                  for q, qs in ((v[0], v[1]) for v in metrics.groups().values())}
 
 # WHY THE FIFTH QUESTION HAS NO PER-FRAME QUANTITY, and why that is the right answer rather than a
 # gap. Every per-frame evidence column is measured INSIDE the window it defines: the horizon is
@@ -172,20 +173,16 @@ SERIES_METRICS = {
 # they come from a separate probe (mechanics, the quasi-static relaxation), from an operator's own
 # history (divide_3d's refusal counter), or from a whole-run predicate that is not one of the six.
 # Each was checked to be actually WRITTEN into the summary before being kept here.
-SCALAR_METRICS = {
-    "IS THERE A PATTERN AT ALL -- the Turing field": (
-        "act_alive_frac", "act_extinct_frame", "act_peak_frame"),
-    "IS THIS EVIDENCE AT ALL -- the apparatus, not the biology": (
-        "mech_p_ratio", "Q_drop", "div_blocked", "buf_full", "div_blocked_first_frame"),
-}
+SCALAR_METRICS = {q: tuple(n for n in qs if not metrics.REGISTRY[n].series
+                                and not metrics.REGISTRY[n].withdrawn)
+                  for q, qs in ((v[0], v[1]) for v in metrics.groups().values())}
 
 SERIES_QUANTITIES = tuple(q for v in SERIES_METRICS.values() for q in v)
 SCALAR_QUANTITIES = tuple(q for v in SCALAR_METRICS.values() for q in v)
 
 # Measured to lie by the instrument gate (F15/F16). Kept nameable so a prediction resting on one
 # is REPORTED as such rather than silently unrecognised -- saying so is the point of the gate.
-REJECTED_METRICS = ("ta_aspect_len_over_diam", "ta_tube_len_final", "retention",
-                    "autocorr_hops_uncalibrated")
+REJECTED_METRICS = tuple(m.name for m in metrics.REGISTRY.values() if m.withdrawn)
 
 # WITHDRAWN -- admitted yesterday, not admitted today, WITH THE REASON. A withdrawn name that is
 # simply deleted becomes "no clause naming a known metric", which tells the agent that wrote it
@@ -263,100 +260,11 @@ WITHDRAWN = {**{q + s: why for q, why in WITHDRAWN_QUANTITIES.items()
 # dead field reads 0.00 and a live Turing field reads about 1. Every note states the NULL reading,
 # because that is what makes a prediction a bet rather than a description. Where a number is
 # quoted it is measured, on okuda_route's per-frame record.
-METRIC_NOTES = {
-    # ---- IS IT A TUBE -------------------------------------------------------------------
-    "protr": "p95/median of cell radius about the tissue centroid. NO = 1.0 (a sphere). A TAIL "
-             "statistic: one long tube and a lumpy ball read alike, and a spike thinner than 5% "
-             "of the cells is invisible to it",
-    "protr_p99": "p99/median of cell radius. NO = 1.0. The only admitted statistic sensitive to a "
-                 "spike in under 5% of cells -- which is what a narrow tube on a 4,000-cell shell is",
-    "r_cv": "sd/mean of cell radius. NO = 0. Rises with ANY departure from a sphere, not only "
-            "with the tail, so it moves when protr cannot",
-    "gyr_prolate": "largest gyration eigenvalue over the mean of the other two. NO = 1.0. Above 1 "
-                   "= ELONGATED along one axis: this is what separates a TUBE from an undulating "
-                   "ball, which raise protr equally",
-    "gyr_oblate": "NO = 0 for a sphere AND for a rod; POSITIVE means flattened -- a vesicle "
-                  "collapsing into a disc, a failure that otherwise reads only as `not a tube`",
-    "reduced_volume": "6 sqrt(pi) V / A^1.5. NO = 1.0 (a sphere). BELOW 1 the shell holds more "
-                      "area than a sphere of that volume can and MUST wrinkle, buckle or fold: "
-                      "the mechanical precondition for budding, not a consequence of it",
-    "n_tubes": "angular clusters of protruding cells = protrusion BASES. NO = 0 (exactly 0 at all "
-               "37 mesh samples of okuda_route). Does NOT move when a tube forks -- that is n_tips",
-    "tube_diam": "2x median perpendicular distance of a tube's cells from its axis. NO = 0. "
-                 "Okuda's own control target: thin_tube vs thick_tube differ in DIAMETER AT EQUAL "
-                 "LENGTH, and n_tubes counts bases, not width",
-    "n_tips": "distinct tips summed over all protrusions. NO = 0. A fork is ONE base with TWO "
-              "tips, so this is the only admitted quantity that moves when a tube branches (Fig 6)",
-    "protrusion_aspect_max": "length/width of the deepest protrusion. NO = 0; a shallow bump is "
-                             "~1; >= 1.5 IS morphology.classify's own tube criterion. okuda_route "
-                             "peaks at 1.006 -- bumps for 901 frames, never a tube",
-    # ---- IS IT STILL MADE OF CELLS ------------------------------------------------------
-    "cells": "live faces in the mesh, at the MESH TIER (every 25 frames). NO = the seed count, "
-             "flat, _trend 0 (no division at all). A tail that is bit-identical sample after "
-             "sample is the VERTEX ARRAY, not biology -- read div_blocked before calling it a "
-             "limit of growth",
-    "v_cell_mean": "mean cell volume. NO = flat (nothing grew and nothing divided). Roughly "
-                   "steady while `cells` climbs = growth absorbed by division, which is premise "
-                   "3; falling = division outruns growth; RISING = cells inflate instead of dividing",
-    "shape_idx_med": "median perimeter/sqrt(area). NO = 3.545, a circle, which is the hard FLOOR "
-                     "for any shape; 3.81 is the rigidity transition -- above it the tissue FLOWS "
-                     "and cannot hold a shape it is pushed into. okuda_route sits at 3.85-3.90",
-    "shape_idx_p95": "the same for the worst-shaped 5% of cells. NO = ~3.8, i.e. even the worst "
-                     "cells are near-regular; okuda_route reaches 7.0, a 4:1 sliver, which means "
-                     "the MESH and not the tissue is what the shape numbers describe",
-    "shape_idx_min": "the best-shaped cell. Cannot fall below 3.5449 for ANY shape -- that is "
-                     "geometry, not biology -- so a value below it is a BROKEN RULER, never a "
-                     "finding. NO = ~3.55. It is the one statistic that can prove the ruler lying",
-    # ---- IS THERE A PATTERN -------------------------------------------------------------
-    "act_cv": "act_sd/act_mean, scale-free, so it survives a collapsing or exploding level. "
-              "NO = 0.00 (uniform OR dead, whatever the mean). A real Turing pattern reads "
-              "0.9-1.8. okuda_route's median over 901 frames is 0.025: there was no pattern",
-    "act_mean": "mean activator. CANNOT SEE A PATTERN -- 0.5 everywhere and half-at-1/half-at-0 "
-                "give the same number. Read it for the LEVEL (a collapse, a blow-up), never as "
-                "evidence that a field exists",
-    "act_max": "peak activator over the cells. NO answer of its own: it reads high for one "
-               "exploding cell and for a healthy field alike. okuda_route peaks at 9.5e5, which "
-               "is a singularity, not a pattern",
-    "red_frac": "fraction of cells above the growth operator's OWN switch a_sw -- the cells growth "
-                "actually acts on. NO = 0. LOW = localised spots (distinct tubes); 1.0 means "
-                "growth is acting on EVERY cell at once, which grows a sphere (okuda_route: 0.997)",
-    "n_spots": "distinct activator domains on the cell graph. NO = 0. Okuda's own reading is "
-               "about five on a 2,000-cell ball; 48 is noise and 1 is a single bud",
-    "spot_spacing_cells": "centre-to-centre domain spacing IN CELLS -- the only pattern length we "
-                          "have that is comparable with the paper (chi is a solver rate, not a "
-                          "scale). NOT MEASURED below 2 spots: okuda_route measures it on 70% of "
-                          "samples, so read its _measured_frac first",
-    # ---- DOES THE PATTERN GRIP THE SHAPE ------------------------------------------------
-    "corr_act_rad": "Pearson r between a cell's activator and its radius. NO = 0. REFUSED (not "
-                    "measured) when act_cv <= 0.05, because a correlation on a dead field is a "
-                    "correlation of round-off -- it reads a confident 0.294 on a spread of 8e-05. "
-                    "okuda_route: measured_frac 0.230, so 77% of that run has NO answer here",
-    "act_at_tip": "mean activator in the outermost tenth of cells, over the tissue mean. NO = 1.0 "
-                  "(no relation to shape); above 1 the activator sits at the protrusions. The "
-                  "same question as corr_act_rad without assuming the relation is a straight "
-                  "line, and refused on a dead field for the same reason",
-    "red_at_tip": "fraction of ACTIVATED cells that are tip cells. NO = 0 -- which is also what it "
-                  "reads when nothing is activated at all, so read it beside red_frac. 1.0 = the "
-                  "activator is CONFINED to the tips, which is what a clean tube looks like",
-    # ---- the run-level scalars ----------------------------------------------------------
-    "act_alive_frac": "fraction of frames in which a pattern existed at all (act_cv > 0.05 AND "
-                      "occupancy > 0.01). NO = 0.0; 1.0 = patterned throughout; 0.2 = a FLASH, "
-                      "and the last 80% of the run grew on a corpse",
-    "act_extinct_frame": "the frame at which the pattern LAST stopped existing; absent if it "
-                         "never did. Turns `the chemistry died` into a measurement",
-    "act_peak_frame": "the frame of maximum act_max. Early, with act_extinct_frame later, is a "
-                      "blow-up followed by extinction -- not a pattern",
-    "mech_p_ratio": "pressure in protruding cells over body cells. ~1 = a growth-driven "
-                    "EQUILIBRIUM shape; ~3 = a FORCED protrusion, held by the driver",
-    "Q_drop": "protrusion LOST when the forces are switched off and the tissue relaxes from its "
-              "own end state. ~0 = an equilibrium shape; large = the shape was being held",
-    "div_blocked": "divisions REFUSED for want of vertex buffer. NO = 0. Non-zero means growth "
-                   "stopped where the ARRAY ended, not where the biology did",
-    "buf_full": "the vertex array filled (1/0). A run that ends here has not found a limit of "
-                "growth, and every growth number after that frame describes the reservoir",
-    "div_blocked_first_frame": "the frame at which the buffer first refused a division; "
-                               "everything after it is a run against a wall. Absent if it never did",
-}
+METRIC_NOTES = metrics.notes()   # each quantity's note is its class docstring in metrics.py
+# ONE PLACE, AND IT IS THE CLASS. These 94 lines were a second copy of what every Metric
+# subclass already says in its docstring, and the two had no way to be checked against each
+# other -- which is how `wavelength_cells` came to be documented under a name pattern_scale
+# never produced. The docstring is the note; there is nothing left to drift.
 
 # =================================================================================================
 # DERIVED. The bank is generated, so a quantity cannot be added without its six reductions and a

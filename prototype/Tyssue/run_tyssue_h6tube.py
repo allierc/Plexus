@@ -154,7 +154,7 @@ def do(preset):
             for j, t in enumerate(keep):
                 mt, pt, a = frame(int(t)); draw_movie_frame(axm, axin, pt, mt, 3.90, (2 * j) % 360, col(mt, pt, a), L3, L2); wri.grab_frame()
         plt.close(figm)
-        from tube_analysis import analyze                    # per-frame hollow count / size CV / tube diameter
+        from tissue_analysis import analyze                    # per-frame hollow count / size CV / tube diameter
         mf = []
         for t in np.unique(np.linspace(0, T - 1, 40).astype(int)):
             mt, pt, a = frame(int(t)); mf.append((int(t), pt, mt, a))   # a -> red_frac (activator localisation)
