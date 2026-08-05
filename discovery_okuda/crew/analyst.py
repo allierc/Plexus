@@ -49,7 +49,8 @@ def run(bundle):
 
     prompt = _prompt.build("analyst", [
         ("The control", bundle.get("control")),
-        ("Every run this round, with its metrics", bundle.get("metrics"), {"limit": 30000}),
+        ("Every run this round, with its metrics",
+         _prompt.bank_only(bundle.get("metrics")), {"limit": 60000}),
         ("What each run predicted, and how it scored", bundle.get("predictions")),
         ("Observations -- broken premises, inert operators, saturation",
          bundle.get("observations")),

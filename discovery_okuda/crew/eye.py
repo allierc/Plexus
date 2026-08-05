@@ -104,5 +104,8 @@ def run(bundle):
         # thing it fans out over, which is exactly the role knowledge it is built not to have.
         ("What the metrics say about this run", _own(bundle, name)),
     ])
-    ok, text = run_agent("eye", prompt, ledger=bundle.get("ledger"))
+        # QUIET PER CALL. A fanned-out node runs once per run, so `[eye] 0.2 min, tools: Readx1` printed
+    # eleven identical lines while the round already reports `[round] eye: 11/11`. The eye's own words
+    # are what is worth reading, and eleven timing lines pushed them off the screen.
+    ok, text = run_agent("eye", prompt, ledger=bundle.get("ledger"), quiet=True)
     return text if ok else ""
