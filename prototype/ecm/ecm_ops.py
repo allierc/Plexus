@@ -50,6 +50,13 @@ from plexus.models.registry import register_operator
 STRESS_HISTORY: list = []
 BALL_RADIUS: list = []
 
+# THE REACTION THE TISSUE NEVER FELT. `cell_to_ecm` computes the force the tissue puts on the matrix
+# and, by Newton's third law, that force has an equal and opposite partner on the tissue -- which a
+# REPLAY has nowhere to put, because pass 1 finished before pass 2 began. Recording it here is what
+# makes the second half of the coupling possible: `ecm_load_3d` reads this map in a LATER tissue pass
+# and pushes back with it. One row per frame, as an equirectangular map of pressure by direction.
+PRESSURE_HISTORY: list = []
+
 
 # --------------------------------------------------------------------------- seeding
 @register_operator("ecm_seed", family="growth", set="particle", kind="structural")
@@ -87,6 +94,13 @@ class ECMSeed(Structural):
         self.cavity_h = float(params.get("cavity_h", 0.07))     # half-thickness along `axis`
         self.axis = int(params.get("axis", 1))                  # the pinched axis
         self.margin = float(params.get("margin", 0.03))         # keep clear of the domain walls
+        # SOLID BLOCKS, top and bottom: no matrix is seeded inside them. `None` = no blocks. The
+        # blocks are the SAME object `plate_confine_3d` holds the matrix out of during the run, so the
+        # two numbers have to agree -- pass the same `gap_half` to both, from one place in the spec.
+        # Seeding matrix into a solid and then relying on the confinement operator to evict it would
+        # start the run with a shock the material never recovers from.
+        self.plate_half = params.get("plate_half", None)
+        self.plate_half = None if self.plate_half is None else float(self.plate_half)
         self.n_fibres = int(params.get("n_fibres", 900))
         self.fibre_len = float(params.get("fibre_len", 0.16))
         # 0 = isotropic directions, 1 = every fibre parallel to `align_dir`. Anything between is a
@@ -98,13 +112,16 @@ class ECMSeed(Structural):
         self._done = False
 
     def _outside_cavity(self, pos):
-        """True where a point is IN the matrix -- i.e. outside the disc-shaped cavity."""
+        """True where a point is IN the matrix -- outside the cavity AND outside the solid blocks."""
         c = torch.tensor(self.centre, device=pos.device, dtype=pos.dtype)
         d = pos - c
         ax = self.axis
         along = d[:, ax].abs()
         radial = torch.sqrt((d ** 2).sum(1) - d[:, ax] ** 2 + 1e-12)
-        return ~((radial < self.cavity_r) & (along < self.cavity_h))
+        ok = ~((radial < self.cavity_r) & (along < self.cavity_h))
+        if self.plate_half is not None:
+            ok = ok & (d[:, ax].abs() < self.plate_half)
+        return ok
 
     def forward(self, H, mask=None):
         if self._done:
@@ -160,6 +177,13 @@ class ECMSeed(Structural):
         # matrix particle sitting where the cell ball is about to be is not a small error: it is
         # in contact from frame 0, so "the moment of first contact", which is the one event this
         # experiment exists to observe, would be frame 0 for the whole run.
+        # INTO THE SLAB FIRST, THEN OUT OF THE CAVITY. A particle beyond a plate has to come back
+        # along the plate normal; a particle in the cavity has to go out through its rim. Doing the
+        # cavity push first and clamping afterwards can drop a particle straight back into the cavity.
+        if self.plate_half is not None:
+            lim = self.plate_half - self.jitter * 2
+            p[:, self.axis] = (p[:, self.axis] - self.centre[self.axis]).clamp(-lim, lim) \
+                + self.centre[self.axis]
         inside = ~self._outside_cavity(p.to(dev)).cpu()
         if inside.any():
             c = torch.tensor(self.centre, dtype=p.dtype)
@@ -182,8 +206,11 @@ class ECMSeed(Structural):
         self._done = True
         n_in = int((~self._outside_cavity(lvl.get("pos"))).sum())
         print(f"[ecm_seed] {n} particles on {self.n_fibres} fibres; cavity r={self.cavity_r} "
-              f"h={self.cavity_h} about axis {self.axis}; {n_in} left inside the cavity",
-              flush=True)
+              f"h={self.cavity_h} about axis {self.axis}"
+              + ("" if self.plate_half is None
+                 else f"; solid blocks beyond +/-{self.plate_half:.3f} "
+                      f"({100 * (1 - 2 * self.plate_half):.0f}% of the box)")
+              + f"; {n_in} left inside the cavity or a block", flush=True)
         return {}
 
 
@@ -256,7 +283,10 @@ class CellToECMSphere(Lateral):
             n = d[hit] / r[hit]
             a = self.k * depth[hit][:, None] * n                # push outward along the normal
             if self.damp > 0:
-                v = lvl.get("vel")[hit] if "vel" in getattr(lvl, "state", {}) else None
+                # `lvl.state` is the TENSOR, not a dict of blocks: `"vel" in lvl.state` raises
+                # inside Tensor.__contains__. Never fired because `damp` defaults to 0, which is
+                # exactly what a landmine looks like -- the first run to set `damp` would have died.
+                v = lvl.get("vel")[hit] if "vel" in lvl.state_schema else None
                 if v is not None:
                     a = a - self.damp * (v * n).sum(1, keepdim=True).clamp(max=0.0) * n
             acc[hit] = a
@@ -379,6 +409,7 @@ class CellToECMReplay(Lateral):
         self.T = int(self.smap.shape[0])
         self._frame = -1
         self._t = 0
+        self._dom = None                 # per-row solid angle, built on the first call
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
@@ -406,7 +437,112 @@ class CellToECMReplay(Lateral):
         acc = torch.zeros_like(pos)
         if hit.any():
             acc[hit] = self.k * depth[hit][:, None] * u[hit]
+
+        # THE REACTION, BINNED BY DIRECTION AND TURNED INTO A PRESSURE. Sum the contact force in each
+        # (theta, phi) bin and divide by the AREA that bin covers on the tissue surface,
+        # R^2 * dOmega -- otherwise the poles, whose bins are slivers, would report a pressure many
+        # times the equator's for the same force, and a later tissue pass would grow a waist.
+        # dOmega = (2pi/nph) * (cos theta_lo - cos theta_hi), exact per row rather than sin(theta)
+        # d(theta), which diverges from it precisely at the poles where it matters.
+        if self._dom is None or self._dom.shape[0] != nth:
+            e = torch.linspace(0, math.pi, nth + 1, device=dev, dtype=dt_)
+            self._dom = (e[:-1].cos() - e[1:].cos()) * (2 * math.pi / nph)
+        load = torch.zeros(nth * nph, device=dev, dtype=dt_)
+        if hit.any():
+            load.index_add_(0, (it[hit] * nph + ip[hit]),
+                            (self.k * depth[hit]).to(dt_))
+        area = (M * M) * self._dom[:, None]
+        PRESSURE_HISTORY.append(
+            (load.reshape(nth, nph) / area.clamp_min(1e-12)).detach().to("cpu").numpy())
         BALL_RADIUS.append(float(M.median()))
         if mask is not None:
             acc = acc * mask[:, None].float()
         return {self.at: acc * lvl.occ[:, None].float()}
+
+
+@register_operator("cell_exclude_3d", family="mechanics", set="particle", kind="structural")
+class CellExclude3D(Structural):
+    """No matrix particle may be INSIDE the tissue. A hard non-penetration constraint.
+
+    THE DEFECT THIS FIXES, WHICH WAS VISIBLE IN THE MOVIES. Matrix particles ended up inside the
+    epithelium -- bright dots in the lumen, where there is no matrix. `cell_to_ecm` is a PENALTY: it
+    pushes a particle out with a force proportional to how far in it already is, so penetration is not
+    prevented, it is punished after the fact, and three things let it lose:
+
+      * `mpm_scatter` CLAMPS the external acceleration at `a_max` (200 by default). The penalty is
+        k * depth, so past depth = a_max/k the force stops growing no matter how deep the particle is,
+        and at k = 900 that ceiling is reached at depth 0.22. A clamp is the right thing for stability
+        and the wrong thing for a constraint.
+      * the tissue surface SWEEPS. It is a replay: it advances every frame whether or not the matrix
+        has got out of the way, so a particle only has to be out-accelerated once to be left behind.
+      * the surface is an angular map, smoothed. Where the smoothing cuts a bump, particles sit inside
+        the true mesh while the map says they are outside it.
+
+    So the penalty is kept -- it is what generates the stress the movie is about -- and this operator
+    is added after it as a BACKSTOP: any particle still inside gets projected onto the surface, with a
+    thin skin, and its inward radial velocity is removed so it does not simply re-enter next substep.
+    Same device as `plate_confine_3d` uses for the blocks, and for the same reason: a boundary that
+    must not be crossed is a projection, not a force.
+
+    IT IS RIGID, AND THAT IS HONEST HERE ONLY BECAUSE THE COUPLING IS ONE-WAY. The tissue's shape is
+    prescribed by pass 1, so nothing is being decided by letting the tissue win every contact -- it was
+    always going to win. In a two-way run (`ecm_load_3d`) this operator would be taking a side, and the
+    projection would have to become a shared correction.
+    """
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = ["surface"]
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = True
+    MECHANISM_TAGS = ["non_penetration", "rigid_contact", "moving_boundary"]
+    PARAM_ROLES = {"skin": "projection_skin_fraction", "scale": "surface_rescale"}
+    REFERENCE = "Plexus (this work); the surface is Okuda, S. et al. (2018) Sci. Rep. 8:2386."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        import numpy as _np
+        self.at = params.get("_at", "mpm_particle")
+        self.centre = [float(v) for v in params.get("centre", [0.5, 0.5, 0.5])]
+        self.scale = float(params.get("scale", 1.0))
+        self.skin = float(params.get("skin", 0.004))
+        z = _np.load(str(params["surface"]))
+        self.smap = torch.as_tensor(z["smap"], dtype=torch.float32) * self.scale
+        self.T = int(self.smap.shape[0])
+        self._frame, self._t, self._n = -1, 0, 0
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        dev, dt_ = pos.device, pos.dtype
+        f = int(getattr(H, "frame", -1) or -1)
+        if f != self._frame:
+            self._frame = f
+            self._t = min(self.T - 1, max(0, f))
+        M = self.smap[self._t].to(dev, dt_)
+        nth, nph = M.shape
+
+        c = torch.tensor(self.centre, device=dev, dtype=dt_)
+        d = pos - c
+        r = d.norm(dim=1).clamp_min(1e-9)
+        u = d / r[:, None]
+        th = torch.acos(u[:, 2].clamp(-1, 1))
+        ph = torch.atan2(u[:, 1], u[:, 0]) % (2 * math.pi)
+        R = M[(th / math.pi * nth).long().clamp(0, nth - 1),
+              (ph / (2 * math.pi) * nph).long().clamp(0, nph - 1)]
+        inside = r < R
+        n_in = int(inside.sum())
+        if n_in:
+            # ONTO THE SURFACE PLUS A SKIN. Exactly onto it would leave the particle at depth 0, where
+            # the penalty is also 0, so the next substep's own motion puts it straight back in.
+            target = R * (1.0 + self.skin)
+            pos[inside] = c + u[inside] * target[inside][:, None]
+            if "vel" in lvl.state_schema:
+                v = lvl.get("vel")
+                vr = (v * u).sum(1)                       # radial component, inward is negative
+                v[inside] = v[inside] - torch.minimum(
+                    vr[inside], torch.zeros_like(vr[inside]))[:, None] * u[inside]
+        if f <= 1 or (n_in and n_in > self._n * 4 + 50):
+            print(f"[cell_exclude_3d] frame {f}: {n_in} particle(s) projected out of the tissue",
+                  flush=True)
+        self._n = n_in
+        return {}
