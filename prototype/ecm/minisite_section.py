@@ -117,15 +117,23 @@ deep, the lumen is hollow, the fibres are cut where they cross, and the blocks a
 def main():
     R3 = [
         ("30_epi2_soft_E5", "vertex_mpm_free", "unconfined",
-         "no blocks: the tissue stays a SPHERE and reaches ~6,000 cells. First contact with the matrix "
-         "at frame 32; by the end 89% of it is strained and the front has reached the wall of the box"),
-        ("42_plate_blk67", "vertex_mpm_plate67", "blocks 67% of the box",
-         "two solid blocks, free gap 1/3 of the box: the sphere flattens to an OVOID of aspect 1.65, "
-         "and the matrix — now confined to the middle third — ends 97% strained rather than 89%"),
-        ("43_plate_blk75", "vertex_mpm_plate75", "blocks 75% of the box",
-         "free gap 1/4 of the box: ASPECT 2.08, and only 4,000 cells instead of 6,000. Confinement "
-         "suppresses proliferation — a squeezed cell reaches its division volume later — which nothing "
-         "in the spec asks it to do"),
+         "the control: a growing, dividing epithelium presses into a soft fibrous matrix and stays a "
+         "SPHERE (oblateness 1.01) at ~6,000 cells. First contact at frame 32; by the end 89% of the "
+         "matrix is strained and the front has reached the wall of the box"),
+        ("52_aniso_growth_oblate", "vertex_mpm_grown", "grown into an ovoid",
+         "the matrix is denser within 55 deg of the vertical, so it resists there 2.6x harder -- and "
+         "<code>ecm_growth_gate_3d</code> slows the CELL CYCLE where it resists. Cells divide less at "
+         "the poles than at the equator, so the sphere GROWS into an ovoid rather than being pressed "
+         "into one: oblateness 1.01 -> 1.22 at 4,356 cells instead of 5,968. A FLAT stress pattern of "
+         "the same strength shrinks the tissue just as hard and leaves it round (1.015), so the shape "
+         "comes from the pattern of matrix stress, not the amount of it"),
+        ("54_caps_plane_oblate", "vertex_mpm_capsplane", "plus a plane it never touches",
+         "two solid planes are added at 0.368 of the box -- filling a quarter of the volume, and far "
+         "enough out that the tissue (which reaches 0.30) never reaches them. They act on the MATRIX "
+         "only, trapping a thin polar layer against themselves so the same growth strains it harder. "
+         "Planes that TOUCH do the opposite: the tissue fills up to them, the leftover stress is "
+         "EQUATORIAL (measured 0.19-0.61 pole-over-equator), and gating on it fights the confinement -- "
+         "1.353 for plates alone and 1.324 for the gate alone, but 1.090 together"),
     ]
     runs = [(d, f"{v}.mp4", lbl, os.path.join(LOG, d, "spec_run.yaml"), cap)
             for d, v, lbl, cap in R3]
