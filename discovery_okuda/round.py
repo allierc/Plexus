@@ -820,7 +820,10 @@ def record_all(ctx):
     with open(RECORDS, "a") as f:
         for s in (ctx.get("specs") or []):
             m = met.get(s["name"]) or {}
-            f.write(json.dumps({"round": rid, "name": s["name"], "parent": s.get("parent"),
+            # `run_id` IS WRITTEN even though this file is no longer merged into run_record's. A row
+            # that cannot say which run it describes is a row that poisons whatever reads it next.
+            f.write(json.dumps({"round": rid, "name": s["name"], "run_id": s["name"],
+                                "parent": s.get("parent"),
                                 "edit": s.get("edit"), "claim": s.get("claim"),
                                 "intent": s.get("intent"), "comp_hash": s.get("comp_hash"),
                                 "out_of_range": s.get("out_of_range") or [],
@@ -992,8 +995,14 @@ def reset_campaign(quiet=False):
     arch = os.path.join(HERE, "_archive")
     os.makedirs(arch, exist_ok=True)
     moved = 0
+    # ITS OWN FILE, NOT run_record's. This is the mistake that killed a whole round: the campaign's
+    # round records were appended into `_archive/records.jsonl`, which belongs to
+    # `run_record.RunArchive` and has a completely different schema -- it requires `run_id` on every
+    # line and does `json.loads(line)["run_id"]` unguarded. Eleven of my rows went in without it, and
+    # every job in the next round died with KeyError: 'run_id' AFTER several minutes of simulation,
+    # eight of eleven before the user stopped it. Two schemas, two files, one consumer each.
     if os.path.exists(RECORDS):
-        with open(RECORDS) as src, open(os.path.join(arch, "records.jsonl"), "a") as dst:
+        with open(RECORDS) as src, open(os.path.join(arch, "round_records.jsonl"), "a") as dst:
             for line in src:
                 if line.strip():
                     dst.write(line)
@@ -1011,7 +1020,8 @@ def reset_campaign(quiet=False):
             print(T_.no(f"[round] could not clear {f}: {e}"))
     n_gone, n_kept = _clear_colliding_runs(quiet=quiet)
     if not quiet:
-        print(T_.ok(f"[round] campaign reset: {cleared} file(s) cleared, {moved} record(s) archived, "
+        print(T_.ok(f"[round] campaign reset: {cleared} file(s) cleared, {moved} record(s) archived "
+                    f"to _archive/round_records.jsonl, "
                     f"{len(kept)} input(s) kept, {n_gone} empty run dir(s) removed"
                     + (f", {n_kept} moved to _superseded/" if n_kept else "")))
     return cleared

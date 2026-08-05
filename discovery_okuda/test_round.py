@@ -316,6 +316,53 @@ def test_a_child_differs_from_its_parent_by_exactly_the_edit():
         check(not bad, f"a one-parameter edit also changed: {bad}")
 
 
+def test_the_record_does_not_poison_the_run_archive():
+    """THE FAULT THAT KILLED EIGHT JOBS AFTER THEY HAD ALREADY SIMULATED FOR MINUTES.
+
+    `reset_campaign` archived the campaign's round records into `_archive/records.jsonl` -- which
+    belongs to `run_record.RunArchive`, has a different schema, and did
+    `json.loads(line)["run_id"]` with no guard. Eleven of my rows went in without that key, and every
+    job in the next round died with KeyError: 'run_id' at its WRITE step, so the GPU time was spent
+    first. Two things had to change and both are asserted: the reset writes to its own file, and the
+    reader survives a line it does not recognise."""
+    print("\nthe campaign's records cannot poison run_record's archive")
+    import json
+    import tempfile
+    import round as E
+    from run_record import RunArchive
+
+    # 1. a row identifies itself
+    with tempfile.TemporaryDirectory() as td:
+        old = E.RECORDS
+        E.RECORDS = os.path.join(td, "records.jsonl")
+        try:
+            E.record_all({"round_id": "t", "specs": [{"name": "t_01", "slot": 1}],
+                          "metrics": {"t_01": {}}, "predictions": {}})
+            row = json.loads(open(E.RECORDS).read().strip())
+            check(row.get("run_id") == "t_01",
+                  f"a record row does not say which run it describes: {sorted(row)}")
+        finally:
+            E.RECORDS = old
+
+    # 2. the reset writes to its OWN file, not run_record's
+    src = open(os.path.join(HERE, "round.py")).read()
+    check('"round_records.jsonl"' in src,
+          "reset_campaign no longer names its own archive file")
+    check('os.path.join(arch, "records.jsonl")' not in src,
+          "reset_campaign is appending to run_record's records.jsonl again")
+
+    # 3. and the reader survives an alien line anyway
+    with tempfile.TemporaryDirectory() as td:
+        os.makedirs(os.path.join(td, "traj"), exist_ok=True)
+        with open(os.path.join(td, "records.jsonl"), "w") as f:
+            f.write(json.dumps({"run_id": "good"}) + "\n")
+            f.write(json.dumps({"name": "alien", "metrics": {}}) + "\n")
+            f.write("not json at all\n")
+        a = RunArchive(td)
+        check(a._seen == {"good"},
+              f"RunArchive did not survive an alien line: {a._seen}")
+
+
 def test_the_live_flow_loads():
     print("\nthe flow the loop will actually run")
     import round as E
