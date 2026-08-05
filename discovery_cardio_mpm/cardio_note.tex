@@ -2,6 +2,7 @@
 \usepackage[margin=2.4cm]{geometry}
 \usepackage[T1]{fontenc}
 \usepackage{booktabs}
+\usepackage{amsmath}
 \usepackage[font=small,labelformat=empty,skip=4pt]{caption}
 \usepackage{array}
 \usepackage{xcolor}
@@ -741,156 +742,187 @@ same specimen.
 \end{itemize}
 \end{phasebox}
 
-\begin{phasebox}{Phase 2 --- The loop cannot yet say what it is looking at \hfill \prog\ (4 of 6) \ \stopp}
+\begin{phasebox}{Phase 2 --- Deciding what may be believed about a number \hfill \prog\ (5 of 6) \ \stopp}
 \textbf{Goal.} Give the loop numbers it can trust. \emph{Not new numbers} --- the measurements this
-campaign needs were written over three weeks in the old folder and audited in July, and the audit's
-own remedy survived. What was never done is the boring part: saying which quantity is which.
+campaign needs were written over three weeks in the old folder and audited in July. What was never
+done is deciding what may be believed about any of them.
 
-\textbf{The fault, and it is one fault four times over.} The same quantity acquired \textbf{four
-names, in four places, on four different sets of nodes}, and nothing recorded which was which:
+\textbf{The fault that started it, and it is one fault four times over.} The same quantity acquired
+\textbf{four names, in four places, on four different sets of nodes}, and nothing recorded which was
+which: \code{loopscore\_residual}, \code{enclosure\_row}, \code{morphology\_row} (withdrawn in July
+and still printed by every run) and \code{descriptors.py} --- the last of which is mine, written one
+turn after being told to measure the loops, which is the same mistake again. So Phase~2 invents no
+ruler. It names the ones that exist and puts each through the same five tests.
+
+\medskip
+\textbf{THE APPROACH: five tests, and they answer different questions.} No one of them is
+sufficient, and each was added because the ones before it had missed something.
 
 \begin{center}\footnotesize
-\begin{tabular}{@{}l p{9.3cm}@{}}
+\begin{tabular}{@{}l p{5.0cm} p{4.6cm}@{}}
 \toprule
-\code{loopscore\_residual} & size $\cdot$ orientation $\cdot$ openness/aspect $\cdot$ chirality
-$\cdot$ shape-detail\\
-\code{enclosure\_row} & energy, peak $\cdot$ area, loopiness $\cdot$ chir\_match $\cdot$ minor\\
-\code{morphology\_row} & size $\cdot$ open $\cdot$ chir+ \quad\emph{(simulation only --- withdrawn
-in July, still printed by every run today)}\\
-\code{descriptors.py} & magnitude\_peak $\cdot$ opening\_area $\cdot$ direction\_chirality $\cdot$
-orientation\_rad \quad\emph{(mine, added in Phase 1)}\\
+& \textbf{the question it answers} & \textbf{what it cannot see}\\
+\midrule
+\textbf{1. the registry}\newline\code{metrics.py -{}-check} &
+Is there one name, one definition and one implementation per quantity? Does a withdrawn metric
+refuse to compute? Does every declared zero say where it came from? &
+Anything about the numbers themselves\\
+\addlinespace
+\textbf{2. the battery}\newline\code{metrics.py -{}-certify} &
+Distort the recording one axis at a time. Does it move on the axis it declares and hold still on the
+other eight? &
+Whether the number is \emph{right}. And any change that is a \textbf{symmetry of the population} ---
+see the openness defect below\\
+\addlinespace
+\textbf{3. the null bank}\newline\code{floors.py -{}-nulls} &
+What do six models that know nothing score? Predict nothing, slide the sheet, copy the previous
+beat, interpolate from the edge, muscle off, fields untrained. &
+Whether a difference above that zero is larger than the noise\\
+\addlinespace
+\textbf{4. the floors}\newline\code{noise.py} &
+How much does it wobble when nothing changed? Beat against beat, the same seed twice, and seed to
+seed. &
+Whether the number means what its name says\\
+\addlinespace
+\textbf{5. calibration}\newline\code{calibrate.py} &
+Put in an ellipse, whose area, perimeter, reach, long axis and circulation all have a closed form.
+\textbf{Is the number right?} &
+Whether real tissue behaves like an ellipse\\
 \bottomrule
 \end{tabular}
 \end{center}
 
-The fourth is the same mistake one turn later, and worth admitting plainly: told to measure the
-loops, I wrote a new set of names for quantities that already had them. \textbf{Phase~2 is not
-inventing a ruler. It is naming the ones that exist, pointing each at the code that computes it,
-and recording what may be believed about it.}
+\textbf{And then one rule, declared before the numbers arrived.} Precision alone decides nothing:
+the three most precise quantities in the registry were, until this phase, the three that could
+support no claim at all, because they had no zero to be precise \emph{relative to}. So
 
-\textbf{1. One name, one quantity. \dn} A registry of eighteen entries, one class each. Each carries a definition a
-person can check, the code that computes it, and a tier: \emph{certified} (a measured zero, a
-measured noise floor, and it moved when it should), \emph{provisional} (it computes, one of those
-is missing --- usable, never citable), or \emph{withdrawn} (a defect was demonstrated; kept with
-its cause of death, never quoted). \textbf{Nothing is certified yet}, fourteen are provisional and
-four are withdrawn, and that is the honest state rather than a placeholder.
+\begin{center}
+\emph{levels} \ = \ \(\dfrac{\lvert\,\text{what the tissue scores against itself} \; - \;
+\text{what knowing nothing scores}\,\rvert}{3 \times \text{the largest measured noise floor}}\)
+\end{center}
 
-Three checks, borrowed from the Okuda folder where this exact fault cost weeks: every live metric
-must have code that computes it; every one must carry a written definition; and \textbf{no live
-definition may name a withdrawn metric}. Two more were added here: a withdrawn metric must record
-why, and \emph{the two implementations of each shared quantity must agree numerically} --- proved,
-not assumed, because renaming without checking is how four names became four measurements. Eight
-checks pass.
+\noindent and a metric needs \textbf{five} of those steps before it may carry a claim --- four to
+rank runs into quartiles, one spare. Below it, a metric can say \emph{knows nothing} or
+\emph{tissue-like} and has no opinion in between.
 
-\textbf{2. The reading surface, and the defect in it. \dn} The campaign reads loops on a
-\textbf{ten-by-ten grid of the tissue}, comparing each node's path with the recording's. That is
-the picture on every dashboard and the thing a person actually judges, so it stays.
+\textbf{A role, which is not a tier.} A tier says how much is known about a measurement; a role says
+what it is \emph{for}. The quantity a fit descends and the quantity a claim cites are different jobs
+and there is no reason one number is good at both. \code{loopscore} spans $0.640$ between its zero
+and the recording's agreement with itself, with a spread of $0.129$ --- \textbf{1.6 steps across its
+entire range}, which is the resolution at which the previous campaign ranked 324 runs and settled
+orderings on differences of $0.003$. It is not defective, so it cannot be withdrawn, and it is the
+only number comparable with those runs and with the replay bar, so it is not deleted. It is marked
+\emph{objective}: still optimised, still reported, and \code{cite()} raises if anything asks it to
+support a claim.
 
-But its margin is ten nodes from the edge, and \textbf{the pinned band is wider than that}: the
-outer ring of the grid --- \textbf{36 of the 100 nodes} --- sits on particles tied to the answer.
-The July audit found this and it was never fixed; every dashboard since has been read with a third
-of its panels showing the anchor. The margin is corrected to twenty, which puts all hundred outside
-the band, and both versions are reported so the change is visible rather than silent.
-
-\emph{And the check itself was wrong first.} It reported none of the hundred inside the band,
-against the audit's thirty-six, because it measured distance in the wrong units --- the grid is
-mapped onto a sheet occupying 0.70 of the world and the factor was missing. The audit was right.
-Fixed, it returns exactly 36.
-
-\textbf{3. Where is zero. \dn} Six trivial models, on the frozen split and the frozen mask:
+\medskip
+\textbf{WHERE THAT LEAVES US.} Seven instruments hold a zero, the battery and the beat-to-beat
+floor:
 
 \begin{center}\small
-\begin{tabular}{@{}l r r p{4.4cm}@{}}
+\begin{tabular}{@{}l r r r l@{}}
 \toprule
-\textbf{model} & \textbf{fit beat} & \textbf{held-out} & \textbf{what it knows}\\
+& \textbf{zero} & \textbf{the tissue} & \textbf{steps} & \textbf{still missing}\\
 \midrule
-predict nothing & $+0.070$ & $+0.067$ & nothing --- \emph{the origin}\\
-slide the whole sheet & $-0.020$ & $-0.050$ & the timing and the amount, no shape\\
-\textbf{copy the previous beat} & $\mathbf{+0.851}$ & $\mathbf{+0.62}$ & \textbf{no physics, no
-parameters, no fit}\\
-interpolate from the pinned edge & $-0.118$ & $-0.16$ & the anchoring alone\\
-the model, muscle off & $+0.070$ & --- & \emph{exactly} the do-nothing score\\
-the model, fields untrained & $-0.880$ & --- & 2.5$\times$ too much motion\\
+\code{coordination} & $0.078$ & $0.997$ & $120.5$ & the fitted floor\\
+\code{path\_length} & $0.0042$ & $0.0001$ & $39.5$ & the fitted floor\\
+\code{openness} & $0.339$ & $0.006$ & $36.6$ & the fitted floor; \emph{and see below}\\
+\code{peak\_excursion} & $0.0011$ & $0.0000$ & $30.2$ & the fitted floor\\
+\code{interior\_r2} & $-0.831$ & $0.899$ & $12.1$ & the fitted floor\\
+\code{chirality\_match} & $0.500$ & $0.946$ & $10.6$ & the fitted floor\\
+\code{orientation\_error} & $0.785$ & $0.058$ & $10.5$ & the fitted floor\\
+\midrule
+\code{loopscore} & $0.070$ & $0.710$ & $1.6$ & \emph{nothing --- it is the objective}\\
+\code{loopscore\_sd}, 5 $\times$ \code{residual/} & --- & --- & --- & a measured zero\\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\textbf{The bar is $+0.851$ on the beat we fit and $+0.62$ on beats we do not}, and the previous
-campaign's best was $0.545$ --- below even the held-out bar, set by a model with no physics in it.
-Everything from here is reported as the difference from the first row, never as a bare number.
+\noindent Registry 17 checks of 17, battery 0 disagreements in 112 tested cells (14 more
+skipped as outside a declared domain), calibration 6 metrics against
+their closed form. \textbf{The one thing outstanding is the fitted-noise floor} --- the same seed
+twice and several seeds, which need fits and are running. Every \emph{steps} column above can only
+fall when they land, because the working unit is the largest floor and not the cheapest.
 
-Three side results. \emph{Sliding the sheet scores below doing nothing}: right timing, wrong shape
-is worse than silence, which is a good property in a ruler. \emph{The edge interpolation scores
-$-0.118$}, so the anchoring is not quietly buying score. And \emph{the muscle-off model scores what
-predicting nothing scores}, to the last digit.
+\medskip
+\textbf{WHAT THE FIVE TESTS ACTUALLY FOUND.} Each was added after the previous one let something
+through, and this is the list, because it is the argument for having five:
 
-\emph{A caution about how nearly that went wrong.} The first version rebuilt the particle layout
-beside the run instead of reading it from the run's own record, and reported that the pinned edge
-drives a third of the sheet --- dramatic, and false. The cause is worth keeping: \textbf{the initial
-particle layout depends on the device.} Same seed, one on the processor and one on the card, and
-the positions differ by the width of the whole sheet. So a fit on the processor and a fit on the
-card do not start from the same material. The measurement now refuses to run unless its mapping
-reproduces the run's own recorded data.
+\begin{center}\footnotesize
+\begin{tabular}{@{}l p{10.2cm}@{}}
+\toprule
+\textbf{the grid} & The reading surface's margin was ten nodes and the pinned band is wider:
+\textbf{36 of the 100 panels} sat on particles tied to the answer, scoring a perfect $1.000$ and
+lifting the picture by $+0.17$. Found in the July audit, never fixed, read on every dashboard since.
+Corrected to twenty. \emph{My own check was wrong first} --- it said 0 of 100 against the audit's 36,
+because the grid maps onto a sheet occupying $0.70$ of the world and the factor was missing.\\
+\addlinespace
+\textbf{the null bank} & \textbf{Copying the previous beat scores $+0.851$}, and the previous
+campaign's best fit was $0.545$. The bar is a model with no physics in it. Also: the null bank was
+recorded in a vocabulary the registry does not contain, so nine of fourteen metrics had no measured
+zero and the two that did held hand-copied digits --- \code{interior\_r2} was typed $-0.875$ against
+a measured $-0.8308$.\\
+\addlinespace
+\textbf{the null bank,\newline again} & Two metrics scored \textbf{their best in the whole bank on
+the model that does nothing}. \code{coordination} read a perfect $1.0000$: a dead signal has no peak,
+so every lag comes back zero and they agree perfectly because they are all the same nothing.
+\code{residual/shape\_detail} read $+0.3031$, because that family measures \emph{recoverability} and
+everything is recoverable from nothing. Both now refuse. The battery could never have found either
+--- every distortion starts from a real loop.\\
+\addlinespace
+\textbf{the pairing} & \code{openness}, \code{path\_length} and \code{peak\_excursion} all took
+(model, recording) and \textbf{used only the model}. They described the model and never compared it,
+and a description has no right answer, so it has no score for knowing nothing, so its precision
+divides into nothing. Read on both sides and subtracted, they went from uninterpretable to the
+sharpest instruments here after coordination.\\
+\addlinespace
+\textbf{calibration} & \code{openness} \textbf{does not read how fat a loop is} --- on ellipses it
+returns $\pi/4$ for every aspect ratio, a circle and a needle alike. And it \textbf{responds to
+orientation by 25\%}, which it does not declare, because its normaliser is an axis-aligned box that
+grows as the loop turns. \emph{The battery cannot see this}: it turns every loop by one angle, and a
+population already pointing every which way is a symmetry of that. A coherent tissue is the case
+that matters and the case the battery never builds. Also: \code{path\_length} was dropping the
+closing segment of a closed loop, so rolling a beat moved which segment went missing and it appeared
+to respond to \emph{timing}; and \code{orientation\_error} is exact from $0$ to $\pi/2$ but returns
+$1.4360$\,rad for two circles instead of refusing.\\
+\bottomrule
+\end{tabular}
+\end{center}
 
-\textbf{4. How big is nothing. \prog\ (one floor of three)} Three different questions, and only one
-of them is cheap. \emph{Beat to beat} --- one real beat against another real beat --- needs no
-fitting at all and is the floor that matters most, because \textbf{no model may be scored better
-than the recording agrees with itself}. Measured, on 10 complete beats: openness $\pm 0.0034$,
-chirality $\pm 0.0140$, orientation $\pm 0.0232$\,rad, coordination $\pm 0.0025$, and the composite
-loopscore $\pm 0.1294$. The two that remain both need fits and are therefore slow: the same seed
-twice (the card is not bit-reproducible) and several different seeds at the depth the loop will use.
-Until those exist \textbf{no metric is eligible for certification} --- the promotion check reports
-0 of 14, and it reports it mechanically rather than as an opinion.
-
-\textbf{5. Teach the ruler to see coordination. \dn} It returned a perfect score for a sheet whose
-points beat in random order. Two measures now exist: \code{coordination}, the agreement in when each
-node's beat happens, and \code{orientation\_error}, the angle between the model's principal axis and
-the tissue's. Both are written as classes with their own definition, response set and floor, and both
-pass the battery. \emph{The failure that mattered is now visible}: the tissue's own beats agree on
-timing to $0.9968$ with a spread of $0.0025$, and the best fit in the archive reads $0.5821$ --- more
-than a hundred times that spread away.
-
-\emph{Getting coordination right took three attempts, and the reason is worth recording.} The
-obvious construction --- the phase of the fundamental of each node's distance from its own centre
---- fails, because that signal peaks \textbf{twice} per beat, so a rigid shift of the whole recording
-scored $0.50$ when it must score $1$. Replacing it with the lag of peak cross-correlation failed the
-same way for the same reason: the two maxima sit half a beat apart and the winner is arbitrary. What
-works is mapping the lag onto the half period, which scores $1.0000$ under a rigid shift and
-$0.0778$ under scrambled timing. \textbf{The declared cost: it cannot tell in-phase from exactly
-antiphase.} That is written into the class as a known defect, not left for someone to discover.
+\noindent The openness finding is the one still open. Normalising by the loop's own axes, or using
+$4\pi A/P^2$, removes the orientation dependence and adds a genuine response to aspect --- and
+invalidates every number measured with the current definition. That is a decision, not a patch, so
+it is stated and not taken. Until it is, a claim from \code{openness} must travel with
+\code{orientation\_error}, which is separately measured and does read the axis.
 
 \medskip
 \noindent\textbf{What each measurement responds to, and how finely --- drawn.} Every entry in the
 registry is a claim of the form \emph{this moves when X changes and ignores everything else}.
-Figure~1 is that claim as a picture: nine single changes to a loop across the top,
-the eight readable measurements down the side, and a cell saying whether the measurement moved or
-held.
+Figure~1 is that claim as a picture: nine single changes to a loop across the top, the eight readable
+measurements down the side, and a cell saying whether the measurement moved or held.
 
 \begin{center}
 \includegraphics[width=\linewidth]{figures/metrics_figure.png}
 \end{center}
 \vspace{-0.6em}
 \begin{center}\footnotesize
-\parbox{0.94\linewidth}{\textbf{Figure~1.} \textbf{Left:} the certification
-battery. Nine changes, each made one at a time, and no cell is red --- every measurement moves on
-the axis it names and holds still on the eight it does not. Note that the two changes of
-\emph{timing} are invisible in any picture of a shape: only the dot marking the first frame has
-moved, and only two rows respond there. \textbf{Right:} the precision. Column one is what the
-measurement reads comparing one real beat with another, column two its spread --- \emph{the finest
-difference the recording itself permits} --- and column three the best fit the previous campaign
-produced. \textbf{Pink is the point of the figure.} Seven of the eight measurements put that fit
-more than three spreads outside the tissue's own variation, and the one that does not is
+\parbox{0.94\linewidth}{\textbf{Figure~1.} \textbf{Left:} the battery. Nine changes, each made one at
+a time, and no cell is red. The two changes of \emph{timing} are invisible in any picture of a shape:
+only the dot marking the first frame has moved, and only two rows respond there. \textbf{Right:} the
+precision --- what the measurement reads comparing one real beat with another, its spread, and the
+best fit the previous campaign produced. \textbf{Pink is the point of the figure.} Seven of the eight
+put that fit more than three spreads outside the tissue's own variation, and the one that cannot is
 \code{loopscore}, the composite the whole campaign ranked on: $0.4987$ against a beat-to-beat
-$0.7104 \pm 0.1294$, which at three spreads \textbf{cannot tell the fit from the recording's own
-noise}. The specific measurements can, and they say where: the orientation is off by $0.431$\,rad
-where real beats vary by $0.058$, and the coordination reads $0.582$ where real beats read $0.997$.
-This is the argument for the decomposition in item~6, and it is now measured rather than asserted.}
+$0.7104 \pm 0.1294$. The specific measurements can, and they say where: the orientation is off by
+$0.431$\,rad where real beats vary by $0.058$, and the coordination reads $0.582$ where real beats
+read $0.997$.}
 \end{center}
 \medskip
 
-\textbf{6. Deliver the decomposition per run. \ns} The five named dimensions --- size, orientation,
-openness, chirality, shape-detail --- computed on the corrected grid and written into every run's
-record, so step 3 of the loop returns \emph{where} the model is wrong rather than how much.
+\textbf{The last item: deliver the decomposition per run. \ns} The five named dimensions --- size,
+orientation, openness, chirality, shape-detail --- on the corrected grid and written into every run's
+record, so step 3 of the loop returns \emph{where} the model is wrong rather than how much. All five
+still lack a measured zero, which is what makes this the remaining item rather than a finished one.
 
 \begin{stopbox}
 \textbf{THE STOP.} At the end we know whether the fitted model beats \emph{the best of the trivial

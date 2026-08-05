@@ -193,6 +193,34 @@ recording's. That stays — it is what a person judges.
    chirality, shape-detail — on the corrected grid, written into every run's record, so step 3 of
    the loop returns *where* the model is wrong rather than how much.
 
+**THE APPROACH — five tests, and each was added after the previous one let something through:**
+
+| | question | blind to |
+|---|---|---|
+| 1. registry (`metrics.py --check`) | one name, one definition, one implementation; withdrawn refuses; every zero says where it came from | the numbers themselves |
+| 2. battery (`metrics.py --certify`) | does it move on its axis and hold on the other eight? | whether the number is *right*; and any change that is a **symmetry of the population** |
+| 3. null bank (`floors.py --nulls`) | what do six models that know nothing score? | whether a difference is above the noise |
+| 4. floors (`noise.py`) | how much does it wobble when nothing changed? | whether it means what its name says |
+| 5. calibration (`calibrate.py`) | ellipses, where area/perimeter/reach/axis/circulation are closed-form — **is the number right?** | whether tissue is an ellipse |
+
+**The rule, declared before the numbers:** `levels = |tissue-vs-itself − knows-nothing| / (3 × largest measured floor)`, and a metric needs **5** steps to carry a claim (four to rank quartiles, one spare). **A role is not a tier:** the quantity a fit descends and the quantity a claim cites are different jobs. `loopscore` = 1.6 steps → marked `OBJECTIVE`, still optimised and reported, `cite()` raises.
+
+| | zero | tissue | steps |
+|---|---|---|---|
+| `coordination` | 0.078 | 0.997 | 120.5 |
+| `path_length` | 0.0042 | 0.0001 | 39.5 |
+| `openness` | 0.339 | 0.006 | 36.6 |
+| `peak_excursion` | 0.0011 | 0.0000 | 30.2 |
+| `interior_r2` | −0.831 | 0.899 | 12.1 |
+| `chirality_match` | 0.500 | 0.946 | 10.6 |
+| `orientation_error` | 0.785 | 0.058 | 10.5 |
+| `loopscore` | 0.070 | 0.710 | **1.6 — objective** |
+
+Registry 17/17 · battery 0 disagreements in 112 cells · calibration 6 metrics vs closed form.
+**Outstanding: the fitted-noise floor only** (running). Every `steps` above can only fall.
+
+**What the tests found:** copying the previous beat scores **+0.851** vs the campaign's best 0.545 · the null bank was written in a vocabulary the registry doesn't contain, so 9 of 14 had no zero and `interior_r2`'s was typed −0.875 against a measured −0.8308 · **`coordination` scored a perfect 1.0000 on the do-nothing model** and `residual/shape_detail` +0.3031, both now refuse · `openness`/`path_length`/`peak_excursion` took (model, recording) and **used only the model**, now paired · `path_length` dropped the closing segment of a closed loop so rolling a beat looked like a timing response · **`openness` returns π/4 for every aspect ratio and swings 25% with orientation** — the battery cannot see it, because turning every loop by one angle is a symmetry of a population that already points every which way. That one is open: the fix invalidates every number measured so far, so it is stated not taken, and an `openness` claim must travel with `orientation_error`.
+
 **The figure Phase 2 reports into** (`figure_metrics.py` → `figures/metrics_figure.png`): nine
 single distortions across the top drawn as loops, eight readable measurements down the side, and a
 cell per pair saying whether it moved or held. **No cell is red** — every measurement moves on its

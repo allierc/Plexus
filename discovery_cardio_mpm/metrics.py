@@ -482,6 +482,20 @@ class Openness(PairedProperty):
     source = "cardio_mpm_train._openness (audit remedy, 4-5 July), paired here"
     responds_to = {"openness"}
     domain = "a closed path with non-zero extent"
+    known_defects = [
+        "IT DOES NOT READ HOW FAT A LOOP IS. On ellipses it returns pi/4 for EVERY aspect ratio -- "
+        "a circle and a needle read the same to five decimals. What it separates is a loop from a "
+        "degenerate back-and-forth line, and nothing finer. Aspect is residual/openness_aspect's "
+        "job, not this one's.",
+        "IT RESPONDS TO ORIENTATION, WHICH IT DOES NOT DECLARE. The normaliser is an AXIS-ALIGNED "
+        "bounding box, which grows when the loop turns off-axis, so the same ellipse reads 0.785 "
+        "aligned and 0.588 at 45 degrees -- a 25% swing from turning alone. The battery cannot see "
+        "it: it turns every loop by one angle, and a population already pointing every which way "
+        "is a symmetry of that. Found by calibrate.py on shapes with a closed form. Normalising by "
+        "the loop's OWN axes, or by 4*pi*area/perimeter^2, removes it -- both change every number "
+        "measured so far, so it is a decision and not a patch. UNTIL THEN: a claim from this metric "
+        "must be accompanied by orientation_error, which is separately measured and does read the "
+        "axis."]
 
     null = 0.3389                  # floors.py N0: what predicting nothing costs
     null_source = MEASURED
@@ -564,7 +578,16 @@ class OrientationError(Metric):
     domain = "a path with a distinguishable long axis; degenerate for a circle"
     null = float(np.pi / 4)
     null_source = ANALYTIC
+    undefined_on = {"a loop with no long axis"}
     higher_is_better = False
+    known_defects = [
+        "EXACT WHERE IT IS DEFINED, SILENT WHERE IT IS NOT. calibrate.py sweeps a known rotation "
+        "and it returns that angle to three decimals from 0 to pi/2, which is its maximum -- two "
+        "axes can differ by at most 90 degrees, so perpendicular reads pi/2 and there is no wrap. "
+        "But a CIRCLE has no long axis, and asked to compare two circles it returned 1.4360 rad "
+        "instead of refusing: the covariance is isotropic and the eigenvector it picks is whichever "
+        "way the arithmetic fell. Real loops are elongated, so this is latent rather than active, "
+        "and it is now declared. If a claim ever rests on near-circular loops it must be checked."]
 
     def compute(self, sim, real):
         return np.median(axis_difference(major_axis_angle(sim), major_axis_angle(real)))
