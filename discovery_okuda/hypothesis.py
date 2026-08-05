@@ -69,7 +69,22 @@ from dataclasses import asdict, dataclass, field
 # dilute the campaign's only control signal (with a 6-slot batch, by a sixth). What a control CAN
 # do is fail -- and that is `is_baseline_drift`, a louder signal than a surprise, because it means
 # the baseline moved under us and the round's other five comparisons are all suspect.
-INTENTS = ("confirmatory", "adversarial", "control")
+# `exploratory` -- THE HALF OF TRACK A THAT DID NOT EXIST. The goal statement is explicit:
+# "it must be allowed to be curious. A loop that may only test predictions will only ever propose
+# things it can predict, which is how a campaign came to spend nineteen of thirty-four predictions
+# on 'nothing will happen' and count eighteen confirmations that a sphere stayed a sphere. An
+# exploratory slot states what it is VARYING and what it will REPORT, rather than what it EXPECTS."
+#
+# Until now `Hypothesis(intent="exploratory")` raised ValueError, and so did `predicted=""`. So the
+# only way to pose a slot was as a bet, and the trap the goal names was structural rather than
+# cultural: an agent that must predict will propose what it can predict.
+#
+# An exploratory slot is kept OUT of MECHANISM_INTENTS for the same reason a control is: it makes
+# no claim, so it can neither confirm nor refute one, and folding it into the surprise rate would
+# dilute the campaign's only control signal. It resolves `described` -- a real outcome, recorded,
+# and outside the confirmed/refuted arithmetic. "A labyrinth nobody forecast is a finding, not a
+# failed prediction."
+INTENTS = ("confirmatory", "adversarial", "control", "exploratory")
 MECHANISM_INTENTS = ("confirmatory", "adversarial")
 
 # ---------------------------------------------------------------------------------------------
@@ -101,7 +116,12 @@ MECHANISM_INTENTS = ("confirmatory", "adversarial")
 TERRITORIES = ("in_paper", "excursion")
 TERRITORY_TARGET = 0.70          # fraction of MECHANISM slots that should sit in Okuda's space
 TERRITORY_LOW, TERRITORY_HIGH = 0.55, 0.85
-OUTCOMES = ("confirmed", "refuted", "inconclusive")
+# `described` -- what an EXPLORATORY slot resolves to. Not `inconclusive`: that word means "we
+# tried to check a claim and could not", and it lands the slot in the wasted bucket the Supervisor
+# reads. An exploratory slot made no claim, so it cannot be inconclusive about one -- it reported
+# what it said it would report, and that is a completed experiment. Kept out of the surprise
+# arithmetic because there was no prediction to be surprised by.
+OUTCOMES = ("confirmed", "refuted", "inconclusive", "described")
 
 # WHAT KIND OF CLAIM IS THIS. The distinction is not pedantry -- it is the difference between an
 # experiment and an anecdote, and it decides what the Interpreter is ALLOWED to write.
@@ -160,8 +180,13 @@ class Hypothesis:
     t_posed: float = field(default_factory=time.time)
 
     # --- filled in after the run ---
+    # WHAT AN EXPLORATORY SLOT CARRIES INSTEAD OF A PREDICTION. Stated before the run, exactly as
+    # a prediction is, so the slot is still a committed experiment and not a licence to look at
+    # whatever came out and call it interesting afterwards.
+    varying: str = ""              # the thing being turned up, and over what range
+    will_report: str = ""          # the observable that will be described, chosen in advance
     observed: dict | None = None
-    outcome: str | None = None     # confirmed | refuted | inconclusive
+    outcome: str | None = None     # confirmed | refuted | inconclusive | described
     run_ids: list = field(default_factory=list)
     note: str = ""
 
@@ -172,7 +197,17 @@ class Hypothesis:
             raise ValueError(f"territory {self.territory!r} not in {TERRITORIES}")
         if self.claim_kind not in CLAIM_KINDS:
             raise ValueError(f"claim_kind {self.claim_kind!r} not in {CLAIM_KINDS}")
-        if not self.predicted:
+        # AN EXPLORATORY SLOT HAS NO PREDICTION, BY DESIGN -- it has `varying` and `will_report`.
+        # The rule below is right for a bet and wrong for a question, and applying it to both is
+        # what made curiosity unrepresentable. It still bites where it should: a confirmatory or
+        # adversarial slot with no prediction is still refused, which is the case it was written
+        # for (a prediction invented after the run is not a prediction).
+        if self.intent == "exploratory":
+            if not (self.varying and self.will_report):
+                raise ValueError("an exploratory slot must say what it is VARYING and what it "
+                                 "WILL REPORT -- those are its equivalent of a prediction, and "
+                                 "a slot that states neither is not an experiment either")
+        elif not self.predicted:
             raise ValueError("a hypothesis without a recorded prediction is not a hypothesis; "
                              "the prediction MUST exist before the run")
 

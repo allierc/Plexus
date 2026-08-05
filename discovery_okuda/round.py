@@ -1087,14 +1087,35 @@ def build_composition_batch(sup, cfg, n_slots, ledger):
             # `refuted` purely because the Proposer contradicted itself, which feeds a FALSE surprise
             # signal into the mixture the Supervisor sets from it. A replicate is a legitimate
             # experiment, but it is one the proposer must ASK for -- and it would carry one prediction.
+            # THE SAME KEY THE CRITIC ALREADY USES, and not using it removed the whole second
+            # half of Track A. `comp_hash` is deliberately parameter-blind, so a retune cannot be
+            # filed as a new mechanism -- that is right, and it is proven: 107 of 107 set_param
+            # edits leave the hash bit-identical. But read one screen later as an EXPERIMENT ID,
+            # the same identity says a retune is not an experiment either: every parameter move
+            # in a batch collides with the mandatory unchanged control at slot 0.
+            #
+            # Measured by an external reviewer on the live frontier: 48 of 48 Critic-admitted
+            # set_param children were refused here as DUPLICATE_IN_BATCH, with the refusal text
+            # "Vary the EDIT, not the number" -- which then entered the next Proposer's prompt as
+            # a lesson. So "what does this mechanism do as you turn it up", the second question
+            # Track A asks of EVERY mechanism, was asked zero times in 36 slots, and the loop was
+            # teaching itself not to ask it.
+            #
+            # critic.py:556 had the answer all along: a set_param slot is keyed on
+            # `_run_key(graph)` -- mechanism AND operating point -- because for a sweep the exact
+            # experiment is what counts as already run. Two readings of one identity function
+            # disagreed about what a sweep is, and the stricter one won by being one screen later.
             h = comp_hash(g)
-            if h in in_batch:
-                rejected.append((f"{tag}{i}", f"DUPLICATE_IN_BATCH: identical to slot {in_batch[h]} "
-                                    f"({h}). Same composition, so at most one prediction about it "
-                                    f"can be right; the others are the same experiment re-run under "
-                                    f"a different guess. Vary the EDIT, not the number."))
+            _dedupe_key = (C._run_key(g) if _edit_kind == "set_param" else h)
+            if _dedupe_key in in_batch:
+                rejected.append((f"{tag}{i}",
+                                 f"DUPLICATE_IN_BATCH: identical to slot {in_batch[_dedupe_key]} "
+                                 f"({h}). Same composition AND the same operating point, so at "
+                                 f"most one prediction about it can be right; the others are the "
+                                 f"same experiment re-run under a different guess. Vary the EDIT, "
+                                 f"or -- for a sweep -- the PARAMETER VALUE."))
                 continue
-            in_batch[h] = i
+            in_batch[_dedupe_key] = i
             # ON THE SLOT, because the Hypothesis is constructed in a different function and a
             # dict that crosses the boundary is the only thing both ends can see.
             sl["_parent_hash"] = comp_hash(parent)

@@ -799,6 +799,126 @@ def _attrition(log):
                     (int(x) for x in m.groups())))
 
 
+@case("a sweep is a legal experiment, not a duplicate of the control")
+def t_sweep_is_an_experiment():
+    """THE SECOND HALF OF TRACK A, WHICH WAS UNREACHABLE BY ARITHMETIC.
+
+    `comp_hash` is deliberately parameter-blind so a retune cannot be filed as a new mechanism --
+    proven, 107 of 107 set_param edits leave it bit-identical. But round.py deduped slots WITHIN a
+    batch on that same bare hash while proposer.py REQUIRES slot 0 to be the unchanged parent, so
+    every parameter move collided with the mandatory control: an external review measured 48 of 48
+    admitted sweep slots refused as DUPLICATE_IN_BATCH, with the refusal text "Vary the EDIT, not
+    the number" then entering the next Proposer's prompt as a lesson. "What does this mechanism do
+    as you turn it up" was asked ZERO times in 36 slots.
+
+    critic.py had the answer already: a set_param slot is keyed on `_run_key` -- mechanism AND
+    operating point. Two readings of one identity function disagreed about what a sweep is.
+    """
+    import offline as O
+    O.install("clean")
+    import round as R, critic as C
+    g0 = R.load_frontier()[0]
+    sp = [e for e, _lbl in g0.legal_edits() if e[0] == "set_param"]
+    check(len(sp) >= 5, f"only {len(sp)} set_param edits offered on the frontier parent")
+    bare, keyed = set(), set()
+    for e in sp:
+        try:
+            r = g0.apply(e)
+        except Exception:
+            continue
+        g = r[0] if isinstance(r, tuple) else r
+        bare.add(R.comp_hash(g)); keyed.add(C._run_key(g))
+    check(len(bare) == 1, f"comp_hash is no longer parameter-blind: {len(bare)} hashes for "
+                          f"{len(sp)} sweep edits -- a retune could now pass as a new mechanism")
+    check(len(keyed) >= len(sp) - 1,
+          f"only {len(keyed)} distinct run keys for {len(sp)} sweep edits -- the in-batch dedupe "
+          f"would still collapse them onto the control")
+    src = open(os.path.join(HERE, "round.py")).read()
+    check("_dedupe_key" in src and "_run_key" in src,
+          "round.py's in-batch dedupe no longer distinguishes a sweep from its control")
+
+
+@case("a broken premise makes a prediction inconclusive, not confirmed")
+def t_specimen_gates_the_resolver():
+    """TWO RECORDS OF ONE EXPERIMENT DISAGREED ABOUT WHETHER IT WAS EVIDENCE.
+
+    The Biologist writes `premises_broken`; critic.check_posthoc never read it. So a run that
+    passed through itself (P11) or absorbed area by stretching (P7) was scored confirmed/refuted
+    in hypotheses.jsonl while collector.py wrote "specimen invalid ... describes the
+    configuration and not a tissue" into analysis.md about the SAME run -- and the Supervisor
+    reads the register, so the surprise rate, the 70/30 steer and the cluster freeze were all
+    computed over runs the Biologist had rejected. Measured: 24 of 35 archived runs.
+    """
+    import critic as C
+    clean = {"protr_peak": 1.4, "inert_operators": [], "premises_broken": []}
+    check(not [r for r in C.check_posthoc(clean) if r.code == "P0_SPECIMEN_INVALID"],
+          "a clean specimen is being refused")
+    broken = dict(clean, premises_broken=["P7", "P11"])
+    codes = [r.code for r in C.check_posthoc(broken)]
+    check("P0_SPECIMEN_INVALID" in codes,
+          f"a run that broke P7 and P11 is still scorable: {codes}")
+    # A JUDGEMENT CALL IS NOT A HARD REFUSAL. `?`-suffixed premises are uncertain by convention,
+    # and refusing on those would throw away real evidence.
+    soft = dict(clean, premises_broken=["P5b?"])
+    check("P0_SPECIMEN_INVALID" not in [r.code for r in C.check_posthoc(soft)],
+          "an uncertain premise is being treated as a certain refusal")
+
+
+@case("the loop is allowed to be curious")
+def t_exploratory_intent():
+    """"It must be allowed to be curious ... an exploratory slot states what it is VARYING and
+    what it will REPORT, rather than what it expects." Until now `intent="exploratory"` raised
+    ValueError and so did `predicted=""`, so every slot had to be a bet -- and the trap the goal
+    names (a loop that may only test predictions proposes only what it can predict) was structural
+    rather than cultural."""
+    import hypothesis as HY
+    check("exploratory" in HY.INTENTS, "there is still no exploratory intent")
+    check("described" in HY.OUTCOMES, "an exploratory slot has no outcome of its own")
+    check("exploratory" not in HY.MECHANISM_INTENTS,
+          "an exploratory slot is in the surprise denominator -- it made no prediction to be "
+          "surprised by, so it would dilute the campaign's only control signal")
+    base = dict(hid="X", comp_hash="C1", parent_hash=None, edit="turn chi up",
+                intent="exploratory", claim="", metric="protr_peak", predicted="", round_id=1)
+    h = HY.Hypothesis(**dict(base, varying="chi 1.3 -> 8.0", will_report="n_spots_peak"))
+    h.resolve({"n_spots_peak": 41}, "described", note="41 spots, no elongation")
+    check(h.outcome == "described", f"resolved {h.outcome!r}, not `described`")
+    for bad in ({}, {"varying": "chi 1.3 -> 8.0"}):
+        try:
+            HY.Hypothesis(**dict(base, **bad))
+            check(False, f"an exploratory slot stating {list(bad) or 'nothing'} was accepted -- "
+                         f"it is a licence to look at the output and call it interesting")
+        except ValueError:
+            pass
+    try:
+        HY.Hypothesis(**dict(base, intent="confirmatory", predicted=""))
+        check(False, "a confirmatory slot with no prediction is now accepted -- the rule that "
+                     "matters has been weakened")
+    except ValueError:
+        pass
+
+
+@case("a round that cannot move its own metric is caught")
+def t_null_difference():
+    """NINE OF TWELVE ROUND-3 RUNS SHARED A SHAPE TO SIXTEEN DIGITS under nine different
+    structural edits, because both frontier parents had `conns: []` and no growth operator -- so
+    the chemistry could not reach the mechanics and the shape was a constant of the edits being
+    made. Seven of the nine resolved `confirmed`. Re-measured here: 10 of 12 on gyr_prolate_peak.
+    """
+    import critic as C
+    rows = [("ctrl", "Ca", {"protr_peak": 1.022, "gyr_prolate_peak": 2.153}, "protr_peak"),
+            ("slotA", "Cb", {"protr_peak": 1.022, "gyr_prolate_peak": 2.153}, "protr_peak"),
+            ("slotB", "Cc", {"protr_peak": 1.022, "gyr_prolate_peak": 2.153}, "protr_peak"),
+            ("slotC", "Cd", {"protr_peak": 1.31, "gyr_prolate_peak": 2.9}, "protr_peak")]
+    hits = C.check_null_difference(rows, control="ctrl")
+    names = {n for n, _m, _v in hits}
+    check(names == {"slotA", "slotB"},
+          f"the null slots were not identified: {sorted(names)}")
+    n, metric, group = C.check_round_decoupled(rows)
+    check(n >= 3, f"the round-level decoupling check found only a group of {n}")
+    check(metric in C.SHAPE_VECTOR, f"grouped on {metric!r}, which is not a shape metric")
+
+
+
 if __name__ == "__main__":
     print(f"offline regression -- {len(CASES)} case(s), no agent, no GPU\n")
     for name, fn in CASES:
@@ -848,3 +968,4 @@ def t_proposer_sees_the_bank():
     groups = sum(1 for g in PR.SERIES_METRICS if g in prompt)
     check(groups >= 4, f"only {groups} of the metric groups reached the prompt")
     check("THE SIX SUFFIXES" in prompt, "the reduction suffixes never reach the Proposer")
+

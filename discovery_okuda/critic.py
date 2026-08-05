@@ -644,6 +644,83 @@ def check_reservoir(spec, graph=None, frames=None):
 
 
 # ============================================================================ POST-HOC rule
+def check_null_difference(rows, control=None):
+    """Refuse the SLOTS whose own scored metric is bit-identical to the control's.
+
+    NINE OF TWELVE ROUND-3 RUNS SHARED A SHAPE VECTOR TO SIXTEEN DIGITS -- gyr_prolate_peak
+    1.0461507109415944, r_cv_peak 0.011745760528715305 -- under nine DIFFERENT structural edits:
+    remove cell_react, remove cell_diffuse, remove cell_rd_seed, remove reconnect_t1, swap the
+    reaction, swap the diffusion. Seven of the nine resolved `confirmed`.
+
+    That is one fixed mesh measured nine times under nine names. It happened because both frontier
+    parents had `conns: []` and no growth operator, so the chemistry could not reach the mechanics
+    and the shape was a CONSTANT FUNCTION of the edits being made -- and the surprise rate, the
+    mixture and the cluster freeze were all computed over it.
+
+    KEYED ON THE SLOT'S OWN METRIC, not on every float in the record. The first version compared
+    all of them and flagged 148, because `*_measured_frac` is legitimately 1.0 on every run: a
+    constant is only damning when it is the quantity the SLOT WAS SCORED ON. Comparing each slot's
+    predicted metric against the control's value for that same metric asks the question that
+    matters -- "could this edit have moved the number it was judged by?" -- and answers it in one
+    float comparison.
+
+    Bit-identity, not a tolerance. Two DIFFERENT compositions agreeing to sixteen digits is not a
+    weak effect; it is no effect, and floating-point arithmetic says so more plainly than any
+    threshold chosen by hand.
+
+    `rows` is [(name, comp_hash, summary, metric)]. Returns [(name, metric, value)] for every
+    non-control slot whose metric matches the control's bit for bit.
+    """
+    ctrl = None
+    for name, ch, summ, metric in rows:
+        if control is not None and name == control:
+            ctrl = (name, summ)
+    if ctrl is None:
+        return []
+    out = []
+    for name, ch, summ, metric in rows:
+        if name == ctrl[0] or not metric:
+            continue
+        a, b = (summ or {}).get(metric), (ctrl[1] or {}).get(metric)
+        if isinstance(a, float) and isinstance(b, float) and a == a and a == b:
+            out.append((name, metric, a))
+    return out
+
+
+# THE HEADLINE SHAPE, and only these. The round-level check below compares a SHORT fixed list
+# rather than every float in the record: `*_measured_frac` is legitimately 1.0 everywhere, and
+# comparing all of them flagged 148 metrics -- noise that hides the finding.
+SHAPE_VECTOR = ("protr_peak", "r_cv_peak", "gyr_prolate_peak", "reduced_volume_floor",
+                "n_cells_final")
+
+
+def check_round_decoupled(rows):
+    """Is the WHOLE ROUND measuring a subsystem the edits cannot reach?
+
+    The slot-level test above asks whether one slot bought nothing. This asks the worse question:
+    whether the round was ever capable of buying anything. Nine of round 3's twelve runs shared
+    gyr_prolate_peak to sixteen digits under nine different structural edits, because both frontier
+    parents had `conns: []` and no growth operator -- so the chemistry could not reach the
+    mechanics and the shape was a constant of the edits being made.
+
+    A round in that state produces confirmations (seven of the nine) and they are all artefacts of
+    one fixed mesh. Returning the largest identical group is enough to refuse the batch: if a
+    majority of slots cannot be distinguished by their own shape, the round is not an experiment.
+    """
+    import collections
+    best = (0, None, [])
+    for m in SHAPE_VECTOR:
+        buckets = collections.defaultdict(list)
+        for name, ch, summ, _metric in rows:
+            v = (summ or {}).get(m)
+            if isinstance(v, float) and v == v:
+                buckets[repr(v)].append((ch, name))
+        for _v, members in buckets.items():
+            if len({c for c, _ in members}) >= 2 and len(members) > best[0]:
+                best = (len(members), m, sorted(n for _, n in members))
+    return best
+
+
 def check_posthoc(summary):
     """After the run: was this actually evidence? (D4 + the saturation guard.)
 
@@ -652,6 +729,30 @@ def check_posthoc(summary):
     crossed. Recording such a run as evidence is how a search manufactures a false impossibility.
     """
     out = []
+    # THE SPECIMEN VERDICT MUST GATE THE RESOLVER, NOT ONLY THE PROSE. The Biologist writes
+    # `premises_broken` into the summary and this function never read it -- so a run that passed
+    # through itself (P11), or absorbed area by stretching (P7), was scored `confirmed` or
+    # `refuted` in hypotheses.jsonl while collector.py:355 wrote "specimen invalid, so this
+    # describes the configuration and not a tissue" into analysis.md about the SAME run.
+    #
+    # Measured by an external review of the last campaign: 14 of 15 spent runs have a non-empty
+    # premises_broken, and 13 of the 14 conclusive verdicts in the register come from those runs.
+    # Two records of the same experiment disagreed about whether it was evidence, and the
+    # Supervisor reads the register -- so the surprise rate, the 70/30 steer, the cluster freeze
+    # and the lever map were all computed over runs the Biologist had already rejected.
+    #
+    # `certain` grade only. A premise can fire on a judgement call, and a hard refusal on those
+    # would throw away real evidence; a tissue that passed through itself is not a judgement call.
+    _broken = summary.get("premises_broken") or []
+    _certain = [b for b in _broken if not str(b).endswith("?")]
+    if _certain:
+        out.append(Rejection("P0_SPECIMEN_INVALID",
+                             "the Biologist refused this specimen before it was scored",
+                             f"premises broken: {', '.join(str(b) for b in _certain[:5])}"
+                             f"{' ...' if len(_certain) > 5 else ''} -- a prediction about a "
+                             f"tissue that broke a premise is a prediction about the "
+                             f"configuration, not about biology. analysis.md already said so; "
+                             f"the register used to disagree."))
     for op in (summary.get("inert_operators") or []):
         out.append(Rejection("P1_INERT_OPERATOR",
                              "a scheduled operator never acted -- the run is not evidence",

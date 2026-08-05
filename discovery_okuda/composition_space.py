@@ -445,7 +445,21 @@ OPERATORS = {
         params={"gamma": (0.0, GAMMA_CEIL, 0.3), "a0": (0.0, 0.05, 0.01),
                 "rate": (0.0, RD_RATE_CEIL, 1.0),
                 "F": (0.02, 0.06, F_DEFAULT), "kk": (0.05, 0.07, KK_DEFAULT),
-                "mu_h": (0.2, 2.0, MU_H_DEFAULT)}),
+                "mu_h": (0.2, 2.0, MU_H_DEFAULT),
+                # THE PARAMETER THAT DECIDES WHETHER THE CHEMISTRY SURVIVES AT ALL, and it was
+                # not in this table. Meinhardt's saturation kappa in a^2/(h(1 + kappa a^2)): the
+                # operator implements it and DEFAULTS IT TO 0.0, which is unbounded autocatalysis.
+                # okuda_route -- the supplied reference recipe, the parent the whole search breeds
+                # from -- never set it, so its activator ran to 9.5e5 and the premise gate refused
+                # 10 of the campaign's 15 runs as P3_CHEMISTRY_DIVERGED. Every composition bred
+                # from it inherited the divergence, and the loop could neither set the parameter
+                # nor sweep it because it was not here.
+                #
+                # Measured over 250 frames on okuda_route: sat 0.0 -> act_max_peak 9.51e5,
+                # alive_frac 0.052; sat 0.02 -> 2122, 0.311; sat 0.1 -> 1489, 0.375; sat 0.5 ->
+                # 599 but the pattern weakens (act_cv_peak 4.14 -> 2.80). 0.1 is the measured knee
+                # and is the default here.
+                "sat": (0.0, 2.0, 0.1)}),
     "cell_rd_seed": dict(                                     # the prescribed activation driver
         stage=3, role="driver", outputs=["morphogen"], slots=[], needs=[],
         # `scatter` added 2026-07-31: it is the ONLY Gray-Scott seeding validated on this
@@ -1233,7 +1247,19 @@ def reference_recipes():
     # rate=0.01 is 11.5 doublings over 800 frames -- SIX MILLION cells -- and was only ever
     # survivable because max_div capped it at 30 per call. That is what "the rail was the rate"
     # means in numbers. Okuda's tissue doubles ONCE, 2,000 -> 4,000, so rate = ln(2)/800.
-    h = h.with_params({**h.params, "cell_react0.rate": 0.4,
+    # AND IT MUST NOT DIVERGE. The recipe named for the target shipped Gierer-Meinhardt with
+    # `sat` unset, i.e. 0.0 -- UNSATURATED autocatalysis. Measured over 250 frames: act_max_peak
+    # 9.51e5, act_cv_peak 0.188, alive_frac 0.052. Every composition the search bred from it
+    # inherited that, and the premise gate then refused 10 of the campaign's 15 runs as
+    # P3_CHEMISTRY_DIVERGED -- two thirds of the GPU budget spent on runs that could not be
+    # evidence, while the loop read the refusals as a property of the mechanisms it was testing.
+    #
+    # The operator has always implemented the saturation and always defaulted it off. sat=0.1
+    # caps the activator at 1489 and takes alive_frac to 0.375 (0.5 caps harder, at 599, but the
+    # pattern weakens: act_cv_peak 4.14 -> 2.80). This is the recipe's operating point, not a
+    # bound on the search -- `sat` is now in the tunable table, so the loop can sweep it and ask
+    # what the saturation DOES rather than inheriting one value forever.
+    h = h.with_params({**h.params, "cell_react0.rate": 0.4, "cell_react0.sat": 0.1,
                        "morphogen_growth_3d0.rate": 0.000866,
                        "seed_mesh_3d0.n_cells": 2000})
     out["okuda_route"] = h
