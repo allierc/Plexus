@@ -121,22 +121,13 @@ def main():
          "SPHERE (oblateness 1.01) at ~6,000 cells. First contact at frame 32; by the end 89% of the "
          "matrix is strained and the front has reached the wall of the box"),
         ("52_aniso_growth_oblate", "vertex_mpm_grown", "grown into an ovoid",
-         "the matrix is denser within 55 deg of the vertical, so it resists there 2.6x harder -- and "
-         "<code>ecm_growth_gate_3d</code> slows the CELL CYCLE where it resists. Cells divide less at "
-         "the poles than at the equator, so the sphere GROWS into an ovoid rather than being pressed "
-         "into one: oblateness 1.01 -> 1.22 at 4,356 cells instead of 5,968. A FLAT stress pattern of "
-         "the same strength shrinks the tissue just as hard and leaves it round (1.015), so the shape "
-         "comes from the pattern of matrix stress, not the amount of it"),
-        ("58_oblcav_oblate", "vertex_mpm_grown_oblate", "grown into an ovoid",
-         "the matrix's cavity is OBLATE, so the tissue meets the fibres at its poles first and the "
-         "stress is directional from first contact (pole/equator 14.7 by frame 250, against 1.5 for a "
-         "round cavity). Gate that and the sphere GROWS into an ovoid: oblateness 1.01 -> "
-         "<b>1.43</b>, at 1,140 cells from 200 -- a 5.7x expansion with growth in all three axes, so "
-         "it is proliferating and not crushed. Nothing presses on it: the coupling is one-way, so the "
-         "cavity cannot deform the tissue, only tell it where to divide. Getting here meant five "
-         "failed amplifications -- a stiffer matrix, a denser one, a plane it never touches, an "
-         "earlier gate, plates that touch -- each of which raised the matrix's stress and LOWERED "
-         "the shape, because what limits it is WHEN the pattern exists, not how strong it is"),
+         "the matrix is 3x denser within 55 deg of the vertical and resists 2.6x harder there, so "
+         "<code>ecm_growth_gate_3d</code> slows the cell cycle at the poles. The sphere GROWS into an "
+         "ovoid instead of being pressed into one: oblateness 1.22"),
+        ("58_oblcav_oblate", "vertex_mpm_grown_oblate", "ovoid from first contact",
+         "an OBLATE cavity, so the tissue meets the fibres at its poles first and the stress is "
+         "directional from first contact -- pole/equator 14.7, against 1.5 for a round cavity. "
+         "Oblateness 1.43, grown in all three axes. Nothing presses on it"),
     ]
     runs = [(d, f"{v}.mp4", lbl, os.path.join(LOG, d, "spec_run.yaml"), cap)
             for d, v, lbl, cap in R3]

@@ -1591,13 +1591,13 @@ plotting:
   camera_elev: 1.05
   camera_turns: 0.0
   camera_zoom: 0.0</pre></span></span>
-      <span class="sim-cap">the matrix is denser within 55 deg of the vertical, so it resists there 2.6x harder -- and <code>ecm_growth_gate_3d</code> slows the CELL CYCLE where it resists. Cells divide less at the poles than at the equator, so the sphere GROWS into an ovoid rather than being pressed into one: oblateness 1.01 -> 1.22 at 4,356 cells instead of 5,968. A FLAT stress pattern of the same strength shrinks the tissue just as hard and leaves it round (1.015), so the shape comes from the pattern of matrix stress, not the amount of it</span>
+      <span class="sim-cap">the matrix is 3x denser within 55 deg of the vertical and resists 2.6x harder there, so <code>ecm_growth_gate_3d</code> slows the cell cycle at the poles. The sphere GROWS into an ovoid instead of being pressed into one: oblateness 1.22</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/vertex_mpm_grown_oblate.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">grown into an ovoid<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">ovoid from first contact<span class="sim-spec"><pre>general:
   name: 58_oblcav_oblate
   seed: 0
   n_frames: 402
@@ -1773,7 +1773,7 @@ plotting:
   camera_elev: 1.05
   camera_turns: 0.0
   camera_zoom: 0.0</pre></span></span>
-      <span class="sim-cap">the matrix's cavity is OBLATE, so the tissue meets the fibres at its poles first and the stress is directional from first contact (pole/equator 14.7 by frame 250, against 1.5 for a round cavity). Gate that and the sphere GROWS into an ovoid: oblateness 1.01 -> <b>1.43</b>, at 1,140 cells from 200 -- a 5.7x expansion with growth in all three axes, so it is proliferating and not crushed. Nothing presses on it: the coupling is one-way, so the cavity cannot deform the tissue, only tell it where to divide. Getting here meant five failed amplifications -- a stiffer matrix, a denser one, a plane it never touches, an earlier gate, plates that touch -- each of which raised the matrix's stress and LOWERED the shape, because what limits it is WHEN the pattern exists, not how strong it is</span>
+      <span class="sim-cap">an OBLATE cavity, so the tissue meets the fibres at its poles first and the stress is directional from first contact -- pole/equator 14.7, against 1.5 for a round cavity. Oblateness 1.43, grown in all three axes. Nothing presses on it</span>
     </figcaption>
   </figure>
 </div>
