@@ -173,10 +173,41 @@ class ECMGrowthGate3D(Structural):
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
-        import numpy as _np
+        import numpy as np
         self.at = params.get("_at", "vertex")
-        z = _np.load(str(params["load"]))
-        P = _np.asarray(z["pmap"], _np.float32)
+        z = np.load(str(params["load"]))
+        P = np.asarray(z["pmap"], np.float32)
+
+        # SMOOTHED, AND THIS WAS THE LAST THING IN THE WAY. The recorded map is a CONTACT LEDGER, not a
+        # stress field: at frame 250 only 24% of its bins are nonzero, because 140,000 particles binned
+        # into 2,048 directions against a moving surface touch a different quarter of it every frame. A
+        # zero bin gates to 1.0 -- no suppression -- so three quarters of the polar cells were
+        # unsuppressed in any given frame and a different three quarters the next, which time-averages to
+        # a nearly UNIFORM weak suppression. That is why a 15x instantaneous directional contrast moved
+        # the aspect ratio by 3%: the contrast was real and it was not persistent for any given cell.
+        #
+        # The patchiness is a sampling artefact of the estimator, not a feature of the field, so it is
+        # averaged out: a running mean over `smooth_frames` and a box over `smooth_phi_deg` of longitude
+        # and one row of colatitude. `smooth_phi_deg = 360` makes the map AXISYMMETRIC, which is the
+        # right estimator when the matrix is (dense polar caps are), and is wrong the moment the
+        # experiment puts structure in longitude -- so it is a parameter and not a default of the code.
+        sf = int(params.get("smooth_frames", 25))
+        sp = float(params.get("smooth_phi_deg", 360.0))
+        if sf > 1 and P.shape[0] > sf:
+            k = np.ones(sf, np.float32) / sf
+            flat = P.reshape(P.shape[0], -1)
+            P = np.stack([np.convolve(flat[:, j], k, mode="same") for j in range(flat.shape[1])],
+                         axis=1).reshape(P.shape).astype(np.float32)
+        if sp >= 359.0:
+            P = np.repeat(P.mean(axis=2, keepdims=True), P.shape[2], axis=2)
+        elif sp > 0:
+            w = max(1, int(round(sp / 360.0 * P.shape[2])))
+            ker = np.ones(w, np.float32) / w
+            P = np.stack([[np.convolve(np.tile(P[t, i], 3), ker, mode="same")[P.shape[2]:2 * P.shape[2]]
+                           for i in range(P.shape[1])] for t in range(P.shape[0])]).astype(np.float32)
+        # one row of colatitude, clamped at the poles
+        P = (P + np.pad(P, ((0, 0), (1, 0), (0, 0)), mode="edge")[:, :-1]
+             + np.pad(P, ((0, 0), (0, 1), (0, 0)), mode="edge")[:, 1:]) / 3.0
         # NORMALISED so `p_half` means the same thing whatever the matrix's stiffness was -- otherwise
         # stiffening the matrix moves both the pressure and the gate's operating point and a stiffness
         # sweep measures two things at once.
@@ -190,13 +221,43 @@ class ECMGrowthGate3D(Structural):
         # quarters of the map is identically zero, and including it would drag the scale toward the
         # tissue's own solid angle rather than the pressures it produced.
         nz = P[P > 0]
-        self.pk = float(_np.percentile(nz, 99)) if nz.size else 1.0
-        self.pk = max(self.pk, 1e-12)
+        self.pk = max(float(np.percentile(nz, 99)) if nz.size else 1.0, 1e-12)
         self.P = torch.as_tensor(P / self.pk, dtype=torch.float32)
         self.T = int(self.P.shape[0])
-        self.p_half = float(params.get("p_half", 0.10))
-        self.hill = float(params.get("hill", 2.0))
-        self.floor = float(params.get("floor", 0.25))
+        # SELF-CALIBRATING OPERATING POINT. `p_half` in units of the p99 was a hand-picked number and it
+        # put the gate on the wrong part of its own curve: a real map's typical pressures sit far below
+        # its p99, which is set by a few hot contact bins. With dense polar caps giving poles 7234 and
+        # equator 2631 -- a genuine 2.75x pattern -- both landed at 0.145 and 0.053 against p_half 0.10,
+        # i.e. on the flat foot of the Hill, for a rate difference of only 1.7x where the clean synthetic
+        # map gave 5x. `auto` puts the half-suppression point at the MEDIAN of the pressure the surface
+        # actually carries late in the run, so half the loaded tissue sits either side of it and the
+        # pattern falls across the steep part of the curve instead of under it.
+        # `relative` IS A DIFFERENT MECHANISM AND IS LABELLED ONE. The absolute gate is the physical
+        # reading -- a cell responds to the stress it carries -- and it has a timing problem that is the
+        # MATRIX's, not the gate's: the measured pressure only passes the half-point around frame 350 of
+        # 402, so a 15x directional rate difference arrives with 50 frames left to shape anything. In
+        # `relative` mode the reference is the current frame's own mean over loaded directions, so the
+        # gate reads the PATTERN and ignores the amplitude, and it acts from first contact. That is
+        # adaptive mechanosensing (cells habituating to ambient stress and responding to the excess),
+        # which is a real mechanism and a WEAKER claim than the absolute one -- it cannot be reported as
+        # "the matrix's stress shaped the tissue" without saying which mode produced it.
+        self.relative = str(params.get("p_half", "")).lower() == "relative"
+        ph = params.get("p_half", "auto")
+        if self.relative:
+            self.p_half = float(params.get("rel_half", 1.0))
+        elif isinstance(ph, str) and ph.lower() == "auto":
+            late = P[int(0.75 * P.shape[0]):]
+            lnz = late[late > 0]
+            self.p_half = float(np.median(lnz) / self.pk) if lnz.size else 0.10
+        else:
+            self.p_half = float(ph)
+        # SHARPER THAN 2, AND THAT IS A CLAIM ABOUT MECHANOSENSING, not a fitting knob. A linear-ish
+        # gate cannot turn a 2.75x stress pattern into a shape: it needs to be switch-like, which is what
+        # a Hill exponent of 4-6 is and what mechanotransduction actually looks like (a threshold, not a
+        # proportionality). Stated here because the alternative reading -- "the exponent was raised until
+        # the picture worked" -- is the one a reader should be able to rule out from the numbers above.
+        self.hill = float(params.get("hill", 4.0))
+        self.floor = float(params.get("floor", 0.15))
         self._prev = None
         self._frame, self._t, self._said = -1, 0, False
 
@@ -234,8 +295,17 @@ class ECMGrowthGate3D(Structural):
         press = M[(th / math.pi * nth).long().clamp(0, nth - 1),
                   (ph / (2 * math.pi) * nph).long().clamp(0, nph - 1)]
         press = torch.where(ok, press, torch.zeros_like(press))
+        ref = self.p_half
+        if self.relative:
+            # THE CURRENT FRAME'S OWN MEAN OVER LOADED DIRECTIONS. Zero bins are excluded: three
+            # quarters of the map is untouched surface early on, and averaging that in would put the
+            # reference far below anything real and saturate the gate everywhere.
+            live = M[M > 0]
+            if live.numel() < 8:
+                return {}                      # nothing in contact yet: nothing to be relative to
+            ref = float(live.mean()) * self.p_half
         gate = self.floor + (1.0 - self.floor) / (
-            1.0 + (press / max(self.p_half, 1e-9)).clamp_min(0.0) ** self.hill)
+            1.0 + (press / max(ref, 1e-12)).clamp_min(0.0) ** self.hill)
 
         # ---- GATE THE TARGET VOLUME, NOT `mg_scale` -------------------------------------------------
         # THE TRAP THIS AVOIDS, MEASURED. `morphogen_growth_3d` reallocates `mg_scale` to ONES and
