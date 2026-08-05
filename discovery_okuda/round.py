@@ -480,26 +480,17 @@ def build_all(ctx):
     if len(out) < len(slots):
         print(T_.warn(f"[round] {len(slots) - len(out)} of {len(slots)} slot(s) dropped -- running "
                       f"the short batch of {len(out)}. A short round is a real round."))
-    _report_ranges(out)
-    print(T_.ok(f"[round] {len(out)} slot(s) built: "
-                + ", ".join(f"{s['name'].split('_')[-1]}" for s in out)))
-    return out
-
-
-def _report_ranges(specs):
-    """The out-of-range values in this batch, once per PARENT.
-
-    The finding itself is in round.md: all six pool parents carry values outside their declared box --
-    `l_th_frac` at 0.28-0.35 against a 0.12 ceiling, `Lambda` at 3 against 0.3 -- so the search space
-    contains no working point. That is worth knowing once a round, not once a slot.
-    """
+    # OUT-OF-RANGE VALUES, ONCE PER PARENT. Inherited, so per-slot printed one fact nine times.
     by_parent = {}
-    for sp in specs:
+    for sp in out:
         for note in (sp.get("out_of_range") or []):
             by_parent.setdefault(sp.get("parent") or "?", set()).add(note)
     for parent, notes in by_parent.items():
         print(T_.quiet(f"[round] {parent}: {len(notes)} value(s) outside the declared space -- "
                        + "; ".join(sorted(notes))))
+    print(T_.ok(f"[round] {len(out)} slot(s) built: "
+                + ", ".join(f"{s['name'].split('_')[-1]}" for s in out)))
+    return out
 
 
 def _resolve_edit(g, edit):
