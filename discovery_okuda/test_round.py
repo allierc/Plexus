@@ -244,6 +244,78 @@ def test_a_q_carrying_summary_can_be_read():
               "the value was destroyed rather than moved aside")
 
 
+def test_a_child_differs_from_its_parent_by_exactly_the_edit():
+    """THE BUG THAT VOIDED ROUND 1, and the reason it could happen here and not in the one-agent loop.
+
+    That loop copies the parent's config file and edits one field, so nothing can be lost. This one
+    projects the spec into a CompositionGraph -- which knows only parameters the declared space declares
+    -- and re-emits from the projection. Measured on the round that ran:
+
+        control vs its own parent (refute_coral_nocons -> r001_00_ctrl): 29 DIFFERENCES
+          reconnect_t1_3d.l_th_frac   0.35 -> 2.45      round 2 died of 1.96
+          reconnect_t1_3d.every          4 -> 1
+          seed_mesh_3d.radius          5.0 -> dropped
+          seed_mesh_3d.jitter         0.18 -> dropped
+          shape_energy_3d.K_R          0.4 -> 0.02
+        and l_th_frac 0.28 -> 1.96 on both other parents.
+
+    Every run executed the configuration the previous campaign died of, and five of eight were
+    byte-identical. What is asserted here is the property that was missing: the LOAD-BEARING values of
+    a child equal its parent's, and the only intended difference is the edit."""
+    print("\na child differs from its parent by exactly its edit")
+    import io
+    import contextlib
+    import yaml
+    import round as E
+    CFG = os.path.abspath(os.path.join(os.path.dirname(HERE), "config", "okuda"))
+
+    def emitted(slot, idx):
+        with contextlib.redirect_stdout(io.StringIO()):
+            sp = E._build_one(slot, "tfid", idx, set())
+        if sp is None:
+            return None, None
+        with open(os.path.join(CFG, f"{sp['name']}.yaml")) as f:
+            return sp, yaml.safe_load(f)
+
+    def val(spec, op, key):
+        for o in (spec.get("operators") or []):
+            if o.get("op") == op:
+                return o.get(key)
+        return None
+
+    LOAD_BEARING = [("reconnect_t1_3d", "l_th_frac"), ("reconnect_t1_3d", "every"),
+                    ("reconnect_t1_3d", "max_flips"), ("seed_mesh_3d", "radius"),
+                    ("seed_mesh_3d", "jitter"), ("seed_mesh_3d", "p0"),
+                    ("seed_mesh_3d", "n_cells"), ("shape_energy_3d", "K_R"),
+                    ("divide_3d", "every"), ("divide_3d", "min_cycle"),
+                    ("morphogen_growth_3d", "vth_frac")]
+
+    for parent in ("refute_coral_nocons", "coral_gate"):
+        with open(os.path.join(E.LOG_ROOT, parent, "spec_run.yaml")) as f:
+            pspec = yaml.safe_load(f)
+        _sp, ctrl = emitted({"parent": parent}, E.CONTROL_SLOT)
+        check(ctrl is not None, f"the control off {parent} would not build")
+        if ctrl is None:
+            continue
+        bad = [f"{op}.{k}: {val(pspec, op, k)} -> {val(ctrl, op, k)}"
+               for op, k in LOAD_BEARING
+               if val(pspec, op, k) is not None and val(pspec, op, k) != val(ctrl, op, k)]
+        check(not bad, f"the CONTROL off {parent} is not its parent: {bad}")
+
+    # and a one-parameter edit changes exactly that parameter
+    _sp, child = emitted({"parent": "coral_gate",
+                          "edit": ["set_param", "cell_diffuse.d_h", 0.08]}, 1)
+    check(child is not None, "the one-edit child would not build")
+    if child is not None:
+        check(val(child, "cell_diffuse", "d_h") == 0.08,
+              f"the edit did not land: d_h = {val(child, 'cell_diffuse', 'd_h')}")
+        with open(os.path.join(E.LOG_ROOT, "coral_gate", "spec_run.yaml")) as f:
+            pspec = yaml.safe_load(f)
+        bad = [f"{op}.{k}" for op, k in LOAD_BEARING
+               if val(pspec, op, k) is not None and val(pspec, op, k) != val(child, op, k)]
+        check(not bad, f"a one-parameter edit also changed: {bad}")
+
+
 def test_the_live_flow_loads():
     print("\nthe flow the loop will actually run")
     import round as E

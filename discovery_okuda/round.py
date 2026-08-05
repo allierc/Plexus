@@ -190,8 +190,19 @@ def run_round(round_id, mode="composition", ledger=None, n_slots=N_SLOTS, flow=N
                         got[item] = v
                 ctx[out] = "\n\n".join(f"[{nid}] {k}: {v}" for k, v in got.items())
                 print(f"[round] {nid}: {len(got)}/{len(items)}")
+                # EACH ONE SPEAKS, BRIEFLY AND IN ITS OWN COLOUR. Cedric: "before I could read in the
+                # terminal a few lines for each agent with a color, now they are gone." They were: the
+                # old loop routed every role through T_.say, and the rewrite has the round FILE what a
+                # role returns without printing it -- so the eye, the Analyst and the Grounder went
+                # silent even when they disagreed with each other, which is the one thing worth
+                # watching. The round still names no role: it prints the NODE'S OWN id as the voice,
+                # and term.VOICE colours it if it recognises the name.
+                for k, v in got.items():
+                    print(T_.say(f"{nid} {_short(k)}", str(v), sentences=2))
             else:
                 ctx[out] = _exec(node, ctx)
+                if "agent" in node and isinstance(ctx[out], str) and ctx[out].strip():
+                    print(T_.say(nid, ctx[out], sentences=4))
         except Exception as e:
             # ONE NODE MUST NOT TAKE THE ROUND WITH IT, and a swallowed failure must not read as a
             # completed step -- so the reason is printed and the value stays absent.
@@ -203,6 +214,12 @@ def run_round(round_id, mode="composition", ledger=None, n_slots=N_SLOTS, flow=N
     names = ctx.get("names") or []
     print(f"[round] {round_id}: {len(names)} run(s) in {(time.time() - t0) / 60:.1f} min")
     return ctx
+
+
+def _short(name):
+    """A run name short enough to sit in a voice tag: r001_04 from r001_04_something."""
+    parts = str(name).split("_")
+    return "_".join(parts[:2]) if len(parts) > 2 else str(name)
 
 
 def _exec(node, ctx):
@@ -580,6 +597,7 @@ def _build_one(slot, rid, index, seen):
         return None
     try:
         T.write_config(g, name, frames=FRAMES)
+        _restore_parent_params(name, par, edit)
     except Exception as e:
         print(T_.no(f"[round] slot {index}: spec would not write: {e}"))
         return None
@@ -597,6 +615,78 @@ def _build_one(slot, rid, index, seen):
             "run_key": C._run_key(g),
             "comp_hash": h() if callable(h) else h,
             **{k: slot.get(k) for k in ("claim", "predict", "intent", "why")}}
+
+
+def _restore_parent_params(name, parent, edit):
+    """Put back every parameter the rebuild lost, so a child differs from its parent by ONE edit.
+
+    THIS IS THE BUG THAT VOIDED ROUND 1, and Cedric named its cause exactly: *"this would not have
+    happened in the one-agent LLM loop."* It would not. That loop COPIES the parent's config file and
+    edits one field, so nothing can be lost. Ours projects the spec into a `CompositionGraph` -- which
+    knows only the parameters the declared space declares -- and re-emits from the projection. The
+    projection is lossy, and the loss is not cosmetic:
+
+        CONTROL vs ITS OWN PARENT, refute_coral_nocons -> r001_00_ctrl: 29 DIFFERENCES
+          reconnect_t1_3d.l_th_frac   0.35 -> 2.45     round 2 died of 1.96
+          reconnect_t1_3d.every          4 -> 1        T1 flips every frame, not every fourth
+          seed_mesh_3d.radius          5.0 -> dropped  the seed geometry
+          seed_mesh_3d.jitter         0.18 -> dropped
+          seed_mesh_3d.p0              3.5 -> dropped
+          shape_energy_3d.K_R          0.4 -> 0.02
+        and l_th_frac 0.28 -> 1.96 on BOTH other parents.
+
+    So every run in round 1 executed the configuration the previous campaign died of, the control was
+    not the parent, five of eight runs were byte-identical, and frame 0 already had shape_idx_p95 6.4
+    against the parent's 4.0 with the surface no longer star-convex. The `-N out-of-space` and
+    `N clock re-anchored` lines I had been printing as informational were reporting exactly this.
+
+    THE FIX KEEPS THE GRAPH FOR STRUCTURE AND THE SPEC FOR VALUES. The graph is still what the critic
+    checks and what the menu is enumerated from -- a structural edit needs it. But after emitting, every
+    operator parameter the parent had is restored unless the edit itself changed it. Structure comes
+    from the graph, values come from the run that actually worked.
+
+    A value the space "disallows" is restored deliberately: the parent RAN with it, and the declared
+    boxes have already been measured to exclude every working recipe in the pool.
+    """
+    import yaml
+    cfg_dir = os.path.abspath(os.path.join(os.path.dirname(HERE), "config", "okuda"))
+    child_path = os.path.join(cfg_dir, f"{name}.yaml")
+    parent_spec_path = os.path.join(LOG_ROOT, str(parent), "spec_run.yaml")
+    if not (os.path.exists(child_path) and os.path.exists(parent_spec_path)):
+        return
+    with open(child_path) as f:
+        child = yaml.safe_load(f)
+    with open(parent_spec_path) as f:
+        pspec = yaml.safe_load(f)
+
+    # the ONE key the edit is allowed to change, as it appears in an emitted spec (op name, not node id)
+    spared = None
+    if edit and edit[0] == "set_param" and "." in str(edit[1]):
+        node, _, key = str(edit[1]).rpartition(".")
+        spared = (node.rstrip("0123456789"), key)
+
+    pops = {}
+    for o in (pspec.get("operators") or []):
+        pops.setdefault(o.get("op"), o)
+    restored = []
+    for o in (child.get("operators") or []):
+        src = pops.get(o.get("op"))
+        if not src:
+            continue                                    # an operator the edit ADDED: defaults are right
+        for k, v in src.items():
+            if k in ("op", "at"):
+                continue
+            if spared and o.get("op") == spared[0] and k == spared[1]:
+                continue                                # this is the experiment
+            if o.get(k) != v:
+                o[k] = v
+                restored.append(f"{o['op']}.{k}")
+    if restored:
+        with open(child_path, "w") as f:
+            yaml.safe_dump(child, f, sort_keys=False)
+        print(T_.quiet(f"[round] {name}: restored {len(restored)} parent value(s) the rebuild had "
+                       f"lost ({', '.join(restored[:4])}{', ...' if len(restored) > 4 else ''})"))
+    return restored
 
 
 def launch(ctx):

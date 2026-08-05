@@ -567,6 +567,24 @@ class _Timed:
 _BREVITY_BLOCK = re.compile(r"^BREVITY\b.*?(?=\n\s*\n|\Z)", re.S | re.M)
 
 
+# LINES THE HARNESS EMITS THAT ARE NOT PART OF AN ANSWER. The CLI writes these to the same stream as
+# the reply, so they arrive inside the text a role returns -- and that text goes into analysis.md, into
+# the record, and into the next stage's prompt. The eye's first voiced line in the terminal was
+# "warning: no stdin data received in 3s", which is the harness talking about a pipe.
+_NOISE = ("warning: no stdin data received",
+          "redirect stdin explicitly",
+          "if piping from a slow command")
+
+
+def _strip_harness_noise(text):
+    """Remove the harness's own lines from a reply. A role's answer is what the role said."""
+    if not isinstance(text, str) or not text:
+        return text
+    keep = [ln for ln in text.split("\n")
+            if not any(n in ln.lower() for n in _NOISE)]
+    return "\n".join(keep).strip()
+
+
 def run_agent(agent, prompt, ledger=None, **over):
     """Run one agent under its budget. THE ONLY SUPPORTED PATH TO run_claude().
 
@@ -637,7 +655,7 @@ def run_agent(agent, prompt, ledger=None, **over):
         tools = tool_summary()
         if tools and not over.get("quiet"):
             print(f"  [{agent}] {(time.time() - t0) / 60.0:.1f} min, tools: {tools}", flush=True)
-    return ok, out
+    return ok, _strip_harness_noise(out)
 
 
 def _catch_bypass(timeout_min):
