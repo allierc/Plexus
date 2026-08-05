@@ -621,16 +621,22 @@ def _spec(name):
 
 
 def _seen():
-    """Both identities of every evaluated run, THIS campaign and every archived one.
+    """Both identities of every evaluated run IN THIS CAMPAIGN. The archive is deliberately not read.
 
-    THE ARCHIVE IS THE LONG MEMORY AND I WAS NOT READING IT. `reset_campaign` appends the records to
-    `_archive/records.jsonl` and then cleared campaign/, so a fresh launch knew 0 evaluated
-    compositions while 137 sat in the archive -- and would have spent GPUs re-running compositions the
-    previous campaign had already refuted. A reset should forget the NARRATIVE (the analysis, the
-    parent set, the round counter) and not the fact that a GPU-hour was already spent on a given
-    mechanism. Found by Cedric asking what a clean campaign actually clears.
+    I WIRED THE ARCHIVE IN AND CEDRIC WAS RIGHT TO PULL IT OUT. "discard previous 135 known
+    compositions they are not sound." Those records were produced by rounds carrying the defects this
+    phase found: no `edit_kind` passed to the duplicate check, so a retune of a recorded parent read as
+    a repeat; a legal menu serialised as 57 rows of placeholders, so the Proposer chose blind; and a
+    bare `set_param` target that wrote a key no operator reads, so a slot could run as an exact copy of
+    its parent and be recorded as an experiment.
 
-    If replication IS what is wanted, R6's own message says how: request a robustness test explicitly.
+    A composition suppressed on the strength of a run that may never have tested what it claimed is
+    worse than a composition re-run: the first silently removes it from the search forever, and the
+    second costs one GPU-hour and produces evidence. So a clean start is CLEAN, and the archive is
+    history rather than memory.
+
+    When the records are sound again -- a campaign's worth of rounds through this pipeline -- reading
+    them here is a two-line change, and it should be made deliberately rather than inherited.
 
     TWO KINDS OF IDENTITY IN ONE SET. `comp_hash` answers "has this MECHANISM been built?" and is
     parameter-blind on purpose, so a retune shares its parent's hash. `_run_key` answers "has this
@@ -639,7 +645,7 @@ def _seen():
     serves both. Recording only comp_hash made every sweep look like a duplicate of its own control.
     """
     out = set()
-    for path in (RECORDS, os.path.join(HERE, "_archive", "records.jsonl")):
+    for path in (RECORDS,):
         if not os.path.exists(path):
             continue
         with open(path) as f:
@@ -724,10 +730,53 @@ def reset_campaign(quiet=False):
             cleared += 1
         except OSError as e:
             print(T_.no(f"[round] could not clear {f}: {e}"))
+    n_gone, n_kept = _clear_colliding_runs(quiet=quiet)
     if not quiet:
-        print(T_.ok(f"[round] campaign reset: {cleared} file(s) cleared, {moved} record(s) archived "
-                    f"to _archive/records.jsonl, {len(kept)} input(s) kept"))
+        print(T_.ok(f"[round] campaign reset: {cleared} file(s) cleared, {moved} record(s) archived, "
+                    f"{len(kept)} input(s) kept, {n_gone} empty run dir(s) removed"
+                    + (f", {n_kept} moved to _superseded/" if n_kept else "")))
     return cleared
+
+
+def _clear_colliding_runs(quiet=False):
+    """Remove the run directories whose names the fresh campaign is about to reuse.
+
+    THE HAZARD THIS CLOSES, and it is the one that destroyed round 2's twelve run directories. A reset
+    renumbers to r001, so the next round writes `r001_00_ctrl`, `r001_01` ... -- exactly the names an
+    ABORTED previous attempt already left on disk. `measure()` reads `log/okuda/<name>/diag.json`, so a
+    stale file from the earlier attempt would be scored as this round's result: a prediction confirmed
+    against a run that was never launched.
+
+    NOTHING WITH A diag.json IS DELETED. A finished run is evidence even if its campaign was abandoned,
+    so those are moved to `log/okuda/_superseded/` and the empty shells are removed. Only names matching
+    a campaign round -- r000_00 style -- are touched; the reference recipes and the previous
+    campaign's own `r001n_*` / `r002c_*` runs do not collide and are left alone.
+    """
+    import re
+    import shutil
+    pat = re.compile(r"^r\d{3}_\d{2}(_|$)")
+    gone, moved = 0, 0
+    if not os.path.isdir(LOG_ROOT):
+        return 0, 0
+    for name in sorted(os.listdir(LOG_ROOT)):
+        d = os.path.join(LOG_ROOT, name)
+        if not os.path.isdir(d) or not pat.match(name):
+            continue
+        if os.path.exists(os.path.join(d, "diag.json")):
+            dest = os.path.join(LOG_ROOT, "_superseded", name)
+            os.makedirs(os.path.dirname(dest), exist_ok=True)
+            if os.path.exists(dest):
+                shutil.rmtree(d)               # already superseded once; the copy aside is the keeper
+            else:
+                shutil.move(d, dest)
+            moved += 1
+            if not quiet:
+                print(T_.quiet(f"[round] {name} has results -- moved to _superseded/ rather than "
+                               f"overwritten"))
+        else:
+            shutil.rmtree(d)
+            gone += 1
+    return gone, moved
 
 
 def next_round_id():
