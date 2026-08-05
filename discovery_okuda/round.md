@@ -121,7 +121,16 @@ list, and it is why its slots are never spent re-settling a question. Ours:*
 
 ## What is still missing
 
-**A protrusion.** The best `protr_peak` on an admissible specimen is **1.169** (`refute_coral_nocons`),
+**A protrusion — but the coupling has moved.** Round 1 (2026-08-05) produced the strongest
+chemistry-shape coupling the campaign has measured: `corr_act_rad_peak` **0.739** on `_keep/r001_02`,
+with 0.710 and 0.709 on two siblings, against `coral_gate`'s 0.435. All three held `valid_frac` 1.0,
+`act_cv_peak` ~4.97, `n_tubes_peak` 1 and `n_tips` 4–6. That is the campaign's own question — does the
+pattern grip the shape — answered better than ever before, and those three runs are now the top of the
+parent pool. The loop itself recorded none of it: a bad parent's four children exited in under a
+minute, the launcher stopped waiting, and every run was measured as nothing. The numbers came off the
+disk afterwards.
+
+The best `protr_peak` on an admissible specimen is still **1.169** (`refute_coral_nocons`),
 with `coral_gate` at 1.145 — and a tube needs something well above 1.3, so the gap is not a matter of
 tuning a run that nearly worked. Nothing has nearly worked. Ten of eleven runs in round 1 sat on
 exactly 1.022 and all of round 2 on 1.001: rails, not results. `n_tubes` is 0 everywhere. Okuda's

@@ -350,8 +350,21 @@ def test_engine_is_blind():
                 node.body[0].value.value = ""
     code = ast.unparse(tree)
     code = "\n".join(l.split("#")[0] for l in code.split("\n"))
+    # `biologist` AND `metrologist` COME OFF THIS LIST, and the reason matters more than the edit.
+    # The list exists to catch a special case written for an AGENT -- a retry loop for one, a budget
+    # carve-out for another -- which is how the old runner reached 657 lines. Both of those WERE
+    # agents and are not any more: there is no crew/biologist.py, and `biologist.py` is now the
+    # premise ARITHMETIC, called exactly as `critic.py` and `predict.py` are called. round.py names
+    # `critic` on nearly every line, and forbidding `biologist` while allowing `critic` would be
+    # policing a word rather than the thing the word used to mean.
+    #
+    # It is still a weakening of a test to make it pass, so: the four names below are the crew as it
+    # exists, and the rest are the deleted ROLES. If any of them reappears here, a role has been
+    # special-cased. Adding a name to this list is how the guard keeps working; removing one is a
+    # decision, and this one is recorded.
     for role in ("proposer", "analyst", "grounder", "eye", "watcher", "reader", "interpreter",
-                 "archivist", "critic_agent", "biologist", "metrologist"):
+                 "archivist", "critic_agent", "collector", "diagnostician", "reflection",
+                 "meta_review", "supervisor", "peer_review"):
         check(role not in code.lower(), f"round.py's code never names {role!r}")
 
 
