@@ -127,18 +127,33 @@ def _fit(seed, n_iter, device, tag):
     base = [PY, os.path.join(HERE, "train.py"), FIT_SPEC, "--seed", str(seed),
             "--device", device, "--outdir", d, *MODEL_ARGS]
 
-    r = subprocess.run(base + ["--n_iter", str(n_iter), "--ckpt_every",
-                               str(max(1, n_iter // 2))],
-                       capture_output=True, text=True, env=env, timeout=14400)
+    def _go(args, phase, timeout):
+        """Run, streaming to a file. NOT capture_output=True.
+
+        The first version captured both streams into memory, which on a job measured in hours means
+        the only evidence of progress is invisible until the process exits. It cost an afternoon:
+        two fits sat on a card another session had filled, made no progress for 105 minutes, and
+        looked identical from outside to two fits working normally. `progress.txt` was no help
+        either, because it is written only at checkpoints -- hence the fifth of the run below.
+        """
+        log = os.path.join(d, f"{phase}.log")
+        with open(log, "w") as fh:
+            r = subprocess.run(args, stdout=fh, stderr=subprocess.STDOUT, text=True, env=env,
+                               timeout=timeout)
+        tail = (open(log, errors="replace").read().strip().splitlines() or ["no output"])[-1]
+        return r, tail[:140]
+
+    _, tail = _go(base + ["--n_iter", str(n_iter),
+                          # a checkpoint every fifth, so progress.txt is a progress file
+                          "--ckpt_every", str(max(1, n_iter // 5))], "train", 14400)
     ck = sorted(glob.glob(os.path.join(d, "checkpoints", "model_*.pt")))
     if not ck:
-        return None, "train: " + ((r.stderr or "").strip().splitlines() or ["no output"])[-1][:140]
+        return None, f"train: {tail}"
 
     dump = os.path.join(d, "dump.npz")
-    r2 = subprocess.run(base + ["--resume", ck[-1], "--eval_dump", dump],
-                        capture_output=True, text=True, env=env, timeout=3600)
+    _, tail = _go(base + ["--resume", ck[-1], "--eval_dump", dump], "eval", 3600)
     if not os.path.exists(dump):
-        return None, "eval: " + ((r2.stderr or "").strip().splitlines() or ["no output"])[-1][:140]
+        return None, f"eval: {tail}"
     return dump, None
 
 
@@ -192,12 +207,21 @@ def fit_spreads(seeds=4, n_iter=60, device="cuda:0", devices=None, verbose=True)
 
     # (label, seed) -- the repeat pair asks about ONE device, the seeds about the optimiser
     jobs = [("repeat_a", 7), ("repeat_b", 7)] + [(f"seed{s}", s) for s in range(11, 11 + seeds)]
-    # the repeat pair must share a device or it stops being a determinism question; every job here
-    # is on a device from the same verified-identical pool, so any assignment is admissible
-    plan = [(k, s, pool[i % len(pool)]) for i, (k, s) in enumerate(jobs)]
-    if len(pool) > 1:
-        plan[0] = (jobs[0][0], jobs[0][1], pool[0])
-        plan[1] = (jobs[1][0], jobs[1][1], pool[0])
+
+    # THE REPEAT PAIR SHARES A DEVICE, and it must not share it AT THE SAME TIME.
+    # "Does the same command twice give the same answer" is a question about one card, so both halves
+    # go on pool[0]. But the executor runs len(pool) jobs at once in submission order, so listing
+    # them adjacently put both on one card while the other sat idle -- 15.7 s/it and an 85-minute ETA
+    # for the first pair alone. Interleaving by device means every concurrent slice spans different
+    # cards, and the repeat pair still shares one.
+    per_dev = {d: [] for d in pool}
+    for i, (k, sd) in enumerate(jobs):
+        per_dev[pool[0] if k.startswith("repeat") else pool[(i - 2) % len(pool)]].append((k, sd))
+    plan = []
+    for r in range(max(len(v) for v in per_dev.values())):
+        for d in pool:
+            if r < len(per_dev[d]):
+                plan.append((per_dev[d][r][0], per_dev[d][r][1], d))
     if verbose:
         print(f"  plan: " + "  ".join(f"{k}(seed {s}) on {d}" for k, s, d in plan), flush=True)
 
