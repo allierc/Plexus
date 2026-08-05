@@ -119,6 +119,30 @@ list, and it is why its slots are never spent re-settling a question. Ours:*
 - **`divide_3d` + `shape_energy_3d:monolayer` together** — a filled 2×2 table says the pair is a
   substrate bug (see *What is ruled out*).
 
+## Two things about the operator space, added mid-campaign 2026-08-05
+
+**`extrude` can manufacture the answer, and the metric that would catch it is not in your bank.**
+`extrude` is a *forcing* operator — `radial_push`, gated on the morphogen. It can drive `protr_peak`
+past 1.3 by pushing the surface out, with no growth and no mechanics doing the work. The number that
+separates the two is `mech_p_ratio`: **about 3 for a forced tube, about 1 for a grown one**. It is
+measured on every run and recorded, and it is deliberately **not** in the metric bank, so a prediction
+cannot rest on it and it will not appear in your metrics block.
+
+So: `extrude` is a legitimate mechanism to test and the coverage block will keep offering it, because
+no parent exercises it. But **a protrusion produced with `extrude` in the composition is not an answer
+to the open problem** unless something independent says the tissue made it. If you propose it, say in
+the claim that you expect a forced signature, and expect the eye to be asked whether the tube looks
+grown or pushed. A `protr_peak` of 1.4 from a radial push would satisfy the campaign's threshold and
+answer none of its question.
+
+**The feedback leg is real but structurally invisible.** `shape_to_chem` (curvature / tension /
+apical_area / pressure) is the geometry → chemistry direction, and it works — it mutates the chemistry
+field in place, exactly as `cell_diffuse` does, which is why neither declares `outputs`. The
+consequence is only that the critic cannot verify *structurally* that the loop is closed: an
+`add_op shape_to_chem` will be admitted whether or not the chemistry it feeds actually exists
+downstream. If you wire it, check that a reaction operator is present and that `beta` is non-zero —
+it was 0 in every pool parent until round 1, so the feedback had never once been switched on.
+
 ## What is still missing
 
 **A protrusion — but the coupling has moved.** Round 1 (2026-08-05) produced the strongest
