@@ -98,8 +98,11 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                # frame-0 surface it is laid on; None = absent. See membrane_ops for what it is and what
                # this discretisation cannot claim about it.
                membrane=None, membrane_particles=30000, membrane_youngs=400.0,
-               membrane_bond_k=4.0e4, membrane_cutoff=0.020, membrane_break=0.35,
-               membrane_offset=0.004, membrane_thickness=0.010):
+               membrane_bond_k=2.0e5, membrane_cutoff=0.020, membrane_break=0.35,
+               membrane_offset=0.004, membrane_thickness=0.010, membrane_adhesion=2.0e4,
+               # crosslink turnover, in frames. Large = a membrane that cannot keep up with growth and
+               # must fragment; small = one that remodels and stays intact. 0 or None disables it.
+               membrane_tau=60.0):
     """The whole experiment as a plain dict, ready for yaml.safe_dump + schema.load."""
     types = {f"s{i}": {"fraction": 1.0 / len(STRESS_COLORS), "youngs": youngs}
              for i in range(len(STRESS_COLORS))}
@@ -170,9 +173,16 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
              "centre": [0.5, 0.5, 0.5], "surface": str(membrane), "scale": 1.0,
              "offset": float(membrane_offset), "thickness": float(membrane_thickness),
              "seed": int(seed)},
+            # INTEGRINS FIRST: without them the sheet slides over the epithelium and its bonds never
+            # feel the growth. `membrane_adhesion = 0` reproduces the unanchored (wrong) loading path.
+            {"op": "integrin_adhesion", "at": "basement_membrane_particle",
+             "centre": [0.5, 0.5, 0.5], "surface": str(membrane), "scale": 1.0,
+             "k": float(membrane_adhesion), "offset": float(membrane_offset), "detach": 0.0},
             {"op": "basement_membrane_bond", "at": "basement_membrane_particle",
              "k": float(membrane_bond_k), "cutoff": float(membrane_cutoff),
              "max_neighbours": 6},
+            {"op": "basement_membrane_remodel", "at": "basement_membrane_particle",
+             "tau": float(membrane_tau), "cap": 0.02},
             {"op": "basement_membrane_bond_break", "at": "basement_membrane_particle",
              "break_strain": float(membrane_break), "components_every": 40},
             # the MLS-MPM cycle for the third body. APPENDED, so its scatter accumulates AFTER the
@@ -188,8 +198,15 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
         # the bond force is a DYNAMICS operator (EMIT mpm_acceleration): it must run before the substep
         # block so the engine has its delta to integrate, and the break check after it.
         i = spec["schedule"].index("ecm_stress")
-        spec["schedule"].insert(i, "basement_membrane_bond")
-        spec["schedule"].insert(i + 1, "basement_membrane_bond_break")
+        spec["schedule"].insert(i, "integrin_adhesion")
+        spec["schedule"].insert(i + 1, "basement_membrane_bond")
+        if membrane_tau and membrane_tau > 0:
+            spec["schedule"].insert(i + 2, "basement_membrane_remodel")
+            spec["schedule"].insert(i + 3, "basement_membrane_bond_break")
+        else:
+            spec["operators"] = [o for o in spec["operators"]
+                                 if o["op"] != "basement_membrane_remodel"]
+            spec["schedule"].insert(i + 2, "basement_membrane_bond_break")
     if block_gap is not None:
         # ONE SET, ONE MATERIAL. The block's stiffness is a property of its TYPE, which is why it has
         # to be a separate set rather than extra types on the matrix: `ecm_stress` rewrites
