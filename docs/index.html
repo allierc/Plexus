@@ -1409,14 +1409,14 @@ plotting:
   camera_elev: 1.05
   camera_turns: 0.0
   camera_zoom: 0.0</pre></span></span>
-      <span class="sim-cap">no blocks: the tissue stays a SPHERE and reaches ~6,000 cells. First contact with the matrix at frame 32; by the end 89% of it is strained and the front has reached the wall of the box</span>
+      <span class="sim-cap">the control: a growing, dividing epithelium presses into a soft fibrous matrix and stays a SPHERE (oblateness 1.01) at ~6,000 cells. First contact at frame 32; by the end 89% of the matrix is strained and the front has reached the wall of the box</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/vertex_mpm_plate67.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/vertex_mpm_grown.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">blocks 67% of the box<span class="sim-spec"><pre>general:
-  name: 42_plate_blk67
+      <span class="sim-name" tabindex="0">grown into an ovoid<span class="sim-spec"><pre>general:
+  name: 52_aniso_growth_oblate
   seed: 0
   n_frames: 402
   dt: 0.004
@@ -1482,13 +1482,15 @@ operators:
   axis: 2
   n_fibres: 6000
   fibre_len: 0.16
-  align: 0.0
+  align: 0.85
   align_dir:
   - 1.0
   - 0.0
   - 0.0
   seed: 0
-  plate_half: 0.16602667239733643
+  dense_axis: 2
+  dense_cone_deg: 55.0
+  dense_boost: 3.0
 - op: cell_to_ecm
   at: mpm_particle
   centre:
@@ -1498,12 +1500,13 @@ operators:
   k: 1200.0
   damp: 0.0
   implementation: replay
-  surface: /workspace/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_plate9p2.npz
-  scale: 0.018046377808631504
+  surface: /workspace/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_gautoh6f0p08.npz
+  scale: 0.018716607957519026
 - op: ecm_stress
   at: mpm_particle
-  scale: 0.08
+  scale: 0.008
   bands: 8
+  measure: vonmises
 - op: mpm_strain
   at: mpm_particle
 - op: mpm_scatter
@@ -1511,6 +1514,7 @@ operators:
   to: mpm_grid
   drag: 0.0
   a_max: 300.0
+  store_stress: true
 - op: mpm_grid_update
   at: mpm_grid
   wall_damp: 0.6
@@ -1526,15 +1530,9 @@ operators:
   - 0.5
   - 0.5
   - 0.5
-  surface: /workspace/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_plate9p2.npz
-  scale: 0.018046377808631504
+  surface: /workspace/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_gautoh6f0p08.npz
+  scale: 0.018716607957519026
   skin: 0.004
-- op: plate_confine_3d
-  at: mpm_particle
-  axis: 2
-  centre: 0.5
-  gap_half: 0.16602667239733643
-  stiff: 1.0
 schedule:
 - aggregate
 - ecm_seed
@@ -1547,7 +1545,6 @@ schedule:
   - mpm_grid_update
   - mpm_gather
 - cell_exclude_3d
-- plate_confine_3d
 plotting:
   background: black
   up_axis: 1
@@ -1564,44 +1561,44 @@ plotting:
     - 0.19
     - 0.3
     s1:
-    - 0.35
-    - 0.15
-    - 0.42
+    - 0.46
+    - 0.31
+    - 0.72
     s2:
-    - 0.58
-    - 0.13
-    - 0.42
-    s3:
     - 0.78
-    - 0.2
-    - 0.33
+    - 0.26
+    - 0.72
+    s3:
+    - 0.95
+    - 0.28
+    - 0.45
     s4:
-    - 0.92
-    - 0.35
-    - 0.18
-    s5:
     - 0.99
-    - 0.55
-    - 0.1
+    - 0.45
+    - 0.2
+    s5:
+    - 1.0
+    - 0.62
+    - 0.12
     s6:
     - 1.0
-    - 0.76
-    - 0.22
+    - 0.8
+    - 0.28
     s7:
     - 1.0
     - 0.97
-    - 0.75
+    - 0.78
   camera_elev: 1.05
   camera_turns: 0.0
   camera_zoom: 0.0</pre></span></span>
-      <span class="sim-cap">two solid blocks, free gap 1/3 of the box: the sphere flattens to an OVOID of aspect 1.65, and the matrix — now confined to the middle third — ends 97% strained rather than 89%</span>
+      <span class="sim-cap">the matrix is denser within 55 deg of the vertical, so it resists there 2.6x harder -- and <code>ecm_growth_gate_3d</code> slows the CELL CYCLE where it resists. Cells divide less at the poles than at the equator, so the sphere GROWS into an ovoid rather than being pressed into one: oblateness 1.01 -> 1.22 at 4,356 cells instead of 5,968. A FLAT stress pattern of the same strength shrinks the tissue just as hard and leaves it round (1.015), so the shape comes from the pattern of matrix stress, not the amount of it</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/vertex_mpm_plate75.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/vertex_mpm_grown_oblate.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">blocks 75% of the box<span class="sim-spec"><pre>general:
-  name: 43_plate_blk75
+      <span class="sim-name" tabindex="0">grown into an ovoid<span class="sim-spec"><pre>general:
+  name: 58_oblcav_oblate
   seed: 0
   n_frames: 402
   dt: 0.004
@@ -1662,40 +1659,44 @@ operators:
   - 0.5
   - 0.5
   - 0.5
-  cavity_r: 0.095
+  cavity_r: 0.17
   cavity_h: 0.095
   axis: 2
   n_fibres: 6000
   fibre_len: 0.16
-  align: 0.0
+  align: 0.85
   align_dir:
   - 1.0
   - 0.0
   - 0.0
   seed: 0
-  plate_half: 0.126170139863746
+  dense_axis: 2
+  dense_cone_deg: 55.0
+  dense_boost: 3.0
 - op: cell_to_ecm
   at: mpm_particle
   centre:
   - 0.5
   - 0.5
   - 0.5
-  k: 4000.0
+  k: 1200.0
   damp: 0.0
   implementation: replay
-  surface: /workspace/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_plate7.npz
-  scale: 0.018024305694820858
+  surface: /workspace/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_aaecfeb32a.npz
+  scale: 0.028148275675084617
 - op: ecm_stress
   at: mpm_particle
-  scale: 0.08
+  scale: 0.008
   bands: 8
+  measure: vonmises
 - op: mpm_strain
   at: mpm_particle
 - op: mpm_scatter
   at: mpm_particle
   to: mpm_grid
   drag: 0.0
-  a_max: 800.0
+  a_max: 300.0
+  store_stress: true
 - op: mpm_grid_update
   at: mpm_grid
   wall_damp: 0.6
@@ -1711,15 +1712,9 @@ operators:
   - 0.5
   - 0.5
   - 0.5
-  surface: /workspace/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_plate7.npz
-  scale: 0.018024305694820858
+  surface: /workspace/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_aaecfeb32a.npz
+  scale: 0.028148275675084617
   skin: 0.004
-- op: plate_confine_3d
-  at: mpm_particle
-  axis: 2
-  centre: 0.5
-  gap_half: 0.126170139863746
-  stiff: 1.0
 schedule:
 - aggregate
 - ecm_seed
@@ -1732,8 +1727,6 @@ schedule:
   - mpm_grid_update
   - mpm_gather
 - cell_exclude_3d
-- plate_confine_3d
-_block: null
 plotting:
   background: black
   up_axis: 1
@@ -1750,37 +1743,37 @@ plotting:
     - 0.19
     - 0.3
     s1:
-    - 0.35
-    - 0.15
-    - 0.42
+    - 0.46
+    - 0.31
+    - 0.72
     s2:
-    - 0.58
-    - 0.13
-    - 0.42
-    s3:
     - 0.78
-    - 0.2
-    - 0.33
+    - 0.26
+    - 0.72
+    s3:
+    - 0.95
+    - 0.28
+    - 0.45
     s4:
-    - 0.92
-    - 0.35
-    - 0.18
-    s5:
     - 0.99
-    - 0.55
-    - 0.1
+    - 0.45
+    - 0.2
+    s5:
+    - 1.0
+    - 0.62
+    - 0.12
     s6:
     - 1.0
-    - 0.76
-    - 0.22
+    - 0.8
+    - 0.28
     s7:
     - 1.0
     - 0.97
-    - 0.75
+    - 0.78
   camera_elev: 1.05
   camera_turns: 0.0
   camera_zoom: 0.0</pre></span></span>
-      <span class="sim-cap">free gap 1/4 of the box: ASPECT 2.08, and only 4,000 cells instead of 6,000. Confinement suppresses proliferation — a squeezed cell reaches its division volume later — which nothing in the spec asks it to do</span>
+      <span class="sim-cap">the matrix's cavity is OBLATE, so the tissue meets the fibres at its poles first and the stress is directional from first contact (pole/equator 14.7 by frame 250, against 1.5 for a round cavity). Gate that and the sphere GROWS into an ovoid: oblateness 1.01 -> <b>1.43</b>, at 1,140 cells from 200 -- a 5.7x expansion with growth in all three axes, so it is proliferating and not crushed. Nothing presses on it: the coupling is one-way, so the cavity cannot deform the tissue, only tell it where to divide. Getting here meant five failed amplifications -- a stiffer matrix, a denser one, a plane it never touches, an earlier gate, plates that touch -- each of which raised the matrix's stress and LOWERED the shape, because what limits it is WHEN the pattern exists, not how strong it is</span>
     </figcaption>
   </figure>
 </div>
