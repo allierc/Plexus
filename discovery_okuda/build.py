@@ -9,6 +9,7 @@ keys in `coral_gate`: 34 of 48 runs carry them, including every campaign run. Me
 from __future__ import annotations
 
 import json
+import time
 import os
 import sys
 
@@ -21,11 +22,25 @@ from composition_space import CompositionGraph, OPERATORS      # noqa: E402,F401
 
 LOG = os.path.join(os.path.dirname(HERE), "log", "okuda")
 
+# THE TWO CONSTANTS I FAILED TO PORT, and the whole quarantine crashed without them. `read_diag_summary`
+# raised NameError on any summary carrying a Q key -- 34 of the 48 runs on disk -- and `measure()` does
+# not catch it, so the round's metrics node would have returned None and every prediction scored
+# inconclusive. It did not fire yet only because none of the six pool parents has a Q key; the moment a
+# run is launched with the relax probe, it would have taken the round out. Found by checking the stopped
+# run rather than by anything failing.
+SEED_SPHERE_Q = 1.014          # protr of the relaxed SEED SPHERE -- what the broken test measured
+SEED_SPHERE_Q_TOL = 5e-4       # run_one rounds Q to 3 dp, so this is exact-match with slack
 Q_KEY = "Q_protr_after_relax"
 
 Q_DERIVED = ("Q_drop",)
 
 STALE_SUFFIX = "__STALE"
+# THE THIRD CONSTANT THE PORT DROPPED, found by the test written for the first two. `_quarantine_log`
+# appends here every time a poisoned Q is intercepted, so the interceptions are countable rather than
+# inferred. Deliberately in campaign/ and NOT in _archive/: the archive is the immutable research
+# record, and this is a log of what the reader refused.
+Q_QUARANTINE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            "campaign", "q_quarantine.jsonl")
 
 def stale_q_reason(summary):
     """Why this summary's Q must not be scored, or None if it may be.

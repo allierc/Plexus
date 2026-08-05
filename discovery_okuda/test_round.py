@@ -208,6 +208,42 @@ def test_dedupe_admits_a_sweep_and_the_control():
     check(ctrl and ctrl["edit"] is None, "the control carries no edit")
 
 
+def test_a_q_carrying_summary_can_be_read():
+    """THE PORT DROPPED TWO CONSTANTS AND NOTHING NOTICED. Moving the Q quarantine into build.py left
+    `SEED_SPHERE_Q` and `SEED_SPHERE_Q_TOL` behind in the deleted round.py, so `read_diag_summary`
+    raised NameError on any summary carrying a Q key -- 34 of the 48 runs on disk. `measure()` does not
+    catch it, so `metrics` would have come back None and every prediction in the round scored
+    inconclusive.
+
+    It had not fired only because none of the six current pool parents has a Q key. The first run
+    launched with the relax probe would have taken the round out silently."""
+    print("\na summary with a Q key is readable, and a poisoned Q is quarantined")
+    import json
+    import tempfile
+    import build
+
+    with tempfile.TemporaryDirectory() as td:
+        d = os.path.join(td, "diag.json")
+
+        # an ordinary Q: read, not quarantined
+        json.dump({"summary": {"protr_final": 1.4, "Q_protr_after_relax": 1.31, "Q_drop": 0.09}},
+                  open(d, "w"))
+        s1 = build.read_diag_summary(d, quiet=True)
+        check(s1.get("Q_protr_after_relax") == 1.31, f"an ordinary Q was not read: {s1}")
+        check(not s1.get("Q_stale"), "an ordinary Q was wrongly quarantined")
+
+        # THE POISON: exactly the relaxed seed sphere's own value, which is what the broken probe
+        # measured on every run regardless of its shape.
+        json.dump({"summary": {"protr_final": 1.4, "Q_protr_after_relax": build.SEED_SPHERE_Q,
+                               "Q_drop": 0.386}}, open(d, "w"))
+        s2 = build.read_diag_summary(d, quiet=True)
+        check(s2.get("Q_stale") is True, f"the poisoned Q was not quarantined: {s2}")
+        check("Q_protr_after_relax" not in s2, "the poisoned Q is still in scoring reach")
+        check("Q_drop" not in s2, "Q_drop is derived from the poison and must move with it")
+        check(s2.get("Q_protr_after_relax__STALE") == build.SEED_SPHERE_Q,
+              "the value was destroyed rather than moved aside")
+
+
 def test_the_live_flow_loads():
     print("\nthe flow the loop will actually run")
     import round as E
