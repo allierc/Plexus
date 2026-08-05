@@ -742,7 +742,7 @@ same specimen.
 \end{itemize}
 \end{phasebox}
 
-\begin{phasebox}{Phase 2 --- Deciding what may be believed about a number \hfill \prog\ (5 of 6) \ \stopp}
+\begin{phasebox}{Phase 2 --- Deciding what may be believed about a number \hfill \dn\ \emph{(the instruments)} \ \stopp}
 \textbf{Goal.} Give the loop numbers it can trust. \emph{Not new numbers} --- the measurements this
 campaign needs were written over three weeks in the old folder and audited in July. What was never
 done is deciding what may be believed about any of them.
@@ -919,10 +919,37 @@ read $0.997$.}
 \end{center}
 \medskip
 
-\textbf{The last item: deliver the decomposition per run. \ns} The five named dimensions --- size,
-orientation, openness, chirality, shape-detail --- on the corrected grid and written into every run's
-record, so step 3 of the loop returns \emph{where} the model is wrong rather than how much. All five
-still lack a measured zero, which is what makes this the remaining item rather than a finished one.
+\medskip
+\textbf{THE INSTRUMENTS ARE CLOSED.} Seven measurements exist that a claim may rest on. Each has one
+name, one definition and one implementation; each moves on the axis it declares and holds on the
+other eight; each has a zero measured on six models that know nothing; each has the tissue's own
+beat-to-beat variation measured; and six of the seven have been read against a closed form and
+return the right number. Every defect found along the way is recorded on the class that carries it,
+with the measurement that found it. \textbf{That was the phase, and it is done.}
+
+Two things remain, and \emph{neither can reverse a decision already taken}:
+
+\begin{center}\small
+\begin{tabular}{@{}l p{9.6cm}@{}}
+\toprule
+\textbf{the fitted floor} & \emph{measuring, not deciding.} The same seed twice and four different
+seeds, at 300 iterations. It can only \textbf{lower} every \emph{steps} figure above, because the
+working unit is the largest of the three floors --- so it can retire an instrument and it cannot
+promote one, and it cannot change which of them is the objective. Measured cost: $11.0$\,s an
+iteration alone, $72$--$85$ under a neighbouring session holding four 13\,GB jobs across both cards,
+so about six hours rather than one. Not ours to fix, and it is running where it can be watched.\\
+\addlinespace
+\textbf{the decomposition} & The five \code{residual/} dimensions --- size, orientation, openness,
+chirality, shape-detail --- written into every run's record so step~3 returns \emph{where} the model
+is wrong rather than how much. \textbf{They are five of the six quantities that still have no measured
+zero} --- the sixth is \code{loopscore\_sd} --- and one of them,
+\code{residual/shape\_detail}, scored its best in the whole null bank on the model that does
+nothing, because the family measures \emph{recoverability} and everything is recoverable from
+nothing. So this is not a reporting chore: it is the same admission procedure again, on five more
+quantities, and it belongs with the loop that consumes them rather than ahead of it.\\
+\bottomrule
+\end{tabular}
+\end{center}
 
 \begin{stopbox}
 \textbf{THE STOP.} At the end we know whether the fitted model beats \emph{the best of the trivial
