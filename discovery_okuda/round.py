@@ -282,6 +282,27 @@ def parents(ctx):
     # parent measured" for a role choosing what to try next.
     import metrics as _M
     bank = set(_M.names())
+    # ONE PARENT PER EXPERIMENT. Six recorded runs can be the same mechanism at the same operating
+    # point -- a round's control is its parent unchanged, and an inert edit reproduces it exactly -- so
+    # the parent set was offering six copies of two runs. Every structural or set_param edit proposed
+    # on the second copy lands on a composition already evaluated, and R6 refused it: three slots of a
+    # twelve-slot round in one batch, all reporting the same hash.
+    #
+    # Keyed on `run_key` (mechanism AND operating point) rather than `comp_hash`, because a sweep is a
+    # legitimate parent -- two runs of one composition at different parameters are two different
+    # starting points and both are worth offering. What is not worth offering twice is the same
+    # experiment. Best first, so the survivor of each group is the one that scored highest.
+    seen_key, uniq = set(), []
+    for r in rows:
+        k = r.get("run_key") or r.get("comp_hash") or r.get("name")
+        if k in seen_key:
+            continue
+        seen_key.add(k)
+        uniq.append(r)
+    if len(uniq) < len(rows):
+        print(T_.quiet(f"[round] {len(rows) - len(uniq)} recorded run(s) are repeats of an experiment "
+                       f"already in the parent set -- offering {len(uniq)} distinct"))
+    rows = uniq
     return [{"name": r["name"], "parent": r.get("parent"),
              "metrics": {k: v for k, v in r["metrics"].items() if k in bank},
              "premises_broken": r.get("premises_broken") or []} for r in rows[:PARENT_LIMIT]]
@@ -475,8 +496,14 @@ def build_all(ctx):
         s = _build_one(slot, rid, i, seen)
         if s:
             out.append(s)
-            if s.get("comp_hash"):
-                seen.add(s["comp_hash"])          # in-batch duplicates too, not only cross-round
+            # BOTH IDENTITIES, IN-BATCH. This added only `comp_hash`, which `_build_one` had been
+            # writing as None for 69 runs -- so the in-batch check was inert and two slots proposing the
+            # same edit on two parents that differ only in that parameter both got built, or the second
+            # was refused cross-round instead. A structural edit is keyed on the composition and a
+            # set_param edit on the operating point, so the batch has to carry both.
+            for _k in ("comp_hash", "run_key"):
+                if s.get(_k):
+                    seen.add(s[_k])
     if len(out) < len(slots):
         print(T_.warn(f"[round] {len(slots) - len(out)} of {len(slots)} slot(s) dropped -- running "
                       f"the short batch of {len(out)}. A short round is a real round."))
@@ -604,10 +631,19 @@ def _build_one(slot, rid, index, seen):
     # per slot printed one fact nine times -- and the nine copies pushed the two lines that differed
     # (the compile refusal, the short batch) off the top of the screen.
     rng = C.range_notes(g)
-    h = getattr(g, "comp_hash", None)
+    # `comp_hash` IS A FUNCTION, NOT AN ATTRIBUTE, and reading it as one wrote None onto every record
+    # for 69 runs. So no row could say which composition it was, `_seen()` collected no composition
+    # hashes at all, and the structural duplicate check had nothing to compare against -- only the
+    # run_key path was ever working.
+    from run_record import comp_hash as _comp_hash
+    try:
+        h = _comp_hash(g)
+    except Exception as e:
+        print(T_.no(f"[round] slot {index}: cannot hash the composition: {e}"))
+        h = None
     return {"name": name, "slot": index, "parent": par, "edit": edit, "out_of_range": rng,
             "run_key": C._run_key(g),
-            "comp_hash": h() if callable(h) else h,
+            "comp_hash": h,
             **{k: slot.get(k) for k in ("claim", "predict", "intent", "why")}}
 
 
