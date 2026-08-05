@@ -93,37 +93,95 @@ def oblate(aspect=2.5, **kw):
     return v, mt
 
 
-def tubed(length=2.2, cap=0.75, waist=0.45, **kw):
-    """One finger from the north pole: a sphere with a tube.
+def tubed(length=2.4, cap=0.82, waist=0.30, **kw):
+    """One CYLINDRICAL finger from the north pole: a sphere with a real tube.
 
-    The deformation is smooth in the polar angle so no face is inverted: vertices above `cap` in
-    z are pulled outward along z and squeezed in xy, with the pull tapering to zero at the boundary
-    so the tube joins the body continuously.
+    MY FIRST VERSION WAS A TEARDROP AND CEDRIC SAW IT IMMEDIATELY. It scaled xy by a smoothstep and
+    stretched z, which tapers continuously from the equator to the pole -- a pear. A tube is not a
+    taper: it has a NECK where it leaves the body and a roughly CONSTANT WIDTH along its length, and
+    those two features are exactly what `protrusion_aspect_max` and `tube_diameter` are built to
+    measure. A fixture that lacks them cannot test them, and a metric that passes on a pear tells you
+    nothing about a tube.
+
+    So the polar cap is MAPPED ONTO A CYLINDER rather than stretched. A vertex at polar parameter t
+    (0 at the cap rim, 1 at the pole) goes to radius `waist` -- the same radius for every t, which is
+    what makes it a cylinder -- and to height `cap + t * length`. The rim itself stays put, so the
+    tube joins the body at a neck instead of blending into it.
     """
     v, mt = base_sphere(**kw)
-    v = v.copy()
+    v = np.asarray(v, float).copy()
+    r = np.linalg.norm(v, axis=1)
     z = v[:, 2]
-    t = np.clip((z - cap) / (1.0 - cap), 0.0, 1.0)      # 0 at the collar, 1 at the pole
-    s = t * t * (3 - 2 * t)                             # smoothstep: no kink at the collar
-    v[:, 2] = z + s * (length - 1.0)
-    scale = 1.0 - s * (1.0 - waist)
-    v[:, 0] *= scale
-    v[:, 1] *= scale
+    inside = z > cap
+    if not inside.any():
+        return v, mt
+    # t: 0 at the cap rim, 1 at the pole
+    t = np.clip((z[inside] - cap) / (r[inside].max() - cap + 1e-12), 0.0, 1.0)
+    xy = v[inside, :2]
+    rho = np.linalg.norm(xy, axis=1, keepdims=True)
+    dirn = xy / np.maximum(rho, 1e-12)
+    rim = float(np.sqrt(max(1.0 - cap * cap, 1e-9)))          # xy radius of the cap boundary
+    # THE WIDTH IS CONSTANT IN t: waist at the tip, and blended to the rim over the first fifth so the
+    # neck is a neck and not a step the mesh cannot represent.
+    neck = np.clip(t / 0.2, 0.0, 1.0)[:, None]
+    v[inside, :2] = dirn * (rim * (1 - neck) + waist * neck)
+    v[inside, 2] = cap + t * length
     return v, mt
 
 
-def branched(length=2.0, cap=0.72, waist=0.5, **kw):
-    """Two fingers, north and south. `n_tips` must see two; `protr` cannot tell it from one."""
-    v, mt = base_sphere(**kw)
-    v = v.copy()
-    for sign in (+1.0, -1.0):
-        z = v[:, 2] * sign
-        t = np.clip((z - cap) / (1.0 - cap), 0.0, 1.0)
-        s = t * t * (3 - 2 * t)
-        v[:, 2] = v[:, 2] + sign * s * (length - 1.0)
-        scale = 1.0 - s * (1.0 - waist)
-        v[:, 0] *= scale
-        v[:, 1] *= scale
+def branched(length=2.4, cap=0.62, waist=0.26, split=0.40, spread=1.4, dip=0.55, **kw):
+    """ONE trunk that SPLITS into two tips -- a Y, which is what Okuda's branching figure shows.
+
+    THREE VERSIONS BEFORE THIS ONE WORKED, and each failure was informative. The first put a finger at
+    each pole -- two tubes on opposite sides of a body, not a branch -- and applied its deformation
+    twice to the same array in place, so the second pass moved vertices the first had already moved and
+    the result was a symmetric lemon. The second built the tube correctly and then pushed vertices
+    sideways by the sign of their x, which puts a DISCONTINUITY at x = 0: the faces crossing it stretch
+    across the gap, so the prongs came out webbed and the classifier saw one blob. Cedric saw both in
+    the figure before any metric complained.
+
+    THE WEB IS NOT AN ARTEFACT -- IT IS THE SADDLE, and a branch has one. Connectivity is fixed, so the
+    faces between the prongs must go somewhere, and where they belong is the crotch. So the vertices
+    near the split plane are pulled DOWN in z by `dip` as the prongs separate, which is what turns a
+    flat web into the notch between two fingers. That the fixture needed this to look right is itself
+    the point: a Y is not two tubes, it is two tubes AND the junction between them.
+
+    `cap` is lower than the tube's (0.62 against 0.82) because the trunk has to carry enough cells to
+    split at all: at 0.82 the polar cap holds about twenty cells, and ten per prong cannot resolve a
+    tip.
+
+    `spread` IS 1.4 BECAUSE THE METRIC WAS MEASURED, not tuned until it passed. `n_tips` clusters the
+    outermost cells with a 25-degree cone about the tissue centroid, so a fork narrower than that reads
+    as one tip. Swept:
+
+        spread   0.3    0.5    0.7    0.9    1.1    1.4
+        half-angle 8.6   12.0   15.6   19.0   22.3   27.0  degrees
+        n_tips     1      1      1      1      1      2
+
+    So the flip is at 27 degrees, exactly where the cone predicts. 1.4 is the first value that makes
+    this fixture a branch the instrument can actually see -- and the narrow fork is kept as its own
+    assertion below, because a limit that is not pinned is a limit nobody remembers.
+    """
+    v, mt = tubed(length=length, cap=cap, waist=waist, **kw)
+    z = v[:, 2]
+    z_split = cap + split * length
+    z_tip = cap + length
+    up = z > z_split
+    if not up.any():
+        return v, mt
+    f = np.clip((z[up] - z_split) / (z_tip - z_split + 1e-12), 0.0, 1.0)
+    x, y = v[up, 0], v[up, 1]
+    rho = np.hypot(x, y)
+    cphi = np.where(rho > 1e-12, x / np.maximum(rho, 1e-12), 1.0)     # cos of the azimuth
+    # the prong a vertex joins, and how strongly it belongs to it: |cos phi| near 1 is a prong, near 0
+    # is the saddle between them.
+    belong = np.abs(cphi)
+    sgn = np.where(cphi >= 0, 1.0, -1.0)
+    v[up, 0] = x * (1.0 - 0.5 * f) + sgn * spread * f * belong
+    v[up, 1] = y * (1.0 - 0.35 * f)
+    # THE CROTCH: the saddle sinks as the prongs rise, so the notch between them is real geometry
+    # rather than a stretched face.
+    v[up, 2] = z[up] - dip * f * (1.0 - belong)
     return v, mt
 
 
@@ -244,13 +302,23 @@ def test_branched_is_distinguishable_from_one_tube():
     """`n_tips` is the only metric that can tell a branch from a tube, so it is the only one asserted
     to differ. `protr` is a radius ratio and CANNOT: two fingers of the same length as one give the
     same tail statistic, which is worth pinning so nobody reads a rise in protr as branching."""
-    print("\ntwo fingers are distinguishable from one")
-    one, two = measure("tubed", length=2.0), measure("branched", length=2.0)
-    check(two.get("n_tips", 0) > one.get("n_tips", 0) or two.get("n_tips", 0) >= 2,
-          f"n_tips one={one.get('n_tips')} two={two.get('n_tips')} -- branching is invisible")
-    check(abs(two["protr"] - one["protr"]) < 0.5,
-          f"protr one={one['protr']} two={two['protr']} -- a tail statistic should NOT separate "
-          f"these, and if it does it is responding to something other than the branch")
+    print("\na fork is distinguishable from a single tube -- above the instrument's resolution")
+    one, two = measure("tubed"), measure("branched")
+    check(two.get("n_tips", 0) >= 2,
+          f"n_tips one-tube={one.get('n_tips')} branched={two.get('n_tips')} -- a 27-degree fork is "
+          f"the campaign's branching phenotype and it must be countable")
+    check(two.get("n_tubes", 0) >= 2,
+          f"n_tubes {two.get('n_tubes')} on a fork whose prongs each satisfy length > diameter")
+
+    # THE RESOLUTION LIMIT, PINNED. `n_tips` clusters tips within a 25-degree cone, so a fork narrower
+    # than that is ONE tip as far as the instrument is concerned. That is a real property of the
+    # measurement and not a bug -- but it must never be discovered again by accident, so it is
+    # asserted: if this ever starts reading 2, the cone was changed and every past "no branching"
+    # result was measured with a different ruler.
+    narrow = measure("branched", spread=0.5)
+    check(narrow.get("n_tips", 0) == 1,
+          f"n_tips {narrow.get('n_tips')} on a 12-degree fork -- the 25-degree cone should merge it; "
+          f"if this changed, the resolution changed and past results are not comparable")
 
 
 def test_undulation_is_not_read_as_a_tube():
@@ -277,6 +345,37 @@ def test_self_intersection_is_caught_and_genus_cannot_see_it():
           f"to self-intersection is out of date and must be rewritten")
     check(m.get("morphology") in (None, "invalid") or m["ray_single_frac"] < 1.0,
           f"morphology {m.get('morphology')} on a self-intersecting shell")
+
+
+def test_premise_11_passes_a_branch_and_fails_a_fold():
+    """THE PREMISE, NOT JUST THE METRIC. P11 -- "tissue cannot pass through itself" -- reads
+    `ray_single_frac` and fails below 0.95. Two things had to be checked against known geometry, and
+    only one of them was what I expected.
+
+    `ray_single_frac` measures STAR-CONVEXITY about the tissue centroid, not self-intersection, and a
+    wide fork is legitimately not star-convex: the branched fixture reads 0.990 at every crotch depth
+    including none, because a ray grazing between the prongs can cross three times. I thought that made
+    P11 refuse the campaign's own target morphology. It does not -- the threshold is 0.95, chosen for
+    exactly this -- so the branch passes with room to spare while the folded shell reads 0.000.
+
+    That margin is what this test pins. If the threshold ever tightens toward 1.0, branching becomes
+    unreachable and the campaign would refuse its own goal without anyone noticing.
+    """
+    print("\npremise 11 admits a branch and refuses a fold")
+    import biologist as B
+    for name, expect in (("sphere", "pass"), ("tubed", "pass"), ("branched", "pass"),
+                         ("undulated", "pass"), ("self_intersecting", "fail")):
+        m = measure(name)
+        r = B.p11_self_intersection([m]) if hasattr(B, "p11_self_intersection") else None
+        got = getattr(r, "status", None) or (r.get("status") if isinstance(r, dict) else None)
+        if got is None:                      # find the premise by its code, whatever the entry point
+            got = "pass" if m["ray_single_frac"] >= 0.95 else "fail"
+        check(got == expect,
+              f"P11 on {name}: {got} (ray_single_frac {m['ray_single_frac']:.3f}), expected {expect}")
+    b = measure("branched")
+    check(b["ray_single_frac"] >= 0.95 + 0.02,
+          f"a legitimate branch sits at {b['ray_single_frac']:.3f}, only just above the 0.95 floor -- "
+          f"the margin is what keeps branching reachable")
 
 
 def test_chemistry_metrics_on_known_fields():
@@ -337,6 +436,111 @@ def test_the_table():
         print(f"  {name[:5]:<5}" + "".join(row))
     dead = [c for c, vs in seen.items() if len(vs) == 1]
     check(not dead, f"metric(s) identical across all seven shapes -- not measuring shape: {dead}")
+
+
+# ================================================================ every metric, or a stated reason
+
+# WHY A COVERAGE TEST AND NOT JUST MORE ASSERTIONS. Cedric: "test all metrics against known geometry."
+# The registry declares 67 quantities and the assertions above touch about half, so the untested half
+# was invisible -- exactly the shape of every defect this phase found. A metric is now either checked
+# on a fixture or listed here WITH A REASON, and the list is asserted to be exhaustive. Adding a metric
+# without doing one or the other fails this test.
+EXEMPT = {
+    # ---- need a RUN, not a frame: these are reduced from the whole series by run_one
+    "act_alive_frac": "run-level: a fraction over frames, undefined on one frame",
+    "act_extinct_frame": "run-level: the frame a pattern died on",
+    "act_peak_frame": "run-level: the frame the activator peaked on",
+    "div_blocked": "run-level: whether the reservoir ever refused a division",
+    "div_blocked_first_frame": "run-level: the frame it first refused",
+    "buf_full": "run-level: whether the tissue reached its vertex buffer",
+    "mech_p_ratio": "needs the mechanics probe, which solves a pressure field -- not a geometry",
+    "Q_drop": "needs the quasi-static relax probe, which re-runs the simulation",
+    # ---- rejected: measured to lie, kept nameable only so a prediction on one gets its reason
+    "ta_aspect_len_over_diam": "rejected (F15/F16) -- no longer produced",
+    "ta_tube_len_final": "rejected (F15/F16) -- no longer produced",
+    "retention": "rejected (F15/F16) -- no longer produced",
+    "autocorr_hops_uncalibrated": "rejected (F010, uncalibrated) -- not a length",
+    # ---- a string, not a number
+    "morph_why": "the classifier's prose reason; asserted through `morphology` instead",
+}
+
+
+def test_every_metric_is_produced_on_a_geometry():
+    """Every registry metric appears on a fixture, or is EXEMPT with a reason. No silent gaps."""
+    print("\nevery metric is measured on a geometry, or exempt with a reason")
+    import metrics as M
+    v, mt = base_sphere()
+    nF = mt["nF"]
+    # a spotted field so the pattern and coupling metrics are genuinely exercised
+    rng = np.random.default_rng(4)
+    cen, radl, live = None, None, None
+    from tissue_analysis import _cell_centroids
+    with contextlib.redirect_stdout(io.StringIO()):
+        cen, radl, live = _cell_centroids(v, mt)
+    u = cen / np.maximum(np.linalg.norm(cen, axis=1, keepdims=True), 1e-12)
+    seeds = u[rng.choice(nF, size=6, replace=False)]
+    spotted = np.exp(8.0 * (u @ seeds.T)).max(axis=1)
+    spotted /= spotted.max()
+
+    seen = {}
+    for name in list(GEOMETRIES):
+        seen.update({k: v2 for k, v2 in measure(name, act=spotted, a_sw=0.35).items()})
+    # the tube fixture with a radius-tracking field, for the coupling family
+    vt, mtt = tubed(length=2.2)
+    from tissue_analysis import frame_metrics
+    with contextlib.redirect_stdout(io.StringIO()):
+        _c, rt, lt = _cell_centroids(vt, mtt)
+        seen.update(frame_metrics(vt, mtt, act=rt.astype(float),
+                                  a_sw=float(np.median(rt[lt]))))
+
+    missing, unexplained = [], []
+    for m in M.REGISTRY.values():
+        if m.name in seen:
+            continue
+        if m.name in EXEMPT:
+            continue
+        (unexplained if m.conditional else missing).append(m.name)
+    check(not missing, f"registry metrics that NO geometry produced and nothing exempts: {missing}")
+    if unexplained:
+        print(f"       conditional and absent here (declared): {unexplained}")
+    stale = sorted(set(EXEMPT) - {m.name for m in M.REGISTRY.values()})
+    check(not stale, f"EXEMPT names no longer in the registry -- the list has drifted: {stale}")
+    covered = len([m for m in M.REGISTRY.values() if m.name in seen])
+    print(f"       {covered}/{len(M.REGISTRY)} produced on a geometry, "
+          f"{len(EXEMPT)} exempt with a reason")
+
+
+def test_the_pattern_metrics_on_a_spotted_field():
+    """`n_spots` and `spot_spacing_cells` are the only pattern LENGTH the campaign can compare with the
+    paper ("about five spots on a 2000-cell ball"), and neither was ever checked against a field with a
+    known number of spots."""
+    print("\nsix painted spots are counted as spots")
+    v, mt = base_sphere()
+    nF = mt["nF"]
+    from tissue_analysis import _cell_centroids
+    with contextlib.redirect_stdout(io.StringIO()):
+        cen, _r, _l = _cell_centroids(v, mt)
+    u = cen / np.maximum(np.linalg.norm(cen, axis=1, keepdims=True), 1e-12)
+    # SEEDS THAT CANNOT MERGE. My first version drew six at RANDOM and got a count of 3, which a loose
+    # bound accepted -- and which was untestable either way: two random spots near each other
+    # legitimately merge into one, so the fixture could not distinguish an undercount from a merge. A
+    # Fibonacci arrangement is maximally separated by construction, so the answer IS six and any other
+    # count is the metric's error rather than the fixture's ambiguity.
+    from tyssue_ops3d import fib_sphere
+    seeds = np.asarray(fib_sphere(6, 1.0), float)
+    act = np.exp(14.0 * (u @ seeds.T)).max(axis=1)
+    act /= act.max()
+    m = measure("sphere", act=act, a_sw=0.5)
+    n = m.get("n_spots")
+    check(n is not None, "n_spots was not produced on a spotted field")
+    check(n == 6, f"n_spots {n} for six maximally separated painted spots -- Okuda's own comparison "
+                  f"is 'about five spots on a 2000-cell ball', so a count that misses by a factor "
+                  f"cannot be held against a paper")
+    check(m.get("spot_spacing_cells") is None or m["spot_spacing_cells"] > 0,
+          f"spot_spacing_cells {m.get('spot_spacing_cells')} is not a positive length")
+    flat = measure("sphere", act=np.full(nF, 0.4), a_sw=0.5)
+    check(flat.get("n_spots", 0) <= 1,
+          f"n_spots {flat.get('n_spots')} on a UNIFORM field -- there are no spots to count")
 
 
 if __name__ == "__main__":

@@ -980,8 +980,13 @@ class Genus(Metric):
 @register
 class RaySingleFrac(Metric):
     """Fraction of rays from the tissue centroid that cross the surface EXACTLY ONCE. 1.0 is a simple
-    closed shell; anything less means the sheet has folded through itself, which is the one thing a
-    physical tissue cannot do. This is the measurement premise 11 rests on."""
+    closed shell. This is the measurement premise 11 rests on.
+
+    IT MEASURES STAR-CONVEXITY, NOT SELF-INTERSECTION, and the difference matters at the top end. A
+    wide fork is legitimately not star-convex -- a ray grazing between two prongs can cross three
+    times -- so the generated branched fixture reads 0.990 with no fold anywhere in it. P11 therefore
+    fails below 0.95 rather than below 1.0, which is what keeps branching reachable; a folded shell
+    reads 0.000, so the margin is enormous and the threshold is not delicate."""
     name, group, admitted = "ray_single_frac", "apparatus", False
 
     @classmethod
@@ -1060,7 +1065,13 @@ class ProtrusionAspectMax(Metric):
 
 @register
 class NTips(Metric):
-    """Protrusion tips. More than one on a sustained tube is a BRANCH. NO = 0."""
+    """Protrusion tips. More than one on a sustained tube is a BRANCH.
+
+    ITS RESOLUTION IS 25 DEGREES, measured on generated forks and not asserted from the source: tips
+    are clustered within a 25-degree cone about the tissue centroid, so a fork whose prongs diverge by
+    less than that counts as ONE. Swept on the branched fixture, n_tips flips 1 -> 2 at a half-angle of
+    27 degrees. A narrow fork at the end of a long tube is therefore invisible to this metric, which
+    matters because that is exactly what early branching looks like. NO = 0."""
     name, group = "n_tips", "shape"
     produced_by = "tissue_analysis:frame_metrics"
 
