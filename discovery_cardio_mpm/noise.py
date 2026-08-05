@@ -54,6 +54,12 @@ import metrics as M                                                 # noqa: E402
 FIT_SPEC = os.path.join(HERE, "config", "material", "material_aniso_cardio_fit.yaml")
 
 
+def _load(name):
+    """One of the metrology artefacts, or {} if it has not been measured yet."""
+    p = os.path.join(HERE, "_metrology", name)
+    return json.load(open(p)) if os.path.exists(p) else {}
+
+
 # ---------------------------------------------------------------------------------------------
 # 1. BEAT TO BEAT -- the recording against itself. No fitting.
 # ---------------------------------------------------------------------------------------------
@@ -244,18 +250,82 @@ def fit_spreads(seeds=4, n_iter=60, device="cuda:0", devices=None, verbose=True)
 
 
 # ---------------------------------------------------------------------------------------------
+# RESOLVING POWER -- precision is only meaningful next to a range
+# ---------------------------------------------------------------------------------------------
+def resolving_power(verbose=True):
+    """How many distinguishable steps each metric offers across its usable range.
+
+    A small spread is not the same as a useful metric. `peak_excursion` wobbles by 0.0000 between
+    real beats, which sounds superb until you notice its values are around 0.001 and it has no
+    measured null, so there is nothing to divide by: **precision without a zero buys nothing, and a
+    zero without precision buys nothing.** A metric needs both ends of a scale before any of its
+    digits mean anything.
+
+    Where both ends exist the question has an answer:
+
+        levels = |what the tissue scores against itself  -  what knowing nothing scores|
+                 -------------------------------------------------------------------
+                                       3 x the working unit
+
+    and the working unit is the LARGEST of the noise floors that have been measured, never the
+    cheapest. Below `metrics.MIN_LEVELS` a metric may be reported and may not carry a claim.
+    """
+    beat = _load("noise_beats.json").get("metrics", {})
+    fit = _load("noise_fits.json").get("metrics", {})
+    rows = []
+    for name, m in M.live().items():
+        b = beat.get(name, {})
+        f = fit.get(name, {})
+        floors = {k: v for k, v in (("beat_to_beat", b.get("sd")),
+                                    ("same_seed", f.get("same_seed_difference")),
+                                    ("seed_to_seed", f.get("seed_sd"))) if v is not None}
+        unit = max(floors.values()) if floors else None
+        which = max(floors, key=floors.get) if floors else None
+        ceiling = b.get("median")
+        rng = (abs(ceiling - m.null) if (ceiling is not None and m.null is not None) else None)
+        lev = (rng / (3.0 * unit) if (rng is not None and unit and unit > 0) else None)
+        rows.append({"metric": name, "role": m.role, "null": m.null, "ceiling": ceiling,
+                     "range": rng, "unit": unit, "unit_from": which,
+                     "floors_measured": sorted(floors), "levels": lev,
+                     "verdict": ("no null -- its range is undeclared, so its precision cannot be "
+                                 "interpreted" if m.null is None else
+                                 "no floor measured" if unit is None else
+                                 "objective, never an instrument" if m.role != M.EVIDENCE else
+                                 "enough to rank on" if lev >= M.MIN_LEVELS else
+                                 "TOO COARSE to carry a claim")})
+    rows.sort(key=lambda r: (-1e9 if r["levels"] is None else -r["levels"]))
+    if verbose:
+        print(f"\n{'=' * 112}\n  RESOLVING POWER -- how many steps between knowing nothing and "
+              f"matching the tissue (threshold {M.MIN_LEVELS:g})\n{'=' * 112}")
+        print(f"  {'metric':<26s} {'null':>8s} {'ceiling':>8s} {'range':>8s} {'unit':>9s} "
+              f"{'levels':>7s}   verdict")
+        for r in rows:
+            g = lambda v, f="{:>8.3f}": ("      --" if v is None else f.format(v))
+            print(f"  {r['metric']:<26s} {g(r['null'])} {g(r['ceiling'])} {g(r['range'])} "
+                  f"{g(r['unit'], '{:>9.4f}')} {g(r['levels'], '{:>7.1f}')}   {r['verdict']}")
+        miss = sorted(r["metric"] for r in rows if r["null"] is None)
+        if miss:
+            print(f"\n  NO MEASURED NULL, so precision is uninterpretable for: {', '.join(miss)}")
+        part = [r for r in rows if r["unit"] and set(r["floors_measured"]) != {
+            "beat_to_beat", "same_seed", "seed_to_seed"}]
+        if part:
+            print(f"  PROVISIONAL: {len(part)} of these use only "
+                  f"{'+'.join(sorted(set(f for r in part for f in r['floors_measured'])))}. The "
+                  f"working unit is the LARGEST floor, so every `levels` here can only fall when "
+                  f"the fitted floors land.")
+        print("=" * 112)
+    return rows
+
+
+# ---------------------------------------------------------------------------------------------
 # PROMOTION -- mechanical, not editorial
 # ---------------------------------------------------------------------------------------------
 def promotion_report(verbose=True):
     """What each metric still lacks before it may be cited. Read from the artefacts on disk."""
-    p_floor = os.path.join(HERE, "_metrology", "floors.json")
-    p_cert = os.path.join(HERE, "_metrology", "metrics_certify.json")
-    p_beat = os.path.join(HERE, "_metrology", "noise_beats.json")
-    p_fit = os.path.join(HERE, "_metrology", "noise_fits.json")
-    cert = json.load(open(p_cert)) if os.path.exists(p_cert) else {}
-    beat = json.load(open(p_beat)) if os.path.exists(p_beat) else {}
-    fit = json.load(open(p_fit)) if os.path.exists(p_fit) else {}
+    cert, beat, fit = (_load("metrics_certify.json"), _load("noise_beats.json"),
+                       _load("noise_fits.json"))
     bad = {n for _, n in (cert.get("disagreements") or [])}
+    power = {r["metric"]: r for r in resolving_power(verbose=False)}
 
     rows = []
     for name, m in M.live().items():
@@ -263,7 +333,11 @@ def promotion_report(verbose=True):
         passed = bool(cert) and name not in bad
         has_beat = name in (beat.get("metrics") or {})
         has_fit = name in (fit.get("metrics") or {})
+        lev = power.get(name, {}).get("levels")
         missing = []
+        if m.role != M.EVIDENCE:
+            missing.append(f"nothing -- it is the {m.role}, and no evidence it ever gathers can "
+                           f"make it one")
         if not has_null:
             missing.append("a measured null")
         if not passed:
@@ -272,17 +346,21 @@ def promotion_report(verbose=True):
             missing.append("a beat-to-beat floor")
         if not has_fit:
             missing.append("a fitted-noise floor")
+        if lev is not None and lev < M.MIN_LEVELS and m.role == M.EVIDENCE:
+            missing.append(f"resolving power ({lev:.1f} steps, {M.MIN_LEVELS:g} required)")
         rows.append({"metric": name, "null": has_null, "battery": passed,
-                     "beat_floor": has_beat, "fit_floor": has_fit,
+                     "beat_floor": has_beat, "fit_floor": has_fit, "levels": lev,
                      "eligible": not missing, "missing": missing})
     if verbose:
         print(f"\n{'=' * 100}\n  PROMOTION -- what each metric still lacks before it may be cited"
               f"\n{'=' * 100}")
-        print(f"  {'metric':<26s} {'null':>6s} {'battery':>8s} {'beats':>7s} {'fits':>6s}   still needs")
+        print(f"  {'metric':<26s} {'null':>6s} {'battery':>8s} {'beats':>7s} {'fits':>6s} "
+              f"{'levels':>7s}   still needs")
         for r in rows:
             tick = lambda b: "yes" if b else "-"
             print(f"  {r['metric']:<26s} {tick(r['null']):>6s} {tick(r['battery']):>8s} "
-                  f"{tick(r['beat_floor']):>7s} {tick(r['fit_floor']):>6s}   "
+                  f"{tick(r['beat_floor']):>7s} {tick(r['fit_floor']):>6s} "
+                  f"{'     --' if r['levels'] is None else format(r['levels'], '>7.1f')}   "
                   f"{', '.join(r['missing']) if r['missing'] else 'NOTHING -- eligible'}")
         n = sum(r["eligible"] for r in rows)
         print(f"\n  {n} of {len(rows)} are eligible for certification. Nothing is promoted "
@@ -302,9 +380,13 @@ def main(argv=None):
     ap.add_argument("--devices", default="", help="comma-separated; the fits are split across them "
                                                  "ONLY if they build an identical material")
     ap.add_argument("--promotion", action="store_true")
+    ap.add_argument("--power", action="store_true", help="the resolving-power table alone")
     a = ap.parse_args(argv)
     os.makedirs(os.path.join(HERE, "_metrology"), exist_ok=True)
 
+    if a.power:
+        resolving_power()
+        return 0
     if a.beats or not (a.fits or a.promotion):
         out = beat_to_beat(a.device)
         json.dump(out, open(os.path.join(HERE, "_metrology", "noise_beats.json"), "w"),
@@ -314,6 +396,9 @@ def main(argv=None):
                           [d for d in a.devices.split(",") if d.strip()] or None)
         json.dump(out, open(os.path.join(HERE, "_metrology", "noise_fits.json"), "w"),
                   indent=1, default=float)
+    rows = resolving_power()
+    json.dump(rows, open(os.path.join(HERE, "_metrology", "resolving_power.json"), "w"),
+              indent=1, default=float)
     promotion_report()
     return 0
 

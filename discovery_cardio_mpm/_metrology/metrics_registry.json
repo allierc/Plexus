@@ -22,6 +22,31 @@
    "detail": "4 withdrawn, all with a cause"
   },
   {
+   "check": "every declared null says where it came from",
+   "pass": true,
+   "detail": "3 measured, 2 analytic, 9 with no null at all"
+  },
+  {
+   "check": "every MEASURED null still matches the null bank",
+   "pass": true,
+   "detail": "checked 3 against floors.json N0"
+  },
+  {
+   "check": "no metric scores its best by predicting NOTHING",
+   "pass": true,
+   "detail": "8 scored on the null bank"
+  },
+  {
+   "check": "every non-instrument records why it is not one",
+   "pass": true,
+   "detail": "1 objective (loopscore), 13 instruments"
+  },
+  {
+   "check": "an objective REFUSES to be cited",
+   "pass": true,
+   "detail": "['loopscore'] raise NotEvidence when asked to support a claim"
+  },
+  {
    "check": "a withdrawn metric REFUSES to be computed",
    "pass": true,
    "detail": "all 4 refuse"
@@ -68,6 +93,8 @@
    "definition": "per node, the beat is a closed path; compare its low-order Fourier description with the recording's, normalised by that node's own energy, and average over nodes. 1 means the loops match.",
    "source": "cardio_harmonic.harmonic_score (26 June, the objective shift)",
    "tier": "provisional",
+   "role": "objective",
+   "not_evidence_because": "it is the quantity the fit descends, and it is too coarse to be an instrument. Between its null (+0.070) and what the recording scores against itself (+0.710) there is a range of 0.640, and its beat-to-beat spread is 0.129 -- about 1.6 distinguishable steps across the whole usable range, where every other metric with a measured null offers 10 to 130. It can say `knows nothing' or `tissue-like' and has no opinion in between, which is precisely the resolution at which the previous campaign ranked 324 runs and settled orderings on differences of 0.003. It is kept, reported and optimised -- it is the only number comparable with those runs and with the replay bar -- and it may not carry a claim.",
    "responds_to": [
     "chirality",
     "openness",
@@ -90,6 +117,8 @@
    "definition": "the spread of the per-node loopscore. Uniformly mediocre tissue and a few excellent nodes among wrong ones give the same mean; this separates them.",
    "source": "cardio_harmonic.harmonic_stats",
    "tier": "provisional",
+   "role": "evidence",
+   "not_evidence_because": "",
    "responds_to": [
     "heterogeneity"
    ],
@@ -107,6 +136,8 @@
    "definition": "frame-locked goodness of fit, pooled over nodes, with the temporal mean removed from the recording only.",
    "source": "cardio_harmonic.interior_r2 (23 June, the original objective)",
    "tier": "provisional",
+   "role": "evidence",
+   "not_evidence_because": "",
    "responds_to": [
     "chirality",
     "coordination",
@@ -122,7 +153,7 @@
     "NOT A SHAPE MEASURE, and the battery pinned it down: it moves when the loop is merely TRANSLATED and when the whole beat is merely SHIFTED IN TIME. Both are correct behaviour for a frame-locked residual and both disqualify it from answering a question about morphology. That is why it is a diagnostic."
    ],
    "cause_of_death": "",
-   "null": -0.875,
+   "null": -0.8308,
    "higher_is_better": true
   },
   "residual/size": {
@@ -130,11 +161,15 @@
    "definition": "how much loopscore is recovered by scaling the simulated loops to the recording's size, leaving everything else alone.",
    "source": "cardio_harmonic.loopscore_residual",
    "tier": "provisional",
+   "role": "evidence",
+   "not_evidence_because": "",
    "responds_to": [
     "size"
    ],
-   "domain": "as loopscore, and UNDEFINED on a degenerate path: the decomposition works by correcting one property of an ellipse at a time, and a loop flattened onto a line has no aspect, no handedness and no meaningful higher harmonics to correct. The battery skips it there rather than recording a failure.",
-   "known_defects": [],
+   "domain": "as loopscore, and UNDEFINED on a degenerate path: the decomposition works by correcting one property of an ellipse at a time, and a loop flattened onto a line has no aspect, no handedness and no meaningful higher harmonics to correct. The battery skips it there rather than recording a failure. ALSO undefined for a model with no motion, and that one is enforced below.",
+   "known_defects": [
+    "THESE MEASURE RECOVERABILITY, NOT ERROR. Each says how much loopscore is regained by correcting one property, which is not the same as how wrong that property is. The consequence was measurable: on the do-nothing model residual/shape_detail read +0.3031, the highest score in the whole null bank, because when a model does nothing every axis is maximally recoverable. Enforced away below rather than left as a caveat."
+   ],
    "cause_of_death": "",
    "null": null,
    "higher_is_better": true
@@ -144,10 +179,12 @@
    "definition": "how much is recovered by rotating the simulated loops onto the recording's axis.",
    "source": "cardio_harmonic.loopscore_residual",
    "tier": "provisional",
+   "role": "evidence",
+   "not_evidence_because": "",
    "responds_to": [
     "orientation"
    ],
-   "domain": "as loopscore, and UNDEFINED on a degenerate path: the decomposition works by correcting one property of an ellipse at a time, and a loop flattened onto a line has no aspect, no handedness and no meaningful higher harmonics to correct. The battery skips it there rather than recording a failure.",
+   "domain": "as loopscore, and UNDEFINED on a degenerate path: the decomposition works by correcting one property of an ellipse at a time, and a loop flattened onto a line has no aspect, no handedness and no meaningful higher harmonics to correct. The battery skips it there rather than recording a failure. ALSO undefined for a model with no motion, and that one is enforced below.",
    "known_defects": [
     "the residual family measures RECOVERABILITY, not error, and mirroring is where the two part company: a reflected loop genuinely has the wrong axis -- orientation_error sees it -- but no ROTATION undoes a reflection, so nothing is recoverable and this reads zero. The battery reported that as a failure until the distinction was written down."
    ],
@@ -160,11 +197,15 @@
    "definition": "how much is recovered by matching the aspect ratio -- how fat the loop is against how long -- while keeping its size.",
    "source": "cardio_harmonic.loopscore_residual",
    "tier": "provisional",
+   "role": "evidence",
+   "not_evidence_because": "",
    "responds_to": [
     "openness"
    ],
-   "domain": "as loopscore, and UNDEFINED on a degenerate path: the decomposition works by correcting one property of an ellipse at a time, and a loop flattened onto a line has no aspect, no handedness and no meaningful higher harmonics to correct. The battery skips it there rather than recording a failure.",
-   "known_defects": [],
+   "domain": "as loopscore, and UNDEFINED on a degenerate path: the decomposition works by correcting one property of an ellipse at a time, and a loop flattened onto a line has no aspect, no handedness and no meaningful higher harmonics to correct. The battery skips it there rather than recording a failure. ALSO undefined for a model with no motion, and that one is enforced below.",
+   "known_defects": [
+    "THESE MEASURE RECOVERABILITY, NOT ERROR. Each says how much loopscore is regained by correcting one property, which is not the same as how wrong that property is. The consequence was measurable: on the do-nothing model residual/shape_detail read +0.3031, the highest score in the whole null bank, because when a model does nothing every axis is maximally recoverable. Enforced away below rather than left as a caveat."
+   ],
    "cause_of_death": "",
    "null": null,
    "higher_is_better": true
@@ -174,11 +215,15 @@
    "definition": "how much is recovered by making each loop circulate the same way round as the recording's.",
    "source": "cardio_harmonic.loopscore_residual",
    "tier": "provisional",
+   "role": "evidence",
+   "not_evidence_because": "",
    "responds_to": [
     "chirality"
    ],
-   "domain": "as loopscore, and UNDEFINED on a degenerate path: the decomposition works by correcting one property of an ellipse at a time, and a loop flattened onto a line has no aspect, no handedness and no meaningful higher harmonics to correct. The battery skips it there rather than recording a failure.",
-   "known_defects": [],
+   "domain": "as loopscore, and UNDEFINED on a degenerate path: the decomposition works by correcting one property of an ellipse at a time, and a loop flattened onto a line has no aspect, no handedness and no meaningful higher harmonics to correct. The battery skips it there rather than recording a failure. ALSO undefined for a model with no motion, and that one is enforced below.",
+   "known_defects": [
+    "THESE MEASURE RECOVERABILITY, NOT ERROR. Each says how much loopscore is regained by correcting one property, which is not the same as how wrong that property is. The consequence was measurable: on the do-nothing model residual/shape_detail read +0.3031, the highest score in the whole null bank, because when a model does nothing every axis is maximally recoverable. Enforced away below rather than left as a caveat."
+   ],
    "cause_of_death": "",
    "null": null,
    "higher_is_better": true
@@ -188,11 +233,15 @@
    "definition": "how much is recovered by taking the higher harmonics from the recording -- everything the ellipse does not describe.",
    "source": "cardio_harmonic.loopscore_residual",
    "tier": "provisional",
+   "role": "evidence",
+   "not_evidence_because": "",
    "responds_to": [
     "openness"
    ],
-   "domain": "as loopscore, and UNDEFINED on a degenerate path: the decomposition works by correcting one property of an ellipse at a time, and a loop flattened onto a line has no aspect, no handedness and no meaningful higher harmonics to correct. The battery skips it there rather than recording a failure.",
-   "known_defects": [],
+   "domain": "as loopscore, and UNDEFINED on a degenerate path: the decomposition works by correcting one property of an ellipse at a time, and a loop flattened onto a line has no aspect, no handedness and no meaningful higher harmonics to correct. The battery skips it there rather than recording a failure. ALSO undefined for a model with no motion, and that one is enforced below.",
+   "known_defects": [
+    "THESE MEASURE RECOVERABILITY, NOT ERROR. Each says how much loopscore is regained by correcting one property, which is not the same as how wrong that property is. The consequence was measurable: on the do-nothing model residual/shape_detail read +0.3031, the highest score in the whole null bank, because when a model does nothing every axis is maximally recoverable. Enforced away below rather than left as a caveat."
+   ],
    "cause_of_death": "",
    "null": null,
    "higher_is_better": true
@@ -202,6 +251,8 @@
    "definition": "enclosed area divided by the area of the box the loop fits in. A straight line is 0; a circle is about 0.79.",
    "source": "cardio_mpm_train._openness (audit remedy, 4-5 July)",
    "tier": "provisional",
+   "role": "evidence",
+   "not_evidence_because": "",
    "responds_to": [
     "openness"
    ],
@@ -216,6 +267,8 @@
    "definition": "how far a node travels over the beat, summed frame to frame. A loop and a line of the same width differ here; the enclosed area alone does not say so.",
    "source": "this file -- the one quantity the prototype named and never computed",
    "tier": "provisional",
+   "role": "evidence",
+   "not_evidence_because": "",
    "responds_to": [
     "openness",
     "size"
@@ -233,6 +286,8 @@
    "definition": "how far a node reaches from the centre of its own path, at its furthest. Centred, so sliding the loop elsewhere does not change it.",
    "source": "cardio_mpm_train.enclosure_row (peak), centred here",
    "tier": "provisional",
+   "role": "evidence",
+   "not_evidence_because": "",
    "responds_to": [
     "size"
    ],
@@ -249,6 +304,8 @@
    "definition": "the fraction of nodes circulating the same way round as the recording's.",
    "source": "cardio_mpm_train.enclosure_row (chir_match)",
    "tier": "provisional",
+   "role": "evidence",
+   "not_evidence_because": "",
    "responds_to": [
     "chirality"
    ],
@@ -263,6 +320,8 @@
    "definition": "the angle between the simulated and the recorded long axis of each loop, median over nodes, in radians. 0 is perfect; about 0.785 is what chance gives, because an axis has no head or tail.",
    "source": "this file. The quantity lived inside the objective as the phase of a product of Fourier coefficients and was NEVER REPORTED, so this axis could move for a whole campaign with nobody able to see it.",
    "tier": "provisional",
+   "role": "evidence",
+   "not_evidence_because": "",
    "responds_to": [
     "orientation"
    ],
@@ -277,16 +336,20 @@
    "definition": "does the tissue contract TOGETHER the way the recording does? Per node, find the time shift that best lines its motion up with the recording's; then measure how tightly those shifts agree with each other. 1 means the pattern of who-moves-when matches, up to one global offset; 0 means it is unrelated.",
    "source": "this file. Nothing measured it, which is why the objective scores a sheet whose points beat in random order at exactly 1.0000 -- whether the tissue contracts together was not a measurable property of any run in sixty batches.",
    "tier": "provisional",
+   "role": "evidence",
+   "not_evidence_because": "",
    "responds_to": [
     "coordination"
    ],
    "domain": "a periodic beat. Undefined for a node that does not move, so those must be masked out before this is read. Determined only up to HALF a beat -- see the defect below.",
    "known_defects": [
+    "FIXED, and kept because the number it gave was a perfect one: a model predicting NO MOTION AT ALL scored 1.0000. A dead signal has no peak, so the cross-correlation is flat, argmax returns 0 for every node, and the lags agree perfectly because they are all the same nothing. Found by scoring the null bank through the registry -- the distortion battery could not have found it, because every distortion starts from a real loop. compute() now enforces its own domain and raises Undefined.",
+    "its null is NOT 0. Predicting nothing scores 1.0 (above) and the analytic 0 that was declared here was simply wrong; the measured baseline for knowing nothing about timing is the scrambled-timing row, 0.0778.",
     "CANNOT TELL IN-PHASE FROM EXACTLY ANTIPHASE. The signal it uses is a distance from a centre, which peaks twice on a path traversed once per beat, so the alignment is only determined modulo half a beat. Two regions contracting in exact opposition therefore read as coordinated. Anything less than exact opposition is seen.",
     "reads a whole number of frames, so on a 24-frame beat it cannot resolve better than about 15 degrees of phase"
    ],
    "cause_of_death": "",
-   "null": 0.0,
+   "null": 0.0778,
    "higher_is_better": true
   },
   "morphology_row/size": {
@@ -294,6 +357,8 @@
    "definition": "the mean over the 10x10 grid of each node's largest displacement, computed on the simulation alone and uncentred.",
    "source": "cardio_mpm_train.morphology_row (~24 June)",
    "tier": "withdrawn",
+   "role": "evidence",
+   "not_evidence_because": "",
    "responds_to": [],
    "domain": "none",
    "known_defects": [],
@@ -306,6 +371,8 @@
    "definition": "openness over the 10x10 grid, on the simulation alone.",
    "source": "cardio_mpm_train.morphology_row",
    "tier": "withdrawn",
+   "role": "evidence",
+   "not_evidence_because": "",
    "responds_to": [],
    "domain": "none",
    "known_defects": [],
@@ -318,6 +385,8 @@
    "definition": "the fraction of grid panels turning anticlockwise, on the simulation alone.",
    "source": "cardio_mpm_train.morphology_row",
    "tier": "withdrawn",
+   "role": "evidence",
+   "not_evidence_because": "",
    "responds_to": [],
    "domain": "none",
    "known_defects": [],
@@ -330,6 +399,8 @@
    "definition": "the ratio of total motion energy, simulated against recorded, over the whole field.",
    "source": "cardio_mpm_train (23 June, Batch 1)",
    "tier": "withdrawn",
+   "role": "evidence",
+   "not_evidence_because": "",
    "responds_to": [],
    "domain": "none",
    "known_defects": [],

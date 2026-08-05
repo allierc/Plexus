@@ -238,8 +238,15 @@ def nulls(with_model=False, device="cuda:0"):
 
 
 def score(sim, real, mask):
-    """Both rulers, on the frozen mask. The inherited one for comparability with the old record,
-    the Track B axes because they are what the campaign is judged on."""
+    """Every ruler, on the frozen mask.
+
+    THREE VOCABULARIES, AND ONLY ONE OF THEM COUNTS.
+    The first two are kept for comparability with a record that is written in them -- the inherited
+    `harmonic` numbers and `descriptors.loop_residual`'s axes. The third is `metrics.REGISTRY`, and
+    it is the only one a claim may use. It was missing here, which meant the null bank -- the thing
+    that says where zero is -- was recorded in names the registry does not contain, so nine of its
+    fourteen live metrics had no measured zero and their precision could not be interpreted at all.
+    """
     rec = {}
     r = DS.loop_residual(sim, real, mask)
     for k in ("magnitude_peak", "opening_area", "opening_loopiness", "direction_chirality",
@@ -256,6 +263,14 @@ def score(sim, real, mask):
             if hasattr(HARM, "interior_r2") else None
     except Exception as e:
         rec["loopscore_error"] = f"{type(e).__name__}: {e}"
+
+    import metrics as MET
+    rec["registry"] = {}
+    for name, m in MET.live().items():
+        try:
+            rec["registry"][name] = m(sim, real, mask)
+        except Exception as e:
+            rec["registry"][name] = {"error": f"{type(e).__name__}: {e}"}
     return rec
 
 

@@ -53,6 +53,32 @@ sys.path.insert(0, HERE)
 
 CERTIFIED, PROVISIONAL, WITHDRAWN = "certified", "provisional", "withdrawn"
 
+# A TIER SAYS HOW MUCH IS KNOWN ABOUT A MEASUREMENT. A ROLE SAYS WHAT IT IS FOR, AND THEY ARE
+# INDEPENDENT.
+# The quantity a fit DESCENDS and the quantity a claim CITES are not the same job and there is no
+# reason one number should be good at both. An objective has to be smooth, differentiable and
+# cheap; an instrument has to be precise and separable. `loopscore` is the objective, it is not
+# defective, and it is the only number comparable with the 324 archived runs and the replay bar --
+# so it is neither withdrawn nor promotable. It is simply not evidence, and that is enforced here
+# rather than remembered.
+EVIDENCE, OBJECTIVE = "evidence", "objective"
+
+# WHERE A ZERO CAME FROM, BECAUSE A COPIED DIGIT DRIFTS.
+# ANALYTIC nulls are derivable and need no run: circulating the right way round by chance is 0.5,
+# two unrelated axes differ by pi/4 on average, timing agreement between unrelated nodes is 0.
+# MEASURED nulls are read off the null bank in `floors.py`, and `check()` proves the number in the
+# class still matches the artefact -- which is the whole difference between a measurement and a
+# number somebody once typed.
+ANALYTIC, MEASURED = "analytic", "measured"
+
+# HOW MANY DISTINGUISHABLE STEPS A METRIC MUST OFFER BEFORE IT MAY CARRY A CLAIM.
+# Declared as a rule, not fitted to an outcome: ranking runs into quartiles needs four steps
+# between "knows nothing" and "as good as the tissue agrees with itself", and this allows one
+# spare. Below it a metric can say "nothing" or "tissue-like" and has no opinion in between.
+# It is applied to the WORKING UNIT -- the largest of the three noise floors -- never to the
+# cheapest one.
+MIN_LEVELS = 5.0
+
 # The axes a loop can be wrong along. The first four are the campaign's own vocabulary, from
 # `cardio_harmonic.loopscore_residual`; `coordination` is added because nothing covered it.
 # The first four are the campaign's own vocabulary; `coordination` was added because nothing
@@ -174,6 +200,21 @@ class Withdrawn(RuntimeError):
     """Raised when a withdrawn measurement is asked for."""
 
 
+class NotEvidence(RuntimeError):
+    """Raised when a measurement that is not an instrument is asked to support a claim."""
+
+
+class Undefined(RuntimeError):
+    """Raised when a measurement is asked about something outside its domain.
+
+    The alternative is worse than an error: a metric that declares its own domain in prose and then
+    returns a number anyway. `coordination` did exactly that -- it said "undefined for a node that
+    does not move, so those must be masked out before this is read", which the caller cannot do,
+    because the mask selects nodes moving in the RECORDING and says nothing about the model. So a
+    model predicting no motion at all scored a perfect 1.0000.
+    """
+
+
 class Metric:
     """One measurement. Everything that decides whether it may be believed lives here."""
 
@@ -188,19 +229,38 @@ class Metric:
     undefined_on: set = set()       # distortions outside this metric's declared domain
     axis_separable = True           # False when its response is not attributable to single axes
     null = None                     # what a model that knows nothing scores
+    null_source = ""                # ANALYTIC (derivable) or MEASURED (read off the null bank)
     higher_is_better = True
+    role = EVIDENCE                 # EVIDENCE = an instrument; OBJECTIVE = a thing to descend
+    not_evidence_because = ""       # required when role is OBJECTIVE
 
     def __call__(self, sim, real, mask=None):
+        """Read the number. Reporting and optimising are both allowed; citing is not."""
         if self.tier == WITHDRAWN:
             raise Withdrawn(f"{self.name} may not be quoted: {self.cause_of_death}")
         return float(self.compute(_sel(sim, mask), _sel(real, mask)))
+
+    def cite(self, sim, real, mask=None):
+        """Read the number FOR A CLAIM. The gate every conclusion must come through.
+
+        Deliberately narrower than `__call__`: a run record may print anything, but the moment a
+        number is offered as evidence it has to be an instrument, and it has to be certified.
+        """
+        if self.role != EVIDENCE:
+            raise NotEvidence(f"{self.name} is the {self.role}, not evidence: "
+                              f"{self.not_evidence_because}")
+        if self.tier != CERTIFIED:
+            raise NotEvidence(f"{self.name} is {self.tier}, so it may be reported but not cited")
+        return self(sim, real, mask)
 
     def compute(self, sim, real):                             # pragma: no cover - interface
         raise NotImplementedError
 
     def as_dict(self):
         return {"name": self.name, "definition": self.definition, "source": self.source,
-                "tier": self.tier, "responds_to": sorted(self.responds_to), "domain": self.domain,
+                "tier": self.tier, "role": self.role,
+                "not_evidence_because": self.not_evidence_because,
+                "responds_to": sorted(self.responds_to), "domain": self.domain,
                 "known_defects": list(self.known_defects), "cause_of_death": self.cause_of_death,
                 "null": self.null, "higher_is_better": self.higher_is_better}
 
@@ -230,6 +290,17 @@ class LoopScore(Metric):
     responds_to = {"size", "openness", "chirality", "orientation"}
     domain = "one closed beat, at least 8 frames, on moving interior nodes"
     null = 0.0700
+    null_source = MEASURED
+    role = OBJECTIVE
+    not_evidence_because = (
+        "it is the quantity the fit descends, and it is too coarse to be an instrument. Between "
+        "its null (+0.070) and what the recording scores against itself (+0.710) there is a range "
+        "of 0.640, and its beat-to-beat spread is 0.129 -- about 1.6 distinguishable steps across "
+        "the whole usable range, where every other metric with a measured null offers 10 to 130. "
+        "It can say `knows nothing' or `tissue-like' and has no opinion in between, which is "
+        "precisely the resolution at which the previous campaign ranked 324 runs and settled "
+        "orderings on differences of 0.003. It is kept, reported and optimised -- it is the only "
+        "number comparable with those runs and with the replay bar -- and it may not carry a claim.")
     known_defects = [
         "BLIND TO COORDINATION: give every node an independent random timing offset and it returns "
         "exactly 1.0000, measured on all 10 corpus runs. That is what Coordination is for.",
@@ -272,7 +343,8 @@ class InteriorR2(Metric):
     responds_to = {"size", "openness", "chirality", "orientation", "coordination",
                    "placement", "phase"}
     domain = "any window; blind to whether the path is a loop at all"
-    null = -0.875
+    null = -0.8308
+    null_source = MEASURED
     known_defects = [
         "every one of the 324 archived fits scores below its own null",
         "NOT A SHAPE MEASURE, and the battery pinned it down: it moves when the loop is merely "
@@ -295,10 +367,31 @@ class ResidualDimension(Metric):
     domain = ("as loopscore, and UNDEFINED on a degenerate path: the decomposition works by "
               "correcting one property of an ellipse at a time, and a loop flattened onto a line "
               "has no aspect, no handedness and no meaningful higher harmonics to correct. The "
-              "battery skips it there rather than recording a failure.")
-    undefined_on = {"collapse to a line"}
+              "battery skips it there rather than recording a failure. ALSO undefined for a model "
+              "with no motion, and that one is enforced below.")
+    undefined_on = {"collapse to a line", "a model with no motion to correct"}
+    known_defects = [
+        "THESE MEASURE RECOVERABILITY, NOT ERROR. Each says how much loopscore is regained by "
+        "correcting one property, which is not the same as how wrong that property is. The "
+        "consequence was measurable: on the do-nothing model residual/shape_detail read +0.3031, "
+        "the highest score in the whole null bank, because when a model does nothing every axis is "
+        "maximally recoverable. Enforced away below rather than left as a caveat."]
+
+    #: as Coordination, and for the same reason: a model with no motion must not be scored well for
+    #: having nothing to correct
+    DEAD_FRACTION = 0.01
+    MIN_ALIVE = 0.25
 
     def compute(self, sim, real):
+        a_sim = np.ptp(motion_signal(sim), axis=0)
+        a_real = np.ptp(motion_signal(real), axis=0)
+        ref = np.median(a_real[a_real > 0]) if np.any(a_real > 0) else 0.0
+        alive = a_sim > self.DEAD_FRACTION * ref
+        if ref <= 0 or alive.mean() < self.MIN_ALIVE:
+            raise Undefined(
+                f"{self.name}: {100 * (1 - alive.mean()):.0f}% of nodes have no simulated motion. "
+                f"The decomposition asks how much is recovered by correcting one property, and "
+                f"everything is recoverable from nothing -- it must not be scored for that.")
         _, d = _harm().loopscore_residual(_t(sim), _t(real), None)
         return d[self.key]
 
@@ -397,6 +490,7 @@ class ChiralityMatch(Metric):
     domain = ("a closed path with non-zero area. A flattened loop has no handedness, so this is "
               "meaningless there and is expected to move when a loop is collapsed onto a line.")
     null = 0.5                     # a coin toss
+    null_source = ANALYTIC
 
     def compute(self, sim, real):
         return (np.sign(signed_area(sim)) == np.sign(signed_area(real))).mean()
@@ -415,6 +509,7 @@ class OrientationError(Metric):
     responds_to = {"orientation"}
     domain = "a path with a distinguishable long axis; degenerate for a circle"
     null = float(np.pi / 4)
+    null_source = ANALYTIC
     higher_is_better = False
 
     def compute(self, sim, real):
@@ -453,8 +548,19 @@ class Coordination(Metric):
     responds_to = {"coordination"}
     domain = ("a periodic beat. Undefined for a node that does not move, so those must be masked "
               "out before this is read. Determined only up to HALF a beat -- see the defect below.")
-    null = 0.0
+    null = 0.0778
+    null_source = MEASURED          # the scrambled-timing row of the battery, not a derivation
+    undefined_on = {"a model with no motion to time"}
     known_defects = [
+        "FIXED, and kept because the number it gave was a perfect one: a model predicting NO MOTION "
+        "AT ALL scored 1.0000. A dead signal has no peak, so the cross-correlation is flat, argmax "
+        "returns 0 for every node, and the lags agree perfectly because they are all the same "
+        "nothing. Found by scoring the null bank through the registry -- the distortion battery "
+        "could not have found it, because every distortion starts from a real loop. compute() now "
+        "enforces its own domain and raises Undefined.",
+        "its null is NOT 0. Predicting nothing scores 1.0 (above) and the analytic 0 that was "
+        "declared here was simply wrong; the measured baseline for knowing nothing about timing is "
+        "the scrambled-timing row, 0.0778.",
         "CANNOT TELL IN-PHASE FROM EXACTLY ANTIPHASE. The signal it uses is a distance from a "
         "centre, which peaks twice on a path traversed once per beat, so the alignment is only "
         "determined modulo half a beat. Two regions contracting in exact opposition therefore read "
@@ -462,7 +568,26 @@ class Coordination(Metric):
         "reads a whole number of frames, so on a 24-frame beat it cannot resolve better than about "
         "15 degrees of phase"]
 
+    #: a node whose simulated motion is below this fraction of the recording's typical motion is
+    #: dead rather than quiet, and carries no timing information. Deliberately strict, so that a
+    #: model which is merely too small keeps every node and this stays a measure of TIMING alone.
+    DEAD_FRACTION = 0.01
+    MIN_ALIVE = 0.25                # below this share of nodes the question has no answer
+
     def compute(self, sim, real):
+        # ENFORCE THE DOMAIN, rather than describing it and trusting the caller.
+        a_sim = np.ptp(motion_signal(sim), axis=0)
+        a_real = np.ptp(motion_signal(real), axis=0)
+        ref = np.median(a_real[a_real > 0]) if np.any(a_real > 0) else 0.0
+        alive = a_sim > self.DEAD_FRACTION * ref
+        if ref <= 0 or alive.mean() < self.MIN_ALIVE:
+            raise Undefined(
+                f"{self.name}: {100 * (1 - alive.mean()):.0f}% of nodes have no simulated motion to "
+                f"time (threshold {self.DEAD_FRACTION:g} of the recording's typical excursion). "
+                f"Coordination is a question about WHEN things move and has no answer for something "
+                f"that does not move -- it must not be scored 1.0 for holding still.")
+        sim, real = sim[:, alive], real[:, alive]
+
         lag, G = timing_lag(sim, real)
         # The lag is only determined MODULO HALF A BEAT, so it is mapped onto the half period before
         # the lags are combined. Why: the signal is a distance from a centre, and on a path traversed
@@ -689,6 +814,70 @@ def check(verbose=True):
     add("every withdrawn metric records why",
         all(m.cause_of_death for m in withdrawn().values()),
         f"{len(wd)} withdrawn, all with a cause")
+
+    declared = {n: m for n, m in live().items() if m.null is not None}
+    add("every declared null says where it came from",
+        all(m.null_source in (ANALYTIC, MEASURED) for m in declared.values()),
+        f"{sum(m.null_source == MEASURED for m in declared.values())} measured, "
+        f"{sum(m.null_source == ANALYTIC for m in declared.values())} analytic, "
+        f"{len(live()) - len(declared)} with no null at all")
+
+    # a copied digit drifts; this is the only thing that stops it
+    fl = os.path.join(os.path.dirname(os.path.abspath(__file__)), "_metrology", "floors.json")
+    bank = (json.load(open(fl)).get("models", {}).get("N0_zero", {})
+            .get("windows", {}).get("fit", {}).get("registry", {}) if os.path.exists(fl) else {})
+    drift = {n: (m.null, bank[n]) for n, m in declared.items()
+             if m.null_source == MEASURED and isinstance(bank.get(n), (int, float))
+             and abs(m.null - bank[n]) > 0.02}
+    add("every MEASURED null still matches the null bank", not drift,
+        (f"checked {sum(1 for n, m in declared.items() if m.null_source == MEASURED and n in bank)}"
+         f" against floors.json N0" if not drift else
+         f"drifted: {drift}") if bank else
+        "floors.json has no registry row yet -- rerun floors.py --nulls")
+
+    # THE GATE THAT CAUGHT COORDINATION, generalised.
+    # The distortion battery starts from a real loop every time, so it can only ever ask "does this
+    # respond correctly to a change?" It cannot ask "can this be fooled by a model that does
+    # nothing?" -- and a metric whose best score in the whole null bank belongs to the do-nothing
+    # model is not measuring the thing it claims. Scored on the bank rather than argued.
+    bank_all = (json.load(open(fl)).get("models", {}) if os.path.exists(fl) else {})
+    def _reg(k):
+        return (bank_all.get(k, {}).get("windows", {}).get("fit", {}) or {}).get("registry", {})
+    n0 = _reg("N0_zero")
+    flattered, tested = [], 0
+    for n, m in live().items():
+        vals = {k: _reg(k).get(n) for k in bank_all}
+        vals = {k: v for k, v in vals.items() if isinstance(v, (int, float))}
+        if n not in n0 or not isinstance(n0.get(n), (int, float)) or len(vals) < 3:
+            continue
+        tested += 1
+        best = max(vals.values()) if m.higher_is_better else min(vals.values())
+        # N4 is the model with its muscle switched off and is the same nothing as N0; a tie with it
+        # is not flattery
+        if abs(n0[n] - best) < 1e-9 and not all(
+                abs(v - best) < 1e-9 for k, v in vals.items() if k in ("N0_zero", "N4_passive")
+        ) is None:
+            ties = [k for k, v in vals.items() if abs(v - best) < 1e-9]
+            if set(ties) <= {"N0_zero", "N4_passive"}:
+                flattered.append(f"{n} ({n0[n]:+.4f}, the best of {len(vals)} trivial models)")
+    add("no metric scores its best by predicting NOTHING", not flattered,
+        f"{tested} scored on the null bank" if not flattered else "; ".join(flattered))
+
+    objectives = {n: m for n, m in REGISTRY.items() if m.role == OBJECTIVE}
+    add("every non-instrument records why it is not one",
+        all(m.not_evidence_because.strip() for m in objectives.values()),
+        f"{len(objectives)} objective ({', '.join(objectives) or 'none'}), "
+        f"{len(live()) - len(objectives)} instruments")
+
+    refused = []
+    for n, m in objectives.items():
+        try:
+            m.cite(real, real)
+        except NotEvidence:
+            refused.append(n)
+    add("an objective REFUSES to be cited", len(refused) == len(objectives),
+        f"{refused} raise NotEvidence when asked to support a claim"
+        if refused else "nothing refused -- the gate is not wired up")
 
     computed = []
     for n, m in withdrawn().items():
