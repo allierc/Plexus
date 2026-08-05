@@ -697,10 +697,46 @@ def launch(ctx):
     frames = None if ctx.get("mode") == "recon" else FRAMES
     ok = cluster.run_batch(names, frames=frames, campaign="campaign")
     if not ok:
-        # NOT AN ABORT. The runs that landed are still evidence, and the ones that did not have no
-        # diag.json, so they measure as absent and score inconclusive on their own.
-        print("[round] the batch did not complete cleanly -- scoring what landed")
+        print(T_.warn("[round] the batch did not complete cleanly -- waiting for the survivors"))
+    _wait_for_outputs(names)
     return names
+
+
+def _wait_for_outputs(names, settle_min=5.0, cap_min=240.0, poll_s=30.0):
+    """Wait until the runs that CAN finish have written their diag.json.
+
+    THE BUG THIS CLOSES THREW AWAY A GOOD ROUND. `cluster.run_batch` waits on the QUEUE, and returns
+    not-ok as soon as any job exits. Four children of a bad parent were refused pre-run and exited
+    within a minute, so `run_batch` returned at 14:30, `launch` printed "scoring what landed" and the
+    round moved on -- and `measure` ran while NO run had finished. The earliest diag.json was 14:37;
+    the records were written at 14:52 with ZERO metrics for all eleven. Seven healthy runs, one of them
+    at corr_act_rad 0.739 against the campaign's previous best of 0.435, were measured as nothing.
+
+    A queue is the wrong thing to wait on: it says when a JOB left, not when a RESULT arrived. So this
+    waits on the outputs. It stops when every run has a diag.json, or when the count has not moved for
+    `settle_min` -- a run that died will never write one, and one still going will.
+    """
+    import time as _t
+    deadline = _t.time() + cap_min * 60.0
+    have, last_change = -1, _t.time()
+    while _t.time() < deadline:
+        n = sum(1 for x in names if os.path.exists(os.path.join(LOG_ROOT, x, "diag.json")))
+        if n == len(names):
+            print(T_.ok(f"[round] all {n} run(s) wrote their results"))
+            return n
+        if n != have:
+            have, last_change = n, _t.time()
+            print(T_.quiet(f"[round] {n}/{len(names)} results written; waiting"))
+        elif _t.time() - last_change > settle_min * 60.0:
+            missing = [x for x in names
+                       if not os.path.exists(os.path.join(LOG_ROOT, x, "diag.json"))]
+            print(T_.warn(f"[round] {n}/{len(names)} results after {settle_min:g} min with no "
+                          f"change -- {len(missing)} run(s) produced nothing: "
+                          f"{', '.join(missing[:6])}"))
+            return n
+        _t.sleep(poll_s)
+    print(T_.no(f"[round] gave up waiting after {cap_min:g} min with {have}/{len(names)} results"))
+    return have
 
 
 def measure_all(ctx):
@@ -716,7 +752,18 @@ def measure(name):
     """
     from build import read_diag_summary
     d = os.path.join(LOG_ROOT, name, "diag.json")
-    s = read_diag_summary(d, source=name, quiet=True) or {}
+    if not os.path.exists(d):
+        # ONE DEAD RUN MUST NOT VOID THE BATCH. `read_diag_summary` opens the file unguarded, so a
+        # single missing diag.json raised inside `measure_all`'s comprehension, the metrics node
+        # failed, and every run in the round -- including seven healthy ones -- was recorded with no
+        # metrics and scored inconclusive.
+        print(T_.warn(f"[round] {name}: no diag.json -- it produced nothing, and is recorded as such"))
+        return {}
+    try:
+        s = read_diag_summary(d, source=name, quiet=True) or {}
+    except Exception as e:
+        print(T_.no(f"[round] {name}: its diag.json will not read ({type(e).__name__}: {e})"))
+        return {}
     try:
         with open(d) as f:
             raw = json.load(f)
@@ -862,6 +909,22 @@ def _seen():
     return out
 
 
+def _static_premises(name):
+    """The premise failures run_one would refuse this spec for, read from the spec alone."""
+    import yaml
+    p = os.path.join(LOG_ROOT, str(name), "spec_run.yaml")
+    if not os.path.exists(p):
+        return [f"no spec_run.yaml at {p}"]
+    try:
+        import biologist as B
+        with open(p) as f:
+            cfg = yaml.safe_load(f)
+        return [f"PREMISE {getattr(r, 'premise', '?')}: {str(getattr(r, 'detail', ''))[:70]}"
+                for r in B.check(cfg) if getattr(r, "status", "") == "fail"]
+    except Exception as e:
+        return [f"premise check failed: {type(e).__name__}: {e}"]
+
+
 def check_pool(verbose=True):
     """Every pool entry rebuilds into an ADMISSIBLE composition. Returns the bad ones.
 
@@ -881,8 +944,17 @@ def check_pool(verbose=True):
                 with contextlib.redirect_stdout(io.StringIO()):
                     ok, rej = C.admit(_graph(name))
                     n_menu = len(C.legal_menu(_graph(name), limit=60))
+                    # THE PRE-FLIGHT MUST TEST WHAT THE CLUSTER TESTS. `--check` reported "pool OK"
+                    # while run_one refused four of eleven runs before touching a GPU: critic.admit
+                    # checks the composition's WIRING, and biologist.check checks the spec's own
+                    # arithmetic -- a growth ceiling below the division trigger, chemistry on the
+                    # mechanics clock. Two different questions, and only one was being asked here.
+                    static = _static_premises(name)
             except Exception as e:
-                ok, rej, n_menu = False, [f"{type(e).__name__}: {e}"], 0
+                ok, rej, n_menu, static = False, [f"{type(e).__name__}: {e}"], 0, []
+            if static:
+                ok = False
+                rej = list(rej) + static
             if verbose:
                 codes = ", ".join(getattr(r, "code", str(r)) for r in rej)
                 print(f"  {'ok ' if ok else 'BAD'} {name:<26} menu {n_menu:>3}"

@@ -42,28 +42,29 @@ nodes:
       # this pool did not: two of its six entries were inadmissible and it took a live Proposer call
       # to find out. All were measured, not remembered -- metrics come from each run's own diag.json.
       pool:
-        - refute_coral_nocons      # 1.169 -- the best admissible protrusion on disk
-        - coral_gate               # 1.145, act_cv_peak 2.20, alive 1.00, branched: the working chemistry
-        - repair_l_th_frac         # 1.113, act_cv_peak 4.97 -- the l_th_frac revert, premises hold
-        - wk_pressure_pos_s0       # 1.110 -- a different mechanical arm
-        - coral_gate_div           # division on the working chemistry, act_cv_peak 2.20
-        - cfl_c000p080_d002p000    # 1.006 -- a CFL-safe baseline
+        # PROMOTED FROM ROUND 1, which the loop threw away and the disk kept. These carry the highest
+        # chemistry-shape coupling the campaign has measured -- corr_act_rad_peak 0.739, 0.710, 0.709
+        # against coral_gate's 0.435 -- and that is the campaign's actual question. They live under
+        # _keep/ so no reset can reach them.
+        - _keep/r001_02            # corr 0.739, n_tubes 1, n_tips 6, valid 1.0  <- the best on record
+        - _keep/r001_05            # corr 0.710, n_tubes 1, n_tips 6
+        - repair_l_th_frac         # corr 0.708, the one parent that ever tripped the tube instrument
+        - coral_gate               # corr 0.435, act_cv 2.20 -- the reference working chemistry
+        - coral_gate_div           # division on the working chemistry
+        - cfl_c000p080_d002p000    # a CFL-safe baseline
       #
-      # THREE ENTRIES REMOVED AFTER MEASURING THEM, each for its own reason and none of them a
-      # rebuild artifact -- I checked all three against their own spec_run.yaml on disk:
+      # DROPPED, each for a measured reason:
       #
-      #   round40_mc8             protr_peak 1.899, the highest on disk, and NOT USABLE. Its spec
-      #                           carries `alpha`, which the space renamed to `hill`, so the rebuild
-      #                           fails C2_COMPILE_FAILED. An alias would fix it and Cedric has ruled
-      #                           aliases out as hacks. It also has NO chemistry metrics at all
-      #                           (act_cv_peak absent) -- it predates the metric bank, so its 1.899 is
-      #                           not comparable to anything this campaign measures.
-      #   p1_ph_coral_fixed_ball  chi 65.0 against a stability limit of 2.0 -- 32x over. It ran and
-      #                           its premises held, but R1c is right: the chemistry advanced 65 per
-      #                           frame, so the run is evidence about an integrator.
-      #   cellfix_B_new           `morphogen_growth_3d` with NO reaction-diffusion operator anywhere,
-      #                           so nothing produced morphogen and the growth operator was inert.
-      #                           Its 1.054 is mechanics only.
+      #   refute_coral_nocons   its growth ceiling vth_frac=1.4 sits BELOW the division trigger
+      #                         factor=2.0, so volume-triggered division is arithmetically impossible.
+      #                         run_one's static premise check refuses it before touching a GPU, and
+      #                         the fidelity overlay faithfully propagates the broken pair to every
+      #                         child -- so all FOUR of its children in round 1 died in under a minute,
+      #                         the control among them. `--check` said "pool OK" because critic.admit
+      #                         does not test that relation while biologist.check does; it now runs
+      #                         both.
+      #   wk_pressure_pos_s0    passes every premise, but has no measurable chemistry-shape coupling
+      #                         (corr_act_rad absent), so it cannot speak to the open question.
 
   - id: history
     code: round.history
