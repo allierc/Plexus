@@ -51,7 +51,13 @@ QUEUE = os.environ.get("PG_QUEUE", "gpu_l4")
 NCPUS = os.environ.get("PG_NCPUS", "8")          # gpu_l4 is 8 slots/GPU; >8 with 1 GPU delays
 WALL = os.environ.get("PG_WALL", "240")          # minutes
 GPU = os.environ.get("PG_GPU", "1")              # gpu_l4 REJECTS jobs without -gpu num=1
-PARALLEL = int(os.environ.get("PG_PARALLEL", "8"))
+# 12, NOT 8. Cedric, 5 August: "we can run 12 jobs in parallel on the l4 cluster there are many
+# nodes." The old 8 came from the slot count of a SINGLE gpu_l4 card, which is the wrong unit -- the
+# partition has many nodes, so the limit was self-imposed. It cost a full simulation duration per
+# round: a 12-slot batch submitted as 8 + 3 and `run_batch` waits for the first wave to drain, so
+# every round took ~3 h of wall-clock instead of ~1.5 h. A courtesy limit that doubles the campaign's
+# latency is not a courtesy.
+PARALLEL = int(os.environ.get("PG_PARALLEL", "12"))
 PREFIX = "pg_"                                   # job-name prefix; all queue ops filter on it
 
 
