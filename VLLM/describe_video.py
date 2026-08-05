@@ -32,7 +32,27 @@ _SPEC_MARKER = "# --- auto: video descriptions (gemma-4-12B) ---"
 
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GEMMA = os.environ.get("GEMMA_DIR", "/workspace/Plexus/VLLM/gemma-4-12B-it")
-DEV = "cuda:0" if torch.cuda.is_available() else "cpu"
+def _pick_device():
+    """The card with the most FREE memory, not card zero.
+
+    This was hard-coded to cuda:0 and ignored whatever device the caller was using. The model needs
+    about 22 GB, so on a shared machine where another session holds card 0 the captioner OOMs every
+    time -- and because Plexus_Main runs it with check=False, the run reported success with no
+    captions written. Silent is the worst of the three possible outcomes.
+    """
+    if not torch.cuda.is_available():
+        return "cpu"
+    free = []
+    for i in range(torch.cuda.device_count()):
+        try:
+            f, _ = torch.cuda.mem_get_info(i)
+        except Exception:
+            f = 0
+        free.append((f, i))
+    return f"cuda:{max(free)[1]}"
+
+
+DEV = os.environ.get("PLEXUS_VLM_DEVICE") or _pick_device()
 DEFAULT_ROOT = os.environ.get(
     "PLEXUS_OUTPUT_ROOT", os.environ.get("GNN_OUTPUT_ROOT", "/groups/saalfeld/home/allierc/GraphData")
 ) + "/graphs_data"
@@ -143,6 +163,8 @@ def main():
     ap.add_argument("--root", default=None, help="recurse for *.mp4 under this dir")
     ap.add_argument("--out", default=None, help="aggregate text file (default <root>/video_descriptions.txt)")
     ap.add_argument("--frames", type=int, default=8)
+    ap.add_argument("--device", default=None,
+                    help="cuda:N or cpu; default = the card with the most free memory")
     ap.add_argument("--append", action="store_true", help="append to --out instead of truncating it")
     ap.add_argument("--config-root", default=os.path.join(_REPO, "config"),
                     help="also write each description into the repo spec config/<type>/<name>.yaml")
@@ -159,9 +181,22 @@ def main():
     assert os.path.isdir(GEMMA), f"gemma weights not found: {GEMMA}"
     print(f"[describe] {len(videos)} videos -> {out_file}", flush=True)
 
-    print(f"[load] {GEMMA} on {DEV} ...", flush=True)
+    dev = args.device or DEV
+    if dev.startswith("cuda"):
+        i = int(dev.split(":")[1]) if ":" in dev else 0
+        gb = torch.cuda.mem_get_info(i)[0] / 2**30
+        print(f"[load] {GEMMA} on {dev} ({gb:.1f} GB free) ...", flush=True)
+        if gb < 24.0:
+            alt = _pick_device()
+            if alt != dev and alt.startswith("cuda") and \
+                    torch.cuda.mem_get_info(int(alt.split(":")[1]))[0] / 2**30 > gb:
+                print(f"[load] {dev} has only {gb:.1f} GB free and this model needs about 22 -- "
+                      f"using {alt} instead", flush=True)
+                dev = alt
+    else:
+        print(f"[load] {GEMMA} on {dev} ...", flush=True)
     proc = AutoProcessor.from_pretrained(GEMMA)
-    model = AutoModelForMultimodalLM.from_pretrained(GEMMA, dtype="bfloat16", device_map=DEV)
+    model = AutoModelForMultimodalLM.from_pretrained(GEMMA, dtype="bfloat16", device_map=dev)
 
     records = []
     spec_updates: dict[str, dict] = {}                             # spec.yaml -> {movie_stem: {...}}

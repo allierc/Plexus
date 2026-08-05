@@ -121,7 +121,7 @@ def main():
 
     # caption the freshly rendered movies (default on for -o generate; --no-describe to skip)
     if describe and "generate" in task and data_dir:
-        _describe(data_dir, args.describe_out)
+        _describe(data_dir, args.describe_out, device=args.device)
         _mark(run_log_dir, "_completed_describe", args.describe_out or "graphs_data/video_descriptions.txt")
 
     for stage in ("train", "test"):
@@ -132,7 +132,7 @@ def main():
     _mark(run_log_dir, "_complete", " ".join(sys.argv))
 
 
-def _describe(data_dir: str, out_file: str | None) -> None:
+def _describe(data_dir: str, out_file: str | None, device: str = "cuda:0") -> None:
     """Caption this run's movies with the local VLM, appending to the aggregate file.
     Runs describe_video.py as a subprocess so a missing/broken VLM never breaks a run."""
     import glob
@@ -151,8 +151,18 @@ def _describe(data_dir: str, out_file: str | None) -> None:
     out_file = out_file or os.path.join(gd, "video_descriptions.txt")
     script = os.path.join(repo, "VLLM", "describe_video.py")
     print(f"[describe] captioning {len(movies)} movie(s) -> {out_file}", flush=True)
-    subprocess.run([sys.executable, script, *movies, "--root", gd,
-                    "--out", out_file, "--append"], check=False)
+    # a caption that did not happen must SAY SO. check=False keeps a broken VLM from killing a run,
+    # which is right, but on its own it also let an out-of-memory captioner pass for a successful one.
+    before = os.path.getsize(out_file) if os.path.exists(out_file) else 0
+    r = subprocess.run([sys.executable, script, *movies, "--root", gd,
+                        "--out", out_file, "--append", "--device", device], check=False)
+    after = os.path.getsize(out_file) if os.path.exists(out_file) else 0
+    if r.returncode != 0 or after <= before:
+        print(f"[describe] *** NO CAPTIONS WERE WRITTEN *** (exit {r.returncode}, "
+              f"{out_file} unchanged at {after} bytes). The movies exist and are undescribed.",
+              flush=True)
+    else:
+        print(f"[describe] wrote {after - before} bytes of captions", flush=True)
 
 
 def _mark(run_log_dir: str, marker: str, info: str) -> None:
