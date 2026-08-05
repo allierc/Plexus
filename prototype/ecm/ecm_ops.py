@@ -335,14 +335,58 @@ class ECMStress(Lateral):
         self.scale = float(params.get("scale", 0.15))
         self.bands = int(params.get("bands", 8))
         self.channel = str(params.get("channel", "node_type"))
+        # WHICH STRAIN. `vol` is |J-1|, the local VOLUME change, and it is the honest default because it
+        # needs no material constants. But it is blind to the deformation this experiment actually
+        # produces: a matrix pushed outward by a growing sphere is SHEARED and dragged far more than it
+        # is compressed, and MLS-MPM's fixed-corotated material resists volume change stiffly, so
+        # |J-1| stays near zero while the fibres are visibly splayed. That is why movies of a plainly
+        # moving matrix read as unstressed -- the MEASURE, not the mechanics. `dev` is the
+        # volume-normalised equivalent deviatoric strain, which is where the signal is.
+        # `vol` |J-1| volume change | `dev` equivalent deviatoric STRAIN | `vonmises` the von Mises
+        # invariant of the CAUCHY STRESS the solver itself computed (`mpm_scatter: store_stress: true`).
+        # `vonmises` is the physical one: it is in stress units, it weights shear the way this material's
+        # own mu and la do, and it is the same tensor that generated the grid forces -- not a proxy
+        # re-derived from F with a constitutive law chosen by the diagnostic.
+        self.measure = str(params.get("measure", "vol"))
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
         F = getattr(lvl, "F", None)
         if F is None:
             return {}
+        if self.measure == "vonmises":
+            sig = getattr(lvl, "sigma", None)
+            if sig is None:
+                if not getattr(self, "_warned_vm", False):
+                    print("[ecm_stress] measure=vonmises but no `sigma` buffer -- the scatter was not "
+                          "asked to keep it (`store_stress: true`). Falling back to |J-1|, which is a "
+                          "DIFFERENT quantity: read the colours accordingly.", flush=True)
+                    self._warned_vm = True
+            else:
+                tr = sig.diagonal(dim1=-2, dim2=-1).sum(-1)
+                eye = torch.eye(sig.shape[-1], device=sig.device, dtype=sig.dtype)
+                dv = sig - (tr / 3.0)[:, None, None] * eye
+                vm = torch.sqrt((1.5 * (dv * dv).sum((-1, -2))).clamp_min(0.0))
+                band = ((vm / max(self.scale, 1e-9)).clamp(0, 1)
+                        * (self.bands - 1)).round().long()
+                ch = getattr(lvl, self.channel, None)
+                if ch is not None:
+                    ch[:] = band.to(ch.dtype).reshape(ch.shape)
+                STRESS_HISTORY.append(band.detach().to("cpu", torch.uint8).numpy())
+                return {}
         J = torch.linalg.det(F)
-        s = (J - 1.0).abs() / max(self.scale, 1e-9)
+        if self.measure == "dev":
+            # Volume-normalised left Cauchy-Green, then its deviator: shape change with the volume
+            # change divided out, so `dev` and `vol` are independent readings of the same F rather than
+            # two views of mostly the same number.
+            B = F @ F.transpose(-1, -2)
+            Bb = B / J.abs().clamp_min(1e-9).pow(2.0 / 3.0)[:, None, None]
+            tr = Bb.diagonal(dim1=-2, dim2=-1).sum(-1)
+            eye = torch.eye(Bb.shape[-1], device=Bb.device, dtype=Bb.dtype)
+            dev = Bb - (tr / 3.0)[:, None, None] * eye
+            s = torch.sqrt((1.5 * (dev * dev).sum((-1, -2))).clamp_min(0.0)) / max(self.scale, 1e-9)
+        else:
+            s = (J - 1.0).abs() / max(self.scale, 1e-9)
         band = (s.clamp(0, 1) * (self.bands - 1)).round().long()
         # `node_type` IS A BUFFER, NOT A STATE BLOCK. It is registered by the provision
         # (base.py:348) alongside mass/F/C, so `lvl.get()` -- which slices the state matrix --

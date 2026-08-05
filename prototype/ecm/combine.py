@@ -116,7 +116,14 @@ def build(name, tissue_npz, fit=FIT, plate_box=None, **ecm):
                               "centre": [0.5, 0.5, 0.5], "surface": tissue_npz, "scale": s,
                               "skin": 0.004})
     spec["schedule"].append("cell_exclude_3d")
-    if gap_box is not None:
+    if gap_box is not None and "mpm_block" not in spec["sets"]:
+        # RIGID PROJECTION *OR* ELASTIC BLOCK, NEVER BOTH -- and getting this wrong produced a null that
+        # looked like a physical result. `48_block_elastic_g40` ran with the matrix clamped at +/-0.199
+        # by `plate_confine_3d` AND an elastic block filling the same region. The projection wins every
+        # frame, so the block could not be loaded through the matrix, and a POSITION clamp launders
+        # deformation out of F, which is integrated from the velocity gradient. Result: the matrix sat
+        # at 100% band 0 for 400 frames -- strained fraction 0.006 against 0.207 for the rigid-plate run
+        # -- while the block itself strained normally. A matrix being HELD, not squeezed.
         import plate_ops                                            # noqa: F401  register it
         # AFTER the substep block: the MPM loop moves the particles, and the plates then take back
         # whatever crossed them. Inside the loop it would be applied 20 times a frame, which is a

@@ -28,7 +28,8 @@ class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
     REQUIRES_TYPE_PROPS = ["youngs"]
     MECHANISM_TAGS = ["particle_to_grid", "fixed_corotated_stress"]
     PARAM_ROLES = {"dt_sub": "MLS-MPM substep dt", "drag": "Stokes drag coefficient",
-                   "a_max": "external-acceleration clamp"}
+                   "a_max": "external-acceleration clamp",
+                   "store_stress": "cache Cauchy stress to a per-particle buffer"}
     REFERENCE = "Hu, Y. et al. (2018). ACM Trans. Graph. 37(4):150 (MLS-MPM P2G); Sulsky, D. et al. (1994)."
 
     def __init__(self, params, device="cpu"):
@@ -38,6 +39,17 @@ class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
         self.dt_sub = float(params.get("dt_sub", 2e-4))
         self.drag = float(params.get("drag", 0.0))
         self.a_max = float(params.get("a_max", 200.0))
+        # KEEP THE CAUCHY STRESS, OPTIONALLY. The fixed-corotated law below produces the Kirchhoff
+        # stress tau = J.sigma, uses it to build the affine momentum matrix, and then overwrites the
+        # variable with its dt-scaled form -- so the one tensor in the solver that says what the
+        # material is actually carrying is computed 8,000 times a run and discarded every time. With
+        # `store_stress: true` it is cached to a per-particle `sigma` buffer (Cauchy, i.e. tau/J) that
+        # diagnostics and colourings can read instead of re-deriving a proxy from F.
+        #
+        # DEFAULT OFF, and the guard is what makes this safe to add to a shared operator: when off,
+        # nothing is allocated and the only cost is one branch per substep. The cached value is read,
+        # never written back, so the mechanics cannot be changed by asking for it.
+        self.store_stress = bool(params.get("store_stress", False))
 
     def forward(self, H, mask=None):
         p = H.level(self.at); g = H.field(self.to); dev = p.state.device
@@ -106,6 +118,17 @@ class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
         act = getattr(H, "active_stress", None)
         if act is not None:
             stress = stress + act
+        if self.store_stress:
+            # CAUCHY, NOT KIRCHHOFF. What the lines above build is tau = J.sigma (the fixed-corotated
+            # first Piola P times F^T), which is the form MLS-MPM scatters; sigma = tau / J is the
+            # stress per unit CURRENT area, which is what "Cauchy stress" means and what a von Mises
+            # invariant is normally quoted from. Captured here, after any active stress has been added
+            # and BEFORE the dt / p_vol rescale on the next line, so it is the material's stress and
+            # not a momentum increment.
+            sig = stress / J.abs().clamp_min(1e-9)[:, None, None]
+            if getattr(p, "sigma", None) is None or p.sigma.shape != sig.shape:
+                p.register_buffer("sigma", torch.zeros_like(sig))
+            p.sigma.copy_(sig.detach())
         stress = (-dt * 4 * inv_dx * inv_dx) * p.p_vol[:, None, None] * stress
         affine = stress + mass[:, None, None] * C
 

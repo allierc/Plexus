@@ -507,6 +507,7 @@ class MPMScatterAccumulate(Exchange):
         self.dt_sub = float(params.get("dt_sub", 2e-4))
         self.drag = float(params.get("drag", 0.0))
         self.a_max = float(params.get("a_max", 200.0))
+        self.store_stress = bool(params.get("store_stress", False))   # see plexus.operators.mpm_scatter
 
     def forward(self, H, mask=None):
         p = H.level(self.at); g = H.field(self.to); dev = p.state.device
@@ -540,6 +541,15 @@ class MPMScatterAccumulate(Exchange):
         act = getattr(p, "active_stress", None)          # PER-SET active stress (muscle)
         if act is not None:
             stress = stress + act
+        if self.store_stress:
+            # Same capture as the stock implementation -- see `plexus.operators.mpm_scatter`. Present
+            # here too because a second body sharing the grid is still a material with a stress, and a
+            # diagnostic that worked for one set and silently returned nothing for the other would be
+            # the exact producer-with-no-consumer defect this project keeps finding.
+            sig = stress / J.abs().clamp_min(1e-9)[:, None, None]
+            if getattr(p, "sigma", None) is None or p.sigma.shape != sig.shape:
+                p.register_buffer("sigma", torch.zeros_like(sig))
+            p.sigma.copy_(sig.detach())
         stress = (-dt * 4 * inv_dx * inv_dx) * p.p_vol[:, None, None] * stress
         affine = stress + mass[:, None, None] * C
 

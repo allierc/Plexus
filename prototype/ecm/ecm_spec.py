@@ -35,9 +35,15 @@ import copy
 # The result was a frame containing nothing: you cannot watch a front propagate INTO fibres you
 # cannot see. The rest state is now a dim slate -- clearly matrix, clearly unstressed -- and the
 # ramp climbs to white through the inferno hues.
+# AND THE LOW END HAS TO SEPARATE FROM BAND 0. The first version ramped 0 -> 1 -> 2 as
+# slate -> dark purple -> dark magenta: three dark colours, so the ONSET of stress -- the outermost edge
+# of the front, where most of the strained material is -- was a hue shift inside a dark fog and read as
+# nothing. The ramp now brightens immediately: band 1 is a clearly lit violet, band 2 a bright magenta,
+# and the top four keep the inferno hues they had, so a run whose strain sits in bands 1-2 is legible
+# without changing what the top of the scale means.
 STRESS_COLORS = [
-    [0.16, 0.19, 0.30], [0.35, 0.15, 0.42], [0.58, 0.13, 0.42], [0.78, 0.20, 0.33],
-    [0.92, 0.35, 0.18], [0.99, 0.55, 0.10], [1.00, 0.76, 0.22], [1.00, 0.97, 0.75],
+    [0.16, 0.19, 0.30], [0.46, 0.31, 0.72], [0.78, 0.26, 0.72], [0.95, 0.28, 0.45],
+    [0.99, 0.45, 0.20], [1.00, 0.62, 0.12], [1.00, 0.80, 0.28], [1.00, 0.97, 0.78],
 ]
 
 
@@ -72,12 +78,13 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                # the run showed a uniformly white matrix and the front stopped being visible exactly
                # where it was strongest. 0.05 keeps the top band for the material that is genuinely
                # at the front.
-               stress_scale=0.05, drag=0.0, wall_damp=0.6, seed=0, fps=10, a_max=300.0,
+               stress_scale=0.05, stress_measure="vol", drag=0.0, wall_damp=0.6, seed=0,
+               fps=10, a_max=300.0,
                # AN ELASTIC BLOCK instead of a rigid plate: a SECOND MPM set, ~130x stiffer than the
                # matrix, scattering into the same grid (`prototype/eye`'s two-body pattern). None =
                # no block. A rigid projection cannot be seen to do anything; a material can.
                block_gap=None, block_youngs=2000.0, block_particles=60000,
-               block_stress_scale=0.004):
+               block_stress_scale=0.004, block_measure="vol"):
     """The whole experiment as a plain dict, ready for yaml.safe_dump + schema.load."""
     types = {f"s{i}": {"fraction": 1.0 / len(STRESS_COLORS), "youngs": youngs}
              for i in range(len(STRESS_COLORS))}
@@ -108,10 +115,11 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
              "k": float(k_contact), "r0": float(r0), "r_max": float(r_max),
              "growth": float(growth), "damp": float(damp)},
             {"op": "ecm_stress", "at": "mpm_particle", "scale": float(stress_scale),
-             "bands": len(STRESS_COLORS)},
+             "bands": len(STRESS_COLORS), "measure": str(stress_measure)},
             {"op": "mpm_strain", "at": "mpm_particle"},
             {"op": "mpm_scatter", "at": "mpm_particle", "to": "mpm_grid",
-             "drag": float(drag), "a_max": float(a_max)},
+             "drag": float(drag), "a_max": float(a_max),
+             "store_stress": (stress_measure == "vonmises")},
             {"op": "mpm_grid_update", "at": "mpm_grid", "wall_damp": float(wall_damp)},
             {"op": "mpm_gather", "at": "mpm_particle", "from": "mpm_grid",
              "wall_damp": float(wall_damp), "wall_contact": 0.04, "vmax": 1.0e9},
@@ -147,14 +155,15 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
             {"op": "block_seed", "at": "mpm_block", "centre": [0.5, 0.5, 0.5],
              "axis": int(axis), "gap_half": float(block_gap), "seed": int(seed)},
             {"op": "block_stress", "at": "mpm_block", "scale": float(block_stress_scale),
-             "bands": len(STRESS_COLORS)},
+             "bands": len(STRESS_COLORS), "measure": str(block_measure)},
             # APPENDED, WHICH IS WHAT PUTS THEM SECOND. One schedule token runs every operator of
             # that name in spec order, and `mpm_scatter`'s default implementation RESETS the grid
             # while `accumulate` adds to it -- so the matrix's scatter must come first or the block
             # would wipe the matrix out of the grid every substep.
             {"op": "mpm_strain", "at": "mpm_block"},
             {"op": "mpm_scatter", "at": "mpm_block", "to": "mpm_grid",
-             "implementation": "accumulate", "drag": float(drag), "a_max": float(a_max)},
+             "implementation": "accumulate", "drag": float(drag), "a_max": float(a_max),
+             "store_stress": (block_measure == "vonmises")},
             {"op": "mpm_gather", "at": "mpm_block", "from": "mpm_grid",
              "wall_damp": float(wall_damp), "wall_contact": 0.04, "vmax": 1.0e9},
         ]
