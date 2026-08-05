@@ -143,6 +143,51 @@ consequence is only that the critic cannot verify *structurally* that the loop i
 downstream. If you wire it, check that a reaction operator is present and that `beta` is non-zero —
 it was 0 in every pool parent until round 1, so the feedback had never once been switched on.
 
+## The spot scale, read off Okuda's Fig. 5
+
+*Corrected 2026-08-05. The previous version of this section, and `crew/grounder.md`, and
+`metrics.py`'s note on `n_spots`, all said the paper "reports about five spots on a 2000-cell ball".
+IT DOES NOT. The phrase occurs nowhere in Okuda et al. 2018 — it was a calibration target Cedric chose
+by eye, recorded as such in `pattern_scale.py`'s header, and it hardened into a citation as it was
+copied between files. A decision is not a measurement, and neither is a quotation.*
+
+**What the figure actually shows.** Fig. 5a, thin tubes, at χ = 0.01 and γ = 100. The cell counts are
+printed in the caption:
+
+| | t = 0.0 | t = 12.6 | t = 25.2 cell cycles |
+|---|---|---|---|
+| cells | **2032** | 2843 | **3572** |
+| morphology | ~10 small red spots on a sphere | ~10 thin tubes | ~10 longer thin tubes, some branched |
+
+Read off the panels: each initial spot is **about ten cells**. Fig. 5b, the thick-tube/budding case,
+starts from a comparable count with spots of **roughly 100–200 cells**, and produces fat lobes rather
+than fingers.
+
+**Three numbers follow, and they are the campaign's actual targets.**
+
+1. **A tube spot is ~10 cells; a bud spot is ~100–200.** Our best run measures
+   `spot_cells_med` **99** with `n_spots` **1** — one bud-sized domain. That is the Fig. 5b regime, and
+   it is why `protr` climbs while the eye reports no finger. To reach Fig. 5a the spot must be an order
+   of magnitude smaller and there must be about ten of them.
+2. **~10 spots, not 1.** `spot_spacing_cells` has been unmeasurable on every run
+   (`measured_frac` 0.0) because a single spot has no spacing. With ten spots it becomes the one
+   pattern length directly comparable to the figure.
+3. **Growth is modest: 2032 → 3572 cells is 1.76× over 25 cell cycles.** Our runs either do not divide
+   at all (`cells_final` 2000 from 2000) or explode (150 → 7785). Tubes form under slow, sustained
+   growth, not under a burst and not under none.
+
+**The knob Okuda uses to set this does not exist in our space, and that is finding F009.** His χ is a
+spatial scale — *"with increasing χ, the size of spots increased and the number of spots decreased"*,
+and his tube diameter goes as χ^(1/4). Ours is a degree-normalised graph Laplacian with no `dx`
+anywhere, so `d·chi` is a dimensionless per-frame mixing fraction: a rate. Measured on a 2000-cell
+ball our `chi` does three unrelated jobs — 1.3 gives one domain, 4.0 kills scattered seeds, 13
+saturates the integrator, 40 gives 109 single-cell specks. **Every run in this campaign uses
+chi = 1.3.**
+
+So do not copy χ = 0.01 from the paper; it means something different here. Aim at the MEASURED
+quantities instead — `spot_cells_med` toward 10, `n_spots` toward 10, `spot_spacing_cells` measurable
+at all — and treat whichever parameter moves them as the lever, whatever it is called.
+
 ## What is still missing
 
 **A protrusion — but the coupling has moved.** Round 1 (2026-08-05) produced the strongest

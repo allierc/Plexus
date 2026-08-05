@@ -71,6 +71,11 @@ measurement that happened three times, not a finding.
 
 ## How to read a round
 
+- **Say which REGIME the round is in before anything else.** `spot_cells_med` near 10 with `n_spots`
+  near 10 is Okuda's thin-tube regime (Fig. 5a, 2032 cells, ~10 spots of ~10 cells); one spot of
+  100-200 cells is the budding regime (Fig. 5b), which produces lobes however high `protr` climbs.
+  Every run so far has been the second. A round that moved `protr` without moving the spot scale has
+  not moved toward the figure.
 - **Always compare to the control first.** A metric that moved in the control moved for reasons that
   have nothing to do with any edit.
 - **A difference smaller than the seed spread is not a difference.** If two runs of the same

@@ -25,6 +25,18 @@ kept.*
 | **undulation** | many shallow waves over the whole surface, no single dominant feature | `shape_idx` elevated with `protr_peak` modest; multiple lobes in the movie; a spatial wavelength of a few cells |
 | **branching** | a tube that splits, giving two or more tips | protrusion count above one with sustained length; the eye reporting a split |
 
+**The spot scale, read off Fig. 5 rather than quoted.** Earlier versions of this file said the paper
+"reports about five spots on a 2000-cell ball". It does not — that phrase is nowhere in Okuda et al.
+2018; it was a calibration target chosen by eye and it hardened into a citation. What Fig. 5a actually
+shows, with the counts printed in its own caption: **2032 cells at t = 0 carrying about ten small red
+spots of roughly ten cells each, growing to 2843 at t = 12.6 and 3572 at t = 25.2 cell cycles** — about
+ten thin tubes, 1.76x growth over 25 cell cycles. Fig. 5b, the thick-tube case, has spots of roughly
+100-200 cells and yields fat lobes instead of fingers.
+
+So when you compare a run to the paper, say where it sits on that axis: `spot_cells_med` near 10 with
+`n_spots` near 10 is the tube regime; 100-200 cells in one spot is the budding regime. Every run so far
+measures ONE spot of about 99 cells, which is Fig. 5b, and no `protr` value changes that.
+
 **Settings.** The paper's phase behaviour is reported over (χ, γ) — the chemical–mechanical coupling
 strength and the growth rate. The regime boundaries, not single points, are what the campaign is
 trying to reproduce.
