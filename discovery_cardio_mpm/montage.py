@@ -85,12 +85,23 @@ def draw(dump, out, cols=10):
         ax0 = fig.add_subplot(len(panels) * (rows_per + 1), 1, base + 1)
         ax0.axis("off")
         n_pin = int(pinned.sum())
-        ax0.text(0.0, 0.25,
-                 f"{label}     mean {sc.mean():+.3f}"
+        # the registry's own reading of this grid, so the picture and the numbers agree
+        import metrics as MM
+        m = np.zeros(rest.shape[0], bool); m[idx] = True
+        try:
+            extra = (f"   openness {MM.REGISTRY['openness'](sim, real, m):.3f}"
+                     f"   orientation error {MM.REGISTRY['orientation_error'](sim, real, m):.3f} rad"
+                     f"   chirality {MM.REGISTRY['chirality_match'](sim, real, m):.3f}"
+                     f"   coordination {MM.REGISTRY['coordination'](sim, real, m):.3f}")
+        except Exception:
+            extra = ""
+        ax0.text(0.0, 0.45,
+                 f"{label}     mean loopscore {sc.mean():+.3f}"
                  + (f"     {n_pin} of {len(sc)} panels are PINNED to the recording "
                     f"(mean without them {sc[~pinned].mean():+.3f})" if n_pin else
                     "     no panel is pinned"),
                  color="white", fontsize=11, fontweight="bold", transform=ax0.transAxes)
+        ax0.text(0.0, 0.05, extra, color="#9FD3FF", fontsize=9, transform=ax0.transAxes)
         for k, j in enumerate(order):
             ax = fig.add_subplot(len(panels) * (rows_per + 1), cols,
                                  (base + 1) * cols + k + 1)
