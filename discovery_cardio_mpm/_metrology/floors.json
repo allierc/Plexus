@@ -44,9 +44,9 @@
       "residual/shape_detail": {
        "error": "Undefined: residual/shape_detail: 100% of nodes have no simulated motion. The decomposition asks how much is recovered by correcting one property, and everything is recoverable from nothing -- it must not be scored for that."
       },
-      "openness": 0.0,
-      "path_length": 0.0,
-      "peak_excursion": 0.0,
+      "openness": 0.3389197861678486,
+      "path_length": 0.004211462065798062,
+      "peak_excursion": 0.0011491200841666407,
       "chirality_match": 0.0,
       "orientation_error": 0.7841267922291832,
       "coordination": {
@@ -83,9 +83,9 @@
       "residual/shape_detail": {
        "error": "Undefined: residual/shape_detail: 100% of nodes have no simulated motion. The decomposition asks how much is recovered by correcting one property, and everything is recoverable from nothing -- it must not be scored for that."
       },
-      "openness": 0.0,
-      "path_length": 0.0,
-      "peak_excursion": 0.0,
+      "openness": 0.3352280207659801,
+      "path_length": 0.004268859056938037,
+      "peak_excursion": 0.001143961820426414,
       "chirality_match": 0.0,
       "orientation_error": 0.7930764151241463,
       "coordination": {
@@ -122,9 +122,9 @@
       "residual/shape_detail": {
        "error": "Undefined: residual/shape_detail: 100% of nodes have no simulated motion. The decomposition asks how much is recovered by correcting one property, and everything is recoverable from nothing -- it must not be scored for that."
       },
-      "openness": 0.0,
-      "path_length": 0.0,
-      "peak_excursion": 0.0,
+      "openness": 0.32797627395310147,
+      "path_length": 0.004308140963746194,
+      "peak_excursion": 0.001120917597503785,
       "chirality_match": 0.0,
       "orientation_error": 0.7942340101637395,
       "coordination": {
@@ -161,9 +161,9 @@
       "residual/shape_detail": {
        "error": "Undefined: residual/shape_detail: 100% of nodes have no simulated motion. The decomposition asks how much is recovered by correcting one property, and everything is recoverable from nothing -- it must not be scored for that."
       },
-      "openness": 0.0,
-      "path_length": 0.0,
-      "peak_excursion": 0.0,
+      "openness": 0.33004956270144686,
+      "path_length": 0.004175232228208518,
+      "peak_excursion": 0.0011110592817441566,
       "chirality_match": 0.0,
       "orientation_error": 0.7830539500542427,
       "coordination": {
@@ -195,9 +195,9 @@
       "residual/openness_aspect": 0.07515677437186241,
       "residual/chirality": 0.1382812112569809,
       "residual/shape_detail": 0.23534584045410156,
-      "openness": 0.4805968916611335,
-      "path_length": 0.0018373396972753654,
-      "peak_excursion": 0.0006272578811005202,
+      "openness": 0.14167710549328488,
+      "path_length": 0.0021306555045647905,
+      "peak_excursion": 0.0005218622030661204,
       "chirality_match": 0.6691707873716242,
       "orientation_error": 0.6253938178265708,
       "coordination": 0.9052553497001629
@@ -222,9 +222,9 @@
       "residual/openness_aspect": 0.09199460968375206,
       "residual/chirality": 0.1756141409277916,
       "residual/shape_detail": 0.23285292834043503,
-      "openness": 0.4135280343769598,
-      "path_length": 0.001846341008723649,
-      "peak_excursion": 0.0006148039658070406,
+      "openness": 0.07830001361097971,
+      "path_length": 0.0021963098100366675,
+      "peak_excursion": 0.0005291578546193735,
       "chirality_match": 0.6422594142259415,
       "orientation_error": 0.6163001935902472,
       "coordination": 0.8962634104932613
@@ -249,9 +249,9 @@
       "residual/openness_aspect": -0.010248935781419277,
       "residual/chirality": 0.15874957293272018,
       "residual/shape_detail": 0.3156067505478859,
-      "openness": 0.30836972503067944,
-      "path_length": 0.001898136141553913,
-      "peak_excursion": 0.0005387285395036564,
+      "openness": 0.01960654892242203,
+      "path_length": 0.0022400762855234644,
+      "peak_excursion": 0.0005821890580001287,
       "chirality_match": 0.6096424496006086,
       "orientation_error": 0.6708270997076261,
       "coordination": 0.8794258600705753
@@ -276,9 +276,9 @@
       "residual/openness_aspect": 0.07983016085927375,
       "residual/chirality": 0.17963856321875937,
       "residual/shape_detail": 0.28713025015895255,
-      "openness": 0.43441886813474556,
-      "path_length": 0.0017563930783691772,
-      "peak_excursion": 0.0005177985837633147,
+      "openness": 0.1043693054332987,
+      "path_length": 0.002352208193064911,
+      "peak_excursion": 0.0005932606979808419,
       "chirality_match": 0.6238113351084063,
       "orientation_error": 0.7030872862676787,
       "coordination": 0.8928033846639992
@@ -308,9 +308,9 @@
       "residual/openness_aspect": 0.03261065483093262,
       "residual/chirality": 0.02197396755218506,
       "residual/shape_detail": 0.038943350315093994,
-      "openness": 0.33004956270144686,
-      "path_length": 0.003520919164591208,
-      "peak_excursion": 0.0011110592817441566,
+      "openness": 0.008870223466401761,
+      "path_length": 3.62298375895442e-05,
+      "peak_excursion": 3.806080242248406e-05,
       "chirality_match": 0.9321985545834918,
       "orientation_error": 0.0817486333411721,
       "coordination": 0.9988078801089798
@@ -335,9 +335,9 @@
       "residual/openness_aspect": 0.13986057043075562,
       "residual/chirality": 0.09167706966400146,
       "residual/shape_detail": 0.012836694717407227,
-      "openness": 0.3352280207659801,
-      "path_length": 0.003896011478084711,
-      "peak_excursion": 0.001143961820426414,
+      "openness": 0.007251746812878601,
+      "path_length": 3.9281906808157595e-05,
+      "peak_excursion": 2.3044222922628983e-05,
       "chirality_match": 0.947223278813237,
       "orientation_error": 0.058988283807309944,
       "coordination": 0.9925590549305693
@@ -362,9 +362,9 @@
       "residual/openness_aspect": 0.17064416408538818,
       "residual/chirality": 0.10877478122711182,
       "residual/shape_detail": 0.0344233512878418,
-      "openness": 0.32797627395310147,
-      "path_length": 0.0038078787635358155,
-      "peak_excursion": 0.001120917597503785,
+      "openness": 0.002073288748345392,
+      "path_length": 0.00013290873553767606,
+      "peak_excursion": 9.858315759628472e-06,
       "chirality_match": 0.951977938379612,
       "orientation_error": 0.030358296342286227,
       "coordination": 0.9997233607421053
@@ -394,9 +394,9 @@
       "residual/openness_aspect": 0.03938668221235275,
       "residual/chirality": 0.09030435234308243,
       "residual/shape_detail": 0.20650426298379898,
-      "openness": 0.32262844212875985,
-      "path_length": 0.0023413577576672185,
-      "peak_excursion": 0.0008159674642422097,
+      "openness": 0.016291344039088773,
+      "path_length": 0.0013271058267755789,
+      "peak_excursion": 0.000333152619924431,
       "chirality_match": 0.6010840623811335,
       "orientation_error": 0.8073231420744333,
       "coordination": 0.8207465946173419
@@ -421,9 +421,9 @@
       "residual/openness_aspect": 0.02555684745311737,
       "residual/chirality": 0.10565153881907463,
       "residual/shape_detail": 0.20021430775523186,
-      "openness": 0.2968282423734746,
-      "path_length": 0.002661309130059105,
-      "peak_excursion": 0.0008146150176960427,
+      "openness": 0.03839977839250547,
+      "path_length": 0.0012853334335645502,
+      "peak_excursion": 0.0003293468027303713,
       "chirality_match": 0.5794028147584633,
       "orientation_error": 0.8048469255188067,
       "coordination": 0.8176989672376194
@@ -448,9 +448,9 @@
       "residual/openness_aspect": 0.01583576202392578,
       "residual/chirality": 0.15234801173210144,
       "residual/shape_detail": 0.2366919256746769,
-      "openness": 0.2779071712009086,
-      "path_length": 0.002645950724997216,
-      "peak_excursion": 0.0007818557753584759,
+      "openness": 0.050069102752192896,
+      "path_length": 0.0012957728173868762,
+      "peak_excursion": 0.0003390618221453092,
       "chirality_match": 0.5649486496766831,
       "orientation_error": 0.8122587876683395,
       "coordination": 0.8058861695900577
@@ -475,9 +475,9 @@
       "residual/openness_aspect": 0.033731475472450256,
       "residual/chirality": 0.10806456208229065,
       "residual/shape_detail": 0.2387704774737358,
-      "openness": 0.30934498543138855,
-      "path_length": 0.002379480464231231,
-      "peak_excursion": 0.0007693532299814347,
+      "openness": 0.02070457727005831,
+      "path_length": 0.0014018689408826406,
+      "peak_excursion": 0.00034170605176272193,
       "chirality_match": 0.5611449220235831,
       "orientation_error": 0.8146775485475369,
       "coordination": 0.8058640079877051
@@ -517,9 +517,9 @@
       "residual/shape_detail": {
        "error": "Undefined: residual/shape_detail: 100% of nodes have no simulated motion. The decomposition asks how much is recovered by correcting one property, and everything is recoverable from nothing -- it must not be scored for that."
       },
-      "openness": 0.0,
-      "path_length": 0.0,
-      "peak_excursion": 0.0,
+      "openness": 0.33893401196710193,
+      "path_length": 0.004211629256249377,
+      "peak_excursion": 0.001149133210894602,
       "chirality_match": 0.0,
       "orientation_error": 0.7841296384364507,
       "coordination": {
@@ -551,9 +551,9 @@
       "residual/openness_aspect": 0.044876933097839355,
       "residual/chirality": 0.060195088386535645,
       "residual/shape_detail": 0.055111706256866455,
-      "openness": 0.2345896550343674,
-      "path_length": 0.007301972850505583,
-      "peak_excursion": 0.0021062613643304078,
+      "openness": 0.10434435693273453,
+      "path_length": 0.0036127467926538696,
+      "peak_excursion": 0.0009571281534358057,
       "chirality_match": 0.5178775199695702,
       "orientation_error": 0.7697954232502674,
       "coordination": 0.6748699579052369
