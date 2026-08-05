@@ -72,6 +72,31 @@ def block(title, payload, *, as_json=True, limit=None):
     return f"\n## {title}\n{body}\n"
 
 
+def bank_only(metrics):
+    """{run: summary} reduced to the 24 admitted quantities. What a ROLE is given.
+
+    THE ANALYST WAS SEEING A FIFTH OF THE ROUND. Ten runs at 183 keys each is 149,088 chars; the block
+    limit cut it to 30,000 and said so -- "the role is not seeing 80% of it" -- and the conclusion for
+    the round was therefore drawn from two runs' numbers. Restricted to the bank it is about 26,000 and
+    nothing is cut.
+
+    The record still carries all 183. `euler`, `broken_n`, `ray_single_frac` and the rest are evidence
+    and stay on file; they are simply not what a role needs in order to read a round, and handing them
+    over cost the very thing they were meant to inform.
+    """
+    try:
+        import metrics as _M
+        bank = set(_M.names())
+    except Exception:
+        return metrics
+    if not isinstance(metrics, dict):
+        return metrics
+    out = {}
+    for k, v in metrics.items():
+        out[k] = {kk: vv for kk, vv in v.items() if kk in bank} if isinstance(v, dict) else v
+    return out
+
+
 def build(name, sections):
     """round.md + <role>.md + the data blocks, in that order.
 

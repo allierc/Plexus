@@ -480,14 +480,17 @@ def build_all(ctx):
     if len(out) < len(slots):
         print(T_.warn(f"[round] {len(slots) - len(out)} of {len(slots)} slot(s) dropped -- running "
                       f"the short batch of {len(out)}. A short round is a real round."))
-    # OUT-OF-RANGE VALUES, ONCE PER PARENT. Inherited, so per-slot printed one fact nine times.
-    by_parent = {}
-    for sp in out:
-        for note in (sp.get("out_of_range") or []):
-            by_parent.setdefault(sp.get("parent") or "?", set()).add(note)
-    for parent, notes in by_parent.items():
-        print(T_.quiet(f"[round] {parent}: {len(notes)} value(s) outside the declared space -- "
-                       + "; ".join(sorted(notes))))
+    # ONE LINE PER ROUND, NOT ONE PER PARENT. That every pool parent sits outside its declared box on
+    # at least one parameter is a standing FACT of this campaign -- it is in round.md, it is why the
+    # menu offers a grid anchored on the parent rather than points from the range, and it has not
+    # changed in days. Printing it per parent per round made a known condition look like a fresh fault
+    # every ninety minutes. The full list stays on each record row as `out_of_range`.
+    off = {n for sp in out for n in (sp.get("out_of_range") or [])}
+    if off:
+        names = sorted({n.split("=")[0] for n in off})
+        print(T_.quiet(f"[round] {len(off)} value(s) outside the declared space across the batch "
+                       f"({', '.join(names[:4])}{', ...' if len(names) > 4 else ''}) -- expected, "
+                       f"recorded per run, see round.md"))
     print(T_.ok(f"[round] {len(out)} slot(s) built: "
                 + ", ".join(f"{s['name'].split('_')[-1]}" for s in out)))
     return out
@@ -675,8 +678,13 @@ def _restore_parent_params(name, parent, edit):
     if restored:
         with open(child_path, "w") as f:
             yaml.safe_dump(child, f, sort_keys=False)
-        print(T_.quiet(f"[round] {name}: restored {len(restored)} parent value(s) the rebuild had "
-                       f"lost ({', '.join(restored[:4])}{', ...' if len(restored) > 4 else ''})"))
+    # SILENT WHEN IT WORKS. Cedric: "if this is not an issue, it looks like one." This printed a line
+    # per slot per round -- eleven of them, every round, saying the overlay had done exactly its job.
+    # The rebuild is lossy for a KNOWN and unchanging reason (the space does not declare
+    # seed_mesh_3d.radius at all, and declares l_th_frac with a ceiling every working recipe exceeds),
+    # so the restore is the normal case, not an event. It is verified by
+    # test_round.py::test_a_child_differs_from_its_parent_by_exactly_the_edit and the count is on the
+    # record. A failure to restore would be worth a line; succeeding is not.
     return restored
 
 

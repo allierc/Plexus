@@ -50,7 +50,8 @@ def run(bundle):
     out = os.path.join(bundle.get("out_dir") or ROOT, "grounding.md")
 
     prompt = _prompt.build("grounder", [
-        ("Every run this round, with its metrics", bundle.get("metrics"), {"limit": 24000}),
+        ("Every run this round, with its metrics",
+         _prompt.bank_only(bundle.get("metrics")), {"limit": 60000}),
         ("The morphology each run was classified as", bundle.get("morphology")),
         ("What the eye saw", bundle.get("observed"), {"as_json": False, "limit": 16000}),
         ("Your task", f"Compare this round to the paper and write {out}. Quantify the gap or write "
