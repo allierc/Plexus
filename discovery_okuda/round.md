@@ -103,6 +103,22 @@ et al. 2018 report three morphologies out of this coupling: **tubes**, **undulat
   confidently from four runs' metrics by a role that had been given an empty history, and it is what
   every role's history block exists to prevent.
 
+## What is pinned
+
+*The reference loop this campaign is measured against carries an explicit "things you must NOT change"
+list, and it is why its slots are never spent re-settling a question. Ours:*
+
+- **The seed cell count** (`seed_mesh_3d.n_cells`). Not an axis of the search: it is grounded on every
+  slot so runs stay comparable, and a reservoir big enough for the target is checked before launch.
+- **The vertex and cell reservoir sizes.** Derived from the target cell count, never proposed. A
+  closed trivalent sheet obeys V = 2F − 4, so a buffer is arithmetic, not a choice.
+- **`conserve_amount` on `morphogen_growth_3d`.** Okuda Appendix A: the morphogen is an AMOUNT, so a
+  growing cell must dilute its concentration. Turning it off silently creates mass every step.
+- **The frame count and the analysis stride.** Campaign-wide, so a metric measured on one run means
+  the same as on another.
+- **`divide_3d` + `shape_energy_3d:monolayer` together** — a filled 2×2 table says the pair is a
+  substrate bug (see *What is ruled out*).
+
 ## What is still missing
 
 **A protrusion.** The best `protr_peak` on an admissible specimen is **1.169** (`refute_coral_nocons`),

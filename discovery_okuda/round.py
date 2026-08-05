@@ -68,6 +68,11 @@ N_SLOTS = 8                 # including slot 0, the control
 FRAMES = 900
 CONTROL_SLOT = 0
 MENU_LIMIT = 40
+# THE SWEEP GRID, as factors of the PARENT's own value rather than points in a declared box. The
+# control loop's table reads {0, 1e-3, 1e-2 *parent*, 1e-1} -- a human-chosen grid around what works.
+# Ours cannot be hand-written for 24 quantities x 6 parents, but it can at least be anchored on the
+# parent instead of on a range that no working recipe respects.
+GRID_FACTORS = (0.5, 2.0)
 PARENT_LIMIT = 6
 
 
@@ -269,31 +274,134 @@ def metric_bank(ctx):
 
 
 def menu(ctx):
-    """Every edit the critic will admit, per parent -- handed over rather than checked afterwards.
+    """Every edit the critic will admit, per parent -- each one legible as a CHANGE, not a magnitude.
 
-    Round 2 refused 8 of 12 proposed slots. That was a MENU BUG, not an attrition rate: the critic
-    can enumerate what it will accept, so a refused proposal is a question asked badly rather than a
-    mistake a model made.
+    WHAT THE CONTROL LOOP HAS AND THIS DID NOT. `connectome-gnn-cx`'s instruction file gives its agent
+    a table where every row names the sweep values AND marks which one the parent uses:
+
+        coeff_rate_L2   {0, 1e-3, 1e-2 *parent*, 1e-1}
+
+    Ours offered `['set_param', 'cell_diffuse0.d_h', 0.08]` and nothing else. The parent's value is
+    0.16, so that is a halving -- but the Proposer could not know whether it was a halving, a doubling,
+    or a jump clean out of the working range. A number with nothing to compare it against is not a
+    proposal, it is a guess that reads as a decision.
+
+    So each `set_param` row now carries `from` (the parent's own value), `range` (what the space
+    declares, and whether the parent is already outside it), and `try` -- a small grid around the
+    parent rather than one sampled point. Retuning is not the weakness: the control loop is 100%
+    retunes with its architecture pinned, and it produces usable science. Retuning BLIND is the
+    weakness.
     """
+    from composition_space import OPERATORS
     out = {}
     for p in (ctx.get("parents") or []):
         try:
-            # `legal_menu` returns DICTS -- {edit, label, yields, hash}. My first version wrote
-            # `[list(e) for e in ...]`, which on a dict yields its KEYS, so all 57 rows serialised
-            # as ["edit","label","yields","hash"] and the Proposer was handed a table of
-            # placeholders. It said so in its own reply -- "the menu came through fully redacted
-            # (placeholder rows)" -- and proposed blind, which is exactly the "question asked badly"
-            # this node exists to prevent. Caught on the first live round, by reading what the agent
-            # said instead of only what it returned.
-            #
-            # `hash` is dropped: it is the composition identity, useful to the critic and noise to a
-            # reader. `label` and `yields` are kept -- they are what make a menu row legible.
-            rows = C.legal_menu(_graph(p["name"]), limit=MENU_LIMIT)
-            out[p["name"]] = [{k: r[k] for k in ("edit", "label", "yields") if k in r}
-                              if isinstance(r, dict) else list(r) for r in rows]
+            g = _graph(p["name"])
         except Exception as e:
-            print(f"[round] no menu for {p['name']}: {e}")
+            print(T_.no(f"[round] no menu for {p['name']}: {e}"))
+            continue
+        rows, seen = [], set()
+        for r in C.legal_menu(g, limit=MENU_LIMIT):
+            if not isinstance(r, dict):
+                continue
+            e = r.get("edit") or []
+            row = {k: r[k] for k in ("edit", "label", "yields") if k in r}
+            if e and e[0] == "set_param" and "." in str(e[1]):
+                tgt = str(e[1])
+                if tgt in seen:
+                    continue                       # one row per target, carrying its whole grid
+                seen.add(tgt)
+                node, _, key = tgt.rpartition(".")
+                op = _op_of(g, node)
+                cur = (g.params or {}).get(tgt)
+                tri = (OPERATORS.get(op, {}).get("params") or {}).get(key)
+                if cur is None and isinstance(tri, (list, tuple)) and len(tri) == 3:
+                    cur = tri[2]                   # unset means the declared default
+                row["from"] = cur
+                if isinstance(tri, (list, tuple)) and len(tri) == 3:
+                    lo, hi = tri[0], tri[1]
+                    row["range"] = [lo, hi]
+                    if isinstance(cur, (int, float)) and not (lo <= cur <= hi):
+                        # SAID ON THE ROW ITSELF. All six pool parents sit outside their declared box
+                        # on at least one parameter, so "inside the range" is not a safety property
+                        # here -- and a Proposer told to stay in the box would be steered away from
+                        # every working point.
+                        row["range_note"] = ("the parent is OUTSIDE this declared range -- the range "
+                                             "is unreliable, prefer a factor of the parent's value")
+                if isinstance(cur, (int, float)) and not isinstance(cur, bool) and cur:
+                    # AN INTEGER PARAMETER STAYS AN INTEGER. My first version handed `n_spots` a grid
+                    # of [0.5, 2.0] -- half a spot -- because it multiplied blind. `n_spots`, `hill`
+                    # and the frame counts are counts, and a count times 0.5 is not a smaller count,
+                    # it is a type error the engine would have silently floored.
+                    is_int = isinstance(cur, int) or (
+                        isinstance(tri, (list, tuple)) and len(tri) == 3
+                        and all(isinstance(x, int) for x in tri))
+                    vals = set()
+                    for f in GRID_FACTORS:
+                        v = cur * f
+                        v = max(1, int(round(v))) if is_int else round(v, 6)
+                        if v != cur:
+                            vals.add(v)
+                    grid = sorted(vals)
+                    if grid:
+                        row["try"] = grid
+                        # THE LABEL MUST AGREE WITH THE EDIT. `legal_menu` built it from the value it
+                        # had offered, so after replacing the value the row read `=5` while proposing
+                        # 0.5 -- a row that contradicts itself is worse than one with no label.
+                        row["edit"] = [e[0], tgt, grid[0]]
+                        row["label"] = f"@{op}.{key}={grid[0]:g} (from {cur:g})"
+                rows.append(row)
+            else:
+                rows.append(row)
+        out[p["name"]] = rows
     return out
+
+
+def coverage(ctx):
+    """What the campaign has NOT tried: unexercised operators, untried implementations, unused parents.
+
+    `proposer.md` says "cover the map: an operator no run has ever exercised alone is worth more than a
+    fourth variation on a combination already characterised" -- and nothing told it what was uncovered.
+    A role asked to cover a map it cannot see is the producer-with-no-consumer defect wearing an
+    instruction, and the measured cost is a round where eight of eleven slots came off ONE parent and
+    two of thirteen operators could not be reached at all.
+
+    In the control loop this is unnecessary because the sweep table IS the coverage, hand-maintained.
+    Here it has to be derived, so it is derived once a round and handed over.
+    """
+    from composition_space import OPERATORS
+    used_ops, used_impls = set(), set()
+    for p in (ctx.get("parents") or []):
+        try:
+            g = _graph(p["name"])
+        except Exception:
+            continue
+        for o in g.ops:
+            used_ops.add(o["op"])
+            if o.get("impl"):
+                used_impls.add((o["op"], o["impl"]))
+    untried = []
+    for op, spec in OPERATORS.items():
+        for impl in (spec.get("impls") or []):
+            if op in used_ops and (op, impl) not in used_impls:
+                untried.append(f"{op}:{impl}")
+    posed = set()
+    if os.path.exists(RECORDS):
+        with open(RECORDS) as f:
+            for line in f:
+                try:
+                    posed.add(json.loads(line).get("parent"))
+                except Exception:
+                    pass
+    return {
+        "operators_never_exercised": sorted(set(OPERATORS) - used_ops),
+        "implementations_never_tried": sorted(untried),
+        "parents_never_built_from": sorted(p["name"] for p in (ctx.get("parents") or [])
+                                           if p["name"] not in posed),
+        "note": ("an operator nothing exercises can only be reached with `add_op`; an untried "
+                 "implementation with `set_impl`. Both are one edit and both answer a question no "
+                 "retune can."),
+    }
 
 
 def diagnosis(ctx):

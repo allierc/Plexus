@@ -213,7 +213,10 @@ def test_the_live_flow_loads():
     import round as E
     order = E.load_flow()
     ids = [n["id"] for n in order]
-    check(len(ids) == 17, f"17 nodes: {len(ids)}")
+    # THE COUNT IS ASSERTED SO THAT ADDING A NODE IS A DECISION. It went 17 -> 18 when `coverage` was
+    # wired in, and the test failing is the point: a flow that grows silently is how the old engine
+    # reached 657 lines.
+    check(len(ids) == 18, f"18 nodes: {len(ids)}")
     # a topological order: every dep appears before the node that needs it
     emits = {n.get("out", n["id"]): n["id"] for n in order}
     pos = {n["id"]: i for i, n in enumerate(order)}

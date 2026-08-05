@@ -82,10 +82,18 @@ nodes:
     code: round.diagnosis
     in: [parents]
 
+  # WHAT THE CAMPAIGN HAS NOT TRIED. proposer.md says "cover the map"; nothing told it what was
+  # uncovered, and the measured cost was a round where eight of eleven slots came off one parent while
+  # two of thirteen operators could not be reached at all. In the control loop this is unnecessary --
+  # its hand-maintained sweep table IS the coverage -- so here it is derived once a round.
+  - id: coverage
+    code: round.coverage
+    in: [parents]
+
   # ---- propose -------------------------------------------------------------------
   - id: proposer
     agent: proposer
-    in: [parents, menu, metric_bank, diagnosis, history]
+    in: [parents, menu, metric_bank, coverage, diagnosis, history]
     out: edits
 
   # ---- build, launch, measure ----------------------------------------------------

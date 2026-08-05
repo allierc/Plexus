@@ -10,7 +10,17 @@ prediction you could be wrong about**.
 
 - the **parent set**: the compositions the campaign is currently building from, with their metrics;
 - the **legal menu**: every edit the critic will admit on each parent. You may only propose from it.
-  An edit outside the menu is refused before it runs and the slot is wasted;
+  An edit outside the menu is refused before it runs and the slot is wasted. Each `set_param` row
+  reads:
+
+      from   the parent's OWN current value -- what you are varying away from
+      try    a grid around it (half and double), so a number is legible as a change
+      range  what the search space declares. Note the warning when it appears: **all six pool
+             parents sit outside their declared range on at least one parameter**, so "inside the
+             range" is not a safety property here. Prefer a factor of `from` over a point in `range`.
+
+- **coverage**: the operators no parent exercises, the implementations never tried, and the parents
+  nothing has been built from yet;
 - the **metric bank**: every quantity you may name in a prediction, with what each one measures;
 - **last round's diagnosis**, when a run broke a premise its parent holds: the difference between
   them, ranked, with the parent's value to revert to.
@@ -54,8 +64,15 @@ report.
   with the prediction that the broken premise passes, is a real experiment: if the premise still
   fails, that suspect is *cleared*, which is knowledge either way. It is not a repair — it is
   cheaper than a new mechanism and it settles something.
-- **Cover the map.** An operator no run has ever exercised alone is worth more than a fourth
-  variation on a combination already characterised.
+- **Cover the map, and you are now shown it.** The coverage block lists what has never been tried. An
+  operator nothing exercises is reachable only with `add_op`; an untried implementation only with
+  `set_impl`. Each is ONE edit and answers a question no retune can. A round that spends eight of
+  eleven slots on one parent has not covered anything.
+- **A retune is not a lesser experiment, but a BLIND retune is.** The reference loop this campaign is
+  measured against is 100% retunes with its architecture pinned, and it produces real science --
+  because its sweep values are chosen relative to a known-good parent and its target metric responds
+  to them. Ours has railed twice (1.022 across ten runs, 1.001 across twelve). If you retune, say
+  which direction you expect and why the metric should move at all.
 - **Do not propose a retune as a mechanism.** If numbers are what you want to move, say so and pose
   it as a sweep of one parameter.
 
