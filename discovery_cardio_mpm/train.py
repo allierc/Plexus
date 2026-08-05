@@ -883,7 +883,12 @@ def main():
             import re as _re
             _m = _re.search(r"model_(\d+)", str(args.resume))
             it = int(_m.group(1)) if _m else 0
-            rd_out = os.path.dirname(os.path.dirname(os.path.abspath(args.resume)))   # the run dir (has checkpoints/)
+            # WRITE WHERE WE WERE TOLD TO. This defaulted to the run directory of the checkpoint it
+            # resumed, which for an archived fit means writing into the archive -- the one place this
+            # campaign has agreed to treat as read-only evidence. An explicit --outdir now wins.
+            rd_out = (os.path.abspath(args.outdir) if args.outdir
+                      else os.path.dirname(os.path.dirname(os.path.abspath(args.resume))))
+            os.makedirs(os.path.join(rd_out, "checkpoints"), exist_ok=True)
             render_ckpt(it, rest, idx, sim_d, real_d, youngs_map, gain_map, theta, dir_grid, rd_out,
                         info=f"{spec.name} redash it {it}", traj_amp=args.traj_amp, theta_dev=theta_dev,
                         microscope=microscope_img)
