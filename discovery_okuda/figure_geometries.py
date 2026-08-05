@@ -45,16 +45,17 @@ COLS = [("protr", "protr"), ("protr_p99", "p99"), ("r_cv", "r_cv"),
         ("n_tubes", "tubes"), ("n_tips", "tips"), ("protrusion_aspect_max", "aspect"),
         ("ray_single_frac", "ray1"), ("shape_idx_p95", "shape95"), ("genus", "genus")]
 
-ORDER = ["sphere", "prolate", "oblate", "undulated", "tubed", "branched", "self_intersecting"]
+ORDER = ["sphere", "prolate", "oblate", "undulated", "tubed", "branched", "multi_tube",
+         "self_intersecting"]
 LABEL = {"sphere": "sphere", "prolate": "prolate (2:1)", "oblate": "oblate (2.5:1)",
          "undulated": "undulated", "tubed": "tube", "branched": "branched",
-         "self_intersecting": "self-intersecting"}
+         "multi_tube": "5 tubes", "self_intersecting": "self-intersecting"}
 
 
 def render():
     from run_tyssue_vesicle import _draw
-    fig = plt.figure(figsize=(15.5, 5.2), facecolor="black")
-    gs = fig.add_gridspec(2, 7, height_ratios=[1.15, 1.0], hspace=-0.06, wspace=0.0,
+    fig = plt.figure(figsize=(17.0, 5.4), facecolor="black")
+    gs = fig.add_gridspec(2, 8, height_ratios=[1.15, 1.0], hspace=-0.06, wspace=0.0,
                           left=0.004, right=0.996, top=0.985, bottom=0.02)
 
     rows = {}
@@ -78,7 +79,7 @@ def render():
     # ---- the numbers, as one table spanning the width
     axt = fig.add_subplot(gs[1, :], facecolor="black")
     axt.axis("off")
-    axt.text(0.004, 0.97, "h", color="white", fontsize=13, fontweight="bold",
+    axt.text(0.004, 0.97, "i", color="white", fontsize=13, fontweight="bold",   # not "h": the last panel is h
              va="top", transform=axt.transAxes)
 
     x0, dx = 0.155, (1.0 - 0.165) / len(COLS)

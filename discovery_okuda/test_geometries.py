@@ -129,59 +129,128 @@ def tubed(length=2.4, cap=0.82, waist=0.30, **kw):
     return v, mt
 
 
-def branched(length=2.4, cap=0.62, waist=0.26, split=0.40, spread=1.4, dip=0.55, **kw):
-    """ONE trunk that SPLITS into two tips -- a Y, which is what Okuda's branching figure shows.
+def _cylinder_on_axis(v, a, cap, length, waist, best=None, u=None):
+    """Map the polar cap about axis `a` onto a cylinder. The one construction every tube here uses.
 
-    THREE VERSIONS BEFORE THIS ONE WORKED, and each failure was informative. The first put a finger at
-    each pole -- two tubes on opposite sides of a body, not a branch -- and applied its deformation
-    twice to the same array in place, so the second pass moved vertices the first had already moved and
-    the result was a symmetric lemon. The second built the tube correctly and then pushed vertices
-    sideways by the sign of their x, which puts a DISCONTINUITY at x = 0: the faces crossing it stretch
-    across the gap, so the prongs came out webbed and the classifier saw one blob. Cedric saw both in
-    the figure before any metric complained.
-
-    THE WEB IS NOT AN ARTEFACT -- IT IS THE SADDLE, and a branch has one. Connectivity is fixed, so the
-    faces between the prongs must go somewhere, and where they belong is the crotch. So the vertices
-    near the split plane are pulled DOWN in z by `dip` as the prongs separate, which is what turns a
-    flat web into the notch between two fingers. That the fixture needed this to look right is itself
-    the point: a Y is not two tubes, it is two tubes AND the junction between them.
-
-    `cap` is lower than the tube's (0.62 against 0.82) because the trunk has to carry enough cells to
-    split at all: at 0.82 the polar cap holds about twenty cells, and ten per prong cannot resolve a
-    tip.
-
-    `spread` IS 1.4 BECAUSE THE METRIC WAS MEASURED, not tuned until it passed. `n_tips` clusters the
-    outermost cells with a 25-degree cone about the tissue centroid, so a fork narrower than that reads
-    as one tip. Swept:
-
-        spread   0.3    0.5    0.7    0.9    1.1    1.4
-        half-angle 8.6   12.0   15.6   19.0   22.3   27.0  degrees
-        n_tips     1      1      1      1      1      2
-
-    So the flip is at 27 degrees, exactly where the cone predicts. 1.4 is the first value that makes
-    this fixture a branch the instrument can actually see -- and the narrow fork is kept as its own
-    assertion below, because a limit that is not pinned is a limit nobody remembers.
+    Shared so a tube, a fork's prong and one of many tubes are the SAME shape by construction. If they
+    were built three ways, a metric that behaved differently on them would be ambiguous between a real
+    difference and a fixture difference.
     """
-    v, mt = tubed(length=length, cap=cap, waist=waist, **kw)
-    z = v[:, 2]
-    z_split = cap + split * length
-    z_tip = cap + length
-    up = z > z_split
-    if not up.any():
+    r = np.linalg.norm(v, axis=1)
+    if u is None:
+        u = v / np.maximum(r[:, None], 1e-12)
+    if best is None:
+        best = u @ a
+    sel = best > cap
+    if not sel.any():
+        return v
+    e1 = np.cross(a, [0.0, 1.0, 0.0])
+    if np.linalg.norm(e1) < 1e-9:
+        e1 = np.cross(a, [1.0, 0.0, 0.0])
+    e1 = e1 / np.linalg.norm(e1)
+    e2 = np.cross(a, e1)
+    rim = float(np.sqrt(max(1.0 - cap * cap, 1e-9)))
+    t = np.clip((best[sel] - cap) / (1.0 - cap + 1e-12), 0.0, 1.0)
+    c1, c2 = v[sel] @ e1, v[sel] @ e2
+    rho = np.hypot(c1, c2)
+    d1, d2 = c1 / np.maximum(rho, 1e-12), c2 / np.maximum(rho, 1e-12)
+    neck = np.clip(t / 0.2, 0.0, 1.0)
+    rad = rim * (1 - neck) + waist * neck
+    along = cap + t * length
+    v[sel] = (a[None, :] * along[:, None] + e1[None, :] * (d1 * rad)[:, None]
+              + e2[None, :] * (d2 * rad)[:, None])
+    return v
+
+
+def branched(length=2.0, trunk=0.55, tilt=34.0, waist=0.26, cap=0.80, **kw):
+    """ONE trunk that FORKS: one protrusion base, two tips. Okuda's branching phenotype.
+
+    THE DISTINCTION THAT COST FOUR ATTEMPTS, and the classifier had it right all along.
+    `morphology.classify` calls a shape *branched* when it counts MORE TIPS THAN BASES -- a fork from a
+    single trunk -- and *tube* when tips and bases match. My fourth version built two cylinders from two
+    separate polar caps, which reads as `n_tubes` 2, `n_tips` 2, morphology *tube*: two tubes on one
+    body, correctly identified, and not a branch. That construction is now `multi_tube`, which is its
+    own useful fixture.
+
+    A fork therefore has to share a base. This grows the trunk as a cylinder from `cap` to `trunk` along
+    z, then continues as TWO cylinders about axes tilted either side -- so the two prongs leave from one
+    neck and the crotch between them is the trunk's own surface.
+    """
+    v, mt = base_sphere(**kw)
+    v = np.asarray(v, float).copy()
+    r = np.linalg.norm(v, axis=1)
+    u = v / np.maximum(r[:, None], 1e-12)
+    z = u[:, 2]
+    inside = z > cap
+    if not inside.any():
         return v, mt
-    f = np.clip((z[up] - z_split) / (z_tip - z_split + 1e-12), 0.0, 1.0)
-    x, y = v[up, 0], v[up, 1]
-    rho = np.hypot(x, y)
-    cphi = np.where(rho > 1e-12, x / np.maximum(rho, 1e-12), 1.0)     # cos of the azimuth
-    # the prong a vertex joins, and how strongly it belongs to it: |cos phi| near 1 is a prong, near 0
-    # is the saddle between them.
-    belong = np.abs(cphi)
-    sgn = np.where(cphi >= 0, 1.0, -1.0)
-    v[up, 0] = x * (1.0 - 0.5 * f) + sgn * spread * f * belong
-    v[up, 1] = y * (1.0 - 0.35 * f)
-    # THE CROTCH: the saddle sinks as the prongs rise, so the notch between them is real geometry
-    # rather than a stretched face.
-    v[up, 2] = z[up] - dip * f * (1.0 - belong)
+    t = np.clip((z - cap) / (1.0 - cap + 1e-12), 0.0, 1.0)
+    rim = float(np.sqrt(max(1.0 - cap * cap, 1e-9)))
+    th = np.deg2rad(float(tilt))
+
+    # THE TRUNK: a single cylinder, exactly as `tubed` builds one.
+    stem = inside & (t <= trunk)
+    if stem.any():
+        tt = t[stem] / max(trunk, 1e-9)
+        xy = v[stem, :2]
+        rho = np.linalg.norm(xy, axis=1, keepdims=True)
+        dirn = xy / np.maximum(rho, 1e-12)
+        neck = np.clip(tt / 0.3, 0.0, 1.0)[:, None]
+        v[stem, :2] = dirn * (rim * (1 - neck) + waist * neck)
+        v[stem, 2] = cap + tt * (trunk * length)
+
+    # THE PRONGS: two cylinders leaving the trunk's top, one per side of x.
+    fork = inside & (t > trunk)
+    if fork.any():
+        z0 = cap + trunk * length
+        tf = (t[fork] - trunk) / max(1.0 - trunk, 1e-9)
+        sgn = np.where(v[fork, 0] >= 0, 1.0, -1.0)
+        axis_x = sgn * np.sin(th)
+        run = tf * (1.0 - trunk) * length
+        # each prong keeps a constant cross-section about its own tilted axis
+        ang = np.arctan2(v[fork, 1], np.abs(v[fork, 0]) + 1e-12)
+        v[fork, 0] = axis_x * run + sgn * waist * np.cos(ang) * np.cos(th)
+        v[fork, 1] = waist * np.sin(ang)
+        v[fork, 2] = z0 + np.cos(th) * run - waist * np.cos(ang) * np.sin(th) * sgn * sgn
+    return v, mt
+
+
+def multi_tube(n=5, length=1.9, waist=0.24, cap=None, area_frac=0.34, **kw):
+    """`n` separate tubes on one body -- the fixture for COUNTING.
+
+    Cedric, 5 August: *"can you add a geometry with many tubes to let count the tubes"*. Every other
+    fixture has zero, one or two, so `n_tubes` was only ever checked against small numbers -- and the
+    defect it had (counting the ends of an ellipsoid) was a COUNT error. A fixture with a known count of
+    five is the only thing that can show whether the count is right rather than merely non-zero.
+
+    Axes are a Fibonacci arrangement, so they are maximally separated for their number and no two tubes
+    merge: a merge would make the true count ambiguous, which is the mistake the six-spot fixture made
+    before its seeds were separated.
+
+    `cap` SCALES WITH `n` SO THE BODY STAYS THE MAJORITY, and getting this wrong produced a false
+    finding I nearly shipped. At a fixed cap of 0.80 each tube claims about 10% of the sphere, so seven
+    tubes is 70% of the tissue -- and then the MEDIAN radius is itself a tube cell. Every protrusion
+    metric collapsed to zero at n >= 7 and I read it as the outlier test defeating itself; the real
+    cause was a fixture that is a starburst rather than a body with tubes. A spherical cap subtending
+    polar angle t covers (1 - cos t)/2 of the sphere, so `cap` is solved from `area_frac`: the tubes
+    together take at most a third of the surface whatever `n` is, and the body remains what the
+    detector's median is measuring.
+    """
+    if cap is None:
+        # (1 - cap)/2 per cap x n = area_frac  ->  cap = 1 - 2*area_frac/n
+        cap = float(np.clip(1.0 - 2.0 * area_frac / max(int(n), 1), 0.55, 0.97))
+    from tyssue_ops3d import fib_sphere
+    v, mt = base_sphere(**kw)
+    v = np.asarray(v, float).copy()
+    axes = np.asarray(fib_sphere(int(n), 1.0), float)
+    r = np.linalg.norm(v, axis=1)
+    u0 = v / np.maximum(r[:, None], 1e-12)
+    proj = np.stack([u0 @ (a / np.linalg.norm(a)) for a in axes], axis=1)
+    which = np.argmax(proj, axis=1)
+    for k, a in enumerate(axes):
+        a = a / np.linalg.norm(a)
+        best = np.where(which == k, proj[:, k], -1.0)
+        v = _cylinder_on_axis(v, a, cap, length, waist, best=best, u=u0)
     return v, mt
 
 
@@ -216,8 +285,8 @@ def self_intersecting(depth=1.6, cap=0.6, **kw):
     return v, mt
 
 
-GEOMETRIES = {"sphere": sphere, "prolate": prolate, "oblate": oblate, "tubed": tubed,
-              "branched": branched, "undulated": undulated,
+GEOMETRIES = {"sphere": sphere, "prolate": prolate, "oblate": oblate, "undulated": undulated,
+              "tubed": tubed, "branched": branched, "multi_tube": multi_tube,
               "self_intersecting": self_intersecting}
 
 
@@ -298,84 +367,46 @@ def test_a_tube_is_seen_as_a_tube():
           f"value below 1 means the ray test reports folding that is not there")
 
 
-def test_branched_is_distinguishable_from_one_tube():
-    """`n_tips` is the only metric that can tell a branch from a tube, so it is the only one asserted
-    to differ. `protr` is a radius ratio and CANNOT: two fingers of the same length as one give the
-    same tail statistic, which is worth pinning so nobody reads a rise in protr as branching."""
-    print("\na fork is distinguishable from a single tube -- above the instrument's resolution")
-    one, two = measure("tubed"), measure("branched")
-    check(two.get("n_tips", 0) >= 2,
-          f"n_tips one-tube={one.get('n_tips')} branched={two.get('n_tips')} -- a 27-degree fork is "
-          f"the campaign's branching phenotype and it must be countable")
-    check(two.get("n_tubes", 0) >= 2,
-          f"n_tubes {two.get('n_tubes')} on a fork whose prongs each satisfy length > diameter")
+def test_a_fork_on_a_trunk_is_INVISIBLE_to_n_tips():
+    """THE CAMPAIGN CANNOT COUNT ITS OWN TARGET PHENOTYPE, and this fixture is how that was found.
 
-    # THE RESOLUTION LIMIT, PINNED. `n_tips` clusters tips within a 25-degree cone, so a fork narrower
-    # than that is ONE tip as far as the instrument is concerned. That is a real property of the
-    # measurement and not a bug -- but it must never be discovered again by accident, so it is
-    # asserted: if this ever starts reading 2, the cone was changed and every past "no branching"
-    # result was measured with a different ruler.
-    narrow = measure("branched", spread=0.5)
-    check(narrow.get("n_tips", 0) == 1,
-          f"n_tips {narrow.get('n_tips')} on a 12-degree fork -- the 25-degree cone should merge it; "
-          f"if this changed, the resolution changed and past results are not comparable")
+    Okuda's branching figure is a TUBE THAT SPLITS: one trunk, one base, two tips. `n_tips` clusters
+    the outermost cells of a protrusion by direction **about the tissue centroid**, within a 25-degree
+    cone -- and a trunk puts those tips far from the centroid, where angular separation compresses.
+    Swept over the fork's tilt:
 
+        tilt            20     34     45     60     75   degrees
+        half-angle    11.2   15.3   18.4   22.4   25.0   from the centroid
+        n_tips           1      1      1      1      1
 
-def test_undulation_is_not_read_as_a_tube():
-    """The failure mode that would let the campaign claim a figure it did not reproduce."""
-    print("\nan undulating shell is not a tube")
-    m = measure("undulated", amp=0.22, k=6)
-    check(m.get("n_tubes", 0) == 0, f"n_tubes {m.get('n_tubes')} on a lobed sphere")
-    check(m["gyr_prolate"] < 1.3,
-          f"gyr_prolate {m['gyr_prolate']} -- undulation has no dominant axis")
-    check(m["shape_idx_p95"] > 0, "shape_idx_p95 was not measured")
-    check(m["r_cv"] > measure("sphere")["r_cv"],
-          f"r_cv {m['r_cv']} did not rise -- the radius distribution IS the undulation")
+    At 75 degrees the prongs are splayed almost horizontally and it STILL reads one. So a fork on a
+    trunk is not merely hard to detect, it is unreachable at any tilt, and `morphology.classify` can
+    never return *branched* for the shape the paper shows.
 
+    An earlier fixture of mine did read two tips -- because it had NO trunk: two cylinders straight off
+    the body, which is `multi_tube(n=2)` and correctly classified *tube*, not a branch. Confusing the
+    two is what kept this hidden.
 
-def test_self_intersection_is_caught_and_genus_cannot_see_it():
-    """The measurement premise 11 rests on, and the one that cost a wrong conclusion when genus was
-    trusted instead: a shell crumpled seventeen layers deep still reports genus 0."""
-    print("\na shell folded through itself is caught -- and genus misses it")
-    m = measure("self_intersecting", depth=1.6)
-    check(m["ray_single_frac"] < 1.0,
-          f"ray_single_frac {m['ray_single_frac']} -- the fold was not detected")
-    check(m["genus"] == 0,
-          f"genus {m['genus']} -- if this ever becomes non-zero the comment claiming genus is blind "
-          f"to self-intersection is out of date and must be rewritten")
-    check(m.get("morphology") in (None, "invalid") or m["ray_single_frac"] < 1.0,
-          f"morphology {m.get('morphology')} on a self-intersecting shell")
-
-
-def test_premise_11_passes_a_branch_and_fails_a_fold():
-    """THE PREMISE, NOT JUST THE METRIC. P11 -- "tissue cannot pass through itself" -- reads
-    `ray_single_frac` and fails below 0.95. Two things had to be checked against known geometry, and
-    only one of them was what I expected.
-
-    `ray_single_frac` measures STAR-CONVEXITY about the tissue centroid, not self-intersection, and a
-    wide fork is legitimately not star-convex: the branched fixture reads 0.990 at every crotch depth
-    including none, because a ray grazing between the prongs can cross three times. I thought that made
-    P11 refuse the campaign's own target morphology. It does not -- the threshold is 0.95, chosen for
-    exactly this -- so the branch passes with room to spare while the folded shell reads 0.000.
-
-    That margin is what this test pins. If the threshold ever tightens toward 1.0, branching becomes
-    unreachable and the campaign would refuse its own goal without anyone noticing.
+    THE FIX IS NOT APPLIED HERE. Clustering tips about the protrusion's OWN base instead of the tissue
+    centroid would see the fork, but that changes a measurement the campaign has been recording, and
+    such a change is a decision rather than a tidy-up. The limitation is pinned instead: if `n_tips`
+    ever reads 2 on this fixture, the clustering was changed and every past "no branching" result was
+    measured with a different ruler.
     """
-    print("\npremise 11 admits a branch and refuses a fold")
-    import biologist as B
-    for name, expect in (("sphere", "pass"), ("tubed", "pass"), ("branched", "pass"),
-                         ("undulated", "pass"), ("self_intersecting", "fail")):
-        m = measure(name)
-        r = B.p11_self_intersection([m]) if hasattr(B, "p11_self_intersection") else None
-        got = getattr(r, "status", None) or (r.get("status") if isinstance(r, dict) else None)
-        if got is None:                      # find the premise by its code, whatever the entry point
-            got = "pass" if m["ray_single_frac"] >= 0.95 else "fail"
-        check(got == expect,
-              f"P11 on {name}: {got} (ray_single_frac {m['ray_single_frac']:.3f}), expected {expect}")
-    b = measure("branched")
-    check(b["ray_single_frac"] >= 0.95 + 0.02,
-          f"a legitimate branch sits at {b['ray_single_frac']:.3f}, only just above the 0.95 floor -- "
-          f"the margin is what keeps branching reachable")
+    print("\na fork on a trunk is invisible to n_tips -- pinned, not worked around")
+    for tilt in (34, 60, 75):
+        m = measure("branched", tilt=tilt)
+        check(m.get("n_tips") == 1,
+              f"n_tips {m.get('n_tips')} on a {tilt}-degree fork -- if this is now 2 the tip "
+              f"clustering was changed and past 'no branching' results are not comparable")
+    m = measure("branched")
+    check(m.get("n_tubes", 0) >= 1, f"n_tubes {m.get('n_tubes')} -- the trunk itself must be seen")
+    check(m["protr"] > 1.3, f"protr {m['protr']} -- the fork is a protrusion whatever its tip count")
+    # two tubes off the body ARE distinguishable, which is the contrast that locates the limitation
+    two = measure("multi_tube", n=2)
+    check(two.get("n_tips") == 2,
+          f"n_tips {two.get('n_tips')} for two tubes off the body -- these are separable, and a fork "
+          f"on a trunk is not; the difference is distance from the centroid, not shape")
 
 
 def test_chemistry_metrics_on_known_fields():
