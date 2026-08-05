@@ -1,0 +1,74 @@
+{
+ "argv": [
+  "/workspace/Plexus/discovery_cardio_mpm/train.py",
+  "/workspace/Plexus/discovery_cardio_mpm/config/material/material_aniso_cardio_fit.yaml",
+  "--seed",
+  "7",
+  "--device",
+  "cuda:1",
+  "--outdir",
+  "/workspace/Plexus/discovery_cardio_mpm/_gradient/f_ph_p1",
+  "--stiff_src",
+  "siren",
+  "--siren_fibre",
+  "1",
+  "--siren_omega",
+  "5",
+  "--allow_nondeterministic_ops",
+  "1",
+  "--learn",
+  "fibre,gain,dur,stiff",
+  "--n_iter",
+  "1",
+  "--loss_probe",
+  "1",
+  "--perturb",
+  "f_ph=0.700249988079071"
+ ],
+ "cwd": "/workspace/Plexus/discovery_cardio_mpm",
+ "host": "e6217cbb65bf",
+ "python": "3.12.12",
+ "git_commit": "ab6d8b97d1ffe9c1bc81025055729c8975a8f115",
+ "git_branch": "main",
+ "campaign_dirty": true,
+ "campaign_dirty_paths": [
+  "iscovery_cardio_mpm/train.py",
+  "discovery_cardio_mpm/_gradient/",
+  "discovery_cardio_mpm/_metrology/gradient_cuda1.json",
+  "discovery_cardio_mpm/gradient.py"
+ ],
+ "sources": {
+  "discovery_cardio_mpm/data.py": "6ad70fd0d350c1fbb12bfaff7349e489321c92ba2fe6b3f12466638467b27df1",
+  "discovery_cardio_mpm/descriptors.py": "8d777a857d906bddb7b24071c1049885840a42b85b431aad2812932645374c11",
+  "discovery_cardio_mpm/determinism.py": "95a7fd657d24e3fbd57fa006917d7edf212af23ed9b5857c6d413dd74b671749",
+  "discovery_cardio_mpm/harmonic_inherited.py": "22c0096966298b1c7f8bdd1f147eb48dfc9bfd9051e12feb0c417da7c6e3b001",
+  "discovery_cardio_mpm/provenance.py": "2f45232bbba398ed34ff9b7f6005909d5329a3e9bf1fe0e703c43f681c5702f0",
+  "discovery_cardio_mpm/split.py": "8ea4cb9cf4dd962e279ef6731d93e898b4a6812b3e596bfe96bd1903bf623715",
+  "discovery_cardio_mpm/train.py": "e6274fd75ae86085c7948a239da8f308e7651349daa1d0729e82c67572d54d4a"
+ },
+ "inputs": [
+  {
+   "label": "recording",
+   "path": "/workspace/Plexus/prototype/cardio_mpm/cardio_real.npz",
+   "sha256": "4070ee2ec5875f1319ac711a0cd761638de4f051b65f2259c445a528f1162d36",
+   "bytes": 54045402,
+   "content_id": "2de5cd27470d92f149b5f57c2e8251b68571c84177d674556fe3828e71c7a5cf"
+  }
+ ],
+ "rng": {
+  "seed": 7,
+  "deterministic": true,
+  "warn_only": true,
+  "CUBLAS_WORKSPACE_CONFIG": ":4096:8",
+  "cudnn_benchmark": false,
+  "torch": "2.9.0+cu128",
+  "cuda": "12.8"
+ },
+ "spec": "material_aniso_cardio",
+ "rng_fingerprint": "3d8b3e67bde72e33",
+ "torch": "2.9.0+cu128",
+ "gpu": [
+  "NVIDIA RTX A6000",
+  "NVIDIA RTX A6000"
+ ]
+}
