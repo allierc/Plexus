@@ -1,0 +1,51 @@
+{
+ "run": "p3_b49_s2_fs2",
+ "fields_present": {
+  "stiff": true,
+  "gain": true,
+  "fibre": true,
+  "prestress": false
+ },
+ "rows": {
+  "": {
+   "loopscore": 0.49873024225234985,
+   "orientation_error": 0.4312199993086011,
+   "chirality_match": 0.83,
+   "peak_excursion": 0.00048771708017925856,
+   "coordination": 0.5821436290816542,
+   "path_length": 0.0010342007515694892
+  },
+  "stiff": {
+   "loopscore": 0.06930653750896454,
+   "orientation_error": 0.5221698366814671,
+   "chirality_match": 0.78,
+   "peak_excursion": 0.0005337176744914982,
+   "coordination": 0.5572996975867294,
+   "path_length": 0.0011795224642491492
+  },
+  "gain": {
+   "loopscore": -0.13621391355991364,
+   "orientation_error": 0.6078426175014626,
+   "chirality_match": 0.58,
+   "peak_excursion": 0.0004621393133841041,
+   "coordination": 0.46250834158064424,
+   "path_length": 0.0008310241062214705
+  },
+  "fibre": {
+   "loopscore": 0.1255345493555069,
+   "orientation_error": 0.5653780029222322,
+   "chirality_match": 0.67,
+   "peak_excursion": 0.0005285597344787896,
+   "coordination": 0.6763911871025562,
+   "path_length": 0.001278524467838724
+  }
+ },
+ "units": {
+  "loopscore": 0.1294297825300854,
+  "orientation_error": 0.02317529376865356,
+  "chirality_match": 0.017084429803802523,
+  "peak_excursion": 4.153914756351469e-05,
+  "coordination": 0.03844894468817567,
+  "path_length": 0.0002104962348062635
+ }
+}
