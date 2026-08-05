@@ -1181,7 +1181,7 @@ specimen, and starts from a composition whose chemistry is alive. What it still 
 protrusion.
 \end{phasebox}
 
-\begin{phasebox}{Phase 12 --- The reduction \hfill \prog}
+\begin{phasebox}{Phase 12 --- The reduction \hfill \done}
 \textbf{Goal.} Take the one-agent loop as the control, and cut this one down to what composition
 actually requires. Not an addition. Cedric, 5 August: \emph{``my feeling is that we should not add
 at this point but remove, loose, look for a simplification.''}
@@ -1673,9 +1673,93 @@ jobs now at frame 110 of 900. Editing it mid-round would reproduce the defect th
 reproduction exactly: trained at one commit, evaluated at another, with the metric redefined in
 between. The refactor waits for round 3 to land.
 
-\textbf{What you get.} A loop of four roles and $\sim$5 calls a round that keeps the three things the
+\subsection*{Built, and what it measures}
+Committed as \code{dc498686}. \textbf{27/27} offline checks and every \code{test\_round.py} check pass.
+
+\begin{center}\small
+\begin{tabular}{lrr}
+\toprule
+ & before & after \\
+\midrule
+the round runner                 & 2{,}504 & \textbf{480} \\
+\quad executable statements      & 1{,}099 & \textbf{478} (round $+$ build $+$ crew) \\
+\code{frame\_metrics}            &   279 & \textbf{63} \\
+\code{tissue\_analysis.py}       &   611 & \textbf{412} \\
+a metric's definition            & 6 places, 4 files & \textbf{1 class} \\
+LLM calls a round                &   153 & $\sim$\textbf{11} \\
+python in \code{discovery\_okuda}& 23{,}725 & \textbf{22{,}251} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent \textbf{Deleted:} \code{round.py} (2{,}504), \code{agents/\{llm\_agents,proposer,metrologist\}.py}
+(1{,}377), the post-hoc gates and two orphan checks (187), \code{predict.py}'s literal blocks
+($\sim$120), dead test cases ($\sim$130). \textbf{Renamed:} \code{engine.py} $\to$ \code{round.py}
+(\emph{engine} belongs to plexus2), \code{tube\_analysis.py} $\to$ \code{tissue\_analysis.py}.
+
+\subsection*{The metrics: 67 defined, 24 in the bank, 5 headline}
+Cedric, 5 August: \emph{``67 quantities is very large, in a previous effort we agreed on 24 \dots hold
+the classes but use only 24 in the loop and point the main important (5) to the agent so that it does
+not go into a given metric / rabbit hole.''}
+
+The registry \emph{defines} 67 because \code{euler}, \code{broken\_n}, \code{ray\_single\_frac} and
+\code{hollow\_frac} were the keys most likely to be computed where nobody could find them. It
+\emph{hands over} 24. And it names five, one per question, so a role reads the whole round before any
+single number acquires an opinion:
+
+\begin{center}\small
+\begin{tabular}{ll}
+\toprule
+\code{protr\_peak}                  & is there a protrusion at all \\
+\code{protrusion\_aspect\_max\_peak}& a finger or a bulge --- what no radius ratio can tell \\
+\code{n\_tubes\_peak}               & did the instrument call it a tube (zero, campaign-wide) \\
+\code{act\_cv\_peak}                & is there a pattern at all \\
+\code{corr\_act\_rad\_peak}         & does the pattern grip the shape --- \emph{the} question \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent \code{metrics.Frame} caches the geometry that used to be built in the middle of the
+expressions using it --- which is the whole reason \code{frame\_metrics} was 279 lines --- and the
+refactor is verified \textbf{bit-identical on three meshes, 66 keys}, including the \code{a\_sw=None}
+fallback. The eight run-level scalars (\code{buf\_full}, \code{mech\_p\_ratio}, \code{Q\_drop}\dots)
+left the bank: they are evidence \emph{context}, and \code{buf\_full} turning true is a result about
+the array, not about biology.
+
+\subsection*{Four defects the work exposed, none of them cosmetic}
+\begin{enumerate}\itemsep3pt
+\item \textbf{No \code{edit\_kind} passed to \code{critic.admit}.} \code{comp\_hash} is
+parameter-blind by design, so once a parent is recorded \emph{every retune of it} would be refused as
+a duplicate --- a sweep impossible, most of a batch dead. Caught by the offline suite's own
+``a sweep is a legal experiment'' case.
+\item \textbf{And then the control.} Fixing that immediately refused slot 0, which \emph{is} the
+parent unchanged --- every round would have lost the one slot that makes the others interpretable,
+while reporting a full batch.
+\item \textbf{A \code{set\_param} on a bare operator name writes a key no operator reads.}
+\code{apply} does \code{g.params[k] = v} with no validation, so \code{rd\_interface\_tension.K\_purse}
+(no node index) runs as an exact copy of the parent and is recorded as an experiment. The live
+Proposer wrote that form on its first real call and seven runs were submitted. Resolved by name where
+unique, and any edit that changes nothing is refused.
+\item \textbf{The redacted menu.} \code{legal\_menu} returns dicts; \code{[list(e) for e in rows]}
+yields their KEYS, so all 57 rows serialised as \code{["edit","label","yields","hash"]}. The Proposer
+said so in its reply --- \emph{``the menu came through fully redacted''} --- and proposed blind.
+\end{enumerate}
+
+\noindent Numbers three and four were found by \emph{reading what the agent said}, not what it
+returned, and both had already reached the cluster.
+
+\subsection*{And one claim of mine that was false}
+The Analyst, given an empty history in a dry run, diagnosed round 2 as ``growth against a frozen shell
+radius'' --- confidently, with numbers. I folded it into \code{round.md} as fact. It is wrong:
+\code{morphogen\_growth\_3d} has rescaled \code{R0} from the target volume since 31 July, five days
+before round 2 ran, and \code{r002c\_03} broke P7 and P11 \textbf{with no growth operator at all}. A
+run that never grows cannot buckle from a growth radius. The real cause was the one already proven ---
+\code{l\_th\_frac} 1.96 in eleven of twelve runs. Both the correction and the false diagnosis are now
+in \code{round.md}, the second so it is not proposed again.
+
+\textbf{What you get.} A loop of four roles and $\sim$11 calls a round that keeps the three things the
 control cannot have --- composition, a structural critic, and an eye --- and drops the eleven that
-were judging without learning. \emph{To be agreed before any of it is committed.}
+were judging without learning.
 \end{phasebox}
 
 \begin{phasebox}{Phase 13 --- The demonstration \hfill \todo}
