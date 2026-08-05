@@ -562,6 +562,50 @@ def check_static(graph, seen_hashes=(), edit_kind=None):
 
 
 # ============================================================================ COMPILE rules
+def range_notes(graph):
+    """Every parameter outside its own declared range, as TEXT. Deliberately not a refusal.
+
+    I WROTE THIS AS A GATE FIRST AND IT REFUSED THE WHOLE CAMPAIGN. `R5_PARAM_OUT_OF_RANGE` has sat in
+    THETA_RULES since the rule list was written, emitted nowhere -- declared, documented, never wired --
+    and wiring it as a rejection refused SIX OF SIX working recipes, including `coral_gate`, the
+    healthiest run on disk (valid_frac 1.0, all ten premises holding, act_cv_peak 2.20).
+
+    Measured across the starting pool:
+
+        reconnect_t1_3d.l_th_frac   6/6 runs   0.35 vs [0.01, 0.12]     3x the ceiling
+        shape_energy_3d.Lambda      3/6        3 vs [0, 0.3]           10x
+        morphogen_growth_3d.rate    3/6        0.000866 vs floor 0.002
+        morphogen_growth_3d.a_sw    1/6        50 vs [0.2, 6]           8x
+        cell_diffuse.d_h            1/6        2 vs [0, 0.346]          6x
+
+    So the declared box does not contain a single working point, and the consequence is worse than a
+    bad gate: the menu handed to the Proposer samples `set_param` INSIDE those boxes, so the search
+    explores a region no working recipe occupies. That is a decision about the search space -- widen
+    the boxes with a derivation, or drop the pretence that they bound anything -- and it is not a
+    decision this function may take on a campaign's behalf.
+
+    It also refutes a claim of mine. `l_th_frac` 1.96 destroys the tissue and 0.28 does not, and BOTH
+    are outside the declared range: the box is not the discriminator. The evidence for 1.96 is the
+    one-parameter revert that fixed it, not its distance from a ceiling.
+    """
+    notes = []
+    for full_key, val in (getattr(graph, "params", None) or {}).items():
+        if not isinstance(val, (int, float)) or isinstance(val, bool):
+            continue
+        node_id, _, key = str(full_key).rpartition(".")
+        op = _op_identity(node_id)
+        tri = (OPERATORS.get(op, {}).get("params") or {}).get(key)
+        if not (isinstance(tri, (tuple, list)) and len(tri) == 3):
+            continue
+        lo, hi = float(tri[0]), float(tri[1])
+        v = float(val)
+        if not (lo <= v <= hi):
+            over = (v / hi) if (hi > 0 and v > hi) else None
+            notes.append(f"{op}.{key}={v:g} outside [{lo:g}, {hi:g}]"
+                         + (f" ({over:.0f}x the ceiling)" if over else " (below the floor)"))
+    return notes
+
+
 def check_compile(graph):
     """Can it become a runnable spec? Cheap, and catches emitter/schedule gaps."""
     import translate as T
@@ -644,190 +688,37 @@ def check_reservoir(spec, graph=None, frames=None):
 
 
 # ============================================================================ POST-HOC rule
-def check_null_difference(rows, control=None):
-    """Refuse the SLOTS whose own scored metric is bit-identical to the control's.
+def observations(summary):
+    """What the run DID, in words -- never a refusal. Cedric, 5 August: an input, not a gate.
 
-    NINE OF TWELVE ROUND-3 RUNS SHARED A SHAPE VECTOR TO SIXTEEN DIGITS -- gyr_prolate_peak
-    1.0461507109415944, r_cv_peak 0.011745760528715305 -- under nine DIFFERENT structural edits:
-    remove cell_react, remove cell_diffuse, remove cell_rd_seed, remove reconnect_t1, swap the
-    reaction, swap the diffusion. Seven of the nine resolved `confirmed`.
+    Everything here used to be a rejection, and every one of them was a RESULT wearing a veto:
 
-    That is one fixed mesh measured nine times under nine names. It happened because both frontier
-    parents had `conns: []` and no growth operator, so the chemistry could not reach the mechanics
-    and the shape was a CONSTANT FUNCTION of the edits being made -- and the surprise rate, the
-    mixture and the cluster freeze were all computed over it.
+      P0_SPECIMEN_INVALID   a broken premise. Fired on 12 of 12 runs in two consecutive rounds
+                            and halted the campaign. A gate that fires on everything carries no
+                            information and costs the round. The premise DETAIL is the most useful
+                            output in the system -- "volume went 522.1 -> 312.9" -- so it now goes
+                            to the next proposal through repair.py instead.
+      P1_INERT_OPERATOR     an operator that changed nothing is a FINDING. "cell_diffuse did
+                            nothing at D=0.002" is knowledge; refusing the run deletes it.
+      P3_CHEMISTRY_DIVERGED nan metrics cannot be scored as confirmed or refuted anyway -- the
+                            arithmetic already refuses itself, so the gate was ceremony.
 
-    KEYED ON THE SLOT'S OWN METRIC, not on every float in the record. The first version compared
-    all of them and flagged 148, because `*_measured_frac` is legitimately 1.0 on every run: a
-    constant is only damning when it is the quantity the SLOT WAS SCORED ON. Comparing each slot's
-    predicted metric against the control's value for that same metric asks the question that
-    matters -- "could this edit have moved the number it was judged by?" -- and answers it in one
-    float comparison.
-
-    Bit-identity, not a tolerance. Two DIFFERENT compositions agreeing to sixteen digits is not a
-    weak effect; it is no effect, and floating-point arithmetic says so more plainly than any
-    threshold chosen by hand.
-
-    `rows` is [(name, comp_hash, summary, metric)]. Returns [(name, metric, value)] for every
-    non-control slot whose metric matches the control's bit for bit.
+    The two mechanisms that DO stop a number being believed are untouched and are both arithmetic:
+    the evidence horizon truncates frames after the mesh tears, and check_reservoir refuses a run
+    that cannot reach its own target before a GPU is touched.
     """
-    ctrl = None
-    for name, ch, summ, metric in rows:
-        if control is not None and name == control:
-            ctrl = (name, summ)
-    if ctrl is None:
-        return []
-    out = []
-    for name, ch, summ, metric in rows:
-        if name == ctrl[0] or not metric:
-            continue
-        a, b = (summ or {}).get(metric), (ctrl[1] or {}).get(metric)
-        if isinstance(a, float) and isinstance(b, float) and a == a and a == b:
-            out.append((name, metric, a))
-    return out
-
-
-# THE HEADLINE SHAPE, and only these. The round-level check below compares a SHORT fixed list
-# rather than every float in the record: `*_measured_frac` is legitimately 1.0 everywhere, and
-# comparing all of them flagged 148 metrics -- noise that hides the finding.
-SHAPE_VECTOR = ("protr_peak", "r_cv_peak", "gyr_prolate_peak", "reduced_volume_floor",
-                "n_cells_final")
-
-
-def check_round_decoupled(rows):
-    """Is the WHOLE ROUND measuring a subsystem the edits cannot reach?
-
-    The slot-level test above asks whether one slot bought nothing. This asks the worse question:
-    whether the round was ever capable of buying anything. Nine of round 3's twelve runs shared
-    gyr_prolate_peak to sixteen digits under nine different structural edits, because both frontier
-    parents had `conns: []` and no growth operator -- so the chemistry could not reach the
-    mechanics and the shape was a constant of the edits being made.
-
-    A round in that state produces confirmations (seven of the nine) and they are all artefacts of
-    one fixed mesh. Returning the largest identical group is enough to refuse the batch: if a
-    majority of slots cannot be distinguished by their own shape, the round is not an experiment.
-    """
-    import collections
-    best = (0, None, [])
-    for m in SHAPE_VECTOR:
-        buckets = collections.defaultdict(list)
-        for name, ch, summ, _metric in rows:
-            v = (summ or {}).get(m)
-            if isinstance(v, float) and v == v:
-                buckets[repr(v)].append((ch, name))
-        for _v, members in buckets.items():
-            if len({c for c, _ in members}) >= 2 and len(members) > best[0]:
-                best = (len(members), m, sorted(n for _, n in members))
-    return best
-
-
-def check_posthoc(summary):
-    """After the run: was this actually evidence? (D4 + the saturation guard.)
-
-    Static checks cannot see this. An operator can satisfy every type rule and still never act --
-    because `after_frame` was never reached, a reservoir was exhausted, or a threshold was never
-    crossed. Recording such a run as evidence is how a search manufactures a false impossibility.
-    """
-    out = []
-    # THE SPECIMEN VERDICT MUST GATE THE RESOLVER, NOT ONLY THE PROSE. The Biologist writes
-    # `premises_broken` into the summary and this function never read it -- so a run that passed
-    # through itself (P11), or absorbed area by stretching (P7), was scored `confirmed` or
-    # `refuted` in hypotheses.jsonl while collector.py:355 wrote "specimen invalid, so this
-    # describes the configuration and not a tissue" into analysis.md about the SAME run.
-    #
-    # Measured by an external review of the last campaign: 14 of 15 spent runs have a non-empty
-    # premises_broken, and 13 of the 14 conclusive verdicts in the register come from those runs.
-    # Two records of the same experiment disagreed about whether it was evidence, and the
-    # Supervisor reads the register -- so the surprise rate, the 70/30 steer, the cluster freeze
-    # and the lever map were all computed over runs the Biologist had already rejected.
-    #
-    # `certain` grade only. A premise can fire on a judgement call, and a hard refusal on those
-    # would throw away real evidence; a tissue that passed through itself is not a judgement call.
-    _broken = summary.get("premises_broken") or []
-    _certain = [b for b in _broken if not str(b).endswith("?")]
-    if _certain:
-        out.append(Rejection("P0_SPECIMEN_INVALID",
-                             "the Biologist refused this specimen before it was scored",
-                             f"premises broken: {', '.join(str(b) for b in _certain[:5])}"
-                             f"{' ...' if len(_certain) > 5 else ''} -- a prediction about a "
-                             f"tissue that broke a premise is a prediction about the "
-                             f"configuration, not about biology. analysis.md already said so; "
-                             f"the register used to disagree."))
+    obs = []
     for op in (summary.get("inert_operators") or []):
-        out.append(Rejection("P1_INERT_OPERATOR",
-                             "a scheduled operator never acted -- the run is not evidence",
-                             op))
-    # P2 -- SATURATION IS A CENSORED MEASUREMENT, NOT A VOID ONE.
-    #
-    # This voided the whole run, and that threw away real trajectory: on 3 August it discarded
-    # FIVE of twelve slots -- the entire wk_* family -- each of which had grown, patterned and
-    # been measured for hundreds of frames before it met the array. What is not readable off a
-    # saturated run is its FINAL cell count, which is a property of the buffer. Everything the
-    # run did before the wall happened, and the shape it reached is the shape it reached.
-    #
-    # So: refuse it only if it saturated so early that there is no run to speak of. Otherwise
-    # admit it with the bound stated, and let the claim checker refuse conclusions that rest on
-    # the censored quantity. A lower bound is evidence; treating it as no evidence is how a
-    # campaign loses 42% of a batch and calls it rigour.
+        obs.append(f"{op} changed nothing measurable -- a null result for that operator")
+    for p in (summary.get("premises_broken") or []):
+        obs.append(f"premise {p} broken")
+    if summary.get("chemistry_diverged"):
+        obs.append("the chemistry diverged (metrics are nan and cannot be scored)")
     if summary.get("saturated"):
-        _frac = summary.get("saturated_frac_of_run")
-        if isinstance(_frac, (int, float)) and _frac < 0.25:
-            out.append(Rejection(
-                "P2_BUFFER_SATURATED",
-                "the run met its cell buffer in the first quarter, so almost nothing was "
-                "measured before the array decided the answer",
-                f"n_cells={summary.get('n_cells_final')} at {_frac:.0%} of the run"))
-        else:
-            summary["censored"] = True
-            summary["censored_reason"] = (
-                f"n_cells_final={summary.get('n_cells_final')} is a LOWER BOUND: the vertex "
-                f"reservoir filled"
-                + (f" at {_frac:.0%} of the run" if isinstance(_frac, (int, float)) else "")
-                + ". Growth measurements after that frame describe the array.")
-
-    # P3 -- THE CHEMISTRY DIVERGED. This is where the reaction ceiling went.
-    #
-    # The parameter boxes used to reject an absurd reaction rate for free, before any compute.
-    # That guard was removed on purpose: the bound was an arbitrary hand-written number, and the
-    # rule now is that a bound is either PHYSICAL AND DERIVED or absent. The diffusion limit is
-    # derivable and is still enforced up front; the reaction one is not (measured -- see
-    # composition_space.reaction_stiffness, "NOT a stability criterion").
-    #
-    # But "no arbitrary cap" must not become "no protection". We cannot say in advance which rate
-    # diverges; we can say with certainty that a run whose chemistry went non-finite is not
-    # evidence about a mechanism. So the guard moves from a guess before the run to a measurement
-    # after it. Gierer-Meinhardt at rate 100 reaches ~4e13 within 300 steps, so this fires.
-    for key in ("act_max_final", "act_max_peak", "protr_peak", "protr_final"):
-        v = summary.get(key)
-        if v is None:
-            continue
-        try:
-            f = float(v)
-        except (TypeError, ValueError):
-            continue
-        if not math.isfinite(f):
-            out.append(Rejection("P3_CHEMISTRY_DIVERGED",
-                                 "a recorded quantity is not finite -- the integration blew up, "
-                                 "so this run is evidence about numerics, not biology",
-                                 f"{key}={v}"))
-        elif key.startswith("act_max") and f > ACT_DIVERGED:
-            out.append(Rejection("P3_CHEMISTRY_DIVERGED",
-                                 "the activator exceeded every physical scale -- the reaction "
-                                 "integration is diverging", f"{key}={f:.3g} > {ACT_DIVERGED:g}"))
-    if summary.get("act_nan"):
-        out.append(Rejection("P3_CHEMISTRY_DIVERGED",
-                             "the activator field contains NaN", "act_nan=True"))
-    return out
+        obs.append("the cell count saturated on its reservoir")
+    return obs
 
 
-# The activator is a concentration of order 1 in every kinetics we run (Gray-Scott saturates
-# near 1, Gierer-Meinhardt's steady state is O(1)). Three orders of magnitude above that is not a
-# strong pattern, it is a diverging integration. Deliberately loose: this is a divergence
-# detector, not a quality bar.
-ACT_DIVERGED = 1e3
-
-
-# ============================================================================ the gate + menu
 def admit(graph, seen_hashes=(), compile_check=True, edit_kind=None):
     """(ok, [Rejection]). The whole static+compile gate."""
     rej = check_static(graph, seen_hashes, edit_kind=edit_kind)

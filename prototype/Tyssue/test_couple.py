@@ -16,7 +16,7 @@ import tyssue_ops3d, tyssue_rd_ops, tyssue_t1_ops3d  # noqa
 import plexus.schema as S
 from plexus.engine import run as engine_run
 from tyssue_ops3d import build_sphere_mesh
-from tube_analysis import frame_metrics
+from tissue_analysis import frame_metrics
 import run_tyssue_fig5 as F
 
 R, J, SEED, CELLS, FR = 5.0, 0.16, 0, 150, 150

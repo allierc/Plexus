@@ -262,7 +262,17 @@ def _emit_react(g, n, ga):
     base = {"op": "cell_react", "at": "cell", "implementation": impl,
             "rate": float(_p(g, i, "rate")) * RD_PER_FRAME}   # D5: physical time, not substeps
     if impl == "gierer_meinhardt":
-        base.update({"gm_rho": 1.0, "mu_a": 1.0, "mu_h": float(_p(g, i, "mu_h")),
+        # `sat` MUST BE EMITTED OR IT DOES NOT EXIST. It was added to OPERATORS' tunable table and
+        # to okuda_route's parameters, and neither had any effect: this emitter is what writes the
+        # spec, and it did not pass the key. Measured after that "fix": r002c_11 still reported
+        # act_max_peak = 9.51e5, the identical unsaturated value. A parameter set in the search
+        # space and dropped by the translator is a parameter that only exists in the record.
+        #
+        # Meinhardt's saturation kappa in a^2/(h(1 + kappa a^2)). At 0 the autocatalysis is
+        # unbounded, which refused 10 of 15 runs in the previous campaign as
+        # P3_CHEMISTRY_DIVERGED; 0.1 caps the activator at 1489 with alive_frac 0.375.
+        base.update({"sat": float(_p(g, i, "sat")),
+                     "gm_rho": 1.0, "mu_a": 1.0, "mu_h": float(_p(g, i, "mu_h")),
                      "a0": float(_p(g, i, "a0"))})
     elif impl == "gray_scott":
         base.update({"F": float(_p(g, i, "F")), "kk": float(_p(g, i, "kk"))})

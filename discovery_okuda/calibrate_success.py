@@ -15,9 +15,9 @@ here from SHAPES OF KNOWN ASPECT RATIO, with no simulator in the loop. Sampling 
 surface of an analytic capsule isolates the metric from the vertex model entirely: whatever this
 file reports is a property of the RULER, not of the thing being measured.
 
-THE METRIC IS NOT REIMPLEMENTED HERE. `protrusion_ratio` is imported from `tube_analysis`, which
+THE METRIC IS NOT REIMPLEMENTED HERE. `protrusion_ratio` is imported from `tissue_analysis`, which
 is the single definition shared by `run_one.protr_of` (vertex positions) and
-`tube_analysis.frame_metrics` (cell centroids), and `_protr` below is asserted equal to
+`tissue_analysis.frame_metrics` (cell centroids), and `_protr` below is asserted equal to
 `run_one.protr_of` on a random point set at import time. A calibration performed against a
 lookalike formula would calibrate nothing.
 
@@ -47,7 +47,7 @@ sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(ROOT, "src"))
 sys.path.insert(0, os.path.join(ROOT, "prototype", "Tyssue"))
 
-from tube_analysis import protrusion_ratio                            # noqa: E402  THE definition
+from tissue_analysis import protrusion_ratio                            # noqa: E402  THE definition
 
 
 def _protr(points):
@@ -202,7 +202,7 @@ def main():
     print("=" * 92)
     print("CALIBRATING protrusion = percentile(r,95) / median(r)   [r = distance from centroid]")
     print("=" * 92)
-    print(f"metric provenance : tube_analysis.protrusion_ratio -- {_assert_same_metric_as_run_one()}")
+    print(f"metric provenance : tissue_analysis.protrusion_ratio -- {_assert_same_metric_as_run_one()}")
     print(f"sampling          : {N_MC:,} points, uniform BY AREA on the analytic surface; no simulator")
 
     # -------------------------------------------------------------- the null

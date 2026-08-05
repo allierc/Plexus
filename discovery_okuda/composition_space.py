@@ -94,7 +94,7 @@ CLOCK_COUPLED = {                       # param -> how to convert an archived va
 #   CORRECTION (same day): the evidence I cited for this was a FALSE DISCREPANCY OF MY OWN
 #   MAKING. I compared our r95/median metric -- which I had misnamed `aspect` -- against the
 #   report's "aspect ~7.5" for round_40_mc8, which is tube_len/tube_diam. Two different
-#   quantities. tube_analysis.py:89 calls r95/median `protr`, and ours is now named `protr` too.
+#   quantities. tissue_analysis.py:89 calls r95/median `protr`, and ours is now named `protr` too.
 #   The re-anchored replay recovered the archived CELL COUNT (2927 vs ~2700); whether it recovers
 #   the archived tube_len/tube_diam is being measured with the archive's OWN metric bank.
 #   vcap's rate-coupling therefore remains UNTESTED -- neither proven nor disproven. Which is

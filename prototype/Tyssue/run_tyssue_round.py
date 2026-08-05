@@ -23,7 +23,7 @@ from tyssue_ops3d import face_geometry_3d
 from tyssue_specfmt import write_spec
 from run_tyssue_vesicle import _draw, _draw_cross, make_movie_axes, draw_movie_frame
 from tyssue_diag import hollow_flags
-from tube_analysis import analyze
+from tissue_analysis import analyze
 import torch
 
 CKPT = os.path.join(HERE, "archive", "smoke_hom", "ckpt.npz")

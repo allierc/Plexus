@@ -1,0 +1,152 @@
+# The round, as a graph. Cedric, 5 August: "what about a graph provided to the round with agents
+# and information flow so that it is blind ... that would be easy to modify, easy to understand
+# instead of hardcoding?"
+#
+# THIS FILE IS THE MULTI-AGENT DESIGN. Not a diagram of it -- the thing itself. The round loads it,
+# checks it, sorts it and runs it, and holds no opinion about what any node is for.
+#
+# WHY A GRAPH RATHER THAN THE THREE HARD-CODED STAGES IT REPLACES. The defect this campaign hit at
+# least six times is A PRODUCER WITH NO CONSUMER: something computed, written to disk, and never
+# handed to the role that needed it. `steer` never reached the Proposer. The premise diagnosis was
+# spent on a refusal. `sat` was set in two places and emitted in none. The eye disagreed with the
+# Reader on 2 of 10 runs and nothing compared them. Every one of those was found by hand, weeks
+# later. As a graph it is arithmetic: a node that emits something no `in:` names is unreachable, and
+# `engine.load_flow()` says so at load time, before a GPU or a token is spent.
+#
+#   id      the node's name, and the default name of what it emits
+#   code    a function in round.py, called as fn(ctx) -> value
+#   agent   a module in crew/, run as its ROLE says
+#   in      what it is given. Every name must be emitted by some node, or the flow is refused
+#   out     what it emits, if not its own id. Omit for a terminal node that only writes files
+#   each    fan out: run once per item of the named list, not once for the batch
+#   writes  the files this node produces. Declaring it marks the node TERMINAL, so the
+#           producer-with-no-consumer check accepts that nothing reads its return value
+#   args    values merged into the context for that node only -- how a campaign decision is
+#           declared here rather than hard-coded in round.py
+#
+# TO CHANGE THE LOOP, EDIT THIS FILE. Dropping the eye is deleting four lines. Adding a fifth role
+# is adding four, plus its .py and .md. Neither touches round.py -- which is the test the design
+# has to pass, because the eleven roles Phase 12 removes were each ADDED by editing the engine.
+
+nodes:
+
+  # ---- what the round starts from ------------------------------------------------
+  # WHERE ROUND 1 STARTS. Nothing in the first version of this flow said, so on a fresh campaign the
+  # parent set was empty and nothing could be built -- a missing node, found by trying to launch.
+  # These are Cedric's choices, each with a spec and a measured diag.json on disk. After round 1 the
+  # campaign's own records supersede them.
+  - id: parents
+    code: round.parents
+    args:
+      # EVERY ENTRY REBUILDS AND ADMITS. Checked by `round.py --check`, because the first version of
+      # this pool did not: two of its six entries were inadmissible and it took a live Proposer call
+      # to find out. All were measured, not remembered -- metrics come from each run's own diag.json.
+      pool:
+        - refute_coral_nocons      # 1.169 -- the best admissible protrusion on disk
+        - coral_gate               # 1.145, act_cv_peak 2.20, alive 1.00, branched: the working chemistry
+        - repair_l_th_frac         # 1.113, act_cv_peak 4.97 -- the l_th_frac revert, premises hold
+        - wk_pressure_pos_s0       # 1.110 -- a different mechanical arm
+        - coral_gate_div           # division on the working chemistry, act_cv_peak 2.20
+        - cfl_c000p080_d002p000    # 1.006 -- a CFL-safe baseline
+      #
+      # THREE ENTRIES REMOVED AFTER MEASURING THEM, each for its own reason and none of them a
+      # rebuild artifact -- I checked all three against their own spec_run.yaml on disk:
+      #
+      #   round40_mc8             protr_peak 1.899, the highest on disk, and NOT USABLE. Its spec
+      #                           carries `alpha`, which the space renamed to `hill`, so the rebuild
+      #                           fails C2_COMPILE_FAILED. An alias would fix it and Cedric has ruled
+      #                           aliases out as hacks. It also has NO chemistry metrics at all
+      #                           (act_cv_peak absent) -- it predates the metric bank, so its 1.899 is
+      #                           not comparable to anything this campaign measures.
+      #   p1_ph_coral_fixed_ball  chi 65.0 against a stability limit of 2.0 -- 32x over. It ran and
+      #                           its premises held, but R1c is right: the chemistry advanced 65 per
+      #                           frame, so the run is evidence about an integrator.
+      #   cellfix_B_new           `morphogen_growth_3d` with NO reaction-diffusion operator anywhere,
+      #                           so nothing produced morphogen and the growth operator was inert.
+      #                           Its 1.054 is mechanics only.
+
+  - id: history
+    code: round.history
+
+  - id: metric_bank
+    code: round.metric_bank
+
+  - id: menu
+    code: round.menu
+    in: [parents]
+
+  # A CHILD THAT BROKE A PREMISE ITS PARENT HOLDS differs from it in a small enumerable set of ways,
+  # so each difference is a hypothesis and reverting exactly one is a legal one-edit experiment.
+  # Round 2 had both halves on disk and nothing joined them. This edge is that join.
+  - id: diagnosis
+    code: round.diagnosis
+    in: [parents]
+
+  # ---- propose -------------------------------------------------------------------
+  - id: proposer
+    agent: proposer
+    in: [parents, menu, metric_bank, diagnosis, history]
+    out: edits
+
+  # ---- build, launch, measure ----------------------------------------------------
+  - id: build
+    code: round.build_all
+    in: [edits, parents]
+    out: specs
+
+  - id: launch
+    code: round.launch
+    in: [specs]
+    out: names
+
+  - id: measure
+    code: round.measure_all
+    in: [names]
+    out: metrics
+
+  - id: control
+    code: round.control_of
+    in: [specs, metrics]
+
+  - id: score
+    code: round.score
+    in: [specs, metrics]
+    out: predictions
+
+  # The premise verdicts and null results as TEXT, never as a refusal.
+  - id: observations
+    code: round.observations_of
+    in: [metrics]
+
+  - id: morphology
+    code: round.morphology_of
+    in: [metrics]
+
+  # ---- observe: one call per run -------------------------------------------------
+  # The only role that looks at the picture. It disagreed with both the metric and the text roles on
+  # 2 of 10 runs last round, and it is the cheapest node here at 3.7% of the budget.
+  - id: eye
+    agent: eye
+    in: [metrics]
+    each: names
+    out: observed
+
+  # ---- review: one call over the batch -------------------------------------------
+  - id: analyst
+    agent: analyst
+    in: [control, metrics, predictions, observations, observed, history]
+
+  - id: grounder
+    agent: grounder
+    in: [metrics, morphology, observed]
+
+  # ---- the record is written by the engine, never by an agent ---------------------
+  # `writes:` is how a node declares itself TERMINAL -- it produces files, not data the graph needs.
+  # Without it the load check refuses this node, which is exactly right: on the flow's first load it
+  # said "'record' emits 'record' and NO node consumes it", and the honest answer is that its output
+  # is a file rather than an edge. A terminal node has to say so, otherwise the check would have to
+  # stay silent about every genuine dead end and would catch nothing.
+  - id: record
+    code: round.record_all
+    in: [specs, metrics, predictions]
+    writes: campaign/records.jsonl

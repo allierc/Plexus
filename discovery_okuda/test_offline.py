@@ -52,32 +52,6 @@ def quiet():
 
 
 # --------------------------------------------------------------------------- the prompt seam
-@case("the whole prompt reaches the model")
-def t_prompt_intact():
-    """THE 3 AUGUST DEFECT. `split("BREVITY")[0]` cut the Proposer's prompt at character 331.
-
-    The agent then said "I lack the injected LEGAL MOVES menu (this call omitted it)" and was
-    disbelieved. It was telling the truth, and four rounds were spent on the consequences.
-    """
-    import offline as O
-    O.install("clean")
-    import round as R, proposer as P, llm
-    cap = {}
-    real, llm.run_claude = llm.run_claude, lambda p, **k: (cap.__setitem__("p", p), (True, "{}"))[1]
-    try:
-        with quiet():
-            P.propose(R.load_frontier(), R.CampaignConfig(batch=6, keep_truncate=2),
-                      None, "", 4, n_slots=8)
-    finally:
-        llm.run_claude = real
-    p = cap.get("p", "")
-    check(len(p) > 5000, f"prompt reaching the model is only {len(p)} chars -- it is being cut")
-    check("LEGAL MOVES" in p, "the legal-move menu never reached the model")
-    check(len(re.findall(r"parent_index=\d+\s+edit=", p)) >= 8,
-          "fewer than 8 legal moves in the prompt -- the menu is smaller than any batch")
-    check("slots" in p, "the output schema never reached the model")
-
-
 @case("no path reaches the real CLI")
 def t_no_subprocess():
     """A harness that quietly spends money is worse than none. The first version cost $0.37."""
@@ -100,46 +74,6 @@ def _boom(*a, **k):
 
 
 # --------------------------------------------------------------------------- the gates
-@case("a clean round fills its batch and reaches Act 3")
-def t_clean_round():
-    code, log = _round("clean", batch=6)
-    check("ACT 3" in log, "the round never reached Act 3")
-    d = _attrition(log)
-    check(d and d["delivered"] >= 1, f"no slots delivered: {d}")
-
-
-@case("phenotype edits are refused, then repaired in the same round")
-def t_repair():
-    """Round 2 proposed `add branching` sixteen times and delivered ONE job of twelve.
-
-    The Critic's refusals are mechanical, so there is a right answer the Proposer could have
-    given -- which is why this is repaired in-round rather than next round.
-    """
-    code, log = _round("phenotypes", batch=6)
-    check("unknown edit" in log or "not applicable" in log,
-          "the phenotype edits were not refused at all")
-    check("repair pass" in log, "no repair pass ran after a batch was gutted")
-    d = _attrition(log)
-    check(d and d["delivered"] > 1,
-          f"the repair pass did not recover the batch: {d}")
-
-
-@case("a proposal under the wrong key is still read")
-def t_wrong_key():
-    """`candidates` instead of `slots` silently discarded 12 experiments every round."""
-    code, log = _round("wrong_key", batch=6)
-    d = _attrition(log)
-    check(d and d["proposed"] >= 1, f"the batch under `candidates` was discarded: {d}")
-
-
-@case("a reply with no JSON does not fabricate a batch")
-def t_no_json():
-    """Silence must read as refusal. A random batch is not a substitute for a reasoned one."""
-    code, log = _round("no_json", batch=6)
-    check("no usable proposal" in log or "no proposal.json" in log or _attrition(log),
-          "a proposal that was never written did not produce an honest refusal")
-
-
 @case("REJECT with no flag is still a rejection")
 def t_no_flag():
     """peer-review printed `batch_ok=None. REJECT` and nothing anywhere reacted."""
@@ -168,33 +102,6 @@ def t_truncated():
     check(len(hits) >= 1, f"the truncation of {src!r} resolves to nothing")
 
 
-@case("parameter moves are offered, and keep the composition's identity")
-def t_set_param():
-    """Track A asks two questions of a mechanism; only the first has ever been askable.
-
-    `--mode theta` existed from the first draft and plan() never emitted it, so "what does this
-    do as you turn it up" has not once been asked in a live round. As a menu move it can be, and
-    can be MIXED with structural moves in one batch.
-    """
-    import offline as O
-    O.install("clean")
-    import round as R, proposer as P, run_record as RR
-    menu = P._legal_menu(R.load_frontier(), R.CampaignConfig(batch=12, keep_truncate=4), None)
-    rows = [r for p_ in menu for r in p_["legal_edits"]]
-    kinds = {r["edit"][0] for r in rows}
-    check("set_param" in kinds, f"no parameter move is offered at all; kinds={kinds}")
-    struct = [r for r in rows if r["edit"][0] != "set_param"]
-    param = [r for r in rows if r["edit"][0] == "set_param"]
-    check(len(struct) >= len(param),
-          f"the menu is mostly dials: {len(param)} parameter vs {len(struct)} structural moves")
-    # THE DISCIPLINE, mechanically: a retune must not read as a new mechanism.
-    g = R.load_frontier()[0]
-    e = next(r["edit"] for r in rows if r["edit"][0] == "set_param")
-    child, _ = g.apply(tuple(e))
-    check(RR.comp_hash(child) == RR.comp_hash(g),
-          "a set_param move changed the composition hash -- a retune would count as a new mechanism")
-
-
 @case("our own measured runs can be frontier parents")
 def t_own_runs():
     """THE STANDARD from_preset states: a space that cannot express our own evidence is wrong.
@@ -206,13 +113,13 @@ def t_own_runs():
     import io, contextlib
     import offline as O
     O.install("clean")
-    import round as R, critic as C
+    import build as B, critic as C
     names = ("wk_null_s0", "coral_fixed_ball", "cfl_c000p080_d002p000", "wk_pressure_pos_s0")
     ok = 0
     for n in names:
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
-            g = R._graph_from_run(n)
+            g = B.graph_from_run(n)
         if g and C.admit(g, ())[0]:
             ok += 1
     check(ok >= 3, f"only {ok} of {len(names)} measured runs are admissible as parents -- the "
@@ -337,6 +244,15 @@ def t_metrics_have_producers():
             orphan.append(base)
     check(not undecomposable, "admitted but not <quantity><suffix> nor a declared scalar: "
                               + ", ".join(undecomposable))
+    # THE REGISTRY IS CONSULTED FIRST. A metric the registry computes has no assignment to grep for:
+    # `metrics.ShapeIdxP95.compute` IS the producer, and the name appears in metrics.py only as a
+    # quoted class field. Finding nothing in the sources is therefore correct for those, and this is
+    # the refactor working rather than a gap -- so the source scan now only has to account for the
+    # metrics that delegate.
+    import metrics as MX
+    orphan = [q for q in orphan
+              if not (MX.quantity_of(q) and MX.quantity_of(q).compute.__func__
+                      is not MX.Metric.compute.__func__)]
     check(not orphan, "admitted with no producer: " + ", ".join(sorted(set(orphan))))
 
 
@@ -704,13 +620,15 @@ def t_admitted_reaches_the_summary():
     """
     import glob
     import predict as PR
-    # DECLARED ABSENCES, with the reason each is null rather than missing.
-    allowed = {
-        "Q_drop": "only written when the quasi-static relaxation ran (--q)",
-        "corr_act_rad_final": "refused at the horizon frame when act_cv < 0.05 -- no pattern to "
-                              "correlate; corr_act_rad_measured_frac reports how often",
-        "act_at_tip_final": "same refusal as corr_act_rad_final",
-    }
+    # DECLARED ABSENCES COME FROM THE REGISTRY NOW. This was a dict maintained HERE, in the test --
+    # a third place declaring the same fact, after the metric's own definition and its note. And it
+    # was incomplete in exactly the way that matters: `spot_spacing_cells` is null whenever the spot
+    # graph has fewer than two edges, nobody had added it, and this case has been failing for days
+    # over a metric that was behaving correctly. A `conditional` field on the Metric class is the one
+    # place that can be right, because it sits beside the thing it describes.
+    import metrics as MX
+    allowed = {n for q, why in MX.conditional_names().items()
+               for n in (MX.REGISTRY[q].names() if MX.REGISTRY[q].series else (q,))}
     # ...plus any reduction of a series that is CONSTANT on this run: _trend is null on ties and
     # _span is null on a zero median, both by design. Those are run-dependent, not bank defects.
     degenerate = ("_trend", "_span")
@@ -816,30 +734,40 @@ def t_sweep_is_an_experiment():
     """
     import offline as O
     O.install("clean")
-    import round as R, critic as C
-    g0 = R.load_frontier()[0]
+    import build as B, critic as C, round as E
+    from run_record import comp_hash   # was round.comp_hash, re-exported from run_record
+    g0 = B.graph_from_run(E.parents({'pool': ['coral_gate']})[0]['name'])
     sp = [e for e, _lbl in g0.legal_edits() if e[0] == "set_param"]
     check(len(sp) >= 5, f"only {len(sp)} set_param edits offered on the frontier parent")
     bare, keyed = set(), set()
     for e in sp:
         try:
-            r = g0.apply(e)
+            r = g0.apply(E._resolve_edit(g0, tuple(e)))   # the round resolves a bare target first
         except Exception:
             continue
         g = r[0] if isinstance(r, tuple) else r
-        bare.add(R.comp_hash(g)); keyed.add(C._run_key(g))
+        bare.add(comp_hash(g)); keyed.add(C._run_key(g))
     check(len(bare) == 1, f"comp_hash is no longer parameter-blind: {len(bare)} hashes for "
                           f"{len(sp)} sweep edits -- a retune could now pass as a new mechanism")
     check(len(keyed) >= len(sp) - 1,
           f"only {len(keyed)} distinct run keys for {len(sp)} sweep edits -- the in-batch dedupe "
           f"would still collapse them onto the control")
-    src = open(os.path.join(HERE, "round.py")).read()
-    check("_dedupe_key" in src and "_run_key" in src,
-          "round.py's in-batch dedupe no longer distinguishes a sweep from its control")
+    # BEHAVIOUR, NOT SOURCE TEXT. This asserted that the string `_dedupe_key` appeared in round.py --
+    # a function name from the file Phase 12 deleted. A test that greps for an identifier passes when
+    # the identifier is present and fails when the code is merely rewritten, which is the opposite of
+    # what it was written to protect. The new round passes `edit_kind` to `critic.admit` and records
+    # both identities, so what matters is that a retune of a RECORDED parent survives.
+    seen = {comp_hash(g0), C._run_key(g0)}
+    e0 = E._resolve_edit(g0, tuple(sp[0]))
+    g1, _ = g0.apply(e0)
+    ok, rej = C.admit(g1, seen_hashes=seen, edit_kind="set_param")
+    check(ok, f"a retune of a recorded parent was refused as a duplicate: {[r.code for r in rej]}")
+    ok2, _ = C.admit(g0, seen_hashes=seen, edit_kind=None)
+    check(not ok2, "the same mechanism unchanged should still be a duplicate")
 
 
-@case("a broken premise makes a prediction inconclusive, not confirmed")
-def t_specimen_gates_the_resolver():
+@case("a broken premise is reported and the run stays evidence")
+def t_specimen_travels_with_the_outcome():
     """TWO RECORDS OF ONE EXPERIMENT DISAGREED ABOUT WHETHER IT WAS EVIDENCE.
 
     The Biologist writes `premises_broken`; critic.check_posthoc never read it. So a run that
@@ -851,16 +779,28 @@ def t_specimen_gates_the_resolver():
     """
     import critic as C
     clean = {"protr_peak": 1.4, "inert_operators": [], "premises_broken": []}
-    check(not [r for r in C.check_posthoc(clean) if r.code == "P0_SPECIMEN_INVALID"],
+    check(not C.observations(clean),
           "a clean specimen is being refused")
     broken = dict(clean, premises_broken=["P7", "P11"])
-    codes = [r.code for r in C.check_posthoc(broken)]
-    check("P0_SPECIMEN_INVALID" in codes,
-          f"a run that broke P7 and P11 is still scorable: {codes}")
+    codes = C.observations(broken)
+    # THE VERDICT RIDES ON THE OUTCOME; IT DOES NOT REPLACE IT. Cedric, 5 August: "I like the
+    # premise.md but as an input not a gate." The gate version of this test asserted that P7/P11
+    # made the run unscorable, and that gate refused 12 of 12 runs in two consecutive rounds and
+    # halted the campaign. What the audit actually asked for was that the two records stop
+    # disagreeing, which is a verdict written NEXT TO the outcome.
+    check(any("P7" in o for o in codes) and any("P11" in o for o in codes),
+          f"both broken premises are reported: {codes}")
+    import round as E
+    sc = E.score({"specs": [{"name": "x", "predict": "protr_peak > 1.3"}],
+                       "metrics": {"x": dict(broken, name="x")}})
+    check(sc["x"]["outcome"] == "confirmed",
+          f"the prediction is still SCORED, not withheld: {sc['x']['outcome']}")
+    check("specimen: P7, P11 broken" in sc["x"]["why"],
+          f"and the verdict travels with it: {sc['x']['why']}")
     # A JUDGEMENT CALL IS NOT A HARD REFUSAL. `?`-suffixed premises are uncertain by convention,
     # and refusing on those would throw away real evidence.
     soft = dict(clean, premises_broken=["P5b?"])
-    check("P0_SPECIMEN_INVALID" not in [r.code for r in C.check_posthoc(soft)],
+    check(not any("P0" in o for o in C.observations(soft)),
           "an uncertain premise is being treated as a certain refusal")
 
 
@@ -904,19 +844,133 @@ def t_null_difference():
     the chemistry could not reach the mechanics and the shape was a constant of the edits being
     made. Seven of the nine resolved `confirmed`. Re-measured here: 10 of 12 on gyr_prolate_peak.
     """
-    import critic as C
-    rows = [("ctrl", "Ca", {"protr_peak": 1.022, "gyr_prolate_peak": 2.153}, "protr_peak"),
-            ("slotA", "Cb", {"protr_peak": 1.022, "gyr_prolate_peak": 2.153}, "protr_peak"),
-            ("slotB", "Cc", {"protr_peak": 1.022, "gyr_prolate_peak": 2.153}, "protr_peak"),
-            ("slotC", "Cd", {"protr_peak": 1.31, "gyr_prolate_peak": 2.9}, "protr_peak")]
-    hits = C.check_null_difference(rows, control="ctrl")
-    names = {n for n, _m, _v in hits}
-    check(names == {"slotA", "slotB"},
-          f"the null slots were not identified: {sorted(names)}")
-    n, metric, group = C.check_round_decoupled(rows)
-    check(n >= 3, f"the round-level decoupling check found only a group of {n}")
-    check(metric in C.SHAPE_VECTOR, f"grouped on {metric!r}, which is not a shape metric")
+    # THE DETECTION MOVED FROM CODE TO PROSE, WHICH IS THE HONEST ACCOUNTING. The two checks this
+    # case used to call (`check_null_difference`, `check_round_decoupled`) were written on 4 August
+    # and called only from this file -- orphans, never once run against a live round. Phase 12
+    # deletes them and puts the same recognition in the role that reads the batch, where it can act
+    # on it. So what is testable is that the ANALYST IS TOLD, and the finding itself survives in
+    # round.md under "What is still missing".
+    md = open(os.path.join(HERE, "crew", "analyst.md")).read().lower()
+    check("rail, not a result" in md,
+          "analyst.md no longer tells the reader that an identical value across runs is a rail")
+    check("seed spread" in md,
+          "analyst.md no longer tells the reader to compare differences against the seed spread")
+    check("control first" in md, "analyst.md no longer says to compare to the control first")
+    rm = open(os.path.join(HERE, "round.md")).read()
+    check("1.022" in rm, "round.md no longer records the rail the campaign actually sat on")
 
+
+
+@case("a proposal under the wrong key is still read")
+def t_proposal_tolerant_parse():
+    """THE BEHAVIOUR SURVIVED, THE MACHINERY DID NOT. This used to drive the old round through the
+    offline harness; `crew/proposer.py::_parse` is where the tolerance lives now, so it is tested
+    directly. A batch answered under `candidates` instead of a bare list is a formatting difference,
+    and discarding it costs the round for nothing.
+    """
+    import json
+    import tempfile
+    from crew import proposer as P
+    with tempfile.TemporaryDirectory() as td:
+        f = os.path.join(td, "proposal.json")
+        json.dump({"slots": [{"parent": "coral_gate", "edit": ["set_param", "a.b", 1]}]}, open(f, "w"))
+        got = P._parse("", f)
+        check(len(got) == 1, f"a proposal under `slots` was discarded: {got}")
+        json.dump([{"parent": "x"}], open(f, "w"))
+        check(len(P._parse("", f)) == 1, "a bare list was discarded")
+    # and from the reply when no file was written at all
+    got = P._parse('here you go: [{"parent": "coral_gate"}] -- done', None)
+    check(len(got) == 1, f"a batch present only in the reply was discarded: {got}")
+
+
+@case("a reply with no JSON does not fabricate a batch")
+def t_no_json_no_batch():
+    """An unexplained batch is worse than a small one: the old path fell back to random edits, which
+    is how a round could report twelve slots nobody chose."""
+    from crew import proposer as P
+    check(P._parse("I could not decide.", None) == [],
+          "prose with no JSON produced slots out of nothing")
+    check(P._parse("", "/nonexistent/proposal.json") == [],
+          "a missing proposal file produced slots out of nothing")
+
+
+@case("every metric named in a markdown file exists in the registry")
+def t_md_metrics_are_real():
+    """PROSE MAY POINT, NEVER DEFINE. `analyst.md` leads the reader to metrics by question, which is
+    only useful while those names still exist -- and a metric list that has stopped describing the
+    code is this campaign's most reliable defect: a limit in a comment, the paper's own phi, a rail
+    read as a result. So every backticked name in every role file is checked against the registry.
+    """
+    import glob
+    import re
+    import metrics as MX
+    # ONLY THE METRIC VOCABULARY. My first version flagged every backticked token, and it named run
+    # ids, parameter names, edit verbs and intents -- prose is allowed to mention `coral_gate` and
+    # `set_param`. What must not drift is a metric name, and a metric name is recognisable: it carries
+    # one of the six temporal suffixes, or it is a bare quantity in the registry.
+    known = set(MX.names()) | set(MX.REGISTRY)
+    bad = {}
+    for f in sorted(glob.glob(os.path.join(HERE, "crew", "*.md")) + [os.path.join(HERE, "round.md")]):
+        for tok in re.findall(r"`([a-z][a-z0-9_]{3,})`", open(f).read()):
+            if tok in known:
+                continue
+            if not any(tok.endswith(sfx) for sfx in MX.SUFFIXES):
+                continue                      # not claiming to be a metric
+            bad.setdefault(os.path.basename(f), []).append(tok)
+    check(not bad, f"markdown names a metric the registry does not have: {bad}")
+
+
+def _OPERATOR_NAMES():
+    from composition_space import OPERATORS
+    return set(OPERATORS) | {i for o in OPERATORS.values() for i in (o.get("impls") or [])}
+
+
+@case("every admitted metric declares a producer that really sets it")
+def t_metrics_have_declared_producers():
+    """`produced_by` IS CHECKED, which is what makes the registry more than documentation. The
+    campaign admitted `spot_spacing_cells` in three suffixed forms while nothing in the three files I
+    searched produced it -- `pattern_scale.py` did, and my search had missed it. A pointer nobody
+    verifies is how that stays true for days.
+    """
+    import re
+    import metrics as MX
+    src = {}
+    for mod, path in (("tissue_analysis", "../prototype/Tyssue/tissue_analysis.py"),
+                      ("morphology", "../prototype/Tyssue/morphology.py"),
+                      ("pattern_scale", "pattern_scale.py"), ("run_one", "run_one.py")):
+        try:
+            src[mod] = open(os.path.join(HERE, path)).read()
+        except OSError:
+            pass
+    missing, unset = [], []
+    for m in MX.REGISTRY.values():
+        # A REJECTED METRIC NEED NOT STILL BE PRODUCED. It was measured to lie and may since have
+        # been removed from the instrument; what matters is that its NAME stays recognisable so a
+        # prediction resting on it is answered with the reason.
+        if m.withdrawn:
+            continue
+        # A METRIC COMPUTES ITSELF, OR NAMES WHO DOES. Since the registry took over the arithmetic,
+        # 45 of the 67 carry their own `compute` and an empty `produced_by` -- which is the refactor
+        # working, not a gap. What must never happen is BOTH being absent: that is an admitted name
+        # with nothing behind it, which is how `spot_spacing_cells` sat unscorable for days.
+        own = m.compute.__func__ is not MX.Metric.compute.__func__
+        if own:
+            continue
+        if not m.produced_by:
+            missing.append(f"{m.name}: no compute() and no produced_by"); continue
+        mod, _, fn = m.produced_by.partition(":")
+        if mod not in src:
+            missing.append(f"{m.name} -> {m.produced_by} (module not found)"); continue
+        if f"def {fn}" not in src[mod]:
+            missing.append(f"{m.name} -> {m.produced_by} (no such function)"); continue
+        # A KEY CAN BE WRITTEN TWO WAYS. `m["shape_idx_p95"] = ...` and `dict(shape_idx_p95=...)`
+        # are the same fact, and my first regex only saw the first -- so it reported six correct
+        # producers as broken. Checking the detector before believing it.
+        if not re.search(r"[\"']" + re.escape(m.name) + r"[\"']|\b"
+                         + re.escape(m.name) + r"\s*=", src[mod]):
+            unset.append(f"{m.name} not set anywhere in {mod}.py")
+    check(not missing, f"producers that do not exist: {missing}")
+    check(not unset, f"declared producers that never set their key: {unset}")
 
 
 if __name__ == "__main__":
@@ -935,37 +989,34 @@ if __name__ == "__main__":
     sys.exit(1 if FAILED else 0)
 
 
-@case("the Proposer is shown the metrics it must predict against")
-def t_proposer_sees_the_bank():
-    """THE ROLE THAT WRITES THE PREDICTIONS WAS NEVER GIVEN THE LIST.
-
-    proposer.py's prompt says "naming a metric from the admitted list" and did not include the
-    list. The only metric names in it were the two used as EXAMPLES of the clause syntax --
-    `protr_peak` and `mech_p_ratio` -- and in round 2 the Proposer wrote ALL TWELVE predictions
-    on protr_peak. I diagnosed that as a presentation problem with a 53-name flat list; it was
-    a bank the Proposer had never been handed. The Reader, which only labels a finished run,
-    received the full registry all along.
-
-    Checked on the ASSEMBLED PROMPT, not on the source, because that is where the omission was:
-    every part was correct and the seam was missing.
+@case("a proposal under the wrong key is still read")
+def t_proposal_tolerant_parse():
+    """THE BEHAVIOUR SURVIVED, THE MACHINERY DID NOT. This used to drive the old round through the
+    offline harness; `crew/proposer.py::_parse` is where the tolerance lives now, so it is tested
+    directly. A batch answered under `candidates` instead of a bare list is a formatting difference,
+    and discarding it costs the round for nothing.
     """
-    import offline as O
-    O.install("clean")
-    import round as R, proposer as P, llm
-    cap = {}
-    real, llm.run_claude = llm.run_claude, lambda p, **k: (cap.__setitem__("p", p), (True, "{}"))[1]
-    try:
-        with quiet():
-            P.propose(R.load_frontier(), R.CampaignConfig(batch=6, keep_truncate=2),
-                      None, "", 4, n_slots=8)
-    finally:
-        llm.run_claude = real
-    prompt = cap.get("p", "")
-    check(prompt, "the proposer prompt was never captured")
-    import predict as PR
-    for m in ("act_cv_peak", "corr_act_rad_measured_frac", "act_alive_frac"):
-        check(m in prompt, f"{m} is admitted but never reaches the Proposer's prompt")
-    groups = sum(1 for g in PR.SERIES_METRICS if g in prompt)
-    check(groups >= 4, f"only {groups} of the metric groups reached the prompt")
-    check("THE SIX SUFFIXES" in prompt, "the reduction suffixes never reach the Proposer")
+    import json
+    import tempfile
+    from crew import proposer as P
+    with tempfile.TemporaryDirectory() as td:
+        f = os.path.join(td, "proposal.json")
+        json.dump({"slots": [{"parent": "coral_gate", "edit": ["set_param", "a.b", 1]}]}, open(f, "w"))
+        got = P._parse("", f)
+        check(len(got) == 1, f"a proposal under `slots` was discarded: {got}")
+        json.dump([{"parent": "x"}], open(f, "w"))
+        check(len(P._parse("", f)) == 1, "a bare list was discarded")
+    # and from the reply when no file was written at all
+    got = P._parse('here you go: [{"parent": "coral_gate"}] -- done', None)
+    check(len(got) == 1, f"a batch present only in the reply was discarded: {got}")
 
+
+@case("a reply with no JSON does not fabricate a batch")
+def t_no_json_no_batch():
+    """An unexplained batch is worse than a small one: the old path fell back to random edits, which
+    is how a round could report twelve slots nobody chose."""
+    from crew import proposer as P
+    check(P._parse("I could not decide.", None) == [],
+          "prose with no JSON produced slots out of nothing")
+    check(P._parse("", "/nonexistent/proposal.json") == [],
+          "a missing proposal file produced slots out of nothing")

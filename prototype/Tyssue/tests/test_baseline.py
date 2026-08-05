@@ -13,7 +13,7 @@ For each run we record, at frame 0, the midpoint and the final frame:
   * the live cell count nF and vertex count Nv,
   * the closed-surface invariants (closed, V, E, F, Euler characteristic) recomputed from the
     face rings -- Euler must be 2 for a closed sphere,
-  * the FULL tube_analysis.frame_metrics dict (hollow cells, size CVs, protrusion, tube
+  * the FULL tissue_analysis.frame_metrics dict (hollow cells, size CVs, protrusion, tube
     diameter/length/count, cell census),
   * a sha256 HASH of the live float64 vertex positions plus scalar position invariants,
   * the mesh event counters n_div / n_t1 and (rd) the activator statistics.
@@ -28,7 +28,7 @@ cannot change an integer.  Floats are compared with rtol=1e-9 / atol=1e-12: the 
 deterministic torch reductions with seeded numpy RNGs, so a refactor that only moves data
 between containers must reproduce them bit-for-bit; the tolerance exists solely to absorb
 reassociation of a scalar that is read out of a dict instead of an attribute.  Most of the tube
-metrics are already rounded to 3 decimals inside tube_analysis, so they are far coarser than
+metrics are already rounded to 3 decimals inside tissue_analysis, so they are far coarser than
 that anyway.  The position HASH is exact; `--allow-hash-drift` downgrades it to a warning so a
 last-ULP change can be distinguished from a change in the physics (the float invariants recorded
 alongside it stay hard checks either way).
@@ -71,7 +71,7 @@ import tyssue_t1_ops3d         # noqa: F401  reconnect_t1_3d
 import tyssue_rd_ops           # noqa: F401  cell_geometry_3d / cell_adjacency / cell_rd_seed / cell_diffuse / cell_react
 import plexus.schema as S
 from plexus.engine import run as engine_run
-from tube_analysis import frame_metrics
+from tissue_analysis import frame_metrics
 from tyssue_topology_ops3d import rings_from_flat_3d, _check_closed
 
 BASE = os.path.join(HERE, "_baseline")

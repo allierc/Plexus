@@ -84,7 +84,7 @@ def chem_metrics_batch(A, occ_mask, a_sw=0.5):
 def cell_centroids_fast(pt, mt):
     """Per-cell centroids, radius and live mask -- VECTORISED.
 
-    `tube_analysis._cell_centroids` builds the rings as a Python list comprehension over every
+    `tissue_analysis._cell_centroids` builds the rings as a Python list comprehension over every
     face: 29.7 ms for 3,975 cells. This is the same quantity by scatter-add: 1.9 ms, 15x faster,
     and verified bit-identical (max radius difference 0.000e+00, live masks equal) on a real end
     mesh before being used here.
@@ -211,7 +211,7 @@ def main():
           f"({1000*t_cent/T:.2f} ms/frame)", flush=True)
 
     # ---------------------------------------------------------------- tier 3: mesh, coarse
-    from tube_analysis import frame_metrics
+    from tissue_analysis import frame_metrics
     idx = np.unique(np.append(np.arange(0, T, a.mesh_stride), T - 1))
     t0 = time.time()
     mesh = [frame_metrics(posf[t][:hist[t]["Nv"]].astype(np.float64), hist[t],

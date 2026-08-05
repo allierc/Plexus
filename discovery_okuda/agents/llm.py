@@ -118,6 +118,7 @@ EXPENSIVE_TOOLS = ("Bash", "WebFetch", "WebSearch", "Task", "Agent", "NotebookEd
 # under-estimate while the caps are still unproven. They are replaced by this round's own measured
 # spend as soon as the role has been called once.
 EXPECTED_MIN = {"interpreter": 3.2, "reader": 1.1, "watcher": 0.3, "meta_review": 3.3,
+                "eye": 0.4, "analyst": 3.0, "grounder_v2": 0.8,
                 "proposer": 3.0, "archivist": 1.0, "diagnostician": 0.5, "reflection": 0.7,
                 "grounder": 0.1,
                 # added after "OVER CEILING at operator_request (3.0+8 > 10.0)" fired on a role
@@ -202,6 +203,22 @@ AGENT_BUDGETS = {
     # how the x8 argument got imported without the thing that made the argument true.
     "reader":        ( 4,    8,  ["Read"]),                    # one run, one label
     "watcher":       ( 3,    4,  []),                          # text -> JSON, no tools
+    # THE THREE PHASE-12 ROLES, each with its own line so the metrology stays per role.
+    #
+    # `eye` IS NOT `watcher` AND NEEDS A TOOL. The old watcher had none because it never saw an
+    # image: caption_wave.py loaded a local VLM, wrote description.txt, and the watcher judged that
+    # TEXT. The new eye opens `strip.png` itself -- the frame montage every run already writes, 1.6 MB
+    # of actual frames -- which needs `Read` and needs no GPU or model load. Found before the first
+    # live round by checking this table against what eye.md tells the model to do: it said "watch it
+    # with the Read tool" while the budget granted no tools at all.
+    "eye":           ( 4,    6,  ["Read"]),                    # one run, one picture
+    # `analyst` absorbs reader + interpreter + meta_review + collector + diagnostician: one call over
+    # the whole batch, writing analysis.md and knowledge.md. Bigger than any of them because it does
+    # all five jobs and the comparison between runs that none of them could see.
+    "analyst":       (10,   30,  ["Read", "Edit", "Write"]),
+    # `grounder` moved from Act 1 to review and now WRITES grounding.md, which the old entry's
+    # read-only tools would have made impossible.
+    "grounder_v2":   ( 5,   10,  ["Read", "Edit", "Write"]),
     "interpreter":   ( 6,   20,  ["Read", "Edit", "Write"]),   # appends the causal description
     "meta_review":   ( 8,   30,  ["Read", "Edit", "Write"]),   # rewrites the distilled section
     "grounder":      ( 4,    8,  ["Read"]),
