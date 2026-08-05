@@ -95,8 +95,23 @@ def tube_diameter(pt, mt, prot_frac=1.3):
             continue
         ax = c["dir"]; P = cen[c["idx"]]
         perp = P - np.outer(P @ ax, ax)                      # component perpendicular to the tube axis
-        diams.append(2.0 * float(np.median(np.linalg.norm(perp, axis=1))))
-        lens.append(float((P @ ax).max() - rbody))
+        d = 2.0 * float(np.median(np.linalg.norm(perp, axis=1)))
+        L = float((P @ ax).max() - rbody)
+        # A TUBE IS LONGER THAN IT IS WIDE. Without this the count is "how many groups of cells sit far
+        # from the centre", which on any ELONGATED body is just its ends: a 2:1 ellipsoid with no
+        # protrusion at all reported n_tubes = 3, because both polar caps pass r > 1.3*median and the
+        # greedy angular clustering splits a broad cap into several. Measured by
+        # test_geometries.py::test_prolate_is_elongated_without_a_protrusion, on a fixture whose shape
+        # is known by construction.
+        #
+        # THE THRESHOLD IS THE DEFINITION, not a tuned constant. length/diameter > 1 says the feature
+        # extends further than it spans -- which is what distinguishes a finger from a bulge, and is
+        # the same distinction `protrusion_aspect_max` reports as a magnitude. A hand-picked number
+        # here would be the alpha-ceiling mistake again.
+        if L <= d:
+            continue
+        diams.append(d)
+        lens.append(L)
     return dict(tube_diam=round(float(np.median(diams)), 3) if diams else 0.0,
                 n_tubes=len(diams), tube_len=round(float(np.median(lens)), 3) if lens else 0.0)
 

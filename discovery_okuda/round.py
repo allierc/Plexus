@@ -253,7 +253,20 @@ def parents(ctx):
                          "premises_broken": m.get("premises_broken") or []})
         print(f"[round] no records yet -- seeding the parent set from {len(rows)} pool entr"
               f"{'y' if len(rows) == 1 else 'ies'}")
-    return [{"name": r["name"], "parent": r.get("parent"), "metrics": r["metrics"],
+    # THE PARENT'S METRICS ARE RESTRICTED TO THE BANK, and this was the biggest single block in the
+    # Proposer's prompt: 45,462 chars against the menu's 27,110, because each parent carried its whole
+    # 103-key summary -- 622 numbers across six parents, of which 218 are diagnostics nobody should
+    # rest a prediction on. Handing a role 622 numbers and then telling it to lead with five is the
+    # rabbit hole Cedric named, built into the prompt rather than into the instructions.
+    #
+    # Restricted: 45,462 -> 13,104 chars. The diagnostics are not lost -- `euler`, `broken_n`,
+    # `ray_single_frac` are still measured, still recorded, still read by the premises and still shown
+    # to the Analyst in the `observations` block. They are simply not part of "here is what this
+    # parent measured" for a role choosing what to try next.
+    import metrics as _M
+    bank = set(_M.names())
+    return [{"name": r["name"], "parent": r.get("parent"),
+             "metrics": {k: v for k, v in r["metrics"].items() if k in bank},
              "premises_broken": r.get("premises_broken") or []} for r in rows[:PARENT_LIMIT]]
 
 
