@@ -621,7 +621,16 @@ def _spec(name):
 
 
 def _seen():
-    """Both identities of every evaluated run, so neither kind of duplicate costs a GPU.
+    """Both identities of every evaluated run, THIS campaign and every archived one.
+
+    THE ARCHIVE IS THE LONG MEMORY AND I WAS NOT READING IT. `reset_campaign` appends the records to
+    `_archive/records.jsonl` and then cleared campaign/, so a fresh launch knew 0 evaluated
+    compositions while 137 sat in the archive -- and would have spent GPUs re-running compositions the
+    previous campaign had already refuted. A reset should forget the NARRATIVE (the analysis, the
+    parent set, the round counter) and not the fact that a GPU-hour was already spent on a given
+    mechanism. Found by Cedric asking what a clean campaign actually clears.
+
+    If replication IS what is wanted, R6's own message says how: request a robustness test explicitly.
 
     TWO KINDS OF IDENTITY IN ONE SET. `comp_hash` answers "has this MECHANISM been built?" and is
     parameter-blind on purpose, so a retune shares its parent's hash. `_run_key` answers "has this
@@ -630,8 +639,10 @@ def _seen():
     serves both. Recording only comp_hash made every sweep look like a duplicate of its own control.
     """
     out = set()
-    if os.path.exists(RECORDS):
-        with open(RECORDS) as f:
+    for path in (RECORDS, os.path.join(HERE, "_archive", "records.jsonl")):
+        if not os.path.exists(path):
+            continue
+        with open(path) as f:
             for line in f:
                 try:
                     r = json.loads(line)
