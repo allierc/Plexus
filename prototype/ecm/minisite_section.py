@@ -120,14 +120,14 @@ def main():
          "the control: a growing, dividing epithelium presses into a soft fibrous matrix and stays a "
          "SPHERE (oblateness 1.01) at ~6,000 cells. First contact at frame 32; by the end 89% of the "
          "matrix is strained and the front has reached the wall of the box"),
-        ("52_aniso_growth_oblate", "vertex_mpm_grown", "grown into an ovoid",
-         "the matrix is 3x denser within 55 deg of the vertical and resists 2.6x harder there, so "
-         "<code>ecm_growth_gate_3d</code> slows the cell cycle at the poles. The sphere GROWS into an "
-         "ovoid instead of being pressed into one: oblateness 1.22"),
-        ("58_oblcav_oblate", "vertex_mpm_grown_oblate", "ovoid from first contact",
-         "an OBLATE cavity, so the tissue meets the fibres at its poles first and the stress is "
-         "directional from first contact -- pole/equator 14.7, against 1.5 for a round cavity. "
-         "Oblateness 1.43, grown in all three axes. Nothing presses on it"),
+        ("58_oblcav_oblate", "vertex_mpm_grown_oblate", "GROWN into an ovoid",
+         "an oblate cavity, so the tissue meets the fibres at its poles first and the matrix resists "
+         "there 14.7x harder. <code>ecm_growth_gate_3d</code> slows the cell cycle where it resists, so "
+         "the sphere GROWS to oblateness 1.43. Nothing presses on it"),
+        ("43_plate_blk75", "vertex_mpm_pressed", "PRESSED between two planes",
+         "the other way to the same shape: two solid planes fill 75% of the box, and blocked in one "
+         "axis the epithelium grows into the other two -- oblateness 2.08. It also divides 4,000 times "
+         "instead of 6,000: confinement suppresses proliferation"),
     ]
     runs = [(d, f"{v}.mp4", lbl, os.path.join(LOG, d, "spec_run.yaml"), cap)
             for d, v, lbl, cap in R3]
