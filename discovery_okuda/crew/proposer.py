@@ -30,7 +30,7 @@ for _p in (ROOT, os.path.join(ROOT, "agents")):
 from . import _prompt
 
 ROLE = {
-    "wants": ["parents", "menu", "metric_bank", "diagnosis", "history", "n_slots"],
+    "wants": ["parents", "menu", "metric_bank", "coverage", "diagnosis", "history", "n_slots"],
     "writes": "proposal.json",
     "md": "proposer.md",
 }
@@ -75,6 +75,8 @@ def run(bundle):
         ("Every edit the critic will admit, by parent", bundle.get("menu"),
          {"limit": 90000}),
         ("The metric bank -- the only names a prediction may use", bundle.get("metric_bank")),
+        ("What the campaign has NEVER tried -- an operator or implementation here answers a question "
+         "no retune can", bundle.get("coverage")),
         ("What went wrong last round, and the cheapest way to find out why",
          bundle.get("diagnosis"), {"as_json": False}),
         ("What previous rounds concluded", bundle.get("history"), {"as_json": False,
