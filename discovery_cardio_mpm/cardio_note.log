@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  5 AUG 2026 17:00
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  5 AUG 2026 18:54
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -877,6 +877,12 @@ Overfull \hbox (5.22064pt too wide) in paragraph at lines 943--957
 [18]
 
 [19]
+Underfull \hbox (badness 4886) in paragraph at lines 1191--1195
+[]\T1/cmr/m/it/10.95 A use-ful thing found on the way. \T1/cmr/m/n/10.95 The fo
+r-ward is \T1/cmr/bx/n/10.95 bit-identical \T1/cmr/m/n/10.95 on re-peat
+ []
+
+
 
 [20]
 
@@ -885,19 +891,21 @@ Overfull \hbox (5.22064pt too wide) in paragraph at lines 943--957
 [22]
 
 [23]
-Overfull \hbox (67.4257pt too wide) in paragraph at lines 1336--1370
+
+[24]
+Overfull \hbox (67.4257pt too wide) in paragraph at lines 1403--1437
 [][] 
  []
 
 
 
-[24]
-
 [25]
 
 [26]
 
-[27] (./cardio_note.aux)
+[27]
+
+[28] (./cardio_note.aux)
  ***********
 LaTeX2e <2024-11-01> patch level 2
 L3 programming layer <2025-01-18>
@@ -906,10 +914,10 @@ Package rerunfilecheck Info: File `cardio_note.out' has not changed.
 (rerunfilecheck)             Checksum: E042035BA11E7B7C1C19C092023707B5;2245.
  ) 
 Here is how much of TeX's memory you used:
- 25384 strings out of 475102
- 488905 string characters out of 5764878
+ 25386 strings out of 475102
+ 488928 string characters out of 5764878
  885759 words of memory out of 5000000
- 47957 multiletter control sequences out of 15000+600000
+ 47958 multiletter control sequences out of 15000+600000
  581208 words of font info for 86 fonts, out of 8000000 for 9000
  59 hyphenation exceptions out of 8191
  116i,18n,121p,451b,1016s stack positions out of 10000i,1000n,20000p,200000b,200000s
@@ -935,10 +943,10 @@ r/share/texmf/fonts/type1/public/cm-super/sfti1000.pfb></usr/share/texmf/fonts/
 type1/public/cm-super/sfti1095.pfb></usr/share/texmf/fonts/type1/public/cm-supe
 r/sftt0900.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt1000.pfb></usr
 /share/texmf/fonts/type1/public/cm-super/sftt1095.pfb>
-Output written on cardio_note.pdf (27 pages, 833138 bytes).
+Output written on cardio_note.pdf (28 pages, 839072 bytes).
 PDF statistics:
- 326 PDF objects out of 1000 (max. 8388607)
- 237 compressed objects within 3 object streams
- 43 named destinations out of 1000 (max. 500000)
+ 330 PDF objects out of 1000 (max. 8388607)
+ 240 compressed objects within 3 object streams
+ 44 named destinations out of 1000 (max. 500000)
  98 words of extra memory for PDF output out of 10000 (max. 10000000)
 

@@ -1079,7 +1079,7 @@ axis the objective was blind to for sixty batches and the one \code{coordination
 
 \end{phasebox}
 
-\begin{phasebox}{Phase 3 --- Certify the gradient \hfill \todo}
+\begin{phasebox}{Phase 3 --- Certify the gradient \hfill \prog\ (1 of 5) \ \stopp}
 \textbf{Goal.} Differentiability is this loop's advantage, and right now it is an assumption that is
 false as stated: asked for a gradient through a specification file the library returns
 \emph{nothing}, because nearly every operator turns its settings into plain numbers the moment it is
@@ -1128,8 +1128,75 @@ product can ever be recovered. \emph{An instrument that cannot recover an answer
 judge one we have not.}
 \end{itemize}
 
+\medskip
+\textbf{FIRST RESULTS --- and the second test failed.}
+
+\textbf{Wiring. \dn} \code{train.py -{}-grad\_check} runs one forward and backward and reports what
+came back, before clipping and before stepping. \textbf{36 of 36 learnable tensors receive a
+non-zero gradient}, prestress included --- which mattered immediately, because the prestress
+experiment then running would otherwise have been answering \emph{is this field plumbed in?} while
+reporting an answer to \emph{does the tissue have prestress?} Worth recording: the residual
+gradients are an \textbf{order of magnitude the largest} in the model, $4.7\times10^{4}$ against
+stiffness at $5.2\times10^{3}$.
+
+\textbf{Is the gradient the gradient? \ns\ NO --- and the cause is found.} A central difference
+through the trainer's own forward, at three step sizes, because a ratio near 1 at one step size is
+not proof: a correct gradient \emph{converges} to the finite difference as the step shrinks.
+
+\begin{center}\small
+\begin{tabular}{@{}l r r r r l@{}}
+\toprule
+& \textbf{analytic} & \textbf{$h$} & \textbf{$h/4$} & \textbf{$h/16$} & \\
+\midrule
+\code{raw\_dur} & $-73.3$ & $0.819$ & $0.725$ & $\mathbf{0.939}$ & agrees\\
+\code{raw\_g} & $641.0$ & $1.310$ & $1.309$ & $1.313$ & \textbf{flat at 1.31}\\
+\code{f\_ang} & $1014.6$ & $0.850$ & $0.833$ & $0.721$ & does not converge\\
+\code{f\_amp} & $227.8$ & $0.991$ & $0.979$ & $0.803$ & does not converge\\
+\code{f\_wl} & $-43.7$ & $0.853$ & $1.143$ & $1.173$ & does not converge\\
+\code{f\_ph} & $105.1$ & $1.657$ & $1.731$ & $1.345$ & does not converge\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent \textbf{One of six converges.} \code{raw\_g} is the clearest: three step sizes, ratio
+$1.31$ every time. A flat plateau away from 1 is not truncation error --- it is a gradient that is
+simply wrong, and no step size will rescue it.
+
+\textbf{The cause, and it is one line of the trainer.} The 50-frame warm-up runs under
+\code{no\_grad} with every map \code{.detach()}ed. The state the graded beat starts from therefore
+\emph{does} depend on the parameters, and that dependence is cut out of the graph. \textbf{The
+analytic gradient is a partial derivative holding the warm-up fixed; the loss's true derivative
+includes it.} Tested directly by shrinking the warm-up:
+
+\begin{center}\small
+\begin{tabular}{@{}l r r r@{}}
+\toprule
+\textbf{warm-up} & \textbf{analytic} & \textbf{finite difference} & \textbf{ratio}\\
+\midrule
+50 frames (the default) & $641.0$ & $839.0$ & $1.309$\\
+1 frame & $539.4$ & $572.7$ & $\mathbf{1.062}$\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent Removing the warm-up removes most of the error. \textbf{Every fit this project has ever
+run has been descending a surrogate that differs from its own loss by about 30\% on gain}, and
+nothing in sixty batches could have noticed, because nothing compared the two.
+
+\emph{And this meets the design document's advice from the other direction.} Phase~3 already
+records that a loss should be \textbf{local in space and time}, on cost grounds. A shorter warm-up
+is both cheaper \emph{and} more faithful, which is the rare case where the cheap option is also the
+correct one. The residual 6\% at one frame is not yet explained and is the next thing to chase.
+
+\emph{A useful thing found on the way.} The forward is \textbf{bit-identical} on repeat
+($365.65628051757812$ every time), so the non-determinism that makes two identical fits diverge
+lives entirely in the \textbf{backward}, not in the simulation. That is a different and more
+tractable problem than it looked.
+
+\medskip
 \textbf{Exit gate.} A gradient reaches every learnable setting through the ordinary specification
-path; the classification table is complete with nothing left unconfirmed; the planted settings come
+path; \textbf{the analytic gradient converges to the brute-force one for every connected setting};
+the classification table is complete with nothing left unconfirmed; the planted settings come
 back within their stated error bars and \textbf{both planted traps are caught}.
 
 \textbf{Cost.} About a day, one GPU.
