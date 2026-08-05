@@ -180,11 +180,13 @@ def rerender(out_dir, **kw):
     z = np.load(os.path.join(out_dir, "traj.npz"))
     import ecm_ops
     ecm_ops.STRESS_HISTORY[:] = list(np.asarray(z["stress"]))
+    ecm_ops.STRESS_RAW[:] = list(np.asarray(z["vm"])) if "vm" in z.files else []
     ecm_ops.BALL_RADIUS[:] = list(np.asarray(z["radius"], float))
     out = {"sets": {"mpm_particle": {"pos": np.asarray(z["pos"])}}}
     if "bpos" in z.files:
         import block_ops
         block_ops.BLOCK_STRESS[:] = list(np.asarray(z["bstress"]))
+        block_ops.BLOCK_RAW[:] = list(np.asarray(z["bvm"])) if "bvm" in z.files else []
         out["sets"]["mpm_block"] = {"pos": np.asarray(z["bpos"])}
     render(os.path.basename(out_dir.rstrip("/")), out, spec, out_dir, **kw)
 
@@ -258,8 +260,26 @@ def render_sphere(name, pos, hist, spec, out_dir, cmap, ax_i, centre, T,
     print(f"[{name}] movie.mp4 ({len(keep)} frames, prescribed-sphere layout)", flush=True)
 
 
+def autoscale(raw, pct=99.0, sample=12):
+    """One colour full-scale for the WHOLE run, taken from the run's own distribution.
+
+    NOT PER FRAME. Rescaling each frame to its own maximum makes a growing load and a static one look
+    identical -- the same defect `run_box` fixes for the camera and `ecm_stress` warns about for the
+    palette. But a HAND-PICKED fixed scale has the opposite failure, and runs 47/48 hit it: 0.008
+    resolved the front at frame 200 and left 76% of the matrix saturated at frame 400. Taking a high
+    percentile over frames sampled across the run keeps one scale, chosen by the data, so the top band
+    means "the most stressed material this run produced" instead of "whatever I guessed".
+    """
+    if not len(raw):
+        return None
+    idx = np.unique(np.linspace(0, len(raw) - 1, min(sample, len(raw))).astype(int))
+    v = np.concatenate([np.asarray(raw[i], np.float32).ravel() for i in idx])
+    v = v[np.isfinite(v)]
+    return float(np.percentile(v, pct)) if v.size else None
+
+
 def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True,
-           strip_only=False, frame_limit=None):
+           strip_only=False, frame_limit=None, stress_scale=None, block_scale=None):
     """The okuda artefact pair, with the matrix added: a 4-row strip and a 2-camera movie.
 
     ROWS OF THE STRIP, in the order `log/okuda/cellfix_B_new/strip.png` has them, plus one:
@@ -341,11 +361,28 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True,
         """The block in tissue coordinates, with its own band -- or None if there is no block."""
         if bpos is None:
             return None
-        b = (np.asarray(bhist[t]) if bhist and t < len(bhist)
-             else np.zeros(bpos.shape[1], np.uint8))
+        if braw and t < len(braw):
+            b = (np.clip(np.asarray(braw[t], np.float32) / max(bsc, 1e-12), 0, 1)
+                 * 7).round().astype(np.uint8)
+        else:
+            b = (np.asarray(bhist[t]) if bhist and t < len(bhist)
+                 else np.zeros(bpos.shape[1], np.uint8))
         return ((bpos[min(t, bpos.shape[0] - 1)] - centre) / max(scale, 1e-12), b)
 
+    # THE RAW SCALAR WINS WHERE IT EXISTS. `stress` in traj.npz is already banded and clipped; `vm` is
+    # the number itself, so the scale below is a rendering decision and re-deciding it costs nothing.
+    raw = ecm_ops.STRESS_RAW
+    sc = stress_scale or autoscale(raw)
+    braw = block_ops.BLOCK_RAW if bpos is not None else []
+    bsc = block_scale or autoscale(braw)
+    if sc:
+        print(f"[{name}] stress colour full-scale {sc:.5g} (p99 over the run)"
+              + (f"; block {bsc:.5g}" if bsc else ""), flush=True)
+
     def band_of(t):
+        if raw and t < len(raw):
+            v = np.asarray(raw[t], np.float32) / max(sc, 1e-12)
+            return (np.clip(v, 0, 1) * 7).round().astype(np.uint8)
         return (np.asarray(hist[t]) if hist and t < len(hist)
                 else np.zeros(pos.shape[1], np.uint8))
 
@@ -434,8 +471,10 @@ def run(name, spec, device="cuda:0", movie=True, keep_traj=True, render_kw=None)
     ecm_ops.STRESS_HISTORY.clear()
     ecm_ops.BALL_RADIUS.clear()
     ecm_ops.PRESSURE_HISTORY.clear()
+    ecm_ops.STRESS_RAW.clear()
     import block_ops
     block_ops.BLOCK_STRESS.clear()
+    block_ops.BLOCK_RAW.clear()
     import plexus.schema as S
     from plexus.engine import run as engine_run
 
@@ -457,9 +496,13 @@ def run(name, spec, device="cuda:0", movie=True, keep_traj=True, render_kw=None)
         try:
             import block_ops
             extra = {}
+            if ecm_ops.STRESS_RAW:
+                extra["vm"] = np.asarray(ecm_ops.STRESS_RAW, np.float16)
             if "mpm_block" in out.get("sets", {}):
                 extra["bpos"] = np.asarray(out["sets"]["mpm_block"]["pos"], np.float32)
                 extra["bstress"] = np.asarray(block_ops.BLOCK_STRESS, np.uint8)
+                if block_ops.BLOCK_RAW:
+                    extra["bvm"] = np.asarray(block_ops.BLOCK_RAW, np.float16)
             np.savez_compressed(os.path.join(out_dir, "traj.npz"),
                                 pos=np.asarray(out["sets"]["mpm_particle"]["pos"], np.float32),
                                 stress=np.asarray(ecm_ops.STRESS_HISTORY, np.uint8),
