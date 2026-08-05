@@ -300,9 +300,10 @@ def resolving_power(verbose=True):
     for name, m in M.live().items():
         b = beat.get(name, {})
         f = fit.get(name, {})
-        floors = {k: v for k, v in (("beat_to_beat", b.get("sd")),
-                                    ("same_seed", f.get("same_seed_difference")),
-                                    ("seed_to_seed", f.get("seed_sd"))) if v is not None}
+        floors = {k: float(v) for k, v in (("beat_to_beat", b.get("sd")),
+                                           ("same_seed", f.get("same_seed_difference")),
+                                           ("seed_to_seed", f.get("seed_sd")))
+                  if v is not None and np.isfinite(v)}
         unit = max(floors.values()) if floors else None
         which = max(floors, key=floors.get) if floors else None
         ceiling = b.get("median")
@@ -356,7 +357,14 @@ def promotion_report(verbose=True):
         has_null = m.null is not None
         passed = bool(cert) and name not in bad
         has_beat = name in (beat.get("metrics") or {})
-        has_fit = name in (fit.get("metrics") or {})
+        # THREE floors, not two. A metric's row appearing in noise_fits.json only means SOME fitted
+        # floor was measured -- when repeat_b died of an out-of-memory error every `same seed` cell
+        # read nan and this still reported `fits: yes`, which is the same silence the caption
+        # failure had. Each floor is now checked for itself.
+        frow = (fit.get("metrics") or {}).get(name, {})
+        has_same = np.isfinite(frow.get("same_seed_difference", float("nan")))
+        has_seeds = np.isfinite(frow.get("seed_sd", float("nan")))
+        has_fit = bool(has_same and has_seeds)
         lev = power.get(name, {}).get("levels")
         missing = []
         if m.role != M.EVIDENCE:
@@ -368,12 +376,16 @@ def promotion_report(verbose=True):
             missing.append("the battery")
         if not has_beat:
             missing.append("a beat-to-beat floor")
-        if not has_fit:
-            missing.append("a fitted-noise floor")
+        if not has_same:
+            missing.append("the same-seed floor")
+        if not has_seeds:
+            missing.append("the seed-to-seed floor")
         if lev is not None and lev < M.MIN_LEVELS and m.role == M.EVIDENCE:
             missing.append(f"resolving power ({lev:.1f} steps, {M.MIN_LEVELS:g} required)")
         rows.append({"metric": name, "null": has_null, "battery": passed,
-                     "beat_floor": has_beat, "fit_floor": has_fit, "levels": lev,
+                     "beat_floor": has_beat, "fit_floor": has_fit,
+                     "same_seed_floor": bool(has_same), "seed_floor": bool(has_seeds),
+                     "levels": lev,
                      "eligible": not missing, "missing": missing})
     if verbose:
         print(f"\n{'=' * 100}\n  PROMOTION -- what each metric still lacks before it may be cited"

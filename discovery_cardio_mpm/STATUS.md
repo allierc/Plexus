@@ -157,7 +157,21 @@ recording's. That stays — it is what a person judges.
 
 **THE INSTRUMENTS ARE CLOSED.** Seven measurements a claim may rest on: one name/definition/implementation each, each moves on its declared axis and holds on the other eight, each has a zero measured on six models that know nothing, each has the tissue's own beat-to-beat variation, and six of seven return the right number against a closed form. Every defect is recorded on the class that carries it, with the measurement that found it.
 
-Two things remain and **neither can reverse a decision already taken**: (a) the **fitted floor** — measuring, not deciding; it can only *lower* every `steps` figure, so it can retire an instrument and never promote one. Cost measured: 11.0 s/it alone, 72–85 s/it under a neighbouring session holding four 13 GB jobs on both cards → ~6 h. (b) the **decomposition** — the five `residual/` dimensions, which are five of the six quantities still lacking a zero (the sixth is `loopscore_sd`), and one of which scored its best in the whole null bank on the do-nothing model. That is the same admission procedure again, and it belongs with the loop that consumes it.
+**THE FITTED FLOOR IS MEASURED, and it did what was predicted.** Seed-to-seed spread is **5–15× the beat-to-beat** floor (coordination 0.0384 vs 0.0025; openness 0.0340 vs 0.0030). Working unit = largest floor, so every `steps` fell:
+
+| | beat only | + seeds | |
+|---|---|---|---|
+| `orientation_error` | 10.5 | **10.5** | survives |
+| `chirality_match` | 10.6 | **8.7** | survives |
+| `peak_excursion` | 30.2 | **8.6** | survives |
+| `coordination` | 120.5 | **8.0** | survives |
+| `path_length` | 39.5 | **6.5** | survives |
+| `openness` | 36.6 | 3.3 | **RETIRED** |
+| `interior_r2` | 12.1 | 2.3 | **RETIRED** |
+
+It retired two and promoted none. `openness` is the one calibration had already caught (π/4 for every aspect ratio) — two independent tests condemn it. **Five instruments survive.**
+
+Two caveats: (a) the **same-seed floor is still missing** — that run OOM'd on a card another session filled, so every `same seed` cell read `nan`, and `promotion_report` said *fits: yes* anyway (same silence as the captioner; now checks all three floors separately). Re-running. (b) **Depth is load-bearing**: at 300 iterations the fits have barely learned — `orientation_error` lands at 0.770–0.796 against a null of π/4 = 0.785, `chirality_match` at 0.569–0.606 against a null of 0.5. A spread across models that have not learned is not obviously the spread across models that have. (b) the **decomposition** — the five `residual/` dimensions, which are five of the six quantities still lacking a zero (the sixth is `loopscore_sd`), and one of which scored its best in the whole null bank on the do-nothing model. That is the same admission procedure again, and it belongs with the loop that consumes it.
 
 **Done, 5 of 6:**
 

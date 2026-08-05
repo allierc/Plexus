@@ -932,12 +932,37 @@ Two things remain, and \emph{neither can reverse a decision already taken}:
 \begin{center}\small
 \begin{tabular}{@{}l p{9.6cm}@{}}
 \toprule
-\textbf{the fitted floor} & \emph{measuring, not deciding.} The same seed twice and four different
-seeds, at 300 iterations. It can only \textbf{lower} every \emph{steps} figure above, because the
-working unit is the largest of the three floors --- so it can retire an instrument and it cannot
-promote one, and it cannot change which of them is the objective. Measured cost: $11.0$\,s an
-iteration alone, $72$--$85$ under a neighbouring session holding four 13\,GB jobs across both cards,
-so about six hours rather than one. Not ours to fix, and it is running where it can be watched.\\
+\textbf{the fitted floor} & \emph{measured, and it did what was predicted of it.} The
+seed-to-seed spread is \textbf{5 to 15 times} the tissue's own beat-to-beat variation --- coordination
+$0.0384$ against $0.0025$, openness $0.0340$ against $0.0030$ --- and since the working unit is the
+largest floor, every \emph{steps} figure fell:
+
+\smallskip
+\begin{tabular}{@{}l r r l@{}}
+\toprule
+& \textbf{beat only} & \textbf{with seeds} & \\
+\midrule
+\code{orientation\_error} & $10.5$ & $\mathbf{10.5}$ & survives\\
+\code{chirality\_match} & $10.6$ & $\mathbf{8.7}$ & survives\\
+\code{peak\_excursion} & $30.2$ & $\mathbf{8.6}$ & survives\\
+\code{coordination} & $120.5$ & $\mathbf{8.0}$ & survives\\
+\code{path\_length} & $39.5$ & $\mathbf{6.5}$ & survives\\
+\code{openness} & $36.6$ & $3.3$ & \textbf{RETIRED}\\
+\code{interior\_r2} & $12.1$ & $2.3$ & \textbf{RETIRED}\\
+\bottomrule
+\end{tabular}
+\smallskip
+
+It retired two instruments and promoted none, exactly as claimed --- and \code{openness} is the one
+calibration had already caught reading $\pi/4$ for every aspect ratio, so two independent tests
+condemn it. \textbf{Five instruments survive.} Two caveats, both load-bearing. \emph{The same-seed
+floor is still missing}: its run died of an out-of-memory error on a card another session had filled,
+so every `same seed' cell read \code{nan} --- and the promotion check reported \emph{fits: yes}
+anyway, the same silence as the captioner, now fixed to check each of the three floors separately.
+\emph{And depth is doing real work here}: at 300 iterations the fits have barely learned, with
+\code{orientation\_error} landing at $0.770$--$0.796$ against a null of $\pi/4 = 0.785$ and
+\code{chirality\_match} at $0.569$--$0.606$ against a null of $0.5$. A spread measured across models
+that have not learned is not obviously the spread across models that have.\\
 \addlinespace
 \textbf{the decomposition} & The five \code{residual/} dimensions --- size, orientation, openness,
 chirality, shape-detail --- written into every run's record so step~3 returns \emph{where} the model
