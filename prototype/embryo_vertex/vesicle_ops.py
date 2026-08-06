@@ -10,7 +10,7 @@ adhesion spreads them to tile one layer; cortical tension shrinks the shell so, 
 no longer hold all cells in a single layer, they STRATIFY into a multilayer. Sweeping the shell
 radius (the tension knob) reproduces the monolayer->multilayer transition.
 
-`vesicle_seed`      -- frame-0 IC: place cells on a Fibonacci sphere shell (+ noise).
+`seed_vesicle`      -- frame-0 IC: place cells on a Fibonacci sphere shell (+ noise).
 `vesicle_mechanics` -- radial confinement to the shell (tension sets its radius) + a lumen floor +
                        cell-cell adhesion & steric repulsion over the contact graph; `EMIT=velocity`.
 """
@@ -24,7 +24,7 @@ from plexus.models.base import Lateral, Structural
 from plexus.models.registry import register_operator
 
 
-@register_operator("vesicle_seed", level="cell", kind="structural")
+@register_operator("seed_vesicle", level="cell", kind="structural")
 class VesicleSeed(Structural):
     """Place the cells on a spherical shell (Fibonacci sphere) of radius `radius` about the domain
     centre, with a little radial noise. Gate with `before_frame: 1`."""

@@ -76,7 +76,7 @@ def make_spec(name, p0, cells, Nv):
         "sets": {"vertex": {"n": Nv}},
         "fields": {},
         "operators": [
-            {"op": "mesh_seed", "at": "vertex", "nx": NX, "ny": NY, "a": A, "border": BORDER,
+            {"op": "seed_mesh", "at": "vertex", "nx": NX, "ny": NY, "a": A, "border": BORDER,
              "jitter": JITTER, "p0": p0, "seed": SEED, "before_frame": 1},
             {"op": "shape_energy", "at": "vertex", "p0": p0, "K_A": 1.0, "K_P": 1.0, "Lambda": 0.12,
              "Gamma": 0.05, "mu": 1.0, "dt": 1.0, "relax_iters": 8, "eta": 0.08, "cap_frac": 0.15},
@@ -90,7 +90,7 @@ def make_spec(name, p0, cells, Nv):
             {"op": "t1_transition", "at": "vertex", "l_th": 0.16, "p0": p0, "every": 2},
             {"op": "topo_snapshot", "at": "vertex"},
         ],
-        "schedule": ["mesh_seed", "shape_energy", "apoptosis", "t1_transition", "topo_snapshot"],
+        "schedule": ["seed_mesh", "shape_energy", "apoptosis", "t1_transition", "topo_snapshot"],
     }
     with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as fh:
         yaml.safe_dump(cfg, fh); path = fh.name

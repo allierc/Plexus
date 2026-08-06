@@ -3,7 +3,7 @@
 
 A disordered confluent tissue (jittered cell centres in a periodic box) relaxes under
 the shape energy E = sum K_A(A-A0)^2 + K_P(P-P0)^2 (plexus2 operators in vertex_ops.py):
-tissue_seed -> voronoi_graph (re-tessellate) -> voronoi_tension (force). Cells settle to
+seed_tissue -> voronoi_graph (re-tessellate) -> voronoi_tension (force). Cells settle to
 a foam whose regularity is set by the target shape index p0 (solid below ~3.81, fluid
 above). Renders the Voronoi polygons coloured by shape index p = P/sqrt(A).
 
@@ -35,7 +35,7 @@ except Exception:
     pass
 
 import plexus.operators   # noqa: F401
-import vertex_ops         # noqa: F401  tissue_seed + voronoi_graph + voronoi_tension
+import vertex_ops         # noqa: F401  seed_tissue + voronoi_graph + voronoi_tension
 from vertex_ops import cell_polygons
 import plexus.schema as S
 from plexus.engine import run as engine_run
@@ -61,13 +61,13 @@ def make_spec(name, p0, v0):
         "sets": {"cell": {"n": N}},                  # default spatial state (pos/vel); overdamped
         "fields": {},
         "operators": [
-            {"op": "tissue_seed", "at": "cell", "a0": A0, "jitter": 0.2, "lattice": "triangular",
+            {"op": "seed_tissue", "at": "cell", "a0": A0, "jitter": 0.2, "lattice": "triangular",
              "before_frame": 1},
             {"op": "voronoi_graph", "at": "cell"},
             {"op": "voronoi_tension", "at": "cell", "p0": p0, "A0": A0, "K_A": 1.0, "K_P": 1.0,
              "mu": 1.0, "v0": v0, "Dr": 1.0, "dt": DT},
         ],
-        "schedule": ["tissue_seed", "voronoi_graph", "voronoi_tension"],
+        "schedule": ["seed_tissue", "voronoi_graph", "voronoi_tension"],
     }
     with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as fh:
         yaml.safe_dump(cfg, fh); path = fh.name

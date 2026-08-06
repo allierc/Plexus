@@ -16,7 +16,7 @@ FINITE tissue via GHOST boundary points, giving the paper's two initial tissues:
     shell so the central cavity (lumen) stays open.
 
 Operators:
-  tissue_seed_3d     (structural) -- seed a ball (no lumen) or a shell (vesicle); init V0
+  seed_tissue_3d     (structural) -- seed a ball (no lumen) or a shell (vesicle); init V0
   voronoi_graph_3d   (rewire)     -- Delaunay cell-cell adjacency (the RD graph, for coupling)
   voronoi_tension_3d (lateral)    -- 3D shape-energy force on the centres (EMIT=velocity)
 """
@@ -214,7 +214,7 @@ def delaunay_edges_3d(pos_np, lumen, pad):
 # --------------------------------------------------------------------------- #
 #  Seed: ball (no lumen) or shell/vesicle (with lumen)
 # --------------------------------------------------------------------------- #
-@register_operator("tissue_seed_3d", set="cell", kind="structural", family="growth")
+@register_operator("seed_tissue_3d", set="cell", kind="structural", family="growth")
 class TissueSeed3D(Structural):
     """Frame-0 IC (`before_frame: 1`): place N cell centres as a solid BALL (`lumen: false`,
     compacted aggregate) or a monolayer SHELL (`lumen: true`, vesicle around a cavity) of

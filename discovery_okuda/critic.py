@@ -790,7 +790,7 @@ if __name__ == "__main__":
     print(" ", check_static(bad))
 
     print("\n-- R3: present but unconnected == inert, and looks deliberate --")
-    d, _ = seed("substrate").apply(("add_op", "cell_rd_seed", "cone"))
+    d, _ = seed("substrate").apply(("add_op", "seed_cell_rd", "cone"))
     d, _ = d.apply(("add_op", "morphogen_growth_3d", "hill_conserve_amount"))
     print(" ", [r for r in check_static(d) if r.code == "R3_DANGLING_SLOT"])
 

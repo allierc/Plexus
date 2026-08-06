@@ -77,12 +77,12 @@ def base_config():
     ops = {o["op"]: o for o in c["operators"]}
     # chemistry, at the calibrated values (F012)
     rd = [{"op": "cell_adjacency", "at": "cell"},
-          {"op": "cell_rd_seed", "at": "cell", "seed": 0, "before_frame": 3,
+          {"op": "seed_cell_rd", "at": "cell", "seed": 0, "before_frame": 3,
            "mode": "scatter", "seed_frac": 0.06},
           {"op": "cell_diffuse", "at": "cell", "d_a": 0.08, "d_h": 0.16, "chi": 1.3},
           {"op": "cell_react", "at": "cell", "implementation": "gray_scott",
            "F": 0.046, "kk": 0.062, "rate": 1.0}]
-    order = ["seed_mesh_3d", "cell_geometry_3d", "cell_adjacency", "cell_rd_seed", "cell_diffuse",
+    order = ["seed_mesh_3d", "cell_geometry_3d", "cell_adjacency", "seed_cell_rd", "cell_diffuse",
              "cell_react", "shape_to_chem", "morphogen_growth_3d", "shape_energy_3d",
              "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
     c["operators"] = [ops["seed_mesh_3d"], ops["cell_geometry_3d"]] + rd + \

@@ -60,9 +60,9 @@ def measure_V0(R, N, lumen):
     cfg = {"general": {"name": "seed", "seed": 0, "n_frames": 1, "dt": 0.02, "boundary": "free",
                        "dim": 3, "world": [W, W, W]},
            "sets": {"cell": {"n": N}}, "fields": {},
-           "operators": [{"op": "tissue_seed_3d", "at": "cell", "radius": R, "lumen": lumen,
+           "operators": [{"op": "seed_tissue_3d", "at": "cell", "radius": R, "lumen": lumen,
                           "v0": 1.0, "before_frame": 1}],
-           "schedule": ["tissue_seed_3d"]}
+           "schedule": ["seed_tissue_3d"]}
     with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as fh:
         yaml.safe_dump(cfg, fh); path = fh.name
     sim = S.load(path); os.unlink(path)
@@ -80,11 +80,11 @@ def make_spec(name, lumen, R, N, s0, frames, dt, mu, V0):
         "sets": {"cell": {"n": N}},
         "fields": {},
         "operators": [
-            {"op": "tissue_seed_3d", "at": "cell", "radius": R, "lumen": lumen, "v0": V0, "before_frame": 1},
+            {"op": "seed_tissue_3d", "at": "cell", "radius": R, "lumen": lumen, "v0": V0, "before_frame": 1},
             {"op": "voronoi_tension_3d", "at": "cell", "s0": s0, "radius": R, "V0": V0,
              "K_V": 1.0, "K_S": 0.5, "mu": mu, "lumen": lumen},
         ],
-        "schedule": ["tissue_seed_3d", "voronoi_tension_3d"],
+        "schedule": ["seed_tissue_3d", "voronoi_tension_3d"],
     }
     with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as fh:
         yaml.safe_dump(cfg, fh); path = fh.name

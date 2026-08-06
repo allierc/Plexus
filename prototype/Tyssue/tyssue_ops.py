@@ -29,7 +29,7 @@ face, stashed on the vertex Level (like VoronoiGraph stashes its rings). Per-fac
 the Voronoi tessellation of a triangular lattice ONCE, then the AVM takes over.
 
 Operators:
-  mesh_seed       (structural) -- build a honeycomb half-edge mesh on the `vertex` set;
+  seed_mesh       (structural) -- build a honeycomb half-edge mesh on the `vertex` set;
                                    stash the edge table + per-face A0/P0/alive/pin on H.
   shape_energy  (lateral)    -- AVM shape-energy force on vertices (vectorised scatter-add
                                    + autograd), with an inner overdamped relax loop so each
@@ -128,7 +128,7 @@ def build_honeycomb(nx, ny, a=1.0, border=1, jitter=0.0, seed=0):
 # --------------------------------------------------------------------------- #
 #  Seed: build the mesh, place vertices, stash topology on the Level
 # --------------------------------------------------------------------------- #
-@register_operator("mesh_seed", set="vertex", kind="structural", family="growth")
+@register_operator("seed_mesh", set="vertex", kind="structural", family="growth")
 class MeshSeed(Structural):
     """Frame-0 IC (`before_frame: 1`): build a bounded honeycomb half-edge mesh, write the
     vertex positions into the `vertex` set, and stash the edge table + per-face targets on
@@ -203,7 +203,7 @@ class ShapeEnergy(Lateral):
 
         K_A (A_f - A0_f)^2 + K_P (P_f - P0_f)^2  [+ 0.5 Gamma P_f^2 + Lambda * l_e / 2]
 
-    with A_f, P_f the polygon area/perimeter from the half-edge table (`mesh_seed`). Force =
+    with A_f, P_f the polygon area/perimeter from the half-edge table (`seed_mesh`). Force =
     -grad E on the vertices by one autograd pass; overdamped (EMIT=velocity). To emulate
     tyssue's quasistatic MINIMISE-to-residual between topology events, an inner loop takes
     `relax_iters` gradient steps per tick and returns the net displacement as a velocity, so

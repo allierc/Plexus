@@ -20,12 +20,12 @@ def build(chi, d_h):
     verts, es, et, ef, nF = build_sphere_mesh(N, 5.0, 0.16, 0); Nv = verts.shape[0]
     ops = [{"op": "seed_mesh_3d", "at": "vertex", "n_cells": N, "radius": 5.0, "jitter": 0.16, "p0": 3.9, "seed": 0, "before_frame": 1},
            {"op": "cell_geometry_3d", "at": "cell"}, {"op": "cell_adjacency", "at": "cell"},
-           {"op": "cell_rd_seed", "at": "cell", "seed": 0, "before_frame": 3, "mode": "noise", "A": 1.0, "B": 3.0, "noise": 0.04},
+           {"op": "seed_cell_rd", "at": "cell", "seed": 0, "before_frame": 3, "mode": "noise", "A": 1.0, "B": 3.0, "noise": 0.04},
            {"op": "cell_diffuse", "at": "cell", "d_a": 0.05, "d_h": d_h, "chi": chi},
            {"op": "cell_react", "at": "cell", "implementation": "brusselator", "gamma": 2.0, "A": 1.0, "B": 3.0},
            {"op": "shape_energy_3d", "at": "vertex", "p0": 3.9, "K_A": 1.0, "K_P": 1.0, "Gamma": 0.05, "Lambda": 0.2,
             "K_V": 1.0, "K_R": 0.4, "mu": 1.0, "dt": 0.02, "relax_iters": 8, "eta": 0.08, "cap_frac": 0.12}]
-    sched = ["seed_mesh_3d", "cell_geometry_3d", "cell_adjacency", "cell_rd_seed", "cell_diffuse", "cell_react", "shape_energy_3d"]
+    sched = ["seed_mesh_3d", "cell_geometry_3d", "cell_adjacency", "seed_cell_rd", "cell_diffuse", "cell_react", "shape_energy_3d"]
     cfg = {"general": {"name": "calibchi", "seed": 0, "n_frames": FRAMES, "dt": 0.02, "record_cap": 8,
                        "boundary": "free", "dim": 3, "world": [80, 80, 80]},
            "sets": {"vertex": {"n": int(Nv * 1.3)},

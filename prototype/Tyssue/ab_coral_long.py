@@ -41,11 +41,11 @@ def build(cv, max_div_frac, grow=0.003):
            {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "cycle_cv": cv,
             "p0": 3.72, "every": 2, "max_div": 10, "max_div_frac": max_div_frac, "cell_set": "cell"},
            {"op": "cell_geometry_3d", "at": "cell"}, {"op": "cell_adjacency", "at": "cell"},
-           {"op": "cell_rd_seed", "at": "cell", "seed": R.SEED, "before_frame": 3, **rd["seed"]},
+           {"op": "seed_cell_rd", "at": "cell", "seed": R.SEED, "before_frame": 3, **rd["seed"]},
            {"op": "cell_diffuse", "at": "cell", **rd["diffuse"]}, {"op": "cell_react", "at": "cell", **rd["react"]},
            {"op": "topo_snapshot_3d", "at": "vertex", "every": sstride}]
     sched = ["seed_mesh_3d", "vesicle_growth", "shape_energy_3d", "reconnect_t1_3d", "divide_3d",
-             "cell_geometry_3d", "cell_adjacency", "cell_rd_seed", "cell_diffuse", "cell_react", "topo_snapshot_3d"]
+             "cell_geometry_3d", "cell_adjacency", "seed_cell_rd", "cell_diffuse", "cell_react", "topo_snapshot_3d"]
     mesh0, nF = R._mesh(N_CELLS); Nv = mesh0["Nv"]; buf = int(Nv * 6.0); cbuf = int(nF * 6.0)
     cfg = {"general": {"name": "coral_long_ab", "seed": R.SEED, "n_frames": FRAMES, "dt": dt, "record_cap": rec_cap,
                        "boundary": "free", "dim": 3, "world": [8 * R.RADIUS] * 3},

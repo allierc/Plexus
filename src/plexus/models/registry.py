@@ -142,15 +142,57 @@ def get_entity(name: str) -> type:
     return _ENTITY_REGISTRY[name]
 
 
+# --------------------------------------------------------------------------------------------
+# LEGACY OPERATOR NAMES
+#
+# Cedric, 6 August: *"I found inconsistency in the naming, some seed operator are named xxx_seed
+# other seed_xxx, can you uniform to seed_xxx"*. He is right and it was not two cases: of the 18
+# operators that establish an initial condition, 14 read `xxx_seed` and 2 read `seed_xxx`.
+#
+# An operator name is a VERB ON A NOUN everywhere else in this registry -- `divide_3d`,
+# `reconnect_t1_3d`, `shape_to_chem` -- and `cell_rd_seed` inverts that for no reason, which is
+# how the same act ended up with two spellings and a reader has to know which is which.
+#
+# WHY AN ALIAS AND NOT A CLEAN BREAK. 305 files name `cell_rd_seed`, nearly all of them archived
+# specs and run records. Unlike `mode: tip`, a rename changes NO semantics -- the old name runs the
+# identical class -- so resolving it silently is safe, where silently reinterpreting `tip` as
+# `scatter` would not have been. Archived specs keep loading; new specs get one spelling.
+#
+# The map is applied at RESOLUTION, not at registration, so only the canonical name is in
+# `_OP_CONTRACTS` and every enumeration (coverage, the menu, the battery) sees one entry per
+# operator rather than two.
+LEGACY_OPERATOR_NAMES = {
+    "aggregate_seed": "seed_aggregate",
+    "basement_membrane_seed": "seed_basement_membrane",
+    "block_seed": "seed_block",
+    "cell_rd_seed": "seed_cell_rd",
+    "cell_seed": "seed_cell",
+    "coupled_seed_2d": "seed_coupled_2d",
+    "ecm_seed": "seed_ecm",
+    "mesh_seed": "seed_mesh",
+    "nca_seed": "seed_nca",
+    "sheet_seed": "seed_sheet",
+    "spiral_seed": "seed_spiral",
+    "tissue_seed": "seed_tissue",
+    "tissue_seed_3d": "seed_tissue_3d",
+    "vesicle_seed": "seed_vesicle",
+}
+
+
+def canonical_operator(name: str) -> str:
+    """The current name for `name`, translating a pre-6-August seed operator."""
+    return LEGACY_OPERATOR_NAMES.get(name, name)
+
+
 def get_operator(name: str, implementation: str | None = None) -> type:
     """The implementation class for operator `name` -- the default, or the named
     `implementation`. Raises KeyError if the operator or the implementation is unknown."""
-    return _OP_CONTRACTS[name].get(implementation)
+    return _OP_CONTRACTS[canonical_operator(name)].get(implementation)
 
 
 def get_contract(name: str) -> OperatorContract:
     """The full operator contract (signature + every registered implementation)."""
-    return _OP_CONTRACTS[name]
+    return _OP_CONTRACTS[canonical_operator(name)]
 
 
 def get_field(name: str) -> type:

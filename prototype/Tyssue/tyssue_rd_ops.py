@@ -7,7 +7,7 @@ substrate for morphogen-driven growth -> budding.
 
 Operators:
   cell_adjacency (rewire)     -- build the cell-cell neighbour graph from the half-edge table
-  cell_rd_seed   (structural) -- Gray-Scott initial condition (substrate=1, a central activator spot)
+  seed_cell_rd   (structural) -- Gray-Scott initial condition (substrate=1, a central activator spot)
   cell_diffuse   (lateral)    -- graph-Laplacian diffusion of chem on the cell adjacency (EMIT=velocity)
   cell_react     (lateral)    -- Gray-Scott autocatalysis (EMIT=velocity)
   cell_geometry_3d (aggregate)-- vertices -> per-cell centroid/area
@@ -93,7 +93,7 @@ class CellAdjacency(Rewire):
         return {}
 
 
-@register_operator("cell_rd_seed", set="cell", kind="structural", family="growth")
+@register_operator("seed_cell_rd", set="cell", kind="structural", family="growth")
 class CellRDSeed(Structural):
     """Gray-Scott initial condition on the cell set: substrate u=1 everywhere, activator a=0 except
     a central spot (a=0.5, u=0.25) that nucleates the pattern. chem = [a, u].
@@ -129,7 +129,7 @@ class CellRDSeed(Structural):
         self.mode = params.get("mode", "scatter")               # "noise" | "scatter" | "patch" | "cones"
         if self.mode not in self.MODES:
             raise ValueError(
-                f"cell_rd_seed: unknown mode {self.mode!r}; known: {list(self.MODES)}. "
+                f"seed_cell_rd: unknown mode {self.mode!r}; known: {list(self.MODES)}. "
                 + ("`tip` was removed on 6 August -- it re-seeded every frame, which makes it a "
                    "moving boundary condition and annihilates every operator that writes to "
                    "`chem`. Use `scatter` with `before_frame: 3`." if self.mode == "tip" else ""))

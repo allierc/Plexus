@@ -67,12 +67,12 @@ def make_spec(name, mode, N, R, chi, react=None, frames=FRAMES):
             "xyz":  {"width": 3, "integration": "none", "boundary": "free"}}}},
         "fields": {},
         "operators": [
-            {"op": "aggregate_seed", "at": "cell", "mode": mode, "seed_mode": "noise",
+            {"op": "seed_aggregate", "at": "cell", "mode": mode, "seed_mode": "noise",
              "radius": R, "k": 6, "a0": 1.0, "h0": 3.0, "noise": 0.03, "before_frame": 1},
             {"op": "graph_diffuse", "at": "cell", "d_a": 0.05, "d_h": 0.5, "chi": chi, "norm": True},
             r,
         ],
-        "schedule": ["aggregate_seed", "graph_diffuse", "react"],
+        "schedule": ["seed_aggregate", "graph_diffuse", "react"],
     }
     with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as fh:
         yaml.safe_dump(cfg, fh); path = fh.name

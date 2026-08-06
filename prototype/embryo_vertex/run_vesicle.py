@@ -30,7 +30,7 @@ except Exception:
     pass
 
 import plexus.operators           # noqa: F401  radius_graph
-import vesicle_ops                 # noqa: F401  vesicle_seed + vesicle_mechanics
+import vesicle_ops                 # noqa: F401  seed_vesicle + vesicle_mechanics
 import plexus.schema as S
 from plexus.engine import run as engine_run
 
@@ -57,12 +57,12 @@ def make_sim(p, frames=500, dt=1.0):
         "sets": {"cell": {"n": N, "spawn": "random", "types": {"a": {"fraction": 1.0}}}},
         "fields": {},
         "operators": [
-            {"op": "vesicle_seed", "at": "cell", "radius": p["shell"], "before_frame": 1},
+            {"op": "seed_vesicle", "at": "cell", "radius": p["shell"], "before_frame": 1},
             {"op": "radius_graph", "at": "cell", "radius": 1.4},
             {"op": "vesicle_mechanics", "at": "cell", "shell": p["shell"], "adhesion": 1.0,
              "sigma": 0.9, "r_adh": 1.4, "k_rep": 40.0, "k_r": 0.6, "mu": 0.02, "noise": 0.01},
         ],
-        "schedule": ["vesicle_seed", "radius_graph", "vesicle_mechanics"],
+        "schedule": ["seed_vesicle", "radius_graph", "vesicle_mechanics"],
     }
     with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as fh:
         yaml.safe_dump(cfg, fh); path = fh.name

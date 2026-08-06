@@ -96,7 +96,7 @@ def make(p):
     verts, es, et, ef, nF = build_sphere_mesh(n, R, J, SEED); Nv = verts.shape[0]
     ops = [{"op": "seed_mesh_3d", "at": "vertex", "n_cells": n, "radius": R, "jitter": J, "p0": 3.90, "seed": SEED, "before_frame": 1, "vseed_cv": 0.15},
            {"op": "cell_geometry_3d", "at": "cell"}, {"op": "cell_adjacency", "at": "cell"},
-           {"op": "cell_rd_seed", "at": "cell", "seed": SEED, "before_frame": 3, "mode": "noise", "A": 1.0, "B": 3.0, "noise": 0.04},
+           {"op": "seed_cell_rd", "at": "cell", "seed": SEED, "before_frame": 3, "mode": "noise", "A": 1.0, "B": 3.0, "noise": 0.04},
            {"op": "cell_diffuse", "at": "cell", "d_a": 0.05, "d_h": 0.7, "chi": p["chi"]},
            {"op": "cell_react", "at": "cell", "implementation": "brusselator", "gamma": p["gamma"], "A": 1.0, "B": 3.0},
            # activator->growth on a LOCKED body (rho=0): only red cells grow (v_eq up to vth*v_ref) -> protrude
@@ -107,7 +107,7 @@ def make(p):
            {"op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": 0.28, "every": 1, "max_flips": max(60, n // 8)},
            {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "cycle_cv": p.get("cyc_cv", 0.15), "p0": 3.90, "every": 2, "max_div": 60, "max_div_frac": 0.02, "cell_set": "cell", "min_cycle": 4, "max_cycle": p.get("max_cyc", 30)},
            {"op": "topo_snapshot_3d", "at": "vertex", "every": 1}]
-    sched = ["seed_mesh_3d", "cell_geometry_3d", "cell_adjacency", "cell_rd_seed", "cell_diffuse", "cell_react",
+    sched = ["seed_mesh_3d", "cell_geometry_3d", "cell_adjacency", "seed_cell_rd", "cell_diffuse", "cell_react",
              "morphogen_growth_3d", "shape_energy_3d", "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
     cfg = {"general": {"name": "tyssue_h6", "seed": SEED, "n_frames": frames, "dt": 0.02, "record_cap": frames + 2, "boundary": "free", "dim": 3, "world": [16 * R] * 3},
            "sets": {"vertex": {"n": int(Nv * 8)}, "cell": {"n": int(nF * 8), "state": {"chem": {"width": 2, "integration": "first_order"}, "cen": {"width": 3}, "area": {"width": 1}}}},  # big buffer: proliferation must not hit the cell-slot ceiling

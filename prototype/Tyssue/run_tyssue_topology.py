@@ -35,7 +35,7 @@ except Exception:
     pass
 
 import plexus.operators   # noqa: F401
-import tyssue_ops          # noqa: F401  mesh_seed + shape_energy
+import tyssue_ops          # noqa: F401  seed_mesh + shape_energy
 import tyssue_topology_ops  # noqa: F401  face_growth + face_divide + t1_transition
 from tyssue_ops import build_honeycomb, face_polygons
 from tyssue_topology_ops import rings_from_flat
@@ -61,7 +61,7 @@ def make_spec(name, p0, rate, ratio, Nv):
         "sets": {"vertex": {"n": Nv}},
         "fields": {},
         "operators": [
-            {"op": "mesh_seed", "at": "vertex", "nx": NX, "ny": NY, "a": A, "border": BORDER,
+            {"op": "seed_mesh", "at": "vertex", "nx": NX, "ny": NY, "a": A, "border": BORDER,
              "jitter": JITTER, "p0": p0, "seed": SEED, "before_frame": 1},
             {"op": "face_divide", "at": "vertex", "frac": ratio, "a0_base": float(A0BASE),
              "p0": p0, "before_frame": 2},                    # one-shot clonal division (frac of cells)
@@ -70,7 +70,7 @@ def make_spec(name, p0, rate, ratio, Nv):
             {"op": "t1_transition", "at": "vertex", "l_th": 0.08, "p0": p0, "every": 3},
             {"op": "topo_snapshot", "at": "vertex"},          # capture per-tick topology for the movie
         ],
-        "schedule": ["mesh_seed", "face_divide", "shape_energy", "t1_transition", "topo_snapshot"],
+        "schedule": ["seed_mesh", "face_divide", "shape_energy", "t1_transition", "topo_snapshot"],
     }
     with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as fh:
         yaml.safe_dump(cfg, fh); path = fh.name

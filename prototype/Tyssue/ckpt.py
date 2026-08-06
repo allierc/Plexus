@@ -3,7 +3,7 @@
 homogenised vesicle) instead of a fresh sphere. save_state() dumps the vertex positions + the mesh dict
 (topology + per-cell targets) + the cell-level state (chem/cen/area) to an npz; the load_mesh_3d operator
 restores all of it at frame 0 (drop-in replacement for seed_mesh_3d). The tubing run then re-seeds fresh
-RD spots on top (cell_rd_seed runs after), so we get: smoke_hom's uniform cells + big spots -> tubes."""
+RD spots on top (seed_cell_rd runs after), so we get: smoke_hom's uniform cells + big spots -> tubes."""
 from __future__ import annotations
 import numpy as np, torch
 from plexus.models.registry import register_operator

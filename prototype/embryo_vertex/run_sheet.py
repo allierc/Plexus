@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """run_sheet -- cell_polarity case 1: apical constriction -> INVAGINATION of an epithelial sheet.
 
-A flat apical/basal monolayer (`sheet_seed`) is given apico-basal polarity (`cell_polarity`: a
+A flat apical/basal monolayer (`seed_sheet`) is given apico-basal polarity (`cell_polarity`: a
 central patch gets high apical cortical tension) and relaxed under the epithelial shape energy
 (`epithelium`). The constricting patch wedges its cells so the sheet buckles into a furrow --
 the canonical gastrulation / neural-tube fold. Renders the folding cells (patch highlighted) with
@@ -31,7 +31,7 @@ except Exception:
     pass
 
 import plexus.operators           # noqa: F401
-import sheet_ops                   # noqa: F401  sheet_seed + cell_polarity + epithelium
+import sheet_ops                   # noqa: F401  seed_sheet + cell_polarity + epithelium
 import plexus.schema as S
 from plexus.engine import run as engine_run
 
@@ -59,13 +59,13 @@ def make_sim(p, frames=1000, dt=0.02):
         "sets": {"cell": {"n": n, "spawn": "random", "types": {"a": {"fraction": 1.0}}}},
         "fields": {},
         "operators": [
-            {"op": "sheet_seed", "at": "cell", "width": WIDTH, "height": H0, "bow": 0.3, "before_frame": 1},
+            {"op": "seed_sheet", "at": "cell", "width": WIDTH, "height": H0, "bow": 0.3, "before_frame": 1},
             {"op": "cell_polarity", "at": "cell", "constrict": p["constrict"], "elongate": p["elongate"],
              "patch_center": 0.5, "patch_half": p["patch_half"]},
             {"op": "epithelium", "at": "cell", "K_A": 2.0, "A0": A0, "k_ap": 3.0, "k_ba": 2.0,
              "k_lat": 1.0, "h0": H0, "mu": 0.4, "pin": "basal"},
         ],
-        "schedule": ["sheet_seed", "cell_polarity", "epithelium"],
+        "schedule": ["seed_sheet", "cell_polarity", "epithelium"],
     }
     with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as fh:
         yaml.safe_dump(cfg, fh); path = fh.name

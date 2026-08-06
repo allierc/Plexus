@@ -2,7 +2,7 @@
 """run_tyssue_tube -- bridge step 3 (Turing_vertex Fig 5): morphogen-driven growth+division on a
 FLUID vesicle with T1 reconnection -> does a localized bud EXTEND into a tube instead of jamming?
 
-A localized activator patch (top pole, cell_rd_seed mode=patch) drives morphogen_growth_3d (grow the
+A localized activator patch (top pole, seed_cell_rd mode=patch) drives morphogen_growth_3d (grow the
 target volume where a is high) and, because those cells inflate past their doubling volume, divide_3d
 (which propagates the activator to daughters, so the growing region stays activated and proliferates).
 The shell is FLUID (p0 > p0* ~ 3.81) and reconnect_t1_3d fires every tick so the tissue can flow /
@@ -33,7 +33,7 @@ except Exception:
 
 import plexus.operators   # noqa: F401
 import tyssue_ops3d        # noqa: F401
-import tyssue_rd_ops       # noqa: F401  cell_geometry_3d + cell_rd_seed + morphogen_growth_3d
+import tyssue_rd_ops       # noqa: F401  cell_geometry_3d + seed_cell_rd + morphogen_growth_3d
 import tyssue_t1_ops3d     # noqa: F401  reconnect_t1_3d
 from tyssue_ops3d import build_sphere_mesh
 import plexus.schema as S
@@ -69,7 +69,7 @@ def make_spec(name, n_cells, frames, p0, grow_rate, a_sw, patch_z, l_th_frac, cv
         {"op": "seed_mesh_3d", "at": "vertex", "n_cells": n_cells, "radius": RADIUS,
          "jitter": JITTER, "p0": p0, "seed": SEED, "before_frame": 1, "vseed_cv": cv},
         {"op": "cell_geometry_3d", "at": "cell"},              # cen (needed by the patch seed) each frame
-        {"op": "cell_rd_seed", "at": "cell", "mode": "patch", "patch_z": patch_z},  # RE-SEED EVERY FRAME:
+        {"op": "seed_cell_rd", "at": "cell", "mode": "patch", "patch_z": patch_z},  # RE-SEED EVERY FRAME:
         #   activator tracks the current TIP (top z-band) -> growth stays confined to the advancing tip and
         #   cells left behind switch OFF, so the neck constricts into a TUBE (vs the static patch's broad dome).
         {"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": grow_rate,
@@ -85,7 +85,7 @@ def make_spec(name, n_cells, frames, p0, grow_rate, a_sw, patch_z, l_th_frac, cv
          "g1_ramp": g1},  # stochastic cycle + G1 ramp (daughter v_eq = birth volume) -> smooth proliferating tip
         {"op": "topo_snapshot_3d", "at": "vertex", "every": 1},   # record EVERY frame -> posf/hist aligned
     ]
-    sched = ["seed_mesh_3d", "cell_geometry_3d", "cell_rd_seed", "morphogen_growth_3d",
+    sched = ["seed_mesh_3d", "cell_geometry_3d", "seed_cell_rd", "morphogen_growth_3d",
              "shape_energy_3d", "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
     cfg = {
         "general": {"name": f"tyssue_tube_{name}", "seed": SEED, "n_frames": frames, "dt": 1.0, "record_cap": frames + 2,

@@ -9,7 +9,7 @@ tyssue apical-constriction effector.
 Cells 0..Nc-1 sit on a chain of Nc+1 apical vertices a_i and Nc+1 basal vertices b_i; cell i is the
 quad (a_i, a_{i+1}, b_{i+1}, b_i). The set stores the 2*(Nc+1) vertices as [apical(Nc+1), basal(Nc+1)].
 
-`sheet_seed`    -- frame-0 IC (`before_frame: 1`): lay a flat monolayer (apical row + basal row).
+`seed_sheet`    -- frame-0 IC (`before_frame: 1`): lay a flat monolayer (apical row + basal row).
 `cell_polarity` -- SimuCell3D apico-basal polarity: set a per-cell APICAL cortical-tension multiplier,
                    high on a patch -> localized apical constriction (the morphogen-gated fold domain).
 `epithelium`    -- the sheet mechanics: area elasticity + apical/basal line tension + lateral (height)
@@ -27,7 +27,7 @@ def _ncells(n):
     return n // 2 - 1                                          # n = 2*(Nc+1)
 
 
-@register_operator("sheet_seed", level="cell", kind="structural")
+@register_operator("seed_sheet", level="cell", kind="structural")
 class SheetSeed(Structural):
     """Lay a flat epithelial monolayer: apical row at the bottom, basal row on top, centred."""
     SUPPORTED_DIMS = [2]

@@ -227,7 +227,7 @@ def main():
     check("V5 compilation refuses it", refused,
           "a composition that would no-op never reaches the cluster")
 
-    dangling, _ = seed("substrate").apply(("add_op", "cell_rd_seed", "cone"))
+    dangling, _ = seed("substrate").apply(("add_op", "seed_cell_rd", "cone"))
     dangling, _ = dangling.apply(("add_op", "morphogen_growth_3d", "hill_conserve_amount"))
     check("V5 dangling slot detected", len(dangling.unrouted_slots()) >= 1,
           f"{dangling.unrouted_slots()} -- present but disconnected == inert")

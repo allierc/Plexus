@@ -41,11 +41,11 @@ import am2_hydro as HY
 AGENT_DEFAULTS = dict(n=8000, move_speed=0.006, radius=0.03, res=200, frames=1000, seed=0,
                       beta=0.16, c_th=-0.001, c_base=0.0, sigma=1.2, eps=0.05, diffuse=0.16, decay=0.02,
                       gamma=0.15, align_noise=0.04, omega=0.38, repel=0.015, r0=0.010,
-                      spiral_seed=0.0, rf_tau=0.0, rf_gain=0.08, rf_th=2.0, marker="triangle")
+                      seed_spiral=0.0, rf_tau=0.0, rf_gain=0.08, rf_th=2.0, marker="triangle")
 
 
 def _agent_spec(name, p):
-    seed_amp = float(p.get("spiral_seed", 0.0))
+    seed_amp = float(p.get("seed_spiral", 0.0))
     rf_tau = float(p.get("rf_tau", 0.0))
     rf_th = float(p.get("rf_th", 2.0))
     ops = [
@@ -69,8 +69,8 @@ def _agent_spec(name, p):
                        "tau": rf_tau, "gain": float(p["rf_gain"]), "c_th": float(p["c_th"])})
         schedule.insert(5, "refract")
     if seed_amp > 0.0:   # nucleate a spiral: one-shot broken-front IC, stamped BEFORE relay reads c
-        ops.insert(0, {"op": "spiral_seed", "at": "cell", "to": "chemical", "amp": seed_amp})
-        schedule.insert(0, "spiral_seed")
+        ops.insert(0, {"op": "seed_spiral", "at": "cell", "to": "chemical", "amp": seed_amp})
+        schedule.insert(0, "seed_spiral")
     return {
         "general": {"name": name, "seed": int(p["seed"]), "n_frames": int(p["frames"]),
                     "dt": 1.0, "boundary": "periodic"},

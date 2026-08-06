@@ -513,8 +513,8 @@ def make(p):
         # tip-tracking -> the control that should DOME). Else re-seed every frame = tip-riding cones -> tube.
         smode = p.get("seed_mode", "cones")                     # "cones" (fixed-angle) | "tip" (fixed-size, tip-tracking)
         seed = {} if smode == "tip" else ({"before_frame": 3} if (rd or p.get("seed_once")) else {})   # tip re-seeds EVERY frame
-        ops += [{"op": "cell_rd_seed", "at": "cell", "mode": smode, "n_spots": p["spots"], "cone_deg": p["cone_deg"], "seed_dir": p.get("seed_dir", None), "tip_radius": p.get("tip_radius", 2.0), **seed}]
-        sched += ["cell_rd_seed"]
+        ops += [{"op": "seed_cell_rd", "at": "cell", "mode": smode, "n_spots": p["spots"], "cone_deg": p["cone_deg"], "seed_dir": p.get("seed_dir", None), "tip_radius": p.get("tip_radius", 2.0), **seed}]
+        sched += ["seed_cell_rd"]
         if rd:
             impl = p.get("rd_impl", "brusselator")
             if impl == "gray_scott":                              # stable localized SPOTS (substrate depletion)
@@ -529,10 +529,10 @@ def make(p):
             sched += ["cell_adjacency", "cell_diffuse", "cell_react"]
     else:                                                       # Brusselator RD (develops from noise -> spots emerge late)
         ops += [{"op": "cell_adjacency", "at": "cell"},
-                {"op": "cell_rd_seed", "at": "cell", "seed": 0, "before_frame": 3, "mode": "noise", "A": 1.0, "B": 3.0, "noise": 0.04},
+                {"op": "seed_cell_rd", "at": "cell", "seed": 0, "before_frame": 3, "mode": "noise", "A": 1.0, "B": 3.0, "noise": 0.04},
                 {"op": "cell_diffuse", "at": "cell", "d_a": 0.05, "d_h": 0.7, "chi": p["chi"]},
                 {"op": "cell_react", "at": "cell", "implementation": "brusselator", "gamma": p["gamma"], "A": 1.0, "B": 3.0}]
-        sched += ["cell_adjacency", "cell_rd_seed", "cell_diffuse", "cell_react"]
+        sched += ["cell_adjacency", "seed_cell_rd", "cell_diffuse", "cell_react"]
     ga = int(p.get("grow_after", 0))                            # growth+division start only AFTER frame ga, so the
     #   RD activation pattern stabilises FIRST (GM peaks amplify) before morphogenesis acts on it
     if p.get("monolayer"):                                     # MONOLAYER (apical/basal) energy: growth-driven,

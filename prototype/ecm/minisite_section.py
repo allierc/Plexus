@@ -105,7 +105,7 @@ deep, the lumen is hollow, the fibres are cut where they cross, and the blocks a
 <a href="https://www.nature.com/articles/s41598-018-20678-6">Okuda et&nbsp;al. (2018)</a> on the
 <a href="https://github.com/DamCB/tyssue">Tyssue</a> mesh; the matrix is MLS-MPM
 (<a href="https://github.com/yuanming-hu/taichi_mpm">Hu et&nbsp;al. 2018</a>). The coupling and the
-<code>ecm_seed</code> / <code>cell_to_ecm</code> / <code>cell_exclude_3d</code> /
+<code>seed_ecm</code> / <code>cell_to_ecm</code> / <code>cell_exclude_3d</code> /
 <code>ecm_stress</code> / <code>plate_confine_3d</code> operators are ours
 (<code>prototype/ecm</code>).</p>
 <div class="sim-gallery g3">

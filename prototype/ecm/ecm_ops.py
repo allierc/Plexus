@@ -20,7 +20,7 @@ one schedule token runs both. One-way coupling was considered and rejected: it d
 decoratively while leaving the ball's shape untouched, which produces a convincing movie of
 nothing.
 
-THE FIBRES ARE GEOMETRY, NOT YET MECHANICS -- and the distinction matters. `ecm_seed` lays the
+THE FIBRES ARE GEOMETRY, NOT YET MECHANICS -- and the distinction matters. `seed_ecm` lays the
 particles along straight segments with a shared orientation, so the matrix LOOKS fibrous and the
 movie shows fibres being dragged and splayed. But MPM interpolates every particle onto a
 continuum grid, so a fibrous ARRANGEMENT of an isotropic material still responds isotropically.
@@ -67,7 +67,7 @@ PRESSURE_HISTORY: list = []
 
 
 # --------------------------------------------------------------------------- seeding
-@register_operator("ecm_seed", family="growth", set="particle", kind="structural")
+@register_operator("seed_ecm", family="growth", set="particle", kind="structural")
 class ECMSeed(Structural):
     """Lay the matrix out ONCE, at frame 0: the box minus a cavity, as fibres.
 
@@ -76,7 +76,7 @@ class ECMSeed(Structural):
     operator also means the cavity is a parameter of the experiment, visible in the spec beside
     the stiffness it is being tested against, rather than a number buried in a seeder.
 
-    The particles are not deleted from the cavity, they are never placed there: `ecm_seed`
+    The particles are not deleted from the cavity, they are never placed there: `seed_ecm`
     rewrites every position in the set. A cut-out would leave the discarded particles occupying
     memory and mass, and an MPM particle with zero occupancy still costs a scatter.
     """
@@ -241,7 +241,7 @@ class ECMSeed(Structural):
         self.fibre = f.to(dev, dt_)
         self._done = True
         n_in = int((~self._outside_cavity(lvl.get("pos"))).sum())
-        print(f"[ecm_seed] {n} particles on {self.n_fibres} fibres; cavity r={self.cavity_r} "
+        print(f"[seed_ecm] {n} particles on {self.n_fibres} fibres; cavity r={self.cavity_r} "
               f"h={self.cavity_h} about axis {self.axis}"
               + ("" if self.plate_half is None
                  else f"; solid blocks beyond +/-{self.plate_half:.3f} "

@@ -804,7 +804,7 @@ def quasi_static_Q(cfg, cfg_path, device, protr_before, out_dir, Hf, relax_frame
     ckpt.save_state(Hf, ck)                                # the end state, positions + topology
 
     c2 = copy.deepcopy(cfg)
-    drop = {"morphogen_growth_3d", "vesicle_growth", "rd_interface_tension", "cell_rd_seed",
+    drop = {"morphogen_growth_3d", "vesicle_growth", "rd_interface_tension", "seed_cell_rd",
             "divide_3d"}
     seeders = {"seed_mesh_3d", "load_mesh_3d"}             # replaced by the end-state checkpoint
     c2["operators"] = [o for o in c2["operators"] if o["op"] not in drop | seeders]

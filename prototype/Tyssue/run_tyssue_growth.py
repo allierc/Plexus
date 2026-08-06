@@ -57,7 +57,7 @@ def make_spec(name, p0, rate, ratio, buf):
         "sets": {"vertex": {"n": buf}},
         "fields": {},
         "operators": [
-            {"op": "mesh_seed", "at": "vertex", "nx": NX, "ny": NY, "a": A, "border": BORDER,
+            {"op": "seed_mesh", "at": "vertex", "nx": NX, "ny": NY, "a": A, "border": BORDER,
              "jitter": JITTER, "p0": p0, "seed": SEED, "pin_border": False, "before_frame": 1},   # free -> expands
             {"op": "face_growth", "at": "vertex", "rate": rate, "p0": p0, "every": 1},
             {"op": "shape_energy", "at": "vertex", "p0": p0, "K_A": 1.0, "K_P": 1.0, "Lambda": 0.15,
@@ -69,7 +69,7 @@ def make_spec(name, p0, rate, ratio, buf):
             {"op": "t1_transition", "at": "vertex", "l_th": 0.10, "p0": p0, "every": 2},
             {"op": "topo_snapshot", "at": "vertex"},
         ],
-        "schedule": ["mesh_seed", "face_growth", "shape_energy", "face_divide_line",
+        "schedule": ["seed_mesh", "face_growth", "shape_energy", "face_divide_line",
                      "t1_transition", "topo_snapshot"],
     }
     with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as fh:

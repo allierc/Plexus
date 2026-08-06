@@ -26,10 +26,10 @@ def build(with_rd):
     sched = ["seed_mesh_3d", "cell_geometry_3d"]
     if with_rd:                                             # RD ops (colour only): adjacency + seed + diffuse + react
         ops += [{"op": "cell_adjacency", "at": "cell"},
-                {"op": "cell_rd_seed", "at": "cell", "seed": SEED, "before_frame": 3, "mode": "noise", "A": 1.0, "B": 3.0, "noise": 0.04},
+                {"op": "seed_cell_rd", "at": "cell", "seed": SEED, "before_frame": 3, "mode": "noise", "A": 1.0, "B": 3.0, "noise": 0.04},
                 {"op": "cell_diffuse", "at": "cell", "d_a": 0.05, "d_h": 0.7, "chi": 4.0},
                 {"op": "cell_react", "at": "cell", "implementation": "brusselator", "gamma": 2.0, "A": 1.0, "B": 3.0}]
-        sched += ["cell_adjacency", "cell_rd_seed", "cell_diffuse", "cell_react"]
+        sched += ["cell_adjacency", "seed_cell_rd", "cell_diffuse", "cell_react"]
     # UNMODULATED growth: a_sw=50 so the activator never fires the Hill -> drive=rho=1 uniform (homogenised recipe)
     ops += [{"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": 0.03,
              "a_sw": 50.0, "hill": 4.0, "rho": 1.0, "vth_frac": 1.4},

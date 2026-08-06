@@ -14,7 +14,7 @@ operator families that a single-set port folds away, and it is the substrate the
 (Goal 2) needs -- RD is a lateral operator ON the cell set.
 
 Operators:
-  cell_seed      (structural) -- initialise the cell set from the mesh (a0=base, ctype=0, occ=alive)
+  seed_cell      (structural) -- initialise the cell set from the mesh (a0=base, ctype=0, occ=alive)
   cell_geometry  (aggregate)  -- vertices -> cell area/perimeter/centroid (the cross-scale readout)
   cell_paint     (structural) -- assign a CLONE of cells a type + a larger target area (the demo:
                                  per-cell BIOLOGICAL state that drives the mechanics)
@@ -50,7 +50,7 @@ def _face_geom(pos, es, et, ef, nF):
     return area, perim, torch.stack([cx, cy], 1)
 
 
-@register_operator("cell_seed", set="cell", kind="structural", family="growth")
+@register_operator("seed_cell", set="cell", kind="structural", family="growth")
 class CellSeed(Structural):
     """Frame-0: initialise the cell set from the vertex mesh -- one live cell per face, target area
     a0 = the regular-hexagon area, type 0, occupancy = alive. Emits no delta."""

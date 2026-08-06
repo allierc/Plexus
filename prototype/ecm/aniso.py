@@ -5,7 +5,7 @@
 
 THE CHAIN THIS TESTS, one link at a time, with a number on each:
 
-    1  the fibres are laid down with a preferred direction (`ecm_seed align`), so the matrix is
+    1  the fibres are laid down with a preferred direction (`seed_ecm align`), so the matrix is
        DENSER along one axis than the others
     2  a growing tissue therefore meets more material in that direction and the matrix pushes back
        harder there -- `cell_to_ecm` records the contact pressure by direction, so this is measured,

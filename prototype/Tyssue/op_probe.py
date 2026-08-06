@@ -25,7 +25,7 @@ downstream, because it never looks at the emission.
     UNREAD   the class never reads the key      -> dead by construction, no simulation needed
 
 UNREAD is free and runs first: `params` is handed over as a dict that records every key read
-during __init__ and forward. `cell_rd_seed.amp` has sat in every spec this campaign has ever
+during __init__ and forward. `seed_cell_rd.amp` has sat in every spec this campaign has ever
 written and is not read by any branch of the operator.
 
 RUN:  python op_probe.py <spec.yaml> --op shape_to_chem --param beta --values -2 -4
@@ -223,7 +223,7 @@ def warm_spec(spec_dict, ckpt_path, frames=50, freeze_topology=False):
     at frame 0 again. An initial-condition operator gated `before_frame: 3` would therefore fire
     on frames 0-2 of the warm run and OVERWRITE the pattern we just restored -- the probe would
     measure a re-seeded sphere and call every chemistry parameter live for the wrong reason.
-    So a GATED `cell_rd_seed` is dropped (its job is done, it is in the checkpoint), while an
+    So a GATED `seed_cell_rd` is dropped (its job is done, it is in the checkpoint), while an
     UNGATED one is kept, because there it is not an initial condition at all: `mode: tip`
     re-seeds every frame BY DESIGN, and removing it would change the mechanism under test.
     """
@@ -257,7 +257,7 @@ def warm_spec(spec_dict, ckpt_path, frames=50, freeze_topology=False):
                         "cell_set": o.get("cell_set", "cell"), "ckpt": ckpt_path,
                         "before_frame": 1})
             continue
-        if o.get("op") == "cell_rd_seed" and any(k in o for k in ("before_frame", "every")):
+        if o.get("op") == "seed_cell_rd" and any(k in o for k in ("before_frame", "every")):
             continue                       # an initial condition, already restored
         o = dict(o)
         for k in ("after_frame",):          # the warm run starts past the spin-up gate

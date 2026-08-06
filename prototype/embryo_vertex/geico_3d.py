@@ -34,7 +34,7 @@ except Exception:
     pass
 
 import plexus.operators           # noqa: F401
-import embryo_nca_ops             # noqa: F401  growing_nca + nca_seed
+import embryo_nca_ops             # noqa: F401  growing_nca + seed_nca
 import plexus.schema as S
 from plexus.engine import run as engine_run
 
@@ -49,9 +49,9 @@ def grow_lizard(frames=240, device="cuda:0"):
                     "boundary": "free", "world": [1.0, 1.0]},
         "sets": {"seed_cell": {"n": 1, "types": {"a": {"fraction": 1.0}}}},
         "fields": {"nca": {"frame": "grid", "res": RES, "components": 16}},
-        "operators": [{"op": "nca_seed", "at": "nca", "before_frame": 1},
+        "operators": [{"op": "seed_nca", "at": "nca", "before_frame": 1},
                       {"op": "growing_nca", "at": "nca", "fire_rate": 0.5}],
-        "schedule": ["nca_seed", "growing_nca"],
+        "schedule": ["seed_nca", "growing_nca"],
     }
     with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as f:
         yaml.safe_dump(cfg, f); path = f.name

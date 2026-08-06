@@ -53,7 +53,7 @@ def spec_diff(parent_spec, child_spec):
     """Every way two emitted specs differ, as [(op, key, parent_value, child_value)].
 
     `None` on either side means the operator or key exists on only one of them -- which is itself a
-    difference worth testing, and the shape a missing `cell_rd_seed` or a dropped parameter takes.
+    difference worth testing, and the shape a missing `seed_cell_rd` or a dropped parameter takes.
     """
     pa, ch = _ops_by_id(parent_spec), _ops_by_id(child_spec)
     rows = []

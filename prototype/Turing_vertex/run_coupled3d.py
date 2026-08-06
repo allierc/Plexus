@@ -47,7 +47,7 @@ except Exception:
 import plexus.operators   # noqa: F401
 import turing_ops         # noqa: F401  graph_diffuse + react (INTEGRAND="chem")
 import coupled_ops        # noqa: F401  growth + divide_2x (block="v0")
-import vertex3d_ops       # noqa: F401  tissue_seed_3d + voronoi_graph_3d + voronoi_tension_3d
+import vertex3d_ops       # noqa: F401  seed_tissue_3d + voronoi_graph_3d + voronoi_tension_3d
 import shell_ops          # noqa: F401  membrane_bending + voronoi_tension_shell + lumen_pressure
 from shell_ops import shell_faces
 from vertex3d_ops import cell_shape_3d, cell_prisms_3d
@@ -147,8 +147,8 @@ def measure_V0(R, N, lumen):
     cfg = {"general": {"name": "seed", "seed": 0, "n_frames": 1, "dt": 0.02, "boundary": "free",
                        "dim": 3, "world": [W, W, W]},
            "sets": {"cell": {"n": N}}, "fields": {},
-           "operators": [{"op": "tissue_seed_3d", "at": "cell", "radius": R, "lumen": lumen,
-                          "v0": 1.0, "before_frame": 1}], "schedule": ["tissue_seed_3d"]}
+           "operators": [{"op": "seed_tissue_3d", "at": "cell", "radius": R, "lumen": lumen,
+                          "v0": 1.0, "before_frame": 1}], "schedule": ["seed_tissue_3d"]}
     with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as fh:
         yaml.safe_dump(cfg, fh); path = fh.name
     sim = S.load(path); os.unlink(path)
@@ -165,7 +165,7 @@ def make_spec(p, V0):
     seed_mode = p.get("seed_mode", "noise")             # noise (Brusselator/GM) | scatter (Gray-Scott)
     thick = 0.7 * V0 ** (1.0 / 3.0)
     ops = [
-        {"op": "tissue_seed_3d", "at": "cell", "radius": p["R"], "lumen": p["lumen"], "v0": V0,
+        {"op": "seed_tissue_3d", "at": "cell", "radius": p["R"], "lumen": p["lumen"], "v0": V0,
          "a_mean": A, "h_mean": B / A, "cnoise": 0.04, "seed_mode": seed_mode,
          "seed_frac": p.get("seed_frac", 0.04), "v0noise": p.get("v0noise", 0.0), "before_frame": 1},
         {"op": "voronoi_graph_3d", "at": "cell", "radius": p["R"], "lumen": p["lumen"]},
