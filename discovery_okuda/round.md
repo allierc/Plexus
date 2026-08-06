@@ -163,18 +163,14 @@ Read off the panels: each initial spot is **about ten cells**. Fig. 5b, the thic
 starts from a comparable count with spots of **roughly 100–200 cells**, and produces fat lobes rather
 than fingers.
 
-**Three numbers follow, and they are the campaign's actual targets.**
+**What our runs measure against that, as facts and not as instructions.**
 
-1. **A tube spot is ~10 cells; a bud spot is ~100–200.** Our best run measures
-   `spot_cells_med` **99** with `n_spots` **1** — one bud-sized domain. That is the Fig. 5b regime, and
-   it is why `protr` climbs while the eye reports no finger. To reach Fig. 5a the spot must be an order
-   of magnitude smaller and there must be about ten of them.
-2. **~10 spots, not 1.** `spot_spacing_cells` has been unmeasurable on every run
-   (`measured_frac` 0.0) because a single spot has no spacing. With ten spots it becomes the one
-   pattern length directly comparable to the figure.
-3. **Growth is modest: 2032 → 3572 cells is 1.76× over 25 cell cycles.** Our runs either do not divide
-   at all (`cells_final` 2000 from 2000) or explode (150 → 7785). Tubes form under slow, sustained
-   growth, not under a burst and not under none.
+* Best run to date: `spot_cells_med` **99**, `n_spots` **1** — one domain, bud-sized by the figure's
+  scale. `protr_peak` reached 1.333 on it and the eye reported no finger in any run of the round.
+* `spot_spacing_cells` has never once been measurable (`measured_frac` 0.0 on every run): a single spot
+  has no spacing, so the one pattern length comparable to the figure has never been recorded.
+* Growth: Fig. 5a goes 2032 → 3572 cells, 1.76× over 25 cell cycles. Ours either does not divide at all
+  (`cells_final` 2000 from 2000) or reaches 7785 from 150.
 
 **The knob Okuda uses to set this does not exist in our space, and that is finding F009.** His χ is a
 spatial scale — *"with increasing χ, the size of spots increased and the number of spots decreased"*,
@@ -184,9 +180,10 @@ ball our `chi` does three unrelated jobs — 1.3 gives one domain, 4.0 kills sca
 saturates the integrator, 40 gives 109 single-cell specks. **Every run in this campaign uses
 chi = 1.3.**
 
-So do not copy χ = 0.01 from the paper; it means something different here. Aim at the MEASURED
-quantities instead — `spot_cells_med` toward 10, `n_spots` toward 10, `spot_spacing_cells` measurable
-at all — and treat whichever parameter moves them as the lever, whatever it is called.
+So χ = 0.01 cannot be copied from the paper; the symbol does not mean the same thing here. What the
+measured quantities are — `spot_cells_med`, `n_spots`, `spot_spacing_cells` — and what they read on
+every run so far is above. What follows from that is not written down, because it is the thing worth
+proposing.
 
 ## What is still missing
 
