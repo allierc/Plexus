@@ -183,11 +183,20 @@ def rerender(out_dir, **kw):
     ecm_ops.STRESS_RAW[:] = list(np.asarray(z["vm"])) if "vm" in z.files else []
     ecm_ops.BALL_RADIUS[:] = list(np.asarray(z["radius"], float))
     out = {"sets": {"mpm_particle": {"pos": np.asarray(z["pos"])}}}
+    if "mpos" in z.files:
+        import membrane_ops
+        membrane_ops.MEMBRANE_STRAIN[:] = (list(np.asarray(z["mstrain"]))
+                                           if "mstrain" in z.files else [])
+        out["sets"]["basement_membrane_particle"] = {"pos": np.asarray(z["mpos"])}
     if "bpos" in z.files:
         import block_ops
         block_ops.BLOCK_STRESS[:] = list(np.asarray(z["bstress"]))
         block_ops.BLOCK_RAW[:] = list(np.asarray(z["bvm"])) if "bvm" in z.files else []
         out["sets"]["mpm_block"] = {"pos": np.asarray(z["bpos"])}
+    # `fps` lives in the spec, not in render()'s signature, but a re-render is exactly when you want to
+    # change it without touching the archived spec on disk.
+    if "fps" in kw:
+        spec.setdefault("plotting", {})["fps"] = int(kw.pop("fps"))
     render(os.path.basename(out_dir.rstrip("/")), out, spec, out_dir, **kw)
 
 
@@ -278,8 +287,9 @@ def autoscale(raw, pct=99.0, sample=12):
     return float(np.percentile(v, pct)) if v.size else None
 
 
-def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True,
-           strip_only=False, frame_limit=None, stress_scale=None, block_scale=None):
+def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, fps=None,
+           strip_only=False, frame_limit=None, stress_scale=None, block_scale=None,
+           membrane_scale=None):
     """The okuda artefact pair, with the matrix added: a 4-row strip and a 2-camera movie.
 
     ROWS OF THE STRIP, in the order `log/okuda/cellfix_B_new/strip.png` has them, plus one:
@@ -372,9 +382,7 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True,
             return None
         qm = (mem_pos[min(t, mem_pos.shape[0] - 1)] - centre) / max(scale, 1e-12)
         if mem_hist and t < len(mem_hist):
-            sm = np.asarray(mem_hist[t], np.float32)
-            hi = max(float(np.percentile(sm, 99)), 1e-9)
-            return qm, sm / hi
+            return qm, np.asarray(mem_hist[t], np.float32) / max(mem_sc or 1.0, 1e-12)
         return qm, np.zeros(qm.shape[0], np.float32)
 
     def blk_of(t):
@@ -396,8 +404,30 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True,
     braw = block_ops.BLOCK_RAW if bpos is not None else []
     bsc = block_scale or autoscale(braw)
     if sc:
+        # A GUARD, so an unstable run can never again be ranked best on its membrane numbers alone.
+        # `k_adh = 8e4` blew the matrix up by three orders of magnitude while LOOKING like the value that
+        # finally held the sheet out; the tell was here, in a scale nobody was reading.
+        if float(sc) > 100.0:
+            print(f"[{name}] *** UNSTABLE: ECM stress p99 = {float(sc):.4g}. Healthy runs sit at 2-8. "
+                  f"The membrane numbers from this run are NOT comparable -- a blown-up matrix can hold "
+                  f"a sheet out geometrically while tearing it.", flush=True)
         print(f"[{name}] stress colour full-scale {sc:.5g} (p99 over the run)"
               + (f"; block {bsc:.5g}" if bsc else ""), flush=True)
+
+    # TWO MATERIALS, TWO FIXED SCALES. The interstitial ECM and the basement membrane carry different
+    # quantities (von Mises stress in MPM units against crosslink strain, dimensionless) that differ by
+    # orders of magnitude, so one shared full-scale would render whichever is smaller as uniformly
+    # unstrained. They also get different ramps -- inferno for the ECM, green-to-amber for the membrane --
+    # so the two are never confused for one field.
+    #
+    # AND BOTH ARE FIXED OVER THE RUN. The membrane was being normalised PER FRAME, which is the defect
+    # `autoscale` exists to avoid: rescaling every frame to its own p99 makes a sheet whose strain is
+    # climbing look exactly like one at equilibrium, and the whole question about this membrane is
+    # whether strain accumulates faster than turnover removes it.
+    mem_sc = membrane_scale or autoscale(mem_hist) if mem_pos is not None else None
+    if mem_sc:
+        print(f"[{name}] membrane colour full-scale {mem_sc:.5g} strain (p99 over the run), "
+              f"separate from the ECM's {sc:.5g}", flush=True)
 
     def band_of(t):
         if raw and t < len(raw):
@@ -467,7 +497,8 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True,
         figm = plt.figure(figsize=(11.0, 11.0), facecolor="black")
         axs = figm.add_subplot(2, 2, 1, projection="3d", computed_zorder=False, facecolor="black")
         axc2 = figm.add_subplot(2, 2, 2, facecolor="black")
-        axz = figm.add_subplot(2, 2, 3, facecolor="black")
+        axz = figm.add_subplot(2, 2, 3, projection="3d", computed_zorder=False,
+                               facecolor="black")
         axzc = figm.add_subplot(2, 2, 4, facecolor="black")
     else:
         figm = plt.figure(figsize=(11.0, 5.5), facecolor="black")
@@ -475,7 +506,7 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True,
         axc2 = figm.add_subplot(1, 2, 2, facecolor="black")
         axz = axzc = None
     figm.subplots_adjust(0, 0, 1, 1, wspace=0.02, hspace=0.02)
-    fps = int(spec.get("plotting", {}).get("fps", 10))
+    fps = int(fps or spec.get("plotting", {}).get("fps", 10))
     wri = FFMpegWriter(fps=fps, metadata={"title": name})
     t0 = time.time()
     with wri.saving(figm, os.path.join(out_dir, "movie.mp4"), dpi=95):
@@ -492,15 +523,22 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True,
                     mq = (mem_pos[min(t, mem_pos.shape[0] - 1)] - centre) / max(scale, 1e-12)
                     if mem_hist and t < len(mem_hist):
                         ms = np.asarray(mem_hist[t], np.float32)
-                RD.draw_zoom(axz, mt, vp, mem_q=mq, mem_s=ms, name=name)
-                axz.text(0.03, 0.97, "zoom  junction myosin (blue) + basement membrane (green->amber)",
-                         transform=axz.transAxes, color="#888", fontsize=7.5, va="top")
-                # the zoomed SECTION: the same routine as the panel above, clipped to a window on the
-                # surface, so the layering reads outward -- lumen, epithelium, membrane, stroma
-                RD.draw_cross(axzc, mt, vp, q, band, cmap, L2, axis_dir, slab, dot_scale=0.55,
-                              plate_gap=plate, blk=blk, mem=mem_of(t),
-                              zoom_half=0.34 * float(np.percentile(np.linalg.norm(vp, axis=1), 98)))
-                axzc.text(0.03, 0.97, "zoom  cross-section: lumen | epithelium | membrane | stroma",
+                # BOTTOM-LEFT IS THE JUNCTIONS, AND NOTHING ELSE. With the membrane drawn over it the
+                # network was invisible: 30k dots sit in front of a line mesh whose spacing is comparable
+                # to the dot size, so the sheet simply occluded the thing the panel exists to show. The
+                # membrane keeps the bottom-right, where the section shows it in its layer.
+                # THE STRIP'S THIRD ROW, PROMOTED. Same camera as the top-left, but with the epithelium
+                # not drawn and the matrix cut away on the near side, so the basement membrane is seen
+                # whole and unobstructed instead of through the cells in front of it.
+                RD.draw_3d(axz, mt, vp, q, band, cmap, RD.CAM_SIDE, L3, div=div, brk=brk,
+                           tissue=False, cutaway=True, plate_gap=plate, blk=blk, mem=mem_of(t))
+                axz.text2D(0.03, 0.97, "cutaway  matrix opened, epithelium hidden: the membrane alone",
+                           transform=axz.transAxes, color="#888", fontsize=7.5, va="top")
+                # BOTTOM-RIGHT IS THE JUNCTION NETWORK, on its own. The membrane is not drawn here at
+                # all: 30k dots sit in front of a line mesh of comparable spacing and simply occlude it,
+                # so the two entities get a panel each rather than one panel showing neither well.
+                RD.draw_zoom(axzc, mt, vp, mem_q=None, mem_s=None, name=name, frac=0.26, lw=2.6)
+                axzc.text(0.03, 0.97, "zoom  junction network, coloured by myosin",
                           transform=axzc.transAxes, color="#888", fontsize=7.5, va="top")
             # ONE LABEL, ON THE 3D PANEL. `_draw`/`_cross_screen` both call ax.clear(), which drops
             # any label, so it is re-stamped every frame. The camera elevation and the cut plane used
@@ -554,6 +592,14 @@ def run(name, spec, device="cuda:0", movie=True, keep_traj=True, render_kw=None)
             extra = {}
             if ecm_ops.STRESS_RAW:
                 extra["vm"] = np.asarray(ecm_ops.STRESS_RAW, np.float16)
+            # THE MEMBRANE TOO, or a membrane run cannot be redrawn -- which is the whole point of
+            # keeping a trajectory. Without it a re-render would silently produce the same movie with the
+            # basement membrane simply missing, and missing reads as "there wasn't one".
+            import membrane_ops
+            if "basement_membrane_particle" in out.get("sets", {}):
+                extra["mpos"] = np.asarray(out["sets"]["basement_membrane_particle"]["pos"], np.float32)
+                if membrane_ops.MEMBRANE_STRAIN:
+                    extra["mstrain"] = np.asarray(membrane_ops.MEMBRANE_STRAIN, np.float16)
             if "mpm_block" in out.get("sets", {}):
                 extra["bpos"] = np.asarray(out["sets"]["mpm_block"]["pos"], np.float32)
                 extra["bstress"] = np.asarray(block_ops.BLOCK_STRESS, np.uint8)

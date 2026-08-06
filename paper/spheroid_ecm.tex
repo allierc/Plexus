@@ -88,8 +88,18 @@ change, so the volumetric measure was blind to the deformation, not the mechanic
 
 \section*{4.\; Spheroid $\leftrightarrow$ ECM}
 
-The two solvers cannot share a world ($\op{mpm\_grid}$ is unit-box; the vertex model lives in a 50-unit
-box and collapses if rescaled), so they are run as two passes joined by one geometric scale. The tissue
+The two solvers cannot share a world, and the reason is not a software limit. \op{mpm\_grid} is
+hard-coded to $[0,1]^3$ with $dx=1/n_{\text{grid}}$, while the epithelium lives in a 50-unit box seeding
+cells at radius~5. Rescaling the tissue into the unit box was tried and measured, not assumed: the same
+run gave $200\to319$ cells at its own scale, $200\to212$ under a pure geometric rescale (it
+\emph{collapses}), and $200\to201$ under a dimensional one---stable, but no longer growing. The cause is
+that the terms of Eq.~\eqref{eq:avm} carry different powers of length, $K_A(\Delta A)^2\!\sim\!s^4$,
+$K_P(\Delta P)^2\!\sim\!s^2$, $K_V(\Delta V)^2\!\sim\!s^6$, $\Lambda P\!\sim\!s$, so a $50\times$ shrink
+changes \emph{which term wins} and surface tension takes over; correcting every exponent stops the
+collapse and still does not restore growth. Calibrating a vertex model to a new scale is a project, and
+doing it badly would mean running the ECM experiment against a tissue that is no longer the reference
+one while the movie looked right. So the two are run as two passes joined by a single geometric scale
+$s$, applied to a \emph{recorded} shape rather than to a simulation. The tissue
 surface is recorded as an angular radius map $R(\theta,\phi,t)$ over its apical vertices. Contact is a
 one-sided penalty plus a hard projection,
 %
@@ -144,9 +154,14 @@ battery confirms $\alpha{=}1,\beta{=}0$ is bit-identical to no operator, that th
 monotonically over $\alpha\in[0,3]$ ($7.22\to6.14$), and that new junctions appear at $10.5$ per division
 rather than at the edge count per frame---the signature that the keying holds.
 
-\paragraph{Basement membrane.} A shell of material points seeded on $R(\hat{\mathbf u},0)+\delta$, with
-explicit crosslinks, so that it can be \emph{defective}---MPM alone has no connectivity and cannot
-fragment. Three terms, plus adhesion:
+\paragraph{Basement membrane.} A monolayer of material points seeded on $R(\hat{\mathbf u},0)+\delta$
+and joined by explicit \emph{crosslinks}, so that the sheet can be \emph{defective}: MPM particles are
+independent material points coupled only through the grid, so an MPM-only membrane has no connectivity,
+cannot be crosslinked and cannot fragment. A crosslink is a two-body bond $(i,j)$ between neighbouring
+membrane particles, built once by a radius search on the seeded shell and carrying its own rest length
+$\ell^0_{ij}$---it stands for the collagen~IV network that carries the load (laminin and nidogen
+contribute little to stiffness). Adhesion is a different object entirely: a \emph{one-body} spring
+between a membrane particle and a moving point on the epithelial surface. Four terms:
 %
 \begin{align}
 \text{crosslink:}\quad & \mathbf{f}_{ij}=k_b\,(\ell_{ij}-\ell^0_{ij})\,\hat{\mathbf d}_{ij},
@@ -159,9 +174,37 @@ fragment. Three terms, plus adhesion:
 \label{eq:integrin}
 \end{align}
 %
+\paragraph{Do the two matrix layers interact?} Only by pushing, and only as far as the grid resolves.
+Both particle bodies scatter into the one \op{mpm\_grid} and gather back from it
+(\op{mpm\_scatter[accumulate]}), so they exchange momentum---but no bond joins a membrane particle to a
+fibre, and the two layers slide past one another freely. The missing object is collagen~VII: anchoring
+fibrils staple the basement membrane to the interstitial matrix, and their operator
+(\op{basement\_to\_ecm}) is designed and not written. The quantitative caveat is sharper. At
+$n_{\text{grid}}=48$ the cell size is $dx=0.021$, against a membrane thickness of $0.002$ and an in-plane
+particle spacing of $\approx\!0.005$: one grid cell holds some sixteen membrane particles and is ten
+times thicker than the sheet. The grid does not resolve the membrane, it sees a smeared density, and any
+fibre within one cell of it is effectively co-moving. The strength of the membrane--matrix coupling is
+therefore set by $dx$ rather than by any parameter of the model, and no membrane--matrix result should be
+read off this configuration without a resolution study.
+
 Bond removal is registered \op{rewire}: fragmentation \emph{is} a change of $E$. What is reported is not
 the bond count but the largest connected component---a sheet that has lost a third of its crosslinks and
 is still one piece is not fragmented.
+
+The anchor $\mathbf a_i$ of Eq.~\eqref{eq:integrin} deserves stating precisely, because it is what
+distinguishes adhesion from contact. $\hat{\mathbf u}_i$ is the particle's \emph{own} direction, frozen at
+seeding, so the anchor sits at a fixed \emph{angular} position and the spring resists tangential
+sliding---anchoring instead to the nearest surface point would let the particle slide freely, which is
+contact, and the shared grid already provides that. The radial coordinate $R(\hat{\mathbf u}_i,t)$ follows
+the epithelium outward, so the bond is radially compliant and tangentially stiff, as an integrin--focal
+adhesion complex is. Two consequences follow. Geometrically, a particle pinned to a fixed angular
+position on a surface whose radius triples must accommodate area growing as $R^2$, so its crosslinks
+stretch by $\sim\!R$: this is the loading a basement membrane experiences under tissue growth, and
+without it the sheet merely slides and its bonds never strain at all (measured: mean strain $0.0000$ at
+every bond stiffness). Mechanically, because the tissue is a replay, $\mathbf a_i$ is a \emph{prescribed
+kinematic target} and not a mutual force pair---the epithelium feels no reaction. That is the one-way
+coupling of \S4 again, and it bites hardest here, since integrin adhesion is precisely the route by which
+a stiff membrane would restrain a growing acinus.
 
 Two calibration facts, both found by tests rather than by inspection. (i) Writing the crosslink force as
 $k\,\varepsilon=k(\ell-\ell^0)/\ell^0$ makes it $1/\ell^0\!\approx\!450\times$ stiffer than the number
@@ -198,5 +241,52 @@ particles where areal density has fallen below target and bond them in, the shee
 oversized reservoir. Only then does ``the membrane survived'' mean what it means biologically---that the
 tissue did not outgrow the membrane it was building---rather than that its crosslinks were stretched and
 told to forget.
+
+\section{Two things the implementation gets wrong, stated plainly}
+
+\paragraph{The anchor sets where the sheet sits, and only a narrow band of it works.} With critical
+damping the sheet stopped tearing, but it then sank \emph{through} the epithelium: the gap to the
+recorded surface ran $+0.0040\to-0.0101\to-0.0255$, every particle inside by mid-run. Tracking lag does
+not explain it ($2v_a/\sqrt{k}=0.0019$, sixteen times too small). Nor---and this corrects the obvious
+guess---does hoop tension: quartering $k_{\text{bond}}$ from $2\times10^5$ to $5\times10^4$ at fixed
+$k_{\text{adh}}$ moves the gap by under 5\% ($+0.00185/{+}0.00183/{+}0.00176$) and leaves the strain
+alone. The reason is in Eq.~\eqref{eq:bond}'s companion: remodelling fixes the steady-state strain at
+$\dot\epsilon\,\tau=0.0027\times60=0.16$ (measured $0.151$--$0.160$ in every run, at every stiffness),
+so rest lengths adapt and bond force never becomes large. What sets the gap is $k_{\text{adh}}$ against a
+residual inward force; the untested candidate is the interstitial matrix pressing through the shared
+grid, which would be the one real matrix-on-membrane effect in the model.
+
+The sweep is narrow. At 200 frames $k_{\text{adh}}=4\times10^4/6\times10^4/8\times10^4$ gives gaps
+$-0.0037/-0.0013/+0.0019$; $1\times10^5$ \emph{reverses} to $-0.069$ and $2\times10^5$ tears 94\% of
+the crosslinks. A stiffer spring cannot hold less well, so the reversal is a stability threshold rather
+than mechanics, and $8\times10^4$ is the usable value---at which 46\% of particles are still inside.
+A membrane pinned at fixed angular positions on a surface that triples in radius is being asked to cover
+nine times the area with the same particles; the operator that would resolve this, and which the model
+does not have, is \op{basement\_membrane\_secrete}.
+
+\paragraph{\op{activity} is degenerate with $\Lambda$.} Actomyosin entered Eq.~\eqref{eq:avm} as the
+single scalar $\Lambda$ and now also as a per-junction variable, and the two do not double-count: myosin
+\emph{multiplies} the line term, $\Lambda\sum_e m_e\ell_e$, and the recruitment setpoint of
+Eq.~\eqref{eq:myo} is written against the \emph{running mean} edge length
+$\langle\ell\rangle$, so
+\[ m^{ss}_e=a\Bigl(1+\beta\bigl(\ell_e/\langle\ell\rangle-1\bigr)\Bigr) \quad\Longrightarrow\quad \langle m^{ss}\rangle=a . \]
+At $a=1$ the mean is pinned to one, $\Lambda$ keeps the meaning it was calibrated with, and myosin is a
+pure zero-mean redistribution---which is why the ablation is bit-identical rather than merely close.
+But it follows that $a$, which scales every junction uniformly, is \emph{not identifiable against}
+$\Lambda$: the monotone radius response over $a\in[0,3]$ ($7.216\to6.138$) is reproduced by sweeping
+$\Lambda$ and is a consistency check, not a result. The new parameters are $\beta$, $\tau$ and
+$m_{\text{new}}$.
+
+\paragraph{The epithelial surface is not an entity.} It is $R(\hat{\mathbf u},t)$, a $32\times64$ angular
+table, read by four operators (\op{cell\_to\_ecm}, \op{cell\_exclude\_3d}, \op{integrin\_adhesion},
+\op{basement\_membrane\_seed}). Being a table and not a Level it carries no state and can receive no
+delta, which is the structural reason the adhesion of Eq.~\eqref{eq:integrin} is one-way. The Plexus2
+form is a Level \op{surface}, one member per outer face with $(\mathbf x,\mathbf v,\hat{\mathbf n},A)$,
+written each frame by a \op{broadcast} from the replayed mesh; the four operators then become ordinary
+\op{lateral} ones between two Levels, the angular lookup disappears, and---because a Level can be
+integrated---the integrin spring becomes mutual. A stronger version is available once the sheet is
+anchored, since the membrane particles are themselves a discretisation of that surface and could carry
+the contact directly; but runs without a membrane still need a contact path, so \op{surface} is the
+general answer and membrane-as-surface the specialisation.
 
 \end{document}

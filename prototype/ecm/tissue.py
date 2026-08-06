@@ -53,7 +53,7 @@ CELL_SPEC = os.path.join(ROOT, "log", "okuda", "cellfix_B_new", "spec_run.yaml")
 # mean, which is a smoother sphere than the tissue and hides the early shape entirely. 2,048 bins
 # are covered from frame 0 and still resolve a cell.
 N_THETA, N_PHI = 32, 64
-RENDER_FRAMES = 90          # frames whose full mesh is kept -- the movie draws exactly these
+RENDER_FRAMES = 200         # frames whose full mesh is kept -- the movie draws exactly these
 MESH_PAD = 1.12             # camera headroom, the `run_one.run_box` convention
 
 

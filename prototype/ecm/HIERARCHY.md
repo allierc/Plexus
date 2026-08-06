@@ -98,8 +98,43 @@ field / coupling
   [x] mpm_strain, mpm_scatter, mpm_gather, mpm_grid_update
   [x] mpm_scatter[accumulate]   the second and third bodies into the shared grid
   [ ] basement_to_ecm           an explicit membrane-to-matrix link (collagen VII);
-                                today they couple only through the grid
+                                today they couple only through the grid -- and UNRESOLVED: at
+                                n_grid=48, dx=0.021 against a 0.002 sheet with 0.005 spacing, so
+                                one cell holds ~16 membrane particles. The coupling strength is
+                                set by dx, not by a parameter.
 ```
+
+## `surface` should be a Level, and is not
+
+`R(u,t)` -- a 32x64 angular table -- is read by `cell_to_ecm`, `cell_exclude_3d`, `integrin_adhesion`
+and `basement_membrane_seed`. A table carries no state and can receive no delta, which is the
+STRUCTURAL reason integrin adhesion is one-way. As a Level (one member per outer face, pos/vel/normal/
+area, written by a `broadcast` from the replayed mesh) all four become plain `lateral` operators, the
+lookup disappears, and the integrin spring becomes mutual. Stronger still: once anchored, the membrane
+particles ARE a discretisation of that surface. But runs without a membrane still need contact, so
+`surface` is the general answer and membrane-as-surface the specialisation.
+
+## `activity` is degenerate with `Lambda`
+
+Myosin multiplies the line term and `l_ref` is the RUNNING MEAN, so <myo> = activity by construction:
+at activity=1 nothing is double-counted (the ablation is bit-identical). But `activity` scales every
+junction uniformly -- exactly what scaling `Lambda` does. T2's 7.216 -> 6.138 over activity 0..3 is a
+consistency check, NOT a result; sweeping `Lambda` gives the same curve. The new physics is `beta`,
+`tau`, `myo_new`.
+
+## The seed lattice was a crystal, and it showed
+
+A pure Fibonacci sphere is regular enough to be visible as lattice rows in the render, and the crosslink
+network inherits that regularity. Measured on the un-jittered run: the end-state strain field is
+spatially organised at **6.1x** the shuffled null, yet local growth (`r = -0.10`), bond coordination
+(`+0.21`) and nearby fibre density (`-0.07`) together explain only **4%** of it -- and growth is nearly
+uniform anyway (2.97 to 3.26). So the pattern is real structure with no mechanical explanation, which is
+what a lattice artifact looks like. `jitter` (default 0.35 of the local spacing) breaks it; as a side
+effect connectivity improves, 3.1 -> 3.4 bonds per particle.
+
+NOT YET IDENTIFIED: what remains of that pattern after jitter. Binning at the surface map's own 32x64
+resolution explains 0.87 of the variance, but that test is confounded -- finer bins explain more by
+construction (0.97 at 96x192, at 1.9 particles per bin), so it does not isolate the lookup table.
 
 ## The gap that matters most
 
@@ -114,8 +149,29 @@ has been in:
 * **without it**, mean bond strain stayed 0.0000 for the whole run at every bond stiffness -- the sheet
   slid over the epithelium instead of being stretched, so `59`/`60`'s fragmentation numbers describe the
   wrong loading path and are discarded;
-* **with it at k = 2e4**, 69,428 of 70,129 bonds broke within 40 frames at a strain of 0.95 -- the anchor
-  is far stiffer than the crosslinks, so it tears the sheet apart before the tissue has grown into it.
+* **with it at k = 2e4, undamped**, 69,428 of 70,129 bonds broke within 40 frames at a strain of 0.95 --
+  an undamped spring does not track a moving anchor, it oscillates about it;
+* **swept**: `k_adh` = 4e4 / 6e4 / 8e4 gives gap -0.0037 / -0.0013 / +0.0019 (200 frames), while 1e5
+  reverses to -0.069 and 2e5 tears 94% of the bonds. A stiffer spring cannot hold less well, so the
+  reversal above ~1e5 is a numerical threshold, not mechanics. **8e4 is the usable value**, and even
+  there 46% of particles are still inside at 200 frames.
+* **with it at k = 2e4, critically damped**, nothing broke at all -- but the sheet SANK INTO the
+  epithelium. Measured gap between the membrane and the recorded surface: `+0.00400` at frame 0,
+  `-0.01010` at mid-run, `-0.02547` at the end, with 100% of particles inside from mid-run on. This is
+  not tracking lag: for a critically damped spring following a ramp the lag is `2 v_a / sqrt(k)` =
+  0.0019, sixteen times too small.
+
+  I first wrote that the cause was HOOP TENSION -- a strained shell pulling itself inward -- and a sweep
+  of `k_bond` falsified it. Quartering the crosslink stiffness (2e5 -> 1e5 -> 5e4 at fixed `k_adh`)
+  moved the gap by under 5% (+0.00185 / +0.00183 / +0.00176) and left the strain unchanged. Crosslink
+  tension is therefore NOT what pushes the sheet in. The reason is visible in the same numbers: the
+  end-state strain is ~0.15 in EVERY run regardless of stiffness, because `basement_membrane_remodel`
+  sets it -- steady state is (growth rate)x`tau` = 0.0027 x 60 = 0.16, measured 0.151-0.160. Rest
+  lengths adapt, so bond force stays modest whatever `k_bond` is.
+
+  What DOES set the gap is `k_adh` against a residual inward force of order 170-300 in box units.
+  UNTESTED: the remaining candidate is the interstitial matrix pressing on the sheet through the shared
+  grid. That would be the one genuine ECM-to-membrane effect in the model, and it is not yet isolated.
 
 The physics needs `k_adhesion` and `k_bond` to be comparable, and neither number is yet calibrated
 against the other. Until they are, no fragmentation result from this membrane means anything.
