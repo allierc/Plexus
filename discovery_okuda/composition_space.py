@@ -993,39 +993,22 @@ class CompositionGraph:
             g.ops.append({"id": nid, "op": op, "impl": impl})
             for pn, (lo, hi, d) in OPERATORS[op]["params"].items():
                 g.params[f"{nid}.{pn}"] = d
-            # AN OPERATOR IS BORN WIRED, when there is only one way to wire it.
+            # NOT WIRED HERE. `add_op` adds; `connect` wires. A slot with no source dangles,
+            # the critic says R3, and the menu offers the pair as one two-edit row.
             #
-            # THIS IS THE DEFECT THAT COST THE CAMPAIGN. add_op created the node and never the
-            # connection, is_runnable() is false for a dangling slot, and the Proposer's menu
-            # filters on is_runnable() -- so NO OPERATOR THAT DECLARES A SLOT COULD EVER BE ADDED
-            # BY A ONE-EDIT MOVE, from any parent, ever. An external review proved it by breadth
-            # first search: 9,760 reachable compositions, ZERO containing a single connection.
+            # WHAT USED TO BE HERE, and why it is gone. add_op auto-connected a slot whenever
+            # exactly ONE operator in the graph could legally feed it. That existed only because a
+            # slot could carry one edit, so an operator that needed adding AND wiring was
+            # unreachable -- an external review proved it by breadth-first search: 9,760 reachable
+            # compositions, ZERO containing a single connection. The rule fixed the unique case and
+            # left the ambiguous one, which is how `extrude` stayed invisible to every parent (two
+            # operators produce `morphogen`, so no unique source), and the escape hatch this code
+            # claimed -- "a `connect` edit remains available" -- did not exist, because `connect`
+            # needs a node that could not be added.
             #
-            # The three slotted operators are the entire morphogen -> mechanics arrow:
-            #     morphogen_growth_3d.gate   -- Okuda's own mechanism
-            #     extrude.site               -- the forcing term
-            #     divide_3d:orient_iface.axis
-            # so the search could destroy the coupling and never build it, and six rounds of
-            # "chemistry is inert for shape" were a measurement of a disconnected subsystem.
-            #
-            # UNIQUE SOURCE ONLY -- the same rule already used to rebuild parents from specs. One
-            # candidate is not a guess, it is the only wiring the composition admits. Two or more
-            # is a real choice and stays dangling, so the Critic still says R3 and a `connect`
-            # edit remains available to make it deliberately.
-            # LEGAL_LINKS is the authority on what may feed what -- reuse it rather than invent
-            # a second rule, because a slot is named `gate` while the port it accepts is called
-            # `morphogen`, and matching the two by name silently wires nothing.
-            for _sl in slots_of(op, impl):
-                _src = [o["id"] for o in g.ops if o["id"] != nid
-                        and any((_ot, _sl) in LEGAL_LINKS
-                                for _ot in (OPERATORS[o["op"]].get("outputs") or []))]
-                # NOT TWICE. The auto-wire fires on add_op and a recipe may then `connect` the
-                # same pair explicitly, which gave okuda_route the identical edge twice -- and a
-                # duplicated coupling is not a cosmetic problem in a graph the engine compiles.
-                if len(_src) == 1 and not any(
-                        c["src"] == _src[0] and c["dst"] == nid and c["slot"] == _sl
-                        for c in g.conns):
-                    g.conns.append({"src": _src[0], "dst": nid, "slot": _sl})
+            # With MAX_EDITS = 4 the pair is expressible, so one rule replaces two: wiring is
+            # always explicit and always in the record, instead of silent when unique and absent
+            # when not. `from_preset` already connects explicitly and is unaffected.
         elif kind == "remove_op":
             nid = edit[1]
             g.ops = [o for o in g.ops if o["id"] != nid]
@@ -1059,18 +1042,9 @@ class CompositionGraph:
             keep = set(slots_of(g._op_of(edit[1]), edit[2]))
             g.conns = [c for c in g.conns
                        if c["dst"] != edit[1] or c["slot"] in keep]
-            # AND AN IMPLEMENTATION WITH MORE SLOTS MUST HAVE THEM FED, by the same unique-source
-            # rule add_op uses. Without this, `set_impl divide_3d0 orient_iface` left the `axis`
-            # slot dangling, so is_runnable() was false and ORIENTED DIVISION -- a named Okuda
-            # mechanism -- was unreachable by swap even after add_op learned to wire. The auto
-            # wiring lived in one of the two branches that create a slot.
-            _held = {c["slot"] for c in g.conns if c["dst"] == edit[1]}
-            for _sl in keep - _held:
-                _src = [o["id"] for o in g.ops if o["id"] != edit[1]
-                        and any((_ot, _sl) in LEGAL_LINKS
-                                for _ot in (OPERATORS[o["op"]].get("outputs") or []))]
-                if len(_src) == 1:
-                    g.conns.append({"src": _src[0], "dst": edit[1], "slot": _sl})
+            # A NEW SLOT IS NOT WIRED HERE EITHER, for the same reason: `set_impl` swaps the
+            # implementation, `connect` wires what the swap exposed. The unique-source copy that
+            # lived here was the second of two, and the two could disagree.
         else:
             raise ValueError(f"unknown edit {edit!r}")
         return g, edit

@@ -206,13 +206,24 @@ class BasementMembraneSeed(Structural):
         lvl.get("pos")[:] = P.to(dev, dt_)
         n0 = n if self.reserve <= 0 else max(1, int(round(n / (1.0 + self.reserve))))
         alive = torch.zeros(n, dtype=torch.bool, device=dev)
-        alive[:n0] = True
+        # STRIDED, NOT THE FIRST n0. The Fibonacci lattice is generated with ct = 1 - 2i/n, so its index
+        # runs monotonically from the north pole to the south: `alive[:n0]` is a POLAR CAP, not a sparse
+        # shell. Run 66 seeded with reserve=8 covered z in [0.500, 0.589] at frame 0 -- exactly the top
+        # ninth of the sphere -- and then grew downward as it secreted, which read as the membrane
+        # migrating upward. Every k-th point of a Fibonacci spiral is itself a coarser Fibonacci spiral,
+        # so a stride gives a uniform sparse shell and the reserve fills in between.
+        step = max(1, int(round(n / max(n0, 1))))
+        alive[::step] = True
+        if int(alive.sum()) > n0:                       # trim the overshoot from the far end
+            extra = int(alive.sum()) - n0
+            idx = alive.nonzero(as_tuple=True)[0][-extra:]
+            alive[idx] = False
         if n0 < n:
             # PARKED AT THE CENTRE, MASSLESS. Inside the tissue, where nothing else lives, so a dormant
             # particle cannot be mistaken for membrane by any operator that works on position; and mass 0
             # so it scatters nothing into the shared grid. `cell_exclude_3d` skips massless particles for
             # exactly this reason -- otherwise it would project the whole reserve onto the surface.
-            lvl.get("pos")[n0:] = c.to(dev, dt_)
+            lvl.get("pos")[~alive] = c.to(dev, dt_)
             m = getattr(lvl, "mass", None)
             if m is None:
                 raise RuntimeError(
@@ -220,7 +231,7 @@ class BasementMembraneSeed(Structural):
                     "particles massless, and this level has none. Without it the reserve would scatter "
                     "into the grid from the tissue centre.")
             self._mass0 = float(m.reshape(-1)[0])
-            m[n0:] = 0.0
+            m[~alive] = 0.0
         H.membrane_alive = alive
         # Published so `surface_track` can pair element i with particle i without reproducing an RNG
         # sequence. (Rebuilding the lattice does in fact reproduce it -- the jitter draws come first in

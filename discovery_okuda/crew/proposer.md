@@ -83,7 +83,10 @@ report.
 
 ## What not to do
 
-- Do not propose two edits in one slot.
+- Do not propose more than **four** edits in one slot. One is usually right; a sequence is for a
+  composition that is not legal until two moves are made — `add_op` then `connect` is the common
+  case, because an operator whose input could come from more than one source is not wired
+  automatically and a dangling slot is refused. Write it as a list of edits, applied in order.
 - Do not name a metric that is not in the bank; it cannot be scored.
 - Do not re-propose anything under *What is ruled out*.
 - Do not write any file other than the proposal.
