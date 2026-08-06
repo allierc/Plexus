@@ -41,7 +41,7 @@ operators:
   chi: 0.02
 - op: cell_react
   at: cell
-  implementation: gray_scott
+  model: gray_scott
   F: 0.046
   kk: 0.062
   rate: 1.0

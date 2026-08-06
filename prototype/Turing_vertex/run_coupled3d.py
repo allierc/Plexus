@@ -66,14 +66,14 @@ def presets():
     domain (spots insert / are maintained; the paper's hysteresis). Rendered as EXTRUDED PRISMS
     (cell_prisms_3d) for clean epithelial paving. gamma sets the patterning time scale.
     (Fig 5 tubulation needs the apical/basal + bending mechanics in shell_ops.py -- deferred.)"""
-    BR = {"implementation": "brusselator", "gamma": 2.0, "A": 1.0, "B": 3.0}
+    BR = {"model": "brusselator", "gamma": 2.0, "A": 1.0, "B": 3.0}
     base = dict(lumen=True, R=6.0, dt=0.02, chi=5.0, d_a=0.05, d_h=0.7, react=BR,
                 s0=5.3, mu=0.02, vmax=1.0, ratio=2.0, K_V=10.0, K_S=1.0, k_bend=0.35, k_lloyd=1.5,
                 lam_ref=0.25, rho_lam=1.0, a_sw=1.0, hill=2.0)                 # UNIFORM growth (activator-independent)
     # Fig 5: activator-driven (mitogen) QUASI-STATIC growth on the apical/basal SHELL mechanics +
     # membrane_bending (prevents single-cell spikes -> coherent folds) + lumen_pressure (area growth
     # buckles instead of inflating). Fast RD (gamma high) so the pattern pre-forms before much growth.
-    BR5 = {"implementation": "brusselator", "gamma": 4.0, "A": 1.0, "B": 3.0}
+    BR5 = {"model": "brusselator", "gamma": 4.0, "A": 1.0, "B": 3.0}
     base5 = dict(lumen=True, R=6.0, dt=0.02, d_a=0.05, react=BR5, s0=5.3, mu=0.015, vmax=0.8,
                  ratio=2.0, K_V=10.0, K_S=1.0, k_bend=0.45, mechanics="shell",
                  lam_ref=0.15, rho_lam=0.03, a_sw=1.6, hill=8.0,                  # quasi-static MITOGEN
@@ -83,7 +83,7 @@ def presets():
     # dt to develop (F,kk are fixed by the regime, can't be rescaled), so run the whole coupling at
     # dt=0.35 with GENTLE mechanics (small mu, tight vmax clamp) so the vertex model stays stable.
     def GS(F, kk):
-        return {"implementation": "gray_scott", "F": F, "kk": kk}
+        return {"model": "gray_scott", "F": F, "kk": kk}
     gs = dict(lumen=True, R=8.0, dt=0.35, norm=False, seed_mode="scatter", seed_frac=0.04,
               d_a=0.08, d_h=0.16, chi=0.28, react=GS(0.058, 0.063), compile=False,   # growing N -> vectorised eager (32x, robust)
               s0=5.3, mu=0.006, vmax=0.6, ratio=2.0, K_V=10.0, K_S=1.0, k_bend=0.2, k_lloyd=0.5,
@@ -101,7 +101,7 @@ def presets():
     # (dt*d_h*chi*degree < ~0.4). The robust high-feed coral tolerates chi=9.8/rate=35; the delicate
     # low-feed labyrinth (F=0.029) diverges there, so it runs gentler chi/rate over more frames.
     def GSV(F, kk, rate=35.0):
-        return {"implementation": "gray_scott", "F": F, "kk": kk, "rate": rate}
+        return {"model": "gray_scott", "F": F, "kk": kk, "rate": rate}
     # extrusion-ELONGATION sweep (cluster). WAVE 1 (ext_*, buffer=4500, frames=6-9k) FAILED: over-growing
     # to N=4500 packs cells densely at the activator domains -> explicit-diffusion CFL blows up -> activator
     # NaN -> black render + relaxed sphere. LESSON: the extrusion lives in the N~3000 window; "run longer"
@@ -117,7 +117,7 @@ def presets():
     return [
         dict(base, name="fig4_vesicle",      n0=600, buffer=3000, frames=1000),                  # slow patterning
         dict(base, name="fig4_vesicle_fast", n0=600, buffer=3000, frames=1000, chi=5.0,
-             react={"implementation": "brusselator", "gamma": 8.0, "A": 1.0, "B": 3.0}),          # fast patterning -> spots insert
+             react={"model": "brusselator", "gamma": 8.0, "A": 1.0, "B": 3.0}),          # fast patterning -> spots insert
         dict(gs, name="fig4_coral",     n0=1000, buffer=2600, frames=9000, react=GS(0.058, 0.063)),   # coral on growing vesicle
         dict(gs, name="fig4_labyrinth", n0=1000, buffer=2600, frames=9000, react=GS(0.029, 0.054)),   # labyrinth
         dict(gs, name="fig4_holes",     n0=1000, buffer=2600, frames=9000, react=GS(0.039, 0.058)),   # holes

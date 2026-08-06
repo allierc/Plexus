@@ -364,7 +364,7 @@ class CellDiffuseInterfaceWeighted(Lateral):
         return {self.at: (coef[None, :] * lap) * occ}
 
 
-@register_operator("cell_react", set="cell", kind="lateral", family="fields", implementation="gray_scott")
+@register_operator("cell_react", set="cell", kind="lateral", family="fields", model="gray_scott")
 class CellReactGrayScott(Lateral):
     """Gray-Scott autocatalysis on the cell set (forked from Turing_vertex `react`), chem = [a, u]:
         da/dt =  u a^2 - (F + kk) a      (a = activator / autocatalyst)
@@ -393,7 +393,7 @@ class CellReactGrayScott(Lateral):
         return {self.at: self.rate * torch.stack([da, du], dim=1) * occ}
 
 
-@register_operator("cell_react", set="cell", kind="lateral", family="fields", implementation="gierer_meinhardt")
+@register_operator("cell_react", set="cell", kind="lateral", family="fields", model="gierer_meinhardt")
 class CellReactGiererMeinhardt(Lateral):
     """Gierer-Meinhardt activator(a)-inhibitor(h) -- the RD OKUDA uses (ref 37). chem = [a, h]:
         da/dt = gm_rho * a^2/h - mu_a * a + a0     (SELF-ENHANCING activator: the a^2/h AUTOCATALYSIS is the
@@ -592,7 +592,7 @@ class RDInterfaceTension(Lateral):
         return {self.at: vel * occ}
 
 
-@register_operator("cell_react", set="cell", kind="lateral", family="fields", implementation="brusselator")
+@register_operator("cell_react", set="cell", kind="lateral", family="fields", model="brusselator")
 class CellReactBrusselator(Lateral):
     """`brusselator` implementation of cell_react (transposed verbatim from Turing_vertex fig4_coral),
     chem = [a, h] (activator, inhibitor):

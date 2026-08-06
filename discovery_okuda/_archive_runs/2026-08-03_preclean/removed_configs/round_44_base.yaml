@@ -48,7 +48,7 @@ operators:
   chi: 4.0
 - op: cell_react
   at: cell
-  implementation: gierer_meinhardt
+  model: gierer_meinhardt
   rate: 1.0
   gm_rho: 1.0
   mu_a: 1.0

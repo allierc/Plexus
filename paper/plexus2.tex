@@ -745,11 +745,44 @@ needs, for instance while a mesh relaxes, but cannot ask an initial condition to
 the length of the trajectory. This is the same move as \code{EMIT}: a discipline every
 specification would otherwise have to remember becomes a guarantee the language provides.
 
-Selection is by name: \code{get\_operator(name, implementation)} returns the chosen
-class (the default when none is named), and \code{get\_contract(name)} exposes the
+\paragraph{Model and implementation are different choices.} A contract may be varied along
+two axes, and conflating them makes a model-search campaign unable to say what it found.
+
+An \textbf{implementation} is a numerical realization of a fixed biology. Its variants share
+the contract's parameters and answer the same question with different numerics: diffusion on a
+combinatorial graph Laplacian or on interface-weighted finite volumes; a finite-difference or a
+spectral field update. Swapping one for another holds the operating point fixed, and a result
+that changes under the swap is a statement about discretization, not about the tissue.
+
+A \textbf{model} is a different biological hypothesis occupying the same slot. Gray--Scott,
+Brusselator and Gierer--Meinhardt are all reaction operators on a two-species state, but they
+are not three ways of computing one reaction: their parameter sets are disjoint
+(\{\code{F},\code{kk}\}, \{\code{A},\code{B}\}, \{\code{a0},\code{mu\_a},\code{sat}\}), so no
+common operating point exists at which to compare them. Likewise an operator coupling shape
+back to chemistry may sense curvature, cortical tension, apical area or pressure; these share a
+signature exactly, yet each is a distinct claim about mechanotransduction, resting on different
+evidence. Swapping a model \emph{is} an experiment.
+
+Declaring both through one keyword had a concrete cost. In our developmental campaign the
+search's own documentation described implementation swaps as ``genuine mechanism edits'' while
+this appendix described them as numerical choices; every finding recorded against the reaction
+operator was in fact a finding about Gray--Scott, and the search verb that was pushed hardest
+by coverage analysis was the one whose meaning was ambiguous. The registry's only guard --- that
+variants of a contract share a \code{KIND} --- cannot detect this, since all four shape-sensing
+variants are \code{lateral}.
+
+Contracts therefore carry \code{model=} and \code{implementation=} as separate axes: a contract
+has models, and a model has implementations. A specification names them with separate keys, and
+naming one where the other is meant is refused rather than silently accepted. Two consequences
+follow. A mechanism claim becomes attributable, because the record names the model it is about.
+And a search can distinguish an edit that changes the biology from one that changes only the
+arithmetic --- which is the difference between an experiment and a control.
+
+Selection is by name: \code{get\_operator(name, model, implementation)} returns the chosen
+class (the defaults when none are named), and \code{get\_contract(name)} exposes the
 whole contract. The registry therefore separates biological semantics from
 numerical realization: new numerical methods are new registered implementations,
-never edits to the execution engine.
+new hypotheses are new registered models, and neither is an edit to the execution engine.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 

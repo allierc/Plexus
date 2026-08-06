@@ -37,7 +37,7 @@ def build(chi, rho, vth, rate, a_sw, gamma=2.0):
            {"op": "cell_geometry_3d", "at": "cell"}, {"op": "cell_adjacency", "at": "cell"},
            {"op": "seed_cell_rd", "at": "cell", "seed": SEED, "before_frame": 3, "mode": "noise", "A": 1.0, "B": 3.0, "noise": 0.04},
            {"op": "cell_diffuse", "at": "cell", "d_a": 0.05, "d_h": 0.7, "chi": chi},
-           {"op": "cell_react", "at": "cell", "implementation": "brusselator", "gamma": gamma, "A": 1.0, "B": 3.0},
+           {"op": "cell_react", "at": "cell", "model": "brusselator", "gamma": gamma, "A": 1.0, "B": 3.0},
            # activator->growth: low body rho + activator boost; v_eq capped (uniform behind the front)
            {"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": rate,
             "a_sw": a_sw, "hill": 4.0, "rho": rho, "vth_frac": vth},

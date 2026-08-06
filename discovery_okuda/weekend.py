@@ -80,7 +80,7 @@ def base_config():
           {"op": "seed_cell_rd", "at": "cell", "seed": 0, "before_frame": 3,
            "mode": "scatter", "seed_frac": 0.06},
           {"op": "cell_diffuse", "at": "cell", "d_a": 0.08, "d_h": 0.16, "chi": 1.3},
-          {"op": "cell_react", "at": "cell", "implementation": "gray_scott",
+          {"op": "cell_react", "at": "cell", "model": "gray_scott",
            "F": 0.046, "kk": 0.062, "rate": 1.0}]
     order = ["seed_mesh_3d", "cell_geometry_3d", "cell_adjacency", "seed_cell_rd", "cell_diffuse",
              "cell_react", "shape_to_chem", "morphogen_growth_3d", "shape_energy_3d",
@@ -118,7 +118,7 @@ def specs():
         # THE NULL. Same composition, feedback silent. This is also the subtractive direction that
         # makes a causal claim about shape_to_chem legal under critic.check_batch.
         c = copy.deepcopy(b)
-        c["operators"].insert(6, {"op": "shape_to_chem", "at": "cell", "implementation": "curvature",
+        c["operators"].insert(6, {"op": "shape_to_chem", "at": "cell", "model": "curvature",
                                   "vertex_set": "vertex", "beta": 0.0, "F0": 0.046, "rate": 1.0})
         out.append((f"wk_null_s{sd}", c, sd, "NULL: shape feedback silent (beta = 0)"))
         for feat in FEATURES:

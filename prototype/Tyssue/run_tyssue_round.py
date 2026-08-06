@@ -518,11 +518,11 @@ def make(p):
         if rd:
             impl = p.get("rd_impl", "brusselator")
             if impl == "gray_scott":                              # stable localized SPOTS (substrate depletion)
-                react = {"op": "cell_react", "at": "cell", "implementation": "gray_scott", "F": p.get("F", 0.055), "kk": p.get("kk", 0.062), "rate": p.get("rd_rate", 1.0)}
+                react = {"op": "cell_react", "at": "cell", "model": "gray_scott", "F": p.get("F", 0.055), "kk": p.get("kk", 0.062), "rate": p.get("rd_rate", 1.0)}
             elif impl == "gierer_meinhardt":                      # SELF-ENHANCING a^2/h peak (Okuda's RD, ref 37)
-                react = {"op": "cell_react", "at": "cell", "implementation": "gierer_meinhardt", "gm_rho": p.get("gm_rho", 1.0), "mu_a": p.get("mu_a", 1.0), "mu_h": p.get("mu_h", 1.0), "a0": p.get("a0", 0.01), "rate": p.get("rd_rate", 1.0)}
+                react = {"op": "cell_react", "at": "cell", "model": "gierer_meinhardt", "gm_rho": p.get("gm_rho", 1.0), "mu_a": p.get("mu_a", 1.0), "mu_h": p.get("mu_h", 1.0), "a0": p.get("a0", 0.01), "rate": p.get("rd_rate", 1.0)}
             else:                                                 # Brusselator (Turing spots); B = activator contrast
-                react = {"op": "cell_react", "at": "cell", "implementation": "brusselator", "gamma": p.get("gamma", 0.3), "A": 1.0, "B": p.get("B", 3.0)}
+                react = {"op": "cell_react", "at": "cell", "model": "brusselator", "gamma": p.get("gamma", 0.3), "A": 1.0, "B": p.get("B", 3.0)}
             ops += [{"op": "cell_adjacency", "at": "cell"},
                     {"op": "cell_diffuse", "at": "cell", "d_a": p.get("d_a", 0.05), "d_h": p.get("d_h", 0.7), "chi": p.get("chi", 4.0)},
                     react]
@@ -531,12 +531,12 @@ def make(p):
         ops += [{"op": "cell_adjacency", "at": "cell"},
                 {"op": "seed_cell_rd", "at": "cell", "seed": 0, "before_frame": 3, "mode": "noise", "A": 1.0, "B": 3.0, "noise": 0.04},
                 {"op": "cell_diffuse", "at": "cell", "d_a": 0.05, "d_h": 0.7, "chi": p["chi"]},
-                {"op": "cell_react", "at": "cell", "implementation": "brusselator", "gamma": p["gamma"], "A": 1.0, "B": 3.0}]
+                {"op": "cell_react", "at": "cell", "model": "brusselator", "gamma": p["gamma"], "A": 1.0, "B": 3.0}]
         sched += ["cell_adjacency", "seed_cell_rd", "cell_diffuse", "cell_react"]
     ga = int(p.get("grow_after", 0))                            # growth+division start only AFTER frame ga, so the
     #   RD activation pattern stabilises FIRST (GM peaks amplify) before morphogenesis acts on it
     if p.get("monolayer"):                                     # MONOLAYER (apical/basal) energy: growth-driven,
-        se = {"op": "shape_energy_3d", "implementation": "monolayer", "at": "vertex",   # quasi-static tube (Okuda)
+        se = {"op": "shape_energy_3d", "model": "monolayer", "at": "vertex",   # quasi-static tube (Okuda)
               "k_v": p.get("mono_kv", 6.0), "kappa_s": p.get("kappa_s", 0.2), "h0": p.get("h0", 0.4),
               "gamma": p.get("mono_gamma", 0.06), "mu": 1.0, "dt": dt, "relax_iters": p.get("relax", 30),
               "eta": 0.08, "cap_frac": 0.12}

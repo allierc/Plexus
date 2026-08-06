@@ -65,7 +65,7 @@ def make(n, frames, coral, relax=30, K_R=0.4, mdf=0.03):
         ops += [{"op": "cell_adjacency", "at": "cell"},
                 {"op": "seed_cell_rd", "at": "cell", "seed": SEED, "before_frame": 3, "mode": "scatter", "seed_frac": 0.06},
                 {"op": "cell_diffuse", "at": "cell", "d_a": 0.08, "d_h": 0.16, "chi": 1.3},
-                {"op": "cell_react", "at": "cell", "implementation": "gray_scott", "F": 0.055, "kk": 0.062, "rate": 1.0}]
+                {"op": "cell_react", "at": "cell", "model": "gray_scott", "F": 0.055, "kk": 0.062, "rate": 1.0}]
         sched += ["cell_adjacency", "seed_cell_rd", "cell_diffuse", "cell_react"]
     ops += [{"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": 0.03, "a_sw": 50.0, "hill": 4.0, "rho": 1.0, "vth_frac": 1.4},
             {"op": "shape_energy_3d", "at": "vertex", "p0": P0, "K_A": 1.0, "K_P": 1.0, "Gamma": GAM, "Lambda": LAM, "K_V": K_V, "K_R": K_R, "mu": 1.0, "dt": dt, "relax_iters": relax, "eta": 0.08, "cap_frac": 0.12},

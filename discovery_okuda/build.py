@@ -182,7 +182,7 @@ def _graph_from_run(name):
                 # operator has only one, so the name has to come from the space, not from a
                 # placeholder -- `seed_mesh_3d:default` compiles to nothing and refuses the parent.
                 _impls = (_CS.OPERATORS[nm].get("impls") or ["default"])
-                _im = o.get("implementation") or o.get("impl")
+                _im = o.get("model") or o.get("implementation") or o.get("impl")
                 ops.append({"id": oid, "op": nm,
                             "impl": _im if _im in _impls else _impls[0]})
                 for k, v in o.items():

@@ -90,7 +90,7 @@ def _monolayer_energy_core(pos, es, et, ef, nF, h_cell, V_eq, alive, k_v, kappa_
     return E
 
 
-@register_operator("shape_energy_3d", implementation="monolayer", set="vertex", kind="lateral", family="mechanics")
+@register_operator("shape_energy_3d", model="monolayer", set="vertex", kind="lateral", family="mechanics")
 class MonolayerShapeEnergy3D(Lateral):
     """The MONOLAYER implementation of the shape_energy_3d contract (plexus2 sec. 5: same biological
     operator -- the mechanical force that shapes the epithelial vesicle -- different NUMERICS). The

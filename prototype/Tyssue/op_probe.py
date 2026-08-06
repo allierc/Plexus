@@ -330,7 +330,7 @@ def gradient(spec_dict, op_name, key, frames, device="cpu"):
 def _impl_of(spec_dict, op_name):
     for o in spec_dict.get("operators", []):
         if o.get("op") == op_name:
-            return o.get("implementation")
+            return o.get("model") or o.get("implementation")
     return None
 
 
@@ -455,7 +455,7 @@ def battery(fixture_spec, ckpt, frames=50, device="cpu", only=None, verbose=True
         if only and name not in only:
             continue
         declared = _params_of(warm, name)
-        missing, err = unread_params(name, declared, o.get("implementation"))
+        missing, err = unread_params(name, declared, o.get("model") or o.get("implementation"))
         for key, val in sorted(declared.items()):
             if err is None and key in (missing or []):
                 rows.append(dict(op=name, param=key, verdict="UNREAD", rel=0.0,
@@ -521,7 +521,7 @@ def main():
         name = o.get("op")
         params = {k: v for k, v in o.items() if k not in ("op", "id", "at", "every",
                                                           "when", "before_frame", "after_frame")}
-        missing, err = unread_params(name, params, o.get("implementation"))
+        missing, err = unread_params(name, params, o.get("model") or o.get("implementation"))
         if err:
             print(f"  {name:24} -- {err}")
         elif missing:

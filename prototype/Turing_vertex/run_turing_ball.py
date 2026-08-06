@@ -48,11 +48,11 @@ PANEL = 4.4
 
 
 def BR(gamma, A=1.0, B=3.0):
-    return {"implementation": "brusselator", "gamma": gamma, "A": A, "B": B}
+    return {"model": "brusselator", "gamma": gamma, "A": A, "B": B}
 
 
 def GS(F, kk):
-    return {"implementation": "gray_scott", "F": F, "kk": kk}
+    return {"model": "gray_scott", "F": F, "kk": kk}
 
 
 def presets():

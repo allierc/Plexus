@@ -42,7 +42,7 @@ operators:
   at: cell
 - op: cell_react
   at: cell
-  implementation: gierer_meinhardt
+  model: gierer_meinhardt
   rate: 1.0
   gm_rho: 1.0
   mu_a: 1.0
@@ -50,7 +50,7 @@ operators:
   a0: 0.01
 - op: shape_to_chem
   at: cell
-  implementation: curvature
+  model: curvature
   vertex_set: vertex
   beta: 0.0
   F0: 0.055
@@ -72,7 +72,7 @@ operators:
   dt: 1.0
   conserve_amount: true
 - op: shape_energy_3d
-  implementation: monolayer
+  model: monolayer
   at: vertex
   k_v: 6.0
   kappa_s: 0.2

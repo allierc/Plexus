@@ -412,7 +412,7 @@ def _activator_zero_is_a_fixed_point(cfg):
     if "seed_cell_rd" in ops:
         return None                                    # something did seed; zero is a real failure
     react = ops.get("cell_react") or {}
-    impl = react.get("implementation")
+    impl = react.get("model") or react.get("implementation")
     if impl == "gray_scott":
         return ("no seeding operator, and gray_scott's da = u*a^2 - (F+kk)*a is homogeneous in a, "
                 "so a = 0 is an exact fixed point for every value of u, F and kk")
@@ -1084,16 +1084,16 @@ def certify():
     flat = [{"frame": i, "act_max": 0.0, "act_min": 0.0} for i in range(50)]
     for lbl, react, want in (
             ("P4 zero activator, gray_scott, no seed",
-             {"op": "cell_react", "implementation": "gray_scott", "F": 0.046, "kk": 0.062},
+             {"op": "cell_react", "model": "gray_scott", "F": 0.046, "kk": 0.062},
              "censored"),
             ("P4 zero activator, GM a0=0, no seed",
-             {"op": "cell_react", "implementation": "gierer_meinhardt", "a0": 0.0}, "censored"),
+             {"op": "cell_react", "model": "gierer_meinhardt", "a0": 0.0}, "censored"),
             ("P4 zero activator, GM a0=0.01, no seed",
-             {"op": "cell_react", "implementation": "gierer_meinhardt", "a0": 0.01}, "fail"),
+             {"op": "cell_react", "model": "gierer_meinhardt", "a0": 0.01}, "fail"),
             ("P4 zero activator, brusselator, no seed",
-             {"op": "cell_react", "implementation": "brusselator", "gamma": 0.3}, "fail"),
+             {"op": "cell_react", "model": "brusselator", "gamma": 0.3}, "fail"),
             ("P4 zero activator WITH a seed present",
-             {"op": "cell_react", "implementation": "gray_scott", "F": 0.046, "kk": 0.062},
+             {"op": "cell_react", "model": "gray_scott", "F": 0.046, "kk": 0.062},
              "fail")):
         ops = [react] + ([{"op": "seed_cell_rd", "mode": "scatter"}] if "WITH" in lbl else [])
         r = p4_chemistry_not_extinguished({"operators": ops}, flat)

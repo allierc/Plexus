@@ -47,7 +47,7 @@ operators:   # the operators to instantiate (each realises one mechanism)
   chi: 4.0
 - op: cell_react
   at: cell   # the set this operator acts on
-  implementation: brusselator
+  model: brusselator
   gamma: 2.0
   A: 1.0
   B: 3.0
