@@ -84,7 +84,13 @@ from dataclasses import asdict, dataclass, field
 # dilute the campaign's only control signal. It resolves `described` -- a real outcome, recorded,
 # and outside the confirmed/refuted arithmetic. "A labyrinth nobody forecast is a finding, not a
 # failed prediction."
-INTENTS = ("confirmatory", "adversarial", "control", "exploratory")
+# A REPLICATE IS ITS OWN INTENT, added 6 August. It arises when a proposed slot repeats an experiment
+# already on file: instead of refusing it, the round re-seeds it and runs it, so the wasted slot becomes
+# the campaign's only measurement of its own noise floor. It is kept OUT of MECHANISM_INTENTS for the
+# same reason a control and an exploratory slot are -- it makes no NEW claim about a mechanism, it tests
+# whether an old one survives a different seed. Its prediction is the original's, and whether that holds
+# is the robustness result.
+INTENTS = ("confirmatory", "adversarial", "control", "exploratory", "replicate")
 MECHANISM_INTENTS = ("confirmatory", "adversarial")
 
 # ---------------------------------------------------------------------------------------------

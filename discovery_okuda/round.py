@@ -637,8 +637,8 @@ def _build_one(slot, rid, index, seen):
         ok, bad = C.admit(g, seen_hashes=(), edit_kind=(edit[0] if edit else None))
         replicate = bool(ok)
         if ok:
-            print(T_.quiet(f"[round] slot {index} repeats an experiment -- re-seeded and run as a "
-                           f"REPLICATE, which is how the seed spread gets measured"))
+            print(T_.quiet(f"[round] slot {index} repeats an experiment -- re-seeded and relabelled a "
+                           f"ROBUSTNESS TEST, which is how the seed spread gets measured"))
 
     if not ok:
         print(T_.no(f"[round] slot {index} refused: {[r.code for r in bad]} -- {bad[0].detail}"))
@@ -657,6 +657,21 @@ def _build_one(slot, rid, index, seen):
     # REPORTED ONCE PER PARENT, at the end of the batch. These values are inherited, so printing them
     # per slot printed one fact nine times -- and the nine copies pushed the two lines that differed
     # (the compile refusal, the short batch) off the top of the screen.
+    # THE SLOT SAYS WHAT IT NOW IS. Cedric: "if the critic finds replicate it should set different seed
+    # and mention that it is robustness test itself." Without this the record keeps the Proposer's
+    # original claim -- "coverage: vesicle_growth on the three best chemistry parents" -- on a run that
+    # is no longer that experiment, and a reader six rounds later has no way to tell. The original text
+    # is kept beside it rather than overwritten: it is why the slot was proposed, and that is worth
+    # knowing even though it is no longer what the slot does.
+    if replicate:
+        slot = dict(slot)
+        slot["claim_proposed"] = slot.get("claim")
+        slot["intent"] = "replicate"
+        slot["claim"] = ("ROBUSTNESS TEST, not a new experiment: this repeats an experiment already on "
+                         "file at a different seed. Its prediction is the original's, and whether that "
+                         "holds is the result. Proposed as: "
+                         + (str(slot.get("claim_proposed")) or "(no claim given)"))
+
     rng = C.range_notes(g)
     # `comp_hash` IS A FUNCTION, NOT AN ATTRIBUTE, and reading it as one wrote None onto every record
     # for 69 runs. So no row could say which composition it was, `_seen()` collected no composition
@@ -669,7 +684,8 @@ def _build_one(slot, rid, index, seen):
         print(T_.no(f"[round] slot {index}: cannot hash the composition: {e}"))
         h = None
     return {"name": name, "slot": index, "parent": par, "edit": edit, "out_of_range": rng,
-            "replicate": replicate, "run_key": C._run_key(g),
+            "replicate": replicate, "claim_proposed": slot.get("claim_proposed"),
+            "run_key": C._run_key(g),
             "comp_hash": h,
             **{k: slot.get(k) for k in ("claim", "predict", "intent", "why")}}
 
@@ -908,6 +924,7 @@ def record_all(ctx):
                                 "intent": s.get("intent"), "comp_hash": s.get("comp_hash"),
                                 "out_of_range": s.get("out_of_range") or [],
                                 "replicate": bool(s.get("replicate")),
+                                "claim_proposed": s.get("claim_proposed"),
                                 "run_key": s.get("run_key"),
                                 "metrics": m, "premises_broken": m.get("premises_broken") or [],
                                 "scored": sc.get(s["name"])}, default=str) + "\n")
