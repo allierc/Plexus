@@ -1,0 +1,61 @@
+{
+ "field": "prestress",
+ "n_iter": 300,
+ "seeds": [
+  11,
+  12,
+  13,
+  14
+ ],
+ "rows": {
+  "loopscore": {
+   "without": -0.15560793317854404,
+   "with": -0.8582664579153061,
+   "change": -0.702658524736762,
+   "unit": 0.1294297825300854,
+   "distinguishable": true,
+   "verdict": "WORSE with it  (the objective -- reported, not evidence)"
+  },
+  "orientation_error": {
+   "without": 0.7867355037938253,
+   "with": 0.7871018056200672,
+   "change": 0.000366301826241866,
+   "unit": 0.023931392541678642,
+   "distinguishable": false,
+   "verdict": "indistinguishable"
+  },
+  "chirality_match": {
+   "without": 0.5937143400532522,
+   "with": 0.5239872575123621,
+   "change": -0.0697270825408901,
+   "unit": 0.06504374286801073,
+   "distinguishable": false,
+   "verdict": "indistinguishable"
+  },
+  "peak_excursion": {
+   "without": 0.0004953137351341617,
+   "with": 0.0006990129642670196,
+   "change": 0.00020369922913285787,
+   "unit": 4.211823972718933e-05,
+   "distinguishable": true,
+   "verdict": "WORSE with it"
+  },
+  "coordination": {
+   "without": 0.6652736677709131,
+   "with": 0.538712097272013,
+   "change": -0.12656157049890016,
+   "unit": 0.03844894468817567,
+   "distinguishable": true,
+   "verdict": "WORSE with it"
+  },
+  "path_length": {
+   "without": 0.00154386858304726,
+   "with": 0.003064164682293227,
+   "change": 0.0015202960992459669,
+   "unit": 0.0002104962348062635,
+   "distinguishable": true,
+   "verdict": "WORSE with it"
+  }
+ },
+ "errors": {}
+}
