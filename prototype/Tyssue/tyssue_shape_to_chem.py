@@ -334,6 +334,7 @@ class ShapeToChemPressure(_ShapeToChemBase):
 
 # --------------------------------------------------------------------------- self-test
 if __name__ == "__main__":
+    import os
     import sys
     sys.path.insert(0, "/workspace/Plexus/prototype/Tyssue")
     from tyssue_ops3d import build_sphere_mesh
@@ -398,9 +399,99 @@ if __name__ == "__main__":
     chk(abs(_standardise(x, np.ones(200))).max() <= 4.0 + 1e-9,
         "one extreme cell is clipped, not allowed to set the scale")
 
-    # --- beta = 0 must be an exact no-op: the null has to be runnable
-    print("\n  the null:")
-    chk(True, "beta = 0 returns zeros by construction (see forward)")
+    # ----------------------------------------------------------------- everything above is CHECK 0
+    # It certifies the ARITHMETIC INSIDE the operator, and every line of it passes. It is also the
+    # whole reason `beta` spent 13 rounds and 25 GPU-runs contributing nothing: the operator whose
+    # curvature reads 1/R on spheres of known radius, whose bump is positive and whose dimple is
+    # negative, never reached the state at all. What used to stand here was
+    #
+    #     chk(True, "beta = 0 returns zeros by construction (see forward)")
+    #
+    # -- the single check about `forward`, hardcoded to pass. Below are the three that were missing.
+    import torch
+
+    print("\n  CHECK 0b -- the null, actually executed rather than asserted:")
+    v, es, et, ef, nF = build_sphere_mesh(500, 5.0, 0.0, 0)
+    m = dict(E_srce=es, E_trgt=et, E_face=ef, nF=nF, Nv=v.shape[0])
+
+    class _Lvl:                                    # the smallest thing `forward` will accept
+        def __init__(self, st, sch, mesh=None):
+            self.state, self.state_schema, self._mesh, self.occ = st, sch, mesh, None
+
+        def get(self, k):
+            a, b = self.state_schema[k]
+            return self.state[:, a:b]
+
+    class _H:
+        def __init__(self, d):
+            self.levels = d
+
+        def level(self, n):
+            return self.levels[n]
+
+    chem = torch.zeros(nF, 2)
+    chem[:, 0] = 0.3
+    chem[:, 1] = 0.6                                # u != 1, or (1 - u) zeroes the emission anyway
+    H = _H({"cell": _Lvl(chem, {"chem": (0, 2)}),
+            "vertex": _Lvl(torch.as_tensor(v, dtype=torch.float32), {"pos": (0, 3)}, m)})
+    out0 = ShapeToChemCurvature({"beta": 0.0}).forward(H)["cell"]
+    chk(float(out0.abs().max()) == 0.0, "beta = 0 emits exactly zero (executed)",
+        f"max |emission| {float(out0.abs().max()):.3e}")
+
+    print("\n  CHECK 1 -- is the emission set by BETA, or by the clamp?")
+    # I expected zero here, on the reasoning that a sphere has uniform curvature so `_standardise`
+    # returns zero. The operator disagreed and it was right: a FIBONACCI sphere is discrete, its
+    # per-cell curvature carries mesh noise, and the MAD-scaling turns that noise into a full-range
+    # standardised field. So the operator fires on a sphere -- driven by discretisation, not shape.
+    #
+    # The number that matters is not that it fires but WHAT SETS ITS SIZE. dF is clamped into
+    # [0 - F0, F_CEIL - F0], so the largest correction the operator can ever emit is
+    # (F_CEIL - F0) * (1 - u), independent of beta and of geometry. If the measured maximum equals
+    # that bound, beta is not a strength -- it only chooses WHICH cells sit at the ceiling.
+    outs = {b: ShapeToChemCurvature({"beta": b}).forward(H)["cell"] for b in (-2.0, -4.0)}
+    bound = (F_CEIL - 0.055) * (1.0 - 0.6)
+    for b, o in outs.items():
+        print(f"        beta={b:<6} max |emission| {float(o.abs().max()):.4e}"
+              f"   clamp bound {bound:.4e}")
+    chk(all(abs(float(o.abs().max()) - bound) < 1e-6 for o in outs.values()),
+        "the emission is PINNED TO THE CLAMP CEILING, so beta sets no magnitude",
+        f"{float(outs[-2.0].abs().max()):.4e} vs bound {bound:.4e}")
+
+    print("\n  CHECK 1b -- and on a shape that HAS curvature variation?")
+    u = v / np.linalg.norm(v, axis=1, keepdims=True)
+    g = np.exp(-((u[:, 2] - 1.0) ** 2) / (2 * 0.05 ** 2))
+    w = (v + 1.2 * g[:, None] * u).astype(np.float32)
+    H.levels["vertex"] = _Lvl(torch.as_tensor(w), {"pos": (0, 3)}, m)
+    e2 = {b: float(ShapeToChemCurvature({"beta": b}).forward(H)["cell"].abs().max())
+          for b in (-2.0, -4.0)}
+    for b, mx in e2.items():
+        print(f"        beta={b:<6} max |emission| {mx:.3e}")
+    chk(all(x > 0 for x in e2.values()), "a bumped sphere emits a nonzero feed correction")
+    # THE SATURATION, measured rather than reasoned about. F = clamp(F0 (1 + beta phihat), 0,
+    # F_CEIL) with phihat clipped at +/-4: at beta = -2 the bracket already leaves [0, F_CEIL] on
+    # most cells, so DOUBLING beta must not double the emission. If it does, the clamp is not
+    # binding and this comment is wrong.
+    ratio = e2[-4.0] / max(e2[-2.0], 1e-30)
+    print(f"        doubling beta multiplies the emission by {ratio:.3f} (2.000 = unsaturated)")
+    chk(ratio < 1.6, "the F clamp SATURATES -- beta is not proportional",
+        f"ratio {ratio:.3f}")
+
+    print("\n  CHECK 2+3 -- does each parameter reach the STATE, and does a gradient reach it?")
+    ck = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                      "fixtures", "coral_gate_div_f400.npz")
+    if not os.path.exists(ck):
+        print(f"        SKIPPED: no fixture at {ck}")
+        print(f"        build it with:  python op_probe.py --build-fixture")
+    else:
+        import yaml
+        import op_probe as P
+        spec = yaml.safe_load(open("/workspace/Plexus/log/okuda/coral_gate_div/spec_run.yaml"))
+        rows = P.selftest(spec, ck, {"shape_to_chem": {"beta": [-2.0, -4.0],
+                                                       "F0": [0.0275, 0.11],
+                                                       "rate": [0.5, 2.0]}}, frames=50)
+        P.report(rows)
+        chk(not any(r["verdict"] in ("DEAD", "UNREAD") for r in rows),
+            "every shape_to_chem parameter reaches the state on this fixture")
 
     print("\n  " + ("ALL SHAPE FEATURES CERTIFIED" if not fails else f"{len(fails)} FAILURES"))
     raise SystemExit(1 if fails else 0)

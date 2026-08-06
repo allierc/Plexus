@@ -1,0 +1,280 @@
+{
+ "fixture": "coral_gate_div_f400.npz",
+ "spec": "coral_gate_div/spec_run.yaml",
+ "frames": 50,
+ "topology": "full composition",
+ "rows": [
+  {
+   "op": "cell_diffuse",
+   "param": "chi",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.29064362546805605,
+   "grad": null,
+   "note": "ValueError"
+  },
+  {
+   "op": "cell_diffuse",
+   "param": "d_a",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.2885965672863764,
+   "grad": null,
+   "note": "ValueError"
+  },
+  {
+   "op": "cell_diffuse",
+   "param": "d_h",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.2918184644881812,
+   "grad": null,
+   "note": "ValueError"
+  },
+  {
+   "op": "cell_react",
+   "param": "F",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.2889578235204755,
+   "grad": null,
+   "note": "ValueError"
+  },
+  {
+   "op": "cell_react",
+   "param": "kk",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.2999196199006474,
+   "grad": null,
+   "note": "ValueError"
+  },
+  {
+   "op": "cell_react",
+   "param": "rate",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.6424588700878676,
+   "grad": null,
+   "note": "ValueError"
+  },
+  {
+   "op": "shape_to_chem",
+   "param": "F0",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.28922326087545186,
+   "grad": null,
+   "note": "ValueError"
+  },
+  {
+   "op": "shape_to_chem",
+   "param": "beta",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.2942163243448441,
+   "grad": null,
+   "note": "ValueError"
+  },
+  {
+   "op": "shape_to_chem",
+   "param": "rate",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.28565499522333304,
+   "grad": null,
+   "note": "ValueError"
+  },
+  {
+   "op": "morphogen_growth_3d",
+   "param": "a_sw",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.30067476104225355,
+   "grad": null,
+   "note": "ValueError"
+  },
+  {
+   "op": "morphogen_growth_3d",
+   "param": "conserve_amount",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.2736745366040473,
+   "grad": null,
+   "note": ""
+  },
+  {
+   "op": "morphogen_growth_3d",
+   "param": "dt",
+   "verdict": "UNREAD",
+   "rel": 0.0,
+   "grad": null,
+   "note": "never looked up"
+  },
+  {
+   "op": "morphogen_growth_3d",
+   "param": "hill",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.31083177754190977,
+   "grad": null,
+   "note": "ValueError"
+  },
+  {
+   "op": "morphogen_growth_3d",
+   "param": "rate",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.31370420584321296,
+   "grad": null,
+   "note": "ValueError"
+  },
+  {
+   "op": "morphogen_growth_3d",
+   "param": "rho",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.2877430736207616,
+   "grad": null,
+   "note": "ValueError"
+  },
+  {
+   "op": "morphogen_growth_3d",
+   "param": "vth_frac",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.30014565555069217,
+   "grad": null,
+   "note": "ValueError"
+  },
+  {
+   "op": "shape_energy_3d",
+   "param": "cap_frac",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.31886736258114995,
+   "grad": null,
+   "note": "ValueError"
+  },
+  {
+   "op": "shape_energy_3d",
+   "param": "dt",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.4166894689836162,
+   "grad": null,
+   "note": "ValueError"
+  },
+  {
+   "op": "shape_energy_3d",
+   "param": "eta",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.3009100454539412,
+   "grad": null,
+   "note": "ValueError"
+  },
+  {
+   "op": "shape_energy_3d",
+   "param": "gamma",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.3801064519478994,
+   "grad": null,
+   "note": "ValueError"
+  },
+  {
+   "op": "shape_energy_3d",
+   "param": "h0",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.30543297082088344,
+   "grad": null,
+   "note": "ValueError"
+  },
+  {
+   "op": "shape_energy_3d",
+   "param": "k_v",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.3911664000635829,
+   "grad": null,
+   "note": "ValueError"
+  },
+  {
+   "op": "shape_energy_3d",
+   "param": "kappa_s",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.46918139320016294,
+   "grad": null,
+   "note": "ValueError"
+  },
+  {
+   "op": "shape_energy_3d",
+   "param": "mu",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.3009100454539412,
+   "grad": null,
+   "note": "ValueError"
+  },
+  {
+   "op": "shape_energy_3d",
+   "param": "relax_iters",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.3023841509985892,
+   "grad": null,
+   "note": ""
+  },
+  {
+   "op": "divide_3d",
+   "param": "cycle_cv",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.2714170489714833,
+   "grad": null,
+   "note": "ValueError"
+  },
+  {
+   "op": "divide_3d",
+   "param": "engine_clock",
+   "verdict": "ERROR",
+   "rel": 0.0,
+   "grad": null,
+   "note": "ValueError: D1: operator-side `every=4` is no longer supported -- the engine owns the clock. (A private period multiplied the engine's, so `every: 2` meant once every 4 frames and every per-call quantity meant 4x what it said.) If this spec was written for the OLD semantics, its true period was 4x the engine's -- convert it and set `every: 16`. Then declare `engine_clock: true` beside it to confirm the period is now engine-owned."
+  },
+  {
+   "op": "divide_3d",
+   "param": "factor",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.9777423840831146,
+   "grad": null,
+   "note": "ValueError"
+  },
+  {
+   "op": "divide_3d",
+   "param": "max_cycle",
+   "verdict": "DEAD",
+   "rel": 0.0,
+   "grad": null,
+   "note": ""
+  },
+  {
+   "op": "divide_3d",
+   "param": "min_cycle",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.293091874016593,
+   "grad": null,
+   "note": ""
+  },
+  {
+   "op": "divide_3d",
+   "param": "p0",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.0001357510881521183,
+   "grad": null,
+   "note": "ValueError"
+  },
+  {
+   "op": "divide_3d",
+   "param": "reset_noise",
+   "verdict": "DEAD",
+   "rel": 0.0,
+   "grad": null,
+   "note": ""
+  },
+  {
+   "op": "reconnect_t1_3d",
+   "param": "l_th_frac",
+   "verdict": "LIVE, no derivative",
+   "rel": 0.3578877574666659,
+   "grad": null,
+   "note": "ValueError"
+  },
+  {
+   "op": "reconnect_t1_3d",
+   "param": "max_flips",
+   "verdict": "DEAD",
+   "rel": 0.0,
+   "grad": null,
+   "note": ""
+  }
+ ]
+}
