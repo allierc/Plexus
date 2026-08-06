@@ -100,7 +100,9 @@ def build(name, tissue_npz, fit=FIT, plate_box=None, **ecm):
                 o.pop(k, None)                      # a replay has no r(t) formula to grow by
         if o["op"] == "ecm_seed" and gap_box is not None:
             o["plate_half"] = gap_box
-        if o["op"] == "integrin_adhesion":
+        if o["op"] in ("integrin_adhesion", "surface_track"):
+            # `surface_track` is on this list for the same reason the two below it are: it reads the
+            # pass-1 map, which is in TISSUE units, and only `combine` knows the tissue-to-box scale.
             o["scale"] = s
             o["surface"] = tissue_npz
         if o["op"] == "basement_membrane_seed":
@@ -119,6 +121,7 @@ def build(name, tissue_npz, fit=FIT, plate_box=None, **ecm):
     if "basement_membrane_particle" in spec["sets"]:
         sys.path.insert(0, os.path.join(ROOT, "prototype", "eye"))
         import membrane_ops                                           # noqa: F401
+        import surface_ops                                            # noqa: F401
         import muscle_ops                                             # noqa: F401
     if "mpm_block" in spec["sets"]:
         # THE ELASTIC BLOCK's two dependencies: its own ops, and the eye prototype's
@@ -131,6 +134,18 @@ def build(name, tissue_npz, fit=FIT, plate_box=None, **ecm):
                               "centre": [0.5, 0.5, 0.5], "surface": tissue_npz, "scale": s,
                               "skin": 0.004})
     spec["schedule"].append("cell_exclude_3d")
+    # THE MEMBRANE GETS THE SAME BACKSTOP THE MATRIX HAS ALWAYS HAD, and the asymmetry it corrects is
+    # why the sheet sank. The epithelium repels interstitial fibres twice -- `cell_to_ecm` as a soft
+    # penalty and `cell_exclude_3d` as a hard projection -- while NOTHING pushed on the basement
+    # membrane at all. Its only outward force was the integrin spring, so any inward push (the matrix
+    # bearing down on it through the shared grid) moved it in unopposed, and the measured gap ran
+    # +0.0040 -> -0.0117 with 90% of particles below the apical surface. A sheet whose whole job is to
+    # sit on a surface should not be the one body allowed through it.
+    if "basement_membrane_particle" in spec["sets"]:
+        spec["operators"].append({"op": "cell_exclude_3d", "at": "basement_membrane_particle",
+                                  "centre": [0.5, 0.5, 0.5], "surface": tissue_npz, "scale": s,
+                                  "skin": 0.006})
+        spec["schedule"].append("cell_exclude_3d")
     if gap_box is not None and "mpm_block" not in spec["sets"]:
         # RIGID PROJECTION *OR* ELASTIC BLOCK, NEVER BOTH -- and getting this wrong produced a null that
         # looked like a physical result. `48_block_elastic_g40` ran with the matrix clamped at +/-0.199

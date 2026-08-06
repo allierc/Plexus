@@ -353,8 +353,71 @@ def _cmap(colors):
     return ListedColormap(colors)
 
 
+def draw_junctions_3d(ax, mt, pos, cam, L, myo_hi=None, cutaway=True, lw=0.9):
+    """THE JUNCTION NETWORK IN 3D, WITH NOTHING ELSE IN FRONT OF IT.
+
+    The same framing as `draw_3d(tissue=False)` -- no cell faces, no matrix, no membrane -- so the
+    network is seen as an object rather than as an edge-on rim. Cells are what the epithelium is made of,
+    but the junctions are where myosin lives, and drawn together the faces hide them completely.
+
+    `cutaway` drops the half nearest the camera, which is the only way a closed shell of lines reads at
+    all: a full sphere of edges is a solid mass of ink from any angle.
+    """
+    from mpl_toolkits.mplot3d.art3d import Line3DCollection
+    ax.clear(); ax.set_facecolor("black")
+    ax.set_xlim(-L, L); ax.set_ylim(-L, L); ax.set_zlim(-L, L)
+    ax.set_box_aspect((1, 1, 1)); ax.axis("off")
+    ax.view_init(elev=cam["elev"], azim=cam["azim"])
+
+    es, et, ef = np.asarray(mt["E_srce"]), np.asarray(mt["E_trgt"]), np.asarray(mt["E_face"])
+    live = ef < int(mt["nF"])
+    a, b = pos[es[live]], pos[et[live]]
+    d, _, _ = screen_basis(cam["elev"], cam["azim"])
+    keep = ((0.5 * (a + b)) @ d) > 0 if cutaway else np.ones(len(a), bool)
+    if not keep.any():
+        return
+    segs = np.stack([a[keep], b[keep]], axis=1)
+    # LENGTH-CHECKED, as everywhere `myo` is read: it is written before the topology operators run.
+    _m = np.asarray(mt["myo"], float) if "myo" in mt else None
+    myo = _m[live] if (_m is not None and _m.shape[0] == live.shape[0]) else None
+    if myo is None:
+        lc = Line3DCollection(segs, colors="#7ab8ff", linewidths=lw)
+    else:
+        hi = myo_hi or max(float(np.percentile(myo, 98)), 1e-9)
+        lc = Line3DCollection(segs, cmap=_cmap(MYOSIN_COLORS), linewidths=lw)
+        lc.set_array(np.clip(myo[keep] / hi, 0, 1)); lc.set_clim(0, 1)
+    ax.add_collection3d(lc)
+
+
+def draw_membrane_3d(ax, mem_q, mem_s, cam, L, mem_hi=None, cutaway=True, s_dot=4.5):
+    """THE BASEMENT MEMBRANE ALONE, framed and cut exactly as `draw_junctions_3d` frames the network.
+
+    The pair is the point: two panels, one per entity, same camera, same cutaway, same tissue-sized box,
+    so the sheet and the network can be compared frame to frame instead of hunted for inside a cloud of
+    matrix. Neither panel draws the other's material, and neither draws the interstitial ECM.
+    """
+    ax.clear(); ax.set_facecolor("black")
+    ax.set_xlim(-L, L); ax.set_ylim(-L, L); ax.set_zlim(-L, L)
+    ax.set_box_aspect((1, 1, 1)); ax.axis("off")
+    ax.view_init(elev=cam["elev"], azim=cam["azim"])
+    if mem_q is None or len(mem_q) == 0:
+        return
+    d, _, _ = screen_basis(cam["elev"], cam["azim"])
+    keep = (mem_q @ d) > 0 if cutaway else np.ones(len(mem_q), bool)
+    if not keep.any():
+        return
+    q = mem_q[keep]
+    if mem_s is None:
+        ax.scatter(q[:, 0], q[:, 1], q[:, 2], s=s_dot, c="#3cb85a", marker=".", linewidths=0)
+    else:
+        v = np.asarray(mem_s, float)[keep]
+        hi = mem_hi or max(float(np.percentile(np.asarray(mem_s, float), 99)), 1e-9)
+        ax.scatter(q[:, 0], q[:, 1], q[:, 2], s=s_dot, c=np.clip(v / hi, 0, 1),
+                   cmap=_cmap(MEMBRANE_COLORS), vmin=0, vmax=1, marker=".", linewidths=0)
+
+
 def draw_zoom(ax, mt, pos, mem_q=None, mem_s=None, cam=None, frac=0.55, myo_hi=None,
-              mem_hi=None, name="", lw=None):
+              mem_hi=None, name="", lw=None, junctions=True):
     """A ZOOM on one patch of the surface: junctions coloured by MYOSIN, membrane by BOND STRAIN.
 
     WHY A SEPARATE PANEL AND NOT A COLOUR ON THE EXISTING ONES. Both new entities live in a shell a few
@@ -393,7 +456,7 @@ def draw_zoom(ax, mt, pos, mem_q=None, mem_s=None, cam=None, frac=0.55, myo_hi=N
     # the mechanics: skip the colouring for that frame rather than index past the end.
     _m = np.asarray(mt["myo"], float) if "myo" in mt else None
     myo = _m[live] if (_m is not None and _m.shape[0] == live.shape[0]) else None
-    if inwin.any():
+    if inwin.any() and junctions:
         segs = np.stack([np.stack([(a[inwin] - ctr) @ u, (a[inwin] - ctr) @ v], 1),
                          np.stack([(b[inwin] - ctr) @ u, (b[inwin] - ctr) @ v], 1)], axis=1)
         if myo is None:
