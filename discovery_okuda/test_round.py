@@ -408,6 +408,16 @@ def test_a_duplicate_becomes_a_reseeded_replicate():
     if sp is None:
         return
     check(sp.get("replicate") is True, "the spec does not record that it is a replicate")
+    # IT MUST SAY WHAT IT NOW IS. Without this the record keeps the Proposer's original claim on a run
+    # that is no longer that experiment, and a reader six rounds later cannot tell.
+    check(sp.get("intent") == "replicate", f"intent is {sp.get('intent')!r}, not 'replicate'")
+    check("ROBUSTNESS TEST" in (sp.get("claim") or "").upper(),
+          f"the claim does not say it is a robustness test: {sp.get('claim')!r}")
+    import hypothesis as H
+    check("replicate" in H.INTENTS, "'replicate' is not a declared intent")
+    check("replicate" not in H.MECHANISM_INTENTS,
+          "a replicate must stay out of MECHANISM_INTENTS -- it makes no new claim, so folding it into "
+          "the surprise rate would dilute the campaign's only control signal")
     with open(os.path.join(CFG, f"{sp['name']}.yaml")) as f:
         child = yaml.safe_load(f)
     with open(os.path.join(E.LOG_ROOT, "coral_gate", "spec_run.yaml")) as f:
