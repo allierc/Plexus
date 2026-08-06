@@ -57,7 +57,7 @@ def presets():
 
 def make_spec(name, mode, N, R, chi, react=None, frames=FRAMES):
     W = 2.6 * R
-    r = {"op": "react", "at": "cell", "implementation": "brusselator",
+    r = {"op": "react", "at": "cell", "model": "brusselator",
          "gamma": 0.1, "A": 1.0, "B": 3.0}
     cfg = {
         "general": {"name": f"turing3d_{name}", "seed": 0, "n_frames": frames, "dt": DT,

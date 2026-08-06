@@ -203,7 +203,7 @@ def _composition(run_id, config_dir=None, log_dir=None):
         try:
             import yaml
             c = yaml.safe_load(open(p))
-            ops = tuple(sorted((o.get("op"), o.get("implementation"))
+            ops = tuple(sorted((o.get("op"), o.get("model") or o.get("implementation"))
                                for o in (c.get("operators") or [])))
             return ops, ()
         except Exception:

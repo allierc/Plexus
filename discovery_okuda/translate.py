@@ -212,7 +212,7 @@ def _emit_seed(g, n, ga):
 def _emit_shape_energy(g, n, ga):
     i = n["id"]
     if g.impl_of(n) == "monolayer":
-        return {"op": "shape_energy_3d", "implementation": "monolayer", "at": "vertex",
+        return {"op": "shape_energy_3d", "model": "monolayer", "at": "vertex",
                 "k_v": float(_p(g, i, "K_V")), "kappa_s": float(_p(g, i, "kappa_s")),
                 "h0": float(_p(g, i, "h0")), "gamma": float(_p(g, i, "gamma")),
                 "mu": 1.0, "dt": DT_GLOBAL, "relax_iters": int(_p(g, i, "relax_iters")),
@@ -262,7 +262,7 @@ def _emit_rd_seed(g, n, ga):
 
 def _emit_react(g, n, ga):
     i, impl = n["id"], g.impl_of(n)
-    base = {"op": "cell_react", "at": "cell", "implementation": impl,
+    base = {"op": "cell_react", "at": "cell", "model": impl,
             "rate": float(_p(g, i, "rate")) * RD_PER_FRAME}   # D5: physical time, not substeps
     if impl == "gierer_meinhardt":
         # `sat` MUST BE EMITTED OR IT DOES NOT EXIST. It was added to OPERATORS' tunable table and
@@ -349,7 +349,7 @@ EMIT = {
         "op": "vesicle_growth", "at": "vertex", "cell_set": "cell",
         "rate": float(_p(g, n["id"], "rate"))},
     "shape_to_chem": lambda g, n, ga: {
-        "op": "shape_to_chem", "at": "cell", "implementation": g.impl_of(n),
+        "op": "shape_to_chem", "at": "cell", "model": g.impl_of(n),
         "vertex_set": "vertex",
         "beta": float(_p(g, n["id"], "beta")), "F0": float(_p(g, n["id"], "F0")),
         # the feedback is chemistry and must run on the SAME clock as the reaction it modulates,

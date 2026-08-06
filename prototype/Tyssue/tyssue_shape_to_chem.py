@@ -218,7 +218,7 @@ class _ShapeToChemBase(Lateral):
 
 # --------------------------------------------------------------------------- implementations
 @register_operator("shape_to_chem", set="cell", kind="lateral", family="fields",
-                   implementation="curvature")
+                   model="curvature")
 class ShapeToChemCurvature(_ShapeToChemBase):
     """The chemistry listens to CURVATURE -- the feedback Okuda's framing implies.
 
@@ -261,7 +261,7 @@ class ShapeToChemCurvature(_ShapeToChemBase):
 
 
 @register_operator("shape_to_chem", set="cell", kind="lateral", family="fields",
-                   implementation="tension")
+                   model="tension")
 class ShapeToChemTension(_ShapeToChemBase):
     """The chemistry listens to CORTICAL TENSION -- mechanotransduction.
 
@@ -288,7 +288,7 @@ class ShapeToChemTension(_ShapeToChemBase):
 
 
 @register_operator("shape_to_chem", set="cell", kind="lateral", family="fields",
-                   implementation="apical_area")
+                   model="apical_area")
 class ShapeToChemApicalArea(_ShapeToChemBase):
     """The chemistry listens to APICAL AREA -- crowding and density sensing.
 
@@ -309,7 +309,7 @@ class ShapeToChemApicalArea(_ShapeToChemBase):
 
 
 @register_operator("shape_to_chem", set="cell", kind="lateral", family="fields",
-                   implementation="pressure")
+                   model="pressure")
 class ShapeToChemPressure(_ShapeToChemBase):
     """The chemistry listens to VOLUME-ELASTIC PRESSURE.
 

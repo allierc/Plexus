@@ -98,7 +98,7 @@ def make(p):
            {"op": "cell_geometry_3d", "at": "cell"}, {"op": "cell_adjacency", "at": "cell"},
            {"op": "seed_cell_rd", "at": "cell", "seed": SEED, "before_frame": 3, "mode": "noise", "A": 1.0, "B": 3.0, "noise": 0.04},
            {"op": "cell_diffuse", "at": "cell", "d_a": 0.05, "d_h": 0.7, "chi": p["chi"]},
-           {"op": "cell_react", "at": "cell", "implementation": "brusselator", "gamma": p["gamma"], "A": 1.0, "B": 3.0},
+           {"op": "cell_react", "at": "cell", "model": "brusselator", "gamma": p["gamma"], "A": 1.0, "B": 3.0},
            # activator->growth on a LOCKED body (rho=0): only red cells grow (v_eq up to vth*v_ref) -> protrude
            {"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": p["rate"], "a_sw": p["a_sw"], "hill": 4.0, "rho": p["rho"], "vth_frac": p["vth"]},
            # p0>3.81 FLUID (tubes need T1 flow) + modest surface tension for rounder cells; radial ~off so tubes leave the sphere

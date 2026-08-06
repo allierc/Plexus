@@ -42,7 +42,7 @@ operators:
   at: cell
 - op: cell_react
   at: cell
-  implementation: gray_scott
+  model: gray_scott
   rate: 50.0
   F: 0.055
   kk: 0.062
@@ -58,7 +58,7 @@ operators:
   dt: 0.02
   conserve_amount: true
 - op: shape_energy_3d
-  implementation: monolayer
+  model: monolayer
   at: vertex
   k_v: 6.0
   kappa_s: 0.2

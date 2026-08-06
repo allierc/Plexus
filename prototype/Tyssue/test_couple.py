@@ -28,7 +28,7 @@ def build(rho, rate=0.02, gamma=2.0, vth=1.3, mdf=0.02, dev=2):
            {"op": "cell_geometry_3d", "at": "cell"}, {"op": "cell_adjacency", "at": "cell"},
            {"op": "seed_cell_rd", "at": "cell", "seed": SEED, "before_frame": 3, "mode": "noise", "A": 1.0, "B": 3.0, "noise": 0.04},
            {"op": "cell_diffuse", "at": "cell", "d_a": 0.05, "d_h": 0.7, "chi": 4.0},
-           {"op": "cell_react", "at": "cell", "implementation": "brusselator", "gamma": gamma, "A": 1.0, "B": 3.0},
+           {"op": "cell_react", "at": "cell", "model": "brusselator", "gamma": gamma, "A": 1.0, "B": 3.0},
            # locked body (rho=0) so growth is fully localised to the red cells; only rate (coupling strength) varies
            {"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": rate, "a_sw": 2.5, "hill": 4.0, "rho": rho, "vth_frac": vth},
            {"op": "shape_energy_3d", "at": "vertex", "p0": 3.90, "K_A": 1.0, "K_P": 1.0, "Gamma": 0.2, "Lambda": 0.6, "K_V": 4.0, "K_R": 0.02, "mu": 1.0, "dt": 0.02, "relax_iters": 30, "eta": 0.08, "cap_frac": 0.12},

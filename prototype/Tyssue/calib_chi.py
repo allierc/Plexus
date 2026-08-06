@@ -22,7 +22,7 @@ def build(chi, d_h):
            {"op": "cell_geometry_3d", "at": "cell"}, {"op": "cell_adjacency", "at": "cell"},
            {"op": "seed_cell_rd", "at": "cell", "seed": 0, "before_frame": 3, "mode": "noise", "A": 1.0, "B": 3.0, "noise": 0.04},
            {"op": "cell_diffuse", "at": "cell", "d_a": 0.05, "d_h": d_h, "chi": chi},
-           {"op": "cell_react", "at": "cell", "implementation": "brusselator", "gamma": 2.0, "A": 1.0, "B": 3.0},
+           {"op": "cell_react", "at": "cell", "model": "brusselator", "gamma": 2.0, "A": 1.0, "B": 3.0},
            {"op": "shape_energy_3d", "at": "vertex", "p0": 3.9, "K_A": 1.0, "K_P": 1.0, "Gamma": 0.05, "Lambda": 0.2,
             "K_V": 1.0, "K_R": 0.4, "mu": 1.0, "dt": 0.02, "relax_iters": 8, "eta": 0.08, "cap_frac": 0.12}]
     sched = ["seed_mesh_3d", "cell_geometry_3d", "cell_adjacency", "seed_cell_rd", "cell_diffuse", "cell_react", "shape_energy_3d"]

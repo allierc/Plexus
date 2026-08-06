@@ -75,16 +75,60 @@ class OperatorContract:
     family: str | None = None
     set: str | None = None
     signature: dict = field(default_factory=dict)
-    implementations: dict = field(default_factory=dict)   # impl_name -> class
+    implementations: dict = field(default_factory=dict)   # variant name -> class (models + impls)
     default: str | None = None
+    # WHICH AXIS EACH VARIANT VARIES. `model` = a different biological hypothesis at this slot;
+    # `implementation` = the same biology computed differently. See the contract paragraph in
+    # plexus2.tex: conflating them left every finding recorded against `cell_react` actually
+    # about Gray-Scott, and the search unable to tell an experiment from a control.
+    axis: dict = field(default_factory=dict)              # variant name -> "model" | "implementation"
 
-    def get(self, implementation: str | None = None) -> type:
-        impl = implementation or self.default
-        if impl not in self.implementations:
+    def get(self, implementation: str | None = None, model: str | None = None,
+            variant: str | None = None) -> type:
+        """The class for a named variant.
+
+        `model=` / `implementation=` are the SPEC's keys and are checked against the axis the
+        variant was registered on -- naming one where the other is meant is refused, because the
+        word is the claim. `variant=` is the axis-agnostic lookup the engine uses once the schema
+        has already made that check; re-checking there would fail every model the schema just
+        admitted.
+        """
+        if model is not None and implementation is not None:
+            raise KeyError(f"operator {self.name!r}: name a model or an implementation, not both")
+        if variant is not None:
+            if variant not in self.implementations:
+                raise KeyError(f"operator {self.name!r} has no variant {variant!r}; "
+                               f"models: {self.models() or '-'}  "
+                               f"implementations: {self.impls() or '-'}")
+            return self.implementations[variant]
+        want = model if model is not None else implementation
+        variant = want or self.default
+        if variant not in self.implementations:
+            kinds = {"model": sorted(v for v, a in self.axis.items() if a == "model"),
+                     "implementation": sorted(v for v, a in self.axis.items()
+                                              if a == "implementation")}
             raise KeyError(
-                f"operator {self.name!r} has no implementation {impl!r}; "
-                f"available: {sorted(self.implementations)}")
-        return self.implementations[impl]
+                f"operator {self.name!r} has no variant {variant!r}; "
+                f"models: {kinds['model'] or '-'}  implementations: {kinds['implementation'] or '-'}")
+        got = self.axis.get(variant, "implementation")
+        if want is not None:
+            asked = "model" if model is not None else "implementation"
+            if got != asked:
+                raise KeyError(
+                    f"operator {self.name!r}: {variant!r} is a {got}, not a{'n' if asked[0] == 'i' else ''}"
+                    f" {asked}. Write `{got}: {variant}`. "
+                    + ("A model is a different biological hypothesis at this slot, so swapping it "
+                       "is an experiment; an implementation is the same biology computed "
+                       "differently." if got == "model" else
+                       "An implementation is the same biology computed differently; a result that "
+                       "changes under the swap is about discretisation, not about the tissue."))
+        return self.implementations[variant]
+
+    def models(self) -> list:
+        return sorted(v for v, a in self.axis.items() if a == "model")
+
+    def impls(self) -> list:
+        return sorted(v for v, a in self.axis.items() if a == "implementation")
 
     def capabilities(self) -> dict:
         """Per-implementation capability table: supported dims + differentiability."""
@@ -96,7 +140,8 @@ class OperatorContract:
 _OP_CONTRACTS: dict[str, OperatorContract] = {}   # name -> contract (signature + all implementations)
 
 
-def register_operator(*names: str, implementation: str | None = None, **tags):
+def register_operator(*names: str, implementation: str | None = None,
+                      model: str | None = None, **tags):
     """Register an operator implementation. The FIRST registration of a name creates its
     contract (from the class's typed `signature()`); a later registration of the SAME name
     with a different `implementation=` adds an interchangeable implementation to that same
@@ -105,12 +150,16 @@ def register_operator(*names: str, implementation: str | None = None, **tags):
     resolve to the same class."""
     tags.setdefault("set", None)
     tags.setdefault("kind", None)
+    if implementation is not None and model is not None:
+        raise ValueError(f"operator {names[0]!r}: a variant is a model OR an implementation")
     def decorator(cls):
         for k, v in tags.items():
             setattr(cls, k.upper(), v)
         cls.REGISTERED_NAMES = list(names)
-        impl = implementation or "default"
+        impl = model or implementation or "default"
+        axis = "model" if model is not None else "implementation"
         cls.IMPLEMENTATION = impl
+        cls.VARIANT_AXIS = axis
         for name in names:
             contract = _OP_CONTRACTS.get(name)
             if contract is None:
@@ -124,16 +173,20 @@ def register_operator(*names: str, implementation: str | None = None, **tags):
             else:
                 if impl in contract.implementations:
                     raise ValueError(
-                        f"operator {name!r} already has implementation {impl!r} "
+                        f"operator {name!r} already has variant {impl!r} "
                         f"({contract.implementations[impl].__name__})")
-                # implementations of one contract must share its biology (kind); only the
-                # numerics may differ.
+                # Variants of one contract must share its KIND. This is a weak guard and always
+                # was: all four `shape_to_chem` variants are `lateral` while each senses a
+                # different physical quantity, so the check passed on four distinct biological
+                # hypotheses wearing one label. The `model`/`implementation` axis is what
+                # actually carries that distinction.
                 if getattr(cls, "KIND", None) != contract.kind:
                     raise ValueError(
-                        f"operator {name!r} implementation {impl!r} has kind "
+                        f"operator {name!r} variant {impl!r} has kind "
                         f"{getattr(cls, 'KIND', None)!r}, but the contract's kind is "
-                        f"{contract.kind!r}; implementations may differ only in numerics.")
+                        f"{contract.kind!r}; a variant may not change the kind.")
             contract.implementations[impl] = cls
+            contract.axis[impl] = axis
         return cls
     return decorator
 
@@ -142,10 +195,12 @@ def get_entity(name: str) -> type:
     return _ENTITY_REGISTRY[name]
 
 
-def get_operator(name: str, implementation: str | None = None) -> type:
-    """The implementation class for operator `name` -- the default, or the named
-    `implementation`. Raises KeyError if the operator or the implementation is unknown."""
-    return _OP_CONTRACTS[name].get(implementation)
+def get_operator(name: str, implementation: str | None = None,
+                 model: str | None = None, variant: str | None = None) -> type:
+    """The class for operator `name` -- the default variant, or a named `model` /
+    `implementation`. Raises KeyError if the operator or the variant is unknown, or if the
+    variant exists on the other axis (naming a model an implementation is refused)."""
+    return _OP_CONTRACTS[name].get(implementation, model, variant)
 
 
 def get_contract(name: str) -> OperatorContract:

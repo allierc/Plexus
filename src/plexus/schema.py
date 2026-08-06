@@ -53,7 +53,11 @@ class OpSpec:
     on: Selector
     to: Optional[str] = None        # target field (Exchange scatter)
     frm: Optional[str] = None       # source field (Exchange gather)
-    impl: Optional[str] = None      # which numerical implementation of the op's contract (default: the sole one)
+    impl: Optional[str] = None      # which VARIANT of the op's contract -- a `model` (a different
+                                    # biological hypothesis at this slot) or an `implementation`
+                                    # (the same biology computed differently). One field, because
+                                    # the engine instantiates a class either way; the SPEC keeps
+                                    # them as separate keys, because the word is the claim.
     params: dict = field(default_factory=dict)
 
 
@@ -77,7 +81,7 @@ class Spec:
     field_record_cap: int = 256                      # max recorded FIELD (grid) frames — fields are large, so a tighter cap
 
 
-_RESERVED = {"op", "at", "to", "from", "implementation"}
+_RESERVED = {"op", "at", "to", "from", "implementation", "model"}
 # No schedule builtins: `aggregate` and `diffuse` are ordinary registered operators
 # now, and integration is implicit (end of tick). Every schedule token must resolve
 # to a declared operator.
@@ -170,11 +174,20 @@ def load(path: str) -> Spec:
     ops = []
     for o in raw["operators"]:
         name = o["op"]
+        # `model:` and `implementation:` are separate keys and naming one where the other is meant
+        # is refused by the contract. Gray-Scott and Brusselator are not two ways of computing one
+        # reaction -- their parameter sets are disjoint -- so calling the swap an implementation
+        # made every finding recorded against `cell_react` silently a finding about Gray-Scott.
         impl = o.get("implementation")
+        modl = o.get("model")
+        if impl is not None and modl is not None:
+            raise ValueError(
+                f"operator {o['op']!r} names both `model: {modl}` and "
+                f"`implementation: {impl}`; a variant is one or the other")
         # resolve the SELECTED implementation of the operator's contract; capability
         # checks below then run against the implementation that will actually execute.
         try:
-            cls = registry.get_operator(name, impl)
+            cls = registry.get_operator(name, impl, modl)
         except KeyError:
             try:
                 contract = registry.get_contract(name)
@@ -183,8 +196,9 @@ def load(path: str) -> Spec:
                     f"operator {name!r} not in registry. Available: "
                     f"{sorted(registry._OPERATOR_REGISTRY)}")
             raise ValueError(
-                f"operator {name!r} has no implementation {impl!r}; "
-                f"available: {sorted(contract.implementations)}")
+                f"operator {name!r} has no variant {(modl or impl)!r}; "
+                f"models: {contract.models() or '-'}  "
+                f"implementations: {contract.impls() or '-'}")
         kind = getattr(cls, "KIND", None)
         if kind not in KINDS:
             raise ValueError(
@@ -245,7 +259,7 @@ def load(path: str) -> Spec:
                         f"operator {name!r} requires property {prop!r} on every type of "
                         f"{owner!r}; missing on type {tname!r}. "
                         f"(declared in {cls.__name__}.REQUIRES_TYPE_PROPS)")
-        ops.append(OpSpec(op=name, on=sel, to=o.get("to"), frm=o.get("from"), impl=impl, params=params))
+        ops.append(OpSpec(op=name, on=sel, to=o.get("to"), frm=o.get("from"), impl=(modl or impl), params=params))
 
     # --- warn about per-type properties no operator reads (typo guard) ------ #
     used_props = set()

@@ -47,7 +47,7 @@ operators:   # the operators to instantiate (each realises one mechanism)
   chi: 4.0
 - op: cell_react
   at: cell   # the set this operator acts on
-  implementation: gierer_meinhardt
+  model: gierer_meinhardt
   gm_rho: 1.0
   mu_a: 1.0
   mu_h: 1.0

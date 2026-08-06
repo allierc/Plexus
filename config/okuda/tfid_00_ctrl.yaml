@@ -57,13 +57,13 @@ operators:
   chi: 1.3
 - op: cell_react
   at: cell
-  implementation: gray_scott
+  model: gray_scott
   rate: 1.0
   F: 0.046
   kk: 0.062
 - op: shape_to_chem
   at: cell
-  implementation: curvature
+  model: curvature
   vertex_set: vertex
   beta: 0.0
   F0: 0.055
@@ -80,7 +80,7 @@ operators:
   dt: 1.0
   conserve_amount: true
 - op: shape_energy_3d
-  implementation: monolayer
+  model: monolayer
   at: vertex
   k_v: 6.0
   kappa_s: 0.2

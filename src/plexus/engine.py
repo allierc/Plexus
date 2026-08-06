@@ -285,7 +285,7 @@ def _resolve_emit(sim: Spec, H: "Hierarchy" = None) -> dict:
     and so does not constrain the coordinate's order. A conflict is a modelling error."""
     modes: dict[str, str] = {}
     for o in sim.operators:
-        cls = get_operator(o.op, o.impl)
+        cls = get_operator(o.op, variant=o.impl)
         emit = o.params.get("emit") or getattr(cls, "EMIT", None)
         if emit not in ("velocity", "acceleration"):
             continue                                   # None / mpm_acceleration: no engine-integrated set delta
@@ -693,7 +693,7 @@ def _seed_window(sim):
     length of the trajectory, which is what `cell_rd_seed mode: tip` did on all 900 frames.
     """
     declared = [int(o.params["before_frame"]) for o in sim.operators
-                if getattr(get_operator(o.op, o.impl), "KIND", None) == "seed"
+                if getattr(get_operator(o.op, variant=o.impl), "KIND", None) == "seed"
                 and "before_frame" in o.params]
     return min(max(declared) if declared else 1, SEED_MAX)
 
@@ -730,7 +730,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     seed_window = _seed_window(sim)              # one pass over the spec, before anything runs
 
     def _gate(o):
-        cls = get_operator(o.op, o.impl)
+        cls = get_operator(o.op, variant=o.impl)
         after = int(o.params.get("after_frame", 0))
         before = int(o.params.get("before_frame", 1 << 30))
         every = max(1, int(o.params.get("every", 1)))
@@ -739,7 +739,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
         return (after, before, every)
 
     inst = [(o.op,
-             get_operator(o.op, o.impl)({**o.params, "to": o.to, "from": o.frm, "_at": o.on.set}, device),
+             get_operator(o.op, variant=o.impl)({**o.params, "to": o.to, "from": o.frm, "_at": o.on.set}, device),
              o.on,
              _gate(o))                                   # multi-rate cadence: run only when tick % every == 0
             for o in sim.operators]

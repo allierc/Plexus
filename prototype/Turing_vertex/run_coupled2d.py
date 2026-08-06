@@ -54,13 +54,13 @@ def presets():
     # growth lam_ref sets how fast the activator inflates a0; divide_2x at ratio*A0.
     #  - fig4_grow  : activator-INDEPENDENT uniform growth (rho_lam=1, lam by activator off) + patterning
     #  - fig5_couple: activator-DRIVEN growth (mitogen) -> non-uniform expansion, deformation
-    BR = {"implementation": "brusselator", "gamma": 0.05, "A": 1.0, "B": 3.0}
+    BR = {"model": "brusselator", "gamma": 0.05, "A": 1.0, "B": 3.0}
     # 2D filled-disc analog of Fig 4: activator-INDEPENDENT uniform growth + Turing RD. Validates the
     # coupling + growing-domain patterning. (The literal Fig 4/5 are 3D hollow monolayer vesicles --
     # see run_coupled3d.py; tubulation is intrinsically 3D so the mitogen/differential-growth variant
     # is done there, not on a flat disc.)
     def GS(F, kk):
-        return {"implementation": "gray_scott", "F": F, "kk": kk}
+        return {"model": "gray_scott", "F": F, "kk": kk}
     # all share the couple2d_grow coupling (uniform growth + division); only the RD REGIME varies,
     # to show the growing-disc machinery reproduces the static-shell Turing patterns (archive/shell_*).
     # Each regime is emitted twice: plain, and `_lloyd` (planar Lloyd relaxation -> uniform hex cells).
