@@ -353,8 +353,8 @@ def _cmap(colors):
     return ListedColormap(colors)
 
 
-def draw_zoom(ax, mt, pos, mem_q=None, mem_s=None, cam=None, frac=0.34, myo_hi=None,
-              mem_hi=None, name=""):
+def draw_zoom(ax, mt, pos, mem_q=None, mem_s=None, cam=None, frac=0.55, myo_hi=None,
+              mem_hi=None, name="", lw=None):
     """A ZOOM on one patch of the surface: junctions coloured by MYOSIN, membrane by BOND STRAIN.
 
     WHY A SEPARATE PANEL AND NOT A COLOUR ON THE EXISTING ONES. Both new entities live in a shell a few
@@ -387,15 +387,20 @@ def draw_zoom(ax, mt, pos, mem_q=None, mem_s=None, cam=None, frac=0.34, myo_hi=N
     # keep junctions in the window AND on the near side, so the far hemisphere does not overprint it
     near = ((mid - ctr) @ d) > -half
     inwin = (np.abs((mid - ctr) @ u) < half) & (np.abs((mid - ctr) @ v) < half) & near
-    myo = np.asarray(mt["myo"], float)[live] if "myo" in mt else None
+    # LENGTH-CHECKED. `junction_myosin` writes `m["myo"]` before `divide_3d` and `reconnect_t1_3d` run,
+    # so the array recorded in a snapshot can be one topology-event out of step with that snapshot's
+    # half-edge table -- 1188 against 1206 on the run that caught this. Same guard as `_grad_myo` uses in
+    # the mechanics: skip the colouring for that frame rather than index past the end.
+    _m = np.asarray(mt["myo"], float) if "myo" in mt else None
+    myo = _m[live] if (_m is not None and _m.shape[0] == live.shape[0]) else None
     if inwin.any():
         segs = np.stack([np.stack([(a[inwin] - ctr) @ u, (a[inwin] - ctr) @ v], 1),
                          np.stack([(b[inwin] - ctr) @ u, (b[inwin] - ctr) @ v], 1)], axis=1)
         if myo is None:
-            lc = LineCollection(segs, colors="#666", linewidths=0.8, zorder=3)
+            lc = LineCollection(segs, colors="#7ab8ff", linewidths=(lw or 1.4), zorder=3)
         else:
             hi = myo_hi or max(float(np.percentile(myo, 98)), 1e-9)
-            lc = LineCollection(segs, cmap=_cmap(MYOSIN_COLORS), linewidths=1.6, zorder=3)
+            lc = LineCollection(segs, cmap=_cmap(MYOSIN_COLORS), linewidths=(lw or 1.6), zorder=3)
             lc.set_array(np.clip(myo[inwin] / hi, 0, 1))
             lc.set_clim(0, 1)
         ax.add_collection(lc)
@@ -407,12 +412,12 @@ def draw_zoom(ax, mt, pos, mem_q=None, mem_s=None, cam=None, frac=0.34, myo_hi=N
         if keep.any():
             xy = np.stack([rel[keep] @ u, rel[keep] @ v], axis=1)
             if mem_s is None:
-                ax.scatter(xy[:, 0], xy[:, 1], s=2.0, c="#3cb85a", marker=".", linewidths=0,
+                ax.scatter(xy[:, 0], xy[:, 1], s=13.0, c="#3cb85a", marker=".", linewidths=0,
                            zorder=2)
             else:
                 s = np.asarray(mem_s, float)[keep]
                 hi = mem_hi or max(float(np.percentile(np.asarray(mem_s, float), 99)), 1e-9)
-                ax.scatter(xy[:, 0], xy[:, 1], s=3.0, c=np.clip(s / hi, 0, 1),
+                ax.scatter(xy[:, 0], xy[:, 1], s=13.0, c=np.clip(s / hi, 0, 1),
                            cmap=_cmap(MEMBRANE_COLORS), vmin=0, vmax=1, marker=".",
                            linewidths=0, zorder=2)
     ax.set_xlim(-half, half); ax.set_ylim(-half, half)

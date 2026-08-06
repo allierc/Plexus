@@ -99,7 +99,8 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                # this discretisation cannot claim about it.
                membrane=None, membrane_particles=30000, membrane_youngs=400.0,
                membrane_bond_k=2.0e5, membrane_cutoff=0.020, membrane_break=0.35,
-               membrane_offset=0.004, membrane_thickness=0.010, membrane_adhesion=2.0e4,
+               membrane_offset=0.004, membrane_thickness=0.002, membrane_adhesion=2.0e4,
+               membrane_jitter=0.35,
                # crosslink turnover, in frames. Large = a membrane that cannot keep up with growth and
                # must fragment; small = one that remodels and stays intact. 0 or None disables it.
                membrane_tau=60.0):
@@ -172,7 +173,7 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
             {"op": "basement_membrane_seed", "at": "basement_membrane_particle",
              "centre": [0.5, 0.5, 0.5], "surface": str(membrane), "scale": 1.0,
              "offset": float(membrane_offset), "thickness": float(membrane_thickness),
-             "seed": int(seed)},
+             "seed": int(seed), "jitter": float(membrane_jitter)},
             # INTEGRINS FIRST: without them the sheet slides over the epithelium and its bonds never
             # feel the growth. `membrane_adhesion = 0` reproduces the unanchored (wrong) loading path.
             {"op": "integrin_adhesion", "at": "basement_membrane_particle",

@@ -97,6 +97,7 @@ class BasementMembraneSeed(Structural):
     REQUIRES_PARAMS = ["surface"]
     MECHANISM_TAGS = ["basement_membrane", "material_seeding", "epithelial_polarity"]
     PARAM_ROLES = {"offset": "shell_offset_outward", "thickness": "shell_thickness",
+                   "jitter": "seed_lattice_disorder",
                    "scale": "surface_rescale"}
     REFERENCE = ("Topfer, U. et al. (2022) Development 149:dev200456 "
                  "(collagen IV sets basement-membrane stiffness).")
@@ -108,7 +109,12 @@ class BasementMembraneSeed(Structural):
         self.centre = [float(v) for v in params.get("centre", [0.5, 0.5, 0.5])]
         self.scale = float(params.get("scale", 1.0))
         self.offset = float(params.get("offset", 0.004))     # sits just outside the apical surface
-        self.thickness = float(params.get("thickness", 0.010))
+        # A MONOLAYER, NOT A SLAB. At 0.010 the shell was ~5.7 particle spacings thick, so the k-nearest
+        # search found radial neighbours and built chains through the thickness instead of a connected
+        # sheet -- the seeded membrane came out with a largest component of 0.846, 15% of it already in
+        # pieces. A basement membrane IS a sheet; the thickness should be about one spacing.
+        self.thickness = float(params.get("thickness", 0.002))
+        self.jitter = float(params.get("jitter", 0.35))   # tangential noise, in units of local spacing
         self.seed = int(params.get("seed", 0))
         z = np.load(str(params["surface"]))
         self.smap0 = np.asarray(z["smap"], np.float32)[0] * self.scale
@@ -134,6 +140,25 @@ class BasementMembraneSeed(Structural):
         phi = (math.pi * (1.0 + 5.0 ** 0.5) * i) % (2 * math.pi)
         u = torch.stack([st * torch.cos(phi), st * torch.sin(phi), ct], dim=1).to(torch.float32)
 
+        # ...BUT NOT A PERFECT ONE. A pure Fibonacci spiral is a crystal: the rendered sheet shows obvious
+        # lattice rows, and worse, the crosslink network inherits that regularity, so the strain field
+        # carries a smooth large-scale modulation that is a property of the lattice and not of the
+        # mechanics. (Measured on the un-jittered run: the end-state strain pattern is spatially organised
+        # at 6x the shuffled null, yet growth, local coordination and nearby fibre density together
+        # explain only 4% of it.) A real basement membrane is not crystalline. Displace each point
+        # tangentially by a fraction of the local spacing, which breaks the lattice without opening holes.
+        if self.jitter > 0.0:
+            spacing = math.sqrt(4.0 * math.pi / max(n, 1))          # mean angular separation, radians
+            e1 = torch.stack([-u[:, 1], u[:, 0], torch.zeros_like(u[:, 0])], dim=1)
+            nrm = e1.norm(dim=1, keepdim=True)
+            e1 = torch.where(nrm > 1e-6, e1 / nrm.clamp_min(1e-12),
+                             torch.tensor([[1.0, 0.0, 0.0]]).expand_as(e1))
+            e2 = torch.cross(u, e1, dim=1)
+            d1 = torch.randn(n, generator=g) * (self.jitter * spacing)
+            d2 = torch.randn(n, generator=g) * (self.jitter * spacing)
+            u = u + e1 * d1[:, None] + e2 * d2[:, None]
+            u = u / u.norm(dim=1, keepdim=True).clamp_min(1e-12)
+
         th = torch.acos(u[:, 2].clamp(-1, 1))
         ph = torch.atan2(u[:, 1], u[:, 0]) % (2 * math.pi)
         R = M[(th / math.pi * nth).long().clamp(0, nth - 1),
@@ -153,7 +178,7 @@ class BasementMembraneSeed(Structural):
         lvl.get("pos")[:] = P.to(dev, dt_)
         self._done = True
         print(f"[basement_membrane_seed] {n} particles on a shell at r_surface + {self.offset:.4g} "
-              f"(thickness {self.thickness:.4g}), Fibonacci-distributed so areal density is uniform",
+              f"(thickness {self.thickness:.4g}), Fibonacci + {self.jitter:.2g}-spacing jitter",
               flush=True)
         return {}
 
