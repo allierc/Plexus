@@ -613,12 +613,39 @@ def _build_one(slot, rid, index, seen):
     # sweep is impossible and most of a batch dies.
     ok, bad = C.admit(g, seen_hashes=(() if index == CONTROL_SLOT else seen),
                       edit_kind=(edit[0] if edit else None))
+
+    # A DUPLICATE BECOMES A REPLICATE. Cedric, 6 August: "loose this rule, change the seed instead."
+    #
+    # Refusing cost three of eleven slots in one round, and one of the three was a real experiment --
+    # `add_op vesicle_growth` proposed on three parents to test whether the operator's effect is general
+    # or parent-specific, which is what the lever map is FOR. But the deeper waste is that this campaign
+    # has never once measured its own seed spread. The Analyst's standing instruction is that "a
+    # difference smaller than the seed spread is not a difference", and there has never been a replicate
+    # to measure that spread with -- so every difference reported so far rests on an unmeasured noise
+    # floor.
+    #
+    # The seeds are NOT in the theta hash (`seed_mesh_3d.seed` and `cell_rd_seed.seed` are undeclared,
+    # so `_theta_hash` never sees them), which is why the replicate is admitted deliberately rather than
+    # slipping past the check on a changed number.
+    replicate = False
+    if not ok and any(getattr(r, "code", "") == "R6_DUPLICATE" for r in bad):
+        # THE SEED IS A RUN-LEVEL ARGUMENT, NOT A GRAPH PARAMETER. My first version set
+        # `seed_mesh_3d0.seed` on the graph and the emitted spec still read 0: `translate.to_spec`
+        # fills every seeded operator from `general.seed` (`_seed_the_run`), so a per-operator seed in
+        # the graph is overwritten on the way out. The composition is unchanged either way -- which is
+        # the point of a replicate -- so the seed travels as an argument to `write_config` below.
+        ok, bad = C.admit(g, seen_hashes=(), edit_kind=(edit[0] if edit else None))
+        replicate = bool(ok)
+        if ok:
+            print(T_.quiet(f"[round] slot {index} repeats an experiment -- re-seeded and run as a "
+                           f"REPLICATE, which is how the seed spread gets measured"))
+
     if not ok:
         print(T_.no(f"[round] slot {index} refused: {[r.code for r in bad]} -- {bad[0].detail}"))
         return None
     try:
-        T.write_config(g, name, frames=FRAMES)
-        _restore_parent_params(name, par, edit)
+        T.write_config(g, name, frames=FRAMES, seed_=(1000 + index if replicate else 0))
+        _restore_parent_params(name, par, edit, spare_seeds=replicate)
     except Exception as e:
         print(T_.no(f"[round] slot {index}: spec would not write: {e}"))
         return None
@@ -642,12 +669,12 @@ def _build_one(slot, rid, index, seen):
         print(T_.no(f"[round] slot {index}: cannot hash the composition: {e}"))
         h = None
     return {"name": name, "slot": index, "parent": par, "edit": edit, "out_of_range": rng,
-            "run_key": C._run_key(g),
+            "replicate": replicate, "run_key": C._run_key(g),
             "comp_hash": h,
             **{k: slot.get(k) for k in ("claim", "predict", "intent", "why")}}
 
 
-def _restore_parent_params(name, parent, edit):
+def _restore_parent_params(name, parent, edit, spare_seeds=False):
     """Put back every parameter the rebuild lost, so a child differs from its parent by ONE edit.
 
     THIS IS THE BUG THAT VOIDED ROUND 1, and Cedric named its cause exactly: *"this would not have
@@ -689,6 +716,13 @@ def _restore_parent_params(name, parent, edit):
     with open(parent_spec_path) as f:
         pspec = yaml.safe_load(f)
 
+    # THE SEEDS SURVIVE ON A REPLICATE, and this cost the first working version of the replicate path:
+    # the re-seed happened on the graph, `write_config` emitted it, and then this function faithfully
+    # restored the parent's seed -- so the replicate was byte-identical to the run it was replicating
+    # and measured nothing. The overlay is right to be aggressive; it just has to know when a
+    # difference is the point.
+    spare = {"seed", "vseed", "rng_seed"} if spare_seeds else set()
+
     # the ONE key the edit is allowed to change, as it appears in an emitted spec (op name, not node id)
     spared = None
     if edit and edit[0] == "set_param" and "." in str(edit[1]):
@@ -708,6 +742,8 @@ def _restore_parent_params(name, parent, edit):
                 continue
             if spared and o.get("op") == spared[0] and k == spared[1]:
                 continue                                # this is the experiment
+            if k in spare:
+                continue                                # this is the replicate
             if o.get(k) != v:
                 o[k] = v
                 restored.append(f"{o['op']}.{k}")
@@ -871,6 +907,7 @@ def record_all(ctx):
                                 "edit": s.get("edit"), "claim": s.get("claim"),
                                 "intent": s.get("intent"), "comp_hash": s.get("comp_hash"),
                                 "out_of_range": s.get("out_of_range") or [],
+                                "replicate": bool(s.get("replicate")),
                                 "run_key": s.get("run_key"),
                                 "metrics": m, "premises_broken": m.get("premises_broken") or [],
                                 "scored": sc.get(s["name"])}, default=str) + "\n")
@@ -1066,8 +1103,7 @@ def reset_campaign(quiet=False):
     if not quiet:
         print(T_.ok(f"[round] campaign reset: {cleared} file(s) cleared, {moved} record(s) archived "
                     f"to _archive/round_records.jsonl, "
-                    f"{len(kept)} input(s) kept, {n_gone} empty run dir(s) removed"
-                    + (f", {n_kept} moved to _superseded/" if n_kept else "")))
+                    f"{len(kept)} input(s) kept, {n_gone} run dir(s) deleted"))
     return cleared
 
 
@@ -1095,20 +1131,14 @@ def _clear_colliding_runs(quiet=False):
         d = os.path.join(LOG_ROOT, name)
         if not os.path.isdir(d) or not pat.match(name):
             continue
-        if os.path.exists(os.path.join(d, "diag.json")):
-            dest = os.path.join(LOG_ROOT, "_superseded", name)
-            os.makedirs(os.path.dirname(dest), exist_ok=True)
-            if os.path.exists(dest):
-                shutil.rmtree(d)               # already superseded once; the copy aside is the keeper
-            else:
-                shutil.move(d, dest)
-            moved += 1
-            if not quiet:
-                print(T_.quiet(f"[round] {name} has results -- moved to _superseded/ rather than "
-                               f"overwritten"))
-        else:
-            shutil.rmtree(d)
-            gone += 1
+        # DELETED, NOT SET ASIDE. Cedric, 6 August: "do not move to superseded, delete them." The
+        # previous reset moved 74 directories and printed a line for each, and _superseded/ was
+        # accumulating campaigns nobody reads -- the RECORDS are archived to
+        # _archive/round_records.jsonl and that is the evidence; the run directory is a rendering of it.
+        # `_keep/` is still never touched: it does not match the r000_00 pattern, which is the whole
+        # reason the promoted parents live there.
+        shutil.rmtree(d)
+        gone += 1
     return gone, moved
 
 
