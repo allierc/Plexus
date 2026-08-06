@@ -325,6 +325,7 @@ def metric_bank(ctx):
     return {"lead with these five": list(metrics.headline_metrics()), **metrics.bank()}
 
 
+MAX_EDITS = 4          # edits per slot; still one experiment, applied in order to one parent
 CLOSURE_N = 4          # distinct values RUN before a parameter leaves the menu
 BATTERY = os.path.join(HERE, "battery.json")     # written by prototype/Tyssue/op_probe.py --all
 
@@ -435,7 +436,7 @@ def menu(ctx):
     retunes with its architecture pinned, and it produces usable science. Retuning BLIND is the
     weakness.
     """
-    from composition_space import OPERATORS
+    from composition_space import LEGAL_LINKS, OPERATORS
     TRIED, DEAD = _sweep_state(), _dead_params()
     if DEAD:
         print(T_.quiet(f"[round] {len(DEAD)} parameter(s) proved dead by the battery, "
@@ -545,6 +546,37 @@ def menu(ctx):
                 rows.append(row)
             else:
                 rows.append(row)
+        # OPERATORS THAT NEED TWO MOVES TO BE LEGAL, offered as the two moves. `legal_menu` shows
+        # only edits that leave a runnable graph, so an operator whose slot cannot be auto-wired
+        # (two or more candidate sources) appears nowhere -- `extrude` was invisible to every
+        # parent, which the Proposer noticed on round 1 and could do nothing about. Now the pair
+        # is one row, and `MAX_EDITS` makes it proposable.
+        present = {o["op"] for o in g.ops}
+        for op, spec in sorted(OPERATORS.items()):
+            if op in present or not spec.get("slots"):
+                continue
+            for impl in (spec.get("impls") or [None]):
+                try:
+                    g_add, _ = g.apply(("add_op", op, impl))
+                except Exception:
+                    continue
+                for dst, _o, slot in g_add.unrouted_slots():
+                    for s in g_add.ops:
+                        outs = OPERATORS[s["op"]].get("outputs") or []
+                        if not any((ot, slot) in LEGAL_LINKS for ot in outs):
+                            continue
+                        try:
+                            g2, _ = g_add.apply(("connect", s["id"], dst, slot))
+                        except Exception:
+                            continue
+                        if C.check_static(g2):
+                            continue                # the pair still does not admit -- not a row
+                        rows.append({
+                            "edit": [["add_op", op, impl], ["connect", s["id"], dst, slot]],
+                            "label": f"+{op}:{impl} <- {s['op']}.{slot}",
+                            "status": "UNTRIED -- two edits: add, then wire",
+                            "yields": spec.get("role")})
+
         # OPEN SWEEPS FIRST, untried parameters after them, structural edits last. Ordering is the
         # cheapest steer there is and it costs no tokens.
         rows.sort(key=lambda r: (0 if str(r.get("status", "")).startswith("OPEN") else
@@ -567,7 +599,7 @@ def coverage(ctx):
     In the control loop this is unnecessary because the sweep table IS the coverage, hand-maintained.
     Here it has to be derived, so it is derived once a round and handed over.
     """
-    from composition_space import OPERATORS
+    from composition_space import LEGAL_LINKS, OPERATORS
     used_ops, used_impls = set(), set()
     for p in (ctx.get("parents") or []):
         try:
@@ -802,6 +834,26 @@ def _refuse(index, slot, reason):
                      "edit": (slot or {}).get("edit"), "reason": reason})
 
 
+def _edit_kind(edit):
+    """The verb the critic dedupes on. A SEQUENCE dedupes as its most structural member.
+
+    `critic.check_static` keys a structural edit on comp_hash (a new mechanism) and a `set_param`
+    edit on _run_key (mechanism AND operating point), because comp_hash is parameter-blind. A slot
+    that adds an operator and then retunes it is a new mechanism, so the structural identity is the
+    right one -- keying it on the retune would refuse the whole composition the moment any parent
+    with that comp_hash was on file.
+    """
+    if not edit:
+        return None
+    if isinstance(edit[0], str):
+        return edit[0]
+    verbs = [e[0] for e in edit if e]
+    for v in ("add_op", "remove_op", "set_impl", "connect", "disconnect"):
+        if v in verbs:
+            return v
+    return verbs[0] if verbs else None
+
+
 def _build_one(slot, rid, index, seen):
     par, edit = slot.get("parent"), slot.get("edit")
     try:
@@ -820,12 +872,37 @@ def _build_one(slot, rid, index, seen):
     if index == CONTROL_SLOT or not edit:
         name, edit = f"{rid}_{index:02d}_ctrl", None
     else:
-        edit = _resolve_edit(g, tuple(edit))
+        # UP TO `MAX_EDITS` EDITS PER SLOT. Cedric, 6 August: "the one-edit-per-slot rule is too
+        # rigid, allow 4."
+        #
+        # One edit was never a principle, it was a simplification, and it made part of the search
+        # space UNREACHABLE. `extrude` -- the forced-tube probe the Analyst asked for in rounds
+        # 10, 11 and 12, and whose K_extrude the battery measured LIVE -- declares a `site` slot
+        # fed by `morphogen`, and TWO operators produce morphogen (`cell_react` and
+        # `seed_cell_rd`). With two candidates `add_op` will not guess a wiring, so the slot
+        # dangles, R3 refuses it, and the menu never offers it. `apply`'s own comment says a
+        # `connect` edit "remains available to make it deliberately" -- but `connect` needs the
+        # node to exist, and the node cannot be added, so under one edit that escape hatch does
+        # not exist. The Proposer found this by itself on the first round: "extrude is in no
+        # parent's menu, so it can't be proposed".
+        #
+        # A sequence is still ONE experiment: it is applied in order to one parent, refused as a
+        # unit, fingerprinted as a unit, and recorded as a unit. What it buys is compositions that
+        # need two moves to be legal -- add and wire -- which is most of the coupling arrows.
+        edits = [tuple(edit)] if isinstance(edit[0], str) else [tuple(e) for e in edit]
+        if len(edits) > MAX_EDITS:
+            _refuse(index, slot, f"{len(edits)} edits proposed, the limit is {MAX_EDITS}")
+            return None
         before = _fingerprint(g)
         try:
-            g, _ = g.apply(tuple(edit))
+            applied = []
+            for e in edits:
+                e = _resolve_edit(g, e)          # re-resolve: a later edit may name an earlier node
+                g, _ = g.apply(e)
+                applied.append(e)
+            edit = applied[0] if len(applied) == 1 else applied
         except Exception as e:
-            _refuse(index, slot, f"edit {edit} not applicable: {e}")
+            _refuse(index, slot, f"edit {edits} not applicable: {e}")
             return None
         # AN EDIT THAT CHANGED NOTHING IS NOT AN EXPERIMENT. One check for every silent no-op --
         # a set_param on a node that does not exist, a remove_op of an absent operator, a connect
@@ -850,7 +927,7 @@ def _build_one(slot, rid, index, seen):
     # retune of a recorded parent is refused as R6_DUPLICATE the moment that parent is on file, so a
     # sweep is impossible and most of a batch dies.
     ok, bad = C.admit(g, seen_hashes=(() if index == CONTROL_SLOT else seen),
-                      edit_kind=(edit[0] if edit else None))
+                      edit_kind=_edit_kind(edit))
 
     # A DUPLICATE BECOMES A REPLICATE. Cedric, 6 August: "loose this rule, change the seed instead."
     #
@@ -872,7 +949,7 @@ def _build_one(slot, rid, index, seen):
         # fills every seeded operator from `general.seed` (`_seed_the_run`), so a per-operator seed in
         # the graph is overwritten on the way out. The composition is unchanged either way -- which is
         # the point of a replicate -- so the seed travels as an argument to `write_config` below.
-        ok, bad = C.admit(g, seen_hashes=(), edit_kind=(edit[0] if edit else None))
+        ok, bad = C.admit(g, seen_hashes=(), edit_kind=_edit_kind(edit))
         replicate = bool(ok)
         if ok:
             print(T_.quiet(f"[round] slot {index} repeats an experiment -- re-seeded and relabelled a "
