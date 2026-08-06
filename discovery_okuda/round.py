@@ -324,6 +324,97 @@ def metric_bank(ctx):
     return {"lead with these five": list(metrics.headline_metrics()), **metrics.bank()}
 
 
+CLOSURE_N = 4          # distinct values RUN before a parameter leaves the menu
+BATTERY = os.path.join(HERE, "battery.json")     # written by prototype/Tyssue/op_probe.py --all
+
+
+def _sweep_state():
+    """Per parameter: which values the campaign has RUN, and whether that sweep is finished.
+
+    THE ONE THING THE CONTROL LOOP DOES THAT THIS DID NOT. Measured over 13 rounds, side by side:
+
+                                    okuda      LLM_flyvis_noise_005
+        parameters touched            14              23
+        distinct (param,value)        27              65
+        swept to >= 4 values           1               9
+        visited at ONE value only    6/14             0/23
+
+    The control sweeps a parameter to closure -- `W_L1` at 7 values, `lr_W`/`DAL`/`f_L2` at 5 --
+    then writes `g_phi_norm CLOSED (5 values)` and never returns to it. Ours took ONE point per
+    round and never came back to finish, so nothing ever closed and everything stayed
+    re-proposable forever. That is the whole mechanism behind `shape_to_chem.beta` being
+    re-proposed 25 times across 13 rounds: it was never swept, so it was never closed.
+
+    Closure is counted on values that were RUN, not proposed. A refused slot taught nothing and
+    must not retire a parameter.
+    """
+    tried = {}
+    for path in (RECORDS, os.path.join(HERE, "_archive", "round_records.jsonl")):
+        if not os.path.exists(path):
+            continue
+        with open(path) as fh:
+            for line in fh:
+                try:
+                    r = json.loads(line)
+                except Exception:
+                    continue
+                if not r.get("metrics"):
+                    continue          # never produced evidence: it does not count toward closure
+                e = r.get("edit")
+                if not e or len(e) < 3 or e[0] != "set_param":
+                    continue
+                tried.setdefault(str(e[1]), set()).add(_round_val(e[2]))
+    return {k: sorted(v, key=str) for k, v in tried.items()}
+
+
+def _round_val(v):
+    """`-4` and `-4.0` are one value. The records hold both, which inflated every count."""
+    try:
+        f = float(v)
+        return int(f) if f == int(f) else round(f, 9)
+    except (TypeError, ValueError):
+        return v
+
+
+def _dead_params():
+    """{param: reason} for anything the operator battery proved cannot influence a run.
+
+    A DEAD parameter on the menu is worse than an absent one: the Proposer spends a slot, the run
+    completes, the prediction scores `refuted`, and the campaign records a mechanism claim about a
+    knob that was never connected. At least 13 of the first 84 refutations were exactly that.
+
+    UNREAD AND DEAD ARE NOT THE SAME VERDICT, and conflating them would delete working code.
+
+      UNREAD  the class never looks the key up, so it is inert in EVERY composition. Universal.
+      DEAD    the class reads it, and it did not move THIS fixture. Not universal at all --
+              measured causes, all three benign: `divide_3d.max_cycle` defaults to 10^9 so its
+              ceiling cannot bind; `divide_3d.reset_noise` is only read when `cycle_cv == 0` and
+              this fixture sets it; `reconnect_t1_3d.max_flips` caps flips at 20 and this mesh
+              never reaches 20. Each is a real limiter that would bite on a busier mesh.
+
+    So a DEAD verdict is withheld only on the fixture that produced it, and the reason travels
+    with it. Withholding `max_flips` everywhere because one calm fixture never hit the cap would
+    be the same error as deleting it.
+    """
+    if not os.path.exists(BATTERY):
+        return {}
+    try:
+        blob = json.load(open(BATTERY))
+    except Exception:
+        return {}
+    rows = blob.get("rows", blob) if isinstance(blob, dict) else blob
+    fixture = blob.get("fixture", "an unrecorded fixture") if isinstance(blob, dict) else \
+        "an unrecorded fixture"
+    out = {}
+    for r in rows:
+        v = r.get("verdict")
+        if v == "UNREAD":
+            out[f"{r['op']}.{r['param']}"] = "UNREAD -- the operator never reads this key"
+        elif v == "DEAD":
+            out[f"{r['op']}.{r['param']}"] = f"DEAD on {fixture} -- read, but it did not move that run"
+    return out
+
+
 def menu(ctx):
     """Every edit the critic will admit, per parent -- each one legible as a CHANGE, not a magnitude.
 
@@ -344,6 +435,14 @@ def menu(ctx):
     weakness.
     """
     from composition_space import OPERATORS
+    TRIED, DEAD = _sweep_state(), _dead_params()
+    if DEAD:
+        print(T_.quiet(f"[round] {len(DEAD)} parameter(s) proved dead by the battery, "
+                     f"withheld from every menu"))
+    closed = sum(1 for v in TRIED.values() if len(v) >= CLOSURE_N)
+    if closed:
+        print(T_.quiet(f"[round] {closed} parameter(s) swept to closure ({CLOSURE_N} values), "
+                     f"withheld"))
     out = {}
     for p in (ctx.get("parents") or []):
         try:
@@ -351,7 +450,7 @@ def menu(ctx):
         except Exception as e:
             print(T_.no(f"[round] no menu for {p['name']}: {e}"))
             continue
-        rows, seen = [], set()
+        rows, seen, dropped = [], set(), []
         for r in C.legal_menu(g, limit=MENU_LIMIT):
             if not isinstance(r, dict):
                 continue
@@ -362,6 +461,21 @@ def menu(ctx):
                 if tgt in seen:
                     continue                       # one row per target, carrying its whole grid
                 seen.add(tgt)
+                # THE TWO RULES THAT MAKE THE MENU BIND, rather than advise.
+                #
+                # Telling the Proposer in prose has been tried and measured. `proposer.md` has said
+                # "cover the map" since round 1; the Analyst wrote "do NOT re-issue another
+                # set_param sweep" in rounds 10, 11 and 12; round 13's proposal was nine set_params.
+                # A rule that lives in a prompt is a suggestion. A row that is not on the menu
+                # cannot be proposed.
+                bare = tgt.rpartition(".")[0].rstrip("0123456789") + "." + tgt.rpartition(".")[2]
+                if bare in DEAD or tgt in DEAD:
+                    dropped.append(f"{tgt} ({DEAD.get(bare) or DEAD.get(tgt)}: cannot reach the state)")
+                    continue
+                done = TRIED.get(tgt, [])
+                if len(done) >= CLOSURE_N:
+                    dropped.append(f"{tgt} (CLOSED, {len(done)} values run: {done})")
+                    continue
                 node, _, key = tgt.rpartition(".")
                 op = _op_of(g, node)
                 cur = (g.params or {}).get(tgt)
@@ -401,10 +515,22 @@ def menu(ctx):
                         # 0.5 -- a row that contradicts itself is worse than one with no label.
                         row["edit"] = [e[0], tgt, grid[0]]
                         row["label"] = f"@{op}.{key}={grid[0]:g} (from {cur:g})"
+                # AN OPEN SWEEP OUTRANKS A NEW ONE, and the row says how far along it is. The
+                # control loop's agent reads `g_phi_norm CLOSED (5 values)` and moves on; ours had
+                # no way to know a parameter was half-explored, so it re-ran the first point.
+                row["tried"] = done
+                row["status"] = (f"OPEN -- {len(done)}/{CLOSURE_N} values run"
+                                 if done else "UNTRIED -- no value has ever been run")
                 rows.append(row)
             else:
                 rows.append(row)
+        # OPEN SWEEPS FIRST, untried parameters after them, structural edits last. Ordering is the
+        # cheapest steer there is and it costs no tokens.
+        rows.sort(key=lambda r: (0 if str(r.get("status", "")).startswith("OPEN") else
+                                 1 if str(r.get("status", "")).startswith("UNTRIED") else 2))
         out[p["name"]] = rows
+        if dropped:
+            out[f"{p['name']} -- NOT on the menu, and why"] = dropped
     return out
 
 

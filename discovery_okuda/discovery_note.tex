@@ -1893,14 +1893,124 @@ control cannot have --- composition, a structural critic, and an eye --- and dro
 were judging without learning.
 \end{phasebox}
 
-\begin{phasebox}{Phase 13 --- The demonstration \hfill \todo}
+\begin{phasebox}{Phase 13 --- The operator battery: is this parameter connected? \hfill \todo}
+\textbf{Goal.} No parameter enters a campaign unmeasured. For every operator and every parameter,
+establish whether changing it changes the run --- and use the same harness to turn 87 declared
+differentiability flags into 87 measurements.
+
+\subsection*{Why: three layers of defence, and all three missed the same thing}
+\code{shape\_to\_chem} is the operator that closes Okuda's loop --- geometry back to chemistry. It
+was edited \textbf{25 times across 13 rounds}, 8 of them same-seed. Not one of those 8 changed the
+run by a single bit. Every one was recorded as \code{refuted}, which is the campaign asserting a
+mechanism claim about an operator that never reached the state.
+
+Three things should have caught it:
+
+\begin{enumerate}[leftmargin=1.4em]
+\item \textbf{The operator's own self-test, which passes.} Forty lines certifying that curvature
+reads $1/R$ on spheres of known radius, that a bump is positive and a dimple negative, that the
+standardisation is unit-invariant, that one spike cannot set the scale. All correct, and all about
+arithmetic \emph{inside} \code{\_feature()}. Its one check about \code{forward} is literally
+\code{chk(True, "beta = 0 returns zeros by construction")} --- an assertion hardcoded to pass.
+\item \textbf{\code{instrument.install()}}, whose entire purpose is ``did this operator actually do
+anything?''. It decides with \code{acted = bool(out) or (before != after)}. \code{shape\_to\_chem}
+returns a full-size tensor on every call, so \code{bool(out)} is \code{True} \emph{even when that
+tensor is all zeros}. It has scored 100\% acted on every run it has ever been in.
+\item \textbf{The scoring itself}, which cannot distinguish \emph{the hypothesis is false} from
+\emph{the knob is disconnected}. At least 13 of the campaign's 84 refutations refuted nothing.
+\end{enumerate}
+
+\noindent The common failure is exact: \textbf{none of the three measured the operator's effect on
+the trajectory.} One measured its internal arithmetic, one measured whether it returned an object,
+one measured a metric downstream of it.
+
+\subsection*{Three probes, cheapest first}
+\code{prototype/Tyssue/op\_probe.py}:
+
+\begin{center}\small
+\begin{tabular}{llll}
+\toprule
+probe & cost & catches & verdict \\
+\midrule
+\code{UNREAD} & free, no simulation & the class never looks the key up & dead by construction \\
+\code{TRAJECTORY} & 2 short runs & read, but cannot reach the state & \code{LIVE} / \code{DEAD} \\
+\code{GRADIENT} & 1 run with the tape & \emph{how much}, and where the path breaks & sensitivity \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent \code{UNREAD} hands the operator a \code{params} dict that records every key read during
+\code{\_\_init\_\_} and \code{forward}; a declared key never read cannot influence anything, whatever
+the sweep does to it. Run against the r013 control it took under a second and returned
+\code{cell\_rd\_seed.amp}, \code{morphogen\_growth\_3d.dt} and \code{seed\_mesh\_3d.cell\_set} ---
+three parameters that have sat in every spec this campaign has written and are read by nothing.
+
+\code{TRAJECTORY} is deliberately dumber than all three failed defences: run the composition twice,
+change one number, compare the state. It cannot be fooled by an emission that is discarded
+downstream, because it never looks at the emission. It compares \emph{state}, not metrics --- a
+metric can be blind to a change (\code{n\_spots} reads 1 on a six-domain pattern) and then report a
+live parameter dead.
+
+\subsection*{Does this need autograd? Not for the fix --- but it is exactly the groundwork}
+The finite difference is the ground truth and must stay: it cannot be fooled by a severed tape, and
+it works on operators that have no gradient at all. Autograd adds two things it cannot give.
+
+\textbf{First, ranking instead of classification.} \code{TRAJECTORY} answers \emph{live or dead};
+$\partial(\mathrm{state})/\partial\theta$ answers \emph{how much, and in which direction}, from one run
+instead of two per parameter. That is what turns the battery from a defect detector into a menu
+ordering --- the Proposer's real problem is not which knobs are dead but which of the live ones is
+worth a GPU.
+
+\textbf{Second, and this is the differentiability work itself:} the interesting cell of the table is
+\emph{finite difference nonzero, gradient zero}. That is an operator that is live but not
+\emph{learnable}, and the probe names the barrier. The barriers here are known and specific:
+\code{\_standardise} computes the shape feature in \textbf{numpy} (\code{np.median},
+\code{np.clip}), which severs the tape outright; \code{shape\_to\_chem} then applies
+\code{clamp(min=0, max=F\_CEIL)}, which zeroes the gradient wherever it binds --- and at $\beta=-2$
+with the feature clipped to $\pm4$ it binds on most cells; \code{cell\_rd\_seed} uses
+\code{argmax} and \code{torch.where} on a hard radius.
+
+\textbf{87 implementations are registered; 23 declare \code{DIFFERENTIABLE = False}} --- including
+\emph{all four} \code{shape\_to\_chem} implementations and \code{morphogen\_growth\_3d}, which is to
+say both operators of the chemistry--shape loop. Those flags are \emph{declarations}. Nobody has
+measured one. The battery makes each of them a measurement, and the three-way outcome
+(\,gradient matches the finite difference / gradient is zero where the difference is not / no tape at
+all\,) is a work list for making them differentiable, ordered by how much each one moves the run.
+
+\subsection*{The fixes this exposes, none of them cosmetic}
+\begin{enumerate}[leftmargin=1.4em]
+\item \code{cell\_rd\_seed} carries no \code{before\_frame}, so the \emph{initial condition} is
+re-applied every frame, overwriting both chemistry channels. \code{shape\_to\_chem} writes to
+channel 1, which the reset pins to exactly 1.0. \textbf{Measured, 140 frames:} as the campaign ran
+it, $\beta:0\to-2$ and $0\to-4$ both move the trajectory by \textbf{exactly} $0$; with the seed
+gated to \code{before\_frame: 1} they move it by $2.34\times10^{-5}$ and $2.38\times10^{-5}$.
+\item \textbf{And a second throttle the same measurement exposes.} Doubling $\beta$ changes the
+effect by 1.8\%. A coupling should scale with its strength; this one does not, because
+\code{clamp(min=0, max=F\_CEIL)} saturates --- with the feature clipped to $\pm4$,
+$F_0(1+\beta\hat\phi)$ leaves $[0,0.11]$ on most cells at both $-2$ and $-4$, so the two clamp to
+the same field. Gating the seed removes one throttle of two. \emph{This is also the clearest case
+for the gradient probe: a saturated clamp has zero derivative, so \code{shape\_to\_chem} is the
+canonical ``live but not learnable'' entry in the table above.}
+\item \code{instrument.py}: \code{bool(out)} must become ``the emission contains a nonzero value''.
+\item \code{cell\_rd\_seed.n\_spots} is read only by \code{\_cone\_dirs()}, which only
+\code{mode: cones} calls; the campaign runs \code{mode: tip}. A parameter that is inert in the
+current mode should be refused at build time, not swept.
+\item \code{amp} is read by no branch of any mode.
+\end{enumerate}
+
+\textbf{What you get.} A battery every operator runs from its own \code{\_\_main\_\_}, a
+\code{LIVE}/\code{DEAD}/\code{UNREAD} column on every parameter in the menu before a round can
+propose it, and the measured differentiability table that the inverse work needs.
+\end{phasebox}
+
+\begin{phasebox}{Phase 14 --- The demonstration \hfill \todo}
 \textbf{Goal.} Run the designed grid --- six to eight simulations --- that produces the figure:
 tube, undulation and branching, at Okuda's settings.
 
 \textbf{What you get.} \emph{The figure.}
 \end{phasebox}
 
-\begin{phasebox}{Phase 14 --- The method claim \hfill \todo}
+\begin{phasebox}{Phase 15 --- The method claim \hfill \todo}
 \textbf{Goal.} Write up what the loop found by itself versus what we told it, with the record of
 predictions and retractions as the evidence.
 
