@@ -59,6 +59,7 @@ T_.install_line_colour()
 LOG_ROOT = os.environ.get("OKUDA_LOG", os.path.join(os.path.dirname(HERE), "log", "okuda"))
 CAMPAIGN = os.path.join(HERE, "campaign")
 RECORDS = os.path.join(CAMPAIGN, "records.jsonl")
+REFUSALS = os.path.join(CAMPAIGN, "refusals.json")   # written by build_all, read by refusals()
 FLOW = os.path.join(HERE, "crew", "flow.yaml")
 
 # THE ROUND'S QUANTITIES LIVE HERE, NOT IN MARKDOWN OR IN THE FLOW. Cedric, 5 August: markdown
@@ -618,6 +619,7 @@ def build_all(ctx):
     slots = ([{"parent": pars[0]["name"]}] + list(ctx.get("edits") or []))[:int(
         ctx.get("n_slots") or N_SLOTS)]
     rid, seen, out = ctx["round_id"], _seen(), []
+    _REFUSED.clear()                       # this round's, not the campaign's
     for i, slot in enumerate(slots):
         s = _build_one(slot, rid, i, seen)
         if s:
@@ -646,7 +648,43 @@ def build_all(ctx):
                        f"recorded per run, see round.md"))
     print(T_.ok(f"[round] {len(out)} slot(s) built: "
                 + ", ".join(f"{s['name'].split('_')[-1]}" for s in out)))
+    # HAND THE REFUSALS FORWARD. Written here, read by `refusals` at the top of the next round --
+    # the same shape as knowledge.md -> history, and the reason a refused slot stops being a slot
+    # spent teaching nobody anything.
+    try:
+        os.makedirs(CAMPAIGN, exist_ok=True)
+        with open(REFUSALS, "w") as fh:
+            json.dump({"round": rid, "refused": list(_REFUSED)}, fh, indent=1)
+        if _REFUSED:
+            print(T_.quiet(f"[round] {len(_REFUSED)} refusal(s) recorded for the next Proposer"))
+    except Exception as e:
+        print(T_.warn(f"[round] could not record refusals: {e}"))
     return out
+
+
+def refusals(ctx):
+    """What the LAST round proposed and could not run, with the reason.
+
+    Cedric, 6 August, on three refused `set_impl` slots: *"does it get the message to rectify if
+    necessary next round?"* It did not. The refusal was printed to a terminal and lost, so the
+    Proposer had no way to know a slot had died, let alone why -- and would re-propose the same
+    edit for the same reason indefinitely. Twelve refusals across two rounds once halted this
+    campaign entirely and the Proposer was never told.
+    """
+    if not os.path.exists(REFUSALS):
+        return "No previous round, or nothing was refused."
+    try:
+        blob = json.load(open(REFUSALS))
+    except Exception:
+        return "No refusals on file."
+    rows = blob.get("refused") or []
+    if not rows:
+        return f"Round {blob.get('round')}: every slot was built. Nothing was refused."
+    out = [f"Round {blob.get('round')} refused {len(rows)} slot(s). "
+           f"A refused slot ran nothing and taught nothing:"]
+    for r in rows:
+        out.append(f"  - {r.get('edit')} on {r.get('parent')}: {r.get('reason')}")
+    return "\n".join(out)
 
 
 def _resolve_edit(g, edit):
@@ -724,12 +762,32 @@ def _fingerprint(g):
                         if str(k).rpartition(".")[0] in ids)))
 
 
+# ---- refusals, which used to be printed and then lost -------------------------------------------
+_REFUSED = []
+
+
+def _refuse(index, slot, reason):
+    """Print a refusal AND keep it, so the Proposer can read it next round.
+
+    THE SIXTH PRODUCER WITH NO CONSUMER, and the one the flow graph could not catch because a
+    refusal was never a node. `steer` never reached the Proposer; the premise diagnosis was spent
+    on a refusal; `sat` was emitted nowhere; the eye's disagreements were never compared. Each was
+    found by hand, weeks later. This one was found by Cedric reading three red lines in a terminal
+    and asking "does it get the message to rectify if necessary next round?" -- and the answer was
+    no. The Proposer re-proposed the same refused edit for the same reason with nothing to tell it
+    otherwise, which is exactly how `shape_to_chem.beta` was re-proposed 25 times in 13 rounds.
+    """
+    print(T_.no(f"[round] slot {index}: {reason}"))
+    _REFUSED.append({"slot": index, "parent": (slot or {}).get("parent"),
+                     "edit": (slot or {}).get("edit"), "reason": reason})
+
+
 def _build_one(slot, rid, index, seen):
     par, edit = slot.get("parent"), slot.get("edit")
     try:
         g = _graph(par)
     except Exception as e:
-        print(T_.no(f"[round] slot {index}: parent {par!r} cannot be rebuilt: {e}"))
+        _refuse(index, slot, f"parent {par!r} cannot be rebuilt: {e}")
         return None
     if index == CONTROL_SLOT or not edit:
         name, edit = f"{rid}_{index:02d}_ctrl", None
@@ -739,7 +797,7 @@ def _build_one(slot, rid, index, seen):
         try:
             g, _ = g.apply(tuple(edit))
         except Exception as e:
-            print(T_.no(f"[round] slot {index}: edit {edit} not applicable: {e}"))
+            _refuse(index, slot, f"edit {edit} not applicable: {e}")
             return None
         # AN EDIT THAT CHANGED NOTHING IS NOT AN EXPERIMENT. One check for every silent no-op --
         # a set_param on a node that does not exist, a remove_op of an absent operator, a connect
@@ -747,8 +805,8 @@ def _build_one(slot, rid, index, seen):
         # runs as an exact copy of the parent, is recorded as evidence, and scores as a confirmation
         # of whatever it happened to predict.
         if _fingerprint(g) == before:
-            print(T_.no(f"[round] slot {index} refused: {edit} changed nothing -- the target does "
-                        f"not exist in {par}, so the run would have been a copy of its parent"))
+            _refuse(index, slot, f"{edit} changed nothing -- the target does not exist in {par}, "
+                                 f"so the run would have been a copy of its parent")
             return None
         name = f"{rid}_{index:02d}"
 
@@ -793,13 +851,13 @@ def _build_one(slot, rid, index, seen):
                            f"ROBUSTNESS TEST, which is how the seed spread gets measured"))
 
     if not ok:
-        print(T_.no(f"[round] slot {index} refused: {[r.code for r in bad]} -- {bad[0].detail}"))
+        _refuse(index, slot, f"refused {[r.code for r in bad]} -- {bad[0].detail}")
         return None
     try:
         T.write_config(g, name, frames=FRAMES, seed_=(1000 + index if replicate else 0))
         _restore_parent_params(name, par, edit, spare_seeds=replicate)
     except Exception as e:
-        print(T_.no(f"[round] slot {index}: spec would not write: {e}"))
+        _refuse(index, slot, f"spec would not write: {e}")
         return None
     # OUT-OF-RANGE VALUES TRAVEL WITH THE SPEC. Not a refusal -- as a gate this refused 6 of 6
     # working recipes including coral_gate. But a run whose parameters sit outside the declared box
@@ -833,7 +891,7 @@ def _build_one(slot, rid, index, seen):
     try:
         h = _comp_hash(g)
     except Exception as e:
-        print(T_.no(f"[round] slot {index}: cannot hash the composition: {e}"))
+        _refuse(index, slot, f"cannot hash the composition: {e}")
         h = None
     return {"name": name, "slot": index, "parent": par, "edit": edit, "out_of_range": rng,
             "replicate": replicate, "claim_proposed": slot.get("claim_proposed"),

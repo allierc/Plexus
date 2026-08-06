@@ -105,9 +105,18 @@ nodes:
     in: [parents]
 
   # ---- propose -------------------------------------------------------------------
+  # WHAT LAST ROUND PROPOSED AND COULD NOT RUN. Cedric, 6 August, reading three red `set_impl`
+  # lines: "does it get the message to rectify if necessary next round?" It did not. Refusals were
+  # printed to a terminal and lost, so the Proposer could re-propose the same dead edit forever
+  # with nothing to tell it otherwise -- and once lost twelve slots across two rounds while being
+  # told none of it. This is the sixth producer-with-no-consumer, and the one this graph could not
+  # catch, because a refusal was never a node. Now it is.
+  - id: refusals
+    code: round.refusals
+
   - id: proposer
     agent: proposer
-    in: [parents, menu, metric_bank, coverage, diagnosis, history]
+    in: [parents, menu, metric_bank, coverage, diagnosis, history, refusals]
     out: edits
 
   # ---- build, launch, measure ----------------------------------------------------

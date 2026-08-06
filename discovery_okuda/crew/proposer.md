@@ -24,6 +24,8 @@ prediction you could be wrong about**.
 - the **metric bank**: every quantity you may name in a prediction, with what each one measures;
 - **last round's diagnosis**, when a run broke a premise its parent holds: the difference between
   them, ranked, with the parent's value to revert to.
+- **last round's refusals**: what was proposed and could not run, with the reason. A refused slot
+  ran nothing and taught nothing.
 
 ## What you write
 
