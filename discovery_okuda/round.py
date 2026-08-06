@@ -508,7 +508,22 @@ def menu(ctx):
                         v = max(1, int(round(v))) if is_int else round(v, 6)
                         if v != cur:
                             vals.add(v)
-                    grid = sorted(vals)
+                    # EVERY GRID VALUE MUST SURVIVE THE CRITIC, or `legal_menu` stops meaning
+                    # legal. `legal_menu` returns a value it has admitted; this grid REPLACES it
+                    # with factors of the parent's own value and nothing re-checked them. Round 1
+                    # of the live campaign offered `chi 1.3 -> 2.6` and the critic refused it as
+                    # R1c_REACTION_UNSTABLE (2.6 per frame against a limit of 2.0) -- a slot spent
+                    # on an edit the menu had promised was admissible. Any parent with chi > 1.0
+                    # would have done the same every round for 25 rounds.
+                    legal = []
+                    for v in sorted(vals):
+                        try:
+                            gv, _ = g.apply(("set_param", tgt, v))
+                            if not C.check_static(gv):
+                                legal.append(v)
+                        except Exception:
+                            pass
+                    grid = legal
                     if grid:
                         row["try"] = grid
                         # THE LABEL MUST AGREE WITH THE EDIT. `legal_menu` built it from the value it
@@ -516,6 +531,11 @@ def menu(ctx):
                         # 0.5 -- a row that contradicts itself is worse than one with no label.
                         row["edit"] = [e[0], tgt, grid[0]]
                         row["label"] = f"@{op}.{key}={grid[0]:g} (from {cur:g})"
+                    else:
+                        # Boxed in: neither half nor double survives the critic. Say so, because a
+                        # row with no grid otherwise looks like a row nobody bothered to fill.
+                        row["try_note"] = ("no factor of the parent's value is admissible -- "
+                                           "the critic refuses both half and double")
                 # AN OPEN SWEEP OUTRANKS A NEW ONE, and the row says how far along it is. The
                 # control loop's agent reads `g_phi_norm CLOSED (5 values)` and moves on; ours had
                 # no way to know a parameter was half-explored, so it re-ran the first point.
@@ -789,6 +809,14 @@ def _build_one(slot, rid, index, seen):
     except Exception as e:
         _refuse(index, slot, f"parent {par!r} cannot be rebuilt: {e}")
         return None
+    # A SLOT THAT SAYS "control" IS ASKING FOR THE PARENT UNCHANGED, and that is a real experiment
+    # -- two runs of one composition at two seeds bound the noise floor, which is the number every
+    # other difference in the round has to clear. Round 1 of the live campaign wrote
+    # `('control',)` on slot 1 and lost the slot to "unknown edit ('control',)". The verb does not
+    # exist, but the intent is unambiguous and the machinery for it (replicate at a fresh seed)
+    # already exists, so refusing was the wrong answer to a request we can grant.
+    if edit and str(tuple(edit)[0]).lower() in ("control", "none", "null", "ctrl", "replicate"):
+        edit = None
     if index == CONTROL_SLOT or not edit:
         name, edit = f"{rid}_{index:02d}_ctrl", None
     else:
