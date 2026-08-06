@@ -468,10 +468,14 @@ OPERATORS = {
         # exposed only cones and tip, so the one seeding known to work could not be expressed.
         # Scattered seeds are also the physically natural initial condition for a Turing system:
         # a pattern should emerge from noise, not from foci we placed by hand.
-        impls=["tip", "cone", "spot", "scatter"], impl_structural=True,
-        params={"tip_radius": (0.6, 3.0, 2.0), "cone_deg": (4.0, 30.0, 8.0),
+        # `tip` REMOVED 6 August: it re-seeded a cap at the outermost cell every frame, which makes
+        # the activation a moving boundary condition rather than an initial condition -- so
+        # "does the pattern grip the shape?" was asked of a pattern pinned to the shape -- and it
+        # overwrote both chemistry channels every tick, annihilating shape_to_chem.
+        impls=["cone", "spot", "scatter"], impl_structural=True,
+        params={"cone_deg": (4.0, 30.0, 8.0),
                 "seed_frac": (0.01, 0.30, 0.06),
-                "amp": (0.5, 5.0, 2.0), "n_spots": (1, 8, 1)}),
+                "n_spots": (1, 8, 1)}),
     # NOTE: there is deliberately no separate `rd_interface_tension` node. In the engine that op
     # carries BOTH K_purse and K_extrude; the mechanism we need to ablate is the outward forcing,
     # so it is exposed once, as `extrude`. A second node would be the same engine operator under
@@ -1191,7 +1195,7 @@ def reference_recipes():
 
     g = seed("substrate")
     for op, impl in [("cell_geometry_3d", "scatter_add"), ("cell_adjacency", "shared_edge"),
-                     ("cell_rd_seed", "tip"), ("morphogen_growth_3d", "hill_conserve_amount"),
+                     ("cell_rd_seed", "cone"), ("morphogen_growth_3d", "hill_conserve_amount"),
                      ("divide_3d", "orient_iface"), ("extrude", "radial_push")]:
         g, _ = g.apply(("add_op", op, impl))
     src = next(o["id"] for o in g.ops if o["op"] == "cell_rd_seed")

@@ -229,9 +229,12 @@ def _emit_rd_seed(g, n, ga):
     i, impl = n["id"], g.impl_of(n)
     # the engine's mode name for a fixed-angle cone is "cones" (plural). Emitting "cone" here
     # silently fell through to a different seeding mode -- caught by the V9 parameter check.
-    ENGINE_MODE = {"cone": "cones", "tip": "tip", "spot": "cones", "scatter": "scatter"}
+    # `tip` REMOVED 6 August -- see cell_rd_seed's docstring. `amp` removed with it: the operator
+    # reads no such parameter in any mode, so every spec this campaign wrote carried a number that
+    # nothing looked at. Found by the UNREAD probe in one second, having survived 14 rounds.
+    ENGINE_MODE = {"cone": "cones", "spot": "cones", "scatter": "scatter"}
     d = {"op": "cell_rd_seed", "at": "cell", "mode": ENGINE_MODE[impl],
-         "n_spots": int(_p(g, i, "n_spots")), "amp": float(_p(g, i, "amp"))}
+         "n_spots": int(_p(g, i, "n_spots"))}
     if impl == "scatter":
         # random seeds over the whole shell -- the validated minisite condition. n_spots/amp are
         # meaningless here, so do not emit them: an ignored parameter in a spec reads as if it
@@ -243,12 +246,12 @@ def _emit_rd_seed(g, n, ga):
         # was pinned for the entire campaign. The signature in the record is unmistakable once you
         # look: the acted-ledger shows cell_rd_seed firing 501 times in a 500-frame run, and
         # act_max varies by 1.2e-3 across the whole run -- exactly one step of Gray-Scott.
-        # `tip` re-seeds every frame on purpose (it tracks the moving tip) and `cone` maintains a
-        # source; neither of those is an initial condition. This one is.
+        # `cone` maintains a source and is not an initial condition either. This one is.
+        # (That note used to read "`tip` re-seeds every frame ON PURPOSE" -- the defect was
+        # diagnosed here, fixed for `scatter`, and left standing for `tip`, which is the mode the
+        # whole campaign then ran on.)
         d = {"op": "cell_rd_seed", "at": "cell", "mode": "scatter",
              "seed_frac": float(_p(g, i, "seed_frac")), "before_frame": 3}
-    elif impl == "tip":
-        d["tip_radius"] = float(_p(g, i, "tip_radius"))       # re-seeds EVERY frame: tip-tracking
     elif impl == "cone":
         d["cone_deg"] = float(_p(g, i, "cone_deg"))
     else:                                                     # a frozen spot -- the DOME control
@@ -286,7 +289,11 @@ def _emit_growth(g, n, ga):
     return {"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell",
             "rate": float(_p(g, i, "rate")), "a_sw": float(_p(g, i, "a_sw")),
             "hill": float(_p(g, i, "hill")), "rho": float(_p(g, i, "rho")),
-            "vth_frac": GROWTH_CEILING, "after_frame": ga, "dt": DT_GLOBAL,
+            # `dt` REMOVED 6 August: MorphogenGrowth3D has no `self.dt` and never looks the key up.
+            # It is a leftover from before D1 gave the engine the clock (`_engine_owns_clock`), and
+            # a parameter in a spec reads as if it does something -- which is the whole failure this
+            # phase is about. Found by op_probe's UNREAD probe in under a second.
+            "vth_frac": GROWTH_CEILING, "after_frame": ga,
             "conserve_amount": g.impl_of(n) == "hill_conserve_amount"}
 
 
@@ -337,8 +344,10 @@ EMIT = {
         "d_h": float(_p(g, n["id"], "d_h")),
         "chi": float(_p(g, n["id"], "chi")) * RD_PER_FRAME},        # D5: scaled WITH the reaction
     "vesicle_growth": lambda g, n, ga: {
+        # `dt` removed with morphogen_growth_3d's, and for the same reason: VesicleGrowth reads
+        # `rate`, `max_scale` and the engine's period, never a dt of its own.
         "op": "vesicle_growth", "at": "vertex", "cell_set": "cell",
-        "rate": float(_p(g, n["id"], "rate")), "dt": DT_GLOBAL},
+        "rate": float(_p(g, n["id"], "rate"))},
     "shape_to_chem": lambda g, n, ga: {
         "op": "shape_to_chem", "at": "cell", "implementation": g.impl_of(n),
         "vertex_set": "vertex",
@@ -677,8 +686,6 @@ def from_preset(p: dict) -> CompositionGraph:
         ("cell_react", "rate", p.get("rate")), ("cell_react", "a0", p.get("a0")),
         ("cell_react", "gamma", p.get("gamma")),
         ("cell_rd_seed", "cone_deg", p.get("cone_deg")),
-        ("cell_rd_seed", "tip_radius", p.get("tip_radius")),
-        ("cell_rd_seed", "amp", p.get("amp")),
         ("reconnect_t1_3d", "l_th_frac", p.get("l_th_frac")),
     ]
     for op, pname, val in mapping:
