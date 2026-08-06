@@ -1151,6 +1151,12 @@ class MechPRatio(_RunScalar):
     the number that separates a tube the mechanics made from one an operator pushed."""
     name, group = "mech_p_ratio", "apparatus"
     produced_by = "run_one:mechanics"
+    # ADMITTED, unlike its neighbours. `buf_full` becoming true is a result about an array, but
+    # forced-versus-grown is the question the campaign exists to answer -- "protr > 1.3 with
+    # mech_p_ratio < 2" IS its success criterion, and a prediction should be able to say so.
+    # Admitting it also puts it in `bank()`, which is what a parent's metrics are restricted to,
+    # so the Proposer can finally see whether the run it is building on was pushed.
+    admitted = True
 
 
 @register
