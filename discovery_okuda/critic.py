@@ -553,7 +553,24 @@ def check_static(graph, seen_hashes=(), edit_kind=None):
     # experiment -- mechanism AND parameters -- counts as already evaluated.
     h = comp_hash(graph)
     _seen = set(seen_hashes)
-    _dup = (_run_key(graph) in _seen) if edit_kind == "set_param" else (h in _seen)
+    # THE KEY IS ALWAYS `_run_key`, AND THIS USED TO DEPEND ON THE EDIT KIND. A structural edit was
+    # keyed on `comp_hash`, which is parameter-blind -- so `add_op vesicle_growth` proposed on THREE
+    # different parents produced one hash and two of the three slots were refused. Measured on the
+    # relaunched round 1:
+    #
+    #   _keep/r001_02   + vesicle_growth   Caa2255d08b2@6420561ce7   built
+    #   coral_gate      + vesicle_growth   Caa2255d08b2@a3dd27bbc7   REFUSED, and it is a different run
+    #   repair_l_th_frac+ vesicle_growth   Caa2255d08b2@a3dd27bbc7   refused, correctly -- same as above
+    #
+    # The Proposer's stated intent was "coverage: vesicle_growth" across the three best chemistry
+    # parents -- testing whether an operator's effect is general or parent-specific, which is the
+    # experiment the lever map is FOR. Refusing it treated "same mechanism" as "same experiment".
+    #
+    # comp_hash still answers "is this a new MECHANISM" and that question still matters -- it is what
+    # keeps a retune from being filed as a discovery. It is simply not the question a GPU asks. The
+    # question a GPU asks is "will this produce a run I already have", and that is mechanism AND
+    # operating point.
+    _dup = _run_key(graph) in _seen
     if _dup:
         out.append(Rejection("R6_DUPLICATE", "this composition has already been evaluated",
                              f"{h} -- request a robustness test explicitly if replication is "

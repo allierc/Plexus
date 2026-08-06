@@ -374,6 +374,60 @@ def test_the_record_does_not_poison_the_run_archive():
               f"RunArchive did not survive an alien line: {a._seen}")
 
 
+def test_a_duplicate_becomes_a_reseeded_replicate():
+    """A REPEAT IS RUN AT A NEW SEED RATHER THAN REFUSED. Cedric: "loose this rule, change the seed
+    instead."
+
+    Refusing cost three of eleven slots in one round. Worse, this campaign has never measured its own
+    seed spread -- the Analyst is told that "a difference smaller than the seed spread is not a
+    difference" and there has never been a replicate to measure it with, so every difference reported so
+    far rests on an unmeasured noise floor.
+
+    Two things are asserted because both were wrong in the first version: the replicate is BUILT, and it
+    actually differs. The seed is a run-level argument to `to_spec`, not a graph parameter -- setting
+    `seed_mesh_3d0.seed` on the graph emitted 0 anyway, because `_seed_the_run` overwrites every seeded
+    operator from `general.seed`. And the fidelity overlay restored the parent's seed on top, so the
+    first working replicate was byte-identical to the run it replicated.
+    """
+    print("\na repeat is re-seeded and run, not refused")
+    import io
+    import contextlib
+    import yaml
+    import round as E
+    import critic as C
+    import build
+    CFG = os.path.abspath(os.path.join(os.path.dirname(HERE), "config", "okuda"))
+
+    with contextlib.redirect_stdout(io.StringIO()):
+        g = build.graph_from_run("coral_gate")
+    seen = {C._run_key(g)}
+    with contextlib.redirect_stdout(io.StringIO()):
+        sp = E._build_one({"parent": "coral_gate"}, "trep", 3, seen)
+
+    check(sp is not None, "a repeat was refused instead of re-seeded")
+    if sp is None:
+        return
+    check(sp.get("replicate") is True, "the spec does not record that it is a replicate")
+    with open(os.path.join(CFG, f"{sp['name']}.yaml")) as f:
+        child = yaml.safe_load(f)
+    with open(os.path.join(E.LOG_ROOT, "coral_gate", "spec_run.yaml")) as f:
+        parent = yaml.safe_load(f)
+
+    seeds = lambda spec: {o["op"]: o.get("seed") for o in spec["operators"] if "seed" in o}
+    ps, cs = seeds(parent), seeds(child)
+    check(cs and all(cs[k] != ps.get(k) for k in cs),
+          f"the replicate did not actually re-seed: parent {ps} child {cs}")
+    check(child.get("general", {}).get("seed") != parent.get("general", {}).get("seed"),
+          "general.seed is unchanged, so the run would be identical")
+
+    # and the COMPOSITION must be untouched -- a replicate that also changes a parameter is not one
+    val = lambda spec, op, k: next((o.get(k) for o in spec["operators"] if o.get("op") == op), None)
+    for op, k in (("reconnect_t1_3d", "l_th_frac"), ("morphogen_growth_3d", "rate"),
+                  ("seed_mesh_3d", "n_cells")):
+        check(val(parent, op, k) == val(child, op, k),
+              f"the replicate changed {op}.{k}: {val(parent, op, k)} -> {val(child, op, k)}")
+
+
 def test_the_live_flow_loads():
     print("\nthe flow the loop will actually run")
     import round as E

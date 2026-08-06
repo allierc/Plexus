@@ -73,6 +73,10 @@ measurement that happened three times, not a finding.
 
 - **Always compare to the control first.** A metric that moved in the control moved for reasons that
   have nothing to do with any edit.
+- **The seed spread is now measurable, and some rounds contain a replicate.** A slot that repeated an
+  experiment already on file is re-run at a different seed instead of being refused, and its record
+  says `replicate: true`. Two runs of the same composition at different seeds bound the noise floor
+  directly — use it.
 - **A difference smaller than the seed spread is not a difference.** If two runs of the same
   composition differ by more than the edits do, say so — that finding outranks everything else in
   the round.
