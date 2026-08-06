@@ -197,7 +197,7 @@ def block_cmap():
 
 
 def draw_3d(ax, mt, pos, q, band, cmap, cam, L, div=None, brk=None, tissue=True, cutaway=False,
-            plate_gap=None, blk=None):
+            plate_gap=None, blk=None, mem=None):
     """One 3D panel: far matrix -> epithelium -> near matrix, in tissue units.
 
     `cutaway` removes the octant nearest the camera instead of drawing the tissue. A solid cube of
@@ -231,6 +231,19 @@ def draw_3d(ax, mt, pos, q, band, cmap, cam, L, div=None, brk=None, tissue=True,
     else:
         _matrix_scatter(ax, q[far], band[far], cmap, zorder=0, alpha=0.9)
         _matrix_scatter(ax, q[near], band[near], cmap, zorder=10, alpha=0.9)
+    if mem is not None:
+        # THE BASEMENT MEMBRANE IN THE MAIN PANELS TOO. It was drawn only in the zoom, which made a
+        # 30,000-particle body carrying the whole tissue-matrix interface invisible in the two panels
+        # people actually look at -- so a sheet that had disintegrated looked like a sheet that was
+        # simply not shown. Drawn on its own green-to-amber ramp, between the far and near halves of the
+        # stroma, at the surface where it belongs.
+        qm, sm = mem
+        dm = qm @ screen_basis(cam["elev"], cam["azim"])[0]
+        for sel, al, zo in ((dm > 0, 0.95, 2), (dm <= 0, 0.35, 12)):
+            if sel.any():
+                ax.scatter(qm[sel, 0], qm[sel, 1], qm[sel, 2], c=np.clip(sm[sel], 0, 1),
+                           cmap=_cmap(MEMBRANE_COLORS), vmin=0, vmax=1, s=1.4, marker=".",
+                           linewidths=0, alpha=al, zorder=zo, depthshade=False)
     if blk is not None:
         # THE BLOCK, SPLIT THE SAME WAY. It is a body enclosing the tissue from two sides, so a single
         # scatter has the same per-artist depth problem the matrix has -- and the block is opaque
@@ -251,7 +264,7 @@ def draw_3d(ax, mt, pos, q, band, cmap, cam, L, div=None, brk=None, tissue=True,
 
 
 def draw_cross(ax, mt, pos, q, band, cmap, L2, axis_dir, slab, dot_scale=1.0, plate_gap=None,
-               blk=None):
+               blk=None, mem=None, zoom_half=None):
     """The monolayer in section + the matrix in the SAME plane, cut in the SCREEN plane.
 
     `seed_dir=None` on purpose, which makes `_cross_screen` fall back to the camera's own frame: the
@@ -281,6 +294,13 @@ def draw_cross(ax, mt, pos, q, band, cmap, L2, axis_dir, slab, dot_scale=1.0, pl
         # the caller's panel size, not a taste setting.
         _matrix_scatter(ax, proj, band[sl], cmap, zorder=0, alpha=0.95,
                         s_rest=3.4 * dot_scale, s_hot=7.0 * dot_scale, three_d=False)
+    if mem is not None:
+        qm, sm = mem
+        sl_m = np.abs(qm @ d) < slab
+        if sl_m.any():
+            ax.scatter((qm[sl_m] @ u), (qm[sl_m] @ v), c=np.clip(sm[sl_m], 0, 1),
+                       cmap=_cmap(MEMBRANE_COLORS), vmin=0, vmax=1, s=4.0 * dot_scale,
+                       marker=".", linewidths=0, zorder=3)
     if blk is not None:
         qb, bb = blk
         sb = np.abs(qb @ d) < slab
@@ -298,7 +318,18 @@ def draw_cross(ax, mt, pos, q, band, cmap, L2, axis_dir, slab, dot_scale=1.0, pl
         for lo in (b, -L2):
             ax.add_patch(Rectangle((-L2, lo if lo > 0 else -L2), 2 * L2, L2 - b,
                                    facecolor=PLATE_FACE, edgecolor=PLATE_EDGE, lw=0.8, zorder=2))
-    ax.set_xlim(-L2, L2); ax.set_ylim(-L2, L2); ax.set_aspect("equal"); ax.axis("off")
+    if zoom_half:
+        # ZOOM BY MOVING THE AXES LIMITS, not by re-deriving a windowed slice. Everything above already
+        # drew at full scale through the SAME routine the whole-tissue panel uses, so the zoom cannot
+        # disagree with the panel above it -- it is literally the same drawing, clipped. The window sits
+        # on the +u surface crossing, which is where the layering is: lumen, epithelium, basement
+        # membrane, stroma, in that order outward.
+        rs = float(np.percentile(np.linalg.norm(pos, axis=1), 98))
+        ax.set_xlim(rs - zoom_half, rs + zoom_half)
+        ax.set_ylim(-zoom_half, zoom_half)
+    else:
+        ax.set_xlim(-L2, L2); ax.set_ylim(-L2, L2)
+    ax.set_aspect("equal"); ax.axis("off")
 
 
 # --------------------------------------------------------------------------- the two new levels

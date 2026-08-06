@@ -366,6 +366,17 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True,
         """The matrix in tissue coordinates."""
         return (pos[t] - centre) / max(scale, 1e-12)
 
+    def mem_of(t):
+        """The basement membrane in tissue coordinates, with its bond strain -- or None."""
+        if mem_pos is None:
+            return None
+        qm = (mem_pos[min(t, mem_pos.shape[0] - 1)] - centre) / max(scale, 1e-12)
+        if mem_hist and t < len(mem_hist):
+            sm = np.asarray(mem_hist[t], np.float32)
+            hi = max(float(np.percentile(sm, 99)), 1e-9)
+            return qm, sm / hi
+        return qm, np.zeros(qm.shape[0], np.float32)
+
     def blk_of(t):
         """The block in tissue coordinates, with its own band -- or None if there is no block."""
         if bpos is None:
@@ -407,13 +418,14 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True,
             ax = fig.add_subplot(4, n_strip, row * n_strip + i + 1, projection="3d",
                                  computed_zorder=False, facecolor="black")
             RD.draw_3d(ax, mt, vp, q, band, cmap, cam, L3, div=div, brk=brk, tissue=tissue,
-                       cutaway=cut, plate_gap=plate, blk=blk)
+                       cutaway=cut, plate_gap=plate, blk=blk, mem=mem_of(t))
             if row == 0:
                 ax.text2D(0.03, 0.95, f"frame {t}   {int(mt['nF'])} cells   "
                                       f"strained {float((band > 0).mean()) * 100:.0f}%",
                           transform=ax.transAxes, color="white", fontsize=11, va="top")
         axc = fig.add_subplot(4, n_strip, 3 * n_strip + i + 1, facecolor="black")
-        RD.draw_cross(axc, mt, vp, q, band, cmap, L2, axis_dir, slab, plate_gap=plate, blk=blk)
+        RD.draw_cross(axc, mt, vp, q, band, cmap, L2, axis_dir, slab, plate_gap=plate, blk=blk,
+                      mem=mem_of(t))
     fig.subplots_adjust(0.005, 0.005, 0.995, 0.995, wspace=0.02, hspace=0.02)
     fig.savefig(os.path.join(out_dir, "strip.png"), dpi=100, facecolor="black")
     plt.close(fig)
@@ -445,13 +457,24 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True,
     # thinner than the line used to draw a cell and the membrane is a one-dot rim, so neither is readable
     # in the panels the other results need. The zoom is the only place a colour scale can honestly be
     # spent on them.
+    # 2x2 WHEN THERE IS A BASEMENT MEMBRANE OR PER-JUNCTION MYOSIN. Top row is the whole tissue -- 3D
+    # and cross-section -- and the bottom row is the SAME two views zoomed onto a patch of the surface,
+    # which is the only scale at which a sheet a few percent of the radius thick and a junction network
+    # thinner than a cell outline can be read. The bottom-right is the one that shows the layering the
+    # biology is about: lumen, epithelium, basement membrane, stroma, outward in that order.
     zoom = (mem_pos is not None) or any("myo" in m for _, m in meshes)
-    ncol = 3 if zoom else 2
-    figm = plt.figure(figsize=(5.5 * ncol, 5.5), facecolor="black")
-    axs = figm.add_subplot(1, ncol, 1, projection="3d", computed_zorder=False, facecolor="black")
-    axc2 = figm.add_subplot(1, ncol, 2, facecolor="black")
-    axz = figm.add_subplot(1, ncol, 3, facecolor="black") if zoom else None
-    figm.subplots_adjust(0, 0, 1, 1, wspace=0.02)
+    if zoom:
+        figm = plt.figure(figsize=(11.0, 11.0), facecolor="black")
+        axs = figm.add_subplot(2, 2, 1, projection="3d", computed_zorder=False, facecolor="black")
+        axc2 = figm.add_subplot(2, 2, 2, facecolor="black")
+        axz = figm.add_subplot(2, 2, 3, facecolor="black")
+        axzc = figm.add_subplot(2, 2, 4, facecolor="black")
+    else:
+        figm = plt.figure(figsize=(11.0, 5.5), facecolor="black")
+        axs = figm.add_subplot(1, 2, 1, projection="3d", computed_zorder=False, facecolor="black")
+        axc2 = figm.add_subplot(1, 2, 2, facecolor="black")
+        axz = axzc = None
+    figm.subplots_adjust(0, 0, 1, 1, wspace=0.02, hspace=0.02)
     fps = int(spec.get("plotting", {}).get("fps", 10))
     wri = FFMpegWriter(fps=fps, metadata={"title": name})
     t0 = time.time()
@@ -460,9 +483,9 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True,
             vp, q, band, blk = mt["pos"], q_of(t), band_of(t), blk_of(t)
             div, brk = RD.divided_mask(mt), RD.broken_mask(mt, vp, name)
             RD.draw_3d(axs, mt, vp, q, band, cmap, RD.CAM_SIDE, L3, div=div, brk=brk,
-                       plate_gap=plate, blk=blk)
+                       plate_gap=plate, blk=blk, mem=mem_of(t))
             RD.draw_cross(axc2, mt, vp, q, band, cmap, L2, axis_dir, slab, dot_scale=0.85,
-                          plate_gap=plate, blk=blk)
+                          plate_gap=plate, blk=blk, mem=mem_of(t))
             if axz is not None:
                 mq = ms = None
                 if mem_pos is not None:
@@ -470,8 +493,15 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True,
                     if mem_hist and t < len(mem_hist):
                         ms = np.asarray(mem_hist[t], np.float32)
                 RD.draw_zoom(axz, mt, vp, mem_q=mq, mem_s=ms, name=name)
-                axz.text(0.03, 0.97, "zoom: junction myosin (blue) + basement membrane (green->amber)",
-                         transform=axz.transAxes, color="#888", fontsize=7, va="top")
+                axz.text(0.03, 0.97, "zoom  junction myosin (blue) + basement membrane (green->amber)",
+                         transform=axz.transAxes, color="#888", fontsize=7.5, va="top")
+                # the zoomed SECTION: the same routine as the panel above, clipped to a window on the
+                # surface, so the layering reads outward -- lumen, epithelium, membrane, stroma
+                RD.draw_cross(axzc, mt, vp, q, band, cmap, L2, axis_dir, slab, dot_scale=0.55,
+                              plate_gap=plate, blk=blk, mem=mem_of(t),
+                              zoom_half=0.34 * float(np.percentile(np.linalg.norm(vp, axis=1), 98)))
+                axzc.text(0.03, 0.97, "zoom  cross-section: lumen | epithelium | membrane | stroma",
+                          transform=axzc.transAxes, color="#888", fontsize=7.5, va="top")
             # ONE LABEL, ON THE 3D PANEL. `_draw`/`_cross_screen` both call ax.clear(), which drops
             # any label, so it is re-stamped every frame. The camera elevation and the cut plane used
             # to be printed too and are not any more: they are fixed for the whole run and recorded in

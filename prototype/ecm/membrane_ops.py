@@ -378,6 +378,9 @@ class IntegrinAdhesion(Lateral):
         self.k = float(params.get("k", 2.0e4))
         self.offset = float(params.get("offset", 0.004))
         self.detach = float(params.get("detach", 0.0))       # 0 = permanent
+        # critical by default: c = 2*sqrt(k). Under-damped oscillates about a moving anchor, over-damped
+        # lags it -- and a lagging anchor stretches the sheet, which is a different experiment.
+        self.damp = float(params.get("damp", 2.0 * math.sqrt(max(float(params.get("k", 2.0e4)), 1e-12))))
         z = np.load(str(params["surface"]))
         self.smap = torch.as_tensor(np.asarray(z["smap"], np.float32)) * self.scale
         self.T = int(self.smap.shape[0])
@@ -412,7 +415,18 @@ class IntegrinAdhesion(Lateral):
         delta = anchor - pos
         if self.detach > 0:
             self.bound &= delta.norm(dim=1) < self.detach
-        acc = self.k * delta * self.bound[:, None].to(dt_)
+        # A DASHPOT, NOT JUST A SPRING -- and its absence destroyed the sheet. The anchor MOVES: the
+        # surface grows at ~5.4e-4 box units per frame, and an undamped spring does not track a moving
+        # target, it oscillates about it with amplitude ~v/omega = 0.135/141 = 1e-3 box units. The bond
+        # rest length is 2.2e-3, so every particle was oscillating by half a bond length -- ~45% strain,
+        # above any sane failure threshold, on every particle, forever. 105,420 of 105,496 crosslinks
+        # broke and the freed particles (stiffer than the stroma) were flung through it, which is what
+        # the white plumes in `61`'s movie are. Critical damping c = 2*sqrt(k) makes it track instead.
+        vel = lvl.get("vel") if "vel" in lvl.state_schema else None
+        acc = self.k * delta
+        if vel is not None:
+            acc = acc - self.damp * vel
+        acc = acc * self.bound[:, None].to(dt_)
         if not self._said:
             print(f"[integrin_adhesion] {int(self.bound.sum())} of {pos.shape[0]} particles anchored "
                   f"to the surface in their own direction, k={self.k:g}, offset={self.offset:g}, "
