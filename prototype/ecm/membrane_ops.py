@@ -811,6 +811,19 @@ class BasementMembraneSecrete(Structural):
         m = getattr(lvl, "mass", None)
         if m is not None:
             m[slot] = m[src]
+        # NEWLY SECRETED MATERIAL IS UNSTRAINED, and this is not a detail. A parked particle is massless,
+        # so it scatters nothing -- but `mpm_gather` still hands it a velocity every frame and
+        # `mpm_strain` still integrates its deformation gradient from it. Sitting at the tissue centre for
+        # hundreds of frames, F drifts arbitrarily far from identity. Activating it then promotes that
+        # accumulated garbage into real material with real mass, and a single such particle can carry a
+        # stress three orders of magnitude above the rest: run 66 came out with an ECM p99 of 392 against
+        # 2-8 in every stable run, which renders as a few blazing pixels and a black field behind them.
+        F = getattr(lvl, "F", None)
+        if F is not None:
+            F[slot] = torch.eye(F.shape[-1], device=dev, dtype=F.dtype)
+        Cb = getattr(lvl, "C", None)
+        if Cb is not None:
+            Cb[slot] = 0.0
         live = live.clone(); live[slot] = True
         H.membrane_alive = live
         H.membrane_new = slot
