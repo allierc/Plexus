@@ -768,7 +768,24 @@ def _resolve_edit(g, edit):
     if edit[0] == "set_param" and "." in str(edit[1]):
         node, _, key = str(edit[1]).rpartition(".")
         nid = node_id(node)
-        return edit if nid is None else (edit[0], f"{nid}.{key}") + tuple(edit[2:])
+        tgt = edit[1] if nid is None else f"{nid}.{key}"
+        # A NUMBER WRITTEN AS A STRING IS STILL A NUMBER. Round 2 lost a slot to
+        # `('set_param', 'cell_diffuse0.chi', '0.325')` -- quoted -- which reached the critic and
+        # raised `'>' not supported between instances of 'str' and 'float'`. JSON has no way to
+        # tell an agent that a field is numeric, so the string is the agent doing something
+        # reasonable and us refusing it on a technicality. Coerce against the declared type;
+        # anything that will not coerce is left alone and refused with its own message.
+        val = edit[2] if len(edit) > 2 else None
+        if isinstance(val, str):
+            from composition_space import OPERATORS
+            tri = ((OPERATORS.get(_op_of(g, nid) or "", {}) or {}).get("params") or {}).get(key)
+            try:
+                is_int = isinstance(tri, (list, tuple)) and len(tri) == 3 and all(
+                    isinstance(x, int) for x in tri)
+                val = int(round(float(val))) if is_int else float(val)
+            except (TypeError, ValueError):
+                val = edit[2]
+        return (edit[0], tgt, val) + tuple(edit[3:])
 
     # EVERY VERB WHOSE ARGUMENT IS A NODE ID, not just set_param. The first version of this
     # resolved set_param only, and the live Proposer immediately wrote
