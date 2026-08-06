@@ -504,6 +504,7 @@ class IntegrinAdhesion(Lateral):
         self.smap = torch.as_tensor(np.asarray(z["smap"], np.float32)) * self.scale
         self.T = int(self.smap.shape[0])
         self.u0 = None                                        # the seeded direction, kept
+        self._alive_prev = None
         self.bound = None
         self._frame, self._t, self._said = -1, 0, False
 
@@ -522,6 +523,24 @@ class IntegrinAdhesion(Lateral):
             d0 = pos - c
             self.u0 = (d0 / d0.norm(dim=1, keepdim=True).clamp_min(1e-9)).detach().clone()
             self.bound = torch.ones(pos.shape[0], device=dev, dtype=torch.bool)
+
+        # ---- AT SEED TIME MEANS AT *ITS* SEED TIME -------------------------------------------------
+        # A particle held in the unsecreted reserve is parked at the tissue CENTRE, where `pos - c` is
+        # zero and its "direction" is numerical noise. Freezing that at frame 0 and using it the moment
+        # the particle is secreted anchors it to an arbitrary point on the far side of the sphere: the
+        # spring yanks it across the tissue and drags its brand-new crosslinks past the break threshold.
+        # That is why secretion added 21,613 particles to run 66 and only 1,099 surviving bonds --
+        # 0.05 per particle against the 3.4 a seeded one gets -- and why run 67's sheet lost 66% of its
+        # network. A particle's direction must be frozen when IT is laid down, not when the array was.
+        alive = getattr(H, "membrane_alive", None)
+        if alive is not None:
+            if self._alive_prev is None:
+                self._alive_prev = alive.clone()
+            born = alive & (~self._alive_prev)
+            if bool(born.any()):
+                db = (pos[born] - c)
+                self.u0[born] = (db / db.norm(dim=1, keepdim=True).clamp_min(1e-9)).detach()
+            self._alive_prev = alive.clone()
 
         M = self.smap[self._t].to(dev, dt_)
         nth, nph = M.shape
@@ -561,6 +580,11 @@ class IntegrinAdhesion(Lateral):
         if vel is not None:
             acc = acc - self.damp * vel
         acc = acc * self.bound[:, None].to(dt_)
+        # UNSECRETED MATERIAL IS NOT ADHERED TO ANYTHING. The reserve sits at the tissue centre; without
+        # this it is dragged out toward the surface by a spring it has not yet earned, arriving as a
+        # shell of particles that were never laid down.
+        if alive is not None and alive.shape[0] == acc.shape[0]:
+            acc = acc * alive[:, None].to(dt_)
         if not self._said:
             print(f"[integrin_adhesion] {int(self.bound.sum())} of {pos.shape[0]} particles anchored "
                   f"to the surface in their own direction, k={self.k:g}, offset={self.offset:g}, "
@@ -712,42 +736,73 @@ class BasementMembraneSecrete(Structural):
         bi, bj, brest, balive = bonds
         d = (pos[bj] - pos[bi]).norm(dim=1).clamp_min(1e-9)
         strain = ((d - brest) / brest) * balive.to(dt_)
-        # WEIGHTED SAMPLING, NOT A GLOBAL TOP-K. Taking the `add` most strained bonds in the whole sheet
-        # is winner-take-all: this matrix has a dense polar cone, so the most strained bonds are all in
-        # the same place and EVERY new particle landed there. Run 66 finished with the membrane covering
-        # a polar cap and the rest of the sphere bare -- which looks like a fragmentation result and is
-        # a sampling bug. Secretion is local in the tissue: each cell lays down material where it is,
-        # biased by the load it feels, not only where the load is globally highest. Sampling bonds with
-        # probability proportional to strain^targeted keeps the load-direction claim and restores
-        # coverage; `targeted = 0` is then exactly uniform, as before.
-        k = min(add, strain.numel())
-        if self.targeted > 0:
-            w = strain.clamp_min(0.0) ** self.targeted
-            if float(w.sum()) <= 0:
-                pick = torch.randperm(strain.numel(), device=dev)[:k]
-            else:
-                pick = torch.multinomial(w, k, replacement=False)
+
+        # DEPOSIT AGAINST PARTICLES, NOT AGAINST BONDS -- and this is the correction that matters.
+        # Two versions failed before this one. Taking the globally most strained BONDS is winner-take-all:
+        # this matrix has a dense polar cone, so every new particle landed there and the rest of the
+        # sphere stayed bare. Sampling bonds in proportion to strain fixed the aim and not the outcome,
+        # because the deeper fault is the same in both: a site is a MIDPOINT OF AN EXISTING BOND. A patch
+        # that has lost its crosslinks therefore cannot receive new material, so it dilutes further and
+        # loses more -- a one-way ratchet into bare. Run 67 ended with `strain_equator` exactly 0.0: not
+        # a small number, zero, meaning no non-polar particle had a single bond left.
+        #
+        # Cells are what secrete, and cells are everywhere on the surface. So the site is a LIVE PARTICLE,
+        # chosen with weight (local sparsity x load), and the new material goes beside it, tangentially,
+        # about one target spacing away. An isolated particle with no bonds at all is then still a place
+        # the membrane can be repaired, which is what makes coverage recoverable instead of a ratchet.
+        idx_live = live.nonzero(as_tuple=True)[0]
+        # per-particle load: the mean strain of the bonds it still has (0 where it has none)
+        pl = torch.zeros(n_tot, device=dev, dtype=dt_)
+        pc = torch.zeros(n_tot, device=dev, dtype=dt_)
+        for a_, b_ in ((bi, bj), (bj, bi)):
+            pl.index_add_(0, a_, strain.clamp_min(0.0))
+            pc.index_add_(0, a_, balive.to(dt_))
+        pl = pl / pc.clamp_min(1.0)
+        # per-particle sparsity: how far its nearest live neighbour is, against the target spacing
+        want_sp = math.sqrt(4.0 * math.pi * R * R / max(n_live, 1))
+        sub = pos[idx_live]
+        nn = torch.full((idx_live.numel(),), want_sp, device=dev, dtype=dt_)
+        step = 4096
+        for a_ in range(0, idx_live.numel(), step):
+            dd = (sub[a_:a_ + step, None, :] - sub[None, :, :]).norm(dim=-1)
+            dd[torch.arange(dd.shape[0], device=dev), torch.arange(a_, min(a_ + step, idx_live.numel()),
+                                                                   device=dev)] = 1e9
+            nn[a_:a_ + step] = dd.min(dim=1).values
+        sparsity = (nn / max(want_sp, 1e-12)).clamp(0.5, 4.0)
+        w = sparsity ** 2 * (1.0 + self.targeted * pl[idx_live])
+        if self.targeted <= 0:
+            w = torch.ones_like(w)
+        k = min(add, idx_live.numel())
+        if float(w.sum()) <= 0:
+            pick = torch.randperm(idx_live.numel(), device=dev)[:k]
         else:
-            pick = torch.randperm(strain.numel(), device=dev)[:k]
-        add = int(pick.numel())
+            pick = torch.multinomial(w, k, replacement=(k > idx_live.numel()))
+        src = idx_live[pick]
+        add = int(src.numel())
         if add == 0:
             return {}
-
         slot = (~live).nonzero(as_tuple=True)[0][:add]
-        add = int(slot.numel())
-        pick = pick[:add]
-        new = 0.5 * (pos[bi[pick]] + pos[bj[pick]])
-        pos[slot] = new
+        add = int(slot.numel()); src = src[:add]
+
+        # beside the chosen particle, tangentially, about one target spacing out, then back onto the shell
+        u0 = (pos[src] - c)
+        r0 = u0.norm(dim=1, keepdim=True).clamp_min(1e-9)
+        u0 = u0 / r0
+        rnd = torch.randn(add, 3, device=dev, dtype=dt_)
+        tang = rnd - (rnd * u0).sum(1, keepdim=True) * u0
+        tang = tang / tang.norm(dim=1, keepdim=True).clamp_min(1e-12)
+        newp = c + u0 * r0 + tang * want_sp
+        newp = c + (newp - c) / (newp - c).norm(dim=1, keepdim=True).clamp_min(1e-12) * r0
+        pos[slot] = newp
         v = lvl.get("vel") if "vel" in lvl.state_schema else None
         if v is not None:
-            v[slot] = 0.5 * (v[bi[pick]] + v[bj[pick]])
+            v[slot] = v[src]
         m = getattr(lvl, "mass", None)
         if m is not None:
-            live_m = m[live]
-            m[slot] = live_m[0] if live_m.numel() else m.max()
+            m[slot] = m[src]
         live = live.clone(); live[slot] = True
         H.membrane_alive = live
-        H.membrane_new = slot                          # bonded in incrementally by the bond operator
+        H.membrane_new = slot
         SECRETE_TRACE.append((n_live, add, int(live.sum()), R))
         return {}
 
