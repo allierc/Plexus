@@ -93,7 +93,7 @@ class CellAdjacency(Rewire):
         return {}
 
 
-@register_operator("seed_cell_rd", set="cell", kind="structural", family="growth")
+@register_operator("seed_cell_rd", set="cell", kind="seed", family="growth")
 class CellRDSeed(Structural):
     """Gray-Scott initial condition on the cell set: substrate u=1 everywhere, activator a=0 except
     a central spot (a=0.5, u=0.25) that nucleates the pattern. chem = [a, u].

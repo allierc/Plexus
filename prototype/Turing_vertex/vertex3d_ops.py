@@ -214,7 +214,7 @@ def delaunay_edges_3d(pos_np, lumen, pad):
 # --------------------------------------------------------------------------- #
 #  Seed: ball (no lumen) or shell/vesicle (with lumen)
 # --------------------------------------------------------------------------- #
-@register_operator("seed_tissue_3d", set="cell", kind="structural", family="growth")
+@register_operator("seed_tissue_3d", set="cell", kind="seed", family="growth")
 class TissueSeed3D(Structural):
     """Frame-0 IC (`before_frame: 1`): place N cell centres as a solid BALL (`lumen: false`,
     compacted aggregate) or a monolayer SHELL (`lumen: true`, vesicle around a cavity) of

@@ -681,6 +681,23 @@ def _print_run_summary(sim: Spec, H: Hierarchy) -> None:
 # --------------------------------------------------------------------------- #
 #  run: build -> iterate schedule -> record
 # --------------------------------------------------------------------------- #
+SEED_MAX = 10          # a seed runs on the opening frames; it can never span the run
+
+
+def _seed_window(sim):
+    """How many opening frames a `seed` operator runs for -- read from the spec in one pass.
+
+    The largest `before_frame` any seed declares (1 if none does), capped at SEED_MAX. That is
+    the whole rule. A model may take a few frames to establish its state -- the working parents
+    use 3, while a mesh relaxes -- but no model can ask an initial condition to run for the
+    length of the trajectory, which is what `cell_rd_seed mode: tip` did on all 900 frames.
+    """
+    declared = [int(o.params["before_frame"]) for o in sim.operators
+                if getattr(get_operator(o.op, o.impl), "KIND", None) == "seed"
+                and "before_frame" in o.params]
+    return min(max(declared) if declared else 1, SEED_MAX)
+
+
 def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
         on_frame=None, progress: bool = False,
         grad: bool = False) -> tuple[Hierarchy, dict]:
@@ -705,11 +722,26 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     # 3) instantiate each operator ONCE -> (op_name, live instance, selector, frame-window); its params
     #    carry the field refs (to/from) + the set name (_at), and the frame gate (after_frame/before_frame)
     #    is enforced HERE by the engine, so no operator special-cases the clock.
+    # A `seed` IS GATED BY THE ENGINE, NOT BY THE SPEC -- running only at the start is what the
+    # kind means, so it is the engine's to enforce rather than each spec's to remember.
+    # `cell_rd_seed mode: tip` re-stamped its activation cap on all 900 frames and was a perfectly
+    # legal spec, because the discipline lived in a yaml key three parents carried and the whole
+    # campaign lineage did not.
+    seed_window = _seed_window(sim)              # one pass over the spec, before anything runs
+
+    def _gate(o):
+        cls = get_operator(o.op, o.impl)
+        after = int(o.params.get("after_frame", 0))
+        before = int(o.params.get("before_frame", 1 << 30))
+        every = max(1, int(o.params.get("every", 1)))
+        if getattr(cls, "KIND", None) == "seed":
+            return (0, min(before, seed_window), 1)
+        return (after, before, every)
+
     inst = [(o.op,
              get_operator(o.op, o.impl)({**o.params, "to": o.to, "from": o.frm, "_at": o.on.set}, device),
              o.on,
-             (int(o.params.get("after_frame", 0)), int(o.params.get("before_frame", 1 << 30)),
-              max(1, int(o.params.get("every", 1)))))       # multi-rate cadence: run only when tick % every == 0
+             _gate(o))                                   # multi-rate cadence: run only when tick % every == 0
             for o in sim.operators]
     rec_index, rec_sets, occ_sets, rec_state, fstride, rec_fields = _setup_recording(sim, H)
     _print_run_summary(sim, H)

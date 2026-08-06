@@ -80,7 +80,7 @@ class BasementMembraneParticle:
     provision = MPMParticle.provision
 
 
-@register_operator("seed_basement_membrane", family="growth", set="particle", kind="structural")
+@register_operator("seed_basement_membrane", family="growth", set="particle", kind="seed")
 class BasementMembraneSeed(Structural):
     """Lay the membrane down ONCE, as a shell just OUTSIDE the epithelium's surface.
 
@@ -712,10 +712,23 @@ class BasementMembraneSecrete(Structural):
         bi, bj, brest, balive = bonds
         d = (pos[bj] - pos[bi]).norm(dim=1).clamp_min(1e-9)
         strain = ((d - brest) / brest) * balive.to(dt_)
+        # WEIGHTED SAMPLING, NOT A GLOBAL TOP-K. Taking the `add` most strained bonds in the whole sheet
+        # is winner-take-all: this matrix has a dense polar cone, so the most strained bonds are all in
+        # the same place and EVERY new particle landed there. Run 66 finished with the membrane covering
+        # a polar cap and the rest of the sphere bare -- which looks like a fragmentation result and is
+        # a sampling bug. Secretion is local in the tissue: each cell lays down material where it is,
+        # biased by the load it feels, not only where the load is globally highest. Sampling bonds with
+        # probability proportional to strain^targeted keeps the load-direction claim and restores
+        # coverage; `targeted = 0` is then exactly uniform, as before.
+        k = min(add, strain.numel())
         if self.targeted > 0:
-            pick = torch.topk(strain, min(add, strain.numel())).indices
+            w = strain.clamp_min(0.0) ** self.targeted
+            if float(w.sum()) <= 0:
+                pick = torch.randperm(strain.numel(), device=dev)[:k]
+            else:
+                pick = torch.multinomial(w, k, replacement=False)
         else:
-            pick = torch.randperm(strain.numel(), device=dev)[:min(add, strain.numel())]
+            pick = torch.randperm(strain.numel(), device=dev)[:k]
         add = int(pick.numel())
         if add == 0:
             return {}
@@ -740,3 +753,6 @@ class BasementMembraneSecrete(Structural):
 
 
 SECRETE_TRACE = []
+
+# Published by `run_ecm.run`/`rerender`: which particles are membrane and which are unsecreted reserve.
+MEMBRANE_ALIVE = None

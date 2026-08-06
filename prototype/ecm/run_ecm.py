@@ -188,6 +188,8 @@ def rerender(out_dir, **kw):
         membrane_ops.MEMBRANE_STRAIN[:] = (list(np.asarray(z["mstrain"]))
                                            if "mstrain" in z.files else [])
         out["sets"]["basement_membrane_particle"] = {"pos": np.asarray(z["mpos"])}
+        if "malive" in z.files:
+            membrane_ops.MEMBRANE_ALIVE = np.asarray(z["malive"], bool)
     if "bpos" in z.files:
         import block_ops
         block_ops.BLOCK_STRESS[:] = list(np.asarray(z["bstress"]))
@@ -351,6 +353,14 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, f
     mem_pos = (np.asarray(out["sets"]["basement_membrane_particle"]["pos"])
                if "basement_membrane_particle" in out.get("sets", {}) else None)
     mem_hist = membrane_ops.MEMBRANE_STRAIN if mem_pos is not None else None
+    # `render` has no Hierarchy in scope, so `run` and `rerender` both publish the mask here first.
+    # (`a or b` on arrays raises, so this is a plain None check, not a fallback expression.)
+    mem_alive = getattr(membrane_ops, "MEMBRANE_ALIVE", None) if mem_pos is not None else None
+    if mem_alive is not None:
+        mem_alive = np.asarray(mem_alive.detach().cpu() if hasattr(mem_alive, "detach")
+                               else mem_alive, bool)
+        print(f"[{name}] {int(mem_alive.sum())} of {mem_alive.size} membrane particles secreted; "
+              f"the reserve is not drawn", flush=True)
     if mem_pos is not None:
         print(f"[{name}] basement membrane: {mem_pos.shape[1]} particles, "
               f"{len(mem_hist or [])} strain frames", flush=True)
@@ -377,13 +387,23 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, f
         return (pos[t] - centre) / max(scale, 1e-12)
 
     def mem_of(t):
-        """The basement membrane in tissue coordinates, with its bond strain -- or None."""
+        """The basement membrane in tissue coordinates, with its bond strain -- or None.
+
+        MASKED TO WHAT HAS ACTUALLY BEEN SECRETED. With `reserve = 8` the set is nine times the size of
+        the sheet and the unsecreted eight ninths sit at the tissue CENTRE with mass 0. Drawn unmasked
+        they are a bright blob in the middle of the lumen, which is how run 66's first frames rendered:
+        a membrane apparently collapsed inside the tissue. They are not membrane yet.
+        """
         if mem_pos is None:
             return None
         qm = (mem_pos[min(t, mem_pos.shape[0] - 1)] - centre) / max(scale, 1e-12)
-        if mem_hist and t < len(mem_hist):
-            return qm, np.asarray(mem_hist[t], np.float32) / max(mem_sc or 1.0, 1e-12)
-        return qm, np.zeros(qm.shape[0], np.float32)
+        sm = (np.asarray(mem_hist[t], np.float32) / max(mem_sc or 1.0, 1e-12)
+              if (mem_hist and t < len(mem_hist)) else np.zeros(qm.shape[0], np.float32))
+        if mem_alive is not None:
+            a = mem_alive if mem_alive.ndim == 1 else mem_alive[min(t, mem_alive.shape[0] - 1)]
+            if a.shape[0] == qm.shape[0]:
+                qm, sm = qm[a], sm[a]
+        return qm, sm
 
     def blk_of(t):
         """The block in tissue coordinates, with its own band -- or None if there is no block."""
@@ -615,6 +635,9 @@ def run(name, spec, device="cuda:0", movie=True, keep_traj=True, render_kw=None)
     t0 = time.time()
     sim = S.load(spec_path)
     H, out = engine_run(sim, device=device)
+    # publish the secreted/reserve split for `render`, which has no Hierarchy in scope
+    import membrane_ops as _mo
+    _mo.MEMBRANE_ALIVE = getattr(H, "membrane_alive", None)
     wall = time.time() - t0
 
     # THE TRAJECTORY, KEPT -- so a re-render never costs a re-simulation. Asked to redraw a run

@@ -128,7 +128,7 @@ def build_honeycomb(nx, ny, a=1.0, border=1, jitter=0.0, seed=0):
 # --------------------------------------------------------------------------- #
 #  Seed: build the mesh, place vertices, stash topology on the Level
 # --------------------------------------------------------------------------- #
-@register_operator("seed_mesh", set="vertex", kind="structural", family="growth")
+@register_operator("seed_mesh", set="vertex", kind="seed", family="growth")
 class MeshSeed(Structural):
     """Frame-0 IC (`before_frame: 1`): build a bounded honeycomb half-edge mesh, write the
     vertex positions into the `vertex` set, and stash the edge table + per-face targets on

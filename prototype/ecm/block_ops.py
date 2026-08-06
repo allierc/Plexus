@@ -56,7 +56,7 @@ class MPMBlock:
     provision = MPMParticle.provision
 
 
-@register_operator("seed_block", family="growth", set="particle", kind="structural")
+@register_operator("seed_block", family="growth", set="particle", kind="seed")
 class BlockSeed(Structural):
     """Fill the two slabs beyond `gap_half` with particles, once, at frame 0."""
 

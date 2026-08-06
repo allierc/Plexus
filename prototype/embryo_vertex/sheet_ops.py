@@ -27,7 +27,7 @@ def _ncells(n):
     return n // 2 - 1                                          # n = 2*(Nc+1)
 
 
-@register_operator("seed_sheet", level="cell", kind="structural")
+@register_operator("seed_sheet", level="cell", kind="seed")
 class SheetSeed(Structural):
     """Lay a flat epithelial monolayer: apical row at the bottom, basal row on top, centred."""
     SUPPORTED_DIMS = [2]
