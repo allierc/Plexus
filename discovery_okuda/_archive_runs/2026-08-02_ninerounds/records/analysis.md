@@ -773,7 +773,7 @@ Reservoir: 2000 of 104004 cells (2%) — not limiting.
 Specimen: valid — all hold
 Reader: phenotype=sphere, specimen=MISSING
 Eye-check: supports
-Mutation: ('remove_op', 'cell_rd_seed0')
+Mutation: ('remove_op', 'seed_cell_rd0')
 Verdict: falsified — measured protr_peak=1, protr_final=1, ta_n_tubes_final=0, mech_p_ratio=0 against "protr_peak <= 1.0"
 Next: parent=Ca4940bd4902
 

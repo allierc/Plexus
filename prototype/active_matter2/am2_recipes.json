@@ -7,7 +7,7 @@
     "polar_bands":     {"gamma": 0.42, "omega": 0.06, "move_speed": 0.007, "beta": 0.08, "decay": 0.03},
     "aggregation":     {"gamma": 0.0, "omega": 0.85, "marker": "dot"},
     "vortex":          {"move_speed": 0.002, "omega": 0.55, "n": 20000},
-    "spiral_vortex":   {"move_speed": 0.002, "omega": 0.55, "n": 20000, "c_th": 0.05, "c_base": 0.05, "spiral_seed": 1, "rf_tau": 40, "rf_gain": 0.10, "rf_th": 0.5}
+    "spiral_vortex":   {"move_speed": 0.002, "omega": 0.55, "n": 20000, "c_th": 0.05, "c_base": 0.05, "seed_spiral": 1, "rf_tau": 40, "rf_gain": 0.10, "rf_th": 0.5}
   },
   "hydro": {
     "vortices":            {"v0": 0.6, "omega": 1.8},

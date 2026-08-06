@@ -31,7 +31,7 @@
   "seed_mesh_3d": 1,
   "cell_geometry_3d": 399,
   "cell_adjacency": 74,
-  "cell_rd_seed": 3,
+  "seed_cell_rd": 3,
   "cell_diffuse": 401,
   "cell_react": 401,
   "shape_to_chem": 401,

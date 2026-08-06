@@ -34,7 +34,7 @@ operators:
   vseed_cv: 0.15
 - op: cell_geometry_3d
   at: cell
-- op: cell_rd_seed
+- op: seed_cell_rd
   at: cell
   mode: scatter
   seed_frac: 0.06
@@ -103,7 +103,7 @@ operators:
 schedule:
 - seed_mesh_3d
 - cell_geometry_3d
-- cell_rd_seed
+- seed_cell_rd
 - cell_adjacency
 - cell_diffuse
 - cell_react
@@ -123,8 +123,8 @@ _discovery:
       impl: graph_laplacian
     - id: cell_geometry_3d0
       op: cell_geometry_3d
-    - id: cell_rd_seed0
-      op: cell_rd_seed
+    - id: seed_cell_rd0
+      op: seed_cell_rd
       impl: scatter
     - id: cell_react0
       op: cell_react

@@ -13,7 +13,7 @@ sets:   # the biological SETS (Levels) of the model
     n: 781   # buffer size (max elements)
 fields: {}   # continuous fields
 operators:   # the operators to instantiate (each realises one mechanism)
-- op: mesh_seed   # build the honeycomb half-edge mesh on the vertex set (frame 0)
+- op: seed_mesh   # build the honeycomb half-edge mesh on the vertex set (frame 0)
   at: vertex   # the set this operator acts on
   nx: 11   # lattice columns (cell centres)
   ny: 12   # lattice rows
@@ -55,7 +55,7 @@ operators:   # the operators to instantiate (each realises one mechanism)
 - op: topo_snapshot   # record the per-tick topology so a movie can be rendered
   at: vertex   # the set this operator acts on
 schedule:   # the order the operators run each frame
-- mesh_seed
+- seed_mesh
 - face_growth
 - shape_energy
 - face_divide_line

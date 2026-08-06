@@ -1,13 +1,4 @@
 {
  "name": "vh_K4_cv15_d4_rd",
- "cells_end": 1778,
- "n_div": 1628,
- "area_cv": 0.145,
- "vol_cv": 0.121,
- "hollow_frac": 0.015,
- "activator_range": [
-  0.34,
-  4.47
- ],
- "patterned": true
+ "error": "ValueError(\"D1: operator-side `every=2` is no longer supported -- the engine owns the clock. (A private period multiplied the engine's, so `every: 2` meant once every 4 frames and every per-call quantity meant 4x what it said.) If this spec was written for the OLD semantics, its true period was 2x the engine's -- convert it and set `every: 4`. Then declare `engine_clock: true` beside it to confirm the period is now engine-owned.\")"
 }

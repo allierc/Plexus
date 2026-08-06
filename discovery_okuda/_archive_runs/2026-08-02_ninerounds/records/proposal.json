@@ -1,5 +1,5 @@
 {
- "reasoning": "New Track-B parents replace the exhausted sphere body: growth-driven mid-surface (P0) and the Okuda monolayer route (P2). On P0 I test the two cell_rd_seed synergies (+divide_3d +0.586, +reconnect_t1_3d +0.537) predicted to raise, morphogen necessity, cell_geometry, and a uniform_ramp excursion. I mirror the productive edits on the P2 monolayer (Okuda geometry) with its OWN in-batch control, fixing round 9's missing-baseline flaw. ~70/30 confirmatory/adversarial and in_paper/excursion.",
+ "reasoning": "New Track-B parents replace the exhausted sphere body: growth-driven mid-surface (P0) and the Okuda monolayer route (P2). On P0 I test the two seed_cell_rd synergies (+divide_3d +0.586, +reconnect_t1_3d +0.537) predicted to raise, morphogen necessity, cell_geometry, and a uniform_ramp excursion. I mirror the productive edits on the P2 monolayer (Okuda geometry) with its OWN in-batch control, fixing round 9's missing-baseline flaw. ~70/30 confirmatory/adversarial and in_paper/excursion.",
  "mode": "explore",
  "slots": [
   {"parent_index": 0, "edit": null, "intent": "control",
@@ -10,16 +10,16 @@
   {"parent_index": 0,
    "edit": {"edit": ["add_op", "divide_3d", "hertwig"], "label": "+divide_3d:hertwig", "yields": "growth-driven mid-surface"},
    "intent": "confirmatory", "track": "A", "territory": "in_paper",
-   "claim": "adding division to a cell_rd_seed base amplifies the protrusion via the measured synergy.",
+   "claim": "adding division to a seed_cell_rd base amplifies the protrusion via the measured synergy.",
    "metric": "protr_peak", "predicted": "protr_peak >= 1.25",
-   "why": "cell_rd_seed+divide_3d SYNERGY +0.586; P0 already carries cell_rd_seed, so the pair should raise despite divide_3d solo -0.347."},
+   "why": "seed_cell_rd+divide_3d SYNERGY +0.586; P0 already carries seed_cell_rd, so the pair should raise despite divide_3d solo -0.347."},
 
   {"parent_index": 0,
    "edit": {"edit": ["add_op", "reconnect_t1_3d", "length_threshold"], "label": "+reconnect_t1_3d:length_threshold", "yields": "growth-driven mid-surface"},
    "intent": "confirmatory", "track": "A", "territory": "in_paper",
-   "claim": "T1 reconnection on the cell_rd_seed base raises the protrusion via the measured synergy.",
+   "claim": "T1 reconnection on the seed_cell_rd base raises the protrusion via the measured synergy.",
    "metric": "protr_peak", "predicted": "protr_peak >= 1.25",
-   "why": "cell_rd_seed+reconnect_t1_3d SYNERGY +0.537; on the old sphere reconnect was inert, so a rise here would isolate the synergy to this base."},
+   "why": "seed_cell_rd+reconnect_t1_3d SYNERGY +0.537; on the old sphere reconnect was inert, so a rise here would isolate the synergy to this base."},
 
   {"parent_index": 0,
    "edit": {"edit": ["add_op", "vesicle_growth", "uniform_ramp"], "label": "+vesicle_growth:uniform_ramp", "yields": "growth-driven mid-surface"},
@@ -53,7 +53,7 @@
    "intent": "confirmatory", "track": "B", "territory": "in_paper",
    "claim": "division on the Okuda monolayer sheet drives a division-scaled protrusion.",
    "metric": "protr_peak", "predicted": "protr_peak >= 1.20",
-   "why": "Okuda's coupled growth+deformation on a ~2000-cell monolayer is the paper morphology; cell_rd_seed+divide_3d synergy should carry to the monolayer impl."},
+   "why": "Okuda's coupled growth+deformation on a ~2000-cell monolayer is the paper morphology; seed_cell_rd+divide_3d synergy should carry to the monolayer impl."},
 
   {"parent_index": 2,
    "edit": {"edit": ["add_op", "vesicle_growth", "uniform_ramp"], "label": "+vesicle_growth:uniform_ramp", "yields": "growth-driven monolayer (Okuda route)"},

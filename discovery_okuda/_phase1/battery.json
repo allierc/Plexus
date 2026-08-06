@@ -56,10 +56,10 @@
    "inert_operators": [],
    "saturated": false
   },
-  "p1_ko_cell_rd_seed": {
+  "p1_ko_seed_cell_rd": {
    "secs": 159.1,
    "device": "cuda:0",
-   "question": "KNOCKOUT cell_rd_seed: no initial pattern -- does RD start at all?",
+   "question": "KNOCKOUT seed_cell_rd: no initial pattern -- does RD start at all?",
    "exit": 0,
    "protr_peak": 1.02,
    "protr_final": 1.02,

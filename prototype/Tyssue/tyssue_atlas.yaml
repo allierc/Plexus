@@ -99,7 +99,7 @@ operators:
 
   # --- generation / seed ---
   generation:
-    - {raw: hexa_grid/three_faces_sheet, norm: seed/mesh_honeycomb, status: existing, note: "prototype mesh_seed bootstraps this via a Voronoi of a hex lattice"}
+    - {raw: hexa_grid/three_faces_sheet, norm: seed/mesh_honeycomb, status: existing, note: "prototype seed_mesh bootstraps this via a Voronoi of a hex lattice"}
     - {raw: from_2d_voronoi/from_3d_voronoi, norm: seed/voronoi, status: existing}
     - {raw: ellipsoid/spherical_sheet/generate_ring, norm: seed/closed_surface, status: existing}
     - {raw: extrude (apical->bulk), norm: seed/extrude_monolayer, kind: structural, status: new, note: "2D sheet -> 3D monolayer lift"}
@@ -125,4 +125,4 @@ saturation:
               CONSTRAINT and SCHEDULE contracts -- exactly the three atlas-growth outcomes."
 
 status: inspected            # candidate | inspected | normalized | implemented
-implemented_here: [seed/mesh_honeycomb (mesh_seed), "AVM shape energy = line_tension+contractility+area_elasticity (shape_energy)", "force_balance (inner GD relax loop)"]
+implemented_here: [seed/mesh_honeycomb (seed_mesh), "AVM shape energy = line_tension+contractility+area_elasticity (shape_energy)", "force_balance (inner GD relax loop)"]

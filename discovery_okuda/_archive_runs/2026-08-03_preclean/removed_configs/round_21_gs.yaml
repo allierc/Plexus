@@ -33,7 +33,7 @@ operators:
   before_frame: 1
 - op: cell_geometry_3d
   at: cell
-- op: cell_rd_seed
+- op: seed_cell_rd
   at: cell
   mode: cones
   n_spots: 3
@@ -107,7 +107,7 @@ operators:
 schedule:
 - load_mesh_3d
 - cell_geometry_3d
-- cell_rd_seed
+- seed_cell_rd
 - cell_adjacency
 - cell_diffuse
 - cell_react
@@ -126,8 +126,8 @@ _discovery:
       op: cell_diffuse
     - id: cell_geometry_3d0
       op: cell_geometry_3d
-    - id: cell_rd_seed0
-      op: cell_rd_seed
+    - id: seed_cell_rd0
+      op: seed_cell_rd
       impl: cone
     - id: cell_react0
       op: cell_react
@@ -146,7 +146,7 @@ _discovery:
       op: shape_energy_3d
       impl: default
     connections:
-    - src_op: cell_rd_seed
+    - src_op: seed_cell_rd
       dst_op: morphogen_growth_3d
       slot: gate
   region: growth-driven emergent (target mechanism)

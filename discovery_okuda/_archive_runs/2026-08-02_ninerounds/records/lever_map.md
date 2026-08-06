@@ -25,7 +25,7 @@ The campaign's product. Specific questions are queries against this table.
 | `reconnect_t1_3d` | 36 | 17 | -0.101 | neutral | bud×17, sphere×13, undulation×4, exploded×1, degenerate×1 |
 | `cell_geometry_3d` | 46 | 7 | -0.208 | neutral | bud×25, sphere×15, degenerate×3, undulation×3 |
 | `divide_3d` | 17 | 36 | -0.267 | lowers | bud×9, sphere×8 |
-| `cell_rd_seed` | 38 | 15 | -0.437 | lowers | bud×25, sphere×10, undulation×3 |
+| `seed_cell_rd` | 38 | 15 | -0.437 | lowers | bud×25, sphere×10, undulation×3 |
 | `cell_diffuse` | 1 | 52 | — | insufficient | — |
 | `seed_mesh_3d` | 53 | 0 | — | insufficient | — |
 | `shape_energy_3d` | 53 | 0 | — | insufficient | — |
@@ -36,9 +36,9 @@ _The expensive half of the map: what cannot be read off the code._
 
 | pair | n | observed | additive prediction | interaction | verdict |
 |---|---|---|---|---|---|
-| `cell_rd_seed+divide_3d` | 16 | 1.935 | 1.387 | **+0.548** | SYNERGY |
+| `seed_cell_rd+divide_3d` | 16 | 1.935 | 1.387 | **+0.548** | SYNERGY |
 | `cell_react+shape_to_chem` | 9 | 2.525 | 3.058 | **-0.532** | ANTAGONISM |
-| `cell_geometry_3d+cell_rd_seed` | 36 | 1.963 | 1.446 | **+0.518** | SYNERGY |
+| `cell_geometry_3d+seed_cell_rd` | 36 | 1.963 | 1.446 | **+0.518** | SYNERGY |
 
 ## Phenotypes observed
 

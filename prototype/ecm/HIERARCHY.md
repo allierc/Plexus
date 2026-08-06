@@ -82,7 +82,7 @@ junction
   [ ] junction_rupture          junction failure -> a gap                       (rewire)
 
 basement_membrane
-  [x] basement_membrane_seed    lay the sheet on the epithelium's basal surface
+  [x] seed_basement_membrane    lay the sheet on the epithelium's basal surface
   [x] basement_membrane_bond    crosslinks: the collagen IV network
   [x] basement_membrane_bond_break   fragmentation                              (rewire)
   [x] basement_membrane_secrete lay down NEW membrane as the surface grows      (structural)
@@ -97,7 +97,7 @@ basement_membrane
   [ ] basement_membrane_degrade MMP proteolysis -> local softening
 
 interstitial_ecm
-  [x] ecm_seed                  fibres, with alignment and a density field
+  [x] seed_ecm                  fibres, with alignment and a density field
   [x] ecm_stress                strain / von Mises colouring
   [x] cell_to_ecm               the epithelium's contact force on the matrix
   [x] cell_exclude_3d           non-penetration                                 (structural)
@@ -133,7 +133,7 @@ projected onto the surface as a second, fake sheet.
 ## `surface` IS a Level now -- and it did not explain the strain pattern
 
 Built in `surface_ops.py`: a Level of elements on a lattice it OWNS, with `surface_track` writing each
-element's radius by smooth interpolation of the pass-1 map. `basement_membrane_seed` and
+element's radius by smooth interpolation of the pass-1 map. `seed_basement_membrane` and
 `integrin_adhesion` both read it, so the dependency runs one way and there is no second place a
 direction or radius can be computed slightly differently. Enabled with `membrane_surface_level=True`.
 

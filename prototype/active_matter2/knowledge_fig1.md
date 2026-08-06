@@ -45,7 +45,7 @@ Batch-6 CONFIRMED the mill diagnosis and found the fill lever; the vortex proble
   [batch6 s3 vort_excite: eps 0.012->0.07 gave crisp hollow rainbow loops + annular front, not a filled disk].
 
 ## THE VORTEX: the seed WASHES OUT because refractoriness is MOBILE -> a spiral needs a FIELD (continuum) inhibitor (Established @ batch10)
-Batch-9 handed the medium a broken front (spiral_seed one-shot IC); the result is DECISIVE and reframes the whole vortex:
+Batch-9 handed the medium a broken front (seed_spiral one-shot IC); the result is DECISIVE and reframes the whole vortex:
 - SEED (b09 s0 vort_seed) and NO-SEED (b09 s3 vort_noseed) are MORPHOLOGICALLY IDENTICAL at the final frame: both relax to a
   handful of SMALL FILLED rainbow PINWHEELS (each a correct mini rotating disk) + sinuous worm-streams; chemical = compact blobs
   + worm channels. The seeded broken front leaves NO trace. Lowering c_th (s2) or diffuse (s1) only changes the NUMBER/size of
@@ -75,8 +75,8 @@ The batch-8 c_th>0 + c_base experiment is IN and the mechanism story is now clea
   FRONT (a free wave tip = phase singularity) that then winds up. We built the medium but never created the singularity.
   c_th brackets excitability (loops<->plane), c_base brackets ignition FRACTION (patchy<->plane), diffuse sets WAVELENGTH --
   all three confirmed as knobs -- but NONE of them breaks a front. => the vortex is a NUCLEATION problem, not a medium problem.
-- THE LEVER (under test @ batch9): NEW `spiral_seed` op stamps a one-shot broken-front IC (half-plane front + refractory tail)
-  so the free tip curls into a spiral; agents chemotax onto the rotating arm -> filled rainbow pinwheel disk. spiral_seed=0 =
+- THE LEVER (under test @ batch9): NEW `seed_spiral` op stamps a one-shot broken-front IC (half-plane front + refractory tail)
+  so the free tip curls into a spiral; agents chemotax onto the rotating arm -> filled rainbow pinwheel disk. seed_spiral=0 =
   old behaviour. If the seeded front curls & agents fill a rotating disk, the vortex is solved (lever = broken-front nucleation
   in the excitable medium). Open risk: seeded spiral may DRIFT/annihilate (periodic pair) -> need core-pinning / single tip.
 
@@ -141,7 +141,7 @@ fill 2D instead of rim-lock).
 - VORTICES: [OPEN -- reframed @ batch10 as a MOBILE-REFRACTORY MEDIUM problem; continuum-inhibitor `refract` under test].
   Transport knobs exhausted (consolidation re-hollows [b6]; omega-up FRAGMENTS [b7]; v0-up->filaments [b7]; slow-decay->LABYRINTH
   [b7]). c_th>0 + c_base makes an excitable medium with clean travelling WAVE FRONTS [b8] but only PLANE/TARGET waves. The
-  `spiral_seed` broken-front IC [b9] does NOT persist: SEED (b09 s0) and NO-SEED (b09 s3) relax to the SAME attractor -- small
+  `seed_spiral` broken-front IC [b9] does NOT persist: SEED (b09 s0) and NO-SEED (b09 s3) relax to the SAME attractor -- small
   FILLED rainbow PINWHEELS + worm-streams. ROOT CAUSE [b10]: refractoriness `s` is carried by MOBILE AGENTS (Eq 5), which are
   pulled into their own front and scramble the tail -> no space-fixed inhibitor -> a spiral core cannot pin. The mini-pinwheel
   field is the model's honest vortex proxy (fill works [b6], SCALE fails). LEVER (test b10): NEW `refract` op = per-voxel
@@ -163,10 +163,10 @@ fill 2D instead of rim-lock).
 - omega = chemotactic collapse strength AND a nucleation-COUNT knob: UP = MORE, SMALLER clusters (Nc 5->23->32 off
   drop_slow [batch7]) not one tighter blob; DOWN = disperse to streams. Aggregation omega-up: ctr 0.94->1.45->1.8
   across batches 4-5, but Nc rises (fragments) past ~1.0 -- diminishing returns. NOT a droplet->vortex or fill lever.
-- EXCITABILITY (c_th, c_base, spiral_seed, refract) = the medium-type levers [c_th/c_base @ b8; spiral_seed @ b9; refract NEW @ b10]:
+- EXCITABILITY (c_th, c_base, seed_spiral, refract) = the medium-type levers [c_th/c_base @ b8; seed_spiral @ b9; refract NEW @ b10]:
   c_th=-0.001 (default) = gate always ON = constant emitter -> target/labyrinth fronts. c_th>0 = excitable medium making clean
   travelling WAVE FRONTS. Confirmed roles: c_th = EXCITABILITY (low->plane/crisp loops; high->patchy) ; c_base = IGNITION FRACTION
-  (low->patchy loops; high->one plane wave P~0.8) ; diffuse = WAVELENGTH. NONE breaks a front. spiral_seed (broken-front IC) =
+  (low->patchy loops; high->one plane wave P~0.8) ; diffuse = WAVELENGTH. NONE breaks a front. seed_spiral (broken-front IC) =
   REJECTED as the vortex fix [b10]: the seed WASHES OUT (seed==no-seed at final frame) because recovery is agent-borne and mobile.
   refract (NEW @ b10) = per-voxel refractory FIELD `fld._rf` (d_t rf = gain*Theta(c-c_th) - rf/tau; relay blocked where rf>rf_th):
   gives the medium a SPACE-FIXED inhibitor (continuum FitzHugh-Nagumo) so a broken front's wake pins a singularity -> SUSTAINED
@@ -177,7 +177,7 @@ fill 2D instead of rim-lock).
 - r0/repel UP = the loop->stream disperser (reverse of condensation).
 
 ## Open questions
-- VORTEX = CONTINUUM-INHIBITOR EXCITABLE SPIRAL [batch10 primary]: b9 proved the `spiral_seed` broken-front IC WASHES OUT
+- VORTEX = CONTINUUM-INHIBITOR EXCITABLE SPIRAL [batch10 primary]: b9 proved the `seed_spiral` broken-front IC WASHES OUT
   (seed==no-seed attractor: small pinwheels + worms) because recovery `s` is agent-borne/mobile. Does the NEW `refract` op
   (per-voxel refractory FIELD, continuum FitzHugh-Nagumo) let a broken front pin a phase singularity and wind into a SUSTAINED
   rotating spiral disk, while the no-rf control stays pinwheels? Does rf_tau set the core size (40 vs 80)? If YES, the vortex
@@ -229,13 +229,13 @@ fill 2D instead of rim-lock).
   medium makes only PLANE/TARGET waves: under-seed (c_th0.10/c_base0.05) = patchy hollow loops [s0/s1]; over-seed
   (c_base0.08 / diffuse0.55) = one coherent plane wave, P~0.8 band-like [s2/s3]. No c_th/c_base/diffuse setting BREAKS a
   front, and a spiral requires a broken front (free tip). => a spiral cannot self-nucleate here; it must be SEEDED
-  (new spiral_seed op, batch9). c_th/c_base/diffuse ARE confirmed as excitability/ignition/wavelength knobs, just not
+  (new seed_spiral op, batch9). c_th/c_base/diffuse ARE confirmed as excitability/ignition/wavelength knobs, just not
   front-breakers.
 - SPIRAL_SEED (one-shot broken-front IC) as the VORTEX fix. [Rejected @ batch10] SEED (b09 s0) and NO-SEED (b09 s3) relax to
   the IDENTICAL final attractor -- small filled rainbow pinwheels + worm-streams; the stamped broken front leaves no trace.
   Cause: recovery `s` is agent-borne and MOBILE (agents pulled into their own front scramble the refractory tail in a few ticks),
   so the geometry dies before winding. A one-shot IC cannot help when the medium can't HOLD a spiral. => the vortex needs a
-  space-fixed (continuum) inhibitor FIELD, not a seed. spiral_seed retained only as a tip-initiator FOR the `refract` medium (b10).
+  space-fixed (continuum) inhibitor FIELD, not a seed. seed_spiral retained only as a tip-initiator FOR the `refract` medium (b10).
 - SLOW-DECAY as the VORTEX 2D-fill. [Partial/Rejected @ batch7 s3] decay 0.018->0.006 on the consolidated sigma-well
   DID fill 2D but into a fat space-filling LABYRINTH (fill everywhere the front swept), not a compact rotating disk.
   Confirms slow-decay as a real 2D-fill mechanism; rejects it as a route to the compact vortex DISK.

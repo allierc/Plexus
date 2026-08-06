@@ -18,7 +18,7 @@ sets:
         fraction: 1.0
 fields: {}
 operators:
-- op: vesicle_seed
+- op: seed_vesicle
   at: cell
   radius: 6.5
   before_frame: 1
@@ -36,6 +36,6 @@ operators:
   mu: 0.02
   noise: 0.01
 schedule:
-- vesicle_seed
+- seed_vesicle
 - radius_graph
 - vesicle_mechanics

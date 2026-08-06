@@ -142,7 +142,7 @@ pacemaker.py, activation_pulse.py, scalar_field.py, prescribed_field.py
 ```
 cell_geometry_3d      set=cell   kind=aggregate   family=hierarchy
 cell_adjacency        set=cell   kind=rewire      family=topology
-cell_rd_seed          set=cell   kind=structural  family=growth
+seed_cell_rd          set=cell   kind=structural  family=growth
 cell_diffuse          set=cell   kind=lateral     family=fields
 cell_react            set=cell   kind=lateral     family=fields  impl=gray_scott
 cell_react            set=cell   kind=lateral     family=fields  impl=gierer_meinhardt
@@ -294,7 +294,7 @@ stage-gated:
   `monolayer`), `reconnect_t1_3d`
 - **Stage 2 growth coupling:** `vesicle_growth`, `morphogen_growth_3d`, `divide_3d`
   (`orient_iface` on/off), `face_growth`
-- **Stage 3 patterning + feedback:** `cell_rd_seed` (modes), `cell_react`
+- **Stage 3 patterning + feedback:** `seed_cell_rd` (modes), `cell_react`
   (`gray_scott` | `gierer_meinhardt` | `brusselator` — already three interchangeable impls, which
   is exactly the plexus2 contract paying off), `cell_diffuse`, `rd_interface_tension`,
   `cell_differentiate`

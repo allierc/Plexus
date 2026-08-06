@@ -33,7 +33,7 @@ operators:
   before_frame: 1
 - op: cell_geometry_3d
   at: cell
-- op: cell_rd_seed
+- op: seed_cell_rd
   at: cell
   mode: tip
   n_spots: 1
@@ -103,7 +103,7 @@ operators:
 schedule:
 - load_mesh_3d
 - cell_geometry_3d
-- cell_rd_seed
+- seed_cell_rd
 - morphogen_growth_3d
 - shape_energy_3d
 - rd_interface_tension
@@ -116,8 +116,8 @@ _discovery:
     operators:
     - id: cell_geometry_3d0
       op: cell_geometry_3d
-    - id: cell_rd_seed0
-      op: cell_rd_seed
+    - id: seed_cell_rd0
+      op: seed_cell_rd
       impl: tip
     - id: divide_3d0
       op: divide_3d
@@ -135,10 +135,10 @@ _discovery:
       op: shape_energy_3d
       impl: default
     connections:
-    - src_op: cell_rd_seed
+    - src_op: seed_cell_rd
       dst_op: extrude
       slot: site
-    - src_op: cell_rd_seed
+    - src_op: seed_cell_rd
       dst_op: morphogen_growth_3d
       slot: gate
   region: driven + forced (round-33 recipe)

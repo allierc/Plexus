@@ -165,7 +165,7 @@ keys we deliberately changed (`dt`, `every` — the D1/D2 fixes).
 
 ### 🔴 FINDING 7 — V9 caught a silent semantic bug plus 7 fidelity gaps
 
-The one that matters: **`cell_rd_seed.mode='cone'` vs the engine's `'cones'`.** My emitter used the
+The one that matters: **`seed_cell_rd.mode='cone'` vs the engine's `'cones'`.** My emitter used the
 singular; the engine matches on the plural, so the seeding mode was falling through to a different
 branch entirely. **Identical operator set, different mechanism** — precisely the class of defect
 V9 exists to catch, and invisible to V3.

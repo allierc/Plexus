@@ -32,7 +32,7 @@ operators:   # the operators to instantiate (each realises one mechanism)
   before_frame: 1   # run this operator once, before the given frame
 - op: cell_geometry_3d
   at: cell   # the set this operator acts on
-- op: cell_rd_seed
+- op: seed_cell_rd
   at: cell   # the set this operator acts on
   mode: cones
   n_spots: 3
@@ -84,7 +84,7 @@ operators:   # the operators to instantiate (each realises one mechanism)
 schedule:   # the order the operators run each frame
 - load_mesh_3d
 - cell_geometry_3d
-- cell_rd_seed
+- seed_cell_rd
 - morphogen_growth_3d
 - shape_energy_3d
 - reconnect_t1_3d

@@ -38,7 +38,7 @@ operators:   # the operators to instantiate (each realises one mechanism)
   at: cell   # the set this operator acts on
 - op: cell_adjacency
   at: cell   # the set this operator acts on
-- op: cell_rd_seed
+- op: seed_cell_rd
   at: cell   # the set this operator acts on
   seed: 0   # RNG seed
   before_frame: 3   # run this operator once, before the given frame
@@ -103,7 +103,7 @@ schedule:   # the order the operators run each frame
 - seed_mesh_3d
 - cell_geometry_3d
 - cell_adjacency
-- cell_rd_seed
+- seed_cell_rd
 - cell_diffuse
 - cell_react
 - morphogen_growth_3d
