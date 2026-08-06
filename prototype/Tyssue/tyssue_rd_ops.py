@@ -96,16 +96,43 @@ class CellAdjacency(Rewire):
 @register_operator("cell_rd_seed", set="cell", kind="structural", family="growth")
 class CellRDSeed(Structural):
     """Gray-Scott initial condition on the cell set: substrate u=1 everywhere, activator a=0 except
-    a central spot (a=0.5, u=0.25) that nucleates the pattern. chem = [a, u]."""
+    a central spot (a=0.5, u=0.25) that nucleates the pattern. chem = [a, u].
+
+    `mode: tip` WAS REMOVED, 6 August. It re-activated a fixed-size cap at the current outermost
+    cell EVERY FRAME, so the activation chased the advancing tip and forced a constant-diameter
+    extension. Two reasons it had to go, and the second is the one that matters:
+
+      * it is a moving BOUNDARY CONDITION, not an initial condition. Where the activity sits is
+        then our answer rather than the simulation's, and the campaign's question -- does the
+        chemical pattern grip the shape? -- was being asked of a pattern pinned to the shape's own
+        outermost point. `corr_act_rad` was partly measuring the seeding rule against itself;
+      * re-applying it every frame overwrites BOTH chemistry channels, so no operator that writes
+        to `chem` can accumulate anything. `shape_to_chem` writes to channel 1 and `tip` sets that
+        channel to exactly 1.0, which is why 8 same-seed `beta` edits across 13 rounds moved the
+        trajectory by exactly zero and were each recorded as a refuted hypothesis.
+
+    AN UNKNOWN MODE NOW RAISES. It used to fall through to the `else`, which means deleting the
+    branch alone would have turned 265 archived `mode: tip` specs into SCATTER runs that still
+    load, still finish and describe a different mechanism. A spec that can no longer be run is a
+    correct outcome; a spec that quietly runs something else is the failure this whole phase is
+    about.
+    """
     SUPPORTED_DIMS = [2, 3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
     MECHANISM_TAGS = ["initial_condition", "gray_scott"]
+    MODES = ("scatter", "noise", "patch", "cones")
     REFERENCE = "Plexus (this work); cone seeding after Okuda, S. et al. (2018). Sci. Rep. 8:2386."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.at = params.get("_at", "cell"); self.vat = params.get("vertex_set", "vertex")
         self.seed = int(params.get("seed", 0))
-        self.mode = params.get("mode", "scatter")               # "noise" | "scatter" | "patch" (localized source)
+        self.mode = params.get("mode", "scatter")               # "noise" | "scatter" | "patch" | "cones"
+        if self.mode not in self.MODES:
+            raise ValueError(
+                f"cell_rd_seed: unknown mode {self.mode!r}; known: {list(self.MODES)}. "
+                + ("`tip` was removed on 6 August -- it re-seeded every frame, which makes it a "
+                   "moving boundary condition and annihilates every operator that writes to "
+                   "`chem`. Use `scatter` with `before_frame: 3`." if self.mode == "tip" else ""))
         self.seed_frac = float(params.get("seed_frac", 0.06))   # (scatter) fraction of strong activator seeds
         self.A = float(params.get("A", 1.0)); self.B = float(params.get("B", 3.0))   # (noise) steady state (A, B/A)
         self.noise = float(params.get("noise", 0.04))
@@ -114,7 +141,6 @@ class CellRDSeed(Structural):
         self.cone_deg = float(params.get("cone_deg", 18.0))     # (cones) half-angle of each activation cone
         self.seed_dir = params.get("seed_dir", None)            # (cones, n_spots=1) override the cone axis to a fixed
         #   direction -> aim the tube where we want it (e.g. FRONT of the render camera at elev18/azim30 ~ (.82,.48,.31))
-        self.tip_radius = float(params.get("tip_radius", 2.0))  # (tip mode) 3D radius of the tip-tracking activation cap
 
     def _cone_dirs(self):
         """`n_spots` spread unit directions on the sphere (Fibonacci) -> fixed radial tube axes (Fig 5). A given
@@ -146,23 +172,12 @@ class CellRDSeed(Structural):
                 cosmax = (d @ dirs.T).max(dim=1).values
                 a = torch.where(cosmax > float(np.cos(np.radians(self.cone_deg))), torch.ones(nF, device=dev), a)
             u = torch.ones(nF, device=dev)
-        elif self.mode == "tip":                                # TIP-TRACKING: a fixed-SIZE cap riding the advancing
-            a = torch.full((nF,), 0.02, device=dev)             # tip -> CONSTANT-diameter extension (a fixed-angle cone
-            if "cen" in clvl.state_schema:                      # widens with radius -> fat lobe; a fixed 3D-size cap
-                ci0, ci1 = clvl.state_schema["cen"]; cen = clvl.state[:nF, ci0:ci0 + 3]
-                if self.seed_dir is not None:                   # position ALONG the bud axis; tip = the furthest cell
-                    sd = np.asarray(self.seed_dir, float); sd = sd / (np.linalg.norm(sd) + 1e-12)
-                    proj = cen @ torch.as_tensor(sd, dtype=cen.dtype, device=dev)
-                else:
-                    proj = cen.norm(dim=1)
-                tip = cen[int(torch.argmax(proj))]              # current outermost cell (the advancing tip)
-                d3 = (cen - tip).norm(dim=1)                     # 3D distance from the tip (FIXED size, not angle)
-                a = torch.where(d3 < self.tip_radius, torch.ones(nF, device=dev), a)
-            u = torch.ones(nF, device=dev)
         elif self.mode == "noise":                              # Brusselator: homogeneous steady state + noise
             a = (self.A + self.noise * torch.randn(nF, generator=g)).to(dev)
             u = (self.B / self.A + self.noise * torch.randn(nF, generator=g)).to(dev)
-        else:                                                   # Gray-Scott: substrate=1 + scattered activator nuclei
+        else:                                                   # "scatter" -- and ONLY scatter. The mode is validated
+            # in __init__, so this branch can no longer be reached by a typo or by a mode that was
+            # deleted out from under an archived spec.
             # (a central spot is 2D-disk logic -- on a sphere every cell is equidistant, so scatter/noise)
             a = (0.04 * torch.rand(nF, generator=g)).to(dev)
             u = torch.ones(nF, device=dev)
