@@ -89,6 +89,8 @@ class JunctionMyosin(Structural):
         self.tau = float(params.get("tau", 20.0))
         self.beta = float(params.get("beta", 1.0))
         self.myo_new = float(params.get("myo_new", 1.0))
+        self.inherit = bool(params.get("inherit", True))
+        self._vseen = None
         self.dt = float(params.get("dt", 1.0))
         self._keys = None            # int64 [K] topological identities seen so far
         self._vals = None            # float  [K] their myosin
@@ -123,9 +125,45 @@ class JunctionMyosin(Structural):
         idx_c = idx.clamp(max=max(ks.numel() - 1, 0))
         found = (ks.numel() > 0) & (idx_c < ks.numel())
         hit = found & (ks[idx_c] == key) if ks.numel() else torch.zeros_like(key, dtype=torch.bool)
-        myo = torch.where(hit, vs[idx_c] if vs.numel() else torch.zeros_like(length),
-                          torch.full_like(length, self.myo_new))
+        base = vs[idx_c] if vs.numel() else torch.zeros_like(length)
+        myo = torch.where(hit, base, torch.full_like(length, self.myo_new))
         n_new = int((~hit).sum())
+
+        # ---- A JUNCTION WITH A PARENT INHERITS FROM IT ------------------------------------------
+        # Not every edge that misses the lookup is a new junction. `divide_3d` inserts a new vertex on
+        # each of two edges of the dividing cell and then joins them, so a division produces two KINDS
+        # of edge, and only one of them is new:
+        #
+        #   one endpoint new, one old   -- a SPLIT HALF of the cut junction (a,b). The same physical
+        #                                  contact, now in two pieces. It has a myosin history and
+        #                                  giving it `myo_new` throws that history away.
+        #   both endpoints new          -- the interface between the two daughters. This one really is
+        #                                  new, and `myo_new` is the honest answer for it.
+        #
+        # The parent is recoverable without any help from `divide_3d`, which is the point of keying by
+        # vertex pair: a new vertex `n` has exactly two OLD neighbours, and they are the endpoints of the
+        # edge it was inserted into. So the parent key is (min, max) over `n`'s old neighbours, and both
+        # halves look it up. Falls back to `myo_new` where there is no parent to find.
+        if self.inherit and n_new and self._vseen is not None:
+            oi = self._vseen[vi.clamp(max=self._vseen.numel() - 1)] & (vi < self._vseen.numel())
+            oj = self._vseen[vj.clamp(max=self._vseen.numel() - 1)] & (vj < self._vseen.numel())
+            half = (~hit) & (oi ^ oj)                       # exactly one endpoint is new
+            if bool(half.any()):
+                newv = torch.where(oi[half], vj[half], vi[half])     # the inserted vertex
+                oldv = torch.where(oi[half], vi[half], vj[half])     # its old neighbour
+                uq, inv = torch.unique(newv, return_inverse=True)
+                lo = torch.full((uq.numel(),), stride, dtype=torch.long, device=dev)
+                hi_ = torch.zeros(uq.numel(), dtype=torch.long, device=dev)
+                lo = lo.scatter_reduce(0, inv, oldv, reduce="amin", include_self=True)
+                hi_ = hi_.scatter_reduce(0, inv, oldv, reduce="amax", include_self=True)
+                pkey = lo * stride + hi_                             # the edge the vertex was cut into
+                pidx = torch.searchsorted(ks, pkey).clamp(max=max(ks.numel() - 1, 0))
+                phit = (ks.numel() > 0) & (ks[pidx] == pkey) & (lo < hi_)
+                inh = torch.where(phit, vs[pidx] if vs.numel() else torch.zeros_like(pkey, dtype=dt_),
+                                  torch.full_like(pkey, self.myo_new, dtype=dt_))
+                myo = myo.masked_scatter(half, inh[inv])
+                n_inherited = int(phit[inv].sum())
+                INHERIT_TRACE.append((n_new, int(half.sum()), n_inherited))
 
         # ---- recruitment ------------------------------------------------------------------------
         ss = self.activity * (1.0 + self.beta * (length / l_ref - 1.0)).clamp_min(0.0)
@@ -135,6 +173,10 @@ class JunctionMyosin(Structural):
         # ---- store back, keyed. Junctions that no longer exist are simply not written, so a T1 or a
         # death drops them without anyone having to notice.
         self._keys, self._vals = key.detach().clone(), myo.detach().clone()
+        # which vertices existed this frame, so next frame can tell an inserted vertex from an old one
+        vs_seen = torch.zeros(stride, dtype=torch.bool, device=dev)
+        vs_seen[vi] = True; vs_seen[vj] = True
+        self._vseen = vs_seen
         # the per-half-edge array the mechanics reads: full length, 1.0 on dead slots so a masked-out
         # half-edge contributes its usual tension if anything ever reads it unmasked
         full = torch.ones(es.shape[0], device=dev, dtype=dt_)
@@ -148,3 +190,7 @@ class JunctionMyosin(Structural):
                   f"death need no edits", flush=True)
             self._said = True
         return {}
+
+
+# Per frame, only when inheritance fires: (new edges, split halves, halves that found a parent).
+INHERIT_TRACE: list = []

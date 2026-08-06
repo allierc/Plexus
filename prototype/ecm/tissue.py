@@ -177,7 +177,7 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap
         import junction_ops                                           # noqa: F401  register it
         spec["operators"].append({"op": "junction_myosin", "at": "vertex",
                                   "activity": float(myosin), "tau": float(myo_tau),
-                                  "beta": float(myo_beta), "myo_new": float(myo_new), "dt": 1.0})
+                                  "beta": float(myo_beta), "myo_new": float(myo_new), "dt": 1.0, "inherit": True})
         i = spec["schedule"].index("shape_energy_3d")
         spec["schedule"].insert(i, "junction_myosin")
         print(f"[tissue] per-junction myosin: activity={myosin}, tau={myo_tau}, beta={myo_beta}, "
@@ -301,7 +301,7 @@ def load_or_build(frames=401, device="cuda:0", name="cellfix_B_new", rebuild=Fal
            "gate": None, "load": None,
            "gate_p_half": gate_p_half, "gate_hill": gate_hill, "gate_floor": gate_floor,
            "gate_smooth_frames": gate_smooth_frames, "gate_smooth_phi": gate_smooth_phi,
-           "load_gain": load_gain, "myosin": myosin, "myo_tau": myo_tau, "myo_beta": myo_beta,
+           "load_gain": load_gain, "myosin": myosin, "myo_tau": myo_tau, "myo_beta": myo_beta, "myo_inherit": 1,
            "myo_new": myo_new}
     for key, path in (("gate", gate_npz), ("load", load_npz)):
         if path is not None:
