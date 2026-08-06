@@ -325,7 +325,7 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, f
     if not hist:
         print(f"[{name}] no stress history -- the matrix cannot be stress-coloured", flush=True)
     cmap = ListedColormap(ES.STRESS_COLORS)
-    seed_op = next(o for o in spec["operators"] if o["op"] == "ecm_seed")
+    seed_op = next(o for o in spec["operators"] if o["op"] == "seed_ecm")
     ax_i = int(seed_op["axis"])
     axis_dir = np.eye(3)[ax_i]                                      # the cavity's pinched axis
     op = next((o for o in spec["operators"] if o["op"] == "cell_to_ecm"), None)
@@ -634,6 +634,13 @@ def run(name, spec, device="cuda:0", movie=True, keep_traj=True, render_kw=None)
                 extra["mpos"] = np.asarray(out["sets"]["basement_membrane_particle"]["pos"], np.float32)
                 if membrane_ops.MEMBRANE_STRAIN:
                     extra["mstrain"] = np.asarray(membrane_ops.MEMBRANE_STRAIN, np.float16)
+                # WHICH PARTICLES ARE MEMBRANE AND WHICH ARE UNSECRETED RESERVE. With `reserve = 8`,
+                # eight ninths of the set starts parked at the tissue centre with mass 0, so any
+                # measurement or render that treats the set as one body reports a membrane collapsed
+                # into the lumen. Anything reading this file must mask on it.
+                al = getattr(H, "membrane_alive", None)
+                if al is not None:
+                    extra["malive"] = np.asarray(al.detach().cpu(), bool)
             if "mpm_block" in out.get("sets", {}):
                 extra["bpos"] = np.asarray(out["sets"]["mpm_block"]["pos"], np.float32)
                 extra["bstress"] = np.asarray(block_ops.BLOCK_STRESS, np.uint8)

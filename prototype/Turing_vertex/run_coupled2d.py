@@ -39,7 +39,7 @@ except Exception:
 
 import plexus.operators   # noqa: F401
 import turing_ops         # noqa: F401  graph_diffuse + react (INTEGRAND="chem")
-import coupled_ops        # noqa: F401  coupled_seed_2d + voronoi_graph_2d + growth + divide_2x + vertex_tension_2d
+import coupled_ops        # noqa: F401  seed_coupled_2d + voronoi_graph_2d + growth + divide_2x + vertex_tension_2d
 from coupled_ops import cell_polygons_2d
 import plexus.schema as S
 from plexus.engine import run as engine_run
@@ -84,7 +84,7 @@ def presets():
 
 def _ops2d(p, A, B, seed_mode):
     ops = [
-        {"op": "coupled_seed_2d", "at": "cell", "radius": p["radius"], "a0": A0,
+        {"op": "seed_coupled_2d", "at": "cell", "radius": p["radius"], "a0": A0,
          "a_mean": A, "h_mean": B / A, "noise": 0.04, "seed_mode": seed_mode,
          "seed_frac": p.get("seed_frac", 0.04), "before_frame": 1},
         {"op": "voronoi_graph_2d", "at": "cell"},

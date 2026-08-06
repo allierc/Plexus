@@ -8,7 +8,7 @@ here lives in the engine; importing `ecm_ops` registers the three new operators.
                mpm_particle -- the MATRIX itself: one particle set, seeded into fibres
     fields     mpm_grid    -- the background grid; when the real cell mesh arrives it scatters
                               into THIS grid, which is what makes the coupling two-way
-    schedule   aggregate -> ecm_seed -> cell_to_ecm -> ecm_stress
+    schedule   aggregate -> seed_ecm -> cell_to_ecm -> ecm_stress
                -> [ MLS-MPM substep loop ]
 
 WHY THE MATERIAL IS SOFT. MPM is explicit, so the substep must satisfy dt < dx/c with
@@ -127,7 +127,7 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
         "fields": {"mpm_grid": {"frame": "mpm_grid", "n_grid": int(n_grid)}},
         "operators": [
             {"op": "aggregate", "at": "cell"},
-            {"op": "ecm_seed", "at": "mpm_particle", "centre": [0.5, 0.5, 0.5],
+            {"op": "seed_ecm", "at": "mpm_particle", "centre": [0.5, 0.5, 0.5],
              "cavity_r": float(cavity_r), "cavity_h": float(cavity_h), "axis": int(axis),
              "n_fibres": int(n_fibres), "fibre_len": float(fibre_len),
              "align": float(align), "align_dir": list(align_dir), "seed": int(seed),
@@ -148,7 +148,7 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
         ],
         "schedule": [
             "aggregate",
-            "ecm_seed",                      # once, at frame 0
+            "seed_ecm",                      # once, at frame 0
             "cell_to_ecm",                   # the ball's push, as an external acceleration
             "ecm_stress",                    # recolour by |J-1| BEFORE the frame is recorded
             {"substep_dt": float(substep_dt),
@@ -172,7 +172,7 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                                 "youngs": float(membrane_youngs)}
                       for i in range(len(STRESS_COLORS))}}
         spec["operators"] += [
-            {"op": "basement_membrane_seed", "at": "basement_membrane_particle",
+            {"op": "seed_basement_membrane", "at": "basement_membrane_particle",
              "centre": [0.5, 0.5, 0.5], "surface": str(membrane), "scale": 1.0,
              "offset": float(membrane_offset), "thickness": float(membrane_thickness),
              "seed": int(seed), "jitter": float(membrane_jitter),
@@ -203,8 +203,8 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
             {"op": "mpm_gather", "at": "basement_membrane_particle", "from": "mpm_grid",
              "wall_damp": float(wall_damp), "wall_contact": 0.04, "vmax": 1.0e9},
         ]
-        i = spec["schedule"].index("ecm_seed") + 1
-        spec["schedule"].insert(i, "basement_membrane_seed")
+        i = spec["schedule"].index("seed_ecm") + 1
+        spec["schedule"].insert(i, "seed_basement_membrane")
         # the bond force is a DYNAMICS operator (EMIT mpm_acceleration): it must run before the substep
         # block so the engine has its delta to integrate, and the break check after it.
         i = spec["schedule"].index("ecm_stress")
@@ -227,7 +227,7 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
             # place where a direction or a radius can be computed slightly differently.
             spec["schedule"].insert(0, "surface_track")
             for o in spec["operators"]:
-                if o["op"] in ("integrin_adhesion", "basement_membrane_seed"):
+                if o["op"] in ("integrin_adhesion", "seed_basement_membrane"):
                     o["surface_set"] = "surface"
         else:
             spec["operators"] = [o for o in spec["operators"] if o["op"] != "surface_track"]
@@ -251,7 +251,7 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                                 "youngs": float(block_youngs)}
                       for i in range(len(STRESS_COLORS))}}
         spec["operators"] += [
-            {"op": "block_seed", "at": "mpm_block", "centre": [0.5, 0.5, 0.5],
+            {"op": "seed_block", "at": "mpm_block", "centre": [0.5, 0.5, 0.5],
              "axis": int(axis), "gap_half": float(block_gap), "seed": int(seed)},
             {"op": "block_stress", "at": "mpm_block", "scale": float(block_stress_scale),
              "bands": len(STRESS_COLORS), "measure": str(block_measure)},
@@ -266,8 +266,8 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
             {"op": "mpm_gather", "at": "mpm_block", "from": "mpm_grid",
              "wall_damp": float(wall_damp), "wall_contact": 0.04, "vmax": 1.0e9},
         ]
-        i = spec["schedule"].index("ecm_seed") + 1
-        spec["schedule"].insert(i, "block_seed")
+        i = spec["schedule"].index("seed_ecm") + 1
+        spec["schedule"].insert(i, "seed_block")
         i = spec["schedule"].index("ecm_stress") + 1
         spec["schedule"].insert(i, "block_stress")
     return copy.deepcopy(spec)

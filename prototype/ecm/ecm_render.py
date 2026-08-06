@@ -410,7 +410,7 @@ def draw_junctions_3d(ax, mt, pos, cam, L, myo_hi=None, cutaway=True, lw=0.9):
     ax.add_collection3d(lc)
 
 
-def draw_membrane_3d(ax, mem_q, mem_s, cam, L, mem_hi=None, cutaway=True, s_dot=4.5):
+def draw_membrane_3d(ax, mem_q, mem_s, cam, L, mem_hi=None, cutaway=True, s_dot=4.5, alive=None):
     """THE BASEMENT MEMBRANE ALONE, framed and cut exactly as `draw_junctions_3d` frames the network.
 
     The pair is the point: two panels, one per entity, same camera, same cutaway, same tissue-sized box,
@@ -425,6 +425,9 @@ def draw_membrane_3d(ax, mem_q, mem_s, cam, L, mem_hi=None, cutaway=True, s_dot=
         return
     d, _, _ = screen_basis(cam["elev"], cam["azim"])
     keep = (mem_q @ d) > 0 if cutaway else np.ones(len(mem_q), bool)
+    # the unsecreted reserve is parked at the centre and is not membrane yet
+    if alive is not None and len(alive) == len(mem_q):
+        keep = keep & np.asarray(alive, bool)
     if not keep.any():
         return
     q = mem_q[keep]

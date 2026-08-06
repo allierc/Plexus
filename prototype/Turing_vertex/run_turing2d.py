@@ -31,7 +31,7 @@ except Exception:
     pass
 
 import plexus.operators   # noqa: F401
-import turing_ops         # noqa: F401  aggregate_seed + graph_diffuse + react
+import turing_ops         # noqa: F401  seed_aggregate + graph_diffuse + react
 import plexus.schema as S
 from plexus.engine import run as engine_run
 
@@ -66,12 +66,12 @@ def make_spec(name, p, frames=FRAMES):
             "xyz":  {"width": 2, "integration": "none", "boundary": "free"}}}},
         "fields": {},
         "operators": [
-            {"op": "aggregate_seed", "at": "cell", "mode": "disc", "radius": RADIUS, "k": K,
+            {"op": "seed_aggregate", "at": "cell", "mode": "disc", "radius": RADIUS, "k": K,
              "seed_frac": 0.12, "before_frame": 1},
             {"op": "graph_diffuse", "at": "cell", "d_a": p["d_a"], "d_h": p["d_h"], "chi": p["chi"]},
             react,
         ],
-        "schedule": ["aggregate_seed", "graph_diffuse", "react"],
+        "schedule": ["seed_aggregate", "graph_diffuse", "react"],
     }
     with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as fh:
         yaml.safe_dump(cfg, fh); path = fh.name

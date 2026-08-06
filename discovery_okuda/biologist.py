@@ -405,11 +405,11 @@ def _activator_zero_is_a_fixed_point(cfg):
                           hard-coded in translate._emit_react. NEVER fixed. Measured from zero:
                           a -> 0.26 in 50 steps, and on to the homogeneous steady state a = A.
 
-    So "no cell_rd_seed" is NOT the condition. Gating on it would silence this check on two of
+    So "no seed_cell_rd" is NOT the condition. Gating on it would silence this check on two of
     the three reactions in the bank, in exactly the case it exists for.
     """
     ops = _ops(cfg)
-    if "cell_rd_seed" in ops:
+    if "seed_cell_rd" in ops:
         return None                                    # something did seed; zero is a real failure
     react = ops.get("cell_react") or {}
     impl = react.get("implementation")
@@ -442,7 +442,7 @@ def p4_chemistry_not_extinguished(cfg, s):
             # so it starts at zero; with no seeding operator the activator can only stay there if
             # a = 0 is an EXACT FIXED POINT of the chosen kinetics. That is a property of the
             # KINETICS, not of the seeding, which is why this gate reads the implementation and
-            # NOT merely `cell_rd_seed not in ops` -- see the helper: two of the three reactions
+            # NOT merely `seed_cell_rd not in ops` -- see the helper: two of the three reactions
             # leave zero on their own, and for those a peak of zero still means the reaction
             # never ran, which is exactly what this branch was written to catch.
             # `na` would be a lie: the premise APPLIES and its answer is that this composition
@@ -1095,7 +1095,7 @@ def certify():
             ("P4 zero activator WITH a seed present",
              {"op": "cell_react", "implementation": "gray_scott", "F": 0.046, "kk": 0.062},
              "fail")):
-        ops = [react] + ([{"op": "cell_rd_seed", "mode": "scatter"}] if "WITH" in lbl else [])
+        ops = [react] + ([{"op": "seed_cell_rd", "mode": "scatter"}] if "WITH" in lbl else [])
         r = p4_chemistry_not_extinguished({"operators": ops}, flat)
         ok = r.status == want; bad += not ok
         print(f"  [{'ok ' if ok else 'BAD'}] {lbl:48} -> {r.status:9} (want {want})")

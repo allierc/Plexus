@@ -34,8 +34,8 @@ except Exception:
     pass
 
 import plexus.operators   # noqa: F401
-import tyssue_ops          # noqa: F401  mesh_seed + shape_energy (cross-set)
-import tyssue_cell_ops     # noqa: F401  cell_seed + cell_geometry + cell_paint
+import tyssue_ops          # noqa: F401  seed_mesh + shape_energy (cross-set)
+import tyssue_cell_ops     # noqa: F401  seed_cell + cell_geometry + cell_paint
 from tyssue_ops import build_honeycomb, face_polygons
 import plexus.schema as S
 from plexus.engine import run as engine_run
@@ -72,16 +72,16 @@ def make_spec(name, p0, amp, sigma, mode, Nv, Fbuf):
         },
         "fields": {},
         "operators": [
-            {"op": "mesh_seed", "at": "vertex", "nx": NX, "ny": NY, "a": A, "border": BORDER,
+            {"op": "seed_mesh", "at": "vertex", "nx": NX, "ny": NY, "a": A, "border": BORDER,
              "jitter": JITTER, "p0": p0, "seed": SEED, "before_frame": 1},
-            {"op": "cell_seed", "at": "cell", "a": A, "before_frame": 1},
+            {"op": "seed_cell", "at": "cell", "a": A, "before_frame": 1},
             {"op": "cell_geometry", "at": "cell"},
             {"op": "cell_morphogen", "at": "cell", "amp": amp, "sigma": sigma, "before_frame": 3},
             growth,
             {"op": "shape_energy", "at": "vertex", "p0": p0, "K_A": 1.0, "K_P": 1.0, "mu": 1.0,
              "dt": 1.0, "relax_iters": 8, "eta": 0.08, "cap_frac": 0.15},
         ],
-        "schedule": ["mesh_seed", "cell_seed", "cell_geometry", "cell_morphogen",
+        "schedule": ["seed_mesh", "seed_cell", "cell_geometry", "cell_morphogen",
                      gname, "shape_energy"],
     }
     with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as fh:

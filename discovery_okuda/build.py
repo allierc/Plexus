@@ -224,7 +224,7 @@ def _graph_from_run(name):
                         cands = [(a, b, sl) for a, b, sl in g._candidate_links()
                                  if b == nid and sl == slot]
                         if len(cands) > 1:
-                            # NOT A GUESS -- THE PIPELINE'S OWN ORDER. cell_rd_seed and cell_react
+                            # NOT A GUESS -- THE PIPELINE'S OWN ORDER. seed_cell_rd and cell_react
                             # both "produce" morphogen because they both write the same shared
                             # field; there is no choice between them in the engine, only a
                             # sequence. The effective source for a consumer is the LAST producer

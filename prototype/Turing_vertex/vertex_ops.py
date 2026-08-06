@@ -17,7 +17,7 @@ so one tessellation feeds `voronoi_tension` and `graph_diffuse`. Per-cell target
 A0 is the coupling handle: the activator raises A0 -> cells grow -> tissue deforms.
 
 Operators:
-  tissue_seed      (structural) -- place cell centres in a periodic box; init A0
+  seed_tissue      (structural) -- place cell centres in a periodic box; init A0
   voronoi_graph    (rewire)     -- re-tessellate: cell.edge_index (Delaunay) + rings
   voronoi_tension  (lateral)    -- shape-energy force on the centres (EMIT=velocity)
 """
@@ -125,7 +125,7 @@ def cell_polygons(pos_np, L, N):
 # --------------------------------------------------------------------------- #
 #  Seed: place cell centres, init target area
 # --------------------------------------------------------------------------- #
-@register_operator("tissue_seed", set="cell", kind="structural", family="growth")
+@register_operator("seed_tissue", set="cell", kind="structural", family="growth")
 class TissueSeed(Structural):
     """Frame-0 IC (`before_frame: 1`): scatter N cell centres in the periodic box
     [0,L)^2 (jittered grid) and set every cell's target area A0 (state block `a0`)."""

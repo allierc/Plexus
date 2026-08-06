@@ -76,7 +76,7 @@ def presets():
 
 def make_spec(p):
     W = 2.6 * p["R"]
-    seed = {"op": "aggregate_seed", "at": "cell", "mode": p["mode"], "seed_mode": p["seed"],
+    seed = {"op": "seed_aggregate", "at": "cell", "mode": p["mode"], "seed_mode": p["seed"],
             "radius": p["R"], "k": p["k"], "before_frame": 1}
     if p["seed"] == "noise":
         A, B = p["react"]["A"], p["react"]["B"]
@@ -96,7 +96,7 @@ def make_spec(p):
              "chi": p["chi"], "norm": p["norm"]},
             {"op": "react", "at": "cell", **p["react"]},
         ],
-        "schedule": ["aggregate_seed", "graph_diffuse", "react"],
+        "schedule": ["seed_aggregate", "graph_diffuse", "react"],
     }
     with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as fh:
         yaml.safe_dump(cfg, fh); path = fh.name

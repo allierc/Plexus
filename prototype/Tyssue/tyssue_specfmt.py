@@ -7,8 +7,8 @@ import yaml
 
 # operator purpose, keyed by the `op:` value
 OP = {
-    "mesh_seed":     "build the honeycomb half-edge mesh on the vertex set (frame 0)",
-    "cell_seed":     "init the cell set from the mesh: one live cell/face, a0=base, type=0",
+    "seed_mesh":     "build the honeycomb half-edge mesh on the vertex set (frame 0)",
+    "seed_cell":     "init the cell set from the mesh: one live cell/face, a0=base, type=0",
     "cell_geometry": "AGGREGATE vertices -> per-cell area / perimeter / centroid (readouts)",
     "cell_paint":    "one-shot: mark a central clone (radius r) as type 1 with a0 x gain -> it bulges",
     "shape_energy":  "AVM shape-energy force on the vertices (bounded Euler); reads target area a0 from the cell set",

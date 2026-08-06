@@ -11,7 +11,7 @@ division wakes dormant slots (no resizing). Multi-block state (the engine extens
 integrated by the mechanics, chem=[act,inh] by the RD, a0 by growth -- each its own block.
 
 Operators (this file):
-  coupled_seed_2d   (structural) -- seed n0 cells on a fixed buffer; init chem, a0, occ
+  seed_coupled_2d   (structural) -- seed n0 cells on a fixed buffer; init chem, a0, occ
   voronoi_graph_2d  (rewire)     -- finite Voronoi -> cell.edge_index (the diffusion graph)
   growth            (lateral)    -- activator -> da0/dt (Hill, Eqs 7-8);  INTEGRAND="a0"
   divide_2x         (structural) -- a0 >= 2*a0_base -> wake a daughter, split a0, inherit chem
@@ -125,7 +125,7 @@ def cell_polygons_2d(pos_np, pad):
 # --------------------------------------------------------------------------- #
 #  Seed: n0 cells on a fixed buffer (occupancy)
 # --------------------------------------------------------------------------- #
-@register_operator("coupled_seed_2d", set="cell", kind="structural", family="growth")
+@register_operator("seed_coupled_2d", set="cell", kind="structural", family="growth")
 class CoupledSeed2D(Structural):
     """Frame-0 IC (`before_frame: 1`): place the live cells (occ>0) as a disc, init the
     morphogens (activator noise around a mean, substrate/inhibitor), and the target area a0.

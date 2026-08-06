@@ -71,7 +71,7 @@ def build(name, tissue_npz, fit=FIT, plate_box=None, **ecm):
     extent is this fraction of the box half-width", which is the only reading that keeps it inside.
 
     IF THE TISSUE WAS GROWN AGAINST PLATES, THE SAME PLATES GO INTO THE MATRIX. They are one physical
-    object: `plate_confine_3d` holds the matrix out of them during the run and `ecm_seed` never seeds
+    object: `plate_confine_3d` holds the matrix out of them during the run and `seed_ecm` never seeds
     into them, both at the gap the tissue was actually grown against, converted by the one scale.
     """
     import ecm_spec as ES
@@ -98,14 +98,14 @@ def build(name, tissue_npz, fit=FIT, plate_box=None, **ecm):
             o["scale"] = s
             for k in ("r0", "r_max", "growth"):
                 o.pop(k, None)                      # a replay has no r(t) formula to grow by
-        if o["op"] == "ecm_seed" and gap_box is not None:
+        if o["op"] == "seed_ecm" and gap_box is not None:
             o["plate_half"] = gap_box
         if o["op"] in ("integrin_adhesion", "surface_track"):
             # `surface_track` is on this list for the same reason the two below it are: it reads the
             # pass-1 map, which is in TISSUE units, and only `combine` knows the tissue-to-box scale.
             o["scale"] = s
             o["surface"] = tissue_npz
-        if o["op"] == "basement_membrane_seed":
+        if o["op"] == "seed_basement_membrane":
             # THE SURFACE SCALE, not 1.0. `ecm_spec` cannot know it -- only `combine` computes the
             # tissue-to-box scale -- and hardcoding 1.0 put the membrane at radius 4.66 in a unit box,
             # i.e. entirely outside it. The wall boundary then clamped 20,000 particles onto the cube's

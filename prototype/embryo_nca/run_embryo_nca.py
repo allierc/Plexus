@@ -30,7 +30,7 @@ except Exception:
     pass
 
 import plexus.operators           # noqa: F401  stock library
-import embryo_nca_ops                 # noqa: F401  growing_nca + nca_seed + nca_damage
+import embryo_nca_ops                 # noqa: F401  growing_nca + seed_nca + nca_damage
 import plexus.schema as S
 from plexus.engine import run as engine_run
 
@@ -66,10 +66,10 @@ def variants():
 
 def make_sim(p):
     ops = [
-        {"op": "nca_seed", "at": "nca", "before_frame": 1},
+        {"op": "seed_nca", "at": "nca", "before_frame": 1},
         {"op": "growing_nca", "at": "nca", "fire_rate": p["fire"]},
     ]
-    sched = ["nca_seed", "growing_nca"]
+    sched = ["seed_nca", "growing_nca"]
     for i, d in enumerate(p.get("dmg") or []):
         line = {"op": "nca_damage", "at": "nca", "frame": d["frame"]}
         if "side" in d:

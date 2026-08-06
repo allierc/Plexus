@@ -91,10 +91,10 @@ def make_spec(name, rd, n_cells, frames, grow, divide, cv, buf, cbuf):
         sched.append("divide_3d")
     ops += [{"op": "cell_geometry_3d", "at": "cell"},            # --- RD (colouring only), after the mechanics ---
             {"op": "cell_adjacency", "at": "cell"},
-            {"op": "cell_rd_seed", "at": "cell", "seed": SEED, "before_frame": 3, **rd["seed"]},
+            {"op": "seed_cell_rd", "at": "cell", "seed": SEED, "before_frame": 3, **rd["seed"]},
             {"op": "cell_diffuse", "at": "cell", **rd["diffuse"]},
             {"op": "cell_react", "at": "cell", **rd["react"]}]
-    sched += ["cell_geometry_3d", "cell_adjacency", "cell_rd_seed", "cell_diffuse", "cell_react"]
+    sched += ["cell_geometry_3d", "cell_adjacency", "seed_cell_rd", "cell_diffuse", "cell_react"]
     if divide:
         ops.append({"op": "topo_snapshot_3d", "at": "vertex", "every": sstride}); sched.append("topo_snapshot_3d")
     cfg = {

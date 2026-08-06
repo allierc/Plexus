@@ -35,7 +35,7 @@ def build(chi, rho, vth, rate, a_sw, gamma=2.0):
     ops = [{"op": "seed_mesh_3d", "at": "vertex", "n_cells": CELLS, "radius": R, "jitter": J,
             "p0": 3.90, "seed": SEED, "before_frame": 1, "vseed_cv": 0.15},
            {"op": "cell_geometry_3d", "at": "cell"}, {"op": "cell_adjacency", "at": "cell"},
-           {"op": "cell_rd_seed", "at": "cell", "seed": SEED, "before_frame": 3, "mode": "noise", "A": 1.0, "B": 3.0, "noise": 0.04},
+           {"op": "seed_cell_rd", "at": "cell", "seed": SEED, "before_frame": 3, "mode": "noise", "A": 1.0, "B": 3.0, "noise": 0.04},
            {"op": "cell_diffuse", "at": "cell", "d_a": 0.05, "d_h": 0.7, "chi": chi},
            {"op": "cell_react", "at": "cell", "implementation": "brusselator", "gamma": gamma, "A": 1.0, "B": 3.0},
            # activator->growth: low body rho + activator boost; v_eq capped (uniform behind the front)
@@ -47,7 +47,7 @@ def build(chi, rho, vth, rate, a_sw, gamma=2.0):
            {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "cycle_cv": 0.15, "p0": 3.90,
             "every": 2, "max_div": 12, "max_div_frac": 0.03, "cell_set": "cell", "min_cycle": 4, "max_cycle": 30},
            {"op": "topo_snapshot_3d", "at": "vertex", "every": 1}]
-    sched = ["seed_mesh_3d", "cell_geometry_3d", "cell_adjacency", "cell_rd_seed", "cell_diffuse", "cell_react",
+    sched = ["seed_mesh_3d", "cell_geometry_3d", "cell_adjacency", "seed_cell_rd", "cell_diffuse", "cell_react",
              "morphogen_growth_3d", "shape_energy_3d", "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
     cfg = {"general": {"name": "h6", "seed": SEED, "n_frames": FR, "dt": 0.02, "record_cap": FR + 2,
                        "boundary": "free", "dim": 3, "world": [16 * R] * 3},

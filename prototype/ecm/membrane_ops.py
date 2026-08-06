@@ -80,7 +80,7 @@ class BasementMembraneParticle:
     provision = MPMParticle.provision
 
 
-@register_operator("basement_membrane_seed", family="growth", set="particle", kind="structural")
+@register_operator("seed_basement_membrane", family="growth", set="particle", kind="structural")
 class BasementMembraneSeed(Structural):
     """Lay the membrane down ONCE, as a shell just OUTSIDE the epithelium's surface.
 
@@ -183,7 +183,7 @@ class BasementMembraneSeed(Structural):
             sp = sl.get("pos")
             if sp.shape[0] != n:
                 raise RuntimeError(
-                    f"basement_membrane_seed: `surface_set` has {sp.shape[0]} elements against {n} "
+                    f"seed_basement_membrane: `surface_set` has {sp.shape[0]} elements against {n} "
                     f"membrane particles; the 1:1 seeding needs them equal.")
             su = sl.u if hasattr(sl, "u") else \
                 (sp - c.to(sp)) / (sp - c.to(sp)).norm(dim=1, keepdim=True).clamp_min(1e-12)
@@ -198,7 +198,7 @@ class BasementMembraneSeed(Structural):
         # later -- which reads as a bond bug rather than a units mistake.
         if float(P.min()) < 0.0 or float(P.max()) > 1.0:
             raise RuntimeError(
-                f"basement_membrane_seed: shell radius "
+                f"seed_basement_membrane: shell radius "
                 f"{float((P - c).norm(dim=1).mean()):.4g} puts particles outside "
                 f"the unit box (range {float(P.min()):.3g}..{float(P.max()):.3g}). `scale` is almost "
                 f"certainly wrong: the surface map is in TISSUE units and must be multiplied by the "
@@ -216,7 +216,7 @@ class BasementMembraneSeed(Structural):
             m = getattr(lvl, "mass", None)
             if m is None:
                 raise RuntimeError(
-                    "basement_membrane_seed: `reserve` needs a `mass` buffer to park the dormant "
+                    "seed_basement_membrane: `reserve` needs a `mass` buffer to park the dormant "
                     "particles massless, and this level has none. Without it the reserve would scatter "
                     "into the grid from the tissue centre.")
             self._mass0 = float(m.reshape(-1)[0])
@@ -228,7 +228,7 @@ class BasementMembraneSeed(Structural):
         # coincidence, not an invariant.)
         H.membrane_u0 = u.to(dev, dt_).clone()
         self._done = True
-        print(f"[basement_membrane_seed] {n} particles on a shell at r_surface + {self.offset:.4g} "
+        print(f"[seed_basement_membrane] {n} particles on a shell at r_surface + {self.offset:.4g} "
               f"(thickness {self.thickness:.4g}), Fibonacci + {self.jitter:.2g}-spacing jitter; "
               f"{int(alive.sum())} laid down, {n - int(alive.sum())} held in reserve",
               flush=True)

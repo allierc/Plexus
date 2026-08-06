@@ -750,7 +750,7 @@ def _build_one(slot, rid, index, seen):
     # to measure that spread with -- so every difference reported so far rests on an unmeasured noise
     # floor.
     #
-    # The seeds are NOT in the theta hash (`seed_mesh_3d.seed` and `cell_rd_seed.seed` are undeclared,
+    # The seeds are NOT in the theta hash (`seed_mesh_3d.seed` and `seed_cell_rd.seed` are undeclared,
     # so `_theta_hash` never sees them), which is why the replicate is admitted deliberately rather than
     # slipping past the check on a changed number.
     replicate = False

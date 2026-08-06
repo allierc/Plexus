@@ -160,7 +160,7 @@ GROWTH_CEILING = DIV_FACTOR * 1.25    # 25% headroom so cells cross the trigger,
 # first, then patterning, then growth, then mechanics, then topology, then recording.
 SCHEDULE_ORDER = [
     "load_mesh_3d", "seed_mesh_3d", "cell_geometry_3d",
-    "cell_rd_seed", "cell_adjacency", "cell_diffuse", "cell_react", "shape_to_chem",
+    "seed_cell_rd", "cell_adjacency", "cell_diffuse", "cell_react", "shape_to_chem",
     "vesicle_growth", "morphogen_growth_3d", "shape_energy_3d", "rd_interface_tension",
     "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d",
 ]
@@ -178,7 +178,7 @@ ENGINE_NAME = {
     "cell_adjacency": "cell_adjacency",
     "cell_diffuse": "cell_diffuse",
     "cell_react": "cell_react",
-    "cell_rd_seed": "cell_rd_seed",
+    "seed_cell_rd": "seed_cell_rd",
     "shape_to_chem": "shape_to_chem",
     "rd_interface_tension": "rd_interface_tension",
 }
@@ -229,28 +229,28 @@ def _emit_rd_seed(g, n, ga):
     i, impl = n["id"], g.impl_of(n)
     # the engine's mode name for a fixed-angle cone is "cones" (plural). Emitting "cone" here
     # silently fell through to a different seeding mode -- caught by the V9 parameter check.
-    # `tip` REMOVED 6 August -- see cell_rd_seed's docstring. `amp` removed with it: the operator
+    # `tip` REMOVED 6 August -- see seed_cell_rd's docstring. `amp` removed with it: the operator
     # reads no such parameter in any mode, so every spec this campaign wrote carried a number that
     # nothing looked at. Found by the UNREAD probe in one second, having survived 14 rounds.
     ENGINE_MODE = {"cone": "cones", "spot": "cones", "scatter": "scatter"}
-    d = {"op": "cell_rd_seed", "at": "cell", "mode": ENGINE_MODE[impl],
+    d = {"op": "seed_cell_rd", "at": "cell", "mode": ENGINE_MODE[impl],
          "n_spots": int(_p(g, i, "n_spots"))}
     if impl == "scatter":
         # random seeds over the whole shell -- the validated minisite condition. n_spots/amp are
         # meaningless here, so do not emit them: an ignored parameter in a spec reads as if it
         # were doing something.
         # `before_frame: 1` IS THE WHOLE POINT OF A SCATTER SEED. It is an INITIAL CONDITION, and
-        # without the guard the engine re-applies it on every tick -- and cell_rd_seed sits BEFORE
+        # without the guard the engine re-applies it on every tick -- and seed_cell_rd sits BEFORE
         # cell_diffuse and cell_react in the schedule, so each frame went: overwrite the chemistry
         # with the seed, let the reaction advance it by one step, overwrite it again. The activator
         # was pinned for the entire campaign. The signature in the record is unmistakable once you
-        # look: the acted-ledger shows cell_rd_seed firing 501 times in a 500-frame run, and
+        # look: the acted-ledger shows seed_cell_rd firing 501 times in a 500-frame run, and
         # act_max varies by 1.2e-3 across the whole run -- exactly one step of Gray-Scott.
         # `cone` maintains a source and is not an initial condition either. This one is.
         # (That note used to read "`tip` re-seeds every frame ON PURPOSE" -- the defect was
         # diagnosed here, fixed for `scatter`, and left standing for `tip`, which is the mode the
         # whole campaign then ran on.)
-        d = {"op": "cell_rd_seed", "at": "cell", "mode": "scatter",
+        d = {"op": "seed_cell_rd", "at": "cell", "mode": "scatter",
              "seed_frac": float(_p(g, i, "seed_frac")), "before_frame": 3}
     elif impl == "cone":
         d["cone_deg"] = float(_p(g, i, "cone_deg"))
@@ -322,7 +322,7 @@ def _emit_extrude(g, n, ga):
 EMIT = {
     "seed_mesh_3d": _emit_seed,
     "shape_energy_3d": _emit_shape_energy,
-    "cell_rd_seed": _emit_rd_seed,
+    "seed_cell_rd": _emit_rd_seed,
     "cell_react": _emit_react,
     "morphogen_growth_3d": _emit_growth,
     "divide_3d": _emit_divide,
@@ -463,7 +463,7 @@ def _assert_rd_stable(ops, dt, name=""):
 
 # ============================================================================ RUN-TO-RUN SEEDING
 # THE DEFECT: `general.seed` was written into every spec and read by NOTHING. Both stochastic
-# operators take a `seed` parameter -- seed_mesh_3d for the vertex jitter, cell_rd_seed for which
+# operators take a `seed` parameter -- seed_mesh_3d for the vertex jitter, seed_cell_rd for which
 # cells are nucleated -- and the translator passed neither. So a batch of "three seeds" was three
 # copies of one run: measured on 2026-08-01, seeds 0/1/2 at seed_frac 0.06 gave act_max 0.501,
 # 0.501, 0.501 and red_frac 0.374, 0.374, 0.374 -- bit-identical to three decimal places.
@@ -473,7 +473,7 @@ def _assert_rd_stable(ops, dt, name=""):
 # composition again differently. Every spread this campaign has quoted across seeds describes the
 # floating-point reproducibility of one trajectory.
 SEED_SENTINEL = "__RUN_SEED__"
-SEEDED_OPS = ("seed_mesh_3d", "cell_rd_seed")
+SEEDED_OPS = ("seed_mesh_3d", "seed_cell_rd")
 
 
 def _seed_the_run(ops, seed_):
@@ -481,7 +481,7 @@ def _seed_the_run(ops, seed_):
 
     ONE seed, shared, because that is what the working specs do. `archive_rounded.py`,
     `archive_vh_rd_coral.py` and `run_tyssue_fig5.py` all pass the same SEED to seed_mesh_3d and
-    cell_rd_seed. I first offset them per operator, reasoning that the mesh jitter and the
+    seed_cell_rd. I first offset them per operator, reasoning that the mesh jitter and the
     nucleation are independent draws -- true, and beside the point: a composition that reproduces
     an archived run has to draw the same numbers it did, and the archive's convention is shared.
     Departing from it would have made every reproduction check compare two different experiments,
@@ -624,13 +624,13 @@ def from_preset(p: dict) -> CompositionGraph:
     rd = bool(p.get("rd", False))
 
     if cones:
-        g = add(g, "cell_rd_seed", p.get("seed_mode", "cones").replace("cones", "cone"))
+        g = add(g, "seed_cell_rd", p.get("seed_mode", "cones").replace("cones", "cone"))
     if rd or not cones:
         g = add(g, "cell_adjacency", "shared_edge")
         g = add(g, "cell_diffuse", "graph_laplacian")
         g = add(g, "cell_react", p.get("rd_impl", "brusselator"))
         if not cones:
-            g = add(g, "cell_rd_seed", "spot")
+            g = add(g, "seed_cell_rd", "spot")
 
     g = add(g, "morphogen_growth_3d",
             "hill_conserve_amount" if p.get("conserve_amount", True) else "hill_no_conserve")
@@ -677,7 +677,7 @@ def from_preset(p: dict) -> CompositionGraph:
         ("extrude", "K_extrude", p.get("K_extrude")),
         ("extrude", "a_sw", p.get("iface_asw", p.get("a_sw"))),
         ("divide_3d", "orient_asw", p.get("orient_asw", p.get("a_sw"))),
-        ("cell_rd_seed", "n_spots", p.get("spots")),
+        ("seed_cell_rd", "n_spots", p.get("spots")),
         ("cell_react", "F", p.get("F")), ("cell_react", "kk", p.get("kk")),
         ("cell_react", "mu_h", p.get("mu_h")),
         ("shape_energy_3d", "gamma", p.get("gamma")),
@@ -685,7 +685,7 @@ def from_preset(p: dict) -> CompositionGraph:
         ("cell_diffuse", "d_h", p.get("d_h")),
         ("cell_react", "rate", p.get("rate")), ("cell_react", "a0", p.get("a0")),
         ("cell_react", "gamma", p.get("gamma")),
-        ("cell_rd_seed", "cone_deg", p.get("cone_deg")),
+        ("seed_cell_rd", "cone_deg", p.get("cone_deg")),
         ("reconnect_t1_3d", "l_th_frac", p.get("l_th_frac")),
     ]
     for op, pname, val in mapping:

@@ -1,7 +1,7 @@
 """surface -- the epithelial surface as a LEVEL, instead of a lookup table.
 
 WHAT THIS REPLACES. Until now the surface was `R(u, t)`: a 32x64 angular table recorded in pass 1 and
-read by four operators (`cell_to_ecm`, `cell_exclude_3d`, `integrin_adhesion`, `basement_membrane_seed`).
+read by four operators (`cell_to_ecm`, `cell_exclude_3d`, `integrin_adhesion`, `seed_basement_membrane`).
 A table is not a Plexus entity. It carries no state, nothing can act on it, and it cannot receive a
 delta -- which is the STRUCTURAL reason integrin adhesion is one-way rather than a mutual force pair.
 
@@ -113,10 +113,10 @@ class SurfaceTrack(Structural):
         dev, dt_ = pos.device, pos.dtype
         n = pos.shape[0]
         if self._u is None:
-            # THE MEMBRANE'S OWN DIRECTIONS, handed over by `basement_membrane_seed`, so element i and
+            # THE MEMBRANE'S OWN DIRECTIONS, handed over by `seed_basement_membrane`, so element i and
             # particle i share a direction exactly rather than by reproducing an RNG sequence. Falls back
             # to rebuilding the lattice only when there is no membrane in the run.
-            # THIS LEVEL OWNS THE LATTICE. `basement_membrane_seed` reads it back rather than
+            # THIS LEVEL OWNS THE LATTICE. `seed_basement_membrane` reads it back rather than
             # rebuilding it, so element i and particle i share a direction because they are the same
             # array -- not because two functions happen to draw from their generators in the same order.
             self._u = self._lattice(n, dev, dt_)

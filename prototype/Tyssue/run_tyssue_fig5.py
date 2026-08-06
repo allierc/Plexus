@@ -58,7 +58,7 @@ def make_spec(name, n_cells, frames, n_spots, cone_deg, grow, cv, rho, vth, K_V,
     ops = [{"op": "seed_mesh_3d", "at": "vertex", "n_cells": n_cells, "radius": RADIUS, "jitter": JITTER,
             "p0": 3.90, "seed": SEED, "before_frame": 1, "vseed_cv": cv},
            {"op": "cell_geometry_3d", "at": "cell"},                    # per-cell centroid (for the cones)
-           {"op": "cell_rd_seed", "at": "cell", "mode": "cones", "n_spots": n_spots, "cone_deg": cone_deg},  # re-seed each frame -> tracks the N growing tips
+           {"op": "seed_cell_rd", "at": "cell", "mode": "cones", "n_spots": n_spots, "cone_deg": cone_deg},  # re-seed each frame -> tracks the N growing tips
            {"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": grow,
             "a_sw": 0.5, "hill": 4.0, "rho": rho, "vth_frac": vth},     # OKUDA: rate*(rho+Hill), v_eq capped -> uniform
            {"op": "shape_energy_3d", "at": "vertex", "p0": 3.90, "K_A": 1.0, "K_P": 1.0, "Gamma": 0.05,
@@ -69,7 +69,7 @@ def make_spec(name, n_cells, frames, n_spots, cone_deg, grow, cv, rho, vth, K_V,
             "p0": 3.90, "every": 2, "max_div": 12, "max_div_frac": 0.03, "cell_set": "cell",
             "min_cycle": min_cyc, "max_cycle": max_cyc},                # volume-primary + bounded duration
            {"op": "topo_snapshot_3d", "at": "vertex", "every": 1}]     # ALIGNED recording
-    sched = ["seed_mesh_3d", "cell_geometry_3d", "cell_rd_seed", "morphogen_growth_3d",
+    sched = ["seed_mesh_3d", "cell_geometry_3d", "seed_cell_rd", "morphogen_growth_3d",
              "shape_energy_3d", "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
     cfg = {"general": {"name": f"tyssue_fig5_{name}", "seed": SEED, "n_frames": frames, "dt": dt,
                        "record_cap": frames + 2, "boundary": "free", "dim": 3, "world": [16 * RADIUS] * 3},

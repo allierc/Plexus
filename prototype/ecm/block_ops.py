@@ -56,7 +56,7 @@ class MPMBlock:
     provision = MPMParticle.provision
 
 
-@register_operator("block_seed", family="growth", set="particle", kind="structural")
+@register_operator("seed_block", family="growth", set="particle", kind="structural")
 class BlockSeed(Structural):
     """Fill the two slabs beyond `gap_half` with particles, once, at frame 0."""
 
@@ -127,7 +127,7 @@ class BlockSeed(Structural):
                 * (self.gap_half + spacing * 0.5)
         lvl.get("pos")[:] = p.to(pos.device, pos.dtype)
         self._done = True
-        print(f"[block_seed] {n} particles in two slabs beyond +/-{self.gap_half:.4g} of "
+        print(f"[seed_block] {n} particles in two slabs beyond +/-{self.gap_half:.4g} of "
               f"{c:.3g} on axis {ax} ({100 * (1 - 2 * self.gap_half):.0f}% of the box)", flush=True)
         return {}
 

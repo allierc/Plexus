@@ -5,7 +5,7 @@ the sibling of Turing_vertex's Self-Propelled-Voronoi run_vertex2d.py.
 
 A disordered honeycomb (jittered cell centres -> Voronoi -> half-edge mesh) relaxes to force
 balance under the AVM shape energy E = sum_f K_A(A-A0)^2 + K_P(P-P0)^2 (tyssue_ops.py):
-mesh_seed -> shape_energy (inner gradient-descent to residual). We sweep the target shape
+seed_mesh -> shape_energy (inner gradient-descent to residual). We sweep the target shape
 index p0: below p0*~3.81 the tissue jams (finite residual energy, cells stay compact); above
 it the cells can satisfy A0 and P0 at once (residual energy -> 0, elongated cells). The
 relaxed <q> and residual energy vs p0 is the rigidity-transition signature (Bi et al. 2015).
@@ -36,7 +36,7 @@ except Exception:
     pass
 
 import plexus.operators   # noqa: F401
-import tyssue_ops         # noqa: F401  registers mesh_seed + shape_energy
+import tyssue_ops         # noqa: F401  registers seed_mesh + shape_energy
 from tyssue_ops import build_honeycomb, face_polygons
 import plexus.schema as S
 from plexus.engine import run as engine_run
@@ -70,12 +70,12 @@ def make_spec(name, p0, mesh):
         "sets": {"vertex": {"n": Nv}},
         "fields": {},
         "operators": [
-            {"op": "mesh_seed", "at": "vertex", "nx": NX, "ny": NY, "a": A, "border": BORDER,
+            {"op": "seed_mesh", "at": "vertex", "nx": NX, "ny": NY, "a": A, "border": BORDER,
              "jitter": JITTER, "p0": p0, "seed": SEED, "before_frame": 1},
             {"op": "shape_energy", "at": "vertex", "p0": p0, "K_A": 1.0, "K_P": 1.0,
              "mu": 1.0, "dt": 1.0, "relax_iters": RELAX_ITERS, "eta": ETA},
         ],
-        "schedule": ["mesh_seed", "shape_energy"],
+        "schedule": ["seed_mesh", "shape_energy"],
     }
     with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as fh:
         yaml.safe_dump(cfg, fh); path = fh.name

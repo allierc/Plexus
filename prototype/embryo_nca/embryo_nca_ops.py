@@ -16,7 +16,7 @@ frames, so the rollout is just the schedule running):
 
 `growing_nca` -- the learned local update (perceive -> 1x1 dense -> relu -> 1x1 dense,
                  stochastic fire mask, living mask); `kind=field`. Loads the paper's weights.
-`nca_seed`    -- frame-0 initial condition (`before_frame: 1`): one living cell at the
+`seed_nca`    -- frame-0 initial condition (`before_frame: 1`): one living cell at the
                  grid centre (alpha + hidden = 1), the Growing-NCA seed.
 `nca_damage`  -- wipes a region at a chosen `frame` (a regeneration probe) so the same
                  local rule can be shown re-growing the missing tissue.
@@ -121,7 +121,7 @@ class GrowingNCA(FieldUpdate):
         return {}
 
 
-@register_operator("nca_seed", level="field", kind="field")
+@register_operator("seed_nca", level="field", kind="field")
 class NCASeed(FieldUpdate):
     """Frame-0 initial condition: a single living seed cell at the grid centre (alpha +
     all hidden channels = 1). Gate with `before_frame: 1` so it fires once."""

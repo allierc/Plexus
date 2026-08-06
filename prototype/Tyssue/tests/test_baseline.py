@@ -6,7 +6,7 @@ Two short, fully deterministic end-to-end runs on the closed spherical half-edge
   vesicle3d : seed_mesh_3d -> vesicle_growth -> shape_energy_3d -> reconnect_t1_3d -> divide_3d
               -> cell_geometry_3d -> topo_snapshot_3d
   rd        : the same mechanics + the live Turing RD on the cell set
-              (cell_adjacency -> cell_rd_seed -> cell_diffuse -> cell_react), with divide_3d
+              (cell_adjacency -> seed_cell_rd -> cell_diffuse -> cell_react), with divide_3d
               propagating the morphogen to daughters (cell_set: cell)
 
 For each run we record, at frame 0, the midpoint and the final frame:
@@ -68,7 +68,7 @@ import yaml
 import plexus.operators        # noqa: F401  registers the 52 core operators
 import tyssue_ops3d            # noqa: F401  seed_mesh_3d / shape_energy_3d / vesicle_growth / divide_3d / topo_snapshot_3d
 import tyssue_t1_ops3d         # noqa: F401  reconnect_t1_3d
-import tyssue_rd_ops           # noqa: F401  cell_geometry_3d / cell_adjacency / cell_rd_seed / cell_diffuse / cell_react
+import tyssue_rd_ops           # noqa: F401  cell_geometry_3d / cell_adjacency / seed_cell_rd / cell_diffuse / cell_react
 import plexus.schema as S
 from plexus.engine import run as engine_run
 from tissue_analysis import frame_metrics
@@ -118,10 +118,10 @@ def make_spec(name, rd, n_cells, frames, buf, cbuf):
              "divide_3d", "cell_geometry_3d"]
     if rd:
         ops += [{"op": "cell_adjacency", "at": "cell"},
-                {"op": "cell_rd_seed", "at": "cell", "seed": SEED, "before_frame": 3, **rd["seed"]},
+                {"op": "seed_cell_rd", "at": "cell", "seed": SEED, "before_frame": 3, **rd["seed"]},
                 {"op": "cell_diffuse", "at": "cell", **rd["diffuse"]},
                 {"op": "cell_react", "at": "cell", **rd["react"]}]
-        sched += ["cell_adjacency", "cell_rd_seed", "cell_diffuse", "cell_react"]
+        sched += ["cell_adjacency", "seed_cell_rd", "cell_diffuse", "cell_react"]
     ops.append({"op": "topo_snapshot_3d", "at": "vertex", "every": 1})
     sched.append("topo_snapshot_3d")
     cell_state = {"cen": {"width": 3}, "area": {"width": 1}}

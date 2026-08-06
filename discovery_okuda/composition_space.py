@@ -460,7 +460,7 @@ OPERATORS = {
                 # 599 but the pattern weakens (act_cv_peak 4.14 -> 2.80). 0.1 is the measured knee
                 # and is the default here.
                 "sat": (0.0, 2.0, 0.1)}),
-    "cell_rd_seed": dict(                                     # the prescribed activation driver
+    "seed_cell_rd": dict(                                     # the prescribed activation driver
         stage=3, role="driver", outputs=["morphogen"], slots=[], needs=[],
         # `scatter` added 2026-07-31: it is the ONLY Gray-Scott seeding validated on this
         # substrate -- the minisite coral movie uses mode="scatter", seed_frac=0.06, and that is
@@ -1128,7 +1128,7 @@ class CompositionGraph:
 
         _gate = _feeds("morphogen_growth_3d", "gate") if local else set()
         emergent = "cell_react" in _gate
-        driven = "cell_rd_seed" in _gate
+        driven = "seed_cell_rd" in _gate
         # `forced` READS ITS WIRE TOO. It was `"extrude" in ops`, so a composition carrying the
         # forcing term -- the operator that made the only tube on this disk -- with its `site`
         # slot fed by nothing was filed under the sphere control's region.
@@ -1195,10 +1195,10 @@ def reference_recipes():
 
     g = seed("substrate")
     for op, impl in [("cell_geometry_3d", "scatter_add"), ("cell_adjacency", "shared_edge"),
-                     ("cell_rd_seed", "cone"), ("morphogen_growth_3d", "hill_conserve_amount"),
+                     ("seed_cell_rd", "cone"), ("morphogen_growth_3d", "hill_conserve_amount"),
                      ("divide_3d", "orient_iface"), ("extrude", "radial_push")]:
         g, _ = g.apply(("add_op", op, impl))
-    src = next(o["id"] for o in g.ops if o["op"] == "cell_rd_seed")
+    src = next(o["id"] for o in g.ops if o["op"] == "seed_cell_rd")
     g, _ = g.apply(("connect", src, next(o["id"] for o in g.ops
                                          if o["op"] == "morphogen_growth_3d"), "gate"))
     g, _ = g.apply(("connect", src, next(o["id"] for o in g.ops if o["op"] == "extrude"), "site"))
