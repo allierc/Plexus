@@ -26,7 +26,7 @@ grows the body also **heals** it, because growth and repair are the same local d
 | operator | what it does |
 |---|---|
 | `growing_nca` | one NCA update step on a 16-channel `grid` field (`kind=field`); reimplemented self-contained, loads the paper's pretrained `fc0`/`fc1` weights |
-| `nca_seed` | frame-0 IC (`before_frame: 1`): one living seed cell at the grid centre (alpha + hidden = 1) |
+| `seed_nca` | frame-0 IC (`before_frame: 1`): one living seed cell at the grid centre (alpha + hidden = 1) |
 | `nca_damage` | wipes a disc / half of the body at a chosen `frame` — the regeneration probe |
 
 The CA **state is a Plexus 16-channel `grid` field**; the update is a Plexus **field operator**

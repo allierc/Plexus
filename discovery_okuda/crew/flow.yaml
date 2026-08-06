@@ -46,7 +46,7 @@ nodes:
         #
         # `_keep/r001_02` (corr 0.739), `_keep/r001_05` (0.710) and `repair_l_th_frac` (0.708) were
         # promoted for carrying "the highest chemistry-shape coupling the campaign has measured",
-        # against coral_gate's 0.435. All three ran `cell_rd_seed mode: tip`, which re-activates a
+        # against coral_gate's 0.435. All three ran `seed_cell_rd mode: tip`, which re-activates a
         # cap at the CURRENT OUTERMOST CELL every frame. So the activator was pinned to the shape's
         # own furthest point, and `corr_act_rad` -- activator against radius -- was reading the
         # seeding rule against itself. The number that got them promoted is the artifact.

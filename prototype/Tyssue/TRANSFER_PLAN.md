@@ -45,7 +45,7 @@ integrated biological state) is already a proper Level and does **not** need thi
 | `cell_geometry` | `aggregate` (existing family) | **promote after (A)** | genuine vertices→cell aggregate; trivial once maps are first-class. |
 | `cell_morphogen`, `morphogen_growth`, `cell_differentiate` | `field` / `growth` / `differentiate` | **keep prototyping** | `differentiate` (French-flag threshold) is a clean new contract worth promoting later; the imposed-bump morphogen is a demo scaffold, not a mechanism. |
 | `cell_diffuse`, `cell_react` (RD) | `diffuse` / `react` (exist in main registry already) | **do NOT re-promote** | the core already has `diffuse`/`react`; these are forks. Reconcile, don't duplicate. |
-| `mesh_seed`, `cell_seed`, `cell_adjacency`, `topo_snapshot` | seed / rewire / tooling | **stay prototype** | `mesh_seed` bootstraps via a Voronoi (prototype convenience); `topo_snapshot` is a render helper. |
+| `seed_mesh`, `seed_cell`, `cell_adjacency`, `topo_snapshot` | seed / rewire / tooling | **stay prototype** | `seed_mesh` bootstraps via a Voronoi (prototype convenience); `topo_snapshot` is a render helper. |
 
 ---
 
@@ -76,7 +76,7 @@ For every operator moved to `src/plexus/operators/`:
 ## 5. Explicitly NOT promoting yet
 
 - The `_mesh` dict (replaced by §1A first).
-- `mesh_seed`'s Voronoi bootstrap (prototype convenience; core should take an explicit mesh).
+- `seed_mesh`'s Voronoi bootstrap (prototype convenience; core should take an explicit mesh).
 - The imposed-bump morphogen (a demo, not a mechanism) — promote `differentiate`, not the bump.
 - Anything 3D (IH/HI, monolayer) — not yet prototyped here (Goal 1bis).
 

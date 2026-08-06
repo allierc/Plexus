@@ -23,7 +23,7 @@ registered plexus2 operators. Two goals:
 
 | op | family / kind | role |
 |---|---|---|
-| `mesh_seed` | growth / structural | build honeycomb half-edge mesh; stash edge table + per-face A0/P0 |
+| `seed_mesh` | growth / structural | build honeycomb half-edge mesh; stash edge table + per-face A0/P0 |
 | `shape_energy` | mechanics / lateral | AVM shape-energy force on vertices (vectorised scatter-add + autograd), inner relax loop = force balance |
 | `t1_transition` | topology / rewire | *(coming)* explicit T1: collapse short edge → split vertex |
 | `face_divide` | growth / structural | *(coming)* split a face along an axis |

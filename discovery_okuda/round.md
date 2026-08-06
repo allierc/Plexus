@@ -59,7 +59,7 @@ et al. 2018 report three morphologies out of this coupling: **tubes**, **undulat
   nothing elongates, detaches, or self-intersects." The numbers agree with the eye — `n_tubes` 0 and
   `protr_peak` 1.145. Treat `morphology` as a hint and the protrusion metrics as the fact.
 - **Gray–Scott needs a seed.** Its u = 1, v = 0 state is a *stable* fixed point: without
-  `cell_rd_seed` nothing ever happens.
+  `seed_cell_rd` nothing ever happens.
 - **A reservoir caps the tissue.** A closed trivalent sheet obeys V = 2F − 4, so a vertex buffer of
   size V caps the cell count at (V+4)/2 regardless of the biology. 3,552 vertices give exactly
   1,778 cells — the number that voided **59 runs across two batches**, both reported as findings

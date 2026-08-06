@@ -19,7 +19,7 @@ fields:
     res: 72
     components: 16
 operators:
-- op: nca_seed
+- op: seed_nca
   at: nca
   before_frame: 1
 - op: growing_nca
@@ -30,6 +30,6 @@ operators:
   frame: 250
   side: left
 schedule:
-- nca_seed
+- seed_nca
 - growing_nca
 - nca_damage

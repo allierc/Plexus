@@ -39,7 +39,7 @@ operators:
   at: cell
 - op: cell_adjacency
   at: cell
-- op: cell_rd_seed
+- op: seed_cell_rd
   at: cell
   seed: 0
   before_frame: 3
@@ -105,7 +105,7 @@ schedule:
 - seed_mesh_3d
 - cell_geometry_3d
 - cell_adjacency
-- cell_rd_seed
+- seed_cell_rd
 - cell_diffuse
 - cell_react
 - morphogen_growth_3d

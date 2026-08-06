@@ -13,7 +13,7 @@ Writes `panel.png` (top: orientation-coloured field; bottom: `c`) + `progress.tx
 - **agent** (Fig 1, microscopic): glide+polar_align+chemotax+relay(excitable)+adapt+repel.
   Defaults: n8000 move_speed0.006 radius0.03 res200 frames1000 beta0.16 c_th-0.001 sigma1.2
   eps0.05 diffuse0.16(=Dc) decay0.02(=alpha) gamma0.15(align) align_noise0.04 omega0.38(chemotax)
-  repel0.015 r00.010. Extra medium knobs: c_base, spiral_seed, rf_tau, rf_gain, rf_th (see VORTEX).
+  repel0.015 r00.010. Extra medium knobs: c_base, seed_spiral, rf_tau, rf_gain, rf_th (see VORTEX).
 - **hydro** (Fig 2/3, continuum ρ,p,s,c). Base preset `fig`: sigma0.7 delta0.6 chi0.5 Drho0.5
   Dp0.6 Dc1.1 Q0.5 alpha0.42 beta0.6 eps0.045 c_th-1 v00.6 omega1.8 rho0 1.2. Overridable flags:
   v0 omega sigma alpha beta eps Dc chi Q delta Drho Dp rho0 L N nsteps seed mode(snapshot|coarsen).
@@ -27,7 +27,7 @@ Writes `panel.png` (top: orientation-coloured field; bottom: `c`) + `progress.tx
 | polar-bands | `--gamma 0.42 --omega 0.06 --move_speed 0.007 --beta 0.08 --decay 0.03` | straight coherent travelling stripe, empty bg |
 | aggregation | `--gamma 0.0 --omega 0.85 --marker dot` | Keller-Segel coarsening; separated bright blobs |
 | **vortex (proxy)** | `--move_speed 0.002 --omega 0.55 --n 20000` | field of small FILLED rainbow pinwheels (each a mini rotating disk) |
-| **spiral vortex** | proxy + `--c_th 0.05 --c_base 0.05 --spiral_seed 1 --rf_tau 40 --rf_gain 0.10 --rf_th 0.5` | sustained rotating spiral (see VORTEX below) |
+| **spiral vortex** | proxy + `--c_th 0.05 --c_base 0.05 --seed_spiral 1 --rf_tau 40 --rf_gain 0.10 --rf_th 0.5` | sustained rotating spiral (see VORTEX below) |
 
 ## HYDRO recipes — Fig 2 (all 6 states placed)
 | state | flags | note |
@@ -59,7 +59,7 @@ not a parameter problem:
   LABYRINTH, v0-up → filaments. The honest proxy is a FIELD OF MINI-PINWHEELS (fill works, scale fails).
 - ROOT CAUSE: recovery `s` (Eq 5) is carried by MOBILE agents → they advect into their own emitted
   front and scramble the refractory tail → the medium cannot HOLD a phase singularity → a seeded
-  broken front (`spiral_seed`) WASHES OUT (seed == no-seed at the final frame).
+  broken front (`seed_spiral`) WASHES OUT (seed == no-seed at the final frame).
 - THE FIX (the model needs a continuum inhibitor): the `refract` op maintains a SPACE-FIXED per-voxel
   refractory FIELD `fld._rf` (∂ₜrf = rf_gain·Θ(c−c_th) − rf/rf_tau; relay blocked where rf>rf_th),
   turning the single-scalar relay into a FitzHugh-Nagumo excitable medium. A broken front then leaves

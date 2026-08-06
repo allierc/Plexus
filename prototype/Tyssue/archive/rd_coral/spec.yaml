@@ -49,7 +49,7 @@ operators:   # the operators to instantiate (each realises one mechanism)
   at: cell   # the set this operator acts on
 - op: cell_adjacency
   at: cell   # the set this operator acts on
-- op: cell_rd_seed
+- op: seed_cell_rd
   at: cell   # the set this operator acts on
   seed_radius: 2.0
   seed: 0   # RNG seed
@@ -69,6 +69,6 @@ schedule:   # the order the operators run each frame
 - shape_energy_3d
 - cell_geometry_3d
 - cell_adjacency
-- cell_rd_seed
+- seed_cell_rd
 - cell_diffuse
 - cell_react

@@ -28,7 +28,7 @@ sets:   # the biological SETS (Levels) of the model
         width: 2   # number of scalar columns in this state block
 fields: {}   # continuous fields
 operators:   # the operators to instantiate (each realises one mechanism)
-- op: mesh_seed   # build the honeycomb half-edge mesh on the vertex set (frame 0)
+- op: seed_mesh   # build the honeycomb half-edge mesh on the vertex set (frame 0)
   at: vertex   # the set this operator acts on
   nx: 16   # lattice columns (cell centres)
   ny: 18   # lattice rows
@@ -38,7 +38,7 @@ operators:   # the operators to instantiate (each realises one mechanism)
   p0: 3.72   # target shape index -- the rigidity knob (< ~3.81 solid, > ~3.81 fluid)
   seed: 0   # RNG seed
   before_frame: 1   # run this operator once, before the given frame
-- op: cell_seed   # init the cell set from the mesh: one live cell/face, a0=base, type=0
+- op: seed_cell   # init the cell set from the mesh: one live cell/face, a0=base, type=0
   at: cell   # the set this operator acts on
   a: 1.0   # cell spacing (sets the base cell size)
   before_frame: 1   # run this operator once, before the given frame
@@ -67,8 +67,8 @@ operators:   # the operators to instantiate (each realises one mechanism)
   eta: 0.08   # relaxation step size
   cap_frac: 0.15   # max per-step move as a fraction of mean edge (the stability cap)
 schedule:   # the order the operators run each frame
-- mesh_seed
-- cell_seed
+- seed_mesh
+- seed_cell
 - cell_geometry
 - cell_morphogen
 - morphogen_growth

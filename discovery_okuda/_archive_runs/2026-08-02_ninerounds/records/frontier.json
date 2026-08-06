@@ -17,8 +17,8 @@
     "impl": "scatter_add"
    },
    {
-    "id": "cell_rd_seed0",
-    "op": "cell_rd_seed",
+    "id": "seed_cell_rd0",
+    "op": "seed_cell_rd",
     "impl": "tip"
    },
    {
@@ -29,17 +29,17 @@
   ],
   "conns": [
    {
-    "src": "cell_rd_seed0",
+    "src": "seed_cell_rd0",
     "dst": "morphogen_growth_3d0",
     "slot": "gate"
    }
   ],
   "params": {
-   "cell_rd_seed0.tip_radius": 2.0,
-   "cell_rd_seed0.cone_deg": 8.0,
-   "cell_rd_seed0.seed_frac": 0.06,
-   "cell_rd_seed0.amp": 2.0,
-   "cell_rd_seed0.n_spots": 1,
+   "seed_cell_rd0.tip_radius": 2.0,
+   "seed_cell_rd0.cone_deg": 8.0,
+   "seed_cell_rd0.seed_frac": 0.06,
+   "seed_cell_rd0.amp": 2.0,
+   "seed_cell_rd0.n_spots": 1,
    "morphogen_growth_3d0.rate": 0.01,
    "morphogen_growth_3d0.a_sw": 1.5,
    "morphogen_growth_3d0.alpha": 4.0,
@@ -70,8 +70,8 @@
     "impl": "scatter_add"
    },
    {
-    "id": "cell_rd_seed0",
-    "op": "cell_rd_seed",
+    "id": "seed_cell_rd0",
+    "op": "seed_cell_rd",
     "impl": "tip"
    },
    {
@@ -82,17 +82,17 @@
   ],
   "conns": [
    {
-    "src": "cell_rd_seed0",
+    "src": "seed_cell_rd0",
     "dst": "morphogen_growth_3d0",
     "slot": "gate"
    }
   ],
   "params": {
-   "cell_rd_seed0.tip_radius": 2.0,
-   "cell_rd_seed0.cone_deg": 8.0,
-   "cell_rd_seed0.seed_frac": 0.06,
-   "cell_rd_seed0.amp": 2.0,
-   "cell_rd_seed0.n_spots": 1,
+   "seed_cell_rd0.tip_radius": 2.0,
+   "seed_cell_rd0.cone_deg": 8.0,
+   "seed_cell_rd0.seed_frac": 0.06,
+   "seed_cell_rd0.amp": 2.0,
+   "seed_cell_rd0.n_spots": 1,
    "morphogen_growth_3d0.rate": 0.01,
    "morphogen_growth_3d0.a_sw": 1.5,
    "morphogen_growth_3d0.alpha": 4.0,
@@ -118,8 +118,8 @@
     "impl": "scatter_add"
    },
    {
-    "id": "cell_rd_seed0",
-    "op": "cell_rd_seed",
+    "id": "seed_cell_rd0",
+    "op": "seed_cell_rd",
     "impl": "tip"
    },
    {
@@ -130,17 +130,17 @@
   ],
   "conns": [
    {
-    "src": "cell_rd_seed0",
+    "src": "seed_cell_rd0",
     "dst": "morphogen_growth_3d0",
     "slot": "gate"
    }
   ],
   "params": {
-   "cell_rd_seed0.tip_radius": 2.0,
-   "cell_rd_seed0.cone_deg": 8.0,
-   "cell_rd_seed0.seed_frac": 0.06,
-   "cell_rd_seed0.amp": 2.0,
-   "cell_rd_seed0.n_spots": 1,
+   "seed_cell_rd0.tip_radius": 2.0,
+   "seed_cell_rd0.cone_deg": 8.0,
+   "seed_cell_rd0.seed_frac": 0.06,
+   "seed_cell_rd0.amp": 2.0,
+   "seed_cell_rd0.n_spots": 1,
    "morphogen_growth_3d0.rate": 0.01,
    "morphogen_growth_3d0.a_sw": 1.5,
    "morphogen_growth_3d0.alpha": 4.0,
@@ -166,8 +166,8 @@
     "impl": "scatter_add"
    },
    {
-    "id": "cell_rd_seed0",
-    "op": "cell_rd_seed",
+    "id": "seed_cell_rd0",
+    "op": "seed_cell_rd",
     "impl": "tip"
    },
    {
@@ -183,17 +183,17 @@
   ],
   "conns": [
    {
-    "src": "cell_rd_seed0",
+    "src": "seed_cell_rd0",
     "dst": "morphogen_growth_3d0",
     "slot": "gate"
    }
   ],
   "params": {
-   "cell_rd_seed0.tip_radius": 2.0,
-   "cell_rd_seed0.cone_deg": 8.0,
-   "cell_rd_seed0.seed_frac": 0.06,
-   "cell_rd_seed0.amp": 2.0,
-   "cell_rd_seed0.n_spots": 1,
+   "seed_cell_rd0.tip_radius": 2.0,
+   "seed_cell_rd0.cone_deg": 8.0,
+   "seed_cell_rd0.seed_frac": 0.06,
+   "seed_cell_rd0.amp": 2.0,
+   "seed_cell_rd0.n_spots": 1,
    "morphogen_growth_3d0.rate": 0.01,
    "morphogen_growth_3d0.a_sw": 1.5,
    "morphogen_growth_3d0.alpha": 4.0,

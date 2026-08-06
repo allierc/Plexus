@@ -56,18 +56,19 @@ descriptions:
       is zero as they do not exist.
   movie_cell:
     description: The simulation shows a static distribution of blue particles within a square boundary.
-      There is no visible movement or evolution of the particles across the provided keyframes. The spatial
-      arrangement of the blue clusters remains constant throughout the sequence. The overall scene maintains
-      a steady state with no dynamic changes.
-    objects: The scene contains a large collection of small, irregularly shaped blue particles. These
-      particles are densely packed to form a textured, porous square in the center of the frame. The objects
-      are distributed randomly, creating a stochastic pattern against a solid black background. Each individual
-      cluster is tiny, but they collectively occupy a significant portion of the central area.
+      There is no observable movement or evolution of the particles across the provided keyframes. The
+      spatial arrangement of the blue clusters remains constant throughout the sequence. The overall density
+      and pattern of the field do not change over time.
+    objects: The scene contains a large number of small, blue particles clustered into irregular shapes.
+      These particles are distributed uniformly across a square area, creating a speckled texture. The
+      individual clusters vary in size but are generally small relative to the overall frame. The particles
+      are disconnected from one another, forming a stochastic field rather than a continuous structure.
   movie_mpm_particle:
-    description: The video shows a static field of blue particles against a black background. There is
-      no visible movement or evolution of the particles across the four keyframes. The distribution of
-      the points remains constant throughout the sequence. The scene represents a steady-state distribution
-      of discrete elements.
-    objects: The scene contains a large number of small, individual blue dots. These particles are arranged
-      in a dense, uniform square grid. Each dot is roughly the same size and maintains a consistent brightness.
-      The dots are disconnected from one another, forming a stochastic point cloud.
+    description: The video shows a static distribution of blue particles within a square frame. There
+      is no visible movement or evolution of the particles across the four keyframes. The spatial arrangement
+      of the dots remains constant throughout the sequence. The simulation appears to be in a steady state
+      or represents a single snapshot of a random field.
+    objects: The scene contains a large number of small, blue dots distributed across a white background.
+      These particles are arranged in a stochastic, non-uniform pattern that fills a square area. Each
+      individual dot is tiny and appears to be of a uniform size. There are no visible connections or
+      topological structures between the individual particles.
