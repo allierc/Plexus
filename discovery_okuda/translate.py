@@ -315,7 +315,9 @@ def _emit_divide(g, n, ga):
 def _emit_extrude(g, n, ga):
     i = n["id"]
     return {"op": "rd_interface_tension", "at": "vertex", "cell_set": "cell",
-            "K_purse": 0.0, "K_extrude": float(_p(g, i, "K_extrude")),
+            # K_purse was HARD-ZERO here, so the sound half of this operator could never run
+            # whatever the search proposed. It is a parameter now.
+            "K_purse": float(_p(g, i, "K_purse")), "K_extrude": float(_p(g, i, "K_extrude")),
             "a_sw": float(_p(g, i, "a_sw")), "eta": 0.05, "iters": 4, "after_frame": ga}
 
 

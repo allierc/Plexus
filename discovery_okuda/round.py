@@ -255,7 +255,13 @@ def parents(ctx):
                     continue
                 if r.get("name") and r.get("metrics"):
                     rows.append(r)
+    # A FORCED RUN IS EVIDENCE, NOT A PARENT. Ranking was `protr_peak` alone, and `extrude`
+    # minimises an energy that falls as red cells move outward -- so it wins the ranking by
+    # construction and every later round would build on a hardcoded tube-maker. `mech_p_ratio` is
+    # ~3 for a forced tube and ~1 for a grown one, is already in every record, and is what it is
+    # for. Forced runs sort last; they stay in the record and the Analyst still reads them.
     rows.sort(key=lambda r: (bool(r.get("premises_broken")),
+                             float(r["metrics"].get("mech_p_ratio") or 0) > FORCED_P_RATIO,
                              -float(r["metrics"].get("protr_peak") or 0)))
     if not rows:
         # ROUND 1 HAS NO RECORD TO BUILD FROM. The pool is declared in flow.yaml `args:` because it
@@ -325,6 +331,7 @@ def metric_bank(ctx):
     return {"lead with these five": list(metrics.headline_metrics()), **metrics.bank()}
 
 
+FORCED_P_RATIO = 2.0   # mech_p_ratio above this is a pushed tube, not a grown one
 MAX_EDITS = 4          # edits per slot; still one experiment, applied in order to one parent
 CLOSURE_N = 4          # distinct values RUN before a parameter leaves the menu
 BATTERY = os.path.join(HERE, "battery.json")     # written by prototype/Tyssue/op_probe.py --all

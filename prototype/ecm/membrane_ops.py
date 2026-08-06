@@ -115,6 +115,15 @@ class BasementMembraneSeed(Structural):
         # pieces. A basement membrane IS a sheet; the thickness should be about one spacing.
         self.thickness = float(params.get("thickness", 0.002))
         self.jitter = float(params.get("jitter", 0.35))   # tangential noise, in units of local spacing
+        # MODEL vs IMPLEMENTATION. The model is "uniform areal density on a sphere". Fibonacci is one way
+        # to compute it and `relaxed` is another; they are not different models and the parameter is named
+        # so. Fibonacci is exactly uniform in density and badly non-uniform in ARRANGEMENT: consecutive
+        # indices land angularly adjacent, so the points queue into spiral arms about one spacing apart,
+        # which jitter at 0.35 of a spacing cannot erase. At 30k that is invisible; at the 3.3k a
+        # secreting run starts with, the sheet renders as a spiral and the eye reads structure that is
+        # not in the physics.
+        self.implementation = str(params.get("implementation", "relaxed")).lower()
+        self.relax_iters = int(params.get("relax_iters", 24))
         # THE RESERVE IS NOT SPARE CAPACITY, IT IS UNSECRETED MEMBRANE. A sheet pinned at fixed angular
         # positions on a surface whose radius triples must cover NINE TIMES the area with the particles
         # it started with, so it can only slip or thin or tear. `reserve` is the fraction of the set held
@@ -140,11 +149,41 @@ class BasementMembraneSeed(Structural):
         # A FIBONACCI SPHERE, not uniform (theta, phi) sampling: equirectangular sampling piles points at
         # the poles, and a sheet with four times the areal density at its poles has four times the mass
         # and stiffness there -- an anisotropy nobody asked for, in the axis these experiments measure.
-        i = torch.arange(n, dtype=torch.float64) + 0.5
-        ct = 1.0 - 2.0 * i / n
-        st = torch.sqrt((1.0 - ct * ct).clamp_min(0.0))
-        phi = (math.pi * (1.0 + 5.0 ** 0.5) * i) % (2 * math.pi)
-        u = torch.stack([st * torch.cos(phi), st * torch.sin(phi), ct], dim=1).to(torch.float32)
+        if self.implementation == "relaxed":
+            # BLUE NOISE BY REPULSION. Start from a uniform random sample -- which has the right density
+            # and no arms, but clumps and holes -- and let each point drift away from its nearest
+            # neighbours, renormalising to the sphere each step. That equalises SPACING without imposing
+            # an order on the points, which is exactly the property a spiral lacks.
+            gg = torch.Generator().manual_seed(self.seed)
+            u = torch.randn(n, 3, generator=gg)
+            u = u / u.norm(dim=1, keepdim=True).clamp_min(1e-12)
+            u = u.to(dev)
+            sp = math.sqrt(4.0 * math.pi / max(n, 1))
+            kk = 7
+            for _ in range(self.relax_iters):
+                push = torch.zeros_like(u)
+                blk = 2048
+                for a0 in range(0, n, blk):
+                    b0 = min(n, a0 + blk)
+                    dd = 1.0 - (u[a0:b0] @ u.T).clamp(-1, 1)          # 1 - cos, monotone in angle
+                    dd[torch.arange(b0 - a0, device=dev), torch.arange(a0, b0, device=dev)] = 1e9
+                    nb = torch.topk(-dd, kk, dim=1).indices
+                    diff = u[a0:b0, None, :] - u[nb]                   # away from each neighbour
+                    dist = diff.norm(dim=-1).clamp_min(1e-9)
+                    w = (sp - dist).clamp_min(0.0) / sp                # only push if closer than target
+                    push[a0:b0] = (diff / dist[..., None] * w[..., None]).sum(1)
+                u = u + push * (0.35 * sp)
+                u = u / u.norm(dim=1, keepdim=True).clamp_min(1e-12)
+            u = u.to(torch.float32).cpu()
+            print(f"[seed_basement_membrane] implementation=relaxed: {self.relax_iters} repulsion "
+                  f"iterations from a uniform random sample -- same density as Fibonacci, no spiral "
+                  f"arms", flush=True)
+        else:
+            i = torch.arange(n, dtype=torch.float64) + 0.5
+            ct = 1.0 - 2.0 * i / n
+            st = torch.sqrt((1.0 - ct * ct).clamp_min(0.0))
+            phi = (math.pi * (1.0 + 5.0 ** 0.5) * i) % (2 * math.pi)
+            u = torch.stack([st * torch.cos(phi), st * torch.sin(phi), ct], dim=1).to(torch.float32)
 
         # ...BUT NOT A PERFECT ONE. A pure Fibonacci spiral is a crystal: the rendered sheet shows obvious
         # lattice rows, and worse, the crosslink network inherits that regularity, so the strain field
@@ -153,7 +192,7 @@ class BasementMembraneSeed(Structural):
         # at 6x the shuffled null, yet growth, local coordination and nearby fibre density together
         # explain only 4% of it.) A real basement membrane is not crystalline. Displace each point
         # tangentially by a fraction of the local spacing, which breaks the lattice without opening holes.
-        if self.jitter > 0.0:
+        if self.jitter > 0.0 and self.implementation != "relaxed":
             spacing = math.sqrt(4.0 * math.pi / max(n, 1))          # mean angular separation, radians
             e1 = torch.stack([-u[:, 1], u[:, 0], torch.zeros_like(u[:, 0])], dim=1)
             nrm = e1.norm(dim=1, keepdim=True)

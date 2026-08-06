@@ -395,7 +395,15 @@ OPERATORS = {
     "extrude": dict(                                          # THE FORCING TERM -- ablatable
         stage=2, role="forcing", outputs=[], slots=["site"], needs=["morphogen"],
         impls=["radial_push"], impl_structural=False,
-        params={"K_extrude": (0.0, 14.0, 4.0), "a_sw": (0.2, 6.0, 0.5)}),
+        # THE ENGINE OP CARRIES TWO TERMS AND THE SPACE EXPOSED ONE:
+        #     E = K_purse * sum_iface l_e  -  K_extrude * sum_red a*r
+        # `K_purse` is a line tension on the red/white interface -- ordinary vertex-model physics
+        # and how a real purse-string works. `K_extrude` is an energy that FALLS as red cells move
+        # outward: not a mechanism but the answer written into the objective, which is why a run
+        # carrying it can only be a control. Exposing both lets the search set K_extrude = 0 and
+        # test the purse-string alone, which is the sound half and was unreachable.
+        params={"K_purse": (0.0, 6.0, 1.0), "K_extrude": (0.0, 14.0, 4.0),
+                "a_sw": (0.2, 6.0, 0.5)}),
 
     # ---------------------------------------------------------------- Stage 3: patterning
     "cell_geometry_3d": dict(
