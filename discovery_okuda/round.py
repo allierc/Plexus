@@ -664,16 +664,42 @@ def _resolve_edit(g, edit):
     the mapping is unique and mechanical. Where it is NOT unique the edit is left alone and the
     no-op check below rejects it, because guessing between two nodes is not resolution.
     """
-    if not edit or edit[0] != "set_param" or "." not in str(edit[1]):
+    if not edit:
         return edit
-    node, _, key = str(edit[1]).rpartition(".")
     ids = [o["id"] for o in g.ops]
-    if node in ids:
-        return edit
-    hits = [i for i in ids if _op_of(g, i) == node]
-    if len(hits) != 1:
-        return edit
-    return (edit[0], f"{hits[0]}.{key}") + tuple(edit[2:])
+
+    def node_id(name):
+        """The unique node running operator `name`, or None if that is not unique."""
+        if name in ids:
+            return name
+        hits = [i for i in ids if _op_of(g, i) == name]
+        return hits[0] if len(hits) == 1 else None
+
+    if edit[0] == "set_param" and "." in str(edit[1]):
+        node, _, key = str(edit[1]).rpartition(".")
+        nid = node_id(node)
+        return edit if nid is None else (edit[0], f"{nid}.{key}") + tuple(edit[2:])
+
+    # EVERY VERB WHOSE ARGUMENT IS A NODE ID, not just set_param. The first version of this
+    # resolved set_param only, and the live Proposer immediately wrote
+    # `('set_impl', 'cell_react', 'brusselator')` -- the operator, not the node. `apply` then asked
+    # `_op_of('cell_react')`, got None, and `slots_of(None, ...)` raised `KeyError: None`, which
+    # reached the terminal as "not applicable: none". Three slots of round 1 died on it.
+    #
+    # Refusing would have been defensible; resolving is better, for the same reason it was for
+    # set_param. The menu offers indexed ids, the bare operator name is the obvious human way to
+    # write the same thing, and no operator appears twice in any pool graph -- so the mapping is
+    # mechanical. Where it is NOT unique the edit is left alone and the no-op check rejects it,
+    # because guessing between two nodes is not resolution.
+    if edit[0] in ("set_impl", "remove_op"):
+        nid = node_id(str(edit[1]))
+        return edit if nid is None else (edit[0], nid) + tuple(edit[2:])
+    if edit[0] in ("connect", "disconnect") and len(edit) >= 3:
+        src, dst = node_id(str(edit[1])), node_id(str(edit[2]))
+        if src is None or dst is None:
+            return edit
+        return (edit[0], src, dst) + tuple(edit[3:])
+    return edit
 
 
 def _op_of(g, node_id):
