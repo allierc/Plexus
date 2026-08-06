@@ -115,6 +115,12 @@ class BasementMembraneSeed(Structural):
         # pieces. A basement membrane IS a sheet; the thickness should be about one spacing.
         self.thickness = float(params.get("thickness", 0.002))
         self.jitter = float(params.get("jitter", 0.35))   # tangential noise, in units of local spacing
+        # THE RESERVE IS NOT SPARE CAPACITY, IT IS UNSECRETED MEMBRANE. A sheet pinned at fixed angular
+        # positions on a surface whose radius triples must cover NINE TIMES the area with the particles
+        # it started with, so it can only slip or thin or tear. `reserve` is the fraction of the set held
+        # back at mass 0 for `basement_membrane_secrete` to lay down as the surface grows.
+        self.reserve = float(params.get("reserve", 0.0))
+        self.surface_set = params.get("surface_set", None)
         self.seed = int(params.get("seed", 0))
         z = np.load(str(params["surface"]))
         self.smap0 = np.asarray(z["smap"], np.float32)[0] * self.scale
@@ -163,22 +169,68 @@ class BasementMembraneSeed(Structural):
         ph = torch.atan2(u[:, 1], u[:, 0]) % (2 * math.pi)
         R = M[(th / math.pi * nth).long().clamp(0, nth - 1),
               (ph / (2 * math.pi) * nph).long().clamp(0, nph - 1)]
-        r = R + self.offset + (torch.rand(n, generator=g) - 0.5) * self.thickness
         c = torch.tensor(self.centre, dtype=torch.float32)
-        P = c + u * r[:, None]
+        # SEEDED ON THE SURFACE LEVEL IF THERE IS ONE, and this is not a refinement -- it is the
+        # difference between a sheet that starts at rest and one that starts torn. The table lookup below
+        # takes R from whichever 32x64 cell a direction falls in; `surface_track` interpolates the same
+        # map smoothly. The two disagree by the quantisation error, ~0.0016 at the starting radius,
+        # against a bond rest length of 0.0021. Seed with one and anchor with the other and EVERY
+        # particle begins about a full bond length away from its anchor: the run does not crash, it
+        # returns 141 surviving bonds out of 100,801 and an ECM stress of 57,792.
+        sset = getattr(self, "surface_set", None)
+        if sset is not None:
+            sl = H.level(sset)
+            sp = sl.get("pos")
+            if sp.shape[0] != n:
+                raise RuntimeError(
+                    f"basement_membrane_seed: `surface_set` has {sp.shape[0]} elements against {n} "
+                    f"membrane particles; the 1:1 seeding needs them equal.")
+            su = sl.u if hasattr(sl, "u") else \
+                (sp - c.to(sp)) / (sp - c.to(sp)).norm(dim=1, keepdim=True).clamp_min(1e-12)
+            u = su.detach().cpu()
+            thick = (torch.rand(n, generator=g) - 0.5) * self.thickness
+            P = (sp.detach().cpu() + su.detach().cpu() * (self.offset + thick)[:, None])
+        else:
+            r = R + self.offset + (torch.rand(n, generator=g) - 0.5) * self.thickness
+            P = c + u * r[:, None]
         # LOUD IF IT LANDS OUTSIDE THE BOX. The engine's wall boundary would silently clamp the shell
         # onto the cube faces, and the only symptom would be a bond count of zero several operators
         # later -- which reads as a bond bug rather than a units mistake.
         if float(P.min()) < 0.0 or float(P.max()) > 1.0:
             raise RuntimeError(
-                f"basement_membrane_seed: shell radius {float(r.mean()):.4g} puts particles outside "
+                f"basement_membrane_seed: shell radius "
+                f"{float((P - c).norm(dim=1).mean()):.4g} puts particles outside "
                 f"the unit box (range {float(P.min()):.3g}..{float(P.max()):.3g}). `scale` is almost "
                 f"certainly wrong: the surface map is in TISSUE units and must be multiplied by the "
                 f"tissue-to-box scale, which only `combine.build` knows.")
         lvl.get("pos")[:] = P.to(dev, dt_)
+        n0 = n if self.reserve <= 0 else max(1, int(round(n / (1.0 + self.reserve))))
+        alive = torch.zeros(n, dtype=torch.bool, device=dev)
+        alive[:n0] = True
+        if n0 < n:
+            # PARKED AT THE CENTRE, MASSLESS. Inside the tissue, where nothing else lives, so a dormant
+            # particle cannot be mistaken for membrane by any operator that works on position; and mass 0
+            # so it scatters nothing into the shared grid. `cell_exclude_3d` skips massless particles for
+            # exactly this reason -- otherwise it would project the whole reserve onto the surface.
+            lvl.get("pos")[n0:] = c.to(dev, dt_)
+            m = getattr(lvl, "mass", None)
+            if m is None:
+                raise RuntimeError(
+                    "basement_membrane_seed: `reserve` needs a `mass` buffer to park the dormant "
+                    "particles massless, and this level has none. Without it the reserve would scatter "
+                    "into the grid from the tissue centre.")
+            self._mass0 = float(m.reshape(-1)[0])
+            m[n0:] = 0.0
+        H.membrane_alive = alive
+        # Published so `surface_track` can pair element i with particle i without reproducing an RNG
+        # sequence. (Rebuilding the lattice does in fact reproduce it -- the jitter draws come first in
+        # both -- but a shared lattice that depends on two functions drawing in the same order is a
+        # coincidence, not an invariant.)
+        H.membrane_u0 = u.to(dev, dt_).clone()
         self._done = True
         print(f"[basement_membrane_seed] {n} particles on a shell at r_surface + {self.offset:.4g} "
-              f"(thickness {self.thickness:.4g}), Fibonacci + {self.jitter:.2g}-spacing jitter",
+              f"(thickness {self.thickness:.4g}), Fibonacci + {self.jitter:.2g}-spacing jitter; "
+              f"{int(alive.sum())} laid down, {n - int(alive.sum())} held in reserve",
               flush=True)
         return {}
 
@@ -218,7 +270,7 @@ class BasementMembraneBond(Lateral):
         self.i = self.j = self.rest = self.alive = None
         self._said = False
 
-    def _build(self, pos):
+    def _build(self, pos, live=None):
         # O(N^2) ONCE, at frame 0, in chunks. 20-40k particles is 1.6e9 pairs if done in one tensor, so
         # it is chunked; it runs once, and the alternative (a grid hash) is more code for a cost paid
         # a single time.
@@ -244,14 +296,52 @@ class BasementMembraneBond(Lateral):
         # fragmented cannot report fragmentation.
         n2 = pos.shape[0] + 1
         uk = torch.unique(torch.minimum(i, j) * n2 + torch.maximum(i, j))
-        return (uk // n2).long(), (uk % n2).long()
+        i, j = (uk // n2).long(), (uk % n2).long()
+        if live is not None:
+            # the dormant reserve is co-located at the centre, so without this every parked particle is
+            # inside every other one's cutoff and the "sheet" acquires a dense clique at its core
+            keep = live[i] & live[j]
+            i, j = i[keep], j[keep]
+        return i, j
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
         pos = lvl.get("pos")
         dev, dt_ = pos.device, pos.dtype
+        # BONDED INCREMENTALLY, NOT REBUILT. The first version recomputed the whole network whenever
+        # secretion fired, and the run stalled at frame 1: `_build` is an O(n^2) neighbour search over
+        # 30k particles, which is affordable once at seeding and not once per frame. Secretion adds a few
+        # hundred particles at a time, so only THEY need neighbours -- and bonding only the new material
+        # carries every existing rest length forward untouched, which the rebuild had to reconstruct by
+        # key just to avoid erasing the remodelling history.
+        new = getattr(H, "membrane_new", None)
+        if new is not None and self.i is not None and new.numel():
+            H.membrane_new = None
+            live = getattr(H, "membrane_alive", None)
+            p = pos.detach()
+            d = (p[new][:, None, :] - p[None, :, :]).norm(dim=-1)
+            d[torch.arange(new.numel(), device=p.device), new] = 1e9
+            if live is not None:
+                d = torch.where(live[None, :], d, torch.full_like(d, 1e9))
+            k = min(self.max_nb, p.shape[0] - 1)
+            idx = torch.topk(-d, k, dim=1).indices
+            keep = torch.gather(d, 1, idx) <= self.cutoff
+            rows = new[:, None].expand_as(idx)
+            ni, nj = rows[keep], idx[keep]
+            n2 = p.shape[0] + 1
+            key_new = torch.minimum(ni, nj) * n2 + torch.maximum(ni, nj)
+            key_old = torch.minimum(self.i, self.j) * n2 + torch.maximum(self.i, self.j)
+            fresh = torch.unique(key_new)
+            fresh = fresh[~torch.isin(fresh, key_old)]
+            if fresh.numel():
+                ai, aj = (fresh // n2).long(), (fresh % n2).long()
+                self.i = torch.cat([self.i, ai]); self.j = torch.cat([self.j, aj])
+                self.rest = torch.cat([self.rest,
+                                       (p[aj] - p[ai]).norm(dim=-1).clamp_min(1e-9)])
+                self.alive = torch.cat([self.alive,
+                                        torch.ones(ai.numel(), dtype=torch.bool, device=p.device)])
         if self.i is None:
-            self.i, self.j = self._build(pos.detach())
+            self.i, self.j = self._build(pos.detach(), getattr(H, "membrane_alive", None))
             self.rest = (pos[self.j] - pos[self.i]).norm(dim=-1).detach().clamp_min(1e-9)
             self.alive = torch.ones_like(self.rest, dtype=torch.bool)
             if self.i.numel() == 0:
@@ -403,6 +493,10 @@ class IntegrinAdhesion(Lateral):
         self.k = float(params.get("k", 2.0e4))
         self.offset = float(params.get("offset", 0.004))
         self.detach = float(params.get("detach", 0.0))       # 0 = permanent
+        # BIND TO THE `surface` LEVEL IF ONE EXISTS, otherwise to the 32x64 table as before. Named
+        # rather than inferred, so a run either uses the Level or does not and the spec says which --
+        # the two differ in a way that shows up in the strain field and must not be silent.
+        self.surface_set = params.get("surface_set", None)
         # critical by default: c = 2*sqrt(k). Under-damped oscillates about a moving anchor, over-damped
         # lags it -- and a lagging anchor stretches the sheet, which is a different experiment.
         self.damp = float(params.get("damp", 2.0 * math.sqrt(max(float(params.get("k", 2.0e4)), 1e-12))))
@@ -432,11 +526,26 @@ class IntegrinAdhesion(Lateral):
         M = self.smap[self._t].to(dev, dt_)
         nth, nph = M.shape
         u = self.u0
-        th = torch.acos(u[:, 2].clamp(-1, 1))
-        ph = torch.atan2(u[:, 1], u[:, 0]) % (2 * math.pi)
-        R = M[(th / math.pi * nth).long().clamp(0, nth - 1),
-              (ph / (2 * math.pi) * nph).long().clamp(0, nph - 1)]
-        anchor = c + u * (R + self.offset)[:, None]
+        if self.surface_set is not None:
+            # ELEMENT i HOLDS PARTICLE i. `surface_track` lays its elements on the same Fibonacci
+            # lattice, with the same seed and jitter, that the membrane was seeded on, so the pairing is
+            # 1:1 by construction -- no search, no bins, and the anchor radius is a smooth interpolation
+            # of the recorded map rather than the value of whichever 32x64 cell the direction fell in.
+            sl = H.level(self.surface_set)
+            sp = sl.get("pos")
+            if sp.shape[0] != pos.shape[0]:
+                raise RuntimeError(
+                    f"integrin_adhesion: `surface_set` has {sp.shape[0]} elements against "
+                    f"{pos.shape[0]} membrane particles. The 1:1 binding requires the two sets to be "
+                    f"the same size and built on the same lattice; set `n` equal in the spec.")
+            su = sl.u if hasattr(sl, "u") else (sp - c) / (sp - c).norm(dim=1, keepdim=True).clamp_min(1e-12)
+            anchor = sp + su * self.offset
+        else:
+            th = torch.acos(u[:, 2].clamp(-1, 1))
+            ph = torch.atan2(u[:, 1], u[:, 0]) % (2 * math.pi)
+            R = M[(th / math.pi * nth).long().clamp(0, nth - 1),
+                  (ph / (2 * math.pi) * nph).long().clamp(0, nph - 1)]
+            anchor = c + u * (R + self.offset)[:, None]
         delta = anchor - pos
         if self.detach > 0:
             self.bound &= delta.norm(dim=1) < self.detach
@@ -520,3 +629,114 @@ class BasementMembraneRemodel(Lateral):
                   f"fragmentation is a race between turnover and growth", flush=True)
             self._said = True
         return {}
+
+
+@register_operator("basement_membrane_secrete", family="growth", set="particle", kind="structural")
+class BasementMembraneSecrete(Structural):
+    """Lay down NEW membrane as the surface it sits on grows.
+
+    WHY THIS OPERATOR HAS TO EXIST, stated as the measurement that forced it. A sheet anchored at fixed
+    angular positions on a sphere whose radius triples must cover nine times the area with the particles
+    it started with. It has only three ways out, and the runs found all three:
+
+      * SLIP -- at `k_adh = 2e4` and `4e4` nothing tears, but the sheet sinks through the apical surface
+        (gap +0.0040 -> -0.0117, 90% of particles below it by the end);
+      * TEAR -- at `k_adh = 2e5`, 94% of crosslinks break;
+      * NOTHING -- at `k_adh = 8e4` the sheet appears to hold, but the matrix stress p99 is 7120 against
+        2-8 in every stable run. That one is not a third option, it is an unstable simulation.
+
+    No stiffness avoids the trilemma, because the trilemma is not about stiffness. It is about material.
+    Real basement membrane is SECRETED continuously by the cells it sits on, which is why an acinus can
+    triple in size without its membrane thinning to nothing.
+
+    WHERE NEW MATERIAL GOES. Into the most strained crosslinks, at their midpoints. That is a claim, not
+    a convenience: it says deposition is load-directed, which is what makes the operator do anything
+    interesting -- it relieves strain exactly where the sheet is closest to failing, so secretion and
+    fragmentation compete on the same variable. Depositing uniformly at random would be the null and is
+    available by setting `targeted = 0`.
+
+    WHAT IT DOES NOT MODEL. The cells do not pay for it. Secretion here is free and instantaneous rather
+    than a flux out of the epithelium with a cost, because the coupling is one-way and the epithelium is
+    a replay: there is nothing to debit. `rate` caps how fast the reserve can be spent, which is the only
+    place a secretion timescale enters.
+    """
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = True
+    MECHANISM_TAGS = ["secretion", "material_addition", "load_directed_deposition"]
+    PARAM_ROLES = {"rate": "max_fraction_secreted_per_frame", "targeted": "load_directed_vs_uniform",
+                   "centre": "tissue_centre"}
+    REFERENCE = ("Plexus (this work). Continuous basement-membrane deposition during epithelial growth: "
+                 "Ku & Bilder (2023) Dev. Cell 58:522; Toepfer et al. (2022) Development 149:dev200456.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "basement_membrane_particle")
+        self.centre = [float(v) for v in params.get("centre", [0.5, 0.5, 0.5])]
+        self.rate = float(params.get("rate", 0.02))
+        self.targeted = float(params.get("targeted", 1.0))
+        self._r0 = None
+        self._n0 = None
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        dev, dt_ = pos.device, pos.dtype
+        live = getattr(H, "membrane_alive", None)
+        if live is None:
+            return {}
+        n_live = int(live.sum())
+        n_tot = pos.shape[0]
+        if n_live >= n_tot:
+            return {}                                  # the reserve is spent; nothing left to lay down
+
+        c = torch.tensor(self.centre, device=dev, dtype=dt_)
+        r = (pos[live] - c).norm(dim=1)
+        R = float(r.mean())
+        if self._r0 is None:
+            self._r0, self._n0 = R, n_live
+            return {}
+
+        # AREAL DENSITY IS THE SETPOINT, not particle count: the sheet should be as thick per unit area
+        # at the end as at the start, and area goes as R^2.
+        want = min(n_tot, int(round(self._n0 * (R / max(self._r0, 1e-9)) ** 2)))
+        add = want - n_live
+        add = min(add, max(1, int(self.rate * n_live)))
+        if add <= 0:
+            return {}
+
+        bonds = getattr(H, "membrane_bonds", None)
+        if bonds is None:
+            return {}
+        bi, bj, brest, balive = bonds
+        d = (pos[bj] - pos[bi]).norm(dim=1).clamp_min(1e-9)
+        strain = ((d - brest) / brest) * balive.to(dt_)
+        if self.targeted > 0:
+            pick = torch.topk(strain, min(add, strain.numel())).indices
+        else:
+            pick = torch.randperm(strain.numel(), device=dev)[:min(add, strain.numel())]
+        add = int(pick.numel())
+        if add == 0:
+            return {}
+
+        slot = (~live).nonzero(as_tuple=True)[0][:add]
+        add = int(slot.numel())
+        pick = pick[:add]
+        new = 0.5 * (pos[bi[pick]] + pos[bj[pick]])
+        pos[slot] = new
+        v = lvl.get("vel") if "vel" in lvl.state_schema else None
+        if v is not None:
+            v[slot] = 0.5 * (v[bi[pick]] + v[bj[pick]])
+        m = getattr(lvl, "mass", None)
+        if m is not None:
+            live_m = m[live]
+            m[slot] = live_m[0] if live_m.numel() else m.max()
+        live = live.clone(); live[slot] = True
+        H.membrane_alive = live
+        H.membrane_new = slot                          # bonded in incrementally by the bond operator
+        SECRETE_TRACE.append((n_live, add, int(live.sum()), R))
+        return {}
+
+
+SECRETE_TRACE = []

@@ -492,6 +492,15 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, f
     # which is the only scale at which a sheet a few percent of the radius thick and a junction network
     # thinner than a cell outline can be read. The bottom-right is the one that shows the layering the
     # biology is about: lumen, epithelium, basement membrane, stroma, outward in that order.
+    # A FIXED MYOSIN SCALE, like the other two. The junction panel was normalising to its own p98 every
+    # frame, so a sheet-wide drift in myosin -- exactly what `beta` produces -- rendered as no change at
+    # all, while the membrane beside it sat on a fixed scale. Two panels, two conventions, is a way to
+    # publish a null.
+    _myo = np.concatenate([np.asarray(m["myo"], float).ravel() for _, m in meshes if "myo" in m]) \
+        if any("myo" in m for _, m in meshes) else None
+    myo_sc = float(np.percentile(_myo, 98)) if _myo is not None and _myo.size else None
+    if myo_sc:
+        print(f"[{name}] myosin colour full-scale {myo_sc:.4g} (p98 over the run, fixed)", flush=True)
     zoom = (mem_pos is not None) or any("myo" in m for _, m in meshes)
     if zoom:
         figm = plt.figure(figsize=(11.0, 11.0), facecolor="black")
@@ -499,7 +508,14 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, f
         axc2 = figm.add_subplot(2, 2, 2, facecolor="black")
         axz = figm.add_subplot(2, 2, 3, projection="3d", computed_zorder=False,
                                facecolor="black")
-        axzc = figm.add_subplot(2, 2, 4, facecolor="black")
+        axzc = figm.add_subplot(2, 2, 4, projection="3d", computed_zorder=False,
+                                facecolor="black")
+        # A 2D ZOOM INSET IN EACH BOTTOM PANEL. The 3D views show each entity whole; at whole-tissue
+        # framing neither sheet nor network resolves to more than a few pixels, so the inset carries
+        # the detail and the panel around it carries the context. FIGURE-level axes, not `inset_axes`
+        # on the 3D parents: an inset of a 3D axis inherits its projection machinery and came out empty.
+        inz = figm.add_axes([0.335, 0.035, 0.155, 0.155], facecolor="black", zorder=20)
+        inzc = figm.add_axes([0.818, 0.035, 0.155, 0.155], facecolor="black", zorder=20)
     else:
         figm = plt.figure(figsize=(11.0, 5.5), facecolor="black")
         axs = figm.add_subplot(1, 2, 1, projection="3d", computed_zorder=False, facecolor="black")
@@ -513,7 +529,11 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, f
         for k, (t, mt) in enumerate(keep):
             vp, q, band, blk = mt["pos"], q_of(t), band_of(t), blk_of(t)
             div, brk = RD.divided_mask(mt), RD.broken_mask(mt, vp, name)
-            RD.draw_3d(axs, mt, vp, q, band, cmap, RD.CAM_SIDE, L3, div=div, brk=brk,
+            # FRAMED TO MATCH THE SECTION BESIDE IT. `L3` is sized for the MPM cube, and measured off
+            # a rendered frame the spheroid came out ~180px against ~250px in the 2D section, so the two
+            # top panels could not be read against each other. 0.72 closes that ratio; the outer matrix
+            # is clipped, which costs nothing -- it is a diffuse cloud and the section shows its extent.
+            RD.draw_3d(axs, mt, vp, q, band, cmap, RD.CAM_SIDE, 0.72 * L3, div=div, brk=brk,
                        plate_gap=plate, blk=blk, mem=mem_of(t))
             RD.draw_cross(axc2, mt, vp, q, band, cmap, L2, axis_dir, slab, dot_scale=0.85,
                           plate_gap=plate, blk=blk, mem=mem_of(t))
@@ -527,19 +547,27 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, f
                 # network was invisible: 30k dots sit in front of a line mesh whose spacing is comparable
                 # to the dot size, so the sheet simply occluded the thing the panel exists to show. The
                 # membrane keeps the bottom-right, where the section shows it in its layer.
-                # THE STRIP'S THIRD ROW, PROMOTED. Same camera as the top-left, but with the epithelium
-                # not drawn and the matrix cut away on the near side, so the basement membrane is seen
-                # whole and unobstructed instead of through the cells in front of it.
-                RD.draw_3d(axz, mt, vp, q, band, cmap, RD.CAM_SIDE, L3, div=div, brk=brk,
-                           tissue=False, cutaway=True, plate_gap=plate, blk=blk, mem=mem_of(t))
-                axz.text2D(0.03, 0.97, "cutaway  matrix opened, epithelium hidden: the membrane alone",
-                           transform=axz.transAxes, color="#888", fontsize=7.5, va="top")
+                # ONE ENTITY PER PANEL, IDENTICALLY FRAMED. The cutaway still drew the interstitial
+                # matrix around the sheet, so "the membrane alone" was the membrane inside a cloud. Here
+                # it is the membrane and nothing else, cut and boxed exactly as the network on its right,
+                # which is what makes the two panels comparable frame by frame.
+                Lt = 1.12 * float(np.percentile(np.linalg.norm(vp, axis=1), 98))
+                RD.draw_membrane_3d(axz, mq, ms, RD.CAM_SIDE, Lt, mem_hi=mem_sc)
                 # BOTTOM-RIGHT IS THE JUNCTION NETWORK, on its own. The membrane is not drawn here at
                 # all: 30k dots sit in front of a line mesh of comparable spacing and simply occlude it,
                 # so the two entities get a panel each rather than one panel showing neither well.
-                RD.draw_zoom(axzc, mt, vp, mem_q=None, mem_s=None, name=name, frac=0.26, lw=2.6)
-                axzc.text(0.03, 0.97, "zoom  junction network, coloured by myosin",
-                          transform=axzc.transAxes, color="#888", fontsize=7.5, va="top")
+                # FRAMED ON THE TISSUE, NOT ON THE MATRIX BOX. `L3` is sized for the MPM cube, which is
+                # half again the tissue extent, so the network rendered as a small ball in a large frame.
+                RD.draw_junctions_3d(axzc, mt, vp, RD.CAM_SIDE, Lt, myo_hi=myo_sc)
+                # the insets: the membrane patch under the cutaway, the junction patch under the network
+                RD.draw_zoom(inz, mt, vp, mem_q=mq, mem_s=ms, name=name, frac=0.22,
+                             mem_hi=mem_sc, junctions=False)
+                RD.draw_zoom(inzc, mt, vp, mem_q=None, mem_s=None, name=name, frac=0.16, lw=2.4,
+                             myo_hi=myo_sc)
+                for _a in (inz, inzc):
+                    for _sp in _a.spines.values():
+                        _sp.set_color("#666"); _sp.set_visible(True)
+                    _a.set_xticks([]); _a.set_yticks([])
             # ONE LABEL, ON THE 3D PANEL. `_draw`/`_cross_screen` both call ax.clear(), which drops
             # any label, so it is re-stamped every frame. The camera elevation and the cut plane used
             # to be printed too and are not any more: they are fixed for the whole run and recorded in

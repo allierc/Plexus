@@ -71,6 +71,10 @@ cells / vertex
   [ ] cell_polarity             apical-basal axis -- currently ABSENT, which is why the
                                 membrane has to be placed by hand rather than by polarity
 
+surface                         PROMOTED TO A LEVEL (surface_ops.py)
+  [x] surface_track             one element per membrane particle, on the lattice this Level OWNS;
+                                radius interpolated smoothly from the pass-1 map, no bins
+
 junction
   [x] junction_myosin           per-junction myosin, recruited by tension; survives T1 /
                                 division / death by topological keying
@@ -81,6 +85,12 @@ basement_membrane
   [x] basement_membrane_seed    lay the sheet on the epithelium's basal surface
   [x] basement_membrane_bond    crosslinks: the collagen IV network
   [x] basement_membrane_bond_break   fragmentation                              (rewire)
+  [x] basement_membrane_secrete lay down NEW membrane as the surface grows      (structural)
+                                areal density is the setpoint: over 200 frames R grew 1.415x
+                                (area 2.002x) and the sheet grew 15000 -> 30000 particles
+                                (2.000x) over 92 events. Deposition is LOAD-DIRECTED -- into the
+                                most strained crosslinks -- so secretion and fragmentation
+                                compete on the same variable; `targeted=0` is the uniform null.
   [~] integrin_adhesion         anchor the sheet to the epithelium. WITHOUT THIS THE SHEET SLIDES
                                 and never stretches -- see the note below
   [ ] basement_membrane_stiffen collagen IV deposition -> stiffening
@@ -91,6 +101,7 @@ interstitial_ecm
   [x] ecm_stress                strain / von Mises colouring
   [x] cell_to_ecm               the epithelium's contact force on the matrix
   [x] cell_exclude_3d           non-penetration                                 (structural)
+                                NOW ALSO REGISTERED AT basement_membrane_particle -- see below
   [ ] ecm_crosslink             connectivity for the interstitial matrix too
   [ ] ecm_remodel               fibre realignment under load
 
@@ -104,15 +115,47 @@ field / coupling
                                 set by dx, not by a parameter.
 ```
 
-## `surface` should be a Level, and is not
+## The membrane had no repulsion at all, and that is why it sank
 
-`R(u,t)` -- a 32x64 angular table -- is read by `cell_to_ecm`, `cell_exclude_3d`, `integrin_adhesion`
-and `basement_membrane_seed`. A table carries no state and can receive no delta, which is the
-STRUCTURAL reason integrin adhesion is one-way. As a Level (one member per outer face, pos/vel/normal/
-area, written by a `broadcast` from the replayed mesh) all four become plain `lateral` operators, the
-lookup disappears, and the integrin spring becomes mutual. Stronger still: once anchored, the membrane
-particles ARE a discretisation of that surface. But runs without a membrane still need contact, so
-`surface` is the general answer and membrane-as-surface the specialisation.
+The epithelium repels interstitial fibres TWICE -- `cell_to_ecm` as a soft penalty and `cell_exclude_3d`
+as a hard projection -- and did nothing whatever to the basement membrane. Its only outward force was
+the integrin spring. Registering `cell_exclude_3d` at `basement_membrane_particle` too, at the SAME
+stable stiffness (k_adh = 4e4), flips the sign of the gap:
+
+| | gap | inside | ECM stress p99 |
+|---|---|---|---|
+| without exclusion | -0.00365 | 75.8% | 2.15 |
+| with exclusion    | +0.00085 | 43.4% | 1.71 |
+
+`cell_exclude_3d` now skips massless particles, so `basement_membrane_secrete`'s parked reserve is not
+projected onto the surface as a second, fake sheet.
+
+## `surface` IS a Level now -- and it did not explain the strain pattern
+
+Built in `surface_ops.py`: a Level of elements on a lattice it OWNS, with `surface_track` writing each
+element's radius by smooth interpolation of the pass-1 map. `basement_membrane_seed` and
+`integrin_adhesion` both read it, so the dependency runs one way and there is no second place a
+direction or radius can be computed slightly differently. Enabled with `membrane_surface_level=True`.
+
+It reproduces the physics exactly -- ECM stress p99 1.709 against 1.707 for the table, end strain
+0.17346 against 0.17346 -- and it FALSIFIED the hypothesis it was built to test. The claim was that the
+membrane's unexplained strain organisation came from the 32x64 bins. Measured against the shuffled null:
+**5.0x with bins, 4.9x without**. Removing the quantisation changes nothing.
+
+What the strain DOES track is the shape of the surface itself: `corr(strain, local radius) = +0.404`,
+R^2 = 0.164 with a curvature proxy added (curvature alone contributes nothing). The epithelium is not a
+sphere -- its radius has a 1.5% spread -- and the sheet is more stretched where it bulges. So the
+leading explanation is now mechanical rather than numerical, having ruled out growth (-0.10),
+coordination (+0.21), fibre density (-0.07), lattice crystallinity (fixed by `jitter`) and angular
+quantisation (this test). 84% is still unaccounted for.
+
+TWO FAILURES WORTH KEEPING. The Level cost two runs that did not crash and were not right. First, the
+seed placed particles by NEAREST-BIN radius while the Level anchored them by the SMOOTH one -- a
+disagreement of ~0.0016 against a bond rest length of 0.0021, so every particle started about a bond
+length off its anchor: 141 surviving bonds out of 100,801, ECM stress 57,792. Second, I diagnosed that
+as an RNG mismatch between two lattices; the rerun was BIT-IDENTICAL, which proved the lattices had
+always agreed and the diagnosis was wrong. The fix was to make the Level authoritative so there is only
+one lattice and one radius, rather than two that must agree.
 
 ## `activity` is degenerate with `Lambda`
 

@@ -103,7 +103,8 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                membrane_jitter=0.35,
                # crosslink turnover, in frames. Large = a membrane that cannot keep up with growth and
                # must fragment; small = one that remodels and stays intact. 0 or None disables it.
-               membrane_tau=60.0):
+               membrane_tau=60.0, membrane_reserve=0.0, membrane_secrete_rate=0.02,
+               membrane_secrete_targeted=1.0, membrane_surface_level=False):
     """The whole experiment as a plain dict, ready for yaml.safe_dump + schema.load."""
     types = {f"s{i}": {"fraction": 1.0 / len(STRESS_COLORS), "youngs": youngs}
              for i in range(len(STRESS_COLORS))}
@@ -163,6 +164,7 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
     }
     if membrane is not None:
         import membrane_ops                                           # noqa: F401  register it
+        import surface_ops                                            # noqa: F401
         spec["sets"]["basement_membrane_particle"] = {
             "parent": "cell", "per_parent": int(membrane_particles), "radius": 0.48,
             "density": float(density),
@@ -173,7 +175,8 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
             {"op": "basement_membrane_seed", "at": "basement_membrane_particle",
              "centre": [0.5, 0.5, 0.5], "surface": str(membrane), "scale": 1.0,
              "offset": float(membrane_offset), "thickness": float(membrane_thickness),
-             "seed": int(seed), "jitter": float(membrane_jitter)},
+             "seed": int(seed), "jitter": float(membrane_jitter),
+             "reserve": float(membrane_reserve)},
             # INTEGRINS FIRST: without them the sheet slides over the epithelium and its bonds never
             # feel the growth. `membrane_adhesion = 0` reproduces the unanchored (wrong) loading path.
             {"op": "integrin_adhesion", "at": "basement_membrane_particle",
@@ -184,6 +187,12 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
              "max_neighbours": 6},
             {"op": "basement_membrane_remodel", "at": "basement_membrane_particle",
              "tau": float(membrane_tau), "cap": 0.02},
+            {"op": "surface_track", "at": "surface", "centre": [0.5, 0.5, 0.5],
+             "surface": str(membrane), "scale": 1.0, "k": 6,
+             "seed": int(seed), "jitter": float(membrane_jitter)},
+            {"op": "basement_membrane_secrete", "at": "basement_membrane_particle",
+             "centre": [0.5, 0.5, 0.5], "rate": float(membrane_secrete_rate),
+             "targeted": float(membrane_secrete_targeted)},
             {"op": "basement_membrane_bond_break", "at": "basement_membrane_particle",
              "break_strain": float(membrane_break), "components_every": 40},
             # the MLS-MPM cycle for the third body. APPENDED, so its scatter accumulates AFTER the
@@ -208,6 +217,28 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
             spec["operators"] = [o for o in spec["operators"]
                                  if o["op"] != "basement_membrane_remodel"]
             spec["schedule"].insert(i + 2, "basement_membrane_bond_break")
+        if membrane_surface_level:
+            # `per_parent`, not `n`: a set with a parent is provisioned per parent, and `n` is
+            # simply not read -- the build dies on a KeyError several frames of setup later.
+            spec["sets"]["surface"] = {"parent": "cell", "per_parent": int(membrane_particles),
+                                       "radius": 0.48}
+            # FIRST, AND BEFORE THE SEED. The Level is authoritative: it owns the lattice, and both
+            # the seed and the adhesion read it. The dependency runs one way, so there is no second
+            # place where a direction or a radius can be computed slightly differently.
+            spec["schedule"].insert(0, "surface_track")
+            for o in spec["operators"]:
+                if o["op"] in ("integrin_adhesion", "basement_membrane_seed"):
+                    o["surface_set"] = "surface"
+        else:
+            spec["operators"] = [o for o in spec["operators"] if o["op"] != "surface_track"]
+        if membrane_reserve and membrane_reserve > 0:
+            # LAST IN THE FRAME. `basement_membrane_bond` must have run at least once so
+            # `H.membrane_bonds` exists to choose a strained bond from, and the rebuild it triggers is
+            # picked up at the top of the next frame, so new material is bonded in before it is loaded.
+            spec["schedule"].append("basement_membrane_secrete")
+        else:
+            spec["operators"] = [o for o in spec["operators"]
+                                 if o["op"] != "basement_membrane_secrete"]
     if block_gap is not None:
         # ONE SET, ONE MATERIAL. The block's stiffness is a property of its TYPE, which is why it has
         # to be a separate set rather than extra types on the matrix: `ecm_stress` rewrites

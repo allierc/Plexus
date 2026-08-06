@@ -615,6 +615,12 @@ class CellExclude3D(Structural):
         R = M[(th / math.pi * nth).long().clamp(0, nth - 1),
               (ph / (2 * math.pi) * nph).long().clamp(0, nph - 1)]
         inside = r < R
+        # A MASSLESS PARTICLE IS NOT MATERIAL. `basement_membrane_secrete` parks its unsecreted reserve
+        # at the centre with mass 0; without this line the projection would fire on every dormant
+        # particle and paste the entire reserve onto the surface as a second, fake sheet.
+        m = getattr(lvl, "mass", None)
+        if m is not None and m.shape[0] == inside.shape[0]:
+            inside = inside & (m > 0)
         n_in = int(inside.sum())
         if n_in:
             # ONTO THE SURFACE PLUS A SKIN. Exactly onto it would leave the particle at depth 0, where
