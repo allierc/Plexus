@@ -353,6 +353,28 @@ def _cmap(colors):
     return ListedColormap(colors)
 
 
+def _myo_of(mt, n_half, myo_new=1.0):
+    """`myo` padded to the snapshot's half-edge count, rather than discarded when it is short.
+
+    `junction_myosin` writes `m["myo"]` before `divide_3d` and `reconnect_t1_3d` run, and division
+    APPENDS half-edges, so a snapshot's table is routinely longer than the myosin array recorded with it
+    -- 28% of frames in run 65, by 6 to 1404 entries. The old guard skipped the colouring on those
+    frames and fell back to a flat light blue, so the panel alternated between a colour-mapped network
+    and a uniform one: a 28%-duty-cycle flicker that looked like a bad colour scale.
+
+    The missing entries are exactly the junctions born that frame, and a newborn junction starts at
+    `myo_new`. So the padding is not a cosmetic patch, it is the value the operator would have written.
+    """
+    if "myo" not in mt:
+        return None
+    m = np.asarray(mt["myo"], float)
+    if m.shape[0] == n_half:
+        return m
+    if m.shape[0] < n_half:
+        return np.concatenate([m, np.full(n_half - m.shape[0], myo_new)])
+    return m[:n_half]
+
+
 def draw_junctions_3d(ax, mt, pos, cam, L, myo_hi=None, cutaway=True, lw=0.9):
     """THE JUNCTION NETWORK IN 3D, WITH NOTHING ELSE IN FRONT OF IT.
 
@@ -377,9 +399,8 @@ def draw_junctions_3d(ax, mt, pos, cam, L, myo_hi=None, cutaway=True, lw=0.9):
     if not keep.any():
         return
     segs = np.stack([a[keep], b[keep]], axis=1)
-    # LENGTH-CHECKED, as everywhere `myo` is read: it is written before the topology operators run.
-    _m = np.asarray(mt["myo"], float) if "myo" in mt else None
-    myo = _m[live] if (_m is not None and _m.shape[0] == live.shape[0]) else None
+    _m = _myo_of(mt, live.shape[0])
+    myo = _m[live] if _m is not None else None
     if myo is None:
         lc = Line3DCollection(segs, colors="#7ab8ff", linewidths=lw)
     else:
@@ -450,12 +471,8 @@ def draw_zoom(ax, mt, pos, mem_q=None, mem_s=None, cam=None, frac=0.55, myo_hi=N
     # keep junctions in the window AND on the near side, so the far hemisphere does not overprint it
     near = ((mid - ctr) @ d) > -half
     inwin = (np.abs((mid - ctr) @ u) < half) & (np.abs((mid - ctr) @ v) < half) & near
-    # LENGTH-CHECKED. `junction_myosin` writes `m["myo"]` before `divide_3d` and `reconnect_t1_3d` run,
-    # so the array recorded in a snapshot can be one topology-event out of step with that snapshot's
-    # half-edge table -- 1188 against 1206 on the run that caught this. Same guard as `_grad_myo` uses in
-    # the mechanics: skip the colouring for that frame rather than index past the end.
-    _m = np.asarray(mt["myo"], float) if "myo" in mt else None
-    myo = _m[live] if (_m is not None and _m.shape[0] == live.shape[0]) else None
+    _m = _myo_of(mt, live.shape[0])
+    myo = _m[live] if _m is not None else None
     if inwin.any() and junctions:
         segs = np.stack([np.stack([(a[inwin] - ctr) @ u, (a[inwin] - ctr) @ v], 1),
                          np.stack([(b[inwin] - ctr) @ u, (b[inwin] - ctr) @ v], 1)], axis=1)

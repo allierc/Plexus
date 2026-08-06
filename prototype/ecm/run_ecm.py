@@ -551,7 +551,13 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, f
                 # matrix around the sheet, so "the membrane alone" was the membrane inside a cloud. Here
                 # it is the membrane and nothing else, cut and boxed exactly as the network on its right,
                 # which is what makes the two panels comparable frame by frame.
-                Lt = 1.12 * float(np.percentile(np.linalg.norm(vp, axis=1), 98))
+                #
+                # AND THE SAME FIXED BOX AS THE TOP ROW. This was `1.12 * p98(|vp|)` -- recomputed every
+                # frame, so the box grew with the tissue and the spheroid held a constant apparent size
+                # while the top row showed it growing. Two rows, two camera conventions, and the growth
+                # visible in one and invisible in the other. A camera that tracks its subject hides the
+                # one thing the run is about.
+                Lt = 0.72 * L3
                 RD.draw_membrane_3d(axz, mq, ms, RD.CAM_SIDE, Lt, mem_hi=mem_sc)
                 # BOTTOM-RIGHT IS THE JUNCTION NETWORK, on its own. The membrane is not drawn here at
                 # all: 30k dots sit in front of a line mesh of comparable spacing and simply occlude it,
