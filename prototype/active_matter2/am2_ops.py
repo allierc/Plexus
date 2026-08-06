@@ -262,7 +262,7 @@ class Relay(Exchange):
 # --------------------------------------------------------------------------- #
 #  spiral nucleation:  one-shot BROKEN-FRONT initial condition
 # --------------------------------------------------------------------------- #
-@register_operator("seed_spiral", level="cell", kind="exchange")
+@register_operator("seed_spiral", level="cell", kind="seed")
 class SpiralSeed(Exchange):
     """Nucleate a rotating SPIRAL wave in an excitable medium (needs relay c_th>0).
 

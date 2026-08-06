@@ -24,7 +24,7 @@ from plexus.models.base import Lateral, Structural
 from plexus.models.registry import register_operator
 
 
-@register_operator("seed_vesicle", level="cell", kind="structural")
+@register_operator("seed_vesicle", level="cell", kind="seed")
 class VesicleSeed(Structural):
     """Place the cells on a spherical shell (Fibonacci sphere) of radius `radius` about the domain
     centre, with a little radial noise. Gate with `before_frame: 1`."""

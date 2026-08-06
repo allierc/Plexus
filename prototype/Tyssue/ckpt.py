@@ -30,7 +30,7 @@ def save_state(H, path):
     print(f"[ckpt] saved {path}: {int(m['nF'])} cells, {int(m['Nv'])} verts", flush=True)
 
 
-@register_operator("load_mesh_3d", set="vertex", kind="structural", family="mechanics")
+@register_operator("load_mesh_3d", set="vertex", kind="seed", family="mechanics")
 class LoadMesh3D(Structural):
     """Frame-0: restore a saved mesh+cell state (drop-in for seed_mesh_3d). buffer must be >= saved size;
     reservoir sizes (Nv_max/nF_max/Ebuf) are recomputed to the NEW (larger) buffer so growth has headroom."""

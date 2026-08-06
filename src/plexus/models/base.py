@@ -100,10 +100,33 @@ from plexus.models.state import StateSchema
 # STATE and return a delta; `field` is a FIELD's own self-dynamics (diffuse / decay /
 # react / playback -- field->field, mutates the field, returns {}); `exchange` couples
 # a SET to a field (set->field deposit, field->set sense/chemotaxis); `rewire` changes
-# the RELATIONS (the edge set E); `structural` changes the ENTITIES (the node set |S|).
+# the RELATIONS (the edge set E); `structural` changes the ENTITIES (the node set |S|);
+# `seed` WRITES THE INITIAL STATE, once, and never again.
 # Naming them lets the registry enumerate "what can change the state, the field, the
 # relation, or the set".
-KINDS = ("lateral", "aggregate", "broadcast", "exchange", "field", "structural", "rewire")
+#
+# WHY `seed` IS A KIND AND NOT A FLAVOUR OF `structural`. Added 6 August, and the argument
+# is a measured failure rather than a taxonomy preference.
+#
+# `structural` conflated two acts that differ in the one property that matters: establishing
+# the initial state (once) and changing membership as the simulation runs (divide, extrude,
+# apoptosis -- throughout). Both mutate in place and return nothing, so the purity contract
+# could not tell them apart, and neither could the engine.
+#
+# The cost of that was `cell_rd_seed mode: tip`. It re-stamped an activation cap on the
+# outermost cell EVERY frame, which makes it a moving boundary condition rather than an
+# initial condition -- and nothing in the language could say so. Three hand-written parents
+# carried `before_frame: 3`; the whole campaign lineage carried nothing; both were equally
+# legal specs. The measured consequence: the chemistry was overwritten every tick, so
+# `shape_to_chem` could accumulate nothing, and 8 same-seed `beta` edits across 13 rounds
+# moved the trajectory by EXACTLY zero while each was recorded as a refuted hypothesis.
+#
+# A `seed` operator is gated by the engine at frame 0 whatever the spec says (see
+# engine._schedule), so a per-frame initialiser is now UNEXPRESSIBLE rather than merely
+# discouraged. This is the same move as EMIT making the engine own integration: a discipline
+# every spec had to remember becomes a guarantee the language provides.
+KINDS = ("lateral", "aggregate", "broadcast", "exchange", "field", "structural", "rewire",
+         "seed")
 
 
 # The recognised temporal-integration states (Axis A: how a SET moves in time), shared by
@@ -654,6 +677,22 @@ class Structural(Operator):
     mitosis) and only relabel membership at completion; returns `{}` otherwise."""
     KIND = "structural"
     MAY_MUTATE_INTEGRATED_STATE = True             # waking/retiring slots rewrites the state buffer
+
+
+class Seed(Structural):
+    """WRITES THE INITIAL STATE, once, and never again.
+
+    A subclass of `Structural` because it does the same thing to the buffer -- writes state
+    directly rather than returning a delta -- but a distinct KIND because it differs in the one
+    property that matters: WHEN. `divide_3d` and `apoptosis` change membership throughout a run;
+    a seed establishes the state the run starts from. Conflating the two is what allowed
+    `cell_rd_seed mode: tip` to re-stamp an activation cap every frame, which made it a moving
+    boundary condition and annihilated every operator writing to the same channel.
+
+    The engine gates `kind="seed"` to `SEED_WINDOW` ticks whatever the spec says, so the
+    guarantee is the language's rather than each spec's to remember.
+    """
+    KIND = "seed"
 
 
 class Rewire(Operator):

@@ -172,7 +172,7 @@ def _engine_owns_clock(params, default=1):
 
 
 
-@register_operator("seed_mesh_3d", set="vertex", kind="structural", family="growth")
+@register_operator("seed_mesh_3d", set="vertex", kind="seed", family="growth")
 class SeedMesh3D(Structural):
     """Frame-0: build a closed spherical half-edge mesh (spherical Voronoi), write the 3D vertex
     positions, and stash the edge table + per-face targets (A0, P0) and the lumen target V0."""

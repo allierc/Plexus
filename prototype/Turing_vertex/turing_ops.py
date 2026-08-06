@@ -29,7 +29,7 @@ from plexus.models.registry import register_operator
 # --------------------------------------------------------------------------- #
 #  Seed: place cells (2D disc / 3D shell / 3D ball), seed the pattern, build adjacency
 # --------------------------------------------------------------------------- #
-@register_operator("seed_aggregate", set="cell", kind="structural", family="growth")
+@register_operator("seed_aggregate", set="cell", kind="seed", family="growth")
 class AggregateSeed(Structural):
     """Frame-0 IC (gate with `before_frame: 1`): place N cells in an aggregate, seed
     the morphogens (substrate full, a small central activator patch + noise -> spots

@@ -50,7 +50,7 @@ def _face_geom(pos, es, et, ef, nF):
     return area, perim, torch.stack([cx, cy], 1)
 
 
-@register_operator("seed_cell", set="cell", kind="structural", family="growth")
+@register_operator("seed_cell", set="cell", kind="seed", family="growth")
 class CellSeed(Structural):
     """Frame-0: initialise the cell set from the vertex mesh -- one live cell per face, target area
     a0 = the regular-hexagon area, type 0, occupancy = alive. Emits no delta."""

@@ -125,7 +125,7 @@ def cell_polygons_2d(pos_np, pad):
 # --------------------------------------------------------------------------- #
 #  Seed: n0 cells on a fixed buffer (occupancy)
 # --------------------------------------------------------------------------- #
-@register_operator("seed_coupled_2d", set="cell", kind="structural", family="growth")
+@register_operator("seed_coupled_2d", set="cell", kind="seed", family="growth")
 class CoupledSeed2D(Structural):
     """Frame-0 IC (`before_frame: 1`): place the live cells (occ>0) as a disc, init the
     morphogens (activator noise around a mean, substrate/inhibitor), and the target area a0.

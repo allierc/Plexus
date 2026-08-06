@@ -143,8 +143,13 @@ def build_harness(n=12, buffer=48, dim=2, device="cpu", dt=0.1, rate=0.0):
 
 
 def _event_driven(cls):
-    """Operators whose work is gated on a random draw or a discrete event."""
-    return getattr(cls, "KIND", None) in ("structural", "rewire")
+    """Operators whose work is gated on a random draw or a discrete event.
+
+    `seed` joins them for the same reason and a sharper one: it acts on the first tick only, so
+    an audit that expects action on every tick would report the campaign's initial conditions
+    inert -- which is the exact false-negative this audit exists to avoid.
+    """
+    return getattr(cls, "KIND", None) in ("structural", "rewire", "seed")
 
 
 def _acted(out, H, occ_before):

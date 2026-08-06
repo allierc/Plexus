@@ -125,7 +125,7 @@ def cell_polygons(pos_np, L, N):
 # --------------------------------------------------------------------------- #
 #  Seed: place cell centres, init target area
 # --------------------------------------------------------------------------- #
-@register_operator("seed_tissue", set="cell", kind="structural", family="growth")
+@register_operator("seed_tissue", set="cell", kind="seed", family="growth")
 class TissueSeed(Structural):
     """Frame-0 IC (`before_frame: 1`): scatter N cell centres in the periodic box
     [0,L)^2 (jittered grid) and set every cell's target area A0 (state block `a0`)."""

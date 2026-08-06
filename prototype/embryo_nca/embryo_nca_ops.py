@@ -121,7 +121,7 @@ class GrowingNCA(FieldUpdate):
         return {}
 
 
-@register_operator("seed_nca", level="field", kind="field")
+@register_operator("seed_nca", level="field", kind="seed")
 class NCASeed(FieldUpdate):
     """Frame-0 initial condition: a single living seed cell at the grid centre (alpha +
     all hidden channels = 1). Gate with `before_frame: 1` so it fires once."""

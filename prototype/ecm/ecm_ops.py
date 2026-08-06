@@ -67,7 +67,7 @@ PRESSURE_HISTORY: list = []
 
 
 # --------------------------------------------------------------------------- seeding
-@register_operator("seed_ecm", family="growth", set="particle", kind="structural")
+@register_operator("seed_ecm", family="growth", set="particle", kind="seed")
 class ECMSeed(Structural):
     """Lay the matrix out ONCE, at frame 0: the box minus a cavity, as fibres.
 

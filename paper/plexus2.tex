@@ -153,7 +153,7 @@ every biological phenomenon, Plexus identifies a compact operator algebra that
 can be reused across mechanics, signalling, metabolism, development and
 physiology.
 
-The proposed operator algebra consists of seven elementary families
+The proposed operator algebra consists of eight elementary families
 (Fig.~\ref{fig:ops}):
 
 \begin{itemize}
@@ -164,12 +164,28 @@ The proposed operator algebra consists of seven elementary families
 \item \textbf{Rewire}: modification of relations between biological entities.
 \item \textbf{Divide}: creation of biological entities.
 \item \textbf{Die}: removal of biological entities.
+\item \textbf{Seed}: establishment of the initial state.
 \end{itemize}
 
 The first four families transform biological state while preserving the
 underlying biological organization. Rewire modifies the interaction graph,
-whereas Divide and Die modify the biological entities themselves. Together they
-form the elementary computational vocabulary of Plexus.
+whereas Divide and Die modify the biological entities themselves. Seed writes
+the state a model starts from. Together they form the elementary computational
+vocabulary of Plexus.
+
+Seed is separated from Divide and Die --- with which it shares a mechanism, since
+all three write state directly rather than returning a delta --- because it differs
+in \emph{when}. Divide and Die act throughout a trajectory; Seed acts only at its
+opening. Treating that distinction as a naming convention rather than a kind has a
+concrete cost. In an automated model-search campaign on a growing epithelial vesicle,
+an initial condition for a reaction--diffusion field was re-applied on every timestep rather
+than once, which converts it from an initial condition into a moving boundary
+condition and silently overwrites the state of any operator writing to the same
+channel. Both spellings were legal specifications and nothing in the language could
+distinguish them; the resulting runs reported a mechanism as refuted eight times
+across thirteen rounds when the operator under test had in fact never reached the
+state. Because Seed is a kind, the runtime imposes its window, and a
+per-timestep initial condition is not expressible.
 
 
 \begin{figure}[h]
@@ -712,12 +728,22 @@ implementations, so an inverse loop can select, e.g., the differentiable
 implementation of a contract.
 
 \paragraph{Kind and purity.} Every operator belongs to exactly one \code{KIND} ---
-the seven of the main text (\code{lateral}, \code{aggregate}, \code{broadcast},
-\code{exchange}, \code{field}, \code{rewire}, \code{structural}). Dynamics operators
-are pure: \code{forward} returns a per-set delta and the engine integrates once per
-tick (its order set by \code{EMIT} $\in$ \{\code{velocity}, \code{acceleration},
-\code{mpm\_acceleration}\}); \code{field}/\code{rewire}/\code{structural} operators
-mutate the field, the relation, or the membership in place and return nothing.
+the eight of the main text (\code{lateral}, \code{aggregate}, \code{broadcast},
+\code{exchange}, \code{field}, \code{rewire}, \code{structural}, \code{seed}).
+Dynamics operators are pure: \code{forward} returns a per-set delta and the engine
+integrates once per tick (its order set by \code{EMIT} $\in$ \{\code{velocity},
+\code{acceleration}, \code{mpm\_acceleration}\});
+\code{field}/\code{rewire}/\code{structural}/\code{seed} operators mutate the field,
+the relation, the membership, or the initial state in place and return nothing.
+
+\paragraph{The seed window.} \code{seed} is the one kind whose \emph{schedule} is part of
+its contract rather than of the specification: the runtime reads the specification once
+before execution and confines every seed to the opening frames. The window is the largest
+one any seed in that specification requests, defaulting to a single frame and capped at a
+small maximum. A model may therefore establish its initial state over the few frames it
+needs, for instance while a mesh relaxes, but cannot ask an initial condition to run for
+the length of the trajectory. This is the same move as \code{EMIT}: a discipline every
+specification would otherwise have to remember becomes a guarantee the language provides.
 
 Selection is by name: \code{get\_operator(name, implementation)} returns the chosen
 class (the default when none is named), and \code{get\_contract(name)} exposes the

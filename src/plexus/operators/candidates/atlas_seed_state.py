@@ -23,7 +23,7 @@ from plexus.models.base import Operator
 from plexus.models.registry import register_operator
 
 
-@register_operator("seed_state", set="cell", kind="structural")
+@register_operator("seed_state", set="cell", kind="seed")
 class SeedState(Operator):
     EMIT = None                                  # writes state directly; returns no delta
     MAY_MUTATE_INTEGRATED_STATE = True           # that write is the whole point, and it is declared
