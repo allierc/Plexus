@@ -85,6 +85,31 @@ SERIES = {
     "74v2_brittle": dict(membrane_break=0.08),
     "75v2_on_ovoid": dict(_gated=True),
 
+    # --- STIFFNESS LADDER: the one thing removing the mass should buy -------------------------------
+    # v2 (overdamped) matched v1 (inertial) to within 2% on every metric, so the fix is correct physics
+    # and a no-op at the working point -- the inertial path also carried `drag`, which was already
+    # suppressing what the mass added. That makes the v3 attribution set moot: there is no difference
+    # between the two changes to attribute, because together they produce none.
+    #
+    # Where the mass DID matter is the ceiling. With inertia the explicit limit is dt*sqrt(k) < 1, giving
+    # k_max ~ 8.2e3, which is what the k = 200..40,000 sweep measured. Overdamped the limit is a
+    # different expression, dt*k/gamma < 2, giving
+    #
+    #     k_max = 2*gamma/dt = 2(2000)/0.004 = 1e6      -- a 120x increase
+    #
+    # so 5e5 should now run where it could not before, and 5e6 should fail. That is falsifiable in both
+    # directions: if 5e5 diverges the overdamped path is not doing what it claims, and if 5e6 survives
+    # the stability argument is wrong.
+    "69s_k5e3": dict(membrane_bond_k=5.0e3),
+    "69s_k5e4": dict(membrane_bond_k=5.0e4),
+    "69s_k1e5": dict(membrane_bond_k=1.0e5),
+    "69s_k5e5": dict(membrane_bond_k=5.0e5),
+    "69s_k1e6": dict(membrane_bond_k=1.0e6),
+    "69s_k5e6": dict(membrane_bond_k=5.0e6),
+    # the inertial control at a stiffness the OLD ceiling forbade: it should diverge, and its divergence
+    # is what makes the overdamped runs above it meaningful rather than merely uneventful.
+    "69s_k5e5_inertial": dict(membrane_bond_k=5.0e5, membrane_inertial=True),
+
     # --- 84-95: WHAT MAKES THE HOLES ----------------------------------------------------------------
     # An external reviewer: the holes in the reference sheet are too big -- real microperforations are
     # ~1 um across, against a 5-10 um cell footprint, so a hole should be about an eighth of a cell and
