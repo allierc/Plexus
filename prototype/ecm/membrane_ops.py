@@ -784,6 +784,12 @@ class IntegrinAdhesion(Lateral):
         self.offset = float(params.get("offset", 0.004))
         self.detach = float(params.get("detach", 0.0))       # 0 = permanent
         self.gamma = float(params.get("overdamped_gamma", 0.0))
+        # ADHESIONS TURN OVER. `u0` was frozen at seeding, which pins every node to one direction for the
+        # whole run -- and that is what defeats the relaxation meant to close gaps: material pushed into
+        # a hole is pulled straight back out by its own anchor. Real focal adhesions detach and re-form,
+        # so the anchor direction is allowed to follow the node on a timescale `tau_adh`. At 0 it is
+        # frozen, which reproduces every earlier run.
+        self.tau_adh = float(params.get("tau_adh", 0.0))
         # BIND TO THE `surface` LEVEL IF ONE EXISTS, otherwise to the 32x64 table as before. Named
         # rather than inferred, so a run either uses the Level or does not and the spec says which --
         # the two differ in a way that shows up in the strain field and must not be silent.
@@ -855,6 +861,12 @@ class IntegrinAdhesion(Lateral):
             ph = torch.atan2(u[:, 1], u[:, 0]) % (2 * math.pi)
             R = M[(th / math.pi * nth).long().clamp(0, nth - 1),
                   (ph / (2 * math.pi) * nph).long().clamp(0, nph - 1)]
+            if self.tau_adh > 0:
+                # let the frozen direction creep toward where the node actually is
+                cur = (pos - c) / (pos - c).norm(dim=1, keepdim=True).clamp_min(1e-12)
+                self.u0 = self.u0 + (cur - self.u0) * (1.0 / self.tau_adh)
+                self.u0 = self.u0 / self.u0.norm(dim=1, keepdim=True).clamp_min(1e-12)
+                u = self.u0
             anchor = c + u * (R + self.offset)[:, None]
         delta = anchor - pos
         if self.detach > 0:
@@ -998,6 +1010,8 @@ class BasementMembraneSecrete(Structural):
         self.rate = float(params.get("rate", 0.02))
         self.targeted = float(params.get("targeted", 1.0))
         self.relax_new = int(params.get("relax_new", 4))
+        self.relax_every = int(params.get("relax_every", 20))     # sweep the whole sheet this often
+        self.relax_sweeps = int(params.get("relax_sweeps", 3))
         self._r0 = None
         self._n0 = None
 
@@ -1125,6 +1139,30 @@ class BasementMembraneSecrete(Structural):
         # A few repulsion sweeps over the newly placed nodes push them off their neighbours and into the
         # space that is actually free. Only the new ones move: relaxing the whole sheet every frame would
         # fight the integrin anchors, which are the thing holding it in place.
+        # THE WHOLE SHEET, PERIODICALLY. Relaxing only the nodes placed this frame is a placement
+        # correction, not a repair: once a gap has opened, nothing ever revisits it. Measured over a full
+        # run that bought 20% (clearance 3.08 -> 2.47 spacings) against a well-packed 1.10. Every
+        # `relax_every` frames the live sheet is swept as a whole so existing gaps are closed too.
+        _f = int(getattr(H, "frame", -1) or -1)
+        if self.relax_every > 0 and _f > 0 and _f % self.relax_every == 0:
+            idx_all = live.nonzero(as_tuple=True)[0]
+            sp_a = math.sqrt(4.0 * math.pi * R * R / max(int(live.sum()), 1))
+            for _ in range(self.relax_sweeps):
+                pa = pos[idx_all]
+                blk = 4096
+                push_all = torch.zeros_like(pa)
+                for a0 in range(0, pa.shape[0], blk):
+                    b0 = min(pa.shape[0], a0 + blk)
+                    dd = (pa[a0:b0, None, :] - pa[None, :, :]).norm(dim=-1)
+                    dd[torch.arange(b0 - a0, device=dev), torch.arange(a0, b0, device=dev)] = 1e9
+                    nd, ni = torch.topk(-dd, min(7, pa.shape[0]), dim=1)
+                    nd = -nd
+                    diff = pa[a0:b0, None, :] - pa[ni]
+                    w_ = (sp_a - nd).clamp_min(0.0) / sp_a
+                    push_all[a0:b0] = (diff / nd[..., None].clamp_min(1e-9) * w_[..., None]).sum(1)
+                pn = pa + push_all * (0.3 * sp_a)
+                rad = (pa - c).norm(dim=1, keepdim=True)
+                pos[idx_all] = c + (pn - c) / (pn - c).norm(dim=1, keepdim=True).clamp_min(1e-12) * rad
         if self.relax_new > 0 and add:
             sp_t = want_sp
             for _ in range(self.relax_new):

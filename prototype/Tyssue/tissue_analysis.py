@@ -344,7 +344,7 @@ def analyze(frames, OUT, a_sw=None):
 
     def _mark(a):
         if _brk is not None:
-            a.axvline(_brk, color="magenta", lw=1.6, alpha=0.85, zorder=5)
+            a.axvline(_brk, color="red", lw=1.6, alpha=0.85, zorder=5)
 
     # 1. THE HEADLINE. protr is what the campaign ranks on and was never drawn.
     ax[0].plot(fr, col("protr"), "-", color="black", lw=2.0, label="protr (ranked on)")
@@ -422,6 +422,6 @@ def analyze(frames, OUT, a_sw=None):
     if _brk is not None:
         fig.suptitle(f"MAGENTA LINE = frame {_brk:.0f}: the surface stops being a single closed "
                      f"sheet. Everything to its right measures a folded mesh.",
-                     fontsize=10, color="magenta", y=0.995)
+                     fontsize=10, color="red", y=0.995)
     fig.tight_layout(); fig.savefig(os.path.join(OUT, "metrics.png"), dpi=110); plt.close(fig)
     return summ

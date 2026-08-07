@@ -800,6 +800,17 @@ def route_a(ctx):
     plan = ctx.get("plan") or []
     limit = int(ctx.get("slots") or 8)
     tried = _sweep_state()
+    # AN EQUAL SHARE PER BASE. Cedric, 7 August: "I expected 4 coral and 4 cellfix_B_new in route
+    # A". Walking the plan in order gave 5 + 3, because cellfix's rho grid has five values and is
+    # listed first -- so one base ran ahead of the other and the Analyst got one long ladder and
+    # one short one instead of two comparable ones. The whole point of two bases is the
+    # comparison: one grows without patterning, the other patterns without growing.
+    plan_bases = []
+    for e in plan:
+        if e[0] not in plan_bases:
+            plan_bases.append(e[0])
+    per_base = max(1, limit // max(1, len(plan_bases)))
+    used = {b: 0 for b in plan_bases}
     out = []
     for base, op, key, values in plan:
         done = set(tried.get(f"{op}0.{key}", []))
@@ -822,7 +833,15 @@ def route_a(ctx):
             gone = [v for v in todo if v not in legal]
             print(T_.quiet(f"[route A] {base} {op}.{key}: {gone} refused by a premise -- "
                            f"not offered"))
+        # BALANCED ACROSS BASES. Cedric, 7 August: "I expected 4 coral and 4 cellfix_B_new in
+        # route A". Walking the plan in order gave 5 + 3, because cellfix's rho grid has five
+        # values and it is listed first -- so one base ran ahead of the other and the Analyst got
+        # one long table and one short one instead of two comparable ladders. A round should
+        # advance both bases by the same amount, because the WHOLE POINT of two bases is the
+        # comparison: one grows without patterning, one patterns without growing.
+        legal = legal[:max(0, per_base - used.get(base, 0))]
         for v in legal:
+            used[base] = used.get(base, 0) + 1
             out.append({"sweep": True, "base": base, "op": op, "key": key, "value": v,
                         "claim": f"ROUTE A: sweep {op}.{key} on {base} -- what value makes it work",
                         "intent": "sweep"})

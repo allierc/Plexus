@@ -470,8 +470,13 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
         if os.path.exists(_mn):
             _z = np.load(_mn)
             if "broken_n" in _z.files:
-                horizon = _CS.evidence_horizon({}, {"broken_n": _z["broken_n"]},
-                                               _z["frame"] if "frame" in _z.files else None)
+                # `cells` is passed so the 10% ceiling can apply: without it the horizon has no
+                # denominator and one broken face in 3,250 ends the evidence (r001_06,
+                # valid_frac 0.167 on damage that peaks at 5.9%).
+                horizon = _CS.evidence_horizon(
+                    {}, {"broken_n": _z["broken_n"]},
+                    _z["frame"] if "frame" in _z.files else None,
+                    cells=(_z["cells"] if "cells" in _z.files else None))
                 if horizon.get("horizon") is not None and not horizon.get("complete", True):
                     last_valid_i = min(last_valid_i, max(0, int(horizon["horizon"])))
             else:
