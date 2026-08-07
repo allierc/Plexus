@@ -19,8 +19,10 @@ import cluster  # noqa: E402
 
 LOG = "/workspace/Plexus/log/okuda_ECM"
 WAVES = [
-    ["96_corset_off", "97_corset_x3", "98_corset_x10", "99_corset_reversed",
-     "100_polarised_myosin", "101_corset_and_myosin"],
+    ["84_holes_45k_r0", "85_holes_45k_r8", "86_holes_135k_r0",
+     "87_holes_135k_r8", "88_holes_270k_r0", "89_holes_270k_r8"],
+    ["90_holes_45k_r0_noadh", "91_holes_45k_r8_noadh", "92_holes_135k_r0_noadh",
+     "93_holes_135k_r8_noadh", "94_holes_270k_r0_noadh", "95_holes_270k_r8_noadh"],
 ]
 PERIOD = int(os.environ.get("WD_PERIOD", 1800))
 

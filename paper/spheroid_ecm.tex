@@ -132,30 +132,26 @@ and neither reaches back, and the second pass cannot change the tissue it is rea
 mutual means letting an operator write to \op{surface} instead of only reading it, which is now a change
 to one Level rather than a change to the architecture.
 
-\section*{5.\; The two new levels}
+\section*{5.\; The basement membrane}
 
-\paragraph{Junctions.} In the vertex model every cell--cell contact pulls with the same strength. Each
-junction now carries its own amount of myosin, which multiplies that strength and chases a target on its
-own timescale:
-%
-\begin{equation}\Lambda\sum_e \ell_e \;\longrightarrow\; \Lambda\sum_e m_e\,\ell_e,\qquad
- m^{ss}_e = a\Bigl(1+\beta\,\bigl(x_e/\langle x\rangle-1\bigr)\Bigr),\qquad
- \dot m_e=\bigl(m^{ss}_e-m_e\bigr)/\tau_m.
-\label{eq:myo}\end{equation}
-%
-What matters is what $x_e$ is. If it is the junction's \emph{length}, the loop reads \emph{longer $\to$
-more myosin $\to$ shorter}, which evens the cells out. Real myosin is recruited by \emph{tension} and
-accumulates on junctions that are in the act of disappearing, which is the opposite: a junction that
-pulls harder shortens, which makes it pull harder still, and neighbours swap. $x_e$ is the edge tension,
-read from the same energy the mechanics minimises. The two versions look alike in the spread of junction
-lengths and differ in how often cells exchange neighbours, so that exchange rate is what we report.
+A basement membrane is a thin sheet of protein an epithelium lays down underneath itself and sits on. It
+has to do two things at once that pull against each other: hold together as a sheet, and keep covering a
+surface that grows. We model the load-bearing part of it --- the crosslinked collagen~IV network --- as
+nodes joined by springs.
 
-\paragraph{Basement membrane.} A sheet of nodes joined by explicit crosslinks. The crosslinks are what
-make it a sheet rather than dust --- material points on their own have no connections, so they cannot be
-crosslinked and cannot tear. Each crosslink is a spring that slowly forgets having been stretched, and
-snaps if stretched too far; each node is tied to a fixed \emph{direction} on the recorded surface, which
-is what makes it adhesion rather than mere contact, since a node allowed to slide to the nearest point
-would never be stretched at all:
+\begin{figure}[t]\centering
+\includegraphics[width=\textwidth]{fig_bm_schematic.pdf}
+\caption{Four objects, and the arrows between them are the model. The epithelium advances on a recorded
+schedule and nothing pushes it back. Its outer boundary is the \op{surface} Level: one node per membrane
+node, each holding a fixed direction and the radius the tissue reached in it. The membrane is grey
+\emph{nodes} joined by green \emph{crosslinks}, sitting a distance $\delta$ outside, each node tied to
+its own surface node by one red \emph{tether}. The matrix beyond is never bonded to.}
+\end{figure}
+
+Three rules. A crosslink is a spring that slowly \emph{forgets} being stretched and snaps if stretched
+too far; a node is tied to a fixed \emph{direction} on the surface, which is what makes it adhesion
+rather than contact, since a node free to slide to the nearest point would never be stretched at all;
+and everything moves at a speed set by force against drag, with no mass:
 %
 \begin{align}
 \gamma\,\dot{\mathbf x}_i &= \sum_{j\sim i}\mathbf f_{ij} \;+\; \mathbf f^{\text{adh}}_i, &
@@ -168,38 +164,64 @@ would never be stretched at all:
 \label{eq:integrin}
 \end{align}
 %
-with a crosslink dying once $(L-\ell^0)/\ell^0>\varepsilon_b$. Note the left-hand side of
-Eq.~\eqref{eq:bond}: the forces set a \emph{velocity}, not an acceleration. A stretched crosslink makes
-its two nodes approach at a speed proportional to the stretch, and they stop the moment it is relieved.
-%
+with a crosslink dying once $(L-\ell^0)/\ell^0>\varepsilon_b$.
+
 Forgetting is not optional: a sheet that only stretches cannot enclose a surface that more than triples
 in size. And because area grows as the square of the radius while new material is added as a fraction of
 what is already there, the sheet must be \emph{secreted} as the tissue grows or it thins.
 
-At this scale viscous drag beats inertia by about ten orders of magnitude, so
-$\gamma\dot{\mathbf x}=\mathbf F$ is the equation of motion: the sheet has no mass and no momentum.
+Two consequences of having no mass. Only the ratio $k_b/\gamma$ appears in Eq.~\eqref{eq:bond} --- a
+relaxation \emph{rate} --- so a stiffness on its own has no meaning here, and the question worth asking
+is whether the sheet relaxes faster than the tissue grows. The same ratio bounds what a fixed time step
+can carry, $\Delta t\,(z\,k_b+\kappa)/\gamma<2$ for $z$ crosslinks meeting at a node, which is about
+twenty times the bound an inertial sheet would have. Raising $\gamma$ moves it further, at the price of a
+sheet that responds more slowly.
 
-This changes what a crosslink stiffness \emph{is}. In Eq.~\eqref{eq:bond}, $k_b$ and $\gamma$ appear
-only as the ratio $k_b/\gamma$, which is a relaxation \emph{rate} --- so stiffness on its own has no
-meaning here, and the quantity that matters is whether the sheet relaxes faster than the tissue grows.
-It also sets what the integrator can carry. Stepping forward in fixed slices is stable while
-$\Delta t\,(z\,k_b+\kappa)/\gamma<2$, where $z$ is the number of crosslinks meeting at a node:
+Finally, what is called adhesion here is a tether to a surface, not a receptor: the dominant anchor in a
+real epithelium is to laminin, which is not modelled, and there is no attachment to the surrounding
+stroma either, so this tether is the only thing holding the sheet.
+
+\section*{6.\; Junction myosin}
+
+In the vertex model every cell--cell contact pulls with the same strength. Real contractility is not
+uniform: myosin accumulates on some junctions and not others, and where it accumulates the junction
+pulls harder and shortens, which is how cells exchange neighbours. Giving each junction its own myosin
+is what lets that happen.
+
+\begin{figure}[t]\centering
+\includegraphics[width=\textwidth]{fig_junction_schematic.pdf}
+\caption{Two cells share an edge, and that edge \emph{is} the junction --- it belongs to neither, which
+is why its state is keyed by the pair of vertices rather than stored on a cell. Myosin sits on the shared
+edge and multiplies its tension. Right: the feedback, which is the only thing here the original model
+cannot already do.}
+\end{figure}
+
+Each junction carries an amount of myosin $m_e$ multiplying the line tension, chasing a target on its
+own timescale:
 %
-\begin{equation}
-k_b^{\max}=\frac{2\gamma/\Delta t-\kappa}{z}\;\approx\;1.7\times10^{5}
-\qquad\text{against}\qquad
-\frac{1/\Delta t^{2}-\kappa}{z}\;\approx\;9.0\times10^{3}
-\quad\text{for an inertial sheet.}
-\label{eq:ceiling}\end{equation}
+\begin{equation}\Lambda\sum_e \ell_e \;\longrightarrow\; \Lambda\sum_e m_e\,\ell_e,\qquad
+ m^{ss}_e = a\Bigl(1+\beta\,\bigl(x_e/\langle x\rangle-1\bigr)\Bigr),\qquad
+ \dot m_e=\bigl(m^{ss}_e-m_e\bigr)/\tau_m.
+\label{eq:myo}\end{equation}
 %
-Nineteen times higher --- and because the bound is set by $\gamma$, it is not a property of the membrane
-at all: raising $\gamma$ admits any stiffness, at the price of a sheet that responds more slowly.
+What matters is what $x_e$ is. If it is the junction's \emph{length}, the loop reads \emph{longer $\to$
+more myosin $\to$ shorter}, which evens the cells out and suppresses neighbour exchange. Myosin is in
+fact recruited by \emph{tension}, and accumulates on junctions in the act of disappearing --- the
+opposite: a junction that pulls harder shortens, which makes it pull harder still. So $x_e$ is the edge
+tension, $\Lambda m_e+2K_P(P_f-P^0_f)+\Gamma P_f$, taken from the same energy the mechanics minimises.
 
-What is called adhesion here is a tether to a surface, not a receptor. The dominant anchor in a real
-epithelium is to laminin, which is not modelled, and the sheet has no attachment to the surrounding
-stroma either --- so this tether is the only thing holding it.
+The two versions cannot be told apart by the spread of junction lengths, because in the fast-myosin
+limit --- the correct one, since myosin turns over in seconds --- substituting the target into
+Eq.~\eqref{eq:myo} turns the length version into a line tension plus a harmonic spring on each edge, and
+narrowing that spread is what such a spring does by definition. They differ in how often cells swap
+neighbours, so that is the observable we report: keyed to tension, the rate of neighbour exchange is
+roughly double.
 
-\section*{6.\; Symbols}
+Two things the model does not have. The myosin responds to the \emph{magnitude} of tension and has no
+preferred direction in the plane of the sheet, so it cannot express the planar polarity that drives
+directional tissue elongation. And $\tau_m$ is a chosen number, not a measured one.
+
+\section*{7.\; Symbols}
 
 Grouped by what they belong to. Where a symbol is a stiffness, the second column says what it is a
 stiffness \emph{of}, since several are easy to confuse.
@@ -245,33 +267,6 @@ $\delta$ & offset & how far outside the surface the sheet sits\\
 \end{tabular}
 \end{center}
 
-\section*{7.\; The two schematics}
 
-The two levels added on top of the spheroid and the matrix. Everything else about them --- the
-configurations, the measurements, and the external audit that found much of it wanting --- has moved to
-\texttt{spheroid\_ecm\_archive.tex} while the model is being corrected.
-
-\begin{figure}[t]\centering
-\includegraphics[width=\textwidth]{fig_bm_schematic.pdf}
-\caption{\textbf{What the membrane is made of.} Four objects, and the arrows between them are the whole
-model. The \emph{epithelium} (cream wedges) is a recording: it advances on a prescribed schedule and
-nothing can push it back. Its outer boundary is the \op{surface} Level (orange), one element per
-membrane node, each holding a fixed direction $\hat{\mathbf u}_i$ and the radius $R(\hat{\mathbf u}_i,t)$
-the tissue reached in that direction. The \emph{basement membrane} is grey \emph{nodes} joined by green
-\emph{crosslinks}, sitting a distance $\delta$ outside. Each node is tied to its \emph{own} surface
-element by one red \emph{integrin} spring---one per node, to a fixed angular position, which is what
-makes it adhesion rather than contact. Outside is the interstitial matrix (purple), which the membrane
-never bonds to: they meet only through the shared grid, or in the spring-graph version, not at all.}
-\end{figure}
-
-\begin{figure}[t]\centering
-\includegraphics[width=\textwidth]{fig_junction_schematic.pdf}
-\caption{\textbf{What a junction is, and the one loop that makes it interesting.} Left: two cells share
-an edge, and that edge \emph{is} the junction---it belongs to neither cell, which is why its state is
-keyed by the unordered pair of vertices $(i,j)$ rather than stored on a cell. Myosin $m_e$ sits on the
-shared edge and sets its tension. Right: the feedback. A junction longer than average recruits more
-myosin ($\beta$), which pulls harder, which shortens it. That loop is the only thing here that Okuda's
-model cannot already do.}
-\end{figure}
 
 \end{document}

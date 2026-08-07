@@ -601,8 +601,17 @@ class BasementMembraneBond(Lateral):
             rad = mid / mid.norm(dim=1, keepdim=True).clamp_min(1e-12)
             axis = torch.tensor([0.0, 0.0, 1.0], device=pos.device, dtype=dt_)
             par = torch.cross(axis.expand_as(rad), rad, dim=1)          # local circle of latitude
-            par = par / par.norm(dim=1, keepdim=True).clamp_min(1e-12)
-            circ = ((d / L[:, None]) * par).sum(1).abs()                # 1 = circumferential, 0 = meridional
+            # ITS LENGTH IS sin(colatitude), AND THAT IS PHYSICS, NOT A NORMALISATION NUISANCE. The
+            # circumferential direction is undefined at the poles, where the parallels shrink to a point.
+            # Normalising with a clamp turned that near-zero vector into a unit vector of NOISE, so polar
+            # bonds drew a random stiffness boost instead of none -- and the recorded hoop tension came
+            # out HIGHER at the poles than the equator (8.63 against 7.01), which is a corset backwards.
+            #
+            # Keeping the length as a weight makes the anisotropy vanish smoothly toward the poles, which
+            # is what a corset does: it grips the girth and nothing at the ends.
+            sin_th = par.norm(dim=1, keepdim=True)
+            par = par / sin_th.clamp_min(1e-12)
+            circ = ((d / L[:, None]) * par).sum(1).abs() * sin_th[:, 0]
             kk = self.k * (1.0 + (self.aniso - 1.0) * circ)
         f = (kk * (L - self.rest) * self.alive.to(dt_))[:, None] * (d / L[:, None])
         # the sheet's own hoop tension, by direction -- this is what a corset would press with, and it is
