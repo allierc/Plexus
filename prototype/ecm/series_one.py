@@ -142,6 +142,12 @@ SERIES = {
     "101_corset_and_myosin": dict(membrane_aniso=10.0, membrane_record_hoop=True,
                                   _myo=dict(myosin=1.0, myo_beta=2.0, myo_keyed_on="tension")),
 
+    # RESERVE FIXED AT 12.5, NOT SCALED WITH THE NODE COUNT. The first version set
+    # membrane_reserve = particles/3333, which pins the INITIAL laid-down count at 3333 whatever the
+    # reservoir -- and because secretion is demand-limited (want = n0 (R/R0)^2) the reservoir never
+    # binds. Measured: reservoirs of 45k/135k/270k gave 34,825 / 37,355 / 38,231 live nodes. A sixfold
+    # reservoir bought 10% more sheet, and the grid varied nothing. With the ratio fixed, n0 becomes
+    # 3.3k / 10k / 20k and the resolution actually changes.
     # --- 84-95: WHAT MAKES THE HOLES ----------------------------------------------------------------
     # An external reviewer: the holes in the reference sheet are too big -- real microperforations are
     # ~1 um across, against a 5-10 um cell footprint, so a hole should be about an eighth of a cell and
@@ -159,18 +165,18 @@ SERIES = {
     # whole (coverage 1.00 -> 0.895), and no amount of relaxation or resolution addresses that. If the
     # no-adhesion holes shrink with relaxation and nodes they were packing; if they do not, the sheet is
     # drifting and the missing piece is an attachment to the stroma.
-    "84_holes_45k_r0": dict(membrane_particles=45000, membrane_reserve=13.5, membrane_relax_new=0),
-    "85_holes_45k_r8": dict(membrane_particles=45000, membrane_reserve=13.5, membrane_relax_new=8),
-    "86_holes_135k_r0": dict(membrane_particles=135000, membrane_reserve=40.5, membrane_relax_new=0),
-    "87_holes_135k_r8": dict(membrane_particles=135000, membrane_reserve=40.5, membrane_relax_new=8),
-    "88_holes_270k_r0": dict(membrane_particles=270000, membrane_reserve=81.0, membrane_relax_new=0),
-    "89_holes_270k_r8": dict(membrane_particles=270000, membrane_reserve=81.0, membrane_relax_new=8),
-    "90_holes_45k_r0_noadh": dict(membrane_particles=45000, membrane_reserve=13.5, membrane_relax_new=0, membrane_adhesion=0.0),
-    "91_holes_45k_r8_noadh": dict(membrane_particles=45000, membrane_reserve=13.5, membrane_relax_new=8, membrane_adhesion=0.0),
-    "92_holes_135k_r0_noadh": dict(membrane_particles=135000, membrane_reserve=40.5, membrane_relax_new=0, membrane_adhesion=0.0),
-    "93_holes_135k_r8_noadh": dict(membrane_particles=135000, membrane_reserve=40.5, membrane_relax_new=8, membrane_adhesion=0.0),
-    "94_holes_270k_r0_noadh": dict(membrane_particles=270000, membrane_reserve=81.0, membrane_relax_new=0, membrane_adhesion=0.0),
-    "95_holes_270k_r8_noadh": dict(membrane_particles=270000, membrane_reserve=81.0, membrane_relax_new=8, membrane_adhesion=0.0),
+    "84_holes_45k_r0": dict(membrane_particles=45000, membrane_reserve=12.5, membrane_relax_new=0),
+    "85_holes_45k_r8": dict(membrane_particles=45000, membrane_reserve=12.5, membrane_relax_new=8),
+    "86_holes_135k_r0": dict(membrane_particles=135000, membrane_reserve=12.5, membrane_relax_new=0),
+    "87_holes_135k_r8": dict(membrane_particles=135000, membrane_reserve=12.5, membrane_relax_new=8),
+    "88_holes_270k_r0": dict(membrane_particles=270000, membrane_reserve=12.5, membrane_relax_new=0),
+    "89_holes_270k_r8": dict(membrane_particles=270000, membrane_reserve=12.5, membrane_relax_new=8),
+    "90_holes_45k_r0_noadh": dict(membrane_particles=45000, membrane_reserve=12.5, membrane_relax_new=0, membrane_adhesion=0.0),
+    "91_holes_45k_r8_noadh": dict(membrane_particles=45000, membrane_reserve=12.5, membrane_relax_new=8, membrane_adhesion=0.0),
+    "92_holes_135k_r0_noadh": dict(membrane_particles=135000, membrane_reserve=12.5, membrane_relax_new=0, membrane_adhesion=0.0),
+    "93_holes_135k_r8_noadh": dict(membrane_particles=135000, membrane_reserve=12.5, membrane_relax_new=8, membrane_adhesion=0.0),
+    "94_holes_270k_r0_noadh": dict(membrane_particles=270000, membrane_reserve=12.5, membrane_relax_new=0, membrane_adhesion=0.0),
+    "95_holes_270k_r8_noadh": dict(membrane_particles=270000, membrane_reserve=12.5, membrane_relax_new=8, membrane_adhesion=0.0),
 
     # --- 84-91: WHICH VARIABLE THE MYOSIN FEEDBACK IS KEYED TO ---------------------------------------
     # The audit's charge: keyed to LENGTH the feedback homogenises junction lengths, where the measured

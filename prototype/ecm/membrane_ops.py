@@ -691,7 +691,12 @@ class BasementMembraneBondBreak(Structural):
         # is NaN wherever it is read is not a metric.
         _last = self._k >= int(getattr(H, "n_frames", 0) or 0) - 1
         if self.components_every > 0 and (self._k % self.components_every == 0 or _last):
-            self._frac = self._largest_component(i[alive], j[alive], pos.shape[0])
+            # NORMALISED BY THE LIVE SHEET, not by the whole set. Dividing by pos.shape[0] counted the
+            # unsecreted reserve as membrane that had failed to connect, so `lcc` simply tracked
+            # n0/N_total: 0.769 / 0.275 / 0.141 at reservoirs of 45k / 135k / 270k is 0.769 x 45/N, and
+            # says nothing about whether the sheet is in one piece.
+            _n = int(getattr(self, "_n_live", pos.shape[0])) or pos.shape[0]
+            self._frac = self._largest_component(i[alive], j[alive], pos.shape[0], denom=_n)
         frac = getattr(self, "_frac", float("nan"))
         # MEAN DEGREE, the quantity that says whether this is a sheet at all. Central-force rigidity
         # percolation in 2D needs z ~ 4; run 74 finished at 2*47046/37424 = 2.51 and was read as an
@@ -703,7 +708,7 @@ class BasementMembraneBondBreak(Structural):
         return {}
 
     @staticmethod
-    def _largest_component(i, j, n, iters=64):
+    def _largest_component(i, j, n, iters=64, denom=None):
         """Largest connected component as a fraction of the sheet, by label propagation.
 
         Iterative rather than a union-find: it is a diagnostic run every 40 frames on the GPU where the
@@ -720,7 +725,7 @@ class BasementMembraneBondBreak(Structural):
             lab = lab.scatter_reduce_(0, j, lab[i], reduce="amin")
             if torch.equal(lab, prev):
                 break
-        return float(torch.bincount(lab).max().item() / max(n, 1))
+        return float(torch.bincount(lab).max().item() / max(denom or n, 1))
 
 
 @register_operator("integrin_adhesion", family="mechanics", set="particle", kind="lateral")
