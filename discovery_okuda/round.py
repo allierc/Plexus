@@ -1911,6 +1911,38 @@ if __name__ == "__main__":
                       f"{'y' if len(bad) == 1 else 'ies'} cannot be admitted as a parent")
                 sys.exit(1)
             print("  pool OK")
+
+            # THE ROUTE A BASES TOO. Cedric, 7 August: "do not see
+            # /workspace/Plexus/log/okuda/cellfix_B_new ????" -- because `--check` printed the
+            # Route B pool and nothing else, so half the batch's recipes were never named or
+            # verified. A base that has moved, been renamed or lost its spec would have gone
+            # undetected until eight slots died on the cluster.
+            print("\n  the Route A bases:")
+            seen_base = set()
+            for n in load_flow():
+                if n["id"] != "route_a":
+                    continue
+                for base, op, key, values in ((n.get("args") or {}).get("plan") or []):
+                    if base in seen_base:
+                        continue
+                    seen_base.add(base)
+                    src = next((p for p in
+                                (os.path.join(LOG_ROOT, base, "spec_run.yaml"),
+                                 os.path.join(LOG_ROOT, base, "spec_q.yaml"),
+                                 os.path.join(os.path.dirname(HERE), "config", "okuda",
+                                              f"{base}.yaml")) if os.path.exists(p)), None)
+                    if src is None:
+                        print(f"  BAD {base:24} no spec on disk -- every sweep on it will refuse")
+                        sys.exit(1)
+                    legal = sum(1 for _b, _o, _k, _vs in
+                                ((n.get("args") or {}).get("plan") or [])
+                                if _b == base for v in _vs
+                                if _sweep_premises_ok(base, _o, _k, v))
+                    total = sum(len(_vs) for _b, _o, _k, _vs in
+                                ((n.get("args") or {}).get("plan") or []) if _b == base)
+                    print(f"  ok  {base:24} {os.path.relpath(src, os.path.dirname(HERE))}"
+                          f"   {legal}/{total} planned values premise-legal")
+            print("  bases OK")
         except FlowError as e:
             print(f"  flow REFUSED: {e}")
             sys.exit(1)
