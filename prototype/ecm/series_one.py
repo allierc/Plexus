@@ -46,6 +46,14 @@ SERIES = {
     "73_no_adhesion": dict(membrane_adhesion=0.0),
     "74_brittle": dict(membrane_break=0.08),
     "75_on_ovoid": dict(_gated=True),
+    # x10 and x20 the reference RATE. A prediction first, so the runs can refute it: these should look
+    # like 69. The rate sweep put the supply/demand knee at 0.0064 per frame and the reference is
+    # already 0.012, twice above it -- past the knee the particle count is set by AREAL DEMAND
+    # (want = n0 (R/R0)^2), not by supply, so pouring in ten times the material faster cannot make a
+    # thicker sheet, only reach the same one sooner. If 76 and 77 differ from 69 by more than the run
+    # to run scatter, the demand-limited picture is wrong.
+    "76_secrete_x10": dict(membrane_secrete_rate=0.12),
+    "77_secrete_x20": dict(membrane_secrete_rate=0.24),
 }
 
 
