@@ -239,6 +239,34 @@ def _exec(node, ctx):
 # ================================================================ the code nodes
 # Each takes the context and returns what its `out:` names. Nothing here judges a result.
 
+FORCING_TERMS = {"rd_interface_tension": "K_extrude"}   # op -> the parameter that writes the answer
+
+
+def _is_forced(name):
+    """Does this run's composition carry a forcing term above zero? Read from its own spec.
+
+    Structural, not measured. `K_extrude` multiplies `- sum_red(a * r)`: an energy that falls the
+    further activated cells get from the centre. A run carrying it did not grow a protrusion, it
+    was paid to have one, and no downstream metric can undo that.
+    """
+    if not name:
+        return False
+    for base in (os.path.join(LOG_ROOT, str(name), "spec_run.yaml"),
+                 os.path.join(os.path.dirname(HERE), "config", "okuda", f"{name}.yaml")):
+        if not os.path.exists(base):
+            continue
+        try:
+            import yaml
+            for o in (yaml.safe_load(open(base)) or {}).get("operators", []):
+                key = FORCING_TERMS.get(o.get("op"))
+                if key and float(o.get(key) or 0) > 0:
+                    return True
+        except Exception:
+            pass
+        return False
+    return False
+
+
 def parents(ctx):
     """The runs the campaign is building from: valid first, best first.
 
@@ -255,12 +283,21 @@ def parents(ctx):
                     continue
                 if r.get("name") and r.get("metrics"):
                     rows.append(r)
-    # A FORCED RUN IS EVIDENCE, NOT A PARENT. Ranking was `protr_peak` alone, and `extrude`
-    # minimises an energy that falls as red cells move outward -- so it wins the ranking by
-    # construction and every later round would build on a hardcoded tube-maker. `mech_p_ratio` is
-    # ~3 for a forced tube and ~1 for a grown one, is already in every record, and is what it is
-    # for. Forced runs sort last; they stay in the record and the Analyst still reads them.
+    # A FORCED RUN IS EVIDENCE, NOT A PARENT -- decided by the COMPOSITION, not by a proxy.
+    #
+    # This first used `mech_p_ratio > 2` alone, on the reasoning that ~3 means forced and ~1 means
+    # grown. Measured on the very first round after `rd_interface_tension` was repaired: r001_01
+    # carries `K_extrude: 4.0`, the operator fired 801 times, it reached protr_peak 1.352 with
+    # n_tubes 2 -- the first run in the project's history to clear the tube threshold -- and its
+    # `mech_p_ratio` read 0.622. The proxy did not fire. It ranked third only because it happened
+    # to break premise P5b, which is luck, not a guard.
+    #
+    # So ask the composition instead. `K_extrude` multiplies an energy term that FALLS as red
+    # cells move outward; a run carrying it above zero is forced by construction, whatever any
+    # measured ratio says afterwards. Both tests are kept: the structural one cannot be fooled,
+    # and the proxy still catches forcing that arrives some other way.
     rows.sort(key=lambda r: (bool(r.get("premises_broken")),
+                             _is_forced(r.get("name")),
                              float(r["metrics"].get("mech_p_ratio") or 0) > FORCED_P_RATIO,
                              -float(r["metrics"].get("protr_peak") or 0)))
     if not rows:
