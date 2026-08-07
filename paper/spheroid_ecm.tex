@@ -89,164 +89,100 @@ change, so the volumetric measure was blind to the deformation, not the mechanic
 
 \section*{4.\; Spheroid $\leftrightarrow$ ECM}
 
-The two solvers cannot share a world, and the reason is not a software limit. \op{mpm\_grid} is
-hard-coded to $[0,1]^3$ with $dx=1/n_{\text{grid}}$, while the epithelium lives in a 50-unit box seeding
-cells at radius~5. Rescaling the tissue into the unit box was tried and measured, not assumed: the same
-run gave $200\to319$ cells at its own scale, $200\to212$ under a pure geometric rescale (it
-\emph{collapses}), and $200\to201$ under a dimensional one---stable, but no longer growing. The cause is
-that the terms of Eq.~\eqref{eq:avm} carry different powers of length, $K_A(\Delta A)^2\!\sim\!s^4$,
-$K_P(\Delta P)^2\!\sim\!s^2$, $K_V(\Delta V)^2\!\sim\!s^6$, $\Lambda P\!\sim\!s$, so a $50\times$ shrink
-changes \emph{which term wins} and surface tension takes over; correcting every exponent stops the
-collapse and still does not restore growth. Calibrating a vertex model to a new scale is a project, and
-doing it badly would mean running the ECM experiment against a tissue that is no longer the reference
-one while the movie looked right. So the two are run as two passes joined by a single geometric scale
-$s$, applied to a \emph{recorded} shape rather than to a simulation. The tissue
-surface is recorded as an angular radius map $R(\theta,\phi,t)$ over its apical vertices. Contact is a
-one-sided penalty plus a hard projection,
-%
-\begin{equation}
-\mathbf{a}_i = k\,\bigl(R(\hat{\mathbf u}_i)-r_i\bigr)\,\hat{\mathbf u}_i \;\;\text{for}\;\; r_i<R ,
-\qquad\text{then}\qquad
-\mathbf{x}_i \leftarrow \mathbf{c}+\hat{\mathbf u}_i\,R(1+\varepsilon)\;\;\text{if still inside},
-\label{eq:contact}
-\end{equation}
-%
-the projection (\op{cell\_exclude\_3d}) being necessary because a penalty punishes penetration rather
-than preventing it. The reaction is accumulated by direction into a pressure map and normalised by the
-solid angle each bin subtends,
-$P(\theta,\phi,t)=\sum_{i\in\text{bin}}k\,\mathrm{depth}_i\,/\,(R^2\,d\Omega)$, which closes the loop
-back onto the cells: \op{ecm\_growth\_gate\_3d} slows the cell cycle where the matrix presses,
-%
-\begin{equation}
-g \;=\; f_0+\frac{1-f_0}{1+(P/P_{1/2})^{n}},
-\qquad
-v_f^0 \leftarrow v_f^{0,\text{prev}} + g\,\bigl(v_f^{0,\text{now}}-v_f^{0,\text{prev}}\bigr),
-\label{eq:gate}
-\end{equation}
-%
-i.e.\ the growth \emph{increment} of Eq.~\eqref{eq:growth} is gated, so a loaded cell reaches its
-division threshold later and divides less often. This is a rate effect and compounds: it turns a
-$2.75\times$ stress anisotropy into a shape. Measured, against a round control at oblateness $1.009$:
-gating on a polar stress pattern gives $1.32$--$1.43$, while a \emph{flat} pattern of the same strength
-shrinks the tissue just as hard and leaves it round ($1.015$). The shape comes from the pattern, not the
-amount.
+The two solvers cannot share a world. \op{mpm\_grid} is hard-coded to $[0,1]^3$; the epithelium lives in
+a 50-unit box, and rescaling it there was tried and measured, not assumed --- the same run gives
+$200\!\to\!319$ cells at its own scale but $200\!\to\!212$ rescaled, because the terms of the vertex
+energy carry different powers of length and a $50\times$ shrink changes which one wins. So the two run as
+two passes joined by one geometric scale, applied to a \emph{recorded} shape.
 
-That last sentence is now known to be an identity rather than a finding, and the correction matters more
-than the claim did. The gate reads the map normalised by its own p99 against a $p_{1/2}$ that is the
-late-run median in the same units, so it depends only on $P/\mathrm{median}(P)$: \textbf{multiplying the
-whole pressure field by any constant leaves it unchanged.} The invariance was built deliberately---so
-$p_{1/2}$ would mean the same thing whatever the matrix stiffness---and the null of the stiffness sweep
-was then reported as a discovery. Two further constraints are also imposed rather than emergent:
-\op{smooth\_phi\_deg}$=360$ makes the map axisymmetric before any cell divides, so the outcome can only
-be a spheroid of revolution; and the estimator's own null on a perfect sphere is $1.020$, so every
-oblateness below $\approx\!1.05$ quoted anywhere in this work sits at or under it. What the campaign
-actually shows is that \emph{a prescribed polar growth mask makes an oblate tissue}. Whether matrix
-stress is what sets the mask is untested, and the Hill exponent $n=6$ lies outside the $n\in[1,2]$ that
-the one published calibration of this functional form allows.
+That recording is the whole coupling, and it runs one way. The epithelium's surface is a moving boundary
+the matrix feels; nothing the matrix does reaches back. Fibres inside the surface are pushed out by a
+soft penalty and then, as a backstop, projected out:
+%
+\begin{equation}\mathbf a_i \;=\; k_c\,\bigl(R(\hat{\mathbf u}_i,t)-r_i\bigr)_+\,\hat{\mathbf u}_i,
+\label{eq:contact}\end{equation}
+%
+and the reaction is binned by direction and divided by the area each bin covers, $R^2\,d\Omega$, to give
+a pressure map $P(\theta,\phi,t)$. A cell facing a stressed matrix then grows more slowly:
+%
+\begin{equation}g \;=\; f + \frac{1-f}{1+\bigl(P/p_{1/2}\bigr)^{n}},\qquad
+ s_{\text{now}} \leftarrow s_{\text{prev}}\,\bigl(1+g\,(f_{\text{grow}}-1)\bigr).
+\label{eq:gate}\end{equation}
+%
+Because it is the growth \emph{rate} that is gated, a small difference compounds over 400 frames, and a
+$2.75\times$ stress anisotropy becomes a shape: an oblate cavity takes the tissue to oblateness $1.43$
+where a flat pattern of the same strength leaves it round at $1.015$.
+
+Three cautions, all found after the fact. First, $P$ is normalised by its own 99th percentile and
+$p_{1/2}$ is the late-run median in those units, so Eq.~\eqref{eq:gate} depends only on
+$P/\mathrm{median}(P)$: \textbf{multiplying the whole pressure field by any constant changes nothing.}
+The invariance was deliberate --- it makes $p_{1/2}$ mean the same thing at any matrix stiffness --- but
+the stiffness sweep that found ``the amount does not matter'' was then measuring an identity. Second, the
+map is averaged over longitude before any cell divides, so the outcome can only be a spheroid of
+revolution. Third, our oblateness estimator reads $1.020$ on a perfect sphere, so every value below
+$\approx\!1.05$ reported anywhere here is at or under its own null. What the campaign shows is that
+\emph{a prescribed polar growth mask makes an oblate tissue}; that matrix stress is what sets the mask is
+not yet shown, and $n=6$ sits outside the $n\!\in\![1,2]$ that the one published calibration of this
+function allows.
 
 \section*{5.\; The two new levels}
 
-\paragraph{Junction myosin.} Actomyosin previously existed only as the scalar $\Lambda$ of
-Eq.~\eqref{eq:avm}. It is now per-junction, recruited by tension and relaxing over $\tau_m$:
+\paragraph{Junctions.} In the vertex model contractility is one number for the whole tissue. Each
+junction now carries its own myosin $m_e$, multiplying the line tension, and chasing a setpoint on a
+timescale $\tau_m$:
 %
-\begin{equation}
-m_e^{\text{ss}} \;=\; \alpha\Bigl(1+\beta\bigl(\ell_e/\langle\ell\rangle-1\bigr)\Bigr),
-\qquad
-\frac{dm_e}{dt} \;=\; \frac{m_e^{\text{ss}}-m_e}{\tau_m},
-\label{eq:myo}
-\end{equation}
+\begin{equation}\Lambda\sum_e \ell_e \;\longrightarrow\; \Lambda\sum_e m_e\,\ell_e,\qquad
+ m^{ss}_e = a\Bigl(1+\beta\,\bigl(x_e/\langle x\rangle-1\bigr)\Bigr),\qquad
+ \dot m_e=\bigl(m^{ss}_e-m_e\bigr)/\tau_m.
+\label{eq:myo}\end{equation}
 %
-with $\alpha$ the global activity---the \emph{in silico} myosin inhibition. Because \op{rewire} and
-\op{structural} operators return no delta (\S1), any state living on junctions is silently invalidated by
-every T1, division and death. So $m_e$ is keyed by \emph{topological identity}, the unordered vertex pair
-$(\min(v_i,v_j),\max(v_i,v_j))$: a surviving edge finds its own value, a new edge takes $m_{\text{new}}$,
-a deleted edge stops being asked, and \op{reconnect\_t1\_3d} and \op{divide\_3d} need no edits. A test
-battery confirms $\alpha{=}1,\beta{=}0$ is bit-identical to no operator, that the radius falls
-monotonically over $\alpha\in[0,3]$ ($7.22\to6.14$), and that new junctions appear at $10.5$ per division
-rather than at the edge count per frame---the signature that the keying holds.
+What $x_e$ should be is the substance. Our first choice was junction \emph{length}, which makes the loop
+\emph{longer $\to$ more myosin $\to$ shorter} --- a negative feedback that evens junction lengths out. The
+measured biology is the opposite: myosin is recruited by \emph{tension} and is enriched on
+\emph{disassembling} junctions, giving a positive feedback that drives neighbour exchange. Worse, in the
+fast-myosin limit --- the correct one, since myosin turns over in seconds --- substituting the setpoint
+turns Eq.~\eqref{eq:myo} into a line tension plus a harmonic spring on each edge, so ``$\beta$ reduces
+the spread of junction lengths'' is that spring's definition and cannot be evidence for it. $x_e$ is now
+the actual edge tension, $\Lambda m_e + 2K_P(P_f-P_f^0)+\Gamma P_f$, taken from the same energy the
+mechanics minimises; and the observable we report is the \textbf{T1 rate}, which the two feedbacks move
+in opposite directions where the length spread does not.
 
-\paragraph{Basement membrane.} A monolayer of material points seeded on $R(\hat{\mathbf u},0)+\delta$
-and joined by explicit \emph{crosslinks}, so that the sheet can be \emph{defective}: MPM particles are
-independent material points coupled only through the grid, so an MPM-only membrane has no connectivity,
-cannot be crosslinked and cannot fragment. A crosslink is a two-body bond $(i,j)$ between neighbouring
-membrane particles, built once by a radius search on the seeded shell and carrying its own rest length
-$\ell^0_{ij}$---it stands for the collagen~IV network that carries the load (laminin and nidogen
-contribute little to stiffness). Adhesion is a different object entirely: a \emph{one-body} spring
-between a membrane particle and a moving point on the epithelial surface. Four terms:
+\paragraph{Basement membrane.} A sheet of nodes joined by explicit crosslinks --- MPM particles alone
+have no connectivity, so they cannot be crosslinked and cannot fragment. Each crosslink is a spring that
+forgets being stretched on a timescale $\tau_r$ and breaks past a strain $\varepsilon_b$; each node is
+tied to a fixed \emph{direction} on the recorded surface, which is what makes it adhesion rather than
+contact, since anchoring to the nearest point would let the node slide and the sheet would never stretch:
 %
 \begin{align}
-\text{crosslink:}\quad & \mathbf{f}_{ij}=k_b\,(\ell_{ij}-\ell^0_{ij})\,\hat{\mathbf d}_{ij},
-&\text{turnover:}\quad & \ell^0_{ij}\leftarrow \ell^0_{ij}+\frac{\ell_{ij}-\ell^0_{ij}}{\tau_r}\,,
-&\text{failure:}\quad & \frac{\ell_{ij}}{\ell^0_{ij}}-1>\varepsilon_b \Rightarrow \text{bond removed},
+\mathbf f_{ij}&=k_b\,(L_{ij}-\ell^0_{ij})\,\hat{\mathbf d}_{ij}, &
+\dot\ell^0_{ij}&=(L_{ij}-\ell^0_{ij})/\tau_r, &
+&\text{bond dies if } (L-\ell^0)/\ell^0>\varepsilon_b,
 \label{eq:bond}\\[2pt]
-\text{integrin:}\quad & \ddot{\mathbf x}_i = k_a\bigl(\mathbf a_i(t)-\mathbf x_i\bigr)-c_d\,\dot{\mathbf x}_i,
-&&\mathbf a_i(t)=\mathbf c+\hat{\mathbf u}_i\bigl(R(\hat{\mathbf u}_i,t)+\delta\bigr),
-&& c_d=2\sqrt{k_a}\;(\zeta=1).
+\mathbf a_i&=\kappa\bigl(\mathbf c+\hat{\mathbf u}_i(R(\hat{\mathbf u}_i,t)+\delta)-\mathbf x_i\bigr), &
+&\hat{\mathbf u}_i \text{ frozen at seeding.}
 \label{eq:integrin}
 \end{align}
 %
-\paragraph{Do the two matrix layers interact?} Only by pushing, and only as far as the grid resolves.
-Both particle bodies scatter into the one \op{mpm\_grid} and gather back from it
-(\op{mpm\_scatter[accumulate]}), so they exchange momentum---but no bond joins a membrane particle to a
-fibre, and the two layers slide past one another freely. The missing object is collagen~VII: anchoring
-fibrils staple the basement membrane to the interstitial matrix, and their operator
-(\op{basement\_to\_ecm}) is designed and not written. The quantitative caveat is sharper. At
-$n_{\text{grid}}=48$ the cell size is $dx=0.021$, against a membrane thickness of $0.002$ and an in-plane
-particle spacing of $\approx\!0.005$: one grid cell holds some sixteen membrane particles and is ten
-times thicker than the sheet. The grid does not resolve the membrane, it sees a smeared density, and any
-fibre within one cell of it is effectively co-moving. The strength of the membrane--matrix coupling is
-therefore set by $dx$ rather than by any parameter of the model, and no membrane--matrix result should be
-read off this configuration without a resolution study.
+Remodelling is not optional: a purely elastic sheet cannot enclose a surface that grows $260\%$ in linear
+strain, and it tore at every $\varepsilon_b$ we tried. With it, the sheet settles at
+$\langle\epsilon\rangle\simeq\dot\varepsilon\,\tau_r$. And because area grows as $R^2$ while deposition
+adds a fixed fraction of existing material per frame, secretion has a threshold, $\rho^\ast=2\ln(R_1/R_0)/N$
+--- though that follows from the operator's own setpoint, so measuring it confirms an implementation
+rather than testing a hypothesis.
 
-Bond removal is registered \op{rewire}: fragmentation \emph{is} a change of $E$. What is reported is not
-the bond count but the largest connected component---a sheet that has lost a third of its crosslinks and
-is still one piece is not fragmented.
+Two corrections. The sheet was integrated with a \emph{mass}, and everything this section used to report
+about oscillation, critical damping, tracking lag and a stiffness ceiling followed from that; at
+$\mathrm{Re}\sim10^{-10}$ the motion is $\gamma\dot{\mathbf x}=\mathbf F$ and none of it exists. It is now
+overdamped. And the metric these claims rested on --- the largest connected component --- was
+\texttt{NaN} on every frame any analysis read, so it had never once been reported; it is now carried
+forward beside the mean degree $z$, which must exceed $\approx\!4$ for the sheet to be mechanically a
+sheet at all.
 
-The anchor $\mathbf a_i$ of Eq.~\eqref{eq:integrin} deserves stating precisely, because it is what
-distinguishes adhesion from contact. $\hat{\mathbf u}_i$ is the particle's \emph{own} direction, frozen at
-seeding, so the anchor sits at a fixed \emph{angular} position and the spring resists tangential
-sliding---anchoring instead to the nearest surface point would let the particle slide freely, which is
-contact, and the shared grid already provides that. The radial coordinate $R(\hat{\mathbf u}_i,t)$ follows
-the epithelium outward, so the bond is radially compliant and tangentially stiff, as an integrin--focal
-adhesion complex is. Two consequences follow. Geometrically, a particle pinned to a fixed angular
-position on a surface whose radius triples must accommodate area growing as $R^2$, so its crosslinks
-stretch by $\sim\!R$: this is the loading a basement membrane experiences under tissue growth, and
-without it the sheet merely slides and its bonds never strain at all (measured: mean strain $0.0000$ at
-every bond stiffness). Mechanically, because the tissue is a replay, $\mathbf a_i$ is a \emph{prescribed
-kinematic target} and not a mutual force pair---the epithelium feels no reaction. That is the one-way
-coupling of \S4 again, and it bites hardest here, since integrin adhesion is precisely the route by which
-a stiff membrane would restrain a growing acinus.
-
-Two calibration facts, both found by tests rather than by inspection. (i) Writing the crosslink force as
-$k\,\varepsilon=k(\ell-\ell^0)/\ell^0$ makes it $1/\ell^0\!\approx\!450\times$ stiffer than the number
-supplied, and the sheet tore itself apart in 40 frames; Eq.~\eqref{eq:bond} is Hookean in the
-\emph{extension}, with the explicit-integration bound $\Delta t_{\text{sub}}<2/\sqrt{k_b}$. (ii) The
-anchor in Eq.~\eqref{eq:integrin} \emph{moves}, at $v_a\!\approx\!0.135$ box/time. An undamped spring does
-not track a ramp, it oscillates about it with amplitude $v_a/\omega=9.5\times10^{-4}$, against a bond rest
-length of $2.2\times10^{-3}$: $43\%$ strain oscillation on every particle, and $66\,680$ of $70\,129$
-crosslinks broken. At $\zeta=1$ the steady lag $2v_a/\omega$ is larger but \emph{coherent} between
-neighbours, so it does not stretch bonds---$0$ broken, the sheet intact at $10\%$ strain.
-
-A result falls out of Eq.~\eqref{eq:bond} without $\tau_r$: sweeping $\varepsilon_b$ over
-$0.05/0.20/0.60$ destroyed the sheet at every value, because the surface grows $66\%$ in linear strain by
-frame 150 and $260\%$ by the end. A purely elastic basement membrane \emph{cannot} enclose a growing
-epithelium; remodelling is not optional, and fragmentation becomes a race between $\tau_r$ and growth.
-
-Point (ii) above, and everything else in this section about oscillation, critical damping and tracking
-lag, describes a sheet that was given a \textbf{mass}. At $\mathrm{Re}\sim10^{-10}$ the equation of
-motion is $\gamma\dot{\mathbf x}=\mathbf F$, not $m\ddot{\mathbf x}=\mathbf F$: overdamped there is
-no oscillation to damp, no lag to critically damp away, and no stability ceiling of the kind measured at
-$k\approx8\times10^3$. Those were reported as calibration facts found by testing; they are numerical
-facts about a term that should not have been in the model. The membrane is now integrated overdamped, and
-the runs that re-measure the ceiling, the sinking and the tearing without inertia are in progress.
-
-Two further corrections to this section. The fragmentation metric it appeals to---the largest connected
-component---was \texttt{NaN} on every frame any analysis read, so it had never once been reported; it is
-now carried forward, alongside the mean degree $z$, for which central-force rigidity percolation in 2D
-requires $z\approx4$. And \op{integrin\_adhesion} is named for a bond it does not represent: in
-mammals $\alpha_1\beta_1$ and $\alpha_2\beta_1$ do bind collagen~IV, so the receptor exists---but the
-dominant epithelial anchor is to \emph{laminin}, through $\alpha_3\beta_1$ and $\alpha_6\beta_4$, and
-laminin is not modelled at all.
+Finally, on naming: \op{integrin\_adhesion} is a tether to a surface, not a receptor. In mammals
+$\alpha_1\beta_1$ and $\alpha_2\beta_1$ do bind collagen~IV, so the receptor exists --- but the dominant
+epithelial anchor is to \emph{laminin}, which is not modelled, and the sheet has no attachment to the
+stroma either. Removing the tether therefore leaves it attached to nothing, which is why that run is a
+control and not a knockout.
 
 \section*{6.\; The two schematics}
 
