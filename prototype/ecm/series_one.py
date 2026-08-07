@@ -59,6 +59,26 @@ SERIES = {
     # 76 is the new nominal: same configuration as 69, on a sheet that starts packed.
     "76_reference_fixed_seed": dict(),
 
+    # --- 77: THE BIOLOGICAL VERSION -----------------------------------------------------------------
+    # Two rules replaced, both because the versions they replace are not things a cell could do.
+    #
+    # DEPOSITION. Cells secrete basement membrane basally, into the patch of surface directly beneath
+    # themselves -- laminin polymerises where integrin and dystroglycan nucleate it, collagen IV
+    # assembles onto that. So deposition is local to each cell and UNIFORM PER UNIT BASAL AREA. Placing
+    # new material beside an existing node is a random walk and clumps; placing it in the largest gap
+    # packs better but is worse biology, because it needs a global view of where the holes are and a cell
+    # has none. Uniform fills a hole at the same rate it adds anywhere else, which is the honest
+    # mechanism, and leaves the evening-out to the network.
+    #
+    # ANCHORS. `u0` was frozen at seeding, which says a patch of membrane remembers where a cell was
+    # four hundred frames ago. Focal adhesions turn over in seconds to minutes, and the cells themselves
+    # divide and swap neighbours, so the tissue a patch is attached to MOVES. Frozen anchors are also
+    # what pins the holes: material that relaxes into a gap is dragged back out by its own tether.
+    "77_biological": dict(membrane_deposit="uniform", membrane_tau_adh=40.0),
+    # the two controls that say which of the two changes did the work
+    "78_uniform_only": dict(membrane_deposit="uniform", membrane_tau_adh=0.0),
+    "79_turnover_only": dict(membrane_deposit="parent", membrane_tau_adh=40.0),
+
 }
 
 
