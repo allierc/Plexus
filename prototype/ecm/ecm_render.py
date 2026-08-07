@@ -469,7 +469,8 @@ def draw_membrane_3d(ax, mem_q, mem_s, cam, L, mem_hi=None, cutaway=True, s_dot=
 
 
 def draw_zoom(ax, mt, pos, mem_q=None, mem_s=None, cam=None, frac=0.55, myo_hi=None,
-              mem_hi=None, name="", lw=None, junctions=True):
+              mem_hi=None, name="", lw=None, junctions=True, bonds=None, bond_s=None,
+              bond_hi=None):
     """A ZOOM on one patch of the surface: junctions coloured by MYOSIN, membrane by BOND STRAIN.
 
     WHY A SEPARATE PANEL AND NOT A COLOUR ON THE EXISTING ONES. Both new entities live in a shell a few
@@ -516,6 +517,23 @@ def draw_zoom(ax, mt, pos, mem_q=None, mem_s=None, cam=None, frac=0.55, myo_hi=N
             lc.set_clim(0, 1)
         ax.add_collection(lc)
 
+    # THE SAME QUANTITY AND RAMP AS THE PANEL AROUND IT. The inset used to draw per-PARTICLE strain on
+    # the green->amber membrane ramp while its parent panel drew per-BOND elongation on blue->red: two
+    # different quantities on two different scales inside one frame, which invites reading the zoom as a
+    # magnified version of the panel when it was measuring something else.
+    if bonds is not None and mem_q is not None and len(bonds[0]):
+        bi, bj = bonds
+        rel_i, rel_j = mem_q[bi] - ctr, mem_q[bj] - ctr
+        inb = ((np.abs(rel_i @ u) < half) & (np.abs(rel_i @ v) < half) & ((rel_i @ d) > -half)
+               & (np.abs(rel_j @ u) < half) & (np.abs(rel_j @ v) < half))
+        if inb.any():
+            segs = np.stack([np.stack([rel_i[inb] @ u, rel_i[inb] @ v], 1),
+                             np.stack([rel_j[inb] @ u, rel_j[inb] @ v], 1)], axis=1)
+            hb = bond_hi or 0.35
+            bc = LineCollection(segs, cmap=_cmap(STRAIN_COLORS), linewidths=1.1, zorder=2)
+            bc.set_array(np.clip(np.asarray(bond_s, float)[inb] / hb, 0, 1)); bc.set_clim(0, 1)
+            ax.add_collection(bc)
+        mem_q = None                      # the nodes are drawn by the network above; skip the dot cloud
     if mem_q is not None:
         mq = mem_q
         rel = mq - ctr
