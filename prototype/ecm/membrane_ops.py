@@ -980,6 +980,8 @@ class BasementMembraneRemodel(Lateral):
         self.at = params.get("_at", "basement_membrane_particle")
         self.tau = float(params.get("tau", 60.0))
         self.cap = float(params.get("cap", 0.02))
+        self.target = str(params.get("target", "own")).lower()    # "own" | "mesh"
+        self.mesh_w = float(params.get("mesh_w", 1.0))            # how far toward the common spacing
         self._said = False
 
     def forward(self, H, mask=None):
@@ -993,7 +995,24 @@ class BasementMembraneRemodel(Lateral):
         # CAPPED PER FRAME. Without it a single violent frame -- a contact transient, an instability --
         # is written permanently into the reference state, and the sheet would remember a shock it should
         # have forgotten. The cap is a fraction of the current rest length.
-        d = ((L - rest) / max(self.tau, 1e-9)).clamp(-self.cap * rest, self.cap * rest)
+        # TOWARD WHAT? `L` -- each bond's OWN current length -- is what this used to relax to, and that
+        # turns out to be why the sheet never evens out. If every spring remembers its own length, the
+        # network has no common preferred spacing, so a disordered configuration IS its equilibrium and
+        # relaxation cannot improve on it. Measured at the end of a run: cv of the rest lengths is 0.521.
+        # Anchors, crosslinking and deposition were all tested against the holes and none of them
+        # mattered, because none of them touches where the disorder is stored.
+        #
+        # A real collagen IV network has a characteristic mesh size -- protomers are a defined length --
+        # so `mesh` relaxes rest lengths toward the spacing the sheet's own density implies, which gives
+        # the network something uniform to relax TO. `own` is the previous behaviour, kept because every
+        # run to date used it.
+        if self.target == "mesh":
+            live_n = float(alive.to(rest.dtype).sum())
+            l_star = L[alive].mean() if live_n > 0 else rest.mean()
+            tgt = (1.0 - self.mesh_w) * L + self.mesh_w * l_star
+        else:
+            tgt = L
+        d = ((tgt - rest) / max(self.tau, 1e-9)).clamp(-self.cap * rest, self.cap * rest)
         rest += d * alive.to(rest.dtype)
         if not self._said:
             print(f"[basement_membrane_remodel] crosslink turnover tau={self.tau} frames "
