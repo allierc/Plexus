@@ -66,7 +66,18 @@ def main():
                 membrane_impl="graph", membrane_aniso=an, membrane_record_hoop=True)
     spec, info = C.build(name, npz, **base)
     spec["general"]["n_frames"] = frames
+    if frames < 100:
+        name = "_smoke_" + name          # same guard as series_one: never share a folder with a real run
+        print(f"[corset] {frames} frames -> writing to {name}", flush=True)
+    # WIPED BEFORE WRITING. A relaunch that leaves the previous attempt's files behind gives a folder
+    # whose contents came from two different runs, and no way to tell which is which -- 79 held a
+    # 24-frame movie from a smoke test beside nothing else, and 77 held one beside a 402-frame
+    # trajectory. Either the folder is this run's output or it is empty.
     d = os.path.join(R.LOG, name)
+    if os.path.isdir(d):
+        import shutil
+        shutil.rmtree(d, ignore_errors=True)
+        print(f"[corset] cleared {d} before writing", flush=True)
     os.makedirs(d, exist_ok=True)
     R.run(name, spec, device=dev, movie=False, render_kw={"strip_only": True})
 

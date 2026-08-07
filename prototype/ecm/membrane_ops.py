@@ -1151,6 +1151,25 @@ class BasementMembraneSecrete(Structural):
             SECRETE_TRACE.append((n_live, add, int(live.sum()), R))
             return {}
 
+        # ---- deposit == "parent": the original rule, kept as the contrast ------------------------------
+        # Its parent selection lived in the code the uniform/gaps branch replaced, so it has to be
+        # restated here. Weighted by local sparsity and by load, exactly as before -- 79 exists to say
+        # what changes when only the ANCHORS move, so its deposition has to be the old one unchanged.
+        want_sp = math.sqrt(4.0 * math.pi * R * R / max(n_live, 1))
+        pl = torch.zeros(n_tot, device=dev, dtype=dt_)
+        pc = torch.zeros(n_tot, device=dev, dtype=dt_)
+        for a_, b_ in ((bi, bj), (bj, bi)):
+            pl.index_add_(0, a_, strain.clamp_min(0.0))
+            pc.index_add_(0, a_, balive.to(dt_))
+        pl = pl / pc.clamp_min(1.0)
+        w = 1.0 + self.targeted * pl[idx_live]
+        k_ = min(add, idx_live.numel())
+        if float(w.sum()) <= 0:
+            pick = torch.randperm(idx_live.numel(), device=dev)[:k_]
+        else:
+            pick = torch.multinomial(w, k_, replacement=False)
+        src = idx_live[pick]
+
         slot = (~live).nonzero(as_tuple=True)[0][:add]
         add = int(slot.numel()); src = src[:add]
 

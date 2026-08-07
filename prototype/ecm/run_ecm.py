@@ -452,6 +452,16 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, f
             a = mem_alive if mem_alive.ndim == 1 else mem_alive[min(t, mem_alive.shape[0] - 1)]
             if a.shape[0] == qm.shape[0]:
                 qm, sm = qm[a], sm[a]
+        # ...AND THAT MASK IS THE FINAL ONE, applied to every frame. A node alive at the END was still
+        # parked at the tissue centre at frame 0, so the early frames drew tens of thousands of nodes
+        # sitting in the lumen -- the green blob in the middle of the spheroid. Aliveness is per-frame
+        # and the position says it exactly: unsecreted material is AT the centre, so anything at a small
+        # fraction of the sheet radius is not membrane yet. Done here rather than by storing a per-frame
+        # mask so that runs already on disk are fixed on re-render.
+        rr = np.linalg.norm(qm, axis=1)
+        if rr.size:
+            live_now = rr > 0.35 * float(np.median(rr[rr > 1e-9])) if (rr > 1e-9).any() else rr > -1
+            qm, sm = qm[live_now], sm[live_now]
         return qm, sm
 
     def blk_of(t):
@@ -639,6 +649,11 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, f
                 _al = None
                 if mem_alive is not None:
                     _al = mem_alive if mem_alive.ndim == 1 else mem_alive[min(t, mem_alive.shape[0] - 1)]
+                # same per-frame correction as `mem_of`: the final mask keeps nodes that are still parked
+                _rr = np.linalg.norm(_raw, axis=1)
+                if _rr.size and (_rr > 1e-9).any():
+                    _now = _rr > 0.35 * float(np.median(_rr[_rr > 1e-9]))
+                    _al = _now if _al is None else (_al & _now)
                 _rs = (np.asarray(mem_hist[t], np.float32) / max(mem_sc or 1.0, 1e-12)
                        if (mem_hist and t < len(mem_hist)) else None)
                 RD.draw_membrane_3d(axz, _raw, _rs, RD.CAM_SIDE, Lt, mem_hi=1.0,
