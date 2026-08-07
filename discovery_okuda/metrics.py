@@ -815,7 +815,7 @@ class CorrActRad(Metric):
     That is a correlation of round-off. Pearson is scale-free by construction, so it returns a confident
     number for a dead field -- and a dead field is precisely the state this campaign keeps landing in."""
     name, group = "corr_act_rad", "coupling"
-    headline = True
+    headline = False   # superseded by `grip`; kept as a diagnostic
     conditional = "refused on a dead field -- needs act_cv > 0.05 and more than 8 live cells"
 
     @classmethod
@@ -829,6 +829,25 @@ class CorrActRad(Metric):
             return cls.SKIP
         return round(float(f.np.corrcoef(a, r)[0, 1]), 4)
 
+
+
+@register
+class Grip(Metric):
+    """CORRELATION x AMPLITUDE: does the pattern grip the shape, and by how much.
+
+    `corr_act_rad` answers only the first half. Pearson normalises the amplitude away, so a
+    perfectly correlated 1% wobble and a perfectly correlated tube score the same -- and over 273
+    runs that is not hypothetical: `r002_10` reported corr 0.922, the second-highest coupling the
+    campaign ever recorded, on a SPHERE (r_cv 0.081, protr 1.163). Cedric watched `r017_03`
+    (corr 0.356) and reported no influence of the red spot on the geometry; he was right and the
+    metric was not.
+
+    grip = corr_act_rad * r_cv. Zero on a sphere however well correlated, and it drops r002_10
+    from rank 2 to rank 35 while leaving genuinely deformed runs on top.
+    """
+    name, group = "grip", "coupling"
+    headline = True
+    conditional = "same refusal as corr_act_rad -- needs a live pattern"
 
 @register
 class ActAtTip(Metric):

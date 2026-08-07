@@ -133,6 +133,16 @@ def centroid_metrics(pt, mt, act, a_sw=0.5):
         cv = float(al.std() / abs(al.mean())) if abs(al.mean()) > 1e-12 else 0.0
         if cv > 0.05 and al.std() > 1e-12 and rl.std() > 1e-12:
             out["corr_act_rad"] = float(np.corrcoef(al, rl)[0, 1])
+            # GRIP = CORRELATION x AMPLITUDE, because Pearson normalises the amplitude away and
+            # that is exactly what made it useless as the campaign's headline. A perfectly
+            # correlated 1% wobble scores identically to a perfectly correlated tube. Measured
+            # over 273 runs: `r002_10` reported corr 0.922 -- the SECOND HIGHEST coupling of the
+            # campaign -- on a sphere (r_cv 0.081, protr 1.163), and `r017_03` reported 0.356 on
+            # a shape Cedric watched and saw nothing happen in. Multiplying by the radial spread
+            # the correlation is about drops r002_10 from rank 2 to rank 35 and puts genuinely
+            # deformed runs on top. The old number stays, as a diagnostic; this is the headline.
+            rcv = float(rl.std() / abs(rl.mean())) if abs(rl.mean()) > 1e-12 else 0.0
+            out["grip"] = out["corr_act_rad"] * rcv
             tip = rl >= np.percentile(rl, 90)
             if tip.any() and abs(al.mean()) > 1e-12:
                 out["act_at_tip"] = float(al[tip].mean() / al.mean())

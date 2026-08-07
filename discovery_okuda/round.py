@@ -296,9 +296,33 @@ def parents(ctx):
     # cells move outward; a run carrying it above zero is forced by construction, whatever any
     # measured ratio says afterwards. Both tests are kept: the structural one cannot be fooled,
     # and the proxy still catches forcing that arrives some other way.
-    rows.sort(key=lambda r: (bool(r.get("premises_broken")),
-                             _is_forced(r.get("name")),
+    # A BROKEN PREMISE IS A DIAGNOSIS, NOT A DISQUALIFICATION -- which `round.md` has said all
+    # along while this sort key did the opposite.
+    #
+    # Measured over 25 rounds and 273 runs: EVERY run that divided broke a premise (23 of 23), so
+    # no growing run was ever eligible to be a parent, and the share of dead spheres climbed from
+    # 7/12 in round 1 to 11/11 by round 24. The loop selected against growth for 25 rounds and the
+    # Analyst read the result as biology -- "growth dilutes coupling", six confirmations.
+    #
+    # The premises were RIGHT: at rho = 0.1 the tissue added 1% volume while cells went 2000 ->
+    # 3250, so P1 ("the body added no material") and P7 ("accommodating area by THINNING") were
+    # describing real subdivision. What was wrong is that one broken premise outranked every
+    # measurement, and that a SOLVER complaint counted the same as a biological one:
+    # `cellfix_B_new` grows x22.7 with P1 and P7 passing and is demoted for P5b, which says
+    # `relax_iters` is a constant while the tissue grows.
+    #
+    # So premises no longer gate the ranking. They are handed to the roles as text, where they
+    # inform; SOLVER premises are separated out so a numerical lag cannot outrank biology; and
+    # forcing -- which is not a diagnosis but a composition that writes its own answer -- still
+    # sorts last.
+    SOLVER_PREMISES = {"P5b", "P5"}
+
+    def _biology_broken(r):
+        return bool(set(r.get("premises_broken") or []) - SOLVER_PREMISES)
+
+    rows.sort(key=lambda r: (_is_forced(r.get("name")),
                              float(r["metrics"].get("mech_p_ratio") or 0) > FORCED_P_RATIO,
+                             -float(r["metrics"].get("grip_peak") or 0),
                              -float(r["metrics"].get("protr_peak") or 0)))
     if not rows:
         # ROUND 1 HAS NO RECORD TO BUILD FROM. The pool is declared in flow.yaml `args:` because it
