@@ -52,7 +52,7 @@ import math
 
 import torch
 
-from plexus.models.base import Lateral, Structural
+from plexus.models.base import Lateral, Rewire, Structural
 from plexus.models.entities import MPMParticle
 from plexus.models.registry import register_entity, register_operator
 
@@ -389,6 +389,7 @@ class BasementMembraneBond(Lateral):
         # obviously wrong to average into a sweep. Checked here rather than discovered there.
         self.graph_mode = bool(params.get("graph_mode", False))
         self.snapshot_every = int(params.get("snapshot_every", 20))
+        self.rebond_every = int(params.get("rebond_every", 20))   # ongoing crosslinking
         self.aniso = float(params.get("aniso", 1.0))          # circumferential : meridional stiffness
         self.record_hoop = bool(params.get("record_hoop", False))
         self.centre_t = torch.tensor([float(v) for v in params.get("centre", [0.5, 0.5, 0.5])])
@@ -556,6 +557,18 @@ class BasementMembraneBond(Lateral):
         # hundred particles at a time, so only THEY need neighbours -- and bonding only the new material
         # carries every existing rest length forward untouched, which the rebuild had to reconstruct by
         # key just to avoid erasing the remodelling history.
+        # CROSSLINKS FORMED BY THE REWIRE OPERATOR, appended here. `basement_membrane_crosslink` decides
+        # WHICH pairs bond -- that is a change to the edge set and belongs in a `rewire` operator, beside
+        # `basement_membrane_bond_break` -- while this operator stays the owner of the bond arrays. Same
+        # split as secretion: the structural operator chooses, this one wires in.
+        _rb = getattr(H, "membrane_rebond", None)
+        if _rb is not None and self.i is not None and _rb[0].numel():
+            H.membrane_rebond = None
+            ai, aj = _rb
+            self.i = torch.cat([self.i, ai]); self.j = torch.cat([self.j, aj])
+            self.rest = torch.cat([self.rest, (pos[aj] - pos[ai]).norm(dim=-1).detach().clamp_min(1e-9)])
+            self.alive = torch.cat([self.alive, torch.ones(ai.numel(), dtype=torch.bool, device=dev)])
+
         new = getattr(H, "membrane_new", None)
         if new is not None and self.i is not None and new.numel():
             H.membrane_new = None
@@ -666,6 +679,7 @@ class BasementMembraneBond(Lateral):
             tot.index_add_(0, a, s_abs)
         MEMBRANE_STRAIN.append((tot / cnt.clamp_min(1.0)).detach().to("cpu", torch.float16).numpy())
         H.membrane_bonds = (self.i, self.j, self.rest, self.alive)     # for the break operator
+        H.__dict__["_bm_bond_op"] = self         # the crosslink operator reuses this neighbour search
         _f = int(getattr(H, "frame", -1) or -1)
         if self.snapshot_every > 0 and _f >= 0 and _f % self.snapshot_every == 0:
             _k = self.alive
@@ -1273,5 +1287,77 @@ BOND_SNAPSHOTS: list = []
 # route by which the membrane can reach the epithelium while the coupling is one-way.
 HOOP_TRACE: list = []
 
+# Per rebonding event: (frame, crosslinks formed, live crosslinks after).
+REBOND_TRACE: list = []
+
 # Published by `run_ecm.run`/`rerender`: which particles are membrane and which are unsecreted reserve.
 MEMBRANE_ALIVE = None
+
+
+@register_operator("basement_membrane_crosslink", family="topology", set="particle", kind="rewire")
+class BasementMembraneCrosslink(Rewire):
+    """Form new crosslinks between nodes that have come within range. Registered `rewire`, because it is.
+
+    THE DEFECT THIS CLOSES. The bond list was built once and thereafter extended only for newly secreted
+    nodes, so the topology was frozen: two nodes drifting within range of one another never formed a
+    crosslink, while a bond whose ends drifted apart survived until 35% strain. Measured at the end of a
+    run, 29% of pairs inside the cutoff had no bond between them, and there were MORE bonds than close
+    pairs -- 144k against 123k -- so a third of the network was held together by history rather than by
+    proximity. Relaxation cannot fix that: it moves nodes, and the defect is in the edges.
+
+    AND IT IS THE BIOLOGY. Peroxidasin crosslinks collagen IV continuously; a network that only ever
+    loses crosslinks is not remodelling, it is decaying. Fragmentation and repair are the two directions
+    of one process and this is the missing half of it.
+
+    KIND. Bond breaking is already `rewire`; forming them is the same kind of change and gets the same
+    kind, so both directions of the edge set are registered rather than one hiding inside a force
+    operator. The pairs are published for `basement_membrane_bond` to wire in, which keeps that operator
+    the single owner of the bond arrays -- the same split secretion uses.
+    """
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    DIFFERENTIABLE = False
+    MECHANISM_TAGS = ["crosslinking", "network_repair", "peroxidasin"]
+    PARAM_ROLES = {"every": "frames between crosslinking events", "cutoff": "bonding range",
+                   "max_neighbours": "cap per node"}
+    REFERENCE = ("Plexus (this work). Continuous collagen IV crosslinking: Bhave et al. (2017) "
+                 "Am. J. Physiol. Renal; Barrientos et al. (2026) Cell (BM turnover sets relaxation).")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "basement_membrane_particle")
+        self.every = int(params.get("every", 20))
+        self.cutoff = float(params.get("cutoff", 0.008))
+        self.max_nb = int(params.get("max_neighbours", 6))
+        self._k = 0
+
+    def forward(self, H, mask=None):
+        self._k += 1
+        if self.every <= 0 or self._k % self.every:
+            return {}
+        bonds = getattr(H, "membrane_bonds", None)
+        if bonds is None:
+            return {}
+        bi, bj, _, _ = bonds
+        lvl = H.level(self.at)
+        pos = lvl.get("pos").detach()
+        lv = getattr(H, "membrane_alive", None)
+        idx = lv.nonzero(as_tuple=True)[0] if lv is not None else torch.arange(pos.shape[0],
+                                                                              device=pos.device)
+        sub = pos[idx]
+        finder = H.__dict__.get("_bm_bond_op")
+        if finder is None:
+            return {}
+        k = min(self.max_nb, max(sub.shape[0] - 1, 1))
+        ni, nj = (finder._neighbours_celllist(sub, k) if sub.shape[0] > 20000
+                  else finder._build_pairwise(sub, k))
+        ni, nj = idx[ni], idx[nj]
+        n2 = pos.shape[0] + 1
+        cand = torch.unique(torch.minimum(ni, nj) * n2 + torch.maximum(ni, nj))
+        has = torch.minimum(bi, bj) * n2 + torch.maximum(bi, bj)
+        fresh = cand[~torch.isin(cand, has)]
+        if not fresh.numel():
+            return {}
+        H.membrane_rebond = ((fresh // n2).long(), (fresh % n2).long())
+        REBOND_TRACE.append((int(getattr(H, "frame", -1) or -1), int(fresh.numel()), int(bi.numel())))
+        return {}

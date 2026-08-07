@@ -79,6 +79,21 @@ SERIES = {
     "78_uniform_only": dict(membrane_deposit="uniform", membrane_tau_adh=0.0),
     "79_turnover_only": dict(membrane_deposit="parent", membrane_tau_adh=40.0),
 
+    # --- 80: WITH ONGOING CROSSLINKING --------------------------------------------------------------
+    # The 2x2 of 76-79 settled two things and left the real defect untouched. Anchor turnover does
+    # essentially nothing (d/hex moves 0.013 and 0.001, inside run-to-run scatter), so frozen anchors
+    # were NOT what stopped relaxation working. Deposition is a straight trade: parent packs well
+    # (0.79) with large gaps (1.64), uniform has the smallest gaps (1.41) and packing that reverts to
+    # random (0.47).
+    #
+    # Neither is the problem. The bond list was built once and extended only for newly secreted nodes,
+    # so the topology was frozen: 29% of pairs within the cutoff had no bond, and there were more bonds
+    # than close pairs -- a third of the network held together by history. The black patches are
+    # plausibly regions with nodes and no crosslinks, which renders identically to an empty patch and
+    # which no amount of relaxation could repair, because relaxation moves nodes and the defect is in
+    # the edges. `basement_membrane_crosslink` (rewire) is the missing half of fragmentation.
+    "80_crosslinking": dict(membrane_deposit="uniform", membrane_rebond_every=20),
+
 }
 
 
