@@ -139,7 +139,8 @@ def classify_npz(path, keys=None):
     return out
 
 
-def evidence_horizon(shapes, series, t=None, n_bar=3, first_bar=1):
+def evidence_horizon(shapes, series, t=None, n_bar=3, first_bar=1, frac_bar=0.10,
+                     cells=None):
     """The first frame at which the mesh stops being trustworthy, as an ABSOLUTE CELL COUNT.
 
     A run is not all-or-nothing: if the mesh fails at frame 380 of 400, the first 379 frames are
@@ -208,6 +209,29 @@ def evidence_horizon(shapes, series, t=None, n_bar=3, first_bar=1):
     y = np.asarray(series[key], dtype=float)
     tt = np.arange(len(y)) if t is None else np.asarray(t)
     out = {"criterion": f"{key} >= {n_bar} cells", "counted": key}
+
+    # A 10% BAR, ON TOP OF THE LAST-CLEAN RULE. Cedric, 7 August, looking at r001_06: "83% of the
+    # run is discarded, on one broken face out of 3,250 cells -- add a threshold at 10%".
+    #
+    # `first_bar = 1` means the evidence ends at the last frame with ZERO broken faces, and on a
+    # dividing tissue that is the first sliver. r001_06 hit broken_n = 1 at frame 125 and lost
+    # 83% of the run (valid_frac 0.167), while its damage only reaches 1% of cells by frame 375
+    # and 5.9% at the end -- a movie that looks intact, because it very nearly is.
+    #
+    # The docstring below argues against a FRACTIONAL bar and is right about why: a fraction gets
+    # more permissive as the tissue grows. So this is a CEILING, not a replacement. The last-clean
+    # rule still finds the boundary; it is simply not allowed to call a run broken while fewer
+    # than `frac_bar` of its cells are. Damage that never reaches 10% leaves the run whole, and
+    # damage that does still gets the strict last-clean boundary it deserves.
+    if cells is not None and frac_bar:
+        c = np.asarray(cells, float)
+        n = min(len(c), len(y))
+        if n and np.nanmax(np.where(c[:n] > 0, y[:n] / np.maximum(c[:n], 1.0), 0.0)) < frac_bar:
+            return {**out, "horizon": None, "horizon_idx": len(y) - 1, "complete": True,
+                    "valid_frac": 1.0, "first_damage": None,
+                    "why": (f"{key} never reaches {frac_bar:.0%} of cells "
+                            f"(peak {100 * float(np.nanmax(y[:n] / np.maximum(c[:n], 1.0))):.1f}%)"
+                            f" -- local damage, not a tear")}
 
     dmg = np.where(y >= first_bar)[0]
     out["first_damage"] = int(tt[dmg[0]]) if len(dmg) else None

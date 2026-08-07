@@ -104,7 +104,8 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                # crosslink turnover, in frames. Large = a membrane that cannot keep up with growth and
                # must fragment; small = one that remodels and stays intact. 0 or None disables it.
                membrane_tau=60.0, membrane_reserve=0.0, membrane_secrete_rate=0.02,
-               membrane_secrete_targeted=1.0, membrane_relax_new=4, membrane_aniso=1.0, membrane_record_hoop=False, membrane_surface_level=False,
+               membrane_secrete_targeted=1.0, membrane_relax_new=4, membrane_relax_every=20, membrane_relax_sweeps=3,
+               membrane_tau_adh=0.0, membrane_aniso=1.0, membrane_record_hoop=False, membrane_surface_level=False,
                membrane_impl="mpm", membrane_drag=40.0, membrane_inertial=False,
                membrane_gamma=2.0e3):
     """The whole experiment as a plain dict, ready for yaml.safe_dump + schema.load."""
@@ -183,7 +184,8 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
             # feel the growth. `membrane_adhesion = 0` reproduces the unanchored (wrong) loading path.
             {"op": "integrin_adhesion", "at": "basement_membrane_particle",
              "centre": [0.5, 0.5, 0.5], "surface": str(membrane), "scale": 1.0,
-             "k": float(membrane_adhesion), "offset": float(membrane_offset), "detach": 0.0},
+             "k": float(membrane_adhesion), "offset": float(membrane_offset), "detach": 0.0,
+             "tau_adh": float(membrane_tau_adh)},
             {"op": "basement_membrane_bond", "at": "basement_membrane_particle",
              "k": float(membrane_bond_k), "cutoff": float(membrane_cutoff),
              "aniso": float(membrane_aniso), "record_hoop": bool(membrane_record_hoop),
@@ -196,7 +198,9 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
             {"op": "basement_membrane_secrete", "at": "basement_membrane_particle",
              "centre": [0.5, 0.5, 0.5], "rate": float(membrane_secrete_rate),
              "targeted": float(membrane_secrete_targeted),
-             "relax_new": int(membrane_relax_new)},
+             "relax_new": int(membrane_relax_new),
+             "relax_every": int(membrane_relax_every),
+             "relax_sweeps": int(membrane_relax_sweeps)},
             {"op": "basement_membrane_bond_break", "at": "basement_membrane_particle",
              "break_strain": float(membrane_break), "components_every": 40},
             # the MLS-MPM cycle for the third body. APPENDED, so its scatter accumulates AFTER the
