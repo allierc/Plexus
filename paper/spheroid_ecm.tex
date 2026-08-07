@@ -382,4 +382,76 @@ and dropping it costs exactly one thing---momentum exchange with the matrix, mea
 falling from $7.5$ to $0.006$. That coupling has to come back as an explicit operator
 (\op{basement\_to\_ecm}), which resolves at the sheet's own length scale instead of the grid's.
 
+
+\section{The junction network, drawn out}
+
+\begin{figure}[t]\centering
+\includegraphics[width=\textwidth]{fig_junction_schematic.pdf}
+\caption{\textbf{What a junction is, and the one loop that makes it interesting.} Left: two cells share
+an edge, and that edge \emph{is} the junction---it belongs to neither cell, which is why its state is
+keyed by the unordered pair of vertices $(i,j)$ rather than stored on a cell. Myosin $m_e$ sits on the
+shared edge and sets its tension. Right: the feedback. A junction longer than average recruits more
+myosin ($\beta$), which pulls harder, which shortens it. That loop is the only thing here that Okuda's
+model cannot already do.}
+\end{figure}
+
+\subsection*{The rules}
+
+In the original vertex model, contractility is one number for the whole tissue: every junction pulls
+with the same line tension $\Lambda$. We keep $\Lambda$ and give each junction a dimensionless
+multiplier $m_e$ on top of it, so the line term of Eq.~\eqref{eq:avm} becomes
+\[ \Lambda\sum_e \ell_e \;\longrightarrow\; \Lambda\sum_e m_e\,\ell_e . \]
+
+\paragraph{1. Myosin chases a setpoint that depends on length.} A junction longer than the current
+average recruits more; shorter recruits less. Written against the \emph{running} mean $\langle\ell\rangle$,
+\[ m^{ss}_e=a\Bigl(1+\beta\bigl(\ell_e/\langle\ell\rangle-1\bigr)\Bigr),\qquad
+   \dot m_e=\bigl(m^{ss}_e-m_e\bigr)/\tau_m . \]
+Because the reference is the running mean, $\langle m^{ss}\rangle=a$ exactly: the average is pinned and
+myosin is a pure \emph{redistribution}. At $a=1$ nothing is double-counted with $\Lambda$, which is why
+the ablation is bit-identical rather than merely close.
+
+\paragraph{2. And therefore $a$ is not a new parameter, but $\beta$ is.} Since $a$ multiplies every
+junction equally, it does exactly what scaling $\Lambda$ does; the two cannot be told apart from any
+observation. $\beta$ can: it changes the \emph{disorder} of junction lengths at constant tissue size.
+Sweeping $a$ over $[0.6,1.4]$ traces a line in (radius, junction-length CV) of slope $+0.103$; $\beta$
+moves perpendicular to it, $\Delta R=-0.02$ (0.2\%, nothing) against $\Delta\mathrm{CV}=-0.099$, where
+that line predicts $-0.002$. Measured:
+\begin{center}\small
+\begin{tabular}{lccc}\toprule
+ & $a$ & $R$ & CV of $\ell_e$ \\ \midrule
+reference        & 1.0 & 10.94 & 0.321 \\
+$\beta=2$        & 1.0 & 10.95 & \textbf{0.249} \\
+$\beta=4$        & 1.0 & 10.92 & \textbf{0.222} \\
+blebbistatin-ish & 0.6 & 11.12 & 0.350 \\
+hypercontractile & 1.4 & 10.73 & 0.310 \\ \bottomrule
+\end{tabular}
+\end{center}
+$\beta=4$ reaches a CV no value of $a$ in range approaches, at a radius that has not moved.
+
+\paragraph{3. A junction born from a division inherits.} Not every edge that appears is new. A division
+inserts a vertex into each of two edges and joins them, so it makes two \emph{kinds}: a split half of a
+cut junction, which has a myosin history, and the daughter--daughter interface, which does not. Measured
+over 251 frames: of 13{,}750 edges that had no record, 9{,}920 (72\%) were split halves and 9{,}760 of
+those (98.4\%) recovered their parent. Only the remaining 28\% take $m_{\rm new}$.
+
+\paragraph{4. $\tau_m$ was chosen, not measured.} Stated plainly because it is the weakest number in
+this section: $\tau_m=20$ frames is a default. It is swept nowhere except a determinism check. What it
+sets is how far myosin lags the length changes driving it, and the analogous relation for the membrane
+($\langle\epsilon\rangle\simeq\dot\varepsilon\tau$) was measurable, so this one should be too.
+
+\subsection*{How it is built in Plexus2}
+
+One operator, \op{junction\_myosin}, of kind \textbf{structural}: it does not return a force, it rewrites
+a per-edge quantity that the mechanics then reads in the same frame. It is scheduled immediately before
+\op{shape\_energy\_3d} for that reason---placed after, every relaxation would use the previous frame's
+myosin.
+
+The design claim worth stating is what is \emph{not} there. Junction is not a Level. Per-edge state is
+keyed by the unordered vertex pair, so \op{divide\_3d}, \op{reconnect\_t1\_3d} and any future death
+operator permute, lengthen and shorten the half-edge arrays freely: an edge that still exists finds its
+own value, one that is new finds its parent or a default, one that is gone is simply never asked. None
+of the three topology operators knows that myosin exists, and adding the next per-edge state will not
+require editing them either. Promoting junction to a Level would buy per-edge provisioning and cost a
+reconciliation operator for every topology change.
+
 \end{document}
