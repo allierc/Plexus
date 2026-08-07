@@ -201,6 +201,13 @@ nodes:
       slots: 16
       frames: 900
       max_edits: 4
+      # THE CELL CAP A ROUTE A RUN IS GIVEN. Not derived from the base's seed count, which is what
+      # capped cellfix_B_new at 10,404 while rho = 1.0 wanted more (finished 9,999, buf_full).
+      # A sweep pushes a knob until something stops it; if the array stops it, the sweep measured
+      # the array. Cost is ~22 MB of recorded trajectory per 1,000 cells of cap, so 100,000 is
+      # ~2.2 GB per run against an A6000's 49 GB. There is always a ceiling -- this one is set by
+      # memory rather than by an accident of how many cells the base happened to start with.
+      sweep_cells: 100000
 
   - id: launch
     code: round.launch
