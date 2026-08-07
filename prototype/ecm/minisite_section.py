@@ -141,7 +141,7 @@ deep, the lumen is hollow, the fibres are cut where they cross, and the blocks a
 <div class="sim-gallery g3">
 {cards}
 </div>
-<h3>Basement membrane + junctions — the two levels inside the epithelium</h3>
+<h3>Basement membrane + junctions</h3>
 <p class="opk">The same tissue, with two things that were not there before. The <b>basement membrane</b>
 is a sheet of nodes joined by explicit <b>crosslinks</b>, laid down outside the epithelium and tied to
 it by one <b>integrin</b> spring per node — anchored to a fixed direction, so the sheet stretches as the
