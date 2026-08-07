@@ -399,6 +399,15 @@ def draw_junctions_3d(ax, mt, pos, cam, L, myo_hi=None, cutaway=True, lw=0.9):
     if not keep.any():
         return
     segs = np.stack([a[keep], b[keep]], axis=1)
+    # DEPTH-SORTED, because Line3DCollection is not. Matplotlib draws the segments in array order under a
+    # single z-order, and the array order is the half-edge table -- which `divide_3d` and
+    # `reconnect_t1_3d` PERMUTE every frame. So which of 12,000 overlapping lines ends up on top changes
+    # frame to frame for reasons that have nothing to do with geometry, and the panel shimmers. Measured
+    # on run 67 the colour is not moving at all (rendered mean 0.667 -> 0.670, max step 0.006) and the
+    # visible set barely is (median 6 edges differ between frames), so the flicker is entirely this.
+    # Sorting by depth makes the draw order a function of geometry, which is stable across frames.
+    order = np.argsort(-(0.5 * (segs[:, 0] + segs[:, 1]) @ d))
+    segs = segs[order]
     _m = _myo_of(mt, live.shape[0])
     myo = _m[live] if _m is not None else None
     if myo is None:
@@ -406,7 +415,7 @@ def draw_junctions_3d(ax, mt, pos, cam, L, myo_hi=None, cutaway=True, lw=0.9):
     else:
         hi = myo_hi or max(float(np.percentile(myo, 98)), 1e-9)
         lc = Line3DCollection(segs, cmap=_cmap(MYOSIN_COLORS), linewidths=lw)
-        lc.set_array(np.clip(myo[keep] / hi, 0, 1)); lc.set_clim(0, 1)
+        lc.set_array(np.clip(myo[keep][order] / hi, 0, 1)); lc.set_clim(0, 1)
     ax.add_collection3d(lc)
 
 
