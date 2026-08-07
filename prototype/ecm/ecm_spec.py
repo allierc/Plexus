@@ -104,7 +104,7 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                # crosslink turnover, in frames. Large = a membrane that cannot keep up with growth and
                # must fragment; small = one that remodels and stays intact. 0 or None disables it.
                membrane_tau=60.0, membrane_reserve=0.0, membrane_secrete_rate=0.02,
-               membrane_secrete_targeted=1.0, membrane_deposit="uniform", membrane_relax_new=4, membrane_relax_every=20, membrane_relax_sweeps=3,
+               membrane_secrete_targeted=1.0, membrane_deposit="uniform", membrane_rebond_every=20, membrane_relax_new=4, membrane_relax_every=20, membrane_relax_sweeps=3,
                membrane_tau_adh=0.0, membrane_aniso=1.0, membrane_record_hoop=False, membrane_surface_level=False,
                membrane_impl="mpm", membrane_drag=40.0, membrane_inertial=False,
                membrane_gamma=2.0e3):
@@ -202,6 +202,9 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
              "relax_new": int(membrane_relax_new),
              "relax_every": int(membrane_relax_every),
              "relax_sweeps": int(membrane_relax_sweeps)},
+            {"op": "basement_membrane_crosslink", "at": "basement_membrane_particle",
+             "every": int(membrane_rebond_every), "cutoff": float(membrane_cutoff),
+             "max_neighbours": 6},
             {"op": "basement_membrane_bond_break", "at": "basement_membrane_particle",
              "break_strain": float(membrane_break), "components_every": 40},
             # the MLS-MPM cycle for the third body. APPENDED, so its scatter accumulates AFTER the
@@ -221,7 +224,8 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
         spec["schedule"].insert(i + 1, "basement_membrane_bond")
         if membrane_tau and membrane_tau > 0:
             spec["schedule"].insert(i + 2, "basement_membrane_remodel")
-            spec["schedule"].insert(i + 3, "basement_membrane_bond_break")
+            spec["schedule"].insert(i + 3, "basement_membrane_crosslink")
+            spec["schedule"].insert(i + 4, "basement_membrane_bond_break")
         else:
             spec["operators"] = [o for o in spec["operators"]
                                  if o["op"] != "basement_membrane_remodel"]
