@@ -161,7 +161,14 @@ nodes:
       slots: 8
       plan:
         - [cellfix_B_new,  morphogen_growth_3d, rho,      [0.0, 0.1, 0.3, 1.0, 2.0]]
-        - [coral_gate_div, morphogen_growth_3d, rho,      [0.0, 0.1, 0.3, 1.0, 2.0]]
+        # rho 0.0 is DROPPED for coral_gate_div and kept for cellfix_B_new, and the difference is
+        # the gate. With the activator gate connected, rho = 0 is the infinite tip-to-body ratio
+        # premise P2 refuses BEFORE the GPU ("if the gate is connected at all, then rho > 0") --
+        # r001_13 died on exactly that. A refused run records no metrics, so the closure counter
+        # never sees the value and route_a would re-propose it every round for the whole campaign.
+        # cellfix_B_new runs a_sw = 50, so its gate is off, P2 reads `na`, and rho = 0 is a legal
+        # measurement there (200 cells, no growth) rather than a pathology.
+        - [coral_gate_div, morphogen_growth_3d, rho,      [0.1, 0.3, 1.0, 2.0]]
         - [coral_gate_div, morphogen_growth_3d, vth_frac, [1.4, 2.0, 2.5, 3.5]]
         - [coral_gate_div, divide_3d,           factor,   [1.5, 2.0, 3.0, 4.0]]
         - [coral_gate_div, morphogen_growth_3d, a_sw,     [0.05, 0.15, 0.35, 0.8]]
