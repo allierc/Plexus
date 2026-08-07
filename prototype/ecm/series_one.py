@@ -101,14 +101,16 @@ SERIES = {
     # directions: if 5e5 diverges the overdamped path is not doing what it claims, and if 5e6 survives
     # the stability argument is wrong.
     "69s_k5e3": dict(membrane_bond_k=5.0e3),
+    "69s_k2e4": dict(membrane_bond_k=2.0e4),
     "69s_k5e4": dict(membrane_bond_k=5.0e4),
     "69s_k1e5": dict(membrane_bond_k=1.0e5),
-    "69s_k5e5": dict(membrane_bond_k=5.0e5),
-    "69s_k1e6": dict(membrane_bond_k=1.0e6),
-    "69s_k5e6": dict(membrane_bond_k=5.0e6),
-    # the inertial control at a stiffness the OLD ceiling forbade: it should diverge, and its divergence
-    # is what makes the overdamped runs above it meaningful rather than merely uneventful.
-    "69s_k5e5_inertial": dict(membrane_bond_k=5.0e5, membrane_inertial=True),
+    "69s_k15e4": dict(membrane_bond_k=1.5e5),
+    # the inertial control at a stiffness the inertial ceiling forbids: it must be REFUSED, which is what
+    # makes the overdamped runs above 9e3 a gain rather than a coincidence
+    "69s_k5e4_inertial": dict(membrane_bond_k=5.0e4, membrane_inertial=True),
+    # gamma raised 10x, to show the ceiling is not a property of the sheet: overdamped k and gamma enter
+    # only as k/gamma, so 1e6 becomes reachable -- at the cost of a sheet ten times slower to respond
+    "69s_k1e6_gam2e4": dict(membrane_bond_k=1.0e6, membrane_gamma=2.0e4),
 
     # --- 84-95: WHAT MAKES THE HOLES ----------------------------------------------------------------
     # An external reviewer: the holes in the reference sheet are too big -- real microperforations are
