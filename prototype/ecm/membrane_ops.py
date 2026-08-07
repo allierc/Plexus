@@ -350,6 +350,18 @@ class BasementMembraneBond(Lateral):
         # dt_sub < 2/omega. At dt_sub = 2e-4 that is k < 1e8; 2e5 gives ~70 substeps per period, which
         # is stable with room to spare.
         self.k = float(params.get("k", 2.0e5))
+        # ...AND THAT ARGUMENT ONLY HOLDS FOR THE MPM PATH. `emit: acceleration` hands the force to the
+        # ENGINE, which integrates once per FRAME at dt = 4e-3 -- twenty times the MPM substep. The limit
+        # is dt < 2/omega with omega = sqrt(k_eff), and k_eff is not k but the SUM over a node's bonds,
+        # about 4.6 of them, so the ceiling drops by another factor of 4.6:
+        #
+        #     k_max  =  4 / (dt^2 * bonds_per_node)   ~  5.4e4  at dt = 4e-3
+        #
+        # Above it the sheet does not wobble, it diverges: the first graph-mode run returned a mean
+        # crosslink strain of INFINITY at k = 2e5, a value that is obviously wrong and would have been
+        # obviously wrong to average into a sweep. Checked here rather than discovered there.
+        self.graph_mode = bool(params.get("graph_mode", False))
+        self.snapshot_every = int(params.get("snapshot_every", 20))
         self.cutoff = float(params.get("cutoff", 0.020))
         self.max_nb = int(params.get("max_neighbours", 6))
         self.damp = float(params.get("damp", 0.0))
@@ -389,6 +401,19 @@ class BasementMembraneBond(Lateral):
             keep = live[i] & live[j]
             i, j = i[keep], j[keep]
         return i, j
+
+    def _check_stability(self, bonds_per_node, dt_frame=4.0e-3):
+        if not self.graph_mode:
+            return                                   # MPM path: integrated at the substep, ~70 per period
+        k_max = 4.0 / (dt_frame ** 2 * max(bonds_per_node, 1.0))
+        if self.k > k_max:
+            raise RuntimeError(
+                f"basement_membrane_bond: k = {self.k:.3g} exceeds the explicit-integration ceiling "
+                f"{k_max:.3g} for emit=acceleration at dt = {dt_frame:g} with {bonds_per_node:.1f} bonds "
+                f"per node. The spring graph is integrated once per FRAME, not at the MPM substep, so it "
+                f"cannot carry the stiffness the MPM path could: this run would return an infinite "
+                f"strain rather than a soft sheet. Either lower k, or give the membrane its own substep "
+                f"loop (which is what moving off MPM gave up).")
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
@@ -437,6 +462,13 @@ class BasementMembraneBond(Lateral):
                     f"dust, and every downstream fragmentation number would be vacuous. Either the "
                     f"shell was seeded at the wrong scale or the cutoff is below the particle spacing "
                     f"(~sqrt(4*pi*R^2/N)).")
+            # LIVE nodes, not the whole set. Dividing by all 45,000 -- of which 41,000 are unsecreted
+            # reserve parked at the centre -- gave 0.42 bonds per node instead of 5.6, a ceiling 13x too
+            # high, and the guard passed a run that returned an infinite strain. A denominator that
+            # includes material which does not exist yet is not a coordination number.
+            _live = getattr(H, "membrane_alive", None)
+            _n = int(_live.sum()) if _live is not None else pos.shape[0]
+            self._check_stability(self.i.numel() / max(_n, 1) * 2.0)
             print(f"[basement_membrane_bond] {self.i.numel()} bonds on {pos.shape[0]} particles "
                   f"({self.i.numel() / max(pos.shape[0], 1):.1f} per particle), k={self.k:g}, "
                   f"cutoff={self.cutoff:g}", flush=True)
@@ -463,6 +495,13 @@ class BasementMembraneBond(Lateral):
             tot.index_add_(0, a, s_abs)
         MEMBRANE_STRAIN.append((tot / cnt.clamp_min(1.0)).detach().to("cpu", torch.float16).numpy())
         H.membrane_bonds = (self.i, self.j, self.rest, self.alive)     # for the break operator
+        _f = int(getattr(H, "frame", -1) or -1)
+        if self.snapshot_every > 0 and _f >= 0 and _f % self.snapshot_every == 0:
+            _k = self.alive
+            BOND_SNAPSHOTS.append((_f,
+                                   self.i[_k].detach().cpu().numpy().astype("int32"),
+                                   self.j[_k].detach().cpu().numpy().astype("int32"),
+                                   strain[_k].detach().cpu().numpy().astype("float16")))
         return {lvl.name: acc}
 
 
@@ -907,6 +946,12 @@ class BasementMembraneSecrete(Structural):
 
 
 SECRETE_TRACE = []
+
+# Periodic snapshots of the crosslink NETWORK: (frame, i, j, strain). Per-particle strain cannot show
+# topology -- a node with three taut bonds and a node with one look identical -- and "structured vs
+# broken" is a statement about edges, so the edges have to be recorded. Every `snapshot_every` frames,
+# because storing 140k bonds x 400 frames is not worth it and the network changes slowly.
+BOND_SNAPSHOTS: list = []
 
 # Published by `run_ecm.run`/`rerender`: which particles are membrane and which are unsecreted reserve.
 MEMBRANE_ALIVE = None

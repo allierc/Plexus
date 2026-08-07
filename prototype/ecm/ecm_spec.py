@@ -239,6 +239,12 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
             for o in spec["operators"]:
                 if o["op"] in ("basement_membrane_bond", "integrin_adhesion"):
                     o["emit"] = "acceleration"
+                    # EXPLICIT, not inferred from `emit`. The spec's `emit` key is consumed by the
+                    # engine's emit resolution and does not survive into the round-tripped yaml, so an
+                    # operator that keys its stability check off it silently skips the check -- which is
+                    # what happened: k = 2e5 ran to completion in graph mode and returned an infinite
+                    # strain with no warning.
+                    o["graph_mode"] = True
             spec["operators"].append({"op": "drag", "at": "basement_membrane_particle",
                                       "k": float(membrane_drag)})
             i = spec["schedule"].index("basement_membrane_bond")

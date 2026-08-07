@@ -444,7 +444,6 @@ class Divide3D(Structural):
         super().__init__(params, device)
         self.at = params.get("_at", "vertex")
         self.factor = float(params.get("factor", 2.0))           # divide when volume >= factor x birth volume
-        self.reset_noise = float(params.get("reset_noise", 0.12))  # per-cell threshold jitter -> staggered (gradual) divisions
         self.cycle_cv = float(params.get("cycle_cv", 0.0))       # STOCHASTIC CELL CYCLE: Gaussian CV of each daughter's
         #   cell-cycle length (fresh division threshold). >0 keeps division waves broken up (desynchronised) as the
         #   tissue proliferates -- essential at scale so max-rate division never outruns relaxation. 0 -> uniform reset_noise.
@@ -482,10 +481,14 @@ class Divide3D(Structural):
     def _fresh_djit(self, rng, n=1):
         """Fresh per-cell division-threshold multiplier. Gaussian CV (cycle_cv) when set -> desynchronised
         cell cycles; otherwise the legacy uniform +/-reset_noise jitter. Clamped so thresholds stay sane."""
+        # `reset_noise` REMOVED 6 August. It was the legacy jitter, read only on the `cycle_cv == 0`
+        # branch, and every parent this campaign has run sets cycle_cv > 0 -- so the battery
+        # measured it DEAD (a same-seed edit moved the trajectory by exactly zero) and the search
+        # could not reach it anyway. Two ways of doing one thing, one of them unreachable.
         if self.cycle_cv > 0:
             v = np.clip(1.0 + self.cycle_cv * rng.standard_normal(n), 0.4, 1.8)
         else:
-            v = 1.0 + self.reset_noise * (rng.random(n) * 2 - 1)
+            v = np.ones(n)                     # cycle_cv = 0 means synchronous, not "jittered a bit"
         return v if n > 1 else float(v[0])
 
     def forward(self, H, mask=None):

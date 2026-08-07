@@ -353,14 +353,35 @@ OPERATORS = {
     "seed_mesh_3d": dict(
         stage=1, role="substrate", outputs=[], slots=[], needs=[],
         impls=["fibonacci_sphere", "checkpoint"], impl_structural=False,
+        # `radius` and `jitter` were unreachable -- the INITIAL GEOMETRY itself. jitter breaks the
+        # Fibonacci lattice, whose regularity was measured at 6.1x the shuffled null in the strain
+        # field (see prototype/ecm/HIERARCHY.md); leaving it unsearchable meant the lattice
+        # artefact could never be varied against.
         params={"n_cells": (150, 4000, 500),          # 4000 = Okuda's largest case (grounder.SETUP)
+                "radius": (2.0, 12.0, 5.0), "jitter": (0.0, 0.8, 0.35),
                 "vseed_cv": (0.0, 0.5, 0.15)}),
     "shape_energy_3d": dict(
         stage=1, role="mechanics", outputs=["geometry"], slots=[], needs=[],
         impls=["default", "monolayer"], impl_structural=True,       # mid-surface vs true 3D volume
+        # UNPINNED 6 August. Eight of this operator's terms were LITERALS in translate's emitter
+        # -- K_A: 1.0, K_P: 1.0, K_R: 0.02, K_bend: 0.0, antiinv: 0.0, mu: 1.0 -- so no proposal
+        # could ever name them. Two of those zeros are the mechanisms that decide whether a lobe
+        # necks into a finger, which is the question the campaign has been stuck on for seven
+        # rounds while the terms were switched off:
+        #   K_bend   bending rigidity. Its own comment: penalises sharp curvature but "does NOT
+        #            flatten gentle whole-shell/tube curvature" -- i.e. exactly the term that
+        #            separates a neck from a bulge. Pinned to 0.0.
+        #   K_lumen  global lumen incompressibility, which "distinguishes sphere from a
+        #            per-cell-volume-preserving buckle" -- the collapse-is-not-a-tube confound the
+        #            Analyst has reported six times. NEVER EMITTED AT ALL (0 occurrences).
+        # eta / cap_frac / smooth_* stay pinned: they are solver numerics, not mechanisms, and the
+        # model/implementation split says a numerical choice is not an experiment.
         params={"K_V": (1.0, 8.0, 6.0), "kappa_s": (0.05, 0.6, 0.2),
                 "Gamma": (0.0, 0.4, 0.05), "Lambda": (0.0, 0.3, 0.20),
                 "p0": (3.4, 4.2, 3.90), "h0": (0.05, 0.4, 0.40), "gamma": (0.0, 0.3, 0.06),
+                "K_bend": (0.0, 2.0, 0.0), "K_lumen": (0.0, 2.0, 0.0),
+                "K_A": (0.0, 4.0, 1.0), "K_P": (0.0, 4.0, 1.0), "K_R": (0.0, 0.2, 0.02),
+                "mu": (0.25, 4.0, 1.0),
                 "relax_iters": (10, 90, 30)}),
     "reconnect_t1_3d": dict(
         stage=1, role="topology", outputs=[], slots=[], needs=[],

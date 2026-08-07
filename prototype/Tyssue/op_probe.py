@@ -90,6 +90,47 @@ def unread_params(op_name, params, implementation=None):
     return sorted(declared - rec.read), None
 
 
+# --------------------------------------------------------------------------- the UNREACHABLE probe
+def _init_reads(cls):
+    """Every params key an operator's __init__ looks up. Static, no instantiation."""
+    import inspect
+    import re
+    try:
+        src = inspect.getsource(cls.__init__)
+    except (OSError, TypeError):
+        return set()
+    return (set(re.findall(r'params\.get\("(\w+)"', src))
+            | set(re.findall(r'params\["(\w+)"\]', src)))
+
+
+HOUSEKEEPING = {"_at", "to", "from", "at", "op", "id", "implementation", "model",
+                "cell_set", "vertex_set", "every", "before_frame", "after_frame", "when"}
+
+
+def unreachable_params(node_params, cls, emitted=()):
+    """Parameters the operator READS that the search cannot set. The mirror of `unread_params`.
+
+    THE QUESTION NOBODY ASKED, and it is the one that mattered. `unread_params` audits a spec
+    against the code in one direction -- declared but never read -- and found `dt` and `amp`. The
+    other direction is: read by the class, and absent from the search space, so no proposal can
+    ever name it. `rd_interface_tension.K_purse` was exactly that. The engine operator carries two
+    mechanisms:
+
+        E = K_purse * sum_iface(edge length)  -  K_extrude * sum_red(a * r)
+
+    the space modelled it as one, named the node `extrude` after the half it kept, and the
+    translator emitted `"K_purse": 0.0` as a literal. The purse-string -- ordinary vertex-model
+    physics, and the only sound half of that operator -- was not hidden by accident; it was
+    defined out of existence by the node's name. No battery run could find it, because a battery
+    probes the parameters a SPEC declares and this one never appeared in a spec.
+
+    `emitted` is the translator's hard-coded keys: a parameter the emitter pins to a literal is
+    unreachable even when the space declares it, which is a second way to lose one.
+    """
+    read = _init_reads(cls) - HOUSEKEEPING
+    return sorted(read - set(node_params) - set(emitted))
+
+
 # --------------------------------------------------------------------------- the LIVE/DEAD probe
 def _fingerprint(H):
     """A trajectory fingerprint: every level's state, plus the mesh's own targets.
