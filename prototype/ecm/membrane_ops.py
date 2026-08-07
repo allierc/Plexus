@@ -370,6 +370,36 @@ class BasementMembraneBond(Lateral):
         self.i = self.j = self.rest = self.alive = None
         self._said = False
 
+    def _check_stability(self, bonds_per_node, dt_frame=4.0e-3):
+        """Refuse a stiffness the frame-rate integration cannot carry.
+
+        CALIBRATED AGAINST A SWEEP, not derived and left. The textbook dt < 2/omega using the crosslinks
+        alone gives 4.4e4; a measured sweep over k = 200..40,000 put the real transition between 5,000
+        and 10,000, six times lower:
+
+          k    200-5,000   bonds ~50,700   strain 0.101-0.106   stable
+          k       10,000   bonds  33,421   strain 0.114         transition
+          k   20,000+      bonds  63,615   strain 2.02          diverged
+
+        Two corrections to the textbook form. The INTEGRIN spring pulls on the same node, so it belongs
+        in the effective stiffness; and the usable criterion with drag present is dt*omega < 1, not the
+        marginal 2. (The diverged runs also over-secrete -- 29k nodes against 11k -- because the
+        secretion setpoint keys on mean radius and an exploding sheet has a large one. A numerical
+        failure that reads as biology.)
+        """
+        if not self.graph_mode:
+            return                                   # MPM path: integrated at the substep, ~70 per period
+        k_eff = max(bonds_per_node, 1.0) * self.k + self.k_adh_hint
+        k_max = self.k * (1.0 / (dt_frame ** 2)) / max(k_eff, 1e-9)
+        if self.k > k_max:
+            raise RuntimeError(
+                f"basement_membrane_bond: k = {self.k:.3g} exceeds the explicit-integration ceiling "
+                f"{k_max:.3g} for graph mode at dt = {dt_frame:g} with {bonds_per_node:.1f} bonds per "
+                f"node. The spring graph is integrated once per FRAME, not at the MPM substep, so it "
+                f"cannot carry the stiffness the MPM path could: this run would return an infinite "
+                f"strain rather than a soft sheet. Either lower k, or give the membrane its own substep "
+                f"loop (which is what moving off MPM gave up).")
+
     def _neighbours_celllist(self, pos, k):
         """k nearest within `cutoff`, in O(N) instead of O(N^2), via a uniform cell list.
 
