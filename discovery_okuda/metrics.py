@@ -849,6 +849,19 @@ class Grip(Metric):
     headline = True
     conditional = "same refusal as corr_act_rad -- needs a live pattern"
 
+    @classmethod
+    def compute(cls, f):
+        # COMPUTED HERE, because this registry is what a run's series is built from. My first
+        # version put the arithmetic in `measure_1frame.py` and left this class as a declaration
+        # with no `compute` -- so `grip` appeared in one module, in no npz, and as None in every
+        # record. A headline metric that silently produces nothing is worse than the metric it
+        # replaced.
+        c = CorrActRad.compute(f)
+        v = RCv.compute(f)
+        if c is cls.SKIP or v is cls.SKIP:
+            return cls.SKIP
+        return round(float(c) * float(v), 5)
+
 @register
 class ActAtTip(Metric):
     """How much more activator sits in the outermost tenth of the tissue than in the tissue as a whole.
