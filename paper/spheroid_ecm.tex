@@ -454,4 +454,85 @@ of the three topology operators knows that myosin exists, and adding the next pe
 require editing them either. Promoting junction to a Level would buy per-edge provisioning and cost a
 reconciliation operator for every topology change.
 
+
+\section{External review, August 2026 --- and what to do about it}
+
+An external reviewer with a cell-biology and biophysics background audited the code and this note. The
+findings below are theirs; the three marked \textbf{[verified]} I re-checked independently against the
+code and the run archive before recording them. Citations are as supplied and are \emph{not} all
+independently confirmed; those I could not check are marked \textbf{[unchecked]}.
+
+\subsection*{Verdict}
+The engineering is sound and self-critical; the biology is thinner than the prose implies, and three
+headline results are properties of the code rather than of the model.
+
+\subsection*{The three most serious findings}
+
+\paragraph{1. The growth gate cannot see stress magnitude. [verified]} The gate compares
+$P/p_{99}$ to $p_{\text{half}}=\mathrm{median}(P_{\text{late}})/p_{99}$, so it evaluates
+$f(P/\mathrm{median}\,P)$: \emph{multiplying the entire pressure field by any constant leaves it
+unchanged}. Every ``the amount does not matter, only the pattern'' control in this campaign is therefore
+an identity of the normalisation, not a finding. Compounding this, \op{smooth\_phi\_deg}$=360$ forces the
+map axisymmetric before any cell divides, so an oblate spheroid is the only shape available. The
+reviewer notes that Hill $n=6$ also sits beyond the one calibrated fit in the literature: Van Liedekerke
+et al.\ 2019 fit this exact form to Helmlinger/Montel data, obtained $n\in[1,2]$, and explicitly reject
+$n\ge4$. \textbf{[unchecked]} They further note our own primary citation, Helmlinger 1997, reports
+suppression accompanied by \emph{decreased apoptosis with no significant change in proliferation}.
+
+\paragraph{2. The membrane series is coupled to nothing, and its adjudicating metric is \texttt{NaN}.
+[verified]} Runs 69--74 return \emph{byte-identical} matrix metrics ($\texttt{strained\_frac\_end}
+=0.9635714285714285$, identical \texttt{front\_r95} arrays). In \op{membrane\_impl="graph"} the sheet's
+MPM operators are stripped, so it exchanges no momentum with the matrix: the seven configurations are a
+sheet driven by a prescribed boundary, affecting nothing. Separately, \op{lcc\_end} is \texttt{NaN} in
+every race run, because the component fraction is computed only every 40 frames and 403 is not a
+multiple of 40 --- so the quantity \S5 claims is reported ``instead of the bond count'' has never been
+reported. Worst, run~74's mean bond degree is $z=2.51$ \textbf{[verified]}, below both rigidity
+($z\!\approx\!4$) and connectivity percolation, while runs 69--73, 75 sit at $5.4$--$10.0$: that sheet
+most likely has no mechanical integrity, and Fig.~2's reading of it as ``the survivors are the slack
+ones'' is probably wrong.
+
+\paragraph{3. Both new levels use the wrong state variable or the wrong integrator.} Junction myosin is
+driven by \emph{length}, not tension, and the docstring's identification of the two is false in this
+energy. The literature has myosin recruited by tension or strain rate, giving a \emph{positive} feedback
+that drives T1; ours is a negative feedback on length that homogenises junctions. Worse, in the
+biologically correct fast-myosin limit the operator is analytically an edge spring: substituting
+$m_e=a(1+\beta(\ell_e/L-1))$ gives $\Lambda a\sum_e[(1-\beta)\ell_e+\beta\ell_e^2/L]$, a line tension
+plus a harmonic spring of stiffness $2\Lambda a\beta/L$. Reducing the CV of edge lengths is exactly what
+that does, so our one non-degenerate myosin result is guaranteed by construction. The reviewer also
+shows the \op{clamp\_min(0)} breaks the $\langle m\rangle=a$ argument at $\beta=4$ (estimated $+16\%$),
+which is the row the table rests on. Separately, the membrane is integrated inertially with unit mass,
+so the whole critical-damping / tracking-lag / sinking narrative of \S7 is the phenomenology of an
+inertia that should not exist at $\mathrm{Re}\sim10^{-10}$.
+
+\subsection*{Other findings worth keeping}
+$\bullet$ $\rho^\ast$ is an identity of \op{basement\_membrane\_secrete}, not a prediction --- and it was
+computed from the \emph{ungated} tissue ($R_1/R_0=3.57$) while the sweep ran on the gated one, for which
+$\rho^\ast=0.0055$, not $0.0064$. $\bullet$ ``Thinning, not rupture'' is imposed: there is no thickness
+variable, and remodelling puts rupture out of reach by construction. The literature has BMs opening by
+\emph{focal, protease-mediated perforation}, and being maintained or stiffening during growth.
+\textbf{[unchecked]} $\bullet$ Our integrin anchors to the collagen~IV network; integrins bind
+\emph{laminin}, and \emph{Drosophila} has no collagen-binding integrin at all. $\bullet$ Break strain
+$0.35$ is below every tissue-level BM failure measurement cited. $\bullet$ $\tau_m=20$ frames is
+$\sim\!3.5$\,h under the only sensible time anchor, against a junctional myosin FRAP $t_{1/2}$ of
+$\sim\!6$\,s. $\bullet$ Our citation ``Ku \& Bilder (2023) \emph{Dev.\ Cell} 58:522'' is wrong and must
+be corrected or removed. $\bullet$ Our oblateness estimator returns $1.022$ on a perfect sphere, so
+several reported effects sit at its own null.
+
+\subsection*{The work list, in order}
+\begin{enumerate}\itemsep2pt
+\item \textbf{Fix \op{lcc} and re-report 69--77 by connectivity.} Compute the component fraction on the
+final frame unconditionally, and record mean degree $z$ alongside every bond count. No new simulation
+--- the trajectories are on disk. This settles run~74 and decides ``thinning vs fragmented''.
+\item \textbf{Three tissue passes that decide the ovoid:} \op{gate\_hill}$=1$ and $=2$ at fixed floor,
+and one run at \op{smooth\_phi\_deg}$=90$ so axisymmetry is not imposed. Then quote the estimator's
+sphere null and rewrite the ``amount does not matter'' controls as the normalisation identity they are.
+\item \textbf{Give junction myosin the per-edge tension} (available from \op{shape\_energy\_3d}'s
+gradient) or the strain rate, report $\langle m\rangle$ against $a$, and measure something
+non-tautological --- T1 rate or hexagonal fraction against a $\Lambda$-matched control.
+\item \textbf{Make the epithelium feel the sheet}, for runs 70 and 74 only: they are the two
+configurations carrying real tension, and a local hernia through a fragmented patch is the one
+phenomenon a basement-membrane model exists to produce.
+\item \textbf{Switch the membrane to overdamped integration}, which deletes \S7 rather than fixing it.
+\end{enumerate}
+
 \end{document}
