@@ -128,9 +128,18 @@ nodes:
     out: edits
 
   # ---- build, launch, measure ----------------------------------------------------
+  # ---- Route A: what VALUE makes a mechanism work ---------------------------------
+  # Cedric, 7 August: "fix 16 jobs per run, 8 for route A 8 for route B", and "route A should be
+  # parents of route B too". Route B chooses WHICH mechanism; A sweeps one knob on a known-good
+  # recipe to closure. 25 rounds of B alone produced 214 dead spheres of 273, because the setting
+  # that makes division real -- `rho` -- had never been swept by anyone. A's runs are recorded
+  # like any other, so `parents` picks them up and B builds its next mechanism on them.
+  - id: route_a
+    code: round.route_a
+
   - id: build
     code: round.build_all
-    in: [edits, parents]
+    in: [edits, parents, route_a]
     out: specs
 
   - id: launch
