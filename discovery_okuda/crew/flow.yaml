@@ -169,8 +169,17 @@ nodes:
         # cellfix_B_new runs a_sw = 50, so its gate is off, P2 reads `na`, and rho = 0 is a legal
         # measurement there (200 cells, no growth) rather than a pathology.
         - [coral_gate_div, morphogen_growth_3d, rho,      [0.1, 0.3, 1.0, 2.0]]
-        - [coral_gate_div, morphogen_growth_3d, vth_frac, [1.4, 2.0, 2.5, 3.5]]
-        - [coral_gate_div, divide_3d,           factor,   [1.5, 2.0, 3.0, 4.0]]
+        # vth_frac AND factor ARE COUPLED: volume-triggered division needs the growth ceiling
+        # ABOVE the division trigger, or a cell can never reach the size that divides it. That is
+        # the `refute_coral_nocons` relation documented under `parents` -- and sweeping either knob
+        # alone walks straight across it. Round r003 lost FOUR slots to exactly this:
+        # vth_frac 1.4 and 2.0 sit at or below factor 2.0, and factor 3.0 and 4.0 sit above
+        # vth_frac 2.5. The premise refused all four before the GPU, correctly, and a refused run
+        # records no metrics -- so closure never advances and route_a would re-propose them every
+        # round for the rest of the campaign. Each grid now stays on its own side of the other
+        # knob's value on this base (vth_frac 2.5, factor 2.0).
+        - [coral_gate_div, morphogen_growth_3d, vth_frac, [2.2, 2.5, 3.0, 3.5]]
+        - [coral_gate_div, divide_3d,           factor,   [1.2, 1.5, 1.8, 2.0]]
         - [coral_gate_div, morphogen_growth_3d, a_sw,     [0.05, 0.15, 0.35, 0.8]]
         - [coral_gate_div, morphogen_growth_3d, hill,     [2.0, 4.0, 8.0, 16.0]]
         - [coral_gate_div, morphogen_growth_3d, rate,     [0.000433, 0.001732, 0.006928, 0.02]]
