@@ -8,6 +8,8 @@ import cluster  # noqa: E402
 
 sys.path.insert(0, HERE)
 from series_one import SERIES  # noqa: E402
+from corset_one import CONFIGS as _CORSET  # noqa: E402
+SERIES = {**SERIES, **{k: {} for k in _CORSET}}
 
 LOGDIR = "/workspace/Plexus/log/okuda_ECM/_series_jobs"
 
@@ -26,7 +28,11 @@ def main():
                 f"{cluster.cpath('/workspace/Plexus/prototype/Tyssue')}:{cluster.cpath(HERE)}",
                 "export OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 OMP_NUM_THREADS=8",
                 "export GNN_OUTPUT_ROOT=/groups/saalfeld/home/allierc/GraphData",
-                f"conda run -n {cluster.ENV} python series_one.py {name} cuda:0 402",
+                # corset runs are two-stage and live in their own script; dispatch by name so one
+                # launcher serves both rather than duplicating the bsub plumbing
+                f"conda run -n {cluster.ENV} python "
+                f"{'corset_one.py' if name.split('_')[0] in ('102','103','104','105','106','107') else 'series_one.py'}"
+                f" {name} cuda:0 402",
             ]) + "\n")
         os.chmod(sh, 0o755)
         out = cluster.cpath(os.path.join(LOGDIR, f"{name}.out"))
