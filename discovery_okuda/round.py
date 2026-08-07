@@ -1130,6 +1130,34 @@ def _build_sweep(slot, rid, index):
     for o in d["operators"]:
         if o.get("op") == op:
             o[key] = val
+    # THE RESERVOIR IS APPARATUS, NOT MECHANISM, so "verbatim" must not include it.
+    #
+    # r001_11 (cellfix_B_new, rho = 1.0) grew 200 -> 3170 cells by frame 400 and then added
+    # exactly ZERO for the remaining 500 frames: buf_full, P13 broken, 55% of the run measuring a
+    # full array. 3170 is the Euler cap of the base's own buffer -- vertex 6396 gives
+    # (V+4)/2 = 3200 cells -- and the base was written for a run that grew far less. Copying it
+    # verbatim carried the ceiling into a sweep whose whole purpose is to push growth harder.
+    #
+    # `translate._reservoirs` documents this exact failure twice already, on `wk_pressure_pos_s0`:
+    # "1778 is exactly the (V+4)/2 cap of a buffer sized for a 150-cell start ... Cedric saw it as
+    # division stopping two seconds into a six-second movie". Third time.
+    #
+    # A sweep must differ from its base in the swept value ALONE -- but an array size is not a
+    # value, it is the room the measurement is given, and a capped run measures the cap.
+    try:
+        import translate as _T
+        seed_n = next((int(o.get("n_cells", 0)) for o in d["operators"]
+                       if o.get("op") == "seed_mesh_3d" and o.get("n_cells")), 0)
+        if seed_n:
+            vbuf, cbuf, _tgt = _T._reservoirs(seed_n, _FRAMES)
+            old_v = ((d.get("sets") or {}).get("vertex") or {}).get("n")
+            if old_v and vbuf > int(old_v):
+                d["sets"]["vertex"]["n"] = int(vbuf)
+                d["sets"]["cell"]["n"] = int(cbuf)
+                print(T_.quiet(f"[route A] reservoir raised {old_v} -> {vbuf} vertices "
+                               f"(cap {(int(old_v) + 4) // 2} -> {(vbuf + 4) // 2} cells)"))
+    except Exception as e:
+        print(T_.warn(f"[route A] could not size the reservoir: {e}"))
     name = f"{rid}_{index:02d}"
     d.setdefault("general", {})["name"] = name
     d["general"]["n_frames"] = _FRAMES
