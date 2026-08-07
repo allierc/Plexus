@@ -70,7 +70,7 @@ reaches $\sim6000$ and its apical radius $4.66\to16.6$ (arbitrary units) in $402
 \section*{3.\; The ECM: MLS-MPM}
 
 The matrix is a material, not a set of springs, so it is solved the way materials are: as a cloud of
-points that carry the stuff and a background grid that does the arithmetic. Each frame the points hand
+points that carry the material and a background grid that does the physics. Each frame the points hand
 their mass and momentum to the grid nodes nearest them, the grid resolves everything arriving at each
 node into one velocity, and the points read that velocity back and move. Nothing is ever computed
 between two points directly --- which is why bodies that never touch can still push on one another, and
