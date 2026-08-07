@@ -119,7 +119,23 @@ def main():
     cfg["membrane"] = npz
     spec, info = C.build(name, npz, **cfg)
     spec["general"]["n_frames"] = frames
+    # A SHORT RUN IS A SMOKE TEST, AND IT GETS ITS OWN FOLDER. Running one under the real name writes
+    # into the folder a cluster job may be using for the same name -- which is how 77 ended up with a
+    # 24-frame movie from a 25-frame test sitting beside a 402-frame trajectory, and could as easily have
+    # corrupted the trajectory instead of just the movie. The underscore prefix also keeps it off the
+    # numbered ledger.
+    if frames < 100:
+        name = "_smoke_" + name
+        print(f"[series] {frames} frames -> writing to {name}, not the numbered folder", flush=True)
+    # WIPED BEFORE WRITING. A relaunch that leaves the previous attempt's files behind gives a folder
+    # whose contents came from two different runs, and no way to tell which is which -- 79 held a
+    # 24-frame movie from a smoke test beside nothing else, and 77 held one beside a 402-frame
+    # trajectory. Either the folder is this run's output or it is empty.
     d = os.path.join(R.LOG, name)
+    if os.path.isdir(d):
+        import shutil
+        shutil.rmtree(d, ignore_errors=True)
+        print(f"[series] cleared {d} before writing", flush=True)
     os.makedirs(d, exist_ok=True)
     info["varied"] = label or {"reference": True}
     json.dump(info, open(os.path.join(d, "pass1.json"), "w"), indent=1)

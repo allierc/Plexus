@@ -16,6 +16,17 @@ LOGDIR = "/workspace/Plexus/log/okuda_ECM/_series_jobs"
 
 def main():
     os.makedirs(LOGDIR, exist_ok=True)
+    # REFUSE TO RESUBMIT A NAME THAT IS ALREADY IN THE QUEUE. The runners now wipe their output folder
+    # before writing, which is what makes "what is in this folder" answerable -- and it would destroy a
+    # live job's output if the same name were launched twice. Checked here rather than there, because
+    # here is where the queue is visible.
+    _q = cluster._ssh_retry("bjobs -w", timeout=90, tries=2)
+    if _q is not None and _q.returncode == 0:
+        _busy = [n for n in (sys.argv[1:] or []) if n in " ".join(_q.stdout.split())]
+        if _busy:
+            print(f"[series] REFUSING: already in the queue -> {', '.join(_busy)}")
+            print("[series] kill them first, or the relaunch would wipe the folder they are writing to")
+            return
     lines = []
     only = sys.argv[1:] or list(SERIES)
     for name in only:
