@@ -742,6 +742,18 @@ def run(name, spec, device="cuda:0", movie=True, keep_traj=True, render_kw=None)
                 al = getattr(H, "membrane_alive", None)
                 if al is not None:
                     extra["malive"] = np.asarray(al.detach().cpu(), bool)
+                # THE HOOP MAP, in the shape the growth gate reads. `ecm_growth_gate_3d` takes a
+                # (frames, ntheta, nphi) pressure map; the sheet's hoop tension is recorded per latitude
+                # band, so it is broadcast across longitude -- which is exact here, because a corset
+                # built from an axis-aligned anisotropy IS axisymmetric. Without this file the corset
+                # cannot reach the epithelium at all: runs 96-99 recorded the tension and had nowhere to
+                # send it, so they came back identical.
+                if getattr(membrane_ops, "HOOP_TRACE", None):
+                    hp = np.asarray(membrane_ops.HOOP_TRACE, np.float32)      # (T, nth)
+                    np.savez_compressed(os.path.join(out_dir, "hoop.npz"),
+                                        pmap=np.repeat(hp[:, :, None], 64, axis=2))
+                    print(f"[{name}] hoop.npz  {hp.shape[0]} frames x {hp.shape[1]} latitude bands, "
+                          f"mean tension {float(hp.mean()):.4g}", flush=True)
                 if membrane_ops.BOND_SNAPSHOTS:
                     snaps = membrane_ops.BOND_SNAPSHOTS
                     extra["bond_frames"] = np.asarray([q[0] for q in snaps], np.int32)
