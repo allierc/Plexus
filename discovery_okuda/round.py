@@ -357,8 +357,16 @@ def _sweep_state():
     Closure is counted on values that were RUN, not proposed. A refused slot taught nothing and
     must not retire a parameter.
     """
+    # THIS CAMPAIGN'S RECORDS ONLY, not the archive. Closure used to read
+    # `_archive/round_records.jsonl` too, which survives a reset -- so a FRESH campaign inherited
+    # the previous one's closures and started with `shape_to_chem.beta` already retired on
+    # [-2, -4, -8, 2]. Those four values were swept against an operator that was DEAD at the time
+    # (`mode: tip` overwrote the channel it wrote to), on a substrate whose mechanics were pinned.
+    # Closing a parameter on measurements taken through a broken instrument is worse than never
+    # having closed it. A reset means re-derive; the archive is cross-campaign memory, not a
+    # verdict this campaign has earned.
     tried = {}
-    for path in (RECORDS, os.path.join(HERE, "_archive", "round_records.jsonl")):
+    for path in (RECORDS,):
         if not os.path.exists(path):
             continue
         with open(path) as fh:
