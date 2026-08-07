@@ -38,6 +38,12 @@ nodes:
   - id: parents
     code: round.parents
     args:
+      # HOW MANY to build from, and what counts as FORCED. The second is a judgement about
+      # evidence -- a composition carrying `rd_interface_tension.K_extrude > 0` is paid to have a
+      # protrusion -- so it is a campaign decision, not arithmetic.
+      limit: 6
+      forced_p_ratio: 2.0
+      forcing_terms: {rd_interface_tension: K_extrude}
       # EVERY ENTRY REBUILDS AND ADMITS. Checked by `round.py --check`, because the first version of
       # this pool did not: two of its six entries were inadmissible and it took a live Proposer call
       # to find out. All were measured, not remembered -- metrics come from each run's own diag.json.
@@ -88,6 +94,11 @@ nodes:
   - id: menu
     code: round.menu
     in: [parents]
+    args:
+      # HOW THE MENU IS BUILT is a campaign decision, not an implementation detail.
+      limit: 40          # rows offered per parent
+      grid: [0.5, 2.0]   # the factors of the parent's OWN value a set_param row offers
+      closure: 4         # distinct values RUN before a knob is withheld as closed
 
   # A CHILD THAT BROKE A PREMISE ITS PARENT HOLDS differs from it in a small enumerable set of ways,
   # so each difference is a hypothesis and reverting exactly one is a legal one-edit experiment.
@@ -163,6 +174,13 @@ nodes:
     code: round.build_all
     in: [edits, parents, route_a]
     out: specs
+    args:
+      # Cedric, 7 August: "fix 16 jobs per run, 8 for route A 8 for route B" -- and 6 August:
+      # "the one-edit-per-slot rule is too rigid, allows 4". Both were decisions made in
+      # conversation and both were hard-coded here; this is where they belong.
+      slots: 16
+      frames: 900
+      max_edits: 4
 
   - id: launch
     code: round.launch

@@ -242,7 +242,7 @@ def _exec(node, ctx):
 FORCING_TERMS = {"rd_interface_tension": "K_extrude"}   # op -> the parameter that writes the answer
 
 
-def _is_forced(name):
+def _is_forced(name, terms=None):
     """Does this run's composition carry a forcing term above zero? Read from its own spec.
 
     Structural, not measured. `K_extrude` multiplies `- sum_red(a * r)`: an energy that falls the
@@ -258,7 +258,7 @@ def _is_forced(name):
         try:
             import yaml
             for o in (yaml.safe_load(open(base)) or {}).get("operators", []):
-                key = FORCING_TERMS.get(o.get("op"))
+                key = (terms or FORCING_TERMS).get(o.get("op"))
                 if key and float(o.get(key) or 0) > 0:
                     return True
         except Exception:
@@ -283,6 +283,11 @@ def parents(ctx):
                     continue
                 if r.get("name") and r.get("metrics"):
                     rows.append(r)
+    # DECLARED IN crew/flow.yaml: how many parents, and what counts as forced.
+    p_limit = int(ctx.get("limit") or PARENT_LIMIT)
+    p_ratio = float(ctx.get("forced_p_ratio") or FORCED_P_RATIO)
+    forcing = dict(ctx.get("forcing_terms") or FORCING_TERMS)
+
     # A FORCED RUN IS EVIDENCE, NOT A PARENT -- decided by the COMPOSITION, not by a proxy.
     #
     # This first used `mech_p_ratio > 2` alone, on the reasoning that ~3 means forced and ~1 means
@@ -320,8 +325,8 @@ def parents(ctx):
     def _biology_broken(r):
         return bool(set(r.get("premises_broken") or []) - SOLVER_PREMISES)
 
-    rows.sort(key=lambda r: (_is_forced(r.get("name")),
-                             float(r["metrics"].get("mech_p_ratio") or 0) > FORCED_P_RATIO,
+    rows.sort(key=lambda r: (_is_forced(r.get("name"), forcing),
+                             float(r["metrics"].get("mech_p_ratio") or 0) > p_ratio,
                              -float(r["metrics"].get("grip_peak") or 0),
                              -float(r["metrics"].get("protr_peak") or 0)))
     if not rows:
@@ -373,7 +378,7 @@ def parents(ctx):
     rows = uniq
     return [{"name": r["name"], "parent": r.get("parent"),
              "metrics": {k: v for k, v in r["metrics"].items() if k in bank},
-             "premises_broken": r.get("premises_broken") or []} for r in rows[:PARENT_LIMIT]]
+             "premises_broken": r.get("premises_broken") or []} for r in rows[:p_limit]]
 
 
 def history(ctx):
@@ -393,6 +398,7 @@ def metric_bank(ctx):
 
 
 FORCED_P_RATIO = 2.0   # mech_p_ratio above this is a pushed tube, not a grown one
+_FRAMES, _MAX_EDITS = 900, 4   # published by build_all from the graph; these are fallbacks
 MAX_EDITS = 4          # edits per slot; still one experiment, applied in order to one parent
 CLOSURE_N = 4          # distinct values RUN before a parameter leaves the menu
 BATTERY = os.path.join(HERE, "battery.json")     # written by prototype/Tyssue/op_probe.py --all
@@ -513,13 +519,17 @@ def menu(ctx):
     weakness.
     """
     from composition_space import LEGAL_LINKS, OPERATORS
+    # DECLARED IN crew/flow.yaml, not here -- how the menu is built is a campaign decision.
+    m_limit = int(ctx.get("limit") or MENU_LIMIT)
+    m_grid = tuple(ctx.get("grid") or GRID_FACTORS)
+    m_closure = int(ctx.get("closure") or CLOSURE_N)
     TRIED, DEAD = _sweep_state(), _dead_params()
     if DEAD:
         print(T_.quiet(f"[round] {len(DEAD)} parameter(s) proved dead by the battery, "
                      f"withheld from every menu"))
-    closed = sum(1 for v in TRIED.values() if len(v) >= CLOSURE_N)
+    closed = sum(1 for v in TRIED.values() if len(v) >= m_closure)
     if closed:
-        print(T_.quiet(f"[round] {closed} parameter(s) swept to closure ({CLOSURE_N} values), "
+        print(T_.quiet(f"[round] {closed} parameter(s) swept to closure ({m_closure} values), "
                      f"withheld"))
     out = {}
     for p in (ctx.get("parents") or []):
@@ -529,7 +539,7 @@ def menu(ctx):
             print(T_.no(f"[round] no menu for {p['name']}: {e}"))
             continue
         rows, seen, dropped = [], set(), []
-        for r in C.legal_menu(g, limit=MENU_LIMIT):
+        for r in C.legal_menu(g, limit=m_limit):
             if not isinstance(r, dict):
                 continue
             e = r.get("edit") or []
@@ -551,7 +561,7 @@ def menu(ctx):
                     dropped.append(f"{tgt} ({DEAD.get(bare) or DEAD.get(tgt)}: cannot reach the state)")
                     continue
                 done = TRIED.get(tgt, [])
-                if len(done) >= CLOSURE_N:
+                if len(done) >= m_closure:
                     dropped.append(f"{tgt} (CLOSED, {len(done)} values run: {done})")
                     continue
                 node, _, key = tgt.rpartition(".")
@@ -580,7 +590,7 @@ def menu(ctx):
                         isinstance(tri, (list, tuple)) and len(tri) == 3
                         and all(isinstance(x, int) for x in tri))
                     vals = set()
-                    for f in GRID_FACTORS:
+                    for f in m_grid:
                         v = cur * f
                         v = max(1, int(round(v))) if is_int else round(v, 6)
                         if v != cur:
@@ -617,7 +627,7 @@ def menu(ctx):
                 # control loop's agent reads `g_phi_norm CLOSED (5 values)` and moves on; ours had
                 # no way to know a parameter was half-explored, so it re-ran the first point.
                 row["tried"] = done
-                row["status"] = (f"OPEN -- {len(done)}/{CLOSURE_N} values run"
+                row["status"] = (f"OPEN -- {len(done)}/{m_closure} values run"
                                  if done else "UNTRIED -- no value has ever been run")
                 rows.append(row)
             else:
@@ -790,8 +800,12 @@ def build_all(ctx):
     # B proposes a mechanism edit (WHICH mechanism to try). 25 rounds of B alone gave 214 dead
     # spheres out of 273, because the setting that makes division real had never been swept.
     # Route A's runs are recorded like any other, so they become Route B's parents.
+    n_total = int(ctx.get("slots") or N_SLOTS)
+    global _FRAMES, _MAX_EDITS
+    _FRAMES = int(ctx.get("frames") or FRAMES)          # published for the builders,
+    _MAX_EDITS = int(ctx.get("max_edits") or MAX_EDITS)  # which take no ctx
+    frames = _FRAMES
     a_slots = list(ctx.get("route_a") or [])
-    n_total = int(ctx.get("n_slots") or N_SLOTS)
     b_slots = ([{"parent": pars[0]["name"]}] + list(ctx.get("edits") or []))[
         :max(1, n_total - len(a_slots))]
     slots = b_slots + a_slots
@@ -1051,7 +1065,7 @@ def _build_sweep(slot, rid, index):
             o[key] = val
     name = f"{rid}_{index:02d}"
     d.setdefault("general", {})["name"] = name
-    d["general"]["n_frames"] = FRAMES
+    d["general"]["n_frames"] = _FRAMES
     cfg_dir = os.path.join(os.path.dirname(HERE), "config", "okuda")
     os.makedirs(cfg_dir, exist_ok=True)
     with open(os.path.join(cfg_dir, f"{name}.yaml"), "w") as fh:
@@ -1098,8 +1112,8 @@ def _build_one(slot, rid, index, seen):
         # unit, fingerprinted as a unit, and recorded as a unit. What it buys is compositions that
         # need two moves to be legal -- add and wire -- which is most of the coupling arrows.
         edits = [tuple(edit)] if isinstance(edit[0], str) else [tuple(e) for e in edit]
-        if len(edits) > MAX_EDITS:
-            _refuse(index, slot, f"{len(edits)} edits proposed, the limit is {MAX_EDITS}")
+        if len(edits) > _MAX_EDITS:
+            _refuse(index, slot, f"{len(edits)} edits proposed, the limit is {_MAX_EDITS}")
             return None
         before = _fingerprint(g)
         try:
@@ -1167,7 +1181,7 @@ def _build_one(slot, rid, index, seen):
         _refuse(index, slot, f"refused {[r.code for r in bad]} -- {bad[0].detail}")
         return None
     try:
-        T.write_config(g, name, frames=FRAMES, seed_=(1000 + index if replicate else 0))
+        T.write_config(g, name, frames=_FRAMES, seed_=(1000 + index if replicate else 0))
         _restore_parent_params(name, par, edit, spare_seeds=replicate)
     except Exception as e:
         _refuse(index, slot, f"spec would not write: {e}")
