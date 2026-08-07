@@ -230,7 +230,7 @@ def main():
     if gated:
         label["tissue"] = "gated ovoid (aspect 1.33)"
     for t in (membrane_ops.BOND_TRACE, membrane_ops.MEMBRANE_STRAIN,
-              membrane_ops.SECRETE_TRACE, membrane_ops.BOND_SNAPSHOTS):
+              membrane_ops.SECRETE_TRACE, membrane_ops.BOND_SNAPSHOTS, membrane_ops.HOOP_TRACE):
         t.clear()
     tk = dict(frames=401, device=dev, buffer_x=4, myosin=1.0)
     if myo:

@@ -742,6 +742,38 @@ def diagnosis(ctx):
     return ""
 
 
+def _sweep_premises_ok(base, op, key, value):
+    """Would this sweep point survive the STATIC premises? Spec-only, no simulation.
+
+    Returns True when nothing can be checked -- a missing base or an import failure must not
+    silently empty a sweep, because a plan that quietly proposes nothing is worse than one that
+    proposes something refusable.
+    """
+    import copy
+    try:
+        import yaml
+        import biologist as B
+    except Exception:
+        return True
+    src = None
+    for p in (os.path.join(LOG_ROOT, base, "spec_run.yaml"),
+              os.path.join(LOG_ROOT, base, "spec_q.yaml"),
+              os.path.join(os.path.dirname(HERE), "config", "okuda", f"{base}.yaml")):
+        if os.path.exists(p):
+            src = p
+            break
+    if src is None:
+        return True
+    try:
+        d = copy.deepcopy(yaml.safe_load(open(src)))
+        for o in d.get("operators", []):
+            if o.get("op") == op:
+                o[key] = value
+        return not any(r.status == "fail" for r in B.check(d))
+    except Exception:
+        return True
+
+
 def route_a(ctx):
     """Up to `slots` sweep points: the next OPEN knob, on a known-good recipe.
 
@@ -774,7 +806,23 @@ def route_a(ctx):
         todo = [v for v in values if _round_val(v) not in done]
         if not todo:
             continue                                   # swept to closure, retired
-        for v in todo:
+        # A VALUE THE PREMISES WILL REFUSE IS DROPPED HERE, not discovered on the cluster.
+        #
+        # Twice now the plan has walked into a constraint and lost slots to it: `rho = 0.0` with
+        # the gate connected (P2, one slot), and `vth_frac`/`factor` crossing each other (the
+        # refute_coral_nocons relation, FOUR slots in round 3). Both were refused correctly and
+        # before any GPU -- but a refused run records no metrics, so the closure counter never
+        # advances and route_a re-proposes the same dead value every round for the rest of the
+        # campaign. Hand-patching the grid fixes one crossing and not the next.
+        #
+        # The premises are a function of the spec, so ask them here, on the spec this slot would
+        # write. Costs milliseconds, no GPU, and an illegal value simply never becomes a slot.
+        legal = [v for v in todo if _sweep_premises_ok(base, op, key, v)]
+        if len(legal) < len(todo):
+            gone = [v for v in todo if v not in legal]
+            print(T_.quiet(f"[route A] {base} {op}.{key}: {gone} refused by a premise -- "
+                           f"not offered"))
+        for v in legal:
             out.append({"sweep": True, "base": base, "op": op, "key": key, "value": v,
                         "claim": f"ROUTE A: sweep {op}.{key} on {base} -- what value makes it work",
                         "intent": "sweep"})

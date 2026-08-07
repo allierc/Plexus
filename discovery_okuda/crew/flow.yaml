@@ -178,7 +178,11 @@ nodes:
         # records no metrics -- so closure never advances and route_a would re-propose them every
         # round for the rest of the campaign. Each grid now stays on its own side of the other
         # knob's value on this base (vth_frac 2.5, factor 2.0).
-        - [coral_gate_div, morphogen_growth_3d, vth_frac, [2.2, 2.5, 3.0, 3.5]]
+        # The grids may span the whole interesting range again: `route_a` now asks the STATIC
+        # premises about each point before offering it, so a value that crosses the
+        # vth_frac > factor constraint is dropped in milliseconds rather than discovered on the
+        # cluster. Narrowing them by hand fixed one crossing and would not have seen the next.
+        - [coral_gate_div, morphogen_growth_3d, vth_frac, [2.2, 2.5, 3.0, 3.5, 4.5]]
         - [coral_gate_div, divide_3d,           factor,   [1.2, 1.5, 1.8, 2.0]]
         - [coral_gate_div, morphogen_growth_3d, a_sw,     [0.05, 0.15, 0.35, 0.8]]
         - [coral_gate_div, morphogen_growth_3d, hill,     [2.0, 4.0, 8.0, 16.0]]
