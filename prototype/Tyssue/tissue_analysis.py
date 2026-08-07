@@ -419,9 +419,9 @@ def analyze(frames, OUT, a_sw=None):
 
     for a_ in ax:
         a_.grid(alpha=0.3)
-    if _brk is not None:
-        fig.suptitle(f"MAGENTA LINE = frame {_brk:.0f}: the surface stops being a single closed "
-                     f"sheet. Everything to its right measures a folded mesh.",
-                     fontsize=10, color="red", y=0.995)
+    # NO BANNER. The red line says where; a shouting title said it again in words and, on a run
+    # whose damage never reaches 10% of cells, said it wrongly -- r001_06 carried
+    # "the surface stops being a single closed sheet" over a movie that looks intact, because one
+    # face of 3,250 had broken. The line is a marker, not a verdict.
     fig.tight_layout(); fig.savefig(os.path.join(OUT, "metrics.png"), dpi=110); plt.close(fig)
     return summ
