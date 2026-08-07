@@ -1165,6 +1165,25 @@ def _build_sweep(slot, rid, index):
     os.makedirs(cfg_dir, exist_ok=True)
     with open(os.path.join(cfg_dir, f"{name}.yaml"), "w") as fh:
         yaml.safe_dump(d, fh, sort_keys=False)
+    # SAY WHICH BASE, WHERE THE RUN LIVES. Cedric, twice: "do not see cellfix_B_new ????" and
+    # "where are the 4 4 cellfix_B_new ??????". They were there both times -- r001_08..11 -- but a
+    # Route A run directory is named `r001_08` and nothing inside it says what it is a sweep OF.
+    # The pipeline keys on the round/slot name, so the name stays; a marker beside the spec makes
+    # the answer visible to `ls` and `cat`, which is where the question was actually being asked.
+    try:
+        rd = os.path.join(LOG_ROOT, name)
+        os.makedirs(rd, exist_ok=True)
+        with open(os.path.join(rd, "ROUTE_A.md"), "w") as fh:
+            fh.write(f"# {name} -- Route A sweep\n\n"
+                     f"base   {base}\n"
+                     f"knob   {op}.{key}\n"
+                     f"value  {val}\n\n"
+                     f"The base spec copied verbatim, with that one value changed and the\n"
+                     f"reservoir sized for the growth the sweep may induce.\n")
+        with open(os.path.join(CAMPAIGN, "route_a_map.txt"), "a") as fh:
+            fh.write(f"{name}\t{base}\t{op}.{key}={val}\n")
+    except Exception as e:
+        print(T_.warn(f"[route A] could not write the marker: {e}"))
     print(T_.ok(f"[route A] {name}: {base} with {op}.{key} = {val}"))
     return {"name": name, "parent": base, "edit": ["set_param", f"{op}0.{key}", val],
             "claim": slot.get("claim"), "intent": "sweep", "comp_hash": None,
