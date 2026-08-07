@@ -59,6 +59,35 @@ def split_concat(src, dst):
         sys.exit(f"ffmpeg split+concat failed for {dst}")
 
 
+
+def quad_concat(src, dst, keep=0.78):
+    """Cut a 2x2 movie into its four panels and play them in SEQUENCE, each cropped to its subject.
+
+    THE 2x2 LAYOUT DOES NOT SURVIVE A GALLERY CARD. Four panels in a square card is each panel at a
+    quarter linear scale, and the crosslink network -- the thing these runs exist to show -- is a mesh
+    whose spacing is already near a pixel. Played one after another, each panel gets the whole card.
+
+    `keep` crops each quadrant about ITS OWN CENTRE, which does two things at once: the spheroid stays
+    centred (it is drawn centred in every panel), and the run label in the top-left panel is cropped away
+    with the margin, so no frame carries a caption the page has not written itself.
+    """
+    ff = _exe("ffmpeg")
+    w, h = _size(src)
+    qw, qh = w // 2, h // 2
+    cw = int(qw * keep) - int(qw * keep) % 2
+    ch = int(qh * keep) - int(qh * keep) % 2
+    ox, oy = (qw - cw) // 2, (qh - ch) // 2
+    parts, labels = [], []
+    for n, (qx, qy) in enumerate(((0, 0), (qw, 0), (0, qh), (qw, qh))):
+        parts.append(f"[0:v]crop={cw}:{ch}:{qx + ox}:{qy + oy}[p{n}]")
+        labels.append(f"[p{n}]")
+    fc = ";".join(parts) + ";" + "".join(labels) + "concat=n=4:v=1[o]"
+    cmd = [ff, "-y", "-loglevel", "error", "-i", src, "-filter_complex", fc,
+           "-map", "[o]", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "21", dst]
+    if subprocess.call(cmd) != 0 or not os.path.exists(dst):
+        sys.exit(f"ffmpeg quad+concat failed for {dst}")
+
+
 def _exe(name):
     """Next to the interpreter, not on PATH -- the conda env ships ffmpeg but the shell does not see it."""
     p = os.path.join(os.path.dirname(sys.executable), name)
@@ -87,9 +116,10 @@ def card(video, name, spec_path, cap):
   </figure>"""
 
 
-def build(runs):
-    """Three cards in the page's 3-column grid -- one per confinement, each playing 3D then section."""
+def build(runs, runs2=()):
+    """Two rows: the confinement series, then the two new levels drawn on their own."""
     cards = "\n".join(card(v, n, sp, c) for _, v, n, sp, c in runs)
+    cards2 = "\n".join(card(v, n, sp, c) for _, v, n, sp, c in runs2)
     return f"""{BEGIN}
 <h3>Vertex + MPM — an epithelium loading an extracellular matrix</h3>
 <p class="opk">Two Levels, two solvers, one experiment: the <b>vertex</b> shell of the section above grows
@@ -111,6 +141,26 @@ deep, the lumen is hollow, the fibres are cut where they cross, and the blocks a
 <div class="sim-gallery g3">
 {cards}
 </div>
+<h3>Basement membrane + junctions — the two levels inside the epithelium</h3>
+<p class="opk">The same tissue, with two things that were not there before. The <b>basement membrane</b>
+is a sheet of nodes joined by explicit <b>crosslinks</b>, laid down outside the epithelium and tied to
+it by one <b>integrin</b> spring per node — anchored to a fixed direction, so the sheet stretches as the
+tissue grows instead of sliding over it. It is <b>secreted</b>: it starts with a ninth of its material
+and lays down more as the surface expands, because a sphere that triples in radius needs nine times the
+area covered. The <b>junctions</b> are the cell–cell contacts, each carrying its own <b>myosin</b>, which
+is recruited where a junction is longer than average. Each clip plays the four panels in turn — the
+whole tissue, a cross-section, the membrane alone with its crosslinks coloured by how far they are
+stretched (blue slack, red at the breaking point), and the junction network alone coloured by myosin.</p>
+<p class="opk-ref">Reference — the crosslinked-sheet and secretion picture follows
+<a href="https://doi.org/10.1016/j.devcel.2023.01.004">Ku &amp; Bilder (2023)</a> and
+<a href="https://doi.org/10.1242/dev.200456">T&ouml;pfer et&nbsp;al. (2022)</a>; junctional myosin
+recruitment by tension is the standard vertex-model feedback. The
+<code>seed_basement_membrane</code> / <code>basement_membrane_bond</code> /
+<code>basement_membrane_secrete</code> / <code>integrin_adhesion</code> / <code>junction_myosin</code>
+operators are ours (<code>prototype/ecm</code>).</p>
+<div class="sim-gallery g3">
+{cards2}
+</div>
 {END}"""
 
 
@@ -120,18 +170,37 @@ def main():
          "the control: a growing, dividing epithelium presses into a soft fibrous matrix and stays a "
          "SPHERE (oblateness 1.01) at ~6,000 cells. First contact at frame 32; by the end 89% of the "
          "matrix is strained and the front has reached the wall of the box"),
+        ("27_epi_ecm_fibres_long", "vertex_mpm_fibres", "the fibres, at length",
+         "the same coupling run out: an epithelium pressing into a fibre matrix for the full growth, "
+         "so the stress front has time to cross the box. Nothing confines it -- this is what the "
+         "matrix does when only the tissue's own growth loads it"),
         ("58_oblcav_oblate", "vertex_mpm_grown_oblate", "GROWN into an ovoid",
          "an oblate cavity, so the tissue meets the fibres at its poles first and the matrix resists "
          "there 14.7x harder. <code>ecm_growth_gate_3d</code> slows the cell cycle where it resists, so "
          "the sphere GROWS to oblateness 1.43. Nothing presses on it"),
-        ("48_block_elastic_g40", "vertex_mpm_pressed", "PRESSED by an elastic solid",
+        ("48_block_elastic_g40", "vertex_mpm_pressed", "pressed by an elastic solid",
          "the same shape the other way. Two solid blocks -- a second MPM body, 130x stiffer than the "
          "matrix, so they deform too -- press the tissue to oblateness 1.41, indistinguishable from "
          "the grown 1.43 beside it. Two mechanisms, one shape"),
     ]
+    R4 = [
+        ("69_graph_reference", "bm_reference", "reference",
+         "the sheet at work. 37,427 nodes joined by 180,304 crosslinks, covering the whole surface, "
+         "stretched to 10% on average — teal-green on a scale whose top is the breaking point"),
+        ("71_fast_remodelling", "bm_fast_remodel", "fast remodelling",
+         "the same network — 187,781 crosslinks, same coverage — but the crosslinks forget being "
+         "stretched four times faster, so the sheet never builds tension and sits at 3%. Uniformly "
+         "dark blue. Turnover, not strength, sets how hard a membrane pulls"),
+        ("73_no_adhesion", "bm_no_adhesion", "no adhesion",
+         "the control: with the integrin springs removed the sheet SLIDES over the epithelium instead "
+         "of being stretched by it, and is the only run that loses coverage (0.89) — it goes where the "
+         "matrix pushes it. The strain in the other two is real because this one has none"),
+    ]
     runs = [(d, f"{v}.mp4", lbl, os.path.join(LOG, d, "spec_run.yaml"), cap)
             for d, v, lbl, cap in R3]
-    missing = [r for r, *_ in runs if not os.path.exists(os.path.join(LOG, r, "movie.mp4"))]
+    runs2 = [(d, f"{v}.mp4", lbl, os.path.join(LOG, d, "spec_run.yaml"), cap)
+             for d, v, lbl, cap in R4]
+    missing = [r for r, *_ in runs + runs2 if not os.path.exists(os.path.join(LOG, r, "movie.mp4"))]
     if missing:
         sys.exit(f"no movie.mp4 for {missing} -- run them before writing the page")
 
@@ -141,15 +210,22 @@ def main():
         split_concat(src, os.path.join(GAL, v))
         print(f"[minisite] gallery/{v} <- {d}/movie.mp4  "
               f"({os.path.getsize(os.path.join(GAL, v)) / 1e6:.1f} MB, 3D then section)")
+    for d, v, *_ in runs2:
+        src = os.path.join(LOG, d, "movie.mp4")
+        quad_concat(src, os.path.join(GAL, v))
+        print(f"[minisite] gallery/{v} <- {d}/movie.mp4  "
+              f"({os.path.getsize(os.path.join(GAL, v)) / 1e6:.1f} MB, four panels in turn)")
 
     import shutil
     for tgt, rendered in ((QMD, False), (DOCS, True)):
         if rendered and not os.path.exists(DOCS):
             print("[minisite] no docs/index.html -- source updated only; run `quarto render`")
             continue
-        _patch(tgt, build(runs), rendered=rendered)
+        _patch(tgt, build(runs, runs2), rendered=rendered)
     if os.path.isdir(DOCS_GAL):
-        for d, v, *_ in runs:
+        # `runs + runs2`. Copying only the first row left the new clips out of docs/gallery while the
+        # page that referenced them was patched -- three cards pointing at files the site did not have.
+        for d, v, *_ in runs + runs2:
             shutil.copy2(os.path.join(GAL, v), os.path.join(DOCS_GAL, v))
         print("[minisite] videos copied into docs/gallery/")
     return
