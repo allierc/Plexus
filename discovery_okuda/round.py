@@ -399,6 +399,7 @@ def metric_bank(ctx):
 
 FORCED_P_RATIO = 2.0   # mech_p_ratio above this is a pushed tube, not a grown one
 _FRAMES, _MAX_EDITS = 900, 4   # published by build_all from the graph; these are fallbacks
+_SWEEP_CELLS = 100_000         # the cell cap a Route A run is given; see _build_sweep
 MAX_EDITS = 4          # edits per slot; still one experiment, applied in order to one parent
 CLOSURE_N = 4          # distinct values RUN before a parameter leaves the menu
 BATTERY = os.path.join(HERE, "battery.json")     # written by prototype/Tyssue/op_probe.py --all
@@ -871,6 +872,8 @@ def build_all(ctx):
     global _FRAMES, _MAX_EDITS
     _FRAMES = int(ctx.get("frames") or FRAMES)          # published for the builders,
     _MAX_EDITS = int(ctx.get("max_edits") or MAX_EDITS)  # which take no ctx
+    global _SWEEP_CELLS
+    _SWEEP_CELLS = int(ctx.get("sweep_cells") or _SWEEP_CELLS)
     frames = _FRAMES
     a_slots = list(ctx.get("route_a") or [])
     b_slots = ([{"parent": pars[0]["name"]}] + list(ctx.get("edits") or []))[
@@ -1144,18 +1147,32 @@ def _build_sweep(slot, rid, index):
     #
     # A sweep must differ from its base in the swept value ALONE -- but an array size is not a
     # value, it is the room the measurement is given, and a capped run measures the cap.
+    # SIZED FOR THE SWEEP'S DESTINATION, NOT THE BASE'S SEED. Cedric, 7 August: "rho = 1.0 blew
+    # through the buffer so rho 4 can not work -- remove all ceiling."
+    #
+    # The first version used `translate._reservoirs`, which derives the target from the SEED:
+    # min(max(seed * 40, 2000), MAX_CELLS). cellfix_B_new seeds 200 cells, so its target was
+    # 8,000 and its cap 10,404 -- and rho = 1.0 finished at 9,999 with buf_full True, flat for
+    # its last eight frames. Sizing a sweep's buffer from the base's TYPICAL growth is backwards:
+    # a sweep exists to push a knob until something else stops it, and if the array stops it the
+    # sweep measured the array. `grounder.buffer_for` says as much in its own docstring -- "sizing
+    # the buffer from the DESTINATION rather than from the seed is the whole fix".
+    #
+    # `sweep_cells` is declared in crew/flow.yaml because it is a campaign decision with a real
+    # cost: ~22 MB of recorded trajectory per 1,000 cells of cap (measured in _reservoirs at
+    # headroom 40), so 100,000 cells is ~2.2 GB per run against an A6000's 49 GB. There is always
+    # a ceiling; this one is set by memory rather than by an accident of the base's seed count.
     try:
-        import translate as _T
-        seed_n = next((int(o.get("n_cells", 0)) for o in d["operators"]
-                       if o.get("op") == "seed_mesh_3d" and o.get("n_cells")), 0)
-        if seed_n:
-            vbuf, cbuf, _tgt = _T._reservoirs(seed_n, _FRAMES)
-            old_v = ((d.get("sets") or {}).get("vertex") or {}).get("n")
-            if old_v and vbuf > int(old_v):
-                d["sets"]["vertex"]["n"] = int(vbuf)
-                d["sets"]["cell"]["n"] = int(cbuf)
-                print(T_.quiet(f"[route A] reservoir raised {old_v} -> {vbuf} vertices "
-                               f"(cap {(int(old_v) + 4) // 2} -> {(vbuf + 4) // 2} cells)"))
+        from agents.grounder import buffer_for
+        tgt = int(slot.get("sweep_cells") or _SWEEP_CELLS)
+        b = buffer_for(tgt)
+        vbuf, cbuf = int(b["vertex"]), int(b["cell"])
+        old_v = ((d.get("sets") or {}).get("vertex") or {}).get("n")
+        if old_v and vbuf > int(old_v):
+            d["sets"]["vertex"]["n"] = vbuf
+            d["sets"]["cell"]["n"] = cbuf
+            print(T_.quiet(f"[route A] reservoir {old_v} -> {vbuf} vertices "
+                           f"(cap {(int(old_v) + 4) // 2} -> {(vbuf + 4) // 2} cells)"))
     except Exception as e:
         print(T_.warn(f"[route A] could not size the reservoir: {e}"))
     name = f"{rid}_{index:02d}"
