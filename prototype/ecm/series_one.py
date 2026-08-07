@@ -112,6 +112,36 @@ SERIES = {
     # only as k/gamma, so 1e6 becomes reachable -- at the cost of a sheet ten times slower to respond
     "69s_k1e6_gam2e4": dict(membrane_bond_k=1.0e6, membrane_gamma=2.0e4),
 
+    # --- 96-101: THE CORSET, AND THE MECHANISM THAT COMPETES WITH IT --------------------------------
+    # A reviewer's suggestion: a sheet stiffer around the girth than along the long axis -- the
+    # "molecular corset" -- should squeeze the middle and push growth into the ends, elongating the
+    # tissue. It is the first thing that would make the MEMBRANE change the EPITHELIUM, which so far it
+    # cannot. With the coupling one-way it has to travel the same route the ovoid does: the sheet's hoop
+    # tension is recorded by latitude in pass 2, and pass 1 is rebuilt with growth gated on that.
+    #
+    # The prediction has the OPPOSITE SIGN from every shape result so far. A polar-dense matrix resists
+    # at the poles and gives an oblate tissue, aspect r_eq/r_ax = 1.43. A corset resists at the equator,
+    # so it should give a PROLATE one, aspect < 1. Same gate, same pipeline, opposite outcome -- which
+    # also means that if a corset map produces an oblate tissue, the gate is not reading what we think.
+    #
+    # AND THE COMPETING EXPLANATION, because the corset is contested (Anderson & Horne-Badovinac 2025,
+    # Matrix Biol 140:16, argues against the basement-membrane stiffness-gradient account). The
+    # alternative is that elongation is generated inside the epithelium, by planar-polarised junctional
+    # myosin -- the germband-extension mechanism -- and needs no anisotropic membrane at all. 100 tests
+    # that with the membrane isotropic; 101 runs both, and asks whether the corset adds anything to a
+    # tissue that is already elongating on its own. If 100 elongates as much as 97, the corset is not
+    # necessary; if 101 exceeds both, they compose.
+    "96_corset_off": dict(membrane_aniso=1.0, membrane_record_hoop=True),
+    "97_corset_x3": dict(membrane_aniso=3.0, membrane_record_hoop=True),
+    "98_corset_x10": dict(membrane_aniso=10.0, membrane_record_hoop=True),
+    # sign control: stiffer along the MERIDIAN instead. If the corset works by squeezing the girth this
+    # should push the shape the other way, and if it does not the effect is not orientational at all.
+    "99_corset_reversed": dict(membrane_aniso=0.1, membrane_record_hoop=True),
+    "100_polarised_myosin": dict(membrane_aniso=1.0, membrane_record_hoop=True,
+                                 _myo=dict(myosin=1.0, myo_beta=2.0, myo_keyed_on="tension")),
+    "101_corset_and_myosin": dict(membrane_aniso=10.0, membrane_record_hoop=True,
+                                  _myo=dict(myosin=1.0, myo_beta=2.0, myo_keyed_on="tension")),
+
     # --- 84-95: WHAT MAKES THE HOLES ----------------------------------------------------------------
     # An external reviewer: the holes in the reference sheet are too big -- real microperforations are
     # ~1 um across, against a 5-10 um cell footprint, so a hole should be about an eighth of a cell and

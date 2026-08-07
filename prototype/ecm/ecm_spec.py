@@ -104,7 +104,7 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                # crosslink turnover, in frames. Large = a membrane that cannot keep up with growth and
                # must fragment; small = one that remodels and stays intact. 0 or None disables it.
                membrane_tau=60.0, membrane_reserve=0.0, membrane_secrete_rate=0.02,
-               membrane_secrete_targeted=1.0, membrane_relax_new=4, membrane_surface_level=False,
+               membrane_secrete_targeted=1.0, membrane_relax_new=4, membrane_aniso=1.0, membrane_record_hoop=False, membrane_surface_level=False,
                membrane_impl="mpm", membrane_drag=40.0, membrane_inertial=False,
                membrane_gamma=2.0e3):
     """The whole experiment as a plain dict, ready for yaml.safe_dump + schema.load."""
@@ -186,6 +186,7 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
              "k": float(membrane_adhesion), "offset": float(membrane_offset), "detach": 0.0},
             {"op": "basement_membrane_bond", "at": "basement_membrane_particle",
              "k": float(membrane_bond_k), "cutoff": float(membrane_cutoff),
+             "aniso": float(membrane_aniso), "record_hoop": bool(membrane_record_hoop),
              "max_neighbours": 6},
             {"op": "basement_membrane_remodel", "at": "basement_membrane_particle",
              "tau": float(membrane_tau), "cap": 0.02},

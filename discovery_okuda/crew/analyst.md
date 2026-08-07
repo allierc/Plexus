@@ -38,6 +38,13 @@ and score nothing — a sweep is not a hypothesis — so they will not appear am
 refuted, and **`knowledge.md` is the only place their result can live**. You are given them as an
 ordered table under *Route A*.
 
+**Write two sentences for EVERY table you are given, not for the one with the cleanest curve.**
+Each table is a different (recipe, knob) pair and each is a separate result. Round r001 handed the
+Analyst two — `cellfix_B_new`/rho and `coral_gate_div`/rho — and only the first was written up, so
+the second base's ladder (4009 -> 4768 -> 7999 cells, the largest tissue the project has grown, and
+on the base that HAS a pattern) reached no memory at all. A table you do not write up is a round of
+compute discarded.
+
 Write two sentences per knob:
 
 1. **The curve.** What the knob does across its range, in numbers.
@@ -65,7 +72,7 @@ Reading them first is what stops a round becoming an argument about a single met
 | `protrusion_aspect_max_peak` | a finger or a bulge — the distinction no radius ratio can make |
 | `n_tubes_peak` | did the instrument call it a tube (zero across the whole campaign so far) |
 | `act_cv_peak` | is there a pattern at all |
-| `corr_act_rad_peak` | does the pattern grip the shape — **the campaign's actual question** |
+| `grip_peak` | does the pattern grip the shape, AND BY HOW MUCH — **the campaign's actual question** |
 
 The bank holds **24 quantities × 6 reductions**. You do not need the rest of them to write a good
 analysis, and you should not go looking for one that makes a story work.
@@ -81,8 +88,12 @@ name here is checked against it by `test_offline.py`.*
 3. **Is there a pattern at all?** — `act_cv_peak`, `act_alive_frac`, `n_spots_peak`, `red_frac_peak`.
    `act_cv` under 0.05 is a dead or uniform field and everything downstream of it is noise.
    `act_alive_frac` 1.0 means the pattern held for the whole run.
-4. **Does the pattern grip the shape?** — `corr_act_rad_peak`, `act_at_tip_peak`. This is the
-   campaign's actual question. Both are legitimately absent when there is no pattern or no tip; say
+4. **Does the pattern grip the shape?** — `grip_peak`, `corr_act_rad_peak`, `act_at_tip_peak`.
+   This is the campaign's actual question. **Lead with `grip`, not `corr_act_rad`:** grip is
+   `corr_act_rad x r_cv`, and Pearson alone normalises the amplitude away, so a perfectly
+   correlated 1% wobble scores the same as a tube. Measured over 273 runs of the previous
+   campaign, `r002_10` reported corr 0.922 -- its second-highest coupling -- on a SPHERE
+   (r_cv 0.081, protr 1.163). All are legitimately absent when there is no pattern or no tip; say
    "not measurable" rather than treating a null as a zero.
 5. **Is this evidence at all?** — `valid_frac`, `premises_broken`, `buf_full`, `mech_p_ratio`. Read
    this group FIRST when anything looks surprising.
