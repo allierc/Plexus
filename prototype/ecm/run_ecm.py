@@ -732,7 +732,20 @@ def run(name, spec, device="cuda:0", movie=True, keep_traj=True, render_kw=None)
             # basement membrane simply missing, and missing reads as "there wasn't one".
             import membrane_ops
             if "basement_membrane_particle" in out.get("sets", {}):
-                extra["mpos"] = np.asarray(out["sets"]["basement_membrane_particle"]["pos"], np.float32)
+                # STRIDED. At 390k nodes the full record is 390k x 3 x 4 B x 403 frames = 1.9 GB for
+                # `mpos` alone, and nothing reads every frame -- the movie draws 200 and the analysis
+                # reads the last. The stride keeps the first and LAST frames exactly, which are the two
+                # the gap measurements use.
+                _mp = np.asarray(out["sets"]["basement_membrane_particle"]["pos"], np.float32)
+                _st = max(1, int(np.ceil(_mp.shape[0] * _mp.shape[1] * 12 / 400e6)))
+                if _st > 1:
+                    _keep = np.unique(np.r_[np.arange(0, _mp.shape[0], _st), _mp.shape[0] - 1])
+                    _mp = _mp[_keep]
+                    extra["mpos_frames"] = _keep.astype(np.int32)
+                    print(f"[{name}] mpos strided 1-in-{_st} ({len(_keep)} of "
+                          f"{out['sets']['basement_membrane_particle']['pos'].shape[0]} frames, "
+                          f"first and last kept)", flush=True)
+                extra["mpos"] = _mp
                 if membrane_ops.MEMBRANE_STRAIN:
                     extra["mstrain"] = np.asarray(membrane_ops.MEMBRANE_STRAIN, np.float16)
                 # WHICH PARTICLES ARE MEMBRANE AND WHICH ARE UNSECRETED RESERVE. With `reserve = 8`,

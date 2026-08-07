@@ -104,7 +104,7 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                # crosslink turnover, in frames. Large = a membrane that cannot keep up with growth and
                # must fragment; small = one that remodels and stays intact. 0 or None disables it.
                membrane_tau=60.0, membrane_reserve=0.0, membrane_secrete_rate=0.02,
-               membrane_secrete_targeted=1.0, membrane_relax_new=4, membrane_relax_every=20, membrane_relax_sweeps=3,
+               membrane_secrete_targeted=1.0, membrane_deposit="uniform", membrane_relax_new=4, membrane_relax_every=20, membrane_relax_sweeps=3,
                membrane_tau_adh=0.0, membrane_aniso=1.0, membrane_record_hoop=False, membrane_surface_level=False,
                membrane_impl="mpm", membrane_drag=40.0, membrane_inertial=False,
                membrane_gamma=2.0e3):
@@ -198,6 +198,7 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
             {"op": "basement_membrane_secrete", "at": "basement_membrane_particle",
              "centre": [0.5, 0.5, 0.5], "rate": float(membrane_secrete_rate),
              "targeted": float(membrane_secrete_targeted),
+             "deposit": str(membrane_deposit),
              "relax_new": int(membrane_relax_new),
              "relax_every": int(membrane_relax_every),
              "relax_sweeps": int(membrane_relax_sweeps)},

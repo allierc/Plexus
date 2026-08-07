@@ -1035,6 +1035,8 @@ class BasementMembraneSecrete(Structural):
         self.rate = float(params.get("rate", 0.02))
         self.targeted = float(params.get("targeted", 1.0))
         self.relax_new = int(params.get("relax_new", 4))
+        self.deposit = str(params.get("deposit", "uniform")).lower()  # uniform | gaps | parent
+        self.cand_mult = int(params.get("cand_mult", 12))
         self.relax_every = int(params.get("relax_every", 20))     # sweep the whole sheet this often
         self.relax_sweeps = int(params.get("relax_sweeps", 3))
         self._r0 = None
@@ -1088,36 +1090,67 @@ class BasementMembraneSecrete(Structural):
         # about one target spacing away. An isolated particle with no bonds at all is then still a place
         # the membrane can be repaired, which is what makes coverage recoverable instead of a ratchet.
         idx_live = live.nonzero(as_tuple=True)[0]
-        # per-particle load: the mean strain of the bonds it still has (0 where it has none)
-        pl = torch.zeros(n_tot, device=dev, dtype=dt_)
-        pc = torch.zeros(n_tot, device=dev, dtype=dt_)
-        for a_, b_ in ((bi, bj), (bj, bi)):
-            pl.index_add_(0, a_, strain.clamp_min(0.0))
-            pc.index_add_(0, a_, balive.to(dt_))
-        pl = pl / pc.clamp_min(1.0)
-        # per-particle sparsity: how far its nearest live neighbour is, against the target spacing
-        want_sp = math.sqrt(4.0 * math.pi * R * R / max(n_live, 1))
         sub = pos[idx_live]
-        nn = torch.full((idx_live.numel(),), want_sp, device=dev, dtype=dt_)
-        step = 4096
-        for a_ in range(0, idx_live.numel(), step):
-            dd = (sub[a_:a_ + step, None, :] - sub[None, :, :]).norm(dim=-1)
-            dd[torch.arange(dd.shape[0], device=dev), torch.arange(a_, min(a_ + step, idx_live.numel()),
-                                                                   device=dev)] = 1e9
-            nn[a_:a_ + step] = dd.min(dim=1).values
-        sparsity = (nn / max(want_sp, 1e-12)).clamp(0.5, 4.0)
-        w = sparsity ** 2 * (1.0 + self.targeted * pl[idx_live])
-        if self.targeted <= 0:
-            w = torch.ones_like(w)
-        k = min(add, idx_live.numel())
-        if float(w.sum()) <= 0:
-            pick = torch.randperm(idx_live.numel(), device=dev)[:k]
-        else:
-            pick = torch.multinomial(w, k, replacement=(k > idx_live.numel()))
-        src = idx_live[pick]
-        add = int(src.numel())
-        if add == 0:
+
+        if self.deposit in ("uniform", "gaps"):
+            # WHERE THE CELLS ARE, NOT WHERE THE HOLES ARE. Cells secrete basement membrane basally,
+            # into the patch of surface directly beneath themselves: laminin polymerises on the cell
+            # surface where integrin and dystroglycan nucleate it, collagen IV assembles onto that and is
+            # crosslinked in place. So deposition is LOCAL TO EACH CELL and uniform per unit basal area.
+            #
+            # That rules out both of the rules tried here. Placing new material beside an existing node
+            # is a random walk and clumps. Placing it in the largest gap is worse as biology, however
+            # well it packs: it needs a global view of where every hole is, and a cell has none -- it
+            # cannot know whether there is a gap two cells away.
+            #
+            # Uniform-per-area is what a sheet of secreting cells does, and it fills a hole at exactly
+            # the rate it adds to anywhere else, which is the honest mechanism. Evening out is then the
+            # job of the network itself -- crosslink turnover and rearrangement -- not of aimed
+            # deposition. `deposit="gaps"` is kept as the non-biological upper bound on how well
+            # targeted placement could do.
+            n_cand = max(add * self.cand_mult, add)
+            cd = torch.randn(n_cand, 3, generator=None, device=dev, dtype=dt_)
+            cd = cd / cd.norm(dim=1, keepdim=True).clamp_min(1e-12)
+            best = torch.full((n_cand,), 1e9, device=dev, dtype=dt_)
+            near = torch.zeros(n_cand, dtype=torch.long, device=dev)
+            u_live = (sub - c) / (sub - c).norm(dim=1, keepdim=True).clamp_min(1e-12)
+            blk = 4096
+            for a0 in range(0, n_cand, blk):
+                b0 = min(n_cand, a0 + blk)
+                dd = 1.0 - (cd[a0:b0] @ u_live.T).clamp(-1, 1)     # 1 - cos, monotone in angle
+                v, i_ = dd.min(dim=1)
+                best[a0:b0] = v
+                near[a0:b0] = i_
+            if self.deposit == "uniform":
+                # every candidate direction is equally acceptable: a cell secretes under itself, and the
+                # cells tile the surface, so the deposition field is flat per unit area
+                pick_c = torch.randperm(n_cand, device=dev)[:min(add, n_cand)]
+            else:
+                # the non-biological bound: purely how far a candidate is from anything already there
+                pick_c = torch.topk(best, min(add, n_cand)).indices
+            add = int(pick_c.numel())
+            slot = (~live).nonzero(as_tuple=True)[0][:add]
+            add = int(slot.numel()); pick_c = pick_c[:add]
+            rad = (sub - c).norm(dim=1)[near[pick_c]][:, None]
+            pos[slot] = c + cd[pick_c] * rad
+            v = lvl.get("vel") if "vel" in lvl.state_schema else None
+            if v is not None:
+                v[slot] = v[idx_live][near[pick_c]]
+            m = getattr(lvl, "mass", None)
+            if m is not None:
+                m[slot] = m[idx_live][near[pick_c]]
+            F = getattr(lvl, "F", None)
+            if F is not None:
+                F[slot] = torch.eye(F.shape[-1], device=dev, dtype=F.dtype)
+            Cb = getattr(lvl, "C", None)
+            if Cb is not None:
+                Cb[slot] = 0.0
+            live = live.clone(); live[slot] = True
+            H.membrane_alive = live
+            H.membrane_new = slot
+            SECRETE_TRACE.append((n_live, add, int(live.sum()), R))
             return {}
+
         slot = (~live).nonzero(as_tuple=True)[0][:add]
         add = int(slot.numel()); src = src[:add]
 
