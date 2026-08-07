@@ -161,6 +161,22 @@ def remeasure(out_dir):
     applied to every finished run, not a reason to keep a number nobody trusts.
     """
     spec = yaml.safe_load(open(os.path.join(out_dir, "spec_run.yaml")))
+    # A RUN SUBMITTED TO THE CLUSTER RECORDS CLUSTER PATHS. The same NFS export is mounted at
+    # /workspace in the devcontainer and at /groups/saalfeld/home/allierc/Graph on gpu_l4, so a spec
+    # written there names files this side cannot open -- re-rendering 69 locally died on a surface map
+    # that exists, under its other name. The mapping is `cluster.MAP`; it is read from there rather
+    # than restated, so there is one place it can be wrong.
+    try:
+        sys.path.insert(0, "/workspace/Plexus/discovery_okuda")
+        from cluster import MAP as _MAP
+    except Exception:
+        _MAP = ("/workspace", "/groups/saalfeld/home/allierc/Graph")
+    def _here(v):
+        return _MAP[0] + v[len(_MAP[1]):] if isinstance(v, str) and v.startswith(_MAP[1]) else v
+    for _o in spec.get("operators", []):
+        for _k in ("surface", "load", "gate", "map"):
+            if _k in _o:
+                _o[_k] = _here(_o[_k])
     z = np.load(os.path.join(out_dir, "traj.npz"))
     out = {"sets": {"mpm_particle": {"pos": np.asarray(z["pos"])}}}
     m = measure(out, spec, stress=list(np.asarray(z["stress"])))
@@ -177,6 +193,22 @@ def remeasure(out_dir):
 def rerender(out_dir, **kw):
     """Redraw a finished run from `traj.npz` -- no GPU, no re-simulation."""
     spec = yaml.safe_load(open(os.path.join(out_dir, "spec_run.yaml")))
+    # A RUN SUBMITTED TO THE CLUSTER RECORDS CLUSTER PATHS. The same NFS export is mounted at
+    # /workspace in the devcontainer and at /groups/saalfeld/home/allierc/Graph on gpu_l4, so a spec
+    # written there names files this side cannot open -- re-rendering 69 locally died on a surface map
+    # that exists, under its other name. The mapping is `cluster.MAP`; it is read from there rather
+    # than restated, so there is one place it can be wrong.
+    try:
+        sys.path.insert(0, "/workspace/Plexus/discovery_okuda")
+        from cluster import MAP as _MAP
+    except Exception:
+        _MAP = ("/workspace", "/groups/saalfeld/home/allierc/Graph")
+    def _here(v):
+        return _MAP[0] + v[len(_MAP[1]):] if isinstance(v, str) and v.startswith(_MAP[1]) else v
+    for _o in spec.get("operators", []):
+        for _k in ("surface", "load", "gate", "map"):
+            if _k in _o:
+                _o[_k] = _here(_o[_k])
     z = np.load(os.path.join(out_dir, "traj.npz"))
     import ecm_ops
     ecm_ops.STRESS_HISTORY[:] = list(np.asarray(z["stress"]))
@@ -497,8 +529,11 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, f
     fig.savefig(os.path.join(out_dir, "strip.png"), dpi=100, facecolor="black")
     plt.close(fig)
     print(f"[{name}] strip.png ({n_strip} columns of {len(meshes)} drawn frames)", flush=True)
-    if strip_only or not movie:
+    if strip_only:
         return
+    # NOT `or not movie`. `3d.png` is drawn from the movie figure, so returning here on movie=False
+    # skipped the still as well -- and "give me the end state without waiting for the mp4" is exactly
+    # the movie=False case. The still is written below, then the loop is skipped.
 
     # ------------------------------------------------------------------ movie
     # THE MOVIE DRAWS THE FRAMES THE MESH WAS KEPT FOR. Choosing its own would leave most panels
@@ -562,8 +597,10 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, f
     fps = int(fps or spec.get("plotting", {}).get("fps", 10))
     wri = FFMpegWriter(fps=fps, metadata={"title": name})
     t0 = time.time()
-    with wri.saving(figm, os.path.join(out_dir, "movie.mp4"), dpi=95):
-        for k, (t, mt) in enumerate(keep):
+    # ONE FRAME FIRST, AS A STILL. The movie takes minutes to write and the end state is what anyone
+    # looks at first, so `3d.png` is the LAST frame in the same 2x2 layout, saved before the loop starts.
+    # Same code path, so the still cannot drift from the movie.
+    def _draw_frame(t, mt):
             vp, q, band, blk = mt["pos"], q_of(t), band_of(t), blk_of(t)
             div, brk = RD.divided_mask(mt), RD.broken_mask(mt, vp, name)
             # FRAMED TO MATCH THE SECTION BESIDE IT. `L3` is sized for the MPM cube, and measured off
@@ -613,8 +650,8 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, f
                 # half again the tissue extent, so the network rendered as a small ball in a large frame.
                 RD.draw_junctions_3d(axzc, mt, vp, RD.CAM_SIDE, Lt, myo_hi=myo_sc)
                 # the insets: the membrane patch under the cutaway, the junction patch under the network
-                RD.draw_zoom(inz, mt, vp, mem_q=mq, mem_s=ms, name=name, frac=0.22,
-                             mem_hi=mem_sc, junctions=False)
+                RD.draw_zoom(inz, mt, vp, mem_q=_raw, mem_s=None, name=name, frac=0.22,
+                             junctions=False, bonds=_bij, bond_s=_bs)
                 RD.draw_zoom(inzc, mt, vp, mem_q=None, mem_s=None, name=name, frac=0.16, lw=2.4,
                              myo_hi=myo_sc)
                 for _a in (inz, inzc):
@@ -628,6 +665,20 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, f
             axs.text2D(0.02, 0.96, f"{name}   frame {t}   {int(mt['nF'])} cells   "
                                    f"strained {float((band > 0).mean()) * 100:.0f}%",
                        transform=axs.transAxes, color="white", fontsize=9)
+
+
+    if keep:
+        _t, _mt = keep[-1]
+        _draw_frame(_t, _mt)
+        figm.savefig(os.path.join(out_dir, "3d.png"), dpi=140, facecolor="black")
+        print(f"[{name}] 3d.png (end point, frame {_t})", flush=True)
+    if not movie:
+        plt.close(figm)
+        return
+
+    with wri.saving(figm, os.path.join(out_dir, "movie.mp4"), dpi=95):
+        for k, (t, mt) in enumerate(keep):
+            _draw_frame(t, mt)
             wri.grab_frame()
             if k == 0:
                 print(f"[{name}] first movie frame in {time.time()-t0:.1f}s "
