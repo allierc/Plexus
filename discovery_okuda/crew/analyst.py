@@ -50,7 +50,14 @@ def run(bundle):
     prompt = _prompt.build("analyst", [
         ("The control", bundle.get("control")),
         ("Every run this round, with its metrics",
-         _prompt.bank_only(bundle.get("metrics")), {"limit": 60000}),
+         _prompt.bank_only(bundle.get("metrics")), {"limit": 140000}),
+        # 60,000 WAS SIZED FOR A 10-SLOT ROUND. At 16 slots the bank-reduced bundle is 65,692
+        # chars and the block cut the last 9% -- which alphabetically is r001_14/r001_15, the two
+        # coral_gate_div Route A runs, so the Analyst's sweep section covered one base and never
+        # mentioned the other. It said so out loud, which is the only reason this was caught. The
+        # limit exists to protect the context, and 140k chars is ~35k tokens: affordable, and
+        # headroom to ~34 slots. Raise it again rather than let a role reason over a mutilated
+        # round.
         ("What each run predicted, and how it scored", bundle.get("predictions")),
         ("Observations -- broken premises, inert operators, saturation",
          bundle.get("observations")),
