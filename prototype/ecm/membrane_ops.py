@@ -392,8 +392,25 @@ class BasementMembraneBond(Lateral):
         """
         if not self.graph_mode:
             return                                   # MPM path: integrated at the substep, ~70 per period
-        k_eff = max(bonds_per_node, 1.0) * self.k + self.k_adh_hint
-        k_max = self.k * (1.0 / (dt_frame ** 2)) / max(k_eff, 1e-9)
+        # THE CRITERION DEPENDS ON WHICH EQUATION OF MOTION IS BEING INTEGRATED, and using the wrong one
+        # refuses exactly the runs that motivated the change. Inertial (v += dt*a) is a spring-mass
+        # oscillator, dt*sqrt(k_eff) < 1. Overdamped (x += dt*F/gamma) is first order, dt*k_eff/gamma < 2.
+        # Either way k_eff is the sum over the node's OWN bonds plus its tether, not k alone.
+        #
+        #     inertial     k_max = (1/dt^2 - kappa)/z   ~ 9.0e3
+        #     overdamped   k_max = (2*gamma/dt - kappa)/z ~ 1.7e5   at gamma = 2000
+        #
+        # 19x, not the 120x I first claimed -- that figure dropped the coordination factor z, which is
+        # the same term that made the first version of this guard 13x too generous.
+        #
+        # Worth stating because it changes what a stiffness sweep MEANS: overdamped, k and gamma enter
+        # only as k/gamma, a relaxation RATE. So the ceiling is not a property of the sheet, it can be
+        # moved by raising gamma -- at the cost of a sheet that responds more slowly than the tissue grows.
+        z = max(bonds_per_node, 1.0)
+        if self.gamma > 0:
+            k_max = (2.0 * self.gamma / dt_frame - self.k_adh_hint) / z
+        else:
+            k_max = (1.0 / dt_frame ** 2 - self.k_adh_hint) / z
         if self.k > k_max:
             raise RuntimeError(
                 f"basement_membrane_bond: k = {self.k:.3g} exceeds the explicit-integration ceiling "

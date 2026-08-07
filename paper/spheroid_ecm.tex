@@ -163,6 +163,22 @@ what is already there, the sheet must be \emph{secreted} as the tissue grows or 
 At this scale viscous drag beats inertia by about ten orders of magnitude, so
 $\gamma\dot{\mathbf x}=\mathbf F$ is the equation of motion: the sheet has no mass and no momentum.
 
+This changes what a crosslink stiffness \emph{is}. In Eq.~\eqref{eq:bond}, $k_b$ and $\gamma$ appear
+only as the ratio $k_b/\gamma$, which is a relaxation \emph{rate} --- so stiffness on its own has no
+meaning here, and the quantity that matters is whether the sheet relaxes faster than the tissue grows.
+It also sets what the integrator can carry. Stepping forward in fixed slices is stable while
+$\Delta t\,(z\,k_b+\kappa)/\gamma<2$, where $z$ is the number of crosslinks meeting at a node:
+%
+\begin{equation}
+k_b^{\max}=\frac{2\gamma/\Delta t-\kappa}{z}\;\approx\;1.7\times10^{5}
+\qquad\text{against}\qquad
+\frac{1/\Delta t^{2}-\kappa}{z}\;\approx\;9.0\times10^{3}
+\quad\text{for an inertial sheet.}
+\label{eq:ceiling}\end{equation}
+%
+Nineteen times higher --- and because the bound is set by $\gamma$, it is not a property of the membrane
+at all: raising $\gamma$ admits any stiffness, at the price of a sheet that responds more slowly.
+
 What is called adhesion here is a tether to a surface, not a receptor. The dominant anchor in a real
 epithelium is to laminin, which is not modelled, and the sheet has no attachment to the surrounding
 stroma either --- so this tether is the only thing holding it.
