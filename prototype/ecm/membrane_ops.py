@@ -364,6 +364,9 @@ class BasementMembraneBond(Lateral):
         # obviously wrong to average into a sweep. Checked here rather than discovered there.
         self.graph_mode = bool(params.get("graph_mode", False))
         self.snapshot_every = int(params.get("snapshot_every", 20))
+        self.aniso = float(params.get("aniso", 1.0))          # circumferential : meridional stiffness
+        self.record_hoop = bool(params.get("record_hoop", False))
+        self.centre_t = torch.tensor([float(v) for v in params.get("centre", [0.5, 0.5, 0.5])])
         # the adhesion stiffness acting on the same nodes; the spec passes it so the ceiling can see it
         self.k_adh_hint = float(params.get("k_adhesion_hint", 0.0))
         self.gamma = float(params.get("overdamped_gamma", 0.0))
@@ -585,7 +588,34 @@ class BasementMembraneBond(Lateral):
         # spacing -- the sheet overshot, oscillated and tore itself apart, 69,428 of 70,129 bonds gone
         # within 40 frames before the tissue had grown into it. The BREAKING criterion stays relative
         # (strain is the right dimensionless failure measure); only the force is extension-based.
-        f = (self.k * (L - self.rest) * self.alive.to(dt_))[:, None] * (d / L[:, None])
+        # THE CORSET. `aniso` makes crosslinks stiffer around the girth than along the long axis, which
+        # is the "molecular corset" idea: a sheet that resists circumferential expansion more than
+        # meridional expansion should squeeze the middle and push growth into the ends.
+        #
+        # A bond's orientation is measured against the local parallel (the circle of latitude): a bond
+        # lying along it is circumferential and gets the full factor, one lying along the meridian gets
+        # none. `aniso = 1` is isotropic and reproduces every run to date bit-for-bit.
+        kk = self.k
+        if self.aniso != 1.0:
+            mid = 0.5 * (pos[self.i] + pos[self.j]) - self.centre_t.to(pos)
+            rad = mid / mid.norm(dim=1, keepdim=True).clamp_min(1e-12)
+            axis = torch.tensor([0.0, 0.0, 1.0], device=pos.device, dtype=dt_)
+            par = torch.cross(axis.expand_as(rad), rad, dim=1)          # local circle of latitude
+            par = par / par.norm(dim=1, keepdim=True).clamp_min(1e-12)
+            circ = ((d / L[:, None]) * par).sum(1).abs()                # 1 = circumferential, 0 = meridional
+            kk = self.k * (1.0 + (self.aniso - 1.0) * circ)
+        f = (kk * (L - self.rest) * self.alive.to(dt_))[:, None] * (d / L[:, None])
+        # the sheet's own hoop tension, by direction -- this is what a corset would press with, and it is
+        # what the growth gate can read in the next pass. Without it the corset cannot reach the tissue.
+        if self.record_hoop:
+            th = torch.acos((mid_u := (0.5 * (pos[self.i] + pos[self.j]) - self.centre_t.to(pos)))[:, 2]
+                            / mid_u.norm(dim=1).clamp_min(1e-12)).clamp(0, math.pi)
+            nb_ = 32
+            bin_ = (th / math.pi * nb_).long().clamp(0, nb_ - 1)
+            ten = (kk * (L - self.rest)).clamp_min(0.0) * self.alive.to(dt_)
+            acc_ = torch.zeros(nb_, device=pos.device, dtype=dt_).index_add_(0, bin_, ten)
+            cnt_ = torch.zeros(nb_, device=pos.device, dtype=dt_).index_add_(0, bin_, self.alive.to(dt_))
+            HOOP_TRACE.append((acc_ / cnt_.clamp_min(1.0)).detach().cpu().numpy())
         acc = torch.zeros_like(pos)
         acc.index_add_(0, self.i, f)
         acc.index_add_(0, self.j, -f)
@@ -1109,6 +1139,10 @@ SECRETE_TRACE = []
 # broken" is a statement about edges, so the edges have to be recorded. Every `snapshot_every` frames,
 # because storing 140k bonds x 400 frames is not worth it and the network changes slowly.
 BOND_SNAPSHOTS: list = []
+
+# Per frame: mean crosslink tension by latitude band. What a corset would press with, and the only
+# route by which the membrane can reach the epithelium while the coupling is one-way.
+HOOP_TRACE: list = []
 
 # Published by `run_ecm.run`/`rerender`: which particles are membrane and which are unsecreted reserve.
 MEMBRANE_ALIVE = None

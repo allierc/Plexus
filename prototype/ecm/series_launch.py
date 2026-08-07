@@ -41,7 +41,27 @@ def main():
                  f"{cluster.cpath(os.path.join(LOGDIR, '_submit.log'))} 2>&1 < /dev/null &", timeout=30)
     # `only`, not SERIES. Printing the whole table while submitting a subset says nine jobs went out
     # when two did -- a log that reports the intent instead of the action.
-    print(f"[series] fired {len(only)} bsub(s): " + ", ".join(only))
+    # VERIFY, DO NOT ASSUME. `_ssh` fires the submissions detached and returns as soon as ssh does, so
+    # when login1 hung this printed "fired 6 bsub(s)" and submitted nothing -- 84-89 were reported as
+    # launched, never ran, and a watchdog polling an empty queue then fired the NEXT wave on top. A
+    # launcher that reports intent instead of outcome is worse than one that fails loudly.
+    import time as _t
+    landed = []
+    for _ in range(6):
+        _t.sleep(10)
+        out = cluster._ssh_retry("bjobs -w", timeout=90, tries=2)
+        if out is not None and out.returncode == 0:
+            q = " ".join(out.stdout.split())
+            landed = [n for n in only if n in q]
+            if len(landed) == len(only):
+                break
+    if len(landed) == len(only):
+        print(f"[series] fired and CONFIRMED {len(only)}: " + ", ".join(only))
+    else:
+        missing = [n for n in only if n not in landed]
+        print(f"[series] WARNING: {len(landed)}/{len(only)} confirmed in the queue. "
+              f"NOT CONFIRMED: {', '.join(missing)}")
+        print("[series] these were not seen after 60s of polling -- assume they did not submit")
 
 
 if __name__ == "__main__":
