@@ -391,7 +391,8 @@ OPERATORS = {
         impls=["hertwig", "orient_iface"], impl_structural=True,   # long-axis vs bud-axis septum
         params={"cycle_cv": (0.05, 0.5, 0.40), "min_cycle": (2, 64, 16),   # 4 calls x 4
                 "max_cycle": (6, 10**9, 10**9),   # vcap: PROVISIONAL
-                "orient_asw": (0.2, 6.0, 1.0)}),
+                # a FRACTION of the activator max now, not an absolute value -- see tyssue_ops3d
+                "orient_asw": (0.3, 0.95, 0.6)}),
     "extrude": dict(                                          # THE FORCING TERM -- ablatable
         stage=2, role="forcing", outputs=[], slots=["site"], needs=["morphogen"],
         impls=["radial_push"], impl_structural=False,
