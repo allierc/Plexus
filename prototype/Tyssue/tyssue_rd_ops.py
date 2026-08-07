@@ -567,7 +567,23 @@ class RDInterfaceTension(Lateral):
         ef = torch.as_tensor(m["E_face"], device=dev, dtype=torch.long)
         h0, _ = clvl.state_schema["chem"]
         a = clvl.state[:nF, h0].detach().to(dev)
-        red = (a > self.a_sw).to(dt)                             # per-cell red state
+        # `a_sw` IS A FRACTION OF THE FIELD'S OWN MAXIMUM, NOT AN ABSOLUTE VALUE.
+        #
+        # It used to be `a > self.a_sw` with a_sw declared (0.2, 6.0) and defaulted to 0.5, while
+        # the activator's own ceiling is whatever the chemistry produces -- measured across 78
+        # campaign runs, act_max_final has a MEDIAN OF 0.000 and a maximum of 1.541. So the entire
+        # declared range sat above the field, `red.sum()` was 0, and the operator returned {} on
+        # every one of 800 scheduled frames. The acted-ledger recorded `rd_interface_tension: 0`
+        # and the Analyst reported it "inert" for two rounds without being able to say why. Nine
+        # edits, 10% of a campaign, on an operator that could not fire at any legal setting.
+        #
+        # Fixing the RANGE would have been a patch: the ceiling moves with the chemistry, so the
+        # next parent could put it out of reach again. `shape_to_chem` in this same repo
+        # standardises its feature for exactly this reason -- so `beta` means one thing whatever
+        # the units -- and its docstring names the alternative as finding F009. A threshold
+        # relative to the field cannot be outside the field.
+        amax = float(a.max()) if a.numel() else 0.0
+        red = (a > self.a_sw * amax).to(dt) if amax > 0 else torch.zeros_like(a)
         twin = ShapeEnergy3D._twin_faces(es, et, ef, Nv)        # neighbour cell across each half-edge
         iface = (red[ef] != red[twin]).to(dt)                   # 1 on the red/white interface half-edges (the ring)
         if float(red.sum()) < 1.0 or float(iface.sum()) < 1.0:  # no red spot / no interface yet -> nothing to do
