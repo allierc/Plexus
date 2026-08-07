@@ -119,7 +119,8 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap
           plate_stiff=0.6, load_npz=None, load_gain=1.0, gate_npz=None,
           gate_p_half="auto", gate_hill=4.0, gate_floor=0.15,
           gate_smooth_frames=25, gate_smooth_phi=360.0,
-          myosin=None, myo_tau=20.0, myo_beta=1.0, myo_new=1.0):
+          myosin=None, myo_tau=20.0, myo_beta=1.0, myo_new=1.0,
+          myo_keyed_on="length", myo_destabilising=1):
     """Run cellfix_B_new verbatim and write the cache.
 
     `buffer_x` MULTIPLIES THE VERTEX AND CELL RESERVOIRS AND NOTHING ELSE. At the reference buffers
@@ -177,7 +178,9 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap
         import junction_ops                                           # noqa: F401  register it
         spec["operators"].append({"op": "junction_myosin", "at": "vertex",
                                   "activity": float(myosin), "tau": float(myo_tau),
-                                  "beta": float(myo_beta), "myo_new": float(myo_new), "dt": 1.0, "inherit": True})
+                                  "beta": float(myo_beta), "myo_new": float(myo_new), "dt": 1.0, "inherit": True,
+                                  "keyed_on": str(myo_keyed_on),
+                                  "destabilising": bool(myo_destabilising)})
         i = spec["schedule"].index("shape_energy_3d")
         spec["schedule"].insert(i, "junction_myosin")
         print(f"[tissue] per-junction myosin: activity={myosin}, tau={myo_tau}, beta={myo_beta}, "
@@ -281,6 +284,7 @@ def load_or_build(frames=401, device="cuda:0", name="cellfix_B_new", rebuild=Fal
                   load_gain=1.0, tag_extra="", gate_npz=None, gate_p_half="auto",
                   gate_hill=4.0, gate_floor=0.15, gate_smooth_frames=25,
                   gate_smooth_phi=360.0, myosin=None, myo_tau=20.0, myo_beta=1.0,
+                  myo_keyed_on="length", myo_destabilising=1,
                   myo_new=1.0):
     """The cache path, built if missing. Frames are part of the filename: a 401-frame tissue and a
     120-frame one are different tissues, and silently reusing one for the other would be a run
@@ -302,6 +306,7 @@ def load_or_build(frames=401, device="cuda:0", name="cellfix_B_new", rebuild=Fal
            "gate_p_half": gate_p_half, "gate_hill": gate_hill, "gate_floor": gate_floor,
            "gate_smooth_frames": gate_smooth_frames, "gate_smooth_phi": gate_smooth_phi,
            "load_gain": load_gain, "myosin": myosin, "myo_tau": myo_tau, "myo_beta": myo_beta, "myo_inherit": 1,
+           "myo_keyed_on": myo_keyed_on, "myo_destabilising": myo_destabilising,
            "myo_new": myo_new}
     for key, path in (("gate", gate_npz), ("load", load_npz)):
         if path is not None:
@@ -317,7 +322,8 @@ def load_or_build(frames=401, device="cuda:0", name="cellfix_B_new", rebuild=Fal
               gate_npz=gate_npz, gate_p_half=gate_p_half, gate_hill=gate_hill,
               gate_floor=gate_floor, gate_smooth_frames=gate_smooth_frames,
               gate_smooth_phi=gate_smooth_phi, myosin=myosin, myo_tau=myo_tau,
-              myo_beta=myo_beta, myo_new=myo_new)
+              myo_beta=myo_beta, myo_new=myo_new, myo_keyed_on=myo_keyed_on,
+              myo_destabilising=myo_destabilising)
     else:
         z = np.load(out)
         print(f"[tissue] reusing {os.path.relpath(out, ROOT)}  "

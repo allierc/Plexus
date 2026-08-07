@@ -65,6 +65,40 @@ SERIES = {
     "81_no_feedback": dict(_myo=dict(myosin=1.0, myo_beta=0.0, myo_tau=20.0)),
     "82_strong_feedback": dict(_myo=dict(myosin=1.0, myo_beta=4.0, myo_tau=20.0)),
     "83_weak_newborn": dict(_myo=dict(myosin=1.0, myo_beta=1.0, myo_tau=20.0, myo_new=0.3)),
+
+    # --- 84-91: WHICH VARIABLE THE MYOSIN FEEDBACK IS KEYED TO ---------------------------------------
+    # The audit's charge: keyed to LENGTH the feedback homogenises junction lengths, where the measured
+    # biology (Bertet 2004, Fernandez-Gonzalez 2009) has myosin recruited by TENSION and enriched on
+    # DISASSEMBLING junctions -- a positive feedback that GENERATES T1s. And in the fast-myosin limit the
+    # length law is analytically a harmonic edge spring, so "beta lowers junction-length CV" is its
+    # definition, not evidence. The discriminating observable is the T1 RATE, which the two laws move in
+    # OPPOSITE directions: length-keyed should suppress T1s, tension-keyed should produce them.
+    "84_key_length_b0": dict(_myo=dict(myosin=1.0, myo_beta=0.0)),
+    "85_key_length_b2": dict(_myo=dict(myosin=1.0, myo_beta=2.0)),
+    "86_key_tension_b2": dict(_myo=dict(myosin=1.0, myo_beta=2.0, myo_keyed_on="tension")),
+    "87_key_tension_b4": dict(_myo=dict(myosin=1.0, myo_beta=4.0, myo_keyed_on="tension")),
+    "88_key_tension_stab": dict(_myo=dict(myosin=1.0, myo_beta=2.0, myo_keyed_on="tension",
+                                          myo_destabilising=0)),
+    "89_key_strainrate_b2": dict(_myo=dict(myosin=1.0, myo_beta=2.0, myo_keyed_on="strain_rate")),
+    "90_key_strainrate_b4": dict(_myo=dict(myosin=1.0, myo_beta=4.0, myo_keyed_on="strain_rate")),
+    # the control the CV argument never had: a uniform tension scale matched to 87's mean myosin, so any
+    # difference in T1 rate cannot be attributed to overall contractility
+    "91_lambda_matched": dict(_myo=dict(myosin=1.16, myo_beta=0.0)),
+
+    # --- 92-100: THE MEMBRANE WITHOUT INERTIA -------------------------------------------------------
+    # At Re ~ 1e-10 the equation of motion is gamma*x_dot = F, not m*x_ddot = F. Everything reported
+    # about the sheet's dynamics -- oscillation about a moving anchor, critical damping, tracking lag,
+    # sinking, and the stability ceiling at k ~ 8e3 -- follows from a mass that should not be there.
+    # 92 vs 96 is the direct comparison; 93-95 ask whether the ceiling exists at all overdamped.
+    "92_od_k5e3": dict(membrane_bond_k=5.0e3),
+    "93_od_k5e4": dict(membrane_bond_k=5.0e4),
+    "94_od_k5e5": dict(membrane_bond_k=5.0e5),
+    "95_od_k5e6": dict(membrane_bond_k=5.0e6),
+    "96_inertial_k5e3": dict(membrane_bond_k=5.0e3, membrane_inertial=True),
+    "97_od_no_adhesion": dict(membrane_bond_k=5.0e3, membrane_adhesion=0.0),
+    "98_od_no_remodel": dict(membrane_bond_k=5.0e3, membrane_tau=0.0),
+    "99_od_brittle": dict(membrane_bond_k=5.0e3, membrane_break=0.08),
+    "100_od_on_ovoid": dict(membrane_bond_k=5.0e3, _gated=True),
 }
 
 
@@ -120,7 +154,14 @@ def main():
     ph = np.arctan2(u[:, 1], u[:, 0])
     bi = (np.clip((th / np.pi * 16).astype(int), 0, 15) * 32
           + np.clip(((ph + np.pi) / (2 * np.pi) * 32).astype(int), 0, 31))
+    import tyssue_t1_ops3d as T1
+    t1 = np.asarray(T1.T1_TRACE, float) if T1.T1_TRACE else np.zeros((1, 4))
     info["result"] = dict(bonds_start=int(bt[0, 0]), bonds_end=int(bt[-1, 0]),
+                          lcc_end=float(bt[-1, 3]) if bt.shape[1] > 3 else None,
+                          mean_degree_z=float(bt[-1, 4]) if bt.shape[1] > 4 else None,
+                          t1_total=int(t1[-1, 2]) if len(t1) else 0,
+                          t1_per_cell_per_frame=float(t1[:, 1].sum() / max(t1[:, 3].mean(), 1)
+                                                      / max(len(t1), 1)),
                           n_alive=int(al.sum()) if al is not None else None,
                           strain_end=float(ms.mean()),
                           strain_p99=float(np.percentile(ms, 99)),
