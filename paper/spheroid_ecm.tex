@@ -24,24 +24,40 @@ here is four entities and one field; the basement membrane is a \emph{specialise
 
 \smallskip
 {\small
-\begin{tabular}{@{}llll@{}}
+\begin{tabular}{@{}lll@{}}
 \toprule
-entity & set & representation & principal operators\\
+entity / set & representation & principal operators\\
 \midrule
-epithelium & \op{vertex}, \op{cell} & 3D active vertex model & \op{shape\_energy\_3d}, \op{morphogen\_growth\_3d}, \op{divide\_3d}\\
-junction & relation on the mesh & half-edges, keyed state & \op{junction\_myosin}, \op{reconnect\_t1\_3d}\\
-basement membrane & \op{basement\_membrane\_particle} & MPM + explicit bonds & \op{..\_seed/bond/remodel/bond\_break}, \op{integrin\_adhesion}\\
-interstitial ECM & \op{mpm\_particle} & MPM fibres & \op{ecm\_seed}, \op{ecm\_stress}, \op{cell\_to\_ecm}\\
-(field) & \op{mpm\_grid} & MLS-MPM background grid & \op{mpm\_scatter/gather/grid\_update}\\
+\textbf{epithelium}          & 3D active vertex model  & \op{seed\_mesh\_3d} \quad build the shell\\
+\op{vertex}, \op{cell}       &                         & \op{cell\_geometry\_3d} \quad area, perimeter, volume per cell\\
+                             &                         & \op{shape\_energy\_3d} \quad the mechanics\\
+                             &                         & \op{morphogen\_growth\_3d} \quad grow each cell's target\\
+                             &                         & \op{divide\_3d} \quad divide on volume doubling\\
+                             &                         & \op{ecm\_growth\_gate\_3d} \quad matrix stress slows the cycle\\
+\midrule
+\textbf{junction}            & half-edges of the mesh, & \op{junction\_myosin} \quad per-junction myosin\\
+a relation, not a set        & state keyed by vertex pair & \op{reconnect\_t1\_3d} \quad neighbour exchange (T1)\\
+\midrule
+\textbf{basement membrane}   & nodes + explicit        & \op{seed\_basement\_membrane} \quad lay the sheet down\\
+\op{basement\_membrane\_particle} & crosslinks         & \op{basement\_membrane\_bond} \quad the crosslink force\\
+                             &                         & \op{basement\_membrane\_remodel} \quad rest lengths creep\\
+                             &                         & \op{basement\_membrane\_bond\_break} \quad fragmentation\\
+                             &                         & \op{basement\_membrane\_secrete} \quad add material as it grows\\
+                             &                         & \op{integrin\_adhesion} \quad tether to the surface\\
+\midrule
+\textbf{surface}             & one node per membrane   & \op{surface\_track} \quad write the recorded boundary\\
+\op{surface}                 & node: direction, radius &\\
+\midrule
+\textbf{interstitial ECM}    & MPM fibres              & \op{seed\_ecm} \quad fibres, alignment, density\\
+\op{mpm\_particle}           &                         & \op{cell\_to\_ecm} \quad the epithelium's push\\
+                             &                         & \op{cell\_exclude\_3d} \quad non-penetration backstop\\
+                             &                         & \op{ecm\_stress} \quad colour by von Mises stress\\
+\midrule
+\textbf{(field)}             & MLS-MPM background grid & \op{mpm\_scatter} / \op{mpm\_grid\_update} /\\
+\op{mpm\_grid}               &                         & \op{mpm\_gather} \quad the solve\\
 \bottomrule
 \end{tabular}}
 \smallskip
-
-Every particle body scatters into and gathers from the \emph{same} grid; that sharing \emph{is} the
-mechanical coupling between them, so no pairwise contact model is written. Operators carry one of seven
-kinds. The four dynamics kinds return a per-set delta the engine integrates once per tick; \op{field},
-\op{rewire} and \op{structural} mutate the grid, the relation $E$, or the membership $|S|$ in place and
-\emph{return nothing}. That last fact drives a design decision in \S5.
 
 \section*{2.\; The spheroid: 3D active vertex model}
 
