@@ -1298,12 +1298,21 @@ MEMBRANE_ALIVE = None
 class BasementMembraneCrosslink(Rewire):
     """Form new crosslinks between nodes that have come within range. Registered `rewire`, because it is.
 
-    THE DEFECT THIS CLOSES. The bond list was built once and thereafter extended only for newly secreted
-    nodes, so the topology was frozen: two nodes drifting within range of one another never formed a
-    crosslink, while a bond whose ends drifted apart survived until 35% strain. Measured at the end of a
-    run, 29% of pairs inside the cutoff had no bond between them, and there were MORE bonds than close
-    pairs -- 144k against 123k -- so a third of the network was held together by history rather than by
-    proximity. Relaxation cannot fix that: it moves nodes, and the defect is in the edges.
+    WHAT IT IS FOR, AND WHAT IT IS NOT. The bond list was built once and thereafter extended only for
+    newly secreted nodes, so two nodes drifting within range of one another never formed a crosslink.
+    That is a real gap in the model and this closes it.
+
+    IT IS NOT, HOWEVER, WHY THE SHEET HAS HOLES, and the measurement that suggested it was misread. At
+    the end of a run 29% of pairs inside the cutoff had no bond -- but the bonding rule only ever
+    considers each node's `max_neighbours` nearest, and nodes have about 7.1 neighbours within the
+    cutoff against a cap of 6. So 15% of close pairs were never candidates at all: the cap working as
+    designed, not a topology that had frozen. Switching this operator on moves the unbonded fraction
+    18% -> 16%, d/hex 0.472 -> 0.472 and the largest gap 1.41 -> 1.42. It is correct and it is not the
+    fix.
+
+    (The other half of that observation stands: there were MORE bonds than close pairs, 144k against
+    123k, so a substantial part of the network is held by history rather than proximity -- bonds survive
+    until 35% strain whatever the distance.)
 
     AND IT IS THE BIOLOGY. Peroxidasin crosslinks collagen IV continuously; a network that only ever
     loses crosslinks is not remodelling, it is decaying. Fragmentation and repair are the two directions
