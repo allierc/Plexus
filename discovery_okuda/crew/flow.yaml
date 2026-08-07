@@ -111,12 +111,20 @@ nodes:
   # with nothing to tell it otherwise -- and once lost twelve slots across two rounds while being
   # told none of it. This is the sixth producer-with-no-consumer, and the one this graph could not
   # catch, because a refusal was never a node. Now it is.
+  # THE HUMAN'S CHANNEL. `campaign/user_input.md` has been protected from every reset since before
+  # Phase 12 -- "it is the human-in-the-loop channel" -- and has reached no role since Phase 12
+  # deleted the agent that read it. A consumer with no producer, which this graph exists to catch
+  # and could not, because it was never a node. Read at the top of EVERY round, so an instruction
+  # written mid-campaign lands on the next round without a relaunch.
+  - id: user_input
+    code: round.user_input
+
   - id: refusals
     code: round.refusals
 
   - id: proposer
     agent: proposer
-    in: [parents, menu, metric_bank, coverage, diagnosis, history, refusals]
+    in: [parents, menu, metric_bank, coverage, diagnosis, history, refusals, user_input]
     out: edits
 
   # ---- build, launch, measure ----------------------------------------------------
@@ -165,7 +173,7 @@ nodes:
   # ---- review: one call over the batch -------------------------------------------
   - id: analyst
     agent: analyst
-    in: [control, metrics, predictions, observations, observed, history]
+    in: [control, metrics, predictions, observations, observed, history, user_input]
 
   - id: grounder
     agent: grounder

@@ -402,8 +402,15 @@ OPERATORS = {
         # outward: not a mechanism but the answer written into the objective, which is why a run
         # carrying it can only be a control. Exposing both lets the search set K_extrude = 0 and
         # test the purse-string alone, which is the sound half and was unreachable.
+        # `a_sw` IS A THRESHOLD ON THE ACTIVATOR, AND ITS RANGE SAT ABOVE THE ACTIVATOR'S CEILING.
+        # Measured over 78 runs: act_max_final has a median of 0.000 and a maximum of 1.541, while
+        # a_sw was declared (0.2, 6.0) with a default of 0.5. The operator's first act is
+        # `red = a > a_sw`, and `if red.sum() < 1: return {}` -- so at the default it can never
+        # fire. The acted-ledger says so exactly: `rd_interface_tension: 0` in 800 scheduled
+        # frames. Nine edits, 10% of the campaign, spent on an operator that could not act, and
+        # the Analyst reported it "inert" for two rounds without being able to say why.
         params={"K_purse": (0.0, 6.0, 1.0), "K_extrude": (0.0, 14.0, 4.0),
-                "a_sw": (0.2, 6.0, 0.5)}),
+                "a_sw": (0.02, 0.4, 0.15)}),
 
     # ---------------------------------------------------------------- Stage 3: patterning
     "cell_geometry_3d": dict(
