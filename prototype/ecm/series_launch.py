@@ -15,7 +15,8 @@ LOGDIR = "/workspace/Plexus/log/okuda_ECM/_series_jobs"
 def main():
     os.makedirs(LOGDIR, exist_ok=True)
     lines = []
-    for name in SERIES:
+    only = sys.argv[1:] or list(SERIES)
+    for name in only:
         sh = os.path.join(LOGDIR, f"{name}.sh")
         with open(sh, "w") as f:
             f.write("\n".join([
@@ -38,7 +39,9 @@ def main():
     os.chmod(runner, 0o755)
     cluster._ssh(f"nohup bash {cluster.cpath(runner)} > "
                  f"{cluster.cpath(os.path.join(LOGDIR, '_submit.log'))} 2>&1 < /dev/null &", timeout=30)
-    print(f"[series] fired {len(SERIES)} bsub(s): " + ", ".join(SERIES))
+    # `only`, not SERIES. Printing the whole table while submitting a subset says nine jobs went out
+    # when two did -- a log that reports the intent instead of the action.
+    print(f"[series] fired {len(only)} bsub(s): " + ", ".join(only))
 
 
 if __name__ == "__main__":

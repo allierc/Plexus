@@ -290,50 +290,6 @@ anchored, since the membrane particles are themselves a discretisation of that s
 the contact directly; but runs without a membrane still need a contact path, so \op{surface} is the
 general answer and membrane-as-surface the specialisation.
 
-\section{Four limitations, worked}
-
-\paragraph{The membrane had no repulsion at all.} The epithelium repels interstitial fibres twice, by a
-soft penalty (Eq.~\eqref{eq:contact}) and a hard projection, and did nothing to the basement membrane:
-its only outward force was the integrin spring of Eq.~\eqref{eq:integrin}, so any inward push moved it
-in unopposed. Registering the projection at the membrane too, at the same \emph{stable}
-$k_{\text{adh}}=4\times10^4$, flips the sign of the gap from $-0.00365$ (75.8\% below the apical
-surface) to $+0.00085$ (43.4\%), with matrix stress falling from 2.15 to 1.71.
-
-\paragraph{\op{basement\_membrane\_secrete}.} The trilemma of \S6---slip, tear, or an unstable
-run---is not about stiffness but about material, so the operator adds it. Areal density is the setpoint
-and deposition is \emph{load-directed}, into the most strained crosslinks, which puts secretion and
-fragmentation in competition on one variable ($\texttt{targeted}=0$ gives the uniform null). Over 200
-frames the radius grew $1.415\times$ (area $2.002\times$) and the sheet grew from 15{,}000 to 30{,}000
-particles ($2.000\times$) across 92 events: the density setpoint held to 0.1\%. Bonding is incremental;
-a first version recomputed the whole $O(n^2)$ network per event and stalled at frame~1.
-
-\paragraph{\op{activity} is degenerate with $\Lambda$, but $\beta$ is not.} Since \op{activity}
-scales every junction uniformly it \emph{is} $\Lambda$, and the question is whether the per-junction
-model is a reparameterisation of the scalar one. It is not. Sweeping \op{activity} over $[0.6,1.4]$
-traces a line in (radius, junction-length CV) of slope $\mathrm{dCV}/\mathrm{d}R=+0.103$; $\beta$ moves
-perpendicular to it, $\Delta R=-0.02$ (0.2\%, nothing) against $\Delta\mathrm{CV}=-0.099$, where the
-activity line predicts $-0.002$. That is $48\times$, and $\beta=4$ reaches $\mathrm{CV}=0.222$, which no
-\op{activity} in range approaches. $\beta$ changes the \emph{disorder} of junction lengths at constant
-size, which no uniform tension scale can do.
-
-\paragraph{\op{surface} is a Level, and it falsified its own motivation.} Built as a set of elements on
-a lattice the Level owns, with radii interpolated smoothly from the pass-1 map; the seed and the adhesion
-both read it, so the dependency runs one way. It reproduces the physics to four figures (stress p99
-$1.709$ against $1.707$; end strain $0.17346$ against $0.17346$). It was built to test whether the
-membrane's unexplained strain organisation was the $32\times64$ quantisation. Against the shuffled null:
-$5.0\times$ with bins, $4.9\times$ without. It is not the bins. What the strain does track is the shape
-of the surface---$\mathrm{corr}=+0.404$ with local radius, $R^2=0.164$---so the epithelium's 1.5\%
-radius spread stretches the sheet where it bulges. Growth, coordination, fibre density, lattice
-crystallinity and quantisation are now all excluded; 84\% remains unaccounted for.
-
-Two failures are worth recording because neither crashed. Seeding by nearest-bin radius while anchoring
-by the smooth one left every particle a bond length off its anchor and returned 141 surviving bonds of
-100{,}801 with a matrix stress of 57{,}792---a number that reads as a result. I then diagnosed that as an
-RNG mismatch between two lattices; the rerun was bit-identical, which proved the lattices had always
-agreed and the diagnosis was wrong. The repair was structural: make the Level authoritative, so there is
-one lattice and one radius rather than two that must agree.
-
-
 \section{The basement membrane, drawn out}
 
 \begin{figure}[t]\centering
@@ -348,8 +304,6 @@ element by one red \emph{integrin} spring---one per node, to a fixed angular pos
 makes it adhesion rather than contact. Outside is the interstitial matrix (purple), which the membrane
 never bonds to: they meet only through the shared grid, or in the spring-graph version, not at all.}
 \end{figure}
-
-\subsection*{In plain English, and then in symbols}
 
 A basement membrane is a thin sheet of protein that an epithelium lays down underneath itself and sits
 on. Two networks do the work: \textbf{laminin}, which cells grip, and \textbf{collagen~IV}, which is

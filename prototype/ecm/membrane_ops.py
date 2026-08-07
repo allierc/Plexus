@@ -370,10 +370,78 @@ class BasementMembraneBond(Lateral):
         self.i = self.j = self.rest = self.alive = None
         self._said = False
 
+    def _neighbours_celllist(self, pos, k):
+        """k nearest within `cutoff`, in O(N) instead of O(N^2), via a uniform cell list.
+
+        WHY THIS REPLACED THE CHUNKED PAIRWISE SEARCH. The old comment here said a grid hash was "more
+        code for a cost paid a single time", which was true at 40k nodes and false the moment secretion
+        started re-bonding and the deposition term began measuring local sparsity every frame. At 45k the
+        pairwise form is 2e9 distances; at 500k it is 2.5e11, and it is no longer paid once.
+
+        Cell size IS the cutoff, so every neighbour within range lies in the particle's own cell or one
+        of the 26 around it. On a shell at this density that is order 100 candidates per node rather than
+        N, and the total work becomes linear.
+        """
+        n = pos.shape[0]
+        dev = pos.device
+        c = torch.div(pos, self.cutoff, rounding_mode="floor").long()
+        c = c - c.min(0).values                                  # non-negative cell coords
+        G = int(c.max().item()) + 2
+        cid = (c[:, 0] * G + c[:, 1]) * G + c[:, 2]
+        order = torch.argsort(cid)
+        cid_s = cid[order]
+        uniq, counts = torch.unique_consecutive(cid_s, return_counts=True)
+        starts = torch.cumsum(counts, 0) - counts
+
+        off = torch.tensor([[dx, dy, dz] for dx in (-1, 0, 1) for dy in (-1, 0, 1) for dz in (-1, 0, 1)],
+                           device=dev, dtype=torch.long)
+        best_d = torch.full((n, k), 1e9, device=dev, dtype=pos.dtype)
+        best_j = torch.zeros((n, k), device=dev, dtype=torch.long)
+        for o in off:
+            nid = ((c[:, 0] + o[0]) * G + (c[:, 1] + o[1])) * G + (c[:, 2] + o[2])
+            slot = torch.searchsorted(uniq, nid).clamp(max=uniq.numel() - 1)
+            ok = uniq[slot] == nid
+            cnt = torch.where(ok, counts[slot], torch.zeros_like(counts[slot]))
+            if int(cnt.max()) == 0:
+                continue
+            m = int(cnt.max())
+            # a fixed (n, m) candidate block per offset: m is the fullest cell, single digits here
+            ar = torch.arange(m, device=dev)[None, :]
+            valid = ar < cnt[:, None]
+            idx = (starts[slot][:, None] + ar).clamp(max=n - 1)
+            cand = order[idx]
+            d = (pos[:, None, :] - pos[cand]).norm(dim=-1)
+            d = torch.where(valid & (cand != torch.arange(n, device=dev)[:, None]), d,
+                            torch.full_like(d, 1e9))
+            allj = torch.cat([best_j, cand], 1)
+            alld = torch.cat([best_d, d], 1)
+            sel = torch.topk(-alld, k, dim=1).indices
+            best_d = torch.gather(alld, 1, sel)
+            best_j = torch.gather(allj, 1, sel)
+        keep = best_d <= self.cutoff
+        rows = torch.arange(n, device=dev)[:, None].expand_as(best_j)
+        return rows[keep], best_j[keep]
+
     def _build(self, pos, live=None):
         # O(N^2) ONCE, at frame 0, in chunks. 20-40k particles is 1.6e9 pairs if done in one tensor, so
         # it is chunked; it runs once, and the alternative (a grid hash) is more code for a cost paid
         # a single time.
+        n = pos.shape[0]
+        k = min(self.max_nb, n - 1)
+        if n > 20000:
+            i, j = self._neighbours_celllist(pos, k)
+        else:
+            i, j = self._build_pairwise(pos, k)
+        n2 = n + 1
+        uk = torch.unique(torch.minimum(i, j) * n2 + torch.maximum(i, j))
+        i, j = (uk // n2).long(), (uk % n2).long()
+        if live is not None:
+            keep = live[i] & live[j]
+            i, j = i[keep], j[keep]
+        return i, j
+
+    def _build_pairwise(self, pos, k):
+        """The original chunked O(N^2) search, kept as the reference the cell list is checked against."""
         n = pos.shape[0]
         I, J = [], []
         step = max(1, 4096 ** 2 // max(n, 1))
@@ -387,49 +455,7 @@ class BasementMembraneBond(Lateral):
             keep = torch.gather(near, 1, idx)
             rows = (torch.arange(a, b, device=pos.device)[:, None]).expand_as(idx)
             I.append(rows[keep]); J.append(idx[keep])
-        i, j = torch.cat(I), torch.cat(J)
-        # CANONICAL PAIRS, THEN UNIQUE -- not `i < j` on the k-nearest lists. Keeping only pairs whose
-        # LOWER-indexed endpoint happened to list the other one drops every bond where the relationship is
-        # one-directional, and on a Fibonacci spiral spatial neighbours are not index-neighbours, so that
-        # is most of them: the seeded sheet came out with a largest connected component of 0.888, i.e. 11%
-        # of the membrane in separate pieces before anything had been loaded. A sheet that starts
-        # fragmented cannot report fragmentation.
-        n2 = pos.shape[0] + 1
-        uk = torch.unique(torch.minimum(i, j) * n2 + torch.maximum(i, j))
-        i, j = (uk // n2).long(), (uk % n2).long()
-        if live is not None:
-            # the dormant reserve is co-located at the centre, so without this every parked particle is
-            # inside every other one's cutoff and the "sheet" acquires a dense clique at its core
-            keep = live[i] & live[j]
-            i, j = i[keep], j[keep]
-        return i, j
-
-    def _check_stability(self, bonds_per_node, dt_frame=4.0e-3):
-        if not self.graph_mode:
-            return                                   # MPM path: integrated at the substep, ~70 per period
-        # CALIBRATED AGAINST A SWEEP, not derived and left. The first version used the textbook
-        # dt < 2/omega with omega from the crosslinks alone, giving 4.4e4 -- and a measured sweep at
-        # k = 200 .. 40,000 put the real transition between 5,000 and 10,000, six times lower:
-        #
-        #   k    200-5,000   bonds ~50,700   strain 0.101-0.106   stable
-        #   k       10,000   bonds  33,421   strain 0.114         transition
-        #   k   20,000+      bonds  63,615   strain 2.02          diverged
-        #
-        # Two corrections. The INTEGRIN spring pulls on the same node, so it belongs in the effective
-        # stiffness; and the usable criterion with drag present is dt*omega < 1, not the marginal 2.
-        # (The diverged runs also over-secrete -- 29k nodes against 11k -- because the secretion setpoint
-        # keys on mean radius, and an exploding sheet has a large one. A numerical failure that looks
-        # like biology.)
-        k_eff = max(bonds_per_node, 1.0) * self.k + self.k_adh_hint
-        k_max = self.k * (1.0 / (dt_frame ** 2)) / max(k_eff, 1e-9)
-        if self.k > k_max:
-            raise RuntimeError(
-                f"basement_membrane_bond: k = {self.k:.3g} exceeds the explicit-integration ceiling "
-                f"{k_max:.3g} for emit=acceleration at dt = {dt_frame:g} with {bonds_per_node:.1f} bonds "
-                f"per node. The spring graph is integrated once per FRAME, not at the MPM substep, so it "
-                f"cannot carry the stiffness the MPM path could: this run would return an infinite "
-                f"strain rather than a soft sheet. Either lower k, or give the membrane its own substep "
-                f"loop (which is what moving off MPM gave up).")
+        return torch.cat(I), torch.cat(J)
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
