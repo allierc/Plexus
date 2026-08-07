@@ -559,8 +559,17 @@ class Divide3D(Structural):
             if clvl0 is not None and "chem" in clvl0.state_schema:
                 ci0, _ = clvl0.state_schema["chem"]
                 a_cells = clvl0.state[:nF, ci0].detach().cpu().numpy()
+                # RELATIVE TO THE FIELD, for the reason `rd_interface_tension.a_sw` is: an absolute
+                # threshold on a field whose scale the chemistry sets is one edit from selecting
+                # nothing. `orient_asw` defaulted to 1.0 with the same (0.2, 6.0) range, and only
+                # 20 of 78 campaign runs ever reached act_max > 1.0 -- so in 74% of runs
+                # `divide_3d:orient_iface`, a named Okuda mechanism, could orient nothing and was
+                # behaviourally `hertwig`. A `set_impl ... orient_iface` edit was a silent no-op.
+                amax = float(a_cells.max()) if a_cells.size else 0.0
+                thr = self.orient_asw * amax
                 rc = [np.array([pos[v] for v in rings[f]]).mean(0) for f in range(nF)
-                      if a_cells[f] > self.orient_asw and rings[f] is not None and len(rings[f]) >= 3]
+                      if amax > 0 and a_cells[f] > thr
+                      and rings[f] is not None and len(rings[f]) >= 3]
                 if len(rc):
                     ba = np.mean(rc, 0); nba = float(np.linalg.norm(ba))
                     if nba > 1e-6:
