@@ -1085,7 +1085,7 @@ deep, the lumen is hollow, the fibres are cut where they cross, and the blocks a
 <a href="https://www.nature.com/articles/s41598-018-20678-6">Okuda et&nbsp;al. (2018)</a> on the
 <a href="https://github.com/DamCB/tyssue">Tyssue</a> mesh; the matrix is MLS-MPM
 (<a href="https://github.com/yuanming-hu/taichi_mpm">Hu et&nbsp;al. 2018</a>). The coupling and the
-<code>ecm_seed</code> / <code>cell_to_ecm</code> / <code>cell_exclude_3d</code> /
+<code>seed_ecm</code> / <code>cell_to_ecm</code> / <code>cell_exclude_3d</code> /
 <code>ecm_stress</code> / <code>plate_confine_3d</code> operators are ours
 (<code>prototype/ecm</code>).</p>
 <div class="sim-gallery g3">
@@ -1148,7 +1148,7 @@ fields:
 operators:
 - op: aggregate
   at: cell
-- op: ecm_seed
+- op: seed_ecm
   at: mpm_particle
   centre:
   - 0.5
@@ -1198,7 +1198,7 @@ operators:
   vmax: 1000000000.0
 schedule:
 - aggregate
-- ecm_seed
+- seed_ecm
 - cell_to_ecm
 - ecm_stress
 - substep_dt: 0.0002
@@ -1257,9 +1257,358 @@ plotting:
     </figcaption>
   </figure>
   <figure class="sim-card">
+    <video src="gallery/vertex_mpm_fibres.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">the fibres, at length<span class="sim-spec"><pre>general:
+  name: 27_epi_ecm_fibres_long
+  seed: 0
+  n_frames: 402
+  dt: 0.004
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+sets:
+  cell:
+    n: 1
+    start:
+    - - 0.5
+      - 0.5
+      - 0.5
+    types: &amp;id001
+      s0:
+        fraction: 0.125
+        youngs: 40.0
+      s1:
+        fraction: 0.125
+        youngs: 40.0
+      s2:
+        fraction: 0.125
+        youngs: 40.0
+      s3:
+        fraction: 0.125
+        youngs: 40.0
+      s4:
+        fraction: 0.125
+        youngs: 40.0
+      s5:
+        fraction: 0.125
+        youngs: 40.0
+      s6:
+        fraction: 0.125
+        youngs: 40.0
+      s7:
+        fraction: 0.125
+        youngs: 40.0
+  mpm_particle:
+    parent: cell
+    per_parent: 110000
+    radius: 0.48
+    density: 1.0
+    types: *id001
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 48
+operators:
+- op: aggregate
+  at: cell
+- op: seed_ecm
+  at: mpm_particle
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  cavity_r: 0.14
+  cavity_h: 0.14
+  axis: 2
+  n_fibres: 700
+  fibre_len: 0.34
+  align: 0.0
+  align_dir:
+  - 1.0
+  - 0.0
+  - 0.0
+  seed: 0
+- op: cell_to_ecm
+  at: mpm_particle
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  k: 900.0
+  damp: 0.0
+  implementation: replay
+  surface: /workspace/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401.npz
+  scale: 0.018861533103953422
+- op: ecm_stress
+  at: mpm_particle
+  scale: 0.05
+  bands: 8
+- op: mpm_strain
+  at: mpm_particle
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 200
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.6
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.6
+  wall_contact: 0.04
+  vmax: 1000000000.0
+schedule:
+- aggregate
+- seed_ecm
+- cell_to_ecm
+- ecm_stress
+- substep_dt: 0.0002
+  steps:
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+plotting:
+  background: black
+  up_axis: 1
+  box_frame: true
+  fps: 10
+  render_3d: dots
+  dot_size: 0.9
+  hide_sets:
+  - cell
+  color_by: node_type
+  colors:
+    s0:
+    - 0.16
+    - 0.19
+    - 0.3
+    s1:
+    - 0.35
+    - 0.15
+    - 0.42
+    s2:
+    - 0.58
+    - 0.13
+    - 0.42
+    s3:
+    - 0.78
+    - 0.2
+    - 0.33
+    s4:
+    - 0.92
+    - 0.35
+    - 0.18
+    s5:
+    - 0.99
+    - 0.55
+    - 0.1
+    s6:
+    - 1.0
+    - 0.76
+    - 0.22
+    s7:
+    - 1.0
+    - 0.97
+    - 0.75
+  camera_elev: 1.05
+  camera_turns: 0.0
+  camera_zoom: 0.0</pre></span></span>
+      <span class="sim-cap">the same coupling run out: an epithelium pressing into a fibre matrix for the full growth, so the stress front has time to cross the box. Nothing confines it -- this is what the matrix does when only the tissue's own growth loads it</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/vertex_mpm_grown_oblate.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">GROWN into an ovoid<span class="sim-spec"><pre>general:
+  name: 58_oblcav_oblate
+  seed: 0
+  n_frames: 402
+  dt: 0.004
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+sets:
+  cell:
+    n: 1
+    start:
+    - - 0.5
+      - 0.5
+      - 0.5
+    types: &amp;id001
+      s0:
+        fraction: 0.125
+        youngs: 15.0
+      s1:
+        fraction: 0.125
+        youngs: 15.0
+      s2:
+        fraction: 0.125
+        youngs: 15.0
+      s3:
+        fraction: 0.125
+        youngs: 15.0
+      s4:
+        fraction: 0.125
+        youngs: 15.0
+      s5:
+        fraction: 0.125
+        youngs: 15.0
+      s6:
+        fraction: 0.125
+        youngs: 15.0
+      s7:
+        fraction: 0.125
+        youngs: 15.0
+  mpm_particle:
+    parent: cell
+    per_parent: 140000
+    radius: 0.48
+    density: 1.0
+    types: *id001
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 48
+operators:
+- op: aggregate
+  at: cell
+- op: seed_ecm
+  at: mpm_particle
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  cavity_r: 0.17
+  cavity_h: 0.095
+  axis: 2
+  n_fibres: 6000
+  fibre_len: 0.16
+  align: 0.85
+  align_dir:
+  - 1.0
+  - 0.0
+  - 0.0
+  seed: 0
+  dense_axis: 2
+  dense_cone_deg: 55.0
+  dense_boost: 3.0
+- op: cell_to_ecm
+  at: mpm_particle
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  k: 1200.0
+  damp: 0.0
+  implementation: replay
+  surface: /workspace/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_aaecfeb32a.npz
+  scale: 0.028148275675084617
+- op: ecm_stress
+  at: mpm_particle
+  scale: 0.008
+  bands: 8
+  measure: vonmises
+- op: mpm_strain
+  at: mpm_particle
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 300.0
+  store_stress: true
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.6
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.6
+  wall_contact: 0.04
+  vmax: 1000000000.0
+- op: cell_exclude_3d
+  at: mpm_particle
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  surface: /workspace/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_aaecfeb32a.npz
+  scale: 0.028148275675084617
+  skin: 0.004
+schedule:
+- aggregate
+- seed_ecm
+- cell_to_ecm
+- ecm_stress
+- substep_dt: 0.0002
+  steps:
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+- cell_exclude_3d
+plotting:
+  background: black
+  up_axis: 1
+  box_frame: true
+  fps: 10
+  render_3d: dots
+  dot_size: 0.9
+  hide_sets:
+  - cell
+  color_by: node_type
+  colors:
+    s0:
+    - 0.16
+    - 0.19
+    - 0.3
+    s1:
+    - 0.46
+    - 0.31
+    - 0.72
+    s2:
+    - 0.78
+    - 0.26
+    - 0.72
+    s3:
+    - 0.95
+    - 0.28
+    - 0.45
+    s4:
+    - 0.99
+    - 0.45
+    - 0.2
+    s5:
+    - 1.0
+    - 0.62
+    - 0.12
+    s6:
+    - 1.0
+    - 0.8
+    - 0.28
+    s7:
+    - 1.0
+    - 0.97
+    - 0.78
+  camera_elev: 1.05
+  camera_turns: 0.0
+  camera_zoom: 0.0</pre></span></span>
+      <span class="sim-cap">an oblate cavity, so the tissue meets the fibres at its poles first and the matrix resists there 14.7x harder. <code>ecm_growth_gate_3d</code> slows the cell cycle where it resists, so the sphere GROWS to oblateness 1.43. Nothing presses on it</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
     <video src="gallery/vertex_mpm_pressed.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">PRESSED by an elastic solid<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">pressed by an elastic solid<span class="sim-spec"><pre>general:
   name: 48_block_elastic_g40
   seed: 0
   n_frames: 402
@@ -1345,7 +1694,7 @@ fields:
 operators:
 - op: aggregate
   at: cell
-- op: ecm_seed
+- op: seed_ecm
   at: mpm_particle
   centre:
   - 0.5
@@ -1396,7 +1745,7 @@ operators:
   wall_damp: 0.6
   wall_contact: 0.04
   vmax: 1000000000.0
-- op: block_seed
+- op: seed_block
   at: mpm_block
   centre:
   - 0.5
@@ -1436,8 +1785,8 @@ operators:
   skin: 0.004
 schedule:
 - aggregate
-- ecm_seed
-- block_seed
+- seed_ecm
+- seed_block
 - cell_to_ecm
 - ecm_stress
 - block_stress
@@ -1498,378 +1847,872 @@ plotting:
     </figcaption>
   </figure>
 </div>
+<h3>Basement membrane + junctions — the two levels inside the epithelium</h3>
+<p class="opk">The same tissue, with two things that were not there before. The <b>basement membrane</b>
+is a sheet of nodes joined by explicit <b>crosslinks</b>, laid down outside the epithelium and tied to
+it by one <b>integrin</b> spring per node — anchored to a fixed direction, so the sheet stretches as the
+tissue grows instead of sliding over it. It is <b>secreted</b>: it starts with a ninth of its material
+and lays down more as the surface expands, because a sphere that triples in radius needs nine times the
+area covered. The <b>junctions</b> are the cell–cell contacts, each carrying its own <b>myosin</b>, which
+is recruited where a junction is longer than average. Each clip plays the four panels in turn — the
+whole tissue, a cross-section, the membrane alone with its crosslinks coloured by how far they are
+stretched (blue slack, red at the breaking point), and the junction network alone coloured by myosin.</p>
+<p class="opk-ref">Reference — the crosslinked-sheet and secretion picture follows
+<a href="https://doi.org/10.1016/j.devcel.2023.01.004">Ku &amp; Bilder (2023)</a> and
+<a href="https://doi.org/10.1242/dev.200456">T&ouml;pfer et&nbsp;al. (2022)</a>; junctional myosin
+recruitment by tension is the standard vertex-model feedback. The
+<code>seed_basement_membrane</code> / <code>basement_membrane_bond</code> /
+<code>basement_membrane_secrete</code> / <code>integrin_adhesion</code> / <code>junction_myosin</code>
+operators are ours (<code>prototype/ecm</code>).</p>
+<div class="sim-gallery g3">
+  <figure class="sim-card">
+    <video src="gallery/bm_reference.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">reference<span class="sim-spec"><pre>general:
+  name: 69_graph_reference
+  seed: 0
+  n_frames: 402
+  dt: 0.004
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+sets:
+  cell:
+    n: 1
+    start:
+    - - 0.5
+      - 0.5
+      - 0.5
+    types: &amp;id001
+      s0:
+        fraction: 0.125
+        youngs: 15.0
+      s1:
+        fraction: 0.125
+        youngs: 15.0
+      s2:
+        fraction: 0.125
+        youngs: 15.0
+      s3:
+        fraction: 0.125
+        youngs: 15.0
+      s4:
+        fraction: 0.125
+        youngs: 15.0
+      s5:
+        fraction: 0.125
+        youngs: 15.0
+      s6:
+        fraction: 0.125
+        youngs: 15.0
+      s7:
+        fraction: 0.125
+        youngs: 15.0
+  mpm_particle:
+    parent: cell
+    per_parent: 140000
+    radius: 0.48
+    density: 1.0
+    types: *id001
+  basement_membrane_particle:
+    parent: cell
+    per_parent: 45000
+    radius: 0.48
+    density: 1.0
+    types:
+      m0:
+        fraction: 0.125
+        youngs: 400.0
+      m1:
+        fraction: 0.125
+        youngs: 400.0
+      m2:
+        fraction: 0.125
+        youngs: 400.0
+      m3:
+        fraction: 0.125
+        youngs: 400.0
+      m4:
+        fraction: 0.125
+        youngs: 400.0
+      m5:
+        fraction: 0.125
+        youngs: 400.0
+      m6:
+        fraction: 0.125
+        youngs: 400.0
+      m7:
+        fraction: 0.125
+        youngs: 400.0
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 48
+operators:
+- op: aggregate
+  at: cell
+- op: seed_ecm
+  at: mpm_particle
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  cavity_r: 0.095
+  cavity_h: 0.095
+  axis: 2
+  n_fibres: 6000
+  fibre_len: 0.16
+  align: 0.85
+  align_dir:
+  - 1.0
+  - 0.0
+  - 0.0
+  seed: 0
+  dense_axis: 2
+  dense_cone_deg: 55.0
+  dense_boost: 3.0
+- op: cell_to_ecm
+  at: mpm_particle
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  k: 1200.0
+  damp: 0.0
+  implementation: replay
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  scale: 0.017933333538564047
+- op: ecm_stress
+  at: mpm_particle
+  scale: 0.008
+  bands: 8
+  measure: vonmises
+- op: mpm_strain
+  at: mpm_particle
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 300.0
+  store_stress: true
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.6
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.6
+  wall_contact: 0.04
+  vmax: 1000000000.0
+- op: seed_basement_membrane
+  at: basement_membrane_particle
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  scale: 0.017933333538564047
+  offset: 0.004
+  thickness: 0.002
+  seed: 0
+  jitter: 0.35
+  reserve: 12.5
+- op: integrin_adhesion
+  at: basement_membrane_particle
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  scale: 0.017933333538564047
+  k: 10000.0
+  offset: 0.004
+  detach: 0.0
+  emit: acceleration
+  graph_mode: true
+- op: basement_membrane_bond
+  at: basement_membrane_particle
+  k: 5000.0
+  cutoff: 0.008
+  max_neighbours: 6
+  emit: acceleration
+  graph_mode: true
+  k_adhesion_hint: 10000.0
+- op: basement_membrane_remodel
+  at: basement_membrane_particle
+  tau: 60.0
+  cap: 0.02
+- op: basement_membrane_secrete
+  at: basement_membrane_particle
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  rate: 0.012
+  targeted: 1.0
+- op: basement_membrane_bond_break
+  at: basement_membrane_particle
+  break_strain: 0.35
+  components_every: 40
+- op: drag
+  at: basement_membrane_particle
+  k: 40.0
+- op: cell_exclude_3d
+  at: mpm_particle
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  scale: 0.017933333538564047
+  skin: 0.004
+- op: cell_exclude_3d
+  at: basement_membrane_particle
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  scale: 0.017933333538564047
+  skin: 0.006
+schedule:
+- aggregate
+- seed_ecm
+- seed_basement_membrane
+- cell_to_ecm
+- integrin_adhesion
+- basement_membrane_bond
+- drag
+- basement_membrane_remodel
+- basement_membrane_bond_break
+- ecm_stress
+- substep_dt: 0.0002
+  steps:
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+- basement_membrane_secrete
+- cell_exclude_3d
+- cell_exclude_3d
+plotting:
+  background: black
+  up_axis: 1
+  box_frame: true
+  fps: 10
+  render_3d: dots
+  dot_size: 0.9
+  hide_sets:
+  - cell
+  color_by: node_type
+  colors:
+    s0:
+    - 0.16
+    - 0.19
+    - 0.3
+    s1:
+    - 0.46
+    - 0.31
+    - 0.72
+    s2:
+    - 0.78
+    - 0.26
+    - 0.72
+    s3:
+    - 0.95
+    - 0.28
+    - 0.45
+    s4:
+    - 0.99
+    - 0.45
+    - 0.2
+    s5:
+    - 1.0
+    - 0.62
+    - 0.12
+    s6:
+    - 1.0
+    - 0.8
+    - 0.28
+    s7:
+    - 1.0
+    - 0.97
+    - 0.78
+  camera_elev: 1.05
+  camera_turns: 0.0
+  camera_zoom: 0.0</pre></span></span>
+      <span class="sim-cap">the sheet at work. 37,427 nodes joined by 180,304 crosslinks, covering the whole surface, stretched to 10% on average — teal-green on a scale whose top is the breaking point</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/bm_fast_remodel.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">fast remodelling<span class="sim-spec"><pre>general:
+  name: 71_fast_remodelling
+  seed: 0
+  n_frames: 402
+  dt: 0.004
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+sets:
+  cell:
+    n: 1
+    start:
+    - - 0.5
+      - 0.5
+      - 0.5
+    types: &amp;id001
+      s0:
+        fraction: 0.125
+        youngs: 15.0
+      s1:
+        fraction: 0.125
+        youngs: 15.0
+      s2:
+        fraction: 0.125
+        youngs: 15.0
+      s3:
+        fraction: 0.125
+        youngs: 15.0
+      s4:
+        fraction: 0.125
+        youngs: 15.0
+      s5:
+        fraction: 0.125
+        youngs: 15.0
+      s6:
+        fraction: 0.125
+        youngs: 15.0
+      s7:
+        fraction: 0.125
+        youngs: 15.0
+  mpm_particle:
+    parent: cell
+    per_parent: 140000
+    radius: 0.48
+    density: 1.0
+    types: *id001
+  basement_membrane_particle:
+    parent: cell
+    per_parent: 45000
+    radius: 0.48
+    density: 1.0
+    types:
+      m0:
+        fraction: 0.125
+        youngs: 400.0
+      m1:
+        fraction: 0.125
+        youngs: 400.0
+      m2:
+        fraction: 0.125
+        youngs: 400.0
+      m3:
+        fraction: 0.125
+        youngs: 400.0
+      m4:
+        fraction: 0.125
+        youngs: 400.0
+      m5:
+        fraction: 0.125
+        youngs: 400.0
+      m6:
+        fraction: 0.125
+        youngs: 400.0
+      m7:
+        fraction: 0.125
+        youngs: 400.0
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 48
+operators:
+- op: aggregate
+  at: cell
+- op: seed_ecm
+  at: mpm_particle
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  cavity_r: 0.095
+  cavity_h: 0.095
+  axis: 2
+  n_fibres: 6000
+  fibre_len: 0.16
+  align: 0.85
+  align_dir:
+  - 1.0
+  - 0.0
+  - 0.0
+  seed: 0
+  dense_axis: 2
+  dense_cone_deg: 55.0
+  dense_boost: 3.0
+- op: cell_to_ecm
+  at: mpm_particle
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  k: 1200.0
+  damp: 0.0
+  implementation: replay
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  scale: 0.017933333538564047
+- op: ecm_stress
+  at: mpm_particle
+  scale: 0.008
+  bands: 8
+  measure: vonmises
+- op: mpm_strain
+  at: mpm_particle
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 300.0
+  store_stress: true
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.6
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.6
+  wall_contact: 0.04
+  vmax: 1000000000.0
+- op: seed_basement_membrane
+  at: basement_membrane_particle
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  scale: 0.017933333538564047
+  offset: 0.004
+  thickness: 0.002
+  seed: 0
+  jitter: 0.35
+  reserve: 12.5
+- op: integrin_adhesion
+  at: basement_membrane_particle
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  scale: 0.017933333538564047
+  k: 10000.0
+  offset: 0.004
+  detach: 0.0
+  emit: acceleration
+  graph_mode: true
+- op: basement_membrane_bond
+  at: basement_membrane_particle
+  k: 5000.0
+  cutoff: 0.008
+  max_neighbours: 6
+  emit: acceleration
+  graph_mode: true
+  k_adhesion_hint: 10000.0
+- op: basement_membrane_remodel
+  at: basement_membrane_particle
+  tau: 10.0
+  cap: 0.02
+- op: basement_membrane_secrete
+  at: basement_membrane_particle
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  rate: 0.012
+  targeted: 1.0
+- op: basement_membrane_bond_break
+  at: basement_membrane_particle
+  break_strain: 0.35
+  components_every: 40
+- op: drag
+  at: basement_membrane_particle
+  k: 40.0
+- op: cell_exclude_3d
+  at: mpm_particle
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  scale: 0.017933333538564047
+  skin: 0.004
+- op: cell_exclude_3d
+  at: basement_membrane_particle
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  scale: 0.017933333538564047
+  skin: 0.006
+schedule:
+- aggregate
+- seed_ecm
+- seed_basement_membrane
+- cell_to_ecm
+- integrin_adhesion
+- basement_membrane_bond
+- drag
+- basement_membrane_remodel
+- basement_membrane_bond_break
+- ecm_stress
+- substep_dt: 0.0002
+  steps:
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+- basement_membrane_secrete
+- cell_exclude_3d
+- cell_exclude_3d
+plotting:
+  background: black
+  up_axis: 1
+  box_frame: true
+  fps: 10
+  render_3d: dots
+  dot_size: 0.9
+  hide_sets:
+  - cell
+  color_by: node_type
+  colors:
+    s0:
+    - 0.16
+    - 0.19
+    - 0.3
+    s1:
+    - 0.46
+    - 0.31
+    - 0.72
+    s2:
+    - 0.78
+    - 0.26
+    - 0.72
+    s3:
+    - 0.95
+    - 0.28
+    - 0.45
+    s4:
+    - 0.99
+    - 0.45
+    - 0.2
+    s5:
+    - 1.0
+    - 0.62
+    - 0.12
+    s6:
+    - 1.0
+    - 0.8
+    - 0.28
+    s7:
+    - 1.0
+    - 0.97
+    - 0.78
+  camera_elev: 1.05
+  camera_turns: 0.0
+  camera_zoom: 0.0</pre></span></span>
+      <span class="sim-cap">the same network — 187,781 crosslinks, same coverage — but the crosslinks forget being stretched four times faster, so the sheet never builds tension and sits at 3%. Uniformly dark blue. Turnover, not strength, sets how hard a membrane pulls</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/bm_no_adhesion.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">no adhesion<span class="sim-spec"><pre>general:
+  name: 73_no_adhesion
+  seed: 0
+  n_frames: 402
+  dt: 0.004
+  boundary: wall
+  dim: 3
+  world:
+  - 1.0
+  - 1.0
+  - 1.0
+sets:
+  cell:
+    n: 1
+    start:
+    - - 0.5
+      - 0.5
+      - 0.5
+    types: &amp;id001
+      s0:
+        fraction: 0.125
+        youngs: 15.0
+      s1:
+        fraction: 0.125
+        youngs: 15.0
+      s2:
+        fraction: 0.125
+        youngs: 15.0
+      s3:
+        fraction: 0.125
+        youngs: 15.0
+      s4:
+        fraction: 0.125
+        youngs: 15.0
+      s5:
+        fraction: 0.125
+        youngs: 15.0
+      s6:
+        fraction: 0.125
+        youngs: 15.0
+      s7:
+        fraction: 0.125
+        youngs: 15.0
+  mpm_particle:
+    parent: cell
+    per_parent: 140000
+    radius: 0.48
+    density: 1.0
+    types: *id001
+  basement_membrane_particle:
+    parent: cell
+    per_parent: 45000
+    radius: 0.48
+    density: 1.0
+    types:
+      m0:
+        fraction: 0.125
+        youngs: 400.0
+      m1:
+        fraction: 0.125
+        youngs: 400.0
+      m2:
+        fraction: 0.125
+        youngs: 400.0
+      m3:
+        fraction: 0.125
+        youngs: 400.0
+      m4:
+        fraction: 0.125
+        youngs: 400.0
+      m5:
+        fraction: 0.125
+        youngs: 400.0
+      m6:
+        fraction: 0.125
+        youngs: 400.0
+      m7:
+        fraction: 0.125
+        youngs: 400.0
+fields:
+  mpm_grid:
+    frame: mpm_grid
+    n_grid: 48
+operators:
+- op: aggregate
+  at: cell
+- op: seed_ecm
+  at: mpm_particle
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  cavity_r: 0.095
+  cavity_h: 0.095
+  axis: 2
+  n_fibres: 6000
+  fibre_len: 0.16
+  align: 0.85
+  align_dir:
+  - 1.0
+  - 0.0
+  - 0.0
+  seed: 0
+  dense_axis: 2
+  dense_cone_deg: 55.0
+  dense_boost: 3.0
+- op: cell_to_ecm
+  at: mpm_particle
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  k: 1200.0
+  damp: 0.0
+  implementation: replay
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  scale: 0.017933333538564047
+- op: ecm_stress
+  at: mpm_particle
+  scale: 0.008
+  bands: 8
+  measure: vonmises
+- op: mpm_strain
+  at: mpm_particle
+- op: mpm_scatter
+  at: mpm_particle
+  to: mpm_grid
+  drag: 0.0
+  a_max: 300.0
+  store_stress: true
+- op: mpm_grid_update
+  at: mpm_grid
+  wall_damp: 0.6
+- op: mpm_gather
+  at: mpm_particle
+  from: mpm_grid
+  wall_damp: 0.6
+  wall_contact: 0.04
+  vmax: 1000000000.0
+- op: seed_basement_membrane
+  at: basement_membrane_particle
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  scale: 0.017933333538564047
+  offset: 0.004
+  thickness: 0.002
+  seed: 0
+  jitter: 0.35
+  reserve: 12.5
+- op: integrin_adhesion
+  at: basement_membrane_particle
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  scale: 0.017933333538564047
+  k: 0.0
+  offset: 0.004
+  detach: 0.0
+  emit: acceleration
+  graph_mode: true
+- op: basement_membrane_bond
+  at: basement_membrane_particle
+  k: 5000.0
+  cutoff: 0.008
+  max_neighbours: 6
+  emit: acceleration
+  graph_mode: true
+  k_adhesion_hint: 0.0
+- op: basement_membrane_remodel
+  at: basement_membrane_particle
+  tau: 60.0
+  cap: 0.02
+- op: basement_membrane_secrete
+  at: basement_membrane_particle
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  rate: 0.012
+  targeted: 1.0
+- op: basement_membrane_bond_break
+  at: basement_membrane_particle
+  break_strain: 0.35
+  components_every: 40
+- op: drag
+  at: basement_membrane_particle
+  k: 40.0
+- op: cell_exclude_3d
+  at: mpm_particle
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  scale: 0.017933333538564047
+  skin: 0.004
+- op: cell_exclude_3d
+  at: basement_membrane_particle
+  centre:
+  - 0.5
+  - 0.5
+  - 0.5
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  scale: 0.017933333538564047
+  skin: 0.006
+schedule:
+- aggregate
+- seed_ecm
+- seed_basement_membrane
+- cell_to_ecm
+- integrin_adhesion
+- basement_membrane_bond
+- drag
+- basement_membrane_remodel
+- basement_membrane_bond_break
+- ecm_stress
+- substep_dt: 0.0002
+  steps:
+  - mpm_strain
+  - mpm_scatter
+  - mpm_grid_update
+  - mpm_gather
+- basement_membrane_secrete
+- cell_exclude_3d
+- cell_exclude_3d
+plotting:
+  background: black
+  up_axis: 1
+  box_frame: true
+  fps: 10
+  render_3d: dots
+  dot_size: 0.9
+  hide_sets:
+  - cell
+  color_by: node_type
+  colors:
+    s0:
+    - 0.16
+    - 0.19
+    - 0.3
+    s1:
+    - 0.46
+    - 0.31
+    - 0.72
+    s2:
+    - 0.78
+    - 0.26
+    - 0.72
+    s3:
+    - 0.95
+    - 0.28
+    - 0.45
+    s4:
+    - 0.99
+    - 0.45
+    - 0.2
+    s5:
+    - 1.0
+    - 0.62
+    - 0.12
+    s6:
+    - 1.0
+    - 0.8
+    - 0.28
+    s7:
+    - 1.0
+    - 0.97
+    - 0.78
+  camera_elev: 1.05
+  camera_turns: 0.0
+  camera_zoom: 0.0</pre></span></span>
+      <span class="sim-cap">the control: with the integrin springs removed the sheet SLIDES over the epithelium instead of being stretched by it, and is the only run that loses coverage (0.89) — it goes where the matrix pushes it. The strain in the other two is real because this one has none</span>
+    </figcaption>
+  </figure>
+</div>
 <!-- END vertex-mpm -->
-
-<h3>Stigmergy — Physarum slime (one species, a disc colony)</h3>
-<p class="opk">A set of agents coupled to a scalar field: agents deposit a trail, the field diffuses and decays, agents sense and steer up it — a self-reinforcing transport network (one schedule: <code>deposit → diffuse → decay → sense → steer</code>). Here a <b>single</b> species is seeded in a disc (<code>spawn: disc</code>), so the colony stays a bounded circular web; the three differ only in turn rate and sensor geometry.</p>
-<p class="opk-ref">Reference — the Physarum agent is adapted from <a href="https://github.com/SebLague/Slime-Simulation">Sebastian Lague’s Slime-Simulation</a>.</p>
-<div class="sim-gallery g3">
-  <figure class="sim-card">
-    <video src="gallery/slime.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">slime (default)<span class="sim-spec"><pre># slime_default -- one species, the canonical Physarum transport network.
-# The monolithic `slime` operator decomposed into 5 primitives over 1 set + 1 scalar
-# field: deposit (set-&gt;field) | diffuse, decay (field-&gt;field) | sense (field-&gt;set,
-# turns the heading) | glide (self-propelled move). Agents spawn in a central disc;
-# stigmergy grows a self-reinforcing, coarsening network.
-general: {name: slime_default, seed: 0, n_frames: 400, dt: 1.0, boundary: wall}
-sets:
-  cell:
-    n: 12000
-    spawn: disc
-    spawn_radius: 0.3
-    types:
-      a: {fraction: 1.0, move_speed: 0.006, turn_speed: 0.45, sensor_angle: 28, sensor_dist: 0.025, sensor_size: 1}
-fields:
-  chemical: {frame: grid, res: 220, couples_to: cell}
-operators:
-- {op: deposit, at: cell, to: chemical, amount: 0.045}
-- {op: diffuse, at: chemical,            rate: 0.0175}
-- {op: decay,   at: chemical,            rate: 0.0006}
-- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}
-- {op: bounce,  at: cell}
-- {op: glide, at: cell}
-schedule: [deposit, diffuse, decay, sense, bounce, glide]
-plotting:
-  colors: {a: [0.2, 0.95, 0.65]}
-  background: black
-  gamma: 0.7
-
-# --- auto: video descriptions (gemma-4-12B) ---
-descriptions:
-  movie_cell:
-    description: A dense cloud of green particles initially forms a roughly spherical shape. Over time,
-      the particles begin to organize into a complex, interconnected network of filaments. These filaments
-      form a web-like structure that maintains a spherical overall boundary. The network becomes increasingly
-      defined as the particles align into distinct paths.
-    objects: The primary objects are small, bright green particles. These particles are arranged in a
-      spherical cluster that occupies the center of the frame. They transition from a random distribution
-      into a connected topology of curved lines and loops. The overall size of the cluster remains constant
-      while the internal structure evolves from a cloud to a web.
-  movie_chemical:
-    description: The simulation begins with a dense, uniform cloud of green particles forming a circular
-      shape. Over time, these particles begin to organize into a complex, interconnected network of filaments.
-      The network structure becomes increasingly defined, forming a dense web of loops and strands within
-      the central sphere. Finally, long, thin filaments extend outward from the central mass into the
-      surrounding black space.
-    objects: The primary object is a large, circular cluster of green filaments located in the center
-      of the frame. These filaments are interconnected in a complex, web-like topology, creating a porous
-      internal structure. Surrounding the central mass are numerous thin, thread-like strands that radiate
-      outward in all directions. All objects are a consistent teal-green color and are set against a solid
-      black background.</pre></span></span>
-      <span class="sim-cap">exchange + lateral — deposit into a field, sense it, steer up it: a self-organizing network</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/slime_curly.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">curly<span class="sim-spec"><pre># slime_curly -- one species, high turn rate + short sensors -&gt; tight curly filaments
-# (a fine, meandering network). Same 5 operators; only the `types:` scalars change.
-general: {name: slime_curly, seed: 1, n_frames: 400, dt: 1.0, boundary: wall}
-sets:
-  cell:
-    n: 12000
-    spawn: disc
-    spawn_radius: 0.32
-    types:
-      a: {fraction: 1.0, move_speed: 0.006, turn_speed: 0.95, sensor_angle: 45, sensor_dist: 0.013, sensor_size: 1}
-fields:
-  chemical: {frame: grid, res: 220, couples_to: cell}
-operators:
-- {op: deposit, at: cell, to: chemical, amount: 0.045}
-- {op: diffuse, at: chemical,            rate: 0.015}
-- {op: decay,   at: chemical,            rate: 0.00075}
-- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}
-- {op: bounce,  at: cell}
-- {op: glide, at: cell}
-schedule: [deposit, diffuse, decay, sense, bounce, glide]
-plotting:
-  colors: {a: [0.45, 0.75, 1.0]}
-  background: black
-  gamma: 0.7
-
-# --- auto: video descriptions (gemma-4-12B) ---
-descriptions:
-  movie_cell:
-    description: A large cluster of blue particles initially appears as a dense, uniform sphere. Over
-      time, the particles begin to organize into distinct, interconnected looping structures. These loops
-      expand and refine their shapes while maintaining a roughly spherical overall boundary. By the end
-      of the sequence, the internal structure is clearly defined by a network of continuous, winding paths.
-    objects: The primary objects are thousands of small, light-blue dots. These dots are arranged in a
-      complex, interconnected network of closed loops and winding paths. The overall shape of the collection
-      is a large, roughly spherical cluster against a black background. A few isolated dots and small
-      linear trails appear outside the main spherical body.
-  movie_chemical:
-    description: The video begins with a nearly invisible, faint cluster of particles in the center of
-      a black background. Over the course of the simulation, these particles rapidly brighten and organize
-      into a dense, interconnected network of blue filaments. The structure expands slightly as the filaments
-      become more defined and saturated in color. By the final frame, the central cluster is fully formed
-      and surrounded by thin, radiating lines extending outward.
-    objects: The primary object is a large, spherical cluster of interconnected blue filaments located
-      in the center of the frame. These filaments are arranged in a complex, tangled topology resembling
-      a neural network or a microscopic biological structure. Surrounding this central mass are several
-      thin, faint blue lines that radiate outward like spokes. The color of the filaments is a consistent
-      medium blue, contrasting sharply against the solid black background.</pre></span></span>
-      <span class="sim-cap">the same operators, tighter turning — curled, looping trails</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/slime_filaments.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">filaments<span class="sim-spec"><pre># slime_filaments -- ported from prototype/slime to the decomposed src operators:
-# deposit(set-&gt;field) / diffuse,decay(field-&gt;field) / sense(field-&gt;set) / bounce / glide.
-general: {name: slime_filaments, seed: 0, n_frames: 450, dt: 1.0, boundary: wall}
-sets:
-  cell:
-    n: 13000
-    spawn: disc
-    spawn_radius: 0.3
-    types:
-      a: {fraction: 1.0, move_speed: 0.007, turn_speed: 0.18, sensor_angle: 14, sensor_dist: 0.035, sensor_size: 1}
-fields:
-  chemical: {frame: grid, res: 220, couples_to: cell}
-operators:
-- {op: deposit, at: cell, to: chemical, amount: 0.045}
-- {op: diffuse, at: chemical, rate: 0.015}
-- {op: decay,   at: chemical, rate: 0.0005}
-- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}
-- {op: bounce,  at: cell}
-- {op: glide, at: cell}
-schedule: [deposit, diffuse, decay, sense, bounce, glide]
-plotting:
-  colors:
-    a: [0.2, 0.95, 0.65]
-  background: black
-  gamma: 0.7
-
-# --- auto: video descriptions (gemma-4-12B) ---
-descriptions:
-  movie_cell:
-    description: A large number of cyan particles are initially distributed in a dense, roughly spherical
-      cluster against a black background. Over time, these particles begin to organize into distinct,
-      elongated filaments that radiate outward from the center. A prominent circular boundary forms, with
-      many filaments crossing through its interior and extending beyond its perimeter. The simulation
-      concludes with a complex network of interconnected paths and scattered points, maintaining the overall
-      spherical symmetry.
-    objects: The primary objects are thousands of tiny cyan dots that represent individual particles or
-      data points. These particles are arranged into a dense central mass that gradually transitions into
-      a web-like topology of curved lines. A large, circular ring of high particle density defines a central
-      region where many filaments intersect. The filaments vary in length and curvature, extending from
-      the core to the edges of the frame in a radial pattern.
-  movie_chemical:
-    description: A dense cluster of green particles initially forms a spherical shape against a black
-      background. Over time, the particles begin to organize into a complex, interconnected network of
-      filaments. These filaments extend outward from the central sphere, creating a radial, web-like structure.
-      The final frames show a highly structured, glowing orb with long, thread-like tendrils reaching
-      toward the edges of the frame.
-    objects: The primary objects are thousands of small, cyan-colored particles. These particles are arranged
-      in a spherical topology, transitioning from a random distribution to a structured lattice. The filaments
-      are thin, elongated, and interconnected, forming a dense mesh in the center. The overall structure
-      is large relative to the frame, occupying most of the central space with radiating extensions.</pre></span></span>
-      <span class="sim-cap">the same operators, low turning — thin, radiating filaments</span>
-    </figcaption>
-  </figure>
-</div>
-
-<h3>Stigmergy — Physarum slime (many species, space-filling)</h3>
-<p class="opk">The <b>same</b> schedule, but agents are now seeded <b>uniformly</b> across the field (<code>spawn: random</code>) and split into 4–8 species, each depositing and sensing its own trail channel with cross-species inhibition (<code>cross: −1</code>). That is why this row looks so unlike the discs above: instead of one bounded colony, the networks fill the whole plane and segregate into distinct interwoven colours.</p>
-<p class="opk-ref">Reference — the Physarum agent is adapted from <a href="https://github.com/SebLague/Slime-Simulation">Sebastian Lague’s Slime-Simulation</a>.</p>
-<div class="sim-gallery g3">
-  <figure class="sim-card">
-    <video src="gallery/slime_four.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">four species<span class="sim-spec"><pre># slime_four -- ported from prototype/slime to the decomposed src operators:
-# deposit(set-&gt;field) / diffuse,decay(field-&gt;field) / sense(field-&gt;set) / bounce / glide.
-general: {name: slime_four, seed: 0, n_frames: 420, dt: 1.0, boundary: wall}
-sets:
-  cell:
-    n: 14000
-    spawn: random
-    types:
-      a: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
-      b: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
-      c: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
-      d: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
-fields:
-  chemical: {frame: grid, res: 240, couples_to: cell}
-operators:
-- {op: deposit, at: cell, to: chemical, amount: 0.02}
-- {op: diffuse, at: chemical, rate: 0.013}
-- {op: decay,   at: chemical, rate: 0.002}
-- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}
-- {op: bounce,  at: cell}
-- {op: glide, at: cell}
-schedule: [deposit, diffuse, decay, sense, bounce, glide]
-plotting:
-  colors:
-    a: [0.2, 0.95, 0.65]
-    b: [1.0, 0.35, 0.45]
-    c: [0.4, 0.65, 1.0]
-    d: [1.0, 0.85, 0.3]
-  background: black
-  gamma: 0.7
-
-# --- auto: video descriptions (gemma-4-12B) ---
-descriptions:
-  movie_cell:
-    description: The simulation shows a collection of multi-colored particles moving in complex, fluid-like
-      trajectories across a black background. Over time, the particles form elongated, winding filaments
-      that twist and curve like smoke or flowing water. These filaments appear to interact and weave around
-      one another, maintaining distinct paths while filling the space. The overall motion is continuous
-      and smooth, creating a dynamic, organic pattern of flowing lines.
-    objects: The scene contains thousands of tiny, point-like particles of varying colors including red,
-      yellow, green, and blue. These particles are organized into long, continuous, thread-like structures
-      that curve and loop throughout the frame. The filaments are densely packed in some areas and more
-      sparse in others, creating a sense of depth and flow. Each individual particle is very small, but
-      their collective arrangement forms large, sweeping paths that dominate the visual field.
-  movie_chemical:
-    description: The simulation shows a complex network of colorful, undulating lines moving across a
-      black background. These lines appear to flow and twist in a fluid-like motion, maintaining their
-      continuous paths throughout the sequence. The movement is smooth and organic, with the lines weaving
-      over and under one another. Over time, the overall pattern remains stable while the individual curves
-      shift and evolve dynamically.
-    objects: The scene contains numerous thin, continuous lines that form a dense, tangled web. These
-      lines are colored in a repeating palette of cyan, magenta, yellow, and green. Each line is of a
-      uniform, small thickness, creating a delicate thread-like appearance. The lines are interconnected
-      in a non-linear topology, filling the entire frame with a chaotic yet harmonious structure.</pre></span></span>
-      <span class="sim-cap">four types over four trail channels, one shared schedule</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/slime_six.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">six species<span class="sim-spec"><pre># slime_six -- ported from prototype/slime to the decomposed src operators:
-# deposit(set-&gt;field) / diffuse,decay(field-&gt;field) / sense(field-&gt;set) / bounce / glide.
-general: {name: slime_six, seed: 0, n_frames: 420, dt: 1.0, boundary: wall}
-sets:
-  cell:
-    n: 18000
-    spawn: random
-    types:
-      a: {fraction: 0.16667, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
-      b: {fraction: 0.16667, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
-      c: {fraction: 0.16667, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
-      d: {fraction: 0.16667, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
-      e: {fraction: 0.16666, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
-      f: {fraction: 0.16666, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
-fields:
-  chemical: {frame: grid, res: 240, couples_to: cell}
-operators:
-- {op: deposit, at: cell, to: chemical, amount: 0.019}
-- {op: diffuse, at: chemical, rate: 0.0125}
-- {op: decay,   at: chemical, rate: 0.0021}
-- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}
-- {op: bounce,  at: cell}
-- {op: glide, at: cell}
-schedule: [deposit, diffuse, decay, sense, bounce, glide]
-plotting:
-  colors:
-    a: [0.2, 0.95, 0.65]
-    b: [1.0, 0.35, 0.45]
-    c: [0.4, 0.65, 1.0]
-    d: [1.0, 0.85, 0.3]
-    e: [0.95, 0.4, 0.95]
-    f: [1.0, 0.6, 0.2]
-  background: black
-  gamma: 0.7
-
-# --- auto: video descriptions (gemma-4-12B) ---
-descriptions:
-  movie_cell:
-    description: The simulation begins with a dense, uniform distribution of multicolored particles scattered
-      across a black background. Over time, the particles begin to organize into distinct, flowing streams
-      that move in undulating, wave-like patterns. These streams gradually become more defined, forming
-      intricate, intertwined loops and winding paths. By the final frame, the particles have settled into
-      a complex network of coherent, swirling trajectories that fill the entire space.
-    objects: The scene contains thousands of tiny, point-like particles of varying colors including yellow,
-      cyan, magenta, and orange. These particles are initially arranged in a stochastic, disordered state
-      with no clear spatial correlation. As the simulation progresses, they form elongated, continuous
-      filaments that exhibit a fluid-like topology. The filaments are characterized by smooth, curved
-      geometries and varying densities, creating a sense of dynamic flow.
-  movie_chemical:
-    description: The simulation shows a dense network of colorful, undulating lines moving across a black
-      background. Over time, the lines shift and flow in a fluid, organic motion, creating a sense of
-      constant, rhythmic turbulence. The paths of the lines appear to weave in and out of each other,
-      maintaining a consistent density throughout the frame. The overall effect is a dynamic, abstract
-      visualization of complex, interconnected trajectories.
-    objects: The scene consists of numerous thin, continuous lines that are intertwined and overlapping.
-      These lines are colored in a vibrant palette of pink, orange, yellow, and cyan. Each line follows
-      a winding, non-linear path, creating a complex web-like topology. The lines are uniform in thickness
-      and are distributed evenly across the entire field of view.</pre></span></span>
-      <span class="sim-cap">six types coupled through cross-inhibition — richer networks</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/slime_eight.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">eight species<span class="sim-spec"><pre># slime_eight -- ported from prototype/slime to the decomposed src operators:
-# deposit(set-&gt;field) / diffuse,decay(field-&gt;field) / sense(field-&gt;set) / bounce / glide.
-general: {name: slime_eight, seed: 0, n_frames: 440, dt: 1.0, boundary: wall}
-sets:
-  cell:
-    n: 24000
-    spawn: random
-    types:
-      a: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
-      b: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
-      c: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
-      d: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
-      e: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
-      f: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
-      g: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
-      h: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
-fields:
-  chemical: {frame: grid, res: 256, couples_to: cell}
-operators:
-- {op: deposit, at: cell, to: chemical, amount: 0.0165}
-- {op: diffuse, at: chemical, rate: 0.012}
-- {op: decay,   at: chemical, rate: 0.0025}
-- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}
-- {op: bounce,  at: cell}
-- {op: glide, at: cell}
-schedule: [deposit, diffuse, decay, sense, bounce, glide]
-plotting:
-  colors:
-    a: [0.2, 0.95, 0.65]
-    b: [1.0, 0.35, 0.45]
-    c: [0.4, 0.65, 1.0]
-    d: [1.0, 0.85, 0.3]
-    e: [0.95, 0.4, 0.95]
-    f: [1.0, 0.6, 0.2]
-    g: [0.2, 0.85, 0.85]
-    h: [0.65, 0.5, 1.0]
-  background: black
-  gamma: 0.7
-
-# --- auto: video descriptions (gemma-4-12B) ---
-descriptions:
-  movie_cell:
-    description: The simulation begins with a dense, chaotic distribution of multicolored particles scattered
-      across a black background. Over time, the particles begin to organize into distinct, flowing streams
-      and swirling patterns. These structures evolve into complex, interconnected filaments that resemble
-      turbulent fluid flows or magnetic field lines. By the final frame, the particles have formed highly
-      defined, undulating curves and nested loops that fill the entire space.
-    objects: The scene contains thousands of tiny, point-like particles of varying colors including cyan,
-      magenta, yellow, and green. Initially, these objects are arranged in a stochastic, high-entropy
-      distribution with no clear spatial correlation. As the simulation progresses, the particles align
-      into elongated, continuous trajectories that form a network of winding filaments. These filaments
-      exhibit a nested topology, creating concentric loops and branching structures that mimic the behavior
-      of a complex dynamical system.
-  movie_chemical:
-    description: The simulation begins with a dense, chaotic network of multicolored filaments intertwined
-      in a dark space. Over time, these filaments appear to shift and undulate, maintaining their complex,
-      tangled structure while subtly changing their positions. The movement is fluid and continuous, suggesting
-      a dynamic flow or a field of interacting agents. By the final frame, the overall pattern remains
-      consistent, showing a steady-state of turbulent, weaving lines.
-    objects: The scene contains numerous thin, thread-like filaments that are densely packed and overlapping.
-      These objects are arranged in a complex, non-linear topology, forming a tangled web of curves and
-      loops. The filaments exhibit a vibrant color palette including shades of cyan, magenta, yellow,
-      and orange. Each individual filament is very small in width but spans across large portions of the
-      frame, creating a high-frequency texture.</pre></span></span>
-      <span class="sim-cap">eight types — the most restrained deposit, the most finely channelled web</span>
-    </figcaption>
-  </figure>
-</div>
 
 <h3>Continuum mechanics — MLS-MPM</h3>
 <p class="opk">The same particle Level, now a material: the decomposed MLS-MPM cycle (strain → scatter → grid solve → gather) carries elastic, fluid, and granular bodies. Each clip plays the default <b>material</b> render; most also show the run coloured by <b>deformation</b> (‖F‖), then <b>stress</b>.</p>
@@ -2260,6 +3103,377 @@ descriptions:
 plotting:
   background: black</pre></span></span>
       <span class="sim-cap">grid-level surface tension — two drops coalesce</span>
+    </figcaption>
+  </figure>
+</div>
+
+<h3>Stigmergy — Physarum slime (one species, a disc colony)</h3>
+<p class="opk">A set of agents coupled to a scalar field: agents deposit a trail, the field diffuses and decays, agents sense and steer up it — a self-reinforcing transport network (one schedule: <code>deposit → diffuse → decay → sense → steer</code>). Here a <b>single</b> species is seeded in a disc (<code>spawn: disc</code>), so the colony stays a bounded circular web; the three differ only in turn rate and sensor geometry.</p>
+<p class="opk-ref">Reference — the Physarum agent is adapted from <a href="https://github.com/SebLague/Slime-Simulation">Sebastian Lague’s Slime-Simulation</a>.</p>
+<div class="sim-gallery g3">
+  <figure class="sim-card">
+    <video src="gallery/slime.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">slime (default)<span class="sim-spec"><pre># slime_default -- one species, the canonical Physarum transport network.
+# The monolithic `slime` operator decomposed into 5 primitives over 1 set + 1 scalar
+# field: deposit (set-&gt;field) | diffuse, decay (field-&gt;field) | sense (field-&gt;set,
+# turns the heading) | glide (self-propelled move). Agents spawn in a central disc;
+# stigmergy grows a self-reinforcing, coarsening network.
+general: {name: slime_default, seed: 0, n_frames: 400, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 12000
+    spawn: disc
+    spawn_radius: 0.3
+    types:
+      a: {fraction: 1.0, move_speed: 0.006, turn_speed: 0.45, sensor_angle: 28, sensor_dist: 0.025, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 220, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.045}
+- {op: diffuse, at: chemical,            rate: 0.0175}
+- {op: decay,   at: chemical,            rate: 0.0006}
+- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}
+- {op: bounce,  at: cell}
+- {op: glide, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, glide]
+plotting:
+  colors: {a: [0.2, 0.95, 0.65]}
+  background: black
+  gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: A dense cloud of green particles initially forms a roughly spherical shape. Over time,
+      the particles begin to organize into a complex, interconnected network of filaments. These filaments
+      form a web-like structure that maintains a spherical overall boundary. The network becomes increasingly
+      defined as the particles align into distinct paths.
+    objects: The primary objects are small, bright green particles. These particles are arranged in a
+      spherical cluster that occupies the center of the frame. They transition from a random distribution
+      into a connected topology of curved lines and loops. The overall size of the cluster remains constant
+      while the internal structure evolves from a cloud to a web.
+  movie_chemical:
+    description: The simulation begins with a dense, uniform cloud of green particles forming a circular
+      shape. Over time, these particles begin to organize into a complex, interconnected network of filaments.
+      The network structure becomes increasingly defined, forming a dense web of loops and strands within
+      the central sphere. Finally, long, thin filaments extend outward from the central mass into the
+      surrounding black space.
+    objects: The primary object is a large, circular cluster of green filaments located in the center
+      of the frame. These filaments are interconnected in a complex, web-like topology, creating a porous
+      internal structure. Surrounding the central mass are numerous thin, thread-like strands that radiate
+      outward in all directions. All objects are a consistent teal-green color and are set against a solid
+      black background.</pre></span></span>
+      <span class="sim-cap">exchange + lateral — deposit into a field, sense it, steer up it: a self-organizing network</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/slime_curly.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">curly<span class="sim-spec"><pre># slime_curly -- one species, high turn rate + short sensors -&gt; tight curly filaments
+# (a fine, meandering network). Same 5 operators; only the `types:` scalars change.
+general: {name: slime_curly, seed: 1, n_frames: 400, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 12000
+    spawn: disc
+    spawn_radius: 0.32
+    types:
+      a: {fraction: 1.0, move_speed: 0.006, turn_speed: 0.95, sensor_angle: 45, sensor_dist: 0.013, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 220, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.045}
+- {op: diffuse, at: chemical,            rate: 0.015}
+- {op: decay,   at: chemical,            rate: 0.00075}
+- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}
+- {op: bounce,  at: cell}
+- {op: glide, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, glide]
+plotting:
+  colors: {a: [0.45, 0.75, 1.0]}
+  background: black
+  gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: A large cluster of blue particles initially appears as a dense, uniform sphere. Over
+      time, the particles begin to organize into distinct, interconnected looping structures. These loops
+      expand and refine their shapes while maintaining a roughly spherical overall boundary. By the end
+      of the sequence, the internal structure is clearly defined by a network of continuous, winding paths.
+    objects: The primary objects are thousands of small, light-blue dots. These dots are arranged in a
+      complex, interconnected network of closed loops and winding paths. The overall shape of the collection
+      is a large, roughly spherical cluster against a black background. A few isolated dots and small
+      linear trails appear outside the main spherical body.
+  movie_chemical:
+    description: The video begins with a nearly invisible, faint cluster of particles in the center of
+      a black background. Over the course of the simulation, these particles rapidly brighten and organize
+      into a dense, interconnected network of blue filaments. The structure expands slightly as the filaments
+      become more defined and saturated in color. By the final frame, the central cluster is fully formed
+      and surrounded by thin, radiating lines extending outward.
+    objects: The primary object is a large, spherical cluster of interconnected blue filaments located
+      in the center of the frame. These filaments are arranged in a complex, tangled topology resembling
+      a neural network or a microscopic biological structure. Surrounding this central mass are several
+      thin, faint blue lines that radiate outward like spokes. The color of the filaments is a consistent
+      medium blue, contrasting sharply against the solid black background.</pre></span></span>
+      <span class="sim-cap">the same operators, tighter turning — curled, looping trails</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/slime_filaments.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">filaments<span class="sim-spec"><pre># slime_filaments -- ported from prototype/slime to the decomposed src operators:
+# deposit(set-&gt;field) / diffuse,decay(field-&gt;field) / sense(field-&gt;set) / bounce / glide.
+general: {name: slime_filaments, seed: 0, n_frames: 450, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 13000
+    spawn: disc
+    spawn_radius: 0.3
+    types:
+      a: {fraction: 1.0, move_speed: 0.007, turn_speed: 0.18, sensor_angle: 14, sensor_dist: 0.035, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 220, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.045}
+- {op: diffuse, at: chemical, rate: 0.015}
+- {op: decay,   at: chemical, rate: 0.0005}
+- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}
+- {op: bounce,  at: cell}
+- {op: glide, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, glide]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+  background: black
+  gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: A large number of cyan particles are initially distributed in a dense, roughly spherical
+      cluster against a black background. Over time, these particles begin to organize into distinct,
+      elongated filaments that radiate outward from the center. A prominent circular boundary forms, with
+      many filaments crossing through its interior and extending beyond its perimeter. The simulation
+      concludes with a complex network of interconnected paths and scattered points, maintaining the overall
+      spherical symmetry.
+    objects: The primary objects are thousands of tiny cyan dots that represent individual particles or
+      data points. These particles are arranged into a dense central mass that gradually transitions into
+      a web-like topology of curved lines. A large, circular ring of high particle density defines a central
+      region where many filaments intersect. The filaments vary in length and curvature, extending from
+      the core to the edges of the frame in a radial pattern.
+  movie_chemical:
+    description: A dense cluster of green particles initially forms a spherical shape against a black
+      background. Over time, the particles begin to organize into a complex, interconnected network of
+      filaments. These filaments extend outward from the central sphere, creating a radial, web-like structure.
+      The final frames show a highly structured, glowing orb with long, thread-like tendrils reaching
+      toward the edges of the frame.
+    objects: The primary objects are thousands of small, cyan-colored particles. These particles are arranged
+      in a spherical topology, transitioning from a random distribution to a structured lattice. The filaments
+      are thin, elongated, and interconnected, forming a dense mesh in the center. The overall structure
+      is large relative to the frame, occupying most of the central space with radiating extensions.</pre></span></span>
+      <span class="sim-cap">the same operators, low turning — thin, radiating filaments</span>
+    </figcaption>
+  </figure>
+</div>
+
+<h3>Stigmergy — Physarum slime (many species, space-filling)</h3>
+<p class="opk">The <b>same</b> schedule, but agents are now seeded <b>uniformly</b> across the field (<code>spawn: random</code>) and split into 4–8 species, each depositing and sensing its own trail channel with cross-species inhibition (<code>cross: −1</code>). That is why this row looks so unlike the discs above: instead of one bounded colony, the networks fill the whole plane and segregate into distinct interwoven colours.</p>
+<p class="opk-ref">Reference — the Physarum agent is adapted from <a href="https://github.com/SebLague/Slime-Simulation">Sebastian Lague’s Slime-Simulation</a>.</p>
+<div class="sim-gallery g3">
+  <figure class="sim-card">
+    <video src="gallery/slime_four.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">four species<span class="sim-spec"><pre># slime_four -- ported from prototype/slime to the decomposed src operators:
+# deposit(set-&gt;field) / diffuse,decay(field-&gt;field) / sense(field-&gt;set) / bounce / glide.
+general: {name: slime_four, seed: 0, n_frames: 420, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 14000
+    spawn: random
+    types:
+      a: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      b: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      c: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      d: {fraction: 0.25, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 240, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.02}
+- {op: diffuse, at: chemical, rate: 0.013}
+- {op: decay,   at: chemical, rate: 0.002}
+- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}
+- {op: bounce,  at: cell}
+- {op: glide, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, glide]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+    b: [1.0, 0.35, 0.45]
+    c: [0.4, 0.65, 1.0]
+    d: [1.0, 0.85, 0.3]
+  background: black
+  gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation shows a collection of multi-colored particles moving in complex, fluid-like
+      trajectories across a black background. Over time, the particles form elongated, winding filaments
+      that twist and curve like smoke or flowing water. These filaments appear to interact and weave around
+      one another, maintaining distinct paths while filling the space. The overall motion is continuous
+      and smooth, creating a dynamic, organic pattern of flowing lines.
+    objects: The scene contains thousands of tiny, point-like particles of varying colors including red,
+      yellow, green, and blue. These particles are organized into long, continuous, thread-like structures
+      that curve and loop throughout the frame. The filaments are densely packed in some areas and more
+      sparse in others, creating a sense of depth and flow. Each individual particle is very small, but
+      their collective arrangement forms large, sweeping paths that dominate the visual field.
+  movie_chemical:
+    description: The simulation shows a complex network of colorful, undulating lines moving across a
+      black background. These lines appear to flow and twist in a fluid-like motion, maintaining their
+      continuous paths throughout the sequence. The movement is smooth and organic, with the lines weaving
+      over and under one another. Over time, the overall pattern remains stable while the individual curves
+      shift and evolve dynamically.
+    objects: The scene contains numerous thin, continuous lines that form a dense, tangled web. These
+      lines are colored in a repeating palette of cyan, magenta, yellow, and green. Each line is of a
+      uniform, small thickness, creating a delicate thread-like appearance. The lines are interconnected
+      in a non-linear topology, filling the entire frame with a chaotic yet harmonious structure.</pre></span></span>
+      <span class="sim-cap">four types over four trail channels, one shared schedule</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/slime_six.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">six species<span class="sim-spec"><pre># slime_six -- ported from prototype/slime to the decomposed src operators:
+# deposit(set-&gt;field) / diffuse,decay(field-&gt;field) / sense(field-&gt;set) / bounce / glide.
+general: {name: slime_six, seed: 0, n_frames: 420, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 18000
+    spawn: random
+    types:
+      a: {fraction: 0.16667, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      b: {fraction: 0.16667, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      c: {fraction: 0.16667, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      d: {fraction: 0.16667, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      e: {fraction: 0.16666, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+      f: {fraction: 0.16666, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.032, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 240, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.019}
+- {op: diffuse, at: chemical, rate: 0.0125}
+- {op: decay,   at: chemical, rate: 0.0021}
+- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}
+- {op: bounce,  at: cell}
+- {op: glide, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, glide]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+    b: [1.0, 0.35, 0.45]
+    c: [0.4, 0.65, 1.0]
+    d: [1.0, 0.85, 0.3]
+    e: [0.95, 0.4, 0.95]
+    f: [1.0, 0.6, 0.2]
+  background: black
+  gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation begins with a dense, uniform distribution of multicolored particles scattered
+      across a black background. Over time, the particles begin to organize into distinct, flowing streams
+      that move in undulating, wave-like patterns. These streams gradually become more defined, forming
+      intricate, intertwined loops and winding paths. By the final frame, the particles have settled into
+      a complex network of coherent, swirling trajectories that fill the entire space.
+    objects: The scene contains thousands of tiny, point-like particles of varying colors including yellow,
+      cyan, magenta, and orange. These particles are initially arranged in a stochastic, disordered state
+      with no clear spatial correlation. As the simulation progresses, they form elongated, continuous
+      filaments that exhibit a fluid-like topology. The filaments are characterized by smooth, curved
+      geometries and varying densities, creating a sense of dynamic flow.
+  movie_chemical:
+    description: The simulation shows a dense network of colorful, undulating lines moving across a black
+      background. Over time, the lines shift and flow in a fluid, organic motion, creating a sense of
+      constant, rhythmic turbulence. The paths of the lines appear to weave in and out of each other,
+      maintaining a consistent density throughout the frame. The overall effect is a dynamic, abstract
+      visualization of complex, interconnected trajectories.
+    objects: The scene consists of numerous thin, continuous lines that are intertwined and overlapping.
+      These lines are colored in a vibrant palette of pink, orange, yellow, and cyan. Each line follows
+      a winding, non-linear path, creating a complex web-like topology. The lines are uniform in thickness
+      and are distributed evenly across the entire field of view.</pre></span></span>
+      <span class="sim-cap">six types coupled through cross-inhibition — richer networks</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/slime_eight.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">eight species<span class="sim-spec"><pre># slime_eight -- ported from prototype/slime to the decomposed src operators:
+# deposit(set-&gt;field) / diffuse,decay(field-&gt;field) / sense(field-&gt;set) / bounce / glide.
+general: {name: slime_eight, seed: 0, n_frames: 440, dt: 1.0, boundary: wall}
+sets:
+  cell:
+    n: 24000
+    spawn: random
+    types:
+      a: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
+      b: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
+      c: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
+      d: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
+      e: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
+      f: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
+      g: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
+      h: {fraction: 0.125, move_speed: 0.006, turn_speed: 0.42, sensor_angle: 28, sensor_dist: 0.034, sensor_size: 1}
+fields:
+  chemical: {frame: grid, res: 256, couples_to: cell}
+operators:
+- {op: deposit, at: cell, to: chemical, amount: 0.0165}
+- {op: diffuse, at: chemical, rate: 0.012}
+- {op: decay,   at: chemical, rate: 0.0025}
+- {op: sense,   at: cell, from: chemical, cross: -1.0, noise: 1.0}
+- {op: bounce,  at: cell}
+- {op: glide, at: cell}
+schedule: [deposit, diffuse, decay, sense, bounce, glide]
+plotting:
+  colors:
+    a: [0.2, 0.95, 0.65]
+    b: [1.0, 0.35, 0.45]
+    c: [0.4, 0.65, 1.0]
+    d: [1.0, 0.85, 0.3]
+    e: [0.95, 0.4, 0.95]
+    f: [1.0, 0.6, 0.2]
+    g: [0.2, 0.85, 0.85]
+    h: [0.65, 0.5, 1.0]
+  background: black
+  gamma: 0.7
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_cell:
+    description: The simulation begins with a dense, chaotic distribution of multicolored particles scattered
+      across a black background. Over time, the particles begin to organize into distinct, flowing streams
+      and swirling patterns. These structures evolve into complex, interconnected filaments that resemble
+      turbulent fluid flows or magnetic field lines. By the final frame, the particles have formed highly
+      defined, undulating curves and nested loops that fill the entire space.
+    objects: The scene contains thousands of tiny, point-like particles of varying colors including cyan,
+      magenta, yellow, and green. Initially, these objects are arranged in a stochastic, high-entropy
+      distribution with no clear spatial correlation. As the simulation progresses, the particles align
+      into elongated, continuous trajectories that form a network of winding filaments. These filaments
+      exhibit a nested topology, creating concentric loops and branching structures that mimic the behavior
+      of a complex dynamical system.
+  movie_chemical:
+    description: The simulation begins with a dense, chaotic network of multicolored filaments intertwined
+      in a dark space. Over time, these filaments appear to shift and undulate, maintaining their complex,
+      tangled structure while subtly changing their positions. The movement is fluid and continuous, suggesting
+      a dynamic flow or a field of interacting agents. By the final frame, the overall pattern remains
+      consistent, showing a steady-state of turbulent, weaving lines.
+    objects: The scene contains numerous thin, thread-like filaments that are densely packed and overlapping.
+      These objects are arranged in a complex, non-linear topology, forming a tangled web of curves and
+      loops. The filaments exhibit a vibrant color palette including shades of cyan, magenta, yellow,
+      and orange. Each individual filament is very small in width but spans across large portions of the
+      frame, creating a high-frequency texture.</pre></span></span>
+      <span class="sim-cap">eight types — the most restrained deposit, the most finely channelled web</span>
     </figcaption>
   </figure>
 </div>
