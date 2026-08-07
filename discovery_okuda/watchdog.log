@@ -29,3 +29,5 @@
 [07:36] ok -- 263 run dirs, campaign alive (pid 3694128)
 [07:51] ok -- 274 run dirs, campaign alive (pid 3694128)
 [08:06] campaign process is gone -- watchdog exiting
+[08:32] watchdog up, guarding pid 3815879
+[08:37] ok -- 12 run dirs, campaign alive (pid 3815940)
