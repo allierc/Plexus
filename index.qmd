@@ -1426,7 +1426,7 @@ plotting:
   <figure class="sim-card">
     <video src="gallery/vertex_mpm_grown_oblate.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">GROWN into an ovoid<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">grown into an ovoid<span class="sim-spec"><pre>general:
   name: 58_oblcav_oblate
   seed: 0
   n_frames: 402

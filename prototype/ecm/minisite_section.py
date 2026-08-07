@@ -174,7 +174,7 @@ def main():
          "the same coupling run out: an epithelium pressing into a fibre matrix for the full growth, "
          "so the stress front has time to cross the box. Nothing confines it -- this is what the "
          "matrix does when only the tissue's own growth loads it"),
-        ("58_oblcav_oblate", "vertex_mpm_grown_oblate", "GROWN into an ovoid",
+        ("58_oblcav_oblate", "vertex_mpm_grown_oblate", "grown into an ovoid",
          "an oblate cavity, so the tissue meets the fibres at its poles first and the matrix resists "
          "there 14.7x harder. <code>ecm_growth_gate_3d</code> slows the cell cycle where it resists, so "
          "the sphere GROWS to oblateness 1.43. Nothing presses on it"),
