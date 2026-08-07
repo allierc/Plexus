@@ -31,6 +31,29 @@ Two files.
 a fact. This file is folded into the campaign instructions by hand between rounds, so a sentence
 that is merely plausible pollutes every future round. If nothing survived, write that nothing did.
 
+### Route A goes in `knowledge.md` as a CURVE and a CLOSURE
+
+Half the batch is Route A: one knob swept on a known-good recipe. Those runs make no prediction
+and score nothing — a sweep is not a hypothesis — so they will not appear among the confirmed or
+refuted, and **`knowledge.md` is the only place their result can live**. You are given them as an
+ordered table under *Route A*.
+
+Write two sentences per knob:
+
+1. **The curve.** What the knob does across its range, in numbers.
+   *"`rho` drives division monotonically on cellfix_B_new: 200 → 360 → 1997 → 3170 cells at
+   0.0/0.1/0.3/1.0. Cell volume holds at ~2.9 up to rho 0.3 and jumps to 6.05 at 1.0."*
+2. **The closure, and where it breaks.** Which value to use, and the value beyond which something
+   fails. *"Use rho 0.3: 1997 cells with every premise intact. At 1.0 and above, P13 and P5b break
+   — growth outruns the relaxation. CLOSED at 5 values."*
+
+A knob written up this way is never swept again, which is the entire point: the campaign this one
+replaces re-proposed the same parameter twenty-five times because nothing ever wrote down that it
+was finished. If a sweep is incomplete, say how many values are left rather than concluding.
+
+And say plainly when a sweep **rules a base out**: a recipe whose cells shrink at every value of a
+growth knob is not going to be rescued by that knob, and the next round should stop trying.
+
 ## The metrics
 
 **Lead with these five, in this order, before any other number.** One per question the campaign asks.

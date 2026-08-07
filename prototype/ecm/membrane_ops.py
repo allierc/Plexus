@@ -56,7 +56,8 @@ from plexus.models.base import Lateral, Structural
 from plexus.models.entities import MPMParticle
 from plexus.models.registry import register_entity, register_operator
 
-# Per frame: (live bonds, bonds broken this frame, mean bond strain, largest-component fraction).
+# Per frame: (live bonds, bonds broken this frame, mean bond strain, largest-component fraction,
+# mean degree z). `z ~ 4` is central-force rigidity percolation in 2D: below it the sheet is not a sheet.
 # The last one is the point: "connectivity defect" is only meaningful if the size of the connected
 # components is measured, and a sheet that has lost 30% of its bonds but is still one piece is not
 # fragmented. Filled by `basement_membrane_bond_break`.
@@ -163,6 +164,7 @@ class BasementMembraneSeed(Structural):
         # back at mass 0 for `basement_membrane_secrete` to lay down as the surface grows.
         self.reserve = float(params.get("reserve", 0.0))
         self.surface_set = params.get("surface_set", None)
+        self.gamma = float(params.get("overdamped_gamma", 0.0))
         self.seed = int(params.get("seed", 0))
         z = np.load(str(params["surface"]))
         self.smap0 = np.asarray(z["smap"], np.float32)[0] * self.scale
@@ -364,6 +366,7 @@ class BasementMembraneBond(Lateral):
         self.snapshot_every = int(params.get("snapshot_every", 20))
         # the adhesion stiffness acting on the same nodes; the spec passes it so the ceiling can see it
         self.k_adh_hint = float(params.get("k_adhesion_hint", 0.0))
+        self.gamma = float(params.get("overdamped_gamma", 0.0))
         self.cutoff = float(params.get("cutoff", 0.020))
         self.max_nb = int(params.get("max_neighbours", 6))
         self.damp = float(params.get("damp", 0.0))
@@ -569,6 +572,10 @@ class BasementMembraneBond(Lateral):
         acc = torch.zeros_like(pos)
         acc.index_add_(0, self.i, f)
         acc.index_add_(0, self.j, -f)
+        # F/gamma, so the emitted quantity is a VELOCITY, not an acceleration (see ecm_spec's graph
+        # branch). gamma = 0 keeps the inertial path bit-identical for the comparison runs.
+        if self.gamma > 0:
+            acc = acc / self.gamma
         # per-particle strain for the renderer: mean |strain| over its live bonds
         s_abs = (strain.abs() * self.alive.to(dt_))
         cnt = torch.zeros(pos.shape[0], device=dev, dtype=dt_)
@@ -622,16 +629,30 @@ class BasementMembraneBondBreak(Structural):
         pos = lvl.get("pos")
         L = (pos[j] - pos[i]).norm(dim=-1).clamp_min(1e-9)
         strain = (L - rest) / rest
+        _lv = getattr(H, "membrane_alive", None)
+        self._n_live = int(_lv.sum()) if _lv is not None else pos.shape[0]
         broke = alive & (strain > self.break_strain)
         n_broke = int(broke.sum())
         if n_broke:
             alive &= ~broke
         self._k += 1
-        frac = float("nan")
-        if self.components_every > 0 and self._k % self.components_every == 0:
-            frac = self._largest_component(i[alive], j[alive], pos.shape[0])
+        # COMPUTED PERIODICALLY, BUT ALSO CARRIED FORWARD -- and that second half is the whole point.
+        # `frac` used to be NaN on every frame that was not a multiple of `components_every`, and every
+        # analysis reads the LAST row, which with 403 frames and a period of 40 is never a multiple. So
+        # `lcc_end` came back NaN in all 27 race runs and was silently dropped from every conclusion,
+        # while the note asserted that connectivity, not bond count, was what we reported. A metric that
+        # is NaN wherever it is read is not a metric.
+        _last = self._k >= int(getattr(H, "n_frames", 0) or 0) - 1
+        if self.components_every > 0 and (self._k % self.components_every == 0 or _last):
+            self._frac = self._largest_component(i[alive], j[alive], pos.shape[0])
+        frac = getattr(self, "_frac", float("nan"))
+        # MEAN DEGREE, the quantity that says whether this is a sheet at all. Central-force rigidity
+        # percolation in 2D needs z ~ 4; run 74 finished at 2*47046/37424 = 2.51 and was read as an
+        # intact sheet whose taut bonds had broken. Reporting z makes that unmissable.
+        n_live = int(getattr(self, "_n_live", pos.shape[0])) or pos.shape[0]
+        z = 2.0 * int(alive.sum()) / max(n_live, 1)
         BOND_TRACE.append((int(alive.sum()), n_broke, float(strain[alive].abs().mean())
-                           if bool(alive.any()) else 0.0, frac))
+                           if bool(alive.any()) else 0.0, frac, z))
         return {}
 
     @staticmethod
@@ -701,6 +722,7 @@ class IntegrinAdhesion(Lateral):
         self.k = float(params.get("k", 2.0e4))
         self.offset = float(params.get("offset", 0.004))
         self.detach = float(params.get("detach", 0.0))       # 0 = permanent
+        self.gamma = float(params.get("overdamped_gamma", 0.0))
         # BIND TO THE `surface` LEVEL IF ONE EXISTS, otherwise to the 32x64 table as before. Named
         # rather than inferred, so a run either uses the Level or does not and the spec says which --
         # the two differ in a way that shows up in the strain field and must not be silent.
@@ -785,8 +807,14 @@ class IntegrinAdhesion(Lateral):
         # the white plumes in `61`'s movie are. Critical damping c = 2*sqrt(k) makes it track instead.
         vel = lvl.get("vel") if "vel" in lvl.state_schema else None
         acc = self.k * delta
-        if vel is not None:
+        # THE DASHPOT IS AN INERTIAL FIX AND GOES AWAY OVERDAMPED. `damp` exists because an undamped
+        # spring does not track a moving anchor, it oscillates about it -- a problem that only arises
+        # because the sheet was given a mass. With gamma*x_dot = F there is no oscillation to damp, and
+        # subtracting damp*vel on top of dividing by gamma would be damping the damping.
+        if vel is not None and self.gamma <= 0:
             acc = acc - self.damp * vel
+        if self.gamma > 0:
+            acc = acc / self.gamma
         acc = acc * self.bound[:, None].to(dt_)
         # UNSECRETED MATERIAL IS NOT ADHERED TO ANYTHING. The reserve sits at the tissue centre; without
         # this it is dragged out toward the surface by a spring it has not yet earned, arriving as a

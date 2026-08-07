@@ -105,7 +105,8 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                # must fragment; small = one that remodels and stays intact. 0 or None disables it.
                membrane_tau=60.0, membrane_reserve=0.0, membrane_secrete_rate=0.02,
                membrane_secrete_targeted=1.0, membrane_surface_level=False,
-               membrane_impl="mpm", membrane_drag=40.0):
+               membrane_impl="mpm", membrane_drag=40.0, membrane_inertial=False,
+               membrane_gamma=2.0e3):
     """The whole experiment as a plain dict, ready for yaml.safe_dump + schema.load."""
     types = {f"s{i}": {"fraction": 1.0 / len(STRESS_COLORS), "youngs": youngs}
              for i in range(len(STRESS_COLORS))}
@@ -236,9 +237,19 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
             keep = {"mpm_strain", "mpm_scatter", "mpm_gather"}
             spec["operators"] = [o for o in spec["operators"]
                                  if not (o["op"] in keep and o["at"] == "basement_membrane_particle")]
+            # OVERDAMPED, NOT INERTIAL. `emit: acceleration` integrates v += dt*a; x += dt*v with unit
+            # mass -- a term with no physical basis at Re ~ 1e-10, where the equation of motion is
+            # gamma*x_dot = F. Everything section 5 and 7 report about the sheet -- the undamped spring
+            # oscillating about a moving anchor, critical damping c = 2*sqrt(k), the tracking lag, the
+            # sinking, the stability reversal above k_adh = 1e5 -- is the phenomenology of that inertia.
+            # In the overdamped limit none of it exists. `emit: velocity` gives x += dt*(F/gamma), which
+            # is the correct low-Reynolds motion and removes both the oscillation and the ceiling that
+            # came with it. `membrane_inertial=True` restores the old path for comparison only.
+            emit = "acceleration" if membrane_inertial else "velocity"
             for o in spec["operators"]:
                 if o["op"] in ("basement_membrane_bond", "integrin_adhesion"):
-                    o["emit"] = "acceleration"
+                    o["emit"] = emit
+                    o["overdamped_gamma"] = 0.0 if membrane_inertial else float(membrane_gamma)
                     # EXPLICIT, not inferred from `emit`. The spec's `emit` key is consumed by the
                     # engine's emit resolution and does not survive into the round-tripped yaml, so an
                     # operator that keys its stability check off it silently skips the check -- which is
@@ -247,10 +258,14 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                     o["graph_mode"] = True
                     if o["op"] == "basement_membrane_bond":
                         o["k_adhesion_hint"] = float(membrane_adhesion)
-            spec["operators"].append({"op": "drag", "at": "basement_membrane_particle",
-                                      "k": float(membrane_drag)})
-            i = spec["schedule"].index("basement_membrane_bond")
-            spec["schedule"].insert(i + 1, "drag")
+            if membrane_inertial:
+                # `drag` only makes sense against inertia. Overdamped, the dissipation IS gamma.
+                spec["operators"].append({"op": "drag", "at": "basement_membrane_particle",
+                                          "k": float(membrane_drag)})
+                i = spec["schedule"].index("basement_membrane_bond")
+                spec["schedule"].insert(i + 1, "drag")
+            else:
+                spec["operators"] = [o for o in spec["operators"] if o["op"] != "drag"]
             # (no schedule surgery: the substep block dispatches mpm steps BY OP NAME, so dropping the
             # three operator entries above is what removes them from the cycle.)
         if membrane_surface_level:

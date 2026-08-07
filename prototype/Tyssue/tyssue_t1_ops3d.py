@@ -144,6 +144,12 @@ def _face_ok_3d(ring, getp):
 # --------------------------------------------------------------------------------------------------
 #  the T1 flip
 # --------------------------------------------------------------------------------------------------
+# Per frame: (frame, flips this frame, cumulative flips, live faces). The RATE per cell per frame is
+# what discriminates a homogenising (length-keyed) myosin feedback from a destabilising (tension-keyed)
+# one; junction-length CV moves the same way under both.
+T1_TRACE: list = []
+
+
 def t1_flip_3d(rings, pos, e_uv, new_len=None, emap=None, vf=None):
     """One surface T1 on interior edge e_uv=(u,v): rewire the four rings A,B,C,D and move u,v apart
     along the tangent-plane perpendicular (projected onto the shell). Mutates `rings` and pos[u],pos[v]
@@ -273,6 +279,14 @@ class ReconnectT1_3D(Rewire):
             seen.add(key)
             if t1_flip_3d(rings, pos, (a, b), new_len=thr, emap=emap, vf=vf) is not None:
                 used.add(a); used.add(b); ndone += 1
+        # TRACED PER FRAME, because the RATE is the observable that separates a length-keyed myosin
+        # feedback from a tension-keyed one. A length feedback homogenises junction lengths and should
+        # SUPPRESS T1s; a tension feedback is the destabilising one the germband-extension literature
+        # describes and should PRODUCE them. Both move junction-length CV the same way, so CV cannot
+        # tell them apart -- this can. `n_t1` was already accumulated; only the per-frame series was
+        # missing, and without it the discriminating measurement was unavailable.
+        T1_TRACE.append((int(getattr(H, "frame", -1) or -1), ndone, int(m.get("n_t1", 0)) + ndone,
+                         int(nF)))
         if ndone == 0:
             return {}
         es2, et2, ef2, nF2, _ = flat_from_rings_3d(rings)    # T1 drops no face -> nF2 == nF, order kept

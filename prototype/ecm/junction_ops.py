@@ -89,12 +89,63 @@ class JunctionMyosin(Structural):
         self.tau = float(params.get("tau", 20.0))
         self.beta = float(params.get("beta", 1.0))
         self.myo_new = float(params.get("myo_new", 1.0))
+        # "length" reproduces every run up to 83 bit-for-bit; "tension" and "strain_rate" are the two
+        # the literature supports. `destabilising` flips the sign so high drive -> more myosin -> higher
+        # drive, which is the positive feedback that produces T1s rather than suppressing them.
+        self.keyed_on = str(params.get("keyed_on", "length")).lower()
+        self.destabilising = bool(params.get("destabilising", True))
+        self._prev_len = None
+        self.lam = float(params.get("lam", 1.0))          # Lambda, for the tension expression
+        self.k_perim = float(params.get("k_perim", 1.0))
         self.inherit = bool(params.get("inherit", True))
         self._vseen = None
         self.dt = float(params.get("dt", 1.0))
         self._keys = None            # int64 [K] topological identities seen so far
         self._vals = None            # float  [K] their myosin
         self._said = False
+
+    def _edge_tension(self, m, length, myo, lvl):
+        """Per-edge tension: the line term plus the perimeter term of the faces the edge belongs to.
+
+        T_e = Lambda*m_e + sum over the two adjacent faces of 2 K_P (P_f - P_f^0). This is the quantity
+        `shape_energy_3d` differentiates, so it is the tension in the same sense the mechanics uses --
+        not a proxy for it. Falls back to length only if the perimeter state is unavailable, and says so
+        once rather than silently keying on the wrong thing.
+        """
+        ef = m["E_face"]
+        nF = int(m["nF"])
+        live = ef < nF
+        P, P0 = m.get("perim"), m.get("perim0")
+        if P is None or P0 is None:
+            if not getattr(self, "_said_tension", False):
+                self._said_tension = True
+                print("[junction_myosin] keyed_on='tension' but no perimeter state on the mesh; "
+                      "falling back to LENGTH, which is a different feedback with the opposite sign. "
+                      "Do not read this run as a tension experiment.", flush=True)
+            return length
+        kp = float(self.k_perim)
+        face_t = 2.0 * kp * (P - P0)                       # per-face perimeter tension
+        return (self.lam * myo + face_t[ef[live].long()]).clamp_min(0.0)
+
+    def _edge_strain_rate(self, key, length):
+        """d ln(l_e)/dt, matched to the PREVIOUS frame by the same vertex-pair key the myosin uses.
+
+        Cheaper than tension and closer to Gustafson et al. 2022, whose recruitment variable is strain
+        rate. Keyed rather than positional because divide_3d and reconnect_t1_3d permute the half-edge
+        arrays every frame -- comparing arrays by index would silently difference unrelated junctions.
+        """
+        cur = torch.stack([key, length])
+        if self._prev_len is None:
+            self._prev_len = cur
+            return torch.zeros_like(length)
+        pk, pl = self._prev_len
+        order = torch.argsort(pk)
+        ks, vs = pk[order], pl[order]
+        idx = torch.searchsorted(ks, key).clamp(max=max(ks.numel() - 1, 0))
+        hit = (ks.numel() > 0) & (ks[idx] == key)
+        prev = torch.where(hit, vs[idx], length)
+        self._prev_len = cur
+        return torch.log(length.clamp_min(1e-9) / prev.clamp_min(1e-9))
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
@@ -166,7 +217,44 @@ class JunctionMyosin(Structural):
                 INHERIT_TRACE.append((n_new, int(half.sum()), n_inherited))
 
         # ---- recruitment ------------------------------------------------------------------------
-        ss = self.activity * (1.0 + self.beta * (length / l_ref - 1.0)).clamp_min(0.0)
+        # ---- WHAT THE FEEDBACK IS KEYED TO ------------------------------------------------------
+        # `length` was the original choice and it is the wrong variable, in two separate ways.
+        #
+        #   WRONG VARIABLE. Edge tension in this energy is Lambda*m_e + sum_f 2 K_P (P_f - P_f^0); length
+        #   does not appear in it, so a long edge is not necessarily a taut one. The docstring used to
+        #   assert "setpoint rises with junction length, i.e. with tension", which is an identification,
+        #   not a derivation, and it is false here.
+        #
+        #   WRONG SIGN. Keyed to length the feedback is longer -> more myosin -> shorter: a STABILISER
+        #   that homogenises junction lengths. The measured relationship runs the other way -- Bertet
+        #   et al. 2004 find myosin enriched in DISASSEMBLING junctions, Fernandez-Gonzalez et al. 2009
+        #   find more myosin on linked edges "regardless of edge length" -- and the resulting feedback is
+        #   POSITIVE, a mechanical instability that generates T1s. The modelling literature keys on
+        #   tension or strain rate and never on length; Sknepnek et al. 2023 say so verbatim.
+        #
+        # And keyed to length the operator is not even independent evidence for itself: in the tau -> 0
+        # limit (the biologically correct one, myosin FRAP t1/2 ~ 6 s) substituting the setpoint gives
+        # Lambda*a*sum[(1-beta) l_e + beta l_e^2/<l>], i.e. a line tension plus a HARMONIC EDGE SPRING of
+        # zero rest length. Lowering the coefficient of variation of edge lengths is what such a spring
+        # does by definition, so "beta lowers CV at constant radius" is a tautology and cannot
+        # discriminate a right law from a wrong one. The T1 rate can, and the two signs move it oppositely.
+        if self.keyed_on == "tension":
+            drive = self._edge_tension(m, length, myo, lvl)
+        elif self.keyed_on == "strain_rate":
+            drive = self._edge_strain_rate(key, length)
+        else:
+            drive = length
+        d_ref = drive.mean().clamp_min(1e-9) if self.keyed_on != "strain_rate" else torch.ones((), device=dev, dtype=dt_)
+        # SIGN. Getting this backwards silently converts the experiment into its own control, so it is
+        # written out rather than inferred:
+        #   length-keyed, +   longer -> more myosin -> shorter.  Negative feedback ON LENGTH: homogenises.
+        #   tension-keyed, +  tauter -> more myosin -> tauter.   POSITIVE feedback ON TENSION: this is the
+        #                     germband-extension instability, and it should RAISE the T1 rate.
+        #   tension-keyed, -  tension homeostasis, the stabilising variant, kept as the contrast.
+        # So the destabilising choice is +1, not -1. I had it as -1 on the first pass, which would have
+        # made every "tension" run a stabiliser and the whole 84-91 comparison vacuous.
+        sgn = 1.0 if self.destabilising else -1.0
+        ss = self.activity * (1.0 + sgn * self.beta * (drive / d_ref - 1.0)).clamp_min(0.0)
         myo = myo + (ss - myo) * (self.dt / max(self.tau, 1e-9))
         myo = myo.clamp(0.0, 5.0)
 
