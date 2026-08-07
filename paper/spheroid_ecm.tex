@@ -2,6 +2,7 @@
 \usepackage[margin=1.7cm]{geometry}
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
+\usepackage{graphicx}
 \usepackage[T1]{fontenc}
 \usepackage{microtype}
 \usepackage[colorlinks,linkcolor=black,citecolor=black,urlcolor=blue]{hyperref}
@@ -331,5 +332,100 @@ by the smooth one left every particle a bond length off its anchor and returned 
 RNG mismatch between two lattices; the rerun was bit-identical, which proved the lattices had always
 agreed and the diagnosis was wrong. The repair was structural: make the Level authoritative, so there is
 one lattice and one radius rather than two that must agree.
+
+
+\section{The basement membrane, drawn out}
+
+\begin{figure}[t]\centering
+\includegraphics[width=\textwidth]{fig_bm_schematic.pdf}
+\caption{\textbf{What the membrane is made of.} Four objects, and the arrows between them are the whole
+model. The \emph{epithelium} (cream wedges) is a recording: it advances on a prescribed schedule and
+nothing can push it back. Its outer boundary is the \op{surface} Level (orange), one element per
+membrane node, each holding a fixed direction $\hat{\mathbf u}_i$ and the radius $R(\hat{\mathbf u}_i,t)$
+the tissue reached in that direction. The \emph{basement membrane} is grey \emph{nodes} joined by green
+\emph{crosslinks}, sitting a distance $\delta$ outside. Each node is tied to its \emph{own} surface
+element by one red \emph{integrin} spring---one per node, to a fixed angular position, which is what
+makes it adhesion rather than contact. Outside is the interstitial matrix (purple), which the membrane
+never bonds to: they meet only through the shared grid, or in the spring-graph version, not at all.}
+\end{figure}
+
+\subsection*{In plain English, and then in symbols}
+
+A basement membrane is a thin sheet of protein that an epithelium lays down underneath itself and sits
+on. Two networks do the work: \textbf{laminin}, which cells grip, and \textbf{collagen~IV}, which is
+crosslinked and carries the load; \textbf{nidogen} staples the two together and \textbf{perlecan} fills
+the mesh. We model the load-bearing one. So a node is not a molecule---it is a patch of sheet about a
+micron across---and a crosslink is not one collagen~IV protomer but the stiffness of all of them across
+that patch.
+
+Three rules, and everything in Fig.~2 follows from them.
+
+\paragraph{1. The crosslinks make it a sheet.} Every pair of neighbouring nodes is a spring with its own
+rest length $\ell^0_{ij}$, and its \emph{elongation} is what the colours in Fig.~2 show:
+\[ \epsilon_{ij}=\frac{L_{ij}-\ell^0_{ij}}{\ell^0_{ij}},\qquad
+   \mathbf f_{ij}=k\,(L_{ij}-\ell^0_{ij})\,\hat{\mathbf d}_{ij},\qquad
+   \text{bond dies if } \epsilon_{ij}>\epsilon_{\rm break}. \]
+Without them the nodes are dust: independent points that cannot tear, cannot fragment, and cannot be
+measured for either.
+
+\paragraph{2. Integrin pins each node to a \emph{direction}, not to the nearest surface.} The anchor is
+\[ \mathbf a_i=\mathbf c+\hat{\mathbf u}_i\bigl(R(\hat{\mathbf u}_i,t)+\delta\bigr), \]
+with $\hat{\mathbf u}_i$ frozen when the node is laid down. Anchoring to the \emph{nearest} point instead
+would let a node slide freely along the surface---that is contact, not adhesion---and the sheet would
+never stretch at all. Run~73 is that experiment run on purpose, and its mean elongation is the lowest in
+the series outside the slack cases.
+
+\paragraph{3. Remodelling lets the sheet forget.} A crosslink's rest length creeps toward its current
+length on a timescale $\tau$, $\dot\ell^0=(L-\ell^0)/\tau$, which gives the relation that governs this
+whole series: a sheet stretched at rate $\dot\varepsilon$ settles at
+\[ \boxed{\;\langle\epsilon\rangle \simeq \dot\varepsilon\,\tau\;} \]
+independent of stiffness and of supply. It is why $k$ can be swept over three orders and change nothing,
+and why $\tau$ is the parameter that decides whether the membrane ever approaches failure.
+
+\paragraph{4. Secretion adds material.} A surface growing from $R_0$ to $R_1$ needs $(R_1/R_0)^2$ times
+as many nodes to stay the same thickness. Deposition is a fixed fraction $\rho$ of existing material per
+frame, so there is a threshold, predictable before any run:
+\[ \rho^\ast=\frac{2\ln(R_1/R_0)}{N_{\rm frames}}=\frac{\ln 12.77}{400}=0.0064\ \text{per frame}, \]
+measured at $0.006$.
+
+\begin{figure}[t]\centering
+\includegraphics[width=\textwidth]{fig_bm_series.pdf}
+\caption{\textbf{Seven configurations, same tissue, end state.} Only the membrane is drawn: nodes grey,
+crosslinks coloured by elongation with full scale at the break threshold. Reading them against
+Eq.~(boxed): \textbf{71} ($\tau=10$) forgets stretch as fast as it arrives and is uniformly slack---the
+whole sheet is dark blue at $\langle\epsilon\rangle=0.028$. \textbf{69} ($\tau=60$) is the same network
+(180{,}304 against 187{,}781 crosslinks, both fully covering) under four times the tension, $0.104$, and
+reads teal-green. \textbf{70} ($\tau=0$, remodelling removed) cannot forget at all: tension accumulates,
+p99 reaches $0.263$ against a threshold of $0.35$, and $39\%$ of the crosslinks have already gone
+(109{,}798). \textbf{74} lowers the threshold to $0.08$ instead---the mechanics are untouched, but now
+the sheet is above it, and $74\%$ of the crosslinks break (47{,}046); the survivors are the slack ones,
+which is why its mean elongation reads \emph{lower} than the reference at $0.033$. \textbf{72} is
+starved below $\rho^\ast$: 6{,}624 nodes instead of 37{,}427, a sheet stretched thin rather than torn.
+\textbf{73} removes the anchor and the sheet slides instead of stretching---and is the only one that
+loses coverage, $0.895$, because nothing holds it in place. \textbf{75} is the same membrane on an ovoid
+($1.33$), where the equator carries $33\%$ more elongation than the poles.}
+\end{figure}
+
+\subsection*{How it is built in Plexus2}
+
+The hierarchy is four sets and one field. \op{cells} and \op{junction} are the epithelium; \op{surface}
+is its boundary; \op{basement\_membrane} is the sheet; \op{interstitial\_ecm} is the matrix; and
+\op{mpm\_grid} is the field every particle body scatters into, which is how bodies that never touch each
+other exchange momentum.
+
+The membrane's operators divide by what they do to the state, which is the distinction Plexus2 draws:
+\op{seed\_basement\_membrane} and \op{basement\_membrane\_secrete} are \textbf{structural} (they change
+how much material exists); \op{basement\_membrane\_bond} and \op{integrin\_adhesion} are
+\textbf{dynamics} (they return a force the engine integrates); \op{basement\_membrane\_remodel} is
+\textbf{field}-like (it rewrites rest lengths in place); and \op{basement\_membrane\_bond\_break} is
+\textbf{rewire}, because fragmentation \emph{is} a change of the edge set and is registered as one.
+
+Two implementation choices are worth naming because neither is forced by the biology. First, per-bond
+state is keyed by the \emph{unordered pair of node indices} rather than stored by position in an array,
+so division, T1 and death permute the mesh freely and no topology operator needs to know that crosslinks
+exist. Second, the membrane no longer uses MPM: nothing about the sheet came from the continuum solver,
+and dropping it costs exactly one thing---momentum exchange with the matrix, measured as an ECM stress
+falling from $7.5$ to $0.006$. That coupling has to come back as an explicit operator
+(\op{basement\_to\_ecm}), which resolves at the sheet's own length scale instead of the grid's.
 
 \end{document}
