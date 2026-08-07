@@ -46,171 +46,19 @@ SERIES = {
     "73_no_adhesion": dict(membrane_adhesion=0.0),
     "74_brittle": dict(membrane_break=0.08),
     "75_on_ovoid": dict(_gated=True),
-    # x10 and x20 the reference RATE. A prediction first, so the runs can refute it: these should look
-    # like 69. The rate sweep put the supply/demand knee at 0.0064 per frame and the reference is
-    # already 0.012, twice above it -- past the knee the particle count is set by AREAL DEMAND
-    # (want = n0 (R/R0)^2), not by supply, so pouring in ten times the material faster cannot make a
-    # thicker sheet, only reach the same one sooner. If 76 and 77 differ from 69 by more than the run
-    # to run scatter, the demand-limited picture is wrong.
-    "76_secrete_x10": dict(membrane_secrete_rate=0.12),
-    "77_secrete_x20": dict(membrane_secrete_rate=0.24),
-    # --- the junction twin: the same treatment for the OTHER new level -------------------------------
-    # These vary myosin, not the membrane, so the panel to read is the junction network (bottom right).
-    # `activity` is the blebbistatin knob and is degenerate with Lambda by construction; `beta` is the
-    # tension feedback and is NOT -- it moves junction-length disorder at constant tissue size, which no
-    # uniform tension scale can do. `myo_new` is what a junction born from a division starts with.
-    "78_myo_reference": dict(_myo=dict(myosin=1.0, myo_beta=1.0, myo_tau=20.0)),
-    "79_blebbistatin": dict(_myo=dict(myosin=0.3, myo_beta=1.0, myo_tau=20.0)),
-    "80_hypercontractile": dict(_myo=dict(myosin=2.0, myo_beta=1.0, myo_tau=20.0)),
-    "81_no_feedback": dict(_myo=dict(myosin=1.0, myo_beta=0.0, myo_tau=20.0)),
-    "82_strong_feedback": dict(_myo=dict(myosin=1.0, myo_beta=4.0, myo_tau=20.0)),
-    "83_weak_newborn": dict(_myo=dict(myosin=1.0, myo_beta=1.0, myo_tau=20.0, myo_new=0.3)),
 
-    # --- v2: THE SAME SEVEN, RE-VERIFIED OVERDAMPED --------------------------------------------------
-    # Identical configurations to 69-75, under NEW NAMES on purpose. Re-running into the original folders
-    # is what destroyed their results once already: a relaunch was killed mid-flight and overwrote
-    # pass1.json before writing its own, so the reference the comparison needs was gone (recovered only
-    # because the cluster .out files still held the SERIES lines). A regression check that can destroy
-    # its own baseline is not a check.
+    # --- 76 onward: THE FIXED SEED ------------------------------------------------------------------
+    # Everything above 75 was deleted. The sheet those runs started from was not packed: the relaxation
+    # ran over the whole 45,000-particle reservoir and the sheet then kept every 13.5th of them, and a
+    # SUBSET of a blue-noise set is not blue noise -- thinning randomises it back to Poisson. Measured on
+    # the seeded sheet, nearest-neighbour distance was 0.505 of a hexagonal packing with cv 0.411,
+    # against 0.461 / 0.535 for points thrown at random. So it began 8% better than random, which is why
+    # holes were visible in the first frames and grew from there. Relaxing the laid-down count directly
+    # gives 0.885 with cv 0.046.
     #
-    # These are not a pure regression test either: `membrane_inertial=False` is now the default, so the
-    # sheet is integrated overdamped rather than given a mass. Bond counts, node counts and coverage
-    # should track the originals closely -- that is the "nothing broke" half. Strain and any sinking
-    # should MOVE -- that is the fix doing something.
-    "69v2_graph_reference": dict(),
-    "70v2_no_remodelling": dict(membrane_tau=0.0),
-    "71v2_fast_remodelling": dict(membrane_tau=10.0),
-    "72v2_starved": dict(membrane_secrete_rate=0.002),
-    "73v2_no_adhesion": dict(membrane_adhesion=0.0),
-    "74v2_brittle": dict(membrane_break=0.08),
-    "75v2_on_ovoid": dict(_gated=True),
+    # 76 is the new nominal: same configuration as 69, on a sheet that starts packed.
+    "76_reference_fixed_seed": dict(),
 
-    # --- STIFFNESS LADDER: the one thing removing the mass should buy -------------------------------
-    # v2 (overdamped) matched v1 (inertial) to within 2% on every metric, so the fix is correct physics
-    # and a no-op at the working point -- the inertial path also carried `drag`, which was already
-    # suppressing what the mass added. That makes the v3 attribution set moot: there is no difference
-    # between the two changes to attribute, because together they produce none.
-    #
-    # Where the mass DID matter is the ceiling. With inertia the explicit limit is dt*sqrt(k) < 1, giving
-    # k_max ~ 8.2e3, which is what the k = 200..40,000 sweep measured. Overdamped the limit is a
-    # different expression, dt*k/gamma < 2, giving
-    #
-    #     k_max = 2*gamma/dt = 2(2000)/0.004 = 1e6      -- a 120x increase
-    #
-    # so 5e5 should now run where it could not before, and 5e6 should fail. That is falsifiable in both
-    # directions: if 5e5 diverges the overdamped path is not doing what it claims, and if 5e6 survives
-    # the stability argument is wrong.
-    "69s_k5e3": dict(membrane_bond_k=5.0e3),
-    "69s_k2e4": dict(membrane_bond_k=2.0e4),
-    "69s_k5e4": dict(membrane_bond_k=5.0e4),
-    "69s_k1e5": dict(membrane_bond_k=1.0e5),
-    "69s_k15e4": dict(membrane_bond_k=1.5e5),
-    # the inertial control at a stiffness the inertial ceiling forbids: it must be REFUSED, which is what
-    # makes the overdamped runs above 9e3 a gain rather than a coincidence
-    "69s_k5e4_inertial": dict(membrane_bond_k=5.0e4, membrane_inertial=True),
-    # gamma raised 10x, to show the ceiling is not a property of the sheet: overdamped k and gamma enter
-    # only as k/gamma, so 1e6 becomes reachable -- at the cost of a sheet ten times slower to respond
-    "69s_k1e6_gam2e4": dict(membrane_bond_k=1.0e6, membrane_gamma=2.0e4),
-
-    # --- 96-101: THE CORSET, AND THE MECHANISM THAT COMPETES WITH IT --------------------------------
-    # A reviewer's suggestion: a sheet stiffer around the girth than along the long axis -- the
-    # "molecular corset" -- should squeeze the middle and push growth into the ends, elongating the
-    # tissue. It is the first thing that would make the MEMBRANE change the EPITHELIUM, which so far it
-    # cannot. With the coupling one-way it has to travel the same route the ovoid does: the sheet's hoop
-    # tension is recorded by latitude in pass 2, and pass 1 is rebuilt with growth gated on that.
-    #
-    # The prediction has the OPPOSITE SIGN from every shape result so far. A polar-dense matrix resists
-    # at the poles and gives an oblate tissue, aspect r_eq/r_ax = 1.43. A corset resists at the equator,
-    # so it should give a PROLATE one, aspect < 1. Same gate, same pipeline, opposite outcome -- which
-    # also means that if a corset map produces an oblate tissue, the gate is not reading what we think.
-    #
-    # AND THE COMPETING EXPLANATION, because the corset is contested (Anderson & Horne-Badovinac 2025,
-    # Matrix Biol 140:16, argues against the basement-membrane stiffness-gradient account). The
-    # alternative is that elongation is generated inside the epithelium, by planar-polarised junctional
-    # myosin -- the germband-extension mechanism -- and needs no anisotropic membrane at all. 100 tests
-    # that with the membrane isotropic; 101 runs both, and asks whether the corset adds anything to a
-    # tissue that is already elongating on its own. If 100 elongates as much as 97, the corset is not
-    # necessary; if 101 exceeds both, they compose.
-    "96_corset_off": dict(membrane_aniso=1.0, membrane_record_hoop=True),
-    "97_corset_x3": dict(membrane_aniso=3.0, membrane_record_hoop=True),
-    "98_corset_x10": dict(membrane_aniso=10.0, membrane_record_hoop=True),
-    # sign control: stiffer along the MERIDIAN instead. If the corset works by squeezing the girth this
-    # should push the shape the other way, and if it does not the effect is not orientational at all.
-    "99_corset_reversed": dict(membrane_aniso=0.1, membrane_record_hoop=True),
-    "100_polarised_myosin": dict(membrane_aniso=1.0, membrane_record_hoop=True,
-                                 _myo=dict(myosin=1.0, myo_beta=2.0, myo_keyed_on="tension")),
-    "101_corset_and_myosin": dict(membrane_aniso=10.0, membrane_record_hoop=True,
-                                  _myo=dict(myosin=1.0, myo_beta=2.0, myo_keyed_on="tension")),
-
-    # RESERVE FIXED AT 12.5, NOT SCALED WITH THE NODE COUNT. The first version set
-    # membrane_reserve = particles/3333, which pins the INITIAL laid-down count at 3333 whatever the
-    # reservoir -- and because secretion is demand-limited (want = n0 (R/R0)^2) the reservoir never
-    # binds. Measured: reservoirs of 45k/135k/270k gave 34,825 / 37,355 / 38,231 live nodes. A sixfold
-    # reservoir bought 10% more sheet, and the grid varied nothing. With the ratio fixed, n0 becomes
-    # 3.3k / 10k / 20k and the resolution actually changes.
-    # --- 84-95: WHAT MAKES THE HOLES ----------------------------------------------------------------
-    # An external reviewer: the holes in the reference sheet are too big -- real microperforations are
-    # ~1 um across, against a 5-10 um cell footprint, so a hole should be about an eighth of a cell and
-    # ours are about two and a half. Measured, the sheet is NOT at its resolution limit: the largest gaps
-    # are 6.1 node spacings where a well-packed sheet gives ~1.5. And the seeded sheet is fine (clearance
-    # 1.10 spacings, better than uniform random at 1.53) -- it degrades to 3.08 during the run. The holes
-    # are made by the deposition rule, which places a node beside a random parent rather than into the
-    # gap, and a random walk clumps. A relaxation pass on the new material takes 4.4 back to 1.75.
-    #
-    # So two things could be setting hole size and they are confounded: PACKING (relaxation) and
-    # RESOLUTION (node count). This grid separates them, at 45k/135k/270k nodes x relaxation off/on.
-    #
-    # And the same grid again WITHOUT ADHESION, because the reviewer's second point is a different
-    # mechanism that currently looks identical: unanchored, the sheet does not clump, it SLIDES OFF as a
-    # whole (coverage 1.00 -> 0.895), and no amount of relaxation or resolution addresses that. If the
-    # no-adhesion holes shrink with relaxation and nodes they were packing; if they do not, the sheet is
-    # drifting and the missing piece is an attachment to the stroma.
-    "84_holes_45k_r0": dict(membrane_particles=45000, membrane_reserve=12.5, membrane_relax_new=0),
-    "85_holes_45k_r8": dict(membrane_particles=45000, membrane_reserve=12.5, membrane_relax_new=8),
-    "86_holes_135k_r0": dict(membrane_particles=135000, membrane_reserve=12.5, membrane_relax_new=0),
-    "87_holes_135k_r8": dict(membrane_particles=135000, membrane_reserve=12.5, membrane_relax_new=8),
-    "88_holes_270k_r0": dict(membrane_particles=270000, membrane_reserve=12.5, membrane_relax_new=0),
-    "89_holes_270k_r8": dict(membrane_particles=270000, membrane_reserve=12.5, membrane_relax_new=8),
-    "90_holes_45k_r0_noadh": dict(membrane_particles=45000, membrane_reserve=12.5, membrane_relax_new=0, membrane_adhesion=0.0),
-    "91_holes_45k_r8_noadh": dict(membrane_particles=45000, membrane_reserve=12.5, membrane_relax_new=8, membrane_adhesion=0.0),
-    "92_holes_135k_r0_noadh": dict(membrane_particles=135000, membrane_reserve=12.5, membrane_relax_new=0, membrane_adhesion=0.0),
-    "93_holes_135k_r8_noadh": dict(membrane_particles=135000, membrane_reserve=12.5, membrane_relax_new=8, membrane_adhesion=0.0),
-    "94_holes_270k_r0_noadh": dict(membrane_particles=270000, membrane_reserve=12.5, membrane_relax_new=0, membrane_adhesion=0.0),
-    "95_holes_270k_r8_noadh": dict(membrane_particles=270000, membrane_reserve=12.5, membrane_relax_new=8, membrane_adhesion=0.0),
-
-    # --- 84-91: WHICH VARIABLE THE MYOSIN FEEDBACK IS KEYED TO ---------------------------------------
-    # The audit's charge: keyed to LENGTH the feedback homogenises junction lengths, where the measured
-    # biology (Bertet 2004, Fernandez-Gonzalez 2009) has myosin recruited by TENSION and enriched on
-    # DISASSEMBLING junctions -- a positive feedback that GENERATES T1s. And in the fast-myosin limit the
-    # length law is analytically a harmonic edge spring, so "beta lowers junction-length CV" is its
-    # definition, not evidence. The discriminating observable is the T1 RATE, which the two laws move in
-    # OPPOSITE directions: length-keyed should suppress T1s, tension-keyed should produce them.
-    "84_key_length_b0": dict(_myo=dict(myosin=1.0, myo_beta=0.0)),
-    "85_key_length_b2": dict(_myo=dict(myosin=1.0, myo_beta=2.0)),
-    "86_key_tension_b2": dict(_myo=dict(myosin=1.0, myo_beta=2.0, myo_keyed_on="tension")),
-    "87_key_tension_b4": dict(_myo=dict(myosin=1.0, myo_beta=4.0, myo_keyed_on="tension")),
-    "88_key_tension_stab": dict(_myo=dict(myosin=1.0, myo_beta=2.0, myo_keyed_on="tension",
-                                          myo_destabilising=0)),
-    "89_key_strainrate_b2": dict(_myo=dict(myosin=1.0, myo_beta=2.0, myo_keyed_on="strain_rate")),
-    "90_key_strainrate_b4": dict(_myo=dict(myosin=1.0, myo_beta=4.0, myo_keyed_on="strain_rate")),
-    # the control the CV argument never had: a uniform tension scale matched to 87's mean myosin, so any
-    # difference in T1 rate cannot be attributed to overall contractility
-    "91_lambda_matched": dict(_myo=dict(myosin=1.16, myo_beta=0.0)),
-
-    # --- 92-100: THE MEMBRANE WITHOUT INERTIA -------------------------------------------------------
-    # At Re ~ 1e-10 the equation of motion is gamma*x_dot = F, not m*x_ddot = F. Everything reported
-    # about the sheet's dynamics -- oscillation about a moving anchor, critical damping, tracking lag,
-    # sinking, and the stability ceiling at k ~ 8e3 -- follows from a mass that should not be there.
-    # 92 vs 96 is the direct comparison; 93-95 ask whether the ceiling exists at all overdamped.
-    "92_od_k5e3": dict(membrane_bond_k=5.0e3),
-    "93_od_k5e4": dict(membrane_bond_k=5.0e4),
-    "94_od_k5e5": dict(membrane_bond_k=5.0e5),
-    "95_od_k5e6": dict(membrane_bond_k=5.0e6),
-    "96_inertial_k5e3": dict(membrane_bond_k=5.0e3, membrane_inertial=True),
-    "97_od_no_adhesion": dict(membrane_bond_k=5.0e3, membrane_adhesion=0.0),
-    "98_od_no_remodel": dict(membrane_bond_k=5.0e3, membrane_tau=0.0),
-    "99_od_brittle": dict(membrane_bond_k=5.0e3, membrane_break=0.08),
-    "100_od_on_ovoid": dict(membrane_bond_k=5.0e3, _gated=True),
 }
 
 
