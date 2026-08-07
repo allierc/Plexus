@@ -167,7 +167,53 @@ What is called adhesion here is a tether to a surface, not a receptor. The domin
 epithelium is to laminin, which is not modelled, and the sheet has no attachment to the surrounding
 stroma either --- so this tether is the only thing holding it.
 
-\section*{6.\; The two schematics}
+\section*{6.\; Symbols}
+
+Grouped by what they belong to. Where a symbol is a stiffness, the second column says what it is a
+stiffness \emph{of}, since several are easy to confuse.
+
+\begin{center}\small
+\begin{tabular}{@{}llp{7.4cm}@{}}\toprule
+\multicolumn{3}{@{}l}{\textbf{Epithelium} --- Eqs.~\eqref{eq:avm},~\eqref{eq:growth}}\\
+$A_f,P_f,V_f$ & area, perimeter, volume & of cell (face) $f$; $A^0_f,P^0_f,V^0_f$ are its targets\\
+$K_A,K_P,K_V$ & stiffnesses & how hard a cell resists changing its area / perimeter / volume\\
+$\Lambda$ & line tension & pull along every cell--cell contact, one value for the whole tissue\\
+$\Gamma$ & perimeter contractility & a second, quadratic pull on each cell's perimeter\\
+$\ell_e$ & length of junction $e$ &\\
+$K_R,R_0$ & radial restoring stiffness, radius & holds the shell against collapse\\
+$f_{\text{grow}}$ & per-frame growth factor & applied to a cell's target volume\\
+\midrule
+\multicolumn{3}{@{}l}{\textbf{Junction myosin} --- Eq.~\eqref{eq:myo}}\\
+$m_e$ & myosin on junction $e$ & dimensionless multiplier on $\Lambda$; mean 1\\
+$x_e$ & what the feedback reads & the junction's tension\\
+$a$ & global myosin level & multiplies every junction equally\\
+$\beta$ & feedback strength & how strongly $m_e$ responds to $x_e$ above average\\
+$\tau_m$ & myosin timescale & how fast $m_e$ chases its target\\
+\midrule
+\multicolumn{3}{@{}l}{\textbf{Surface and matrix} --- Eqs.~\eqref{eq:contact},~\eqref{eq:gate}}\\
+$\hat{\mathbf u}_i$ & direction & fixed unit vector from the tissue centre $\mathbf c$\\
+$R(\hat{\mathbf u},t)$ & surface radius & how far the epithelium reached in that direction\\
+$r_i$ & radius of particle $i$ &\\
+$k_c$ & contact stiffness & how hard the surface pushes a fibre back out\\
+$P$ & matrix pressure & contact force per unit surface area, by direction\\
+$p_{1/2},n,f$ & gate half-point, sharpness, floor & $g$ is the resulting growth multiplier, $f\le g\le1$\\
+\midrule
+\multicolumn{3}{@{}l}{\textbf{Basement membrane} --- Eqs.~\eqref{eq:bond},~\eqref{eq:integrin}}\\
+$\mathbf x_i$ & position of node $i$ &\\
+$\gamma$ & drag & converts force to speed: $\dot{\mathbf x}=\mathbf F/\gamma$\\
+$k_b$ & \textbf{crosslink stiffness} & how hard a stretched crosslink pulls its two nodes together\\
+$L_{ij},\ell^0_{ij}$ & current, rest length & of the crosslink between nodes $i$ and $j$\\
+$\hat{\mathbf d}_{ij}$ & unit vector & from node $i$ toward node $j$\\
+$\tau_r$ & remodelling timescale & how fast $\ell^0$ creeps toward $L$, i.e.\ how fast it forgets\\
+$\varepsilon_b$ & break strain & the stretch at which a crosslink snaps\\
+$\kappa$ & \textbf{tether stiffness} & how hard a node is pulled back to its anchor (not $k_b$)\\
+$\mathbf a_i$ & anchor & the point on the surface node $i$ is tied to\\
+$\delta$ & offset & how far outside the surface the sheet sits\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section*{7.\; The two schematics}
 
 The two levels added on top of the spheroid and the matrix. Everything else about them --- the
 configurations, the measurements, and the external audit that found much of it wanting --- has moved to
