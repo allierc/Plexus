@@ -184,22 +184,35 @@ class BasementMembraneSeed(Structural):
         # A FIBONACCI SPHERE, not uniform (theta, phi) sampling: equirectangular sampling piles points at
         # the poles, and a sheet with four times the areal density at its poles has four times the mass
         # and stiffness there -- an anisotropy nobody asked for, in the axis these experiments measure.
+        # RELAX THE COUNT THAT WILL BE LAID DOWN, NOT THE WHOLE RESERVOIR. The relaxation used to run
+        # over all `n` particles and the sheet then took every k-th of them -- and a SUBSET of a blue
+        # noise set is not blue noise. Thinning randomises it straight back to Poisson:
+        #
+        #     relax 13.5k then keep 1 in 4     d/hex = 0.546   cv = 0.311
+        #     uniform random                   d/hex = 0.461   cv = 0.535
+        #     relax 3.4k directly              d/hex = 0.877   cv = 0.047
+        #
+        # So the seeded sheet was 8% better than random rather than packed, which is why holes are
+        # present at frame 0 and grow from there -- an initialisation defect, not a resolution one.
+        n_lay = n if self.reserve <= 0 else max(1, int(round(n / (1.0 + self.reserve))))
         if self.implementation == "relaxed":
             # BLUE NOISE BY REPULSION. Start from a uniform random sample -- which has the right density
             # and no arms, but clumps and holes -- and let each point drift away from its nearest
             # neighbours, renormalising to the sphere each step. That equalises SPACING without imposing
             # an order on the points, which is exactly the property a spiral lacks.
             gg = torch.Generator().manual_seed(self.seed)
-            u = torch.randn(n, 3, generator=gg)
+            # the laid-down set is relaxed on its own; the reserve is placed afterwards and does not
+            # participate, since it is parked at the centre until secreted
+            u = torch.randn(n_lay, 3, generator=gg)
             u = u / u.norm(dim=1, keepdim=True).clamp_min(1e-12)
             u = u.to(dev)
-            sp = math.sqrt(4.0 * math.pi / max(n, 1))
+            sp = math.sqrt(4.0 * math.pi / max(n_lay, 1))
             kk = 7
             for _ in range(self.relax_iters):
                 push = torch.zeros_like(u)
                 blk = 2048
-                for a0 in range(0, n, blk):
-                    b0 = min(n, a0 + blk)
+                for a0 in range(0, n_lay, blk):
+                    b0 = min(n_lay, a0 + blk)
                     dd = 1.0 - (u[a0:b0] @ u.T).clamp(-1, 1)          # 1 - cos, monotone in angle
                     dd[torch.arange(b0 - a0, device=dev), torch.arange(a0, b0, device=dev)] = 1e9
                     nb = torch.topk(-dd, kk, dim=1).indices
@@ -209,6 +222,12 @@ class BasementMembraneSeed(Structural):
                     push[a0:b0] = (diff / dist[..., None] * w[..., None]).sum(1)
                 u = u + push * (0.35 * sp)
                 u = u / u.norm(dim=1, keepdim=True).clamp_min(1e-12)
+            # the reserve: random directions, parked at the centre anyway, so their arrangement is
+            # irrelevant until secretion places them beside a live node
+            if n_lay < n:
+                extra = torch.randn(n - n_lay, 3, generator=gg)
+                extra = extra / extra.norm(dim=1, keepdim=True).clamp_min(1e-12)
+                u = torch.cat([u.cpu(), extra]).to(dev)
             u = u.to(torch.float32).cpu()
             print(f"[seed_basement_membrane] implementation=relaxed: {self.relax_iters} repulsion "
                   f"iterations from a uniform random sample -- same density as Fibonacci, no spiral "
@@ -286,8 +305,14 @@ class BasementMembraneSeed(Structural):
         # ninth of the sphere -- and then grew downward as it secreted, which read as the membrane
         # migrating upward. Every k-th point of a Fibonacci spiral is itself a coarser Fibonacci spiral,
         # so a stride gives a uniform sparse shell and the reserve fills in between.
-        step = max(1, int(round(n / max(n0, 1))))
-        alive[::step] = True
+        if self.implementation == "relaxed":
+            # THE FIRST n0, because for `relaxed` those ARE the set that was relaxed -- the reserve
+            # after them is random and parked. Striding here would interleave the two and hand the sheet
+            # a mixture, undoing the packing the relaxation just produced.
+            alive[:n0] = True
+        else:
+            step = max(1, int(round(n / max(n0, 1))))
+            alive[::step] = True
         if int(alive.sum()) > n0:                       # trim the overshoot from the far end
             extra = int(alive.sum()) - n0
             idx = alive.nonzero(as_tuple=True)[0][-extra:]
