@@ -121,6 +121,8 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap
           gate_smooth_frames=25, gate_smooth_phi=360.0,
           myosin=None, myo_tau=20.0, myo_beta=1.0, myo_new=1.0,
           myo_keyed_on="length", myo_destabilising=1):
+    import tyssue_t1_ops3d as _T1
+    _T1.T1_TRACE.clear()                       # per build, so a rebuild never inherits a previous run's
     """Run cellfix_B_new verbatim and write the cache.
 
     `buffer_x` MULTIPLIES THE VERTEX AND CELL RESERVOIRS AND NOTHING ELSE. At the reference buffers
@@ -176,7 +178,14 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap
         # after it, the relaxation would always use the previous frame's myosin, which for a quantity with
         # a 20-frame timescale is a lag nobody would notice and everybody would inherit.
         import junction_ops                                           # noqa: F401  register it
+        # THE SAME K_P / Lambda / Gamma `shape_energy_3d` WAS GIVEN, read off that operator rather than
+        # restated. `keyed_on="tension"` computes dE/dl_e, and if these three disagree with the energy
+        # actually being minimised it is the tension of a different tissue -- a discrepancy that would
+        # produce plausible numbers and no error.
+        _se = next((o for o in spec["operators"] if o["op"] == "shape_energy_3d"), {})
+        _en = {k: float(_se.get(k, d)) for k, d in (("K_P", 1.0), ("Lam", 0.0), ("Gam", 0.0))}
         spec["operators"].append({"op": "junction_myosin", "at": "vertex",
+                                  "k_perim": _en["K_P"], "lam": _en["Lam"], "gam": _en["Gam"],
                                   "activity": float(myosin), "tau": float(myo_tau),
                                   "beta": float(myo_beta), "myo_new": float(myo_new), "dt": 1.0, "inherit": True,
                                   "keyed_on": str(myo_keyed_on),
@@ -266,7 +275,12 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap
         Lbox=np.float32(extent * MESH_PAD),
         r_eq=np.asarray(r_eq, np.float32), r_ax=np.asarray(r_ax, np.float32),
         r_xyz=np.asarray(r_xyz, np.float32),
-        plate_gap=np.float32(-1.0 if plate_gap is None else plate_gap), **mesh)
+        plate_gap=np.float32(-1.0 if plate_gap is None else plate_gap),
+        # T1 FLIPS, SAVED WITH THE TISSUE. The trace is a module global that only fills while pass 1 is
+        # actually running, so on a cache hit every downstream run reported ZERO T1s -- the observable
+        # that is supposed to discriminate the two myosin laws, silently zeroed by the cache.
+        t1_trace=(np.asarray(_T1.T1_TRACE, np.int64) if _T1.T1_TRACE
+                  else np.zeros((0, 4), np.int64)), **mesh)
     ar = r_eq[-1] / max(r_ax[-1], 1e-9)
     ax3 = r_xyz[-1]
     print(f"[tissue] semi-axes x/y/z = {ax3[0]:.2f} / {ax3[1]:.2f} / {ax3[2]:.2f}  "

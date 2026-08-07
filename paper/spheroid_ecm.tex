@@ -129,10 +129,20 @@ division threshold later and divides less often. This is a rate effect and compo
 $2.75\times$ stress anisotropy into a shape. Measured, against a round control at oblateness $1.009$:
 gating on a polar stress pattern gives $1.32$--$1.43$, while a \emph{flat} pattern of the same strength
 shrinks the tissue just as hard and leaves it round ($1.015$). The shape comes from the pattern, not the
-amount. The binding constraint proved to be \emph{when} the pattern exists, not how strong it is: five
-interventions that raised the stress (stiffer matrix, denser matrix, a trapping plane, an earlier gate,
-plates in contact) each \emph{lowered} the shape, and only an oblate cavity---which makes the pattern
-directional from first contact, $14.7$ against $1.5$ at frame 250---reached the ideal.
+amount.
+
+That last sentence is now known to be an identity rather than a finding, and the correction matters more
+than the claim did. The gate reads the map normalised by its own p99 against a $p_{1/2}$ that is the
+late-run median in the same units, so it depends only on $P/\mathrm{median}(P)$: \textbf{multiplying the
+whole pressure field by any constant leaves it unchanged.} The invariance was built deliberately---so
+$p_{1/2}$ would mean the same thing whatever the matrix stiffness---and the null of the stiffness sweep
+was then reported as a discovery. Two further constraints are also imposed rather than emergent:
+\op{smooth\_phi\_deg}$=360$ makes the map axisymmetric before any cell divides, so the outcome can only
+be a spheroid of revolution; and the estimator's own null on a perfect sphere is $1.020$, so every
+oblateness below $\approx\!1.05$ quoted anywhere in this work sits at or under it. What the campaign
+actually shows is that \emph{a prescribed polar growth mask makes an oblate tissue}. Whether matrix
+stress is what sets the mask is untested, and the Hill exponent $n=6$ lies outside the $n\in[1,2]$ that
+the one published calibration of this functional form allows.
 
 \section*{5.\; The two new levels}
 
@@ -222,75 +232,27 @@ $0.05/0.20/0.60$ destroyed the sheet at every value, because the surface grows $
 frame 150 and $260\%$ by the end. A purely elastic basement membrane \emph{cannot} enclose a growing
 epithelium; remodelling is not optional, and fragmentation becomes a race between $\tau_r$ and growth.
 
-\section*{6.\; Status and the next operator}
+Point (ii) above, and everything else in this section about oscillation, critical damping and tracking
+lag, describes a sheet that was given a \textbf{mass}. At $\mathrm{Re}\sim10^{-10}$ the equation of
+motion is $\gamma\dot{\mathbf x}=\mathbf F$, not $m\ddot{\mathbf x}=\mathbf F$: overdamped there is
+no oscillation to damp, no lag to critically damp away, and no stability ceiling of the kind measured at
+$k\approx8\times10^3$. Those were reported as calibration facts found by testing; they are numerical
+facts about a term that should not have been in the model. The membrane is now integrated overdamped, and
+the runs that re-measure the ceiling, the sinking and the tearing without inertia are in progress.
 
-$63$ runs in \texttt{log/okuda\_ECM}; \texttt{prototype/ecm/RUNS.md} records which are mutually
-comparable, since three quantities were redefined mid-campaign (notably $|J-1|\to\sigma_{\mathrm{vM}}$,
-$\sim\!100\times$ in ``strained fraction''). The coupling of \S4 is one-way; \op{ecm\_load\_3d} is the
-staggered two-way scheme, implemented and uncalibrated. \op{cell\_polarity} is absent---the epithelium
-has no simulated basal side, its cells being wedges from the centre and the monolayer a rendering
-convention---as are \op{cell\_extrude\_3d} and MMP degradation.
+Two further corrections to this section. The fragmentation metric it appeals to---the largest connected
+component---was \texttt{NaN} on every frame any analysis read, so it had never once been reported; it is
+now carried forward, alongside the mean degree $z$, for which central-force rigidity percolation in 2D
+requires $z\approx4$. And \op{integrin\_adhesion} is named for a bond it does not represent: in
+mammals $\alpha_1\beta_1$ and $\alpha_2\beta_1$ do bind collagen~IV, so the receptor exists---but the
+dominant epithelial anchor is to \emph{laminin}, through $\alpha_3\beta_1$ and $\alpha_6\beta_4$, and
+laminin is not modelled at all.
 
-The clearest gap is in Eq.~\eqref{eq:bond}. With $N$ fixed on a shell whose radius grows $3.6\times$, the
-areal density $N/4\pi R^2$ falls $13\times$ and every rest length must creep to $3.6\times$ its original
-span: what $\tau_r$ delivers is therefore \emph{dilution with amnesia}, not remodelling, and it is why the
-surviving sheet sits permanently near $10\%$ strain. A basement membrane does not thin thirteenfold as an
-acinus grows---the epithelium secretes laminin and collagen~IV continuously and thickness is held roughly
-constant. The missing operator is \op{basement\_membrane\_secrete}, kind \op{structural}: insert
-particles where areal density has fallen below target and bond them in, the sheet's analogue of
-\op{divide\_3d}. Plexus supports it directly through \texttt{Level.free\_slots}/\texttt{spawn} with an
-oversized reservoir. Only then does ``the membrane survived'' mean what it means biologically---that the
-tissue did not outgrow the membrane it was building---rather than that its crosslinks were stretched and
-told to forget.
+\section*{6.\; The two schematics}
 
-\section{Two things the implementation gets wrong, stated plainly}
-
-\paragraph{The anchor sets where the sheet sits, and only a narrow band of it works.} With critical
-damping the sheet stopped tearing, but it then sank \emph{through} the epithelium: the gap to the
-recorded surface ran $+0.0040\to-0.0101\to-0.0255$, every particle inside by mid-run. Tracking lag does
-not explain it ($2v_a/\sqrt{k}=0.0019$, sixteen times too small). Nor---and this corrects the obvious
-guess---does hoop tension: quartering $k_{\text{bond}}$ from $2\times10^5$ to $5\times10^4$ at fixed
-$k_{\text{adh}}$ moves the gap by under 5\% ($+0.00185/{+}0.00183/{+}0.00176$) and leaves the strain
-alone. The reason is in Eq.~\eqref{eq:bond}'s companion: remodelling fixes the steady-state strain at
-$\dot\epsilon\,\tau=0.0027\times60=0.16$ (measured $0.151$--$0.160$ in every run, at every stiffness),
-so rest lengths adapt and bond force never becomes large. What sets the gap is $k_{\text{adh}}$ against a
-residual inward force; the untested candidate is the interstitial matrix pressing through the shared
-grid, which would be the one real matrix-on-membrane effect in the model.
-
-The sweep is narrow. At 200 frames $k_{\text{adh}}=4\times10^4/6\times10^4/8\times10^4$ gives gaps
-$-0.0037/-0.0013/+0.0019$; $1\times10^5$ \emph{reverses} to $-0.069$ and $2\times10^5$ tears 94\% of
-the crosslinks. A stiffer spring cannot hold less well, so the reversal is a stability threshold rather
-than mechanics, and $8\times10^4$ is the usable value---at which 46\% of particles are still inside.
-A membrane pinned at fixed angular positions on a surface that triples in radius is being asked to cover
-nine times the area with the same particles; the operator that would resolve this, and which the model
-does not have, is \op{basement\_membrane\_secrete}.
-
-\paragraph{\op{activity} is degenerate with $\Lambda$.} Actomyosin entered Eq.~\eqref{eq:avm} as the
-single scalar $\Lambda$ and now also as a per-junction variable, and the two do not double-count: myosin
-\emph{multiplies} the line term, $\Lambda\sum_e m_e\ell_e$, and the recruitment setpoint of
-Eq.~\eqref{eq:myo} is written against the \emph{running mean} edge length
-$\langle\ell\rangle$, so
-\[ m^{ss}_e=a\Bigl(1+\beta\bigl(\ell_e/\langle\ell\rangle-1\bigr)\Bigr) \quad\Longrightarrow\quad \langle m^{ss}\rangle=a . \]
-At $a=1$ the mean is pinned to one, $\Lambda$ keeps the meaning it was calibrated with, and myosin is a
-pure zero-mean redistribution---which is why the ablation is bit-identical rather than merely close.
-But it follows that $a$, which scales every junction uniformly, is \emph{not identifiable against}
-$\Lambda$: the monotone radius response over $a\in[0,3]$ ($7.216\to6.138$) is reproduced by sweeping
-$\Lambda$ and is a consistency check, not a result. The new parameters are $\beta$, $\tau$ and
-$m_{\text{new}}$.
-
-\paragraph{The epithelial surface is not an entity.} It is $R(\hat{\mathbf u},t)$, a $32\times64$ angular
-table, read by four operators (\op{cell\_to\_ecm}, \op{cell\_exclude\_3d}, \op{integrin\_adhesion},
-\op{basement\_membrane\_seed}). Being a table and not a Level it carries no state and can receive no
-delta, which is the structural reason the adhesion of Eq.~\eqref{eq:integrin} is one-way. The Plexus2
-form is a Level \op{surface}, one member per outer face with $(\mathbf x,\mathbf v,\hat{\mathbf n},A)$,
-written each frame by a \op{broadcast} from the replayed mesh; the four operators then become ordinary
-\op{lateral} ones between two Levels, the angular lookup disappears, and---because a Level can be
-integrated---the integrin spring becomes mutual. A stronger version is available once the sheet is
-anchored, since the membrane particles are themselves a discretisation of that surface and could carry
-the contact directly; but runs without a membrane still need a contact path, so \op{surface} is the
-general answer and membrane-as-surface the specialisation.
-
-\section{The basement membrane, drawn out}
+The two levels added on top of the spheroid and the matrix. Everything else about them --- the
+configurations, the measurements, and the external audit that found much of it wanting --- has moved to
+\texttt{spheroid\_ecm\_archive.tex} while the model is being corrected.
 
 \begin{figure}[t]\centering
 \includegraphics[width=\textwidth]{fig_bm_schematic.pdf}
@@ -305,86 +267,6 @@ makes it adhesion rather than contact. Outside is the interstitial matrix (purpl
 never bonds to: they meet only through the shared grid, or in the spring-graph version, not at all.}
 \end{figure}
 
-A basement membrane is a thin sheet of protein that an epithelium lays down underneath itself and sits
-on. Two networks do the work: \textbf{laminin}, which cells grip, and \textbf{collagen~IV}, which is
-crosslinked and carries the load; \textbf{nidogen} staples the two together and \textbf{perlecan} fills
-the mesh. We model the load-bearing one. So a node is not a molecule---it is a patch of sheet about a
-micron across---and a crosslink is not one collagen~IV protomer but the stiffness of all of them across
-that patch.
-
-Three rules, and everything in Fig.~2 follows from them.
-
-\paragraph{1. The crosslinks make it a sheet.} Every pair of neighbouring nodes is a spring with its own
-rest length $\ell^0_{ij}$, and its \emph{elongation} is what the colours in Fig.~2 show:
-\[ \epsilon_{ij}=\frac{L_{ij}-\ell^0_{ij}}{\ell^0_{ij}},\qquad
-   \mathbf f_{ij}=k\,(L_{ij}-\ell^0_{ij})\,\hat{\mathbf d}_{ij},\qquad
-   \text{bond dies if } \epsilon_{ij}>\epsilon_{\rm break}. \]
-Without them the nodes are dust: independent points that cannot tear, cannot fragment, and cannot be
-measured for either.
-
-\paragraph{2. Integrin pins each node to a \emph{direction}, not to the nearest surface.} The anchor is
-\[ \mathbf a_i=\mathbf c+\hat{\mathbf u}_i\bigl(R(\hat{\mathbf u}_i,t)+\delta\bigr), \]
-with $\hat{\mathbf u}_i$ frozen when the node is laid down. Anchoring to the \emph{nearest} point instead
-would let a node slide freely along the surface---that is contact, not adhesion---and the sheet would
-never stretch at all. Run~73 is that experiment run on purpose, and its mean elongation is the lowest in
-the series outside the slack cases.
-
-\paragraph{3. Remodelling lets the sheet forget.} A crosslink's rest length creeps toward its current
-length on a timescale $\tau$, $\dot\ell^0=(L-\ell^0)/\tau$, which gives the relation that governs this
-whole series: a sheet stretched at rate $\dot\varepsilon$ settles at
-\[ \boxed{\;\langle\epsilon\rangle \simeq \dot\varepsilon\,\tau\;} \]
-independent of stiffness and of supply. It is why $k$ can be swept over three orders and change nothing,
-and why $\tau$ is the parameter that decides whether the membrane ever approaches failure.
-
-\paragraph{4. Secretion adds material.} A surface growing from $R_0$ to $R_1$ needs $(R_1/R_0)^2$ times
-as many nodes to stay the same thickness. Deposition is a fixed fraction $\rho$ of existing material per
-frame, so there is a threshold, predictable before any run:
-\[ \rho^\ast=\frac{2\ln(R_1/R_0)}{N_{\rm frames}}=\frac{\ln 12.77}{400}=0.0064\ \text{per frame}, \]
-measured at $0.006$.
-
-\begin{figure}[t]\centering
-\includegraphics[width=\textwidth]{fig_bm_series.pdf}
-\caption{\textbf{Seven configurations, same tissue, end state.} Only the membrane is drawn: nodes grey,
-crosslinks coloured by elongation with full scale at the break threshold. Reading them against
-Eq.~(boxed): \textbf{71} ($\tau=10$) forgets stretch as fast as it arrives and is uniformly slack---the
-whole sheet is dark blue at $\langle\epsilon\rangle=0.028$. \textbf{69} ($\tau=60$) is the same network
-(180{,}304 against 187{,}781 crosslinks, both fully covering) under four times the tension, $0.104$, and
-reads teal-green. \textbf{70} ($\tau=0$, remodelling removed) cannot forget at all: tension accumulates,
-p99 reaches $0.263$ against a threshold of $0.35$, and $39\%$ of the crosslinks have already gone
-(109{,}798). \textbf{74} lowers the threshold to $0.08$ instead---the mechanics are untouched, but now
-the sheet is above it, and $74\%$ of the crosslinks break (47{,}046); the survivors are the slack ones,
-which is why its mean elongation reads \emph{lower} than the reference at $0.033$. \textbf{72} is
-starved below $\rho^\ast$: 6{,}624 nodes instead of 37{,}427, a sheet stretched thin rather than torn.
-\textbf{73} removes the anchor and the sheet slides instead of stretching---and is the only one that
-loses coverage, $0.895$, because nothing holds it in place. \textbf{75} is the same membrane on an ovoid
-($1.33$), where the equator carries $33\%$ more elongation than the poles.}
-\end{figure}
-
-\subsection*{How it is built in Plexus2}
-
-The hierarchy is four sets and one field. \op{cells} and \op{junction} are the epithelium; \op{surface}
-is its boundary; \op{basement\_membrane} is the sheet; \op{interstitial\_ecm} is the matrix; and
-\op{mpm\_grid} is the field every particle body scatters into, which is how bodies that never touch each
-other exchange momentum.
-
-The membrane's operators divide by what they do to the state, which is the distinction Plexus2 draws:
-\op{seed\_basement\_membrane} and \op{basement\_membrane\_secrete} are \textbf{structural} (they change
-how much material exists); \op{basement\_membrane\_bond} and \op{integrin\_adhesion} are
-\textbf{dynamics} (they return a force the engine integrates); \op{basement\_membrane\_remodel} is
-\textbf{field}-like (it rewrites rest lengths in place); and \op{basement\_membrane\_bond\_break} is
-\textbf{rewire}, because fragmentation \emph{is} a change of the edge set and is registered as one.
-
-Two implementation choices are worth naming because neither is forced by the biology. First, per-bond
-state is keyed by the \emph{unordered pair of node indices} rather than stored by position in an array,
-so division, T1 and death permute the mesh freely and no topology operator needs to know that crosslinks
-exist. Second, the membrane no longer uses MPM: nothing about the sheet came from the continuum solver,
-and dropping it costs exactly one thing---momentum exchange with the matrix, measured as an ECM stress
-falling from $7.5$ to $0.006$. That coupling has to come back as an explicit operator
-(\op{basement\_to\_ecm}), which resolves at the sheet's own length scale instead of the grid's.
-
-
-\section{The junction network, drawn out}
-
 \begin{figure}[t]\centering
 \includegraphics[width=\textwidth]{fig_junction_schematic.pdf}
 \caption{\textbf{What a junction is, and the one loop that makes it interesting.} Left: two cells share
@@ -394,315 +276,5 @@ shared edge and sets its tension. Right: the feedback. A junction longer than av
 myosin ($\beta$), which pulls harder, which shortens it. That loop is the only thing here that Okuda's
 model cannot already do.}
 \end{figure}
-
-\subsection*{The rules}
-
-In the original vertex model, contractility is one number for the whole tissue: every junction pulls
-with the same line tension $\Lambda$. We keep $\Lambda$ and give each junction a dimensionless
-multiplier $m_e$ on top of it, so the line term of Eq.~\eqref{eq:avm} becomes
-\[ \Lambda\sum_e \ell_e \;\longrightarrow\; \Lambda\sum_e m_e\,\ell_e . \]
-
-\paragraph{1. Myosin chases a setpoint that depends on length.} A junction longer than the current
-average recruits more; shorter recruits less. Written against the \emph{running} mean $\langle\ell\rangle$,
-\[ m^{ss}_e=a\Bigl(1+\beta\bigl(\ell_e/\langle\ell\rangle-1\bigr)\Bigr),\qquad
-   \dot m_e=\bigl(m^{ss}_e-m_e\bigr)/\tau_m . \]
-Because the reference is the running mean, $\langle m^{ss}\rangle=a$ exactly: the average is pinned and
-myosin is a pure \emph{redistribution}. At $a=1$ nothing is double-counted with $\Lambda$, which is why
-the ablation is bit-identical rather than merely close.
-
-\paragraph{2. And therefore $a$ is not a new parameter, but $\beta$ is.} Since $a$ multiplies every
-junction equally, it does exactly what scaling $\Lambda$ does; the two cannot be told apart from any
-observation. $\beta$ can: it changes the \emph{disorder} of junction lengths at constant tissue size.
-Sweeping $a$ over $[0.6,1.4]$ traces a line in (radius, junction-length CV) of slope $+0.103$; $\beta$
-moves perpendicular to it, $\Delta R=-0.02$ (0.2\%, nothing) against $\Delta\mathrm{CV}=-0.099$, where
-that line predicts $-0.002$. Measured:
-\begin{center}\small
-\begin{tabular}{lccc}\toprule
- & $a$ & $R$ & CV of $\ell_e$ \\ \midrule
-reference        & 1.0 & 10.94 & 0.321 \\
-$\beta=2$        & 1.0 & 10.95 & \textbf{0.249} \\
-$\beta=4$        & 1.0 & 10.92 & \textbf{0.222} \\
-blebbistatin-ish & 0.6 & 11.12 & 0.350 \\
-hypercontractile & 1.4 & 10.73 & 0.310 \\ \bottomrule
-\end{tabular}
-\end{center}
-$\beta=4$ reaches a CV no value of $a$ in range approaches, at a radius that has not moved.
-
-\paragraph{3. A junction born from a division inherits.} Not every edge that appears is new. A division
-inserts a vertex into each of two edges and joins them, so it makes two \emph{kinds}: a split half of a
-cut junction, which has a myosin history, and the daughter--daughter interface, which does not. Measured
-over 251 frames: of 13{,}750 edges that had no record, 9{,}920 (72\%) were split halves and 9{,}760 of
-those (98.4\%) recovered their parent. Only the remaining 28\% take $m_{\rm new}$.
-
-\paragraph{4. $\tau_m$ was chosen, not measured.} Stated plainly because it is the weakest number in
-this section: $\tau_m=20$ frames is a default. It is swept nowhere except a determinism check. What it
-sets is how far myosin lags the length changes driving it, and the analogous relation for the membrane
-($\langle\epsilon\rangle\simeq\dot\varepsilon\tau$) was measurable, so this one should be too.
-
-\subsection*{How it is built in Plexus2}
-
-One operator, \op{junction\_myosin}, of kind \textbf{structural}: it does not return a force, it rewrites
-a per-edge quantity that the mechanics then reads in the same frame. It is scheduled immediately before
-\op{shape\_energy\_3d} for that reason---placed after, every relaxation would use the previous frame's
-myosin.
-
-The design claim worth stating is what is \emph{not} there. Junction is not a Level. Per-edge state is
-keyed by the unordered vertex pair, so \op{divide\_3d}, \op{reconnect\_t1\_3d} and any future death
-operator permute, lengthen and shorten the half-edge arrays freely: an edge that still exists finds its
-own value, one that is new finds its parent or a default, one that is gone is simply never asked. None
-of the three topology operators knows that myosin exists, and adding the next per-edge state will not
-require editing them either. Promoting junction to a Level would buy per-edge provisioning and cost a
-reconciliation operator for every topology change.
-
-
-\section{External review, August 2026 --- and what to do about it}
-
-An external reviewer with a cell-biology and biophysics background audited the code and this note. The
-findings below are theirs; the three marked \textbf{[verified]} I re-checked independently against the
-code and the run archive before recording them. Citations are as supplied and are \emph{not} all
-independently confirmed; those I could not check are marked \textbf{[unchecked]}.
-
-\subsection*{Verdict}
-The engineering is sound and self-critical; the biology is thinner than the prose implies, and three
-headline results are properties of the code rather than of the model.
-
-\subsection*{The three most serious findings}
-
-\paragraph{1. The growth gate cannot see stress magnitude. [verified]} The gate compares
-$P/p_{99}$ to $p_{\text{half}}=\mathrm{median}(P_{\text{late}})/p_{99}$, so it evaluates
-$f(P/\mathrm{median}\,P)$: \emph{multiplying the entire pressure field by any constant leaves it
-unchanged}. Every ``the amount does not matter, only the pattern'' control in this campaign is therefore
-an identity of the normalisation, not a finding. Compounding this, \op{smooth\_phi\_deg}$=360$ forces the
-map axisymmetric before any cell divides, so an oblate spheroid is the only shape available. The
-reviewer notes that Hill $n=6$ also sits beyond the one calibrated fit in the literature: Van Liedekerke
-et al.\ 2019 fit this exact form to Helmlinger/Montel data, obtained $n\in[1,2]$, and explicitly reject
-$n\ge4$. \textbf{[unchecked]} They further note our own primary citation, Helmlinger 1997, reports
-suppression accompanied by \emph{decreased apoptosis with no significant change in proliferation}.
-
-\paragraph{2. The membrane series is coupled to nothing, and its adjudicating metric is \texttt{NaN}.
-[verified]} Runs 69--74 return \emph{byte-identical} matrix metrics ($\texttt{strained\_frac\_end}
-=0.9635714285714285$, identical \texttt{front\_r95} arrays). In \op{membrane\_impl="graph"} the sheet's
-MPM operators are stripped, so it exchanges no momentum with the matrix: the seven configurations are a
-sheet driven by a prescribed boundary, affecting nothing. Separately, \op{lcc\_end} is \texttt{NaN} in
-every race run, because the component fraction is computed only every 40 frames and 403 is not a
-multiple of 40 --- so the quantity \S5 claims is reported ``instead of the bond count'' has never been
-reported. Worst, run~74's mean bond degree is $z=2.51$ \textbf{[verified]}, below both rigidity
-($z\!\approx\!4$) and connectivity percolation, while runs 69--73, 75 sit at $5.4$--$10.0$: that sheet
-most likely has no mechanical integrity, and Fig.~2's reading of it as ``the survivors are the slack
-ones'' is probably wrong.
-
-\paragraph{3. Both new levels use the wrong state variable or the wrong integrator.} Junction myosin is
-driven by \emph{length}, not tension, and the docstring's identification of the two is false in this
-energy. The literature has myosin recruited by tension or strain rate, giving a \emph{positive} feedback
-that drives T1; ours is a negative feedback on length that homogenises junctions. Worse, in the
-biologically correct fast-myosin limit the operator is analytically an edge spring: substituting
-$m_e=a(1+\beta(\ell_e/L-1))$ gives $\Lambda a\sum_e[(1-\beta)\ell_e+\beta\ell_e^2/L]$, a line tension
-plus a harmonic spring of stiffness $2\Lambda a\beta/L$. Reducing the CV of edge lengths is exactly what
-that does, so our one non-degenerate myosin result is guaranteed by construction. The reviewer also
-shows the \op{clamp\_min(0)} breaks the $\langle m\rangle=a$ argument at $\beta=4$ (estimated $+16\%$),
-which is the row the table rests on. Separately, the membrane is integrated inertially with unit mass,
-so the whole critical-damping / tracking-lag / sinking narrative of \S7 is the phenomenology of an
-inertia that should not exist at $\mathrm{Re}\sim10^{-10}$.
-
-\subsection*{Other findings worth keeping}
-$\bullet$ $\rho^\ast$ is an identity of \op{basement\_membrane\_secrete}, not a prediction --- and it was
-computed from the \emph{ungated} tissue ($R_1/R_0=3.57$) while the sweep ran on the gated one, for which
-$\rho^\ast=0.0055$, not $0.0064$. $\bullet$ ``Thinning, not rupture'' is imposed: there is no thickness
-variable, and remodelling puts rupture out of reach by construction. The literature has BMs opening by
-\emph{focal, protease-mediated perforation}, and being maintained or stiffening during growth.
-\textbf{[unchecked]} $\bullet$ Our integrin anchors to the collagen~IV network; integrins bind
-\emph{laminin}, and \emph{Drosophila} has no collagen-binding integrin at all. $\bullet$ Break strain
-$0.35$ is below every tissue-level BM failure measurement cited. $\bullet$ $\tau_m=20$ frames is
-$\sim\!3.5$\,h under the only sensible time anchor, against a junctional myosin FRAP $t_{1/2}$ of
-$\sim\!6$\,s. $\bullet$ Our citation ``Ku \& Bilder (2023) \emph{Dev.\ Cell} 58:522'' is wrong and must
-be corrected or removed. $\bullet$ Our oblateness estimator returns $1.022$ on a perfect sphere, so
-several reported effects sit at its own null.
-
-\subsection*{The work list, in order}
-\begin{enumerate}\itemsep2pt
-\item \textbf{Fix \op{lcc} and re-report 69--77 by connectivity.} Compute the component fraction on the
-final frame unconditionally, and record mean degree $z$ alongside every bond count. No new simulation
---- the trajectories are on disk. This settles run~74 and decides ``thinning vs fragmented''.
-\item \textbf{Three tissue passes that decide the ovoid:} \op{gate\_hill}$=1$ and $=2$ at fixed floor,
-and one run at \op{smooth\_phi\_deg}$=90$ so axisymmetry is not imposed. Then quote the estimator's
-sphere null and rewrite the ``amount does not matter'' controls as the normalisation identity they are.
-\item \textbf{Give junction myosin the per-edge tension} (available from \op{shape\_energy\_3d}'s
-gradient) or the strain rate, report $\langle m\rangle$ against $a$, and measure something
-non-tautological --- T1 rate or hexagonal fraction against a $\Lambda$-matched control.
-\item \textbf{Make the epithelium feel the sheet}, for runs 70 and 74 only: they are the two
-configurations carrying real tension, and a local hernia through a fragmented patch is the one
-phenomenon a basement-membrane model exists to produce.
-\item \textbf{Switch the membrane to overdamped integration}, which deletes \S7 rather than fixing it.
-\end{enumerate}
-
-
-\section{External audit, and the work list it produces}
-
-An external reviewer with a cell-biology and biophysics background was asked to audit this prototype
-adversarially: to find where the biology is wrong, where a simplification changes a conclusion, and where
-a reported result is a property of the code rather than of the model. What follows is that audit,
-condensed. I have marked \textbf{[verified]} against every claim I checked independently before writing
-it down; those checks are cheap and are listed so the reader can repeat them.
-
-\subsection*{Findings I confirmed}
-
-\paragraph{The growth gate cannot see stress magnitude. [verified]} The gate reads
-$\mathrm{press}/p_{1/2}$ where the map is normalised as $P/P_{99}$ and $p_{1/2}$ is the late-run median in
-those same units. The normalisation cancels: the operator is a function of $P/\mathrm{median}(P)$ alone,
-so multiplying the entire pressure field by any constant---stiffer matrix, denser matrix, larger
-$k_{\text{contact}}$---leaves the gate unchanged. The comment in \texttt{load\_ops.py} states that the
-normalisation was introduced so that $p_{1/2}$ would mean the same thing whatever the matrix stiffness.
-That is an invariance built on purpose; \S4's ``five amplifications each raised the stress and lowered the
-shape'' and ``the shape comes from the pattern, not the amount'' then report the null of a sweep the code
-guarantees to be null. Compounding it, \texttt{smooth\_phi\_deg}$=360$ makes the map axisymmetric before
-any cell divides, so the output is constrained to be a spheroid of revolution, and $p_{1/2}$ is
-calibrated on the last quarter of the same run it gates from frame~0.
-
-\paragraph{The Hill exponent is outside the range the one calibrated fit allows.} Van Liedekerke
-et~al.\ (2019, \emph{PLoS Comput Biol} 15:e1006273) fit this exact functional form to the
-Helmlinger/Montel/Alessandri data and obtain $n\in[1,2]$, stating that $n\ge4$ produces a flattening of
-residual growth that is not observed. We use $n=6$, and the only sweep that exists (4/6/8) spans the flat
-top of the switch and co-varies \texttt{floor} with \texttt{hill}, confounding the two. Integrating the
-gate on our own recorded map, the pole/equator contrast falls only about 16\% at $n=1$, so the ovoid may
-well survive---but $n=1$ and $n=2$ have never been run on the headline configuration.
-
-\paragraph{Helmlinger measured the opposite of what we cite it for.} Our primary citation for
-pressure-suppressed proliferation states in its abstract that stress-induced inhibition of plateau-phase
-spheroids ``was accompanied by decreased apoptosis with \emph{no significant changes in
-proliferation}''. Delarue et~al.\ (2014) locate the causal variable in cell \emph{volume} acting through
-p27$^{\text{Kip1}}$, two abstractions from a Hill function of stress; and the sign is not universal
-(Aragona 2013, Gudipaty 2017 have proliferation permitted where stretch is high).
-
-\paragraph{The oblateness estimator's own null is 1.020. [verified]} On 200{,}000 uniformly sampled
-points of a perfect sphere, $r_{\text{eq}}/r_{\text{ax}}$ taken as ratio of 98th percentiles reads
-\textbf{1.020}, while the RMS form reads 1.000. So the reference tissue's ``aspect 1.021'' is exactly
-round, and every effect in the campaign below $\approx\!1.05$---including the myosin runs at
-1.016--1.056---sits at or under one estimator's null. Two estimators are in use and neither null was
-quoted. This is a fourth quantity redefined mid-campaign and belongs in \texttt{DEFECTS.md}.
-
-\paragraph{The membrane series is a sheet coupled to nothing. [verified]} Runs 69--74 return
-\emph{byte-identical} interstitial-matrix metrics---\texttt{strained\_frac\_end} $=0.9635714285714285$,
-\texttt{max\_disp} $=0.20738065242767334$, \texttt{front\_reaches\_wall} $=235$---to full float precision
-across all six. In \texttt{membrane\_impl="graph"} the membrane's MPM operators are stripped, so the
-sheet exchanges no momentum with the matrix at any resolution. The \S5 caveat about $dx$ failing to
-resolve a $0.002$ sheet is moot for these runs: there is no coupling to under-resolve.
-
-\paragraph{The fragmentation metric has never returned a number. [verified]} \texttt{lcc\_end} reads
-\texttt{bt[-1,3]}, but the component fraction is only computed when the frame index is a multiple of
-\texttt{components\_every}$=40$ and is \texttt{NaN} otherwise. With 403 frames it is \texttt{NaN} in all
-27 race runs and is not recorded at all for 69--77. \S5 asserts that what is reported is the largest
-connected component rather than the bond count. It has never been reported.
-
-\paragraph{Run 74 is probably not a sheet. [verified]} 47{,}046 bonds on 37{,}424 live nodes is a mean
-degree of \textbf{2.51}, against $z\approx4$ for central-force rigidity percolation in 2D and
-$z\approx4.5$ for connectivity percolation. Figure~2 reads that panel as ``the survivors are the slack
-ones''; the more likely reading is that the network has lost mechanical integrity altogether.
-\texttt{coverage}$=1.0$ does not contradict this---it counts occupied angular bins, not connectivity.
-
-\paragraph{$\langle\epsilon\rangle\simeq\dot\varepsilon\tau$ fails at the $\tau$ we use.} With
-$\dot\varepsilon=0.00314$/frame: $\tau=10$ predicts 0.031 against 0.028 measured (good); $\tau=60$
-predicts 0.188 against \textbf{0.104} measured, 44\% low. The values quoted as verification (0.151--0.160)
-come from the \emph{non-secreting} runs; in the secreting series most of the final material was deposited
-unstrained, which dilutes the mean. The boxed law is presented as holding across the series and does not.
-
-\paragraph{The secretion threshold is an identity, not a prediction.} $\rho^\ast$ follows in three lines
-from the operator's own setpoint $N_{\text{want}}=n_0(R/R_0)^2$. Deriving it and then measuring it is a
-unit test presented as a falsifiable prediction---and the number quoted uses the \emph{ungated} tissue
-($R_1/R_0=3.57$) while the sweep runs on the gated one ($\approx3.0$, giving $\rho^\ast=0.0055$), so the
-agreement is fortuitous at the sweep's resolution.
-
-\subsection*{Junction myosin is keyed to the wrong variable}
-
-The setpoint uses $\ell_e/\langle\ell\rangle$: the state variable is \emph{length}, not tension, and the
-docstring's identification of the two is false in this energy, where edge tension is
-$\Lambda m_e+\sum_f 2K_P(P_f-P_f^0)$ and length does not appear directly. The sign is also inverted
-relative to the papers we cite: Bertet et~al.\ (2004) report myosin enriched in \emph{disassembling}
-junctions, and Fernandez-Gonzalez et~al.\ (2009) find more myosin on linked edges \emph{regardless of
-edge length}. The modelling literature keys on tension or strain rate and never on length
-(Sknepnek et~al.\ 2023 state verbatim that their active force ``does not include the junction length'').
-So our feedback is a \emph{stabiliser}---longer $\to$ more myosin $\to$ shorter, homogenising---where the
-biology is a \emph{destabiliser} that generates T1s.
-
-Worse for the identifiability argument of \S9: in the $\tau_m\to0$ limit, which is the biologically
-correct one, substituting the setpoint gives
-\[ E_{\text{line}}=\Lambda a\sum_e\Bigl[(1-\beta)\,\ell_e+\beta\,\ell_e^2/\langle\ell\rangle\Bigr], \]
-a line tension plus \emph{a harmonic edge spring of zero rest length}. Lowering the coefficient of
-variation of edge lengths is the defining property of such a spring. The measurement that $\beta$ lowers
-CV at constant radius is therefore tautological: any length-restoring feedback produces it, so it cannot
-discriminate a correct law from an incorrect one. The observable that would is the \textbf{T1 rate}, which
-the two laws move in opposite directions and which we have never measured.
-
-And $\langle m^{ss}\rangle=a$ holds only without the \texttt{clamp\_min(0)}. At $\beta=4$ with edge-length
-CV $\approx0.32$ the setpoint clamps for any edge shorter than $0.75\langle\ell\rangle$, biasing the mean
-up by an estimated 16\%---so $\beta=4$ also raises effective $\Lambda$, and ``$R$ did not move, therefore
-$\beta$ is a pure redistribution'' is not established. \texttt{MYOSIN\_TRACE} already records
-\texttt{myo.mean()}, so this is checkable from logs on disk without rerunning anything.
-
-Separately, $\tau_m=20$ frames is not merely unmeasured but wrong by orders of magnitude: under the time
-anchor that makes $\tau_r$ defensible ($\approx10$~min/frame), $\tau_m\approx3.5$~h against a junctional
-myosin FRAP half-time of $\approx6$~s (Kasza et~al.\ 2014).
-
-\subsection*{Two more structural objections}
-
-\paragraph{The membrane is integrated inertially, at Re $\sim10^{-10}$.} \texttt{emit: acceleration}
-gives $v\mathrel{+}=dt\,a;\;x\mathrel{+}=dt\,v$ with unit mass, where the correct equation of motion is
-$\gamma\dot{\mathbf x}=\mathbf F$. The entire narrative of \S5 and \S7---the undamped spring oscillating
-about a moving anchor, critical damping $c=2\sqrt k$, the tracking lag, the sheet sinking through the
-epithelium, the stability reversal above $k_{\text{adh}}=10^5$---is the phenomenology of an artificial
-inertia. In the overdamped limit none of it exists. Those were reported as calibration facts found by
-tests rather than by inspection; they are numerical facts about a term that should not be in the model.
-
-\paragraph{Integrin binds laminin, not collagen~IV.} Integrins $\alpha3\beta1$, $\alpha6\beta4$ and
-$\alpha6\beta1$ bind laminin; the collagen~IV receptor is $\alpha1\beta1$, and \emph{Drosophila} has no
-collagen-binding integrin at all. So the model couples cells to the membrane through a ligand its
-reference organism's integrins do not bind, while omitting the network they do. Junctional epidermolysis
-bullosa---laminin-332 \emph{or} $\alpha6\beta4$ mutations---is the genetic proof that the link runs
-through laminin. Töpfer et~al.\ (2022), which we cite, also finds \emph{perlecan} contributes greatly to
-elongation, contradicting our description of it as filler. And a central-force network has no bending
-rigidity, which for a 100--300\,nm sheet is arguably the dominant mode.
-
-Also: \texttt{break\_strain}$=0.35$ sits below every tissue-level failure measurement found (lens capsule
-108\%, declining to $\approx$40\% with age; \emph{C.~elegans} spermatheca stretching $\approx$70\% and
-recoiling hundreds of times). And the literature does not support ``thinning'': basement membranes open by
-\emph{regulated focal perforation}, and where imaged during growth they are maintained or thickened.
-
-\subsection*{Citations to fix}
-
-``Ku \& Bilder (2023) \emph{Dev.\ Cell} 58:522'' in \texttt{membrane\_ops.py} does not exist; the real
-paper is Ku, Harris \& Bilder 2023, \emph{Dev Cell} 58(3):211--223, and it is about polar cells secreting
-an MMP, not basement-membrane deposition. ``Eschenbruch et~al.\ (2021) \emph{Cells} 10:1979'' could not be
-verified. Okuda 2018, Hu 2018, Töpfer 2022 and Villeneuve 2024 check out.
-
-\subsection*{The work list, in the order the audit ranks it}
-
-\begin{enumerate}
-\item \textbf{Fix \texttt{lcc} and re-report by connectivity.} One line, no new simulation: compute the
-component fraction unconditionally on the final frame, and add mean degree $z=2n_{\text{bonds}}/n_{\text{alive}}$
-to the reported dicts with the $z\approx4$ rigidity threshold drawn on Figure~2. This settles run~74 and
-either validates or kills ``thinning, not rupture'', from trajectories already on disk.
-\item \textbf{Three tissue passes that decide the ovoid.} $n=1$ and $n=2$ at fixed floor---the
-dose-response the literature supports---and one run at \texttt{smooth\_phi\_deg}$=90$ to test whether the
-shape survives when axisymmetry is not imposed. Then quote the estimator null and rewrite the
-``amount does not matter'' controls as the consequence of the normalisation that they are.
-\item \textbf{Give junction myosin the right input.} Replace $\ell_e/\langle\ell\rangle$ with the per-edge
-tension already available from \op{shape\_energy\_3d}'s gradient, or with the strain rate
-$d\ln\ell_e/dt$. Print $\langle m\rangle$ to test the clamp bias from existing logs. Then report
-\textbf{T1 rate} and hexagonal fraction against a $\Lambda$-matched control---the observables that
-discriminate a homogenising length feedback from a destabilising tension one.
-\end{enumerate}
-
-Standing large item: make the epithelium feel the sheet, for runs 70 and 74 only---the two configurations
-carrying real tension, and the two where a local hernia through a fragmented patch could finally appear.
-
-\subsection*{Where the work stands after this}
-
-Two things survive intact. The software design---operator kinds, topological keying of per-edge state,
-the negative results recorded rather than buried---is not what the audit attacks. And the combination of
-a discrete crosslinked membrane, secretion-coupled membrane growth, and a 3D growing, dividing epithelium
-appears to be genuinely unpublished; the reviewer could find no model with all three. That novelty is
-conditional on the coupling becoming two-way and the fragmentation metric working.
-
-What does not survive in its current form: the ovoid as a stress-driven result, the membrane failure-mode
-dichotomy, and the claim that per-junction myosin expresses a tension feedback.
 
 \end{document}

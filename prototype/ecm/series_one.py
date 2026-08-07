@@ -123,7 +123,12 @@ def main():
     tk = dict(frames=401, device=dev, buffer_x=4, myosin=1.0)
     if myo:
         tk.update(myo)
-        tk["tag_extra"] = "_" + "_".join(f"{k}{v:g}" for k, v in sorted(myo.items()))
+        # `:g` on a str raises; `myo_keyed_on` is a string ("tension"/"strain_rate"), so the tag has to
+        # format by type. The cache key is built from this, so getting it wrong either crashes or -- worse
+        # -- collides two different configurations onto one cached tissue.
+        tk["tag_extra"] = "_" + "_".join(
+            f"{k}{v:g}" if isinstance(v, (int, float)) and not isinstance(v, bool) else f"{k}{v}"
+            for k, v in sorted(myo.items()))
     if gated:
         tk.update(gate_npz=GATE, gate_p_half="auto", gate_hill=6.0, gate_floor=0.08,
                   gate_smooth_frames=25, gate_smooth_phi=360.0, tag_extra="_gated_myo")
@@ -154,8 +159,11 @@ def main():
     ph = np.arctan2(u[:, 1], u[:, 0])
     bi = (np.clip((th / np.pi * 16).astype(int), 0, 15) * 32
           + np.clip(((ph + np.pi) / (2 * np.pi) * 32).astype(int), 0, 31))
-    import tyssue_t1_ops3d as T1
-    t1 = np.asarray(T1.T1_TRACE, float) if T1.T1_TRACE else np.zeros((1, 4))
+    # FROM THE TISSUE FILE, not the module global: the global is empty whenever pass 1 came from cache.
+    _tz = np.load(npz)
+    t1 = np.asarray(_tz["t1_trace"], float) if "t1_trace" in _tz.files else np.zeros((1, 4))
+    if t1.size == 0:
+        t1 = np.zeros((1, 4))
     info["result"] = dict(bonds_start=int(bt[0, 0]), bonds_end=int(bt[-1, 0]),
                           lcc_end=float(bt[-1, 3]) if bt.shape[1] > 3 else None,
                           mean_degree_z=float(bt[-1, 4]) if bt.shape[1] > 4 else None,

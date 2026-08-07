@@ -97,6 +97,7 @@ class JunctionMyosin(Structural):
         self._prev_len = None
         self.lam = float(params.get("lam", 1.0))          # Lambda, for the tension expression
         self.k_perim = float(params.get("k_perim", 1.0))
+        self.gam = float(params.get("gam", 0.0))
         self.inherit = bool(params.get("inherit", True))
         self._vseen = None
         self.dt = float(params.get("dt", 1.0))
@@ -104,28 +105,35 @@ class JunctionMyosin(Structural):
         self._vals = None            # float  [K] their myosin
         self._said = False
 
-    def _edge_tension(self, m, length, myo, lvl):
-        """Per-edge tension: the line term plus the perimeter term of the faces the edge belongs to.
+    def _edge_tension(self, m, length, myo, live, ef, dev, dt_):
+        """Per-edge tension, as dE/dl_e of the energy `shape_energy_3d` actually minimises.
 
-        T_e = Lambda*m_e + sum over the two adjacent faces of 2 K_P (P_f - P_f^0). This is the quantity
-        `shape_energy_3d` differentiates, so it is the tension in the same sense the mechanics uses --
-        not a proxy for it. Falls back to length only if the perimeter state is unavailable, and says so
-        once rather than silently keying on the wrong thing.
+        E = K_A(A-A0)^2 + K_P(P-P0)^2 + 0.5 Gam P^2 + K_V(...)^2 + Lambda*sum(m_e l_e), and only the
+        perimeter and line terms depend on an individual edge length, so
+
+            T_e = Lambda*m_e + 2 K_P (P_f - P0_f) + Gam * P_f      (f = the edge's own face)
+
+        The CURRENT perimeter is not stored on the mesh -- `face_geometry_3d` computes and discards it --
+        so it is recomputed here by the same index_add. P0 is on the mesh; K_P, Gam and Lambda come from
+        the spec and MUST match the values `shape_energy_3d` was given, or this is the tension of a
+        different tissue.
+
+        RAISES rather than falling back. The first version printed a warning and returned `length`, and
+        the smoke test duly printed it -- which means run 86 would have been a LENGTH experiment wearing
+        a tension label, and the 86-88 comparison would have been vacuous while looking fine. A silent
+        fallback to the exact hypothesis under test is the worst possible failure mode.
         """
-        ef = m["E_face"]
         nF = int(m["nF"])
-        live = ef < nF
-        P, P0 = m.get("perim"), m.get("perim0")
-        if P is None or P0 is None:
-            if not getattr(self, "_said_tension", False):
-                self._said_tension = True
-                print("[junction_myosin] keyed_on='tension' but no perimeter state on the mesh; "
-                      "falling back to LENGTH, which is a different feedback with the opposite sign. "
-                      "Do not read this run as a tension experiment.", flush=True)
-            return length
-        kp = float(self.k_perim)
-        face_t = 2.0 * kp * (P - P0)                       # per-face perimeter tension
-        return (self.lam * myo + face_t[ef[live].long()]).clamp_min(0.0)
+        P0 = m.get("P0")
+        if P0 is None:
+            raise RuntimeError(
+                "junction_myosin: keyed_on='tension' needs the target perimeter P0 on the mesh and it "
+                "is absent. Refusing to fall back to length -- that is the variable this run exists to "
+                "replace, and the fallback would have produced a length-keyed run labelled as tension.")
+        perim = torch.zeros(nF, device=dev, dtype=dt_).index_add(0, ef, length)
+        f = ef.long()
+        T = self.lam * myo + 2.0 * self.k_perim * (perim - P0.to(dt_))[f] + self.gam * perim[f]
+        return T.clamp_min(0.0)
 
     def _edge_strain_rate(self, key, length):
         """d ln(l_e)/dt, matched to the PREVIOUS frame by the same vertex-pair key the myosin uses.
@@ -239,7 +247,7 @@ class JunctionMyosin(Structural):
         # does by definition, so "beta lowers CV at constant radius" is a tautology and cannot
         # discriminate a right law from a wrong one. The T1 rate can, and the two signs move it oppositely.
         if self.keyed_on == "tension":
-            drive = self._edge_tension(m, length, myo, lvl)
+            drive = self._edge_tension(m, length, myo, live, ef[live].long(), dev, dt_)
         elif self.keyed_on == "strain_rate":
             drive = self._edge_strain_rate(key, length)
         else:
