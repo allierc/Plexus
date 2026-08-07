@@ -94,6 +94,23 @@ SERIES = {
     # the edges. `basement_membrane_crosslink` (rewire) is the missing half of fragmentation.
     "80_crosslinking": dict(membrane_deposit="uniform", membrane_rebond_every=20),
 
+    # --- 81, 82: WHY THE NETWORK DOES NOT EVEN OUT --------------------------------------------------
+    # Cedric: a spring network, overdamped, should reach equilibrium -- so why are the nodes not
+    # equidistant? It has reached equilibrium. Measured on 80, the cv of the REST LENGTHS is 0.521:
+    # every spring wants a different length, so a disordered configuration is exactly what the network
+    # relaxes to. That is why anchors, crosslinking and deposition all did nothing -- none of them
+    # touches where the disorder is stored.
+    #
+    # 81 is his test: remove the anchors entirely, so the sheet is a pure spring network with nothing
+    # holding it to the surface. It should slide (73 lost coverage doing this), but it isolates whether
+    # the tethers constrain the packing at all.
+    # 82 is what the rest-length measurement points to: relax rest lengths toward the spacing the
+    # sheet's own density implies, instead of toward each bond's own length. A real collagen IV network
+    # has a characteristic mesh size; giving the springs a COMMON target is what lets a relaxed network
+    # be a uniform one.
+    "81_no_anchor": dict(membrane_deposit="uniform", membrane_adhesion=0.0),
+    "82_mesh_restlength": dict(membrane_deposit="uniform", membrane_remodel_target="mesh"),
+
 }
 
 
