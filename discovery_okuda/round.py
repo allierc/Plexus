@@ -721,6 +721,27 @@ def build_all(ctx):
     return out
 
 
+def user_input(ctx):
+    """`campaign/user_input.md` -- what Cedric wants this campaign to do, read fresh every round.
+
+    THE CHANNEL EXISTED AND NOTHING READ IT. `user_input.md` is on KEEP_ON_RESET with the comment
+    "it is the human-in-the-loop channel", so a previous version protected it from every reset --
+    and it was wired to `agents/llm.py`, which Phase 12 deleted. Since then the file has survived
+    every reset and reached no role: a consumer with no producer, in the same family as the five
+    the flow graph was built to catch.
+
+    Read at the TOP OF EVERY ROUND, not at launch, so an instruction written mid-campaign takes
+    effect on the next round without a relaunch. That is the whole point of a steering channel.
+    """
+    txt = _read(os.path.join(CAMPAIGN, "user_input.md"), limit=8000)
+    body = "\n".join(l for l in (txt or "").splitlines()
+                     if l.strip() and not l.strip().startswith("#"))
+    if not body.strip():
+        return "Nothing from Cedric this round."
+    return ("FROM CEDRIC, read fresh this round. This is the human steering the campaign; it "
+            "outranks the menu's ordering and anything a previous round concluded:\n" + txt)
+
+
 def refusals(ctx):
     """What the LAST round proposed and could not run, with the reason.
 

@@ -80,6 +80,39 @@ class BasementMembraneParticle:
     provision = MPMParticle.provision
 
 
+@register_entity("basement_membrane_node")
+class BasementMembraneNode:
+    """A node of the SPRING-GRAPH membrane: position and velocity, and nothing else.
+
+    WHY THIS EXISTS ALONGSIDE `BasementMembraneParticle`. The MPM version carries a full continuum state
+    -- deformation gradient, affine momentum, Lame parameters, particle volume -- and NONE of it is read
+    by anything that matters. The sheet's mechanics come from the crosslinks, its position from the
+    integrin springs, its fragmentation from bonds breaking, and every figure colours it by crosslink
+    strain rather than by MPM stress. What the MPM state actually buys is one thing: momentum exchange
+    with the interstitial matrix through the shared grid, because that is how every body in this model
+    couples to every other.
+
+    AND THAT ONE THING IS THE PART THAT DOES NOT WORK. At n_grid = 48 the cell is dx = 0.021 against a
+    sheet 0.002 thick with 0.005 particle spacing: one grid cell holds about sixteen membrane particles
+    and is ten times thicker than the sheet, so the coupling strength is set by grid resolution rather
+    than by any parameter of the model. We were paying the full continuum cost for a coupling the grid
+    cannot resolve -- and paying it in bugs, twice: a parked reserve particle accumulating a garbage
+    deformation gradient (ECM p99 392 against 2-8), and a membrane von Mises stress computed every frame
+    and discarded.
+
+    So this entity drops the continuum state. The trade is that the membrane is no longer "just another
+    MPM body" and cannot inherit `mpm_scatter`/`mpm_gather` for free: coupling to the matrix has to
+    become an explicit operator (`basement_to_ecm`), which is the honest form of it anyway, and resolves
+    at the sheet's own length scale instead of the grid's.
+    """
+    @staticmethod
+    def provision(lvl, parent, s, H, device):
+        # `alive` replaces the mass-zero trick the MPM version used to park its unsecreted reserve:
+        # without a mass buffer there is nothing to zero, and a boolean is what was meant all along.
+        n = lvl.get("pos").shape[0]
+        lvl.register_buffer("alive", torch.zeros(n, dtype=torch.bool, device=device))
+
+
 @register_operator("seed_basement_membrane", family="growth", set="particle", kind="seed")
 class BasementMembraneSeed(Structural):
     """Lay the membrane down ONCE, as a shell just OUTSIDE the epithelium's surface.
@@ -298,6 +331,9 @@ class BasementMembraneBond(Lateral):
     this operator moving particles behind the solver's back.
     """
 
+    # `mpm_acceleration` routes the force into the MPM substep as an external body force; `acceleration`
+    # hands it to the engine, which integrates v += dt*a; x += dt*v directly. The spring graph needs the
+    # second, and the spec sets `emit:` per run -- `_resolve_emit` reads the spec ahead of this default.
     EMIT = "mpm_acceleration"
     SUPPORTED_DIMS = [3]
     REQUIRES_PARAMS = []

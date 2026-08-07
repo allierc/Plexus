@@ -104,7 +104,8 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                # crosslink turnover, in frames. Large = a membrane that cannot keep up with growth and
                # must fragment; small = one that remodels and stays intact. 0 or None disables it.
                membrane_tau=60.0, membrane_reserve=0.0, membrane_secrete_rate=0.02,
-               membrane_secrete_targeted=1.0, membrane_surface_level=False):
+               membrane_secrete_targeted=1.0, membrane_surface_level=False,
+               membrane_impl="mpm", membrane_drag=40.0):
     """The whole experiment as a plain dict, ready for yaml.safe_dump + schema.load."""
     types = {f"s{i}": {"fraction": 1.0 / len(STRESS_COLORS), "youngs": youngs}
              for i in range(len(STRESS_COLORS))}
@@ -217,6 +218,33 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
             spec["operators"] = [o for o in spec["operators"]
                                  if o["op"] != "basement_membrane_remodel"]
             spec["schedule"].insert(i + 2, "basement_membrane_bond_break")
+        if membrane_impl == "graph":
+            # THE MEMBRANE AS A SPRING GRAPH, not a continuum body. Nothing about the sheet's mechanics
+            # was ever coming from MPM: the crosslinks hold it together, the integrin springs hold it in
+            # place, bonds breaking fragment it, and every figure colours it by crosslink strain. MPM was
+            # buying exactly one thing -- momentum exchange with the matrix through the shared grid --
+            # and at n_grid=48 that grid cannot resolve a 0.002-thick sheet anyway.
+            #
+            # `emit: acceleration` hands the bond and integrin forces to the ENGINE (v += dt*a; x += dt*v)
+            # instead of routing them into the MPM substep as an external body force. `drag` replaces the
+            # damping the grid was providing implicitly -- an undamped spring network rings forever, and
+            # the grid transfer was quietly acting as a low-pass filter on it.
+            #
+            # The MPM buffers (F, C, mass, p_vol) are still provisioned and now unused. That is deliberate
+            # rather than tidy: `mass` is what parks the unsecreted reserve, and dropping the entity would
+            # rename the set and touch every reference to it in the spec, the renderer and the analysis.
+            keep = {"mpm_strain", "mpm_scatter", "mpm_gather"}
+            spec["operators"] = [o for o in spec["operators"]
+                                 if not (o["op"] in keep and o["at"] == "basement_membrane_particle")]
+            for o in spec["operators"]:
+                if o["op"] in ("basement_membrane_bond", "integrin_adhesion"):
+                    o["emit"] = "acceleration"
+            spec["operators"].append({"op": "drag", "at": "basement_membrane_particle",
+                                      "k": float(membrane_drag)})
+            i = spec["schedule"].index("basement_membrane_bond")
+            spec["schedule"].insert(i + 1, "drag")
+            # (no schedule surgery: the substep block dispatches mpm steps BY OP NAME, so dropping the
+            # three operator entries above is what removes them from the cycle.)
         if membrane_surface_level:
             # `per_parent`, not `n`: a set with a parent is provisioned per parent, and `n` is
             # simply not read -- the build dies on a KeyError several frames of setup later.

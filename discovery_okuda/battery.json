@@ -275,6 +275,14 @@
    "rel": 0.0,
    "grad": null,
    "note": ""
+  },
+  {
+   "op": "seed_cell_rd",
+   "param": "n_spots",
+   "verdict": "DEAD",
+   "rel": 0.0,
+   "grad": null,
+   "note": "read only by _cone_dirs(), which only mode: cones calls. Every parent runs mode: scatter. Measured by the campaign itself: r007_00_ctrl and r007_10 differ only in n_spots (1 vs 2) and are bit-identical -- which the Analyst reported for 8 rounds as 'launcher duplication'."
   }
  ]
 }
