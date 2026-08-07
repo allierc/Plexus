@@ -362,6 +362,8 @@ class BasementMembraneBond(Lateral):
         # obviously wrong to average into a sweep. Checked here rather than discovered there.
         self.graph_mode = bool(params.get("graph_mode", False))
         self.snapshot_every = int(params.get("snapshot_every", 20))
+        # the adhesion stiffness acting on the same nodes; the spec passes it so the ceiling can see it
+        self.k_adh_hint = float(params.get("k_adhesion_hint", 0.0))
         self.cutoff = float(params.get("cutoff", 0.020))
         self.max_nb = int(params.get("max_neighbours", 6))
         self.damp = float(params.get("damp", 0.0))
@@ -405,7 +407,21 @@ class BasementMembraneBond(Lateral):
     def _check_stability(self, bonds_per_node, dt_frame=4.0e-3):
         if not self.graph_mode:
             return                                   # MPM path: integrated at the substep, ~70 per period
-        k_max = 4.0 / (dt_frame ** 2 * max(bonds_per_node, 1.0))
+        # CALIBRATED AGAINST A SWEEP, not derived and left. The first version used the textbook
+        # dt < 2/omega with omega from the crosslinks alone, giving 4.4e4 -- and a measured sweep at
+        # k = 200 .. 40,000 put the real transition between 5,000 and 10,000, six times lower:
+        #
+        #   k    200-5,000   bonds ~50,700   strain 0.101-0.106   stable
+        #   k       10,000   bonds  33,421   strain 0.114         transition
+        #   k   20,000+      bonds  63,615   strain 2.02          diverged
+        #
+        # Two corrections. The INTEGRIN spring pulls on the same node, so it belongs in the effective
+        # stiffness; and the usable criterion with drag present is dt*omega < 1, not the marginal 2.
+        # (The diverged runs also over-secrete -- 29k nodes against 11k -- because the secretion setpoint
+        # keys on mean radius, and an exploding sheet has a large one. A numerical failure that looks
+        # like biology.)
+        k_eff = max(bonds_per_node, 1.0) * self.k + self.k_adh_hint
+        k_max = self.k * (1.0 / (dt_frame ** 2)) / max(k_eff, 1e-9)
         if self.k > k_max:
             raise RuntimeError(
                 f"basement_membrane_bond: k = {self.k:.3g} exceeds the explicit-integration ceiling "

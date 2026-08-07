@@ -245,6 +245,8 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                     # what happened: k = 2e5 ran to completion in graph mode and returned an infinite
                     # strain with no warning.
                     o["graph_mode"] = True
+                    if o["op"] == "basement_membrane_bond":
+                        o["k_adhesion_hint"] = float(membrane_adhesion)
             spec["operators"].append({"op": "drag", "at": "basement_membrane_particle",
                                       "k": float(membrane_drag)})
             i = spec["schedule"].index("basement_membrane_bond")
