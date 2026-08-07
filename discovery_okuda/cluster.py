@@ -604,26 +604,24 @@ def kill():
 
 # --------------------------------------------------------------------------- throttled batch
 def run_batch(names, frames=None, do_q=False, campaign="campaign", parallel=None, poll=POLL_S):
-    """Submit in waves of `parallel`, waiting for the queue to drain between waves.
+    """Submit the WHOLE batch at once and wait for it.
 
-    The L4 partition is cheap, so `parallel` is a courtesy limit rather than a cost control;
-    8 is the default because gpu_l4 gives 8 slots per GPU.
+    WAVES REMOVED, 7 August. `parallel` chunked the batch and drained the queue between chunks,
+    which cost a round its wall-clock twice over: a 16-slot round ran 12 + 4, and the 4-job tail
+    held the round open for a second full run length while eleven of twelve GPUs sat idle. LSF is
+    already a scheduler -- chunking in front of it is a second, worse one that cannot see the
+    partition. `parallel` is kept as an argument so existing callers do not break, and ignored.
     """
-    parallel = parallel or PARALLEL
-    waves = [names[i:i + parallel] for i in range(0, len(names), parallel)]
-    print(f"[cluster] {len(names)} runs in {len(waves)} wave(s) of <= {parallel}")
-    for i, wave in enumerate(waves, 1):
-        print(f"\n=== wave {i}/{len(waves)}: {', '.join(wave)}")
-        ids = submit(wave, frames=frames, do_q=do_q, campaign=campaign)
-        # `wait_for_ids` returns a DICT now: `not {...}` is always False, so testing the bare
-        # return would silently never stop. Check the field.
-        st = wait_for_ids(ids, poll=poll)
-        if not st["ok"]:
-            print(f"[cluster] wave {i} did not complete cleanly "
-                  f"(exit={st['exit']} killed={st['killed']} timed_out={st['timed_out']}) -- "
-                  f"stopping rather than continuing on partial evidence")
-            return False
-    print("\n[cluster] batch complete")
+    print(f"[cluster] {len(names)} runs, all submitted together")
+    ids = submit(names, frames=frames, do_q=do_q, campaign=campaign)
+    # `wait_for_ids` returns a DICT: `not {...}` is always False, so testing the bare return would
+    # silently never stop. Check the field.
+    st = wait_for_ids(ids, poll=poll)
+    if not st["ok"]:
+        print(f"[cluster] batch did not complete cleanly "
+              f"(exit={st['exit']} killed={st['killed']} timed_out={st['timed_out']})")
+        return False
+    print("[cluster] batch complete")
     return True
 
 
