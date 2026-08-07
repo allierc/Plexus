@@ -1,0 +1,93 @@
+_discovery:
+  comp_hash: MINI_mini_grow_divide_bigger
+  region: same, vth_frac 1.4 -> 2.5 so cells can actually double before dividing [reference
+    buffers 3552/1800]
+fields: {}
+general:
+  boundary: free
+  dim: 3
+  dt: 1.0
+  n_frames: 900
+  name: cellfix_B_new_sw_vth_frac2
+  record_cap: 403
+  seed: 0
+  world:
+  - 50.0
+  - 50.0
+  - 50.0
+operators:
+- at: vertex
+  before_frame: 1
+  cell_set: cell
+  jitter: 0.18
+  n_cells: 200
+  op: seed_mesh_3d
+  p0: 3.5
+  radius: 5.0
+  seed: 0
+  vseed_cv: 0.15
+- at: cell
+  op: cell_geometry_3d
+- a_sw: 50.0
+  at: vertex
+  cell_set: cell
+  hill: 4.0
+  op: morphogen_growth_3d
+  rate: 0.003457
+  rho: 1.0
+  vth_frac: 2.5
+- Gamma: 0.4
+  K_A: 1.0
+  K_P: 1.0
+  K_R: 0.4
+  K_V: 2.0
+  Lambda: 3.0
+  at: vertex
+  cap_frac: 0.12
+  dt: 1.0
+  eta: 0.08
+  mu: 1.0
+  op: shape_energy_3d
+  p0: 3.5
+  relax_iters: 30
+- at: vertex
+  engine_clock: true
+  every: 4
+  l_th_frac: 0.35
+  max_flips: 30
+  op: reconnect_t1_3d
+- at: vertex
+  cell_set: cell
+  cycle_cv: 0.15
+  engine_clock: true
+  every: 4
+  factor: 2.0
+  max_cycle: 1000000000
+  min_cycle: 4
+  op: divide_3d
+  p0: 3.5
+  reset_noise: 0.12
+- at: vertex
+  every: 1
+  op: topo_snapshot_3d
+schedule:
+- seed_mesh_3d
+- cell_geometry_3d
+- morphogen_growth_3d
+- shape_energy_3d
+- reconnect_t1_3d
+- divide_3d
+- topo_snapshot_3d
+sets:
+  cell:
+    n: 3200
+    state:
+      area:
+        width: 1
+      cen:
+        width: 3
+      chem:
+        integration: first_order
+        width: 2
+  vertex:
+    n: 6396

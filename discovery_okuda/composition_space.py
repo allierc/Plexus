@@ -401,7 +401,16 @@ OPERATORS = {
         # the Hill function (see hill_alpha_ceiling). lo = 1.0 stays: below 1 the Hill switch has
         # infinite slope at the origin and stops being a switch.
         params={"rate": (0.002, 0.03, 0.010), "a_sw": (A_SW_MIN, A_SW_MAX, A_SW_DEFAULT),
-                "hill": (1.0, ALPHA_CEIL, 4.0), "rho": (0.0, 1.0, 0.0)}),
+                "hill": (1.0, ALPHA_CEIL, 4.0),
+                # `rho` IS THE BASELINE EVERY CELL GROWS AT, and the tip:body ratio is
+                # (rho + 1) : rho. Its default was 0.0 -- an INFINITE ratio, a growing tip on a
+                # frozen body, which premise P2 names as the thing no tissue does. Measured over
+                # 274 runs at rho = 0.1: the shell added 1% volume (522.3 -> 527.4) while cells
+                # went 2000 -> 3250, so division was SUBDIVISION and P1/P7 fired correctly every
+                # time. `cellfix_B_new`, which divides cleanly, runs rho = 1.0 and grows 413.8 ->
+                # 9411.8 (x22.7). Default is 1.0: a 2:1 tip-to-body ratio, Okuda's regime, and a
+                # composition must now choose to freeze the body rather than starting frozen.
+                "rho": (0.0, 2.0, 1.0)}),
     "divide_3d": dict(
         # `hertwig` splits normal to the cell's OWN longest axis -> needs no morphogen input.
         # `orient_iface` stacks daughters along the bud axis -> needs the activator routed in.
