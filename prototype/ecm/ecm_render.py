@@ -342,6 +342,7 @@ MYOSIN_COLORS = [
     [0.55, 0.95, 0.98], [0.42, 0.83, 0.96], [0.31, 0.70, 0.93], [0.23, 0.57, 0.88],
     [0.18, 0.44, 0.80], [0.14, 0.32, 0.70], [0.10, 0.22, 0.58], [0.06, 0.13, 0.45],
 ]
+STRAIN_COLORS = ["#1b3a5c", "#1f6f8b", "#3aa17e", "#8cc04f", "#e8d44d", "#f0913a", "#e0452b"]
 MEMBRANE_COLORS = [
     [0.20, 0.72, 0.35], [0.34, 0.78, 0.31], [0.50, 0.84, 0.28], [0.66, 0.88, 0.25],
     [0.80, 0.90, 0.22], [0.90, 0.86, 0.20], [0.97, 0.78, 0.18], [1.00, 0.66, 0.15],
@@ -419,7 +420,8 @@ def draw_junctions_3d(ax, mt, pos, cam, L, myo_hi=None, cutaway=True, lw=0.9):
     ax.add_collection3d(lc)
 
 
-def draw_membrane_3d(ax, mem_q, mem_s, cam, L, mem_hi=None, cutaway=True, s_dot=4.5, alive=None):
+def draw_membrane_3d(ax, mem_q, mem_s, cam, L, mem_hi=None, cutaway=True, s_dot=4.5, alive=None,
+                     bonds=None, bond_s=None, bond_hi=None):
     """THE BASEMENT MEMBRANE ALONE, framed and cut exactly as `draw_junctions_3d` frames the network.
 
     The pair is the point: two panels, one per entity, same camera, same cutaway, same tissue-sized box,
@@ -440,7 +442,24 @@ def draw_membrane_3d(ax, mem_q, mem_s, cam, L, mem_hi=None, cutaway=True, s_dot=
     if not keep.any():
         return
     q = mem_q[keep]
-    if mem_s is None:
+    # NODES AND EDGES, DRAWN DIFFERENTLY, because topology is a property of the EDGES. A cloud of dots
+    # cannot distinguish a well-connected sheet from the same dots with every crosslink broken, and
+    # "structured / broken" is exactly that distinction. Nodes are a single flat colour so they read as
+    # material; the colour scale is spent on the crosslinks, mapped to ELONGATION (L - rest)/rest, which
+    # is the quantity that decides whether a bond survives.
+    if bonds is not None and len(bonds[0]):
+        from mpl_toolkits.mplot3d.art3d import Line3DCollection
+        bi, bj = bonds
+        vis = keep[bi] & keep[bj] if keep.dtype == bool else None
+        if vis is None or vis.any():
+            sel = np.ones(len(bi), bool) if vis is None else vis
+            segs = np.stack([mem_q[bi[sel]], mem_q[bj[sel]]], axis=1)
+            hi_b = bond_hi or 0.35                       # the break threshold: full scale IS failure
+            lc = Line3DCollection(segs, cmap=_cmap(STRAIN_COLORS), linewidths=0.7, alpha=0.9)
+            lc.set_array(np.clip(np.asarray(bond_s, float)[sel] / hi_b, 0, 1)); lc.set_clim(0, 1)
+            ax.add_collection3d(lc)
+        ax.scatter(q[:, 0], q[:, 1], q[:, 2], s=s_dot * 0.5, c="#9fb0c0", marker=".", linewidths=0)
+    elif mem_s is None:
         ax.scatter(q[:, 0], q[:, 1], q[:, 2], s=s_dot, c="#3cb85a", marker=".", linewidths=0)
     else:
         v = np.asarray(mem_s, float)[keep]

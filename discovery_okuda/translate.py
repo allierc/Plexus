@@ -205,6 +205,8 @@ def _emit_seed(g, n, ga):
     # the D3 alignment assertion fires. (Found by that assertion on the first real run.)
     return {"op": "seed_mesh_3d", "at": "vertex", "cell_set": "cell", "before_frame": 1,
             "n_cells": int(_p(g, n["id"], "n_cells")),
+            "radius": float(_p(g, n["id"], "radius")),
+            "jitter": float(_p(g, n["id"], "jitter")),
             "seed": SEED_SENTINEL,          # filled from general.seed -- see _seed_the_run
             "vseed_cv": float(_p(g, n["id"], "vseed_cv"))}
 
@@ -215,13 +217,19 @@ def _emit_shape_energy(g, n, ga):
         return {"op": "shape_energy_3d", "model": "monolayer", "at": "vertex",
                 "k_v": float(_p(g, i, "K_V")), "kappa_s": float(_p(g, i, "kappa_s")),
                 "h0": float(_p(g, i, "h0")), "gamma": float(_p(g, i, "gamma")),
-                "mu": 1.0, "dt": DT_GLOBAL, "relax_iters": int(_p(g, i, "relax_iters")),
-                "eta": 0.08, "cap_frac": 0.12}
+                "mu": float(_p(g, i, "mu")), "dt": DT_GLOBAL,
+                "relax_iters": int(_p(g, i, "relax_iters")),
+                "K_bend": float(_p(g, i, "K_bend")), "K_lumen": float(_p(g, i, "K_lumen")),
+                "eta": 0.08, "cap_frac": 0.12}          # eta/cap_frac: solver numerics, not knobs
     return {"op": "shape_energy_3d", "at": "vertex",
-            "p0": float(_p(g, i, "p0")), "K_A": 1.0, "K_P": 1.0,
+            "p0": float(_p(g, i, "p0")),
+            "K_A": float(_p(g, i, "K_A")), "K_P": float(_p(g, i, "K_P")),
             "Gamma": float(_p(g, i, "Gamma")), "Lambda": float(_p(g, i, "Lambda")),
-            "K_V": float(_p(g, i, "K_V")), "K_R": 0.02, "K_bend": 0.0, "antiinv": 0.0,
-            "mu": 1.0, "dt": DT_GLOBAL, "relax_iters": int(_p(g, i, "relax_iters")),
+            "K_V": float(_p(g, i, "K_V")), "K_R": float(_p(g, i, "K_R")),
+            "K_bend": float(_p(g, i, "K_bend")), "K_lumen": float(_p(g, i, "K_lumen")),
+            "antiinv": 0.0,
+            "mu": float(_p(g, i, "mu")), "dt": DT_GLOBAL,
+            "relax_iters": int(_p(g, i, "relax_iters")),
             "eta": 0.08, "cap_frac": 0.12}
 
 

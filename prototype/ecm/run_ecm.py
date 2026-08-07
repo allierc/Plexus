@@ -190,6 +190,11 @@ def rerender(out_dir, **kw):
         out["sets"]["basement_membrane_particle"] = {"pos": np.asarray(z["mpos"])}
         if "malive" in z.files:
             membrane_ops.MEMBRANE_ALIVE = np.asarray(z["malive"], bool)
+        if "bond_frames" in z.files:
+            membrane_ops.BOND_SNAPSHOTS = [
+                (int(f), np.asarray(z["bond_i"][a:b]), np.asarray(z["bond_j"][a:b]),
+                 np.asarray(z["bond_s"][a:b], float))
+                for f, a, b in zip(z["bond_frames"], z["bond_off"][:-1], z["bond_off"][1:])]
     if "bpos" in z.files:
         import block_ops
         block_ops.BLOCK_STRESS[:] = list(np.asarray(z["bstress"]))
@@ -355,6 +360,18 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, f
     mem_hist = membrane_ops.MEMBRANE_STRAIN if mem_pos is not None else None
     # `render` has no Hierarchy in scope, so `run` and `rerender` both publish the mask here first.
     # (`a or b` on arrays raises, so this is a plain None check, not a fallback expression.)
+    snaps = getattr(membrane_ops, "BOND_SNAPSHOTS", None) or []
+    snap_f = np.asarray([q[0] for q in snaps]) if snaps else None
+
+    def bonds_of(t):
+        """The crosslink network recorded NEAREST this frame, or None. Snapshots are periodic, so the
+        network drawn on a frame between two of them is the older one -- correct to within the snapshot
+        interval, and far better than drawing no edges at all."""
+        if snap_f is None or not len(snap_f):
+            return None, None
+        k = int(np.argmin(np.abs(snap_f - t)))
+        return (snaps[k][1], snaps[k][2]), snaps[k][3]
+
     mem_alive = getattr(membrane_ops, "MEMBRANE_ALIVE", None) if mem_pos is not None else None
     if mem_alive is not None:
         mem_alive = np.asarray(mem_alive.detach().cpu() if hasattr(mem_alive, "detach")
@@ -578,7 +595,17 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, f
                 # visible in one and invisible in the other. A camera that tracks its subject hides the
                 # one thing the run is about.
                 Lt = 0.72 * L3
-                RD.draw_membrane_3d(axz, mq, ms, RD.CAM_SIDE, Lt, mem_hi=mem_sc)
+                # UNMASKED positions here, with the mask passed separately: bond indices are in the
+                # FULL particle space, so indexing an already-masked array would connect the wrong nodes.
+                _bij, _bs = bonds_of(t)
+                _raw = (mem_pos[min(t, mem_pos.shape[0] - 1)] - centre) / max(scale, 1e-12)
+                _al = None
+                if mem_alive is not None:
+                    _al = mem_alive if mem_alive.ndim == 1 else mem_alive[min(t, mem_alive.shape[0] - 1)]
+                _rs = (np.asarray(mem_hist[t], np.float32) / max(mem_sc or 1.0, 1e-12)
+                       if (mem_hist and t < len(mem_hist)) else None)
+                RD.draw_membrane_3d(axz, _raw, _rs, RD.CAM_SIDE, Lt, mem_hi=1.0,
+                                    alive=_al, bonds=_bij, bond_s=_bs)
                 # BOTTOM-RIGHT IS THE JUNCTION NETWORK, on its own. The membrane is not drawn here at
                 # all: 30k dots sit in front of a line mesh of comparable spacing and simply occlude it,
                 # so the two entities get a panel each rather than one panel showing neither well.
@@ -664,6 +691,14 @@ def run(name, spec, device="cuda:0", movie=True, keep_traj=True, render_kw=None)
                 al = getattr(H, "membrane_alive", None)
                 if al is not None:
                     extra["malive"] = np.asarray(al.detach().cpu(), bool)
+                if membrane_ops.BOND_SNAPSHOTS:
+                    snaps = membrane_ops.BOND_SNAPSHOTS
+                    extra["bond_frames"] = np.asarray([q[0] for q in snaps], np.int32)
+                    # ragged: one flat array plus offsets, because the bond count grows with secretion
+                    extra["bond_i"] = np.concatenate([q[1] for q in snaps])
+                    extra["bond_j"] = np.concatenate([q[2] for q in snaps])
+                    extra["bond_s"] = np.concatenate([q[3] for q in snaps])
+                    extra["bond_off"] = np.cumsum([0] + [len(q[1]) for q in snaps]).astype(np.int64)
             if "mpm_block" in out.get("sets", {}):
                 extra["bpos"] = np.asarray(out["sets"]["mpm_block"]["pos"], np.float32)
                 extra["bstress"] = np.asarray(block_ops.BLOCK_STRESS, np.uint8)
