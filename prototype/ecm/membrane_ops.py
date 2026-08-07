@@ -427,18 +427,29 @@ class BasementMembraneBond(Lateral):
         # it is chunked; it runs once, and the alternative (a grid hash) is more code for a cost paid
         # a single time.
         n = pos.shape[0]
-        k = min(self.max_nb, n - 1)
-        if n > 20000:
-            i, j = self._neighbours_celllist(pos, k)
+        # COMPACT TO THE LIVE NODES FIRST, then map back. Filtering afterwards is what the pairwise path
+        # did and it was affordable there; for the cell list it is fatal. The unsecreted reserve is parked
+        # at a SINGLE POINT (the tissue centre), so with a cell the size of the cutoff that one cell holds
+        # every dormant particle -- 41,667 of them at reserve 12.5. The candidate block is sized by the
+        # fullest cell, so it became (45000, 41667, 3): a 14 GiB allocation that killed six jobs on a 22
+        # GiB card. Bonds can only ever form between live nodes, so they are the only ones to search.
+        idx = None
+        if live is not None:
+            idx = live.nonzero(as_tuple=True)[0]
+            sub = pos[idx]
         else:
-            i, j = self._build_pairwise(pos, k)
+            sub = pos
+        m = sub.shape[0]
+        k = min(self.max_nb, max(m - 1, 1))
+        if m > 20000:
+            i, j = self._neighbours_celllist(sub, k)
+        else:
+            i, j = self._build_pairwise(sub, k)
+        if idx is not None:
+            i, j = idx[i], idx[j]
         n2 = n + 1
         uk = torch.unique(torch.minimum(i, j) * n2 + torch.maximum(i, j))
-        i, j = (uk // n2).long(), (uk % n2).long()
-        if live is not None:
-            keep = live[i] & live[j]
-            i, j = i[keep], j[keep]
-        return i, j
+        return (uk // n2).long(), (uk % n2).long()
 
     def _build_pairwise(self, pos, k):
         """The original chunked O(N^2) search, kept as the reference the cell list is checked against."""
