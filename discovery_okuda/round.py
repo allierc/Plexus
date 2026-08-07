@@ -65,7 +65,7 @@ FLOW = os.path.join(HERE, "crew", "flow.yaml")
 # THE ROUND'S QUANTITIES LIVE HERE, NOT IN MARKDOWN OR IN THE FLOW. Cedric, 5 August: markdown
 # carries the procedure and the judgement, config carries the numbers. A value the engine must OBEY
 # should not be parsed out of prose, where it can silently drift from the number that actually ran.
-N_SLOTS = 16          # 8 route B + 8 route A (ROUTE_A_SLOTS)
+N_SLOTS = 16          # 8 route B + 8 route A (route_a.slots in crew/flow.yaml)
 FRAMES = 900
 CONTROL_SLOT = 0
 MENU_LIMIT = 40
@@ -732,26 +732,8 @@ def diagnosis(ctx):
     return ""
 
 
-ROUTE_A_SLOTS = 8          # Cedric, 7 August: "fix 16 jobs per run, 8 for route A 8 for route B"
-
-# Route A's order, and it is deliberate: nothing downstream means anything until the tissue
-# actually gains material. Each entry is swept to CLOSURE_N distinct values, then retired -- the
-# control loop's discipline (`W_L1 CLOSED (7 values)`) that this one never had.
-ROUTE_A_PLAN = [
-    ("cellfix_B_new",  "morphogen_growth_3d", "rho",      [0.0, 0.1, 0.3, 1.0, 2.0]),
-    ("coral_gate_div", "morphogen_growth_3d", "rho",      [0.0, 0.1, 0.3, 1.0, 2.0]),
-    ("coral_gate_div", "morphogen_growth_3d", "vth_frac", [1.4, 2.0, 2.5, 3.5]),
-    ("coral_gate_div", "divide_3d",           "factor",   [1.5, 2.0, 3.0, 4.0]),
-    ("coral_gate_div", "morphogen_growth_3d", "a_sw",     [0.05, 0.15, 0.35, 0.8]),
-    ("coral_gate_div", "morphogen_growth_3d", "hill",     [2.0, 4.0, 8.0, 16.0]),
-    ("coral_gate_div", "morphogen_growth_3d", "rate",     [0.000433, 0.001732, 0.006928, 0.02]),
-    ("coral_gate_div", "shape_to_chem",       "beta",     [-4.0, -2.0, 0.0, 2.0, 4.0]),
-    ("coral_gate_div", "shape_to_chem",       "F0",       [0.03, 0.055, 0.09, 0.11]),
-]
-
-
 def route_a(ctx):
-    """Up to ROUTE_A_SLOTS sweep points: the next OPEN knob, on a known-good recipe.
+    """Up to `slots` sweep points: the next OPEN knob, on a known-good recipe.
 
     Cedric, 7 August: *"this is typically a good job for the one-agent loop -- it could have swept
     the parameters of growth to get knowledge. make the route A goal to understand the growth /
@@ -768,9 +750,16 @@ def route_a(ctx):
     but the swept value is not a sweep. So these slots copy the parent spec verbatim and set one
     key -- which is also why `cellfix_B_new` can be a Route A base at all.
     """
+    # THE PLAN COMES FROM THE GRAPH, not from this file. Cedric, 7 August: "there is a graph for
+    # the multi-agent, this should land there not in the code?" -- and flow.yaml says so itself:
+    # `args` is "how a campaign decision is declared here rather than hard-coded in round.py".
+    # Which knobs to sweep, in what order, on which recipe, is exactly such a decision; the same
+    # reason `parents.pool` lives there. This function only knows how to walk a plan.
+    plan = ctx.get("plan") or []
+    limit = int(ctx.get("slots") or 8)
     tried = _sweep_state()
     out = []
-    for base, op, key, values in ROUTE_A_PLAN:
+    for base, op, key, values in plan:
         done = set(tried.get(f"{op}0.{key}", []))
         todo = [v for v in values if _round_val(v) not in done]
         if not todo:
@@ -779,7 +768,7 @@ def route_a(ctx):
             out.append({"sweep": True, "base": base, "op": op, "key": key, "value": v,
                         "claim": f"ROUTE A: sweep {op}.{key} on {base} -- what value makes it work",
                         "intent": "sweep"})
-            if len(out) >= ROUTE_A_SLOTS:
+            if len(out) >= limit:
                 return out
     return out
 
@@ -801,7 +790,7 @@ def build_all(ctx):
     # B proposes a mechanism edit (WHICH mechanism to try). 25 rounds of B alone gave 214 dead
     # spheres out of 273, because the setting that makes division real had never been swept.
     # Route A's runs are recorded like any other, so they become Route B's parents.
-    a_slots = list(ctx.get("route_a") or [])[:ROUTE_A_SLOTS]
+    a_slots = list(ctx.get("route_a") or [])
     n_total = int(ctx.get("n_slots") or N_SLOTS)
     b_slots = ([{"parent": pars[0]["name"]}] + list(ctx.get("edits") or []))[
         :max(1, n_total - len(a_slots))]
@@ -1409,6 +1398,44 @@ def control_of(ctx):
         if s.get("slot") == CONTROL_SLOT:
             return (ctx.get("metrics") or {}).get(s["name"])
     return None
+
+
+def route_a_results(ctx):
+    """This round's sweeps AS SWEEPS -- one table per knob, ordered by value.
+
+    Cedric, 7 August: *"can you check that the memory md file collects properly the route A
+    knowledge"*. It did not. The Analyst was handed the sweep runs as eight anonymous rows in
+    `metrics`, with nothing saying they were one knob at eight values on two bases -- and `score`
+    skips them entirely, correctly, because a sweep makes no prediction. So the one thing a sweep
+    produces, a RESPONSE CURVE, was the one thing nothing assembled.
+
+    A sweep's conclusion is not "run 11 was best". It is "rho drives division 200 -> 360 -> 1997
+    -> 3170 and breaks P13 above 0.3", which is a sentence only readable from the ordered table.
+    """
+    specs = [s for s in (ctx.get("specs") or []) if s.get("route") == "A"]
+    met = ctx.get("metrics") or {}
+    if not specs:
+        return "No Route A slots this round."
+    COLS = ["cells_final", "v_cell_mean_final", "protr_peak", "grip_peak", "act_cv_peak",
+            "reduced_volume_final"]
+    by = {}
+    for s in specs:
+        key = (s.get("parent"), str(s.get("edit", ["", "?"])[1]))
+        by.setdefault(key, []).append(s)
+    out = ["ROUTE A -- one knob swept on a known-good recipe. Read each table as a CURVE: what",
+           "value makes the mechanism work, and where does it break? Record the closure in",
+           "knowledge.md so the knob is never swept again.", ""]
+    for (base, knob), rs in sorted(by.items()):
+        out.append(f"  {base}   {knob}")
+        out.append("     value" + "".join(f"{c.replace('_final','').replace('_peak','')[:12]:>13}"
+                                          for c in COLS) + "   premises")
+        for s in sorted(rs, key=lambda x: float(x["edit"][2])):
+            m = met.get(s["name"]) or {}
+            cells = "".join(f"{m[c]:>13.3f}" if isinstance(m.get(c), (int, float))
+                            else f"{'--':>13}" for c in COLS)
+            out.append(f"     {float(s['edit'][2]):<9g}{cells}   {m.get('premises_broken') or []}")
+        out.append("")
+    return "\n".join(out)
 
 
 def score(ctx):

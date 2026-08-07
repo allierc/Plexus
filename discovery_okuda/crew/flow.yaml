@@ -136,6 +136,28 @@ nodes:
   # like any other, so `parents` picks them up and B builds its next mechanism on them.
   - id: route_a
     code: round.route_a
+    args:
+      # THE SWEEP PLAN IS A CAMPAIGN DECISION, so it is declared here rather than in round.py --
+      # the same reason `parents.pool` is. Each entry is [base, operator, knob, values]; the node
+      # takes the next one with values still unrun and stops at `slots`. Order matters and is
+      # deliberate: DIVISION FIRST, because nothing downstream means anything until the tissue
+      # actually gains material. A knob run at every value here is CLOSED and never offered again.
+      #
+      # Why these two bases: cellfix_B_new divides cleanly (x22.7 volume) and has NO pattern
+      # (act_cv 0.000); coral_gate_div has the pattern (act_cv 2.2) and its cells SHRINK as they
+      # divide (v_cell 0.17). One grows without patterning, one patterns without growing. Route A
+      # exists to find the setting where both happen, and hand it to Route B as a parent.
+      slots: 8
+      plan:
+        - [cellfix_B_new,  morphogen_growth_3d, rho,      [0.0, 0.1, 0.3, 1.0, 2.0]]
+        - [coral_gate_div, morphogen_growth_3d, rho,      [0.0, 0.1, 0.3, 1.0, 2.0]]
+        - [coral_gate_div, morphogen_growth_3d, vth_frac, [1.4, 2.0, 2.5, 3.5]]
+        - [coral_gate_div, divide_3d,           factor,   [1.5, 2.0, 3.0, 4.0]]
+        - [coral_gate_div, morphogen_growth_3d, a_sw,     [0.05, 0.15, 0.35, 0.8]]
+        - [coral_gate_div, morphogen_growth_3d, hill,     [2.0, 4.0, 8.0, 16.0]]
+        - [coral_gate_div, morphogen_growth_3d, rate,     [0.000433, 0.001732, 0.006928, 0.02]]
+        - [coral_gate_div, shape_to_chem,       beta,     [-4.0, -2.0, 0.0, 2.0, 4.0]]
+        - [coral_gate_div, shape_to_chem,       F0,       [0.03, 0.055, 0.09, 0.11]]
 
   - id: build
     code: round.build_all
@@ -180,9 +202,19 @@ nodes:
     out: observed
 
   # ---- review: one call over the batch -------------------------------------------
+  # THE SWEEPS AS SWEEPS. Without this the Analyst gets eight anonymous rows in `metrics` and
+  # nothing saying they are one knob at eight values -- and `score` skips them, correctly, because
+  # a sweep makes no prediction. So the one thing a sweep produces, a response curve, was the one
+  # thing nothing assembled. Cedric asked whether the memory file collected Route A properly; it
+  # did not, and this is why.
+  - id: route_a_results
+    code: round.route_a_results
+    in: [specs, metrics]
+
   - id: analyst
     agent: analyst
-    in: [control, metrics, predictions, observations, observed, history, user_input]
+    in: [control, metrics, predictions, observations, observed, history, user_input,
+         route_a_results]
 
   - id: grounder
     agent: grounder
