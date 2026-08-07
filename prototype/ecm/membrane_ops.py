@@ -936,6 +936,7 @@ class BasementMembraneSecrete(Structural):
         self.centre = [float(v) for v in params.get("centre", [0.5, 0.5, 0.5])]
         self.rate = float(params.get("rate", 0.02))
         self.targeted = float(params.get("targeted", 1.0))
+        self.relax_new = int(params.get("relax_new", 4))
         self._r0 = None
         self._n0 = None
 
@@ -1052,6 +1053,34 @@ class BasementMembraneSecrete(Structural):
         live = live.clone(); live[slot] = True
         H.membrane_alive = live
         H.membrane_new = slot
+
+        # RELAX THE NEW MATERIAL INTO THE GAPS. Placing a node beside a randomly chosen parent, one
+        # spacing away in a random tangential direction, is a random walk -- and random walks clump. The
+        # parent is weighted toward sparse regions but the PLACEMENT is not, so the node lands next to
+        # the parent rather than in the hole. Measured: the seeded sheet has a p99.9 clearance of 1.10
+        # spacings (better than uniform random at 1.53), and by the end of a run it has degraded to 3.08.
+        # The holes an external reviewer called too big are made here, not at initialisation.
+        #
+        # A few repulsion sweeps over the newly placed nodes push them off their neighbours and into the
+        # space that is actually free. Only the new ones move: relaxing the whole sheet every frame would
+        # fight the integrin anchors, which are the thing holding it in place.
+        if self.relax_new > 0 and add:
+            sp_t = want_sp
+            for _ in range(self.relax_new):
+                pn = pos[slot]
+                d2 = (pn[:, None, :] - pos[live][None, :, :]).norm(dim=-1)
+                d2 = torch.where(d2 > 1e-9, d2, torch.full_like(d2, 1e9))
+                k_ = min(7, int(live.sum()))
+                nd, ni = torch.topk(-d2, k_, dim=1)
+                nd = -nd
+                diff = pn[:, None, :] - pos[live][ni]
+                w_ = (sp_t - nd).clamp_min(0.0) / sp_t
+                push = (diff / nd[..., None].clamp_min(1e-9) * w_[..., None]).sum(1)
+                pn = pn + push * (0.3 * sp_t)
+                # back onto the shell: relaxation must not change the radius the anchors set
+                rad = (pos[slot] - c).norm(dim=1, keepdim=True)
+                dirn = (pn - c) / (pn - c).norm(dim=1, keepdim=True).clamp_min(1e-12)
+                pos[slot] = c + dirn * rad
         SECRETE_TRACE.append((n_live, add, int(live.sum()), R))
         return {}
 

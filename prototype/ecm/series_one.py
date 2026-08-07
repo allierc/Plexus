@@ -66,6 +66,55 @@ SERIES = {
     "82_strong_feedback": dict(_myo=dict(myosin=1.0, myo_beta=4.0, myo_tau=20.0)),
     "83_weak_newborn": dict(_myo=dict(myosin=1.0, myo_beta=1.0, myo_tau=20.0, myo_new=0.3)),
 
+    # --- v2: THE SAME SEVEN, RE-VERIFIED OVERDAMPED --------------------------------------------------
+    # Identical configurations to 69-75, under NEW NAMES on purpose. Re-running into the original folders
+    # is what destroyed their results once already: a relaunch was killed mid-flight and overwrote
+    # pass1.json before writing its own, so the reference the comparison needs was gone (recovered only
+    # because the cluster .out files still held the SERIES lines). A regression check that can destroy
+    # its own baseline is not a check.
+    #
+    # These are not a pure regression test either: `membrane_inertial=False` is now the default, so the
+    # sheet is integrated overdamped rather than given a mass. Bond counts, node counts and coverage
+    # should track the originals closely -- that is the "nothing broke" half. Strain and any sinking
+    # should MOVE -- that is the fix doing something.
+    "69v2_graph_reference": dict(),
+    "70v2_no_remodelling": dict(membrane_tau=0.0),
+    "71v2_fast_remodelling": dict(membrane_tau=10.0),
+    "72v2_starved": dict(membrane_secrete_rate=0.002),
+    "73v2_no_adhesion": dict(membrane_adhesion=0.0),
+    "74v2_brittle": dict(membrane_break=0.08),
+    "75v2_on_ovoid": dict(_gated=True),
+
+    # --- 84-95: WHAT MAKES THE HOLES ----------------------------------------------------------------
+    # An external reviewer: the holes in the reference sheet are too big -- real microperforations are
+    # ~1 um across, against a 5-10 um cell footprint, so a hole should be about an eighth of a cell and
+    # ours are about two and a half. Measured, the sheet is NOT at its resolution limit: the largest gaps
+    # are 6.1 node spacings where a well-packed sheet gives ~1.5. And the seeded sheet is fine (clearance
+    # 1.10 spacings, better than uniform random at 1.53) -- it degrades to 3.08 during the run. The holes
+    # are made by the deposition rule, which places a node beside a random parent rather than into the
+    # gap, and a random walk clumps. A relaxation pass on the new material takes 4.4 back to 1.75.
+    #
+    # So two things could be setting hole size and they are confounded: PACKING (relaxation) and
+    # RESOLUTION (node count). This grid separates them, at 45k/135k/270k nodes x relaxation off/on.
+    #
+    # And the same grid again WITHOUT ADHESION, because the reviewer's second point is a different
+    # mechanism that currently looks identical: unanchored, the sheet does not clump, it SLIDES OFF as a
+    # whole (coverage 1.00 -> 0.895), and no amount of relaxation or resolution addresses that. If the
+    # no-adhesion holes shrink with relaxation and nodes they were packing; if they do not, the sheet is
+    # drifting and the missing piece is an attachment to the stroma.
+    "84_holes_45k_r0": dict(membrane_particles=45000, membrane_reserve=13.5, membrane_relax_new=0),
+    "85_holes_45k_r8": dict(membrane_particles=45000, membrane_reserve=13.5, membrane_relax_new=8),
+    "86_holes_135k_r0": dict(membrane_particles=135000, membrane_reserve=40.5, membrane_relax_new=0),
+    "87_holes_135k_r8": dict(membrane_particles=135000, membrane_reserve=40.5, membrane_relax_new=8),
+    "88_holes_270k_r0": dict(membrane_particles=270000, membrane_reserve=81.0, membrane_relax_new=0),
+    "89_holes_270k_r8": dict(membrane_particles=270000, membrane_reserve=81.0, membrane_relax_new=8),
+    "90_holes_45k_r0_noadh": dict(membrane_particles=45000, membrane_reserve=13.5, membrane_relax_new=0, membrane_adhesion=0.0),
+    "91_holes_45k_r8_noadh": dict(membrane_particles=45000, membrane_reserve=13.5, membrane_relax_new=8, membrane_adhesion=0.0),
+    "92_holes_135k_r0_noadh": dict(membrane_particles=135000, membrane_reserve=40.5, membrane_relax_new=0, membrane_adhesion=0.0),
+    "93_holes_135k_r8_noadh": dict(membrane_particles=135000, membrane_reserve=40.5, membrane_relax_new=8, membrane_adhesion=0.0),
+    "94_holes_270k_r0_noadh": dict(membrane_particles=270000, membrane_reserve=81.0, membrane_relax_new=0, membrane_adhesion=0.0),
+    "95_holes_270k_r8_noadh": dict(membrane_particles=270000, membrane_reserve=81.0, membrane_relax_new=8, membrane_adhesion=0.0),
+
     # --- 84-91: WHICH VARIABLE THE MYOSIN FEEDBACK IS KEYED TO ---------------------------------------
     # The audit's charge: keyed to LENGTH the feedback homogenises junction lengths, where the measured
     # biology (Bertet 2004, Fernandez-Gonzalez 2009) has myosin recruited by TENSION and enriched on

@@ -68,78 +68,77 @@ reaches $\sim6000$ and its apical radius $4.66\to16.6$ (arbitrary units) in $402
 
 \section*{3.\; The ECM: MLS-MPM}
 
-The matrix is material points on a background grid, fixed-corotated with $F=RS$:
-%
-\begin{equation}
-\boldsymbol{\tau} \;=\; 2\mu\,(F-R)F^{\!\top} + \lambda J (J-1)\,I ,
-\qquad \boldsymbol{\sigma} \;=\; \boldsymbol{\tau}/J ,
-\qquad
-\sigma_{\mathrm{vM}}=\sqrt{\tfrac32\,\mathbf{s}\!:\!\mathbf{s}},\;\;
-\mathbf{s}=\boldsymbol{\sigma}-\tfrac13\mathrm{tr}(\boldsymbol{\sigma})I .
-\label{eq:mpm}
-\end{equation}
-%
-$\boldsymbol{\tau}$ was already computed every substep to build the affine momentum matrix and then
-discarded; \op{mpm\_scatter} now optionally caches the Cauchy stress $\boldsymbol{\sigma}$ to a
-per-particle buffer (\texttt{store\_stress}, off by default, byte-identical when off). This matters
-quantitatively: colouring by the volumetric measure $|J-1|$ put $0.6\%$ of the matrix above the display
-floor, whereas $\sigma_{\mathrm{vM}}$ of the \emph{same} run puts $64\%$ there. A matrix pushed by a
-growing sphere \emph{shears}; the fixed-corotated law resists volume change far more stiffly than shape
-change, so the volumetric measure was blind to the deformation, not the mechanics.
+The matrix is a material, not a set of springs, so it is solved the way materials are: as a cloud of
+points that carry the stuff and a background grid that does the arithmetic. Each frame the points hand
+their mass and momentum to the grid nodes nearest them, the grid resolves everything arriving at each
+node into one velocity, and the points read that velocity back and move. Nothing is ever computed
+between two points directly --- which is why bodies that never touch can still push on one another, and
+why the grid spacing sets the finest thing the matrix can feel.
+
+We seed it as fibres rather than a uniform block, because a fibrous matrix and a homogeneous one respond
+differently to being pushed, and the interesting behaviour --- splaying, dragging, a stress front
+travelling outward --- lives in the fibres.
 
 \section*{4.\; Spheroid $\leftrightarrow$ ECM}
 
-The two solvers cannot share a world. \op{mpm\_grid} is hard-coded to $[0,1]^3$; the epithelium lives in
-a 50-unit box, and rescaling it there was tried and measured, not assumed --- the same run gives
-$200\!\to\!319$ cells at its own scale but $200\!\to\!212$ rescaled, because the terms of the vertex
-energy carry different powers of length and a $50\times$ shrink changes which one wins. So the two run as
-two passes joined by one geometric scale, applied to a \emph{recorded} shape.
+The two solvers cannot share a world: the matrix grid is fixed to the unit cube, the epithelium lives in
+a box fifty times larger, and shrinking the tissue to fit changes which term of its energy dominates and
+stops it growing. So they are run as two passes joined by one geometric scale, and what crosses between
+them is a \emph{recorded shape} rather than a live tissue.
 
-That recording is the whole coupling, and it runs one way. The epithelium's surface is a moving boundary
-the matrix feels; nothing the matrix does reaches back. Fibres inside the surface are pushed out by a
-soft penalty and then, as a backstop, projected out:
+That recording needs somewhere to live, and this is what the \op{surface} Level is. It is a set of
+nodes, one per membrane node, each holding a fixed direction from the tissue centre and the radius the
+epithelium reached in that direction at that moment. It is not a mesh and carries no mechanics; it is
+the epithelium's outer boundary, written down. Before it existed the same information was a lookup
+table, which meant nothing could act on it and nothing could be attached to it --- promoting it to a
+Level is what lets other things bind to the tissue surface as an object rather than consult it as data.
+
+Everything outside the epithelium then reads that one surface. Matrix fibres that end up inside it are
+pushed back out, first softly and then, as a backstop, by being placed outside:
 %
 \begin{equation}\mathbf a_i \;=\; k_c\,\bigl(R(\hat{\mathbf u}_i,t)-r_i\bigr)_+\,\hat{\mathbf u}_i,
 \label{eq:contact}\end{equation}
 %
-and the reaction is binned by direction and divided by the area each bin covers, $R^2\,d\Omega$, to give
-a pressure map $P(\theta,\phi,t)$. A cell facing a stressed matrix then grows more slowly:
+and the force the fibres push back with is collected by direction and divided by the area each direction
+covers, giving a pressure over the surface. A cell facing a stressed matrix then grows more slowly:
 %
 \begin{equation}g \;=\; f + \frac{1-f}{1+\bigl(P/p_{1/2}\bigr)^{n}},\qquad
  s_{\text{now}} \leftarrow s_{\text{prev}}\,\bigl(1+g\,(f_{\text{grow}}-1)\bigr).
 \label{eq:gate}\end{equation}
 %
-Because it is the growth \emph{rate} that is gated, a small difference compounds over 400 frames, and a
-$2.75\times$ stress anisotropy becomes a shape: an oblate cavity takes the tissue to oblateness $1.43$
-where a flat pattern of the same strength leaves it round at $1.015$.
+Because it is the growth \emph{rate} that is slowed and not the size directly, a small difference
+compounds over hundreds of frames --- which is how a modest difference in stress between one direction
+and another can become a difference in shape.
+
+The coupling still runs one way. The surface is a recording, so it drives the matrix and the membrane
+and neither reaches back, and the second pass cannot change the tissue it is reacting to. Making it
+mutual means letting an operator write to \op{surface} instead of only reading it, which is now a change
+to one Level rather than a change to the architecture.
 
 \section*{5.\; The two new levels}
 
-\paragraph{Junctions.} In the vertex model contractility is one number for the whole tissue. Each
-junction now carries its own myosin $m_e$, multiplying the line tension, and chasing a setpoint on a
-timescale $\tau_m$:
+\paragraph{Junctions.} In the vertex model every cell--cell contact pulls with the same strength. Each
+junction now carries its own amount of myosin, which multiplies that strength and chases a target on its
+own timescale:
 %
 \begin{equation}\Lambda\sum_e \ell_e \;\longrightarrow\; \Lambda\sum_e m_e\,\ell_e,\qquad
  m^{ss}_e = a\Bigl(1+\beta\,\bigl(x_e/\langle x\rangle-1\bigr)\Bigr),\qquad
  \dot m_e=\bigl(m^{ss}_e-m_e\bigr)/\tau_m.
 \label{eq:myo}\end{equation}
 %
-What $x_e$ should be is the substance. Our first choice was junction \emph{length}, which makes the loop
-\emph{longer $\to$ more myosin $\to$ shorter} --- a negative feedback that evens junction lengths out. The
-measured biology is the opposite: myosin is recruited by \emph{tension} and is enriched on
-\emph{disassembling} junctions, giving a positive feedback that drives neighbour exchange. Worse, in the
-fast-myosin limit --- the correct one, since myosin turns over in seconds --- substituting the setpoint
-turns Eq.~\eqref{eq:myo} into a line tension plus a harmonic spring on each edge, so ``$\beta$ reduces
-the spread of junction lengths'' is that spring's definition and cannot be evidence for it. $x_e$ is now
-the actual edge tension, $\Lambda m_e + 2K_P(P_f-P_f^0)+\Gamma P_f$, taken from the same energy the
-mechanics minimises; and the observable we report is the \textbf{T1 rate}, which the two feedbacks move
-in opposite directions where the length spread does not.
+What matters is what $x_e$ is. If it is the junction's \emph{length}, the loop reads \emph{longer $\to$
+more myosin $\to$ shorter}, which evens the cells out. Real myosin is recruited by \emph{tension} and
+accumulates on junctions that are in the act of disappearing, which is the opposite: a junction that
+pulls harder shortens, which makes it pull harder still, and neighbours swap. $x_e$ is the edge tension,
+read from the same energy the mechanics minimises. The two versions look alike in the spread of junction
+lengths and differ in how often cells exchange neighbours, so that exchange rate is what we report.
 
-\paragraph{Basement membrane.} A sheet of nodes joined by explicit crosslinks --- MPM particles alone
-have no connectivity, so they cannot be crosslinked and cannot fragment. Each crosslink is a spring that
-forgets being stretched on a timescale $\tau_r$ and breaks past a strain $\varepsilon_b$; each node is
-tied to a fixed \emph{direction} on the recorded surface, which is what makes it adhesion rather than
-contact, since anchoring to the nearest point would let the node slide and the sheet would never stretch:
+\paragraph{Basement membrane.} A sheet of nodes joined by explicit crosslinks. The crosslinks are what
+make it a sheet rather than dust --- material points on their own have no connections, so they cannot be
+crosslinked and cannot tear. Each crosslink is a spring that slowly forgets having been stretched, and
+snaps if stretched too far; each node is tied to a fixed \emph{direction} on the recorded surface, which
+is what makes it adhesion rather than mere contact, since a node allowed to slide to the nearest point
+would never be stretched at all:
 %
 \begin{align}
 \mathbf f_{ij}&=k_b\,(L_{ij}-\ell^0_{ij})\,\hat{\mathbf d}_{ij}, &
@@ -151,26 +150,19 @@ contact, since anchoring to the nearest point would let the node slide and the s
 \label{eq:integrin}
 \end{align}
 %
-Remodelling is not optional: a purely elastic sheet cannot enclose a surface that grows $260\%$ in linear
-strain, and it tore at every $\varepsilon_b$ we tried. With it, the sheet settles at
-$\langle\epsilon\rangle\simeq\dot\varepsilon\,\tau_r$. And because area grows as $R^2$ while deposition
-adds a fixed fraction of existing material per frame, secretion has a threshold, $\rho^\ast=2\ln(R_1/R_0)/N$
---- though that follows from the operator's own setpoint, so measuring it confirms an implementation
-rather than testing a hypothesis.
+Forgetting is not optional: a sheet that only stretches cannot enclose a surface that more than triples
+in size. And because area grows as the square of the radius while new material is added as a fraction of
+what is already there, the sheet must be \emph{secreted} as the tissue grows or it thins.
 
-Two corrections. The sheet was integrated with a \emph{mass}, and everything this section used to report
-about oscillation, critical damping, tracking lag and a stiffness ceiling followed from that; at
-$\mathrm{Re}\sim10^{-10}$ the motion is $\gamma\dot{\mathbf x}=\mathbf F$ and none of it exists. It is now
-overdamped. And the metric these claims rested on --- the largest connected component --- was
-\texttt{NaN} on every frame any analysis read, so it had never once been reported; it is now carried
-forward beside the mean degree $z$, which must exceed $\approx\!4$ for the sheet to be mechanically a
-sheet at all.
-
-Finally, on naming: \op{integrin\_adhesion} is a tether to a surface, not a receptor. In mammals
-$\alpha_1\beta_1$ and $\alpha_2\beta_1$ do bind collagen~IV, so the receptor exists --- but the dominant
-epithelial anchor is to \emph{laminin}, which is not modelled, and the sheet has no attachment to the
-stroma either. Removing the tether therefore leaves it attached to nothing, which is why that run is a
-control and not a knockout.
+The sheet is moved the way something this small actually moves. Force used to set its
+\emph{acceleration}, so it had a mass and a momentum, could overshoot a target and oscillate about it.
+Force now sets its \emph{velocity} --- $\gamma\dot{\mathbf x}=\mathbf F$ --- so it has neither, and
+stops the instant it stops being pushed. At this scale viscous drag beats inertia by about ten orders of
+magnitude, so this is not a numerical convenience but the correct equation of motion, and a whole class
+of behaviour we used to observe and tune around does not exist in it. And what is called adhesion here is a tether to a surface, not a
+receptor: the dominant anchor in a real epithelium is to laminin, which is not modelled, and there is no
+attachment to the surrounding stroma either, so removing the tether leaves the sheet held by nothing at
+all.
 
 \section*{6.\; The two schematics}
 
