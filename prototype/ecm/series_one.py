@@ -54,6 +54,17 @@ SERIES = {
     # to run scatter, the demand-limited picture is wrong.
     "76_secrete_x10": dict(membrane_secrete_rate=0.12),
     "77_secrete_x20": dict(membrane_secrete_rate=0.24),
+    # --- the junction twin: the same treatment for the OTHER new level -------------------------------
+    # These vary myosin, not the membrane, so the panel to read is the junction network (bottom right).
+    # `activity` is the blebbistatin knob and is degenerate with Lambda by construction; `beta` is the
+    # tension feedback and is NOT -- it moves junction-length disorder at constant tissue size, which no
+    # uniform tension scale can do. `myo_new` is what a junction born from a division starts with.
+    "78_myo_reference": dict(_myo=dict(myosin=1.0, myo_beta=1.0, myo_tau=20.0)),
+    "79_blebbistatin": dict(_myo=dict(myosin=0.3, myo_beta=1.0, myo_tau=20.0)),
+    "80_hypercontractile": dict(_myo=dict(myosin=2.0, myo_beta=1.0, myo_tau=20.0)),
+    "81_no_feedback": dict(_myo=dict(myosin=1.0, myo_beta=0.0, myo_tau=20.0)),
+    "82_strong_feedback": dict(_myo=dict(myosin=1.0, myo_beta=4.0, myo_tau=20.0)),
+    "83_weak_newborn": dict(_myo=dict(myosin=1.0, myo_beta=1.0, myo_tau=20.0, myo_new=0.3)),
 }
 
 
@@ -63,16 +74,22 @@ def main():
     frames = int(sys.argv[3]) if len(sys.argv) > 3 else 402
     over = dict(SERIES[name])
     gated = over.pop("_gated", False)
+    myo = over.pop("_myo", None)          # junction-level knobs: they belong to PASS 1, not the spec
     # RECORDED BEFORE THE POP CONSUMES IT. `_gated` is the only change 75 makes, so popping it left an
     # empty dict and the run archived itself as `{"reference": true}` -- identical to 69's label, for a
     # run on a tissue of aspect 1.332 against 69's 1.021.
     label = dict(over)
+    if myo:
+        label.update(myo)
     if gated:
         label["tissue"] = "gated ovoid (aspect 1.33)"
     for t in (membrane_ops.BOND_TRACE, membrane_ops.MEMBRANE_STRAIN,
               membrane_ops.SECRETE_TRACE, membrane_ops.BOND_SNAPSHOTS):
         t.clear()
     tk = dict(frames=401, device=dev, buffer_x=4, myosin=1.0)
+    if myo:
+        tk.update(myo)
+        tk["tag_extra"] = "_" + "_".join(f"{k}{v:g}" for k, v in sorted(myo.items()))
     if gated:
         tk.update(gate_npz=GATE, gate_p_half="auto", gate_hill=6.0, gate_floor=0.08,
                   gate_smooth_frames=25, gate_smooth_phi=360.0, tag_extra="_gated_myo")
