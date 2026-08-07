@@ -358,7 +358,7 @@ OPERATORS = {
         # field (see prototype/ecm/HIERARCHY.md); leaving it unsearchable meant the lattice
         # artefact could never be varied against.
         params={"n_cells": (150, 4000, 500),          # 4000 = Okuda's largest case (grounder.SETUP)
-                "radius": (2.0, 12.0, 5.0), "jitter": (0.0, 0.8, 0.35),
+                "radius": (2.0, 12.0, 5.0), "jitter": (0.0, 0.8, 0.15),   # 0.15 = the operator default; a different one here would silently re-geometry every parent on resume
                 "vseed_cv": (0.0, 0.5, 0.15)}),
     "shape_energy_3d": dict(
         stage=1, role="mechanics", outputs=["geometry"], slots=[], needs=[],
