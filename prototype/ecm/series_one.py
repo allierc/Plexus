@@ -266,6 +266,18 @@ SERIES = {
     "93_mpm_nosecrete": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
                              membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
                              membrane_reserve=12.5, membrane_secrete_rate=0.0),
+    # 94: 92 and 93 both froze at R = 0.0876 while 91 tracked to 0.3151, and the difference is DENSITY,
+    #     not secretion: `reserve=12.5` lays down only 3,333 of the 45,000 particles, and a sheet that
+    #     sparse does not register as material on the grid, so the boundary has nothing to push. Two
+    #     things were changed from the working point at once and the first one broke it.
+    #
+    #     94 changes exactly ONE thing from 91: the reserve is added ON TOP of the working sheet rather
+    #     than carved out of it -- 90,000 particles at reserve 1.0 is the same 45,000 laid down at frame
+    #     0, with 45,000 held back to secrete. 91 is its own control.
+    "94_secrete_dense": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
+                             membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
+                             membrane_particles=90000, membrane_reserve=1.0,
+                             membrane_secrete_rate=0.012),
 
     # 89-91: Plexus's own attraction_repulsion law instead of the one-sided spring.
     #
