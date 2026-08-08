@@ -99,6 +99,81 @@ When a residual survives every composition of the operators already in the model
 \]
 Fitting the data and \emph{building the language that can express it} thereby become the same activity. In the case study below this loop runs to completion more than once. A plateau in loop \emph{enclosure}~--- trajectories that trace thin, nearly one-dimensional arcs rather than closed loops~--- is traced not to insufficient force but to a symmetry: a contraction axis that is fixed over the beat retraces its path and encloses no area. The named ingredient is a rotating contraction axis, added as a single operator, which breaks the plateau and fills the enclosure residual. A subsequent plateau in loop \emph{size} then resists every lever the current language offers~--- drive, gain, stiffness, duration~--- and prompts a different hypothesis: that the tissue does not enter each beat from a stress-free reference, so that the missing ingredient is a residual-stress (pre-stress) operator, proposed precisely because no operator already in the model can reach it. Each such step both removes a class of models and adds a word to the vocabulary.
 
+\section{From a continuum with a pattern to a tissue made of cells}
+
+The campaign so far fits a \emph{continuum}. Heterogeneity enters as a map: an image is sampled at
+each material point and becomes that point's Young's modulus, so neighbouring points differ a
+little and the contraction's symmetry is broken. This is enough to produce spatial variation and it
+is not enough to produce a tissue, because a map has no boundaries in it. Two material points a
+micron apart always have almost the same material, whatever the map. A monolayer of cardiomyocytes
+does not work that way: it is a set of discrete contractile units, mechanically coupled but
+individually stiff, individually oriented, and individually timed. The residual this leaves is
+structural rather than numerical --- no setting of a smooth field can make two adjacent points
+belong to different objects --- and by the argument of this paper it is exactly the kind of
+residual that names its own missing ingredient.
+
+\paragraph{The hypothesis comes from the data, and from its motion rather than its appearance.}
+Cell boundaries are not visible in these recordings. The phase-contrast frames are a dense texture
+at confluence, and segmenting them is segmenting nothing --- an edge detector finds halos and
+granules. But a cardiomyocyte contracts along its own long axis, and that axis is a property of the
+cell, not of the image. It can therefore be measured \emph{over time at one point} before any
+spatial reasoning: each grid point's beat trajectory is nearly a straight line (median anisotropy
+$\lambda_1/\lambda_2 = 14$) whose direction is that point's contraction axis. Segmentation then
+becomes: cut where the axis turns, using $\exp(2i\theta)$ because an axis has no head or tail.
+
+\paragraph{What that measurement does and does not establish.} It is worth stating both, because
+the positive results are all of one kind. The axis field is real rather than an artefact of
+smoothing: computed from two disjoint pairs of beats it agrees at $0.9989$ with \emph{no} smoothing,
+and its spatial coherence length is $90$\,px. The resulting partition reproduces across beats at
+$\mathrm{ARI} = 0.95$ against a rolled null of $0.18$, and it recovers the right cell density
+without being told it --- $465$ regions against $472$ nuclei counted independently in the image, a
+$1.5\%$ agreement, which also pins the uncalibrated pixel size at $\approx 0.33\,\mu$m so that the
+$90$\,px coherence length is $30\,\mu$m, a cardiomyocyte.
+
+Against that: the unseeded partition does \emph{not} localise individual cells. Displace the nuclei
+and they fall one-per-region just as often ($z = +0.5$), and the borders do not coincide with image
+edges ($z = -1.9$). Reproducible is not correct: a patch of aligned myofibrils produces the same
+stable structure and may span two cells or divide one. The construction that survives its nulls
+uses the nuclei --- which are visible --- to fix \emph{where} the cells are, and the motion to
+decide only \emph{where the border between two of them runs}. Scored by fitting one affine map per
+region to held-out beats, on the principle that a cell is the unit that moves together, the
+motion-bent partition explains the held-out motion better than a Voronoi tessellation of the same
+nuclei by $2.1\%$, against $1.1\%$ for the same borders displaced --- $z = +3.1$, and $+3.2$ with
+the halves exchanged. Small, and earned.
+
+\paragraph{The operator.} The ingredient is then named and registered:
+\code{seed\_from\_segmentation}, with a companion \code{label\_image} field. Two properties of a
+label map force both to exist. Labels may not be interpolated --- cell $7$ beside cell $12$ must not
+yield cell $9$ in between --- so the field is read without normalisation and sampled by nearest
+neighbour, unlike the greyscale map field it otherwise resembles. And a cell is not a disc: the
+engine scatters a contained set in a ball about its parent, which is correct for a generic child
+and wrong for a cell whose shape has been measured, so the operator re-seeds each cell entity onto
+its own centroid and places that cell's material points inside its own mask. It is structural, not
+dynamics: it establishes a configuration and then returns immediately, and it declares the
+exemption from the integration invariant that writing state directly requires.
+
+\paragraph{What the language can now say.} The hierarchy the framework describes --- sets contained
+in sets --- becomes populated at three levels that each mean something:
+\[
+\text{tissue} \;\longrightarrow\; \text{cells} \;\longrightarrow\; \text{material points},
+\]
+one tissue, $472$ cells measured from the recording, and $500$ material points per cell placed
+inside its measured shape. Every point of a given cell carries that cell's Young's modulus
+\emph{exactly}, so two points either side of a boundary differ discontinuously --- which is what a
+painted map cannot do, and which lets adjacent cells shear against one another. The per-cell
+stiffness is not invented either: it is taken from each cell's measured beat amplitude, under the
+stated hypothesis that a cell which moved little is stiff rather than weakly contractile. That
+hypothesis is a lever, and the alternative reading --- amplitude as contraction gain --- is the same
+line the other way round, which makes it a testable fork rather than a modelling choice buried in
+code.
+
+This is one full turn of the loop the paper argues for. A residual that no parameter could reach
+(the model has no cells) generated a hypothesis (the tissue is a set of discrete units), the
+hypothesis was measured in the data by a route the appearance of the data forbids (time before
+space), and the result became a registered operator that enlarges what the forward model can
+express. Whether it improves the \emph{fit} is the next experiment, and it is now a question the
+language can pose.
+
 The remainder of the paper develops this method and its instantiation: the differentiable active-stress MPM forward model and the operators it is assembled from; the LoopScore morphology metric and why framewise error is the wrong objective for a loop; the residual decomposition that attributes a plateau to a named morphological axis; and the sequence of operator-discovery steps the campaign has produced, presented as the running example of optimization, residual, hypothesis, operator, extended language.
 
 \end{document}
