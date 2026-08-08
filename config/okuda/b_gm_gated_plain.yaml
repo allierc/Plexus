@@ -75,7 +75,7 @@ operators:
   rate: 0.000866
   a_sw: 0.35
   hill: 4.0
-  rho: 1.0
+  rho: 0.1
   vth_frac: 2.5
   after_frame: 100
   conserve_amount: false

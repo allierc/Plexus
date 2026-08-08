@@ -82,9 +82,22 @@ VERT_BUF = 120000            # array must not be what stops a base. ~1.3 GB of t
 WORLD = 80.0
 
 GROWTH_RATE = 0.000866       # the rate every campaign run has used
-RHO = 1.0                    # NOT the old default of 0.1. At 0.1 the tissue added 1% volume while
-                             # cells went 2000 -> 3250 -- division was subdivision, and P1 said so.
-                             # The rho ladder measured in round 1 puts grip at its peak here.
+# rho MEANS TWO DIFFERENT THINGS DEPENDING ON THE GATE, so there are two values.
+#
+# Growth is rate * (rho + Hill(activator)). On a GATED base the Hill term is the activator's
+# contribution and rho is the baseline every white cell gets anyway, so the tip-to-body growth
+# ratio is (rho+1):rho -- rho is the LOCALIZATION knob and low means localized. On an UNGATED base
+# (a_sw = 0, or no chemistry at all) the Hill term is 0 and rho is the ONLY growth term, so
+# lowering it does not localize anything, it just grows slower.
+#
+# The first basis used 1.0 everywhere, which puts every gated member at 2:1 -- a red cell grows
+# twice as fast as a white one. That is a bias, not localization, and all sixteen basis runs and
+# all forty-six runs of rounds 1-4 came back spheres. Cedric, 8 August: "this is exactly the role
+# of the morphogen activity, that cells grow locally on red spot??" It is, and it was turned down
+# almost off. 0.1 is 11:1, and it centres every Route B run -- which inherits its parent's rho --
+# in the regime the campaign is about, instead of leaving that to Route A to find.
+RHO_GATED = 0.1              # tip:body = 11:1 on the four *_gated_* members
+RHO_UNGATED = 1.0            # the only growth term where there is no gate; not a ratio
 HILL = 4.0
 VTH_FRAC = 2.5
 DIVIDE_FACTOR = 2.0          # must sit BELOW vth_frac or a cell can never reach the size that
@@ -223,7 +236,7 @@ def build(chem, mat, mech):
         ops.append(
             {"op": "grow_3d", "at": "vertex", "cell_set": "cell",
              "rate": GROWTH_RATE, "a_sw": A_SW_GATED if gated else A_SW_OPEN, "hill": HILL,
-             "rho": RHO, "vth_frac": VTH_FRAC, "after_frame": 100,
+             "rho": (RHO_GATED if gated else RHO_UNGATED), "vth_frac": VTH_FRAC, "after_frame": 100,
              # P1: growth ADDS material here. conserve_amount redistributes it, which is what made
              # coral_gate_div_defaultE fail P1 with a growth operator running.
              "conserve_amount": False})
