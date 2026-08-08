@@ -259,9 +259,13 @@ SERIES = {
     "92_mpm_secrete": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
                            membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
                            membrane_reserve=12.5, membrane_secrete_rate=0.012),
-    "93_mpm_starved": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
-                           membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
-                           membrane_reserve=12.5, membrane_secrete_rate=0.002),
+    # 93 is now the CONTROL, not a starved variant: the same sparse seeded sheet with secretion off, so
+    # 92 minus 93 is the effect of added material and nothing else. (A rate sweep is worthless until the
+    # rate is read at all -- 92 vs 93 at 0.012 and 0.002 returned identical numbers because the operator
+    # returned early on the missing bond list.)
+    "93_mpm_nosecrete": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
+                             membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
+                             membrane_reserve=12.5, membrane_secrete_rate=0.0),
 
     # 89-91: Plexus's own attraction_repulsion law instead of the one-sided spring.
     #

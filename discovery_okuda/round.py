@@ -848,64 +848,70 @@ def route_a(ctx):
     n_rounds = len({r for r in _sweep_rounds()})
     order = plan_bases[n_rounds % len(plan_bases):] + plan_bases[:n_rounds % len(plan_bases)]
     out = []
-    for base_turn in order:
-        for base, op, key, values in plan:
-            if base != base_turn or len(out) >= limit:
-                continue
-            done = set((tried_by_base.get(base) or {}).get(f"{op}0.{key}", []))
+
+    def _offer(base, op, key, values, n):
+        """Up to `n` fresh, premise-legal values of one knob on one base -> slot dicts."""
+        done = set((tried_by_base.get(base) or {}).get(f"{op}0.{key}", []))
         todo = [v for v in values if _round_val(v) not in done]
         if not todo:
-            continue                                   # swept to closure, retired
+            return []                                  # swept to closure on this base, retired
         # A VALUE THE PREMISES WILL REFUSE IS DROPPED HERE, not discovered on the cluster.
         #
-        # Twice now the plan has walked into a constraint and lost slots to it: `rho = 0.0` with
-        # the gate connected (P2, one slot), and `vth_frac`/`factor` crossing each other (the
-        # refute_coral_nocons relation, FOUR slots in round 3). Both were refused correctly and
-        # before any GPU -- but a refused run records no metrics, so the closure counter never
-        # advances and route_a re-proposes the same dead value every round for the rest of the
-        # campaign. Hand-patching the grid fixes one crossing and not the next.
-        #
-        # The premises are a function of the spec, so ask them here, on the spec this slot would
-        # write. Costs milliseconds, no GPU, and an illegal value simply never becomes a slot.
+        # Twice the plan has walked into a constraint and lost slots to it: `rho = 0.0` with the
+        # gate connected (P2), and `vth_frac`/`factor` crossing each other (FOUR slots in round 3).
+        # Both were refused correctly and before any GPU -- but a refused run records no metrics,
+        # so the closure counter never advances and route_a re-proposes the same dead value every
+        # round for the rest of the campaign. Hand-patching the grid fixes one crossing, not the
+        # next. The premises are a function of the spec, so ask them here, on the spec this slot
+        # would write: milliseconds, no GPU, and an illegal value never becomes a slot.
         legal = [v for v in todo if _sweep_premises_ok(base, op, key, v)]
         if len(legal) < len(todo):
             gone = [v for v in todo if v not in legal]
             print(T_.quiet(f"[route A] {base} {op}.{key}: {gone} refused by a premise -- "
                            f"not offered"))
-        # ONE ENTRY PER BASE PER ROUND, so a round advances every base by a comparable amount and
-        # the Analyst gets ladders it can set side by side -- which is the whole point of having
-        # more than one base. `per_base` here is what is left divided by the bases still to come.
-            share = max(1, (limit - len(out)) // max(1, len(order)))
-            for v in legal[:share]:
-                out.append({"sweep": True, "base": base, "op": op, "key": key, "value": v,
-                            "claim": f"ROUTE A: sweep {op}.{key} on {base} -- "
-                                     f"what value makes it work",
-                            "intent": "sweep"})
-            break                       # this base has had its turn; go to the next one
-    # ANY SLOTS LEFT GO BACK ROUND. A base with nothing open passes its share on rather than
-    # leaving the round short -- the defect that ran Route A at half budget for three rounds.
+        return [{"sweep": True, "base": base, "op": op, "key": key, "value": v,
+                 "claim": f"ROUTE A: sweep {op}.{key} on {base} -- what value makes it work",
+                 "intent": "sweep"} for v in legal[:max(0, n)]]
+
+    # PASS ONE -- ONE KNOB PER BASE, IN ROTATION, so a round advances every base by a comparable
+    # amount and the Analyst gets ladders it can set side by side. That is the whole point of
+    # having more than one base: the same knob on four reaction schemes separates a property of
+    # growth from a property of gray_scott, and one base racing ahead destroys the comparison.
+    for i, base_turn in enumerate(order):
+        if len(out) >= limit:
+            break
+        share = max(1, (limit - len(out)) // max(1, len(order) - i))
+        for base, op, key, values in plan:
+            if base != base_turn:
+                continue
+            got = _offer(base, op, key, values, min(share, limit - len(out)))
+            if got:
+                out.extend(got)
+                break                                  # this base has had its turn
+    # PASS TWO -- ANY SLOTS LEFT GO BACK ROUND, least-served base first. A base with nothing open
+    # passes its share on rather than leaving the round short: that is the defect that ran Route A
+    # at HALF its declared budget for three rounds, and it is also why sorting matters here --
+    # handing the remainder to whoever is listed first is how round 1 became 5 rungs and 3.
     if len(out) < limit:
         spent = {(d["base"], d["op"], d["key"], _round_val(d["value"])) for d in out}
-        # LEAST-SERVED FIRST, so passing a share on does not simply hand it to whichever base is
-        # listed earliest. Round 1 of the old code gave cellfix five rungs and coral three for
-        # exactly that reason, and Cedric read the split off the round: "I expected 4 coral and 4
-        # cellfix_B_new in route A".
-        got = {b: sum(1 for d in out if d["base"] == b) for b in plan_bases}
-        plan = sorted(plan, key=lambda e: (got.get(e[0], 0), order.index(e[0])
-                                           if e[0] in order else 0))
-        for base, op, key, values in plan:
-            done = set((tried_by_base.get(base) or {}).get(f"{op}0.{key}", []))
-            for v in values:
+        while len(out) < limit:
+            got = {b: sum(1 for d in out if d["base"] == b) for b in plan_bases}
+            ranked = sorted(plan, key=lambda e: (got.get(e[0], 0), order.index(e[0])))
+            added = 0
+            for base, op, key, values in ranked:
                 if len(out) >= limit:
                     break
-                if _round_val(v) in done or (base, op, key, _round_val(v)) in spent:
-                    continue
-                if not _sweep_premises_ok(base, op, key, v):
-                    continue
-                out.append({"sweep": True, "base": base, "op": op, "key": key, "value": v,
-                            "claim": f"ROUTE A: sweep {op}.{key} on {base} -- "
-                                     f"what value makes it work",
-                            "intent": "sweep"})
+                fresh = [v for v in values
+                         if (base, op, key, _round_val(v)) not in spent]
+                for d in _offer(base, op, key, fresh, 1):
+                    out.append(d)
+                    spent.add((base, op, key, _round_val(d["value"])))
+                    added += 1
+                    break
+                if added:
+                    break                              # re-rank after every slot
+            if not added:
+                break                                  # nothing legal left anywhere
     return out
 
 
