@@ -519,7 +519,21 @@ OPERATORS = {
         # candidate derivation was measured and did not hold (see "explicit reaction" above).
         # An absent bound is the honest state; 3.0 was a hand-written one that hid three decades.
         # gamma (brusselator): was (0.1, 100.0), equally hand-written. Also open above.
-        params={"gamma": (0.0, GAMMA_CEIL, 0.3), "a0": (0.0, 0.05, 0.01),
+        #
+        # THE DEFAULT MOVED 0.3 -> 0.05 ON A MEASUREMENT, 8 August. The four brusselator members
+        # of the basis ran at gamma = 0.3 and every one came back with act_max = NaN, P12 broken
+        # (a concentration must be finite), P4 broken (chemistry extinguished) and the mesh frozen
+        # at its seed count -- NaN chemistry makes NaN growth targets and the mechanics stops.
+        # `reaction_stiffness` in this file already said why: brusselator's linear decay is
+        # gamma*(B+1) = 1.2 at gamma 0.3, against gray_scott's rate*(F+kk) = 0.108, and explicit
+        # Euler at dt = 1 does not carry it. 0.05 puts the stiffness at 0.2, within 2x of the
+        # gray_scott recipe this campaign knows works.
+        #
+        # THE CEILING STAYS ABSENT. One diverging point is evidence about a default, not a derived
+        # bound, and the note above records that a candidate derivation was measured and did not
+        # hold. Writing a ceiling from a single measurement is the hand-written bound this file
+        # already removed once.
+        params={"gamma": (0.0, GAMMA_CEIL, 0.05), "a0": (0.0, 0.05, 0.01),
                 "rate": (0.0, RD_RATE_CEIL, 1.0),
                 "F": (0.02, 0.06, F_DEFAULT), "kk": (0.05, 0.07, KK_DEFAULT),
                 "mu_h": (0.2, 2.0, MU_H_DEFAULT),

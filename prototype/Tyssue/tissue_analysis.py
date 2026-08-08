@@ -382,7 +382,15 @@ def analyze(frames, OUT, a_sw=None):
     try:
         _t = ax[2].twinx()
         _t.plot(fr, col("ray_single_frac"), "--", color="purple", lw=1.3)
-        _t.set_ylabel("ray single frac (P11)", color="purple", fontsize=8)
+        # PINNED, because autoscale turns a perfect score into what looks like a ceiling.
+        # `ray_single_frac` = 1.0 means every ray crosses the surface exactly once: the BEST
+        # value, not a limit. On a healthy run it never moves off 1.0, so matplotlib scaled the
+        # axis to 0.96-1.04 and drew it hard against the top of the panel -- read off
+        # b_gm_uniform_plain as "a cap is passed around frame 850", when the run has
+        # broken_frac 0.0, folded_frac 0.0 and ray_single_frac 1.0 at every one of 900 frames.
+        # 1.0 now sits where 1.0 belongs, with room below it for the only direction it can go.
+        _t.set_ylim(0.0, 1.05)
+        _t.set_ylabel("ray single frac (P11)  1.0 = perfect", color="purple", fontsize=8)
     except Exception:
         pass
     ax[2].set_title("mesh faults by mode"); ax[2].set_xlabel("frame"); ax[2].legend(fontsize=7)

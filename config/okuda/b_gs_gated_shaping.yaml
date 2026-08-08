@@ -135,7 +135,7 @@ _basis:
   chem: gs
   mat: gated
   mech: shaping
-  grid: 3 chemistry x 2 material x 2 mechanics
+  grid: 4 chemistry x 2 material x 2 mechanics
   why: chemistry=gs, material=gated, mechanics=shaping -- one cell of the basis grid
     written by make_basis.py; every value not on an axis is shared with the other
-    eleven.
+    fifteen.

@@ -200,45 +200,88 @@ nodes:
     args:
       # THE SWEEP PLAN IS A CAMPAIGN DECISION, so it is declared here rather than in round.py --
       # the same reason `parents.pool` is. Each entry is [base, operator, knob, values]; the node
-      # takes the next one with values still unrun and stops at `slots`. Order matters and is
-      # deliberate: DIVISION FIRST, because nothing downstream means anything until the tissue
-      # actually gains material. A knob run at every value here is CLOSED and never offered again.
+      # walks the bases in rotation, gives each an equal share of the remaining slots, and lets a
+      # base with nothing open pass its share on. A knob run at every value on its base is CLOSED
+      # and never offered again -- closure is scoped (base, knob) and to Route A's own slots, so
+      # one base cannot retire another's ladder and a Route B edit cannot be counted as a rung.
       #
-      # Why these two bases: cellfix_B_new divides cleanly (x22.7 volume) and has NO pattern
-      # (act_cv 0.000); coral_gate_div has the pattern (act_cv 2.2) and its cells SHRINK as they
-      # divide (v_cell 0.17). One grows without patterning, one patterns without growing. Route A
-      # exists to find the setting where both happen, and hand it to Route B as a parent.
+      # RE-BASED 8 AUGUST onto the generated basis. The old plan swept `cellfix_B_new` and
+      # `coral_gate_div`, both archived: their mechanics model cannot express K_bend or K_lumen,
+      # so half the questions below were unaskable on them.
+      #
+      # FOUR BASES, ONE PER CHEMISTRY COLUMN, all `gated` except the chemistry-free one, which has
+      # no gate to close. That is the comparison Route A exists to make -- Cedric, 8 August: "add 4
+      # to study RD mechanisms in route A" -- and it only became possible when `brusselator` gave
+      # the chemistry axis its third model. The same knob swept on four reaction schemes answers
+      # "is this a property of growth or a property of gray_scott", which no single-base sweep can.
+      #
+      # EVERY GRID EXCLUDES ITS BASE'S OWN DEFAULT VALUE. Measured on the last campaign: 5 of 24
+      # Route A slots re-ran the baseline unchanged -- r001_12 (rho 0.1), r002_13 (vth_frac 2.5)
+      # and r004_13 (factor 2.0) are bit-identical to each other, because all three values are what
+      # `coral_gate_div` already carried. A free determinism check, and an expensive sweep point.
+      # The round's own control measures that point every round for nothing.
       slots: 8
       plan:
-        - [cellfix_B_new,  grow_3d, rho,      [0.0, 0.1, 0.3, 1.0, 2.0]]
-        # rho 0.0 is DROPPED for coral_gate_div and kept for cellfix_B_new, and the difference is
-        # the gate. With the activator gate connected, rho = 0 is the infinite tip-to-body ratio
-        # premise P2 refuses BEFORE the GPU ("if the gate is connected at all, then rho > 0") --
-        # r001_13 died on exactly that. A refused run records no metrics, so the closure counter
-        # never sees the value and route_a would re-propose it every round for the whole campaign.
-        # cellfix_B_new runs a_sw = 50, so its gate is off, P2 reads `na`, and rho = 0 is a legal
-        # measurement there (200 cells, no growth) rather than a pathology.
-        - [coral_gate_div, grow_3d, rho,      [0.1, 0.3, 1.0, 2.0]]
-        # vth_frac AND factor ARE COUPLED: volume-triggered division needs the growth ceiling
-        # ABOVE the division trigger, or a cell can never reach the size that divides it. That is
-        # the `refute_coral_nocons` relation documented under `parents` -- and sweeping either knob
-        # alone walks straight across it. Round r003 lost FOUR slots to exactly this:
-        # vth_frac 1.4 and 2.0 sit at or below factor 2.0, and factor 3.0 and 4.0 sit above
-        # vth_frac 2.5. The premise refused all four before the GPU, correctly, and a refused run
-        # records no metrics -- so closure never advances and route_a would re-propose them every
-        # round for the rest of the campaign. Each grid now stays on its own side of the other
-        # knob's value on this base (vth_frac 2.5, factor 2.0).
-        # The grids may span the whole interesting range again: `route_a` now asks the STATIC
-        # premises about each point before offering it, so a value that crosses the
-        # vth_frac > factor constraint is dropped in milliseconds rather than discovered on the
-        # cluster. Narrowing them by hand fixed one crossing and would not have seen the next.
-        - [coral_gate_div, grow_3d, vth_frac, [2.2, 2.5, 3.0, 3.5, 4.5]]
-        - [coral_gate_div, divide_3d,           factor,   [1.2, 1.5, 1.8, 2.0]]
-        - [coral_gate_div, grow_3d, a_sw,     [0.05, 0.15, 0.35, 0.8]]
-        - [coral_gate_div, grow_3d, hill,     [2.0, 4.0, 8.0, 16.0]]
-        - [coral_gate_div, grow_3d, rate,     [0.000433, 0.001732, 0.006928, 0.02]]
-        - [coral_gate_div, shape_to_chem,       beta,     [-4.0, -2.0, 0.0, 2.0, 4.0]]
-        - [coral_gate_div, shape_to_chem,       F0,       [0.03, 0.055, 0.09, 0.11]]
+        # ---- DIVISION AND GROWTH FIRST, because nothing downstream means anything until the
+        # tissue actually gains material. Swept on all four bases so the answer can be separated
+        # from the chemistry that happens to be running.
+        - [b_none_uniform_plain, divide_3d, factor,   [1.3, 1.6, 2.4, 3.0]]
+        - [b_gs_gated_plain,     divide_3d, factor,   [1.3, 1.6, 2.4, 3.0]]
+        - [b_gm_gated_plain,     divide_3d, factor,   [1.3, 1.6, 2.4, 3.0]]
+        - [b_bru_gated_plain,    divide_3d, factor,   [1.3, 1.6, 2.4, 3.0]]
+        # `rho` is the baseline growth every cell gets regardless of the activator. The last
+        # campaign's one real curve came from this knob: cells 4.0k -> 14.2k with grip peaking at
+        # an INTERIOR point, which is the only non-monotone result the project has produced.
+        # 0.0 is omitted on the gated bases -- premise P2 refuses a connected gate at rho = 0, and
+        # a value refused before the GPU never records, so it would be re-proposed every round.
+        - [b_none_uniform_plain, grow_3d,   rho,      [0.0, 0.25, 0.5, 2.0]]
+        - [b_gs_gated_plain,     grow_3d,   rho,      [0.25, 0.5, 2.0, 3.0]]
+        - [b_gm_gated_plain,     grow_3d,   rho,      [0.25, 0.5, 2.0, 3.0]]
+        - [b_bru_gated_plain,    grow_3d,   rho,      [0.25, 0.5, 2.0, 3.0]]
+        # ---- THE GATE ITSELF: where the activator opens growth, and how sharply.
+        - [b_gs_gated_plain,     grow_3d,   a_sw,     [0.1, 0.2, 0.5, 0.7]]
+        - [b_gm_gated_plain,     grow_3d,   a_sw,     [0.1, 0.2, 0.5, 0.7]]
+        - [b_bru_gated_plain,    grow_3d,   a_sw,     [0.1, 0.2, 0.5, 0.7]]
+        - [b_gs_gated_plain,     grow_3d,   hill,     [1.0, 2.0, 8.0, 16.0]]
+        - [b_gm_gated_plain,     grow_3d,   hill,     [1.0, 2.0, 8.0, 16.0]]
+        - [b_bru_gated_plain,    grow_3d,   hill,     [1.0, 2.0, 8.0, 16.0]]
+        - [b_none_uniform_plain, grow_3d,   rate,     [0.000433, 0.001732, 0.003464, 0.006928]]
+        - [b_gs_gated_plain,     grow_3d,   rate,     [0.000433, 0.001732, 0.003464, 0.006928]]
+        # ---- THE RD MECHANISMS. Each model's OWN parameters -- they do not share a vocabulary,
+        # which is exactly the mistake that shipped four bases carrying Gray-Scott's `F` and `kk`
+        # on a gierer_meinhardt slot. gray_scott reads F/kk, gierer_meinhardt reads a0/mu_h/sat,
+        # brusselator reads gamma (with A, B fixed at the Turing-unstable 1.0 / 3.0).
+        - [b_gs_gated_plain,     cell_react, F,       [0.03, 0.038, 0.054, 0.06]]
+        - [b_gs_gated_plain,     cell_react, kk,      [0.052, 0.057, 0.066, 0.07]]
+        - [b_gm_gated_plain,     cell_react, a0,      [0.0, 0.002, 0.02, 0.05]]
+        - [b_gm_gated_plain,     cell_react, sat,     [0.0, 0.03, 0.3, 1.0]]
+        - [b_gm_gated_plain,     cell_react, mu_h,    [0.3, 0.6, 1.5, 2.0]]
+        - [b_bru_gated_plain,    cell_react, gamma,   [0.05, 0.15, 0.6, 1.2]]
+        # Diffusion is shared vocabulary and IS comparable across the three, so it is swept on all
+        # of them: the ratio d_h/d_a is what sets the Turing wavelength in every one of these
+        # schemes, and whether the spacing responds the same way is a real question about the
+        # models rather than about their parameter names.
+        - [b_gs_gated_plain,     cell_diffuse, d_a,   [0.02, 0.04, 0.16, 0.3]]
+        - [b_gm_gated_plain,     cell_diffuse, d_a,   [0.02, 0.04, 0.16, 0.3]]
+        - [b_bru_gated_plain,    cell_diffuse, d_a,   [0.02, 0.04, 0.16, 0.3]]
+        - [b_gs_gated_plain,     cell_diffuse, d_h,   [0.04, 0.08, 0.32, 0.6]]
+        - [b_gm_gated_plain,     cell_diffuse, d_h,   [0.04, 0.08, 0.32, 0.6]]
+        - [b_bru_gated_plain,    cell_diffuse, d_h,   [0.04, 0.08, 0.32, 0.6]]
+        - [b_gs_gated_plain,     cell_diffuse, chi,   [0.3, 0.65, 2.0, 2.8]]
+        # ---- SHAPE -> CHEMISTRY, the second arrow. beta = 0 is the null and must be run.
+        - [b_gs_gated_plain,     shape_to_chem, beta, [-2.0, 0.0, 1.0, 2.0]]
+        - [b_gm_gated_plain,     shape_to_chem, beta, [-2.0, 0.0, 1.0, 2.0]]
+        - [b_bru_gated_plain,    shape_to_chem, beta, [-2.0, 0.0, 1.0, 2.0]]
+        - [b_gs_gated_plain,     shape_to_chem, F0,   [0.02, 0.03, 0.07, 0.1]]
+        # ---- MECHANICS LAST, and these have NEVER been swept by this project. K_bend and K_lumen
+        # were inexpressible in the old base's model; K_purse existed only alongside the forcing
+        # term that disqualifies a run. They are the three terms that can neck a lobe into a
+        # finger, so a null result here is as informative as a positive one.
+        - [b_gs_gated_shaping,   shape_energy_3d, K_bend,  [0.0, 0.005, 0.08, 0.3]]
+        - [b_gs_gated_shaping,   shape_energy_3d, K_lumen, [0.0, 0.1, 2.0, 8.0]]
+        - [b_gs_gated_shaping,   rd_interface_tension, K_purse, [0.0, 0.25, 3.0, 6.0]]
+        - [b_gs_gated_shaping,   shape_energy_3d, K_V,     [5.0, 10.0, 40.0, 80.0]]
+        - [b_gs_gated_shaping,   shape_energy_3d, Lambda,  [0.0, 0.2, 1.0, 2.0]]
 
   - id: build
     code: round.build_all
