@@ -41,7 +41,8 @@ def main():
     want = None if a.runs is None else {s.strip() for s in a.runs.split(",")}
 
     dirs = []
-    for d in sorted(glob.glob(os.path.join(LOG, "[23][0-9]_*"))):
+    # was "[23][0-9]_*" -- runs 20-39 only, from when that was all there was
+    for d in sorted(glob.glob(os.path.join(LOG, "[0-9]*_*"))):
         if want and os.path.basename(d).split("_")[0] not in want:
             continue
         if not os.path.exists(os.path.join(d, "traj.npz")):
