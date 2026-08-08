@@ -1081,6 +1081,7 @@ class MPMTissueBoundary(FieldUpdate):
         self.centre = [float(v) for v in params.get("centre", [0.5, 0.5, 0.5])]
         self.scale = float(params.get("scale", 1.0))
         self.dt_frame = float(params.get("dt_frame", 4.0e-3))
+        self.band = float(params.get("band", 2.0))        # surface band width, in grid cells
         import numpy as _np
         z = _np.load(str(params["surface"]))
         self.smap = torch.as_tensor(_np.asarray(z["smap"], _np.float32)) * self.scale
@@ -1121,13 +1122,25 @@ class MPMTissueBoundary(FieldUpdate):
         pi = ((ph + math.pi) / (2 * math.pi) * nph).long().clamp(0, nph - 1)
         R = M[ti, pi]
         Rdot = (Mn[ti, pi] - R) / max(self.dt_frame, 1e-9)
-        inside = r < R
-        if bool(inside.any()):
+        # ON NODES THAT CARRY MASS, IN A BAND AROUND THE SURFACE -- not on the nodes strictly inside.
+        # Run 90 imposed the velocity inside r < R and the membrane did not move one step (R stayed
+        # 0.0875 for 402 frames) for a reason that is obvious afterwards: the LUMEN IS EMPTY. There are
+        # no MPM particles inside the epithelium, so those nodes have zero mass, `mv = v*m` writes
+        # nothing, and G2P gathers nothing from them. The boundary was being imposed exactly where
+        # there is no material to impose it on. The material is in the shell just OUTSIDE the surface,
+        # so that is where the constraint has to act.
+        band = self.band * g.dx
+        near = (r < R + band) & (g.m > 1.0e-9)
+        if bool(near.any()):
             gm = g.m.clamp(min=1e-10)
             gv = g.mv / gm[:, None]
-            # no-slip against a boundary that is itself moving: the node takes the surface's radial
-            # velocity rather than zero, which is the whole difference between a wall and a growing ball
-            gv_new = torch.where(inside[:, None], Rdot[:, None] * u, gv)
+            # SEPARATING, NOT NO-SLIP. Only the outward NORMAL component is corrected, and only when the
+            # material is moving slower than the surface -- so the tissue pushes material out of its way
+            # and never pulls it back in or drags it tangentially. Full no-slip would weld the sheet to
+            # the epithelium, which is what the integrin anchor is for and is a different experiment.
+            vn = (gv * u).sum(-1)
+            push = near & (vn < Rdot)
+            gv_new = torch.where(push[:, None], gv + (Rdot - vn)[:, None] * u, gv)
             # THE OTHER HALF OF THE COUPLING, and it costs one subtraction. The momentum the boundary
             # must INJECT to hold its prescribed motion is exactly what the material is exerting back on
             # the tissue: dp = m*(v_bc - v_free), summed over the constrained nodes. Pass 2 replays a
@@ -1135,15 +1148,16 @@ class MPMTissueBoundary(FieldUpdate):
             # push it, measured rather than assumed, and it is what pass 1 would have to be given for a
             # genuinely two-way run. Its radial component is the one that matters: negative = the
             # matrix and membrane are resisting the growth.
-            dp = ((gv_new - gv) * gm[:, None])[inside]
-            fr = (dp * u[inside]).sum(-1)
+            dp = ((gv_new - gv) * gm[:, None])[near]
+            fr = (dp * u[near]).sum(-1)
             BOUNDARY_REACTION.append((int(getattr(H, "frame", 0) or 0),
                                       float(dp.norm(dim=-1).sum()), float(fr.sum()),
-                                      int(inside.sum())))
+                                      int(near.sum())))
             g.mv = gv_new * gm[:, None]
         if not self._said:
-            print(f"[mpm_tissue_boundary] tissue imposed on the grid: {int(inside.sum())} of "
-                  f"{r.numel()} nodes inside at frame {f}, max Rdot {float(Rdot.max()):.4g}", flush=True)
+            print(f"[mpm_tissue_boundary] tissue imposed on the grid: {int(near.sum())} massed nodes "
+                  f"in the surface band of {r.numel()} at frame {f}, max Rdot {float(Rdot.max()):.4g}",
+                  flush=True)
             self._said = True
         return {}
 
