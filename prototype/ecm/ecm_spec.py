@@ -106,6 +106,15 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                membrane_tau=60.0, membrane_reserve=0.0, membrane_secrete_rate=0.02,
                membrane_secrete_targeted=1.0, membrane_deposit="uniform", membrane_rebond_every=20, membrane_remodel_target="own",
                membrane_mesh_w=1.0, membrane_relax_new=4, membrane_relax_every=20, membrane_relax_sweeps=3,
+               # l* is the mesh size the network is BUILT to, held fixed rather than tracking the sheet's
+               # own mean; 0 freezes it from frame 0. `repel_w` is k_repel/k_bond -- a ratio, so it
+               # transfers between calibrations, and it is bounded above by the integrator, not the sheet.
+               membrane_l_star=0.0, membrane_repel_w=0.0, membrane_repel_range=1.0,
+               # "linear" = one-sided spring, range 1 l*. "ar" = Plexus's attraction_repulsion law with
+               # its attractive term dropped, range ~3 l* -- the form CGI uses to scatter points evenly
+               # over a surface, and the one that took the frozen sheet from d/hex 0.677 to 0.895.
+               membrane_repel_law="linear", membrane_repel_sigma=0.7, membrane_repel_k=0.0,
+               membrane_repel_aggr="",
                membrane_tau_adh=0.0, membrane_aniso=1.0, membrane_record_hoop=False, membrane_surface_level=False,
                membrane_impl="mpm", membrane_drag=40.0, membrane_inertial=False,
                membrane_gamma=2.0e3):
@@ -193,7 +202,21 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
              "max_neighbours": 6},
             {"op": "basement_membrane_remodel", "at": "basement_membrane_particle",
              "tau": float(membrane_tau), "cap": 0.02,
-             "target": str(membrane_remodel_target), "mesh_w": float(membrane_mesh_w)},
+             "target": str(membrane_remodel_target), "mesh_w": float(membrane_mesh_w),
+             "l_star": float(membrane_l_star)},
+            # EXCLUDED VOLUME, beside the springs rather than instead of them. Ordered AFTER the bond
+            # operator because it borrows that operator's neighbour search, and after the remodel because
+            # the remodel is what freezes l*.
+            {"op": "basement_membrane_repel", "at": "basement_membrane_particle",
+             # absolute if given, otherwise the ratio w * k_bond. The absolute form exists so the
+             # repulsion survives a run with the crosslink springs turned off, where w * k_bond is 0.
+             "k": (float(membrane_repel_k) if membrane_repel_k > 0.0
+                   else float(membrane_repel_w) * float(membrane_bond_k)),
+             "every": int(membrane_rebond_every),
+             "max_neighbours": 6 if membrane_repel_law == "linear" else 18,
+             "range_scale": float(membrane_repel_range),
+             "law": str(membrane_repel_law), "sigma_scale": float(membrane_repel_sigma),
+             **({"aggr": str(membrane_repel_aggr)} if membrane_repel_aggr else {})},
             {"op": "surface_track", "at": "surface", "centre": [0.5, 0.5, 0.5],
              "surface": str(membrane), "scale": 1.0, "k": 6,
              "seed": int(seed), "jitter": float(membrane_jitter)},
@@ -232,6 +255,15 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
             spec["operators"] = [o for o in spec["operators"]
                                  if o["op"] != "basement_membrane_remodel"]
             spec["schedule"].insert(i + 2, "basement_membrane_bond_break")
+        if membrane_repel_w > 0.0 or membrane_repel_k > 0.0:
+            # after the remodel, which is what freezes l*, and after the bond operator, whose neighbour
+            # search it borrows. w = 0 leaves the operator out entirely, so every run to date is
+            # unchanged bit-for-bit.
+            after = ("basement_membrane_remodel" if "basement_membrane_remodel" in spec["schedule"]
+                     else "basement_membrane_bond")
+            spec["schedule"].insert(spec["schedule"].index(after) + 1, "basement_membrane_repel")
+        else:
+            spec["operators"] = [o for o in spec["operators"] if o["op"] != "basement_membrane_repel"]
         if membrane_impl == "graph":
             # THE MEMBRANE AS A SPRING GRAPH, not a continuum body. Nothing about the sheet's mechanics
             # was ever coming from MPM: the crosslinks hold it together, the integrin springs hold it in
@@ -260,7 +292,8 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
             # came with it. `membrane_inertial=True` restores the old path for comparison only.
             emit = "acceleration" if membrane_inertial else "velocity"
             for o in spec["operators"]:
-                if o["op"] in ("basement_membrane_bond", "integrin_adhesion"):
+                if o["op"] in ("basement_membrane_bond", "integrin_adhesion",
+                               "basement_membrane_repel"):
                     o["emit"] = emit
                     o["overdamped_gamma"] = 0.0 if membrane_inertial else float(membrane_gamma)
                     # EXPLICIT, not inferred from `emit`. The spec's `emit` key is consumed by the

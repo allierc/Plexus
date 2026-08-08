@@ -980,8 +980,10 @@ class BasementMembraneRemodel(Lateral):
         self.at = params.get("_at", "basement_membrane_particle")
         self.tau = float(params.get("tau", 60.0))
         self.cap = float(params.get("cap", 0.02))
-        self.target = str(params.get("target", "own")).lower()    # "own" | "mesh"
+        self.target = str(params.get("target", "own")).lower()    # "own" | "mesh" | "fixed"
         self.mesh_w = float(params.get("mesh_w", 1.0))            # how far toward the common spacing
+        lst = params.get("l_star", 0.0)
+        self._l_star = float(lst) if lst else None                # None = freeze it from frame 0
         self._said = False
 
     def forward(self, H, mask=None):
@@ -1006,7 +1008,22 @@ class BasementMembraneRemodel(Lateral):
         # so `mesh` relaxes rest lengths toward the spacing the sheet's own density implies, which gives
         # the network something uniform to relax TO. `own` is the previous behaviour, kept because every
         # run to date used it.
-        if self.target == "mesh":
+        # `fixed` GOES ONE STEP FURTHER, AND THE STEP MATTERS. `mesh` relaxes toward the sheet's OWN
+        # current mean, which is self-referential: if secretion under-delivers, the mean spacing grows
+        # and the springs simply accept the sparser sheet. The holes get ratified rather than closed.
+        # A collagen IV protomer has a defined length, so the mesh size is set by the MOLECULE, not by
+        # whatever density happens to exist. Holding l* fixed makes N = 4*pi*R^2/l*^2 the number of nodes
+        # the sheet needs, secretion the only thing that can supply it, and a shortfall visible as
+        # tension and holes -- a result, not an artefact. l* is frozen from the frame-0 sheet, which is
+        # the one configuration that was seeded evenly on purpose.
+        if self.target == "fixed":
+            if self._l_star is None:
+                self._l_star = float(L[alive].mean()) if float(alive.sum()) > 0 else float(rest.mean())
+                print(f"[basement_membrane_remodel] target l* = {self._l_star:.5g} (frozen from frame 0); "
+                      f"the sheet must SECRETE to hold it as it grows", flush=True)
+            H.membrane_l_star = self._l_star
+            tgt = torch.full_like(L, self._l_star)
+        elif self.target == "mesh":
             live_n = float(alive.to(rest.dtype).sum())
             l_star = L[alive].mean() if live_n > 0 else rest.mean()
             tgt = (1.0 - self.mesh_w) * L + self.mesh_w * l_star
@@ -1020,6 +1037,192 @@ class BasementMembraneRemodel(Lateral):
                   f"fragmentation is a race between turnover and growth", flush=True)
             self._said = True
         return {}
+
+
+@register_operator("basement_membrane_continuum_strain", family="mpm", set="particle", kind="lateral")
+class BasementMembraneContinuumStrain(Lateral):
+    """Per-particle strain read from the deformation gradient, for a membrane with no crosslinks.
+
+    WHY IT EXISTS. Every membrane diagnostic in this prototype is bond-based -- crosslink strain colours
+    the renderer, and `lcc` / `mean_degree_z` / `bonds_end` are the integrity measures. A basement
+    membrane carried as an MPM continuum has no bonds at all, so those quantities do not become bad, they
+    stop existing. This publishes the continuum equivalent into the same channel the renderer already
+    reads, so the switch costs no plumbing downstream.
+
+    THE MEASURE is the largest principal stretch minus one, sigma_max(F) - 1: the tensile strain in the
+    direction the sheet is actually being pulled. det(F) is the wrong choice for a growing shell, because
+    a sheet stretching biaxially while it thins is close to volume-preserving and would read J ~ 1 while
+    being stretched to failure.
+    """
+
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = []
+    MECHANISM_TAGS = ["basement_membrane", "continuum_strain"]
+    PARAM_ROLES = {}
+    REFERENCE = "Hu, Y. et al. (2018) ACM Trans. Graph. 37(4):150 (MLS-MPM)."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "basement_membrane_particle")
+        self._said = False
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        F = getattr(lvl, "F", None)
+        if F is None:
+            return {}
+        alive = getattr(H, "membrane_alive", None)
+        s = torch.linalg.svdvals(F)[:, 0] - 1.0        # largest principal stretch, as a strain
+        if alive is not None:
+            s = s * alive.to(s.dtype)
+        MEMBRANE_STRAIN.append(s.detach().to("cpu", torch.float16).numpy())
+        if not self._said:
+            print("[basement_membrane_continuum_strain] no crosslinks: colouring by sigma_max(F) - 1, "
+                  "the continuum strain, in place of bond strain", flush=True)
+            self._said = True
+        return {}
+
+
+@register_operator("basement_membrane_repel", family="mechanics", set="particle", kind="lateral")
+class BasementMembraneRepel(Lateral):
+    """Excluded volume between membrane nodes: push apart anything closer than l*, never pull.
+
+    WHY A SECOND FORCE, WHEN A SPRING ALREADY PUSHES WHEN COMPRESSED. It does -- this is not a missing
+    repulsion, it is an unopposed ATTRACTION. Measured on a frozen mid-run sheet, relaxing 1500 steps
+    with growth, secretion and anchors all off:
+
+        two-sided spring, common rest length   d/hex 0.750   cv 0.173
+        the SAME springs, attractive half cut  d/hex 0.929   cv 0.049
+        push only, on the 6 nearest unbonded   d/hex 0.899   cv 0.031
+
+    The bond set is not the problem; deleting the pull is worth the whole difference. The mechanism is
+    visible in the movie: the rewire bonds each node to its 6 nearest REGARDLESS of distance, so
+    crosslinks are thrown clear across a hole, and those long bonds haul the rim inward into knots of
+    short edges beside a hole that never closes. That is the picture a relaxed sheet should not have.
+
+    Cutting the attraction outright is not an option -- a network that only pushes bears no tension, and
+    resisting the epithelium's expansion is the whole job of a basement membrane. So the pull stays and
+    excluded volume is added beside it: repulsion sets the SPACING, the springs carry the LOAD.
+
+    THE ONE PARAMETER IS A RATIO, w = k_repel/k_bond, which is why it transfers between calibrations
+    that differ by five orders of magnitude in absolute stiffness. Swept at the run's own k and gamma:
+
+        w = 0    d/hex 0.773   cv 0.159
+        w = 8    d/hex 0.917   cv 0.020
+        w = 20   d/hex 0.884   cv 0.179     <- NOT a plateau, an instability
+
+    w = 20 is worse than w = 8 because h*z*k*(1+w)/gamma passes 2 and the integration goes unstable, so
+    the useful range is bounded from ABOVE by the integrator, not by any property of the sheet.
+    """
+
+    EMIT = "mpm_acceleration"
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = []
+    MECHANISM_TAGS = ["basement_membrane", "excluded_volume", "steric_repulsion"]
+    PARAM_ROLES = {"w": "repel_stiffness_over_bond_stiffness", "every": "neighbour_rebuild_period"}
+    REFERENCE = ("Yurchenco, P.D. (2011) Cold Spring Harb. Perspect. Biol. 3:a004911 (collagen IV and "
+                 "laminin networks have a characteristic protomer-set mesh size).")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "basement_membrane_particle")
+        self.k = float(params.get("k", 0.0))              # absolute; = w * k_bond, set by the spec
+        self.every = int(params.get("every", 20))
+        self.gamma = float(params.get("overdamped_gamma", 0.0))
+        self.range_scale = float(params.get("range_scale", 1.0))   # repel range, in units of l*
+        # `ar` swaps the one-sided linear spring for Plexus's own attraction_repulsion law, run in its
+        # purely repulsive form. Measured on run 85's middle frame, 300 iterations on the frozen sheet:
+        #     start                      d/hex 0.677   cv 0.243
+        #     linear, range 1.0 l*       (this is what 85 already is)
+        #     ar,     range 3.0 l*       d/hex 0.895   cv 0.052
+        # The archived `blue` parameters do NOT do this. f(0) = p0 - p2, and blue's is +0.022 -- an
+        # ATTRACTIVE core, so any pair that closes below r = 0.0011 welds together and the set clumps
+        # (2D: d/hex 0.471 -> 0.242, worse than random). p0 = 0 removes the core and leaves a single
+        # decaying repulsion, which is the law CGI uses to scatter points evenly over a surface.
+        self.law = str(params.get("law", "linear")).lower()        # "linear" | "ar"
+        self.p2 = float(params.get("p2", 1.6))
+        self.p3 = float(params.get("p3", 1.0))
+        self.sigma_scale = float(params.get("sigma_scale", 0.7))   # sigma, in units of l*
+        self.aggr = str(params.get("aggr", "sum" if self.law == "linear" else "mean")).lower()
+        self.max_neighbours = int(params.get("max_neighbours", 6 if self.law == "linear" else 18))
+        self._i = self._j = None
+        self._said = False
+
+    def forward(self, H, mask=None):
+        if self.k <= 0.0:
+            return {}
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        # the live sheet is published by the seed operator, not a level field: the reserve is parked at
+        # the tissue centre, and letting it into the neighbour search puts 40k particles in one cell.
+        alive = getattr(H, "membrane_alive", None)
+        if alive is None:
+            return {}
+        l_star = float(getattr(H, "membrane_l_star", 0.0) or 0.0)
+        if l_star <= 0.0:
+            return {}                       # the remodel operator has not frozen the target yet
+        rng = self.range_scale * l_star
+        idx = alive.nonzero(as_tuple=True)[0]
+        if idx.numel() < 8:
+            return {}
+        frame = int(getattr(H, "frame", 0) or 0)
+        if self._i is None or frame % max(self.every, 1) == 0 or self._i.numel() == 0:
+            # borrow the bond operator's cell list rather than duplicate it -- it is the same search at
+            # a different radius, and its `cutoff` is the cell size, so it has to be swapped, not passed.
+            finder = H.__dict__.get("_bm_bond_op")
+            if finder is None:
+                return {}
+            keep, finder.cutoff = finder.cutoff, rng
+            try:
+                sub = pos[idx]
+                i, j = (finder._neighbours_celllist(sub, self.max_neighbours) if sub.shape[0] > 20000
+                        else finder._build_pairwise(sub, self.max_neighbours))
+            finally:
+                finder.cutoff = keep
+            n2 = pos.shape[0] + 1
+            uk = torch.unique(torch.minimum(idx[i], idx[j]) * n2 + torch.maximum(idx[i], idx[j]))
+            self._i, self._j = (uk // n2).long(), (uk % n2).long()
+        d = pos[self._j] - pos[self._i]
+        L = d.norm(dim=-1).clamp_min(1e-9)
+        if self.law == "ar":
+            # f = -p2 * exp(-(r^2)^p3 / 2 sigma^2), the attraction_repulsion law with its attractive
+            # term dropped. It multiplies the SEPARATION VECTOR, not the unit vector -- that is the
+            # operator's own convention, and it is what makes the force fall off smoothly to nothing
+            # rather than being truncated at the neighbour radius the way the linear form is.
+            sig = self.sigma_scale * l_star
+            amp = -self.p2 * torch.exp(-((L * L) ** self.p3) / (2.0 * sig * sig))
+            f = (self.k * amp)[:, None] * d
+            # k IS NOT A STIFFNESS HERE AND DOES NOT SCALE LIKE ONE. `amp` is O(1), so the step is
+            # dt*k*amp*d and the usable range is set by k*dt ~ O(1) -- k ~ 250 at dt = 4e-3, not the
+            # 1e4-1e6 a spring constant would take. Swept on run 85's middle frame:
+            #     k =   25   d/hex 0.785      k =  600   0.855
+            #     k =  100   0.830            k = 1500   0.872
+            #     k =  250   0.846            k = 4000   0.730  <- overshoot
+            # Above that the sheet scrambles to a fixed point near where it started, which is what made
+            # runs 89-91 (k = 1.75e4) read as "no effect" rather than as "far too strong".
+        else:
+            # ONE-SIDED: zero for anything at or beyond l*, so this can never pull.
+            f = (self.k * (L - l_star).clamp_max(0.0))[:, None] * (d / L[:, None])
+        acc = torch.zeros_like(pos)
+        acc.index_add_(0, self._i, f)
+        acc.index_add_(0, self._j, -f)
+        if self.aggr == "mean":
+            # the attraction_repulsion operator's own default: average over neighbours, so the force a
+            # node feels does not scale with how many happen to be in range.
+            deg = torch.zeros(pos.shape[0], device=pos.device, dtype=pos.dtype)
+            one = torch.ones_like(L)
+            deg.index_add_(0, self._i, one)
+            deg.index_add_(0, self._j, one)
+            acc = acc / deg.clamp(min=1.0)[:, None]
+        if self.gamma > 0:
+            acc = acc / self.gamma
+        if not self._said:
+            print(f"[basement_membrane_repel] excluded volume k={self.k:.3g} at l*={l_star:.5g} over "
+                  f"{self._i.numel():,} pairs: repulsion sets the spacing, the crosslinks carry the load",
+                  flush=True)
+            self._said = True
+        return {lvl.name: acc}
 
 
 @register_operator("basement_membrane_secrete", family="growth", set="particle", kind="structural")

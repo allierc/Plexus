@@ -1,0 +1,42 @@
+# blue_only -- ONE type, the blue (t0) law from arbitrary_bison_g1, nothing else.
+#
+# WHY THIS RUN EXISTS. The basement membrane will not equidistribute: 6000 frames of crosslink springs
+# plateau at cv 0.18 with holes that never close, and the relaxation bench traced it to the springs'
+# ATTRACTION -- the rewire throws crosslinks across a hole and those long bonds haul the rim into knots.
+# Deleting the pull fixed the packing (d/hex 0.750 -> 0.929) but leaves a sheet that bears no load.
+#
+# Reading the blue parameters through the operator's own law,
+#     f(r) = p0*exp(-(r^2)^p1 / 2 sigma^2) - p2*exp(-(r^2)^p3 / 2 sigma^2),  dpos += f*(xj - xi)
+# blue is a PURE REPELLER: its only zero crossing is at r = 0.0011, well inside the particle spacing, and
+# f < 0 from there out to the graph radius 0.075. So it has no preferred distance of its own -- spacing
+# comes from density and confinement, which is the regime that packed best in the bench.
+#
+# This config asks the narrow question before any of it touches the membrane: left alone in a periodic
+# box, does one blue type actually reach an even spacing, and how evenly?
+general: {name: blue_only, seed: 0, n_frames: 250, dt: 0.1, boundary: periodic}
+sets:
+  particle:
+    n: 4800
+    types:
+      t0: {fraction: 1.0, p: [1.6233, 1.0413, 1.6012, 1.5615]}
+fields: {}
+operators:
+  - {op: radius_graph,         at: particle, radius: 0.075}
+  - {op: attraction_repulsion, at: particle, sigma: 0.005}
+schedule: [radius_graph, attraction_repulsion]
+plotting:
+  background: black
+  colormap: tab10
+  point_size: 4.0
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The video shows a static field of blue particles against a black background. There is
+      no visible movement or evolution of the particles across the four frames. The distribution of the
+      points remains constant throughout the entire sequence. The scene represents a steady-state distribution
+      of discrete elements.
+    objects: The scene contains a large number of small, circular blue particles. These particles are
+      distributed randomly across the entire two-dimensional plane. They are not connected to one another
+      and maintain a uniform density. Each particle is a single pixel or a very small cluster of pixels
+      in size.

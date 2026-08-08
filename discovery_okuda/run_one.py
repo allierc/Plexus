@@ -31,6 +31,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import signal
 import sys
 import time
 import traceback
@@ -285,7 +286,54 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
         pass
     sim = S.load(cfg_path)
     _beat = _heartbeat(name, t0)
-    Hf, out = engine_run(sim, device=device, on_frame=_beat)
+
+    # A KILLED RUN IS STILL EVIDENCE ABOUT THE FRAMES IT REACHED. Cedric, 8 August: "if 1 hour
+    # expires, the last job is killed but can still be used."
+    #
+    # Until now it could not be. `r005_12` was killed at frame 690 of 900 holding 95,755 cells --
+    # the largest tissue this project has produced -- and left ROUTE_A.md, progress.json and
+    # spec_run.yaml. Nothing measurable. The trajectory lives in the engine's recording buffers
+    # and was assembled into `out` only on return, so an interrupt discarded all of it.
+    #
+    # LSF sends SIGTERM before SIGKILL, so the handler has a window: raise inside `on_frame`, let
+    # the engine's loop unwind, then assemble the SAME structure `run` would have returned from
+    # the buffers it stashed on H. Everything downstream -- tissue_analysis, morphology, the
+    # movie -- then runs unchanged on a shorter trajectory, and the record carries
+    # `stopped_early` so no one mistakes 690 frames for 900.
+    class _Stopped(Exception):
+        pass
+
+    _stop = {"hit": False}
+
+    def _on_signal(_sig, _frm):
+        _stop["hit"] = True                      # do not raise here -- unwinding C code is unsafe
+
+    for _s in (signal.SIGTERM, signal.SIGINT, signal.SIGUSR1, signal.SIGUSR2):
+        try:
+            signal.signal(_s, _on_signal)
+        except (ValueError, OSError):
+            pass
+
+    _live = {}
+
+    def _beat_or_stop(H, tick, phase="simulating", force=False):
+        _live["H"] = H                            # on_frame is handed H; keep it for the salvage
+        _beat(H, tick, phase=phase, force=force)
+        if _stop["hit"]:
+            raise _Stopped(tick)
+
+    stopped_early = None
+    try:
+        Hf, out = engine_run(sim, device=device, on_frame=_beat_or_stop)
+    except _Stopped as e:
+        import plexus.engine as _E
+        Hf = _live["H"]
+        stopped_early = int(getattr(e, "args", [0])[0] or 0)
+        # rows actually written: the recorded ticks at or before the stop
+        _rows = sum(1 for _t in getattr(Hf, '_rec_index', {}) if _t <= stopped_early) or 1
+        out = _E._assemble(Hf, *Hf._rec, n_rows=_rows)
+        print(f"[{name}] STOPPED EARLY at frame {stopped_early} -- assembling the trajectory "
+              f"reached so far; this run is evidence about those frames", flush=True)
     # THE LAST BEAT. The heartbeat fires from on_frame, so it stopped the instant the loop ended
     # -- and everything after this line (tissue_analysis, morphology, the movie, the strip) takes
     # minutes. A run that had FINISHED its 900 frames therefore went silent and was killed as
@@ -777,6 +825,11 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
                # rests on the censored quantity, which is the whole reason for keeping the run.
                "premises_censored": [p.pid for p in prem if p.status == "censored"],
                "premises_ablated": [p.pid for p in prem if p.status == "ablation"],
+               # HOW FAR IT ACTUALLY GOT. None for a complete run; the frame it was stopped at
+               # otherwise. Without this a salvaged 690-frame run and a finished 900-frame one are
+               # indistinguishable in the record, and every `_final` metric would silently mean
+               # two different things.
+               "stopped_early": stopped_early,
                "run_id": rec.run_id},
               open(os.path.join(out_dir, "diag.json"), "w"), indent=1)
     return summary
