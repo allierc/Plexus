@@ -96,10 +96,8 @@ def main():
 
             # side by side: the recording as it is, and the same frame with the cells on it, so
             # the overlay can be judged against the thing it claims to describe
-            fig = plt.figure(figsize=(2 * IM / 100, IM / 100 + 0.34), facecolor="black")
-            a1 = fig.add_axes([0.0, 0, 0.5, IM / (IM + 34)])
-            a2 = fig.add_axes([0.5, 0, 0.5, IM / (IM + 34)])
-            a1.imshow(g, cmap="gray", vmin=0, vmax=1); a1.axis("off")
+            fig = plt.figure(figsize=(IM / 100, IM / 100 + 0.34), facecolor="black")
+            a2 = fig.add_axes([0.0, 0, 1.0, IM / (IM + 34)])
             a2.imshow(rgb); a2.axis("off")
             # the nucleus is a material point, so it moves FORWARD with the field -- no inversion
             # needed here, unlike the mask, which had to be pulled back
@@ -111,11 +109,10 @@ def main():
                 a2.add_patch(plt.Circle((nx[k], ny[k]), nuc_r[k], fill=False,
                                         color=LUT[k + 1], lw=1.1, alpha=0.95))
             a2.set_xlim(0, IM); a2.set_ylim(IM, 0)
-            fig.text(0.004, 0.982, f"ORIGINAL  0_B_15kPa (healthy)   frame {t+1}/{T}   "
-                                   f"t = {t*0.042:5.2f} s   beat {min(4, sum(t >= o for o in (2,51,101,152)))} of 4",
-                     color="white", fontsize=8.5)
-            fig.text(0.504, 0.982, f"{n} CELLS from the beat -- fill = cell, circle = its nucleus, "
-                                   f"both warped by the measured displacement",
+            fig.text(0.006, 0.982, f"{n} cells -- fill = cell, circle = the nucleus that seeded it, "
+                                   f"both warped by the measured displacement   frame {t+1}/{T}   "
+                                   f"t = {t*0.042:5.2f} s   beat "
+                                   f"{min(4, sum(t >= o for o in (2,51,101,152)))} of 4",
                      color="white", fontsize=8.5)
             fig.savefig(os.path.join(tmp, f"f_{t:05d}.png"), dpi=100, facecolor="black")
             plt.close(fig)
@@ -123,7 +120,7 @@ def main():
                 print(f"  frame {t}/{T}", flush=True)
 
     from plexus.plot import _ffmpeg
-    out = f"{OUT}/cells_side_by_side.mp4"
+    out = f"{OUT}/cells_instance_warped.mp4"
     os.makedirs(OUT, exist_ok=True)
     r = subprocess.run([_ffmpeg(), "-y", "-loglevel", "error", "-framerate", "24",
                         "-i", os.path.join(tmp, "f_%05d.png"),
