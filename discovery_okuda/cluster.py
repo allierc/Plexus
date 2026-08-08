@@ -429,7 +429,7 @@ def _is_working(job_id, ids, min_frac=0.5):
 
 
 def wait_for_ids(ids, poll=POLL_S, timeout_h=24, straggler_factor=4.0, min_straggler_min=25,
-                 hard_cap_min=float(os.environ.get("PG_ROUND_CAP", "60"))):
+                 hard_cap_min=float(os.environ.get("PG_ROUND_CAP", "30"))):
     """Block until every submitted JOB ID reaches a terminal state. IDs, not names.
 
     STRAGGLER KILL -- why this is not optional for a weeks-long campaign.
@@ -473,6 +473,17 @@ def wait_for_ids(ids, poll=POLL_S, timeout_h=24, straggler_factor=4.0, min_strag
     killed = set()
     id_to_name = {}                 # job id -> run name, filled from the queue on every poll
     while time.time() - t0 < timeout_h * 3600:
+        # 30 MINUTES, not 60 -- Cedric, 8 August. Measured on this campaign: rounds 1-3 took ~85
+        # minutes each, and round 3 needed the cap to close at all. A round is 16 jobs on a
+        # 12-GPU partition, so the tail is one or two runs that grew enormous while eleven cards
+        # sat idle; halving the cap costs those runs their last third and buys the campaign twice
+        # the rounds per hour. Nothing is discarded -- a SIGTERMed run salvages the frames it
+        # reached and records `stopped_early`.
+        #
+        # THIS ALSO CAPS DIRECT `cluster.py` CALLS, which is worth knowing when re-measuring the
+        # basis: those runs take ~50 minutes and would be truncated at 30. Pass PG_ROUND_CAP=90
+        # for a basis batch; the default is set for the loop, which is what runs unattended.
+        #
         # THE HARD CAP, checked before anything else. Every other rule here can spare a job:
         # `_is_working` exempts one that is still advancing, and that is why round 5 ran for two
         # hours. This one cannot be argued with -- at `hard_cap_min` whatever is still running is

@@ -129,6 +129,9 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                # radius:  band 2.0 -> +0.0181,  band 1.0 -> +0.0015,  band 0.5 -> -0.0062.
                # 1.0 sits the sheet on the surface; 0.5 is too weak to hold it out and it sinks inside.
                membrane_band=1.0,
+               # frames over which material found INSIDE the surface is pushed back out. 0 = the old
+               # velocity-only constraint, which cannot recover ground already lost.
+               membrane_recover=2.0,
                # THE TISSUE AS A MOVING BOUNDARY ON THE GRID, rather than a positional projection.
                # 88 showed the projection carries no strain -- see membrane_ops.MPMTissueBoundary.
                membrane_grid_bc=False,
@@ -280,7 +283,7 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                 spec["operators"].append(
                     {"op": "mpm_tissue_boundary", "at": "mpm_grid", "centre": [0.5, 0.5, 0.5],
                      "surface": str(membrane), "scale": 1.0, "dt_frame": float(dt),
-                     "band": float(membrane_band)})
+                     "band": float(membrane_band), "recover": float(membrane_recover)})
             j = spec["schedule"].index("ecm_stress")
             if "integrin_adhesion" not in drop:
                 spec["schedule"].insert(j, "integrin_adhesion"); j += 1
