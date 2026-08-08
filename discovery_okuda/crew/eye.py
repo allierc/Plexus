@@ -70,6 +70,21 @@ def _own(bundle, name):
     return m
 
 
+def _scale_note(bundle, name):
+    """One sentence the eye can act on: the view half-width, and the warning it implies."""
+    m = (bundle.get("metrics") or {}).get(name) or {}
+    L = m.get("camera_lbox")
+    base = ("Each panel carries a scale bar bottom-left labelled with its length in world units. "
+            "The camera is FIXED for the whole run and chosen PER RUN, so every run fills its own "
+            "frame: two movies can look the same size and differ tenfold. Never call a run larger "
+            "or smaller than another from the picture alone -- read the bar.")
+    if L is None:
+        return base + " (this run did not record its camera box)"
+    return (f"{base} This run's 3D panels span {2 * float(L):g} world units edge to edge "
+            f"(half-width {L:g}); the cross-section inset spans "
+            f"{2 * float(m.get('camera_lbox_cross') or 0):g}.")
+
+
 def run(bundle):
     """-> text about ONE run. The round files it and does not read it."""
     from llm import run_agent
@@ -93,6 +108,18 @@ def run(bundle):
     prompt = _prompt.build("eye", [
         ("The run", name, {"as_json": False}),
         ("The frames -- open this with the Read tool and look at it", pic, {"as_json": False}),
+        # THE CAMERA, AS A NUMBER. Cedric, 8 August: "the eye agent should be aware of the scale
+        # bar through passing the camera zoom value."
+        #
+        # Every panel is drawn with a box held FIXED for the whole run -- deliberately, because
+        # per-frame autofit "is what rescaling hid growth". The cost is that the box is chosen per
+        # RUN, so every run fills its own frame: a 2,000-cell sphere and a 53,000-cell one look
+        # the same size. The eye is the one reader who cannot check a metric to break the tie, and
+        # it has been asked to compare runs for the whole campaign. The bar bottom-left carries
+        # the world length; this line carries the same fact in words, so a judgement about SIZE
+        # has to go through it.
+        ("The scale -- the camera box, and what the bar bottom-left means",
+         _scale_note(bundle, name), {"as_json": False}),
         # ITS OWN RUN'S METRICS, SLICED HERE. The round fans this node out over the run names and
         # hands each call the WHOLE context, so `metrics` is {name: summary} for the entire batch --
         # eleven summaries of 183 keys. The prompt came to 147,149 chars (~37k tokens) against a

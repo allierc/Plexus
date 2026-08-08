@@ -57,6 +57,41 @@ LOG_DIR = os.path.join(ROOT, "log", "okuda")
 ARCHIVE = os.path.join(HERE, "_archive")
 
 
+def _scalebar(ax, Lbox, color="w", frac=0.25):
+    """A scale bar in the bottom-left, with the world length written on it.
+
+    Cedric, 8 August: "the mp4 should have a scale bar bottom left with a number, and the eye
+    agent should be aware of the scale bar through passing the camera zoom value."
+
+    WHY IT IS NEEDED HERE SPECIFICALLY. This project renders with a camera that is FIXED for the
+    whole run, deliberately -- run_one prints "per-frame autofit would have run 5.467 -> 7.649,
+    x1.40: that rescaling is what hid growth". A fixed camera makes growth visible WITHIN a run
+    and invisible BETWEEN runs: a 2,000-cell sphere and a 53,000-cell one are drawn the same size,
+    each filling its own box. Anyone comparing two movies -- the eye agent above all -- is reading
+    shape while believing they are reading size. The number on the bar is the only thing in the
+    frame that distinguishes them.
+
+    The bar is drawn in AXES coordinates and its length is computed from the axis limits, so it is
+    exact for the 2D panels. On the 3D panels matplotlib's default projection is perspective, so
+    the bar is exact only at the depth of the view centre; `_draw` sets a cube box with equal
+    aspect, so that is the sphere's own centre and the error at its silhouette is a few percent.
+    It is a scale bar, not a caliper -- and a few percent is the difference between reading 53,000
+    cells and reading 2,000.
+    """
+    span = 2.0 * float(Lbox)
+    # a round number near `frac` of the view, so the label reads 1 / 2 / 5 x 10^n
+    raw = span * frac
+    import math
+    mag = 10.0 ** math.floor(math.log10(max(raw, 1e-12)))
+    nice = min((1.0, 2.0, 5.0, 10.0), key=lambda m: abs(m * mag - raw)) * mag
+    f = nice / span                                    # bar length as a fraction of the axis
+    x0, y0 = 0.04, 0.055
+    ax.plot([x0, x0 + f], [y0, y0], transform=ax.transAxes, color=color, lw=2.6,
+            solid_capstyle="butt", zorder=10_000, clip_on=False)
+    ax.text(x0 + f / 2.0, y0 + 0.018, f"{nice:g}", transform=ax.transAxes, color=color,
+            fontsize=9, ha="center", va="bottom", zorder=10_000, clip_on=False)
+
+
 def _lazy_engine():
     """Import the heavy stack only when we actually run (keeps validate_space fast)."""
     import plexus.operators                                          # noqa: F401
@@ -771,7 +806,9 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     # --------------------------------------------------------------- artefacts
     if True:
         try:
-            render(name, fr, out_dir, movie=movie)
+            _cam = render(name, fr, out_dir, movie=movie)
+            if isinstance(_cam, dict):
+                summary.update(_cam)
             # Captioning is NOT done here. The cluster environment has no `transformers`, so an
             # in-job caption fails on exactly the runs a long campaign produces -- leaving the
             # Watcher blind where it matters most. caption_wave.py does it on the devcontainer
@@ -1064,15 +1101,24 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60, movie=True):
         pt, mt, a = fr[t]
         div, brk = faults_of(pt, mt)
         cls = classes_of(pt, mt)
-        draw3d(fig.add_subplot(4, n_strip, i + 1, projection="3d"), pt, mt, a, CAM_SIDE, div, brk)
-        draw3d(fig.add_subplot(4, n_strip, n_strip + i + 1, projection="3d"), pt, mt, a, CAM_TOP, div, brk)
+        _a1 = fig.add_subplot(4, n_strip, i + 1, projection="3d")
+        draw3d(_a1, pt, mt, a, CAM_SIDE, div, brk)
+        _a2 = fig.add_subplot(4, n_strip, n_strip + i + 1, projection="3d")
+        draw3d(_a2, pt, mt, a, CAM_TOP, div, brk)
         axc = fig.add_subplot(4, n_strip, 2 * n_strip + i + 1, projection="3d")
         draw3d(axc, pt, mt, a, CAM_SIDE, None, brk, classes=cls)
+        # THE STRIP CARRIES THE BAR TOO, and this is the panel that matters most for it: `Read`
+        # takes PNG and not mp4, so strip.png -- not the movie -- is what the eye agent actually
+        # looks at. A scale bar only on the movie would put the number in front of the one reader
+        # who cannot open it.
+        for _ax in (_a1, _a2, axc):
+            _scalebar(_ax, L3)
         ax3 = fig.add_subplot(4, n_strip, 3 * n_strip + i + 1)
         # NO try/except here. Swallowing the error is exactly the silent-no-op pattern this
         # project keeps being bitten by: the first version caught a TypeError from a wrong
         # signature and rendered a blank row that looked deliberate.
         _cross_screen(ax3, pt, mt, col(a), seed_dir=_cross_axis(pt, None), Lbox=L2)
+        _scalebar(ax3, L2)
     # STAMP THE STRIP WHEN THE FIELD IS NOT FINITE. A NaN activator paints magenta per cell now,
     # but a reader still has to infer WHY the picture changed. Say it: the frame the chemistry
     # died, on the image, so the strip accuses the run instead of the plotter.
@@ -1123,13 +1169,44 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60, movie=True):
             axs.text2D(0.02, 0.96, "side  elev 18", transform=axs.transAxes, color="w",
                        fontsize=9)
             axt.text2D(0.02, 0.96, "top  elev 88", transform=axt.transAxes, color="w", fontsize=9)
+            # THE SCALE. `_draw` clears the axes every frame, so this is re-stamped like the
+            # labels above. Both 3D panels share L3, the one box held for the whole run.
+            _scalebar(axs, L3)
+            _scalebar(axt, L3)
             _cross_screen(axin, pt, mt, col(a), seed_dir=_cross_axis(pt, None),
                           Lbox=L2)              # cross-section, minisite convention
             axin.axis("off")
+            _scalebar(axin, L2)                 # its own box: the inset is 2.05x the 3D view
             wri.grab_frame()
     plt.close(figm)
-    print(f"[{name}] artefacts -> {os.path.relpath(out_dir, ROOT)}/{{strip.png,movie.mp4}}",
-          flush=True)
+    # 3d.png -- THE LAST FRAME, ALONE, AT FULL SIZE. Cedric, 8 August: "add one 3d.png end frame
+    # of mp4". The strip is eight thumbnails across a 4-row grid, so the final state is one small
+    # panel among 32; the movie ends on it but cannot be opened by `Read`, which is how every
+    # automated reader in this loop looks at a picture. This is the run's outcome as a single
+    # image, drawn with the same fixed camera and the same scale bar as everything else.
+    try:
+        figE = plt.figure(figsize=(7.0, 7.0)); figE.patch.set_facecolor("black")
+        axE = figE.add_subplot(111, projection="3d")
+        ptE, mtE, aE = fr[-1]
+        divE, brkE = faults_of(ptE, mtE)
+        draw3d(axE, ptE, mtE, aE, CAM_SIDE, divE, brkE)
+        axE.text2D(0.02, 0.96, f"{name}  frame {T - 1}", transform=axE.transAxes,
+                   color="w", fontsize=10)
+        _scalebar(axE, L3)
+        figE.savefig(os.path.join(out_dir, "3d.png"), dpi=110, facecolor="black",
+                     bbox_inches="tight")
+        plt.close(figE)
+    except Exception as _e:
+        # SAID, NOT SWALLOWED: a missing 3d.png reads downstream as "the run had no end state".
+        print(f"[{name}] 3d.png not written: {type(_e).__name__}: {str(_e)[:80]}", flush=True)
+
+    print(f"[{name}] artefacts -> {os.path.relpath(out_dir, ROOT)}/"
+          f"{{strip.png,movie.mp4,3d.png}}", flush=True)
+    # THE CAMERA IS EVIDENCE, so it leaves this function. The eye is shown a picture drawn with a
+    # box held fixed for the whole run and identical in structure for every run in the batch; the
+    # only thing separating a 2,000-cell sphere from a 53,000-cell one in that picture is the
+    # number on the scale bar. Returning it lets the summary carry it and the eye be told it.
+    return {"camera_lbox": round(float(L3), 3), "camera_lbox_cross": round(float(L2), 3)}
 
 
 # --------------------------------------------------------------------------- mechanics

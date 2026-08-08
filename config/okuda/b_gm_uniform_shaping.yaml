@@ -61,7 +61,7 @@ operators:
   a0: 0.01
   mu_h: 1.0
   sat: 0.1
-  rate: 1.0
+  rate: 0.4
 - op: shape_to_chem
   at: cell
   model: curvature
@@ -136,7 +136,7 @@ _basis:
   chem: gm
   mat: uniform
   mech: shaping
-  grid: 3 chemistry x 2 material x 2 mechanics
+  grid: 4 chemistry x 2 material x 2 mechanics
   why: chemistry=gm, material=uniform, mechanics=shaping -- one cell of the basis
     grid written by make_basis.py; every value not on an axis is shared with the other
-    eleven.
+    fifteen.

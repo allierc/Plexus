@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""make_basis -- write the 12 specs the campaign builds from, as a GRID rather than a collection.
+"""make_basis -- write the 16 specs the campaign builds from, as a GRID rather than a collection.
 
 Cedric, 8 August: *"put the current 12 folders of log/okuda into archive, you write a new set of 12
 specs, run and test them on l4 clusters, to form a sound basis for the agentic loop. Route A can
@@ -15,12 +15,12 @@ compared to each other or to a 900-frame campaign run.
 WHY THIS IS GENERATED AND NOT TWELVE HAND-WRITTEN FILES. Twelve hand-written recipes rebuild the
 same problem one phase later: each would drift on some parameter nobody meant to vary, and "pull
 from the basis" would mean "pick a folder" instead of "choose which axis to move". Here the twelve
-ARE the cells of a 3 x 2 x 2, every non-axis parameter is written once, and the diff between any
+ARE the cells of a 4 x 2 x 2, every non-axis parameter is written once, and the diff between any
 two members is exactly the axes that separate them.
 
 THE THREE AXES
 
-  chemistry (3)   none | gray_scott | gierer_meinhardt
+  chemistry (4)   none | gray_scott | gierer_meinhardt | brusselator
                   `none` is not an empty slot -- it is the control that grows without patterning,
                   which is what `cellfix_B_new` was for. `cell_react` also offers `brusselator`;
                   two RD models plus a null says more than three RD models and no null.
@@ -139,7 +139,33 @@ GS = dict(F=0.046, kk=0.062, rate=1.0)                 # the coral spots the cam
 # activator ceiling from 1489 to a usable range without flattening the pattern (act_cv 4.14 ->
 # 2.80). Both come from the declared box in composition_space, which is where this campaign's
 # validated values live.
-GM = dict(a0=0.01, mu_h=1.0, sat=0.1, rate=1.0)
+# rate = 0.4, AND THE FIRST LAUNCH USED 1.0, WHICH CRITIC RULE R1d REFUSES ON MEASURED GROUNDS:
+# gierer_meinhardt WITH divide_3d must advance dt*rate <= 0.5 or "the activator diverges uniformly
+# and the run measures an integrator, not a mechanism". At 1.0 the four gm members reached 53,000
+# cells with a PRISTINE mesh -- broken_frac 0.0, ray_single_frac 1.0, reduced_volume 0.97 -- and
+# premise P12 broken: the shell was perfect and the chemistry on it was not finite. The rule was
+# right and I walked across it; `round.py --check` refused all four as parents before the loop
+# could build on them, which is the only reason this is a corrected value and not a campaign.
+GM = dict(a0=0.01, mu_h=1.0, sat=0.1, rate=0.4)
+# THE THIRD RD MODEL, AND THE CAMPAIGN HAS NEVER RUN IT. Cedric, 8 August: "I think we miss RD
+# basis, got to 16 specs, add 4 to study RD mechanisms in route A." `cell_react` registers three
+# models and the basis carried two, so "which reaction-diffusion mechanism" was an axis with a
+# hole in it -- and an axis the loop cannot vary is an axis it cannot learn anything about.
+#
+#     da/dt = gamma ( A - (B+1) a + a^2 h )
+#     dh/dt = gamma ( B a - a^2 h )
+#
+# Turing-unstable for B > 1 + A^2, so A = 1, B = 3 sits inside the unstable region (3 > 2) rather
+# than on its edge. These are also the values `translate._emit_react` hard-wires, so the basis and
+# anything the loop compiles agree. gamma is the reaction rate; `rate`, `F` and `kk` are NOT read
+# by this model and are therefore absent -- the unread gate would refuse the spec otherwise, which
+# is how the gierer_meinhardt column was caught carrying Gray-Scott's parameters.
+# gamma = 0.05 AND THE FIRST LAUNCH USED 0.3, WHICH IS THE SPACE'S OLD DEFAULT AND DIVERGES. All
+# four brusselator members came back with act_max = NaN and P12 + P4 + P1 broken, mesh frozen at
+# 2000 cells: NaN chemistry makes NaN growth targets and the mechanics stops. `reaction_stiffness`
+# had the answer before the runs did -- brusselator's linear decay is gamma*(B+1), so 0.3 gives
+# 1.2 against gray_scott's 0.108, and explicit Euler at dt = 1 does not carry it. 0.05 gives 0.2.
+BRU = dict(gamma=0.05, A=1.0, B=3.0)
 BETA = 0.5                                             # shape -> chemistry, the second arrow
 F0 = 0.046
 
@@ -149,8 +175,9 @@ F0 = 0.046
 # {uniform, gated} with it. Every column still contributes four, and every row still differs from
 # its neighbour in exactly one axis.
 AXES = {
-    "chem": ["none", "gs", "gm"],
-    "mat":  {"none": ["static", "uniform"], "gs": ["uniform", "gated"], "gm": ["uniform", "gated"]},
+    "chem": ["none", "gs", "gm", "bru"],
+    "mat":  {"none": ["static", "uniform"], "gs": ["uniform", "gated"],
+             "gm": ["uniform", "gated"], "bru": ["uniform", "gated"]},
     "mech": ["plain", "shaping"],
 }
 
@@ -182,8 +209,9 @@ def build(chem, mat, mech):
              "mode": "scatter", "seed_frac": 0.06},
             {"op": "cell_diffuse", "at": "cell", "implementation": "graph_laplacian", **RD},
             {"op": "cell_react", "at": "cell",
-             "model": "gray_scott" if chem == "gs" else "gierer_meinhardt",
-             **(GS if chem == "gs" else GM)},
+             "model": {"gs": "gray_scott", "gm": "gierer_meinhardt",
+                       "bru": "brusselator"}[chem],
+             **{"gs": GS, "gm": GM, "bru": BRU}[chem]},
             # THE SECOND ARROW. shape_to_chem makes a bulging cell feed faster, so the loop closes:
             # curvature -> feed -> activator -> growth gate -> curvature. Present in every
             # chemistry member, because `beta = 0` as the null is what `coral_gate` was for and the
@@ -232,15 +260,15 @@ def build(chem, mat, mech):
         "operators": ops,
         "schedule": [o["op"] for o in ops],
         "_basis": {"chem": chem, "mat": mat, "mech": mech,
-                   "grid": "3 chemistry x 2 material x 2 mechanics",
+                   "grid": "4 chemistry x 2 material x 2 mechanics",
                    "why": f"chemistry={chem}, material={mat}, mechanics={mech} -- one cell of the "
                           f"basis grid written by make_basis.py; every value not on an axis is "
-                          f"shared with the other eleven."},
+                          f"shared with the other fifteen."},
     }
 
 
 def grid():
-    """The twelve, in a fixed order: four per chemistry column.
+    """The sixteen, in a fixed order: four per chemistry column.
 
     `static` is DIVISION WITHOUT GROWTH -- cells subdivide and the body adds nothing. It is the
     substrate every growth claim is read against, and it is the regime the old `factor 1.5/1.8`
