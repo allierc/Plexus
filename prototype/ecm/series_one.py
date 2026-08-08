@@ -238,6 +238,31 @@ SERIES = {
                            membrane_exclude=False, membrane_adhesion=0.0, membrane_secrete_rate=0.0,
                            membrane_tau=0.0, membrane_reserve=0.0),
 
+    # ---- M1 PASSES. The bug in 89-91 was one line and not physics: `mpm_grid_update` writes the solved
+    # velocity into `g.v` and `mpm_gather` reads `g.v`, while the boundary operator was editing `g.mv`.
+    # It ran every substep (140 calls in 6 frames, counted) and was invisible, which reads exactly like a
+    # physical null -- so it was misdiagnosed three times, as the empty lumen and then as the band.
+    #
+    # With `g.v` written, the continuum registers the stretch the geometry implies:
+    #     frame   100     200     300     402
+    #     R/R0-1  0.481   1.019   1.708   2.600
+    #     strain  0.494   1.029   1.682   2.365
+    # and coverage falls to 0.934 -- the sheet begins to FAIL with no material being added, which is the
+    # tear the ladder was built to produce, arriving without being asked for.
+    #
+    # ---- M2: does secreted material stop it? -----------------------------------------------------
+    # 92 turns secretion on (reserve 12.5, nominal rate): 3,333 particles laid down at frame 0 and the
+    #    rest released as the surface grows. If coverage holds at ~1 while 91 falls to 0.93, added
+    #    material is what keeps a basement membrane intact under a tripling radius.
+    # 93 starves it (rate/6) -- the control that says the effect is supply and not the reserve merely
+    #    existing. Expect a WORSE tear than 91, since it starts with a sparser sheet.
+    "92_mpm_secrete": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
+                           membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
+                           membrane_reserve=12.5, membrane_secrete_rate=0.012),
+    "93_mpm_starved": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
+                           membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
+                           membrane_reserve=12.5, membrane_secrete_rate=0.002),
+
     # 89-91: Plexus's own attraction_repulsion law instead of the one-sided spring.
     #
     # WHAT 86-88 LEFT. 86 (w = 50) is the best packing so far, d/hex 0.746 -- but at z = 3.82, under the
