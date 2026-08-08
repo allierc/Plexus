@@ -203,11 +203,11 @@ def seed():
                 "force-balance/zero-stress distinction spelled out; its example withdrawn.",
         tags=["retracted", "biology"])
 
-    add("F006", "morphogen_growth_3d never updates R0, so the radial spring in shape_energy_3d "
+    add("F006", "grow_3d never updates R0, so the radial spring in shape_energy_3d "
                 "holds the shell at its seed radius while cell target volumes grow sixteenfold.",
         "standing", D,
         evidence="Read from source: the radial term is tyssue_ops3d.py:85, R0 is set at seeding "
-                 ":217 and rescaled only by vesicle_growth :409. Fixing it (R0 from the enclosing "
+                 ":217 and rescaled only by grow_3d :409. Fixing it (R0 from the enclosing "
                  "sphere of the current TARGET volume) removes the self-intersection completely: "
                  "rays cross exactly once at every frame, reduced volume 0.985 -> 0.977 instead "
                  "of -> 0.229, mean cell volume flat instead of collapsing.",
@@ -217,7 +217,7 @@ def seed():
                 "penalise a growing bud -- the one shape the campaign exists to produce.",
         tags=["standing", "mechanism", "defect"])
 
-    add("F007", "morphogen_growth_3d.conserve_amount extinguishes a Gray-Scott pattern.",
+    add("F007", "grow_3d.conserve_amount extinguishes a Gray-Scott pattern.",
         "standing", D,
         evidence="Dilution of 1% per step kills the activator within 250 steps in pure chemistry, "
                  "while the undiluted pattern reaches 53% coverage by step 250 and holds "

@@ -35,7 +35,7 @@
   "cell_diffuse": 401,
   "cell_react": 401,
   "shape_to_chem": 401,
-  "morphogen_growth_3d": 328,
+  "grow_3d": 328,
   "shape_energy_3d": 401,
   "reconnect_t1_3d": 98,
   "divide_3d": 101,

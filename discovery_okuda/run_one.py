@@ -364,7 +364,7 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     # built here, before the block below that used to read it. Read it first or every red_frac in
     # the every-frame table is measured against a default the simulation never used.
     GROWTH_SWITCH[0] = next((float(o["a_sw"]) for o in cfg.get("operators", [])
-                    if o.get("op") == "morphogen_growth_3d" and "a_sw" in o), 1.5)
+                    if o.get("op") == "grow_3d" and "a_sw" in o), 1.5)
     per_frame = frame_metrics(fr)
     # THE EVERY-FRAME RECORD, ON DISK. `time_analysis.report` reads it beside metrics.npz, so the
     # trajectories an agent is shown carry the chemistry at full resolution while the mesh
@@ -862,7 +862,7 @@ def quasi_static_Q(cfg, cfg_path, device, protr_before, out_dir, Hf, relax_frame
     ckpt.save_state(Hf, ck)                                # the end state, positions + topology
 
     c2 = copy.deepcopy(cfg)
-    drop = {"morphogen_growth_3d", "vesicle_growth", "rd_interface_tension", "seed_cell_rd",
+    drop = {"grow_3d", "rd_interface_tension", "seed_cell_rd",
             "divide_3d"}
     seeders = {"seed_mesh_3d", "load_mesh_3d"}             # replaced by the end-state checkpoint
     c2["operators"] = [o for o in c2["operators"] if o["op"] not in drop | seeders]

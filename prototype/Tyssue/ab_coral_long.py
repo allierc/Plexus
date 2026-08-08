@@ -33,7 +33,7 @@ def build(cv, max_div_frac, grow=0.003):
     sstride = max(1, (FRAMES + rec_cap) // rec_cap)
     ops = [{"op": "seed_mesh_3d", "at": "vertex", "n_cells": N_CELLS, "radius": R.RADIUS,
             "jitter": R.JITTER, "p0": 3.72, "seed": R.SEED, "before_frame": 1, "vseed_cv": cv},
-           {"op": "vesicle_growth", "at": "vertex", "rate": grow, "every": 1, "max_scale": 2.5},
+           {"op": "grow_3d", "at": "vertex", "rate": grow, "every": 1, "rho": 1.0, "a_sw": 0.0, "vth_frac": 15.625, "conserve_amount": False},
            {"op": "shape_energy_3d", "at": "vertex", "p0": 3.72, "K_A": 1.0, "K_P": 1.0,
             "Gamma": 0.1, "Lambda": 0.5, "K_V": 1.0, "K_R": 0.4, "mu": 1.0, "dt": dt,
             "relax_iters": 26, "eta": 0.08, "cap_frac": 0.12},
@@ -44,7 +44,7 @@ def build(cv, max_div_frac, grow=0.003):
            {"op": "seed_cell_rd", "at": "cell", "seed": R.SEED, "before_frame": 3, **rd["seed"]},
            {"op": "cell_diffuse", "at": "cell", **rd["diffuse"]}, {"op": "cell_react", "at": "cell", **rd["react"]},
            {"op": "topo_snapshot_3d", "at": "vertex", "every": sstride}]
-    sched = ["seed_mesh_3d", "vesicle_growth", "shape_energy_3d", "reconnect_t1_3d", "divide_3d",
+    sched = ["seed_mesh_3d", "grow_3d", "shape_energy_3d", "reconnect_t1_3d", "divide_3d",
              "cell_geometry_3d", "cell_adjacency", "seed_cell_rd", "cell_diffuse", "cell_react", "topo_snapshot_3d"]
     mesh0, nF = R._mesh(N_CELLS); Nv = mesh0["Nv"]; buf = int(Nv * 6.0); cbuf = int(nF * 6.0)
     cfg = {"general": {"name": "coral_long_ab", "seed": R.SEED, "n_frames": FRAMES, "dt": dt, "record_cap": rec_cap,

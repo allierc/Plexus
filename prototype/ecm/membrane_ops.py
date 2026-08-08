@@ -52,7 +52,7 @@ import math
 
 import torch
 
-from plexus.models.base import Lateral, Rewire, Structural
+from plexus.models.base import FieldUpdate, Lateral, Rewire, Structural
 from plexus.models.entities import MPMParticle
 from plexus.models.registry import register_entity, register_operator
 
@@ -62,6 +62,8 @@ from plexus.models.registry import register_entity, register_operator
 # components is measured, and a sheet that has lost 30% of its bonds but is still one piece is not
 # fragmented. Filled by `basement_membrane_bond_break`.
 BOND_TRACE: list = []
+# (frame, |dp| total, radial dp, n nodes): what the matrix and membrane push back on the tissue
+BOUNDARY_REACTION: list = []
 MEMBRANE_STRAIN: list = []       # per-particle bond strain, for the renderer
 
 
@@ -1035,6 +1037,113 @@ class BasementMembraneRemodel(Lateral):
             print(f"[basement_membrane_remodel] crosslink turnover tau={self.tau} frames "
                   f"(cap {self.cap:g} of rest per frame): the sheet forgets strain over tau, so "
                   f"fragmentation is a race between turnover and growth", flush=True)
+            self._said = True
+        return {}
+
+
+
+@register_operator("mpm_tissue_boundary", family="mpm", set="field", kind="field")
+class MPMTissueBoundary(FieldUpdate):
+    """The growing epithelium as a MOVING no-slip boundary on the MPM grid.
+
+    WHY THIS OPERATOR EXISTS, as the measurement that forced it. Run 88 carried the basement membrane as
+    a pure MPM continuum and it tracked the spheroid perfectly -- R 0.0875 -> 0.2985, coverage 1.0 -- while
+    reporting a peak strain of 7e-4 against a true in-plane stretch of 3.4x. The sheet was a DECAL. The
+    log said why: 18,134 particles per frame were being repositioned by `cell_exclude_3d`, a hard
+    positional projection. Moving a particle by hand does not touch its deformation gradient, so the
+    material never learns it was stretched, and a body at zero strain cannot tear, cannot resist growth,
+    and cannot load the stroma.
+
+    THE FIX IS WHERE MPM PUTS BOUNDARIES: on the grid. `mpm_grid_update` already zeroes grid velocity
+    inside rasterized obstacles -- correct for a wall, wrong for a growing tissue, which is an obstacle
+    with a VELOCITY. Setting the grid velocity inside the tissue to the surface's own expansion velocity
+    makes the growth enter as momentum: particles gather it, the affine gradient C becomes non-zero, and
+    F integrates the stretch that a projection threw away. This is the standard collision-object
+    treatment (Stomakhin 2013), not a new mechanism.
+
+    IT USES THE REAL TISSUE, not a sphere fitted to it: the same `smap` table the membrane is seeded on
+    and the integrin anchors read, so the boundary and the sheet cannot disagree about where the surface
+    is. R is looked up per direction per frame, and Rdot from the difference between consecutive frames.
+    """
+
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = ["surface"]
+    MECHANISM_TAGS = ["moving_boundary", "no_slip", "tissue_grid_coupling"]
+    PARAM_ROLES = {"surface": "tissue_surface_radius_map", "dt_frame": "frame_dt_for_Rdot",
+                   "scale": "surface_rescale", "shell": "band_outside_R_also_driven"}
+    REFERENCE = ("Stomakhin, A. et al. (2013) ACM Trans. Graph. 32(4):102 (collision objects imposed on "
+                 "the grid); Hu, Y. et al. (2018) ACM Trans. Graph. 37(4):150 (MLS-MPM).")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "mpm_grid")
+        self.centre = [float(v) for v in params.get("centre", [0.5, 0.5, 0.5])]
+        self.scale = float(params.get("scale", 1.0))
+        self.dt_frame = float(params.get("dt_frame", 4.0e-3))
+        import numpy as _np
+        z = _np.load(str(params["surface"]))
+        self.smap = torch.as_tensor(_np.asarray(z["smap"], _np.float32)) * self.scale
+        self.T = int(self.smap.shape[0])
+        self._xyz = None
+        self._said = False
+
+    def _node_dirs(self, g, dev, dt_):
+        """Unit direction and radius of every grid node, cached -- the grid does not move."""
+        if self._xyz is not None:
+            return self._xyz
+        nx, ny, nz = g.nx, g.ny, getattr(g, "nz", g.ny)
+        dx = g.dx
+        ii = torch.arange(nx, device=dev, dtype=dt_)
+        jj = torch.arange(ny, device=dev, dtype=dt_)
+        kk = torch.arange(nz, device=dev, dtype=dt_)
+        X, Y, Z = torch.meshgrid(ii, jj, kk, indexing="ij")
+        P = torch.stack([X, Y, Z], dim=-1).reshape(-1, 3) * dx
+        c = torch.tensor(self.centre, device=dev, dtype=dt_)
+        d = P - c
+        r = d.norm(dim=-1).clamp_min(1e-9)
+        self._xyz = (d / r[:, None], r)
+        return self._xyz
+
+    def forward(self, H, mask=None):
+        g = H.field(self.at)
+        dev, dt_ = g.m.device, g.mv.dtype
+        f = int(getattr(H, "frame", 0) or 0)
+        t = min(self.T - 1, max(0, f))
+        tn = min(self.T - 1, t + 1)
+        u, r = self._node_dirs(g, dev, dt_)
+        M = self.smap[t].to(dev, dt_)
+        Mn = self.smap[tn].to(dev, dt_)
+        nth, nph = M.shape
+        th = torch.acos(u[:, 2].clamp(-1.0, 1.0))
+        ph = torch.atan2(u[:, 1], u[:, 0])
+        ti = (th / math.pi * nth).long().clamp(0, nth - 1)
+        pi = ((ph + math.pi) / (2 * math.pi) * nph).long().clamp(0, nph - 1)
+        R = M[ti, pi]
+        Rdot = (Mn[ti, pi] - R) / max(self.dt_frame, 1e-9)
+        inside = r < R
+        if bool(inside.any()):
+            gm = g.m.clamp(min=1e-10)
+            gv = g.mv / gm[:, None]
+            # no-slip against a boundary that is itself moving: the node takes the surface's radial
+            # velocity rather than zero, which is the whole difference between a wall and a growing ball
+            gv_new = torch.where(inside[:, None], Rdot[:, None] * u, gv)
+            # THE OTHER HALF OF THE COUPLING, and it costs one subtraction. The momentum the boundary
+            # must INJECT to hold its prescribed motion is exactly what the material is exerting back on
+            # the tissue: dp = m*(v_bc - v_free), summed over the constrained nodes. Pass 2 replays a
+            # tissue recorded in pass 1 and so cannot be pushed by it -- but this is the force that would
+            # push it, measured rather than assumed, and it is what pass 1 would have to be given for a
+            # genuinely two-way run. Its radial component is the one that matters: negative = the
+            # matrix and membrane are resisting the growth.
+            dp = ((gv_new - gv) * gm[:, None])[inside]
+            fr = (dp * u[inside]).sum(-1)
+            BOUNDARY_REACTION.append((int(getattr(H, "frame", 0) or 0),
+                                      float(dp.norm(dim=-1).sum()), float(fr.sum()),
+                                      int(inside.sum())))
+            g.mv = gv_new * gm[:, None]
+        if not self._said:
+            print(f"[mpm_tissue_boundary] tissue imposed on the grid: {int(inside.sum())} of "
+                  f"{r.numel()} nodes inside at frame {f}, max Rdot {float(Rdot.max()):.4g}", flush=True)
             self._said = True
         return {}
 

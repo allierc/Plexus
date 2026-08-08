@@ -78,7 +78,7 @@ et al. 2018 report three morphologies out of this coupling: **tubes**, **undulat
   This is a substrate bug, not a biological result. Avoid the pair until it is fixed.
 - **The declared search space contains none of the working recipes.** All six pool parents carry
   out-of-range parameters: `l_th_frac` in 6/6 (0.35 vs a 0.12 ceiling), `shape_energy_3d.Lambda` in
-  3/6 (3 vs 0.3 — 10×), `morphogen_growth_3d.rate` in 3/6 (below its floor), `a_sw` at 50 vs a
+  3/6 (3 vs 0.3 — 10×), `grow_3d.rate` in 3/6 (below its floor), `a_sw` at 50 vs a
   ceiling of 6. So a `set_param` edit offered by the menu samples a region **no working recipe
   occupies**. Until the boxes are re-derived, treat a value inside the declared range as *unproven*
   rather than safe, and prefer edits that stay near a parent's own measured value.
@@ -93,11 +93,11 @@ et al. 2018 report three morphologies out of this coupling: **tubes**, **undulat
   `valid_frac` 0.0, `protr_peak` railed at 1.001). **Proven by a one-parameter revert** to the
   parent's 0.28 — which is the evidence, and note that the declared range is *not*: the space declares
   `[0.01, 0.12]`, so 0.28 is outside it too and works perfectly. The twelfth run
-  had `l_th_frac` 0.28 and broke anyway — it carried `divide_3d` + `morphogen_growth_3d`, already
+  had `l_th_frac` 0.28 and broke anyway — it carried `divide_3d` + `grow_3d`, already
   ruled out above.
 
   *A diagnosis that was offered and is FALSE, recorded so it is not proposed again:* "growth against a
-  frozen shell radius." `morphogen_growth_3d` has rescaled `R0` from the target volume since
+  frozen shell radius." `grow_3d` has rescaled `R0` from the target volume since
   2026-07-31, five days before round 2 ran, and `r002c_03` broke P7 and P11 with **no growth operator
   at all** — a run that never grows cannot buckle from a growth radius. The claim was produced
   confidently from four runs' metrics by a role that had been given an empty history, and it is what
@@ -112,7 +112,7 @@ list, and it is why its slots are never spent re-settling a question. Ours:*
   slot so runs stay comparable, and a reservoir big enough for the target is checked before launch.
 - **The vertex and cell reservoir sizes.** Derived from the target cell count, never proposed. A
   closed trivalent sheet obeys V = 2F − 4, so a buffer is arithmetic, not a choice.
-- **`conserve_amount` on `morphogen_growth_3d`.** Okuda Appendix A: the morphogen is an AMOUNT, so a
+- **`conserve_amount` on `grow_3d`.** Okuda Appendix A: the morphogen is an AMOUNT, so a
   growing cell must dilute its concentration. Turning it off silently creates mass every step.
 - **The frame count and the analysis stride.** Campaign-wide, so a metric measured on one run means
   the same as on another.

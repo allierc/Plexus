@@ -32,7 +32,7 @@ operators:
   at: vertex
   cell_set: cell
   hill: 4.0
-  op: morphogen_growth_3d
+  op: grow_3d
   rate: 0.03
   rho: 1.0
   vth_frac: 2.5
@@ -75,7 +75,7 @@ operators:
 schedule:
 - seed_mesh_3d
 - cell_geometry_3d
-- morphogen_growth_3d
+- grow_3d
 - shape_energy_3d
 - reconnect_t1_3d
 - divide_3d

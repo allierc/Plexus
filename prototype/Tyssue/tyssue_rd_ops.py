@@ -11,7 +11,7 @@ Operators:
   cell_diffuse   (lateral)    -- graph-Laplacian diffusion of chem on the cell adjacency (EMIT=velocity)
   cell_react     (lateral)    -- Gray-Scott autocatalysis (EMIT=velocity)
   cell_geometry_3d (aggregate)-- vertices -> per-cell centroid/area
-  morphogen_growth_3d (growth)-- grow each cell's target volume by a Hill fn of its activator -> BUDDING
+  grow_3d (growth)-- grow each cell's target volume by a Hill fn of its activator -> BUDDING
 """
 from __future__ import annotations
 
@@ -272,7 +272,7 @@ class CellDiffuseInterfaceWeighted(Lateral):
         degree-normalised graph Laplacian -- so d_a/d_h/chi keep the meaning every round_* preset
         calibrated them with, and only the DEVIATION from uniformity acts. (It also means a uniform
         inflation of the whole vesicle is normalised away; global dilution under growth is already
-        handled structurally by morphogen_growth_3d's conserve_amount, so applying it here too would
+        handled structurally by grow_3d's conserve_amount, so applying it here too would
         double-count it.)
 
     STABILITY / STENCIL GAIN (derived, then measured -- do not re-guess it). The operator is -L for a
@@ -428,13 +428,28 @@ class CellReactGiererMeinhardt(Lateral):
         return {self.at: self.rate * torch.stack([da, dh], dim=1) * occ}
 
 
-@register_operator("morphogen_growth_3d", set="vertex", kind="structural", family="growth")
-class MorphogenGrowth3D(Structural):
-    """Morphogen-driven growth: each cell's targets grow at a per-cell rate set by a Hill function of
-    its activator (read from the cell set), so the shell BULGES where the Turing activator is high ->
-    self-organised budding/coral. A cross-set coupling (reads cell.chem, writes the vertex mesh targets
-    A0/P0/v_eq); the per-cell volume elasticity then inflates the activated cells by force balance.
-    Uniform vesicle_growth is the a_sw->0 limit."""
+# `grow_3d`, AND THE OLD NAME IS GONE RATHER THAN ALIASED. Cedric, 8 August: "I always found
+# grow_3d misleading -- is it morphogen, is it growth?" and then, on the alias:
+# "I'm not a fan of alias and backward compatibility, this makes everything intricated and not
+# readable. I prefer modifying prior spec files. Simplicity needs erasing here."
+#
+# It is growth. It does not produce a morphogen, it READS one and uses it as a per-cell rate: the
+# morphogen is a GATE on this operator, and the composition space already declares that gate as an
+# optional slot. With the gate open (`a_sw = 0`) the same operator is plain uniform growth. Naming
+# the gate in the operator made the optional half look mandatory, and made the sibling pair
+# unreadable -- `grow_3d` / `divide_3d` says what the schedule actually does.
+@register_operator("grow_3d", set="vertex", kind="structural", family="growth")
+class Grow3D(Structural):
+    """Cell growth on the vesicle: each cell's targets (A0 / P0 / v_eq) grow at a per-cell rate,
+    and the per-cell volume elasticity in shape_energy_3d then inflates the cell by force balance.
+    This operator moves no vertex itself -- it raises what the cells ASK for, and the mechanics
+    decides whether they get it.
+
+    THE RATE IS `rate * (rho + Hill(activator))`, which is one operator covering both regimes:
+      rho = 1, a_sw = 0   uniform growth, every cell at the same rate (what `grow_3d` did)
+      rho = 0, a_sw > 0   growth only where the activator is high -> self-organised budding/coral
+      in between          a baseline everywhere plus an activator-driven excess at the tips
+    A cross-set coupling: reads cell.chem, writes the vertex mesh targets."""
     # MAY_MUTATE_INTEGRATED_STATE was declared False and the operator mutates it anyway: the
     # `conserve_amount` branch rescales cell.chem in place (c_j <- c_j * (v_old/v_new)) when the
     # cell's target volume grows. The engine's integration invariant caught it and refused to run
@@ -474,11 +489,19 @@ class MorphogenGrowth3D(Structural):
             return {}
         self._k += 1                    # monotonic tick only -- D1: the engine owns the period
         clvl = H.level(self.cat)
-        if "chem" not in clvl.state_schema:
-            return {}
-        nF = m["nF"]; h0, h1 = clvl.state_schema["chem"]
+        nF = m["nF"]
         dev = m["V0f"].device
-        a = clvl.state[:nF, h0].detach().to(dev)                 # per-cell activator
+        # NO CHEMISTRY IS UNIFORM GROWTH, NOT NO GROWTH. This used to `return {}` when the cell set
+        # carried no `chem` state, which made a growth operator silently inert on any composition
+        # without an RD pair -- and hid a dependency that is not real: the activator is a GATE, and
+        # with the gate open (a_sw = 0, rho = 1) the rate does not consult it at all. That guard is
+        # also why `grow_3d` had to exist as a separate operator. a = 0 is the honest reading
+        # of "there is no activator here"; the Hill term evaluates to 0 and the rho baseline stands.
+        if "chem" in clvl.state_schema:
+            h0, _h1 = clvl.state_schema["chem"]
+            a = clvl.state[:nF, h0].detach().to(dev)             # per-cell activator
+        else:
+            a = torch.zeros(nF, device=dev, dtype=m["V0f"].dtype)
         if "mg_scale" not in m or m["mg_scale"].shape[0] != nF:  # per-cell cumulative linear scale (capped)
             m["mg_scale"] = torch.ones(nF, device=dev, dtype=m["V0f"].dtype)
             m["A0_init"] = m["A0"].clone(); m["P0_init"] = m["P0"].clone(); m["V0f_init"] = m["V0f"].clone()
@@ -498,7 +521,7 @@ class MorphogenGrowth3D(Structural):
         m["V0"] = float(m["V0f"].sum())
         # THE SHELL RADIUS MUST GROW WITH THE CELLS. shape_energy_3d carries a radial spring,
         #     E += K_R * sum_i (|x_i| - R0)^2                 (tyssue_ops3d.py:85)
-        # and R0 is set once at seeding (:217). `vesicle_growth` rescales it (:409); this operator
+        # and R0 is set once at seeding (:217). `grow_3d` rescales it (:409); this operator
         # never did. So with K_R = 0.4 the mechanics pinned the shell at the seed radius while the
         # cells' target volumes grew sixteenfold, and the sheet had nowhere to put the extra area
         # but through itself. Measured on mini_grow_divide_bigger: rays cast from the tissue
@@ -513,7 +536,7 @@ class MorphogenGrowth3D(Structural):
         # the one shape this campaign exists to produce.
         if "R0" in m:
             m["R0"] = float((3.0 * max(m["V0"], 1e-12) / (4.0 * np.pi)) ** (1.0 / 3.0))
-        if self.conserve_amount:
+        if self.conserve_amount and "chem" in clvl.state_schema:
             # conserve molecule AMOUNT: c_j <- c_j * (v_old/v_new) = c_j * (s_prev/s)^3 as v_eq grows ~ s^3.
             # Makes dilution STRUCTURAL (no continuum -c(div.v) term); it is LOAD-BEARING (Okuda's intra-domain
             # gradients come from it) -> keep it, don't cancel. The flood is a gamma (rate) problem, fixed elsewhere.
@@ -635,3 +658,4 @@ class CellReactBrusselator(Lateral):
         dh = self.gamma * (self.B * a - a2h)
         occ = lvl.occ[:, None] if getattr(lvl, "occ", None) is not None else 1.0
         return {self.at: torch.stack([da, dh], dim=1) * occ}
+

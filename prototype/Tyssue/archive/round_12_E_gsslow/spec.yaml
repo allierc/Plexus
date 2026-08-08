@@ -51,7 +51,7 @@ operators:   # the operators to instantiate (each realises one mechanism)
   F: 0.03
   kk: 0.062
   rate: 1.0   # growth rate of the target area per frame
-- op: morphogen_growth_3d
+- op: grow_3d
   at: vertex   # the set this operator acts on
   cell_set: cell
   rate: 0.02   # growth rate of the target area per frame
@@ -101,7 +101,7 @@ schedule:   # the order the operators run each frame
 - cell_adjacency
 - cell_diffuse
 - cell_react
-- morphogen_growth_3d
+- grow_3d
 - shape_energy_3d
 - reconnect_t1_3d
 - divide_3d

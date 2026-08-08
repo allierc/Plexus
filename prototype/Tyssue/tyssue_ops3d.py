@@ -390,42 +390,17 @@ class ShapeEnergy3D(Lateral):
         return {self.at: v_full}
 
 
-@register_operator("vesicle_growth", set="vertex", kind="structural", family="growth")
-class VesicleGrowth(Structural):
-    """Grow the vesicle self-similarly by ramping only the per-cell TARGETS (no vertex is moved by
-    hand -- the expansion emerges from shape_energy_3d's force balance). Each tick a linear scale grows
-    by `rate`, so per cell: A0 <- A0*(1+rate)^2, P0 <- P0*(1+rate), v_eq <- v_eq*(1+rate)^3, and the
-    shell radius R0 <- R0*(1+rate) (area~R^2, volume~R^3). The per-cell volume elasticity then pushes
-    each cell's vertices outward to restore its target wedge volume, so the whole shell inflates
-    smoothly and resists buckling -- the physically-correct mechanism, matching tyssue's ClosedMonolayer
-    (grow prefered_vol, minimise) and Turing_vertex Eq.3 (grow v_eq)."""
-    SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = False
-    MECHANISM_TAGS = ["growth", "isotropic_inflation", "vesicle", "volume_target_scaling"]
-    REFERENCE = "Plexus (this work)."
-
-    def __init__(self, params, device="cpu"):
-        super().__init__(params, device)
-        self.at = params.get("_at", "vertex")
-        self.rate = float(params.get("rate", 0.004)); self.every = _engine_owns_clock(params)
-        self.max_scale = float(params.get("max_scale", 1e9))    # cap the linear growth -> the shell PLATEAUS
-        self._k = 0
-
-    def forward(self, H, mask=None):
-        lvl = H.level(self.at); m = getattr(lvl, "_mesh", None)
-        if m is None:
-            return {}
-        self._k += 1                    # monotonic tick only -- D1: the engine owns the period
-        gs = float(m.get("gscale", 1.0))
-        if gs >= self.max_scale:                                # plateaued: stop inflating (division then stops too)
-            return {}
-        g = 1.0 + self.rate
-        m["gscale"] = gs * g                                     # cumulative linear scale (radius factor)
-        m["A0"] = m["A0"] * (g * g)                              # area ~ radius^2
-        m["P0"] = m["P0"] * g                                    # perimeter ~ radius
-        m["V0f"] = m["V0f"] * (g ** 3)                           # per-cell target volume ~ radius^3
-        m["V0"] = float(m["V0f"].sum())
-        m["R0"] = float(m["R0"]) * g                             # shell radius ~ radius
-        return {}
+# `vesicle_growth` (class VesicleGrowth) WAS HERE AND IS DELETED. Cedric, 8 August: "it is a
+# bummer to have two growth competing operators... simplicity needs erasing here."
+#
+# It duplicated `grow_3d` and CONTRADICTED it: both wrote the same mesh targets, this one
+# multiplicatively (V0f <- V0f * g^3), the other by assignment from its own snapshot
+# (V0f <- V0f_init * s^3). Scheduled together -- which the discovery loop did twice, r001_07
+# and r002_03 -- grow_3d ran second and overwrote this one every frame, silently.
+#
+# Every call site is ported: uniform body-wide inflation is `grow_3d` with `rho = 1` and the
+# gate open (`a_sw = 0`). `max_scale` capped the LINEAR scale and `vth_frac` caps per-cell
+# VOLUME, so the same plateau is `vth_frac = max_scale ** 3`.
 
 
 @register_operator("divide_3d", set="vertex", kind="structural", family="growth")
@@ -467,7 +442,7 @@ class Divide3D(Structural):
         # is set by ramped morphogen growth, so an actively-growing tip cell has mother_V0f >> vf; halving it
         # leaves a fresh daughter with target >> actual and (since K_V dominates tension 5-50x) K_V drives the
         # tiny face hard -> inverted/hollow caps at the proliferating tip. Birth-at-target removes the mismatch;
-        # morphogen_growth_3d then re-ramps activated daughters as their G1 regrowth. Off by default so other
+        # grow_3d then re-ramps activated daughters as their G1 regrowth. Off by default so other
         # presets (vesicle_divide/fig4) are unchanged; the tube preset turns it on.
         self.g1_ramp = bool(params.get("g1_ramp", False))
         # ORIENTED division at the red/white interface (Okuda's tube mechanism, user issue 3): the dividing
@@ -538,7 +513,7 @@ class Divide3D(Structural):
         # lines above: current volume >= factor x jitter x its OWN birth volume, after min_cycle
         # (or past max_cycle, which is a backstop and must be set long or it becomes the rate).
         # That is P3 -- "a cell divides because it got big" -- and it is the mechanism the paper
-        # is about. The pace therefore comes from how fast morphogen_growth_3d inflates cells:
+        # is about. The pace therefore comes from how fast grow_3d inflates cells:
         # ONE number, and it is a growth rate, in the place where the biology is.
         #
         # THREE NUMERICAL SHORTCUTS USED TO OVERRIDE IT, and each in turn WAS the rate:

@@ -58,8 +58,8 @@ def make_spec(name, p0, buf, grow_rate, divide, n_cells, frames):
     ]
     sched = ["seed_mesh_3d"]
     if grow_rate > 0:
-        ops.append({"op": "vesicle_growth", "at": "vertex", "rate": grow_rate, "every": 1})
-        sched.append("vesicle_growth")           # ramp the per-cell TARGETS before the force step reads them
+        ops.append({"op": "grow_3d", "at": "vertex", "rate": grow_rate, "every": 1, "rho": 1.0, "a_sw": 0.0, "vth_frac": 1e9, "conserve_amount": False})
+        sched.append("grow_3d")           # ramp the per-cell TARGETS before the force step reads them
     # Expansion EMERGES from the per-cell volume elasticity: growth only ramps each cell's target volume,
     # and shape_energy_3d's force balance inflates every cell locally (no vertex moved by hand). During
     # growth give it more relax iters per frame so it tracks the ramping targets quasi-statically.

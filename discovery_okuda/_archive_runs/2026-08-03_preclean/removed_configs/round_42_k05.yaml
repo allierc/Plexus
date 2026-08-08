@@ -39,7 +39,7 @@ operators:
   n_spots: 1
   amp: 2.0
   tip_radius: 1.2
-- op: morphogen_growth_3d
+- op: grow_3d
   at: vertex
   cell_set: cell
   rate: 0.01
@@ -91,7 +91,7 @@ schedule:
 - load_mesh_3d
 - cell_geometry_3d
 - seed_cell_rd
-- morphogen_growth_3d
+- grow_3d
 - shape_energy_3d
 - reconnect_t1_3d
 - divide_3d
@@ -108,8 +108,8 @@ _discovery:
     - id: divide_3d0
       op: divide_3d
       impl: orient_iface
-    - id: morphogen_growth_3d0
-      op: morphogen_growth_3d
+    - id: grow_3d0
+      op: grow_3d
       impl: hill_conserve_amount
     - id: reconnect_t1_3d0
       op: reconnect_t1_3d
@@ -123,7 +123,7 @@ _discovery:
       dst_op: divide_3d
       slot: axis
     - src_op: seed_cell_rd
-      dst_op: morphogen_growth_3d
+      dst_op: grow_3d
       slot: gate
   region: growth-driven monolayer (Okuda route)
   defect_fixes:

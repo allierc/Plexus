@@ -67,12 +67,12 @@ def make(n, frames, coral, relax=30, K_R=0.4, mdf=0.03):
                 {"op": "cell_diffuse", "at": "cell", "d_a": 0.08, "d_h": 0.16, "chi": 1.3},
                 {"op": "cell_react", "at": "cell", "model": "gray_scott", "F": 0.055, "kk": 0.062, "rate": 1.0}]
         sched += ["cell_adjacency", "seed_cell_rd", "cell_diffuse", "cell_react"]
-    ops += [{"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": 0.03, "a_sw": 50.0, "hill": 4.0, "rho": 1.0, "vth_frac": 1.4},
+    ops += [{"op": "grow_3d", "at": "vertex", "cell_set": "cell", "rate": 0.03, "a_sw": 50.0, "hill": 4.0, "rho": 1.0, "vth_frac": 1.4},
             {"op": "shape_energy_3d", "at": "vertex", "p0": P0, "K_A": 1.0, "K_P": 1.0, "Gamma": GAM, "Lambda": LAM, "K_V": K_V, "K_R": K_R, "mu": 1.0, "dt": dt, "relax_iters": relax, "eta": 0.08, "cap_frac": 0.12},
             {"op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": 0.35, "every": 2, "max_flips": 60},
             {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "cycle_cv": 0.15, "p0": P0, "every": 2, "max_div": 60, "max_div_frac": mdf, "cell_set": "cell", "min_cycle": 4, "max_cycle": 12},
             {"op": "topo_snapshot_3d", "at": "vertex", "every": 1}]
-    sched += ["morphogen_growth_3d", "shape_energy_3d", "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
+    sched += ["grow_3d", "shape_energy_3d", "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
     cfg = {"general": {"name": f"tyssue_su", "seed": SEED, "n_frames": frames, "dt": dt, "record_cap": frames + 2, "boundary": "free", "dim": 3, "world": [10 * R] * 3},
            "sets": {"vertex": {"n": int(Nv * 6)}, "cell": {"n": int(nF * 6), "state": {"chem": {"width": 2, "integration": "first_order"}, "cen": {"width": 3}, "area": {"width": 1}}}},
            "fields": {}, "operators": ops, "schedule": sched}

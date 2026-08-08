@@ -83,14 +83,14 @@ def base_config():
           {"op": "cell_react", "at": "cell", "model": "gray_scott",
            "F": 0.046, "kk": 0.062, "rate": 1.0}]
     order = ["seed_mesh_3d", "cell_geometry_3d", "cell_adjacency", "seed_cell_rd", "cell_diffuse",
-             "cell_react", "shape_to_chem", "morphogen_growth_3d", "shape_energy_3d",
+             "cell_react", "shape_to_chem", "grow_3d", "shape_energy_3d",
              "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
     c["operators"] = [ops["seed_mesh_3d"], ops["cell_geometry_3d"]] + rd + \
-                     [ops["morphogen_growth_3d"], ops["shape_energy_3d"],
+                     [ops["grow_3d"], ops["shape_energy_3d"],
                       ops["reconnect_t1_3d"], ops["divide_3d"], ops["topo_snapshot_3d"]]
     # the growth switch must be INSIDE the activator's range or the chemistry cannot shape anything
     for o in c["operators"]:
-        if o["op"] == "morphogen_growth_3d":
+        if o["op"] == "grow_3d":
             o["a_sw"] = 0.25; o["rho"] = 0.35; o["hill"] = 4.0; o["vth_frac"] = 2.5
             # DILUTION OFF, and it is a declared choice with a measured reason (finding F007).
             # Growth dilutes what is inside a cell -- correct physics -- but Gray-Scott's activator

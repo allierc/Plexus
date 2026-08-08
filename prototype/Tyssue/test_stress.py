@@ -19,14 +19,14 @@ def build(frames):
     verts, es, et, ef, nF = build_sphere_mesh(150, 5.0, 0.18, 0); Nv = verts.shape[0]
     ops = [{"op": "seed_mesh_3d", "at": "vertex", "n_cells": 150, "radius": 5.0, "jitter": 0.18,
             "p0": 3.72, "seed": 0, "before_frame": 1},
-           {"op": "vesicle_growth", "at": "vertex", "rate": 0.003, "every": 1, "max_scale": 4.0},
+           {"op": "grow_3d", "at": "vertex", "rate": 0.003, "every": 1, "rho": 1.0, "a_sw": 0.0, "vth_frac": 64, "conserve_amount": False},
            {"op": "shape_energy_3d", "at": "vertex", "p0": 3.72, "K_A": 1.0, "K_P": 1.0, "Lambda": 0.5,
             "Gamma": 0.1, "K_V": 1.0, "K_R": 0.4, "mu": 1.0, "dt": 1.0, "relax_iters": 26, "eta": 0.08, "cap_frac": 0.12},
            {"op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": 0.35, "every": 2, "max_flips": 30},
            {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "p0": 3.72, "every": 2,
             "max_div": 12, "max_div_frac": 0.02},
            {"op": "topo_snapshot_3d", "at": "vertex", "every": 1}]                       # ALIGNED recording
-    sched = ["seed_mesh_3d", "vesicle_growth", "shape_energy_3d", "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
+    sched = ["seed_mesh_3d", "grow_3d", "shape_energy_3d", "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
     cfg = {"general": {"name": "stress", "seed": 0, "n_frames": frames, "dt": 1.0, "record_cap": frames + 2,
                        "boundary": "free", "dim": 3, "world": [40, 40, 40]},
            "sets": {"vertex": {"n": int(Nv * 30)}}, "fields": {}, "operators": ops, "schedule": sched}

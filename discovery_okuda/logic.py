@@ -350,7 +350,7 @@ def admitted_metrics():
 
 # A PROPERTY IS NAMED IN A MEASUREMENT CONTEXT, not merely mentioned. The first version matched
 # every snake_case token and duly proposed building instruments for `remove_op`,
-# `reconnect_t1_3d0` and `vesicle_growth0` -- operator names, not measurable quantities. An
+# `reconnect_t1_3d0` and `grow_3d0` -- operator names, not measurable quantities. An
 # instrument request per operator is noise, and noise is how the operator backlog stopped being
 # read the first time.
 # NOT AFTER A DOT. `\b` falls between the "." and the "j" of "metrics.json", so "metrics.json is

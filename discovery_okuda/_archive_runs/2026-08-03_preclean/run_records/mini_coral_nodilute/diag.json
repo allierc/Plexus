@@ -44,7 +44,7 @@
   "seed_cell_rd": 3,
   "cell_diffuse": 501,
   "cell_react": 501,
-  "morphogen_growth_3d": 477,
+  "grow_3d": 477,
   "shape_energy_3d": 501,
   "reconnect_t1_3d": 121,
   "divide_3d": 126,

@@ -60,7 +60,7 @@ operators:
   cell_set: cell
   rate: 0.006
   dt: 1.0
-- op: morphogen_growth_3d
+- op: grow_3d
   at: vertex
   cell_set: cell
   rate: 0.01
@@ -93,7 +93,7 @@ schedule:
 - cell_react
 - shape_to_chem
 - vesicle_growth
-- morphogen_growth_3d
+- grow_3d
 - shape_energy_3d
 - topo_snapshot_3d
 _discovery:
@@ -107,8 +107,8 @@ _discovery:
     - id: cell_react0
       op: cell_react
       impl: gierer_meinhardt
-    - id: morphogen_growth_3d0
-      op: morphogen_growth_3d
+    - id: grow_3d0
+      op: grow_3d
       impl: hill_conserve_amount
     - id: seed_mesh_3d0
       op: seed_mesh_3d
@@ -122,7 +122,7 @@ _discovery:
       op: vesicle_growth
     connections:
     - src_op: cell_react
-      dst_op: morphogen_growth_3d
+      dst_op: grow_3d
       slot: gate
   region: growth-driven monolayer (Okuda route)
   defect_fixes:

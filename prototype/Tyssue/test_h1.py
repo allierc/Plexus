@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-"""H1: vesicle cell non-uniformity comes from growing by INFLATION (vesicle_growth ramps V0f -> big
+"""H1: vesicle cell non-uniformity comes from growing by INFLATION (grow_3d ramps V0f -> big
 cells) rather than PROLIFERATION. Test: short A/B, same seed/length, measure cell-area CV.
-  A inflation    = vesicle_growth (current vesicle_grow_divide)
+  A inflation    = grow_3d (current vesicle_grow_divide)
   B proliferation= morphogen_growth rho=1 (all cells) + v_eq capped at vth*v_ref (Okuda)
 H1 validated if area_cv(B) << area_cv(A). Short (150c/180f), metrics only."""
 from __future__ import annotations
@@ -25,13 +25,13 @@ def build(mode):
     common_seed = {"op": "seed_mesh_3d", "at": "vertex", "n_cells": 150, "radius": R, "jitter": J,
                    "p0": 3.72, "seed": SEED, "before_frame": 1, "vseed_cv": 0.4}
     if mode == "inflation":
-        grow = {"op": "vesicle_growth", "at": "vertex", "rate": 0.003, "every": 1, "max_scale": 2.5}
-        gname = "vesicle_growth"; pre = ["seed_mesh_3d", "vesicle_growth"]; extra = [common_seed, grow]
+        grow = {"op": "grow_3d", "at": "vertex", "rate": 0.003, "every": 1, "rho": 1.0, "a_sw": 0.0, "vth_frac": 15.625, "conserve_amount": False}
+        gname = "grow_3d"; pre = ["seed_mesh_3d", "grow_3d"]; extra = [common_seed, grow]
     else:  # proliferation (Okuda uniform): rho=1 + v_eq cap; needs cell set + geometry
         extra = [common_seed, {"op": "cell_geometry_3d", "at": "cell"},
-                 {"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": 0.03,
+                 {"op": "grow_3d", "at": "vertex", "cell_set": "cell", "rate": 0.03,
                   "a_sw": 0.5, "hill": 4.0, "rho": 1.0, "vth_frac": 1.4}]
-        pre = ["seed_mesh_3d", "cell_geometry_3d", "morphogen_growth_3d"]
+        pre = ["seed_mesh_3d", "cell_geometry_3d", "grow_3d"]
     ops = extra + [
         {"op": "shape_energy_3d", "at": "vertex", "p0": 3.72, "K_A": 1.0, "K_P": 1.0, "Gamma": 0.1,
          "Lambda": 0.5, "K_V": 1.0, "K_R": 0.4, "mu": 1.0, "dt": 1.0, "relax_iters": 26, "eta": 0.08, "cap_frac": 0.12},

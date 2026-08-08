@@ -36,7 +36,7 @@ except Exception:
     pass
 
 import plexus.operators   # noqa: F401
-import tyssue_ops3d        # noqa: F401  seed_mesh_3d + shape_energy_3d + vesicle_growth + divide_3d + topo_snapshot_3d
+import tyssue_ops3d        # noqa: F401  seed_mesh_3d + shape_energy_3d + grow_3d + divide_3d + topo_snapshot_3d
 import tyssue_t1_ops3d     # noqa: F401  reconnect_t1_3d (anneal division defects -> rounded cells over long runs)
 import tyssue_rd_ops       # noqa: F401  cell_* RD ops
 from tyssue_ops3d import build_sphere_mesh
@@ -76,8 +76,8 @@ def make_spec(name, rd, n_cells, frames, grow, divide, cv, buf, cbuf):
             "jitter": JITTER, "p0": 3.72, "seed": SEED, "before_frame": 1, "vseed_cv": cv}]  # stochastic volume seed
     sched = ["seed_mesh_3d"]
     if grow > 0:
-        ops.append({"op": "vesicle_growth", "at": "vertex", "rate": grow, "every": 1, "max_scale": 2.5})
-        sched.append("vesicle_growth")            # capped -> PLATEAUS (~1400 cells); BEFORE shape_energy (== vesicle_divide)
+        ops.append({"op": "grow_3d", "at": "vertex", "rate": grow, "every": 1, "rho": 1.0, "a_sw": 0.0, "vth_frac": 15.625, "conserve_amount": False})
+        sched.append("grow_3d")            # capped -> PLATEAUS (~1400 cells); BEFORE shape_energy (== vesicle_divide)
     ops.append({"op": "shape_energy_3d", "at": "vertex", "p0": 3.72, "K_A": 1.0, "K_P": 1.0,
                 "Gamma": 0.1, "Lambda": 0.5, "K_V": 1.0, "K_R": 0.4, "mu": 1.0, "dt": dt,    # == vesicle_divide (clean)
                 "relax_iters": 26 if (grow > 0 or divide) else 6, "eta": 0.08, "cap_frac": 0.12})

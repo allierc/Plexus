@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """run_tyssue_veshom -- Round 2: HOMOGENISE cells on a growing/dividing vesicle (the clean test, no tubes,
 fixing vesicle_grow_divide_500f). Key change vs vesicle_grow_divide: it grew the shell by INFLATING cells
-(vesicle_growth ramps V0f -> big non-uniform cells); here the shell grows by PROLIFERATION (Okuda) --
-morphogen_growth_3d with rho=1 baseline (all cells, no activator gradient) and v_eq CAPPED at vth*v_ref,
+(grow_3d ramps V0f -> big non-uniform cells); here the shell grows by PROLIFERATION (Okuda) --
+grow_3d with rho=1 baseline (all cells, no activator gradient) and v_eq CAPPED at vth*v_ref,
 so every cell cycles in [~2/3,vth]*v_ref (uniform) and the sphere grows because there are MORE cells.
 divide_3d volume-primary + bounded cell-cycle DURATION (min/max_cycle). Metric = area_cv (cell-size
 uniformity); strip is coloured by |area-median|/median so size outliers show RED. Cluster sweep.
@@ -50,7 +50,7 @@ def make_spec(name, frames, rate, K_V, cv, vth, min_cyc, max_cyc, buf, cbuf):
             "p0": 3.72, "seed": SEED, "before_frame": 1, "vseed_cv": cv},
            {"op": "cell_geometry_3d", "at": "cell"},
            # UNIFORM Okuda growth: rho=1 -> all cells grow (activator-independent), v_eq capped at vth*v_ref
-           {"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": rate,
+           {"op": "grow_3d", "at": "vertex", "cell_set": "cell", "rate": rate,
             "a_sw": 0.5, "hill": 4.0, "rho": 1.0, "vth_frac": vth},
            {"op": "shape_energy_3d", "at": "vertex", "p0": 3.72, "K_A": 1.0, "K_P": 1.0, "Gamma": 0.1,
             "Lambda": 0.5, "K_V": K_V, "K_R": 0.4, "mu": 1.0, "dt": 1.0, "relax_iters": 26, "eta": 0.08, "cap_frac": 0.12},
@@ -58,7 +58,7 @@ def make_spec(name, frames, rate, K_V, cv, vth, min_cyc, max_cyc, buf, cbuf):
            {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "cycle_cv": cv, "p0": 3.72,
             "every": 2, "max_div": 12, "max_div_frac": 0.03, "cell_set": "cell", "min_cycle": min_cyc, "max_cycle": max_cyc},
            {"op": "topo_snapshot_3d", "at": "vertex", "every": 1}]
-    sched = ["seed_mesh_3d", "cell_geometry_3d", "morphogen_growth_3d", "shape_energy_3d",
+    sched = ["seed_mesh_3d", "cell_geometry_3d", "grow_3d", "shape_energy_3d",
              "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
     cfg = {"general": {"name": f"tyssue_veshom_{name}", "seed": SEED, "n_frames": frames, "dt": 1.0,
                        "record_cap": frames + 2, "boundary": "free", "dim": 3, "world": [10 * RADIUS] * 3},

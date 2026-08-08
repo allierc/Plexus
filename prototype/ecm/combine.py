@@ -90,6 +90,7 @@ def build(name, tissue_npz, fit=FIT, plate_box=None, **ecm):
         # experiment. Overrides whatever pass 1 recorded.
         gap_box = float(plate_box)
         gap_t = gap_box / max(s, 1e-12)
+    membrane_exclude = bool(ecm.pop("membrane_exclude", True))
     spec = ES.build_spec(name, n_frames=T, **ecm)
     for o in spec["operators"]:
         if o["op"] == "cell_to_ecm":
@@ -100,7 +101,7 @@ def build(name, tissue_npz, fit=FIT, plate_box=None, **ecm):
                 o.pop(k, None)                      # a replay has no r(t) formula to grow by
         if o["op"] == "seed_ecm" and gap_box is not None:
             o["plate_half"] = gap_box
-        if o["op"] in ("integrin_adhesion", "surface_track"):
+        if o["op"] in ("integrin_adhesion", "surface_track", "mpm_tissue_boundary"):
             # `surface_track` is on this list for the same reason the two below it are: it reads the
             # pass-1 map, which is in TISSUE units, and only `combine` knows the tissue-to-box scale.
             o["scale"] = s
@@ -141,7 +142,13 @@ def build(name, tissue_npz, fit=FIT, plate_box=None, **ecm):
     # bearing down on it through the shared grid) moved it in unopposed, and the measured gap ran
     # +0.0040 -> -0.0117 with 90% of particles below the apical surface. A sheet whose whole job is to
     # sit on a surface should not be the one body allowed through it.
-    if "basement_membrane_particle" in spec["sets"]:
+    # ...AND WITH A GRID BOUNDARY CONDITION THAT ASYMMETRY IS GONE, which is why this is now optional.
+    # A hard projection is applied AFTER the substep and rewrites positions, so it overwrites whatever
+    # momentum the grid just gave the sheet and launders the deformation back out of F -- run 89 added
+    # `mpm_tissue_boundary` and the strain did not move by one digit (3.8e-4, identical to 88) because
+    # the projection was still running behind it. If the tissue is imposed on the grid, it is already
+    # pushing on the membrane, and the backstop is what stops that push from being recorded.
+    if "basement_membrane_particle" in spec["sets"] and membrane_exclude:
         spec["operators"].append({"op": "cell_exclude_3d", "at": "basement_membrane_particle",
                                   "centre": [0.5, 0.5, 0.5], "surface": tissue_npz, "scale": s,
                                   "skin": 0.006})

@@ -27,7 +27,7 @@ def build(grow, rho, vth, K_V, min_cycle, max_cycle):
             "p0": 3.90, "seed": SEED, "before_frame": 1, "vseed_cv": 0.4},
            {"op": "cell_geometry_3d", "at": "cell"},
            {"op": "seed_cell_rd", "at": "cell", "mode": "patch", "patch_z": 0.90},
-           {"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": grow,
+           {"op": "grow_3d", "at": "vertex", "cell_set": "cell", "rate": grow,
             "a_sw": 0.5, "hill": 4.0, "rho": rho, "vth_frac": vth},
            {"op": "shape_energy_3d", "at": "vertex", "p0": 3.90, "K_A": 1.0, "K_P": 1.0, "Gamma": 0.05,
             "Lambda": 0.2, "K_V": K_V, "K_R": 0.02, "mu": 1.0, "dt": 1.0, "relax_iters": 30, "eta": 0.08, "cap_frac": 0.12},
@@ -36,7 +36,7 @@ def build(grow, rho, vth, K_V, min_cycle, max_cycle):
             "p0": 3.90, "every": 2, "max_div": 12, "max_div_frac": 0.03, "cell_set": "cell",
             "min_cycle": min_cycle, "max_cycle": max_cycle},
            {"op": "topo_snapshot_3d", "at": "vertex", "every": 1}]
-    sched = ["seed_mesh_3d", "cell_geometry_3d", "seed_cell_rd", "morphogen_growth_3d",
+    sched = ["seed_mesh_3d", "cell_geometry_3d", "seed_cell_rd", "grow_3d",
              "shape_energy_3d", "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
     cfg = {"general": {"name": "tubecv", "seed": SEED, "n_frames": FRAMES, "dt": 1.0, "record_cap": FRAMES + 2,
                        "boundary": "free", "dim": 3, "world": [16 * RADIUS] * 3},

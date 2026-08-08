@@ -23,12 +23,12 @@ def build(Lam, Gam, K_V, p0):
     verts, es, et, ef, nF = build_sphere_mesh(150, R, J, SEED); Nv = verts.shape[0]
     ops = [{"op": "seed_mesh_3d", "at": "vertex", "n_cells": 150, "radius": R, "jitter": J, "p0": p0, "seed": SEED, "before_frame": 1, "vseed_cv": 0.15},
            {"op": "cell_geometry_3d", "at": "cell"},
-           {"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": 0.03, "a_sw": 50.0, "hill": 4.0, "rho": 1.0, "vth_frac": 1.4},
+           {"op": "grow_3d", "at": "vertex", "cell_set": "cell", "rate": 0.03, "a_sw": 50.0, "hill": 4.0, "rho": 1.0, "vth_frac": 1.4},
            {"op": "shape_energy_3d", "at": "vertex", "p0": p0, "K_A": 1.0, "K_P": 1.0, "Gamma": Gam, "Lambda": Lam, "K_V": K_V, "K_R": 0.4, "mu": 1.0, "dt": 1.0, "relax_iters": 30, "eta": 0.08, "cap_frac": 0.12},
            {"op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": 0.35, "every": 2, "max_flips": 30},
            {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "cycle_cv": 0.15, "p0": p0, "every": 2, "max_div": 12, "max_div_frac": 0.03, "cell_set": "cell", "min_cycle": 4, "max_cycle": 12},
            {"op": "topo_snapshot_3d", "at": "vertex", "every": 1}]
-    sched = ["seed_mesh_3d", "cell_geometry_3d", "morphogen_growth_3d", "shape_energy_3d", "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
+    sched = ["seed_mesh_3d", "cell_geometry_3d", "grow_3d", "shape_energy_3d", "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
     cfg = {"general": {"name": "h10", "seed": SEED, "n_frames": FR, "dt": 1.0, "record_cap": FR + 2, "boundary": "free", "dim": 3, "world": [10 * R] * 3},
            "sets": {"vertex": {"n": int(Nv * 8)}, "cell": {"n": int(nF * 8), "state": {"chem": {"width": 2, "integration": "first_order"}, "cen": {"width": 3}, "area": {"width": 1}}}},
            "fields": {}, "operators": ops, "schedule": sched}

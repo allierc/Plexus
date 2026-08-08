@@ -100,7 +100,7 @@ def make(p):
            {"op": "cell_diffuse", "at": "cell", "d_a": 0.05, "d_h": 0.7, "chi": p["chi"]},
            {"op": "cell_react", "at": "cell", "model": "brusselator", "gamma": p["gamma"], "A": 1.0, "B": 3.0},
            # activator->growth on a LOCKED body (rho=0): only red cells grow (v_eq up to vth*v_ref) -> protrude
-           {"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": p["rate"], "a_sw": p["a_sw"], "hill": 4.0, "rho": p["rho"], "vth_frac": p["vth"]},
+           {"op": "grow_3d", "at": "vertex", "cell_set": "cell", "rate": p["rate"], "a_sw": p["a_sw"], "hill": 4.0, "rho": p["rho"], "vth_frac": p["vth"]},
            # p0>3.81 FLUID (tubes need T1 flow) + modest surface tension for rounder cells; radial ~off so tubes leave the sphere
            {"op": "shape_energy_3d", "at": "vertex", "p0": 3.90, "K_A": 1.0, "K_P": 1.0, "Gamma": p.get("Gamma", 0.2), "Lambda": p.get("Lambda", 0.6), "K_V": p.get("K_V", 4.0), "K_R": 0.02, "mu": 1.0, "dt": 0.02, "relax_iters": 26, "eta": 0.08, "cap_frac": 0.12,
             "K_bend": p.get("K_bend", 0.0), "K_lumen": p.get("K_lumen", 0.0), "antiinv": p.get("antiinv", 0.0)},   # balloon-hollow stabilisers (one per variant)
@@ -108,7 +108,7 @@ def make(p):
            {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "cycle_cv": p.get("cyc_cv", 0.15), "p0": 3.90, "every": 2, "max_div": 60, "max_div_frac": 0.02, "cell_set": "cell", "min_cycle": 4, "max_cycle": p.get("max_cyc", 30)},
            {"op": "topo_snapshot_3d", "at": "vertex", "every": 1}]
     sched = ["seed_mesh_3d", "cell_geometry_3d", "cell_adjacency", "seed_cell_rd", "cell_diffuse", "cell_react",
-             "morphogen_growth_3d", "shape_energy_3d", "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
+             "grow_3d", "shape_energy_3d", "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
     cfg = {"general": {"name": "tyssue_h6", "seed": SEED, "n_frames": frames, "dt": 0.02, "record_cap": frames + 2, "boundary": "free", "dim": 3, "world": [16 * R] * 3},
            "sets": {"vertex": {"n": int(Nv * 8)}, "cell": {"n": int(nF * 8), "state": {"chem": {"width": 2, "integration": "first_order"}, "cen": {"width": 3}, "area": {"width": 1}}}},  # big buffer: proliferation must not hit the cell-slot ceiling
            "fields": {}, "operators": ops, "schedule": sched}

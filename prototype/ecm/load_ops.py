@@ -144,7 +144,7 @@ class ECMGrowthGate3D(Structural):
     not being pushed into an ovoid -- it is GROWING into one, because the directions differ in how much
     the matrix objects.
 
-    HOW IT INTERCEPTS WITHOUT REWRITING THE GROWTH OPERATOR. `morphogen_growth_3d` keeps a per-cell
+    HOW IT INTERCEPTS WITHOUT REWRITING THE GROWTH OPERATOR. `grow_3d` keeps a per-cell
     cumulative scale `mg_scale` and multiplies it by (1 + rate.(rho + Hill(a))) each tick, then derives
     A0/P0/V0f/R0 from it. This operator runs AFTER it, remembers the scale it left behind last frame,
     and reads the factor growth just applied as `f = s_now / s_prev`. The gated scale is then
@@ -308,7 +308,7 @@ class ECMGrowthGate3D(Structural):
             1.0 + (press / max(ref, 1e-12)).clamp_min(0.0) ** self.hill)
 
         # ---- GATE THE TARGET VOLUME, NOT `mg_scale` -------------------------------------------------
-        # THE TRAP THIS AVOIDS, MEASURED. `morphogen_growth_3d` reallocates `mg_scale` to ONES and
+        # THE TRAP THIS AVOIDS, MEASURED. `grow_3d` reallocates `mg_scale` to ONES and
         # re-bases its A0_init/P0_init/V0f_init snapshots from the current values whenever `nF` changes
         # -- and with `divide_3d` firing every 4 frames, nF changes on most frames. A gate that reads
         # `s_now / s_prev` therefore saw a size change almost every frame, skipped its correction, and

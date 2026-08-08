@@ -31,7 +31,7 @@ def build(with_rd):
                 {"op": "cell_react", "at": "cell", "model": "brusselator", "gamma": 2.0, "A": 1.0, "B": 3.0}]
         sched += ["cell_adjacency", "seed_cell_rd", "cell_diffuse", "cell_react"]
     # UNMODULATED growth: a_sw=50 so the activator never fires the Hill -> drive=rho=1 uniform (homogenised recipe)
-    ops += [{"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": 0.03,
+    ops += [{"op": "grow_3d", "at": "vertex", "cell_set": "cell", "rate": 0.03,
              "a_sw": 50.0, "hill": 4.0, "rho": 1.0, "vth_frac": 1.4},
             {"op": "shape_energy_3d", "at": "vertex", "p0": 3.72, "K_A": 1.0, "K_P": 1.0, "Gamma": 0.1,
              "Lambda": 0.5, "K_V": 4.0, "K_R": 0.4, "mu": 1.0, "dt": 0.02, "relax_iters": 26, "eta": 0.08, "cap_frac": 0.12},
@@ -39,7 +39,7 @@ def build(with_rd):
             {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "cycle_cv": 0.15, "p0": 3.72,
              "every": 2, "max_div": 12, "max_div_frac": 0.03, "cell_set": "cell", "min_cycle": 4, "max_cycle": 12},
             {"op": "topo_snapshot_3d", "at": "vertex", "every": 1}]
-    sched += ["morphogen_growth_3d", "shape_energy_3d", "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
+    sched += ["grow_3d", "shape_energy_3d", "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
     cfg = {"general": {"name": "h7", "seed": SEED, "n_frames": FR, "dt": 0.02, "record_cap": FR + 2,
                        "boundary": "free", "dim": 3, "world": [10 * R] * 3},
            "sets": {"vertex": {"n": int(Nv * 12)}, "cell": {"n": int(nF * 12), "state": {"chem": {"width": 2, "integration": "first_order"},

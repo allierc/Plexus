@@ -72,7 +72,7 @@
   "note": "ValueError"
  },
  {
-  "op": "morphogen_growth_3d",
+  "op": "grow_3d",
   "param": "a_sw",
   "verdict": "LIVE, no derivative",
   "rel": 6.314643839180976e-06,
@@ -80,7 +80,7 @@
   "note": "ValueError"
  },
  {
-  "op": "morphogen_growth_3d",
+  "op": "grow_3d",
   "param": "conserve_amount",
   "verdict": "LIVE, no derivative",
   "rel": 3.4426219363247497e-06,
@@ -88,7 +88,7 @@
   "note": ""
  },
  {
-  "op": "morphogen_growth_3d",
+  "op": "grow_3d",
   "param": "dt",
   "verdict": "UNREAD",
   "rel": 0.0,
@@ -96,7 +96,7 @@
   "note": "never looked up"
  },
  {
-  "op": "morphogen_growth_3d",
+  "op": "grow_3d",
   "param": "hill",
   "verdict": "LIVE, no derivative",
   "rel": 3.59155033657234e-06,
@@ -104,7 +104,7 @@
   "note": "ValueError"
  },
  {
-  "op": "morphogen_growth_3d",
+  "op": "grow_3d",
   "param": "rate",
   "verdict": "LIVE, no derivative",
   "rel": 9.158234284496391e-06,
@@ -112,7 +112,7 @@
   "note": "ValueError"
  },
  {
-  "op": "morphogen_growth_3d",
+  "op": "grow_3d",
   "param": "rho",
   "verdict": "LIVE, no derivative",
   "rel": 3.699884342953758e-06,
@@ -120,7 +120,7 @@
   "note": "ValueError"
  },
  {
-  "op": "morphogen_growth_3d",
+  "op": "grow_3d",
   "param": "vth_frac",
   "verdict": "LIVE, no derivative",
   "rel": 7.011024052453133e-06,

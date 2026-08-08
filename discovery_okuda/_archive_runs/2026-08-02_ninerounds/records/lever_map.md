@@ -19,7 +19,7 @@ The campaign's product. Specific questions are queries against this table.
 | `shape_to_chem` | 9 | 44 | 0.523 | raises | sphere×4, undulation×3, degenerate×2 |
 | `vesicle_growth` | 6 | 47 | 0.485 | raises | bud×3, exploded×1, sphere×1, undulation×1 |
 | `cell_react` | 12 | 41 | 0.444 | raises | sphere×6, degenerate×3, undulation×3 |
-| `morphogen_growth_3d` | 40 | 13 | 0.384 | raises | bud×21, sphere×11, undulation×5, degenerate×3 |
+| `grow_3d` | 40 | 13 | 0.384 | raises | bud×21, sphere×11, undulation×5, degenerate×3 |
 | `cell_adjacency` | 27 | 26 | 0.2 | neutral | bud×13, sphere×8, degenerate×3, undulation×3 |
 | `extrude` | 12 | 41 | -0.034 | neutral | bud×12 |
 | `reconnect_t1_3d` | 36 | 17 | -0.101 | neutral | bud×17, sphere×13, undulation×4, exploded×1, degenerate×1 |

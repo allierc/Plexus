@@ -19,7 +19,7 @@ something special, and then you must say so).
 A cell is mostly water. Its volume changes because it takes up or loses material, not because it
 rearranges what it already has. So a tissue that gets bigger has *added* something.
 
-*Constrains:* `morphogen_growth_3d.rho` — the baseline growth floor.
+*Constrains:* `grow_3d.rho` — the baseline growth floor.
 *Check:* total tissue volume at the end > total tissue volume when growth started.
 *If violated:* a protrusion with `rho = 0` is made entirely of material taken from somewhere else
 in the same body. That is a deliberate ablation, not a setting — say so, and say what the rest of
@@ -30,7 +30,7 @@ the body gave up.
 Every cell in a proliferating epithelium grows, signal or no signal. A limb bud, a branch, a tube:
 the tip adds material faster, while the body keeps adding it too.
 
-*Constrains:* `rho` together with the `cell_react → morphogen_growth_3d.gate` connection.
+*Constrains:* `rho` together with the `cell_react → grow_3d.gate` connection.
 *Check:* if the gate is connected at all, then `rho > 0`.
 *If violated:* the tip-to-body growth ratio is infinite — a growing tip on a frozen body. No tissue
 does that.
@@ -40,7 +40,7 @@ does that.
 Roughly a doubling of birth volume, then mitosis. Cycle times vary, but tightly — order 10%, not a
 factor of two. Division itself adds nothing: two daughters sum to the mother.
 
-*Constrains:* `divide_3d.factor`, `min_cycle`, `cycle_cv`, and `morphogen_growth_3d.vth_frac`.
+*Constrains:* `divide_3d.factor`, `min_cycle`, `cycle_cv`, and `grow_3d.vth_frac`.
 *Check:* **the growth ceiling must sit above the division trigger.** Mean cell volume must be
 roughly steady over the run, not drifting down.
 *Caught:* this is defect D5b. `vth_frac` capped a cell's target at 1.5× while `factor` demanded
@@ -52,7 +52,7 @@ impossible and the only divisions we ever saw came from a timeout.
 Concentration is amount over volume. Grow the volume and the concentration falls, with no chemistry
 involved. A reaction whose fixed point sits at zero is driven to extinction by growth alone.
 
-*Constrains:* `morphogen_growth_3d.conserve_amount`.
+*Constrains:* `grow_3d.conserve_amount`.
 *Check:* with the chemistry switched off and growth on, every cell's concentration must fall.
 *If violated:* the tissue is manufacturing morphogen in proportion to its own growth, which feeds
 the tip from nothing.

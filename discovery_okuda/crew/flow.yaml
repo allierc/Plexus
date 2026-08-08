@@ -188,7 +188,7 @@ nodes:
       # exists to find the setting where both happen, and hand it to Route B as a parent.
       slots: 8
       plan:
-        - [cellfix_B_new,  morphogen_growth_3d, rho,      [0.0, 0.1, 0.3, 1.0, 2.0]]
+        - [cellfix_B_new,  grow_3d, rho,      [0.0, 0.1, 0.3, 1.0, 2.0]]
         # rho 0.0 is DROPPED for coral_gate_div and kept for cellfix_B_new, and the difference is
         # the gate. With the activator gate connected, rho = 0 is the infinite tip-to-body ratio
         # premise P2 refuses BEFORE the GPU ("if the gate is connected at all, then rho > 0") --
@@ -196,7 +196,7 @@ nodes:
         # never sees the value and route_a would re-propose it every round for the whole campaign.
         # cellfix_B_new runs a_sw = 50, so its gate is off, P2 reads `na`, and rho = 0 is a legal
         # measurement there (200 cells, no growth) rather than a pathology.
-        - [coral_gate_div, morphogen_growth_3d, rho,      [0.1, 0.3, 1.0, 2.0]]
+        - [coral_gate_div, grow_3d, rho,      [0.1, 0.3, 1.0, 2.0]]
         # vth_frac AND factor ARE COUPLED: volume-triggered division needs the growth ceiling
         # ABOVE the division trigger, or a cell can never reach the size that divides it. That is
         # the `refute_coral_nocons` relation documented under `parents` -- and sweeping either knob
@@ -210,11 +210,11 @@ nodes:
         # premises about each point before offering it, so a value that crosses the
         # vth_frac > factor constraint is dropped in milliseconds rather than discovered on the
         # cluster. Narrowing them by hand fixed one crossing and would not have seen the next.
-        - [coral_gate_div, morphogen_growth_3d, vth_frac, [2.2, 2.5, 3.0, 3.5, 4.5]]
+        - [coral_gate_div, grow_3d, vth_frac, [2.2, 2.5, 3.0, 3.5, 4.5]]
         - [coral_gate_div, divide_3d,           factor,   [1.2, 1.5, 1.8, 2.0]]
-        - [coral_gate_div, morphogen_growth_3d, a_sw,     [0.05, 0.15, 0.35, 0.8]]
-        - [coral_gate_div, morphogen_growth_3d, hill,     [2.0, 4.0, 8.0, 16.0]]
-        - [coral_gate_div, morphogen_growth_3d, rate,     [0.000433, 0.001732, 0.006928, 0.02]]
+        - [coral_gate_div, grow_3d, a_sw,     [0.05, 0.15, 0.35, 0.8]]
+        - [coral_gate_div, grow_3d, hill,     [2.0, 4.0, 8.0, 16.0]]
+        - [coral_gate_div, grow_3d, rate,     [0.000433, 0.001732, 0.006928, 0.02]]
         - [coral_gate_div, shape_to_chem,       beta,     [-4.0, -2.0, 0.0, 2.0, 4.0]]
         - [coral_gate_div, shape_to_chem,       F0,       [0.03, 0.055, 0.09, 0.11]]
 

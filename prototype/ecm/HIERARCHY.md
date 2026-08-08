@@ -61,7 +61,7 @@ cells / vertex
   [x] seed_mesh_3d              build the epithelial shell
   [x] cell_geometry_3d          per-cell area / perimeter / volume from the mesh
   [x] shape_energy_3d           the 3D AVM: area, perimeter, volume, line tension, radial
-  [x] morphogen_growth_3d       per-cell target growth
+  [x] grow_3d       per-cell target growth
   [x] divide_3d                 division on volume doubling                      (structural)
   [x] reconnect_t1_3d           T1 rearrangement                                (rewire)
   [x] topo_snapshot_3d          record the mesh for analysis and rendering

@@ -37,7 +37,7 @@ operators:
   vseed_cv: 0.15
 - op: cell_geometry_3d
   at: cell
-- op: morphogen_growth_3d
+- op: grow_3d
   at: vertex
   cell_set: cell
   rate: 0.03
@@ -84,7 +84,7 @@ operators:
 schedule:
 - seed_mesh_3d
 - cell_geometry_3d
-- morphogen_growth_3d
+- grow_3d
 - shape_energy_3d
 - reconnect_t1_3d
 - divide_3d

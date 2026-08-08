@@ -38,7 +38,7 @@ def make(coral, frames, dt):
                 {"op": "cell_diffuse", "at": "cell", "d_a": 0.08, "d_h": 0.16, "chi": 1.3},
                 {"op": "cell_react", "at": "cell", "model": "gray_scott", "F": 0.055, "kk": 0.062, "rate": 1.0}]
         sched += ["cell_adjacency", "seed_cell_rd", "cell_diffuse", "cell_react"]
-    ops += [{"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": 0.03, "a_sw": 50.0, "hill": 4.0, "rho": 1.0, "vth_frac": 1.4},
+    ops += [{"op": "grow_3d", "at": "vertex", "cell_set": "cell", "rate": 0.03, "a_sw": 50.0, "hill": 4.0, "rho": 1.0, "vth_frac": 1.4},
             {"op": "shape_energy_3d", "at": "vertex", "p0": P0, "K_A": 1.0, "K_P": 1.0, "Gamma": GAM, "Lambda": LAM, "K_V": K_V, "K_R": 0.4, "mu": 1.0, "dt": dt, "relax_iters": 30, "eta": 0.08, "cap_frac": 0.12},
             # D1 CLOCK MIGRATION. These two read `every: 2` when the operator ALSO gated itself,
             # so their true period was 2 (engine) x 2 (operator) = 4. The engine now owns the
@@ -48,7 +48,7 @@ def make(coral, frames, dt):
             {"op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": 0.35, "every": 4, "engine_clock": True, "max_flips": 30},
             {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "cycle_cv": 0.15, "p0": P0, "every": 4, "engine_clock": True, "max_div": 12, "max_div_frac": 0.03, "cell_set": "cell", "min_cycle": 4, "max_cycle": 12},
             {"op": "topo_snapshot_3d", "at": "vertex", "every": 1}]
-    sched += ["morphogen_growth_3d", "shape_energy_3d", "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
+    sched += ["grow_3d", "shape_energy_3d", "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
     nm = "vh_K4_cv15_d4_rd_coral" if coral else "vh_K4_cv15_d4"
     cfg = {"general": {"name": f"tyssue_{nm}", "seed": SEED, "n_frames": frames, "dt": dt, "record_cap": frames + 2, "boundary": "free", "dim": 3, "world": [10 * R] * 3},
            "sets": {"vertex": {"n": int(Nv * 12)}, "cell": {"n": int(nF * 12), "state": {"chem": {"width": 2, "integration": "first_order"}, "cen": {"width": 3}, "area": {"width": 1}}}},

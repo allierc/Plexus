@@ -25,7 +25,7 @@ def build(cv, K_V, mn, mx):
     ops = [{"op": "seed_mesh_3d", "at": "vertex", "n_cells": 150, "radius": R, "jitter": J,
             "p0": 3.72, "seed": SEED, "before_frame": 1, "vseed_cv": cv},
            {"op": "cell_geometry_3d", "at": "cell"},
-           {"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": 0.03,
+           {"op": "grow_3d", "at": "vertex", "cell_set": "cell", "rate": 0.03,
             "a_sw": 0.5, "hill": 4.0, "rho": 1.0, "vth_frac": 1.4},
            {"op": "shape_energy_3d", "at": "vertex", "p0": 3.72, "K_A": 1.0, "K_P": 1.0, "Gamma": 0.1,
             "Lambda": 0.5, "K_V": K_V, "K_R": 0.4, "mu": 1.0, "dt": 1.0, "relax_iters": 26, "eta": 0.08, "cap_frac": 0.12},
@@ -33,7 +33,7 @@ def build(cv, K_V, mn, mx):
            {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "cycle_cv": cv, "p0": 3.72,
             "every": 2, "max_div": 12, "max_div_frac": 0.03, "cell_set": "cell", "min_cycle": mn, "max_cycle": mx},
            {"op": "topo_snapshot_3d", "at": "vertex", "every": 1}]
-    sched = ["seed_mesh_3d", "cell_geometry_3d", "morphogen_growth_3d", "shape_energy_3d",
+    sched = ["seed_mesh_3d", "cell_geometry_3d", "grow_3d", "shape_energy_3d",
              "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
     cfg = {"general": {"name": "h2", "seed": SEED, "n_frames": FR, "dt": 1.0, "record_cap": FR + 2,
                        "boundary": "free", "dim": 3, "world": [10 * R] * 3},

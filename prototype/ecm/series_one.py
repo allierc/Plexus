@@ -168,8 +168,61 @@ SERIES = {
                        membrane_repel_w=50.0),
     "87_repel120": dict(membrane_deposit="uniform", membrane_remodel_target="fixed",
                         membrane_repel_w=120.0),
-    "88_repel20_range94": dict(membrane_deposit="uniform", membrane_remodel_target="fixed",
-                               membrane_repel_w=20.0, membrane_repel_range=0.94),
+    # ====================================================================================
+    # THE CONTINUUM LADDER, from 88. One step per folder, one change per step.
+    #
+    # WHY THE SPRING LINE STOPPED. Runs 82-87 and the deleted 88-97 chased the holes with crosslink
+    # springs, excluded volume and the attraction_repulsion law. The best of them (86) reached d/hex
+    # 0.733 -- and across all 16, corr(d/hex, mean_degree_z) = -0.68: EVERY mechanism that improved the
+    # packing did so by breaking crosslinks, with no counterexample. Best packing at z >= 6 was 0.581;
+    # to beat it the network had to be dismantled.
+    #
+    # That is a defect of the OBJECT, not of the tuning. Holes and coordination are properties of a bond
+    # network. An MPM continuum has none: particles are quadrature points, the response comes from the
+    # deformation gradient through the grid, and a gap between particles is not a gap in the material.
+    # So d/hex, gap, lcc and z stop being meaningful rather than becoming good.
+    #
+    # THE ONE RISK, AND IT IS REAL. The sheet is 0.002 thick and the grid cell is 1/64 = 0.0156, so the
+    # BM is 1/8 of a cell through-thickness and the grid smears it over 8x its thickness. In-plane it is
+    # well resolved (spacing 0.0015 at reserve 0, ~10 particles per cell edge); through-thickness it is
+    # not resolved at all. Step 89 refines the grid precisely to find out how much of step 88 is that.
+    #
+    # 88  elastic continuum, NOTHING else: no bonds, no anchor, no secretion, no remodelling.
+    #     Does an MPM shell survive 402 frames and get pushed outward by the growing epithelium at all?
+    #     `membrane_impl="mpm"` matters: BASE runs "graph", which STRIPS mpm_strain/scatter/gather from
+    #     the membrane. With springs off as well that would leave a set with no mechanics whatsoever.
+    #     reserve=0 lays all 45,000 particles down at frame 0, since there is no secretion to release them.
+    "88_mpm_bare": dict(membrane_springs=False, membrane_impl="mpm", membrane_adhesion=0.0,
+                        membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
+    # 89: 88 said the sheet GROWS with the spheroid (R 0.0875 -> 0.2985, coverage 1.0) but carries no
+    #     strain -- sigma_max(F) - 1 reaches 7e-4 against a true stretch of 3.4x. The log says why:
+    #     18,134 particles per frame are PROJECTED out of the tissue by cell_exclude_3d, a positional
+    #     constraint that repositions without touching F. The sheet is a decal. A body at zero strain
+    #     cannot tear, cannot resist growth and cannot load the stroma.
+    #
+    #     The membrane receives no force at all: cell_to_ecm is an analytic growing sphere bound to
+    #     mpm_particle and its geometry is not the vertex tissue's. integrin_adhesion is the only
+    #     operator that couples the membrane to the REAL surface with a force -- and a force is what
+    #     becomes grid momentum, which is what makes C non-zero and F integrate. So the anchor turns
+    #     out to be the prerequisite for milestone 1, not a milestone 3 refinement.
+    #     Cedric's call, and it is the better one: inject the growth into the MPM GRID rather than
+    #     anchoring particles. `mpm_grid_update` already zeroes grid velocity inside obstacles -- right
+    #     for a wall, wrong for a growing tissue, which is an obstacle with a velocity. Setting the grid
+    #     velocity inside the surface to the surface's own Rdot makes growth arrive as momentum, so C is
+    #     non-zero and F integrates the stretch the projection was discarding. Standard collision-object
+    #     treatment, and it reads the same `smap` the membrane is seeded on, so boundary and sheet cannot
+    #     disagree about where the surface is. NO ANCHOR: this tests the grid route alone.
+    "89_mpm_gridbc": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
+                          membrane_adhesion=0.0, membrane_secrete_rate=0.0, membrane_tau=0.0,
+                          membrane_reserve=0.0),
+    # 90: 89 changed NOTHING -- strain 3.8e-4, p99 5.9e-4, identical to 88 to every digit. Because the
+    #     grid BC was only half the fix: `cell_exclude_3d` still ran on the membrane and is applied
+    #     AFTER the substep, so it rewrote the positions the grid had just moved and laundered the
+    #     deformation straight back out of F. A hard projection always beats a body force that ran
+    #     before it. 90 removes it, which is the actual test of the grid route.
+    "90_gridbc_noexcl": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
+                             membrane_exclude=False, membrane_adhesion=0.0,
+                             membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
 
     # 89-91: Plexus's own attraction_repulsion law instead of the one-sided spring.
     #
@@ -196,13 +249,6 @@ SERIES = {
     # of 6 gives k ~ 1.7e4, i.e. w ~ 3.5, so 89/90 straddle it. 91 is the literal reading of "only
     # attraction-repulsion": the crosslink springs off entirely, absolute k, no tension-bearing network
     # left -- expected to pack well and to have nothing holding the sheet against growth.
-    "89_ar_w3": dict(membrane_deposit="uniform", membrane_remodel_target="fixed",
-                     membrane_repel_law="ar", membrane_repel_w=3.5, membrane_repel_range=3.0),
-    "90_ar_w10": dict(membrane_deposit="uniform", membrane_remodel_target="fixed",
-                      membrane_repel_law="ar", membrane_repel_w=10.0, membrane_repel_range=3.0),
-    "91_ar_only": dict(membrane_deposit="uniform", membrane_remodel_target="fixed",
-                       membrane_repel_law="ar", membrane_repel_k=5.0e4, membrane_repel_range=3.0,
-                       membrane_bond_k=0.0),
 
     # 92-94: 89-91 again with k set correctly. THE ERROR WAS UNITS, NOT THE LAW. In the ar form `k` is
     # not a stiffness: amp is O(1), the step is dt*k*amp*d, so the scale is fixed by k*dt ~ 1, meaning
@@ -211,12 +257,6 @@ SERIES = {
     # 89-91 read as a null (0.564 / 0.591 / 0.535) instead of as an overshoot. Swept on 85's middle
     # frame: k = 25 -> 0.785, 100 -> 0.830, 250 -> 0.846, 600 -> 0.855, 1500 -> 0.872, 4000 -> 0.730.
     # Mean aggregation, as the attraction_repulsion operator itself uses.
-    "92_ar_k250": dict(membrane_deposit="uniform", membrane_remodel_target="fixed",
-                       membrane_repel_law="ar", membrane_repel_k=250.0, membrane_repel_range=3.0),
-    "93_ar_k600": dict(membrane_deposit="uniform", membrane_remodel_target="fixed",
-                       membrane_repel_law="ar", membrane_repel_k=600.0, membrane_repel_range=3.0),
-    "94_ar_k1500": dict(membrane_deposit="uniform", membrane_remodel_target="fixed",
-                        membrane_repel_law="ar", membrane_repel_k=1500.0, membrane_repel_range=3.0),
 
     # 95-97. 92-94 came back a flat null (0.542/0.540/0.544 against 82's 0.543 with no repulsion at
     # all), and that finally located the real error -- which is NOT the one 92-94 were correcting.
@@ -234,15 +274,6 @@ SERIES = {
     # half. Sum aggregation, deliberately -- same as the linear operator, so the ONLY thing that differs
     # is the force shape, which is the actual hypothesis: range ~3 l* and a smooth decay instead of
     # range 1 l* and a hard truncation.
-    "95_ar_k2e5": dict(membrane_deposit="uniform", membrane_remodel_target="fixed",
-                       membrane_repel_law="ar", membrane_repel_k=2.0e5, membrane_repel_range=3.0,
-                       membrane_repel_aggr="sum"),
-    "96_ar_k1e6": dict(membrane_deposit="uniform", membrane_remodel_target="fixed",
-                       membrane_repel_law="ar", membrane_repel_k=1.0e6, membrane_repel_range=3.0,
-                       membrane_repel_aggr="sum"),
-    "97_ar_k5e6": dict(membrane_deposit="uniform", membrane_remodel_target="fixed",
-                       membrane_repel_law="ar", membrane_repel_k=5.0e6, membrane_repel_range=3.0,
-                       membrane_repel_aggr="sum"),
 }
 
 
@@ -261,7 +292,7 @@ def main():
         label.update(myo)
     if gated:
         label["tissue"] = "gated ovoid (aspect 1.33)"
-    for t in (membrane_ops.BOND_TRACE, membrane_ops.MEMBRANE_STRAIN,
+    for t in (membrane_ops.BOND_TRACE, membrane_ops.BOUNDARY_REACTION, membrane_ops.MEMBRANE_STRAIN,
               membrane_ops.SECRETE_TRACE, membrane_ops.BOND_SNAPSHOTS, membrane_ops.HOOP_TRACE):
         t.clear()
     tk = dict(frames=401, device=dev, buffer_x=4, myosin=1.0)
@@ -305,6 +336,11 @@ def main():
     json.dump(info, open(os.path.join(d, "pass1.json"), "w"), indent=1)
     R.run(name, spec, device=dev, movie=True, render_kw={"movie_frames": 150, "fps": 15})
 
+    # THE REACTION THE TISSUE WOULD FEEL, saved whenever the grid boundary condition ran. Pass 2 replays
+    # a tissue it cannot push, so this is the coupling's other half measured rather than applied.
+    br = np.asarray(membrane_ops.BOUNDARY_REACTION, float)
+    if br.size:
+        np.savez_compressed(os.path.join(d, "reaction.npz"), reaction=br)
     bt = np.asarray(membrane_ops.BOND_TRACE, float)
     z = np.load(os.path.join(d, "traj.npz"))
     al = np.asarray(z["malive"]) if "malive" in z.files else None
@@ -324,16 +360,25 @@ def main():
     t1 = np.asarray(_tz["t1_trace"], float) if "t1_trace" in _tz.files else np.zeros((1, 4))
     if t1.size == 0:
         t1 = np.zeros((1, 4))
-    info["result"] = dict(bonds_start=int(bt[0, 0]), bonds_end=int(bt[-1, 0]),
-                          lcc_end=float(bt[-1, 3]) if bt.shape[1] > 3 else None,
-                          mean_degree_z=float(bt[-1, 4]) if bt.shape[1] > 4 else None,
+    # A CONTINUUM MEMBRANE HAS NO BONDS, so bonds_end / lcc / z are not poor measurements of it -- they
+    # do not exist. What replaces them is the thing those numbers were standing in for: whether the sheet
+    # still COVERS the epithelium. `coverage` (fraction of 16x32 solid-angle bins holding a particle) is
+    # already computed below and is the honest measure for both representations, which is why it is the
+    # one to compare a continuum run against a spring run on.
+    has_bonds = bt.ndim == 2 and bt.shape[0] > 0
+    info["result"] = dict(bonds_start=int(bt[0, 0]) if has_bonds else None,
+                          bonds_end=int(bt[-1, 0]) if has_bonds else None,
+                          lcc_end=float(bt[-1, 3]) if has_bonds and bt.shape[1] > 3 else None,
+                          mean_degree_z=float(bt[-1, 4]) if has_bonds and bt.shape[1] > 4 else None,
                           t1_total=int(t1[-1, 2]) if len(t1) else 0,
                           t1_per_cell_per_frame=float(t1[:, 1].sum() / max(t1[:, 3].mean(), 1)
                                                       / max(len(t1), 1)),
                           n_alive=int(al.sum()) if al is not None else None,
                           strain_end=float(ms.mean()),
                           strain_p99=float(np.percentile(ms, 99)),
-                          coverage=len(np.unique(bi)) / (16 * 32))
+                          coverage=len(np.unique(bi)) / (16 * 32),
+                          reaction_radial_end=(float(br[br[:, 0] == br[:, 0].max(), 2].sum())
+                                               if br.size else None))
     json.dump(info, open(os.path.join(d, "pass1.json"), "w"), indent=1)
     print("SERIES " + json.dumps({"name": name, **info["result"]}), flush=True)
 
