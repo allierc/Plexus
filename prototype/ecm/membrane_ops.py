@@ -1153,7 +1153,8 @@ class MPMTissueBoundary(FieldUpdate):
             # push it, measured rather than assumed, and it is what pass 1 would have to be given for a
             # genuinely two-way run. Its radial component is the one that matters: negative = the
             # matrix and membrane are resisting the growth.
-            dp = ((gv_new - gv) * gm[:, None])[near]
+            dp = torch.nan_to_num(((gv_new - gv) * gm[:, None])[near], nan=0.0,
+                                  posinf=0.0, neginf=0.0)
             fr = (dp * u[near]).sum(-1)
             BOUNDARY_REACTION.append((int(getattr(H, "frame", 0) or 0),
                                       float(dp.norm(dim=-1).sum()), float(fr.sum()),
@@ -1203,8 +1204,16 @@ class BasementMembraneContinuumStrain(Lateral):
             return {}
         alive = getattr(H, "membrane_alive", None)
         s = torch.linalg.svdvals(F)[:, 0] - 1.0        # largest principal stretch, as a strain
+        # MASK, DO NOT MULTIPLY. The unsecreted reserve is parked at the tissue centre with zero mass and
+        # a degenerate F, so its stretch is NaN -- and NaN * 0 is NaN, which poisons the whole array and
+        # surfaces as the -1 sentinel after nan_to_num. `where` drops them instead of scaling them.
+        s = torch.nan_to_num(s, nan=0.0, posinf=0.0, neginf=0.0)
         if alive is not None:
-            s = s * alive.to(s.dtype)
+            s = torch.where(alive, s, torch.zeros_like(s))
+        # CLAMPED BECAUSE THE CHANNEL IS float16. A parked reserve particle can integrate a runaway F,
+        # and anything past 65504 becomes inf on the cast, then -1 through the reader's nan_to_num --
+        # a sentinel that looks like a failed run rather than an unused particle.
+        s = s.clamp(-1.0, 50.0)
         MEMBRANE_STRAIN.append(s.detach().to("cpu", torch.float16).numpy())
         if not self._said:
             print("[basement_membrane_continuum_strain] no crosslinks: colouring by sigma_max(F) - 1, "
