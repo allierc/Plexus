@@ -86,10 +86,17 @@ def _scalebar(ax, Lbox, color="w", frac=0.25):
     nice = min((1.0, 2.0, 5.0, 10.0), key=lambda m: abs(m * mag - raw)) * mag
     f = nice / span                                    # bar length as a fraction of the axis
     x0, y0 = 0.04, 0.055
-    ax.plot([x0, x0 + f], [y0, y0], transform=ax.transAxes, color=color, lw=2.6,
-            solid_capstyle="butt", zorder=10_000, clip_on=False)
-    ax.text(x0 + f / 2.0, y0 + 0.018, f"{nice:g}", transform=ax.transAxes, color=color,
-            fontsize=9, ha="center", va="bottom", zorder=10_000, clip_on=False)
+    # 3D AXES NEED DIFFERENT CALLS, and this is what broke all sixteen runs of round 1:
+    # `Axes3D.text` is text(x, y, z, s) -- four arguments -- so the 2D call raised TypeError inside
+    # `render`, whose caller catches, and every run lost strip.png, movie.mp4 AND 3d.png at once.
+    # The bar had been checked on a 2D axis only. `text2D` is the axes-fraction version, and a
+    # plain Line2D carries its own transform onto a 3D axes where `plot` would not.
+    from matplotlib.lines import Line2D
+    ax.add_artist(Line2D([x0, x0 + f], [y0, y0], transform=ax.transAxes, color=color, lw=2.6,
+                         solid_capstyle="butt", zorder=10_000, clip_on=False))
+    _text = getattr(ax, "text2D", ax.text)
+    _text(x0 + f / 2.0, y0 + 0.018, f"{nice:g}", transform=ax.transAxes, color=color,
+          fontsize=9, ha="center", va="bottom", zorder=10_000, clip_on=False)
 
 
 def _lazy_engine():

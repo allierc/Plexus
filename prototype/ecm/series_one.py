@@ -274,6 +274,9 @@ SERIES = {
     #     94 changes exactly ONE thing from 91: the reserve is added ON TOP of the working sheet rather
     #     than carved out of it -- 90,000 particles at reserve 1.0 is the same 45,000 laid down at frame
     #     0, with 45,000 held back to secrete. 91 is its own control.
+    "_probe_sparse": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
+                          membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
+                          membrane_particles=3333, membrane_reserve=0.0, membrane_secrete_rate=0.0),
     "94_secrete_dense": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
                              membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
                              membrane_particles=90000, membrane_reserve=1.0,
