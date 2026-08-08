@@ -1029,6 +1029,28 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60, movie=True):
         return out
 
     # ---- ONE box, computed once, held for every frame of both artefacts and both viewpoints.
+    # THE GEOMETRY LEAVES THIS FUNCTION, and until now it never did. `frames.npz` holds 17
+    # per-frame SCALARS -- 482 KB for a 900-frame run -- and the vertex positions and mesh existed
+    # only inside `render`. So when a one-line bug in the scale bar killed strip.png, movie.mp4 and
+    # 3d.png across four rounds and 64 runs, there was nothing to re-render FROM: the only way to
+    # get a picture of an already-measured run was to spend the GPU again and re-run it.
+    #
+    # This writes exactly the frames the strip and the movie draw -- the same subsample, not the
+    # full trajectory -- so a plot fix costs a re-render instead of a re-simulation. Measured on
+    # b_gs_gated_plain: ~60 frames of a 17k-cell mesh is a few tens of MB, against 900 frames of a
+    # 50k-cell mesh which would be tens of GB. The cheap half of the choice is the useful half.
+    try:
+        _keep = np.unique(np.linspace(0, T - 1, min(max(movie_frames, n_strip), T)).astype(int))
+        np.savez_compressed(
+            os.path.join(out_dir, "traj.npz"),
+            ticks=_keep.astype(np.int32),
+            **{f"pos_{i}": np.asarray(fr[int(t)][0], np.float32) for i, t in enumerate(_keep)},
+            **{f"mesh_{i}": np.asarray(fr[int(t)][1]) for i, t in enumerate(_keep)},
+            **{f"act_{i}": np.asarray(fr[int(t)][2], np.float32) for i, t in enumerate(_keep)})
+    except Exception as _e:
+        print(f"[{name}] traj.npz not written ({type(_e).__name__}: {str(_e)[:70]}) -- this run "
+              f"cannot be re-rendered without re-running it", flush=True)
+
     L3 = run_box(fr)
     L2 = L3 * 2.05
     l_first, l_last = np.abs(fr[0][0]).max() * 1.12, np.abs(fr[-1][0]).max() * 1.12
