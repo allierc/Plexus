@@ -428,7 +428,8 @@ def _is_working(job_id, ids, min_frac=0.5):
         return False
 
 
-def wait_for_ids(ids, poll=POLL_S, timeout_h=24, straggler_factor=4.0, min_straggler_min=25):
+def wait_for_ids(ids, poll=POLL_S, timeout_h=24, straggler_factor=4.0, min_straggler_min=25,
+                 hard_cap_min=float(os.environ.get("PG_ROUND_CAP", "60"))):
     """Block until every submitted JOB ID reaches a terminal state. IDs, not names.
 
     STRAGGLER KILL -- why this is not optional for a weeks-long campaign.
@@ -448,6 +449,18 @@ def wait_for_ids(ids, poll=POLL_S, timeout_h=24, straggler_factor=4.0, min_strag
     straggler. A killed slot is not a null result -- it is reported, and `round.py` resolves its
     hypothesis `inconclusive`, which keeps it out of the surprise rate.
 
+    A HARD CAP ON TOP OF THAT, because the progress test can spare a job forever. Cedric,
+    8 August: "I want that the loop does not exceed 1 hour, if 1 hour expires the last job is
+    killed but can still be used."
+
+    `_is_working` deliberately exempts a job whose frame counter is still advancing -- written
+    because a median-based killer once "killed five productive runs at 46 minutes". That
+    exemption is right and it is also unbounded: `r005_12` grew to 95,755 cells and held round 5
+    open for nearly two hours, working the whole time. So the round now stops at
+    `hard_cap_min` regardless of progress, and the job is killed with SIGTERM -- which `run_one`
+    catches to assemble the trajectory it reached, so a capped run is a SHORTER experiment rather
+    than a lost one. That is what makes the cap acceptable: nothing is discarded.
+
     Returns {"ok", "done", "exit", "killed", "timed_out"} -- a dict, because "did everything
     finish" and "did everything finish WELL" are different questions and the caller needs both.
     """
@@ -460,6 +473,23 @@ def wait_for_ids(ids, poll=POLL_S, timeout_h=24, straggler_factor=4.0, min_strag
     killed = set()
     id_to_name = {}                 # job id -> run name, filled from the queue on every poll
     while time.time() - t0 < timeout_h * 3600:
+        # THE HARD CAP, checked before anything else. Every other rule here can spare a job:
+        # `_is_working` exempts one that is still advancing, and that is why round 5 ran for two
+        # hours. This one cannot be argued with -- at `hard_cap_min` whatever is still running is
+        # SIGTERMed, and run_one's handler turns the kill into a shorter experiment instead of a
+        # lost one.
+        if hard_cap_min and (time.time() - t0) > hard_cap_min * 60:
+            still = sorted(ids - set(finished_at))
+            if still:
+                print(f"[cluster] {hard_cap_min:.0f} min cap reached -- stopping {len(still)} "
+                      f"job(s) so the round can close. Each is SIGTERMed and salvages the frames "
+                      f"it reached.", flush=True)
+                _ssh_retry("bkill -s TERM " + " ".join(still))
+                # a moment for run_one to catch the signal, assemble and write its diag
+                time.sleep(90)
+                killed |= set(still)
+            return {"ok": not killed, "done": sorted(finished_at), "exit": [],
+                    "killed": sorted(killed), "timed_out": False}
         # JOB_NAME is polled because the straggler test needs to find a job's run directory,
         # and a set of job ids cannot say which run wrote which heartbeat. Without it
         # `_is_working` had no name to look up and refused every job it was asked about.

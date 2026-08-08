@@ -698,6 +698,44 @@ def _seed_window(sim):
     return min(max(declared) if declared else 1, SEED_MAX)
 
 
+
+def _assemble(H, sim, rec_sets, occ_sets, rec_state, rec_fields, n_rows=None):
+    """The recorded trajectory, from whatever the buffers hold.
+
+    Split out of `run` so a partial run can be salvaged: `on_frame` receives H every tick, and a
+    caller that stashes the buffers can call this after an interrupt and get the same structure
+    `run` would have returned, covering the frames actually reached.
+
+    `n_rows` TRUNCATES to the rows actually written. The recording arrays are PREALLOCATED to the
+    full frame count, so an interrupt at frame 12 of 40 leaves a (41, N, 3) array whose last 28
+    rows were never filled. Returning those would hand the analysis 28 frames of uninitialised
+    memory and every `_final` metric would be read off them -- silently, and worse than having no
+    trajectory at all. A salvaged run must be SHORT, not padded.
+    """
+    def _cut(a):
+        return a if (n_rows is None or a is None) else a[:max(1, int(n_rows))]
+
+    return {"sets": {name: {"pos": _cut(rec_sets.get(name)), "occ": _cut(occ_sets[name]),
+                           # non-spatial recorded blocks (voltage, calcium, ...); None for a pos/vel set
+                           "state": ({k: _cut(v) for k, v in rec_state[name].items()}
+                                     if rec_state.get(name) else None),
+                           "node_type": (H.level(name).node_type.cpu().numpy()
+                                         if hasattr(H.level(name), "node_type") else None),
+                           "type_names": getattr(H.level(name), "type_names", None),
+                           # containment: which parent set + the per-node parent index, so a
+                           # plotter can render a container set as its merged child cloud.
+                           "parent_name": getattr(H.level(name), "parent_name", None),
+                           "parent": (H.level(name).parent.cpu().numpy()
+                                      if H.level(name).parent.numel() else None)}
+                    for name in H.levels},
+           "fields": {fn: {"grid": np.stack(fr[:n_rows] if n_rows else fr), "colors": _field_colors(H, sim, H.fields[fn]),
+                           "world": H.world_width}
+                      for fn, fr in rec_fields.items() if fr},
+           "world": H.world_width,
+           "world_size": H.world_size.cpu().numpy(),   # per-axis box [w0..w_{D-1}] (3D plotter reads it)
+           "name": sim.name}
+
+
 def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
         on_frame=None, progress: bool = False,
         grad: bool = False) -> tuple[Hierarchy, dict]:
@@ -744,6 +782,9 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
              _gate(o))                                   # multi-rate cadence: run only when tick % every == 0
             for o in sim.operators]
     rec_index, rec_sets, occ_sets, rec_state, fstride, rec_fields = _setup_recording(sim, H)
+    # LIVE BUFFERS ON H, so an interrupted run can still be assembled -- see _assemble.
+    H._rec = (sim, rec_sets, occ_sets, rec_state, rec_fields)
+    H._rec_index = rec_index          # tick -> row, so a salvage can truncate
     _print_run_summary(sim, H)
 
     def _run_token(token, tick):
@@ -824,25 +865,8 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
             if on_frame is not None:
                 on_frame(H, tick)
 
-    out = {"sets": {name: {"pos": rec_sets.get(name), "occ": occ_sets[name],
-                           # non-spatial recorded blocks (voltage, calcium, ...); None for a pos/vel set
-                           "state": rec_state.get(name),
-                           "node_type": (H.level(name).node_type.cpu().numpy()
-                                         if hasattr(H.level(name), "node_type") else None),
-                           "type_names": getattr(H.level(name), "type_names", None),
-                           # containment: which parent set + the per-node parent index, so a
-                           # plotter can render a container set as its merged child cloud.
-                           "parent_name": getattr(H.level(name), "parent_name", None),
-                           "parent": (H.level(name).parent.cpu().numpy()
-                                      if H.level(name).parent.numel() else None)}
-                    for name in H.levels},
-           "fields": {fn: {"grid": np.stack(fr), "colors": _field_colors(H, sim, H.fields[fn]),
-                           "world": H.world_width}
-                      for fn, fr in rec_fields.items() if fr},
-           "world": H.world_width,
-           "world_size": H.world_size.cpu().numpy(),   # per-axis box [w0..w_{D-1}] (3D plotter reads it)
-           "name": sim.name}
-    
+    out = _assemble(H, sim, rec_sets, occ_sets, rec_state, rec_fields)
+
     if out_path is not None:
         import zarr
         root = zarr.open_group(out_path, mode="w")

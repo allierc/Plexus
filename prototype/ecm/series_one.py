@@ -111,6 +111,138 @@ SERIES = {
     "81_no_anchor": dict(membrane_deposit="uniform", membrane_adhesion=0.0),
     "82_mesh_restlength": dict(membrane_deposit="uniform", membrane_remodel_target="mesh"),
 
+    # 83-85: the holes, taken to the bottom. 82 helped (cv of the rest lengths 0.527 -> 0.191) but only
+    # halfway, and the relaxation bench said why: fitting cv = A*exp(-t/T) + C over 6000 iterations gives
+    # C = 0.18-0.22, a PLATEAU, not a slow decay. About 85% of the disorder never relaxes at all.
+    #
+    # Two changes, and neither is a tuning knob.
+    #
+    # `fixed` holds l* at the frame-0 spacing instead of tracking the sheet's own mean. `mesh` is
+    # self-referential: if secretion under-delivers, the mean grows and the springs bless the sparser
+    # sheet. Fixed, N = 4*pi*R^2/l*^2 is the node count the sheet NEEDS, secretion is the only thing that
+    # can supply it, and a shortfall shows up as tension rather than being absorbed into the target.
+    #
+    # `repel_w` adds excluded volume beside the springs. The bench isolated the cause: it is not a
+    # missing repulsion (a spring pushes when compressed) but an unopposed attraction -- the rewire
+    # throws crosslinks clear across the holes and those long bonds haul the rim into knots. Deleting
+    # the pull fixes it (cv 0.173 -> 0.049) but leaves a sheet that bears no tension, so the pull stays
+    # and repulsion is added: spacing from one, load from the other.
+    #
+    # THREE RUNS BECAUSE THE BENCH BRACKETS w RATHER THAN FIXING IT, and the bracket is stiffness
+    # dependent. Swept at k = 2e5 the answer was w = 8 (cv 0.020) with w = 20 unstable (0.179); swept at
+    # 100x softer springs it was the reverse, w = 20 the better of the two. THIS SERIES RUNS k = 5e3, so
+    # h*z*k*(1+w)/gamma = 0.06 / 0.51 / 1.20 for w = 0 / 8 / 20 -- all under the limit of 2, and none of
+    # them is the case the bench calibrated. So the bracket is run, not predicted.
+    #
+    # 83 separates the target change from the repulsion: if `fixed` alone closes the holes, the excluded
+    # volume is not needed and 84/85 should not be kept. (The bond range needs no change here: cutoff =
+    # 0.008 against l* = 0.00575 is 1.4 spacings already, not the 3.7 the spec default would have given.)
+    "83_fixed_target": dict(membrane_deposit="uniform", membrane_remodel_target="fixed"),
+    "84_fixed_repel8": dict(membrane_deposit="uniform", membrane_remodel_target="fixed",
+                            membrane_repel_w=8.0),
+    "85_fixed_repel20": dict(membrane_deposit="uniform", membrane_remodel_target="fixed",
+                             membrane_repel_w=20.0),
+
+    # 86-88. What 83-85 settled, measured at the middle frame:
+    #
+    #   82 mesh target      d/hex 0.543   cv 0.442
+    #   83 fixed target     d/hex 0.540   cv 0.443     <- a NULL. Fixing l* alone changes nothing.
+    #   84 w = 8            d/hex 0.604   cv 0.339
+    #   85 w = 20           d/hex 0.677   cv 0.243     <- monotone, no plateau: the optimum is above 20
+    #
+    # And the supply question is closed: N_live/N_needed at l* is 1.14 at EVERY frame from R = 0.088 to
+    # 0.298, so secretion tracks growth exactly and the sheet always carries a 14% surplus of nodes. The
+    # holes are not a material shortage, they are enough nodes badly arranged -- which is precisely the
+    # case repulsion addresses, so the lever is right and only too weak.
+    #
+    # 86/87 push w, since 85 was still climbing. Frame-level h*z*k*(1+w)/gamma is 2.9 at w = 50 and 6.9
+    # at w = 120, both past the overdamped limit of 2 -- but the membrane is on the MPM path, integrated
+    # at the substep, which is why w = 20 improved instead of diverging. So these two also LOCATE THE
+    # CEILING: if 87 explodes, the substep headroom is smaller than the MPM path implies.
+    #
+    # 88 is the other error 83-85 exposed. The sheet's actual mean spacing is 0.94 l*, BELOW the
+    # repulsion range, so nearly every pair is inside it and the operator acts as a uniform outward
+    # pressure against the anchors rather than selectively separating the over-close pairs. Setting the
+    # range to the density-implied spacing restores the selectivity at a stiffness already shown stable.
+    "86_repel50": dict(membrane_deposit="uniform", membrane_remodel_target="fixed",
+                       membrane_repel_w=50.0),
+    "87_repel120": dict(membrane_deposit="uniform", membrane_remodel_target="fixed",
+                        membrane_repel_w=120.0),
+    "88_repel20_range94": dict(membrane_deposit="uniform", membrane_remodel_target="fixed",
+                               membrane_repel_w=20.0, membrane_repel_range=0.94),
+
+    # 89-91: Plexus's own attraction_repulsion law instead of the one-sided spring.
+    #
+    # WHAT 86-88 LEFT. 86 (w = 50) is the best packing so far, d/hex 0.746 -- but at z = 3.82, under the
+    # 2D rigidity threshold, with lcc 0.64: some of that gain is bought by BREAKING crosslinks, which is
+    # the same process that destroyed 87 (w = 120: lcc 0.04, z = 2.06, packing back down to 0.568). 88
+    # was a null (0.679 against 85's 0.677), so the range-selectivity argument was simply wrong.
+    #
+    # THE ARCHIVED `blue` PARAMETERS DO NOT DO THIS, and that is worth recording because it is the
+    # opposite of what the name suggests. f(0) = p0 - p2, and blue's is +0.022: an attractive core. Any
+    # pair closing below r = 0.0011 welds, so the set CLUMPS -- in 2D, d/hex 0.471 -> 0.242 over 250
+    # frames, worse than random (0.465). Every archived type in the two configs has an attractive core
+    # except rand_2t's t0, and that one never decays to zero at the neighbour radius (f = -0.63 there),
+    # so it churns instead. Dropping p0 leaves one decaying repulsion, which is the CGI recipe for
+    # scattering points evenly over a surface, and it reaches blue noise in 2D (d/hex 0.887, cv 0.037).
+    #
+    # ON THE REAL SHEET, run 85's middle frame relaxed 300 iterations:
+    #     start                          d/hex 0.677   cv 0.243   gap 1.14
+    #     attraction_repulsion, 3 l*     d/hex 0.895   cv 0.052   gap 0.65
+    # Better than anything the spring reached, and the likely reason is RANGE, not strength: the AR law
+    # acts over ~3 spacings and dies smoothly, the one-sided spring acts over 1 and is truncated.
+    #
+    # k is bracketed, not derived. Matching total force against 85 (w = 20) over ~28 neighbours instead
+    # of 6 gives k ~ 1.7e4, i.e. w ~ 3.5, so 89/90 straddle it. 91 is the literal reading of "only
+    # attraction-repulsion": the crosslink springs off entirely, absolute k, no tension-bearing network
+    # left -- expected to pack well and to have nothing holding the sheet against growth.
+    "89_ar_w3": dict(membrane_deposit="uniform", membrane_remodel_target="fixed",
+                     membrane_repel_law="ar", membrane_repel_w=3.5, membrane_repel_range=3.0),
+    "90_ar_w10": dict(membrane_deposit="uniform", membrane_remodel_target="fixed",
+                      membrane_repel_law="ar", membrane_repel_w=10.0, membrane_repel_range=3.0),
+    "91_ar_only": dict(membrane_deposit="uniform", membrane_remodel_target="fixed",
+                       membrane_repel_law="ar", membrane_repel_k=5.0e4, membrane_repel_range=3.0,
+                       membrane_bond_k=0.0),
+
+    # 92-94: 89-91 again with k set correctly. THE ERROR WAS UNITS, NOT THE LAW. In the ar form `k` is
+    # not a stiffness: amp is O(1), the step is dt*k*amp*d, so the scale is fixed by k*dt ~ 1, meaning
+    # k ~ 250 at dt = 4e-3 -- not the 1.75e4 I derived by matching spring forces, which is 70x past it.
+    # Above the edge the sheet scrambles to a fixed point that sits near where it started, which is why
+    # 89-91 read as a null (0.564 / 0.591 / 0.535) instead of as an overshoot. Swept on 85's middle
+    # frame: k = 25 -> 0.785, 100 -> 0.830, 250 -> 0.846, 600 -> 0.855, 1500 -> 0.872, 4000 -> 0.730.
+    # Mean aggregation, as the attraction_repulsion operator itself uses.
+    "92_ar_k250": dict(membrane_deposit="uniform", membrane_remodel_target="fixed",
+                       membrane_repel_law="ar", membrane_repel_k=250.0, membrane_repel_range=3.0),
+    "93_ar_k600": dict(membrane_deposit="uniform", membrane_remodel_target="fixed",
+                       membrane_repel_law="ar", membrane_repel_k=600.0, membrane_repel_range=3.0),
+    "94_ar_k1500": dict(membrane_deposit="uniform", membrane_remodel_target="fixed",
+                        membrane_repel_law="ar", membrane_repel_k=1500.0, membrane_repel_range=3.0),
+
+    # 95-97. 92-94 came back a flat null (0.542/0.540/0.544 against 82's 0.543 with no repulsion at
+    # all), and that finally located the real error -- which is NOT the one 92-94 were correcting.
+    #
+    # THE BENCH CANNOT CALIBRATE THIS OPERATOR. relax_bench integrates x += dt*F, a position update. The
+    # operator emits an ACCELERATION into MPM, so displacement goes as dt^2*F, smaller by ~1.6e-5 at
+    # dt = 4e-3. The bench's k ~ 250-1500 is therefore about 1e5 too small in the run, and 89's faint
+    # effect at k = 1.75e4 (0.564 against a 0.543 baseline) is consistent with being under-powered, not
+    # with the overshoot I read it as. Two brackets went to calibration because I kept trusting a
+    # testbed that does not share the run's equation of motion.
+    #
+    # The only sound anchor is the LINEAR repel, which is the same operator on the same emission path:
+    # k = 1e5 there (85, w = 20) moved d/hex 0.543 -> 0.677 and k = 2.5e5 (86, w = 50) -> 0.746. Matching
+    # the ar law's typical force against those gives k ~ 2e5, so this brackets it across a decade and a
+    # half. Sum aggregation, deliberately -- same as the linear operator, so the ONLY thing that differs
+    # is the force shape, which is the actual hypothesis: range ~3 l* and a smooth decay instead of
+    # range 1 l* and a hard truncation.
+    "95_ar_k2e5": dict(membrane_deposit="uniform", membrane_remodel_target="fixed",
+                       membrane_repel_law="ar", membrane_repel_k=2.0e5, membrane_repel_range=3.0,
+                       membrane_repel_aggr="sum"),
+    "96_ar_k1e6": dict(membrane_deposit="uniform", membrane_remodel_target="fixed",
+                       membrane_repel_law="ar", membrane_repel_k=1.0e6, membrane_repel_range=3.0,
+                       membrane_repel_aggr="sum"),
+    "97_ar_k5e6": dict(membrane_deposit="uniform", membrane_remodel_target="fixed",
+                       membrane_repel_law="ar", membrane_repel_k=5.0e6, membrane_repel_range=3.0,
+                       membrane_repel_aggr="sum"),
 }
 
 
