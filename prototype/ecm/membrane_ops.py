@@ -1434,12 +1434,19 @@ class BasementMembraneSecrete(Structural):
         if add <= 0:
             return {}
 
+        # BONDS ARE ONLY NEEDED BY `parent`, which weights sites by the load on each particle's own
+        # crosslinks. `uniform` and `gaps` never look at them -- so returning early when there is no
+        # network disabled secretion for the entire continuum membrane, silently. Runs 92 and 93 came
+        # back identical to every digit with n_alive frozen at its seeded 3,333, which is what a rate
+        # parameter looks like when nothing reads it: the sheet then sat at R = 0.0875 while the tissue
+        # grew past it, leaving the membrane INSIDE the spheroid.
         bonds = getattr(H, "membrane_bonds", None)
-        if bonds is None:
+        if bonds is None and self.deposit not in ("uniform", "gaps"):
             return {}
-        bi, bj, brest, balive = bonds
-        d = (pos[bj] - pos[bi]).norm(dim=1).clamp_min(1e-9)
-        strain = ((d - brest) / brest) * balive.to(dt_)
+        if bonds is not None:
+            bi, bj, brest, balive = bonds
+            d = (pos[bj] - pos[bi]).norm(dim=1).clamp_min(1e-9)
+            strain = ((d - brest) / brest) * balive.to(dt_)
 
         # DEPOSIT AGAINST PARTICLES, NOT AGAINST BONDS -- and this is the correction that matters.
         # Two versions failed before this one. Taking the globally most strained BONDS is winner-take-all:
