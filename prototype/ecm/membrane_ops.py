@@ -165,6 +165,8 @@ class BasementMembraneSeed(Structural):
         # it started with, so it can only slip or thin or tear. `reserve` is the fraction of the set held
         # back at mass 0 for `basement_membrane_secrete` to lay down as the surface grows.
         self.reserve = float(params.get("reserve", 0.0))
+        # where dormant particles wait: outside the box, not at the tissue centre (see `forward`)
+        self.park = [float(v) for v in params.get("park", (-0.25, -0.25, -0.25))]
         self.surface_set = params.get("surface_set", None)
         self.gamma = float(params.get("overdamped_gamma", 0.0))
         self.seed = int(params.get("seed", 0))
@@ -320,11 +322,18 @@ class BasementMembraneSeed(Structural):
             idx = alive.nonzero(as_tuple=True)[0][-extra:]
             alive[idx] = False
         if n0 < n:
-            # PARKED AT THE CENTRE, MASSLESS. Inside the tissue, where nothing else lives, so a dormant
-            # particle cannot be mistaken for membrane by any operator that works on position; and mass 0
-            # so it scatters nothing into the shared grid. `cell_exclude_3d` skips massless particles for
-            # exactly this reason -- otherwise it would project the whole reserve onto the surface.
-            lvl.get("pos")[~alive] = c.to(dev, dt_)
+            # PARKED OUTSIDE THE BOX, MASSLESS. It used to be parked at the tissue CENTRE, which is
+            # fine for a spring membrane -- MPM never touched it -- and is not fine for a continuum one.
+            # Measured: the same 3,333 live particles track the surface to R = 0.1145 with no reserve
+            # behind them, and sit frozen at 0.0876 with one, so the dormant particles were reaching the
+            # live sheet through the shared grid. Massless is not inert: `mpm_scatter` still deposits the
+            # stress term, which carries p_vol and not m.
+            #
+            # Outside the box does not mean off the grid -- `bspline` clamps out-of-range indices to the
+            # boundary cells, so the reserve lands on one corner node. That is the point: the corner is
+            # ~0.87 from the tissue, far outside the surface band the boundary condition acts on, so
+            # whatever it deposits cannot reach the membrane.
+            lvl.get("pos")[~alive] = torch.tensor(self.park, device=dev, dtype=dt_)
             m = getattr(lvl, "mass", None)
             if m is None:
                 raise RuntimeError(
@@ -333,6 +342,16 @@ class BasementMembraneSeed(Structural):
                     "into the grid from the tissue centre.")
             self._mass0 = float(m.reshape(-1)[0])
             m[~alive] = 0.0
+            # AND `occ`, WHICH IS THE FLAG THE MPM OPERATORS ACTUALLY CHECK. Mass 0 was this file's own
+            # convention for "dormant" and it is not the framework's: `mpm_scatter` masks its weights by
+            # occupancy, `mpm_gather` freezes occ==0 particles instead of advecting them, and Level
+            # already carries occ with a spawn/retire API. Mass alone does not stop a particle
+            # scattering, because the scatter's STRESS term is weighted by p_vol, not by m -- so a
+            # massless reserve parked at the tissue centre still deposits stress into the shared grid,
+            # right where the boundary condition is looking. That is what froze the live sheet.
+            oc = getattr(lvl, "occ", None)
+            if oc is not None:
+                oc[~alive] = 0.0
         H.membrane_alive = alive
         # Published so `surface_track` can pair element i with particle i without reproducing an RNG
         # sequence. (Rebuilding the lattice does in fact reproduce it -- the jitter draws come first in
@@ -1570,8 +1589,9 @@ class BasementMembraneSecrete(Structural):
         m = getattr(lvl, "mass", None)
         if m is not None:
             m[slot] = m[src]
-        # NEWLY SECRETED MATERIAL IS UNSTRAINED, and this is not a detail. A parked particle is massless,
-        # so it scatters nothing -- but `mpm_gather` still hands it a velocity every frame and
+        # NEWLY SECRETED MATERIAL IS UNSTRAINED, and this is not a detail. A parked particle used to be
+        # marked dormant by mass alone, which does NOT stop it scattering (the stress term is weighted by
+        # p_vol, not m) -- and `mpm_gather` still hands it a velocity every frame while
         # `mpm_strain` still integrates its deformation gradient from it. Sitting at the tissue centre for
         # hundreds of frames, F drifts arbitrarily far from identity. Activating it then promotes that
         # accumulated garbage into real material with real mass, and a single such particle can carry a
@@ -1583,6 +1603,9 @@ class BasementMembraneSecrete(Structural):
         Cb = getattr(lvl, "C", None)
         if Cb is not None:
             Cb[slot] = 0.0
+        oc = getattr(lvl, "occ", None)
+        if oc is not None:
+            oc[slot] = 1.0          # spawn: the flag mpm_scatter/mpm_gather key off
         live = live.clone(); live[slot] = True
         H.membrane_alive = live
         H.membrane_new = slot

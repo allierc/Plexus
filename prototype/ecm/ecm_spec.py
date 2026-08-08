@@ -119,6 +119,9 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                # separation where material thins past the grid's support. Nothing new is added -- this is
                # the mechanics that was already underneath the springs and invisible while they ran.
                membrane_springs=True,
+               # where the unsecreted reserve waits. Outside the box by default; (0.5,0.5,0.5) is the
+               # old tissue-centre parking, kept so the two can be compared directly.
+               membrane_park=(-0.25, -0.25, -0.25),
                # THE TISSUE AS A MOVING BOUNDARY ON THE GRID, rather than a positional projection.
                # 88 showed the projection carries no strain -- see membrane_ops.MPMTissueBoundary.
                membrane_grid_bc=False,
@@ -199,7 +202,7 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
              "centre": [0.5, 0.5, 0.5], "surface": str(membrane), "scale": 1.0,
              "offset": float(membrane_offset), "thickness": float(membrane_thickness),
              "seed": int(seed), "jitter": float(membrane_jitter),
-             "reserve": float(membrane_reserve)},
+             "reserve": float(membrane_reserve), "park": list(membrane_park)},
             # INTEGRINS FIRST: without them the sheet slides over the epithelium and its bonds never
             # feel the growth. `membrane_adhesion = 0` reproduces the unanchored (wrong) loading path.
             {"op": "integrin_adhesion", "at": "basement_membrane_particle",

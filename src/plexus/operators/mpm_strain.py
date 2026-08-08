@@ -75,5 +75,14 @@ class MPMStrain(Lateral):
                 ratio = sig.prod(-1) / sig_c.prod(-1).clamp(min=1e-6)
                 Jp = p.Jp.clone(); Jp[sm] = (Jp[sm] * ratio).clamp(0.6, 20.0)
                 p.Jp = Jp
+        # DORMANT PARTICLES DO NOT DEFORM. `mpm_scatter` masks its weights by occupancy and
+        # `mpm_gather` freezes occ==0 rather than advecting it, but this operator integrated F for the
+        # reserve regardless -- so a particle waiting to be spawned accumulated an arbitrary deformation
+        # for as long as it waited, and was then promoted into real material carrying it. Byte-identical
+        # when every particle is live, which is every composition that has no reserve.
+        occ = getattr(p, "occ", None)
+        if occ is not None:
+            live = (occ > 0)[:, None, None]
+            F = torch.where(live, F, p.F)
         p.F = F
         return {}
