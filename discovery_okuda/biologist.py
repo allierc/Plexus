@@ -714,12 +714,71 @@ def p6_resting_vesicle_rests(cfg, device="cpu", frames=40, tol=0.03):
              f"the drift.", meas)
 
 
-# --------------------------------------------------------------------------- driver
-STATIC = [p2_gate_implies_baseline, p3_ceiling_above_trigger, p5_biology_advances_in_biological_time]
-PASSIVE = [p1_tissue_gains_material, p3b_mean_cell_volume_holds, p4_chemistry_not_extinguished,
-           p13_growth_not_capped_by_the_array,
-           p7_no_absorbing_area_by_stretching, p8_shape_index_floor, p9_closed_sphere,
-           p11_tissue_does_not_pass_through_itself, p12_concentrations_are_physical]
+# --------------------------------------------------------------------------- the register
+# EVERY PREMISE IN ONE TABLE, and NOWHERE ELSE. Cedric, 8 August: "I found the removal of premises
+# hacky, can we better structure the code to add/remove premises easily?"
+#
+# Deleting a premise used to mean five separate edits -- the function, one of two hand-kept lists,
+# a call site inside `check`, and its cases in `--certify` -- and missing any one of them left a
+# name behind that still read as a live check. Retiring one now means writing its id in
+# `crew/flow.yaml`. The function stays in this file, tested and readable, because "we tried this
+# check and it fired on everything" is a finding about the campaign and deleting the code deletes
+# the finding.
+#
+# `kind` says HOW a premise is called, which is the only thing the driver needs to know:
+#   static     f(cfg)              -- answerable from the spec, before any GPU
+#   passive    f(cfg, series)      -- reads the recorded per-frame metrics
+#   mechanics  f(cfg, series, mech) -- also needs mechanics.npz
+#   probe      f(cfg, device=...)  -- runs its own little simulation; only when probe=True
+REGISTER = [
+    ("P1",  "passive",   p1_tissue_gains_material),
+    ("P2",  "static",    p2_gate_implies_baseline),
+    ("P3",  "static",    p3_ceiling_above_trigger),
+    ("P3b", "passive",   p3b_mean_cell_volume_holds),
+    ("P4",  "passive",   p4_chemistry_not_extinguished),
+    ("P5",  "static",    p5_biology_advances_in_biological_time),
+    ("P5b", "mechanics", p5b_relaxation_keeps_up),
+    ("P6",  "probe",     p6_resting_vesicle_rests),
+    ("P7",  "passive",   p7_no_absorbing_area_by_stretching),
+    ("P8",  "passive",   p8_shape_index_floor),
+    ("P9",  "passive",   p9_closed_sphere),
+    ("P11", "passive",   p11_tissue_does_not_pass_through_itself),
+    ("P12", "passive",   p12_concentrations_are_physical),
+    ("P13", "passive",   p13_growth_not_capped_by_the_array),
+]
+
+FLOW = os.path.join(os.path.dirname(os.path.abspath(__file__)), "crew", "flow.yaml")
+
+
+def retired():
+    """{id: why} -- the premises this campaign has switched off, declared in crew/flow.yaml.
+
+    IN THE GRAPH, NOT IN THIS FILE, for the reason `parents.pool` and `route_a.plan` are there:
+    which premises a campaign holds itself to is a campaign decision, and flow.yaml is where the
+    campaign's decisions are written down with their reasons. A different campaign reading the
+    same code can keep P7.
+    """
+    try:
+        import yaml
+        with open(FLOW) as fh:
+            flow = yaml.safe_load(fh) or {}
+        return dict((flow.get("premises") or {}).get("retired") or {})
+    except Exception:
+        return {}
+
+
+def active(kind=None):
+    """The premises in force, as (id, kind, fn). Resolved per call so an edit to flow.yaml lands
+    on the next round without a relaunch -- the same contract `user_input.md` has."""
+    off = retired()
+    return [(pid, k, fn) for pid, k, fn in REGISTER
+            if pid not in off and (kind is None or k == kind)]
+
+
+# Kept as names because five modules and the docs still say STATIC/PASSIVE; both are now views on
+# the register rather than the second place a premise has to be listed.
+STATIC = [fn for _, _, fn in active("static")]
+PASSIVE = [fn for _, _, fn in active("passive")]
 
 
 def _mech(run):
@@ -734,16 +793,20 @@ def _mech(run):
 def check(cfg, series=None, probe=False, device="cpu", mech=None):
     """Every applicable premise. Waivers declared in the spec turn a fail into a recorded ablation."""
     waive = (cfg.get("_premises") or {}).get("waive") or {}
-    res = [f(cfg) for f in STATIC]
-    if series:
-        res += [f(cfg, series) for f in PASSIVE]
-        res.append(p5b_relaxation_keeps_up(cfg, series, mech))
-    if probe:
-        try:
-            res.append(p6_resting_vesicle_rests(cfg, device=device))
-        except Exception as e:
-            res.append(R("P6", "probe", "a resting vesicle rests", "error",
-                         f"{type(e).__name__}: {str(e)[:160]}"))
+    res = []
+    for pid, kind, fn in active():
+        if kind == "static":
+            res.append(fn(cfg))
+        elif kind == "passive" and series:
+            res.append(fn(cfg, series))
+        elif kind == "mechanics" and series:
+            res.append(fn(cfg, series, mech))
+        elif kind == "probe" and probe:
+            try:
+                res.append(fn(cfg, device=device))
+            except Exception as e:
+                res.append(R(pid, "probe", fn.__doc__.splitlines()[0] if fn.__doc__ else pid,
+                             "error", f"{type(e).__name__}: {str(e)[:160]}"))
     for r in res:
         if r.status == "fail" and r.pid in waive:
             r.status = "ablation"
@@ -1010,7 +1073,20 @@ def certify():
     ]
     print("CERTIFYING the premise checks against cases whose answer we already know\n")
     bad, missing = 0, []
+    # A RETIRED PREMISE IS NOT AN UNCERTIFIED ONE. Its cases stay in the table -- so bringing the
+    # premise back in flow.yaml brings its test back with it -- but they are announced and skipped
+    # rather than counted, because a check that is switched off cannot fail a run either.
+    off = retired()
+    skipped = [lab for lab in [c[0] for c in cases] if lab.split()[0] in off]
+    def _retired(label):
+        pid = label.split()[0]
+        if pid not in off:
+            return False
+        print(f"  [off] {label:48} RETIRED in crew/flow.yaml -- {str(off[pid]).strip()[:60]}")
+        return True
     for label, fn, cfgname, runname, expect in cases:
+        if _retired(label):
+            continue
         cfg, cfg_where = _cert_cfg(cfgname)
         if cfg is None:
             print(f"  [MISS] {label:48} NO CONFIG {cfgname} -- case cannot run")
@@ -1033,6 +1109,8 @@ def certify():
     for label, runname, expect in (("P5b residual force runs away (x1e9)", "r002c_01_a5a036", "fail"),
                                    ("P5b relaxation keeps up while GROWING", "r002c_02_c09d72",
                                     "pass")):
+        if _retired(label):
+            continue
         cfg, _ = _cert_cfg(runname)
         m = _cert_mech(runname)
         if cfg is None or m is None:
@@ -1050,18 +1128,21 @@ def certify():
     print(f"  [{'ok ' if ok else 'BAD'}] {'P13 the array decided the answer (plateau 95%)':48} -> "
           f"{r.status:9} (want fail)")
     # P5 on the pre-fix clock, synthesised: dt=0.02 with an unscaled reaction rate
-    stale = {"general": {"dt": 0.02, "n_frames": 300},
-             "operators": [{"op": "cell_react", "rate": 1.0}]}
-    r = p5_biology_advances_in_biological_time(stale)
-    ok = r.status == "fail"; bad += not ok
-    print(f"  [{'ok ' if ok else 'BAD'}] {'P5 chemistry on the mechanics clock (D5a)':48} -> "
-          f"{r.status:9} (want fail)")
-    fixed = {"general": {"dt": 0.02, "n_frames": 500},
-             "operators": [{"op": "cell_react", "rate": 50.0}]}
-    r = p5_biology_advances_in_biological_time(fixed)
-    ok = r.status == "pass"; bad += not ok
-    print(f"  [{'ok ' if ok else 'BAD'}] {'P5 chemistry rescaled by 1/dt':48} -> "
-          f"{r.status:9} (want pass)")
+    if "P5" in off:
+        print(f"  [off] {'P5 chemistry on the mechanics clock (D5a)':48} RETIRED in crew/flow.yaml")
+    else:
+        stale = {"general": {"dt": 0.02, "n_frames": 300},
+                 "operators": [{"op": "cell_react", "rate": 1.0}]}
+        r = p5_biology_advances_in_biological_time(stale)
+        ok = r.status == "fail"; bad += not ok
+        print(f"  [{'ok ' if ok else 'BAD'}] {'P5 chemistry on the mechanics clock (D5a)':48} -> "
+              f"{r.status:9} (want fail)")
+        fixed = {"general": {"dt": 0.02, "n_frames": 500},
+                 "operators": [{"op": "cell_react", "rate": 50.0}]}
+        r = p5_biology_advances_in_biological_time(fixed)
+        ok = r.status == "pass"; bad += not ok
+        print(f"  [{'ok ' if ok else 'BAD'}] {'P5 chemistry rescaled by 1/dt':48} -> "
+              f"{r.status:9} (want pass)")
     # P8 on a fabricated impossible measurement
     r = p8_shape_index_floor({}, [{"shape_idx_min": 3.90}, {"shape_idx_min": 3.21}])
     ok = r.status == "fail"; bad += not ok
