@@ -56,6 +56,7 @@ from . import polarity_flow_align  # noqa: F401  mpm_grid -> agent heading (pola
 from . import polarity_align       # noqa: F401  agent -> agent heading (1st-order Vicsek polar alignment; was heading_align)
 from . import cell_divide           # noqa: F401  agent set structural: proliferation on a fixed buffer (occ)
 from . import cell_grow             # noqa: F401  mpm_particle structural: tissue growth by material-point addition
+from . import segmentation_seed     # noqa: F401  a measured instance segmentation -> the CELL level
 
 __all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion", "squared_law", "attractor_flow",
            "cohesion", "velocity_align", "separation", "velocity_cruise", "drag",

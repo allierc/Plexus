@@ -22,6 +22,14 @@
 \definecolor{rule}{HTML}{2B4C7E}
 
 \newcommand{\code}[1]{\texttt{#1}}
+% --- the linalg-note formalism, same symbols so the two documents compose
+\usepackage{amssymb}
+\newcommand{\Mat}[1]{\mathbf{#1}}
+\newcommand{\A}{\Mat{A}}
+\newcommand{\thet}{\boldsymbol{\theta}}
+\DeclareMathOperator{\rank}{rank}
+\DeclareMathOperator{\cond}{cond}
+\newcommand{\src}[1]{{\footnotesize\textcolor{grey}{[#1]}}}
 \newcommand{\dn}{\textcolor{good}{\textbf{done}}}
 \newcommand{\fl}{\textcolor{warn}{\textbf{in flight}}}
 \newcommand{\ns}{\textcolor{grey}{not started}}
@@ -1200,6 +1208,122 @@ the classification table is complete with nothing left unconfirmed; the planted 
 back within their stated error bars and \textbf{both planted traps are caught}.
 
 \textbf{Cost.} About a day, one GPU.
+\end{phasebox}
+
+\begin{phasebox}{Phase 3b --- The algebraic inverse: injecting the data instead of integrating past it \hfill \prog\ \ \stopp}
+\textbf{Goal.} Decide whether the per-cell parameters can be recovered by \emph{solving} rather
+than by descending --- and if so, whether the campaign still needs a gradient at all.
+
+\textbf{What segmentation changed.} Until Phase~2b the material was a continuum with a pattern
+painted on it, and heterogeneity was carried by coordinate networks: three SIREN fields,
+$397{,}827$ parameters between them, none of which is a property of anything. With cells, the same
+heterogeneity is $472$ numbers per property. The count is not the interesting part --- the
+\emph{structure} is. A field parameterisation enters the forward model through a network and is
+nonlinear in its weights. \textbf{A per-cell constant does not.}
+
+\medskip
+\textbf{THE OBSERVATION.} The fixed-corotated stress carried by a material point is
+\begin{equation}
+\boldsymbol\sigma_p \;=\; 2\mu_p (\Mat F_p - \Mat R_p)\Mat F_p^{\!\top} \;+\; \lambda_p J_p (J_p-1)\Mat I
+\;+\; g_{c(p)}\,a(\Mat x_p,t)\,\Mat n_{c(p)}\Mat n_{c(p)}^{\!\top},
+\label{eq:sigma}
+\end{equation}
+and the Lam\'e constants are \emph{linear} in Young's modulus, $\mu = E/2(1+\nu)$,
+$\lambda = E\nu/(1+\nu)(1-2\nu)$. Every other symbol in \eqref{eq:sigma} --- $\Mat F_p$, its polar
+factor $\Mat R_p$, $J_p$, the activation $a$, the interpolation weights --- is a function of the
+\textbf{observed configuration}. So if the measured positions are \emph{injected} at every frame
+rather than produced by integrating from $t_0$, the balance
+\begin{equation}
+\rho\,\ddot{\Mat x} \;=\; \nabla\!\cdot\!\boldsymbol\sigma \;-\; k\,\dot{\Mat x}
+\label{eq:balance}
+\end{equation}
+is \textbf{linear in the parameters once the trajectory is observed} --- exactly the situation of
+the companion note \src{linalg\_note.tex, \S1}, where the Flyvis ODE becomes linear in
+$(\tau, V^{\mathrm{rest}}, W)$ the moment $v$ is recorded. Collecting the unknowns on the left and
+everything the recording already determines on the right,
+\begin{equation}
+\A\,\thet \;=\; \Mat b, \qquad
+\thet = (E_1,\dots,E_C,\; g_1,\dots,g_C) \in \mathbb R^{2C}, \qquad C = 472,
+\label{eq:ls}
+\end{equation}
+with $\Mat b$ carrying the drag, the boundary and anything else independent of $\thet$. The
+least-squares solution obeys the normal equations
+\begin{equation}
+\underbrace{\A^{\!\top}\A}_{\textstyle \Mat G}\,\hat\thet = \A^{\!\top}\Mat b ,
+\label{eq:normal}
+\end{equation}
+and $\Mat G$, the Gram matrix, is also the Hessian of the cost --- for this problem exactly, not
+merely to Gauss--Newton order.
+
+\textbf{Three consequences, and each is worth more than a faster optimiser.}
+
+\emph{The fibre angle is the only nonlinear parameter.} $\Mat n\Mat n^{\!\top}$ is nonlinear in the
+angle, but it is one scalar per cell, and the active tensor can be solved for as a symmetric
+matrix and its axis read off afterwards. So the problem is $944$ linear unknowns plus $472$
+one-dimensional ones, not $1{,}416$ coupled nonlinear ones.
+
+\emph{Non-identifiability becomes computable rather than discoverable.} A degenerate direction is
+$\boldsymbol\eta \ne \Mat 0$ with $\A\boldsymbol\eta = \Mat 0$; then $\A(\thet + \lambda\boldsymbol\eta) = \Mat b$
+for every $\lambda$, and no amount of fitting can separate them \src{linalg\_note.tex, \S2}. Here
+that has a physical reading the Flyvis case does not: a degenerate direction is a set of per-cell
+stiffnesses and gains that produce the \emph{same tissue motion} --- a stiffer cell beside a softer
+one against the reverse. \textbf{We do not have to run a campaign to find out which cells are
+determined; it is the spectrum of $\Mat G$}, and the badly-determined ones can be drawn as a map.
+
+\emph{And it does not need the gradient that Phase~3 found to be wrong.} There is no rollout, so
+there is no backward pass through $530$ solver steps, so the detached warm-up --- which makes the
+analytic gradient a partial derivative differing from the true one by about $30\%$ on gain --- does
+not arise at all.
+
+\medskip
+\textbf{WHAT MUST BE TRUE, AND IS BEING MEASURED.}
+
+\begin{center}\footnotesize
+\begin{tabular}{@{}l p{9.8cm}@{}}
+\toprule
+\textbf{superposition} & \eqref{eq:ls} is only valid if the response to two disjoint sets of cells
+is the sum of the responses. The scatter operator takes \code{a\_max} (the cardio spec sets $200$)
+and the grid update clamps at the wall --- \textbf{a clamp is not linear}, and whether it bites at
+these settings is a measurement, not an assumption.\\
+\addlinespace
+\textbf{the identity holds} & $\|\A\thet_{\text{true}} - \Mat b\| / \|\Mat b\|$ at the parameters
+the simulation actually used. If that is not small the formulation is wrong, and which of the two
+it is matters more than the number.\\
+\addlinespace
+\textbf{recovery} & plant per-cell values, simulate, inject, solve, compare. \emph{An instrument
+that cannot recover an answer we planted may not judge one we have not.}\\
+\addlinespace
+\textbf{noise} & the method differentiates the observed positions, and the observation is PIV. Twice
+differencing amplifies error brutally. The level at which recovery stops being useful is the number
+that decides whether this works on real data at all --- and the weak form (multiply by test
+functions, integrate by parts) removes the second derivative if it does not.\\
+\addlinespace
+\textbf{scaling} & $E \sim 100$ and $g \sim 1$, so an unscaled $\A$ will look ill-conditioned for a
+trivial reason. $\cond$ must be reported on a column-normalised $\A$ or it is an artefact of units.\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{The honest limit of the method.} This is \emph{equation} error, not \emph{output} error: it
+asks which parameters satisfy the balance frame by frame, not which reproduce the trajectory when
+rolled out. The two differ, and equation error is the biased one under measurement noise. So the
+structure is not a replacement but a division of labour --- \textbf{solve for the parameters
+algebraically, then judge them by rolling the model out with the border anchored to the recording,
+exactly as the prototype already does}. The anchor stays.
+
+\textbf{And it does not replace the loop.} Solving \eqref{eq:normal} estimates parameters
+\emph{within} a fixed mechanism. If the model has no prestress, no per-cell stiffness repairs that.
+What changes is the quality of the evidence the loop receives: the residual after an algebraic fit
+is attributable to \textbf{individual cells}, not smeared across a smooth field, which is a sharper
+input to mechanism discovery than anything the campaign has had.
+
+\begin{stopbox}
+\textbf{THE STOP.} If superposition fails, or the planted parameters do not come back at zero noise,
+the algebraic route is closed and Phase~3's gradient is the only way through --- and that must be
+said rather than patched around. If it succeeds, the honest consequence is larger than a speed-up:
+\textbf{most of what the agentic loop was going to spend its GPU-hours on is a linear solve}, and
+the loop should be re-scoped onto the question it is actually for.
+\end{stopbox}
 \end{phasebox}
 
 \begin{phasebox}{Phase 4 --- What a fit may claim, and the loop that enforces it \hfill \todo\ \ \stopp}
