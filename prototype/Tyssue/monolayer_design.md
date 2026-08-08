@@ -55,7 +55,7 @@ mechanism). No thickness DOF, no integrator change.
 - *v2 option:* let `h_j` relax (incompressible-ish, cell thins as it spreads) — only if v1's tubes need it.
 
 ## Growth coupling (reuse, unchanged)
-`morphogen_growth_3d` already raises `v_eq_j` via `Hill(activator)`. With the monolayer volume it now inflates
+`grow_3d` already raises `v_eq_j` via `Hill(activator)`. With the monolayer volume it now inflates
 the **cell's own volume**, not the lumen — the physically correct target. Division inherits `h_j` (daughters
 split the mid-surface polygon, keep the mother's thickness). RD, T1, division: untouched.
 
@@ -66,7 +66,7 @@ split the mid-surface polygon, keep the mother's thickness). RD, T1, division: u
 | RD ops (diffuse/react/seed) | **none** (cell-graph only) |
 | `shape_energy_3d` volume | swap wedge-volume → prism `v_j`; add `κ_s s_j`; targets optional |
 | new state | one cell channel `h_j` |
-| `morphogen_growth_3d` | none (already grows `v_eq`) |
+| `grow_3d` | none (already grows `v_eq`) |
 
 ## Validation ladder (once the flood is fixed)
 1. **Geometry sanity** — on the smoke_hom sphere: total `Σv_j` ≈ shell volume, uniform `h`, `s_j` positive;

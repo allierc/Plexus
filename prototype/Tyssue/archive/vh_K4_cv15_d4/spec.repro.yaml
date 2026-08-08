@@ -36,7 +36,7 @@ operators:   # the operators to instantiate (each realises one mechanism)
   vseed_cv: 0.15
 - op: cell_geometry_3d
   at: cell   # the set this operator acts on
-- op: morphogen_growth_3d
+- op: grow_3d
   at: vertex   # the set this operator acts on
   cell_set: cell
   rate: 0.03   # growth rate of the target area per frame
@@ -83,7 +83,7 @@ operators:   # the operators to instantiate (each realises one mechanism)
 schedule:   # the order the operators run each frame
 - seed_mesh_3d
 - cell_geometry_3d
-- morphogen_growth_3d
+- grow_3d
 - shape_energy_3d
 - reconnect_t1_3d
 - divide_3d

@@ -23,7 +23,7 @@ operators:   # the operators to instantiate (each realises one mechanism)
   p0: 3.72   # target shape index -- the rigidity knob (< ~3.81 solid, > ~3.81 fluid)
   seed: 0   # RNG seed
   before_frame: 1   # run this operator once, before the given frame
-- op: vesicle_growth
+- op: grow_3d
   at: vertex   # the set this operator acts on
   rate: 0.003   # growth rate of the target area per frame
   every: 1   # run this operator every N frames
@@ -43,5 +43,5 @@ operators:   # the operators to instantiate (each realises one mechanism)
   cap_frac: 0.12   # max per-step move as a fraction of mean edge (the stability cap)
 schedule:   # the order the operators run each frame
 - seed_mesh_3d
-- vesicle_growth
+- grow_3d
 - shape_energy_3d

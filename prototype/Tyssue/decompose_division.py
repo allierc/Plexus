@@ -26,11 +26,11 @@ def build():
     verts, es, et, ef, nF = build_sphere_mesh(150, RADIUS, JITTER, SEED); Nv = verts.shape[0]
     ops = [{"op": "seed_mesh_3d", "at": "vertex", "n_cells": 150, "radius": RADIUS, "jitter": JITTER,
             "p0": 3.72, "seed": SEED, "before_frame": 1},
-           {"op": "vesicle_growth", "at": "vertex", "rate": 0.003, "every": 1},
+           {"op": "grow_3d", "at": "vertex", "rate": 0.003, "every": 1, "rho": 1.0, "a_sw": 0.0, "vth_frac": 1e9, "conserve_amount": False},
            {"op": "shape_energy_3d", "at": "vertex", "p0": 3.72, "K_A": 1.0, "K_P": 1.0, "Lambda": 0.5,
             "Gamma": 0.1, "K_V": 1.0, "K_R": 0.4, "mu": 1.0, "dt": 1.0, "relax_iters": 26, "eta": 0.08, "cap_frac": 0.12},
            {"op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": 0.35, "every": 2, "max_flips": 20}]
-    sched = ["seed_mesh_3d", "vesicle_growth", "shape_energy_3d", "reconnect_t1_3d"]   # NO divide -> clean mesh
+    sched = ["seed_mesh_3d", "grow_3d", "shape_energy_3d", "reconnect_t1_3d"]   # NO divide -> clean mesh
     cfg = {"general": {"name": "dcmp", "seed": SEED, "n_frames": STOP, "dt": 1.0, "record_cap": 300,
                        "boundary": "free", "dim": 3, "world": [6 * RADIUS] * 3},
            "sets": {"vertex": {"n": int(Nv * 4)}}, "fields": {}, "operators": ops, "schedule": sched}

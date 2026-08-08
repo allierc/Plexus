@@ -150,7 +150,7 @@ ENGINE_DT = 1.0
 #   A silent disagreement would make every derived bound below wrong by the ratio of the two dts.
 
 FLOAT32_MAX = 3.4028234663852886e38   # the state dtype the operators run in
-HILL_EPS = 1e-12          # the additive regulariser in MorphogenGrowth3D.forward's Hill function
+HILL_EPS = 1e-12          # the additive regulariser in Grow3D.forward's Hill function
 GM_MU_A = 1.0             # hard-wired by translate._emit_react (gm_rho=1.0, mu_a=1.0)
 BRUSSELATOR_B = 3.0       # hard-wired by translate._emit_react (A=1.0, B=3.0)
 
@@ -272,7 +272,7 @@ def reaction_stiffness(impl, rate=1.0, mu_h=1.0, F=0.055, kk=0.062, gamma=0.3):
 
 
 # ---------------------------------------------------------------- the growth switch (Hill)
-# MorphogenGrowth3D.forward:  hillv = a**alpha / (a_sw**alpha + a**alpha + HILL_EPS)
+# Grow3D.forward:  hillv = a**alpha / (a_sw**alpha + a**alpha + HILL_EPS)
 #
 # ONE branch of this is statically derivable and it is the a_sw > 1 branch: `a_sw**alpha` depends
 # only on PARAMETERS, and once it overflows float32 the denominator is inf, hillv is identically
@@ -314,7 +314,14 @@ CHI_DEFAULT, D_A_DEFAULT, D_H_DEFAULT = 1.3, 0.08, 0.16
 # LABYRINTH regime and coarsens to a single bicontinuous domain at 53% coverage at any run length
 # (F011) -- which is what this campaign has unknowingly been running all along.
 MU_H_DEFAULT, F_DEFAULT, KK_DEFAULT = 1.0, 0.046, 0.062
-A_SW_MIN, A_SW_MAX, A_SW_DEFAULT = 0.2, 6.0, 1.5
+# a_sw IS A FRACTION OF THE ACTIVATOR'S OWN MAXIMUM, and this box still said (0.2, 6.0) --
+# the ABSOLUTE range from before the operator was changed, against a field whose median
+# maximum across 78 runs is 0.000. `extrude` was fixed to (0.3, 0.95); grow_3d was not, so
+# every a_sw the loop could propose for growth sat above any value the activator reaches.
+# 0.0 IS INCLUDED DELIBERATELY: it is the gate held open, which is what uniform growth is
+# now that `vesicle_growth` is gone. A range that excluded it would make the degenerate
+# control unreachable in the very space that is supposed to contain it.
+A_SW_MIN, A_SW_MAX, A_SW_DEFAULT = 0.0, 0.95, 0.35
 
 # MEASURED CEILINGS, from the 2026-08-01 certification sweep on L4 (cfl_certify + 14 cluster
 # runs at 300 frames). The divergence wall sits below the formula's 1.0 -- points at CFL 0.50 and
@@ -389,12 +396,29 @@ OPERATORS = {
         params={"l_th_frac": (0.01, 0.12, 0.04)}),
 
     # ---------------------------------------------------------------- Stage 2: growth & topology
-    "vesicle_growth": dict(                                  # uniform, body-wide inflation
-        stage=2, role="growth", outputs=[], slots=[], needs=[],
-        impls=["uniform_ramp"], impl_structural=False,
-        params={"rate": (0.002, 0.03, 0.006)}),
-    "morphogen_growth_3d": dict(                             # LOCAL growth, gated by the activator
-        stage=2, role="growth", outputs=[], slots=["gate"], needs=["morphogen"],
+    # `grow_3d` WAS HERE AND IS GONE. Cedric, 8 August: "it is a bummer to have two growth
+    # competing operators... definitely simplify this chain."
+    #
+    # It was not merely redundant, it was BROKEN IN COMPOSITION, and the loop built it twice --
+    # r001_07 and r002_03 each carry `grow_3d` and `grow_3d` scheduled four lines apart.
+    # Both write the same mesh targets, and they write them DIFFERENTLY: grow_3d multiplies
+    # (`V0f <- V0f * g^3`) while grow_3d assigns from its own snapshot (`V0f <- V0f_init * s^3`).
+    # grow_3d runs second, so every frame it overwrote the other's contribution outright. Two
+    # operators, one silently discarded, and nothing in the record said so.
+    #
+    # Nothing is lost: uniform body-wide inflation IS `grow_3d` with `rho = 1` and the gate open,
+    # which is the `uniform` column of the basis grid. The operator itself stays registered in
+    # tyssue_ops3d for the fifteen scripts outside this campaign that use it; it is simply not
+    # something the loop may add to a composition any more.
+    "grow_3d": dict(                                         # growth; the activator is an OPTIONAL gate
+        # `needs` IS EMPTY AND USED TO BE ["morphogen"]. That was true only while `vesicle_growth`
+        # existed to cover the ungated case: with one growth operator the morphogen is a GATE on
+        # the rate (`rate * (rho + Hill(a))`), and a gate is by definition optional -- open it
+        # (a_sw = 0) and the rate is the rho baseline. Declaring it as a precondition made the
+        # degenerate control the search must visit, `uniform_inflation`, refuse to compile.
+        # The genuinely dead case -- unfed gate AND rho = 0 -- is caught by name_region instead,
+        # where it can say which of the two is missing.
+        stage=2, role="growth", outputs=[], slots=["gate"], opt_slots=["gate"], needs=[],
         impls=["hill_conserve_amount", "hill_no_conserve"], impl_structural=True,
         # alpha: was (1.0, 8.0) -- a hand-written cap that put OKUDA'S OWN alpha = 10 outside the
         # searchable space. Now ALPHA_CEIL, derived from the float32 overflow of a_sw**alpha in
@@ -433,12 +457,21 @@ OPERATORS = {
         # outward: not a mechanism but the answer written into the objective, which is why a run
         # carrying it can only be a control. Exposing both lets the search set K_extrude = 0 and
         # test the purse-string alone, which is the sound half and was unreachable.
+        #
+        # AND K_extrude NOW DEFAULTS TO ZERO. Cedric, 8 August: "remove this hard coded K_extrude
+        # 4.0 value, should be a knob obviously?" Exposing both terms did not finish the job: the
+        # default is what an `add_op extrude` edit WRITES, so every way the loop could reach this
+        # operator handed it K_extrude = 4.0, `_is_forced` read the composition and sorted the run
+        # last, and the purse-string was reachable in principle and unreachable in practice.
+        # Adding the operator now adds the sound half; turning the forcing on is a separate,
+        # deliberate `set_param` that the record will show as such -- which is what a control
+        # should cost.
         # `a_sw` is now a FRACTION OF THE ACTIVATOR'S OWN MAXIMUM -- 0.6 means "the top 40% of the
         # field is red" -- so it selects a set that exists at every operating point. It used to be
         # an absolute value declared (0.2, 6.0) against a field whose median maximum is 0.000, and
         # the operator returned {} on all 800 frames of every run. See tyssue_rd_ops for the
         # measurement; a threshold relative to the field cannot be outside the field.
-        params={"K_purse": (0.0, 6.0, 1.0), "K_extrude": (0.0, 14.0, 4.0),
+        params={"K_purse": (0.0, 6.0, 1.0), "K_extrude": (0.0, 14.0, 0.0),
                 "a_sw": (0.3, 0.95, 0.6)}),
 
     # ---------------------------------------------------------------- Stage 3: patterning
@@ -561,7 +594,7 @@ def slots_of(op: str, impl: str):
 # Listed here: sigma pinned to the width of the OLD, pre-widening box, so this change is
 # basin-preserving by construction and no existing robustness claim changes meaning.
 PARAM_BASIN = {
-    ("morphogen_growth_3d", "hill"): 8.0 - 1.0,        # old box (1.0, 8.0)
+    ("grow_3d", "hill"): 8.0 - 1.0,        # old box (1.0, 8.0)
     ("cell_diffuse", "d_a"): 0.2 - 0.005,               # old box (0.005, 0.2)
     ("cell_diffuse", "d_h"): 2.0 - 0.1,                 # old box (0.1, 2.0)
     ("cell_diffuse", "chi"): 10.0 - 1.0,                # old box (1.0, 10.0)
@@ -830,7 +863,7 @@ class CompositionGraph:
             # cell_react has NO stability condition on purpose: the candidate bound was measured
             # against the real operators and refuted. See "explicit reaction" above.
 
-            elif op == "morphogen_growth_3d":
+            elif op == "grow_3d":
                 a_sw, alpha = self.theta(nid, "a_sw"), self.theta(nid, "hill")
                 ceil = hill_alpha_ceiling(a_sw)
                 if alpha > ceil:
@@ -861,12 +894,20 @@ class CompositionGraph:
         return bad
 
     def unrouted_slots(self):
-        """Operators with a slot that nothing feeds -- present but disconnected, so inert."""
+        """Operators with a REQUIRED slot that nothing feeds -- present but disconnected, so inert.
+
+        `opt_slots` ARE EXEMPT. A slot that may legally be empty is not a dangling wire, and
+        `grow_3d.gate` became one when `vesicle_growth` was deleted: the activator modulates the
+        growth rate, it does not enable it, so leaving it unwired selects the rho baseline rather
+        than breaking the composition. Without this exemption the `uniform_inflation` reference
+        recipe -- the degenerate control the search is meant to visit -- is unreachable.
+        """
         fed = {(c["dst"], c["slot"]) for c in self.conns}
         out = []
         for o in self.ops:
+            optional = set(OPERATORS[o["op"]].get("opt_slots", ()))
             for slot in slots_of(o["op"], self.impl_of(o)):
-                if (o["id"], slot) not in fed:
+                if slot not in optional and (o["id"], slot) not in fed:
                     out.append((o["id"], o["op"], slot))
         return out
 
@@ -1068,7 +1109,7 @@ class CompositionGraph:
         elif kind == "set_param":
             # A PARAMETER MOVE, AND IT IS NOT A MECHANISM. Track A asks two questions about a
             # mechanism -- does it matter, and what does it do as you turn it up -- and only the
-            # first has ever been askable. `("set_param", "morphogen_growth_3d0.rate", 0.02)` is
+            # first has ever been askable. `("set_param", "grow_3d0.rate", 0.02)` is
             # the second, expressed as an ordinary edit so it can be chosen from the same menu and
             # MIXED with structural moves in one batch, instead of needing a whole round of its own.
             #
@@ -1135,7 +1176,7 @@ class CompositionGraph:
         ops = set(self.op_names())
         impls = {o["op"]: self.impl_of(o) for o in self.ops}
         _force_src = set()
-        local = "morphogen_growth_3d" in ops
+        local = "grow_3d" in ops
         mono = impls.get("shape_energy_3d") == "monolayer"
 
         def _feeds(dst_op, slot):
@@ -1144,7 +1185,7 @@ class CompositionGraph:
             return {self._op_of(c["src"]) for c in self.conns
                     if c["dst"] in dst and c["slot"] == slot}
 
-        _gate = _feeds("morphogen_growth_3d", "gate") if local else set()
+        _gate = _feeds("grow_3d", "gate") if local else set()
         emergent = "cell_react" in _gate
         driven = "seed_cell_rd" in _gate
         # `forced` READS ITS WIRE TOO. It was `"extrude" in ops`, so a composition carrying the
@@ -1152,12 +1193,22 @@ class CompositionGraph:
         # slot fed by nothing was filed under the sphere control's region.
         _force_src = _feeds("extrude", "site") if "extrude" in ops else set()
         forced = bool(_force_src)
-        # A growth operator whose gate is fed by nothing is not "growth-driven" anything: it is a
-        # composition that will not run, and saying so is more useful than naming it a mechanism.
+        # AN UNFED GATE IS A REGIME, NOT A FAULT -- since `vesicle_growth` was deleted and its one
+        # job folded into `grow_3d`. This branch used to refuse outright, which was right when a
+        # separate operator existed for ungated growth and wrong the moment it did not: the
+        # `uniform_inflation` reference recipe, the degenerate control the search is supposed to
+        # visit, stopped being nameable at all.
+        #
+        # The rate is `rate * (rho + Hill(a))`, so an unfed gate leaves the rho baseline, and the
+        # only genuinely dead case is rho = 0 as well -- growth that cannot grow. That is the one
+        # still refused, and now for a reason a reader can check against the operator.
         if local and not _gate:
-            return "growth present but UNGATED (nothing feeds it)"
+            _rho = float((self.params or {}).get("grow_3d0.rho", 0.0) or 0.0)
+            if _rho <= 0.0:
+                return "growth present but INERT (gate fed by nothing and rho = 0)"
+            return "uniform growth (ungated, rho baseline only)"
 
-        if not (local or "vesicle_growth" in ops):
+        if not (local or "grow_3d" in ops):
             # A FORCING TERM IS NOT NOTHING. `extrude` is the operator that made the only tube on
             # this disk; a composition carrying it, wired, was filed under the sphere control's
             # own region because this branch tested growth alone.
@@ -1183,7 +1234,7 @@ class CompositionGraph:
             return "growth-driven emergent (target mechanism)"
         if local and not forced:
             return "growth-driven mid-surface"
-        if "vesicle_growth" in ops and not local:
+        if "grow_3d" in ops and not local:
             return "uniform inflation (no patterning)"
         return "unnamed"
 
@@ -1213,12 +1264,12 @@ def reference_recipes():
 
     g = seed("substrate")
     for op, impl in [("cell_geometry_3d", "scatter_add"), ("cell_adjacency", "shared_edge"),
-                     ("seed_cell_rd", "cone"), ("morphogen_growth_3d", "hill_conserve_amount"),
+                     ("seed_cell_rd", "cone"), ("grow_3d", "hill_conserve_amount"),
                      ("divide_3d", "orient_iface"), ("extrude", "radial_push")]:
         g, _ = g.apply(("add_op", op, impl))
     src = next(o["id"] for o in g.ops if o["op"] == "seed_cell_rd")
     g, _ = g.apply(("connect", src, next(o["id"] for o in g.ops
-                                         if o["op"] == "morphogen_growth_3d"), "gate"))
+                                         if o["op"] == "grow_3d"), "gate"))
     g, _ = g.apply(("connect", src, next(o["id"] for o in g.ops if o["op"] == "extrude"), "site"))
     g, _ = g.apply(("connect", src, next(o["id"] for o in g.ops if o["op"] == "divide_3d"), "axis"))
     out["round40_mc8"] = g
@@ -1227,11 +1278,11 @@ def reference_recipes():
     h, _ = h.apply(("set_impl", "shape_energy_3d0", "monolayer"))
     for op, impl in [("cell_geometry_3d", "scatter_add"), ("cell_adjacency", "shared_edge"),
                      ("cell_react", "gierer_meinhardt"), ("cell_diffuse", "graph_laplacian"),
-                     ("morphogen_growth_3d", "hill_conserve_amount"), ("divide_3d", "hertwig")]:
+                     ("grow_3d", "hill_conserve_amount"), ("divide_3d", "hertwig")]:
         h, _ = h.apply(("add_op", op, impl))
     rsrc = next(o["id"] for o in h.ops if o["op"] == "cell_react")
     h, _ = h.apply(("connect", rsrc, next(o["id"] for o in h.ops
-                                          if o["op"] == "morphogen_growth_3d"), "gate"))
+                                          if o["op"] == "grow_3d"), "gate"))
     # NO morphogen -> divide_3d.axis here: `hertwig` splits on the cell's OWN longest axis and
     # exposes no `axis` slot. The earlier version made that connection anyway; it compiled and
     # was SILENTLY IGNORED. Caught by the consolidated Critic rule R4_SLOT_NOT_ON_IMPL.
@@ -1282,15 +1333,22 @@ def reference_recipes():
     # bound on the search -- `sat` is now in the tunable table, so the loop can sweep it and ask
     # what the saturation DOES rather than inheriting one value forever.
     h = h.with_params({**h.params, "cell_react0.rate": 0.4, "cell_react0.sat": 0.1,
-                       "morphogen_growth_3d0.rate": 0.000866,
+                       "grow_3d0.rate": 0.000866,
                        "seed_mesh_3d0.n_cells": 2000})
     out["okuda_route"] = h
 
     # the degenerate control the search must visit on its way: uniform inflation, no patterning.
     # It is the "grows but cannot subdivide" corner -- where impossibility results come from.
+    #
+    # This used to read `("vesicle_growth", "uniform_ramp")`, and that operator is gone. Uniform
+    # inflation is not a second operator, it is `grow_3d` WITH THE GATE OPEN: rho = 1 gives every
+    # cell the same baseline rate and a_sw = 0 means the Hill term is never consulted. Writing the
+    # control this way also makes it a real member of the same family as the gated recipes, so the
+    # comparison between them is one parameter rather than two different mechanisms.
     u = seed("substrate")
-    for op, impl in [("vesicle_growth", "uniform_ramp"), ("divide_3d", "hertwig")]:
+    for op, impl in [("grow_3d", "hill_no_conserve"), ("divide_3d", "hertwig")]:
         u, _ = u.apply(("add_op", op, impl))
+    u = u.with_params({**u.params, "grow_3d0.rho": 1.0, "grow_3d0.a_sw": 0.0})
     out["uniform_inflation"] = u
     return out
 
@@ -1370,7 +1428,7 @@ if __name__ == "__main__":
     print("\n" + "-" * 88)
     print("REACHABILITY -- Okuda's published values are inside the boxes")
     print("-" * 88)
-    for op, pn, val, what in [("morphogen_growth_3d", "hill", 10.0, "growth-switch sharpness"),
+    for op, pn, val, what in [("grow_3d", "hill", 10.0, "growth-switch sharpness"),
                               ("cell_diffuse", "d_h", 10.0, "inhibitor spread"),
                               ("cell_react", "rate", 0.01, "chemistry speed, bottom decade"),
                               ("cell_react", "rate", 100.0, "chemistry speed, top decade")]:

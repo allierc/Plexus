@@ -33,14 +33,14 @@ Three operators declare slots, and they are the entire morphogen -> mechanics ar
 
 | operator | slot | what it is |
 |---|---|---|
-| `morphogen_growth_3d` | `gate` | **Okuda's actual mechanism** |
+| `grow_3d` | `gate` | **Okuda's actual mechanism** |
 | `extrude` | `site` | the forcing term |
 | `divide_3d:orient_iface` | `axis` | oriented division |
 
 Breadth-first closure of the reachable one-edit space, using the menu's own filter:
 
     REACHABLE RUNNABLE compositions from seed:  9760
-       morphogen_growth_3d                         0
+       grow_3d                         0
        extrude                                     0
        reachable compositions with ANY connection: 0
 

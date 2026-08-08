@@ -56,7 +56,7 @@ operators:
   F: 0.055
   kk: 0.062
   rate: 1.0
-- op: morphogen_growth_3d
+- op: grow_3d
   at: vertex
   cell_set: cell
   rate: 0.03
@@ -108,7 +108,7 @@ schedule:
 - seed_cell_rd
 - cell_diffuse
 - cell_react
-- morphogen_growth_3d
+- grow_3d
 - shape_energy_3d
 - reconnect_t1_3d
 - divide_3d

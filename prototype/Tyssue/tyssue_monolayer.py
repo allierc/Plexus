@@ -206,7 +206,7 @@ class MonolayerShapeEnergy3D(Lateral):
         R0t = torch.as_tensor(float(m["R0"]), dtype=dt, device=dev)
         h_cell = torch.full((nF,), self.h0, dtype=dt, device=dev)   # v1: uniform fixed thickness
         # target monolayer volume: calibrate ONCE so V_eq matches the rest prism volume, then track the
-        # growth op's scaling of the wedge target V0f (morphogen_growth_3d scales V0f per cell) -> reuse it.
+        # growth op's scaling of the wedge target V0f (grow_3d scales V0f per cell) -> reuse it.
         v_rest, _, _, _ = monolayer_geometry_3d(x0, es, et, ef, nF, h_cell, eocc)
         if "mono_k" not in m:
             wedge = face_geometry_3d(x0, es, et, ef, nF, eocc)[3]

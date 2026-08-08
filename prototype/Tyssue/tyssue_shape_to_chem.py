@@ -3,7 +3,7 @@
 
 WHAT IS MISSING WITHOUT IT
 ================================================================================================
-Our model runs one way. The chemistry patterns the shell (cell_react -> morphogen_growth_3d) and
+Our model runs one way. The chemistry patterns the shell (cell_react -> grow_3d) and
 the shell then deforms, but the shape it takes never reaches back to the chemistry. Half of
 Okuda's loop is absent, and so is the mechanism behind every reported branching morphology: a bud
 forms, and nothing about having formed a bud changes where the next signal goes.

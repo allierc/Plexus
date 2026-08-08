@@ -114,6 +114,14 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                # its attractive term dropped, range ~3 l* -- the form CGI uses to scatter points evenly
                # over a surface, and the one that took the frozen sheet from d/hex 0.677 to 0.895.
                membrane_repel_law="linear", membrane_repel_sigma=0.7, membrane_repel_k=0.0,
+               # False = NO CROSSLINK NETWORK. The sheet is then a pure MPM continuum: elasticity from
+               # the deformation gradient, contact with epithelium and stroma through the shared grid,
+               # separation where material thins past the grid's support. Nothing new is added -- this is
+               # the mechanics that was already underneath the springs and invisible while they ran.
+               membrane_springs=True,
+               # THE TISSUE AS A MOVING BOUNDARY ON THE GRID, rather than a positional projection.
+               # 88 showed the projection carries no strain -- see membrane_ops.MPMTissueBoundary.
+               membrane_grid_bc=False,
                membrane_repel_aggr="",
                membrane_tau_adh=0.0, membrane_aniso=1.0, membrane_record_hoop=False, membrane_surface_level=False,
                membrane_impl="mpm", membrane_drag=40.0, membrane_inertial=False,
@@ -165,7 +173,9 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
             "cell_to_ecm",                   # the ball's push, as an external acceleration
             "ecm_stress",                    # recolour by |J-1| BEFORE the frame is recorded
             {"substep_dt": float(substep_dt),
-             "steps": ["mpm_strain", "mpm_scatter", "mpm_grid_update", "mpm_gather"]},
+             "steps": (["mpm_strain", "mpm_scatter", "mpm_grid_update", "mpm_tissue_boundary",
+                        "mpm_gather"] if (membrane and membrane_grid_bc) else
+                       ["mpm_strain", "mpm_scatter", "mpm_grid_update", "mpm_gather"])},
         ],
         "plotting": {
             "background": "black", "up_axis": 1, "box_frame": True, "fps": int(fps),
@@ -242,78 +252,101 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
         ]
         i = spec["schedule"].index("seed_ecm") + 1
         spec["schedule"].insert(i, "seed_basement_membrane")
-        # the bond force is a DYNAMICS operator (EMIT mpm_acceleration): it must run before the substep
-        # block so the engine has its delta to integrate, and the break check after it.
-        i = spec["schedule"].index("ecm_stress")
-        spec["schedule"].insert(i, "integrin_adhesion")
-        spec["schedule"].insert(i + 1, "basement_membrane_bond")
-        if membrane_tau and membrane_tau > 0:
-            spec["schedule"].insert(i + 2, "basement_membrane_remodel")
-            spec["schedule"].insert(i + 3, "basement_membrane_crosslink")
-            spec["schedule"].insert(i + 4, "basement_membrane_bond_break")
-        else:
-            spec["operators"] = [o for o in spec["operators"]
-                                 if o["op"] != "basement_membrane_remodel"]
-            spec["schedule"].insert(i + 2, "basement_membrane_bond_break")
-        if membrane_repel_w > 0.0 or membrane_repel_k > 0.0:
-            # after the remodel, which is what freezes l*, and after the bond operator, whose neighbour
-            # search it borrows. w = 0 leaves the operator out entirely, so every run to date is
-            # unchanged bit-for-bit.
-            after = ("basement_membrane_remodel" if "basement_membrane_remodel" in spec["schedule"]
-                     else "basement_membrane_bond")
-            spec["schedule"].insert(spec["schedule"].index(after) + 1, "basement_membrane_repel")
-        else:
-            spec["operators"] = [o for o in spec["operators"] if o["op"] != "basement_membrane_repel"]
-        if membrane_impl == "graph":
-            # THE MEMBRANE AS A SPRING GRAPH, not a continuum body. Nothing about the sheet's mechanics
-            # was ever coming from MPM: the crosslinks hold it together, the integrin springs hold it in
-            # place, bonds breaking fragment it, and every figure colours it by crosslink strain. MPM was
-            # buying exactly one thing -- momentum exchange with the matrix through the shared grid --
-            # and at n_grid=48 that grid cannot resolve a 0.002-thick sheet anyway.
-            #
-            # `emit: acceleration` hands the bond and integrin forces to the ENGINE (v += dt*a; x += dt*v)
-            # instead of routing them into the MPM substep as an external body force. `drag` replaces the
-            # damping the grid was providing implicitly -- an undamped spring network rings forever, and
-            # the grid transfer was quietly acting as a low-pass filter on it.
-            #
-            # The MPM buffers (F, C, mass, p_vol) are still provisioned and now unused. That is deliberate
-            # rather than tidy: `mass` is what parks the unsecreted reserve, and dropping the entity would
-            # rename the set and touch every reference to it in the spec, the renderer and the analysis.
-            keep = {"mpm_strain", "mpm_scatter", "mpm_gather"}
-            spec["operators"] = [o for o in spec["operators"]
-                                 if not (o["op"] in keep and o["at"] == "basement_membrane_particle")]
-            # OVERDAMPED, NOT INERTIAL. `emit: acceleration` integrates v += dt*a; x += dt*v with unit
-            # mass -- a term with no physical basis at Re ~ 1e-10, where the equation of motion is
-            # gamma*x_dot = F. Everything section 5 and 7 report about the sheet -- the undamped spring
-            # oscillating about a moving anchor, critical damping c = 2*sqrt(k), the tracking lag, the
-            # sinking, the stability reversal above k_adh = 1e5 -- is the phenomenology of that inertia.
-            # In the overdamped limit none of it exists. `emit: velocity` gives x += dt*(F/gamma), which
-            # is the correct low-Reynolds motion and removes both the oscillation and the ceiling that
-            # came with it. `membrane_inertial=True` restores the old path for comparison only.
-            emit = "acceleration" if membrane_inertial else "velocity"
-            for o in spec["operators"]:
-                if o["op"] in ("basement_membrane_bond", "integrin_adhesion",
-                               "basement_membrane_repel"):
-                    o["emit"] = emit
-                    o["overdamped_gamma"] = 0.0 if membrane_inertial else float(membrane_gamma)
-                    # EXPLICIT, not inferred from `emit`. The spec's `emit` key is consumed by the
-                    # engine's emit resolution and does not survive into the round-tripped yaml, so an
-                    # operator that keys its stability check off it silently skips the check -- which is
-                    # what happened: k = 2e5 ran to completion in graph mode and returned an infinite
-                    # strain with no warning.
-                    o["graph_mode"] = True
-                    if o["op"] == "basement_membrane_bond":
-                        o["k_adhesion_hint"] = float(membrane_adhesion)
-            if membrane_inertial:
-                # `drag` only makes sense against inertia. Overdamped, the dissipation IS gamma.
-                spec["operators"].append({"op": "drag", "at": "basement_membrane_particle",
-                                          "k": float(membrane_drag)})
-                i = spec["schedule"].index("basement_membrane_bond")
-                spec["schedule"].insert(i + 1, "drag")
+        if not membrane_springs:
+            # THE MEMBRANE AS A CONTINUUM, with no crosslink network at all. Everything the sheet does
+            # then comes from MPM: the deformation gradient carries the elastic response, the shared grid
+            # carries contact with both the epithelium and the stroma, and material that thins past the
+            # grid's support separates on its own. Nothing here is a new mechanism -- it is the mechanics
+            # that was already present underneath the springs and could not be seen while they ran.
+            drop = {"basement_membrane_bond", "basement_membrane_remodel",
+                    "basement_membrane_crosslink", "basement_membrane_bond_break",
+                    "basement_membrane_repel"}
+            if membrane_adhesion <= 0.0:
+                drop.add("integrin_adhesion")
+            spec["operators"] = [o for o in spec["operators"] if o["op"] not in drop]
+            spec["operators"].append({"op": "basement_membrane_continuum_strain",
+                                      "at": "basement_membrane_particle"})
+            if membrane_grid_bc:
+                spec["operators"].append(
+                    {"op": "mpm_tissue_boundary", "at": "mpm_grid", "centre": [0.5, 0.5, 0.5],
+                     "surface": str(membrane), "scale": 1.0, "dt_frame": float(dt)})
+            j = spec["schedule"].index("ecm_stress")
+            if "integrin_adhesion" not in drop:
+                spec["schedule"].insert(j, "integrin_adhesion"); j += 1
+            spec["schedule"].insert(j, "basement_membrane_continuum_strain")
+        if membrane_springs:
+            # the bond force is a DYNAMICS operator (EMIT mpm_acceleration): it must run before the substep
+            # block so the engine has its delta to integrate, and the break check after it.
+            i = spec["schedule"].index("ecm_stress")
+            spec["schedule"].insert(i, "integrin_adhesion")
+            spec["schedule"].insert(i + 1, "basement_membrane_bond")
+            if membrane_tau and membrane_tau > 0:
+                spec["schedule"].insert(i + 2, "basement_membrane_remodel")
+                spec["schedule"].insert(i + 3, "basement_membrane_crosslink")
+                spec["schedule"].insert(i + 4, "basement_membrane_bond_break")
             else:
-                spec["operators"] = [o for o in spec["operators"] if o["op"] != "drag"]
-            # (no schedule surgery: the substep block dispatches mpm steps BY OP NAME, so dropping the
-            # three operator entries above is what removes them from the cycle.)
+                spec["operators"] = [o for o in spec["operators"]
+                                     if o["op"] != "basement_membrane_remodel"]
+                spec["schedule"].insert(i + 2, "basement_membrane_bond_break")
+            if membrane_repel_w > 0.0 or membrane_repel_k > 0.0:
+                # after the remodel, which is what freezes l*, and after the bond operator, whose neighbour
+                # search it borrows. w = 0 leaves the operator out entirely, so every run to date is
+                # unchanged bit-for-bit.
+                after = ("basement_membrane_remodel" if "basement_membrane_remodel" in spec["schedule"]
+                         else "basement_membrane_bond")
+                spec["schedule"].insert(spec["schedule"].index(after) + 1, "basement_membrane_repel")
+            else:
+                spec["operators"] = [o for o in spec["operators"] if o["op"] != "basement_membrane_repel"]
+            if membrane_impl == "graph":
+                # THE MEMBRANE AS A SPRING GRAPH, not a continuum body. Nothing about the sheet's mechanics
+                # was ever coming from MPM: the crosslinks hold it together, the integrin springs hold it in
+                # place, bonds breaking fragment it, and every figure colours it by crosslink strain. MPM was
+                # buying exactly one thing -- momentum exchange with the matrix through the shared grid --
+                # and at n_grid=48 that grid cannot resolve a 0.002-thick sheet anyway.
+                #
+                # `emit: acceleration` hands the bond and integrin forces to the ENGINE (v += dt*a; x += dt*v)
+                # instead of routing them into the MPM substep as an external body force. `drag` replaces the
+                # damping the grid was providing implicitly -- an undamped spring network rings forever, and
+                # the grid transfer was quietly acting as a low-pass filter on it.
+                #
+                # The MPM buffers (F, C, mass, p_vol) are still provisioned and now unused. That is deliberate
+                # rather than tidy: `mass` is what parks the unsecreted reserve, and dropping the entity would
+                # rename the set and touch every reference to it in the spec, the renderer and the analysis.
+                keep = {"mpm_strain", "mpm_scatter", "mpm_gather"}
+                spec["operators"] = [o for o in spec["operators"]
+                                     if not (o["op"] in keep and o["at"] == "basement_membrane_particle")]
+                # OVERDAMPED, NOT INERTIAL. `emit: acceleration` integrates v += dt*a; x += dt*v with unit
+                # mass -- a term with no physical basis at Re ~ 1e-10, where the equation of motion is
+                # gamma*x_dot = F. Everything section 5 and 7 report about the sheet -- the undamped spring
+                # oscillating about a moving anchor, critical damping c = 2*sqrt(k), the tracking lag, the
+                # sinking, the stability reversal above k_adh = 1e5 -- is the phenomenology of that inertia.
+                # In the overdamped limit none of it exists. `emit: velocity` gives x += dt*(F/gamma), which
+                # is the correct low-Reynolds motion and removes both the oscillation and the ceiling that
+                # came with it. `membrane_inertial=True` restores the old path for comparison only.
+                emit = "acceleration" if membrane_inertial else "velocity"
+                for o in spec["operators"]:
+                    if o["op"] in ("basement_membrane_bond", "integrin_adhesion",
+                                   "basement_membrane_repel"):
+                        o["emit"] = emit
+                        o["overdamped_gamma"] = 0.0 if membrane_inertial else float(membrane_gamma)
+                        # EXPLICIT, not inferred from `emit`. The spec's `emit` key is consumed by the
+                        # engine's emit resolution and does not survive into the round-tripped yaml, so an
+                        # operator that keys its stability check off it silently skips the check -- which is
+                        # what happened: k = 2e5 ran to completion in graph mode and returned an infinite
+                        # strain with no warning.
+                        o["graph_mode"] = True
+                        if o["op"] == "basement_membrane_bond":
+                            o["k_adhesion_hint"] = float(membrane_adhesion)
+                if membrane_inertial:
+                    # `drag` only makes sense against inertia. Overdamped, the dissipation IS gamma.
+                    spec["operators"].append({"op": "drag", "at": "basement_membrane_particle",
+                                              "k": float(membrane_drag)})
+                    i = spec["schedule"].index("basement_membrane_bond")
+                    spec["schedule"].insert(i + 1, "drag")
+                else:
+                    spec["operators"] = [o for o in spec["operators"] if o["op"] != "drag"]
+                # (no schedule surgery: the substep block dispatches mpm steps BY OP NAME, so dropping the
+                # three operator entries above is what removes them from the cycle.)
         if membrane_surface_level:
             # `per_parent`, not `n`: a set with a parent is provisioned per parent, and `n` is
             # simply not read -- the build dies on a KeyError several frames of setup later.

@@ -31,7 +31,7 @@ def build(antiinv=0.0, local_relax=0, K_bend=0.0):
     Nv = verts.shape[0]; buf = int(Nv * 30.0)
     ops = [{"op": "seed_mesh_3d", "at": "vertex", "n_cells": N_CELLS, "radius": RADIUS,
             "jitter": JITTER, "p0": 3.72, "seed": SEED, "before_frame": 1},
-           {"op": "vesicle_growth", "at": "vertex", "rate": 0.003, "every": 1},
+           {"op": "grow_3d", "at": "vertex", "rate": 0.003, "every": 1, "rho": 1.0, "a_sw": 0.0, "vth_frac": 1e9, "conserve_amount": False},
            {"op": "shape_energy_3d", "at": "vertex", "p0": 3.72, "K_A": 1.0, "K_P": 1.0, "Lambda": 0.5,
             "Gamma": 0.1, "K_V": 1.0, "K_R": 0.4, "mu": 1.0, "dt": 1.0, "relax_iters": 26,
             "eta": 0.08, "cap_frac": 0.12, "antiinv": antiinv, "K_bend": K_bend},
@@ -39,7 +39,7 @@ def build(antiinv=0.0, local_relax=0, K_bend=0.0):
            {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "p0": 3.72,
             "every": 2, "max_div": 10, "local_relax": local_relax},
            {"op": "topo_snapshot_3d", "at": "vertex", "every": max(1, (FRAMES + 300) // 300)}]
-    sched = ["seed_mesh_3d", "vesicle_growth", "shape_energy_3d", "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
+    sched = ["seed_mesh_3d", "grow_3d", "shape_energy_3d", "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
     cfg = {"general": {"name": "fix_ab", "seed": SEED, "n_frames": FRAMES, "dt": 1.0, "record_cap": 300,
                        "boundary": "free", "dim": 3, "world": [6 * RADIUS] * 3},
            "sets": {"vertex": {"n": buf}}, "fields": {}, "operators": ops, "schedule": sched}

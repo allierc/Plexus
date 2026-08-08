@@ -45,7 +45,7 @@ operators:
   amp: 2.0
   tip_radius: 2.0
   seed: 0
-- op: morphogen_growth_3d
+- op: grow_3d
   at: vertex
   cell_set: cell
   rate: 0.01
@@ -80,7 +80,7 @@ schedule:
 - seed_mesh_3d
 - cell_geometry_3d
 - seed_cell_rd
-- morphogen_growth_3d
+- grow_3d
 - shape_energy_3d
 - reconnect_t1_3d
 - topo_snapshot_3d
@@ -93,8 +93,8 @@ _discovery:
     - id: seed_cell_rd0
       op: seed_cell_rd
       impl: tip
-    - id: morphogen_growth_3d0
-      op: morphogen_growth_3d
+    - id: grow_3d0
+      op: grow_3d
       impl: hill_conserve_amount
     - id: reconnect_t1_3d0
       op: reconnect_t1_3d
@@ -105,7 +105,7 @@ _discovery:
       impl: monolayer
     connections:
     - src_op: seed_cell_rd
-      dst_op: morphogen_growth_3d
+      dst_op: grow_3d
       slot: gate
   region: growth-driven monolayer (Okuda route)
   defect_fixes:

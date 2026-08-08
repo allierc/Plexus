@@ -468,7 +468,7 @@ def draw_membrane_3d(ax, mem_q, mem_s, cam, L, mem_hi=None, cutaway=True, s_dot=
                    cmap=_cmap(MEMBRANE_COLORS), vmin=0, vmax=1, marker=".", linewidths=0)
 
 
-def draw_zoom(ax, mt, pos, mem_q=None, mem_s=None, cam=None, frac=0.55, myo_hi=None,
+def draw_zoom(ax, mt, pos, mem_q=None, mem_s=None, cam=None, frac=0.55, myo_hi=None, r_ref=None,
               mem_hi=None, name="", lw=None, junctions=True, bonds=None, bond_s=None,
               bond_hi=None):
     """A ZOOM on one patch of the surface: junctions coloured by MYOSIN, membrane by BOND STRAIN.
@@ -491,7 +491,14 @@ def draw_zoom(ax, mt, pos, mem_q=None, mem_s=None, cam=None, frac=0.55, myo_hi=N
     ax.clear(); ax.set_facecolor("black")
 
     R = float(np.percentile(np.linalg.norm(pos, axis=1), 98))
-    half = frac * R
+    # A WINDOW THAT SCALES WITH R CANNOT SHOW GROWTH. Sizing the patch as frac*R(t) keeps roughly the
+    # same number of cells in frame all run, which is what the original comment above wanted -- and it
+    # makes a tissue whose radius triples look completely static, which is what the inset is watching.
+    # `r_ref` sizes the window ONCE, from the final radius, so the surface genuinely grows across it.
+    # The centre still follows the current surface, so the patch stays on the sheet instead of drifting
+    # off it, and the window never cuts inside the spheroid.
+    Rw = float(r_ref) if r_ref else R
+    half = frac * Rw
     # the patch centre: on the surface, on the +x side, projected into the screen plane
     ctr = np.array([R, 0.0, 0.0])
 

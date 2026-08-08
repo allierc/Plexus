@@ -222,7 +222,7 @@ def run_spec(spec_dict, frames, device="cpu", tag=""):
 # tested too?"
 #
 # Both halves of that are right, and the second is the stronger reason. A cold probe spends 100
-# frames before `morphogen_growth_3d` even switches on, and it starts from a SPHERE -- where the
+# frames before `grow_3d` even switches on, and it starts from a SPHERE -- where the
 # curvature feature is uniform by construction, so `_standardise` returns exactly zero and any
 # shape-sensing operator is untestable on the geometry it is handed. Starting mid-run gives the
 # probe a specimen that already has curvature, division history and a live pattern.

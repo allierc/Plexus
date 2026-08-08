@@ -55,16 +55,16 @@ OUT = os.path.join(HERE, "campaign", "sweep.jsonl")
 # nobody had looked.
 STAGES = {
     "division": [
-        ("morphogen_growth_3d", "rho", [0.0, 0.1, 0.3, 1.0, 2.0]),
-        ("morphogen_growth_3d", "vth_frac", [1.4, 2.0, 2.5, 3.5]),
+        ("grow_3d", "rho", [0.0, 0.1, 0.3, 1.0, 2.0]),
+        ("grow_3d", "vth_frac", [1.4, 2.0, 2.5, 3.5]),
         ("divide_3d", "factor", [1.5, 2.0, 3.0]),
     ],
     "activation": [
-        ("morphogen_growth_3d", "a_sw", [0.05, 0.15, 0.35, 0.8]),
-        ("morphogen_growth_3d", "hill", [2.0, 4.0, 8.0, 16.0]),
+        ("grow_3d", "a_sw", [0.05, 0.15, 0.35, 0.8]),
+        ("grow_3d", "hill", [2.0, 4.0, 8.0, 16.0]),
     ],
     "chem_to_growth": [
-        ("morphogen_growth_3d", "rate", [0.000433, 0.001732, 0.006928]),
+        ("grow_3d", "rate", [0.000433, 0.001732, 0.006928]),
     ],
     "growth_to_chem": [
         ("shape_to_chem", "beta", [-4.0, -2.0, 0.0, 2.0, 4.0]),

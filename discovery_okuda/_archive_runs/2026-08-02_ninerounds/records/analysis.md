@@ -143,7 +143,7 @@ Reservoir: 2001 of 104004 cells (2%) — not limiting.
 Specimen: valid — all hold
 Reader: phenotype=bud, specimen=MISSING
 Eye-check: supports
-Mutation: ('remove_op', 'morphogen_growth_3d0')
+Mutation: ('remove_op', 'grow_3d0')
 Verdict: supported — measured protr_peak=1.05, protr_final=1.04, ta_n_tubes_final=1, mech_p_ratio=2.11 against "protr_peak < 1.2"
 Next: parent=C414a11f60c8
 
@@ -388,7 +388,7 @@ Reservoir: 2000 of 104004 cells (2%) — not limiting.
 Specimen: valid — all hold
 Reader: phenotype=bud, specimen=MISSING
 Eye-check: supports
-Mutation: ('remove_op', 'morphogen_growth_3d0')
+Mutation: ('remove_op', 'grow_3d0')
 Verdict: falsified — measured protr_peak=1.05, protr_final=1.05, ta_n_tubes_final=1, mech_p_ratio=1.38 against "protr_peak >= 1.15"
 Next: parent=Cf2ac86789d3
 
@@ -573,7 +573,7 @@ Reservoir: 2001 of 104004 cells (2%) — not limiting.
 Specimen: valid — all hold
 Reader: phenotype=bud, specimen=MISSING
 Eye-check: supports
-Mutation: ('remove_op', 'morphogen_growth_3d0')
+Mutation: ('remove_op', 'grow_3d0')
 Verdict: supported — measured protr_peak=1.05, protr_final=1.04, ta_n_tubes_final=1, mech_p_ratio=2.11 against "protr_peak <= 1.05"
 Next: parent=C4fac9400204
 
@@ -658,7 +658,7 @@ Reservoir: 2000 of 104004 cells (2%) — not limiting.
 Specimen: valid — all hold
 Reader: phenotype=sphere, specimen=MISSING
 Eye-check: supports
-Mutation: ('remove_op', 'morphogen_growth_3d0')
+Mutation: ('remove_op', 'grow_3d0')
 Verdict: supported — measured protr_peak=1, protr_final=1, ta_n_tubes_final=0, mech_p_ratio=0 against "protr_peak <= 1.10"
 Next: parent=Cb00f851b493
 
@@ -888,7 +888,7 @@ Reservoir: 2000 of 104004 cells (2%) — not limiting.
 Specimen: valid — all hold
 Reader: phenotype=undulation, specimen=MISSING
 Eye-check: DISAGREES — The movie shows large protrusions and a highly irregular multi-lobed shape, the opposite of collapsing to a passive sphere with protr_peak <= 1.05.
-Mutation: ('remove_op', 'morphogen_growth_3d0')
+Mutation: ('remove_op', 'grow_3d0')
 Verdict: falsified — measured protr_peak=1.15, protr_final=1.15, ta_n_tubes_final=0, mech_p_ratio=0 against "protr_peak <= 1.05"
 Next: parent=Ca5afdb2e107
 
@@ -903,7 +903,7 @@ Reservoir: 2000 of 104004 cells (2%) — not limiting.
 Specimen: valid — all hold
 Reader: phenotype=sphere, specimen=MISSING
 Eye-check: supports
-Mutation: ('remove_op', 'morphogen_growth_3d0')
+Mutation: ('remove_op', 'grow_3d0')
 Verdict: supported — measured protr_peak=1, protr_final=1, ta_n_tubes_final=0, mech_p_ratio=0 against "protr_peak <= 1.05"
 Next: parent=C4ba933f9fad
 

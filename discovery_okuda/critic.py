@@ -374,10 +374,10 @@ def check_static(graph, seen_hashes=(), edit_kind=None):
             # THE RATE IS THE GROWTH RATE, so that is what this projects. The division
             # throttles are gone: every cell that reaches DIV_FACTOR x its birth volume divides.
             # So the population doubles roughly every ln(2)/rate frames, where `rate` is how fast
-            # morphogen_growth_3d inflates a cell -- and the reservoir question becomes "how many
+            # grow_3d inflates a cell -- and the reservoir question becomes "how many
             # doublings does this run get".
-            _gro = next((o for o in graph.ops if o["op"] in ("morphogen_growth_3d",
-                                                             "vesicle_growth")), None)
+            _gro = next((o for o in graph.ops if o["op"] in ("grow_3d",
+                                                             "grow_3d")), None)
             grate = float(_p.get(f"{_gro['id']}.rate", 0) or 0) if _gro else 0.0
             if grate > 0 and calls > 0 and cap > 0:
                 import math as _m
@@ -554,15 +554,15 @@ def check_static(graph, seen_hashes=(), edit_kind=None):
     h = comp_hash(graph)
     _seen = set(seen_hashes)
     # THE KEY IS ALWAYS `_run_key`, AND THIS USED TO DEPEND ON THE EDIT KIND. A structural edit was
-    # keyed on `comp_hash`, which is parameter-blind -- so `add_op vesicle_growth` proposed on THREE
+    # keyed on `comp_hash`, which is parameter-blind -- so `add_op grow_3d` proposed on THREE
     # different parents produced one hash and two of the three slots were refused. Measured on the
     # relaunched round 1:
     #
-    #   _keep/r001_02   + vesicle_growth   Caa2255d08b2@6420561ce7   built
-    #   coral_gate      + vesicle_growth   Caa2255d08b2@a3dd27bbc7   REFUSED, and it is a different run
-    #   repair_l_th_frac+ vesicle_growth   Caa2255d08b2@a3dd27bbc7   refused, correctly -- same as above
+    #   _keep/r001_02   + grow_3d   Caa2255d08b2@6420561ce7   built
+    #   coral_gate      + grow_3d   Caa2255d08b2@a3dd27bbc7   REFUSED, and it is a different run
+    #   repair_l_th_frac+ grow_3d   Caa2255d08b2@a3dd27bbc7   refused, correctly -- same as above
     #
-    # The Proposer's stated intent was "coverage: vesicle_growth" across the three best chemistry
+    # The Proposer's stated intent was "coverage: grow_3d" across the three best chemistry
     # parents -- testing whether an operator's effect is general or parent-specific, which is the
     # experiment the lever map is FOR. Refusing it treated "same mechanism" as "same experiment".
     #
@@ -591,8 +591,8 @@ def range_notes(graph):
 
         reconnect_t1_3d.l_th_frac   6/6 runs   0.35 vs [0.01, 0.12]     3x the ceiling
         shape_energy_3d.Lambda      3/6        3 vs [0, 0.3]           10x
-        morphogen_growth_3d.rate    3/6        0.000866 vs floor 0.002
-        morphogen_growth_3d.a_sw    1/6        50 vs [0.2, 6]           8x
+        grow_3d.rate    3/6        0.000866 vs floor 0.002
+        grow_3d.a_sw    1/6        50 vs [0.2, 6]           8x
         cell_diffuse.d_h            1/6        2 vs [0, 0.346]          6x
 
     So the declared box does not contain a single working point, and the consequence is worse than a
@@ -791,7 +791,7 @@ if __name__ == "__main__":
 
     print("\n-- R3: present but unconnected == inert, and looks deliberate --")
     d, _ = seed("substrate").apply(("add_op", "seed_cell_rd", "cone"))
-    d, _ = d.apply(("add_op", "morphogen_growth_3d", "hill_conserve_amount"))
+    d, _ = d.apply(("add_op", "grow_3d", "hill_conserve_amount"))
     print(" ", [r for r in check_static(d) if r.code == "R3_DANGLING_SLOT"])
 
     print("\n-- R6: a re-run is a replicate, not a hypothesis --")

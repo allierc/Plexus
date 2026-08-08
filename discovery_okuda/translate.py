@@ -148,7 +148,7 @@ DT_GLOBAL = 1.0
 # anything, and composition_space.reaction_advance is the quantity it bounds.
 RD_PER_FRAME = 1.0 / DT_GLOBAL
 
-# The growth ceiling must sit ABOVE the division trigger. `morphogen_growth_3d` caps each cell's
+# The growth ceiling must sit ABOVE the division trigger. `grow_3d` caps each cell's
 # target volume at vth_frac*v_ref, while `divide_3d` fires at factor*Vbirth -- and vth_frac was
 # 1.5 against factor 2.0, so a cell's target could never reach the size that makes it divide.
 # Volume-triggered division was arithmetically impossible; the only divisions ever seen came from
@@ -161,7 +161,7 @@ GROWTH_CEILING = DIV_FACTOR * 1.25    # 25% headroom so cells cross the trigger,
 SCHEDULE_ORDER = [
     "load_mesh_3d", "seed_mesh_3d", "cell_geometry_3d",
     "seed_cell_rd", "cell_adjacency", "cell_diffuse", "cell_react", "shape_to_chem",
-    "vesicle_growth", "morphogen_growth_3d", "shape_energy_3d", "rd_interface_tension",
+    "grow_3d", "shape_energy_3d", "rd_interface_tension",
     "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d",
 ]
 
@@ -170,8 +170,7 @@ ENGINE_NAME = {
     "seed_mesh_3d": None,             # resolved by implementation (see _emit_seed)
     "shape_energy_3d": "shape_energy_3d",
     "reconnect_t1_3d": "reconnect_t1_3d",
-    "vesicle_growth": "vesicle_growth",
-    "morphogen_growth_3d": "morphogen_growth_3d",
+    "grow_3d": "grow_3d",
     "divide_3d": "divide_3d",
     "extrude": "rd_interface_tension",   # the forcing term lives inside this engine op
     "cell_geometry_3d": "cell_geometry_3d",
@@ -294,10 +293,10 @@ def _emit_react(g, n, ga):
 
 def _emit_growth(g, n, ga):
     i = n["id"]
-    return {"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell",
+    return {"op": "grow_3d", "at": "vertex", "cell_set": "cell",
             "rate": float(_p(g, i, "rate")), "a_sw": float(_p(g, i, "a_sw")),
             "hill": float(_p(g, i, "hill")), "rho": float(_p(g, i, "rho")),
-            # `dt` REMOVED 6 August: MorphogenGrowth3D has no `self.dt` and never looks the key up.
+            # `dt` REMOVED 6 August: Grow3D has no `self.dt` and never looks the key up.
             # It is a leftover from before D1 gave the engine the clock (`_engine_owns_clock`), and
             # a parameter in a spec reads as if it does something -- which is the whole failure this
             # phase is about. Found by op_probe's UNREAD probe in under a second.
@@ -334,7 +333,7 @@ EMIT = {
     "shape_energy_3d": _emit_shape_energy,
     "seed_cell_rd": _emit_rd_seed,
     "cell_react": _emit_react,
-    "morphogen_growth_3d": _emit_growth,
+    "grow_3d": _emit_growth,
     "divide_3d": _emit_divide,
     "extrude": _emit_extrude,
     "reconnect_t1_3d": lambda g, n, ga: {
@@ -353,11 +352,6 @@ EMIT = {
         "d_a": float(_p(g, n["id"], "d_a")),
         "d_h": float(_p(g, n["id"], "d_h")),
         "chi": float(_p(g, n["id"], "chi")) * RD_PER_FRAME},        # D5: scaled WITH the reaction
-    "vesicle_growth": lambda g, n, ga: {
-        # `dt` removed with morphogen_growth_3d's, and for the same reason: VesicleGrowth reads
-        # `rate`, `max_scale` and the engine's period, never a dt of its own.
-        "op": "vesicle_growth", "at": "vertex", "cell_set": "cell",
-        "rate": float(_p(g, n["id"], "rate"))},
     "shape_to_chem": lambda g, n, ga: {
         "op": "shape_to_chem", "at": "cell", "model": g.impl_of(n),
         "vertex_set": "vertex",
@@ -642,7 +636,7 @@ def from_preset(p: dict) -> CompositionGraph:
         if not cones:
             g = add(g, "seed_cell_rd", "spot")
 
-    g = add(g, "morphogen_growth_3d",
+    g = add(g, "grow_3d",
             "hill_conserve_amount" if p.get("conserve_amount", True) else "hill_no_conserve")
     g = add(g, "shape_energy_3d", "monolayer" if p.get("monolayer") else "default")
     if p.get("K_extrude", 0.0) > 0 or p.get("K_purse", 0.0) > 0:
@@ -654,7 +648,7 @@ def from_preset(p: dict) -> CompositionGraph:
     src = next((o["id"] for o in g.ops if "morphogen" in OPERATORS[o["op"]]["outputs"]), None)
     if src is None:
         return g
-    for dst_op, slot in (("morphogen_growth_3d", "gate"), ("divide_3d", "axis"),
+    for dst_op, slot in (("grow_3d", "gate"), ("divide_3d", "axis"),
                          ("extrude", "site")):
         dst = next((o["id"] for o in g.ops if o["op"] == dst_op), None)
         if dst is None:
@@ -671,8 +665,8 @@ def from_preset(p: dict) -> CompositionGraph:
     mapping = [
         ("shape_energy_3d", "K_V", p.get("K_V")), ("shape_energy_3d", "relax_iters", p.get("relax")),
         ("shape_energy_3d", "kappa_s", p.get("kappa_s")), ("shape_energy_3d", "h0", p.get("h0")),
-        ("morphogen_growth_3d", "rate", p.get("rate")), ("morphogen_growth_3d", "a_sw", p.get("a_sw")),
-        ("morphogen_growth_3d", "hill", p.get("hill")), ("morphogen_growth_3d", "rho", p.get("rho")),
+        ("grow_3d", "rate", p.get("rate")), ("grow_3d", "a_sw", p.get("a_sw")),
+        ("grow_3d", "hill", p.get("hill")), ("grow_3d", "rho", p.get("rho")),
         ("divide_3d", "cycle_cv", p.get("cycle_cv")),
         # CLOCK RE-ANCHORING: these are per-CALL in the operator and the archived configs ran
         # divide_3d once every 4 frames. Rescale so the replay preserves the archived

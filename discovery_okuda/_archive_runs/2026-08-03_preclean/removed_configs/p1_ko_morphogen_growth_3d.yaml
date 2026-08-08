@@ -1,5 +1,5 @@
 general:
-  name: p1_ko_morphogen_growth_3d
+  name: p1_ko_grow_3d
   seed: 0
   n_frames: 500
   dt: 0.02

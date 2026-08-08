@@ -40,7 +40,7 @@
  "acted": {
   "seed_mesh_3d": 1,
   "cell_geometry_3d": 501,
-  "morphogen_growth_3d": 496,
+  "grow_3d": 496,
   "shape_energy_3d": 501,
   "reconnect_t1_3d": 123,
   "divide_3d": 126,

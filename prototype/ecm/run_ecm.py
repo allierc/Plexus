@@ -665,10 +665,14 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, f
                 # half again the tissue extent, so the network rendered as a small ball in a large frame.
                 RD.draw_junctions_3d(axzc, mt, vp, RD.CAM_SIDE, Lt, myo_hi=myo_sc)
                 # the insets: the membrane patch under the cutaway, the junction patch under the network
-                RD.draw_zoom(inz, mt, vp, mem_q=_raw, mem_s=None, name=name, frac=0.22,
+                # r_ref = the SAME fixed extent the panels above use. The insets were the last place
+                # still sizing themselves off the current radius each frame, so the two rows had the
+                # camera convention this file already fixed once for the panels -- growth visible in the
+                # panel and invisible in the inset sitting on top of it.
+                RD.draw_zoom(inz, mt, vp, mem_q=_raw, mem_s=None, name=name, frac=0.22, r_ref=Lt,
                              junctions=False, bonds=_bij, bond_s=_bs)
                 RD.draw_zoom(inzc, mt, vp, mem_q=None, mem_s=None, name=name, frac=0.16, lw=2.4,
-                             myo_hi=myo_sc)
+                             r_ref=Lt, myo_hi=myo_sc)
                 for _a in (inz, inzc):
                     for _sp in _a.spines.values():
                         _sp.set_color("#666"); _sp.set_visible(True)

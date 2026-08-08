@@ -3,7 +3,7 @@
 
 Two short, fully deterministic end-to-end runs on the closed spherical half-edge mesh:
 
-  vesicle3d : seed_mesh_3d -> vesicle_growth -> shape_energy_3d -> reconnect_t1_3d -> divide_3d
+  vesicle3d : seed_mesh_3d -> grow_3d -> shape_energy_3d -> reconnect_t1_3d -> divide_3d
               -> cell_geometry_3d -> topo_snapshot_3d
   rd        : the same mechanics + the live Turing RD on the cell set
               (cell_adjacency -> seed_cell_rd -> cell_diffuse -> cell_react), with divide_3d
@@ -44,7 +44,7 @@ baseline records the CURRENT behaviour.  Removing the private gates is a deliber
 CHANGE: it will move n_div / n_t1 and everything downstream, and requires a documented
 re-record, not a tolerance widening.
 
-NOTE (why vesicle_growth is in both runs).  Without a target-volume ramp no cell ever reaches
+NOTE (why grow_3d is in both runs).  Without a target-volume ramp no cell ever reaches
 divide_3d's 2x-birth-volume trigger, so divide_3d would sit silently inert and the baseline
 would pin down nothing about it.  The growth operator is therefore part of both baselines.
 """
@@ -66,7 +66,7 @@ import numpy as np
 import yaml
 
 import plexus.operators        # noqa: F401  registers the 52 core operators
-import tyssue_ops3d            # noqa: F401  seed_mesh_3d / shape_energy_3d / vesicle_growth / divide_3d / topo_snapshot_3d
+import tyssue_ops3d            # noqa: F401  seed_mesh_3d / shape_energy_3d / grow_3d / divide_3d / topo_snapshot_3d
 import tyssue_t1_ops3d         # noqa: F401  reconnect_t1_3d
 import tyssue_rd_ops           # noqa: F401  cell_geometry_3d / cell_adjacency / seed_cell_rd / cell_diffuse / cell_react
 import plexus.schema as S
@@ -104,7 +104,7 @@ def make_spec(name, rd, n_cells, frames, buf, cbuf):
     bug that produced a phantom 97%-hollow-cell result)."""
     ops = [{"op": "seed_mesh_3d", "at": "vertex", "n_cells": n_cells, "radius": RADIUS,
             "jitter": JITTER, "p0": P0, "seed": SEED, "before_frame": 1},
-           {"op": "vesicle_growth", "at": "vertex", "rate": GROW, "every": 1},
+           {"op": "grow_3d", "at": "vertex", "rate": GROW, "every": 1, "rho": 1.0, "a_sw": 0.0, "vth_frac": 1e9, "conserve_amount": False},
            {"op": "shape_energy_3d", "at": "vertex", "p0": P0, "K_A": 1.0, "K_P": 1.0,
             "Gamma": 0.1, "Lambda": 0.5, "K_V": 1.0, "K_R": 0.4, "mu": 1.0, "dt": 1.0,
             "relax_iters": 26, "eta": 0.08, "cap_frac": 0.12},
@@ -114,7 +114,7 @@ def make_spec(name, rd, n_cells, frames, buf, cbuf):
             "every": 2, "max_div": max(10, n_cells // 20),
             **({"cell_set": "cell"} if rd else {})},
            {"op": "cell_geometry_3d", "at": "cell"}]
-    sched = ["seed_mesh_3d", "vesicle_growth", "shape_energy_3d", "reconnect_t1_3d",
+    sched = ["seed_mesh_3d", "grow_3d", "shape_energy_3d", "reconnect_t1_3d",
              "divide_3d", "cell_geometry_3d"]
     if rd:
         ops += [{"op": "cell_adjacency", "at": "cell"},

@@ -63,7 +63,7 @@ operators:
   beta: 1.5
   F0: 0.046
   rate: 1.0
-- op: morphogen_growth_3d
+- op: grow_3d
   at: vertex
   cell_set: cell
   rate: 0.03
@@ -116,7 +116,7 @@ schedule:
 - cell_diffuse
 - cell_react
 - shape_to_chem
-- morphogen_growth_3d
+- grow_3d
 - shape_energy_3d
 - reconnect_t1_3d
 - divide_3d

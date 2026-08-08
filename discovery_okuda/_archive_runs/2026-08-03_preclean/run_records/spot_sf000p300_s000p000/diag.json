@@ -46,7 +46,7 @@
    "tier": "static",
    "premise": "morphogen sets where/how fast, not whether",
    "status": "na",
-   "detail": "no morphogen_growth_3d in this composition",
+   "detail": "no grow_3d in this composition",
    "measured": null
   },
   {
@@ -54,7 +54,7 @@
    "tier": "static",
    "premise": "a cell divides because it got big",
    "status": "na",
-   "detail": "needs both morphogen_growth_3d and divide_3d",
+   "detail": "needs both grow_3d and divide_3d",
    "measured": null
   },
   {
@@ -90,7 +90,7 @@
    "tier": "passive",
    "premise": "the chemistry must not be silently extinguished",
    "status": "fail",
-   "detail": "the activator decayed to 0.000 of its peak (0.673 -> 0.000). The pattern is extinct, so every downstream reading is about a dead field. The usual cause is growth dilution: morphogen_growth_3d.conserve_amount divides chem by (s/s_prev)^3 every frame a cell grows, and autocatalysis is quadratic, so it loses.",
+   "detail": "the activator decayed to 0.000 of its peak (0.673 -> 0.000). The pattern is extinct, so every downstream reading is about a dead field. The usual cause is growth dilution: grow_3d.conserve_amount divides chem by (s/s_prev)^3 every frame a cell grows, and autocatalysis is quadratic, so it loses.",
    "measured": {
     "peak": 0.6733,
     "end": 0.0,

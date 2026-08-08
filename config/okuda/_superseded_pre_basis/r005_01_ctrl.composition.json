@@ -1,0 +1,104 @@
+{
+ "ops": [
+  {
+   "id": "seed_mesh_3d0",
+   "op": "seed_mesh_3d",
+   "impl": "fibonacci_sphere"
+  },
+  {
+   "id": "cell_geometry_3d0",
+   "op": "cell_geometry_3d",
+   "impl": "scatter_add"
+  },
+  {
+   "id": "seed_cell_rd0",
+   "op": "seed_cell_rd",
+   "impl": "cone"
+  },
+  {
+   "id": "cell_adjacency0",
+   "op": "cell_adjacency",
+   "impl": "shared_edge"
+  },
+  {
+   "id": "cell_diffuse0",
+   "op": "cell_diffuse",
+   "impl": "graph_laplacian"
+  },
+  {
+   "id": "cell_react0",
+   "op": "cell_react",
+   "impl": "gray_scott"
+  },
+  {
+   "id": "shape_to_chem0",
+   "op": "shape_to_chem",
+   "impl": "curvature"
+  },
+  {
+   "id": "grow_3d0",
+   "op": "grow_3d",
+   "impl": "hill_conserve_amount"
+  },
+  {
+   "id": "shape_energy_3d0",
+   "op": "shape_energy_3d",
+   "impl": "monolayer"
+  },
+  {
+   "id": "reconnect_t1_3d0",
+   "op": "reconnect_t1_3d",
+   "impl": "length_threshold"
+  }
+ ],
+ "conns": [
+  {
+   "src": "cell_react0",
+   "dst": "grow_3d0",
+   "slot": "gate"
+  }
+ ],
+ "params": {
+  "seed_mesh_3d0.cell_set": "cell",
+  "seed_mesh_3d0.before_frame": 1,
+  "seed_mesh_3d0.n_cells": 2000,
+  "seed_mesh_3d0.seed": 0,
+  "seed_mesh_3d0.vseed_cv": 0.15,
+  "seed_cell_rd0.mode": "scatter",
+  "seed_cell_rd0.n_spots": 1,
+  "seed_cell_rd0.cone_deg": 8.0,
+  "seed_cell_rd0.seed_frac": 0.06,
+  "cell_diffuse0.d_a": 0.08,
+  "cell_diffuse0.d_h": 0.16,
+  "cell_diffuse0.chi": 1.3,
+  "cell_react0.model": "gray_scott",
+  "cell_react0.rate": 1.0,
+  "cell_react0.F": 0.046,
+  "cell_react0.kk": 0.062,
+  "shape_to_chem0.model": "curvature",
+  "shape_to_chem0.vertex_set": "vertex",
+  "shape_to_chem0.beta": 0.0,
+  "shape_to_chem0.F0": 0.055,
+  "shape_to_chem0.rate": 1.0,
+  "grow_3d0.cell_set": "cell",
+  "grow_3d0.rate": 0.000866,
+  "grow_3d0.a_sw": 0.35,
+  "grow_3d0.hill": 4.0,
+  "grow_3d0.rho": 0.1,
+  "grow_3d0.vth_frac": 2.5,
+  "grow_3d0.after_frame": 100,
+  "grow_3d0.conserve_amount": true,
+  "shape_energy_3d0.model": "monolayer",
+  "shape_energy_3d0.k_v": 6.0,
+  "shape_energy_3d0.kappa_s": 0.1,
+  "shape_energy_3d0.h0": 0.4,
+  "shape_energy_3d0.gamma": 0.06,
+  "shape_energy_3d0.mu": 1.0,
+  "shape_energy_3d0.dt": 1.0,
+  "shape_energy_3d0.relax_iters": 30,
+  "shape_energy_3d0.eta": 0.08,
+  "shape_energy_3d0.cap_frac": 0.12,
+  "reconnect_t1_3d0.l_th_frac": 0.28,
+  "reconnect_t1_3d0.max_flips": 300
+ }
+}

@@ -76,7 +76,7 @@ Plexus spec`, targeting the same spec shape `run_tyssue_round.make()` produces.
 
 - **Implementation choice is part of composition identity** when it changes the phenomenology
   (`impl_structural=True`): the three reaction kinetics, `shape_energy_3d` default vs monolayer,
-  `divide_3d` hertwig vs orient_iface, `morphogen_growth_3d` conserve-amount vs not. plexus2 says
+  `divide_3d` hertwig vs orient_iface, `grow_3d` conserve-amount vs not. plexus2 says
   implementations "differ only in numerics", which holds for finite-difference vs spectral
   diffusion but *not* for Brusselator vs Gierer–Meinhardt. Recorded as a deliberate departure in
   the module docstring — the campaign must be able to ask "which kinetics".
@@ -120,7 +120,7 @@ not merely well-formed, they are accepted by the engine's validator.
    leaving exactly one entry. Under the old `hist[min(t, len(hist)-1)]` clamp this would have
    rendered every frame's coordinates against **frame 0's connectivity** and produced a
    spectacular, entirely fictitious result. It failed loudly instead.
-2. **`vesicle_growth` was missing from `SCHEDULE_ORDER`**, so it sorted to position 999 — i.e.
+2. **`grow_3d` was missing from `SCHEDULE_ORDER`**, so it sorted to position 999 — i.e.
    growth ran *after* the recorder. Added a compile-time guard: any operator missing from
    `SCHEDULE_ORDER` is now a hard error rather than a silent last-place sort.
 
@@ -251,13 +251,13 @@ First test on `ref_uniform_inflation` reported **two** inert operators. Only one
 
 - `divide_3d` — **true positive.** `after_frame = 100` but the smoke ran 25 frames, so division
   genuinely never fired.
-- `vesicle_growth` — **false positive.** It writes the per-cell mechanical *targets* inside the
+- `grow_3d` — **false positive.** It writes the per-cell mechanical *targets* inside the
   mesh dict (`A0`, `P0`, `V0f`), which my fingerprint did not cover. A growth operator would have
   been reported inert on every run, invalidating perfectly good evidence.
 
 Fixed by folding every numeric array in the mesh dict into the fingerprint. Re-verified in both
 directions: at 25 frames `divide_3d` is correctly flagged; at 131 frames **all 6 operators act**
-(`divide_3d` 31×, `vesicle_growth` 131×) and the run is marked `valid_evidence: true`.
+(`divide_3d` 31×, `grow_3d` 131×) and the run is marked `valid_evidence: true`.
 
 *This is the discipline the whole document is about, applied to the guard itself: verify the
 instrument before trusting the measurement.* A detector that cries wolf is worse than none,
@@ -993,7 +993,7 @@ identical, which is what confirms the D1 migration is `every: 2 → 4` (old true
 
 ### 🔴 FINDING 28 — a second lying tag, and it only lies when chemistry is present
 
-The coral video needed one more fix. `morphogen_growth_3d` declares
+The coral video needed one more fix. `grow_3d` declares
 `MAY_MUTATE_INTEGRATED_STATE = False` and mutates it anyway (`conserve_amount` rescales
 `cell.chem` in place). The engine's integration invariant refused to run it. This is one of the
 four tags HANDOFF §4 flagged; now confirmed by execution rather than inference.
@@ -1096,7 +1096,7 @@ and the VLM caption of that run begins *"A small red region on a large white sph
 shrinks and disappears"*. That is the F29 signature. Checked `config/okuda/round_40_mc8.yaml`:
 
 ```yaml
-- op: morphogen_growth_3d
+- op: grow_3d
   rate: 0.01
   rho: 0.0
   conserve_amount: true      # <-- the same dilution
@@ -1193,7 +1193,7 @@ has collapsed to 0.5% of cells while its peak stays at 0.97. And the tip tells t
 | run | `ta_tip_act_final` | `protr_peak` |
 |---|---|---|
 | control | **0.27** | 4.03 |
-| −morphogen_growth_3d | **0.80** | 1.03 |
+| −grow_3d | **0.80** | 1.03 |
 
 With growth on, the activator is *not at the tip*. That is a local effect — growth carries the
 activated region away from the protrusion it is supposed to drive — not a global decay, and
@@ -1221,12 +1221,12 @@ because the captions do not show a tube. That is the eye/number divergence defen
 composition round for the first time, and it is the difference between this round reporting "the
 control makes a tube (4.03)" and reporting the truth.
 
-The Critic separately refused `+vesicle_growth:uniform_ramp` as **not evidence** — the reservoir
+The Critic separately refused `+grow_3d:uniform_ramp` as **not evidence** — the reservoir
 saturated at 15002 cells. Two of six slots produced no evidence, and both said so loudly rather
 than returning a plausible number.
 
 **The dissociation result:** both knockouts collapse the protrusion (4.03 → 1.39 for −extrude,
-→ 1.03 for −morphogen_growth_3d). The Proposer predicted −morphogen would leave it unchanged if
+→ 1.03 for −grow_3d). The Proposer predicted −morphogen would leave it unchanged if
 the protrusion were *forced*; it did not. Recorded as the round's one **surprise**. But the
 control is itself Watcher-vetoed, so the 4.03 baseline those ratios are measured against is
 suspect — the honest reading is *"both operators are necessary for whatever 4.03 is"*, and what
@@ -1316,7 +1316,7 @@ Also: grow_after=100 turns out to be a workaround for D1 -- a window to let the 
 growth. It survives as a pattern-formation window, which is a legitimate reason.
 
 VERIFIED. log/okuda cleared, battery relaunched at 500 frames, 12 specs, 2 GPUs x 3.
-  p1_ko_morphogen_growth_3d (no growth)  static baseline: folded 0, shape_idx pinned 3.76,
+  p1_ko_grow_3d (no growth)  static baseline: folded 0, shape_idx pinned 3.76,
                                          area_cv flat 0.15 -- the ball holds its size.
   p1_ko_divide_3d (growth, no division)  the ball GROWS, a Turing pattern forms (act 0.465 vs the
                                          minisite's 0.43), the shell buckles: folded 0 -> 145 ->

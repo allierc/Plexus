@@ -4,7 +4,7 @@ Posed 2026-07-30 ~17:40 EDT, from reading the growth law only. Scored by `predic
 
 ## The mechanism claim under test
 
-`morphogen_growth_3d` has two branches:
+`grow_3d` has two branches:
 
     s <- s * (1 + rate*(rho + hillv))          hillv = a^h/(a_sw^h + a^h)  in [0,1]
     rho > 0 :  s <- min(s, (vth_frac*v_ref/V0f_init)^(1/3))     # CAPPED  -- divide, don't bulge

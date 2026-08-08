@@ -54,7 +54,7 @@ operators:
   mu_a: 1.0
   mu_h: 1.0
   a0: 0.0
-- op: morphogen_growth_3d
+- op: grow_3d
   at: vertex
   cell_set: cell
   rate: 0.01
@@ -113,7 +113,7 @@ schedule:
 - cell_adjacency
 - cell_diffuse
 - cell_react
-- morphogen_growth_3d
+- grow_3d
 - shape_energy_3d
 - reconnect_t1_3d
 - divide_3d
@@ -139,8 +139,8 @@ _discovery:
       impl: orient_iface
     - id: extrude0
       op: extrude
-    - id: morphogen_growth_3d0
-      op: morphogen_growth_3d
+    - id: grow_3d0
+      op: grow_3d
       impl: hill_conserve_amount
     - id: reconnect_t1_3d0
       op: reconnect_t1_3d
@@ -157,7 +157,7 @@ _discovery:
       dst_op: extrude
       slot: site
     - src_op: seed_cell_rd
-      dst_op: morphogen_growth_3d
+      dst_op: grow_3d
       slot: gate
   region: emergent RD + forced extrusion
   defect_fixes:

@@ -39,7 +39,7 @@ def build(chi, rho, vth, rate, a_sw, gamma=2.0):
            {"op": "cell_diffuse", "at": "cell", "d_a": 0.05, "d_h": 0.7, "chi": chi},
            {"op": "cell_react", "at": "cell", "model": "brusselator", "gamma": gamma, "A": 1.0, "B": 3.0},
            # activator->growth: low body rho + activator boost; v_eq capped (uniform behind the front)
-           {"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": rate,
+           {"op": "grow_3d", "at": "vertex", "cell_set": "cell", "rate": rate,
             "a_sw": a_sw, "hill": 4.0, "rho": rho, "vth_frac": vth},
            {"op": "shape_energy_3d", "at": "vertex", "p0": 3.90, "K_A": 1.0, "K_P": 1.0, "Gamma": 0.05,
             "Lambda": 0.2, "K_V": 4.0, "K_R": 0.02, "mu": 1.0, "dt": 0.02, "relax_iters": 26, "eta": 0.08, "cap_frac": 0.12},
@@ -48,7 +48,7 @@ def build(chi, rho, vth, rate, a_sw, gamma=2.0):
             "every": 2, "max_div": 12, "max_div_frac": 0.03, "cell_set": "cell", "min_cycle": 4, "max_cycle": 30},
            {"op": "topo_snapshot_3d", "at": "vertex", "every": 1}]
     sched = ["seed_mesh_3d", "cell_geometry_3d", "cell_adjacency", "seed_cell_rd", "cell_diffuse", "cell_react",
-             "morphogen_growth_3d", "shape_energy_3d", "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
+             "grow_3d", "shape_energy_3d", "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
     cfg = {"general": {"name": "h6", "seed": SEED, "n_frames": FR, "dt": 0.02, "record_cap": FR + 2,
                        "boundary": "free", "dim": 3, "world": [16 * R] * 3},
            "sets": {"vertex": {"n": int(Nv * 4)}, "cell": {"n": int(nF * 4), "state": {"chem": {"width": 2, "integration": "first_order"},

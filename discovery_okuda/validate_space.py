@@ -227,8 +227,13 @@ def main():
     check("V5 compilation refuses it", refused,
           "a composition that would no-op never reaches the cluster")
 
+    # THE ANCHOR MOVED FROM `grow_3d.gate` TO `extrude.site`, and it had to. The gate is now an
+    # `opt_slots` entry -- leaving it unwired selects the rho baseline, which is uniform growth and
+    # a legal composition -- so a test that proved dangling slots are caught by pointing at the one
+    # slot that is allowed to dangle would pass forever without testing anything. `extrude.site`
+    # is still required: the forcing term with nothing selecting the cells it pushes is inert.
     dangling, _ = seed("substrate").apply(("add_op", "seed_cell_rd", "cone"))
-    dangling, _ = dangling.apply(("add_op", "morphogen_growth_3d", "hill_conserve_amount"))
+    dangling, _ = dangling.apply(("add_op", "extrude", "radial_push"))
     check("V5 dangling slot detected", len(dangling.unrouted_slots()) >= 1,
           f"{dangling.unrouted_slots()} -- present but disconnected == inert")
 

@@ -299,7 +299,7 @@ def test_a_child_differs_from_its_parent_by_exactly_the_edit():
                     ("seed_mesh_3d", "jitter"), ("seed_mesh_3d", "p0"),
                     ("seed_mesh_3d", "n_cells"), ("shape_energy_3d", "K_R"),
                     ("divide_3d", "every"), ("divide_3d", "min_cycle"),
-                    ("morphogen_growth_3d", "vth_frac")]
+                    ("grow_3d", "vth_frac")]
 
     for parent in ("refute_coral_nocons", "coral_gate"):
         with open(os.path.join(E.LOG_ROOT, parent, "spec_run.yaml")) as f:
@@ -432,7 +432,7 @@ def test_a_duplicate_becomes_a_reseeded_replicate():
 
     # and the COMPOSITION must be untouched -- a replicate that also changes a parameter is not one
     val = lambda spec, op, k: next((o.get(k) for o in spec["operators"] if o.get("op") == op), None)
-    for op, k in (("reconnect_t1_3d", "l_th_frac"), ("morphogen_growth_3d", "rate"),
+    for op, k in (("reconnect_t1_3d", "l_th_frac"), ("grow_3d", "rate"),
                   ("seed_mesh_3d", "n_cells")):
         check(val(parent, op, k) == val(child, op, k),
               f"the replicate changed {op}.{k}: {val(parent, op, k)} -> {val(child, op, k)}")

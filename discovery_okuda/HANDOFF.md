@@ -102,22 +102,22 @@ All four are documented in `paper/plexus2_discovery.tex` §6 in plain language.
 
 | # | Bug | Where | Why it's fatal for a *composition search* |
 |---|---|---|---|
-| 1 | **Clock double-gating.** Operators keep a private `self.every`/`self._k` while the engine *also* gates them → effective period `every²` | `tyssue_ops3d.py` `divide_3d` ~:399,:452; `vesicle_growth` ~:354,:362; `topo_snapshot_3d` ~:599,:605; `tyssue_t1_ops3d.py` `reconnect_t1_3d` ~:246,:252; `tyssue_rd_ops.py` `morphogen_growth_3d` ~:293,:307 | Division across **all 316 archived runs** fired at a fraction of the advertised rate. Engine owns the clock (`src/plexus/engine.py` ~:688-689). Fixing this **re-anchors every baseline** — expect division counts to roughly double. |
+| 1 | **Clock double-gating.** Operators keep a private `self.every`/`self._k` while the engine *also* gates them → effective period `every²` | `tyssue_ops3d.py` `divide_3d` ~:399,:452; `grow_3d` ~:354,:362; `topo_snapshot_3d` ~:599,:605; `tyssue_t1_ops3d.py` `reconnect_t1_3d` ~:246,:252; `tyssue_rd_ops.py` `grow_3d` ~:293,:307 | Division across **all 316 archived runs** fired at a fraction of the advertised rate. Engine owns the clock (`src/plexus/engine.py` ~:688-689). Fixing this **re-anchors every baseline** — expect division counts to roughly double. |
 | 2 | **dt depends on the composition.** `dt = 1.0 if (cones and not rd) else 0.02` | `run_tyssue_round.py` ~:505 | The loop's flagship edit is add/remove RD — which under this rule *also* rescales chemical:mechanical time by **50×**. Every signalling verdict would be confounded. Fix: one global dt; stability handled *inside* the RD operator as substeps. |
 | 3 | **Silent mis-pairing.** `mt = hist[min(t, len(hist)-1)]` | `run_tyssue_round.py` ~:640 | This is the exact bug that produced the phantom **"97% hollow / global buckling"** result believed for days. It sits **in the fitness path**. Make it an assertion; add the length check inside `tube_analysis.frame_metrics`. Also `divide_3d` reservoir-exhaustion `break` (~`tyssue_ops3d.py:507`) silently caps runs → record `saturated: true` and hard-error. |
-| 4 | **Undeclared prerequisites → silent no-op.** | `cell_diffuse`←`cell_adjacency`; `morphogen_growth_3d`←cell `chem` block; `shape_energy_3d`←seeded mesh; `divide_3d.local_relax`/`orient_iface`←`shape_energy_3d` same tick (undeclared `m["mech"]` written ~`tyssue_ops3d.py:281`, read ~:566) | **The most dangerous bug.** A composition search generates combos no preset ever ran. A silently-inert operator still returns metrics → recorded as **"this mechanism cannot produce tubes"** = a **false impossibility claim**, which decision #1 elevates to a headline result. Fix: `tyssue_preconditions.py` with `assert_preconditions()` + `did_work()` counters + `assert_all_acted()`. |
+| 4 | **Undeclared prerequisites → silent no-op.** | `cell_diffuse`←`cell_adjacency`; `grow_3d`←cell `chem` block; `shape_energy_3d`←seeded mesh; `divide_3d.local_relax`/`orient_iface`←`shape_energy_3d` same tick (undeclared `m["mech"]` written ~`tyssue_ops3d.py:281`, read ~:566) | **The most dangerous bug.** A composition search generates combos no preset ever ran. A silently-inert operator still returns metrics → recorded as **"this mechanism cannot produce tubes"** = a **false impossibility claim**, which decision #1 elevates to a headline result. Fix: `tyssue_preconditions.py` with `assert_preconditions()` + `did_work()` counters + `assert_all_acted()`. |
 
 ### Four tags that lie
 - `rd_interface_tension` `DIFFERENTIABLE` True→**False** (detaches ~`tyssue_rd_ops.py:384`; branches on `float(red.sum())` ~:381)
 - `face_divide` `SUPPORTED_DIMS` `[3,2]`→**`[2]`** (`ring_valid` is an xy shoelace, `tyssue_topology_ops.py:54-56`)
 - `morphogen_growth` — `kind` mis-tagged
-- `morphogen_growth_3d` — `MAY_MUTATE_INTEGRATED_STATE` mis-declared
+- `grow_3d` — `MAY_MUTATE_INTEGRATED_STATE` mis-declared
 
 ### Contract compliance
 Only **5 of 30** registered implementations declare the five attributes
 `audit_operator_registry.py` enforces (`EMIT`, `SUPPORTED_DIMS`, `REQUIRES_PARAMS`,
 `MECHANISM_TAGS`, `PARAM_ROLES` in `cls.__dict__`). 25 fail. `divide_3d` and
-`morphogen_growth_3d` have **zero** `PARAM_ROLES` for ~15 params.
+`grow_3d` have **zero** `PARAM_ROLES` for ~15 params.
 
 Plan: declare them **in place**, and add a `--prototype` flag to
 `tools/audit_operator_registry.py` so a prototype-resident operator can be **certified**
@@ -147,7 +147,7 @@ cell_diffuse          set=cell   kind=lateral     family=fields
 cell_react            set=cell   kind=lateral     family=fields  impl=gray_scott
 cell_react            set=cell   kind=lateral     family=fields  impl=gierer_meinhardt
 cell_react            set=cell   kind=lateral     family=fields  impl=brusselator
-morphogen_growth_3d   set=vertex kind=structural  family=growth
+grow_3d   set=vertex kind=structural  family=growth
 rd_interface_tension  set=vertex kind=lateral     family=mechanics
 ```
 Also `prototype/embryo_gray_scott/embryo_gray_scott_ops.py` (grid-based Gray-Scott, separate).
@@ -292,7 +292,7 @@ stage-gated:
 
 - **Stage 1 substrate:** `seed_mesh_3d` / `load_mesh_3d`, `shape_energy_3d` (impl: `default` |
   `monolayer`), `reconnect_t1_3d`
-- **Stage 2 growth coupling:** `vesicle_growth`, `morphogen_growth_3d`, `divide_3d`
+- **Stage 2 growth coupling:** `grow_3d`, `grow_3d`, `divide_3d`
   (`orient_iface` on/off), `face_growth`
 - **Stage 3 patterning + feedback:** `seed_cell_rd` (modes), `cell_react`
   (`gray_scott` | `gierer_meinhardt` | `brusselator` — already three interchangeable impls, which
@@ -417,7 +417,7 @@ paper/plexus2_discovery.tex/.pdf        # NEW: the discovery note (this work)
 paper/gland.tex                         # the three-loop method, written up (gland case)
 
 prototype/Tyssue/                       # the Okuda AVM backend (most mature prototype)
-  tyssue_ops3d.py                       # seed_mesh_3d, shape_energy_3d, vesicle_growth, divide_3d
+  tyssue_ops3d.py                       # seed_mesh_3d, shape_energy_3d, grow_3d, divide_3d
   tyssue_rd_ops.py                      # ALL the RD operators (see §5)
   tyssue_t1_ops3d.py                    # reconnect_t1_3d
   tyssue_topology_ops.py / _ops3d.py    # face_divide, apoptosis, t1_transition

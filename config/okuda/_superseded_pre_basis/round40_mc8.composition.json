@@ -1,0 +1,83 @@
+{
+ "ops": [
+  {
+   "id": "seed_mesh_3d0",
+   "op": "seed_mesh_3d",
+   "impl": "fibonacci_sphere"
+  },
+  {
+   "id": "shape_energy_3d0",
+   "op": "shape_energy_3d",
+   "impl": "default"
+  },
+  {
+   "id": "reconnect_t1_3d0",
+   "op": "reconnect_t1_3d",
+   "impl": "length_threshold"
+  },
+  {
+   "id": "cell_geometry_3d0",
+   "op": "cell_geometry_3d",
+   "impl": "scatter_add"
+  },
+  {
+   "id": "cell_adjacency0",
+   "op": "cell_adjacency",
+   "impl": "shared_edge"
+  },
+  {
+   "id": "seed_cell_rd0",
+   "op": "seed_cell_rd",
+   "impl": "tip"
+  },
+  {
+   "id": "grow_3d0",
+   "op": "grow_3d",
+   "impl": "hill_conserve_amount"
+  },
+  {
+   "id": "divide_3d0",
+   "op": "divide_3d",
+   "impl": "orient_iface"
+  },
+  {
+   "id": "extrude0",
+   "op": "extrude",
+   "impl": "radial_push"
+  }
+ ],
+ "conns": [
+  {
+   "src": "seed_cell_rd0",
+   "dst": "grow_3d0",
+   "slot": "gate"
+  },
+  {
+   "src": "seed_cell_rd0",
+   "dst": "divide_3d0",
+   "slot": "axis"
+  },
+  {
+   "src": "seed_cell_rd0",
+   "dst": "extrude0",
+   "slot": "site"
+  }
+ ],
+ "params": {
+  "seed_cell_rd0.tip_radius": 2.0,
+  "seed_cell_rd0.cone_deg": 8.0,
+  "seed_cell_rd0.seed_frac": 0.06,
+  "seed_cell_rd0.amp": 2.0,
+  "seed_cell_rd0.n_spots": 1,
+  "grow_3d0.rate": 0.01,
+  "grow_3d0.a_sw": 1.5,
+  "grow_3d0.alpha": 4.0,
+  "grow_3d0.rho": 0.0,
+  "divide_3d0.cycle_cv": 0.4,
+  "divide_3d0.min_cycle": 16,
+  "divide_3d0.max_cycle": 1000000000,
+  "divide_3d0.orient_asw": 1.0,
+  "extrude0.K_extrude": 4.0,
+  "extrude0.a_sw": 0.5
+ }
+}

@@ -1284,7 +1284,7 @@ def _build_one(slot, rid, index, seen):
     # A DUPLICATE BECOMES A REPLICATE. Cedric, 6 August: "loose this rule, change the seed instead."
     #
     # Refusing cost three of eleven slots in one round, and one of the three was a real experiment --
-    # `add_op vesicle_growth` proposed on three parents to test whether the operator's effect is general
+    # `add_op grow_3d` proposed on three parents to test whether the operator's effect is general
     # or parent-specific, which is what the lever map is FOR. But the deeper waste is that this campaign
     # has never once measured its own seed spread. The Analyst's standing instruction is that "a
     # difference smaller than the seed spread is not a difference", and there has never been a replicate
@@ -1326,7 +1326,7 @@ def _build_one(slot, rid, index, seen):
     # (the compile refusal, the short batch) off the top of the screen.
     # THE SLOT SAYS WHAT IT NOW IS. Cedric: "if the critic finds replicate it should set different seed
     # and mention that it is robustness test itself." Without this the record keeps the Proposer's
-    # original claim -- "coverage: vesicle_growth on the three best chemistry parents" -- on a run that
+    # original claim -- "coverage: grow_3d on the three best chemistry parents" -- on a run that
     # is no longer that experiment, and a reader six rounds later has no way to tell. The original text
     # is kept beside it rather than overwritten: it is why the slot was proposed, and that is worth
     # knowing even though it is no longer what the slot does.

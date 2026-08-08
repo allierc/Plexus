@@ -26,7 +26,7 @@ from, that absence is the apparatus gap to surface — not a reason to re-push t
 
 ## What is ESTABLISHED
 
-- "Patterned growth is NECESSARY for the bud." — SUPPORTED, remove_op morphogen_growth_3d0 on C414a11,
+- "Patterned growth is NECESSARY for the bud." — SUPPORTED, remove_op grow_3d0 on C414a11,
   protr_peak=1.046 (valid intact sphere), round 2; reconfirmed r7/r8/r10. Falsifiable by: a morphogen-free
   recipe >1.2 physical.
 - "Cell division is NECESSARY for the bud." — SUPPORTED, remove_op divide_3d0 (1.19 eye-read division-driven;
@@ -62,7 +62,7 @@ from, that absence is the apparatus gap to surface — not a reason to re-push t
 - add_op vesicle_growth uniform_ramp → explodes, breaks P11+P5b (r2/r5/r8/r10). Never re-propose.
 - ANY morphogen-tune (amplitude/gradient/rate, UP or DOWN, or clamping) → integrator runaway (r4+r5).
 - remove_op cell_diffuse0 → DIVERGES (strips damping), round 3.
-- remove_op divide_3d0 / morphogen_growth_3d0 / reconnect_t1_3d0 / cell_adjacency0 / cell_geometry_3d0 — all
+- remove_op divide_3d0 / grow_3d0 / reconnect_t1_3d0 / cell_adjacency0 / cell_geometry_3d0 — all
   MAPPED (r2/r3/r10). Re-removing buys nothing; round 10 wasted 5 slots doing exactly this.
 - Predicting protr_peak ≥1.3/1.4/1.5 — WRONG-HIGH every time; physical ceiling ~1.23. ≤1.05/≤1.10 on a LIVE
   bud also refuted (r4/r7/r9).
@@ -76,7 +76,7 @@ from, that absence is the apparatus gap to surface — not a reason to re-push t
 ## Frontier and parent
 
 Breed from the intact forced base, parent **Cad4767d855d** (control clean, protr_peak 1.19, valid bud;
-morphogen_growth_3d0 + divide_3d0 present). C414a11 is an equivalent valid base. Do NOT breed from cfl/RECON_
+grow_3d0 + divide_3d0 present). C414a11 is an equivalent valid base. Do NOT breed from cfl/RECON_
 nulls nor the diverged C855e6 / Ca230941 / cell_diffuse0 / morphogen-tune branches. Every amplifier on this
 body is closed — the productive frontier is Track B: a DIFFERENT base geometry, not another slot pushing 1.23.
 
@@ -90,7 +90,7 @@ round-1 wk_ runs (n~36749); C-hash recipes stay at n~2000. Physical bud protr_pe
 
 ## Track A — the map
 
-NECESSARY: morphogen_growth_3d0, divide_3d0. INERT on bud: reconnect_t1_3d0, cell_adjacency0, cell_geometry_3d0
+NECESSARY: grow_3d0, divide_3d0. INERT on bud: reconnect_t1_3d0, cell_adjacency0, cell_geometry_3d0
 (P1_INERT gate; rd_interface_tension inert). SHAPE-ZEROING when removed: extrude0, vesicle_growth0.
 DESTABILISING: vesicle_growth uniform_ramp (explodes), cell_diffuse0 removal (diverges), divide_3d hertwig add
 (1.295 late mesh degradation), morphogen driver tuned UP (r4) AND DOWN/clamped (r5, same runaway). cfl/RD =

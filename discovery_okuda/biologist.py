@@ -214,10 +214,10 @@ def p2_gate_implies_baseline(cfg):
     """#2 A morphogen sets WHERE and HOW FAST, not WHETHER. If growth is gated on a signal at all,
     ungated cells must still grow -- otherwise the tip-to-body growth ratio is infinite, which is
     a tissue whose body is frozen while its tip builds itself out of nothing."""
-    o = _ops(cfg).get("morphogen_growth_3d")
+    o = _ops(cfg).get("grow_3d")
     if o is None:
         return R("P2", "static", "morphogen sets where/how fast, not whether", "na",
-                 "no morphogen_growth_3d in this composition")
+                 "no grow_3d in this composition")
     rho, a_sw = float(o.get("rho", 0.0)), float(o.get("a_sw", 0.2))
     # a_sw far above any reachable activator means the switch is DISABLED -- growth is uniform and
     # the premise does not bite. Gray-Scott's activator cannot exceed ~1.
@@ -236,15 +236,15 @@ def p2_gate_implies_baseline(cfg):
 
 
 def p3_ceiling_above_trigger(cfg):
-    """#3 A cell divides because it got big. morphogen_growth_3d caps a cell's target volume at
+    """#3 A cell divides because it got big. grow_3d caps a cell's target volume at
     vth_frac*v_ref; divide_3d fires at factor*Vbirth. If the CEILING sits below the TRIGGER, no
     cell can ever divide by reaching size and every division comes from the max_cycle stopwatch.
     This is defect D5b, and it was present in the minisite config too."""
     ops = _ops(cfg)
-    g, d = ops.get("morphogen_growth_3d"), ops.get("divide_3d")
+    g, d = ops.get("grow_3d"), ops.get("divide_3d")
     if g is None or d is None:
         return R("P3", "static", "a cell divides because it got big", "na",
-                 "needs both morphogen_growth_3d and divide_3d")
+                 "needs both grow_3d and divide_3d")
     vth, fac = float(g.get("vth_frac", 1.35)), float(d.get("factor", 2.0))
     if float(g.get("rho", 0.0)) <= 0 and float(g.get("a_sw", 0.2)) > 1.0:
         return R("P3", "static", "a cell divides because it got big", "na",
@@ -292,7 +292,7 @@ def p1_tissue_gains_material(cfg, s):
     with more material than it started with. Unmeasurable before 2026-07-31: only the CVs of cell
     area and volume were recorded, never the totals."""
     ops = _ops(cfg)
-    g = ops.get("morphogen_growth_3d") or ops.get("vesicle_growth")
+    g = ops.get("grow_3d") or ops.get("grow_3d")
     if g is None or float(g.get("rate", 0.0)) <= 0:
         return R("P1", "passive", "cells grow by taking material in", "na", "no growth operator")
     v = _col(s, "V_total")
@@ -470,7 +470,7 @@ def p4_chemistry_not_extinguished(cfg, s):
     return R("P4", "passive", "the chemistry must not be silently extinguished", "fail",
              f"the activator decayed to {ratio:.3f} of its peak ({peak:.3f} -> {a[-1]:.3f}). The "
              f"pattern is extinct, so every downstream reading is about a dead field. The usual "
-             f"cause is growth dilution: morphogen_growth_3d.conserve_amount divides chem by "
+             f"cause is growth dilution: grow_3d.conserve_amount divides chem by "
              f"(s/s_prev)^3 every frame a cell grows, and autocatalysis is quadratic, so it "
              f"loses.", dict(peak=peak, end=float(a[-1]), ratio=ratio))
 
@@ -1153,7 +1153,7 @@ def certify():
     print(f"  [{'ok ' if ok else 'BAD'}] {'P8 shape index above the floor':48} -> "
           f"{r.status:9} (want pass)")
     # P2 gated growth with no baseline
-    r = p2_gate_implies_baseline({"operators": [{"op": "morphogen_growth_3d", "rho": 0.0,
+    r = p2_gate_implies_baseline({"operators": [{"op": "grow_3d", "rho": 0.0,
                                                  "a_sw": 0.3}]})
     ok = r.status == "fail"; bad += not ok
     print(f"  [{'ok ' if ok else 'BAD'}] {'P2 gated growth with rho=0':48} -> "

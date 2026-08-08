@@ -13,7 +13,7 @@ WHAT "COMPLY WITH cellfix_B_new" MEANS HERE, CONCRETELY. The spec is not rewritt
 or rescaled: `log/okuda/cellfix_B_new/spec_run.yaml` is loaded verbatim and run by the stock engine,
 so the operator stack IS the reference one --
 
-    seed_mesh_3d -> cell_geometry_3d -> morphogen_growth_3d -> shape_energy_3d
+    seed_mesh_3d -> cell_geometry_3d -> grow_3d -> shape_energy_3d
                  -> reconnect_t1_3d -> divide_3d -> topo_snapshot_3d
 
 200 cells at radius 5 in a 50-unit box, growing and dividing to ~3,200 under the 3D AVM shape
@@ -195,7 +195,7 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap
         print(f"[tissue] per-junction myosin: activity={myosin}, tau={myo_tau}, beta={myo_beta}, "
               f"myo_new={myo_new}", flush=True)
     if gate_npz is not None:
-        # AFTER `morphogen_growth_3d`, whose per-cell increment it corrects, and BEFORE the force step
+        # AFTER `grow_3d`, whose per-cell increment it corrects, and BEFORE the force step
         # and the topology ops -- so `shape_energy_3d` relaxes toward the GATED targets and `divide_3d`
         # tests a volume that grew at the gated rate. Placed anywhere later and the frame's mechanics
         # would already have been solved for the ungated targets.
@@ -205,7 +205,7 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap
                                   "hill": float(gate_hill), "floor": float(gate_floor),
                                   "smooth_frames": int(gate_smooth_frames),
                                   "smooth_phi_deg": float(gate_smooth_phi)})
-        i = spec["schedule"].index("morphogen_growth_3d") + 1
+        i = spec["schedule"].index("grow_3d") + 1
         spec["schedule"].insert(i, "ecm_growth_gate_3d")
         print(f"[tissue] ECM-stress growth gate from {os.path.basename(str(gate_npz))} "
               f"(p_half {gate_p_half}, hill {gate_hill}, floor {gate_floor})", flush=True)

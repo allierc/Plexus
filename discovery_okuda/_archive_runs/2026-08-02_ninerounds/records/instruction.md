@@ -32,7 +32,7 @@ Also available and NOT part of scoring, but informative: mech_p_ratio (tube/body
 
 **THIS BODY IS CLOSED — and round 10 proved the loop is now CHURNING, not learning.** All 9 round-10 slots
 re-ran ALREADY-MAPPED points: 2 controls, 2× `vesicle_growth uniform_ramp` (the known explosion), 2× remove
-morphogen_growth_3d0 (established NECESSARY, r2), 2× remove cell_geometry_3d0, 1× remove reconnect_t1_3d0
+grow_3d0 (established NECESSARY, r2), 2× remove cell_geometry_3d0, 1× remove reconnect_t1_3d0
 (established INERT). ZERO novel edits, ZERO Track B. The map has gained no cell since round 5. **Before you
 propose, check the op is not already in the settled map below — a re-removal buys nothing but a spent slot.**
 
@@ -60,7 +60,7 @@ TIGHT/BIMODAL: live bud 1.19–1.30, shape-zeroed/morphogen-off 1.003–1.05; �
 too (r4,r7,r9). Land the clause inside one attractor.
 
 **Settled op-map (do NOT re-probe by removal — removal only holds/shrinks/diverges, never amplifies).**
-NECESSARY: morphogen_growth_3d0, divide_3d0. INERT: reconnect_t1_3d0, cell_adjacency0. SHAPE-ZEROING: extrude0,
+NECESSARY: grow_3d0, divide_3d0. INERT: reconnect_t1_3d0, cell_adjacency0. SHAPE-ZEROING: extrude0,
 vesicle_growth0 removal → sphere 1.003. DESTABILISING: cell_diffuse0 removal (diverges), vesicle_growth
 uniform_ramp add (explodes). cell_geometry_3d0 removal → P1_INERT gate, not evidence.
 

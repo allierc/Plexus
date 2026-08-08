@@ -22,12 +22,12 @@ def build():
     verts, es, et, ef, nF = build_sphere_mesh(CELLS, R, J, SEED); Nv = verts.shape[0]
     ops = [{"op": "seed_mesh_3d", "at": "vertex", "n_cells": CELLS, "radius": R, "jitter": J, "p0": 3.90, "seed": SEED, "before_frame": 1, "vseed_cv": 0.15},
            {"op": "cell_geometry_3d", "at": "cell"},
-           {"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": 0.03, "a_sw": 0.5, "hill": 4.0, "rho": 0.15, "vth_frac": 1.35},
+           {"op": "grow_3d", "at": "vertex", "cell_set": "cell", "rate": 0.03, "a_sw": 0.5, "hill": 4.0, "rho": 0.15, "vth_frac": 1.35},
            {"op": "shape_energy_3d", "at": "vertex", "p0": 3.90, "K_A": 1.0, "K_P": 1.0, "Gamma": 0.05, "Lambda": 0.2, "K_V": 3.0, "K_R": 0.05, "mu": 1.0, "dt": 1.0, "relax_iters": 45, "eta": 0.08, "cap_frac": 0.12},
            {"op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": 0.28, "every": 1, "max_flips": 120},
            {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "cycle_cv": 0.3, "p0": 3.90, "every": 2, "max_div": 40, "max_div_frac": 0.02, "cell_set": "cell", "min_cycle": 4, "max_cycle": 16},
            {"op": "topo_snapshot_3d", "at": "vertex", "every": 50}]
-    sched = ["seed_mesh_3d", "cell_geometry_3d", "morphogen_growth_3d", "shape_energy_3d", "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
+    sched = ["seed_mesh_3d", "cell_geometry_3d", "grow_3d", "shape_energy_3d", "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
     cfg = {"general": {"name": "smoke_hom_ckpt", "seed": SEED, "n_frames": FR, "dt": 1.0, "record_cap": 4, "boundary": "free", "dim": 3, "world": [16 * R] * 3},
            "sets": {"vertex": {"n": int(Nv * 10)}, "cell": {"n": int(nF * 10), "state": {"chem": {"width": 2, "integration": "first_order"}, "cen": {"width": 3}, "area": {"width": 1}}}},
            "fields": {}, "operators": ops, "schedule": sched}

@@ -54,7 +54,7 @@
    "tier": "static",
    "premise": "morphogen sets where/how fast, not whether",
    "status": "na",
-   "detail": "no morphogen_growth_3d in this composition",
+   "detail": "no grow_3d in this composition",
    "measured": null
   },
   {
@@ -62,7 +62,7 @@
    "tier": "static",
    "premise": "a cell divides because it got big",
    "status": "na",
-   "detail": "needs both morphogen_growth_3d and divide_3d",
+   "detail": "needs both grow_3d and divide_3d",
    "measured": null
   },
   {

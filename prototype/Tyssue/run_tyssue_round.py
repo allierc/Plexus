@@ -542,8 +542,8 @@ def make(p):
               "eta": 0.08, "cap_frac": 0.12}
     else:
         se = {"op": "shape_energy_3d", "at": "vertex", "p0": 3.90, "K_A": 1.0, "K_P": 1.0, "Gamma": 0.05, "Lambda": 0.2, "K_V": p.get("K_V", 4.0), "K_R": 0.02, "K_bend": p.get("K_bend", 0.0), "antiinv": p.get("antiinv", 0.0), "mu": 1.0, "dt": dt, "relax_iters": p.get("relax", 30), "eta": 0.08, "cap_frac": 0.12}
-    ops += [{"op": "morphogen_growth_3d", "at": "vertex", "cell_set": "cell", "rate": p["rate"], "a_sw": p["a_sw"], "hill": p.get("hill", 4.0), "rho": p["rho"], "vth_frac": p["vth"], "after_frame": ga, "dt": dt, "conserve_amount": p.get("conserve_amount", True)}, se]
-    sched += ["morphogen_growth_3d", "shape_energy_3d"]
+    ops += [{"op": "grow_3d", "at": "vertex", "cell_set": "cell", "rate": p["rate"], "a_sw": p["a_sw"], "hill": p.get("hill", 4.0), "rho": p["rho"], "vth_frac": p["vth"], "after_frame": ga, "dt": dt, "conserve_amount": p.get("conserve_amount", True)}, se]
+    sched += ["grow_3d", "shape_energy_3d"]
     if p.get("K_purse", 0.0) > 0 or p.get("K_extrude", 0.0) > 0:   # RD-INTERFACE tube mechanism (purse-string + red extrusion)
         ops += [{"op": "rd_interface_tension", "at": "vertex", "cell_set": "cell", "K_purse": p.get("K_purse", 0.0), "K_extrude": p.get("K_extrude", 0.0), "a_sw": p.get("iface_asw", p["a_sw"]), "eta": p.get("iface_eta", 0.05), "iters": 4, "after_frame": ga}]
         sched += ["rd_interface_tension"]
