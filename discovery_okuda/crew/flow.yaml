@@ -38,6 +38,14 @@ premises:
   retired:
     # Cedric, 8 August: "delete premise 3 5 and 7, they are too strong. I keep P1 and P11,
     # there are sound gate keepers." Measured over rounds 1-4 of this campaign:
+    P2:  >-
+      "a morphogen sets WHERE and HOW FAST, not WHETHER" -- so a gated composition must keep
+      rho > 0, and rho = 0 is refused before the GPU. The objection is real at the limit (an
+      infinite tip-to-body ratio is a body frozen while its tip builds itself out of nothing) and
+      it has never been tested anywhere short of the limit. Meanwhile it bars the campaign from
+      the one regime Okuda is about: at the basis default rho = 1.0 a red cell grows 2x a white
+      one, which is a bias, not localization, and every run is a sphere. Retired so the ratio can
+      be swept as a quantity instead of vetoed as a principle.
     P3:  >-
       refused FOUR route A slots in round 3 before the GPU, because the vth_frac grid and the
       factor grid cross each other on coral_gate_div. The relation is real; as a veto it spent
@@ -231,22 +239,54 @@ nodes:
       # The round's own control measures that point every round for nothing.
       slots: 8
       plan:
-        # ---- DIVISION AND GROWTH FIRST, because nothing downstream means anything until the
-        # tissue actually gains material. Swept on all four bases so the answer can be separated
-        # from the chemistry that happens to be running.
+        # ---- LOCALIZATION FIRST, and the previous version of this plan led with `divide_3d.factor`
+        # at [1.3, 1.6, ...] instead. That ordering came from "nothing downstream means anything
+        # until the tissue gains material", which was true of the old substrate and is false of
+        # this one: the basis reaches 53,000 cells and one Route A rung hit 129,703. The problem
+        # is now the opposite, and the Grounder has said so for three rounds running -- Okuda
+        # Fig 5a grows 2032 -> 3572 cells (1.76x), the control reached 30,743 (15x), and
+        # "over-proliferation floods the surface, raising n_spots while each dilutes into a bulge".
+        # Leading with the low end of `factor` walks further into the failure.
+        #
+        # `rho` IS THE LOCALIZATION KNOB. Growth is rate*(rho + Hill(a)), so the tip-to-body ratio
+        # is (rho+1):rho -- and the basis default rho = 1.0 is 2:1. A red cell grows twice as fast
+        # as a white one, which is a bias, not localization, and every run in the basis and every
+        # run in rounds 1-3 is a sphere. The old grid [0.25, 0.5, 2.0, 3.0] made this worse: three
+        # of its four values are LESS localized than the base and its best is 5:1.
+        #
+        #     rho 0.05 -> 21:1     rho 0.1 -> 11:1     rho 0.25 -> 5:1     rho 0.5 -> 3:1
+        #
+        # 0.0 (infinite ratio, activator-only growth) is now reachable too -- P2 was retired on
+        # 8 August precisely because it vetoed the limit case as a principle instead of letting
+        # the campaign measure where the objection starts to bite.
+        - [b_none_uniform_plain, grow_3d,   rho,      [0.0, 0.05, 0.25, 0.5]]
+        - [b_gs_gated_plain,     grow_3d,   rho,      [0.05, 0.1, 0.25, 0.5]]
+        - [b_gm_gated_plain,     grow_3d,   rho,      [0.05, 0.1, 0.25, 0.5]]
+        - [b_bru_gated_plain,    grow_3d,   rho,      [0.05, 0.1, 0.25, 0.5]]
+        # HOW BIG A RED CELL MAY GET BEFORE IT DIVIDES -- the lever the Grounder has asked for in
+        # three consecutive rounds and nobody moved: "cap cells_final near 3600 so growth loads
+        # into elongation, not more cells". Okuda Fig 5a grows 2032 -> 3572 cells, 1.76x. This
+        # campaign's control reached 30,743, FIFTEEN times, and the Grounder's reading is that the
+        # surface floods with spots which each dilute into a bulge.
+        #
+        # `vth_frac` caps a cell's target volume at vth_frac x v_ref; `factor` divides it at
+        # factor x its BIRTH volume. At the basis values (2.5 and 2.0) a cell divides at 2x and
+        # can never reach 2.5x -- so growth has nowhere to go except into more cells. Cedric,
+        # 8 August: "we should allow up to x4 or x10 cell growth in red spot?" These grids are
+        # that question. They must be swept TOGETHER: factor above vth_frac is a cell that can
+        # never reach the size that divides it, which is the relation the retired P3 used to veto.
+        - [b_gs_gated_plain,     grow_3d,   vth_frac, [4.0, 6.0, 10.0, 16.0]]
+        - [b_gm_gated_plain,     grow_3d,   vth_frac, [4.0, 6.0, 10.0, 16.0]]
+        - [b_bru_gated_plain,    grow_3d,   vth_frac, [4.0, 6.0, 10.0, 16.0]]
+        - [b_gs_gated_plain,     divide_3d, factor,   [2.4, 3.0, 5.0, 8.0, 14.0]]
+        - [b_gm_gated_plain,     divide_3d, factor,   [2.4, 3.0, 5.0, 8.0, 14.0]]
+        - [b_bru_gated_plain,    divide_3d, factor,   [2.4, 3.0, 5.0, 8.0, 14.0]]
+        # The low end of `factor` stays on the CHEMISTRY-FREE base only. Rounds 1-3 closed that
+        # ladder on three bases and it produced the campaign's one replicated law -- fewer
+        # divisions, bigger cells, rounder shell, higher coupling, monotone on all of them. It is
+        # knowledge, not a question, and re-running it on the gated bases would spend eight slots
+        # confirming that flooding floods. Keeping it here preserves the geometric control.
         - [b_none_uniform_plain, divide_3d, factor,   [1.3, 1.6, 2.4, 3.0]]
-        - [b_gs_gated_plain,     divide_3d, factor,   [1.3, 1.6, 2.4, 3.0]]
-        - [b_gm_gated_plain,     divide_3d, factor,   [1.3, 1.6, 2.4, 3.0]]
-        - [b_bru_gated_plain,    divide_3d, factor,   [1.3, 1.6, 2.4, 3.0]]
-        # `rho` is the baseline growth every cell gets regardless of the activator. The last
-        # campaign's one real curve came from this knob: cells 4.0k -> 14.2k with grip peaking at
-        # an INTERIOR point, which is the only non-monotone result the project has produced.
-        # 0.0 is omitted on the gated bases -- premise P2 refuses a connected gate at rho = 0, and
-        # a value refused before the GPU never records, so it would be re-proposed every round.
-        - [b_none_uniform_plain, grow_3d,   rho,      [0.0, 0.25, 0.5, 2.0]]
-        - [b_gs_gated_plain,     grow_3d,   rho,      [0.25, 0.5, 2.0, 3.0]]
-        - [b_gm_gated_plain,     grow_3d,   rho,      [0.25, 0.5, 2.0, 3.0]]
-        - [b_bru_gated_plain,    grow_3d,   rho,      [0.25, 0.5, 2.0, 3.0]]
         # ---- THE GATE ITSELF: where the activator opens growth, and how sharply.
         - [b_gs_gated_plain,     grow_3d,   a_sw,     [0.1, 0.2, 0.5, 0.7]]
         - [b_gm_gated_plain,     grow_3d,   a_sw,     [0.1, 0.2, 0.5, 0.7]]
