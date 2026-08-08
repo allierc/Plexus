@@ -854,6 +854,22 @@ def run_claude(prompt, timeout_min=DEFAULT_TIMEOUT_MIN, allowed_tools=None, cwd=
     # keeps the line-by-line stream AND ends with a `result` event carrying tokens, turns,
     # duration and cost. That event is the whole point: until now the ledger measured minutes,
     # and minutes are not what a subscription is spent in.
+    # ~/.claude/CLAUDE.md REACHES EVERY ROLE, and nothing in this repo says so. This is the real
+    # `claude` CLI with the user's own auth and no memory opt-out, so the user-level CLAUDE.md is
+    # loaded into the Proposer, Analyst, Eye and Grounder exactly as it is into an interactive
+    # session. On 8 August a response-style rule was added there -- "answer in 2-4 sentences" --
+    # which would have gutted the Analyst's per-run tables and the Grounder's comparison against
+    # Okuda's figures, silently, with nothing in the record to show it.
+    #
+    # `--bare` skips CLAUDE.md auto-discovery and would close this, but it also skips keychain
+    # reads: measured, it returns "Not logged in - Please run /login". So the file has to carve
+    # out non-interactive roles itself, and it now does. Verified in the loop's exact call shape:
+    # the CLI reports it sees both the rule and the exception, and a role-shaped prompt returns a
+    # seven-column table plus multi-paragraph findings rather than four sentences.
+    #
+    # WHAT TO WATCH. A rule about tone is harmless once scoped. A rule about how to REASON, or
+    # what to conclude, would bias the Proposer's choices and the Analyst's findings from outside
+    # the repository, outside the flow graph, and outside every check in this directory.
     cmd = ["claude", "-p", prompt, "--output-format", "stream-json", "--verbose",
            "--max-turns", str(max_turns), "--allowedTools", *allowed_tools]
     # --allowedTools AUTO-APPROVES; it does not restrict. A tool outside the list is not absent,
