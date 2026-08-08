@@ -681,7 +681,14 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, f
                 # still sizing themselves off the current radius each frame, so the two rows had the
                 # camera convention this file already fixed once for the panels -- growth visible in the
                 # panel and invisible in the inset sitting on top of it.
-                RD.draw_zoom(inz, mt, vp, mem_q=_raw, mem_s=None, name=name, frac=0.22, r_ref=Lt,
+                # `mem_s=_rs`, THE SAME ARRAY AND THE SAME SCALE the panel above it uses. Passing None
+                # left the inset on a flat colour while the panel it magnifies was coloured by strain,
+                # so the two disagreed about what they were showing.
+                RD.draw_zoom(inz, mt, vp, mem_q=_raw, mem_s=_rs, name=name, frac=0.22, r_ref=Lt,
+                             # mem_hi=1.0 as well: _rs is ALREADY divided by the run-wide scale, so
+                             # letting the inset fall back to percentile(mem_s, 99) normalises it a
+                             # second time -- same colormap, different stretch, green beside orange
+                             mem_hi=1.0,
                              junctions=False, bonds=_bij, bond_s=_bs)
                 RD.draw_zoom(inzc, mt, vp, mem_q=None, mem_s=None, name=name, frac=0.16, lw=2.4,
                              r_ref=Lt, myo_hi=myo_sc)

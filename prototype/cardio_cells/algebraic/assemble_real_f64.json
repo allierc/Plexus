@@ -1,0 +1,126 @@
+{
+ "argv": {
+  "device": "cuda:1",
+  "cells": 24,
+  "per_parent": 40,
+  "n_grid": 64,
+  "warmup": 12,
+  "dtype": "float64",
+  "mode": "full",
+  "fidelity": false,
+  "frames": "",
+  "cost": false,
+  "both_modes": false,
+  "real": true,
+  "light": true,
+  "out": "/workspace/Plexus/prototype/cardio_cells/algebraic/assemble_real_f64.json"
+ },
+ "real": {
+  "mode": "real",
+  "C": 472,
+  "Np": 236000,
+  "n_grid": 128,
+  "dtype": "torch.float64",
+  "dt": 0.002,
+  "dt_sub": 0.0002,
+  "substeps_per_frame": 10,
+  "warmup_frames": 12,
+  "E_true_range": [
+   40.0,
+   220.0
+  ],
+  "gain_true_range": [
+   0.5030144610855877,
+   1.4955541041243257
+  ],
+  "norm_active_force_delta": 16392.785644274365,
+  "norm_passive_delta": 2512.142837699533,
+  "wall_diag": {
+   "grid_nodes_massive": 16129,
+   "grid_nodes_normal_clamped": 0,
+   "grid_nodes_sign_conditional_damped": 250,
+   "particles_in_wall_contact_band": 62290,
+   "cfl_hits": 0,
+   "cfl_vmax": 15.625,
+   "max_speed": 0.4058008501756991,
+   "max_abs_cell_delta_(a_max_clamp_target)": 0.0
+  },
+  "A_shape": [
+   472000,
+   944
+  ],
+  "assembly_seconds": 19.08644437789917,
+  "solver_evaluations": 945,
+  "norm_a_obs": 3517.9553178847245,
+  "norm_a0_offset": 3307.4497757449035,
+  "offset_over_total": 0.9401625310390828,
+  "norm_b": 5699.643900568331,
+  "RESIDUAL_rel_b": 7.814682782649664e-05,
+  "RESIDUAL_rel_a_obs": 0.00012661021824400846,
+  "interior_particle_fraction": 0.8344745635986328,
+  "RESIDUAL_interior": 7.175468059771857e-14,
+  "RESIDUAL_wallband": 0.0008389539124020016,
+  "resid_frac_on_wall_particles": 1.0000000000000002,
+  "null_repeat": 0.0,
+  "null_scale_10x_columns": NaN,
+  "null_scale_10x_residual": NaN,
+  "null_permuted_columns": 294.8283861333095,
+  "null_shuffled_theta": 330.73653332823307,
+  "null_zero_A": 1.0,
+  "residual_other_theta": {
+   "0.5x": 7.532085080602576e-05,
+   "2x": 8.112528562504726e-05,
+   "random": 7.729142126303976e-06
+  },
+  "block_norm_E": 456.55474021598496,
+  "block_norm_gain": 14054.74503744561,
+  "contrib_norm_E": 15343.003859263412,
+  "contrib_norm_gain": 16608.45699437522,
+  "singular_values": [
+   1998.4650099064788,
+   1981.5948923283568,
+   1979.8851095760888,
+   1954.3122557695974,
+   1952.639471864726,
+   "...",
+   0.00038670490793797565,
+   0.00021635016928229207,
+   8.907891874732825e-05
+  ],
+  "rank_tol1e-10": 944,
+  "cond_A": 22434769.505623564,
+  "cond_G": 503318882770457.0,
+  "cond_A_dimensionless": 27773696.794844143,
+  "cond_G_dimensionless": 771378233651935.9,
+  "per_cell_1pct_signal_over_b_E": [
+   3.1797451866696643e-08,
+   0.0023317494592784865,
+   0.0221480257034675
+  ],
+  "per_cell_1pct_signal_over_b_gain": [
+   9.113993810862929e-10,
+   6.911863322466472e-05,
+   0.004610330191340647
+  ],
+  "eff_rank_dimensionless": {
+   "sv>0.01*svmax": 529,
+   "sv>0.0001*svmax": 816,
+   "sv>1e-06*svmax": 927,
+   "sv>1e-08*svmax": 944
+  },
+  "theta_rel_error_at_1e-3_noise_on_b": 0.029507834858580047,
+  "lstsq_theta_rel_error_noisefree": 9.550118195280216e-05,
+  "substep_sweep": {
+   "1": {
+    "residual_rel_b": 7.814682782649664e-05,
+    "residual_rel_a_obs": 0.00012661021824400846,
+    "assembly_s": 19.126877546310425
+   },
+   "10": {
+    "residual_rel_b": 1.6734233888474623,
+    "residual_rel_a_obs": 2.3434865421403543,
+    "assembly_s": 188.18542098999023
+   }
+  }
+ }
+}

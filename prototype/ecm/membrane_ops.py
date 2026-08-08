@@ -1101,6 +1101,7 @@ class MPMTissueBoundary(FieldUpdate):
         self.scale = float(params.get("scale", 1.0))
         self.dt_frame = float(params.get("dt_frame", 4.0e-3))
         self.band = float(params.get("band", 2.0))        # surface band width, in grid cells
+        self.recover = float(params.get("recover", 2.0))  # frames to clear an overlap; 0 = velocity only
         import numpy as _np
         z = _np.load(str(params["surface"]))
         self.smap = torch.as_tensor(_np.asarray(z["smap"], _np.float32)) * self.scale
@@ -1137,10 +1138,26 @@ class MPMTissueBoundary(FieldUpdate):
         nth, nph = M.shape
         th = torch.acos(u[:, 2].clamp(-1.0, 1.0))
         ph = torch.atan2(u[:, 1], u[:, 0])
-        ti = (th / math.pi * nth).long().clamp(0, nth - 1)
-        pi = ((ph + math.pi) / (2 * math.pi) * nph).long().clamp(0, nph - 1)
-        R = M[ti, pi]
-        Rdot = (Mn[ti, pi] - R) / max(self.dt_frame, 1e-9)
+        # BILINEAR, NOT NEAREST-BIN. The map is 32x64, so a bin subtends a fixed ANGLE and therefore a
+        # growing LENGTH: at the last frame its equatorial width is 1.40 grid cells. Read by nearest bin
+        # that is a staircase whose steps outgrow the grid, and the membrane -- which is smooth -- ends
+        # up inside the step. Measured on 94: the fraction of the sheet lying inside the surface goes
+        # 0.0% -> 7.8% -> 31.3% -> 46.6% over the run, exactly as the steps widen.
+        #
+        # This removes the staircase; it does not add information. With ~2,800 vertices against 2,048
+        # bins the map is at its resolution limit, so a sheet that must follow the true apical surface
+        # needs the FACES, not a finer radius map.
+        fth = (th / math.pi * nth - 0.5).clamp(0, nth - 1)
+        fph = ((ph + math.pi) / (2 * math.pi) * nph - 0.5) % nph
+        t0 = fth.floor().long().clamp(0, nth - 1); t1 = (t0 + 1).clamp(0, nth - 1)
+        p0 = fph.floor().long() % nph; p1 = (p0 + 1) % nph
+        wt = (fth - t0.to(fth.dtype))[:, None]; wp = (fph - p0.to(fph.dtype))[:, None]
+        wt = wt[:, 0]; wp = wp[:, 0]
+        def _bil(A):
+            return ((A[t0, p0] * (1 - wp) + A[t0, p1] * wp) * (1 - wt)
+                    + (A[t1, p0] * (1 - wp) + A[t1, p1] * wp) * wt)
+        R = _bil(M)
+        Rdot = (_bil(Mn) - R) / max(self.dt_frame, 1e-9)
         # ON NODES THAT CARRY MASS, IN A BAND AROUND THE SURFACE -- not on the nodes strictly inside.
         # Run 90 imposed the velocity inside r < R and the membrane did not move one step (R stayed
         # 0.0875 for 402 frames) for a reason that is obvious afterwards: the LUMEN IS EMPTY. There are
@@ -1149,7 +1166,12 @@ class MPMTissueBoundary(FieldUpdate):
         # there is no material to impose it on. The material is in the shell just OUTSIDE the surface,
         # so that is where the constraint has to act.
         band = self.band * g.dx
-        near = (r < R + band) & (g.m > 1.0e-9)
+        # A SHELL, NOT A BALL. `r < R + band` is every node inside the tissue as well, which was
+        # harmless while the constraint only topped velocity up to Rdot -- bounded -- and is not harmless
+        # with a penetration term: a node near the centre has pen = R, so it was handed an enormous
+        # outward velocity, and membrane particles sampling it through the B-spline stencil were flung
+        # out. That is the constant standoff visible from the very first frame.
+        near = (r > R - band) & (r < R + band) & (g.m > 1.0e-9)
         if bool(near.any()):
             gm = g.m.clamp(min=1e-10)
             # `g.v`, NOT `g.mv`. `mpm_grid_update` ends by writing the solved velocity into `g.v`, and
@@ -1163,8 +1185,20 @@ class MPMTissueBoundary(FieldUpdate):
             # and never pulls it back in or drags it tangentially. Full no-slip would weld the sheet to
             # the epithelium, which is what the integrin anchor is for and is a different experiment.
             vn = (gv * u).sum(-1)
-            push = near & (vn < Rdot)
-            gv_new = torch.where(push[:, None], gv + (Rdot - vn)[:, None] * u, gv)
+            # VELOCITY ALONE CANNOT RECOVER LOST GROUND. Topping the normal velocity up to Rdot keeps
+            # material moving WITH the surface but never pushes back material the surface has already
+            # overtaken -- so the stroma's back-pressure squeezes the sheet inward between corrections
+            # and the standoff decays monotonically: +0.0081 at frame 100 to +0.0006 at 402, with 47% of
+            # the sheet ending up inside the epithelium. A wider band hides it by catching the sheet
+            # earlier, which is what band 2.0 was doing, at the cost of a visible gap.
+            #
+            # The penetration term makes it a real non-penetration constraint: anything inside R is given
+            # the extra outward speed that clears the overlap over `recover` frames, on top of Rdot.
+            # Zero reproduces the previous behaviour exactly.
+            pen = (R - r).clamp(0.0, band)      # clamped: at most one band's worth of overlap per step
+            v_want = Rdot + pen / max(self.recover * self.dt_frame, 1e-9)
+            push = near & (vn < v_want)
+            gv_new = torch.where(push[:, None], gv + (v_want - vn)[:, None] * u, gv)
             # THE OTHER HALF OF THE COUPLING, and it costs one subtraction. The momentum the boundary
             # must INJECT to hold its prescribed motion is exactly what the material is exerting back on
             # the tissue: dp = m*(v_bc - v_free), summed over the constrained nodes. Pass 2 replays a

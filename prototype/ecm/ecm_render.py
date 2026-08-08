@@ -468,7 +468,7 @@ def draw_membrane_3d(ax, mem_q, mem_s, cam, L, mem_hi=None, cutaway=True, s_dot=
                    cmap=_cmap(MEMBRANE_COLORS), vmin=0, vmax=1, marker=".", linewidths=0)
 
 
-def draw_zoom(ax, mt, pos, mem_q=None, mem_s=None, cam=None, frac=0.55, myo_hi=None, r_ref=None,
+def draw_zoom(ax, mt, pos, mem_q=None, mem_s=None, cam=None, frac=0.55, myo_hi=None, mem_hi=None, r_ref=None,
               mem_hi=None, name="", lw=None, junctions=True, bonds=None, bond_s=None,
               bond_hi=None):
     """A ZOOM on one patch of the surface: junctions coloured by MYOSIN, membrane by BOND STRAIN.

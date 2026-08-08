@@ -289,6 +289,23 @@ SERIES = {
     "95_band05": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
                       membrane_exclude=False, membrane_adhesion=0.0, membrane_secrete_rate=0.0,
                       membrane_tau=0.0, membrane_reserve=0.0, membrane_band=0.5),
+    # 96: band 1.0 with the surface read by BILINEAR interpolation instead of nearest bin -- the
+    #     staircase fix. 94 is its control (same run, nearest bin).
+    "96_bilinear": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
+                        membrane_exclude=False, membrane_adhesion=0.0, membrane_secrete_rate=0.0,
+                        membrane_tau=0.0, membrane_reserve=0.0, membrane_band=1.0),
+    # 97: non-penetration. 96 showed the bilinear read changes nothing (47.9% inside vs 94's 46.6%), so
+    #     the staircase was not the cause -- the constraint simply never pushed back material the surface
+    #     had already overtaken.  clears an overlap over 2 frames.
+    "97_recover": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
+                       membrane_exclude=False, membrane_adhesion=0.0, membrane_secrete_rate=0.0,
+                       membrane_tau=0.0, membrane_reserve=0.0, membrane_band=1.0, membrane_recover=2.0),
+    # 98: 97 fixed the sinking (46.6% inside -> 3.8%) but opened a standoff visible from frame 0,
+    #     because  was a BALL, not a shell: every node inside the tissue qualified, and with the
+    #     penetration term a node near the centre carries pen = R and an enormous outward velocity.
+    "98_shell": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
+                     membrane_exclude=False, membrane_adhesion=0.0, membrane_secrete_rate=0.0,
+                     membrane_tau=0.0, membrane_reserve=0.0, membrane_band=1.0, membrane_recover=2.0),
     "_unused_secrete_dense": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
                              membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
                              membrane_particles=90000, membrane_reserve=1.0,

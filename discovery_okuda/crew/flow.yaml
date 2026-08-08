@@ -122,10 +122,22 @@ nodes:
         - b_gs_uniform_shaping
         - b_gs_gated_plain         # the campaign's own question: pattern gating growth
         - b_gs_gated_shaping
-        - b_gm_uniform_plain
-        - b_gm_uniform_shaping
-        - b_gm_gated_plain
-        - b_gm_gated_shaping
+        # THE FOUR gm MEMBERS ARE DROPPED, 8 August. Gierer-Meinhardt does not sustain a pattern
+        # on this substrate at dt = 1: its activator peaks at ~4,240 -- unbounded by construction,
+        # a^2/h with no ceiling, unlike Gray-Scott's [0,1] -- and collapses to 0.7-1.9% of that,
+        # which premise P4 refuses. Cedric watched b_gm_gated_plain's movie and named it before
+        # the metric did: "chemistry flickering that can not be".
+        #
+        # FIVE INTERVENTIONS, none of which moved it: sat 0.5 (peak 872 -> final 6.1), sat 1.5
+        # (316 -> 3.0), mu_h 0.3 (4106 -> 0.8), rate 0.12 (1277 -> 0.6), and nine cone-seeded
+        # spots ten cells across (4232 -> 30, WORSE than scatter, and coarsening 2 spots to 1).
+        # Lowering the peak never stopped the collapse. Starting at the pattern's own length scale
+        # does not help a pattern that cannot hold one.
+        #
+        # The runs stay on disk and the negative stays on the record -- "GM does not sustain here"
+        # is worth knowing, and the column was added precisely so the chemistry axis could be
+        # varied. What it must not do is be a PARENT: every Route B run inherits its parent's
+        # composition, and a dead field poisons every reading taken downstream of it.
         # THE FOURTH CHEMISTRY, added 8 August with the column itself. Measured: brusselator
         # patterns (act_cv 0.80) and does NOT couple -- corr_act_rad 0.06-0.29 and grip ~1e-4,
         # against gray_scott's 0.56-0.81 and 0.033-0.051 on the same growth and mechanics. It is
@@ -261,7 +273,6 @@ nodes:
         # the campaign measure where the objection starts to bite.
         - [b_none_uniform_plain, grow_3d,   rho,      [0.0, 0.05, 0.25, 0.5]]
         - [b_gs_gated_plain,     grow_3d,   rho,      [0.05, 0.1, 0.25, 0.5]]
-        - [b_gm_gated_plain,     grow_3d,   rho,      [0.05, 0.1, 0.25, 0.5]]
         - [b_bru_gated_plain,    grow_3d,   rho,      [0.05, 0.1, 0.25, 0.5]]
         # HOW BIG A RED CELL MAY GET BEFORE IT DIVIDES -- the lever the Grounder has asked for in
         # three consecutive rounds and nobody moved: "cap cells_final near 3600 so growth loads
@@ -283,10 +294,8 @@ nodes:
         # that question. They must be swept TOGETHER: factor above vth_frac is a cell that can
         # never reach the size that divides it, which is the relation the retired P3 used to veto.
         - [b_gs_gated_plain,     grow_3d,   vth_frac, [4.0, 6.0, 10.0]]
-        - [b_gm_gated_plain,     grow_3d,   vth_frac, [4.0, 6.0, 10.0]]
         - [b_bru_gated_plain,    grow_3d,   vth_frac, [4.0, 6.0, 10.0]]
         - [b_gs_gated_plain,     divide_3d, factor,   [2.4, 3.0, 5.0, 8.0]]
-        - [b_gm_gated_plain,     divide_3d, factor,   [2.4, 3.0, 5.0, 8.0]]
         - [b_bru_gated_plain,    divide_3d, factor,   [2.4, 3.0, 5.0, 8.0]]
         # The low end of `factor` stays on the CHEMISTRY-FREE base only. Rounds 1-3 closed that
         # ladder on three bases and it produced the campaign's one replicated law -- fewer
@@ -296,10 +305,8 @@ nodes:
         - [b_none_uniform_plain, divide_3d, factor,   [1.3, 1.6, 2.4, 3.0]]
         # ---- THE GATE ITSELF: where the activator opens growth, and how sharply.
         - [b_gs_gated_plain,     grow_3d,   a_sw,     [0.1, 0.2, 0.5, 0.7]]
-        - [b_gm_gated_plain,     grow_3d,   a_sw,     [0.1, 0.2, 0.5, 0.7]]
         - [b_bru_gated_plain,    grow_3d,   a_sw,     [0.1, 0.2, 0.5, 0.7]]
         - [b_gs_gated_plain,     grow_3d,   hill,     [1.0, 2.0, 8.0, 16.0]]
-        - [b_gm_gated_plain,     grow_3d,   hill,     [1.0, 2.0, 8.0, 16.0]]
         - [b_bru_gated_plain,    grow_3d,   hill,     [1.0, 2.0, 8.0, 16.0]]
         - [b_none_uniform_plain, grow_3d,   rate,     [0.000433, 0.001732, 0.003464, 0.006928]]
         - [b_gs_gated_plain,     grow_3d,   rate,     [0.000433, 0.001732, 0.003464, 0.006928]]
@@ -309,24 +316,18 @@ nodes:
         # brusselator reads gamma (with A, B fixed at the Turing-unstable 1.0 / 3.0).
         - [b_gs_gated_plain,     cell_react, F,       [0.03, 0.038, 0.054, 0.06]]
         - [b_gs_gated_plain,     cell_react, kk,      [0.052, 0.057, 0.066, 0.07]]
-        - [b_gm_gated_plain,     cell_react, a0,      [0.0, 0.002, 0.02, 0.05]]
-        - [b_gm_gated_plain,     cell_react, sat,     [0.0, 0.03, 0.3, 1.0]]
-        - [b_gm_gated_plain,     cell_react, mu_h,    [0.3, 0.6, 1.5, 2.0]]
         - [b_bru_gated_plain,    cell_react, gamma,   [0.05, 0.15, 0.6, 1.2]]
         # Diffusion is shared vocabulary and IS comparable across the three, so it is swept on all
         # of them: the ratio d_h/d_a is what sets the Turing wavelength in every one of these
         # schemes, and whether the spacing responds the same way is a real question about the
         # models rather than about their parameter names.
         - [b_gs_gated_plain,     cell_diffuse, d_a,   [0.02, 0.04, 0.16, 0.3]]
-        - [b_gm_gated_plain,     cell_diffuse, d_a,   [0.02, 0.04, 0.16, 0.3]]
         - [b_bru_gated_plain,    cell_diffuse, d_a,   [0.02, 0.04, 0.16, 0.3]]
         - [b_gs_gated_plain,     cell_diffuse, d_h,   [0.04, 0.08, 0.32, 0.6]]
-        - [b_gm_gated_plain,     cell_diffuse, d_h,   [0.04, 0.08, 0.32, 0.6]]
         - [b_bru_gated_plain,    cell_diffuse, d_h,   [0.04, 0.08, 0.32, 0.6]]
         - [b_gs_gated_plain,     cell_diffuse, chi,   [0.3, 0.65, 2.0, 2.8]]
         # ---- SHAPE -> CHEMISTRY, the second arrow. beta = 0 is the null and must be run.
         - [b_gs_gated_plain,     shape_to_chem, beta, [-2.0, 0.0, 1.0, 2.0]]
-        - [b_gm_gated_plain,     shape_to_chem, beta, [-2.0, 0.0, 1.0, 2.0]]
         - [b_bru_gated_plain,    shape_to_chem, beta, [-2.0, 0.0, 1.0, 2.0]]
         - [b_gs_gated_plain,     shape_to_chem, F0,   [0.02, 0.03, 0.07, 0.1]]
         # ---- MECHANICS LAST, and these have NEVER been swept by this project. K_bend and K_lumen

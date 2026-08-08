@@ -1,0 +1,245 @@
+{
+  "null_repeat_deviation": 0.0,
+  "null_theta_ulp_sensitivity": 3.0655681246484427e-15,
+  "dtype_eps": 2.220446049250313e-16,
+  "tolerance": 3.065568124648443e-14,
+  "diagnostics": {
+    "grid_nodes_massive": 16129,
+    "grid_nodes_wall_normal_clamped": 0,
+    "grid_nodes_sign_conditional_damped": 248,
+    "grid_nodes_nonlinear_total": 248,
+    "particles": 236000,
+    "cfl_cap_hits": 0,
+    "cfl_vmax": 15.625,
+    "max_speed": 0.4321386222055465,
+    "pos_clamp_hits": 0,
+    "wall_contact_particles": 62290
+  },
+  "materials": {
+    "is_liquid": 0,
+    "is_snow": 0,
+    "is_visco": 0,
+    "Jp_deviation_from_1": 0.0,
+    "F_res_inv_present": false,
+    "H.active_stress_present": false,
+    "H.part_accel_present": false
+  },
+  "n_cells": 472,
+  "n_particles": 236000,
+  "dt_sub": 0.0002,
+  "substeps_per_frame": 10,
+  "T0c_drag": {
+    "k": 30.0,
+    "rel_err_vs_minus_k_v": 2.9566549718360485e-16,
+    "drag_frac_of_body_force": 0.17008777330740973,
+    "mpm_scatter_own_drag_param": 0.0,
+    "note": "drag reads only the frozen `vel`; it is recomputed by the OUTER schedule, not inside the substep loop, so within one substep it is a constant -> belongs to b"
+  },
+  "offset_frac_E": 4.1440672893465145,
+  "offset_frac_gain": 4.5712621751303075,
+  "T1_homogeneity_E": {
+    "0.5": {
+      "rel": 8.433841456015043e-06,
+      "relmax": 0.0004994137871227711
+    },
+    "1.0": {
+      "rel": 0.0,
+      "relmax": 0.0
+    },
+    "2.0": {
+      "rel": 6.128501364622086e-06,
+      "relmax": 0.0002891066313725554
+    },
+    "4.0": {
+      "rel": 1.0682586262754785e-05,
+      "relmax": 0.0004337347177577869
+    },
+    "worst": 1.0682586262754785e-05,
+    "PASS": false
+  },
+  "T3a_homogeneity_gain": {
+    "0.5": {
+      "rel": 6.26908105896796e-08,
+      "relmax": 5.039666249876553e-06
+    },
+    "1.0": {
+      "rel": 0.0,
+      "relmax": 0.0
+    },
+    "2.0": {
+      "rel": 3.13454052948396e-08,
+      "relmax": 2.5198331249382765e-06
+    },
+    "4.0": {
+      "rel": 7.841246982878885e-08,
+      "relmax": 5.595873414105812e-06
+    },
+    "worst": 7.841246982878885e-08,
+    "PASS": false
+  },
+  "T2_superposition_E": {
+    "rel": 3.917744330456399e-05,
+    "rel_vs_total": 0.00016168186300708309,
+    "relmax": 0.0019541642714745754,
+    "naive_no_offset_rel": 4.144067303649292,
+    "resid_frac_on_wall_particles": 1.0000000000000002,
+    "wall_particle_frac": 0.27334320545196533,
+    "PASS": false
+  },
+  "T2b_superposition_E_4groups": {
+    "rel": 2.0842613465881716e-05,
+    "rel_vs_total": 8.601563274313253e-05,
+    "relmax": 0.0014233001987532933,
+    "naive_no_offset_rel": 12.43220187958168,
+    "resid_frac_on_wall_particles": 1.0,
+    "wall_particle_frac": 0.27334320545196533,
+    "PASS": false
+  },
+  "T3b_superposition_gain": {
+    "rel": 1.3751342308242398e-08,
+    "rel_vs_total": 6.449549334115839e-08,
+    "relmax": 1.3264431138114846e-06,
+    "naive_no_offset_rel": 4.571262175130283,
+    "resid_frac_on_wall_particles": 0.9999999999999547,
+    "wall_particle_frac": 0.27334320545196533,
+    "PASS": false
+  },
+  "T4_a_max": {
+    "a_max": 200.0,
+    "cell_delta_absmax": 0.0,
+    "frac_cell_delta_at_clamp": 0.0,
+    "cell_delta_is_all_zero": true,
+    "note": "a_max clamps H.delta(parent='cell') ONLY -- theta-independent in this spec"
+  },
+  "T4_superposition_E_amax_high": {
+    "rel": 3.917744330456399e-05,
+    "rel_vs_total": 0.00016168186300708309,
+    "relmax": 0.0019541642714745754,
+    "naive_no_offset_rel": 4.144067303649292,
+    "resid_frac_on_wall_particles": 1.0000000000000002,
+    "wall_particle_frac": 0.27334320545196533,
+    "PASS": false
+  },
+  "T5_interior": {
+    "margin_4dx": {
+      "n_particles": 196936,
+      "rel": 5.41941369901171e-15,
+      "rel_vs_total": 2.2352674787579785e-14,
+      "relmax": 5.744218485431135e-14,
+      "naive_no_offset_rel": 4.144067303649292,
+      "resid_frac_on_wall_particles": 1.0000000000000002,
+      "wall_particle_frac": 0.27334320545196533,
+      "PASS": true
+    },
+    "margin_8dx": {
+      "n_particles": 171491,
+      "rel": 5.453413477603421e-15,
+      "rel_vs_total": 2.2367786920490862e-14,
+      "relmax": 5.394460643876636e-14,
+      "naive_no_offset_rel": 4.144067303649292,
+      "resid_frac_on_wall_particles": 1.0000000000000002,
+      "wall_particle_frac": 0.27334320545196533,
+      "PASS": true
+    },
+    "margin_16dx": {
+      "n_particles": 127754,
+      "rel": 5.428888604713619e-15,
+      "rel_vs_total": 2.3152041984018725e-14,
+      "relmax": 4.673417868645237e-14,
+      "naive_no_offset_rel": 4.144067303649292,
+      "resid_frac_on_wall_particles": 1.0000000000000002,
+      "wall_particle_frac": 0.27334320545196533,
+      "PASS": true
+    }
+  },
+  "T5_nearwall": {
+    "n_particles": 64509,
+    "rel": 0.00033285562393589916,
+    "rel_vs_total": 0.003979920584647543,
+    "relmax": 0.008680305902907047,
+    "naive_no_offset_rel": 4.144067303649292,
+    "resid_frac_on_wall_particles": 1.0000000000000002,
+    "wall_particle_frac": 0.27334320545196533,
+    "PASS": false
+  },
+  "T5b_no_sign_conditional_damp": {
+    "rel": 1.54565928881356e-07,
+    "rel_vs_total": 6.378669664075485e-07,
+    "relmax": 1.2279927379629159e-05,
+    "naive_no_offset_rel": 4.143970350167786,
+    "resid_frac_on_wall_particles": 0.9999999999999994,
+    "wall_particle_frac": 0.27334320545196533,
+    "PASS": false
+  },
+  "T5_cells_touching_wall": {
+    "n_cells_contaminated": 168,
+    "n_cells": 472,
+    "frac": 0.35593220591545105
+  },
+  "T6_multistep": {
+    "n_sub_1": {
+      "rel": 3.917744330456399e-05,
+      "rel_vs_total": 0.00016168186300708309,
+      "relmax": 0.0019541642714745754,
+      "naive_no_offset_rel": 4.144067303649292,
+      "resid_frac_on_wall_particles": 1.0000000000000002,
+      "wall_particle_frac": 0.27334320545196533,
+      "PASS": false,
+      "homogeneity_worst": 8.433841456015043e-06,
+      "homogeneity": {
+        "0.5": 8.433841456015043e-06,
+        "2.0": 6.128501364622086e-06
+      }
+    },
+    "n_sub_2": {
+      "rel": 0.054440814721331145,
+      "rel_vs_total": 0.22624310017062696,
+      "relmax": 0.8277233972061151,
+      "naive_no_offset_rel": 4.179374299866101,
+      "resid_frac_on_wall_particles": 0.0565034583134362,
+      "wall_particle_frac": 0.27334320545196533,
+      "PASS": false,
+      "homogeneity_worst": 0.0057169062822002605,
+      "homogeneity": {
+        "0.5": 0.0028586309543868196,
+        "2.0": 0.0057169062822002605
+      }
+    },
+    "n_sub_5": {
+      "rel": 0.2952243971521871,
+      "rel_vs_total": 1.260081837245617,
+      "relmax": 3.9329606320789785,
+      "naive_no_offset_rel": 4.52164778695909,
+      "resid_frac_on_wall_particles": 0.047743403675521455,
+      "wall_particle_frac": 0.27334320545196533,
+      "PASS": false,
+      "homogeneity_worst": 0.019817156789438576,
+      "homogeneity": {
+        "0.5": 0.012742316315538087,
+        "2.0": 0.019817156789438576
+      }
+    },
+    "n_sub_10": {
+      "rel": 0.5977829686604155,
+      "rel_vs_total": 2.6608255141719686,
+      "relmax": 6.902026754675168,
+      "naive_no_offset_rel": 5.421174467547926,
+      "resid_frac_on_wall_particles": 0.04028043894095744,
+      "wall_particle_frac": 0.27334320545196533,
+      "PASS": false,
+      "homogeneity_worst": 0.033018661441780166,
+      "homogeneity": {
+        "0.5": 0.02630689179277139,
+        "2.0": 0.033018661441780166
+      }
+    }
+  },
+  "config": {
+    "device": "cuda:1",
+    "per_parent": 500,
+    "warmup": 12,
+    "n_grid": null,
+    "dtype": "float64",
+    "shrink": 1.0
+  }
+}
