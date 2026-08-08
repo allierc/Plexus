@@ -28,6 +28,34 @@
 # is adding four, plus its .py and .md. Neither touches round.py -- which is the test the design
 # has to pass, because the eleven roles Phase 12 removes were each ADDED by editing the engine.
 
+# WHICH PREMISES THIS CAMPAIGN HOLDS ITSELF TO. Not a node the round executes -- `biologist.py`
+# reads it directly, on the cluster as well as here -- but the same kind of declaration as
+# `parents.pool` and `route_a.plan`, so it is written here with its reason rather than compiled
+# into a list in the code. Add an id to retire a premise; delete the line to bring it back. The
+# check itself stays in biologist.py either way, because "we tried this and it fired on
+# everything" is a finding about the campaign, and deleting the code deletes the finding.
+premises:
+  retired:
+    # Cedric, 8 August: "delete premise 3 5 and 7, they are too strong. I keep P1 and P11,
+    # there are sound gate keepers." Measured over rounds 1-4 of this campaign:
+    P3:  >-
+      refused FOUR route A slots in round 3 before the GPU, because the vth_frac grid and the
+      factor grid cross each other on coral_gate_div. The relation is real; as a veto it spent
+      a quarter of a round saying so.
+    P3b: >-
+      fires whenever cells divide faster than they grow -- v_cell 0.083 at factor 1.5, 0.163
+      at 2.0 -- which is the regime the campaign is trying to characterise, not an error in it.
+    P5:  >-
+      a statement about the frame clock, settled once when dt was removed from the growth
+      operators. Nothing since round 1 has been able to break it.
+    P5b: >-
+      broke in the CONTROL itself (residual force 1.38 -> 3.25 at a fixed 2000 cells). It says
+      relax_iters is constant while the tissue grows, which is true, is about the solver, and
+      is not something a spec edit can answer.
+    P7:  >-
+      broke on ALL 15 valid runs of round 3 and on every dividing rung of round 1. A check that
+      fails on everything separates nothing.
+
 nodes:
 
   # ---- what the round starts from ------------------------------------------------

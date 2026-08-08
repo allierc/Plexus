@@ -317,13 +317,12 @@ def parents(ctx):
     # `relax_iters` is a constant while the tissue grows.
     #
     # So premises no longer gate the ranking. They are handed to the roles as text, where they
-    # inform; SOLVER premises are separated out so a numerical lag cannot outrank biology; and
-    # forcing -- which is not a diagnosis but a composition that writes its own answer -- still
-    # sorts last.
-    SOLVER_PREMISES = {"P5b", "P5"}
-
-    def _biology_broken(r):
-        return bool(set(r.get("premises_broken") or []) - SOLVER_PREMISES)
+    # inform; and forcing -- which is not a diagnosis but a composition that writes its own answer
+    # -- still sorts last.
+    #
+    # The SOLVER/biology split that used to live here is gone with the premises it sorted: P5 and
+    # P5b were deleted on 8 August, so the set it subtracted is empty and every premise left (P1,
+    # P2, P4, P8, P9, P11, P12, P13) is a statement about the tissue.
 
     rows.sort(key=lambda r: (_is_forced(r.get("name"), forcing),
                              float(r["metrics"].get("mech_p_ratio") or 0) > p_ratio,
