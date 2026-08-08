@@ -483,6 +483,20 @@ class Grow3D(Structural):
         # amount (else we silently CREATE mass each step -> spuriously feeds the tip). On (default) = correct.
         self.conserve_amount = bool(params.get("conserve_amount", True))
 
+    def _advance(self, s_prev, hillv, m, v_ref):
+        """The RATE LAW, and the only thing a `model=` variant of grow_3d changes.
+
+        Returns the new per-cell linear scale. Volume is V0f_init * s**3, so a multiplicative step
+        on `s` is exponential growth in volume -- which is the default and is deliberate: it is
+        what Okuda's growth term does. Ginzberg, Kafri & Kirschner (Science 2015) name the
+        consequence exactly: "with exponential growth, larger cells grow faster than do smaller
+        cells, amplifying any existing size disparities". Measured on this campaign's own basis,
+        the coefficient of variation of cell volume climbs 0.160 at seed to 0.33-0.53 by frame 900
+        in every run. The variants below are the mechanisms that review says real cells use to
+        stop that, written so the search can put them side by side.
+        """
+        return s_prev * (1.0 + self.rate * (self.rho + hillv))
+
     def forward(self, H, mask=None):
         vlvl = H.level(self.at); m = getattr(vlvl, "_mesh", None)
         if m is None:
@@ -507,9 +521,9 @@ class Grow3D(Structural):
             m["A0_init"] = m["A0"].clone(); m["P0_init"] = m["P0"].clone(); m["V0f_init"] = m["V0f"].clone()
         hillv = a ** self.hill / (self.a_sw ** self.hill + a ** self.hill + 1e-12)   # Hill activation in [0,1]
         s_prev = m["mg_scale"]                                    # per-cell scale BEFORE this tick (for the dilution rate)
-        s = m["mg_scale"] * (1.0 + self.rate * (self.rho + hillv))    # lambda = rate*(rho baseline + activator)
+        v_ref = float(m.get("v_ref", 1.0))                        # SEED-TIME MEDIAN cell volume (tyssue_ops3d:220)
+        s = self._advance(m["mg_scale"], hillv, m, v_ref)         # <-- the rate law; models override THIS only
         if self.rho > 0:                                             # OKUDA uniform-cell mode: cap v_eq per cell at
-            v_ref = float(m.get("v_ref", 1.0))                       # vth_frac*v_ref so it cycles (divides), not bulge
             s_cap = (self.vth_frac * v_ref / m["V0f_init"].clamp(min=1e-9)) ** (1.0 / 3.0)
             s = torch.minimum(s, s_cap.clamp(min=1.0))
         else:
@@ -554,6 +568,117 @@ class Grow3D(Structural):
             cst[:nF, h0:h0 + 1] = cst[:nF, h0:h0 + 1] / g_vol.clamp(min=1e-9)[:, None]
             clvl.state = cst
         return {}
+
+
+# =========================================================== grow_3d: the size-control models
+# Three mechanisms from Ginzberg, Kafri & Kirschner, "On being the right (cell) size", Science 348
+# (2015) and Ginzberg et al., eLife 7:e26957 (2018). They are `model=` variants, not replacements,
+# because each is a different biological hypothesis at the same slot and the search should put
+# them side by side. The default `grow_3d` above has NO size control at all -- its rate reads the
+# morphogen and never the cell's own size -- which by the review's Eq. 2 means cell-size variance
+# can only ever increase, and in this campaign's basis it does: vol_cv 0.160 -> 0.53.
+#
+# WHY THIS MATTERS BEYOND TIDINESS. The review's Fig 2 sets a healthy mammary epithelium, uniform
+# in cell size, beside a pleomorphic tumour that is not, and states that "pleomorphism ... is a
+# histological characteristic of many malignant lesions". This project is trying to grow an
+# epithelial TUBE -- a coherent structure -- and its tissue drifts toward the second picture.
+
+
+@register_operator("grow_3d", model="sizer", set="vertex", kind="structural", family="growth")
+class Grow3DSizer(Grow3D):
+    """Growth rate falls with the cell's own size: small cells grow faster, large ones slower.
+
+    The review's Fig 3B, and the eLife paper measures it directly -- twice per cell cycle the
+    correlation between size and subsequent growth rate goes negative, and cell-size variance
+    falls while the cells are still growing. The rate is multiplied by
+
+        f = (v_ref / v_now) ** size_gain,  clamped to [1/f_max, f_max]
+
+    so a cell at the reference volume is unchanged, one at half it grows 2**size_gain faster, and
+    one at twice it grows that much slower. size_gain = 0 recovers the default exactly, which is
+    the null this variant must be run against.
+    """
+    MECHANISM_TAGS = ["growth", "size_control", "sizer", "negative_feedback"]
+    REFERENCE = ("Ginzberg, M.B., Kafri, R. & Kirschner, M.W. (2015). On being the right (cell) "
+                 "size. Science 348:1245075; Ginzberg et al. (2018) eLife 7:e26957.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.size_gain = float(params.get("size_gain", 1.0))
+        self.f_max = float(params.get("f_max", 4.0))
+
+    def _advance(self, s_prev, hillv, m, v_ref):
+        v_now = m["V0f"].clamp(min=1e-9)
+        f = (v_ref / v_now) ** self.size_gain
+        f = torch.clamp(f, 1.0 / max(self.f_max, 1e-9), self.f_max)
+        return s_prev * (1.0 + self.rate * (self.rho + hillv) * f)
+
+
+@register_operator("grow_3d", model="balance", set="vertex", kind="structural", family="growth")
+class Grow3DBalance(Grow3D):
+    """Size emerges from a synthesis/degradation balance, with no size sensor anywhere.
+
+        dV/dt = k_syn * (rho + Hill(a))  -  k_deg * V
+
+    The review, on how a cell could regulate size without measuring it: "If, for example, cells
+    synthesise proteins at a fixed rate but degrade them at a rate that is proportional to their
+    total cell size, net growth would slow as cell size increases." It then flags the non-trivial
+    part, which is why this is a separate model and not a tweak: "this requires that degradation
+    depend on the total AMOUNT of protein in the cell, rather than the concentration."
+
+    The steady state is V* = k_syn * (rho + Hill(a)) / k_deg -- so the morphogen sets the TARGET
+    SIZE here, not the rate, which is a genuinely different hypothesis from every other variant.
+    """
+    MECHANISM_TAGS = ["growth", "size_control", "synthesis_degradation_balance", "homeostasis"]
+    REFERENCE = ("Ginzberg, M.B., Kafri, R. & Kirschner, M.W. (2015). On being the right (cell) "
+                 "size. Science 348:1245075.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        # k_syn is expressed as a multiple of v_ref per unit time, so the balance point lands near
+        # v_ref at k_deg = rate and the parameter has the same meaning at any mesh scale.
+        self.k_syn = float(params.get("k_syn", 1.0))
+        self.k_deg = float(params.get("k_deg", 1.0))
+
+    def _advance(self, s_prev, hillv, m, v_ref):
+        v_now = (m["V0f_init"] * s_prev ** 3).clamp(min=1e-9)
+        dv = self.rate * (self.k_syn * v_ref * (self.rho + hillv) - self.k_deg * v_now)
+        v_new = (v_now + dv).clamp(min=1e-9)
+        return (v_new / m["V0f_init"].clamp(min=1e-9)) ** (1.0 / 3.0)
+
+
+@register_operator("grow_3d", model="timer", set="vertex", kind="structural", family="growth")
+class Grow3DTimer(Grow3D):
+    """Grow at whatever rate lands the cell on its target size after `cycle_frames` frames.
+
+    The partner of `divide_3d model: timer`: if division fires on the clock, growth has to be the
+    thing that guarantees the cell is the right size when it does. This is the review's Fig 3B
+    taken to its limit -- the rate is set entirely by the size deficit rather than modulated by it:
+
+        per-frame volume factor = (v_target / v_now) ** (1 / cycle_frames)
+
+    which is a proportional controller with time constant `cycle_frames`, so a cell far below
+    target grows fast and one at target holds. Together with a clock-driven division that gives
+    every cell the same age AND the same size at division, which is the strongest size homeostasis
+    of the four and therefore the right upper bound to measure the others against.
+
+    The morphogen still decides WHERE: the target is scaled by (rho + Hill(a)) / (rho + 1), so a
+    red cell aims for the full `vth_frac * v_ref` and a white one for the rho fraction of it.
+    """
+    MECHANISM_TAGS = ["growth", "size_control", "timer", "target_size", "proportional_control"]
+    REFERENCE = ("Ginzberg, M.B., Kafri, R. & Kirschner, M.W. (2015). On being the right (cell) "
+                 "size. Science 348:1245075.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.cycle_frames = float(params.get("cycle_frames", 100.0))
+
+    def _advance(self, s_prev, hillv, m, v_ref):
+        v_now = (m["V0f_init"] * s_prev ** 3).clamp(min=1e-9)
+        share = (self.rho + hillv) / max(self.rho + 1.0, 1e-9)   # the morphogen sets WHERE, as a target
+        v_tgt = (self.vth_frac * v_ref * share).clamp(min=1e-9)
+        g = (v_tgt / v_now) ** (1.0 / max(self.cycle_frames, 1.0))
+        return s_prev * g ** (1.0 / 3.0)
 
 
 @register_operator("rd_interface_tension", set="vertex", kind="lateral", family="mechanics")

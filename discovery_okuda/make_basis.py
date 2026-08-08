@@ -100,8 +100,18 @@ RHO_GATED = 0.1              # tip:body = 11:1 on the four *_gated_* members
 RHO_UNGATED = 1.0            # the only growth term where there is no gate; not a ratio
 HILL = 4.0
 VTH_FRAC = 2.5
-DIVIDE_FACTOR = 2.0          # must sit BELOW vth_frac or a cell can never reach the size that
-                             # divides it -- the relation that used to be premise P3.
+DIVIDE_FACTOR = 2.0          # OF v_ref, THE SEED-TIME MEDIAN CELL VOLUME, and that reference
+                             # CHANGED on 8 August. `divide_3d`'s default model is now `sizer`, an
+                             # ABSOLUTE threshold, where it used to be `factor x THIS CELL'S OWN
+                             # BIRTH VOLUME`. Ginzberg, Kafri & Kirschner (Science 2015): "both the
+                             # cell's target size and its actual size must be evaluated on absolute
+                             # rather than relative scales". The old rule was relative, so it
+                             # corrected no size deviation at all and this campaign measured the
+                             # result -- cell-volume CV 0.160 at seed to 0.53 by frame 900, in
+                             # every basis run. It survives as `model: doubler`, the null.
+                             #
+                             # Must still sit BELOW vth_frac or a cell can never reach the size
+                             # that divides it -- the relation that used to be premise P3.
 
 A_SW_GATED = 0.35            # a FRACTION of the activator's own maximum (the absolute version
 A_SW_OPEN = 0.0              # selected zero cells in every run of the last campaign)
