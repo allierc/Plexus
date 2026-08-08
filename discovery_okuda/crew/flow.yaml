@@ -89,14 +89,14 @@ nodes:
         # let you compare its members to each other; those could not be compared to each other, nor
         # to a 900-frame campaign run. They are in log/okuda/_superseded_pre_basis/.
         #
-        # WHAT REPLACED IT IS A GRID, NOT A COLLECTION -- 3 chemistry x 2 material x 2 mechanics,
+        # WHAT REPLACED IT IS A GRID, NOT A COLLECTION -- 4 chemistry x 2 material x 2 mechanics,
         # generated so that every value NOT on an axis is written once and shared by all twelve.
         # The diff between any two members is exactly the axes that separate them, which is what
         # makes "Route A pulls from the basis" mean "choose an axis to move" rather than "pick a
         # folder". Twelve bases also means the per-base share in `route_a.slots` must ROTATE rather
         # than divide -- see that node.
         #
-        #   chemistry   none | gray-scott | gierer-meinhardt
+        #   chemistry   none | gray-scott | gierer-meinhardt | brusselator
         #   material    static (divide, no growth) | uniform (gate open) | gated (Hill on activator)
         #   mechanics   plain | shaping (K_bend + K_lumen + rd_interface_tension.K_purse)
         #
@@ -118,6 +118,15 @@ nodes:
         - b_gm_uniform_shaping
         - b_gm_gated_plain
         - b_gm_gated_shaping
+        # THE FOURTH CHEMISTRY, added 8 August with the column itself. Measured: brusselator
+        # patterns (act_cv 0.80) and does NOT couple -- corr_act_rad 0.06-0.29 and grip ~1e-4,
+        # against gray_scott's 0.56-0.81 and 0.033-0.051 on the same growth and mechanics. It is
+        # in the pool BECAUSE of that, not despite it: a parent set holding only recipes that work
+        # cannot tell the loop what makes them work.
+        - b_bru_uniform_plain
+        - b_bru_uniform_shaping
+        - b_bru_gated_plain
+        - b_bru_gated_shaping
       #
       # DROPPED, each for a measured reason:
       #
