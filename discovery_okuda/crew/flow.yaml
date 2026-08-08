@@ -269,18 +269,25 @@ nodes:
         # campaign's control reached 30,743, FIFTEEN times, and the Grounder's reading is that the
         # surface floods with spots which each dilute into a bulge.
         #
-        # `vth_frac` caps a cell's target volume at vth_frac x v_ref; `factor` divides it at
+        # THE TOP OF BOTH GRIDS IS CUT (vth_frac 16, factor 14) -- Cedric, 8 August. A cell at
+        # factor 14 divides only on reaching FOURTEEN TIMES ITS OWN BIRTH VOLUME, which on a
+        # 2,000-cell sphere is one enormous cell among small ones; P8 (the shape-index floor) or
+        # P11 (self-intersection) would likely refuse it, and a grid whose top rungs are refused
+        # spends slots discovering its own bound. 10x and 8x already ask the question.
+        #
+        # `vth_frac` caps a cell's target volume at vth_frac x v_ref, the SEED-TIME MEDIAN cell
+        # volume; `factor` divides it at
         # factor x its BIRTH volume. At the basis values (2.5 and 2.0) a cell divides at 2x and
         # can never reach 2.5x -- so growth has nowhere to go except into more cells. Cedric,
         # 8 August: "we should allow up to x4 or x10 cell growth in red spot?" These grids are
         # that question. They must be swept TOGETHER: factor above vth_frac is a cell that can
         # never reach the size that divides it, which is the relation the retired P3 used to veto.
-        - [b_gs_gated_plain,     grow_3d,   vth_frac, [4.0, 6.0, 10.0, 16.0]]
-        - [b_gm_gated_plain,     grow_3d,   vth_frac, [4.0, 6.0, 10.0, 16.0]]
-        - [b_bru_gated_plain,    grow_3d,   vth_frac, [4.0, 6.0, 10.0, 16.0]]
-        - [b_gs_gated_plain,     divide_3d, factor,   [2.4, 3.0, 5.0, 8.0, 14.0]]
-        - [b_gm_gated_plain,     divide_3d, factor,   [2.4, 3.0, 5.0, 8.0, 14.0]]
-        - [b_bru_gated_plain,    divide_3d, factor,   [2.4, 3.0, 5.0, 8.0, 14.0]]
+        - [b_gs_gated_plain,     grow_3d,   vth_frac, [4.0, 6.0, 10.0]]
+        - [b_gm_gated_plain,     grow_3d,   vth_frac, [4.0, 6.0, 10.0]]
+        - [b_bru_gated_plain,    grow_3d,   vth_frac, [4.0, 6.0, 10.0]]
+        - [b_gs_gated_plain,     divide_3d, factor,   [2.4, 3.0, 5.0, 8.0]]
+        - [b_gm_gated_plain,     divide_3d, factor,   [2.4, 3.0, 5.0, 8.0]]
+        - [b_bru_gated_plain,    divide_3d, factor,   [2.4, 3.0, 5.0, 8.0]]
         # The low end of `factor` stays on the CHEMISTRY-FREE base only. Rounds 1-3 closed that
         # ladder on three bases and it produced the campaign's one replicated law -- fewer
         # divisions, bigger cells, rounder shell, higher coupling, monotone on all of them. It is
