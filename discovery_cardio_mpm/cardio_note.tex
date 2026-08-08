@@ -1229,18 +1229,94 @@ nonlinear in its weights. \textbf{A per-cell constant does not.}
 \label{eq:sigma}
 \end{equation}
 and the Lam\'e constants are \emph{linear} in Young's modulus, $\mu = E/2(1+\nu)$,
-$\lambda = E\nu/(1+\nu)(1-2\nu)$. Every other symbol in \eqref{eq:sigma} --- $\Mat F_p$, its polar
-factor $\Mat R_p$, $J_p$, the activation $a$, the interpolation weights --- is a function of the
-\textbf{observed configuration}. So if the measured positions are \emph{injected} at every frame
-rather than produced by integrating from $t_0$, the balance
+$\lambda = E\nu/(1+\nu)(1-2\nu)$ \src{\code{entities.\_lame}}.
+
+The motion this stress produces is the momentum balance,
 \begin{equation}
-\rho\,\ddot{\Mat x} \;=\; \nabla\!\cdot\!\boldsymbol\sigma \;-\; k\,\dot{\Mat x}
+\rho\,\ddot{\Mat x} \;=\; \nabla\!\cdot\!\boldsymbol\sigma \;-\; k\,\dot{\Mat x} ,
 \label{eq:balance}
 \end{equation}
-is \textbf{linear in the parameters once the trajectory is observed} --- exactly the situation of
-the companion note \src{linalg\_note.tex, \S1}, where the Flyvis ODE becomes linear in
-$(\tau, V^{\mathrm{rest}}, W)$ the moment $v$ is recorded. Collecting the unknowns on the left and
-everything the recording already determines on the right,
+with $k$ the drag. Equations \eqref{eq:sigma} and \eqref{eq:balance} are the model; everything
+below is bookkeeping on them.
+
+\medskip
+\textbf{FROM \eqref{eq:sigma} TO \eqref{eq:balance}: what $\nabla\!\cdot\!\boldsymbol\sigma$ IS,
+discretely.} In MLS-MPM the divergence is never formed; it is what the scatter to the grid computes.
+Each particle contributes to the grid nodes $g$ of its stencil, with B-spline weight $w_{gp}$,
+\begin{equation}
+\Mat m_g \Mat v_g \;=\; \sum_p w_{gp}\Big[\, m_p\Mat v_p \;+\;
+\big(\underbrace{m_p\Mat C_p}_{\text{affine, known}} \;-\; \tfrac{4\Delta t}{\Delta x^{2}}V_p\,\boldsymbol\sigma_p\big)
+(\Mat x_g - \Mat x_p)\Big],
+\label{eq:p2g}
+\end{equation}
+\src{\code{mpm\_scatter}: \code{stress = (-dt*4*inv\_dx**2)*p\_vol*stress}; \code{affine = stress + mass*C}}
+and the new particle velocity is gathered back, $\Mat v_p^{+} = \sum_g w_{gp}\Mat v_g$. Composing the
+two and keeping only what carries $\boldsymbol\sigma$ gives the discrete divergence explicitly as a
+\emph{linear operator} $\mathcal D$ on the collection of particle stresses,
+\begin{equation}
+(\mathcal D\boldsymbol\sigma)_p \;:=\; -\frac{4}{\Delta x^{2}}
+\sum_g \frac{w_{gp}}{m_g}\sum_q w_{gq}\,V_q\,\boldsymbol\sigma_q\,(\Mat x_g - \Mat x_q),
+\label{eq:Dop}
+\end{equation}
+so that the one-step particle acceleration is
+\begin{equation}
+\Mat a_p \;=\; (\mathcal D\boldsymbol\sigma)_p \;+\; \Mat r_p ,
+\qquad
+\Mat r_p := \underbrace{\text{affine } \Mat C \text{ transport}}_{\text{from observed } \Mat v}
++ \underbrace{\text{gravity}}_{} - \underbrace{k\,\Mat v_p}_{\text{drag}}
++ \underbrace{\text{wall}}_{\text{boundary}} .
+\label{eq:step}
+\end{equation}
+\textbf{Every symbol in $\mathcal D$ and in $\Mat r$ --- the weights $w_{gp}$, the nodal masses
+$m_g$, the volumes $V_p$, the positions --- is fixed by the configuration.} If the configuration is
+\emph{injected} from the recording rather than produced by integrating, they are all data. That is
+the whole content of the injection: it converts $\mathcal D$ from something that depends on the
+unknowns into a known matrix.
+
+\medskip
+\textbf{FROM \eqref{eq:balance} TO \eqref{eq:ls}: moving the unknowns to one side.} Factor
+\eqref{eq:sigma} into the part each parameter multiplies. Writing $c(p)$ for the cell owning
+particle $p$,
+\begin{equation}
+\boldsymbol\sigma_p \;=\; E_{c(p)}\,\Mat S_p \;+\; g_{c(p)}\,\Mat T_p ,
+\qquad
+\begin{aligned}
+\Mat S_p &:= \tfrac{1}{1+\nu}(\Mat F_p-\Mat R_p)\Mat F_p^{\!\top}
+ + \tfrac{\nu}{(1+\nu)(1-2\nu)}J_p(J_p-1)\Mat I ,\\
+\Mat T_p &:= a(\Mat x_p,t)\,\Mat n_{c(p)}\Mat n_{c(p)}^{\!\top} .
+\end{aligned}
+\label{eq:split}
+\end{equation}
+$\Mat S_p$ is the stress the particle would carry at unit stiffness and $\Mat T_p$ at unit gain;
+both are computed from the observed $\Mat F_p$ and the known activation. Substituting
+\eqref{eq:split} into \eqref{eq:step}, and using that $\mathcal D$ is linear and that each particle
+belongs to \emph{exactly one} cell, the sum over particles regroups into a sum over cells:
+\begin{equation}
+\Mat a_p \;=\; \sum_{c=1}^{C} E_c\,\big(\mathcal D[\Mat S\,\mathbf 1_c]\big)_p
+\;+\; \sum_{c=1}^{C} g_c\,\big(\mathcal D[\Mat T\,\mathbf 1_c]\big)_p \;+\; \Mat r_p ,
+\label{eq:regroup}
+\end{equation}
+where $\mathbf 1_c$ keeps only cell $c$'s particles. \eqref{eq:regroup} \emph{is}
+\eqref{eq:ls}: stack $p$ and the frames down the rows, read the columns off directly,
+\begin{equation}
+\A_{:,\,E_c} = \mathcal D[\Mat S\,\mathbf 1_c], \qquad
+\A_{:,\,g_c} = \mathcal D[\Mat T\,\mathbf 1_c], \qquad
+\Mat b = \Mat a^{\text{obs}} - \Mat r ,
+\label{eq:cols}
+\end{equation}
+and the passage from \eqref{eq:balance} to \eqref{eq:ls} is, as in the companion note, nothing but
+moving across the equals sign everything the recording already determines \src{linalg\_note.tex,
+\S1}.
+
+\emph{Two things \eqref{eq:cols} hands us for free.} A column is one scatter--gather with a single
+cell's particles carrying stress, so $\A$ is assembled by $2C$ cheap passes rather than by
+differentiating anything. And a cell touches only the grid nodes near it, so
+$\mathcal D[\Mat S\mathbf 1_c]$ is \textbf{spatially localised}: $\A$ is sparse, $\Mat G$ is banded
+up to the range of the stencil, and two cells far apart are exactly orthogonal in the fit. The
+coupling that can hide a degeneracy is between \emph{neighbours}, which is where to look.
+
+\medskip
+Collecting \eqref{eq:cols},
 \begin{equation}
 \A\,\thet \;=\; \Mat b, \qquad
 \thet = (E_1,\dots,E_C,\; g_1,\dots,g_C) \in \mathbb R^{2C}, \qquad C = 472,
