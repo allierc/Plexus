@@ -458,9 +458,19 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, f
         # and the position says it exactly: unsecreted material is AT the centre, so anything at a small
         # fraction of the sheet radius is not membrane yet. Done here rather than by storing a per-frame
         # mask so that runs already on disk are fixed on re-render.
-        rr = np.linalg.norm(qm, axis=1)
-        if rr.size:
-            live_now = rr > 0.35 * float(np.median(rr[rr > 1e-9])) if (rr > 1e-9).any() else rr > -1
+        # THE TEST IS "IS IT IN THE BOX", not "is its radius a decent fraction of the median". The
+        # median heuristic assumed the reserve waits at the tissue CENTRE; it now waits OUTSIDE the box,
+        # where it inflates the median instead of deflating it -- so early frames, which are almost all
+        # reserve, pushed the threshold above the live sheet and hid the membrane entirely. It reappeared
+        # only once secretion had released enough material to drag the median back down, about 70% of the
+        # way through the run. Position still says it exactly, just not by that statistic: dormant
+        # material is either at the centre or outside the walls, and live material is neither.
+        Pb = mem_pos[min(t, mem_pos.shape[0] - 1)]
+        rb = np.linalg.norm(Pb - centre, axis=1)
+        live_now = np.all((Pb > 0.0) & (Pb < 1.0), axis=1) & (rb > 0.02)
+        if mem_alive is not None and a.shape[0] == live_now.shape[0]:
+            live_now = live_now[a] if qm.shape[0] != live_now.shape[0] else live_now
+        if live_now.shape[0] == qm.shape[0]:
             qm, sm = qm[live_now], sm[live_now]
         return qm, sm
 
@@ -649,11 +659,13 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, f
                 _al = None
                 if mem_alive is not None:
                     _al = mem_alive if mem_alive.ndim == 1 else mem_alive[min(t, mem_alive.shape[0] - 1)]
-                # same per-frame correction as `mem_of`: the final mask keeps nodes that are still parked
-                _rr = np.linalg.norm(_raw, axis=1)
-                if _rr.size and (_rr > 1e-9).any():
-                    _now = _rr > 0.35 * float(np.median(_rr[_rr > 1e-9]))
-                    _al = _now if _al is None else (_al & _now)
+                # same per-frame correction as `mem_of`, and it has to be the SAME RULE -- this was a
+                # second copy of the median heuristic, so fixing one left the bottom-left panel drawing
+                # no membrane at all while the strip and the zoom drew it correctly.
+                _Pb = mem_pos[min(t, mem_pos.shape[0] - 1)]
+                _now = (np.all((_Pb > 0.0) & (_Pb < 1.0), axis=1)
+                        & (np.linalg.norm(_Pb - centre, axis=1) > 0.02))
+                _al = _now if _al is None else (_al & _now)
                 _rs = (np.asarray(mem_hist[t], np.float32) / max(mem_sc or 1.0, 1e-12)
                        if (mem_hist and t < len(mem_hist)) else None)
                 RD.draw_membrane_3d(axz, _raw, _rs, RD.CAM_SIDE, Lt, mem_hi=1.0,

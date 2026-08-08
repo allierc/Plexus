@@ -122,6 +122,13 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                # where the unsecreted reserve waits. Outside the box by default; (0.5,0.5,0.5) is the
                # old tissue-centre parking, kept so the two can be compared directly.
                membrane_park=(-0.25, -0.25, -0.25),
+               # how far outside the surface the boundary condition reaches, in grid cells. It sets the
+               # standoff the sheet settles at, and 2.0 is what put a visible gap between the epithelium
+               # and everything around it -- the matrix as well as the membrane, since the constraint
+               # acts on every massed node. Measured at the end of the run, BM radius minus tissue
+               # radius:  band 2.0 -> +0.0181,  band 1.0 -> +0.0015,  band 0.5 -> -0.0062.
+               # 1.0 sits the sheet on the surface; 0.5 is too weak to hold it out and it sinks inside.
+               membrane_band=1.0,
                # THE TISSUE AS A MOVING BOUNDARY ON THE GRID, rather than a positional projection.
                # 88 showed the projection carries no strain -- see membrane_ops.MPMTissueBoundary.
                membrane_grid_bc=False,
@@ -272,7 +279,8 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
             if membrane_grid_bc:
                 spec["operators"].append(
                     {"op": "mpm_tissue_boundary", "at": "mpm_grid", "centre": [0.5, 0.5, 0.5],
-                     "surface": str(membrane), "scale": 1.0, "dt_frame": float(dt)})
+                     "surface": str(membrane), "scale": 1.0, "dt_frame": float(dt),
+                     "band": float(membrane_band)})
             j = spec["schedule"].index("ecm_stress")
             if "integrin_adhesion" not in drop:
                 spec["schedule"].insert(j, "integrin_adhesion"); j += 1

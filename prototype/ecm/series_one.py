@@ -277,7 +277,19 @@ SERIES = {
     #     94 changes exactly ONE thing from 91: the reserve is added ON TOP of the working sheet rather
     #     than carved out of it -- 90,000 particles at reserve 1.0 is the same 45,000 laid down at frame
     #     0, with 45,000 held back to secrete. 91 is its own control.
-    "94_secrete_dense": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
+    # 94/95: THE GAP between sheet and epithelium. The boundary corrects every massed node within
+    #     `band` grid cells of the surface, so material is pushed out to about R + band*dx. At band 2.0
+    #     that is R + 0.042 against an intended standoff of membrane_offset = 0.004 -- ten times too far,
+    #     and the visible space in the movies is that width rather than physics. The band cannot go to
+    #     zero: it has to be at least the B-spline stencil's reach or the constraint cannot see the
+    #     material it is meant to push. 1.0 and 0.5 bracket that limit.
+    "94_band1": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
+                     membrane_exclude=False, membrane_adhesion=0.0, membrane_secrete_rate=0.0,
+                     membrane_tau=0.0, membrane_reserve=0.0, membrane_band=1.0),
+    "95_band05": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
+                      membrane_exclude=False, membrane_adhesion=0.0, membrane_secrete_rate=0.0,
+                      membrane_tau=0.0, membrane_reserve=0.0, membrane_band=0.5),
+    "_unused_secrete_dense": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
                              membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
                              membrane_particles=90000, membrane_reserve=1.0,
                              membrane_secrete_rate=0.012),
