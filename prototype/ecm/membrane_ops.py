@@ -1133,7 +1133,12 @@ class MPMTissueBoundary(FieldUpdate):
         near = (r < R + band) & (g.m > 1.0e-9)
         if bool(near.any()):
             gm = g.m.clamp(min=1e-10)
-            gv = g.mv / gm[:, None]
+            # `g.v`, NOT `g.mv`. `mpm_grid_update` ends by writing the solved velocity into `g.v`, and
+            # `mpm_gather` reads `g.v[flat]` -- so an operator that edits momentum after the grid solve
+            # is editing a field nobody downstream looks at. That single mistake is the whole of runs
+            # 89, 90 and 91: the boundary condition ran every substep (140 calls in 6 frames, verified)
+            # and was invisible, which reads exactly like a physical null.
+            gv = g.v if getattr(g, "v", None) is not None else g.mv / gm[:, None]
             # SEPARATING, NOT NO-SLIP. Only the outward NORMAL component is corrected, and only when the
             # material is moving slower than the surface -- so the tissue pushes material out of its way
             # and never pulls it back in or drags it tangentially. Full no-slip would weld the sheet to
@@ -1153,6 +1158,7 @@ class MPMTissueBoundary(FieldUpdate):
             BOUNDARY_REACTION.append((int(getattr(H, "frame", 0) or 0),
                                       float(dp.norm(dim=-1).sum()), float(fr.sum()),
                                       int(near.sum())))
+            g.v = gv_new
             g.mv = gv_new * gm[:, None]
         if not self._said:
             print(f"[mpm_tissue_boundary] tissue imposed on the grid: {int(near.sum())} massed nodes "
