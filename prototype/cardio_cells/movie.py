@@ -8,7 +8,7 @@ TIF = f"{RT}/Cardio_1/0_B_15kPa_1_MMStack_Pos0.ome.tif"
 OUT = "/workspace/Plexus/log/cardio_mpm/cells_from_motion"
 os.makedirs(OUT, exist_ok=True)
 
-big = np.load("/tmp/final_big.npy")                       # nuclei-seeded, motion borders
+big = np.load("/tmp/best_big.npy")     # lambda=3, the validated partition
 unseeded = np.load("/tmp/cells_big.npy")                  # motion only, no nuclei
 E = lambda L: ndi.maximum_filter(L, 3) != ndi.minimum_filter(L, 3)
 e_seed, e_uns = E(big), E(unseeded)
@@ -16,7 +16,7 @@ nuc = np.load("/tmp/nuclei_best.npy")
 S = 2                                                     # downsample for a readable movie
 e_seed, e_uns = e_seed[::S, ::S], e_uns[::S, ::S]
 
-FR = list(range(2, 102))                                  # two beats
+FR = list(range(0, 239))                                  # the whole recording
 tmp = tempfile.mkdtemp(prefix="cellmov_")
 with tifffile.TiffFile(TIF) as tf:
     lo = hi = None
@@ -31,7 +31,7 @@ with tifffile.TiffFile(TIF) as tf:
         fig = plt.figure(figsize=(10.24, 10.60), facecolor="black")
         ax = fig.add_axes([0, 0, 1, 0.965]); ax.imshow(rgb); ax.axis("off")
         ax.plot(nuc[:, 1] / S, nuc[:, 0] / S, ".", color="cyan", ms=1.6)
-        fig.text(0.01, 0.978, f"frame {t}   yellow = cells (nuclei-seeded, motion borders)   "
+        fig.text(0.01, 0.978, f"frame {t}   yellow = cells (nuclei + motion, lambda=3)   "
                               f"blue = motion domains alone   cyan = nuclei",
                  color="white", fontsize=9)
         fig.savefig(os.path.join(tmp, f"f_{k:05d}.png"), dpi=100, facecolor="black")

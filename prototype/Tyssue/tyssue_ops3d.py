@@ -407,7 +407,9 @@ class ShapeEnergy3D(Lateral):
 class Divide3D(Structural):
     """In-surface cell division on the vesicle -- the sheet-division analog (tyssue
     sheet_topology.cell_division) lifted to the closed sphere. A cell divides when its wedge volume
-    reaches `factor` x its BIRTH volume (the volume-doubling cell cycle): it is split by an
+    reaches `factor` x v_ref, THE SEED-TIME MEDIAN CELL VOLUME -- an absolute size checkpoint, the
+    default since 8 August; see `_trigger` for why, and `model: doubler` for the birth-relative
+    rule it replaced. It is split by an
     edge-midpoint septum (divide_face_3d), which also splits the shared edges of its two neighbours so
     the mesh stays closed (Euler=2). Each daughter inherits half the area & target volume and resets
     its birth volume to half; shape_energy_3d re-balances."""
@@ -452,6 +454,23 @@ class Divide3D(Structural):
         # rather than widening it. orient_asw = activator threshold that flags an interface/red cell. 0 = off.
         self.orient_iface = bool(params.get("orient_iface", False))
         self.orient_asw = float(params.get("orient_asw", 1.0))
+
+    def _trigger(self, v_now, v_birth, jit, age, v_ref):
+        """Has this cell earned a division? THE ONLY THING A `model=` VARIANT OF divide_3d CHANGES.
+
+        THE DEFAULT IS `sizer`: an ABSOLUTE threshold, v >= factor * v_ref, where v_ref is the
+        seed-time median cell volume. Ginzberg, Kafri & Kirschner (Science 2015) are explicit that
+        this is what size control requires -- "both the cell's target size and its actual size
+        must be evaluated on ABSOLUTE rather than relative scales" -- and it is the mechanism they
+        review as the G1/S size checkpoint, where small cells are held longer so they can catch up.
+        A sizer corrects a size deviation in ONE generation.
+
+        The rule this replaced as default, `v >= factor * v_birth`, is kept as `model: doubler`.
+        It is relative, so it corrects nothing: a cell born 30% small divides 30% small and passes
+        the deviation on undiminished. Combined with exponential growth it does worse than nothing,
+        which is what this campaign measured -- vol_cv 0.160 at seed to 0.53 by frame 900.
+        """
+        return v_now >= self.factor * jit * v_ref
 
     def _fresh_djit(self, rng, n=1):
         """Fresh per-cell division-threshold multiplier. Gaussian CV (cycle_cv) when set -> desynchronised
@@ -502,10 +521,11 @@ class Divide3D(Structural):
         ndiv = m.get("ndiv")
         ndiv = ([0] * nF) if (ndiv is None or ndiv.shape[0] != nF) else ndiv.detach().cpu().numpy().tolist()
         # volume-primary + bounded duration: divide if (2x volume AND old enough) OR (past max cycle length)
+        v_ref = float(m.get("v_ref", 1.0))                       # SEED-TIME MEDIAN cell volume
         def _ready(f):
             if rings[f] is None or len(rings[f]) < 4 or alive[f] <= 0:
                 return False
-            vol_ok = vf[f] >= self.factor * djit[f] * Vbirth[f]
+            vol_ok = self._trigger(vf[f], Vbirth[f], djit[f], age[f], v_ref)
             return (vol_ok and age[f] >= self.min_cycle) or (age[f] >= self.max_cycle)
         cand = [f for f in range(nF) if _ready(f)]
         rng.shuffle(cand)                                        # unbiased when more cells are ready than the cap
@@ -660,6 +680,46 @@ class Divide3D(Structural):
                 if getattr(clvl, "occ", None) is not None:
                     cocc = torch.zeros(clvl.state.shape[0], device=clvl.state.device); cocc[:nF2] = 1.0; clvl.occ = cocc
         return {}
+
+
+
+@register_operator("divide_3d", model="doubler", set="vertex", kind="structural", family="growth")
+class Divide3DDoubler(Divide3D):
+    """Divide at `factor` x THIS CELL'S OWN BIRTH VOLUME -- the rule that was the default until
+    8 August, kept because it is the null the sizer has to beat and because every result in this
+    project's record up to round 4 was measured under it.
+
+    Under exponential growth this is a TIMER wearing a sizer's clothes: doubling from any birth
+    volume takes the same time, so it never consults size in any way that could correct one. The
+    review is direct about the consequence: size disparities are amplified, not constrained.
+    """
+    MECHANISM_TAGS = ["division", "volume_doubling", "relative_threshold", "no_size_control"]
+
+    def _trigger(self, v_now, v_birth, jit, age, v_ref):
+        return v_now >= self.factor * jit * v_birth
+
+
+@register_operator("divide_3d", model="timer", set="vertex", kind="structural", family="growth")
+class Divide3DTimer(Divide3D):
+    """Divide on the CLOCK: `age >= cycle * jit` division-calls since birth, size ignored entirely.
+
+    Alone this is the worst of the three -- a cell divides whether or not it has grown, so size
+    variance is set by whatever growth did in the interval and nothing corrects it. It exists to
+    be paired with `grow_3d model: timer`, which sets the growth rate from the size deficit so the
+    cell arrives at its target size exactly when the clock fires. That pair gives every cell the
+    same age AND the same size at division, the strongest homeostasis available here, and it is
+    the upper bound the sizer and the balance model should be read against.
+
+    `cycle` is in DIVISION-CALLS, the same unit as `min_cycle` and `max_cycle`, not frames.
+    """
+    MECHANISM_TAGS = ["division", "timer", "cell_cycle_clock", "size_independent"]
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.cycle = float(params.get("cycle", 8.0))
+
+    def _trigger(self, v_now, v_birth, jit, age, v_ref):
+        return age >= self.cycle * jit
 
 
 @register_operator("topo_snapshot_3d", set="vertex", kind="structural", family="growth")
