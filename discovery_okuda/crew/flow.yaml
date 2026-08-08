@@ -76,42 +76,64 @@ nodes:
       # this pool did not: two of its six entries were inadmissible and it took a live Proposer call
       # to find out. All were measured, not remembered -- metrics come from each run's own diag.json.
       pool:
-        # RE-BASED 6 AUGUST, and the three that went were the three this pool was proudest of.
+        # RE-BASED 8 AUGUST ONTO THE GENERATED BASIS -- `discovery_okuda/make_basis.py`. Cedric:
+        # "put the current 12 folders of log/okuda into archive, you write a new set of 12 specs...
+        # to form a sound basis for the agentic loop. Route A can pull from this basis, not limited
+        # to two specs."
         #
-        # `_keep/r001_02` (corr 0.739), `_keep/r001_05` (0.710) and `repair_l_th_frac` (0.708) were
-        # promoted for carrying "the highest chemistry-shape coupling the campaign has measured",
-        # against coral_gate's 0.435. All three ran `seed_cell_rd mode: tip`, which re-activates a
-        # cap at the CURRENT OUTERMOST CELL every frame. So the activator was pinned to the shape's
-        # own furthest point, and `corr_act_rad` -- activator against radius -- was reading the
-        # seeding rule against itself. The number that got them promoted is the artifact.
+        # WHAT WENT, AND WHY IT WAS NOT A BASIS. Sixteen folders accumulated over four phases: six
+        # different frame counts (201/301/401/501/801/901), `grip_peak` absent from all sixteen
+        # because they predate the metric registry the campaign scores on, one folder with no spec
+        # at all, and one (`repair_l_th_frac`, act_cv 4.97) whose number came from the `mode: tip`
+        # artifact. Three were in this pool and exactly TWO could be a Route A base. A basis has to
+        # let you compare its members to each other; those could not be compared to each other, nor
+        # to a 900-frame campaign run. They are in log/okuda/_superseded_pre_basis/.
         #
-        # They are also unrunnable now: `mode: tip` was deleted and an unknown mode raises. Nothing
-        # is lost that was ever evidence, and `_keep/` still holds the runs.
+        # WHAT REPLACED IT IS A GRID, NOT A COLLECTION -- 3 chemistry x 2 material x 2 mechanics,
+        # generated so that every value NOT on an axis is written once and shared by all twelve.
+        # The diff between any two members is exactly the axes that separate them, which is what
+        # makes "Route A pulls from the basis" mean "choose an axis to move" rather than "pick a
+        # folder". Twelve bases also means the per-base share in `route_a.slots` must ROTATE rather
+        # than divide -- see that node.
         #
-        # What remains are the three hand-written parents, all `mode: scatter` with
-        # `before_frame: 3` -- a real initial condition, pattern emerging from random nuclei rather
-        # than placed by us. On coral_gate_div the same `beta` edit that moved the tip lineage by
-        # EXACTLY ZERO moves the trajectory by 2.57e-01, so the campaign's own question becomes
-        # askable here for the first time.
+        #   chemistry   none | gray-scott | gierer-meinhardt
+        #   material    static (divide, no growth) | uniform (gate open) | gated (Hill on activator)
+        #   mechanics   plain | shaping (K_bend + K_lumen + rd_interface_tension.K_purse)
         #
-        # Three parents is thin, and deliberately so: the campaign promotes its own from round 1,
-        # and the last pool's best entries were promoted on a measurement nobody had checked.
-        - coral_gate               # the reference working chemistry, corr 0.435, act_cv 2.20
-        - coral_gate_div           # division on the working chemistry -- the battery's fixture
-        - cfl_c000p080_d002p000    # a CFL-safe baseline
+        # THE MECHANICS COLUMN IS THE ONE THAT WAS UNREACHABLE. `coral_gate_div` ran
+        # `shape_energy_3d model: monolayer`, whose parameter list contains no K_bend and no
+        # K_lumen -- so the three terms that can neck a lobe into a finger were not merely missing
+        # from its spec, they were INEXPRESSIBLE in its model, and no edit the Proposer could write
+        # would have reached them. All twelve carry them explicitly; four carry K_purse with
+        # K_extrude at zero, which is the sound half of the forcing operator on its own.
+        - b_none_static_plain      # divide, no growth, no chemistry -- the substrate null
+        - b_none_static_shaping
+        - b_none_uniform_plain     # grows without patterning (what cellfix_B_new was for)
+        - b_none_uniform_shaping
+        - b_gs_uniform_plain
+        - b_gs_uniform_shaping
+        - b_gs_gated_plain         # the campaign's own question: pattern gating growth
+        - b_gs_gated_shaping
+        - b_gm_uniform_plain
+        - b_gm_uniform_shaping
+        - b_gm_gated_plain
+        - b_gm_gated_shaping
       #
       # DROPPED, each for a measured reason:
       #
+      #   coral_gate / coral_gate_div   the campaign's parents through round 5, on `monolayer`
+      #                         mechanics that cannot express the bending and lumen terms. Their
+      #                         measured evidence is not discarded -- the rho ladder (cells
+      #                         4.0k -> 14.2k, grip peaking at rho 1.0) and the flat vth_frac
+      #                         ladder are in campaign/knowledge.md -- but a base whose mechanics
+      #                         model forecloses half the search cannot lead the next campaign.
       #   refute_coral_nocons   its growth ceiling vth_frac=1.4 sits BELOW the division trigger
-      #                         factor=2.0, so volume-triggered division is arithmetically impossible.
-      #                         run_one's static premise check refuses it before touching a GPU, and
-      #                         the fidelity overlay faithfully propagates the broken pair to every
-      #                         child -- so all FOUR of its children in round 1 died in under a minute,
-      #                         the control among them. `--check` said "pool OK" because critic.admit
-      #                         does not test that relation while biologist.check does; it now runs
-      #                         both.
-      #   wk_pressure_pos_s0    passes every premise, but has no measurable chemistry-shape coupling
-      #                         (corr_act_rad absent), so it cannot speak to the open question.
+      #                         factor=2.0, so volume-triggered division is arithmetically
+      #                         impossible. All FOUR of its children in round 1 died in under a
+      #                         minute, the control among them.
+      #   wk_pressure_pos_s0    passes every premise, but has no measurable chemistry-shape
+      #                         coupling (corr_act_rad absent), so it cannot speak to the open
+      #                         question.
 
   - id: history
     code: round.history

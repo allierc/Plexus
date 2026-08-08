@@ -404,7 +404,7 @@ CLOSURE_N = 4          # distinct values RUN before a parameter leaves the menu
 BATTERY = os.path.join(HERE, "battery.json")     # written by prototype/Tyssue/op_probe.py --all
 
 
-def _sweep_state():
+def _sweep_state(by_base=False, sweeps_only=False):
     """Per parameter: which values the campaign has RUN, and whether that sweep is finished.
 
     THE ONE THING THE CONTROL LOOP DOES THAT THIS DID NOT. Measured over 13 rounds, side by side:
@@ -432,6 +432,21 @@ def _sweep_state():
     # Closing a parameter on measurements taken through a broken instrument is worse than never
     # having closed it. A reset means re-derive; the archive is cross-campaign memory, not a
     # verdict this campaign has earned.
+    # TWO SCOPES, AND ROUTE A NEEDS THE NARROW ONE. Closure used to be keyed on the PARAMETER
+    # alone, over every record. Two consequences, both measured on rounds 1-4:
+    #
+    #   ONE BASE RETIRED ANOTHER'S LADDER. `coral_gate_div`'s rho grid closed
+    #   `grow_3d0.rho`, and `cellfix_B_new` -- whose own rho = 2.0 rung had never run -- was
+    #   dropped from Route A after round 1 and never offered again. With twelve bases instead of
+    #   two, that collision is no longer an edge case, it is the normal case.
+    #
+    #   ROUTE B CONTAMINATED ROUTE A. Route B set `shape_to_chem0.beta` to -2, 1.0 and 2.0 on
+    #   three DIFFERENT parents. When Route A reaches its beta grid it would skip -2 and 2 and
+    #   call the remainder a ladder -- rungs measured on three different specs, which is not a
+    #   sweep. `sweeps_only` counts only slots Route A itself ran.
+    #
+    # The flat, everything-counts view is still what the MENU wants: there the question is "has
+    # this knob been tried at all", and a value tried by either route answers it.
     tried = {}
     for path in (RECORDS,):
         if not os.path.exists(path):
@@ -444,10 +459,18 @@ def _sweep_state():
                     continue
                 if not r.get("metrics"):
                     continue          # never produced evidence: it does not count toward closure
+                if sweeps_only and r.get("intent") != "sweep":
+                    continue
                 e = r.get("edit")
                 if not e or len(e) < 3 or e[0] != "set_param":
                     continue
-                tried.setdefault(str(e[1]), set()).add(_round_val(e[2]))
+                if by_base:
+                    tried.setdefault(str(r.get("parent")), {}) \
+                         .setdefault(str(e[1]), set()).add(_round_val(e[2]))
+                else:
+                    tried.setdefault(str(e[1]), set()).add(_round_val(e[2]))
+    if by_base:
+        return {b: {k: sorted(v, key=str) for k, v in d.items()} for b, d in tried.items()}
     return {k: sorted(v, key=str) for k, v in tried.items()}
 
 
@@ -799,7 +822,9 @@ def route_a(ctx):
     # reason `parents.pool` lives there. This function only knows how to walk a plan.
     plan = ctx.get("plan") or []
     limit = int(ctx.get("slots") or 8)
-    tried = _sweep_state()
+    # SCOPED PER BASE AND TO ROUTE A'S OWN SLOTS -- see `_sweep_state`. A ladder is only a ladder
+    # if every rung was measured on the same spec by the same route.
+    tried_by_base = _sweep_state(by_base=True, sweeps_only=True)
     # AN EQUAL SHARE PER BASE. Cedric, 7 August: "I expected 4 coral and 4 cellfix_B_new in route
     # A". Walking the plan in order gave 5 + 3, because cellfix's rho grid has five values and is
     # listed first -- so one base ran ahead of the other and the Analyst got one long ladder and
@@ -809,11 +834,25 @@ def route_a(ctx):
     for e in plan:
         if e[0] not in plan_bases:
             plan_bases.append(e[0])
-    per_base = max(1, limit // max(1, len(plan_bases)))
-    used = {b: 0 for b in plan_bases}
+    # A ROTATION, NOT A DIVISION. This was `per_base = limit // len(plan_bases)`, which is a fair
+    # share only while the number of bases divides the number of slots. Measured on rounds 2-4:
+    # with two bases it computed 4, one base's only plan entry closed after round 1, and its four
+    # slots were then unspendable -- Route A quietly ran at HALF its declared budget for three
+    # rounds, and the 8/8 split Cedric asked for was never honoured. With the twelve-member basis
+    # it computes `8 // 12 = 0` and Route A would emit nothing at all.
+    #
+    # So: give each base an equal share of what is left, walking the bases in order and starting
+    # from a different one each round, and let a base that has nothing to offer pass its share on
+    # rather than sit on it. Over rounds every base gets the same number of slots; within a round
+    # the budget is always fully spent.
+    n_rounds = len({r for r in _sweep_rounds()})
+    order = plan_bases[n_rounds % len(plan_bases):] + plan_bases[:n_rounds % len(plan_bases)]
     out = []
-    for base, op, key, values in plan:
-        done = set(tried.get(f"{op}0.{key}", []))
+    for base_turn in order:
+        for base, op, key, values in plan:
+            if base != base_turn or len(out) >= limit:
+                continue
+            done = set((tried_by_base.get(base) or {}).get(f"{op}0.{key}", []))
         todo = [v for v in values if _round_val(v) not in done]
         if not todo:
             continue                                   # swept to closure, retired
@@ -833,21 +872,56 @@ def route_a(ctx):
             gone = [v for v in todo if v not in legal]
             print(T_.quiet(f"[route A] {base} {op}.{key}: {gone} refused by a premise -- "
                            f"not offered"))
-        # BALANCED ACROSS BASES. Cedric, 7 August: "I expected 4 coral and 4 cellfix_B_new in
-        # route A". Walking the plan in order gave 5 + 3, because cellfix's rho grid has five
-        # values and it is listed first -- so one base ran ahead of the other and the Analyst got
-        # one long table and one short one instead of two comparable ladders. A round should
-        # advance both bases by the same amount, because the WHOLE POINT of two bases is the
-        # comparison: one grows without patterning, one patterns without growing.
-        legal = legal[:max(0, per_base - used.get(base, 0))]
-        for v in legal:
-            used[base] = used.get(base, 0) + 1
-            out.append({"sweep": True, "base": base, "op": op, "key": key, "value": v,
-                        "claim": f"ROUTE A: sweep {op}.{key} on {base} -- what value makes it work",
-                        "intent": "sweep"})
-            if len(out) >= limit:
-                return out
+        # ONE ENTRY PER BASE PER ROUND, so a round advances every base by a comparable amount and
+        # the Analyst gets ladders it can set side by side -- which is the whole point of having
+        # more than one base. `per_base` here is what is left divided by the bases still to come.
+            share = max(1, (limit - len(out)) // max(1, len(order)))
+            for v in legal[:share]:
+                out.append({"sweep": True, "base": base, "op": op, "key": key, "value": v,
+                            "claim": f"ROUTE A: sweep {op}.{key} on {base} -- "
+                                     f"what value makes it work",
+                            "intent": "sweep"})
+            break                       # this base has had its turn; go to the next one
+    # ANY SLOTS LEFT GO BACK ROUND. A base with nothing open passes its share on rather than
+    # leaving the round short -- the defect that ran Route A at half budget for three rounds.
+    if len(out) < limit:
+        spent = {(d["base"], d["op"], d["key"], _round_val(d["value"])) for d in out}
+        # LEAST-SERVED FIRST, so passing a share on does not simply hand it to whichever base is
+        # listed earliest. Round 1 of the old code gave cellfix five rungs and coral three for
+        # exactly that reason, and Cedric read the split off the round: "I expected 4 coral and 4
+        # cellfix_B_new in route A".
+        got = {b: sum(1 for d in out if d["base"] == b) for b in plan_bases}
+        plan = sorted(plan, key=lambda e: (got.get(e[0], 0), order.index(e[0])
+                                           if e[0] in order else 0))
+        for base, op, key, values in plan:
+            done = set((tried_by_base.get(base) or {}).get(f"{op}0.{key}", []))
+            for v in values:
+                if len(out) >= limit:
+                    break
+                if _round_val(v) in done or (base, op, key, _round_val(v)) in spent:
+                    continue
+                if not _sweep_premises_ok(base, op, key, v):
+                    continue
+                out.append({"sweep": True, "base": base, "op": op, "key": key, "value": v,
+                            "claim": f"ROUTE A: sweep {op}.{key} on {base} -- "
+                                     f"what value makes it work",
+                            "intent": "sweep"})
     return out
+
+
+def _sweep_rounds():
+    """The round ids Route A has already run in -- used only to rotate which base goes first."""
+    seen = set()
+    if os.path.exists(RECORDS):
+        with open(RECORDS) as fh:
+            for line in fh:
+                try:
+                    r = json.loads(line)
+                except Exception:
+                    continue
+                if r.get("intent") == "sweep" and r.get("round"):
+                    seen.add(r["round"])
+    return seen
 
 
 def build_all(ctx):

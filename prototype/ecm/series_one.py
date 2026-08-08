@@ -223,6 +223,20 @@ SERIES = {
     "90_gridbc_noexcl": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
                              membrane_exclude=False, membrane_adhesion=0.0,
                              membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
+    # 91: 90 ended at R = 0.0875 -- the membrane did not move at all in 402 frames, so the projection
+    #     had been the ONLY thing carrying it outward. The boundary condition was imposed on nodes
+    #     INSIDE the surface, and THE LUMEN IS EMPTY: no MPM particles live there, so those nodes carry
+    #     no mass, `mv = v*m` writes nothing and G2P gathers nothing back. The constraint was applied
+    #     exactly where there is no material to apply it to.
+    #
+    #     91 imposes it where the material actually is: on MASSED nodes in a band around the surface,
+    #     correcting only the outward normal component and only when material is moving slower than the
+    #     surface. That is a separating collision object rather than no-slip -- the tissue pushes
+    #     material out of its way, and never pulls it back or drags it tangentially. Welding the sheet
+    #     to the epithelium is what the integrin anchor is for, and is a different experiment.
+    "91_gridbc_band": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
+                           membrane_exclude=False, membrane_adhesion=0.0, membrane_secrete_rate=0.0,
+                           membrane_tau=0.0, membrane_reserve=0.0),
 
     # 89-91: Plexus's own attraction_repulsion law instead of the one-sided spring.
     #

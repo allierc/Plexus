@@ -126,7 +126,20 @@ K_PURSE = 1.0                                # rd_interface_tension, `shaping` h
 
 RD = dict(d_a=0.08, d_h=0.16, chi=1.3)
 GS = dict(F=0.046, kk=0.062, rate=1.0)                 # the coral spots the campaign knows
-GM = dict(F=0.046, kk=0.062, rate=1.0)                 # same feed, different model at the slot
+# GM READS A DIFFERENT SET OF KEYS, AND THE FIRST DRAFT OF THIS LINE DID NOT. It said
+# `GM = dict(F=0.046, kk=0.062, rate=1.0)` -- "same feed, different model at the slot" -- and
+# `CellReactGiererMeinhardt` reads none of F or kk. It reads gm_rho, mu_a, mu_h, a0, rate, sat.
+# So four of the twelve shipped carrying two keys their operator ignores and ran at bare defaults
+# nobody had validated: in the launch batch all four `b_gm_*` sat at 2000 cells while their
+# Gray-Scott twins were at 5,000-6,500 on identical growth and mechanics.
+#
+# `a0 > 0` IS LOAD-BEARING, not decoration: da = rho*a^2/h - mu_a*a + a0, so da(0) = a0, and at
+# a0 = 0 the zero state is a fixed point -- premise P4 says so in as many words and censors the
+# run. `sat` caps the autocatalysis; the space's own note records that sat = 0.1 takes the
+# activator ceiling from 1489 to a usable range without flattening the pattern (act_cv 4.14 ->
+# 2.80). Both come from the declared box in composition_space, which is where this campaign's
+# validated values live.
+GM = dict(a0=0.01, mu_h=1.0, sat=0.1, rate=1.0)
 BETA = 0.5                                             # shape -> chemistry, the second arrow
 F0 = 0.046
 
@@ -195,8 +208,12 @@ def build(chem, mat, mech):
                     "K_purse": K_PURSE, "K_extrude": 0.0})
     ops += [
         {"op": "divide_3d", "at": "vertex", "cell_set": "cell", "factor": DIVIDE_FACTOR,
+         # `reset_noise` IS NOT HERE, and the first draft copied it from coral_gate_div. It was
+         # the legacy uniform jitter, read only when cycle_cv == 0, and it was REMOVED from
+         # divide_3d on 6 August -- so every spec still carrying it names a key nothing reads.
+         # Caught by the unread gate below, which is the entire reason that gate exists.
          "cycle_cv": 0.15, "min_cycle": 4, "max_cycle": 10 ** 9, "p0": 3.5,
-         "reset_noise": 0.12, "every": 4, "engine_clock": True},
+         "every": 4, "engine_clock": True},
         {"op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": 0.28, "every": 1, "max_flips": 300},
         {"op": "topo_snapshot_3d", "at": "vertex", "every": 1},
     ]
@@ -234,6 +251,36 @@ def grid():
             for mech in AXES["mech"]]
 
 
+def _unread(spec):
+    """Keys each operator in `spec` never looks up -- reported as `op.key UNREAD`."""
+    sys.path.insert(0, os.path.join(os.path.dirname(HERE), "prototype", "Tyssue"))
+    sys.path.insert(0, os.path.join(os.path.dirname(HERE), "src"))
+    try:
+        import plexus.operators                                          # noqa: F401
+        import tyssue_ops3d, tyssue_rd_ops, tyssue_monolayer             # noqa: F401
+        import tyssue_shape_to_chem, tyssue_t1_ops3d                     # noqa: F401
+        from op_probe import unread_params
+    except Exception as e:
+        return [f"(unread check unavailable: {type(e).__name__})"]
+    out = []
+    for o in spec["operators"]:
+        params = {k: v for k, v in o.items()
+                  # the engine consumes these; the operator class never sees them as its own
+                  if k not in ("op", "model", "implementation", "every", "connect",
+                               "after_frame", "before_frame", "reads", "writes")}
+        params["_at"] = o.get("at")
+        try:
+            dead, err = unread_params(o["op"], params, o.get("model") or o.get("implementation"))
+        except Exception:
+            continue
+        if err or dead is None:
+            continue
+        for k in dead:
+            if k not in ("at", "cell_set", "vertex_set", "seed"):   # resolved by the engine
+                out.append(f"{o['op']}.{k} UNREAD")
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="run the static premises on each")
@@ -255,6 +302,14 @@ def main():
             import biologist as B
             res = B.check(spec)
             fails = [r.pid for r in res if r.status == "fail"]
+            # AND EVERY KEY MUST BE ONE THE OPERATOR ACTUALLY READS. This gate exists because the
+            # first launch of this basis shipped four members carrying `F` and `kk` on a
+            # gierer_meinhardt slot, which that model does not read: it takes gm_rho, mu_a, mu_h,
+            # a0, rate, sat. Nothing complained. The premises passed, the specs compiled, the jobs
+            # ran -- and a third of the basis was measuring an unvalidated default instead of the
+            # recipe its name claims. A wrong VALUE is a result; a key nobody reads is a lie about
+            # what was tested, and it is statically detectable, so it is checked here.
+            fails += _unread(spec)
             bad += bool(fails)
             note = "BROKEN " + ",".join(fails) if fails else "static ok"
         print(f"{name:<26}{chem:<6}{mat:<9}{mech:<9}{len(spec['operators']):>4}  {note}")
