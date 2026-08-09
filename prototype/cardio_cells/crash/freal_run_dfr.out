@@ -144,3 +144,4 @@
 [r] reference window built, 150 frames [739s]
     candidate                 medE      raw     kE     kg   gauged  band_lo  band_hi       R2  r2cell  conv
     theta_true              0.0000   1.0000  1.000  1.000   1.0000   1.0000   1.0000   1.0000  1.0000  True [537s]
+    none                    0.2572   0.5865  1.801  1.122   0.8271   0.8271   0.8726   0.9472  0.9739  True [394s]

@@ -1,0 +1,86 @@
+{
+ "args": {
+  "device": "cuda:0",
+  "tag": "fcell_M",
+  "stages": "M",
+  "ticks": "165,170,175,180",
+  "hpx": "15,34",
+  "cells": 100,
+  "per_parent": 100,
+  "ridge": 1e-08
+ },
+ "stage_M": {
+  "M1_tracked": {
+   "frac_nodes_moving": 1.0,
+   "median_time_sd_px": 0.9680249426127925,
+   "p99_time_sd_px": 3.489393304425023,
+   "median_peak_to_peak_px": 3.7199859619140625,
+   "max_peak_to_peak_px": 15.14013671875,
+   "axis_of_x": 1,
+   "node_spacing_x_px": 15.004241943359375,
+   "node_spacing_y_px": 15.0040283203125,
+   "frame0_deviation_from_perfect_lattice_px": 0.6279295009214881
+  },
+  "M2_displacement": {
+   "max_abs_u_px": 14.8800048828125,
+   "max_abs_v_px": 13.1529541015625,
+   "median_abs_u_over_spacing": 0.0369931192147403
+  },
+  "M3_registration": {
+   "label_shape": [
+    1024,
+    1024
+   ],
+   "n_labels": 472,
+   "scale_label_px_per_recording_px": [
+    0.4976121935020475,
+    0.4974008738429178
+   ],
+   "exact_count_agreement_with_props": 0.6970338983050848,
+   "count_correlation": 0.9823470812691122,
+   "nodes_with_label_0": 0,
+   "n_nodes": 18769,
+   "nodes_per_cell_median": 38.0,
+   "nodes_per_cell_min": 4,
+   "nodes_per_cell_max": 117,
+   "cells_with_lt_6_nodes": 3,
+   "cells_with_lt_12_nodes": 10,
+   "cells_with_lt_20_nodes": 30,
+   "n_cells_hit": 472
+  },
+  "M4_fold": {
+   "n_quads": 18496,
+   "n_frames": 239,
+   "min_relative_signed_area": 0.6828845780361609,
+   "n_negative_quad_frames": 0,
+   "frac_negative": 0.0
+  },
+  "M5_eulerian_cost": {
+   "ticks": [
+    152,
+    158,
+    164,
+    170,
+    176,
+    182,
+    188,
+    194,
+    200
+   ],
+   "frac_relabelled": [
+    0.020352709254621983,
+    0.06169747988704779,
+    0.04885715807981246,
+    0.013852629335606586,
+    0.010176354627310992,
+    0.008577974319356385,
+    0.008205018914166978,
+    0.007938622196174543,
+    0.008098460226970004
+   ],
+   "max_frac_relabelled": 0.06169747988704779
+  },
+  "membership_is_material": true
+ },
+ "seconds": 0.4413442611694336
+}
