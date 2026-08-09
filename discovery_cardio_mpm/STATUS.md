@@ -310,6 +310,23 @@ note falls.**
 
 - **The instrument lies before the physics does.** Three of the six defects above were in
   measurement code, two of them in code I had just written to fix a measurement.
+- **A gate that refuses everything does not stop bad claims — it redirects them to the ungated
+  thing.** Nothing was certified, so `cite()` refused all seven instruments and every consumer fell
+  back to the objective. Eligibility reported ≠ judgement made.
+- **A check that asserts the empty set passes until the work is done, then hides that it isn't.**
+  `add(..., not admitted())` was a placeholder that outlived its phase.
+- **Precision is not sensitivity.** Resolving power (null → tissue) admits an instrument; it says
+  nothing about ranking candidates that all roughly work. Measure the range across the *candidate
+  bank* too — they differed by 7× per instrument here.
+- **A null measured on another tissue is not this tissue's null.** The registry's floors come from
+  the recording; the synthetic sheet beats 8.7× harder, and its own frozen-sheet null is 95.06
+  steps against the imported 6.65.
+- **A linearization base can manufacture an invariance.** At θ=0 the stress vanishes, so *anything*
+  multiplying it looks F-free — bitwise, convincingly, and meaninglessly.
+- **A prior anchored on the fit rides the bias.** The box slid down exactly as far as attenuation
+  did, so the worse the data, the more confidently it excluded the truth.
+- **Ask what a per-cell map is a map OF.** Here per-cell sensitivity correlates ρ=+0.96 with the
+  stimulus a cell happens to receive and ρ=+0.14 with its own parameter.
 - **A gate that cannot fail is not a gate.** Every certification script ships a `--canary` mode that
   injects the faults it claims to catch.
 - **A default is a belief in disguise**, and goes in the register with the rest.
