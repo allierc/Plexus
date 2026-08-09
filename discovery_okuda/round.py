@@ -1537,7 +1537,12 @@ def launch(ctx):
     if not names:
         print("[round] nothing to launch")
         return []
-    frames = None if ctx.get("mode") == "recon" else FRAMES
+    # `_FRAMES`, NOT `FRAMES`. This read the module constant while `build_all` read
+    # `flow.yaml`'s `build.frames` into `_FRAMES` -- so the spec was WRITTEN with the declared
+    # frame count and then the job was SUBMITTED with `--frames 900`, which overrides it. Raising
+    # frames in the graph did nothing, silently, and the graph is where campaign decisions are
+    # supposed to live. A producer with no consumer, hidden because both are called "frames".
+    frames = None if ctx.get("mode") == "recon" else _FRAMES
     ok = cluster.run_batch(names, frames=frames, campaign="campaign")
     if not ok:
         print(T_.warn("[round] the batch did not complete cleanly -- waiting for the survivors"))

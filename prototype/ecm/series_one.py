@@ -306,6 +306,16 @@ SERIES = {
     "98_shell": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
                      membrane_exclude=False, membrane_adhesion=0.0, membrane_secrete_rate=0.0,
                      membrane_tau=0.0, membrane_reserve=0.0, membrane_band=1.0, membrane_recover=2.0),
+    # M3: is the integrin anchor still needed now that the grid boundary carries the sheet? 91 is the
+    #     control (no anchor). 99 tethers it, 100 tethers it stiffly -- a stiff tether on a sheet the
+    #     boundary is already moving is a way to tear it, not to hold it.
+    "99_anchor": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
+                      membrane_exclude=False, membrane_adhesion=1.0e4, membrane_secrete_rate=0.0,
+                      membrane_tau=0.0, membrane_reserve=0.0, membrane_band=1.0, membrane_recover=2.0),
+    "100_anchor_stiff": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
+                             membrane_exclude=False, membrane_adhesion=5.0e4, membrane_secrete_rate=0.0,
+                             membrane_tau=0.0, membrane_reserve=0.0, membrane_band=1.0,
+                             membrane_recover=2.0),
     "_unused_secrete_dense": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
                              membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
                              membrane_particles=90000, membrane_reserve=1.0,

@@ -19,10 +19,15 @@ import cluster  # noqa: E402
 
 LOG = "/workspace/Plexus/log/okuda_ECM"
 WAVES = [
-    ["84_holes_45k_r0", "85_holes_45k_r8", "86_holes_135k_r0",
-     "87_holes_135k_r8", "88_holes_270k_r0", "89_holes_270k_r8"],
-    ["90_holes_45k_r0_noadh", "91_holes_45k_r8_noadh", "92_holes_135k_r0_noadh",
-     "93_holes_135k_r8_noadh", "94_holes_270k_r0_noadh", "95_holes_270k_r8_noadh"],
+    # A: the corset and its sign control (two-stage runs: sheet records hoop tension, tissue rebuilt
+    # gated on it). 102 is the isotropic baseline, 105 reverses the anisotropy -- an effect that does
+    # not reverse when its cause reverses is not the effect.
+    ["102_corset_off", "103_corset_x3", "104_corset_x10", "105_corset_reversed"],
+    # the competing explanation: elongation from tension-keyed myosin with an ISOTROPIC membrane.
+    # If 106 elongates as much as 104, the corset is not necessary.
+    ["106_polarised_myosin", "107_corset_and_myosin"],
+    # B: the continuum ladder, M3 -- is the anchor still needed now the grid boundary carries the sheet?
+    ["99_anchor", "100_anchor_stiff"],
 ]
 PERIOD = int(os.environ.get("WD_PERIOD", 1800))
 
