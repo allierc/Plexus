@@ -440,6 +440,52 @@ SERIES = {
                      membrane_grid_bc=False, membrane_contact_k=0.0, membrane_exclude=False,
                      membrane_adhesion=5.0e4, membrane_gamma=2.0e3, membrane_tau=0.0, membrane_secrete_rate=0.012, membrane_reserve=1.0,
                          membrane_particles=90000),
+    # 129-130: THE DIRECT-FORCE PATH, THIS TIME ACTUALLY APPLIED. 120-128 all set
+    #     `membrane_direct_forces=True` and none of them ran it: the branch was nested inside
+    #     `if membrane_springs:` and every one of those runs sets springs off. So `membrane_gamma` never
+    #     reached the operator, 120/121/122 were a bare stiffness sweep (1e4 / 5e4 / 2.5e5) rather than
+    #     the k/gamma = 5 / 25 / 125 they are named for, and 122 collapsed at the frame-level stability
+    #     limit dt_frame*sqrt(k) = 2.0 rather than from two integrators disagreeing.
+    #
+    #     WHAT CHANGES, AND THE PREDICTION IT MAKES. `emit: velocity` integrates x += dt*(k/gamma)*(a-x),
+    #     first order and overdamped, so stability needs dt*(k/gamma) < 2 instead of dt*sqrt(k) < 1 --
+    #     and the standoff stops being a force balance against the sheet's resistance to inflation and
+    #     becomes a TRACKING LAG behind a moving anchor. The anchor moves 5.32e-4 box units per frame
+    #     (R: 0.0835 -> 0.2973 over 402), so the lag is 5.32e-4 / (dt*k/gamma):
+    #         r =  25   dt*r = 0.10   lag 0.0053   standoff = offset - lag = -0.0013
+    #         r = 125   dt*r = 0.50   lag 0.0011   standoff              = +0.0029
+    #     against 121's -0.0082. Both land near the 0 to +0.002 the biology asks for, and the second
+    #     prediction is the sharper one: as r rises the standoff approaches +offset, i.e. the sheet sits
+    #     at the fibre's rest length -- which is the flat rig's result arriving on the spheroid. If that
+    #     holds, `membrane_offset` becomes the standoff and is a material property rather than a knob.
+    "129_direct_r25_fixed": dict(membrane_springs=False, membrane_impl="mpm",
+                                 membrane_direct_forces=True, membrane_grid_bc=False,
+                                 membrane_contact_k=0.0, membrane_exclude=False,
+                                 membrane_adhesion=5.0e4, membrane_gamma=2.0e3,
+                                 membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
+    "130_direct_r125_fixed": dict(membrane_springs=False, membrane_impl="mpm",
+                                  membrane_direct_forces=True, membrane_grid_bc=False,
+                                  membrane_contact_k=0.0, membrane_exclude=False,
+                                  membrane_adhesion=2.5e5, membrane_gamma=2.0e3,
+                                  membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
+
+    # 131: THE FIBRE THAT CANNOT BE SQUASHED -- 126 again (turnover on, k/gamma = 25) with the radial
+    #     compression branch stiffened 10x, `k_compress = 5e5` against `k = 5e4`. The question is
+    #     whether a length is enough on its own: an integrin is a molecule of finite length, so the
+    #     sheet should not be able to approach the surface closer than that length, and if the fibre
+    #     enforces it then no separate repulsion is needed to keep the BM out of the epithelium --
+    #     `basement_membrane_contact` becomes redundant rather than badly tuned.
+    #     Measured on 121, every integrin in the run ends SQUASHED to a third of its 0.004 length
+    #     (the sheet sits 0.0126 inside its rest position) and nothing objects, which is what a single
+    #     stiffness both ways buys. Overdamped the compression branch is stable to dt*(k/gamma) < 2,
+    #     i.e. k/gamma < 500, so 250 is inside it with room.
+    "131_fibre_stiff_compress": dict(membrane_springs=False, membrane_impl="mpm",
+                                     membrane_direct_forces=True, membrane_grid_bc=False,
+                                     membrane_contact_k=0.0, membrane_exclude=False,
+                                     membrane_adhesion=5.0e4, membrane_adhesion_compress=5.0e5,
+                                     membrane_gamma=2.0e3, membrane_tau=0.0, membrane_tau_adh=40.0,
+                                     membrane_secrete_rate=0.0, membrane_reserve=0.0),
+
     "_unused_secrete_dense": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
                              membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
                              membrane_particles=90000, membrane_reserve=1.0,
@@ -602,6 +648,20 @@ def main():
                                                if br.size else None))
     json.dump(info, open(os.path.join(d, "pass1.json"), "w"), indent=1)
     print("SERIES " + json.dumps({"name": name, **info["result"]}), flush=True)
+
+    # THE SECTION, ALWAYS. `movie.mp4` frames the whole tissue, where the sheet is a one-dot rim and the
+    # integrin holding it is sub-pixel -- so every question this prototype is now asking (where the BM
+    # sits, whether the fibre is stretched or squashed, which anchors are still bound) was invisible in
+    # the artefact each run produced. It costs ~3 minutes off `traj.npz`, no GPU, and a run whose spec
+    # has no `integrin_adhesion` simply says so and skips.
+    try:
+        import bm_section
+        bm_section.render(name)
+    except SystemExit as e:
+        print(f"[series] no section.mp4: {e}", flush=True)
+    except Exception as e:
+        print(f"[series] section.mp4 FAILED ({type(e).__name__}: {e}) -- traj.npz is on disk, so "
+              f"`bm_section.render('{name}')` redraws it without re-running", flush=True)
 
 
 if __name__ == "__main__":

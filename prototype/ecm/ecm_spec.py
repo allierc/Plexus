@@ -137,6 +137,11 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                # fraction of the sheet that carries an integrin anchor. Adhesion is punctate in vivo --
                # hemidesmosome plaques with membrane spanning between -- so < 1 is the faithful case.
                membrane_adhesion_fraction=1.0,
+               # THE FIBRE'S COMPRESSION BRANCH. 0 = one stiffness both ways (every run to 130). Set it
+               # above `membrane_adhesion` and the integrin becomes what a fibre is -- easy to stretch,
+               # hard to squash -- so the sheet cannot come closer to the surface than the fibre is
+               # long, and no separate repulsion is needed to keep it out of the epithelium.
+               membrane_adhesion_compress=0.0,
                # HEMIDESMOSOMES AS THEIR OWN SET. n_adhesions = 0 keeps the old field-on-the-membrane
                # tether; > 0 replaces it with discrete plaques that form, bear load, rupture and re-bind.
                n_adhesions=0, adhesion_k=1.0e4, adhesion_gamma=1.0, adhesion_rupture=0.0,
@@ -240,7 +245,8 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
              "k": float(membrane_adhesion), "offset": float(membrane_offset),
              "detach": float(membrane_detach),
              "tau_adh": float(membrane_tau_adh),
-             "fraction": float(membrane_adhesion_fraction)},
+             "fraction": float(membrane_adhesion_fraction),
+             "k_compress": float(membrane_adhesion_compress)},
             {"op": "basement_membrane_bond", "at": "basement_membrane_particle",
              "k": float(membrane_bond_k), "cutoff": float(membrane_cutoff),
              "aniso": float(membrane_aniso), "record_hoop": bool(membrane_record_hoop),
@@ -371,16 +377,29 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                 spec["schedule"].insert(spec["schedule"].index(after) + 1, "basement_membrane_repel")
             else:
                 spec["operators"] = [o for o in spec["operators"] if o["op"] != "basement_membrane_repel"]
-            if membrane_direct_forces:
-                for o in spec["operators"]:
-                    if o["op"] in ("integrin_adhesion", "basement_membrane_contact"):
-                        o["emit"] = "velocity"          # x += dt*(F/gamma): first-order, no inertia
-                        o["overdamped_gamma"] = float(membrane_gamma)
-                        o["graph_mode"] = False
-                # and out of the substep block: an engine-integrated delta is applied once per frame
-                for _st in spec["schedule"]:
-                    if isinstance(_st, dict) and "substep_dt" in _st:
-                        _st["steps"] = [x for x in _st["steps"] if x != "basement_membrane_contact"]
+        # OUTSIDE `if membrane_springs:`, WHICH IS WHERE IT SPENT RUNS 120-128 DOING NOTHING. Every one
+        # of those runs sets `membrane_springs=False` and `membrane_direct_forces=True`, so the branch
+        # was unreachable in exactly the runs named after it: `emit: velocity` and `overdamped_gamma`
+        # are absent from all of their saved specs and present in the graph-mode ones (102-107). What
+        # actually ran was the ordinary `mpm_acceleration` path, so `membrane_gamma` was never applied,
+        # 120/121/122 are a bare k sweep (1e4 / 5e4 / 2.5e5) rather than k/gamma = 5/25/125, and 122
+        # collapsed at the frame-level stability limit dt_frame*sqrt(k) = 2.0, not from an integrator
+        # disagreement. The hybrid is a continuum sheet with DIRECT adhesion, which has nothing to do
+        # with whether the sheet also carries springs.
+        if membrane_direct_forces:
+            for o in spec["operators"]:
+                if o["op"] in ("integrin_adhesion", "basement_membrane_contact"):
+                    o["emit"] = "velocity"          # x += dt*(F/gamma): first-order, no inertia
+                    o["overdamped_gamma"] = float(membrane_gamma)
+                    o["graph_mode"] = False
+            # and out of the substep block: an engine-integrated delta is applied once per frame.
+            # (It must come out for a second reason -- `H.zero_delta()` runs once per FRAME, so a force
+            # operator left inside the block accumulates across the substeps, 1x to 20x within one
+            # frame. That is measured, not supposed: mpm_scatter sees 20/40/60/80 for a body force
+            # placed inside a four-substep block against a flat 20/20/20/20 outside it.)
+            for _st in spec["schedule"]:
+                if isinstance(_st, dict) and "substep_dt" in _st:
+                    _st["steps"] = [x for x in _st["steps"] if x != "basement_membrane_contact"]
         if membrane_impl == "graph":
                 # THE MEMBRANE AS A SPRING GRAPH, not a continuum body. Nothing about the sheet's mechanics
                 # was ever coming from MPM: the crosslinks hold it together, the integrin springs hold it in

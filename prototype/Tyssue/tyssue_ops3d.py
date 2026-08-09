@@ -728,12 +728,19 @@ class Apoptosis3D(Structural):
         self.cells = [int(c) for c in (params.get("cells") or [])]
         # WHICH CELLS DIE is targeting, not a second mechanism: the shrink-shed-extrude pathway is
         # identical in every mode, so these are one operator rather than four.
-        self.mode = str(params.get("mode", "list"))       # list | band | cone | small | chem_low
+        self.mode = str(params.get("mode", "list"))   # list|band|cone|small|stalled|chem_low
+        #   LOCAL (vs neighbours): competition|smaller|dimmer|older|crowded|lonely
         self.frac = float(params.get("frac", 0.04))
         self.cone_deg = float(params.get("cone_deg", 22.8))       # 10 cells across on a 2,000-cell ball
         self.band_deg = float(params.get("band_deg", 8.0))        # half-width of each ring
         self.n_bands = int(params.get("n_bands", 1))              # >1 -> that many latitude rings
         self.small_frac = float(params.get("small_frac", 0.35))   # (small) die below this x v_ref
+        self.stall_frac = float(params.get("stall_frac", 0.5))    # (stalled) die below this x the
+        self.stall_margin = float(params.get("stall_margin", 0.02))  # population's MEDIAN growth,
+        self.min_age = int(params.get("min_age", 4))              # once older than min_age, and
+        self.n_max = int(params.get("n_max", 9))          # (crowded) die at this many neighbours
+        self.n_min = int(params.get("n_min", 3))          # (lonely) die at this few
+        #   only while the median cell has actually grown by stall_margin -- see _marked
         self.a_sw = float(params.get("a_sw", 0.25))               # fraction of the activator's own max
         self.shrink = float(params.get("shrink_rate", 0.04))
         self.crit = float(params.get("critical_frac", 0.12))      # x v_ref, the seed-time median
@@ -741,6 +748,76 @@ class Apoptosis3D(Structural):
         self.after_frame = int(params.get("after_frame", 0))
         self.every = _engine_owns_clock(params, default=1); self._k = 0
         self.seed = int(params.get("seed", 0))
+
+    def _nb(self, m, nF, q):
+        """(neighbour mean of `q`, neighbour count) on the CELL ADJACENCY GRAPH.
+
+        Cedric, 9 August: "we could make a comparison graph network between adjacent cells to make
+        a proper rule of cell competition?" -- and then: "this death operator could have different
+        modes: game of life, too small vs others, too slow growth vs others, cell duration too long
+        vs others". They are one mechanism: every useful death rule is a LOCAL comparison, and they
+        differ only in which per-cell quantity is compared. So the graph is built once, here.
+
+        WHY LOCAL AND NOT GLOBAL. `chem_low` compared each cell against the whole field and marked
+        the tissue when the pattern weakened -- 2,000 cells shrank to 21.6% of their volume and not
+        one was extruded. `stalled` compared growth against the population median and marked NOBODY
+        on r010_12, because at rho = 0.1 every white cell grows at the SAME slow rate and none sits
+        below half the median. Uniformly slow is not the same as losing, and only the neighbour
+        graph can tell them apart. A local rule is also self-limiting: it cannot mark a uniform
+        field however extreme that field is.
+
+        Adjacency is the face across each half-edge -- the same relation rd_interface_tension uses
+        for the red/white ring, so "adjacent" means one thing in this file.
+        """
+        import torch as _t
+        es = _t.as_tensor(m["E_srce"], dtype=_t.long)
+        et = _t.as_tensor(m["E_trgt"], dtype=_t.long)
+        ef = _t.as_tensor(m["E_face"], dtype=_t.long)
+        twin = ShapeEnergy3D._twin_faces(es, et, ef, int(m["Nv"])).cpu().numpy()
+        efn = ef.cpu().numpy()
+        ok = (efn < nF) & (twin < nF) & (twin >= 0)
+        ssum = np.zeros(nF); cnt = np.zeros(nF)
+        np.add.at(ssum, efn[ok], q[twin[ok]])
+        np.add.at(cnt, efn[ok], 1.0)
+        mean = np.zeros(nF)
+        hit = cnt > 0
+        mean[hit] = ssum[hit] / cnt[hit]
+        return mean, cnt
+
+    def _loser(self, m, nF, q, below=True):
+        """Cells whose `q` is far from their neighbours' -- the shared body of every local mode."""
+        ag = m.get("age")
+        nb, cnt = self._nb(m, nF, q)
+        old_enough = (ag.detach().cpu().numpy()[:nF] >= self.min_age) if ag is not None \
+            else np.ones(nF, bool)
+        live = (cnt > 0) & old_enough
+        if below:
+            # the neighbours must be doing the thing, or a quiet patch culls itself from inside
+            return set(np.where(live & (nb > self.stall_margin)
+                                & (q < self.stall_frac * nb))[0].tolist())
+        return set(np.where(live & (q > nb / max(self.stall_frac, 1e-9)))[0].tolist())
+
+    def _q(self, m, H, nF, what):
+        """The per-cell quantity a local mode compares."""
+        if what == "growth":                                  # fractional growth SINCE BIRTH
+            v = m.get("V0f"); vb = m.get("Vbirth")
+            if v is None or vb is None:
+                return None
+            return np.maximum(v.detach().cpu().numpy()[:nF]
+                              / np.maximum(vb.detach().cpu().numpy()[:nF], 1e-12) - 1.0, 0.0)
+        if what == "volume":
+            v = m.get("V0f")
+            return None if v is None else v.detach().cpu().numpy()[:nF]
+        if what == "age":
+            a = m.get("age")
+            return None if a is None else a.detach().cpu().numpy()[:nF]
+        if what == "act":
+            clvl = H.level(self.cat)
+            if clvl is None or "chem" not in getattr(clvl, "state_schema", {}):
+                return None
+            h0, _ = clvl.state_schema["chem"]
+            return clvl.state[:nF, h0].detach().cpu().numpy()
+        return None
 
     def _marked(self, m, H, nF):
         """The set of cell indices currently marked to die."""
@@ -777,6 +854,71 @@ class Apoptosis3D(Structural):
             vv = v.detach().cpu().numpy()[:nF]
             v_ref = float(m.get("v_ref", 1.0))
             return set(np.where(vv < self.small_frac * v_ref)[0].tolist())
+        if self.mode == "stalled":
+            # CELL COMPETITION: a cell that is not growing while its neighbours are gets removed.
+            # Cedric, 9 August: "the apoptosis is working but not what triggers it -- would it be
+            # possible to kill cells that do not grow?"
+            #
+            # RELATIVE, WHICH IS THE WHOLE POINT. `chem_low` marks every cell below a fraction of
+            # the activator's maximum, so when the pattern weakens it marks the TISSUE: measured on
+            # r019_02_apop_low, every cell shrank to 21.6% of its volume, act_max went to zero, and
+            # not one cell was ever extruded, because death needs a cell squeezed to a triangle by
+            # neighbours that are not shrinking too. A threshold against the population's own
+            # median cannot do that: it always names a minority, by construction.
+            #
+            # V0f/Vbirth is growth since birth and `age` is time since birth. Both are already
+            # carried across renumbering by `keep` -- in divide_3d and in this operator -- so this
+            # needs no new bookkeeping, which is the part that has gone wrong twice already.
+            v = m.get("V0f"); vb = m.get("Vbirth"); ag = m.get("age")
+            if v is None or vb is None:
+                return set()
+            vv = v.detach().cpu().numpy()[:nF]
+            vbb = np.maximum(vb.detach().cpu().numpy()[:nF], 1e-12)
+            # THE EXCESS OVER BIRTH SIZE, NOT THE RATIO -- and the first version compared ratios,
+            # which cannot work. V0f/Vbirth is >= 1 for any cell that has grown at all and exactly
+            # 1.0 for one that has not, so with a median near 1.4 a cut at 0.5 x median = 0.7 sits
+            # BELOW the floor and marks nobody. Measured: zero deaths across three runs and
+            # hundreds of frames. `g = ratio - 1` is fractional growth SINCE BIRTH -- 0 for a
+            # stalled cell -- and half the median excess is the comparison that was intended. On a
+            # synthetic population of 400 stalled cells among 1,600 growing ones: the ratio form
+            # marks 0, the excess form marks 618.
+            g = np.maximum(vv / vbb - 1.0, 0.0)
+            med = float(np.median(g))
+            # A GLOBALLY STALLED TISSUE IS NOT A TISSUE FULL OF LOSERS. If the median cell has not
+            # grown, there is no competition to lose and this marks nobody -- otherwise the same
+            # runaway that chem_low produced would return by another route.
+            if med < self.stall_margin:
+                return set()
+            old_enough = (ag.detach().cpu().numpy()[:nF] >= self.min_age) if ag is not None \
+                else np.ones(nF, bool)
+            return set(np.where((g < self.stall_frac * med) & old_enough)[0].tolist())
+        # ---- THE LOCAL FAMILY. All five compare a cell with the cells TOUCHING it; they differ
+        # only in what is compared, which is why they share `_loser`. Each is a different
+        # biological hypothesis about why a cell is eliminated, not a different way to compute one.
+        if self.mode == "competition":            # grows slower than its neighbours -- Myc-style
+            q = self._q(m, H, nF, "growth")       # cell competition, the loser is out-proliferated
+            return set() if q is None else self._loser(m, nF, q, below=True)
+        if self.mode == "smaller":                # smaller than its neighbours: squeezed out by a
+            q = self._q(m, H, nF, "volume")       # tissue that can no longer accommodate it
+            return set() if q is None else self._loser(m, nF, q, below=True)
+        if self.mode == "dimmer":                 # less activator than its neighbours -- the LOCAL
+            q = self._q(m, H, nF, "act")          # form of chem_low, which failed by being global
+            return set() if q is None else self._loser(m, nF, q, below=True)
+        if self.mode == "older":                  # has gone longer without dividing than its
+            q = self._q(m, H, nF, "age")          # neighbours: a cell that stopped cycling
+            return set() if q is None else self._loser(m, nF, q, below=False)
+        if self.mode in ("crowded", "lonely"):
+            # GAME OF LIFE, on the real adjacency rather than a lattice. A closed trivalent sheet
+            # gives every cell about six neighbours, so `crowded` fires where division has packed a
+            # region and `lonely` only after deaths have already thinned one -- which makes
+            # `lonely` a rule about how a wound SPREADS or heals, and worth having for that alone.
+            deg = self._nb(m, nF, np.ones(nF))[1]
+            ag = m.get("age")
+            old_enough = (ag.detach().cpu().numpy()[:nF] >= self.min_age) if ag is not None \
+                else np.ones(nF, bool)
+            if self.mode == "crowded":
+                return set(np.where(old_enough & (deg >= self.n_max))[0].tolist())
+            return set(np.where(old_enough & (deg > 0) & (deg <= self.n_min))[0].tolist())
         if self.mode == "chem_low":                                 # die BETWEEN the spots
             clvl = H.level(self.cat)
             if clvl is None or "chem" not in getattr(clvl, "state_schema", {}):

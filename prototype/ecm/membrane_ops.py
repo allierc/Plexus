@@ -855,6 +855,9 @@ class IntegrinAdhesion(Lateral):
         # anchors let the sheet drape. Measured on 114, the radius varied 5.2x more BETWEEN map bins
         # than within one, and the between-bin spread was the map's own.
         self.fraction = float(params.get("fraction", 1.0))
+        # 0 (default) = one stiffness both ways, which is every run to 130. > 0 makes the radial branch
+        # asymmetric: `k` while the fibre is stretched, `k_compress` while it is squashed.
+        self.k_compress = float(params.get("k_compress", 0.0))
         self._anchor_mask = None
         self.gamma = float(params.get("overdamped_gamma", 0.0))
         # ADHESIONS TURN OVER. `u0` was frozen at seeding, which pins every node to one direction for the
@@ -959,6 +962,21 @@ class IntegrinAdhesion(Lateral):
         # the white plumes in `61`'s movie are. Critical damping c = 2*sqrt(k) makes it track instead.
         vel = lvl.get("vel") if "vel" in lvl.state_schema else None
         acc = self.k * delta
+        # A FIBRE IS EASY TO STRETCH AND HARD TO SQUASH, and until now this spring was neither -- one
+        # stiffness both ways, so the only thing keeping the sheet out of the epithelium was the same
+        # weak constant that pulls it along. `k_compress` splits the two branches. The fibre is
+        # COMPRESSED when the particle sits inside its rest position, which is the case the standoff is
+        # about: 121 ends 0.0126 inside its anchor, i.e. every integrin in the run is squashed to a
+        # third of its 0.004 length and none of them objects.
+        #
+        # Radially, because that is the direction the length lives in: the tangential part of `delta`
+        # is shear, which an integrin resists in one way whether the sheet is in or out.
+        if self.k_compress > 0.0 and self.k_compress != self.k:
+            dr = (delta * u).sum(1, keepdim=True)        # > 0: anchor outside the particle -> compressed
+            radial = dr * u
+            kr = torch.where(dr > 0, torch.full_like(dr, self.k_compress),
+                             torch.full_like(dr, self.k))
+            acc = self.k * (delta - radial) + kr * radial
         # THE DASHPOT IS AN INERTIAL FIX AND GOES AWAY OVERDAMPED. `damp` exists because an undamped
         # spring does not track a moving anchor, it oscillates about it -- a problem that only arises
         # because the sheet was given a mass. With gamma*x_dot = F there is no oscillation to damp, and

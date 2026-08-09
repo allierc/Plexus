@@ -3,6 +3,52 @@
 State at the end of the session. Read `LADDER.md` for the plan, `AUDIT.md` for what is still a
 numerical device rather than a mechanism, `INTEGRIN_DESIGN.md` for the next build.
 
+## Corrections, 2026-08-09 -- read these before the rest of the file
+
+Three claims below and the whole motivation of `INTEGRIN_DESIGN.md` were checked against the saved
+specs and the engine, and did not survive.
+
+- **`membrane_direct_forces` NEVER RAN in 120-128.** The branch that applies it (`ecm_spec.py:374`) is
+  nested inside `if membrane_springs:`, and every run from 120 on sets `membrane_springs=False`. Proof
+  on disk: `emit: velocity` and `overdamped_gamma` appear in the saved `spec_run.yaml` of the graph-mode
+  runs 102-107 and in NONE of 120-128. So:
+  - `membrane_gamma=2e3` was never applied, and 120/121/122 are not a `k/gamma` = 5/25/125 sweep. They
+    are a bare stiffness sweep, k = 1e4 / 5e4 / 2.5e5, with the operator's own critical damping.
+  - **There are not two integrators.** `integrin_adhesion` emitted `mpm_acceleration` as always, so
+    everything went through MPM. 122 did not collapse from an integrator disagreement; it collapsed
+    because a frame-level body force is stable only while `dt_frame*sqrt(k) < 1`, and at k = 2.5e5 that
+    is 2.0 (5e4 gives 0.89, the last stable value -- which is where 121 sits).
+  - The first of INTEGRIN_DESIGN's two arguments ("one integrator") is therefore void. The second (an
+    integrin that RUPTURES as material rather than at a set threshold) still stands on its own.
+- **127 (rupture) is a null because the threshold is above the load, not because it is unwired.**
+  `detach: 0.02` is in the spec and the operator applies it. Measured on 121's trajectory, the
+  anchor-to-particle distance grows monotonically 0.0005 -> 0.0126 (mean) and its maximum over ALL
+  particles and ALL frames is 0.0170. Nothing reaches 0.02, so no integrin ever lets go. A threshold
+  anywhere below ~0.012 would engage; that is the run to do.
+- **126 (turnover) is wired and acts, but only on the angular coordinate.** `tau_adh` creeps the frozen
+  direction toward the particle's current one; the particles barely drift tangentially, so the standoff
+  moves by 1e-4 (-0.0081 against 121's -0.0082) and the strain by 0.014 (2.236 against 2.251).
+- **NEW DEFECT, proven on the engine, not inferred.** `H.zero_delta()` runs once per FRAME
+  (`engine.py:828`), so an operator that emits a force from INSIDE a `substep_dt` block accumulates
+  across the substeps. Probe (four substeps, one frame): `gravity` at frame level is seen by
+  `mpm_scatter` as 20.0, 20.0, 20.0, 20.0; the same operator inside the block as 20.0, 40.0, 60.0, 80.0.
+  `ecm_spec.py:338` deliberately puts `basement_membrane_contact` inside the block, so **every run with
+  `membrane_contact_k > 0` (110-115, 118, 119, 123) applied a contact ramping from 1x to 20x its
+  nominal stiffness within each frame**, mean 10.5x. That is consistent with what those runs did: 115
+  (k = 2e6) lost the sheet, coverage 0.64, and 123 reached strain 24.2 at coverage 0.18. The 1/k check
+  in `AUDIT.md` survives -- a constant factor preserves a ratio -- but no absolute contact stiffness
+  quoted anywhere in this prototype is the one that acted.
+- **128 (secretion) adds material that never joins the sheet.** Split by origin at the last frame: the
+  45,000 seeded particles sit at standoff -0.0084, i.e. exactly where 121's sheet sits, while the
+  45,000 secreted ones sit at -0.1885 -- a SECOND SHELL deep in the lumen, visible as the green ring in
+  `128_secreting/section.mp4`. The run's mean standoff of -0.098 is those two populations averaged and
+  describes neither. Secretion halved the strain (2.25 -> 1.13) by adding material that is not part of
+  the membrane.
+- Measurement note: `mpos` is STRIDED when the set is large (128 keeps 202 of 403 frames, listed in
+  `mpos_frames`), while `pos`, `stress` and `mstrain` keep every frame. Indexing them all by the same
+  integer pairs a membrane at frame 402 with an epithelium at 201. `rerender()` in `run_ecm.py` still
+  does this.
+
 ## Settled, with numbers
 
 - **The continuum replaced the spring network and fixed what it could not.** Across the 16 spring runs
