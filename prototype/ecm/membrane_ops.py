@@ -1128,6 +1128,7 @@ class MPMTissueBoundary(FieldUpdate):
         self.smap = torch.as_tensor(_np.asarray(z["smap"], _np.float32)) * self.scale
         self.T = int(self.smap.shape[0])
         self._xyz = None
+        self._ang = None          # bin indices + bilinear weights: constant, the grid does not move
         self._said = False
 
     def _node_dirs(self, g, dev, dt_):
@@ -1157,8 +1158,20 @@ class MPMTissueBoundary(FieldUpdate):
         M = self.smap[t].to(dev, dt_)
         Mn = self.smap[tn].to(dev, dt_)
         nth, nph = M.shape
-        th = torch.acos(u[:, 2].clamp(-1.0, 1.0))
-        ph = torch.atan2(u[:, 1], u[:, 0])
+        # THE GRID DOES NOT MOVE, so every node's direction -- and therefore its bin indices and its
+        # bilinear weights -- is constant for the whole run. Recomputing acos/atan2/floor over 110,592
+        # nodes at every substep was 24% of all operator time across 420 calls per 20 frames. Cached,
+        # the arithmetic is unchanged, so results stay bit-identical.
+        if self._ang is None:
+            th_ = torch.acos(u[:, 2].clamp(-1.0, 1.0))
+            ph_ = torch.atan2(u[:, 1], u[:, 0])
+            fth_ = (th_ / math.pi * nth - 0.5).clamp(0, nth - 1)
+            fph_ = ((ph_ + math.pi) / (2 * math.pi) * nph - 0.5) % nph
+            t0_ = fth_.floor().long().clamp(0, nth - 1); t1_ = (t0_ + 1).clamp(0, nth - 1)
+            p0_ = fph_.floor().long() % nph; p1_ = (p0_ + 1) % nph
+            self._ang = (t0_, t1_, p0_, p1_,
+                         (fth_ - t0_.to(fth_.dtype)), (fph_ - p0_.to(fph_.dtype)))
+        t0, t1, p0, p1, wt, wp = self._ang
         # BILINEAR, NOT NEAREST-BIN. The map is 32x64, so a bin subtends a fixed ANGLE and therefore a
         # growing LENGTH: at the last frame its equatorial width is 1.40 grid cells. Read by nearest bin
         # that is a staircase whose steps outgrow the grid, and the membrane -- which is smooth -- ends
@@ -1168,12 +1181,6 @@ class MPMTissueBoundary(FieldUpdate):
         # This removes the staircase; it does not add information. With ~2,800 vertices against 2,048
         # bins the map is at its resolution limit, so a sheet that must follow the true apical surface
         # needs the FACES, not a finer radius map.
-        fth = (th / math.pi * nth - 0.5).clamp(0, nth - 1)
-        fph = ((ph + math.pi) / (2 * math.pi) * nph - 0.5) % nph
-        t0 = fth.floor().long().clamp(0, nth - 1); t1 = (t0 + 1).clamp(0, nth - 1)
-        p0 = fph.floor().long() % nph; p1 = (p0 + 1) % nph
-        wt = (fth - t0.to(fth.dtype))[:, None]; wp = (fph - p0.to(fph.dtype))[:, None]
-        wt = wt[:, 0]; wp = wp[:, 0]
         def _bil(A):
             return ((A[t0, p0] * (1 - wp) + A[t0, p1] * wp) * (1 - wt)
                     + (A[t1, p0] * (1 - wp) + A[t1, p1] * wp) * wt)
@@ -1529,8 +1536,11 @@ class AdhesionPull(Lateral):
         # WHERE THE ADHESION IS NOW: its own frozen direction, at the CURRENT surface radius. It rides
         # the growing surface, which is what makes the sheet feel the growth at all.
         site = c + u * (R + self.offset)[:, None]
-        lvl_a = H.level(self.adhesion_set)
-        lvl_a.get("pos")[:] = site
+        # NOT WRITTEN HERE. A dynamics operator returns a delta and the engine integrates it; writing
+        # another set's position from inside one is exactly what the integration invariant forbids, and
+        # the engine refused the run. The adhesion's site is DERIVED -- frozen direction times the
+        # current surface radius -- so it is published for the structural operator to commit.
+        H.adhesion_site = site
         d = site - pos[idx]
         acc = torch.zeros_like(pos)
         acc.index_add_(0, idx, (self.k / max(self.gamma, 1e-12)) * d)
@@ -1557,6 +1567,7 @@ class AdhesionTurnover(Rewire):
     EMIT = None
     SUPPORTED_DIMS = [3]
     REQUIRES_PARAMS = []
+    MAY_MUTATE_INTEGRATED_STATE = True     # it commits the derived adhesion site
     MECHANISM_TAGS = ["adhesion_turnover", "bond_rupture", "integrin"]
     PARAM_ROLES = {"rupture": "strain_at_which_an_adhesion_lets_go", "tau": "frames_to_re-form"}
     REFERENCE = "Walko, G. et al. (2015) Cell Tissue Res. 360:363."
@@ -1571,14 +1582,19 @@ class AdhesionTurnover(Rewire):
 
     def forward(self, H, mask=None):
         idx = getattr(H, "adhesion_bound", None)
-        if idx is None or self.rupture <= 0:
+        if idx is None:
+            return {}
+        # commit the derived site: this operator is structural, so it may write integrated state
+        site_ = getattr(H, "adhesion_site", None)
+        if site_ is not None:
+            H.level("adhesion").get("pos")[:] = site_
+        if self.rupture <= 0:
             return {}
         lvl = H.level(self.at)
         pos = lvl.get("pos")
         c = torch.tensor(self.centre, device=pos.device, dtype=pos.dtype)
         u = H.adhesion_dir
-        site = H.level("adhesion").get("pos")
-        stretch = (site - pos[idx]).norm(dim=1)
+        stretch = (site_ - pos[idx]).norm(dim=1)
         broke = stretch > self.rupture
         if bool(broke.any()):
             # re-bind to whatever patch is beneath the adhesion NOW

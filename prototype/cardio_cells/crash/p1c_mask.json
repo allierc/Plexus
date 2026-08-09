@@ -1,0 +1,338 @@
+{
+ "null": {
+  "path_length": 6.6509503188431465,
+  "peak_excursion": 8.705650308314425,
+  "orientation_error": 10.939580191299047,
+  "coordination": 7.995017873521396
+ },
+ "surfaces": {
+  "10x10 (the certified selection)": {
+   "checker vs uniform(132.5)": {
+    "path_length": 1.3703997322483605,
+    "peak_excursion": 1.58760186212877,
+    "orientation_error": 0.5499180808746162,
+    "coordination": 0.01370183657117016,
+    "STAT": 1.58760186212877
+   },
+   "checker vs ANTI-checker": {
+    "path_length": 0.4168969387225607,
+    "peak_excursion": 4.4614163228581045,
+    "orientation_error": 0.7967830327483464,
+    "coordination": 0.3328339014628721,
+    "STAT": 4.4614163228581045
+   },
+   "checker vs PERMUTED (same multiset)": {
+    "path_length": 0.39902632536919846,
+    "peak_excursion": 0.632137428488115,
+    "orientation_error": 0.5977596104219993,
+    "coordination": 0.10039583152183479,
+    "STAT": 0.632137428488115
+   },
+   "checker vs uniform(124)": {
+    "path_length": 1.3943501857658218,
+    "peak_excursion": 1.56759904301209,
+    "orientation_error": 0.5556225515322527,
+    "coordination": 0.010350934242998145,
+    "STAT": 1.56759904301209
+   }
+  },
+  "20x20 (same patch, denser)": {
+   "checker vs uniform(132.5)": {
+    "path_length": 3.346444470574144,
+    "peak_excursion": 1.630422541564861,
+    "orientation_error": 0.4974593012675787,
+    "coordination": 0.017988019063881786,
+    "STAT": 3.346444470574144
+   },
+   "checker vs ANTI-checker": {
+    "path_length": 1.748246965342568,
+    "peak_excursion": 2.247277672930831,
+    "orientation_error": 0.7483552864888978,
+    "coordination": 0.21762344811094889,
+    "STAT": 2.247277672930831
+   },
+   "checker vs PERMUTED (same multiset)": {
+    "path_length": 0.9646527081319058,
+    "peak_excursion": 1.6687887768561593,
+    "orientation_error": 0.608783753442146,
+    "coordination": 0.05630110737144422,
+    "STAT": 1.6687887768561593
+   },
+   "checker vs uniform(124)": {
+    "path_length": 3.272179756185743,
+    "peak_excursion": 1.7595725182454431,
+    "orientation_error": 0.4848508707863125,
+    "coordination": 0.02016560783624305,
+    "STAT": 3.272179756185743
+   }
+  },
+  "30x30 (same patch, denser)": {
+   "checker vs uniform(132.5)": {
+    "path_length": 4.301953867013346,
+    "peak_excursion": 2.4175701033399153,
+    "orientation_error": 0.5083143340186047,
+    "coordination": 0.013310261027358121,
+    "STAT": 4.301953867013346
+   },
+   "checker vs ANTI-checker": {
+    "path_length": 2.821750485912908,
+    "peak_excursion": 0.7652281271545739,
+    "orientation_error": 0.76486661818801,
+    "coordination": 0.148444381119363,
+    "STAT": 2.821750485912908
+   },
+   "checker vs PERMUTED (same multiset)": {
+    "path_length": 2.132351019701553,
+    "peak_excursion": 1.9245819822692793,
+    "orientation_error": 0.6157622093369406,
+    "coordination": 0.03769743030686549,
+    "STAT": 2.132351019701553
+   },
+   "checker vs uniform(124)": {
+    "path_length": 3.7732382738647177,
+    "peak_excursion": 2.2939132270128955,
+    "orientation_error": 0.507097977016278,
+    "coordination": 0.011462916182708189,
+    "STAT": 3.7732382738647177
+   }
+  }
+ },
+ "masked": {
+  "10x10 (the certified selection)": {
+   "n_stiff": 47,
+   "n_soft": 53,
+   "checker vs uniform(132.5) | all probes": {
+    "path_length": 1.3703997322483605,
+    "peak_excursion": 1.58760186212877,
+    "orientation_error": 0.5499180808746162,
+    "coordination": 0.01370183657117016,
+    "STAT": 1.58760186212877,
+    "peak_excursion_sim": 0.009851227285426326,
+    "peak_excursion_real": 0.01005182827288774,
+    "signed_delta": -0.00020060098746141515
+   },
+   "checker vs uniform(132.5) | STIFF probes only": {
+    "path_length": 4.893779307572228,
+    "peak_excursion": 0.13077306818951376,
+    "orientation_error": 0.5760172342310206,
+    "coordination": 0.01332133312425468,
+    "STAT": 4.893779307572228,
+    "peak_excursion_sim": 0.00980418827810742,
+    "peak_excursion_real": 0.009820712072415017,
+    "signed_delta": -1.6523794307598053e-05
+   },
+   "checker vs uniform(132.5) | SOFT probes only": {
+    "path_length": 1.0596695118858432,
+    "peak_excursion": 0.025630408886942086,
+    "orientation_error": 0.5193223001834701,
+    "coordination": 0.014039084228800241,
+    "STAT": 1.0596695118858432,
+    "peak_excursion_sim": 0.010120142605485681,
+    "peak_excursion_real": 0.010116904082368263,
+    "signed_delta": 3.238523117418332e-06
+   },
+   "checker vs ANTI-checker | all probes": {
+    "path_length": 0.4168969387225607,
+    "peak_excursion": 4.4614163228581045,
+    "orientation_error": 0.7967830327483464,
+    "coordination": 0.3328339014628721,
+    "STAT": 4.4614163228581045,
+    "peak_excursion_sim": 0.009851227285426326,
+    "peak_excursion_real": 0.009287506278799526,
+    "signed_delta": 0.0005637210066267995
+   },
+   "checker vs ANTI-checker | STIFF probes only": {
+    "path_length": 6.798930793525686,
+    "peak_excursion": 5.180942833521355,
+    "orientation_error": 0.7475302351685543,
+    "coordination": 0.376605353844524,
+    "STAT": 6.798930793525686,
+    "peak_excursion_sim": 0.00980418827810742,
+    "peak_excursion_real": 0.009149551701282071,
+    "signed_delta": 0.000654636576825348
+   },
+   "checker vs ANTI-checker | SOFT probes only": {
+    "path_length": 1.6208589730910825,
+    "peak_excursion": 5.497869439846271,
+    "orientation_error": 0.8254901553681998,
+    "coordination": 0.29236046072116173,
+    "STAT": 5.497869439846271,
+    "peak_excursion_sim": 0.010120142605485681,
+    "peak_excursion_real": 0.009425460856316981,
+    "signed_delta": 0.0006946817491687001
+   }
+  },
+  "20x20 (same patch, denser)": {
+   "n_stiff": 182,
+   "n_soft": 218,
+   "checker vs uniform(132.5) | all probes": {
+    "path_length": 3.346444470574144,
+    "peak_excursion": 1.630422541564861,
+    "orientation_error": 0.4974593012675787,
+    "coordination": 0.017988019063881786,
+    "STAT": 3.346444470574144,
+    "peak_excursion_sim": 0.012031206676088913,
+    "peak_excursion_real": 0.011825195093702187,
+    "signed_delta": 0.00020601158238672639
+   },
+   "checker vs uniform(132.5) | STIFF probes only": {
+    "path_length": 5.357091662087227,
+    "peak_excursion": 8.66059636921852,
+    "orientation_error": 0.5563451328720691,
+    "coordination": 0.03040621947434702,
+    "STAT": 8.66059636921852,
+    "peak_excursion_sim": 0.01480043020064141,
+    "peak_excursion_real": 0.013706122978463896,
+    "signed_delta": 0.0010943072221775135
+   },
+   "checker vs uniform(132.5) | SOFT probes only": {
+    "path_length": 2.6672119306481057,
+    "peak_excursion": 0.12172406517925007,
+    "orientation_error": 0.4296219064935695,
+    "coordination": 0.0074623448523666635,
+    "STAT": 2.6672119306481057,
+    "peak_excursion_sim": 0.010826807695479246,
+    "peak_excursion_real": 0.01084218810555261,
+    "signed_delta": -1.538041007336302e-05
+   },
+   "checker vs ANTI-checker | all probes": {
+    "path_length": 1.748246965342568,
+    "peak_excursion": 2.247277672930831,
+    "orientation_error": 0.7483552864888978,
+    "coordination": 0.21762344811094889,
+    "STAT": 2.247277672930831,
+    "peak_excursion_sim": 0.012031206676088913,
+    "peak_excursion_real": 0.012315160815375096,
+    "signed_delta": -0.00028395413928618274
+   },
+   "checker vs ANTI-checker | STIFF probes only": {
+    "path_length": 5.733234476095242,
+    "peak_excursion": 9.470686476604966,
+    "orientation_error": 0.8459877049108341,
+    "coordination": 0.38700776284860355,
+    "STAT": 9.470686476604966,
+    "peak_excursion_sim": 0.01480043020064141,
+    "peak_excursion_real": 0.013603764270433315,
+    "signed_delta": 0.0011966659302080941
+   },
+   "checker vs ANTI-checker | SOFT probes only": {
+    "path_length": 2.1505039076154726,
+    "peak_excursion": 1.5828298732240482,
+    "orientation_error": 0.694380588518502,
+    "coordination": 0.07393945778572254,
+    "STAT": 2.1505039076154726,
+    "peak_excursion_sim": 0.010826807695479246,
+    "peak_excursion_real": 0.011026805719622668,
+    "signed_delta": -0.00019999802414342148
+   }
+  },
+  "30x30 (same patch, denser)": {
+   "n_stiff": 417,
+   "n_soft": 483,
+   "checker vs uniform(132.5) | all probes": {
+    "path_length": 4.301953867013346,
+    "peak_excursion": 2.4175701033399153,
+    "orientation_error": 0.5083143340186047,
+    "coordination": 0.013310261027358121,
+    "STAT": 4.301953867013346,
+    "peak_excursion_sim": 0.012751474323450775,
+    "peak_excursion_real": 0.012446002931941506,
+    "signed_delta": 0.0003054713915092693
+   },
+   "checker vs uniform(132.5) | STIFF probes only": {
+    "path_length": 5.066180297960404,
+    "peak_excursion": 8.553572332790239,
+    "orientation_error": 0.5639612030490269,
+    "coordination": 0.020767007929684722,
+    "STAT": 8.553572332790239,
+    "peak_excursion_sim": 0.015652001632790267,
+    "peak_excursion_real": 0.014571217402681327,
+    "signed_delta": 0.0010807842301089401
+   },
+   "checker vs uniform(132.5) | SOFT probes only": {
+    "path_length": 2.2348165469543955,
+    "peak_excursion": 0.8083070543342625,
+    "orientation_error": 0.47147387694704,
+    "coordination": 0.006703674571689168,
+    "STAT": 2.2348165469543955,
+    "peak_excursion_sim": 0.01095504917923648,
+    "peak_excursion_real": 0.011057182590099366,
+    "signed_delta": -0.00010213341086288616
+   },
+   "checker vs ANTI-checker | all probes": {
+    "path_length": 2.821750485912908,
+    "peak_excursion": 0.7652281271545739,
+    "orientation_error": 0.76486661818801,
+    "coordination": 0.148444381119363,
+    "STAT": 2.821750485912908,
+    "peak_excursion_sim": 0.012751474323450775,
+    "peak_excursion_real": 0.012848164508567229,
+    "signed_delta": -9.669018511645339e-05
+   },
+   "checker vs ANTI-checker | STIFF probes only": {
+    "path_length": 3.4742629209400366,
+    "peak_excursion": 8.219265333460495,
+    "orientation_error": 0.8006730068633898,
+    "coordination": 0.24305589141332812,
+    "STAT": 8.219265333460495,
+    "peak_excursion_sim": 0.015652001632790267,
+    "peak_excursion_real": 0.01461345866970207,
+    "signed_delta": 0.0010385429630881977
+   },
+   "checker vs ANTI-checker | SOFT probes only": {
+    "path_length": 1.6564678698351767,
+    "peak_excursion": 1.7660825504800286,
+    "orientation_error": 0.7285542369952529,
+    "coordination": 0.0657892962654416,
+    "STAT": 1.7660825504800286,
+    "peak_excursion_sim": 0.01095504917923648,
+    "peak_excursion_real": 0.011178202043953851,
+    "signed_delta": -0.0002231528647173714
+   }
+  }
+ },
+ "cancellation": {
+  "checker vs uniform(132.5) @ 10x10 (the certified selection)": {
+   "abs_diff_of_medians": 0.00020060098746141515,
+   "median_abs_diff": 0.0007264946780968567,
+   "ratio": 3.6215907373666107,
+   "diff_of_medians_steps": 1.58760186212877,
+   "median_abs_diff_steps": 5.749644198511536
+  },
+  "checker vs ANTI-checker @ 10x10 (the certified selection)": {
+   "abs_diff_of_medians": 0.0005637210066267995,
+   "median_abs_diff": 0.0008581785596917081,
+   "ratio": 1.522346248593586,
+   "diff_of_medians_steps": 4.4614163228581045,
+   "median_abs_diff_steps": 6.791820402517225
+  },
+  "checker vs uniform(132.5) @ 20x20 (same patch, denser)": {
+   "abs_diff_of_medians": 0.00020601158238672639,
+   "median_abs_diff": 0.000792770209729214,
+   "ratio": 3.848182711596381,
+   "diff_of_medians_steps": 1.630422541564861,
+   "median_abs_diff_steps": 6.27416383704693
+  },
+  "checker vs ANTI-checker @ 20x20 (same patch, denser)": {
+   "abs_diff_of_medians": 0.00028395413928618274,
+   "median_abs_diff": 0.0010719840868920532,
+   "ratio": 3.7752014800237013,
+   "diff_of_medians_steps": 2.247277672930831,
+   "median_abs_diff_steps": 8.483925996872692
+  },
+  "checker vs uniform(132.5) @ 30x30 (same patch, denser)": {
+   "abs_diff_of_medians": 0.0003054713915092693,
+   "median_abs_diff": 0.0008825970790703559,
+   "ratio": 2.8892953762695455,
+   "diff_of_medians_steps": 2.4175701033399153,
+   "median_abs_diff_steps": 6.9850741213875045
+  },
+  "checker vs ANTI-checker @ 30x30 (same patch, denser)": {
+   "abs_diff_of_medians": 9.669018511645339e-05,
+   "median_abs_diff": 0.0011011399056741287,
+   "ratio": 11.38833175619551,
+   "diff_of_medians_steps": 0.7652281271545739,
+   "median_abs_diff_steps": 8.71467178120845
+  }
+ }
+}

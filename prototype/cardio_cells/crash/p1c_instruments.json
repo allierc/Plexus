@@ -1,0 +1,294 @@
+{
+ "rows": [
+  {
+   "path_length": 0.5386729155297193,
+   "peak_excursion": 5.072008785139253,
+   "orientation_error": 0.7190560934726101,
+   "coordination": 1.0147336333633297,
+   "loopscore": 0.3186943531036377,
+   "STAT": 5.072008785139253,
+   "_values": {
+    "path_length": 0.000340165861533355,
+    "peak_excursion": 0.0006408722457327161,
+    "orientation_error": 0.05162404089713701,
+    "coordination": 0.8829536879727454
+   },
+   "amp_reading": 0.008929617624262358,
+   "path_reading": 0.03219754821954917,
+   "E": 20.0
+  },
+  {
+   "path_length": 1.8573405821482896,
+   "peak_excursion": 5.104231011591886,
+   "orientation_error": 0.6318102538307765,
+   "coordination": 0.5971923084538547,
+   "loopscore": 0.3970315456390381,
+   "STAT": 5.104231011591886,
+   "_values": {
+    "path_length": 0.0011728895978852655,
+    "peak_excursion": 0.0006449436761075435,
+    "orientation_error": 0.0453602975888458,
+    "coordination": 0.9311157578921614
+   },
+   "amp_reading": 0.00892554619388753,
+   "path_reading": 0.03303027195590108,
+   "E": 27.197876345754093
+  },
+  {
+   "path_length": 2.3437634515294854,
+   "peak_excursion": 3.215488331120981,
+   "orientation_error": 0.5826185853307092,
+   "coordination": 0.46270100014238114,
+   "loopscore": 0.5291734337806702,
+   "STAT": 3.215488331120981,
+   "_values": {
+    "path_length": 0.0014800601454704673,
+    "peak_excursion": 0.0004062921251104003,
+    "orientation_error": 0.041828622202880084,
+    "coordination": 0.9466289045150861
+   },
+   "amp_reading": 0.009164197744884674,
+   "path_reading": 0.03333744250348628,
+   "E": 36.98622388594647
+  },
+  {
+   "path_length": 1.1966191034251963,
+   "peak_excursion": 3.3037624139429624,
+   "orientation_error": 0.4249439557579428,
+   "coordination": 0.15795323716364967,
+   "loopscore": 0.6213674545288086,
+   "STAT": 3.3037624139429624,
+   "_values": {
+    "path_length": 0.0007556514473047518,
+    "peak_excursion": 0.00041744597205638223,
+    "orientation_error": 0.030508501840371155,
+    "coordination": 0.9817805941629296
+   },
+   "amp_reading": 0.009153043897938692,
+   "path_reading": 0.03261303380532057,
+   "E": 50.297337187317424
+  },
+  {
+   "path_length": 1.9699559450915614,
+   "peak_excursion": 0.7326373231959294,
+   "orientation_error": 0.2618455313764252,
+   "coordination": 0.04707082695263069,
+   "loopscore": 0.7534545660018921,
+   "STAT": 1.9699559450915614,
+   "_values": {
+    "path_length": 0.001244004927527964,
+    "peak_excursion": 9.257218323435734e-05,
+    "orientation_error": 0.018798984589960988,
+    "coordination": 0.9945705291342148
+   },
+   "amp_reading": 0.009477917686760717,
+   "path_reading": 0.03310138728554378,
+   "E": 68.39903786706788
+  },
+  {
+   "path_length": 0.7273861832281976,
+   "peak_excursion": 0.3091473316704635,
+   "orientation_error": 0.19191681239039354,
+   "coordination": 0.013153355909076398,
+   "loopscore": 0.790526807308197,
+   "STAT": 0.7273861832281976,
+   "_values": {
+    "path_length": 0.0004593361584589034,
+    "peak_excursion": 3.906222427895248e-05,
+    "orientation_error": 0.013778509717986609,
+    "coordination": 0.9984828020385641
+   },
+   "amp_reading": 0.009531427645716121,
+   "path_reading": 0.03231671851647472,
+   "E": 93.01542870385317
+  },
+  {
+   "path_length": 0.0017541539159186966,
+   "peak_excursion": 3.834674603934992,
+   "orientation_error": 0.2609840072002736,
+   "coordination": 0.03113816840662547,
+   "loopscore": 0.6664389967918396,
+   "STAT": 3.834674603934992,
+   "_values": {
+    "path_length": 1.1077283837146457e-06,
+    "peak_excursion": 0.00048452923273289636,
+    "orientation_error": 0.018737132170230097,
+    "coordination": 0.9964083108557277
+   },
+   "amp_reading": 0.01005501910272797,
+   "path_reading": 0.03185849008639953,
+   "E": 126.49110640673521
+  },
+  {
+   "path_length": 0.10609407644352019,
+   "peak_excursion": 6.218411892615949,
+   "orientation_error": 0.3818534400373922,
+   "coordination": 0.18116591654056832,
+   "loopscore": 0.6507369875907898,
+   "STAT": 6.218411892615949,
+   "_values": {
+    "path_length": 6.699721087982669e-05,
+    "peak_excursion": 0.000785725688446811,
+    "orientation_error": 0.02741485370077554,
+    "coordination": 0.9791030850866471
+   },
+   "amp_reading": 0.010356215558441885,
+   "path_reading": 0.03179038514713599,
+   "E": 172.01447354440026
+  },
+  {
+   "path_length": 0.16242019417603973,
+   "peak_excursion": 8.838506324484587,
+   "orientation_error": 0.5281423321418787,
+   "coordination": 0.23953040535030712,
+   "loopscore": 0.5554578900337219,
+   "STAT": 8.838506324484587,
+   "_values": {
+    "path_length": 0.00010256651799167571,
+    "peak_excursion": 0.0011167869846147628,
+    "orientation_error": 0.03791754440509476,
+    "coordination": 0.9723709260806492
+   },
+   "amp_reading": 0.010687276854609837,
+   "path_reading": 0.03175481584002414,
+   "E": 233.9214190570292
+  },
+  {
+   "path_length": 1.0245237352878238,
+   "peak_excursion": 4.509915167275358,
+   "orientation_error": 0.6023601988130648,
+   "coordination": 0.41243098085834357,
+   "loopscore": 0.455648273229599,
+   "STAT": 4.509915167275358,
+   "_values": {
+    "path_length": 0.0006469751662432077,
+    "peak_excursion": 0.0005698490644937722,
+    "orientation_error": 0.04324595510783713,
+    "coordination": 0.9524273920878625
+   },
+   "amp_reading": 0.010140338934488846,
+   "path_reading": 0.031210407191772607,
+   "E": 318.10829150682036
+  },
+  {
+   "path_length": 1.6422009660250692,
+   "peak_excursion": 2.2812532785173136,
+   "orientation_error": 0.9422630058728729,
+   "coordination": 0.5954161221999209,
+   "loopscore": 0.4311639666557312,
+   "STAT": 2.2812532785173136,
+   "_values": {
+    "path_length": 0.001037031360430457,
+    "peak_excursion": 0.00028824711738908645,
+    "orientation_error": 0.06764899761313731,
+    "coordination": 0.9313206353532616
+   },
+   "amp_reading": 0.00985873698738416,
+   "path_reading": 0.030820350997585358,
+   "E": 432.5934988480796
+  },
+  {
+   "path_length": 3.793622145462003,
+   "peak_excursion": 0.44840186317864733,
+   "orientation_error": 1.3412331503584722,
+   "coordination": 0.8975198200715568,
+   "loopscore": 0.2179374247789383,
+   "STAT": 3.793622145462003,
+   "_values": {
+    "path_length": 0.0023956295336922326,
+    "peak_excursion": 5.665769150242986e-05,
+    "orientation_error": 0.09629273103342267,
+    "coordination": 0.896473930244582
+   },
+   "amp_reading": 0.009627147561497504,
+   "path_reading": 0.029461752824323582,
+   "E": 588.2812244823589
+  },
+  {
+   "path_length": 1.0084523254086466,
+   "peak_excursion": 4.358751801347994,
+   "orientation_error": 1.534908452514836,
+   "coordination": 1.058155295325434,
+   "loopscore": 0.056066080927848816,
+   "STAT": 4.358751801347994,
+   "_values": {
+    "path_length": 0.0006368262524404228,
+    "peak_excursion": 0.0005507488598414795,
+    "orientation_error": 0.11019749007801916,
+    "coordination": 0.8779451367355966
+   },
+   "amp_reading": 0.010121238729836553,
+   "path_reading": 0.031220556105575392,
+   "E": 800.0
+  }
+ ],
+ "null": {
+  "path_length": 6.6509503188431465,
+  "peak_excursion": 8.705650308314425,
+  "orientation_error": 10.939580191299047,
+  "coordination": 7.995017873521396
+ },
+ "span_steps": {
+  "path_length": {
+   "min": 0.0017541539159186966,
+   "max": 3.793622145462003,
+   "span": 3.7918679915460842,
+   "monotone": false,
+   "n_turning_points": 5
+  },
+  "peak_excursion": {
+   "min": 0.3091473316704635,
+   "max": 8.838506324484587,
+   "span": 8.529358992814124,
+   "monotone": false,
+   "n_turning_points": 6
+  },
+  "orientation_error": {
+   "min": 0.19191681239039354,
+   "max": 1.534908452514836,
+   "span": 1.3429916401244424,
+   "monotone": false,
+   "n_turning_points": 1
+  },
+  "coordination": {
+   "min": 0.013153355909076398,
+   "max": 1.058155295325434,
+   "span": 1.0450019394163577,
+   "monotone": false,
+   "n_turning_points": 1
+  },
+  "STAT": {
+   "min": 0.7273861832281976,
+   "max": 8.838506324484587,
+   "span": 8.11112014125639,
+   "monotone": false,
+   "n_turning_points": 6
+  }
+ },
+ "span_readings": {
+  "peak_excursion": {
+   "min": 0.00892554619388753,
+   "max": 0.010687276854609837,
+   "span": 0.0017617306607223063,
+   "monotone": false,
+   "n_turning_points": 5
+  },
+  "path_length": {
+   "min": 0.029461752824323582,
+   "max": 0.03333744250348628,
+   "span": 0.0038756896791627,
+   "monotone": false,
+   "n_turning_points": 4
+  }
+ },
+ "planted": {
+  "min": 40.02713857827739,
+  "max": 216.3142841011474,
+  "mean": 128.4076240723354,
+  "median": 127.98671107076339
+ },
+ "reference_readings": {
+  "peak_excursion": 0.009570489869995074,
+  "path_length": 0.031857382358015815
+ }
+}

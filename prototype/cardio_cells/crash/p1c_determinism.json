@@ -1,0 +1,52 @@
+{
+ "max_abs_diff_identical_rollouts": 0.0,
+ "bitwise_identical": true,
+ "E x1.001": {
+  "path_length": 0.024794858262219433,
+  "peak_excursion": 0.028377972303315544,
+  "orientation_error": 0.0005623208342231376,
+  "coordination": 0.0,
+  "loopscore": 0.9999973773956299,
+  "STAT": 0.028377972303315544
+ },
+ "gain x1.001": {
+  "path_length": 0.030098335492472865,
+  "peak_excursion": 0.09316971096125745,
+  "orientation_error": 0.0009289878789736416,
+  "coordination": 0.0,
+  "loopscore": 0.9999994039535522,
+  "STAT": 0.09316971096125745
+ },
+ "E x1.01": {
+  "path_length": 0.1933159044901157,
+  "peak_excursion": 0.2925334579696168,
+  "orientation_error": 0.005424688121044424,
+  "coordination": 0.0,
+  "loopscore": 0.9997615218162537,
+  "STAT": 0.2925334579696168
+ },
+ "gain x1.01": {
+  "path_length": 0.3008417988127942,
+  "peak_excursion": 0.9341437037043092,
+  "orientation_error": 0.008946605910071227,
+  "coordination": 0.0,
+  "loopscore": 0.9999370574951172,
+  "STAT": 0.9341437037043092
+ },
+ "E x1.1": {
+  "path_length": 0.04607186782407469,
+  "peak_excursion": 0.502360685845881,
+  "orientation_error": 0.05854521386187336,
+  "coordination": 0.0003040260648442169,
+  "loopscore": 0.9810663461685181,
+  "STAT": 0.502360685845881
+ },
+ "gain x1.1": {
+  "path_length": 3.4184183612496555,
+  "peak_excursion": 8.228321813187238,
+  "orientation_error": 0.08385681234379791,
+  "coordination": 0.0,
+  "loopscore": 0.9934872984886169,
+  "STAT": 8.228321813187238
+ }
+}

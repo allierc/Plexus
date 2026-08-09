@@ -1,0 +1,67 @@
+[    0.0s] 
+################################################################################################################
+#  DENSE
+################################################################################################################
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[   31.4s] 
+  baseline  drag30 period150   (warmup 180, window 150)
+[   31.4s]            E  path_length peak_excurs orientation coordinatio     STAT  loopscore   peak_exc
+[   44.2s]       100.00         0.30        0.18        0.21        0.01     0.30     0.7860   0.009593
+[   56.9s]       109.89         0.73        2.36        0.20        0.01     2.36     0.7419   0.009869
+[   69.7s]       120.76         0.15        3.76        0.24        0.02     3.76     0.6868   0.010045
+[   82.4s]       132.70         0.09        3.81        0.26        0.05     3.81     0.6441   0.010052
+[   95.1s]       145.82         0.03        3.98        0.29        0.08     3.98     0.6593   0.010074
+[  107.8s]       160.24         0.25        5.32        0.32        0.09     5.32     0.6592   0.010243
+[  120.5s]       176.09         0.24        6.54        0.40        0.19     6.54     0.6423   0.010397
+[  133.3s]       193.50         0.63        7.87        0.49        0.21     7.87     0.6168   0.010564
+[  146.2s]       212.64         0.17        9.19        0.49        0.23     9.19     0.6169   0.010731
+[  159.0s]       233.67         0.17        8.82        0.53        0.24     8.82     0.5560   0.010684
+[  171.7s]       256.78         0.61        7.67        0.54        0.26     7.67     0.5096   0.010540
+[  184.6s]       282.17         1.29        5.44        0.53        0.28     5.44     0.4861   0.010257
+[  197.4s]       310.07         0.99        4.00        0.57        0.40     4.00     0.4679   0.010076
+[  210.3s]       340.74         1.01        4.65        0.70        0.43     4.65     0.4429   0.010158
+[  223.2s]       374.43         0.35        3.76        0.80        0.46     3.76     0.4368   0.010046
+[  236.0s]       411.46         1.17        2.67        0.89        0.50     2.67     0.4283   0.009908
+[  248.8s]       452.15         2.20        1.17        0.94        0.59     2.20     0.4124   0.009718
+[  261.7s]       496.87         2.90        2.36        0.98        0.71     2.90     0.2928   0.009869
+[  274.5s]       546.00         3.72        0.06        1.11        0.87     3.72     0.2668   0.009578
+[  287.3s]       600.00         4.09        0.32        1.37        0.83     4.09     0.2131   0.009611
+[  287.3s]     argmax of peak_excursion at E = 212.6  (interior -> a real turning point);  amplitude range 0.00957832 .. 0.0107312 = 12.0%
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[  302.9s] 
+  period 75 (drive x2 faster)   (warmup 105, window 75)
+[  302.9s]            E  path_length peak_excurs orientation coordinatio     STAT  loopscore   peak_exc
+[  309.3s]       100.00         1.00        2.89        0.24        0.01     2.89     0.8971   0.005855
+[  315.7s]       109.89         0.95        2.41        0.21        0.01     2.41     0.9040   0.005794
+[  322.1s]       120.76         0.72        1.83        0.20        0.00     1.83     0.8990   0.005721
+[  328.5s]       132.70         0.58        1.27        0.23        0.02     1.27     0.8826   0.005650
+[  335.0s]       145.82         0.44        0.99        0.29        0.02     0.99     0.8554   0.005615
+[  341.3s]       160.24         0.21        0.78        0.34        0.04     0.78     0.8180   0.005588
+[  347.7s]       176.09         0.32        0.39        0.40        0.05     0.40     0.7762   0.005539
+[  354.1s]       193.50         0.79        0.01        0.47        0.07     0.79     0.7334   0.005488
+[  360.5s]       212.64         1.10        0.80        0.49        0.08     1.10     0.6927   0.005389
+[  367.0s]       233.67         1.37        1.97        0.54        0.09     1.97     0.6484   0.005241
+[  373.4s]       256.78         1.58        3.35        0.52        0.12     3.35     0.6032   0.005066
+[  379.9s]       282.17         1.79        4.65        0.54        0.32     4.65     0.5631   0.004903
+[  386.3s]       310.07         2.21        5.86        0.56        0.35     5.86     0.5337   0.004750
+[  392.6s]       340.74         2.62        7.03        0.64        0.36     7.03     0.5174   0.004602
+[  399.1s]       374.43         3.02        7.66        0.66        0.37     7.66     0.5034   0.004521
+[  405.4s]       411.46         3.39        8.22        0.68        0.42     8.22     0.4894   0.004451
+[  410.7s]       452.15         3.86        9.11        0.74        0.45     9.11     0.4753   0.004338
+[  414.6s]       496.87         3.99       10.16        0.79        0.47    10.16     0.4608   0.004206
+[  418.5s]       546.00         4.05       11.47        0.80        0.68    11.47     0.4419   0.004040
+[  422.3s]       600.00         4.10       12.05        0.83        0.77    12.05     0.4166   0.003968
+[  422.3s]     argmax of peak_excursion at E = 100.0  (at an endpoint);  amplitude range 0.00396751 .. 0.00585494 = 47.6%
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[  454.7s] 
+  period 300 (drive x2 slower)   (warmup 330, window 300)
+[  454.7s]            E  path_length peak_excurs orientation coordinatio     STAT  loopscore   peak_exc
+[  470.0s]       100.00         0.71        0.17        0.50        0.01     0.71     0.5552   0.014199

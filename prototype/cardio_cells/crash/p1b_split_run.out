@@ -1,0 +1,35 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125  warm-up 165 frames
+          reference config at tick 0: |F(0) - I| max 0.00e+00  (must be 0 for X to be the configuration p.F is measured against)
+
+[nsub=1] block split of the theta-dependent signal b = y_obs - y(theta=0)
+    ||b|| 0.000158594;  elastic ||A_E theta_E||/||b|| = 1.0047;  active ||A_g theta_g||/||b|| = 1.0633;  cos(elastic, active) = -0.5335;  superposition residual 2.861e-04
+    the theta-free offset y(theta=0) is 0.9880 of the observed displacement
+    [conditional] gain solved with the elastic part removed using the TRUE-F E columns; the gain columns come from each F variant
+    F variant      |   g slope    g corr  g medErr g meanrat |   fit res
+    true           |    1.0021  0.999862  3.04e-09    1.0004 |  2.69e-04
+    sF_indep       |    1.0021  0.999862  3.04e-09    1.0004 |  2.69e-04
+    derived_15px   |    1.0021  0.999862  3.04e-09    1.0004 |  2.69e-04
+    [honest]      the same, but the elastic part is removed with the variant's OWN (measured-F) E columns -- what an experimenter could actually do
+    true           |    1.0021  0.999862  3.04e-09    1.0004 |  2.69e-04
+    sF_indep       |  -10.1996 -0.089897  1.18e-01   -1.2091 |  7.25e-01
+    derived_15px   | -928.5517 -0.136899  3.65e+00 -343.0535 |  9.95e-01
+
+[nsub=10] block split of the theta-dependent signal b = y_obs - y(theta=0)
+    ||b|| 0.00617964;  elastic ||A_E theta_E||/||b|| = 1.0744;  active ||A_g theta_g||/||b|| = 1.4989;  cos(elastic, active) = -0.7436;  superposition residual 7.967e-02
+    the theta-free offset y(theta=0) is 0.9399 of the observed displacement
+    [conditional] gain solved with the elastic part removed using the TRUE-F E columns; the gain columns come from each F variant
+    F variant      |   g slope    g corr  g medErr g meanrat |   fit res
+    true           |    0.9967  0.999371  5.32e-04    0.9980 |  5.30e-02
+    sF_indep       |    0.9967  0.999371  5.32e-04    0.9980 |  5.30e-02
+    derived_15px   |    0.9967  0.999371  5.32e-04    0.9980 |  5.30e-02
+    [honest]      the same, but the elastic part is removed with the variant's OWN (measured-F) E columns -- what an experimenter could actually do
+    true           |    0.9967  0.999371  5.32e-04    0.9980 |  5.30e-02
+    sF_indep       |  -26.6017 -0.124600  1.27e-01   -3.2097 |  6.41e-01
+    derived_15px   | -853.1673 -0.139379  5.64e+00 -244.8581 |  9.87e-01
+
+wrote p1b_split.json  [75 s]

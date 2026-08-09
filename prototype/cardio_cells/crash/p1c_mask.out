@@ -1,0 +1,86 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[   13.9s] [planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+[   13.9s]           E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+[   13.9s]           warm-up 180 frames; window A = ticks 31..180 recorded
+[   13.9s] 
+  checkerboard: 51 stiff / 49 soft cells, block 0.10 world (cells are ~0.1 across)
+[   21.6s]   rolled checker
+[   29.4s]   rolled anti
+[   37.1s]   rolled perm
+[   44.8s]   rolled uniform_mean
+[   52.5s]   rolled uniform_124
+[   52.5s] 
+====================================================================================================================
+  1. DOES A DENSER READING SURFACE SEE IT? same rollouts, more probes
+====================================================================================================================
+[   52.5s] 
+  10x10 (the certified selection)   M = 100 probes
+[   52.5s]   comparison                             path_length peak_excurs orientation coordinatio     STAT
+[   52.5s]   checker vs uniform(132.5)                     1.37        1.59        0.55        0.01     1.59  
+[   52.5s]   checker vs ANTI-checker                       0.42        4.46        0.80        0.33     4.46  
+[   52.5s]   checker vs PERMUTED (same multiset)           0.40        0.63        0.60        0.10     0.63  
+[   52.6s]   checker vs uniform(124)                       1.39        1.57        0.56        0.01     1.57  
+[   52.6s] 
+  20x20 (same patch, denser)   M = 400 probes
+[   52.6s]   comparison                             path_length peak_excurs orientation coordinatio     STAT
+[   52.6s]   checker vs uniform(132.5)                     3.35        1.63        0.50        0.02     3.35  
+[   52.6s]   checker vs ANTI-checker                       1.75        2.25        0.75        0.22     2.25  
+[   52.6s]   checker vs PERMUTED (same multiset)           0.96        1.67        0.61        0.06     1.67  
+[   52.6s]   checker vs uniform(124)                       3.27        1.76        0.48        0.02     3.27  
+[   52.6s] 
+  30x30 (same patch, denser)   M = 900 probes
+[   52.6s]   comparison                             path_length peak_excurs orientation coordinatio     STAT
+[   52.7s]   checker vs uniform(132.5)                     4.30        2.42        0.51        0.01     4.30  
+[   52.7s]   checker vs ANTI-checker                       2.82        0.77        0.76        0.15     2.82  
+[   52.8s]   checker vs PERMUTED (same multiset)           2.13        1.92        0.62        0.04     2.13  
+[   52.8s]   checker vs uniform(124)                       3.77        2.29        0.51        0.01     3.77  
+[   52.8s] 
+====================================================================================================================
+  2. MASKED SCORING -- the median cancels a checkerboard by construction; scoring each half alone does not
+====================================================================================================================
+[   52.8s] 
+  10x10 (the certified selection): 47 probes in stiff cells, 53 in soft
+[   52.8s]   comparison                             path_length peak_excurs orientation coordinatio     STAT
+[   52.8s]   checker vs uniform(1 | all probes             1.37        1.59        0.55        0.01     1.59  peak_exc 0.009851 vs 0.010052  delta -2.01e-04
+[   52.8s]   checker vs uniform(1 | STIFF probes only        4.89        0.13        0.58        0.01     4.89  peak_exc 0.009804 vs 0.009821  delta -1.65e-05
+[   52.8s]   checker vs uniform(1 | SOFT probes only        1.06        0.03        0.52        0.01     1.06  peak_exc 0.010120 vs 0.010117  delta +3.24e-06
+[   52.8s]   checker vs ANTI-chec | all probes             0.42        4.46        0.80        0.33     4.46  peak_exc 0.009851 vs 0.009288  delta +5.64e-04
+[   52.8s]   checker vs ANTI-chec | STIFF probes only        6.80        5.18        0.75        0.38     6.80  peak_exc 0.009804 vs 0.009150  delta +6.55e-04
+[   52.8s]   checker vs ANTI-chec | SOFT probes only        1.62        5.50        0.83        0.29     5.50  peak_exc 0.010120 vs 0.009425  delta +6.95e-04
+[   52.8s] 
+  20x20 (same patch, denser): 182 probes in stiff cells, 218 in soft
+[   52.8s]   comparison                             path_length peak_excurs orientation coordinatio     STAT
+[   52.9s]   checker vs uniform(1 | all probes             3.35        1.63        0.50        0.02     3.35  peak_exc 0.012031 vs 0.011825  delta +2.06e-04
+[   52.9s]   checker vs uniform(1 | STIFF probes only        5.36        8.66        0.56        0.03     8.66  peak_exc 0.014800 vs 0.013706  delta +1.09e-03
+[   52.9s]   checker vs uniform(1 | SOFT probes only        2.67        0.12        0.43        0.01     2.67  peak_exc 0.010827 vs 0.010842  delta -1.54e-05
+[   52.9s]   checker vs ANTI-chec | all probes             1.75        2.25        0.75        0.22     2.25  peak_exc 0.012031 vs 0.012315  delta -2.84e-04
+[   52.9s]   checker vs ANTI-chec | STIFF probes only        5.73        9.47        0.85        0.39     9.47  peak_exc 0.014800 vs 0.013604  delta +1.20e-03
+[   52.9s]   checker vs ANTI-chec | SOFT probes only        2.15        1.58        0.69        0.07     2.15  peak_exc 0.010827 vs 0.011027  delta -2.00e-04
+[   52.9s] 
+  30x30 (same patch, denser): 417 probes in stiff cells, 483 in soft
+[   52.9s]   comparison                             path_length peak_excurs orientation coordinatio     STAT
+[   53.0s]   checker vs uniform(1 | all probes             4.30        2.42        0.51        0.01     4.30  peak_exc 0.012751 vs 0.012446  delta +3.05e-04
+[   53.0s]   checker vs uniform(1 | STIFF probes only        5.07        8.55        0.56        0.02     8.55  peak_exc 0.015652 vs 0.014571  delta +1.08e-03
+[   53.1s]   checker vs uniform(1 | SOFT probes only        2.23        0.81        0.47        0.01     2.23  peak_exc 0.010955 vs 0.011057  delta -1.02e-04
+[   53.1s]   checker vs ANTI-chec | all probes             2.82        0.77        0.76        0.15     2.82  peak_exc 0.012751 vs 0.012848  delta -9.67e-05
+[   53.2s]   checker vs ANTI-chec | STIFF probes only        3.47        8.22        0.80        0.24     8.22  peak_exc 0.015652 vs 0.014613  delta +1.04e-03
+[   53.2s]   checker vs ANTI-chec | SOFT probes only        1.66        1.77        0.73        0.07     1.77  peak_exc 0.010955 vs 0.011178  delta -2.23e-04
+[   53.2s] 
+====================================================================================================================
+  3. DIAGNOSTIC (uncertified): the per-node spread the median discards
+====================================================================================================================
+[   53.2s]   comparison                                 surface   |d median|   median |d|  cancellation  in steps
+[   53.2s]   checker vs uniform(132.5)                    10x10    2.006e-04    7.265e-04          3.62x     5.75
+[   53.2s]   checker vs ANTI-checker                      10x10    5.637e-04    8.582e-04          1.52x     6.79
+[   53.2s]   checker vs uniform(132.5)                    20x20    2.060e-04    7.928e-04          3.85x     6.27
+[   53.2s]   checker vs ANTI-checker                      20x20    2.840e-04    1.072e-03          3.78x     8.48
+[   53.2s]   checker vs uniform(132.5)                    30x30    3.055e-04    8.826e-04          2.89x     6.99
+[   53.2s]   checker vs ANTI-checker                      30x30    9.669e-05    1.101e-03         11.39x     8.71
+[   53.2s] 
+  one certified step of peak_excursion = 1.264e-04 world units; the reference beat is 0.01005
+[   53.2s]   the null (knowing nothing): path_length 6.65, peak_excursion 8.71, orientation_error 10.94, coordination 8.00
+[   53.3s]   -> /workspace/Plexus/prototype/cardio_cells/crash/p1c_mask.json

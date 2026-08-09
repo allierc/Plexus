@@ -1,0 +1,592 @@
+{
+ "argv": {
+  "device": "cuda:0",
+  "cells": 100,
+  "per_parent": 100,
+  "n_grid": 128,
+  "warmup": 180,
+  "window": 150,
+  "dtype": "float64",
+  "mode": "full",
+  "e_lo": 40.0,
+  "e_hi": 220.0,
+  "g_lo": 0.5,
+  "g_hi": 1.5,
+  "beat_frames": 150,
+  "fracs": "-0.3,-0.1,-0.03,0.03,0.1,0.3",
+  "cases": "66:gain,6:gain,7:E,51:E",
+  "tag": "p1a"
+ },
+ "cases": {
+  "cell66_gain": {
+   "cell": 66,
+   "param": "gain",
+   "rows": [
+    {
+     "frac": -0.3,
+     "amplitude": 0.009382638120845669,
+     "rel_amp": -0.01962822715463589,
+     "max_px": 4.282903557689917,
+     "steps": {
+      "path_length": 0.26226814239595897,
+      "peak_excursion": 1.4867014889999288,
+      "orientation_error": 0.0015917727793885146,
+      "coordination": 0.0
+     },
+     "worst_steps": 1.4867014889999288,
+     "limiting": "peak_excursion"
+    },
+    {
+     "frac": -0.1,
+     "amplitude": 0.009414921101055566,
+     "rel_amp": -0.016255047657198728,
+     "max_px": 1.7428268564857523,
+     "steps": {
+      "path_length": 0.14096396353919666,
+      "peak_excursion": 1.2312066375293815,
+      "orientation_error": 0.0005413515844897904,
+      "coordination": 0.0
+     },
+     "worst_steps": 1.2312066375293815,
+     "limiting": "peak_excursion"
+    },
+    {
+     "frac": -0.03,
+     "amplitude": 0.009453652882846643,
+     "rel_amp": -0.012208046686798407,
+     "max_px": 0.5456181134813625,
+     "steps": {
+      "path_length": 0.00014716028246480542,
+      "peak_excursion": 0.9246745029011523,
+      "orientation_error": 0.00016336932747995316,
+      "coordination": 0.0
+     },
+     "worst_steps": 0.9246745029011523,
+     "limiting": "peak_excursion"
+    },
+    {
+     "frac": 0.03,
+     "amplitude": 0.009697325201201461,
+     "rel_amp": 0.013252752255037154,
+     "max_px": 0.5554224327860808,
+     "steps": {
+      "path_length": 0.00015084926593476365,
+      "peak_excursion": 1.0038036729291355,
+      "orientation_error": 0.00016419154130838866,
+      "coordination": 0.0
+     },
+     "worst_steps": 1.0038036729291355,
+     "limiting": "peak_excursion"
+    },
+    {
+     "frac": 0.1,
+     "amplitude": 0.009894294437077988,
+     "rel_amp": 0.03383364608096918,
+     "max_px": 1.8457861125271917,
+     "steps": {
+      "path_length": 0.0005164338224507408,
+      "peak_excursion": 2.5626630265990817,
+      "orientation_error": 0.000556242841563611,
+      "coordination": 0.0
+     },
+     "worst_steps": 2.5626630265990817,
+     "limiting": "peak_excursion"
+    },
+    {
+     "frac": 0.3,
+     "amplitude": 0.009890140895984775,
+     "rel_amp": 0.033399651463176895,
+     "max_px": 4.891950731589833,
+     "steps": {
+      "path_length": 0.001645355083678777,
+      "peak_excursion": 2.5297909572365995,
+      "orientation_error": 0.0017945731063266127,
+      "coordination": 0.0
+     },
+     "worst_steps": 2.5297909572365995,
+     "limiting": "peak_excursion"
+    }
+   ],
+   "amplitude_monotone_in_frac": false,
+   "n_turning_points": 1,
+   "amp0": 0.009570489869995074,
+   "opposite_sign_at_the_two_ends": true,
+   "span_rel_amp": 0.05346187323560507
+  },
+  "cell6_gain": {
+   "cell": 6,
+   "param": "gain",
+   "rows": [
+    {
+     "frac": -0.3,
+     "amplitude": 0.009438481545732885,
+     "rel_amp": -0.013793267226169416,
+     "max_px": 4.14785159429668,
+     "steps": {
+      "path_length": 0.0035386594047051626,
+      "peak_excursion": 1.0447439171029091,
+      "orientation_error": 0.0019004962823848043,
+      "coordination": 0.0
+     },
+     "worst_steps": 1.0447439171029091,
+     "limiting": "peak_excursion"
+    },
+    {
+     "frac": -0.1,
+     "amplitude": 0.00943262417252868,
+     "rel_amp": -0.014405291614029526,
+     "max_px": 1.4285027603216454,
+     "steps": {
+      "path_length": 0.0012371479796841878,
+      "peak_excursion": 1.0911005015039101,
+      "orientation_error": 0.0006755591258516191,
+      "coordination": 0.0
+     },
+     "worst_steps": 1.0911005015039101,
+     "limiting": "peak_excursion"
+    },
+    {
+     "frac": -0.03,
+     "amplitude": 0.009520065862865402,
+     "rel_amp": -0.005268696567744041,
+     "max_px": 0.4174792559297499,
+     "steps": {
+      "path_length": 0.00037847735506873673,
+      "peak_excursion": 0.39906706655898105,
+      "orientation_error": 0.00019129482362778119,
+      "coordination": 0.0
+     },
+     "worst_steps": 0.39906706655898105,
+     "limiting": "peak_excursion"
+    },
+    {
+     "frac": 0.03,
+     "amplitude": 0.00962274974191169,
+     "rel_amp": 0.005460522149493992,
+     "max_px": 0.3962984451435764,
+     "steps": {
+      "path_length": 0.00038491230723992854,
+      "peak_excursion": 0.4135965182394184,
+      "orientation_error": 0.00018103834066103542,
+      "coordination": 0.0
+     },
+     "worst_steps": 0.4135965182394184,
+     "limiting": "peak_excursion"
+    },
+    {
+     "frac": 0.1,
+     "amplitude": 0.009751065784241661,
+     "rel_amp": 0.018867990740235735,
+     "max_px": 1.2225208399566425,
+     "steps": {
+      "path_length": 0.001306730216248628,
+      "peak_excursion": 1.4291188759408717,
+      "orientation_error": 0.0005767643847551949,
+      "coordination": 0.0
+     },
+     "worst_steps": 1.4291188759408717,
+     "limiting": "peak_excursion"
+    },
+    {
+     "frac": 0.3,
+     "amplitude": 0.009884322787805584,
+     "rel_amp": 0.03279172979373013,
+     "max_px": 3.3685428200433623,
+     "steps": {
+      "path_length": 0.10998760723500635,
+      "peak_excursion": 2.4837451251784373,
+      "orientation_error": 0.0016314545160948423,
+      "coordination": 0.0
+     },
+     "worst_steps": 2.4837451251784373,
+     "limiting": "peak_excursion"
+    }
+   ],
+   "amplitude_monotone_in_frac": false,
+   "n_turning_points": 1,
+   "amp0": 0.009570489869995074,
+   "opposite_sign_at_the_two_ends": true,
+   "span_rel_amp": 0.04719702140775966
+  },
+  "cell7_E": {
+   "cell": 7,
+   "param": "E",
+   "rows": [
+    {
+     "frac": -0.3,
+     "amplitude": 0.00978903493216663,
+     "rel_amp": 0.022835305730454645,
+     "max_px": 2.8230087729988096,
+     "steps": {
+      "path_length": 0.2503973838717847,
+      "peak_excursion": 1.7296153526130975,
+      "orientation_error": 0.024498075215590928,
+      "coordination": 0.0
+     },
+     "worst_steps": 1.7296153526130975,
+     "limiting": "peak_excursion"
+    },
+    {
+     "frac": -0.1,
+     "amplitude": 0.00963405759299605,
+     "rel_amp": 0.006642055303801107,
+     "max_px": 0.6727266636527702,
+     "steps": {
+      "path_length": 0.17516554808832077,
+      "peak_excursion": 0.5030894248566261,
+      "orientation_error": 0.0062326404032703375,
+      "coordination": 0.0
+     },
+     "worst_steps": 0.5030894248566261,
+     "limiting": "peak_excursion"
+    },
+    {
+     "frac": -0.03,
+     "amplitude": 0.00958316268229407,
+     "rel_amp": 0.0013241550297991155,
+     "max_px": 0.17245523728266351,
+     "steps": {
+      "path_length": 0.0514207210590215,
+      "peak_excursion": 0.10029552027087332,
+      "orientation_error": 0.0018391957614440034,
+      "coordination": 0.0
+     },
+     "worst_steps": 0.10029552027087332,
+     "limiting": "peak_excursion"
+    },
+    {
+     "frac": 0.03,
+     "amplitude": 0.009561479649660424,
+     "rel_amp": -0.0009414586355603902,
+     "max_px": 0.17027143477874662,
+     "steps": {
+      "path_length": 0.05090558804343706,
+      "peak_excursion": 0.07130893403120685,
+      "orientation_error": 0.0017150045624368452,
+      "coordination": 0.0
+     },
+     "worst_steps": 0.07130893403120685,
+     "limiting": "peak_excursion"
+    },
+    {
+     "frac": 0.1,
+     "amplitude": 0.009459075820599199,
+     "rel_amp": -0.011641415529331994,
+     "max_px": 1.1287065537928307,
+     "steps": {
+      "path_length": 0.035092577147044085,
+      "peak_excursion": 0.8817561395215995,
+      "orientation_error": 0.007880073381066765,
+      "coordination": 0.0
+     },
+     "worst_steps": 0.8817561395215995,
+     "limiting": "peak_excursion"
+    },
+    {
+     "frac": 0.3,
+     "amplitude": 0.009472585300990842,
+     "rel_amp": -0.010229838841497292,
+     "max_px": 2.5472631197594233,
+     "steps": {
+      "path_length": 0.2744340309705772,
+      "peak_excursion": 0.7748390375791664,
+      "orientation_error": 0.023236691035082732,
+      "coordination": 0.0
+     },
+     "worst_steps": 0.7748390375791664,
+     "limiting": "peak_excursion"
+    }
+   ],
+   "amplitude_monotone_in_frac": false,
+   "n_turning_points": 1,
+   "amp0": 0.009570489869995074,
+   "opposite_sign_at_the_two_ends": true,
+   "span_rel_amp": 0.03447672125978664
+  },
+  "cell51_E": {
+   "cell": 51,
+   "param": "E",
+   "rows": [
+    {
+     "frac": -0.3,
+     "amplitude": 0.009866054260415194,
+     "rel_amp": 0.03088289047217516,
+     "max_px": 3.547270200845429,
+     "steps": {
+      "path_length": 0.25704742676010395,
+      "peak_excursion": 2.339163842352437,
+      "orientation_error": 0.023883796367150822,
+      "coordination": 0.0
+     },
+     "worst_steps": 2.339163842352437,
+     "limiting": "peak_excursion"
+    },
+    {
+     "frac": -0.1,
+     "amplitude": 0.009567927273699314,
+     "rel_amp": -0.0002677602014704089,
+     "max_px": 1.4286855112923724,
+     "steps": {
+      "path_length": 0.3058169658805661,
+      "peak_excursion": 0.02028097021115621,
+      "orientation_error": 0.006040641203896589,
+      "coordination": 0.0
+     },
+     "worst_steps": 0.3058169658805661,
+     "limiting": "path_length"
+    },
+    {
+     "frac": -0.03,
+     "amplitude": 0.009604501376984093,
+     "rel_amp": 0.003553789560516659,
+     "max_px": 0.2844799379922781,
+     "steps": {
+      "path_length": 0.15318078400574694,
+      "peak_excursion": 0.2691748057319917,
+      "orientation_error": 0.001870190430447615,
+      "coordination": 0.0
+     },
+     "worst_steps": 0.2691748057319917,
+     "limiting": "peak_excursion"
+    },
+    {
+     "frac": 0.03,
+     "amplitude": 0.009536712458635646,
+     "rel_amp": -0.0035293294092839647,
+     "max_px": 0.2743313750932265,
+     "steps": {
+      "path_length": 0.1570091212933628,
+      "peak_excursion": 0.2673221196502423,
+      "orientation_error": 0.001971218660573427,
+      "coordination": 0.0
+     },
+     "worst_steps": 0.2673221196502423,
+     "limiting": "peak_excursion"
+    },
+    {
+     "frac": 0.1,
+     "amplitude": 0.009463338053685233,
+     "rel_amp": -0.011196063917875065,
+     "max_px": 0.8818063187784686,
+     "steps": {
+      "path_length": 0.17804386397259692,
+      "peak_excursion": 0.848023856994741,
+      "orientation_error": 0.006039406373987437,
+      "coordination": 0.0
+     },
+     "worst_steps": 0.848023856994741,
+     "limiting": "peak_excursion"
+    },
+    {
+     "frac": 0.3,
+     "amplitude": 0.009434166752402166,
+     "rel_amp": -0.014244110745083364,
+     "max_px": 2.5775895574234307,
+     "steps": {
+      "path_length": 0.07134490688206657,
+      "peak_excursion": 1.0788921733664418,
+      "orientation_error": 0.016032131449433617,
+      "coordination": 0.0
+     },
+     "worst_steps": 1.0788921733664418,
+     "limiting": "peak_excursion"
+    }
+   ],
+   "amplitude_monotone_in_frac": false,
+   "n_turning_points": 2,
+   "amp0": 0.009570489869995074,
+   "opposite_sign_at_the_two_ends": true,
+   "span_rel_amp": 0.045127001217258524
+  },
+  "UNIFORM_gain": {
+   "cell": null,
+   "param": "gain",
+   "rows": [
+    {
+     "frac": -0.3,
+     "amplitude": 0.006549312013508321,
+     "rel_amp": -0.31567640711460343,
+     "max_px": 11.957005466280103,
+     "steps": {
+      "path_length": 9.665749048556426,
+      "peak_excursion": 23.91028903436056,
+      "orientation_error": 0.3243843157008994,
+      "coordination": 0.02261690480843798
+     },
+     "worst_steps": 23.91028903436056,
+     "limiting": "peak_excursion"
+    },
+    {
+     "frac": -0.1,
+     "amplitude": 0.008471651865183848,
+     "rel_amp": -0.11481523095868354,
+     "max_px": 4.150872340171139,
+     "steps": {
+      "path_length": 3.207658313264761,
+      "peak_excursion": 8.696454013974957,
+      "orientation_error": 0.09292864954308439,
+      "coordination": 0.0011789360670047655
+     },
+     "worst_steps": 8.696454013974957,
+     "limiting": "peak_excursion"
+    },
+    {
+     "frac": -0.03,
+     "amplitude": 0.009225913577292771,
+     "rel_amp": -0.03600403922714564,
+     "max_px": 1.3866682486039452,
+     "steps": {
+      "path_length": 0.9051741497605654,
+      "peak_excursion": 2.7270551898196747,
+      "orientation_error": 0.02907967606172698,
+      "coordination": 0.0
+     },
+     "worst_steps": 2.7270551898196747,
+     "limiting": "peak_excursion"
+    },
+    {
+     "frac": 0.03,
+     "amplitude": 0.009903401756481104,
+     "rel_amp": 0.0347852503903441,
+     "max_px": 1.445341521442074,
+     "steps": {
+      "path_length": 0.9017347717444786,
+      "peak_excursion": 2.634740424753316,
+      "orientation_error": 0.025453303699631565,
+      "coordination": 0.0
+     },
+     "worst_steps": 2.634740424753316,
+     "limiting": "peak_excursion"
+    },
+    {
+     "frac": 0.1,
+     "amplitude": 0.010610177162035918,
+     "rel_amp": 0.10863469959885962,
+     "max_px": 4.450552246826788,
+     "steps": {
+      "path_length": 3.4184183612496555,
+      "peak_excursion": 8.228321813187238,
+      "orientation_error": 0.08385681234379791,
+      "coordination": 0.0
+     },
+     "worst_steps": 8.228321813187238,
+     "limiting": "peak_excursion"
+    },
+    {
+     "frac": 0.3,
+     "amplitude": 0.012553343578924327,
+     "rel_amp": 0.3116719989726908,
+     "max_px": 12.570880106879697,
+     "steps": {
+      "path_length": 9.98558470882732,
+      "peak_excursion": 23.60698300981525,
+      "orientation_error": 0.2239627852426553,
+      "coordination": 0.0057410678247823005
+     },
+     "worst_steps": 23.60698300981525,
+     "limiting": "peak_excursion"
+    }
+   ],
+   "amplitude_monotone_in_frac": true,
+   "n_turning_points": 0,
+   "amp0": 0.009570489869995074,
+   "opposite_sign_at_the_two_ends": true,
+   "span_rel_amp": 0.6273484060872943
+  },
+  "UNIFORM_E": {
+   "cell": null,
+   "param": "E",
+   "rows": [
+    {
+     "frac": -0.3,
+     "amplitude": 0.009020346566416072,
+     "rel_amp": -0.057483296158515745,
+     "max_px": 9.69861328263734,
+     "steps": {
+      "path_length": 0.11769757318315976,
+      "peak_excursion": 4.353959291290593,
+      "orientation_error": 0.20909086766628773,
+      "coordination": 0.009016853998111897
+     },
+     "worst_steps": 4.353959291290593,
+     "limiting": "peak_excursion"
+    },
+    {
+     "frac": -0.1,
+     "amplitude": 0.009707773232790621,
+     "rel_amp": 0.014344444710813736,
+     "max_px": 3.5908449308869104,
+     "steps": {
+      "path_length": 0.10892686185026593,
+      "peak_excursion": 1.0864917724068157,
+      "orientation_error": 0.05858344688413454,
+      "coordination": 0.0003040260648432544
+     },
+     "worst_steps": 1.0864917724068157,
+     "limiting": "peak_excursion"
+    },
+    {
+     "frac": -0.03,
+     "amplitude": 0.009555448906705954,
+     "rel_amp": -0.001571598057511683,
+     "max_px": 1.0127413739583941,
+     "steps": {
+      "path_length": 0.2502677242635684,
+      "peak_excursion": 0.11903760608660827,
+      "orientation_error": 0.018486000940648433,
+      "coordination": 0.0
+     },
+     "worst_steps": 0.2502677242635684,
+     "limiting": "path_length"
+    },
+    {
+     "frac": 0.03,
+     "amplitude": 0.009463317183172688,
+     "rel_amp": -0.011198244633055701,
+     "max_px": 1.2140371185689856,
+     "steps": {
+      "path_length": 0.09716301866918892,
+      "peak_excursion": 0.848189030980175,
+      "orientation_error": 0.017574174266853558,
+      "coordination": 0.0
+     },
+     "worst_steps": 0.848189030980175,
+     "limiting": "peak_excursion"
+    },
+    {
+     "frac": 0.1,
+     "amplitude": 0.009507014226607158,
+     "rel_amp": -0.006632434102137435,
+     "max_px": 4.522585205965844,
+     "steps": {
+      "path_length": 0.04607186782407469,
+      "peak_excursion": 0.502360685845881,
+      "orientation_error": 0.05854521386187336,
+      "coordination": 0.0003040260648442169
+     },
+     "worst_steps": 0.502360685845881,
+     "limiting": "peak_excursion"
+    },
+    {
+     "frac": 0.3,
+     "amplitude": 0.009653655266591838,
+     "rel_amp": 0.008689774267198148,
+     "max_px": 7.563516085062521,
+     "steps": {
+      "path_length": 0.18776232814922808,
+      "peak_excursion": 0.6581898732033706,
+      "orientation_error": 0.16932518931665963,
+      "coordination": 0.007263142560848962
+     },
+     "worst_steps": 0.6581898732033706,
+     "limiting": "peak_excursion"
+    }
+   ],
+   "amplitude_monotone_in_frac": false,
+   "n_turning_points": 2,
+   "amp0": 0.009570489869995074,
+   "opposite_sign_at_the_two_ends": true,
+   "span_rel_amp": 0.07182774086932948
+  }
+ }
+}
