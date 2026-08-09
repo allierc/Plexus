@@ -5,18 +5,8 @@
   [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
 [planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
           E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
-          warm-up 163 frames; window A = ticks 14..163 recorded
-[noise grid48] effective independent F samples per cell 16.8  (round-5 indep = 100, recording = 22.8)
-[control] frame 0 oracle-state assembly vs refute5_norm_grid48_s90210_sF0.0039.npz: rel G0 0.000e+00  rel r0 0.000e+00
-[derivation] at this noise draw: v 0.0262  C 0.2734
-    frame 0 (tick 165) derived-state assembly + 6 re-noisings [74s]
-    frame 1 (tick 166) derived-state assembly + 6 re-noisings [147s]
-    frame 2 (tick 167) derived-state assembly + 6 re-noisings [221s]
-    frame 3 (tick 168) derived-state assembly + 6 re-noisings [294s]
-    frame 4 (tick 169) derived-state assembly + 6 re-noisings [368s]
-    frame 5 (tick 170) derived-state assembly + 6 re-noisings [442s]
-    frame 6 (tick 171) derived-state assembly + 6 re-noisings [515s]
-    frame 7 (tick 172) derived-state assembly + 6 re-noisings [589s]
-[fit] wrote state_norm_grid48_der_s90210.npz
-
-wrote state_combine_f_s90210.json [612 s]
+          warm-up 165 frames; window A = ticks 16..165 recorded
+[reference] built [20s]
+[shard 0/1] 7/7: theta_true, grid48_der_s90210|b1|naive, grid48_der_s90210|b1|eiv_box, grid48_der_s90210|b2|eiv_box, cleanF_oracleState, cleanF_derivedState, noiseF_oracleState_grid48_s90210|eiv_box
+    candidate                                   medE  neg mnratio hold_oc hold_dv |      raw     kE   gauged       R2
+    theta_true                                0.0000    0   1.000  0.0047  0.0194 |   1.0000  1.000   1.0000   1.0000  [230s]

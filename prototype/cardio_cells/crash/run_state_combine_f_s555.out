@@ -10,3 +10,9 @@
 [control] frame 0 oracle-state assembly vs refute5_norm_grid48_s555_sF0.0039.npz: rel G0 0.000e+00  rel r0 0.000e+00
 [derivation] at this noise draw: v 0.0261  C 0.2735
     frame 0 (tick 165) derived-state assembly + 6 re-noisings [160s]
+    frame 1 (tick 166) derived-state assembly + 6 re-noisings [330s]
+    frame 2 (tick 167) derived-state assembly + 6 re-noisings [500s]
+    frame 3 (tick 168) derived-state assembly + 6 re-noisings [691s]
+    frame 4 (tick 169) derived-state assembly + 6 re-noisings [889s]
+    frame 5 (tick 170) derived-state assembly + 6 re-noisings [1080s]
+    frame 6 (tick 171) derived-state assembly + 6 re-noisings [1303s]

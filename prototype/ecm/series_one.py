@@ -337,6 +337,20 @@ SERIES = {
     "111_contact_x5": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=False,
                            membrane_contact_k=5.0e4, membrane_exclude=False, membrane_adhesion=0.0,
                            membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
+    # 112/113: 110 and 111 showed a one-sided contact CANNOT set a standoff -- with nothing pulling back
+    #     there is no equilibrium, so the sheet is pushed off the surface (+0.1238) and, having left it,
+    #     stops being stretched at all (strain 0.05 against 2.37). Biology already said this: the sheet
+    #     is HELD by integrin a6b4 and dystroglycan binding laminin, not merely prevented from entering.
+    #     112 adds that adhesion to the contact; 113 is adhesion alone, the control that says which of
+    #     the two does the holding.
+    "112_contact_adhesion": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=False,
+                                 membrane_contact_k=1.0e4, membrane_exclude=False,
+                                 membrane_adhesion=1.0e4, membrane_secrete_rate=0.0,
+                                 membrane_tau=0.0, membrane_reserve=0.0),
+    "113_adhesion_only": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=False,
+                              membrane_contact_k=0.0, membrane_exclude=False,
+                              membrane_adhesion=1.0e4, membrane_secrete_rate=0.0,
+                              membrane_tau=0.0, membrane_reserve=0.0),
     "_unused_secrete_dense": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
                              membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
                              membrane_particles=90000, membrane_reserve=1.0,
