@@ -63,20 +63,22 @@ def main():
     print(f"  rms error over the window: {err.mean()/dx:.4f} dx   peak {err.max()/dx:.3f} dx")
 
     tmp = tempfile.mkdtemp(prefix="mpmgt_")
-    vmax = float(np.percentile(err, 99.5)) / dx
+    # the error is tiny for most particles and large for a few, so a linear scale set by p99.5
+    # renders the panel black. Scale to the median of the per-frame maxima instead, and say so.
+    vmax = float(np.median(err.max(1))) / dx
     for t in range(A.shape[0]):
         fig, ax = plt.subplots(1, 3, figsize=(19.5, 7.1), facecolor="black")
         for a in ax:
             a.set_xlim(0, 1); a.set_ylim(0, 1); a.set_aspect("equal")
             a.set_xticks([]); a.set_yticks([]); a.set_facecolor("black")
-        ax[0].scatter(A[t, :, 0], A[t, :, 1], s=2.2, c=col, marker=".", linewidths=0)
+        ax[0].scatter(A[t, :, 0], A[t, :, 1], s=14, c=col, marker=".", linewidths=0)
         ax[0].set_title("GROUND TRUTH -- the planted per-cell (E, gain)", color="white", fontsize=11)
-        ax[1].scatter(B[t, :, 0], B[t, :, 1], s=2.2, c=col, marker=".", linewidths=0)
+        ax[1].scatter(B[t, :, 0], B[t, :, 1], s=14, c=col, marker=".", linewidths=0)
         ax[1].set_title("LEARNED -- solved from the injected data, then free-run",
                         color="white", fontsize=11)
-        s = ax[2].scatter(B[t, :, 0], B[t, :, 1], s=2.2, c=err[t] / dx, cmap="inferno",
+        s = ax[2].scatter(B[t, :, 0], B[t, :, 1], s=14, c=err[t] / dx, cmap="inferno",
                           vmin=0, vmax=max(vmax, 1e-9), marker=".", linewidths=0)
-        ax[2].set_title("|GT - learned| per particle, in grid cells", color="white", fontsize=11)
+        ax[2].set_title(f"|GT - learned| per particle, grid cells (scale 0-{vmax:.3f})", color="white", fontsize=11)
         if t == 0:
             cb = fig.colorbar(s, ax=ax[2], fraction=.046); cb.ax.tick_params(colors="white", labelsize=7)
         fig.suptitle(f"synthetic crash test -- same initial condition, free 150-frame rollout    "

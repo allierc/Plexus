@@ -2015,6 +2015,22 @@ def campaign(rounds=1, mode="composition", n_slots=N_SLOTS, fresh=True):
             print(f"\n[campaign] RESUMING -- {len(_done)} round(s) on record ({_done[0]} .. "
                   f"{_done[-1]}), {_n_records()} run(s). Nothing is reset: parents come from "
                   f"these records, not from the pool, and closed sweeps stay closed.")
+            # AND WHAT THE ROLES WILL BE TOLD. `user_input.md` is the one channel that reaches the
+            # Proposer and the Analyst mid-campaign, and it is the one thing a resume changes that
+            # is invisible from the outside -- the records look the same, the pool looks the same,
+            # and the instructions may have been rewritten between one invocation and the next.
+            # Printing the headings is enough to see WHICH instructions are live without pasting
+            # five thousand characters into the terminal every launch.
+            _ui = user_input({})
+            _heads = [l.strip() for l in _ui.splitlines() if l.startswith("### ")]
+            if _heads:
+                print(f"[campaign] user_input.md is live ({len(_ui)} chars, read fresh every "
+                      f"round) -- {len(_heads)} standing instruction(s):")
+                for _h in _heads:
+                    print(f"             {_h[4:][:96]}")
+            else:
+                print("[campaign] user_input.md has no `### ` instructions -- the roles will be "
+                      "steered by the records alone.")
         else:
             print("\n[campaign] --resume asked for, but the records are empty: this will behave "
                   "as a fresh campaign, seeding round 1 from the pool.")
