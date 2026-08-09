@@ -238,15 +238,28 @@ def render(run, frames=150, zoom_half=2.2, slab_cells=0.35, teeth=5, fps=15, max
                 RD.draw_cross(ax, mt, vp, q, band_all[t], cmap, L2, np.eye(3)[2],
                               slab if half else 0.055 / scale, dot_scale=2.6 if half else 1.0,
                               mem=mem, zoom_half=half)
-            # CENTRED ON THE SHEET, not on the epithelium's 98th percentile radius. `draw_cross`'s own
-            # window is right for the layering panel it was written for; here the sheet is the subject
-            # and in the runs that fail it is half a cell away from where that percentile puts it, which
-            # would slide it out of frame exactly when it matters most.
-            rm = float(np.linalg.norm(qm[live], axis=1).mean())
-            axz.set_xlim(rm - zoom_half, rm + zoom_half)
-            axz.set_ylim(-zoom_half, zoom_half)
+            # THE WINDOW HOLDS THE SURFACE AND THE SHEET, whatever the distance between them. Centring
+            # on the sheet's mean radius fails on the two runs that most need the panel: 125 sags 6.6
+            # tissue units away from the surface, and 128's secreted half sits in a second shell deep in
+            # the lumen, so the mean lands in empty space BETWEEN two populations and the panel shows
+            # neither. The span is measured every frame and the zoom opens only as far as it must.
+            rs = float(smap[min(smap.shape[0] - 1, t)].mean())
+            r_live = np.linalg.norm(qm[live], axis=1)
+            rlo, rhi = np.percentile(r_live, [2, 98])
+            lo, hi = min(rs, float(rlo)), max(rs, float(rhi))
+            half = float(np.clip(0.6 * (hi - lo), zoom_half, 8.0))
+            ctr = 0.5 * (lo + hi)
+            axz.set_xlim(ctr - half, ctr + half)
+            axz.set_ylim(-half, half)
             # ---- the springs, in the zoom panel only: at whole-tissue framing they are sub-pixel
-            qa = (A_box - c) / scale
+            #
+            # DRAWN FROM THE SURFACE TO THE PARTICLE, not from the particle to its rest position. The
+            # operator's target sits at R + offset, i.e. 0.22 tissue units OUTSIDE the epithelium, and
+            # drawing to it puts the integrin's cell-side end floating in the matrix -- which is where
+            # nothing attaches. The cell end of an integrin is IN the basal membrane, at R. The rest
+            # position is a length along the fibre, not a place to hang it from, so the drawing starts
+            # at R and the fibre's own length shows as how far the sheet sits from that end.
+            qa = u * (R[:, None])
             sel = anchored & live & (np.abs(qm @ dvec) < slab)
             x0, y0 = qm[sel] @ uvec, qm[sel] @ vvec
             x1, y1 = qa[sel] @ uvec, qa[sel] @ vvec
@@ -275,8 +288,8 @@ def render(run, frames=150, zoom_half=2.2, slab_cells=0.35, teeth=5, fps=15, max
                                                       linestyles=":", zorder=6, alpha=0.9))
             lab = (f"{run}\nframe {t}   {int(mt['nF'])} cells\n"
                    f"standoff {stat[-1][1]:+.4f} box units (0 = on the surface)\n"
-                   f"{100 * frac:.0f}% of the sheet anchored; {len(Aq)} of {n_win} integrins in "
-                   f"this window drawn"
+                   f"{100 * frac:.0f}% of the sheet anchored\n"
+                   f"{len(Aq)} of {n_win} integrins drawn, window +/-{half:.1f} tissue units"
                    + (f", {stat[-1][2]} ruptured" if detach > 0 else ""))
             # A BOX BEHIND IT, because the epithelium fills this panel with white and white-on-white is
             # not a label. Same convention otherwise: top left, no title, fontsize 11.
