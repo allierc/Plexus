@@ -498,6 +498,21 @@ SERIES = {
                              membrane_adhesion=2.5e5, membrane_gamma=2.0e3, membrane_offset=0.001,
                              membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
 
+    # 133: BOTH HALVES IN ONE RUN. 130 put the sheet at the fibre's rest length and lost its mechanics
+    #     (F carries 13% of the true stretch, because a particle the engine moves never passes through
+    #     the grid); 121 kept the mechanics (98%) and sat 0.008 inside. The difference is the ROUTE, and
+    #     the route was only abandoned because of a timestep: a frame-level force is integrated at
+    #     dt_frame, capping k at 6.2e4. Recomputed every substep it is integrated at dt_sub, so k = 1e6
+    #     is comfortable (dt_sub*sqrt(k) = 0.20, and the operator's own critical damping 2*sqrt(k) gives
+    #     dt_sub*damp = 0.40). Predicted: standoff +0.0039 from the measured lag law k^-0.86, strain back
+    #     at ~2.25, coverage 1.000. This is the run that decides whether the standoff needs new
+    #     operators at all.
+    "133_grid_substep_k1e6": dict(membrane_springs=False, membrane_impl="mpm",
+                                  membrane_direct_forces=False, membrane_adhesion_substep=True,
+                                  membrane_grid_bc=False, membrane_contact_k=0.0,
+                                  membrane_exclude=False, membrane_adhesion=1.0e6,
+                                  membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
+
     "_unused_secrete_dense": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
                              membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
                              membrane_particles=90000, membrane_reserve=1.0,
