@@ -1,0 +1,1000 @@
+{
+ "args": {
+  "device": "cuda:1",
+  "tag": "p1x",
+  "t0": 165,
+  "ticks_a": "165,180,195",
+  "ticks_b": "170,185,200",
+  "window": 150,
+  "hpx": 15.0,
+  "seed_noise": 90210,
+  "noise_nodes": 48,
+  "no_roll": false
+ },
+ "F0ref_max_abs_dev_from_I": 0.0,
+ "fits": {
+  "clean|joint": {
+   "gain": {
+    "med_rel": 0.004508144115226442,
+    "p90_rel": 0.03464635525867568,
+    "corr": 0.9813689446901532,
+    "atten": 0.9899267493624008,
+    "n_negative": 0
+   },
+   "med_E": 0.007777332098339839,
+   "fit_residual": 0.10606327160952032,
+   "lstsq_vs_normal_rel": 8.903589240459953e-13,
+   "alpha": 0.0818068419789833
+  },
+  "clean|gain@E_true": {
+   "gain": {
+    "med_rel": 0.0027001180932751507,
+    "p90_rel": 0.008841576240869157,
+    "corr": 0.9993310171875315,
+    "atten": 0.9955744765581598,
+    "n_negative": 0
+   },
+   "med_E": 0.0,
+   "fit_residual": 0.10819861184863566,
+   "lstsq_vs_normal_rel": 2.1340132653891462e-15,
+   "alpha": 0.0818068419789833
+  },
+  "clean|gain@E132": {
+   "gain": {
+    "med_rel": 0.2399304576237685,
+    "p90_rel": 2.457171047296975,
+    "corr": 0.2561425812874575,
+    "atten": 2.373344807859269,
+    "n_negative": 10
+   },
+   "med_E": 0.3227859490625463,
+   "fit_residual": 1.9373336233455587,
+   "lstsq_vs_normal_rel": 3.804919614806152e-15,
+   "alpha": 0.0818068419789833
+  },
+  "clean|alphaE+gain": {
+   "gain": {
+    "med_rel": 0.4892637558434581,
+    "p90_rel": 2.6397394815838857,
+    "corr": 0.18466249410303612,
+    "atten": 1.059090301579625,
+    "n_negative": 1
+   },
+   "med_E": 0.9159497091807371,
+   "fit_residual": 0.5684285004337541,
+   "lstsq_vs_normal_rel": 0.0,
+   "alpha": 0.0818068419789833
+  },
+  "clean|boxFISTA@E132": {
+   "gain": {
+    "med_rel": 0.26206976288734907,
+    "p90_rel": 0.8001935294101078,
+    "corr": 0.37502583316211574,
+    "atten": 1.063420744191156,
+    "n_negative": 0
+   },
+   "med_E": 0.3227859490625463,
+   "fit_residual": 1.9563685488223819,
+   "lstsq_vs_normal_rel": 0.0,
+   "alpha": 0.0818068419789833
+  },
+  "clean|boxFISTA@alphaE": {
+   "gain": {
+    "med_rel": 0.4843188653946149,
+    "p90_rel": 2.5076063704341767,
+    "corr": 0.21385476312896773,
+    "atten": 0.823253560925754,
+    "n_negative": 0
+   },
+   "med_E": 0.9159497091807371,
+   "fit_residual": 0.5706555667889912,
+   "lstsq_vs_normal_rel": 0.0,
+   "alpha": 0.0818068419789833
+  },
+  "noiseF_grid48|joint": {
+   "gain": {
+    "med_rel": 0.24513327862898235,
+    "p90_rel": 2.6970274408653805,
+    "corr": 0.2264061203202344,
+    "atten": 1.247356162798323,
+    "n_negative": 2
+   },
+   "med_E": 0.8416422025377133,
+   "fit_residual": 0.3788931326945155,
+   "lstsq_vs_normal_rel": 1.2988435906869244e-14,
+   "alpha": 0.07292617414364022
+  },
+  "noiseF_grid48|gain@E_true": {
+   "gain": {
+    "med_rel": 0.08499367660592433,
+    "p90_rel": 7.107212464113387,
+    "corr": -0.12335730106795939,
+    "atten": -12.252312926472657,
+    "n_negative": 12
+   },
+   "med_E": 0.0,
+   "fit_residual": 0.7382721289198625,
+   "lstsq_vs_normal_rel": 3.5009913062190263e-14,
+   "alpha": 0.07292617414364022
+  },
+  "noiseF_grid48|gain@E132": {
+   "gain": {
+    "med_rel": 0.2674330292499527,
+    "p90_rel": 7.374727265635797,
+    "corr": -0.13389640963133576,
+    "atten": -28.293916530094517,
+    "n_negative": 11
+   },
+   "med_E": 0.3227859490625463,
+   "fit_residual": 2.048322081458408,
+   "lstsq_vs_normal_rel": 5.566766726916901e-14,
+   "alpha": 0.07292617414364022
+  },
+  "noiseF_grid48|alphaE+gain": {
+   "gain": {
+    "med_rel": 0.5000817292835456,
+    "p90_rel": 3.7770265256520803,
+    "corr": -0.07656162099723877,
+    "atten": -1.1900670708790544,
+    "n_negative": 3
+   },
+   "med_E": 0.9250739180631876,
+   "fit_residual": 0.571311994587768,
+   "lstsq_vs_normal_rel": 0.0,
+   "alpha": 0.07292617414364022
+  },
+  "noiseF_grid48|boxFISTA@E132": {
+   "gain": {
+    "med_rel": 0.25463101615100886,
+    "p90_rel": 1.421431419730435,
+    "corr": 0.2818891717760224,
+    "atten": 1.177267681047008,
+    "n_negative": 0
+   },
+   "med_E": 0.3227859490625463,
+   "fit_residual": 2.0679057819204854,
+   "lstsq_vs_normal_rel": 0.0,
+   "alpha": 0.07292617414364022
+  },
+  "noiseF_grid48|boxFISTA@alphaE": {
+   "gain": {
+    "med_rel": 0.48138406644994797,
+    "p90_rel": 2.371862477521557,
+    "corr": 0.22353301626001124,
+    "atten": 0.9020686968190669,
+    "n_negative": 0
+   },
+   "med_E": 0.9250739180631876,
+   "fit_residual": 0.5736958528389129,
+   "lstsq_vs_normal_rel": 0.0,
+   "alpha": 0.07292617414364022
+  },
+  "derivedF_15px|joint": {
+   "gain": {
+    "med_rel": 0.5325628470874032,
+    "p90_rel": 2.9118113347777235,
+    "corr": 0.19928697291315406,
+    "atten": 1.3030175526490164,
+    "n_negative": 1
+   },
+   "med_E": 0.9985539230945528,
+   "fit_residual": 0.5826214758265276,
+   "lstsq_vs_normal_rel": 4.703934548046537e-13,
+   "alpha": 0.0022302751262170896
+  },
+  "derivedF_15px|gain@E_true": {
+   "gain": {
+    "med_rel": 5.764458949247728,
+    "p90_rel": 162.8324775855189,
+    "corr": -0.13937857051600722,
+    "atten": -853.1673329782875,
+    "n_negative": 44
+   },
+   "med_E": 0.0,
+   "fit_residual": 33.02551397928524,
+   "lstsq_vs_normal_rel": 1.1935140003565855e-13,
+   "alpha": 0.0022302751262170896
+  },
+  "derivedF_15px|gain@E132": {
+   "gain": {
+    "med_rel": 5.78968503006723,
+    "p90_rel": 167.16535282024378,
+    "corr": -0.13625905042144854,
+    "atten": -957.8127451202663,
+    "n_negative": 44
+   },
+   "med_E": 0.3227859490625463,
+   "fit_residual": 30.630756304047296,
+   "lstsq_vs_normal_rel": 1.1907617529872128e-13,
+   "alpha": 0.0022302751262170896
+  },
+  "derivedF_15px|alphaE+gain": {
+   "gain": {
+    "med_rel": 0.540382187712326,
+    "p90_rel": 3.169695021753431,
+    "corr": -0.07584943003777776,
+    "atten": -1.1962906601867886,
+    "n_negative": 4
+   },
+   "med_E": 0.9977085624083415,
+   "fit_residual": 0.5879229525112782,
+   "lstsq_vs_normal_rel": 0.0,
+   "alpha": 0.0022302751262170896
+  },
+  "derivedF_15px|boxFISTA@E132": {
+   "gain": {
+    "med_rel": 0.8577224704645304,
+    "p90_rel": 3.6245728656619414,
+    "corr": 0.4170696244985811,
+    "atten": 2.7832801793903417,
+    "n_negative": 0
+   },
+   "med_E": 0.3227859490625463,
+   "fit_residual": 30.764486451039634,
+   "lstsq_vs_normal_rel": 0.0,
+   "alpha": 0.0022302751262170896
+  },
+  "derivedF_15px|boxFISTA@alphaE": {
+   "gain": {
+    "med_rel": 0.5112089737074925,
+    "p90_rel": 2.8316877873960267,
+    "corr": 0.20643847305445284,
+    "atten": 0.8341531311267814,
+    "n_negative": 0
+   },
+   "med_E": 0.9977085624083415,
+   "fit_residual": 0.592111590499327,
+   "lstsq_vs_normal_rel": 0.0,
+   "alpha": 0.0022302751262170896
+  }
+ },
+ "balance": {
+  "clean": {
+   "errF_med_interior": 1.8764102799686405e-05,
+   "norm_b": 0.006179636378878123,
+   "norm_A_E_Etrue": 0.0065789075388046035,
+   "norm_A_g_gtrue": 0.009262773163524364,
+   "elastic_over_active": 0.7102524721982304,
+   "norm_A_E_Etrue_over_b": 1.0646107854001219,
+   "norm_A_E_E132_over_b": 2.48769454135243
+  },
+  "noiseF_grid48": {
+   "errF_med_interior": 0.0010643161779348223,
+   "norm_b": 0.006179636378878123,
+   "norm_A_E_Etrue": 0.007969997011859041,
+   "norm_A_g_gtrue": 0.009262773163524364,
+   "elastic_over_active": 0.8604331414747245,
+   "norm_A_E_Etrue_over_b": 1.289719414414145,
+   "norm_A_E_E132_over_b": 2.5785395886662696
+  },
+  "derivedF_15px": {
+   "errF_med_interior": 0.019672942384781532,
+   "norm_b": 0.006179636378878123,
+   "norm_A_E_Etrue": 0.20658651004165382,
+   "norm_A_g_gtrue": 0.009262773163524364,
+   "elastic_over_active": 22.302879104841466,
+   "norm_A_E_Etrue_over_b": 33.430204849554336,
+   "norm_A_E_E132_over_b": 31.14659779259223
+  }
+ },
+ "alpha": {
+  "clean": 0.0818068419789833,
+  "noiseF_grid48": 0.07292617414364022,
+  "derivedF_15px": 0.0022302751262170896
+ },
+ "controls": {
+  "target": {
+   "clean": 0.0078,
+   "derivedF_15px": 0.9986,
+   "noiseF_grid48": 0.8416
+  },
+  "got": {
+   "clean": 0.007777332098339839,
+   "noiseF_grid48": 0.8416422025377133,
+   "derivedF_15px": 0.9985539230945528
+  }
+ },
+ "null_steps_imported": {
+  "path_length": 6.6509503188431465,
+  "peak_excursion": 8.705650308314425,
+  "orientation_error": 10.939580191299047,
+  "coordination": 7.995017873521396
+ },
+ "reference_amplitude": {
+  "165": {
+   "raw_peak_excursion": 0.00772272365193852,
+   "raw_path_length": 0.030851942355887067,
+   "max_disp_dx": 4.35792504687656
+  },
+  "170": {
+   "raw_peak_excursion": 0.006621903289497903,
+   "raw_path_length": 0.029627936826032583,
+   "max_disp_dx": 3.0354817172323916
+  },
+  "180": {
+   "raw_peak_excursion": 0.009570489869995074,
+   "raw_path_length": 0.031857382358015815,
+   "max_disp_dx": 4.207867111886262
+  },
+  "185": {
+   "raw_peak_excursion": 0.011562406272779985,
+   "raw_path_length": 0.0321668904659667,
+   "max_disp_dx": 3.6968640935625143
+  },
+  "195": {
+   "raw_peak_excursion": 0.012011111738879077,
+   "raw_path_length": 0.03103214441295244,
+   "max_disp_dx": 3.920703862594828
+  },
+  "200": {
+   "raw_peak_excursion": 0.012000721773787772,
+   "raw_path_length": 0.031446175389408186,
+   "max_disp_dx": 4.5671724936284095
+  }
+ },
+ "accept": {
+  "A(165,180,195)": {
+   "theta_true": {
+    "statistic": 0.0,
+    "limiting_instrument": "path_length",
+    "pattern_channel": 0.0,
+    "amplitude_channel": 0.0,
+    "undefined_ticks": {},
+    "worst_over_ticks": {
+     "path_length": 0.0,
+     "peak_excursion": 0.0,
+     "orientation_error": 0.0,
+     "coordination": 0.0
+    },
+    "median_over_ticks": {
+     "path_length": 0.0,
+     "peak_excursion": 0.0,
+     "orientation_error": 0.0,
+     "coordination": 0.0
+    },
+    "null_steps": {
+     "path_length": 6.6509503188431465,
+     "peak_excursion": 8.705650308314425,
+     "orientation_error": 10.939580191299047,
+     "coordination": 7.995017873521396
+    },
+    "beats_null": {
+     "path_length": true,
+     "peak_excursion": true,
+     "orientation_error": true,
+     "coordination": true
+    },
+    "informative": true,
+    "n_ticks": 3
+   },
+   "null_gain_true_at_E132": {
+    "statistic": 5.323648089138323,
+    "limiting_instrument": "peak_excursion",
+    "pattern_channel": 0.44853175378112414,
+    "amplitude_channel": 5.323648089138323,
+    "undefined_ticks": {},
+    "worst_over_ticks": {
+     "path_length": 0.9755263096181841,
+     "peak_excursion": 5.323648089138323,
+     "orientation_error": 0.44853175378112414,
+     "coordination": 0.044533467068039984
+    },
+    "median_over_ticks": {
+     "path_length": 0.15636400546481577,
+     "peak_excursion": 3.8055659244472837,
+     "orientation_error": 0.2676109259790158,
+     "coordination": 0.04353391789789718
+    },
+    "null_steps": {
+     "path_length": 6.6509503188431465,
+     "peak_excursion": 8.705650308314425,
+     "orientation_error": 10.939580191299047,
+     "coordination": 7.995017873521396
+    },
+    "beats_null": {
+     "path_length": true,
+     "peak_excursion": true,
+     "orientation_error": true,
+     "coordination": true
+    },
+    "informative": true,
+    "n_ticks": 3
+   },
+   "derivedF_15px|gain@E132": {
+    "statistic": 90.20320872689096,
+    "limiting_instrument": "peak_excursion",
+    "pattern_channel": 1.106369360765278,
+    "amplitude_channel": 90.20320872689096,
+    "undefined_ticks": {},
+    "worst_over_ticks": {
+     "path_length": 46.65028298710391,
+     "peak_excursion": 90.20320872689096,
+     "orientation_error": 1.106369360765278,
+     "coordination": 0.35544793595214047
+    },
+    "median_over_ticks": {
+     "path_length": 31.390607674600844,
+     "peak_excursion": 83.11740684360387,
+     "orientation_error": 1.0340670407539834,
+     "coordination": 0.18228077022809924
+    },
+    "null_steps": {
+     "path_length": 6.6509503188431465,
+     "peak_excursion": 8.705650308314425,
+     "orientation_error": 10.939580191299047,
+     "coordination": 7.995017873521396
+    },
+    "beats_null": {
+     "path_length": false,
+     "peak_excursion": false,
+     "orientation_error": true,
+     "coordination": true
+    },
+    "informative": false,
+    "n_ticks": 3
+   },
+   "derivedF_15px|alphaE+gain": {
+    "statistic": 25.534148341587134,
+    "limiting_instrument": "peak_excursion",
+    "pattern_channel": 1.1566943032786576,
+    "amplitude_channel": 25.534148341587134,
+    "undefined_ticks": {},
+    "worst_over_ticks": {
+     "path_length": 11.40005100777768,
+     "peak_excursion": 25.534148341587134,
+     "orientation_error": 0.7631005809115066,
+     "coordination": 1.1566943032786576
+    },
+    "median_over_ticks": {
+     "path_length": 6.5342561591774375,
+     "peak_excursion": 17.23079109898164,
+     "orientation_error": 0.6546312174719059,
+     "coordination": 0.5835617928808693
+    },
+    "null_steps": {
+     "path_length": 6.6509503188431465,
+     "peak_excursion": 8.705650308314425,
+     "orientation_error": 10.939580191299047,
+     "coordination": 7.995017873521396
+    },
+    "beats_null": {
+     "path_length": false,
+     "peak_excursion": false,
+     "orientation_error": true,
+     "coordination": true
+    },
+    "informative": false,
+    "n_ticks": 3
+   },
+   "derivedF_15px|boxFISTA@E132": {
+    "statistic": 87.69978825566328,
+    "limiting_instrument": "peak_excursion",
+    "pattern_channel": 1.0956170531913016,
+    "amplitude_channel": 87.69978825566328,
+    "undefined_ticks": {},
+    "worst_over_ticks": {
+     "path_length": 42.17790583274593,
+     "peak_excursion": 87.69978825566328,
+     "orientation_error": 1.0956170531913016,
+     "coordination": 0.35083216382687626
+    },
+    "median_over_ticks": {
+     "path_length": 30.206847911286527,
+     "peak_excursion": 84.42841439352816,
+     "orientation_error": 1.050080217915715,
+     "coordination": 0.18393449330263054
+    },
+    "null_steps": {
+     "path_length": 6.6509503188431465,
+     "peak_excursion": 8.705650308314425,
+     "orientation_error": 10.939580191299047,
+     "coordination": 7.995017873521396
+    },
+    "beats_null": {
+     "path_length": false,
+     "peak_excursion": false,
+     "orientation_error": true,
+     "coordination": true
+    },
+    "informative": false,
+    "n_ticks": 3
+   },
+   "derivedF_15px|boxFISTA@alphaE": {
+    "statistic": 25.238360078290842,
+    "limiting_instrument": "peak_excursion",
+    "pattern_channel": 1.1566943032786576,
+    "amplitude_channel": 25.238360078290842,
+    "undefined_ticks": {},
+    "worst_over_ticks": {
+     "path_length": 11.443767476696312,
+     "peak_excursion": 25.238360078290842,
+     "orientation_error": 0.7508312131830316,
+     "coordination": 1.1566943032786576
+    },
+    "median_over_ticks": {
+     "path_length": 6.513319254803495,
+     "peak_excursion": 17.20160672053797,
+     "orientation_error": 0.6551446789128249,
+     "coordination": 0.5835617928808693
+    },
+    "null_steps": {
+     "path_length": 6.6509503188431465,
+     "peak_excursion": 8.705650308314425,
+     "orientation_error": 10.939580191299047,
+     "coordination": 7.995017873521396
+    },
+    "beats_null": {
+     "path_length": false,
+     "peak_excursion": false,
+     "orientation_error": true,
+     "coordination": true
+    },
+    "informative": false,
+    "n_ticks": 3
+   },
+   "derivedF_15px|joint": {
+    "statistic": 25.259119673834554,
+    "limiting_instrument": "peak_excursion",
+    "pattern_channel": 1.1637718551714629,
+    "amplitude_channel": 25.259119673834554,
+    "undefined_ticks": {},
+    "worst_over_ticks": {
+     "path_length": 11.00190368800299,
+     "peak_excursion": 25.259119673834554,
+     "orientation_error": 0.7395581352311795,
+     "coordination": 1.1637718551714629
+    },
+    "median_over_ticks": {
+     "path_length": 6.341450164808088,
+     "peak_excursion": 18.279831051826346,
+     "orientation_error": 0.6877159343839852,
+     "coordination": 0.5805667653595948
+    },
+    "null_steps": {
+     "path_length": 6.6509503188431465,
+     "peak_excursion": 8.705650308314425,
+     "orientation_error": 10.939580191299047,
+     "coordination": 7.995017873521396
+    },
+    "beats_null": {
+     "path_length": false,
+     "peak_excursion": false,
+     "orientation_error": true,
+     "coordination": true
+    },
+    "informative": false,
+    "n_ticks": 3
+   },
+   "clean|gain@E132": {
+    "statistic": 6.931648169459444,
+    "limiting_instrument": "peak_excursion",
+    "pattern_channel": 0.5647920326471142,
+    "amplitude_channel": 6.931648169459444,
+    "undefined_ticks": {},
+    "worst_over_ticks": {
+     "path_length": 1.843318848396875,
+     "peak_excursion": 6.931648169459444,
+     "orientation_error": 0.5647920326471142,
+     "coordination": 0.06332586586967455
+    },
+    "median_over_ticks": {
+     "path_length": 0.9018451118729727,
+     "peak_excursion": 4.365232348103026,
+     "orientation_error": 0.36198479519150656,
+     "coordination": 0.04717335788345975
+    },
+    "null_steps": {
+     "path_length": 6.6509503188431465,
+     "peak_excursion": 8.705650308314425,
+     "orientation_error": 10.939580191299047,
+     "coordination": 7.995017873521396
+    },
+    "beats_null": {
+     "path_length": true,
+     "peak_excursion": true,
+     "orientation_error": true,
+     "coordination": true
+    },
+    "informative": true,
+    "n_ticks": 3
+   },
+   "clean|alphaE+gain": {
+    "statistic": 25.914830420000722,
+    "limiting_instrument": "peak_excursion",
+    "pattern_channel": 1.1813152882165057,
+    "amplitude_channel": 25.914830420000722,
+    "undefined_ticks": {},
+    "worst_over_ticks": {
+     "path_length": 11.506392104682668,
+     "peak_excursion": 25.914830420000722,
+     "orientation_error": 0.7332723100496644,
+     "coordination": 1.1813152882165057
+    },
+    "median_over_ticks": {
+     "path_length": 7.379145069575022,
+     "peak_excursion": 20.07669293795171,
+     "orientation_error": 0.6563408618279307,
+     "coordination": 0.5664861167551799
+    },
+    "null_steps": {
+     "path_length": 6.6509503188431465,
+     "peak_excursion": 8.705650308314425,
+     "orientation_error": 10.939580191299047,
+     "coordination": 7.995017873521396
+    },
+    "beats_null": {
+     "path_length": false,
+     "peak_excursion": false,
+     "orientation_error": true,
+     "coordination": true
+    },
+    "informative": false,
+    "n_ticks": 3
+   },
+   "ON-SHEET NULL (frozen sheet)": {
+    "statistic": 95.05867146614577,
+    "limiting_instrument": "peak_excursion",
+    "pattern_channel": 12.292441730639865,
+    "amplitude_channel": 95.05867146614577,
+    "undefined_ticks": {
+     "coordination": 3
+    },
+    "worst_over_ticks": {
+     "path_length": 50.44806365513174,
+     "peak_excursion": 95.05867146614577,
+     "orientation_error": 12.292441730639865
+    },
+    "median_over_ticks": {
+     "path_length": 49.14125018516967,
+     "peak_excursion": 75.74303462493693,
+     "orientation_error": 12.197027312283746
+    },
+    "null_steps": {
+     "path_length": 6.6509503188431465,
+     "peak_excursion": 8.705650308314425,
+     "orientation_error": 10.939580191299047,
+     "coordination": 7.995017873521396
+    },
+    "beats_null": {
+     "path_length": false,
+     "peak_excursion": false,
+     "orientation_error": false
+    },
+    "informative": false,
+    "n_ticks": 3
+   }
+  },
+  "B(170,185,200)": {
+   "theta_true": {
+    "statistic": 0.0,
+    "limiting_instrument": "path_length",
+    "pattern_channel": 0.0,
+    "amplitude_channel": 0.0,
+    "undefined_ticks": {},
+    "worst_over_ticks": {
+     "path_length": 0.0,
+     "peak_excursion": 0.0,
+     "orientation_error": 0.0,
+     "coordination": 0.0
+    },
+    "median_over_ticks": {
+     "path_length": 0.0,
+     "peak_excursion": 0.0,
+     "orientation_error": 0.0,
+     "coordination": 0.0
+    },
+    "null_steps": {
+     "path_length": 6.6509503188431465,
+     "peak_excursion": 8.705650308314425,
+     "orientation_error": 10.939580191299047,
+     "coordination": 7.995017873521396
+    },
+    "beats_null": {
+     "path_length": true,
+     "peak_excursion": true,
+     "orientation_error": true,
+     "coordination": true
+    },
+    "informative": true,
+    "n_ticks": 3
+   },
+   "null_gain_true_at_E132": {
+    "statistic": 4.444201295530288,
+    "limiting_instrument": "peak_excursion",
+    "pattern_channel": 0.4138106264986,
+    "amplitude_channel": 4.444201295530288,
+    "undefined_ticks": {},
+    "worst_over_ticks": {
+     "path_length": 0.8306275884111602,
+     "peak_excursion": 4.444201295530288,
+     "orientation_error": 0.4138106264986,
+     "coordination": 0.06578650860383443
+    },
+    "median_over_ticks": {
+     "path_length": 0.7137473306867373,
+     "peak_excursion": 0.9027755458636266,
+     "orientation_error": 0.26115353413769,
+     "coordination": 0.006870161575173878
+    },
+    "null_steps": {
+     "path_length": 6.6509503188431465,
+     "peak_excursion": 8.705650308314425,
+     "orientation_error": 10.939580191299047,
+     "coordination": 7.995017873521396
+    },
+    "beats_null": {
+     "path_length": true,
+     "peak_excursion": true,
+     "orientation_error": true,
+     "coordination": true
+    },
+    "informative": true,
+    "n_ticks": 3
+   },
+   "derivedF_15px|gain@E132": {
+    "statistic": 97.26987047499011,
+    "limiting_instrument": "peak_excursion",
+    "pattern_channel": 1.087296808014399,
+    "amplitude_channel": 97.26987047499011,
+    "undefined_ticks": {},
+    "worst_over_ticks": {
+     "path_length": 51.228876946944915,
+     "peak_excursion": 97.26987047499011,
+     "orientation_error": 1.087296808014399,
+     "coordination": 0.22261816615225422
+    },
+    "median_over_ticks": {
+     "path_length": 41.13999499565113,
+     "peak_excursion": 87.34287575325635,
+     "orientation_error": 1.012790033217544,
+     "coordination": 0.1690841558844668
+    },
+    "null_steps": {
+     "path_length": 6.6509503188431465,
+     "peak_excursion": 8.705650308314425,
+     "orientation_error": 10.939580191299047,
+     "coordination": 7.995017873521396
+    },
+    "beats_null": {
+     "path_length": false,
+     "peak_excursion": false,
+     "orientation_error": true,
+     "coordination": true
+    },
+    "informative": false,
+    "n_ticks": 3
+   },
+   "derivedF_15px|alphaE+gain": {
+    "statistic": 26.65766981917735,
+    "limiting_instrument": "peak_excursion",
+    "pattern_channel": 1.8778499175273045,
+    "amplitude_channel": 26.65766981917735,
+    "undefined_ticks": {},
+    "worst_over_ticks": {
+     "path_length": 12.885289920126947,
+     "peak_excursion": 26.65766981917735,
+     "orientation_error": 0.8623481382067831,
+     "coordination": 1.8778499175273045
+    },
+    "median_over_ticks": {
+     "path_length": 8.698272954083945,
+     "peak_excursion": 13.881004507678705,
+     "orientation_error": 0.7624306035847145,
+     "coordination": 0.5260061719230741
+    },
+    "null_steps": {
+     "path_length": 6.6509503188431465,
+     "peak_excursion": 8.705650308314425,
+     "orientation_error": 10.939580191299047,
+     "coordination": 7.995017873521396
+    },
+    "beats_null": {
+     "path_length": false,
+     "peak_excursion": false,
+     "orientation_error": true,
+     "coordination": true
+    },
+    "informative": false,
+    "n_ticks": 3
+   },
+   "derivedF_15px|boxFISTA@E132": {
+    "statistic": 88.70802329765301,
+    "limiting_instrument": "peak_excursion",
+    "pattern_channel": 1.0544659344260128,
+    "amplitude_channel": 88.70802329765301,
+    "undefined_ticks": {},
+    "worst_over_ticks": {
+     "path_length": 42.6164795049939,
+     "peak_excursion": 88.70802329765301,
+     "orientation_error": 1.0544659344260128,
+     "coordination": 0.2433081899302617
+    },
+    "median_over_ticks": {
+     "path_length": 38.68469566399106,
+     "peak_excursion": 84.24569323026185,
+     "orientation_error": 1.0510549470163961,
+     "coordination": 0.16772250157846708
+    },
+    "null_steps": {
+     "path_length": 6.6509503188431465,
+     "peak_excursion": 8.705650308314425,
+     "orientation_error": 10.939580191299047,
+     "coordination": 7.995017873521396
+    },
+    "beats_null": {
+     "path_length": false,
+     "peak_excursion": false,
+     "orientation_error": true,
+     "coordination": true
+    },
+    "informative": false,
+    "n_ticks": 3
+   },
+   "derivedF_15px|boxFISTA@alphaE": {
+    "statistic": 26.41679555873641,
+    "limiting_instrument": "peak_excursion",
+    "pattern_channel": 1.8579643528998422,
+    "amplitude_channel": 26.41679555873641,
+    "undefined_ticks": {},
+    "worst_over_ticks": {
+     "path_length": 12.709178105374683,
+     "peak_excursion": 26.41679555873641,
+     "orientation_error": 0.8623335703340252,
+     "coordination": 1.8579643528998422
+    },
+    "median_over_ticks": {
+     "path_length": 8.626752173809546,
+     "peak_excursion": 13.877358394783622,
+     "orientation_error": 0.7351351929098725,
+     "coordination": 0.5260061719230741
+    },
+    "null_steps": {
+     "path_length": 6.6509503188431465,
+     "peak_excursion": 8.705650308314425,
+     "orientation_error": 10.939580191299047,
+     "coordination": 7.995017873521396
+    },
+    "beats_null": {
+     "path_length": false,
+     "peak_excursion": false,
+     "orientation_error": true,
+     "coordination": true
+    },
+    "informative": false,
+    "n_ticks": 3
+   },
+   "derivedF_15px|joint": {
+    "statistic": 26.633949037870693,
+    "limiting_instrument": "peak_excursion",
+    "pattern_channel": 1.8807177569610927,
+    "amplitude_channel": 26.633949037870693,
+    "undefined_ticks": {},
+    "worst_over_ticks": {
+     "path_length": 12.851619804322873,
+     "peak_excursion": 26.633949037870693,
+     "orientation_error": 0.8552962667409847,
+     "coordination": 1.8807177569610927
+    },
+    "median_over_ticks": {
+     "path_length": 8.643342441947482,
+     "peak_excursion": 14.280372270262395,
+     "orientation_error": 0.7201762405556874,
+     "coordination": 0.5260061719230741
+    },
+    "null_steps": {
+     "path_length": 6.6509503188431465,
+     "peak_excursion": 8.705650308314425,
+     "orientation_error": 10.939580191299047,
+     "coordination": 7.995017873521396
+    },
+    "beats_null": {
+     "path_length": false,
+     "peak_excursion": false,
+     "orientation_error": true,
+     "coordination": true
+    },
+    "informative": false,
+    "n_ticks": 3
+   },
+   "clean|gain@E132": {
+    "statistic": 5.926655329386416,
+    "limiting_instrument": "peak_excursion",
+    "pattern_channel": 0.5751176305817862,
+    "amplitude_channel": 5.926655329386416,
+    "undefined_ticks": {},
+    "worst_over_ticks": {
+     "path_length": 2.385777432040981,
+     "peak_excursion": 5.926655329386416,
+     "orientation_error": 0.5751176305817862,
+     "coordination": 0.08094144862125144
+    },
+    "median_over_ticks": {
+     "path_length": 2.130622044380343,
+     "peak_excursion": 2.7497246827700974,
+     "orientation_error": 0.34129029708599024,
+     "coordination": 0.06577592773448772
+    },
+    "null_steps": {
+     "path_length": 6.6509503188431465,
+     "peak_excursion": 8.705650308314425,
+     "orientation_error": 10.939580191299047,
+     "coordination": 7.995017873521396
+    },
+    "beats_null": {
+     "path_length": true,
+     "peak_excursion": true,
+     "orientation_error": true,
+     "coordination": true
+    },
+    "informative": true,
+    "n_ticks": 3
+   },
+   "clean|alphaE+gain": {
+    "statistic": 30.79412077847914,
+    "limiting_instrument": "peak_excursion",
+    "pattern_channel": 1.889195996373473,
+    "amplitude_channel": 30.79412077847914,
+    "undefined_ticks": {},
+    "worst_over_ticks": {
+     "path_length": 13.68660522397844,
+     "peak_excursion": 30.79412077847914,
+     "orientation_error": 0.7829003641978606,
+     "coordination": 1.889195996373473
+    },
+    "median_over_ticks": {
+     "path_length": 9.244953334657373,
+     "peak_excursion": 14.354768271707135,
+     "orientation_error": 0.7167950272197147,
+     "coordination": 0.5218556253301395
+    },
+    "null_steps": {
+     "path_length": 6.6509503188431465,
+     "peak_excursion": 8.705650308314425,
+     "orientation_error": 10.939580191299047,
+     "coordination": 7.995017873521396
+    },
+    "beats_null": {
+     "path_length": false,
+     "peak_excursion": false,
+     "orientation_error": true,
+     "coordination": true
+    },
+    "informative": false,
+    "n_ticks": 3
+   },
+   "ON-SHEET NULL (frozen sheet)": {
+    "statistic": 94.97644291814447,
+    "limiting_instrument": "peak_excursion",
+    "pattern_channel": 11.045126887903509,
+    "amplitude_channel": 94.97644291814447,
+    "undefined_ticks": {
+     "coordination": 3
+    },
+    "worst_over_ticks": {
+     "path_length": 50.93818819066995,
+     "peak_excursion": 94.97644291814447,
+     "orientation_error": 11.045126887903509
+    },
+    "median_over_ticks": {
+     "path_length": 49.796892912519496,
+     "peak_excursion": 91.50751430315715,
+     "orientation_error": 10.966753748779368
+    },
+    "null_steps": {
+     "path_length": 6.6509503188431465,
+     "peak_excursion": 8.705650308314425,
+     "orientation_error": 10.939580191299047,
+     "coordination": 7.995017873521396
+    },
+    "beats_null": {
+     "path_length": false,
+     "peak_excursion": false,
+     "orientation_error": false
+    },
+    "informative": false,
+    "n_ticks": 3
+   }
+  }
+ },
+ "wall_seconds": 526.2072458267212
+}

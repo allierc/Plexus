@@ -1,0 +1,34 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125  warm-up 165 frames
+          reference config at tick 0: |F(0) - I| max 0.00e+00  (must be 0 for X to be the configuration p.F is measured against)
+[state] C=100 Np=10000 interior=7877 ||act0||=4212.6  E in [40.03,216.31] med 127.99; gain in [0.5026,1.4993] mean 0.9867
+
+===== n_sub = 1 (assembly 1.1 s) =====
+  [rank] cells with an all-zero interior column: 2/100 (E 2, gain 2)
+[alias E->gain] the gain block absorbs 36.9% (in norm) of the per-cell STIFFNESS signal A_E dE; residual 92.9%
+                corr(g_alias, dE) = -0.0244  spearman -0.3270
+                induced spurious gain: med |dg/g| 0.1906, p90 2.1803; std(g_alias)/std(gain_true) 19.155
+[alias gain->E] the E block absorbs 27.3% of the per-cell GAIN signal; corr -0.1454
+[geometry] |cos(A_E[:,c], A_g[:,c])| per cell: med 0.1382, p90 0.2674, max 0.9071; 1% above 0.90
+[conditional] best per-cell direction (dE/E, dg/g), median [+0.997, -0.045], angle -2.6 deg (0 = pure E, 90 = pure gain)
+              rel sd along it: med 2.58; along the worst direction med 6.76; anisotropy med 2.34
+              cells with a <=10% readable combination: 0/98; both directions <=10%: 0/98
+[marginal]    rel sd per cell: E med 3.05, gain med 5.885; gains under 10%: 0/98, under 30%: 0/98
+
+===== n_sub = 10 (assembly 9.9 s) =====
+  [rank] cells with an all-zero interior column: 0/100 (E 0, gain 0)
+[alias E->gain] the gain block absorbs 49.9% (in norm) of the per-cell STIFFNESS signal A_E dE; residual 86.7%
+                corr(g_alias, dE) = +0.0599  spearman -0.3077
+                induced spurious gain: med |dg/g| 0.2148, p90 2.8376; std(g_alias)/std(gain_true) 165.581
+[alias gain->E] the E block absorbs 35.6% of the per-cell GAIN signal; corr -0.1941
+[geometry] |cos(A_E[:,c], A_g[:,c])| per cell: med 0.2100, p90 0.4244, max 0.9552; 1% above 0.90
+[conditional] best per-cell direction (dE/E, dg/g), median [+0.899, -0.192], angle -11.1 deg (0 = pure E, 90 = pure gain)
+              rel sd along it: med 0.09644; along the worst direction med 0.1815; anisotropy med 1.97
+              cells with a <=10% readable combination: 50/100; both directions <=10%: 41/100
+[marginal]    rel sd per cell: E med 0.1115, gain med 0.1436; gains under 10%: 43/100, under 30%: 58/100
+
+[done] 22.8 s -> p1e_alias.json / .log

@@ -68,3 +68,61 @@
   [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
 [planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125  warm-up 210 frames
           reference config at tick 0: |F(0) - I| max 0.00e+00  (must be 0 for X to be the configuration p.F is measured against)
+
+[tick 210] base=base0 (step_E=100, step_gain=1)  ||A_gain|| 0  ||y(base)|| 0.0126758
+    variant        | max|dA_gain|  rel dA_gain |   rel dA_E |    max|dy0|    rel dy0
+    true           |    0.000e+00          nan |  0.000e+00 |   0.000e+00  0.000e+00
+    sF_indep       |    0.000e+00          nan |  8.620e-01 |   0.000e+00  0.000e+00
+    derived_15px   |    0.000e+00          nan |  2.718e+01 |   0.000e+00  0.000e+00
+    [recovery, base=base0] theta_hat = base + ridge0 increment
+    assembly                   |   E slope   E corr  E medErr |   g slope   g corr  g medErr |  fit res
+    all_true                   | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    all_sF_indep               | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    all_derived15              | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    Eonly_derived15            | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    gainonly_derived15         | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    y0only_derived15           | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+
+[tick 210] base=baseMid (step_E=1, step_gain=0.01)  ||A_gain|| 0  ||y(base)|| 0.0133683
+    variant        | max|dA_gain|  rel dA_gain |   rel dA_E |    max|dy0|    rel dy0
+    true           |    0.000e+00          nan |  0.000e+00 |   0.000e+00  0.000e+00
+    sF_indep       |    0.000e+00          nan |  8.620e-01 |   3.612e-04  5.333e-01
+    derived_15px   |    0.000e+00          nan |  2.243e+01 |   1.470e-02  1.563e+01
+    [recovery, base=baseMid] theta_hat = base + ridge0 increment
+    assembly                   |   E slope   E corr  E medErr |   g slope   g corr  g medErr |  fit res
+    all_true                   | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    all_sF_indep               | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    all_derived15              | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    Eonly_derived15            | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    gainonly_derived15         | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    y0only_derived15           | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+
+[tick 210] base=baseMid_secant (step_E=100, step_gain=1)  ||A_gain|| 0  ||y(base)|| 0.0133683
+    variant        | max|dA_gain|  rel dA_gain |   rel dA_E |    max|dy0|    rel dy0
+    true           |    0.000e+00          nan |  0.000e+00 |   0.000e+00  0.000e+00
+    sF_indep       |    0.000e+00          nan |  8.620e-01 |   3.612e-04  5.333e-01
+    derived_15px   |    0.000e+00          nan |  2.001e+01 |   1.470e-02  1.563e+01
+    [recovery, base=baseMid_secant] theta_hat = base + ridge0 increment
+    assembly                   |   E slope   E corr  E medErr |   g slope   g corr  g medErr |  fit res
+    all_true                   | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    all_sF_indep               | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    all_derived15              | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    Eonly_derived15            | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    gainonly_derived15         | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    y0only_derived15           | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+
+[tick 210] base=baseTrue (step_E=1, step_gain=0.01)  ||A_gain|| 0  ||y(base)|| 0.0126185
+    variant        | max|dA_gain|  rel dA_gain |   rel dA_E |    max|dy0|    rel dy0
+    true           |    0.000e+00          nan |  0.000e+00 |   0.000e+00  0.000e+00
+    sF_indep       |    0.000e+00          nan |  8.623e-01 |   4.057e-04  6.222e-01
+    derived_15px   |    0.000e+00          nan |  2.229e+01 |   1.807e-02  1.737e+01
+    [recovery, base=baseTrue] theta_hat = base + ridge0 increment
+    assembly                   |   E slope   E corr  E medErr |   g slope   g corr  g medErr |  fit res
+    all_true                   | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    all_sF_indep               | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    all_derived15              | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    Eonly_derived15            | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    gainonly_derived15         | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    y0only_derived15           | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+
+wrote p1bv_base_ph.json  [290 s]

@@ -1,0 +1,90 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[   20.9s] 
+  baseline  seed=2026  planted E [40.0, 216.3] median 128.0; theta_true amplitude 0.00957049, path 0.0318574
+[   20.9s]    uniform E path_length peak_excurs orientation coordinatio     STAT         amp  amp/ref
+[   28.7s]         40.0        2.24        3.07        0.55        0.28     3.07    0.009183    0.959
+[   36.4s]         47.3        1.77        3.74        0.49        0.19     3.74    0.009098    0.951
+[   44.2s]         56.0        1.42        1.79        0.37        0.13     1.79    0.009344    0.976
+[   52.0s]         66.2        1.88        0.81        0.27        0.08     1.88    0.009468    0.989
+[   59.7s]         78.3        1.79        0.06        0.22        0.03     1.79    0.009577    1.001
+[   67.4s]         92.6        0.75        0.25        0.19        0.01     0.75    0.009539    0.997
+[   75.0s]        109.5        0.76        2.30        0.20        0.01     2.30    0.009861    1.030
+[   82.7s]        129.6        0.08        3.81        0.27        0.04     3.81    0.010051    1.050
+[   90.4s]        153.3        0.09        4.65        0.31        0.09     4.65    0.010158    1.061
+[   98.1s]        181.3        0.31        6.94        0.42        0.19     6.94    0.010447    1.092
+[  105.9s]        214.4        0.13        9.26        0.48        0.23     9.26    0.010741    1.122
+[  113.7s]        253.6        0.52        7.85        0.54        0.26     7.85    0.010563    1.104
+[  121.5s]        300.0        1.15        4.08        0.54        0.40     4.08    0.010086    1.054
+[  121.5s]     BEST uniform impostor: E = 92.6 at 0.75 steps (limiting path_length)
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[  138.8s] 
+  drag 3  seed=2026  planted E [40.0, 216.3] median 128.0; theta_true amplitude 0.023249, path 0.0784734
+[  138.8s]    uniform E path_length peak_excurs orientation coordinatio     STAT         amp  amp/ref
+[  146.6s]         60.0        2.24       11.17        1.23        1.02    11.17    0.021838    0.939
+[  154.4s]         67.8        3.54       12.65        1.20        0.87    12.65    0.021651    0.931
+[  162.2s]         76.6        0.60       10.66        1.07        0.76    10.66    0.021903    0.942
+[  169.9s]         86.6        2.91        5.15        0.87        0.53     5.15    0.022598    0.972
+[  177.7s]         97.8        3.35        6.00        0.69        0.05     6.00    0.022491    0.967
+[  185.4s]        110.5        5.73        0.27        0.83        0.03     5.73    0.023215    0.999
+[  193.1s]        124.9        3.92        3.45        0.58        0.18     3.92    0.023685    1.019
+[  200.8s]        141.1        0.58       14.65        0.70        0.17    14.65    0.025100    1.080
+[  208.5s]        159.5        4.35       14.61        0.94        0.30    14.61    0.025096    1.079
+[  216.3s]        180.2        2.51       15.64        1.28        0.53    15.64    0.025225    1.085
+[  224.0s]        203.6        8.20       17.95        1.13        0.65    17.95    0.025517    1.098
+[  231.8s]        230.1       13.06       26.44        1.36        0.83    26.44    0.026590    1.144
+[  239.5s]        260.0       21.57       38.89        1.50        0.90    38.89    0.028163    1.211
+[  239.5s]     BEST uniform impostor: E = 124.9 at 3.92 steps (limiting path_length)
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[  256.7s] 
+  amplitude 80  seed=2026  planted E [40.0, 216.3] median 128.0; theta_true amplitude 0.0363913, path 0.102862
+[  256.7s]    uniform E path_length peak_excurs orientation coordinatio     STAT         amp  amp/ref
+[  264.4s]         60.0        1.04       36.71        0.62        0.58    36.71    0.031753    0.873
+[  272.2s]         67.8        3.98       27.21        0.61        0.26    27.21    0.032953    0.906
+[  279.9s]         76.6        1.18       19.30        0.56        0.18    19.30    0.033953    0.933
+[  287.6s]         86.6        2.41       12.78        0.51        0.07    12.78    0.034776    0.956
+[  295.3s]         97.8        4.86       15.32        0.49        0.04    15.32    0.034455    0.947
+[  303.1s]        110.5        0.24        8.60        0.51        0.03     8.60    0.037478    1.030
+[  310.9s]        124.9        6.99       22.14        0.55        0.04    22.14    0.039189    1.077
+[  318.7s]        141.1        9.66       34.36        0.53        0.23    34.36    0.040733    1.119
+[  326.5s]        159.5       12.37       52.41        0.62        0.25    52.41    0.043013    1.182
+[  334.2s]        180.2       21.21       64.16        0.75        0.37    64.16    0.044498    1.223
+[  342.0s]        203.6       26.47       76.44        0.83        0.48    76.44    0.046050    1.265
+[  349.8s]        230.1       27.53       68.32        0.68        0.65    68.32    0.045023    1.237
+[  357.6s]        260.0       32.85       86.71        0.87        0.93    86.71    0.047347    1.301
+[  357.6s]     BEST uniform impostor: E = 110.5 at 8.60 steps (limiting peak_excursion)
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[  374.7s] 
+  duration 150 (always on)  seed=2026  planted E [40.0, 216.3] median 128.0; theta_true amplitude 0.0136288, path 0.0531893
+[  374.7s]    uniform E path_length peak_excurs orientation coordinatio     STAT         amp  amp/ref
+[  382.4s]         60.0       59.04       77.81        0.82        0.76    77.81    0.023460    1.721
+[  390.1s]         67.8       44.51       59.83        0.76        0.47    59.83    0.021188    1.555
+[  397.8s]         76.6       32.47       43.81        0.76        0.28    43.81    0.019165    1.406
+[  405.6s]         86.6       21.09       30.52        0.59        0.14    30.52    0.017485    1.283
+[  413.2s]         97.8       10.42       14.86        0.52        0.08    14.86    0.015507    1.138
+[  420.8s]        110.5        0.74        4.63        0.49        0.05     4.63    0.014213    1.043
+[  428.5s]        124.9        7.37        6.43        0.43        0.09     7.37    0.012817    0.940
+[  436.3s]        141.1       13.32       14.17        0.72        0.15    14.17    0.011839    0.869
+[  444.1s]        159.5       17.98       21.47        1.02        0.23    21.47    0.010916    0.801
+[  451.8s]        180.2       21.91       27.35        1.32        0.42    27.35    0.010172    0.746
+[  459.6s]        203.6       25.78       31.81        1.47        0.62    31.81    0.009609    0.705
+[  467.4s]        230.1       29.45       36.27        1.87        0.65    36.27    0.009046    0.664
+[  475.1s]        260.0       31.74       42.03        2.10        1.06    42.03    0.008318    0.610
+[  475.1s]     BEST uniform impostor: E = 110.5 at 4.63 steps (limiting peak_excursion)
+[  475.2s] 
+================================================================================================
+  BEST UNIFORM-E IMPOSTOR FOR THE PLANTED FIELD, per regime
+================================================================================================
+[  475.2s]   config                         best E     STAT            limiting  8-pt grid min
+[  475.2s]   baseline                         92.6     0.75         path_length
+[  475.2s]   drag 3                          124.9     3.92         path_length
+[  475.2s]   amplitude 80                    110.5     8.60      peak_excursion
+[  475.2s]   duration 150 (always on)        110.5     4.63      peak_excursion
+[  475.2s]   -> p1v_impostor.json

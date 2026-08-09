@@ -1354,6 +1354,9 @@ class BasementMembraneContact(Lateral):
         # critical by default, as integrin_adhesion has always been: an undamped one-sided spring on a
         # particle with mass oscillates about the surface instead of resting on it.
         self.damp = float(params.get("damp", 2.0 * math.sqrt(max(float(params.get("k", 1.0e4)), 1e-12))))
+        # overdamped: emit F/gamma as a VELOCITY. Then there is no oscillation and no dashpot -- the
+        # dashpot only exists to damp an inertia the sheet should not have at Re ~ 1e-10.
+        self.gamma = float(params.get("overdamped_gamma", 0.0))
         self.scale = float(params.get("scale", 1.0))
         import numpy as _np
         z = _np.load(str(params["surface"]))
@@ -1393,8 +1396,10 @@ class BasementMembraneContact(Lateral):
         # At Re ~ 1e-10 the inertia has no physical basis in the first place, so the damping is not a
         # numerical patch: it is the term that makes the contact overdamped, which is the real regime.
         vel = lvl.get("vel") if "vel" in lvl.state_schema else None   # same test integrin uses
-        if vel is not None and self.damp > 0:
-            acc = acc - self.damp * vel
+        if self.gamma > 0:
+            acc = acc / self.gamma          # overdamped: the emitted quantity is a velocity
+        elif vel is not None and self.damp > 0:
+            acc = acc - self.damp * vel     # inertial path: critical damping
         alive = getattr(H, "membrane_alive", None)
         if alive is not None:
             acc = torch.where(alive[:, None], acc, torch.zeros_like(acc))

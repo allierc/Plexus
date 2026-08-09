@@ -1,0 +1,33 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[tick  152] ||act0||      851.6  interior 7876  ||D_E|| 0.001246  ||D_gain|| 0.001674  zero gain cols 0/100
+           stacked 1: cond(G) 4.917e+13  marg rel sd  E med 0.7796 gain med 0.7015  |  E<=10% 0/100  gain<=10% 11/100  gain<=30% 37/100  | best-dir angle med -1.7 deg
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[tick  158] ||act0||       3059  interior 7876  ||D_E|| 0.003439  ||D_gain|| 0.006009  zero gain cols 0/100
+           stacked 2: cond(G) 1.177e+13  marg rel sd  E med 0.2707 gain med 0.188  |  E<=10% 20/100  gain<=10% 38/100  gain<=30% 55/100  | best-dir angle med -27.3 deg
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[tick  165] ||act0||       4213  interior 7877  ||D_E|| 0.01213  ||D_gain|| 0.008247  zero gain cols 0/100
+           stacked 3: cond(G) 1.557e+13  marg rel sd  E med 0.1053 gain med 0.1137  |  E<=10% 49/100  gain<=10% 48/100  gain<=30% 62/100  | best-dir angle med -11.8 deg
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[tick  172] ||act0||       3245  interior 7883  ||D_E|| 0.02347  ||D_gain|| 0.006308  zero gain cols 0/100
+           stacked 4: cond(G) 2.183e+13  marg rel sd  E med 0.06653 gain med 0.09404  |  E<=10% 57/100  gain<=10% 50/100  gain<=30% 62/100  | best-dir angle med -7.1 deg
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[tick  179] ||act0||      469.9  interior 7895  ||D_E|| 0.02582  ||D_gain|| 0.000908  zero gain cols 0/100
+           stacked 5: cond(G) 2.117e+13  marg rel sd  E med 0.04989 gain med 0.09345  |  E<=10% 61/100  gain<=10% 50/100  gain<=30% 62/100  | best-dir angle med -3.3 deg
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[tick  100] ||act0||          0  interior 7878  ||D_E|| 0.001512  ||D_gain|| 0  zero gain cols 100/100
+           stacked 6: cond(G) 2.120e+13  marg rel sd  E med 0.04938 gain med 0.09343  |  E<=10% 61/100  gain<=10% 50/100  gain<=30% 62/100  | best-dir angle med -3.3 deg
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[tick  120] ||act0||          0  interior 7877  ||D_E|| 0.001372  ||D_gain|| 0  zero gain cols 100/100
+           stacked 7: cond(G) 2.121e+13  marg rel sd  E med 0.04904 gain med 0.09342  |  E<=10% 61/100  gain<=10% 50/100  gain<=30% 62/100  | best-dir angle med -3.3 deg
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[tick  140] ||act0||          0  interior 7877  ||D_E|| 0.001279  ||D_gain|| 0  zero gain cols 100/100
+           stacked 8: cond(G) 2.122e+13  marg rel sd  E med 0.0488 gain med 0.0934  |  E<=10% 61/100  gain<=10% 50/100  gain<=30% 62/100  | best-dir angle med -3.3 deg
+[done] 146.4 s

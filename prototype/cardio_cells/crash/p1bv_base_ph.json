@@ -1,0 +1,588 @@
+{
+ "args": {
+  "device": "cuda:1",
+  "tag": "p1bv_base_ph",
+  "ticks": "100,210",
+  "cells": 100,
+  "per_parent": 100,
+  "n_grid": 128,
+  "nsub": 10,
+  "seed": 1234
+ },
+ "sigma_F": 0.0039,
+ "ticks": {
+  "100": {
+   "base0": {
+    "step_E": 100.0,
+    "step_gain": 1.0,
+    "norm_A_gain": 0.0,
+    "norm_A_E": 3.248491095807318e-05,
+    "norm_y0": 0.0015138904091541617,
+    "variants": {
+     "true": {
+      "max_abs_dA_gain": 0.0,
+      "rel_dA_gain": NaN,
+      "max_abs_dA_E": 0.0,
+      "rel_dA_E": 0.0,
+      "max_abs_dy0": 0.0,
+      "rel_dy0": 0.0
+     },
+     "sF_indep": {
+      "max_abs_dA_gain": 0.0,
+      "rel_dA_gain": NaN,
+      "max_abs_dA_E": 2.7705835431146577e-06,
+      "rel_dA_E": 1.6930521778156533,
+      "max_abs_dy0": 0.0,
+      "rel_dy0": 0.0
+     },
+     "derived_15px": {
+      "max_abs_dA_gain": 0.0,
+      "rel_dA_gain": NaN,
+      "max_abs_dA_E": 9.629686949826577e-05,
+      "rel_dA_E": 34.20413521647702,
+      "max_abs_dy0": 0.0,
+      "rel_dy0": 0.0
+     }
+    },
+    "recovery": {
+     "all_true": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "all_sF_indep": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "all_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "Eonly_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "gainonly_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "y0only_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     }
+    }
+   },
+   "baseMid": {
+    "step_E": 1.0,
+    "step_gain": 0.01,
+    "norm_A_gain": 0.0,
+    "norm_A_E": 3.242678253236858e-05,
+    "norm_y0": 0.002745372485348783,
+    "variants": {
+     "true": {
+      "max_abs_dA_gain": 0.0,
+      "rel_dA_gain": NaN,
+      "max_abs_dA_E": 0.0,
+      "rel_dA_E": 0.0,
+      "max_abs_dy0": 0.0,
+      "rel_dy0": 0.0
+     },
+     "sF_indep": {
+      "max_abs_dA_gain": 0.0,
+      "rel_dA_gain": NaN,
+      "max_abs_dA_E": 2.7602324125242106e-06,
+      "rel_dA_E": 1.6955277847447223,
+      "max_abs_dy0": 0.0003599339431534787,
+      "rel_dy0": 2.5885989227355433
+     },
+     "derived_15px": {
+      "max_abs_dA_gain": 0.0,
+      "rel_dA_gain": NaN,
+      "max_abs_dA_E": 7.756128222247138e-05,
+      "rel_dA_E": 29.72506415406853,
+      "max_abs_dy0": 0.011341585890667805,
+      "rel_dy0": 49.892356385676116
+     }
+    },
+    "recovery": {
+     "all_true": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "all_sF_indep": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "all_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "Eonly_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "gainonly_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "y0only_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     }
+    }
+   },
+   "baseMid_secant": {
+    "step_E": 100.0,
+    "step_gain": 1.0,
+    "norm_A_gain": 0.0,
+    "norm_A_E": 3.2398903982975156e-05,
+    "norm_y0": 0.002745372485348783,
+    "variants": {
+     "true": {
+      "max_abs_dA_gain": 0.0,
+      "rel_dA_gain": NaN,
+      "max_abs_dA_E": 0.0,
+      "rel_dA_E": 0.0,
+      "max_abs_dy0": 0.0,
+      "rel_dy0": 0.0
+     },
+     "sF_indep": {
+      "max_abs_dA_gain": 0.0,
+      "rel_dA_gain": NaN,
+      "max_abs_dA_E": 2.75199611260768e-06,
+      "rel_dA_E": 1.6966778568353815,
+      "max_abs_dy0": 0.0003599339431534787,
+      "rel_dy0": 2.5885989227355433
+     },
+     "derived_15px": {
+      "max_abs_dA_gain": 0.0,
+      "rel_dA_gain": NaN,
+      "max_abs_dA_E": 6.708806110809929e-05,
+      "rel_dA_E": 27.981542313323843,
+      "max_abs_dy0": 0.011341585890667805,
+      "rel_dy0": 49.892356385676116
+     }
+    },
+    "recovery": {
+     "all_true": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "all_sF_indep": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "all_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "Eonly_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "gainonly_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "y0only_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     }
+    }
+   },
+   "baseTrue": {
+    "step_E": 1.0,
+    "step_gain": 0.01,
+    "norm_A_gain": 0.0,
+    "norm_A_E": 3.247477639623156e-05,
+    "norm_y0": 0.0015713945687548848,
+    "variants": {
+     "true": {
+      "max_abs_dA_gain": 0.0,
+      "rel_dA_gain": NaN,
+      "max_abs_dA_E": 0.0,
+      "rel_dA_E": 0.0,
+      "max_abs_dy0": 0.0,
+      "rel_dy0": 0.0
+     },
+     "sF_indep": {
+      "max_abs_dA_gain": 0.0,
+      "rel_dA_gain": NaN,
+      "max_abs_dA_E": 2.7577209941176406e-06,
+      "rel_dA_E": 1.6932409558823271,
+      "max_abs_dy0": 0.00041402130444867513,
+      "rel_dy0": 4.981395838255914
+     },
+     "derived_15px": {
+      "max_abs_dA_gain": 0.0,
+      "rel_dA_gain": NaN,
+      "max_abs_dA_E": 6.859711110984712e-05,
+      "rel_dA_E": 29.710758471061425,
+      "max_abs_dy0": 0.013332494435474601,
+      "rel_dy0": 92.0146215068407
+     }
+    },
+    "recovery": {
+     "all_true": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "all_sF_indep": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "all_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "Eonly_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "gainonly_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "y0only_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     }
+    }
+   }
+  },
+  "210": {
+   "base0": {
+    "step_E": 100.0,
+    "step_gain": 1.0,
+    "norm_A_gain": 0.0,
+    "norm_A_E": 6.399599380367564e-05,
+    "norm_y0": 0.012675791838542257,
+    "variants": {
+     "true": {
+      "max_abs_dA_gain": 0.0,
+      "rel_dA_gain": NaN,
+      "max_abs_dA_E": 0.0,
+      "rel_dA_E": 0.0,
+      "max_abs_dy0": 0.0,
+      "rel_dy0": 0.0
+     },
+     "sF_indep": {
+      "max_abs_dA_gain": 0.0,
+      "rel_dA_gain": NaN,
+      "max_abs_dA_E": 2.7800319030857336e-06,
+      "rel_dA_E": 0.8619776865777217,
+      "max_abs_dy0": 0.0,
+      "rel_dy0": 0.0
+     },
+     "derived_15px": {
+      "max_abs_dA_gain": 0.0,
+      "rel_dA_gain": NaN,
+      "max_abs_dA_E": 0.0001463938218097949,
+      "rel_dA_E": 27.184275638578345,
+      "max_abs_dy0": 0.0,
+      "rel_dy0": 0.0
+     }
+    },
+    "recovery": {
+     "all_true": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "all_sF_indep": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "all_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "Eonly_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "gainonly_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "y0only_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     }
+    }
+   },
+   "baseMid": {
+    "step_E": 1.0,
+    "step_gain": 0.01,
+    "norm_A_gain": 0.0,
+    "norm_A_E": 6.398929427033472e-05,
+    "norm_y0": 0.01336827377784234,
+    "variants": {
+     "true": {
+      "max_abs_dA_gain": 0.0,
+      "rel_dA_gain": NaN,
+      "max_abs_dA_E": 0.0,
+      "rel_dA_E": 0.0,
+      "max_abs_dy0": 0.0,
+      "rel_dy0": 0.0
+     },
+     "sF_indep": {
+      "max_abs_dA_gain": 0.0,
+      "rel_dA_gain": NaN,
+      "max_abs_dA_E": 2.7697482948285668e-06,
+      "rel_dA_E": 0.8620110157716867,
+      "max_abs_dy0": 0.0003611637623878172,
+      "rel_dy0": 0.5333036658493865
+     },
+     "derived_15px": {
+      "max_abs_dA_gain": 0.0,
+      "rel_dA_gain": NaN,
+      "max_abs_dA_E": 0.0001325415041950606,
+      "rel_dA_E": 22.434118478091428,
+      "max_abs_dy0": 0.014697958070729322,
+      "rel_dy0": 15.629378238991935
+     }
+    },
+    "recovery": {
+     "all_true": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "all_sF_indep": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "all_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "Eonly_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "gainonly_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "y0only_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     }
+    }
+   },
+   "baseMid_secant": {
+    "step_E": 100.0,
+    "step_gain": 1.0,
+    "norm_A_gain": 0.0,
+    "norm_A_E": 6.398769865167709e-05,
+    "norm_y0": 0.01336827377784234,
+    "variants": {
+     "true": {
+      "max_abs_dA_gain": 0.0,
+      "rel_dA_gain": NaN,
+      "max_abs_dA_E": 0.0,
+      "rel_dA_E": 0.0,
+      "max_abs_dy0": 0.0,
+      "rel_dy0": 0.0
+     },
+     "sF_indep": {
+      "max_abs_dA_gain": 0.0,
+      "rel_dA_gain": NaN,
+      "max_abs_dA_E": 2.761587425130774e-06,
+      "rel_dA_E": 0.8619952830073032,
+      "max_abs_dy0": 0.0003611637623878172,
+      "rel_dy0": 0.5333036658493865
+     },
+     "derived_15px": {
+      "max_abs_dA_gain": 0.0,
+      "rel_dA_gain": NaN,
+      "max_abs_dA_E": 8.771194030205154e-05,
+      "rel_dA_E": 20.00999171958554,
+      "max_abs_dy0": 0.014697958070729322,
+      "rel_dy0": 15.629378238991935
+     }
+    },
+    "recovery": {
+     "all_true": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "all_sF_indep": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "all_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "Eonly_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "gainonly_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "y0only_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     }
+    }
+   },
+   "baseTrue": {
+    "step_E": 1.0,
+    "step_gain": 0.01,
+    "norm_A_gain": 0.0,
+    "norm_A_E": 6.39919535346508e-05,
+    "norm_y0": 0.012618507218506877,
+    "variants": {
+     "true": {
+      "max_abs_dA_gain": 0.0,
+      "rel_dA_gain": NaN,
+      "max_abs_dA_E": 0.0,
+      "rel_dA_E": 0.0,
+      "max_abs_dy0": 0.0,
+      "rel_dy0": 0.0
+     },
+     "sF_indep": {
+      "max_abs_dA_gain": 0.0,
+      "rel_dA_gain": NaN,
+      "max_abs_dA_E": 2.767256647162597e-06,
+      "rel_dA_E": 0.8622672891324833,
+      "max_abs_dy0": 0.0004057016055226681,
+      "rel_dy0": 0.6222016711699421
+     },
+     "derived_15px": {
+      "max_abs_dA_gain": 0.0,
+      "rel_dA_gain": NaN,
+      "max_abs_dA_E": 0.00011095332679100789,
+      "rel_dA_E": 22.289526040171378,
+      "max_abs_dy0": 0.018070732303410664,
+      "rel_dy0": 17.374832886163503
+     }
+    },
+    "recovery": {
+     "all_true": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "all_sF_indep": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "all_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "Eonly_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "gainonly_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     },
+     "y0only_derived15": {
+      "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.",
+      "drop_E": {
+       "error": "_LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular."
+      }
+     }
+    }
+   }
+  }
+ },
+ "wall_seconds": 289.88458156585693
+}

@@ -1,0 +1,21 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[   36.0s] planted E [40.0, 216.3] median 128.0; 3 beats of 150 frames
+[   36.0s]   candidate                       beat1 STAT  accept 3-tick            limiting                          per-beat
+[   59.4s]   uniform E=66.2                        1.88           8.29      peak_excursion                [1.88, 7.24, 8.29]
+[   82.6s]   uniform E=78.3                        1.79           5.72      peak_excursion                [1.79, 4.57, 5.72]
+[  105.7s]   uniform E=86.2                        1.08           6.04      peak_excursion                [1.08, 3.87, 6.04]
+[  128.8s]   uniform E=92.6                        0.75           5.20      peak_excursion                 [0.75, 2.62, 5.2]
+[  151.9s]   uniform E=100.0                       0.30           6.56      peak_excursion                 [0.3, 1.56, 6.56]
+[  175.0s]   uniform E=109.5                       2.30           3.58      peak_excursion                 [2.3, 1.78, 3.58]
+[  198.2s]   uniform E=128.4                       3.82           5.01      peak_excursion                [3.82, 5.01, 2.04]
+[  221.3s]   theta_true (control)                  0.00           0.00         path_length                   [0.0, 0.0, 0.0]
+[  244.6s]   gain x1.05, E true (control)          4.22           4.22      peak_excursion                [4.22, 4.17, 3.09]
+[  244.6s] 
+  best uniform impostor on ONE beat : uniform E=100.0 at 0.30 steps
+[  244.6s]   best uniform impostor on THREE beats: uniform E=109.5 at 3.58 steps (accept, 3 ticks)
+[  244.6s]   the null (knowing nothing): 6.65 steps
+[  244.6s]   -> p1v_long_impostor.json

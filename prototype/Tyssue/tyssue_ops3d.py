@@ -995,6 +995,13 @@ class TopoSnapshot3D(Structural):
             # plateaued at 98.5% of its array reported buf_full False. The flag existed, the
             # counter existed, and the one structure anybody reads afterwards did not have them.
             div_blocked=int(m.get("div_blocked") or 0),
+            # CUMULATIVE DEATHS, for the same reason div_blocked is here: apoptosis_3d counts
+            # every extrusion on the mesh and nothing carried it into the history, so the only
+            # visible trace of a death was the cell COUNT -- which cannot distinguish "nothing
+            # died" from "deaths were masked by divisions". Measured on r019_02_apop_small: cells
+            # went 2000 -> 3089 with death running, and on r019_02_apop_low they held at 2000 with
+            # death running and nothing dying. Both read identically from the count alone.
+            n_apop=int(m.get("n_apop") or 0),
             buf_full=bool(m.get("buf_full"))))
         return {}
 

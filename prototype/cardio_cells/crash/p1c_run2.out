@@ -65,3 +65,248 @@
   period 300 (drive x2 slower)   (warmup 330, window 300)
 [  454.7s]            E  path_length peak_excurs orientation coordinatio     STAT  loopscore   peak_exc
 [  470.0s]       100.00         0.71        0.17        0.50        0.01     0.71     0.5552   0.014199
+[  485.2s]       109.89         1.12        3.06        0.68        0.01     3.06     0.4482   0.013834
+[  502.3s]       120.76         5.64        5.60        0.70        0.01     5.64     0.4554   0.013513
+[  527.7s]       132.70         7.08        8.08        0.93        0.02     8.08     0.3544   0.013200
+[  553.3s]       145.82        10.52       12.31        0.83        0.02    12.31     0.4392   0.012665
+[  578.5s]       160.24        12.46       20.19        0.71        0.03    20.19     0.4636   0.011670
+[  598.1s]       176.09        15.09       19.84        0.76        0.04    19.84     0.4320   0.011714
+[  613.4s]       193.50        19.47       23.01        0.92        0.06    23.01     0.4137   0.011314
+[  628.5s]       212.64        21.78       27.71        1.11        0.07    27.71     0.4205   0.010720
+[  643.7s]       233.67        22.93       24.69        1.23        0.08    24.69     0.3579   0.011101
+[  659.0s]       256.78        25.58       31.45        1.21        0.09    31.45     0.3884   0.010247
+[  674.7s]       282.17        27.06       34.47        1.36        0.12    34.47     0.3036   0.009865
+[  690.4s]       310.07        27.07       31.05        1.51        0.17    31.05     0.2614   0.010297
+[  705.9s]       340.74        27.33       32.77        1.43        0.18    32.77     0.1979   0.010080
+[  721.2s]       374.43        28.98       35.60        1.73        0.20    35.60     0.1962   0.009723
+[  736.5s]       411.46        30.52       37.33        1.92        0.27    37.33     0.3391   0.009503
+[  751.9s]       452.15        31.63       40.41        2.26        0.29    40.41     0.2589   0.009115
+[  767.2s]       496.87        32.56       41.28        2.52        0.35    41.28     0.3151   0.009005
+[  782.5s]       546.00        36.08       41.11        2.72        0.48    41.11     0.3475   0.009026
+[  797.8s]       600.00        36.80       44.51        2.75        0.57    44.51     0.3761   0.008596
+[  797.8s]     argmax of peak_excursion at E = 100.0  (at an endpoint);  amplitude range 0.00859631 .. 0.0141989 = 65.2%
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[  814.9s] 
+  drag 3 (x10 less)   (warmup 180, window 150)
+[  814.9s]            E  path_length peak_excurs orientation coordinatio     STAT  loopscore   peak_exc
+[  822.6s]       100.00         4.31        3.95        0.75        0.04     4.31     0.4880   0.022750
+[  830.3s]       109.89         5.68        0.26        0.81        0.03     5.68     0.4803   0.023281
+[  838.0s]       120.76         4.77        0.80        0.65        0.03     4.77     0.5022   0.023148
+[  845.7s]       132.70         1.66        9.21        0.55        0.16     9.21     0.4721   0.024413
+[  853.5s]       145.82         0.94        9.37        0.80        0.23     9.37     0.3861   0.024433
+[  861.2s]       160.24         4.03       14.59        0.95        0.31    14.59     0.2263   0.025092
+[  869.0s]       176.09         2.15       17.13        1.39        0.52    17.13     0.1757   0.025414
+[  876.7s]       193.50         4.42       14.44        1.12        0.60    14.44     0.1173   0.025074
+[  884.4s]       212.64        11.16       26.53        1.19        0.77    26.53     0.0691   0.026601
+[  892.1s]       233.67        14.23       26.10        1.34        0.92    26.10    -0.0969   0.026547
+[  899.8s]       256.78        20.89       38.07        1.47        0.90    38.07    -0.1572   0.028060
+[  907.4s]       282.17        22.29       46.02        1.74        1.00    46.02    -0.2212   0.029064
+[  915.1s]       310.07        25.21       53.30        1.99        1.14    53.30    -0.2957   0.029984
+[  922.8s]       340.74        21.74       55.47        1.96        1.23    55.47    -0.3774   0.030258
+[  930.5s]       374.43        23.66       60.97        2.13        1.40    60.97    -0.4471   0.030952
+[  938.2s]       411.46        26.37       63.58        2.24        1.50    63.58    -0.4754   0.031282
+[  945.9s]       452.15        25.27       64.13        2.20        1.56    64.13    -0.4880   0.031353
+[  953.7s]       496.87        27.72       73.49        2.43        1.76    73.49    -0.4708   0.032534
+[  961.3s]       546.00        32.79       84.24        2.38        1.94    84.24    -0.5387   0.033894
+[  969.0s]       600.00        36.49       90.45        2.50        2.02    90.45    -0.5499   0.034678
+[  969.0s]     argmax of peak_excursion at E = 600.0  (at an endpoint);  amplitude range 0.0227502 .. 0.0346778 = 52.4%
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[  986.0s] 
+  drag 300 (x10 more)   (warmup 180, window 150)
+[  986.0s]            E  path_length peak_excurs orientation coordinatio     STAT  loopscore   peak_exc
+[  993.6s]       100.00         0.14        0.60        0.20        0.00     0.60     0.9278   0.002001
+[ 1001.3s]       109.89         0.23        0.56        0.22        0.00     0.56     0.9173   0.001996
+[ 1009.0s]       120.76         0.33        0.51        0.20        0.00     0.51     0.9036   0.001990
+[ 1016.7s]       132.70         0.38        0.33        0.21        0.00     0.38     0.8776   0.001968
+[ 1024.4s]       145.82         0.38        0.14        0.27        0.00     0.38     0.8480   0.001943
+[ 1032.2s]       160.24         0.37        0.06        0.29        0.00     0.37     0.8228   0.001918
+[ 1042.2s]       176.09         0.36        0.06        0.32        0.00     0.36     0.8063   0.001918
+[ 1055.0s]       193.50         0.40        0.18        0.31        0.00     0.40     0.7851   0.001948
+[ 1067.7s]       212.64         0.46        0.39        0.33        0.00     0.46     0.7579   0.001975
+[ 1080.4s]       233.67         0.57        0.33        0.36        0.01     0.57     0.7251   0.001968
+[ 1093.2s]       256.78         0.76        0.24        0.45        0.01     0.76     0.6899   0.001957
+[ 1106.1s]       282.17         0.87        0.05        0.55        0.01     0.87     0.6511   0.001932
+[ 1118.9s]       310.07         0.98        0.13        0.65        0.01     0.98     0.6112   0.001909
+[ 1131.7s]       340.74         1.06        0.29        0.68        0.01     1.06     0.5767   0.001889
+[ 1144.5s]       374.43         1.14        0.32        0.70        0.02     1.14     0.5432   0.001885
+[ 1157.3s]       411.46         1.21        0.34        0.73        0.02     1.21     0.5149   0.001883
+[ 1170.2s]       452.15         1.28        0.35        0.77        0.02     1.28     0.4931   0.001881
+[ 1209.3s]       496.87         1.37        0.37        0.82        0.02     1.37     0.4736   0.001879
+[ 1222.1s]       546.00         1.45        0.38        0.87        0.03     1.45     0.4541   0.001878
+[ 1234.8s]       600.00         1.47        0.39        0.89        0.16     1.47     0.4346   0.001876
+[ 1234.8s]     argmax of peak_excursion at E = 100.0  (at an endpoint);  amplitude range 0.00187634 .. 0.00200131 = 6.7%
+[ 1234.8s] 
+  DOES THE TURNING POINT MOVE?
+[ 1234.8s]     baseline  drag30 period150       argmax E =   212.6   sign changes 6   amplitude range  12.0%
+[ 1234.8s]     period 75 (drive x2 faster)      argmax E =   100.0   sign changes 0   amplitude range  47.6%
+[ 1234.8s]     period 300 (drive x2 slower)     argmax E =   100.0   sign changes 8   amplitude range  65.2%
+[ 1234.8s]     drag 3 (x10 less)                argmax E =   600.0   sign changes 6   amplitude range  52.4%
+[ 1234.8s]     drag 300 (x10 more)              argmax E =   100.0   sign changes 2   amplitude range   6.7%
+[ 1234.8s]   -> /workspace/Plexus/prototype/cardio_cells/crash/p1c_dense.json
+[ 1234.8s] 
+################################################################################################################
+#  REGIME
+################################################################################################################
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[ 1263.1s] 
+  baseline   spec {}
+[ 1263.1s]            E  path_length peak_excurs orientation coordinatio     STAT  loopscore   peak_exc
+[ 1276.0s]        20.00         0.54        5.07        0.72        1.01     5.07     0.3187   0.008930
+[ 1288.7s]        33.88         2.48        4.03        0.64        0.50     4.03     0.4892   0.009061
+[ 1301.5s]        57.38         1.49        1.44        0.36        0.12     1.49     0.6653   0.009388
+[ 1314.3s]        97.19         0.48        0.76        0.20        0.01     0.76     0.7887   0.009474
+[ 1327.1s]       164.62         0.16        5.76        0.34        0.10     5.76     0.6601   0.010299
+[ 1339.9s]       278.84         1.29        5.70        0.54        0.28     5.70     0.4872   0.010291
+[ 1352.7s]       472.31         2.90        0.26        1.03        0.58     2.90     0.3619   0.009538
+[ 1365.5s]       800.00         1.01        4.36        1.53        1.06     4.36     0.0561   0.010121
+[ 1390.9s]     E over x40: amplitude 15.3% (exponent +0.034, monotone False), STAT span 5.0 steps   |   gain 0.5 -> 2.0 moves amplitude x4.16
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[ 1418.9s] 
+  drag 0.3   spec {'drag_k': 0.3}
+[ 1418.9s]            E  path_length peak_excurs orientation coordinatio     STAT  loopscore   peak_exc
+[ 1431.6s]        20.00        22.00       15.21        2.01        4.06    22.00    -0.1028   0.026341
+[ 1444.4s]        33.88        11.46       18.41        2.26        1.90    18.41     0.1470   0.025937
+[ 1457.1s]        57.38         2.73       19.07        1.02        0.72    19.07     0.4207   0.025854
+[ 1469.9s]        97.19         2.66        1.84        0.67        0.05     2.66     0.7583   0.028031
+[ 1482.7s]       164.62         9.93       31.00        0.98        0.19    31.00     0.4693   0.032181
+[ 1495.3s]       278.84         7.96       44.97        2.12        0.69    44.97     0.2361   0.033945
+[ 1508.0s]       472.31        26.54       91.76        1.97        1.27    91.76     0.0168   0.039858
+[ 1520.6s]       800.00        46.57      128.30        2.11        2.96   128.30    -0.1045   0.044475
+[ 1545.9s]     E over x40: amplitude 72.0% (exponent +0.153, monotone False), STAT span 125.6 steps   |   gain 0.5 -> 2.0 moves amplitude x1.17
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[ 1574.1s] 
+  drag 3   spec {'drag_k': 3.0}
+[ 1574.1s]            E  path_length peak_excurs orientation coordinatio     STAT  loopscore   peak_exc
+[ 1586.8s]        20.00        13.80       21.99        2.10        4.12    21.99    -0.0513   0.020471
+[ 1599.6s]        33.88         7.56       18.42        1.72        2.34    18.42     0.1307   0.020922
+[ 1612.2s]        57.38         1.99       15.40        1.18        1.00    15.40     0.3592   0.021303
+[ 1625.0s]        97.19         3.60        6.61        0.72        0.05     6.61     0.4705   0.022414
+[ 1637.7s]       164.62         0.91       13.63        0.97        0.34    13.63     0.2039   0.024971
+[ 1650.4s]       278.84        21.54       40.29        1.72        1.00    40.29    -0.2289   0.028340
+[ 1663.2s]       472.31        25.49       71.75        2.30        1.65    71.75    -0.4871   0.032315
+[ 1675.9s]       800.00        47.31      123.65        2.40        2.17   123.65    -0.5025   0.038872
+[ 1701.6s]     E over x40: amplitude 89.9% (exponent +0.172, monotone True), STAT span 117.0 steps   |   gain 0.5 -> 2.0 moves amplitude x1.34
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[ 1729.8s] 
+  drag 300   spec {'drag_k': 300.0}
+[ 1729.8s]            E  path_length peak_excurs orientation coordinatio     STAT  loopscore   peak_exc
+[ 1742.6s]        20.00         0.61        0.27        0.63        0.00     0.63     0.7215   0.001891
+[ 1755.4s]        33.88         0.17        0.33        0.39        0.00     0.39     0.7613   0.001967
+[ 1768.2s]        57.38         0.27        0.25        0.29        0.00     0.29     0.8451   0.001957
+[ 1781.1s]        97.19         0.11        0.61        0.20        0.00     0.61     0.9278   0.002003
+[ 1793.9s]       164.62         0.37        0.12        0.30        0.00     0.37     0.8180   0.001911
+[ 1806.8s]       278.84         0.85        0.07        0.54        0.01     0.85     0.6563   0.001935
+[ 1819.5s]       472.31         1.32        0.36        0.79        0.02     1.32     0.4839   0.001880
+[ 1832.4s]       800.00         1.52        0.42        0.91        0.18     1.52     0.3654   0.001872
+[ 1857.9s]     E over x40: amplitude 7.0% (exponent -0.009, monotone False), STAT span 1.2 steps   |   gain 0.5 -> 2.0 moves amplitude x4.58
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[ 1886.0s] 
+  drag 3000   spec {'drag_k': 3000.0}
+[ 1886.0s]            E  path_length peak_excurs orientation coordinatio     STAT  loopscore   peak_exc
+[ 1898.7s]        20.00         1.00        1.81        0.17        2.33     2.33     0.6331   0.011985
+[ 1911.4s]        33.88         0.92        1.62        0.17        2.39     2.39     0.7179   0.012009
+[ 1924.4s]        57.38         0.60        1.24        0.16        2.26     2.26     0.7623   0.012057
+[ 1937.2s]        97.19         0.28        0.44        0.13        1.76     1.76     0.6303   0.012158
+[ 1950.1s]       164.62         0.05        1.99        0.14        1.46     1.99     0.2596   0.012465
+[ 1963.0s]       278.84         0.68        2.67        0.27        2.94     2.94    -0.1172   0.012550
+[ 1976.0s]       472.31         0.99        4.70        0.35        3.72     4.70    -0.1515   0.012807
+[ 1988.8s]       800.00      4507.25       39.71        0.54        4.08  4507.25    -0.7851   0.017231
+[ 2014.5s]     E over x40: amplitude 43.8% (exponent +0.068, monotone True), STAT span 4505.5 steps   |   gain 0.5 -> 2.0 moves amplitude x1.00
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[ 2043.0s] 
+  amplitude 5   spec {'amplitude': 5.0}
+[ 2043.0s]            E  path_length peak_excurs orientation coordinatio     STAT  loopscore   peak_exc
+[ 2055.8s]        20.00         1.47        0.00        1.07        0.90     1.47     0.4059   0.002894
+[ 2068.6s]        33.88         1.03        0.06        0.72        0.44     1.03     0.5359   0.002886
+[ 2081.3s]        57.38         0.35        0.54        0.50        0.04     0.54     0.7528   0.002963
+[ 2094.1s]        97.19         0.06        0.36        0.26        0.01     0.36     0.9202   0.002940
+[ 2106.9s]       164.62         0.57        0.62        0.29        0.02     0.62     0.8140   0.002816
+[ 2119.7s]       278.84         1.58        1.09        0.52        0.07     1.58     0.5527   0.002757
+[ 2132.5s]       472.31         2.21        1.83        0.79        0.44     2.21     0.3920   0.002663
+[ 2145.2s]       800.00         2.44        2.33        1.07        0.81     2.44     0.3043   0.002600
+[ 2171.1s]     E over x40: amplitude 13.9% (exponent -0.032, monotone False), STAT span 2.1 steps   |   gain 0.5 -> 2.0 moves amplitude x3.94
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[ 2199.5s] 
+  amplitude 80   spec {'amplitude': 80.0}
+[ 2199.5s]            E  path_length peak_excurs orientation coordinatio     STAT  loopscore   peak_exc
+[ 2212.3s]        20.00        28.62       55.08        1.02        5.42    55.08     0.2461   0.029431
+[ 2225.1s]        33.88        10.39       77.41        0.83        2.34    77.41     0.3162   0.026610
+[ 2237.9s]        57.38         1.48       39.31        0.67        0.83    39.31     0.4711   0.031424
+[ 2250.7s]        97.19         5.20       15.06        0.49        0.04    15.06     0.6787   0.034488
+[ 2263.5s]       164.62        14.69       54.83        0.69        0.27    54.83     0.5274   0.043319
+[ 2276.2s]       278.84        35.14       96.65        0.90        0.94    96.65     0.2540   0.048603
+[ 2289.0s]       472.31        74.51      180.12        1.26        1.36   180.12    -0.0529   0.059150
+[ 2302.0s]       800.00       106.60      247.24        1.20        1.69   247.24    -0.2667   0.067632
+[ 2327.7s]     E over x40: amplitude 154.2% (exponent +0.256, monotone False), STAT span 232.2 steps   |   gain 0.5 -> 2.0 moves amplitude x1.51
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[ 2343.2s] 
+  period 75   spec {'period': 75.0, 'duration': 15.0}
+[ 2343.2s]            E  path_length peak_excurs orientation coordinatio     STAT  loopscore   peak_exc
+[ 2349.6s]        20.00         0.15        2.22        0.85        0.27     2.22     0.4147   0.005770
+[ 2356.0s]        33.88         0.21        0.54        0.65        0.22     0.65     0.5970   0.005558
+[ 2362.3s]        57.38         0.94        0.04        0.45        0.02     0.94     0.7362   0.005484
+[ 2368.7s]        97.19         1.01        2.65        0.25        0.01     2.65     0.8938   0.005824
+[ 2375.2s]       164.62         0.05        0.67        0.36        0.04     0.67     0.8056   0.005574
+[ 2381.5s]       278.84         1.77        4.49        0.54        0.32     4.49     0.5677   0.004922
+[ 2387.8s]       472.31         3.92        9.49        0.75        0.45     9.49     0.4691   0.004290
+[ 2394.2s]       800.00         4.34       13.23        0.92        1.20    13.23     0.3257   0.003818
+[ 2407.1s]     E over x40: amplitude 52.5% (exponent -0.103, monotone False), STAT span 12.6 steps   |   gain 0.5 -> 2.0 moves amplitude x3.89
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[ 2460.9s] 
+  period 300   spec {'period': 300.0, 'duration': 60.0}
+[ 2460.9s]            E  path_length peak_excurs orientation coordinatio     STAT  loopscore   peak_exc
+[ 2486.4s]        20.00        42.74       49.26        1.13        0.94    49.26    -0.5537   0.020445
+[ 2511.9s]        33.88        32.74       50.78        1.06        0.37    50.78    -0.4228   0.020637
+[ 2537.6s]        57.38        20.75       24.29        0.79        0.06    24.29    -0.0352   0.017290
+[ 2563.2s]        97.19         0.51        0.67        0.56        0.01     0.67     0.5851   0.014305
+[ 2588.7s]       164.62        13.21       20.53        0.72        0.04    20.53     0.4300   0.011627
+[ 2614.3s]       278.84        26.75       34.03        1.30        0.12    34.03     0.3311   0.009921
+[ 2640.0s]       472.31        31.71       39.75        2.50        0.32    39.75     0.3244   0.009198
+[ 2665.6s]       800.00        33.85       47.70        3.23        0.69    47.70     0.2517   0.008193
+[ 2717.0s]     E over x40: amplitude 151.9% (exponent -0.278, monotone False), STAT span 50.1 steps   |   gain 0.5 -> 2.0 moves amplitude x2.95
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[ 2745.3s] 
+  duration 150 (always on)   spec {'duration': 150.0}
+[ 2745.3s]            E  path_length peak_excurs orientation coordinatio     STAT  loopscore   peak_exc
+[ 2758.1s]        20.00       249.73      379.63        1.09        4.46   379.63    -0.5730   0.061596
+[ 2771.0s]        33.88       148.09      204.05        0.90        2.61   204.05    -0.5261   0.039411
+[ 2783.8s]        57.38        63.24       87.37        0.80        0.85    87.37    -0.4494   0.024669
+[ 2796.6s]        97.19        10.85       15.33        0.54        0.08    15.33     0.4576   0.015566
+[ 2809.4s]       164.62        19.02       21.50        1.08        0.27    21.50     0.5039   0.010913
+[ 2822.3s]       278.84        32.93       47.31        2.16        1.25    47.31     0.4504   0.007651
+[ 2835.1s]       472.31        37.04       58.93        3.18        3.22    58.93     0.3733   0.006183
+[ 2847.8s]       800.00        35.53       61.30        4.38        4.43    61.30     0.3229   0.005883
+[ 2873.5s]     E over x40: amplitude 947.0% (exponent -0.668, monotone True), STAT span 364.3 steps   |   gain 0.5 -> 2.0 moves amplitude x4.55
+[ 2873.5s] 
+================================================================================================================
+  REGIME TABLE -- does E become visible anywhere?
+================================================================================================================
+[ 2873.5s]   config                      E span (steps)   E amp %  exponent  monotone  argmax E  gain x4 amp
+[ 2873.5s]   baseline                               5.0      15.3    +0.034     False     164.6         4.16
+[ 2873.5s]   drag 0.3                             125.6      72.0    +0.153     False     800.0         1.17
+[ 2873.5s]   drag 3                               117.0      89.9    +0.172      True     800.0         1.34
+[ 2873.5s]   drag 300                               1.2       7.0    -0.009     False      97.2         4.58
+[ 2873.5s]   drag 3000                           4505.5      43.8    +0.068      True     800.0         1.00
+[ 2873.5s]   amplitude 5                            2.1      13.9    -0.032     False      57.4         3.94
+[ 2873.5s]   amplitude 80                         232.2     154.2    +0.256     False     800.0         1.51
+[ 2873.5s]   period 75                             12.6      52.5    -0.103     False      97.2         3.89
+[ 2873.5s]   period 300                            50.1     151.9    -0.278     False      33.9         2.95
+[ 2873.5s]   duration 150 (always on)             364.3     947.0    -0.668      True      20.0         4.55
+[ 2873.5s]   -> /workspace/Plexus/prototype/cardio_cells/crash/p1c_regime.json
+[ 2873.5s] 
+################################################################################################################
+#  LONG
+################################################################################################################
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[ 2927.3s] 
+  3 beats (450 frames). Each beat is one TICK, so accept() applies.
+[ 2927.3s]   candidate                   1 beat STAT  3 beats STAT  accept() 3-tick            limiting
+[ 2965.9s]   uniform_E=planted_mean             3.82          1.63             5.01      peak_excursion
+[ 3004.3s]   uniform_E=40                       3.07         19.84            12.35      peak_excursion
+[ 3042.7s]   uniform_E=220                      9.10         15.99             9.10      peak_excursion
+[ 3081.2s]   uniform_E=800                      4.36         44.30            33.41      peak_excursion
+[ 3119.7s]   E_true, gain x1.05                 4.22          7.76             4.22      peak_excursion
+[ 3119.7s] 
+  the null, for reference: 6.65 steps
+[ 3119.7s]   -> /workspace/Plexus/prototype/cardio_cells/crash/p1c_long.json
+[ 3119.7s] done
