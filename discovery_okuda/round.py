@@ -1949,6 +1949,29 @@ def _clear_colliding_runs(quiet=False):
     return gone, moved
 
 
+def _campaign_rounds():
+    """The round ids already on record, in order. Empty on a fresh campaign."""
+    seen = []
+    if os.path.exists(RECORDS):
+        with open(RECORDS) as fh:
+            for line in fh:
+                try:
+                    r = json.loads(line)
+                except Exception:
+                    continue
+                if r.get("round") and r["round"] not in seen:
+                    seen.append(r["round"])
+    return sorted(seen)
+
+
+def _n_records():
+    """How many runs are on record."""
+    if not os.path.exists(RECORDS):
+        return 0
+    with open(RECORDS) as fh:
+        return sum(1 for _l in fh if _l.strip())
+
+
 def next_round_id():
     """The next unused round id, from the record itself. No separate counter to drift.
 
@@ -1980,11 +2003,27 @@ def campaign(rounds=1, mode="composition", n_slots=N_SLOTS, fresh=True):
     """
     if fresh:
         reset_campaign()
+    else:
+        # WHAT A RESUME INHERITED, SAID OUT LOUD. Cedric, 9 August: the header printed
+        # "round 1/40" on a resume and he read it as the campaign restarting from scratch --
+        # which is exactly the thing a resume must never leave in doubt. `k + 1` counts rounds in
+        # THIS INVOCATION; the campaign's position is `rid`, derived from the records. Both are
+        # now printed, and the records are described before the first round rather than left to
+        # be inferred from "31 recorded runs are repeats" ten lines later.
+        _done = _campaign_rounds()
+        if _done:
+            print(f"\n[campaign] RESUMING -- {len(_done)} round(s) on record ({_done[0]} .. "
+                  f"{_done[-1]}), {_n_records()} run(s). Nothing is reset: parents come from "
+                  f"these records, not from the pool, and closed sweeps stay closed.")
+        else:
+            print("\n[campaign] --resume asked for, but the records are empty: this will behave "
+                  "as a fresh campaign, seeding round 1 from the pool.")
     out = []
     for k in range(int(rounds)):
         rid = next_round_id()
-        print(f"\n{'=' * 78}\n[campaign] round {k + 1}/{rounds}: {rid} ({mode}, {n_slots} slots)"
-              f"\n{'=' * 78}")
+        _n = "".join(c for c in rid if c.isdigit())
+        print(f"\n{'=' * 78}\n[campaign] ROUND {int(_n) if _n else '?'}  ({rid})   "
+              f"-- {k + 1} of {rounds} this run, {mode}, {n_slots} slots\n{'=' * 78}")
         try:
             ctx = run_round(rid, mode=mode, n_slots=n_slots)
         except FlowError as e:
