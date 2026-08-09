@@ -1243,6 +1243,13 @@ class TopoSnapshot3D(Structural):
             # went 2000 -> 3089 with death running, and on r019_02_apop_low they held at 2000 with
             # death running and nothing dying. Both read identically from the count alone.
             n_apop=int(m.get("n_apop") or 0),
+            # WHICH CELLS ARE MARKED TO DIE, recorded for the same reason `age` is: a renderer
+            # cannot colour a state that only existed inside one frame's forward pass. Without it
+            # a dying cell is drawn exactly like a living one, the sheet closes over the gap, and
+            # the mechanism is invisible in the movie -- which is what happened: a 293-cell patch
+            # dying at the north pole could not be seen even looking straight down at it.
+            apop=(np.asarray(m["apop_flag"]).copy()
+                  if isinstance(m.get("apop_flag"), np.ndarray) else None),
             buf_full=bool(m.get("buf_full"))))
         return {}
 

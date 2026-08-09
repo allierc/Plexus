@@ -56,6 +56,11 @@ LOCAL = os.path.join(_ROOT, "log")
 # CYAN, BECAUSE NOTHING ELSE IN THIS PANEL IS. The stroma owns inferno, the membrane green-to-amber, the
 # cells white. A ruptured integrin goes red and is drawn as the straight line it no longer holds.
 SPRING = "#4aa3ff"
+# ORANGE FOR THE MATERIAL FIBRE, cyan for the spring, and the difference is not decoration: one is a
+# force with a target reconstructed from the operator's arithmetic, the other is particles read off the
+# trajectory. `flat_test` and `flat_mpm` already draw fibres orange against a blue sheet, so the two
+# rigs and the spheroid now say the same thing with the same colours.
+FIBRE = "#f0913a"
 BROKEN = "#e0452b"
 
 
@@ -130,8 +135,15 @@ def render(run, frames=150, zoom_half=2.2, slab_cells=0.35, teeth=5, fps=15, max
     spec = yaml.safe_load(open(os.path.join(d, "spec_run.yaml")))
     ops = {o["op"]: o for o in spec["operators"] if isinstance(o, dict) and "op" in o}
     ia = ops.get("integrin_adhesion")
-    if ia is None:
-        sys.exit(f"{run}: no integrin_adhesion in the spec -- there are no springs to draw")
+    # TWO KINDS OF INTEGRIN, ONE PANEL. The spring version is reconstructed from the operator's own
+    # arithmetic; the MPM version is drawn from the particles themselves, which are in `traj.npz`. A run
+    # has one or the other, and the label says which so the two are never read as the same picture.
+    seedop, trackop = ops.get("integrin_seed"), ops.get("integrin_track")
+    mpm_fibre = ia is None and seedop is not None
+    if ia is None and not mpm_fibre:
+        sys.exit(f"{run}: no integrin_adhesion and no integrin_seed -- there are no fibres to draw")
+    ia = ia or dict(trackop or seedop, offset=float(seedop.get("length", 0.004)), k=0.0,
+                    fraction=1.0, detach=0.0, tau_adh=0.0)
     surf = _local(str(ia["surface"]))
     scale = float(ia.get("scale", 1.0))
     offset = float(ia.get("offset", 0.004))
@@ -145,6 +157,10 @@ def render(run, frames=150, zoom_half=2.2, slab_cells=0.35, teeth=5, fps=15, max
     smap = np.asarray(z["smap"], np.float32)            # TISSUE units, as the renderer wants it
     Tis = RD.load_tissue(surf, scale)
     tr = np.load(os.path.join(d, "traj.npz"))
+    IP = np.asarray(tr["ipos"]) if "ipos" in tr.files else None
+    ipf = (np.asarray(tr["ipos_frames"], int) if "ipos_frames" in tr.files
+           else (np.arange(IP.shape[0]) if IP is not None else None))
+    n_layer = int(seedop.get("layers", 3)) if seedop is not None else 0
     pos, band_all = np.asarray(tr["pos"]), np.asarray(tr["stress"])
     P = np.asarray(tr["mpos"])
     mst = np.asarray(tr["mstrain"], np.float32)
@@ -236,7 +252,7 @@ def render(run, frames=150, zoom_half=2.2, slab_cells=0.35, teeth=5, fps=15, max
             for ax, half in ((axw, None), (axz, zoom_half)):
                 ax.clear(); ax.set_facecolor("black")
                 RD.draw_cross(ax, mt, vp, q, band_all[t], cmap, L2, np.eye(3)[2],
-                              slab if half else 0.055 / scale, dot_scale=2.6 if half else 1.0,
+                              slab if half else 0.055 / scale, dot_scale=5.0 if half else 1.0,
                               mem=mem, zoom_half=half)
             # THE WINDOW HOLDS THE SURFACE AND THE SHEET, whatever the distance between them. Centring
             # on the sheet's mean radius fails on the two runs that most need the panel: 125 sags 6.6
@@ -259,6 +275,55 @@ def render(run, frames=150, zoom_half=2.2, slab_cells=0.35, teeth=5, fps=15, max
             # nothing attaches. The cell end of an integrin is IN the basal membrane, at R. The rest
             # position is a length along the fibre, not a place to hang it from, so the drawing starts
             # at R and the fibre's own length shows as how far the sheet sits from that end.
+            if mpm_fibre:
+                # THE FIBRE AS IT IS, not as it was asked to be: inner particle to outer particle, the
+                # two ends of the material column. Nothing is reconstructed here.
+                j = int(np.argmin(np.abs(ipf - t)))
+                Q = (IP[j] - c) / scale
+                nf = Q.shape[0] // max(n_layer, 1)
+                qm_i, qa_i = Q[:nf], Q[(n_layer - 1) * nf: n_layer * nf]
+                selF = np.abs(qm_i @ dvec) < slab
+                A2 = np.stack([qa_i[selF] @ uvec, qa_i[selF] @ vvec], 1)
+                B2 = np.stack([qm_i[selF] @ uvec, qm_i[selF] @ vvec], 1)
+                lo, hi = axz.get_xlim(), axz.get_ylim()
+                # lo IS THE X LIMITS AND hi THE Y LIMITS. Comparing an x against hi[1] asks whether
+                # a radius of 16 is below 2.2, which is never, so the first version of this drew
+                # "0 of 0" fibres on a frame that had four thousand of them.
+                w2 = ((np.minimum(A2[:, 0], B2[:, 0]) < lo[1] + 1)
+                      & (np.maximum(A2[:, 0], B2[:, 0]) > lo[0] - 1)
+                      & (np.minimum(A2[:, 1], B2[:, 1]) < hi[1] + 1)
+                      & (np.maximum(A2[:, 1], B2[:, 1]) > hi[0] - 1))
+                Aq, Bq = B2[w2], A2[w2]
+                n_win = len(Aq)
+                if n_win > max_springs:
+                    Aq, Bq = Aq[::int(np.ceil(n_win / max_springs))], \
+                        Bq[::int(np.ceil(n_win / max_springs))]
+                # THE PARTICLES, NOT A CARTOON OF THEM. A zig-zag is the right drawing for the
+                # spring version, where the operator's force IS a line between two points and there is
+                # nothing else to show. Here the fibre is material: its state is where its particles
+                # are, and a spring glyph drawn over them would assert a connection MPM does not have
+                # -- which is precisely what 142 disproved (inner ends at 0.2969, outer at 0.0875, no
+                # coupling whatever). So the fibre is drawn as what it is.
+                selA = np.abs(Q @ dvec) < slab
+                fx_, fy_ = Q[selA] @ uvec, Q[selA] @ vvec
+                inwin = ((fx_ > lo[0]) & (fx_ < lo[1]) & (fy_ > hi[0]) & (fy_ < hi[1]))
+                n_win = int(inwin.sum())
+                if n_win:
+                    axz.scatter(fx_[inwin], fy_[inwin], s=16.0, c=FIBRE, marker=".",
+                                linewidths=0, zorder=6, alpha=0.95)
+                Aq = fx_[inwin]
+                lab = (f"{run}\nframe {t}   {int(mt['nF'])} cells\n"
+                       f"standoff {stat[-1][1]:+.4f} box units (0 = on the surface)\n"
+                       f"MPM fibre particles (orange)\n"
+                       f"rest length {offset:g} box = {offset/scale:.2f} tissue units\n"
+                       f"{n_win} in window, +/-{half:.1f} tissue units")
+                bb = dict(facecolor="black", alpha=0.55, edgecolor="none", pad=4.0)
+                axz.text(0.02, 0.98, lab, transform=axz.transAxes, color="white", fontsize=11,
+                         va="top", ha="left", linespacing=1.5, zorder=8, bbox=bb)
+                axw.text(0.02, 0.98, "whole section", transform=axw.transAxes, color="white",
+                         fontsize=11, va="top", zorder=8, bbox=bb)
+                wri.grab_frame()
+                continue
             qa = u * (R[:, None])
             sel = anchored & live & (np.abs(qm @ dvec) < slab)
             x0, y0 = qm[sel] @ uvec, qm[sel] @ vvec

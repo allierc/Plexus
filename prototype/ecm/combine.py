@@ -102,7 +102,12 @@ def build(name, tissue_npz, fit=FIT, plate_box=None, **ecm):
         if o["op"] == "seed_ecm" and gap_box is not None:
             o["plate_half"] = gap_box
         if o["op"] in ("integrin_adhesion", "surface_track", "mpm_tissue_boundary",
-                       "basement_membrane_contact", "adhesion_seed", "adhesion_pull"):
+                       "basement_membrane_contact", "adhesion_seed", "adhesion_pull",
+                       # AND THE MPM FIBRES, for exactly the reason the comment below records for the
+                       # seed. Left off this list they were placed at the map's TISSUE radius, 4.65 in
+                       # a box 1.0 wide, and the first smoke test reported a standoff of -4.57 box
+                       # units. A membership list is a thing a new operator forgets to join.
+                       "integrin_seed", "integrin_track"):
             # `surface_track` is on this list for the same reason the two below it are: it reads the
             # pass-1 map, which is in TISSUE units, and only `combine` knows the tissue-to-box scale.
             o["scale"] = s
