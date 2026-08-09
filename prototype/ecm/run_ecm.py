@@ -784,6 +784,18 @@ def run(name, spec, device="cuda:0", movie=True, keep_traj=True, render_kw=None)
                           f"{out['sets']['basement_membrane_particle']['pos'].shape[0]} frames, "
                           f"first and last kept)", flush=True)
                 extra["mpos"] = _mp
+            # THE INTEGRIN SET, when the fibres are MPM material rather than a force with a target.
+            # Without it a re-render draws a sheet held by nothing visible, and the one measurement the
+            # design is for -- what the fibre's length actually does -- cannot be made after the fact.
+            if "integrin_particle" in out.get("sets", {}):
+                _ip = np.asarray(out["sets"]["integrin_particle"]["pos"], np.float32)
+                _st2 = max(1, int(np.ceil(_ip.shape[0] * _ip.shape[1] * 12 / 400e6)))
+                if _st2 > 1:
+                    _k2 = np.unique(np.r_[np.arange(0, _ip.shape[0], _st2), _ip.shape[0] - 1])
+                    _ip = _ip[_k2]
+                    extra["ipos_frames"] = _k2.astype(np.int32)
+                extra["ipos"] = _ip
+                print(f"[{name}] integrin fibres: {_ip.shape[1]} particles recorded", flush=True)
                 if membrane_ops.MEMBRANE_STRAIN:
                     extra["mstrain"] = np.asarray(membrane_ops.MEMBRANE_STRAIN, np.float16)
                 # WHICH PARTICLES ARE MEMBRANE AND WHICH ARE UNSECRETED RESERVE. With `reserve = 8`,

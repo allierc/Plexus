@@ -158,6 +158,9 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                # the same adhesion, kept on the grid route but RECOMPUTED at every substep, so the
                # stability limit is dt_sub*sqrt(k) instead of dt_frame*sqrt(k) -- 400x the stiffness.
                membrane_adhesion_substep=False,
+               # THE INTEGRIN AS AN MPM BODY (0 = off, which is every run to 141). `integrin_length` 0
+               # means "the same standoff the spring version uses", so the two are comparable.
+               n_integrins=0, integrin_layers=3, integrin_length=0.0, integrin_youngs=400.0,
                # adhesions rupture under load: `detach` is the displacement at which one lets go.
                membrane_detach=0.0,
                # THE TISSUE AS A MOVING BOUNDARY ON THE GRID, rather than a positional projection.
@@ -414,6 +417,38 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
         # extrapolates to 7.3e-5 and a standoff of +0.0039 -- the fibre's rest length, with F intact.
         # Correct only since the engine restores the outer delta at each substep; before that an
         # operator in here accumulated 1x to 20x within a frame.
+        # THE INTEGRIN AS MATERIAL. A third MPM body: `n_integrins` fibres of `integrin_layers`
+        # particles each, cell end prescribed on the recorded surface, outer end sitting in the sheet.
+        # It reaches the membrane the way the stroma does -- `mpm_scatter[accumulate]` into the shared
+        # grid -- so no operator couples them and the sheet's own F sees the load. The MPM tokens in the
+        # schedule run every instance of their name, so declaring the cycle here is enough; only
+        # `integrin_track` needs placing, and it goes at the END of the substep list so the prescribed
+        # row is re-pinned after each gather has moved it.
+        if n_integrins > 0:
+            import integrin_ops                                       # noqa: F401  register them
+            L_fib = float(integrin_length if integrin_length > 0 else membrane_offset)
+            spec["sets"]["integrin_particle"] = {
+                "parent": "cell", "per_parent": int(n_integrins * integrin_layers),
+                "radius": 0.48, "density": float(density),
+                "types": {"i0": {"fraction": 1.0, "youngs": float(integrin_youngs)}}}
+            spec["operators"] += [
+                {"op": "integrin_seed", "at": "integrin_particle", "centre": [0.5, 0.5, 0.5],
+                 "surface": str(membrane), "scale": 1.0, "length": L_fib,
+                 "layers": int(integrin_layers), "seed": int(seed)},
+                {"op": "integrin_track", "at": "integrin_particle", "centre": [0.5, 0.5, 0.5],
+                 "surface": str(membrane), "scale": 1.0},
+                {"op": "mpm_strain", "at": "integrin_particle"},
+                {"op": "mpm_scatter", "at": "integrin_particle", "to": "mpm_grid",
+                 "implementation": "accumulate", "drag": float(drag), "a_max": float(a_max)},
+                {"op": "mpm_gather", "at": "integrin_particle", "from": "mpm_grid",
+                 "wall_damp": float(wall_damp), "wall_contact": 0.04, "vmax": 1.0e9},
+            ]
+            spec["schedule"].insert(spec["schedule"].index("seed_basement_membrane") + 1,
+                                    "integrin_seed")
+            for _st in spec["schedule"]:
+                if isinstance(_st, dict) and "substep_dt" in _st:
+                    _st["steps"].append("integrin_track")
+                    break
         if membrane_adhesion_substep and "integrin_adhesion" in spec["schedule"]:
             spec["schedule"] = [s for s in spec["schedule"] if s != "integrin_adhesion"]
             for _st in spec["schedule"]:

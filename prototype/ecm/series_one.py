@@ -574,6 +574,28 @@ SERIES = {
                              membrane_particles=90000, membrane_reserve=1.0,
                              membrane_secrete_rate=0.0),
 
+    # 142/143: THE INTEGRIN AS MPM MATERIAL, on the spheroid. No `integrin_adhesion` at all
+    #     (`membrane_adhesion = 0`): the sheet is held only by 4,000 fibres of 3 particles each, whose
+    #     cell ends are prescribed on the recorded surface and whose load reaches the membrane through
+    #     the shared grid. 142 is at the biological length (0.004 box, L/dx = 0.19) and is EXPECTED TO
+    #     BE A NULL -- the flat rig says a fibre shorter than a cell changes nothing, because the grid
+    #     hands both bodies one velocity and they cannot move relative to each other whatever material
+    #     lies between (tension test: 0.0030 box with the fibre, 0.0030 without, 0.0030 with it deleted).
+    #     143 is the positive control at L = 2*dx = 0.0417, where the same rig shows the fibre carrying
+    #     the load (0.0030 against 0.0261 without it) -- and where the standoff it sets is 2.3 tissue
+    #     units, ten times a basement membrane. Between them they say whether this design can exist at a
+    #     grid we can afford, which is the question INTEGRIN_DESIGN.md never asked before proposing it.
+    "142_mpm_integrin": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=False,
+                             membrane_contact_k=0.0, membrane_exclude=False, membrane_adhesion=0.0,
+                             n_integrins=4000, integrin_layers=3, integrin_length=0.004,
+                             integrin_youngs=400.0, membrane_offset=0.004,
+                             membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
+    "143_mpm_integrin_2dx": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=False,
+                                 membrane_contact_k=0.0, membrane_exclude=False, membrane_adhesion=0.0,
+                                 n_integrins=4000, integrin_layers=3, integrin_length=0.0417,
+                                 integrin_youngs=400.0, membrane_offset=0.0417,
+                                 membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
+
     "_unused_secrete_dense": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
                              membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
                              membrane_particles=90000, membrane_reserve=1.0,
