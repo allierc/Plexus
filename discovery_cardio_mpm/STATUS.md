@@ -52,12 +52,17 @@ in `HYPOTHESES.md` as open questions; `BELIEFS.md` has zero entries. Defaults co
 | 0 — make it run, make it repeat | **done** | gate 18/18, canaries 6/6; seeded, provenanced, ledger stripped from the source |
 | 1 — freeze the recording, seal the test | **done (7 of 7)** | the ceiling, the tracker floor, the resolution ladder, the frozen+sealed split, `PREMISES.md` (2 of 8 fail, recorded not waived) |
 | 1b — the corpus we already own | **done** | 8 recipes migrated; **the operator merge is NOT behaviour-preserving** |
-| 2 — certify the ruler, find the floor | **the instruments are DONE** | the null bank is measured: **the bar is +0.851 on the fit beat, +0.62 held-out** — copying the previous beat, no physics. **STOP point** |
-| 3 — certify the gradient | not started | the language-vs-switches decision |
+| 2 — certify the ruler, find the floor | **done for real 2026-08-09** | 4 instruments CERTIFIED (nothing was promoted until then — see §6 warning). Null bank: bar +0.851 on the fit beat, +0.62 held-out. **STOP point** |
+| 3 — certify the gradient | not started | the language-vs-switches decision. **Now the leading route — see §10** |
 | 4 — what a fit may claim, build the gate | not started | **STOP point** |
 | 5–8 — first round, campaign, seal-break, method claim | not started | |
 
 **Registers:** 38 inherited hypotheses, all open · **0 beliefs** · 0 retractions.
+
+> **→ CURRENT STATE IS §10.** Everything after 2026-08-08 lives there: the acceptance statistic was
+> rebuilt, the amplitude gauge withdrawn, and a four-probe investigation settled that P1 is **not**
+> a gain verdict. §10 also records three errors in the P0 work itself, one of which mis-calibrates
+> every "distinguishable steps" number in this file.
 
 ---
 
@@ -156,6 +161,17 @@ The campaign reads loops on a **10×10 grid of the tissue**, comparing each node
 recording's. That stays — it is what a person judges.
 
 **THE INSTRUMENTS ARE CLOSED.** Seven measurements a claim may rest on: one name/definition/implementation each, each moves on its declared axis and holds on the other eight, each has a zero measured on six models that know nothing, each has the tissue's own beat-to-beat variation, and six of seven return the right number against a closed form. Every defect is recorded on the class that carries it, with the measurement that found it.
+
+> **⚠ THAT SENTENCE WAS FALSE FOR SIX DAYS, and it is the origin of everything in §10.** The
+> evidence was gathered and the promotion report said four were eligible, but **no metric was ever
+> promoted**: `tiers = {provisional: 14, withdrawn: 4}`, `admitted()` empty, so `Metric.cite()`
+> refused all seven. A check in the suite asserted exactly that (`add(..., not admitted())`) — a
+> Phase-2 placeholder that outlived Phase 2 and passed for as long as nothing was certified.
+> Consumers, finding nothing citable, fell back to `loopscore` (the *objective*, 1.6 steps) and
+> then built a gauge to make it behave. Closed for real on **2026-08-09**: four certified
+> (`orientation_error`, `coordination`, `peak_excursion`, `path_length`), each signed with its
+> evidence in the class. Three of the seven remain provisional on resolving power (`interior_r2`
+> 2.3, `openness` 3.3, `chirality_match` 2.3, against `MIN_LEVELS` 5).
 
 **THE FITTED FLOOR IS MEASURED, and it did what was predicted.** Seed-to-seed spread is **5–15× the beat-to-beat** floor (coordination 0.0384 vs 0.0025; openness 0.0340 vs 0.0030). Working unit = largest floor, so every `steps` fell:
 
@@ -304,3 +320,139 @@ note falls.**
 - **The archive is never the thing being overwritten.** Regeneration goes to a scratch root.
 - **Environment:** `/workspace/.conda_envs/neural-graph-linux/bin/python`,
   `PYTHONPATH=/workspace/Plexus/src`. `git push` may need `--no-verify` (git-lfs absent).
+
+---
+
+## 10. 2026-08-09 — P0 closed, and P1 is NOT a gain verdict
+
+*Written after rebuilding the acceptance statistic and running a four-probe investigation
+(9 agents, each finding adversarially refuted) into whether the campaign should pivot from
+per-cell stiffness to per-cell contraction gain. **It should not.** Read §6's warning box first;
+this section is its consequence.*
+
+### 10.1 What P0 fixed
+
+| | |
+|---|---|
+| four instruments **certified**, each signed with its evidence in the class | `orientation_error` 10.1 steps, `peak_excursion` 8.5, `coordination` 8.0, `path_length` 6.5 |
+| the placeholder check replaced by an **audit** | a certification must be checkable against role, declared null, and ≥ `MIN_LEVELS` from the floors that justified it |
+| **`accept.py`** — the acceptance statistic | no oracle (reads two `[G,M,2]` loop arrays), ≥3 ticks enforced, worst-channel rule so a good angle cannot pay for a broken amplitude. 9/9 selftest |
+| the amplitude **gauge withdrawn** | `gauge_fix`/`gauge_fix2` raise. Over 64 candidate-rollouts the amplitude channel spans 25.0 steps and the pattern channel 1.5 — **the gauge divided out the channel with 17× the information** |
+| `discriminating_power` added | resolving power (vs the null) admits an instrument; it does not say the instrument can rank candidates that all roughly work. Across the bank: `orientation_error` 10.1 → **1.4**, `coordination` 8.0 → **1.5** |
+| the **box prior cannot be data-anchored** | it was `[0.2,5]×median(naive)` — the attenuated fit it constrained — so it slid with the bias: implied median 128 clean → 40 at realizable noise → **2.2** at high noise, against a true 132. 40/56 configs excluded some planted modulus. `anchor_from_amplitude` now raises `NotInvertible` |
+
+### 10.2 The verdict: no gain pivot
+
+**Per-cell gain is not identifiable, and the case that it might be was an artefact.**
+
+- **The gain channel is structurally ABSENT from most of the beat.** Gain multiplies `act0`, and
+  `activation_pulse.py:78` makes the clock exactly 0 for 120/150 ticks, so **‖A_gain‖ = 0.0 exactly
+  at 75.8% of frames** (nonzero at 58/240), where the normal equations are singular. Tick 165 —
+  the only tick four probes used — is the **global argmax** of ‖act0‖ (4212.6).
+- **0/100 cells clear the 5-step bar for either parameter** (all 100 measured, full beat). Best
+  gain cell 2.56 steps, best E cell 0.97; 4/100 gain cells clear even one step.
+- **"The gain columns of A are exactly F-free" was a degenerate-base artefact.** Probe B
+  linearised at θ=0 where `_lame(0)` gives μ=λ=0, so the stress vanishes and the injected F
+  multiplies nothing — the bitwise `0.000e+00` was guaranteed by arithmetic, not measured. At base
+  E=130 uniform (whose true-F control is *better*), the same derived-F error moves the gain block
+  by rel **9.29e-02** and the θ-free offset by rel **2.061**. The attribution inverts: the offset
+  does most of the damage, not the E columns.
+- **The multi-frame Fisher ceiling says stiffness, not gain.** Stacking the Grams over the active
+  window with clean F and tracking noise only: per-cell relative sd at 5 frames = **E 0.0499 vs
+  gain 0.0935** — E is 1.9× better determined, and gain's p90 is 5.6 against E's 0.70. Off-pulse
+  frames improve E and add **exactly nothing** to gain. The best-determined per-cell direction is
+  `(dE/E, dg/g) = (0.999, −0.058)`: **the one per-cell number this data determines is stiffness.**
+- **A per-cell gain map would not be gain.** The gain block reproduces **49.9% in norm / 24.9% in
+  energy** of the per-cell stiffness signal, and the imitator has **165× the spread** of the true
+  gain map with `corr = +0.060` — unstructured debris, not a bias you could regress out.
+- **There is no per-cell gain in the forward model.** `material_cardio_cells.yaml` gives
+  `active_force` a single global `amplitude: 20.0`; per-cell gain exists only in the estimation
+  harness (`assemble.py`'s own docstring says so). Per-cell stiffness *is* in the model
+  (`seed_from_segmentation`). PREMISES.md #3: an operator that never acts is not part of the model.
+
+P0's founding 22× is not contradicted — it is about a **uniform** multiplier, these are about
+**per-cell** structure. The pivot conflated them.
+
+### 10.3 Three errors in the P0 work itself
+
+1. **The null bar is the wrong tissue's.** `accept.py`'s nulls come from the registry, which
+   measured them **on the recording** — `peak_excursion` null 0.0011 is the recording's own median
+   excursion. The synthetic sheet beats **8.7× harder** (0.0066–0.0120). The do-nothing model rolled
+   out on *this* sheet scores **95.06 steps, not 6.65**. So "the per-frame solve at 19.33 is worse
+   than knowing nothing" is wrong in its comparison, and **every steps figure in §10 and in the P0
+   record inherits the mis-calibration**. Rankings are unaffected (same statistic, same floors).
+   *Fix: `accept.py` must measure the null on the sheet it is scoring.*
+2. **"E is unobservable" is a property of the operating point, not the physics.** The spec sits at
+   a **stationary point** of its own amplitude-vs-E curve (exponent +0.034, turning point E≈212.6).
+   The same sweep gives **117 steps at drag 3, 232 at drive amplitude 80, 364 monotone with the
+   pulse always on**.
+3. **Per-cell E structure IS visible; one beat was the wrong window.** Over **three** beats the best
+   uniform-E impostor of the planted field costs **3.58 steps** (0.73 at one beat), and **8.60** at
+   drive 80 — above the null. Flattening the whole per-cell E field costs about as much as a 5%
+   gain error.
+
+### 10.4 The apparatus is what the per-cell map measures
+
+`activation_pulse` writes one Gaussian bump, σ=0.12, at the domain centre. Consequence, measured:
+per-cell active force spans **max/min = 1.6e4**; 52/100 cells receive <10% of the strongest cell's,
+23/100 <1%, **37/100 are essentially frozen**. Per-cell gain sensitivity correlates **ρ=+0.959 with
+the active force a cell happens to receive** and only **ρ=+0.142 with its own planted gain**; a
+cell's amplitude is 0.43 R² from its *radius* and 0.0095 R² from its own (E, gain).
+
+**A per-cell map on this spec is a map of the stimulus geometry.** `activation_pulse` already
+supports `profile: uniform` (line 70) and nobody has run the comparison under it.
+
+Two conditioning facts worth keeping: `cond(G_blockdiag) ≈ cond(G)`, so the near-singularity is
+*inside* both blocks and not in the coupling; and the raw `cond` 5.96e11 is inflated by a 50×
+column-norm mismatch between blocks, so column scaling recovers most of it.
+
+### 10.5 What to run next, in order, with decision rules
+
+1. **Amplitude-matched Fisher ceiling** (~15 min). Re-run `p1f_stack.py` with the drive scaled so
+   peak excursion matches the recording's 0.0011 (`amplitude` 20 → ≈2.3), all 29 active ticks, read
+   on a 15-px control grid (~37 nodes/cell) not 100 particles. **Rule:** if median per-cell gain
+   relative sd exceeds the planted spread (0.319), per-cell gain is undecidable on the recording
+   *even with a perfect F*, and P1 becomes a **global-parameters verdict**. Back-of-envelope
+   transfer (arithmetic, not measured) already suggests E ~63% / gain ~119% — i.e. **one beat may
+   determine neither parameter per cell.**
+2. **The confound forward test** (~25 min). Plant gain **exactly uniform**, E heterogeneous, run the
+   estimator that would ship; report `corr(g_hat, E_true)`, `std(g_hat)` against a planted zero.
+   **Rule:** `std(g_hat) > 0.1` or `|corr| > 0.3` under any F condition ⇒ a per-cell gain product is
+   not a contractility measurement and must not ship as one. Run the converse too.
+3. **Uniform-activation operating point** (~30 min). Repeat the P0 sweeps and the Fisher stack with
+   `profile: uniform`, period 50, duration 12 (the recording's beat), amplitude-matched. **Rule:** if
+   per-cell E identifiability improves >2×, every P0/P1 conclusion must be re-taken at the
+   recording's operating point.
+4. **Amplitude-blind re-reading of P0's founding sweep** (~5 min). `peak_excursion` was the limiting
+   instrument for 37/40 candidates, "steps" is an absolute world distance, and gain is *defined* as
+   an amplitude multiplier — comparing an amplitude-defined parameter to a shape parameter on an
+   amplitude-limited statistic is near-tautological. **Rule:** if gain's advantage lives only on
+   `peak_excursion` and vanishes on `orientation_error`/`coordination`, the 22× is an artefact.
+5. **C=472 at real scale** (~25 min). `System(real=True)` and `small_labels_full_472.tif` exist; A is
+   [472000 × 944] float64 ≈ 3.6 GB, fits. Cells here are 4.7× larger in area, so every per-cell
+   number on record is optimistic by an unquantified amount.
+6. **Scoped gradient probe** (half a day engineering). **This is the branch that matters.** The
+   entire F blocker exists *only because the algebraic formulation takes F as an input*; a
+   differentiable rollout never measures F — it is internal state propagated from the initial
+   configuration, and the only observable is x(t), which the recording supplies. Untested in six
+   rounds. **Rule:** if it recovers per-cell E to ≤10% from positions alone, P1's premise was wrong
+   for a reason nobody tested.
+
+**Do not spend time on:** another single-tick algebraic experiment at tick 165 (the global argmax of
+‖act0‖; four probes have saturated it), or any steps number quoted against the imported 6.65 null.
+
+**The parameterisation is settled either way (Cedric, 2026-08-09): one learnable per cell.** That
+matches the generative truth exactly — `seed_from_segmentation:209` broadcasts one E per cell to its
+particles — so there is no approximation error, unlike F which is a genuine field. 10.2's evidence
+says the learnable should be **E**, and 10.5(6) says the machinery should be the gradient route. The
+open question is spatial rank: keep one learnable per cell and let a smoothness/shrinkage prior
+collapse the unidentifiable directions, so the low-rank basis is *learned* rather than declared.
+
+### 10.6 Artifacts
+
+`prototype/cardio_cells/crash/`: `accept.py` (the statistic), `boxprior.py` (+`_p0`/`_ident.json`),
+`p1a_*` (per-cell ladder, ceiling, null, mono, actcorr), `p1b_*` (gaincol, leak, split),
+`p1bv_*` (base sweep, phase scan, repro), `p1v_verify.*`, `p1v_impostor.*`, `p1v_long_impostor.*`,
+`p1x_verify.*`, `p1c_*` (regime table), `p1e_alias.*` (the confound), `p1f_stack.*` (Fisher).
+Plan: `discovery_cardio_mpm/PLAN.md`. Nothing sealed was opened; `prototype/cardio_mpm/archive`
+was not written to.
