@@ -1,0 +1,96 @@
+{
+ "argv": {
+  "device": "cuda:0",
+  "real": true,
+  "cells": 100,
+  "per_parent": 500,
+  "n_grid": 128,
+  "warmup": 12,
+  "attack": "U,P",
+  "stride": 15,
+  "tag": "real_UP"
+ },
+ "reference": {
+  "A_shape": [
+   472000,
+   944
+  ],
+  "assembly_s": 18.707088947296143,
+  "residual_rel_b": 7.814682782649664e-05,
+  "norm_b": 5699.643900568331
+ },
+ "U_units": {
+  "raw": {
+   "cond_A": 22438860.778502457,
+   "sigma_max": 1998.4650099073233,
+   "sigma_min": 8.906267700639919e-05,
+   "cond_G": 503502473037015.9
+  },
+  "block_only_theta_median": {
+   "cond_A": 32444244.09401098,
+   "sigma_max": 22194.580932398432,
+   "sigma_min": 0.0006840837736298323,
+   "cond_G": 1052628974831766.2
+  },
+  "block_only_colnorm_median": {
+   "cond_A": 4637365.598803949,
+   "sigma_max": 47.92975317664063,
+   "sigma_min": 1.0335556288467419e-05,
+   "cond_G": 21505159696970.305
+  },
+  "dimensionless_percell": {
+   "cond_A": 27764777.6012307,
+   "sigma_max": 14223.302036373327,
+   "sigma_min": 0.000512278622960872,
+   "cond_G": 770882875245802.0
+  },
+  "equilibrated_percell": {
+   "cond_A": 46.14954589365968,
+   "sigma_max": 1.4679405537860015,
+   "sigma_min": 0.0318083423219052,
+   "cond_G": 2129.780586191001
+  },
+  "A_E_block_only": {
+   "cond_A_raw": 1490367.7576532753,
+   "cond_A_dimensionless": 789510.7152251243,
+   "colnorm_spread": 1464236.7251006,
+   "theta_true_spread": 5.5
+  },
+  "A_gain_block_only": {
+   "cond_A_raw": 2818361.370728059,
+   "cond_A_dimensionless": 5168181.815462704,
+   "colnorm_spread": 2596076.929723247,
+   "theta_true_spread": 2.973183118625804
+  },
+  "explained_by_units": {
+   "colnorm_spread_raw": 20180842.55075941,
+   "colnorm_spread_dimensionless": 24301119.97340767,
+   "spread_of_theta_true": 437.363171478617,
+   "note": "if units drove the spread, dividing by theta_true would collapse it"
+  }
+ },
+ "P_probe": {
+  "probe_x10": {
+   "assembly_s": 18.87235689163208,
+   "global_rel_change": 1.5723407239338468e-06,
+   "percol_rel_change_median": 8.95287889306566e-15,
+   "percol_rel_change_max": 0.3850081783267868,
+   "percol_rel_change_on_20_smallest_columns_max": 0.3850081783267868,
+   "percol_rel_change_on_20_smallest_columns_median": 3.1427896763039823e-13,
+   "cond_A_dimensionless": 27544460.714931265,
+   "sigma_min_dimensionless": 0.0005163761303434583,
+   "cond_ratio_vs_reference": 0.9920648784058811
+  },
+  "probe_x0.1": {
+   "assembly_s": 18.947589874267578,
+   "global_rel_change": 8.672881936834912e-07,
+   "percol_rel_change_median": 7.326777736905743e-14,
+   "percol_rel_change_max": 0.03506126696547867,
+   "percol_rel_change_on_20_smallest_columns_max": 0.022327744542524623,
+   "percol_rel_change_on_20_smallest_columns_median": 4.0649487250851615e-13,
+   "cond_A_dimensionless": 27764777.60075084,
+   "sigma_min_dimensionless": 0.0005122786229697226,
+   "cond_ratio_vs_reference": 0.999999999982717
+  }
+ }
+}

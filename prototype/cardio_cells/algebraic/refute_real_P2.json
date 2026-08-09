@@ -1,0 +1,102 @@
+{
+ "argv": {
+  "device": "cuda:0",
+  "real": true,
+  "cells": 100,
+  "per_parent": 500,
+  "n_grid": 128,
+  "warmup": 12,
+  "attack": "P",
+  "stride": 15,
+  "tag": "real_P2"
+ },
+ "reference": {
+  "A_shape": [
+   472000,
+   944
+  ],
+  "assembly_s": 18.870065212249756,
+  "residual_rel_b": 7.814682782649664e-05,
+  "norm_b": 5699.643900568331
+ },
+ "P_probe": {
+  "probe_x10": {
+   "assembly_s": 18.945821285247803,
+   "global_rel_change": 1.5723407239338468e-06,
+   "percol_rel_change_median": 8.95287889306566e-15,
+   "percol_rel_change_max": 0.3850081783267868,
+   "percol_rel_change_on_20_smallest_columns_max": 0.3850081783267868,
+   "percol_rel_change_on_20_smallest_columns_median": 3.1427896763039823e-13,
+   "n_columns_rel_change_gt_1e-6": 62,
+   "n_columns_rel_change_gt_1e-2": 17,
+   "n_columns_rel_change_gt_1e-1": 5,
+   "colnorm_percentile_of_moved_columns": [
+    0.0,
+    0.03707627207040787,
+    0.0021186440717428923,
+    0.010593220591545105,
+    0.0010593220358714461,
+    0.04449152573943138,
+    0.04025423899292946,
+    0.0052966102957725525,
+    0.01800847426056862,
+    0.012711863964796066
+   ],
+   "colnorm_of_moved_columns": [
+    9.138012573957578e-05,
+    0.013946422680989704,
+    0.0004001963427129435,
+    0.0019002891474408608,
+    0.00022481101777032576,
+    0.018713320944058646,
+    0.017602557133130702,
+    0.0010805562235022615,
+    0.0032157997547758626,
+    0.002576677746537114
+   ],
+   "colnorm_median": 11.97104369901671,
+   "cond_A_dimensionless": 27544460.714931265,
+   "sigma_min_dimensionless": 0.0005163761303434583,
+   "cond_ratio_vs_reference": 0.9920648784058811
+  },
+  "probe_x0.1": {
+   "assembly_s": 19.057063579559326,
+   "global_rel_change": 8.672881936834912e-07,
+   "percol_rel_change_median": 7.326777736905743e-14,
+   "percol_rel_change_max": 0.03506126696547867,
+   "percol_rel_change_on_20_smallest_columns_max": 0.022327744542524623,
+   "percol_rel_change_on_20_smallest_columns_median": 4.0649487250851615e-13,
+   "n_columns_rel_change_gt_1e-6": 27,
+   "n_columns_rel_change_gt_1e-2": 4,
+   "n_columns_rel_change_gt_1e-1": 0,
+   "colnorm_percentile_of_moved_columns": [
+    0.09957627207040787,
+    0.0010593220358714461,
+    0.04449152573943138,
+    0.15466101467609406,
+    0.049788136035203934,
+    0.11016949266195297,
+    0.032838981598615646,
+    0.0052966102957725525,
+    0.12711864709854126,
+    0.02118644118309021
+   ],
+   "colnorm_of_moved_columns": [
+    0.15326970518635896,
+    0.00022481101777032576,
+    0.018713320944058646,
+    0.4618575812563548,
+    0.026369169229992596,
+    0.17974936296406507,
+    0.011214494992726106,
+    0.0010805562235022615,
+    0.25320117688265875,
+    0.003879741665490855
+   ],
+   "colnorm_median": 11.97104369901671,
+   "cond_A_dimensionless": 27764777.60075084,
+   "sigma_min_dimensionless": 0.0005122786229697226,
+   "cond_ratio_vs_reference": 0.999999999982717
+  }
+ }
+}

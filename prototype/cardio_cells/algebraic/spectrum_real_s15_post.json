@@ -1,0 +1,83 @@
+{
+ "partial_correlations": {
+  "se_E": {
+   "dist_to_wall | r_from_centre": {
+    "partial_spearman": -0.24051656282922276,
+    "marginal_spearman": -0.9275197260053238
+   },
+   "r_from_centre | dist_to_wall": {
+    "partial_spearman": 0.7608498026230825,
+    "marginal_spearman": 0.9682747451213642
+   },
+   "dist_to_wall | activity": {
+    "partial_spearman": -0.2739219594077907,
+    "marginal_spearman": -0.9275197260053238
+   },
+   "activity | dist_to_wall": {
+    "partial_spearman": -0.7462247112301196,
+    "marginal_spearman": -0.9659537969493306
+   },
+   "activity | r_from_centre": {
+    "partial_spearman": -0.032322925928093424,
+    "marginal_spearman": -0.9659537969493306
+   },
+   "r_from_centre | activity": {
+    "partial_spearman": 0.2608546549702011,
+    "marginal_spearman": 0.9682747451213642
+   },
+   "spread | activity": {
+    "partial_spearman": -0.1990509086842056,
+    "marginal_spearman": -0.2342279258291701
+   },
+   "n_particles | activity": {
+    "partial_spearman": 0.025542481942951854,
+    "marginal_spearman": -0.025603922400128362
+   }
+  },
+  "se_gain": {
+   "dist_to_wall | r_from_centre": {
+    "partial_spearman": -0.2509426647311568,
+    "marginal_spearman": -0.9390365953888244
+   },
+   "r_from_centre | dist_to_wall": {
+    "partial_spearman": 0.9143196087600224,
+    "marginal_spearman": 0.9896000113205851
+   },
+   "dist_to_wall | activity": {
+    "partial_spearman": -0.277112136340655,
+    "marginal_spearman": -0.9390365953888244
+   },
+   "activity | dist_to_wall": {
+    "partial_spearman": -0.9362775687935893,
+    "marginal_spearman": -0.9920693139337459
+   },
+   "activity | r_from_centre": {
+    "partial_spearman": -0.4888010629048911,
+    "marginal_spearman": -0.9920693139337459
+   },
+   "r_from_centre | activity": {
+    "partial_spearman": 0.0565275497209512,
+    "marginal_spearman": 0.9896000113205851
+   },
+   "spread | activity": {
+    "partial_spearman": -0.15412930101265113,
+    "marginal_spearman": -0.20765513480968065
+   },
+   "n_particles | activity": {
+    "partial_spearman": 0.06421939643557918,
+    "marginal_spearman": -0.025011874061230215
+   }
+  }
+ },
+ "model_error_floor": {
+  "residual_rel_b": 7.814682782649664e-05,
+  "norm_b": 5699.643900568331,
+  "absolute_model_error": 0.4454090905700551,
+  "sigma_max": 14223.302036373327,
+  "n_directions_detectable_at_100pct_param_change": 865,
+  "n_directions_detectable_at_10pct_param_change": 763,
+  "n_directions_detectable_at_1pct_param_change": 620,
+  "n_params": 944,
+  "eps_at_the_model_floor": 9.806573506441365e-10
+ }
+}

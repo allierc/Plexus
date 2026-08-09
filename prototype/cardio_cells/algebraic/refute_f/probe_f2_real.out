@@ -1,0 +1,20 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 472 cells from 'cells'; 236000 particles (500 per cell); youngs 40-220 from measured beat amplitude; cell centres seeded: 472
+   built: C=472 Np=236000 grid 128^2 warmup=12
+   null (E=130,g=1): med E 0.291 med g 0.238 l2 0.353
+   one-frame displacement rms = 2.634e-04 (0.034 grid cells)
+   [chord@0       ] superposition residual 1.422e+00  | ridge0 med E 8.931e-01 med g 4.466e+00 l2 1.676e+00 | best ridge0.01 l2 9.907e-01
+   [chord@nominal ] superposition residual 4.173e-01  | ridge0 med E 4.755e-01 med g 2.002e+00 l2 4.966e+00 | best ridge0.0001 l2 5.356e-01
+   local Jacobian at theta_true: ||J d - (r(th+d)-r(th))||/||r(th+d)|| for a random d of relative size: {'0.01': 0.0030650961331312827, '0.1': 0.024277512733111743, '0.5': 0.18962746289188698}
+
+   [LM] inject x_k, predict x_{k+1} over ONE FRAME, minimise ||x_pred - x_obs||, start at the nominal theta
+      it 0: ||r||/||r_0|| 9.842e-02  med E 6.720e-02 med g 2.044e-01  l2 1.288e-01  lam 3.0e-07 ok=True
+      it 1: ||r||/||r_0|| 1.526e-03  med E 6.893e-03 med g 2.819e-02  l2 6.159e-02  lam 9.0e-08 ok=True
+      it 2: ||r||/||r_0|| 5.295e-05  med E 2.234e-04 med g 8.550e-04  l2 5.042e-02  lam 2.7e-08 ok=True
+      it 3: ||r||/||r_0|| 1.401e-05  med E 2.269e-05 med g 7.132e-05  l2 4.073e-02  lam 8.1e-09 ok=True
+      it 4: ||r||/||r_0|| 5.828e-06  med E 3.038e-06 med g 1.032e-05  l2 3.248e-02  lam 2.4e-09 ok=True
+
+wrote /workspace/Plexus/prototype/cardio_cells/algebraic/refute_f/probe_f2_real.json  [1771.0s]
