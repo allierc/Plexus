@@ -103,8 +103,14 @@ def _mesh_from_build(n_cells=NCELLS):
 INNER = 0.82                                                    # basal radius fraction (thin monolayer wall)
 
 
+# MARKED TO DIE. Blue is the one hue left: white->red is the activator ramp, green is
+# just-divided and magenta is the broken alarm. Blended at the same strength as the green so a
+# dying cell still reports how lit it is.
+C_DYING, DYING_ALPHA = (0.20, 0.45, 0.95), 0.72
+
+
 def _draw(ax, pos, mesh, p0, azim, act=None, inner=INNER, Lbox=None,
-          divided=None, broken=None, wall_shade=1.0, classes=None):
+          divided=None, broken=None, wall_shade=1.0, classes=None, dying=None):
     """3D monolayer: each cell is a prism -- an apical face (outer), a basal face (inner), and lateral
     walls. Cells are coloured by ACTIVATION with the Turing white->red LUT (activation 0 -> white).
 
@@ -117,6 +123,11 @@ def _draw(ax, pos, mesh, p0, azim, act=None, inner=INNER, Lbox=None,
                        shows how lit it is -- pale green when quiet, olive-to-amber when active.
         MAGENTA        the cell is genuinely BROKEN -- under-connected, or its ring is not a
                        polygon. An alarm. If nothing is broken this colour never appears.
+        BLUE WASH      the cell is MARKED TO DIE and has not been extruded yet. Blended like the
+                       green, so a dying cell still shows how lit it is. Death was invisible until
+                       this existed: a marked cell is drawn like any other, and once extruded the
+                       sheet closes over the gap, so a 293-cell patch dying at the north pole
+                       could not be seen even from straight above it.
 
     WHY THE GREY WENT. The lateral walls used to be drawn at 0.72 x the cap colour, so an
     unactivated (white) cell had GREY sides. On a smooth sphere those hide at the silhouette, but a
@@ -174,6 +185,9 @@ def _draw(ax, pos, mesh, p0, azim, act=None, inner=INNER, Lbox=None,
         if divided is not None and f < len(divided) and divided[f]:
             base = tuple((1.0 - DIVIDED_ALPHA) * np.array(base[:3])
                          + DIVIDED_ALPHA * np.array(C_DIVIDED)) + (1.0,)
+        if dying is not None and f < len(dying) and dying[f]:
+            base = tuple((1.0 - DYING_ALPHA) * np.array(base[:3])
+                         + DYING_ALPHA * np.array(C_DYING)) + (1.0,)
         if broken is not None and f < len(broken) and broken[f]:
             base = C_BROKEN                                      # alarm wins over everything
         bp = ap * inner                                          # basal ring (apical scaled toward the sphere centre)

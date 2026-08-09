@@ -1120,9 +1120,15 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60, movie=True):
                   flush=True)
             return None
 
+    def dying_of(mt):
+        """Cells marked to die and not yet extruded -- recorded per frame by topo_snapshot_3d.
+        None on any run without apoptosis, which is every run before 9 August."""
+        d = mt.get("apop")
+        return None if d is None else (np.asarray(d)[:mt["nF"]] > 0)
+
     def draw3d(ax, pt, mt, a, cam, div=None, brk=None, classes=None):
         _draw(ax, pt, mt, 3.90, azim=cam["azim"], act=col(a), Lbox=L3,
-              divided=div, broken=brk, classes=classes)
+              divided=div, broken=brk, classes=classes, dying=dying_of(mt))
         # _draw hardwires elev=18 as its last statement; re-aim afterwards to get the 2nd view.
         ax.view_init(elev=cam["elev"], azim=cam["azim"])
 
