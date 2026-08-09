@@ -701,7 +701,18 @@ class RDInterfaceTension(Lateral):
         super().__init__(params, device)
         self.at = params.get("_at", "vertex"); self.cat = params.get("cell_set", "cell")
         self.K_purse = float(params.get("K_purse", 1.0)); self.K_extrude = float(params.get("K_extrude", 0.5))
-        self.a_sw = float(params.get("a_sw", 1.0)); self.eta = float(params.get("eta", 0.05))
+        # 0.6, AND IT WAS 1.0 -- A DEFAULT THAT CANNOT FIRE. The gate below is
+        # `red = a > a_sw * amax`, so a_sw = 1.0 asks for cells STRICTLY ABOVE the maximum: the
+        # empty set, by construction, at every operating point and for every value of K_purse.
+        #
+        # This is the SECOND time this operator has been written off as inert without ever having
+        # run. The first was an absolute threshold against a field whose median maximum is 0.000,
+        # fixed by making a_sw a fraction -- and the fix left a default that is a fraction of one.
+        # Route A then swept K_purse [0, 0.25, 3, 6] on b_gs_gated_shaping, whose spec omits a_sw,
+        # and got four runs identical to four significant figures with `acted = 0` on all of them.
+        # Reported as "K_purse is inert"; nothing was measured. 0.6 is the composition space's own
+        # declared default and means "the top 40% of the field is red".
+        self.a_sw = float(params.get("a_sw", 0.6)); self.eta = float(params.get("eta", 0.05))
         self.cap_frac = float(params.get("cap_frac", 0.10)); self.iters = int(params.get("iters", 4))
 
     def forward(self, H, mask=None):

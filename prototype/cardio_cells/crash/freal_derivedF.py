@@ -415,7 +415,17 @@ def main():
 
     with torch.no_grad():
         t_lo, t_hi = a.t0, max(a.t0 + a.T - 1, a.holdout_tick)
-        keep = set(a.t0 - m for m in m_list if 0 < a.t0 - m)
+        # A reference configuration is needed for every (lag, frame) pair actually used.  A lag
+        # m >= t0 means "the recording's frame 0", a FIXED tick; a smaller lag is a short baseline
+        # and slides with the frame, so the held-out frame needs its own reference -- getting this
+        # wrong silently turns a lag-2 held-out measurement into a lag-17 one.
+        keep = set()
+        for _m in m_list:
+            if _m >= a.t0:
+                continue
+            for _t in (a.t0, a.holdout_tick):
+                if 0 < _t - _m < a.t0:
+                    keep.add(_t - _m)
         sy, REF, B = collect(args, t_lo, t_hi, log, keep_ticks=keep)
         C, n, dt, dx = sy.C, sy.n_sub_per_frame, sy.dt, sy.g.dx
         th = sy.theta_true.double()
@@ -453,17 +463,26 @@ def main():
         R["n_interior"] = int(interior.sum())
         log(f"           interior (outside the {band:.4f} wall band) {int(interior.sum())}/{sy.Np}")
 
-        # grids, one per (reference lag m, spacing h)
-        def refidx(m):
-            return max(a.t0 - m, 0)
+        # grids, one per (reference tick, spacing h)
+        def refidx(m, t=None):
+            """The tick whose configuration the displacement is measured from."""
+            return 0 if m >= a.t0 else (a.t0 if t is None else t) - m
+
+        def refstate(r):
+            if r in REF:
+                return REF[r]
+            return {"x": B[r]["x0"], "F": B[r]["F0"]}
 
         allh = sorted(set(hs_px + fit_px + roll_px))
-        CG = {(m, hp): ControlGrid(REF[refidx(m)]["x"], hp * PX) for m in m_list for hp in allh}
-        CG2 = {(m, hp): ControlGrid(REF[refidx(m)]["x"], 2 * hp * PX) for m in m_list for hp in allh}
+        allr = sorted(set([refidx(m, t) for m in m_list for t in (a.t0, a.holdout_tick)]))
+        CG = {(r, hp): ControlGrid(refstate(r)["x"], hp * PX) for r in allr for hp in allh}
+        CG2 = {(r, hp): ControlGrid(refstate(r)["x"], 2 * hp * PX) for r in allr for hp in allh}
+        log(f"[refconfigs] reference ticks in use: {allr}")
 
-        def derF(m, hp, x, mode="bilinear"):
-            r = refidx(m)
-            return derive_F(CG[(m, hp)], REF[r]["x"], x, mode, F_ref=REF[r]["F"])
+        def derF(m, hp, x, mode="bilinear", t=None):
+            r = refidx(m, t)
+            st = refstate(r)
+            return derive_F(CG[(r, hp)], st["x"], x, mode, F_ref=st["F"])
 
         Ft0 = B[k0]["F0"]
 
@@ -483,8 +502,8 @@ def main():
             for m in m_list:
                 for rm in (2.5,):
                     r = refidx(m)
-                    Fk, nb = particle_lsq_F(REF[r]["x"], B[k0]["x0"], rm * p_sp,
-                                            F_ref=REF[r]["F"])
+                    Fk, nb = particle_lsq_F(refstate(r)["x"], B[k0]["x0"], rm * p_sp,
+                                            F_ref=refstate(r)["F"])
                     at = attenuation(Fk, Ft0, interior)
                     fl[f"m{m}_r{rm:g}ps"] = {"m": m, "radius_ps": rm, "mean_neighbours": nb, **at}
                     log(f"    {m:>5d} {rm:>8.1f} {nb:>5.0f} {at['med_abs_disagree']:>9.2e} "
@@ -502,15 +521,16 @@ def main():
             rows = []
             for m in m_list:
                 for hp in hs_px:
-                    cg, cg2 = CG[(m, hp)], CG2[(m, hp)]
                     r = refidx(m)
+                    cg, cg2 = CG[(r, hp)], CG2[(r, hp)]
+                    Xr, Fr = refstate(r)["x"], refstate(r)["F"]
                     Fd = derF(m, hp, B[k0]["x0"])
                     at = attenuation(Fd, Ft0, interior)
                     # matched-smoothing controls: apply the estimator's own support to the TRUE F,
                     # in the same reference frame (so F_true is pulled back by F_ref first)
-                    Ft_rel = Ft0 @ torch.linalg.inv(REF[r]["F"])
-                    Fm = matched_smooth_F(cg, REF[r]["x"], Ft_rel) @ REF[r]["F"]
-                    Fb = box_smooth_F(cg2, REF[r]["x"], Ft_rel) @ REF[r]["F"]
+                    Ft_rel = Ft0 @ torch.linalg.inv(Fr)
+                    Fm = matched_smooth_F(cg, Xr, Ft_rel) @ Fr
+                    Fb = box_smooth_F(cg2, Xr, Ft_rel) @ Fr
                     Fn = derF(m, hp, B[k0]["x0"], "nearest")
                     row = {"m": m, "h_px": hp, "h_world": hp * PX,
                            "h_over_particle_spacing": hp * PX / p_sp,
@@ -594,9 +614,13 @@ def main():
                 return float((y - y_obs_h).norm() / y_obs_h.norm())
 
             def pair(fn):
-                """(injected F over the fit frame, injected F over the held-out frame)."""
-                return (lerp(fn(B[k0]["x0"]), fn(B[k0]["x_next"]), n),
-                        lerp(fn(B[hk]["x0"]), fn(B[hk]["x_next"]), n))
+                """(injected F over the fit frame, injected F over the held-out frame).
+
+                `fn(frame_tick, x)`: the frame tick is passed because a short-baseline reference
+                slides with the frame -- the held-out frame is measured from ITS own baseline.
+                """
+                return (lerp(fn(k0, B[k0]["x0"]), fn(k0, B[k0]["x_next"]), n),
+                        lerp(fn(hk, B[hk]["x0"]), fn(hk, B[hk]["x_next"]), n))
 
             INJ = [("none", None, None),
                    ("F_hold_simF", hold(B[k0]["F0"], n), hold(B[hk]["F0"], n)),
@@ -611,12 +635,12 @@ def main():
                 if nm in seen:
                     continue
                 seen.add(nm)
-                i0, i1 = pair(lambda x, m=m, hp=hp: derF(m, hp, x))
+                i0, i1 = pair(lambda t, x, m=m, hp=hp: derF(m, hp, x, t=t))
                 INJ.append((nm, i0, i1))
             for m in (m_real, m_grid):
-                r = refidx(m)
-                i0, i1 = pair(lambda x, r=r: particle_lsq_F(REF[r]["x"], x, 2.5 * p_sp,
-                                                            F_ref=REF[r]["F"])[0])
+                i0, i1 = pair(lambda t, x, m=m: particle_lsq_F(
+                    refstate(refidx(m, t))["x"], x, 2.5 * p_sp,
+                    F_ref=refstate(refidx(m, t))["F"])[0])
                 INJ.append((f"F_kin_lsq_m{m}", i0, i1))
 
             # ---- ROUND 5'S OWN ERROR MODEL, on this instrument, at this frame ------------------ #
@@ -641,8 +665,10 @@ def main():
             # a few rungs turn "how accurate must F be?" into a number instead of an adjective.
             sens_src = (m_grid, min(fit_px))
             sm, shp = sens_src
-            sf0, sf1 = derF(sm, shp, B[k0]["x0"]), derF(sm, shp, B[k0]["x_next"])
-            sh0, sh1 = derF(sm, shp, B[hk]["x0"]), derF(sm, shp, B[hk]["x_next"])
+            sf0 = derF(sm, shp, B[k0]["x0"], t=k0)
+            sf1 = derF(sm, shp, B[k0]["x_next"], t=k0)
+            sh0 = derF(sm, shp, B[hk]["x0"], t=hk)
+            sh1 = derF(sm, shp, B[hk]["x_next"], t=hk)
             for eps in (0.03, 0.1, 0.3):
                 INJ.append((f"F_eps{eps:g}_m{sm}_{shp:g}px",
                             lerp(B[k0]["F0"] + eps * (sf0 - B[k0]["F0"]),
@@ -752,7 +778,7 @@ def main():
             names = ["theta_true", "none", "F_lerp_simF"]
             names += [f"F_der_m{max(m_list)}_{h:g}px" for h in roll_px]
             names += [f"F_der_m{min(m_list)}_{h:g}px" for h in roll_px]
-            names += [f"F_kin_lsq_m{max(m_list)}"]
+            names += [f"F_noise_grid48_sF{SIGMA_F:g}", f"F_eps0.1_m{min(m_list)}_{min(fit_px):g}px"]
             names = [nm for nm in names if nm == "theta_true" or nm in thetas]
             R["rollouts"] = {}
             log(f"    {'candidate':<22s} {'medE':>7s} {'raw':>8s} {'kE':>6s} {'kg':>6s} "

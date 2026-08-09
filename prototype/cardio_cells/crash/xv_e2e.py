@@ -434,14 +434,15 @@ def main():
 
             cands = []
             want = [w for w in a.roll.split(",") if w] or [
-                "FC|T8|eiv_box", "F|T8|eiv_box", "FC|T8|naive_box", "FC|T1|eiv_box"]
+                f"FC|T{a.T}|eiv_box", f"F|T{a.T}|eiv_box", f"FC|T{a.T}|naive_box", "FC|T1|eiv_box"]
             cands.append(("theta_true", th))
             for w in want:
                 if w in Zt.files:
                     cands.append((w, torch.as_tensor(Zt[w], device=dev, dtype=f64)))
             # the floor and the zero-information bank
-            mEd = float(torch.as_tensor(Zt["FC|T8|eiv_box"], device=dev, dtype=f64)[:C].median()) \
-                if "FC|T8|eiv_box" in Zt.files else 130.0
+            wk = f"FC|T{a.T}|eiv_box"
+            mEd = float(torch.as_tensor(Zt[wk], device=dev, dtype=f64)[:C].median()) \
+                if wk in Zt.files else 130.0
             cands.append(("blind_const", const(mEd, 1.0)))
             gg = torch.Generator().manual_seed(303)
             cands.append(("null_prior_draw", torch.cat([
@@ -499,7 +500,11 @@ def main():
 
         # ============================================================= P: PLOT ================ #
         if "P" in a.stages:
-            make_figure(os.path.join(HERE, f"{a.tag}.png"), THZ, R, C, a, log)
+            Rp = R
+            jp = os.path.join(HERE, f"{a.tag}.json")
+            if "Tcurve" not in Rp and os.path.exists(jp):        # replot without re-solving
+                Rp = json.load(open(jp))
+            make_figure(os.path.join(HERE, f"{a.tag}.png"), THZ, Rp, C, a, log)
 
         # ---- the verdict --------------------------------------------------------------------- #
         if "S" in a.stages:
@@ -507,24 +512,37 @@ def main():
             key = "eiv_box" if "eiv_box" in win else ("naive_box" if "naive_box" in win else None)
             if key:
                 w = win[key]
-                ho = w["holdout"]["realizable"]
-                med = w["param"]["med_E"]
-                neg = w["param"]["n_negE"]
-                gl = R.get("rollout", {}).get("FC|T8|eiv_box", {}).get("gauged", {}).get("loop")
-                verdict = {"held_out_realizable": ho,
-                           "held_out_clean_oracle": w["holdout"]["clean_oracle"],
-                           "med_E": med, "n_negE": neg, "gauged_loopscore": gl,
-                           "PASS_holdout": bool(ho <= 0.06), "PASS_negE": bool(neg == 0),
-                           "PASS_loop": (bool(gl >= 0.85) if isinstance(gl, float) else None),
-                           "STOP": bool(ho > 0.19 or med > 0.45)}
+                fl = R["holdout_band"]["theta_true (floor)"]
+                ho_r, ho_c = w["holdout"]["realizable"], w["holdout"]["clean_oracle"]
+                med, neg = w["param"]["med_E"], w["param"]["n_negE"]
+                gl = R.get("rollout", {}).get(f"FC|T{a.T}|eiv_box", {}) \
+                      .get("gauged", {}).get("loop")
+                # THE BAR IS READ ON THE ROUND-5 PROTOCOL (clean F, oracle state, clean y), the one
+                # the 0.06 threshold was calibrated on (round 5: floor 0.0047, eiv_box 0.0317).
+                # The fully realizable protocol is reported beside it WITH ITS OWN FLOOR, because
+                # a noisy observation gives theta_true itself a non-zero residual.
+                verdict = {
+                    "acceptance_statistic": "held-out one-frame residual, clean-F/oracle-state "
+                                            "protocol (round-5 comparable)",
+                    "held_out_clean_oracle": ho_c, "floor_clean_oracle": fl["clean_oracle"],
+                    "held_out_realizable": ho_r, "floor_realizable": fl["realizable"],
+                    "held_out_realizable_excess_over_floor": ho_r - fl["realizable"],
+                    "med_E": med, "n_negE": neg, "gauged_loopscore": gl,
+                    "PASS_holdout": bool(ho_c <= 0.06), "PASS_negE": bool(neg == 0),
+                    "PASS_loop": (bool(gl >= 0.85) if isinstance(gl, float) else None),
+                    "STOP": bool(ho_c > 0.19 or med > 0.45)}
                 verdict["ACCEPT"] = bool(verdict["PASS_holdout"] and verdict["PASS_negE"]
                                          and verdict["PASS_loop"] is True)
                 R["verdict"] = verdict
-                log(f"\n[verdict] winner FC|T{a.T}|{key}: held-out(realizable) {ho:.4f} "
-                    f"(<=0.06 {verdict['PASS_holdout']}), med|dE/E| {med:.4f}, negE {neg} "
-                    f"(=0 {verdict['PASS_negE']}), gauged loopscore "
-                    f"{gl if gl is None else round(gl,4)} (>=0.85 {verdict['PASS_loop']}) "
-                    f"-> ACCEPT {verdict['ACCEPT']}  STOP {verdict['STOP']}")
+                log(f"\n[verdict] winner FC|T{a.T}|{key}")
+                log(f"    held-out (clean-F/oracle-state, round-5 protocol) {ho_c:.4f}  "
+                    f"floor {fl['clean_oracle']:.4f}   <=0.06 ? {verdict['PASS_holdout']}")
+                log(f"    held-out (fully realizable)                       {ho_r:.4f}  "
+                    f"floor {fl['realizable']:.4f}  excess {ho_r - fl['realizable']:+.4f}")
+                log(f"    med|dE/E| {med:.4f}   negative moduli {neg} (=0 ? "
+                    f"{verdict['PASS_negE']})   gauged loopscore "
+                    f"{gl if gl is None else round(gl, 4)} (>=0.85 ? {verdict['PASS_loop']})")
+                log(f"    -> ACCEPT {verdict['ACCEPT']}   STOP {verdict['STOP']}")
 
     R["wall_seconds"] = time.time() - t_start
     json.dump(R, open(os.path.join(HERE, f"{a.tag}.json"), "w"), indent=1, default=str)
@@ -542,8 +560,12 @@ def make_figure(path, THZ, R, C, a, log):
     Z = np.load(THZ)
     th = Z["theta_true"]
     E = th[:C]
-    panels = [("FC|T8|eiv_box", "{F_lerp, C_lerp}"), ("F|T8|eiv_box", "F_lerp only")]
+    panels = [(f"FC|T{a.T}|eiv_box", f"{{F_lerp, C_lerp}}  T={a.T}"),
+              (f"F|T{a.T}|eiv_box", f"F_lerp only  T={a.T}")]
     panels = [(k, lbl) for k, lbl in panels if k in Z.files]
+    if not panels:
+        log("[P] no theta to plot")
+        return
     fig, axes = plt.subplots(1, len(panels) + 1, figsize=(4.1 * (len(panels) + 1), 4.0))
     lim = (0, 1.05 * max(E.max(), max(float(Z[k][:C].max()) for k, _ in panels)))
     for ax, (k, lbl) in zip(axes, panels):

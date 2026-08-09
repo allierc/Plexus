@@ -55,6 +55,7 @@ def main():
     ap.add_argument("--nodes", type=int, default=48)
     ap.add_argument("--npz", default="state_theta_combine.npz")
     ap.add_argument("--ref", default="grid48_der_s90210|b1|eiv_box")
+    ap.add_argument("--only", default="")
     a = ap.parse_args()
     tag = a.tag or f"state_refscore_{a.mode}"
 
@@ -212,6 +213,9 @@ def main():
             for k in ("grid48_der_s90210|b1|eiv_box", "grid48_der_s555|b1|eiv_box"):
                 cands.append((k, torch.as_tensor(Z[k], device=dev, dtype=f64)))
 
+        if a.only:
+            want = set(a.only.split(","))
+            cands = [c for c in cands if c[0] in want]
         log(f"[{a.mode}] {len(cands)} candidates: " + ", ".join(nm for nm, _ in cands))
         R["candidates"] = {}
 
@@ -234,7 +238,7 @@ def main():
                 R["candidates"][name] = {"param": ps, "holdout": hd, "raw": raw, "gauged": gau,
                                          "gauge": {k: v for k, v in gf.items() if k != "cells"},
                                          "seconds": time.time() - tc}
-                bl, bh = gf["loop_spread_within_10pct"]
+                bl, bh = gf["loop_spread_within_10pct"] or (float("nan"), float("nan"))
                 log(f"    {name:<26s} {ps['med_E']:>7.4f} {ps['rel_l2']:>6.3f} "
                     f"{hd['cleanF_oracleState']:>7.4f} {hd['cleanF_derivedState']:>7.4f} "
                     f"{hd['noisyF_derivedState']:>7.4f} | {CT.fmt(raw['loop'],8)} "

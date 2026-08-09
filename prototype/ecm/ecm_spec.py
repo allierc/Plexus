@@ -134,6 +134,12 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                membrane_recover=2.0,
                # per-particle non-penetration instead of the grid boundary condition. 0 = off.
                membrane_contact_k=0.0,
+               # fraction of the sheet that carries an integrin anchor. Adhesion is punctate in vivo --
+               # hemidesmosome plaques with membrane spanning between -- so < 1 is the faithful case.
+               membrane_adhesion_fraction=1.0,
+               # HEMIDESMOSOMES AS THEIR OWN SET. n_adhesions = 0 keeps the old field-on-the-membrane
+               # tether; > 0 replaces it with discrete plaques that form, bear load, rupture and re-bind.
+               n_adhesions=0, adhesion_k=1.0e4, adhesion_gamma=1.0, adhesion_rupture=0.0,
                # THE TISSUE AS A MOVING BOUNDARY ON THE GRID, rather than a positional projection.
                # 88 showed the projection carries no strain -- see membrane_ops.MPMTissueBoundary.
                membrane_grid_bc=False,
@@ -220,7 +226,8 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
             {"op": "integrin_adhesion", "at": "basement_membrane_particle",
              "centre": [0.5, 0.5, 0.5], "surface": str(membrane), "scale": 1.0,
              "k": float(membrane_adhesion), "offset": float(membrane_offset), "detach": 0.0,
-             "tau_adh": float(membrane_tau_adh)},
+             "tau_adh": float(membrane_tau_adh),
+             "fraction": float(membrane_adhesion_fraction)},
             {"op": "basement_membrane_bond", "at": "basement_membrane_particle",
              "k": float(membrane_bond_k), "cutoff": float(membrane_cutoff),
              "aniso": float(membrane_aniso), "record_hoop": bool(membrane_record_hoop),
@@ -281,6 +288,29 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
             spec["operators"] = [o for o in spec["operators"] if o["op"] not in drop]
             spec["operators"].append({"op": "basement_membrane_continuum_strain",
                                       "at": "basement_membrane_particle"})
+            if n_adhesions > 0:
+                # its own SET, hung off the same parent the other particle sets use
+                spec["sets"]["adhesion"] = {"parent": "cell", "per_parent": int(n_adhesions),
+                                            "radius": 0.48, "density": float(density)}
+                spec["operators"] += [
+                    {"op": "adhesion_seed", "at": "adhesion", "centre": [0.5, 0.5, 0.5],
+                     "surface": str(membrane), "scale": 1.0, "seed": int(seed),
+                     "membrane_set": "basement_membrane_particle"},
+                    {"op": "adhesion_pull", "at": "basement_membrane_particle", "adhesion_set": "adhesion",
+                     "centre": [0.5, 0.5, 0.5], "surface": str(membrane), "scale": 1.0,
+                     "k": float(adhesion_k), "gamma": float(adhesion_gamma),
+                     "offset": float(membrane_offset)},
+                    {"op": "adhesion_turnover", "at": "basement_membrane_particle",
+                     "centre": [0.5, 0.5, 0.5], "rupture": float(adhesion_rupture)},
+                ]
+                i2 = spec["schedule"].index("seed_basement_membrane") + 1
+                spec["schedule"].insert(i2, "adhesion_seed")
+                j2 = spec["schedule"].index("ecm_stress")
+                spec["schedule"].insert(j2, "adhesion_pull")
+                spec["schedule"].insert(j2 + 1, "adhesion_turnover")
+                # the adhesion set is a marker, not a material: keep it out of the MPM cycle
+                spec["operators"] = [o for o in spec["operators"]
+                                     if not (o.get("at") == "adhesion" and o["op"].startswith("mpm_"))]
             if membrane_contact_k > 0.0:
                 spec["operators"].append(
                     {"op": "basement_membrane_contact", "at": "basement_membrane_particle",
