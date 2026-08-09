@@ -242,3 +242,142 @@ def flatten(n=40, E=8.0e3, amp=1.1, frames=500, every=5, dev="cuda:0",
     plt.close(fig)
     h = np.array(hist)
     return h[0, 1], h[-1, 1], h[0, 2], h[-1, 2], out
+
+
+# ---------------------------------------------------------------------------------------------------
+# THE MPM INTEGRIN, AND THE ONE QUESTION THAT DECIDES WHETHER IT CAN EXIST AT THIS GRID
+# ---------------------------------------------------------------------------------------------------
+class FibreRig:
+    """Sheet + integrin, both as MPM MATERIAL, coupled only through the shared grid.
+
+    Everything above holds the sheet with a BODY FORCE: `k*(target - x)` applied to the particle, which
+    reaches the grid as momentum but is not a thing with a length. `INTEGRIN_DESIGN.md` proposes the
+    other construction -- the fibre is its own MPM material, anchored at the surface, and the gap it
+    holds is its REST LENGTH rather than a balance of forces. That is the only version in which the
+    standoff is a material property and detachment is material failure.
+
+    It has one prerequisite nobody has measured, and it is the design's own check #1: MPM transmits
+    force only through the grid, and the grid's smallest feature is `dx`. A fibre spanning less than a
+    cell puts both of its ends inside one cell, where they share a B-spline stencil and the grid cannot
+    tell them apart -- so the fibre's own stress cannot separate them and the length it is supposed to
+    hold is invisible. On the spheroid the fibre is 0.004 box units against `dx` = 1/48 = 0.0208, i.e.
+    L/dx = 0.19. This rig measures what fraction of its rest length such a fibre actually holds when the
+    sheet is pressed onto it, against the same fibre resolved at L/dx = 0.5, 1 and 2.
+
+    The kinematic end is the inner one: an epithelium that is a REPLAY cannot be an MPM body, so the
+    fibre's cell end is prescribed. That is one row of particles, not a grid boundary condition -- the
+    distinction `mpm_tissue_boundary` got wrong.
+    """
+
+    def __init__(self, n=20, n_grid=32, L_over_dx=0.2, E_sheet=8.0e3, E_fib=8.0e3, nu=0.2,
+                 rho=1.0, n_fib=3, dt=2.0e-4, dev="cuda:0"):
+        self.dev, self.n_grid, self.dt = dev, n_grid, dt
+        self.dx = 1.0 / n_grid; self.inv_dx = float(n_grid)
+        self.L = L_over_dx * self.dx
+        xs = torch.linspace(0.4, 0.6, n)
+        Xg, Yg = torch.meshgrid(xs, xs, indexing="ij")
+        base_xy = torch.stack([Xg.reshape(-1), Yg.reshape(-1)], -1)
+        ns = base_xy.shape[0]
+        # the sheet: three layers, sitting one fibre length above the plane
+        sheet = torch.cat([torch.cat([base_xy, torch.full((ns, 1), 0.5 + self.L + z)], -1)
+                           for z in torch.linspace(0.0, 0.3 * self.dx, 3)])
+        # the fibre: `n_fib` particles per site, from the plane up to the sheet's underside
+        fib = torch.cat([torch.cat([base_xy, torch.full((ns, 1), 0.5 + float(z))], -1)
+                         for z in torch.linspace(0.0, self.L, n_fib)])
+        self.x = torch.cat([sheet, fib]).to(dev)
+        self.N = self.x.shape[0]
+        self.n_sheet = sheet.shape[0]
+        self.is_fib = torch.zeros(self.N, dtype=torch.bool, device=dev)
+        self.is_fib[self.n_sheet:] = True
+        # KINEMATIC: the lowest fibre row only. Prescribed by position after every step, so the epithelium
+        # enters as ~n*n particles rather than as a condition on every grid node.
+        self.kin = torch.zeros(self.N, dtype=torch.bool, device=dev)
+        self.kin[self.n_sheet:self.n_sheet + ns] = True
+        self.kin_x = self.x[self.kin].clone()
+        self.low = torch.arange(ns, device=dev)          # the sheet's bottom layer, for the gap
+        self.v = torch.zeros_like(self.x)
+        self.C = torch.zeros(self.N, 3, 3, device=dev)
+        self.F = torch.eye(3, device=dev).expand(self.N, 3, 3).contiguous()
+        self.vol = (0.2 * 0.2 * (self.L + 0.3 * self.dx)) / self.N
+        self.m = rho * self.vol
+        E = torch.where(self.is_fib, torch.tensor(float(E_fib), device=dev),
+                        torch.tensor(float(E_sheet), device=dev))
+        self.mu = (E / (2 * (1 + nu)))[:, None, None]
+        self.la = (E * nu / ((1 + nu) * (1 - 2 * nu)))[:, None, None]
+        self.off = OFF.to(dev)
+
+    def step(self, g=0.0):
+        dev, ng, dt, inv_dx = self.dev, self.n_grid, self.dt, self.inv_dx
+        gm = torch.zeros(ng ** 3, device=dev)
+        gmv = torch.zeros(ng ** 3, 3, device=dev)
+        U, S, Vh = torch.linalg.svd(self.F)
+        R = U @ Vh
+        J = torch.linalg.det(self.F).clamp_min(1e-6)
+        P = (2 * self.mu * (self.F - R) @ self.F.transpose(1, 2)
+             + self.la * ((J - 1) * J)[:, None, None] * torch.eye(3, device=dev))
+        affine = self.m * self.C - (4 * inv_dx * inv_dx * dt * self.vol) * P
+        # THE LOAD PRESSES THE SHEET ONTO THE FIBRE, and acts on the sheet alone: the question is what
+        # the fibre does when it is squashed, which is the case the spheroid is in (121 ends with every
+        # integrin compressed to a third of its length).
+        fb = torch.zeros_like(self.x)
+        fb[~self.is_fib, 2] = -g * self.m
+        base, fx, w = _bspline(self.x, inv_dx, dev)
+        for o in self.off:
+            ww = w[o[0], :, 0] * w[o[1], :, 1] * w[o[2], :, 2]
+            dpos = (o.float() - fx) * self.dx
+            idx = ((base[:, 0] + o[0]).clamp(0, ng - 1) * ng * ng
+                   + (base[:, 1] + o[1]).clamp(0, ng - 1) * ng
+                   + (base[:, 2] + o[2]).clamp(0, ng - 1))
+            gm.index_add_(0, idx, ww * self.m)
+            gmv.index_add_(0, idx, ww[:, None] * (self.m * self.v
+                                                  + torch.einsum('nij,nj->ni', affine, dpos)
+                                                  + dt * fb))
+        gv = gmv / gm.clamp_min(1e-12)[:, None]
+        newv = torch.zeros_like(self.v); newC = torch.zeros_like(self.C)
+        for o in self.off:
+            ww = w[o[0], :, 0] * w[o[1], :, 1] * w[o[2], :, 2]
+            dpos = (o.float() - fx) * self.dx
+            idx = ((base[:, 0] + o[0]).clamp(0, ng - 1) * ng * ng
+                   + (base[:, 1] + o[1]).clamp(0, ng - 1) * ng
+                   + (base[:, 2] + o[2]).clamp(0, ng - 1))
+            g_ = gv[idx]
+            newv += ww[:, None] * g_
+            newC += (4 * inv_dx) * ww[:, None, None] * torch.einsum('ni,nj->nij', g_, dpos * inv_dx)
+        self.v, self.C = newv, newC
+        self.x = self.x + dt * self.v
+        self.F = (torch.eye(3, device=dev) + dt * self.C) @ self.F
+        # the prescribed inner end, applied after the update: position held, velocity zeroed
+        self.x[self.kin] = self.kin_x
+        self.v[self.kin] = 0.0
+
+    def gap(self):
+        """What the sheet's underside actually keeps, in units of the fibre's rest length."""
+        return float((self.x[self.low, 2] - 0.5).mean() / self.L)
+
+
+def fibre_transmit(L_over_dx=(0.2, 0.5, 1.0, 2.0), steps=1500, g=2.0e3, n=20, n_grid=32,
+                   E_fib=8.0e3, dev="cuda:0"):
+    """Sweep the fibre's length against the grid cell and report how much of it survives a load.
+
+    The load is the same for every row, so the only thing that changes is whether the grid can SEE the
+    fibre. A fibre that holds its length reports ~1.0; one the grid cannot resolve reports ~0.
+    """
+    print(f"  {'L/dx':>6}{'L (box)':>10}{'gap/L @0':>11}{'gap/L end':>11}{'min over run':>14}")
+    out = []
+    for r in L_over_dx:
+        s = FibreRig(n=n, n_grid=n_grid, L_over_dx=r, E_fib=E_fib, dev=dev)
+        g0, lo = s.gap(), 1e9
+        for t in range(steps):
+            s.step(g=g)
+            if t % 25 == 0:
+                lo = min(lo, s.gap())
+            if not torch.isfinite(s.x).all():
+                print(f"  {r:>6}{s.L:>10.5f}   NaN at step {t}"); lo = float("nan"); break
+        print(f"  {r:>6}{s.L:>10.5f}{g0:>11.3f}{s.gap():>11.3f}{lo:>14.3f}")
+        out.append((r, s.gap()))
+    return out
+
+
+if __name__ == "__main__" and "--fibre" in sys.argv:
+    print("\nCan an MPM fibre hold a gap the grid cannot resolve?  (dx = 1/32 = 0.03125)\n")
+    fibre_transmit()

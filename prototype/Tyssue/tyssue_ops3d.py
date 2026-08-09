@@ -761,6 +761,23 @@ class Apoptosis3D(Structural):
         self.every = _engine_owns_clock(params, default=1); self._k = 0
         self.seed = int(params.get("seed", 0))
 
+    @staticmethod
+    def _ring_neighbours(rings, f):
+        """The faces sharing an EDGE with f, read off the rings before f is collapsed."""
+        r = rings[f]
+        if r is None:
+            return []
+        edges = {(int(r[i]), int(r[(i + 1) % len(r)])) for i in range(len(r))}
+        edges |= {(b, a) for a, b in edges}
+        out = set()
+        for g, rg in enumerate(rings):
+            if rg is None or g == f:
+                continue
+            for i in range(len(rg)):
+                if (int(rg[i]), int(rg[(i + 1) % len(rg)])) in edges:
+                    out.add(g); break
+        return sorted(out)
+
     def _nb(self, m, nF, q):
         """(neighbour mean of `q`, neighbour count) on the CELL ADJACENCY GRAPH.
 
@@ -1021,16 +1038,45 @@ class Apoptosis3D(Structural):
         # perimeter its area no longer supports, which is a shape-index error, not a size one.
         m["P0"] = torch.as_tensor(self.p0 * np.sqrt(np.maximum(A0, 1e-9)), dtype=dt, device=dev)
         # 2. EXTRUDE the ones that are now triangles AND small enough.
+        # A DYING CELL'S CONTENTS GO SOMEWHERE. Cedric, 9 August: "a rule should enforce that the
+        # sum of activity in the dying cell's vicinity does not change much by construction."
+        #
+        # Until now they did not: the row was dropped from the cell state and its activator and
+        # inhibitor left the tissue. That is a discontinuity in a conserved quantity, injected at
+        # every death, and nothing in the model accounted for it -- a cell is extruded and its
+        # chemistry is simply gone. Real extrusion hands the contents to the neighbours that close
+        # over the gap.
+        #
+        # AMOUNT, NOT CONCENTRATION. The cell holds a * v; the neighbours receive that amount and
+        # each converts it back to a concentration by its own volume. Distributing the
+        # CONCENTRATION would create or destroy material whenever the neighbours are a different
+        # size from the deceased, which is exactly the accounting error this fixes.
+        clvl_c = H.level(self.cat)
+        _has_chem = clvl_c is not None and "chem" in getattr(clvl_c, "state_schema", {})
+        _bequest = []                       # (neighbour indices, amount per channel)
         gone = 0
         for f in sorted(marked, reverse=True):
             if f >= nF or rings[f] is None or len(rings[f]) != 3:
                 continue
             if V0f[f] > crit:
                 continue
+            nbrs = [int(g) for g in self._ring_neighbours(rings, f) if g < nF]
             if face_collapse_3d(rings, pos_t, f):
                 gone += 1
+                if _has_chem and nbrs:
+                    h0, h1 = clvl_c.state_schema["chem"]
+                    amt = clvl_c.state[f, h0:h1].detach().clone() * float(V0f[f])
+                    _bequest.append((nbrs, amt))
         if gone == 0:
             return {}
+        if _bequest:
+            cs = clvl_c.state.clone()
+            h0, h1 = clvl_c.state_schema["chem"]
+            for nbrs, amt in _bequest:
+                share = amt / float(len(nbrs))
+                for g in nbrs:
+                    cs[g, h0:h1] += share / max(float(V0f[g]), 1e-9)
+            clvl_c.state = cs
         # 3. REBUILD, exactly as divide_3d does: `keep` maps new face -> old face and carries every
         #    per-face array across, so nothing can fall out of step with the mesh.
         es2, et2, ef2, nF2, keep = flat_from_rings_3d(rings)
@@ -1066,6 +1112,41 @@ class Apoptosis3D(Structural):
             if getattr(clvl, "occ", None) is not None:
                 cocc = torch.zeros(clvl.state.shape[0], device=clvl.state.device)
                 cocc[:nF2] = 1.0; clvl.occ = cocc
+        # THE PENDING DELTAS MUST BE RENUMBERED TOO, AND THIS IS THE BUG THAT BROKE P12 ON EVERY
+        # RUN WHERE A CELL DIED.
+        #
+        # The engine zeroes the delta accumulator once per TICK and integrates at the END of the
+        # schedule, so `cell_diffuse` and `cell_react` deposit their per-cell deltas early and the
+        # engine applies them last. An operator that RENUMBERS the set in between leaves every one
+        # of those deltas pointing at a different cell -- a large negative flux meant for one cell
+        # lands on another that has almost no activator, and the concentration goes negative. That
+        # is exactly what was measured: the activator hit -0.1529 at frame 50 on every mode that
+        # killed anything, decaying afterwards as the scrambled deltas diffused away, while the
+        # no-death control never left 0.0000.
+        #
+        # `divide_3d` never hit it because appending is not renumbering: daughters go to indices
+        # >= nF and every existing cell keeps its own. Removal is the first operation in this
+        # engine that moves a row.
+        #
+        # Permuting the accumulator with the SAME `keep` map fixes it wherever the operator sits
+        # in the schedule. Confirmed independently by moving apoptosis ahead of the chemistry --
+        # act_min held at 0.0000 for the whole run and P12 and P4 both cleared -- but that is a
+        # discipline every spec would have to remember, and this is the guarantee instead.
+        try:
+            _d = getattr(H, "_delta", None)
+            if isinstance(_d, dict) and self.cat in _d and _d[self.cat] is not None:
+                _kt = torch.as_tensor(keep, device=_d[self.cat].device, dtype=torch.long)
+                _d[self.cat][:nF2] = _d[self.cat][_kt]
+                _d[self.cat][nF2:] = 0.0
+            _db = getattr(H, "_delta_blocks", None)
+            if isinstance(_db, dict):
+                for _k, _v in _db.items():
+                    if isinstance(_k, tuple) and _k and _k[0] == self.cat and _v is not None:
+                        _kt = torch.as_tensor(keep, device=_v.device, dtype=torch.long)
+                        _v[:nF2] = _v[_kt]; _v[nF2:] = 0.0
+        except Exception as _e:
+            print(f"[apoptosis_3d] could not renumber the pending deltas "
+                  f"({type(_e).__name__}) -- chemistry may be scrambled this tick", flush=True)
         m["n_apop"] = int(m.get("n_apop", 0)) + gone
         # LOUD, because a death is not recoverable and the count must be auditable against the
         # cell count: nF -> nF2 should differ by exactly `gone` and by nothing else.

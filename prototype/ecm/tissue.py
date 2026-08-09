@@ -322,16 +322,19 @@ def load_or_build(frames=401, device="cuda:0", name="cellfix_B_new", rebuild=Fal
            "gate_smooth_frames": gate_smooth_frames, "gate_smooth_phi": gate_smooth_phi,
            "load_gain": load_gain, "myosin": myosin, "myo_tau": myo_tau, "myo_beta": myo_beta, "myo_inherit": 1,
            "myo_keyed_on": myo_keyed_on, "myo_destabilising": myo_destabilising,
-           "myo_new": myo_new,
-           # IN THE KEY, because the surface map IS the epithelium as far as every membrane operator
-           # is concerned -- `integrin_adhesion`, `basement_membrane_contact`, `adhesion_pull` and
-           # `surface_track` all read it and nothing else. At 32x64 a bin is 1.63 x 1.63 tissue units
-           # at the end of the run, i.e. about 2x2 cells, so the anchor a fibre pulls toward is a
-           # staircase two cells wide and neighbouring integrins share a value while the surface under
-           # them differs by 0.09 (median) to 0.18 (p90) tissue units -- most of a fibre's 0.223.
-           # Left out of the key, raising the resolution would silently reuse the coarse cache, which
-           # is the third time this file would have shipped that bug.
-           "map_theta": map_theta, "map_phi": map_phi}
+           "myo_new": myo_new}
+    # THE SURFACE MAP'S RESOLUTION IS IN THE KEY, because the map IS the epithelium as far as every
+    # membrane operator is concerned -- `integrin_adhesion`, `basement_membrane_contact`,
+    # `adhesion_pull` and `surface_track` read it and nothing else. At 32x64 a bin is 1.63 x 1.63
+    # tissue units at the end of the run, about 2x2 cells, so the anchor a fibre pulls toward is a
+    # staircase two cells wide and neighbouring integrins share a value while the surface under them
+    # differs by 0.09 (median) to 0.18 (p90) tissue units -- most of a fibre's 0.223 length.
+    #
+    # ADDED ONLY WHEN IT IS NOT THE DEFAULT, and that is not tidiness. Put in unconditionally it
+    # changes the hash of every key ever written, so the next run finds no cache, tries to rebuild, and
+    # dies on a pass-1 spec that is no longer on disk -- which is exactly what happened at 18:35.
+    if (map_theta, map_phi) != (N_THETA, N_PHI):
+        cfg["map_theta"], cfg["map_phi"] = map_theta, map_phi
     for key, path in (("gate", gate_npz), ("load", load_npz)):
         if path is not None:
             sz = os.path.getsize(path) if os.path.exists(path) else 0

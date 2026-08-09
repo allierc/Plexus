@@ -513,6 +513,67 @@ SERIES = {
                                   membrane_exclude=False, membrane_adhesion=1.0e6,
                                   membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
 
+    # ------------------------------------------------------------------------------------------------
+    # 134-137: HOW FEW INTEGRINS BEFORE THE SHEET BULGES. Every run to 133 anchors every particle, which
+    #     is not what a basal surface looks like -- hemidesmosomes are discrete plaques and the membrane
+    #     spans between them. 124/125 tried this on the old route and could not answer it: at k = 5e4 on
+    #     the grid the WHOLE sheet sank (-0.045 at 20%, -0.119 at 5%), so sparse anchoring showed up as
+    #     uniform sinking and the thing it should produce -- the sheet ballooning BETWEEN plaques -- was
+    #     buried under it. On 130's route the anchored particles sit at the fibre length with a residual
+    #     of 3e-5, so whatever the unanchored ones do is the bulge and nothing else.
+    #     The breaking point is where the bulge reaches the surface: standoff p5 < 0 means part of the
+    #     sheet is back inside the epithelium, and that is a failure of adhesion density, not of tuning.
+    "134_anchors_30pct": dict(membrane_springs=False, membrane_impl="mpm", membrane_direct_forces=True,
+                              membrane_grid_bc=False, membrane_contact_k=0.0, membrane_exclude=False,
+                              membrane_adhesion=2.5e5, membrane_gamma=2.0e3,
+                              membrane_adhesion_fraction=0.30,
+                              membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
+    "135_anchors_10pct": dict(membrane_springs=False, membrane_impl="mpm", membrane_direct_forces=True,
+                              membrane_grid_bc=False, membrane_contact_k=0.0, membrane_exclude=False,
+                              membrane_adhesion=2.5e5, membrane_gamma=2.0e3,
+                              membrane_adhesion_fraction=0.10,
+                              membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
+    "136_anchors_3pct": dict(membrane_springs=False, membrane_impl="mpm", membrane_direct_forces=True,
+                             membrane_grid_bc=False, membrane_contact_k=0.0, membrane_exclude=False,
+                             membrane_adhesion=2.5e5, membrane_gamma=2.0e3,
+                             membrane_adhesion_fraction=0.03,
+                             membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
+    "137_anchors_1pct": dict(membrane_springs=False, membrane_impl="mpm", membrane_direct_forces=True,
+                             membrane_grid_bc=False, membrane_contact_k=0.0, membrane_exclude=False,
+                             membrane_adhesion=2.5e5, membrane_gamma=2.0e3,
+                             membrane_adhesion_fraction=0.01,
+                             membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
+
+    # 138-141: HOW LITTLE MATERIAL BEFORE THE SHEET TEARS. The epithelium's surface area grows 11.8x
+    #     (radius 0.0875 -> 0.3010), so a sheet with a fixed particle count is thinned by that factor and
+    #     must either be replenished or come apart. 138 is the control that has to pass first: on the old
+    #     route 128 secreted 45,000 particles and NONE of them joined the sheet -- they ended in a second
+    #     shell 0.19 box units inside, because at k = 5e4 a newly laid particle could not be pulled out
+    #     to the surface faster than the surface ran away from it. At k/gamma = 125 the lag is 3e-5, so
+    #     the same secretion should deliver. If 138 shows the second shell again, 139-141 measure nothing
+    #     and should be killed rather than read.
+    "138_secrete_nominal": dict(membrane_springs=False, membrane_impl="mpm", membrane_direct_forces=True,
+                                membrane_grid_bc=False, membrane_contact_k=0.0, membrane_exclude=False,
+                                membrane_adhesion=2.5e5, membrane_gamma=2.0e3, membrane_tau=0.0,
+                                membrane_particles=90000, membrane_reserve=1.0,
+                                membrane_secrete_rate=0.012),
+    "139_secrete_half": dict(membrane_springs=False, membrane_impl="mpm", membrane_direct_forces=True,
+                             membrane_grid_bc=False, membrane_contact_k=0.0, membrane_exclude=False,
+                             membrane_adhesion=2.5e5, membrane_gamma=2.0e3, membrane_tau=0.0,
+                             membrane_particles=90000, membrane_reserve=1.0,
+                             membrane_secrete_rate=0.006),
+    "140_secrete_quarter": dict(membrane_springs=False, membrane_impl="mpm",
+                                membrane_direct_forces=True, membrane_grid_bc=False,
+                                membrane_contact_k=0.0, membrane_exclude=False,
+                                membrane_adhesion=2.5e5, membrane_gamma=2.0e3, membrane_tau=0.0,
+                                membrane_particles=90000, membrane_reserve=1.0,
+                                membrane_secrete_rate=0.003),
+    "141_secrete_none": dict(membrane_springs=False, membrane_impl="mpm", membrane_direct_forces=True,
+                             membrane_grid_bc=False, membrane_contact_k=0.0, membrane_exclude=False,
+                             membrane_adhesion=2.5e5, membrane_gamma=2.0e3, membrane_tau=0.0,
+                             membrane_particles=90000, membrane_reserve=1.0,
+                             membrane_secrete_rate=0.0),
+
     "_unused_secrete_dense": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
                              membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
                              membrane_particles=90000, membrane_reserve=1.0,
