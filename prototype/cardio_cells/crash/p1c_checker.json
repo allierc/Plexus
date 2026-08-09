@@ -1,0 +1,553 @@
+{
+ "contrasts": {
+  "planted 45/220 (x4.9)": {
+   "lo": 45.0,
+   "hi": 220.0,
+   "mean": 132.5,
+   "n_stiff": 51,
+   "n_soft": 49,
+   "checker vs uniform(mean)": {
+    "path_length": 1.3703997322483605,
+    "peak_excursion": 1.58760186212877,
+    "orientation_error": 0.5499180808746162,
+    "coordination": 0.01370183657117016,
+    "loopscore": 0.6002382636070251,
+    "STAT": 1.58760186212877
+   },
+   "checker vs ANTI-checker": {
+    "path_length": 0.4168969387225607,
+    "peak_excursion": 4.4614163228581045,
+    "orientation_error": 0.7967830327483464,
+    "coordination": 0.3328339014628721,
+    "loopscore": 0.4553520977497101,
+    "STAT": 4.4614163228581045
+   },
+   "checker(space) vs checker(index)": {
+    "path_length": 0.7656217093750501,
+    "peak_excursion": 3.392075169626348,
+    "orientation_error": 0.5430309421999749,
+    "coordination": 0.023081925933008857,
+    "loopscore": 0.4540902078151703,
+    "STAT": 3.392075169626348
+   },
+   "index-checker vs uniform(mean)": {
+    "path_length": 2.1360214416234107,
+    "peak_excursion": 1.8044733074975778,
+    "orientation_error": 0.42524699336173716,
+    "coordination": 0.007524760600879737,
+    "loopscore": 0.6758528351783752,
+    "STAT": 2.1360214416234107
+   },
+   "uniform_impostor_scan": [
+    {
+     "path_length": 1.0899943394598115,
+     "peak_excursion": 6.765199849172305,
+     "orientation_error": 0.6490751115234508,
+     "coordination": 0.8152813177817757,
+     "loopscore": 0.48368266224861145,
+     "STAT": 6.765199849172305,
+     "amp_reading": 0.008996412358276973,
+     "path_reading": 0.0334706109275735,
+     "E": 31.499999999999996
+    },
+    {
+     "path_length": 0.7908201975368851,
+     "peak_excursion": 5.184433880711328,
+     "orientation_error": 0.5868522237330202,
+     "coordination": 0.6020795066617349,
+     "loopscore": 0.5566322207450867,
+     "STAT": 5.184433880711328,
+     "amp_reading": 0.009196149598313639,
+     "path_reading": 0.03328168583629499,
+     "E": 39.567131838806105
+    },
+    {
+     "path_length": 0.15658073106097006,
+     "peak_excursion": 5.687546875247811,
+     "orientation_error": 0.4663513183156718,
+     "coordination": 0.4292112235362953,
+     "loopscore": 0.6152733564376831,
+     "STAT": 5.687546875247811,
+     "amp_reading": 0.009132578897172384,
+     "path_reading": 0.03268341285132957,
+     "E": 49.700251490459145
+    },
+    {
+     "path_length": 0.25699187998180434,
+     "peak_excursion": 3.2048034376856336,
+     "orientation_error": 0.35469317652976357,
+     "coordination": 0.32905043966188463,
+     "loopscore": 0.6473233103752136,
+     "STAT": 3.2048034376856336,
+     "amp_reading": 0.009446285247025434,
+     "path_reading": 0.03294457928366007,
+     "E": 62.4284572426926
+    },
+    {
+     "path_length": 0.32249251563734016,
+     "peak_excursion": 2.1424691436526846,
+     "orientation_error": 0.46732891336704074,
+     "coordination": 0.21778346496578987,
+     "loopscore": 0.6831014156341553,
+     "STAT": 2.1424691436526846,
+     "amp_reading": 0.009580516198424916,
+     "path_reading": 0.03298594219520879,
+     "E": 78.41634914967895
+    },
+    {
+     "path_length": 1.0620936346333807,
+     "peak_excursion": 2.5884529392810065,
+     "orientation_error": 0.4886952806245598,
+     "coordination": 0.019203160432198118,
+     "loopscore": 0.6669420003890991,
+     "STAT": 2.5884529392810065,
+     "amp_reading": 0.00952416404116877,
+     "path_reading": 0.03211159168101813,
+     "E": 98.49873095629202
+    },
+    {
+     "path_length": 1.3871267978551223,
+     "peak_excursion": 1.5638355257368568,
+     "orientation_error": 0.5562027585564363,
+     "coordination": 0.010350934242998145,
+     "loopscore": 0.6160927414894104,
+     "STAT": 1.5638355257368568,
+     "amp_reading": 0.010048825284126966,
+     "path_reading": 0.031906336909882094,
+     "E": 123.72419916516505
+    },
+    {
+     "path_length": 1.317060767119681,
+     "peak_excursion": 2.6369155440242684,
+     "orientation_error": 0.5120811324723868,
+     "coordination": 0.01704402305764184,
+     "loopscore": 0.632789134979248,
+     "STAT": 2.6369155440242684,
+     "amp_reading": 0.010184414008497024,
+     "path_reading": 0.031950582816854985,
+     "E": 155.40989523869175
+    },
+    {
+     "path_length": 1.7675904425554987,
+     "peak_excursion": 5.727763427258618,
+     "orientation_error": 0.5030952641550942,
+     "coordination": 0.0338749992731056,
+     "loopscore": 0.5998764634132385,
+     "STAT": 5.727763427258618,
+     "amp_reading": 0.010574957224816044,
+     "path_reading": 0.0316660784158118,
+     "E": 195.21027980839247
+    },
+    {
+     "path_length": 1.8332072605101033,
+     "peak_excursion": 6.198503965227431,
+     "orientation_error": 0.6881873172088631,
+     "coordination": 0.06188934262651168,
+     "loopscore": 0.4966176152229309,
+     "STAT": 6.198503965227431,
+     "amp_reading": 0.010634437513298473,
+     "path_reading": 0.031624642136453565,
+     "E": 245.20351991964722
+    },
+    {
+     "path_length": 2.505753436894377,
+     "peak_excursion": 1.7677283874583523,
+     "orientation_error": 0.6982656143482612,
+     "coordination": 0.2038931873262262,
+     "loopscore": 0.3851335942745209,
+     "STAT": 2.505753436894377,
+     "amp_reading": 0.010074588109412912,
+     "path_reading": 0.03119993682286685,
+     "E": 308.0
+    }
+   ],
+   "best_uniform": {
+    "path_length": 1.3871267978551223,
+    "peak_excursion": 1.5638355257368568,
+    "orientation_error": 0.5562027585564363,
+    "coordination": 0.010350934242998145,
+    "loopscore": 0.6160927414894104,
+    "STAT": 1.5638355257368568,
+    "amp_reading": 0.010048825284126966,
+    "path_reading": 0.031906336909882094,
+    "E": 123.72419916516505
+   }
+  },
+  "wide 20/800 (x40)": {
+   "lo": 20.0,
+   "hi": 800.0,
+   "mean": 410.0,
+   "n_stiff": 51,
+   "n_soft": 49,
+   "checker vs uniform(mean)": {
+    "path_length": 4.53582364681346,
+    "peak_excursion": 0.5399025653991233,
+    "orientation_error": 1.333063578675505,
+    "coordination": 0.6960451522963035,
+    "loopscore": 0.18206608295440674,
+    "STAT": 4.53582364681346
+   },
+   "checker vs ANTI-checker": {
+    "path_length": 3.482655097008619,
+    "peak_excursion": 8.869721085862883,
+    "orientation_error": 1.2306927927551556,
+    "coordination": 0.6416548586829111,
+    "loopscore": 0.21008418500423431,
+    "STAT": 8.869721085862883
+   },
+   "checker(space) vs checker(index)": {
+    "path_length": 1.7575231502443933,
+    "peak_excursion": 6.346520679028966,
+    "orientation_error": 1.3974516960112624,
+    "coordination": 0.3758503105359001,
+    "loopscore": 0.34667474031448364,
+    "STAT": 6.346520679028966
+   },
+   "index-checker vs uniform(mean)": {
+    "path_length": 6.293346797057853,
+    "peak_excursion": 5.806618113629843,
+    "orientation_error": 1.1794171579832755,
+    "coordination": 0.6669711475522874,
+    "loopscore": -0.09764722734689713,
+    "STAT": 6.293346797057853
+   },
+   "uniform_impostor_scan": [
+    {
+     "path_length": 1.4726616585532466,
+     "peak_excursion": 7.403968496109473,
+     "orientation_error": 0.9148632451740283,
+     "coordination": 1.1418100661975559,
+     "loopscore": 0.30806419253349304,
+     "STAT": 7.403968496109473,
+     "amp_reading": 0.00889671057018998,
+     "path_reading": 0.033058560457318295,
+     "E": 14.0
+    },
+    {
+     "path_length": 2.479773005184962,
+     "peak_excursion": 7.153016910225993,
+     "orientation_error": 0.8391968493407412,
+     "coordination": 1.1514172840337502,
+     "loopscore": 0.4048505127429962,
+     "STAT": 7.153016910225993,
+     "amp_reading": 0.008928419487352457,
+     "path_reading": 0.03242258101782837,
+     "E": 21.698865825676716
+    },
+    {
+     "path_length": 0.8856703076872525,
+     "peak_excursion": 6.157961590332474,
+     "orientation_error": 0.7647065961529537,
+     "coordination": 0.7992698936498303,
+     "loopscore": 0.48787593841552734,
+     "STAT": 6.157961590332474,
+     "amp_reading": 0.009054149422867728,
+     "path_reading": 0.0334292388649817,
+     "E": 33.63148415148007
+    },
+    {
+     "path_length": 2.131556736137737,
+     "peak_excursion": 4.878524383688519,
+     "orientation_error": 0.7525376899506481,
+     "coordination": 0.637955629885305,
+     "loopscore": 0.4955979883670807,
+     "STAT": 4.878524383688519,
+     "amp_reading": 0.009215812351823675,
+     "path_reading": 0.03264247565842655,
+     "E": 52.126075865809916
+    },
+    {
+     "path_length": 1.729334586170143,
+     "peak_excursion": 1.5667607501962988,
+     "orientation_error": 0.7991654821838714,
+     "coordination": 0.49570262774623225,
+     "loopscore": 0.5254884958267212,
+     "STAT": 1.729334586170143,
+     "amp_reading": 0.009634269315729313,
+     "path_reading": 0.03289647440279812,
+     "E": 80.79119473080392
+    },
+    {
+     "path_length": 3.3392674673389062,
+     "peak_excursion": 1.7384930687054942,
+     "orientation_error": 0.8995451473429821,
+     "coordination": 0.4014073424659641,
+     "loopscore": 0.5101720690727234,
+     "STAT": 3.3392674673389062,
+     "amp_reading": 0.010051903733840455,
+     "path_reading": 0.03187981997346765,
+     "E": 125.21980673998816
+    },
+    {
+     "path_length": 4.003235638518651,
+     "peak_excursion": 5.807120924727109,
+     "orientation_error": 0.8537265318445533,
+     "coordination": 0.4426146404283549,
+     "loopscore": 0.4470747113227844,
+     "STAT": 5.807120924727109,
+     "amp_reading": 0.01056599406404237,
+     "path_reading": 0.03146053157327404,
+     "E": 194.0805560834409
+    },
+    {
+     "path_length": 4.48893948197447,
+     "peak_excursion": 1.9722533218777782,
+     "orientation_error": 1.0686461753160243,
+     "coordination": 0.7279910370247936,
+     "loopscore": 0.3315495252609253,
+     "STAT": 4.48893948197447,
+     "amp_reading": 0.01008144044498585,
+     "path_reading": 0.031153815082438897,
+     "E": 300.809138987665
+    },
+    {
+     "path_length": 6.403072143587092,
+     "peak_excursion": 2.4247267424854893,
+     "orientation_error": 1.3872796976092074,
+     "coordination": 0.9484238301023197,
+     "loopscore": 0.262156218290329,
+     "STAT": 6.403072143587092,
+     "amp_reading": 0.009525861263706277,
+     "path_reading": 0.029945061927871452,
+     "E": 466.2297961450488
+    },
+    {
+     "path_length": 6.9788218844156855,
+     "peak_excursion": 1.3147858859778259,
+     "orientation_error": 1.8164963900508593,
+     "coordination": 1.3652128624833513,
+     "loopscore": 0.1297534853219986,
+     "STAT": 6.9788218844156855,
+     "amp_reading": 0.009666107528938452,
+     "path_reading": 0.02958148246996615,
+     "E": 722.6184136060017
+    },
+    {
+     "path_length": 4.782960340964908,
+     "peak_excursion": 2.551486783747364,
+     "orientation_error": 2.444224263432779,
+     "coordination": 1.2238192838013535,
+     "loopscore": -0.18595294654369354,
+     "STAT": 4.782960340964908,
+     "amp_reading": 0.01015462932640095,
+     "path_reading": 0.030968144231122926,
+     "E": 1120.0
+    }
+   ],
+   "best_uniform": {
+    "path_length": 1.729334586170143,
+    "peak_excursion": 1.5667607501962988,
+    "orientation_error": 0.7991654821838714,
+    "coordination": 0.49570262774623225,
+    "loopscore": 0.5254884958267212,
+    "STAT": 1.729334586170143,
+    "amp_reading": 0.009634269315729313,
+    "path_reading": 0.03289647440279812,
+    "E": 80.79119473080392
+   }
+  }
+ },
+ "gain_control": {
+  "gain checker vs uniform(1.0)": {
+   "path_length": 5.76133017299649,
+   "peak_excursion": 13.800112822109167,
+   "orientation_error": 0.44994313140938963,
+   "coordination": 0.03054340404891587,
+   "loopscore": 0.9306623935699463,
+   "STAT": 13.800112822109167
+  },
+  "gain checker vs ANTI-checker": {
+   "path_length": 9.982501747583498,
+   "peak_excursion": 18.888454585653882,
+   "orientation_error": 0.8020920929291331,
+   "coordination": 0.16304250834101625,
+   "loopscore": 0.7140386700630188,
+   "STAT": 18.888454585653882
+  },
+  "uniform_impostor_scan": [
+   {
+    "path_length": 14.060917060238086,
+    "peak_excursion": 32.32505565320232,
+    "orientation_error": 0.6623657151749952,
+    "coordination": 0.16510329171519478,
+    "loopscore": 0.8672811985015869,
+    "STAT": 32.32505565320232,
+    "amp_reading": 0.005323123148885979,
+    "path_reading": 0.02200970911084841,
+    "gain": 0.5
+   },
+   {
+    "path_length": 10.703202860446412,
+    "peak_excursion": 23.060158545239716,
+    "orientation_error": 0.5422668571096806,
+    "coordination": 0.08896318302482076,
+    "loopscore": 0.9028205871582031,
+    "STAT": 23.060158545239716,
+    "amp_reading": 0.006493786621208715,
+    "path_reading": 0.02413006770068343,
+    "gain": 0.6
+   },
+   {
+    "path_length": 6.9783423592526885,
+    "peak_excursion": 14.925455080749787,
+    "orientation_error": 0.434608378164673,
+    "coordination": 0.04522249000300524,
+    "loopscore": 0.9275166988372803,
+    "STAT": 14.925455080749787,
+    "amp_reading": 0.007521644793089669,
+    "path_reading": 0.02648227503272298,
+    "gain": 0.7
+   },
+   {
+    "path_length": 2.6691931451008535,
+    "peak_excursion": 5.658197930478734,
+    "orientation_error": 0.4650043321740775,
+    "coordination": 0.03384573974193431,
+    "loopscore": 0.9406533241271973,
+    "STAT": 5.658197930478734,
+    "amp_reading": 0.008692606467895546,
+    "path_reading": 0.02920345408711497,
+    "gain": 0.8
+   },
+   {
+    "path_length": 1.4723583174025376,
+    "peak_excursion": 4.2082470064665,
+    "orientation_error": 0.44731324310442333,
+    "coordination": 0.02293191869873703,
+    "loopscore": 0.9416427612304688,
+    "STAT": 4.2082470064665,
+    "amp_reading": 0.009939278347223664,
+    "path_reading": 0.031818797054454985,
+    "gain": 0.9
+   },
+   {
+    "path_length": 5.76133017299649,
+    "peak_excursion": 13.800112822109167,
+    "orientation_error": 0.44994313140938963,
+    "coordination": 0.030543404048914907,
+    "loopscore": 0.9289261698722839,
+    "STAT": 13.800112822109167,
+    "amp_reading": 0.011151255858786475,
+    "path_reading": 0.034527234334832665,
+    "gain": 1.0
+   },
+   {
+    "path_length": 9.58195035560601,
+    "peak_excursion": 22.87077595194946,
+    "orientation_error": 0.4476234151553464,
+    "coordination": 0.036542361475095216,
+    "loopscore": 0.9032189846038818,
+    "STAT": 22.87077595194946,
+    "amp_reading": 0.012297376951348048,
+    "path_reading": 0.036939912824025034,
+    "gain": 1.1
+   },
+   {
+    "path_length": 12.319389719380727,
+    "peak_excursion": 31.98713882021811,
+    "orientation_error": 0.40217698411679176,
+    "coordination": 0.04522509081832849,
+    "loopscore": 0.8672673106193542,
+    "STAT": 31.98713882021811,
+    "amp_reading": 0.013449272421525407,
+    "path_reading": 0.03866857486128013,
+    "gain": 1.2000000000000002
+   },
+   {
+    "path_length": 15.897330626219533,
+    "peak_excursion": 35.88595606363108,
+    "orientation_error": 0.4323495856347894,
+    "coordination": 0.04901281034431758,
+    "loopscore": 0.8148850798606873,
+    "STAT": 35.88595606363108,
+    "amp_reading": 0.013941906379457107,
+    "path_reading": 0.04092800412902676,
+    "gain": 1.3
+   },
+   {
+    "path_length": 18.972998274483455,
+    "peak_excursion": 42.2611983608044,
+    "orientation_error": 0.47435558219629637,
+    "coordination": 0.060296321539488315,
+    "loopscore": 0.745740532875061,
+    "STAT": 42.2611983608044,
+    "amp_reading": 0.014747448329630897,
+    "path_reading": 0.04287025350745173,
+    "gain": 1.4
+   },
+   {
+    "path_length": 22.699650967745693,
+    "peak_excursion": 50.805211713686944,
+    "orientation_error": 0.5052157770758855,
+    "coordination": 0.07426183505930119,
+    "loopscore": 0.6625636219978333,
+    "STAT": 50.805211713686944,
+    "amp_reading": 0.015827024737517938,
+    "path_reading": 0.0452235925885387,
+    "gain": 1.5
+   },
+   {
+    "path_length": 26.59252814097907,
+    "peak_excursion": 59.03468760900477,
+    "orientation_error": 0.511932576496389,
+    "coordination": 0.0832030431785319,
+    "loopscore": 0.5635342597961426,
+    "STAT": 59.03468760900477,
+    "amp_reading": 0.016866857853282305,
+    "path_reading": 0.047681900551125325,
+    "gain": 1.6
+   }
+  ],
+  "best_uniform": {
+   "path_length": 1.4723583174025376,
+   "peak_excursion": 4.2082470064665,
+   "orientation_error": 0.44731324310442333,
+   "coordination": 0.02293191869873703,
+   "loopscore": 0.9416427612304688,
+   "STAT": 4.2082470064665,
+   "amp_reading": 0.009939278347223664,
+   "path_reading": 0.031818797054454985,
+   "gain": 0.9
+  }
+ },
+ "planted": {
+  "uniform E at planted mean": {
+   "path_length": 0.05441292581631207,
+   "peak_excursion": 3.817602225624435,
+   "orientation_error": 0.2656794498642943,
+   "coordination": 0.0327871443656595,
+   "loopscore": 0.6591843366622925,
+   "STAT": 3.817602225624435
+  },
+  "uniform E at planted median": {
+   "path_length": 0.041905519554734,
+   "peak_excursion": 3.8237112059268825,
+   "orientation_error": 0.26680633108911556,
+   "coordination": 0.0327871443656595,
+   "loopscore": 0.6608148813247681,
+   "STAT": 3.8237112059268825
+  },
+  "planted E SHUFFLED across cells": {
+   "path_length": 3.183789871318426,
+   "peak_excursion": 5.212316076785344,
+   "orientation_error": 0.37461597518437323,
+   "coordination": 0.006366293192701422,
+   "loopscore": 0.6011072397232056,
+   "STAT": 5.212316076785344
+  },
+  "uniform gain at planted mean (control)": {
+   "path_length": 2.3129738476051815,
+   "peak_excursion": 5.281867582594015,
+   "orientation_error": 0.3212475850955315,
+   "coordination": 0.004800526463388211,
+   "loopscore": 0.9394828677177429,
+   "STAT": 5.281867582594015
+  }
+ },
+ "null": {
+  "path_length": 6.6509503188431465,
+  "peak_excursion": 8.705650308314425,
+  "orientation_error": 10.939580191299047,
+  "coordination": 7.995017873521396
+ }
+}

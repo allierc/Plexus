@@ -1,0 +1,236 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125  warm-up 165 frames
+          reference config at tick 0: |F(0) - I| max 0.00e+00  (must be 0 for X to be the configuration p.F is measured against)
+[collect] ticks 165..195; C=100 Np=10000 dx=0.0078125 [15s]
+[pacemaker] tick 165: clock 1.0000, ||active delta|| 4213, ||passive delta|| 1236
+
+[f] FITS at tick 165, ridge0, displacement read-out.  b is the EXACT simulated displacement in every row; only F (which lives in A) is corrupted.
+    cadence  F                  fit                medg     p90g  corr_g   atten  meanrat  negg     medE      cond     resid
+    sub      clean              joint            0.0000   0.0002   1.000   1.004   1.0008     0   0.0000  1.72e+10 2.857e-04  oracle-ridge ridge1e-12 0.0000
+    sub      clean              gain@E_true      0.0000   0.0002   1.000   1.002   1.0004     0   0.0000  2.35e+08 2.861e-04  oracle-ridge ridge1e-12 0.0000
+/workspace/.conda_envs/neural-graph-linux/lib/python3.12/site-packages/numpy/lib/_function_base_impl.py:3045: RuntimeWarning: invalid value encountered in divide
+  c /= stddev[:, None]
+/workspace/.conda_envs/neural-graph-linux/lib/python3.12/site-packages/numpy/lib/_function_base_impl.py:3046: RuntimeWarning: invalid value encountered in divide
+  c /= stddev[None, :]
+    sub      clean              gain@E132        0.2201   2.2527   0.298   1.704   0.9588     8   0.3228  2.35e+08 1.543e+00  oracle-ridge ridge0     0.2201
+    sub      clean              gain@E60         0.2601   1.7735   0.304   1.459   1.3908     2   0.5330  2.35e+08 8.172e-01  oracle-ridge ridge0.0001 0.2480
+    sub      clean              gain@E240        0.5694   3.8416   0.197   2.072   0.3108    30   0.8680  2.35e+08 2.898e+00  oracle-ridge ridge0.0001 0.5434
+    sub      clean              gain@E_true_err0.03   0.0059   0.0384   0.995   1.004   0.9934     0   0.0082  2.35e+08 2.188e-02  oracle-ridge ridge1e-08 0.0056
+    sub      clean              gain@E_true_err0.1   0.0205   0.1251   0.947   1.007   0.9771     0   0.0272  2.35e+08 7.292e-02  oracle-ridge ridge1e-08 0.0199
+    sub      clean              gain@E_true_err0.3   0.0595   0.3728   0.706   1.018   0.9305     3   0.0816  2.35e+08 2.187e-01  oracle-ridge ridge0     0.0595
+    sub      noiseF_grid48      joint            0.2014   2.8115   0.236   1.440   1.7213     0   0.8347  1.68e+10 4.151e-01  oracle-ridge ridge0     0.2014
+    sub      noiseF_grid48      gain@E_true      0.1003   4.2653  -0.093  -5.660  -0.0030    11   0.0000  2.35e+08 7.953e-01  oracle-ridge ridge0.0001 0.0986
+    sub      noiseF_grid48      gain@E132        0.2854   8.8131  -0.125 -10.563  -0.0969    15   0.3228  2.35e+08 1.705e+00  oracle-ridge ridge0.0001 0.2556
+    sub      noiseF_grid48      gain@E60         0.2964   5.4410  -0.109  -4.117   0.9109     7   0.5330  2.35e+08 8.840e-01  oracle-ridge ridge0     0.2964
+    sub      noiseF_grid48      gain@E240        0.8042  16.6828  -0.131 -20.232  -1.6087    28   0.8680  2.35e+08 3.179e+00  oracle-ridge ridge0.0001 0.7717
+    sub      noiseF_grid48      gain@E_true_err0.03   0.1070   4.1883  -0.095  -5.738   0.0203    11   0.0082  2.35e+08 7.974e-01  oracle-ridge ridge0.0001 0.1056
+    sub      noiseF_grid48      gain@E_true_err0.1   0.0959   4.1638  -0.097  -5.922   0.0748    11   0.0272  2.35e+08 8.048e-01  oracle-ridge ridge0     0.0959
+    sub      noiseF_grid48      gain@E_true_err0.3   0.1166   4.3841  -0.106  -6.446   0.2304    11   0.0816  2.35e+08 8.457e-01  oracle-ridge ridge0.0001 0.1110
+    sub      derivedF_15px      joint            0.4935   2.6479   0.183   1.160   1.6805     0   0.9967  8.24e+11 7.725e-01  oracle-ridge ridge1e-06 0.4673
+    sub      derivedF_15px      gain@E_true      3.9387 173.3921  -0.137 -928.546 -343.0499    46   0.0000  2.35e+08 3.563e+01  oracle-ridge ridge0.01  2.1046
+    sub      derivedF_15px      gain@E132        4.5577 158.7841  -0.131 -1424.524 -505.3133    48   0.3228  2.35e+08 3.295e+01  oracle-ridge ridge0.01  2.2630
+    sub      derivedF_15px      gain@E60         1.9496  69.6030  -0.130 -646.827 -228.7329    43   0.5330  2.35e+08 1.494e+01  oracle-ridge ridge0.01  1.1910
+    sub      derivedF_15px      gain@E240        8.4929 292.5558  -0.131 -2591.069 -920.1840    49   0.8680  2.35e+08 5.998e+01  oracle-ridge ridge0.01  4.2185
+    sub      derivedF_15px      gain@E_true_err0.03   3.9619 172.4467  -0.137 -930.266 -343.1125    46   0.0082  2.35e+08 3.566e+01  oracle-ridge ridge0.01  2.1328
+    sub      derivedF_15px      gain@E_true_err0.1   4.0585 170.2407  -0.137 -934.278 -343.2584    47   0.0272  2.35e+08 3.576e+01  oracle-ridge ridge0.01  2.1883
+    sub      derivedF_15px      gain@E_true_err0.3   4.4688 164.4088  -0.138 -945.743 -343.6753    47   0.0816  2.35e+08 3.614e+01  oracle-ridge ridge0.01  2.2957
+    frame    clean              joint            0.0045   0.0346   0.981   0.990   0.9875     0   0.0078  4.40e+10 1.061e-01  oracle-ridge ridge0     0.0045
+    frame    clean              gain@E_true      0.0027   0.0088   0.999   0.996   0.9995     0   0.0000  5.76e+08 1.082e-01  oracle-ridge ridge1e-10 0.0027
+    frame    clean              gain@E132        0.2399   2.4572   0.256   2.373   1.1106    10   0.3228  5.76e+08 1.937e+00  oracle-ridge ridge0     0.2399
+    frame    clean              gain@E60         0.2808   1.9912   0.270   1.593   1.4194     3   0.5330  5.76e+08 9.425e-01  oracle-ridge ridge1e-08 0.2679
+    frame    clean              gain@E240        0.6301   4.8648   0.216   3.544   0.6473    28   0.8680  5.76e+08 3.548e+00  oracle-ridge ridge0.0001 0.6201
+    frame    clean              gain@E_true_err0.03   0.0072   0.0450   0.976   0.997   0.9889     0   0.0082  5.76e+08 1.133e-01  oracle-ridge ridge0     0.0072
+    frame    clean              gain@E_true_err0.1   0.0211   0.1357   0.824   1.001   0.9642     1   0.0272  5.76e+08 1.459e-01  oracle-ridge ridge0     0.0211
+    frame    clean              gain@E_true_err0.3   0.0634   0.4057   0.446   1.013   0.8935     3   0.0816  5.76e+08 3.009e-01  oracle-ridge ridge0     0.0634
+    frame    noiseF_grid48      joint            0.2451   2.6970   0.226   1.247   1.6431     2   0.8416  4.00e+10 3.789e-01  oracle-ridge ridge0.0001 0.2269
+    frame    noiseF_grid48      gain@E_true      0.0850   7.1072  -0.123 -12.252  -1.4982    12   0.0000  5.76e+08 7.383e-01  oracle-ridge ridge0     0.0850
+    frame    noiseF_grid48      gain@E132        0.2674   7.3747  -0.134 -28.294  -5.0444    11   0.3228  5.76e+08 2.048e+00  oracle-ridge ridge0.0001 0.2537
+    frame    noiseF_grid48      gain@E60         0.3176   5.0360  -0.129 -12.347  -1.3783     5   0.5330  5.76e+08 9.910e-01  oracle-ridge ridge0.0001 0.2801
+    frame    noiseF_grid48      gain@E240        0.7737  11.3092  -0.136 -52.214 -10.5436    23   0.8680  5.76e+08 3.747e+00  oracle-ridge ridge0.0001 0.6856
+    frame    noiseF_grid48      gain@E_true_err0.03   0.0861   7.0793  -0.124 -12.308  -1.5125    12   0.0082  5.76e+08 7.405e-01  oracle-ridge ridge0     0.0861
+    frame    noiseF_grid48      gain@E_true_err0.1   0.0928   7.0141  -0.124 -12.438  -1.5458    11   0.0272  5.76e+08 7.498e-01  oracle-ridge ridge1e-06 0.0928
+    frame    noiseF_grid48      gain@E_true_err0.3   0.1410   7.1196  -0.125 -12.808  -1.6409    12   0.0816  5.76e+08 8.062e-01  oracle-ridge ridge0.0001 0.1284
+    frame    derivedF_15px      joint            0.5326   2.9118   0.199   1.303   1.7116     1   0.9986  4.48e+11 5.826e-01  oracle-ridge ridge1e-06 0.4964
+    frame    derivedF_15px      gain@E_true      5.7645 162.8325  -0.139 -853.167 -244.8581    44   0.0000  5.76e+08 3.303e+01  oracle-ridge ridge0.01  2.3380
+    frame    derivedF_15px      gain@E132        5.7897 167.1654  -0.136 -957.813 -273.0714    44   0.3228  5.76e+08 3.063e+01  oracle-ridge ridge0.01  2.5829
+    frame    derivedF_15px      gain@E60         2.5000  75.6187  -0.136 -434.856 -123.2088    42   0.5330  5.76e+08 1.390e+01  oracle-ridge ridge0.01  1.2317
+    frame    derivedF_15px      gain@E240       10.4833 304.4853  -0.136 -1742.248 -497.8653    47   0.8680  5.76e+08 5.574e+01  oracle-ridge ridge0.01  5.0251
+    frame    derivedF_15px      gain@E_true_err0.03   5.6922 164.0412  -0.139 -854.388 -245.3931    44   0.0082  5.76e+08 3.308e+01  oracle-ridge ridge0.01  2.3301
+    frame    derivedF_15px      gain@E_true_err0.1   5.7204 167.3736  -0.139 -857.235 -246.6416    44   0.0272  5.76e+08 3.322e+01  oracle-ridge ridge0.01  2.3116
+    frame    derivedF_15px      gain@E_true_err0.3   6.2307 174.4951  -0.139 -865.370 -250.2088    42   0.0816  5.76e+08 3.374e+01  oracle-ridge ridge0.01  2.3920
+
+[f] 48 fits in 51s -> p1d_fit.json
+
+[r] 40 candidates x 3 ticks x 150-frame free rollouts (margin 20); the reference at each tick is theta_true through the SAME code path, so theta_true must read 0.00 steps
+    tick 165: reference built in 8s; max displacement 4.36 dx
+      n1|clean|joint                               R2    1.0000 rms/dx  0.0000 [13s]
+      n1|clean|gain@E_true                         R2    1.0000 rms/dx  0.0000 [13s]
+      n1|clean|gain@E132                           R2    0.8184 rms/dx  0.1971 [13s]
+      n1|clean|gain@E60                            R2    0.6097 rms/dx  0.2649 [13s]
+      n1|clean|gain@E240                           R2    0.3490 rms/dx  0.3619 [13s]
+      n1|noiseF_grid48|joint                       R2    0.8454 rms/dx  0.1738 [11s]
+      n1|noiseF_grid48|gain@E_true                 R2    0.9955 rms/dx  0.0307 [8s]
+      n1|noiseF_grid48|gain@E132                   R2    0.8142 rms/dx  0.1994 [8s]
+      n1|noiseF_grid48|gain@E60                    R2    0.6070 rms/dx  0.2666 [8s]
+      n1|noiseF_grid48|gain@E240                   R2    0.3709 rms/dx  0.3547 [8s]
+      n1|derivedF_15px|joint                       R2   -1.0641 rms/dx  0.5905 [8s]
+      n1|derivedF_15px|gain@E_true                 R2   -1.6215 rms/dx  0.6822 [8s]
+      n1|derivedF_15px|gain@E132                   R2   -1.6656 rms/dx  0.7216 [8s]
+      n1|derivedF_15px|gain@E60                    R2   -1.5759 rms/dx  0.6655 [8s]
+      n1|derivedF_15px|gain@E240                   R2   -1.0980 rms/dx  0.6537 [8s]
+      n10|clean|joint                              R2    0.9999 rms/dx  0.0046 [8s]
+      n10|clean|gain@E_true                        R2    1.0000 rms/dx  0.0027 [12s]
+      n10|clean|gain@E132                          R2    0.8172 rms/dx  0.1977 [13s]
+      n10|clean|gain@E60                           R2    0.6143 rms/dx  0.2641 [13s]
+      n10|clean|gain@E240                          R2    0.3518 rms/dx  0.3614 [13s]
+      n10|noiseF_grid48|joint                      R2    0.7604 rms/dx  0.2118 [13s]
+      n10|noiseF_grid48|gain@E_true                R2    0.9968 rms/dx  0.0260 [11s]
+      n10|noiseF_grid48|gain@E132                  R2    0.8057 rms/dx  0.2038 [8s]
+      n10|noiseF_grid48|gain@E60                   R2    0.6137 rms/dx  0.2648 [8s]
+      n10|noiseF_grid48|gain@E240                  R2    0.3467 rms/dx  0.3627 [8s]
+      n10|derivedF_15px|joint                      R2   -0.9437 rms/dx  0.5752 [8s]
+      n10|derivedF_15px|gain@E_true                R2   -2.3930 rms/dx  0.7674 [8s]
+      n10|derivedF_15px|gain@E132                  R2   -1.8384 rms/dx  0.7270 [8s]
+      n10|derivedF_15px|gain@E60                   R2   -2.2386 rms/dx  0.7500 [8s]
+      n10|derivedF_15px|gain@E240                  R2   -1.8372 rms/dx  0.7633 [8s]
+      RAW(unboxed) n10|derivedF_15px|gain@E132     R2  -18.9645 rms/dx  2.0675 [8s]
+      RAW(unboxed) n10|clean|gain@E132             R2    0.8010 rms/dx  0.2063 [8s]
+      theta_true                                   R2    1.0000 rms/dx  0.0000 [8s]
+      null_g1_at_E_true                            R2    0.9041 rms/dx  0.1429 [8s]
+      null_g1_at_E132                              R2    0.7957 rms/dx  0.2087 [8s]
+      null_gain_true_at_E132                       R2    0.8593 rms/dx  0.1730 [8s]
+      null_gain_true_at_E60                        R2    0.4665 rms/dx  0.2963 [8s]
+      null_gain_true_at_E240                       R2    0.2044 rms/dx  0.3916 [8s]
+      null_permerr[n10|derivedF_15px|gain@E132]    R2 -985.6904 rms/dx 14.5903 [8s]
+      null_permerr[n10|clean|gain@E_true]          R2    0.9993 rms/dx  0.0121 [8s]
+    tick 180: reference built in 8s; max displacement 4.21 dx
+      n1|clean|joint                               R2    1.0000 rms/dx  0.0000 [8s]
+      n1|clean|gain@E_true                         R2    1.0000 rms/dx  0.0000 [8s]
+      n1|clean|gain@E132                           R2    0.9379 rms/dx  0.1397 [8s]
+      n1|clean|gain@E60                            R2    0.8550 rms/dx  0.2043 [8s]
+      n1|clean|gain@E240                           R2    0.6614 rms/dx  0.3170 [8s]
+      n1|noiseF_grid48|joint                       R2    0.9174 rms/dx  0.1579 [8s]
+      n1|noiseF_grid48|gain@E_true                 R2    0.9995 rms/dx  0.0045 [8s]
+      n1|noiseF_grid48|gain@E132                   R2    0.9376 rms/dx  0.1399 [8s]
+      n1|noiseF_grid48|gain@E60                    R2    0.8552 rms/dx  0.2042 [8s]
+      n1|noiseF_grid48|gain@E240                   R2    0.6628 rms/dx  0.3164 [8s]
+      n1|derivedF_15px|joint                       R2    0.2372 rms/dx  0.4696 [8s]
+      n1|derivedF_15px|gain@E_true                 R2   -0.8445 rms/dx  0.2693 [8s]
+      n1|derivedF_15px|gain@E132                   R2   -0.7333 rms/dx  0.3726 [8s]
+      n1|derivedF_15px|gain@E60                    R2   -0.0052 rms/dx  0.3582 [8s]
+      n1|derivedF_15px|gain@E240                   R2   -0.5641 rms/dx  0.4985 [8s]
+      n10|clean|joint                              R2    1.0000 rms/dx  0.0033 [8s]
+      n10|clean|gain@E_true                        R2    1.0000 rms/dx  0.0004 [8s]
+      n10|clean|gain@E132                          R2    0.9377 rms/dx  0.1399 [8s]
+      n10|clean|gain@E60                           R2    0.8555 rms/dx  0.2042 [8s]
+      n10|clean|gain@E240                          R2    0.6607 rms/dx  0.3176 [8s]
+      n10|noiseF_grid48|joint                      R2    0.8805 rms/dx  0.1882 [8s]
+      n10|noiseF_grid48|gain@E_true                R2    0.9996 rms/dx  0.0040 [8s]
+      n10|noiseF_grid48|gain@E132                  R2    0.9373 rms/dx  0.1401 [8s]
+      n10|noiseF_grid48|gain@E60                   R2    0.8555 rms/dx  0.2041 [8s]
+      n10|noiseF_grid48|gain@E240                  R2    0.6607 rms/dx  0.3175 [8s]
+      n10|derivedF_15px|joint                      R2    0.2341 rms/dx  0.4712 [8s]
+      n10|derivedF_15px|gain@E_true                R2   -1.5891 rms/dx  0.3194 [8s]
+      n10|derivedF_15px|gain@E132                  R2   -1.1364 rms/dx  0.4021 [8s]
+      n10|derivedF_15px|gain@E60                   R2   -0.3457 rms/dx  0.3903 [8s]
+      n10|derivedF_15px|gain@E240                  R2   -0.8452 rms/dx  0.5226 [8s]
+      RAW(unboxed) n10|derivedF_15px|gain@E132     R2   -3.2153 rms/dx  0.5172 [8s]
+      RAW(unboxed) n10|clean|gain@E132             R2    0.9363 rms/dx  0.1410 [8s]
+      theta_true                                   R2    1.0000 rms/dx  0.0000 [8s]
+      null_g1_at_E_true                            R2    0.9751 rms/dx  0.0317 [8s]
+      null_g1_at_E132                              R2    0.9178 rms/dx  0.1519 [8s]
+      null_gain_true_at_E132                       R2    0.9391 rms/dx  0.1386 [8s]
+      null_gain_true_at_E60                        R2    0.8109 rms/dx  0.2263 [8s]
+      null_gain_true_at_E240                       R2    0.6096 rms/dx  0.3356 [8s]
+      null_permerr[n10|derivedF_15px|gain@E132]    R2 -123.6728 rms/dx  2.6307 [8s]
+      null_permerr[n10|clean|gain@E_true]          R2    1.0000 rms/dx  0.0014 [8s]
+    tick 195: reference built in 8s; max displacement 3.92 dx
+      n1|clean|joint                               R2    1.0000 rms/dx  0.0000 [8s]
+      n1|clean|gain@E_true                         R2    1.0000 rms/dx  0.0000 [8s]
+      n1|clean|gain@E132                           R2    0.9638 rms/dx  0.1130 [8s]
+      n1|clean|gain@E60                            R2    0.9196 rms/dx  0.1269 [10s]
+      n1|clean|gain@E240                           R2    0.8124 rms/dx  0.2301 [13s]
+      n1|noiseF_grid48|joint                       R2    0.9650 rms/dx  0.1040 [13s]
+      n1|noiseF_grid48|gain@E_true                 R2    0.9987 rms/dx  0.0112 [13s]
+      n1|noiseF_grid48|gain@E132                   R2    0.9624 rms/dx  0.1142 [13s]
+      n1|noiseF_grid48|gain@E60                    R2    0.9202 rms/dx  0.1268 [13s]
+      n1|noiseF_grid48|gain@E240                   R2    0.8150 rms/dx  0.2290 [8s]
+      n1|derivedF_15px|joint                       R2    0.7519 rms/dx  0.2402 [8s]
+      n1|derivedF_15px|gain@E_true                 R2   -1.2479 rms/dx  0.4838 [9s]
+      n1|derivedF_15px|gain@E132                   R2   -0.7898 rms/dx  0.4914 [13s]
+      n1|derivedF_15px|gain@E60                    R2   -0.6493 rms/dx  0.4488 [13s]
+      n1|derivedF_15px|gain@E240                   R2   -0.2091 rms/dx  0.4640 [13s]
+      n10|clean|joint                              R2    1.0000 rms/dx  0.0024 [13s]
+      n10|clean|gain@E_true                        R2    1.0000 rms/dx  0.0008 [13s]
+      n10|clean|gain@E132                          R2    0.9638 rms/dx  0.1131 [13s]
+      n10|clean|gain@E60                           R2    0.9226 rms/dx  0.1259 [13s]
+      n10|clean|gain@E240                          R2    0.8117 rms/dx  0.2311 [13s]
+      n10|noiseF_grid48|joint                      R2    0.9468 rms/dx  0.1224 [13s]
+      n10|noiseF_grid48|gain@E_true                R2    0.9990 rms/dx  0.0098 [13s]
+      n10|noiseF_grid48|gain@E132                  R2    0.9617 rms/dx  0.1149 [13s]
+      n10|noiseF_grid48|gain@E60                   R2    0.9231 rms/dx  0.1258 [13s]
+      n10|noiseF_grid48|gain@E240                  R2    0.8106 rms/dx  0.2313 [13s]
+      n10|derivedF_15px|joint                      R2    0.7729 rms/dx  0.2378 [13s]
+      n10|derivedF_15px|gain@E_true                R2   -2.0453 rms/dx  0.5621 [13s]
+      n10|derivedF_15px|gain@E132                  R2   -1.1464 rms/dx  0.5308 [13s]
+      n10|derivedF_15px|gain@E60                   R2   -1.1741 rms/dx  0.5107 [11s]
+      n10|derivedF_15px|gain@E240                  R2   -0.5521 rms/dx  0.5169 [8s]
+      RAW(unboxed) n10|derivedF_15px|gain@E132     R2   -5.0100 rms/dx  0.8576 [8s]
+      RAW(unboxed) n10|clean|gain@E132             R2    0.9591 rms/dx  0.1175 [8s]
+      theta_true                                   R2    1.0000 rms/dx  0.0000 [8s]
+      null_g1_at_E_true                            R2    0.9628 rms/dx  0.0629 [8s]
+      null_g1_at_E132                              R2    0.9381 rms/dx  0.1355 [8s]
+      null_gain_true_at_E132                       R2    0.9682 rms/dx  0.1086 [8s]
+      null_gain_true_at_E60                        R2    0.8353 rms/dx  0.1653 [13s]
+      null_gain_true_at_E240                       R2    0.7702 rms/dx  0.2477 [13s]
+      null_permerr[n10|derivedF_15px|gain@E132]    R2 -181.5579 rms/dx  4.7828 [13s]
+      null_permerr[n10|clean|gain@E_true]          R2    0.9999 rms/dx  0.0031 [13s]
+
+[r] THE ACCEPTANCE STATISTIC, worst certified instrument over 3 ticks, in distinguishable steps (lower is better).  Knowing nothing = 6.65.
+    candidate                                        STAT  pattern   amplit limiting              medg  atten  beats null?
+    theta_true                                       0.00     0.00     0.00 path_length          0.000   1.00          YES
+    n1|clean|gain@E_true                             0.00     0.00     0.00 path_length          0.000   1.00          YES
+    n1|clean|joint                                   0.00     0.00     0.00 path_length          0.000   1.00          YES
+    n10|clean|gain@E_true                            0.14     0.01     0.14 peak_excursion       0.003   1.00          YES
+    n10|clean|joint                                  0.24     0.01     0.24 peak_excursion       0.005   0.99          YES
+    null_permerr[n10|clean|gain@E_true]              0.59     0.02     0.59 path_length          0.002   1.00          YES
+    n10|noiseF_grid48|gain@E_true                    1.77     0.10     1.77 peak_excursion       0.085   1.19          YES
+    n1|noiseF_grid48|gain@E_true                     2.61     0.09     2.61 peak_excursion       0.100   0.48          YES
+    n1|noiseF_grid48|gain@E132                       4.53     0.53     4.53 peak_excursion       0.285   0.40          YES
+    null_gain_true_at_E132                           5.32     0.45     5.32 peak_excursion       0.000   1.00          YES
+    n10|clean|gain@E132                              6.93     0.56     6.93 peak_excursion       0.240   1.29           no
+    null_g1_at_E_true                                7.99     0.37     7.99 peak_excursion       0.280  -0.00           no
+    n1|clean|gain@E132                               8.03     0.55     8.03 peak_excursion       0.220   1.34           no
+    RAW(unboxed) n10|clean|gain@E132                 8.81     0.57     8.81 peak_excursion       0.240   2.37           no
+    n10|noiseF_grid48|gain@E132                      9.90     0.60     9.90 peak_excursion       0.267   1.07           no
+    n10|noiseF_grid48|gain@E60                      10.09     0.62    10.09 peak_excursion       0.318   0.91           no
+    n1|clean|gain@E60                               10.19     0.54    10.19 peak_excursion       0.260   1.19           no
+    n10|clean|gain@E60                              10.37     0.58    10.37 peak_excursion       0.281   1.09           no
+    n1|noiseF_grid48|joint                          10.99     0.56    10.99 peak_excursion       0.201   1.22           no
+    n1|noiseF_grid48|gain@E60                       12.09     0.57    12.09 peak_excursion       0.296   0.55           no
+    null_g1_at_E132                                 12.50     0.55    12.50 peak_excursion       0.280  -0.00           no
+    n10|noiseF_grid48|joint                         12.86     0.57    12.86 peak_excursion       0.245   1.14           no
+    null_gain_true_at_E60                           13.74     0.49    13.74 peak_excursion       0.000   1.00           no
+    n1|noiseF_grid48|gain@E240                      15.39     0.89    15.39 peak_excursion       0.720   0.44           no
+    n1|clean|gain@E240                              17.28     0.90    17.28 peak_excursion       0.569   1.52           no
+    n10|clean|gain@E240                             20.13     0.91    20.13 peak_excursion       0.620   1.53           no
+    n10|noiseF_grid48|gain@E240                     20.28     0.87    20.28 peak_excursion       0.704   1.35           no
+    null_gain_true_at_E240                          22.18     0.99    22.18 peak_excursion       0.000   1.00           no
+    n1|derivedF_15px|joint                          25.18     1.18    25.18 peak_excursion       0.493   1.00           no
+    n10|derivedF_15px|joint                         25.26     1.16    25.26 peak_excursion       0.533   0.93           no
+    n1|derivedF_15px|gain@E60                       68.46     0.98    68.46 peak_excursion       0.745   1.95           no
+    n1|derivedF_15px|gain@E_true                    81.59     0.93    81.59 peak_excursion       0.837   2.60           no
+    n1|derivedF_15px|gain@E240                      86.06     1.08    86.06 peak_excursion       0.839   2.76           no
+    n10|derivedF_15px|gain@E240                     87.01     1.49    87.01 peak_excursion       0.865   2.84           no
+    n1|derivedF_15px|gain@E132                      87.87     1.41    87.87 peak_excursion       0.833   2.71           no
+    n10|derivedF_15px|gain@E132                     90.20     1.11    90.20 peak_excursion       0.858   2.89           no
+    n10|derivedF_15px|gain@E60                      92.89     1.33    92.89 peak_excursion       0.801   2.27           no
+    n10|derivedF_15px|gain@E_true                  103.60     1.09   103.60 peak_excursion       0.860   2.46           no
+    RAW(unboxed) n10|derivedF_15px|gain@E132       201.07     2.32   201.07 peak_excursion       5.790 -957.81           no
+    null_permerr[n10|derivedF_15px|gain@E132]      626.24     3.63   626.24 peak_excursion       7.288 167.62           no
+
+wrote p1d.json [1221 s]

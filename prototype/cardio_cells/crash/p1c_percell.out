@@ -1,0 +1,44 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[   18.6s] [planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+[   18.6s]           E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+[   18.6s]           warm-up 180 frames; window A = ticks 31..180 recorded
+[   18.6s]   reading surface: all 10000 particles, 100-100 per cell
+[   31.5s]   reference peak_excursion: all-particles 0.00777337, 10x10 surface 0.00957049
+[   31.5s] 
+====================================================================================================================
+  A. ONE CELL AT A TIME. Its modulus is moved 40 -> 220 (x5.5, the whole planted range) and its OWN particles are read.
+====================================================================================================================
+[   31.5s]    cell          centroid r from pulse  E_true  own-cell STAT  own peak_exc  WHOLE-sheet STAT  10x10 STAT
+[   57.5s]      50     [0.494 0.506]        0.009    53.9         13.162        13.162             1.856       4.708
+[   83.4s]      59     [0.567 0.708]        0.218   132.7          8.464         8.464             0.548       0.755
+[  109.3s]      20     [0.803 0.645]        0.335   157.8          0.947         0.947             0.361       0.303
+[  135.4s]      81     [0.164 0.778]        0.436   120.0          0.143         0.036             0.088       0.007
+[  153.1s]      10     [0.062 0.918]        0.605   125.0          0.100         0.000             0.000       0.000
+[  153.1s]   (a step is a difference the instrument can resolve; the null is 6.65 steps)
+[  153.1s] 
+====================================================================================================================
+  B. THE WHOLE FIELD, scored per cell against the planted rollout
+====================================================================================================================
+[  153.1s]   candidate                                 median       p90       max           >1 step     >5 steps
+[  161.3s]   uniform E = 93 (best impostor)           median    1.71  p90   13.51  max    27.38   cells >1 step  60/100   >5 steps  36/100
+[  170.0s]   uniform E = 128.4 (planted mean)         median    1.57  p90   11.37  max    20.08   cells >1 step  63/100   >5 steps  28/100
+[  178.6s]   planted E SHUFFLED                       median    2.26  p90   12.64  max    31.22   cells >1 step  66/100   >5 steps  37/100
+[  187.2s]   checkerboard 45/220                      median    2.73  p90   21.93  max    39.59   cells >1 step  71/100   >5 steps  43/100
+[  195.9s]   uniform gain = mean (E true) [control]   median    2.56  p90   24.93  max    40.87   cells >1 step  59/100   >5 steps  45/100
+[  204.7s]   gain x1.10 (E true) [control]            median    6.53  p90   17.54  max    22.49   cells >1 step  62/100   >5 steps  56/100
+[  205.1s] 
+  whole-sheet (unmasked) and the certified 10x10 surface, for the same candidates:
+[  205.1s]   candidate                                 all particles  10x10 surface   rho(steps, |log E err|)
+[  205.1s]   uniform E = 93 (best impostor)                     2.19           0.73                     0.132
+[  205.1s]   uniform E = 128.4 (planted mean)                   3.56           3.82                     0.213
+[  205.1s]   planted E SHUFFLED                                 3.62           5.21                    -0.036
+[  205.1s]   checkerboard 45/220                                2.09           2.22                     0.130
+[  205.1s]   uniform gain = mean (E true) [control]             1.84           5.28                        --
+[  205.1s]   gain x1.10 (E true) [control]                      6.59           8.23                        --
+[  205.1s] 
+  the null (knowing nothing): path_length 6.65, peak_excursion 8.71, orientation_error 10.94, coordination 8.00
+[  205.1s]   -> /workspace/Plexus/prototype/cardio_cells/crash/p1c_percell.json

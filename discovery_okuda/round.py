@@ -1017,7 +1017,17 @@ def user_input(ctx):
     Read at the TOP OF EVERY ROUND, not at launch, so an instruction written mid-campaign takes
     effect on the next round without a relaunch. That is the whole point of a steering channel.
     """
-    txt = _read(os.path.join(CAMPAIGN, "user_input.md"), limit=8000)
+    # 12,000 AND LOUD, because `_read` keeps the LAST `limit` characters and this file is written
+    # newest-first. At 8,000 a 8,445-byte file lost its opening section -- which was the most
+    # important one, a withdrawal of a standing conclusion -- and what reached the roles began
+    # mid-word: "d rather than revised." Silent truncation of the human channel is the same defect
+    # class as the channel reaching nobody at all, which this file already suffered once.
+    _p = os.path.join(CAMPAIGN, "user_input.md")
+    _raw = _read(_p)
+    if len(_raw) > 12000:
+        print(T_.warn(f"[round] user_input.md is {len(_raw)} chars and only the last 12,000 reach "
+                      f"the roles -- the OPENING will be cut. Trim it, newest instructions last."))
+    txt = _read(_p, limit=12000)
     body = "\n".join(l for l in (txt or "").splitlines()
                      if l.strip() and not l.strip().startswith("#"))
     if not body.strip():

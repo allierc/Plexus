@@ -1,0 +1,70 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125  warm-up 100 frames
+          reference config at tick 0: |F(0) - I| max 0.00e+00  (must be 0 for X to be the configuration p.F is measured against)
+
+[tick 100] base=base0 (step_E=100, step_gain=1)  ||A_gain|| 0  ||y(base)|| 0.00151389
+    variant        | max|dA_gain|  rel dA_gain |   rel dA_E |    max|dy0|    rel dy0
+    true           |    0.000e+00          nan |  0.000e+00 |   0.000e+00  0.000e+00
+    sF_indep       |    0.000e+00          nan |  1.693e+00 |   0.000e+00  0.000e+00
+    derived_15px   |    0.000e+00          nan |  3.420e+01 |   0.000e+00  0.000e+00
+    [recovery, base=base0] theta_hat = base + ridge0 increment
+    assembly                   |   E slope   E corr  E medErr |   g slope   g corr  g medErr |  fit res
+    all_true                   | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    all_sF_indep               | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    all_derived15              | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    Eonly_derived15            | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    gainonly_derived15         | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    y0only_derived15           | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+
+[tick 100] base=baseMid (step_E=1, step_gain=0.01)  ||A_gain|| 0  ||y(base)|| 0.00274537
+    variant        | max|dA_gain|  rel dA_gain |   rel dA_E |    max|dy0|    rel dy0
+    true           |    0.000e+00          nan |  0.000e+00 |   0.000e+00  0.000e+00
+    sF_indep       |    0.000e+00          nan |  1.696e+00 |   3.599e-04  2.589e+00
+    derived_15px   |    0.000e+00          nan |  2.973e+01 |   1.134e-02  4.989e+01
+    [recovery, base=baseMid] theta_hat = base + ridge0 increment
+    assembly                   |   E slope   E corr  E medErr |   g slope   g corr  g medErr |  fit res
+    all_true                   | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    all_sF_indep               | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    all_derived15              | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    Eonly_derived15            | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    gainonly_derived15         | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    y0only_derived15           | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+
+[tick 100] base=baseMid_secant (step_E=100, step_gain=1)  ||A_gain|| 0  ||y(base)|| 0.00274537
+    variant        | max|dA_gain|  rel dA_gain |   rel dA_E |    max|dy0|    rel dy0
+    true           |    0.000e+00          nan |  0.000e+00 |   0.000e+00  0.000e+00
+    sF_indep       |    0.000e+00          nan |  1.697e+00 |   3.599e-04  2.589e+00
+    derived_15px   |    0.000e+00          nan |  2.798e+01 |   1.134e-02  4.989e+01
+    [recovery, base=baseMid_secant] theta_hat = base + ridge0 increment
+    assembly                   |   E slope   E corr  E medErr |   g slope   g corr  g medErr |  fit res
+    all_true                   | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    all_sF_indep               | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    all_derived15              | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    Eonly_derived15            | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    gainonly_derived15         | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    y0only_derived15           | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+
+[tick 100] base=baseTrue (step_E=1, step_gain=0.01)  ||A_gain|| 0  ||y(base)|| 0.00157139
+    variant        | max|dA_gain|  rel dA_gain |   rel dA_E |    max|dy0|    rel dy0
+    true           |    0.000e+00          nan |  0.000e+00 |   0.000e+00  0.000e+00
+    sF_indep       |    0.000e+00          nan |  1.693e+00 |   4.140e-04  4.981e+00
+    derived_15px   |    0.000e+00          nan |  2.971e+01 |   1.333e-02  9.201e+01
+    [recovery, base=baseTrue] theta_hat = base + ridge0 increment
+    assembly                   |   E slope   E corr  E medErr |   g slope   g corr  g medErr |  fit res
+    all_true                   | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    all_sF_indep               | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    all_derived15              | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    Eonly_derived15            | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    gainonly_derived15         | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+    y0only_derived15           | _LinAlgError: torch.linalg.solve: The solver failed because the input matrix is singular.
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125  warm-up 210 frames
+          reference config at tick 0: |F(0) - I| max 0.00e+00  (must be 0 for X to be the configuration p.F is measured against)

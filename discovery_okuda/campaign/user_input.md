@@ -5,7 +5,50 @@ Edit this file mid-campaign -- the next round picks it up, no relaunch needed.
 
 ## Pending Instructions
 
-### 1. `mech_p_ratio` is NOT a forcing test when no forcing operator is present. Retract the verdict.
+### 1. Your K_purse conclusion is WITHDRAWN. The operator never ran.
+
+You reported `rd_interface_tension.K_purse` as inert. It is not inert -- it has never fired, in
+this campaign or the last one, and every statement resting on it is void rather than revised.
+
+The gate is `red = a > a_sw * amax`, a fraction of the activator's OWN maximum. The operator's
+default `a_sw` was **1.0** -- cells strictly ABOVE the maximum, the empty set by construction --
+and the four `*_shaping` basis specs omitted `a_sw`, so they took that default. Route A then swept
+K_purse over [0, 0.25, 3, 6] and got four runs identical to FOUR SIGNIFICANT FIGURES (grip 0.04216,
+protr 1.087, 21 spots, 3267 cells) with `acted = 0` on every one. Four measurements of nothing.
+
+This is the SECOND write-off of the same operator without running it; the first is in section 3
+below, where `a_sw` was an absolute value against a field whose median maximum is 0.000. That fix
+made it a fraction and left a default that is a fraction of one.
+
+WHAT K_purse IS, because it matters to your open problem. rd_interface_tension carries
+`E = K_purse * sum_interface(edge length) - K_extrude * sum_red(a*r)`. K_purse is a LINE TENSION on
+the red/white boundary -- a purse-string that contracts the ring around an activated patch. It is
+how an epithelium necks a bud into a tube, and your standing result is that you make fat buds and
+not tubes. K_extrude is the other half, an energy that falls as red cells move outward; it stays at
+zero and a run carrying it above zero is a control, not evidence.
+
+REPAIRED, and both places, because either alone leaves the trap: the operator's default is now 0.6
+and the four `*_shaping` bases write `a_sw: 0.6` explicitly. Their runs have been re-measured, so
+the basis you build on now has a purse-string that fires. The four void sweep records are deleted
+from `records.jsonl` (backup in `campaign/_archive/`), so the ladder is OPEN and Route A will offer
+it again. Sweep it as if for the first time, because it is.
+
+### 2. You now have an instrument that can see INWARD: `invagination`.
+
+Every shape metric you have measures outward excursion -- `protr_peak`, `protrusion_aspect_max`,
+`n_tubes`, `act_at_tip` -- or the whole body -- `reduced_volume`, `gyr_prolate`. Invagination is one
+of Okuda's three morphologies and you had no way to detect one. Twenty rounds could have produced a
+pit and reported a sphere.
+
+`invagination` is how far the deepest dimple sits below the tissue's own radius, as a fraction of
+it, measured on cell radii smoothed over ring neighbours so one squeezed cell is not a dimple.
+
+READ IT AGAINST A CONTROL, NOT ABSOLUTELY. A quiet 2,000-cell vesicle reads about 0.019 after 600
+frames -- that is mesh roughness, not morphology. Measured on the apoptosis smoke runs, ordered by
+how many cells were removed: control 0.0189, one death 0.0194, a 76-cell cap 0.0297, a 278-cell
+band 0.0307, nine bands 0.0461.
+
+### 3. `mech_p_ratio` is NOT a forcing test when no forcing operator is present. Retract the verdict.
 
 For four rounds your headline has been "protr and grip past the wall are bought with forcing, not
 growth", and for four rounds the run it rests on has carried no forcing term at all.
@@ -25,7 +68,7 @@ So two of your standing conclusions are wrong as stated:
 - **"forcing stays linear past protr 1.5"** -- the correlation you fitted (ratio 2.284/2.025/1.958
   -> protr 1.588/1.268/1.453) is between two consequences of something else, not cause and effect.
 
-### 2. What that something else is, and the control it needs.
+### 4. What that something else is, and the control it needs.
 
 `r017_07` differs from its parent `r014_01` (protr 1.453, n_tubes 0) by ONE edit:
 `remove_op reconnect_t1_3d0`. T1 transitions are gone, so cells cannot exchange neighbours. With
@@ -44,7 +87,7 @@ identical. If protr survives at ~1.6, the T1 removal was incidental and you have
 it falls back toward 1.45, the protrusion was the frozen mesh and the last four rounds measured an
 artefact. Please run it, and report both numbers side by side.
 
-### 3. I have watched r017_07 and r014_01. They are real protrusions -- use them as parents.
+### 5. I have watched r017_07 and r014_01. They are real protrusions -- use them as parents.
 
 This overrides the caution in 2 above about crediting them, and it is a judgement from the movies,
 not from the metrics. There ARE protrusions there. They are too big in DIAMETER to be Okuda's thin
@@ -71,7 +114,7 @@ establishes, neither carries a forcing operator at all.
 The T1 control in 2 is still worth ONE slot, because it tells you which of the two is the better
 base to build on. It is not a reason to withhold either from the parent set in the meantime.
 
-### 4. Make the activity smaller in radius -- and note r017_02 already did it.
+### 6. Make the activity smaller in radius -- and note r017_02 already did it.
 
 This is the standing gap and the Grounder has it exactly: "need ~10 thin tubes at spot_cells ~10;
 got 2 buds at 262". A bud 262 cells across cannot become a thin tube -- the pattern has to set a
