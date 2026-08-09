@@ -56,7 +56,57 @@ The gradient route never measures F — it *integrates* it from the initial cond
 
 ## 3. The plan
 
-### P0 — Rebuild the instrument. Nothing else is interpretable until this is done. *(cheap, hours)*
+### P0 — DONE, 2026-08-09. And it turned up something that reorders P1.
+
+**What went wrong with the instrument.** The note said *"the instruments are closed — seven
+measurements a claim may rest on."* The registry said `tiers = {provisional: 14, withdrawn: 4}`
+and `admitted()` was **empty**, so `cite()` refused all seven. A check in the suite asserted
+exactly that (`add(..., not admitted())`) — a Phase-2 placeholder that outlived Phase 2, passing
+for as long as nothing was certified. The evidence had been gathered, the promotion report said
+four were eligible, and **nobody made the judgement**. A gate that refuses everything doesn't
+prevent bad claims, it redirects them to the ungated thing: every consumer fell back to
+`loopscore` (the objective, 1.6 steps) and then built a gauge to make it behave.
+
+Done: four certified with their evidence recorded in the class; the placeholder replaced by an
+audit; `accept.py` (no oracle, ≥3 ticks, worst-channel rule, 9/9 selftest, θ_true first, 17.4
+steps clear of `null_permerr`); `gauge_fix`/`gauge_fix2` withdrawn and refusing to run.
+
+**Why the gauge was fatal, as a number.** Over 64 candidate-rollouts the amplitude channel spans
+**25.0 steps** and the pattern channel **1.5**. The gauge divided out the channel carrying 17× the
+information and left 1.5 resolvable steps to rank 31 candidates. No better Newton solve could have
+helped — the signal was gone before the solve started. Rescored honestly, the per-substep solve
+ties θ_true at 0.00 steps and the per-frame solve sits at **19.33, worse than knowing nothing (6.65)**.
+
+**The certification criterion had a hole, now measured.** `resolving_power` asks how many steps
+separate *knowing nothing* from the tissue. That admits an instrument; it does not say the
+instrument can rank candidates that all roughly work. `accept.discriminating_power` measures the
+range **across the candidate bank**, and the two differ wildly: `orientation_error` 10.1 vs **1.4**,
+`coordination` 8.0 vs **1.5**, `peak_excursion` 8.5 vs **23.2**, `path_length` 6.5 vs **25.0**.
+An instrument can be precise and still be blind to the parameter you are fitting.
+
+**The box prior: it cannot be repaired, and that is the real finding.** It was anchored on
+`median(naive)` — the attenuated fit it was meant to constrain — so it slid down exactly as far as
+the bias: implied median 128 clean, 40–46 at realizable noise, 29–34 on a coarse grid, **2.2** at
+high noise, against a true 132. 40/56 stored configurations excluded some planted modulus; the
+anchor itself moved by a factor of **62** on noise alone. The replacement — anchor it on the
+certified amplitude instrument, which is observed and never differentiated, so never attenuated —
+**refuses itself**:
+
+| swept over | amplitude span | monotone | exponent | invertible |
+|---|---|---|---|---|
+| **E**, 40× | 13.9 steps | **no** (turning point near E≈234) | +0.037 | **no** |
+| **gain**, 16× | **308.5 steps** | yes | +0.886 | yes |
+
+40× in stiffness moves the observable by 12%, non-monotonically, so one amplitude names two
+moduli. 16× in gain moves it by 22× as much, cleanly. Independently, the CODEMAP already measured
+the per-cell version: +10% on one cell's E moves the sheet 0.036 px per frame — unobservable by
+~3 orders.
+
+**So: the parameter this data constrains is the contraction gain, not the Young's modulus.** The
+campaign has spent its effort recovering the one the observable is nearly blind to. This is a
+property of the sheet, not of any estimator, and no prior, gauge or better F repairs it.
+
+### P0 (original text, for the record) — Rebuild the instrument. *(cheap, hours)*
 
 Replace the one-frame residual with the certified registry. Three of the four surviving instruments are **amplitude-blind by construction** — `orientation_error` (an angle), `coordination` (measured 1.0 at 1% amplitude), `chirality_match` (a sign) — which is exactly what the gauge was invented to fake. Report `peak_excursion` and `path_length` separately as the amplitude channel.
 
