@@ -155,6 +155,9 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                # per-particle contact is smeared to cell scale before it acts. The grid cannot IMPOSE a
                # sub-cell position; it has no trouble holding one.
                membrane_direct_forces=False,
+               # the same adhesion, kept on the grid route but RECOMPUTED at every substep, so the
+               # stability limit is dt_sub*sqrt(k) instead of dt_frame*sqrt(k) -- 400x the stiffness.
+               membrane_adhesion_substep=False,
                # adhesions rupture under load: `detach` is the displacement at which one lets go.
                membrane_detach=0.0,
                # THE TISSUE AS A MOVING BOUNDARY ON THE GRID, rather than a positional projection.
@@ -400,6 +403,23 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
             for _st in spec["schedule"]:
                 if isinstance(_st, dict) and "substep_dt" in _st:
                     _st["steps"] = [x for x in _st["steps"] if x != "basement_membrane_contact"]
+        # THE ADHESION INSIDE THE SUBSTEP, AND STILL ON THE GRID ROUTE. This is the other way to reach
+        # 130's standoff, and the only one that keeps the sheet's mechanics: the force stays an
+        # `mpm_acceleration`, so it goes scatter -> grid -> gather and `F` integrates it (121 reports
+        # strain 2.25 against a true 2.30; 130, engine-integrated, reports 0.31 against 2.44). What
+        # capped it was the timestep, not the route -- a force computed once per frame is held constant
+        # across the substeps, so it is integrated at dt_frame and stable only while dt_frame*sqrt(k) < 1,
+        # i.e. k < 6.2e4. Recomputed every substep the limit is dt_sub*sqrt(k) < 1, k < 2.5e7.
+        # The lag follows k^-0.86 on this route (0.0504 at k=1e4, 0.0126 at 5e4), so 400x the stiffness
+        # extrapolates to 7.3e-5 and a standoff of +0.0039 -- the fibre's rest length, with F intact.
+        # Correct only since the engine restores the outer delta at each substep; before that an
+        # operator in here accumulated 1x to 20x within a frame.
+        if membrane_adhesion_substep and "integrin_adhesion" in spec["schedule"]:
+            spec["schedule"] = [s for s in spec["schedule"] if s != "integrin_adhesion"]
+            for _st in spec["schedule"]:
+                if isinstance(_st, dict) and "substep_dt" in _st:
+                    _st["steps"].insert(0, "integrin_adhesion")
+                    break
         if membrane_impl == "graph":
                 # THE MEMBRANE AS A SPRING GRAPH, not a continuum body. Nothing about the sheet's mechanics
                 # was ever coming from MPM: the crosslinks hold it together, the integrin springs hold it in

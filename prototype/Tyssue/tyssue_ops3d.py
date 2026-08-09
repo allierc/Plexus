@@ -1054,6 +1054,12 @@ class Apoptosis3D(Structural):
         # cell -- the same class of error as a per-face target left behind by division.
         clvl = H.level(self.cat)
         if clvl is not None and clvl.state.shape[0] >= nF:
+            # MEASURED INNOCENT, and worth recording because it was the obvious suspect. At every
+            # death min(a) BEFORE this copy equals min(a) AFTER it -- tick 34 read -0.03872 on
+            # both sides. The negative activator that breaks P12 on every run where cells die
+            # arrives from the reaction/diffusion step operating on a mesh a death has just
+            # perturbed, not from this reindex. Ruled out by experiment as well: removing
+            # shape_to_chem left it at -0.0948, and quartering chi left it at -0.0689.
             cst = clvl.state.clone()
             cst[:nF2] = clvl.state[torch.as_tensor(keep, device=clvl.state.device)]
             clvl.state = cst

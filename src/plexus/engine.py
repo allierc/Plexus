@@ -835,7 +835,25 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                 if isinstance(step, dict) and "substep_dt" in step:
                     H.sub_dt = float(step["substep_dt"])
                     count = max(1, round(sim.dt / H.sub_dt))
-                    for _ in range(count):
+                    # THE OUTER DELTA IS THE SUBSTEP'S BASELINE, RESTORED EACH TIME. `zero_delta` runs
+                    # once per TICK, so an operator that returns a force from INSIDE this block used to
+                    # add to what its own previous substep left behind: measured on a four-substep
+                    # frame, `mpm_scatter` saw a body force of 20 / 40 / 60 / 80 where the same operator
+                    # at frame level gives a flat 20 / 20 / 20 / 20. Anything stiff enough to need
+                    # per-substep evaluation was therefore ramping 1x to Nx within every frame -- the
+                    # ECM prototype's `basement_membrane_contact` did exactly that from run 110 on.
+                    # Snapshotting and restoring keeps the documented behaviour intact (a frame-level
+                    # delta, e.g. gravity, persists across the loop and is seen identically by every
+                    # substep) and makes an inner-schedule force what it reads as: recomputed at the
+                    # substep's own positions, applied once per substep.
+                    _d0 = {k: v.clone() for k, v in H._delta.items()}
+                    _b0 = {k: {b: t.clone() for b, t in d.items()}
+                           for k, d in H._delta_blocks.items()}
+                    for _s in range(count):
+                        if _s:
+                            H._delta = {k: v.clone() for k, v in _d0.items()}
+                            H._delta_blocks = {k: {b: t.clone() for b, t in d.items()}
+                                               for k, d in _b0.items()}
                         for token in step["steps"]:
                             _run_token(token, tick)
                     H.sub_dt = None
