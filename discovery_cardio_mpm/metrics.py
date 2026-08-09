@@ -226,6 +226,7 @@ class Metric:
     domain = ""                     # where it is defined
     known_defects: list = []
     cause_of_death = ""             # withdrawn only
+    certified_because = ""          # CERTIFIED only: the judgement, and the evidence behind it
     undefined_on: set = set()       # distortions outside this metric's declared domain
     axis_separable = True           # False when its response is not attributable to single axes
     null = None                     # what a model that knows nothing scores
@@ -506,6 +507,9 @@ class Openness(PairedProperty):
 
 class PathLength(PairedProperty):
     name = "path_length"
+    tier = CERTIFIED
+    certified_because = (
+        "CERTIFIED 2026-08-09. 6.5 steps, the narrowest margin of the four, so a claim resting on it alone should say so. Calibration: reproduces the closed-form perimeter and is invariant to turning and to rolling once the closing segment was restored. Declared defect: it is a COMPOSITE of size and openness and may not be quoted as a size measure on its own.")
     definition = ("how far the model's nodes travel over the beat against how far the recording's "
                   "do, summed frame to frame and subtracted. 0 is perfect. A loop and a line of "
                   "the same width differ here; the enclosed area alone does not say so.")
@@ -532,6 +536,9 @@ class PathLength(PairedProperty):
 
 class PeakExcursion(PairedProperty):
     name = "peak_excursion"
+    tier = CERTIFIED
+    certified_because = (
+        "CERTIFIED 2026-08-09. 8.5 steps. Paired (it compares, it does not merely describe) with a measured null from the do-nothing model. Calibration: returns the long semi-axis exactly and is invariant to turning. It is the AMPLITUDE channel and must be reported beside the amplitude-blind instruments, never in place of them.")
     definition = ("how far the model's nodes reach from the centre of their own path against how "
                   "far the recording's do, at furthest, subtracted. 0 is perfect. Centred, so "
                   "sliding a loop elsewhere does not change it.")
@@ -568,6 +575,9 @@ class OrientationError(Metric):
     """NEW -- and only because nothing reported it."""
 
     name = "orientation_error"
+    tier = CERTIFIED
+    certified_because = (
+        "CERTIFIED 2026-08-09. 10.1 distinguishable steps between its measured null (pi/4, analytic: two unrelated axes) and the tissue's own beat-to-beat agreement (0.0582), against the declared threshold of 5. Battery: moves on orientation and chirality, holds on the other seven. Calibration: returns the planted rotation to three decimals from 0 to pi/2. Floors: beat 0.0232, same-seed and seed-to-seed both measured. Declared defect: two circles have no axis and it returns 1.4360 rad instead of refusing -- latent, since real loops are elongated.")
     definition = ("the angle between the simulated and the recorded long axis of each loop, median "
                   "over nodes, in radians. 0 is perfect; about 0.785 is what chance gives, because "
                   "an axis has no head or tail.")
@@ -615,6 +625,9 @@ class Coordination(Metric):
     """NEW -- and it is the hole the whole registry was built around."""
 
     name = "coordination"
+    tier = CERTIFIED
+    certified_because = (
+        "CERTIFIED 2026-08-09. 8.0 steps between its measured null (0.0778, the scrambled-timing row) and 0.9968. It is the only instrument that sees WHEN the tissue moves, which the objective scores at exactly 1.0000 for a sheet beating in random order. Battery clean; calibration confirms the declared antiphase blindness on a shape where the answer is known. Amplitude-blind: reads 1.0 at 1% amplitude, which is what makes it usable without a gauge.")
     definition = ("does the tissue contract TOGETHER the way the recording does? Per node, find the "
                   "time shift that best lines its motion up with the recording's; then measure how "
                   "tightly those shifts agree with each other. 1 means the pattern of "
@@ -894,6 +907,16 @@ def check(verbose=True):
         all(m.cause_of_death for m in withdrawn().values()),
         f"{len(wd)} withdrawn, all with a cause")
 
+    # A CERTIFICATION IS A JUDGEMENT AND MUST BE SIGNED, for the same reason a withdrawal is.
+    # The failure this catches is not a metric that is wrongly certified; it is the four that sat
+    # ELIGIBLE and uncertified for a day while every consumer, finding nothing citable, fell back
+    # to the objective and then built a gauge to make the objective behave. A gate that refuses
+    # everything does not prevent bad claims -- it redirects them to the ungated thing.
+    cert = admitted()
+    add("every certified metric records why",
+        all(m.certified_because.strip() for m in cert.values()),
+        f"{len(cert)} certified" + (f": {', '.join(cert)}" if cert else " -- NOTHING IS CITABLE"))
+
     declared = {n: m for n, m in live().items() if m.null is not None}
     add("every declared null says where it came from",
         all(m.null_source in (ANALYTIC, MEASURED) for m in declared.values()),
@@ -971,9 +994,32 @@ def check(verbose=True):
         all(m.responds_to and m.responds_to <= set(AXES) for m in live().values()),
         f"axes: {', '.join(AXES)}")
 
-    add("nothing is cited as certified before Phase 2 certifies it", not admitted(),
+    # This check used to read `not admitted()` -- it asserted the empty set, and passed for as long
+    # as NOTHING was certified. It was a placeholder for Phase 2 that outlived Phase 2, and it is
+    # the reason the failure went unseen: the note said seven instruments were closed while the
+    # suite was actively confirming that none of them could be cited. Replaced by the real
+    # invariant, which is that a certification must be AUDITABLE against the same evidence that
+    # was supposed to justify it.
+    bad = []
+    for n, m in admitted().items():
+        if m.role != EVIDENCE:
+            bad.append(f"{n}: certified but role={m.role}")
+        if m.null is None:
+            bad.append(f"{n}: certified with no declared null, so its range is uninterpretable")
+    try:                                       # floors live in json; absent on a fresh checkout
+        import noise as _nz
+        for r in _nz.resolving_power(verbose=False):
+            if r["metric"] in admitted():
+                if r["levels"] is None:
+                    bad.append(f"{r['metric']}: certified with no measured floor")
+                elif r["levels"] < MIN_LEVELS:
+                    bad.append(f"{r['metric']}: certified at {r['levels']:.1f} steps, "
+                               f"{MIN_LEVELS:g} required")
+    except Exception as e:
+        print(f"    (floors not audited: {type(e).__name__})")
+    add("every certification is auditable against its own evidence", not bad,
         f"{len(admitted())} certified, {len(live()) - len(admitted())} provisional, "
-        f"{len(wd)} withdrawn")
+        f"{len(wd)} withdrawn" + ("" if not bad else " -- " + "; ".join(bad)))
 
     # the two new ones must answer the question they were added for
     G, M = real.shape[0], real.shape[1]

@@ -85,6 +85,35 @@ def gauge_fix(sy, theta, jit, ctx, r_raw, tol=0.005, iters=6):
             costs `iters` extra rollouts at most and typically two.
     Returns (k, ratio_at_k, history, n_extra_rollouts, status).
     """
+    # ------------------------------------------------------------------------------------------
+    # WITHDRAWN 2026-08-09 (P0). This function may not be run again.
+    #
+    # It rescaled amplitude away so that a candidate with the right per-cell pattern and the wrong
+    # overall scale would not be punished for the scale. Measured across 64 candidate-rollouts,
+    # that is what it actually did:
+    #
+    #     channel                            dynamic range across the candidate bank
+    #     amplitude (peak_excursion, path_length)          25.0 steps
+    #     pattern   (orientation_error, coordination)        1.5 steps
+    #
+    # The gauge divided out the channel carrying SEVENTEEN TIMES the information and left 1.5
+    # resolvable steps to rank 31 candidates with. Every ranking downstream of it was noise, and
+    # no better Newton solve could have helped -- the signal was gone before the solve started.
+    # Its own symptoms said so and were read as convergence trouble: band 0.421 wide against a
+    # 0.10 target, 13/31 non-converged, one score moving 0.39 with the iteration budget alone.
+    #
+    # Replaced by `accept.py`, which does not need a gauge because two of its four certified
+    # instruments are amplitude-blind BY CONSTRUCTION and the other two report amplitude as a
+    # channel rather than removing it.
+    #
+    # The stored json of the runs that used it is untouched: those are the evidence for this
+    # verdict. Only re-running it is forbidden.
+    raise RuntimeError(
+        "the amplitude gauge is WITHDRAWN (P0, 2026-08-09): it divided out the channel with 17x "
+        "the dynamic range of the one it kept, so every ranking it produced was noise. "
+        "Use accept.py, which needs no gauge. See its module docstring.")
+    # ------------------------------------------------------------------------------------------
+
     C = sy.C
     hist = [(1.0, r_raw)]
     if not np.isfinite(r_raw) or r_raw <= 0:
