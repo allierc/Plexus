@@ -1,0 +1,80 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 163 frames; window A = ticks 14..163 recorded
+[collect] 163..182  C=100 Np=10000 n_sub=10 dt=0.002 [21s]
+[derivation] tick 165: rel v c2 0.01000  fwd 0.04273  rel C c2 0.13806
+
+[p] THE DRAG LEAK -- is pass0 a hidden v_true oracle?
+    pass0 == -k*v_true to 7.11e-15  (|pass0| 1.2363e+03)
+    recomputing the outer schedule at v = v_TRUE reproduces pass0 to 0.00e+00 and act0 to 0.00e+00   <- the recomputation is a no-op on the oracle
+    at v = v_c2 the body force moves by 1.231e+00 (rel 0.0100); k*(v_true-v_c2) = 1.231e+00
+    => every published 'derived v' number leaks v_true through the drag force.
+
+[c] CONTROLS, single frame tick 165, clean F, ridge0, Jp=1
+    variant                      drag     med|dE/E|      p90    relL2  published          d
+    oracle_v_oracle_C            snap       0.00778   0.0330   0.0231   0.007777  +0.00e+00 [38s]
+    v_c2_oracle_C                snap       0.02271   0.0381   0.0292   0.022707  +0.00e+00 [55s]
+    v_c2_oracle_C                honest     0.02189   0.0366   0.0285   0.022707            [72s]
+    oracle_v_C_c2                snap       0.01008   0.0348   0.0241   0.010084  -9.51e-07 [90s]
+    v_c2_C_c2                    snap       0.02177   0.0362   0.0276        nan            [107s]
+    v_c2_C_c2                    honest     0.02091   0.0346   0.0269        nan            [124s]
+    round-3 controls reproduced to <1e-9: True
+
+[holdout] tick 180, |y_obs| 4.6926e-02;  floor at theta_true: oracle state 0.00474, c2 state 0.01935
+
+[a] ROUTE (a): ONE-STEP MODEL CORRECTION,  v <- (X1-X0)/dt - corr(v_c2, theta_0)
+    route_a (snap, C oracle)       medE   0.02125  p90  0.0371  relL2  0.0296  ho(oracle) 0.01006  ho(c2) 0.01770  ho(shot) 0.00407 [142s]
+        rel v 0.01000 -> 0.00907 ; |corr|/|v| 0.03853 vs true truncation 0.04273 ; theta moved 6.04e-03
+    route_a (honest, C oracle)     medE   0.02061  p90  0.0365  relL2  0.0291  ho(oracle) 0.00994  ho(c2) 0.01773  ho(shot) 0.00420 [159s]
+        rel v 0.01000 -> 0.00917 ; |corr|/|v| 0.03848 vs true truncation 0.04273 ; theta moved 5.65e-03
+    route_a (honest, C c2)         medE   0.01830  p90  0.0333  relL2  0.0274  ho(oracle) 0.00952  ho(c2) 0.01805  ho(shot) 0.00413 [177s]
+
+[b] ROUTE (b): BLOCK ALTERNATION, 4 iterations (theta <- LS | v <- shooting), C oracle, honest drag
+    --- 1 Newton step(s) per iteration ---
+    iter  shootResid      relv  med|dE/E|  thetaMove  ho(oracle)   ho(c2)
+       0           -   0.01000    0.02189          -     0.00912  0.01719
+       1     0.00646   0.00917    0.02061   5.65e-03     0.00994  0.01773 [195s]
+       2     0.00337   0.01107    0.02262   4.16e-03     0.01145  0.01819 [212s]
+       3     0.00273   0.01312    0.02420   4.02e-03     0.01311  0.01881 [230s]
+       4     0.00244   0.01511    0.02608   3.83e-03     0.01481  0.01958 [248s]
+    --- 2 Newton step(s) per iteration ---
+    iter  shootResid      relv  med|dE/E|  thetaMove  ho(oracle)   ho(c2)
+       0           -   0.01000    0.02189          -     0.00912  0.01719
+       1     0.00646   0.01103    0.02339   5.99e-03     0.01060  0.01760 [266s]
+       2     0.00272   0.01484    0.02710   5.87e-03     0.01277  0.01824 [284s]
+       3     0.00222   0.01824    0.03064   5.63e-03     0.01508  0.01923 [308s]
+       4     0.00200   0.02135    0.03278   5.38e-03     0.01741  0.02050 [332s]
+
+[s] DIAGNOSTIC (oracle theta, oracle C): how far can shooting move v?
+    step  shootResid   relv_in
+       0     0.00699   0.01000
+       1     0.00311   0.00862
+       2     0.00238   0.01047
+       3     0.00201   0.01234
+       4     0.00177   0.01403
+       5     0.00159   0.01556
+       6           -   0.01694
+    fit at shot-v (oracle theta)   medE   0.00918  p90  0.0199  relL2  0.0129  ho(oracle) 0.00687  ho(c2) 0.01781  ho(shot) 0.00339 [357s]
+    model error at the TRUE state (injF lerp is the only approximation): 0.00526  <- the shooting floor
+    model error at true v + centred-difference C: 0.00487
+
+[n] NOISE, sigma_x = 1.996e-05 on every measured position used by the derivation AND on the observation x_next (the state's own x0 stays clean, the convention of rounds 3-6)
+    variant                     seed     relv  med|dE/E|  ho(oracle)
+    c2 (baseline)              90210  0.02641    0.03860     0.01230 [437s]
+    route (a)                  90210  0.05112    0.03917     0.01315 [437s]
+    route (b) x3               90210  0.10325    0.04821     0.01603 [437s]
+    c2 (baseline)                555  0.02645    0.05172     0.01258 [514s]
+    route (a)                    555  0.05148    0.04692     0.01367 [514s]
+    route (b) x3                 555  0.10402    0.04938     0.01670 [514s]
+
+[x] CORRUPTION PROOF: destroy every stored copy of the simulator's true v, then re-run route (a).  honest drag must be immune; snap drag must not be.
+    positions untouched: max|v_c2(corrupted store) - v_c2| 0.00e+00
+    route_a honest  med|dE/E| corrupted 0.020608  clean 0.020608  delta +0.00e+00
+    route_a snap    med|dE/E| corrupted 26.103738  clean 0.021251  delta +2.61e+01
+
+wrote mcv_v.json [609 s]

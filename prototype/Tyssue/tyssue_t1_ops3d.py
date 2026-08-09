@@ -289,7 +289,29 @@ class ReconnectT1_3D(Rewire):
                          int(nF)))
         if ndone == 0:
             return {}
-        es2, et2, ef2, nF2, _ = flat_from_rings_3d(rings)    # T1 drops no face -> nF2 == nF, order kept
+        es2, et2, ef2, nF2, keep = flat_from_rings_3d(rings)
+        # "T1 DROPS NO FACE" WAS AN ASSUMPTION, NOT AN INVARIANT, and it held only while nothing
+        # shrank a cell to nothing. `flat_from_rings_3d` discards any ring that falls below three
+        # vertices; a flip on a cell that is already a triangle can do exactly that. This line
+        # threw `keep` away, so when it happened T1 lost a face and left EVERY per-face array --
+        # A0, P0, V0f, Vbirth, divjit, age, ndiv, alive -- shifted by one against the mesh.
+        #
+        # Found by apoptosis_3d, which is the first operator that shrinks a cell far enough to
+        # reach the case: marking ONE cell for death produced three deaths at ticks 86, 164 and
+        # 236, each reporting exactly one marked cell, because the shift kept handing the flag to
+        # a new victim. The control with T1 and no apoptosis holds at 2000 cells, which is why
+        # this went eighteen rounds unseen.
+        if nF2 != nF:
+            print(f"[reconnect_t1_3d] a flip left {nF - nF2} face(s) below three sides -- "
+                  f"reindexing {nF} -> {nF2}. Per-face targets follow the mesh; a cell was lost "
+                  f"to topology, not to biology.", flush=True)
+            for _nm in ("A0", "P0", "V0f", "Vbirth", "divjit", "age", "ndiv", "alive"):
+                if _nm in m:
+                    _a = m[_nm].detach().cpu().numpy()
+                    m[_nm] = torch.as_tensor(np.asarray([_a[i] for i in keep]),
+                                             dtype=m[_nm].dtype, device=m[_nm].device)
+            if isinstance(m.get("apop_flag"), np.ndarray):
+                m["apop_flag"] = np.asarray([m["apop_flag"][i] for i in keep], np.float64)
         m["E_srce"] = torch.as_tensor(es2, device=dev)
         m["E_trgt"] = torch.as_tensor(et2, device=dev)
         m["E_face"] = torch.as_tensor(ef2, device=dev)

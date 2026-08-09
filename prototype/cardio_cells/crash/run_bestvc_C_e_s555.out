@@ -5,11 +5,15 @@
   [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
 [planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
           E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
-          warm-up 165 frames; window A = ticks 16..165 recorded
-[reference] built [20s]
-[gauge] 2 candidates: grid48_der_s90210|b1|eiv_box, grid48_der_s555|b1|eiv_box
-    candidate                      budget         kE     kg    resid  conv   gauged  band_lo  band_hi orbitmax
-    grid48_der_s90210|b1|eiv_box   g5s0.8r2    1.471  1.106   0.0100 False   0.8968   0.8821   0.8968   0.8968 [228s]
-    grid48_der_s90210|b1|eiv_box   g7s0.8r2    1.456  1.111   0.0123 False   0.9078   0.7527   0.9078   0.9078 [420s]
-    grid48_der_s90210|b1|eiv_box   g9s1.0r4    1.503  1.118   0.0006  True   0.8871   0.7670   0.9146   0.9146 [1238s]
-    grid48_der_s555|b1|eiv_box     g5s0.8r2    1.314  1.054   0.0283 False   0.9435   0.7562   0.9435   0.9435 [530s]
+          warm-up 160 frames; window A = ticks 11..160 recorded
+[collect] 160..185, dt=0.002, n_sub=10, dx=0.0078125, grid 128x128 [28s]
+
+[e] T=8 stacked, grid-48 F noise sigma_F=0.0039, sigma_x=1.99592e-05, K=4 EIV re-noisings, seed 555  (refute5 grid48 reference, oracle state: T8 naive 0.730/0.738, eiv_box 0.160/0.150)
+    ctrl_oracle        naive      medE  0.7335 p90   1.006 relL2   0.770 negE  14 mr  0.291 [785s]
+    ctrl_oracle        eiv_snr0   medE  0.1541 p90   1.485 relL2   1.085 negE   8 mr  0.927 [785s]
+    ctrl_oracle        naive_box  medE  0.7341 p90   0.958 relL2   0.754 negE   0 mr  0.306 [785s]
+    ctrl_oracle        eiv_box    medE  0.1713 p90   0.682 relL2   0.377 negE   0 mr  0.794 [785s]
+    t_c2 (sibling)     naive      medE  0.7223 p90   0.988 relL2   0.758 negE   5 mr  0.304 [1529s]
+    t_c2 (sibling)     eiv_snr0   medE  0.1537 p90   1.789 relL2   1.229 negE   8 mr  1.093 [1529s]
+    t_c2 (sibling)     naive_box  medE  0.7230 p90   0.957 relL2   0.748 negE   0 mr  0.313 [1529s]
+    t_c2 (sibling)     eiv_box    medE  0.1951 p90   0.575 relL2   0.340 negE   0 mr  0.805 [1529s]

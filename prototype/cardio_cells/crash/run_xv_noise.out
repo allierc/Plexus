@@ -5,11 +5,20 @@
   [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
 [planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
           E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
-          warm-up 165 frames; window A = ticks 16..165 recorded
-[reference] built [20s]
-[gauge] 2 candidates: grid48_der_s90210|b1|eiv_box, grid48_der_s555|b1|eiv_box
-    candidate                      budget         kE     kg    resid  conv   gauged  band_lo  band_hi orbitmax
-    grid48_der_s90210|b1|eiv_box   g5s0.8r2    1.471  1.106   0.0100 False   0.8968   0.8821   0.8968   0.8968 [228s]
-    grid48_der_s90210|b1|eiv_box   g7s0.8r2    1.456  1.111   0.0123 False   0.9078   0.7527   0.9078   0.9078 [420s]
-    grid48_der_s90210|b1|eiv_box   g9s1.0r4    1.503  1.118   0.0006  True   0.8871   0.7670   0.9146   0.9146 [1238s]
-    grid48_der_s555|b1|eiv_box     g5s0.8r2    1.314  1.054   0.0283 False   0.9435   0.7562   0.9435   0.9435 [530s]
+          warm-up 163 frames; window A = ticks 14..163 recorded
+[collect] boundaries 163..182, C=100 Np=10000 n_sub=10 dt=0.002 [42s]
+
+[series] rel error of the injected series against the reference substep values
+    lerp:  F 4.584e-04  C 1.799e-01  x 7.294e-06  v 1.435e-02
+    hold:  F 4.878e-03  C 3.520e-01  x 6.497e-04  v 4.362e-02
+    frame-start derived state: v0 0.0100  C0 0.1381   (x0, F0 are measured exactly)
+
+[N] the SAME rungs with noise on the observed x_next only, sigma_x = 1.996e-05 world (0.0026 dx), 3 seeds
+    flavour    rung    carry  medE(0)  medE(sx)   ratio
+    realizable F      0.0722   0.0218    0.0416    1.91
+    realizable Fx     0.0124   0.2463    0.2976    1.21
+    realizable FCvx   0.0019   0.6887    1.4258    2.07
+    oracle     F      0.0730   0.0091    0.0349    3.85
+    oracle     Fx     0.0125   0.0000    0.1908 143021.87
+
+wrote xv_noise.json [244 s]

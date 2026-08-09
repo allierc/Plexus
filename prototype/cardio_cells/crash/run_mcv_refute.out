@@ -1,0 +1,36 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 163 frames; window A = ticks 14..163 recorded
+[collect] 163..182 C=100 Np=10000 n=10 dt=0.002 [29s]
+
+[R] REPRODUCTION, tick 165
+    oracle v/C            medE 0.007777  (mcv_v 0.007777)
+    c2 v, oracle C honest medE 0.021888  (mcv_v 0.021890)
+    c2 v, c2 C honest     medE 0.020913  (mcv_v 0.020910)
+    route (a) honest      medE 0.020608  (mcv_v 0.020608)  gap +9.1%  relv 0.00917  ho(oracle) 0.00994 ho(c2) 0.01717
+
+[W] WRONG-THETA CORRECTION.  v <- v_c2 + (obs - pred(v_c2, theta_WRONG))/dt.
+    theta used for the correction        relTh    |corr|     relv  med|dE/E|    gap%  ho(orc)
+    theta_hat (route a, reference)      0.0285     0.273  0.00917    0.02061    +9.1  0.00994 [155s]
+    0.5 * theta_hat                     0.5080     1.540  0.03913    0.27626 -1802.6  0.04618 [185s]
+    2.0 * theta_hat                     0.9696     2.979  0.07121    0.50190 -3401.7  0.07563 [202s]
+    theta_hat, cells shuffled           0.5273    12.548  0.30375    0.28682 -1877.5  0.59507 [219s]
+    flat mean E, mean gain              0.3808     6.595  0.15927    0.20507 -1298.2  0.33683 [237s]
+    theta_true (planted)                0.0000     0.296  0.00862    0.00840   +95.6  0.00677 [254s]
+    E=40 flat, gain=1 flat              0.7418     3.026  0.07429    0.37114 -2475.0  0.11957 [274s]
+
+[N] NULL CONTROL: replace the correction by a RANDOM vector of the SAME norm.
+    variant                                relv  med|dE/E|    gap%  ho(orc)
+    random step, |corr| norm, s11       0.01194    0.02821   -44.8  0.00933 [298s]
+    random step, |corr| norm, s22       0.01203    0.02832   -45.6  0.00926 [323s]
+    random step, |corr| norm, s33       0.01194    0.02568   -26.9  0.00922 [356s]
+
+[T] OTHER FRAMES: is +9.1% a property of the method or of tick 165?
+      t0    oracle   c2 base   route a    gap% relv base   relv a   hoBase      hoA
+     168   0.01265   0.03587   0.04319   -31.5   0.01289  0.01241  0.01349  0.01609 [439s]
+     172   0.02385   0.05734   0.07554   -54.3   0.01483  0.01401  0.01707  0.02351 [567s]

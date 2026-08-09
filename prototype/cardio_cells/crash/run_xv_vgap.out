@@ -1,0 +1,36 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 163 frames; window A = ticks 14..163 recorded
+[collect] boundaries 163..182, C=100 Np=10000 n_sub=10 dt=0.002 [29s]
+
+[series] rel error of the injected series against the reference substep values
+    lerp:  F 4.584e-04  C 1.799e-01  x 7.294e-06  v 1.435e-02
+    hold:  F 4.878e-03  C 3.520e-01  x 6.497e-04  v 4.362e-02
+    frame-start derived state: v0 0.0100  C0 0.1381   (x0, F0 are measured exactly)
+
+[V] THE v GAP, isolated: F_lerp always injected, C0 ORACLE, only v varies
+    target = the substep oracle 0.0078;  control to beat = v derived, set once, 0.0227
+    flavour    rung    affinity      bias     medE     medg  ho_orc  ho_der      |A|F      smin   carry  wrongth      cond
+    vgap       F0      8.04e-02  5.26e-03   0.0078   0.0045  0.0067  0.0208  2.67e-02  7.58e-08  0.0722 1.94e-01  4.40e+10
+      ^ v0=true,       no v injection  (= the 0.0078 target)
+    vgap       Fv1     7.70e-02  2.08e-03   0.0060   0.0043  0.0075  0.0209  7.32e-03  2.48e-08  0.0203 5.34e-02  3.07e+10
+      ^ v0=true,       v_oracle injected (upper bound)
+    vgap       F2      8.04e-02  7.16e-03   0.0227   0.0499  0.0093  0.0171  2.67e-02  7.58e-08  0.0722 1.94e-01  4.40e+10
+      ^ v0=derived c2, no v injection  (= the 0.0227 control)
+    vgap       Fv3     7.70e-02  1.21e-02   0.0515   0.2961  0.0249  0.0361  7.32e-03  2.48e-08  0.0203 5.34e-02  3.07e+10
+      ^ v0=derived c2, v_lerp c2 injected  <- THE TEST
+    vgap       Fv4     7.70e-02  3.00e-02   0.4570   2.4778  0.0835  0.0976  7.32e-03  2.48e-08  0.0203 5.34e-02  3.07e+10
+      ^ v0=derived c2, v_hold c2 injected
+    vgap       F5      8.04e-02  5.15e-03   0.0270   0.0549  0.0086  0.0166  2.67e-02  7.58e-08  0.0722 1.94e-01  4.40e+10
+      ^ v0=derived c4, no v injection
+    vgap       Fv6     7.70e-02  7.89e-03   0.0247   0.3149  0.0149  0.0251  7.32e-03  2.48e-08  0.0203 5.34e-02  3.07e+10
+      ^ v0=derived c4, v_lerp c4 injected
+    vgap       Fv7     7.70e-02  1.15e-02   0.0549   0.2827  0.0249  0.0364  7.32e-03  2.48e-08  0.0203 5.34e-02  3.07e+10
+      ^ v0=true,       v_lerp c2 injected
+
+wrote xv_vgap.json [299 s]

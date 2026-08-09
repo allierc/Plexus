@@ -1281,8 +1281,14 @@ def mechanics(name, fr, cfg, out_dir, n=24):
         r = np.linalg.norm(cen_np - cen_np.mean(0), axis=1)
         prot = r > 1.3 * np.median(r)                      # the protruding cells (tissue_analysis defn)
         fmag = np.linalg.norm(f.numpy(), axis=1)
-        vel = (np.linalg.norm(cen_np[:len(prev_cen)] - prev_cen, axis=1).mean()
-               if prev_cen is not None and len(prev_cen) else 0.0)
+        # `min` OF BOTH, and this sliced only the new array before. It assumed the cell count can
+        # only GROW -- true while division was the sole topology change -- so introducing the Die
+        # family broke it immediately: 1,999 cells against the previous 2,000 is not broadcastable.
+        # Across a death the rows also no longer name the same cells (`keep` renumbers), so this is
+        # a mean over a population whose membership shifted, not a per-cell displacement. It is
+        # reported as migration and should not be read as one on a run where cells die.
+        _n = min(len(cen_np), len(prev_cen)) if prev_cen is not None else 0
+        vel = (np.linalg.norm(cen_np[:_n] - prev_cen[:_n], axis=1).mean() if _n else 0.0)
         prev_cen = cen_np
         pr = pres.numpy()
         rows.append(dict(t=int(t), n_cells=nF,
