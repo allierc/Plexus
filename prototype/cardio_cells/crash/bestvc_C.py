@@ -546,8 +546,9 @@ def main():
                    + eye * (la * J * (J - 1))[:, None, None])
             stress = (-sy.dt_sub * 4 * g.inv_dx * g.inv_dx) * p_vol[:, None, None] * tau
             affC = mass[:, None, None] * C0
-            a_ext = sy.pass0 + sy.gain_true[sy.cid][:, None] * sy.act0
-            a_gain = sy.gain_true[sy.cid][:, None] * sy.act0
+            act0, pass0 = B[k]["snap"]["act0"], B[k]["snap"]["pass0"]
+            a_ext = pass0 + sy.gain_true[sy.cid][:, None] * act0
+            a_gain = sy.gain_true[sy.cid][:, None] * act0
             off, fx, w, flat = bs(X, g)
             dpos = (off[None] - fx[:, None, :]) * g.dx
             mom_v = mass[:, None, None] * (V + sy.dt_sub * a_ext)[:, None, :]
@@ -563,7 +564,7 @@ def main():
                   "mom_C_over_mom_v": wn(mom_C) / wn(mom_v),
                   "mom_C_over_mom_stress": wn(mom_C) / wn(mom_s),
                   "mom_C_over_mom_gain": (wn(mom_C) / wn(mom_g)) if wn(mom_g) > 0 else float("inf"),
-                  "act0_norm": float(sy.act0.norm()), "pass0_norm": float(sy.pass0.norm()),
+                  "act0_norm": float(act0.norm()), "pass0_norm": float(pass0.norm()),
                   "n_substeps_C_acts_in": 1, "n_substeps_per_frame": n}
             R["stage_m_terms"] = mm
             log(f"\n[m] where C enters: affine = stress_dt + mass*C, scattered as affine @ (x_i-x_p)")
@@ -635,7 +636,7 @@ def main():
         #  T = 8 STACKED, the round-5 configuration, plus the held-out acceptance statistic
         if "d" in a.stages:
             sel = ["ctrl_oracle", "t_fwd (round3)", "t_c2 (sibling)", "t_c4",
-                   "s_dec", "s_mls", "ctrl_zero", "ctrl_perm"]
+                   "t_p11d6", "s_dec", "ctrl_zero", "ctrl_perm"]
             log(f"\n[d] T={a.T} stacked, clean F, naive solve, v ORACLE  "
                 f"(round-5 oracle-state target med|dE/E| 0.008562)")
             R["stage_d"] = {}
@@ -690,8 +691,8 @@ def main():
             NF = NoiseF("grid", sy.x0, a.nodes, sy.device, sy.dtype)
             log(f"\n[n] realizable grid-{a.nodes} F noise, sigma_F={SIGMA_F} "
                 f"(same draw in the derivation and in the injected F)")
-            sel = ["ctrl_oracle", "t_fwd (round3)", "t_c2 (sibling)", "t_c4", "t_sg5",
-                   "s_dec", "s_mls", "ctrl_zero"]
+            sel = ["ctrl_oracle", "t_fwd (round3)", "t_c2 (sibling)", "t_c4", "t_c8",
+                   "t_p11d6", "t_sg5", "s_dec", "ctrl_zero"]
             R["stage_n"] = {}
             k = a.t0
             for cond, seeds in (("F only", (90210, 555, 777)), ("F + x", (90210, 555, 777))):
@@ -705,24 +706,32 @@ def main():
                     xn = B[k]["x_next"] + (ex[k + 1] if ex is not None else 0.0)
                     x0m = B[k]["x0"] + (ex[k] if ex is not None else 0.0)
                     T = {**build_table(E, k, eF, ex, extras=False), **controls(E, k)}
+                    z = torch.zeros(2 * nC, device=sy.device, dtype=sy.dtype)
+                    install_state(sy, B[k]["snap"], None, B[k]["C0"].clone(), Jp_one=True)
+                    y0r = y_of(sy, z, n, injF, None)
+                    ynorm = float((xn - x0m).norm())
                     for nm in sel:
                         Cst = T[nm][0]()
+                        install_state(sy, B[k]["snap"], None, Cst, Jp_one=True)
+                        dy = float((y_of(sy, z, n, injF, None) - y0r).norm() / ynorm)
                         install_state(sy, B[k]["snap"], None, Cst, Jp_one=True)
                         sc, _ = fit(sy, n, injF, xn, x0m, th, nC)
                         key = f"{cond}|{nm}"
                         R["stage_n"].setdefault(key, []).append(
                             {"seed": seed, "relC": rel(Cst, B[k]["C0"]), "med_E": sc["med_E"],
+                             "dy0_over_yobs": dy,
                              "p90_E": sc["p90_E"], "rel_l2": sc["rel_l2"], "n_negE": sc["n_negE"]})
                     log(f"    {cond} seed {seed} done [{time.time()-t_start:.0f}s]")
             log(f"    {'condition':<10s} {'estimator':<20s} {'relC':>7s} {'medE':>8s} "
-                f"{'p90E':>7s} {'relL2':>7s}")
+                f"{'p90E':>7s} {'relL2':>7s} {'dy0':>7s}")
             for key, rows in R["stage_n"].items():
                 cond, nm = key.split("|")
                 log(f"    {cond:<10s} {nm:<20s} "
                     f"{np.mean([r['relC'] for r in rows]):>7.4f} "
                     f"{np.mean([r['med_E'] for r in rows]):>8.5f} "
                     f"{np.mean([r['p90_E'] for r in rows]):>7.4f} "
-                    f"{np.mean([r['rel_l2'] for r in rows]):>7.4f}")
+                    f"{np.mean([r['rel_l2'] for r in rows]):>7.4f} "
+                    f"{np.mean([r['dy0_over_yobs'] for r in rows]):>7.4f}")
 
     R["wall_seconds"] = time.time() - t_start
     json.dump(R, open(os.path.join(HERE, f"{a.tag}.json"), "w"), indent=1, default=str)

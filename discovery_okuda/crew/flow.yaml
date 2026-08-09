@@ -323,7 +323,6 @@ nodes:
         # models rather than about their parameter names.
         - [b_gs_gated_plain,     cell_diffuse, d_a,   [0.02, 0.04, 0.16, 0.3]]
         - [b_bru_gated_plain,    cell_diffuse, d_a,   [0.02, 0.04, 0.16, 0.3]]
-        - [b_gs_gated_plain,     cell_diffuse, d_h,   [0.04, 0.08, 0.32, 0.6]]
         - [b_bru_gated_plain,    cell_diffuse, d_h,   [0.04, 0.08, 0.32, 0.6]]
         - [b_gs_gated_plain,     cell_diffuse, chi,   [0.3, 0.65, 2.0, 2.8]]
         # ---- SHAPE -> CHEMISTRY, the second arrow. beta = 0 is the null and must be run.
@@ -334,6 +333,49 @@ nodes:
         # were inexpressible in the old base's model; K_purse existed only alongside the forcing
         # term that disqualifies a run. They are the three terms that can neck a lobe into a
         # finger, so a null result here is as informative as a positive one.
+        # FOUR KNOBS APPEAR TWICE BELOW, and that is deliberate rather than a duplicate to tidy
+        # away: a closed coarse grid and a refinement of it are two entries on the same
+        # (base, knob). Closure is counted on VALUES, per base, so the coarse grid stays closed
+        # and only the unrun refinement is offered. K_bend, Lambda, vth_frac and factor each have
+        # a pair.
+        #
+        # ---- THE SIZE-CONTROL MODELS, added 9 August and never yet run against each other. They
+        # are `model=` variants, so the swept key is `model` and the values are names -- which
+        # `_build_sweep` handles, because it writes any key onto the operator dict. Route B can
+        # only reach them one edit at a time; a ladder is what tells them apart.
+        #
+        # Each is a mechanism from Ginzberg, Kafri & Kirschner rather than a knob: `sizer` makes
+        # small cells grow faster, `balance` sets a target size from a synthesis/degradation
+        # equilibrium with no size sensor at all, `timer` lands every cell on target size at a
+        # fixed cycle length. `divide_3d.doubler` is the birth-relative rule that was default
+        # until 8 August and corrects no size deviation -- it is the NULL these are read against.
+        # The default (absent from both grids, measured every round as the control) is grow_3d
+        # exponential + divide_3d sizer.
+        - [b_gs_gated_plain,     grow_3d,   model,    [sizer, balance, timer]]
+        - [b_gs_gated_plain,     divide_3d, model,    [doubler, timer]]
+        # ---- THE DIFFUSION RATIO, which is what actually sets the Turing wavelength. `d_a` is the
+        # campaign's strongest lever -- spots 166 -> 3 and grip 0.018 -> 0.089 across its grid --
+        # but it is confounded: moving it changes the wavelength AND the diffusion speed together.
+        # Sweeping `d_h` at fixed `d_a` separates them, and it is the one experiment that could
+        # break "coarser-grips-harder", fifteen rounds of it: fine spots at a HIGH ratio may grip
+        # where fine spots at low d_a do not.
+        - [b_gs_gated_plain,     cell_diffuse, d_h,   [0.04, 0.08, 0.32, 0.6, 1.2]]
+        # ---- REFINING THE TWO STRUCTURES ALREADY FOUND. Both were located on a 4-point grid
+        # spanning a decade, which is enough to see a shape and not enough to resolve it.
+        # K_bend has an INTERIOR OPTIMUM: grip 0.0412 / 0.0431 / 0.0574 / 0.0360 at 0 / 0.005 /
+        # 0.08 / 0.3, the second non-monotone result this project has produced.
+        - [b_gs_gated_shaping,   shape_energy_3d, K_bend,  [0.03, 0.05, 0.12, 0.2]]
+        # Lambda is a CLIFF, not a slope: grip 0.0511 / 0.0519 / 0.0227 / 0.0021 and corr 0.87 ->
+        # 0.40 at 0 / 0.2 / 1.0 / 2.0. Everything happens between 0.2 and 1.0 and nothing is
+        # measured there. Lambda charges for edge length, so it opposes any shape that is not a
+        # sphere -- where exactly it starts winning is worth a number.
+        - [b_gs_gated_shaping,   shape_energy_3d, Lambda,  [0.3, 0.45, 0.6, 0.8]]
+        # ---- THE GROWTH CEILINGS, re-opened at the top because 1800 frames changed what they
+        # mean. At 900 the control ended at 3,089 cells; at 1800 it reaches 7,424, so a ceiling
+        # that was never approached now binds, and its effect compounds over the second half of a
+        # run that did not previously exist.
+        - [b_gs_gated_plain,     grow_3d,   vth_frac, [14.0, 20.0, 30.0]]
+        - [b_gs_gated_plain,     divide_3d, factor,   [11.0, 16.0, 24.0]]
         - [b_gs_gated_shaping,   shape_energy_3d, K_bend,  [0.0, 0.005, 0.08, 0.3]]
         - [b_gs_gated_shaping,   shape_energy_3d, K_lumen, [0.0, 0.1, 2.0, 8.0]]
         - [b_gs_gated_shaping,   rd_interface_tension, K_purse, [0.0, 0.25, 3.0, 6.0]]

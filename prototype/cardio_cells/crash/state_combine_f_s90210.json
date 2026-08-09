@@ -1,0 +1,130 @@
+{
+ "config": {
+  "device": "cuda:1",
+  "cells": 100,
+  "per_parent": 100,
+  "n_grid": 128,
+  "warmup": 165,
+  "window": 150,
+  "dtype": "float64",
+  "mode": "full",
+  "e_lo": 40.0,
+  "e_hi": 220.0,
+  "g_lo": 0.5,
+  "g_hi": 1.5
+ },
+ "args": {
+  "stage": "f",
+  "device": "cuda:1",
+  "tag": "",
+  "t0": 165,
+  "T": 8,
+  "K": 6,
+  "noise": "grid",
+  "nodes": 48,
+  "sigma_F": 0.0039,
+  "sigma_x": 1.99592e-05,
+  "seed": 90210,
+  "lo_f": 0.2,
+  "hi_f": 5.0,
+  "box_iters": 4000,
+  "out": "state_theta_combine.npz",
+  "window": 150,
+  "holdout_tick": 180,
+  "shard": 0,
+  "nshards": 1,
+  "only": "",
+  "control": true,
+  "fit": true,
+  "fittag": "state_norm_grid48_der_s90210"
+ },
+ "tag": "state_combine_f_s90210",
+ "noise_eff_samples": 16.77849463909325,
+ "control_vs_refute5": {
+  "file": "refute5_norm_grid48_s90210_sF0.0039.npz",
+  "rel_G0": 0.0,
+  "rel_r0": 0.0,
+  "max_abs_G0": 0.0
+ },
+ "derivation_error_at_noise": {
+  "v_mean": 0.026171599357651065,
+  "C_mean": 0.2733924943378801,
+  "per_tick": [
+   {
+    "tick": 165,
+    "v_rel": 0.026172397666824363,
+    "C_rel": 0.2848115679319766
+   },
+   {
+    "tick": 166,
+    "v_rel": 0.025912147186045613,
+    "C_rel": 0.2746504345551652
+   },
+   {
+    "tick": 167,
+    "v_rel": 0.02538885399476078,
+    "C_rel": 0.27132538304710574
+   },
+   {
+    "tick": 168,
+    "v_rel": 0.025486492450436587,
+    "C_rel": 0.27495886005349185
+   },
+   {
+    "tick": 169,
+    "v_rel": 0.02577169632585066,
+    "C_rel": 0.2750994835627679
+   },
+   {
+    "tick": 170,
+    "v_rel": 0.0260956879901698,
+    "C_rel": 0.27634174105478554
+   },
+   {
+    "tick": 171,
+    "v_rel": 0.026990624185402583,
+    "C_rel": 0.2688131864768047
+   },
+   {
+    "tick": 172,
+    "v_rel": 0.027554895061718123,
+    "C_rel": 0.2611392980209431
+   }
+  ]
+ },
+ "frames": [
+  {
+   "tick": 165,
+   "y_obs_norm": 0.08467107804390861
+  },
+  {
+   "tick": 166,
+   "y_obs_norm": 0.0879609245993868
+  },
+  {
+   "tick": 167,
+   "y_obs_norm": 0.0901897121529371
+  },
+  {
+   "tick": 168,
+   "y_obs_norm": 0.09114896116635463
+  },
+  {
+   "tick": 169,
+   "y_obs_norm": 0.09100595467905094
+  },
+  {
+   "tick": 170,
+   "y_obs_norm": 0.08958789977805943
+  },
+  {
+   "tick": 171,
+   "y_obs_norm": 0.08710148658115208
+  },
+  {
+   "tick": 172,
+   "y_obs_norm": 0.08343211109001222
+  }
+ ],
+ "wall_seconds": 612.3373484611511
+}
