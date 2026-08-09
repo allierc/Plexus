@@ -5,67 +5,84 @@ Edit this file mid-campaign -- the next round picks it up, no relaunch needed.
 
 ## Pending Instructions
 
-### 1. Three of your own conclusions were about broken instruments, not about biology. Retract them.
+### 1. `mech_p_ratio` is NOT a forcing test when no forcing operator is present. Retract the verdict.
 
-Between round 7 and now, three defects were found BELOW the level you can edit. Each one made an
-operator silently do nothing, so your record contains "this mechanism does not work" where the
-truth is "this mechanism never ran". Please do not carry these forward:
+For four rounds your headline has been "protr and grip past the wall are bought with forcing, not
+growth", and for four rounds the run it rests on has carried no forcing term at all.
 
-- **`rd_interface_tension` (the `extrude` node) never acted in ANY run of this campaign.** The
-  acted-ledger reads `rd_interface_tension: 0` across 800 scheduled frames. Its threshold `a_sw`
-  was an absolute value on the activator, declared over (0.2, 6.0) and defaulting to 0.5, while
-  the activator's own maximum across 78 runs has a MEDIAN OF 0.000 and a ceiling of 1.541 -- so
-  it selected zero cells and returned early every frame. `a_sw` is now a FRACTION of the
-  activator's own maximum (0.6 = "the top 40% of the field is red"), so it fires at any operating
-  point. Your rounds 6 and 7 both reported it "inert" and you were right; the reason was not the
-  mechanism. **It is untested, not refuted.**
+**`r017_07` has no `rd_interface_tension` operator in its spec.** There is no `K_extrude` in it to
+set, at any value. The structural test agrees: `_is_forced(r017_07)` returns False, and the same
+for `r014_01` and `r017_02`. Nothing is pushing these runs. `mech_p_ratio` is a PROXY -- the ratio
+of pressure in the protrusion to pressure in the body -- and round.py's own note says why it is
+kept only alongside the structural test: "the proxy did not fire" on a run that WAS forced, and it
+can equally fire on a run that is not.
 
-- **`divide_3d` with `orient_iface` was behaviourally identical to `hertwig` in 74% of runs.** Its
-  gate `orient_asw` had the same absolute (0.2, 6.0) range, defaulting to 1.0, and only 20 of 78
-  runs ever reached `act_max > 1.0`. So a `set_impl divide_3d orient_iface` edit built, ran,
-  recorded -- and was not a mechanism edit. Also now a fraction of the field. **Oriented division
-  is untested.**
+So two of your standing conclusions are wrong as stated:
 
-- **The "rail/copy, launcher duplication" you have reported since round 5 is not the launcher.**
-  `r007_00_ctrl` and `r007_10` differ in exactly one line -- `n_spots: 1` vs `2` -- and are
-  bit-identical because `n_spots` is read only by `mode: cones`, and every parent runs
-  `mode: scatter`. A dead knob, now withheld from the menu. Do not spend further slots
-  diagnosing the launcher.
+- **"the grown wall stands, no unforced run beats protr 1.204"** -- `r017_07` at protr 1.588 and
+  grip 0.198 IS unforced. The wall you have been reporting for fifteen rounds does not exist at
+  1.204; it is at least 1.588.
+- **"forcing stays linear past protr 1.5"** -- the correlation you fitted (ratio 2.284/2.025/1.958
+  -> protr 1.588/1.268/1.453) is between two consequences of something else, not cause and effect.
 
-### 2. What I would like you to spend this campaign on.
+### 2. What that something else is, and the control it needs.
 
-Your own finding is that coupling is settled: `corr_act_rad_peak` 0.852, replicated at n=3, and
-"pattern grips a growing shape, robustly, and still makes only bulges". I agree, and I agree with
-your instruction to yourself not to re-propose coupling retunes. Two things follow.
+`r017_07` differs from its parent `r014_01` (protr 1.453, n_tubes 0) by ONE edit:
+`remove_op reconnect_t1_3d0`. T1 transitions are gone, so cells cannot exchange neighbours. With
+topology frozen, pressure has no way to equilibrate between a bud and the body -- which raises
+`p_tube/p_body` mechanically, with no external force anywhere. That is the likelier reading of
+`mech_p_ratio` 2.284, and it is testable.
 
-**The open question is elongation, not grip.** `protr_peak` has been 1.16-1.22 for seven rounds
-against the >=1.3 a tube needs, and you called the wall real rather than a tuning gap. The spot
-field is now right (~10 spots ~10 cells apart, Fig. 5a). So the missing ingredient is whatever
-turns a lobe into a finger, and the two mechanisms that could supply it -- interface line tension
-and oriented division -- are the two that were never actually running.
+**Do not credit any protrusion measured without `reconnect_t1_3d` until this is controlled.** A
+protrusion on a mesh that cannot rearrange may be a stretched sheet rather than remodelled tissue,
+and stretching is what premise P7 used to refuse before it was retired. `protrusion_aspect_max`
+1.748 with `tube_diam` 1.698, and the eye reading "fat rounded buds", fit stretching better than
+tubulation.
 
-**Test the purse-string separately from the push.** `rd_interface_tension` carries two terms:
+The control is cheap and it is one slot: `r017_07` WITH `reconnect_t1_3d` restored, everything else
+identical. If protr survives at ~1.6, the T1 removal was incidental and you have a real result. If
+it falls back toward 1.45, the protrusion was the frozen mesh and the last four rounds measured an
+artefact. Please run it, and report both numbers side by side.
 
-    E = K_purse * sum_iface(edge length)  -  K_extrude * sum_red(a * r)
+### 3. I have watched r017_07 and r014_01. They are real protrusions -- use them as parents.
 
-`K_purse` is a line tension on the red/white boundary -- ordinary vertex-model physics, and how a
-real purse-string works. `K_extrude` is an energy that FALLS as red cells move outward: it is not
-a mechanism, it is the answer written into the objective, and a run carrying it can only ever be
-a control. `K_purse` was hard-wired to 0 until now and is a free parameter for the first time.
+This overrides the caution in 2 above about crediting them, and it is a judgement from the movies,
+not from the metrics. There ARE protrusions there. They are too big in DIAMETER to be Okuda's thin
+tubes, but nothing about them looks broken and the metrics agree -- no premise fails,
+`reduced_volume` 0.82-0.90, `valid_frac` 1.0, `corr_act_rad` up to 0.968.
 
-So: **`K_extrude = 0` with `K_purse > 0` is the experiment I most want to see.** If an interface
-line tension alone necks a lobe into a finger, that is a result. A run with `K_extrude > 0` is
-worth ONE slot as a positive control -- to show the instruments can detect a tube when one exists
--- and its `mech_p_ratio` (~3 = forced, ~1 = grown) must be reported whenever you discuss it. A
-forced run will never be promoted to a parent; that is enforced, not a request.
+    log/okuda/r017_07   protr 1.588  grip 0.198  n_tubes 3  2486c   2 spots  p_ratio 2.284
+    log/okuda/r014_01   protr 1.453  grip 0.139  n_tubes 0  2286c   1 spot   p_ratio 1.958
+    log/okuda/r017_02   protr 1.204  grip 0.115  n_tubes 0  4001c  18 SPOTS  p_ratio 0.0
 
-### 3. Two standing rules.
+`r017_02` IS THE MOST IMPORTANT OF THE THREE and you have been filing it under "sits below the
+wall". It is unforced on BOTH tests -- no rd_interface_tension operator, and the pressure proxy
+reads exactly 0.0, where r017_07 and r014_01 have the two tests disagreeing. And it carries
+EIGHTEEN spots against their one and two: it already has the fine length scale that 4 asks for,
+which the two big-protrusion runs do not.
 
-- **Say when a mechanism is untested rather than refuted.** The three items above cost this
-  campaign real slots because a broken operator and a false hypothesis were recorded identically.
-  If an operator's acted-count is 0, that run is not evidence about the mechanism.
-- **Growth is not optional.** Okuda's figures go 2032 -> 2843 -> 3572 cells. Your sixth
-  confirmation says growth dilutes coupling; that is a finding about a trade-off, not a licence to
-  stop growing. A morphology on a shell of fixed cell count cannot be the paper's.
+The campaign's question is now one sentence: can r017_02's 18 spots be made to protrude, rather
+than r017_07's 2 buds be made thinner? Build from r017_02 as well, not only from the two that
+score highest on protr.
 
-## Acknowledged
+Treat both as definitive parents and build from them. Stop discounting them as forced -- as 1
+establishes, neither carries a forcing operator at all.
+
+The T1 control in 2 is still worth ONE slot, because it tells you which of the two is the better
+base to build on. It is not a reason to withhold either from the parent set in the meantime.
+
+### 4. Make the activity smaller in radius -- and note r017_02 already did it.
+
+This is the standing gap and the Grounder has it exactly: "need ~10 thin tubes at spot_cells ~10;
+got 2 buds at 262". A bud 262 cells across cannot become a thin tube -- the pattern has to set a
+finer length scale before the mechanics can pull a finger out of it, and every round that grows a
+protrusion at the current spot size is going to produce another fat bud.
+
+The length scale is the chemistry's, not the mechanics'. Reach for it there: `cell_diffuse.d_a`
+and the `d_h/d_a` ratio set the Turing wavelength directly, `cell_react.F`/`kk` move Gray-Scott
+between spots and labyrinth, and `seed_cell_rd.cone_deg` sets it by hand as an initial condition
+(22.8 degrees is 10 cells across on a 2,000-cell sphere; smaller cones, more of them).
+
+Your own anticorrelation is the thing to break: "coarser-grips-harder", fifteen rounds of it --
+n_spots 18/41/40/83 giving grip 0.115/0.097/0.071/0.028. Small spots have never gripped. That is
+the finding to attack, not to keep confirming.

@@ -429,7 +429,7 @@ def _is_working(job_id, ids, min_frac=0.5):
 
 
 def wait_for_ids(ids, poll=POLL_S, timeout_h=24, straggler_factor=4.0, min_straggler_min=25,
-                 hard_cap_min=float(os.environ.get("PG_ROUND_CAP", "30"))):
+                 hard_cap_min=float(os.environ.get("PG_ROUND_CAP", "90"))):
     """Block until every submitted JOB ID reaches a terminal state. IDs, not names.
 
     STRAGGLER KILL -- why this is not optional for a weeks-long campaign.
@@ -473,7 +473,14 @@ def wait_for_ids(ids, poll=POLL_S, timeout_h=24, straggler_factor=4.0, min_strag
     killed = set()
     id_to_name = {}                 # job id -> run name, filled from the queue on every poll
     while time.time() - t0 < timeout_h * 3600:
-        # 30 MINUTES, not 60 -- Cedric, 8 August. Measured on this campaign: rounds 1-3 took ~85
+        # 90 MINUTES, PAIRED WITH `build.frames: 1800` -- Cedric, 9 August. It was 30 while frames
+        # were 900; doubling the frames roughly doubles a run, so 30 would now SIGTERM nearly
+        # everything. 90 lets the small runs finish all 1800 -- which is most of them, since
+        # rho = 0.1 and the sizer hold cell counts near 2,500 -- and salvages the few large ones
+        # at whatever frame they reached, recorded as `stopped_early`. The two numbers move
+        # TOGETHER; changing one without the other is how a round starts measuring the cap.
+        #
+        # The earlier reasoning, from 8 August, when frames were 900: Measured on this campaign: rounds 1-3 took ~85
         # minutes each, and round 3 needed the cap to close at all. A round is 16 jobs on a
         # 12-GPU partition, so the tail is one or two runs that grew enormous while eleven cards
         # sat idle; halving the cap costs those runs their last third and buys the campaign twice

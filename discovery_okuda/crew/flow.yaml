@@ -349,7 +349,18 @@ nodes:
       # "the one-edit-per-slot rule is too rigid, allows 4". Both were decisions made in
       # conversation and both were hard-coded here; this is where they belong.
       slots: 16
-      frames: 900
+      # 1800, DOUBLED 9 August. Cedric, having watched r017_07 and r014_01: "there are indeed
+      # protrusions, a bit big in diameter, but the metrics are healthy -- would just need to run
+      # x2 frames to see further protrusions." Both runs are still elongating when the clock stops
+      # (protr_peak == protr_final on r014_01), so 900 frames is measuring the middle of the
+      # morphogenesis, not its end.
+      #
+      # PAIRED WITH PG_ROUND_CAP=90, which the launch must set. At 900 frames a round took ~50-85
+      # minutes; doubling the frames roughly doubles that, and the 30-minute default cap would
+      # SIGTERM nearly every run. 90 lets the small runs -- which is most of them now that rho=0.1
+      # and the sizer hold cell counts near 2,500 -- finish all 1800, and salvages the few large
+      # ones at whatever frame they reached, recorded as `stopped_early`.
+      frames: 1800
       max_edits: 4
       # THE CELL CAP A ROUTE A RUN IS GIVEN. Not derived from the base's seed count, which is what
       # capped cellfix_B_new at 10,404 while rho = 1.0 wanted more (finished 9,999, buf_full).
