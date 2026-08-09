@@ -312,6 +312,44 @@ class ReconnectT1_3D(Rewire):
                                              dtype=m[_nm].dtype, device=m[_nm].device)
             if isinstance(m.get("apop_flag"), np.ndarray):
                 m["apop_flag"] = np.asarray([m["apop_flag"][i] for i in keep], np.float64)
+            # THE CELL STATE AND THE PENDING DELTAS FOLLOW TOO, and leaving them behind is the
+            # same defect apoptosis_3d had: `chem` is indexed by face, and the engine zeroes its
+            # delta accumulator once per TICK and integrates at the END of the schedule, so
+            # cell_diffuse and cell_react deposit per-cell deltas that are applied after this runs.
+            # Renumber the faces without renumbering those and every activator value, and every
+            # pending flux, lands on a different cell.
+            #
+            # It stayed hidden because a flip only drops a face when a cell is ALREADY a triangle,
+            # which needs something to have shrunk it -- so nothing reached this branch until
+            # apoptosis existed. Then it blew up immediately and enormously: `smaller` on r020_00
+            # reported act_min -1.04e10 with division and death running in the same tick, where
+            # the same operator on a NON-growing tissue held act_min at exactly 0.0000.
+            # reconnect_t1_3d declares no `cell_set`, so the cell level is looked up by name and
+            # a model without one simply skips this -- H.level raises rather than returning None.
+            try:
+                _cl = H.level(getattr(self, "cat", None) or "cell")
+            except Exception:
+                _cl = None
+            _kt = torch.as_tensor(keep, device=dev, dtype=torch.long)
+            if _cl is not None and getattr(_cl, "state", None) is not None \
+                    and _cl.state.shape[0] >= nF:
+                _cs = _cl.state.clone()
+                _cs[:nF2] = _cl.state[_kt.to(_cl.state.device)]
+                _cl.state = _cs
+                if getattr(_cl, "occ", None) is not None:
+                    _oc = torch.zeros(_cl.state.shape[0], device=_cl.state.device)
+                    _oc[:nF2] = 1.0; _cl.occ = _oc
+            _cname = getattr(self, "cat", None) or "cell"
+            _d = getattr(H, "_delta", None)
+            if isinstance(_d, dict) and _d.get(_cname) is not None:
+                _k2 = _kt.to(_d[_cname].device)
+                _d[_cname][:nF2] = _d[_cname][_k2]; _d[_cname][nF2:] = 0.0
+            _db = getattr(H, "_delta_blocks", None)
+            if isinstance(_db, dict):
+                for _bk, _bv in _db.items():
+                    if isinstance(_bk, tuple) and _bk and _bk[0] == _cname and _bv is not None:
+                        _k2 = _kt.to(_bv.device)
+                        _bv[:nF2] = _bv[_k2]; _bv[nF2:] = 0.0
         m["E_srce"] = torch.as_tensor(es2, device=dev)
         m["E_trgt"] = torch.as_tensor(et2, device=dev)
         m["E_face"] = torch.as_tensor(ef2, device=dev)
