@@ -286,8 +286,16 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                     {"op": "basement_membrane_contact", "at": "basement_membrane_particle",
                      "centre": [0.5, 0.5, 0.5], "surface": str(membrane), "scale": 1.0,
                      "k": float(membrane_contact_k), "offset": float(membrane_offset)})
-                spec["schedule"].insert(spec["schedule"].index("ecm_stress"),
-                                        "basement_membrane_contact")
+                # INSIDE THE SUBSTEP LOOP, not at frame level. An mpm_acceleration computed once per
+                # frame is re-applied at every substep, so the governing timestep for a stiff contact is
+                # dt_frame and not dt_sub: dt_frame*sqrt(k) is 0.40 at k=1e4 and 0.89 at 5e4 (the last
+                # stable run), then 2.53 at 4e5 and 5.66 at 2e6 -- both of which blew the sheet apart.
+                # That capped the contact near k = 6e4 while closing the gap needs ~4e5. Evaluated at
+                # the substep the limit becomes dt_sub*sqrt(k) < 1, i.e. k up to 2.5e7.
+                for _st in spec["schedule"]:
+                    if isinstance(_st, dict) and "substep_dt" in _st:
+                        _st["steps"].insert(0, "basement_membrane_contact")
+                        break
             if membrane_grid_bc:
                 spec["operators"].append(
                     {"op": "mpm_tissue_boundary", "at": "mpm_grid", "centre": [0.5, 0.5, 0.5],

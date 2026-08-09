@@ -6,15 +6,10 @@
 [planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
           E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
           warm-up 165 frames; window A = ticks 16..165 recorded
-[reference] built [20s]
-[shard 0/1] 7/7: theta_true, grid48_der_s90210|b1|naive, grid48_der_s90210|b1|eiv_box, grid48_der_s90210|b2|eiv_box, cleanF_oracleState, cleanF_derivedState, noiseF_oracleState_grid48_s90210|eiv_box
-    candidate                                   medE  neg mnratio hold_oc hold_dv |      raw     kE   gauged       R2
-    theta_true                                0.0000    0   1.000  0.0047  0.0194 |   1.0000  1.000   1.0000   1.0000  [230s]
-    grid48_der_s90210|b1|naive                0.7388    2   0.287  0.0671  0.0559 |   0.6229  1.560   0.7645   0.9105  [238s]
-    grid48_der_s90210|b1|eiv_box              0.2940    0   0.648  0.0555  0.0444 |   0.8022  1.471   0.8968   0.9699  [236s]
-    grid48_der_s90210|b2|eiv_box              0.2324    0   0.702  0.0448  0.0347 |   0.8670  1.416   0.9159   0.9726  [237s]
-    cleanF_oracleState                        0.0086    0   0.996  0.0069  0.0183 |   0.9993  1.038   0.9980   0.9993  [238s]
-    cleanF_derivedState                       0.0488    0   0.950  0.0141  0.0141 |   0.9650  1.100   0.9987   0.9994  [239s]
-    noiseF_oracleState_grid48_s90210|eiv_box  0.1504    0   0.798  0.0317  0.0262 |   0.9558  1.285   0.9438   0.9783  [240s]
-
-wrote state_combine_r_A.json [1678 s]
+[reference] built [31s]
+[bank] 10 candidates: bank_blind_E40_g1, bank_blind_E90_g1, bank_blind_E320_g1, bank_blind_E130_g0.95, bank_prior_draw_101, bank_prior_draw_303, null_med0_rand45, null_permerr_der_0, null_permerr_der_1, null_l2match_der_0
+    candidate                     medE  relL2 hold_cO hold_cD hold_nD |      raw   gauged  band_lo  band_hi
+/workspace/.conda_envs/neural-graph-linux/lib/python3.12/site-packages/numpy/lib/_function_base_impl.py:3045: RuntimeWarning: invalid value encountered in divide
+  c /= stddev[:, None]
+/workspace/.conda_envs/neural-graph-linux/lib/python3.12/site-packages/numpy/lib/_function_base_impl.py:3046: RuntimeWarning: invalid value encountered in divide
+  c /= stddev[None, :]

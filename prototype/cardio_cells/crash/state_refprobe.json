@@ -1,0 +1,49 @@
+{
+ "restore_path": {
+  "pC_minus_derivedC_maxabs": 0.0,
+  "pC_minus_trueC_relnorm": 0.2848115679319766,
+  "pv_minus_derivedv_maxabs": 0.0,
+  "pv_minus_truev_relnorm": 0.026172397666824363,
+  "pJp_minus_one_maxabs": 0.0,
+  "trueJp_minus_one_maxabs": 0.0,
+  "pos_is_true_x0_maxabs": 0.0
+ },
+ "corrupt_snapshot": {
+  "rel_G0": 0.0,
+  "rel_r0": 0.0,
+  "corrupt_C_rel_size": 13.296782395607337
+ },
+ "perturb_derived_C_1pct": {
+  "rel_G0": 4.672433452858908e-06,
+  "rel_r0": 0.002525456207788707
+ },
+ "oracle_vs_derived": {
+  "rel_G0": 0.00016876003077182812,
+  "rel_r0": 0.1290342450988043
+ },
+ "artefact_frame0": {
+  "rel_G0": 0.0,
+  "rel_r0": 0.0
+ },
+ "F_identity": {
+  "assembly_F1_minus_derivation_Fkp1_maxabs": 0.0,
+  "assembly_F0_minus_derivation_Fk_maxabs": 0.0,
+  "eF_rel_size_at_k": 0.0028056190957262707
+ },
+ "seed_independence": {
+  "corr_eF_per_tick": [
+   0.0043889465969481,
+   -0.009166612581399627,
+   -0.009981088134229947,
+   -0.003166193858855709,
+   0.014537314323437968,
+   0.00625246335901463,
+   -0.0020001245229370845,
+   -0.010800541010704085,
+   -0.010440868806727854
+  ],
+  "max_abs_corr": 0.014537314323437968,
+  "corr_ex_t0p1": 0.005124487343599859
+ },
+ "wall_seconds": 55.56822228431702
+}

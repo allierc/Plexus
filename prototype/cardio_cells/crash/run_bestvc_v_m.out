@@ -5,18 +5,19 @@
   [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
 [planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
           E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
-          warm-up 163 frames; window A = ticks 14..163 recorded
-[noise grid48] effective independent F samples per cell 16.8  (round-5 indep = 100, recording = 22.8)
-[control] frame 0 oracle-state assembly vs refute5_norm_grid48_s555_sF0.0039.npz: rel G0 0.000e+00  rel r0 0.000e+00
-[derivation] at this noise draw: v 0.0261  C 0.2735
-    frame 0 (tick 165) derived-state assembly + 6 re-noisings [160s]
-    frame 1 (tick 166) derived-state assembly + 6 re-noisings [330s]
-    frame 2 (tick 167) derived-state assembly + 6 re-noisings [500s]
-    frame 3 (tick 168) derived-state assembly + 6 re-noisings [691s]
-    frame 4 (tick 169) derived-state assembly + 6 re-noisings [889s]
-    frame 5 (tick 170) derived-state assembly + 6 re-noisings [1080s]
-    frame 6 (tick 171) derived-state assembly + 6 re-noisings [1303s]
-    frame 7 (tick 172) derived-state assembly + 6 re-noisings [1527s]
-[fit] wrote state_norm_grid48_der_s555.npz
+          warm-up 120 frames; window A = ticks -29..120 recorded
+[collect] ticks 120..225 (106); targets [165, 166, 167, 168, 169, 170, 171, 172, 180]; dt=0.002 n_sub=10 [45s]
+[control] max|W-form - state_derive.derived_v| at tick 165: c2 1.40e-14, c4 1.08e-13, sg5p1 4.00e-14
 
-wrote state_combine_f_s555.json [1563 s]
+[m] T=8 STACKED, C oracle, sigma_x on the differentiated track only
+    estimator          sx    seed  med|dE/E|      p90    relL2  holdout
+    c2                  1   90210    0.05595   0.0787   0.3144  0.01988 [303s]
+    c4                  1   90210    0.05339   0.0746   0.3687  0.02194 [559s]
+    sg7p3               1   90210    0.06359   0.0847   0.3326  0.01669 [814s]
+    sg9p3               1   90210    0.07136   0.0978   0.2308  0.02343 [1068s]
+    c2                  4   90210    0.06699   0.1095   1.2951  0.06041 [1259s]
+    c4                  4   90210    0.06539   0.1138   1.5521  0.07988 [1455s]
+    sg7p3               4   90210    0.07305   0.1137   1.3448  0.04417 [1651s]
+    sg9p3               4   90210    0.07814   0.1204   0.8921  0.03600 [1812s]
+
+wrote bestvc_v_m.json [1812 s]

@@ -351,6 +351,18 @@ SERIES = {
                               membrane_contact_k=0.0, membrane_exclude=False,
                               membrane_adhesion=1.0e4, membrane_secrete_rate=0.0,
                               membrane_tau=0.0, membrane_reserve=0.0),
+    # 114/115: PREDICTED, not swept. With critical damping the contact behaves as a penalty contact
+    #     should -- standoff scaled 5.4x for a 5x stiffness (110 -0.0421, 111 -0.0078), which is the
+    #     1/k law and the check that it is a force rather than a knob. Fitting standoff = -C/k gives
+    #     C = 421, so k = 4e5 should sit within one sheet thickness (0.002) of the surface, and 2e6
+    #     should be indistinguishable from it. If 115 differs from 114 by more than that, the load is
+    #     not what the fit assumed.
+    "114_contact_k4e5": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=False,
+                             membrane_contact_k=4.0e5, membrane_exclude=False, membrane_adhesion=0.0,
+                             membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
+    "115_contact_k2e6": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=False,
+                             membrane_contact_k=2.0e6, membrane_exclude=False, membrane_adhesion=0.0,
+                             membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
     "_unused_secrete_dense": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
                              membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
                              membrane_particles=90000, membrane_reserve=1.0,

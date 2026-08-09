@@ -352,6 +352,27 @@ def main():
                     f"{ho:>8.5f} [{time.time()-t_start:.0f}s]")
             R["stage_e_picked"] = pick
 
+        # ------------------------------------------------------------------ stage m ----------- #
+        #  the noise sweep in round 5's REAL configuration: T=8 stacked, naive solve.
+        if "m" in a.stages:
+            mp = (a.epick or "c2,c4,sg7p3,sg9p3").split(",")
+            log(f"\n[m] T={a.T} STACKED, C oracle, sigma_x on the differentiated track only")
+            log(f"    {'estimator':<14s} {'sx':>6s} {'seed':>7s} {'med|dE/E|':>10s} {'p90':>8s} "
+                f"{'relL2':>8s} {'holdout':>8s}")
+            R["stage_m"] = []
+            for f, seed in [(1.0, 90210), (4.0, 90210)]:
+                g = torch.Generator(device=sy.device).manual_seed(seed + 7)
+                Xn = Xs + (f * SIGMA_X) * torch.randn(Xs.shape, generator=g,
+                                                      device=sy.device, dtype=sy.dtype)
+                for nm in mp:
+                    t_hat, ps = stacked(nm, Xn)
+                    ho = holdout(t_hat, vhat(nm, Xn)[-1])
+                    R["stage_m"].append({"estimator": nm, "sigma_x_units": f, "seed": seed,
+                                         **ps, "holdout_derived_v": ho})
+                    log(f"    {nm:<14s} {f:>6g} {seed:>7d} {ps['med_E']:>10.5f} "
+                        f"{ps['p90_E']:>8.4f} {ps['rel_l2']:>8.4f} {ho:>8.5f} "
+                        f"[{time.time()-t_start:.0f}s]")
+
         # ------------------------------------------------------------------ stage n ----------- #
         if "n" in a.stages:
             # the clean winner AND the estimators the stage-r table says take over under noise

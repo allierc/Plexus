@@ -1,0 +1,23 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 160 frames; window A = ticks 11..160 recorded
+[collect] 160..185, dt=0.002, n_sub=10, dx=0.0078125, grid 128x128 [30s]
+
+[e] T=8 stacked, grid-48 F noise sigma_F=0.0039, sigma_x=1.99592e-05, K=4 EIV re-noisings, seed 90210  (refute5 grid48 reference, oracle state: T8 naive 0.730/0.738, eiv_box 0.160/0.150)
+    ctrl_oracle        naive      medE  0.7359 p90   0.997 relL2   0.790 negE   6 mr  0.294 [757s]
+    ctrl_oracle        eiv_snr0   medE  0.1542 p90   1.058 relL2   0.840 negE  12 mr  0.781 [757s]
+    ctrl_oracle        naive_box  medE  0.7390 p90   0.964 relL2   0.761 negE   0 mr  0.298 [757s]
+    ctrl_oracle        eiv_box    medE  0.2286 p90   0.736 relL2   0.403 negE   0 mr  0.726 [757s]
+    t_c2 (sibling)     naive      medE  0.7163 p90   0.983 relL2   0.778 negE   3 mr  0.306 [1167s]
+    t_c2 (sibling)     eiv_snr0   medE  0.1400 p90   1.057 relL2   0.858 negE  10 mr  0.848 [1167s]
+    t_c2 (sibling)     naive_box  medE  0.7191 p90   0.960 relL2   0.754 negE   0 mr  0.306 [1167s]
+    t_c2 (sibling)     eiv_box    medE  0.2176 p90   0.643 relL2   0.368 negE   0 mr  0.758 [1167s]
+    t_p11d6            naive      medE  0.7288 p90   0.991 relL2   0.786 negE   5 mr  0.298 [1663s]
+    t_p11d6            eiv_snr0   medE  0.1548 p90   1.054 relL2   0.848 negE  10 mr  0.805 [1663s]
+    t_p11d6            naive_box  medE  0.7317 p90   0.963 relL2   0.759 negE   0 mr  0.301 [1663s]
+    t_p11d6            eiv_box    medE  0.2252 p90   0.696 relL2   0.391 negE   0 mr  0.737 [1663s]

@@ -1325,6 +1325,9 @@ class BasementMembraneContact(Lateral):
         self.centre = [float(v) for v in params.get("centre", [0.5, 0.5, 0.5])]
         self.k = float(params.get("k", 1.0e4))
         self.offset = float(params.get("offset", 0.0))
+        # critical by default, as integrin_adhesion has always been: an undamped one-sided spring on a
+        # particle with mass oscillates about the surface instead of resting on it.
+        self.damp = float(params.get("damp", 2.0 * math.sqrt(max(float(params.get("k", 1.0e4)), 1e-12))))
         self.scale = float(params.get("scale", 1.0))
         import numpy as _np
         z = _np.load(str(params["surface"]))
@@ -1357,6 +1360,15 @@ class BasementMembraneContact(Lateral):
         # ONE-SIDED: only material that has entered the epithelium is pushed, and only outward.
         pen = (R + self.offset - r).clamp_min(0.0)
         acc = (self.k * pen)[:, None] * u
+        # A ONE-SIDED SPRING ON A MASSIVE PARTICLE RINGS, AND ON THE OUTWARD SWING IT SEPARATES. Runs
+        # 110/111 did exactly that: the sheet oscillated and left the surface (+0.1238 standoff, strain
+        # collapsed to 0.05 from 2.37), because this operator emitted an acceleration with no dashpot
+        # while `integrin_adhesion` beside it has defaulted to critical damping, 2*sqrt(k), all along.
+        # At Re ~ 1e-10 the inertia has no physical basis in the first place, so the damping is not a
+        # numerical patch: it is the term that makes the contact overdamped, which is the real regime.
+        vel = lvl.get("vel") if "vel" in lvl.state_schema else None   # same test integrin uses
+        if vel is not None and self.damp > 0:
+            acc = acc - self.damp * vel
         alive = getattr(H, "membrane_alive", None)
         if alive is not None:
             acc = torch.where(alive[:, None], acc, torch.zeros_like(acc))
