@@ -1,3 +1,46 @@
+====================================================================================================
+STAGE R -- the recording.  Are ch 6..11 independent of ch 2..5?
+====================================================================================================
+[R.geom] [239, 137, 137, 12]   X varies along axis 1 (h = 15.026 px), Y along axis 0 (h = 14.976 px)
+[R.mask] 17499 / 18769 nodes
+
+[R1] every measured second derivative vs every 30-px central difference of ch2..5
+    measured           best coarse cd                    r    scale   rms_meas     rms_cd  rms_dif/rms_cd
+    ch6  d2u/dx2       d/dx ch2(du/dx)              0.8630   1.5466  2.783e-03  1.553e-03           1.058
+    ch7  d2u/dy2       d/dy ch3(du/dy)              0.8723   1.5016  2.667e-03  1.549e-03           0.980
+    ch8  d2u/dxdy      d/dy ch2(du/dx)              0.9333   1.3528  1.723e-03  1.189e-03           0.629
+    ch9  d2v/dx2       d/dx ch4(dv/dx)              0.8763   1.5077  2.717e-03  1.579e-03           0.972
+    ch10 d2v/dy2       d/dy ch5(dv/dy)              0.8620   1.5369  2.716e-03  1.523e-03           1.051
+    ch11 d2v/dxdy      d/dx ch5(dv/dy)              0.9311   1.3568  1.709e-03  1.173e-03           0.640
+
+[R2] HELD-OUT NODE: predict the omitted 15-px node's ch2..5 from a 30-px grid
+     baselines use ch2..5 ONLY.  `cubic4` and `hermite_cd` spend the SAME four numbers as
+     `hermite` but take the two slopes from ch2..5 instead of ch6..11 -- that is the
+     control that decides whether ch6..11 carry anything of their own.
+    channel       dir  rms_true   nearest    linear    cubic4 hermite_cd  taylorSym   hermite  shuf_null  /linear  /cubic4
+    ch2 du/dx      x 2.980e-02 3.845e-02 2.980e-02 3.120e-02  3.120e-02  1.805e-02 1.823e-02  3.397e-02    0.606    0.579
+    ch2 du/dx      y 3.039e-02 2.331e-02 1.476e-02 1.420e-02  1.420e-02  8.944e-03 5.274e-03  1.834e-02    0.357    0.371
+    ch3 du/dy      x 3.044e-02 2.283e-02 1.485e-02 1.444e-02  1.444e-02  8.898e-03 5.526e-03  1.841e-02    0.372    0.383
+    ch3 du/dy      y 3.002e-02 3.608e-02 2.831e-02 2.938e-02  2.938e-02  1.721e-02 1.679e-02  3.261e-02    0.593    0.572
+    ch4 dv/dx      x 3.064e-02 3.698e-02 2.837e-02 2.950e-02  2.950e-02  1.718e-02 1.674e-02  3.265e-02    0.590    0.568
+    ch4 dv/dx      y 3.106e-02 2.316e-02 1.457e-02 1.412e-02  1.412e-02  8.824e-03 5.403e-03  1.806e-02    0.371    0.383
+    ch5 dv/dy      x 3.001e-02 2.321e-02 1.463e-02 1.417e-02  1.417e-02  8.882e-03 5.270e-03  1.813e-02    0.360    0.372
+    ch5 dv/dy      y 2.951e-02 3.656e-02 2.908e-02 3.045e-02  3.045e-02  1.755e-02 1.770e-02  3.324e-02    0.603    0.576
+    [step 1] coarse grid 30 px, predicting 15 px away:  best2nd/linear 0.481   best2nd/cubic4 0.475  (8/8 beat the cubic control)
+    [step 2] coarse grid 60 px, predicting 30 px away:  best2nd/linear 1.062   best2nd/cubic4 1.017  (4/8 beat the cubic control)
+    [step 4] coarse grid 120 px, predicting 60 px away:  best2nd/linear 1.581   best2nd/cubic4 1.513  (0/8 beat the cubic control)
+
+[R3] temporal noise from the quiet stretch (frames 30-49), per channel
+    ch2  du/dx     rms 3.0198e-02  sigma 2.3912e-03  SNR 12.63
+    ch3  du/dy     rms 3.0175e-02  sigma 2.3929e-03  SNR 12.61
+    ch4  dv/dx     rms 3.0951e-02  sigma 2.4424e-03  SNR 12.67
+    ch5  dv/dy     rms 2.9970e-02  sigma 2.3947e-03  SNR 12.52
+    ch6  d2u/dx2   rms 2.7723e-03  sigma 2.5587e-04  SNR 10.83
+    ch7  d2u/dy2   rms 2.6556e-03  sigma 2.5202e-04  SNR 10.54
+    ch8  d2u/dxdy  rms 1.7144e-03  sigma 1.6346e-04  SNR 10.49
+    ch9  d2v/dx2   rms 2.7058e-03  sigma 2.5326e-04  SNR 10.68
+    ch10 d2v/dy2   rms 2.7069e-03  sigma 2.5303e-04  SNR 10.70
+    ch11 d2v/dxdy  rms 1.7027e-03  sigma 1.6480e-04  SNR 10.33
 
 ====================================================================================================
 STAGE S -- the synthetic system.  Does SUB-CELL F structure matter?
@@ -10,7 +53,7 @@ STAGE S -- the synthetic system.  Does SUB-CELL F structure matter?
 [planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
           E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
           warm-up 163 frames; window A = ticks 14..163 recorded
-[collect] tick 165, C=100 Np=10000 n_sub=10  [51s]
+[collect] tick 165, C=100 Np=10000 n_sub=10  [36s]
 
 [S.geom] median cell span 0.1090 world = 13.96 mpm-dx; a control grid with 6 points per cell is K=56 nodes, h=0.01818 (3.31 particles per control cell)
           RECORDING equivalent: 137 nodes, 15 px, cell ~6 points
@@ -34,15 +77,3 @@ STAGE I -- inject each reconstruction and fit theta.  acceptance statistic = the
     none                  nan  5.146e-01  0.000e+00 3.925e-01   0.2572   0.2486   0.07795
     F_lerp_TRUE        0.0000  8.038e-02  5.256e-03 1.061e-01   0.0078   0.0045   0.00674
     F_true_substep     0.0000  7.967e-02  0.000e+00 7.782e-02   0.0091   0.0062   0.00685
-    F_nearest          0.6738  8.525e-02  4.044e-01 5.559e-01   0.9716   0.5342   0.16270
-    F_bilinear         0.6848  8.071e-02  4.456e-01 5.560e-01   0.9821   0.5361   0.16304
-    F_taylor_cd        0.6354  8.218e-02  4.221e-01 5.565e-01   0.9648   0.5330   0.16282
-    F_ls_const         0.7007  2.103e-01  5.130e-01 5.580e-01   0.9856   0.5377   0.16330
-    F_taylor_lsfull    0.5147  7.039e-02  3.311e-01 5.543e-01   0.9483   0.5279   0.16165
-    blend0.003         0.0015  8.060e-02  5.582e-03 1.094e-01   0.0062   0.0051   0.00750
-    blend0.01          0.0051  8.095e-02  7.723e-03 1.308e-01   0.0177   0.0132   0.01100
-    blend0.03          0.0154  8.089e-02  1.710e-02 2.246e-01   0.1132   0.0869   0.03208
-    blend0.1           0.0515  7.312e-02  5.204e-02 4.189e-01   0.5004   0.3438   0.10346
-    blend0.3           0.1544  5.680e-02  1.402e-01 5.206e-01   0.8158   0.4960   0.14855
-
-wrote freal_sd_SI.json / .log [354 s]

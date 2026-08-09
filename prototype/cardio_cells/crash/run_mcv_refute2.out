@@ -19,3 +19,11 @@
 [T] OTHER FRAMES: is +9.1% a property of the method or of tick 165?
       t0    oracle   c2 base   route a    gap% relv base   relv a   hoBase      hoA
      176   0.07680   0.10433   0.14308  -140.7   0.01776  0.01784  0.02752  0.03782 [314s]
+     180   0.01550   0.10567   0.11104    -6.0   0.02080  0.02068  0.01956  0.02207 [401s]
+
+[X] CORRUPTION on the FULLY DERIVED ladder (C from the centred difference).
+    clean: route_a (honest, C c2) medE 0.018303 (mcv_v 0.018300)  gapC +19.9% of the ORACLE-v/oracle-C gap
+    corrupted v store: baseline 0.020913 (clean 0.020913)  route_a 0.018303 (clean 0.018303)  delta +0.00e+00
+    + C0 snapshot corrupted: c2/C_c2 baseline 0.020913 (unchanged => C_c2 install is complete), 'oracle' ladder 29.143202 (must blow up => the C-oracle ladder DOES read the simulator's C)
+
+wrote mcv_refute2.json [532 s]

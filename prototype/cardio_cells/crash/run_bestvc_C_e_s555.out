@@ -17,3 +17,7 @@
     t_c2 (sibling)     eiv_snr0   medE  0.1537 p90   1.789 relL2   1.229 negE   8 mr  1.093 [1529s]
     t_c2 (sibling)     naive_box  medE  0.7230 p90   0.957 relL2   0.748 negE   0 mr  0.313 [1529s]
     t_c2 (sibling)     eiv_box    medE  0.1951 p90   0.575 relL2   0.340 negE   0 mr  0.805 [1529s]
+    t_p11d6            naive      medE  0.7303 p90   0.998 relL2   0.766 negE   9 mr  0.295 [2127s]
+    t_p11d6            eiv_snr0   medE  0.1440 p90   1.536 relL2   1.127 negE   8 mr  0.981 [2127s]
+    t_p11d6            naive_box  medE  0.7309 p90   0.960 relL2   0.753 negE   0 mr  0.307 [2127s]
+    t_p11d6            eiv_box    medE  0.1852 p90   0.655 relL2   0.375 negE   0 mr  0.771 [2127s]
