@@ -101,7 +101,8 @@ def build(name, tissue_npz, fit=FIT, plate_box=None, **ecm):
                 o.pop(k, None)                      # a replay has no r(t) formula to grow by
         if o["op"] == "seed_ecm" and gap_box is not None:
             o["plate_half"] = gap_box
-        if o["op"] in ("integrin_adhesion", "surface_track", "mpm_tissue_boundary"):
+        if o["op"] in ("integrin_adhesion", "surface_track", "mpm_tissue_boundary",
+                       "basement_membrane_contact"):
             # `surface_track` is on this list for the same reason the two below it are: it reads the
             # pass-1 map, which is in TISSUE units, and only `combine` knows the tissue-to-box scale.
             o["scale"] = s

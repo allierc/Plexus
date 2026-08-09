@@ -360,7 +360,15 @@ nodes:
       # SIGTERM nearly every run. 90 lets the small runs -- which is most of them now that rho=0.1
       # and the sizer hold cell counts near 2,500 -- finish all 1800, and salvages the few large
       # ones at whatever frame they reached, recorded as `stopped_early`.
-      frames: 1800
+      # 3600, DOUBLED AGAIN 9 August: "the first results are cool, we should double again the
+      # number of frames, I would like to see further."
+      #
+      # MEASURED ON ROUND 18 AT 1800, and the population is bimodal. The runs that matter -- the
+      # protrusion lineage, 2,500-16,000 cells -- finished all 1800 frames in 22-40 minutes. The
+      # exploders were at 76,807 cells by FRAME 430 after 46 minutes and are limited by the
+      # reservoir (130,004 cells), not by the clock: more frames buys them nothing they can hold.
+      # So doubling again is cheap where it is useful and irrelevant where it is not.
+      frames: 3600
       max_edits: 4
       # THE CELL CAP A ROUTE A RUN IS GIVEN. Not derived from the base's seed count, which is what
       # capped cellfix_B_new at 10,404 while rho = 1.0 wanted more (finished 9,999, buf_full).

@@ -1,0 +1,66 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 163 frames; window A = ticks 14..163 recorded
+[collect] boundaries 163..182 (20), dt=0.002 n_sub=10 [14s]
+[spec] {'is_liquid': 0, 'is_visco': 0, 'is_snow': 0}  (all None/0 => F <- (I + dt_sub C) F is the whole strain update)
+[consistency] F1(k) vs F0(k+1) 0.00e+00; x_next(k) vs x0(k+1) 0.00e+00
+
+[d] derivation alone, ZERO noise
+     tick      |v0|      |C0|    v_ctr   v_back    C_ctr    C_fwd Cfwd|Ceff  Ceff|C0   maxJp-1
+      165    41.210     563.0   0.0100   0.0371   0.1381   0.2806  1.16e-02   0.2807   0.0e+00
+      166    43.166     603.3   0.0115   0.0335   0.1500   0.2851  1.19e-02   0.2848   0.0e+00
+      167    44.578     623.0   0.0119   0.0334   0.1578   0.3065  1.19e-02   0.3065   0.0e+00
+      168    45.419     640.9   0.0129   0.0338   0.1696   0.3000  1.16e-02   0.2998   0.0e+00
+      169    45.656     646.6   0.0135   0.0349   0.1729   0.3164  1.18e-02   0.3164   0.0e+00
+      170    45.294     646.7   0.0140   0.0379   0.1755   0.3071  1.23e-02   0.3071   0.0e+00
+      171    44.345     653.8   0.0147   0.0410   0.1657   0.2914  1.27e-02   0.2911   0.0e+00
+      172    42.829     653.2   0.0148   0.0459   0.1533   0.2780  1.24e-02   0.2778   0.0e+00
+      180    23.637     574.3   0.0208   0.1290   0.0611   0.1826  1.20e-02   0.1818   0.0e+00
+    noise sF=0        sx=0          seed 0      -> v 0.0129  C_centred 0.1604  C_forward 0.2956
+    noise sF=0.0039   sx=1.99592e-05 seed 90210  -> v 0.0262  C_centred 0.2736  C_forward 0.5325
+    noise sF=0.0039   sx=1.99592e-05 seed 555    -> v 0.0262  C_centred 0.2740  C_forward 0.5320
+    noise sF=0.0039   sx=1.99592e-05 seed 777    -> v 0.0261  C_centred 0.2739  C_forward 0.5324
+    noise sF=0.039    sx=0.000199592 seed 90210  -> v 0.2275  C_centred 2.2215  C_forward 4.4417
+    noise sF=0        sx=1.99592e-05 seed 90210  -> v 0.0262  C_centred 0.1604  C_forward 0.2956
+    noise sF=0.0039   sx=0          seed 90210  -> v 0.0129  C_centred 0.2736  C_forward 0.5325
+    v stencil c2   clean 0.01291  at sigma_x 0.02615
+    v stencil c4   clean 0.00736  at sigma_x 0.03137
+    v stencil sg5  clean 0.03020  at sigma_x 0.03188
+
+[1] ROUND 3 CONTROL: single frame at tick 165, clean F, ridge0
+    variant                      medE     p90E    relL2  negE    round3          d
+    oracle_state              0.00778   0.0330   0.0231     0   0.00778  +0.00e+00
+    v_centred_only            0.02271   0.0381   0.0292     0   0.02271  +0.00e+00
+    C_forward_only(round3)    0.01251   0.0228   0.0190     0   0.01251  +0.00e+00
+    both_round3               0.04043   0.0582   0.0428     0   0.04043  +0.00e+00
+    C_centred_only            0.01008   0.0348   0.0241     0       nan           
+    both_centred              0.02177   0.0362   0.0276     0       nan           
+    v_c4_only                 0.02697   0.0355   0.0282     0       nan           
+    both_centred_v_c4         0.02490   0.0333   0.0261     0       nan           
+    round-3 ladder reproduced to <1e-6: True
+
+[8] ROUND 5 CONTROL: T=8 stacked frames, clean F (sigma_F=0, K=0), naive
+    oracle_state     medE  0.00856 p90  0.0181 relL2  0.0125 negE   0 corr 0.9995 meanratio 0.9963 [182s]
+    derived_v_only   medE  0.05071 p90  0.0724 relL2  0.0549 negE   0 corr 0.9988 meanratio 0.9480 [266s]
+    derived_C_only   medE  0.00735 p90  0.0175 relL2  0.0122 negE   0 corr 0.9995 meanratio 0.9979 [350s]
+    derived_vC       medE  0.04880 p90  0.0708 relL2  0.0534 negE   0 corr 0.9988 meanratio 0.9497 [434s]
+    derived_vC_c4    medE  0.04562 p90  0.0671 relL2  0.0496 negE   0 corr 0.9990 meanratio 0.9533 [518s]
+    derived_v_only_c4 medE  0.04714 p90  0.0690 relL2  0.0511 negE   0 corr 0.9990 meanratio 0.9517 [602s]
+    oracle_state vs round5_norm_clean|T8|naive: rel l2 8.656e-16
+
+    held-out one-frame residual, tick 180, clean F (|y_obs| 4.6926e-02)
+    theta                 oracleState  derivState  derivState_c4
+    theta_true                0.00474     0.01935        0.01759
+    oracle_state              0.00692     0.01834        0.01594
+    derived_v_only            0.01435     0.01408        0.00976
+    derived_C_only            0.00676     0.01852        0.01617
+    derived_vC                0.01408     0.01413        0.00988
+    derived_vC_c4             0.01334     0.01428        0.01008
+    derived_v_only_c4         0.01362     0.01422        0.00995
+
+wrote state_derive.json [603 s]

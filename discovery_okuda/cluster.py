@@ -429,7 +429,7 @@ def _is_working(job_id, ids, min_frac=0.5):
 
 
 def wait_for_ids(ids, poll=POLL_S, timeout_h=24, straggler_factor=4.0, min_straggler_min=25,
-                 hard_cap_min=float(os.environ.get("PG_ROUND_CAP", "90"))):
+                 hard_cap_min=float(os.environ.get("PG_ROUND_CAP", "180"))):
     """Block until every submitted JOB ID reaches a terminal state. IDs, not names.
 
     STRAGGLER KILL -- why this is not optional for a weeks-long campaign.
@@ -473,6 +473,17 @@ def wait_for_ids(ids, poll=POLL_S, timeout_h=24, straggler_factor=4.0, min_strag
     killed = set()
     id_to_name = {}                 # job id -> run name, filled from the queue on every poll
     while time.time() - t0 < timeout_h * 3600:
+        # 180 MINUTES, PAIRED WITH `build.frames: 3600` -- 9 August. At 1800 the small runs took
+        # 22-40 minutes, so 3600 puts them near 45-80 and 90 would have SIGTERMed the very runs
+        # the doubling was for. The exploders are capped by the reservoir long before either
+        # number and are salvaged as `stopped_early` either way.
+        #
+        # A ROUND NOW COSTS UP TO THREE HOURS, which is the real price of seeing further: roughly
+        # eight rounds a day instead of twenty-four. That is the trade, and it is deliberate --
+        # r014_01's protr_peak equalled its protr_final, so the campaign was measuring the middle
+        # of a morphogenesis and calling it the end.
+        #
+        # The earlier reasoning, from 8-9 August at 900 and 1800 frames:
         # 90 MINUTES, PAIRED WITH `build.frames: 1800` -- Cedric, 9 August. It was 30 while frames
         # were 900; doubling the frames roughly doubles a run, so 30 would now SIGTERM nearly
         # everything. 90 lets the small runs finish all 1800 -- which is most of them, since

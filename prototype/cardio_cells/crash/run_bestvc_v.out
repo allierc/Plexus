@@ -1,0 +1,88 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 120 frames; window A = ticks -29..120 recorded
+[collect] ticks 120..225 (106); targets [165, 166, 167, 168, 169, 170, 171, 172, 180]; dt=0.002 n_sub=10 [21s]
+[control] max|W-form - state_derive.derived_v| at tick 165: c2 1.40e-14, c4 1.08e-13, sg5p1 4.00e-14
+
+[r] v accuracy from positions alone.  rel err = |v_hat - v_true| / |v_true|
+    estimator       span    |w|/dt  clean165  cleanFIT  clean180    0.5sx      1sx      2sx      4sx      8sx  consumes
+    back1             11     707.1   0.03709   0.03719   0.12898  0.04360  0.05870  0.09804  0.18510  0.36449  x_{k-1},x_k  (round 3 control)
+    fwd1              11     707.1   0.04273   0.04643   0.16271  0.05174  0.06504  0.10201  0.18725  0.36559  x_k,x_{k+1}
+    back2             13    1274.8   0.01498   0.01947   0.02656  0.04532  0.08403  0.16456  0.32736  0.65384  3 past frames, causal O(dt^2)
+    c2                12     353.6   0.01000   0.01291   0.02080  0.01723  0.02613  0.04713  0.09150  0.18159  x_{k+-1}          BASELINE
+    c4                16     475.1   0.00606   0.00736   0.01792  0.01693  0.03133  0.06132  0.12195  0.24355  x_{k+-2}   O(dt^4)
+    c6                20     541.0   0.00528   0.00625   0.01748  0.01844  0.03523  0.06961  0.13878  0.27734  x_{k+-3}   O(dt^6)
+    c8                24     583.7   0.00501   0.00585   0.01734  0.01961  0.03787  0.07505  0.14974  0.29929  x_{k+-4}   O(dt^8)
+    c10               26     614.3   0.00488   0.00566   0.01727  0.02050  0.03979  0.07895  0.15759  0.31501  x_{k+-5}   O(dt^10)
+    sg5p1             16     158.1   0.02449   0.03020   0.03904  0.03063  0.03189  0.03645  0.05065  0.08657  5 frames, poly deg 1
+    sg7p1             20      94.5   0.03856   0.04607   0.06418  0.04617  0.04648  0.04767  0.05214  0.06705  7 frames, poly deg 1
+    sg7p3             20     256.2   0.01348   0.01678   0.02296  0.01871  0.02353  0.03691  0.06775  0.13228  7 frames, poly deg 3
+    sg9p1             23      64.5   0.05163   0.06036   0.09143  0.06039  0.06049  0.06091  0.06259  0.06889  9 frames, poly deg 1
+    sg9p3             23     169.1   0.02237   0.02739   0.03356  0.02794  0.02950  0.03501  0.05137  0.09096  9 frames, poly deg 3
+    sg9p5             23     323.5   0.00991   0.01226   0.01969  0.01608  0.02411  0.04322  0.08374  0.16611  9 frames, poly deg 5
+    sg11p3            25     122.9   0.03062   0.03665   0.04693  0.03687  0.03750  0.03994  0.04845  0.07306  11 frames, poly deg 3
+    sg11p5            25     227.0   0.01616   0.01998   0.02506  0.02129  0.02476  0.03534  0.06149  0.11792  11 frames, poly deg 5
+    sg13p3            27      94.7   0.03724   0.04366   0.06022  0.04377  0.04408  0.04533  0.05002  0.06545  13 frames, poly deg 3
+    sg13p5            27     171.9   0.02288   0.02798   0.03402  0.02853  0.03011  0.03570  0.05228  0.09249  13 frames, poly deg 5
+    sg15p3            29      75.9   0.04228   0.04878   0.07285  0.04884  0.04902  0.04975  0.05255  0.06250  15 frames, poly deg 3
+    sg17p5            32     111.9   0.03429   0.04052   0.05391  0.04068  0.04116  0.04301  0.04974  0.07041  17 frames, poly deg 5
+    sg21p5            36      80.5   0.04184   0.04810   0.07259  0.04816  0.04837  0.04919  0.05237  0.06350  21 frames, poly deg 5
+    spline3           66     590.0   0.00500   0.00585   0.01736  0.01981  0.03827  0.07585  0.15135  0.30253  whole track, not-a-knot cubic spline
+    spline5           93     688.1   0.00472   0.00537   0.01717  0.02272  0.04445  0.08840  0.17654  0.35296  whole track, quintic spline
+    fourier3         106      11.2   0.20704   0.26216   0.41563  0.26216  0.26216  0.26216  0.26217  0.26221  whole track, 3 harmonics of the 150.0-frame beat
+    fourier5         106      21.8   0.08593   0.08864   0.17983  0.08864  0.08864  0.08866  0.08877  0.08925  whole track, 5 harmonics of the 150.0-frame beat
+    fourier8         106      40.3   0.05651   0.06245   0.11444  0.06246  0.06250  0.06267  0.06332  0.06590  whole track, 8 harmonics of the 150.0-frame beat
+    fourier12        106      74.3   0.04470   0.05117   0.08283  0.05123  0.05139  0.05205  0.05458  0.06366  whole track, 12 harmonics of the 150.0-frame beat
+    fourier16        106     111.0   0.03725   0.04300   0.06083  0.04314  0.04358  0.04532  0.05169  0.07167  whole track, 16 harmonics of the 150.0-frame beat
+    fourier5+t2      106      24.9   0.07745   0.08067   0.15875  0.08067  0.08067  0.08071  0.08087  0.08157  whole track, 5 harmonics + quadratic trend
+    fourier8+t2      106      43.8   0.05468   0.06056   0.10918  0.06057  0.06062  0.06083  0.06163  0.06476  whole track, 8 harmonics + quadratic trend
+    fourier12+t2     106      79.7   0.04345   0.05001   0.07890  0.05007  0.05027  0.05103  0.05395  0.06426  whole track, 12 harmonics + quadratic trend
+    wh1+c4            99     156.2   0.02228   0.02693   0.03573  0.02741  0.02877  0.03363  0.04833  0.08450  whole track, 2nd-diff smoother lam=1, then c4
+    wh10+c4          106      64.4   0.04054   0.04673   0.07410  0.04678  0.04692  0.04747  0.04961  0.05735  whole track, 2nd-diff smoother lam=10, then c4
+    wh100+c4         106      26.7   0.06962   0.07963   0.15450  0.07963  0.07964  0.07969  0.07990  0.08075  whole track, 2nd-diff smoother lam=100, then c4
+    c4@-0.5           15     796.0   0.03707   0.03763   0.12944  0.04551  0.06348  0.10883  0.20757  0.40993  x_{k+-2}, derivative read -0.5 frames off the boundary
+    c4@-0.25          17     591.0   0.01685   0.01770   0.05632  0.02596  0.04184  0.07780  0.15252  0.30347  x_{k+-2}, derivative read -0.25 frames off the boundary
+    c4@+0.25          17     591.0   0.02438   0.02616   0.09077  0.03236  0.04612  0.08021  0.15378  0.30412  x_{k+-2}, derivative read +0.25 frames off the boundary
+    c4@+0.5           15     796.0   0.04333   0.04675   0.16343  0.05334  0.06936  0.11240  0.20949  0.41091  x_{k+-2}, derivative read +0.5 frames off the boundary
+
+[a] end-to-end, SINGLE frame tick 165, clean F, ridge0, C ORACLE, v derived
+    (round 3 control: oracle v 0.007777 / c2 0.022707;  held-out floor 0.00474)
+    estimator       med|dE/E|      p90    relL2  holdout  ho_ostate     relv
+    ORACLE_v          0.00778   0.0330   0.0231  0.00674    0.00674  0.00000
+    back1             0.28336   0.3274   0.2849  0.08944    0.04726  0.03719
+    fwd1              0.32621   0.3833   0.3203  0.11245    0.05793  0.04643
+    back2             0.04080   0.0733   0.0535  0.03059    0.01347  0.01947
+    c2                0.02271   0.0381   0.0292  0.01669    0.00928  0.01291
+    c4                0.02697   0.0355   0.0282  0.01365    0.00855  0.00736
+    c6                0.02646   0.0346   0.0270  0.01368    0.00827  0.00625
+    c8                0.02560   0.0335   0.0263  0.01376    0.00816  0.00585
+    c10               0.02488   0.0332   0.0259  0.01381    0.00811  0.00566
+    sg5p1             0.02148   0.0528   0.0418  0.03457    0.01424  0.03020
+    sg7p1             0.03731   0.0757   0.0615  0.05910    0.02063  0.04607
+    sg7p3             0.03111   0.0502   0.0359  0.01662    0.01096  0.01678
+    sg9p1             0.05011   0.1109   0.0838  0.08520    0.02706  0.06036
+    sg9p3             0.03482   0.0660   0.0441  0.02636    0.01427  0.02739
+    sg9p5             0.03217   0.0435   0.0332  0.01408    0.00982  0.01226
+    sg11p3            0.03289   0.0797   0.0550  0.03971    0.01795  0.03665
+    sg11p5            0.03282   0.0570   0.0391  0.01792    0.01226  0.01998
+    sg13p3            0.04084   0.0985   0.0672  0.05334    0.02175  0.04366
+    sg13p5            0.03555   0.0700   0.0451  0.02601    0.01475  0.02798
+    sg15p3            0.04343   0.1091   0.0772  0.06604    0.02520  0.04878
+    sg17p5            0.03704   0.0944   0.0626  0.04630    0.01999  0.04052
+    sg21p5            0.04054   0.1142   0.0755  0.06515    0.02462  0.04810
+    spline3           0.02563   0.0337   0.0264  0.01373    0.00819  0.00585
+    spline5           0.02382   0.0329   0.0254  0.01383    0.00807  0.00537
+    fourier3          0.17717   0.5122   0.2942  0.40258    0.08305  0.26216
+    fourier5          0.10174   0.2560   0.1541  0.17605    0.05113  0.08864
+    fourier8          0.11177   0.2169   0.1466  0.10981    0.03796  0.06245
+    fourier12         0.05257   0.1523   0.0859  0.07511    0.02935  0.05117
+    fourier16         0.02612   0.0994   0.0648  0.05159    0.02084  0.04300
+    fourier5+t2       0.08664   0.2208   0.1408  0.15221    0.04799  0.08067
+    fourier8+t2       0.09291   0.1722   0.1286  0.10393    0.03525  0.06056
+    fourier12+t2      0.05017   0.1376   0.0843  0.07032    0.02772  0.05001
+    wh1+c4            0.02869   0.0613   0.0442  0.02947    0.01413  0.02693
