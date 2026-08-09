@@ -76,6 +76,10 @@ import metrics as MET                                                    # noqa:
 # exclude the divergent and the negative, not to do the estimating.
 WIDTH = 5.0
 
+
+class NotInvertible(Exception):
+    """The amplitude curve cannot name a parameter value, so no anchor may be read off it."""
+
 # The planted truth on the synthetic sheet, for scoring the prior only. `seed_from_segmentation`
 # gives a deterministic spread over [45, 220] with no props file (see any run log).
 PLANTED_LO, PLANTED_HI = 45.0, 220.0
@@ -160,6 +164,17 @@ def anchor_from_amplitude(curve, observed):
     if E.size < 3:
         raise RuntimeError("amplitude curve has fewer than three usable points")
     slope, intercept = np.polyfit(np.log(E), np.log(A), 1)
+
+    # THE ANCHOR REFUSES ITSELF WHEN THE CURVE CANNOT CARRY IT. Measured on this sheet: over a
+    # 40-fold range of stiffness the amplitude rises to a turning point near E = 234 and comes
+    # back down, so the same amplitude names two moduli, one stiff and one soft. Inverting it
+    # returns a confident number with nothing behind it -- which is the whole failure this file
+    # was written to stop repeating, and it would be absurd to repeat it here.
+    if not bool(np.all(np.diff(A) < 0) or np.all(np.diff(A) > 0)):
+        raise NotInvertible(
+            f"amplitude is NOT MONOTONE in the swept parameter (turning point inside "
+            f"[{E.min():g}, {E.max():g}], fitted exponent {slope:+.3f}), so an amplitude does not "
+            f"name one value. No anchor exists on this curve; the box must be DECLARED.")
     E0 = float(np.exp((np.log(observed) - intercept) / slope))
     pred = np.exp(intercept + slope * np.log(E))
     resid = float(np.max(np.abs(np.log(pred) - np.log(A))))
@@ -223,7 +238,14 @@ def calibrate(args):
     for c in gcurve:
         log(f"    gain = {c['E']:8.3f}   peak_excursion = {c['amplitude']:.6g}")
 
-    a = anchor_from_amplitude(curve, observed)
+    try:
+        a = anchor_from_amplitude(curve, observed)
+        a["anchor_refused"] = None
+    except NotInvertible as e:
+        a = {"anchor_E": None, "box": None, "anchor_refused": str(e),
+             "exponent": float(np.polyfit(np.log([c["E"] for c in curve]),
+                                          np.log([c["amplitude"] for c in curve]), 1)[0]),
+             "observed_amplitude": float(observed), "width": WIDTH}
     a["identifiability"] = {"E": _ident(curve, fl), "gain": _ident(gcurve, fl)}
     a["gain_curve"] = gcurve
     # the planted moduli, READ OFF THE SYSTEM. The operator's log line advertises its
@@ -231,7 +253,7 @@ def calibrate(args):
     # produced, and scoring a prior against the advertised range instead of the installed one is
     # the same class of error this file exists to fix.
     truth = sy.E_true[1:].detach().cpu().numpy()
-    a["scored"] = score_box(a["box"], truth)
+    a["scored"] = score_box(a["box"], truth) if a["box"] else None
     a["true_median"] = float(np.median(truth))
     a["planted_range"] = [float(truth.min()), float(truth.max())]
     a["curve"] = curve
@@ -243,6 +265,16 @@ def calibrate(args):
             f"   monotone {str(v['monotone']):<5s}   exponent {v['exponent']:+.3f}"
             f"   invertible: {v['invertible']}")
     log(f"\n{'=' * 100}\n  THE ANCHOR\n{'=' * 100}")
+    if a["anchor_refused"]:
+        log(f"    NO ANCHOR. {a['anchor_refused']}")
+        log(f"\n    The box must therefore be DECLARED, from biology and a unit calibration, and")
+        log(f"    held fixed across noise levels. It cannot be read off this recording -- and the")
+        log(f"    identifiability table above says why that hardly matters: over 40x of stiffness")
+        log(f"    the observable moves {a['identifiability']['E']['span_steps']:.0f} steps, while "
+            f"{a['identifiability']['gain']['span_steps']:.0f} steps separate the ends of a 16x")
+        log(f"    gain sweep. THE PARAMETER THIS DATA CONSTRAINS IS THE GAIN, NOT THE MODULUS.")
+        json.dump(a, open(os.path.join(HERE, f"boxprior_{args.tag}.json"), "w"), indent=1)
+        return a
     log(f"    amplitude ~ E^{a['exponent']:.3f}   (log-log max residual {a['loglog_max_resid']:.4f}"
         f", monotone: {a['monotone_decreasing']})")
     log(f"    anchor E0            {a['anchor_E']:.2f}      true median {a['true_median']:.1f}"

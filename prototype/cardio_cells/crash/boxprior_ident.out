@@ -1,0 +1,55 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 180 frames; window A = ticks 31..180 recorded
+
+  sweeping 13 uniform moduli over [20, 800] -- observed amplitude 0.00957049
+    E    =    20.00   peak_excursion = 0.00892962
+    E    =    27.20   peak_excursion = 0.00892555
+    E    =    36.99   peak_excursion = 0.0091642
+    E    =    50.30   peak_excursion = 0.00915304
+    E    =    68.40   peak_excursion = 0.00947792
+    E    =    93.02   peak_excursion = 0.00953143
+    E    =   126.49   peak_excursion = 0.010055
+    E    =   172.01   peak_excursion = 0.0103562
+    E    =   233.92   peak_excursion = 0.0106873
+    E    =   318.11   peak_excursion = 0.0101403
+    E    =   432.59   peak_excursion = 0.00985874
+    E    =   588.28   peak_excursion = 0.00962715
+    E    =   800.00   peak_excursion = 0.0101212
+
+  the contrast: the same sweep on GAIN over [0.25, 4]
+    gain =    0.250   peak_excursion = 0.00455376
+    gain =    0.315   peak_excursion = 0.00457284
+    gain =    0.397   peak_excursion = 0.00461448
+    gain =    0.500   peak_excursion = 0.00503034
+    gain =    0.630   peak_excursion = 0.00628878
+    gain =    0.794   peak_excursion = 0.00812625
+    gain =    1.000   peak_excursion = 0.0103809
+    gain =    1.260   peak_excursion = 0.0132863
+    gain =    1.587   peak_excursion = 0.0170546
+    gain =    2.000   peak_excursion = 0.0209193
+    gain =    2.520   peak_excursion = 0.0260771
+    gain =    3.175   peak_excursion = 0.0338186
+    gain =    4.000   peak_excursion = 0.0435319
+
+====================================================================================================
+  IDENTIFIABILITY -- how much the observable moves when the parameter does, in certified steps
+====================================================================================================
+    E     over x40   :  amplitude spans   13.9 steps   monotone False   exponent +0.037   invertible: False
+    gain  over x16   :  amplitude spans  308.5 steps   monotone True    exponent +0.886   invertible: True
+
+====================================================================================================
+  THE ANCHOR
+====================================================================================================
+    amplitude ~ E^0.037   (log-log max residual 0.0765, monotone: False)
+    anchor E0            92.91      true median 128.5      ratio 0.723
+    box  [18.58, 464.55]  (x5 either way, declared)
+    planted E in [40.0, 216.3]
+    planted moduli excluded: 0/100   -- the truth is inside
+
+  -> /workspace/Plexus/prototype/cardio_cells/crash/boxprior_ident.json
