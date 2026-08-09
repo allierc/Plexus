@@ -184,6 +184,8 @@ def main():
     ap.add_argument("--pad", type=int, default=45)
     ap.add_argument("--period", type=float, default=150.0)
     ap.add_argument("--ntop", type=int, default=4)
+    ap.add_argument("--epick", default="", help="comma list overriding stage e's automatic pick")
+    ap.add_argument("--npick", default="", help="comma list overriding stage n's automatic pick")
     a = ap.parse_args()
 
     args = SimpleNamespace(device=a.device, cells=100, per_parent=100, n_grid=128,
@@ -333,6 +335,8 @@ def main():
                 pick = ["ORACLE_v", "c2"] + [k for k in cand[:a.ntop] if k != "c2"]
             else:
                 pick = ["ORACLE_v", "c2", "c4", "spline3", "fourier8"]
+            if a.epick:
+                pick = a.epick.split(",")
             log(f"\n[e] end-to-end, T={a.T} STACKED frames, clean F, naive solve, C ORACLE")
             log(f"    (round 5 control: oracle state 0.008562)")
             log(f"    {'estimator':<14s} {'med|dE/E|':>10s} {'p90':>8s} {'relL2':>8s} "
@@ -358,6 +362,8 @@ def main():
             else:
                 pick = ["c2", "c4", "spline3"]
             pick += [k for k in noisy_cands if k not in pick]
+            if a.npick:
+                pick = a.npick.split(",")
             log(f"\n[n] NOISE on the positions the derivative is taken from "
                 f"(sigma_x = 1 unit = {SIGMA_X:.3e} world = 0.0409 px).  Single frame, "
                 f"tick {a.t0}, C oracle.")

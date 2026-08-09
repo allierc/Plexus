@@ -360,15 +360,18 @@ nodes:
       # SIGTERM nearly every run. 90 lets the small runs -- which is most of them now that rho=0.1
       # and the sizer hold cell counts near 2,500 -- finish all 1800, and salvages the few large
       # ones at whatever frame they reached, recorded as `stopped_early`.
-      # 3600, DOUBLED AGAIN 9 August: "the first results are cool, we should double again the
-      # number of frames, I would like to see further."
+      # 1800, AND IT WAS BRIEFLY 3600. Doubling again was measured, committed, and reverted the
+      # same day: Cedric decided not to relaunch, so the file must say what is actually running.
+      # A config that describes a run nobody started is the same lie as a comment that stopped
+      # describing the code.
       #
-      # MEASURED ON ROUND 18 AT 1800, and the population is bimodal. The runs that matter -- the
-      # protrusion lineage, 2,500-16,000 cells -- finished all 1800 frames in 22-40 minutes. The
-      # exploders were at 76,807 cells by FRAME 430 after 46 minutes and are limited by the
-      # reservoir (130,004 cells), not by the clock: more frames buys them nothing they can hold.
-      # So doubling again is cheap where it is useful and irrelevant where it is not.
-      frames: 3600
+      # The measurement stands if it is ever wanted. At 1800 frames the population is bimodal:
+      # the protrusion lineage (2,500-16,000 cells; r017_07 is 2,486) finishes all 1800 in 22-40
+      # minutes, while the exploders sit at 76,807 cells by FRAME 430 after 46 minutes, limited by
+      # the 130,004-cell reservoir rather than by the clock. So 3600 would be cheap where it helps
+      # and irrelevant where it does not -- and it must move together with PG_ROUND_CAP, which
+      # would need 180, taking a round to three hours and the campaign to ~8 rounds a day.
+      frames: 1800
       max_edits: 4
       # THE CELL CAP A ROUTE A RUN IS GIVEN. Not derived from the base's seed count, which is what
       # capped cellfix_B_new at 10,404 while rho = 1.0 wanted more (finished 9,999, buf_full).
