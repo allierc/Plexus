@@ -1,0 +1,32 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 165 frames; window A = ticks 16..165 recorded
+[control] theta_true here vs theta_round4_eiv.npz: max abs diff 0.000e+00
+
+[A/B/D] raw and 2-D-gauged rollouts, margin 20, anchor=None, 150 frames
+    candidate                 medE    relL2  relL2_g  medE_re   corr  neg |      raw     t1     t2     kE     kg   gauged       R2  r2cell status
+    theta_true              0.0000    0.000    0.000   0.0000  1.000    0 |   1.0000  1.000  1.000  1.000  1.000   1.0000   1.0000  1.0000 already at (1,1)
+    T8/naive                0.4674    0.669    0.601   0.3016  0.407    6 |   0.7827  1.071  0.999  1.094  0.978   0.8044   0.8870  0.9772 converged
+    T8/eiv_snr0             0.0546    1.821    0.836   0.7478  0.254    7 |   0.2375  0.751  0.884  1.595  1.450   0.0037  -0.3233  0.7241 max iters
+    T8/naive_box            0.4674    0.648    0.586   0.3141  0.407    0 |   0.8793  1.055  1.000  1.093  0.990   0.9102   0.9748  0.9930 converged
+    T8/eiv_snr0_box         0.0546    0.685    0.547   0.3379  0.493    0 |   0.9241  1.017  1.001  0.991  0.979   0.9209   0.9764  0.9927 converged
+    null_med0_rand45        0.0000    0.381    0.379   0.0378  0.455    0 |   0.6879  0.972  1.083  0.652  0.825   0.5532   0.7433  0.9701 converged
+    null_medmatch_0.055     0.0546    0.383    0.381   0.0958  0.455    0 |   0.6956  0.963  1.068  0.640  0.834   0.5594   0.7301  0.9685 converged
+
+[C] deterministic 5x5 log-grid gauge (k in [0.45,2.23]): is the non-converged 'gauged' number a score or an optimiser artefact?
+    T8/eiv_snr0      grid-best gauge cell kE 2.226 kg 1.492 resid 0.124 -> loop   0.3890 | Broyden   0.0037 at kE 1.595 kg 1.450 | loops over the whole grid [-0.561, 0.518]; 1 cells within 15% of the targets, their loops span [0.389, 0.389]
+    T8/naive         grid-best gauge cell kE 1.000 kg 1.000 resid 0.069 -> loop   0.7827 | Broyden   0.8044 at kE 1.094 kg 0.978 | loops over the whole grid [-0.725, 0.783]; 3 cells within 15% of the targets, their loops span [0.511, 0.783]
+
+[A] which parameter statistic predicts the rollout?  Spearman over the 10 candidates whose theta is on disk (round 4's own set)
+    med_E                raw -0.552  gauged -0.418  skill -0.527
+    rel_l2               raw -0.818  gauged -0.903  skill -0.818
+    corr_E               raw +0.842  gauged +0.855  skill +0.891
+    rel_l2_gauge_opt     raw -0.903  gauged -0.927  skill -0.939
+    med_E_after_rescale  raw -0.842  gauged -0.879  skill -0.842
+
+wrote refute4.json [1358 s]

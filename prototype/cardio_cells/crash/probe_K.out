@@ -1,0 +1,12 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+A linearity in F: {'|dA|/|A|': 0.00226257159162655, '|curv|/|dA|': 0.04905625215212268, '|A(2d)-A0-2(A(d)-A0)|/|A(d)-A0|': 0.025035645094539698}
+2 {'gtrunc0': (0.1019, 0.752, 0.642, 187), 'gtrunc0.3': (0.1583, 0.601, 0.567, 155), 'gtrunc1': (0.3131, 0.417, 0.385, 129)}
+4 {'gtrunc0': (0.137, 0.797, 0.661, 186), 'gtrunc0.3': (0.1512, 0.586, 0.556, 151), 'gtrunc1': (0.2574, 0.45, 0.397, 128)}
+8 {'gtrunc0': (0.1345, 0.775, 0.564, 186), 'gtrunc0.3': (0.1344, 0.585, 0.565, 153), 'gtrunc1': (0.2505, 0.466, 0.408, 135)}
+16 {'gtrunc0': (0.1763, 1.48, 1.442, 190), 'gtrunc0.3': (0.1644, 0.582, 0.535, 153), 'gtrunc1': (0.251, 0.439, 0.366, 134)}
+32 {'gtrunc0': (0.1443, 0.914, 1.465, 189), 'gtrunc0.3': (0.1576, 0.564, 0.509, 154), 'gtrunc1': (0.2619, 0.455, 0.379, 137)}
+done

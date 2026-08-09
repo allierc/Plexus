@@ -1,0 +1,29 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 165 frames; window A = ticks 16..165 recorded
+
+[threshold] sigma_F sweep, F_lerp injection, no position noise, 3 reps
+       sigma_F   mode     medE     p90E     medg   negE
+      0.00e+00  indep   0.0078   0.0330   0.0045    0.0
+      5.00e-05  indep   0.0079   0.0361   0.0050    0.0
+      1.00e-04  indep   0.0079   0.0425   0.0052    0.7
+      2.00e-04  indep   0.0071   0.0393   0.0054    1.0
+      5.00e-04  indep   0.0095   0.0752   0.0076    1.0
+      1.00e-03  indep   0.0207   0.2790   0.0132    1.0
+      2.00e-03  indep   0.0812   0.6461   0.0325    2.0
+      3.90e-03  indep   0.2528   0.9120   0.0725    3.3
+      0.00e+00   cell   0.0078   0.0330   0.0045    0.0
+      5.00e-05   cell   0.0080   0.0390   0.0053    0.3
+      1.00e-04   cell   0.0079   0.0395   0.0058    0.0
+      2.00e-04   cell   0.0099   0.0539   0.0071    0.7
+      5.00e-04   cell   0.0156   0.1690   0.0125    1.7
+      1.00e-03   cell   0.0473   0.3986   0.0248    0.7
+      2.00e-03   cell   0.1582   0.8041   0.0635    3.3
+      3.90e-03   cell   0.3564   0.9610   0.1090    5.7
+
+wrote finject_thresh.json [469 s]

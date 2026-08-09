@@ -1,0 +1,40 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 165 frames; window A = ticks 16..165 recorded
+[setup] a_ref matches round 2 to 0.00e+00; sse_blind 1.6661 (round2 r2_blind 0.9633)
+
+[control] reproducing round 2 rows on a different GPU
+  theta_true                 medE  0.000 | raw loop   1.0000 Erat  1.000 | k  1.000 gauged loop   1.0000 R2   1.0000 r2cell  1.0000 skill  +1.000
+  blind_E130_g0.95           medE  0.318 | raw loop   0.7599 Erat  0.863 | k  1.142 gauged loop   0.6545 R2   0.8165 r2cell  0.9633 skill  +0.000
+
+[A] is the triad's recovery a tautology of the gauge orbit?
+  true_gain_x1.8             medE  0.000 | raw loop  -0.1764 Erat  1.943 | k  0.558 gauged loop   0.9995 R2   0.9999 r2cell  1.0000 skill  +1.000
+  true_E_x1.8                medE  0.800 | raw loop   0.6978 Erat  0.718 | k  1.359 gauged loop   0.7291 R2   0.7974 r2cell  0.9712 skill  +0.215
+  true_E_x0.5                medE  0.500 | raw loop   0.2297 Erat  1.517 | k  0.672 gauged loop   0.7433 R2   0.7513 r2cell  0.9716 skill  +0.225
+  true_both_x1.8             medE  0.800 | raw loop   0.4989 Erat  1.383 | k  0.753 gauged loop   0.7311 R2   0.7961 r2cell  0.9710 skill  +0.210
+
+[B] the per-cell-BLIND family: zero per-cell information by construction
+  blind_E40_g1               medE  0.689 | raw loop  -0.1799 Erat  1.946 | k  0.534 gauged loop   0.5477 R2   0.4799 r2cell  0.9499 skill  -0.366
+  blind_E60_g1               medE  0.533 | raw loop   0.1804 Erat  1.469 | k  0.701 gauged loop   0.6439 R2   0.7343 r2cell  0.9692 skill  +0.160
+  blind_E90_g1               medE  0.432 | raw loop   0.5886 Erat  1.138 | k  0.882 gauged loop   0.6586 R2   0.8433 r2cell  0.9764 skill  +0.356
+  blind_E130_g1              medE  0.318 | raw loop   0.7372 Erat  0.908 | k  1.088 gauged loop   0.6503 R2   0.8162 r2cell  0.9633 skill  -0.001
+  blind_E180_g1              medE  0.401 | raw loop   0.6686 Erat  0.760 | k  1.276 gauged loop   0.6209 R2   0.6882 r2cell  0.9397 skill  -0.643
+  blind_E240_g1              medE  0.868 | raw loop   0.5904 Erat  0.655 | k  1.457 gauged loop   0.5136 R2   0.5354 r2cell  0.9150 skill  -1.319
+  blind_E320_g1              medE  1.491 | raw loop   0.5524 Erat  0.574 | k  1.652 gauged loop   0.5079 R2   0.3442 r2cell  0.8781 skill  -2.324
+
+[C] independent draws from the planting prior (per-cell variation, zero info)
+  prior_draw_101             medE  0.432 | raw loop   0.6591 Erat  1.207 | k  0.847 gauged loop   0.6196 R2   0.5801 r2cell  0.8986 skill  -1.765
+  prior_draw_202             medE  0.364 | raw loop   0.6456 Erat  0.986 | k  1.014 gauged loop   0.6210 R2   0.7446 r2cell  0.9440 skill  -0.526
+  prior_draw_303             medE  0.482 | raw loop   0.6270 Erat  1.162 | k  0.887 gauged loop   0.7005 R2   0.7079 r2cell  0.9554 skill  -0.217
+
+[D] the nulls round 2 left ungauged
+  replay_raw                 scale 1.0000 | loop   0.2917 Erat  0.575 R2   -5.696 r2cell  0.8549 skill  -2.957
+  replay_energy_matched      scale 1.3185 | loop  -0.0604 Erat  1.000 R2   -7.524 r2cell  0.8549 skill  -2.957
+  replay_best_scale          scale 0.600 | loop   0.4925
+
+wrote refute2.json [596 s]

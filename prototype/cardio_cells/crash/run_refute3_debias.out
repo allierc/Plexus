@@ -1,0 +1,26 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 40 frames; window A = ticks 1..40 recorded
+[control] noise-free F_lerp at t0=165: med|dE/E| 0.0078
+[sF 0 rep 0] naive medE 0.0078 (mean ratio 1.012)  |corr|/|G| 1.082e-16  min eig 5.75e-15 (naive 5.75e-15)
+      corrected ridge 0      medE 0.0078  p90 0.0330  mean ratio 1.012  l2 0.023
+      corrected ridge 1e-08  medE 0.0078  p90 0.0340  mean ratio 1.009  l2 0.035
+      corrected ridge 1e-06  medE 0.0079  p90 0.0354  mean ratio 0.998  l2 0.094
+      corrected ridge 0.0001 medE 0.0115  p90 0.1426  mean ratio 0.935  l2 0.179
+[sF 0.0039 rep 0] naive medE 0.5405 (mean ratio 0.376)  |corr|/|G| 2.720e-03  min eig -3.24e-08 (naive 7.10e-15)
+      corrected ridge 0      medE 0.1762  p90 1.6116  mean ratio 0.818  l2 1.430
+      corrected ridge 1e-08  medE 0.1763  p90 1.6141  mean ratio 0.820  l2 1.379
+      corrected ridge 1e-06  medE 0.1755  p90 1.6163  mean ratio 0.853  l2 1.496
+      corrected ridge 0.0001 medE 0.1805  p90 1.6692  mean ratio 0.723  l2 1.458
+[sF 0.0039 rep 1] naive medE 0.5356 (mean ratio 0.401)  |corr|/|G| 2.869e-03  min eig -3.60e-08 (naive 7.10e-15)
+      corrected ridge 0      medE 0.5478  p90 5.9634  mean ratio -5.797  l2 33.485
+      corrected ridge 1e-08  medE 0.5525  p90 6.0349  mean ratio -5.913  l2 34.324
+      corrected ridge 1e-06  medE 0.5815  p90 7.6971  mean ratio -8.087  l2 49.719
+      corrected ridge 0.0001 medE 0.5784  p90 4.3108  mean ratio -1.554  l2 16.120
+
+wrote refute3_debias.json [296 s]

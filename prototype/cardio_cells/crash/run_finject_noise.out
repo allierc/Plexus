@@ -1,0 +1,31 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 165 frames; window A = ticks 16..165 recorded
+[ref] |F_lerp - F_true|/|F| = 4.584e-04; median |F - I| = 4.6025e-02
+
+[sweep] F_lerp injection, frame cadence, displacement read-out; 2 repeats per case
+      sigma_F   mode   sigma_x     medE     medg     p90E        l2  negE
+       0.0000  indep  0.00e+00   0.0078   0.0045   0.0330     0.023   0.0
+       0.0000  indep  2.00e-05   0.0377   0.0764   0.4479     6.281   1.5
+       0.0039  indep  0.00e+00   0.2417   0.0599   0.9087     0.519   3.0
+       0.0039  indep  2.00e-05   0.2677   0.0918   0.8606     0.551   4.5
+       0.0039   cell  0.00e+00   0.4233   0.1392   0.9820     0.609   5.0
+       0.0039   cell  2.00e-05   0.3919   0.1425   0.9422     0.641   5.0
+       0.0327  indep  0.00e+00   0.9717   0.4362   1.0001     0.930  11.5
+       0.0327  indep  2.00e-05   0.9559   0.4581   1.0095     0.967  18.0
+       0.0327   cell  0.00e+00   0.9871   0.4332   1.0093     0.946  27.5
+       0.0327   cell  2.00e-05   0.9770   0.4667   1.0187     0.957  25.0
+
+[crash test] the noisy recoveries, 150-frame free rollout, margin-20
+    sF0_indep_sx1.99592e-05    medE  0.0406 | raw loop   0.9563 t1  1.015 R2   0.9388 | kE  1.021 kg  1.000 gauged loop   0.9557 r2cell  0.9802
+    sF0.0039_indep_sx1.99592e-05 medE  0.2566 | raw loop   0.8757 t1  1.044 R2   0.9243 | kE  1.060 kg  0.989 gauged loop   0.8994 r2cell  0.9805
+    sF0.0039_cell_sx1.99592e-05 medE  0.3944 | raw loop   0.7263 t1  1.047 R2   0.8377 | kE  1.548 kg  1.182 gauged loop   0.6746 r2cell  0.9348
+    sF0.0327_indep_sx1.99592e-05 medE  0.9563 | raw loop  -0.0051 t1  1.639 R2  -1.2667 | kE  2.703 kg  0.949 gauged loop   0.2946 r2cell  0.7231
+    sF0.0327_cell_sx1.99592e-05 medE  0.9838 | raw loop   0.0985 t1  1.685 R2  -4.4044 | kE  0.368 kg  0.232 gauged loop   0.1428 r2cell  0.5849
+
+wrote finject_noise.json [596 s]

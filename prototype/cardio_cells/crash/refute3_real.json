@@ -1,0 +1,110 @@
+{
+ "path": "/groups/saalfeld/home/allierc/GraphData/graphs_data/cardiomyocytes_real_data/Cardio_1/0_B_15kPa_1_MMStack_Pos0.ome.tif.derivatives.npy",
+ "shape": [
+  239,
+  137,
+  137,
+  12
+ ],
+ "h_px": [
+  15.026214599609375,
+  14.975845336914062
+ ],
+ "n_mask": 17499,
+ "channel_audit": {
+  "corr_channel_vs_centraldiff": {
+   "c2": {
+    "du/dx": 0.7489,
+    "du/dy": 0.0308,
+    "dv/dx": -0.013,
+    "dv/dy": -0.0295
+   },
+   "c3": {
+    "du/dx": 0.0294,
+    "du/dy": 0.7554,
+    "dv/dx": -0.0203,
+    "dv/dy": -0.0428
+   },
+   "c4": {
+    "du/dx": -0.026,
+    "du/dy": -0.0227,
+    "dv/dx": 0.7401,
+    "dv/dy": 0.004
+   },
+   "c5": {
+    "du/dx": -0.0295,
+    "du/dy": -0.0422,
+    "dv/dx": 0.0061,
+    "dv/dy": 0.7359
+   }
+  },
+  "ls_scale_fd_over_chan_diagonal": {
+   "c2": 0.5899,
+   "c3": 0.6059,
+   "c4": 0.6052,
+   "c5": 0.59
+  },
+  "best_match_per_channel": {
+   "c2": "du/dx",
+   "c3": "du/dy",
+   "c4": "dv/dx",
+   "c5": "dv/dy"
+  },
+  "assumed_order_is_argmax": true
+ },
+ "resolution_test": {
+  "disagreement_raw": {
+   "p50": 0.03256547918292226,
+   "p90": 0.06091195583833193,
+   "mean": 0.036304342333884264
+  },
+  "disagreement_after_matching_the_boxcar": {
+   "p50": 0.02488652216605674,
+   "p90": 0.04353179312054263,
+   "mean": 0.026860810246867223
+  },
+  "reduction_factor_p50": 1.308558864337381,
+  "relative_raw": {
+   "p50": 0.9869902342277642,
+   "p90": 2.462025220971237,
+   "mean": 1.2828532951297682
+  },
+  "relative_after": {
+   "p50": 0.8434907636960806,
+   "p90": 2.355258513075528,
+   "mean": 1.1233854848916993
+  },
+  "note": "if the 0.0327 were measurement error it would not care about matching the smoothing of the two estimators"
+ },
+ "bias_vs_noise": {
+  "static_fraction_of_disagreement_power": 0.0162623787389018,
+  "rms_total": 0.020407491529954382,
+  "rms_static": 0.018217119221103834,
+  "rms_fluctuating": 0.009197949653550492
+ },
+ "temporal_autocorr_of_F_residual_quiet": {
+  "lags_0_to_5": [
+   1.0,
+   0.0006,
+   -0.1058,
+   -0.157,
+   -0.1734,
+   -0.1726
+  ],
+  "sigma_F_from_residual": 0.005547124217443014,
+  "note": "lag-1 near 0 => the F error is temporally white => stacking T frames averages it down as 1/sqrt(T).  lag-1 near 1 => it is a static bias and stacking does not help"
+ },
+ "temporal_autocorr_of_disagreement_fluctuation": [
+  1.0,
+  0.9472,
+  0.8729,
+  0.7897,
+  0.7063,
+  0.6236
+ ],
+ "per_frame_signal": {
+  "median_dF": 0.004550099380576979,
+  "p90_dF": 0.021199761802662677,
+  "n_frames_in_fit_beat": 49
+ }
+}

@@ -1,0 +1,35 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 165 frames; window A = ticks 16..165 recorded
+[holdout] tick 180; |y_obs| 4.6926e-02
+[shard 0/2] 13/26 candidates: theta_true, clean/T8/naive_box, s90210/T8/eiv_snr0, s90210/T8/eiv_box, s555/T8/eiv_snr0, s555/T8/eiv_box, s777/T8/eiv_snr0, s777/T8/eiv_box, s90210/T1/eiv_box, hiF/T8/eiv_box, bank_blind_E90_g1, bank_blind_E130_g0.95, bank_prior_draw_303
+    null do_nothing               loopscore   0.2603  coord      n/a  orient   0.7320
+    null replay_previous_beat     loopscore   0.2917  coord   0.8736  orient   0.1047
+    null identity                 loopscore   1.0000  coord   1.0000  orient   0.0000
+
+[crash test] 150-frame free rollouts from tick 165, margin-20, anchor=None; deterministic 5x5 grid gauge + 2 refine
+    candidate                   medE  neg  >5x  hold1f   holdN |      raw     t1     kE     kg   gauged    +-       R2  r2cell  rms/dx
+    theta_true                0.0000    0    0  0.0047  0.0831 |   1.0000  1.000  1.000  1.000   1.0000 0.000   1.0000  1.0000  0.0000  [229s]
+    clean/T8/naive_box        0.0086    0    0  0.0069  0.0832 |   0.9993  1.004  1.038  1.015   0.9980 0.001   0.9993  0.9998  0.0120  [236s]
+    s90210/T8/eiv_snr0        0.0455    4    2  0.0208  0.1104 |   0.6132  0.933  0.994  1.084   0.5387 0.637   0.4604  0.8075  0.3373  [237s]
+    s90210/T8/eiv_box         0.0395    0    0  0.0097  0.0857 |   0.9943  1.007  1.088  1.037   0.9870 0.007   0.9947  0.9986  0.0326  [236s]
+    s555/T8/eiv_snr0          0.0632    3    1  0.0222  0.1162 |   0.7956  0.987  1.000  1.000   0.7956 0.440   0.7948  0.9714  0.2095  [228s]
+    s555/T8/eiv_box           0.0424    0    0  0.0118  0.0856 |   0.9950  1.001  0.996  0.997   0.9955 0.000   0.9989  0.9997  0.0154  [238s]
+    s777/T8/eiv_snr0          0.0313    6    0  0.0189  0.0976 |   0.8857  0.991  1.356  1.177   0.7244 0.513   0.6473  0.9227  0.2751  [237s]
+    s777/T8/eiv_box           0.0320    0    0  0.0095  0.0822 |   0.9932  1.005  0.922  0.953   0.9865 0.007   0.9941  0.9991  0.0335  [236s]
+    s90210/T1/eiv_box         0.1412    0    0  0.0304  0.0876 |   0.9567  1.014  1.014  0.993   0.9459 0.011   0.9917  0.9982  0.0419  [238s]
+    hiF/T8/eiv_box            0.9251    0    0  0.1562  0.1671 |  -0.3518  3.269  4.953  0.961   0.5485 0.000   0.5711  0.9460  0.2885  [236s]
+/workspace/.conda_envs/neural-graph-linux/lib/python3.12/site-packages/numpy/lib/_function_base_impl.py:3045: RuntimeWarning: invalid value encountered in divide
+  c /= stddev[:, None]
+/workspace/.conda_envs/neural-graph-linux/lib/python3.12/site-packages/numpy/lib/_function_base_impl.py:3046: RuntimeWarning: invalid value encountered in divide
+  c /= stddev[None, :]
+    bank_blind_E90_g1         0.4323    0    0  0.3509  0.3573 |   0.5886  1.138  2.226  1.347   0.5813 0.134   0.6300  0.9313  0.2732  [236s]
+    bank_blind_E130_g0.95     0.3180    0    0  0.5053  0.5106 |   0.7599  0.863  1.309  1.319   0.6181 0.131   0.7186  0.9445  0.2415  [237s]
+    bank_prior_draw_303       0.4822    0    0  0.8427  0.8458 |   0.6270  1.162  1.094  0.935   0.6801 0.077   0.6805  0.9513  0.2628  [238s]
+
+wrote round5_score_s0.json [3085 s]

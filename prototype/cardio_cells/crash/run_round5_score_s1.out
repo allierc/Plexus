@@ -1,0 +1,33 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 165 frames; window A = ticks 16..165 recorded
+[holdout] tick 180; |y_obs| 4.6926e-02
+[shard 1/2] 14/26 candidates: theta_true, clean/T8/naive, s90210/T8/naive, s90210/T8/naive_box, s555/T8/naive, s555/T8/naive_box, s777/T8/naive, s777/T8/naive_box, s90210/T1/naive, hiF/T8/naive, bank_blind_E40_g1, bank_blind_E320_g1, bank_prior_draw_101, null_med0_rand45
+
+[crash test] 150-frame free rollouts from tick 165, margin-20, anchor=None; deterministic 5x5 grid gauge + 2 refine
+    candidate                   medE  neg  >5x  hold1f   holdN |      raw     t1     kE     kg   gauged    +-       R2  r2cell  rms/dx
+    theta_true                0.0000    0    0  0.0047  0.0831 |   1.0000  1.000  1.000  1.000   1.0000 0.000   1.0000  1.0000  0.0000  [225s]
+    clean/T8/naive            0.0086    0    0  0.0069  0.0832 |   0.9993  1.004  1.038  1.015   0.9980 0.001   0.9993  0.9998  0.0120  [233s]
+    s90210/T8/naive           0.4674    6    0  0.0385  0.0770 |   0.7821  1.070  1.113  0.993   0.8276 0.068   0.9115  0.9716  0.1364  [231s]
+    s90210/T8/naive_box       0.4682    0    0  0.0385  0.0770 |   0.8801  1.055  1.063  0.978   0.9077 0.029   0.9741  0.9941  0.0739  [232s]
+    s555/T8/naive             0.4741    5    0  0.0382  0.0768 |   0.8179  1.054  1.221  1.060   0.8308 0.270   0.8741  0.9835  0.1633  [232s]
+    s555/T8/naive_box         0.4740    0    0  0.0381  0.0768 |   0.8854  1.051  1.139  1.018   0.9178 0.032   0.9763  0.9918  0.0712  [233s]
+    s777/T8/naive             0.4774    3    0  0.0388  0.0771 |   0.8471  1.058  1.239  1.064   0.8945 0.070   0.9356  0.9783  0.1171  [232s]
+    s777/T8/naive_box         0.4774    0    0  0.0388  0.0771 |   0.8824  1.053  1.070  0.988   0.9098 0.091   0.9756  0.9944  0.0718  [234s]
+    s90210/T1/naive           0.5574    8    0  0.0551  0.0858 |   0.2870  1.073  2.226  1.492   0.1297 0.301  -0.3121  0.7465  0.5274  [232s]
+    hiF/T8/naive              0.9899   19    0  0.1462  0.1578 |  -0.1843  2.839  3.320  0.449   0.3040 0.000  -0.2504  0.8144  0.5161  [231s]
+/workspace/.conda_envs/neural-graph-linux/lib/python3.12/site-packages/numpy/lib/_function_base_impl.py:3045: RuntimeWarning: invalid value encountered in divide
+  c /= stddev[:, None]
+/workspace/.conda_envs/neural-graph-linux/lib/python3.12/site-packages/numpy/lib/_function_base_impl.py:3046: RuntimeWarning: invalid value encountered in divide
+  c /= stddev[None, :]
+    bank_blind_E40_g1         0.6887    0    0  0.1867  0.1965 |  -0.1799  1.946  5.072  1.413   0.5045 0.161   0.6158  0.9315  0.2799  [230s]
+    bank_blind_E320_g1        1.4907    0    7  1.2469  1.2523 |   0.5524  0.574  2.226  2.226   0.2589 0.188  -0.5386  0.7622  0.5422  [232s]
+    bank_prior_draw_101       0.4324    0    0  0.4322  0.4389 |   0.6591  1.207  1.745  1.075   0.5075 0.192   0.1935  0.8402  0.4111  [234s]
+    null_med0_rand45          0.0000    0    0  0.3232  0.3315 |   0.6879  0.972  0.687  0.829   0.5856 0.223   0.7707  0.9733  0.2189  [234s]
+
+wrote round5_score_s1.json [3266 s]

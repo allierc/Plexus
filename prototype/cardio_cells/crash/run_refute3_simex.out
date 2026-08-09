@@ -1,0 +1,22 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 40 frames; window A = ticks 1..40 recorded
+[control] noise-free F_lerp at t0=165: med|dE/E| 0.0078
+
+[simex] sigma_F = 0.0039 coherent per frame, 3 draws per lambda
+     lambda     medE   mean(Ehat)/mean(E)  slope Ehat~E
+       0.00   0.5492               0.3913        0.3441
+       0.50   0.6517               0.3336        0.2849
+       1.00   0.7332               0.2930        0.2325
+       1.50   0.7460               0.2618        0.2006
+       2.00   0.7901               0.2372        0.1775
+
+[simex] naive (lambda=0) med|dE/E| 0.5492  ->  linear extrapolation 0.4650, quadratic 0.2948
+        mean(Ehat)/mean(E): naive 0.3913 -> quadratic 0.5308
+
+wrote refute3_simex.json [152 s]

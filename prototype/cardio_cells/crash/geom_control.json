@@ -1,0 +1,13 @@
+{
+ "n_cells_kept": 95,
+ "corr_a_vs_radius": -0.6524750434144898,
+ "corr_a_vs_cellsize": -0.3796319211525411,
+ "corr_a_vs_E_true": 0.09741920329585885,
+ "corr_a_vs_gain_true": 0.0006150071700181015,
+ "R2_of_radius_alone": 0.4257236822787399,
+ "R2_of_radius_quadratic": 0.5854370420473384,
+ "R2_of_xy_quadratic": 0.5341453120503263,
+ "R2_of_theta_true_alone": 0.00949849743108755,
+ "R2_of_geometry_plus_theta": 0.5346194077624097,
+ "blind_constant_r2_percell": 0.9633
+}

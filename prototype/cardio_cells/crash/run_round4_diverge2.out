@@ -1,0 +1,60 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 165 frames; window A = ticks 16..165 recorded
+
+[A] canonical failure modes, built out of the reference so the answer is known
+    mode                     coord      path      peak  orient     loop |  peakR  pathR     t2   open  chir   lagG  lagIQR | tags
+    identity                1.0000    0.0000    0.0000  0.0000   1.0000 |  1.000  1.000  1.000  0.000  1.00   0.00     0.0 | intact
+    blow_up_x1.5            1.0000    0.0154    0.0039  0.0000   0.0691 |  1.500  1.500  1.000  0.000  1.00   0.00     0.0 | blow_up
+    blow_up_x3              1.0000    0.0617    0.0154  0.0000  -0.8756 |  3.000  3.000  1.000  0.000  1.00   0.00     0.0 | blow_up
+    collapse_x0.5           1.0000    0.0154    0.0039  0.0000   0.6375 |  0.500  0.500  1.000  0.000  1.00   0.00     0.0 | collapse
+    collapse_x0.2           1.0000    0.0247    0.0062  0.0000   0.3666 |  0.200  0.200  1.000  0.000  1.00   0.00     0.0 | collapse
+    do_nothing               Undef    0.0309    0.0077  0.7320   0.2603 |  0.000  0.000  0.000  0.121  0.00   3.05     5.2 | collapse,phase_drift,shape_loss
+    phase_drift_8           1.0000    0.0000    0.0000  0.0000   1.0000 |  1.000  1.000  1.000  0.000  1.00   8.00     0.0 | phase_drift
+    phase_drift_25          1.0000    0.0000    0.0000  0.0000   1.0000 |  1.000  1.000  1.000  0.000  1.00  25.00     0.0 | phase_drift
+    decoherence             0.1822    0.0000    0.0000  0.0000   1.0000 |  1.000  1.000  1.000  0.000  1.00 -22.40    83.5 | phase_drift,decoherence
+    shape_rot_pi/5          1.0000    0.0000    0.0000  0.6283   0.7867 |  1.000  1.000  1.000  0.032  1.00   0.00     0.0 | shape_loss
+    shape_flatten           1.0000    0.0010    0.0000  0.0000   0.5649 |  0.998  0.968  0.970  0.121  0.55   0.01     0.0 | shape_loss
+    replay_previous_beat    0.8736    0.0023    0.0024  0.1047   0.2917 |  1.308  1.076  0.822  0.009  0.72  -1.74     0.0 | blow_up,phase_drift,decoherence,shape_loss
+
+[B] the anchoring question: every candidate FREE and ANCHORED, both margins (band pins 21.2% of particles; probes inside it: m20 0/100, m10 36/100)
+    candidate                       medE | loop20 free     anch    delta | loop10 free     anch    delta |     R2 d  bandrms
+    theta_true                    0.0000 |      1.0000   1.0000  -0.0000 |      1.0000   1.0000  -0.0000 |  -0.0000   0.0000
+    bank_blind_E130_g0.95         0.3180 |      0.7599   0.7597  -0.0002 |      0.7638   0.7664   0.0026 |   0.0008   0.0104
+    bank_prior_draw_303           0.4822 |      0.6270   0.6286   0.0016 |      0.6415   0.6634   0.0219 |   0.0011   0.0173
+    T1/eiv_snr0                   0.1375 |      0.6007   0.6028   0.0021 |      0.6179   0.6389   0.0209 |  -0.0527   0.2882
+    T8/eiv_snr0.3                 0.0707 |      0.2174   0.2155  -0.0019 |      0.3188   0.4520   0.1332 |   0.0383   0.3852
+    T8/eiv_snr1                   0.1725 |      0.3088   0.2176  -0.0912 |      0.3755   0.4405   0.0650 |  -0.3656   0.4099
+    n_candidates                                 6
+    max_abs_delta_loopscore_m20                  0.09117038547992706
+    max_abs_delta_loopscore_m20_who              T8/eiv_snr1
+    median_abs_delta_loopscore_m20               0.0017345994710922241
+    spearman_free_vs_anchored_m20                1.0
+    kendall_inversions                           0
+    anchor_cost_at_theta_true_rms_dx             0.0005362263622221872
+    free_cost_at_theta_true_rms_dx               0.0
+
+[A'] the same rollouts, DIAGNOSED: which failure mode, and does the error grow?
+    candidate                     peakR     t1   lagG  lagIQR   coord  orient     t2   open  rmsend   slope/f fin/max | tags
+    theta_true                    1.000  1.000   0.00     0.0  1.0000  0.0000  1.000  0.000  0.0000  0.00e+00   0.000 | intact
+    bank_blind_E130_g0.95         0.999  0.863  -0.38     0.0  0.9964  0.0347  0.986  0.003  0.2839  1.87e-03   0.876 | intact
+    bank_prior_draw_303           1.086  1.162  -0.10     0.0  0.9951  0.0402  1.032  0.001  0.3741  2.65e-03   1.000 | intact
+    T1/eiv_snr0                   0.803  0.806  -0.89     0.0  0.9192  0.0651  0.898  0.023  0.5316  1.18e-03   0.939 | intact
+    T8/eiv_snr0.3                 0.771  0.737  -1.16     0.0  0.8642  0.2570  0.713  0.012  0.7265  2.24e-03   1.000 | phase_drift,decoherence,shape_loss
+    T8/eiv_snr1                   0.600  0.516  -2.17     1.0  0.8373  0.2475  0.662  0.007  0.8253  9.69e-04   0.850 | collapse,phase_drift,decoherence,shape_loss
+
+[C] the same candidates under round 3's 2-D gauge (k_E, k_g -> t1 = t2 = 1)
+    candidate                       medE      raw     t1     t2     kE     kg   gauged       R2  r2cell  nx status
+    theta_true                    0.0000   1.0000  1.000  1.000  1.000  1.000   1.0000   1.0000  1.0000   0 already at (1,1)
+    bank_blind_E130_g0.95         0.3180   0.7599  0.863  0.986  1.460  1.381   0.5957   0.6600  0.9360   7 converged
+    bank_prior_draw_303           0.4822   0.6270  1.162  1.032  1.205  0.978   0.6488   0.6412  0.9454   8 converged
+    T1/eiv_snr0                   0.1375   0.6007  0.806  0.898  1.774  1.529   0.4545  -0.0720  0.7313   6 converged
+    T8/eiv_snr0.3                 0.0707   0.2174  0.737  0.713  0.898  1.000   0.0457  -1.4185  0.5787  22 max iters
+    T8/eiv_snr1                   0.1725   0.3088  0.516  0.662  1.162  1.000   0.1214  -1.3576  0.2917  22 max iters
+
+wrote round4_diverge2.json [687 s]

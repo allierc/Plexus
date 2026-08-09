@@ -1,0 +1,49 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 165 frames; window A = ticks 16..165 recorded
+[holdout] tick 180: |y_obs| 4.6926e-02
+
+[box across seeds] raw margin-20 loopscore, anchor=None; box = [0.2,5] x the BLOCK'S OWN MEDIAN (no theta_true).  Null band top (round 3/4) = 0.6488
+    theta                                 medE  relL2g  medE_re  neg  hold1f  raw loop       R2  r2cell
+    s90210/T1/naive|raw                 0.5574   0.615   0.3714    8  0.0551    0.3760   0.3475  0.8419
+    s90210/T1/naive|box                 0.5574   0.592   0.3758    0  0.0550    0.7815   0.9300  0.9957
+    s90210/T1/eiv_snr0|raw              0.1741   1.000   1.0007    8  0.1797    0.4106  -0.6029  0.7255
+    s90210/T1/eiv_snr0|box              0.1741   0.636   0.4706    0  0.0349    0.9259   0.9858  0.9978
+    s90210/T8/naive|raw                 0.4674   0.601   0.3016    6  0.0385    0.7827   0.8894  0.9763
+    s90210/T8/naive|box                 0.4674   0.586   0.3141    0  0.0385    0.8793   0.9653  0.9965
+    s90210/T8/eiv_snr0|raw              0.0546   0.836   0.7478    7  0.0478    0.2375  -0.2728  0.4467
+    s90210/T8/eiv_snr0|box              0.0546   0.547   0.3379    0  0.0247    0.9241   0.9748  0.9926
+    s555/T1/naive|raw                   0.5275   0.639   0.3348   10  0.0515    0.6464   0.6192  0.9203
+    s555/T1/naive|box                   0.5275   0.600   0.3857    0  0.0514    0.7468   0.9202  0.9934
+    s555/T1/eiv_snr0|raw                0.1155   0.789   0.5300   15  0.0421    0.3678  -0.5886  0.5696
+    s555/T1/eiv_snr0|box                0.1155   0.611   0.3250    0  0.0355    0.9018   0.9795  0.9939
+    s555/T8/naive|raw                   0.4741   0.591   0.3182    5  0.0382    0.8267   0.8680  0.9894
+    s555/T8/naive|box                   0.4741   0.574   0.3359    0  0.0381    0.8847   0.9669  0.9968
+    s555/T8/eiv_snr0|raw                0.0632   0.663   0.4916    3  0.0222    0.7862   0.7938  0.9751
+    s555/T8/eiv_snr0|box                0.0632   0.490   0.2922    0  0.0178    0.9821   0.9928  0.9979
+    s777/T1/naive|raw                   0.5276   0.609   0.3373    7  0.0522    0.2087   0.4035  0.9000
+    s777/T1/naive|box                   0.5276   0.586   0.3601    0  0.0521    0.7453   0.9189  0.9948
+    s777/T1/eiv_snr0|raw                0.3475   0.912   0.8888   15  0.1577    0.2159  -1.6778  0.0192
+    s777/T1/eiv_snr0|box                0.3376   0.708   0.6120    0  0.0977    0.7726   0.8908  0.9754
+    s777/T8/naive|raw                   0.4774   0.597   0.3093    3  0.0388    0.8457   0.9250  0.9803
+    s777/T8/naive|box                   0.4774   0.580   0.3233    0  0.0388    0.8817   0.9660  0.9967
+    s777/T8/eiv_snr0|raw                0.0313   0.572   0.3511    6  0.0189    0.8746   0.8384  0.9449
+    s777/T8/eiv_snr0|box                0.0313   0.443   0.2159    0  0.0140    0.9907   0.9976  0.9992
+
+[holdout scale] the same one-frame held-out residual for the reference points
+    theta_true                 medE  0.0000  medE_re  0.0000  hold1f  0.0047
+    clean_F_lerp               medE  0.0078  medE_re  0.0081  hold1f  0.0067
+    null_med0_rand45           medE  0.0000  medE_re  0.0378  hold1f  0.3232
+    bank_prior_draw_303        medE  0.4517  medE_re  0.4408  hold1f  0.4409
+/workspace/.conda_envs/neural-graph-linux/lib/python3.12/site-packages/numpy/lib/_function_base_impl.py:3045: RuntimeWarning: invalid value encountered in divide
+  c /= stddev[:, None]
+/workspace/.conda_envs/neural-graph-linux/lib/python3.12/site-packages/numpy/lib/_function_base_impl.py:3046: RuntimeWarning: invalid value encountered in divide
+  c /= stddev[None, :]
+    bank_blind_E130_g0.95      medE  0.3180  medE_re  0.3168  hold1f  0.5053
+
+wrote refute4b.json [208 s]

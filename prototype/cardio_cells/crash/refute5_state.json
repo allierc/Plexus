@@ -1,0 +1,22 @@
+{
+ "t0": 165,
+ "sigma_F": 0.0039,
+ "sigma_x": 1.99592e-05,
+ "C_oracle": {
+  "norm_C0_true": 563.0347700522466,
+  "rel_err_C_from_Fdot_clean": 0.2805640287728574,
+  "rel_err_C_from_Fdot_noisyF": 0.5641187062923715,
+  "rel_err_C_from_Fdot_noisyF_central": 0.2807777312209046,
+  "note": "C <- Fdot F^-1; the noisy version differences two measured F at the recording's own sigma_F, so its error is sigma_F*sqrt(2)/dt"
+ },
+ "v_oracle": {
+  "norm_v0_true": 41.20976319074414,
+  "rel_err_v_central_clean": 0.01000348738294084,
+  "rel_err_v_central_noisy": 0.026054188062670267,
+  "rel_err_v_backward_clean": 0.03709387361416395
+ },
+ "signal": {
+  "F_relchange_over_frame": 0.007871619132291644,
+  "sigma_F_percomponent_over_dF": 0.3512909451276143
+ }
+}
