@@ -5,10 +5,11 @@
   [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
 [planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125  warm-up 165 frames
           reference config at tick 0: |F(0) - I| max 0.00e+00  (must be 0 for X to be the configuration p.F is measured against)
-[collect] boundaries 165..180 (16); reference configs at ticks [0, 125, 155, 163] [20s]
+[collect] boundaries 165..180 (16); reference configs at ticks [0, 125, 140, 155, 163] [35s]
 [geometry] sheet 0.9961x0.9961, particle spacing 0.00996 (20.4 px), cell side 0.0996 (204.1 px), dx 0.00781
            h = 15 px = 0.00732 world -> 13.6 control points per cell HERE, and it is FINER than the particle spacing, so it resolves nothing the sheet contains.  The recording gets 6 points per cell; the matching spacing here is h = 34 px.
            interior (outside the 0.0857 wall band) 7877/10000
+[refconfigs] reference ticks in use: [0, 125, 140, 155, 163, 170, 178]
 
 [d] THE DERIVATION ALONE, tick 165, zero noise, INTERIOR particles.  Reference = the simulator's own p.F.
     m = how many frames back the displacement's reference configuration sits.  m = 165 is tick 0 = the MPM reference, F_ref = I, FULLY REALIZABLE; smaller m composes with the oracle F at the reference tick and so isolates the grid.
@@ -109,35 +110,36 @@
     F_der_m165_15px           1.97e-02  9.67e-02   0.9986   1.0000   0.9972    15  0.0339   0.0033 5.826e-01    0.16970    0.16820         
     F_der_m165_34px           3.33e-02  1.19e-01   0.9977   0.9998   0.9969     4 -0.0446   0.0038 5.674e-01    0.16912    0.16743         
     F_der_m165_68px           4.38e-02  1.21e-01   0.9966   0.9995   0.9959     2 -0.0551   0.0050 5.537e-01    0.16851    0.16692         
-    F_der_m2_15px             1.97e-03  1.10e-02   0.9313   0.9861   0.9442     5  0.2004   0.0628 5.496e-01    0.20439    0.15605         
-    F_der_m2_34px             3.30e-03  1.43e-02   0.9475   0.9900   0.9586     1  0.2109   0.0463 5.378e-01    0.21776    0.15775         
-    F_der_m2_68px             4.39e-03  1.50e-02   0.9472   0.9857   0.9570     0  0.1737   0.0489 5.294e-01    0.21817    0.15665         
-    F_der_m10_34px            8.19e-03  3.40e-02   0.9833   0.9961   0.9853     1  0.1268   0.0167 5.578e-01    0.17370    0.16512         
-    F_der_m40_34px            8.30e-03  3.45e-02   0.9834   0.9960   0.9850     2  0.1238   0.0171 5.577e-01    0.17361    0.16514         
+    F_der_m2_15px             1.97e-03  1.10e-02   0.9313   0.9861   0.9442     5  0.2004   0.0628 5.496e-01    0.15663    0.15605         
+    F_der_m2_34px             3.30e-03  1.43e-02   0.9475   0.9900   0.9586     1  0.2109   0.0463 5.378e-01    0.15745    0.15775         
+    F_der_m2_68px             4.39e-03  1.50e-02   0.9472   0.9857   0.9570     0  0.1737   0.0489 5.294e-01    0.15655    0.15665         
+    F_der_m10_34px            8.19e-03  3.40e-02   0.9833   0.9961   0.9853     1  0.1268   0.0167 5.578e-01    0.16509    0.16512         
+    F_der_m40_34px            8.30e-03  3.45e-02   0.9834   0.9960   0.9850     2  0.1238   0.0171 5.577e-01    0.17360    0.16514         
     F_kin_lsq_m165            2.47e-02  1.05e-01   0.9971   1.0000   0.9959     7 -0.0019   0.0049 5.705e-01    0.16943    0.16734         
-    F_kin_lsq_m2              2.45e-03  1.24e-02   0.9176   0.9846   0.9317     2  0.2578   0.0760 5.285e-01    0.22479    0.15443         
+    F_kin_lsq_m2              2.45e-03  1.24e-02   0.9176   0.9846   0.9317     2  0.2578   0.0760 5.285e-01    0.15414    0.15443         
     F_noise_indep_sF0.0039    1.07e-03  1.60e-03   0.5603   0.9862   0.6973     4  0.3664   0.3846 2.933e-01    0.06128    0.05510         
     F_noise_grid48_sF0.0039   1.04e-03  1.60e-03   0.8416   1.0001   0.8056    10  0.2538   0.2445 3.789e-01    0.08832    0.08164         
-    F_eps0.03_m2_15px         5.92e-05  3.30e-04   0.0407   0.0794   0.0615     0  0.9944   0.9533 1.382e-01    0.08008    0.01229         
-    F_eps0.1_m2_15px          1.97e-04  1.10e-03   0.2533   0.3996   0.3137     0  0.9227   0.7132 2.622e-01    0.19436    0.04336         
-    F_eps0.3_m2_15px          5.92e-04  3.30e-03   0.6759   0.8525   0.7327     0  0.5468   0.2906 4.457e-01    0.23056    0.11109         
+    F_eps0.03_m2_15px         5.92e-05  3.30e-04   0.0407   0.0794   0.0615     0  0.9944   0.9533 1.382e-01    0.01568    0.01229         
+    F_eps0.1_m2_15px          1.97e-04  1.10e-03   0.2533   0.3996   0.3137     0  0.9227   0.7132 2.622e-01    0.04870    0.04336         
+    F_eps0.3_m2_15px          5.92e-04  3.30e-03   0.6759   0.8525   0.7327     0  0.5468   0.2906 4.457e-01    0.11372    0.11109         
     held-out floor at theta_true (the measurement's OWN irreducible residual):
         theta_true_simF                  0.00474
         theta_true_F_hold_simF           0.02601
         theta_true_F_der_m165_15px       5.58417
         theta_true_F_der_m165_34px       7.32258
         theta_true_F_der_m165_68px       7.45119
-        theta_true_F_der_m2_15px         2.38806
-        theta_true_F_der_m2_34px         3.85123
-        theta_true_F_der_m2_68px         3.98612
-        theta_true_F_der_m10_34px        4.49101
-        theta_true_F_der_m40_34px        4.50351
+        theta_true_F_der_m2_15px         0.34061
+        theta_true_F_der_m2_34px         0.58994
+        theta_true_F_der_m2_68px         0.54355
+        theta_true_F_der_m10_34px        2.53781
+        theta_true_F_der_m40_34px        4.51214
         theta_true_F_kin_lsq_m165        5.87941
-        theta_true_F_kin_lsq_m2          2.57227
+        theta_true_F_kin_lsq_m2          0.38200
         theta_true_F_noise_indep_sF0.0039 0.05663
         theta_true_F_noise_grid48_sF0.0039 0.09567
-        theta_true_F_eps0.03_m2_15px     0.08391
-        theta_true_F_eps0.1_m2_15px      0.27876
-        theta_true_F_eps0.3_m2_15px      0.81082
+        theta_true_F_eps0.03_m2_15px     0.01146
+        theta_true_F_eps0.1_m2_15px      0.03507
+        theta_true_F_eps0.3_m2_15px      0.10400
 
-wrote freal_derivedF.json [528 s]
+[r] reference window built, 150 frames [739s]
+    candidate                 medE      raw     kE     kg   gauged  band_lo  band_hi       R2  r2cell  conv

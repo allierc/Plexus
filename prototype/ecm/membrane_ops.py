@@ -66,6 +66,8 @@ BOND_TRACE: list = []
 BOUNDARY_REACTION: list = []
 # (frame, deepest penetration, n particles inside) for the per-particle contact
 CONTACT_TRACE: list = []
+# (frame, mean adhesion stretch, n adhesions or n ruptured)
+ADHESION_TRACE: list = []
 MEMBRANE_STRAIN: list = []       # per-particle bond strain, for the renderer
 
 
@@ -845,6 +847,15 @@ class IntegrinAdhesion(Lateral):
         self.k = float(params.get("k", 2.0e4))
         self.offset = float(params.get("offset", 0.004))
         self.detach = float(params.get("detach", 0.0))       # 0 = permanent
+        # ADHESION IS PUNCTATE. Hemidesmosomes (integrin a6b4) are discrete plaques spaced along the
+        # basal surface, with the membrane spanning freely between them -- a tether on every particle is
+        # the approximation, not the biology. `fraction` < 1 anchors a random subset, so the sheet is
+        # held at points and its own elasticity bridges the gaps. That also removes the reason the sheet
+        # wore the surface map's texture: a dense stiff contact dictates every particle, while sparse
+        # anchors let the sheet drape. Measured on 114, the radius varied 5.2x more BETWEEN map bins
+        # than within one, and the between-bin spread was the map's own.
+        self.fraction = float(params.get("fraction", 1.0))
+        self._anchor_mask = None
         self.gamma = float(params.get("overdamped_gamma", 0.0))
         # ADHESIONS TURN OVER. `u0` was frozen at seeding, which pins every node to one direction for the
         # whole run -- and that is what defeats the relaxation meant to close gaps: material pushed into
@@ -882,6 +893,12 @@ class IntegrinAdhesion(Lateral):
             d0 = pos - c
             self.u0 = (d0 / d0.norm(dim=1, keepdim=True).clamp_min(1e-9)).detach().clone()
             self.bound = torch.ones(pos.shape[0], device=dev, dtype=torch.bool)
+            if self.fraction < 1.0:
+                g = torch.Generator(device="cpu").manual_seed(0)
+                keep = torch.rand(pos.shape[0], generator=g).to(dev) < self.fraction
+                self._anchor_mask = keep
+                print(f"[integrin_adhesion] punctate: {int(keep.sum())} of {pos.shape[0]} particles "
+                      f"anchored ({100*self.fraction:.0f}%), the sheet spans between them", flush=True)
 
         # ---- AT SEED TIME MEANS AT *ITS* SEED TIME -------------------------------------------------
         # A particle held in the unsecreted reserve is parked at the tissue CENTRE, where `pos - c` is
@@ -951,6 +968,8 @@ class IntegrinAdhesion(Lateral):
         if self.gamma > 0:
             acc = acc / self.gamma
         acc = acc * self.bound[:, None].to(dt_)
+        if self._anchor_mask is not None:            # punctate: only the anchored subset is tethered
+            acc = acc * self._anchor_mask[:, None].to(dt_)
         # UNSECRETED MATERIAL IS NOT ADHERED TO ANYTHING. The reserve sits at the tissue centre; without
         # this it is dragged out toward the surface by a spring it has not yet earned, arriving as a
         # shell of particles that were never laid down.
@@ -1379,6 +1398,203 @@ class BasementMembraneContact(Lateral):
                   f"frame {f}", flush=True)
             self._said = True
         return {lvl.name: acc}
+
+
+
+# ---------------------------------------------------------------------------------------------------
+# HEMIDESMOSOMES AS ENTITIES, not as a boolean field on the membrane.
+#
+# A tether on every membrane particle is the approximation; the biology is punctate. Integrin a6b4
+# clusters into discrete hemidesmosome plaques on the basal surface, with basement membrane spanning
+# freely between them, and each plaque has a LIFETIME -- it forms, bears load, ruptures when the load
+# exceeds what its bonds hold, and re-forms elsewhere over minutes. None of that is expressible as a
+# mask: a mask has no age, no load, and nothing to break. As a set it is all three, and the biology
+# becomes reachable -- an integrin b1 knockout is FEWER ADHESIONS, not a smaller spring constant.
+#
+# The set carries, per adhesion: the direction on the surface where it sits (frozen at formation, so it
+# rides the growing surface), the index of the membrane particle it binds, and its age. `adhesion_pull`
+# is the force, `adhesion_turnover` is the rewire that breaks and re-forms.
+# ---------------------------------------------------------------------------------------------------
+
+@register_operator("adhesion_seed", family="growth", set="particle", kind="seed")
+class AdhesionSeed(Structural):
+    """Place hemidesmosomes on the basal surface and bind each to the nearest membrane particle."""
+
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = ["surface"]
+    MECHANISM_TAGS = ["hemidesmosome", "focal_adhesion", "integrin"]
+    PARAM_ROLES = {"surface": "tissue_surface_radius_map", "membrane_set": "the sheet it binds"}
+    REFERENCE = ("Walko, G. et al. (2015) Cell Tissue Res. 360:363 (hemidesmosome architecture); "
+                 "Yurchenco, P.D. (2011) Cold Spring Harb. Perspect. Biol. 3:a004911.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "adhesion")
+        self.membrane_set = params.get("membrane_set", "basement_membrane_particle")
+        self.centre = [float(v) for v in params.get("centre", [0.5, 0.5, 0.5])]
+        self.scale = float(params.get("scale", 1.0))
+        self.seed = int(params.get("seed", 0))
+        import numpy as _np
+        z = _np.load(str(params["surface"]))
+        self.smap = torch.as_tensor(_np.asarray(z["smap"], _np.float32)) * self.scale
+        self._done = False
+
+    def forward(self, H, mask=None):
+        if self._done:
+            return {}
+        self._done = True
+        lvl = H.level(self.at)
+        mem = H.level(self.membrane_set)
+        pos = lvl.get("pos")
+        dev, dt_ = pos.device, pos.dtype
+        n = pos.shape[0]
+        c = torch.tensor(self.centre, device=dev, dtype=dt_)
+        g = torch.Generator(device="cpu").manual_seed(self.seed)
+        # uniform on the sphere, which is uniform per unit BASAL AREA -- adhesions are made by the
+        # cells and the cells tile the surface, so density per area is the honest distribution
+        v = torch.randn(n, 3, generator=g).to(dev, dt_)
+        u = v / v.norm(dim=1, keepdim=True).clamp_min(1e-12)
+        M = self.smap[0].to(dev, dt_)
+        nth, nph = M.shape
+        th = torch.acos(u[:, 2].clamp(-1, 1)); ph = torch.atan2(u[:, 1], u[:, 0])
+        R = M[(th / math.pi * nth).long().clamp(0, nth - 1),
+              ((ph + math.pi) / (2 * math.pi) * nph).long().clamp(0, nph - 1)]
+        lvl.get("pos")[:] = c + u * R[:, None]
+        # bind each adhesion to the membrane particle nearest its own direction
+        mp = mem.get("pos")
+        mu = (mp - c)
+        mu = mu / mu.norm(dim=1, keepdim=True).clamp_min(1e-12)
+        idx = torch.zeros(n, dtype=torch.long, device=dev)
+        blk = 4096
+        for a0 in range(0, n, blk):
+            b0 = min(n, a0 + blk)
+            idx[a0:b0] = (u[a0:b0] @ mu.T).argmax(dim=1)
+        H.adhesion_dir = u.detach().clone()
+        H.adhesion_bound = idx
+        H.adhesion_age = torch.zeros(n, device=dev, dtype=dt_)
+        print(f"[adhesion_seed] {n} hemidesmosomes on the basal surface, each bound to one of "
+              f"{mp.shape[0]} membrane particles", flush=True)
+        return {}
+
+
+@register_operator("adhesion_pull", family="mechanics", set="particle", kind="exchange")
+class AdhesionPull(Lateral):
+    """The force a hemidesmosome exerts on the membrane patch it binds.
+
+    OVERDAMPED, because at Re ~ 1e-10 there is no inertia to speak of: the equation of motion is
+    gamma*x_dot = F, so this emits F/gamma. `integrin_adhesion` reaches the same place with a dashpot at
+    2*sqrt(k), which is an INERTIAL fix -- it damps an oscillation that only exists because the sheet was
+    given a mass. This operator has no oscillation to damp.
+    """
+
+    EMIT = "mpm_acceleration"
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = ["surface"]
+    MECHANISM_TAGS = ["hemidesmosome", "integrin", "adhesion_force", "overdamped"]
+    PARAM_ROLES = {"k": "adhesion_stiffness", "gamma": "drag_the_force_is_divided_by",
+                   "offset": "standoff_of_the_sheet_from_the_surface"}
+    REFERENCE = "Walko, G. et al. (2015) Cell Tissue Res. 360:363."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "basement_membrane_particle")
+        self.adhesion_set = params.get("adhesion_set", "adhesion")
+        self.centre = [float(v) for v in params.get("centre", [0.5, 0.5, 0.5])]
+        self.scale = float(params.get("scale", 1.0))
+        self.k = float(params.get("k", 1.0e4))
+        self.offset = float(params.get("offset", 0.004))
+        self.gamma = float(params.get("gamma", 1.0))
+        import numpy as _np
+        z = _np.load(str(params["surface"]))
+        self.smap = torch.as_tensor(_np.asarray(z["smap"], _np.float32)) * self.scale
+        self.T = int(self.smap.shape[0])
+        self._said = False
+
+    def forward(self, H, mask=None):
+        u = getattr(H, "adhesion_dir", None)
+        idx = getattr(H, "adhesion_bound", None)
+        if u is None or idx is None:
+            return {}
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        dev, dt_ = pos.device, pos.dtype
+        c = torch.tensor(self.centre, device=dev, dtype=dt_)
+        f = int(getattr(H, "frame", 0) or 0)
+        M = self.smap[min(self.T - 1, max(0, f))].to(dev, dt_)
+        nth, nph = M.shape
+        th = torch.acos(u[:, 2].clamp(-1, 1)); ph = torch.atan2(u[:, 1], u[:, 0])
+        R = M[(th / math.pi * nth).long().clamp(0, nth - 1),
+              ((ph + math.pi) / (2 * math.pi) * nph).long().clamp(0, nph - 1)]
+        # WHERE THE ADHESION IS NOW: its own frozen direction, at the CURRENT surface radius. It rides
+        # the growing surface, which is what makes the sheet feel the growth at all.
+        site = c + u * (R + self.offset)[:, None]
+        lvl_a = H.level(self.adhesion_set)
+        lvl_a.get("pos")[:] = site
+        d = site - pos[idx]
+        acc = torch.zeros_like(pos)
+        acc.index_add_(0, idx, (self.k / max(self.gamma, 1e-12)) * d)
+        alive = getattr(H, "membrane_alive", None)
+        if alive is not None:
+            acc = torch.where(alive[:, None], acc, torch.zeros_like(acc))
+        ADHESION_TRACE.append((f, float(d.norm(dim=1).mean()), int(idx.numel())))
+        if not self._said:
+            print(f"[adhesion_pull] {idx.numel()} adhesions pulling, k/gamma = "
+                  f"{self.k / max(self.gamma, 1e-12):.4g} (overdamped: no dashpot)", flush=True)
+            self._said = True
+        return {lvl.name: acc}
+
+
+@register_operator("adhesion_turnover", family="topology", set="particle", kind="rewire")
+class AdhesionTurnover(Rewire):
+    """Rupture over-loaded adhesions and re-form them elsewhere -- focal adhesions turn over in minutes.
+
+    `kind="rewire"` because what changes is the RELATION: which membrane patch each adhesion holds.
+    An adhesion stretched past `rupture` lets go, and after re-forming it binds whatever patch is now
+    beneath it. That is what stops a sheet being dragged by a tether it earned four hundred frames ago.
+    """
+
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = []
+    MECHANISM_TAGS = ["adhesion_turnover", "bond_rupture", "integrin"]
+    PARAM_ROLES = {"rupture": "strain_at_which_an_adhesion_lets_go", "tau": "frames_to_re-form"}
+    REFERENCE = "Walko, G. et al. (2015) Cell Tissue Res. 360:363."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "basement_membrane_particle")
+        self.rupture = float(params.get("rupture", 0.0))     # 0 = permanent
+        self.tau = float(params.get("tau", 0.0))             # 0 = no re-formation
+        self.centre = [float(v) for v in params.get("centre", [0.5, 0.5, 0.5])]
+        self._said = False
+
+    def forward(self, H, mask=None):
+        idx = getattr(H, "adhesion_bound", None)
+        if idx is None or self.rupture <= 0:
+            return {}
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        c = torch.tensor(self.centre, device=pos.device, dtype=pos.dtype)
+        u = H.adhesion_dir
+        site = H.level("adhesion").get("pos")
+        stretch = (site - pos[idx]).norm(dim=1)
+        broke = stretch > self.rupture
+        if bool(broke.any()):
+            # re-bind to whatever patch is beneath the adhesion NOW
+            mu = (pos - c); mu = mu / mu.norm(dim=1, keepdim=True).clamp_min(1e-12)
+            sel = broke.nonzero(as_tuple=True)[0]
+            for a0 in range(0, sel.numel(), 4096):
+                b0 = min(sel.numel(), a0 + 4096)
+                idx[sel[a0:b0]] = (u[sel[a0:b0]] @ mu.T).argmax(dim=1)
+            H.adhesion_bound = idx
+        ADHESION_TRACE.append((int(getattr(H, "frame", 0) or 0), float(stretch.mean()),
+                               int(broke.sum())))
+        if not self._said:
+            print(f"[adhesion_turnover] rupture at {self.rupture:g}: {int(broke.sum())} adhesions "
+                  f"re-bound this frame", flush=True)
+            self._said = True
+        return {}
 
 
 @register_operator("basement_membrane_repel", family="mechanics", set="particle", kind="lateral")

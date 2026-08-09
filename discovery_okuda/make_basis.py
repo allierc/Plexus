@@ -255,8 +255,12 @@ def build(chem, mat, mech):
          **(SHAPING if shaping else {"K_bend": 0.0, "K_lumen": 0.0})},
     ]
     if shaping and has_chem:
+        # a_sw IS NOT OPTIONAL HERE. Omitting it took the operator's default, which was 1.0 --
+        # "cells above 100% of the maximum" -- so the purse-string never fired in a single run of
+        # the basis or of nineteen campaign rounds, and Route A's K_purse ladder measured nothing
+        # four times over. A fraction of the activator's own maximum: 0.6 is the top 40%.
         ops.append({"op": "rd_interface_tension", "at": "vertex", "cell_set": "cell",
-                    "K_purse": K_PURSE, "K_extrude": 0.0})
+                    "K_purse": K_PURSE, "K_extrude": 0.0, "a_sw": 0.6})
     ops += [
         {"op": "divide_3d", "at": "vertex", "cell_set": "cell", "factor": DIVIDE_FACTOR,
          # `reset_noise` IS NOT HERE, and the first draft copied it from coral_gate_div. It was

@@ -99,6 +99,7 @@ operators:
   cell_set: cell
   K_purse: 1.0
   K_extrude: 0.0
+  a_sw: 0.6
 - op: divide_3d
   at: vertex
   cell_set: cell

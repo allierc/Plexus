@@ -363,6 +363,33 @@ SERIES = {
     "115_contact_k2e6": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=False,
                              membrane_contact_k=2.0e6, membrane_exclude=False, membrane_adhesion=0.0,
                              membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
+    # 116-118: THE HYBRID. A continuum sheet (which homogenises perfectly -- coverage 1.000, no holes)
+    #     held by PUNCTATE adhesion (which is what made the spring network track the surface), because
+    #     hemidesmosomes are discrete plaques with membrane spanning between them. The contact drops to
+    #     5e4 so it only stops the sheet entering the cells rather than dictating every particle -- that
+    #     dictation is what made the sheet wear the surface map's texture, 5.2x more variation between
+    #     map bins than within one. 118 anchors everything, as the control.
+    "116_punctate5": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=False,
+                          membrane_contact_k=5.0e4, membrane_exclude=False, membrane_adhesion=1.0e4,
+                          membrane_adhesion_fraction=0.05, membrane_secrete_rate=0.0,
+                          membrane_tau=0.0, membrane_reserve=0.0),
+    "117_punctate20": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=False,
+                           membrane_contact_k=5.0e4, membrane_exclude=False, membrane_adhesion=1.0e4,
+                           membrane_adhesion_fraction=0.20, membrane_secrete_rate=0.0,
+                           membrane_tau=0.0, membrane_reserve=0.0),
+    "118_punctate100": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=False,
+                            membrane_contact_k=5.0e4, membrane_exclude=False, membrane_adhesion=1.0e4,
+                            membrane_adhesion_fraction=1.0, membrane_secrete_rate=0.0,
+                            membrane_tau=0.0, membrane_reserve=0.0),
+    # 119: hemidesmosomes as a SET. 2,000 discrete plaques on the basal surface, each bound to one
+    #     membrane patch, pulling OVERDAMPED (F/gamma, no dashpot -- the dashpot in integrin_adhesion is
+    #     an inertial fix for a mass the sheet should not have at Re ~ 1e-10). The contact stays weak so
+    #     it only stops the sheet entering the cells; the sheet spans between anchors under its own
+    #     elasticity, which is what should stop it wearing the surface map's texture.
+    "119_adhesion_set": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=False,
+                             membrane_contact_k=5.0e4, membrane_exclude=False, membrane_adhesion=0.0,
+                             n_adhesions=2000, adhesion_k=1.0e4, adhesion_gamma=1.0,
+                             membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
     "_unused_secrete_dense": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
                              membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
                              membrane_particles=90000, membrane_reserve=1.0,

@@ -5,14 +5,13 @@
   [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
 [planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
           E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
-          warm-up 165 frames; window A = ticks 16..165 recorded
-[reference] built [20s]
-[gauge] 2 candidates: grid48_der_s90210|b1|eiv_box, grid48_der_s555|b1|eiv_box
-    candidate                      budget         kE     kg    resid  conv   gauged  band_lo  band_hi orbitmax
-    grid48_der_s90210|b1|eiv_box   g5s0.8r2    1.471  1.106   0.0100 False   0.8968   0.8821   0.8968   0.8968 [228s]
-    grid48_der_s90210|b1|eiv_box   g7s0.8r2    1.456  1.111   0.0123 False   0.9078   0.7527   0.9078   0.9078 [420s]
-    grid48_der_s90210|b1|eiv_box   g9s1.0r4    1.503  1.118   0.0006  True   0.8871   0.7670   0.9146   0.9146 [1238s]
-    grid48_der_s555|b1|eiv_box     g5s0.8r2    1.314  1.054   0.0283 False   0.9435   0.7562   0.9435   0.9435 [530s]
-    grid48_der_s555|b1|eiv_box     g7s0.8r2    1.415  1.092   0.0178 False   0.9305   0.7509   0.9305   0.9305 [1034s]
-    grid48_der_s555|b1|eiv_box     g9s1.0r4    1.473  1.107   0.0071  True   0.9110   0.7819   0.9331   0.9331 [1906s]
-wrote state_refscore_gauge.json [5398s]
+          warm-up 159 frames; window A = ticks 10..159 recorded
+[collect] ticks 159..186 (28); fit [165, 166, 167, 168, 169, 170, 171, 172]; holdout 180; dt=0.002 n_sub=10 [15s]
+
+[f] T=8 stacked, ticks 165..172; noise = refute5 grid-48, sigma_F=0.0039, sigma_x=1.996e-05, K=6
+    controls: cleanF|oracle|naive must be 0.008562 (round 5); noisyF|oracle|naive ~0.73 and eiv_box ~0.15 (refute5 grid48)
+    cell                         solver        medE     p90   relL2  neg     mr  hoCLEAN   hoMEAS    relv    relC
+    cleanF|oracle                naive       0.0086  0.0181  0.0125    0  0.996  0.00692  0.00692  0.0000  0.0000 [95s]
+    cleanF|oracle                naive_box   0.0086  0.0181  0.0125    0  0.996  0.00692  0.00692  0.0000  0.0000 [95s]
+    cleanF|derived               naive       0.0456  0.0671  0.0496    0  0.953  0.01008  0.01008  0.0074  0.1604 [176s]
+    cleanF|derived               naive_box   0.0456  0.0671  0.0496    0  0.953  0.01008  0.01008  0.0074  0.1604 [176s]

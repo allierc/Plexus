@@ -863,6 +863,63 @@ class Grip(Metric):
         return round(float(c) * float(v), 5)
 
 @register
+class Invagination(Metric):
+    """How far the DEEPEST dimple sits below the tissue's own radius, as a fraction of it.
+    0 = no depression, 0.05 = a pit 5% of a radius deep. NO = 0.0 (a convex surface has none);
+
+    THE CAMPAIGN HAD NO INSTRUMENT THAT COULD SEE INWARD. Every shape metric in this bank measures
+    OUTWARD excursion (`protr_peak`, `protrusion_aspect_max`, `n_tubes`, `act_at_tip`) or the whole
+    body (`reduced_volume`, `gyr_prolate`) -- and invagination is one of Okuda's three target
+    morphologies. Nineteen rounds could have produced one and reported a sphere.
+
+    MEASURED, AND IT IS WHY THIS EXISTS. `apop_patch` kills a 76-cell cap on a 2,000-cell vesicle.
+    Its `reduced_volume` reads 0.990 and `gyr_prolate` 1.051, which I called a clean negative --
+    "a dying cap does not invaginate". Cedric watched the movie and said it looked good. He was
+    right: measured off the trajectory, the cap sits 2.3% BELOW the mean radius by frame 600, from
+    +0.13% at seed, and it is stable from frame 203 rather than transient. A 76-cell dimple is
+    3.8% of the surface -- no global descriptor could have moved, and the two I quoted are global.
+    That is the same error as reading `protr_peak` on a whole-body ellipsoid and calling it a tube,
+    which this project catalogued a campaign ago.
+
+    LOCAL BY CONSTRUCTION. The depth is the lowest smoothed cell radius, where each cell is
+    averaged with its ring neighbours -- one cell squeezed by a T1 is noise, a patch pulled in
+    together is a dimple. Smoothing is what separates them, and without it this metric would fire
+    on every sliver.
+    """
+    name, group = "invagination", "shape"
+    headline = True
+    admitted = True
+
+    @classmethod
+    def compute(cls, f):
+        r, live = f.radl, f.livem
+        if r is None or live is None or int(live.sum()) < 12:
+            return cls.SKIP
+        np = f.np
+        # neighbour-average each cell's radius over the half-edge graph, so the metric answers
+        # "is this REGION pulled in" rather than "is any single cell small"
+        nb_sum = np.zeros(f.nF); nb_n = np.zeros(f.nF)
+        vtx_faces = {}                                    # vertex -> the faces meeting at it
+        for k in range(len(f.ef)):
+            vtx_faces.setdefault(int(f.es[k]), []).append(int(f.ef[k]))
+        for _v, fs in vtx_faces.items():
+            for g in fs:
+                if g < f.nF and live[g]:
+                    for h in fs:
+                        if h < f.nF and live[h]:
+                            nb_sum[g] += r[h]; nb_n[g] += 1
+        ok = (nb_n > 0) & live
+        if not ok.any():
+            return cls.SKIP
+        sm = nb_sum[ok] / nb_n[ok]
+        Rm = float(np.mean(r[live]))
+        if Rm <= 1e-9:
+            return cls.SKIP
+        depth = (Rm - float(np.min(sm))) / Rm
+        return round(float(max(depth, 0.0)), 5)
+
+
+@register
 class ActAtTip(Metric):
     """How much more activator sits in the outermost tenth of the tissue than in the tissue as a whole.
     1.0 = no relation, above 1 = red at the tips. Pearson assumes a LINE; a pattern that switches

@@ -728,10 +728,12 @@ class Apoptosis3D(Structural):
         self.cells = [int(c) for c in (params.get("cells") or [])]
         # WHICH CELLS DIE is targeting, not a second mechanism: the shrink-shed-extrude pathway is
         # identical in every mode, so these are one operator rather than four.
-        self.mode = str(params.get("mode", "list"))               # list | band | cone | chem_low
+        self.mode = str(params.get("mode", "list"))       # list | band | cone | small | chem_low
         self.frac = float(params.get("frac", 0.04))
         self.cone_deg = float(params.get("cone_deg", 22.8))       # 10 cells across on a 2,000-cell ball
-        self.band_deg = float(params.get("band_deg", 8.0))        # half-width of the great circle
+        self.band_deg = float(params.get("band_deg", 8.0))        # half-width of each ring
+        self.n_bands = int(params.get("n_bands", 1))              # >1 -> that many latitude rings
+        self.small_frac = float(params.get("small_frac", 0.35))   # (small) die below this x v_ref
         self.a_sw = float(params.get("a_sw", 0.25))               # fraction of the activator's own max
         self.shrink = float(params.get("shrink_rate", 0.04))
         self.crit = float(params.get("critical_frac", 0.12))      # x v_ref, the seed-time median
@@ -749,13 +751,32 @@ class Apoptosis3D(Structural):
             return set()
         r = np.linalg.norm(cen, axis=1) + 1e-12
         u = cen / r[:, None]
-        if self.mode == "band":                                    # a great circle in the xy plane
-            return set(np.where(np.abs(np.degrees(np.arcsin(np.clip(u[:, 2], -1, 1))))
-                                < self.band_deg)[0].tolist())
+        if self.mode == "band":                                    # `n_bands` latitude rings
+            lat = np.degrees(np.arcsin(np.clip(u[:, 2], -1, 1)))   # -90 .. +90
+            if self.n_bands <= 1:
+                return set(np.where(np.abs(lat) < self.band_deg)[0].tolist())
+            # evenly spaced in latitude, endpoints excluded so no ring sits on a pole
+            centres = np.linspace(-90.0, 90.0, self.n_bands + 2)[1:-1]
+            hit = np.zeros(len(lat), bool)
+            for c in centres:
+                hit |= np.abs(lat - c) < self.band_deg
+            return set(np.where(hit)[0].tolist())
         if self.mode == "cone":                                     # one contiguous cap
             ax = np.array([0.0, 0.0, 1.0])
             return set(np.where(np.degrees(np.arccos(np.clip(u @ ax, -1, 1)))
                                 < self.cone_deg)[0].tolist())
+        if self.mode == "small":
+            # DEATH BY SIZE, and the one selection that is genuinely about the cell's own state
+            # rather than where it sits. A cell whose volume has fallen below `small_frac` of
+            # v_ref -- the seed-time median -- is squeezed out, which is what an epithelium does
+            # with a cell it can no longer accommodate. It re-evaluates for the same reason
+            # `chem_low` does: a cell arrives in this set by shrinking, not by being pushed.
+            v = m.get("V0f")
+            if v is None:
+                return set()
+            vv = v.detach().cpu().numpy()[:nF]
+            v_ref = float(m.get("v_ref", 1.0))
+            return set(np.where(vv < self.small_frac * v_ref)[0].tolist())
         if self.mode == "chem_low":                                 # die BETWEEN the spots
             clvl = H.level(self.cat)
             if clvl is None or "chem" not in getattr(clvl, "state_schema", {}):
@@ -808,7 +829,7 @@ class Apoptosis3D(Structural):
         # moving boundary condition"; here a one-off selection re-applied every timestep converts a
         # death sentence into a death RATE. `seed` is a kind so the runtime can impose the window;
         # this operator is `structural`, so it imposes its own.
-        if self.mode in ("list", "band", "cone"):
+        if self.mode in ("list", "band", "cone"):     # a POPULATION chosen once; see below
             if not m.get("apop_marked_once"):
                 for f in self._marked(m, H, nF):
                     if f < nF:

@@ -21,3 +21,9 @@
     t_p11d6            eiv_snr0   medE  0.1440 p90   1.536 relL2   1.127 negE   8 mr  0.981 [2127s]
     t_p11d6            naive_box  medE  0.7309 p90   0.960 relL2   0.753 negE   0 mr  0.307 [2127s]
     t_p11d6            eiv_box    medE  0.1852 p90   0.655 relL2   0.375 negE   0 mr  0.771 [2127s]
+    ctrl_zero          naive      medE  0.7106 p90   1.007 relL2   0.759 negE  15 mr  0.308 [2599s]
+    ctrl_zero          eiv_snr0   medE  0.1735 p90   1.701 relL2   1.216 negE   8 mr  1.003 [2599s]
+    ctrl_zero          naive_box  medE  0.7113 p90   0.954 relL2   0.742 negE   0 mr  0.323 [2599s]
+    ctrl_zero          eiv_box    medE  0.1058 p90   0.731 relL2   0.363 negE   0 mr  0.864 [2599s]
+
+wrote bestvc_C_e_s555.json [2599 s]
