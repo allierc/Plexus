@@ -355,13 +355,24 @@ class FibreRig:
         return float((self.x[self.low, 2] - 0.5).mean() / self.L)
 
 
-def fibre_transmit(L_over_dx=(0.2, 0.5, 1.0, 2.0), steps=1500, g=2.0e3, n=20, n_grid=32,
+def fibre_transmit(L_over_dx=(0.2, 0.5, 1.0, 2.0), steps=1500, g=None, n=20, n_grid=32,
                    E_fib=8.0e3, dev="cuda:0"):
     """Sweep the fibre's length against the grid cell and report how much of it survives a load.
 
-    The load is the same for every row, so the only thing that changes is whether the grid can SEE the
-    fibre. A fibre that holds its length reports ~1.0; one the grid cannot resolve reports ~0.
+    THE LOAD IS THE SAME ACCELERATION FOR EVERY ROW, and that is what makes the rows comparable: a
+    fibre's spring constant is E*A/L, so the force needed to compress it by a FRACTION of its own length
+    is E*A*f -- independent of L. Equal load therefore means equal fractional compression for any fibre
+    the grid can resolve, and whatever else happens is the grid.
+
+    Calibrated, not chosen: `g` defaults to the acceleration that would drop an unresisted sheet by
+    three fibre lengths over the run (0.5*g*T^2 = 3L at the LONGEST fibre), so a fibre that holds reads
+    ~1 and one that does not reads <= 0. The first attempt used g = 2e3, which is 1.4e4 times that: the
+    sheet free-fell 37 box units, left the grid, and every row read -400 to -6000 regardless of
+    resolution. A load that swamps the mechanism measures the load.
     """
+    T = steps * 2.0e-4
+    g = (6.0 * max(L_over_dx) / n_grid / (T * T)) if g is None else g
+    print(f"  load g = {g:.3g} box/s^2 over T = {T:.3g}s  (free fall {0.5*g*T*T:.4f} box units)")
     print(f"  {'L/dx':>6}{'L (box)':>10}{'gap/L @0':>11}{'gap/L end':>11}{'min over run':>14}")
     out = []
     for r in L_over_dx:
@@ -371,6 +382,8 @@ def fibre_transmit(L_over_dx=(0.2, 0.5, 1.0, 2.0), steps=1500, g=2.0e3, n=20, n_
             s.step(g=g)
             if t % 25 == 0:
                 lo = min(lo, s.gap())
+                if s.gap() < -1.0:            # through the plane: it has failed, stop measuring
+                    break
             if not torch.isfinite(s.x).all():
                 print(f"  {r:>6}{s.L:>10.5f}   NaN at step {t}"); lo = float("nan"); break
         print(f"  {r:>6}{s.L:>10.5f}{g0:>11.3f}{s.gap():>11.3f}{lo:>14.3f}")
