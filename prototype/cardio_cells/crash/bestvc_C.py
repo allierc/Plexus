@@ -373,9 +373,10 @@ def build_table(E, k, eF=None, ex=None, extras=True):
     return T
 
 
-def controls(E, k, gen):
+def controls(E, k, seed=4242):
     B = E.B
     C0 = B[k]["C0"]
+    gen = torch.Generator(device=C0.device).manual_seed(seed + k)
     perm = torch.randperm(C0.shape[0], generator=gen, device=C0.device)
     nz = torch.randn(C0.shape, generator=gen, device=C0.device, dtype=C0.dtype)
     return {
@@ -464,10 +465,9 @@ def main():
         # ------------------------------------------------------------------ stage b --------- #
         #  accuracy of every estimator against the simulator's own C -- no fits, cheap
         if "b" in a.stages:
-            gen = torch.Generator(device=sy.device).manual_seed(4242)
             names, acc = None, {}
             for k in ticks:
-                T = {**build_table(E, k), **controls(E, k, gen)}
+                T = {**build_table(E, k), **controls(E, k)}
                 names = list(T)
                 for nm, (f, cons) in T.items():
                     Cst = f()
@@ -562,7 +562,8 @@ def main():
                   "mom_C": wn(mom_C), "mom_stress": wn(mom_s),
                   "mom_C_over_mom_v": wn(mom_C) / wn(mom_v),
                   "mom_C_over_mom_stress": wn(mom_C) / wn(mom_s),
-                  "mom_C_over_mom_gain": wn(mom_C) / wn(mom_g),
+                  "mom_C_over_mom_gain": (wn(mom_C) / wn(mom_g)) if wn(mom_g) > 0 else float("inf"),
+                  "act0_norm": float(sy.act0.norm()), "pass0_norm": float(sy.pass0.norm()),
                   "n_substeps_C_acts_in": 1, "n_substeps_per_frame": n}
             R["stage_m_terms"] = mm
             log(f"\n[m] where C enters: affine = stress_dt + mass*C, scattered as affine @ (x_i-x_p)")
@@ -576,11 +577,10 @@ def main():
                 f"annihilated by the F injection, so C0 acts in 1 of {n} substeps, in b only.")
 
             # does a wrong C move the COLUMNS of A, or only the offset y0?
-            gen = torch.Generator(device=sy.device).manual_seed(4242)
             probe = [0, 37, nC, nC + 37]
             cols = {}
             for nm in ("ctrl_oracle", "t_fwd (round3)", "ctrl_perm"):
-                T = {**build_table(E, k, extras=False), **controls(E, k, gen)}
+                T = {**build_table(E, k, extras=False), **controls(E, k)}
                 Cst = T[nm][0]()
                 install_state(sy, B[k]["snap"], None, Cst, Jp_one=True)
                 z = torch.zeros(2 * nC, device=sy.device, dtype=sy.dtype)
@@ -606,8 +606,7 @@ def main():
             k = a.t0
             injF = lerp(B[k]["F0"], B[k]["F1"], n)
             yo = (B[k]["x_next"] - B[k]["x0"]).reshape(-1)
-            gen = torch.Generator(device=sy.device).manual_seed(4242)
-            T = {**build_table(E, k), **controls(E, k, gen)}
+            T = {**build_table(E, k), **controls(E, k)}
             tgt = {"ctrl_oracle": 0.007777332098339839, "t_fwd (round3)": 0.01251113155512942,
                    "t_c2 (sibling)": 0.010075}
             log(f"\n[c] END-TO-END med|dE/E|, single frame tick {k}, clean F, ridge0, v ORACLE")
@@ -615,13 +614,13 @@ def main():
                 f"{'dy0/|y|':>8s} {'negE':>5s} {'target':>8s}")
             R["stage_c"] = {}
             z = torch.zeros(2 * nC, device=sy.device, dtype=sy.dtype)
+            install_state(sy, B[k]["snap"], None, B[k]["C0"].clone(), Jp_one=True)
+            y0_ref = y_of(sy, z, n, injF, None)
             for nm, (f, cons) in T.items():
                 Cst = f()
                 install_state(sy, B[k]["snap"], None, Cst, Jp_one=True)
                 y0 = y_of(sy, z, n, injF, None)
-                if nm == "ctrl_oracle":
-                    y0_ref = y0.clone()
-                dy = float((y0 - y0_ref).norm() / yo.norm()) if nm != "ctrl_oracle" else 0.0
+                dy = float((y0 - y0_ref).norm() / yo.norm())
                 install_state(sy, B[k]["snap"], None, Cst, Jp_one=True)
                 sc, _ = fit(sy, n, injF, B[k]["x_next"], B[k]["x0"], th, nC)
                 sc.update({"relC": rel(Cst, B[k]["C0"]), "dy0_over_yobs": dy, "consumes": cons})
@@ -644,9 +643,8 @@ def main():
             for nm in sel:
                 G0 = torch.zeros(2 * nC, 2 * nC, device=sy.device, dtype=sy.dtype)
                 r0 = torch.zeros(2 * nC, device=sy.device, dtype=sy.dtype)
-                gen = torch.Generator(device=sy.device).manual_seed(4242)
                 for k in ticks:
-                    T = {**build_table(E, k, extras=False), **controls(E, k, gen)}
+                    T = {**build_table(E, k, extras=False), **controls(E, k)}
                     Cst = T[nm][0]()
                     install_state(sy, B[k]["snap"], None, Cst, Jp_one=True)
                     A, y0, _ = assemble_inj(sy, n, lerp(B[k]["F0"], B[k]["F1"], n), None)
@@ -667,8 +665,7 @@ def main():
             hk = a.holdout_tick
             injh = lerp(B[hk]["F0"], B[hk]["F1"], n)
             y_obs = (B[hk]["x_next"] - B[hk]["x0"]).reshape(-1)
-            gen = torch.Generator(device=sy.device).manual_seed(4242)
-            Th = {**build_table(E, hk, extras=False), **controls(E, hk, gen)}
+            Th = {**build_table(E, hk, extras=False), **controls(E, hk)}
             log(f"\n    HELD-OUT one-frame residual at tick {hk} (the acceptance statistic), "
                 f"|y_obs| {float(y_obs.norm()):.4e}; v ORACLE at the held-out frame too")
             log(f"    {'theta':<20s} " + " ".join(f"{c:>11s}" for c in
@@ -707,8 +704,7 @@ def main():
                     injF = lerp(B[k]["F0"] + eF[k], B[k]["F1"] + eF[k + 1], n)
                     xn = B[k]["x_next"] + (ex[k + 1] if ex is not None else 0.0)
                     x0m = B[k]["x0"] + (ex[k] if ex is not None else 0.0)
-                    gen = torch.Generator(device=sy.device).manual_seed(4242)
-                    T = {**build_table(E, k, eF, ex, extras=False), **controls(E, k, gen)}
+                    T = {**build_table(E, k, eF, ex, extras=False), **controls(E, k)}
                     for nm in sel:
                         Cst = T[nm][0]()
                         install_state(sy, B[k]["snap"], None, Cst, Jp_one=True)

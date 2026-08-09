@@ -127,7 +127,9 @@ def fit_stage(a, args, log, R):
     sy, B = SD.collect(args, t_lo, t_hi, log)
     C, n, dt = sy.C, sy.n_sub_per_frame, sy.dt
     s = theta_scale(C, sy.device)
-    NF = NoiseF(a.noise, sy.x0, a.nodes, sy.device, sy.dtype)
+    # NB the node mapping must be built from x0 at t0 (refute5_fit built NF right after
+    # plant_and_warm(warmup=t0)); `collect` leaves sy advanced to t_hi, so sy.x0 is the WRONG frame.
+    NF = NoiseF(a.noise, B[a.t0]["x0"], a.nodes, sy.device, sy.dtype)
     R["noise_eff_samples"] = None
     gchk = torch.Generator(device=sy.device).manual_seed(7)
     cs = []
