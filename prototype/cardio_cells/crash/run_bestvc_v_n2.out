@@ -1,0 +1,52 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 120 frames; window A = ticks -29..120 recorded
+[collect] ticks 120..225 (106); targets [165, 166, 167, 168, 169, 170, 171, 172, 180]; dt=0.002 n_sub=10 [56s]
+[control] max|W-form - state_derive.derived_v| at tick 165: c2 1.40e-14, c4 1.08e-13, sg5p1 4.00e-14
+
+[n] NOISE on the positions the derivative is taken from (sigma_x = 1 unit = 1.996e-05 world = 0.0409 px).  Single frame, tick 165, C oracle.
+    x0 / x_next entering the fit stay clean, so this isolates differentiation noise amplification.
+    estimator          sx    seed     relv  med|dE/E|  holdout
+    c4                  0   90210  0.00736    0.02697  0.01365 [90s]
+    c6                  0   90210  0.00625    0.02646  0.01368 [122s]
+    sg9p5               0   90210  0.01226    0.03217  0.01408 [155s]
+    sg11p5              0   90210  0.01998    0.03282  0.01792 [187s]
+    c4                0.5   90210  0.01685    0.03230  0.01727 [219s]
+    c6                0.5   90210  0.01836    0.03099  0.01820 [251s]
+    sg9p5             0.5   90210  0.01610    0.03673  0.01586 [283s]
+    sg11p5            0.5   90210  0.02132    0.04246  0.01859 [315s]
+    c4                0.5     555  0.01692    0.03416  0.01739 [347s]
+    c6                0.5     555  0.01843    0.03373  0.01837 [380s]
+    sg9p5             0.5     555  0.01606    0.03683  0.01582 [412s]
+    sg11p5            0.5     555  0.02128    0.03930  0.01858 [444s]
+    c4                  1   90210  0.03120    0.03226  0.02491 [476s]
+    c6                  1   90210  0.03509    0.03254  0.02738 [508s]
+    sg9p5               1   90210  0.02412    0.04110  0.02000 [540s]
+    sg11p5              1   90210  0.02482    0.04532  0.02048 [572s]
+    c4                  1     555  0.03130    0.03881  0.02534 [604s]
+    c6                  1     555  0.03520    0.03983  0.02789 [636s]
+    sg9p5               1     555  0.02406    0.04222  0.02024 [668s]
+    sg11p5              1     555  0.02474    0.04285  0.02046 [700s]
+    c4                  2   90210  0.06109    0.05010  0.04355 [732s]
+    c6                  2   90210  0.06935    0.05142  0.04908 [764s]
+    sg9p5               2   90210  0.04323    0.05144  0.03132 [796s]
+    sg11p5              2   90210  0.03542    0.05131  0.02676 [828s]
+    c4                  2     555  0.06124    0.06359  0.04466 [861s]
+    c6                  2     555  0.06952    0.06812  0.05029 [893s]
+    sg9p5               2     555  0.04315    0.05473  0.03244 [925s]
+    sg11p5              2     555  0.03531    0.04510  0.02668 [957s]
+    c4                  4   90210  0.12153    0.09112  0.08354 [989s]
+    c6                  4   90210  0.13830    0.10828  0.09496 [1020s]
+    sg9p5               4   90210  0.08374    0.08892  0.05729 [1045s]
+    sg11p5              4   90210  0.06160    0.06078  0.04366 [1069s]
+    c4                  4     555  0.12178    0.11220  0.08594 [1094s]
+    c6                  4     555  0.13859    0.12867  0.09753 [1118s]
+    sg9p5               4     555  0.08362    0.08328  0.06026 [1143s]
+    sg11p5              4     555  0.06145    0.05765  0.04343 [1167s]
+
+wrote bestvc_v_n2.json [1167 s]

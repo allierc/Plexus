@@ -66,7 +66,7 @@ import crash_test as CT                                           # noqa: E402
 from finject import lerp, assemble_inj, y_of                      # noqa: E402
 from refute_round3 import fit                                     # noqa: E402
 from round5_fit import SIGMA_F, SIGMA_X                           # noqa: E402
-from round5_solve import pstats                                   # noqa: E402
+from round5_solve import pstats, solve_box, snr_trunc             # noqa: E402
 from refute5_fit import NoiseF                                    # noqa: E402
 from state_derive import collect, derived_v, install_state, rel   # noqa: E402
 
@@ -399,6 +399,8 @@ def main():
     ap.add_argument("--holdout-tick", type=int, default=180)
     ap.add_argument("--lam", type=float, default=1e-3)
     ap.add_argument("--nodes", type=int, default=48)
+    ap.add_argument("--K", type=int, default=4)
+    ap.add_argument("--seed", type=int, default=90210)
     a = ap.parse_args()
 
     args = SimpleNamespace(device=a.device, cells=100, per_parent=100, n_grid=128,
@@ -732,6 +734,79 @@ def main():
                     f"{np.mean([r['p90_E'] for r in rows]):>7.4f} "
                     f"{np.mean([r['rel_l2'] for r in rows]):>7.4f} "
                     f"{np.mean([r['dy0_over_yobs'] for r in rows]):>7.4f}")
+
+        # ------------------------------------------------------------------ stage e --------- #
+        #  THE CONFIGURATION IN WHICH A NOISY NUMBER IS MEANINGFUL: round 5's T=8 stack + the EIV
+        #  correction + the box-constrained solve, under refute5's realizable grid-48 F noise.
+        #  Stage n showed the single-frame naive fit is destroyed by that noise (0.77 even with the
+        #  oracle C), so it cannot rank C estimators; this can.  K=4 re-noisings, not round 5's 6.
+        if "e" in a.stages:
+            NF = NoiseF("grid", sy.x0, a.nodes, sy.device, sy.dtype)
+            sel = ["ctrl_oracle", "t_c2 (sibling)", "t_p11d6", "ctrl_zero"]
+            Kmc, seed = a.K, a.seed
+            log(f"\n[e] T={a.T} stacked, grid-{a.nodes} F noise sigma_F={SIGMA_F}, sigma_x={SIGMA_X}, "
+                f"K={Kmc} EIV re-noisings, seed {seed}  (refute5 grid48 reference, oracle state: "
+                f"T8 naive 0.730/0.738, eiv_box 0.160/0.150)")
+            R["stage_e"] = {}
+            for nm in sel:
+                gm_ = torch.Generator(device=sy.device).manual_seed(seed)
+                gk_ = torch.Generator(device=sy.device).manual_seed(31337 + seed)
+                # ONE F error per frame boundary, shared by everything that reads that boundary
+                # (round 5's model, extended over the whole window because the derivation of C at
+                # tick k reads boundaries k-2..k+2, not just k and k+1)
+                eb = {t: (SIGMA_F / 2.0) * NF(gm_) for t in sorted(B)}
+                exn = {t: SIGMA_X * torch.randn(B[t]["x0"].shape, generator=gm_,
+                                                device=sy.device, dtype=sy.dtype) for t in B}
+                G0 = torch.zeros(2 * nC, 2 * nC, device=sy.device, dtype=sy.dtype)
+                r0 = torch.zeros(2 * nC, device=sy.device, dtype=sy.dtype)
+                Gs = torch.zeros_like(G0)
+                rs = torch.zeros_like(r0)
+                for k in ticks:
+                    T = {**build_table(E, k, eb, exn, extras=False), **controls(E, k)}
+                    Cst = T[nm][0]()
+                    F0h, F1h = B[k]["F0"] + eb[k], B[k]["F1"] + eb[k + 1]
+                    yk = (B[k]["x_next"] + exn[k + 1] - B[k]["x0"]).reshape(-1)
+                    install_state(sy, B[k]["snap"], None, Cst, Jp_one=True)
+                    A, y0, _ = assemble_inj(sy, n, lerp(F0h, F1h, n), None)
+                    Az = A * s[None, :]
+                    G0 += Az.T @ Az
+                    r0 += Az.T @ (yk - y0)
+                    del A, Az
+                    torch.cuda.empty_cache()
+                    for _ in range(Kmc):
+                        e0, e1 = (SIGMA_F / 2.0) * NF(gk_), (SIGMA_F / 2.0) * NF(gk_)
+                        install_state(sy, B[k]["snap"], None, Cst, Jp_one=True)
+                        Aj, y0j, _ = assemble_inj(sy, n, lerp(F0h + e0, F1h + e1, n), None)
+                        Azj = Aj * s[None, :]
+                        Gs += Azj.T @ Azj
+                        rs += Azj.T @ (yk - y0j)
+                        del Aj, Azj
+                        torch.cuda.empty_cache()
+                Gs, rs = Gs / Kmc, rs / Kmc
+                G0c, r0c, Gbc, rbc = (t.cpu().double() for t in (G0, r0, Gs, rs))
+                sc_ = s.cpu().double()
+                Sig = Gbc - G0c
+                Gc, rc = G0c - Sig, r0c - (rbc - r0c)
+                out = {"naive": torch.linalg.solve(G0c, r0c) * sc_}
+                out["eiv_snr0"], _ = snr_trunc(G0c, Sig, Gc, rc, sc_, tau=0.0)
+                nv = out["naive"]
+                mE = float(nv[:nC][nv[:nC] > 0].median())
+                mg = float(nv[nC:][nv[nC:] > 0].median())
+                lo = torch.cat([torch.full((nC,), 0.2 * mE, dtype=torch.float64),
+                                torch.full((nC,), 0.2 * mg, dtype=torch.float64)])
+                hi = torch.cat([torch.full((nC,), 5.0 * mE, dtype=torch.float64),
+                                torch.full((nC,), 5.0 * mg, dtype=torch.float64)])
+                out["naive_box"], _ = solve_box(G0c, r0c, sc_, lo, hi,
+                                                z0=torch.clamp(nv, lo, hi) / sc_, iters=4000)
+                out["eiv_box"], _ = solve_box(Gc, rc, sc_, lo, hi,
+                                              z0=torch.clamp(out["eiv_snr0"], lo, hi) / sc_,
+                                              iters=4000)
+                R["stage_e"][nm] = {kk: pstats(v.numpy(), th.cpu().numpy(), nC)
+                                    for kk, v in out.items()}
+                for kk, v in R["stage_e"][nm].items():
+                    log(f"    {nm:<18s} {kk:<10s} medE {v['med_E']:>7.4f} p90 {v['p90_E']:>7.3f} "
+                        f"relL2 {v['rel_l2']:>7.3f} negE {v['n_negE']:>3d} "
+                        f"mr {v['mean_ratio_E']:>6.3f} [{time.time()-t_start:.0f}s]")
 
     R["wall_seconds"] = time.time() - t_start
     json.dump(R, open(os.path.join(HERE, f"{a.tag}.json"), "w"), indent=1, default=str)

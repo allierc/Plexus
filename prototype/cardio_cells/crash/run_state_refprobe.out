@@ -6,17 +6,14 @@
 [planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
           E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
           warm-up 163 frames; window A = ticks 14..163 recorded
-[noise grid48] effective independent F samples per cell 16.8  (round-5 indep = 100, recording = 22.8)
-[control] frame 0 oracle-state assembly vs refute5_norm_grid48_s555_sF0.0039.npz: rel G0 0.000e+00  rel r0 0.000e+00
-[derivation] at this noise draw: v 0.0261  C 0.2735
-    frame 0 (tick 165) derived-state assembly + 6 re-noisings [160s]
-    frame 1 (tick 166) derived-state assembly + 6 re-noisings [330s]
-    frame 2 (tick 167) derived-state assembly + 6 re-noisings [500s]
-    frame 3 (tick 168) derived-state assembly + 6 re-noisings [691s]
-    frame 4 (tick 169) derived-state assembly + 6 re-noisings [889s]
-    frame 5 (tick 170) derived-state assembly + 6 re-noisings [1080s]
-    frame 6 (tick 171) derived-state assembly + 6 re-noisings [1303s]
-    frame 7 (tick 172) derived-state assembly + 6 re-noisings [1527s]
-[fit] wrote state_norm_grid48_der_s555.npz
-
-wrote state_combine_f_s555.json [1563 s]
+[collect] 14s
+[1] p.C == derived C to 0.00e+00; p.C vs TRUE C rel 0.2848; p.v == derived v to 0.00e+00; p.v vs TRUE v rel 0.0262
+    true Jp max|Jp-1| = 0.00e+00 (Jp_one is exact, not an oracle)
+[2] baseline derived-state assembly done [24s]
+[2a] snapshot C0/v0/Jp0 CORRUPTED (rel size 13.3) -> rel dG0 0.000e+00  rel dr0 0.000e+00   [35s]
+[2b] DERIVED C x1.01 -> rel dG0 4.672e-06  rel dr0 2.525e-03
+[2c] ORACLE state vs derived state -> rel dG0 1.688e-04  rel dr0 1.290e-01
+[3] frame 0 of state_norm_grid48_der_s90210.npz reproduces: rel G0 0.000e+00  rel r0 0.000e+00
+[4] assembly F vs derivation F: max|dF1| 0.00e+00, max|dF0| 0.00e+00
+[5] seed 90210 vs 555: max |corr(eF)| over ticks 1.454e-02, corr(ex) 5.124e-03
+wrote state_refprobe.json [56s]

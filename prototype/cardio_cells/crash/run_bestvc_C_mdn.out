@@ -18,3 +18,51 @@
 
 [d] T=8 stacked, clean F, naive solve, v ORACLE  (round-5 oracle-state target med|dE/E| 0.008562)
     ctrl_oracle          medE  0.00856 p90  0.0181 relL2  0.0125 negE   0 corr 0.9995 meanratio 0.9963 [295s]
+    t_fwd (round3)       medE  0.02524 p90  0.0390 relL2  0.0277 negE   0 corr 0.9994 meanratio 0.9753 [548s]
+    t_c2 (sibling)       medE  0.00735 p90  0.0175 relL2  0.0122 negE   0 corr 0.9995 meanratio 0.9979 [742s]
+    t_c4                 medE  0.00751 p90  0.0174 relL2  0.0120 negE   0 corr 0.9995 meanratio 0.9981 [905s]
+    t_p11d6              medE  0.00854 p90  0.0186 relL2  0.0130 negE   0 corr 0.9995 meanratio 0.9956 [1100s]
+    s_dec                medE  0.01435 p90  0.0286 relL2  0.0227 negE   0 corr 0.9983 meanratio 0.9975 [1334s]
+    ctrl_zero            medE  0.06639 p90  0.1249 relL2  0.0844 negE   0 corr 0.9928 meanratio 1.0664 [1539s]
+    ctrl_perm            medE  0.06434 p90  0.1307 relL2  0.4079 negE   1 corr 0.7062 meanratio 1.0295 [1689s]
+
+    HELD-OUT one-frame residual at tick 180 (the acceptance statistic), |y_obs| 4.6926e-02; v ORACLE at the held-out frame too
+    theta                    oracleC       t_fwd        t_c2       s_dec
+    theta_true               0.00474     0.00394     0.00463     0.00678
+    ctrl_oracle              0.00692     0.00632     0.00688     0.00841
+    t_fwd (round3)           0.00923     0.00843     0.00923     0.01035
+    t_c2 (sibling)           0.00676     0.00619     0.00673     0.00829
+    t_c4                     0.00677     0.00621     0.00673     0.00829
+    t_p11d6                  0.00693     0.00632     0.00690     0.00842
+    s_dec                    0.00760     0.00697     0.00757     0.00895
+    ctrl_zero                0.00941     0.00949     0.00930     0.01057
+    ctrl_perm                0.00923     0.00931     0.00911     0.01041
+
+[n] realizable grid-48 F noise, sigma_F=0.0039 (same draw in the derivation and in the injected F)
+    F only seed 90210 done [1849s]
+    F only seed 555 done [2003s]
+    F only seed 777 done [2239s]
+    F + x seed 90210 done [2528s]
+    F + x seed 555 done [2817s]
+    F + x seed 777 done [3106s]
+    condition  estimator               relC     medE    p90E   relL2     dy0
+    F only     ctrl_oracle           0.0000  0.77206  1.0005  0.7972  0.0000
+    F only     t_fwd (round3)        0.5644  0.78662  1.0216  0.8121  0.0061
+    F only     t_c2 (sibling)        0.2822  0.75817  0.9842  0.7840  0.0031
+    F only     t_c4                  0.3418  0.75299  0.9797  0.7799  0.0038
+    F only     t_c8                  0.4117  0.74854  0.9764  0.7767  0.0046
+    F only     t_p11d6               0.2730  0.76777  0.9938  0.7926  0.0030
+    F only     t_sg5                 0.3174  0.76942  0.9975  0.7938  0.0035
+    F only     s_dec                 0.3993  0.77442  1.0003  0.7974  0.0034
+    F only     ctrl_zero             1.0000  0.74878  1.0007  0.7846  0.0111
+    F + x      ctrl_oracle           0.0000  0.77871  1.0487  0.8400  0.0000
+    F + x      t_fwd (round3)        0.5644  0.79226  1.0658  0.8508  0.0061
+    F + x      t_c2 (sibling)        0.2822  0.75527  1.0363  0.8254  0.0031
+    F + x      t_c4                  0.3418  0.74588  1.0318  0.8209  0.0038
+    F + x      t_c8                  0.4117  0.73903  1.0273  0.8173  0.0046
+    F + x      t_p11d6               0.2730  0.76791  1.0427  0.8329  0.0030
+    F + x      t_sg5                 0.3174  0.77273  1.0456  0.8336  0.0035
+    F + x      s_dec                 1.9579  0.77333  1.0615  0.8351  0.0138
+    F + x      ctrl_zero             1.0000  0.75290  1.0502  0.8274  0.0110
+
+wrote bestvc_C_mdn.json [3106 s]
