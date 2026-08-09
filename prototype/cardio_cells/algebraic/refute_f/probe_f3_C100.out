@@ -1,0 +1,15 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+   built: C=100 Np=10000 grid 128^2 warmup=12
+   frame displacement rms = 0.0646 dx;  null med E 0.277
+   sigma=0        dx : final med E 1.339e-10  med g 7.032e-11  p90 E 7.725e-08  l2 1.568e-02  (5 accepted iters, obj/obj0 3.57e-06)
+   sigma=1e-06    dx : final med E 2.396e-05  med g 4.666e-05  p90 E 4.111e-04  l2 1.374e-02  (5 accepted iters, obj/obj0 2.45e-04)
+   sigma=1e-05    dx : final med E 2.463e-04  med g 4.295e-04  p90 E 3.932e-03  l2 5.565e-02  (5 accepted iters, obj/obj0 2.46e-03)
+   sigma=0.0001   dx : final med E 2.402e-03  med g 3.480e-03  p90 E 2.776e-02  l2 2.646e-01  (5 accepted iters, obj/obj0 2.44e-02)
+   sigma=0.001    dx : final med E 2.194e-02  med g 3.603e-02  p90 E 3.701e-01  l2 9.361e-01  (5 accepted iters, obj/obj0 2.41e-01)
+   sigma=0.01     dx : final med E 2.638e-01  med g 3.660e-01  p90 E 2.254e+00  l2 1.255e+00  (5 accepted iters, obj/obj0 9.22e-01)
+
+wrote /workspace/Plexus/prototype/cardio_cells/algebraic/refute_f/probe_f3_C100.json  [316.1s]

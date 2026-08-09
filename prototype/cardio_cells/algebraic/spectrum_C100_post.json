@@ -1,0 +1,116 @@
+{
+ "partial_correlations": {
+  "se_E": {
+   "dist_to_wall | r_from_centre": {
+    "partial_spearman": 0.017712356256278757,
+    "marginal_spearman": -0.9007740774077407
+   },
+   "r_from_centre | dist_to_wall": {
+    "partial_spearman": 0.7144748804347588,
+    "marginal_spearman": 0.9527032703270327
+   },
+   "dist_to_wall | activity": {
+    "partial_spearman": 0.011355106624845648,
+    "marginal_spearman": -0.9007740774077407
+   },
+   "activity | dist_to_wall": {
+    "partial_spearman": -0.7043363325990941,
+    "marginal_spearman": -0.9512871287128712
+   },
+   "activity | r_from_centre": {
+    "partial_spearman": -0.0973034360019391,
+    "marginal_spearman": -0.9512871287128712
+   },
+   "r_from_centre | activity": {
+    "partial_spearman": 0.1938193386947069,
+    "marginal_spearman": 0.9527032703270327
+   },
+   "spread | activity": {
+    "partial_spearman": -0.08582764934583813,
+    "marginal_spearman": 0.2409000900090009
+   },
+   "n_particles | activity": {
+    "partial_spearman": -0.042106066153360516,
+    "marginal_spearman": -0.0848004800480048
+   }
+  },
+  "se_gain": {
+   "dist_to_wall | r_from_centre": {
+    "partial_spearman": -0.04903767926185254,
+    "marginal_spearman": -0.9297929792979298
+   },
+   "r_from_centre | dist_to_wall": {
+    "partial_spearman": 0.8249095255730393,
+    "marginal_spearman": 0.9780618061806181
+   },
+   "dist_to_wall | activity": {
+    "partial_spearman": 0.10862442495822583,
+    "marginal_spearman": -0.9297929792979298
+   },
+   "activity | dist_to_wall": {
+    "partial_spearman": -0.898121697728337,
+    "marginal_spearman": -0.9866546654665467
+   },
+   "activity | r_from_centre": {
+    "partial_spearman": -0.6608551271984006,
+    "marginal_spearman": -0.9866546654665467
+   },
+   "r_from_centre | activity": {
+    "partial_spearman": -0.27937992884186047,
+    "marginal_spearman": 0.9780618061806181
+   },
+   "spread | activity": {
+    "partial_spearman": -0.20680922902620816,
+    "marginal_spearman": 0.24387638763876388
+   },
+   "n_particles | activity": {
+    "partial_spearman": 0.052037530126063054,
+    "marginal_spearman": -0.06607860786078608
+   }
+  }
+ },
+ "model_error_floor": {
+  "residual_rel_b": 4.0940230412771034e-05,
+  "norm_b": 4138.873209984318,
+  "absolute_model_error": 0.16944642286600325,
+  "sigma_max": 8072.476341611947,
+  "n_directions_detectable_at_100pct_param_change": 199,
+  "n_directions_detectable_at_10pct_param_change": 195,
+  "n_directions_detectable_at_1pct_param_change": 176,
+  "n_params": 200,
+  "eps_at_the_model_floor": 4.4060685356533763e-10
+ },
+ "cell_yield_vs_noise": {
+  "0.01": {
+   "cells_E_to_10pct": 68,
+   "cells_gain_to_10pct": 35,
+   "cells_both_to_10pct": 35,
+   "C": 100
+  },
+  "0.001": {
+   "cells_E_to_10pct": 97,
+   "cells_gain_to_10pct": 67,
+   "cells_both_to_10pct": 67,
+   "C": 100
+  },
+  "0.0001": {
+   "cells_E_to_10pct": 100,
+   "cells_gain_to_10pct": 91,
+   "cells_both_to_10pct": 91,
+   "C": 100
+  },
+  "1e-05": {
+   "cells_E_to_10pct": 100,
+   "cells_gain_to_10pct": 97,
+   "cells_both_to_10pct": 97,
+   "C": 100
+  },
+  "1e-06": {
+   "cells_E_to_10pct": 100,
+   "cells_gain_to_10pct": 100,
+   "cells_both_to_10pct": 100,
+   "C": 100
+  }
+ },
+ "caveat": "this ignores the affine model's own 7.8e-5 error, which acts like a noise floor eta >= 7.8e-5 that cannot be averaged away by taking more frames of the same state"
+}

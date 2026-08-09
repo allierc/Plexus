@@ -1,0 +1,38 @@
+
+=== P1  CIRCULARITY: does the recovery depend on the warm-up theta? ===
+ (a) warm-up WITH theta_true  (this is exactly what recover.py does)
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 472 cells from 'cells'; 236000 particles (500 per cell); youngs 40-220 from measured beat amplitude; cell centres seeded: 472
+   built: C=472 Np=236000 grid 128^2 warmup=12
+[P1a truth-warmed] fd-vs-solver 1.52e-10 | model resid 1.071e-04 | ridge0 med E 4.488e-07 med g 1.966e-06 l2 1.549e-04 | best ridge0 l2 1.549e-04
+        tail: {'frac_E_gt_1pct': 0.0, 'frac_gain_gt_1pct': 0.019067796610169493, 'frac_E_gt_10pct': 0.0, 'frac_gain_gt_10pct': 0.00423728813559322}
+ (b) warm-up with a DECOY theta (E=130, gain=1); theta_true installed only at the frozen state
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 472 cells from 'cells'; 236000 particles (500 per cell); youngs 40-220 from measured beat amplitude; cell centres seeded: 472
+   built: C=472 Np=236000 grid 128^2 warmup=12
+[P1b decoy-warmed] fd-vs-solver 2.60e-11 | model resid 2.166e-05 | ridge0 med E 2.895e-07 med g 1.267e-06 l2 2.192e-04 | best ridge0 l2 2.192e-04
+        tail: {'frac_E_gt_1pct': 0.0, 'frac_gain_gt_1pct': 0.01059322033898305, 'frac_E_gt_10pct': 0.0, 'frac_gain_gt_10pct': 0.00423728813559322}
+ (c) warm-up with a DIFFERENT random theta (seed 777)
+  [seed_from_segmentation] 472 cells from 'cells'; 236000 particles (500 per cell); youngs 40-220 from measured beat amplitude; cell centres seeded: 472
+   built: C=472 Np=236000 grid 128^2 warmup=12
+[P1c alt-warmed] fd-vs-solver 1.33e-11 | model resid 1.062e-05 | ridge0 med E 2.558e-07 med g 9.341e-07 l2 1.861e-03 | best ridge0 l2 1.861e-03
+        tail: {'frac_E_gt_1pct': 0.00211864406779661, 'frac_gain_gt_1pct': 0.02754237288135593, 'frac_E_gt_10pct': 0.0, 'frac_gain_gt_10pct': 0.012711864406779662}
+ (d) warm-up 0 frames (no trajectory at all: the seeded initial configuration)
+  [seed_from_segmentation] 472 cells from 'cells'; 236000 particles (500 per cell); youngs 40-220 from measured beat amplitude; cell centres seeded: 472
+   built: C=472 Np=236000 grid 128^2 warmup=1
+[P1d 1-frame] fd-vs-solver 3.30e-10 | model resid 2.236e-08 | ridge0 med E 3.231e-03 med g 5.865e-09 l2 3.142e-02 | best ridge0 l2 3.142e-02
+        tail: {'frac_E_gt_1pct': 0.25, 'frac_gain_gt_1pct': 0.00211864406779661, 'frac_E_gt_10pct': 0.029661016949152543, 'frac_gain_gt_10pct': 0.0}
+ trajectories really are different: ||x_k(a)-x_k(b)||/||x_k|| = 2.649e-04
+
+=== P4  SCALE: rel_l2 is the metric every 'beats the null' claim uses ===
+   true_E_gain_set_to_1       rel_l2 = 0.0020   med_E 0.000  med_gain 0.238
+   true_E_gain_set_to_0       rel_l2 = 0.0073   med_E 0.000  med_gain 1.000
+   true_gain_E_set_to_130     rel_l2 = 0.3528   med_E 0.291  med_gain 0.000
+
+wrote /workspace/Plexus/prototype/cardio_cells/algebraic/refute_f/probe_f_real.json  [93.3s]
