@@ -243,7 +243,12 @@ def fit_field(P, T, U, omega, hidden, layers, iters, lr, tw, dtype, device, seed
 #  measurement 2 -- per-cell contrast
 # --------------------------------------------------------------------------------------------- #
 def cell_contrast(F, cid, mask, C, min_per_cell=10):
-    """between-cell variance / within-cell variance of F - I, per channel and pooled."""
+    """between-cell variance / within-cell variance of F - I, per channel and pooled.
+
+    `between` is the variance of the per-cell MEANS -- the signal a per-cell (E, gain) solve reads.
+    `within` is the pooled variance of particles about their own cell mean.  Also returns the cell
+    means themselves so that an estimator's between-cell field can be regressed on the true one.
+    """
     I2 = torch.eye(2, device=F.device, dtype=F.dtype)[None]
     Y = (F - I2).reshape(-1, 4)[mask]
     cc = cid[mask]
@@ -260,7 +265,7 @@ def cell_contrast(F, cid, mask, C, min_per_cell=10):
     return {"between": [float(x) for x in between], "within": [float(x) for x in within],
             "ratio": [float(b / (w + 1e-300)) for b, w in zip(between, within)],
             "ratio_pooled": float(between.sum() / (within.sum() + 1e-300)),
-            "n_cells": int(keep.sum())}
+            "n_cells": int(keep.sum()), "_mu": mk, "_between": between, "_within": within}
 
 
 def pooled_slope(Fd, Ft, mask):
@@ -270,7 +275,7 @@ def pooled_slope(Fd, Ft, mask):
     return float((a @ b) / (b @ b))
 
 
-def report_row(name, F, Ft, mask, cid, C, extra=None):
+def report_row(name, F, Ft, mask, cid, C, extra=None, ct_true=None):
     at = attenuation(F, Ft, mask)
     ct = cell_contrast(F, cid, mask, C)
     row = {"name": name, "ls_scale": at["ls_scale"], "corr": at["corr"],
@@ -280,7 +285,14 @@ def report_row(name, F, Ft, mask, cid, C, extra=None):
            "med_abs_F_minus_I": at["med_abs_F_minus_I"],
            "disagree_over_FmI": at["disagree_over_FmI"],
            "contrast_ratio": ct["ratio_pooled"], "contrast_per_channel": ct["ratio"],
-           "between": ct["between"], "within": ct["within"]}
+           "between": ct["between"], "within": ct["within"], "n_cells": ct["n_cells"]}
+    if ct_true is not None:
+        a_, b_ = ct["_mu"].reshape(-1), ct_true["_mu"].reshape(-1)
+        am, bm = a_ - a_.mean(), b_ - b_.mean()
+        row["between_amp"] = float((ct["_between"].sum() / ct_true["_between"].sum()).sqrt())
+        row["within_amp"] = float((ct["_within"].sum() / ct_true["_within"].sum()).sqrt())
+        row["cellmean_slope"] = float((a_ @ b_) / (b_ @ b_))
+        row["cellmean_corr"] = float((am @ bm) / (am.norm() * bm.norm() + 1e-300))
     if extra:
         row.update(extra)
     return row
@@ -291,11 +303,14 @@ def fmt(r):
     co = " ".join(f"{v:6.3f}" for v in r["corr"])
     return (f"  {r['name']:<26s} {r['slope_pooled']:7.3f} [{ls}] [{co}] "
             f"{r['rel_fro']:8.4f} {r['med_abs_disagree']:9.5f} {r['disagree_over_FmI']:7.3f} "
-            f"{r['contrast_ratio']:9.3f}")
+            f"{r['contrast_ratio']:8.3f} {r.get('between_amp', float('nan')):8.3f} "
+            f"{r.get('within_amp', float('nan')):8.3f} {r.get('cellmean_slope', float('nan')):8.3f} "
+            f"{r.get('cellmean_corr', float('nan')):8.3f}")
 
 
 HDR = (f"  {'row':<26s} {'slopeP':>7s} [{'ls_scale (4 ch)':^29s}] [{'corr (4 ch)':^29s}] "
-       f"{'rel_fro':>8s} {'med|dF|':>9s} {'/|F-I|':>7s} {'btw/wth':>9s}")
+       f"{'rel_fro':>8s} {'med|dF|':>9s} {'/|F-I|':>7s} {'btw/wth':>8s} {'btwAmp':>8s} "
+       f"{'wthAmp':>8s} {'cmSlope':>8s} {'cmCorr':>8s}")
 
 
 # --------------------------------------------------------------------------------------------- #
@@ -409,19 +424,27 @@ def main():
                             "pts_per_cell_side": cell_side / h, "ticks": {}}
 
         # ---- reference rows: TRUE field, and the CENTRAL DIFFERENCE on the same grid --------- #
+        CT_TRUE = {}
         for k in ev_ticks:
             rows_abs, rows_rel = [], []
             Ft = B[k]["F0"]
-            rows_abs.append(report_row("true F (simulator)", Ft, Ft, interior, cid, Cn))
+            ctT = cell_contrast(Ft, cid, interior, Cn)
+            CT_TRUE[k] = ctT
+            rows_abs.append(report_row("true F (simulator)", Ft, Ft, interior, cid, Cn,
+                                       ct_true=ctT))
             Fcd = derive_F(cg, X0, B[k]["x0"])
-            rows_abs.append(report_row("central diff m=165", Fcd, Ft, interior, cid, Cn))
+            rows_abs.append(report_row("central diff m=165", Fcd, Ft, interior, cid, Cn,
+                                       ct_true=ctT))
             # relative, short lag m: dF between t-m and t, composed with the TRUE F(t-m) (oracle)
             m = a.mlag
             if (k - m) in B:
                 # the grid must live on the configuration the displacement is measured FROM
                 cgm = ControlGrid(B[k - m]["x0"], h)
                 Frel = derive_F(cgm, B[k - m]["x0"], B[k]["x0"], F_ref=B[k - m]["F0"])
-                rows_rel.append(report_row(f"central diff m={m}", Frel, Ft, interior, cid, Cn))
+                rows_rel.append(report_row("true F (simulator)", Ft, Ft, interior, cid, Cn,
+                                           ct_true=ctT))
+                rows_rel.append(report_row(f"central diff m={m}", Frel, Ft, interior, cid, Cn,
+                                           ct_true=ctT))
             R["tables"][key]["ticks"][str(k)] = {"abs": rows_abs, "rel": rows_rel}
 
         # ---- v and C by centred difference (the controls 0.0227 / 0.0101) -------------------- #
@@ -460,7 +483,7 @@ def main():
                 u_t = B[k]["x0"] - X0
                 slot = R["tables"][key]["ticks"][str(k)]
                 row = report_row(f"SIREN omega={om:g}", F_h, Ft, interior, cid, Cn,
-                                 extra={"omega": om, **fi})
+                                 extra={"omega": om, **fi}, ct_true=CT_TRUE[k])
                 row["u_rel_particles"] = rel(u_h[interior], u_t[interior])
                 row["u_rms_world"] = float((u_h - u_t)[interior].pow(2).mean().sqrt())
                 row["v_rel"] = rel(v_h[interior], vt[interior])
@@ -478,7 +501,8 @@ def main():
                     F_hm = F_hm.to(X0.dtype)
                     Frel = (F_h @ torch.linalg.inv(F_hm)) @ B[k - m]["F0"]
                     slot["rel"].append(report_row(f"SIREN omega={om:g}", Frel, Ft, interior,
-                                                  cid, Cn, extra={"omega": om}))
+                                                  cid, Cn, extra={"omega": om},
+                                                  ct_true=CT_TRUE[k]))
             del fld
             torch.cuda.empty_cache()
             dump()
