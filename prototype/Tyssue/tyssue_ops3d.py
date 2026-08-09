@@ -735,7 +735,19 @@ class Apoptosis3D(Structural):
         self.band_deg = float(params.get("band_deg", 8.0))        # half-width of each ring
         self.n_bands = int(params.get("n_bands", 1))              # >1 -> that many latitude rings
         self.small_frac = float(params.get("small_frac", 0.35))   # (small) die below this x v_ref
-        self.stall_frac = float(params.get("stall_frac", 0.5))    # (stalled) die below this x the
+        # THE THRESHOLD IS PER MODE, because the quantities have different dynamic ranges and one
+        # number cannot serve them. Measured on r010_12 at a shared 0.5: `dimmer` removed ~212
+        # cells by frame 480 and `competition`, `stalled`, `smaller` and `older` removed NONE.
+        # The activator spans 0 to its maximum across a spot boundary, so a factor-of-two cut sees
+        # it easily; volume, age and growth vary by roughly +-30% between neighbours, so demanding
+        # HALF the neighbour mean asks for a cell that essentially cannot exist in a healthy sheet.
+        # A silent rule is not a conservative rule -- it is an untested one, which this project has
+        # now paid for three times (rd_interface_tension twice, chem_low once).
+        _STALL_DEFAULT = {"dimmer": 0.5, "competition": 0.7, "older": 0.7,
+                          "stalled": 0.8, "smaller": 0.85}
+        self.stall_frac = float(params.get(
+            "stall_frac", _STALL_DEFAULT.get(str(params.get("mode", "list")), 0.5)))
+        #                                                          (stalled) die below this x the
         self.stall_margin = float(params.get("stall_margin", 0.02))  # population's MEDIAN growth,
         self.min_age = int(params.get("min_age", 4))              # once older than min_age, and
         self.n_max = int(params.get("n_max", 9))          # (crowded) die at this many neighbours
