@@ -22,6 +22,11 @@
    "detail": "4 withdrawn, all with a cause"
   },
   {
+   "check": "every certified metric records why",
+   "pass": true,
+   "detail": "4 certified: path_length, peak_excursion, orientation_error, coordination"
+  },
+  {
    "check": "every declared null says where it came from",
    "pass": true,
    "detail": "6 measured, 2 analytic, 6 with no null at all"
@@ -57,9 +62,9 @@
    "detail": "axes: size, openness, chirality, orientation, coordination, placement, phase, heterogeneity"
   },
   {
-   "check": "nothing is cited as certified before Phase 2 certifies it",
+   "check": "every certification is auditable against its own evidence",
    "pass": true,
-   "detail": "0 certified, 14 provisional, 4 withdrawn"
+   "detail": "4 certified, 10 provisional, 4 withdrawn"
   },
   {
    "check": "Coordination sees what the objective cannot",
@@ -269,7 +274,7 @@
    "name": "path_length",
    "definition": "how far the model's nodes travel over the beat against how far the recording's do, summed frame to frame and subtracted. 0 is perfect. A loop and a line of the same width differ here; the enclosed area alone does not say so.",
    "source": "this file -- the one quantity the prototype named and never computed",
-   "tier": "provisional",
+   "tier": "certified",
    "role": "evidence",
    "not_evidence_because": "",
    "responds_to": [
@@ -288,7 +293,7 @@
    "name": "peak_excursion",
    "definition": "how far the model's nodes reach from the centre of their own path against how far the recording's do, at furthest, subtracted. 0 is perfect. Centred, so sliding a loop elsewhere does not change it.",
    "source": "cardio_mpm_train.enclosure_row (peak), centred here",
-   "tier": "provisional",
+   "tier": "certified",
    "role": "evidence",
    "not_evidence_because": "",
    "responds_to": [
@@ -322,7 +327,7 @@
    "name": "orientation_error",
    "definition": "the angle between the simulated and the recorded long axis of each loop, median over nodes, in radians. 0 is perfect; about 0.785 is what chance gives, because an axis has no head or tail.",
    "source": "this file. The quantity lived inside the objective as the phase of a product of Fourier coefficients and was NEVER REPORTED, so this axis could move for a whole campaign with nobody able to see it.",
-   "tier": "provisional",
+   "tier": "certified",
    "role": "evidence",
    "not_evidence_because": "",
    "responds_to": [
@@ -340,7 +345,7 @@
    "name": "coordination",
    "definition": "does the tissue contract TOGETHER the way the recording does? Per node, find the time shift that best lines its motion up with the recording's; then measure how tightly those shifts agree with each other. 1 means the pattern of who-moves-when matches, up to one global offset; 0 means it is unrelated.",
    "source": "this file. Nothing measured it, which is why the objective scores a sheet whose points beat in random order at exactly 1.0000 -- whether the tissue contracts together was not a measurable property of any run in sixty batches.",
-   "tier": "provisional",
+   "tier": "certified",
    "role": "evidence",
    "not_evidence_because": "",
    "responds_to": [

@@ -9,6 +9,7 @@
   "unit_from": "beat_to_beat",
   "floors_measured": [
    "beat_to_beat",
+   "same_seed",
    "seed_to_seed"
   ],
   "levels": null,
@@ -24,6 +25,7 @@
   "unit_from": "seed_to_seed",
   "floors_measured": [
    "beat_to_beat",
+   "same_seed",
    "seed_to_seed"
   ],
   "levels": null,
@@ -35,10 +37,11 @@
   "null": null,
   "ceiling": 0.009975329041481018,
   "range": null,
-  "unit": 0.0074161496112832665,
-  "unit_from": "seed_to_seed",
+  "unit": 0.012518014758825302,
+  "unit_from": "same_seed",
   "floors_measured": [
    "beat_to_beat",
+   "same_seed",
    "seed_to_seed"
   ],
   "levels": null,
@@ -54,6 +57,7 @@
   "unit_from": "beat_to_beat",
   "floors_measured": [
    "beat_to_beat",
+   "same_seed",
    "seed_to_seed"
   ],
   "levels": null,
@@ -65,10 +69,11 @@
   "null": null,
   "ceiling": 0.06391546130180359,
   "range": null,
-  "unit": 0.047518891312368604,
-  "unit_from": "beat_to_beat",
+  "unit": 0.05086721479892731,
+  "unit_from": "same_seed",
   "floors_measured": [
    "beat_to_beat",
+   "same_seed",
    "seed_to_seed"
   ],
   "levels": null,
@@ -84,6 +89,7 @@
   "unit_from": "seed_to_seed",
   "floors_measured": [
    "beat_to_beat",
+   "same_seed",
    "seed_to_seed"
   ],
   "levels": null,
@@ -95,28 +101,14 @@
   "null": 0.7853981633974483,
   "ceiling": 0.0581960680425906,
   "range": 0.7272020953548577,
-  "unit": 0.02317529376865356,
-  "unit_from": "beat_to_beat",
+  "unit": 0.023931392541678642,
+  "unit_from": "same_seed",
   "floors_measured": [
    "beat_to_beat",
+   "same_seed",
    "seed_to_seed"
   ],
-  "levels": 10.459444478735607,
-  "verdict": "enough to rank on"
- },
- {
-  "metric": "chirality_match",
-  "role": "evidence",
-  "null": 0.5,
-  "ceiling": 0.945701787751997,
-  "range": 0.445701787751997,
-  "unit": 0.017084429803802523,
-  "unit_from": "seed_to_seed",
-  "floors_measured": [
-   "beat_to_beat",
-   "seed_to_seed"
-  ],
-  "levels": 8.696062103924126,
+  "levels": 10.12898426322066,
   "verdict": "enough to rank on"
  },
  {
@@ -125,13 +117,14 @@
   "null": 0.0011,
   "ceiling": 2.5623354792742286e-05,
   "range": 0.0010743766452072578,
-  "unit": 4.153914756351469e-05,
-  "unit_from": "seed_to_seed",
+  "unit": 4.211823972718933e-05,
+  "unit_from": "same_seed",
   "floors_measured": [
    "beat_to_beat",
+   "same_seed",
    "seed_to_seed"
   ],
-  "levels": 8.62139859405718,
+  "levels": 8.502861247813074,
   "verdict": "enough to rank on"
  },
  {
@@ -144,6 +137,7 @@
   "unit_from": "seed_to_seed",
   "floors_measured": [
    "beat_to_beat",
+   "same_seed",
    "seed_to_seed"
   ],
   "levels": 7.967092891834903,
@@ -159,6 +153,7 @@
   "unit_from": "seed_to_seed",
   "floors_measured": [
    "beat_to_beat",
+   "same_seed",
    "seed_to_seed"
   ],
   "levels": 6.531372708972442,
@@ -174,6 +169,7 @@
   "unit_from": "seed_to_seed",
   "floors_measured": [
    "beat_to_beat",
+   "same_seed",
    "seed_to_seed"
   ],
   "levels": 3.2607060269973545,
@@ -189,9 +185,26 @@
   "unit_from": "seed_to_seed",
   "floors_measured": [
    "beat_to_beat",
+   "same_seed",
    "seed_to_seed"
   ],
   "levels": 2.3137829204971516,
+  "verdict": "TOO COARSE to carry a claim"
+ },
+ {
+  "metric": "chirality_match",
+  "role": "evidence",
+  "null": 0.5,
+  "ceiling": 0.945701787751997,
+  "range": 0.445701787751997,
+  "unit": 0.06504374286801073,
+  "unit_from": "same_seed",
+  "floors_measured": [
+   "beat_to_beat",
+   "same_seed",
+   "seed_to_seed"
+  ],
+  "levels": 2.284113060428847,
   "verdict": "TOO COARSE to carry a claim"
  },
  {
@@ -204,6 +217,7 @@
   "unit_from": "beat_to_beat",
   "floors_measured": [
    "beat_to_beat",
+   "same_seed",
    "seed_to_seed"
   ],
   "levels": 1.6491777248767674,
