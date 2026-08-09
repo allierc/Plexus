@@ -140,6 +140,18 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                # HEMIDESMOSOMES AS THEIR OWN SET. n_adhesions = 0 keeps the old field-on-the-membrane
                # tether; > 0 replaces it with discrete plaques that form, bear load, rupture and re-bind.
                n_adhesions=0, adhesion_k=1.0e4, adhesion_gamma=1.0, adhesion_rupture=0.0,
+               # THE HYBRID. MPM keeps the sheet's internal material response -- which is what gives a
+               # continuum its homogeneity, coverage 1.000 with no bond network -- while adhesion and
+               # contact act DIRECTLY on the particle, engine-integrated and overdamped, exactly as they
+               # do in graph mode. That distinction is what run 70 demonstrates: at the SAME grid and
+               # the same sheet thickness its membrane sits properly on the surface, because in graph
+               # mode the sheet never touches the grid and its springs move particles at float
+               # precision. In MPM every force is routed scatter -> grid solve -> gather, so even a
+               # per-particle contact is smeared to cell scale before it acts. The grid cannot IMPOSE a
+               # sub-cell position; it has no trouble holding one.
+               membrane_direct_forces=False,
+               # adhesions rupture under load: `detach` is the displacement at which one lets go.
+               membrane_detach=0.0,
                # THE TISSUE AS A MOVING BOUNDARY ON THE GRID, rather than a positional projection.
                # 88 showed the projection carries no strain -- see membrane_ops.MPMTissueBoundary.
                membrane_grid_bc=False,
@@ -225,7 +237,8 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
             # feel the growth. `membrane_adhesion = 0` reproduces the unanchored (wrong) loading path.
             {"op": "integrin_adhesion", "at": "basement_membrane_particle",
              "centre": [0.5, 0.5, 0.5], "surface": str(membrane), "scale": 1.0,
-             "k": float(membrane_adhesion), "offset": float(membrane_offset), "detach": 0.0,
+             "k": float(membrane_adhesion), "offset": float(membrane_offset),
+             "detach": float(membrane_detach),
              "tau_adh": float(membrane_tau_adh),
              "fraction": float(membrane_adhesion_fraction)},
             {"op": "basement_membrane_bond", "at": "basement_membrane_particle",
@@ -358,7 +371,17 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                 spec["schedule"].insert(spec["schedule"].index(after) + 1, "basement_membrane_repel")
             else:
                 spec["operators"] = [o for o in spec["operators"] if o["op"] != "basement_membrane_repel"]
-            if membrane_impl == "graph":
+            if membrane_direct_forces:
+                for o in spec["operators"]:
+                    if o["op"] in ("integrin_adhesion", "basement_membrane_contact"):
+                        o["emit"] = "velocity"          # x += dt*(F/gamma): first-order, no inertia
+                        o["overdamped_gamma"] = float(membrane_gamma)
+                        o["graph_mode"] = False
+                # and out of the substep block: an engine-integrated delta is applied once per frame
+                for _st in spec["schedule"]:
+                    if isinstance(_st, dict) and "substep_dt" in _st:
+                        _st["steps"] = [x for x in _st["steps"] if x != "basement_membrane_contact"]
+        if membrane_impl == "graph":
                 # THE MEMBRANE AS A SPRING GRAPH, not a continuum body. Nothing about the sheet's mechanics
                 # was ever coming from MPM: the crosslinks hold it together, the integrin springs hold it in
                 # place, bonds breaking fragment it, and every figure colours it by crosslink strain. MPM was

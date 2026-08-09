@@ -1,0 +1,100 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[   31.8s] 
+====================================================================================================================
+  stimulus radius 0.12 (the spec)   radius=None amplitude=None
+====================================================================================================================
+[   31.8s]   reference peak_excursion (10x10 surface) 0.00957049   all-particle median 0.00777337
+[   31.8s]   motion profile:  r[0.00,0.10) n= 6 amp=1.20e-02   r[0.10,0.20) n=13 amp=2.03e-02   r[0.20,0.30) n=23 amp=1.84e-02   r[0.30,0.40) n=21 amp=7.51e-03   r[0.40,0.55) n=32 amp=3.62e-04   r[0.55,1.00) n= 5 amp=1.70e-06
+[   31.8s] 
+  ONE CELL'S MODULUS 40 -> 220, read on its own particles (certified steps):
+[   31.8s]    cell r from pulse   cell amp  own-cell STAT  whole-sheet    10x10
+[   58.1s]      50        0.009   6.86e-03         13.162        1.856    4.708
+[   84.1s]      59        0.218   1.95e-02          8.464        0.548    0.755
+[  110.0s]      20        0.335   4.86e-03          0.947        0.361    0.303
+[  136.1s]      81        0.436   3.39e-04          0.143        0.088    0.007
+[  159.0s]      10        0.605   3.84e-08          0.100        0.000    0.000
+[  159.0s] 
+  THE PLANTED FIELD against uniform impostors (10x10 surface / all particles):
+[  159.0s]    uniform E  10x10 STAT  all-part STAT  cells >1 step  cells >5  median cell
+[  168.1s]         40.0        3.07           3.14             82        50         5.63
+[  177.0s]         58.7        1.55           1.49             70        48         4.53
+[  185.9s]         86.2        1.08           1.34             58        39         2.02
+[  195.0s]        126.5        3.83           3.36             62        26         1.52
+[  203.9s]        185.7        7.29           6.19             71        44         3.34
+[  212.8s]        272.5        6.15           5.89             82        46         4.23
+[  221.9s]        400.0        2.41           4.87             88        51         5.59
+[  221.9s]     BEST uniform impostor for the PLANTED field: E = 86.2 at 1.08 steps on the certified 10x10 surface
+[  221.9s]     does the per-cell reading know WHICH cell is wrong?  rho = +0.106 over all 100 cells; +0.031 over the 55 cells that actually move (amplitude > 25% of the maximum)
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[  239.3s] 
+====================================================================================================================
+  stimulus radius 0.36, force x3   radius=0.36 amplitude=60.0
+====================================================================================================================
+[  239.3s]   reference peak_excursion (10x10 surface) 0.0398577   all-particle median 0.0350253
+[  239.3s]   motion profile:  r[0.00,0.10) n= 6 amp=1.65e-02   r[0.10,0.20) n=23 amp=2.95e-02   r[0.20,0.30) n=31 amp=3.85e-02   r[0.30,0.40) n=20 amp=4.03e-02   r[0.40,0.55) n=17 amp=8.53e-04   r[0.55,1.00) n= 3 amp=4.83e-04
+[  239.3s] 
+  ONE CELL'S MODULUS 40 -> 220, read on its own particles (certified steps):
+[  239.3s]    cell r from pulse   cell amp  own-cell STAT  whole-sheet    10x10
+[  255.7s]      50        0.012   9.92e-03         14.569        3.173    1.471
+[  271.9s]      51        0.190   3.41e-02         19.724        3.072    1.664
+[  288.0s]      79        0.268   4.08e-02          8.098        0.566    1.559
+[  304.3s]      82        0.372   4.24e-02         14.696        0.329    0.452
+[  320.3s]      78        0.591   6.76e-04          0.147        0.005    0.005
+[  320.3s] 
+  THE PLANTED FIELD against uniform impostors (10x10 surface / all particles):
+[  320.3s]    uniform E  10x10 STAT  all-part STAT  cells >1 step  cells >5  median cell
+[  329.2s]         40.0       24.59          24.98             86        85        25.10
+[  338.1s]         58.7       15.03          17.12             86        84        17.35
+[  347.1s]         86.2        8.78          10.17             86        69         9.89
+[  356.0s]        126.5        4.92           3.43             84        54         5.47
+[  364.8s]        185.7        0.89           5.92             86        67         8.71
+[  373.7s]        272.5       47.93          55.50             86        86        55.32
+[  382.6s]        400.0      102.93         116.56             86        86       116.22
+[  382.6s]     BEST uniform impostor for the PLANTED field: E = 185.7 at 0.89 steps on the certified 10x10 surface
+[  382.6s]     does the per-cell reading know WHICH cell is wrong?  rho = -0.051 over all 100 cells; +0.028 over the 85 cells that actually move (amplitude > 25% of the maximum)
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[  399.9s] 
+====================================================================================================================
+  stimulus radius 0.60, force x5   radius=0.6 amplitude=100.0
+====================================================================================================================
+[  399.9s]   reference peak_excursion (10x10 surface) 0.0303403   all-particle median 0.0267731
+[  399.9s]   motion profile:  r[0.00,0.10) n= 6 amp=1.29e-02   r[0.10,0.20) n=19 amp=2.18e-02   r[0.20,0.30) n=34 amp=2.83e-02   r[0.30,0.40) n=19 amp=3.21e-02   r[0.40,0.55) n=19 amp=1.07e-03   r[0.55,1.00) n= 3 amp=7.00e-04
+[  399.9s] 
+  ONE CELL'S MODULUS 40 -> 220, read on its own particles (certified steps):
+[  399.9s]    cell r from pulse   cell amp  own-cell STAT  whole-sheet    10x10
+[  416.2s]      50        0.013   7.76e-03          5.098        1.546    0.769
+[  432.4s]      51        0.204   2.70e-02         12.615        1.115    1.371
+[  448.6s]      25        0.283   2.84e-02          1.773        0.430    0.867
+[  464.7s]      82        0.381   3.26e-02          9.498        0.123    0.216
+[  480.7s]      78        0.588   9.62e-04          0.153        0.006    0.013
+[  480.7s] 
+  THE PLANTED FIELD against uniform impostors (10x10 surface / all particles):
+[  480.7s]    uniform E  10x10 STAT  all-part STAT  cells >1 step  cells >5  median cell
+[  489.6s]         40.0       19.75          18.46             86        85        17.11
+[  498.5s]         58.7       11.40          11.96             86        80        11.29
+[  507.5s]         86.2        5.19           5.52             84        55         5.67
+[  516.4s]        126.5        5.14           4.41             83        42         3.91
+[  525.4s]        185.7        7.85           8.85             86        68         9.75
+[  534.3s]        272.5        2.66           6.50             84        72        10.16
+[  543.3s]        400.0       28.99          42.18             87        86        40.29
+[  543.3s]     BEST uniform impostor for the PLANTED field: E = 272.5 at 2.66 steps on the certified 10x10 surface
+[  543.3s]     does the per-cell reading know WHICH cell is wrong?  rho = -0.061 over all 100 cells; +0.036 over the 85 cells that actually move (amplitude > 25% of the maximum)
+[  543.3s] 
+====================================================================================================================
+  SUMMARY -- does widening the stimulus make E identifiable?
+====================================================================================================================
+[  543.3s]   configuration                       beat amp  nearest-cell  farthest-cell   best impostor  cells >5 steps  rho strained
+[  543.3s]   stimulus radius 0.12 (the spec)      0.00957         13.16           0.10            1.08              39         0.031
+[  543.3s]   stimulus radius 0.36, force x3       0.03986         14.57           0.15            0.89              67         0.028
+[  543.3s]   stimulus radius 0.60, force x5       0.03034          5.10           0.15            2.66              72         0.036
+[  543.3s] 
+  the null (knowing nothing): 6.65 steps
+[  543.3s]   -> /workspace/Plexus/prototype/cardio_cells/crash/p1c_zone.json

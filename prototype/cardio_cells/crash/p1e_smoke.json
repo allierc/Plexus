@@ -1,0 +1,112 @@
+{
+ "args": {
+  "device": "cuda:0",
+  "tag": "p1e_smoke",
+  "t0": 15,
+  "cells": 12,
+  "per_parent": 40,
+  "n_grid": 64,
+  "nsub": "1"
+ },
+ "config": {
+  "device": "cuda:0",
+  "cells": 12,
+  "per_parent": 40,
+  "n_grid": 64,
+  "warmup": 15,
+  "window": 150,
+  "dtype": "float64",
+  "mode": "full",
+  "e_lo": 40.0,
+  "e_hi": 220.0,
+  "g_lo": 0.5,
+  "g_hi": 1.5
+ },
+ "sigma_x_world": 1.99592e-05,
+ "px_world": 0.000488,
+ "n_interior": 338,
+ "Np": 480,
+ "C": 12,
+ "act0_norm": 906.8989544125538,
+ "nsub1": {
+  "assembly_s": 0.1333601474761963,
+  "norm_A_E": 1.3135839403999883e-07,
+  "norm_A_gain": 3.552619966867227e-05,
+  "n_dead_cells_interior": 0,
+  "n_zero_E_cols": 0,
+  "n_zero_gain_cols": 0,
+  "alias_E_into_gain": {
+   "absorbed_fraction_of_stiffness_signal": 0.2181714351973503,
+   "residual_fraction": 0.9759104594500093,
+   "corr_g_alias_vs_dE": -0.6508185376156744,
+   "spearman_g_alias_vs_dE": -0.7762237762237763,
+   "corr_rel": -0.7489629625154685,
+   "med_abs_rel_gain_error_induced": 0.00827924345078414,
+   "p90_abs_rel_gain_error_induced": 0.03537014542621275,
+   "std_g_alias_over_std_gain_true": 0.07019806834780763,
+   "std_rel_alias": 0.019632154379083895,
+   "std_rel_gain_true": 0.2969378045715484,
+   "planted_rel_E_spread_std": 0.4878046628666646
+  },
+  "alias_gain_into_E": {
+   "absorbed_fraction_of_gain_signal": 0.2000623644707687,
+   "residual_fraction": 0.9797831649514933,
+   "corr_E_alias_vs_dg": 0.3742278706879806,
+   "med_abs_rel_E_error_induced": 0.12442936106441166
+  },
+  "percell_cos_E_gain": {
+   "n_valid": 12,
+   "n_zero_gain_cols": 0,
+   "median_abs": 0.12785754539985647,
+   "p90_abs": 0.21582859601471027,
+   "max_abs": 0.22697135061980878,
+   "min_abs": 0.04349328106675649,
+   "frac_abs_gt_0.9": 0.0,
+   "frac_abs_gt_0.99": 0.0
+  },
+  "svd": {
+   "n_cols": 24,
+   "cond": 846.9336573619416,
+   "s_max": 2.8783684730322598e-05,
+   "s_min": 3.398576084457314e-08,
+   "s": [
+    2.8783684730322598e-05,
+    2.1614030758630215e-06,
+    7.652874866976945e-08
+   ]
+  },
+  "percell_conditional": {
+   "sigma_b_world": 2.822657133411708e-05,
+   "note": "std of the RELATIVE per-cell error at iid position noise sigma_x=1.996e-05 world = 0.0409 px, ALL 338 interior particles independent -- optimistic; the recording has ~22.8 effective samples per cell against 100 particles here",
+   "best_direction_angle_deg_med": -82.83139654685354,
+   "best_direction_angle_deg_p10": -88.88735581843979,
+   "best_direction_angle_deg_p90": 89.41920438214052,
+   "best_dir_median_[dE/E, dg/g]": [
+    0.02108363940708879,
+    -0.992183231600232
+   ],
+   "sd_best_med": 3.7172638095771275,
+   "sd_best_min": 0.9832391829253284,
+   "sd_worst_med": 39.165045183157225,
+   "sd_worst_min": 1.904457495376398,
+   "anisotropy_ratio_med": 5.783803500223329,
+   "anisotropy_ratio_max": 11.19460255999151,
+   "n_cells_scored": 12,
+   "n_cells_excluded_dead": 0,
+   "n_cells_sd_best_under_0.10": 0,
+   "n_cells_sd_worst_under_0.10": 0,
+   "n_cells_sd_best_under_0.30": 0,
+   "n_cells_sd_worst_under_0.30": 0
+  },
+  "marginal_rel_sd": {
+   "E_med": 39.16415041252211,
+   "E_min": 1.8849184529432654,
+   "gain_med": 3.7266790704436215,
+   "gain_min": 1.0201960930571026,
+   "n_E_under_0.10": 0,
+   "n_gain_under_0.10": 0,
+   "n_gain_under_0.30": 0
+  }
+ },
+ "wall_seconds": 4.4489829540252686
+}

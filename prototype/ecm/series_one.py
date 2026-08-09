@@ -390,6 +390,56 @@ SERIES = {
                              membrane_contact_k=5.0e4, membrane_exclude=False, membrane_adhesion=0.0,
                              n_adhesions=2000, adhesion_k=1.0e4, adhesion_gamma=1.0,
                              membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
+    # 120-123: THE HYBRID, tuned. MPM keeps the sheet's material response (a continuum has no bond
+    #     network, so no holes -- coverage 1.000); adhesion and contact act DIRECTLY on the particle,
+    #     engine-integrated and overdamped, as they do in graph mode. Run 70 is the evidence that this
+    #     works at THIS grid and THIS sheet thickness, which is what refutes the resolution story.
+    #     Overdamped, k and gamma enter only as the RATIO k/gamma -- a relaxation rate -- so that is the
+    #     axis swept: 5, 25, 125. 123 adds the contact on top of the best-guess adhesion.
+    "120_direct_r5": dict(membrane_springs=False, membrane_impl="mpm", membrane_direct_forces=True,
+                          membrane_grid_bc=False, membrane_contact_k=0.0, membrane_exclude=False,
+                          membrane_adhesion=1.0e4, membrane_gamma=2.0e3,
+                          membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
+    "121_direct_r25": dict(membrane_springs=False, membrane_impl="mpm", membrane_direct_forces=True,
+                           membrane_grid_bc=False, membrane_contact_k=0.0, membrane_exclude=False,
+                           membrane_adhesion=5.0e4, membrane_gamma=2.0e3,
+                           membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
+    "122_direct_r125": dict(membrane_springs=False, membrane_impl="mpm", membrane_direct_forces=True,
+                            membrane_grid_bc=False, membrane_contact_k=0.0, membrane_exclude=False,
+                            membrane_adhesion=2.5e5, membrane_gamma=2.0e3,
+                            membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
+    "123_direct_r25_contact": dict(membrane_springs=False, membrane_impl="mpm",
+                                   membrane_direct_forces=True, membrane_grid_bc=False,
+                                   membrane_contact_k=5.0e4, membrane_exclude=False,
+                                   membrane_adhesion=5.0e4, membrane_gamma=2.0e3,
+                                   membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
+    # 124-128: TOWARD ADHESION BIOLOGY, each one change from 121 (k/gamma = 25, the stable point:
+    #     coverage 1.000, strain 2.25, standoff -0.0082). 121 is biologically a continuous glue that
+    #     tethers all 45,000 particles to positions frozen at frame 0, on a sheet that is never rebuilt.
+    #     These five relax that, one property at a time.
+    #     NOTE the known flaw they inherit: MPM gather and the engine delta both write particle
+    #     positions in the direct-force path. It is benign at k/gamma = 25 and destroyed 122 at 125, so
+    #     none of these raises the ratio.
+    "124_punctate20": dict(membrane_springs=False, membrane_impl="mpm", membrane_direct_forces=True,
+                     membrane_grid_bc=False, membrane_contact_k=0.0, membrane_exclude=False,
+                     membrane_adhesion=5.0e4, membrane_gamma=2.0e3, membrane_tau=0.0, membrane_adhesion_fraction=0.20,
+                          membrane_secrete_rate=0.0, membrane_reserve=0.0),
+    "125_punctate5": dict(membrane_springs=False, membrane_impl="mpm", membrane_direct_forces=True,
+                     membrane_grid_bc=False, membrane_contact_k=0.0, membrane_exclude=False,
+                     membrane_adhesion=5.0e4, membrane_gamma=2.0e3, membrane_tau=0.0, membrane_adhesion_fraction=0.05,
+                         membrane_secrete_rate=0.0, membrane_reserve=0.0),
+    "126_turnover": dict(membrane_springs=False, membrane_impl="mpm", membrane_direct_forces=True,
+                     membrane_grid_bc=False, membrane_contact_k=0.0, membrane_exclude=False,
+                     membrane_adhesion=5.0e4, membrane_gamma=2.0e3, membrane_tau=0.0, membrane_tau_adh=40.0,
+                        membrane_secrete_rate=0.0, membrane_reserve=0.0),
+    "127_rupture": dict(membrane_springs=False, membrane_impl="mpm", membrane_direct_forces=True,
+                     membrane_grid_bc=False, membrane_contact_k=0.0, membrane_exclude=False,
+                     membrane_adhesion=5.0e4, membrane_gamma=2.0e3, membrane_tau=0.0, membrane_detach=0.02,
+                       membrane_secrete_rate=0.0, membrane_reserve=0.0),
+    "128_secreting": dict(membrane_springs=False, membrane_impl="mpm", membrane_direct_forces=True,
+                     membrane_grid_bc=False, membrane_contact_k=0.0, membrane_exclude=False,
+                     membrane_adhesion=5.0e4, membrane_gamma=2.0e3, membrane_tau=0.0, membrane_secrete_rate=0.012, membrane_reserve=1.0,
+                         membrane_particles=90000),
     "_unused_secrete_dense": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
                              membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
                              membrane_particles=90000, membrane_reserve=1.0,

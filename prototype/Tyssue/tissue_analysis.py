@@ -371,9 +371,30 @@ def analyze(frames, OUT, a_sw=None):
                 ax[1].legend(fontsize=7)
     except Exception:
         pass
+    # CUMULATIVE DEATHS, ON THEIR OWN AXIS. Cedric, 9 August: "the ball decreases in size but the
+    # metrics show cell number constant at 2000 -- we should add cell death in the middle top
+    # plot." The count cannot carry this: r019_02_apop_small went 2,000 -> 3,089 WITH death
+    # running, and r019_02_apop_low held flat at 2,000 with death running and nothing dying. Both
+    # read the same off one line, and the second is a real failure mode -- every cell shrank to
+    # 21.6% of its volume and none was ever extruded, because death needs a cell squeezed to a
+    # triangle by its neighbours and that cannot happen when every neighbour is shrinking too.
     _grew = "no division" if np.nanmax(_c) <= np.nanmin(_c) * 1.02 else \
             f"{np.nanmin(_c):.0f} -> {np.nanmax(_c):.0f}"
-    ax[1].set_title(f"cells vs time  ({_grew})"); ax[1].set_xlabel("frame"); _mark(ax[1])
+    _died = ""
+    try:
+        _na = col("n_apop")
+        if _na is not None and np.nanmax(_na) > 0:
+            _t = ax[1].twinx()
+            _t.plot(fr, _na, "-", color="purple", lw=1.6)
+            _t.set_ylabel("cumulative deaths", color="purple", fontsize=8)
+            _t.tick_params(axis="y", labelcolor="purple", labelsize=7)
+            _t.set_ylim(0, max(float(np.nanmax(_na)) * 1.15, 1.0))
+            _died = f", {np.nanmax(_na):.0f} died"
+        elif _na is not None:
+            _died = ", 0 died"          # said explicitly: an apoptosis operator that removed nothing
+    except Exception:
+        pass
+    ax[1].set_title(f"cells vs time  ({_grew}{_died})"); ax[1].set_xlabel("frame"); _mark(ax[1])
 
     # 3. MESH FAULTS, with the self-intersection signal that P11 actually uses.
     ax[2].plot(fr, col("broken_frac"), "-", color="crimson", lw=2.0, label="broken (invalid)")

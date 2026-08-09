@@ -1,0 +1,286 @@
+{
+ "beats": 3,
+ "period": 150,
+ "rows": {
+  "uniform_E=planted_mean": {
+   "one_beat": {
+    "path_length": 0.05441292581631207,
+    "peak_excursion": 3.817602225624435,
+    "orientation_error": 0.2656794498642943,
+    "coordination": 0.0327871443656595,
+    "loopscore": 0.6591843366622925,
+    "STAT": 3.817602225624435
+   },
+   "three_beats": {
+    "path_length": 1.631859867746137,
+    "peak_excursion": 0.3547387054326429,
+    "orientation_error": 0.4549979902772698,
+    "coordination": 0.13273450321326077,
+    "loopscore": 0.41399624943733215,
+    "STAT": 1.631859867746137
+   },
+   "accept": {
+    "statistic": 5.010662694252638,
+    "limiting_instrument": "peak_excursion",
+    "pattern_channel": 0.5203110836474979,
+    "amplitude_channel": 5.010662694252638,
+    "undefined_ticks": {},
+    "worst_over_ticks": {
+     "path_length": 1.0343091128891,
+     "peak_excursion": 5.010662694252638,
+     "orientation_error": 0.5203110836474979,
+     "coordination": 0.060808634468806966
+    },
+    "median_over_ticks": {
+     "path_length": 0.5327238878955156,
+     "peak_excursion": 3.817602225624435,
+     "orientation_error": 0.379288508843393,
+     "coordination": 0.03613975525578953
+    },
+    "null_steps": {
+     "path_length": 6.6509503188431465,
+     "peak_excursion": 8.705650308314425,
+     "orientation_error": 10.939580191299047,
+     "coordination": 7.995017873521396
+    },
+    "beats_null": {
+     "path_length": true,
+     "peak_excursion": true,
+     "orientation_error": true,
+     "coordination": true
+    },
+    "informative": true,
+    "n_ticks": 3
+   },
+   "per_beat_STAT": [
+    3.817602225624435,
+    5.010662694252638,
+    2.0379832949702363
+   ]
+  },
+  "uniform_E=40": {
+   "one_beat": {
+    "path_length": 2.24299213261085,
+    "peak_excursion": 3.0692458759429244,
+    "orientation_error": 0.5527556259162372,
+    "coordination": 0.2756131422610176,
+    "loopscore": 0.5563424825668335,
+    "STAT": 3.0692458759429244
+   },
+   "three_beats": {
+    "path_length": 19.837702187379207,
+    "peak_excursion": 11.319675642591207,
+    "orientation_error": 0.5935683246647977,
+    "coordination": 0.4135733120103647,
+    "loopscore": -0.14721573889255524,
+    "STAT": 19.837702187379207
+   },
+   "accept": {
+    "statistic": 12.354141914283222,
+    "limiting_instrument": "peak_excursion",
+    "pattern_channel": 1.2688965522480473,
+    "amplitude_channel": 12.354141914283222,
+    "undefined_ticks": {},
+    "worst_over_ticks": {
+     "path_length": 11.466056673580404,
+     "peak_excursion": 12.354141914283222,
+     "orientation_error": 0.9047176041613731,
+     "coordination": 1.2688965522480473
+    },
+    "median_over_ticks": {
+     "path_length": 9.297894734798149,
+     "peak_excursion": 7.2739037251448995,
+     "orientation_error": 0.796953372524535,
+     "coordination": 1.078892149257424
+    },
+    "null_steps": {
+     "path_length": 6.6509503188431465,
+     "peak_excursion": 8.705650308314425,
+     "orientation_error": 10.939580191299047,
+     "coordination": 7.995017873521396
+    },
+    "beats_null": {
+     "path_length": false,
+     "peak_excursion": false,
+     "orientation_error": true,
+     "coordination": true
+    },
+    "informative": false,
+    "n_ticks": 3
+   },
+   "per_beat_STAT": [
+    3.0692458759429244,
+    9.297894734798149,
+    12.354141914283222
+   ]
+  },
+  "uniform_E=220": {
+   "one_beat": {
+    "path_length": 0.047275003203598474,
+    "peak_excursion": 9.095107080463938,
+    "orientation_error": 0.493327493581936,
+    "coordination": 0.23311829134282366,
+    "loopscore": 0.5996406674385071,
+    "STAT": 9.095107080463938
+   },
+   "three_beats": {
+    "path_length": 15.988081340107245,
+    "peak_excursion": 11.437314447700166,
+    "orientation_error": 0.755286757325419,
+    "coordination": 0.3967750125301122,
+    "loopscore": 0.4771425724029541,
+    "STAT": 15.988081340107245
+   },
+   "accept": {
+    "statistic": 9.095107080463938,
+    "limiting_instrument": "peak_excursion",
+    "pattern_channel": 0.9681856557290717,
+    "amplitude_channel": 9.095107080463938,
+    "undefined_ticks": {},
+    "worst_over_ticks": {
+     "path_length": 7.785337763961403,
+     "peak_excursion": 9.095107080463938,
+     "orientation_error": 0.9681856557290717,
+     "coordination": 0.39859538473219586
+    },
+    "median_over_ticks": {
+     "path_length": 7.473108654554649,
+     "peak_excursion": 3.849630196228112,
+     "orientation_error": 0.7145598352432146,
+     "coordination": 0.26747138151117483
+    },
+    "null_steps": {
+     "path_length": 6.6509503188431465,
+     "peak_excursion": 8.705650308314425,
+     "orientation_error": 10.939580191299047,
+     "coordination": 7.995017873521396
+    },
+    "beats_null": {
+     "path_length": false,
+     "peak_excursion": false,
+     "orientation_error": true,
+     "coordination": true
+    },
+    "informative": false,
+    "n_ticks": 3
+   },
+   "per_beat_STAT": [
+    9.095107080463938,
+    7.785337763961403,
+    7.473108654554649
+   ]
+  },
+  "uniform_E=800": {
+   "one_beat": {
+    "path_length": 1.0084523254086466,
+    "peak_excursion": 4.358751801347994,
+    "orientation_error": 1.534908452514836,
+    "coordination": 1.058155295325434,
+    "loopscore": 0.056066080927848816,
+    "STAT": 4.358751801347994
+   },
+   "three_beats": {
+    "path_length": 44.29901801149677,
+    "peak_excursion": 27.783369083299746,
+    "orientation_error": 1.766019439441756,
+    "coordination": 0.4251912352520092,
+    "loopscore": 0.08133608102798462,
+    "STAT": 44.29901801149677
+   },
+   "accept": {
+    "statistic": 33.411900993364675,
+    "limiting_instrument": "peak_excursion",
+    "pattern_channel": 1.534908452514836,
+    "amplitude_channel": 33.411900993364675,
+    "undefined_ticks": {},
+    "worst_over_ticks": {
+     "path_length": 24.387401904646413,
+     "peak_excursion": 33.411900993364675,
+     "orientation_error": 1.534908452514836,
+     "coordination": 1.1177967192329674
+    },
+    "median_over_ticks": {
+     "path_length": 20.233116325340124,
+     "peak_excursion": 20.62771791386425,
+     "orientation_error": 1.4075604394866064,
+     "coordination": 1.058155295325434
+    },
+    "null_steps": {
+     "path_length": 6.6509503188431465,
+     "peak_excursion": 8.705650308314425,
+     "orientation_error": 10.939580191299047,
+     "coordination": 7.995017873521396
+    },
+    "beats_null": {
+     "path_length": false,
+     "peak_excursion": false,
+     "orientation_error": true,
+     "coordination": true
+    },
+    "informative": false,
+    "n_ticks": 3
+   },
+   "per_beat_STAT": [
+    4.358751801347994,
+    20.62771791386425,
+    33.411900993364675
+   ]
+  },
+  "E_true, gain x1.05": {
+   "one_beat": {
+    "path_length": 1.6179260984415822,
+    "peak_excursion": 4.2244824546300235,
+    "orientation_error": 0.04124848188897996,
+    "coordination": 0.0,
+    "loopscore": 0.9984034895896912,
+    "STAT": 4.2244824546300235
+   },
+   "three_beats": {
+    "path_length": 7.584891802640447,
+    "peak_excursion": 7.758137953977383,
+    "orientation_error": 0.12406732480139135,
+    "coordination": 0.0,
+    "loopscore": 0.770432710647583,
+    "STAT": 7.758137953977383
+   },
+   "accept": {
+    "statistic": 4.2244824546300235,
+    "limiting_instrument": "peak_excursion",
+    "pattern_channel": 0.19532561490159983,
+    "amplitude_channel": 4.2244824546300235,
+    "undefined_ticks": {},
+    "worst_over_ticks": {
+     "path_length": 3.170459689497209,
+     "peak_excursion": 4.2244824546300235,
+     "orientation_error": 0.19532561490159983,
+     "coordination": 0.0039030982452364664
+    },
+    "median_over_ticks": {
+     "path_length": 3.0876264172860814,
+     "peak_excursion": 4.172176959371927,
+     "orientation_error": 0.13320255053924962,
+     "coordination": 0.0003040260648432544
+    },
+    "null_steps": {
+     "path_length": 6.6509503188431465,
+     "peak_excursion": 8.705650308314425,
+     "orientation_error": 10.939580191299047,
+     "coordination": 7.995017873521396
+    },
+    "beats_null": {
+     "path_length": true,
+     "peak_excursion": true,
+     "orientation_error": true,
+     "coordination": true
+    },
+    "informative": true,
+    "n_ticks": 3
+   },
+   "per_beat_STAT": [
+    4.2244824546300235,
+    4.172176959371927,
+    3.0876264172860814
+   ]
+  }
+ }
+}

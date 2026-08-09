@@ -1272,6 +1272,21 @@ class DivBlockedFirstFrame(_RunScalar):
 
 
 @register
+class NApop(_RunScalar):
+    """How many cells were EXTRUDED over the run -- cumulative apoptotic deaths. NO = 0.
+
+    THE CELL COUNT CANNOT ANSWER THIS, which is the whole reason it exists. Measured on the two
+    apoptosis tests against r019_02: `apop_small` went 2,000 -> 3,089 cells with death running, and
+    `apop_low` held at 2,000 with death running and NOTHING dying -- every cell shrank to 21.6% of
+    its volume and none was ever extruded. From the count alone the two are indistinguishable, and
+    the second is a failure mode (global starvation instead of local extrusion) that would read as
+    "apoptosis did nothing" when it is really "apoptosis marked everything".
+    """
+    name, group = "n_apop", "cells"
+    admitted = True
+
+
+@register
 class BufFull(_RunScalar):
     """Did the tissue reach its vertex buffer. 3,552 vertices cap the tissue at exactly 1,778 cells --
     the arithmetic that voided 59 runs across two batches, both reported as findings."""

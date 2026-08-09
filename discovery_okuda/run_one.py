@@ -854,6 +854,12 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     summary["buf_full"] = bool(any(h.get("buf_full") for h in hist))
     summary["div_blocked_first_frame"] = next(
         (i for i, h in enumerate(hist) if (h.get("div_blocked") or 0) > 0), None)
+    # CUMULATIVE DEATHS, LIFTED THE SAME WAY, and it needs lifting for the same reason: a counter
+    # on the mesh reaches nobody. It is a MAXIMUM over the run rather than the last frame's value
+    # because the array is compacted on every death, so a late frame is not guaranteed to carry
+    # the earlier total. The cell COUNT cannot substitute -- r019_02_apop_small went 2,000 -> 3,089
+    # with death running, and r019_02_apop_low held at 2,000 with death running and nothing dying.
+    summary["n_apop"] = int(max((h.get("n_apop") or 0) for h in hist)) if hist else 0
     if summary["buf_full"] or summary["div_blocked"]:
         print(f"[{name}] RESERVOIR FULL at {summary.get('n_cells_final')} cells "
               f"(first refused division at frame {summary.get('div_blocked_first_frame')}) -- "

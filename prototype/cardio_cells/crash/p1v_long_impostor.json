@@ -1,0 +1,166 @@
+{
+ "uniform E=66.2": {
+  "one_beat_STAT": 1.8831208032106435,
+  "accept_statistic": 8.285544166336097,
+  "limiting": "peak_excursion",
+  "per_beat_STAT": [
+   1.8831208032106435,
+   7.2416748991652495,
+   8.285544166336097
+  ],
+  "beats_null": {
+   "path_length": false,
+   "peak_excursion": false,
+   "orientation_error": true,
+   "coordination": true
+  },
+  "informative": false
+ },
+ "uniform E=78.3": {
+  "one_beat_STAT": 1.7923535069997545,
+  "accept_statistic": 5.717909286349299,
+  "limiting": "peak_excursion",
+  "per_beat_STAT": [
+   1.7923535069997545,
+   4.568528624869939,
+   5.717909286349299
+  ],
+  "beats_null": {
+   "path_length": true,
+   "peak_excursion": true,
+   "orientation_error": true,
+   "coordination": true
+  },
+  "informative": true
+ },
+ "uniform E=86.2": {
+  "one_beat_STAT": 1.0762866766729353,
+  "accept_statistic": 6.0359678890661055,
+  "limiting": "peak_excursion",
+  "per_beat_STAT": [
+   1.0762866766729353,
+   3.8684436033685006,
+   6.0359678890661055
+  ],
+  "beats_null": {
+   "path_length": true,
+   "peak_excursion": true,
+   "orientation_error": true,
+   "coordination": true
+  },
+  "informative": true
+ },
+ "uniform E=92.6": {
+  "one_beat_STAT": 0.7503436453773166,
+  "accept_statistic": 5.19948757239548,
+  "limiting": "peak_excursion",
+  "per_beat_STAT": [
+   0.7503436453773166,
+   2.616733614577519,
+   5.19948757239548
+  ],
+  "beats_null": {
+   "path_length": true,
+   "peak_excursion": true,
+   "orientation_error": true,
+   "coordination": true
+  },
+  "informative": true
+ },
+ "uniform E=100.0": {
+  "one_beat_STAT": 0.3040551924828063,
+  "accept_statistic": 6.562895683214587,
+  "limiting": "peak_excursion",
+  "per_beat_STAT": [
+   0.3040551924828063,
+   1.5569758003034355,
+   6.562895683214587
+  ],
+  "beats_null": {
+   "path_length": true,
+   "peak_excursion": true,
+   "orientation_error": true,
+   "coordination": true
+  },
+  "informative": true
+ },
+ "uniform E=109.5": {
+  "one_beat_STAT": 2.2950766160833687,
+  "accept_statistic": 3.5815781344592197,
+  "limiting": "peak_excursion",
+  "per_beat_STAT": [
+   2.2950766160833687,
+   1.7774813852695899,
+   3.5815781344592197
+  ],
+  "beats_null": {
+   "path_length": true,
+   "peak_excursion": true,
+   "orientation_error": true,
+   "coordination": true
+  },
+  "informative": true
+ },
+ "uniform E=128.4": {
+  "one_beat_STAT": 3.817707609377505,
+  "accept_statistic": 5.01294463673131,
+  "limiting": "peak_excursion",
+  "per_beat_STAT": [
+   3.817707609377505,
+   5.01294463673131,
+   2.0391224573267284
+  ],
+  "beats_null": {
+   "path_length": true,
+   "peak_excursion": true,
+   "orientation_error": true,
+   "coordination": true
+  },
+  "informative": true
+ },
+ "theta_true (control)": {
+  "one_beat_STAT": 0.0,
+  "accept_statistic": 0.0,
+  "limiting": "path_length",
+  "per_beat_STAT": [
+   0.0,
+   0.0,
+   0.0
+  ],
+  "beats_null": {
+   "path_length": true,
+   "peak_excursion": true,
+   "orientation_error": true,
+   "coordination": true
+  },
+  "informative": true
+ },
+ "gain x1.05, E true (control)": {
+  "one_beat_STAT": 4.2244824546300235,
+  "accept_statistic": 4.2244824546300235,
+  "limiting": "peak_excursion",
+  "per_beat_STAT": [
+   4.2244824546300235,
+   4.172176959371927,
+   3.0876264172860814
+  ],
+  "beats_null": {
+   "path_length": true,
+   "peak_excursion": true,
+   "orientation_error": true,
+   "coordination": true
+  },
+  "informative": true
+ },
+ "_summary": {
+  "best_one_beat": {
+   "candidate": "uniform E=100.0",
+   "steps": 0.3040551924828063
+  },
+  "best_three_beats": {
+   "candidate": "uniform E=109.5",
+   "steps": 3.5815781344592197
+  },
+  "null_min": 6.6509503188431465
+ }
+}

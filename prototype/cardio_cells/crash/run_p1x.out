@@ -1,0 +1,115 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125  warm-up 165 frames
+          reference config at tick 0: |F(0) - I| max 0.00e+00  (must be 0 for X to be the configuration p.F is measured against)
+[collect] 16s; |F(tick0)-I|max = 0.0e+00  (0 => the derived-F reference is not an oracle)
+
+    F                  fit                  medg      p90g    corr      atten  negg     medE     resid  lstsq-vs-norm
+  [clean] ||b|| 0.00618  ||A_E E_true|| 0.006579  ||A_g g_true|| 0.009263  elastic/active 0.71x  ||A_E E_true||/||b|| 1.06x
+    clean              joint              0.0045    0.0346   0.981      0.990     0   0.0078 1.061e-01       8.90e-13
+    clean              gain@E_true        0.0027    0.0088   0.999      0.996     0   0.0000 1.082e-01       2.13e-15
+/workspace/.conda_envs/neural-graph-linux/lib/python3.12/site-packages/numpy/lib/_function_base_impl.py:3045: RuntimeWarning: invalid value encountered in divide
+  c /= stddev[:, None]
+/workspace/.conda_envs/neural-graph-linux/lib/python3.12/site-packages/numpy/lib/_function_base_impl.py:3046: RuntimeWarning: invalid value encountered in divide
+  c /= stddev[None, :]
+    clean              gain@E132          0.2399    2.4572   0.256      2.373    10   0.3228 1.937e+00       3.80e-15
+    clean              alphaE+gain        0.4893    2.6397   0.185      1.059     1   0.9159 5.684e-01       0.00e+00
+    clean              boxFISTA@E132      0.2621    0.8002   0.375      1.063     0   0.3228 1.956e+00       0.00e+00
+    clean              boxFISTA@alphaE    0.4843    2.5076   0.214      0.823     0   0.9159 5.707e-01       0.00e+00
+  [noiseF_grid48] ||b|| 0.00618  ||A_E E_true|| 0.00797  ||A_g g_true|| 0.009263  elastic/active 0.86x  ||A_E E_true||/||b|| 1.29x
+    noiseF_grid48      joint              0.2451    2.6970   0.226      1.247     2   0.8416 3.789e-01       1.30e-14
+    noiseF_grid48      gain@E_true        0.0850    7.1072  -0.123    -12.252    12   0.0000 7.383e-01       3.50e-14
+    noiseF_grid48      gain@E132          0.2674    7.3747  -0.134    -28.294    11   0.3228 2.048e+00       5.57e-14
+    noiseF_grid48      alphaE+gain        0.5001    3.7770  -0.077     -1.190     3   0.9251 5.713e-01       0.00e+00
+    noiseF_grid48      boxFISTA@E132      0.2546    1.4214   0.282      1.177     0   0.3228 2.068e+00       0.00e+00
+    noiseF_grid48      boxFISTA@alphaE    0.4814    2.3719   0.224      0.902     0   0.9251 5.737e-01       0.00e+00
+  [derivedF_15px] ||b|| 0.00618  ||A_E E_true|| 0.2066  ||A_g g_true|| 0.009263  elastic/active 22.30x  ||A_E E_true||/||b|| 33.43x
+    derivedF_15px      joint              0.5326    2.9118   0.199      1.303     1   0.9986 5.826e-01       4.70e-13
+    derivedF_15px      gain@E_true        5.7645  162.8325  -0.139   -853.167    44   0.0000 3.303e+01       1.19e-13
+    derivedF_15px      gain@E132          5.7897  167.1654  -0.136   -957.813    44   0.3228 3.063e+01       1.19e-13
+    derivedF_15px      alphaE+gain        0.5404    3.1697  -0.076     -1.196     4   0.9977 5.879e-01       0.00e+00
+    derivedF_15px      boxFISTA@E132      0.8577    3.6246   0.417      2.783     0   0.3228 3.076e+01       0.00e+00
+    derivedF_15px      boxFISTA@alphaE    0.5112    2.8317   0.206      0.834     0   0.9977 5.921e-01       0.00e+00
+
+[controls] joint med|dE/E|, frame cadence: got {'clean': 0.0078, 'noiseF_grid48': 0.8416, 'derivedF_15px': 0.9986}
+           alpha (global stiffness scale the data wants on E=132): {'clean': 0.08181, 'noiseF_grid48': 0.07293, 'derivedF_15px': 0.00223}
+    tick 165: ref in 8s; RAW peak_excursion 0.007723 (registry null 0.0011); RAW path_length 0.030852 (registry null 0.0042)
+      theta_true                           [8s]
+      null_gain_true_at_E132               [8s]
+      derivedF_15px|gain@E132              [8s]
+      derivedF_15px|alphaE+gain            [8s]
+      derivedF_15px|boxFISTA@E132          [8s]
+      derivedF_15px|boxFISTA@alphaE        [8s]
+      derivedF_15px|joint                  [8s]
+      clean|gain@E132                      [8s]
+      clean|alphaE+gain                    [8s]
+    tick 170: ref in 8s; RAW peak_excursion 0.006622 (registry null 0.0011); RAW path_length 0.029628 (registry null 0.0042)
+      theta_true                           [8s]
+      null_gain_true_at_E132               [8s]
+      derivedF_15px|gain@E132              [8s]
+      derivedF_15px|alphaE+gain            [8s]
+      derivedF_15px|boxFISTA@E132          [8s]
+      derivedF_15px|boxFISTA@alphaE        [8s]
+      derivedF_15px|joint                  [8s]
+      clean|gain@E132                      [8s]
+      clean|alphaE+gain                    [8s]
+    tick 180: ref in 8s; RAW peak_excursion 0.009570 (registry null 0.0011); RAW path_length 0.031857 (registry null 0.0042)
+      theta_true                           [8s]
+      null_gain_true_at_E132               [8s]
+      derivedF_15px|gain@E132              [8s]
+      derivedF_15px|alphaE+gain            [8s]
+      derivedF_15px|boxFISTA@E132          [8s]
+      derivedF_15px|boxFISTA@alphaE        [8s]
+      derivedF_15px|joint                  [8s]
+      clean|gain@E132                      [8s]
+      clean|alphaE+gain                    [8s]
+    tick 185: ref in 8s; RAW peak_excursion 0.011562 (registry null 0.0011); RAW path_length 0.032167 (registry null 0.0042)
+      theta_true                           [8s]
+      null_gain_true_at_E132               [8s]
+      derivedF_15px|gain@E132              [8s]
+      derivedF_15px|alphaE+gain            [8s]
+      derivedF_15px|boxFISTA@E132          [8s]
+      derivedF_15px|boxFISTA@alphaE        [8s]
+      derivedF_15px|joint                  [8s]
+      clean|gain@E132                      [8s]
+      clean|alphaE+gain                    [8s]
+    tick 195: ref in 8s; RAW peak_excursion 0.012011 (registry null 0.0011); RAW path_length 0.031032 (registry null 0.0042)
+      theta_true                           [8s]
+      null_gain_true_at_E132               [8s]
+      derivedF_15px|gain@E132              [8s]
+      derivedF_15px|alphaE+gain            [8s]
+      derivedF_15px|boxFISTA@E132          [8s]
+      derivedF_15px|boxFISTA@alphaE        [8s]
+      derivedF_15px|joint                  [8s]
+      clean|gain@E132                      [8s]
+      clean|alphaE+gain                    [8s]
+    tick 200: ref in 8s; RAW peak_excursion 0.012001 (registry null 0.0011); RAW path_length 0.031446 (registry null 0.0042)
+      theta_true                           [8s]
+      null_gain_true_at_E132               [8s]
+      derivedF_15px|gain@E132              [8s]
+      derivedF_15px|alphaE+gain            [8s]
+      derivedF_15px|boxFISTA@E132          [8s]
+      derivedF_15px|boxFISTA@alphaE        [8s]
+      derivedF_15px|joint                  [8s]
+      clean|gain@E132                      [8s]
+      clean|alphaE+gain                    [8s]
+
+[r] the statistic on two DISJOINT tick triples.
+    imported null bar (registry N0 / this sheet's floors): min 6.65, peak_excursion 8.71
+    ON-SHEET null bar (a frozen sheet, scored the same way):  95.06
+    candidate                                    A         B limiting(A)       info
+    theta_true                                0.00      0.00 path_length       True
+    null_gain_true_at_E132                    5.32      4.44 peak_excursion    True
+    derivedF_15px|gain@E132                  90.20     97.27 peak_excursion   False
+    derivedF_15px|alphaE+gain                25.53     26.66 peak_excursion   False
+    derivedF_15px|boxFISTA@E132              87.70     88.71 peak_excursion   False
+    derivedF_15px|boxFISTA@alphaE            25.24     26.42 peak_excursion   False
+    derivedF_15px|joint                      25.26     26.63 peak_excursion   False
+    clean|gain@E132                           6.93      5.93 peak_excursion    True
+    clean|alphaE+gain                        25.91     30.79 peak_excursion   False
+    ON-SHEET NULL (frozen sheet)             95.06     94.98 peak_excursion   False
+
+wrote p1x.json [526s]
