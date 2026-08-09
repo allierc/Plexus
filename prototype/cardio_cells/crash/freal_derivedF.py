@@ -81,9 +81,10 @@ from crash_round2 import percell_amplitude, r2_percell             # noqa: E402
 from crash_round3 import scale2, t2_of                             # noqa: E402
 from finject import lerp, hold, assemble_inj, y_of, record_substeps  # noqa: E402
 from refute_round3 import advance                                  # noqa: E402
-from round5_fit import SNAP                                        # noqa: E402
+from round5_fit import SNAP, SIGMA_F                               # noqa: E402
 from round5_solve import pstats                                    # noqa: E402
 from round5_score import gauge_grid                                # noqa: E402
+from refute5_fit import NoiseF                                     # noqa: E402
 
 PX = 4.88e-4                      # 1 recording pixel in world units (finject.py:400)
 GRID_PX = 15.0                    # the recording's control-point spacing, in pixels
@@ -343,11 +344,31 @@ def attenuation(Fd, Ft, mask=None):
     ref = (Ft - I2).reshape(-1, 4).abs()
     return {"ls_scale": sc, "ls_scale_trim99": sct, "corr": co,
             "med_abs_disagree": float(dev.median()),
+            "rms_abs_disagree": float(dev.pow(2).mean().sqrt()),
+            "p99_abs_disagree": float(torch.quantile(dev.reshape(-1), 0.99)),
             "p90_abs_disagree": float(torch.quantile(dev.reshape(-1), 0.90)),
             "med_abs_F_minus_I": float(ref.median()),
             "med_abs_Fd_minus_I": float((Fd - I2).reshape(-1, 4).abs().median()),
             "disagree_over_FmI": float(dev.median() / (ref.median() + 1e-300)),
             "rel_fro": rel(Fd, Ft)}
+
+
+def dist_to_other_cell(X, cid, chunk=1000):
+    """Distance, in the reference configuration, to the nearest particle of a DIFFERENT cell.
+
+    The displacement field has a KINK at a cell boundary (E runs 40-220 between neighbours), and a
+    central difference straddling one is differentiating across a discontinuity in the gradient.
+    This is the statistic that says whether the derived F's error is a boundary effect.
+    """
+    N = X.shape[0]
+    out = torch.full((N,), float("inf"), device=X.device, dtype=X.dtype)
+    for a0 in range(0, N, chunk):
+        a1 = min(a0 + chunk, N)
+        d2 = (X[None, a0:a1, :] - X[:, None, :]).pow(2).sum(-1)
+        same = cid[:, None] == cid[None, a0:a1]
+        d2 = d2.masked_fill(same, float("inf"))
+        out[a0:a1] = d2.min(0).values.sqrt()
+    return out
 
 
 # --------------------------------------------------------------------------------------------- #
@@ -538,6 +559,28 @@ def main():
                         f"{float(E.abs().median()):>9.2e} {float(mean_e.abs().median()):>11.2e}")
             R["static_bias"] = sb
 
+            # -- d4: is the error a CELL-BOUNDARY effect? ----------------------------------------
+            dbnd = dist_to_other_cell(X0, sy.cid)
+            log(f"\n    [d4] error vs distance to the nearest particle of another cell "
+                f"(median {float(dbnd.median()):.4f} world = {float(dbnd.median())/p_sp:.2f} "
+                f"particle spacings)")
+            log(f"    {'m':>5s} {'h_px':>6s} {'deep(>2h)':>10s} {'nd':>5s} {'near(<=h)':>10s} "
+                f"{'nn':>5s} {'ratio':>6s}")
+            d4 = []
+            for m in m_list:
+                for hp in hs_px:
+                    Fd = derF(m, hp, B[k0]["x0"])
+                    e = (Fd - Ft0).abs().reshape(-1, 4)
+                    deep = interior & (dbnd > 2 * hp * PX)
+                    near = interior & (dbnd <= hp * PX)
+                    md = float(e[deep].median()) if int(deep.sum()) > 0 else float("nan")
+                    mn = float(e[near].median()) if int(near.sum()) > 0 else float("nan")
+                    d4.append({"m": m, "h_px": hp, "med_deep": md, "n_deep": int(deep.sum()),
+                               "med_near": mn, "n_near": int(near.sum()), "ratio": mn / md})
+                    log(f"    {m:>5d} {hp:>6.1f} {md:>10.2e} {int(deep.sum()):>5d} "
+                        f"{mn:>10.2e} {int(near.sum()):>5d} {mn/md:>6.2f}")
+            R["cell_boundary"] = d4
+
         # ------------------------------------------------------------------ stage f ------------ #
         thetas, R["fits"] = {}, {}
         if "f" in a.stages or "r" in a.stages:
@@ -576,14 +619,54 @@ def main():
                                                             F_ref=REF[r]["F"])[0])
                 INJ.append((f"F_kin_lsq_m{m}", i0, i1))
 
+            # ---- ROUND 5'S OWN ERROR MODEL, on this instrument, at this frame ------------------ #
+            # The comparison the whole experiment exists to make: synthetic noise of the same
+            # nominal size, drawn the two ways round 5 and its refutation drew it, fitted with the
+            # identical single-frame solve.  sigma_F/2 coherent at each frame boundary, then lerp
+            # (finject._noise_F), sigma_F = 3.9e-3 from the recording.
+            noise_ctrl = {}
+            for mode, nodes in (("indep", 0), ("grid", 48)):
+                NF = NoiseF(mode, B[k0]["x0"], nodes, dev, f64)
+                gn_ = torch.Generator(device=dev).manual_seed(90210)
+                e0, e1 = (SIGMA_F / 2.0) * NF(gn_), (SIGMA_F / 2.0) * NF(gn_)
+                eh0, eh1 = (SIGMA_F / 2.0) * NF(gn_), (SIGMA_F / 2.0) * NF(gn_)
+                nm = f"F_noise_{mode}{nodes if nodes else ''}_sF{SIGMA_F:g}"
+                noise_ctrl[nm] = float(e0.abs().median())
+                INJ.append((nm, lerp(B[k0]["F0"] + e0, B[k0]["F1"] + e1, n),
+                            lerp(B[hk]["F0"] + eh0, B[hk]["F1"] + eh1, n)))
+            R["noise_control_median_abs_error"] = noise_ctrl
+
+            # ---- the SENSITIVITY family: F_true + eps (F_measured - F_true) -------------------- #
+            # Injection error enters linearly (freal_probe2: 0.0053 + 0.200 eps at m=2, h=15px), so
+            # a few rungs turn "how accurate must F be?" into a number instead of an adjective.
+            sens_src = (m_grid, min(fit_px))
+            sm, shp = sens_src
+            sf0, sf1 = derF(sm, shp, B[k0]["x0"]), derF(sm, shp, B[k0]["x_next"])
+            sh0, sh1 = derF(sm, shp, B[hk]["x0"]), derF(sm, shp, B[hk]["x_next"])
+            for eps in (0.03, 0.1, 0.3):
+                INJ.append((f"F_eps{eps:g}_m{sm}_{shp:g}px",
+                            lerp(B[k0]["F0"] + eps * (sf0 - B[k0]["F0"]),
+                                 B[k0]["F1"] + eps * (sf1 - B[k0]["F1"]), n),
+                            lerp(B[hk]["F0"] + eps * (sh0 - B[hk]["F0"]),
+                                 B[hk]["F1"] + eps * (sh1 - B[hk]["F1"]), n)))
+            R["sensitivity_source"] = {"m": sm, "h_px": shp,
+                                       "med_abs_err_interior":
+                                           float((sf0 - B[k0]["F0"])[interior].abs().median())}
+
             log(f"\n[f] FIT, single frame at tick {k0}, ridge0, displacement read-out; held-out "
                 f"one-frame residual at tick {hk} with the SAME measurement there.")
-            log(f"    {'variant':<20s} {'medE':>8s} {'p90E':>8s} {'relL2':>8s} {'negE':>5s} "
-                f"{'corrE':>7s} {'meanrat':>8s} {'fit_res':>9s} {'hold_ownF':>10s} "
-                f"{'hold_simF':>10s} {'ctrl':>8s}")
+            inj_true = lerp(B[k0]["F0"], B[k0]["F1"], n)
+            log(f"    {'variant':<24s} {'errF_med':>9s} {'errF_rms':>9s} {'medE':>8s} "
+                f"{'p90E':>8s} {'relL2':>8s} {'negE':>5s} {'corrE':>7s} {'meanrat':>8s} "
+                f"{'fit_res':>9s} {'hold_ownF':>10s} {'hold_simF':>10s} {'ctrl':>8s}")
             tgt = {"none": 0.2572, "F_hold_simF": 0.1401, "F_lerp_simF": 0.0078}
             for name, iF, iFh in INJ:
                 tc = time.time()
+                if iF is None:
+                    ef_med = ef_rms = float("nan")
+                else:
+                    de = (iF - inj_true)[:, interior].abs()
+                    ef_med, ef_rms = float(de.median()), float(de.pow(2).mean().sqrt())
                 for kk, vv in B[k0]["snap"].items():
                     setattr(sy, kk, vv.clone())
                 A, y0, _ = assemble_inj(sy, n, iF, None)
@@ -600,17 +683,18 @@ def main():
                 ho_sim = holdout(t_hat, injh_true)
                 thetas[name] = t_hat.clone()
                 R["fits"][name] = {"pstats": ps, "fit_residual": fit_res, "cond": cond,
+                                   "injectedF_err_med": ef_med, "injectedF_err_rms": ef_rms,
                                    "holdout_ownF": ho_own, "holdout_simF": ho_sim,
                                    "seconds": time.time() - tc}
                 dd = f"{ps['med_E']-tgt[name]:+.4f}" if name in tgt else ""
-                log(f"    {name:<20s} {ps['med_E']:>8.4f} {ps['p90_E']:>8.4f} "
-                    f"{ps['rel_l2']:>8.4f} {ps['n_negE']:>5d} {ps['corr_E']:>7.4f} "
-                    f"{ps['mean_ratio_E']:>8.4f} {fit_res:>9.3e} {ho_own:>10.5f} "
-                    f"{ho_sim:>10.5f} {dd:>8s}")
+                log(f"    {name:<24s} {ef_med:>9.2e} {ef_rms:>9.2e} {ps['med_E']:>8.4f} "
+                    f"{ps['p90_E']:>8.4f} {ps['rel_l2']:>8.4f} {ps['n_negE']:>5d} "
+                    f"{ps['corr_E']:>7.4f} {ps['mean_ratio_E']:>8.4f} {fit_res:>9.3e} "
+                    f"{ho_own:>10.5f} {ho_sim:>10.5f} {dd:>8s}")
 
             R["holdout_floor"] = {"theta_true_simF": holdout(th, injh_true)}
             for name, iF, iFh in INJ:
-                if iFh is not None and name.startswith(("F_der", "F_kin")):
+                if iFh is not None and name != "F_lerp_simF":
                     R["holdout_floor"][f"theta_true_{name}"] = holdout(th, iFh)
             log(f"    held-out floor at theta_true (the measurement's OWN irreducible residual):")
             for kk, vv in R["holdout_floor"].items():

@@ -686,8 +686,10 @@ def main():
                                 "t2": R3.t2_of(m20)}
 
                     R["I_rollouts"] = {}
+                    ROLL = ["theta_true", "none", "F_lerp_TRUE", "F_nearest", "F_bilinear",
+                            "F_taylor_lsfull", "blend0.01", "blend0.1"]
                     log(f"\n[I.rollout] free {G}-frame rollout, margin 20, 2-D gauge")
-                    for nm in ["theta_true"] + [v[0] for v in LAD]:
+                    for nm in ROLL:
                         theta = th if nm == "theta_true" else thetas[nm]
                         raw = scored(theta)
 
