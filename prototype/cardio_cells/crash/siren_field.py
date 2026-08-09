@@ -199,8 +199,16 @@ class Field(torch.nn.Module):
 
 
 def fit_field(P, T, U, omega, hidden, layers, iters, lr, tw, dtype, device, seed=0, log=None,
-              batch=0):
-    """Least-squares fit of u_hat to the observed node displacements.  P [M,2], T [nT,1], U [nT,M,2]."""
+              batch=0, val_frac=0.1, val_every=250):
+    """Least-squares fit of u_hat to the observed node displacements.  P [M,2], T [nT,1], U [nT,M,2].
+
+    MODEL SELECTION IS ORACLE-FREE.  A random `val_frac` of the control NODES (whole nodes, all
+    frames, so the split tests spatial generalisation and not memorisation of one frame) is held
+    out; the returned field is the iterate with the lowest held-out error, not the last one.  This
+    matters: a SIREN at omega=30 drives the TRAINING residual to 4e-4 px and its analytic gradient
+    is still nonsense, because it oscillates between the nodes it interpolates.  The held-out
+    residual sees that, and it needs nothing from the simulator.
+    """
     torch.manual_seed(seed)
     nT, M, _ = U.shape
     Xc = P.mean(0)
@@ -211,31 +219,61 @@ def fit_field(P, T, U, omega, hidden, layers, iters, lr, tw, dtype, device, seed
     us = float(U.reshape(-1, 2).std())
     fld = Field(Xc, Xs, tc, ts, uc, us, omega, hidden, layers, tw, dtype).to(device)
 
+    gperm = torch.Generator(device="cpu").manual_seed(1234)
+    nval = int(round(val_frac * M))
+    perm = torch.randperm(M, generator=gperm).to(device)
+    vnode, tnode = perm[:nval], perm[nval:]
+
+    def flat(nodes):
+        return (torch.arange(nT, device=device)[:, None] * M + nodes[None, :]).reshape(-1)
+
     Pg = P.repeat(nT, 1).to(dtype)                                   # [nT*M, 2]
     Tg = T.repeat_interleave(M, 0).to(dtype)                         # [nT*M, 1]
     Yg = ((U.reshape(-1, 2) - uc) / us).to(dtype)
-    C_in = fld.coords(Pg, Tg).detach()
+    C_all = fld.coords(Pg, Tg).detach()
+    itr, iva = flat(tnode), flat(vnode)
+    C_in, Y_in = C_all[itr], Yg[itr]
+    C_va, Y_va = C_all[iva], Yg[iva]
 
     opt = torch.optim.Adam(fld.net.parameters(), lr=lr)
     sch = torch.optim.lr_scheduler.CosineAnnealingLR(opt, iters, eta_min=lr * 1e-2)
     N = C_in.shape[0]
+    best = (float("inf"), -1, None)
+    hist = []
     for it in range(iters):
         if batch and batch < N:
             idx = torch.randint(0, N, (batch,), device=device)
-            loss = (fld.net(C_in[idx]) - Yg[idx]).pow(2).mean()
+            loss = (fld.net(C_in[idx]) - Y_in[idx]).pow(2).mean()
         else:
-            loss = (fld.net(C_in) - Yg).pow(2).mean()
+            loss = (fld.net(C_in) - Y_in).pow(2).mean()
         opt.zero_grad(set_to_none=True)
         loss.backward()
         opt.step()
         sch.step()
+        if (it % val_every == 0 or it == iters - 1) and nval > 0:
+            with torch.no_grad():
+                vm = float((fld.net(C_va) - Y_va).pow(2).mean())
+            hist.append([it, float(loss), vm])
+            if vm < best[0]:
+                best = (vm, it, {k: v.detach().clone() for k, v in fld.net.state_dict().items()})
         if log is not None and (it % max(1, iters // 4) == 0 or it == iters - 1):
-            log(f"      it {it:6d}  mse {float(loss):.3e}  rms {math.sqrt(float(loss))*us/PX:.4f} px")
+            tr = math.sqrt(float(loss)) * us / PX
+            va = math.sqrt(hist[-1][2]) * us / PX if hist else float("nan")
+            log(f"      it {it:6d}  train {tr:9.4f} px   val {va:9.4f} px")
+    final_val = math.sqrt(hist[-1][2]) * us if hist else float("nan")
+    if best[2] is not None:
+        fld.net.load_state_dict(best[2])
     with torch.no_grad():
-        res = (fld.net(C_in) - Yg)
-        node_rel = float(res.norm() / (Yg.norm() + 1e-30))
+        res = (fld.net(C_in) - Y_in)
+        node_rel = float(res.norm() / (Y_in.norm() + 1e-30))
         node_rms_world = float(res.pow(2).mean().sqrt() * us)
+        vres = (fld.net(C_va) - Y_va) if nval > 0 else res
+        val_rms_world = float(vres.pow(2).mean().sqrt() * us)
+        val_rel = float(vres.norm() / (Y_va.norm() + 1e-30)) if nval > 0 else node_rel
     return fld, {"node_rel_centred": node_rel, "node_rms_world": node_rms_world,
+                 "val_rel_centred": val_rel, "val_rms_world": val_rms_world,
+                 "val_rms_world_final_iter": final_val, "best_iter": int(best[1]),
+                 "n_val_nodes": int(nval),
                  "u_scale": us, "X_scale": Xs, "t_scale": ts, "n_train": int(N)}
 
 
@@ -335,6 +373,9 @@ def main():
     ap.add_argument("--batch", type=int, default=0, help="0 = full batch")
     ap.add_argument("--fit-dtype", default="float32", choices=("float32", "float64"))
     ap.add_argument("--mlag", type=int, default=2, help="short reference lag for the relative-F row")
+    ap.add_argument("--val-frac", type=float, default=0.1,
+                    help="fraction of control NODES held out for oracle-free model selection")
+    ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--cache", default="")
     a = ap.parse_args()
 
@@ -435,6 +476,15 @@ def main():
             Fcd = derive_F(cg, X0, B[k]["x0"])
             rows_abs.append(report_row("central diff m=165", Fcd, Ft, interior, cid, Cn,
                                        ct_true=ctT))
+            # NO GRID AT ALL: per-particle weighted least-squares gradient of the displacement.
+            # This is the finest kinematic gradient that exists, and it is the control that decides
+            # whether the m=165 gap is a DISCRETISATION problem (then this row is good) or an
+            # accumulated-reference problem (then this row is as bad as the grid).
+            if a.lsq:
+                Flq, nnb = particle_lsq_F(X0, B[k]["x0"], a.lsq_radius * p_sp, chunk=500)
+                rows_abs.append(report_row("particle lsq m=165 (no grid)", Flq, Ft, interior,
+                                           cid, Cn, ct_true=ctT,
+                                           extra={"mean_neighbours": nnb}))
             # relative, short lag m: dF between t-m and t, composed with the TRUE F(t-m) (oracle)
             m = a.mlag
             if (k - m) in B:
@@ -445,6 +495,11 @@ def main():
                                            ct_true=ctT))
                 rows_rel.append(report_row(f"central diff m={m}", Frel, Ft, interior, cid, Cn,
                                            ct_true=ctT))
+                if a.lsq:
+                    Flq, _ = particle_lsq_F(B[k - m]["x0"], B[k]["x0"], a.lsq_radius * p_sp,
+                                            chunk=500, F_ref=B[k - m]["F0"])
+                    rows_rel.append(report_row(f"particle lsq m={m} (no grid)", Flq, Ft, interior,
+                                               cid, Cn, ct_true=ctT))
             R["tables"][key]["ticks"][str(k)] = {"abs": rows_abs, "rel": rows_rel}
 
         # ---- v and C by centred difference (the controls 0.0227 / 0.0101) -------------------- #
@@ -469,10 +524,14 @@ def main():
             log(f"\n[fit] h={hpx:g}px omega={om:g} hidden={a.hidden} layers={a.layers} "
                 f"iters={a.iters} dtype={a.fit_dtype}")
             fld, fi = fit_field(P, Tall, U, om, a.hidden, a.layers, a.iters, a.lr, a.tw,
-                                fdt, dev, log=log, batch=a.batch)
+                                fdt, dev, log=log, batch=a.batch, val_frac=a.val_frac,
+                                seed=a.seed)
             fi["seconds"] = time.time() - t_om
-            log(f"      node fit: rel(centred) {fi['node_rel_centred']:.3e}  rms "
-                f"{fi['node_rms_world']:.3e} world ({fi['node_rms_world']/PX:.3f} px)")
+            log(f"      node fit: train rms {fi['node_rms_world']/PX:.4f} px (rel "
+                f"{fi['node_rel_centred']:.2e}) | HELD-OUT nodes rms {fi['val_rms_world']/PX:.4f} px "
+                f"(rel {fi['val_rel_centred']:.2e}) | best iter {fi['best_iter']} of {a.iters} "
+                f"(val at last iter {fi['val_rms_world_final_iter']/PX:.4f} px) "
+                f"[{fi['seconds']:.0f}s]")
 
             Xf = X0.to(fdt)
             for k in ev_ticks:
@@ -526,14 +585,79 @@ def main():
                 f"(slope {cv['v_slope']:.4f})  C_rel[simF] {cv['C_centred_simF_rel']:.4f} "
                 f"(slope {cv['C_slope_simF']:.4f})  C_rel[derF] {cv['C_centred_derF_rel']:.4f}")
             log(f"        SIREN")
-            log(f"  {'omega':>8s} {'u_rel(part)':>12s} {'u_rms_px':>9s} {'v_rel':>8s} "
-                f"{'v_slope':>8s} {'C_rel':>9s} {'C_slope':>8s}")
+            log(f"  {'omega':>8s} {'trainpx':>9s} {'valpx':>9s} {'u_rel(part)':>12s} "
+                f"{'u_px(part)':>10s} {'v_rel':>9s} {'v_slope':>8s} {'C_rel':>10s} {'C_slope':>9s}")
             for r in slot["abs"]:
                 if "omega" not in r:
                     continue
-                log(f"  {r['omega']:8g} {r['u_rel_particles']:12.4e} "
-                    f"{r['u_rms_world']/PX:9.4f} {r['v_rel']:8.4f} {r['v_slope']:8.4f} "
-                    f"{r['C_rel']:9.4f} {r['C_slope']:8.4f}")
+                log(f"  {r['omega']:8g} {r['node_rms_world']/PX:9.4f} {r['val_rms_world']/PX:9.4f} "
+                    f"{r['u_rel_particles']:12.4e} {r['u_rms_world']/PX:10.4f} {r['v_rel']:9.4f} "
+                    f"{r['v_slope']:8.4f} {r['C_rel']:10.4f} {r['C_slope']:9.4f}")
+
+    # ------------------------------------------------------------------------------------------ #
+    #  DIAGNOSTIC, NOT A CANDIDATE ESTIMATOR.  The same SIREN fitted to the UNBINNED per-particle
+    #  displacement.  A recording cannot do this -- it is the "cheating" sampling -- but it is the
+    #  control that separates the two possible causes of a bad F: information destroyed by the
+    #  control-grid binning (then this row is good and the grid rows are bad) versus the reference
+    #  lag / the network itself (then this row is bad too).
+    # ------------------------------------------------------------------------------------------ #
+    pc_om = [float(x) for x in a.pc_omegas.split(",") if x.strip()]
+    if pc_om:
+        Up = torch.stack([B[t]["x0"] - X0 for t in ticks])
+        log(f"\n{'='*118}\n[DIAGNOSTIC] SIREN on the UNBINNED particle displacement "
+            f"({Np} points x {len(ticks)} frames).  Not realizable; it isolates the cause.")
+        R["tables"]["particles"] = {"h_px": None, "n_valid": Np, "ticks": {}}
+        for k in ev_ticks:
+            Ft = B[k]["F0"]
+            ctT = cell_contrast(Ft, cid, interior, Cn)
+            R["tables"]["particles"]["ticks"][str(k)] = {
+                "abs": [report_row("true F (simulator)", Ft, Ft, interior, cid, Cn, ct_true=ctT)],
+                "rel": []}
+        for om in pc_om:
+            t_om = time.time()
+            log(f"\n[fit-particles] omega={om:g}")
+            fld, fi = fit_field(X0, Tall, Up, om, a.hidden, a.layers, a.iters, a.lr, a.tw,
+                                fdt, dev, log=log, batch=a.batch, val_frac=a.val_frac, seed=a.seed)
+            fi["seconds"] = time.time() - t_om
+            log(f"      train rms {fi['node_rms_world']/PX:.4f} px | HELD-OUT particles rms "
+                f"{fi['val_rms_world']/PX:.4f} px | best iter {fi['best_iter']} [{fi['seconds']:.0f}s]")
+            Xf = X0.to(fdt)
+            for k in ev_ticks:
+                tk = torch.full((Np, 1), float(k * dt), device=dev, dtype=fdt)
+                u_h, F_h, v_h, C_h = fld.derivs(Xf, tk)
+                u_h, F_h, v_h, C_h = (q.to(X0.dtype) for q in (u_h, F_h, v_h, C_h))
+                Ft, vt, Ct = B[k]["F0"], B[k]["v0"], B[k]["C0"]
+                slot = R["tables"]["particles"]["ticks"][str(k)]
+                ctT = cell_contrast(Ft, cid, interior, Cn)
+                row = report_row(f"SIREN-part omega={om:g}", F_h, Ft, interior, cid, Cn,
+                                 extra={"omega": om, **fi}, ct_true=ctT)
+                row["u_rel_particles"] = rel(u_h[interior], (B[k]["x0"] - X0)[interior])
+                row["u_rms_world"] = float((u_h - (B[k]["x0"] - X0))[interior].pow(2).mean().sqrt())
+                row["v_rel"] = rel(v_h[interior], vt[interior])
+                row["v_slope"] = float((v_h[interior].reshape(-1) @ vt[interior].reshape(-1))
+                                       / (vt[interior].reshape(-1) @ vt[interior].reshape(-1)))
+                row["C_rel"] = rel(C_h[interior], Ct[interior])
+                row["C_slope"] = float((C_h[interior].reshape(-1) @ Ct[interior].reshape(-1))
+                                       / (Ct[interior].reshape(-1) @ Ct[interior].reshape(-1)))
+                slot["abs"].append(row)
+            del fld
+            torch.cuda.empty_cache()
+            dump()
+        for k in ev_ticks:
+            slot = R["tables"]["particles"]["ticks"][str(k)]
+            log(f"\n---- UNBINNED particle sampling (diagnostic), tick {k} ----------------------"
+                f"----------------------------------------")
+            log(HDR)
+            for r in slot["abs"]:
+                log(fmt(r))
+            log(f"  {'omega':>8s} {'trainpx':>9s} {'valpx':>9s} {'u_rel(part)':>12s} "
+                f"{'u_px(part)':>10s} {'v_rel':>9s} {'v_slope':>8s} {'C_rel':>10s} {'C_slope':>9s}")
+            for r in slot["abs"]:
+                if "omega" not in r:
+                    continue
+                log(f"  {r['omega']:8g} {r['node_rms_world']/PX:9.4f} {r['val_rms_world']/PX:9.4f} "
+                    f"{r['u_rel_particles']:12.4e} {r['u_rms_world']/PX:10.4f} {r['v_rel']:9.4f} "
+                    f"{r['v_slope']:8.4f} {r['C_rel']:10.4f} {r['C_slope']:9.4f}")
 
     R["wall_seconds"] = time.time() - t_start
     dump()
