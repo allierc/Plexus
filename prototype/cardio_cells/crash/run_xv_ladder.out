@@ -1,0 +1,75 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 163 frames; window A = ticks 14..163 recorded
+[collect] boundaries 163..182, C=100 Np=10000 n_sub=10 dt=0.002 [23s]
+
+[series] rel error of the injected series against the reference substep values
+    lerp:  F 4.584e-04  C 1.799e-01  x 7.294e-06  v 1.435e-02
+    hold:  F 4.878e-03  C 3.520e-01  x 6.497e-04  v 4.362e-02
+    frame-start derived state: v0 0.0100  C0 0.1381   (x0, F0 are measured exactly)
+
+[p] PREFLIGHT: the two claims the last-substep rule rests on
+    free run reproduces the reference displacement to 0.000e+00 world
+    injecting the ORACLE (F,C,x,v) at 0..n-2 (+F at n-1) is a no-op to 0.000e+00 world
+    injecting C and v at the LAST substep changes nothing: 0.000e+00 world  <- the rule is not a fudge, post-gather C and v at substep n-1 are provably unused
+
+[R] REPRODUCE THE STATED CONTROLS (single frame, tick 165, ridge0)
+    control                                medE   target      delta
+    none (no injection, frame cadence)   0.2572   0.2572   -3.2e-05
+    F_lerp, oracle v0 C0                 0.0078   0.0078   -2.3e-05
+    F_lerp, v derived (centred)          0.0227   0.0227   +7.0e-06
+    F_lerp, C derived (centred)          0.0101   0.0101   -1.7e-05
+    F_lerp, C derived (forward)          0.0125   0.0252   -1.3e-02
+    F_lerp, v+C derived (centred)        0.0218      nan           
+
+[H] HELD-OUT PROTOCOL at tick 180, |y_obs| 4.6926e-02: floor and zero-information band
+    theta_true (floor)         oracleState 0.00474   derivedState 0.01935
+    theta permuted (null)      oracleState 0.59239   derivedState 0.59423
+    theta = block mean (null)  oracleState 0.49902   derivedState 0.50178
+    theta = 0 (null)           oracleState 0.16934   derivedState 0.15450
+
+[l] THE EXTENDED LADDER, frame cadence (n_sub=10), displacement read-out, ZERO measurement noise
+    injection at substeps 0..8 for x,v,C (post-gather) and 0..9 for F
+    flavour    rung    affinity      bias     medE     medg  ho_orc  ho_der      |A|F      smin   carry  wrongth      cond
+    realizable none    5.15e-01  5.38e-03   0.2740   0.2098  0.0790  0.0678  2.36e-02  7.14e-08  0.0729 1.46e-01  3.94e+10
+    realizable F       8.04e-02  7.63e-03   0.0218   0.0503  0.0089  0.0174  2.67e-02  7.58e-08  0.0722 1.94e-01  4.40e+10
+    realizable C       3.10e-02  6.45e-03   0.0234   0.0505  0.0094  0.0178  2.03e-02  6.56e-08  0.0707 1.45e-01  3.37e+10
+    realizable FC      3.12e-02  8.92e-03   0.0121   0.0534  0.0098  0.0216  2.03e-02  6.56e-08  0.0698 1.45e-01  3.38e+10
+    realizable x       8.32e-01  3.61e-03   0.6418   0.3482  0.1412  0.1275  3.98e-03  1.06e-08  0.0124 2.33e-02  5.17e+10
+    realizable v       6.18e-01  1.08e-02   0.2230   0.1801  0.0615  0.0547  6.25e-03  2.44e-08  0.0208 3.77e-02  2.33e+10
+    realizable Fv      7.70e-02  1.22e-02   0.0541   0.3037  0.0251  0.0364  7.32e-03  2.48e-08  0.0203 5.34e-02  3.07e+10
+    realizable FCv     3.42e-02  1.22e-02   0.0713   0.3075  0.0393  0.0494  5.52e-03  2.39e-08  0.0184 4.01e-02  1.88e+10
+    realizable Fx      6.54e-04  3.71e-03   0.2463   0.2912  0.0460  0.0332  4.85e-03  1.20e-08  0.0124 3.58e-02  5.95e+10
+    realizable FCx     1.36e-04  3.73e-03   0.2919   0.2861  0.0535  0.0405  3.43e-03  9.45e-09  0.0120 2.45e-02  4.68e+10
+    realizable FCvx    2.86e-04  3.71e-03   0.6887   2.9443  0.1394  0.1278  5.87e-04  2.39e-09  0.0019 4.30e-03  2.15e+10
+
+    oracle     none    5.15e-01  0.00e+00   0.2572   0.2486  0.0780  0.0673  2.36e-02  7.14e-08  0.0730 1.47e-01  3.95e+10
+    oracle     F       7.97e-02  0.00e+00   0.0091   0.0062  0.0068  0.0179  2.67e-02  7.58e-08  0.0730 1.94e-01  4.40e+10
+    oracle     C       3.11e-02  0.00e+00   0.0038   0.0024  0.0053  0.0186  2.03e-02  6.56e-08  0.0703 1.45e-01  3.38e+10
+    oracle     FC      3.11e-02  0.00e+00   0.0038   0.0024  0.0053  0.0186  2.03e-02  6.56e-08  0.0703 1.45e-01  3.38e+10
+    oracle     x       8.28e-01  0.00e+00   0.5159   0.4204  0.1333  0.1210  3.98e-03  1.06e-08  0.0125 2.33e-02  5.18e+10
+    oracle     v       6.26e-01  0.00e+00   0.2596   0.2586  0.0624  0.0524  6.24e-03  2.44e-08  0.0205 3.77e-02  2.33e+10
+    oracle     Fv      7.64e-02  0.00e+00   0.0034   0.0020  0.0066  0.0197  7.34e-03  2.48e-08  0.0205 5.35e-02  3.08e+10
+    oracle     FCv     3.41e-02  0.00e+00   0.0018   0.0013  0.0053  0.0193  5.53e-03  2.39e-08  0.0186 4.02e-02  1.88e+10
+    oracle     Fx      6.47e-04  0.00e+00   0.0000   0.0000  0.0047  0.0194  4.86e-03  1.20e-08  0.0125 3.58e-02  5.95e+10
+    oracle     FCx     1.35e-04  0.00e+00   0.0000   0.0000  0.0047  0.0194  3.43e-03  9.45e-09  0.0121 2.45e-02  4.68e+10
+    oracle     FCvx    2.87e-04  0.00e+00   0.0000   0.0000  0.0047  0.0194  5.87e-04  2.39e-09  0.0019 4.30e-03  2.15e+10
+
+[l] THE READ-OUT CONFLICT, measured rather than asserted
+    realizable x!           nan  0.00e+00      nan      nan     nan     nan  0.00e+00  0.00e+00  0.0000 0.00e+00       inf
+    oracle     x!           nan  0.00e+00      nan      nan     nan     nan  0.00e+00  0.00e+00  0.0000 0.00e+00       inf
+    oracle     x!v     8.28e-01       nan      nan      nan     nan     nan  1.99e+01  5.31e-05  0.1225 2.29e-01       nan
+    rung 'x!'  = x injected at ALL 10 substeps, displacement read-out.  This is the vacuous fit: y is a constant, ||A|| collapses, medE is meaningless.
+    rung 'x!v' = the same injection read out on the VELOCITY: ||A|| is back, so theta IS still there -- but v is not observed, so this read-out is not realizable.
+
+[l] hold instead of lerp (one measured frame instead of two)
+    realizable Fh      6.75e-02  1.54e-02   0.1418   0.0715  0.0335  0.0231  2.57e-02  7.60e-08  0.0783 1.86e-01  3.99e+10
+    realizable Fvh     5.86e-02  2.97e-02   0.1660   2.5393  0.0485  0.0578  7.04e-03  2.48e-08  0.0241 5.12e-02  2.75e+10
+    realizable FCvh    2.74e-02  2.96e-02   0.4204   2.5278  0.0911  0.1029  5.27e-03  2.39e-08  0.0206 3.82e-02  1.66e+10
+
+wrote xv_ladder.json [792 s]

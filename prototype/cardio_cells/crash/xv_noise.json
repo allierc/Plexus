@@ -1,0 +1,73 @@
+{
+ "config": {
+  "device": "cuda:1",
+  "cells": 100,
+  "per_parent": 100,
+  "n_grid": 128,
+  "warmup": 165,
+  "window": 150,
+  "dtype": "float64",
+  "mode": "full",
+  "e_lo": 40.0,
+  "e_hi": 220.0,
+  "g_lo": 0.5,
+  "g_hi": 1.5
+ },
+ "t0": 165,
+ "holdout_tick": 180,
+ "stages": "N",
+ "series_error_vs_reference": {
+  "lerp_F": 0.0004583953073927705,
+  "lerp_C": 0.17993954487160332,
+  "lerp_x": 7.293970261229746e-06,
+  "lerp_v": 0.014352458951170407,
+  "hold_F": 0.0048779756219871784,
+  "hold_C": 0.35197953135773746,
+  "hold_x": 0.0006496634716238868,
+  "hold_v": 0.0436176785083163
+ },
+ "boundary_state_error": {
+  "v0_derived": 0.01000348738294084,
+  "C0_derived": 0.13806298654167862,
+  "x0_measured": 0.0,
+  "F0_measured": 0.0
+ },
+ "wrong_theta": {
+  "perm_rel_l2": 0.5066182403096284,
+  "mean_rel_l2": 0.3808499360620263
+ },
+ "ladder": {},
+ "noise_probe": {
+  "realizable|F": {
+   "carry": 0.07221964864583001,
+   "med_E_clean": 0.02177300656378741,
+   "med_E_sigma_x": 0.04157659756930879,
+   "sigma_x": 1.99592e-05
+  },
+  "realizable|Fx": {
+   "carry": 0.012368294872377325,
+   "med_E_clean": 0.24632800806772914,
+   "med_E_sigma_x": 0.29758604389157134,
+   "sigma_x": 1.99592e-05
+  },
+  "realizable|FCvx": {
+   "carry": 0.001878433692935818,
+   "med_E_clean": 0.6886949244006786,
+   "med_E_sigma_x": 1.4258393156273594,
+   "sigma_x": 1.99592e-05
+  },
+  "oracle|F": {
+   "carry": 0.07301916673839486,
+   "med_E_clean": 0.009063388023753912,
+   "med_E_sigma_x": 0.03487138160148169,
+   "sigma_x": 1.99592e-05
+  },
+  "oracle|Fx": {
+   "carry": 0.012497613858320876,
+   "med_E_clean": 1.3342596611461354e-06,
+   "med_E_sigma_x": 0.19082830914834192,
+   "sigma_x": 1.99592e-05
+  }
+ },
+ "wall_seconds": 243.52349376678467
+}

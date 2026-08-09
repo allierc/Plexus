@@ -1,0 +1,30 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 163 frames; window A = ticks 14..163 recorded
+[collect] 163..182  C=100 Np=10000 n_sub=10 dt=0.002 [28s]
+[derivation] tick 165: rel v c2 0.01000  fwd 0.04273  rel C c2 0.13806
+
+[holdout] tick 180, |y_obs| 4.6926e-02;  floor at theta_true: oracle state 0.00474, c2 state 0.01935
+
+[c] CONTROLS, single frame tick 165, clean F, ridge0, Jp=1
+    variant                      drag     med|dE/E|      p90    relL2  published          d
+    oracle_v_oracle_C            snap       0.00778   0.0330   0.0231   0.007777  +0.00e+00 [53s]
+        held-out one-frame residual: oracle state 0.00674  c2 state 0.02077
+    v_c2_oracle_C                snap       0.02271   0.0381   0.0292   0.022707  +0.00e+00 [78s]
+        held-out one-frame residual: oracle state 0.00928  c2 state 0.01711
+    v_c2_oracle_C                honest     0.02189   0.0366   0.0285   0.022707            [103s]
+        held-out one-frame residual: oracle state 0.00912  c2 state 0.01719
+    oracle_v_C_c2                snap       0.01008   0.0348   0.0241   0.010084  -9.51e-07 [130s]
+        held-out one-frame residual: oracle state 0.00658  c2 state 0.02107
+    v_c2_C_c2                    snap       0.02177   0.0362   0.0276        nan            [163s]
+        held-out one-frame residual: oracle state 0.00895  c2 state 0.01736
+    v_c2_C_c2                    honest     0.02091   0.0346   0.0269        nan            [196s]
+        held-out one-frame residual: oracle state 0.00879  c2 state 0.01745
+    round-3 controls reproduced to <1e-9: True
+
+wrote mcv_v_cH.json [196 s]

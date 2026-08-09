@@ -1,0 +1,33 @@
+
+====================================================================================================
+STAGE S -- the synthetic system.  Does SUB-CELL F structure matter?
+====================================================================================================
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 163 frames; window A = ticks 14..163 recorded
+[collect] tick 165, C=100 Np=10000 n_sub=10  [51s]
+
+[S.geom] median cell span 0.1090 world = 13.96 mpm-dx; a control grid with 6 points per cell is K=56 nodes, h=0.01818 (3.31 particles per control cell)
+          RECORDING equivalent: 137 nodes, 15 px, cell ~6 points
+
+[S.recon] F reconstruction error at the particles, |F_rec - F_true| / |F_true - I|.  `nearest` is what the pipeline does today; `bilinear` and `taylor_cd` use ch2..5 only; `taylor_ls*` is the ch6..11 idea with an IDEAL gradient (upper bound).
+     pts/cell     K    h/dx  p/cell  empty  rankdef  subcellVar   nearest  bilinear  taylor_cd  taylor_ls  ls_const  tay_lsfull  lsfull/const
+            2    19    7.11   30.86      0        0      0.8110    0.9116    0.9173     0.9028     0.8687    0.9130      0.8680        0.9506
+            3    29    4.57   12.76      0        4      0.6811    0.8504    0.8569     0.8283     0.7666    0.8524      0.7631        0.8952
+            4    38    3.46    7.30      0       28      0.5946    0.8060    0.8050     0.7786     0.6877    0.8150      0.6830        0.8380
+            6    56    2.33    3.31     16      311      0.3619    0.6611    0.6722     0.6247     0.5292    0.6872      0.5067        0.7374
+            8    74    1.75    1.88    384     1144      0.2099    0.5506    0.5664     0.5051     0.3872    0.5961      0.3341        0.5606
+           12   111    1.16    0.83   1761     6337      0.0658    0.3518    0.3595     0.3104     0.3291    0.4748      0.1577        0.3321
+
+====================================================================================================
+STAGE I -- inject each reconstruction and fit theta.  acceptance statistic = the HELD-OUT one-frame residual
+====================================================================================================
+[I.band] held-out floor 0.00474  permuted null 0.59239  zero null 0.16934  (xv_ladder: 0.00474 / 0.59239 / 0.16934)
+
+[I] control grid K=56, h=0.01818 (6 points per cell); frame cadence n_sub=10, displacement read-out
+    variant             F_err   affinity       bias   fit_res     medE     medg   HELDOUT

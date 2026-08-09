@@ -110,6 +110,61 @@ def divide_face_3d(rings, pos, f, project=True, ea=None, eb=None):
 
 
 # --------------------------------------------------------------------------------------------------
+def face_collapse_3d(rings, pos, f):
+    """T2 / cell extrusion: collapse triangular face `f` to a point, so the sheet closes over it.
+
+    THE INVERSE OF `divide_face_3d`, and the operator family the algebra was missing. Plexus2 lists
+    eight elementary families and Die -- "removal of biological entities" -- is one of them; every
+    operator this vesicle owns deforms the sheet OUTWARD (growth inflates, division subdivides,
+    the purse-string measured inert, extrusion is the disqualified forcing term), so there was no
+    mechanism for inward deformation at all.
+
+    WHY IT IS SOUND, and why the caller must shed neighbours first. On a closed trivalent surface,
+    collapsing a TRIANGLE removes 2 vertices, 3 edges and 1 face, so
+
+        chi = V - E + F  ->  (V-2) - (E-3) + (F-1) = V - E + F
+
+    is unchanged and the sheet stays closed at genus 0. Collapsing anything with more than three
+    sides would merge k > 3 vertices into one and leave a rosette -- a vertex of degree > 3 that
+    the trivalent mechanics cannot represent. `reconnect_t1_3d` is what walks a shrinking cell down
+    to a triangle, one short edge at a time, exactly as the 2D `apoptosis` relies on
+    `t1_transition`; this function refuses anything else rather than doing it badly.
+
+    Mutates `rings` (f retired, every reference to its vertices rewired) and `pos` (the surviving
+    vertex moved to the centroid). Returns True if the collapse happened AND left a valid closed
+    surface -- on any failure `rings` and `pos` are left untouched, because a half-applied topology
+    edit is worse than a refused one.
+    """
+    r = rings[f]
+    if r is None or len(r) != 3:
+        return False
+    keep, drop = int(r[0]), {int(v) for v in r[1:]}
+    c = pos[list(r)].mean(0)
+    # WORK ON A COPY AND COMMIT ONLY IF CLOSED. `_check_closed` is cheap next to a frame of
+    # mechanics, and a mesh that has lost its closure does not announce itself: the genus check is
+    # combinatorial and cannot see a surface folded through its own centre, which is how premise
+    # P11 came to be written.
+    trial = [None if rg is None else list(rg) for rg in rings]
+    trial[f] = None
+    for g, rg in enumerate(trial):
+        if rg is None:
+            continue
+        ng = [keep if int(u) in drop else int(u) for u in rg]
+        ded = [ng[i] for i in range(len(ng)) if ng[i] != ng[(i - 1) % len(ng)]]
+        # a neighbour that shared TWO of the collapsed vertices loses a side; below three it is
+        # degenerate and the collapse is refused rather than silently deleting a second cell
+        if len(ded) < 3:
+            return False
+        trial[g] = ded
+    ok, _V, _E, _F, euler = _check_closed(trial)
+    if not ok or euler != 2:
+        return False
+    for g in range(len(rings)):
+        rings[g] = None if trial[g] is None else np.asarray(trial[g], dtype=np.int64)
+    pos[keep] = c
+    return True
+
+
 def _check_closed(rings):
     """Validate a closed orientable surface: every directed edge appears once, its opposite exists,
     no duplicate vertices within a ring. Returns (ok, V, E, F, euler)."""

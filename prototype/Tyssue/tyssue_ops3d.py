@@ -683,6 +683,216 @@ class Divide3D(Structural):
 
 
 
+@register_operator("apoptosis_3d", set="vertex", kind="structural", family="death")
+class Apoptosis3D(Structural):
+    """Cell elimination on the closed vesicle -- the DIE family, and the inverse of divide_3d.
+
+    Plexus2 lists eight elementary operator families and Die, "removal of biological entities", is
+    one of them. This vesicle had no implementation of it: growth inflates, division subdivides,
+    the purse-string measured inert and extrusion is the disqualified forcing term, so every
+    mechanism it owned deformed the sheet OUTWARD. Invagination is one of Okuda's three target
+    morphologies and nineteen rounds of search never produced one, because nothing in the
+    vocabulary could pull inward.
+
+    DECOMPOSED INTO PRIMITIVES, NOT A BEHAVIOUR. Monier et al. (2015) show apoptotic force driving
+    fold formation in Drosophila, and the 2D `apoptosis` operator already renders that as three
+    steps rather than a monolith. The same three exist here and two were already written:
+
+        1. the dying cell's target volume SHRINKS each tick   (this operator)
+        2. `reconnect_t1_3d` sheds its neighbours, one short edge at a time, until it is a triangle
+        3. `face_collapse_3d` extrudes the triangle to a point and the sheet closes by force
+           balance in `shape_energy_3d`
+
+    So this operator does step 1 and asks for step 3; step 2 belongs to T1 and MUST be scheduled or
+    a marked cell shrinks forever without ever reaching three sides. That is not a hidden coupling,
+    it is the mechanism: a cell leaves an epithelium by losing neighbours.
+
+    WHY IT WAITS FOR A TRIANGLE. Collapsing a k-sided face merges k vertices into one and leaves a
+    vertex of degree k, which a trivalent sheet cannot represent -- a rosette. At k = 3 the count
+    is V-2, E-3, F-1 and the Euler characteristic is unchanged. `face_collapse_3d` refuses anything
+    else and validates closure before committing, so a refused collapse costs a frame, not a mesh.
+    """
+    SUPPORTED_DIMS = [3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
+    MECHANISM_TAGS = ["apoptosis", "cell_elimination", "extrusion", "delamination", "die"]
+    REFERENCE = ("Monier, B. et al. (2015). Apico-basal forces exerted by apoptotic cells drive "
+                 "epithelium folding. Nature 518:245-248; tyssue B-Apoptosis (DamCB).")
+    PARAM_ROLES = {"cells": "explicit apoptotic cell indices", "mode": "how dying cells are chosen",
+                   "shrink_rate": "target-volume shrink per tick",
+                   "critical_frac": "extrude below this fraction of v_ref",
+                   "frac": "(band/cone/chem_low) size of the dying population",
+                   "a_sw": "(chem_low) die where the activator is below this fraction of its max"}
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex"); self.cat = params.get("cell_set", "cell")
+        self.cells = [int(c) for c in (params.get("cells") or [])]
+        # WHICH CELLS DIE is targeting, not a second mechanism: the shrink-shed-extrude pathway is
+        # identical in every mode, so these are one operator rather than four.
+        self.mode = str(params.get("mode", "list"))               # list | band | cone | chem_low
+        self.frac = float(params.get("frac", 0.04))
+        self.cone_deg = float(params.get("cone_deg", 22.8))       # 10 cells across on a 2,000-cell ball
+        self.band_deg = float(params.get("band_deg", 8.0))        # half-width of the great circle
+        self.a_sw = float(params.get("a_sw", 0.25))               # fraction of the activator's own max
+        self.shrink = float(params.get("shrink_rate", 0.04))
+        self.crit = float(params.get("critical_frac", 0.12))      # x v_ref, the seed-time median
+        self.p0 = float(params.get("p0", 3.72))                   # target shape index, for P0
+        self.after_frame = int(params.get("after_frame", 0))
+        self.every = _engine_owns_clock(params, default=1); self._k = 0
+        self.seed = int(params.get("seed", 0))
+
+    def _marked(self, m, H, nF):
+        """The set of cell indices currently marked to die."""
+        if self.mode == "list":
+            return {c for c in self.cells if c < nF}
+        cen = m.get("cen_np")
+        if cen is None:                                            # per-cell centroid from the rings
+            return set()
+        r = np.linalg.norm(cen, axis=1) + 1e-12
+        u = cen / r[:, None]
+        if self.mode == "band":                                    # a great circle in the xy plane
+            return set(np.where(np.abs(np.degrees(np.arcsin(np.clip(u[:, 2], -1, 1))))
+                                < self.band_deg)[0].tolist())
+        if self.mode == "cone":                                     # one contiguous cap
+            ax = np.array([0.0, 0.0, 1.0])
+            return set(np.where(np.degrees(np.arccos(np.clip(u @ ax, -1, 1)))
+                                < self.cone_deg)[0].tolist())
+        if self.mode == "chem_low":                                 # die BETWEEN the spots
+            clvl = H.level(self.cat)
+            if clvl is None or "chem" not in getattr(clvl, "state_schema", {}):
+                return set()
+            h0, _h1 = clvl.state_schema["chem"]
+            a = clvl.state[:nF, h0].detach().cpu().numpy()
+            amax = float(np.nanmax(a)) if a.size else 0.0
+            if amax <= 1e-9:
+                return set()
+            return set(np.where(a < self.a_sw * amax)[0].tolist())
+        return set()
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at); m = getattr(lvl, "_mesh", None)
+        if m is None:
+            return {}
+        # LOCAL, as Divide3D does: tyssue_topology_ops3d imports from this module, so a
+        # module-level import here is circular.
+        from tyssue_topology_ops3d import (rings_from_flat_3d, flat_from_rings_3d,
+                                           face_collapse_3d)
+        self._k += 1
+        dev = m["V0f"].device; dt = m["V0f"].dtype
+        nF = int(m["nF"]); Nv = int(m["Nv"])
+        px0, px1 = lvl.state_schema["pos"]
+        pos_t = lvl.state[:Nv, px0:px1].detach().cpu().numpy().astype(np.float64)
+        es = m["E_srce"].cpu().numpy(); et = m["E_trgt"].cpu().numpy(); ef = m["E_face"].cpu().numpy()
+        rings = [np.asarray(r, np.int64) for r in rings_from_flat_3d(es, et, ef, nF)]
+        # per-cell centroid, for the geometric modes
+        m["cen_np"] = np.array([pos_t[r].mean(0) if r is not None and len(r) else np.zeros(3)
+                                for r in rings])
+        # MARKED CELLS ARE A PER-FACE FLAG, NOT A LIST OF INDICES, and the first version was a
+        # list. Every collapse renumbers the faces through `keep`, so `cells: [900]` pointed at a
+        # DIFFERENT cell after each death: marking one cell killed seven in the first smoke run,
+        # a cascade down the index space. The flag rides the same `keep` map as `alive` and `age`,
+        # so a cell stays the cell it was.
+        flag = m.get("apop_flag")
+        if flag is None or len(flag) != nF:
+            base = np.zeros(nF, np.float64)
+            if flag is not None:                       # carried across a topology change already
+                base[:min(len(flag), nF)] = flag[:min(len(flag), nF)]
+            flag = base
+        # AN INDEX IS NOT AN IDENTITY, A REGION IS -- so `list` marks ONCE and the state-defined
+        # modes re-evaluate. `cells: [900]` names the cell at index 900 AT THE MOMENT IT IS READ,
+        # and every collapse renumbers the faces through `keep`; re-reading it each frame therefore
+        # hands the mark to a fresh victim after every death. Measured before this guard: marking
+        # one cell killed three, at ticks 86, 164 and 236, each reporting exactly one marked cell.
+        #
+        # This is the seed-window argument of the Plexus2 paper in a second place. There, an
+        # initial condition re-applied every timestep "converts it from an initial condition into a
+        # moving boundary condition"; here a one-off selection re-applied every timestep converts a
+        # death sentence into a death RATE. `seed` is a kind so the runtime can impose the window;
+        # this operator is `structural`, so it imposes its own.
+        if self.mode in ("list", "band", "cone"):
+            if not m.get("apop_marked_once"):
+                for f in self._marked(m, H, nF):
+                    if f < nF:
+                        flag[f] = 1.0
+                m["apop_marked_once"] = True
+        else:
+            # chem_low IS THE ONLY MODE THAT MAY RE-EVALUATE, and band/cone sat on this branch
+            # until it was measured. A geometric region LOOKS like state and is not: as the equator
+            # constricts, fresh cells rotate INTO the band and are marked, so a ring of 24 became a
+            # mouth that ate the sphere -- 2,000 cells down to 497 by frame 270. A ring or a cap is
+            # a POPULATION chosen at one moment, exactly like an index list. Only a chemical
+            # threshold is a genuine ongoing condition: a cell whose activator has fallen should
+            # now die, and no cell enters that set merely by being pushed.
+            for f in self._marked(m, H, nF):
+                if f < nF:
+                    flag[f] = 1.0
+        m["apop_flag"] = flag
+        marked = {int(f) for f in np.where(flag > 0)[0]}
+        if not marked:
+            return {}
+        V0f = m["V0f"].detach().cpu().numpy().astype(np.float64)
+        A0 = m["A0"].detach().cpu().numpy().astype(np.float64)
+        v_ref = float(m.get("v_ref", 1.0))
+        crit = self.crit * v_ref
+        # 1. SHRINK. shape_energy_3d contracts the cell toward the smaller target; T1 then finds its
+        #    edges short and sheds neighbours. Nothing is removed here.
+        for f in marked:
+            if f < nF:
+                V0f[f] = max(V0f[f] * (1.0 - self.shrink), 1e-9)
+                A0[f] = max(A0[f] * (1.0 - self.shrink) ** (2.0 / 3.0), 1e-9)
+        m["V0f"] = torch.as_tensor(V0f, dtype=dt, device=dev)
+        m["A0"] = torch.as_tensor(A0, dtype=dt, device=dev)
+        # P0 FOLLOWS A0, as it does everywhere else in this file: the target perimeter of a cell
+        # with target area A is p0*sqrt(A). Leaving it behind would make the shrinking cell chase a
+        # perimeter its area no longer supports, which is a shape-index error, not a size one.
+        m["P0"] = torch.as_tensor(self.p0 * np.sqrt(np.maximum(A0, 1e-9)), dtype=dt, device=dev)
+        # 2. EXTRUDE the ones that are now triangles AND small enough.
+        gone = 0
+        for f in sorted(marked, reverse=True):
+            if f >= nF or rings[f] is None or len(rings[f]) != 3:
+                continue
+            if V0f[f] > crit:
+                continue
+            if face_collapse_3d(rings, pos_t, f):
+                gone += 1
+        if gone == 0:
+            return {}
+        # 3. REBUILD, exactly as divide_3d does: `keep` maps new face -> old face and carries every
+        #    per-face array across, so nothing can fall out of step with the mesh.
+        es2, et2, ef2, nF2, keep = flat_from_rings_3d(rings)
+        def _car(name, arr=None):
+            a = (arr if arr is not None else m[name].detach().cpu().numpy().astype(np.float64))
+            return torch.as_tensor(np.asarray([a[i] for i in keep], np.float64), dtype=dt, device=dev)
+        m["A0"] = _car("A0", A0); m["V0f"] = _car("V0f", V0f)
+        m["P0"] = torch.as_tensor(self.p0 * np.sqrt(np.maximum(
+            m["A0"].detach().cpu().numpy(), 1e-9)), dtype=dt, device=dev)
+        for nm in ("Vbirth", "divjit", "age", "ndiv", "alive"):
+            if nm in m:
+                m[nm] = _car(nm)
+        m["apop_flag"] = np.asarray([flag[i] for i in keep], np.float64)   # identity, across renumbering
+        st = lvl.state.clone()
+        st[:len(pos_t), px0:px1] = torch.as_tensor(pos_t, dtype=dt, device=dev)
+        lvl.state = st
+        m["E_srce"] = torch.as_tensor(es2, device=dev); m["E_trgt"] = torch.as_tensor(et2, device=dev)
+        m["E_face"] = torch.as_tensor(ef2, device=dev); m["nF"] = nF2
+        # THE CELL SET FOLLOWS THE MESH. `chem` is indexed by face, so a death that compacts the
+        # faces and not the chemistry silently re-assigns every activator value to a different
+        # cell -- the same class of error as a per-face target left behind by division.
+        clvl = H.level(self.cat)
+        if clvl is not None and clvl.state.shape[0] >= nF:
+            cst = clvl.state.clone()
+            cst[:nF2] = clvl.state[torch.as_tensor(keep, device=clvl.state.device)]
+            clvl.state = cst
+            if getattr(clvl, "occ", None) is not None:
+                cocc = torch.zeros(clvl.state.shape[0], device=clvl.state.device)
+                cocc[:nF2] = 1.0; clvl.occ = cocc
+        m["n_apop"] = int(m.get("n_apop", 0)) + gone
+        # LOUD, because a death is not recoverable and the count must be auditable against the
+        # cell count: nF -> nF2 should differ by exactly `gone` and by nothing else.
+        print(f"[apoptosis_3d] tick {self._k}: extruded {gone} cell(s), {nF} -> {nF2} faces "
+              f"(marked {len(marked)}, total {m['n_apop']})", flush=True)
+        return {}
+
+
 @register_operator("divide_3d", model="doubler", set="vertex", kind="structural", family="growth")
 class Divide3DDoubler(Divide3D):
     """Divide at `factor` x THIS CELL'S OWN BIRTH VOLUME -- the rule that was the default until

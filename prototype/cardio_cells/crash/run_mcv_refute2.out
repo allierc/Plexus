@@ -5,11 +5,17 @@
   [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
 [planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
           E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
-          warm-up 165 frames; window A = ticks 16..165 recorded
-[reference] built [20s]
-[gauge] 2 candidates: grid48_der_s90210|b1|eiv_box, grid48_der_s555|b1|eiv_box
-    candidate                      budget         kE     kg    resid  conv   gauged  band_lo  band_hi orbitmax
-    grid48_der_s90210|b1|eiv_box   g5s0.8r2    1.471  1.106   0.0100 False   0.8968   0.8821   0.8968   0.8968 [228s]
-    grid48_der_s90210|b1|eiv_box   g7s0.8r2    1.456  1.111   0.0123 False   0.9078   0.7527   0.9078   0.9078 [420s]
-    grid48_der_s90210|b1|eiv_box   g9s1.0r4    1.503  1.118   0.0006  True   0.8871   0.7670   0.9146   0.9146 [1238s]
-    grid48_der_s555|b1|eiv_box     g5s0.8r2    1.314  1.054   0.0283 False   0.9435   0.7562   0.9435   0.9435 [530s]
+          warm-up 163 frames; window A = ticks 14..163 recorded
+[collect] 163..182 C=100 Np=10000 n=10 dt=0.002 [49s]
+
+[R] REPRODUCTION, tick 165
+    oracle v/C            medE 0.007777  (mcv_v 0.007777)
+    c2 v, oracle C honest medE 0.021888  (mcv_v 0.021890)
+    c2 v, c2 C honest     medE 0.020913  (mcv_v 0.020910)
+    route (a) honest      medE 0.020608  (mcv_v 0.020608)  gap +9.1%  relv 0.00917  ho(oracle) 0.00994 ho(c2) 0.01717
+    held-out tick 180, HONEST c2 state (no oracle anywhere): base 0.01662  route_a 0.01717  theta_true 0.01872
+    held-out tick 180, ORACLE state: base 0.00912  route_a 0.00994  theta_true 0.00474
+
+[T] OTHER FRAMES: is +9.1% a property of the method or of tick 165?
+      t0    oracle   c2 base   route a    gap% relv base   relv a   hoBase      hoA
+     176   0.07680   0.10433   0.14308  -140.7   0.01776  0.01784  0.02752  0.03782 [314s]
