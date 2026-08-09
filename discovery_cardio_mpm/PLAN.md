@@ -119,7 +119,38 @@ Acceptance for P0 itself, and it must pass all three:
 
 Also: fix the tick-165 problem by scoring at ≥3 ticks everywhere, and re-derive the box prior from something that isn't the answer.
 
-### P1 — The F verdict. This decides whether the algebraic route lives. *(1–2 days)*
+### P1 — pending a decision: does it become a **gain** verdict? *(evidence running, 2026-08-09)*
+
+Four probes are measuring the four things the decision turns on, none of which is yet known:
+
+1. **Is per-cell gain identifiable, or only global gain?** The P0 sweep varied gain *uniformly*.
+   308 steps of global response says nothing about reading one cell's gain — and the CODEMAP
+   already answered the same question for E with *no, by ~3 orders*.
+2. **Do the gain columns of A depend on F?** `step()` puts gain on the external body force
+   (`pass0 + gain·act0`) while E enters through `_lame(E)` → the stress σ = 2μ(F−R)Fᵀ + λJ(J−1)I,
+   which is manifestly a function of F. If the gain column is F-free, **the measurement limit that
+   killed the algebraic route is an E-only problem** and the route lives for gain.
+3. **Does E-blindness survive refutation?** One sweep, one observable, one configuration is thin
+   support for a strategy change. The sharpest attack is a *checkerboard* E field: uniform E is the
+   least favourable case because it moves the global scale, which the pacemaker also moves.
+4. **Does a gain-only fit actually recover anything** with E fixed *wrong* and F derived the way a
+   recording must — scored on the P0 acceptance statistic against the 6.65-step null.
+
+**The fallback is already decided (user, 2026-08-09): if it does not become a gain verdict, it is
+one learnable per cell.** That is the gradient route with the per-cell parameterisation, not a
+SIREN field — 200 numbers instead of 397,827 weights, sparse A, banded G, computable
+identifiability. PLAN §2 already argued this is the durable win *whichever* machinery computes the
+update, so it is not a consolation prize: it is the thing to carry forward either way. Its blocker
+is a code bug (the detached warm-up, ~30% wrong gradient, P1′) rather than a measurement limit,
+which is the better kind of blocker to be left with.
+
+Note the fallback does not escape the P0 finding. One learnable per cell still has to learn
+*something the data constrains* — if E is invisible to the observable, gradient descent finds that
+out too, just slower and with a plausible-looking loss curve. So the gain/E identifiability answer
+is needed for the gradient route as well; it decides **what** the per-cell learnable should be, not
+whether to have one.
+
+### P1 (original text, for the record) — The F verdict. This decides whether the algebraic route lives. *(1–2 days)*
 
 Prerequisite, and it is cheap: **is F cell-delineated at all** on synthetic data where cells are known? Between/within-cell variance of F, the jump across boundaries vs within-cell pairs at the same separation, regressed against the planted E contrast, with a **shuffled-partition null**. If a wrong partition shows the same delineation, the anchored basis has no basis.
 
