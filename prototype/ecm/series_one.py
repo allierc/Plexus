@@ -486,6 +486,18 @@ SERIES = {
                                      membrane_gamma=2.0e3, membrane_tau=0.0, membrane_tau_adh=40.0,
                                      membrane_secrete_rate=0.0, membrane_reserve=0.0),
 
+    # 132: THE SECOND POINT ON THE LINE. 130 put the sheet at +0.00403 against a fibre length of
+    #     0.00400 -- the standoff IS the rest length, to 3e-5. One point is a coincidence; this is the
+    #     same run with the length set to 0.001, the basement membrane's own half-thickness, which is
+    #     where the biology puts it (the BM sits ON the basal plasma membrane; the lamina lucida is a
+    #     fixation artefact). Predicted standoff +0.001. If it lands, `membrane_offset` is the standoff
+    #     and the four-year-old question of where the sheet sits is answered by a material property.
+    "132_fibre_len1e3": dict(membrane_springs=False, membrane_impl="mpm",
+                             membrane_direct_forces=True, membrane_grid_bc=False,
+                             membrane_contact_k=0.0, membrane_exclude=False,
+                             membrane_adhesion=2.5e5, membrane_gamma=2.0e3, membrane_offset=0.001,
+                             membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
+
     "_unused_secrete_dense": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
                              membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
                              membrane_particles=90000, membrane_reserve=1.0,
