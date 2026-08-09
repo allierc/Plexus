@@ -327,6 +327,16 @@ SERIES = {
     "109_recover20": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
                           membrane_exclude=False, membrane_adhesion=0.0, membrane_secrete_rate=0.0,
                           membrane_tau=0.0, membrane_reserve=0.0, membrane_band=1.0, membrane_recover=20.0),
+    # 110/111: THE HACK REMOVED. The grid boundary condition is off; non-penetration is a per-particle
+    #     PENALTY FORCE against the surface instead. The standoff should then emerge from stiffness
+    #     rather than from , and a real penalty contact has standoff proportional to 1/k --
+    #     which is what 111 checks. If it does not scale, the force is just another dialled number.
+    "110_contact": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=False,
+                        membrane_contact_k=1.0e4, membrane_exclude=False, membrane_adhesion=0.0,
+                        membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
+    "111_contact_x5": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=False,
+                           membrane_contact_k=5.0e4, membrane_exclude=False, membrane_adhesion=0.0,
+                           membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
     "_unused_secrete_dense": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
                              membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
                              membrane_particles=90000, membrane_reserve=1.0,

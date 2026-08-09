@@ -132,6 +132,8 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                # frames over which material found INSIDE the surface is pushed back out. 0 = the old
                # velocity-only constraint, which cannot recover ground already lost.
                membrane_recover=2.0,
+               # per-particle non-penetration instead of the grid boundary condition. 0 = off.
+               membrane_contact_k=0.0,
                # THE TISSUE AS A MOVING BOUNDARY ON THE GRID, rather than a positional projection.
                # 88 showed the projection carries no strain -- see membrane_ops.MPMTissueBoundary.
                membrane_grid_bc=False,
@@ -279,6 +281,13 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
             spec["operators"] = [o for o in spec["operators"] if o["op"] not in drop]
             spec["operators"].append({"op": "basement_membrane_continuum_strain",
                                       "at": "basement_membrane_particle"})
+            if membrane_contact_k > 0.0:
+                spec["operators"].append(
+                    {"op": "basement_membrane_contact", "at": "basement_membrane_particle",
+                     "centre": [0.5, 0.5, 0.5], "surface": str(membrane), "scale": 1.0,
+                     "k": float(membrane_contact_k), "offset": float(membrane_offset)})
+                spec["schedule"].insert(spec["schedule"].index("ecm_stress"),
+                                        "basement_membrane_contact")
             if membrane_grid_bc:
                 spec["operators"].append(
                     {"op": "mpm_tissue_boundary", "at": "mpm_grid", "centre": [0.5, 0.5, 0.5],

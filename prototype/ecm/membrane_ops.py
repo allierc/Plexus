@@ -64,6 +64,8 @@ from plexus.models.registry import register_entity, register_operator
 BOND_TRACE: list = []
 # (frame, |dp| total, radial dp, n nodes): what the matrix and membrane push back on the tissue
 BOUNDARY_REACTION: list = []
+# (frame, deepest penetration, n particles inside) for the per-particle contact
+CONTACT_TRACE: list = []
 MEMBRANE_STRAIN: list = []       # per-particle bond strain, for the renderer
 
 
@@ -1273,6 +1275,98 @@ class BasementMembraneContinuumStrain(Lateral):
                   "the continuum strain, in place of bond strain", flush=True)
             self._said = True
         return {}
+
+
+
+@register_operator("basement_membrane_contact", family="mechanics", set="particle", kind="lateral")
+class BasementMembraneContact(Lateral):
+    """Non-penetration between the sheet and the epithelium, as a FORCE on each particle.
+
+    WHY THIS REPLACES THE GRID BOUNDARY CONDITION. `mpm_tissue_boundary` imposes the tissue as a moving
+    obstacle by overwriting grid-node velocity, which works -- the sheet tracks the surface and carries
+    the strain the geometry implies -- but it leaves a standoff that cannot be tuned away:
+
+        recover  0    standoff +0.0006, 46.6% of the sheet INSIDE the epithelium
+        recover  2             +0.0124,  3.8%
+        recover  6             +0.0088, 11.5%
+        recover 20             +0.0069, 13.9%
+
+    against a target of zero-to-one-sheet-thickness (0.002). Biology is unambiguous here: a basement
+    membrane sits ON the basal plasma membrane -- integrin a6b4 and dystroglycan bind laminin directly,
+    and the lamina lucida of classical TEM is read today as a fixation artefact -- so any visible gap is
+    numerical. The reason the sweep cannot reach zero is that the constraint acts on GRID NODES, and each
+    particle smears its mass over +-1.5 cells through the B-spline stencil: part of a correctly placed
+    sheet's footprint always lands on nodes inside R, so the sheet is expelled until its whole footprint
+    clears the surface, a standoff of ~1.5 cells (0.031) set by the stencil and not by the sheet.
+
+    Measuring penetration PER PARTICLE removes that entirely, and it makes the interaction a real force
+    pair rather than injected momentum: the reaction the tissue would feel becomes a quantity that could
+    be fed back to pass 1, instead of a diagnostic that is recorded and discarded.
+
+    THE STANDOFF THEN EMERGES rather than being dialled, from contact stiffness against whatever presses
+    the sheet inward -- which in this model is the stroma's own compression, and that is sound: a
+    spheroid growing in matrix builds solid stress that squeezes it. Adhesion is a separate operator
+    (`integrin_adhesion`) and is the primary mechanism in vivo; this one only stops the sheet entering
+    the cells.
+    """
+
+    EMIT = "mpm_acceleration"
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = ["surface"]
+    MECHANISM_TAGS = ["basement_membrane", "contact", "non_penetration"]
+    PARAM_ROLES = {"k": "contact_stiffness", "offset": "standoff_the_sheet_is_held_at",
+                   "surface": "tissue_surface_radius_map", "scale": "surface_rescale"}
+    REFERENCE = ("Yurchenco, P.D. (2011) Cold Spring Harb. Perspect. Biol. 3:a004911 (the basement "
+                 "membrane is directly apposed to the basal cell surface).")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "basement_membrane_particle")
+        self.centre = [float(v) for v in params.get("centre", [0.5, 0.5, 0.5])]
+        self.k = float(params.get("k", 1.0e4))
+        self.offset = float(params.get("offset", 0.0))
+        self.scale = float(params.get("scale", 1.0))
+        import numpy as _np
+        z = _np.load(str(params["surface"]))
+        self.smap = torch.as_tensor(_np.asarray(z["smap"], _np.float32)) * self.scale
+        self.T = int(self.smap.shape[0])
+        self._said = False
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        pos = lvl.get("pos")
+        dev, dt_ = pos.device, pos.dtype
+        c = torch.tensor(self.centre, device=dev, dtype=dt_)
+        f = int(getattr(H, "frame", 0) or 0)
+        t = min(self.T - 1, max(0, f))
+        M = self.smap[t].to(dev, dt_)
+        nth, nph = M.shape
+        d = pos - c
+        r = d.norm(dim=1).clamp_min(1e-9)
+        u = d / r[:, None]
+        th = torch.acos(u[:, 2].clamp(-1.0, 1.0))
+        ph = torch.atan2(u[:, 1], u[:, 0])
+        # bilinear, so the surface the sheet rests on is smooth rather than a 32x64 staircase
+        fth = (th / math.pi * nth - 0.5).clamp(0, nth - 1)
+        fph = ((ph + math.pi) / (2 * math.pi) * nph - 0.5) % nph
+        t0 = fth.floor().long().clamp(0, nth - 1); t1 = (t0 + 1).clamp(0, nth - 1)
+        p0 = fph.floor().long() % nph; p1 = (p0 + 1) % nph
+        wt = fth - t0.to(fth.dtype); wp = fph - p0.to(fph.dtype)
+        R = ((M[t0, p0] * (1 - wp) + M[t0, p1] * wp) * (1 - wt)
+             + (M[t1, p0] * (1 - wp) + M[t1, p1] * wp) * wt)
+        # ONE-SIDED: only material that has entered the epithelium is pushed, and only outward.
+        pen = (R + self.offset - r).clamp_min(0.0)
+        acc = (self.k * pen)[:, None] * u
+        alive = getattr(H, "membrane_alive", None)
+        if alive is not None:
+            acc = torch.where(alive[:, None], acc, torch.zeros_like(acc))
+        CONTACT_TRACE.append((f, float(pen.max()), float((pen > 0).sum())))
+        if not self._said:
+            print(f"[basement_membrane_contact] per-particle non-penetration, k={self.k:.3g}, "
+                  f"offset={self.offset:.4g}: {int((pen > 0).sum())} particles inside the surface at "
+                  f"frame {f}", flush=True)
+            self._said = True
+        return {lvl.name: acc}
 
 
 @register_operator("basement_membrane_repel", family="mechanics", set="particle", kind="lateral")
