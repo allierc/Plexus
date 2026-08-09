@@ -49,6 +49,42 @@ specs and the engine, and did not survive.
   integer pairs a membrane at frame 402 with an epithelium at 201. `rerender()` in `run_ecm.py` still
   does this.
 
+## 130 IS THE NOMINAL from 2026-08-09
+
+`130_direct_r125_fixed` replaces `91_gridbc_band` as the run everything else is compared against: it is
+the first configuration that puts the basement membrane where a basement membrane goes, and it does it
+with no grid boundary condition, no penalty contact and no positional projection on the sheet -- one
+overdamped fibre per particle, `membrane_contact_k = 0`. 91 stays as the BIT-IDENTITY regression test
+(it is the run with a frozen trajectory to compare against); 130 is the nominal for the biology.
+Its known defect is the strain, below -- do not quote 130's strain field.
+
+## 129/130: the standoff is solved and the mechanics is broken, in the same two runs
+
+With the nesting fixed, `emit: velocity` finally reaches `integrin_adhesion` and the sheet is moved by
+the engine at first order instead of through the grid. Both halves are measured at frame 402:
+
+| run | path | standoff | fibre length | strain F reports | true stretch | coverage |
+|---|---|---|---|---|---|---|
+| 121 | force -> grid | -0.00814 | 0.004 | **2.251** | 2.30 | 1.000 |
+| 129 | direct, k/gamma = 25 | -0.00094 | 0.004 | 0.306 | 2.38 | 1.000 |
+| 130 | direct, k/gamma = 125 | **+0.00403** | 0.004 | 0.311 | 2.44 | 1.000 |
+
+- **The standoff is the fibre's rest length**, +0.00403 against 0.00400 -- 3e-5 apart, on a sheet whose
+  radius tripled. The tracking-lag model that predicted it (lag = 5.32e-4 / (dt*k/gamma)) called 129 at
+  -0.0013 against a measured -0.00094. So the standoff stopped being an emergent balance and became a
+  number that is set. That is the flat rig's result arriving on the spheroid.
+- **And the sheet stopped carrying its own deformation.** A particle moved by the engine delta never
+  passes through the grid, so `mpm_strain` never sees the motion and `F` misses it: 0.31 reported
+  against a geometric stretch of 2.44, i.e. 13% of the truth, while 121 reports 2.25 against 2.30 (98%).
+  This is `AUDIT.md`'s defect 3 -- a positional update that launders deformation -- arriving through a
+  different door. The direct-force path buys the position by giving up the mechanics.
+- **So the case for `INTEGRIN_DESIGN.md` is now empirical rather than argued**, and it is not the one
+  the file makes. A fibre that IS MPM material moves the sheet through the grid, so `F` sees it: that is
+  the only route on the table that could hold 130's standoff at 121's strain. Its stated motivation
+  ("one integrator") is still void; this is the replacement.
+- Runs 120-128 are no longer reproducible from their names -- rebuilt today they take the fixed path.
+  Their artefacts stand; a re-run is a different run and should be numbered as one.
+
 ## Settled, with numbers
 
 - **The continuum replaced the spring network and fixed what it could not.** Across the 16 spring runs
