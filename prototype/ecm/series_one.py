@@ -316,6 +316,17 @@ SERIES = {
                              membrane_exclude=False, membrane_adhesion=5.0e4, membrane_secrete_rate=0.0,
                              membrane_tau=0.0, membrane_reserve=0.0, membrane_band=1.0,
                              membrane_recover=2.0),
+    # THE GAP, against what biology asks for. A basement membrane sits ON the basal plasma membrane --
+    # integrin a6b4 and dystroglycan bind laminin directly, and the lamina lucida of classical TEM is
+    # read today as a fixation artefact. So the standoff should be zero to within the sheet thickness
+    # (0.002 here), and +0.0123 is ~6x that: numerical, not physiological.  clears an overlap
+    # over N frames, so a LARGER N is gentler and should overshoot less.
+    "108_recover6": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
+                         membrane_exclude=False, membrane_adhesion=0.0, membrane_secrete_rate=0.0,
+                         membrane_tau=0.0, membrane_reserve=0.0, membrane_band=1.0, membrane_recover=6.0),
+    "109_recover20": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
+                          membrane_exclude=False, membrane_adhesion=0.0, membrane_secrete_rate=0.0,
+                          membrane_tau=0.0, membrane_reserve=0.0, membrane_band=1.0, membrane_recover=20.0),
     "_unused_secrete_dense": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
                              membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
                              membrane_particles=90000, membrane_reserve=1.0,
