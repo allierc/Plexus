@@ -577,6 +577,10 @@ def main():
     frames = int(sys.argv[3]) if len(sys.argv) > 3 else 402
     over = dict(SERIES[name])
     gated = over.pop("_gated", False)
+    # THE SURFACE MAP'S RESOLUTION, when a run asks for a finer one. It is pass 1's product, so it
+    # belongs to the tissue cache and not to the spec -- and it is in the cache key, so asking for it
+    # rebuilds rather than silently reusing the coarse map.
+    mapres = over.pop("_map", None)
     myo = over.pop("_myo", None)          # junction-level knobs: they belong to PASS 1, not the spec
     # RECORDED BEFORE THE POP CONSUMES IT. `_gated` is the only change 75 makes, so popping it left an
     # empty dict and the run archived itself as `{"reference": true}` -- identical to 69's label, for a
@@ -590,6 +594,9 @@ def main():
               membrane_ops.SECRETE_TRACE, membrane_ops.BOND_SNAPSHOTS, membrane_ops.HOOP_TRACE):
         t.clear()
     tk = dict(frames=401, device=dev, buffer_x=4, myosin=1.0)
+    if mapres:
+        tk.update(map_theta=int(mapres[0]), map_phi=int(mapres[1]))
+        label["surface_map"] = f"{int(mapres[0])}x{int(mapres[1])}"
     if myo:
         tk.update(myo)
         # `:g` on a str raises; `myo_keyed_on` is a string ("tension"/"strain_rate"), so the tag has to

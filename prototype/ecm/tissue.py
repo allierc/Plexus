@@ -120,7 +120,8 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap
           gate_p_half="auto", gate_hill=4.0, gate_floor=0.15,
           gate_smooth_frames=25, gate_smooth_phi=360.0,
           myosin=None, myo_tau=20.0, myo_beta=1.0, myo_new=1.0,
-          myo_keyed_on="length", myo_destabilising=1):
+          myo_keyed_on="length", myo_destabilising=1,
+          map_theta=N_THETA, map_phi=N_PHI):
     import tyssue_t1_ops3d as _T1
     _T1.T1_TRACE.clear()                       # per build, so a rebuild never inherits a previous run's
     """Run cellfix_B_new verbatim and write the cache.
@@ -239,7 +240,7 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap
         cen, rad, live = _cell_centroids(vp, mt)
         c = vp.mean(0)                                    # the vertex centroid: what `_draw` centres on
         v = vp - c
-        maps.append(apical_map(v))
+        maps.append(apical_map(v, map_theta, map_phi))
         r_ap.append(float(np.median(np.linalg.norm(v, axis=1))))
         r_med.append(float(np.median(rad[live])) if live.any() else 0.0)
         ncell.append(int(mt["nF"]))
@@ -299,7 +300,7 @@ def load_or_build(frames=401, device="cuda:0", name="cellfix_B_new", rebuild=Fal
                   gate_hill=4.0, gate_floor=0.15, gate_smooth_frames=25,
                   gate_smooth_phi=360.0, myosin=None, myo_tau=20.0, myo_beta=1.0,
                   myo_keyed_on="length", myo_destabilising=1,
-                  myo_new=1.0):
+                  myo_new=1.0, map_theta=N_THETA, map_phi=N_PHI):
     """The cache path, built if missing. Frames are part of the filename: a 401-frame tissue and a
     120-frame one are different tissues, and silently reusing one for the other would be a run
     whose movie stops before the thing it was testing happened."""
@@ -321,12 +322,22 @@ def load_or_build(frames=401, device="cuda:0", name="cellfix_B_new", rebuild=Fal
            "gate_smooth_frames": gate_smooth_frames, "gate_smooth_phi": gate_smooth_phi,
            "load_gain": load_gain, "myosin": myosin, "myo_tau": myo_tau, "myo_beta": myo_beta, "myo_inherit": 1,
            "myo_keyed_on": myo_keyed_on, "myo_destabilising": myo_destabilising,
-           "myo_new": myo_new}
+           "myo_new": myo_new,
+           # IN THE KEY, because the surface map IS the epithelium as far as every membrane operator
+           # is concerned -- `integrin_adhesion`, `basement_membrane_contact`, `adhesion_pull` and
+           # `surface_track` all read it and nothing else. At 32x64 a bin is 1.63 x 1.63 tissue units
+           # at the end of the run, i.e. about 2x2 cells, so the anchor a fibre pulls toward is a
+           # staircase two cells wide and neighbouring integrins share a value while the surface under
+           # them differs by 0.09 (median) to 0.18 (p90) tissue units -- most of a fibre's 0.223.
+           # Left out of the key, raising the resolution would silently reuse the coarse cache, which
+           # is the third time this file would have shipped that bug.
+           "map_theta": map_theta, "map_phi": map_phi}
     for key, path in (("gate", gate_npz), ("load", load_npz)):
         if path is not None:
             sz = os.path.getsize(path) if os.path.exists(path) else 0
             cfg[key] = f"{os.path.abspath(path)}:{sz}"
-    if any(v is not None for v in (plate_gap, gate_npz, load_npz, myosin)):
+    if any(v is not None for v in (plate_gap, gate_npz, load_npz, myosin)) \
+            or (map_theta, map_phi) != (N_THETA, N_PHI):
         tag += "_" + hashlib.sha1(repr(sorted(cfg.items())).encode()).hexdigest()[:10]
     tag += tag_extra
     out = os.path.join(CACHE, f"{tag}.npz")
@@ -337,7 +348,7 @@ def load_or_build(frames=401, device="cuda:0", name="cellfix_B_new", rebuild=Fal
               gate_floor=gate_floor, gate_smooth_frames=gate_smooth_frames,
               gate_smooth_phi=gate_smooth_phi, myosin=myosin, myo_tau=myo_tau,
               myo_beta=myo_beta, myo_new=myo_new, myo_keyed_on=myo_keyed_on,
-              myo_destabilising=myo_destabilising)
+              myo_destabilising=myo_destabilising, map_theta=map_theta, map_phi=map_phi)
     else:
         z = np.load(out)
         print(f"[tissue] reusing {os.path.relpath(out, ROOT)}  "
