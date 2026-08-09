@@ -1,0 +1,21 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 165 frames; window A = ticks 16..165 recorded
+[percell] 95/100 cells kept; a_ref/dx 0.003 .. 1.310 .. 3.259
+[solve] substep med|dE/E| 2.449e-07; frame med|dE/E| 0.5107
+[shard 0/1] 5/5 candidates
+
+[crash test] 150-frame free rollouts from tick 165, margin-20; RAW and 2-D GAUGED (|t1-1|,|t2-1| <= 0.01)
+    candidate                         medE  rawloop     t1     t2     kE     kg  gauloop    gauR2  r2cell  nx
+    theta_hat_frame_ridge1e-2       0.7690  -0.0854  1.866  0.851  4.737  1.383   0.5500   0.5105  0.8750  22  [max iters, 190s]
+    bank_blind_E90_g1               0.4323   0.5886  1.138  0.930  2.158  1.330   0.5816   0.6472  0.9342  11  [converged, 102s]
+    bank_blind_E320_g1              1.4907   0.5524  0.574  1.058  2.718  1.687   0.3429  -0.8627  0.7555   4  [diverged, 47s]
+    bank_prior_draw_101             0.4324   0.6591  1.207  0.996  2.639  1.219   0.4281  -0.2108  0.7873  10  [converged, 94s]
+    bank_geom_radius                0.4660   0.2456  1.607  0.746  2.881  1.211   0.0802  -0.6415  0.8660  22  [max iters, 256s]
+
+wrote crash_round3fix_only.json  [721 s]

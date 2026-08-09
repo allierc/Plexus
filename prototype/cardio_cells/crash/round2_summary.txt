@@ -1,0 +1,29 @@
+[repro] 12 candidates shared with round 1; max |dloopscore| (raw, free) = 0.00e+00
+[device] theta_true on cuda:1 vs cuda:0: loopscore [1.0, 1.0], per-cell amplitude field differs by 0.00e+00
+
+candidate                      medE   medg |     RAW   Erat |      k  GAUGED   dloop |   R2raw   R2gau |  r2cell   skill
+theta_true                    0.000  0.000 |  1.0000  1.000 |  1.000  1.0000 +0.0000 |  1.0000  1.0000 |  1.0000  +1.000
+theta_hat_substep             0.000  0.000 |  1.0000  1.000 |  1.000  1.0000 +0.0000 |  1.0000  1.0000 |  1.0000  +1.000
+theta_true_perturbed_0.01     0.002  0.002 |  0.9998  1.001 |  1.000  0.9998 +0.0000 |  1.0000  1.0000 |  1.0000  +1.000
+true_gain_x1.8                0.000  0.800 | -0.1764  1.943 |  0.558  0.9995 +1.1759 |  0.0380  0.9999 |  1.0000  +1.000
+theta_true_perturbed_0.03     0.007  0.007 |  0.9978  1.002 |  1.000  0.9978 +0.0000 |  0.9998  0.9998 |  1.0000  +0.999
+theta_true_x0jitter_0.01dx    0.000  0.000 |  0.9855  0.998 |  1.000  0.9855 +0.0000 |  0.9978  0.9978 |  0.9999  +0.998
+theta_true_perturbed_0.1      0.023  0.022 |  0.9752  1.007 |  0.997  0.9762 +0.0010 |  0.9972  0.9974 |  0.9997  +0.993
+theta_true_perturbed_0.3      0.069  0.066 |  0.8849  1.022 |  0.978  0.8967 +0.0118 |  0.9771  0.9798 |  0.9974  +0.928
+frame_DISP_oracle_rescale     0.123  0.393 |  0.7572  0.611 |  1.598  0.8927 +0.1355 |  0.6597  0.9500 |  0.9922  +0.788
+frame_DISP                    0.257  0.249 |  0.5865  1.216 |  0.810  0.8575 +0.2711 |  0.7471  0.8637 |  0.9973  +0.925
+theta_shuffled_true           0.519  0.271 |  0.4955  1.216 |  0.836  0.6615 +0.1660 |  0.5596  0.6829 |  0.9575  -0.160
+blind_E130_g0.95              0.318  0.284 |  0.7599  0.863 |  1.142  0.6545 -0.1054 |  0.7842  0.8165 |  0.9633  +0.000
+theta_true_x0jitter_0.1dx     0.000  0.000 |  0.6522  1.000 |  1.000  0.6522 +0.0000 |  0.7947  0.7947 |  0.9928  +0.804
+theta_const_E130_g1           0.318  0.280 |  0.7372  0.908 |  1.088  0.6503 -0.0869 |  0.8023  0.8162 |  0.9633  -0.001
+theta_hat_frame_ridge0        0.511  0.399 | -0.1636  2.031 |  0.497  0.5862 +0.7499 | -1.1943  0.2405 |  0.9681  +0.131
+blind_E40_g1                  0.689  0.280 | -0.1799  1.946 |  0.534  0.5477 +0.7276 | -0.7665  0.4799 |  0.9499  -0.366
+theta_hat_frame_ridge1e-2     0.769  0.492 | -0.0854  1.866 |  0.527  0.3456 +0.4310 | -1.3241 -0.1647 |  0.9044  -1.606
+
+[raw   ] corr(loopscore, log E_ratio) -0.868   corr(loopscore, med|dE/E|) -0.707   spearman -0.600   spearman(percell skill, med|dE/E|) -0.821   E_ratio in [0.611, 2.031]
+[gauged] corr(loopscore, log E_ratio) -0.046   corr(loopscore, med|dE/E|) -0.892   spearman -0.831   spearman(percell skill, med|dE/E|) -0.907   E_ratio in [0.998, 1.004]
+
+[triad]  true_gain_x1.8 medE 0.000: raw -0.1764 -> gauged +0.9995 (r2cell 1.0000, skill +1.000); blind_E40_g1 medE 0.689: raw -0.1799 -> gauged +0.5477 (r2cell 0.9499, skill -0.366); theta_hat_frame_ridge0 medE 0.511: raw -0.1636 -> gauged +0.5862 (r2cell 0.9681, skill +0.131)
+[pair ]  blind_E130_g0.95 medE 0.318: raw +0.7599 -> gauged +0.6545 (r2cell 0.9633, skill +0.000); frame_DISP_oracle_rescale medE 0.123: raw +0.7572 -> gauged +0.8927 (r2cell 0.9922, skill +0.788)
+
+[gauge] blind per-cell field already explains r2_percell = 0.9633 of the reference field; skill is measured against that. extra rollouts per candidate: [0, 1, 2, 3, 4]

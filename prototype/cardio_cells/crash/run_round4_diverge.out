@@ -1,0 +1,90 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 165 frames; window A = ticks 16..165 recorded
+
+[A] canonical failure modes, built out of the reference so the answer is known
+    mode                     coord      path      peak  orient     loop |  peakR  pathR     t2   open  chir   lagG  lagIQR | tags
+    identity                1.0000    0.0000    0.0000  0.0000   1.0000 |  1.000  1.000  1.000  0.000  1.00   0.00     0.0 | intact
+    blow_up_x1.5            1.0000    0.0154    0.0039  0.0000   0.0691 |  1.500  1.500  1.000  0.000  1.00   0.00     0.0 | blow_up
+    blow_up_x3              1.0000    0.0617    0.0154  0.0000  -0.8756 |  3.000  3.000  1.000  0.000  1.00   0.00     0.0 | blow_up
+    collapse_x0.5           1.0000    0.0154    0.0039  0.0000   0.6375 |  0.500  0.500  1.000  0.000  1.00   0.00     0.0 | collapse
+    collapse_x0.2           1.0000    0.0247    0.0062  0.0000   0.3666 |  0.200  0.200  1.000  0.000  1.00   0.00     0.0 | collapse
+    do_nothing               Undef    0.0309    0.0077  0.7320   0.2603 |  0.000  0.000  0.000  0.121  0.00   3.05     5.2 | collapse,phase_drift,shape_loss
+    phase_drift_8           1.0000    0.0000    0.0000  0.0000   1.0000 |  1.000  1.000  1.000  0.000  1.00   8.00     0.0 | phase_drift
+    phase_drift_25          1.0000    0.0000    0.0000  0.0000   1.0000 |  1.000  1.000  1.000  0.000  1.00  25.00     0.0 | phase_drift
+    decoherence             0.1822    0.0000    0.0000  0.0000   1.0000 |  1.000  1.000  1.000  0.000  1.00 -22.40    83.5 | phase_drift,decoherence
+    shape_rot_pi/5          1.0000    0.0000    0.0000  0.6283   0.7867 |  1.000  1.000  1.000  0.032  1.00   0.00     0.0 | shape_loss
+    shape_flatten           1.0000    0.0010    0.0000  0.0000   0.5649 |  0.998  0.968  0.970  0.121  0.55   0.01     0.0 | shape_loss
+    replay_previous_beat    0.8736    0.0023    0.0024  0.1047   0.2917 |  1.308  1.076  0.822  0.009  0.72  -1.74     0.0 | blow_up,phase_drift,decoherence,shape_loss
+
+[B] the anchoring question: every candidate FREE and ANCHORED, both margins (band pins 21.2% of particles; probes inside it: m20 0/100, m10 36/100)
+    candidate                       medE | loop20 free     anch    delta | loop10 free     anch    delta |     R2 d  bandrms
+    theta_true                    0.0000 |      1.0000   1.0000  -0.0000 |      1.0000   1.0000  -0.0000 |  -0.0000   0.0000
+    theta_hat_frame_ridge0        0.5107 |     -0.1636  -0.1545   0.0091 |      0.2145   0.2394   0.0249 |   0.0058   0.0234
+    theta_shuffled_true           0.5194 |      0.4955   0.4974   0.0019 |      0.5887   0.6024   0.0137 |   0.0030   0.0190
+    bank_blind_E130_g0.95         0.3180 |      0.7599   0.7597  -0.0002 |      0.7638   0.7664   0.0026 |   0.0008   0.0104
+    bank_prior_draw_303           0.4822 |      0.6270   0.6286   0.0016 |      0.6415   0.6634   0.0219 |   0.0011   0.0173
+    true_gain_x0.3                0.0000 |      0.6228   0.6224  -0.0003 |      0.6852   0.6915   0.0062 |   0.0041   0.0192
+    theta_true_x0jitter_0.1dx     0.0000 |      0.6522   0.6541   0.0019 |      0.7334   0.7576   0.0242 |   0.0012   0.1363
+    frame_DISP                    0.2572 |      0.5865   0.5890   0.0025 |      0.7662   0.7698   0.0036 |   0.0013   0.0126
+    T1/naive                      0.5364 |      0.5410   0.6962   0.1553 |      0.6335   0.8100   0.1765 |   0.0466   0.2120
+    T1/eiv_full                   0.2748 |      0.1279   0.1333   0.0054 |      0.3719   0.4495   0.0776 |   0.0268   0.4181
+    T1/eiv_trunc1                 0.9975 |      0.1837   0.1778  -0.0059 |      0.3439   0.4852   0.1413 |  -0.0713   0.2242
+    T1/eiv_snr0                   0.1375 |      0.6007   0.6028   0.0021 |      0.6179   0.6389   0.0209 |  -0.0527   0.2882
+    T1/eiv_snr0.3                 0.1737 |      0.2499   0.3304   0.0805 |      0.2856   0.4398   0.1542 |   0.1570   0.4280
+    T1/clean_F_lerp               0.0078 |      0.9997   0.9997  -0.0000 |      0.9997   0.9996  -0.0000 |  -0.0000   0.0004
+    T8/naive                      0.4674 |      0.7827   0.7167  -0.0660 |      0.7492   0.8742   0.1250 |  -0.0258   0.2636
+    T8/eiv_snr0                   0.0546 |      0.2375   0.3260   0.0884 |      0.4262   0.5284   0.1022 |   0.2443   0.3337
+    n_candidates                                 16
+    max_abs_delta_loopscore_m20                  0.15525323152542114
+    max_abs_delta_loopscore_m20_who              T1/naive
+    median_abs_delta_loopscore_m20               0.002288609743118286
+    spearman_free_vs_anchored_m20                0.9529411764705882
+    kendall_inversions                           6
+    anchor_cost_at_theta_true_rms_dx             0.0005362263622221872
+    free_cost_at_theta_true_rms_dx               0.0
+
+[A'] the same rollouts, DIAGNOSED: which failure mode, and does the error grow?
+    candidate                     peakR     t1   lagG  lagIQR   coord  orient     t2   open  rmsend   slope/f fin/max | tags
+    theta_true                    1.000  1.000   0.00     0.0  1.0000  0.0000  1.000  0.000  0.0000  0.00e+00   0.000 | intact
+    theta_hat_frame_ridge0        1.316  2.031   3.92     8.0  0.9223  0.0391  0.892  0.019  0.3165 -5.82e-03   0.237 | blow_up,phase_drift
+    theta_shuffled_true           1.106  1.216  -0.02     0.0  0.9979  0.0578  0.960  0.010  0.4217  2.20e-03   1.000 | intact
+    bank_blind_E130_g0.95         0.999  0.863  -0.38     0.0  0.9964  0.0347  0.986  0.003  0.2839  1.87e-03   0.876 | intact
+    bank_prior_draw_303           1.086  1.162  -0.10     0.0  0.9951  0.0402  1.032  0.001  0.3741  2.65e-03   1.000 | intact
+    true_gain_x0.3                0.604  0.394  -1.17     2.0  0.9720  0.0696  0.884  0.095  0.8331  4.01e-03   0.996 | collapse,phase_drift
+    theta_true_x0jitter_0.1dx     1.005  1.000  -0.02     0.0  0.9999  0.0375  0.985  0.003  0.2397  1.14e-03   0.986 | intact
+    frame_DISP                    1.143  1.216   1.09     2.0  0.9945  0.0208  0.917  0.004  0.1652 -1.28e-03   0.343 | phase_drift
+    T1/naive                      1.060  1.131   0.24     1.0  0.9765  0.0465  0.952  0.023  0.2838  9.63e-04   0.943 | intact
+    T1/eiv_full                   0.649  0.912  -1.11     0.0  0.8409  0.1810  0.681  0.032  0.7281  5.69e-04   0.783 | collapse,phase_drift,decoherence,shape_loss
+    T1/eiv_trunc1                 0.402  0.356  -5.83    15.0  0.7085  0.3032  0.519  0.102  1.0715  3.12e-04   0.769 | collapse,phase_drift,decoherence,shape_loss
+    T1/eiv_snr0                   0.803  0.806  -0.89     0.0  0.9192  0.0651  0.898  0.023  0.5316  1.18e-03   0.939 | intact
+    T1/eiv_snr0.3                 0.747  0.770  -2.56     1.0  0.8257  0.1773  0.758  0.024  0.6964  8.72e-04   0.883 | collapse,phase_drift,decoherence,shape_loss
+    T1/clean_F_lerp               0.998  1.000   0.00     0.0  1.0000  0.0010  1.001  0.000  0.0065  4.80e-03   1.000 | intact
+    T8/naive                      1.013  1.071  -0.31     0.2  0.9366  0.0239  0.999  0.010  0.1737  4.25e-04   0.927 | intact
+    T8/eiv_snr0                   0.760  0.751  -1.89     1.0  0.8800  0.1480  0.884  0.026  0.6128  1.60e-03   0.762 | phase_drift,decoherence
+
+[C] the same candidates under round 3's 2-D gauge (k_E, k_g -> t1 = t2 = 1)
+    candidate                       medE      raw     t1     t2     kE     kg   gauged       R2  r2cell  nx status
+    theta_true                    0.0000   1.0000  1.000  1.000  1.000  1.000   1.0000   1.0000  1.0000   0 already at (1,1)
+    theta_hat_frame_ridge0        0.5107  -0.1636  2.031  0.892  4.052  1.175   0.6647   0.8762  0.9464   6 converged
+    theta_shuffled_true           0.5194   0.4955  1.216  0.960  3.265  1.290   0.4638  -0.1203  0.8185   8 converged
+    bank_blind_E130_g0.95         0.3180   0.7599  0.863  0.986  1.460  1.381   0.5957   0.6600  0.9360   7 converged
+    bank_prior_draw_303           0.4822   0.6270  1.162  1.032  1.205  0.978   0.6488   0.6412  0.9454   8 converged
+    true_gain_x0.3                0.0000   0.6228  0.394  0.884  1.043  3.428   0.9970   0.9990  0.9999   7 converged
+    theta_true_x0jitter_0.1dx     0.0000   0.6522  1.000  0.985  1.073  1.038   0.6516   0.7961  0.9926   3 converged
+    frame_DISP                    0.2572   0.5865  1.216  0.917  1.796  1.118   0.8277   0.9471  0.9740   5 converged
+    T1/naive                      0.5364   0.5410  1.131  0.952  1.550  1.088   0.3575   0.5110  0.9409  22 max iters
+    T1/eiv_full                   0.2748   0.1279  0.912  0.681  0.157  0.392   0.0174  -2.0909 -0.0872  22 max iters
+    T1/eiv_trunc1                 0.9975   0.1837  0.356  0.519  0.082  0.203   0.2332  -3.6489 -0.3034  22 max iters
+    T1/eiv_snr0                   0.1375   0.6007  0.806  0.898  1.774  1.529   0.4545  -0.0720  0.7313   6 converged
+    T1/eiv_snr0.3                 0.1737   0.2499  0.770  0.758  1.000  1.000   0.2499  -0.7521  0.5009  22 max iters
+    T1/clean_F_lerp               0.0078   0.9997  1.000  1.001  1.000  1.000   0.9997   0.9999  1.0000   0 already at (1,1)
+    T8/naive                      0.4674   0.7827  1.071  0.999  1.094  0.978   0.8044   0.8870  0.9772   4 converged
+    T8/eiv_snr0                   0.0546   0.2375  0.751  0.884  1.595  1.450   0.0037  -0.3233  0.7241  22 max iters
+
+wrote round4_diverge.json [1725 s]

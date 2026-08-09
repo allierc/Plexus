@@ -1,0 +1,401 @@
+{
+ "rows": [
+  {
+   "name": "theta_true",
+   "src": "r1",
+   "med_E": 0.0,
+   "loopscore": 1.0,
+   "motion_energy_ratio": 1.0,
+   "R2_disp": 1.0
+  },
+  {
+   "name": "theta_hat_substep",
+   "src": "r1",
+   "med_E": 2.4486605598435523e-07,
+   "loopscore": 1.0,
+   "motion_energy_ratio": 0.9999997436198516,
+   "R2_disp": 0.9999999999562106
+  },
+  {
+   "name": "theta_hat_frame_ridge0",
+   "src": "r1",
+   "med_E": 0.5107167030778073,
+   "loopscore": -0.16362406313419342,
+   "motion_energy_ratio": 2.0307646065724385,
+   "R2_disp": -1.1942754192367468
+  },
+  {
+   "name": "theta_hat_frame_ridge1e-2",
+   "src": "r1",
+   "med_E": 0.7689980983827603,
+   "loopscore": -0.08541298657655716,
+   "motion_energy_ratio": 1.866162822930948,
+   "R2_disp": -1.3240912439294221
+  },
+  {
+   "name": "theta_const_E130_g1",
+   "src": "r1",
+   "med_E": 0.3179908965736199,
+   "loopscore": 0.7372344732284546,
+   "motion_energy_ratio": 0.9082534320782824,
+   "R2_disp": 0.8022619608724957
+  },
+  {
+   "name": "theta_shuffled_true",
+   "src": "r1",
+   "med_E": 0.5193848970307652,
+   "loopscore": 0.4955262243747711,
+   "motion_energy_ratio": 1.2161026493405929,
+   "R2_disp": 0.5595799500045155
+  },
+  {
+   "name": "theta_true_perturbed_0.01",
+   "src": "r1",
+   "med_E": 0.0023044726252488845,
+   "loopscore": 0.9997770190238953,
+   "motion_energy_ratio": 1.0005405745133118,
+   "R2_disp": 0.9999717187544358
+  },
+  {
+   "name": "theta_true_perturbed_0.03",
+   "src": "r1",
+   "med_E": 0.006913417875746569,
+   "loopscore": 0.9978299736976624,
+   "motion_energy_ratio": 1.001683948632867,
+   "R2_disp": 0.9997508203395915
+  },
+  {
+   "name": "theta_true_perturbed_0.1",
+   "src": "r1",
+   "med_E": 0.023044726252489017,
+   "loopscore": 0.9752336740493774,
+   "motion_energy_ratio": 1.006799374012921,
+   "R2_disp": 0.9972441519769941
+  },
+  {
+   "name": "theta_true_perturbed_0.3",
+   "src": "r1",
+   "med_E": 0.0691341787574668,
+   "loopscore": 0.8848890662193298,
+   "motion_energy_ratio": 1.0223855724136144,
+   "R2_disp": 0.9770699176844346
+  },
+  {
+   "name": "theta_true_x0jitter_0.01dx",
+   "src": "jitter",
+   "med_E": 0.0,
+   "loopscore": 0.9855053424835205,
+   "motion_energy_ratio": 0.9984237291852178,
+   "R2_disp": 0.9978031089532968
+  },
+  {
+   "name": "theta_true_x0jitter_0.1dx",
+   "src": "jitter",
+   "med_E": 0.0,
+   "loopscore": 0.6522238850593567,
+   "motion_energy_ratio": 1.0000142521614688,
+   "R2_disp": 0.794747420654172
+  },
+  {
+   "name": "theta_true",
+   "src": "r2a",
+   "med_E": 0.0,
+   "loopscore": 1.0,
+   "motion_energy_ratio": 1.0,
+   "R2_disp": 1.0
+  },
+  {
+   "name": "frame_vel_fd (ROUND 1)",
+   "src": "r2a",
+   "med_E": 0.5107167030778073,
+   "loopscore": -0.16362406313419342,
+   "motion_energy_ratio": 2.0307646065724385,
+   "R2_disp": -1.1942754192367468
+  },
+  {
+   "name": "frame_vel_ORACLEb",
+   "src": "r2a",
+   "med_E": 0.5158978447406986,
+   "loopscore": -0.10086433589458466,
+   "motion_energy_ratio": 1.9022361368976008,
+   "R2_disp": -0.8730046646791605
+  },
+  {
+   "name": "frame_DISP",
+   "src": "r2a",
+   "med_E": 0.2571675711971929,
+   "loopscore": 0.5864771604537964,
+   "motion_energy_ratio": 1.2156009267459422,
+   "R2_disp": 0.7471413312657378
+  },
+  {
+   "name": "frame_vel_fd_RESCALED(oracle k)",
+   "src": "r2a",
+   "med_E": 0.22549190277150247,
+   "loopscore": 0.7471264004707336,
+   "motion_energy_ratio": 0.6709151999693502,
+   "R2_disp": 0.6532800429493603
+  },
+  {
+   "name": "prior_draw",
+   "src": "r2a",
+   "med_E": 0.3620644274807667,
+   "loopscore": 0.6754720211029053,
+   "motion_energy_ratio": 0.7802263334685864,
+   "R2_disp": 0.6175674545587704
+  },
+  {
+   "name": "blind_E40_g1",
+   "src": "r2a",
+   "med_E": 0.6886594754105081,
+   "loopscore": -0.1799246221780777,
+   "motion_energy_ratio": 1.9457952171782842,
+   "R2_disp": -0.7665343644858222
+  },
+  {
+   "name": "blind_E130_g2",
+   "src": "r2a",
+   "med_E": 0.3179908965736199,
+   "loopscore": -0.2413901835680008,
+   "motion_energy_ratio": 2.072837111344158,
+   "R2_disp": -0.29377750230646305
+  },
+  {
+   "name": "blind_E60_g1.4",
+   "src": "r2a",
+   "med_E": 0.5329892131157622,
+   "loopscore": -0.3704978823661804,
+   "motion_energy_ratio": 2.180198786512061,
+   "R2_disp": -0.7765101462858588
+  },
+  {
+   "name": "true_gain_x0.6",
+   "src": "r2b",
+   "med_E": 0.0,
+   "loopscore": 0.7500119805335999,
+   "motion_energy_ratio": 0.5964848049063436,
+   "R2_disp": 0.6151893494822289
+  },
+  {
+   "name": "true_gain_x0.8",
+   "src": "r2b",
+   "med_E": 0.0,
+   "loopscore": 0.8328717947006226,
+   "motion_energy_ratio": 0.8016146890015655,
+   "R2_disp": 0.8905690643333001
+  },
+  {
+   "name": "true_gain_x0.9",
+   "src": "r2b",
+   "med_E": 0.0,
+   "loopscore": 0.9429596662521362,
+   "motion_energy_ratio": 0.9038974904519873,
+   "R2_disp": 0.9685921263038733
+  },
+  {
+   "name": "true_gain_x1.1",
+   "src": "r2b",
+   "med_E": 0.0,
+   "loopscore": 0.8562873601913452,
+   "motion_energy_ratio": 1.0956394640140041,
+   "R2_disp": 0.9685945826138282
+  },
+  {
+   "name": "true_gain_x1.25",
+   "src": "r2b",
+   "med_E": 0.0,
+   "loopscore": 0.6169818043708801,
+   "motion_energy_ratio": 1.2519211484557093,
+   "R2_disp": 0.8632010729870485
+  },
+  {
+   "name": "true_gain_x1.5",
+   "src": "r2b",
+   "med_E": 0.0,
+   "loopscore": 0.27831894159317017,
+   "motion_energy_ratio": 1.5829140284263867,
+   "R2_disp": 0.5726126647232199
+  },
+  {
+   "name": "true_gain_x1.8",
+   "src": "r2b",
+   "med_E": 0.0,
+   "loopscore": -0.17640401422977448,
+   "motion_energy_ratio": 1.9428819242926894,
+   "R2_disp": 0.03801479420716192
+  },
+  {
+   "name": "true_E_x0.5",
+   "src": "r2b",
+   "med_E": 0.5,
+   "loopscore": 0.22973300516605377,
+   "motion_energy_ratio": 1.516593122834624,
+   "R2_disp": 0.2721295895214917
+  },
+  {
+   "name": "true_E_x0.7",
+   "src": "r2b",
+   "med_E": 0.30000000000000004,
+   "loopscore": 0.6183828711509705,
+   "motion_energy_ratio": 1.2141404636693582,
+   "R2_disp": 0.7976733619279226
+  },
+  {
+   "name": "true_E_x1.5",
+   "src": "r2b",
+   "med_E": 0.5,
+   "loopscore": 0.7839952111244202,
+   "motion_energy_ratio": 0.7938692010513871,
+   "R2_disp": 0.752559392538085
+  },
+  {
+   "name": "true_E_x2",
+   "src": "r2b",
+   "med_E": 1.0,
+   "loopscore": 0.6770185828208923,
+   "motion_energy_ratio": 0.6829804265695261,
+   "R2_disp": 0.4102889144466656
+  },
+  {
+   "name": "blind_E80_g1",
+   "src": "r2b",
+   "med_E": 0.4526067126600551,
+   "loopscore": 0.5231487154960632,
+   "motion_energy_ratio": 1.2179122119888606,
+   "R2_disp": 0.7144092531374041
+  },
+  {
+   "name": "blind_E100_g1",
+   "src": "r2b",
+   "med_E": 0.40717345768983104,
+   "loopscore": 0.6385272145271301,
+   "motion_energy_ratio": 1.0797737445075923,
+   "R2_disp": 0.8287748614250039
+  },
+  {
+   "name": "blind_E115_g1",
+   "src": "r2b",
+   "med_E": 0.3634267721368896,
+   "loopscore": 0.6727827191352844,
+   "motion_energy_ratio": 0.9850053040040687,
+   "R2_disp": 0.8387017121092418
+  },
+  {
+   "name": "blind_E130_g1",
+   "src": "r2b",
+   "med_E": 0.3179908965736199,
+   "loopscore": 0.7372344732284546,
+   "motion_energy_ratio": 0.9082534320782824,
+   "R2_disp": 0.8022619608724957
+  },
+  {
+   "name": "blind_E160_g1",
+   "src": "r2b",
+   "med_E": 0.258660138847732,
+   "loopscore": 0.7012962102890015,
+   "motion_energy_ratio": 0.8158632734128988,
+   "R2_disp": 0.6806874562480771
+  },
+  {
+   "name": "blind_E200_g1",
+   "src": "r2b",
+   "med_E": 0.5567026229474594,
+   "loopscore": 0.6704671382904053,
+   "motion_energy_ratio": 0.7164042701137323,
+   "R2_disp": 0.4521701138207145
+  },
+  {
+   "name": "blind_E130_g0.85",
+   "src": "r2b",
+   "med_E": 0.3179908965736199,
+   "loopscore": 0.7371487617492676,
+   "motion_energy_ratio": 0.7767599032684502,
+   "R2_disp": 0.7228713170793072
+  },
+  {
+   "name": "blind_E130_g0.95",
+   "src": "r2b",
+   "med_E": 0.3179908965736199,
+   "loopscore": 0.7599048018455505,
+   "motion_energy_ratio": 0.8631981827618029,
+   "R2_disp": 0.7841991064013227
+  },
+  {
+   "name": "blind_E130_g1.05",
+   "src": "r2b",
+   "med_E": 0.3179908965736199,
+   "loopscore": 0.6984794735908508,
+   "motion_energy_ratio": 0.9603003886370535,
+   "R2_disp": 0.8151977776418023
+  },
+  {
+   "name": "frame_DISP_gaugefix",
+   "src": "r2b",
+   "med_E": 0.12280162823539062,
+   "loopscore": 0.7571872472763062,
+   "motion_energy_ratio": 0.6112084479529458,
+   "R2_disp": 0.6597204183265822
+  },
+  {
+   "name": "frame_vel_fd_gaugefix",
+   "src": "r2b",
+   "med_E": 0.22549190277150247,
+   "loopscore": 0.7471264004707336,
+   "motion_energy_ratio": 0.6709151999693502,
+   "R2_disp": 0.6532800429493603
+  },
+  {
+   "name": "frame_DISP_error_shuffled",
+   "src": "r2b",
+   "med_E": 0.2439979889169786,
+   "loopscore": 0.11476993560791016,
+   "motion_energy_ratio": 2.5831996902712087,
+   "R2_disp": -7.482708685747234
+  }
+ ],
+ "loopscore_vs_abs_log_energy_ratio": {
+  "intercept": 0.952734401193002,
+  "slope": -1.3398387484526493,
+  "R2_of_fit": 0.7530281712289184,
+  "corr": -0.8677719580793788,
+  "corr_with_med_E": -0.5076768667648622,
+  "partial_corr_med_E_after_amplitude": -0.3105684668786552,
+  "n": 42
+ },
+ "asymmetric_amplitude_fit": {
+  "overshoot": {
+   "n": 19,
+   "intercept": 0.8208229307374922,
+   "slope": -1.3149337575528763,
+   "R2_of_fit": 0.8528183615293428,
+   "corr": -0.9234816519722212,
+   "partial_corr_med_E": -0.4584811683509789,
+   "resid_rms": 0.1530166416512913
+  },
+  "undershoot": {
+   "n": 16,
+   "intercept": 0.771764082491324,
+   "slope": 0.09440964170228694,
+   "R2_of_fit": 0.04248855281240116,
+   "corr": 0.206127515903144,
+   "partial_corr_med_E": -0.620368528979566,
+   "resid_rms": 0.06380292680891443
+  }
+ },
+ "verdict": {
+  "headline_reproduced_bit_exactly": true,
+  "attack_A1_target_mismatch": "FAILED as an explanation: fd_accel vs endpoint-velocity mismatch is 0.336 at frame cadence but the oracle-b solve gives med|dE/E| 0.516 vs 0.511",
+  "attack_A2_displacement_readout": "SUCCEEDED: same A machinery, position read-out -> res 0.515 (was 0.819), med|dE/E| 0.257 (was 0.511), loopscore +0.587 (was -0.164)",
+  "attack_C_amplitude_confound": "SUCCEEDED: theta_true with gain x1.8 (per-cell EXACT) scores loopscore -0.176 at E_ratio 1.943, indistinguishable from theta_hat_frame -0.164 and blind_E40_g1 -0.180",
+  "best_tuned_blind_constant": {
+   "theta": "E=130 g=0.95",
+   "loopscore": 0.7599,
+   "med_E": 0.318
+  },
+  "best_frame_estimate_after_oracle_gauge_fix": {
+   "name": "frame_DISP_gaugefix",
+   "loopscore": 0.7572,
+   "med_E": 0.1228
+  }
+ }
+}

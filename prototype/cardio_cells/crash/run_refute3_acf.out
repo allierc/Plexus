@@ -1,0 +1,27 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 165 frames; window A = ticks 16..165 recorded
+[A] t0=165  none medE 0.2572 (finject 0.2572)   F_lerp medE 0.0078 (finject 0.0078)
+
+[C] wrong-F nulls the round did not run (t0=165)
+    F_lerp (round 3)                   |dF_inj|/|F|  1.38e-03  medE   0.0860  p90   0.2299  l2    0.181
+    F_identity                         |dF_inj|/|F|  1.35e-01  medE 705840.5429  p90 4756113.1586  l2 3593366.184
+    F_hold_only                        |dF_inj|/|F|  5.43e-03  medE   0.3899  p90   0.5236  l2    0.451
+    F_lerp_shuffled_particles          |dF_inj|/|F|  1.90e-01  medE   1.0020  p90   1.0208  l2    1.001
+    F_lerp_of_a_WRONG_model_E130_g1    |dF_inj|/|F|  4.68e-03  medE   0.1914  p90   0.3409  l2    0.270
+    F_lerp_increment_halved            |dF_inj|/|F|  2.90e-03  medE   0.2365  p90   0.3822  l2    0.315
+    F_lerp_increment_doubled           |dF_inj|/|F|  5.71e-03  medE   0.2572  p90   0.4372  l2    0.336
+
+[F] the restored state is an ORACLE in v, C and Jp; only pos and F are measured
+    v from a frame finite difference: rel err 1.000;  C from Fdot F^-1: rel err 0.423;  max|Jp-1| 0.00e+00
+    oracle_state                     medE   0.0377  p90   0.0857  l2     0.122
+    v <- frame finite difference     medE   1.9798  p90   3.3752  l2     2.297
+    C <- Fdot F^-1                   medE   0.0661  p90   0.1055  l2     0.119
+    both                             medE   1.9552  p90   3.3479  l2     2.271
+
+wrote refute3_acf.json [150 s]

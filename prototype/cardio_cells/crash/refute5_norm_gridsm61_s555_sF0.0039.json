@@ -1,0 +1,65 @@
+{
+ "config": {
+  "device": "cuda:0",
+  "cells": 100,
+  "per_parent": 100,
+  "n_grid": 128,
+  "warmup": 165,
+  "window": 150,
+  "dtype": "float64",
+  "mode": "full",
+  "e_lo": 40.0,
+  "e_hi": 220.0,
+  "g_lo": 0.5,
+  "g_hi": 1.5
+ },
+ "sigma_F": 0.0039,
+ "sigma_x": 1.99592e-05,
+ "K": 6,
+ "T": 8,
+ "seed": 555,
+ "tag": "refute5_norm_gridsm61_s555_sF0.0039",
+ "noise_mode": "gridsm",
+ "noise_nodes": 61,
+ "noise_control": {
+  "per_component_unit_std": 1.0022549268274146,
+  "per_cell_mean_std": 0.2797452488786039,
+  "effective_independent_per_cell": 12.778343587118023,
+  "note": "unit per-component input; a cell mean of k independent samples has std 1/sqrt(k), so 1/std^2 IS the effective sample count (round 5's indep model gives 100; the recording gives ~23)"
+ },
+ "frames": [
+  {
+   "tick": 165,
+   "y_obs_norm": 0.08468101811848687
+  },
+  {
+   "tick": 166,
+   "y_obs_norm": 0.08803963360621266
+  },
+  {
+   "tick": 167,
+   "y_obs_norm": 0.09017043509955712
+  },
+  {
+   "tick": 168,
+   "y_obs_norm": 0.09112883550580703
+  },
+  {
+   "tick": 169,
+   "y_obs_norm": 0.0909803026471699
+  },
+  {
+   "tick": 170,
+   "y_obs_norm": 0.08957114843644631
+  },
+  {
+   "tick": 171,
+   "y_obs_norm": 0.08703435464800009
+  },
+  {
+   "tick": 172,
+   "y_obs_norm": 0.08345652779073574
+  }
+ ],
+ "wall_seconds": 579.874279499054
+}

@@ -1,0 +1,45 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 165 frames; window A = ticks 16..165 recorded
+[frame] 10 substeps; |dF|/|F| over the frame 7.872e-03; max displacement 0.3215 dx
+        approximation error of the REALIZABLE injections: F_hold 4.878e-03  F_lerp 4.584e-04  C_hold 3.729e-01  C_lerp 8.777e-02
+[control] injecting the reference (F,C) reproduces the reference displacement to 0.000e+00 world (0.00e+00 dx); free run 0.000e+00
+
+[ladder] frame cadence (n_sub=10), displacement read-out
+    variant      affinity model_bias   fit_res     medE     medg       l2  negE       cond
+    none        5.146e-01  0.000e+00 3.925e-01   0.2572   0.2486   0.2900     0   3.95e+10
+    F_hold      6.752e-02  1.827e-02 2.168e-01   0.1401   0.1032   0.1513     0   3.99e+10
+    F_lerp      8.038e-02  5.256e-03 1.061e-01   0.0078   0.0045   0.0231     0   4.40e+10
+    F_true      7.967e-02  0.000e+00 7.782e-02   0.0091   0.0062   0.0125     0   4.40e+10
+    C_hold      3.099e-02  5.246e-03 7.596e-02   0.0267   0.0166   0.0276     0   3.38e+10
+    C_lerp      3.106e-02  1.688e-03 3.798e-02   0.0027   0.0022   0.0055     0   3.38e+10
+    C_true      3.111e-02  0.000e+00 3.031e-02   0.0038   0.0024   0.0063     0   3.38e+10
+    FC_hold     2.677e-02  1.345e-02 1.791e-01   0.0267   0.0449   0.0416     0   3.03e+10
+    FC_lerp     3.122e-02  4.048e-03 6.324e-02   0.0169   0.0107   0.0292     0   3.38e+10
+    FC_true     3.111e-02  0.000e+00 3.031e-02   0.0038   0.0024   0.0063     0   3.38e+10
+
+[noise] best realizable variant = F_lerp; Gaussian noise on the observed positions (1 px = 4.88e-4 world, dx = 7.812e-03)
+    sigma 0        med|dE/E| 0.0078  med|dg/g| 0.0045  l2 0.0231
+    sigma 1e-06    med|dE/E| 0.0092  med|dg/g| 0.0066  l2 0.2854
+    sigma 1e-05    med|dE/E| 0.0256  med|dg/g| 0.0339  l2 5.0903
+    sigma 0.0001   med|dE/E| 0.1986  med|dg/g| 0.3199  l2 19.0798
+
+[crash test] recovered thetas, 150-frame free rollout, margin-20, raw and 2-D gauged
+    theta_true medE  0.0000 | raw loop   1.0000 t1  1.000 | kE  1.000 kg  1.000 gauged loop   1.0000 R2   1.0000 r2cell  1.0000
+    none       medE  0.2572 | raw loop   0.5865 t1  1.216 | kE  1.796 kg  1.118 gauged loop   0.8277 R2   0.9471 r2cell  0.9740
+    F_hold     medE  0.1401 | raw loop   0.8867 t1  1.071 | kE  1.346 kg  1.091 gauged loop   0.9410 R2   0.9811 r2cell  0.9909
+    F_lerp     medE  0.0078 | raw loop   0.9997 t1  1.000 | kE  1.000 kg  1.000 gauged loop   0.9997 R2   0.9999 r2cell  1.0000
+    F_true     medE  0.0091 | raw loop   0.9986 t1  1.005 | kE  1.000 kg  1.000 gauged loop   0.9986 R2   0.9997 r2cell  1.0000
+    C_hold     medE  0.0267 | raw loop   0.9969 t1  0.990 | kE  1.000 kg  1.018 gauged loop   0.9968 R2   0.9992 r2cell  1.0000
+    C_lerp     medE  0.0027 | raw loop   0.9998 t1  1.001 | kE  1.000 kg  1.000 gauged loop   0.9998 R2   1.0000 r2cell  1.0000
+    C_true     medE  0.0038 | raw loop   0.9997 t1  1.002 | kE  1.000 kg  1.000 gauged loop   0.9997 R2   0.9999 r2cell  1.0000
+    FC_hold    medE  0.0267 | raw loop   0.9935 t1  1.011 | kE  0.989 kg  0.982 gauged loop   0.9920 R2   0.9968 r2cell  0.9998
+    FC_lerp    medE  0.0169 | raw loop   0.9985 t1  0.995 | kE  1.000 kg  1.000 gauged loop   0.9985 R2   0.9997 r2cell  1.0000
+    FC_true    medE  0.0038 | raw loop   0.9997 t1  1.002 | kE  1.000 kg  1.000 gauged loop   0.9997 R2   0.9999 r2cell  1.0000
+
+wrote finject.json [383 s]

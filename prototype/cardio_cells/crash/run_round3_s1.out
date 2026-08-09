@@ -1,0 +1,32 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 165 frames; window A = ticks 16..165 recorded
+[percell] 95/100 cells kept; a_ref/dx 0.003 .. 1.310 .. 3.259
+[solve] substep med|dE/E| 2.449e-07; frame med|dE/E| 0.5107
+[shard 1/2] 16/30 candidates
+
+[crash test] 150-frame free rollouts from tick 165, margin-20; RAW and 2-D GAUGED (|t1-1|,|t2-1| <= 0.01)
+    candidate                         medE  rawloop     t1     t2     kE     kg  gauloop    gauR2  r2cell  nx
+    theta_true                      0.0000   1.0000  1.000  1.000  1.000  1.000   1.0000   1.0000  1.0000   0  [already at (1,1), 8s]
+    theta_hat_substep               0.0000   1.0000  1.000  1.000  1.000  1.000   1.0000   1.0000  1.0000   0  [already at (1,1), 8s]
+    theta_hat_frame_ridge1e-2       0.7690  -0.0854  1.866  0.851  2.957  1.074   0.4164   0.4738  0.8759  10  [max iters, 94s]
+    theta_true_perturbed_0.01       0.0023   0.9998  1.001  0.999  1.000  1.000   0.9998   1.0000  1.0000   0  [already at (1,1), 8s]
+    theta_true_perturbed_0.1        0.0230   0.9752  1.007  1.008  1.000  1.000   0.9752   0.9972  0.9997   0  [already at (1,1), 8s]
+    theta_true_x0jitter_0.01dx      0.0000   0.9855  0.998  1.002  1.000  1.000   0.9855   0.9978  0.9999   0  [already at (1,1), 8s]
+    frame_DISP                      0.2572   0.5865  1.216  0.917  1.796  1.118   0.8277   0.9471  0.9740   5  [converged, 55s]
+    true_gain_x1.8                  0.0000  -0.1764  1.943  1.096  1.006  0.560   0.9994   0.9999  1.0000   7  [converged, 70s]
+    true_E_x0.5                     0.5000   0.2297  1.517  0.977  2.042  1.018   0.9981   0.9997  1.0000   4  [converged, 47s]
+    bank_blind_E40_g1               0.6887  -0.1799  1.946  0.927  4.909  1.348   0.5631   0.6414  0.9335   4  [converged, 47s]
+    bank_blind_E90_g1               0.4323   0.5886  1.138  0.930  2.089  1.309   0.5930   0.6657  0.9365  10  [max iters, 94s]
+    bank_blind_E180_g1              0.4010   0.6686  0.760  1.032  1.068  1.323   0.5853   0.6529  0.9353   8  [converged, 78s]
+    bank_blind_E320_g1              1.4907   0.5524  0.574  1.058  2.718  1.687   0.3429  -0.8627  0.7555   4  [diverged, 47s]
+    bank_prior_draw_101             0.4324   0.6591  1.207  0.996  2.639  1.219   0.4281  -0.2108  0.7873  10  [converged, 94s]
+    bank_prior_draw_303             0.4822   0.6270  1.162  1.032  1.205  0.978   0.6488   0.6412  0.9454   8  [converged, 79s]
+    bank_geom_radius                0.4660   0.2456  1.607  0.746  2.312  1.113   0.2611  -0.7909  0.7820  10  [max iters, 94s]
+
+wrote crash_round3_s1.json  [868 s]

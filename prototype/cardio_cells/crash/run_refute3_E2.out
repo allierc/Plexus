@@ -1,0 +1,25 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 40 frames; window A = ticks 1..40 recorded
+
+[E] MULTI-FRAME STACKING, sigma_F = 0.0039 coherent per frame, T up to 8
+         noise   T     medE     p90E        l2  negE       cond
+                       none_T1 medE   0.0308 p90   0.3616 l2     1.585 negE   1.0 cond   4.40e+10
+                       none_T2 medE   0.0215 p90   0.3073 l2     3.881 negE   1.0 cond   5.06e+10
+                       none_T4 medE   0.0162 p90   0.1996 l2     0.991 negE   2.0 cond   6.46e+10
+                       none_T8 medE   0.0163 p90   0.0917 l2     1.028 negE   0.0 cond   9.81e+10
+        white_across_frames_T1 medE   0.5391 p90   1.0152 l2     0.708 negE  11.7 cond   3.68e+10
+        white_across_frames_T2 medE   0.5427 p90   1.0003 l2     0.701 negE   9.0 cond   4.19e+10
+        white_across_frames_T4 medE   0.5036 p90   0.9915 l2     0.684 negE   9.0 cond   5.22e+10
+        white_across_frames_T8 medE   0.4680 p90   0.9782 l2     0.660 negE   6.0 cond   8.00e+10
+                static_bias_T1 medE   0.6930 p90   1.0202 l2     0.774 negE  14.3 cond   3.65e+10
+                static_bias_T2 medE   0.6927 p90   1.0106 l2     0.765 negE  13.7 cond   4.18e+10
+                static_bias_T4 medE   0.6629 p90   1.0034 l2     0.754 negE  11.3 cond   5.32e+10
+                static_bias_T8 medE   0.6442 p90   0.9926 l2     0.731 negE   7.3 cond   8.16e+10
+
+wrote refute3_E2.json [593 s]

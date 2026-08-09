@@ -1,0 +1,56 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 40 frames; window A = ticks 1..40 recorded
+[A] t0=165  none medE 0.2572 (finject 0.2572)   F_lerp medE 0.0078 (finject 0.0078)
+
+[C] wrong-F nulls the round did not run (t0=165)
+    F_lerp (round 3)                   |dF_inj|/|F|  4.58e-04  medE   0.0078  p90   0.0330  l2    0.023
+    F_identity                         |dF_inj|/|F|  1.32e-01  medE 387206.0450  p90 2368388.2200  l2 1750012.936
+    F_hold_only                        |dF_inj|/|F|  4.88e-03  medE   0.1401  p90   0.1966  l2    0.151
+    F_lerp_shuffled_particles          |dF_inj|/|F|  1.86e-01  medE   1.0015  p90   1.0112  l2    1.001
+    F_lerp_of_a_WRONG_model_E130_g1    |dF_inj|/|F|  3.70e-03  medE   0.2150  p90   0.3772  l2    0.302
+    F_lerp_increment_halved            |dF_inj|/|F|  2.46e-03  medE   0.0519  p90   0.0765  l2    0.055
+    F_lerp_increment_doubled           |dF_inj|/|F|  4.94e-03  medE   0.0646  p90   0.1253  l2    0.082
+
+[D] the noise model: round 3 redraws F error at EVERY substep; the realizable estimator measures F once per frame
+      sigma_F                  model     medE     p90E        l2
+      2.0e-04      white_per_substep   0.0364   0.3328     0.661
+      2.0e-04     coherent_per_frame   0.0387   0.3184     0.358
+      5.0e-04      white_per_substep   0.0372   0.3269     0.414
+      5.0e-04     coherent_per_frame   0.0457   0.3563     0.384
+      1.0e-03      white_per_substep   0.0460   0.4364     0.327
+      1.0e-03     coherent_per_frame   0.0938   0.7100     0.429
+      2.0e-03      white_per_substep   0.0871   0.6500     0.411
+      2.0e-03     coherent_per_frame   0.2437   0.9332     0.578
+      3.9e-03      white_per_substep   0.2592   0.8908     0.555
+      3.9e-03     coherent_per_frame   0.5571   1.0032     0.716
+
+[E] MULTI-FRAME STACKING, sigma_F = 0.0039 coherent per frame, T up to 8
+         noise   T     medE     p90E        l2  negE       cond
+                       none_T1 medE   0.0579 p90   0.4583 l2     4.484 negE   4.0 cond   4.40e+10
+                       none_T2 medE   0.0263 p90   0.2582 l2     3.653 negE   2.0 cond   5.06e+10
+                       none_T4 medE   0.0207 p90   0.1705 l2     3.680 negE   3.0 cond   6.46e+10
+                       none_T8 medE   0.0189 p90   0.1230 l2     1.983 negE   1.0 cond   9.81e+10
+        white_across_frames_T1 medE   0.5166 p90   1.0078 l2     0.738 negE  12.3 cond   3.57e+10
+        white_across_frames_T2 medE   0.5216 p90   1.0046 l2     0.723 negE   9.7 cond   4.18e+10
+        white_across_frames_T4 medE   0.4965 p90   0.9784 l2     0.699 negE   7.3 cond   5.31e+10
+        white_across_frames_T8 medE   0.4761 p90   0.9747 l2     0.665 negE   6.3 cond   8.02e+10
+                static_bias_T1 medE   0.6727 p90   1.0094 l2     0.784 negE  12.0 cond   3.63e+10
+                static_bias_T2 medE   0.6944 p90   0.9970 l2     0.762 negE  10.3 cond   4.15e+10
+                static_bias_T4 medE   0.6744 p90   0.9943 l2     0.754 negE   7.7 cond   5.28e+10
+                static_bias_T8 medE   0.6328 p90   0.9812 l2     0.733 negE   5.3 cond   8.10e+10
+
+[F] the restored state is an ORACLE in v, C and Jp; only pos and F are measured
+    v from a frame finite difference: rel err backward 0.037 centred 0.010;  C from Fdot F^-1: rel err 0.281;  max|Jp-1| 0.00e+00
+    oracle_state                     medE   0.0078  p90   0.0330  l2     0.023
+    v <- backward frame fd           medE   0.2834  p90   0.3274  l2     0.285
+    v <- centred frame fd            medE   0.0227  p90   0.0381  l2     0.029
+    C <- Fdot F^-1                   medE   0.0125  p90   0.0228  l2     0.019
+    both (centred v, C_fd)           medE   0.0404  p90   0.0582  l2     0.043
+
+wrote refute3_acdfe.json [1060 s]

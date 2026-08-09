@@ -1,0 +1,102 @@
+{
+ "path": "/groups/saalfeld/home/allierc/GraphData/graphs_data/cardiomyocytes_real_data/Cardio_1/0_B_15kPa_1_MMStack_Pos0.ome.tif.derivatives.npy",
+ "shape": [
+  239,
+  137,
+  137,
+  12
+ ],
+ "grid": {
+  "dx_px_axis1": 15.026214599609375,
+  "dy_px_axis0": 14.975845336914062,
+  "dx_px_axis0": -0.01975392922759056,
+  "dy_px_axis1": 0.005552232265472412
+ },
+ "displacement_px": {
+  "p50": 1.04737722792154,
+  "p99": 7.763887881362996,
+  "max": 14.887607041469787
+ },
+ "gradu_norm": {
+  "p50": 0.02795789600974963,
+  "p99": 0.18535431429690805,
+  "max": 0.4449816391443697
+ },
+ "eval_mask": {
+  "n_nodes": 17499,
+  "n_total": 18769,
+  "threshold_px": 2.2021985712970027
+ },
+ "within_frame_curvature": {
+  "fit_beat": {
+   "frame_to_frame_dF_over_F": {
+    "p50": 0.17776676748855524,
+    "p90": 0.400033822490158,
+    "mean": 0.2189172743666424
+   },
+   "abs_dF_per_frame": {
+    "p50": 0.004550099380576979,
+    "p90": 0.021199761802662677,
+    "mean": 0.008597141604393697
+   },
+   "abs_d2F_per_frame": {
+    "p50": 0.0070304985479794704,
+    "p90": 0.022268650982164566,
+    "mean": 0.010386157801052261
+   },
+   "lerp_bulge_over_dF": {
+    "p50": 0.1811761043092007,
+    "p90": 0.30551374020818367,
+    "mean": 0.19535366691467262
+   }
+  },
+  "whole_recording": {
+   "frame_to_frame_dF_over_F": {
+    "p50": 0.19755415560342143,
+    "p90": 0.5036175405482163,
+    "mean": 0.29354589665547465
+   },
+   "abs_dF_per_frame": {
+    "p50": 0.005288739591734224,
+    "p90": 0.025582719954278497,
+    "mean": 0.010511139592638708
+   },
+   "abs_d2F_per_frame": {
+    "p50": 0.007832736575889931,
+    "p90": 0.02616953525774626,
+    "mean": 0.01208305724658753
+   },
+   "lerp_bulge_over_dF": {
+    "p50": 0.1728909006323789,
+    "p90": 0.29983764190227796,
+    "mean": 0.18864085818700135
+   }
+  }
+ },
+ "consistency_measured_vs_finite_difference": {
+  "abs": {
+   "p50": 0.032674597937925355,
+   "p90": 0.061329849927272265,
+   "mean": 0.03646563053000109
+  },
+  "relative": {
+   "p50": 0.9748874595214017,
+   "p90": 2.46329366346838,
+   "mean": 1.282255603676146
+  },
+  "note": "central difference of the measured displacement on the 15-px grid vs the recording's own derivative channels; a lower bound on |dF| of the two together"
+ },
+ "noise_sigma_F_from_quiet_stretch": {
+  "frames": [
+   30,
+   49
+  ],
+  "sigma_F": 0.0038827334059838175,
+  "sigma_F_over_p99_gradu": 0.02094762898134811,
+  "note": "|F| here is the Frobenius norm of the 2x2 grad u, so sigma_F is per-node, all four components together"
+ },
+ "signal_to_noise": {
+  "median_dF_per_frame_over_sigma_F": 1.1718804524577093,
+  "p90_dF_per_frame_over_sigma_F": 5.460009633932367
+ }
+}

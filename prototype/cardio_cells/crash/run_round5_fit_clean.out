@@ -1,0 +1,19 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 165 frames; window A = ticks 16..165 recorded
+[frames] 8 consecutive frames from tick 165 (ticks 165..172)
+    frame 0 (tick 165) assembled + 0 re-noisings [22s]
+    frame 1 (tick 166) assembled + 0 re-noisings [33s]
+    frame 2 (tick 167) assembled + 0 re-noisings [43s]
+    frame 3 (tick 168) assembled + 0 re-noisings [53s]
+    frame 4 (tick 169) assembled + 0 re-noisings [63s]
+    frame 5 (tick 170) assembled + 0 re-noisings [73s]
+    frame 6 (tick 171) assembled + 0 re-noisings [83s]
+    frame 7 (tick 172) assembled + 0 re-noisings [93s]
+
+wrote round5_norm_clean.npz [93 s]

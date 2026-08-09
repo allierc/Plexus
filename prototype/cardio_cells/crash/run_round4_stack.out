@@ -1,0 +1,26 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 165 frames; window A = ticks 16..165 recorded
+[frames] 8 consecutive frames from tick 165; |F1-F0| per frame ['7.87e-03', '8.28e-03', '8.47e-03', '8.67e-03']
+    frame 0 (tick 165) assembled + 6 re-noisings [84s]
+    frame 1 (tick 166) assembled + 6 re-noisings [155s]
+    frame 2 (tick 167) assembled + 6 re-noisings [225s]
+    frame 3 (tick 168) assembled + 6 re-noisings [296s]
+    frame 4 (tick 169) assembled + 6 re-noisings [367s]
+    frame 5 (tick 170) assembled + 6 re-noisings [437s]
+    frame 6 (tick 171) assembled + 6 re-noisings [508s]
+    frame 7 (tick 172) assembled + 6 re-noisings [578s]
+
+[stack] sigma_F 0.0039 coherent per boundary, K=6
+      T  naive medE  naive mr  snr0 medE  snr0 mr  snr.3 medE  snr.3 mr  snr1 medE  snr1 mr  rank1   n>1
+      1      0.5574     0.400     0.1741   -0.996      0.1619     0.577     0.2090    0.467    135   135
+      2      0.5548     0.400     0.0680    0.984      0.1353     0.577     0.2403    0.454    133   133
+      4      0.4982     0.411     0.0591    1.079      0.0747     0.548     0.2083    0.479    138   138
+      8      0.4674     0.434     0.0546    1.173      0.0707     0.645     0.1725    0.489    138   138
+
+wrote round4_stack.json [578 s]

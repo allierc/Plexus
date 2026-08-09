@@ -1,0 +1,22 @@
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:161: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cx = torch.bincount(lab_in, weights=wx_in, minlength=n_cells + 1) / cnt
+/workspace/Plexus/src/plexus/operators/segmentation_seed.py:162: UserWarning: _bincount_cuda does not have a deterministic implementation, but you set 'torch.use_deterministic_algorithms(True, warn_only=True)'. You can file an issue at https://github.com/pytorch/pytorch/issues to help us prioritize adding deterministic support for this operation. (Triggered internally at /pytorch/aten/src/ATen/Context.cpp:157.)
+  cy = torch.bincount(lab_in, weights=wy_in, minlength=n_cells + 1) / cnt
+  [seed_from_segmentation] 100 cells from 'cells'; 10000 particles (100 per cell); youngs 45-220 from deterministic spread (no props file); cell centres seeded: 100
+[planted] C=100 Np=10000 grid 128^2 dtype=torch.float64 dx=0.0078125
+          E in [40.0,216.3]  gain in [0.503,1.499]  dt=0.002 dt_sub=0.0002 (10 substeps/frame)
+          warm-up 40 frames; window A = ticks 1..40 recorded
+
+[B] t0 sweep -- is 0.0078 the method or the state?
+       t0  |dF|frame      none    F_hold    F_lerp    F_true    C_lerp    C_true    p90 Fl  zc
+       45   1.92e-03    0.3312    0.1048    0.0035    0.0049    0.0019    0.0018    0.0117 100
+       75   1.81e-02    0.2050    0.6219    0.3191    0.0029    0.2852    0.0024    0.7401 100
+      105   2.14e-02    0.2141    0.6202    0.2796    0.0029    0.2841    0.0024    0.7380 100
+      120   2.18e-02    0.2158    0.6197    0.2822    0.0030    0.2823    0.0025    0.7392 100
+      135   2.19e-02    0.2197    0.6196    0.2833    0.0030    0.2817    0.0025    0.7390 100
+      150   2.20e-02    0.2228    0.6196    0.2838    0.0030    0.2814    0.0025    0.7389 100
+      165   3.76e-02    0.2181    0.6032    0.2126    0.0050    0.2534    0.0030    0.6974   0
+      180   1.15e-01    0.2763    0.6221    0.3643    0.0170    0.3801    0.0168    0.8382 102
+      195   1.76e-01    0.3257    0.6584    0.4088    0.0213    0.4546    0.0305    0.9953 105
+
+wrote refute3_B2.json [561 s]
