@@ -22,6 +22,8 @@ import json
 import os
 import sys
 
+import time
+
 import numpy as np
 import yaml
 
@@ -64,7 +66,9 @@ def main():
     # numbers it cannot ring at all. Critical damping of that mode needs drag = 2*omega = 162, which
     # a drop test cannot have -- terminal velocity g/drag would then be 0.015 box/s and the block would
     # need 19 s to reach the floor. This flag is what makes the trade-off measurable instead of argued.
-    spec = T2.build(name, frames, drag=arg("--drag", 0.05, float))
+    spec = T2.build(name, frames, drag=arg("--drag", 0.05, float),
+                    sub=arg("--sub", 2.0e-4, float),
+                    n_particles=arg("--particles", 90000, int))
     # THE CAUCHY STRESS THE SOLVER ITSELF COMPUTED, kept instead of discarded. `mpm_scatter` builds
     # tau = J.sigma every substep to make the affine momentum matrix and then overwrites it; with
     # `store_stress` it caches sigma = tau/J to a per-particle buffer. It is only worth paying for
@@ -83,7 +87,10 @@ def main():
     per = max(1, spec["sets"]["mpm_particle"]["per_parent"] // spec["operators"][1]["n_fibres"])
 
     ecm_ops.STRESS_HISTORY.clear(); ecm_ops.STRESS_RAW.clear()
+    t0 = time.time()
     H, out = engine_run(schema.load(path), device=dev)
+    solve_s = time.time() - t0
+    print(f"[{name}] SOLVE {solve_s:.1f} s for {frames} frames", flush=True)
     P = np.asarray(out["sets"]["mpm_particle"]["pos"], np.float32)
     band = [np.asarray(b) for b in ecm_ops.STRESS_HISTORY] or [np.zeros(P.shape[1], np.uint8)] * len(P)
     vm = [np.asarray(v, np.float32) for v in ecm_ops.STRESS_RAW] or None

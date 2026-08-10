@@ -1,0 +1,321 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[margin=1.9cm]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage[T1]{fontenc}
+\usepackage{microtype}
+\usepackage[colorlinks,linkcolor=black,citecolor=black,urlcolor=blue]{hyperref}
+\usepackage{titlesec}
+\titlespacing*{\section}{0pt}{6pt}{2pt}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\op}[1]{\texttt{#1}}
+\title{\vspace{-1.4cm}\textbf{What a fibre is in this matrix, and what it is not}}
+\author{}
+\date{\vspace{-0.9cm}\small \texttt{prototype/ecm/block\_bounce.py} $\cdot$
+\texttt{prototype/ecm/block\_metrics.py} $\cdot$
+\texttt{log/okuda\_ECM/02b--02h} $\cdot$ 10 August 2026}
+\setlength{\parindent}{0pt}\setlength{\parskip}{0.55em}
+\begin{document}\maketitle\vspace{-1.0cm}
+
+\section*{1.\; The question, which is about resolution and not about collagen}
+
+\op{seed\_ecm} lays the matrix down as strands: $1500$ straight segments, each carrying $60$ of the
+$90{,}000$ particles, with a shared orientation and a little across-strand jitter. The movies then show
+fibres being dragged and splayed, and every statement anyone has been tempted to make from those movies
+is about \emph{fibres}. The operator's own docstring warns that they are geometry and not mechanics.
+This note measures whether that warning is right, and it is: the strands are an arrangement of the mass,
+and the material responds as though they were not there.
+
+Two facts decide it before anything moves, and both are arithmetic on the spec. The background grid is
+$64^3$, so a cell is $1/64 = 0.0156$ box units. A strand is $0.09$ long --- $5.8$ cells --- and its
+particles sit $0.0015$ apart, a \emph{tenth} of a cell, while the jitter that gives the strand its
+thickness is $0.004$, a \emph{quarter} of a cell. So the grid resolves a strand along its length and
+cannot resolve it across: about ten particles of one strand land in a single cell and are interpolated
+into one velocity. And no force is ever computed between two particles of the same strand --- MLS-MPM
+computes nothing between two points directly \cite{sulsky1994,hu2018}, and \op{seed\_ecm} writes each
+particle's unit fibre vector to an attribute on the operator object that no other operator reads.
+
+A fibre in this model is therefore three things it should not be at once: a line the renderer draws by
+index arithmetic (\code{particle i} belongs to \code{fibre i//per}), a clump of mass the grid smears,
+and a direction stored where nothing can use it.
+
+\section*{2.\; A load that arrives}
+
+Every earlier run loads the matrix the same way --- slowly, outward, everywhere at once --- so none of
+them can say whether it carries stress the way a fibrous material should, because there is no moment at
+which the load appears. A block falling under gravity onto the floor is the cheapest load that
+\emph{arrives}: the impact is a front travelling up through the strands, and the block either returns
+the drop or keeps it.
+
+Seven runs, all $1500$ strands in a cube of $0.4\times0.32\times0.4$ box units with a spherical cavity
+of radius $0.07$, $720$ frames at $\Delta t = 3.2\times10^{-3}$, differing in one number apiece. What is
+measured is in \code{block\_metrics.py}: the bulk (height, energy, the fraction of the drop each impact
+returns), the shape (the three dimensions against their own seeded values), and the fibre state --- the
+three things a strand can do that a continuum cannot, which are stretch along itself, bow sideways, and
+turn.
+
+\textbf{End-to-end, not contour.} The jitter is $0.004$ across a strand whose particles are $0.0015$
+apart, so the contour is a random walk at the particle scale and is six times the end-to-end distance
+before anything has moved ($0.163$ at frame $0$, and $0.163$ again at frame $360$). Any per-segment
+measure reports the seeding noise. End-to-end length, and the RMS distance of a strand's particles from
+its own end-to-end axis, are both taken over the whole strand, where the jitter averages down.
+
+\section*{3.\; The strands do nothing a continuum would not}
+
+Through an impact that compresses the block to $0.914$ of its seeded height, a strand's end-to-end
+length falls to $0.982$ of the $0.0896$ box units it was seeded with, and returns to $0.999$. Its bow
+goes $0.00824 \to 0.00827 \to 0.00826$ box units --- an excursion of $0.4\%$ --- and the orientation
+order parameter about the drop axis moves by $0.04$. Nothing buckles, nothing stays stretched, nothing
+turns.
+
+That is not a surprise and it is not a bug: it is the prediction of the constitutive law. \op{mpm\_scatter}
+computes a fixed-corotated stress from $\mathbf F$ alone and reads the strand direction nowhere, so the
+only anisotropy this matrix can express is \emph{where the mass happens to be}. It is also what the
+earlier alignment campaign found the expensive way --- \code{align 0.85} about one axis bought a
+directional pressure difference of $1.50\times$, and a shape only appeared once the fibres were
+\emph{redistributed} to put three times as many within $55^\circ$ of the poles, which changes the density
+the grid sees rather than the direction it responds to.
+
+\section*{4.\; The readout had been the wrong quantity}
+
+\op{ecm\_stress} defaulted to \code{measure: vol}, which is $|J-1|$, the local volume change --- and an
+impact is a shear. With \code{store\_stress: true} on \op{mpm\_scatter} the solver keeps the Cauchy
+stress it already computes to build the grid forces, and \code{measure: vonmises} reads its invariant
+instead. On the \emph{same trajectory} --- the positions are bit-identical, checked element by element
+over $721\times90{,}000\times3$ floats, so this is a readout and not a mechanism --- the two differ by a
+factor of $250$: at frame $200$, $|J-1|$ gives mean $0.0040$ and p99 $0.0173$, the von Mises gives mean
+$1.11$ and p99 $4.16$ in stress units, peaking at p99 $42.4$ just after first contact. It costs $45\%$
+more wall clock and it is the difference between seeing the front and not. One thing to carry: the
+run-time \code{stress\_scale} of $2\times10^{-5}$ was chosen for $|J-1|$ and saturates every band under
+von Mises; the movie re-bands from the recorded raw values (full scale $9.406$, the p99 over the run),
+but \code{node\_type} in the trajectory is pinned.
+
+\section*{5.\; The block rings, and an extracellular matrix does not}
+
+After the impact every shape metric oscillates. The measured period is $24.2$ frames, $0.0775$ s,
+$12.9$ Hz, against the $17.1$ Hz that a free--free bar of length $0.32$ at $c=\sqrt{E/\rho}=10.95$ box
+units per second would have --- so it is the block's own elastic breathing mode, real physics of the
+material as specified. It is nonetheless biologically wrong. The stock \code{drag} of $0.05$ is a
+velocity decay time of $1/\code{drag} = 20$ s, which is $260$ ringing periods and $8.7$ times the whole
+$2.31$ s run: this matrix is effectively undamped. A hydrated matrix dissipates by solvent forced
+through the network, and at $\mathrm{Re}\sim10^{-10}$ it cannot ring at all.
+
+\code{drag} is the right lever and needs no new operator --- it is a Stokes term on the network
+velocity, which is what Darcy drag is. Raising it costs nothing:
+
+\smallskip
+{\small\begin{tabular}{@{}lccccc@{}}\toprule
+run & \code{drag} & ripple, as a fraction & height returned at & bounding volume & median residual\\
+    &             & of the seeded height  & the first impact   & at the last frame & displacement (box units)\\\midrule
+\op{02c} & $0.05$ & $0.00813$ & $0.707$ & $1.172$ & $0.03604$\\
+\op{02d\_drag2} & $2$ & $0.00475$ & $0.293$ & $0.999$ & $0.00264$\\
+\op{02d\_drag8} & $8$ & $0.00054$ & $0.048$ & $0.997$ & $0.00108$\\
+\bottomrule\end{tabular}}
+\smallskip
+
+The damping that removes the ringing removes the bounce with it: at \code{drag}$=8$ the block returns
+$4.8\%$ of what it fell. There is no bouncing experiment in the regime where the material is physical,
+and the three impacts of \op{02b} are a property of an undamped solid rather than of a matrix.
+
+\section*{6.\; What was read as creep, and was not}
+
+The undamped runs showed the block slowly inflating --- bounding volume rising to $1.34$ of its seeded
+value by frame $560$, median particle displacement with the block's own translation removed reaching
+$0.036$ box units, which is $2.3$ grid cells --- and I reported that as the one irreversible thing the
+material did. It is not the material. At \code{drag}$=2$ the volume ends at $0.999$ and the residual
+displacement at $0.0026$, smaller by a factor of $13.6$; at \code{drag}$=8$, $0.0011$. It was undamped
+particle noise accumulating, and the only reason it looked like creep is that it was monotone.
+
+The general form of that mistake is worth keeping: a quantity that only ever increases is not thereby a
+material property, and the cheapest test of whether it is one is to change the damping, which no
+material property should notice.
+
+\begin{figure}[t]\centering
+\includegraphics[width=\textwidth]{../log/okuda_ECM/02c_ecm_block_vonmises/material.png}
+\caption{\op{02c}, the undamped block, $721$ frames. \textbf{a--c} three impacts, and the height returned
+falling $0.707\to0.612\to0.416$, which reads as dissipation and is in fact the block coming apart ---
+\textbf{e} shows its bounding volume growing to $1.34$ of the seeded value. \textbf{d--e} ring at
+$12.9$ Hz, the block's own elastic mode. \textbf{f--g} are the fibre state and are the point: the
+end-to-end stretch recovers to $0.999$ and the bow moves by $0.4\%$, so the strands ride the continuum.
+Everything in \textbf{e}, and the orange trace in \textbf{h}, is removed by \code{drag}$=2$.}
+\end{figure}
+
+\section*{7.\; What each lever costs, measured}
+
+Four runs, each changing one number from the \code{drag}$=2$ configuration, all $720$ frames, solve time
+timed inside the script and excluding rendering. The last row changes three numbers at once and is the
+configuration \S9 proposes.
+
+\smallskip
+{\small\begin{tabular}{@{}llccrrcccc@{}}\toprule
+run & what changed & particles & substeps & solve (s) & speed-up &
+first impact & height returned & peak compression & fibre stretch\\
+ & & & per frame & & & (frame) & at that impact & (of seeded height) & (minimum)\\\midrule
+\multicolumn{10}{@{}l}{\textit{against the \code{drag}=2 control}}\\
+\op{02d\_drag2} & --- & $90{,}000$ & $16$ & $\sim678^\ast$ & $1.0$ & $181$ & $0.293$ & $0.9468$ & $0.9881$\\
+\op{02e\_sub4} & $\Delta t_{\rm sub}\,4\!\times\!10^{-4}$ & $90{,}000$ & $8$ & $339.1$ & $2.0$ & $181$ & $0.304$ & $0.9439$ & $0.9880$\\
+\op{02f\_sub8} & $\Delta t_{\rm sub}\,8\!\times\!10^{-4}$ & $90{,}000$ & $4$ & $180.6$ & $3.8$ & $182$ & $0.314$ & $0.9415$ & $0.9879$\\
+\op{02g\_p30k} & $20$ particles per strand & $30{,}000$ & $16$ & $261.9$ & $2.6$ & $181$ & $0.280$ & $0.9443$ & $0.9875$\\\midrule
+\multicolumn{10}{@{}l}{\textit{against the \code{drag}=8 control}}\\
+\op{02d\_drag8} & --- & $90{,}000$ & $16$ & $\sim678^\ast$ & $1.0$ & $314$ & $0.048$ & $0.9868$ & $0.9962$\\
+\op{02h\_lean} & all three & $30{,}000$ & $8$ & $\mathbf{115.5}$ & $\mathbf{5.9}$ & $315$ & $0.043$ & $0.9854$ & $0.9960$\\
+\bottomrule\end{tabular}}
+
+{\footnotesize $^\ast$ implied, not timed: the timer was added after those runs. Solve time is exactly
+linear in substeps at fixed particle count ($339.1$ s at $8$, $180.6$ s at $4$, i.e.\ $42.4$ and $45.2$ s
+per substep-set), and \op{02c}'s wall clock including compression was $1086$ s.}
+\smallskip
+
+Two levers, and both were being paid for without buying anything. The substep was $\Delta t_{\rm sub} =
+2\times10^{-4}$ against a CFL limit of $\mathrm{d}x/c = 1.4\times10^{-3}$ --- a factor of seven of
+headroom. Halving the substep count moves the peak compression by $0.3\%$ and the fibre stretch by
+$0.01\%$; quartering it moves them by $0.6\%$ and $0.02\%$ and is still stable, which is why the
+proposal takes the safe half rather than the quarter. And $60$ particles per strand put ten of them in
+one grid cell, so two thirds of them are describing a strand at a resolution the grid discards: at $20$
+per strand the peak compression moves by $0.26\%$ and the run is $2.6\times$ cheaper. Combined, the
+lean configuration reproduces its control to within one frame on the impact, $0.14\%$ on the peak
+compression and $0.02\%$ on the fibre stretch, at $5.9\times$ less compute.
+
+\section*{8.\; What would falsify a fibre model}
+
+Nothing above needs fibres to explain it, so nothing above can falsify a fibre model either. What a real
+fibre network does, in the order the property matters: it carries load along its axis in tension and
+buckles under $\sim\pi^2EI/L^2$ in compression, which for a fibril of aspect ratio $100$ is $10^{-4}$ of
+its tensile stiffness; that asymmetry is what produces strain stiffening as the network goes from
+bending-dominated to stretch-dominated near $10$--$20\%$ strain \cite{storm2005,licup2015}, and
+long-range transmission, where displacement decays like $r^{-0.5}$ to $r^{-1}$ instead of the $r^{-2}$
+of a linear continuum \cite{wang2014}; and its fibres rotate toward the maximum principal stretch, so
+they end up circumferential around a compressed region.
+
+Three loadings would show it, in increasing cost:
+
+\begin{itemize}\setlength{\itemsep}{1pt}
+\item \textbf{Compress between plates to $20\%$ and release.} The tangent modulus at $5\%$ against
+$20\%$ strain is the stiffening ratio, which a network raises by one to two orders of magnitude and an
+isotropic solid does not raise at all; the residual strain after unloading is the plasticity; and the
+effective Poisson ratio separates a solid that bulges ($\approx0.3$ from the Lam\'e pair) from a network
+that densifies ($0$ to $0.1$).
+\item \textbf{Pull by $10\%$, push by $10\%$.} The ratio of secant moduli is $1$ by construction for the
+present law and must exceed $3$ for anything that buckles \cite{notbohm2015}.
+\item \textbf{Contract a sphere at the centre by $10\%$} and fit $u(r)\propto r^{-n}$. An incompressible
+linear continuum gives $n=2$, a fibrous matrix $n$ between $0.5$ and $1$ \cite{wang2014}. That single
+exponent is the property the whole spheroid--matrix coupling rests on, and it is the test to run first.
+\end{itemize}
+
+One metric belongs in every one of them: the mean $\cos^2\theta$ between a strand's axis and the
+maximum-principal-stress eigenvector of its own particles' $\boldsymbol\sigma$. Random gives $1/3$; a
+fibre-reinforced law drives it toward $1$ wherever the strand is in tension. That is ``builds stress
+along its direction'' written as a number that can fail, and it needs the one structural change
+everything else waits on: the fibre direction as a per-particle buffer rather than an attribute on the
+operator.
+
+\section*{9.\; The spec I propose for the ECM--BM--spheroid study}
+
+Keep the two passes. The reason is unchanged and is geometric, not a preference: the MPM grid is fixed
+to the unit cube, the epithelium lives in a box fifty times larger, and shrinking the tissue to fit
+changes which term of its energy dominates. What crosses between them is the \op{surface} Level.
+
+\textbf{Pass 1, the epithelium}, carries no MPM and costs minutes: $200\to\sim\!1100$ cells over $402$
+frames, \op{shape\_energy\_3d} / \op{reconnect\_t1\_3d} / \op{divide\_3d}, with
+\op{ecm\_growth\_gate\_3d} reading the recorded pressure map \cite{helmlinger1997,montel2011}. Nothing
+in this note touches it.
+
+\textbf{Pass 2, the matrix and the sheet}, is where the compute is, and where the four numbers above go:
+
+\smallskip
+{\footnotesize
+\begin{verbatim}
+  fields:  mpm_grid: {n_grid: 64}            # dx = 0.0156; a strand is 5.8 cells long
+  sets:
+    stroma:       {parent: ecm_body,  per_parent: 40000, types: {ecm: {youngs: 15}}}
+    bm:           node set, NOT mpm_particle    # see below
+    plaque:       edge set  cell -> bm
+    fibril:       edge set  bm   -> ecm
+  operators:
+    - {op: seed_ecm,     at: stroma, n_fibres: 6000, fibre_len: 0.16, per_strand: 20}
+    - {op: mpm_scatter,  at: stroma, drag: 8.0, store_stress: true}   # overdamped, keeps sigma
+    - {op: ecm_stress,   at: stroma, measure: vonmises, scale: <p99 of a calibration frame>}
+  schedule:
+    - {substep_dt: 4.0e-4, steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]}
+\end{verbatim}}
+\smallskip
+
+Four choices, each with the measurement behind it. \code{drag: 8} because at $0.05$ the matrix rings for
+the entire run and accumulates $2.3$ grid cells of displacement that is not material (\S5, \S6), and
+raising it costs nothing. $\Delta t_{\rm sub} = 4\times10^{-4}$, eight substeps rather than sixteen,
+because the CFL limit is $1.4\times10^{-3}$ and halving the count moves every deformation measure by
+less than $0.3\%$ (\S7). Twenty particles per strand rather than sixty, because ten of the sixty land in
+one grid cell (\S1) and dropping to twenty moves the same measures by less than $0.3\%$ --- for the
+spheroid's $6000$ strands that is $40{,}000$ particles, not $120{,}000$. And
+\code{store\_stress}/\code{vonmises} because $|J-1|$ cannot see a shear (\S4). Together these are the
+$5.9\times$ of \op{02h}: a pass-2 of about ninety seconds rather than ten minutes, which is what makes a
+sweep affordable rather than a weekend.
+
+\textbf{The basement membrane must not be an MPM material, and the reason is a number.} A basement
+membrane is $\sim\!100$ nm thick on a spheroid $\sim\!200\,\mu$m across --- one part in two thousand of
+the radius, which at a spheroid radius of $0.2$ box units is $10^{-4}$ box, or one part in $150$ of a
+grid cell. There is no resolution at which an MPM sheet is a sheet here. Worse, it would set the
+timestep for everything else: the sheet is $10$ to $100$ times stiffer than the stroma, and the substep
+scales as $1/\sqrt{E}$, so \code{youngs} $=100\times$ the stroma's takes the run from three substeps per
+frame to twenty-seven --- \emph{nine times the cost, to resolve a layer the grid cannot represent}. The
+sheet therefore stays what \S6 of \code{spheroid\_ecm} argues it is: nodes and crosslinks, massless and
+overdamped, integrated at its own rate, with \op{plaque} as an edge-set so the adhesion returns its
+reaction to the cell \cite{kanchanawong2010} and \op{fibril} as an edge-set carrying the stroma's load
+through the sheet \cite{keene1987} rather than letting the epithelium push the stroma directly.
+
+\textbf{Then spend the saving on the one thing that changes an answer.} In order, and each is a separate
+operator with its own falsifier: (i) the fibre direction as a per-particle buffer, which nothing else
+can proceed without; (ii) a tension-only transversely isotropic term in the stress, $I_4 = |\mathbf F
+\mathbf a|^2$ active only when $I_4>1$ \cite{hgo2000,gasser2006}, which is the only way stress can align
+with a strand, tested by the $\cos^2\theta$ metric of \S8 and by the $r^{-n}$ exponent; (iii) affine
+reorientation $\mathbf a \leftarrow \mathbf F\mathbf a/|\mathbf F\mathbf a|$ \cite{wang2014}; (iv) mass
+balance on the sheet rather than a fixed particle budget \cite{matsubayashi2020}. Items (ii) and (iii)
+are perhaps a $15\%$ surcharge on pass 2 --- an $I_4$ and a rank-one stress per particle per substep ---
+against the $5.9\times$ already banked.
+
+\textbf{One caveat that the saving makes sharper.} Under one-way coupling the stroma's \code{youngs} is
+very nearly a free parameter: the tissue never feels the matrix, and the growth gate normalises the
+pressure map to its own late-run median, so a softer stroma changes the substep it needs and not the
+shape that comes out. That is convenient --- softer is cheaper, since the substep scales as
+$1/\sqrt{E}$ --- and it is also the clearest statement of what one-way coupling costs. The moment an
+operator writes back to \op{surface}, \code{youngs} stops being free, and the numbers in this section
+have to be re-measured rather than carried over.
+
+\section*{10.\; References}
+
+{\small
+\begin{thebibliography}{99}\setlength{\itemsep}{0pt}
+\bibitem{sulsky1994} Sulsky, D., Chen, Z., Schreyer, H.L. (1994) A particle method for history-dependent
+materials. \emph{Comput. Methods Appl. Mech. Eng.} \textbf{118}:179--196.
+\bibitem{hu2018} Hu, Y. \emph{et al.} (2018) A moving least squares material point method with
+displacement discontinuity and two-way rigid body coupling. \emph{ACM Trans. Graph.} \textbf{37}(4):150.
+\bibitem{storm2005} Storm, C., Pastore, J.J., MacKintosh, F.C., Lubensky, T.C., Janmey, P.A. (2005)
+Nonlinear elasticity in biological gels. \emph{Nature} \textbf{435}:191--194.
+\bibitem{licup2015} Licup, A.J. \emph{et al.} (2015) Stress controls the mechanics of collagen networks.
+\emph{Proc. Natl. Acad. Sci. USA} \textbf{112}(31):9573--9578.
+\bibitem{notbohm2015} Notbohm, J., Lesman, A., Rosakis, P., Tirrell, D.A., Ravichandran, G. (2015)
+Microbuckling of fibrin provides a mechanism for cell mechanosensing. \emph{J. R. Soc. Interface}
+\textbf{12}(108):20150320.
+\bibitem{wang2014} Wang, H., Abhilash, A.S., Chen, C.S., Wells, R.G., Shenoy, V.B. (2014) Long-range
+force transmission in fibrous matrices enabled by tension-driven alignment of fibers.
+\emph{Biophys. J.} \textbf{107}(11):2592--2603.
+\bibitem{hgo2000} Holzapfel, G.A., Gasser, T.C., Ogden, R.W. (2000) A new constitutive framework for
+arterial wall mechanics and a comparative study of material models. \emph{J. Elasticity} \textbf{61}:1--48.
+\bibitem{gasser2006} Gasser, T.C., Ogden, R.W., Holzapfel, G.A. (2006) Hyperelastic modelling of arterial
+layers with distributed collagen fibre orientations. \emph{J. R. Soc. Interface} \textbf{3}(6):15--35.
+\bibitem{helmlinger1997} Helmlinger, G., Netti, P.A., Lichtenbeld, H.C., Melder, R.J., Jain, R.K. (1997)
+Solid stress inhibits the growth of multicellular tumor spheroids. \emph{Nat. Biotechnol.}
+\textbf{15}(8):778--783.
+\bibitem{montel2011} Montel, F. \emph{et al.} (2011) Stress clamp experiments on multicellular tumor
+spheroids. \emph{Phys. Rev. Lett.} \textbf{107}:188102.
+\bibitem{kanchanawong2010} Kanchanawong, P. \emph{et al.} (2010) Nanoscale architecture of
+integrin-based cell adhesions. \emph{Nature} \textbf{468}:580--584.
+\bibitem{keene1987} Keene, D.R., Sakai, L.Y., Lunstrum, G.P., Morris, N.P., Burgeson, R.E. (1987)
+Type VII collagen forms an extended network of anchoring fibrils. \emph{J. Cell Biol.}
+\textbf{104}(3):611--621.
+\bibitem{matsubayashi2020} Matsubayashi, Y. \emph{et al.} (2020) Rapid homeostatic turnover of embryonic
+ECM during tissue morphogenesis. \emph{Dev. Cell} \textbf{54}(1):33--42.
+\end{thebibliography}}
+
+\end{document}
