@@ -121,6 +121,18 @@ nodes:
       # EVERY ENTRY REBUILDS AND ADMITS. Checked by `round.py --check`, because the first version of
       # this pool did not: two of its six entries were inadmissible and it took a live Proposer call
       # to find out. All were measured, not remembered -- metrics come from each run's own diag.json.
+      # THE UNGATED `uniform` COLUMN WAS DROPPED, 10 August, all seven members. `rho = 1.0` with no
+      # gate is unbounded exponential growth and there is no mechanism in the composition that can
+      # stop it: measured at 1800 frames, b_none_uniform_plain finished at 59,782 cells against a
+      # 60,000 array and b_none_uniform_shaping at 59,928 -- pinned, so their metrics describe the
+      # reservoir rather than the tissue, and the morphology classifier returned `unclear` for
+      # exactly that reason. Death does not rescue it either: the uniform death twin took 2,080
+      # apoptoses and still finished at 57,819 cells.
+      #
+      # This is premise 20-odd of _premises_raw.md, unread for the whole campaign: "tissues stop
+      # growing when compressed; a growth law that reads only a chemical signal has no mechanism by
+      # which it can ever stop". The column is not a bad base, it is a base whose growth law is
+      # incomplete -- worth rebuilding with a compression term, not worth searching from now.
       pool:
         # RE-BASED 8 AUGUST ONTO THE GENERATED BASIS -- `discovery_okuda/make_basis.py`. Cedric:
         # "put the current 12 folders of log/okuda into archive, you write a new set of 12 specs...
@@ -154,10 +166,6 @@ nodes:
         # K_extrude at zero, which is the sound half of the forcing operator on its own.
         - b_none_static_plain      # divide, no growth, no chemistry -- the substrate null
         - b_none_static_shaping
-        - b_none_uniform_plain     # grows without patterning (what cellfix_B_new was for)
-        - b_none_uniform_shaping
-        - b_gs_uniform_plain
-        - b_gs_uniform_shaping
         - b_gs_gated_plain         # the campaign's own question: pattern gating growth
         - b_gs_gated_shaping
         # THE FOUR gm MEMBERS ARE DROPPED, 8 August. Gierer-Meinhardt does not sustain a pattern
@@ -181,8 +189,6 @@ nodes:
         # against gray_scott's 0.56-0.81 and 0.033-0.051 on the same growth and mechanics. It is
         # in the pool BECAUSE of that, not despite it: a parent set holding only recipes that work
         # cannot tell the loop what makes them work.
-        - b_bru_uniform_plain
-        - b_bru_uniform_shaping
         - b_bru_gated_plain
         - b_bru_gated_shaping
         # THE DEATH TWINS, added 10 August. A mechanism enters this campaign through the BASIS
@@ -192,7 +198,6 @@ nodes:
         # already carry the operator, and the Route A plan is static. One twin per Route A base,
         # so `mode` and `max_mark_frac` become sweepable ladders on the same parents everything
         # else is measured against.
-        - b_none_uniform_plain_death
         - b_gs_gated_plain_death
         - b_bru_gated_plain_death
         - b_gs_gated_shaping_death
@@ -335,7 +340,6 @@ nodes:
         # 0.0 (infinite ratio, activator-only growth) is now reachable too -- P2 was retired on
         # 8 August precisely because it vetoed the limit case as a principle instead of letting
         # the campaign measure where the objection starts to bite.
-        - [b_none_uniform_plain, grow_3d,   rho,      [0.0, 0.05, 0.25, 0.5]]
         - [b_gs_gated_plain,     grow_3d,   rho,      [0.05, 0.1, 0.25, 0.5]]
         - [b_bru_gated_plain,    grow_3d,   rho,      [0.05, 0.1, 0.25, 0.5]]
         # HOW BIG A RED CELL MAY GET BEFORE IT DIVIDES -- the lever the Grounder has asked for in
@@ -366,13 +370,11 @@ nodes:
         # divisions, bigger cells, rounder shell, higher coupling, monotone on all of them. It is
         # knowledge, not a question, and re-running it on the gated bases would spend eight slots
         # confirming that flooding floods. Keeping it here preserves the geometric control.
-        - [b_none_uniform_plain, divide_3d, factor,   [1.3, 1.6, 2.4, 3.0]]
         # ---- THE GATE ITSELF: where the activator opens growth, and how sharply.
         - [b_gs_gated_plain,     grow_3d,   a_sw,     [0.1, 0.2, 0.5, 0.7]]
         - [b_bru_gated_plain,    grow_3d,   a_sw,     [0.1, 0.2, 0.5, 0.7]]
         - [b_gs_gated_plain,     grow_3d,   hill,     [1.0, 2.0, 8.0, 16.0]]
         - [b_bru_gated_plain,    grow_3d,   hill,     [1.0, 2.0, 8.0, 16.0]]
-        - [b_none_uniform_plain, grow_3d,   rate,     [0.000433, 0.001732, 0.003464, 0.006928]]
         - [b_gs_gated_plain,     grow_3d,   rate,     [0.000433, 0.001732, 0.003464, 0.006928]]
         # ---- THE RD MECHANISMS. Each model's OWN parameters -- they do not share a vocabulary,
         # which is exactly the mistake that shipped four bases carrying Gray-Scott's `F` and `kk`
@@ -461,14 +463,12 @@ nodes:
         - [b_bru_gated_plain_death,  apoptosis_3d, mode, [smaller, older, crowded, dimmer]]
         # `dimmer` reads the activator, so it is NOT offered on the b_none column: a mode that
         # returns None on a base with no chemistry is a slot spent measuring nothing.
-        - [b_none_uniform_plain_death, apoptosis_3d, mode, [smaller, older, crowded]]
         # HOW FAST, as distinct from WHO -- the knob that decides whether death is a mechanism or
         # a demolition. Uncapped, five of six modes took r020_00_ctrl from protr 1.513 / grip 0.228
         # to 1.131 / 0.049 with 1,660 of 7,424 cells dead; at 0.005 every mode finished within a
         # few percent of its parent with no premise broken. 0.005 is the base, so this spans a
         # factor of twenty around it and asks where the wall is.
         - [b_gs_gated_plain_death,   apoptosis_3d, max_mark_frac, [0.001, 0.002, 0.01, 0.02]]
-        - [b_none_uniform_plain_death, apoptosis_3d, max_mark_frac, [0.001, 0.002, 0.01, 0.02]]
         - [b_gs_gated_shaping_death, apoptosis_3d, max_mark_frac, [0.001, 0.002, 0.01, 0.02]]
 
   - id: build
