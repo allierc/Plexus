@@ -218,12 +218,12 @@ are}\\\midrule
 \op{fibril\_seed}, \op{fibril\_pull} & Rewire, Lateral & \code{fibril} & Eq.~\eqref{eq:anchor}
   \cite{keene1987} & open\\
 \op{mesh\_contact} & Lateral & \code{contact} & particle-to-surface, both endpoints in one call &
-  \code{note\_surface} S1--S16\\
+  \code{note\_surface} S1--S19\\
 \op{bm\_barrier} & Exchange & \code{bm\_face}, fields & pores pass solutes, stop cells
   \cite{yurchenco2011} & open\\
 \multicolumn{5}{@{}l}{\textit{matrix}}\\
 \op{seed\_ecm}, \op{mpm\_*}, \op{ecm\_stress} & Seed, Exchange, Lateral & \code{mpm\_particle} &
-  MLS-MPM \cite{sulsky1994,hu2018} & \code{note\_fibre} F1--F16\\
+  MLS-MPM \cite{sulsky1994,hu2018} & \code{note\_fibre} F1--F18\\
 \op{ecm\_growth\_gate\_3d} & Lateral & \code{cell} & Eq.~\eqref{eq:gate}
   \cite{helmlinger1997,montel2011} & \op{58}; open\\
 \bottomrule\end{tabular}
@@ -277,8 +277,8 @@ B1 & cells, radius, aspect, T1 rate of the bare tissue & the numbers every later
 B2 & adding per-junction myosin at $m_e\equiv1$ changes nothing & bit-identical &
      \pass{bit-identical}\\
 \multicolumn{4}{@{}l}{\textit{each arrow carries its reaction}}\\
-B3 & epithelium $\to$ matrix, momentum residual & $<10^{-6}$ & \pass{1.2e-7} max, \pass{1.5e-8}
-     median (\code{note\_surface} S5)\\
+B3 & epithelium $\to$ matrix, momentum residual & $<10^{-6}$ & \pass{1.5--1.8e-7} across every
+     sweep run (\code{note\_surface} S5, S12)\\
 B4 & cell $\leftrightarrow$ sheet, as bookkeeping and as motion & $<10\varepsilon_{64}$; drift
      $<10^{-12}$ & \pass{1.4e-16}, \pass{4.4e-15} (\code{note\_sheet} G9, G10)\\
 B5 & sheet $\to$ stroma: the stroma is loaded THROUGH the sheet & displacement with the sheet present
