@@ -38,7 +38,53 @@ ANCHOR_OLD = "<h3>Turing × vertex — patterning &amp; shaping a growing tissue
 ANCHOR_NEW = "<h3>Vertex + Turing — patterning &amp; shaping a growing tissue</h3>"
 
 
-def split_concat(src, dst):
+def _content_box(src, x0, wid, hei, n=9, thresh=14):
+    """The bounding box of everything that is not background, in a REGION of the frame.
+
+    Both panels of these movies are drawn on black with matplotlib's own margins around them, and
+    the margins are not symmetric -- the 3D axes sit left of centre and the 2D section right of it,
+    which is exactly what a viewer sees as "the first half is a bit to the left and the second a bit
+    to the right". Centring is therefore a property of the CONTENT, not of the frame, and it has to
+    be measured rather than nudged.
+
+    Sampled over `n` frames and unioned, because the content MOVES: a box measured on one frame
+    crops away the part of the run that happens later. Threshold on the max channel, so a dim strand
+    counts as content and JPEG-ish ringing around the border does not.
+    """
+    import glob
+    import tempfile
+    import numpy as _np
+    import matplotlib.image as _mpimg
+    d = tempfile.mkdtemp(prefix="mscrop_")
+    subprocess.check_call([_exe("ffmpeg"), "-y", "-loglevel", "error", "-i", src,
+                           "-vf", "select='not(mod(n\\," + str(max(1, _nframes(src) // n))
+                           + "))'",
+                           "-vsync", "vfr", os.path.join(d, "f%03d.png")])
+    xs0, xs1, ys0, ys1 = wid, 0, hei, 0
+    for f in sorted(glob.glob(os.path.join(d, "*.png"))):
+        a = _mpimg.imread(f)
+        a = (a[:, :, :3].max(axis=2) * (255 if a.dtype.kind == "f" else 1))[:hei, x0:x0 + wid]
+        m = a > thresh
+        if not m.any():
+            continue
+        cols, rows = _np.nonzero(m.any(0))[0], _np.nonzero(m.any(1))[0]
+        xs0, xs1 = min(xs0, int(cols[0])), max(xs1, int(cols[-1]))
+        ys0, ys1 = min(ys0, int(rows[0])), max(ys1, int(rows[-1]))
+    import shutil as _sh
+    _sh.rmtree(d, ignore_errors=True)
+    if xs1 <= xs0 or ys1 <= ys0:
+        return wid // 2, hei // 2, min(wid, hei)
+    return (xs0 + xs1) // 2, (ys0 + ys1) // 2, max(xs1 - xs0, ys1 - ys0)
+
+
+def _nframes(src):
+    out = subprocess.check_output([_exe("ffprobe"), "-v", "error", "-select_streams", "v",
+                                   "-count_frames", "-show_entries", "stream=nb_read_frames",
+                                   "-of", "csv=p=0", src]).decode().strip()
+    return max(1, int(out.split(",")[0]))
+
+
+def split_concat(src, dst, recentre=True):
     """Cut the two-panel movie in half and play the halves in SEQUENCE: 3D first, then the section.
 
     ONE CLIP PER RUN, NOT TWO. A gallery card is a square block, and the movie is 2:1 -- shown whole it
@@ -52,8 +98,27 @@ def split_concat(src, dst):
     ff = _exe("ffmpeg")
     w, h = _size(src)
     half = (w // 2) - (w // 2) % 2
+    ax, ay, aw = 0, 0, half
+    bx, by, bw = w - half, 0, half
+    side = h
+    if recentre:
+        # EACH HALF CENTRED ON ITS OWN CONTENT, and both cropped to ONE size, because `concat`
+        # requires it. The window is the larger of the two contents plus a fifth, so neither panel
+        # is cut and the smaller one is not blown up past the other.
+        cxa, cya, sa = _content_box(src, 0, half, h)
+        cxb, cyb, sb = _content_box(src, w - half, half, h)
+        side = min(h, half, int(1.2 * max(sa, sb)))
+        side -= side % 2
+        ax = min(max(cxa - side // 2, 0), half - side)
+        ay = min(max(cya - side // 2, 0), h - side)
+        bx = (w - half) + min(max(cxb - side // 2, 0), half - side)
+        by = min(max(cyb - side // 2, 0), h - side)
+        aw = bw = side
+        print(f"[minisite]   recentred: {side}x{side} windows at ({ax},{ay}) and ({bx},{by}) "
+              f"of {w}x{h}", flush=True)
     cmd = [ff, "-y", "-loglevel", "error", "-i", src, "-filter_complex",
-           f"[0:v]crop={half}:{h}:0:0[a];[0:v]crop={half}:{h}:{w - half}:0[b];[a][b]concat=n=2:v=1[o]",
+           f"[0:v]crop={aw}:{side}:{ax}:{ay}[a];[0:v]crop={bw}:{side}:{bx}:{by}[b];"
+           f"[a][b]concat=n=2:v=1[o]",
            "-map", "[o]", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "21", dst]
     if subprocess.call(cmd) != 0 or not os.path.exists(dst):
         sys.exit(f"ffmpeg split+concat failed for {dst}")
@@ -166,42 +231,44 @@ operators are ours (<code>prototype/ecm</code>).</p>
 
 def main():
     R3 = [
-        ("03c_mesh_contact_hole", "vertex_mpm_free", "the interface, tested",
-         "the interface itself, on the smallest rig that can falsify it: a triangulated surface "
-         "pressed into an MPM block against a rigid floor, with a hole in the surface. Contact is "
-         "particle-to-surface, so the reaction really returns to the mesh (momentum residual 1.4e-7, "
-         "float32 precision) and friction changes the slip fourfold -- it is not MPM's automatic "
-         "weld. The block is compressed 14.4% and coloured by |J-1|"),
-        ("27_epi_ecm_fibres_long", "vertex_mpm_fibres", "the fibres, at length",
-         "the same coupling run out: an epithelium pressing into a fibre matrix for the full growth, "
-         "so the stress front has time to cross the box. Nothing confines it -- this is what the "
-         "matrix does when only the tissue's own growth loads it"),
-        ("58_oblcav_oblate", "vertex_mpm_grown_oblate", "grown into an ovoid",
-         "an oblate cavity, so the tissue meets the fibres at its poles first and the matrix resists "
-         "there 14.7x harder. <code>ecm_growth_gate_3d</code> slows the cell cycle where it resists, so "
-         "the sphere GROWS to oblateness 1.43. Nothing presses on it"),
-        ("48_block_elastic_g40", "vertex_mpm_pressed", "pressed by an elastic solid",
+        ("03c_mesh_contact_hole", "vertex_mpm_free", "vertex/MPM interface",
+         "a triangulated surface pressed into an MPM block against a rigid floor, with a hole in "
+         "it. The reaction really returns to the mesh (momentum residual 1.4e-7, float32 "
+         "precision) and friction changes the slip fourfold -- not MPM's automatic weld"),
+        ("_archive/48_block_elastic_g40", "vertex_mpm_pressed", "pressed by an elastic solid",
          "the same shape the other way. Two solid blocks -- a second MPM body, 130x stiffer than the "
          "matrix, so they deform too -- press the tissue to oblateness 1.41, indistinguishable from "
          "the grown 1.43 beside it. Two mechanisms, one shape"),
     ]
     R4 = [
-        ("69_graph_reference", "bm_reference", "reference",
+        ("_archive/69_graph_reference", "bm_reference", "reference",
          "the sheet at work. 37,427 nodes joined by 180,304 crosslinks, covering the whole surface, "
          "stretched to 10% on average — teal-green on a scale whose top is the breaking point"),
-        ("71_fast_remodelling", "bm_fast_remodel", "fast remodelling",
+        ("_archive/71_fast_remodelling", "bm_fast_remodel", "fast remodelling",
          "the same network — 187,781 crosslinks, same coverage — but the crosslinks forget being "
          "stretched four times faster, so the sheet never builds tension and sits at 3%. Uniformly "
          "dark blue. Turnover, not strength, sets how hard a membrane pulls"),
-        ("73_no_adhesion", "bm_no_adhesion", "no adhesion",
+        ("_archive/73_no_adhesion", "bm_no_adhesion", "no adhesion",
          "the control: with the integrin springs removed the sheet SLIDES over the epithelium instead "
          "of being stretched by it, and is the only run that loses coverage (0.89) — it goes where the "
          "matrix pushes it. The strain in the other two is real because this one has none"),
     ]
-    runs = [(d, f"{v}.mp4", lbl, os.path.join(LOG, d, "spec_run.yaml"), cap)
-            for d, v, lbl, cap in R3]
-    runs2 = [(d, f"{v}.mp4", lbl, os.path.join(LOG, d, "spec_run.yaml"), cap)
-             for d, v, lbl, cap in R4]
+    def _spec(d):
+        """`spec_run.yaml` where the engine wrote one, `spec.yaml` where the rig did.
+
+        The rigs (`test_03`, `test_04`) write their own `spec.yaml`; only runs that went through
+        `run_ecm.run` leave a `spec_run.yaml`. Hard-coding the latter is why the live page opened
+        `30_epi2_soft_E5`'s spec under the interface clip -- a spec belonging to a different run
+        entirely, which is the one thing the site's convention exists to prevent.
+        """
+        for nm in ("spec_run.yaml", "spec.yaml"):
+            q = os.path.join(LOG, d, nm)
+            if os.path.exists(q):
+                return q
+        sys.exit(f"no spec beside {d} -- a clip on the page must open the spec that made it")
+
+    runs = [(d, f"{v}.mp4", lbl, _spec(d), cap) for d, v, lbl, cap in R3]
+    runs2 = [(d, f"{v}.mp4", lbl, _spec(d), cap) for d, v, lbl, cap in R4]
     missing = [r for r, *_ in runs + runs2 if not os.path.exists(os.path.join(LOG, r, "movie.mp4"))]
     if missing:
         sys.exit(f"no movie.mp4 for {missing} -- run them before writing the page")

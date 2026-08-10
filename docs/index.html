@@ -1275,517 +1275,23 @@ deep, the lumen is hollow, the fibres are cut where they cross, and the blocks a
   <figure class="sim-card">
     <video src="gallery/vertex_mpm_free.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">the interface, tested<span class="sim-spec"><pre>general:
-  name: 30_epi2_soft_E5
-  seed: 0
-  n_frames: 402
-  dt: 0.004
-  boundary: wall
-  dim: 3
-  world:
-  - 1.0
-  - 1.0
-  - 1.0
-sets:
-  cell:
-    n: 1
-    start:
-    - - 0.5
-      - 0.5
-      - 0.5
-    types: &amp;id001
-      s0:
-        fraction: 0.125
-        youngs: 5.0
-      s1:
-        fraction: 0.125
-        youngs: 5.0
-      s2:
-        fraction: 0.125
-        youngs: 5.0
-      s3:
-        fraction: 0.125
-        youngs: 5.0
-      s4:
-        fraction: 0.125
-        youngs: 5.0
-      s5:
-        fraction: 0.125
-        youngs: 5.0
-      s6:
-        fraction: 0.125
-        youngs: 5.0
-      s7:
-        fraction: 0.125
-        youngs: 5.0
-  mpm_particle:
-    parent: cell
-    per_parent: 140000
-    radius: 0.48
-    density: 1.0
-    types: *id001
-fields:
-  mpm_grid:
-    frame: mpm_grid
-    n_grid: 48
-operators:
-- op: aggregate
-  at: cell
-- op: seed_ecm
-  at: mpm_particle
-  centre:
-  - 0.5
-  - 0.5
-  - 0.5
-  cavity_r: 0.095
-  cavity_h: 0.095
-  axis: 2
-  n_fibres: 6000
-  fibre_len: 0.16
-  align: 0.0
-  align_dir:
-  - 1.0
-  - 0.0
-  - 0.0
-  seed: 0
-- op: cell_to_ecm
-  at: mpm_particle
-  centre:
-  - 0.5
-  - 0.5
-  - 0.5
-  k: 900.0
-  damp: 0.0
-  implementation: replay
-  surface: /workspace/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4.npz
-  scale: 0.01823315533313742
-- op: ecm_stress
-  at: mpm_particle
-  scale: 0.08
-  bands: 8
-- op: mpm_strain
-  at: mpm_particle
-- op: mpm_scatter
-  at: mpm_particle
-  to: mpm_grid
-  drag: 0.0
-  a_max: 200
-- op: mpm_grid_update
-  at: mpm_grid
-  wall_damp: 0.6
-- op: mpm_gather
-  at: mpm_particle
-  from: mpm_grid
-  wall_damp: 0.6
-  wall_contact: 0.04
-  vmax: 1000000000.0
-schedule:
-- aggregate
-- seed_ecm
-- cell_to_ecm
-- ecm_stress
-- substep_dt: 0.0002
-  steps:
-  - mpm_strain
-  - mpm_scatter
-  - mpm_grid_update
-  - mpm_gather
-plotting:
-  background: black
-  up_axis: 1
-  box_frame: true
-  fps: 10
-  render_3d: dots
-  dot_size: 0.9
-  hide_sets:
-  - cell
-  color_by: node_type
-  colors:
-    s0:
-    - 0.16
-    - 0.19
-    - 0.3
-    s1:
-    - 0.35
-    - 0.15
-    - 0.42
-    s2:
-    - 0.58
-    - 0.13
-    - 0.42
-    s3:
-    - 0.78
-    - 0.2
-    - 0.33
-    s4:
-    - 0.92
-    - 0.35
-    - 0.18
-    s5:
-    - 0.99
-    - 0.55
-    - 0.1
-    s6:
-    - 1.0
-    - 0.76
-    - 0.22
-    s7:
-    - 1.0
-    - 0.97
-    - 0.75
-  camera_elev: 1.05
-  camera_turns: 0.0
-  camera_zoom: 0.0</pre></span></span>
-      <span class="sim-cap">the interface itself, on the smallest rig that can falsify it: a triangulated surface pressed into an MPM block against a rigid floor, with a hole in the surface. Contact is particle-to-surface, so the reaction really returns to the mesh (momentum residual 1.4e-7, float32 precision) and friction changes the slip fourfold &mdash; it is not MPM's automatic weld. The block is compressed 14.4% and coloured by |J-1|</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/vertex_mpm_fibres.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">the fibres, at length<span class="sim-spec"><pre>general:
-  name: 27_epi_ecm_fibres_long
-  seed: 0
-  n_frames: 402
-  dt: 0.004
-  boundary: wall
-  dim: 3
-  world:
-  - 1.0
-  - 1.0
-  - 1.0
-sets:
-  cell:
-    n: 1
-    start:
-    - - 0.5
-      - 0.5
-      - 0.5
-    types: &amp;id001
-      s0:
-        fraction: 0.125
-        youngs: 40.0
-      s1:
-        fraction: 0.125
-        youngs: 40.0
-      s2:
-        fraction: 0.125
-        youngs: 40.0
-      s3:
-        fraction: 0.125
-        youngs: 40.0
-      s4:
-        fraction: 0.125
-        youngs: 40.0
-      s5:
-        fraction: 0.125
-        youngs: 40.0
-      s6:
-        fraction: 0.125
-        youngs: 40.0
-      s7:
-        fraction: 0.125
-        youngs: 40.0
-  mpm_particle:
-    parent: cell
-    per_parent: 110000
-    radius: 0.48
-    density: 1.0
-    types: *id001
-fields:
-  mpm_grid:
-    frame: mpm_grid
-    n_grid: 48
-operators:
-- op: aggregate
-  at: cell
-- op: seed_ecm
-  at: mpm_particle
-  centre:
-  - 0.5
-  - 0.5
-  - 0.5
-  cavity_r: 0.14
-  cavity_h: 0.14
-  axis: 2
-  n_fibres: 700
-  fibre_len: 0.34
-  align: 0.0
-  align_dir:
-  - 1.0
-  - 0.0
-  - 0.0
-  seed: 0
-- op: cell_to_ecm
-  at: mpm_particle
-  centre:
-  - 0.5
-  - 0.5
-  - 0.5
-  k: 900.0
-  damp: 0.0
-  implementation: replay
-  surface: /workspace/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401.npz
-  scale: 0.018861533103953422
-- op: ecm_stress
-  at: mpm_particle
-  scale: 0.05
-  bands: 8
-- op: mpm_strain
-  at: mpm_particle
-- op: mpm_scatter
-  at: mpm_particle
-  to: mpm_grid
-  drag: 0.0
-  a_max: 200
-- op: mpm_grid_update
-  at: mpm_grid
-  wall_damp: 0.6
-- op: mpm_gather
-  at: mpm_particle
-  from: mpm_grid
-  wall_damp: 0.6
-  wall_contact: 0.04
-  vmax: 1000000000.0
-schedule:
-- aggregate
-- seed_ecm
-- cell_to_ecm
-- ecm_stress
-- substep_dt: 0.0002
-  steps:
-  - mpm_strain
-  - mpm_scatter
-  - mpm_grid_update
-  - mpm_gather
-plotting:
-  background: black
-  up_axis: 1
-  box_frame: true
-  fps: 10
-  render_3d: dots
-  dot_size: 0.9
-  hide_sets:
-  - cell
-  color_by: node_type
-  colors:
-    s0:
-    - 0.16
-    - 0.19
-    - 0.3
-    s1:
-    - 0.35
-    - 0.15
-    - 0.42
-    s2:
-    - 0.58
-    - 0.13
-    - 0.42
-    s3:
-    - 0.78
-    - 0.2
-    - 0.33
-    s4:
-    - 0.92
-    - 0.35
-    - 0.18
-    s5:
-    - 0.99
-    - 0.55
-    - 0.1
-    s6:
-    - 1.0
-    - 0.76
-    - 0.22
-    s7:
-    - 1.0
-    - 0.97
-    - 0.75
-  camera_elev: 1.05
-  camera_turns: 0.0
-  camera_zoom: 0.0</pre></span></span>
-      <span class="sim-cap">the same coupling run out: an epithelium pressing into a fibre matrix for the full growth, so the stress front has time to cross the box. Nothing confines it -- this is what the matrix does when only the tissue's own growth loads it</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/vertex_mpm_grown_oblate.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">grown into an ovoid<span class="sim-spec"><pre>general:
-  name: 58_oblcav_oblate
-  seed: 0
-  n_frames: 402
-  dt: 0.004
-  boundary: wall
-  dim: 3
-  world:
-  - 1.0
-  - 1.0
-  - 1.0
-sets:
-  cell:
-    n: 1
-    start:
-    - - 0.5
-      - 0.5
-      - 0.5
-    types: &amp;id001
-      s0:
-        fraction: 0.125
-        youngs: 15.0
-      s1:
-        fraction: 0.125
-        youngs: 15.0
-      s2:
-        fraction: 0.125
-        youngs: 15.0
-      s3:
-        fraction: 0.125
-        youngs: 15.0
-      s4:
-        fraction: 0.125
-        youngs: 15.0
-      s5:
-        fraction: 0.125
-        youngs: 15.0
-      s6:
-        fraction: 0.125
-        youngs: 15.0
-      s7:
-        fraction: 0.125
-        youngs: 15.0
-  mpm_particle:
-    parent: cell
-    per_parent: 140000
-    radius: 0.48
-    density: 1.0
-    types: *id001
-fields:
-  mpm_grid:
-    frame: mpm_grid
-    n_grid: 48
-operators:
-- op: aggregate
-  at: cell
-- op: seed_ecm
-  at: mpm_particle
-  centre:
-  - 0.5
-  - 0.5
-  - 0.5
-  cavity_r: 0.17
-  cavity_h: 0.095
-  axis: 2
-  n_fibres: 6000
-  fibre_len: 0.16
-  align: 0.85
-  align_dir:
-  - 1.0
-  - 0.0
-  - 0.0
-  seed: 0
-  dense_axis: 2
-  dense_cone_deg: 55.0
-  dense_boost: 3.0
-- op: cell_to_ecm
-  at: mpm_particle
-  centre:
-  - 0.5
-  - 0.5
-  - 0.5
-  k: 1200.0
-  damp: 0.0
-  implementation: replay
-  surface: /workspace/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_aaecfeb32a.npz
-  scale: 0.028148275675084617
-- op: ecm_stress
-  at: mpm_particle
-  scale: 0.008
-  bands: 8
-  measure: vonmises
-- op: mpm_strain
-  at: mpm_particle
-- op: mpm_scatter
-  at: mpm_particle
-  to: mpm_grid
-  drag: 0.0
-  a_max: 300.0
-  store_stress: true
-- op: mpm_grid_update
-  at: mpm_grid
-  wall_damp: 0.6
-- op: mpm_gather
-  at: mpm_particle
-  from: mpm_grid
-  wall_damp: 0.6
-  wall_contact: 0.04
-  vmax: 1000000000.0
-- op: cell_exclude_3d
-  at: mpm_particle
-  centre:
-  - 0.5
-  - 0.5
-  - 0.5
-  surface: /workspace/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_aaecfeb32a.npz
-  scale: 0.028148275675084617
-  skin: 0.004
-schedule:
-- aggregate
-- seed_ecm
-- cell_to_ecm
-- ecm_stress
-- substep_dt: 0.0002
-  steps:
-  - mpm_strain
-  - mpm_scatter
-  - mpm_grid_update
-  - mpm_gather
-- cell_exclude_3d
-plotting:
-  background: black
-  up_axis: 1
-  box_frame: true
-  fps: 10
-  render_3d: dots
-  dot_size: 0.9
-  hide_sets:
-  - cell
-  color_by: node_type
-  colors:
-    s0:
-    - 0.16
-    - 0.19
-    - 0.3
-    s1:
-    - 0.46
-    - 0.31
-    - 0.72
-    s2:
-    - 0.78
-    - 0.26
-    - 0.72
-    s3:
-    - 0.95
-    - 0.28
-    - 0.45
-    s4:
-    - 0.99
-    - 0.45
-    - 0.2
-    s5:
-    - 1.0
-    - 0.62
-    - 0.12
-    s6:
-    - 1.0
-    - 0.8
-    - 0.28
-    s7:
-    - 1.0
-    - 0.97
-    - 0.78
-  camera_elev: 1.05
-  camera_turns: 0.0
-  camera_zoom: 0.0</pre></span></span>
-      <span class="sim-cap">an oblate cavity, so the tissue meets the fibres at its poles first and the matrix resists there 14.7x harder. <code>ecm_growth_gate_3d</code> slows the cell cycle where it resists, so the sphere GROWS to oblateness 1.43. Nothing presses on it</span>
+      <span class="sim-name" tabindex="0">vertex/MPM interface<span class="sim-spec"><pre>what: particle-to-surface contact between a triangulated patch and an MPM block
+scheme: ICFEMP-style (Chen et al. 2015 CMAME 293:1); grid-node coupling (CFEMP, Lian
+  et al. 2011) needs mesh/grid size consistency, which this prototype violates
+simplification: flat axis-aligned patch, so face lookup is O(1); a general mesh needs
+  a BVH
+measures:
+- momentum residual
+- penetration depth in grid cells
+- slip with and without friction
+rig:
+  mesh_cell_over_dx: 1.6800003051757812
+  n_grid: 64
+  particles: 81202
+  k_penalty: 2.1457672119140625
+  mu: 0.4
+  dt: 0.0001</pre></span></span>
+      <span class="sim-cap">a triangulated surface pressed into an MPM block against a rigid floor, with a hole in it. The reaction really returns to the mesh (momentum residual 1.4e-7, float32 precision) and friction changes the slip fourfold -- not MPM's automatic weld</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -2166,7 +1672,7 @@ operators:
   k: 1200.0
   damp: 0.0
   implementation: replay
-  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_2cedf4bcc6.npz
   scale: 0.017933333538564047
 - op: ecm_stress
   at: mpm_particle
@@ -2196,7 +1702,7 @@ operators:
   - 0.5
   - 0.5
   - 0.5
-  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_2cedf4bcc6.npz
   scale: 0.017933333538564047
   offset: 0.004
   thickness: 0.002
@@ -2209,19 +1715,21 @@ operators:
   - 0.5
   - 0.5
   - 0.5
-  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_2cedf4bcc6.npz
   scale: 0.017933333538564047
   k: 10000.0
   offset: 0.004
   detach: 0.0
-  emit: acceleration
+  emit: velocity
+  overdamped_gamma: 2000.0
   graph_mode: true
 - op: basement_membrane_bond
   at: basement_membrane_particle
   k: 5000.0
   cutoff: 0.008
   max_neighbours: 6
-  emit: acceleration
+  emit: velocity
+  overdamped_gamma: 2000.0
   graph_mode: true
   k_adhesion_hint: 10000.0
 - op: basement_membrane_remodel
@@ -2240,16 +1748,13 @@ operators:
   at: basement_membrane_particle
   break_strain: 0.35
   components_every: 40
-- op: drag
-  at: basement_membrane_particle
-  k: 40.0
 - op: cell_exclude_3d
   at: mpm_particle
   centre:
   - 0.5
   - 0.5
   - 0.5
-  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_2cedf4bcc6.npz
   scale: 0.017933333538564047
   skin: 0.004
 - op: cell_exclude_3d
@@ -2258,7 +1763,7 @@ operators:
   - 0.5
   - 0.5
   - 0.5
-  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_2cedf4bcc6.npz
   scale: 0.017933333538564047
   skin: 0.006
 schedule:
@@ -2268,7 +1773,6 @@ schedule:
 - cell_to_ecm
 - integrin_adhesion
 - basement_membrane_bond
-- drag
 - basement_membrane_remodel
 - basement_membrane_bond_break
 - ecm_stress
@@ -2448,7 +1952,7 @@ operators:
   k: 1200.0
   damp: 0.0
   implementation: replay
-  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_2cedf4bcc6.npz
   scale: 0.017933333538564047
 - op: ecm_stress
   at: mpm_particle
@@ -2478,7 +1982,7 @@ operators:
   - 0.5
   - 0.5
   - 0.5
-  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_2cedf4bcc6.npz
   scale: 0.017933333538564047
   offset: 0.004
   thickness: 0.002
@@ -2491,19 +1995,21 @@ operators:
   - 0.5
   - 0.5
   - 0.5
-  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_2cedf4bcc6.npz
   scale: 0.017933333538564047
   k: 10000.0
   offset: 0.004
   detach: 0.0
-  emit: acceleration
+  emit: velocity
+  overdamped_gamma: 2000.0
   graph_mode: true
 - op: basement_membrane_bond
   at: basement_membrane_particle
   k: 5000.0
   cutoff: 0.008
   max_neighbours: 6
-  emit: acceleration
+  emit: velocity
+  overdamped_gamma: 2000.0
   graph_mode: true
   k_adhesion_hint: 10000.0
 - op: basement_membrane_remodel
@@ -2522,16 +2028,13 @@ operators:
   at: basement_membrane_particle
   break_strain: 0.35
   components_every: 40
-- op: drag
-  at: basement_membrane_particle
-  k: 40.0
 - op: cell_exclude_3d
   at: mpm_particle
   centre:
   - 0.5
   - 0.5
   - 0.5
-  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_2cedf4bcc6.npz
   scale: 0.017933333538564047
   skin: 0.004
 - op: cell_exclude_3d
@@ -2540,7 +2043,7 @@ operators:
   - 0.5
   - 0.5
   - 0.5
-  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_2cedf4bcc6.npz
   scale: 0.017933333538564047
   skin: 0.006
 schedule:
@@ -2550,7 +2053,6 @@ schedule:
 - cell_to_ecm
 - integrin_adhesion
 - basement_membrane_bond
-- drag
 - basement_membrane_remodel
 - basement_membrane_bond_break
 - ecm_stress
@@ -2730,7 +2232,7 @@ operators:
   k: 1200.0
   damp: 0.0
   implementation: replay
-  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_2cedf4bcc6.npz
   scale: 0.017933333538564047
 - op: ecm_stress
   at: mpm_particle
@@ -2760,7 +2262,7 @@ operators:
   - 0.5
   - 0.5
   - 0.5
-  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_2cedf4bcc6.npz
   scale: 0.017933333538564047
   offset: 0.004
   thickness: 0.002
@@ -2773,19 +2275,21 @@ operators:
   - 0.5
   - 0.5
   - 0.5
-  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_2cedf4bcc6.npz
   scale: 0.017933333538564047
   k: 0.0
   offset: 0.004
   detach: 0.0
-  emit: acceleration
+  emit: velocity
+  overdamped_gamma: 2000.0
   graph_mode: true
 - op: basement_membrane_bond
   at: basement_membrane_particle
   k: 5000.0
   cutoff: 0.008
   max_neighbours: 6
-  emit: acceleration
+  emit: velocity
+  overdamped_gamma: 2000.0
   graph_mode: true
   k_adhesion_hint: 0.0
 - op: basement_membrane_remodel
@@ -2804,16 +2308,13 @@ operators:
   at: basement_membrane_particle
   break_strain: 0.35
   components_every: 40
-- op: drag
-  at: basement_membrane_particle
-  k: 40.0
 - op: cell_exclude_3d
   at: mpm_particle
   centre:
   - 0.5
   - 0.5
   - 0.5
-  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_2cedf4bcc6.npz
   scale: 0.017933333538564047
   skin: 0.004
 - op: cell_exclude_3d
@@ -2822,7 +2323,7 @@ operators:
   - 0.5
   - 0.5
   - 0.5
-  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_e783aed62b.npz
+  surface: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_2cedf4bcc6.npz
   scale: 0.017933333538564047
   skin: 0.006
 schedule:
@@ -2832,7 +2333,6 @@ schedule:
 - cell_to_ecm
 - integrin_adhesion
 - basement_membrane_bond
-- drag
 - basement_membrane_remodel
 - basement_membrane_bond_break
 - ecm_stress
