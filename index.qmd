@@ -1118,7 +1118,7 @@ deep, the lumen is hollow, the fibres are cut where they cross, and the blocks a
   <figure class="sim-card">
     <video src="gallery/vertex_mpm_free.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">unconfined<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">the interface, tested<span class="sim-spec"><pre>general:
   name: 30_epi2_soft_E5
   seed: 0
   n_frames: 402
@@ -1279,7 +1279,7 @@ plotting:
   camera_elev: 1.05
   camera_turns: 0.0
   camera_zoom: 0.0</pre></span></span>
-      <span class="sim-cap">the control: a growing, dividing epithelium presses into a soft fibrous matrix and stays a SPHERE (oblateness 1.01) at ~6,000 cells. First contact at frame 32; by the end 89% of the matrix is strained and the front has reached the wall of the box</span>
+      <span class="sim-cap">the interface itself, on the smallest rig that can falsify it: a triangulated surface pressed into an MPM block against a rigid floor, with a hole in the surface. Contact is particle-to-surface, so the reaction really returns to the mesh (momentum residual 1.4e-7, float32 precision) and friction changes the slip fourfold &mdash; it is not MPM's automatic weld. The block is compressed 14.4% and coloured by |J-1|</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
