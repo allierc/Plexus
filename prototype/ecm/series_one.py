@@ -747,6 +747,52 @@ SERIES = {
                                       membrane_secrete_rate=0.0, membrane_tau=0.0,
                                       membrane_reserve=0.0),
 
+    # 156/157: THE SUPPLY HYPOTHESIS, ONE MECHANISM EACH. With the sheet at its declared stiffness the
+    #     best STABLE standoff is 155's -0.016, because a sheet 27x stiffer resists inflation 27x harder
+    #     and its own hoop stress beats a tether that has to stay under the matrix's stability limit. A
+    #     basement membrane does not accommodate a tripling radius elastically -- it remodels and it is
+    #     secreted into -- and both have been off in every run since 91. 156 turns remodelling on
+    #     (`tau = 60`, rest lengths creeping toward the current ones); 157 turns secretion on instead,
+    #     with the reserve the sheet needs to lay down new material. If either recovers the standoff,
+    #     the answer to "where does the membrane sit" stops being a force balance.
+    "156_supply_remodel": dict(membrane_springs=False, membrane_impl="mpm",
+                               membrane_direct_forces=False, membrane_adhesion_substep=True,
+                               membrane_grid_bc=False, membrane_contact_k=0.0, membrane_exclude=False,
+                               membrane_adhesion=3.0e5, membrane_tau=60.0,
+                               membrane_secrete_rate=0.0, membrane_reserve=0.0),
+    "157_supply_secrete": dict(membrane_springs=False, membrane_impl="mpm",
+                               membrane_direct_forces=False, membrane_adhesion_substep=True,
+                               membrane_grid_bc=False, membrane_contact_k=0.0, membrane_exclude=False,
+                               membrane_adhesion=3.0e5, membrane_tau=0.0,
+                               membrane_particles=90000, membrane_reserve=1.0,
+                               membrane_secrete_rate=0.012),
+
+    # 158-160: THE MATRIX, WHICH HAS BEEN THE SOFTEST THING IN THE PICTURE AND PUSHED TWICE.
+    #     Two questions, and they are related. First, the stroma is E = 15 against a sheet at 100 and
+    #     the front reads as fluid; 158/159 raise it x3 and x9 with everything else at 153. Second, the
+    #     epithelium still pushes the stroma DIRECTLY -- `cell_to_ecm` as a soft penalty and
+    #     `cell_exclude_3d` as a hard projection -- and both predate a membrane that sits on the surface.
+    #     With the sheet there and scattering into the shared grid, the stroma should be pushed BY THE
+    #     MEMBRANE, and the direct paths are redundant. They are also why there is a hole: measured on
+    #     153, the innermost matrix sits 0.0205 box units (a full grid cell) outside the sheet with 68
+    #     of 140,000 particles in contact, against 1,062 in 133. 160 removes both and lets the BM do it.
+    "158_ecm_stiff_x3": dict(youngs=45.0, membrane_springs=False, membrane_impl="mpm",
+                             membrane_direct_forces=False, membrane_adhesion_substep=True,
+                             membrane_grid_bc=False, membrane_contact_k=0.0, membrane_exclude=False,
+                             membrane_adhesion=1.0e6, membrane_youngs=100.0,
+                             membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
+    "159_ecm_stiff_x9": dict(youngs=135.0, membrane_springs=False, membrane_impl="mpm",
+                             membrane_direct_forces=False, membrane_adhesion_substep=True,
+                             membrane_grid_bc=False, membrane_contact_k=0.0, membrane_exclude=False,
+                             membrane_adhesion=1.0e6, membrane_youngs=100.0,
+                             membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
+    "160_bm_pushes_ecm": dict(ecm_direct_push=False, k_contact=0.0, membrane_springs=False,
+                              membrane_impl="mpm", membrane_direct_forces=False,
+                              membrane_adhesion_substep=True, membrane_grid_bc=False,
+                              membrane_contact_k=0.0, membrane_exclude=False,
+                              membrane_adhesion=1.0e6, membrane_youngs=100.0,
+                              membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
+
     "_unused_secrete_dense": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
                              membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
                              membrane_particles=90000, membrane_reserve=1.0,
