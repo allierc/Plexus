@@ -156,4 +156,59 @@ formulation (BFEMP, Li et al.\ 2022), which forbids penetration outright at the 
 solve. The next question is whether the same operator survives a \emph{curved, moving} mesh, which is
 the spheroid.
 
+
+\section*{6.\; The spec this argues for}
+
+Everything above, plus the archived line and the literature the note beside this one records, points at
+one container. It is chosen so that the \emph{expensive} fidelity is the fidelity we cannot do without,
+and the cheap fidelity is taken in full.
+
+\textbf{What resolution cannot buy.} A basement membrane is $100$ nm on a tissue of $100\,\mu$m. To
+carry it as a resolved MPM body -- seven cells through its thickness, which is what the pillar rig
+needed -- costs $\Delta x\approx3\times10^{-4}$ and a grid of $3500^3$: four times $10^{10}$ cells, for
+one sheet. So the sheet is \emph{codimensional}: its thickness enters as a parameter (a rest length,
+Eq.~\ref{eq:adh}), never as resolved geometry, which is the move thin-shell MPM and C-IPC both make.
+For the same reason its adhesion is an explicit relation and not grid contact: below a cell the grid
+welds, and runs 142--151 measured that ten times.
+
+\begin{center}\small
+\begin{tabular}{@{}llll@{}}\toprule
+ & representation & why not finer & cost\\\midrule
+epithelium & vertex model, replayed & pass 1 and pass 2 cannot share a world & already paid\\
+basement membrane & MPM particles, codim-1, thickness as $\ell_0$ & $3500^3$ grid to resolve it & $45$k particles\\
+matrix & MPM fibres, $\Delta x=1/64$ & the stress front is resolved at $1/64$ & $140$k particles\\
+plaque & edge set \code{cell}$\to$\code{bm}, $\Sigma\approx7T$ & resolved plaques need the same $3500^3$ & $4$--$20$k edges\\
+fibril & edge set \code{bm}$\to$\code{ecm} & --- & $4$k edges\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{The schedule, and the one placement that matters.} \code{plaque\_pull} and \code{fibril\_pull}
+go \emph{inside} the substep block, with the MPM cycle; at frame level a stiff relation is integrated
+at $\Delta t_{\text{frame}}$ and its stability ceiling is $400\times$ lower, which is the whole
+difference between run 121 and run 133. The mass balance and the proteolysis stay at frame level,
+where their timescale is hours:
+%
+\begin{equation*}
+\text{aggregate}\to\text{seed}\to
+\Bigl[\underbrace{\text{plaque\_pull},\ \text{fibril\_pull},\ \text{mpm\_strain},\ \text{scatter},
+\ \text{grid\_update},\ \text{gather}}_{\Delta t_{\text{sub}}=2\times10^{-4}}\Bigr]
+\to \text{bm\_secrete},\ \text{bm\_degrade},\ \text{ecm\_stress}.
+\end{equation*}
+
+\textbf{The fidelity that is nearly free, and is therefore not optional.} A per-particle areal density
+with production and removal (Eq.~\ref{eq:bmmass}) at the measured half-life of $3$--$10$ hours --- one
+scalar per particle, and the mechanism without which a sheet cannot enclose a tripling radius at all,
+as run 155 showed elasticity alone cannot. A strain-dependent modulus (Eq.~\ref{eq:bmstiff}), one line
+in the constitutive law, against a sheet that reaches $\lambda=2.4$. A stiffness ratio of $10$--$100$
+between sheet and stroma, which costs nothing but a second parent set. And punctate adhesion at the
+measured spacing, which is an edge list rather than a field.
+
+\textbf{What it costs and what it still does not buy.} The added operators are $O(N)$ scalars and two
+edge lists, so a $402$-frame run stays where the current line is: roughly $45$ minutes on one A6000 at
+$185$k particles and $n_{\text{grid}}=64$. What it does not buy is two-way mechanics with the
+epithelium --- the tissue is still a replay, so it drives and is never driven. The operator in this
+note is exactly the piece that removes that limitation, and the next experiment is the one that puts a
+\emph{curved, moving} mesh on the same contact: the spheroid.
+
 \end{document}
