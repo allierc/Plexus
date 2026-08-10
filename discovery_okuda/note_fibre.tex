@@ -213,6 +213,12 @@ F14& stiffening: tangent at $20\%$ over $5\%$ & network $10$--$100$, this law $\
      \op{02i} built, open\\
 F15& residual strain after unloading & $<0.02$ for an elastic solid & \op{02i}, open\\
 F16& effective Poisson ratio & solid $0.15$--$0.30$, network $0$--$0.1$ & \op{02i}, open\\
+\multicolumn{4}{@{}l}{\textit{the stress field is the matrix's, not the picture's} (\op{04}, \op{04d},
+\op{04e})}\\
+F17& the radial stress profile reproduces across independent runs & mean band per shell within
+     $0.15$ & \pass{7.0/7.0/6.98/5.01/2.45/1.13} vs \pass{7.0/7.0/6.92/5.10/2.50/1.16}\\
+F18& the field is smooth in time: change per particle per frame & $<1/8$ of full scale, i.e.\ one
+     band & \pass{1.35\%} median, \pass{21\%} p99\\
 \bottomrule\end{tabularx}}
 \smallskip
 
@@ -222,6 +228,15 @@ measure reports the noise (\S2). And a quantity that only ever increases is not 
 property: the slow swelling of \op{02b}/\op{02c} was reported as creep and was undamped particle
 noise accumulating, which F7 and F8 catch by changing the damping --- a test no material property
 should notice.
+
+\textbf{F17 and F18 are what let a movie be read at all.} The matrix is drawn by banding
+$\sigma_{\rm vm}$ into eight levels against a fixed full scale, and a band is a coarse thing: measured
+on named particles chosen by their initial radius, the value itself moves $1.35\%$ per frame (median)
+while $97\%$ of its colour-band flips come from a change under a \emph{tenth} of a band. So what a
+movie shows changing frame to frame is overwhelmingly the palette crossing a threshold and not the
+material --- which is why F17 compares the radial \emph{profile} across runs rather than any frame's
+appearance, and why two runs differing in friction and in frame count agree on it to within one part
+in fifty while looking different on screen.
 
 \textbf{F14--F16 are open, and the reason is worth recording.} \op{test\_02i\_compress.py} presses the
 block between two plates and releases it, which is the cheapest of the three falsifying loadings. Its
