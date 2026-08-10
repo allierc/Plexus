@@ -192,7 +192,16 @@ def remeasure(out_dir):
 # --------------------------------------------------------------------------- the pictures
 def rerender(out_dir, **kw):
     """Redraw a finished run from `traj.npz` -- no GPU, no re-simulation."""
-    spec = yaml.safe_load(open(os.path.join(out_dir, "spec_run.yaml")))
+    # `spec_run.yaml` IS THE RESOLVED SPEC AND IS PREFERRED, but the earliest runs in this ladder wrote
+    # only `spec.yaml`, and a re-render that dies on a missing filename leaves the run stuck with a
+    # picture already known to be wrong. Falling back is said out loud, because the two files can differ
+    # wherever a run patched its spec at launch.
+    sp = os.path.join(out_dir, "spec_run.yaml")
+    if not os.path.exists(sp):
+        sp = os.path.join(out_dir, "spec.yaml")
+        print(f"[{os.path.basename(out_dir.rstrip('/'))}] no spec_run.yaml -- re-rendering from "
+              f"spec.yaml, which is the SUBMITTED spec, not the resolved one", flush=True)
+    spec = yaml.safe_load(open(sp))
     # A RUN SUBMITTED TO THE CLUSTER RECORDS CLUSTER PATHS. The same NFS export is mounted at
     # /workspace in the devcontainer and at /groups/saalfeld/home/allierc/Graph on gpu_l4, so a spec
     # written there names files this side cannot open -- re-rendering 69 locally died on a surface map
@@ -213,7 +222,10 @@ def rerender(out_dir, **kw):
     import ecm_ops
     ecm_ops.STRESS_HISTORY[:] = list(np.asarray(z["stress"]))
     ecm_ops.STRESS_RAW[:] = list(np.asarray(z["vm"])) if "vm" in z.files else []
-    ecm_ops.BALL_RADIUS[:] = list(np.asarray(z["radius"], float))
+    # ONLY THE PRESCRIBED-SPHERE RUNS HAVE A BALL RADIUS. `mesh_contact` puts a real mesh against the
+    # matrix and records none, so `radius` is absent from those files and this line was a KeyError that
+    # made every interface run un-re-renderable -- the one thing `traj.npz` exists to allow.
+    ecm_ops.BALL_RADIUS[:] = (list(np.asarray(z["radius"], float)) if "radius" in z.files else [])
     out = {"sets": {"mpm_particle": {"pos": np.asarray(z["pos"])}}}
     if "mpos" in z.files:
         import membrane_ops

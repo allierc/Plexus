@@ -167,6 +167,11 @@ def _matrix_strands(ax, q, band, cmap, zorder, alpha, per, three_d=True, lw=0.55
     if max_lines and S.shape[0] > max_lines:
         k = np.linspace(0, S.shape[0] - 1, max_lines).astype(int)
         S, B = S[k], B[k]
+        # AND THE PER-PARTICLE MASK WITH THEM. `pmask` says which of THIS strand's points are in the
+        # cut; left un-subsampled it stays row-aligned to the strands that were dropped, so every
+        # remaining strand is cut at another strand's crossings.
+        if pmask is not None:
+            pmask = pmask[k]
     # STABLE, AND THAT IS THE FLICKER FIX. The sort exists to draw the hottest strands last, but
     # `np.argsort`'s default is quicksort and is NOT stable: with ten thousand strands in eight
     # bands the ties are enormous, so the draw order is reshuffled every frame and overlapping
@@ -177,6 +182,13 @@ def _matrix_strands(ax, q, band, cmap, zorder, alpha, per, three_d=True, lw=0.55
     # so the order changes only where a band does.
     o = np.argsort(B, kind="stable")                   # hottest last, so the front is never buried
     S, B = S[o], B[o]
+    # AND `pmask` IS REORDERED WITH THEM, because it is per-strand data like `B` is. Sorting `S` and
+    # `B` while leaving `pmask` in seeding order hands strand j's in-slab mask to whichever strand the
+    # sort moved into row j -- so a strand is cut where a DIFFERENT strand leaves the cut, and since
+    # the sort's permutation changes wherever any band changes, the cuts move every frame. That is a
+    # flicker with no motion behind it, in the panel whose whole job is to show where the front is.
+    if pmask is not None:
+        pmask = pmask[o]
     # A LINE BETWEEN TWO PARTICLES MORE THAN A GRID CELL APART IS A CLAIM THE PHYSICS DOES NOT MAKE.
     # MLS-MPM computes nothing between two points directly, so two particles of one strand that are
     # further apart than the kernel reaches are two unrelated bodies -- `note_fibre` measured exactly
@@ -242,6 +254,39 @@ def _matrix_strands(ax, q, band, cmap, zorder, alpha, per, three_d=True, lw=0.55
         lc = LineCollection([q_[:, :2] for q_ in S], colors=cols, linewidths=lw, alpha=alpha)
         lc.set_zorder(zorder)
         ax.add_collection(lc)
+
+
+def _matrix_half(ax, q, band, sel, cmap, zorder, alpha, per=None, gap=None, s_rest=1.1, s_hot=2.4):
+    """One half of the matrix -- `sel` is a PER-PARTICLE mask over the WHOLE array, never a slice.
+
+    THIS IS THE INDEXING THE STRAND FORM NEEDS AND THE POINT FORM DOES NOT. `_matrix_strands` reads
+    the strand a particle belongs to off its POSITION IN THE ARRAY -- particle i is on strand i//per,
+    exactly as `seed_ecm` laid it down -- so it is only ever correct on the full, seeding-order array.
+    Handing it `q[far]` compacts 200,000 particles down to the ~100,000 on the far side and then
+    reshapes THAT into rows of 20, which makes each drawn polyline a splice of pieces of two or three
+    unrelated strands: measured on 04d frames 136/138, 95% of the lines drawn in the 3D panel mixed
+    more than one real strand, and each line's colour was the median band over that splice -- which is
+    how an unloaded strand out at the box wall came to be drawn hot, inheriting the band of a loaded
+    strand it was spliced to. Worse, the split is geometric, so the far COUNT changes with the tissue
+    (99,970 particles at frame 136, 99,963 at 138): seven particles of phase shift re-cuts every one
+    of the 4,998 blocks, so the whole matrix is redrawn as a different set of fibres between two
+    consecutive frames. That is the flicker -- the render's indexing, not the stress, which
+    `stress_time.png` already showed to be smooth.
+
+    So the mask travels as a mask. `_matrix_strands` takes it per strand (draw this strand at all)
+    and per particle (draw it only where it is on this side), and breaks each polyline where it
+    crosses -- so a strand straddling the tissue centre is drawn far behind the epithelium and near in
+    front of it, in the two pieces it actually has.
+    """
+    if per and per > 1:
+        n = (q.shape[0] // per) * per
+        if n < per:
+            return
+        pm = np.asarray(sel)[:n].reshape(-1, per)
+        _matrix_strands(ax, q, band, cmap, zorder, alpha, int(per), gap=gap, max_lines=None,
+                        mask=pm.any(axis=1), pmask=pm)
+    else:
+        _matrix_scatter(ax, q[sel], band[sel], cmap, zorder, alpha, s_rest=s_rest, s_hot=s_hot)
 
 
 def _matrix_scatter(ax, q, band, cmap, zorder, alpha, s_rest=1.1, s_hot=2.4, three_d=True,
@@ -331,10 +376,12 @@ def draw_3d(ax, mt, pos, q, band, cmap, cam, L, div=None, brk=None, tissue=True,
     and the front is a shell you can see the thickness of.
     """
     from run_tyssue_vesicle import _draw
-    if cutaway:
-        d, u, v = screen_basis(cam["elev"], cam["azim"])
-        keep = ~(((q @ d) < 0) & ((q @ u) > 0) & ((q @ v) > 0))
-        q, band = q[keep], band[keep]
+    # THE CUTAWAY IS A MASK, NOT A SLICE, for the reason `_matrix_half` documents: `q[keep]` destroys
+    # the seeding order the strand form reads the strand membership off. It is carried alongside the
+    # far/near mask and the two are combined per particle below.
+    d, u, v = screen_basis(cam["elev"], cam["azim"])
+    vis = (np.ones(q.shape[0], bool) if not cutaway
+           else ~(((q @ d) < 0) & ((q @ u) > 0) & ((q @ v) > 0)))
     if tissue:
         _draw(ax, pos, mt, P0, azim=cam["azim"], act=None, inner=INNER, Lbox=L,
               divided=div, broken=brk, wall_shade=1.0)
@@ -347,15 +394,12 @@ def draw_3d(ax, mt, pos, q, band, cmap, cam, L, div=None, brk=None, tissue=True,
         ax.clear(); ax.set_facecolor("black")
         ax.set_xlim(-L, L); ax.set_ylim(-L, L); ax.set_zlim(-L, L)
         ax.set_box_aspect((1, 1, 1)); ax.axis("off")
-    d, _, _ = screen_basis(cam["elev"], cam["azim"])
     depth = q @ d                                      # > 0 is deeper than the tissue centre
-    far, near = depth > 0, depth <= 0
-    if tissue:
-        _matrix_scatter(ax, q[far], band[far], cmap, zorder=0, alpha=0.85, per=per, gap=gap)
-        _matrix_scatter(ax, q[near], band[near], cmap, zorder=10, alpha=0.28, per=per, gap=gap)
-    else:
-        _matrix_scatter(ax, q[far], band[far], cmap, zorder=0, alpha=0.9, per=per, gap=gap)
-        _matrix_scatter(ax, q[near], band[near], cmap, zorder=10, alpha=0.9, per=per, gap=gap)
+    far, near = (depth > 0) & vis, (depth <= 0) & vis
+    a_near = 0.28 if tissue else 0.9                   # the near half is faint only when it is in
+    a_far = 0.85 if tissue else 0.9                    # front of an epithelium worth seeing through
+    _matrix_half(ax, q, band, far, cmap, zorder=0, alpha=a_far, per=per, gap=gap)
+    _matrix_half(ax, q, band, near, cmap, zorder=10, alpha=a_near, per=per, gap=gap)
     if mem is not None:
         # THE BASEMENT MEMBRANE IN THE MAIN PANELS TOO. It was drawn only in the zoom, which made a
         # 30,000-particle body carrying the whole tissue-matrix interface invisible in the two panels
