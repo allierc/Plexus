@@ -38,7 +38,7 @@ ANCHOR_OLD = "<h3>Turing × vertex — patterning &amp; shaping a growing tissue
 ANCHOR_NEW = "<h3>Vertex + Turing — patterning &amp; shaping a growing tissue</h3>"
 
 
-def _content_box(src, x0, wid, hei, n=9, thresh=14):
+def _content_box(src, x0, wid, hei, n=9, thresh=14, skip_top=0.0):
     """The bounding box of everything that is not background, in a REGION of the frame.
 
     Both panels of these movies are drawn on black with matplotlib's own margins around them, and
@@ -64,6 +64,13 @@ def _content_box(src, x0, wid, hei, n=9, thresh=14):
     for f in sorted(glob.glob(os.path.join(d, "*.png"))):
         a = _mpimg.imread(f)
         a = (a[:, :, :3].max(axis=2) * (255 if a.dtype.kind == "f" else 1))[:hei, x0:x0 + wid]
+        # THE PRINTED LABEL IS NOT CONTENT. Every one of these movies stamps the run name, the frame
+        # and the cell count in the top-left corner, in white on black -- so a bounding box that
+        # measures brightness puts the box around the TEXT as well as around the tissue, and the
+        # crop that follows keeps the text and shrinks the subject. `skip_top` is the fraction of
+        # the panel the label occupies; measured below it, the box is the tissue's.
+        if skip_top:
+            a = a[int(skip_top * hei):]
         m = a > thresh
         if not m.any():
             continue
@@ -84,7 +91,7 @@ def _nframes(src):
     return max(1, int(out.split(",")[0]))
 
 
-def split_concat(src, dst, recentre=True):
+def split_concat(src, dst, recentre=True, skip_top=0.0):
     """Cut the two-panel movie in half and play the halves in SEQUENCE: 3D first, then the section.
 
     ONE CLIP PER RUN, NOT TWO. A gallery card is a square block, and the movie is 2:1 -- shown whole it
@@ -105,8 +112,9 @@ def split_concat(src, dst, recentre=True):
         # EACH HALF CENTRED ON ITS OWN CONTENT, and both cropped to ONE size, because `concat`
         # requires it. The window is the larger of the two contents plus a fifth, so neither panel
         # is cut and the smaller one is not blown up past the other.
-        cxa, cya, sa = _content_box(src, 0, half, h)
-        cxb, cyb, sb = _content_box(src, w - half, half, h)
+        cxa, cya, sa = _content_box(src, 0, half, h, skip_top=skip_top)
+        cxb, cyb, sb = _content_box(src, w - half, half, h, skip_top=skip_top)
+        cya += int(skip_top * h); cyb += int(skip_top * h)      # back into full-frame rows
         side = min(h, half, int(1.2 * max(sa, sb)))
         side -= side % 2
         ax = min(max(cxa - side // 2, 0), half - side)
@@ -179,6 +187,41 @@ def card(video, name, spec_path, cap):
       <span class="sim-cap">{cap}</span>
     </figcaption>
   </figure>"""
+
+
+
+def replace_card(video, name, spec_path, cap, files=(), new_video=None):
+    """Rewrite ONE hand-written gallery card in place, matched on the clip it plays.
+
+    The generated block below owns the Vertex + MPM section; the cards in the older sections are
+    part of the page's own prose and are not in it. Rewriting one by hand would break the same rule
+    this file exists to enforce -- that a card's spec is READ from the run that produced it rather
+    than pasted -- so it is done here, keyed on the video filename, which is the one thing about a
+    card that does not change when its content does.
+    """
+    # THE CLIP A CARD PLAYS AND THE CLIP IT IS FOUND BY ARE NOT THE SAME QUESTION. Two cards on
+    # this page play `tyssue_grow_divide.mp4` -- the vertex model's own, and the growth phase of the
+    # Turing section -- so overwriting that FILE changes both, and the second one's spec then
+    # describes a run its clip no longer shows. A new card gets a new filename and only the card
+    # named here is repointed.
+    blk = card(new_video or video, name, spec_path, cap)
+    for path, rendered in files:
+        if not os.path.exists(path):
+            continue
+        s = open(path).read()
+        i = s.find(f'<video src="gallery/{video}"')
+        if i < 0:
+            print(f"[minisite] {os.path.basename(path)}: no card plays {video} -- not replaced")
+            continue
+        # `<figure` AND NOT `<figure class="sim-card">`. Quarto renders the class list as
+        # `sim-card figure`, so matching the bare class found nothing in the rendered page, `rfind`
+        # returned -1, and the "replacement" was appended at the END OF THE FILE -- a second card
+        # four thousand lines below the gallery it belongs to, with the original still in place.
+        a = s.rfind("<figure", 0, i)
+        b = s.index("</figure>", i) + len("</figure>")
+        out = blk if not rendered else blk.replace("&#x27;", "'")
+        open(path, "w").write(s[:a] + out.lstrip() + s[b:])
+        print(f"[minisite] {os.path.basename(path)}: card for {video} replaced ({name})")
 
 
 def build(runs, runs2=()):
@@ -291,6 +334,27 @@ def main():
             print("[minisite] no docs/index.html -- source updated only; run `quarto render`")
             continue
         _patch(tgt, build(runs, runs2), rendered=rendered)
+    # AND THE ONE HAND-WRITTEN CARD THIS SESSION REPLACED: "grow & divide" now plays the vertex
+    # model on its own (`00_spheroid`), cropped to the tissue so the printed label is out of frame,
+    # 3D first and the true cross-section second.
+    gd = os.path.join(LOG, "00_spheroid")
+    if os.path.exists(os.path.join(gd, "movie.mp4")):
+        split_concat(os.path.join(gd, "movie.mp4"), os.path.join(GAL, "tyssue_spheroid_00.mp4"),
+                     skip_top=0.16)
+        print(f"[minisite] gallery/tyssue_spheroid_00.mp4 <- 00_spheroid/movie.mp4 "
+              f"({os.path.getsize(os.path.join(GAL, 'tyssue_spheroid_00.mp4')) / 1e6:.1f} MB)")
+        replace_card("tyssue_grow_divide.mp4", "grow &amp; divide", os.path.join(gd, "spec.yaml"),
+                     "the vertex model on its own: 200 cells and 396 vertices to 6,076 and ~12,000 "
+                     "over 402 frames, the apical radius x3.56 and the shell still round "
+                     "(aspect 1.02), through 1,384 T1 neighbour exchanges. 3D first, then the true "
+                     "cross-section -- one cell deep, hollow",
+                     files=((QMD, False), (DOCS, True)),
+                     new_video="tyssue_spheroid_00.mp4")
+        import shutil as _sh
+        if os.path.isdir(DOCS_GAL):
+            _sh.copy2(os.path.join(GAL, "tyssue_spheroid_00.mp4"),
+                      os.path.join(DOCS_GAL, "tyssue_spheroid_00.mp4"))
+
     if os.path.isdir(DOCS_GAL):
         # `runs + runs2`. Copying only the first row left the new clips out of docs/gallery while the
         # page that referenced them was patched -- three cards pointing at files the site did not have.
