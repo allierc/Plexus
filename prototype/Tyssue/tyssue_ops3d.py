@@ -1073,9 +1073,25 @@ class Apoptosis3D(Structural):
             cs = clvl_c.state.clone()
             h0, h1 = clvl_c.state_schema["chem"]
             for nbrs, amt in _bequest:
-                share = amt / float(len(nbrs))
-                for g in nbrs:
-                    cs[g, h0:h1] += share / max(float(V0f[g]), 1e-9)
+                # DO NOT POUR INTO A CELL THAT IS ITSELF VANISHING. The divisor is the recipient's
+                # volume, and a cell that is MARKED but cannot reach a triangle shrinks to the
+                # 1e-9 floor and stays there -- so a bequest of ~0.04 divided by 1e-9 injects ~1e7
+                # concentration in one step, and a few of those compound. Measured before this
+                # guard, on r020_00_ctrl + `smaller`: act_min -1.04e10.
+                #
+                # This was my own code, added on 9 August to enforce Cedric's rule that "the sum of
+                # activity in the dying cell's vicinity should not change much by construction" --
+                # and it turned a conservation law into an amplifier by dividing by a number the
+                # model allows to reach zero.
+                live = [g for g in nbrs if float(V0f[g]) >= crit]
+                if not live:
+                    # every neighbour is on its way out too: the material leaves with the cell,
+                    # which is what happened before conservation existed and is the honest
+                    # alternative to inventing somewhere to put it
+                    continue
+                share = amt / float(len(live))
+                for g in live:
+                    cs[g, h0:h1] += share / float(V0f[g])
             clvl_c.state = cs
         # 3. REBUILD, exactly as divide_3d does: `keep` maps new face -> old face and carries every
         #    per-face array across, so nothing can fall out of step with the mesh.

@@ -596,6 +596,28 @@ SERIES = {
                                  integrin_youngs=400.0, membrane_offset=0.0417,
                                  membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
 
+    # 144/145: THE MPM INTEGRIN, WITH ITS CELL END CARRYING MOMENTUM. 142 and 143 were exact nulls at
+    #     both the sub-cell length and the resolved one -- fibre inner ends at 0.2969 against a surface
+    #     at 0.2973, outer ends unmoved to one part in ten thousand, sheet strain 1.4e-8. The cause was
+    #     `integrin_track` setting a position and ZEROING the velocity. In MPM a particle reaches its
+    #     neighbours only through `mpm_scatter`, which puts mass*velocity on the grid, so a teleported
+    #     particle at rest scatters nothing and the fibre above it never learns its base is moving. The
+    #     flat rig did not catch it because its prescribed row is static and the load is applied to the
+    #     sheet -- the opposite direction of causation from a fibre dragging a membrane outward.
+    #     With the boundary carrying dR/dt (0.0914 box units per unit time), 30 frames already give
+    #     strain 0.086 and a standoff of +0.0029 against a fibre length of 0.004.
+    "144_mpm_integrin_v": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=False,
+                               membrane_contact_k=0.0, membrane_exclude=False, membrane_adhesion=0.0,
+                               n_integrins=4000, integrin_layers=3, integrin_length=0.004,
+                               integrin_youngs=400.0, membrane_offset=0.004,
+                               membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
+    "145_mpm_integrin_v_2dx": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=False,
+                                   membrane_contact_k=0.0, membrane_exclude=False,
+                                   membrane_adhesion=0.0, n_integrins=4000, integrin_layers=3,
+                                   integrin_length=0.0417, integrin_youngs=400.0,
+                                   membrane_offset=0.0417, membrane_secrete_rate=0.0,
+                                   membrane_tau=0.0, membrane_reserve=0.0),
+
     "_unused_secrete_dense": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
                              membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
                              membrane_particles=90000, membrane_reserve=1.0,

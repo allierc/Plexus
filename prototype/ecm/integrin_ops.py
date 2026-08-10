@@ -172,12 +172,29 @@ class IntegrinTrack(Structural):
         dev, dt_ = pos.device, pos.dtype
         t = min(self.T - 1, max(0, int(getattr(H, "frame", 0) or 0)))
         R = _radius(self.smap[t].to(dev, dt_), u)
+        Rn = _radius(self.smap[min(self.T - 1, t + 1)].to(dev, dt_), u)
         c = torch.tensor(self.centre, device=dev, dtype=dt_)
         lvl.get("pos")[idx] = c + u * R[:, None]
+        # AND ITS VELOCITY, WHICH IS THE WHOLE MECHANISM. Setting a position and zeroing the velocity
+        # was how 142 and 143 came back as exact nulls -- the fibres' cell ends tracked the surface to
+        # 0.2969 against 0.2973 while their outer ends did not move by one part in ten thousand, at
+        # BOTH the sub-cell length and the resolved one. In MPM a particle reaches its neighbours only
+        # through `mpm_scatter`, which puts `mass * velocity` on the grid: a particle that is teleported
+        # and then told it is at rest scatters ZERO momentum, so the constraint is invisible to the grid
+        # and the material above it never learns its base is moving. A moving boundary has to carry the
+        # velocity of its motion, dR/dt along its own direction, and then the fibre is dragged the way
+        # anything is dragged in MPM.
+        #
+        # This is also why the flat rig disagreed: `FibreRig`'s prescribed row is STATIC and the load is
+        # applied to the sheet, so zeroing its velocity was correct there. The spheroid asks the fibre
+        # to pull the sheet outward, which is the opposite direction of causation.
         if "vel" in lvl.state_schema:
-            lvl.get("vel")[idx] = 0.0
+            dt_frame = float(getattr(H, "dt", 0.0) or 0.0) or 0.004
+            lvl.get("vel")[idx] = u * ((Rn - R) / dt_frame)[:, None]
         if not self._said:
+            v_ = float((u * ((Rn - R) / 0.004)[:, None]).norm(dim=1).mean())
             print(f"[integrin_track] {idx.numel()} fibre cell ends prescribed on the recorded surface "
-                  f"(one row of particles, not a grid condition)", flush=True)
+                  f"(one row of particles, not a grid condition), carrying the surface's own velocity "
+                  f"|v| = {v_:.4g} box units per unit time", flush=True)
             self._said = True
         return {}
