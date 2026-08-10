@@ -296,9 +296,20 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     if frames is not None:                                            # smoke override
         cfg["general"]["n_frames"] = int(frames)
         cfg["general"]["record_cap"] = int(frames) + 2
-        tmp = os.path.join(out_dir, "spec_run.yaml")
-        yaml.safe_dump(cfg, open(tmp, "w"), sort_keys=False)
-        cfg_path = tmp
+    # ALWAYS WRITE THE SPEC THIS RUN ACTUALLY RAN. This used to live INSIDE the `--frames` branch,
+    # so a run only recorded its own spec when a frame count was passed on the command line -- and
+    # the round's job script does not pass one. The consequence is not cosmetic: `graph_from_run`
+    # rebuilds a parent from `spec_run.yaml`, so EVERY run the loop produced was unusable as a
+    # parent. Measured on the first resumed round: all sixteen r001 runs finished, all sixteen
+    # lacked the file, `menu` and `coverage` raised AttributeError on the None, `build` followed,
+    # and the round launched nothing -- a complete round of GPU spent and nothing able to inherit
+    # from it. The basis members escaped it only because they were launched by hand WITH --frames.
+    #
+    # A run's spec is its primary record. It is written unconditionally, and after the override so
+    # it says what ran rather than what was asked for.
+    tmp = os.path.join(out_dir, "spec_run.yaml")
+    yaml.safe_dump(cfg, open(tmp, "w"), sort_keys=False)
+    cfg_path = tmp
 
     print(f"[{name}] comp={disc.get('comp_hash')} region={disc.get('region')!r} "
           f"frames={cfg['general']['n_frames']} dt={cfg['general']['dt']} device={device}",

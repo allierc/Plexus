@@ -156,7 +156,19 @@ def _graph_from_run(name):
     # explicit wiring, which is right for these pipelines (the routing is implicit in each
     # operator's `at` / `cell_set` / `vertex_set`) and would be wrong for one that branches. A
     # partial parent that can be edited beats a perfect parent that does not exist.
+    # AND FALL BACK TO THE CONFIG THE RUN WAS BUILT FROM. `spec_run.yaml` is the run's own record
+    # and is the right source, but until 10 August it was written only when `--frames` was passed
+    # -- which the round's job script does not do -- so sixteen finished runs existed with no
+    # recoverable spec at all and the round that should have inherited from them launched nothing.
+    # The config in config/okuda/<name>.yaml is what the run was LAUNCHED with; it differs from
+    # spec_run.yaml only by a command-line frame override, and a parent rebuilt from it is the
+    # composition the run actually had. Preferring spec_run.yaml keeps the record authoritative
+    # where it exists.
     sp = os.path.join(LOG, name, "spec_run.yaml")
+    if not os.path.exists(sp):
+        _cfg = os.path.join(os.path.dirname(HERE), "config", "okuda", f"{name}.yaml")
+        if os.path.exists(_cfg):
+            sp = _cfg
     if os.path.exists(sp):
         try:
             import yaml as _y
