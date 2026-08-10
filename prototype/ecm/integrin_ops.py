@@ -29,7 +29,7 @@ import math
 
 import torch
 
-from plexus.models.base import Structural
+from plexus.models.base import Lateral, Structural
 from plexus.models.entities import MPMParticle
 from plexus.models.registry import register_entity, register_operator
 
@@ -198,3 +198,79 @@ class IntegrinTrack(Structural):
                   f"|v| = {v_:.4g} box units per unit time", flush=True)
             self._said = True
         return {}
+
+
+@register_operator("integrin_pull", family="mechanics", set="particle", kind="lateral")
+class IntegrinPull(Lateral):
+    """The force the fibre's OUTER end exerts on the membrane patch it binds -- and the reaction.
+
+    WHY THE GRID IS NOT ENOUGH, MEASURED. A fibre reaches the sheet through the grid node they share,
+    whose velocity is the MASS-WEIGHTED mean of what is in the cell. At the end of the run the surface
+    shell is ~2,600 cells: 45,000 sheet particles is 17 per cell against 4,000 prescribed fibre ends at
+    1.5, so the puller carries ~9% of the mass it is trying to move -- and 144 duly dragged the sheet a
+    third of the way and tore it (fine coverage 0.471 against 0.948). Grid contact is a good model for
+    two bodies pressing on each other and a poor one for a molecule holding onto one.
+
+    So the last link is explicit: each fibre is BOUND at seeding to the membrane particle nearest its
+    tip, and thereafter exerts `k*(x_fibre - x_membrane)` on it, with the equal and opposite force on
+    the fibre. Both are returned as `mpm_acceleration`, so both still go through the grid solve and both
+    bodies' `F` sees the load -- this adds a relation, it does not bypass the mechanics. The standoff is
+    then the fibre's rest length as a material property, since the fibre's own elasticity is what sets
+    where its tip sits, and rupture is one comparison on a quantity the fibre already carries.
+    """
+
+    EMIT = "mpm_acceleration"
+    SUPPORTED_DIMS = [3]
+    MECHANISM_TAGS = ["integrin", "hemidesmosome", "cell_matrix_anchoring", "adhesion_force"]
+    PARAM_ROLES = {"k": "bond_stiffness", "gamma": "drag_the_force_is_divided_by",
+                   "rupture": "bond_extension_at_which_it_lets_go"}
+    REFERENCE = "Walko, G. et al. (2015) Cell Tissue Res. 360:363 (hemidesmosome architecture)."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "basement_membrane_particle")
+        self.integrin_set = params.get("integrin_set", "integrin_particle")
+        self.k = float(params.get("k", 1.0e5))
+        self.gamma = float(params.get("gamma", 1.0))
+        self.rupture = float(params.get("rupture", 0.0))     # 0 = permanent
+        self.bond = None
+        self.bound = None
+        self._said = False
+
+    def forward(self, H, mask=None):
+        idx_in = getattr(H, "integrin_inner", None)
+        if idx_in is None:
+            return {}
+        ml = H.level(self.at)
+        il = H.level(self.integrin_set)
+        mp, ip = ml.get("pos"), il.get("pos")
+        nf = int(idx_in.numel())
+        tip = ip[-nf:]                                        # the outer row, one per fibre
+        if self.bond is None:
+            # NEAREST AT SEEDING, THEN FIXED. A bond that re-binds to whatever is nearest each frame is
+            # not a bond, it is a field -- and it would hide exactly the failure this operator exists to
+            # measure, since a fibre that has torn free would silently grab a neighbour.
+            b = torch.empty(nf, dtype=torch.long, device=mp.device)
+            blk = 512
+            for a0 in range(0, nf, blk):
+                b1 = min(nf, a0 + blk)
+                b[a0:b1] = torch.cdist(tip[a0:b1], mp).argmin(dim=1)
+            self.bond = b
+            self.bound = torch.ones(nf, dtype=torch.bool, device=mp.device)
+            d0 = (tip - mp[b]).norm(dim=1)
+            print(f"[integrin_pull] {nf} fibres bound to their nearest membrane particle "
+                  f"(mean separation at seeding {float(d0.mean()):.2e} box units), k={self.k:g}, "
+                  f"rupture={'off' if self.rupture <= 0 else self.rupture}", flush=True)
+        d = tip - mp[self.bond]
+        if self.rupture > 0:
+            self.bound &= d.norm(dim=1) < self.rupture
+        f = (self.k / max(self.gamma, 1e-12)) * d * self.bound[:, None].to(d.dtype)
+        acc_m = torch.zeros_like(mp)
+        acc_m.index_add_(0, self.bond, f)                     # several fibres may share a patch
+        acc_i = torch.zeros_like(ip)
+        acc_i[-nf:] = -f                                      # the reaction, on the fibre's own tip
+        if not self._said:
+            print(f"[integrin_pull] first-frame mean |force| {float(f.norm(dim=1).mean()):.4g}",
+                  flush=True)
+            self._said = True
+        return {ml.name: acc_m, il.name: acc_i}
