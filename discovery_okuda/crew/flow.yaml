@@ -445,6 +445,31 @@ nodes:
         - [b_gs_gated_shaping,   interface_line_tension_3d, K_purse, [0.0, 0.25, 3.0, 6.0]]
         - [b_gs_gated_shaping,   shape_energy_3d, K_V,     [5.0, 10.0, 40.0, 80.0]]
         - [b_gs_gated_shaping,   shape_energy_3d, Lambda,  [0.0, 0.2, 1.0, 2.0]]
+        # ---- THE DEATH LADDERS, and the reason the death twins are in the basis at all. Route A
+        # cannot introduce an operator -- `_build_sweep` refuses "route A base has no
+        # apoptosis_3d" and this plan is static -- so a mechanism absent from the basis can never
+        # be swept. apoptosis_3d spent five rounds on the menu, flagged by `coverage` as the only
+        # operator never exercised, and was never chosen; these ladders ask what it DOES rather
+        # than waiting for the Proposer to volunteer.
+        #
+        # `mode` is a `model=`-style axis -- each value is a different biological hypothesis about
+        # WHY a cell is eliminated, sharing one mark/shed/extrude pathway -- and `_build_sweep`
+        # writes any key onto the operator dict, exactly as it does for grow_3d.model. The base
+        # itself runs `competition`, so that is the control these are read against and it is
+        # absent from the grids.
+        - [b_gs_gated_plain_death,   apoptosis_3d, mode, [smaller, older, crowded, dimmer]]
+        - [b_bru_gated_plain_death,  apoptosis_3d, mode, [smaller, older, crowded, dimmer]]
+        # `dimmer` reads the activator, so it is NOT offered on the b_none column: a mode that
+        # returns None on a base with no chemistry is a slot spent measuring nothing.
+        - [b_none_uniform_plain_death, apoptosis_3d, mode, [smaller, older, crowded]]
+        # HOW FAST, as distinct from WHO -- the knob that decides whether death is a mechanism or
+        # a demolition. Uncapped, five of six modes took r020_00_ctrl from protr 1.513 / grip 0.228
+        # to 1.131 / 0.049 with 1,660 of 7,424 cells dead; at 0.005 every mode finished within a
+        # few percent of its parent with no premise broken. 0.005 is the base, so this spans a
+        # factor of twenty around it and asks where the wall is.
+        - [b_gs_gated_plain_death,   apoptosis_3d, max_mark_frac, [0.001, 0.002, 0.01, 0.02]]
+        - [b_none_uniform_plain_death, apoptosis_3d, max_mark_frac, [0.001, 0.002, 0.01, 0.02]]
+        - [b_gs_gated_shaping_death, apoptosis_3d, max_mark_frac, [0.001, 0.002, 0.01, 0.02]]
 
   - id: build
     code: round.build_all
