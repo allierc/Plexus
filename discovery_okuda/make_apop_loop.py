@@ -83,32 +83,44 @@ def _diag(name):
 
 
 def _m(d, k):
-    if not d:
-        return None
-    for src in (d.get("metrics") or {}, d.get("last") or {}, d):
-        if isinstance(src, dict) and k in src:
-            v = src[k]
-            return v if isinstance(v, (int, float)) else None
-    return None
+    s = (d or {}).get("summary") or {}
+    v = s.get(k, s.get(f"{k}_final"))
+    return v if isinstance(v, (int, float)) else None
 
 
 def compare():
-    """The parent beside its death variant. A mode is admissible when protr and grip SURVIVE."""
-    hdr = f"{'run':<26}{'cells':>7}{'deaths':>8}{'protr':>8}{'grip':>8}{'inv':>8}  premises"
+    """The parent beside its death variant. A mode is admissible when protr and grip SURVIVE.
+
+    `deaths` READS AS THREE OUTCOMES, which is why no per-frame instrument was needed. The cap
+    admits ~0.5% of the tissue -- 37 cells on a 7,400-cell parent -- and a marked cell takes
+    ln(0.15)/ln(0.95) ~ 37 ticks to shrink to the extrusion threshold, plus however long T1 needs
+    to shed it to a triangle. So over 900 frames a working cap turns its slots over perhaps a
+    dozen times:
+
+        ~1,660   the cap did not bite; this is the uncapped `smaller` number
+        ~40      the queue DEADLOCKED -- cells were sentenced, never reached a triangle, and held
+                 their slots for the rest of the run, which silently switches the operator off.
+                 This is the r010_12 `competition` failure with a new cause, and a silent rule is
+                 an untested rule, not a safe one.
+        200-800  the cap worked: death as a steady flux rather than a wave
+    """
+    hdr = (f"{'run':<26}{'cells':>7}{'deaths':>8}{'protr':>8}{'grip':>8}{'inv':>8}"
+           f"{'red_v':>8}  premises")
     print(hdr); print("-" * len(hdr))
     for parent, mode, _ in PAIRS:
         for name in (parent, f"{parent}_d_{mode}"):
             d = _diag(name)
             if d is None:
-                print(f"{name:<26}{'-- no diag.json --':>39}")
+                print(f"{name:<26}      -- no diag.json --")
                 continue
-            brk = d.get("broken") or d.get("premises_broken") or []
+            brk = d.get("premises_broken") or []
             brk = ",".join(brk) if isinstance(brk, list) else str(brk)
             def f(k, w=8, p=3):
                 v = _m(d, k)
                 return f"{v:>{w}.{p}f}" if isinstance(v, (int, float)) else f"{'-':>{w}}"
-            print(f"{name:<26}{f('cells_final', 7, 0)}{f('n_apop', 8, 0)}"
-                  f"{f('protr')}{f('grip')}{f('invagination')}  {brk or 'none'}")
+            print(f"{name:<26}{f('cells', 7, 0)}{f('n_apop', 8, 0)}"
+                  f"{f('protr')}{f('grip')}{f('invagination')}{f('reduced_volume')}"
+                  f"  {brk or 'none'}")
         print()
 
 
