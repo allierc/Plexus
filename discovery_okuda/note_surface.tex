@@ -9,10 +9,13 @@
 \usepackage{titlesec}
 \titlespacing*{\section}{0pt}{6pt}{2pt}
 \newcommand{\code}[1]{\texttt{#1}}
-\title{\vspace{-1.4cm}\textbf{The vertex\,/\,MPM interface: particle-to-surface contact}}
+\newcommand{\op}[1]{\texttt{#1}}
+\title{\vspace{-1.4cm}\textbf{The vertex\,/\,MPM interface: particle-to-surface contact,\\
+and the spheroid it was built for}}
 \author{}
 \date{\vspace{-0.9cm}\small \texttt{prototype/ecm/test\_03\_mesh\_contact.py} $\cdot$
-\texttt{log/okuda\_ECM/03\_mesh\_contact} $\cdot$ 10 August 2026}
+\texttt{test\_04\_spheroid\_ecm.py} $\cdot$
+\texttt{log/okuda\_ECM/03*, 04\_spheroid\_ecm} $\cdot$ 10 August 2026}
 \setlength{\parindent}{0pt}\setlength{\parskip}{0.55em}
 \begin{document}\maketitle\vspace{-1.0cm}
 
@@ -210,5 +213,135 @@ $185$k particles and $n_{\text{grid}}=64$. What it does not buy is two-way mecha
 epithelium --- the tissue is still a replay, so it drives and is never driven. The operator in this
 note is exactly the piece that removes that limitation, and the next experiment is the one that puts a
 \emph{curved, moving} mesh on the same contact: the spheroid.
+
+\section*{7.\; The curved, moving mesh: \code{04\_spheroid\_ecm}}
+
+That experiment is now run. It combines the three pieces the neighbouring notes settled --- the
+tissue of \code{01c} (two-pool myosin, cytokinetic ring at $1$), the matrix of \code{02h} ($20$
+particles per strand, eight substeps, \code{drag}$\,=8$, \code{store\_stress} with
+\code{measure: vonmises}), and the contact of \S2 above --- and it deletes the two operators that
+were standing in for the interface: \op{cell\_to\_ecm[replay]}, a radial force read off a smoothed
+$32\times64$ radius map, and \op{cell\_exclude\_3d}, the projection that swept up whatever the
+penalty failed to hold. The first cannot return a reaction (a bin of a map has no vertices) and
+cannot generate a shear (a radial force has no tangential part); the second makes non-penetration
+unmeasurable, because with it on the answer is zero by construction.
+
+\textbf{The lookup, which is the only thing the curved surface needed.} The tissue is star-shaped
+about its own centroid, so a direction names the face --- the bin structure \op{apical\_map} already
+uses, holding the \emph{triangles} instead of a radius. Two details are not free. The grid is
+re-sized every frame, because a nine-bin query is exact only while a triangle fits in a bin and the
+faces shrink from $0.17$ to $0.028$ rad as the tissue divides: $82$ bins in $8$ rows at frame $0$,
+$3576$ in $53$ rows at the last, at most $64$ triangles in a bucket. And the rows are
+\emph{reduced} --- each given as many $\phi$ bins as it can hold square ones --- because on a plain
+$(\theta,\phi)$ lattice a bin near the pole is a sliver, a triangle spans ten of them, and the query
+misses the face the particle is standing on: silently, only near the poles, with matrix inside the
+tissue as the symptom. \code{selftest()} certifies the whole lookup against a test on \emph{every}
+triangle before any run uses it: coverage $1.00000$ and zero disagreement out of $400$ rays, on the
+meshes of frames $0$, $100$ and $199$.
+
+\textbf{The regime, in numbers, since it is the reason the scheme has to be this one.} The spheroid
+is scaled so its final radius is $0.15$ box units, $9.6$ grid cells; a cell face is then $0.27$ to
+$0.42\,\Delta x$ over the whole run. Both bodies live inside one grid cell, which is where grid-node
+coupling welds them --- the thing runs 142--151 measured ten times over.
+
+\smallskip
+{\small\begin{tabular}{@{}lccl@{}}\toprule
+what & \code{03} flat patch & \code{04} spheroid & \\\midrule
+momentum residual & $1.5\times10^{-7}$ & $1.2\times10^{-7}$ max, $1.5\times10^{-8}$ median &
+float32 precision, so the reaction is real\\
+penetration & $0.67$--$1.56$ cells & $0.82$ cells &\\
+particles behind the surface & --- & $4183$ of $200{,}000$ & $0.90$ per particle \emph{in contact}\\
+first contact & prescribed & frame $16$ & the cavity is $0.045$ and the tissue reaches it there\\
+solve & --- & $209$ s, $199$ frames & $200$k particles, $8$ substeps, one A6000\\
+\bottomrule\end{tabular}}
+\smallskip
+
+\textbf{The particles behind the surface are the contact, not a leak}, and that is a measurement
+rather than an assurance: their count stays at $0.90$--$0.96$ of the number of particles in contact
+for the whole run and their greatest depth is $0.77$ cells. A penalty holds a particle where its own
+push balances the surface's advance, so a layer one penetration-depth thick is what a penalty
+\emph{is}; a leak would be a ratio that climbs. This is the number \op{cell\_exclude\_3d} was
+hiding.
+
+\textbf{The matrix responds as an isotropic elastic shell, which is the right answer and not a
+disappointing one.} The radial displacement, binned by the particle's own initial radius so a bin is
+a material shell rather than a region of space, is fitted against the closed form for a spherical
+shell driven at the inside with a free outer surface, $u=C_1r+C_2/r^2$: $R^2 = 0.967$, $0.999$,
+$0.988$, $0.943$ at frames $50$, $100$, $150$, $199$. The local slope is $-1.03$ against the shell's
+own $-1.26$ --- and neither is the $-2$ of an infinite incompressible continuum, because a free outer
+surface at $2.7$ tissue radii adds the $C_1r$ term. Quoting $r^{-2}$ against this geometry would be
+comparing a bounded shell with an unbounded medium; quoting $r^{-0.5}$ to $r^{-1}$ as evidence of
+fibres \cite{wang2014-s} would be reading that same boundary as a mechanism.
+
+\textbf{What the spheroid does to the strands, which is what the run was to check.} Everything
+depends on where the strand started, and a tissue-wide mean is the far field's answer wearing the
+whole matrix's name --- the mean end-to-end stretch is $1.031$, and the shell nearest the tissue is
+at $1.81$:
+
+\smallskip
+{\small\begin{tabular}{@{}lcccccc@{}}\toprule
+the radius the strand started at & $0.052$ & $0.070$ & $0.090$ & $0.115$ & $0.150$ & $0.320$\\\midrule
+end-to-end stretch & $1.812$ & $1.566$ & $1.306$ & $1.138$ & $1.042$ & $1.013$\\
+bow, over its own frame $0$ & $3.432$ & $2.708$ & $1.861$ & $1.412$ & $1.154$ & $1.010$\\
+$\langle\cos^2\theta\rangle$ to the radius, measured & $0.055$ & $0.066$ & $0.087$ & $0.130$ &
+$0.213$ & $0.311$\\
+\quad the same, affine control & --- & $0.016$ & $0.040$ & $0.112$ & $0.211$ & $0.310$\\
+\bottomrule\end{tabular}}
+\smallskip
+
+\textbf{And the turning is affine, which is the control that makes the number mean something.} The
+strands end up strongly circumferential, and a matrix pushed outward does that to its own material
+lines whether or not it is fibrous. So the frame-$0$ strands are carried through the run's own
+measured radial displacement profile --- spherically symmetric by construction, no mechanics in it
+--- and read the same way. Beyond $1.5$ tissue radii the two agree to the third decimal
+($0.213$ against $0.211$, $0.311$ against $0.310$); over the whole inner shell, $0.2725$ measured
+against $0.2714$ affine. The excess is entirely inside $0.1$, where the measured strands are
+\emph{less} circumferential than affine ($0.066$ against $0.016$), which is rearrangement against a
+bumpy moving surface and not a fibre effect --- the constitutive law reads the strand direction
+nowhere, exactly as \code{note\_fibre} measured. Anything else here would have been a defect.
+
+\textbf{And the reaction now exists as a force on named vertices.} It is recorded per frame, and
+also binned by direction and divided by the area each bin covers, which is the pressure map
+\op{ecm\_growth\_gate\_3d} reads. The clamp this operator applies to its own force before recording
+it --- so that the momentum test cannot pass on a force the scatter later clipped --- never bound:
+the largest contact acceleration over the run is $1.8\times10^3$ against a clamp of $3\times10^4$
+and a stability ceiling of $6.25\times10^6$.
+
+\begin{figure}[t]\centering
+\includegraphics[width=\textwidth]{../log/okuda_ECM/04_spheroid_ecm/strip.png}
+\caption{\code{04}, the section, coloured by von Mises stress on one scale over the whole run
+(full scale $7.75$, the p99). The spheroid clears a hole in the matrix, and a shell of compacted,
+stressed strands travels outward ahead of it while the far field stays unloaded. The matrix nearest
+the tissue reaches a density $1.24$ times its own seeded value at $r=0.158$, just outside the
+surface.}
+\end{figure}
+
+\begin{figure}[t]\centering
+\includegraphics[width=\textwidth]{../log/okuda_ECM/04_spheroid_ecm/metrics.png}
+\caption{\code{04}. Top: the three interface measurements --- the momentum residual, the
+penetration, and the particles behind the surface against the particles in contact, which is what
+says they are the contact layer rather than a leak --- and the stress front. Bottom: the radial
+displacement against the shell's own two-term form; the compaction, with the tissue's final radius
+marked; the fibre state against the radius the strand started at; and the reorientation against its
+affine control, which the outer bins sit on exactly.}
+\end{figure}
+
+\textbf{What this licenses and what it does not.} It licenses the interface on the geometry it was
+built for: a curved, dividing, re-meshed surface exchanges force with an MPM continuum
+conservatively, at a resolution three times finer than the grid, with the non-penetration it fails
+to achieve \emph{measured} rather than projected away. It does not license two-way mechanics --- the
+tissue is still a replay, and the reaction it now computes is recorded and dropped; handing
+\code{vertex\_force} to a live epithelium is the next run and is a schedule change rather than an
+architecture change. It does not license the far field, which ends at $2.7$ tissue radii against a
+free surface. And it does not license anything fibrous: every number above is the isotropic
+continuum's, which is what \code{note\_fibre} predicted and what the anisotropic term it proposes
+has to beat.
+
+{\small
+\begin{thebibliography}{9}\setlength{\itemsep}{0pt}
+\bibitem{wang2014-s} Wang, H., Abhilash, A.S., Chen, C.S., Wells, R.G., Shenoy, V.B. (2014)
+Long-range force transmission in fibrous matrices enabled by tension-driven alignment of fibers.
+\emph{Biophys. J.} \textbf{107}(11):2592--2603.
+\end{thebibliography}}
 
 \end{document}

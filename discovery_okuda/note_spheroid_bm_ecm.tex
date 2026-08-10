@@ -84,193 +84,6 @@ A_f^0=A_f^{0,\text{init}}s_f^2,\quad P_f^0=P_f^{0,\text{init}}s_f,\quad v_f^0=v_
 and \op{divide\_3d} splits a cell once $v_f$ passes twice its reference. From $200$ cells the tissue
 reaches $\sim6000$ and its apical radius $4.66\to16.6$ (arbitrary units) in $402$ frames.
 
-\section*{3.\; The ECM: MLS-MPM}
-
-The matrix is a material, not a set of springs, so it is solved the way materials are: as a cloud of
-points that carry the material and a background grid that does the physics. Each frame the points hand
-their mass and momentum to the grid nodes nearest them, the grid resolves everything arriving at each
-node into one velocity, and the points read that velocity back and move. Nothing is ever computed
-between two points directly --- which is why bodies that never touch can still push on one another, and
-why the grid spacing sets the finest thing the matrix can feel.
-
-We seed it as fibres rather than a uniform block, because a fibrous matrix and a homogeneous one respond
-differently to being pushed, and the interesting behaviour --- splaying, dragging, a stress front
-travelling outward --- lives in the fibres.
-
-
-\section*{4.\; The matrix on its own: a block, dropped}
-
-Every run above loads the matrix the same way --- slowly, outward, everywhere at once --- so none of
-them says whether it carries stress the way a fibrous material should. A block of it falling under
-gravity onto the floor is the cheapest load that \emph{arrives}. Four runs
-(\op{02b}, \op{02c}, \op{02d\_drag2}, \op{02d\_drag8}), each $90{,}000$ particles on $1500$ strands of
-$60$, $720$ frames at $\Delta t=3.2\times10^{-3}$, differing in one number apiece.
-
-\textbf{What the grid can resolve, before anything falls.} A grid cell is $1/64=0.0156$ box units. A
-strand is $0.09$ long, so $5.8$ cells; its particles sit $0.0015$ apart, a tenth of a cell; and the
-across-strand jitter that gives it thickness is $0.004$, a quarter of a cell. The grid therefore
-resolves a strand along its length and \emph{cannot} resolve it across --- about ten particles of one
-strand land in a single cell and are interpolated into one velocity --- and no force is ever computed
-between two particles of the same strand. The fibres are an arrangement of the mass, not a mechanism.
-
-\textbf{The strands do nothing a continuum would not.} Through an impact that compresses the block to
-$0.914$ of its seeded height, a strand's end-to-end length falls to $0.982$ of the $0.0896$ box units
-it was seeded with and returns to $0.999$; its bow --- the RMS distance of its own particles from its
-own end-to-end axis --- goes $0.00824\to0.00827\to0.00826$ box units, an excursion of $0.4\%$. Nothing
-buckles, nothing stays stretched, and the orientation order parameter about the drop axis moves by
-$0.04$. This is the prediction of the constitutive law, which is isotropic fixed-corotated and reads
-the strand direction nowhere, and the measurement agrees with it.
-
-\textbf{The readout had been the wrong quantity.} \op{ecm\_stress} defaulted to $|J-1|$, the local
-volume change, and an impact is a shear. With \code{store\_stress: true} on \op{mpm\_scatter} the solver
-keeps the Cauchy stress it already computed to make the grid forces, and \code{measure: vonmises} reads
-its invariant instead. The two readings differ by a factor of $250$ on the same trajectory --- at frame
-$200$, $|J-1|$ gives mean $0.0040$ and p99 $0.0173$, the von Mises gives mean $1.11$ and p99 $4.16$ in
-stress units, peaking at p99 $42.4$ just after first contact. The positions are bit-identical between
-the two runs, so this is a readout and not a mechanism; it costs $45\%$ more wall clock ($12.5\to18.1$
-minutes) and it is the difference between seeing the front and not.
-
-\textbf{The block rings, and an extracellular matrix does not.} After the impact every shape metric
-oscillates: the measured period is $24.2$ frames, $0.0775$ s, $12.9$ Hz, against the $17.1$ Hz a
-free-free bar of length $0.32$ at $c=\sqrt{E/\rho}=10.95$ box units per second would have, so it is the
-block's own elastic breathing mode and not numerical noise. It is nonetheless biologically wrong. The
-stock \code{drag} of $0.05$ is a velocity decay time of $1/\code{drag}=20$ s --- $260$ ringing periods,
-and $8.7$ times the whole $2.31$ s run --- so this matrix is effectively undamped, whereas a hydrated
-matrix dissipates by solvent forced through the network and at $\mathrm{Re}\sim10^{-10}$ cannot ring at
-all. \code{drag} is the right lever for that and needs no new operator: it is a Stokes term on the
-network velocity, which is what Darcy drag is.
-
-\smallskip
-{\small\begin{tabular}{@{}lccccc@{}}\toprule
-run & \code{drag} & ripple, as a fraction & height returned at & bounding volume & median residual\\
-    &             & of the seeded height  & the first impact   & at the last frame & displacement (box units)\\\midrule
-\op{02c}          & $0.05$ & $0.0081$  & $0.707$ & $1.172$ & $0.0360$\\
-\op{02d\_drag2}   & $2$    & $0.0048$  & $0.293$ & $0.999$ & $0.0026$\\
-\op{02d\_drag8}   & $8$    & $0.00054$ & $0.048$ & $0.997$ & $0.0011$\\
-\bottomrule\end{tabular}}
-\smallskip
-
-Two things follow, and the second was invisible until the first was fixed. The damping that removes the
-ringing removes the bounce with it --- at $\code{drag}=8$ the block returns $4.8\%$ of what it fell, so
-there is no bouncing experiment in the regime where the material is physical, and the three impacts of
-\op{02b} are a property of an undamped solid rather than of a matrix. And the slow swelling that
-\op{02b}/\op{02c} showed --- bounding volume rising to $1.34$ of its seeded value by frame $560$, the
-median particle displacement with the block's own translation removed reaching $0.036$ box units, which
-is $2.3$ grid cells --- \emph{was not the material}. At $\code{drag}=2$ it is gone: volume $0.999$,
-residual displacement $0.0026$, a factor of $13.6$ smaller. It was undamped particle noise accumulating,
-and it had been read as creep.
-
-\textbf{What would actually discriminate a fibre model.} None of the above needs fibres to explain it,
-so none of it can falsify a fibre model either. Three loadings would, in increasing cost. Compress the
-block between plates to $20\%$ and release: the tangent modulus at $5\%$ against $20\%$ strain is the
-stiffening ratio, which a network of straightening fibres raises by one to two orders of magnitude
-\cite{storm2005,licup2015} and an isotropic solid does not raise at all; the residual strain after
-unloading is the plasticity; and the effective Poisson ratio distinguishes a solid that bulges from a
-network that densifies. Pull the same block by $10\%$ and push it by $10\%$: the ratio of secant moduli
-is $1$ by construction for the present law and must exceed $3$ for anything that buckles in compression
-\cite{notbohm2015}. And contract a sphere at the centre by $10\%$ and fit the radial decay of
-displacement $u(r)\propto r^{-n}$: an incompressible linear continuum gives $n=2$, a fibrous matrix
-$n$ between $0.5$ and $1$ \cite{wang2014}, and that single exponent is the property on which the whole
-spheroid--matrix coupling of \S5 rests.
-
-\begin{figure}[t]\centering
-\includegraphics[width=\textwidth]{../log/okuda_ECM/02c_ecm_block_vonmises/material.png}
-\caption{\op{02c}, the undamped block, $721$ frames. \textbf{a--c} the bulk: three impacts, and the
-height returned falling $0.707\to0.612\to0.416$ --- which reads as dissipation and is in fact the block
-coming apart, since \textbf{e} shows its bounding volume growing to $1.34$ of the seeded value.
-\textbf{d--e} ring at $12.9$ Hz, the block's own elastic mode. \textbf{f--g} are the fibre state and are
-the point: end-to-end stretch recovers to $0.999$ and the bow moves by $0.4\%$, so the strands ride the
-continuum. Everything in \textbf{e} and the orange trace in \textbf{h} is removed by \code{drag}$=2$.}
-\end{figure}
-
-
-\section*{5.\; Spheroid $\leftrightarrow$ ECM}
-
-The two solvers cannot share a world: the matrix grid is fixed to the unit cube, the epithelium lives in
-a box fifty times larger, and shrinking the tissue to fit changes which term of its energy dominates and
-stops it growing. So they are run as two passes joined by one geometric scale, and what crosses between
-them is a \emph{recorded shape} rather than a live tissue.
-
-That recording needs somewhere to live, and this is what the \op{surface} Level is. It is a set of
-nodes, one per membrane node, each holding a fixed direction from the tissue centre and the radius the
-epithelium reached in that direction at that moment. It is not a mesh and carries no mechanics; it is
-the epithelium's outer boundary, written down. Before it existed the same information was a lookup
-table, which meant nothing could act on it and nothing could be attached to it --- promoting it to a
-Level is what lets other things bind to the tissue surface as an object rather than consult it as data.
-
-Everything outside the epithelium then reads that one surface. Matrix fibres that end up inside it are
-pushed back out, first softly and then, as a backstop, by being placed outside:
-%
-\begin{equation}\mathbf a_i \;=\; k_c\,\bigl(R(\hat{\mathbf u}_i,t)-r_i\bigr)_+\,\hat{\mathbf u}_i,
-\label{eq:contact}\end{equation}
-%
-and the force the fibres push back with is collected by direction and divided by the area each direction
-covers, giving a pressure over the surface. A cell facing a stressed matrix then grows more slowly, which is what a spheroid grown under a measured external stress does \cite{helmlinger1997,montel2011}:
-%
-\begin{equation}g \;=\; f + \frac{1-f}{1+\bigl(P/p_{1/2}\bigr)^{n}},\qquad
- s_{\text{now}} \leftarrow s_{\text{prev}}\,\bigl(1+g\,(f_{\text{grow}}-1)\bigr).
-\label{eq:gate}\end{equation}
-%
-Because it is the growth \emph{rate} that is slowed and not the size directly, a small difference
-compounds over hundreds of frames --- which is how a modest difference in stress between one direction
-and another can become a difference in shape.
-
-The coupling still runs one way. The surface is a recording, so it drives the matrix and the membrane
-and neither reaches back, and the second pass cannot change the tissue it is reacting to. Making it
-mutual means letting an operator write to \op{surface} instead of only reading it, which is now a change
-to one Level rather than a change to the architecture.
-
-\section*{6.\; The basement membrane}
-
-A basement membrane is a thin sheet of protein an epithelium lays down underneath itself and sits on. It
-has to do two things at once that pull against each other: hold together as a sheet, and keep covering a
-surface that grows. We model the load-bearing part of it --- the crosslinked collagen~IV network --- as
-nodes joined by springs.
-
-\begin{figure}[t]\centering
-\includegraphics[width=\textwidth]{fig_bm_schematic.pdf}
-\caption{Four objects, and the arrows between them are the model. The epithelium advances on a recorded
-schedule and nothing pushes it back. Its outer boundary is the \op{surface} Level: one node per membrane
-node, each holding a fixed direction and the radius the tissue reached in it. The membrane is grey
-\emph{nodes} joined by green \emph{crosslinks}, sitting a distance $\delta$ outside, each node tied to
-its own surface node by one red \emph{tether}. The matrix beyond is never bonded to.}
-\end{figure}
-
-Three rules. A crosslink is a spring that slowly \emph{forgets} being stretched and snaps if stretched
-too far; a node is tied to a fixed \emph{direction} on the surface, which is what makes it adhesion
-rather than contact, since a node free to slide to the nearest point would never be stretched at all;
-and everything moves at a speed set by force against drag, with no mass:
-%
-\begin{align}
-\gamma\,\dot{\mathbf x}_i &= \sum_{j\sim i}\mathbf f_{ij} \;+\; \mathbf f^{\text{adh}}_i, &
-\mathbf f_{ij}&=k_b\,(L_{ij}-\ell^0_{ij})\,\hat{\mathbf d}_{ij}, &
-\dot\ell^0_{ij}&=(L_{ij}-\ell^0_{ij})/\tau_r,
-\label{eq:bond}\\[2pt]
-\mathbf f^{\text{adh}}_i&=\kappa\bigl(\mathbf a_i-\mathbf x_i\bigr), &
-\mathbf a_i&=\mathbf c+\hat{\mathbf u}_i\bigl(R(\hat{\mathbf u}_i,t)+\delta\bigr), &
-&\hat{\mathbf u}_i \text{ frozen at seeding,}
-\label{eq:integrin}
-\end{align}
-%
-with a crosslink dying once $(L-\ell^0)/\ell^0>\varepsilon_b$.
-
-Forgetting is not optional: a sheet that only stretches cannot enclose a surface that more than triples
-in size. And because area grows as the square of the radius while new material is added as a fraction of
-what is already there, the sheet must be \emph{secreted} as the tissue grows or it thins.
-
-Two consequences of having no mass. Only the ratio $k_b/\gamma$ appears in Eq.~\eqref{eq:bond} --- a
-relaxation \emph{rate} --- so a stiffness on its own has no meaning here, and the question worth asking
-is whether the sheet relaxes faster than the tissue grows. The same ratio bounds what a fixed time step
-can carry, $\Delta t\,(z\,k_b+\kappa)/\gamma<2$ for $z$ crosslinks meeting at a node, which is about
-twenty times the bound an inertial sheet would have. Raising $\gamma$ moves it further, at the price of a
-sheet that responds more slowly.
-
-Finally, what is called adhesion here is a tether to a surface, not a receptor: the dominant anchor in a
-real epithelium is to laminin, which is not modelled, and there is no attachment to the surrounding
-stroma either, so this tether is the only thing holding the sheet.
-
-\section*{7.\; Junction myosin}
-
 In the vertex model every cell--cell contact pulls with the same strength. Real contractility is not
 uniform: myosin accumulates on some junctions and not others, and where it accumulates the junction
 pulls harder and shortens, which is how cells exchange neighbours. Giving each junction its own myosin
@@ -309,21 +122,63 @@ Two things the model does not have. The myosin responds to the \emph{magnitude} 
 preferred direction in the plane of the sheet, so it cannot express the planar polarity that drives
 directional tissue elongation. And $\tau_m$ is a chosen number, not a measured one.
 
-\section*{8.\; Where this stops, and what it measured}
+\section*{3.\; The ECM: MLS-MPM}
 
-Sixty-six runs (\op{91}--\op{164}, archived) were spent asking where the sheet sits and what holds it
-there, and they answer that question and no other. Four results are worth carrying: the standoff is a
-\emph{tracking lag}, $\delta-\dot R\,\Delta t\,\gamma/\kappa$, not a force balance, which two fibre
-lengths differing fourfold confirmed to $3\times10^{-5}$ box units; a force routed through the grid
-leaves the sheet's deformation gradient carrying $100\%$ of the true stretch while the same force
-integrated by the engine leaves it carrying $13\%$; an MPM fibre cannot act as a rope, because
-$\mathbf F$ is advected by the grid's velocity gradient and never measures the distance between two
-particles, so two ends more than a cell apart are two bodies; and the best configuration reached
-(\op{153}) put the membrane at $+0.0011$ box units with $2.41$ of the $2.43$ stretch the geometry
-implies. What none of them is, is a model derived from what a basement membrane is. The rest of this
-note starts from that instead.
+The matrix is a material, not a set of springs, so it is solved the way materials are: as a cloud of
+points that carry the material and a background grid that does the physics. Each frame the points hand
+their mass and momentum to the grid nodes nearest them, the grid resolves everything arriving at each
+node into one velocity, and the points read that velocity back and move. Nothing is ever computed
+between two points directly --- which is why bodies that never touch can still push on one another, and
+why the grid spacing sets the finest thing the matrix can feel.
 
-\section*{9.\; Spheroid $\leftrightarrow$ BM $\leftrightarrow$ ECM}
+We seed it as fibres rather than a uniform block, because a fibrous matrix and a homogeneous one respond
+differently to being pushed, and the interesting behaviour --- splaying, dragging, a stress front
+travelling outward --- lives in the fibres.
+
+
+
+\section*{4.\; The basement membrane}
+
+A basement membrane is a thin sheet of protein an epithelium lays down underneath itself and sits on. It
+has to do two things at once that pull against each other: hold together as a sheet, and keep covering a
+surface that grows. We model the load-bearing part of it --- the crosslinked collagen~IV network --- as
+nodes joined by springs.
+Three rules. A crosslink is a spring that slowly \emph{forgets} being stretched and snaps if stretched
+too far; a node is tied to a fixed \emph{direction} on the surface, which is what makes it adhesion
+rather than contact, since a node free to slide to the nearest point would never be stretched at all;
+and everything moves at a speed set by force against drag, with no mass:
+%
+\begin{align}
+\gamma\,\dot{\mathbf x}_i &= \sum_{j\sim i}\mathbf f_{ij} \;+\; \mathbf f^{\text{adh}}_i, &
+\mathbf f_{ij}&=k_b\,(L_{ij}-\ell^0_{ij})\,\hat{\mathbf d}_{ij}, &
+\dot\ell^0_{ij}&=(L_{ij}-\ell^0_{ij})/\tau_r,
+\label{eq:bond}\\[2pt]
+\mathbf f^{\text{adh}}_i&=\kappa\bigl(\mathbf a_i-\mathbf x_i\bigr), &
+\mathbf a_i&=\mathbf c+\hat{\mathbf u}_i\bigl(R(\hat{\mathbf u}_i,t)+\delta\bigr), &
+&\hat{\mathbf u}_i \text{ frozen at seeding,}
+\label{eq:integrin}
+\end{align}
+%
+with a crosslink dying once $(L-\ell^0)/\ell^0>\varepsilon_b$.
+
+Forgetting is not optional: a sheet that only stretches cannot enclose a surface that more than triples
+in size. And because area grows as the square of the radius while new material is added as a fraction of
+what is already there, the sheet must be \emph{secreted} as the tissue grows or it thins.
+
+Two consequences of having no mass. Only the ratio $k_b/\gamma$ appears in Eq.~\eqref{eq:bond} --- a
+relaxation \emph{rate} --- so a stiffness on its own has no meaning here, and the question worth asking
+is whether the sheet relaxes faster than the tissue grows. The same ratio bounds what a fixed time step
+can carry, $\Delta t\,(z\,k_b+\kappa)/\gamma<2$ for $z$ crosslinks meeting at a node, which is about
+twenty times the bound an inertial sheet would have. Raising $\gamma$ moves it further, at the price of a
+sheet that responds more slowly.
+
+Finally, what is called adhesion here is a tether to a surface, not a receptor: the dominant anchor in a
+real epithelium is to laminin, which is not modelled, and there is no attachment to the surrounding
+stroma either, so this tether is the only thing holding the sheet.
+
+
+
+\section*{5.\; Spheroid $\leftrightarrow$ BM $\leftrightarrow$ ECM}
 
 Three objects, and every arrow between them is a measured mechanism rather than a modelling choice.
 The first thing the measurements say is that the middle object is not a passive spacer. A basement
@@ -413,7 +268,7 @@ strain-dependent modulus (Eq.~\ref{eq:bmstiff}) rather than one number; an adhes
 reaction and permits slip (Eq.~\ref{eq:adh}) rather than a tether to a frozen direction; and an
 anchorage to the stroma (Eq.~\ref{eq:anchor}) that removes the epithelium's direct push on it.
 
-\section*{10.\; The same thing as a Plexus2 container}
+\section*{6.\; Plexus2 container}
 
 Two questions decide whether the biology above can be written down: what the \emph{sets} are, and what
 kind of operator each mechanism is. Both have answers the literature forces, and both differ from what

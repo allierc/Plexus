@@ -119,6 +119,14 @@ class ECMSeed(Structural):
         self.block = params.get("block", None)
         self.block = None if self.block is None else [float(v) for v in self.block]
         self.cavity_sphere = bool(params.get("cavity_sphere", False))
+        # A SHELL, WHICH IS THE ONLY AFFORDABLE GEOMETRY FOR A SPHEROID IN A MATRIX. Filling the box
+        # at a usable particle density costs a million particles (ppc 4 at dx = 1/64 is 4*64^3 per
+        # unit volume) and spends nearly all of them on a far field that never moves. `shell_r` caps
+        # the radius a fibre CENTRE may be drawn at, so the matrix is the shell between the cavity
+        # and it -- a strand may still stick out by half its length, which is why this is a cap on
+        # centres and not a clamp on particles: clamping would pile mass on the outer surface.
+        self.shell_r = params.get("shell_r", None)
+        self.shell_r = None if self.shell_r is None else float(self.shell_r)
         # A DENSER REGION, so the matrix's ARCHITECTURE is anisotropic and not just its orientation.
         # Fibre alignment alone gave a 1.50x directional pressure difference (measured: 1448 along the
         # alignment axis against 2123 / 2176 across it) -- real, but small, because MPM interpolates
@@ -213,8 +221,12 @@ class ECMSeed(Structural):
         for _ in range(64):
             c = torch.rand(self.n_fibres * 2, D, generator=g) * (hi - lo) + lo
             c = c[self._outside_cavity(c.to(dev)).cpu()]
+            if self.shell_r is not None:
+                c0 = torch.tensor(self.centre, dtype=c.dtype)
+                c = c[(c - c0).norm(dim=1) < self.shell_r - 0.5 * self.fibre_len]
             keep.append(c)
             need = self.n_fibres * (max(self.dense_boost, 1.0) if self.dense_cone > 0 else 1.0)
+
             if sum(x.shape[0] for x in keep) >= need:
                 break
         centres = torch.cat(keep) if centres is None else centres
@@ -234,6 +246,32 @@ class ECMSeed(Structural):
         if centres.shape[0] < self.n_fibres:                  # cavity larger than the box
             centres = centres.repeat((self.n_fibres // max(centres.shape[0], 1)) + 1, 1)
             centres = centres[: self.n_fibres]
+
+        # A STRAND CLEARS THE CAVITY AS A WHOLE, OR IT IS NOT SEEDED THERE. The per-particle eviction
+        # below is a backstop and was doing this job: a strand whose CENTRE was outside the cavity but
+        # whose ends crossed it had those ends teleported onto the rim while the rest stayed put, so
+        # the strand was born already torn. Measured on `04c` before this: 64 of 10,000 strands had an
+        # internal gap of up to seventeen times their own particle spacing at frame 0, and they are
+        # the long straight streaks in the movie. The test is the distance from the cavity centre to
+        # the SEGMENT, not to its midpoint, and a strand that fails it is pushed out along its own
+        # centre's radius until it passes -- direction and length untouched, so the seeded fibre
+        # architecture is unchanged.
+        if self.cavity_sphere and self.cavity_r > 0:
+            c0 = torch.tensor(self.centre, dtype=centres.dtype)
+            half = 0.5 * self.fibre_len
+            need_r = self.cavity_r + 2 * self.jitter
+            for _ in range(8):
+                w = c0 - centres
+                t = (w * d).sum(1, keepdim=True).clamp(-half, half)
+                dist = (w - t * d).norm(dim=1)
+                bad = dist < need_r
+                if not bool(bad.any()):
+                    break
+                u = centres[bad] - c0
+                un = u / u.norm(dim=1, keepdim=True).clamp_min(1e-9)
+                centres[bad] = centres[bad] + un * (need_r - dist[bad] + 1e-4)[:, None]
+            print(f"[seed_ecm] {int(bad.sum())} strand(s) still crossing the cavity after "
+                  f"whole-strand eviction", flush=True)
 
         # PARTICLES ALONG THE FIBRES, evenly spaced with a little across-fibre thickness so a
         # fibre reads as a strand rather than a line of dots.
