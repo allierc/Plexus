@@ -72,6 +72,26 @@ import yaml
 HERE = os.path.dirname(os.path.abspath(__file__))
 CONFIG = os.path.join(os.path.dirname(HERE), "config", "okuda")
 
+# THE GRID AND ITS VALUES ARE DECLARED, NOT COMPILED IN. Cedric, 10 August: "not hardcoded but
+# specified through the md files if possible". They were module constants here, and the cost was
+# measurable rather than stylistic: `HILL` and `RHO_GATED` were pinned for all sixteen members, and
+# those are the two parameters that decide finger-versus-sphere, so the first round of the new
+# campaign returned sixteen runs and every one classified `sphere`. A value that shapes the search
+# belongs where a human reads the search, beside crew/flow.yaml.
+SPEC = yaml.safe_load(open(os.path.join(HERE, "crew", "basis.yaml")))
+_SH = SPEC["shared"]
+FRAMES, SEED_CELLS = int(_SH["frames"]), int(_SH["seed_cells"])
+CELL_BUF, VERT_BUF, WORLD = int(_SH["cell_buf"]), int(_SH["vert_buf"]), float(_SH["world"])
+GROWTH_RATE, VTH_FRAC = float(_SH["growth_rate"]), float(_SH["vth_frac"])
+DIVIDE_FACTOR = float(_SH["divide_factor"])
+A_SW_GATED, A_SW_OPEN = float(_SH["a_sw_gated"]), float(_SH["a_sw_open"])
+BETA, F0, K_PURSE = float(_SH["beta"]), float(_SH["f0"]), float(_SH["k_purse"])
+MECH, SHAPING = dict(SPEC["mech"]), dict(SPEC["shaping"])
+RD, GS, BRU = dict(SPEC["rd"]), dict(SPEC["gs"]), dict(SPEC["bru"])
+LEVERS, MEMBERS = SPEC["levers"], SPEC["members"]
+DEATH = dict(SPEC["death"])
+RHO_UNGATED = 1.0            # `uniform` is gone from the basis; kept for a spec that asks for it
+
 # --------------------------------------------------------------------------- the fixed substrate
 # EVERY NON-AXIS VALUE, WRITTEN ONCE. If a number is here, no member of the basis varies it; if a
 # member varies it, it is an axis and it is in AXES below. That is the whole invariant.
@@ -81,13 +101,7 @@ CONFIG = os.path.join(os.path.dirname(HERE), "config", "okuda")
 # of every run bred from it: measured 10 August, ten members at 901 frames against children at 1801.
 # A base you cannot compare to its own children is not a base. Read it from the graph if they ever
 # diverge again; for now they are one number stated twice, which is why this comment exists.
-FRAMES = 1800                # == crew/flow.yaml build.frames, or a base is not comparable
-SEED_CELLS = 2000
-CELL_BUF = 60000             # room to grow: rho=2.0 on the old coral reached 14,196 cells, and the
-VERT_BUF = 120000            # array must not be what stops a base. ~1.3 GB of trajectory at worst.
-WORLD = 80.0
 
-GROWTH_RATE = 0.000866       # the rate every campaign run has used
 # rho MEANS TWO DIFFERENT THINGS DEPENDING ON THE GATE, so there are two values.
 #
 # Growth is rate * (rho + Hill(activator)). On a GATED base the Hill term is the activator's
@@ -102,11 +116,6 @@ GROWTH_RATE = 0.000866       # the rate every campaign run has used
 # of the morphogen activity, that cells grow locally on red spot??" It is, and it was turned down
 # almost off. 0.1 is 11:1, and it centres every Route B run -- which inherits its parent's rho --
 # in the regime the campaign is about, instead of leaving that to Route A to find.
-RHO_GATED = 0.1              # tip:body = 11:1 on the four *_gated_* members
-RHO_UNGATED = 1.0            # the only growth term where there is no gate; not a ratio
-HILL = 4.0
-VTH_FRAC = 2.5
-DIVIDE_FACTOR = 2.0          # OF v_ref, THE SEED-TIME MEDIAN CELL VOLUME, and that reference
                              # CHANGED on 8 August. `divide_3d`'s default model is now `sizer`, an
                              # ABSOLUTE threshold, where it used to be `factor x THIS CELL'S OWN
                              # BIRTH VOLUME`. Ginzberg, Kafri & Kirschner (Science 2015): "both the
@@ -119,11 +128,7 @@ DIVIDE_FACTOR = 2.0          # OF v_ref, THE SEED-TIME MEDIAN CELL VOLUME, and t
                              # Must still sit BELOW vth_frac or a cell can never reach the size
                              # that divides it -- the relation that used to be premise P3.
 
-A_SW_GATED = 0.35            # a FRACTION of the activator's own maximum (the absolute version
-A_SW_OPEN = 0.0              # selected zero cells in every run of the last campaign)
 
-MECH = dict(K_A=1.0, K_P=1.0, K_V=20.0, K_R=0.0, Lambda=0.5, Gamma=0.4, p0=3.5,
-            mu=1.0, dt=1.0, relax_iters=30, eta=0.08, cap_frac=0.12)
 # K_V = 20 AND Lambda = 0.5, AND THE FIRST DRAFT OF THIS LINE HAD 2.0 AND 3.0 -- copied from
 # `cellfix_B_new`, which grew x22.7 with them. It produced twelve bases carrying a growth operator
 # that raises its target and never moves the tissue, and premise P1 is the only thing that caught it.
@@ -150,11 +155,7 @@ MECH = dict(K_A=1.0, K_P=1.0, K_V=20.0, K_R=0.0, Lambda=0.5, Gamma=0.4, p0=3.5,
 # not what moves the shell here. A basis whose job is to let a shape leave the sphere should not
 # carry a term that pays it to stay.
 
-SHAPING = dict(K_bend=0.02, K_lumen=0.5)     # off (0.0) in the `plain` half
-K_PURSE = 1.0                                # interface_line_tension_3d, `shaping` half only
 
-RD = dict(d_a=0.08, d_h=0.16, chi=1.3)
-GS = dict(F=0.046, kk=0.062, rate=1.0)                 # the coral spots the campaign knows
 # GM READS A DIFFERENT SET OF KEYS, AND THE FIRST DRAFT OF THIS LINE DID NOT. It said
 # `GM = dict(F=0.046, kk=0.062, rate=1.0)` -- "same feed, different model at the slot" -- and
 # `CellReactGiererMeinhardt` reads none of F or kk. It reads gm_rho, mu_a, mu_h, a0, rate, sat.
@@ -175,7 +176,6 @@ GS = dict(F=0.046, kk=0.062, rate=1.0)                 # the coral spots the cam
 # premise P12 broken: the shell was perfect and the chemistry on it was not finite. The rule was
 # right and I walked across it; `round.py --check` refused all four as parents before the loop
 # could build on them, which is the only reason this is a corrected value and not a campaign.
-GM = dict(a0=0.01, mu_h=1.0, sat=0.1, rate=0.4)
 # THE THIRD RD MODEL, AND THE CAMPAIGN HAS NEVER RUN IT. Cedric, 8 August: "I think we miss RD
 # basis, got to 16 specs, add 4 to study RD mechanisms in route A." `cell_react` registers three
 # models and the basis carried two, so "which reaction-diffusion mechanism" was an axis with a
@@ -194,21 +194,12 @@ GM = dict(a0=0.01, mu_h=1.0, sat=0.1, rate=0.4)
 # 2000 cells: NaN chemistry makes NaN growth targets and the mechanics stops. `reaction_stiffness`
 # had the answer before the runs did -- brusselator's linear decay is gamma*(B+1), so 0.3 gives
 # 1.2 against gray_scott's 0.108, and explicit Euler at dt = 1 does not carry it. 0.05 gives 0.2.
-BRU = dict(gamma=0.05, A=1.0, B=3.0)
-BETA = 0.5                                             # shape -> chemistry, the second arrow
-F0 = 0.046
 
 # THE GRID, WRITTEN OUT, because it is not a clean product: `gated` needs an activator to gate on,
 # so the `none` column cannot supply it. The twelve are 3 chemistry columns x 2 material x 2
 # mechanics where the material pair differs by column -- {static, uniform} with no chemistry,
 # {uniform, gated} with it. Every column still contributes four, and every row still differs from
 # its neighbour in exactly one axis.
-AXES = {
-    "chem": ["none", "gs", "gm", "bru"],
-    "mat":  {"none": ["static", "uniform"], "gs": ["uniform", "gated"],
-             "gm": ["uniform", "gated"], "bru": ["uniform", "gated"]},
-    "mech": ["plain", "shaping"],
-}
 
 
 # THE DEATH AXIS, added 10 August, and it exists to make apoptosis REACHABLE rather than merely
@@ -228,18 +219,14 @@ AXES = {
 # deaths with protr and grip within 3% of the parent and no premise broken. max_mark_frac 0.005 is
 # the rate that made death survivable at all -- uncapped, five of six modes took r020_00_ctrl from
 # protr 1.513 / grip 0.228 to 1.131 / 0.049.
-DEATH = dict(mode="competition", max_mark_frac=0.005, min_age=4,
-             shrink_rate=0.05, critical_frac=0.15)
-# the four Route A bases; a death twin of each
-DEATH_TWINS = [("none", "uniform", "plain"), ("gs", "gated", "plain"),
-               ("bru", "gated", "plain"), ("gs", "gated", "shaping")]
 
-
-def _name(chem, mat, mech, death=False):
-    return f"b_{chem}_{mat}_{mech}" + ("_death" if death else "")
-
-
-def build(chem, mat, mech, death=False):
+def build(m):
+    """One DECLARED MEMBER (a row of crew/basis.yaml `members:`) -> a full spec dict."""
+    chem, mat, mech = m["chem"], m["mat"], m["mech"]
+    death = bool(m.get("death"))
+    # the two levers that decide finger-versus-sphere, read from the declared ladders
+    hill = float(LEVERS["gate"][m.get("gate", "soft")])
+    rho_gated = float(LEVERS["drive"][m.get("drive", "lo")])
     """One cell of the grid -> a full spec dict."""
     has_chem = chem != "none"
     gated = mat == "gated"
@@ -262,9 +249,12 @@ def build(chem, mat, mech, death=False):
              "mode": "scatter", "seed_frac": 0.06},
             {"op": "cell_diffuse", "at": "cell", "implementation": "graph_laplacian", **RD},
             {"op": "cell_react", "at": "cell",
-             "model": {"gs": "gray_scott", "gm": "gierer_meinhardt",
-                       "bru": "brusselator"}[chem],
-             **{"gs": GS, "gm": GM, "bru": BRU}[chem]},
+             # `gm` IS GONE FROM THE BASIS. Every gierer_meinhardt member measured grip -0.002 --
+             # no coupling between chemistry and shape at all -- so a column of them spent members
+             # on tissue that cannot answer the campaign's question. Add it back as a member in
+             # crew/basis.yaml if it is ever worth a base again.
+             "model": {"gs": "gray_scott", "bru": "brusselator"}[chem],
+             **{"gs": GS, "bru": BRU}[chem]},
             # THE SECOND ARROW. shape_to_chem makes a bulging cell feed faster, so the loop closes:
             # curvature -> feed -> activator -> growth gate -> curvature. Present in every
             # chemistry member, because `beta = 0` as the null is what `coral_gate` was for and the
@@ -275,8 +265,8 @@ def build(chem, mat, mech, death=False):
     if grows:
         ops.append(
             {"op": "grow_3d", "at": "vertex", "cell_set": "cell",
-             "rate": GROWTH_RATE, "a_sw": A_SW_GATED if gated else A_SW_OPEN, "hill": HILL,
-             "rho": (RHO_GATED if gated else RHO_UNGATED), "vth_frac": VTH_FRAC, "after_frame": 100,
+             "rate": GROWTH_RATE, "a_sw": A_SW_GATED if gated else A_SW_OPEN, "hill": hill,
+             "rho": (rho_gated if gated else RHO_UNGATED), "vth_frac": VTH_FRAC, "after_frame": 100,
              # P1: growth ADDS material here. conserve_amount redistributes it, which is what made
              # coral_gate_div_defaultE fail P1 with a growth operator running.
              "conserve_amount": False})
@@ -311,7 +301,7 @@ def build(chem, mat, mech, death=False):
         {"op": "topo_snapshot_3d", "at": "vertex", "every": 1},
     ]
 
-    name = _name(chem, mat, mech, death)
+    name = m["name"]
     return {
         "general": {"name": name, "seed": 0, "n_frames": FRAMES, "dt": 1.0,
                     "record_cap": FRAMES + 2, "record_every": 1, "boundary": "free", "dim": 3,
@@ -325,6 +315,8 @@ def build(chem, mat, mech, death=False):
         "operators": ops,
         "schedule": [o["op"] for o in ops],
         "_basis": {"chem": chem, "mat": mat, "mech": mech, "death": death,
+                   "gate": m.get("gate"), "hill": hill,
+                   "drive": m.get("drive"), "rho_gated": rho_gated,
                    "grid": "4 chemistry x 2 material x 2 mechanics, + a death twin of each "
                            "Route A base",
                    "why": f"chemistry={chem}, material={mat}, mechanics={mech} -- one cell of the "
@@ -334,16 +326,15 @@ def build(chem, mat, mech, death=False):
 
 
 def grid():
-    """The sixteen, in a fixed order: four per chemistry column.
+    """The declared members, in the order crew/basis.yaml lists them.
 
-    `static` is DIVISION WITHOUT GROWTH -- cells subdivide and the body adds nothing. It is the
-    substrate every growth claim is read against, and it is the regime the old `factor 1.5/1.8`
-    sweep points fell into by accident; here it is a declared member rather than an accident."""
-    base = [(chem, mat, mech, False)
-            for chem in AXES["chem"]
-            for mat in AXES["mat"][chem]
-            for mech in AXES["mech"]]
-    return base + [(c, m, k, True) for (c, m, k) in DEATH_TWINS]
+    IT USED TO BE A PRODUCT OF THREE AXES computed here, and that is what pinned the campaign to
+    spheres: the product varied chemistry, material and mechanics -- none of which produced a
+    protrusion in round 1 -- while `hill` and `rho`, the two that did, were module constants held
+    fixed across all sixteen members. A grid you cannot see is a grid nobody checks. The members are
+    now listed one per line in the yaml, with the lever each one sets.
+    """
+    return list(MEMBERS)
 
 
 def _unread(spec):
@@ -383,10 +374,11 @@ def main():
 
     cells = grid()
     os.makedirs(CONFIG, exist_ok=True)
-    print(f"{'name':<28}{'chem':<6}{'mat':<9}{'mech':<9}{'death':<7}{'ops':>4}  {'premises'}")
+    print(f"{'name':<30}{'chem':<5}{'mech':<9}{'gate':<7}{'drive':<7}{'death':<7}{'ops':>4}  premises")
     bad = 0
-    for chem, mat, mech, death in cells:
-        spec = build(chem, mat, mech, death)
+    for m in cells:
+        spec = build(m)
+        chem, mat, mech, death = m["chem"], m["mat"], m["mech"], bool(m.get("death"))
         name = spec["general"]["name"]
         path = os.path.join(CONFIG, f"{name}.yaml")
         with open(path, "w") as f:
@@ -407,7 +399,8 @@ def main():
             fails += _unread(spec)
             bad += bool(fails)
             note = "BROKEN " + ",".join(fails) if fails else "static ok"
-        print(f"{name:<28}{chem:<6}{mat:<9}{mech:<9}{('yes' if death else '-'):<7}"
+        print(f"{name:<30}{chem:<5}{mech:<9}{str(m.get('gate') or '-'):<7}"
+              f"{str(m.get('drive') or '-'):<7}{('yes' if death else '-'):<7}"
               f"{len(spec['operators']):>4}  {note}")
     print(f"\n{len(cells)} specs -> {CONFIG}")
     if a.check and bad:
