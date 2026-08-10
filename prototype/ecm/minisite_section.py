@@ -166,10 +166,12 @@ operators are ours (<code>prototype/ecm</code>).</p>
 
 def main():
     R3 = [
-        ("30_epi2_soft_E5", "vertex_mpm_free", "unconfined",
-         "the control: a growing, dividing epithelium presses into a soft fibrous matrix and stays a "
-         "SPHERE (oblateness 1.01) at ~6,000 cells. First contact at frame 32; by the end 89% of the "
-         "matrix is strained and the front has reached the wall of the box"),
+        ("03c_mesh_contact_hole", "vertex_mpm_free", "the interface, tested",
+         "the interface itself, on the smallest rig that can falsify it: a triangulated surface "
+         "pressed into an MPM block against a rigid floor, with a hole in the surface. Contact is "
+         "particle-to-surface, so the reaction really returns to the mesh (momentum residual 1.4e-7, "
+         "float32 precision) and friction changes the slip fourfold -- it is not MPM's automatic "
+         "weld. The block is compressed 14.4% and coloured by |J-1|"),
         ("27_epi_ecm_fibres_long", "vertex_mpm_fibres", "the fibres, at length",
          "the same coupling run out: an epithelium pressing into a fibre matrix for the full growth, "
          "so the stress front has time to cross the box. Nothing confines it -- this is what the "
