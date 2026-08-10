@@ -247,8 +247,25 @@ S18& the $k$-dependence weakens when the rate falls & spread $<0.10$ (it is $0.1
      \fail{0.136} ($14.19/15.61/16.31\%$) --- it does NOT\\
 S19& friction changes the slip on a CURVED, moving surface & $>2\times$, as on the flat patch &
      \fail{1.73$\times$} ($5.22$ vs $3.02\times10^{-2}$, \op{04e})\\
+\multicolumn{4}{@{}l}{\textit{the scale the note is quoted in} (\op{0u\_units})}\\
+U1& penetration on the spheroid, against a cell diameter & $[0, 10]$ um & \fail{15.02 um}\\
+U2& penetration on the flat rig & $[0, 30]$ um & \pass{26.93 um}\\
+U3& spheroid radius at the last frame & $[50, 400]$ um & \pass{175.8 um}\\
+U4& the gel around it & $[200, 2000]$ um & \pass{468.9 um}\\
+U5& the speed the surface advances & $[0.5, 20]$ um/h & \pass{3.869 um/h}\\
 \bottomrule\end{tabularx}}
 \smallskip
+
+
+\textbf{The run declares its scale, and these numbers are what it makes of it.} Three base scales
+under \code{general.units:} and everything else derived (\code{plexus/units.py}): $1$ box unit
+$=1172\,\mu$m, because a cell is $8.5\,\mu$m and the tissue is solved at $10\,\mu$m per tissue
+unit; $1$ frame $=600$ s, because $200\to6{,}076$ cells is $4.93$ doublings and a $12$--$24$ h
+cycle puts the run at $2.5$--$4.9$ days; $1$ force unit $=9162$ nN, set so the stroma's
+\code{youngs: 15} is $100$ Pa --- a collagen I gel at $1$--$3$ mg/ml. Only the force scale is
+\emph{chosen}, and it is chosen on the softest and best-measured body rather than on the sheet under
+dispute. Without this block the loader says the run is dimensionless and no result from it may carry
+a unit, which was the state of every run in this folder until now.
 
 \textbf{Two conventions make these mean what they say.} \textbf{The momentum residual is taken on the
 contact's own force pair}, inside the substep and before anything else is added --- with a drive in the
