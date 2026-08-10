@@ -727,6 +727,14 @@ def menu(ctx):
         except Exception as e:
             print(T_.no(f"[round] no menu for {p['name']}: {e}"))
             continue
+        # ONE UNUSABLE PARENT MUST NOT TAKE THE ROUND. `graph_from_run` returns None when a run has
+        # no recoverable spec, and this called `.legal_edits()` on it: menu raised AttributeError,
+        # coverage raised the same on `.ops`, build raised it on `.roles`, and the round launched
+        # NOTHING -- sixteen slots lost to one bad row in the parent set. A parent that cannot be
+        # rebuilt is a fact about that parent, so it is skipped and named.
+        if g is None:
+            print(T_.no(f"[round] no menu for {p['name']}: no recoverable spec -- skipped"))
+            continue
         rows, seen, dropped = [], set(), []
         for r in C.legal_menu(g, limit=m_limit):
             if not isinstance(r, dict):
@@ -880,6 +888,8 @@ def coverage(ctx):
         try:
             g = _graph(p["name"])
         except Exception:
+            continue
+        if g is None:                     # see the note in menu(): a None parent is skipped, not fatal
             continue
         for o in g.ops:
             used_ops.add(o["op"])
@@ -1470,6 +1480,13 @@ def _build_one(slot, rid, index, seen):
         g = _graph(par)
     except Exception as e:
         _refuse(index, slot, f"parent {par!r} cannot be rebuilt: {e}")
+        return None
+    # `graph_from_run` RETURNS None RATHER THAN RAISING when a run has no recoverable spec, so the
+    # except above never saw it and this slot went on to call `.roles()` on None. Losing the slot
+    # is correct; losing the round to an AttributeError is not.
+    if g is None:
+        _refuse(index, slot, f"parent {par!r} has no recoverable spec -- it cannot be edited. "
+                             f"Propose from a parent that has one.")
         return None
     # A SLOT THAT SAYS "control" IS ASKING FOR THE PARENT UNCHANGED, and that is a real experiment
     # -- two runs of one composition at two seeds bound the noise floor, which is the number every
