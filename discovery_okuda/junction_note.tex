@@ -9,6 +9,7 @@
 \usepackage{titlesec}
 \titlespacing*{\section}{0pt}{6pt}{2pt}
 \newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\op}[1]{\texttt{#1}}
 \title{\vspace{-1.4cm}\textbf{What a junction is: myosin through a cell division}}
 \author{}
 \date{\vspace{-0.9cm}\small \texttt{prototype/ecm/test\_01b\_myosin\_pools.py} $\cdot$
@@ -89,8 +90,9 @@ turnover times in frames.
 \textbf{What is stored is the density in both cases}, and that is what makes the two existing
 inheritance rules --- copy onto both halves, copy onto both daughters --- conserve the amount rather
 than double it. \textbf{And the setpoint is now intensive}: the belt's supply is per unit length, so
-$n_e^{\ast}=\tau_{\text{jun}}k_{\text{ex}}\rho_f$ carries no $\ell_e$, and half a junction relaxes
-toward what the whole junction was relaxing toward.
+$n_e^{\ast}=\tau_{\text{jun}}k_{\text{ex}}(\rho_f+\rho_g)$ --- two-sided, because a junction is fed by
+both cells it separates --- carries no $\ell_e$, and half a junction relaxes toward what the whole
+junction was relaxing toward.
 
 \textbf{One prediction arrives unbidden.} The steady state of Eq.~\eqref{eq:med} is
 $\rho^{\ast}=k_{\text{on}}/(1/\tau_{\text{med}}+k_{\text{ex}}P_f/A_f)$: a cell with more perimeter per
@@ -272,5 +274,115 @@ geometry already does. And it does not contain pulsatility, which is the mechani
 pool is famous for: Munjal's pulses need advection-mediated positive feedback with dissociation as the
 negative arm, which is a third state variable and an advection term. That is the next operator, and
 this one is the control it has to beat.
+
+\section*{8.\; What to build next: one specification, three codimensions}
+
+The junction work above is finished, and it makes a specification for the whole spheroid\,--\,basement
+membrane\,--\,matrix problem writable. The proposal below is chosen against two constraints at once ---
+what the biology requires and what the arithmetic costs --- and both are measured rather than
+asserted.
+
+\textbf{Where the time actually goes.} Benchmarked on one A6000, twenty frames each:
+
+\begin{center}\small
+\begin{tabular}{@{}lrl@{}}\toprule
+body & per frame & note\\\midrule
+epithelium, $200\to6900$ cells, $30$ relaxation iterations & $0.22$--$0.52$ s &
+$401$ frames in $89$--$210$ s\\
+matrix, $9\times10^{4}$ MPM particles, $64^3$ grid, $16$ substeps & $0.92$ s &\\
+matrix, $3\times10^{5}$ particles, $64^3$ grid, $16$ substeps & $1.65$ s &\\
+matrix, $3\times10^{5}$ particles, $96^3$ grid, $16$ substeps & $1.33$ s & the grid is nearly free\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Three things follow and they decide the design. The cost is \emph{particles $\times$ substeps} and
+almost nothing else --- tripling the grid at fixed particle count did not cost anything measurable, so
+resolution in space is cheap and resolution in time is not. The epithelium is a rounding error against
+the matrix. And the whole three-body model at $3\times10^{5}$ stroma particles is about
+$\mathbf{11}$ \textbf{minutes} for a $401$-frame run: this is not a problem that needs to be made
+affordable, it is one that needs to be kept affordable.
+
+\textbf{The specification.} One pass, one \code{Hierarchy}, each body at the codimension its biology
+has:
+
+\begin{center}\footnotesize
+\begin{tabular}{@{}llll@{}}\toprule
+set & kind & one element is & carries\\\midrule
+\code{cell} & node & an epithelial cell & $A,P,V$ + targets, $\rho_f$ (medioapical myosin), age\\
+\code{vertex} & node & a corner of the apical mesh & \code{pos}\\
+\code{junction} & \textbf{edge} $\subseteq$\code{vertex}$^2$ & a cell--cell contact & $n_e$ (line
+density), $\ell_e$\\\midrule
+\code{bm} & node on a \emph{surface} mesh & a patch of basement membrane & \code{pos},
+$\mathbf{F}$, $\rho$ (areal collagen IV), age\\
+\code{bm\_edge} & \textbf{edge} $\subseteq$\code{bm}$^2$ & in-plane sheet elasticity & rest length,
+$E(\lambda)$\\
+\code{plaque} & \textbf{edge} \code{cell}$\to$\code{bm} & one hemidesmosome & $\ell_0$, load, bound\\
+\code{fibril} & \textbf{edge} \code{bm}$\to$\code{mpm\_particle} & one anchoring fibril & rest length,
+load\\\midrule
+\code{mpm\_particle} & node & a patch of \emph{stroma only} & \code{pos}, $\mathbf{F}$, fibre direction\\
+\code{mpm\_grid} & field & the stroma's momentum & mass, momentum\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+with the schedule split at exactly one place:
+%
+\begin{align*}
+\text{frame } (\Delta t=1):\quad
+&\op{cell\_geometry\_3d}\to\op{grow\_3d}\to\op{bm\_growth\_gate}\\
+&\to\op{medioapical\_myosin}\to\op{junction\_myosin}\to\op{shape\_energy\_3d}\\
+&\to\op{reconnect\_t1\_3d}\to\op{divide\_3d}\to\op{cytokinetic\_ring}\to\op{junction\_myosin\_sync}\\
+&\to\op{bm\_secrete}\to\op{bm\_degrade}\to\op{plaque\_seed}\to\op{plaque\_rupture}\\[3pt]
+\text{substep } (\Delta t_{\text{sub}}=\Delta t/16):\quad
+&\op{bm\_stiffness}\to\op{bm\_elastic}\to\op{plaque\_pull}\to\op{fibril\_pull}\\
+&\to\op{mpm\_strain}\to\op{mpm\_scatter}\to\op{mpm\_grid\_update}\to\op{mpm\_gather}
+\end{align*}
+
+\textbf{Four rules, and each buys something specific.}
+
+\emph{1. The basement membrane never enters the grid.} It is $\sim\!100$ nm thick against a
+$\sim\!100\,\mu$m spheroid. Resolving that as MPM material needs $\Delta x\lesssim50$ nm over a
+$200\,\mu$m domain, i.e.\ $4000^3$ cells --- not slow, impossible. As a surface mesh with its own
+in-plane elasticity it costs what the epithelium costs, and $\Delta x$ is then set by the stroma
+alone. \S3 of the companion note licenses this: particle-to-surface contact (ICFEMP) exchanges force
+conservatively at a resolution where grid-node coupling cannot, measured to $1.4\times10^{-7}$
+relative momentum residual.
+
+\emph{2. The epithelium stays out of the substep block.} It is overdamped and has no mass, so it does
+not need the matrix's CFL step; putting its $30$-iteration relaxation inside the loop would multiply
+its cost by $16$ and change nothing. This is what the \code{substep\_dt} block is for, and it is the
+whole reason a stiff continuum and a quasi-static tissue can share one specification.
+
+\emph{3. Keep the sheet massless too, and its stiffness costs drag rather than substeps.} The
+literature wants $E_{\text{bm}}/E_{\text{ecm}}\in[10,100]$, and a stiff \emph{inertial} sheet inside
+the substep block would set $n_{\text{sub}}$ by itself. Overdamped, the bound is
+$\Delta t\,(z k_b+\kappa)/\gamma<2$ --- a rate, not a wave speed --- so the ratio is paid for with
+$\gamma$ and the substep count stays the stroma's.
+
+\emph{4. Spend particles on the shell that carries stress, not on the box.} The far field is
+quiescent; $3\times10^{5}$ particles in a shell around the spheroid resolve the gradient that the
+growth gate reads, and the grid can be refined for free (rule above) if the sheet's imprint needs it.
+
+\textbf{What it deletes, which is the other half of the leverage.} The \code{surface} Level and the
+two-pass structure go: once \op{plaque\_pull} returns its reaction, the epithelium is pushed back and
+there is no recorded boundary to consult. \op{cell\_to\_ecm} and \op{cell\_exclude\_3d} go with them
+--- while the sheet is intact the basement membrane \emph{is} the interface, and an epithelium that
+also pushes the stroma is counting the same push twice. And MPM fibres stop being asked to act as
+ropes, which \S7 of \code{spheroid\_ecm.tex} measured they cannot.
+
+\textbf{One thing this makes newly uncomfortable, and it belongs here rather than in a footnote.}
+The specification above forces a frame to have a duration, because \op{bm\_secrete} is a mass balance
+with $\tau_{\text{bm}}=4$--$14$ h in it. The run's own growth fixes it: $200\to6900$ cells is $5.1$
+doublings, so at a $12$--$24$ h cycle the $401$ frames are $2.5$--$5$ days and one frame is
+$9$--$18$ minutes. Collagen IV turnover is then $13$--$93$ frames --- comfortably resolved, which is
+the good news. Junctional myosin turnover is $1$--$2$ \emph{minutes}, i.e.\ a tenth of a frame: at this
+resolution the belt is adiabatic, $n_e$ should be its steady state every frame, and
+$\tau_{\text{jun}}=20$ frames is not myosin turnover by two orders of magnitude. What a $20$-frame
+memory on a junction can legitimately be is \emph{maturation} --- E-cadherin accumulation and the
+assembly of a new contact, which run over tens of minutes to hours --- so the parameter should be
+renamed, re-sourced, and separated from the turnover it is currently pretending to be. That is the
+first thing to fix in the model this note just built, and the specification above is what makes the
+question askable at all.
 
 \end{document}
