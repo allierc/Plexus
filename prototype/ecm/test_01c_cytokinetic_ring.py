@@ -64,10 +64,21 @@ LOG = os.path.join(_ROOT, "log", "okuda_ECM")
 # first column of every table below is the number that folder reported, not a re-run of it.
 BASE = dict(myosin=1.0, myo_tau=20.0, myo_new=1.0, myo_model="two_pool",
             myo_k_on=0.219, myo_tau_med=20.0, myo_k_ex=0.05, myo_beta_T=0.0)
+# `ring = 1` IS THE CONTROL, NOT "NO RING". What a newborn junction starts with is a mechanism, and
+# `cytokinetic_ring` is the operator that owns it: at `ring = 1` it seeds the interface at exactly the
+# density a mature junction of those cells sustains, which is the honest null -- a new contact that is
+# neither privileged nor penalised. `ring = 3` is then an enrichment against that null rather than
+# against an absolute number whose meaning drifts.
+#
+# WITHOUT the operator (`myo_ring = 0`) the seeding falls to `junction_myosin`'s own `myo_new`, and
+# `junction_myosin_sync` -- which is model-agnostic by design -- renders a not-yet-stored newborn at
+# the raw scalar for the one frame before the belt operator sees it. Measured, that put a newborn at
+# 0.46 in one part of the run and 0.94 in another (spread 0.77) purely from which of the two rules the
+# snapshot caught. It is why the middle run here is `ring = 1` and not `myo_ring = 0`.
 RUNS = [("absolute", dict(myo_new_rel=False, myo_ring=0.0)),
-        ("relative", dict(myo_new_rel=True, myo_ring=0.0)),
-        ("relative+ring", dict(myo_new_rel=True, myo_ring=3.0))]
-COL = {"absolute": "#c0392b", "relative": "#e08a2e", "relative+ring": "#2b6cb0"}
+        ("ring x1", dict(myo_new_rel=True, myo_ring=1.0)),
+        ("ring x3", dict(myo_new_rel=True, myo_ring=3.0))]
+COL = {"absolute": "#c0392b", "ring x1": "#e08a2e", "ring x3": "#2b6cb0"}
 
 
 def classify(S):
@@ -109,6 +120,27 @@ def classify(S):
     return {k: np.asarray(v) for k, v in out.items()}, born_at
 
 
+def newborn_vs_time(S, born_at, bins=12):
+    """The newborn interface's myosin relative to the tissue mean, AS A FUNCTION OF FRAME.
+
+    THIS IS THE TEST OF THE RELATIVE FIX, and the median over the whole run is not. An absolute
+    `myo_new` sets a newborn to `myo_new / <n>(t)`, and <n>(t) runs 1.07 -> 1.97 -> 1.48 over 401
+    frames, so what a newborn junction starts with is decided by the frame index -- a drift of nearly
+    two-fold with no mechanism behind it. Stated against the local supply n*_f the ratio should be
+    FLAT, whatever else it equals. A run-median cannot tell the two apart, because both average to
+    something.
+    """
+    edges = np.linspace(0, len(S) - 1, bins + 1)
+    t, v = [], []
+    for q in range(bins):
+        lo, hi = int(edges[q]), int(edges[q + 1])
+        acc = [S[j]["tab"][k][0] / max(S[j]["m_mean"], 1e-9)
+               for k, j in born_at.items() if lo <= j < hi and k in S[j]["tab"]]
+        if len(acc) >= 20:
+            t.append(S[(lo + hi) // 2]["t"]); v.append(float(np.median(acc)))
+    return np.asarray(t), np.asarray(v)
+
+
 def newborn_decay(S, born_at, horizon=15):
     """A newborn interface's myosin against snapshots since it was born, relative to the tissue mean.
 
@@ -131,7 +163,7 @@ def newborn_decay(S, born_at, horizon=15):
 
 
 def fig_newborn(R, out):
-    fig, ax = plt.subplots(1, 3, figsize=(12.4, 3.4), facecolor="white")
+    fig, ax = plt.subplots(1, 4, figsize=(16.0, 3.4), facecolor="white")
     names = [n for n, _ in RUNS]
     x = np.arange(3)
     w = 0.26
@@ -157,13 +189,23 @@ def fig_newborn(R, out):
     ax[1].set_title(r"and how it relaxes ($\tau_{\rm jun}=20$ frames)", fontsize=9)
 
     for n in names:
+        t, v = R[n]["vs_t"]
+        sp = (v.max() - v.min()) / max(np.median(v), 1e-9) if v.size else 0.0
+        ax[2].plot(t, v, color=COL[n], lw=1.7, marker="o", ms=3,
+                   label=f"{n}  (spread {sp:.2f})")
+    ax[2].axhline(1.0, color="#444", lw=0.9)
+    ax[2].set_xlabel("frame"); ax[2].set_ylabel(r"newborn $m/\langle m\rangle$")
+    ax[2].legend(fontsize=6.6, frameon=False)
+    ax[2].set_title("what a newborn starts with, over the run", fontsize=9)
+
+    for n in names:
         c = R[n]["cls"]["born"]
-        ax[2].hist(c, bins=np.linspace(0, 4, 70), histtype="step", lw=1.7, color=COL[n],
+        ax[3].hist(c, bins=np.linspace(0, 4, 70), histtype="step", lw=1.7, color=COL[n],
                    density=True, label=f"{n} (med {np.median(c):.2f})")
-    ax[2].axvline(1.0, color="#444", lw=0.9)
-    ax[2].set_xlabel(r"$m/\langle m\rangle$, newborn interfaces only")
-    ax[2].set_ylabel("density"); ax[2].legend(fontsize=6.6, frameon=False)
-    ax[2].set_title("the junction a cytokinetic ring builds", fontsize=9)
+    ax[3].axvline(1.0, color="#444", lw=0.9)
+    ax[3].set_xlabel(r"$m/\langle m\rangle$, newborn interfaces only")
+    ax[3].set_ylabel("density"); ax[3].legend(fontsize=6.6, frameon=False)
+    ax[3].set_title("the junction a cytokinetic ring builds", fontsize=9)
     for a in ax:
         a.spines[["top", "right"]].set_visible(False)
     fig.tight_layout(); fig.savefig(out, dpi=150, facecolor="white"); plt.close(fig)
@@ -211,7 +253,9 @@ def main():
         cls, born_at = classify(S)
         rate, tot = B.t1_rate(p)
         t, med, jun, pa = B.pools(S)
-        R[name] = dict(cls=cls, decay=newborn_decay(S, born_at), pools=(t, med, jun, pa), t1=rate)
+        vs_t = newborn_vs_time(S, born_at)
+        R[name] = dict(cls=cls, decay=newborn_decay(S, born_at), vs_t=vs_t,
+                       pools=(t, med, jun, pa), t1=rate)
         out[name] = dict(
             cache=os.path.relpath(p, _ROOT), **{k: float(v) for k, v in kw.items()},
             n_survivor=int(cls["survivor"].size), n_half=int(cls["half"].size),
@@ -219,6 +263,8 @@ def main():
             m_survivor=float(np.median(cls["survivor"])), m_half=float(np.median(cls["half"])),
             m_born=float(np.median(cls["born"])),
             born_decay=[float(v) for v in R[name]["decay"][:, 0]],
+            born_vs_time=[float(v) for v in vs_t[1]],
+            born_spread=float((vs_t[1].max() - vs_t[1].min()) / max(np.median(vs_t[1]), 1e-9)),
             med_fraction_first=float(med[0] / (med[0] + jun[0])),
             med_fraction_last=float(med[-1] / (med[-1] + jun[-1])),
             t1_per_cell_per_frame=rate, t1_total=tot)
@@ -243,12 +289,12 @@ def main():
     for n, _ in RUNS:
         o = out[n]
         print(f"[01c/{n:14s}] survivor {o['m_survivor']:.3f}  split half {o['m_half']:.3f}  "
-              f"NEWBORN {o['m_born']:.3f}  (n={o['n_born']})  |  med frac "
+              f"NEWBORN {o['m_born']:.3f} (spread {o['born_spread']:.2f}, n={o['n_born']})  |  med frac "
               f"{o['med_fraction_first']:.3f}->{o['med_fraction_last']:.3f}  |  "
               f"T1 {o['t1_per_cell_per_frame']:.5f}", flush=True)
 
     if "--no-render" not in only:
-        Tis = RD.load_tissue(paths["relative+ring"], 1.0)
+        Tis = RD.load_tissue(paths["ring x3"], 1.0)
         sc = B._myo_scale(Tis)
         B.strip(Tis, d, sc)
         B.panels(Tis, d, sc, movie=("--no-movie" not in only), label="01c_cytokinetic_ring",
