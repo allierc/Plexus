@@ -239,6 +239,14 @@ S15& the answer is converged in the time step & compression within $0.05$ & \fai
      ($14.95\to18.50\%$ at half the step)\\
 S16& the interface does not consult the grid: $n_{\rm grid}$ $64\to96$ & compression within $0.15$,
      depth (box) within $0.5$ & \pass{0.123}; depth \pass{0.067}\\
+\multicolumn{4}{@{}l}{\textit{is the failure rate-limited?} (\op{03e\_press\_rate}, press over $8\times$
+at matched travel)}\\
+S17& the answer converges as the press slows & change between the two slowest $<0.05$ &
+     \pass{0.011} ($19.49\to14.95\to15.44\to15.61\%$)\\
+S18& the $k$-dependence weakens when the rate falls & spread $<0.10$ (it is $0.119$ at nominal) &
+     \fail{0.136} ($14.19/15.61/16.31\%$) --- it does NOT\\
+S19& friction changes the slip on a CURVED, moving surface & $>2\times$, as on the flat patch &
+     \fail{1.73$\times$} ($5.22$ vs $3.02\times10^{-2}$, \op{04e})\\
 \bottomrule\end{tabularx}}
 \smallskip
 
@@ -248,19 +256,40 @@ sum it stops being a statement about the reaction. And \textbf{penetration is re
 well as in cells} across the grid sweep, because $\mathrm dx$ is exactly what changes there and cells
 alone would report a grid dependence that is the unit.
 
-\textbf{S13--S15 are the finding of this note, and they are a failure.} A penalty permits a depth
+\textbf{S13--S15 are the finding of this note, and S17--S18 are what became of the explanation.} A penalty permits a depth
 $d=f/k$, so a sixteenfold stiffening should divide the penetration by sixteen and leave the material's
 compression alone. Measured, the penetration falls by $1.5\times$ and the compression \emph{rises} by
-$13\%$. Both say the same thing: the depth is not set by a force balance but by how far the prescribed
-surface advances before the penalty can accelerate a particle out of its way --- a rate-limited regime,
-in which $k$ is not a numerical detail but part of the answer. S15 says the same thing from the time axis: halving the step
-moves the compression from $14.95\%$ to $18.50\%$, so the run is not converged in $\Delta t$ either,
-and for the same reason --- a rate-limited contact resolves more of the surface's advance when the
-step is smaller. What survives untouched is S12, and S16 with it: the reaction is exact in every
-variant, and refining the grid at fixed particle count moves the compression by $12\%$ and the
-penetration in box units by $7\%$, which is the material's response and not the interface's --- the
-one place the scheme's own claim, that particle-to-surface contact never consults the grid, is
-tested and holds.
+$13\%$; halving the time step moves it again, $14.95\to18.50\%$.
+
+\textbf{The obvious explanation was that the contact is rate-limited}, and \op{03e} rejected it. The
+surface is prescribed, so it advances $v\Delta t$ per step whatever the matrix does; if the penalty
+cannot accelerate a particle out of the way within a step, the depth is set by the advance rather than
+by the force, and all three sweeps become sweeps of how much advance happens per step. That is
+testable, because it predicts two things. The first holds: pressing at $2$, $1$, $\tfrac12$ and
+$\tfrac14$ of the nominal speed at matched total travel, the compression converges --- $19.49\to14.95
+\to15.44\to15.61\%$, the last two within $1.1\%$ of each other (S17), so the nominal press is already
+converged to $4\%$ and the time-step failure S15 is a resolution question rather than a mechanism.
+\textbf{The second fails.} At the slowest press the $k$-dependence does not weaken; it is
+$13.6\%$ over a $16\times$ change in $k$ against $11.9\%$ at the nominal (S18). A rate-limited contact
+must lose its $k$-dependence when the rate falls, and this one does not --- so the compliance is
+intrinsic to the penalty and not an artefact of pressing too fast, and the answer is the barrier
+formulation (BFEMP \cite{li2022}) rather than a slower press. That is a prediction made before the run
+and refuted by it, which is the only reason to have made it.
+
+\textbf{S19 is the same lesson in the other direction.} Friction changes the slip four- to fivefold on
+the flat patch, and only $1.73\times$ on the spheroid --- because the spheroid's loading is very nearly
+pure normal expansion, so there is little tangential relative motion for a friction law to act on. The
+threshold was set on the flat rig and does not transfer: what \op{04e} shows is not that the friction
+law is broken but that the curved run does not exercise it, and a tangential gate for the spheroid
+needs a loading with shear in it.
+
+What survives all of this is S12, and S16 with it: the reaction is exact at $1.5$--$1.8\times10^{-7}$
+in every variant of every sweep --- four press speeds, three stiffnesses, two time steps, two grids,
+two friction coefficients --- because Eq.~\eqref{eq:reaction} is an identity on $\mathbf w$ and not a
+balance that has to converge. And refining the grid at fixed particle count moves the compression by
+$12\%$ and the penetration in box units by $7\%$, which is the material's response and not the
+interface's: the one place the scheme's own claim, that particle-to-surface contact never consults the
+grid, is tested and holds.
 
 \textbf{What the gates license.} A surface and a continuum exchange force conservatively at a
 resolution where grid-node coupling welds them (S4, S5); the slip is a material property rather than a
