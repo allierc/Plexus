@@ -164,6 +164,7 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                # THE EXPLICIT LAST LINK: fibre tip -> the membrane patch it binds. 0 leaves the coupling
                # to the shared grid alone, which 144 measured at ~9% of the mass it must move.
                integrin_bond_k=0.0, integrin_bond_gamma=1.0, integrin_rupture=0.0,
+               integrin_pull_from="tip",
                # adhesions rupture under load: `detach` is the displacement at which one lets go.
                membrane_detach=0.0,
                # THE TISSUE AS A MOVING BOUNDARY ON THE GRID, rather than a positional projection.
@@ -465,7 +466,8 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                 spec["operators"].append(
                     {"op": "integrin_pull", "at": "basement_membrane_particle",
                      "integrin_set": "integrin_particle", "k": float(integrin_bond_k),
-                     "gamma": float(integrin_bond_gamma), "rupture": float(integrin_rupture)})
+                     "gamma": float(integrin_bond_gamma), "rupture": float(integrin_rupture),
+                     "pull_from": str(integrin_pull_from), "rest_length": float(L_fib)})
                 # IN THE SUBSTEP, for the reason `integrin_adhesion` is there in 133: a force computed
                 # once per frame is held across the substeps and is therefore integrated at dt_frame,
                 # which caps k near 6e4. Recomputed per substep the limit is dt_sub*sqrt(k).
