@@ -70,6 +70,15 @@ def build(parent, mode, extra):
     # and it rode in from the parent rather than from anything this test wants.
     for o in spec["operators"]:
         o.pop("reset_noise", None)
+    # THE PARENT'S record_cap IS STALE AND ONLY THE LAUNCHER HIDES IT. 43 campaign specs carry
+    # record_cap 902 against n_frames 1800 -- every index >=08 from round 18 on. They run because
+    # run_one.py:298 rewrites the cap to frames+2 whenever `--frames` is passed and the loop's
+    # launcher always passes it; submitted without it, positions ring-buffer at 901 while topology
+    # records 1801 and the D3 alignment check refuses the run outright. A spec that is only correct
+    # when its caller overrides it is a trap, so this writes the value the stride actually needs.
+    g = spec["general"]
+    g["record_cap"] = max(int(g.get("record_cap", 0)),
+                          int(g["n_frames"]) // max(int(g.get("record_every", 1)), 1) + 2)
     spec.pop("_discovery", None)
     spec["_apoploop"] = {"parent": parent, "mode": mode, "max_mark_frac": MAX_MARK_FRAC,
                          "why": "the parent's own recorded run is the control; this spec differs "
