@@ -97,25 +97,42 @@ ceiling in Eq.~\eqref{eq:cfl} falls by $(\Delta t_{\text{frame}}/\Delta t_{\text
 \section*{4.\; The rig, and what it measures}
 
 A flat patch of $17\times17$ vertices with four-neighbour springs, pressed at a prescribed speed into a
-block of $81{,}202$ MPM particles; mesh cell $1.68\,\Delta x$, no gravity. Three measurements, each of
-which kills the method if it fails.
+block of $81{,}202$ MPM particles; mesh cell $1.68\,\Delta x$, no gravity. Three variants, because one
+of them alone cannot separate the interface from its boundary conditions: the block free, the block
+trapped against a rigid floor, and the same with a hole cut in the surface. The floor is a \emph{grid}
+boundary condition --- the downward component of the grid velocity is zeroed below the plane, which is
+how MPM states an obstacle --- and the hole is a real hole: $21$ vertices inside $r=0.06$ are removed,
+the $52$ springs touching them go with them, and every quad with a missing corner stops being a contact
+face, so the material under it has nowhere to go but through.
 
 \begin{center}\small
-\begin{tabular}{@{}llll@{}}\toprule
-& what it asks & result & reading\\\midrule
-momentum & is the reaction really returned? & $1.3\times10^{-7}$ relative & machine precision in
-float32: \emph{passes}\\
-penetration & does the penalty bound it? & $0.53$ cells, $515$ contacts & bounded, but half a cell
-is not small\\
-slip & is this the grid's weld? & $1.03\times10^{-2}$ against $4.24\times10^{-2}$ & friction changes
-it $4.1\times$: \emph{it is not}\\
+\begin{tabular}{@{}lllll@{}}\toprule
+run & momentum residual & penetration & slip, $\mu=0.4$ / $\mu=0$ & compression\\\midrule
+\code{03}\quad free block            & $1.5\times10^{-7}$ & $0.67$ cells & --- & ---\\
+\code{03b}\; rigid floor             & $1.6\times10^{-7}$ & $1.47$ cells & $0.069$ / $0.368$ & $15.0\%$\\
+\code{03c}\; floor $+$ hole          & $1.4\times10^{-7}$ & $1.56$ cells & $0.088$ / $0.344$ & $14.4\%$\\
 \bottomrule
 \end{tabular}
 \end{center}
 
+\textbf{The momentum residual is float32 machine precision in all three}, so the reaction of
+Eq.~\eqref{eq:reaction} is really returned --- the test a one-way coupling fails by construction, and
+the one the spheroid's adhesion would fail today. \textbf{Friction changes the slip four- to
+fivefold}, so the contact is not MPM's automatic weld wearing a coefficient; the free-block run cannot
+say this, because its slip is measured over the frames that have a contact and it lifts off before
+enough of them accumulate. \textbf{Penetration is bounded but is one to one and a half cells}, which is
+a lot: the fix is a stiffer penalty with a smaller substep, or barrier contact. And the floor is what
+turns an indentation into a confined compression --- with nowhere to go the block loses $15\%$ of its
+height, and the hole gives that back slightly ($14.4\%$) because material escapes through it.
+
+The particles are coloured by $|J-1|$, the volumetric strain, on one $99$th-percentile scale taken over
+the whole run. That scale cannot be known before the run, so the renderer steps the physics once,
+keeps the drawn frames, and sets the scale from them --- the alternative, a value guessed in advance,
+is what made the falling-block movie a solid saturated colour.
+
 \begin{figure}[h]\centering
 \includegraphics[width=\textwidth]{fig_mesh_contact_metrics.png}
-\caption{Left: the momentum residual, which is the test that a one-way coupling fails by construction.
+\caption{Run \code{03}. Left: the momentum residual, which is the test that a one-way coupling fails by construction.
 Middle: how many particles are behind the surface and how deep, in grid cells. Right: tangential slip
 with friction and without --- if these two coincided, the ``contact'' would be MPM's automatic weld
 wearing a friction coefficient.}
@@ -131,7 +148,8 @@ interior behind, so the lattice needed edge springs before a press could load an
 
 It licenses the interface: a surface and a continuum can exchange force conservatively at a resolution
 where grid-node coupling cannot, with slip that is a material property rather than a numerical
-accident. It does not license the geometry --- the patch is flat and axis-aligned, so face lookup is
+accident, and it survives an obstacle behind the material and a hole in the surface without either
+being special-cased. It does not license the geometry --- the patch is flat and axis-aligned, so face lookup is
 $O(1)$ and a real mesh needs a BVH --- and it does not license the accuracy: half a grid cell of
 penetration is a lot, and the fix is either a stiffer penalty with a smaller substep or the barrier
 formulation (BFEMP, Li et al.\ 2022), which forbids penetration outright at the cost of an implicit
