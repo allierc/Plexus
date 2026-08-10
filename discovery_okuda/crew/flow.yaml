@@ -104,18 +104,26 @@ nodes:
       per_target: 1
       max_per_lineage: 2
       targets:
+        # KEYED ON MEASURED QUANTITIES, NOT ON THE CLASSIFIER'S LABEL. The first version filtered
+        # each seat by `morphology`, and the classifier -- whose own docstring calls itself a HINT
+        # -- returns `sphere` for almost everything: 314 of 416 runs in the old ledger and 14 of 14
+        # in round 1 of this one, including r001_03 at aspect 4.914 with two tips and r001_04 at
+        # 6.804. So tube/branched/complex matched nothing, every seat fell through, and the
+        # portfolio silently became the greedy ranking it was written to replace. `where` is a floor
+        # on what was measured; `morphology` may still be added as an extra filter when the label is
+        # trusted.
         tube:
-          morphology: [tube]
+          where: {protrusion_aspect_max_peak: 2.0}
           score: {protrusion_aspect_max_peak: 1.0, n_tubes_peak: 0.5}
         bud:
           # a BULGE, not a finger -- aspect counts against it, or this is just the tube seat again
-          morphology: [sphere, undulation]
+          where: {protr_peak: 1.10}
           score: {protr_peak: 1.0, protrusion_aspect_max_peak: -0.3}
         branched:
-          morphology: [branched]
+          where: {n_tips_peak: 2}
           score: {n_tips_peak: 1.0, protr_peak: 0.5}
         complex:
-          morphology: [undulation, branched]
+          where: {grip_peak: 0.05}
           score: {grip_peak: 1.0, invagination_peak: 0.5}
       forcing_terms: {extrusion_forcing_3d: K_extrude}   # split out 10 Aug; NOT in the vocabulary
       # EVERY ENTRY REBUILDS AND ADMITS. Checked by `round.py --check`, because the first version of
@@ -134,90 +142,23 @@ nodes:
       # which it can ever stop". The column is not a bad base, it is a base whose growth law is
       # incomplete -- worth rebuilding with a compression term, not worth searching from now.
       pool:
-        # RE-BASED 8 AUGUST ONTO THE GENERATED BASIS -- `discovery_okuda/make_basis.py`. Cedric:
-        # "put the current 12 folders of log/okuda into archive, you write a new set of 12 specs...
-        # to form a sound basis for the agentic loop. Route A can pull from this basis, not limited
-        # to two specs."
-        #
-        # WHAT WENT, AND WHY IT WAS NOT A BASIS. Sixteen folders accumulated over four phases: six
-        # different frame counts (201/301/401/501/801/901), `grip_peak` absent from all sixteen
-        # because they predate the metric registry the campaign scores on, one folder with no spec
-        # at all, and one (`repair_l_th_frac`, act_cv 4.97) whose number came from the `mode: tip`
-        # artifact. Three were in this pool and exactly TWO could be a Route A base. A basis has to
-        # let you compare its members to each other; those could not be compared to each other, nor
-        # to a 900-frame campaign run. They are in log/okuda/_superseded_pre_basis/.
-        #
-        # WHAT REPLACED IT IS A GRID, NOT A COLLECTION -- 4 chemistry x 2 material x 2 mechanics,
-        # generated so that every value NOT on an axis is written once and shared by all twelve.
-        # The diff between any two members is exactly the axes that separate them, which is what
-        # makes "Route A pulls from the basis" mean "choose an axis to move" rather than "pick a
-        # folder". Twelve bases also means the per-base share in `route_a.slots` must ROTATE rather
-        # than divide -- see that node.
-        #
-        #   chemistry   none | gray-scott | gierer-meinhardt | brusselator
-        #   material    static (divide, no growth) | uniform (gate open) | gated (Hill on activator)
-        #   mechanics   plain | shaping (K_bend + K_lumen + interface_line_tension_3d.K_purse)
-        #
-        # THE MECHANICS COLUMN IS THE ONE THAT WAS UNREACHABLE. `coral_gate_div` ran
-        # `shape_energy_3d model: monolayer`, whose parameter list contains no K_bend and no
-        # K_lumen -- so the three terms that can neck a lobe into a finger were not merely missing
-        # from its spec, they were INEXPRESSIBLE in its model, and no edit the Proposer could write
-        # would have reached them. All twelve carry them explicitly; four carry K_purse with
-        # K_extrude at zero, which is the sound half of the forcing operator on its own.
-        - b_none_static_plain      # divide, no growth, no chemistry -- the substrate null
-        - b_none_static_shaping
-        - b_gs_gated_plain         # the campaign's own question: pattern gating growth
-        - b_gs_gated_shaping
-        # THE FOUR gm MEMBERS ARE DROPPED, 8 August. Gierer-Meinhardt does not sustain a pattern
-        # on this substrate at dt = 1: its activator peaks at ~4,240 -- unbounded by construction,
-        # a^2/h with no ceiling, unlike Gray-Scott's [0,1] -- and collapses to 0.7-1.9% of that,
-        # which premise P4 refuses. Cedric watched b_gm_gated_plain's movie and named it before
-        # the metric did: "chemistry flickering that can not be".
-        #
-        # FIVE INTERVENTIONS, none of which moved it: sat 0.5 (peak 872 -> final 6.1), sat 1.5
-        # (316 -> 3.0), mu_h 0.3 (4106 -> 0.8), rate 0.12 (1277 -> 0.6), and nine cone-seeded
-        # spots ten cells across (4232 -> 30, WORSE than scatter, and coarsening 2 spots to 1).
-        # Lowering the peak never stopped the collapse. Starting at the pattern's own length scale
-        # does not help a pattern that cannot hold one.
-        #
-        # The runs stay on disk and the negative stays on the record -- "GM does not sustain here"
-        # is worth knowing, and the column was added precisely so the chemistry axis could be
-        # varied. What it must not do is be a PARENT: every Route B run inherits its parent's
-        # composition, and a dead field poisons every reading taken downstream of it.
-        # THE FOURTH CHEMISTRY, added 8 August with the column itself. Measured: brusselator
-        # patterns (act_cv 0.80) and does NOT couple -- corr_act_rad 0.06-0.29 and grip ~1e-4,
-        # against gray_scott's 0.56-0.81 and 0.033-0.051 on the same growth and mechanics. It is
-        # in the pool BECAUSE of that, not despite it: a parent set holding only recipes that work
-        # cannot tell the loop what makes them work.
-        - b_bru_gated_plain
-        - b_bru_gated_shaping
-        # THE DEATH TWINS, added 10 August. A mechanism enters this campaign through the BASIS
-        # or not at all: apoptosis_3d sat at menu row 0 and in
-        # `coverage.operators_never_exercised` for five rounds and the Proposer never took it,
-        # while Route A could not reach it either -- `_build_sweep` refuses a base that does not
-        # already carry the operator, and the Route A plan is static. One twin per Route A base,
-        # so `mode` and `max_mark_frac` become sweepable ladders on the same parents everything
-        # else is measured against.
-        - b_gs_gated_plain_death
-        - b_bru_gated_plain_death
-        - b_gs_gated_shaping_death
-      #
-      # DROPPED, each for a measured reason:
-      #
-      #   coral_gate / coral_gate_div   the campaign's parents through round 5, on `monolayer`
-      #                         mechanics that cannot express the bending and lumen terms. Their
-      #                         measured evidence is not discarded -- the rho ladder (cells
-      #                         4.0k -> 14.2k, grip peaking at rho 1.0) and the flat vth_frac
-      #                         ladder are in campaign/knowledge.md -- but a base whose mechanics
-      #                         model forecloses half the search cannot lead the next campaign.
-      #   refute_coral_nocons   its growth ceiling vth_frac=1.4 sits BELOW the division trigger
-      #                         factor=2.0, so volume-triggered division is arithmetically
-      #                         impossible. All FOUR of its children in round 1 died in under a
-      #                         minute, the control among them.
-      #   wk_pressure_pos_s0    passes every premise, but has no measurable chemistry-shape
-      #                         coupling (corr_act_rad absent), so it cannot speak to the open
-      #                         question.
-
+        # THE POOL IS THE BASIS, member for member -- crew/basis.yaml declares them and this
+        # lists them. They drifted apart once already (a pool entry with no run on disk, a
+        # basis member nothing could build from), and a pool that is not the basis is a
+        # campaign searching from something nobody measured.
+        - b_null_plain
+        - b_null_shaping
+        - b_gs_plain_soft_lo
+        - b_gs_plain_soft_hi
+        - b_gs_plain_sharp_lo
+        - b_gs_plain_sharp_hi
+        - b_gs_shaping_soft_lo
+        - b_gs_shaping_soft_hi
+        - b_gs_shaping_sharp_lo
+        - b_gs_shaping_sharp_hi
+        - b_gs_plain_soft_lo_death
+        - b_gs_shaping_sharp_hi_death
+        - b_bru_question
   - id: history
     code: round.history
     args:
@@ -340,8 +281,8 @@ nodes:
         # 0.0 (infinite ratio, activator-only growth) is now reachable too -- P2 was retired on
         # 8 August precisely because it vetoed the limit case as a principle instead of letting
         # the campaign measure where the objection starts to bite.
-        - [b_gs_gated_plain,     grow_3d,   rho,      [0.05, 0.1, 0.25, 0.5]]
-        - [b_bru_gated_plain,    grow_3d,   rho,      [0.05, 0.1, 0.25, 0.5]]
+        - [b_gs_plain_soft_lo,     grow_3d,   rho,      [0.05, 0.1, 0.25, 0.5]]
+        - [b_bru_question,    grow_3d,   rho,      [0.05, 0.1, 0.25, 0.5]]
         # HOW BIG A RED CELL MAY GET BEFORE IT DIVIDES -- the lever the Grounder has asked for in
         # three consecutive rounds and nobody moved: "cap cells_final near 3600 so growth loads
         # into elongation, not more cells". Okuda Fig 5a grows 2032 -> 3572 cells, 1.76x. This
@@ -361,40 +302,40 @@ nodes:
         # 8 August: "we should allow up to x4 or x10 cell growth in red spot?" These grids are
         # that question. They must be swept TOGETHER: factor above vth_frac is a cell that can
         # never reach the size that divides it, which is the relation the retired P3 used to veto.
-        - [b_gs_gated_plain,     grow_3d,   vth_frac, [4.0, 6.0, 10.0]]
-        - [b_bru_gated_plain,    grow_3d,   vth_frac, [4.0, 6.0, 10.0]]
-        - [b_gs_gated_plain,     divide_3d, factor,   [2.4, 3.0, 5.0, 8.0]]
-        - [b_bru_gated_plain,    divide_3d, factor,   [2.4, 3.0, 5.0, 8.0]]
+        - [b_gs_plain_soft_lo,     grow_3d,   vth_frac, [4.0, 6.0, 10.0]]
+        - [b_bru_question,    grow_3d,   vth_frac, [4.0, 6.0, 10.0]]
+        - [b_gs_plain_soft_lo,     divide_3d, factor,   [2.4, 3.0, 5.0, 8.0]]
+        - [b_bru_question,    divide_3d, factor,   [2.4, 3.0, 5.0, 8.0]]
         # The low end of `factor` stays on the CHEMISTRY-FREE base only. Rounds 1-3 closed that
         # ladder on three bases and it produced the campaign's one replicated law -- fewer
         # divisions, bigger cells, rounder shell, higher coupling, monotone on all of them. It is
         # knowledge, not a question, and re-running it on the gated bases would spend eight slots
         # confirming that flooding floods. Keeping it here preserves the geometric control.
         # ---- THE GATE ITSELF: where the activator opens growth, and how sharply.
-        - [b_gs_gated_plain,     grow_3d,   a_sw,     [0.1, 0.2, 0.5, 0.7]]
-        - [b_bru_gated_plain,    grow_3d,   a_sw,     [0.1, 0.2, 0.5, 0.7]]
-        - [b_gs_gated_plain,     grow_3d,   hill,     [1.0, 2.0, 8.0, 16.0]]
-        - [b_bru_gated_plain,    grow_3d,   hill,     [1.0, 2.0, 8.0, 16.0]]
-        - [b_gs_gated_plain,     grow_3d,   rate,     [0.000433, 0.001732, 0.003464, 0.006928]]
+        - [b_gs_plain_soft_lo,     grow_3d,   a_sw,     [0.1, 0.2, 0.5, 0.7]]
+        - [b_bru_question,    grow_3d,   a_sw,     [0.1, 0.2, 0.5, 0.7]]
+        - [b_gs_plain_soft_lo,     grow_3d,   hill,     [1.0, 2.0, 8.0, 16.0]]
+        - [b_bru_question,    grow_3d,   hill,     [1.0, 2.0, 8.0, 16.0]]
+        - [b_gs_plain_soft_lo,     grow_3d,   rate,     [0.000433, 0.001732, 0.003464, 0.006928]]
         # ---- THE RD MECHANISMS. Each model's OWN parameters -- they do not share a vocabulary,
         # which is exactly the mistake that shipped four bases carrying Gray-Scott's `F` and `kk`
         # on a gierer_meinhardt slot. gray_scott reads F/kk, gierer_meinhardt reads a0/mu_h/sat,
         # brusselator reads gamma (with A, B fixed at the Turing-unstable 1.0 / 3.0).
-        - [b_gs_gated_plain,     cell_react, F,       [0.03, 0.038, 0.054, 0.06]]
-        - [b_gs_gated_plain,     cell_react, kk,      [0.052, 0.057, 0.066, 0.07]]
-        - [b_bru_gated_plain,    cell_react, gamma,   [0.05, 0.15, 0.6, 1.2]]
+        - [b_gs_plain_soft_lo,     cell_react, F,       [0.03, 0.038, 0.054, 0.06]]
+        - [b_gs_plain_soft_lo,     cell_react, kk,      [0.052, 0.057, 0.066, 0.07]]
+        - [b_bru_question,    cell_react, gamma,   [0.05, 0.15, 0.6, 1.2]]
         # Diffusion is shared vocabulary and IS comparable across the three, so it is swept on all
         # of them: the ratio d_h/d_a is what sets the Turing wavelength in every one of these
         # schemes, and whether the spacing responds the same way is a real question about the
         # models rather than about their parameter names.
-        - [b_gs_gated_plain,     cell_diffuse, d_a,   [0.02, 0.04, 0.16, 0.3]]
-        - [b_bru_gated_plain,    cell_diffuse, d_a,   [0.02, 0.04, 0.16, 0.3]]
-        - [b_bru_gated_plain,    cell_diffuse, d_h,   [0.04, 0.08, 0.32, 0.6]]
-        - [b_gs_gated_plain,     cell_diffuse, chi,   [0.3, 0.65, 2.0, 2.8]]
+        - [b_gs_plain_soft_lo,     cell_diffuse, d_a,   [0.02, 0.04, 0.16, 0.3]]
+        - [b_bru_question,    cell_diffuse, d_a,   [0.02, 0.04, 0.16, 0.3]]
+        - [b_bru_question,    cell_diffuse, d_h,   [0.04, 0.08, 0.32, 0.6]]
+        - [b_gs_plain_soft_lo,     cell_diffuse, chi,   [0.3, 0.65, 2.0, 2.8]]
         # ---- SHAPE -> CHEMISTRY, the second arrow. beta = 0 is the null and must be run.
-        - [b_gs_gated_plain,     shape_to_chem, beta, [-2.0, 0.0, 1.0, 2.0]]
-        - [b_bru_gated_plain,    shape_to_chem, beta, [-2.0, 0.0, 1.0, 2.0]]
-        - [b_gs_gated_plain,     shape_to_chem, F0,   [0.02, 0.03, 0.07, 0.1]]
+        - [b_gs_plain_soft_lo,     shape_to_chem, beta, [-2.0, 0.0, 1.0, 2.0]]
+        - [b_bru_question,    shape_to_chem, beta, [-2.0, 0.0, 1.0, 2.0]]
+        - [b_gs_plain_soft_lo,     shape_to_chem, F0,   [0.02, 0.03, 0.07, 0.1]]
         # ---- MECHANICS LAST, and these have NEVER been swept by this project. K_bend and K_lumen
         # were inexpressible in the old base's model; K_purse existed only alongside the forcing
         # term that disqualifies a run. They are the three terms that can neck a lobe into a
@@ -417,36 +358,36 @@ nodes:
         # until 8 August and corrects no size deviation -- it is the NULL these are read against.
         # The default (absent from both grids, measured every round as the control) is grow_3d
         # exponential + divide_3d sizer.
-        - [b_gs_gated_plain,     grow_3d,   model,    [sizer, balance, timer]]
-        - [b_gs_gated_plain,     divide_3d, model,    [doubler, timer]]
+        - [b_gs_plain_soft_lo,     grow_3d,   model,    [sizer, balance, timer]]
+        - [b_gs_plain_soft_lo,     divide_3d, model,    [doubler, timer]]
         # ---- THE DIFFUSION RATIO, which is what actually sets the Turing wavelength. `d_a` is the
         # campaign's strongest lever -- spots 166 -> 3 and grip 0.018 -> 0.089 across its grid --
         # but it is confounded: moving it changes the wavelength AND the diffusion speed together.
         # Sweeping `d_h` at fixed `d_a` separates them, and it is the one experiment that could
         # break "coarser-grips-harder", fifteen rounds of it: fine spots at a HIGH ratio may grip
         # where fine spots at low d_a do not.
-        - [b_gs_gated_plain,     cell_diffuse, d_h,   [0.04, 0.08, 0.32, 0.6, 1.2]]
+        - [b_gs_plain_soft_lo,     cell_diffuse, d_h,   [0.04, 0.08, 0.32, 0.6, 1.2]]
         # ---- REFINING THE TWO STRUCTURES ALREADY FOUND. Both were located on a 4-point grid
         # spanning a decade, which is enough to see a shape and not enough to resolve it.
         # K_bend has an INTERIOR OPTIMUM: grip 0.0412 / 0.0431 / 0.0574 / 0.0360 at 0 / 0.005 /
         # 0.08 / 0.3, the second non-monotone result this project has produced.
-        - [b_gs_gated_shaping,   shape_energy_3d, K_bend,  [0.03, 0.05, 0.12, 0.2]]
+        - [b_gs_shaping_soft_lo,   shape_energy_3d, K_bend,  [0.03, 0.05, 0.12, 0.2]]
         # Lambda is a CLIFF, not a slope: grip 0.0511 / 0.0519 / 0.0227 / 0.0021 and corr 0.87 ->
         # 0.40 at 0 / 0.2 / 1.0 / 2.0. Everything happens between 0.2 and 1.0 and nothing is
         # measured there. Lambda charges for edge length, so it opposes any shape that is not a
         # sphere -- where exactly it starts winning is worth a number.
-        - [b_gs_gated_shaping,   shape_energy_3d, Lambda,  [0.3, 0.45, 0.6, 0.8]]
+        - [b_gs_shaping_soft_lo,   shape_energy_3d, Lambda,  [0.3, 0.45, 0.6, 0.8]]
         # ---- THE GROWTH CEILINGS, re-opened at the top because 1800 frames changed what they
         # mean. At 900 the control ended at 3,089 cells; at 1800 it reaches 7,424, so a ceiling
         # that was never approached now binds, and its effect compounds over the second half of a
         # run that did not previously exist.
-        - [b_gs_gated_plain,     grow_3d,   vth_frac, [14.0, 20.0, 30.0]]
-        - [b_gs_gated_plain,     divide_3d, factor,   [11.0, 16.0, 24.0]]
-        - [b_gs_gated_shaping,   shape_energy_3d, K_bend,  [0.0, 0.005, 0.08, 0.3]]
-        - [b_gs_gated_shaping,   shape_energy_3d, K_lumen, [0.0, 0.1, 2.0, 8.0]]
-        - [b_gs_gated_shaping,   interface_line_tension_3d, K_purse, [0.0, 0.25, 3.0, 6.0]]
-        - [b_gs_gated_shaping,   shape_energy_3d, K_V,     [5.0, 10.0, 40.0, 80.0]]
-        - [b_gs_gated_shaping,   shape_energy_3d, Lambda,  [0.0, 0.2, 1.0, 2.0]]
+        - [b_gs_plain_soft_lo,     grow_3d,   vth_frac, [14.0, 20.0, 30.0]]
+        - [b_gs_plain_soft_lo,     divide_3d, factor,   [11.0, 16.0, 24.0]]
+        - [b_gs_shaping_soft_lo,   shape_energy_3d, K_bend,  [0.0, 0.005, 0.08, 0.3]]
+        - [b_gs_shaping_soft_lo,   shape_energy_3d, K_lumen, [0.0, 0.1, 2.0, 8.0]]
+        - [b_gs_shaping_soft_lo,   interface_line_tension_3d, K_purse, [0.0, 0.25, 3.0, 6.0]]
+        - [b_gs_shaping_soft_lo,   shape_energy_3d, K_V,     [5.0, 10.0, 40.0, 80.0]]
+        - [b_gs_shaping_soft_lo,   shape_energy_3d, Lambda,  [0.0, 0.2, 1.0, 2.0]]
         # ---- THE DEATH LADDERS, and the reason the death twins are in the basis at all. Route A
         # cannot introduce an operator -- `_build_sweep` refuses "route A base has no
         # apoptosis_3d" and this plan is static -- so a mechanism absent from the basis can never
@@ -459,8 +400,7 @@ nodes:
         # writes any key onto the operator dict, exactly as it does for grow_3d.model. The base
         # itself runs `competition`, so that is the control these are read against and it is
         # absent from the grids.
-        - [b_gs_gated_plain_death,   apoptosis_3d, mode, [smaller, older, crowded, dimmer]]
-        - [b_bru_gated_plain_death,  apoptosis_3d, mode, [smaller, older, crowded, dimmer]]
+        - [b_gs_plain_soft_lo_death,   apoptosis_3d, mode, [smaller, older, crowded, dimmer]]
         # `dimmer` reads the activator, so it is NOT offered on the b_none column: a mode that
         # returns None on a base with no chemistry is a slot spent measuring nothing.
         # HOW FAST, as distinct from WHO -- the knob that decides whether death is a mechanism or
@@ -468,8 +408,14 @@ nodes:
         # to 1.131 / 0.049 with 1,660 of 7,424 cells dead; at 0.005 every mode finished within a
         # few percent of its parent with no premise broken. 0.005 is the base, so this spans a
         # factor of twenty around it and asks where the wall is.
-        - [b_gs_gated_plain_death,   apoptosis_3d, max_mark_frac, [0.001, 0.002, 0.01, 0.02]]
-        - [b_gs_gated_shaping_death, apoptosis_3d, max_mark_frac, [0.001, 0.002, 0.01, 0.02]]
+        - [b_gs_plain_soft_lo_death,   apoptosis_3d, max_mark_frac, [0.001, 0.002, 0.01, 0.02]]
+        - [b_gs_shaping_sharp_hi_death, apoptosis_3d, max_mark_frac, [0.001, 0.002, 0.01, 0.02]]
+        # ---- IS BRUSSELATOR INERT, OR JUST SLOW? Every bru member measured grip -0.003 to 0.003
+        # against 0.034-0.076 for gray_scott, and it was about to be written off as a mechanism.
+        # But `gamma` was set to 0.05 to stop it DIVERGING at 0.3 -- chosen for stability, never
+        # once for patterning -- so "brusselator does not couple" is a claim about one untested
+        # number. The column is gone; the question is a ladder on the one member that carries it.
+        - [b_bru_question, cell_react, gamma, [0.02, 0.10, 0.16, 0.24]]
 
   - id: build
     code: round.build_all

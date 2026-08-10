@@ -403,11 +403,32 @@ def parents(ctx):
 
     # one seat per target morphology, best-of-target first, so a lone branched specimen is a parent
     # even when every gripping run is a sphere
+    def _admits(r, spec):
+        """Does this run qualify for the seat? MEASURED first, label second.
+
+        THE FIRST VERSION KEYED THE SEATS ON `morphology` AND THEY NEVER FIRED. The classifier's
+        own docstring calls itself a HINT, and it returns `sphere` for almost everything: 314 of
+        416 runs in the r001-r029 ledger, and 14 of 14 in the first round of this one -- including
+        `r001_03` at protrusion_aspect_max_peak 4.914 with two tips, and `r001_04` at 6.804. Those
+        are protrusions by any measurement and spheres by the label. So `tube`, `branched` and
+        `complex` matched nothing, every seat fell through to the fill, and the portfolio quietly
+        became the greedy single-scalar ranking it was written to replace.
+        
+        `where` is a floor on measured quantities and is what a seat is really claiming. The
+        morphology list is kept as an OPTIONAL extra filter for the day the classifier is trusted;
+        with neither, a seat takes the best of everything, which is the old behaviour and is at
+        least honest about being it.
+        """
+        m = r.get("metrics") or {}
+        for k, lo in (spec.get("where") or {}).items():
+            v = m.get(k)
+            if not isinstance(v, (int, float)) or v < lo:
+                return False
+        morphs = spec.get("morphology")
+        return (not morphs) or (m.get("morphology") in morphs)
+
     for tname, spec in targets.items():
-        cand = [r for r in rows
-                if not any(_demoted(r))
-                and (not spec.get("morphology")
-                     or (r["metrics"].get("morphology") in spec["morphology"]))]
+        cand = [r for r in rows if not any(_demoted(r)) and _admits(r, spec)]
         cand.sort(key=lambda r: -_score(r, spec.get("score") or {"grip_peak": 1.0}))
         for r in cand[:per_target]:
             _take(r)
@@ -525,10 +546,14 @@ MAX_EDITS = 4          # edits per slot; still one experiment, applied in order 
 #   branched  more than one tip on a sustained protrusion
 #   complex   undulation: many protrusions gripping the chemistry, no single dominant finger
 TARGETS = {
-    "tube":     {"morphology": ["tube"], "score": {"protrusion_aspect_max_peak": 1.0, "n_tubes_peak": 0.5}},
-    "bud":      {"morphology": ["sphere", "undulation"], "score": {"protr_peak": 1.0, "protrusion_aspect_max_peak": -0.3}},
-    "branched": {"morphology": ["branched"], "score": {"n_tips_peak": 1.0, "protr_peak": 0.5}},
-    "complex":  {"morphology": ["undulation", "branched"], "score": {"grip_peak": 1.0, "invagination_peak": 0.5}},
+    "tube":     {"where": {"protrusion_aspect_max_peak": 2.0},
+                 "score": {"protrusion_aspect_max_peak": 1.0, "n_tubes_peak": 0.5}},
+    "bud":      {"where": {"protr_peak": 1.10},
+                 "score": {"protr_peak": 1.0, "protrusion_aspect_max_peak": -0.3}},
+    "branched": {"where": {"n_tips_peak": 2},
+                 "score": {"n_tips_peak": 1.0, "protr_peak": 0.5}},
+    "complex":  {"where": {"grip_peak": 0.05},
+                 "score": {"grip_peak": 1.0, "invagination_peak": 0.5}},
 }
 CLOSURE_N = 4          # distinct values RUN before a parameter leaves the menu
 # HOW MANY REPEATS A ROUND MAY BUY. Fallback for crew/flow.yaml `build.args.max_replicates`.

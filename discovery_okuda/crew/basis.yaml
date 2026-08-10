@@ -1,0 +1,104 @@
+# THE BASIS, DECLARED RATHER THAN COMPILED IN
+#
+# Cedric, 10 August: "not hardcoded but specified through the md files if possible", and then
+# "move it [brusselator] to a Route A question and spend those members on the gs protrusion grid".
+#
+# WHY THIS FILE EXISTS. The first round of the new campaign returned sixteen runs and every one
+# classified `sphere`. That was not the portfolio failing and not Route A failing -- Route A was
+# sweeping three distinct operators across six distinct ladders. It was the BASIS having no
+# protrusion axis. `make_basis.py` pinned `HILL = 4.0` and `RHO_GATED = 0.1` for all sixteen
+# members and varied chemistry, material and mechanics instead -- and those three axes are exactly
+# the ones that produced no protrusion:
+#
+#     run        hill   rho    aspect_peak   n_tips
+#     r001_03     8.0   0.10       4.914        2      <- the only member with a sharp gate
+#     r001_04     4.0   0.20       6.804        1      <- the only member with a high baseline
+#     the other 14 4.0  0.05-0.10  0.0-0.6      0-2
+#
+# Two parameters decided finger-versus-sphere, and the grid held both fixed. So they are axes here.
+#
+# WHERE THE MEMBERS GO. `grip_peak` measured 0.034-0.076 across every `gs` member and -0.003 to
+# 0.003 across every `bru` and `gm` member -- two of the three chemistry columns do not couple
+# chemistry to shape at all, so half the basis was spending its members on tissue that cannot
+# answer the campaign's question. The `gs` column gets them instead.
+#
+# BRUSSELATOR IS NOW A QUESTION, NOT A COLUMN. Its `gamma` was set to 0.05 to stop it diverging at
+# 0.3 -- a value chosen for STABILITY and never once for patterning -- so "brusselator is inert" is
+# a claim about one untested number, not about a mechanism. One member survives to carry a Route A
+# ladder on `gamma`, because `_build_sweep` refuses a base that does not exist: a mechanism enters
+# this campaign through the basis or not at all.
+
+shared:
+  frames: 1800                 # == crew/flow.yaml build.frames, or a base is not comparable to
+  seed_cells: 2000             # its own children -- ten members once ran at half their length
+  cell_buf: 60000
+  vert_buf: 120000
+  world: 80.0
+  growth_rate: 0.000866        # the rate every campaign run has used
+  vth_frac: 2.5
+  divide_factor: 2.0           # of v_ref, the seed-time median cell volume
+  a_sw_gated: 0.35             # a FRACTION of the activator's own maximum
+  a_sw_open: 0.0
+  beta: 0.5                    # shape -> chemistry, the second arrow
+  f0: 0.046
+  k_purse: 1.0                 # interface_line_tension_3d, on the `shaping` half only
+
+# The mechanics every member shares. `Lambda` is low deliberately: it charges for edge length, so a
+# high value resists the neighbour exchange that both T1 and cell extrusion depend on.
+mech:
+  K_A: 1.0
+  K_P: 1.0
+  K_V: 20.0
+  K_R: 0.0
+  Lambda: 0.5
+  Gamma: 0.4
+  p0: 3.5
+  mu: 1.0
+  dt: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+
+shaping: {K_bend: 0.02, K_lumen: 0.5}     # zero in the `plain` half
+rd:      {d_a: 0.08, d_h: 0.16, chi: 1.3}
+gs:      {F: 0.046, kk: 0.062, rate: 1.0}
+bru:     {gamma: 0.05, A: 1.0, B: 3.0}    # gamma is the Route A question, see the note above
+
+# THE TWO LEVERS THAT MAKE A FINGER, and the whole reason for this file.
+#   gate  -- grow_3d.hill, the sharpness of the growth switch. A sharp gate concentrates growth
+#            where the activator is high instead of spreading it over the shoulder of the Hill
+#            curve. Measured: hill 8 gave aspect 4.914 with two tips where hill 4 gave 0.000 on
+#            an otherwise identical composition.
+#   drive -- grow_3d.rho, the baseline every cell grows at, so the tip:body ratio is
+#            (rho + 1):rho. Measured: rho 0.20 gave aspect 6.804 against 0.000-0.6 at 0.05-0.10.
+levers:
+  gate:  {soft: 4.0, sharp: 8.0}
+  drive: {lo: 0.1, hi: 0.2}
+
+members:
+  # --- the null. Division WITHOUT growth: cells subdivide and the body adds nothing. Every growth
+  #     claim is read against these, and they are the only members that cannot saturate.
+  - {name: b_null_plain,          chem: none, mat: static, mech: plain}
+  - {name: b_null_shaping,        chem: none, mat: static, mech: shaping}
+
+  # --- THE GS PROTRUSION GRID: 2 mechanics x 2 gates x 2 drives. This is where the members went.
+  #     Every member differs from a neighbour in exactly one axis, and the grid spans the range
+  #     that produced aspect 0 -> 6.8 in round 1 instead of pinning it at one corner.
+  - {name: b_gs_plain_soft_lo,    chem: gs, mat: gated, mech: plain,   gate: soft,  drive: lo}
+  - {name: b_gs_plain_soft_hi,    chem: gs, mat: gated, mech: plain,   gate: soft,  drive: hi}
+  - {name: b_gs_plain_sharp_lo,   chem: gs, mat: gated, mech: plain,   gate: sharp, drive: lo}
+  - {name: b_gs_plain_sharp_hi,   chem: gs, mat: gated, mech: plain,   gate: sharp, drive: hi}
+  - {name: b_gs_shaping_soft_lo,  chem: gs, mat: gated, mech: shaping, gate: soft,  drive: lo}
+  - {name: b_gs_shaping_soft_hi,  chem: gs, mat: gated, mech: shaping, gate: soft,  drive: hi}
+  - {name: b_gs_shaping_sharp_lo, chem: gs, mat: gated, mech: shaping, gate: sharp, drive: lo}
+  - {name: b_gs_shaping_sharp_hi, chem: gs, mat: gated, mech: shaping, gate: sharp, drive: hi}
+
+  # --- DEATH, on the two corners of the grid that differ most, so the death ladders are read
+  #     against a sphere and against a finger rather than against one arbitrary parent.
+  - {name: b_gs_plain_soft_lo_death,    chem: gs, mat: gated, mech: plain,   gate: soft,  drive: lo, death: true}
+  - {name: b_gs_shaping_sharp_hi_death, chem: gs, mat: gated, mech: shaping, gate: sharp, drive: hi, death: true}
+
+  # --- the brusselator QUESTION: one base, carrying the gamma ladder. Not a column.
+  - {name: b_bru_question,        chem: bru, mat: gated, mech: shaping, gate: soft,  drive: lo}
+
+death: {mode: competition, max_mark_frac: 0.005, min_age: 4, shrink_rate: 0.05, critical_frac: 0.15}
