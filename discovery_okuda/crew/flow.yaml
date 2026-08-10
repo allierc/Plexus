@@ -504,6 +504,16 @@ nodes:
       # would need 180, taking a round to three hours and the campaign to ~8 rounds a day.
       frames: 1800
       max_edits: 4
+      # HOW MANY REPEATS A ROUND MAY BUY. A refused duplicate is re-admitted at a fresh seed and
+      # relabelled a robustness test -- which was right, because "a difference smaller than the
+      # seed spread is not a difference" and this campaign had never measured its own seed spread.
+      # But it was UNCAPPED, so re-proposing a known experiment cost nothing and paid: it survived,
+      # produced a scored outcome and inflated the confirm rate. Measured r025-r028, replicates took
+      # 5 of 7 Route B slots in r028, 4 of 5 in r027 and in r025, 3 of 4 in r026 -- Route B had
+      # become a robustness-testing service. Two bounds a noise floor; the rest is a round that has
+      # stopped searching. Past the budget the duplicate is refused AS a duplicate, and that refusal
+      # now reaches the Proposer.
+      max_replicates: 2
       # THE CELL CAP A ROUTE A RUN IS GIVEN. Not derived from the base's seed count, which is what
       # capped cellfix_B_new at 10,404 while rho = 1.0 wanted more (finished 9,999, buf_full).
       # A sweep pushes a knob until something stops it; if the array stops it, the sweep measured
