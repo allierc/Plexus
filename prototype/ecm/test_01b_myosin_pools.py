@@ -374,7 +374,7 @@ def strip(Tis, d, myo_sc, n_col=8):
     plt.close(fig)
 
 
-def panels(Tis, d, myo_sc, movie=True, fps=15):
+def panels(Tis, d, myo_sc, movie=True, fps=15, label="01b_myosin_pools", note=None):
     cmap = ListedColormap(ES.STRESS_COLORS)
     q = np.zeros((0, 3)); band = np.zeros(0, np.uint8)
     L3 = Tis["Lbox"] * 1.60; L2 = L3 * 1.15; Lt = 0.72 * L3
@@ -400,13 +400,13 @@ def panels(Tis, d, myo_sc, movie=True, fps=15):
         for sp in inz.spines.values():
             sp.set_color("#666"); sp.set_visible(True)
         inz.set_xticks([]); inz.set_yticks([])
-        axs.text2D(0.02, 0.96, f"01b_myosin_pools   frame {t}   {int(mt['nF'])} cells",
+        axs.text2D(0.02, 0.96, f"{label}   frame {t}   {int(mt['nF'])} cells",
                    transform=axs.transAxes, color="white", fontsize=11, va="top")
-        axz.text2D(0.03, 0.95, "junction network, coloured by\nmyosin from the medioapical pool",
+        axz.text2D(0.03, 0.95, note or "junction network, coloured by\nmyosin from the medioapical pool",
                    transform=axz.transAxes, color="white", fontsize=10, va="top")
 
     if movie:
-        wri = FFMpegWriter(fps=fps, metadata={"title": "01b_myosin_pools"})
+        wri = FFMpegWriter(fps=fps, metadata={"title": label})
         with wri.saving(fig, os.path.join(d, "movie.mp4"), dpi=100):
             for t, mt in keep:
                 frame(t, mt); wri.grab_frame()

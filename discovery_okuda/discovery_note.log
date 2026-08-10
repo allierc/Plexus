@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  6 AUG 2026 13:47
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  10 AUG 2026 07:44
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -885,7 +885,13 @@ Overfull \hbox (7.03639pt too wide) in paragraph at lines 1931--1940
 [34]
 
 [35]
-Overfull \hbox (1.01701pt too wide) in paragraph at lines 2089--2091
+
+[36]
+
+[37]
+
+[38]
+Overfull \hbox (1.01701pt too wide) in paragraph at lines 2206--2208
 []\T1/cmr/m/n/10 My work-ing log is \T1/cmtt/m/n/10 SESSION_LOG.md\T1/cmr/m/n/1
 0 ; the find-ings reg-is-ter is \T1/cmtt/m/n/10 findings.py \T1/cmr/m/n/10 and 
 the premises are \T1/cmtt/m/n/10 PREMISES.md\T1/cmr/m/n/10 .
@@ -893,7 +899,7 @@ the premises are \T1/cmtt/m/n/10 PREMISES.md\T1/cmr/m/n/10 .
 
 
 
-[36] (./discovery_note.aux)
+[39] (./discovery_note.aux)
  ***********
 LaTeX2e <2024-11-01> patch level 2
 L3 programming layer <2025-01-18>
@@ -902,40 +908,42 @@ Package rerunfilecheck Info: File `discovery_note.out' has not changed.
 (rerunfilecheck)             Checksum: F5D40AD06ADB1B0580AB2B64C07E0CB7;1340.
  ) 
 Here is how much of TeX's memory you used:
- 24276 strings out of 475102
- 468629 string characters out of 5764878
- 914340 words of memory out of 5000000
- 46843 multiletter control sequences out of 15000+600000
+ 24286 strings out of 475102
+ 468726 string characters out of 5764878
+ 914339 words of memory out of 5000000
+ 46846 multiletter control sequences out of 15000+600000
  576902 words of font info for 72 fonts, out of 8000000 for 9000
  59 hyphenation exceptions out of 8191
  116i,11n,121p,454b,1036s stack positions out of 10000i,1000n,20000p,200000b,200000s
-</usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></us
-r/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi9.pfb></usr/share
-/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texliv
-e/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/share/texlive/texmf-
-dist/fonts/type1/public/amsfonts/cm/cmr8.pfb></usr/share/texlive/texmf-dist/fon
-ts/type1/public/amsfonts/cm/cmr9.pfb></usr/share/texlive/texmf-dist/fonts/type1
-/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/texmf-dist/fonts/type1/publi
-c/amsfonts/cm/cmsy8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfo
-nts/cm/cmsy9.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbi1095.pfb></u
-sr/share/texmf/fonts/type1/public/cm-super/sfbi1200.pfb></usr/share/texmf/fonts
-/type1/public/cm-super/sfbx0900.pfb></usr/share/texmf/fonts/type1/public/cm-sup
-er/sfbx1000.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1095.pfb></us
-r/share/texmf/fonts/type1/public/cm-super/sfbx1200.pfb></usr/share/texmf/fonts/
-type1/public/cm-super/sfbx1728.pfb></usr/share/texmf/fonts/type1/public/cm-supe
-r/sfit1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm0900.pfb></usr
-/share/texmf/fonts/type1/public/cm-super/sfrm1000.pfb></usr/share/texmf/fonts/t
-ype1/public/cm-super/sfrm1095.pfb></usr/share/texmf/fonts/type1/public/cm-super
-/sfrm1200.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfsc1095.pfb></usr/
-share/texmf/fonts/type1/public/cm-super/sfti0900.pfb></usr/share/texmf/fonts/ty
-pe1/public/cm-super/sfti1000.pfb></usr/share/texmf/fonts/type1/public/cm-super/
-sfti1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt0900.pfb></usr/s
-hare/texmf/fonts/type1/public/cm-super/sftt1000.pfb></usr/share/texmf/fonts/typ
-e1/public/cm-super/sftt1095.pfb>
-Output written on discovery_note.pdf (36 pages, 951186 bytes).
+</usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmex10.pfb></us
+r/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/shar
+e/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi8.pfb></usr/share/texli
+ve/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi9.pfb></usr/share/texlive/texm
+f-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texlive/texmf-dist/
+fonts/type1/public/amsfonts/cm/cmr7.pfb></usr/share/texlive/texmf-dist/fonts/ty
+pe1/public/amsfonts/cm/cmr8.pfb></usr/share/texlive/texmf-dist/fonts/type1/publ
+ic/amsfonts/cm/cmr9.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfo
+nts/cm/cmsy10.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm
+/cmsy8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy9.
+pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbi1095.pfb></usr/share/texm
+f/fonts/type1/public/cm-super/sfbi1200.pfb></usr/share/texmf/fonts/type1/public
+/cm-super/sfbx0900.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1000.p
+fb></usr/share/texmf/fonts/type1/public/cm-super/sfbx1095.pfb></usr/share/texmf
+/fonts/type1/public/cm-super/sfbx1200.pfb></usr/share/texmf/fonts/type1/public/
+cm-super/sfbx1728.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfit1095.pf
+b></usr/share/texmf/fonts/type1/public/cm-super/sfrm0900.pfb></usr/share/texmf/
+fonts/type1/public/cm-super/sfrm1000.pfb></usr/share/texmf/fonts/type1/public/c
+m-super/sfrm1095.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfrm1200.pfb
+></usr/share/texmf/fonts/type1/public/cm-super/sfsc1095.pfb></usr/share/texmf/f
+onts/type1/public/cm-super/sfti0900.pfb></usr/share/texmf/fonts/type1/public/cm
+-super/sfti1000.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfti1095.pfb>
+</usr/share/texmf/fonts/type1/public/cm-super/sftt0900.pfb></usr/share/texmf/fo
+nts/type1/public/cm-super/sftt1000.pfb></usr/share/texmf/fonts/type1/public/cm-
+super/sftt1095.pfb>
+Output written on discovery_note.pdf (39 pages, 980541 bytes).
 PDF statistics:
- 463 PDF objects out of 1000 (max. 8388607)
- 306 compressed objects within 4 object streams
- 84 named destinations out of 1000 (max. 500000)
+ 494 PDF objects out of 1000 (max. 8388607)
+ 330 compressed objects within 4 object streams
+ 91 named destinations out of 1000 (max. 500000)
  74 words of extra memory for PDF output out of 10000 (max. 10000000)
 

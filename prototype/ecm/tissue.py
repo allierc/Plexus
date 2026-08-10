@@ -128,6 +128,7 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap
           myosin=None, myo_tau=20.0, myo_beta=1.0, myo_new=1.0,
           myo_keyed_on="length", myo_destabilising=1,
           myo_model="one_pool", myo_k_on=0.05, myo_tau_med=20.0, myo_k_ex=0.05, myo_beta_T=0.0,
+          myo_ring=0.0, myo_new_rel=True,
           map_theta=N_THETA, map_phi=N_PHI):
     import tyssue_t1_ops3d as _T1
     _T1.T1_TRACE.clear()                       # per build, so a rebuild never inherits a previous run's
@@ -206,7 +207,8 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap
                                       "k_perim": _en["K_P"], "lam": _en["Lam"], "gam": _en["Gam"]})
             spec["operators"].append({"op": "junction_myosin", "model": "two_pool", "at": "vertex",
                                       "activity": float(myosin), "tau_jun": float(myo_tau),
-                                      "myo_new": float(myo_new), "dt": 1.0, "inherit": True})
+                                      "myo_new": float(myo_new), "dt": 1.0, "inherit": True,
+                                      "myo_new_rel": bool(myo_new_rel)})
             i = spec["schedule"].index("shape_energy_3d")
             spec["schedule"].insert(i, "junction_myosin")
             spec["schedule"].insert(i, "medioapical_myosin")
@@ -227,9 +229,21 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap
         # This operator re-keys it by vertex pair; it is scheduled last of the three so it sees the
         # final topology of the frame. See junction_ops.JunctionMyosinSync for why it cannot perturb
         # the trajectory.
+        if str(myo_model) == "two_pool" and float(myo_ring) > 0.0:
+            # AFTER THE TOPOLOGY OPERATORS AND BEFORE THE SYNC. The ring needs the new vertices to
+            # exist (so, after `divide_3d`) and needs `myo_vseen` from the previous frame to tell them
+            # from old ones (so, before the next `junction_myosin`); putting it before the sync is what
+            # makes the deposit appear in the frame the division happened rather than the one after.
+            spec["operators"].append({"op": "cytokinetic_ring", "at": "vertex",
+                                      "ring": float(myo_ring), "tau_jun": float(myo_tau),
+                                      "debit": True})
+            k = max(spec["schedule"].index(o) for o in ("reconnect_t1_3d", "divide_3d")
+                    if o in spec["schedule"])
+            spec["schedule"].insert(k + 1, "cytokinetic_ring")
         spec["operators"].append({"op": "junction_myosin_sync", "at": "vertex",
                                   "myo_new": float(myo_new), "inherit": True})
-        j = max(spec["schedule"].index(o) for o in ("reconnect_t1_3d", "divide_3d")
+        j = max(spec["schedule"].index(o) for o in ("reconnect_t1_3d", "divide_3d",
+                                                    "cytokinetic_ring")
                 if o in spec["schedule"])
         spec["schedule"].insert(j + 1, "junction_myosin_sync")
         print(f"[tissue] per-junction myosin: activity={myosin}, tau={myo_tau}, beta={myo_beta}, "
@@ -340,7 +354,7 @@ def load_or_build(frames=401, device="cuda:0", name="cellfix_B_new", rebuild=Fal
                   gate_smooth_phi=360.0, myosin=None, myo_tau=20.0, myo_beta=1.0,
                   myo_keyed_on="length", myo_destabilising=1,
                   myo_model="one_pool", myo_k_on=0.05, myo_tau_med=20.0, myo_k_ex=0.05,
-                  myo_beta_T=0.0,
+                  myo_beta_T=0.0, myo_ring=0.0, myo_new_rel=True,
                   myo_new=1.0, map_theta=N_THETA, map_phi=N_PHI):
     """The cache path, built if missing. Frames are part of the filename: a 401-frame tissue and a
     120-frame one are different tissues, and silently reusing one for the other would be a run
@@ -371,6 +385,14 @@ def load_or_build(frames=401, device="cuda:0", name="cellfix_B_new", rebuild=Fal
     if str(myo_model) != "one_pool":
         cfg.update({"myo_model": myo_model, "myo_k_on": myo_k_on, "myo_tau_med": myo_tau_med,
                     "myo_k_ex": myo_k_ex, "myo_beta_T": myo_beta_T})
+    if float(myo_ring) != 0.0:
+        cfg["myo_ring"] = myo_ring
+    # ADDED WHEN TRUE, WHICH IS THE OPPOSITE OF THE CONVENTION ABOVE AND DELIBERATE. `myo_new` used to
+    # be an absolute line density and every two-pool cache on disk was built that way, so it is the
+    # LEGACY value that must keep its key: adding the flag only for the corrected reading leaves those
+    # caches loadable and reproducible while the new behaviour gets a key of its own.
+    if str(myo_model) == "two_pool" and bool(myo_new_rel):
+        cfg["myo_new_rel"] = True
     # THE SURFACE MAP'S RESOLUTION IS IN THE KEY, because the map IS the epithelium as far as every
     # membrane operator is concerned -- `integrin_adhesion`, `basement_membrane_contact`,
     # `adhesion_pull` and `surface_track` read it and nothing else. At 32x64 a bin is 1.63 x 1.63
@@ -401,6 +423,7 @@ def load_or_build(frames=401, device="cuda:0", name="cellfix_B_new", rebuild=Fal
               myo_beta=myo_beta, myo_new=myo_new, myo_keyed_on=myo_keyed_on,
               myo_destabilising=myo_destabilising, myo_model=myo_model, myo_k_on=myo_k_on,
               myo_tau_med=myo_tau_med, myo_k_ex=myo_k_ex, myo_beta_T=myo_beta_T,
+              myo_ring=myo_ring, myo_new_rel=myo_new_rel,
               map_theta=map_theta, map_phi=map_phi)
     else:
         z = np.load(out)
