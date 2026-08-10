@@ -734,6 +734,19 @@ SERIES = {
                                    integrin_pull_from="inner", membrane_offset=0.004,
                                    membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
 
+    # 155: THE MIDDLE. With the sheet at the stiffness its spec always claimed, the nominal's adhesion
+    #     has to move a body 27x harder to move, and the two ends of that trade are measured:
+    #         k = 1e6 (149)   standoff -0.0031, stretch 2.36 -- but ECM stress p99 155, unstable
+    #         k = 1e5 (152)   stable, coverage 0.979 -- but standoff -0.0574 and stretch only 1.74
+    #     3e5 is the geometric mean, and the question is whether there is a window at all or whether a
+    #     stiff shell sharing a grid with a gel 27x softer needs a smaller substep instead.
+    "155_nominal_material_k3e5": dict(membrane_springs=False, membrane_impl="mpm",
+                                      membrane_direct_forces=False, membrane_adhesion_substep=True,
+                                      membrane_grid_bc=False, membrane_contact_k=0.0,
+                                      membrane_exclude=False, membrane_adhesion=3.0e5,
+                                      membrane_secrete_rate=0.0, membrane_tau=0.0,
+                                      membrane_reserve=0.0),
+
     "_unused_secrete_dense": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
                              membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
                              membrane_particles=90000, membrane_reserve=1.0,

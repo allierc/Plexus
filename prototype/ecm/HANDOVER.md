@@ -71,6 +71,30 @@ they exist only because the provision hangs particles off one. Measured after: s
 integrin 400. Runs 149 (the nominal) and 150 (the stiff fibre) are the first with the material their
 specs claim, and **every earlier number in this file describes a softer sheet than it says it does**.
 
+## WITH THE RIGHT MATERIAL, THE STANDOFF BECOMES A SUPPLY PROBLEM (149-155)
+
+The stiffness correction is not a detail: it moves the headline result. Re-running the nominal with the
+sheet at the E = 400 its spec has always declared, instead of the stroma's 15 it was silently getting:
+
+| run | adhesion k | standoff | stretch reached (of 2.43) | stable? |
+|---|---|---|---|---|
+| 133 | 1e6, sheet at E = 15 | **+0.00337** | 2.43 | yes |
+| 149 | 1e6, sheet at E = 400 | -0.00314 | 2.36 | **no** -- ECM stress p99 155 |
+| 155 | 3e5, sheet at E = 400 | -0.01629 | 2.21 | yes |
+| 152 | 1e5, sheet at E = 400 | -0.05744 | 1.74 | yes |
+
+There is a window and it is narrow: the best STABLE standoff on a properly stiff sheet is -0.016, an
+order of magnitude worse than the soft sheet's +0.0034, and pushing k to where the standoff comes back
+blows the matrix up. The reason is not the adhesion. A sheet 27x stiffer resists being inflated 27x
+harder, and the adhesion is what has to win that argument every frame -- so at realistic stiffness the
+sheet's own hoop stress pulls it inward faster than a stable tether can hold it out.
+
+**That makes the standoff a MATERIAL SUPPLY problem, not an adhesion one.** A real basement membrane
+does not accommodate a tripling radius elastically; it remodels and it is secreted into. Both are off in
+every run above (`membrane_tau = 0`, `membrane_secrete_rate = 0`), which was the right choice while the
+question was mechanical and is the wrong one now. The next step is 155 with remodelling on, and it is
+the first time in this prototype that turning those on is a mechanism rather than a patch.
+
 ## WHY AN MPM FIBRE CANNOT BE A ROPE (142-151, and it is not a tuning failure)
 
 Ten runs, one conclusion, and it follows from what MPM is rather than from any parameter:
