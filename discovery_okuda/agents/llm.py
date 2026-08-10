@@ -870,7 +870,16 @@ def run_claude(prompt, timeout_min=DEFAULT_TIMEOUT_MIN, allowed_tools=None, cwd=
     # WHAT TO WATCH. A rule about tone is harmless once scoped. A rule about how to REASON, or
     # what to conclude, would bias the Proposer's choices and the Analyst's findings from outside
     # the repository, outside the flow graph, and outside every check in this directory.
-    cmd = ["claude", "-p", prompt, "--output-format", "stream-json", "--verbose",
+    # THE PROMPT GOES ON STDIN, NOT IN argv. Linux caps a SINGLE argument at MAX_ARG_STRLEN =
+    # 128 kB regardless of how much room the rest of the argv has, and these prompts are now past
+    # it: the Analyst's block carries every run's metrics, the Route A response curves and the
+    # whole of knowledge.md, and it died with "OSError: [errno 7] argument list too long: 'claude'"
+    # -- the round then ran the Analyst with NO history at all, which is a worse failure than the
+    # truncation the bigger limit was meant to remove, and a silent one.
+    #
+    # `claude -p` with no positional prompt reads it from stdin, so this is a size limit that
+    # simply does not exist rather than a larger one to grow into.
+    cmd = ["claude", "-p", "--output-format", "stream-json", "--verbose",
            "--max-turns", str(max_turns), "--allowedTools", *allowed_tools]
     # --allowedTools AUTO-APPROVES; it does not restrict. A tool outside the list is not absent,
     # it is REFUSED -- and an agent learns that one refusal at a time. On 3 August the Proposer
@@ -885,10 +894,20 @@ def run_claude(prompt, timeout_min=DEFAULT_TIMEOUT_MIN, allowed_tools=None, cwd=
     lines, t0 = [], time.time()
     _LAST_USAGE.clear()
     try:
-        proc = subprocess.Popen(cmd, cwd=cwd or AGENT_CWD, stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT, text=True, bufsize=1)
+        proc = subprocess.Popen(cmd, cwd=cwd or AGENT_CWD, stdin=subprocess.PIPE,
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                text=True, bufsize=1)
     except FileNotFoundError:
         return False, "claude CLI not found on PATH"
+    try:
+        # WRITTEN AND CLOSED BEFORE THE READ LOOP. The CLI will not begin emitting until it has
+        # the whole prompt, and the read loop below blocks, so leaving stdin open deadlocks both
+        # ends. Closing is what says "that is the prompt".
+        proc.stdin.write(prompt)
+        proc.stdin.close()
+    except (BrokenPipeError, OSError) as e:
+        proc.kill()
+        return False, f"could not send the prompt on stdin: {type(e).__name__}: {e}"
     try:
         for line in proc.stdout:
             text = _absorb_event(line, quiet)          # parses usage; returns human-readable text
