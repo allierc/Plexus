@@ -62,7 +62,7 @@ LOG = os.path.join(ROOT, "log", "okuda_ECM")
 FIT = 0.30
 
 
-def build(name, tissue_npz, fit=FIT, plate_box=None, **ecm):
+def build(name, tissue_npz, fit=FIT, plate_box=None, ecm_direct_push=True, **ecm):
     """The pass-2 spec: the matrix, coupled to the recorded epithelium.
 
     SCALED BY THE EQUATORIAL SEMI-AXIS, not by the median radius. A confined tissue is an OVOID, and
@@ -137,10 +137,19 @@ def build(name, tissue_npz, fit=FIT, plate_box=None, **ecm):
         sys.path.insert(0, os.path.join(ROOT, "prototype", "eye"))
         import block_ops                                              # noqa: F401
         import muscle_ops                                             # noqa: F401
-    spec["operators"].append({"op": "cell_exclude_3d", "at": "mpm_particle",
-                              "centre": [0.5, 0.5, 0.5], "surface": tissue_npz, "scale": s,
-                              "skin": 0.004})
-    spec["schedule"].append("cell_exclude_3d")
+    # ...UNLESS THE BASEMENT MEMBRANE IS DOING THE JOB. Both of these predate a sheet that sits ON the
+    # surface: the epithelium pushed the stroma DIRECTLY, twice (`cell_to_ecm` as a soft penalty and
+    # this as a hard projection), because nothing else stood between them. With the membrane on the
+    # surface and scattering into the shared grid, the stroma should be pushed BY THE MEMBRANE, and the
+    # two direct paths are both redundant and harmful: `cell_exclude_3d` repositions particles without
+    # touching F (AUDIT 3), and between them they open the rarefied shell measured on 153 -- the
+    # innermost matrix sits 0.0205 box units (one grid cell) outside the sheet, with 68 of 140,000
+    # particles left in contact against 1,062 in 133.
+    if ecm_direct_push:
+        spec["operators"].append({"op": "cell_exclude_3d", "at": "mpm_particle",
+                                  "centre": [0.5, 0.5, 0.5], "surface": tissue_npz, "scale": s,
+                                  "skin": 0.004})
+        spec["schedule"].append("cell_exclude_3d")
     # THE MEMBRANE GETS THE SAME BACKSTOP THE MATRIX HAS ALWAYS HAD, and the asymmetry it corrects is
     # why the sheet sank. The epithelium repels interstitial fibres twice -- `cell_to_ecm` as a soft
     # penalty and `cell_exclude_3d` as a hard projection -- while NOTHING pushed on the basement

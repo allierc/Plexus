@@ -221,7 +221,111 @@ Two things the model does not have. The myosin responds to the \emph{magnitude} 
 preferred direction in the plane of the sheet, so it cannot express the planar polarity that drives
 directional tissue elongation. And $\tau_m$ is a chosen number, not a measured one.
 
-\section*{7.\; Symbols}
+\section*{7.\; Where this stops, and what it measured}
+
+Sixty-six runs (\op{91}--\op{164}, archived) were spent asking where the sheet sits and what holds it
+there, and they answer that question and no other. Four results are worth carrying: the standoff is a
+\emph{tracking lag}, $\delta-\dot R\,\Delta t\,\gamma/\kappa$, not a force balance, which two fibre
+lengths differing fourfold confirmed to $3\times10^{-5}$ box units; a force routed through the grid
+leaves the sheet's deformation gradient carrying $100\%$ of the true stretch while the same force
+integrated by the engine leaves it carrying $13\%$; an MPM fibre cannot act as a rope, because
+$\mathbf F$ is advected by the grid's velocity gradient and never measures the distance between two
+particles, so two ends more than a cell apart are two bodies; and the best configuration reached
+(\op{153}) put the membrane at $+0.0011$ box units with $2.41$ of the $2.43$ stretch the geometry
+implies. What none of them is, is a model derived from what a basement membrane is. The rest of this
+note starts from that instead.
+
+\section*{8.\; Spheroid $\leftrightarrow$ BM $\leftrightarrow$ ECM}
+
+Three objects, and every arrow between them is a measured mechanism rather than a modelling choice.
+The first thing the measurements say is that the middle object is not a passive spacer. A basement
+membrane is $\sim\!100$ nm thick, its adhesions are \emph{squat} --- plaques $\sim\!350$ nm across on
+$\sim\!700$ nm centres, joined to the cell across a $\sim\!30$ nm gap, so an adhesion is three times
+wider than the sheet is thick and a third as long --- and the sheet is $10$ to $100$ times stiffer than
+the stroma outside it, not equal to it. The second thing they say is that it is not a permanent solid:
+collagen~IV in the fly embryo has a half-life of $7$--$10$ hours and in mouse hair follicle about $3$,
+and slowing that turnover disrupts morphogenesis. A sheet enclosing a tissue that triples its radius
+does not stretch to $2.4$; it is \emph{replaced} at the new size while it is being stretched.
+
+\begin{figure}[t]\centering
+\includegraphics[width=\textwidth]{fig_spheroid_bm_ecm.pdf}
+\caption{(a) The three entities in section, at the proportions the literature measures rather than the
+ones that are convenient: the adhesion is a squat plaque, not a thread, and the sheet is thin against
+its own spacing. (b) Every operator, in the direction it acts. Filled bullets carry a force and must
+therefore have a reaction; open bullets carry a signal or a material flux. There is no arrow between
+the epithelium and the matrix, because while the sheet is intact the basement membrane \emph{is} the
+interface --- an epithelium that also pushes the stroma directly is counting the same push twice.}
+\end{figure}
+
+\textbf{Mass, not just mechanics.} The sheet carries an areal density $\rho$ of collagen~IV that is
+produced by the epithelium and removed by proteolysis, on a surface whose area $A(t)$ is growing:
+%
+\begin{equation}
+\frac{\mathrm{D}\rho}{\mathrm{D}t}
+= \underbrace{s(\mathbf x,t)}_{\text{secretion}}
+\;-\;\underbrace{\frac{\rho}{\tau_{\text{bm}}}}_{\text{turnover}}
+\;-\;\underbrace{\rho\,\frac{\dot A}{A}}_{\text{dilution by growth}},
+\qquad
+\tau_{\text{bm}}=\frac{t_{1/2}}{\ln 2}\approx 4\text{--}14\ \text{h}.
+\label{eq:bmmass}
+\end{equation}
+%
+Homeostasis is $s^\ast=\rho\,(1/\tau_{\text{bm}}+\dot A/A)$, and the two terms are comparable here:
+a spheroid tripling its radius over a day has $\dot A/A\sim\!10^{-1}\,\text{h}^{-1}$ against
+$1/\tau_{\text{bm}}\sim\!10^{-1}\,\text{h}^{-1}$. Turnover is not a correction to growth; it is the same
+size as growth, which is why the sheet can accommodate it at all.
+
+\textbf{A nonlinear sheet.} A single Young's modulus is wrong by construction: the same basement
+membrane reads $\sim\!0.4$ MPa at low strain and $\sim\!3$ MPa at high strain, and a growing spheroid
+takes it across that whole range. The cheapest law that respects it makes the tangent modulus rise with
+the principal stretch $\lambda=\sigma_{\max}(\mathbf F)$,
+%
+\begin{equation}
+E(\lambda)=E_0\bigl[1+\beta\,(\lambda-1)\bigr],
+\qquad E_0\approx 0.4\ \text{MPa},\quad \beta\approx 5,
+\qquad \frac{E_{\text{bm}}}{E_{\text{ecm}}}\in[10,100].
+\label{eq:bmstiff}
+\end{equation}
+
+\textbf{Adhesion with its reaction, and with slip.} An integrin plaque is a two-sided object: whatever
+force it applies to the sheet it applies equally and oppositely to the cell, which a replayed
+epithelium currently discards. And the sheet is not pinned --- it \emph{slides} relative to the cells
+--- so the tangential law is friction against relative velocity, not a spring to a frozen direction:
+%
+\begin{align}
+\mathbf f^{\text{adh}}_p &= \kappa_n\,\bigl(\ell_p-\ell_0\bigr)\,\hat{\mathbf n}_p
+\;-\;\xi\,\bigl(\mathbf v_{\text{bm}}-\mathbf v_{\text{epi}}\bigr)_{\parallel},
+&\mathbf f^{\text{epi}}_p&=-\,\mathbf f^{\text{adh}}_p,
+\label{eq:adh}\\[2pt]
+n_p &= \Sigma^{-2}\ \text{plaques per unit area}, \quad \Sigma\approx 7\,T,
+&\ell_0&\approx 0.3\,T .
+\label{eq:plaque}
+\end{align}
+%
+$\ell_0$, the linkage's rest length, is what sets the standoff --- a material property, not a tuning
+constant --- and $\xi$ is what lets a sheet stay attached while the tissue slides underneath it.
+
+\textbf{Sheet to stroma.} The two are joined by anchoring fibrils, so the stroma is loaded through the
+sheet and never directly by the cells; the same fibrils are what let a stiff sheet spread a local
+epithelial push over a soft matrix. With $\mathbf t$ the traction the sheet exerts on the stroma,
+%
+\begin{equation}
+\mathbf t = k_a\,\bigl(\mathbf x_{\text{ecm}}-\mathbf x_{\text{bm}}\bigr)\quad\text{on anchored
+points},\qquad
+\text{and }\ \mathbf f^{\text{bm}} = -\!\!\sum_{\text{anchors}}\!\mathbf t ,
+\label{eq:anchor}
+\end{equation}
+%
+with the barrier being geometric rather than mechanical: pores of $10$--$130$ nm pass solutes, stop
+cells, and are what a proteolytic operator has to open before anything crosses.
+
+\textbf{What this asks of the implementation.} Four things, and each is a separate operator with its
+own test: a mass balance on the sheet (Eq.~\ref{eq:bmmass}) rather than a fixed particle budget; a
+strain-dependent modulus (Eq.~\ref{eq:bmstiff}) rather than one number; an adhesion that returns its
+reaction and permits slip (Eq.~\ref{eq:adh}) rather than a tether to a frozen direction; and an
+anchorage to the stroma (Eq.~\ref{eq:anchor}) that removes the epithelium's direct push on it.
+
+\section*{9.\; Symbols}
 
 Grouped by what they belong to. Where a symbol is a stiffness, the second column says what it is a
 stiffness \emph{of}, since several are easy to confuse.

@@ -163,8 +163,16 @@ def render(run, frames=150, zoom_half=2.2, slab_cells=0.35, teeth=5, fps=15, max
     n_layer = int(seedop.get("layers", 3)) if seedop is not None else 0
     pos, band_all = np.asarray(tr["pos"]), np.asarray(tr["stress"])
     P = np.asarray(tr["mpos"])
-    mst = np.asarray(tr["mstrain"], np.float32)
-    alive_end = np.asarray(tr["malive"], bool)
+    # A RUN WHOSE STRAIN HISTORY WAS LOST STILL HAS A GEOMETRY. `mstrain` is missing from 149-156:
+    # the `ipos` save was added one indentation level out and swallowed the two saves below it, so the
+    # strain was recorded during the run (153's log says "403 strain frames") and then not written.
+    # Fixed in run_ecm, but those trajectories cannot be recovered -- F is not stored -- so the sheet is
+    # drawn in one colour and the label says so, rather than a zero field being read as no strain.
+    no_strain = "mstrain" not in tr.files
+    mst = (np.zeros((1, P.shape[1]), np.float32) if no_strain
+           else np.asarray(tr["mstrain"], np.float32))
+    alive_end = (np.asarray(tr["malive"], bool) if "malive" in tr.files
+                 else np.ones(np.asarray(tr["mpos"]).shape[1], bool))
     c = np.array([0.5, 0.5, 0.5])
     # WHICH SIMULATION FRAME EACH RECORDED MEMBRANE FRAME IS. `mpos` is strided when the set is big
     # enough to blow the 400 MB budget -- 128 keeps 202 of 403 -- while `pos`, `stress` and `mstrain`
@@ -247,13 +255,17 @@ def render(run, frames=150, zoom_half=2.2, slab_cells=0.35, teeth=5, fps=15, max
             vp = mt["pos"]
             q = (pos[t] - c) / scale
             qm = (P[i] - c) / scale
-            sm = np.clip(mst[t] / max(msc, 1e-12), 0, 1)
+            sm = np.clip(mst[min(t, mst.shape[0] - 1)] / max(msc, 1e-12), 0, 1)
             mem = (qm[live], sm[live])
             for ax, half in ((axw, None), (axz, zoom_half)):
                 ax.clear(); ax.set_facecolor("black")
-                RD.draw_cross(ax, mt, vp, q, band_all[t], cmap, L2, np.eye(3)[2],
-                              slab if half else 0.055 / scale, dot_scale=5.0 if half else 1.0,
-                              mem=mem, zoom_half=half)
+                # THE SAME SLAB AS THE WHOLE PANEL, IN BOTH. The thin slab was introduced so the
+                # springs would not overlay into a hedge, and the spring selection has its own copy of
+                # it below -- but applied to `draw_cross` it also thinned the STROMA, which is a 3D
+                # cloud: at +/-0.29 tissue units almost nothing of it falls in the plane and the zoom
+                # showed the sheet floating in black. The matrix is a field and needs the field's slab.
+                RD.draw_cross(ax, mt, vp, q, band_all[t], cmap, L2, np.eye(3)[2], 0.055 / scale,
+                              dot_scale=5.0 if half else 1.0, mem=mem, zoom_half=half)
             # THE WINDOW HOLDS THE SURFACE AND THE SHEET, whatever the distance between them. Centring
             # on the sheet's mean radius fails on the two runs that most need the panel: 125 sags 6.6
             # tissue units away from the surface, and 128's secreted half sits in a second shell deep in
@@ -353,7 +365,9 @@ def render(run, frames=150, zoom_half=2.2, slab_cells=0.35, teeth=5, fps=15, max
                                                       linestyles=":", zorder=6, alpha=0.9))
             lab = (f"{run}\nframe {t}   {int(mt['nF'])} cells\n"
                    f"standoff {stat[-1][1]:+.4f} box units (0 = on the surface)\n"
-                   f"{100 * frac:.0f}% of the sheet anchored\n"
+                   + ("sheet drawn in one colour: this run's strain history was lost\n"
+                      if no_strain else "")
+                   + f"{100 * frac:.0f}% of the sheet anchored\n"
                    f"{len(Aq)} of {n_win} integrins drawn, window +/-{half:.1f} tissue units"
                    + (f", {stat[-1][2]} ruptured" if detach > 0 else ""))
             # A BOX BEHIND IT, because the epithelium fills this panel with white and white-on-white is
