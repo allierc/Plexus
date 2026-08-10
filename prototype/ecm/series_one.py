@@ -649,6 +649,41 @@ SERIES = {
                                    membrane_offset=0.004, membrane_secrete_rate=0.0,
                                    membrane_tau=0.0, membrane_reserve=0.0),
 
+    # 148: THE LAST LINK MADE EXPLICIT. 144 showed the grid alone carries ~9% of the mass it must move,
+    #     so the fibre tip now BINDS the membrane particle nearest it at seeding and pulls on it
+    #     directly, with the equal and opposite force on the fibre. Both are `mpm_acceleration`, so both
+    #     still go through the grid solve and both bodies' F sees the load -- this adds a relation, it
+    #     does not bypass the mechanics. k/gamma = 1e5 with the operator inside the substep, which is
+    #     the stability regime 133 established.
+    "148_mpm_integrin_bond": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=False,
+                                  membrane_contact_k=0.0, membrane_exclude=False,
+                                  membrane_adhesion=0.0, n_integrins=4000, integrin_layers=3,
+                                  integrin_length=0.004, integrin_youngs=400.0,
+                                  integrin_bond_k=1.0e5, integrin_bond_gamma=1.0,
+                                  membrane_offset=0.004, membrane_secrete_rate=0.0,
+                                  membrane_tau=0.0, membrane_reserve=0.0),
+
+    # 149/150: WITH THE MATERIAL THE SPECS HAVE ALWAYS CLAIMED. `MPMParticle.provision` reads `youngs`
+    #     from the PARENT set's types, never from the particle set's own, and every MPM body in this
+    #     prototype hung off one parent -- so the basement membrane has been carrying the STROMA's
+    #     stiffness (15) in every run to 148, not the 400 its spec declares, and `integrin_youngs` was
+    #     equally inert (146 came back bit-identical to 144 at ten times the fibre stiffness). Each body
+    #     now has its own parent set. Measured after the fix: stroma 15, membrane 400, integrin 400.
+    #     149 re-runs the nominal so the headline result is quoted from a sheet with the right material;
+    #     150 is 144 with a fibre ten times stiffer than the sheet, which is what 146 was meant to be.
+    "149_nominal_material": dict(membrane_springs=False, membrane_impl="mpm",
+                                 membrane_direct_forces=False, membrane_adhesion_substep=True,
+                                 membrane_grid_bc=False, membrane_contact_k=0.0,
+                                 membrane_exclude=False, membrane_adhesion=1.0e6,
+                                 membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
+    "150_mpm_integrin_stiff4k": dict(membrane_springs=False, membrane_impl="mpm",
+                                     membrane_grid_bc=False, membrane_contact_k=0.0,
+                                     membrane_exclude=False, membrane_adhesion=0.0,
+                                     n_integrins=4000, integrin_layers=3, integrin_length=0.004,
+                                     integrin_youngs=4000.0, membrane_offset=0.004,
+                                     membrane_secrete_rate=0.0, membrane_tau=0.0,
+                                     membrane_reserve=0.0),
+
     "_unused_secrete_dense": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
                              membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
                              membrane_particles=90000, membrane_reserve=1.0,

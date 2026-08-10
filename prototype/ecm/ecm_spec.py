@@ -161,6 +161,9 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                # THE INTEGRIN AS AN MPM BODY (0 = off, which is every run to 141). `integrin_length` 0
                # means "the same standoff the spring version uses", so the two are comparable.
                n_integrins=0, integrin_layers=3, integrin_length=0.0, integrin_youngs=400.0,
+               # THE EXPLICIT LAST LINK: fibre tip -> the membrane patch it binds. 0 leaves the coupling
+               # to the shared grid alone, which 144 measured at ~9% of the mass it must move.
+               integrin_bond_k=0.0, integrin_bond_gamma=1.0, integrin_rupture=0.0,
                # adhesions rupture under load: `detach` is the displacement at which one lets go.
                membrane_detach=0.0,
                # THE TISSUE AS A MOVING BOUNDARY ON THE GRID, rather than a positional projection.
@@ -232,8 +235,20 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
     if membrane is not None:
         import membrane_ops                                           # noqa: F401  register it
         import surface_ops                                            # noqa: F401
+        # ITS OWN PARENT, AND THAT IS NOT COSMETIC. `MPMParticle.provision` reads `youngs` from the
+        # PARENT set's types (`entities.py`: `types = parent.types_raw`), never from the particle set's
+        # own -- the framework even warns "property 'youngs' on <set>.<type> is read by no operator".
+        # Every MPM body here hung off the single `cell` parent, so the basement membrane has been
+        # carrying the STROMA's stiffness in every run to 148: `membrane_youngs = 400` was decoration
+        # and the sheet was as soft as the gel around it. Measured on a two-set probe: a child
+        # declaring 10,000 under a parent declaring 100 comes back at E = 100.
+        # The parent sets carry no physics -- they exist because the provision hangs particles off one --
+        # so adding one per body costs a node each and makes the declared material the real one.
+        spec["sets"]["cell_bm"] = {
+            "n": 1, "start": [[0.5, 0.5, 0.5]],
+            "types": {"bm": {"fraction": 1.0, "youngs": float(membrane_youngs)}}}
         spec["sets"]["basement_membrane_particle"] = {
-            "parent": "cell", "per_parent": int(membrane_particles), "radius": 0.48,
+            "parent": "cell_bm", "per_parent": int(membrane_particles), "radius": 0.48,
             "density": float(density),
             "types": {f"m{i}": {"fraction": 1.0 / len(STRESS_COLORS),
                                 "youngs": float(membrane_youngs)}
@@ -427,8 +442,11 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
         if n_integrins > 0:
             import integrin_ops                                       # noqa: F401  register them
             L_fib = float(integrin_length if integrin_length > 0 else membrane_offset)
+            spec["sets"]["cell_int"] = {
+                "n": 1, "start": [[0.5, 0.5, 0.5]],
+                "types": {"it": {"fraction": 1.0, "youngs": float(integrin_youngs)}}}
             spec["sets"]["integrin_particle"] = {
-                "parent": "cell", "per_parent": int(n_integrins * integrin_layers),
+                "parent": "cell_int", "per_parent": int(n_integrins * integrin_layers),
                 "radius": 0.48, "density": float(density),
                 "types": {"i0": {"fraction": 1.0, "youngs": float(integrin_youngs)}}}
             spec["operators"] += [
@@ -443,6 +461,18 @@ def build_spec(name, n_frames=320, dt=0.004, substep_dt=2.0e-4, n_grid=64,
                 {"op": "mpm_gather", "at": "integrin_particle", "from": "mpm_grid",
                  "wall_damp": float(wall_damp), "wall_contact": 0.04, "vmax": 1.0e9},
             ]
+            if integrin_bond_k > 0.0:
+                spec["operators"].append(
+                    {"op": "integrin_pull", "at": "basement_membrane_particle",
+                     "integrin_set": "integrin_particle", "k": float(integrin_bond_k),
+                     "gamma": float(integrin_bond_gamma), "rupture": float(integrin_rupture)})
+                # IN THE SUBSTEP, for the reason `integrin_adhesion` is there in 133: a force computed
+                # once per frame is held across the substeps and is therefore integrated at dt_frame,
+                # which caps k near 6e4. Recomputed per substep the limit is dt_sub*sqrt(k).
+                for _st in spec["schedule"]:
+                    if isinstance(_st, dict) and "substep_dt" in _st:
+                        _st["steps"].insert(0, "integrin_pull")
+                        break
             spec["schedule"].insert(spec["schedule"].index("seed_basement_membrane") + 1,
                                     "integrin_seed")
             for _st in spec["schedule"]:

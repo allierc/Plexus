@@ -49,6 +49,28 @@ specs and the engine, and did not survive.
   integer pairs a membrane at frame 402 with an epithelium at 201. `rerender()` in `run_ecm.py` still
   does this.
 
+## EVERY MPM BODY IN THIS PROTOTYPE HAS HAD THE SAME STIFFNESS (found 2026-08-09)
+
+`MPMParticle.provision` reads `youngs` from the PARENT set's types -- `entities.py`:
+`types = getattr(parent, "types_raw", None)` -- and never from the particle set's own. Every MPM body
+here hung off the single `cell` parent, so:
+
+- **`membrane_youngs = 400` never applied.** The basement membrane has been carrying the STROMA's
+  stiffness, 15, in every run from the first to 148. The sheet was as soft as the gel around it, and
+  every statement in this prototype about a "stiff shell" was about a number that reached nothing.
+- `integrin_youngs` was equally inert, which is how it was caught: **146 came back bit-identical to
+  144 to five decimals** at ten times the fibre stiffness -- standoff -0.17665 both, coverage 0.471
+  both. A parameter that changes nothing to five decimals has not been applied.
+- The framework says so at load time and the warning was being scrolled past:
+  `[warn] property 'youngs' on mpm_particle.t is read by no operator`.
+- Probe (`/tmp/probe_youngs.py`, two sets, one parent): a child declaring 10,000 under a parent
+  declaring 100 comes back at E = 100.
+
+**Fixed** by giving each body its own parent set (`cell_bm`, `cell_int`); the parents carry no physics,
+they exist only because the provision hangs particles off one. Measured after: stroma 15, membrane 400,
+integrin 400. Runs 149 (the nominal) and 150 (the stiff fibre) are the first with the material their
+specs claim, and **every earlier number in this file describes a softer sheet than it says it does**.
+
 ## The MPM integrin, 142-147: two bugs, then a weak coupling
 
 Built as `integrin_ops.py` (`integrin_seed` + `integrin_track`, the fibre's own MPM cycle on the shared
