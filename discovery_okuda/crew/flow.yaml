@@ -158,7 +158,6 @@ nodes:
         - b_gs_shaping_sharp_hi
         - b_gs_plain_soft_lo_death
         - b_gs_shaping_sharp_hi_death
-        - b_bru_question
   - id: history
     code: round.history
     args:
@@ -415,7 +414,7 @@ nodes:
         # But `gamma` was set to 0.05 to stop it DIVERGING at 0.3 -- chosen for stability, never
         # once for patterning -- so "brusselator does not couple" is a claim about one untested
         # number. The column is gone; the question is a ladder on the one member that carries it.
-        - [b_bru_question, cell_react, gamma, [0.02, 0.10, 0.16, 0.24]]
+        # - [b_bru_question, cell_react, gamma, [0.02, 0.10, 0.16, 0.24]]   # base withdrawn un-run
 
   - id: build
     code: round.build_all
