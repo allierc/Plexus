@@ -447,6 +447,38 @@ OPERATORS = {
                 "max_cycle": (6, 10**9, 10**9),   # vcap: PROVISIONAL
                 # a FRACTION of the activator max now, not an absolute value -- see tyssue_ops3d
                 "orient_asw": (0.3, 0.95, 0.6)}),
+    "apoptosis_3d": dict(
+        # THE DIE FAMILY, and the first mechanism in this vocabulary that deforms the sheet INWARD.
+        # Every operator the campaign owned pushes outward -- growth inflates, division subdivides,
+        # the purse-string was inert until 8 August -- and invagination is one of Okuda's three
+        # target morphologies that twenty rounds never produced. Monier et al. (2015) is the
+        # mechanism: apoptotic force drives epithelial folding.
+        #
+        # `role="death"` is its own role so that removing it is always legal (REQUIRED_ROLES is
+        # substrate + mechanics), and so a composition cannot hold two of them.
+        #
+        # NO `impls`. The twelve modes are `model` variants in this project's sense -- different
+        # biological hypotheses about WHY a cell is eliminated -- and they share the entire
+        # mark/shed/extrude pathway, differing only in `_marked`. An `implementation` here is a
+        # registry key naming a separate CLASS (cell_diffuse has two), which these are not. Route A
+        # sweeps `mode` from the plan, exactly as it sweeps divide_3d's sizer/adder/timer.
+        stage=2, role="death", outputs=[], slots=[], needs=[],
+        impls=["default"], impl_structural=False,
+        # `max_mark_frac` IS THE KNOB THAT MATTERS and the reason this operator is admissible at
+        # all. It caps how much of the tissue may be under sentence at once, so the mode chooses
+        # who dies and this chooses how fast. Uncapped, five of six modes destroyed the campaign's
+        # best parents (r020_00_ctrl: protr 1.513 -> 1.131, grip 0.228 -> 0.049, 1,660 dead). At
+        # 0.005 all six finish with NO premise broken and protr/grip within a few percent of the
+        # parent. The upper bound is 0.02 rather than 1.0 deliberately: past a few percent the
+        # measured behaviour is not "more death" but a collapsing run, and a bound the Critic will
+        # admit should not contain a region already known to be off the map.
+        params={"max_mark_frac": (0.0005, 0.02, 0.005),
+                "min_age": (2, 32, 4),               # too young to judge -- a just-divided
+                "shrink_rate": (0.01, 0.15, 0.05),   # cell is small because it just divided
+                "critical_frac": (0.05, 0.40, 0.15),
+                # the per-mode default lives on the operator (_STALL_DEFAULT); 0.7 is
+                # `competition`'s, which is the default mode
+                "stall_frac": (0.50, 0.95, 0.70)}),
     "extrude": dict(                                          # THE FORCING TERM -- ablatable
         stage=2, role="forcing", outputs=[], slots=["site"], needs=["morphogen"],
         impls=["radial_push"], impl_structural=False,
@@ -1364,6 +1396,29 @@ def reference_recipes():
         u, _ = u.apply(("add_op", op, impl))
     u = u.with_params({**u.params, "grow_3d0.rho": 1.0, "grow_3d0.a_sw": 0.0})
     out["uniform_inflation"] = u
+
+    # THE INWARD MECHANISM, and the reason the Die family was written. Monier et al. (2015): the
+    # force exerted by apoptotic cells drives epithelium folding. Every other recipe in this file
+    # deforms the sheet outward, and invagination is one of Okuda's three targets that twenty
+    # rounds of search never reached -- not because the search was poor but because nothing in the
+    # vocabulary could pull.
+    #
+    # Growth AND death together on purpose: death alone on a static sheet is what the dedicated
+    # geometries already certify (make_apop_geo.py), and it answers a different question. What has
+    # to be exercised here is the composition -- growth setting targets, death overriding them for
+    # the cells it has sentenced, mechanics relaxing both in one tick.
+    #
+    # The operating point is the one measured on the campaign's own best parents rather than a
+    # guess: max_mark_frac 0.005 leaves protr and grip within a few percent of the parent on all
+    # six modes tested and breaks no premise, where uncapped death took r020_00_ctrl from protr
+    # 1.513 / grip 0.228 to 1.131 / 0.049.
+    d = seed("substrate")
+    for op, impl in [("grow_3d", "hill_no_conserve"), ("divide_3d", "hertwig"),
+                     ("apoptosis_3d", "default")]:
+        d, _ = d.apply(("add_op", op, impl))
+    d = d.with_params({**d.params, "grow_3d0.rho": 1.0, "grow_3d0.a_sw": 0.0,
+                       "apoptosis_3d0.max_mark_frac": 0.005})
+    out["death_sculpts"] = d
     return out
 
 
