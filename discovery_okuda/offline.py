@@ -52,7 +52,7 @@ _STATE = {"scenario": "clean", "calls": [], "pass_no": 0}
 _ROLE = {"now": "agent"}
 _MARKERS = (("RECONNAISSANCE", "proposer"), ("LEGAL MOVES", "proposer"),
             ("PEER-REVIEW", "peer-review"), ("batch_ok", "peer-review"),
-            ("PREMISES", "biologist"), ("instrument", "metrologist"),
+            ("PREMISES", "biologist"),
             ("what the picture shows", "eye-check"), ("HEADLINE", "reader"))
 
 
@@ -256,7 +256,6 @@ _CANNED = {
                                  "why": "shape matches the numbers"}),
     "eye-check":     json.dumps({"supports": True, "blocks": False,
                                  "describe": "A spherical shell.", "why": "agrees"}),
-    "metrologist":   "No new instrument required.\nHEADLINE: instruments sufficient",
     "collector":     "12 runs collected.\nHEADLINE: 12 runs collected",
     "diagnostician": "No apparatus fault.\nHEADLINE: apparatus sound",
     "interpreter":   "Growth raises protrusion; chemistry alone does not.\n"
