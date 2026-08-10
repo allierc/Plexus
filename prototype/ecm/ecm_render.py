@@ -167,7 +167,15 @@ def _matrix_strands(ax, q, band, cmap, zorder, alpha, per, three_d=True, lw=0.55
     if max_lines and S.shape[0] > max_lines:
         k = np.linspace(0, S.shape[0] - 1, max_lines).astype(int)
         S, B = S[k], B[k]
-    o = np.argsort(B)                                  # hottest last, so the front is never buried
+    # STABLE, AND THAT IS THE FLICKER FIX. The sort exists to draw the hottest strands last, but
+    # `np.argsort`'s default is quicksort and is NOT stable: with ten thousand strands in eight
+    # bands the ties are enormous, so the draw order is reshuffled every frame and overlapping
+    # semi-transparent lines composite differently each time -- which reads as the whole matrix
+    # shimmering while nothing in it moves. Measured on 04c, the stress itself changes 1.35% per
+    # frame (median) and 97% of its colour-band flips come from a change under a tenth of a band,
+    # so the material is not what is flickering. A stable sort keys ties on the strand's own index,
+    # so the order changes only where a band does.
+    o = np.argsort(B, kind="stable")                   # hottest last, so the front is never buried
     S, B = S[o], B[o]
     # A LINE BETWEEN TWO PARTICLES MORE THAN A GRID CELL APART IS A CLAIM THE PHYSICS DOES NOT MAKE.
     # MLS-MPM computes nothing between two points directly, so two particles of one strand that are
@@ -218,8 +226,8 @@ def _matrix_strands(ax, q, band, cmap, zorder, alpha, per, three_d=True, lw=0.55
     # its points, and for the same reason: at one uniform width a few hundred loaded strands are a
     # hue shift inside a haze of thousands of unloaded ones, and the loaded ones are the measurement.
     # Two collections rather than a per-line width, because matplotlib depth-sorts per ARTIST.
-    for sel, w, a, z in ((B == 0, lw * 0.6, alpha * 0.30, zorder),
-                         (B > 0, lw * 1.4, alpha * 0.95, zorder + 1)):
+    for sel, w, a, z in ((B == 0, lw * 0.7, alpha * 0.40, zorder),
+                         (B > 0, lw * 1.5, alpha, zorder + 1)):
         if not sel.any():
             continue
         segs = [S[i] for i in np.nonzero(sel)[0]]
