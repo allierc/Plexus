@@ -71,7 +71,7 @@ arrived**, so a prediction cannot be told apart from a rationalisation written a
 | step | who | what |
 |---|---|---|
 | **register** | **Proposer** | each slot states a `claim`, an `intent` (confirmatory / adversarial / control), a `metric`, and a `predicted` clause containing a **number** — `protr_peak >= 2.0`. Posed to the register *before* anything is submitted, under an id that cannot be overwritten. |
-| **admit the metric** | **Metrologist** | a prediction may only name a metric that has been **certified against known answers**. A prediction on an uncertified metric is not a hypothesis, it is a wish. |
+| **admit the metric** | `metrics.py` (registry) | a prediction may only name a metric marked `admitted`, and the metrics are tested against generated geometries of known answer. A prediction on an uncertified metric is not a hypothesis, it is a wish. The **Metrologist** role that owned this was removed; a certification belongs in the instrument. |
 | **score** | **`predict.py` — CODE** | the prediction is checked against the measurement arithmetically. **No agent decides whether a hypothesis was validated.** |
 | **use** | **Supervisor** | the **surprise rate** — how often the prediction was wrong — drives the next batch's confirmatory/adversarial mixture. |
 
@@ -188,7 +188,6 @@ The third question, and neither of the other two can answer it:
 | | asks | says |
 |---|---|---|
 | Biologist | is the **specimen** a tissue? | *"invalid: the chemistry is extinct"* |
-| Metrologist | does the **instrument** work? | *"this metric is not certified"* |
 | **Diagnostician** | why did the **apparatus** fail? | *"chi is 50× too large, because the clock fix scales it by 1/dt and the engine already steps the reaction per substep"* |
 
 The Biologist's verdict is correct and stops nothing from happening again. Between them those two
@@ -212,17 +211,22 @@ in the Critic.
 Interpreter**, because a causal story written about a configuration error is worse than none.
 **Sends to:** Critic, Supervisor, Proposer
 
-### Metrologist — check — BUILT
-**Asks:** which metrics are admissible?
-Certifies instruments against known answers; files defects and retractions. **Owns metric
-admissibility** — not the Critic.
-**Sends to:** Reader, Collector
+### Metrologist — REMOVED (Phase 12; fully deleted 10 August 2026)
+It asked "does the INSTRUMENT work?" and owned metric admissibility. The module went with the
+Phase 12 reduction and only its wiring survived — a dispatch entry, a colour, an offline stub and
+a node in the loop figure, for a role nothing could run. `campaign_loop._gates_open()` still
+imported it, so the campaign's own admission gate raised `ModuleNotFoundError` on every call and
+reported the gates closed; it had not run once since Phase 12.
+
+Its question is now answered where a certification belongs — **in the instrument, not in an agent
+asked about it**: `metrics.py` carries the registry and the `admitted` flag, and the metrics are
+tested against generated geometries of known answer. The admission gate is `round.py --check`.
 
 ### Reader ×1 — agent — BUILT
 **Asks:** what happened in this one run?
 
 **It does not measure. It labels.** By the time the Reader is called, `diag.json`, `metrics.npz`,
-the curve shapes and the strip have already been computed by instruments the Metrologist certifies
+the curve shapes and the strip have already been computed by certified instruments
 against known answers. Any number of readers would see **identical numbers** and could not
 disagree about one.
 
@@ -243,7 +247,7 @@ cannot do because they have no ground truth to certify against. Having made that
 argument for eight does not transfer, and the earlier version of this document borrowed it anyway.
 
 **The rejected third option, named so it is not drifted into:** letting an Analyst invent its own
-measure. That is precisely what the Metrologist exists to prevent — a metric that has not been
+measure. That is precisely what metric certification exists to prevent — a metric that has not been
 certified is not evidence, however sophisticated the code that produced it.
 
 **Sends to:** Collector
@@ -264,7 +268,7 @@ shrinkage. Its dissent is *recorded as a disagreement*, which is worth reading.
 
 ### Collector — code, NOT an agent — BUILT
 **Builds the round record** from the files on disk: every analyst reading, the eye-check
-observation, every biologist verdict, every metrologist flag, every critic refusal.
+observation, every biologist verdict, every critic refusal.
 
 Collection is a `for` loop, not a judgement. Making it an agent is precisely how the Biologist's
 verdict got lost for the whole campaign — **an agent that collects can forget, and its forgetting
@@ -384,7 +388,7 @@ Critic's.
 
 It does **not** mean the composition family already explored — that belongs to the lever map and
 the Proposer's search space — and it does **not** mean the regime where metrics are certified,
-which is the Metrologist's.
+which belongs to the metric registry.
 
 Both rules are properties of a *batch*, so both are checked before compute is spent.
 

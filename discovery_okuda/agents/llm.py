@@ -124,7 +124,7 @@ EXPECTED_MIN = {"interpreter": 3.2, "reader": 1.1, "watcher": 0.3, "meta_review"
                 # added after "OVER CEILING at operator_request (3.0+8 > 10.0)" fired on a role
                 # that had no entry here and so fell back to its full 8-minute ALLOWANCE. A role
                 # missing from this map is a false alarm waiting to happen.
-                "operator_request": 2.0, "watcher": 0.3, "metrologist": 1.0}
+                "operator_request": 2.0, "watcher": 0.3}
 
 
 def tool_note(agent=None):

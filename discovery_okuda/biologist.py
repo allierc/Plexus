@@ -5,8 +5,13 @@ NAMED FOR THE JOB, NOT THE MECHANISM. It was `premise_check`, which describes ho
 rather than what it is for, and it sat in the roster as "the premise gate" beside things that
 reason. The pair that makes the roster legible is:
 
-    Metrologist  -- does the INSTRUMENT work?
     Biologist    -- is the SPECIMEN a tissue?
+
+(The pair was Metrologist / Biologist. The Metrologist -- "does the INSTRUMENT work?" -- was
+deleted with the Phase 12 reduction and fully removed on 10 August: its module was already gone,
+and what remained were dispatch entries for a role nothing could run. The question it asked is
+now answered by `metrics.py`'s registry and by the generated-geometry tests, which is where a
+certification belongs -- in the instrument, not in an agent asked about it.)
 
 That is exactly the distinction the campaign discovered it was missing: the loop could always
 tell whether a SIMULATION succeeded -- did it finish, is the mesh valid, are the numbers finite

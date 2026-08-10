@@ -67,7 +67,6 @@ cyan, orange, teal, gold, sky = (_c("38;5;51"), _c("38;5;208"), _c("38;5;79"),
 # orange, and the eye-check -- the only one that looks at a picture -- is the one that stands out.
 VOICE = {
     "biologist":     teal,       # is it a tissue
-    "metrologist":   teal,       # is the instrument sound
     "eye-check":     gold,       # the only role that looks at SHAPE
     "reader":        cyan,       # what happened in this run
     "interpreter":   sky,        # what happened this round, and why

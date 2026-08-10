@@ -70,8 +70,7 @@ $PY validate_space.py            # must print 59/59
 $PY critic.py                    # 12 type-guard rules, all self-tests
 $PY cluster.py --status          # should be empty
 $PY -c "import sys;sys.path.insert(0,'.');import cluster;cluster.preflight()"   # must PASS
-$PY -c "import sys;sys.path.insert(0,'agents');from metrologist import Certification
-print(Certification('_metrology').may_admit())"                                  # must be (True, ...)
+$PY round.py --check             # flow OK / pool OK / bases OK -- the real admission gate
 ```
 
 If any of those fail, fix that before anything else — they are the gates.
@@ -114,7 +113,6 @@ than a cross-run comparison (I made that mistake twice last night — see the re
 | L4 driver | jobs submit, run, tracked **by job ID** (names and empty queues both lie) |
 | Loop II (`--mode theta`) | ran the vcap sweep end to end |
 | captioning | per wave, on the devcontainer, one model load |
-| Metrologist | defects + retractions + admission gate, all exercised |
 
 ---
 

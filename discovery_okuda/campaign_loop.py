@@ -138,11 +138,29 @@ def _log(rec):
 
 
 def _gates_open():
-    """Ask the same question round.py asks, before spending a round to be told no."""
+    """Ask the same question round.py asks, before spending a round to be told no.
+
+    THIS GATE HAD NOT RUN SINCE PHASE 12. It imported `metrologist`, a module the reduction
+    deleted, so every call raised ModuleNotFoundError and the except branch below reported the
+    campaign as closed -- "the admission check itself failed". The docstring said it asks what
+    round.py asks; it asked nothing, and had not for the whole of the r001-r029 campaign, which
+    ran through `round.py` directly and never came past here.
+
+    So it now asks what round.py --check asks, and there is only one implementation of that
+    question: the flow loads with every declared agent input genuinely read, and every pool entry
+    rebuilds into an admissible parent with a run on disk. A gate that cannot be reached by a
+    second code path cannot drift from it.
+    """
     try:
-        from metrologist import Certification
-        ok, why = Certification(os.path.join(HERE, "_metrology")).may_admit()
-        return ok, why
+        import round as R
+        R.load_flow()
+        bad = R.check_pool(verbose=False)
+        if bad:
+            names = ", ".join(b[0] if isinstance(b, (list, tuple)) else str(b) for b in bad)
+            return False, (f"{len(bad)} pool entr{'y' if len(bad) == 1 else 'ies'} cannot be a "
+                           f"parent: {names}. Run `python round.py --check` for the reason and the "
+                           f"command that fixes each.")
+        return True, "flow loads, every declared input is read, every pool entry is admissible"
     except Exception as e:
         return False, f"the admission check itself failed: {type(e).__name__}: {e}"
 

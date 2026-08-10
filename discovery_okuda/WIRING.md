@@ -51,14 +51,12 @@ whole mechanism — the same one that keeps `ROLES.md` honest.
 | `archivist.jsonl` | `archivist.py` | `round.py` |
 | `diagnoses.jsonl` | `diagnostician.py` | `round.py` |
 | `holes.jsonl` | `collector.py` | `round.py` |
-| `operator_requests.jsonl` | `metrologist.py` | `round.py` |
 | `llm_timing.jsonl` | `llm.py` | `campaign_loop.py` |
 | `campaign_loop.jsonl` | `campaign_loop.py` | `campaign_loop.py` |
 | `memory.md` | `(agent)` Meta-review | `llm.py`, `proposer.py` |
 | `analysis.md` | `(agent)` several | `llm.py` |
 | `knowledge.md` | `(agent)` Interpreter | `grounder.py`, `proposer.py` |
 | `causal_descriptions.md` | `(agent)` Interpreter | `round.py` |
-| `operator_backlog.md` | `metrologist.py` | `round.py` |
 | `instruction.md` | `campaign_loop.py` | `llm.py` |
 | `user_input.md` | `(hand)` | `llm.py` |
 | `EXTERNAL_AUDIT.md` | `(hand)` | `(hand)` |

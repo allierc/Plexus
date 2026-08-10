@@ -5,7 +5,6 @@ THE THIRD QUESTION. The roster could already ask two things about a failure and 
 is this one:
 
     Biologist     is the SPECIMEN a tissue?          -> "invalid: the chemistry is extinct"
-    Metrologist   does the INSTRUMENT work?          -> "this metric is not certified"
     Diagnostician why did the APPARATUS fail?        -> "chi is 50x too large, because the clock
                                                         fix scales it by 1/dt and the engine
                                                         already steps the reaction per substep"
