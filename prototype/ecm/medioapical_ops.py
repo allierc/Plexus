@@ -298,10 +298,17 @@ class JunctionMyosinTwoPool(Structural):
         # 1.07 -> 1.97 -> 1.48 over the run, `myo_new = 1.0` set a new junction to 51% of its
         # neighbours at frame 100 and 93% at frame 0 -- a visible, meaningless dimming that had nothing
         # to do with the parameter's intent.
+        # n* IS A TWO-SIDED QUANTITY, and getting that wrong is worth a factor of two. A junction is
+        # fed by BOTH cells it separates, so setting dN/dt = 0 gives n* = tau_jun * k_ex * (rho_f +
+        # rho_g), not tau_jun * k_ex * rho_f. The one-sided version put a newborn junction at half the
+        # density of a mature one while claiming `myo_new = 1.0` meant "the same as a mature one" --
+        # measured, it moved the newborn from 0.628 to 0.625, i.e. it did nothing, because the units
+        # error it introduced was the same size as the one it repaired. Summing over the half-edges
+        # sharing a key is exactly the sum over the two cells.
         nsp = m.get("myo_nstar_per_tau")
         ef_l = m["E_face"][live].long()
-        n_star = (self.tau_jun * nsp[ef_l] if nsp is not None
-                  else torch.ones_like(length))
+        n_star = (self.tau_jun * (z.clone().index_add(0, inv, nsp[ef_l]))[inv]
+                  if nsp is not None else torch.ones_like(length))
         # A FLAG AND NOT A REPLACEMENT, because the absolute reading is the one every cache written
         # before 10 August was built with, and a silent change of meaning under an unchanged cache key
         # is how an archived run stops being reproducible without anything failing. `False` reproduces
@@ -436,14 +443,16 @@ class CytokineticRing(Structural):
                 f"cytokinetic_ring: myo_nstar_per_tau has {nsp.shape[0]} entries against {nF} faces. "
                 f"`medioapical_myosin` must declare it in m['face_carry'] and the topology operators "
                 f"must run `_carry_face_state`.")
-        n_star = self.tau_jun * nsp[ef]
-        n_ring = self.ring * n_star
-
+        # TWO-SIDED, as in `junction_myosin[two_pool]`: the belt a ring hands its myosin to is fed by
+        # both daughters, so the mature density it should be measured against is the sum over the two.
         uq, inv = torch.unique(key[fresh], return_inverse=True)
         z = torch.zeros(uq.numel(), device=dev, dtype=dt_)
         cnt = z.clone().index_add(0, inv, torch.ones_like(length[fresh]))
-        n_j = z.clone().index_add(0, inv, n_ring[fresh]) / cnt.clamp_min(1.0)
+        n_star_j = self.tau_jun * z.clone().index_add(0, inv, nsp[ef[fresh]])
+        n_j = self.ring * n_star_j
         l_j = z.clone().index_add(0, inv, length[fresh]) / cnt.clamp_min(1.0)
+        n_ring = torch.zeros_like(length)
+        n_ring[fresh] = n_j[inv] / cnt.clamp_min(1.0)[inv]     # each side pays for its own half
 
         # THE DEBIT, ON THE CELLS THAT BUILT IT. The amount deposited on a junction is n*l; each of the
         # two half-edges belongs to one of the two daughters, so each daughter pays for its own side.

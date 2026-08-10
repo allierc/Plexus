@@ -183,7 +183,77 @@ a junction whose length is \emph{changing} dilutes or concentrates its own belt.
 relax and lengthen, so they dilute. That term is advection of a conserved species along a moving
 cable, which is physics; the $20\%$ it replaces was arithmetic.
 
-\section*{6.\; What this does and does not license}
+\section*{6.\; The newborn junction, which the movie found before the measurement did}
+
+Watching \code{01b}'s movie raises a question the tables above do not answer: junctions light up at a
+division. They do --- and both the brightness and its location are wrong.
+
+\textbf{What is bright is the wrong junction.} Measured as $m/\langle m\rangle$ at the snapshot after a
+division: survivors $1.021$, the two \emph{halves} of a cut contact $1.066$, and the
+daughter--daughter interface $0.628$. The halves are enriched because the junction a division cuts is
+not a random one --- it sits on a cell that has doubled its volume, so it is $1.24\times$ longer than
+average and its cell, being large, has a low $P_f/A_f$, holds more cortical myosin and feeds its belts
+harder. That is Eq.~\eqref{eq:med} working correctly. But the place a real dividing cell puts almost
+all of its myosin is the \emph{cytokinetic ring}, which constricts exactly at the nascent interface;
+in epithelia the new adherens junction is built out of it, with the neighbouring cell contributing
+(Herszterg et al., Dev.\ Cell 24:256, 2013; Founounou et al., Dev.\ Cell 24:242, 2013). The model's
+division sites were bright in the wrong place and dark in the right one.
+
+\textbf{Why the newborn was dark: a units accident.} \code{myo\_new} was an \emph{absolute} line
+density in a model whose mean line density runs $1.07\to1.97\to1.48$ over $401$ frames, so what a new
+junction started with was decided by the frame index. The run-median hides this; binning by time does
+not --- the newborn's $m/\langle m\rangle$ climbs $0.479\to0.670$ across the run, a $40\%$ drift with
+no mechanism behind it.
+
+\textbf{The repair, and what owns it.} A newborn's starting density is a \emph{mechanism}, so it
+belongs to an operator rather than to a fallback constant: \code{cytokinetic\_ring} (Structural, on
+\code{junction}) seeds every interface with both endpoints new --- exactly the case
+\code{\_lookup}'s inheritance already excludes --- at
+%
+\begin{equation}
+n_e = \texttt{ring}\times n^{\ast}, \qquad
+n^{\ast}=\tau_{\text{jun}}\,k_{\text{ex}}\,(\rho_f+\rho_g),
+\label{eq:ring}
+\end{equation}
+%
+and \emph{debits} the medioapical pools of the two daughters, so the ring moves myosin instead of
+creating it and the ledger of \S5 still closes. $n^{\ast}$ is two-sided because a junction is fed by
+both cells it separates; the one-sided version was wrong by exactly the factor of two it was meant to
+repair, and moved the newborn from $0.628$ to $0.625$, i.e.\ nothing.
+
+\begin{center}\small
+\begin{tabular}{@{}lcccl@{}}\toprule
+$m/\langle m\rangle$ & absolute & \texttt{ring}$\,=\!1$ & \texttt{ring}$\,=\!3$ & \\\midrule
+survivor & $1.021$ & $0.999$ & $0.937$ & the normalisation is shared: bright newborns dim the rest\\
+split half & $1.066$ & $1.057$ & $0.964$ & \\
+\textbf{newborn interface} & $\mathbf{0.628}$ & $\mathbf{0.920}$ & $\mathbf{2.483}$ & \\
+drift across the run & $0.33$ & $0.12$ & $0.09$ & (max$-$min)/median of the newborn, binned by frame\\
+T1 per cell per frame & $0.00373$ & $0.00313$ & $0.00388$ & \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{figure}[h]\centering
+\includegraphics[width=\textwidth]{fig_junction_newborn.png}
+\caption{Left: myosin by junction class. Middle-left: the deposit relaxing --- \texttt{ring}$=3$ falls
+$2.48\to1.22$ over $30$ frames toward the \texttt{ring}$=1$ level, an $e$-folding of $\sim\!19$ frames
+against a $\tau_{\text{jun}}$ of $20$ that nobody fitted: the ring needs no timescale of its own
+because the belt already has one. Middle-right: the test of the units repair --- what a newborn starts
+with, binned by frame. The absolute rule drifts $0.479\to0.670$; both ring runs are flat. Right: the
+distributions.}
+\end{figure}
+
+\textbf{Two residuals, both stated rather than tuned away.} At \texttt{ring}$=1$ a newborn sits at
+$0.92$ and not $1.00$, because mature junctions are not \emph{at} $n^{\ast}$: the tissue's mean
+junction length falls from $0.75$ to $0.46$ as cells divide, and the $-n\,\mathrm{d}\ln\ell/\mathrm{d}t$
+term concentrates a shortening belt above its own steady state. The model has no stationary state, and
+$8\%$ is what that costs. And without \code{cytokinetic\_ring} in the schedule the seeding falls back
+to \code{junction\_myosin}'s scalar, which \code{junction\_myosin\_sync} --- model-agnostic by design
+--- renders for the one frame before the belt operator sees it; measured, that put the newborn at
+$0.46$ in one part of the run and $0.94$ in another. It is why the control here is \texttt{ring}$=1$
+and not ``no ring''.
+
+\section*{7.\; What this does and does not license}
 
 It licenses the reading of $m_e$ as a density and therefore the inheritance rules that were already
 written; it licenses the two-pool structure as the smallest thing that makes the junctional setpoint
