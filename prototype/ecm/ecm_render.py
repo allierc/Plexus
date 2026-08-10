@@ -222,26 +222,26 @@ def _matrix_strands(ax, q, band, cmap, zorder, alpha, per, three_d=True, lw=0.55
                       if len(x) < w else x for x in keep_S]
             S, B = np.asarray(keep_S), np.asarray(keep_B)
     S = list(S)
-    # REST THIN AND FAINT, STRAINED THICK AND BRIGHT -- the same weighting `_matrix_scatter` gives
-    # its points, and for the same reason: at one uniform width a few hundred loaded strands are a
-    # hue shift inside a haze of thousands of unloaded ones, and the loaded ones are the measurement.
-    # Two collections rather than a per-line width, because matplotlib depth-sorts per ARTIST.
-    for sel, w, a, z in ((B == 0, lw * 0.7, alpha * 0.40, zorder),
-                         (B > 0, lw * 1.5, alpha, zorder + 1)):
-        if not sel.any():
-            continue
-        segs = [S[i] for i in np.nonzero(sel)[0]]
-        cols = [cmap(int(b) / 7.0) for b in B[sel]]
-        if three_d:
-            from mpl_toolkits.mplot3d.art3d import Line3DCollection
-            lc = Line3DCollection(segs, colors=cols, linewidths=w, alpha=a)
-            lc.set_zorder(z)
-            ax.add_collection3d(lc)
-        else:
-            from matplotlib.collections import LineCollection
-            lc = LineCollection([q_[:, :2] for q_ in segs], colors=cols, linewidths=w, alpha=a)
-            lc.set_zorder(z)
-            ax.add_collection(lc)
+    # ONE COLLECTION, ONE WIDTH, ONE ALPHA -- THE COLOUR CARRIES THE STRESS AND NOTHING ELSE.
+    # Splitting the strands into a thin faint band-0 collection and a thick bright band>0 one made a
+    # single band step across that boundary change a strand's WIDTH by 2.4x and its ALPHA by 2.5x,
+    # so it flashed rather than shifting hue. Measured on 04d: 0.24% of strands cross the boundary
+    # every frame, and in the outer shells only half the strands are on the bright side of it --
+    # which is the same defect seen the other way, as sparse bright lines on a faint mass where the
+    # field itself is a smooth gradient (mean band by radial shell is 7.0/7.0/6.98/5.01/2.45/1.13
+    # against 04's 7.0/7.0/6.97/4.86/2.35/1.09 -- the same field, drawn two ways). The stable sort
+    # stays: it is what fixes the z-order, and it costs nothing.
+    cols = [cmap(int(b_) / 7.0) for b_ in B]
+    if three_d:
+        from mpl_toolkits.mplot3d.art3d import Line3DCollection
+        lc = Line3DCollection(list(S), colors=cols, linewidths=lw, alpha=alpha)
+        lc.set_zorder(zorder)
+        ax.add_collection3d(lc)
+    else:
+        from matplotlib.collections import LineCollection
+        lc = LineCollection([q_[:, :2] for q_ in S], colors=cols, linewidths=lw, alpha=alpha)
+        lc.set_zorder(zorder)
+        ax.add_collection(lc)
 
 
 def _matrix_scatter(ax, q, band, cmap, zorder, alpha, s_rest=1.1, s_hot=2.4, three_d=True,
