@@ -238,8 +238,25 @@ J9 & myosin array length equals the edge array's & $0$ of $200$ short & \fail{56
 J10& the sync perturbs nothing: positions, divisions, T1s & bit-identical & \pass{bit-identical}\\
 J11& T1 per cell per frame: does the law change the observable & any separation &
      $0.00221$ vs \pass{0.00373} ($1.69\times$)\\
+\multicolumn{4}{@{}l}{\textit{the scale the note is quoted in} (\op{0u\_units})}\\
+U1& one frame, from 4.93 doublings at a 12--24\,h cycle & $[8.8, 17.7]$ min & \pass{10 min}\\
+U2& $\tau_{\rm jun}=20$ frames --- maturation, NOT myosin turnover ($1$--$2$ min) & $[30, 600]$ min & \pass{200 min}\\
+U3& cell diameter (the length CALIBRATION) & $[5, 15]$ um & \pass{8.5 um}\\
+U4& junction length at the last frame & $[2, 15]$ um & \pass{4.6 um}\\
+U5& time between neighbour exchanges, per cell & $[20, 200]$ h & \pass{44.68 h}\\
 \bottomrule\end{tabularx}}
 \smallskip
+
+
+\textbf{The run declares its scale, and these numbers are what it makes of it.} Three base scales
+under \code{general.units:} and everything else derived (\code{plexus/units.py}): $1$ box unit
+$=1172\,\mu$m, because a cell is $8.5\,\mu$m and the tissue is solved at $10\,\mu$m per tissue
+unit; $1$ frame $=600$ s, because $200\to6{,}076$ cells is $4.93$ doublings and a $12$--$24$ h
+cycle puts the run at $2.5$--$4.9$ days; $1$ force unit $=9162$ nN, set so the stroma's
+\code{youngs: 15} is $100$ Pa --- a collagen I gel at $1$--$3$ mg/ml. Only the force scale is
+\emph{chosen}, and it is chosen on the softest and best-measured body rather than on the sheet under
+dispute. Without this block the loader says the run is dimensionless and no result from it may carry
+a unit, which was the state of every run in this folder until now.
 
 \textbf{Two conventions make these mean what they say.} \textbf{A cut is measured against an intact
 control on the same frames}, because two frames of dynamics move an untouched junction by $0.9\%$ and

@@ -222,8 +222,25 @@ F17& the radial stress profile reproduces across independent runs & mean band pe
      $0.15$ & \pass{7.0/7.0/6.98/5.01/2.45/1.13} vs \pass{7.0/7.0/6.92/5.10/2.50/1.16}\\
 F18& the field is smooth in time: change per particle per frame & $<1/8$ of full scale, i.e.\ one
      band & \pass{1.35\%} median, \pass{21\%} p99\\
+\multicolumn{4}{@{}l}{\textit{the scale the note is quoted in} (\op{0u\_units})}\\
+U1& stroma modulus (the force CALIBRATION), collagen I at 1--3\,mg/ml & $[10, 1000]$ Pa & \pass{100 Pa}\\
+U2& the grid cell --- TWICE a cell diameter, which is why the grid welds & $[5, 50]$ um & \pass{18.32 um}\\
+U3& strand length, against collagen fibril bundles & $[20, 500]$ um & \pass{140.7 um}\\
+U4& velocity decay time $1/\code{drag}$ & $[1, 1000]$ s & \pass{75 s}\\
+U5& $\Delta t_{\rm sub}$ & $[0.01, 10]$ s & \pass{0.24 s}\\
 \bottomrule\end{tabularx}}
 \smallskip
+
+
+\textbf{The run declares its scale, and these numbers are what it makes of it.} Three base scales
+under \code{general.units:} and everything else derived (\code{plexus/units.py}): $1$ box unit
+$=1172\,\mu$m, because a cell is $8.5\,\mu$m and the tissue is solved at $10\,\mu$m per tissue
+unit; $1$ frame $=600$ s, because $200\to6{,}076$ cells is $4.93$ doublings and a $12$--$24$ h
+cycle puts the run at $2.5$--$4.9$ days; $1$ force unit $=9162$ nN, set so the stroma's
+\code{youngs: 15} is $100$ Pa --- a collagen I gel at $1$--$3$ mg/ml. Only the force scale is
+\emph{chosen}, and it is chosen on the softest and best-measured body rather than on the sheet under
+dispute. Without this block the loader says the run is dimensionless and no result from it may carry
+a unit, which was the state of every run in this folder until now.
 
 \textbf{Two conventions make these mean what they say.} A shape metric is taken end-to-end and never
 per segment, because the seeding jitter is larger than the particle spacing and any per-segment

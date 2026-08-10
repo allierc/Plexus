@@ -115,8 +115,16 @@ def build(name, frames, tissue_npz, scale, n_particles=200000, n_fibres=10000, f
     types = {f"s{i}": {"fraction": 1.0 / len(ES.STRESS_COLORS), "youngs": float(youngs)}
              for i in range(len(ES.STRESS_COLORS))}
     return {
+        # THE PHYSICAL SCALE, DECLARED SO THE RUN CAN BE QUOTED WITH A UNIT. Three base scales and
+        # nothing derived (`plexus/units.py`): the box is 1172 um wide because a cell is 8.5 um and
+        # the tissue is solved at 10 um per tissue unit; a frame is 600 s because 200 -> 6,076 cells
+        # is 4.93 doublings and a 12-24 h cycle puts the run at 2.5-4.9 days; the force unit is set
+        # so the stroma's `youngs: 15` is 100 Pa, which is a collagen I gel at 1-3 mg/ml. Without
+        # this block the loader says the run is dimensionless and no result from it may carry a
+        # unit -- which was the honest state of every run in this folder before `gate_units.py`.
         "general": {"name": name, "seed": int(seed), "n_frames": int(frames), "dt": float(dt),
-                    "boundary": "wall", "dim": 3, "world": [1.0, 1.0, 1.0]},
+                    "boundary": "wall", "dim": 3, "world": [1.0, 1.0, 1.0],
+                    "units": {"length_um": 1172.33, "time_s": 600.0, "force_nN": 9162.43}},
         "sets": {
             "cell": {"n": 1, "start": [list(CENTRE)], "types": types},
             "mpm_particle": {"parent": "cell", "per_parent": int(n_particles), "radius": 0.48,

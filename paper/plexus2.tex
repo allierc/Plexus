@@ -814,7 +814,8 @@ numerical implementations it composes.
 
 Biological models are described declaratively rather than procedurally, as a
 single \code{spec.yaml} with blocks \code{general} / \code{sets} / \code{fields} /
-\code{operators} / \code{schedule}. An operator line names the contract
+\code{operators} / \code{schedule}; \code{general} optionally carries \code{units:}, the run's physical
+scale (see below). An operator line names the contract
 (\code{op}) and, optionally, which implementation to run
 (\code{implementation:}); omitting it selects the contract's default, so a
 single-implementation spec is written exactly as before.
@@ -834,6 +835,65 @@ operator, a missing required parameter, a selector on an undeclared set/field, o
 an unresolved schedule token is rejected up front --- so a spec that loads is
 runnable, and the capability checks (e.g.\ \code{SUPPORTED\_DIMS}) run against the
 implementation that will actually execute.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{Units, and what a dimensionless model may claim}\label{sec:units}
+
+A Plexus model computes in simulation units: the world is a unit box, \code{dt} is a number, a
+stiffness is a number. That is sufficient for a \emph{mechanism} and insufficient for a \emph{claim},
+and the gap between the two is where quiet errors live --- a membrane thickness that turns out to be
+$24\times$ too large once the box is calibrated, a modulus compared against a measurement in
+megapascals, a turnover time whose being ``four hours'' rests on an unstated minutes-per-frame. None of
+those is caught by any validity check, because each is arithmetic that is internally consistent and
+externally meaningless.
+
+The scale is therefore \emph{declared}, once, under \code{general.units:}, and never inferred:
+
+\begin{itemize}\itemsep1pt
+\item \code{length\_um} --- micrometres per simulation length unit (the world box is $1$ unit),
+\item \code{time\_s} --- seconds per simulation time unit; \textbf{the default is $1.0$, i.e.\ the
+      convention is that \code{dt} is in seconds},
+\item \code{force\_nN} --- nanonewtons per simulation force unit; optional, and without it only force
+      \emph{ratios} are meaningful,
+\item \code{amount} --- an optional label for a field's concentration, which is a fourth base unit
+      that nothing mechanical needs.
+\end{itemize}
+
+Three base scales, because mechanics needs three. \textbf{Everything else is derived, and declaring a
+derived scale is rejected at load rather than accepted as a convenience}, since a second declaration is
+a second chance to disagree with the first:
+
+\smallskip
+{\footnotesize
+\begin{tabular}{@{}lll@{}}\toprule
+quantity & dimension & from the base scales\\\midrule
+position, radius, rest length, thickness & $L$ & \code{length\_um}\\
+area / volume & $L^2$ / $L^3$ & \code{length\_um}$^2$ / $^3$\\
+velocity & $L/T$ & \code{length\_um}\,/\,\code{time\_s}\\
+rate, $1/\tau$ & $1/T$ & $1/$\code{time\_s}\\
+force & $F$ & \code{force\_nN}\\
+stress, Young's modulus & $F/L^2$ & \code{force\_nN}\,/\,\code{length\_um}$^2$ \ ($\to$ Pa)\\
+2D (membrane) modulus $Y_2=ET$ & $F/L$ & \code{force\_nN}\,/\,\code{length\_um} \ ($\to$ N/m)\\
+energy & $F\,L$ & \code{force\_nN}\,$\cdot$\,\code{length\_um}\\
+mobility $1/\gamma$ & $L/(F\,T)$ & derived\\
+\bottomrule
+\end{tabular}}
+\smallskip
+
+Two design decisions follow, and both are deliberate omissions. There is \textbf{no automatic
+conversion of state buffers and no dimensional checking of operator arithmetic}: operators compute in
+simulation units exactly as before, and \code{units} is a declaration attached to the run so that what
+comes \emph{out} can be reported in micrometres and seconds, and so that a spec making a physical claim
+can be asked what it is claiming it in. Unit-checked arithmetic would be a large change and a false
+comfort, since the errors above are all dimensionally consistent.
+
+And a model with no \code{units:} block is \textbf{dimensionless}: it loads, it runs, and the loader
+prints \emph{``units: NONE DECLARED --- this run is dimensionless and no result from it may be quoted
+with a unit''}. That is the honest state of a mechanism study, it is the state of every spec written
+before this contract existed, and saying it out loud at build time is the point --- ``dimensionless''
+should be a property the model states, not an oversight a reader discovers later from a number that
+looked like micrometres.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -1105,6 +1165,72 @@ plus the test suite check its numerical behaviour.
 Validation establishes structural and numerical consistency, but does not by
 itself establish biological validity. The latter must be assessed through
 comparison with observations, known limits, ablations or the originating model.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsection{The note as a procedure: gates, and what a gate can be evidence of}
+
+The \code{prototype/ecm} study converged on a working form for that last paragraph, and it is worth
+stating as a procedure rather than as a habit. Each addition to the framework --- an entity, a
+relation, an interface --- is written up in a note with exactly four parts, and the note is
+\emph{the unit of work}: nothing is considered added until it exists.
+
+\begin{enumerate}\setlength{\itemsep}{1pt}
+\item \textbf{Mechanism.} The biology, coarsely, with the one or two measured ratios that fix its
+  proportions --- and the arithmetic that decides what cannot be represented at all. A basement
+  membrane is $100$ nm on a $200\,\mu$m spheroid; resolving it on a grid needs $3500^3$ cells, so it
+  is a surface and its thickness is a parameter. That paragraph is what makes the rest inevitable.
+\item \textbf{Equations and symbols.} The mechanism as equations, with a symbol table saying what
+  each quantity is \emph{of}. Intensive and extensive are distinguished here, because a feedback
+  whose drive is extensive is ill-posed under re-meshing and the error is invisible at runtime.
+\item \textbf{The Plexus2 container.} Sets, their kinds, the state each carries, the operators and
+  their families, and the schedule --- specifically which operators go inside a \code{substep\_dt}
+  block and which do not.
+\item \textbf{Gates.} A numbered table: for each, a threshold decided \emph{before} the run and the
+  measured value, coloured by outcome. A threshold chosen after seeing the number is not a threshold.
+\end{enumerate}
+
+\textbf{Not every gate is evidence of the same kind, and conflating them is the failure mode this
+form exists to prevent.} Across the five notes the gates fall into three tiers, and only the third
+is a statement about biology:
+
+\begin{center}\small
+\begin{tabular}{@{}llp{7.4cm}@{}}\toprule
+tier & asks & example, from \code{prototype/ecm}\\\midrule
+\textbf{bookkeeping} & does the code do what the operator says? &
+  the contact's reaction sums to zero at $1.5\times10^{-7}$; refining a loaded sheet leaves
+  $\lambda$, area and energy bit-identical; a re-keying operator perturbs no trajectory\\
+\textbf{closed form} & does the implementation reproduce the physics it was \emph{given}? &
+  the block's ringing at $12.9$ Hz against the $17.1$ Hz of a free--free bar; the matrix fitting a
+  driven spherical shell's $C_1r+C_2/r^2$ at $R^2=0.999$; an effective Poisson ratio of $0.216$
+  against its own Lam\'e pair's $0.20$\\
+\textbf{measurement} & does the model agree with something \emph{observed in cells}? &
+  collagen~IV turnover of $3$--$10$ h; hemidesmosome spacing of $\sim\!7T$; an epithelial cell of
+  $8.5\,\mu$m; a collagen gel at $10$--$1000$ Pa\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The first two tiers are \emph{verification}: they can be run before any biology is claimed, they are
+cheap, and they catch the errors that are otherwise invisible --- a positional update that launders
+deformation, a spatial lookup that silently misses faces near a pole, a force applied once per
+substep where it should be applied once per step. The third tier is \emph{validation}, and it is
+the only one that can be wrong about the world.
+
+\textbf{So the honest answer to ``are these biophysics tests'' is: a minority of them are, and the
+proportion is worth reporting.} In the \code{ecm} study roughly two thirds of the gates are
+bookkeeping or closed form. That is not a deficiency --- a mechanism whose implementation is
+unverified cannot be compared with an observation at all --- but a note whose gate table is entirely
+first-tier has established that its code is self-consistent and nothing more.
+
+\textbf{And the third tier is only available once the model declares its units} (\S\ref{sec:units}).
+Before a \code{units:} block, a comparison with a measurement is a comparison between a number and a
+quantity, which is how a membrane came to be $24\times$ too thick and a modulus came to be quoted as
+a pressure. With one, every measurement-tier gate becomes a conversion with a literature interval
+around it, and it can fail: in the \code{ecm} study, declaring the scale turned a contact
+penetration of ``$0.82$ grid cells'' --- which sounds small, and was reported as an improvement ---
+into $15\,\mu$m, nearly two cell diameters, which is the strongest single argument for replacing the
+penalty contact with a barrier formulation.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
