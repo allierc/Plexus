@@ -2017,6 +2017,123 @@ predictions and retractions as the evidence.
 \textbf{What you get.} The argument that Track A works, resting on Track B.
 \end{phasebox}
 
+\begin{phasebox}{Phase 16 --- The audit: 28 rounds, and the campaign had no organ \hfill \done}
+\textbf{Goal.} Twenty-eight rounds ran. Ask an outside auditor why they did not add up, and rebuild
+the loop on the answer. \emph{Out of order deliberately: this ran before 13--15, because a battery
+of measurements is worth little to a loop that cannot act on them.}
+
+\subsection*{The complaint, and the verdict}
+Cedric, 10 August: running 28 rounds is a success, but the loop ``does not get the global picture,
+goes in rabbit holes, duplicates too much, and does not explore with imagination, serendipity or
+prior knowledge.'' An external audit of the code and the 416-record ledger returned a one-line
+verdict: this is \textbf{a well-instrumented parameter-refinement rig wearing the interface of a
+discovery engine}. What makes a \emph{round} trustworthy --- the premise gate, the deterministic
+Critic, the pre-registered prediction, the eye as an independent witness --- is good and was left
+alone. What is missing is everything \emph{above} the round. There is no organ that holds the
+campaign.
+
+\subsection*{Four things nobody had measured}
+\begin{enumerate}[leftmargin=1.4em]
+\item \textbf{The memory was a tail.} \code{history} is \code{knowledge.md} read with
+\code{limit=12000}, and \code{\_read} keeps the \emph{last} 12{,}000 characters of a 38{,}591
+character file. \textbf{Rounds 1--20 were invisible to every role, in every round}, with no
+truncation marker, because the cut happened before the block that prints one.
+\item \textbf{Three declared edges carried nothing.} \code{load\_flow} verifies that every emitted
+key appears in some node's \code{in:}; it cannot verify the node \emph{uses} it. The Proposer
+declared \code{refusals} and \code{user\_input}, the Analyst declared \code{user\_input} and
+\code{route\_a\_results}, and no crew module mentioned any of them. So
+\code{campaign/user\_input.md} --- the human's only channel into the loop --- \textbf{reached no
+role for 28 rounds}, and 220 Route~A slots produced response curves handed to nobody.
+\item \textbf{The rabbit hole was a sort key.} Parents were ranked \code{-grip\_peak,
+-protr\_peak}: one scalar, no diversity, novelty, age or lineage term. Measured: 18 distinct
+compositions across 196 structural records, \textbf{one composition proposed 87 times},
+\code{r020\_06} the parent of 33 slots, and for four consecutive rounds the top six parents were
+\emph{five clones of one result} at \code{protr\_peak} 1.595.
+\item \textbf{A hard-coded constant hid the campaign's best result.} \code{FORCED\_P\_RATIO = 2.0}
+sorted any run with \code{mech\_p\_ratio} above it dead last, permanently. Eleven runs crossed it
+and \textbf{not one was ever used as a parent} --- among them \code{r019\_07}, \code{protr\_peak}
+\textbf{1.817} and \code{grip\_peak} \textbf{0.294}, the highest of both in the whole campaign,
+against a control ceiling of 1.595\,/\,0.262 that four rounds could not beat. The loop's best
+result was structurally unreachable, and the proxy was standing in for a forcing term that measured
+\textbf{0.0 in all 78 specs that ever carried it}.
+\end{enumerate}
+
+\subsection*{The purse-string and the push were one operator}
+\code{rd\_interface\_tension} carried $E = K_{\mathrm{purse}}\sum_{\mathrm{iface}} \ell_e -
+K_{\mathrm{extrude}}\sum_{\mathrm{red}} a\,r$. The first term is a line tension on the activator
+interface: ordinary physics. The second is an energy that \emph{falls} as activated cells move
+outward --- the answer written into the objective. One plausible name over both made forcing a
+\emph{parameter of a sound operator}, and the cost was four rounds of ``extrude-forced'' verdicts
+on runs whose specs contain no such operator at all. They are two operators now:
+\code{interface\_line\_tension\_3d}, which is in the vocabulary and has no \code{K\_extrude} key to
+set, and \code{extrusion\_forcing\_3d}, which is not in \code{composition\_space} at all. There is
+no longer a setting of anything in the search space that pushes.
+
+\subsection*{Death was legal, reachable and never chosen}
+\code{apoptosis\_3d} --- the Die family, and the first mechanism here that deforms the sheet
+\emph{inward} --- was injected before round 25. For five rounds it sat on the Proposer's menu and
+was named by \code{coverage} as the only operator never exercised, and it was \textbf{never once
+chosen}. The reason is in the edit log: \code{add\_op} has fired \textbf{30 times in the campaign's
+history and all 30 added the same operator}, none since round 24. Route~A could not reach it
+either, because \code{\_build\_sweep} refuses a base that does not already carry the operator, and
+the Route~A plan is static. \textbf{A mechanism enters this campaign through the basis or not at
+all}, so the basis now carries a death twin of each Route~A base.
+
+\subsection*{What was rebuilt}
+Every policy number moved out of the engine and into \code{crew/flow.yaml}, which is what the graph
+is for:
+
+\begin{center}\small
+\begin{tabular}{@{}p{0.34\linewidth}p{0.60\linewidth}@{}}
+\toprule
+\textbf{change} & \textbf{what it fixes} \\
+\midrule
+edges wired; \code{load\_flow} now refuses a declared agent input the role does not read &
+the human channel and the Route~A curves arrive; negative-tested against a planted fake edge \\
+\code{grounding} is a node, feeding the Proposer & the Grounder was terminal, writing the round's
+most strategic sentence into a file nothing read \\
+\code{history} limit \code{null} & the first twenty rounds become visible again \\
+parents are a \textbf{portfolio}, one reserved seat per target morphology, plus
+\code{max\_per\_lineage} & the rabbit hole closes mechanically, without asking a role to be more
+imaginative \\
+\code{forced\_p\_ratio: null} & forcing is settled structurally; the proxy could only produce false
+positives \\
+basis $\to$ 16 members with death, at 1800 frames & ten members had been running at \emph{half} the
+length of their own children \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent The portfolio and Cedric's new objective --- ``explore altogether tube forming, budding,
+branching, complex shape'' --- are the same fix. One scalar can only climb one hill. Each target
+now holds a seat and its own figure of merit: \code{tube} on aspect ratio, \code{bud} on protrusion
+with aspect counting \emph{against} it (a bud is not a failed tube), \code{branched} on tip count,
+\code{complex} on grip and invagination. Replayed on the archived ledger, the old rule returns five
+clones; the new one returns a tube, a bud, a branched specimen and \code{r019\_07}.
+
+\subsection*{What is still missing, and named so it is not mistaken for done}
+The audit's remaining recommendations are campaign-level organs, each a code node and an edge
+rather than a new role:
+\begin{itemize}[leftmargin=1.4em]
+\item \textbf{No serendipity organ.} Nothing notices a result that was interesting but was not what
+the round was testing. \code{hypothesis.py} implements one --- surprise rate, novelty yield, an
+intent-mix control band --- in 34\,kB that \textbf{nothing imports}. It was left on the floor by the
+Phase~12 reduction: the loop had a learning-rate governor and lost it in a refactor.
+\item \textbf{No global hypothesis.} Every proposal is (parent, edit, one metric, one threshold). A
+claim spanning runs --- ``grip is set by the diffusion \emph{ratio}, not by $d_a$'' --- cannot be
+posed, let alone scored.
+\item \textbf{Duplication is free.} A refused duplicate is re-admitted at a fresh seed, relabelled
+\code{replicate}, and scored against the copied prediction. It was 5 of 7 Route~B slots in r028.
+\item \textbf{Prior knowledge is one-way.} \code{\_premises\_raw.md} holds 70 literature-sourced
+facts; 11 became gates and 59 are unread --- including \emph{tissues stop growing when compressed},
+a direct diagnosis of this project's 30{,}743-cell overshoot.
+\end{itemize}
+
+\textbf{What you get.} A campaign that starts from an empty ledger, a 16-member basis that includes
+cell death, a parent set that cannot collapse onto one lineage, and a search space in which no
+composition can be paid to produce the answer.
+\end{phasebox}
+
 %======================================================================
 \section{The 31 July lesson, in three lines}
 
