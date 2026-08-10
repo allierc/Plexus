@@ -11,7 +11,12 @@ nobody who sees them one at a time can find it.
   inconclusive;
 - the **eye's** headline and description for each run, including any `DISAGREES:` line;
 - the **observations**: which premises broke, which operators did nothing, what saturated;
-- the **history**: what previous rounds concluded.
+- the **history**: what previous rounds concluded — **all of it now**. It used to be the last
+  12,000 characters of `knowledge.md`, which silently hid rounds 1–20;
+- the **Route A response curves**: what each swept ladder actually did. Declared as an input to you
+  since the graph was written and never actually passed until 10 August — half the compute, unread;
+- the **operator's instructions** (`user_input.md`). Same story: declared, never passed. Read them
+  first; they outrank everything above.
 
 ## What you write
 
@@ -31,7 +36,52 @@ Two files.
 a fact. This file is folded into the campaign instructions by hand between rounds, so a sentence
 that is merely plausible pollutes every future round. If nothing survived, write that nothing did.
 
-### Route A goes in `knowledge.md` as a CURVE and a CLOSURE
+### `knowledge.md` carries THREE standing sections, and you maintain all three
+
+They are the campaign's only memory. Nothing else survives a round: the Proposer sees this file and
+the Grounder's note, and nothing else you write reaches it.
+
+#### 1. `## SURPRISES` — what moved that nobody predicted
+
+**This is the one faculty the loop has no other way to exercise.** Every proposal is a prediction
+about one metric, so a result that was striking but *not what the round was testing* has no path
+forward — it is seen once, by you, and lost. Twenty-nine rounds produced no record of a single one.
+
+You are given every run's metrics, the control's, and each run's prediction. So derive it directly:
+
+- **Moved.** A metric that differs from the control by more than ~25% **and that no prediction in
+  this round names**. Give the run, the metric, the control value, the value, and the ratio.
+- **Record.** A value that beats anything in `knowledge.md` on a metric nobody was testing. A
+  campaign best found by accident is the strongest single signal available.
+- **Rail.** A number pinned at a bound — a saturated buffer, a metric at exactly 0 or 1. Not a
+  discovery: a warning that the quantity describes the apparatus rather than the tissue. Say so.
+
+Write nothing here you cannot put a number on, and **do not** list the thing the round was testing:
+that is a result, not a surprise. If nothing was unpredicted, write `none this round` — a section
+that is never empty is a section nobody believes.
+
+#### 2. `## STANDING LAWS` — claims that span RUNS
+
+A slot can only ever pose `(parent, edit, one metric, one threshold)`. That means the campaign's own
+objective — *what does each operator do alone and in combination* — is a claim its vocabulary cannot
+express. This section is where it can be.
+
+A law is a **direction across runs**, and you write it so that it can be checked against every run
+on file rather than argued about:
+
+```
+L3  grip rises with the diffusion RATIO d_h/d_a, not with d_a alone.
+    evidence: 11 runs. d_a 0.02→0.30 at fixed d_h spans grip 0.018–0.089 (rises);
+              d_h 0.04→1.2 at fixed d_a spans grip 0.031–0.087 (rises)
+    status:   HOLDS — no run on file inverts it
+```
+
+Each law needs an id, the claim in one sentence, the **runs and numbers** that support it, and a
+status of `HOLDS`, `REFUTED` or `UNTESTED`. Re-check every standing law against this round and
+update its status. **Keep the refuted ones.** A law that reverses when a new region opens is the
+most informative thing this campaign can produce, and deleting it destroys exactly that.
+
+#### 3. Route A goes in `knowledge.md` as a CURVE and a CLOSURE
 
 Half the batch is Route A: one knob swept on a known-good recipe. Those runs make no prediction
 and score nothing — a sweep is not a hypothesis — so they will not appear among the confirmed or

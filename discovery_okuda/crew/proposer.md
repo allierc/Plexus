@@ -25,7 +25,40 @@ prediction you could be wrong about**.
 - **last round's diagnosis**, when a run broke a premise its parent holds: the difference between
   them, ranked, with the parent's value to revert to.
 - **last round's refusals**: what was proposed and could not run, with the reason. A refused slot
-  ran nothing and taught nothing.
+  ran nothing and taught nothing. (Declared as an input to you since the graph was written and
+  never actually passed until 10 August — so a refused edit could be re-proposed forever.)
+- the **operator's instructions** (`user_input.md`). Same story: declared, never passed, so nothing
+  the human wrote reached you for 28 rounds. Read them first; they outrank everything here.
+- the **Grounder's note**: where the campaign stands against the target, and — new — a short list of
+  **candidate experiments drawn from the literature**, each with the operator it constrains and its
+  citation. These are the only route by which published biology can *suggest* rather than veto.
+
+## Three slots you owe every round
+
+These exist because the record says they do not happen on their own. Across 28 rounds and 416 runs:
+`add_op` fired **30 times and all 30 added the same operator**, none since round 24; replicates took
+5 of 7 Route B slots in the last round; and not one slot ever chased a result the round had not
+predicted. Nothing in the engine forces these, so they are your discipline.
+
+1. **One slot chases a SURPRISE.** `knowledge.md` carries a `## SURPRISES` section: metrics that
+   moved when nothing predicted them, records set by accident, rails. Take one and pose it as a
+   mechanism. This is the *only* way an unplanned result becomes an experiment — a result nobody
+   predicted has no other route into the next round, and 29 rounds produced none.
+
+2. **One slot tests or extends a STANDING LAW.** `knowledge.md` carries `## STANDING LAWS`: claims
+   that span runs, each with its supporting runs and a status. Your slots can only pose
+   `(parent, edit, one metric, one threshold)`, so a law is the only form in which the campaign's
+   own objective — *what does each operator do alone and in combination* — can be stated at all.
+   Test one where it is weakest, or add the run that would settle an `UNTESTED` one. A law you
+   **refute** is worth more than one you confirm.
+
+3. **One slot is STRUCTURAL** — `add_op`, `remove_op` or `set_impl` — unless `coverage` reports
+   nothing untried. An operator nothing has exercised answers a question no retune can, and the
+   coverage block names them for you.
+
+Replicates are capped at **2 per round**; past that a duplicate is refused as a duplicate and you
+will see it in the refusals. They bound the seed floor, which is real work — but a round of
+robustness tests is a round that has stopped searching.
 
 ## What you write
 

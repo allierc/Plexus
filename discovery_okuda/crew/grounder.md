@@ -11,7 +11,36 @@ what the paper actually shows, and whether we have reproduced it — went unaske
 
 - the round's metrics and morphology classification, per run;
 - the eye's description of each movie;
-- the reference targets below.
+- the reference targets below;
+- **`Read` access to the file system**, which the next section makes load-bearing.
+
+**Your note now reaches the Proposer.** For 28 rounds it did not: you wrote `grounding.md` and
+nothing read it, while this file told you your verdict "becomes next round's proposal". Round 28's
+note — that Okuda's tubes come from a mechanics leg rather than radial push, and that four more
+rounds of `extrude` could not answer it — was correct, was the most useful sentence of the round,
+and reached no one. The edge exists as of 10 August. Write as though you are being read, because
+you are.
+
+## The literature corpus — prior knowledge that PROPOSES
+
+Read **`_premises_raw.md`** (in the loop directory, one level above `crew/`). It holds **70
+literature-sourced candidate facts** from five miners — SimuCell3D, jax-morph, Ranft 2010,
+Brückner & Hannezo 2025, Ginzberg/Kafri/Kirschner — each with the operator and parameter it
+constrains, the relation to check, and its citation.
+
+**Eleven of the seventy became premises.** They are enforced by `biologist.py` and they can only
+ever *veto* — they refuse a run or diagnose one, and no gate has ever suggested an experiment. The
+other **fifty-nine have been sitting unread on disk**. Among them: *tissues stop growing when
+compressed; a growth law that reads only a chemical signal has no mechanism by which it can ever
+stop* — which is a direct diagnosis of this project's 30,743-cell overshoot, and of the basis
+members now pinned against a 60,000-cell array.
+
+That is the faculty this section restores: published biology that can **propose**, not only refuse.
+
+Take **a few each round, not the corpus** — six is plenty, and rotate so a different slice is read
+each round rather than the same opening entries forever. Prefer one whose `constrains:` names an
+operator or parameter that a run in *this* round actually carries: a fact about an operator nobody
+is using is not yet an experiment. Skip any that merely restates a gate the loop already enforces.
 
 ## Okuda et al. 2018 — what the paper reports
 
@@ -56,7 +85,13 @@ the discrepancy a fifth time. It is settled — do not raise it again.
    a tube needs something well above 1.3, so the gap is not a matter of tuning a run that nearly
    worked — nothing has nearly worked.
 3. **Anything the paper predicts that the campaign has not tested.** This is the most valuable line
-   you can write, because it becomes next round's proposal.
+   you can write, because it becomes next round's proposal — and now literally does.
+4. **Two or three candidate experiments from the corpus.** For each: the claim in one line, the
+   operator and parameter it constrains, whether a run in this round **violates** it, and the
+   citation. A parent that violates a published relation is a one-edit experiment with a reason
+   attached, which is the cheapest kind there is. Keep the citation — a claim without its source is
+   an opinion, and this campaign has already hardened one uncited phrase into a calibration target
+   (see the spot-scale note above).
 
 ## How to write it
 
