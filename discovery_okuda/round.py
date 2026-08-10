@@ -132,6 +132,31 @@ def load_flow(path=FLOW):
             raise FlowError(f"{nid!r} names code {n['code']!r}, which round.py does not define")
         if n.get("each") and n["each"] not in emits:
             raise FlowError(f"{nid!r} fans out over {n['each']!r}, which no node emits")
+        # AND AN AGENT MUST ACTUALLY READ WHAT IT DECLARES. The producer-with-no-consumer check
+        # below is satisfied by a NAME: it verifies that every emitted key appears in some node's
+        # `in:`, not that the node uses it. Three edges were fiction for 28 rounds -- the Proposer
+        # declared `refusals` and `user_input`, the Analyst declared `user_input` and
+        # `route_a_results`, and no crew module mentioned any of them. The cost was that
+        # campaign/user_input.md, the operator's only channel into the loop, reached NO role at all,
+        # and that 220 Route A slots produced response curves nobody was handed.
+        #
+        # A declared input the role never reads is worse than a missing edge: the graph asserts the
+        # information flows, so nobody looks. This closes the gap the graph exists to close.
+        if "agent" in n:
+            mod = os.path.join(HERE, "crew", f"{n['agent']}.py")
+            try:
+                src = open(mod).read()
+            except OSError:
+                src = ""
+            if src:
+                unread = [k for k in (n.get("in") or [])
+                          if f'"{k}"' not in src and f"'{k}'" not in src]
+                if unread:
+                    raise FlowError(
+                        f"{nid!r} declares input(s) {unread} in its `in:` and crew/{n['agent']}.py "
+                        f"never reads them. Either pass them to the prompt or remove them from "
+                        f"`in:` -- a declared edge that carries nothing is the defect this graph "
+                        f"exists to prevent, and it hid the operator's user_input for 28 rounds.")
 
     for out, nid in emits.items():
         if out in consumed:
@@ -331,11 +356,66 @@ def parents(ctx):
     # P5b were deleted on 8 August, so the set it subtracted is empty and every premise left (P1,
     # P2, P4, P8, P9, P11, P12, P13) is a statement about the tissue.
 
-    rows.sort(key=lambda r: (_is_forced(r.get("name"), forcing),
-                             (p_ratio is not None
-                              and float(r["metrics"].get("mech_p_ratio") or 0) > p_ratio),
+    # A PORTFOLIO, NOT A RANKING -- and the ranking is what built the rabbit hole. The old key was
+    # `-grip_peak, -protr_peak` with no diversity, novelty, age or lineage term, so the children of
+    # the best-gripping run inherit its grip and displace their own siblings: measured over
+    # r001-r029, 18 distinct compositions across 196 structural records, ONE composition proposed 87
+    # times, and `r020_06` the parent of 33 slots. Four rounds running, the top six parents were
+    # five clones of a single result at protr_peak 1.595.
+    #
+    # Cedric, 10 August: "in the new loop I would like to explore altogether tube forming, budding,
+    # branching, complex shape." That is the same fix stated as an objective. One scalar can only
+    # climb one hill; the classifier already separates sphere / undulation / tube / branched, and
+    # `n_tips`, `protrusion_aspect_max` and `invagination` separate a fork from a finger from a
+    # bulge from a pit. So the parent set is now a portfolio with a reserved seat per TARGET
+    # MORPHOLOGY, and a lineage cap so that no one family can take the whole table.
+    #
+    # Every number here is declared in crew/flow.yaml `parents.args`, because which morphologies the
+    # campaign is chasing and how many parents each may hold are campaign decisions, not engine
+    # constants -- the same reason `pool` and `limit` already live there.
+    targets = ctx.get("targets") or TARGETS
+    per_target = int(ctx.get("per_target") or 1)
+    max_lineage = int(ctx.get("max_per_lineage") or 2)
+
+    def _demoted(r):
+        return (_is_forced(r.get("name"), forcing),
+                p_ratio is not None and float(r["metrics"].get("mech_p_ratio") or 0) > p_ratio)
+
+    def _score(r, expr):
+        """The target's own figure of merit, read from the metrics by name."""
+        m = r.get("metrics") or {}
+        return sum(float(m.get(k) or 0) * w for k, w in expr.items())
+
+    rows.sort(key=lambda r: (_demoted(r),
                              -float(r["metrics"].get("grip_peak") or 0),
                              -float(r["metrics"].get("protr_peak") or 0)))
+    picked, used, lineage = [], set(), {}
+
+    def _take(r):
+        if r["name"] in used:
+            return False
+        par = r.get("parent") or r["name"]
+        if lineage.get(par, 0) >= max_lineage:
+            return False
+        used.add(r["name"]); lineage[par] = lineage.get(par, 0) + 1
+        picked.append(r)
+        return True
+
+    # one seat per target morphology, best-of-target first, so a lone branched specimen is a parent
+    # even when every gripping run is a sphere
+    for tname, spec in targets.items():
+        cand = [r for r in rows
+                if not any(_demoted(r))
+                and (not spec.get("morphology")
+                     or (r["metrics"].get("morphology") in spec["morphology"]))]
+        cand.sort(key=lambda r: -_score(r, spec.get("score") or {"grip_peak": 1.0}))
+        for r in cand[:per_target]:
+            _take(r)
+    for r in rows:                              # fill the remainder in the old order
+        if len(picked) >= p_limit:
+            break
+        _take(r)
+    rows = picked + [r for r in rows if r["name"] not in used]
     if not rows:
         # ROUND 1 HAS NO RECORD TO BUILD FROM. The pool is declared in flow.yaml `args:` because it
         # is a campaign decision -- Cedric chose these recipes -- and it is read from each run's own
@@ -361,7 +441,12 @@ def parents(ctx):
     # to the Analyst in the `observations` block. They are simply not part of "here is what this
     # parent measured" for a role choosing what to try next.
     import metrics as _M
-    bank = set(_M.names())
+    # PLUS THE OBJECTIVE. `morphology` is `admitted = False` -- correctly, a prediction should not
+    # rest on a classifier's label -- but `admitted` governs what a prediction may NAME, not what a
+    # role may SEE. Since 10 August the parent set reserves a seat per target morphology, so
+    # filtering the label out handed every role a morphology objective and hid which morphology each
+    # parent is. Same set as crew/_prompt._OBJECTIVE, and for the same reason.
+    bank = set(_M.names()) | {"morphology", "morph_why", "morphology_path"}
     # ONE PARENT PER EXPERIMENT. Six recorded runs can be the same mechanism at the same operating
     # point -- a round's control is its parent unchanged, and an inert edit reproduces it exactly -- so
     # the parent set was offering six copies of two runs. Every structural or set_param edit proposed
@@ -389,8 +474,32 @@ def parents(ctx):
 
 
 def history(ctx):
-    """knowledge.md -- what previous rounds concluded, folded into round.md by hand between rounds."""
-    return _read(os.path.join(CAMPAIGN, "knowledge.md"), limit=12000)
+    """knowledge.md -- everything previous rounds concluded.
+
+    THE 12,000-CHARACTER TAIL DELETED TWENTY ROUNDS. `_read` keeps the LAST `limit` characters, and
+    knowledge.md is 38,591 of them, so what reached the roles was rounds r021-r028 and nothing
+    before: rounds 1-20 were invisible to every role, every round, with no TRUNCATED marker because
+    the cut happened here rather than in `_prompt.block`. A campaign that cannot see its own first
+    twenty rounds will re-propose what they settled, and it did.
+
+    The limit is a campaign decision, so it is declared in crew/flow.yaml and null means "all of
+    it". If this file ever grows past a context, the fix is to COMPACT it into a synthesis -- not to
+    silently drop the beginning, which is the oldest and most settled evidence there is.
+    """
+    lim = ctx.get("limit", None)
+    return _read(os.path.join(CAMPAIGN, "knowledge.md"), limit=(None if lim is None else int(lim)))
+
+
+def grounding(ctx):
+    """What the Grounder concluded LAST round -- the campaign's position against the target.
+
+    It was a terminal node: the Grounder wrote campaign/grounding.md and nothing ever read it,
+    while crew/grounder.md tells the role its verdict "becomes next round's proposal". Round 28's
+    said Okuda's tubes come from a mechanics leg rather than radial push and that four more rounds
+    of `extrude` could not answer it -- the most useful sentence the campaign produced that round,
+    and it reached no one.
+    """
+    return _read(os.path.join(CAMPAIGN, "grounding.md"), limit=ctx.get("limit") or 20000)
 
 
 def metric_bank(ctx):
@@ -408,6 +517,19 @@ FORCED_P_RATIO = 2.0   # mech_p_ratio above this is a pushed tube, not a grown o
 _FRAMES, _MAX_EDITS = 900, 4   # published by build_all from the graph; these are fallbacks
 _SWEEP_CELLS = 100_000         # the cell cap a Route A run is given; see _build_sweep
 MAX_EDITS = 4          # edits per slot; still one experiment, applied in order to one parent
+# THE MORPHOLOGIES THE CAMPAIGN IS CHASING, as a fallback for crew/flow.yaml `parents.args.targets`.
+# Okuda's three plus the bud. `score` is a weighted sum over the run's own metrics, so a target says
+# what "best" MEANS for it rather than inheriting one global scalar:
+#   tube      a sustained finger -- length over width is what separates it from a bulge
+#   bud       a bulge that is NOT yet a finger, so aspect counts against it
+#   branched  more than one tip on a sustained protrusion
+#   complex   undulation: many protrusions gripping the chemistry, no single dominant finger
+TARGETS = {
+    "tube":     {"morphology": ["tube"], "score": {"protrusion_aspect_max_peak": 1.0, "n_tubes_peak": 0.5}},
+    "bud":      {"morphology": ["sphere", "undulation"], "score": {"protr_peak": 1.0, "protrusion_aspect_max_peak": -0.3}},
+    "branched": {"morphology": ["branched"], "score": {"n_tips_peak": 1.0, "protr_peak": 0.5}},
+    "complex":  {"morphology": ["undulation", "branched"], "score": {"grip_peak": 1.0, "invagination_peak": 0.5}},
+}
 CLOSURE_N = 4          # distinct values RUN before a parameter leaves the menu
 BATTERY = os.path.join(HERE, "battery.json")     # written by prototype/Tyssue/op_probe.py --all
 
@@ -1851,14 +1973,24 @@ def check_pool(verbose=True):
         for name in ((n.get("args") or {}).get("pool") or []):
             try:
                 with contextlib.redirect_stdout(io.StringIO()):
-                    ok, rej = C.admit(_graph(name))
-                    n_menu = len(C.legal_menu(_graph(name), limit=60))
+                    # A POOL ENTRY WITH NO RUN ON DISK IS NOT A BROKEN COMPOSITION, it is one that
+                    # has not been measured yet -- `graph_from_run` rebuilds a parent from its own
+                    # spec_run.yaml and returns None when there is none. That surfaced as
+                    # "AttributeError: 'NoneType' object has no attribute 'roles'", which says
+                    # nothing about what to do; the answer is always "run it".
+                    _g_missing = _graph(name) is None
+                    if _g_missing:
+                        ok, rej = False, ["NO RUN ON DISK -- "
+                                          f"python cluster.py run {name} --frames 1800"]
+                    else:
+                        ok, rej = C.admit(_graph(name))
+                    n_menu = 0 if _g_missing else len(C.legal_menu(_graph(name), limit=60))
                     # THE PRE-FLIGHT MUST TEST WHAT THE CLUSTER TESTS. `--check` reported "pool OK"
                     # while run_one refused four of eleven runs before touching a GPU: critic.admit
                     # checks the composition's WIRING, and biologist.check checks the spec's own
                     # arithmetic -- a growth ceiling below the division trigger, chemistry on the
                     # mechanics clock. Two different questions, and only one was being asked here.
-                    static = _static_premises(name)
+                    static = [] if _g_missing else _static_premises(name)
             except Exception as e:
                 ok, rej, n_menu, static = False, [f"{type(e).__name__}: {e}"], 0, []
             if static:

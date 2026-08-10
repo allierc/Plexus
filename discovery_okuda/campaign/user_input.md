@@ -3,129 +3,108 @@
 Written by Cedric, read fresh by the Proposer and the Analyst at the top of every round.
 Edit this file mid-campaign -- the next round picks it up, no relaunch needed.
 
-## Pending Instructions
+*Note, 10 August 2026: for the first 28 rounds that sentence was false. `crew/flow.yaml` declared
+this file as an input to both roles and neither `crew/proposer.py` nor `crew/analyst.py` ever read
+it, so nothing written here reached anyone. It is wired now, and `load_flow` refuses to start if a
+declared input is not genuinely read -- so this channel cannot go silent again without the loop
+failing loudly. The previous contents are archived in
+`_archive_runs/2026-08-10_r001-r029_campaign/user_input.md`.*
 
-### 1. Your K_purse conclusion is WITHDRAWN. The operator never ran.
+---
 
-You reported `rd_interface_tension.K_purse` as inert. It is not inert -- it has never fired, in
-this campaign or the last one, and every statement resting on it is void rather than revised.
+## 1. The objective: FOUR morphologies at once, not one
 
-The gate is `red = a > a_sw * amax`, a fraction of the activator's OWN maximum. The operator's
-default `a_sw` was **1.0** -- cells strictly ABOVE the maximum, the empty set by construction --
-and the four `*_shaping` basis specs omitted `a_sw`, so they took that default. Route A then swept
-K_purse over [0, 0.25, 3, 6] and got four runs identical to FOUR SIGNIFICANT FIGURES (grip 0.04216,
-protr 1.087, 21 spots, 3267 cells) with `acted = 0` on every one. Four measurements of nothing.
+Explore **tube forming, budding, branching and complex shape together.**
 
-This is the SECOND write-off of the same operator without running it; the first is in section 3
-below, where `a_sw` was an absolute value against a field whose median maximum is 0.000. That fix
-made it a fraction and left a default that is a fraction of one.
+This is a change of objective and it is deliberate. The previous campaign ranked candidate parents
+by `grip_peak` then `protr_peak` -- one scalar, greedy, no diversity term. One scalar can only
+climb one hill. Measured over r001-r029: **18 distinct compositions across 196 structural records,
+one composition proposed 87 times, `r020_06` the parent of 33 slots**, and for four consecutive
+rounds the top six parents were five clones of one result at protr_peak 1.595.
 
-WHAT K_purse IS, because it matters to your open problem. rd_interface_tension carries
-`E = K_purse * sum_interface(edge length) - K_extrude * sum_red(a*r)`. K_purse is a LINE TENSION on
-the red/white boundary -- a purse-string that contracts the ring around an activated patch. It is
-how an epithelium necks a bud into a tube, and your standing result is that you make fat buds and
-not tubes. K_extrude is the other half, an energy that falls as red cells move outward; it stays at
-zero and a run carrying it above zero is a control, not evidence.
+The parent set is now a **portfolio with a reserved seat per target** (`crew/flow.yaml`,
+`parents.args.targets`), plus a lineage cap so no family can take the table:
 
-REPAIRED, and both places, because either alone leaves the trap: the operator's default is now 0.6
-and the four `*_shaping` bases write `a_sw: 0.6` explicitly. Their runs have been re-measured, so
-the basis you build on now has a purse-string that fires. The four void sweep records are deleted
-from `records.jsonl` (backup in `campaign/_archive/`), so the ladder is OPEN and Route A will offer
-it again. Sweep it as if for the first time, because it is.
+| target | what it is | scored on |
+|---|---|---|
+| `tube` | a sustained finger | `protrusion_aspect_max_peak`, `n_tubes_peak` |
+| `bud` | a BULGE that is not yet a finger -- aspect counts AGAINST it | `protr_peak`, minus `protrusion_aspect_max_peak` |
+| `branched` | more than one tip on a sustained protrusion | `n_tips_peak`, `protr_peak` |
+| `complex` | undulation: many protrusions gripping, no dominant finger | `grip_peak`, `invagination_peak` |
 
-### 2. You now have an instrument that can see INWARD: `invagination`.
+**A run is not a failure for being the wrong shape.** A bud is not a bad tube. Each target holds its
+own seat and is judged by its own figure of merit, so a lone branched specimen is a parent even when
+every high-grip run is a sphere.
 
-Every shape metric you have measures outward excursion -- `protr_peak`, `protrusion_aspect_max`,
-`n_tubes`, `act_at_tip` -- or the whole body -- `reduced_volume`, `gyr_prolate`. Invagination is one
-of Okuda's three morphologies and you had no way to detect one. Twenty rounds could have produced a
-pit and reported a sphere.
+`morphology` is now shown in the parent block. It is `admitted = False` -- do NOT rest a prediction
+on a classifier's label, rest it on a number -- but use it to see which target a parent serves.
 
-`invagination` is how far the deepest dimple sits below the tissue's own radius, as a fraction of
-it, measured on cell radii smoothed over ring neighbours so one squeezed cell is not a dimple.
+## 2. Start from scratch
 
-READ IT AGAINST A CONTROL, NOT ABSOLUTELY. A quiet 2,000-cell vesicle reads about 0.019 after 600
-frames -- that is mesh roughness, not morphology. Measured on the apoptosis smoke runs, ordered by
-how many cells were removed: control 0.0189, one death 0.0194, a 76-cell cap 0.0297, a 278-cell
-band 0.0307, nine bands 0.0461.
+Nothing is inherited. `records.jsonl` is empty, `knowledge.md` is empty, and the parent set seeds
+from the 16-member basis pool. The old ledger, its knowledge and the graph that produced it are in
+`_archive_runs/2026-08-10_r001-r029_campaign/`, including `flow.yaml.asrun` -- that campaign's
+behaviour was a property of its graph, and reading the records without it would blame the agents.
 
-### 3. `mech_p_ratio` is NOT a forcing test when no forcing operator is present. Retract the verdict.
+## 3. There is no push force any more, by construction
 
-For four rounds your headline has been "protr and grip past the wall are bought with forcing, not
-growth", and for four rounds the run it rests on has carried no forcing term at all.
+`rd_interface_tension` carried two terms under one name: `K_purse`, an ordinary line tension on the
+activator interface, and `K_extrude`, an energy that FALLS as activated cells move outward -- the
+answer written into the objective. They are two operators now:
 
-**`r017_07` has no `rd_interface_tension` operator in its spec.** There is no `K_extrude` in it to
-set, at any value. The structural test agrees: `_is_forced(r017_07)` returns False, and the same
-for `r014_01` and `r017_02`. Nothing is pushing these runs. `mech_p_ratio` is a PROXY -- the ratio
-of pressure in the protrusion to pressure in the body -- and round.py's own note says why it is
-kept only alongside the structural test: "the proxy did not fire" on a run that WAS forced, and it
-can equally fire on a run that is not.
+- `interface_line_tension_3d` -- the purse-string. **IN** the vocabulary. It has no `K_extrude` key
+  at all, so the forcing is absent rather than defaulted to zero.
+- `extrusion_forcing_3d` -- the forcing alone, under a name that says so. **NOT** in
+  `composition_space`. No edit you can write reaches it.
 
-So two of your standing conclusions are wrong as stated:
+**Do not spend slots arguing about whether a result was forced.** It cannot have been. `K_extrude`
+measured 0.0 in all 78 specs that ever carried the old operator -- nothing this project ever ran was
+forced -- and the Grounder still called r028 "the same extrude-forced star for a fourth round", on
+runs whose specs contain no such operator at all. That same verdict was already retracted once, for
+`r017_07`, in section 3 of the previous version of this file.
 
-- **"the grown wall stands, no unforced run beats protr 1.204"** -- `r017_07` at protr 1.588 and
-  grip 0.198 IS unforced. The wall you have been reporting for fifteen rounds does not exist at
-  1.204; it is at least 1.588.
-- **"forcing stays linear past protr 1.5"** -- the correlation you fitted (ratio 2.284/2.025/1.958
-  -> protr 1.588/1.268/1.453) is between two consequences of something else, not cause and effect.
+The measured stand-in (`mech_p_ratio > 2.0`) is **off**. It demoted 11 runs to last place
+permanently and not one was ever used as a parent -- among them `r019_07`, protr_peak **1.817**,
+grip_peak **0.294**, the highest of both in the whole campaign, against a control ceiling of
+1.595 / 0.262 that four rounds could not beat. The best result the loop ever produced was
+structurally unreachable.
 
-### 4. What that something else is, and the control it needs.
+## 4. Cell death is in the vocabulary AND in the basis
 
-`r017_07` differs from its parent `r014_01` (protr 1.453, n_tubes 0) by ONE edit:
-`remove_op reconnect_t1_3d0`. T1 transitions are gone, so cells cannot exchange neighbours. With
-topology frozen, pressure has no way to equilibrate between a bud and the body -- which raises
-`p_tube/p_body` mechanically, with no external force anywhere. That is the likelier reading of
-`mech_p_ratio` 2.284, and it is testable.
+`apoptosis_3d` is the Die family -- the first mechanism here that deforms the sheet **inward**
+(Monier et al. 2015: apoptotic force drives epithelial folding). Every other operator pushes
+outward, which is why invagination was never reached.
 
-**Do not credit any protrusion measured without `reconnect_t1_3d` until this is controlled.** A
-protrusion on a mesh that cannot rearrange may be a stretched sheet rather than remodelled tissue,
-and stretching is what premise P7 used to refuse before it was retired. `protrusion_aspect_max`
-1.748 with `tube_diam` 1.698, and the eye reading "fat rounded buds", fit stretching better than
-tubulation.
+It was injected before round 25 and **never once chosen in five rounds**, while sitting on the menu
+and being named by `coverage` as the only operator never exercised. Route A could not reach it
+either -- `_build_sweep` refuses a base that does not already carry the operator. So it is now in
+the **basis**: one death twin per Route A base (`b_*_death`), which makes `mode` and
+`max_mark_frac` sweepable ladders.
 
-The control is cheap and it is one slot: `r017_07` WITH `reconnect_t1_3d` restored, everything else
-identical. If protr survives at ~1.6, the T1 removal was incidental and you have a real result. If
-it falls back toward 1.45, the protrusion was the frozen mesh and the last four rounds measured an
-artefact. Please run it, and report both numbers side by side.
+`max_mark_frac` is the knob that matters. It caps how much of the tissue may be under sentence at
+once, so the mode chooses WHO dies and the cap chooses HOW FAST. Uncapped, five of six modes
+destroyed the best parents (r020_00_ctrl: protr 1.513 -> 1.131, grip 0.228 -> 0.049, 1,660 of 7,424
+cells dead). At 0.005 all six finish within a few percent of the parent with no premise broken.
 
-### 5. I have watched r017_07 and r014_01. They are real protrusions -- use them as parents.
+## 5. What the loop still cannot do -- named so you do not mistake these for your own failures
 
-This overrides the caution in 2 above about crediting them, and it is a judgement from the movies,
-not from the metrics. There ARE protrusions there. They are too big in DIAMETER to be Okuda's thin
-tubes, but nothing about them looks broken and the metrics agree -- no premise fails,
-`reduced_volume` 0.82-0.90, `valid_frac` 1.0, `corr_act_rad` up to 0.968.
+- **No serendipity organ.** Nothing notices a result that was interesting but not what the round was
+  testing. `hypothesis.py` implements one -- surprise rate, novelty yield, an intent-mix band -- and
+  is imported by nothing.
+- **No global hypothesis.** Every proposal is `(parent, edit, one metric, one threshold)`. A claim
+  spanning runs -- "grip is set by the diffusion RATIO, not by `d_a`" -- cannot be posed or scored.
+- **No quota.** `intent` is free text and nothing counts it. If you label five replicates
+  `adversarial`, nothing objects.
+- **Prior knowledge is one-way.** `_premises_raw.md` holds 70 literature-sourced facts; 11 became
+  gates and 59 are unread. Among them: *tissues stop growing when compressed; a growth law that
+  reads only a chemical signal has no mechanism by which it can ever stop* -- a direct diagnosis of
+  this project's 30,743-cell overshoot.
 
-    log/okuda/r017_07   protr 1.588  grip 0.198  n_tubes 3  2486c   2 spots  p_ratio 2.284
-    log/okuda/r014_01   protr 1.453  grip 0.139  n_tubes 0  2286c   1 spot   p_ratio 1.958
-    log/okuda/r017_02   protr 1.204  grip 0.115  n_tubes 0  4001c  18 SPOTS  p_ratio 0.0
+## 6. Two habits the record says to break
 
-`r017_02` IS THE MOST IMPORTANT OF THE THREE and you have been filing it under "sits below the
-wall". It is unforced on BOTH tests -- no rd_interface_tension operator, and the pressure proxy
-reads exactly 0.0, where r017_07 and r014_01 have the two tests disagreeing. And it carries
-EIGHTEEN spots against their one and two: it already has the fine length scale that 4 asks for,
-which the two big-protrusion runs do not.
-
-The campaign's question is now one sentence: can r017_02's 18 spots be made to protrude, rather
-than r017_07's 2 buds be made thinner? Build from r017_02 as well, not only from the two that
-score highest on protr.
-
-Treat both as definitive parents and build from them. Stop discounting them as forced -- as 1
-establishes, neither carries a forcing operator at all.
-
-The T1 control in 2 is still worth ONE slot, because it tells you which of the two is the better
-base to build on. It is not a reason to withhold either from the parent set in the meantime.
-
-### 6. Make the activity smaller in radius -- and note r017_02 already did it.
-
-This is the standing gap and the Grounder has it exactly: "need ~10 thin tubes at spot_cells ~10;
-got 2 buds at 262". A bud 262 cells across cannot become a thin tube -- the pattern has to set a
-finer length scale before the mechanics can pull a finger out of it, and every round that grows a
-protrusion at the current spot size is going to produce another fat bud.
-
-The length scale is the chemistry's, not the mechanics'. Reach for it there: `cell_diffuse.d_a`
-and the `d_h/d_a` ratio set the Turing wavelength directly, `cell_react.F`/`kk` move Gray-Scott
-between spots and labyrinth, and `seed_cell_rd.cone_deg` sets it by hand as an initial condition
-(22.8 degrees is 10 cells across on a 2,000-cell sphere; smaller cones, more of them).
-
-Your own anticorrelation is the thing to break: "coarser-grips-harder", fifteen rounds of it --
-n_spots 18/41/40/83 giving grip 0.115/0.097/0.071/0.028. Small spots have never gripped. That is
-the finding to attack, not to keep confirming.
+- **Duplication is currently free.** A refused duplicate is re-admitted at a fresh seed, relabelled
+  `replicate`, and scored against the copied prediction -- so re-proposing a known experiment
+  survives and inflates the confirm rate. It was 5 of 7 Route B slots in r028 and 4 of 5 in r027.
+  Replicates bound the seed floor; two per round is plenty.
+- **`add_op` has fired 30 times in this project's history and all 30 added the same operator**, none
+  since round 24. An operator nothing has exercised answers a question no retune can.

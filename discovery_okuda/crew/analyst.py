@@ -63,7 +63,16 @@ def run(bundle):
          bundle.get("observations")),
         ("What the eye saw", bundle.get("observed"), {"as_json": False, "limit": 16000}),
         ("What previous rounds concluded", bundle.get("history"), {"as_json": False,
-                                                                  "limit": 12000}),
+                                                                  "limit": 200000}),
+        # DECLARED IN flow.yaml, NEVER READ HERE -- see the note in proposer.py. `route_a_results`
+        # is the worse of the two: the node exists precisely because "the one thing a sweep
+        # produces, a RESPONSE CURVE, was the one thing nothing assembled", and then the assembled
+        # curves were handed to nobody. Half the compute -- 220 of 416 slots over 28 rounds --
+        # produced no scored outcome AND no reader.
+        ("Route A response curves -- what each swept ladder actually did",
+         bundle.get("route_a_results"), {"limit": 60000}),
+        ("INSTRUCTIONS FROM THE OPERATOR -- these outrank anything above",
+         bundle.get("user_input"), {"as_json": False, "limit": 30000}),
         ("Your task", f"Append this round's analysis to {a_md}, and append to {k_md} only what "
                       f"survives the round, each fact with the number that makes it one. Write no "
                       f"other file.", {"as_json": False}),

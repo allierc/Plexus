@@ -72,6 +72,16 @@ def block(title, payload, *, as_json=True, limit=None):
     return f"\n## {title}\n{body}\n"
 
 
+# THE CAMPAIGN'S OBJECTIVE MUST BE VISIBLE TO THE ROLES, whatever the bank says. From 10 August the
+# loop chases four morphologies at once -- tube, bud, branched, complex -- and the parent set
+# reserves a seat for each. `morphology` and `morph_why` are the classifier's verdict and are
+# declared `admitted = False` (rightly: a prediction should not rest on a classifier's label), but
+# `admitted` governs what a PREDICTION may name, not what a role may SEE. Filtering them out left
+# every role choosing parents for a morphology objective while blind to which morphology each parent
+# actually is.
+_OBJECTIVE = {"morphology", "morph_why", "morphology_path"}
+
+
 def bank_only(metrics):
     """{run: summary} reduced to the 24 admitted quantities. What a ROLE is given.
 
@@ -86,7 +96,7 @@ def bank_only(metrics):
     """
     try:
         import metrics as _M
-        bank = set(_M.names())
+        bank = set(_M.names()) | _OBJECTIVE
     except Exception:
         return metrics
     if not isinstance(metrics, dict):

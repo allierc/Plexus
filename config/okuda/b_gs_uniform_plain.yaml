@@ -1,9 +1,9 @@
 general:
   name: b_gs_uniform_plain
   seed: 0
-  n_frames: 900
+  n_frames: 1800
   dt: 1.0
-  record_cap: 902
+  record_cap: 1802
   record_every: 1
   boundary: free
   dim: 3
@@ -129,7 +129,8 @@ _basis:
   chem: gs
   mat: uniform
   mech: plain
-  grid: 4 chemistry x 2 material x 2 mechanics
+  death: false
+  grid: 4 chemistry x 2 material x 2 mechanics, + a death twin of each Route A base
   why: chemistry=gs, material=uniform, mechanics=plain -- one cell of the basis grid
     written by make_basis.py; every value not on an axis is shared with the other
     fifteen.

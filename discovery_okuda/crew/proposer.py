@@ -80,7 +80,26 @@ def run(bundle):
         ("What went wrong last round, and the cheapest way to find out why",
          bundle.get("diagnosis"), {"as_json": False}),
         ("What previous rounds concluded", bundle.get("history"), {"as_json": False,
-                                                                  "limit": 12000}),
+                                                                  "limit": 200000}),
+        # THREE EDGES THAT flow.yaml DECLARED AND THIS FILE DID NOT READ. `load_flow` checks that
+        # every emitted name appears in SOME node's `in:`; it cannot check that the node uses it,
+        # so `refusals` and `user_input` were listed as Proposer inputs, computed every round, and
+        # dropped on the floor. The measured cost: `campaign/user_input.md` is the human steering
+        # channel -- the place the operator writes "this verdict is wrong, retract it" -- and for
+        # 28 rounds it reached NO role at all. `refusals` was added after twelve refusals across
+        # two rounds halted the campaign with the Proposer never told; it has been equally silent.
+        #
+        # `grounding` is new. The Grounder writes the campaign's most strategic sentence and it
+        # died in a file nothing read: last round it said Okuda's tubes come from a mechanics leg,
+        # not radial push, and that four rounds of `extrude` cannot answer it. Correct, and
+        # discarded. crew/grounder.md already tells the role its verdict "becomes next round's
+        # proposal", which was simply not true.
+        ("What could NOT be run last round, and why -- do not re-propose these",
+         bundle.get("refusals"), {"as_json": False, "limit": 20000}),
+        ("Where the campaign stands, and what it is missing (the Grounder, last round)",
+         bundle.get("grounding"), {"as_json": False, "limit": 20000}),
+        ("INSTRUCTIONS FROM THE OPERATOR -- these outrank anything above",
+         bundle.get("user_input"), {"as_json": False, "limit": 30000}),
         (f"Your task", f"Propose {n - 1} slots (slot 0 is the control, already filled). "
                        f"Write the JSON list to {out_file} and nothing else.", {"as_json": False}),
     ])

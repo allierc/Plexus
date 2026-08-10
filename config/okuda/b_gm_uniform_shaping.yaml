@@ -1,9 +1,9 @@
 general:
   name: b_gm_uniform_shaping
   seed: 0
-  n_frames: 900
+  n_frames: 1800
   dt: 1.0
-  record_cap: 902
+  record_cap: 1802
   record_every: 1
   boundary: free
   dim: 3
@@ -136,7 +136,8 @@ _basis:
   chem: gm
   mat: uniform
   mech: shaping
-  grid: 4 chemistry x 2 material x 2 mechanics
+  death: false
+  grid: 4 chemistry x 2 material x 2 mechanics, + a death twin of each Route A base
   why: chemistry=gm, material=uniform, mechanics=shaping -- one cell of the basis
     grid written by make_basis.py; every value not on an axis is shared with the other
     fifteen.
