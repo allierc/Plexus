@@ -18,6 +18,10 @@ from scipy.spatial import SphericalVoronoi
 from plexus.models.base import Lateral, Structural
 from plexus.models.registry import register_operator
 
+# Every frame whose relaxation ran WITHOUT the per-junction myosin because the array and the half-edge
+# buffer had different lengths: (myosin length, half-edge count). Empty is the only correct value.
+MYO_SKIPPED: list = []
+
 
 def fib_sphere(n, r=1.0):
     i = np.arange(n) + 0.5
@@ -312,7 +316,18 @@ class ShapeEnergy3D(Lateral):
         """
         myo = m.get("myo") if isinstance(m, dict) else None
         if myo is not None and myo.shape[0] != a[1].shape[0]:
-            myo = None                      # half-edge count changed since it was written; skip a frame
+            # A FRAME RELAXED WITH NO MYOSIN AT ALL, which is the operator being off rather than the
+            # operator being approximated -- and it used to happen in silence. It should now be
+            # unreachable: `junction_myosin_sync` re-keys the array after every topology operator, so a
+            # mismatch here means the sync is missing from the schedule or is placed before the operator
+            # that resized the buffer. Counted and announced once rather than raised, because raising
+            # would take down every archived specification that predates the sync operator.
+            MYO_SKIPPED.append((int(myo.shape[0]), int(a[1].shape[0])))
+            if len(MYO_SKIPPED) == 1:
+                print(f"[shape_energy_3d] myosin array is {myo.shape[0]} long against "
+                      f"{a[1].shape[0]} half-edges -- relaxing WITHOUT myosin this frame. Schedule "
+                      f"`junction_myosin_sync` after the topology operators.", flush=True)
+            myo = None
         return self._grad(*a, myo_e=myo, **kw)
 
     @staticmethod
