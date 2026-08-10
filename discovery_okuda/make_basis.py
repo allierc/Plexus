@@ -38,7 +38,7 @@ THE THREE AXES
   mechanics (2)   plain | shaping
                   plain: area/perimeter/volume elasticity only. shaping: plus dihedral bending
                   (K_bend), lumen incompressibility (K_lumen), and a line tension on the red/white
-                  interface (rd_interface_tension.K_purse) -- the three terms that can neck a lobe
+                  interface (interface_line_tension_3d.K_purse) -- the three terms that can neck a lobe
                   into a finger.
 
                   ALL TWELVE RUN `shape_energy_3d` WITH ITS DEFAULT MODEL, and that is a change.
@@ -50,7 +50,7 @@ THE THREE AXES
                   pattern survives on this mechanics is one of the things this batch measures.
 
                   K_extrude STAYS AT ZERO in all twelve. It is the other half of
-                  rd_interface_tension and it multiplies an energy that FALLS as red cells move
+                  the old rd_interface_tension and it multiplies an energy that FALLS as red cells move
                   outward -- a composition carrying it is paid to have a protrusion, which is why
                   `round.parents` sorts it last. K_purse is the sound half: an ordinary line tension.
 
@@ -145,7 +145,7 @@ MECH = dict(K_A=1.0, K_P=1.0, K_V=20.0, K_R=0.0, Lambda=0.5, Gamma=0.4, p0=3.5,
 # carry a term that pays it to stay.
 
 SHAPING = dict(K_bend=0.02, K_lumen=0.5)     # off (0.0) in the `plain` half
-K_PURSE = 1.0                                # rd_interface_tension, `shaping` half only
+K_PURSE = 1.0                                # interface_line_tension_3d, `shaping` half only
 
 RD = dict(d_a=0.08, d_h=0.16, chi=1.3)
 GS = dict(F=0.046, kk=0.062, rate=1.0)                 # the coral spots the campaign knows
@@ -259,8 +259,8 @@ def build(chem, mat, mech):
         # "cells above 100% of the maximum" -- so the purse-string never fired in a single run of
         # the basis or of nineteen campaign rounds, and Route A's K_purse ladder measured nothing
         # four times over. A fraction of the activator's own maximum: 0.6 is the top 40%.
-        ops.append({"op": "rd_interface_tension", "at": "vertex", "cell_set": "cell",
-                    "K_purse": K_PURSE, "K_extrude": 0.0, "a_sw": 0.6})
+        ops.append({"op": "interface_line_tension_3d", "at": "vertex", "cell_set": "cell",
+                    "K_purse": K_PURSE, "a_sw": 0.6})
     ops += [
         {"op": "divide_3d", "at": "vertex", "cell_set": "cell", "factor": DIVIDE_FACTOR,
          # `reset_noise` IS NOT HERE, and the first draft copied it from coral_gate_div. It was

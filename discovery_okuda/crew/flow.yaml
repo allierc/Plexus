@@ -75,11 +75,11 @@ nodes:
     code: round.parents
     args:
       # HOW MANY to build from, and what counts as FORCED. The second is a judgement about
-      # evidence -- a composition carrying `rd_interface_tension.K_extrude > 0` is paid to have a
+      # evidence -- a composition carrying `extrusion_forcing_3d` is paid to have a
       # protrusion -- so it is a campaign decision, not arithmetic.
       limit: 6
       forced_p_ratio: 2.0
-      forcing_terms: {rd_interface_tension: K_extrude}
+      forcing_terms: {extrusion_forcing_3d: K_extrude}   # split out 10 Aug; NOT in the vocabulary
       # EVERY ENTRY REBUILDS AND ADMITS. Checked by `round.py --check`, because the first version of
       # this pool did not: two of its six entries were inadmissible and it took a live Proposer call
       # to find out. All were measured, not remembered -- metrics come from each run's own diag.json.
@@ -106,7 +106,7 @@ nodes:
         #
         #   chemistry   none | gray-scott | gierer-meinhardt | brusselator
         #   material    static (divide, no growth) | uniform (gate open) | gated (Hill on activator)
-        #   mechanics   plain | shaping (K_bend + K_lumen + rd_interface_tension.K_purse)
+        #   mechanics   plain | shaping (K_bend + K_lumen + interface_line_tension_3d.K_purse)
         #
         # THE MECHANICS COLUMN IS THE ONE THAT WAS UNREACHABLE. `coral_gate_div` ran
         # `shape_energy_3d model: monolayer`, whose parameter list contains no K_bend and no
@@ -378,7 +378,7 @@ nodes:
         - [b_gs_gated_plain,     divide_3d, factor,   [11.0, 16.0, 24.0]]
         - [b_gs_gated_shaping,   shape_energy_3d, K_bend,  [0.0, 0.005, 0.08, 0.3]]
         - [b_gs_gated_shaping,   shape_energy_3d, K_lumen, [0.0, 0.1, 2.0, 8.0]]
-        - [b_gs_gated_shaping,   rd_interface_tension, K_purse, [0.0, 0.25, 3.0, 6.0]]
+        - [b_gs_gated_shaping,   interface_line_tension_3d, K_purse, [0.0, 0.25, 3.0, 6.0]]
         - [b_gs_gated_shaping,   shape_energy_3d, K_V,     [5.0, 10.0, 40.0, 80.0]]
         - [b_gs_gated_shaping,   shape_energy_3d, Lambda,  [0.0, 0.2, 1.0, 2.0]]
 

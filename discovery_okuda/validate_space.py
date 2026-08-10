@@ -10,7 +10,7 @@ is the test battery.
     V4  DEFECT FIXES     every emitted config carries the D1/D2/D3 fixes
     V5  PRECONDITIONS    a composition that would silently no-op is REFUSED, not run  (D4)
     V6  IDENTITY         theta never changes comp_hash; an implementation swap always does
-    V7  ABLATION         the campaign's central test (remove `extrude`) is one legal edit
+    V7  ABLATION         the campaign's central test (remove `interface_line_tension_3d`) is one legal edit
     V8  COVERAGE         every operator in the vocabulary is exercised by >=1 emitted config
 
     python validate_space.py            # battery only (seconds, no simulation)
@@ -227,13 +227,13 @@ def main():
     check("V5 compilation refuses it", refused,
           "a composition that would no-op never reaches the cluster")
 
-    # THE ANCHOR MOVED FROM `grow_3d.gate` TO `extrude.site`, and it had to. The gate is now an
+    # THE ANCHOR MOVED FROM `grow_3d.gate` TO `interface_line_tension_3d.site`, and it had to. The gate is now an
     # `opt_slots` entry -- leaving it unwired selects the rho baseline, which is uniform growth and
     # a legal composition -- so a test that proved dangling slots are caught by pointing at the one
-    # slot that is allowed to dangle would pass forever without testing anything. `extrude.site`
+    # slot that is allowed to dangle would pass forever without testing anything. `interface_line_tension_3d.site`
     # is still required: the forcing term with nothing selecting the cells it pushes is inert.
     dangling, _ = seed("substrate").apply(("add_op", "seed_cell_rd", "cone"))
-    dangling, _ = dangling.apply(("add_op", "extrude", "radial_push"))
+    dangling, _ = dangling.apply(("add_op", "interface_line_tension_3d", "default"))
     check("V5 dangling slot detected", len(dangling.unrouted_slots()) >= 1,
           f"{dangling.unrouted_slots()} -- present but disconnected == inert")
 
@@ -252,20 +252,20 @@ def main():
               "mid-surface vs true 3D volume is a mechanism edit")
 
     # ---------------------------------------------------------------- V7 the central ablation
-    print("\nV7 CENTRAL ABLATION -- `extrude` removable by one legal edit?")
+    print("\nV7 CENTRAL ABLATION -- `interface_line_tension_3d` removable by one legal edit?")
     r40 = graphs.get("ref_round40_mc8")
     if r40:
-        ex = next((o["id"] for o in r40.ops if o["op"] == "extrude"), None)
+        ex = next((o["id"] for o in r40.ops if o["op"] == "interface_line_tension_3d"), None)
         if ex:
             ab, _ = r40.apply(("remove_op", ex))
             ok, why = ab.is_runnable()
-            check("V7 ablate extrude", ok,
+            check("V7 ablate interface tension", ok,
                   f"{comp_hash(r40)} -> {comp_hash(ab)}  region -> {ab.name_region()!r}")
             check("V7 ablation is in the legal move set",
                   any(e[0] == "remove_op" and e[1] == ex for e, _ in r40.legal_edits(3)),
                   "round 41 by hand == one automatic necessity test here")
         else:
-            check("V7 ablate extrude", False, "reference recipe has no extrude node")
+            check("V7 ablate interface tension", False, "reference recipe has no interface-tension node")
 
     # ---------------------------------------------------------------- V11 chemistry clock
     print("\nV11 CHEMISTRY CLOCK -- is the RD rescaling exactly 1/dt, and is the RATIO intact?")

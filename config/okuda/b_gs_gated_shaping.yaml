@@ -94,11 +94,10 @@ operators:
   cap_frac: 0.12
   K_bend: 0.02
   K_lumen: 0.5
-- op: rd_interface_tension
+- op: interface_line_tension_3d
   at: vertex
   cell_set: cell
   K_purse: 1.0
-  K_extrude: 0.0
   a_sw: 0.6
 - op: divide_3d
   at: vertex
@@ -128,7 +127,7 @@ schedule:
 - shape_to_chem
 - grow_3d
 - shape_energy_3d
-- rd_interface_tension
+- interface_line_tension_3d
 - divide_3d
 - reconnect_t1_3d
 - topo_snapshot_3d

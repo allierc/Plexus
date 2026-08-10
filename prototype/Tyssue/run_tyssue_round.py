@@ -545,8 +545,15 @@ def make(p):
     ops += [{"op": "grow_3d", "at": "vertex", "cell_set": "cell", "rate": p["rate"], "a_sw": p["a_sw"], "hill": p.get("hill", 4.0), "rho": p["rho"], "vth_frac": p["vth"], "after_frame": ga, "dt": dt, "conserve_amount": p.get("conserve_amount", True)}, se]
     sched += ["grow_3d", "shape_energy_3d"]
     if p.get("K_purse", 0.0) > 0 or p.get("K_extrude", 0.0) > 0:   # RD-INTERFACE tube mechanism (purse-string + red extrusion)
-        ops += [{"op": "rd_interface_tension", "at": "vertex", "cell_set": "cell", "K_purse": p.get("K_purse", 0.0), "K_extrude": p.get("K_extrude", 0.0), "a_sw": p.get("iface_asw", p["a_sw"]), "eta": p.get("iface_eta", 0.05), "iters": 4, "after_frame": ga}]
-        sched += ["rd_interface_tension"]
+        # SPLIT 10 August: the purse-string and the outward forcing are two operators now, so a
+        # recipe asking for the forcing has to name it. K_extrude was 0.0 in every campaign spec,
+        # so nothing that ever ran changes; only a recipe that deliberately sets it gets the second
+        # operator, and the record then shows the control for what it is.
+        ops += [{"op": "interface_line_tension_3d", "at": "vertex", "cell_set": "cell", "K_purse": p.get("K_purse", 0.0), "a_sw": p.get("iface_asw", p["a_sw"]), "eta": p.get("iface_eta", 0.05), "iters": 4, "after_frame": ga}]
+        sched += ["interface_line_tension_3d"]
+        if float(p.get("K_extrude", 0.0)) > 0:
+            ops += [{"op": "extrusion_forcing_3d", "at": "vertex", "cell_set": "cell", "K_extrude": p.get("K_extrude", 0.0), "a_sw": p.get("iface_asw", p["a_sw"]), "eta": p.get("iface_eta", 0.05), "iters": 4, "after_frame": ga}]
+            sched += ["extrusion_forcing_3d"]
     ops += [{"op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": p.get("l_th_frac", 0.28), "every": p.get("t1_every", 1), "max_flips": p.get("max_flips", 300)},
             {"op": "divide_3d", "at": "vertex", "factor": 2.0, "reset_noise": 0.12, "cycle_cv": p.get("cycle_cv", 0.4), "p0": 3.90, "every": 2, "max_div": 120, "max_div_frac": p.get("mdf", 0.03), "vcap": p.get("vcap", 0.0), "cell_set": "cell", "min_cycle": p.get("min_cycle", 4), "max_cycle": p.get("max_cycle", 1000000000), "after_frame": ga, "orient_iface": p.get("orient_iface", False), "orient_asw": p.get("orient_asw", p.get("a_sw", 1.0)), "g1_ramp": p.get("g1_ramp", False)},
             {"op": "topo_snapshot_3d", "at": "vertex", "every": 1}]

@@ -479,9 +479,9 @@ OPERATORS = {
                 # the per-mode default lives on the operator (_STALL_DEFAULT); 0.7 is
                 # `competition`'s, which is the default mode
                 "stall_frac": (0.50, 0.95, 0.70)}),
-    "extrude": dict(                                          # THE FORCING TERM -- ablatable
-        stage=2, role="forcing", outputs=[], slots=["site"], needs=["morphogen"],
-        impls=["radial_push"], impl_structural=False,
+    "interface_line_tension_3d": dict(          # the purse-string alone; the forcing is NOT in this vocabulary
+        stage=2, role="tension", outputs=[], slots=["site"], needs=["morphogen"],
+        impls=["default"], impl_structural=False,
         # THE ENGINE OP CARRIES TWO TERMS AND THE SPACE EXPOSED ONE:
         #     E = K_purse * sum_iface l_e  -  K_extrude * sum_red a*r
         # `K_purse` is a line tension on the red/white interface -- ordinary vertex-model physics
@@ -503,7 +503,21 @@ OPERATORS = {
         # an absolute value declared (0.2, 6.0) against a field whose median maximum is 0.000, and
         # the operator returned {} on all 800 frames of every run. See tyssue_rd_ops for the
         # measurement; a threshold relative to the field cannot be outside the field.
-        params={"K_purse": (0.0, 6.0, 1.0), "K_extrude": (0.0, 14.0, 0.0),
+        # THE FORCING TERM IS GONE FROM THIS SPACE, not merely defaulted to zero. It used to be
+        # `K_extrude: (0.0, 14.0, 0.0)` on this same operator: an energy that FALLS as red cells
+        # move outward, i.e. the answer written into the objective rather than a mechanism. A
+        # default of 0 made it harmless in practice and unreadable in principle -- `K_extrude`
+        # measured 0.0 in all 78 specs that ever carried the operator, and the Grounder still
+        # called r028 "the same extrude-forced star for a fourth round", on runs whose specs hold
+        # no such operator at all. It now lives in `extrusion_forcing_3d`, which this vocabulary
+        # does not contain, so no edit the Proposer can write pushes anything. Running the forcing
+        # is an explicit act outside the loop, which is what a control should cost.
+        #
+        # `a_sw` is a FRACTION OF THE ACTIVATOR'S OWN MAXIMUM -- 0.6 means "the top 40% of the
+        # field is red" -- so it selects a set that exists at every operating point. It was once an
+        # absolute value declared (0.2, 6.0) against a field whose median maximum is 0.000, and the
+        # operator returned {} on all 800 frames of every run.
+        params={"K_purse": (0.0, 6.0, 1.0),
                 "a_sw": (0.3, 0.95, 0.6)}),
 
     # ---------------------------------------------------------------- Stage 3: patterning
@@ -599,10 +613,17 @@ OPERATORS = {
         params={"cone_deg": (4.0, 30.0, 8.0),
                 "seed_frac": (0.01, 0.30, 0.06),
                 "n_spots": (1, 8, 1)}),
-    # NOTE: there is deliberately no separate `rd_interface_tension` node. In the engine that op
-    # carries BOTH K_purse and K_extrude; the mechanism we need to ablate is the outward forcing,
-    # so it is exposed once, as `extrude`. A second node would be the same engine operator under
-    # two names -- which would let one mechanism occupy two points of the search space.
+    # NOTE, REWRITTEN 10 AUGUST. This used to argue that the purse-string and the outward forcing
+    # should stay ONE node, because "a second node would be the same engine operator under two
+    # names -- which would let one mechanism occupy two points of the search space." That reasoning
+    # was sound about the engine and wrong about the search: they are not one mechanism. A line
+    # tension on the interface is ordinary physics; an energy that falls as red cells move outward
+    # is the answer written into the objective. Holding both under one plausible name made the
+    # forcing a PARAMETER of a sound operator, and the cost was four rounds of "extrude-forced"
+    # verdicts on runs whose K_extrude was 0.0 and whose specs, in the r028 case, contained no such
+    # operator at all. They are two engine operators now, and only the tension is in this
+    # vocabulary -- so the search space cannot express a push, and a control that wants one has to
+    # say so outside the loop.
 }
 
 # Slots may depend on the chosen implementation (see divide_3d).
@@ -1237,7 +1258,7 @@ class CompositionGraph:
         # `forced` READS ITS WIRE TOO. It was `"extrude" in ops`, so a composition carrying the
         # forcing term -- the operator that made the only tube on this disk -- with its `site`
         # slot fed by nothing was filed under the sphere control's region.
-        _force_src = _feeds("extrude", "site") if "extrude" in ops else set()
+        _force_src = _feeds("interface_line_tension_3d", "site") if "interface_line_tension_3d" in ops else set()
         forced = bool(_force_src)
         # AN UNFED GATE IS A REGIME, NOT A FAULT -- since `vesicle_growth` was deleted and its one
         # job folded into `grow_3d`. This branch used to refuse outright, which was right when a
@@ -1311,12 +1332,12 @@ def reference_recipes():
     g = seed("substrate")
     for op, impl in [("cell_geometry_3d", "scatter_add"), ("cell_adjacency", "shared_edge"),
                      ("seed_cell_rd", "cone"), ("grow_3d", "hill_conserve_amount"),
-                     ("divide_3d", "orient_iface"), ("extrude", "radial_push")]:
+                     ("divide_3d", "orient_iface"), ("interface_line_tension_3d", "default")]:
         g, _ = g.apply(("add_op", op, impl))
     src = next(o["id"] for o in g.ops if o["op"] == "seed_cell_rd")
     g, _ = g.apply(("connect", src, next(o["id"] for o in g.ops
                                          if o["op"] == "grow_3d"), "gate"))
-    g, _ = g.apply(("connect", src, next(o["id"] for o in g.ops if o["op"] == "extrude"), "site"))
+    g, _ = g.apply(("connect", src, next(o["id"] for o in g.ops if o["op"] == "interface_line_tension_3d"), "site"))
     g, _ = g.apply(("connect", src, next(o["id"] for o in g.ops if o["op"] == "divide_3d"), "axis"))
     out["round40_mc8"] = g
 
@@ -1463,9 +1484,9 @@ if __name__ == "__main__":
 
     # --- the campaign's central ablation is a legal one-edit move ----------------------------
     r40 = refs["round40_mc8"]
-    ex = next(o["id"] for o in r40.ops if o["op"] == "extrude")
+    ex = next(o["id"] for o in r40.ops if o["op"] == "interface_line_tension_3d")
     ablated, _ = r40.apply(("remove_op", ex))
-    print(f"\n[central test] ablate `extrude` -> {ablated.name_region()!r}  "
+    print(f"\n[central test] ablate `interface_line_tension_3d` -> {ablated.name_region()!r}  "
           f"hash {comp_hash(r40)} -> {comp_hash(ablated)}")
     print("  Round 41 by hand; here it is one automatic necessity test on every composition.")
 

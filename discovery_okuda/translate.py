@@ -165,7 +165,7 @@ SCHEDULE_ORDER = [
     # has sentenced, and the relaxation then sees both -- so a cell extruded this tick has its hole
     # closed this tick instead of leaving a raw gap for one frame. This is the order the dedicated
     # geometry tests certify (make_apop_geo.py: euler 2 at every frame, n_apop exactly the loss).
-    "grow_3d", "apoptosis_3d", "shape_energy_3d", "rd_interface_tension",
+    "grow_3d", "apoptosis_3d", "shape_energy_3d", "interface_line_tension_3d",
     "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d",
 ]
 
@@ -177,14 +177,13 @@ ENGINE_NAME = {
     "grow_3d": "grow_3d",
     "divide_3d": "divide_3d",
     "apoptosis_3d": "apoptosis_3d",
-    "extrude": "rd_interface_tension",   # the forcing term lives inside this engine op
     "cell_geometry_3d": "cell_geometry_3d",
     "cell_adjacency": "cell_adjacency",
     "cell_diffuse": "cell_diffuse",
     "cell_react": "cell_react",
     "seed_cell_rd": "seed_cell_rd",
     "shape_to_chem": "shape_to_chem",
-    "rd_interface_tension": "rd_interface_tension",
+    "interface_line_tension_3d": "interface_line_tension_3d",
 }
 
 
@@ -324,12 +323,12 @@ def _emit_divide(g, n, ga):
             "orient_asw": float(_p(g, i, "orient_asw")), "g1_ramp": False}
 
 
-def _emit_extrude(g, n, ga):
+def _emit_interface_tension(g, n, ga):
     i = n["id"]
-    return {"op": "rd_interface_tension", "at": "vertex", "cell_set": "cell",
-            # K_purse was HARD-ZERO here, so the sound half of this operator could never run
-            # whatever the search proposed. It is a parameter now.
-            "K_purse": float(_p(g, i, "K_purse")), "K_extrude": float(_p(g, i, "K_extrude")),
+    # NO `K_extrude`. The forcing is a separate operator (`extrusion_forcing_3d`) that this
+    # vocabulary does not contain, so there is no key here to set and nothing to default to zero.
+    return {"op": "interface_line_tension_3d", "at": "vertex", "cell_set": "cell",
+            "K_purse": float(_p(g, i, "K_purse")),
             "a_sw": float(_p(g, i, "a_sw")), "eta": 0.05, "iters": 4, "after_frame": ga}
 
 
@@ -364,7 +363,7 @@ EMIT = {
     "cell_react": _emit_react,
     "grow_3d": _emit_growth,
     "divide_3d": _emit_divide,
-    "extrude": _emit_extrude,
+    "interface_line_tension_3d": _emit_interface_tension,
     "reconnect_t1_3d": lambda g, n, ga: {
         "op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": float(_p(g, n["id"], "l_th_frac")) * 7.0,
         "every": 1, "max_flips": 300},                          # D1
@@ -388,7 +387,6 @@ EMIT = {
         # the feedback is chemistry and must run on the SAME clock as the reaction it modulates,
         # or beta would mean something different at every dt (defect D5a, one more time)
         "rate": RD_PER_FRAME},
-    "rd_interface_tension": _emit_extrude,
 }
 
 
@@ -668,8 +666,11 @@ def from_preset(p: dict) -> CompositionGraph:
     g = add(g, "grow_3d",
             "hill_conserve_amount" if p.get("conserve_amount", True) else "hill_no_conserve")
     g = add(g, "shape_energy_3d", "monolayer" if p.get("monolayer") else "default")
-    if p.get("K_extrude", 0.0) > 0 or p.get("K_purse", 0.0) > 0:
-        g = add(g, "extrude", "radial_push")
+    # ONLY THE PURSE-STRING SURVIVES THE SPLIT. A preset asking for K_extrude is asking for
+    # `extrusion_forcing_3d`, which is not in this vocabulary -- an archived forcing control cannot
+    # be replayed through the search space, and should not be.
+    if p.get("K_purse", 0.0) > 0:
+        g = add(g, "0", "default")
     g = add(g, "reconnect_t1_3d", "length_threshold")
     g = add(g, "divide_3d", "orient_iface" if p.get("orient_iface") else "hertwig")
 
@@ -678,7 +679,7 @@ def from_preset(p: dict) -> CompositionGraph:
     if src is None:
         return g
     for dst_op, slot in (("grow_3d", "gate"), ("divide_3d", "axis"),
-                         ("extrude", "site")):
+                         ("interface_line_tension_3d", "site")):
         dst = next((o["id"] for o in g.ops if o["op"] == dst_op), None)
         if dst is None:
             continue
@@ -707,8 +708,7 @@ def from_preset(p: dict) -> CompositionGraph:
          if (p.get("max_cycle") and p["max_cycle"] < 10**8) else None),
         ("shape_energy_3d", "Gamma", p.get("Gamma")), ("shape_energy_3d", "Lambda", p.get("Lambda")),
         ("shape_energy_3d", "p0", p.get("p0")),
-        ("extrude", "K_extrude", p.get("K_extrude")),
-        ("extrude", "a_sw", p.get("iface_asw", p.get("a_sw"))),
+        ("interface_line_tension_3d", "a_sw", p.get("iface_asw", p.get("a_sw"))),
         ("divide_3d", "orient_asw", p.get("orient_asw", p.get("a_sw"))),
         ("seed_cell_rd", "n_spots", p.get("spots")),
         ("cell_react", "F", p.get("F")), ("cell_react", "kk", p.get("kk")),
