@@ -729,7 +729,16 @@ class Apoptosis3D(Structural):
         self.cells = [int(c) for c in (params.get("cells") or [])]
         # WHICH CELLS DIE is targeting, not a second mechanism: the shrink-shed-extrude pathway is
         # identical in every mode, so these are one operator rather than four.
-        self.mode = str(params.get("mode", "list"))   # list|band|cone|small|stalled|chem_low
+        # DEFAULT `competition`, NOT `list`. The loop's `add_op` edit writes only the numeric
+        # parameters an operator declares, so a non-numeric default is what every composition the
+        # Proposer builds will actually run. `list` with no `cells` can never fire -- injecting it
+        # would have handed the search an operator that is inert by construction, which is the
+        # failure this project has now paid for three times. `competition` needs no chemistry (so
+        # it is live on the b_none bases too), is the canonical cell-competition hypothesis, and
+        # measured 69 deaths on r020_03 with protr 1.549 vs the parent's 1.596 and no premise
+        # broken. Every existing spec sets `mode` explicitly, so nothing else moves.
+        self.mode = str(params.get("mode", "competition"))
+        #   list|band|cone|small|stalled|chem_low
         #   LOCAL (vs neighbours): competition|smaller|dimmer|older|crowded|lonely
         self.frac = float(params.get("frac", 0.04))
         self.cone_deg = float(params.get("cone_deg", 22.8))       # 10 cells across on a 2,000-cell ball
@@ -747,7 +756,7 @@ class Apoptosis3D(Structural):
         _STALL_DEFAULT = {"dimmer": 0.5, "competition": 0.7, "older": 0.7,
                           "stalled": 0.8, "smaller": 0.85}
         self.stall_frac = float(params.get(
-            "stall_frac", _STALL_DEFAULT.get(str(params.get("mode", "list")), 0.5)))
+            "stall_frac", _STALL_DEFAULT.get(self.mode, 0.5)))
         #                                                          (stalled) die below this x the
         self.stall_margin = float(params.get("stall_margin", 0.02))  # population's MEDIAN growth,
         self.min_age = int(params.get("min_age", 4))              # once older than min_age, and

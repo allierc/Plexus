@@ -64,8 +64,17 @@ def build(parent, mode, extra):
     p0 = next((o.get("p0", 3.5) for o in spec["operators"] if o["op"] == "shape_energy_3d"), 3.5)
     op = {"op": "apoptosis_3d", "at": "vertex", "cell_set": "cell", "p0": p0,
           **{k: v for k, v in APOP.items() if k != "mode"}, "mode": mode, **extra}
-    spec["operators"] = [o for o in spec["operators"] if o["op"] != "apoptosis_3d"] + [op]
-    spec["schedule"] = [o for o in spec["schedule"] if o != "apoptosis_3d"] + ["apoptosis_3d"]
+    # THE POSITION THE LOOP WILL ACTUALLY USE. The first pass appended the operator to the END of
+    # the schedule, after topo_snapshot_3d, so the recorded topology lagged the extrusions by a
+    # tick; translate.SCHEDULE_ORDER puts death between grow_3d and shape_energy_3d, which is the
+    # order the dedicated geometry tests certify. Certifying one order and shipping another is how
+    # a test stops describing the code, so this reads the order from translate rather than
+    # restating it.
+    from translate import SCHEDULE_ORDER
+    rank = {n: i for i, n in enumerate(SCHEDULE_ORDER)}
+    spec["operators"] = sorted([o for o in spec["operators"] if o["op"] != "apoptosis_3d"] + [op],
+                               key=lambda o: rank.get(o["op"], 999))
+    spec["schedule"] = [o["op"] for o in spec["operators"]]
     # `reset_noise` is not read by divide_3d; the unread gate refuses the spec while it is present,
     # and it rode in from the parent rather than from anything this test wants.
     for o in spec["operators"]:

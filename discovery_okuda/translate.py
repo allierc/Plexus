@@ -161,7 +161,11 @@ GROWTH_CEILING = DIV_FACTOR * 1.25    # 25% headroom so cells cross the trigger,
 SCHEDULE_ORDER = [
     "load_mesh_3d", "seed_mesh_3d", "cell_geometry_3d",
     "seed_cell_rd", "cell_adjacency", "cell_diffuse", "cell_react", "shape_to_chem",
-    "grow_3d", "shape_energy_3d", "rd_interface_tension",
+    # DEATH BEFORE THE MECHANICS. Growth sets the targets, death overrides them for the cells it
+    # has sentenced, and the relaxation then sees both -- so a cell extruded this tick has its hole
+    # closed this tick instead of leaving a raw gap for one frame. This is the order the dedicated
+    # geometry tests certify (make_apop_geo.py: euler 2 at every frame, n_apop exactly the loss).
+    "grow_3d", "apoptosis_3d", "shape_energy_3d", "rd_interface_tension",
     "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d",
 ]
 
@@ -172,6 +176,7 @@ ENGINE_NAME = {
     "reconnect_t1_3d": "reconnect_t1_3d",
     "grow_3d": "grow_3d",
     "divide_3d": "divide_3d",
+    "apoptosis_3d": "apoptosis_3d",
     "extrude": "rd_interface_tension",   # the forcing term lives inside this engine op
     "cell_geometry_3d": "cell_geometry_3d",
     "cell_adjacency": "cell_adjacency",
@@ -328,8 +333,32 @@ def _emit_extrude(g, n, ga):
             "a_sw": float(_p(g, i, "a_sw")), "eta": 0.05, "iters": 4, "after_frame": ga}
 
 
+def _emit_apoptosis(g, n, ga):
+    i = n["id"]
+    # `mode` IS NOT A COMPOSITION-SPACE PARAMETER, so it is not read through _p: the twelve modes
+    # are `model` variants, and Route A sweeps them from the plan the way it sweeps divide_3d's
+    # sizer/adder/timer. The operator's own default (`competition`) is what an `add_op` writes, and
+    # it is a firing rule on purpose -- the previous default, `list` with no `cells`, could never
+    # fire, and an operator that is inert by construction is the failure this campaign exists to
+    # eliminate.
+    #
+    # `p0` MATCHES THE MECHANICS, not the operator's own default. A dying cell's target perimeter
+    # is rebuilt from its shrinking volume through the shape index, so a p0 that disagrees with
+    # shape_energy_3d's would have the two operators pulling the same cell toward two different
+    # shapes.
+    p0 = next((float(_p(g, m["id"], "p0")) for m in g.ops if m["op"] == "shape_energy_3d"), 3.72)
+    return {"op": "apoptosis_3d", "at": "vertex", "cell_set": "cell", "p0": p0,
+            "max_mark_frac": float(_p(g, i, "max_mark_frac")),
+            "min_age": int(_p(g, i, "min_age")),
+            "shrink_rate": float(_p(g, i, "shrink_rate")),
+            "critical_frac": float(_p(g, i, "critical_frac")),
+            "stall_frac": float(_p(g, i, "stall_frac")),
+            "every": 1, "after_frame": ga}                       # D1: the ENGINE owns the clock
+
+
 EMIT = {
     "seed_mesh_3d": _emit_seed,
+    "apoptosis_3d": _emit_apoptosis,
     "shape_energy_3d": _emit_shape_energy,
     "seed_cell_rd": _emit_rd_seed,
     "cell_react": _emit_react,
