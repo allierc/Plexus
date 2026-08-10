@@ -174,7 +174,7 @@ def remeasure(out_dir):
     def _here(v):
         return _MAP[0] + v[len(_MAP[1]):] if isinstance(v, str) and v.startswith(_MAP[1]) else v
     for _o in spec.get("operators", []):
-        for _k in ("surface", "load", "gate", "map"):
+        for _k in ("surface", "load", "gate", "map", "tissue"):
             if _k in _o:
                 _o[_k] = _here(_o[_k])
     z = np.load(os.path.join(out_dir, "traj.npz"))
@@ -206,7 +206,7 @@ def rerender(out_dir, **kw):
     def _here(v):
         return _MAP[0] + v[len(_MAP[1]):] if isinstance(v, str) and v.startswith(_MAP[1]) else v
     for _o in spec.get("operators", []):
-        for _k in ("surface", "load", "gate", "map"):
+        for _k in ("surface", "load", "gate", "map", "tissue"):
             if _k in _o:
                 _o[_k] = _here(_o[_k])
     z = np.load(os.path.join(out_dir, "traj.npz"))
@@ -367,10 +367,17 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, f
     seed_op = next(o for o in spec["operators"] if o["op"] == "seed_ecm")
     ax_i = int(seed_op["axis"])
     axis_dir = np.eye(3)[ax_i]                                      # the cavity's pinched axis
-    op = next((o for o in spec["operators"] if o["op"] == "cell_to_ecm"), None)
+    # WHICHEVER OPERATOR CARRIES THE TISSUE. `cell_to_ecm[replay]` names the pass-1 cache in
+    # `surface`; `mesh_contact` -- the particle-to-surface interface that replaces it, which acts on
+    # the mesh rather than on a radius map -- names the same cache in `tissue`. Both give the
+    # renderer what it needs, which is the cache path, the centre and the scale, so the test is
+    # "does this run name a tissue" rather than "is this the operator I was written for".
+    op = next((o for o in spec["operators"] if o["op"] in ("cell_to_ecm", "mesh_contact")), None)
     centre = np.asarray(op["centre"], float)
+    surf = (op or {}).get("surface") or (op or {}).get("tissue")
 
-    if op is None or op.get("implementation") != "replay" or "surface" not in op:
+    if op is None or surf is None or (op["op"] == "cell_to_ecm"
+                                      and op.get("implementation") != "replay"):
         # THE STAND-IN SPHERE HAS NO CELLS, so it gets a renderer that does not pretend to have any.
         # `sweep.py`'s runs 01-20 are prescribed spheres and are still worth drawing; what is not
         # acceptable is drawing a proxy -- centroids, a dot cloud, a shaded ball -- in the slot where
@@ -381,8 +388,46 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, f
         return render_sphere(name, pos, hist, spec, out_dir, cmap, ax_i, centre, T,
                              n_strip=n_strip, movie=movie)
     scale = float(op.get("scale", 1.0))
-    Tis = RD.load_tissue(op["surface"], scale)
-    meshes = [(t, m) for t, m in Tis["meshes"] if t < T]
+    # THE MATRIX AS STRANDS, WHEN IT WAS SEEDED AS STRANDS. `seed_ecm` puts `per_parent // n_fibres`
+    # particles on each segment and the renderer has always drawn the points, which is a picture of
+    # what MPM solves and not of what was laid down -- a cloud cannot show a strand dragged, splayed
+    # or turned. The number is read off the spec rather than passed in, so it cannot disagree with
+    # the seeding that produced the file.
+    fib_per = fib_gap = None
+    if seed_op.get("n_fibres"):
+        fib_per = max(1, int(spec["sets"]["mpm_particle"]["per_parent"]) // int(seed_op["n_fibres"]))
+        if fib_per < 2:
+            fib_per = None
+        else:
+            # AND THE GAP AT WHICH A STRAND STOPS BEING ONE, in the tissue units the panels draw in.
+            # THREE grid cells, which is the quadratic B-spline's own support: two particles further
+            # apart than that share no grid node, and since MLS-MPM computes nothing between two
+            # points directly they are two unrelated bodies -- so a line joining them asserts a fibre
+            # the physics does not have. The number is the kernel's, and it is also what the seeding
+            # allows: measured on 04c, NO segment exceeds 3 cells at frame 0 while 0.06% do by the
+            # last frame. One cell, which this was first, is below the across-strand jitter (0.26
+            # cells on a 0.40-cell spacing) and cut 14% of segments at frame 0 -- it chopped the
+            # seeding, not the separation.
+            fib_gap = 3.0 * (1.0 / int(spec["fields"]["mpm_grid"]["n_grid"])) / max(scale, 1e-12)
+    print(f"[{name}] matrix drawn as "
+          + (f"strands of {fib_per} particles, cut at gaps over three grid cells "
+             f"({fib_gap:.3g} tissue units)" if fib_per else "points"), flush=True)
+    Tis = RD.load_tissue(surf, scale)
+    # WHICH MESH A MATRIX FRAME IS DRAWN WITH, and it is not the same question for the two operators.
+    # `cell_to_ecm[replay]` runs pass 2 for the tissue's own 402 frames and reads the surface map at
+    # frame t, so a mesh recorded at tissue frame t belongs beside matrix frame t. `mesh_contact`
+    # steps the matrix ONCE PER KEPT MESH -- pass-2 frame k acts on kept mesh k, whose tissue frame
+    # is mesh_frames[k] and runs twice as fast. Pairing it by the tissue frame draws the epithelium
+    # at half the age of the matrix around it: measured on the first 04b render, a 688-cell tissue
+    # sitting inside the hole a 4,000-cell one had cleared.
+    if op["op"] == "mesh_contact":
+        # `mesh_stride` is PASS-2 FRAMES PER KEPT MESH: mesh k is what frames k*st .. k*st+st-1 act
+        # on, so it is drawn at frame k*st and the mesh in between is an interpolation the operator
+        # makes and the renderer does not need to.
+        st = max(1, int(op.get("mesh_stride", 1)))
+        meshes = [(k * st, m) for k, (_t, m) in enumerate(Tis["meshes"]) if k * st < T]
+    else:
+        meshes = [(t, m) for t, m in Tis["meshes"] if t < T]
     plate = Tis.get("plate_gap")                        # rigid-block half-gap in TISSUE units, or None
 
     # THE BASEMENT MEMBRANE, if this run has one: a third MPM set with its own bond-strain history.
@@ -628,9 +673,9 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, f
             # top panels could not be read against each other. 0.72 closes that ratio; the outer matrix
             # is clipped, which costs nothing -- it is a diffuse cloud and the section shows its extent.
             RD.draw_3d(axs, mt, vp, q, band, cmap, RD.CAM_SIDE, 0.72 * L3, div=div, brk=brk,
-                       plate_gap=plate, blk=blk, mem=mem_of(t))
+                       plate_gap=plate, blk=blk, mem=mem_of(t), per=fib_per, gap=fib_gap)
             RD.draw_cross(axc2, mt, vp, q, band, cmap, L2, axis_dir, slab, dot_scale=0.85,
-                          plate_gap=plate, blk=blk, mem=mem_of(t))
+                          plate_gap=plate, blk=blk, mem=mem_of(t), per=fib_per, gap=fib_gap)
             if axz is not None:
                 mq = ms = None
                 if mem_pos is not None:
@@ -652,24 +697,37 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, f
                 # visible in one and invisible in the other. A camera that tracks its subject hides the
                 # one thing the run is about.
                 Lt = 0.72 * L3
-                # UNMASKED positions here, with the mask passed separately: bond indices are in the
-                # FULL particle space, so indexing an already-masked array would connect the wrong nodes.
-                _bij, _bs = bonds_of(t)
-                _raw = (mem_pos[min(t, mem_pos.shape[0] - 1)] - centre) / max(scale, 1e-12)
-                _al = None
-                if mem_alive is not None:
-                    _al = mem_alive if mem_alive.ndim == 1 else mem_alive[min(t, mem_alive.shape[0] - 1)]
-                # same per-frame correction as `mem_of`, and it has to be the SAME RULE -- this was a
-                # second copy of the median heuristic, so fixing one left the bottom-left panel drawing
-                # no membrane at all while the strip and the zoom drew it correctly.
-                _Pb = mem_pos[min(t, mem_pos.shape[0] - 1)]
-                _now = (np.all((_Pb > 0.0) & (_Pb < 1.0), axis=1)
-                        & (np.linalg.norm(_Pb - centre, axis=1) > 0.02))
-                _al = _now if _al is None else (_al & _now)
-                _rs = (np.asarray(mem_hist[t], np.float32) / max(mem_sc or 1.0, 1e-12)
-                       if (mem_hist and t < len(mem_hist)) else None)
-                RD.draw_membrane_3d(axz, _raw, _rs, RD.CAM_SIDE, Lt, mem_hi=1.0,
-                                    alive=_al, bonds=_bij, bond_s=_bs)
+                _bij = _bs = _raw = _rs = None
+                # AND THE PANEL IS EMPTY WHEN THERE IS NO SHEET. A run with per-junction myosin and no
+                # basement membrane -- which is what the interface runs are, since `mesh_contact` puts
+                # the epithelium against the matrix directly -- gets the 2x2 for its junction panel and
+                # nothing to put on the left. Drawing something else there (the matrix, the tissue
+                # again) would fill the slot the basement membrane is supposed to occupy with a
+                # different entity, which is how a movie comes to show four panels and three subjects.
+                if mem_pos is None:
+                    axz.clear(); axz.set_axis_off(); axz.set_facecolor("black")
+                    inz.clear(); inz.set_axis_off(); inz.set_facecolor("black")
+                else:
+                    # UNMASKED positions here, with the mask passed separately: bond indices are in the
+                    # FULL particle space, so indexing an already-masked array would connect the wrong
+                    # nodes.
+                    _bij, _bs = bonds_of(t)
+                    _raw = (mem_pos[min(t, mem_pos.shape[0] - 1)] - centre) / max(scale, 1e-12)
+                    _al = None
+                    if mem_alive is not None:
+                        _al = (mem_alive if mem_alive.ndim == 1
+                               else mem_alive[min(t, mem_alive.shape[0] - 1)])
+                    # same per-frame correction as `mem_of`, and it has to be the SAME RULE -- this was
+                    # a second copy of the median heuristic, so fixing one left the bottom-left panel
+                    # drawing no membrane at all while the strip and the zoom drew it correctly.
+                    _Pb = mem_pos[min(t, mem_pos.shape[0] - 1)]
+                    _now = (np.all((_Pb > 0.0) & (_Pb < 1.0), axis=1)
+                            & (np.linalg.norm(_Pb - centre, axis=1) > 0.02))
+                    _al = _now if _al is None else (_al & _now)
+                    _rs = (np.asarray(mem_hist[t], np.float32) / max(mem_sc or 1.0, 1e-12)
+                           if (mem_hist and t < len(mem_hist)) else None)
+                    RD.draw_membrane_3d(axz, _raw, _rs, RD.CAM_SIDE, Lt, mem_hi=1.0,
+                                        alive=_al, bonds=_bij, bond_s=_bs)
                 # BOTTOM-RIGHT IS THE JUNCTION NETWORK, on its own. The membrane is not drawn here at
                 # all: 30k dots sit in front of a line mesh of comparable spacing and simply occlude it,
                 # so the two entities get a panel each rather than one panel showing neither well.
@@ -684,15 +742,17 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, f
                 # `mem_s=_rs`, THE SAME ARRAY AND THE SAME SCALE the panel above it uses. Passing None
                 # left the inset on a flat colour while the panel it magnifies was coloured by strain,
                 # so the two disagreed about what they were showing.
-                RD.draw_zoom(inz, mt, vp, mem_q=_raw, mem_s=_rs, name=name, frac=0.22, r_ref=Lt,
-                             # mem_hi=1.0 as well: _rs is ALREADY divided by the run-wide scale, so
-                             # letting the inset fall back to percentile(mem_s, 99) normalises it a
-                             # second time -- same colormap, different stretch, green beside orange
-                             mem_hi=1.0,
-                             junctions=False, bonds=_bij, bond_s=_bs)
+                if mem_pos is not None:
+                    RD.draw_zoom(inz, mt, vp, mem_q=_raw, mem_s=_rs, name=name, frac=0.22, r_ref=Lt,
+                                 # mem_hi=1.0 as well: _rs is ALREADY divided by the run-wide scale,
+                                 # so letting the inset fall back to percentile(mem_s, 99) normalises
+                                 # it a second time -- same colormap, different stretch, green beside
+                                 # orange
+                                 mem_hi=1.0,
+                                 junctions=False, bonds=_bij, bond_s=_bs)
                 RD.draw_zoom(inzc, mt, vp, mem_q=None, mem_s=None, name=name, frac=0.16, lw=2.4,
                              r_ref=Lt, myo_hi=myo_sc)
-                for _a in (inz, inzc):
+                for _a in ((inz, inzc) if mem_pos is not None else (inzc,)):
                     for _sp in _a.spines.values():
                         _sp.set_color("#666"); _sp.set_visible(True)
                     _a.set_xticks([]); _a.set_yticks([])

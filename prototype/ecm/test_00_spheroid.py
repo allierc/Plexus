@@ -17,6 +17,13 @@ alone, so they are written to `metrics.json` and plotted.
 THE ARTEFACTS, in the shape the rest of the prototype uses: `movie.mp4` with the 3D view beside the
 true cross-section, `section.mp4` zoomed on the epithelium's own wall, `3d.png` for the end state, and
 `spec.yaml` naming the cache and the pass-1 parameters that made it.
+
+WHERE THE MODEL COMES FROM, since a test that cites nothing reads as a model with no provenance. The
+epithelium is the 3D active vertex model of Okuda, S., Inoue, Y., Eiraku, M., Sasai, Y., Adachi, T.
+(2013) Biomech. Model. Mechanobiol. 12(4):627 -- the reversible network reconnection that
+`reconnect_t1_3d` implements -- in the form Okuda, S., Miura, T., Inoue, Y., Adachi, T., Eiraku, M.
+(2018) Sci. Rep. 8:2386 uses, and its ancestor is Honda, H., Tanemura, M., Nagai, T. (2004)
+J. Theor. Biol. 226(4):439. The mesh is Tyssue (github.com/DamCB/tyssue).
 """
 from __future__ import annotations
 

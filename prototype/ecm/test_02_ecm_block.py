@@ -19,6 +19,13 @@ stress in the picture is the matrix's own.
 WHAT IS MEASURED: the block's centre of height against time (the bounce), its kinetic energy (how much
 of the drop comes back), and the stress distribution through the impact -- mean and p99 of the same
 von Mises measure the spheroid runs colour by, so the numbers are comparable with them.
+
+WHERE THE SOLVER COMES FROM, since a test that cites nothing reads as a method with no provenance.
+The material point method is Sulsky, D., Chen, Z., Schreyer, H.L. (1994) Comput. Methods Appl. Mech.
+Eng. 118:179; the moving-least-squares form these four operators implement, with the affine matrix C
+carried on each particle, is Hu, Y. et al. (2018) ACM Trans. Graph. 37(4):150, and the affine
+particle-in-cell transfer it rests on is Jiang, C. et al. (2015) ACM Trans. Graph. 34(4):51. The
+constitutive law is fixed-corotated, Stomakhin, A. et al. (2012) Eurographics Symp. Comput. Anim.
 """
 from __future__ import annotations
 

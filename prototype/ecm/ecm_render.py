@@ -135,7 +135,109 @@ def screen_basis(elev, azim):
     return d, u, v
 
 
-def _matrix_scatter(ax, q, band, cmap, zorder, alpha, s_rest=1.1, s_hot=2.4, three_d=True):
+def _matrix_strands(ax, q, band, cmap, zorder, alpha, per, three_d=True, lw=0.55, max_lines=2500,
+                    mask=None, gap=None, pmask=None):
+    """THE MATRIX AS THE STRANDS IT WAS SEEDED AS, rather than as the points it is solved on.
+
+    `seed_ecm` lays the particles along segments -- particle `i` belongs to strand `i // per` -- and
+    a scatter of those points draws a cloud, which is the right picture of what MPM computes and the
+    wrong picture of what was seeded. The mechanics is unchanged either way (the strands are an
+    arrangement of the mass, as `note_fibre` measured), but a cloud cannot show a strand being
+    dragged, splayed or turned, and those are the things the spheroid does to the matrix.
+
+    One polyline per strand, coloured by that strand's own median band, hottest drawn last. The line
+    count is capped and the sample is deterministic, so a frame is not a different subset of the
+    matrix from the frame before it.
+    """
+    n = (q.shape[0] // per) * per
+    if n < per:
+        return
+    S = q[:n].reshape(-1, per, q.shape[1])
+    B = np.median(band[:n].reshape(-1, per), axis=1).astype(int)
+    # A SECTION SELECTS WHOLE STRANDS, NOT PARTICLES. Cutting a slab out of the particle cloud and
+    # then joining what survives draws a strand as the two or three of its points that happened to
+    # fall in the slab -- a dashed line whose gaps are the cut, not the material. The caller passes
+    # a per-strand mask (its midpoint in the slab) and the whole strand is drawn or none of it is.
+    if mask is not None:
+        S, B = S[mask], B[mask]
+        if pmask is not None:
+            pmask = pmask[mask]
+        if S.shape[0] == 0:
+            return
+    if max_lines and S.shape[0] > max_lines:
+        k = np.linspace(0, S.shape[0] - 1, max_lines).astype(int)
+        S, B = S[k], B[k]
+    o = np.argsort(B)                                  # hottest last, so the front is never buried
+    S, B = S[o], B[o]
+    # A LINE BETWEEN TWO PARTICLES MORE THAN A GRID CELL APART IS A CLAIM THE PHYSICS DOES NOT MAKE.
+    # MLS-MPM computes nothing between two points directly, so two particles of one strand that are
+    # further apart than the kernel reaches are two unrelated bodies -- `note_fibre` measured exactly
+    # this -- and joining them draws a fibre where there is none. Measured on `04c`: 274 of 10,000
+    # strands end the run with an internal gap over two cells, 64 of them broken at SEEDING by the
+    # cavity eviction and 211 pulled apart during it, all of them starting in the shell the tissue
+    # sweeps through. They are the long straight streaks. The polyline is cut at those gaps, so a
+    # strand that has come apart is drawn as the pieces it has become.
+    if gap or pmask is not None:
+        d = np.linalg.norm(np.diff(S, axis=1), axis=2)
+        brk = (d > gap) if gap else np.zeros(d.shape, bool)
+        if pmask is not None:
+            # A SECTION CUTS PARTICLES, NOT STRANDS. Selecting whole strands by their MIDPOINT and
+            # drawing all of them projected the material in front of and behind the lumen onto it:
+            # at frame 72 the tissue is 3.3 grid cells in radius and the slab was +/-3.5, so strands
+            # passing in front of the spheroid were drawn straight across its hollow middle and read
+            # as matrix inside the tissue. Measured, no particle is ever deeper than 0.9 of the
+            # tissue radius and none at all below 0.7. So the polyline is broken wherever it leaves
+            # the slab and only the in-slab runs are drawn -- which keeps every strand that crosses
+            # the cut, drawn only where it is in the cut.
+            brk = brk | ~pmask[:, :-1] | ~pmask[:, 1:]
+        if brk.any():
+            keep_S, keep_B = [], []
+            for k in range(S.shape[0]):
+                if not brk[k].any():
+                    if pmask is None or pmask[k].all():
+                        keep_S.append(S[k]); keep_B.append(B[k])
+                    continue
+                cut = np.nonzero(brk[k])[0] + 1
+                ok_k = None if pmask is None else np.split(pmask[k], cut)
+                for i, piece in enumerate(np.split(S[k], cut)):
+                    if piece.shape[0] > 1 and (ok_k is None or ok_k[i].all()):
+                        keep_S.append(piece); keep_B.append(B[k])
+            if not keep_S:
+                return
+            # PADDED TO ONE LENGTH BY REPEATING EACH PIECE'S LAST POINT. `Line3DCollection` accepts a
+            # ragged list, but `add_collection3d` autoscales with `np.array(segments).transpose()`
+            # and raises on one -- which is how the first cut version killed the render after the
+            # physics had already been written. A repeated point is a zero-length segment and draws
+            # nothing, so the picture is the pieces and nothing else.
+            w = max(len(x) for x in keep_S)
+            keep_S = [np.concatenate([x, np.repeat(x[-1:], w - len(x), axis=0)])
+                      if len(x) < w else x for x in keep_S]
+            S, B = np.asarray(keep_S), np.asarray(keep_B)
+    S = list(S)
+    # REST THIN AND FAINT, STRAINED THICK AND BRIGHT -- the same weighting `_matrix_scatter` gives
+    # its points, and for the same reason: at one uniform width a few hundred loaded strands are a
+    # hue shift inside a haze of thousands of unloaded ones, and the loaded ones are the measurement.
+    # Two collections rather than a per-line width, because matplotlib depth-sorts per ARTIST.
+    for sel, w, a, z in ((B == 0, lw * 0.6, alpha * 0.30, zorder),
+                         (B > 0, lw * 1.4, alpha * 0.95, zorder + 1)):
+        if not sel.any():
+            continue
+        segs = [S[i] for i in np.nonzero(sel)[0]]
+        cols = [cmap(int(b) / 7.0) for b in B[sel]]
+        if three_d:
+            from mpl_toolkits.mplot3d.art3d import Line3DCollection
+            lc = Line3DCollection(segs, colors=cols, linewidths=w, alpha=a)
+            lc.set_zorder(z)
+            ax.add_collection3d(lc)
+        else:
+            from matplotlib.collections import LineCollection
+            lc = LineCollection([q_[:, :2] for q_ in segs], colors=cols, linewidths=w, alpha=a)
+            lc.set_zorder(z)
+            ax.add_collection(lc)
+
+
+def _matrix_scatter(ax, q, band, cmap, zorder, alpha, s_rest=1.1, s_hot=2.4, three_d=True,
+                    per=None, gap=None):
     """Rest (band 0) dim and small, strained bright and larger, hottest band drawn last.
 
     THE REST STATE IS DIM BUT IT IS NOT ABSENT. `ecm_spec` already made this mistake once at the
@@ -143,7 +245,22 @@ def _matrix_scatter(ax, q, band, cmap, zorder, alpha, s_rest=1.1, s_hot=2.4, thr
     cannot watch a front propagate into fibres you cannot see -- and drawing it at alpha 0.4 and
     half a point wide reintroduced it at the renderer level: frame 0 of the smoke test was an empty
     panel for a matrix of 110,000 particles.
+
+    `per` (particles per strand) switches to the strand form above; None keeps the points.
     """
+    if per and per > 1:
+        # FEWER LINES IN 3D THAN IN SECTION, because a 3D panel draws the whole shell and a section
+        # draws one slab of it. At the section's line count the 3D view is a solid mat of strands
+        # with the epithelium somewhere behind it -- the panel exists to show the tissue INSIDE the
+        # material, and a matrix you cannot see through is the same defect as a matrix you cannot
+        # see.
+        # EVERY STRAND IN 3D, AND TRANSPARENCY RATHER THAN A SUBSAMPLE. Drawing 700 of 10,000 makes
+        # the matrix look sparser than it is and drops most of the loaded ones; the epithelium stays
+        # visible because the unloaded strands are drawn faint and thin, not because most of them are
+        # missing. The near half is already alpha 0.28 in `draw_3d`, so the tissue's own tiles and the
+        # green of a division read through the material in front of them.
+        return _matrix_strands(ax, q, band, cmap, zorder, alpha, int(per), three_d=three_d,
+                               max_lines=None, gap=gap)
     rest = band == 0
     hot = ~rest
     args = dict(cmap=cmap, vmin=0, vmax=7, marker=".", linewidths=0)
@@ -197,7 +314,7 @@ def block_cmap():
 
 
 def draw_3d(ax, mt, pos, q, band, cmap, cam, L, div=None, brk=None, tissue=True, cutaway=False,
-            plate_gap=None, blk=None, mem=None):
+            plate_gap=None, blk=None, mem=None, per=None, gap=None):
     """One 3D panel: far matrix -> epithelium -> near matrix, in tissue units.
 
     `cutaway` removes the octant nearest the camera instead of drawing the tissue. A solid cube of
@@ -226,11 +343,11 @@ def draw_3d(ax, mt, pos, q, band, cmap, cam, L, div=None, brk=None, tissue=True,
     depth = q @ d                                      # > 0 is deeper than the tissue centre
     far, near = depth > 0, depth <= 0
     if tissue:
-        _matrix_scatter(ax, q[far], band[far], cmap, zorder=0, alpha=0.85)
-        _matrix_scatter(ax, q[near], band[near], cmap, zorder=10, alpha=0.28)
+        _matrix_scatter(ax, q[far], band[far], cmap, zorder=0, alpha=0.85, per=per, gap=gap)
+        _matrix_scatter(ax, q[near], band[near], cmap, zorder=10, alpha=0.28, per=per, gap=gap)
     else:
-        _matrix_scatter(ax, q[far], band[far], cmap, zorder=0, alpha=0.9)
-        _matrix_scatter(ax, q[near], band[near], cmap, zorder=10, alpha=0.9)
+        _matrix_scatter(ax, q[far], band[far], cmap, zorder=0, alpha=0.9, per=per, gap=gap)
+        _matrix_scatter(ax, q[near], band[near], cmap, zorder=10, alpha=0.9, per=per, gap=gap)
     if mem is not None:
         # THE BASEMENT MEMBRANE IN THE MAIN PANELS TOO. It was drawn only in the zoom, which made a
         # 30,000-particle body carrying the whole tissue-matrix interface invisible in the two panels
@@ -264,7 +381,7 @@ def draw_3d(ax, mt, pos, q, band, cmap, cam, L, div=None, brk=None, tissue=True,
 
 
 def draw_cross(ax, mt, pos, q, band, cmap, L2, axis_dir, slab, dot_scale=1.0, plate_gap=None,
-               blk=None, mem=None, zoom_half=None):
+               blk=None, mem=None, zoom_half=None, per=None, gap=None):
     """The monolayer in section + the matrix in the SAME plane, cut in the SCREEN plane.
 
     `seed_dir=None` on purpose, which makes `_cross_screen` fall back to the camera's own frame: the
@@ -292,8 +409,21 @@ def draw_cross(ax, mt, pos, q, band, cmap, L2, axis_dir, slab, dot_scale=1.0, pl
         # BUT SCALED TO THE PANEL. A marker size is in POINTS, not in data units, so the same `s`
         # that is right for a full strip panel is four times too big in a small one. `dot_scale` is
         # the caller's panel size, not a taste setting.
-        _matrix_scatter(ax, proj, band[sl], cmap, zorder=0, alpha=0.95,
-                        s_rest=3.4 * dot_scale, s_hot=7.0 * dot_scale, three_d=False)
+        if per and per > 1:
+            n = (q.shape[0] // per) * per
+            dd = (q[:n] @ d).reshape(-1, per)
+            # THINNER THAN THE DOT SLAB, and it has to be. The reference slab is +/-0.055 box units,
+            # which is 3.5 grid cells and 37% of the final tissue radius -- thicker than the spheroid
+            # is wide for the first half of the run, so it necessarily holds material in front of the
+            # lumen. A third of it is still ten times the particle spacing and leaves the section
+            # dense, while being thinner than the tissue from first contact on.
+            thin = slab / 3.0 if gap is None else gap / 3.0
+            _matrix_strands(ax, np.stack([q @ u, q @ v], axis=1), band, cmap, 0, 0.95, int(per),
+                            three_d=False, lw=0.8, mask=(np.abs(dd) < thin).any(1), gap=gap,
+                            pmask=np.abs(dd) < thin)
+        else:
+            _matrix_scatter(ax, proj, band[sl], cmap, zorder=0, alpha=0.95,
+                            s_rest=3.4 * dot_scale, s_hot=7.0 * dot_scale, three_d=False)
     if mem is not None:
         qm, sm = mem
         sl_m = np.abs(qm @ d) < slab
