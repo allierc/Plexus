@@ -1229,7 +1229,19 @@ class CompositionGraph:
 
     # ---------------------------------------------------------------- post-hoc naming
     def name_region(self):
-        """Label a DISCOVERED composition against the literature, never chosen a priori."""
+        """Label a DISCOVERED composition against the literature, never chosen a priori.
+
+        DEATH IS APPENDED HERE rather than threaded through every branch below. Without it a death
+        member and its twin return the SAME region -- "growth-driven emergent (target mechanism)"
+        for both -- and the region is what the roles are handed as the description of the
+        composition. The Die family is the only mechanism in this vocabulary that REMOVES material;
+        a label that cannot see it cannot describe the composition it names.
+        """
+        base = self._region_core()
+        return f"{base} + death" if "apoptosis_3d" in set(self.op_names()) else base
+
+    def _region_core(self):
+        """The region ignoring cell death -- see name_region."""
         # WHAT FEEDS THE GATE, not what is merely present. This classified on operator PRESENCE
         # and never read `conns` -- so a composition whose growth is gated by a HAND-PLACED SEED,
         # with the Turing chemistry sitting beside it as a bystander, was labelled
@@ -1255,11 +1267,24 @@ class CompositionGraph:
         _gate = _feeds("grow_3d", "gate") if local else set()
         emergent = "cell_react" in _gate
         driven = "seed_cell_rd" in _gate
+        # `forced` IS NOW ALWAYS FALSE, and saying so is the point. Until 10 August this operator
+        # was `extrude` and carried BOTH a purse-string line tension (K_purse) and an outward
+        # forcing term (K_extrude) under one name; the region vocabulary was built around that and
+        # called any composition holding it "forced". The split left the label attached to the
+        # SOUND half: `b_gs_shaping_sharp_hi` -- a purse-string and nothing else -- came back
+        # labelled "emergent RD + forced extrusion", which is exactly the false verdict that cost
+        # four rounds of the last campaign. `extrusion_forcing_3d` is not in this vocabulary, so no
+        # composition the search can express is forced, and `interface_line_tension_3d` is
+        # mechanics like any other term in shape_energy_3d.
+        #
+        # The branches below are kept rather than deleted: they are the only record of what the
+        # forced regions were called, and restoring the operator would restore their meaning.
         # `forced` READS ITS WIRE TOO. It was `"extrude" in ops`, so a composition carrying the
         # forcing term -- the operator that made the only tube on this disk -- with its `site`
         # slot fed by nothing was filed under the sphere control's region.
-        _force_src = _feeds("interface_line_tension_3d", "site") if "interface_line_tension_3d" in ops else set()
+        _force_src = _feeds("extrusion_forcing_3d", "site") if "extrusion_forcing_3d" in ops else set()
         forced = bool(_force_src)
+        tension = "interface_line_tension_3d" in ops
         # AN UNFED GATE IS A REGIME, NOT A FAULT -- since `vesicle_growth` was deleted and its one
         # job folded into `grow_3d`. This branch used to refuse outright, which was right when a
         # separate operator existed for ungated growth and wrong the moment it did not: the
@@ -1285,6 +1310,15 @@ class CompositionGraph:
             return "driven + forced (round-33 recipe)"
         if forced and emergent:
             return "emergent RD + forced extrusion"
+        # THE PURSE-STRING IS A MECHANISM AND BELONGS IN THE LABEL. It is the only term that
+        # can neck a bulge into a tube, and a region name that omits it cannot distinguish the two
+        # compositions the campaign most needs to tell apart.
+        if tension and emergent:
+            return "emergent RD + purse-string"
+        if tension and driven:
+            return "driven RD + purse-string"
+        if tension:
+            return "purse-string mechanics"
         # THE PAPER'S NAME REQUIRES THE PAPER'S MECHANISM. This branch fired before `emergent`
         # was consulted, so a monolayer whose growth is gated by a HAND-PLACED SEED -- with no
         # reaction-diffusion operator in the composition at all -- was labelled "Okuda route".

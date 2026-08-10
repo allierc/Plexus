@@ -238,6 +238,31 @@ def _graph_from_run(name):
                             made = True
                     if not made:
                         break
+                # AND WIRE THE GATE THE SPEC SAYS IS THERE. `grow_3d.gate` is an OPTIONAL slot,
+                # so `unrouted_slots()` never reports it and the loop above never considers it --
+                # a rebuilt parent therefore always came back with the gate unwired, whatever the
+                # run actually did. The physics was unaffected (grow_3d reads cell.chem directly,
+                # so the Hill term fires either way), but `name_region()` decides gated-versus-
+                # ungated from `conns`, so EVERY rebuilt parent was labelled "uniform growth
+                # (ungated, rho baseline only)" -- including fifteen of sixteen slots in a round
+                # whose specs all carry a_sw = 0.35. That label is what the Proposer and the
+                # Analyst are handed as the description of the composition, and it was false.
+                #
+                # The spec carries the evidence: `a_sw > 0` means the Hill switch selects on the
+                # activator, which IS the gate. `a_sw = 0` means the switch is open and growth
+                # really is ungated. So the rebuild reads the parameter instead of guessing from
+                # the wiring it does not have -- and takes the last producer ahead of grow_3d, the
+                # same spec-order rule the ambiguous case above uses.
+                _grow = next((o for o in g.ops if o["op"] == "grow_3d"), None)
+                if _grow is not None and float(g.params.get(f"{_grow['id']}.a_sw", 0) or 0) > 0:
+                    if not any(c["dst"] == _grow["id"] and c["slot"] == "gate" for c in g.conns):
+                        _pos = {o["id"]: k for k, o in enumerate(g.ops)}
+                        _src = [a for a, b, sl in g._candidate_links()
+                                if b == _grow["id"] and sl == "gate" and _pos[a] < _pos[_grow["id"]]]
+                        if _src:
+                            g, _ = g.apply(("connect", max(_src, key=lambda a: _pos[a]),
+                                            _grow["id"], "gate"))
+
                 # THE SPEC'S NUMBERS MAY BE OUTSIDE THE DECLARED SPACE. cfl_c000p080_d002p000 ran
                 # with cell_diffuse0.d_h=2.0 against a Critic ceiling of 0.346 and produced valid
                 # evidence -- so a faithful rebuild is refused as a parent by R5, and the whole
