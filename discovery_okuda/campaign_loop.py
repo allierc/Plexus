@@ -215,9 +215,23 @@ def _cost_so_far():
     return tot
 
 
-def run_round(batch, frames, mode="composition", timeout_min=180):
-    """One round, as a subprocess. A round that dies must not take the driver with it."""
+def run_round(batch, frames, mode="composition", timeout_min=180, resume=False):
+    """One round, as a subprocess. A round that dies must not take the driver with it.
+
+    `--resume` IS NOT OPTIONAL AFTER THE FIRST ROUND. round.py's rule is "a launch resets" -- it
+    archives the ledger, deletes the run directories and starts at r001 -- which is right for a
+    launch and catastrophic for round 2. Measured on the first campaign this driver ever ran:
+    round 1 finished 16 runs in 104 minutes, and round 2 opened with "campaign reset: 16 record(s)
+    archived, 16 run dir(s) deleted" and rebuilt itself as r001. Every round would have been the
+    first round, forever, and the loop would have reported thirty of them.
+
+    It survived this long because it never executed: `_gates_open()` imported a module the Phase 12
+    reduction deleted, so this driver refused to start for the whole r001-r029 campaign, which ran
+    through round.py directly. Fixing the gate is what exposed it.
+    """
     cmd = [PY, os.path.join(HERE, "round.py"), "--mode", mode, "--batch", str(batch)]
+    if resume:
+        cmd += ["--resume"]
     if frames:
         cmd += ["--frames", str(frames)]
     t0 = time.time()
@@ -438,7 +452,11 @@ def loop(n_rounds, batch, frames, max_retries=1, usd_ceiling=None, recon_rounds=
         print(f"\n{'-' * 96}\n[loop] round {i + 1}/{n_rounds}  mode={mode}   "
               f"spent so far: {cost.get('minutes', 0)} agent-min over "
               f"{cost.get('calls', 0)} calls\n{'-' * 96}")
-        code, minutes, note = run_round(batch, frames, mode=mode)
+        # THE FIRST ROUND OF THIS RUN RESETS; EVERY ROUND AFTER IT RESUMES. `resume` is the
+        # driver's own flag (a caller asking to continue an existing campaign), so the first round
+        # only resets when this is a fresh launch -- and `i > 0` covers the rest.
+        code, minutes, note = run_round(batch, frames, mode=mode,
+                                        resume=(resume or i > 0))
         done += 1
         after = _cost_so_far()
         spent = round(after.get("minutes", 0) - cost.get("minutes", 0), 2)

@@ -1850,11 +1850,34 @@ def route_a_results(ctx):
         out.append(f"  {base}   {knob}")
         out.append("     value" + "".join(f"{c.replace('_final','').replace('_peak','')[:12]:>13}"
                                           for c in COLS) + "   premises")
-        for s in sorted(rs, key=lambda x: float(x["edit"][2])):
+        # A LADDER'S VALUES ARE NOT ALWAYS NUMBERS. `float()` here crashed the whole node --
+        # "could not convert string to float: 'smaller'" -- the first time a categorical ladder
+        # reached it, and categorical ladders are the ones that matter most: `apoptosis_3d.mode`
+        # and `grow_3d.model` sweep MECHANISMS, where each value is a different biological
+        # hypothesis rather than a point on a scale. Losing the node loses every sweep in the
+        # batch, numeric ones included, and the Analyst is then handed nothing for half the round.
+        #
+        # A numeric ladder still sorts numerically, because the ORDER is the whole point of a
+        # response curve. A categorical one sorts by name, which is arbitrary and honest: there is
+        # no order to lose.
+        def _sortkey(x):
+            v = x["edit"][2]
+            try:
+                return (0, float(v), "")
+            except (TypeError, ValueError):
+                return (1, 0.0, str(v))
+
+        def _fmt(v):
+            try:
+                return f"{float(v):<9g}"
+            except (TypeError, ValueError):
+                return f"{str(v):<9}"
+
+        for s in sorted(rs, key=_sortkey):
             m = met.get(s["name"]) or {}
             cells = "".join(f"{m[c]:>13.3f}" if isinstance(m.get(c), (int, float))
                             else f"{'--':>13}" for c in COLS)
-            out.append(f"     {float(s['edit'][2]):<9g}{cells}   {m.get('premises_broken') or []}")
+            out.append(f"     {_fmt(s['edit'][2])}{cells}   {m.get('premises_broken') or []}")
         out.append("")
     return "\n".join(out)
 
