@@ -235,6 +235,48 @@ def _t():
     return got == set(), f"{len(got)} marked despite age 0 < min_age 4"
 
 
+# --------------------------------------------------------------- the rate, as distinct from the set
+@case("the cap admits only max_mark_frac of the tissue at once")
+def _t():
+    m, nF, _ = _mesh()
+    v = m["V0f"].clone(); v[:100] = 0.25 * 0.4               # 100 cells qualify as `smaller`
+    m["V0f"] = v
+    op = _op(mode="smaller", max_mark_frac=0.02)             # 2% of 400 -> 8
+    flag = op._admit(np.zeros(nF), set(range(100)), m, _H(_Level(nF)), nF)
+    return int(flag.sum()) == 8, f"{int(flag.sum())} marked of 100 proposed, cap 8"
+
+
+@case("the cap takes the WORST first, not the lowest-numbered")
+def _t():
+    m, nF, _ = _mesh()
+    v = m["V0f"].clone()
+    v[10] = 0.25 * 0.9; v[20] = 0.25 * 0.2; v[30] = 0.25 * 0.5   # 20 is the worst, 10 the mildest
+    m["V0f"] = v
+    op = _op(mode="smaller", max_mark_frac=0.0025)               # 400 * 0.0025 -> 1
+    flag = op._admit(np.zeros(nF), {10, 20, 30}, m, _H(_Level(nF)), nF)
+    got = set(np.where(flag > 0)[0].tolist())
+    return got == {20}, f"took {sorted(got)}, worst is 20"
+
+
+@case("the queue must DRAIN before more are sentenced")
+def _t():
+    m, nF, _ = _mesh()
+    op = _op(mode="smaller", max_mark_frac=0.01)             # cap 4
+    flag = np.zeros(nF); flag[[1, 2, 3, 4]] = 1.0            # already full
+    flag = op._admit(flag, {50, 51, 52}, m, _H(_Level(nF)), nF)
+    return int(flag.sum()) == 4, f"{int(flag.sum())} marked -- the cap let more through"
+
+
+@case("a NAMED population is exempt from the cap")
+def _t():
+    m, nF, _ = _mesh()
+    # apopgeo_half sentences 45% of the sheet in one act; the cap bounds a flux, and a set chosen
+    # once has none
+    op = _op(mode="band", band_deg=45.0, max_mark_frac=0.005)
+    flag = op._admit(np.zeros(nF), set(range(180)), m, _H(_Level(nF)), nF)
+    return int(flag.sum()) == 180, f"{int(flag.sum())} of 180 -- the cap ate a named population"
+
+
 def main():
     print("CERTIFYING every mode of the death gate against a population whose answer is known\n")
     bad = 0

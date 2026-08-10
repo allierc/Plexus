@@ -720,7 +720,8 @@ class Apoptosis3D(Structural):
                    "shrink_rate": "target-volume shrink per tick",
                    "critical_frac": "extrude below this fraction of v_ref",
                    "frac": "(band/cone/chem_low) size of the dying population",
-                   "a_sw": "(chem_low) die where the activator is below this fraction of its max"}
+                   "a_sw": "(chem_low) die where the activator is below this fraction of its max",
+                   "max_mark_frac": "cap on the fraction of the tissue under sentence at once"}
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -757,6 +758,10 @@ class Apoptosis3D(Structural):
         self.shrink = float(params.get("shrink_rate", 0.04))
         self.crit = float(params.get("critical_frac", 0.12))      # x v_ref, the seed-time median
         self.p0 = float(params.get("p0", 3.72))                   # target shape index, for P0
+        # HOW FAST, as distinct from WHO -- see forward(). 0.5% of the tissue marked at once is
+        # ~37 cells on the 7,400-cell parents this has to survive, against the 1,660 that `smaller`
+        # took uncapped.
+        self.max_mark_frac = float(params.get("max_mark_frac", 0.005))
         self.after_frame = int(params.get("after_frame", 0))
         self.every = _engine_owns_clock(params, default=1); self._k = 0
         self.seed = int(params.get("seed", 0))
@@ -847,6 +852,67 @@ class Apoptosis3D(Structural):
             h0, _ = clvl.state_schema["chem"]
             return clvl.state[:nF, h0].detach().cpu().numpy()
         return None
+
+    def _admit(self, flag, want, m, H, nF):
+        """Turn the mode's proposal into the marks actually TAKEN this tick.
+
+        A DEATH RATE, NOT A DEATH SET. Every state-defined rule re-evaluates each frame, so on a
+        growing tissue the marks ACCUMULATE: measured on the campaign's own best parents, `smaller`
+        killed 1,660 of 7,424 cells and took the run from protr 1.513 / grip 0.228 to 1.131 /
+        0.049, and every mode but `crowded` did something comparable. The thresholds were
+        calibrated on a static 400-cell sheet where a population is marked ONCE; nothing in them
+        bounds a flux, and a threshold on a state variable never can -- it names a set, and the set
+        refills as fast as the tissue can produce members of it.
+
+        `max_mark_frac` caps how much of the tissue may be under sentence AT ONCE, so the mode
+        chooses WHO dies and this chooses HOW FAST. `crowded` is the existence proof that a gentle
+        rate leaves a run intact: 104 deaths, no premise broken, grip 0.216 -> 0.116 where the
+        others reached ~0.01.
+
+        THE NAMED POPULATIONS ARE EXEMPT, because the cap bounds a flux and a set chosen once has
+        none: `apopgeo_half` deliberately sentences 45% of the sheet in one act, and capping it
+        would silently delete the hardest topology test this operator has.
+        """
+        if self.mode in ("list", "band", "cone"):
+            for f in want:
+                flag[f] = 1.0
+            return flag
+        held = np.where(flag > 0)[0]
+        room = max(1, int(self.max_mark_frac * nF)) - len(held)
+        if room <= 0:                       # the queue is full: let it drain before sentencing more
+            return flag
+        fresh = np.array(sorted(want - {int(x) for x in held}), dtype=np.int64)
+        if len(fresh) > room:
+            # WORST FIRST once the cap bites, so the rule still means what it says: a competition
+            # rule that culls an arbitrary subset of its losers is a lottery wearing the rule's name.
+            sev = self._severity(m, H, nF, fresh)
+            fresh = fresh[np.argsort(sev)[:room]] if sev is not None else fresh[:room]
+        flag[fresh] = 1.0
+        return flag
+
+    def _severity(self, m, H, nF, idx):
+        """How badly each of `idx` qualifies -- SMALLEST DIES FIRST. Only consulted when the rate
+        cap bites and the mode has named more cells than may die at once; a competition rule that
+        then culls an arbitrary subset of its losers would be a lottery wearing the rule's name."""
+        _Q = {"competition": "growth", "smaller": "volume", "dimmer": "act", "older": "age"}
+        if self.mode in _Q:
+            q = self._q(m, H, nF, _Q[self.mode])
+            if q is None:
+                return None
+            nb = self._nb(m, nF, q)[0]
+            r = q[idx] / np.maximum(nb[idx], 1e-12)
+            return -r if self.mode == "older" else r        # `older` loses by being ABOVE
+        if self.mode in ("small", "stalled"):
+            q = self._q(m, H, nF, "volume" if self.mode == "small" else "growth")
+            return None if q is None else q[idx]
+        if self.mode == "chem_low":
+            q = self._q(m, H, nF, "act")
+            return None if q is None else q[idx]
+        if self.mode == "crowded":
+            return -self._nb(m, nF, np.ones(nF))[1][idx].astype(float)   # most crowded first
+        if self.mode == "lonely":
+            return self._nb(m, nF, np.ones(nF))[1][idx].astype(float)
+        return None                                          # list/band/cone: a named population
 
     def _marked(self, m, H, nF):
         """The set of cell indices currently marked to die."""
@@ -1000,11 +1066,10 @@ class Apoptosis3D(Structural):
         # moving boundary condition"; here a one-off selection re-applied every timestep converts a
         # death sentence into a death RATE. `seed` is a kind so the runtime can impose the window;
         # this operator is `structural`, so it imposes its own.
+        _want = set()
         if self.mode in ("list", "band", "cone"):     # a POPULATION chosen once; see below
             if not m.get("apop_marked_once"):
-                for f in self._marked(m, H, nF):
-                    if f < nF:
-                        flag[f] = 1.0
+                _want = {f for f in self._marked(m, H, nF) if f < nF}
                 m["apop_marked_once"] = True
         else:
             # chem_low IS THE ONLY MODE THAT MAY RE-EVALUATE, and band/cone sat on this branch
@@ -1014,9 +1079,8 @@ class Apoptosis3D(Structural):
             # a POPULATION chosen at one moment, exactly like an index list. Only a chemical
             # threshold is a genuine ongoing condition: a cell whose activator has fallen should
             # now die, and no cell enters that set merely by being pushed.
-            for f in self._marked(m, H, nF):
-                if f < nF:
-                    flag[f] = 1.0
+            _want = {f for f in self._marked(m, H, nF) if f < nF}
+        flag = self._admit(flag, _want, m, H, nF)
         m["apop_flag"] = flag
         marked = {int(f) for f in np.where(flag > 0)[0]}
         if not marked:
