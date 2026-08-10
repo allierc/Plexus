@@ -46,7 +46,12 @@ for p in (HERE, os.path.join(ROOT, "src"), os.path.join(ROOT, "prototype", "Tyss
 
 LOG = os.path.join(ROOT, "log", "okuda_ECM")
 CACHE = os.path.join(LOG, "_tissue")
-CELL_SPEC = os.path.join(ROOT, "log", "okuda", "cellfix_B_new", "spec_run.yaml")
+# THE REFERENCE SPECIFICATION MOVED, AND EVERY CACHED TISSUE HERE WAS BUILT FROM IT. `cellfix_B_new`
+# was archived into `_superseded_pre_basis` by the Phase-12 basis refactor; the path here still pointed
+# at where it used to be, so `load_or_build` worked on a cache hit and died on a rebuild. The constant
+# names where the file IS -- one path, not a search over two.
+CELL_SPEC = os.path.join(ROOT, "log", "okuda", "_archive", "_superseded_pre_basis",
+                         "cellfix_B_new", "spec_run.yaml")
 
 # 32 x 64 rather than 48 x 96. The map has to be resolved by the VERTICES PRESENT, and the opening
 # frames have ~1,200 of them: 4,608 bins left two thirds of the sphere empty and filled from a row
@@ -193,8 +198,21 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap
                                   "destabilising": bool(myo_destabilising)})
         i = spec["schedule"].index("shape_energy_3d")
         spec["schedule"].insert(i, "junction_myosin")
+        # AND THE CARRY, AFTER THE TOPOLOGY OPERATORS. `reconnect_t1_3d` rewires the half-edge arrays
+        # and `divide_3d` lengthens them, both AFTER `junction_myosin` has written `m["myo"]` for the
+        # arrays as they were -- so what `topo_snapshot_3d` records is this frame's edges beside last
+        # writing's myosin. Measured on the 401-frame nominal: 56 of 200 snapshots carried a myosin
+        # array 6 to 1356 entries short of the edge arrays, and every reader indexes it positionally.
+        # This operator re-keys it by vertex pair; it is scheduled last of the three so it sees the
+        # final topology of the frame. See junction_ops.JunctionMyosinSync for why it cannot perturb
+        # the trajectory.
+        spec["operators"].append({"op": "junction_myosin_sync", "at": "vertex",
+                                  "myo_new": float(myo_new), "inherit": True})
+        j = max(spec["schedule"].index(o) for o in ("reconnect_t1_3d", "divide_3d")
+                if o in spec["schedule"])
+        spec["schedule"].insert(j + 1, "junction_myosin_sync")
         print(f"[tissue] per-junction myosin: activity={myosin}, tau={myo_tau}, beta={myo_beta}, "
-              f"myo_new={myo_new}", flush=True)
+              f"myo_new={myo_new}; re-keyed after {spec['schedule'][j]}", flush=True)
     if gate_npz is not None:
         # AFTER `grow_3d`, whose per-cell increment it corrects, and BEFORE the force step
         # and the topology ops -- so `shape_energy_3d` relaxes toward the GATED targets and `divide_3d`

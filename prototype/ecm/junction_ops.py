@@ -30,12 +30,32 @@ WHAT `myo_new` IS WORTH ARGUING ABOUT. A junction born from a division has no my
 it starts with is a modelling claim with consequences: at `myo_new` below 1 new junctions are
 transiently WEAK, which is a real phenomenon and also exactly the sort of thing that will look like an
 explanation for anything. It is a parameter, it is reported, and it is swept.
+
+THE KEYED STORE LIVES ON THE MESH, NOT ON THE OPERATOR INSTANCE. It used to be `self._keys`/`self._vals`,
+which made `junction_myosin` the only thing in the process that could say what a junction's myosin is.
+That is what `junction_myosin_sync` (below) exists to undo: myosin is state of the junction edge-set, so
+it is stored where the edge-set is stored and any operator scheduled after a topology change can rebuild
+the per-half-edge array from it. This is the `occ`-style discipline of plexus2 sec. "Levels" -- a
+cardinality-changing operator must not be able to leave state indexed against a buffer that no longer
+exists -- reached without teaching `divide_3d` or `reconnect_t1_3d` that myosin exists.
+
+WHAT WENT WRONG WITHOUT IT, MEASURED. `junction_myosin` writes `m["myo"]` sized to the half-edge buffer
+at its own schedule slot (before `shape_energy_3d`); `reconnect_t1_3d` and `divide_3d` then rewire and
+lengthen those arrays later in the same frame, and `topo_snapshot_3d` records the new edges beside the
+old myosin. In `cellfix_B_new_f401_x4_2cedf4bcc6.npz`, 56 of 200 recorded snapshots had `len(myo)`
+short of `len(E_srce)` by 6 to 1356 entries. Every reader downstream indexes myosin positionally
+against the edges, so on those frames a junction was drawn and measured with another junction's myosin:
+the two half-edges of one junction agreed to 0.0011 on the 144 aligned snapshots and disagreed by 0.216
+on the 56 misaligned ones, and the tracked junction of `junction_model.png` moved 0.0095 per snapshot
+step between clean frames against 0.1415 across a misaligned one. The high-frequency buzz on that
+figure's myosin trace was that misalignment, not the dynamics -- the leaky integrator at tau=20 cannot
+move faster than 0.03 per step.
 """
 from __future__ import annotations
 
 import torch
 
-from plexus.models.base import Structural
+from plexus.models.base import Rewire, Structural
 from plexus.models.registry import register_operator
 
 # Per frame: (junctions, mean myosin, min, max, how many were NEW this frame). New-junction count is the
@@ -49,6 +69,93 @@ def _edge_key(vi, vj, stride):
     lo = torch.minimum(vi, vj).long()
     hi = torch.maximum(vi, vj).long()
     return lo * stride + hi
+
+
+def _lookup(m, key, length, vi, vj, stride, myo_new, inherit, dev, dt_):
+    """The keyed store on the mesh, mapped onto the half-edge arrays AS THEY ARE NOW.
+
+    Split out of `JunctionMyosin.forward` so that `junction_myosin_sync` can perform exactly the same
+    mapping after a topology operator has rewired or lengthened those arrays. One function, two callers,
+    so the myosin a frame is RECORDED with is by construction the myosin that frame's mechanics used --
+    the two cannot drift apart because there is only one piece of code that decides it.
+
+    Returns `(myo, n_new)` and touches nothing: the store is read, never written.
+    """
+    keys = m.get("myo_keys")
+    vals = m.get("myo_vals")
+    if keys is None or vals is None:
+        keys = torch.empty(0, dtype=torch.long, device=dev)
+        vals = torch.empty(0, dtype=dt_, device=dev)
+    order = torch.argsort(keys)
+    ks, vs = keys[order], vals[order]
+    idx = torch.searchsorted(ks, key)
+    idx_c = idx.clamp(max=max(ks.numel() - 1, 0))
+    found = (ks.numel() > 0) & (idx_c < ks.numel())
+    hit = found & (ks[idx_c] == key) if ks.numel() else torch.zeros_like(key, dtype=torch.bool)
+    base = vs[idx_c] if vs.numel() else torch.zeros_like(length)
+    myo = torch.where(hit, base, torch.full_like(length, myo_new))
+    n_new = int((~hit).sum())
+
+    # ---- A JUNCTION WITH A PARENT INHERITS FROM IT ------------------------------------------
+    # Not every edge that misses the lookup is a new junction. `divide_3d` inserts a new vertex on
+    # each of two edges of the dividing cell and then joins them, so a division produces two KINDS
+    # of edge, and only one of them is new:
+    #
+    #   one endpoint new, one old   -- a SPLIT HALF of the cut junction (a,b). The same physical
+    #                                  contact, now in two pieces. It has a myosin history and
+    #                                  giving it `myo_new` throws that history away.
+    #   both endpoints new          -- the interface between the two daughters. This one really is
+    #                                  new, and `myo_new` is the honest answer for it.
+    #
+    # The parent is recoverable without any help from `divide_3d`, which is the point of keying by
+    # vertex pair: a new vertex `n` has exactly two OLD neighbours, and they are the endpoints of the
+    # edge it was inserted into. So the parent key is (min, max) over `n`'s old neighbours, and both
+    # halves look it up. Falls back to `myo_new` where there is no parent to find.
+    vseen = m.get("myo_vseen")
+    if inherit and n_new and vseen is not None:
+        oi = vseen[vi.clamp(max=vseen.numel() - 1)] & (vi < vseen.numel())
+        oj = vseen[vj.clamp(max=vseen.numel() - 1)] & (vj < vseen.numel())
+        half = (~hit) & (oi ^ oj)                       # exactly one endpoint is new
+        if bool(half.any()):
+            newv = torch.where(oi[half], vj[half], vi[half])     # the inserted vertex
+            oldv = torch.where(oi[half], vi[half], vj[half])     # its old neighbour
+            uq, inv = torch.unique(newv, return_inverse=True)
+            lo = torch.full((uq.numel(),), stride, dtype=torch.long, device=dev)
+            hi_ = torch.zeros(uq.numel(), dtype=torch.long, device=dev)
+            lo = lo.scatter_reduce(0, inv, oldv, reduce="amin", include_self=True)
+            hi_ = hi_.scatter_reduce(0, inv, oldv, reduce="amax", include_self=True)
+            pkey = lo * stride + hi_                             # the edge the vertex was cut into
+            pidx = torch.searchsorted(ks, pkey).clamp(max=max(ks.numel() - 1, 0))
+            phit = (ks.numel() > 0) & (ks[pidx] == pkey) & (lo < hi_)
+            inh = torch.where(phit, vs[pidx] if vs.numel() else torch.zeros_like(pkey, dtype=dt_),
+                              torch.full_like(pkey, myo_new, dtype=dt_))
+            myo = myo.masked_scatter(half, inh[inv])
+            n_inherited = int(phit[inv].sum())
+            INHERIT_TRACE.append((n_new, int(half.sum()), n_inherited))
+    return myo, n_new
+
+
+def _scatter_full(es, live, myo, dev, dt_):
+    """Live values -> a per-half-edge array sized to the CURRENT buffer, 1.0 on the dead slots."""
+    full = torch.ones(es.shape[0], device=dev, dtype=dt_)
+    full[live] = myo
+    return full
+
+
+def _live_edges(m, pos):
+    """The live half-edges and their identities, for whoever is asking this frame.
+
+    `live` is `E_face < nF`, the same mask `shape_energy_3d` uses, NOT `E_srce < Nv`. The two differ
+    after a division and using the wrong one is how a half-edge ends up with a myosin belonging to a
+    face that no longer exists.
+    """
+    es, et, ef = m["E_srce"], m["E_trgt"], m["E_face"]
+    nF, Nv = int(m["nF"]), int(m["Nv"])
+    live = ef < nF
+    vi, vj = es[live].long(), et[live].long()
+    stride = max(pos.shape[0], Nv) + 1
+    length = (pos[vj] - pos[vi]).norm(dim=-1).to(pos.dtype)
+    return es, live, vi, vj, stride, _edge_key(vi, vj, stride), length
 
 
 @register_operator("junction_myosin", family="mechanics", set="vertex", kind="structural")
@@ -99,10 +206,10 @@ class JunctionMyosin(Structural):
         self.k_perim = float(params.get("k_perim", 1.0))
         self.gam = float(params.get("gam", 0.0))
         self.inherit = bool(params.get("inherit", True))
-        self._vseen = None
         self.dt = float(params.get("dt", 1.0))
-        self._keys = None            # int64 [K] topological identities seen so far
-        self._vals = None            # float  [K] their myosin
+        # THE STORE IS ON THE MESH (`myo_keys` / `myo_vals` / `myo_vseen`), not here. See the module
+        # docstring: state of an edge-set has to be reachable by any operator scheduled after a
+        # topology change, and an operator attribute is reachable by exactly one.
         self._said = False
 
     def _edge_tension(self, m, length, myo, live, ef, dev, dt_):
@@ -161,68 +268,16 @@ class JunctionMyosin(Structural):
         if m is None:
             return {}
         pos = lvl.get("pos")
-        es, et, ef = m["E_srce"], m["E_trgt"], m["E_face"]
-        nF, Nv = int(m["nF"]), int(m["Nv"])
+        ef = m["E_face"]
+        nF = int(m["nF"])
         dev, dt_ = pos.device, pos.dtype
-        live = ef < nF
+        es, live, vi, vj, stride, key, length = _live_edges(m, pos)
         if not bool(live.any()):
             return {}
-        vi, vj = es[live].long(), et[live].long()
-        stride = max(pos.shape[0], Nv) + 1
-        key = _edge_key(vi, vj, stride)
-
-        length = (pos[vj] - pos[vi]).norm(dim=-1).to(dt_)
         l_ref = length.mean().clamp_min(1e-9)
 
         # ---- look each live junction up by its identity ------------------------------------------
-        if self._keys is None:
-            self._keys = torch.empty(0, dtype=torch.long, device=dev)
-            self._vals = torch.empty(0, dtype=dt_, device=dev)
-        order = torch.argsort(self._keys)
-        ks, vs = self._keys[order], self._vals[order]
-        idx = torch.searchsorted(ks, key)
-        idx_c = idx.clamp(max=max(ks.numel() - 1, 0))
-        found = (ks.numel() > 0) & (idx_c < ks.numel())
-        hit = found & (ks[idx_c] == key) if ks.numel() else torch.zeros_like(key, dtype=torch.bool)
-        base = vs[idx_c] if vs.numel() else torch.zeros_like(length)
-        myo = torch.where(hit, base, torch.full_like(length, self.myo_new))
-        n_new = int((~hit).sum())
-
-        # ---- A JUNCTION WITH A PARENT INHERITS FROM IT ------------------------------------------
-        # Not every edge that misses the lookup is a new junction. `divide_3d` inserts a new vertex on
-        # each of two edges of the dividing cell and then joins them, so a division produces two KINDS
-        # of edge, and only one of them is new:
-        #
-        #   one endpoint new, one old   -- a SPLIT HALF of the cut junction (a,b). The same physical
-        #                                  contact, now in two pieces. It has a myosin history and
-        #                                  giving it `myo_new` throws that history away.
-        #   both endpoints new          -- the interface between the two daughters. This one really is
-        #                                  new, and `myo_new` is the honest answer for it.
-        #
-        # The parent is recoverable without any help from `divide_3d`, which is the point of keying by
-        # vertex pair: a new vertex `n` has exactly two OLD neighbours, and they are the endpoints of the
-        # edge it was inserted into. So the parent key is (min, max) over `n`'s old neighbours, and both
-        # halves look it up. Falls back to `myo_new` where there is no parent to find.
-        if self.inherit and n_new and self._vseen is not None:
-            oi = self._vseen[vi.clamp(max=self._vseen.numel() - 1)] & (vi < self._vseen.numel())
-            oj = self._vseen[vj.clamp(max=self._vseen.numel() - 1)] & (vj < self._vseen.numel())
-            half = (~hit) & (oi ^ oj)                       # exactly one endpoint is new
-            if bool(half.any()):
-                newv = torch.where(oi[half], vj[half], vi[half])     # the inserted vertex
-                oldv = torch.where(oi[half], vi[half], vj[half])     # its old neighbour
-                uq, inv = torch.unique(newv, return_inverse=True)
-                lo = torch.full((uq.numel(),), stride, dtype=torch.long, device=dev)
-                hi_ = torch.zeros(uq.numel(), dtype=torch.long, device=dev)
-                lo = lo.scatter_reduce(0, inv, oldv, reduce="amin", include_self=True)
-                hi_ = hi_.scatter_reduce(0, inv, oldv, reduce="amax", include_self=True)
-                pkey = lo * stride + hi_                             # the edge the vertex was cut into
-                pidx = torch.searchsorted(ks, pkey).clamp(max=max(ks.numel() - 1, 0))
-                phit = (ks.numel() > 0) & (ks[pidx] == pkey) & (lo < hi_)
-                inh = torch.where(phit, vs[pidx] if vs.numel() else torch.zeros_like(pkey, dtype=dt_),
-                                  torch.full_like(pkey, self.myo_new, dtype=dt_))
-                myo = myo.masked_scatter(half, inh[inv])
-                n_inherited = int(phit[inv].sum())
-                INHERIT_TRACE.append((n_new, int(half.sum()), n_inherited))
+        myo, n_new = _lookup(m, key, length, vi, vj, stride, self.myo_new, self.inherit, dev, dt_)
 
         # ---- recruitment ------------------------------------------------------------------------
         # ---- WHAT THE FEEDBACK IS KEYED TO ------------------------------------------------------
@@ -268,16 +323,14 @@ class JunctionMyosin(Structural):
 
         # ---- store back, keyed. Junctions that no longer exist are simply not written, so a T1 or a
         # death drops them without anyone having to notice.
-        self._keys, self._vals = key.detach().clone(), myo.detach().clone()
+        m["myo_keys"], m["myo_vals"] = key.detach().clone(), myo.detach().clone()
         # which vertices existed this frame, so next frame can tell an inserted vertex from an old one
         vs_seen = torch.zeros(stride, dtype=torch.bool, device=dev)
         vs_seen[vi] = True; vs_seen[vj] = True
-        self._vseen = vs_seen
+        m["myo_vseen"] = vs_seen
         # the per-half-edge array the mechanics reads: full length, 1.0 on dead slots so a masked-out
         # half-edge contributes its usual tension if anything ever reads it unmasked
-        full = torch.ones(es.shape[0], device=dev, dtype=dt_)
-        full[live] = myo
-        m["myo"] = full
+        m["myo"] = _scatter_full(es, live, myo, dev, dt_)
         MYOSIN_TRACE.append((int(live.sum()), float(myo.mean()), float(myo.min()),
                              float(myo.max()), n_new))
         if not self._said:
@@ -290,3 +343,74 @@ class JunctionMyosin(Structural):
 
 # Per frame, only when inheritance fires: (new edges, split halves, halves that found a parent).
 INHERIT_TRACE: list = []
+
+# Per frame: (half-edges now, half-edges when myosin was written, live junctions re-keyed). A run whose
+# second column never differs from the first is a run in which no topology operator changed the edge
+# buffer -- which for `cellfix_B_new` would itself be the bug.
+SYNC_TRACE: list = []
+
+
+@register_operator("junction_myosin_sync", family="mechanics", set="vertex", kind="rewire")
+class JunctionMyosinSync(Rewire):
+    """Re-key `m["myo"]` onto the half-edge arrays a topology operator has just changed.
+
+    WHY THIS IS AN OPERATOR AND NOT A LINE IN `divide_3d`. Per-FACE state already survives topology:
+    `divide_3d` and `apoptosis_3d` both rebuild the mesh through `flat_from_rings_3d` and carry every
+    per-face array across with the `keep` map, so `A0`, `P0`, `V0f`, `age` and `ndiv` are never left
+    indexed against a buffer that has moved. There is no such carry for per-HALF-EDGE state, because
+    until `junction_myosin` there was none. Adding one to each topology operator is the pattern the
+    module docstring exists to refuse -- the next per-junction state would have to edit them again.
+
+    So the carry is done from the other side: myosin is keyed by vertex pair, and this operator maps
+    the store back onto whatever half-edge arrays now exist. It is `rewire` because it is the relation
+    that changed and this is the state following it; it returns nothing and writes one buffer.
+
+    WHERE IT GOES IN THE SCHEDULE. After every operator that can rewire or resize the half-edge arrays
+    and before `topo_snapshot_3d`:
+
+        junction_myosin -> shape_energy_3d -> reconnect_t1_3d -> divide_3d
+                        -> junction_myosin_sync -> topo_snapshot_3d
+
+    IT CANNOT CHANGE A TRAJECTORY, BY CONSTRUCTION. `shape_energy_3d` reads `m["myo"]` in the same
+    frame `junction_myosin` writes it, before any topology operator runs, and next frame's
+    `junction_myosin` overwrites it from the store. Nothing between reads it. So the array this
+    operator writes is read by exactly one thing -- `topo_snapshot_3d` -- and adding it to a schedule
+    leaves every position, every division and every T1 bit-identical. That is a property worth having:
+    the fix to a recording defect must not be able to alter what is being recorded.
+    """
+
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = []
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = False
+    MECHANISM_TAGS = ["junction_state", "topology_persistent", "bookkeeping"]
+    PARAM_ROLES = {"myo_new": "myosin_of_a_newborn_junction"}
+    REFERENCE = "Plexus (this work)."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex")
+        self.myo_new = float(params.get("myo_new", 1.0))
+        self.inherit = bool(params.get("inherit", True))
+        self._said = False
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        m = getattr(lvl, "_mesh", None)
+        if m is None or m.get("myo_keys") is None:
+            return {}                      # no junction myosin in this specification: nothing to carry
+        pos = lvl.get("pos")
+        dev, dt_ = pos.device, pos.dtype
+        es, live, vi, vj, stride, key, length = _live_edges(m, pos)
+        if not bool(live.any()):
+            return {}
+        was = int(m["myo"].shape[0]) if m.get("myo") is not None else 0
+        myo, _ = _lookup(m, key, length, vi, vj, stride, self.myo_new, self.inherit, dev, dt_)
+        m["myo"] = _scatter_full(es, live, myo, dev, dt_)
+        SYNC_TRACE.append((int(es.shape[0]), was, int(live.sum())))
+        if not self._said:
+            print(f"[junction_myosin_sync] re-keying myosin after the topology operators "
+                  f"({was} half-edges written -> {int(es.shape[0])} now)", flush=True)
+            self._said = True
+        return {}
