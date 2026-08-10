@@ -71,7 +71,7 @@ def _edge_key(vi, vj, stride):
     return lo * stride + hi
 
 
-def _lookup(m, key, length, vi, vj, stride, myo_new, inherit, dev, dt_):
+def _lookup(m, key, length, vi, vj, stride, myo_new, inherit, dev, dt_, new_val=None):
     """The keyed store on the mesh, mapped onto the half-edge arrays AS THEY ARE NOW.
 
     Split out of `JunctionMyosin.forward` so that `junction_myosin_sync` can perform exactly the same
@@ -80,6 +80,15 @@ def _lookup(m, key, length, vi, vj, stride, myo_new, inherit, dev, dt_):
     the two cannot drift apart because there is only one piece of code that decides it.
 
     Returns `(myo, n_new)` and touches nothing: the store is read, never written.
+
+    `new_val` IS WHAT A JUNCTION WITH NO HISTORY GETS, per half-edge, overriding the scalar `myo_new`.
+    A scalar is the right answer only when the stored quantity has a fixed scale, and in the two-pool
+    model it does not: the tissue's mean line density runs 1.07 -> 1.97 -> 1.48 over 401 frames, so a
+    newborn junction pinned at an absolute 1.0 is set to between 51% and 93% of whatever its
+    neighbours happen to hold, for no reason. Passing `new_val = myo_new * n*_f`, with
+    n*_f = tau_jun * k_ex * rho_f the density the supply into that cell's belt sustains, makes
+    `myo_new` mean what its name says -- a newborn junction as a FRACTION of what a mature one there
+    would carry -- and makes it a claim rather than a units accident.
     """
     keys = m.get("myo_keys")
     vals = m.get("myo_vals")
@@ -93,7 +102,8 @@ def _lookup(m, key, length, vi, vj, stride, myo_new, inherit, dev, dt_):
     found = (ks.numel() > 0) & (idx_c < ks.numel())
     hit = found & (ks[idx_c] == key) if ks.numel() else torch.zeros_like(key, dtype=torch.bool)
     base = vs[idx_c] if vs.numel() else torch.zeros_like(length)
-    myo = torch.where(hit, base, torch.full_like(length, myo_new))
+    fresh = (new_val if new_val is not None else torch.full_like(length, myo_new))
+    myo = torch.where(hit, base, fresh)
     n_new = int((~hit).sum())
 
     # ---- A JUNCTION WITH A PARENT INHERITS FROM IT ------------------------------------------
@@ -127,8 +137,13 @@ def _lookup(m, key, length, vi, vj, stride, myo_new, inherit, dev, dt_):
             pkey = lo * stride + hi_                             # the edge the vertex was cut into
             pidx = torch.searchsorted(ks, pkey).clamp(max=max(ks.numel() - 1, 0))
             phit = (ks.numel() > 0) & (ks[pidx] == pkey) & (lo < hi_)
+            # A HALF THAT CANNOT FIND ITS PARENT falls back to the same value a junction with no
+            # history gets, taken per-edge so it follows `new_val` when one is supplied.
+            fb = fresh[half]
+            fb_u = torch.zeros(uq.numel(), device=dev, dtype=dt_).scatter_reduce(
+                0, inv, fb, reduce="amax", include_self=False)
             inh = torch.where(phit, vs[pidx] if vs.numel() else torch.zeros_like(pkey, dtype=dt_),
-                              torch.full_like(pkey, myo_new, dtype=dt_))
+                              fb_u)
             myo = myo.masked_scatter(half, inh[inv])
             n_inherited = int(phit[inv].sum())
             INHERIT_TRACE.append((n_new, int(half.sum()), n_inherited))

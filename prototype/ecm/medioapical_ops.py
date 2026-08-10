@@ -153,7 +153,11 @@ class MedioapicalMyosin(Lateral):
         if rho is None or rho.shape[0] < nF:
             rho = torch.full((nF,), self.rho0, device=dev, dtype=dt_)
         rho = rho[:nF].to(dt_)
+        # BOTH ARE DENSITIES, so `divide_3d`'s copy-onto-both-daughters conserves them. `myo_area` is
+        # NOT declared here on purpose: an area is extensive, copying it would give two daughters the
+        # mother's area each, and anything needing it after a division must recompute it.
         _face_carry(m, "myo_med")
+        _face_carry(m, "myo_nstar_per_tau")
 
         # ---- where the export lands ---------------------------------------------------------------
         # With `beta_T` at 0 this is pure transport: every unit of belt receives at the same rate and
@@ -181,6 +185,16 @@ class MedioapicalMyosin(Lateral):
         rho = (M / area).clamp_min(0.0)
         m["myo_med"] = rho.detach()
         m["myo_med_total"] = float((rho * area).sum())          # the amount, for the ledger
+        m["myo_area"] = area.detach()
+        m["myo_k_ex"] = self.k_ex
+        # THE LOCAL STEADY STATE OF THE BELT, PER CELL. Setting dN/dt = 0 in the junctional equation
+        # with the flux from ONE side gives n* = tau_jun * k_ex * rho_f, which is the density a mature
+        # junction of this cell carries. It is the only scale in the model against which "a newborn
+        # junction starts weak" or "the cytokinetic ring is myosin-rich" can be stated as a FRACTION
+        # rather than as an absolute number that silently means something different at frame 400 than
+        # at frame 0. `tau_jun` belongs to the junction operator, so what is left here is the part this
+        # operator owns and the consumer multiplies by its own tau.
+        m["myo_nstar_per_tau"] = (self.k_ex * rho).detach()
         # WHAT THE JUNCTION OPERATOR CONSUMES: an amount per half-edge, full-length so it is indexed
         # the same way `myo` is, and re-derived every frame so it can never be stale. Filled with 0 on
         # dead slots: an amount, not a multiplier.
@@ -239,6 +253,7 @@ class JunctionMyosinTwoPool(Structural):
         self.activity = float(params.get("activity", 1.0))
         self.tau_jun = float(params.get("tau_jun", 20.0))
         self.myo_new = float(params.get("myo_new", 1.0))
+        self.new_rel = bool(params.get("myo_new_rel", True))
         self.inherit = bool(params.get("inherit", True))
         self.dt = float(params.get("dt", 1.0))
         self._said = False
@@ -278,7 +293,23 @@ class JunctionMyosinTwoPool(Structural):
         # junction. Multiplying by the CURRENT length is what turns that copy into a conservative
         # split: N_an + N_nb = n*(l_an + l_nb) = n*l_ab = N_ab, to the accuracy with which the
         # inserted vertex lies on the parent edge.
-        n_e, _ = JO._lookup(m, key, length, vi, vj, stride, self.myo_new, self.inherit, dev, dt_)
+        # A NEWBORN JUNCTION IS A FRACTION OF WHAT A MATURE ONE HERE WOULD CARRY, not an absolute
+        # number. `myo_new` used to be a bare density, and because the tissue's mean line density runs
+        # 1.07 -> 1.97 -> 1.48 over the run, `myo_new = 1.0` set a new junction to 51% of its
+        # neighbours at frame 100 and 93% at frame 0 -- a visible, meaningless dimming that had nothing
+        # to do with the parameter's intent.
+        nsp = m.get("myo_nstar_per_tau")
+        ef_l = m["E_face"][live].long()
+        n_star = (self.tau_jun * nsp[ef_l] if nsp is not None
+                  else torch.ones_like(length))
+        # A FLAG AND NOT A REPLACEMENT, because the absolute reading is the one every cache written
+        # before 10 August was built with, and a silent change of meaning under an unchanged cache key
+        # is how an archived run stops being reproducible without anything failing. `False` reproduces
+        # those bit-for-bit; `True` is the corrected default and is what enters the cache key.
+        new_val = (self.myo_new * n_star if self.new_rel
+                   else torch.full_like(length, self.myo_new))
+        n_e, _ = JO._lookup(m, key, length, vi, vj, stride, self.myo_new, self.inherit, dev, dt_,
+                            new_val=new_val)
         n_j = (z.clone().index_add(0, inv, n_e) / cnt.clamp_min(1.0))
         N_j = n_j * l_j
         N_j = N_j + J_j - N_j * (self.dt / max(self.tau_jun, 1e-9))
@@ -308,3 +339,145 @@ class JunctionMyosinTwoPool(Structural):
                   f"integrated one is an AMOUNT", flush=True)
             self._said = True
         return {}
+
+
+@register_operator("cytokinetic_ring", family="mechanics", set="vertex", kind="structural")
+class CytokineticRing(Structural):
+    """The myosin a division leaves on the junction it just built, taken from the cortex that built it.
+
+    WHY THE MODEL NEEDED THIS, AND IT WAS VISIBLE IN A MOVIE BEFORE IT WAS MEASURED. In the two-pool
+    run the brightest junctions at a division site are the two HALVES of a contact the division cut
+    (m/<m> = 1.066, because a cell about to divide is large, has a low perimeter-to-area ratio, holds
+    more cortical myosin and feeds its belts harder) -- while the daughter--daughter interface, the one
+    place a real dividing cell puts almost all of its myosin, is the DIMMEST thing in the frame at
+    0.628. The cytokinetic ring is the most myosin-II-rich structure a cell assembles and it
+    constricts exactly there; in epithelia the nascent adherens junction between the daughters is
+    built out of it, with the neighbouring cell contributing (Herszterg et al., Dev. Cell 24:256,
+    2013; Founounou et al., Dev. Cell 24:242, 2013). A model whose division sites are bright for the
+    wrong reason and dark in the right place is getting this backwards twice.
+
+    WHAT IT DOES. A junction born with BOTH endpoints new is a daughter--daughter interface -- exactly
+    the distinction `_lookup`'s inheritance already draws, since a split half has one new endpoint and
+    one old one. Those junctions are written into the keyed store at
+
+        n_e = ring * n*_f,        n*_f = tau_jun * k_ex * rho_f
+
+    i.e. `ring` times the density a mature junction of that cell carries, and the myosin is DEBITED
+    from the medioapical pool of the adjacent cell. That second half is not bookkeeping pedantry: the
+    ring is assembled from cortical actomyosin, so a ring that appears from nowhere would be a source
+    term in a model whose whole point is that myosin is a conserved amount, and the conservation
+    ledger would stop being able to detect a leak.
+
+    IT RELAXES ON ITS OWN. Nothing here decays the deposit: the junctional equation already does,
+    with dN/dt = J - N/tau_jun pulling the interface from `ring * n*` back to `n*` over tau_jun. So
+    `ring` sets how bright a new junction starts and tau_jun sets how long it stays that way, and
+    neither needs a second timescale invented for it.
+
+    WHERE IT GOES IN THE SCHEDULE. After the topology operators, before `junction_myosin_sync`:
+
+        ... -> reconnect_t1_3d -> divide_3d -> cytokinetic_ring -> junction_myosin_sync
+                                                                -> topo_snapshot_3d
+
+    It must see the new vertices, which means after `divide_3d`, and it must read `myo_vseen` from the
+    PREVIOUS frame's `junction_myosin` to know which vertices are new -- which it does, because
+    nothing between the two writes it. Placing it before the sync operator is what makes the deposit
+    visible in the frame it happens rather than the frame after.
+    """
+
+    EMIT = None
+    SUPPORTED_DIMS = [3]
+    REQUIRES_PARAMS = []
+    DIFFERENTIABLE = False
+    MAY_MUTATE_INTEGRATED_STATE = False
+    MECHANISM_TAGS = ["actomyosin_contraction", "cytokinesis", "junction_state", "conserved_amount"]
+    PARAM_ROLES = {"ring": "newborn_junction_density_as_a_multiple_of_the_local_steady_state",
+                   "tau_jun": "the_belt_turnover_that_relaxes_it_back"}
+    REFERENCE = ("Herszterg, S. et al. (2013) Dev. Cell 24:256 and Founounou, N. et al. (2013) "
+                 "Dev. Cell 24:242 (the daughter--daughter junction is built from the cytokinetic "
+                 "ring, with the neighbouring cell contributing).")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex")
+        self.ring = float(params.get("ring", 3.0))
+        self.tau_jun = float(params.get("tau_jun", 20.0))
+        self.debit = bool(params.get("debit", True))
+        self._said = False
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        m = getattr(lvl, "_mesh", None)
+        if m is None or m.get("myo_keys") is None or m.get("myo_nstar_per_tau") is None:
+            return {}
+        pos = lvl.get("pos")
+        dev, dt_ = pos.device, pos.dtype
+        es, live, vi, vj, stride, key, length = JO._live_edges(m, pos)
+        if not bool(live.any()):
+            return {}
+        vseen = m.get("myo_vseen")
+        if vseen is None:
+            return {}
+        # BOTH ENDPOINTS NEW = the interface between the two daughters. One new and one old is a split
+        # half of a pre-existing contact, which has a history and must not be overwritten with a ring.
+        oi = vseen[vi.clamp(max=vseen.numel() - 1)] & (vi < vseen.numel())
+        oj = vseen[vj.clamp(max=vseen.numel() - 1)] & (vj < vseen.numel())
+        fresh = (~oi) & (~oj)
+        if not bool(fresh.any()):
+            RING_TRACE.append((0, 0.0))
+            return {}
+        nF = int(m["nF"])
+        ef = m["E_face"][live].long()
+        nsp = m["myo_nstar_per_tau"]
+        if nsp.shape[0] < nF:
+            # THE CARRY DID NOT HAPPEN, which means this operator is scheduled somewhere `divide_3d`
+            # has grown the face count without `_carry_face_state` running. Said rather than clamped:
+            # a clamp here would silently give every new face the last old face's supply.
+            raise RuntimeError(
+                f"cytokinetic_ring: myo_nstar_per_tau has {nsp.shape[0]} entries against {nF} faces. "
+                f"`medioapical_myosin` must declare it in m['face_carry'] and the topology operators "
+                f"must run `_carry_face_state`.")
+        n_star = self.tau_jun * nsp[ef]
+        n_ring = self.ring * n_star
+
+        uq, inv = torch.unique(key[fresh], return_inverse=True)
+        z = torch.zeros(uq.numel(), device=dev, dtype=dt_)
+        cnt = z.clone().index_add(0, inv, torch.ones_like(length[fresh]))
+        n_j = z.clone().index_add(0, inv, n_ring[fresh]) / cnt.clamp_min(1.0)
+        l_j = z.clone().index_add(0, inv, length[fresh]) / cnt.clamp_min(1.0)
+
+        # THE DEBIT, ON THE CELLS THAT BUILT IT. The amount deposited on a junction is n*l; each of the
+        # two half-edges belongs to one of the two daughters, so each daughter pays for its own side.
+        if self.debit:
+            rho = m.get("myo_med")
+            if rho is not None and rho.shape[0] >= nF:
+                # THE AREA IS RECOMPUTED, NOT READ. `myo_area` on the mesh is the pre-division one and
+                # an area is extensive, so it is not carried across the rebuild; the daughters' areas
+                # are what this debit must be spread over.
+                area, _, _, _ = face_geometry_3d(pos, m["E_srce"].long(), m["E_trgt"].long(),
+                                                 m["E_face"].long().clamp(max=nF - 1), nF,
+                                                 live.to(dt_))
+                area = area.clamp_min(1e-9)
+                paid = (n_ring * length)[fresh]
+                per_face = torch.zeros(nF, device=dev, dtype=dt_).index_add(0, ef[fresh], paid)
+                rho = (rho[:nF] - per_face / area).clamp_min(0.0)
+                m["myo_med"] = rho.detach()
+                m["myo_med_total"] = float((rho * area).sum())
+
+        # APPENDED TO THE STORE, not written to `m["myo"]`: the store is what the next frame's
+        # `junction_myosin` reads and what `junction_myosin_sync` renders from, so putting the deposit
+        # there is what makes it survive to both. Existing keys are kept; a fresh junction cannot
+        # collide with one, since its key contains a vertex index that did not exist before.
+        m["myo_keys"] = torch.cat([m["myo_keys"], uq.detach()])
+        m["myo_vals"] = torch.cat([m["myo_vals"], n_j.detach().to(m["myo_vals"].dtype)])
+        RING_TRACE.append((int(uq.numel()), float((n_j * l_j).sum())))
+        if not self._said:
+            print(f"[cytokinetic_ring] {int(uq.numel())} newborn interface(s) seeded at {self.ring}x "
+                  f"the local steady state, debited from the medioapical pool", flush=True)
+            self._said = True
+        return {}
+
+
+# Per frame: (newborn daughter--daughter interfaces seeded, myosin moved onto them). The second column
+# is what the medioapical pool paid, so a ring that creates myosin instead of moving it shows up as a
+# ledger that no longer closes.
+RING_TRACE: list = []

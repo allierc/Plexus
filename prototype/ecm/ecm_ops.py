@@ -109,6 +109,16 @@ class ECMSeed(Structural):
         # start the run with a shock the material never recovers from.
         self.plate_half = params.get("plate_half", None)
         self.plate_half = None if self.plate_half is None else float(self.plate_half)
+        # A BLOCK REGION, in the framework's own vocabulary. `MPMParticle.provision` already accepts
+        # `block: [x0,y0,z0,x1,y1,z1]` for a type that FILLS a box instead of a disc, and the stock MPM
+        # demos build their falling cubes with it. Fibres cannot use that path -- the provision places
+        # points and this operator places STRANDS -- so the same six numbers are accepted here and the
+        # fibre CENTRES are drawn inside the box, inset by half a fibre so a strand stays in the cube it
+        # belongs to. Without it the only regions this operator could seed were "the whole domain" and
+        # "the whole domain minus a cavity", which is why a cube of matrix had to be faked with plates.
+        self.block = params.get("block", None)
+        self.block = None if self.block is None else [float(v) for v in self.block]
+        self.cavity_sphere = bool(params.get("cavity_sphere", False))
         # A DENSER REGION, so the matrix's ARCHITECTURE is anisotropic and not just its orientation.
         # Fibre alignment alone gave a 1.50x directional pressure difference (measured: 1448 along the
         # alignment axis against 2123 / 2176 across it) -- real, but small, because MPM interpolates
@@ -140,7 +150,14 @@ class ECMSeed(Structural):
         ax = self.axis
         along = d[:, ax].abs()
         radial = torch.sqrt((d ** 2).sum(1) - d[:, ax] ** 2 + 1e-12)
-        ok = ~((radial < self.cavity_r) & (along < self.cavity_h))
+        # A DISC BY DEFAULT, A SPHERE ON REQUEST. The disc is two numbers because anisotropic
+        # confinement is the experiment the cavity was written for; a hole that a SPHEROID will occupy
+        # is a sphere, and setting r = h on the disc gives a cylinder with flat ends, which is a
+        # different shape wearing the right radius.
+        if self.cavity_sphere:
+            ok = ~(d.norm(dim=1) < self.cavity_r)
+        else:
+            ok = ~((radial < self.cavity_r) & (along < self.cavity_h))
         if self.plate_half is not None:
             ok = ok & (d[:, ax].abs() < self.plate_half)
         return ok
@@ -168,6 +185,30 @@ class ECMSeed(Structural):
         # placement because the cavity is a parameter: a formula would have to be rewritten for
         # every new cavity shape, and a rejection loop would not.
         lo, hi = self.margin, 1.0 - self.margin
+        if self.block is not None:
+            b = torch.tensor(self.block, dtype=torch.float32).reshape(2, D)
+            inset = 0.5 * self.fibre_len
+            blo = (b[0] + inset).clamp(lo, hi)
+            bhi = (b[1] - inset).clamp(lo, hi)
+            blo, bhi = torch.minimum(blo, bhi), torch.maximum(blo, bhi)
+            # AND THE CAVITY STILL APPLIES INSIDE THE BLOCK. The hole is what the spheroid will
+            # occupy, so it has to be absent from the matrix from frame 0 -- a fibre seeded where the
+            # ball is going to be is in contact before the run starts, which is the defect the cavity
+            # exists to prevent. Rejection, as everywhere else here, because the cavity's shape is a
+            # parameter and a closed form would have to be rewritten for the next one.
+            got = []
+            for _ in range(64):
+                c = torch.rand(self.n_fibres * 2, D, generator=g) * (bhi - blo) + blo
+                c = c[self._outside_cavity(c.to(dev)).cpu()]
+                got.append(c)
+                if sum(x.shape[0] for x in got) >= self.n_fibres:
+                    break
+            centres = torch.cat(got)[: self.n_fibres]
+            print(f"[seed_ecm] block region {self.block}: {centres.shape[0]} fibre centres inside it, "
+                  f"inset by half a fibre ({inset:.3f}), cavity r={self.cavity_r:g} h={self.cavity_h:g} "
+                  f"left empty", flush=True)
+        else:
+            centres = None
         keep = []
         for _ in range(64):
             c = torch.rand(self.n_fibres * 2, D, generator=g) * (hi - lo) + lo
@@ -176,8 +217,8 @@ class ECMSeed(Structural):
             need = self.n_fibres * (max(self.dense_boost, 1.0) if self.dense_cone > 0 else 1.0)
             if sum(x.shape[0] for x in keep) >= need:
                 break
-        centres = torch.cat(keep)
-        if self.dense_cone > 0 and self.dense_boost != 1.0:
+        centres = torch.cat(keep) if centres is None else centres
+        if self.block is None and self.dense_cone > 0 and self.dense_boost != 1.0:
             # IMPORTANCE SAMPLING, not a second sampling pass: keep every candidate in the cone and
             # thin the rest by 1/boost, so the ACCEPTED set has `boost` times the areal density inside
             # the cone. The particle count is unchanged -- `per = n // n_fibres` -- so this redistributes
