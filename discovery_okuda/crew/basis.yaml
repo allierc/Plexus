@@ -99,6 +99,12 @@ members:
   - {name: b_gs_shaping_sharp_hi_death, chem: gs, mat: gated, mech: shaping, gate: sharp, drive: hi, death: true}
 
   # --- the brusselator QUESTION: one base, carrying the gamma ladder. Not a column.
-  - {name: b_bru_question,        chem: bru, mat: gated, mech: shaping, gate: soft,  drive: lo}
+  #     WITHDRAWN 10 August, un-run: it was still going at 80 minutes when the rest of the basis
+  #     had finished, and was killed so the campaign could start. That is itself a measurement --
+  #     brusselator at gamma 0.05 is far slower per frame than gray_scott -- but it is not the
+  #     measurement the ladder wanted. Restore this line and the ladder below together; a base
+  #     without its ladder is a member nothing asks a question of, and a ladder without its base
+  #     is a refusal every round.
+  # - {name: b_bru_question,      chem: bru, mat: gated, mech: shaping, gate: soft,  drive: lo}
 
 death: {mode: competition, max_mark_frac: 0.005, min_age: 4, shrink_rate: 0.05, critical_frac: 0.15}
