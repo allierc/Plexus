@@ -135,9 +135,49 @@ def _lookup(m, key, length, vi, vj, stride, myo_new, inherit, dev, dt_):
     return myo, n_new
 
 
-def _scatter_full(es, live, myo, dev, dt_):
-    """Live values -> a per-half-edge array sized to the CURRENT buffer, 1.0 on the dead slots."""
-    full = torch.ones(es.shape[0], device=dev, dtype=dt_)
+def edge_tension(m, length, myo, ef, lam, k_perim, gam, dev, dt_):
+    """Per-edge tension, as dE/dl_e of the energy `shape_energy_3d` actually minimises.
+
+    E = K_A(A-A0)^2 + K_P(P-P0)^2 + 0.5 Gam P^2 + K_V(...)^2 + Lambda*sum(m_e l_e), and only the
+    perimeter and line terms depend on an individual edge length, so
+
+        T_e = Lambda*m_e + 2 K_P (P_f - P0_f) + Gam * P_f      (f = the edge's own face)
+
+    The CURRENT perimeter is not stored on the mesh -- `face_geometry_3d` computes and discards it --
+    so it is recomputed here by the same index_add. P0 is on the mesh; K_P, Gam and Lambda come from
+    the spec and MUST match the values `shape_energy_3d` was given, or this is the tension of a
+    different tissue.
+
+    RAISES rather than falling back. The first version printed a warning and returned `length`, and
+    the smoke test duly printed it -- which means run 86 would have been a LENGTH experiment wearing
+    a tension label, and the 86-88 comparison would have been vacuous while looking fine. A silent
+    fallback to the exact hypothesis under test is the worst possible failure mode.
+
+    A MODULE FUNCTION rather than a method, because `medioapical_ops` needs the same expression: the
+    tension a junction is under is a property of the mesh and the energy, not of whichever operator
+    happens to be asking. Two copies of it would be two tensions.
+    """
+    nF = int(m["nF"])
+    P0 = m.get("P0")
+    if P0 is None:
+        raise RuntimeError(
+            "edge_tension: this needs the target perimeter P0 on the mesh and it is absent. Refusing "
+            "to fall back to length -- that is the variable a tension-keyed run exists to replace, and "
+            "the fallback would have produced a length-keyed run labelled as tension.")
+    perim = torch.zeros(nF, device=dev, dtype=dt_).index_add(0, ef, length)
+    f = ef.long()
+    T = lam * myo + 2.0 * k_perim * (perim - P0.to(dt_))[f] + gam * perim[f]
+    return T.clamp_min(0.0)
+
+
+def _scatter_full(es, live, myo, dev, dt_, fill=1.0):
+    """Live values -> a per-half-edge array sized to the CURRENT buffer, `fill` on the dead slots.
+
+    `fill` is 1.0 for a MULTIPLIER (a dead half-edge then contributes its usual tension if anything
+    ever reads it unmasked) and 0.0 for an AMOUNT or a flux (a dead half-edge holds no myosin, and
+    filling it with 1.0 would put the reservoir into the conservation ledger).
+    """
+    full = torch.full((es.shape[0],), float(fill), device=dev, dtype=dt_)
     full[live] = myo
     return full
 
@@ -213,34 +253,7 @@ class JunctionMyosin(Structural):
         self._said = False
 
     def _edge_tension(self, m, length, myo, live, ef, dev, dt_):
-        """Per-edge tension, as dE/dl_e of the energy `shape_energy_3d` actually minimises.
-
-        E = K_A(A-A0)^2 + K_P(P-P0)^2 + 0.5 Gam P^2 + K_V(...)^2 + Lambda*sum(m_e l_e), and only the
-        perimeter and line terms depend on an individual edge length, so
-
-            T_e = Lambda*m_e + 2 K_P (P_f - P0_f) + Gam * P_f      (f = the edge's own face)
-
-        The CURRENT perimeter is not stored on the mesh -- `face_geometry_3d` computes and discards it --
-        so it is recomputed here by the same index_add. P0 is on the mesh; K_P, Gam and Lambda come from
-        the spec and MUST match the values `shape_energy_3d` was given, or this is the tension of a
-        different tissue.
-
-        RAISES rather than falling back. The first version printed a warning and returned `length`, and
-        the smoke test duly printed it -- which means run 86 would have been a LENGTH experiment wearing
-        a tension label, and the 86-88 comparison would have been vacuous while looking fine. A silent
-        fallback to the exact hypothesis under test is the worst possible failure mode.
-        """
-        nF = int(m["nF"])
-        P0 = m.get("P0")
-        if P0 is None:
-            raise RuntimeError(
-                "junction_myosin: keyed_on='tension' needs the target perimeter P0 on the mesh and it "
-                "is absent. Refusing to fall back to length -- that is the variable this run exists to "
-                "replace, and the fallback would have produced a length-keyed run labelled as tension.")
-        perim = torch.zeros(nF, device=dev, dtype=dt_).index_add(0, ef, length)
-        f = ef.long()
-        T = self.lam * myo + 2.0 * self.k_perim * (perim - P0.to(dt_))[f] + self.gam * perim[f]
-        return T.clamp_min(0.0)
+        return edge_tension(m, length, myo, ef, self.lam, self.k_perim, self.gam, dev, dt_)
 
     def _edge_strain_rate(self, key, length):
         """d ln(l_e)/dt, matched to the PREVIOUS frame by the same vertex-pair key the myosin uses.
@@ -406,8 +419,20 @@ class JunctionMyosinSync(Rewire):
         if not bool(live.any()):
             return {}
         was = int(m["myo"].shape[0]) if m.get("myo") is not None else 0
-        myo, _ = _lookup(m, key, length, vi, vj, stride, self.myo_new, self.inherit, dev, dt_)
-        m["myo"] = _scatter_full(es, live, myo, dev, dt_)
+        val, _ = _lookup(m, key, length, vi, vj, stride, self.myo_new, self.inherit, dev, dt_)
+        # THE STORE HOLDS WHAT THE MODEL CHOSE TO STORE, AND `myo` IS WHAT THE MECHANICS READS. For the
+        # default model those are the same number and `myo_gain` is 1. For `two_pool` the store is a
+        # line density and the multiplier is that density scaled to a tissue mean of `activity`, so the
+        # gain is `activity / <n>`; the owning operator leaves it on the mesh and this operator applies
+        # it, which is what keeps this one model-agnostic. The gain is the one computed before the
+        # topology operators ran, i.e. over ~2,000 junctions of which a handful were just cut -- a mean
+        # that does not move at that scale, and stated here rather than hidden.
+        gain = float(m.get("myo_gain", 1.0))
+        m["myo"] = _scatter_full(es, live, (gain * val).clamp(0.0, 5.0), dev, dt_)
+        # AND THE AMOUNT, on the same footing. `myo` is a density (and, for `two_pool`, a normalised
+        # one), so no sum of it says how much myosin there is; N_e = (stored density) * l_e does, and
+        # it is the quantity the conservation ledger is written in. Zero on dead slots: an amount.
+        m["myo_amount"] = _scatter_full(es, live, val * length, dev, dt_, fill=0.0)
         SYNC_TRACE.append((int(es.shape[0]), was, int(live.sum())))
         if not self._said:
             print(f"[junction_myosin_sync] re-keying myosin after the topology operators "
