@@ -218,7 +218,8 @@ S4 & momentum: $|\sum\mathbf f_{\rm part}+\sum\mathbf f_{\rm vert}|/\sum|\mathbf
      $<10^{-6}$ & \pass{1.5e-7} (float32 precision)\\
 S5 & the same on a curved, dividing, re-meshed surface & $<10^{-6}$ & \pass{1.2e-7} max,
      \pass{1.5e-8} median\\
-S6 & penetration stays bounded & $<2$ cells & \pass{1.47} (03b), \pass{0.82} (04), \pass{0.73} (04d)\\
+S6 & the penalty does not run away: penetration bounded & $<2$ cells & \pass{1.47} (03b),
+     \pass{0.82} (04), \pass{0.73} (04d) --- a NUMERICAL bound; U1 asks the physical one\\
 S7 & particles behind the surface are the CONTACT, not a leak & ratio to particles in contact
      $<1.5$; none below $0.7R$ & \pass{0.90--0.96}; deepest \pass{0.90R}, \pass{0} below $0.7R$\\
 S8 & friction changes the slip: $\mu=0.4$ against $\mu=0$ & $>2\times$ &
@@ -266,6 +267,15 @@ cycle puts the run at $2.5$--$4.9$ days; $1$ force unit $=9162$ nN, set so the s
 \emph{chosen}, and it is chosen on the softest and best-measured body rather than on the sheet under
 dispute. Without this block the loader says the run is dimensionless and no result from it may carry
 a unit, which was the state of every run in this folder until now.
+
+\textbf{S6 and U1 are one measurement against two thresholds, and that is the point of declaring
+units.} S6 asks whether the penalty runs away and answers no, in grid cells; U1 asks whether the
+surface is a surface and answers no, in micrometres. A threshold in grid cells is a threshold in the
+currency of the discretisation, which is the currency that makes it easiest to pass --- and the same
+$0.82$ that reads as a comfortable improvement on $1.47$ reads as $15\,\mu$m, nearly two cell
+diameters, against a basement membrane of $0.1\,\mu$m. Neither row is wrong; the failure was having
+only the first. \textbf{The rule this yields is general: a gate's threshold belongs in the unit of the
+phenomenon, not of the mesh.}
 
 \textbf{Two conventions make these mean what they say.} \textbf{The momentum residual is taken on the
 contact's own force pair}, inside the substep and before anything else is added --- with a drive in the

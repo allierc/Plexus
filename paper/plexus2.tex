@@ -1232,6 +1232,22 @@ penetration of ``$0.82$ grid cells'' --- which sounds small, and was reported as
 into $15\,\mu$m, nearly two cell diameters, which is the strongest single argument for replacing the
 penalty contact with a barrier formulation.
 
+\textbf{And that failure did not open a new gate --- it showed an existing one was denominated
+wrongly.} The same measurement was already gated: \emph{penetration stays bounded, threshold $<2$
+grid cells}, passing comfortably at $0.82$. A threshold in grid cells is a threshold in the currency
+of the discretisation, which is the currency in which it is easiest to pass, and a green row of that
+kind reads as an endorsement the interface has not earned. Both questions are worth asking --- does
+the penalty run away, and is the surface a surface --- but only the second is about the model. So the
+rule the units block yields is not "add a units gate" but
+
+\begin{quote}
+\emph{a gate's threshold belongs in the unit of the phenomenon, not of the mesh.}
+\end{quote}
+
+Applying it is cheap and mostly retrospective: it changed two rows in the \code{ecm} notes and left
+the rest, because a threshold already expressed as a ratio, a residual against machine precision, or
+a fraction of a control is dimensionless and was never at risk.
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \subsection{Promotion}
