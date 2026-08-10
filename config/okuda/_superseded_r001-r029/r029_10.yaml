@@ -1,0 +1,160 @@
+general:
+  name: r029_10
+  seed: 1010
+  n_frames: 1800
+  dt: 1.0
+  record_cap: 1802
+  record_every: 1
+  boundary: free
+  dim: 3
+  world:
+  - 80.0
+  - 80.0
+  - 80.0
+_run:
+  target_cells: 50000
+  seed_cells: 2000
+sets:
+  vertex:
+    n: 130004
+  cell:
+    n: 65004
+    state:
+      chem:
+        width: 2
+        integration: first_order
+      cen:
+        width: 3
+      area:
+        width: 1
+fields: {}
+operators:
+- op: seed_mesh_3d
+  at: vertex
+  cell_set: cell
+  before_frame: 1
+  n_cells: 2000
+  radius: 5.0
+  jitter: 0.15
+  seed: 1010
+  vseed_cv: 0.15
+  p0: 3.5
+- op: cell_geometry_3d
+  at: cell
+- op: seed_cell_rd
+  at: cell
+  mode: scatter
+  n_spots: 1
+  cone_deg: 8.0
+  seed: 1010
+  before_frame: 3
+  seed_frac: 0.06
+- op: cell_adjacency
+  at: cell
+- op: cell_diffuse
+  at: cell
+  implementation: graph_laplacian
+  d_a: 0.16
+  d_h: 0.16
+  chi: 1.3
+- op: cell_react
+  at: cell
+  model: gray_scott
+  rate: 2.0
+  F: 0.046
+  kk: 0.062
+- op: shape_to_chem
+  at: cell
+  model: curvature
+  vertex_set: vertex
+  beta: 1.0
+  F0: 0.046
+  rate: 1.0
+- op: shape_energy_3d
+  at: vertex
+  p0: 3.5
+  K_A: 1.0
+  K_P: 1.0
+  Gamma: 0.4
+  Lambda: 0.5
+  K_V: 80.0
+  K_R: 0.0
+  K_bend: 0.02
+  K_lumen: 0.5
+  antiinv: 0.0
+  mu: 1.0
+  dt: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+- op: reconnect_t1_3d
+  at: vertex
+  l_th_frac: 0.28
+  every: 1
+  max_flips: 300
+- op: divide_3d
+  at: vertex
+  factor: 2.0
+  reset_noise: 0.12
+  cycle_cv: 0.15
+  p0: 3.5
+  every: 4
+  cell_set: cell
+  min_cycle: 4
+  max_cycle: 1000000000
+  after_frame: 100
+  orient_iface: false
+  orient_asw: 0.6
+  g1_ramp: false
+  engine_clock: true
+- op: topo_snapshot_3d
+  at: vertex
+  every: 1
+schedule:
+- seed_mesh_3d
+- cell_geometry_3d
+- seed_cell_rd
+- cell_adjacency
+- cell_diffuse
+- cell_react
+- shape_to_chem
+- shape_energy_3d
+- reconnect_t1_3d
+- divide_3d
+- topo_snapshot_3d
+_discovery:
+  comp_hash: Cba038ec376e
+  structure:
+    operators:
+    - id: cell_adjacency0
+      op: cell_adjacency
+    - id: cell_diffuse0
+      op: cell_diffuse
+      impl: graph_laplacian
+    - id: cell_geometry_3d0
+      op: cell_geometry_3d
+    - id: cell_react0
+      op: cell_react
+      impl: gray_scott
+    - id: divide_3d0
+      op: divide_3d
+      impl: hertwig
+    - id: reconnect_t1_3d0
+      op: reconnect_t1_3d
+    - id: seed_cell_rd0
+      op: seed_cell_rd
+      impl: cone
+    - id: seed_mesh_3d0
+      op: seed_mesh_3d
+    - id: shape_energy_3d0
+      op: shape_energy_3d
+      impl: default
+    - id: shape_to_chem0
+      op: shape_to_chem
+      impl: curvature
+    connections: []
+  region: mechanics-only (no growth)
+  defect_fixes:
+  - D1 engine owns the clock (every=1)
+  - D2 one global dt=1.0
+  - D3 topo_snapshot every=1 == position stride
