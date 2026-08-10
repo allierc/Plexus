@@ -1,194 +1,54 @@
 \documentclass[10pt,a4paper]{article}
-\usepackage[margin=1.7cm]{geometry}
+\usepackage[margin=1.8cm]{geometry}
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
 \usepackage{graphicx}
 \usepackage[T1]{fontenc}
 \usepackage{microtype}
 \usepackage[colorlinks,linkcolor=black,citecolor=black,urlcolor=blue]{hyperref}
+\usepackage{xcolor}
+\usepackage{tabularx}
+% A GATE THAT PASSED IS GREEN AND A GATE THAT FAILED IS RED, in the table and nowhere else.
+\definecolor{gpass}{HTML}{1B7F4B}
+\definecolor{gfail}{HTML}{B03A2E}
+\newcommand{\pass}[1]{\textcolor{gpass}{\textbf{#1}}}
+\newcommand{\fail}[1]{\textcolor{gfail}{\textbf{#1}}}
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
 \usepackage{titlesec}
-\titlespacing*{\section}{0pt}{5pt}{2pt}
-\newcommand{\op}[1]{\texttt{#1}}
+\titlespacing*{\section}{0pt}{6pt}{2pt}
 \newcommand{\code}[1]{\texttt{#1}}
-\title{\vspace{-1.4cm}\textbf{A growing epithelial spheroid in an extracellular matrix:\\
-the Plexus2 implementation}}
+\newcommand{\op}[1]{\texttt{#1}}
+\title{\vspace{-1.4cm}\textbf{Spheroid, basement membrane, matrix:\\
+\normalsize the three-entity model and the arrows between them}}
 \author{}
-\date{\vspace{-0.9cm}\small \texttt{prototype/ecm} $\cdot$ runs in \texttt{log/okuda\_ECM} $\cdot$ 6 August 2026}
-\setlength{\parindent}{0pt}
-\setlength{\parskip}{0.6em}
-\begin{document}\maketitle\vspace{-1.1cm}
+\date{\vspace{-0.9cm}\small the container note $\cdot$ \texttt{prototype/ecm} $\cdot$
+\texttt{log/okuda\_ECM} $\cdot$
+companions: \texttt{note\_junction}, \texttt{note\_fibre}, \texttt{note\_surface},
+\texttt{note\_sheet} $\cdot$ 10 August 2026}
+\setlength{\parindent}{0pt}\setlength{\parskip}{0.55em}
+\begin{document}\maketitle\vspace{-1.0cm}
 
-\section*{1.\; Sets, operators, schedule}
+\section*{1.\; Mechanism}
 
-A Plexus model is sets $\times$ fields $\times$ operators $\times$ schedule. The biological hierarchy
-here is four entities and one field; the basement membrane is a \emph{specialised} ECM, not the ECM:
+An epithelial spheroid growing inside an extracellular matrix is \emph{three} entities and not two,
+and the middle one is not a passive spacer. The literature fixes its proportions, and they are not the
+convenient ones.
 
-\smallskip
-{\small
-\begin{tabular}{@{}lll@{}}
-\toprule
-entity / set & representation & principal operators\\
-\midrule
-\textbf{epithelium}          & 3D active vertex model  & \op{seed\_mesh\_3d} \quad build the shell\\
-\op{vertex}, \op{cell}       &                         & \op{cell\_geometry\_3d} \quad area, perimeter, volume per cell\\
-                             &                         & \op{shape\_energy\_3d} \quad the mechanics\\
-                             &                         & \op{morphogen\_growth\_3d} \quad grow each cell's target\\
-                             &                         & \op{divide\_3d} \quad divide on volume doubling\\
-                             &                         & \op{ecm\_growth\_gate\_3d} \quad matrix stress slows the cycle \cite{helmlinger1997}\\
-\midrule
-\textbf{junction}            & half-edges of the mesh, & \op{junction\_myosin} \quad per-junction myosin\\
-a relation, not a set        & state keyed by vertex pair & \op{reconnect\_t1\_3d} \quad neighbour exchange (T1)\\
-\midrule
-\textbf{basement membrane}   & nodes + explicit        & \op{seed\_basement\_membrane} \quad lay the sheet down\\
-\op{basement\_membrane\_particle} & crosslinks         & \op{basement\_membrane\_bond} \quad the crosslink force\\
-                             &                         & \op{basement\_membrane\_remodel} \quad rest lengths creep\\
-                             &                         & \op{basement\_membrane\_bond\_break} \quad fragmentation\\
-                             &                         & \op{basement\_membrane\_secrete} \quad add material as it grows\\
-                             &                         & \op{integrin\_adhesion} \quad tether to the surface\\
-\midrule
-\textbf{surface}             & one node per membrane   & \op{surface\_track} \quad write the recorded boundary\\
-\op{surface}                 & node: direction, radius &\\
-\midrule
-\textbf{interstitial ECM}    & MPM fibres              & \op{seed\_ecm} \quad fibres, alignment, density\\
-\op{mpm\_particle}           &                         & \op{cell\_to\_ecm} \quad the epithelium's push\\
-                             &                         & \op{cell\_exclude\_3d} \quad non-penetration backstop\\
-                             &                         & \op{ecm\_stress} \quad colour by von Mises stress\\
-\midrule
-\textbf{(field)}             & MLS-MPM background grid & \op{mpm\_scatter} / \op{mpm\_grid\_update} /\\
-\op{mpm\_grid}               &                         & \op{mpm\_gather} \quad the solve\\
-\bottomrule
-\end{tabular}}
-\smallskip
+\textbf{The basement membrane is thin, stiff and squat-anchored.} It is $\sim\!100$ nm thick; its
+adhesions are plaques $\sim\!350$ nm across on $\sim\!700$ nm centres joined to the cell across a
+$\sim\!30$ nm gap \cite{kanchanawong2010}, so an adhesion is three times \emph{wider} than the sheet is
+thick and a third as long; and the sheet is $10$ to $100$ times stiffer than the stroma outside it,
+not equal to it.
 
-\section*{2.\; The spheroid: 3D active vertex model}
+\textbf{It is not a permanent solid.} Collagen~IV in the fly embryo has a half-life of $7$--$10$ hours
+\cite{matsubayashi2020} and in mouse hair follicle about $3$, and slowing that turnover disrupts
+morphogenesis. A sheet enclosing a tissue that triples its radius does not stretch to $2.4$; it is
+\emph{replaced} at the new size while it is being stretched.
 
-Cells are faces of a closed triangulated shell; cell $f$'s volume is the wedge from the tissue centre,
-$v_f=\tfrac13\,\mathbf{c}_f\!\cdot\!\mathbf{N}_f$. The energy is
-%
-\begin{equation}
-E \;=\; \sum_f\Bigl[K_A\,(A_f-A_f^0)^2 + K_P\,(P_f-P_f^0)^2 + \tfrac12\Gamma P_f^2 + K_V\,(v_f-v_f^0)^2\Bigr]
-\;+\;\Lambda\!\sum_e m_e\,\ell_e\;+\;K_R\sum_i\bigl(|\mathbf{x}_i|-R_0\bigr)^2 ,
-\label{eq:avm}
-\end{equation}
-%
-relaxed overdamped each frame, $\mathbf{x}\leftarrow\mathbf{x}-\eta\mu\,\nabla E$ with a per-step cap.
-The factor $m_e$ is new (\S6); with $m_e\equiv1$ Eq.~\eqref{eq:avm} is the stock Okuda energy and every
-prior run is bit-identical. Growth scales each cell's targets by a cumulative $s_f$,
-%
-\begin{equation}
-s_f \leftarrow s_f\bigl(1+\lambda(\rho+\mathrm{Hill}(a_f))\bigr),\qquad
-A_f^0=A_f^{0,\text{init}}s_f^2,\quad P_f^0=P_f^{0,\text{init}}s_f,\quad v_f^0=v_f^{0,\text{init}}s_f^3,
-\label{eq:growth}
-\end{equation}
-%
-and \op{divide\_3d} splits a cell once $v_f$ passes twice its reference. From $200$ cells the tissue
-reaches $\sim6000$ and its apical radius $4.66\to16.6$ (arbitrary units) in $402$ frames.
-
-In the vertex model every cell--cell contact pulls with the same strength. Real contractility is not
-uniform: myosin accumulates on some junctions and not others, and where it accumulates the junction
-pulls harder and shortens, which is how cells exchange neighbours. Giving each junction its own myosin
-is what lets that happen.
-
-\begin{figure}[t]\centering
-\includegraphics[width=\textwidth]{fig_junction_schematic.pdf}
-\caption{Two cells share an edge, and that edge \emph{is} the junction --- it belongs to neither, which
-is why its state is keyed by the pair of vertices rather than stored on a cell. Myosin sits on the shared
-edge and multiplies its tension. Right: the feedback, which is the only thing here the original model
-cannot already do.}
-\end{figure}
-
-Each junction carries an amount of myosin $m_e$ multiplying the line tension, chasing a target on its
-own timescale:
-%
-\begin{equation}\Lambda\sum_e \ell_e \;\longrightarrow\; \Lambda\sum_e m_e\,\ell_e,\qquad
- m^{ss}_e = a\Bigl(1+\beta\,\bigl(x_e/\langle x\rangle-1\bigr)\Bigr),\qquad
- \dot m_e=\bigl(m^{ss}_e-m_e\bigr)/\tau_m.
-\label{eq:myo}\end{equation}
-%
-What matters is what $x_e$ is. If it is the junction's \emph{length}, the loop reads \emph{longer $\to$
-more myosin $\to$ shorter}, which evens the cells out and suppresses neighbour exchange. Myosin is in
-fact recruited by \emph{tension} \cite{fgonzalez2009}, and accumulates on junctions in the act of disappearing --- the
-opposite: a junction that pulls harder shortens, which makes it pull harder still. So $x_e$ is the edge
-tension, $\Lambda m_e+2K_P(P_f-P^0_f)+\Gamma P_f$, taken from the same energy the mechanics minimises.
-
-The two versions cannot be told apart by the spread of junction lengths, because in the fast-myosin
-limit --- the correct one, since myosin turns over in seconds --- substituting the target into
-Eq.~\eqref{eq:myo} turns the length version into a line tension plus a harmonic spring on each edge, and
-narrowing that spread is what such a spring does by definition. They differ in how often cells swap
-neighbours, so that is the observable we report: keyed to tension, the rate of neighbour exchange is
-roughly double.
-
-Two things the model does not have. The myosin responds to the \emph{magnitude} of tension and has no
-preferred direction in the plane of the sheet, so it cannot express the planar polarity that drives
-directional tissue elongation. And $\tau_m$ is a chosen number, not a measured one.
-
-\section*{3.\; The ECM: MLS-MPM}
-
-The matrix is a material, not a set of springs, so it is solved the way materials are: as a cloud of
-points that carry the material and a background grid that does the physics. Each frame the points hand
-their mass and momentum to the grid nodes nearest them, the grid resolves everything arriving at each
-node into one velocity, and the points read that velocity back and move. Nothing is ever computed
-between two points directly --- which is why bodies that never touch can still push on one another, and
-why the grid spacing sets the finest thing the matrix can feel.
-
-We seed it as fibres rather than a uniform block, because a fibrous matrix and a homogeneous one respond
-differently to being pushed, and the interesting behaviour --- splaying, dragging, a stress front
-travelling outward --- lives in the fibres.
-
-
-
-\section*{4.\; The basement membrane}
-
-A basement membrane is a thin sheet of protein an epithelium lays down underneath itself and sits on. It
-has to do two things at once that pull against each other: hold together as a sheet, and keep covering a
-surface that grows. We model the load-bearing part of it --- the crosslinked collagen~IV network --- as
-nodes joined by springs.
-Three rules. A crosslink is a spring that slowly \emph{forgets} being stretched and snaps if stretched
-too far; a node is tied to a fixed \emph{direction} on the surface, which is what makes it adhesion
-rather than contact, since a node free to slide to the nearest point would never be stretched at all;
-and everything moves at a speed set by force against drag, with no mass:
-%
-\begin{align}
-\gamma\,\dot{\mathbf x}_i &= \sum_{j\sim i}\mathbf f_{ij} \;+\; \mathbf f^{\text{adh}}_i, &
-\mathbf f_{ij}&=k_b\,(L_{ij}-\ell^0_{ij})\,\hat{\mathbf d}_{ij}, &
-\dot\ell^0_{ij}&=(L_{ij}-\ell^0_{ij})/\tau_r,
-\label{eq:bond}\\[2pt]
-\mathbf f^{\text{adh}}_i&=\kappa\bigl(\mathbf a_i-\mathbf x_i\bigr), &
-\mathbf a_i&=\mathbf c+\hat{\mathbf u}_i\bigl(R(\hat{\mathbf u}_i,t)+\delta\bigr), &
-&\hat{\mathbf u}_i \text{ frozen at seeding,}
-\label{eq:integrin}
-\end{align}
-%
-with a crosslink dying once $(L-\ell^0)/\ell^0>\varepsilon_b$.
-
-Forgetting is not optional: a sheet that only stretches cannot enclose a surface that more than triples
-in size. And because area grows as the square of the radius while new material is added as a fraction of
-what is already there, the sheet must be \emph{secreted} as the tissue grows or it thins.
-
-Two consequences of having no mass. Only the ratio $k_b/\gamma$ appears in Eq.~\eqref{eq:bond} --- a
-relaxation \emph{rate} --- so a stiffness on its own has no meaning here, and the question worth asking
-is whether the sheet relaxes faster than the tissue grows. The same ratio bounds what a fixed time step
-can carry, $\Delta t\,(z\,k_b+\kappa)/\gamma<2$ for $z$ crosslinks meeting at a node, which is about
-twenty times the bound an inertial sheet would have. Raising $\gamma$ moves it further, at the price of a
-sheet that responds more slowly.
-
-Finally, what is called adhesion here is a tether to a surface, not a receptor: the dominant anchor in a
-real epithelium is to laminin, which is not modelled, and there is no attachment to the surrounding
-stroma either, so this tether is the only thing holding the sheet.
-
-
-
-\section*{5.\; Spheroid $\leftrightarrow$ BM $\leftrightarrow$ ECM}
-
-Three objects, and every arrow between them is a measured mechanism rather than a modelling choice.
-The first thing the measurements say is that the middle object is not a passive spacer. A basement
-membrane is $\sim\!100$ nm thick, its adhesions are \emph{squat} --- plaques $\sim\!350$ nm across on
-$\sim\!700$ nm centres, joined to the cell across a $\sim\!30$ nm gap \cite{kanchanawong2010}, so an adhesion is three times
-wider than the sheet is thick and a third as long --- and the sheet is $10$ to $100$ times stiffer than
-the stroma outside it, not equal to it. The second thing they say is that it is not a permanent solid:
-collagen~IV in the fly embryo has a half-life of $7$--$10$ hours \cite{matsubayashi2020} and in mouse hair follicle about $3$,
-and slowing that turnover disrupts morphogenesis. A sheet enclosing a tissue that triples its radius
-does not stretch to $2.4$; it is \emph{replaced} at the new size while it is being stretched.
+\textbf{And it is the interface.} While the sheet is intact the epithelium does not touch the stroma:
+load goes cell $\to$ plaque $\to$ sheet $\to$ anchoring fibril $\to$ stroma \cite{keene1987}. An
+epithelium that \emph{also} pushes the stroma directly is counting the same push twice. That single
+observation is what removes \op{cell\_to\_ecm} from the model and puts two edge sets in its place.
 
 \begin{figure}[t]\centering
 \includegraphics[width=\textwidth]{fig_spheroid_bm_ecm.pdf}
@@ -196,285 +56,308 @@ does not stretch to $2.4$; it is \emph{replaced} at the new size while it is bei
 ones that are convenient: the adhesion is a squat plaque, not a thread, and the sheet is thin against
 its own spacing. (b) Every operator, in the direction it acts. Filled bullets carry a force and must
 therefore have a reaction; open bullets carry a signal or a material flux. There is no arrow between
-the epithelium and the matrix, because while the sheet is intact the basement membrane \emph{is} the
-interface --- an epithelium that also pushes the stroma directly is counting the same push twice.}
+the epithelium and the matrix.}
 \end{figure}
 
-\textbf{Mass, not just mechanics.} The sheet carries an areal density $\rho$ of collagen~IV that is
-produced by the epithelium and removed by proteolysis, on a surface whose area $A(t)$ is growing:
+\section*{2.\; Equations and symbols}
+
+Each equation below belongs to one arrow of Fig.~1b. The companion notes carry the mechanics of each
+entity; this note carries what passes \emph{between} them.
+
+\textbf{Mass, not just mechanics.} The sheet carries an areal density $\rho$ of collagen~IV produced by
+the epithelium and removed by proteolysis, on a surface whose area is growing:
 %
 \begin{equation}
-\frac{\mathrm{D}\rho}{\mathrm{D}t}
-= \underbrace{s(\mathbf x,t)}_{\text{secretion}}
-\;-\;\underbrace{\frac{\rho}{\tau_{\text{bm}}}}_{\text{turnover}}
-\;-\;\underbrace{\rho\,\frac{\dot A}{A}}_{\text{dilution by growth}},
+\frac{\mathrm D\rho}{\mathrm Dt}
+=\underbrace{s(\mathbf x,t)}_{\text{secretion}}
+-\underbrace{\frac{\rho}{\tau_{\rm bm}}}_{\text{turnover}}
+-\underbrace{\rho\frac{\dot A}{A}}_{\text{dilution}},
 \qquad
-\tau_{\text{bm}}=\frac{t_{1/2}}{\ln 2}\approx 4\text{--}14\ \text{h}.
+s^\ast=\rho\Bigl(\frac1{\tau_{\rm bm}}+\frac{\dot A}{A}\Bigr),
+\qquad \tau_{\rm bm}=\frac{t_{1/2}}{\ln2}\approx4\text{--}14\ \text{h}.
 \label{eq:bmmass}
 \end{equation}
 %
-Homeostasis is $s^\ast=\rho\,(1/\tau_{\text{bm}}+\dot A/A)$, and the two terms are comparable here:
-a spheroid tripling its radius over a day has $\dot A/A\sim\!10^{-1}\,\text{h}^{-1}$ against
-$1/\tau_{\text{bm}}\sim\!10^{-1}\,\text{h}^{-1}$. Turnover is not a correction to growth; it is the same
-size as growth, which is why the sheet can accommodate it at all.
+The two removal terms are the same size here --- a spheroid tripling its radius over a day has
+$\dot A/A\sim10^{-1}\,$h$^{-1}$ against $1/\tau_{\rm bm}\sim10^{-1}\,$h$^{-1}$. Turnover is not a
+correction to growth; it is the same size as growth, which is why the sheet can accommodate it at all.
 
-\textbf{A nonlinear sheet.} A single Young's modulus is wrong by construction: the same basement
-membrane reads $\sim\!0.4$ MPa at low strain and $\sim\!3$ MPa at high strain \cite{candiello2007}, and a growing spheroid
-takes it across that whole range. The cheapest law that respects it makes the tangent modulus rise with
-the principal stretch $\lambda=\sigma_{\max}(\mathbf F)$,
+\textbf{A nonlinear sheet.} A single Young's modulus is wrong by construction: the same membrane reads
+$\sim\!0.4$ MPa at low strain and $\sim\!3$ MPa at high \cite{candiello2007}, and a growing spheroid
+takes it across that range:
 %
 \begin{equation}
-E(\lambda)=E_0\bigl[1+\beta\,(\lambda-1)\bigr],
-\qquad E_0\approx 0.4\ \text{MPa},\quad \beta\approx 5,
-\qquad \frac{E_{\text{bm}}}{E_{\text{ecm}}}\in[10,100].
+E(\lambda)=E_0\bigl[1+\beta(\lambda-1)\bigr],\qquad
+\lambda=\sigma_{\max}(\mathbf F),\qquad
+\frac{E_{\rm bm}}{E_{\rm ecm}}\in[10,100].
 \label{eq:bmstiff}
 \end{equation}
+%
+\textbf{MPa is not a quantity this box has} --- it is dimensionless and the stroma's modulus is the
+number $15$ --- so the falsifiable forms are the two ratios and never the pascals.
 
-\textbf{Adhesion with its reaction, and with slip.} An integrin plaque is a two-sided object: whatever
-force it applies to the sheet it applies equally and oppositely to the cell, which a replayed
-epithelium currently discards. And the sheet is not pinned --- it \emph{slides} relative to the cells
---- so the tangential law is friction against relative velocity, not a spring to a frozen direction:
+\textbf{Adhesion, with its reaction and with slip.} A plaque is two-sided: whatever force it applies to
+the sheet it applies equally and oppositely to the cell, which a replayed epithelium discards. And the
+sheet is not pinned --- it \emph{slides} --- so the tangential law is friction against relative
+velocity and not a spring to a frozen direction:
 %
 \begin{align}
-\mathbf f^{\text{adh}}_p &= \kappa_n\,\bigl(\ell_p-\ell_0\bigr)\,\hat{\mathbf n}_p
-\;-\;\xi\,\bigl(\mathbf v_{\text{bm}}-\mathbf v_{\text{epi}}\bigr)_{\parallel},
-&\mathbf f^{\text{epi}}_p&=-\,\mathbf f^{\text{adh}}_p,
-\label{eq:adh}\\[2pt]
-n_p &= \Sigma^{-2}\ \text{plaques per unit area}, \quad \Sigma\approx 7\,T,
-&\ell_0&\approx 0.3\,T .
+\mathbf f^{\rm adh}_p&=\kappa_n(\ell_p-\ell_0)\hat{\mathbf n}_p
+ -\xi\bigl(\mathbf v_{\rm bm}-\mathbf v_{\rm epi}\bigr)_{\parallel},
+&\mathbf f^{\rm epi}_p&=-\mathbf f^{\rm adh}_p,
+\label{eq:adh}\\
+n_p&=\Sigma^{-2}\ \text{plaques per unit area},\quad \Sigma\approx7T,
+&\ell_0&\approx0.3\,T .
 \label{eq:plaque}
 \end{align}
 %
-$\ell_0$, the linkage's rest length, is what sets the standoff --- a material property, not a tuning
-constant --- and $\xi$ is what lets a sheet stay attached while the tissue slides underneath it.
+$\ell_0$ is a material property and not a tuning constant: it is what sets the standoff.
 
-\textbf{Sheet to stroma.} The two are joined by anchoring fibrils \cite{keene1987}, so the stroma is loaded through the
-sheet and never directly by the cells; the same fibrils are what let a stiff sheet spread a local
-epithelial push over a soft matrix. With $\mathbf t$ the traction the sheet exerts on the stroma,
+\textbf{Sheet to stroma.} Anchoring fibrils \cite{keene1987} load the stroma \emph{through} the sheet,
+which is also what lets a stiff sheet spread a local epithelial push over a soft matrix:
 %
 \begin{equation}
-\mathbf t = k_a\,\bigl(\mathbf x_{\text{ecm}}-\mathbf x_{\text{bm}}\bigr)\quad\text{on anchored
-points},\qquad
-\text{and }\ \mathbf f^{\text{bm}} = -\!\!\sum_{\text{anchors}}\!\mathbf t ,
+\mathbf t=k_a\bigl(\mathbf x_{\rm ecm}-\mathbf x_{\rm bm}\bigr)\ \text{on anchored points},
+\qquad
+\mathbf f^{\rm bm}=-\!\!\sum_{\rm anchors}\!\mathbf t .
 \label{eq:anchor}
 \end{equation}
 %
-with the barrier being geometric rather than mechanical: pores of $10$--$130$ nm pass solutes, stop
-cells, and are what a proteolytic operator has to open before anything crosses.
+The barrier is geometric rather than mechanical: pores of $10$--$130$ nm pass solutes, stop cells
+\cite{yurchenco2011}, and are what a proteolytic operator has to open before anything crosses.
 
-\textbf{What this asks of the implementation.} Four things, and each is a separate operator with its
-own test: a mass balance on the sheet (Eq.~\ref{eq:bmmass}) rather than a fixed particle budget; a
-strain-dependent modulus (Eq.~\ref{eq:bmstiff}) rather than one number; an adhesion that returns its
-reaction and permits slip (Eq.~\ref{eq:adh}) rather than a tether to a frozen direction; and an
-anchorage to the stroma (Eq.~\ref{eq:anchor}) that removes the epithelium's direct push on it.
+\textbf{The matrix pushes back on the cell cycle.} The force the stroma returns, collected by direction
+and divided by the area each direction covers, is a pressure; a cell facing a stressed matrix grows
+more slowly, which is what a spheroid grown under a measured external stress does
+\cite{helmlinger1997,montel2011}:
+%
+\begin{equation}
+g=f+\frac{1-f}{1+(P/p_{1/2})^n},
+\qquad s_{\rm now}\leftarrow s_{\rm prev}\bigl(1+g\,(f_{\rm grow}-1)\bigr).
+\label{eq:gate}
+\end{equation}
+%
+Because it is the growth \emph{rate} that is slowed and not the size directly, a small difference
+compounds over hundreds of frames --- which is how a modest difference in stress between one direction
+and another becomes a difference in shape.
 
-\section*{6.\; Plexus2 container}
+\smallskip
+{\small\begin{tabular}{@{}llp{8.4cm}@{}}\toprule
+symbol & is & of what\\\midrule
+$\rho$, $\tau_{\rm bm}$, $s$ & areal density, turnover time, secretion & of collagen~IV on the sheet,
+  Eq.~\eqref{eq:bmmass}\\
+$A$, $\dot A/A$ & sheet area, its relative growth rate & the dilution term; the SAME size as turnover\\
+$E_0$, $\beta$, $\lambda$ & low-strain modulus, stiffening, principal stretch & of the sheet,
+  Eq.~\eqref{eq:bmstiff}; report RATIOS, never MPa\\
+$T$, $\Sigma$, $\ell_0$ & thickness, plaque spacing, linkage rest length & $\Sigma\approx7T$,
+  $\ell_0\approx0.3T$; $T$ never appears as geometry\\
+$\kappa_n$, $\xi$ & plaque normal stiffness, tangential friction & against RELATIVE velocity ---
+  $\xi$ is what lets the sheet stay attached while the tissue slides\\
+$k_a$ & fibril stiffness & sheet to stroma, Eq.~\eqref{eq:anchor}\\
+$P$, $p_{1/2}$, $n$, $f$ & matrix pressure, gate half-point, sharpness, floor & Eq.~\eqref{eq:gate};
+  $f\le g\le1$ multiplies the growth RATE\\
+\bottomrule\end{tabular}}
 
-Two questions decide whether the biology above can be written down: what the \emph{sets} are, and what
-kind of operator each mechanism is. Both have answers the literature forces, and both differ from what
-the archived line built.
+\section*{3.\; The Plexus2 container}
 
-\textbf{Sets.} An adhesion is not a body and a fibril is not a particle --- each is a \emph{relation
-between two entities}, which in Plexus2 is an edge-set carrying \code{.pre} and \code{.post} index
-buffers rather than a set of nodes with positions. Writing the hemidesmosome as an edge-set is what
-makes its reaction automatic: one operator on \code{plaque} returns a delta to both endpoints, so the
-force the sheet feels and the force the cell feels cannot get out of step. The archived line made the
-adhesion first a field on the membrane and then a column of MPM particles, and both lost the reaction.
+\textbf{Two structural claims, and both differ from what the archived line built.} An adhesion is not
+a body and a fibril is not a particle: each is a \emph{relation between two entities}, which in
+Plexus2 is an edge set carrying \code{.pre} and \code{.post} index buffers rather than a set of nodes
+with positions. Writing the hemidesmosome as an edge set is what makes its reaction automatic --- one
+operator returns a delta to both endpoints, so the force the sheet feels and the force the cell feels
+cannot get out of step. The archived line made the adhesion first a field on the membrane and then a
+column of MPM particles, and both lost the reaction.
 
 \begin{center}\small
 \begin{tabular}{@{}llll@{}}\toprule
 \textbf{set} & \textbf{kind} & \textbf{one element is} & \textbf{state it carries}\\\midrule
-\code{spheroid}     & node, depth 0 & the organ                       & centroid, cell count\\
-\quad\code{cell}    & node, depth 1 & one epithelial cell             & $A,P,V$ and their targets, age\\
-\quad\code{vertex}  & node, depth 1 & a corner of the cell mesh       & \code{pos}, \code{vel}\\
-\quad\code{junction}& \textbf{edge} $\subseteq$ \code{vertex}$^2$ & a cell--cell contact & length, myosin\\\midrule
-\code{bm}           & node, depth 1 & a patch of basement membrane    & \code{pos}, $\mathbf F$, $\rho$ (areal density),
-                                                                        age since deposition\\
-\code{plaque}       & \textbf{edge} \code{cell}$\to$\code{bm} & one hemidesmosome & rest length $\ell_0$, load, bound flag\\\midrule
-\code{ecm}          & node, depth 1 & a patch of interstitial matrix  & \code{pos}, $\mathbf F$, fibre direction\\
-\code{fibril}       & \textbf{edge} \code{bm}$\to$\code{ecm} & one anchoring fibril & rest length, load\\\midrule
-\code{mpm\_grid}    & field         & momentum on a background lattice & mass, momentum\\
-\code{protease}     & field         & MMP concentration               & scalar, diffusing\\
-\code{growth\_factor}& field        & FGF/VEGF bound by perlecan      & scalar, bound + free\\
-\bottomrule
-\end{tabular}
+\code{spheroid}     & node, depth 0 & the organ & centroid, cell count\\
+\quad\code{cell}    & node, depth 1 & one epithelial cell & $A,P,V$ and targets, age, $\rho_f$\\
+\quad\code{vertex}  & node, depth 1 & a corner of the apical mesh & \code{pos}\\
+\quad\code{junction}& \textbf{edge} $\subseteq$ \code{vertex}$^2$ & a cell--cell contact & $n_e$,
+  $\ell_e$\\\midrule
+\code{bm}           & node on a surface mesh & a patch of membrane & \code{pos}, $\mathbf F$, $\rho$,
+  age, \code{occ}\\
+\code{bm\_face}     & \textbf{hyperedge} $\subseteq$ \code{bm}$^3$ & a triangle of membrane &
+  $\mathbf D_m^{-1}$, $\mathbf C_0$, $A^0$, $Y_2$\\
+\code{plaque}       & \textbf{edge} \code{cell}$\to$\code{bm} & one hemidesmosome & $\ell_0$, load,
+  bound\\
+\code{fibril}       & \textbf{edge} \code{bm}$\to$\code{mpm\_particle} & one anchoring fibril & rest
+  length, load\\\midrule
+\code{mpm\_particle}& node, depth 1 & a patch of \emph{stroma only} & \code{pos}, $\mathbf F$, fibre
+  direction\\
+\code{mpm\_grid}    & \textbf{field} & the stroma's momentum & mass, momentum\\
+\code{protease}     & \textbf{field} & MMP concentration & scalar, diffusing\\
+\bottomrule\end{tabular}
 \end{center}
-
-\textbf{Operators.} One row per mechanism in Fig.~3b, in Plexus2's own taxonomy: \emph{Lateral} moves
-state along an edge set, \emph{Exchange} scatters to or gathers from a field, \emph{Rewire} changes
-which elements are connected, and \emph{Divide}/\emph{Die} change how many elements exist. The last
-column is what would falsify the operator --- the measurement its test folder has to make.
 
 \begin{center}\footnotesize
-\begin{tabular}{@{}lllp{4.6cm}p{3.5cm}@{}}\toprule
-\textbf{operator} & \textbf{kind} & \textbf{acts on} & \textbf{mechanism, from the literature} &
-\textbf{what its test measures}\\\midrule
+\begin{tabular}{@{}lllp{4.2cm}p{3.0cm}@{}}\toprule
+\textbf{operator} & \textbf{kind} & \textbf{acts on} & \textbf{mechanism} & \textbf{where its gates
+are}\\\midrule
 \multicolumn{5}{@{}l}{\textit{epithelium}}\\
-\code{grow\_3d}, \code{divide\_3d}  & Divide          & \code{cell}     & volume growth and cytokinesis \cite{honda2004,okuda2013} & cells $200\to6076$, radius $\times3.56$\\
-\code{shape\_energy\_3d}            & Lateral         & \code{junction} & vertex-model force balance \cite{okuda2018} & aspect $1.021$, stays round\\
-\code{reconnect\_t1\_3d}            & Rewire          & \code{junction} & neighbour exchange \cite{okuda2013} & $0.0089$ T1 per cell per frame\\\midrule
+\op{grow\_3d}, \op{divide\_3d} & Divide & \code{cell} & volume growth and cytokinesis
+  \cite{honda2004,okuda2013} & \op{00}; \code{note\_junction}\\
+\op{shape\_energy\_3d} & Lateral & \code{junction} & vertex-model force balance \cite{okuda2018} &
+  \op{00}\\
+\op{medioapical\_myosin}, \op{junction\_myosin}, \op{cytokinetic\_ring} & Lateral, Structural &
+  \code{cell}, \code{junction} & two myosin pools and the ring & \code{note\_junction} J1--J11\\
 \multicolumn{5}{@{}l}{\textit{epithelium $\to$ basement membrane}}\\
-\code{bm\_secrete}                  & Divide          & \code{bm}       & polarised deposition of laminin, collagen~IV, nidogen, perlecan; the sheet turns over on a half-life of hours \cite{matsubayashi2020,yurchenco2011} & areal density $\rho$ held constant as $A(t)$ grows\\
-\code{bm\_assemble}                 & Rewire          & \code{bm}       & laminin polymerises where integrin and dystroglycan nucleate it \cite{yurchenco2011} & no sheet forms where the receptor is absent\\
-\code{bm\_degrade}                  & Die             & \code{bm}       & MMP proteolysis, local and MMP-independent breach \cite{kelley2019} & a hole opens only where protease is present\\\midrule
+\op{bm\_secrete}, \op{bm\_degrade} & Divide, Die & \code{bm\_face} & Eq.~\eqref{eq:bmmass}
+  \cite{matsubayashi2020,kelley2019} & \code{note\_sheet} G24--G26, G19--G23\\
+\op{bm\_stiffness}, \op{bm\_elastic} & Lateral & \code{bm\_face} & Eq.~\eqref{eq:bmstiff} &
+  \code{note\_sheet} G1--G8\\
 \multicolumn{5}{@{}l}{\textit{basement membrane $\leftrightarrow$ epithelium}}\\
-\code{plaque\_seed}                 & Rewire          & \code{plaque}   & hemidesmosomes form at density $\Sigma^{-2}$, $\Sigma\approx7T$ \cite{kanchanawong2010} & plaque count and spacing\\
-\code{plaque\_pull}                 & Lateral         & \code{plaque}   & Eq.~\eqref{eq:adh}: normal spring at rest length $\ell_0$, tangential friction $\xi$, \emph{and its reaction} \cite{kanchanawong2010} & standoff $=\ell_0$; momentum conserved to machine precision\\
-\code{plaque\_rupture}              & Rewire          & \code{plaque}   & the bond fails past a load & fraction bound vs.\ applied stress\\
-\code{bm\_stiffness}                & Lateral         & \code{bm}       & Eq.~\eqref{eq:bmstiff}: tangent modulus rising with stretch \cite{candiello2007,hgo2000} & $E$ $0.4\to3$ MPa across the run\\\midrule
+\op{plaque\_seed}, \op{plaque\_pull}, \op{plaque\_rupture} & Rewire, Lateral & \code{plaque} &
+  Eqs.~\eqref{eq:adh}--\eqref{eq:plaque}, \emph{with the reaction} \cite{kanchanawong2010} &
+  \code{note\_sheet} G9--G13\\
 \multicolumn{5}{@{}l}{\textit{basement membrane $\leftrightarrow$ matrix}}\\
-\code{fibril\_seed}, \code{fibril\_pull} & Rewire, Lateral & \code{fibril} & collagen~VII anchoring \cite{keene1987}; the stroma is loaded \emph{through} the sheet & stroma displacement with the sheet present vs.\ absent\\
-\code{mpm\_scatter}/\code{gather}   & Exchange        & \code{bm}, \code{ecm} & both bodies share one momentum field \cite{sulsky1994,hu2018} & contact without an explicit contact law\\
-\code{bm\_barrier}                  & Exchange        & \code{bm}, fields & pores $10$--$130$ nm pass solutes, stop cells \cite{yurchenco2011} & solute flux across an intact vs.\ breached sheet\\\midrule
+\op{fibril\_seed}, \op{fibril\_pull} & Rewire, Lateral & \code{fibril} & Eq.~\eqref{eq:anchor}
+  \cite{keene1987} & open\\
+\op{mesh\_contact} & Lateral & \code{contact} & particle-to-surface, both endpoints in one call &
+  \code{note\_surface} S1--S16\\
+\op{bm\_barrier} & Exchange & \code{bm\_face}, fields & pores pass solutes, stop cells
+  \cite{yurchenco2011} & open\\
 \multicolumn{5}{@{}l}{\textit{matrix}}\\
-\code{ecm\_align}, \code{ecm\_crosslink} & Lateral    & \code{ecm}      & fibres rotate toward the maximum principal stretch, which is what carries force beyond one cell diameter \cite{wang2014,licup2015} & alignment angle vs.\ radial direction\\
-\bottomrule
-\end{tabular}
+\op{seed\_ecm}, \op{mpm\_*}, \op{ecm\_stress} & Seed, Exchange, Lateral & \code{mpm\_particle} &
+  MLS-MPM \cite{sulsky1994,hu2018} & \code{note\_fibre} F1--F16\\
+\op{ecm\_growth\_gate\_3d} & Lateral & \code{cell} & Eq.~\eqref{eq:gate}
+  \cite{helmlinger1997,montel2011} & \op{58}; open\\
+\bottomrule\end{tabular}
 \end{center}
 
-Three of these have no counterpart in the archived implementation and are the reason it stalled:
-\code{bm\_secrete} as a mass balance rather than a fixed particle budget, \code{plaque\_pull}
-returning its reaction, and \code{fibril\_pull} replacing the epithelium's direct push on the stroma.
-Each gets its own folder, spec, movie and measurement plot, in the order of the table.
+\textbf{One schedule, split at exactly one place.} Anything carrying a force runs inside the substep
+block, at the stroma's rate; anything changing topology or mass runs once per frame, because a set
+whose membership changed mid-substep would be integrated against two different index sets in one step:
+%
+\begin{align*}
+\text{frame }(\Delta t=1):\ \ &\op{cell\_geometry\_3d}\to\op{grow\_3d}\to\op{bm\_growth\_gate}
+ \to\op{medioapical\_myosin}\to\op{junction\_myosin}\\
+&\to\op{shape\_energy\_3d}\to\op{reconnect\_t1\_3d}\to\op{divide\_3d}\to\op{cytokinetic\_ring}
+ \to\op{junction\_myosin\_sync}\\
+&\to\op{bm\_refine}\to\op{bm\_secrete}\to\op{bm\_degrade}\to\op{plaque\_seed}\to
+ \op{plaque\_rupture}\\[3pt]
+\text{substep }(\Delta t_{\rm sub}=\Delta t/8):\ \
+&\op{bm\_stiffness}\to\op{bm\_elastic}\to\op{plaque\_pull}\to\op{fibril\_pull}\\
+&\to\op{mpm\_strain}\to\op{mpm\_scatter}\to\op{mpm\_grid\_update}\to\op{mpm\_gather}
+\end{align*}
 
-\section*{11.\; Symbols}
+\textbf{Four rules, each buying something specific.} \emph{The membrane never enters the grid} --- it
+is $\sim\!100$ nm on a $\sim\!200\,\mu$m spheroid, so resolving it as MPM material needs a $3500^3$
+lattice; as a surface mesh it costs what the epithelium costs and $\Delta x$ is set by the stroma
+alone. \emph{The epithelium stays out of the substep block} --- it is overdamped and massless, so it
+does not need the matrix's CFL step, and putting its relaxation inside would multiply its cost by
+eight and change nothing. \emph{The sheet is massless too}, so its stiffness costs drag rather than
+substeps: the bound is $\Delta t\,(zk_b+\kappa)/\gamma<2$, a rate and not a wave speed, and the
+$10$--$100$ stiffness ratio is paid for with $\gamma$. \emph{Particles go on the shell that carries
+stress, not on the box} --- the far field is quiescent, and filling the box at a usable density costs a
+million particles.
 
-Grouped by what they belong to. Where a symbol is a stiffness, the second column says what it is a
-stiffness \emph{of}, since several are easy to confuse.
+\textbf{And one thing this deletes.} \op{cell\_to\_ecm} and \op{cell\_exclude\_3d} go, because while
+the sheet is intact the basement membrane \emph{is} the interface (\S1). MPM fibres also stop being
+asked to act as ropes, which \code{note\_fibre} measured they cannot.
 
-\begin{center}\small
-\begin{tabular}{@{}llp{7.4cm}@{}}\toprule
-\multicolumn{3}{@{}l}{\textbf{Epithelium} --- Eqs.~\eqref{eq:avm},~\eqref{eq:growth}}\\
-$A_f,P_f,V_f$ & area, perimeter, volume & of cell (face) $f$; $A^0_f,P^0_f,V^0_f$ are its targets\\
-$K_A,K_P,K_V$ & stiffnesses & how hard a cell resists changing its area / perimeter / volume\\
-$\Lambda$ & line tension & pull along every cell--cell contact, one value for the whole tissue\\
-$\Gamma$ & perimeter contractility & a second, quadratic pull on each cell's perimeter\\
-$\ell_e$ & length of junction $e$ &\\
-$K_R,R_0$ & radial restoring stiffness, radius & holds the shell against collapse\\
-$f_{\text{grow}}$ & per-frame growth factor & applied to a cell's target volume\\
-\midrule
-\multicolumn{3}{@{}l}{\textbf{Junction myosin} --- Eq.~\eqref{eq:myo}}\\
-$m_e$ & myosin on junction $e$ & dimensionless multiplier on $\Lambda$; mean 1\\
-$x_e$ & what the feedback reads & the junction's tension\\
-$a$ & global myosin level & multiplies every junction equally\\
-$\beta$ & feedback strength & how strongly $m_e$ responds to $x_e$ above average\\
-$\tau_m$ & myosin timescale & how fast $m_e$ chases its target\\
-\midrule
-\multicolumn{3}{@{}l}{\textbf{Surface and matrix} --- Eqs.~\eqref{eq:contact},~\eqref{eq:gate}}\\
-$\hat{\mathbf u}_i$ & direction & fixed unit vector from the tissue centre $\mathbf c$\\
-$R(\hat{\mathbf u},t)$ & surface radius & how far the epithelium reached in that direction\\
-$r_i$ & radius of particle $i$ &\\
-$k_c$ & contact stiffness & how hard the surface pushes a fibre back out\\
-$P$ & matrix pressure & contact force per unit surface area, by direction\\
-$p_{1/2},n,f$ & gate half-point, sharpness, floor & $g$ is the resulting growth multiplier, $f\le g\le1$\\
-\midrule
-\multicolumn{3}{@{}l}{\textbf{Basement membrane} --- Eqs.~\eqref{eq:bond},~\eqref{eq:integrin}}\\
-$\mathbf x_i$ & position of node $i$ &\\
-$\gamma$ & drag & converts force to speed: $\dot{\mathbf x}=\mathbf F/\gamma$\\
-$k_b$ & \textbf{crosslink stiffness} & how hard a stretched crosslink pulls its two nodes together\\
-$L_{ij},\ell^0_{ij}$ & current, rest length & of the crosslink between nodes $i$ and $j$\\
-$\hat{\mathbf d}_{ij}$ & unit vector & from node $i$ toward node $j$\\
-$\tau_r$ & remodelling timescale & how fast $\ell^0$ creeps toward $L$, i.e.\ how fast it forgets\\
-$\varepsilon_b$ & break strain & the stretch at which a crosslink snaps\\
-$\kappa$ & \textbf{tether stiffness} & how hard a node is pulled back to its anchor (not $k_b$)\\
-$\mathbf a_i$ & anchor & the point on the surface node $i$ is tied to\\
-$\delta$ & offset & how far outside the surface the sheet sits\\
-\bottomrule
-\end{tabular}
-\end{center}
+\section*{4.\; Gates}
 
+A gate is a number with a threshold decided \emph{before} the run and a stated consequence if it
+fails. The per-entity gates live in the companion notes and are indexed in \S3; this table is the
+\emph{system} level --- what has to be true of the assembled model, and which arrows are not yet built.
 
+\smallskip
+{\scriptsize\setlength{\tabcolsep}{4pt}
+\begin{tabularx}{\textwidth}{@{}llLl@{}}\toprule
+& \textbf{gate} & \textbf{threshold} & \textbf{measured}\\\midrule
+\multicolumn{4}{@{}l}{\textit{the epithelium is unchanged by everything attached to it} (\op{00} is
+the reference)}\\
+B1 & cells, radius, aspect, T1 rate of the bare tissue & the numbers every later run must reproduce &
+     \pass{$200\to6076$}, $\times$\pass{3.56}, \pass{1.021}, \pass{0.0089}/cell/frame\\
+B2 & adding per-junction myosin at $m_e\equiv1$ changes nothing & bit-identical &
+     \pass{bit-identical}\\
+\multicolumn{4}{@{}l}{\textit{each arrow carries its reaction}}\\
+B3 & epithelium $\to$ matrix, momentum residual & $<10^{-6}$ & \pass{1.2e-7} max, \pass{1.5e-8}
+     median (\code{note\_surface} S5)\\
+B4 & cell $\leftrightarrow$ sheet, as bookkeeping and as motion & $<10\varepsilon_{64}$; drift
+     $<10^{-12}$ & \pass{1.4e-16}, \pass{4.4e-15} (\code{note\_sheet} G9, G10)\\
+B5 & sheet $\to$ stroma: the stroma is loaded THROUGH the sheet & displacement with the sheet present
+     vs absent & \fail{not built} --- \op{fibril\_pull} is the missing arrow\\
+\multicolumn{4}{@{}l}{\textit{the middle entity does what a membrane does}}\\
+B6 & the sheet reports its own deformation & $>0.95$ of the geometric stretch &
+     \pass{0.9935} as a surface; \fail{0.13} as MPM material (run 130)\\
+B7 & $\rho$ held flat while $A$ triples & within $10\%$ & \fail{$1/11.1$} with no secretion
+     (\code{note\_sheet} G24)\\
+B8 & the standoff is the linkage's rest length & $\ell/\ell_0\in[0.9,1.1]$ & \fail{3.43}
+     (\code{note\_sheet} G12)\\
+\multicolumn{4}{@{}l}{\textit{the coupling is mutual}}\\
+B9 & the tissue feels the matrix: shape differs from the free control & any separation &
+     \fail{one-way} --- the reaction is computed, recorded and dropped\\
+B10& the growth gate changes the shape it is given & oblateness against the unconfined run &
+     \pass{1.43} grown vs \pass{1.41} pressed (\op{58}, \op{48})\\
+\bottomrule\end{tabularx}}
+\smallskip
 
+\textbf{One convention makes these mean what they say.} \textbf{A reaction is measured on its own force
+pair}, inside the substep and before any drive is added; with the drive in the sum it stops being a
+statement about the reaction. That is why B3 and B4 are separate rows with different thresholds: B3 is
+float32 through a grid, B4 is float64 on an explicit edge.
 
-\section*{12.\; References}
+\textbf{What the gates license.} The epithelium is reproducible on its own and nothing attached to it
+has moved it (B1, B2); every arrow that has been built returns its reaction to machine precision (B3,
+B4); the sheet, as a surface, reports the deformation it is given (B6); and the growth gate can produce
+a shape that pressing produces too, which is the one place the matrix has been shown to change the
+tissue (B10). \textbf{What they do not license} is the assembled model: B5 is not built, B7 and B8 fail
+on the sheet's own testbench, and B9 is the architecture --- the tissue is a replay, so it drives and
+is never driven. Until B9 passes, the stroma's modulus is very nearly a free parameter: the tissue never
+feels the matrix, and the growth gate normalises the pressure map to its own late-run median, so a
+softer stroma changes the substep it needs and not the shape that comes out. That is the clearest
+statement of what one-way coupling costs, and \op{mesh\_contact} returning \code{vertex\_force} to a
+live epithelium is the run that ends it.
 
-The operators of \S10 are grouped here by what they claim. Where a row of that table states a number
---- a half-life, a plaque spacing, a modulus --- the citation is the measurement it was taken from,
-not a review that mentions it.
+\textbf{What sixty-six archived runs settled, and it is four things.} Runs \op{91}--\op{164} asked
+where the sheet sits and what holds it there, and they answer that question and no other. The standoff
+is a \emph{tracking lag}, $\delta-\dot R\Delta t\gamma/\kappa$, and not a force balance, which two
+fibre lengths differing fourfold confirmed to $3\times10^{-5}$ box units. A force routed through the
+grid leaves the sheet carrying $100\%$ of its true stretch while the same force integrated by the
+engine leaves it carrying $13\%$ (B6). An MPM fibre cannot act as a rope, because $\mathbf F$ is
+advected by the grid's velocity gradient and never measures the distance between two particles. And
+every MPM body in the prototype silently carried the \emph{parent} set's modulus, so a membrane
+declaring $E=400$ ran at the stroma's $15$ until each body was given its own parent --- which is why
+run 146 came back bit-identical to run 144 at ten times the stiffness. None of the four is a model
+derived from what a basement membrane \emph{is}; that is what \code{note\_sheet} builds.
+
+\section*{5.\; References}
 
 {\small
 \begin{thebibliography}{99}\setlength{\itemsep}{0pt}
-
 \bibitem{sulsky1994} Sulsky, D., Chen, Z., Schreyer, H.L. (1994) A particle method for
 history-dependent materials. \emph{Comput. Methods Appl. Mech. Eng.} \textbf{118}:179--196.
-
-\bibitem{hu2018} Hu, Y., Fang, Y., Ge, Z., Qu, Z., Zhu, Y., Pradhana, A., Jiang, C. (2018) A moving
-least squares material point method with displacement discontinuity and two-way rigid body coupling.
-\emph{ACM Trans. Graph.} \textbf{37}(4):150.
-
-\bibitem{honda2004} Honda, H., Tanemura, M., Nagai, T. (2004) A three-dimensional vertex dynamics
-cell model of space-filling polyhedra simulating cell division and death in cell aggregate.
-\emph{J. Theor. Biol.} \textbf{226}(4):439--453.
-
+\bibitem{hu2018} Hu, Y. \emph{et al.} (2018) A moving least squares material point method with
+displacement discontinuity and two-way rigid body coupling. \emph{ACM Trans. Graph.} \textbf{37}(4):150.
+\bibitem{honda2004} Honda, H., Tanemura, M., Nagai, T. (2004) A three-dimensional vertex dynamics cell
+model of space-filling polyhedra. \emph{J. Theor. Biol.} \textbf{226}(4):439--453.
 \bibitem{okuda2013} Okuda, S., Inoue, Y., Eiraku, M., Sasai, Y., Adachi, T. (2013) Reversible network
 reconnection model for simulating large deformation in dynamic tissue morphogenesis.
 \emph{Biomech. Model. Mechanobiol.} \textbf{12}(4):627--644.
-
 \bibitem{okuda2018} Okuda, S., Miura, T., Inoue, Y., Adachi, T., Eiraku, M. (2018) Combining Turing
-and 3D vertex models reproduces autonomous multicellular morphogenesis with undulation, tubulation,
-and branching. \emph{Sci. Rep.} \textbf{8}:2386.
-
-\bibitem{fgonzalez2009} Fernandez-Gonzalez, R., Simoes, S.\,de\,M., R\"oper, J.-C., Eaton, S.,
-Zallen, J.A. (2009) Myosin II dynamics are regulated by tension in intercalating cells.
-\emph{Dev. Cell} \textbf{17}(5):736--743.
-
+and 3D vertex models reproduces autonomous multicellular morphogenesis. \emph{Sci. Rep.} \textbf{8}:2386.
 \bibitem{helmlinger1997} Helmlinger, G., Netti, P.A., Lichtenbeld, H.C., Melder, R.J., Jain, R.K.
-(1997) Solid stress inhibits the growth of multicellular tumor spheroids.
-\emph{Nat. Biotechnol.} \textbf{15}(8):778--783.
-
-\bibitem{montel2011} Montel, F., Delarue, M., Elgeti, J., Malaquin, L., Basan, M., Risler, T.,
-Cabane, B., Vignjevic, D., Prost, J., Cappello, G., Joanny, J.-F. (2011) Stress clamp experiments on
-multicellular tumor spheroids. \emph{Phys. Rev. Lett.} \textbf{107}:188102.
-
-\bibitem{storm2005} Storm, C., Pastore, J.J., MacKintosh, F.C., Lubensky, T.C., Janmey, P.A. (2005)
-Nonlinear elasticity in biological gels. \emph{Nature} \textbf{435}:191--194.
-
-\bibitem{notbohm2015} Notbohm, J., Lesman, A., Rosakis, P., Tirrell, D.A., Ravichandran, G. (2015)
-Microbuckling of fibrin provides a mechanism for cell mechanosensing.
-\emph{J. R. Soc. Interface} \textbf{12}(108):20150320.
-
-\bibitem{wang2014} Wang, H., Abhilash, A.S., Chen, C.S., Wells, R.G., Shenoy, V.B. (2014) Long-range
-force transmission in fibrous matrices enabled by tension-driven alignment of fibers.
-\emph{Biophys. J.} \textbf{107}(11):2592--2603.
-
-\bibitem{licup2015} Licup, A.J., M\"unster, S., Sharma, A., Sheinman, M., Jawerth, L.M., Fabry, B.,
-Weitz, D.A., MacKintosh, F.C. (2015) Stress controls the mechanics of collagen networks.
-\emph{Proc. Natl. Acad. Sci. USA} \textbf{112}(31):9573--9578.
-
-\bibitem{hgo2000} Holzapfel, G.A., Gasser, T.C., Ogden, R.W. (2000) A new constitutive framework for
-arterial wall mechanics and a comparative study of material models.
-\emph{J. Elasticity} \textbf{61}:1--48.
-
-\bibitem{gasser2006} Gasser, T.C., Ogden, R.W., Holzapfel, G.A. (2006) Hyperelastic modelling of
-arterial layers with distributed collagen fibre orientations.
-\emph{J. R. Soc. Interface} \textbf{3}(6):15--35.
-
+(1997) Solid stress inhibits the growth of multicellular tumor spheroids. \emph{Nat. Biotechnol.}
+\textbf{15}(8):778--783.
+\bibitem{montel2011} Montel, F. \emph{et al.} (2011) Stress clamp experiments on multicellular tumor
+spheroids. \emph{Phys. Rev. Lett.} \textbf{107}:188102.
 \bibitem{yurchenco2011} Yurchenco, P.D. (2011) Basement membranes: cell scaffoldings and signaling
 platforms. \emph{Cold Spring Harb. Perspect. Biol.} \textbf{3}(2):a004911.
-
-\bibitem{candiello2007} Candiello, J., Balasubramani, M., Schreiber, E.M., Cole, G.J., Mayer, U.,
-Halfter, W., Lin, H. (2007) Biomechanical properties of native basement membranes.
-\emph{FEBS J.} \textbf{274}(11):2897--2908.
-
-\bibitem{matsubayashi2020} Matsubayashi, Y., S\'anchez-S\'anchez, B.J., Marcotti, S.,
-Serna-Morales, E., Dragu, A., D\'iaz-de-la-Loza, M.-C., Vizcay-Barrena, G., Fleck, R.A.,
-Stramer, B.M. (2020) Rapid homeostatic turnover of embryonic ECM during tissue morphogenesis.
-\emph{Dev. Cell} \textbf{54}(1):33--42.
-
-\bibitem{kanchanawong2010} Kanchanawong, P., Shtengel, G., Pasapera, A.M., Ramko, E.B.,
-Davidson, M.W., Hess, H.F., Waterman, C.M. (2010) Nanoscale architecture of integrin-based cell
-adhesions. \emph{Nature} \textbf{468}:580--584.
-
+\bibitem{candiello2007} Candiello, J. \emph{et al.} (2007) Biomechanical properties of native basement
+membranes. \emph{FEBS J.} \textbf{274}(11):2897--2908.
+\bibitem{matsubayashi2020} Matsubayashi, Y. \emph{et al.} (2020) Rapid homeostatic turnover of
+embryonic ECM during tissue morphogenesis. \emph{Dev. Cell} \textbf{54}(1):33--42.
+\bibitem{kanchanawong2010} Kanchanawong, P. \emph{et al.} (2010) Nanoscale architecture of
+integrin-based cell adhesions. \emph{Nature} \textbf{468}:580--584.
 \bibitem{keene1987} Keene, D.R., Sakai, L.Y., Lunstrum, G.P., Morris, N.P., Burgeson, R.E. (1987)
-Type VII collagen forms an extended network of anchoring fibrils.
-\emph{J. Cell Biol.} \textbf{104}(3):611--621.
-
-\bibitem{kelley2019} Kelley, L.C., Chi, Q., C\'aceres, R., Hastie, E., Schindler, A.J., Jiang, Y.,
-Matus, D.Q., Plastino, J., Sherwood, D.R. (2019) Adaptive F-actin polymerization and localized ATP
-production drive basement membrane invasion in the absence of MMPs.
-\emph{Dev. Cell} \textbf{48}(3):313--328.
-
+Type VII collagen forms an extended network of anchoring fibrils. \emph{J. Cell Biol.}
+\textbf{104}(3):611--621.
+\bibitem{kelley2019} Kelley, L.C. \emph{et al.} (2019) Adaptive F-actin polymerization and localized
+ATP production drive basement membrane invasion in the absence of MMPs. \emph{Dev. Cell}
+\textbf{48}(3):313--328.
 \end{thebibliography}}
-
 
 \end{document}

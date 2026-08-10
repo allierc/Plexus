@@ -117,11 +117,19 @@ def measure(d, scale=None):
     return out
 
 
+
+def _panel(ax, letter):
+    """A bold letter top-left and no title. The numbers a title used to carry go into the note's
+    caption, where they can be read against the gate they belong to; a title repeats them in a place
+    the figure cannot explain them."""
+    ax.text(0.0, 1.03, letter, transform=ax.transAxes, fontweight="bold", fontsize=11, va="bottom")
+
+
 def plot(runs, out):
     fig, ax = plt.subplots(1, len(runs) + 1, figsize=(4.6 * (len(runs) + 1), 3.6),
                            facecolor="white")
     ax = np.atleast_1d(ax)
-    for a, (name, o) in zip(ax, runs):
+    for _k, (a, (name, o)) in enumerate(zip(ax, runs)):
         sc = o["full_scale"]
         edges = np.arange(BANDS) * sc / (BANDS - 1)
         for e in edges[1:]:
@@ -133,9 +141,7 @@ def plot(runs, out):
         a.set_yscale("symlog", linthresh=1e-3)
         a.set_xlabel("run fraction")
         a.set_ylabel("von Mises stress")
-        a.set_title(f"{name}\nband flips {o['band_flips_per_particle_per_frame']:.4f}/particle/frame,"
-                    f" {100 * o['band_flips_that_are_quantisation']:.0f}% quantisation",
-                    fontsize=8)
+        _panel(a, "abcdef"[_k])
         a.legend(fontsize=6.5, frameon=False)
         a.spines[["top", "right"]].set_visible(False)
     a = ax[-1]
@@ -147,7 +153,7 @@ def plot(runs, out):
           color="#2b6cb0", label="strands changing piece count / frame")
     a.set_xticks(xs); a.set_xticklabels([n for n, _ in runs], fontsize=7, rotation=12)
     a.set_yscale("log"); a.legend(fontsize=7, frameon=False)
-    a.set_title("what a frame-to-frame difference is made of", fontsize=8)
+    _panel(a, "abcdef"[len(runs)])
     a.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
     fig.savefig(out, dpi=150, facecolor="white")

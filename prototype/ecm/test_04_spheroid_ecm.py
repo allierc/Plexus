@@ -401,6 +401,14 @@ def measure(P, vm, per, scale, r_tissue, out_dir, dx):
     return m
 
 
+
+def _panel(ax, letter):
+    """A bold letter top-left and no title. The numbers a title used to carry go into the note's
+    caption, where they can be read against the gate they belong to; a title repeats them in a place
+    the figure cannot explain them."""
+    ax.text(0.0, 1.03, letter, transform=ax.transAxes, fontweight="bold", fontsize=11, va="bottom")
+
+
 def plot(m, out):
     fig, ax = plt.subplots(2, 4, figsize=(17.0, 6.6), facecolor="white")
     c = m.get("contact", {})
@@ -408,23 +416,20 @@ def plot(m, out):
     if s:
         ax[0, 0].semilogy(np.maximum(s["momentum_residual"], 1e-18), color="#2b6cb0", lw=1.1)
         ax[0, 0].set_ylabel(r"$|\sum f_{\rm part}+\sum f_{\rm vert}|\,/\,\sum|f|$")
-        ax[0, 0].set_title(f"momentum: max {c['momentum_residual_max']:.1e}, median "
-                           f"{c['momentum_residual_med']:.1e}", fontsize=9)
+        _panel(ax[0, 0], "a")
         ax[0, 1].plot(np.asarray(s["depth_max"]) / m["dx"], color="#e0452b", lw=1.1)
         a1 = ax[0, 1].twinx()
         a1.plot(s["n_contact"], color="#e08a2e", lw=1.0)
         a1.set_ylabel("particles in contact", color="#e08a2e")
         ax[0, 1].set_ylabel("max penetration (grid cells)", color="#e0452b")
-        ax[0, 1].set_title(f"penetration: max {c['penetration_max_cells']:.2f} cells", fontsize=9)
+        _panel(ax[0, 1], "b")
     if "inside" in m:
         ax[0, 2].plot(m["inside"]["series"], color="#1f8a5c", lw=1.2, label="behind the surface")
         if s:
             ax[0, 2].plot(s["n_contact"], color="#e08a2e", lw=1.0, ls="--", label="in contact")
         ax[0, 2].set_ylabel("particles")
         ax[0, 2].legend(fontsize=7, frameon=False)
-        ax[0, 2].set_title(f"no backstop: {m['inside']['last_count']} behind, "
-                           f"{m['inside'].get('over_contact_last', float('nan')):.2f} per contact, "
-                           f"max depth {m['inside']['max_depth_cells']:.2f} cells", fontsize=8)
+        _panel(ax[0, 2], "c")
     rb = np.asarray(m["disp_r"])
     if "vm_profile" in m:
         for k, (fr, pr) in enumerate(zip(m["disp_frames"], m["vm_profile"])):
@@ -434,7 +439,7 @@ def plot(m, out):
                             label=f"frame {fr}")
         ax[0, 3].set_xlabel("radius (box units)")
         ax[0, 3].set_ylabel("von Mises stress")
-        ax[0, 3].set_title("the front, in the readout that can see a shear", fontsize=9)
+        _panel(ax[0, 3], "d")
         ax[0, 3].legend(fontsize=6.5, frameon=False)
 
     for k, (fr, pr) in enumerate(zip(m["disp_frames"], m["disp_profile"])):
@@ -445,18 +450,14 @@ def plot(m, out):
                     label="non-radial")
     ax[1, 0].set_xlabel("initial radius (box units)")
     ax[1, 0].set_ylabel("radial displacement")
-    ax[1, 0].set_title(f"the shell's own two-term form fits at $R^2$ = {m['lame_r2'][-1]:.4f} over "
-                       f"{m['disp_fit_bins'][-1]} bins at signal/non-radial "
-                       f"{m['disp_snr'][-1]:.1f}; slope {m['disp_exponent'][-1]:.2f} against its "
-                       f"{m['lame_exponent']:.2f}", fontsize=8)
+    _panel(ax[1, 0], "e")
     ax[1, 0].legend(fontsize=6.5, frameon=False)
     ax[1, 1].plot(rb, m["density_ratio"], color="#7b4fb5", lw=1.4)
     ax[1, 1].axhline(1.0, color="#999", ls="--", lw=0.8)
     ax[1, 1].axvline(m["r_tissue"][-1], color="#c8a94e", lw=1.0)
     ax[1, 1].set_xlabel("radius (box units)")
     ax[1, 1].set_ylabel("density, last frame / first")
-    ax[1, 1].set_title(f"compaction: {m['density_peak']:.2f} at r = {m['density_peak_r']:.3f}, "
-                       f"just outside the tissue", fontsize=9)
+    _panel(ax[1, 1], "f")
     fr = np.asarray(m["fibre_r"])
     ax[1, 2].plot(fr, m["fibre_lam_r"], color="#2b6cb0", lw=1.4, marker="o", ms=3,
                   label="end-to-end stretch")
@@ -465,8 +466,7 @@ def plot(m, out):
     ax[1, 2].axhline(1.0, color="#999", ls="--", lw=0.8)
     ax[1, 2].axvline(m["r_tissue"][-1], color="#c8a94e", lw=1.0)
     ax[1, 2].set_xlabel("the radius the strand started at")
-    ax[1, 2].set_title(f"the tissue-wide mean is {m['lam_mean'][-1]:.3f}, which is the far "
-                       f"field's answer", fontsize=8)
+    _panel(ax[1, 2], "g")
     ax[1, 2].legend(fontsize=7, frameon=False)
     ax[1, 3].plot(fr, m["fibre_cos2_0_r"], color="#999", lw=1.2, ls="--", label="as seeded")
     ax[1, 3].plot(fr, m["fibre_cos2_aff_r"], color="#1f8a5c", lw=1.6, ls=":",
@@ -476,8 +476,7 @@ def plot(m, out):
     ax[1, 3].axvline(m["r_tissue"][-1], color="#c8a94e", lw=1.0)
     ax[1, 3].set_xlabel("the radius the strand started at")
     ax[1, 3].set_ylabel(r"$\langle\cos^2\theta\rangle$ to the radius")
-    ax[1, 3].set_title(f"measured {m['cos2_measured_matched_inner']:.3f} against the affine "
-                       f"{m['cos2_affine_inner']:.3f}, inner shell", fontsize=8)
+    _panel(ax[1, 3], "h")
     ax[1, 3].legend(fontsize=7, frameon=False)
     for a in ax.reshape(-1):
         a.set_xlabel(a.get_xlabel() or "frame")
