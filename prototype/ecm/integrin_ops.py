@@ -233,6 +233,17 @@ class IntegrinPull(Lateral):
         self.k = float(params.get("k", 1.0e5))
         self.gamma = float(params.get("gamma", 1.0))
         self.rupture = float(params.get("rupture", 0.0))     # 0 = permanent
+        # WHICH END OF THE FIBRE PULLS. `tip` is the design as written -- the fibre's material carries
+        # the load from its prescribed base to its outer end, and the bond is the last link. 148 shows
+        # that middle step is the one that fails: base at 0.2969, tip at 0.1015, a fibre "stretched" to
+        # fifty times its rest length that transmits nothing, because in MPM the deformation gradient is
+        # advected by the GRID's velocity gradient and does not measure the distance between particles.
+        # Two particles more than a cell apart are simply two bodies. `inner` therefore runs the bond
+        # from the prescribed base itself, with the fibre's length as the bond's REST LENGTH: the rope
+        # is then explicit, its length is still a material property of the fibre, and rupture is still
+        # one comparison on the fibre's own extension. The fibre particles remain, and remain drawn.
+        self.pull_from = str(params.get("pull_from", "tip")).lower()
+        self.rest = float(params.get("rest_length", 0.0))
         self.bond = None
         self.bound = None
         self._said = False
@@ -245,7 +256,7 @@ class IntegrinPull(Lateral):
         il = H.level(self.integrin_set)
         mp, ip = ml.get("pos"), il.get("pos")
         nf = int(idx_in.numel())
-        tip = ip[-nf:]                                        # the outer row, one per fibre
+        tip = ip[:nf] if self.pull_from == "inner" else ip[-nf:]
         if self.bond is None:
             # NEAREST AT SEEDING, THEN FIXED. A bond that re-binds to whatever is nearest each frame is
             # not a bond, it is a field -- and it would hide exactly the failure this operator exists to
@@ -262,13 +273,22 @@ class IntegrinPull(Lateral):
                   f"(mean separation at seeding {float(d0.mean()):.2e} box units), k={self.k:g}, "
                   f"rupture={'off' if self.rupture <= 0 else self.rupture}", flush=True)
         d = tip - mp[self.bond]
+        # THE REST LENGTH ENTERS RADIALLY. A zero-rest-length bond would pull the sheet onto the fibre's
+        # end; a fibre holds it one length away, which is the whole reason the standoff is a material
+        # property rather than a balance.
+        if self.rest > 0:
+            nrm = d.norm(dim=1, keepdim=True).clamp_min(1e-12)
+            d = d * (1.0 - self.rest / nrm)
         if self.rupture > 0:
             self.bound &= d.norm(dim=1) < self.rupture
         f = (self.k / max(self.gamma, 1e-12)) * d * self.bound[:, None].to(d.dtype)
         acc_m = torch.zeros_like(mp)
         acc_m.index_add_(0, self.bond, f)                     # several fibres may share a patch
         acc_i = torch.zeros_like(ip)
-        acc_i[-nf:] = -f                                      # the reaction, on the fibre's own tip
+        if self.pull_from == "inner":
+            acc_i[:nf] = -f            # discarded next substep: `integrin_track` re-prescribes the base
+        else:
+            acc_i[-nf:] = -f                                      # the reaction, on the fibre's own tip
         if not self._said:
             print(f"[integrin_pull] first-frame mean |force| {float(f.norm(dim=1).mean()):.4g}",
                   flush=True)

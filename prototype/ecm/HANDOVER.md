@@ -71,6 +71,41 @@ they exist only because the provision hangs particles off one. Measured after: s
 integrin 400. Runs 149 (the nominal) and 150 (the stiff fibre) are the first with the material their
 specs claim, and **every earlier number in this file describes a softer sheet than it says it does**.
 
+## WHY AN MPM FIBRE CANNOT BE A ROPE (142-151, and it is not a tuning failure)
+
+Ten runs, one conclusion, and it follows from what MPM is rather than from any parameter:
+
+| run | what changed from the one before | geometric stretch | fibre tip | coverage |
+|---|---|---|---|---|
+| 142 | the design as written, L = 0.004 | 0.00 | 0.0875 | 0.948 |
+| 143 | L = 2*dx = 0.0417 | 0.00 | 0.1252 | 0.948 |
+| 144 | cell end carries dR/dt (the bug fix) | 0.34 | 0.1167 | 0.471 |
+| 145 | 144 at L = 2*dx | 0.31 | 0.1640 | 0.551 |
+| 146 | fibre E x10 (inert -- the parent bug) | 0.34 | 0.1167 | 0.471 |
+| 147 | 20,000 fibres instead of 4,000 | 0.01 | 0.0885 | 0.942 |
+| 148 | explicit bond, fibre TIP to sheet | 0.16 | 0.1015 | 0.881 |
+| 150 | fibre E x10, this time real | 0.00 | 0.0875 | 0.948 |
+| 151 | explicit rope from the PRESCRIBED BASE | **1.37** | 0.2066 | 0.724 |
+
+The surface goes to 0.2973 and the sheet must reach it, so every row above 151 is a failure and 151 is
+the only one that moves. The reason is in `mpm_strain`: **F is advected by the GRID's velocity gradient
+and never measures the distance between two particles.** A fibre whose base is prescribed on a surface
+that runs away from its tip is not a stretched material -- once the ends are more than a cell apart they
+are two unrelated bodies, and no stiffness reconnects them (150, at ten times the sheet's modulus, is a
+total null). 147 says the same thing from the other side: adding fibres adds puller AND passenger in
+equal numbers, so five times as many dragged the sheet less, not more.
+
+So an integrin CAN be MPM material, but its load path has to be an explicit relation, not the fibre's
+own continuum. 151 does that -- bond from the prescribed base to the bound membrane patch, the fibre's
+length as its rest length, force as `mpm_acceleration` inside the substep so both bodies' F still sees
+it -- and it is the only version that pulls. It also blew the matrix up (ECM stress p99 3.2e4 against a
+healthy 2-8) at k = 1e6; 154 is the same run an order of magnitude gentler.
+
+Which leaves the honest position: **133 already is this operator**, with the bond running to every
+particle rather than to 4,000 plaques. What the fibre buys over it is punctate adhesion and rupture as a
+material event -- not the standoff, which 133 gets right (+0.00337 at 100% strain fidelity) and no MPM
+fibre has yet matched.
+
 ## The MPM integrin, 142-147: two bugs, then a weak coupling
 
 Built as `integrin_ops.py` (`integrin_seed` + `integrin_track`, the fibre's own MPM cycle on the shared

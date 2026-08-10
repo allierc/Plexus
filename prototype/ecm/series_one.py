@@ -684,6 +684,56 @@ SERIES = {
                                      membrane_secrete_rate=0.0, membrane_tau=0.0,
                                      membrane_reserve=0.0),
 
+    # 151: THE ROPE MADE EXPLICIT, WHICH IS WHAT THE FIBRE WAS SUPPOSED TO BE. 148 located the failure
+    #     inside the fibre: base at 0.2969, tip at 0.1015, i.e. a column "stretched" to fifty times its
+    #     rest length that transmits nothing -- because MPM advects F by the GRID's velocity gradient and
+    #     never measures the distance between two particles, so once base and tip are more than a cell
+    #     apart they are two unrelated bodies. No stiffness fixes that; it is what a material model on a
+    #     grid IS. So the bond now runs from the prescribed base to the membrane patch, with the fibre's
+    #     length as its REST LENGTH: the rope is explicit, the standoff is still the fibre's own length,
+    #     rupture is still one comparison on the fibre's extension, and the force is still an
+    #     `mpm_acceleration` inside the substep so both bodies' F sees it. The fibre particles stay --
+    #     they are what the section movie draws and what a rupture criterion will read.
+    "151_integrin_rope": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=False,
+                              membrane_contact_k=0.0, membrane_exclude=False, membrane_adhesion=0.0,
+                              n_integrins=4000, integrin_layers=3, integrin_length=0.004,
+                              integrin_youngs=400.0, integrin_bond_k=1.0e6,
+                              integrin_bond_gamma=1.0, integrin_pull_from="inner",
+                              membrane_offset=0.004, membrane_secrete_rate=0.0,
+                              membrane_tau=0.0, membrane_reserve=0.0),
+
+    # 152/153: WHICH HALF OF 149 BLEW UP. Giving the sheet the stiffness its spec always claimed (15 ->
+    #     400) made the nominal unstable: ECM stress p99 155 against a healthy 2-8, max_disp 0.445
+    #     against ~0.21. Two candidates, one each: the adhesion is now pulling a body 27x harder to move
+    #     (152 drops k 1e6 -> 1e5), or the stiff thin shell itself cannot share a grid with a gel at
+    #     this substep (153 meets it halfway at E = 100). Smoke-tested at 25 frames first -- the stress
+    #     scale is visible there and costs three minutes rather than forty.
+    "152_nominal_material_k1e5": dict(membrane_springs=False, membrane_impl="mpm",
+                                      membrane_direct_forces=False, membrane_adhesion_substep=True,
+                                      membrane_grid_bc=False, membrane_contact_k=0.0,
+                                      membrane_exclude=False, membrane_adhesion=1.0e5,
+                                      membrane_secrete_rate=0.0, membrane_tau=0.0,
+                                      membrane_reserve=0.0),
+    "153_nominal_material_E100": dict(membrane_springs=False, membrane_impl="mpm",
+                                      membrane_direct_forces=False, membrane_adhesion_substep=True,
+                                      membrane_grid_bc=False, membrane_contact_k=0.0,
+                                      membrane_exclude=False, membrane_adhesion=1.0e6,
+                                      membrane_youngs=100.0, membrane_secrete_rate=0.0,
+                                      membrane_tau=0.0, membrane_reserve=0.0),
+
+    # 154: THE ROPE, SOFTER. 151 is the first MPM-integrin run that really pulls -- geometric stretch
+    #     1.37 against 0.34 for the grid-coupled version and 0.00 for the stiff one, the fibre tips out
+    #     at 0.2066 -- and it blew the matrix up doing it (ECM stress p99 3.2e4 against a healthy 2-8).
+    #     A rope at k = 1e6 driving a sheet into a gel 27x softer than itself is the wrong impedance, so
+    #     this is the same run an order of magnitude gentler.
+    "154_integrin_rope_k1e5": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=False,
+                                   membrane_contact_k=0.0, membrane_exclude=False,
+                                   membrane_adhesion=0.0, n_integrins=4000, integrin_layers=3,
+                                   integrin_length=0.004, integrin_youngs=400.0,
+                                   integrin_bond_k=1.0e5, integrin_bond_gamma=1.0,
+                                   integrin_pull_from="inner", membrane_offset=0.004,
+                                   membrane_secrete_rate=0.0, membrane_tau=0.0, membrane_reserve=0.0),
+
     "_unused_secrete_dense": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
                              membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
                              membrane_particles=90000, membrane_reserve=1.0,
