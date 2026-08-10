@@ -110,9 +110,10 @@ def _mesh_of(hist_t, pos_t, centroid):
     # divisions a lineage has had; run_one paints a cell green when `age <= 4 and ndiv > 0`. Both
     # have to travel with the mesh or the ECM movie shows a tissue that never divided -- which is
     # exactly what the reference strip's first two rows are FOR.
-    myo = hist_t.get("myo")
-    if myo is not None:
-        d["myo"] = np.asarray(myo, np.float32)
+    for k in ("myo", "myo_med", "myo_amount"):
+        v = hist_t.get(k)
+        if v is not None:
+            d[k] = np.asarray(v, np.float32)
     for k in ("age", "ndiv"):
         v = hist_t.get(k)
         d[k] = (np.asarray(v, np.float32) if v is not None
@@ -126,6 +127,7 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap
           gate_smooth_frames=25, gate_smooth_phi=360.0,
           myosin=None, myo_tau=20.0, myo_beta=1.0, myo_new=1.0,
           myo_keyed_on="length", myo_destabilising=1,
+          myo_model="one_pool", myo_k_on=0.05, myo_tau_med=20.0, myo_k_ex=0.05, myo_beta_T=0.0,
           map_theta=N_THETA, map_phi=N_PHI):
     import tyssue_t1_ops3d as _T1
     _T1.T1_TRACE.clear()                       # per build, so a rebuild never inherits a previous run's
@@ -190,14 +192,33 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap
         # produce plausible numbers and no error.
         _se = next((o for o in spec["operators"] if o["op"] == "shape_energy_3d"), {})
         _en = {k: float(_se.get(k, d)) for k, d in (("K_P", 1.0), ("Lam", 0.0), ("Gam", 0.0))}
-        spec["operators"].append({"op": "junction_myosin", "at": "vertex",
-                                  "k_perim": _en["K_P"], "lam": _en["Lam"], "gam": _en["Gam"],
-                                  "activity": float(myosin), "tau": float(myo_tau),
-                                  "beta": float(myo_beta), "myo_new": float(myo_new), "dt": 1.0, "inherit": True,
-                                  "keyed_on": str(myo_keyed_on),
-                                  "destabilising": bool(myo_destabilising)})
-        i = spec["schedule"].index("shape_energy_3d")
-        spec["schedule"].insert(i, "junction_myosin")
+        if str(myo_model) == "two_pool":
+            # THE SECOND POOL, AND ITS OWN OPERATOR BEFORE THE BELT'S. `medioapical_myosin` acts on the
+            # `cell` set and hands a flux to the junctions; the belt integrates it. Scheduled in that
+            # order so the flux a frame delivers is the flux that frame's cells produced -- reversed,
+            # the belt would always be integrating the previous frame's supply, which is a lag of one
+            # frame on a quantity whose whole timescale is twenty.
+            import medioapical_ops                                    # noqa: F401  register both
+            spec["operators"].append({"op": "medioapical_myosin", "at": "cell", "mesh_at": "vertex",
+                                      "k_on": float(myo_k_on), "tau_med": float(myo_tau_med),
+                                      "k_ex": float(myo_k_ex), "beta_T": float(myo_beta_T),
+                                      "rho0": 1.0, "dt": 1.0,
+                                      "k_perim": _en["K_P"], "lam": _en["Lam"], "gam": _en["Gam"]})
+            spec["operators"].append({"op": "junction_myosin", "model": "two_pool", "at": "vertex",
+                                      "activity": float(myosin), "tau_jun": float(myo_tau),
+                                      "myo_new": float(myo_new), "dt": 1.0, "inherit": True})
+            i = spec["schedule"].index("shape_energy_3d")
+            spec["schedule"].insert(i, "junction_myosin")
+            spec["schedule"].insert(i, "medioapical_myosin")
+        else:
+            spec["operators"].append({"op": "junction_myosin", "at": "vertex",
+                                      "k_perim": _en["K_P"], "lam": _en["Lam"], "gam": _en["Gam"],
+                                      "activity": float(myosin), "tau": float(myo_tau),
+                                      "beta": float(myo_beta), "myo_new": float(myo_new), "dt": 1.0,
+                                      "inherit": True, "keyed_on": str(myo_keyed_on),
+                                      "destabilising": bool(myo_destabilising)})
+            i = spec["schedule"].index("shape_energy_3d")
+            spec["schedule"].insert(i, "junction_myosin")
         # AND THE CARRY, AFTER THE TOPOLOGY OPERATORS. `reconnect_t1_3d` rewires the half-edge arrays
         # and `divide_3d` lengthens them, both AFTER `junction_myosin` has written `m["myo"]` for the
         # arrays as they were -- so what `topo_snapshot_3d` records is this frame's edges beside last
@@ -318,6 +339,8 @@ def load_or_build(frames=401, device="cuda:0", name="cellfix_B_new", rebuild=Fal
                   gate_hill=4.0, gate_floor=0.15, gate_smooth_frames=25,
                   gate_smooth_phi=360.0, myosin=None, myo_tau=20.0, myo_beta=1.0,
                   myo_keyed_on="length", myo_destabilising=1,
+                  myo_model="one_pool", myo_k_on=0.05, myo_tau_med=20.0, myo_k_ex=0.05,
+                  myo_beta_T=0.0,
                   myo_new=1.0, map_theta=N_THETA, map_phi=N_PHI):
     """The cache path, built if missing. Frames are part of the filename: a 401-frame tissue and a
     120-frame one are different tissues, and silently reusing one for the other would be a run
@@ -341,6 +364,13 @@ def load_or_build(frames=401, device="cuda:0", name="cellfix_B_new", rebuild=Fal
            "load_gain": load_gain, "myosin": myosin, "myo_tau": myo_tau, "myo_beta": myo_beta, "myo_inherit": 1,
            "myo_keyed_on": myo_keyed_on, "myo_destabilising": myo_destabilising,
            "myo_new": myo_new}
+    # ADDED ONLY WHEN IT IS NOT THE DEFAULT, for the reason the map resolution is: unconditionally it
+    # rehashes every key ever written and the next run finds no cache, tries to rebuild, and dies on a
+    # pass-1 spec that has moved. `one_pool` therefore hashes exactly as it did before this model
+    # existed, and every archived tissue still loads.
+    if str(myo_model) != "one_pool":
+        cfg.update({"myo_model": myo_model, "myo_k_on": myo_k_on, "myo_tau_med": myo_tau_med,
+                    "myo_k_ex": myo_k_ex, "myo_beta_T": myo_beta_T})
     # THE SURFACE MAP'S RESOLUTION IS IN THE KEY, because the map IS the epithelium as far as every
     # membrane operator is concerned -- `integrin_adhesion`, `basement_membrane_contact`,
     # `adhesion_pull` and `surface_track` read it and nothing else. At 32x64 a bin is 1.63 x 1.63
@@ -369,7 +399,9 @@ def load_or_build(frames=401, device="cuda:0", name="cellfix_B_new", rebuild=Fal
               gate_floor=gate_floor, gate_smooth_frames=gate_smooth_frames,
               gate_smooth_phi=gate_smooth_phi, myosin=myosin, myo_tau=myo_tau,
               myo_beta=myo_beta, myo_new=myo_new, myo_keyed_on=myo_keyed_on,
-              myo_destabilising=myo_destabilising, map_theta=map_theta, map_phi=map_phi)
+              myo_destabilising=myo_destabilising, myo_model=myo_model, myo_k_on=myo_k_on,
+              myo_tau_med=myo_tau_med, myo_k_ex=myo_k_ex, myo_beta_T=myo_beta_T,
+              map_theta=map_theta, map_phi=map_phi)
     else:
         z = np.load(out)
         print(f"[tissue] reusing {os.path.relpath(out, ROOT)}  "

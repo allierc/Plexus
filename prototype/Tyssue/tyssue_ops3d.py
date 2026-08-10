@@ -23,6 +23,37 @@ from plexus.models.registry import register_operator
 MYO_SKIPPED: list = []
 
 
+def _carry_face_state(m, keep, dt, dev):
+    """Reindex any EXTRA per-face array an operator has declared, through the same `keep` map.
+
+    `keep` maps new face -> old face, and `divide_3d` / `apoptosis_3d` already use it to carry A0, P0,
+    V0f, Vbirth, divjit, age, ndiv and alive across a rebuild. That list was a literal tuple, so a
+    per-face state introduced by a NEW operator was silently left indexed against faces that had
+    moved -- the same defect class as per-half-edge myosin before `junction_myosin_sync`, one level up
+    and with no vertex-pair key to recover from.
+
+    `m["face_carry"]` makes the list open. An operator declares its own array once and the topology
+    operators still know nothing about what is in it, which is the whole point: the alternative is
+    every topology operator learning the name of every state, and the next state added edits them all
+    again.
+
+    NOTE ON SEMANTICS. `keep` COPIES the parent's value onto both daughters, so what is carried this
+    way must be an INTENSIVE quantity -- a density, a concentration, an age. Carrying an extensive
+    one (an amount, a mass) doubles it at every division. `medioapical_myosin` stores an areal density
+    for exactly this reason.
+    """
+    names = m.get("face_carry")
+    if not names:
+        return
+    idx = torch.as_tensor(np.asarray(keep, np.int64), device=dev)
+    for nm in sorted(names):
+        a = m.get(nm)
+        if a is None:
+            continue
+        a = a if torch.is_tensor(a) else torch.as_tensor(np.asarray(a), dtype=dt, device=dev)
+        m[nm] = a.to(dev)[idx.clamp(max=max(a.shape[0] - 1, 0))].to(dt)
+
+
 def fib_sphere(n, r=1.0):
     i = np.arange(n) + 0.5
     phi = np.arccos(1 - 2 * i / n); theta = np.pi * (1 + 5 ** 0.5) * i
@@ -673,6 +704,7 @@ class Divide3D(Structural):
         m["age"] = torch.as_tensor(agea, dtype=dt, device=dev)
         m["ndiv"] = torch.as_tensor(ndva, dtype=dt, device=dev)
         m["alive"] = torch.as_tensor(alv, dtype=dt, device=dev)
+        _carry_face_state(m, keep, dt, dev)
         m["n_div"] = int(m.get("n_div", 0)) + ndone
         if self.local_relax > 0 and "mech" in m and Nv2 > Nv:    # heal the fresh caps in place at birth
             esT = m["E_srce"]; etT = m["E_trgt"]; efT = m["E_face"]
@@ -1193,6 +1225,7 @@ class Apoptosis3D(Structural):
         for nm in ("Vbirth", "divjit", "age", "ndiv", "alive"):
             if nm in m:
                 m[nm] = _car(nm)
+        _carry_face_state(m, keep, dt, dev)
         m["apop_flag"] = np.asarray([flag[i] for i in keep], np.float64)   # identity, across renumbering
         st = lvl.state.clone()
         st[:len(pos_t), px0:px1] = torch.as_tensor(pos_t, dtype=dt, device=dev)
@@ -1335,6 +1368,11 @@ class TopoSnapshot3D(Structural):
             # reason `age`/`ndiv` are: a renderer cannot colour by a quantity that only existed inside
             # one frame's forward pass. `cp` is None-safe, so a run without the operator records None.
             myo=cp("myo"),
+            # THE TWO-POOL STATE, when `medioapical_myosin` is in the schedule. `myo_med` is the
+            # AREAL density on each cell and `myo_amount` the AMOUNT on each half-edge; the pair is
+            # what makes the conservation ledger measurable offline, since `myo` alone is normalised
+            # to a tissue mean of 1 and so cannot say how much myosin there is.
+            myo_med=cp("myo_med"), myo_amount=cp("myo_amount"),
             # THE RESERVOIR, PER FRAME. divide_3d sets these on the mesh and nothing carried them
             # into the history, so run_one read them and always found nothing -- a run that
             # plateaued at 98.5% of its array reported buf_full False. The flag existed, the
