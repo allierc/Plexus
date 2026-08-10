@@ -91,6 +91,32 @@ nodes:
       # measured stand-in can now only produce false positives, which is exactly what it did.
       # null = no measured demotion. Set a number to bring it back.
       forced_p_ratio: null
+      # THE PORTFOLIO. Cedric, 10 August: "in the new loop I would like to explore altogether tube
+      # forming, budding, branching, complex shape." The old selection was a greedy sort on
+      # grip_peak then protr_peak, which can only climb ONE hill: measured over r001-r029, 18
+      # distinct compositions in 196 structural records, one composition proposed 87 times, and for
+      # four rounds the top six parents were five clones of a single result.
+      #
+      # One reserved seat per target morphology, so a lone branched specimen is a parent even when
+      # every high-grip run is a sphere; `score` is a weighted sum over that run's own metrics, so
+      # each target defines what "best" means for it. `max_per_lineage` is what actually closes the
+      # rabbit hole -- no family may hold more than this many seats.
+      per_target: 1
+      max_per_lineage: 2
+      targets:
+        tube:
+          morphology: [tube]
+          score: {protrusion_aspect_max_peak: 1.0, n_tubes_peak: 0.5}
+        bud:
+          # a BULGE, not a finger -- aspect counts against it, or this is just the tube seat again
+          morphology: [sphere, undulation]
+          score: {protr_peak: 1.0, protrusion_aspect_max_peak: -0.3}
+        branched:
+          morphology: [branched]
+          score: {n_tips_peak: 1.0, protr_peak: 0.5}
+        complex:
+          morphology: [undulation, branched]
+          score: {grip_peak: 1.0, invagination_peak: 0.5}
       forcing_terms: {extrusion_forcing_3d: K_extrude}   # split out 10 Aug; NOT in the vocabulary
       # EVERY ENTRY REBUILDS AND ADMITS. Checked by `round.py --check`, because the first version of
       # this pool did not: two of its six entries were inadmissible and it took a live Proposer call
@@ -159,6 +185,17 @@ nodes:
         - b_bru_uniform_shaping
         - b_bru_gated_plain
         - b_bru_gated_shaping
+        # THE DEATH TWINS, added 10 August. A mechanism enters this campaign through the BASIS
+        # or not at all: apoptosis_3d sat at menu row 0 and in
+        # `coverage.operators_never_exercised` for five rounds and the Proposer never took it,
+        # while Route A could not reach it either -- `_build_sweep` refuses a base that does not
+        # already carry the operator, and the Route A plan is static. One twin per Route A base,
+        # so `mode` and `max_mark_frac` become sweepable ladders on the same parents everything
+        # else is measured against.
+        - b_none_uniform_plain_death
+        - b_gs_gated_plain_death
+        - b_bru_gated_plain_death
+        - b_gs_gated_shaping_death
       #
       # DROPPED, each for a measured reason:
       #
@@ -178,6 +215,20 @@ nodes:
 
   - id: history
     code: round.history
+    args:
+      # null = hand over ALL of knowledge.md. It was 12000, and `_read` keeps the LAST 12000
+      # characters of a 38,591-character file, so rounds 1-20 were invisible to every role in
+      # every round -- silently, because the cut happens before the block's TRUNCATED marker.
+      # If this ever outgrows a context the answer is to COMPACT the file into a synthesis, not
+      # to drop its oldest and most settled evidence.
+      limit: null
+
+  # THE GROUNDER'S VERDICT, CARRIED FORWARD. It was a terminal node writing a file nothing read,
+  # while crew/grounder.md tells the role its verdict "becomes next round's proposal". Round 28's
+  # verdict -- that Okuda's tubes come from a mechanics leg, not radial push -- was the most
+  # strategic sentence of the round and reached nobody.
+  - id: grounding
+    code: round.grounding
 
   - id: metric_bank
     code: round.metric_bank
@@ -226,7 +277,8 @@ nodes:
 
   - id: proposer
     agent: proposer
-    in: [parents, menu, metric_bank, coverage, diagnosis, history, refusals, user_input]
+    in: [parents, menu, metric_bank, coverage, diagnosis, history, refusals, user_input,
+         grounding]
     out: edits
 
   # ---- build, launch, measure ----------------------------------------------------

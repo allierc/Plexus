@@ -75,7 +75,13 @@ CONFIG = os.path.join(os.path.dirname(HERE), "config", "okuda")
 # --------------------------------------------------------------------------- the fixed substrate
 # EVERY NON-AXIS VALUE, WRITTEN ONCE. If a number is here, no member of the basis varies it; if a
 # member varies it, it is an axis and it is in AXES below. That is the whole invariant.
-FRAMES = 900                 # the campaign's own run length, so a base is comparable to its children
+# 1800, AND IT SAID 900 WITH THE COMMENT "the campaign's own run length, so a base is comparable to
+# its children" -- which stopped being true when flow.yaml `build.frames` went to 1800. The comment
+# named the right principle and then described the wrong number, so the basis ran at HALF the length
+# of every run bred from it: measured 10 August, ten members at 901 frames against children at 1801.
+# A base you cannot compare to its own children is not a base. Read it from the graph if they ever
+# diverge again; for now they are one number stated twice, which is why this comment exists.
+FRAMES = 1800                # == crew/flow.yaml build.frames, or a base is not comparable
 SEED_CELLS = 2000
 CELL_BUF = 60000             # room to grow: rho=2.0 on the old coral reached 14,196 cells, and the
 VERT_BUF = 120000            # array must not be what stops a base. ~1.3 GB of trajectory at worst.
@@ -205,11 +211,35 @@ AXES = {
 }
 
 
-def _name(chem, mat, mech):
-    return f"b_{chem}_{mat}_{mech}"
+# THE DEATH AXIS, added 10 August, and it exists to make apoptosis REACHABLE rather than merely
+# legal. `apoptosis_3d` was injected into the vocabulary before round 25: it sat at row 0 of the
+# Proposer's menu and was named by the `coverage` node as never exercised, for five rounds, and was
+# never once chosen -- because in its whole history the Proposer has issued 30 `add_op` edits and
+# all 30 added the same operator. Route A could not reach it either: `_build_sweep` refuses with
+# "route A base has no apoptosis_3d", so a mechanism absent from the basis cannot be swept, and the
+# Route A plan is static and cannot add one.
+#
+# So a mechanism enters this campaign through the BASIS or not at all. The twin is taken on each of
+# the four Route A bases specifically, so `apoptosis_3d.mode` and `max_mark_frac` become sweepable
+# ladders on the same parents everything else is measured against.
+#
+# `competition` is the mode: it needs no chemistry (so it is live on the b_none column too), it is
+# the canonical cell-competition hypothesis, and on the campaign's best parents it measured 59-69
+# deaths with protr and grip within 3% of the parent and no premise broken. max_mark_frac 0.005 is
+# the rate that made death survivable at all -- uncapped, five of six modes took r020_00_ctrl from
+# protr 1.513 / grip 0.228 to 1.131 / 0.049.
+DEATH = dict(mode="competition", max_mark_frac=0.005, min_age=4,
+             shrink_rate=0.05, critical_frac=0.15)
+# the four Route A bases; a death twin of each
+DEATH_TWINS = [("none", "uniform", "plain"), ("gs", "gated", "plain"),
+               ("bru", "gated", "plain"), ("gs", "gated", "shaping")]
 
 
-def build(chem, mat, mech):
+def _name(chem, mat, mech, death=False):
+    return f"b_{chem}_{mat}_{mech}" + ("_death" if death else "")
+
+
+def build(chem, mat, mech, death=False):
     """One cell of the grid -> a full spec dict."""
     has_chem = chem != "none"
     gated = mat == "gated"
@@ -250,6 +280,14 @@ def build(chem, mat, mech):
              # P1: growth ADDS material here. conserve_amount redistributes it, which is what made
              # coral_gate_div_defaultE fail P1 with a growth operator running.
              "conserve_amount": False})
+    if death:
+        # BETWEEN GROWTH AND THE MECHANICS, which is where translate.SCHEDULE_ORDER puts it and
+        # where the dedicated geometry tests certify it: growth sets the targets, death overrides
+        # them for the cells it has sentenced, and the relaxation sees both in one tick, so a cell
+        # extruded this frame has its hole closed this frame. Appending it after the recorder
+        # instead measurably changed the outcome on a weak parent (grip 0.031 vs 0.110).
+        ops.append({"op": "apoptosis_3d", "at": "vertex", "cell_set": "cell", "p0": MECH["p0"],
+                    **DEATH})
     ops += [
         {"op": "shape_energy_3d", "at": "vertex", **MECH,
          **(SHAPING if shaping else {"K_bend": 0.0, "K_lumen": 0.0})},
@@ -273,7 +311,7 @@ def build(chem, mat, mech):
         {"op": "topo_snapshot_3d", "at": "vertex", "every": 1},
     ]
 
-    name = _name(chem, mat, mech)
+    name = _name(chem, mat, mech, death)
     return {
         "general": {"name": name, "seed": 0, "n_frames": FRAMES, "dt": 1.0,
                     "record_cap": FRAMES + 2, "record_every": 1, "boundary": "free", "dim": 3,
@@ -286,8 +324,9 @@ def build(chem, mat, mech):
         "fields": {},
         "operators": ops,
         "schedule": [o["op"] for o in ops],
-        "_basis": {"chem": chem, "mat": mat, "mech": mech,
-                   "grid": "4 chemistry x 2 material x 2 mechanics",
+        "_basis": {"chem": chem, "mat": mat, "mech": mech, "death": death,
+                   "grid": "4 chemistry x 2 material x 2 mechanics, + a death twin of each "
+                           "Route A base",
                    "why": f"chemistry={chem}, material={mat}, mechanics={mech} -- one cell of the "
                           f"basis grid written by make_basis.py; every value not on an axis is "
                           f"shared with the other fifteen."},
@@ -300,10 +339,11 @@ def grid():
     `static` is DIVISION WITHOUT GROWTH -- cells subdivide and the body adds nothing. It is the
     substrate every growth claim is read against, and it is the regime the old `factor 1.5/1.8`
     sweep points fell into by accident; here it is a declared member rather than an accident."""
-    return [(chem, mat, mech)
+    base = [(chem, mat, mech, False)
             for chem in AXES["chem"]
             for mat in AXES["mat"][chem]
             for mech in AXES["mech"]]
+    return base + [(c, m, k, True) for (c, m, k) in DEATH_TWINS]
 
 
 def _unread(spec):
@@ -343,10 +383,10 @@ def main():
 
     cells = grid()
     os.makedirs(CONFIG, exist_ok=True)
-    print(f"{'name':<26}{'chem':<6}{'mat':<9}{'mech':<9}{'ops':>4}  {'premises'}")
+    print(f"{'name':<28}{'chem':<6}{'mat':<9}{'mech':<9}{'death':<7}{'ops':>4}  {'premises'}")
     bad = 0
-    for chem, mat, mech in cells:
-        spec = build(chem, mat, mech)
+    for chem, mat, mech, death in cells:
+        spec = build(chem, mat, mech, death)
         name = spec["general"]["name"]
         path = os.path.join(CONFIG, f"{name}.yaml")
         with open(path, "w") as f:
@@ -367,7 +407,8 @@ def main():
             fails += _unread(spec)
             bad += bool(fails)
             note = "BROKEN " + ",".join(fails) if fails else "static ok"
-        print(f"{name:<26}{chem:<6}{mat:<9}{mech:<9}{len(spec['operators']):>4}  {note}")
+        print(f"{name:<28}{chem:<6}{mat:<9}{mech:<9}{('yes' if death else '-'):<7}"
+              f"{len(spec['operators']):>4}  {note}")
     print(f"\n{len(cells)} specs -> {CONFIG}")
     if a.check and bad:
         print(f"{bad} SPEC(S) BROKEN before the GPU")
