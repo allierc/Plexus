@@ -288,7 +288,11 @@ def parents(ctx):
                     rows.append(r)
     # DECLARED IN crew/flow.yaml: how many parents, and what counts as forced.
     p_limit = int(ctx.get("limit") or PARENT_LIMIT)
-    p_ratio = float(ctx.get("forced_p_ratio") or FORCED_P_RATIO)
+    # `or` MEANT THIS COULD NOT BE TURNED OFF FROM THE GRAPH: 0 and null are falsy, so every value
+    # that means "no measured demotion" fell back to 2.0. Read it as a real optional now -- null in
+    # flow.yaml disables the measured proxy and leaves only the structural check.
+    _pr = ctx.get("forced_p_ratio", FORCED_P_RATIO)
+    p_ratio = None if _pr is None else float(_pr)
     forcing = dict(ctx.get("forcing_terms") or FORCING_TERMS)
 
     # A FORCED RUN IS EVIDENCE, NOT A PARENT -- decided by the COMPOSITION, not by a proxy.
@@ -328,7 +332,8 @@ def parents(ctx):
     # P2, P4, P8, P9, P11, P12, P13) is a statement about the tissue.
 
     rows.sort(key=lambda r: (_is_forced(r.get("name"), forcing),
-                             float(r["metrics"].get("mech_p_ratio") or 0) > p_ratio,
+                             (p_ratio is not None
+                              and float(r["metrics"].get("mech_p_ratio") or 0) > p_ratio),
                              -float(r["metrics"].get("grip_peak") or 0),
                              -float(r["metrics"].get("protr_peak") or 0)))
     if not rows:

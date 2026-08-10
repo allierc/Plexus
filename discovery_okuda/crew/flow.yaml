@@ -78,7 +78,19 @@ nodes:
       # evidence -- a composition carrying `extrusion_forcing_3d` is paid to have a
       # protrusion -- so it is a campaign decision, not arithmetic.
       limit: 6
-      forced_p_ratio: 2.0
+      # DISABLED 10 August, and it cost the campaign its best specimen. This is a MEASURED proxy
+      # for forcing -- "a pressure ratio this high means the tube was pushed" -- and it sorted any
+      # run above it dead last, permanently. Measured over r001-r029: 11 runs crossed it and NOT
+      # ONE was ever used as a parent. Among them `r019_07`, protr_peak 1.817 and grip_peak 0.294,
+      # the highest of BOTH in the whole campaign, against a control ceiling of 1.595 / 0.262 that
+      # four rounds could not beat. The loop's best result was structurally unreachable.
+      #
+      # A proxy for forcing is only defensible while forcing is a knob hiding inside a sound
+      # operator. Since the 10 August split it is its own operator, absent from the vocabulary, so
+      # `forcing_terms` below settles the question STRUCTURALLY by reading the spec -- and a
+      # measured stand-in can now only produce false positives, which is exactly what it did.
+      # null = no measured demotion. Set a number to bring it back.
+      forced_p_ratio: null
       forcing_terms: {extrusion_forcing_3d: K_extrude}   # split out 10 Aug; NOT in the vocabulary
       # EVERY ENTRY REBUILDS AND ADMITS. Checked by `round.py --check`, because the first version of
       # this pool did not: two of its six entries were inadmissible and it took a live Proposer call
