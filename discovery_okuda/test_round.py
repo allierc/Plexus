@@ -446,7 +446,12 @@ def test_the_live_flow_loads():
     # THE COUNT IS ASSERTED SO THAT ADDING A NODE IS A DECISION. It went 17 -> 18 when `coverage` was
     # wired in, and the test failing is the point: a flow that grows silently is how the old engine
     # reached 657 lines.
-    check(len(ids) == 18, f"18 nodes: {len(ids)}")
+    # 18 -> 23 on 10 August, and each of the five is named here because that is what makes this a
+    # decision rather than drift: `grounding` (the Grounder was terminal -- it wrote the campaign's
+    # most strategic sentence into a file nothing read), and the four the audit required be visible
+    # as nodes rather than buried in round.py. A flow that grows silently is how the old engine
+    # reached 657 lines; a flow that grows in a commit that says which nodes and why is a design.
+    check(len(ids) == 23, f"23 nodes: {len(ids)}")
     # a topological order: every dep appears before the node that needs it
     emits = {n.get("out", n["id"]): n["id"] for n in order}
     pos = {n["id"]: i for i, n in enumerate(order)}
@@ -662,6 +667,14 @@ def test_round_is_short():
     flow = len(open(os.path.join(HERE, "crew", "flow.yaml")).read().split("\n"))
     print(f"       {a} statements (round + build + crew) vs {OLD_STATEMENTS} in the old round.py -- "
           f"{OLD_STATEMENTS / a:.2f}x smaller, wiring moved out to {flow} lines of yaml")
+    # THE REDUCTION CLAIM NO LONGER HOLDS, and this says so rather than re-basing the number until
+    # it does. Phase 12 replaced a 1,099-statement engine with a 1,099-statement-or-fewer one; the
+    # 10 August audit fixes -- portfolio parent selection, the replicate budget, the grounding node,
+    # the agent-input check that catches a declared edge no role reads -- put it at ~1,400. That is
+    # a 27% overshoot of the budget the reduction was justified by, and it is real debt: most of it
+    # is policy that should end up in flow.yaml, and some of it is comment. Left as a FAILING check
+    # on purpose. Re-basing a ratchet to whatever the code currently is turns it into a thermometer
+    # that always reads room temperature.
     check(a < OLD_STATEMENTS, f"smaller than what it replaced ({a} vs {OLD_STATEMENTS}), with "
                               f"build.py's 286 ported lines counted on the new side")
 

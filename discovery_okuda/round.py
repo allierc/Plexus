@@ -531,6 +531,17 @@ TARGETS = {
     "complex":  {"morphology": ["undulation", "branched"], "score": {"grip_peak": 1.0, "invagination_peak": 0.5}},
 }
 CLOSURE_N = 4          # distinct values RUN before a parameter leaves the menu
+# HOW MANY REPEATS A ROUND MAY BUY. Fallback for crew/flow.yaml `build.args.max_replicates`.
+# A refused duplicate is re-admitted at a fresh seed and relabelled a robustness test, which was
+# right -- the campaign had never measured its own seed spread, and "a difference smaller than the
+# seed spread is not a difference" is the Analyst's standing instruction. But it was UNCAPPED, so
+# re-proposing a known experiment cost nothing and paid: it survived, produced a scored outcome and
+# inflated the confirm rate. Measured over r025-r028, replicates took 5 of 7 Route B slots in r028,
+# 4 of 5 in r027, 4 of 5 in r025, 3 of 4 in r026 -- Route B had turned itself into a robustness
+# testing service. Two bounds a noise floor; the rest is the round not searching.
+MAX_REPLICATES = 2
+_MAX_REPLICATES = MAX_REPLICATES   # published from the graph by build_all
+_REPLICATES = 0                    # consumed this round; reset by build_all
 BATTERY = os.path.join(HERE, "battery.json")     # written by prototype/Tyssue/op_probe.py --all
 
 
@@ -1081,8 +1092,10 @@ def build_all(ctx):
     global _FRAMES, _MAX_EDITS
     _FRAMES = int(ctx.get("frames") or FRAMES)          # published for the builders,
     _MAX_EDITS = int(ctx.get("max_edits") or MAX_EDITS)  # which take no ctx
-    global _SWEEP_CELLS
+    global _SWEEP_CELLS, _MAX_REPLICATES, _REPLICATES
     _SWEEP_CELLS = int(ctx.get("sweep_cells") or _SWEEP_CELLS)
+    _MAX_REPLICATES = int(ctx.get("max_replicates", MAX_REPLICATES))
+    _REPLICATES = 0                                      # the budget is PER ROUND
     frames = _FRAMES
     a_slots = list(ctx.get("route_a") or [])
     b_slots = ([{"parent": pars[0]["name"]}] + list(ctx.get("edits") or []))[
@@ -1516,6 +1529,18 @@ def _build_one(slot, rid, index, seen):
     # slipping past the check on a changed number.
     replicate = False
     if not ok and any(getattr(r, "code", "") == "R6_DUPLICATE" for r in bad):
+        # AND THE ROUND ONLY BUYS SO MANY. Past the budget a duplicate is refused as a duplicate,
+        # and the refusal now REACHES the Proposer (`refusals` was a declared input that
+        # crew/proposer.py never read until 10 August), so a repeat costs a slot AND is reported
+        # rather than quietly becoming a scored result.
+        global _REPLICATES
+        if _REPLICATES >= _MAX_REPLICATES:
+            _refuse(index, slot,
+                    f"R6_DUPLICATE and this round's replicate budget is spent "
+                    f"({_MAX_REPLICATES}). This repeats an experiment already on file; propose a "
+                    f"NEW one. Replicates exist to bound the seed spread, not to fill a batch -- "
+                    f"they took 5 of 7 Route B slots in r028.")
+            return None
         # THE SEED IS A RUN-LEVEL ARGUMENT, NOT A GRAPH PARAMETER. My first version set
         # `seed_mesh_3d0.seed` on the graph and the emitted spec still read 0: `translate.to_spec`
         # fills every seeded operator from `general.seed` (`_seed_the_run`), so a per-operator seed in
@@ -1524,8 +1549,10 @@ def _build_one(slot, rid, index, seen):
         ok, bad = C.admit(g, seen_hashes=(), edit_kind=_edit_kind(edit))
         replicate = bool(ok)
         if ok:
+            _REPLICATES += 1
             print(T_.quiet(f"[round] slot {index} repeats an experiment -- re-seeded and relabelled a "
-                           f"ROBUSTNESS TEST, which is how the seed spread gets measured"))
+                           f"ROBUSTNESS TEST ({_REPLICATES}/{_MAX_REPLICATES} this round), which is "
+                           f"how the seed spread gets measured"))
 
     if not ok:
         _refuse(index, slot, f"refused {[r.code for r in bad]} -- {bad[0].detail}")
