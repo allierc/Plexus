@@ -681,26 +681,43 @@ class Grow3DTimer(Grow3D):
         return s_prev * g ** (1.0 / 3.0)
 
 
-@register_operator("rd_interface_tension", set="vertex", kind="lateral", family="mechanics")
-class RDInterfaceTension(Lateral):
-    """The RD-INTERFACE tube mechanism (user hypothesis): a PURSE-STRING line tension on the RED/WHITE
-    interface ring + a NORMAL (outward) EXTRUSION of the red cells. This turns a localized activator disk
-    into a CYLINDER instead of a ball -- the interface cells reorient into the tube neck (holding the
-    diameter), while the red interior is expelled outward (Okuda: constant-diameter tube from a maintained
-    activator spot). Cross-set: reads cell.chem activator, forces on the vertices; EMIT velocity (the engine
-    integrates it alongside shape_energy). K_purse = ring line tension, K_extrude = outward push, a_sw = red
-    threshold. Runs a few bounded-Euler substeps of -grad E per frame, E = K_purse*Sigma_iface l_e - K_extrude*Sigma_red a*r."""
+@register_operator("interface_line_tension_3d", set="vertex", kind="lateral", family="mechanics")
+class InterfaceLineTension3D(Lateral):
+    """A PURSE-STRING line tension on the RED/WHITE activator interface -- and NOTHING ELSE.
+
+    SPLIT FROM `rd_interface_tension` ON 10 AUGUST, and the split is the point. That operator carried
+    two terms under one name:
+
+        E = K_purse * Sigma_iface l_e   -   K_extrude * Sigma_red a*r
+            [___ ordinary physics ___]       [_ the answer written into the objective _]
+
+    The first is a line tension on the interface ring: real vertex-model mechanics, the same kind of
+    term `shape_energy_3d` already charges for, and how a purse-string actually works. The second is
+    an energy that FALLS as red cells move outward -- it does not model a force, it pays the tissue
+    to produce the morphology the campaign is searching for. A run carrying it can only be a control.
+
+    ONE NAME OVER BOTH TERMS COST FOUR ROUNDS. `K_extrude` measured 0.0 in all 78 specs that have
+    ever carried this operator, so nothing the campaign ran was ever forced -- and the Grounder
+    still reported r028 as "the same extrude-forced star for a fourth round", on three runs
+    (`r028_00`, `03`, `06`) whose specs contain no such operator at all. `user_input.md` section 3
+    had already told it to retract exactly that verdict about `r017_07`. A reader who sees a
+    plausible name cannot check a term that is not in front of them, so the terms are now two
+    operators: this one, and `extrusion_forcing_3d` below, which the loop vocabulary does not
+    contain. There is no longer a setting of anything in the search space that pushes.
+
+    Cross-set: reads cell.chem, forces on vertices; EMIT velocity (the engine integrates it beside
+    shape_energy). Bounded-Euler substeps of -grad E."""
     SUPPORTED_DIMS = [3]; EMIT = "velocity"; DIFFERENTIABLE = True
     INPUTS = ["vertex", "cell"]; OUTPUTS = ["vertex"]; READS = ["pos", "chem"]; WRITES = ["pos"]
     MAPS = ["E_srce", "E_trgt", "E_face"]
-    MECHANISM_TAGS = ["interface_tension", "purse_string", "extrusion", "tube", "oriented", "cross_scale"]
-    PARAM_ROLES = {"K_purse": "interface_line_tension", "K_extrude": "normal_extrusion", "a_sw": "red_threshold"}
+    MECHANISM_TAGS = ["interface_tension", "purse_string", "tube", "oriented", "cross_scale"]
+    PARAM_ROLES = {"K_purse": "interface_line_tension", "a_sw": "red_threshold"}
     REFERENCE = "Plexus (this work); purse-string / apical-constriction tubulation after Okuda, S. et al. (2018). Sci. Rep. 8:2386."
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.at = params.get("_at", "vertex"); self.cat = params.get("cell_set", "cell")
-        self.K_purse = float(params.get("K_purse", 1.0)); self.K_extrude = float(params.get("K_extrude", 0.5))
+        self.K_purse = float(params.get("K_purse", 1.0))
         # 0.6, AND IT WAS 1.0 -- A DEFAULT THAT CANNOT FIRE. The gate below is
         # `red = a > a_sw * amax`, so a_sw = 1.0 asks for cells STRICTLY ABOVE the maximum: the
         # empty set, by construction, at every operating point and for every value of K_purse.
@@ -716,7 +733,7 @@ class RDInterfaceTension(Lateral):
         self.cap_frac = float(params.get("cap_frac", 0.10)); self.iters = int(params.get("iters", 4))
 
     def forward(self, H, mask=None):
-        from tyssue_ops3d import face_geometry_3d, ShapeEnergy3D
+        from tyssue_ops3d import ShapeEnergy3D
         vlvl = H.level(self.at); m = getattr(vlvl, "_mesh", None); clvl = H.level(self.cat)
         if m is None or "chem" not in clvl.state_schema:
             return {}
@@ -751,15 +768,80 @@ class RDInterfaceTension(Lateral):
         x0 = vlvl.state[:, px0:px1].detach()
         x = x0[:Nv].clone()
         cap = self.cap_frac * float((x0[et] - x0[es]).norm(dim=-1).mean().clamp(min=1e-3))
-        redpush = (self.K_extrude * a.clamp(min=0.0) * red)                  # per-cell outward magnitude
-        for _ in range(self.iters):                              # DIRECT forces (no autograd): purse-string + extrusion
+        for _ in range(self.iters):              # DIRECT forces (no autograd): the purse-string alone
             force = torch.zeros(Nv, 3, device=dev, dtype=dt)
-            d = x[et] - x[es]; u = d / (d.norm(dim=-1, keepdim=True) + 1e-9)   # PURSE-STRING: interface edge shortens
+            d = x[et] - x[es]; u = d / (d.norm(dim=-1, keepdim=True) + 1e-9)   # interface edge shortens
             f = (self.K_purse * iface)[:, None] * u
             force.index_add_(0, es, f); force.index_add_(0, et, -f)
-            _, _, cen, _ = face_geometry_3d(x, es, et, ef, nF)  # EXTRUSION: red cells pushed radially OUTWARD
+            x = x + (self.eta * force).clamp(-cap, cap)
+        vel = torch.zeros_like(x0)
+        vel[:Nv] = (x - x0[:Nv]) / max(float(getattr(H.config, "dt", 1.0)), 1e-6)
+        occ = vlvl.occ[:, None] if getattr(vlvl, "occ", None) is not None else 1.0
+        return {self.at: vel * occ}
+
+
+@register_operator("extrusion_forcing_3d", set="vertex", kind="lateral", family="mechanics")
+class ExtrusionForcing3D(Lateral):
+    """THE DISQUALIFIED TERM, ON ITS OWN AND UNDER ITS OWN NAME. A run carrying this is a control.
+
+    Split out of `rd_interface_tension` on 10 August. The energy is
+
+        E = - K_extrude * Sigma_red a * r
+
+    -- it FALLS as activator-high cells move outward, so the tissue is paid, per frame, to do the
+    thing the campaign is searching for. That is not a mechanism; it is the answer written into the
+    objective. Growth, division, adhesion and line tension are hypotheses about what cells DO. This
+    is a hypothesis about what the experimenter WANTS, and any protrusion it produces is evidence
+    about the term and not about the tissue.
+
+    IT IS NOT IN THE LOOP VOCABULARY, deliberately -- `composition_space.OPERATORS` does not contain
+    it, so no `add_op` or `set_param` the Proposer can write will reach it. It exists so that the
+    forcing CAN be run when a control genuinely calls for one, and so that running it is an explicit
+    act that the record shows as such. Keeping it inside the tension operator made forcing a
+    parameter of a sound mechanism, which is how "extrude-forced" was reported for four rounds
+    across runs whose K_extrude was 0.0 -- in fact whose specs held no such operator at all.
+
+    Same gate as the tension operator: `red = a > a_sw * amax`, a fraction of the field's own
+    maximum, because a threshold relative to the field cannot be outside the field."""
+    SUPPORTED_DIMS = [3]; EMIT = "velocity"; DIFFERENTIABLE = True
+    INPUTS = ["vertex", "cell"]; OUTPUTS = ["vertex"]; READS = ["pos", "chem"]; WRITES = ["pos"]
+    MAPS = ["E_srce", "E_trgt", "E_face"]
+    MECHANISM_TAGS = ["extrusion", "forcing", "control_only", "disqualified"]
+    PARAM_ROLES = {"K_extrude": "normal_extrusion_forcing", "a_sw": "red_threshold"}
+    REFERENCE = "Plexus (this work) -- a forcing term retained only as an explicit control."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "vertex"); self.cat = params.get("cell_set", "cell")
+        self.K_extrude = float(params.get("K_extrude", 0.5))
+        self.a_sw = float(params.get("a_sw", 0.6)); self.eta = float(params.get("eta", 0.05))
+        self.cap_frac = float(params.get("cap_frac", 0.10)); self.iters = int(params.get("iters", 4))
+
+    def forward(self, H, mask=None):
+        from tyssue_ops3d import face_geometry_3d
+        vlvl = H.level(self.at); m = getattr(vlvl, "_mesh", None); clvl = H.level(self.cat)
+        if m is None or "chem" not in clvl.state_schema:
+            return {}
+        nF = int(m["nF"]); Nv = int(m["Nv"]); dev = vlvl.state.device; dt = vlvl.state.dtype
+        es = torch.as_tensor(m["E_srce"], device=dev, dtype=torch.long)
+        et = torch.as_tensor(m["E_trgt"], device=dev, dtype=torch.long)
+        ef = torch.as_tensor(m["E_face"], device=dev, dtype=torch.long)
+        h0, _ = clvl.state_schema["chem"]
+        a = clvl.state[:nF, h0].detach().to(dev)
+        amax = float(a.max()) if a.numel() else 0.0
+        red = (a > self.a_sw * amax).to(dt) if amax > 0 else torch.zeros_like(a)
+        if float(red.sum()) < 1.0:
+            return {}
+        px0, px1 = vlvl.state_schema["pos"]
+        x0 = vlvl.state[:, px0:px1].detach()
+        x = x0[:Nv].clone()
+        cap = self.cap_frac * float((x0[et] - x0[es]).norm(dim=-1).mean().clamp(min=1e-3))
+        redpush = (self.K_extrude * a.clamp(min=0.0) * red)          # per-cell outward magnitude
+        for _ in range(self.iters):
+            force = torch.zeros(Nv, 3, device=dev, dtype=dt)
+            _, _, cen, _ = face_geometry_3d(x, es, et, ef, nF)
             cdir = cen / (cen.norm(dim=-1, keepdim=True) + 1e-9)
-            force.index_add_(0, es, (redpush[ef])[:, None] * cdir[ef] / 3.0)   # push each cell's src vertices out
+            force.index_add_(0, es, (redpush[ef])[:, None] * cdir[ef] / 3.0)
             x = x + (self.eta * force).clamp(-cap, cap)
         vel = torch.zeros_like(x0)
         vel[:Nv] = (x - x0[:Nv]) / max(float(getattr(H.config, "dt", 1.0)), 1e-6)

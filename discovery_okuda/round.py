@@ -239,7 +239,10 @@ def _exec(node, ctx):
 # ================================================================ the code nodes
 # Each takes the context and returns what its `out:` names. Nothing here judges a result.
 
-FORCING_TERMS = {"rd_interface_tension": "K_extrude"}   # op -> the parameter that writes the answer
+# THE FORCING IS ITS OWN OPERATOR NOW, so this is a check on the OPERATOR SET, not on a parameter
+# buried inside a sound one. `extrusion_forcing_3d` is absent from composition_space, so nothing the
+# loop builds can contain it and this sorts only hand-written controls last.
+FORCING_TERMS = {"extrusion_forcing_3d": "K_extrude"}
 
 
 def _is_forced(name, terms=None):
@@ -291,7 +294,7 @@ def parents(ctx):
     # A FORCED RUN IS EVIDENCE, NOT A PARENT -- decided by the COMPOSITION, not by a proxy.
     #
     # This first used `mech_p_ratio > 2` alone, on the reasoning that ~3 means forced and ~1 means
-    # grown. Measured on the very first round after `rd_interface_tension` was repaired: r001_01
+    # grown. Measured on the very first round after `interface_line_tension_3d` was repaired: r001_01
     # carries `K_extrude: 4.0`, the operator fired 801 times, it reached protr_peak 1.352 with
     # n_tubes 2 -- the first run in the project's history to clear the tube threshold -- and its
     # `mech_p_ratio` read 0.622. The proxy did not fire. It ranked third only because it happened
@@ -1066,7 +1069,7 @@ def _resolve_edit(g, edit):
 
     THE SILENT NO-OP THIS CLOSES. `CompositionGraph.apply` implements set_param as
     `g.params[edit[1]] = edit[2]` with no validation, so a target naming an operator instead of a NODE
-    -- `rd_interface_tension.K_purse` rather than `rd_interface_tension0.K_purse` -- writes a key no
+    -- `interface_line_tension_3d.K_purse` rather than `interface_line_tension_3d0.K_purse` -- writes a key no
     operator reads. The run then executes with the parent's value, is recorded as an experiment, and
     scores as one. The live Proposer wrote exactly that form on its first real call and `build`
     admitted all six slots; those seven runs would have been silent copies of their parent.
