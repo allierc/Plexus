@@ -209,10 +209,13 @@ F11& the lean configuration reproduces its control & $<1\%$, impact $\le2$ frame
 F12& $u(r)$ around a growing inclusion & network $r^{-0.5..-1}$, continuum $r^{-2}$ &
      \fail{shell's $C_1r+C_2/r^2$}, $R^2$ $0.94$--$0.999$\\
 F13& reorientation beyond its own affine control & any excess & $0.2725$ vs \fail{0.2714} affine\\
-F14& stiffening: tangent at $20\%$ over $5\%$ & network $10$--$100$, this law $\sim\!1$ &
-     \op{02i} built, open\\
-F15& residual strain after unloading & $<0.02$ for an elastic solid & \op{02i}, open\\
-F16& effective Poisson ratio & solid $0.15$--$0.30$, network $0$--$0.1$ & \op{02i}, open\\
+F14& stiffening: tangent at high strain over low, BOTH past the toe & network $10$--$100$, this
+     law $\sim\!1$ & \pass{1.13} ($17.0\to19.2$, at $11.2\%$ and $15.7\%$)\\
+F15& residual strain after unloading & $<0.02$ for an elastic solid & \pass{0.0085}\\
+F16& effective Poisson ratio & solid $0.15$--$0.30$, network $0$--$0.1$ & \pass{0.216}, against the
+     Lam\'e pair's own $0.20$\\
+F16b& the toe is porosity, not fibres straightening & reported, not tuned away &
+     \pass{9.2\%} strain before the block carries $5\%$ of its load\\
 \multicolumn{4}{@{}l}{\textit{the stress field is the matrix's, not the picture's} (\op{04}, \op{04d},
 \op{04e})}\\
 F17& the radial stress profile reproduces across independent runs & mean band per shell within
@@ -238,7 +241,29 @@ material --- which is why F17 compares the radial \emph{profile} across runs rat
 appearance, and why two runs differing in friction and in frame count agree on it to within one part
 in fifty while looking different on screen.
 
-\textbf{F14--F16 are open, and the reason is worth recording.} \op{test\_02i\_compress.py} presses the
+\textbf{F14--F16 are the three falsifiers, and all three return the isotropic solid's answer.}
+The sharpest is F16: compressed axially, the block \emph{bulges} at $\nu_{\rm eff}=0.216$ against the
+$0.20$ of its own Lam\'e pair, where a fibre network densifies at $0$--$0.1$. It returns what it was
+given (F15), and past the toe its tangent modulus rises by $1.13\times$ between $11.2\%$ and $15.7\%$
+strain where a network rises by one to two orders (F14). The strands are an arrangement of the mass;
+the mass is an isotropic solid.
+
+\textbf{The toe is the one thing that LOOKS like a network and is not.} The block carries no load
+until $9.2\%$ strain, which is the same qualitative signature as a bending-dominated network
+straightening --- and here it is the seeding's porosity closing, because a random strand fill has gaps.
+The two are told apart by F16, not by the toe: consolidating porosity and straightening fibres both
+give a toe, and only one of them densifies instead of bulging. Both tangents in F14 are therefore
+taken past it; placed at $5\%$, inside the toe, the ratio is a ratio to zero and came back at $-562$.
+
+\textbf{Three measurement defects were found on the way, and each is the kind that reads as physics.}
+The plate was handed a displacement-per-step where the grid wanted a velocity, a factor of
+$1/\Delta t=2500$: the plate swept THROUGH the block, leaving $2{,}748$ particles above it, while the
+only thing bringing the top down was a safety clamp two cells behind it --- a positional update, so
+$J$ stayed at $0.99998$ through the whole press while the height statistic fell $10.7\%$. That is run
+130's laundering wearing a percentile. The load was then read in a slab under the MOVING plate, whose
+population changes as material extrudes past it, so the reported stress fell while the strain rose;
+it is read at the fixed floor instead. And the Poisson ratio carried a sign error that reported a
+healthy bulging solid as auxetic at $-0.216$. \op{test\_02i\_compress.py} presses the
 block between two plates and releases it, which is the cheapest of the three falsifying loadings. Its
 first version committed, inside the rig, exactly the defect this project documents everywhere else: it
 clamped the particles between the plates, which moves them without the grid seeing it, so $\mathbf F$

@@ -125,13 +125,17 @@ class Press:
         """Down at a constant rate to `strain`, then up at the same rate. The release matters: the
         residual strain after unloading is the plasticity, and a run that only compresses cannot
         report it."""
-        if t < n_load:
-            self.plate_v = -self.rate
-        elif t < 2 * n_load:
-            self.plate_v = +self.rate
-        else:
-            self.plate_v = 0.0
-        self.z_hi += self.plate_v                                   # per FRAME, not per dt
+        # A DISPLACEMENT PER STEP AND A VELOCITY ARE NOT THE SAME NUMBER, and using one as the other
+        # is a factor of 1/dt = 2500 here. `rate` is how far the plate moves per step; the GRID needs
+        # the speed that produces it, rate/dt. Handed `rate` directly, the constraint moved the
+        # material at 8e-8 per step while the plate moved 2e-4 -- so the plate swept THROUGH the
+        # block, leaving 2,748 particles above it by the end, and the only thing bringing the top of
+        # the block down was the safety clamp two cells behind the plate. That clamp is a positional
+        # update, so it carries no deformation: J stayed at 0.99998 through the whole press while the
+        # height statistic fell 10.7%, which is the laundering of run 130 wearing a percentile.
+        sgn = -1.0 if t < n_load else (+1.0 if t < 2 * n_load else 0.0)
+        self.plate_v = sgn * self.rate / self.dt                    # velocity, box units per second
+        self.z_hi += sgn * self.rate                                # displacement, per step
         return self.z_hi
 
     def step(self):
@@ -191,7 +195,12 @@ class Press:
         h = float(torch.quantile(z, self.QH) - torch.quantile(z, self.QL))
         self.res["h"].append(h)
         self.res["strain"].append(1.0 - h / self.h0)
-        near = z > (self.z_hi - 3 * self.dx)
+        # THE LOAD IS READ AT THE FIXED BOUNDARY, NOT UNDER THE MOVING ONE. Sampling a slab three
+        # cells under the plate means sampling a window whose population changes as the plate
+        # descends and as material extrudes past it, so the reported stress fell while the strain
+        # rose and the tangent at high strain came back NEGATIVE. The floor does not move and
+        # nothing leaves through it, so the traction there is the load the block is carrying.
+        near = z < (self.z_lo + 3 * self.dx)
         self.res["stress"].append(float(-sig[near, 2, 2].mean()) if bool(near.any()) else 0.0)
         w_xy = 0.5 * (float(torch.quantile(self.x[:, 0], self.QH)
                             - torch.quantile(self.x[:, 0], self.QL))
@@ -238,20 +247,37 @@ def main():
             return float("nan")
         return float(np.polyfit(e[load][m], s[load][m], 1)[0])
 
-    t5, t20 = tangent(0.05), tangent(max(0.18, e[load].max() - 0.02))
+    # THE HIGH-STRAIN WINDOW IS RELATIVE TO THE STRAIN REACHED, not to the strain asked for. The
+    # plate travels 20% but the block compresses 17.6% -- the rest is material extending past the
+    # plate -- so a window pinned at 0.18 sat beyond the data and fitted its last few points.
+    e_hi = float(e[load].max())
+    # THE TOE IS NOT THE MATERIAL, so neither tangent may be taken inside it. A random strand fill
+    # is porous: the first several per cent of "strain" is the loose arrangement consolidating, and
+    # the block carries no load at all until it is closed. Measured here, the stress is under 1% of
+    # its maximum up to 7.4% strain. A tangent at 5% is therefore a tangent to nothing, which is
+    # what returned a stiffening ratio of -562. The low window is placed at the END of the toe --
+    # the first strain at which the stress passes 5% of its maximum -- and the high window near the
+    # strain actually reached, so both are on the material.
+    smax = float(s[load].max())
+    toe = float(e[load][np.argmax(s[load] > 0.05 * smax)]) if smax > 0 else float("nan")
+    t5, t20 = tangent(toe + 0.02, half=0.015), tangent(e_hi - 0.02, half=0.015)
     # Poisson: transverse strain over axial strain, over the loading branch
     ok = (e[load] > 0.03) & (e[load] < e[load].max() - 0.01)
-    nu_eff = float(-np.polyfit(e[load][ok], (w[load][ok] / w[0] - 1.0), 1)[0]) if ok.sum() > 8 \
+    # SIGN. `e` is a COMPRESSIVE strain and is positive, so the axial strain is -e; the transverse
+    # strain is +(w/w0 - 1) when the block bulges. nu = -eps_trans/eps_axial is then +d(w/w0)/de, and
+    # the extra minus sign reported a healthy bulging solid as auxetic at -0.216.
+    nu_eff = float(np.polyfit(e[load][ok], (w[load][ok] / w[0] - 1.0), 1)[0]) if ok.sum() > 8 \
         else float("nan")
     resid = float(1.0 - h[-1] / rig.h0)
     m = dict(
         particles=rig.N, n_fibres=rig.n_fibres, frames=frames, n_load=n_load,
         h0=rig.h0, strain_max=float(e.max()), drag=rig.drag, dt=rig.dt,
-        tangent_at_5pc=t5, tangent_at_20pc=t20,
+        tangent_low=t5, tangent_high=t20, toe_strain=toe, stress_max=float(s[load].max()),
         gates=dict(
             G_stiffening_ratio=dict(
                 threshold="order 1 for this law; a fibre network gives 10-100",
                 measured=float(t20 / t5) if t5 and np.isfinite(t5) else float("nan"),
+                at_strain=[float(toe + 0.02), float(e_hi - 0.02)],
                 why="the constitutive law reads the strand direction nowhere, so it cannot stiffen "
                     "by straightening"),
             G_residual_strain=dict(
