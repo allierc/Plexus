@@ -618,6 +618,37 @@ SERIES = {
                                    membrane_offset=0.0417, membrane_secrete_rate=0.0,
                                    membrane_tau=0.0, membrane_reserve=0.0),
 
+    # 146/147: WHY 144 ONLY DRAGGED THE SHEET A THIRD OF THE WAY, and the two knobs that could fix it.
+    #     With the cell ends carrying momentum the fibres pull -- outer ends 0.0875 -> 0.1167 against
+    #     142's 0.0875 -> 0.0875, geometric stretch 0.34 against 0.00 -- but the surface went to 0.2973
+    #     and the sheet reached 0.1167, so the coupling is weak and the sheet tore doing it (fine
+    #     coverage 0.471 against 0.948).
+    #
+    #     THE ARITHMETIC OF THE COUPLING. A prescribed particle reaches another body only through the
+    #     grid node it shares, whose velocity is the MASS-WEIGHTED mean of everything in the cell. At the
+    #     end of the run the surface shell is ~2,600 cells: 45,000 sheet particles is 17 per cell, and
+    #     4,000 prescribed cell ends is 1.5 per cell, so the thing doing the pulling carries about 9% of
+    #     the mass in its own cell. Two ways out, one per run:
+    #       146  a STIFFER fibre -- transmission by stress rather than by inertia, which is the honest
+    #            one: the scatter's stress term is (4*inv_dx^2*dt*vol)*P, so E is what sets how hard a
+    #            stretched fibre pulls. Capped by the CFL: c = sqrt(E/rho) and dt_sub*c < dx gives
+    #            E < 1.1e4 at rho = 1, so 4,000 sits at 0.60 of the limit.
+    #       147  MORE fibres -- 20,000 instead of 4,000, i.e. 7.7 prescribed ends per cell instead of
+    #            1.5. Also the direct test of whether the tearing is the sheet being pulled by too few
+    #            discrete points.
+    "146_mpm_integrin_stiff": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=False,
+                                   membrane_contact_k=0.0, membrane_exclude=False,
+                                   membrane_adhesion=0.0, n_integrins=4000, integrin_layers=3,
+                                   integrin_length=0.004, integrin_youngs=4000.0,
+                                   membrane_offset=0.004, membrane_secrete_rate=0.0,
+                                   membrane_tau=0.0, membrane_reserve=0.0),
+    "147_mpm_integrin_dense": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=False,
+                                   membrane_contact_k=0.0, membrane_exclude=False,
+                                   membrane_adhesion=0.0, n_integrins=20000, integrin_layers=3,
+                                   integrin_length=0.004, integrin_youngs=400.0,
+                                   membrane_offset=0.004, membrane_secrete_rate=0.0,
+                                   membrane_tau=0.0, membrane_reserve=0.0),
+
     "_unused_secrete_dense": dict(membrane_springs=False, membrane_impl="mpm", membrane_grid_bc=True,
                              membrane_exclude=False, membrane_adhesion=0.0, membrane_tau=0.0,
                              membrane_particles=90000, membrane_reserve=1.0,

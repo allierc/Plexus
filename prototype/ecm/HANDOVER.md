@@ -49,6 +49,33 @@ specs and the engine, and did not survive.
   integer pairs a membrane at frame 402 with an epithelium at 201. `rerender()` in `run_ecm.py` still
   does this.
 
+## The MPM integrin, 142-147: two bugs, then a weak coupling
+
+Built as `integrin_ops.py` (`integrin_seed` + `integrin_track`, the fibre's own MPM cycle on the shared
+grid, no `integrin_adhesion` at all). What it has taught, in order:
+
+1. **A prescribed particle must carry VELOCITY, not just position.** 142 (L = 0.004) and 143
+   (L = 2*dx = 0.0417) were exact nulls -- fibre cell ends tracked the surface to 0.2969 against
+   0.2973, outer ends unmoved to one part in ten thousand, sheet strain 1.4e-8, the membrane sitting at
+   its seed radius for 402 frames while the epithelium tripled around it. `integrin_track` was setting
+   a position and zeroing the velocity, and in MPM a particle reaches its neighbours ONLY through
+   `mpm_scatter`, which puts `mass * velocity` on the grid: a teleported particle declared at rest
+   scatters nothing. The flat rig could not have caught this -- `FibreRig`'s prescribed row is static
+   and the load is applied to the sheet, the opposite direction of causation.
+2. **Fixed, the fibres pull -- but only a third of the way.** 144 carries dR/dt on the cell ends:
+   outer ends 0.0875 -> 0.1167 (142: 0.0875), geometric stretch 0.34 (142: 0.00). The sheet tore doing
+   it, fine coverage 0.471 against 0.948, and its radial spread p5..p95 is 0.14 box units -- seven grid
+   cells, so it is a cloud rather than a sheet.
+3. **The coupling's strength is a mass fraction, and that is the whole of it.** A prescribed particle
+   reaches another body through the grid node they share, whose velocity is the MASS-WEIGHTED mean of
+   what is in the cell. At the end of the run the surface shell is ~2,600 cells: 45,000 sheet particles
+   is 17 per cell against 4,000 prescribed cell ends at 1.5, so the puller carries ~9% of the mass it
+   is trying to move. 146 (stiffer fibre, E 400 -> 4,000, transmission by stress) and 147 (20,000
+   fibres, 7.7 ends per cell) are the two ways out, one per run.
+4. **The flat rig's resolution result stands but does not bind here.** L/dx = 0.2 vs 2.0 changed
+   nothing in 142/143 because the velocity bug dominated both; particles per fibre (1/3/6/10) is
+   measurably NOT the axis -- identical to four digits at both lengths.
+
 ## 130 IS THE NOMINAL from 2026-08-09
 
 `130_direct_r125_fixed` replaces `91_gridbc_band` as the run everything else is compared against: it is
