@@ -360,7 +360,13 @@ class CellToECMSphere(Lateral):
     MECHANISM_TAGS = ["cell_matrix_contact", "moving_boundary", "confinement"]
     PARAM_ROLES = {"k": "contact_stiffness", "r0": "initial_radius", "growth": "growth_rate",
                    "r_max": "final_radius", "damp": "contact_damping"}
-    REFERENCE = "Okuda, S. et al. (2018) Sci. Rep. 8:2386 (the vesicle this stands in for)."
+    REFERENCE = ("Okuda, S. et al. (2018) Sci. Rep. 8:2386 (the vesicle this stands in for). The "
+                 "penalty on penetration depth is the normal half of the particle-to-surface "
+                 "contact of Chen, Z., Qiu, X., Zhang, X. & Lian, Y. (2015) Comput. Methods Appl. "
+                 "Mech. Engrg. 293:1-19 (ICFEMP), doi:10.1016/j.cma.2015.04.005 -- with the "
+                 "surface analytic and PRESCRIBED, so unlike ICFEMP no reaction is returned to it "
+                 "and momentum is not conserved across the interface. `mesh_contact` is the "
+                 "two-way form.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -559,7 +565,12 @@ class CellToECMReplay(Lateral):
     REQUIRES_PARAMS = ["k", "surface"]
     MECHANISM_TAGS = ["cell_matrix_contact", "moving_boundary", "recorded_tissue"]
     PARAM_ROLES = {"k": "contact_stiffness", "scale": "surface_rescale"}
-    REFERENCE = "Okuda, S. et al. (2018) Sci. Rep. 8:2386."
+    REFERENCE = ("Okuda, S. et al. (2018) Sci. Rep. 8:2386 (the tissue being replayed). The "
+                 "contact is the penalty half of Chen, Z., Qiu, X., Zhang, X. & Lian, Y. (2015) "
+                 "Comput. Methods Appl. Mech. Engrg. 293:1-19 (ICFEMP), "
+                 "doi:10.1016/j.cma.2015.04.005, against a RECORDED surface: the reaction has "
+                 "nowhere to go, so this is one-way by construction. `mesh_contact` returns it to "
+                 "the vertices and is the operator to use where the tissue must feel the matrix.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
@@ -660,7 +671,13 @@ class CellExclude3D(Structural):
     MAY_MUTATE_INTEGRATED_STATE = True
     MECHANISM_TAGS = ["non_penetration", "rigid_contact", "moving_boundary"]
     PARAM_ROLES = {"skin": "projection_skin_fraction", "scale": "surface_rescale"}
-    REFERENCE = "Plexus (this work); the surface is Okuda, S. et al. (2018) Sci. Rep. 8:2386."
+    REFERENCE = ("Plexus (this work); the surface is Okuda, S. et al. (2018) Sci. Rep. 8:2386. It "
+                 "backs up the penalty contact of Chen, Z., Qiu, X., Zhang, X. & Lian, Y. (2015) "
+                 "Comput. Methods Appl. Mech. Engrg. 293:1-19, doi:10.1016/j.cma.2015.04.005, "
+                 "whose own reported weakness is exactly this one -- penetration through a "
+                 "severely deformed contact surface. Forbidding it outright instead of projecting "
+                 "afterwards is BFEMP (Li, X., Fang, Y., Li, M. & Jiang, C. (2022) CMAME 390:114350, "
+                 "doi:10.1016/j.cma.2021.114350), at the cost of an implicit solve.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
