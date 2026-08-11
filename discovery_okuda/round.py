@@ -1911,6 +1911,28 @@ def score(ctx):
             outcome, why = PR.score(s["predict"], m)
         except Exception as e:
             outcome, why = "inconclusive", f"unscorable: {e}"
+        # AN INERT OPERATOR CANNOT REFUTE ITS OWN MECHANISM. `inert_operators` has been measured
+        # and recorded on every run since the instrument existed, and nothing downstream read it:
+        # a slot editing an operator that did nothing was scored `refuted` like any other, so the
+        # campaign recorded "this mechanism does not produce the effect" when the truth was "this
+        # operating point does not reach the mechanism".
+        #
+        # The two are different evidence and only one is about biology. Measured cost: at least 13
+        # of the previous campaign's 84 refutations were of `shape_to_chem` edits that never
+        # changed the run by a bit, and `rd_interface_tension` was written off twice without ever
+        # having fired. INCONCLUSIVE is the honest verdict and it is also the useful one -- it
+        # leaves the hypothesis open and tells the Proposer to move the operating point rather
+        # than abandon the mechanism.
+        inert = set(m.get("inert_operators") or [])
+        edit = s.get("edit") or []
+        target = ""
+        if isinstance(edit, (list, tuple)) and len(edit) > 1 and isinstance(edit[1], str):
+            target = edit[1].split(".")[0].rstrip("0123456789")
+        if target and target in inert and outcome == "refuted":
+            outcome = "inconclusive"
+            why = (f"INERT: `{target}` did nothing on this run, so the prediction failing says "
+                   f"nothing about the mechanism -- only that this operating point does not "
+                   f"reach it. Original scoring: {why}")
         # THE SPECIMEN VERDICT TRAVELS WITH THE OUTCOME -- the whole of what the audit asked for. Its
         # finding was that the register said `confirmed` while the analysis said "specimen invalid"
         # about the same run: two records disagreeing. The fix is to write the verdict beside the
