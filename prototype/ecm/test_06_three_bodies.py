@@ -111,14 +111,22 @@ class VertexPlaques:
 
     def __init__(self, node, vert, l0, kn, xi):
         self.node, self.vert = node, vert
-        self.l0, self.kn, self.xi = float(l0), float(kn), float(xi)
+        # l0 IS PER PLAQUE, and that is what keeps the sheet's mesh intact. Forcing every bond to a
+        # single rest length means moving the node onto its partner's ray -- and with 396 partners
+        # scattered among 2,562 nodes, a moved node between two unmoved ones is a sliver: 05j
+        # measured the worst triangle quality at 0.019 AT FRAME 0, before any dynamics, and no
+        # substep size or refinement can recover from that. A bond that simply remembers the length
+        # it formed at leaves the geometry alone and starts at zero force just the same.
+        self.l0 = l0 if torch.is_tensor(l0) else torch.as_tensor(float(l0))
+        self.kn, self.xi = float(kn), float(xi)
 
     def geometry(self, x_bm, x_ep, v_ep):
         p = x_ep[self.vert]
         d = x_bm[self.node] - p
         ell = d.norm(dim=1).clamp_min(1e-12)
         nh = d / ell[:, None]
-        f_n = -self.kn * (ell - self.l0)[:, None] * nh          # on the SHEET node
+        l0 = self.l0.to(ell.device, ell.dtype) if self.l0.ndim else self.l0
+        f_n = -self.kn * (ell - l0)[:, None] * nh               # on the SHEET node
         return p, nh, ell, v_ep[self.vert], f_n
 
     def retarget(self, x_bm, x_ep, centre, target, frac, gen):
@@ -144,6 +152,8 @@ class VertexPlaques:
         if n_rel:
             k = torch.randperm(self.node.shape[0], generator=gen)[:n_rel].to(x_ep.device)
             self.vert[k] = (ub[self.node[k]] @ ue.T).argmax(dim=1)
+            if self.l0.ndim:            # a re-formed bond takes the length it re-forms AT
+                self.l0[k] = (x_bm[self.node[k]] - x_ep[self.vert[k]]).norm(dim=1)
         # grow: vertices no bond has claimed can take one, up to the target
         room = int(target) - int(self.node.shape[0])
         if room > 0:
@@ -152,8 +162,7 @@ class VertexPlaques:
             free_v = torch.nonzero(~claimed, as_tuple=False).flatten()
             if free_v.numel():
                 add = free_v[: min(room, free_v.numel())]
-                self.node = torch.cat([self.node, (ue[add] @ ub.T).argmax(dim=1)])
-                self.vert = torch.cat([self.vert, add])
+
         return int(self.node.shape[0]), int(n_rel)
 
     def scatter(self, f, x_bm, x_ep):
@@ -328,8 +337,6 @@ def main():
     # leaves every plaque stretched by ten rest lengths before the clock starts. Measured that way:
     # lam_geo 3.34 and slip 11.3 um at frame 0.
     x0 = c + ub * (R_bm + l0)[:, None]
-    u_v = torch.nn.functional.normalize(x_ep0[vert] - c, dim=1)
-    x0[node] = x_ep0[vert] + l0 * u_v
     # the sheet, on that radius field, and the plaque indices moved into the sheet's own numbering
     sheet = BM.Sheet(subdiv=subdiv, R0=1.0, E=arg("--E", 400.0, float),
                      thickness=0.1 / BOX_UM, nu=0.3, tau_r=arg("--tau-r", 25.0, float),
@@ -337,7 +344,13 @@ def main():
                      dev=dev, dtype=torch.float64)
     sheet.reseed(x0)
     node = sheet.live_nodes[node]
-    plq = VertexPlaques(node, vert, l0, kn=arg("--kn", 2.0e4, float), xi=arg("--xi", 0.0, float))
+    l0_vec = (sheet.x[node] - x_ep0[vert]).norm(dim=1).clone()
+    plq = VertexPlaques(node, vert, l0_vec, kn=arg("--kn", 2.0e4, float),
+                        xi=arg("--xi", 0.0, float))
+    print(f"[06] plaque rest lengths {float(l0_vec.min()) * BOX_UM:.2f} to "
+          f"{float(l0_vec.max()) * BOX_UM:.2f} um, mean {float(l0_vec.mean()) * BOX_UM:.2f} -- the "
+          f"spread is the angular offset between a node and its partner, carried by the BOND "
+          f"instead of by the mesh", flush=True)
     lam, pv = sheet.spectral_rate(return_vec=True)
     zeta = arg("--zeta", 20.0, float)
     s_target = arg("--s-target", 1.0, float)
@@ -404,7 +417,7 @@ def main():
         cross = inside.clamp_min(0.0)
         l1, _ = sheet.stretch_geo(); e1, _ = sheet.stretch_elastic()
         rec["frame"].append(int(t)); rec["momentum"].append(mom)
-        rec["standoff"].append(float((ell.mean() - plq.l0) * BOX_UM))
+        rec["standoff"].append(float((ell - plq.l0.to(ell.device, ell.dtype)).mean() * BOX_UM))
         rec["lam_geo"].append(float(l1.mean())); rec["lam_el"].append(float(e1.mean()))
         rec["R_bm"].append(float(rbm.mean())); rec["R_ep"].append(float((x_ep - c).norm(dim=1).mean()))
         rec["n_sub"].append(n_sub)
