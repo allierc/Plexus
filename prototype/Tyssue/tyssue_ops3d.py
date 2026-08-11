@@ -1212,9 +1212,36 @@ class Apoptosis3D(Structural):
                     # which is what happened before conservation existed and is the honest
                     # alternative to inventing somewhere to put it
                     continue
+                # AND THE BEQUEST MUST LEAVE THE RECIPIENT INSIDE THE INTEGRATOR'S BASIN.
+                # Conservation is correct as conservation and unbounded as CONCENTRATION: the
+                # increment is share/V_g, and Gray-Scott integrates stably only while its
+                # activator stays in the region its own kinetics bound. A bequest that pushes a
+                # neighbour outside it diverges under explicit Euler, and the divergence is not
+                # gentle -- measured on tsd_cap10 and tsd_cap25, act_mean_floor reached -7.29e11
+                # and -2.42e23 before going NaN at frame 1430, while tsd_cap10_fast with FIVE
+                # TIMES the deaths stayed clean at 0.0465. The amount of death is not the
+                # variable; the two failing runs are the SLOW ones (shrink 0.05 against 0.15), so
+                # cells linger near the extrusion threshold and their neighbours receive many
+                # small bequests instead of few.
+                #
+                # `ceil` is the field's own running maximum, which is the only scale available
+                # that the chemistry itself sets -- the same argument that makes a_sw a fraction
+                # rather than an absolute. Material that cannot be placed without leaving the
+                # basin is DROPPED AND COUNTED, never silently injected: a conservation law that
+                # is quietly violated is worse than one that reports where it failed, because the
+                # first is indistinguishable from a working one.
                 share = amt / float(len(live))
+                ceil = float(np.nanmax(cs[:nF, h0:h1])) if nF else 0.0
                 for g in live:
-                    cs[g, h0:h1] += share / float(V0f[g])
+                    inc = share / float(V0f[g])
+                    room = ceil - float(cs[g, h0])
+                    if inc > room > 0:
+                        m["apop_spill"] = m.get("apop_spill", 0.0) + (inc - room) * float(V0f[g])
+                        inc = room
+                    elif room <= 0:
+                        m["apop_spill"] = m.get("apop_spill", 0.0) + inc * float(V0f[g])
+                        continue
+                    cs[g, h0:h1] += inc
             clvl_c.state = cs
         # 3. REBUILD, exactly as divide_3d does: `keep` maps new face -> old face and carries every
         #    per-face array across, so nothing can fall out of step with the mesh.
