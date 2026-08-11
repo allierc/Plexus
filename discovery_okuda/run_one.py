@@ -878,36 +878,24 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     # went unnoticed for a whole series.
     summary["apop_spill"] = float(hist[-1].get("apop_spill") or 0.0) if hist else 0.0
 
-    # A METRIC COMPUTED ON A DEAD FIELD IS UNDEFINED, NOT ZERO -- and the difference is the whole
-    # of gate G16. Species B's activator ended at 0.0 and `n_spots_final` came back 1, against
-    # species A's 2. Read as a number that is "fewer spots", which is what the design predicted;
-    # read honestly it is "no spots", which is the opposite finding. The same number, two contrary
-    # meanings, and nothing in the record could tell them apart.
+    # UNDEFINED IS NOT ZERO, AND THE CONDITION IS DECLARED BY THE METRIC. This used to be a
+    # hardcoded list of activator-derived names here, which is the same defect one level up: a rule
+    # about a metric, kept somewhere the metric cannot see. `metrics.undefined_in` evaluates each
+    # metric's own `requires` predicate against this summary, so a metric declines by being ABSENT
+    # rather than by reporting a misleading number, and adding a metric cannot forget to do it.
     #
-    # So every quantity DERIVED FROM THE ACTIVATOR is set to None when the activator is extinct,
-    # and the names are listed. None already reads downstream as "absent"; the list says WHY it is
-    # absent, which is what lets the loop treat it as a missing measurement rather than a poor
-    # result. A zero that means "not measurable" is the most expensive kind of number a campaign
-    # can carry, because it is indistinguishable from evidence.
-    _ACT_DERIVED = ("n_spots", "spot_spacing_cells", "spot_frac", "spot_cells_max",
-                    "spot_cells_med", "grip", "corr_act_rad", "act_cv", "act_at_tip",
-                    "red_frac", "red_at_tip", "autocorr_hops_uncalibrated")
-    _amax = summary.get("act_max_peak")
-    if isinstance(_amax, (int, float)) and _amax <= 1e-6:
-        killed = []
-        for k in list(summary):
-            stem = k.rsplit("_", 1)[0] if "_" in k else k
-            if stem in _ACT_DERIVED or k in _ACT_DERIVED:
-                if summary[k] is not None:
-                    summary[k] = None
-                    killed.append(k)
-        summary["undefined_metrics"] = sorted(killed)
-        summary["undefined_why"] = (f"the activator never rose above {_amax:.3g}: every quantity "
-                                    f"derived from it is undefined on this run, not zero")
-        print(f"[{name}] ⚠ activator extinct (peak {_amax:.3g}) -- {len(killed)} derived "
-              f"metric(s) set to UNDEFINED rather than reported as numbers", flush=True)
-    else:
-        summary["undefined_metrics"] = []
+    # None rather than 0 is the load-bearing choice: `None > 1.3` raises and predict.score turns
+    # that into `inconclusive`, while `0 > 1.3` is silently False and scores REFUTED. The language
+    # refuses the conclusion for us, but only if we never write the zero.
+    import metrics as _M
+    _undef = _M.undefined_in(summary)
+    for _k in _undef:
+        summary[_k] = None
+    summary["undefined_metrics"] = sorted(_undef)
+    if _undef:
+        summary["undefined_why"] = "; ".join(sorted(set(_undef.values())))
+        print(f"[{name}] ⚠ {len(_undef)} metric(s) UNDEFINED on this run (not zero): "
+              f"{', '.join(sorted(_undef))}", flush=True)
     if summary["buf_full"] or summary["div_blocked"]:
         print(f"[{name}] RESERVOIR FULL at {summary.get('n_cells_final')} cells "
               f"(first refused division at frame {summary.get('div_blocked_first_frame')}) -- "

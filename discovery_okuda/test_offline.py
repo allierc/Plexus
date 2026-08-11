@@ -972,6 +972,19 @@ def t_metrics_have_declared_producers():
     check(not missing, f"producers that do not exist: {missing}")
     check(not unset, f"declared producers that never set their key: {unset}")
 
+    # A DECLARED CONDITION MUST BE EXECUTABLE. `conditional` is prose and `requires` is a
+    # predicate, and the whole of gate G16 is that prose does not run: metrics declared "refused
+    # on a dead field" and still reported numbers on a dead field, and `n_spots` returned 1 for a
+    # species whose activator peaked at 0.0 -- which reads as "fewer spots" and means "no spots".
+    # Most metrics legitimately have neither; one that states a condition in English and not in
+    # Python is asserting a guarantee nothing keeps.
+    print("\na declared condition must be executable, not prose")
+    prose_only = [m.name for m in MX.all_metrics() if m.conditional and not (m.requires or m.self_declining)]
+    check(not prose_only,
+          ("every metric with a `conditional` also has an executable `requires`" if not prose_only
+           else f"{len(prose_only)} declare a condition that is neither self-declining nor a predicate: "
+                f"{', '.join(prose_only[:8])}"))
+
 
 if __name__ == "__main__":
     print(f"offline regression -- {len(CASES)} case(s), no agent, no GPU\n")
