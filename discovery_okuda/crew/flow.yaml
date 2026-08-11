@@ -112,19 +112,35 @@ nodes:
         # portfolio silently became the greedy ranking it was written to replace. `where` is a floor
         # on what was measured; `morphology` may still be added as an extra filter when the label is
         # trusted.
+        # _final, NOT _peak -- the campaign proved its own instrument blind. Standing law L3,
+        # r001-r006: "protrusion_aspect_max_peak and n_tubes do NOT discriminate a finger from a
+        # lobe" -- every high-aspect run (7.742, 5.909, 5.578) reads as a lobe or pointed star by
+        # the eye, with aspect_FINAL 0 and n_tips 0. A peak is a transient bulge on the way to
+        # somewhere; a value that survives to the last frame is a structure. Measured over 81
+        # scored runs, aspect_final is nonzero in TWO of them -- r004_06 at 2.207, the campaign's
+        # one run the classifier called `tube`, and r006_08 at 0.414. The threshold is 0.4 rather
+        # than 2.0 because "a protrusion still there at the end" is the claim; 2.0 would be a seat
+        # that has matched one run in ninety-four.
         tube:
-          where: {protrusion_aspect_max_peak: 2.0}
-          score: {protrusion_aspect_max_peak: 1.0, n_tubes_peak: 0.5}
+          where: {protrusion_aspect_max_final: 0.4}
+          score: {protrusion_aspect_max_final: 1.0, n_tubes_final: 0.5}
         bud:
           # a BULGE, not a finger -- aspect counts against it, or this is just the tube seat again
-          where: {protr_peak: 1.10}
-          score: {protr_peak: 1.0, protrusion_aspect_max_peak: -0.3}
+          where: {protr_final: 1.10}
+          score: {protr_final: 1.0, protrusion_aspect_max_final: -0.3}
         branched:
-          where: {n_tips_peak: 2}
-          score: {n_tips_peak: 1.0, protr_peak: 0.5}
+          # LEGITIMATELY EMPTY, and left that way on purpose. A branch is two or more SUSTAINED
+          # tips; n_tips_final is nonzero in two runs of eighty-one and reaches 1.0 in both, so
+          # nothing in this campaign has ever branched. n_tips_PEAK >= 2 matched 27 of 81 and the
+          # Analyst is explicit that those are five- and six-lobe stars -- keying the seat there
+          # filled it with lobes and made the portfolio look diverse while selecting for the same
+          # thing twice. An empty seat falls through to the fill and costs nothing; it will seize
+          # the first real branch the moment one exists, which a lobe-filled seat could not.
+          where: {n_tips_final: 2}
+          score: {n_tips_final: 1.0, protr_final: 0.5}
         complex:
-          where: {grip_peak: 0.05}
-          score: {grip_peak: 1.0, invagination_peak: 0.5}
+          where: {grip_final: 0.05}
+          score: {grip_final: 1.0, invagination_final: 0.5}
       forcing_terms: {extrusion_forcing_3d: K_extrude}   # split out 10 Aug; NOT in the vocabulary
       # EVERY ENTRY REBUILDS AND ADMITS. Checked by `round.py --check`, because the first version of
       # this pool did not: two of its six entries were inadmissible and it took a live Proposer call
