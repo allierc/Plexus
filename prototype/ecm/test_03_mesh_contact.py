@@ -82,8 +82,19 @@ class MeshOnMatrix:
 
     def __init__(self, nx=17, patch=0.42, z_mesh=0.585, block=(0.28, 0.28, 0.18, 0.72, 0.72, 0.58),
                  n_grid=64, ppc=4, E=400.0, nu=0.2, rho=1.0, m_vert=2.0e-4,
-                 k_frac=0.15, mu=0.4, g=0.0, dt=1.0e-4, floor=None, hole_r=0.0, dev="cuda:0"):
+                 k_frac=0.15, mu=0.4, g=0.0, dt=1.0e-4, floor=None, floor_stick=False,
+                 hole_r=0.0, walls=None, track_vm=False, dev="cuda:0"):
         self.dev, self.n_grid, self.dt, self.mu = dev, n_grid, dt, mu
+        # THE RIM'S PRESCRIBED VELOCITY, as a VECTOR rather than a descent rate. The press is
+        # (0, 0, press_v) and stays the default; a tangential drive -- the shear demo -- is the same
+        # boundary condition pointed sideways, and writing it as a vector is what keeps the two runs
+        # the same experiment with one thing changed rather than two rigs.
+        self.drive = None
+        # LATERAL WALLS, the same grid-velocity boundary condition as the floor, on x and y. Without
+        # them a confined press is not confined: the material squeezes out from under the patch's rim
+        # and the hole carries almost nothing. `walls` is (lo, hi) in box units.
+        self.walls = walls
+        self.track_vm = track_vm      # also colour by von Mises, for the loadings that are shear
         self.dx = 1.0 / n_grid; self.inv_dx = float(n_grid)
         self.g = g
         # --- the mesh: a flat lattice of vertices, two triangles per quad
@@ -160,6 +171,7 @@ class MeshOnMatrix:
         # simply translates away from the press and nothing is compressed -- with it, the material has
         # nowhere to go but sideways, which is what makes the compression visible.
         self.floor = floor
+        self.floor_stick = floor_stick
         self.res = dict(momentum=[], n_pen=[], depth=[], slip=[], z_mesh=[], f_norm=[],
                         height=[], vmax=[])
 
@@ -243,7 +255,9 @@ class MeshOnMatrix:
         ii = torch.arange(self.nx * self.nx, device=dev)
         rim = (ii % self.nx == 0) | (ii % self.nx == self.nx - 1) | (ii < self.nx) \
             | (ii >= self.nx * (self.nx - 1))
-        self.Vv[rim] = torch.tensor([0.0, 0.0, float(self.press_v)], device=dev)
+        self.Vv[rim] = (torch.as_tensor(self.drive, dtype=torch.float32, device=dev)
+                        if self.drive is not None
+                        else torch.tensor([0.0, 0.0, float(self.press_v)], device=dev))
         self.V = self.V + dt * self.Vv
         # --- the matrix: one MLS-MPM cycle, with the contact force as a body force
         gm = torch.zeros(ng ** 3, device=dev); gmv = torch.zeros(ng ** 3, 3, device=dev)
@@ -252,6 +266,15 @@ class MeshOnMatrix:
         J = torch.linalg.det(self.F).clamp_min(1e-6)
         P = (2 * self.mu_l * (self.F - R) @ self.F.transpose(1, 2)
              + self.la * ((J - 1) * J)[:, None, None] * torch.eye(3, device=dev))
+        if self.track_vm:
+            # VON MISES OF THE KIRCHHOFF STRESS, sigma_vm = sqrt(3/2 |dev tau|) / J. `P` above is
+            # tau for the fixed-corotated model, so this costs an outer product and no second SVD.
+            # |J-1| is the right colour for a press -- the material is squeezed and cannot leave --
+            # but a DRAG is deviatoric: it changes shape at constant volume, so a volumetric colour
+            # shows nothing where the shear band is.
+            tr = P.diagonal(dim1=1, dim2=2).sum(1) / 3.0
+            dvi = P - tr[:, None, None] * torch.eye(3, device=dev)
+            self.vm = torch.sqrt(1.5 * (dvi * dvi).sum((1, 2))) / J
         affine = self.m * self.C - (4 * inv_dx * inv_dx * dt * self.vol) * P
         fb = fp + torch.tensor([0.0, 0.0, -self.g * self.m], device=dev)
         base, fx, w = _bspline(self.x, inv_dx)
@@ -269,7 +292,25 @@ class MeshOnMatrix:
         if self.floor is not None:
             kz = torch.arange(ng, device=dev).repeat(ng * ng)
             below = (kz.float() * self.dx) < self.floor
-            gv[below, 2] = gv[below, 2].clamp_min(0.0)
+            if self.floor_stick:
+                # NO-SLIP, and the difference is the whole shear experiment. A floor that only stops
+                # the DOWNWARD component lets the block translate bodily under a tangential load --
+                # measured: the whole column moved with the patch and the strain never appeared --
+                # so what looked like "the drag does nothing" was the boundary condition, not the
+                # contact. Zeroing all three components pins the bottom, and the block then has to
+                # shear between a pinned base and a dragged top.
+                gv[below] = 0.0
+            else:
+                gv[below, 2] = gv[below, 2].clamp_min(0.0)
+        if self.walls is not None:
+            lo, hi = self.walls
+            ii_ = torch.arange(ng, device=dev)
+            ix = ii_.repeat_interleave(ng * ng).float() * self.dx
+            iy = ii_.repeat_interleave(ng).repeat(ng).float() * self.dx
+            gv[ix < lo, 0] = gv[ix < lo, 0].clamp_min(0.0)
+            gv[ix > hi, 0] = gv[ix > hi, 0].clamp_max(0.0)
+            gv[iy < lo, 1] = gv[iy < lo, 1].clamp_min(0.0)
+            gv[iy > hi, 1] = gv[iy > hi, 1].clamp_max(0.0)
         newv = torch.zeros_like(self.v); newC = torch.zeros_like(self.C)
         for o in self.off:
             ww = w[o[0], :, 0] * w[o[1], :, 1] * w[o[2], :, 2]

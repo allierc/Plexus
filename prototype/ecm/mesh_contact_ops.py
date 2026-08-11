@@ -124,9 +124,14 @@ class MeshContact(Lateral):
     MECHANISM_TAGS = ["cell_matrix_contact", "particle_to_surface", "friction", "moving_boundary"]
     PARAM_ROLES = {"k_frac": "penalty_fraction_of_ceiling", "mu": "friction_coefficient",
                    "scale": "tissue_to_box_scale", "eps_v": "slip_regularisation_velocity"}
-    REFERENCE = ("Chen, Z.-P. et al. (2015) Comput. Methods Appl. Mech. Eng. 293:1 "
-                 "(particle-to-surface FEM-MPM contact); the surface is Okuda, S. et al. (2018) "
-                 "Sci. Rep. 8:2386.")
+    REFERENCE = ("Chen, Z., Qiu, X., Zhang, X. & Lian, Y. (2015). Improved coupling of finite "
+                 "element method with material point method based on a particle-to-surface contact "
+                 "algorithm (ICFEMP). Comput. Methods Appl. Mech. Engrg. 293:1-19. "
+                 "doi:10.1016/j.cma.2015.04.005 -- the scheme this operator implements. Grid-node "
+                 "coupling (CFEMP, Lian, Y. P., Zhang, X. & Liu, Y. (2011) CMAME 200:3482-3494, "
+                 "doi:10.1016/j.cma.2011.07.014) is the alternative it was chosen over: it needs "
+                 "mesh and grid cells of comparable size, which this prototype violates. The "
+                 "surface is Okuda, S. et al. (2018) Sci. Rep. 8:2386.")
 
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
