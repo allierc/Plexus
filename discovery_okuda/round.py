@@ -546,14 +546,14 @@ MAX_EDITS = 4          # edits per slot; still one experiment, applied in order 
 #   branched  more than one tip on a sustained protrusion
 #   complex   undulation: many protrusions gripping the chemistry, no single dominant finger
 TARGETS = {
-    "tube":     {"where": {"protrusion_aspect_max_peak": 2.0},
-                 "score": {"protrusion_aspect_max_peak": 1.0, "n_tubes_peak": 0.5}},
-    "bud":      {"where": {"protr_peak": 1.10},
-                 "score": {"protr_peak": 1.0, "protrusion_aspect_max_peak": -0.3}},
-    "branched": {"where": {"n_tips_peak": 2},
-                 "score": {"n_tips_peak": 1.0, "protr_peak": 0.5}},
-    "complex":  {"where": {"grip_peak": 0.05},
-                 "score": {"grip_peak": 1.0, "invagination_peak": 0.5}},
+    "tube":     {"where": {"protrusion_aspect_max_final": 0.4},
+                 "score": {"protrusion_aspect_max_final": 1.0, "n_tubes_final": 0.5}},
+    "bud":      {"where": {"protr_final": 1.10},
+                 "score": {"protr_final": 1.0, "protrusion_aspect_max_final": -0.3}},
+    "branched": {"where": {"n_tips_final": 2},
+                 "score": {"n_tips_final": 1.0, "protr_final": 0.5}},
+    "complex":  {"where": {"grip_final": 0.05},
+                 "score": {"grip_final": 1.0, "invagination_final": 0.5}},
 }
 CLOSURE_N = 4          # distinct values RUN before a parameter leaves the menu
 # HOW MANY REPEATS A ROUND MAY BUY. Fallback for crew/flow.yaml `build.args.max_replicates`.
