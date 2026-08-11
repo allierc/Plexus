@@ -1906,8 +1906,8 @@ measured:
 <p class="opk">A spheroid growing in a matrix is <b>three</b> entities, not two, and the middle one
 is not a spacer. While the sheet is intact the epithelium never touches the stroma — load runs cell
 → adhesion plaque → <b>basement membrane</b> → anchoring fibril → stroma — so a model in which the
-tissue <i>also</i> pushes the matrix directly counts the same push twice. Two arrows, one clip each:
-the mechanical one, and the chemical one that puts a hole in the sheet.</p>
+tissue <i>also</i> pushes the matrix directly counts the same push twice. Three clips: the assembly,
+the chemistry that can cut the sheet, and what is left of the sheet once it has.</p>
 <p class="opk-ref">Reference — load path and anchoring fibrils,
 <a href="https://doi.org/10.1083/jcb.104.3.611">Keene et&nbsp;al. (1987)</a>; adhesions are clusters
 at ~555&nbsp;nm spacing, <a href="https://doi.org/10.1002/bies.201600123">Changede &amp; Sheetz
@@ -1917,165 +1917,6 @@ is held in the matrix rather than dissolved in it,
 <a href="https://doi.org/10.1074/jbc.M000907200">Yu et&nbsp;al. (2000)</a>. Working note:
 <code>discovery_okuda/note_spheroid_bm_ecm.pdf</code>; runs, <code>log/okuda_ECM</code>.</p>
 <div class="sim-gallery g3">
-  <figure class="sim-card">
-    <video src="gallery/spheroid_fibres.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">the spheroid loads the matrix<span class="sim-spec"><pre>general:
-  name: 04d_spheroid_fibres
-  seed: 0
-  n_frames: 399
-  dt: 0.0032
-  boundary: wall
-  dim: 3
-  world:
-  - 1.0
-  - 1.0
-  - 1.0
-sets:
-  cell:
-    n: 1
-    start:
-    - - 0.5
-      - 0.5
-      - 0.5
-    types: &amp;id001
-      s0:
-        fraction: 0.125
-        youngs: 15.0
-      s1:
-        fraction: 0.125
-        youngs: 15.0
-      s2:
-        fraction: 0.125
-        youngs: 15.0
-      s3:
-        fraction: 0.125
-        youngs: 15.0
-      s4:
-        fraction: 0.125
-        youngs: 15.0
-      s5:
-        fraction: 0.125
-        youngs: 15.0
-      s6:
-        fraction: 0.125
-        youngs: 15.0
-      s7:
-        fraction: 0.125
-        youngs: 15.0
-  mpm_particle:
-    parent: cell
-    per_parent: 200000
-    radius: 0.48
-    density: 1.0
-    types: *id001
-fields:
-  mpm_grid:
-    frame: mpm_grid
-    n_grid: 64
-operators:
-- op: aggregate
-  at: cell
-- op: seed_ecm
-  at: mpm_particle
-  centre:
-  - 0.5
-  - 0.5
-  - 0.5
-  cavity_r: 0.045
-  cavity_h: 0.045
-  cavity_sphere: true
-  axis: 1
-  shell_r: 0.4
-  margin: 0.02
-  n_fibres: 10000
-  fibre_len: 0.12
-  align: 0.0
-  align_dir:
-  - 1.0
-  - 0.0
-  - 0.0
-  seed: 0
-- op: ecm_stress
-  at: mpm_particle
-  scale: 2.0
-  bands: 8
-  measure: vonmises
-- op: mesh_inside_count
-  at: mpm_particle
-  n_grid: 64
-- op: mesh_contact
-  at: mpm_particle
-  tissue: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_c4a5698982.npz
-  centre:
-  - 0.5
-  - 0.5
-  - 0.5
-  scale: 0.00853007254279858
-  k_frac: 0.15
-  mu: 0.4
-  dt: 0.0032
-  n_grid: 64
-  a_max: 30000.0
-  mesh_stride: 2
-- op: mpm_strain
-  at: mpm_particle
-- op: mpm_scatter
-  at: mpm_particle
-  to: mpm_grid
-  drag: 8.0
-  a_max: 100000.0
-  store_stress: true
-- op: mpm_grid_update
-  at: mpm_grid
-  wall_damp: 0.7
-- op: mpm_gather
-  at: mpm_particle
-  from: mpm_grid
-  wall_damp: 0.7
-  wall_contact: 0.04
-  vmax: 1000000000.0
-schedule:
-- aggregate
-- seed_ecm
-- substep_dt: 0.0004
-  steps:
-  - mesh_contact
-  - mpm_strain
-  - mpm_scatter
-  - mpm_grid_update
-  - mpm_gather
-- ecm_stress
-- mesh_inside_count
-plotting:
-  background: black
-  up_axis: 1
-  box_frame: true</pre></span></span>
-      <span class="sim-cap">6,380 cells pressing on 200,000 material points laid out as 10,000 fibre strands, through the particle-to-surface contact above. The strands turn tangential exactly as an affine deformation predicts — cos²&thinsp;to the radius 0.284 measured against 0.283 affine, from 1/3 isotropic — so the arrangement is fibrous and the response is not. 3D, section, then the tissue alone</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/bm_protease.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">who is allowed to make a hole<span class="sim-spec"><pre>what: 05h_1 -- the ternary mechanism with per-cell rate states, so the bell has spatial
-  structure to act on
-units:
-  length_um: 1171.0
-  time_s: 600.0
-  force_nN: null
-new_states:
-  mt1: graded expression per cell (was a binary flag)
-  s_timp: per-cell inhibitor secretion (was one global number)
-  s_pro: per-cell zymogen secretion (was one global number)
-why: the bell peaks at c_T = K, so a VARYING TIMP field puts different regions at
-  different points on the same curve -- the prediction is a band along c_T ~ K rather
-  than a copy of the source
-seeding: 'smooth low-order modes, not per-cell noise: white noise at this D is averaged
-  away inside one frame, which is how the uniform runs got a featureless field'
-reference: Karagiannis &amp; Popel (2004) J. Biol. Chem. 279(37):39105</pre></span></span>
-      <span class="sim-cap">Four panels in turn, and only the last two are computed: MT1-MMP expression per cell and the matrix-BOUND inhibitor TIMP-3 are prescribed sources, the activation rate is what the pair of them makes, and ρ/ρ₀ is the sheet being eaten. At the bell's peak (c_T = K) 25% of the sheet is gone; with MT1 made uniform the same bell dissolves 0% — so the hole still needs the tethered enzyme's own pattern, which is why it is still r = 0.90 correlated with it</span>
-    </figcaption>
-  </figure>
   <figure class="sim-card">
     <video src="gallery/spheroid_bm_ecm.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
@@ -2141,108 +1982,56 @@ rendering_conventions:
     +-2.916 tissue units, 3x the LAST frame's median plaque gap (0.972; it is 0.071 at frame 0). Sized
     on the standoff because that is what the section is about, and fixed off the last frame so the
     window holds every frame.</pre></span></span>
-      <span class="sim-cap">The three bodies on one tissue: a replayed epithelium (396 vertices to 12,756, apical radius ×3.77), the fibre matrix outside it, and a membrane of 5,120 triangles held by 2,562 plaques on the epithelium's own faces. Four panels: the tissue in the stressed matrix, the same in section, the sheet by λ&#8202;=&#8202;1.01→3.71 with its plaques and a limb section, and the junctions by myosin. Nothing passes between the sheet and the matrix — they share the tissue, not a force — and by the last frame 95% of the plaques have the sheet INSIDE the face holding it, which is a failure of this rig and is why the next row exists</span>
-    </figcaption>
-  </figure>
-</div>
-<p class="opk"><b>And then the sheet's own fate.</b> The membrane above is fixed at the size it was
-seeded, on a tissue that quadruples — so it is stretched rather than grown, and it is never removed.
-These three switch on the two operators that change that: <b>refinement and secretion</b>, which let
-it keep up, and the <b>protease</b>, which takes it away. Same tissue replay, same matrix, same
-camera; one rig differs each time.</p>
-<div class="sim-gallery g3">
-  <figure class="sim-card">
-    <video src="gallery/bm_refine.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">the sheet keeps up<span class="sim-spec"><pre>what: &gt;-
-  06 with the sheet that GROWS: bm_refine and bm_secrete on, so the triangle and plaque counts climb
-  with the tissue instead of being fixed by the rig. Same tissue replay, same matrix trajectory, same
-  camera as 06_spheroid_bm_ecm.
-
-why: &gt;-
-  In 06_spheroid_bm_ecm the panel prints 5,120 triangles and 2,562 plaques on every frame of a run in
-  which the tissue quadruples. That is not a rendering fault: 06's sheet is Rig06c = 05b's rig, which
-  has no refinement, no secretion, and plaques seeded once. The price of it is G44's own number -- the
-  mean edge reaches 3.63x its seeded length -- which is what the demand for bm_refine measures.
-
-rig: &gt;-
-  Rig05l = 05f (refinement, mass balance, tear) under the same RealDriver swap, at 05f's published
-  values: max_refine 2, edge_trigger 1.45, reseed on, tau_bm 40, rho_crit 0. 401 frames.
-
-result:
-  faces: 5120 -&gt; 20480 (frame 121) -&gt; 81920 (frame 340)
-  nodes_and_plaques: 2562 -&gt; 40962 -- one adhesion patch per live sheet node, so refinement makes them
-  lam_geo: 1.009 -&gt; 3.946
-  G43_rho_within_10pc_with_bm_secrete: 0.70% PASS
-  G44_mean_edge_in_0.8_1.7x_with_bm_refine: 0.929x PASS
-
-these_are_the_gates_that_closed: &gt;-
-  G43 and G44 are the two that 05k measured as pending and failing with supply and refinement OFF, and
-  that 05l passed with them ON. This folder is those two numbers in a movie rather than in a table --
-  the same rig, the same values, the same 401 frames.
-
-rendering_note: &gt;-
-  The panel draws 1 plaque in 16 at the end (2,562 of 40,962) and says so in its label. At 40,962 dots
-  the surface is red rather than marked, at any dot size still visible, so the panel holds the NUMBER
-  of marks fixed and states the fraction.
-
-frame_axis: as 06_spheroid_bm_ecm -- pass-2 frame mapped to its tissue frame through mesh_stride
-no_coupling: unchanged and deliberate -- the sheet and the matrix share the tissue, not a force</pre></span></span>
-      <span class="sim-cap">With refinement and secretion on, the membrane grows with the tissue instead of being stretched by it: 5,120 → 81,920 triangles and 2,562 → 40,962 adhesion plaques, which brings the mean edge back to 0.93× its seeded length (3.63× with them off)</span>
+      <span class="sim-cap">The three bodies on one tissue: a replayed epithelium (396 vertices to 12,756, apical radius ×3.77), the fibre matrix outside it, and a membrane of 5,120 triangles held by 2,562 plaques on the epithelium's own faces. Four panels: the tissue in the stressed matrix, the same in section, the sheet by λ&#8202;=&#8202;1.01→3.71 with its plaques and a limb section, and the junctions by myosin. Nothing passes between the sheet and the matrix — they share the tissue, not a force</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/bm_breach_hole.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/bm_protease.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">a hole<span class="sim-spec"><pre>what: &gt;-
-  06 with the protease switched on at 05h_1_hetero's published point: a hole opens in the basement
-  membrane of a growing spheroid. Same tissue replay, same matrix trajectory, same camera as
-  06_spheroid_bm_ecm -- one thing differs, the sheet's rig.
-
+      <span class="sim-name" tabindex="0">who is allowed to make a hole<span class="sim-spec"><pre>what: 05h_1 -- the ternary mechanism with per-cell rate states, so the bell has spatial
+  structure to act on
+units:
+  length_um: 1171.0
+  time_s: 600.0
+  force_nN: null
+new_states:
+  mt1: graded expression per cell (was a binary flag)
+  s_timp: per-cell inhibitor secretion (was one global number)
+  s_pro: per-cell zymogen secretion (was one global number)
+why: the bell peaks at c_T = K, so a VARYING TIMP field puts different regions at
+  different points on the same curve -- the prediction is a band along c_T ~ K rather
+  than a copy of the source
+seeding: 'smooth low-order modes, not per-cell noise: white noise at this D is averaged
+  away inside one frame, which is how the uniform runs got a featureless field'
+reference: Karagiannis &amp; Popel (2004) J. Biol. Chem. 279(37):39105</pre></span></span>
+      <span class="sim-cap">Four panels in turn, and only the last two are computed: MT1-MMP expression per cell and the matrix-BOUND inhibitor TIMP-3 are prescribed sources, the activation rate is what the pair of them makes, and ρ/ρ₀ is the sheet being eaten. At the bell's peak (c_T = K) 25% of the sheet is gone; with MT1 made uniform the same bell dissolves 0% — so the hole still needs the tethered enzyme's own pattern, which is why it is still r = 0.90 correlated with it</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/bm_breach_sheet.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">the sheet, breached<span class="sim-spec"><pre>what: &gt;-
+  06 with the protease on at 05h_1_hetero's published point: ONE hole opens in the basement membrane of
+  a growing spheroid. Same tissue replay, same matrix trajectory, same camera as 06_spheroid_bm_ecm;
+  the sheet's rig is the only difference.
 rig: &gt;-
-  Rig05m = 05h_1_hetero's protease rig (MT1-MMP on the sheet activating proMMP2, TIMP-2 diffusible and
-  TIMP-3 immobile, bm_tear at rho_crit) under the same RealDriver swap that 06c and 05l use. 401
-  frames. Phase point unchanged from 05h_1: K_timp 1e-3, inhibitor/K 1.0, bound fraction 0.6,
-  k_deg 100, mt1_frac 0.25, hetero 1, rho_crit 0.35.
-
+  Rig05m (05h_1's MT1-MMP / proMMP2 / TIMP chemistry with bm_tear at rho_crit) under the RealDriver
+  swap, 401 frames. K_timp 1e-3, inhibitor/K 1.0, bound 0.6, k_deg 100, mt1_frac 0.25, hetero 1,
+  rho_crit 0.35, max_refine 0.
 result:
-  faces_torn: 2225 of 5120 (43.5%)
-  largest_connected_patch: 87.8% of the torn set (~1954 faces)
+  faces_torn: 2414 of 5120 (47.1%)
+  largest_connected_patch: 96.9% of the torn set -- ONE hole, not a perforation
   rho_min: 0.350, exactly on rho_crit
-  verdict: A HOLE (3-50% of faces gone, largest patch &gt;= 20 faces)
-
-why_the_criterion_was_revised: &gt;-
-  The threshold first written down asked for the largest patch to be 60% of the whole torn set -- i.e.
-  for ONE hole. The probe (in test_06_breach.py, --probe) showed that is not what this chemistry does:
-  MT1-MMP is a smooth random field, activation peaks in several places, and the sheet perforates in
-  several. The criterion was revised BEFORE either run was kept, and the original is recorded in the
-  script's docstring with the reason.
-
-the_bell, from the probe: &gt;-
-  Inhibitor is NOT a monotone knob and the probe is the evidence. At inhibitor/K = 0 and = 10, ZERO
-  faces tear in 150 frames; at 1 (the peak) 39% do. That is the ternary complex: TIMP-2 is needed to
-  present proMMP2 to a free MT1-MMP, so both no inhibitor and excess inhibitor switch the cascade off.
-  The knob that does run monotonically is k_deg, which is why the two experiments differ in k_deg
-  (100 here, 300 in 06_breach_torn) and not in inhibitor.
-
-read_this_one_carefully: &gt;-
-  THE REMNANT DOES NOT STAY ON THE TISSUE. The median plaque gap goes from 0.073 to 3.82 tissue units
-  over the run, and the end frame shows the surviving sheet as filaments standing off the epithelium
-  rather than as a perforated shell lying on it. 05m certified the COUNTS (2,167 faces torn in 300
-  frames) and never rendered the geometry, so this is new and it is not yet explained: a torn sliver
-  has almost no bending stiffness and is dragged by a growing tissue through the plaques that still
-  hold it, which is a plausible mechanism and not a measurement.
-
-open_defect: &gt;-
-  PLAQUES ARE NOT CULLED WHEN FACES TEAR. The panel prints 2,562 plaques at frame 0 and 2,562 at frame
-  400, with 43.5% of the faces gone: the contact set is per NODE, and tearing removes faces, so a node
-  that belongs to no live face keeps holding onto the epithelium. Whether that is right depends on
-  what a plaque is a statement about -- integrin holding matrix, which is gone -- and nothing in the
-  ladder has decided it.
-
-frame_axis: as 06_spheroid_bm_ecm -- pass-2 frame mapped to its tissue frame through mesh_stride
-no_coupling: unchanged and deliberate -- the sheet and the matrix share the tissue, not a force</pre></span></span>
-      <span class="sim-cap">The protease switched on at the bell's peak: 43% of the sheet's 5,120 faces torn, and the largest connected patch is 88% of them. MT1-MMP is a smooth random field with several maxima, so the sheet perforates in several places rather than one</span>
+  verdict: A HOLE
+run_after_a_bug_fix: &gt;-
+  THIS FOLDER WAS RE-RUN. The first version had 05h1's per-cell chemistry (mt1, s_timp_cell,
+  s_pro_cell) still sized to the ICOSPHERE's 1,280 faces while the real epithelium has 1,188, read
+  through tissue face indices -- in range, so no assert, and the three smooth fields became a random
+  per-face permutation. The breach then came out as a dozen scattered small holes (largest patch 38%
+  of the torn set). RealDriver now rebuilds the fields on the new epithelium from the same seeds, and
+  neighbouring cells differ by 3.3% of the field's spread instead of by a random draw. 05m_protease
+  carries the old defect and its breach pattern should not be trusted.</pre></span></span>
+      <span class="sim-cap">The same three bodies with the protease switched on, and only the membrane drawn: 47% of its 5,120 faces gone, and 97% of them in ONE connected patch — a hole, not a perforation. Raising the cutting rate 100 → 300 takes it to 87% and the sheet stops being a sheet</span>
     </figcaption>
   </figure>
 </div>
