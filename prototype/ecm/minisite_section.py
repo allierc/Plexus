@@ -375,29 +375,16 @@ very chemical that drives growth, so it can only land in its <b>antiphase</b>.</
 {END2}"""
 
 
-def build3(runs, runs2=()):
-    """Spheroid + basement membrane + matrix: the three-entity model, then the sheet's own fate.
-
-    The second row is written only when it has cards. A row with an empty gallery under a paragraph
-    that describes three clips is worse than no row: it reads as three clips that failed to load.
-    """
+def build3(runs):
+    """Spheroid + basement membrane + matrix: the three-entity model, one clip per thing it does."""
     cards = "\n".join(card(v, n, sp, c) for _, v, n, sp, c in runs)
-    row2 = "" if not runs2 else f"""
-<p class="opk"><b>And then the sheet's own fate.</b> The membrane above is fixed at the size it was
-seeded, on a tissue that quadruples — so it is stretched rather than grown, and it is never removed.
-These three switch on the two operators that change that: <b>refinement and secretion</b>, which let
-it keep up, and the <b>protease</b>, which takes it away. Same tissue replay, same matrix, same
-camera; one rig differs each time.</p>
-<div class="sim-gallery g3">
-{chr(10).join(card(v, n, sp, c) for _, v, n, sp, c in runs2)}
-</div>"""
     return f"""{BEGIN3}
 <h3>Spheroid + basement membrane + matrix</h3>
 <p class="opk">A spheroid growing in a matrix is <b>three</b> entities, not two, and the middle one
 is not a spacer. While the sheet is intact the epithelium never touches the stroma — load runs cell
 → adhesion plaque → <b>basement membrane</b> → anchoring fibril → stroma — so a model in which the
-tissue <i>also</i> pushes the matrix directly counts the same push twice. Two arrows, one clip each:
-the mechanical one, and the chemical one that puts a hole in the sheet.</p>
+tissue <i>also</i> pushes the matrix directly counts the same push twice. Three clips: the assembly,
+the chemistry that can cut the sheet, and what is left of the sheet once it has.</p>
 <p class="opk-ref">Reference — load path and anchoring fibrils,
 <a href="https://doi.org/10.1083/jcb.104.3.611">Keene et&nbsp;al. (1987)</a>; adhesions are clusters
 at ~555&nbsp;nm spacing, <a href="https://doi.org/10.1002/bies.201600123">Changede &amp; Sheetz
@@ -408,7 +395,7 @@ is held in the matrix rather than dissolved in it,
 <code>discovery_okuda/note_spheroid_bm_ecm.pdf</code>; runs, <code>log/okuda_ECM</code>.</p>
 <div class="sim-gallery g3">
 {cards}
-</div>{row2}
+</div>
 {END3}"""
 
 
@@ -457,7 +444,12 @@ def main():
             q = os.path.join(LOG, d, nm)
             if os.path.exists(q):
                 return q
-        sys.exit(f"no spec beside {d} -- a clip on the page must open the spec that made it")
+        # NO CARD, RATHER THAN A CARD WITHOUT ITS SPEC. The rule holds either way -- what changed is
+        # that one run still in flight no longer kills the whole regeneration. A run writes its
+        # spec last, so "movie ready, spec not yet" is a state this script meets routinely.
+        print(f"[minisite] {d}: no spec beside it yet -- card skipped (a clip on the page must "
+              f"open the spec that made it)")
+        return None
 
     runs = [(d, f"{v}.mp4", lbl, _spec(d), cap) for d, v, lbl, cap in R3]
     missing = [r for r, *_ in runs if not os.path.exists(os.path.join(LOG, r, "movie.mp4"))]
@@ -517,11 +509,29 @@ def main():
 
     # ---- the three-entity section: spheroid, basement membrane, matrix ----
     # PANEL GEOMETRY IS A PROPERTY OF THE RUN'S RENDERER, so it is written down beside the run.
-    # 04d draws three of a 2x2 grid (the fourth quadrant is empty); 05h_2 draws all four, each with
-    # two lines of title above it and the run label under the first.
+    # The 06 runs draw one 2x2 with the run label in the top-left corner and the membrane
+    # panel's own title just under the halfway line; 05h_1 draws four, each with two lines of
+    # title above it and the run label under the first.
     q = dict(tl=(0, 0, 0.5, 0.5), tr=(0.5, 0, 0.5, 0.5),
              bl=(0, 0.5, 0.5, 0.5), br=(0.5, 0.5, 0.5, 0.5))
-    fib = _measured("04d_spheroid_fibres")
+    def _metrics_or_none(run):
+        """A run that is being RE-RUN has a directory and not yet a `metrics.json`.
+
+        Caught rather than crashed for the same reason `_clip` tolerates a half-written movie:
+        this script is run while runs are in flight, and the failure mode of not tolerating it is
+        that a page which is 90% ready cannot be regenerated at all. The card is dropped and the
+        reason is printed -- never dropped silently.
+        """
+        try:
+            return json.load(open(os.path.join(LOG, run, "metrics.json")))
+        except (OSError, ValueError):
+            print(f"[minisite] {run}: no readable metrics.json (running?) -- its card is skipped")
+            return None
+
+    hol = _metrics_or_none("06_breach_hole")
+    # `06_breach_torn` HAS NO CARD -- it is read so the breach card can say what the cutting rate
+    # does past the runaway point, from that run rather than from memory.
+    trn = _metrics_or_none("06_breach_torn")
     # THE RUN AT THE BELL'S PEAK, not the one ten times past it. `05h_2` sits at 10 K on the far
     # shoulder and dissolves nothing, so the fourth panel of its clip is a sphere that never
     # changes -- a card about making a hole, showing no hole. This one is at c_T = K.
@@ -530,54 +540,40 @@ def main():
     hetr = het["heterogeneity"]["realistic: all rates vary"]
     bell = het["heterogeneity"]["bell isolated: uniform MT1"]
     R5 = [
-        ("04d_spheroid_fibres", "spheroid_fibres", "the spheroid loads the matrix",
-         [q["tl"], q["tr"], q["br"]], dict(skip_top=0.06),
-         f"6,380 cells pressing on {fib['particles']:,} material points laid out as "
-         f"{fib['n_fibres']:,} fibre strands, through the particle-to-surface contact above. The "
-         f"strands turn tangential exactly as an affine deformation predicts — cos²&thinsp;to the "
-         f"radius {fib['cos2_measured_matched']:.3f} measured against {fib['cos2_affine']:.3f} "
-         f"affine, from 1/3 isotropic — so the arrangement is fibrous and the response is not. 3D, "
-         f"section, then the tissue alone"),
+        ("06_spheroid_bm_ecm", "spheroid_bm_ecm", "all three at once",
+         [q["tl"], q["tr"], q["bl"], q["br"]], dict(skip_top=0.09),
+         "The three bodies on one tissue: a replayed epithelium (396 vertices to 12,756, apical "
+         "radius \u00d73.77), the fibre matrix outside it, and a membrane of 5,120 triangles held "
+         "by 2,562 plaques on the epithelium's own faces. Four panels: the tissue in the stressed "
+         "matrix, the same in section, the sheet by \u03bb&#8202;=&#8202;1.01\u21923.71 with its "
+         "plaques and a limb section, and the junctions by myosin. Nothing passes between the "
+         "sheet and the matrix \u2014 they share the tissue, not a force"),
         ("05h_1_hetero", "bm_protease", "who is allowed to make a hole",
          [q["tl"], q["tr"], q["bl"], q["br"]], dict(skip_top=0.10, skip_bot=0.12),
          f"Four panels in turn, and only the last two are computed: MT1-MMP expression per cell "
          f"and the matrix-BOUND inhibitor TIMP-3 are prescribed sources, the activation rate is "
-         f"what the pair of them makes, and ρ/ρ₀ is the sheet being eaten. At the bell's peak "
-         f"(c_T = K) {100 * hetr['hole']:.0f}% of the sheet is gone; with MT1 made uniform the "
-         f"same bell dissolves {100 * bell['hole']:.0f}% — so the hole still needs the tethered "
-         f"enzyme's own pattern, which is why it is still "
+         f"what the pair of them makes, and \u03c1/\u03c1\u2080 is the sheet being eaten. At the "
+         f"bell's peak (c_T = K) {100 * hetr['hole']:.0f}% of the sheet is gone; with MT1 made "
+         f"uniform the same bell dissolves {100 * bell['hole']:.0f}% \u2014 so the hole still "
+         f"needs the tethered enzyme's own pattern, which is why it is still "
          f"r = {g46['corr_activation_with_source']:.2f} correlated with it"),
-        ("06_spheroid_bm_ecm", "spheroid_bm_ecm", "all three at once",
-         [q["tl"], q["tr"], q["bl"], q["br"]], dict(skip_top=0.09),
-         "The three bodies on one tissue: a replayed epithelium (396 vertices to 12,756, apical "
-         "radius ×3.77), the fibre matrix outside it, and a membrane of 5,120 triangles held by "
-         "2,562 plaques on the epithelium's own faces. Four panels: the tissue in the stressed "
-         "matrix, the same in section, the sheet by λ&#8202;=&#8202;1.01→3.71 with its plaques and "
-         "a limb section, and the junctions by myosin. Nothing passes between the sheet and the "
-         "matrix — they share the tissue, not a force — and by the last frame 95% of the plaques "
-         "have the sheet INSIDE the face holding it, which is a failure of this rig and is why the "
-         "next row exists"),
-    ]
-    # THE SECOND ROW OF THE SECTION: the same three bodies with the sheet allowed to grow, and then
-    # to be eaten. These runs were still RENDERING when the row was written, so the row is declared
-    # here and each card appears the first time this script is run after its movie is complete.
-    ref = json.load(open(os.path.join(LOG, "06_refine", "metrics.json")))
+        # THE SHEET PANEL ALONE. The same run's other three panels are the tissue and the matrix,
+        # which the first card already shows; what is new here is what happens to the MEMBRANE, so
+        # the card plays that panel and nothing else.
+    ] + ([] if not (hol and trn) else [
+        ("06_breach_hole", "bm_breach_sheet", "the sheet, breached",
+         [q["bl"]], dict(skip_top=0.09),
+         f"The same three bodies with the protease switched on, and only the membrane drawn: "
+         f"{100 * hol['torn_frac']:.0f}% of its {hol['faces_seeded']:,} faces gone, and "
+         f"{100 * hol['biggest_patch_frac']:.0f}% of them in ONE connected patch \u2014 a hole, "
+         f"not a perforation. Raising the cutting rate {hol['kdeg']:.0f} \u2192 "
+         f"{trn['kdeg']:.0f} takes it to {100 * trn['torn_frac']:.0f}% and the sheet stops being "
+         f"a sheet"),
+    ])
     hol = json.load(open(os.path.join(LOG, "06_breach_hole", "metrics.json")))
     # `06_breach_torn` has NO CARD -- it is read only so the hole card can say what the
     # cutting rate does past the runaway point, from that run rather than from memory.
     trn = json.load(open(os.path.join(LOG, "06_breach_torn", "metrics.json")))
-    R6 = [
-        ("06_refine", "bm_refine", "the sheet keeps up",
-         f"With refinement and secretion on, the membrane grows with the tissue instead of being "
-         f"stretched by it: {ref['faces'][0]:,} → {ref['faces'][1]:,} triangles and "
-         f"{ref['plaques'][0]:,} → {ref['plaques'][1]:,} adhesion plaques, which brings the mean "
-         f"edge back to {ref['G44']['value']:.2f}× its seeded length (3.63× with them off)"),
-        ("06_breach_hole", "bm_breach_hole", "a hole",
-         f"The protease switched on at the bell's peak: {100 * hol['torn_frac']:.0f}% of the sheet's "
-         f"{hol['faces_seeded']:,} faces torn, and the largest connected patch is "
-         f"{100 * hol['biggest_patch_frac']:.0f}% of them. MT1-MMP is a smooth random field with "
-         f"several maxima, so the sheet perforates in several places rather than one"),
-    ]
 
     def _clip(d, v, panels, kw, seq="panels"):
         """Build one card's clip, or say plainly that the run is not ready.
@@ -605,18 +601,9 @@ def main():
 
     runs5 = []
     for d, v, lbl, panels, kw, cap in R5:
-        if _clip(d, v, panels, kw):
-            runs5.append((d, f"{v}.mp4", lbl, _spec(d), cap))
-    QUAD = [q["tl"], q["tr"], q["bl"], q["br"]]
-    runs6 = []
-    for d, v, lbl, cap in R6:
-        # The 06 movies are one 2x2 with the run label in the top-left corner and the membrane
-        # panel's own title just under the halfway line; 0.09 of a panel clears both.
-        if _clip(d, v, QUAD, dict(skip_top=0.09)):
-            runs6.append((d, f"{v}.mp4", lbl, _spec(d), cap))
-    if len(runs6) < len(R6):
-        print(f"[minisite] second row: {len(runs6)} of {len(R6)} cards -- re-run this script when "
-              f"the rest have finished rendering")
+        sp = _spec(d)
+        if sp and _clip(d, v, panels, kw):
+            runs5.append((d, f"{v}.mp4", lbl, sp, cap))
 
     import shutil
     for tgt, rendered in ((QMD, False), (DOCS, True)):
@@ -625,7 +612,7 @@ def main():
             continue
         _patch(tgt, build(runs), rendered=rendered)
         _patch2(tgt, build2(runs2), rendered=rendered)
-        _patch3(tgt, build3(runs5, runs6), rendered=rendered)
+        _patch3(tgt, build3(runs5), rendered=rendered)
     # AND THE ONE HAND-WRITTEN CARD THIS SESSION REPLACED: "grow & divide" now plays the vertex
     # model on its own (`00_spheroid`), cropped to the tissue so the printed label is out of frame,
     # 3D first and the true cross-section second.
@@ -651,7 +638,7 @@ def main():
         # EVERY CARD'S CLIP, not just the ones that are new this time. Copying a subset once left
         # clips out of docs/gallery while the page that referenced them was patched -- cards
         # pointing at files the site did not have.
-        for d, v, *_ in runs + runs2 + runs5 + runs6:
+        for d, v, *_ in runs + runs2 + runs5:
             shutil.copy2(os.path.join(GAL, v), os.path.join(DOCS_GAL, v))
         print("[minisite] videos copied into docs/gallery/")
     return
