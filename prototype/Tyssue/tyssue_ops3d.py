@@ -1236,17 +1236,23 @@ class Apoptosis3D(Structural):
                 # killed the two runs this bound exists to fix -- so the fix's first outing failed
                 # for a reason unrelated to the fix. Hoisted out of the per-neighbour loop too: it
                 # is a property of the field, not of the recipient.
-                ceil = float(torch.nan_to_num(cs[:nF, h0], nan=0.0).max()) if nF else 0.0
+                # ELEMENTWISE, AND PER COLUMN. The bequest spans every chemistry channel the cell
+                # carries, so `inc` and `room` are vectors: a scalar comparison on them raises
+                # "Boolean value of Tensor with more than one value is ambiguous", and a single
+                # ceiling taken from channel 0 would clamp the substrate against the activator's
+                # maximum. Each column is bounded by its own.
+                ceil = torch.nan_to_num(cs[:nF, h0:h1], nan=0.0).amax(dim=0) if nF else None
                 for g in live:
                     inc = share / float(V0f[g])
-                    room = ceil - float(cs[g, h0])
-                    if inc > room > 0:
-                        m["apop_spill"] = m.get("apop_spill", 0.0) + (inc - room) * float(V0f[g])
-                        inc = room
-                    elif room <= 0:
-                        m["apop_spill"] = m.get("apop_spill", 0.0) + inc * float(V0f[g])
+                    if ceil is None:
+                        cs[g, h0:h1] += inc
                         continue
-                    cs[g, h0:h1] += inc
+                    room = (ceil - cs[g, h0:h1]).clamp(min=0.0)
+                    fits = torch.minimum(inc, room)
+                    over = (inc - fits).sum()
+                    if float(over) > 0:
+                        m["apop_spill"] = m.get("apop_spill", 0.0) + float(over) * float(V0f[g])
+                    cs[g, h0:h1] += fits
             clvl_c.state = cs
         # 3. REBUILD, exactly as divide_3d does: `keep` maps new face -> old face and carries every
         #    per-face array across, so nothing can fall out of step with the mesh.
