@@ -1086,6 +1086,33 @@ class Apoptosis3D(Structural):
         return set()
 
     def forward(self, H, mask=None):
+        # THE ACTED LEDGER IS BLIND TO THIS OPERATOR, AND TO THE WHOLE DIE FAMILY. Measured over
+        # rounds r001-r012 of the live campaign: 24 runs killed cells, 6,693 deaths in total, and
+        # `inert_operators` recorded `apoptosis_3d` as having acted in ZERO of them -- including
+        # runs that extruded 200 cells.
+        #
+        # The cause is structural, in both senses. `instrument._wrap` decides `acted` from
+        # `_nonzero(out) or (before != after)`, where `before`/`after` fingerprint the LEVEL STATE.
+        # A Die operator returns `{}` -- it has no delta to contribute -- and does its work by
+        # mutating the mesh: `nF`, the half-edge table, `alive`, and the per-face arrays. None of
+        # that is in the fingerprint, so the engine cannot see it and infers "nothing happened".
+        #
+        # HARMLESS TODAY AND NOT SAFE TO LEAVE. It never lands in `inert_operators`, so the
+        # inert-implies-inconclusive rule in `round.score` cannot misfire on it. But the ledger is
+        # the only cheap evidence that an operator RAN, and for this family it says nothing at all
+        # -- so a death run and a run where death was silently unreachable are indistinguishable in
+        # the record. That is the failure this project has paid for with `rd_interface_tension`
+        # (written off inert twice, never having fired) and `shape_to_chem` (100% acted, changing
+        # nothing).
+        #
+        # THE FIX IS FOR THE OPERATOR TO REPORT, NOT FOR THE ENGINE TO GUESS. Fingerprinting the
+        # mesh would work and is the wrong shape: the engine would be inferring from a hash what
+        # this operator already knows exactly. `m["n_apop"]` is incremented here on every
+        # extrusion, so the operator can hand back a liveness record -- deaths this tick, cells
+        # marked, cells waiting to be shed -- and the ledger can record a fact instead of a
+        # deduction. That record is also what gate G13 needs: the frame a cell crosses the
+        # extrusion threshold, separate from the frame it is shed, which no downstream sampling
+        # stride can recover.
         lvl = H.level(self.at); m = getattr(lvl, "_mesh", None)
         if m is None:
             return {}
