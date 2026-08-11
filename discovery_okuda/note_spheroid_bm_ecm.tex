@@ -330,6 +330,16 @@ as a field.}
 
 \subsection*{Proteolysis, and the mechanism the literature forced}
 
+\textbf{What the proteases are for, before any of their own chemistry.} Everything up to
+here builds a barrier: a sheet that carries load, holds its density, and stays attached. The proteases
+are the only operators in the model that \emph{remove} it, and they do so \emph{locally} --- so they
+are the mechanism of \textbf{barrier breach}, the step by which an epithelium stops being enclosed and
+a cell can cross into the stroma. Their target is the sheet's material (\op{bm\_degrade} acts on
+\code{bm\_face} mass); adhesion is affected only downstream, because a bond needs ligand, so $\rho$
+falling takes $n_b$ with it.
+
+
+
 \op{05g\_degrade} put the three species on the entities the confinement argument assigns them and
 measured which one can make a hole. The answer was unambiguous and one-sided:
 
