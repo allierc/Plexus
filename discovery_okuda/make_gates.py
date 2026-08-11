@@ -171,6 +171,57 @@ G16B = [
 ]
 
 
+# ------------------------------------------------------------------ G16c: do they coexist?
+# WHAT G16 ACTUALLY FOUND, and it inverts the design. Measured on the static sphere, one species
+# at a time:
+#
+#     A  chi 1.3, d_a 0.08          act_max 0.392   2 spots   spacing 6.99
+#     B  chi 1.3, d_a 0.16 (mine)   act_max 0.0     --        EXTINCT
+#     B  chi 0.4, d_a 0.08 (his)    act_max 0.553  15 spots   spacing 3.18
+#
+# B's KINETICS WERE NEVER THE PROBLEM. F 0.039 / kk 0.058 patterns perfectly well; what killed it
+# was `chi`, which multiplies the whole diffusion term -- I raised it 3.25x on top of doubling the
+# diffusivities and pushed the field out of its Turing regime. And with Cedric's own value B is
+# FINER than A, not coarser: 15 spots against 2. The design asked for a coarse second map and the
+# parameters deliver a fine one, so the roles are simply swapped -- A is the coarse map.
+#
+# G16 FAILS AS STATED and is recorded failed. The requirement it stands for -- that the two maps
+# are DIFFERENT -- is met, by a factor of 2.2 in spacing.
+#
+# G16c is the question those two runs cannot answer: each was measured ALONE. Two species sharing
+# one mesh and one buffer might not keep their wavelengths -- they compete for nothing in the
+# equations, but they are integrated on the same clock at the same dt, and a stability limit is a
+# property of the pair. PREDICTED, before the run: spacing 6.99 +/- 20% on channel 0 and 3.18 +/-
+# 20% on channel 2, both alive.
+G16C = ("g16c_pair", dict(A=dict(chi=1.3, d_a=0.08, d_h=0.16, F=0.046, kk=0.062),
+                          B=dict(chi=0.4, d_a=0.08, d_h=0.16, F=0.039, kk=0.058)))
+
+
+def g16c():
+    """Both species in ONE tissue, each on its own channel. Do they keep their wavelengths?"""
+    name, sp = G16C
+    A, B = sp["A"], sp["B"]
+    ops = [{"op": "cell_adjacency", "at": "cell"},
+           {"op": "seed_cell_rd", "at": "cell", "seed": 0, "before_frame": 3,
+            "mode": "scatter", "seed_frac": 0.12, "chan": 0},
+           {"op": "seed_cell_rd", "at": "cell", "seed": 7, "before_frame": 3,
+            "mode": "scatter", "seed_frac": 0.12, "chan": 2},
+           {"op": "cell_diffuse", "at": "cell", "implementation": "graph_laplacian", "chan": 0,
+            **{k: A[k] for k in ("d_a", "d_h", "chi")}},
+           {"op": "cell_diffuse", "at": "cell", "implementation": "graph_laplacian", "chan": 2,
+            **{k: B[k] for k in ("d_a", "d_h", "chi")}},
+           {"op": "cell_react", "at": "cell", "model": "gray_scott", "chan": 0, "rate": 1.0,
+            **{k: A[k] for k in ("F", "kk")}},
+           {"op": "cell_react", "at": "cell", "model": "gray_scott", "chan": 2, "rate": 1.0,
+            **{k: B[k] for k in ("F", "kk")}}]
+    return name, _shell(name, ops, {"_gate": {
+        "gate": "G16c", "predicted_spacing_chan0": 6.99, "predicted_spacing_chan2": 3.18,
+        "tolerance": 0.2, "A": A, "B": B,
+        "why": "each wavelength was measured ALONE. Two species share one mesh, one buffer and one "
+               "dt, and a stability limit is a property of the pair -- so keeping their separate "
+               "wavelengths together is a claim that has to be measured, not assumed"}})
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true")
@@ -180,6 +231,7 @@ def main():
     specs += [g16("species_a", dict(F=0.046, kk=0.062, rate=1.0), dict(d_a=0.08, d_h=0.16, chi=1.3)),
               g16("species_b", dict(F=0.039, kk=0.058, rate=1.0), dict(d_a=0.16, d_h=0.32, chi=1.3))]
     specs += [i4(s) for s in (0.05, 0.02, 0.01)]
+    specs.append(g16c())
     for tag, diff, why in G16B:
         n, sp = g16(tag, dict(F=0.039, kk=0.058, rate=1.0), diff)
         sp["_gate"] = {"gate": "G16b", "species": tag, **diff, "why": why}

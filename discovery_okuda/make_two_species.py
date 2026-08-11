@@ -49,7 +49,17 @@ BASE = "r001_03"          # a gs gated shaping member: chemistry, growth, purse-
 # (0.046, 0.062): a lower feed and kill pair sits in Gray-Scott's coral/negatons region and gives
 # broader, slower domains than the spot regime species A runs in.
 SPECIES_B = dict(F=0.039, kk=0.058, rate=1.0)
-DIFFUSE_B = dict(d_a=0.16, d_h=0.32, chi=1.3)      # 2x A's diffusivities -> a coarser wavelength
+# MEASURED, NOT ASSUMED, AND THE ASSUMPTION WAS WRONG TWICE. This was d_a 0.16, d_h 0.32, chi 1.3
+# -- doubled diffusivities AND chi raised 3.25x -- on the reasoning that more diffusion means a
+# longer wavelength. Gate G16 measured the field EXTINCT: act_max 0.0, against species A's 0.392.
+# The kinetics were never the problem; `chi` multiplies the whole diffusion term and 1.3 with
+# doubled diffusivities is outside the Turing regime entirely.
+#
+# At Cedric's own 2D value, chi 0.4, B patterns strongly -- and is FINER than A, 15 spots against
+# 2, spacing 3.18 against 6.99. So the two maps do differ, by a factor of 2.2, with the roles the
+# other way round: A is the coarse map and B the fine one. Anything reading these must say which
+# it wants rather than assume B is the broad one.
+DIFFUSE_B = dict(d_a=0.08, d_h=0.16, chi=0.4)      # measured: 15 spots, spacing 3.18 -- the FINE map
 SEED_B = dict(mode="scatter", seed_frac=0.12, seed=7)   # its own seed, or it copies A's pattern
 
 

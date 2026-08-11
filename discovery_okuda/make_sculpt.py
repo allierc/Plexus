@@ -93,7 +93,11 @@ def build(tag, death, *, after_frac=3.0, two_species=False, k_purse=None, note="
             elif o["op"] == "cell_diffuse":
                 out.append({"op": "cell_diffuse", "at": "cell", "chan": 2,
                             "implementation": o.get("implementation", "graph_laplacian"),
-                            "d_a": 0.16, "d_h": 0.32, "chi": 1.3})
+                            # chi 0.4, not 1.3: at 1.3 with doubled diffusivities gate G16
+                            # measured this field EXTINCT (act_max 0.0). At Cedric's own value it
+                            # patterns at 15 spots, spacing 3.18 -- FINER than A's 6.99, so the
+                            # coarse map is A and the fine one is B.
+                            "d_a": 0.08, "d_h": 0.16, "chi": 0.4})
             elif o["op"] == "cell_react":
                 out.append({"op": "cell_react", "at": "cell", "chan": 2, "model": "gray_scott",
                             "F": 0.039, "kk": 0.058, "rate": 1.0})

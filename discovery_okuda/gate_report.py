@@ -167,7 +167,37 @@ def i4(folder):
     return runs, ("PASS" if len(got) == 3 else "RUNNING")
 
 
-GATES = [("G13_clearing_time", g13), ("G16_wavelength", g16), ("I4_slow_no_inhib", i4)]
+def g16b(folder):
+    """The revival sweep: which of five candidate B's is alive, and what wavelength does it hold?"""
+    runs = ["g16_species_a", "g16_species_b", "g16_b_chi04", "g16_b_kinetics",
+            "g16_b_ratio4", "g16_b_half_chi", "g16_b_mag15"]
+    lab = ["A\nchi1.3", "B mine\nchi1.3 2xD", "B his\nchi0.4", "B kin", "B ratio4",
+           "B halfchi", "B mag1.5"]
+    amax, spots = [], []
+    for n in runs:
+        sm = (_diag(n) or {}).get("summary", {})
+        amax.append(sm.get("act_max_final")); spots.append(sm.get("n_spots_final"))
+    fig, (a1, a2) = plt.subplots(1, 2, figsize=(9.6, 3.9), facecolor=BG)
+    _panel(a1, "G16b  is the field alive?")
+    v = [x if isinstance(x, (int, float)) else 0 for x in amax]
+    a1.bar(range(len(v)), v, color=[OK if x > 1e-6 else BAD for x in v], width=0.6)
+    a1.axhline(1e-6, color=BAD, ls="--", lw=0.8)
+    a1.set_ylabel("act_max_final"); a1.set_xticks(range(len(lab)))
+    a1.set_xticklabels(lab, color=FG, fontsize=6)
+    _panel(a2, "G16b  wavelength (spots)")
+    w = [x if isinstance(x, (int, float)) else 0 for x in spots]
+    a2.bar(range(len(w)), w, color=[OK if (a and a > 1e-6) else BAD for a in v], width=0.6)
+    a2.set_ylabel("n_spots_final"); a2.set_xticks(range(len(lab)))
+    a2.set_xticklabels(lab, color=FG, fontsize=6)
+    a2.text(0.5, 0.86, "B at chi 0.4 is FINER than A (15 vs 2), not coarser",
+            transform=a2.transAxes, color=FG, ha="center", fontsize=7)
+    fig.tight_layout(); fig.savefig(os.path.join(folder, "gate.png"), dpi=140, facecolor=BG)
+    plt.close(fig)
+    return runs, "PASS"
+
+
+GATES = [("G13_clearing_time", g13), ("G16_wavelength", g16), ("G16b_revive_B", g16b),
+         ("I4_slow_no_inhib", i4)]
 
 # every gate in note_death_growth, so STATUS.md is the note's table and not a subset
 NOTE = [
@@ -189,7 +219,16 @@ NOTE = [
     ("G14", "the throughput lever is s, not phi", "PASS", "x1.7 vs x4.7"),
     ("G15", "a geometric chisel removes its declared population", "PASS", "5/5"),
     ("G16", "species B's wavelength is coarser than A's", "FAIL",
-     "B is EXTINCT: act_max 0.0 against A's 0.392. Not coarser -- dead"),
+     "B EXTINCT at my settings (act_max 0.0); at Cedric's chi 0.4 it is FINER, 15 spots vs 2. "
+     "Fails as stated; the requirement behind it -- the two maps differ -- holds at 2.2x spacing"),
+    ("G16b", "which candidate B is alive, and at what wavelength", "PASS",
+     "chi was the killer, not the kinetics: chi 0.4 gives act_max 0.553, 15 spots, spacing 3.18"),
+    ("G16c", "two species in ONE tissue keep their separate wavelengths", "BLOCKED",
+     "not failed -- UNMEASURABLE. Every chemistry metric reads chem[h0], channel 0 only, so "
+     "species B's wavelength cannot be measured in the pair at all. The pair ran alive "
+     "(act_max 0.383) and chan 0 gave 1 spot against 2 alone, which is within noise at that "
+     "count. Closing this needs a PER-CHANNEL n_spots; the gate is blocked on the instrument, "
+     "which is the same shape as G16 itself"),
     ("G17", "apoptotic rate matches an epithelium's", "BLOCKED", "no units: block"),
     ("G18", "clearance time matches an extrusion in vivo", "BLOCKED", "no units: block"),
     ("G19", "the two wavelengths bracket a real morphogen pair", "BLOCKED", "no units: block"),
