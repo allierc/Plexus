@@ -121,6 +121,41 @@ class VertexPlaques:
         f_n = -self.kn * (ell - self.l0)[:, None] * nh          # on the SHEET node
         return p, nh, ell, v_ep[self.vert], f_n
 
+    def retarget(self, x_bm, x_ep, centre, target, frac, gen):
+        """`plaque_seed` AS TURNOVER: a fraction of the bonds let go and re-form where their node is
+        NOW, and the set grows as the tissue makes new vertices.
+
+        This is the operator 05's G13 concluded slip requires. A plaque anchored to a FIXED point is
+        a pin in the tangential direction however large its friction is -- xi can only set how fast
+        the sheet equilibrates to the pin, never whether it slides. A bond that lets go and re-forms
+        at the tissue under it now lets the sheet move over the epithelium at a rate set by the
+        turnover, which is what a hemidesmosome does.
+
+        RE-FORMING IS NOT EXCLUSIVE, and the first version made it so. Requiring a free vertex meant
+        that at frame 0, with 395 of the tissue's 396 vertices already claimed, all 79 released bonds
+        re-formed on the ONE free vertex -- 79 sheet nodes pulled onto a single point, lam_geo 2.89
+        before anything had moved, and the sheet's Cholesky failing three frames later. A vertex is
+        8.5 um of tissue and can carry several adhesions; what cannot happen is many nodes on one
+        point, and re-forming each bond at its OWN nearest vertex cannot produce that.
+        """
+        ub = torch.nn.functional.normalize(x_bm - centre, dim=1)
+        ue = torch.nn.functional.normalize(x_ep - centre, dim=1)
+        n_rel = int(round(frac * self.node.shape[0]))
+        if n_rel:
+            k = torch.randperm(self.node.shape[0], generator=gen)[:n_rel].to(x_ep.device)
+            self.vert[k] = (ub[self.node[k]] @ ue.T).argmax(dim=1)
+        # grow: vertices no bond has claimed can take one, up to the target
+        room = int(target) - int(self.node.shape[0])
+        if room > 0:
+            claimed = torch.zeros(x_ep.shape[0], dtype=torch.bool, device=x_ep.device)
+            claimed[self.vert] = True
+            free_v = torch.nonzero(~claimed, as_tuple=False).flatten()
+            if free_v.numel():
+                add = free_v[: min(room, free_v.numel())]
+                self.node = torch.cat([self.node, (ue[add] @ ub.T).argmax(dim=1)])
+                self.vert = torch.cat([self.vert, add])
+        return int(self.node.shape[0]), int(n_rel)
+
     def scatter(self, f, x_bm, x_ep):
         """The force on the sheet and its reaction on the tissue, from one array."""
         fb = torch.zeros_like(x_bm)
@@ -231,8 +266,11 @@ def main():
               f"set coarser than itself (measured: lam_geo 1.445 at frame 0).", flush=True)
     plq = VertexPlaques(node, vert, l0, kn=arg("--kn", 2.0e4, float), xi=arg("--xi", 0.0, float))
     lam, pv = sheet.spectral_rate(return_vec=True)
-    sheet.M = arg("--zeta", 20.0, float) / (lam + plq.kn)
-    n_sub = max(1, int(np.ceil(sheet.M * (lam + plq.kn) / 1.0)))
+    zeta = arg("--zeta", 20.0, float)
+    s_target = arg("--s-target", 1.0, float)
+    refresh = arg("--refresh", 10, int)
+    sheet.M = zeta / (lam + plq.kn)
+    n_sub = max(1, int(np.ceil(sheet.M * (lam + plq.kn) / s_target)))
     R_end_um = T4.R_FINAL_BOX * BOX_UM
     spacing_um = float(np.sqrt(4 * np.pi * R_end_um ** 2 / max(node.shape[0], 1)))
     print(f"[06] sheet {int(sheet.n)} nodes / {int(sheet.m)} faces, {node.shape[0]} plaques "
@@ -241,15 +279,29 @@ def main():
           f"M = {sheet.M:.4g}, {n_sub} substeps; tissue {x_ep0.shape[0]} vertices at "
           f"scale {scale:.6f}", flush=True)
 
+    tau_p = arg("--plaque-tau", 5.0, float)          # frames; 5 x 600 s = 50 min, focal-adhesion-ish
+    gen = torch.Generator().manual_seed(0)
+    ub0 = torch.nn.functional.normalize(sheet.x[sheet.live_nodes] - c, dim=1).clone()
     rec = {k: [] for k in ("frame", "momentum", "standoff", "lam_geo", "lam_el", "R_bm", "R_ep",
-                           "n_sub", "cross_um", "cross_frac")}
+                           "n_sub", "cross_um", "cross_frac", "n_plaque", "slip_um")}
     sheet_pos = []
 
     def on_frame(H, t):
         """One frame of the sheet, driven by the plaques, inside the engine's own frame loop."""
         if t >= frames:
             return
+        nonlocal lam, pv, n_sub
+        # THE SUBSTEP COUNT IS RE-MEASURED, NOT FIXED AT SEEDING. A StVK membrane's tangent stiffens
+        # as it stretches: 05 measured its largest Hessian eigenvalue growing 19.1x over a run, and
+        # the stability bound is dt*M*lambda_max < 2 -- so a count fixed from the seeded value is a
+        # count that is 19x too small by the end. Fixing it here was not a guess: this rig NaN'd on
+        # the sheet's Cholesky partway through, which is that bound being crossed.
+        if t % refresh == 0 and bool(torch.isfinite(sheet.x).all()):
+            with torch.enable_grad():          # power iteration on Hessian-vector products
+                lam, pv = sheet.spectral_rate(iters=25, v0=pv, return_vec=True)
+            n_sub = max(1, int(np.ceil(sheet.M * (lam + plq.kn) / s_target)))
         x_ep, v_ep = tis.at(t)
+        n_now, n_rel = plq.retarget(sheet.x, x_ep, c, n_plq, 1.0 / tau_p, gen)
         dt = 1.0 / n_sub
         mom = 0.0
         # THE ENGINE RUNS UNDER `torch.no_grad()` and the sheet's force is an autograd gradient of
@@ -283,6 +335,13 @@ def main():
         rec["lam_geo"].append(float(l1.mean())); rec["lam_el"].append(float(e1.mean()))
         rec["R_bm"].append(float(rbm.mean())); rec["R_ep"].append(float((x_ep - c).norm(dim=1).mean()))
         rec["n_sub"].append(n_sub)
+        rec["n_plaque"].append(n_now)
+        # SLIP: how far the sheet has moved TANGENTIALLY over the epithelium since seeding. With a
+        # fixed anchor this is identically zero by construction, which is G13; with turnover it is
+        # the quantity a friction law can act on.
+        ub_now = torch.nn.functional.normalize(sheet.x[sheet.live_nodes] - c, dim=1)
+        rec["slip_um"].append(float((1.0 - (ub_now * ub0).sum(1)).clamp_min(0).mean().sqrt()
+                                    * rbm.mean() * BOX_UM * 1.4142))
         rec["cross_um"].append(float(cross[cross > 0].mean() * BOX_UM) if bool((cross > 0).any())
                                else 0.0)
         rec["cross_frac"].append(float((cross > 0).float().mean()))
@@ -290,6 +349,7 @@ def main():
             print(f"[06] frame {t:3d}  lam_geo {l1.mean():.3f}  lam_el {e1.mean():.3f}  "
                   f"standoff {rec['standoff'][-1]:+.3f} um  matrix inside the sheet "
                   f"{100 * rec['cross_frac'][-1]:.1f}% by {rec['cross_um'][-1]:.1f} um  "
+                  f"plaques {n_now}  slip {rec['slip_um'][-1]:.2f} um  "
                   f"momentum {mom:.1e}", flush=True)
         if t % max(1, frames // 120) == 0:
             sheet_pos.append((int(t), sheet.x[sheet.live_nodes].detach().cpu().numpy().copy()))
@@ -328,6 +388,12 @@ def main():
                          threshold="reported, not thresholded: this is the control",
                          measured_um=float(rec["cross_um"][-1]),
                          measured_frac=float(rec["cross_frac"][-1])),
+                 I6=dict(name="turnover grows the plaque set with the tissue",
+                         threshold=f"reaches the target of {n_plq}",
+                         measured=int(rec["n_plaque"][-1]), target=int(n_plq)),
+                 I7=dict(name="the sheet slides: slip is not identically zero (05's G13)",
+                         threshold="> 0 um; a fixed anchor gives exactly 0",
+                         measured_um=float(rec["slip_um"][-1])),
                  I5=dict(name="the plaque returns its reaction",
                          threshold="< 1e-12 (float64, on its own force pair)",
                          measured=float(max(rec["momentum"])))))
