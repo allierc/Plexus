@@ -299,39 +299,44 @@ def main():
     c = torch.tensor(T4.CENTRE, device=dev, dtype=torch.float64)
     # the sheet takes the tissue's own radius by direction, so it starts ON the surface and not on a
     # sphere the surface merely resembles
-    ue = torch.nn.functional.normalize(x_ep0 - c, dim=1)
-    r_ep = (x_ep0 - c).norm(dim=1)
-    R_bm = torch.empty(ub.shape[0], device=dev, dtype=torch.float64)
-    for i in range(0, ub.shape[0], 2048):
-        R_bm[i:i + 2048] = r_ep[(ub[i:i + 2048] @ ue.T).argmax(dim=1)]
-    # SEPARATION 2: seed on a SMOOTHED radius field. `apical_map` already smooths R(theta,phi) once,
-    # wrapped in phi -- a max-per-bin map is jagged by construction and a sheet draped on it takes
-    # that jaggedness as its reference metric, so any later smoothing registers as strain the tissue
-    # never applied.
-    if "--smooth-seed" in sys.argv:
-        smap = torch.as_tensor(z["smap"][0], device=dev, dtype=torch.float64) * scale
-        nth, nph = smap.shape
-        th = torch.acos(ub[:, 2].clamp(-1, 1)); ph = torch.atan2(ub[:, 1], ub[:, 0]) % (2 * np.pi)
-        R_bm = smap[(th / np.pi * nth).long().clamp(0, nth - 1),
-                    (ph / (2 * np.pi) * nph).long().clamp(0, nph - 1)]
-    sheet = BM.Sheet(subdiv=subdiv, R0=1.0, E=arg("--E", 400.0, float),
-                     thickness=0.1 / BOX_UM, nu=0.3, tau_r=arg("--tau-r", 25.0, float),
-                     max_refine=arg("--max-refine", 0, int),   # SEPARATION 3
-                     dev=dev, dtype=torch.float64)
-    sheet.reseed(c + ub * (R_bm + l0)[:, None])
-    # HOW MANY PLAQUES, AND THE HONEST STATEMENT OF WHAT THAT DENSITY IS. The literature spacing is
-    # Sigma ~ 7T ~ 0.7 um (Kanchanawong 2010), which on a sphere of radius 176 um would be ~10^5
-    # plaques -- two orders more than this mesh has nodes. The count is therefore set by the MESH and
-    # not by the biology, and the run reports the spacing it actually achieves so the gap is a number
-    # rather than an omission.
+    # ONE PAIRING, USED TWICE. The sheet's seed radius and its plaque partner were chosen by two
+    # different maps -- the radius from each NODE's nearest vertex, the plaque from each VERTEX's
+    # nearest node -- so a node was seeded at the radius of one vertex and then pulled toward a
+    # different one. That is an inconsistency of order the tissue's own bumpiness applied at frame 0,
+    # before anything moves, and it is why raising the anchored fraction from 15% to 62% made the
+    # frame-0 stretch WORSE (1.049 -> 1.175) instead of better. Here the pairing is computed ONCE,
+    # from the tissue side, and the seed radius is read through it: an anchored node is placed at
+    # exactly l0 from its own partner, so every plaque starts at its rest length and exerts nothing.
+    ub_unit = torch.nn.functional.normalize(
+        BM.icosphere(subdiv, device=dev, dtype=torch.float64)[0], dim=1)
     n_plq = arg("--plaques", 1000, int)
-    node, vert, n_max = seed_plaques(sheet.x[sheet.live_nodes], x_ep0, c, target=n_plq)
-    node = sheet.live_nodes[node]
+    node, vert, n_max = seed_plaques(ub_unit, x_ep0, c, target=n_plq)
     if n_plq > n_max:
         print(f"[06] {n_plq} plaques asked for; the tissue has {x_ep0.shape[0]} vertices at the "
-              f"seeding frame and one plaque per vertex is {n_max}. Seeding {n_max} and saying so, "
-              f"rather than putting several on one vertex -- which crushes the sheet onto a point "
-              f"set coarser than itself (measured: lam_geo 1.445 at frame 0).", flush=True)
+              f"seeding frame and one plaque per vertex is {n_max}. Seeding {n_max}, and the "
+              f"turnover operator grows the set as `divide_3d` makes more.", flush=True)
+    # the radius field: the smoothed map everywhere, overridden by the partner's own radius where a
+    # plaque lands, so the anchored nodes are exact and the rest are smooth rather than bumpy
+    smap = torch.as_tensor(z["smap"][0], device=dev, dtype=torch.float64) * scale
+    nth, nph = smap.shape
+    th = torch.acos(ub[:, 2].clamp(-1, 1)); ph = torch.atan2(ub[:, 1], ub[:, 0]) % (2 * np.pi)
+    R_bm = smap[(th / np.pi * nth).long().clamp(0, nth - 1),
+                (ph / (2 * np.pi) * nph).long().clamp(0, nph - 1)].clone()
+    # AND AN ANCHORED NODE SITS ON ITS PARTNER'S OWN RAY, not on its own at the partner's radius.
+    # The two directions differ by up to the vertex spacing -- 396 vertices is ~10 deg, and 10 deg at
+    # the seeding radius is 8 um against an l0 of 0.7 um -- so placing the node along its own ray
+    # leaves every plaque stretched by ten rest lengths before the clock starts. Measured that way:
+    # lam_geo 3.34 and slip 11.3 um at frame 0.
+    x0 = c + ub * (R_bm + l0)[:, None]
+    u_v = torch.nn.functional.normalize(x_ep0[vert] - c, dim=1)
+    x0[node] = x_ep0[vert] + l0 * u_v
+    # the sheet, on that radius field, and the plaque indices moved into the sheet's own numbering
+    sheet = BM.Sheet(subdiv=subdiv, R0=1.0, E=arg("--E", 400.0, float),
+                     thickness=0.1 / BOX_UM, nu=0.3, tau_r=arg("--tau-r", 25.0, float),
+                     max_refine=arg("--max-refine", 0, int),
+                     dev=dev, dtype=torch.float64)
+    sheet.reseed(x0)
+    node = sheet.live_nodes[node]
     plq = VertexPlaques(node, vert, l0, kn=arg("--kn", 2.0e4, float), xi=arg("--xi", 0.0, float))
     lam, pv = sheet.spectral_rate(return_vec=True)
     zeta = arg("--zeta", 20.0, float)
