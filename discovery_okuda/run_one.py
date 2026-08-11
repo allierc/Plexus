@@ -217,9 +217,11 @@ def frame_metrics(frames):
     from tissue_analysis import _cell_centroids, protrusion_ratio
     keys = ("n_cells", "protr", "protr_p99", "r_cv", "gyr_prolate", "gyr_oblate",
             "act_mean", "act_sd", "act_cv", "act_occupancy", "act_max", "act_min",
-            "red_frac", "act_alive", "corr_act_rad", "act_at_tip")
+            "red_frac", "act_alive", "corr_act_rad", "act_at_tip",
+            # species B's own statistics, so a two-species run reports both maps
+            "b_act_mean", "b_act_cv", "b_act_max", "b_act_min", "b_act_occupancy")
     out = {k: [] for k in keys}
-    for pos, mt, act in frames:
+    for pos, mt, act, act_b in frames:
         cen, rad, live = _cell_centroids(pos, mt)
         out["n_cells"].append(float(mt["nF"]))
         r = rad[live]
@@ -250,6 +252,22 @@ def frame_metrics(frames):
         # BOTH conditions, so a blow-up is not a pattern: one cell of 4,000 gives cv ~10 at
         # occupancy 0.01, and that is a singularity.
         out["act_alive"].append(float(cv > 0.05 and occ > 0.01))
+
+        # THE SECOND SPECIES, the same reduction on its own channel. Zeros on a single-species run
+        # rather than a ragged column, and `b_act_max` is then 0 -- which the registry's `requires`
+        # reads as "no second map", so every other b_ quantity is UNDEFINED rather than reported.
+        if act_b is None:
+            for k in ("b_act_mean", "b_act_cv", "b_act_max", "b_act_min", "b_act_occupancy"):
+                out[k].append(0.0)
+        else:
+            b = np.asarray(act_b, float)
+            bmu, bsd = (float(b.mean()), float(b.std())) if b.size else (0.0, 0.0)
+            blo, bhi = (float(b.min()), float(b.max())) if b.size else (0.0, 0.0)
+            bcv = bsd / abs(bmu) if abs(bmu) > 1e-12 else 0.0
+            bocc = float((b > blo + 0.5 * (bhi - blo)).mean()) if bhi > blo + 1e-12 else 0.0
+            out["b_act_mean"].append(bmu); out["b_act_cv"].append(bcv)
+            out["b_act_max"].append(bhi); out["b_act_min"].append(blo)
+            out["b_act_occupancy"].append(bocc)
 
         # THE COUPLING, REFUSED ON A DEAD FIELD. Pearson is scale-free by construction and
         # returns a confident number for noise: 0.294 measured on an activator whose entire
@@ -409,7 +427,12 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
 
     def frame(t):
         mt = hist[t]
-        return (posf[t][:mt["Nv"]].astype(np.float64), mt, chemf[t][:mt["nF"], 0])
+        # CHANNEL 2 TRAVELS WITH THE FRAME. A two-species run carries species A in chem columns
+        # (0,1) and species B in (2,3); this tuple carried column 0 only, so every per-frame
+        # quantity described one species and was silent about the other. None on a single-species
+        # run, and the loop below then measures nothing extra.
+        b = chemf[t][:mt["nF"], 2] if chemf[t].shape[1] >= 3 else None
+        return (posf[t][:mt["Nv"]].astype(np.float64), mt, chemf[t][:mt["nF"], 0], b)
 
     fr = [frame(t) for t in range(T)]
     # THE SWITCH BEFORE THE TABLE. `red_frac` is the fraction of cells the growth operator

@@ -310,12 +310,36 @@ diffusivity pair --- at $\chi=1.3$ with doubled diffusivities the field does not
 (\code{act\_max} $0.0$). The requirement the gate stands for, that the two maps differ, holds at
 $2.2\times$.
 
+\textbf{G5 --- closed on the run it was built for.} \op{tsd\_cap10} previously reached
+\code{act\_mean\_floor} $-7.29\times10^{11}$ and went NaN at frame 1430. With the bequest bounded
+per column it finishes with \code{act\_max\_final} $0.579$, \code{act\_mean\_floor} $0.0465$, no
+extinction and no premise broken --- and \code{apop\_spill} $3.009$, so material WAS refused and the
+bound engaged rather than passing vacuously. That also closes \textbf{I8}: the conservation law's
+error term is recorded and readable.
+
+\textbf{I4 --- closed, and it confirms the throughput law while removing the confound.} The slow
+ladder with \code{inhib\_chan} absent:
+
+\smallskip
+{\small\begin{tabular}{@{}lrrrr@{}}\toprule
+run & $\tau_{\rm clear}$ & deaths & cells & \code{apop\_spill}\\\midrule
+\op{i4\_slow005} & 37  & 875 &  8482 & 4.14\\
+\op{i4\_slow002} & 94  & 729 & 10534 & 2.45\\
+\op{i4\_slow001} & 189 & 199 & 11553 & 0.29\\
+\bottomrule\end{tabular}}
+\smallskip
+
+Deaths fall and tissue rises monotonically with the clearing time, which is Eq.~\eqref{eq:clear}
+acting as the throughput lever (G14) measured directly. And the confounded series' small tissue
+($3525$--$4353$ cells) was the inhibitor, not the death speed: at the same shrink rates without it
+the tissue holds $8482$--$11553$.
+
 \begin{center}\small
 \begin{tabular}{@{}llp{7.4cm}l@{}}\toprule
 & \textbf{item} & \textbf{what closing it requires} & \textbf{state}\\\midrule
 G5  & the conservation bound holds &
-  \op{tsd\_cap10} and \op{tsd\_cap25} complete with a finite activator and \code{apop\_spill}
-  reported. Both previously diverged to $-7.3\times10^{11}$ and $-2.4\times10^{23}$. & \PEND{running}\\
+  \PASS{closed on \op{tsd\_cap10}}: finite activator, no premise broken, \code{apop\_spill}
+  $3.009$. \op{tsd\_cap25} confirms it at the higher cap. & \PEND{cap25 running}\\
 G8  & runs are reproducible &
   \PASS{deterministic within a build}; \FAIL{not across the channel refactor}. Any comparison
   spanning it must be re-measured. & \FAIL{qualified}\\
@@ -324,11 +348,15 @@ G13 & $\tau_{\rm clear}=\ln c/\ln(1-s)$ &
 G16 & the two maps differ &
   \PASS{closed}: $2.2\times$ in spacing, with A coarse and B fine. & \PASS{done}\\
 G16c& the pair keeps both wavelengths &
-  \op{g16c\_pair} re-measured with the per-species instrument now that it exists. & \PEND{running}\\
+  \op{g16c\_pair} re-measured. The per-species pass was first added to \code{measure\_1frame},
+  which \code{run\_one} does not call --- it carries its own per-frame loop --- so the instrument
+  is now in that loop and the frame tuple carries channel~2. & \PEND{running}\\
 I4  & the slow ladder, unconfounded &
-  three runs with \code{inhib\_chan} absent. & \PEND{running}\\
-I8  & \code{apop\_spill} is near zero on a healthy run &
-  any completed death run; the term is now carried into the summary. & \PEND{running}\\
+  \PASS{closed}: deaths $875\to729\to199$ and cells $8482\to11553$ as $\tau_{\rm clear}$ rises
+  $37\to189$. & \PASS{done}\\
+I8  & \code{apop\_spill} is readable &
+  \PASS{closed}: $0.29$--$4.14$ across the I4 ladder, rising with the death count, so the term
+  tracks the refusals rather than sitting at zero. & \PASS{done}\\
 G17--19 & any measurement-tier gate & a \code{units:} block. & \PEND{blocked}\\
 \bottomrule
 \end{tabular}
