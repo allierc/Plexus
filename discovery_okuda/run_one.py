@@ -541,7 +541,10 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     rec = RunRecord(graph_struct, params={}, seed=cfg["general"]["seed"],
                     backend="tyssue_avm_3d", ic="checkpoint",
                     campaign=campaign, wall_s=round(wall, 1))
-    ref = arch.save_trajectory(rec.run_id, [p for p, _, _ in fr], per_frame,
+    # INDEXED, NOT UNPACKED. The frame tuple gained a fourth member (species B's channel) and a
+    # fixed-arity unpack here raised "too many values to unpack (expected 3)" -- after the run had
+    # finished simulating, so the whole run was lost at the archiving step.
+    ref = arch.save_trajectory(rec.run_id, [f[0] for f in fr], per_frame,
                                meta={"config": name, "comp_hash": disc.get("comp_hash"),
                                      "region": disc.get("region"), "n_frames": T})
     rec.set_trajectory_ref(ref)
@@ -1036,7 +1039,7 @@ def run_box(fr, pad=1.12):
     Measured on the whole trajectory (not just the last frame) because a run can peak and then
     retract -- fitting to the end state would clip the peak straight out of the picture.
     """
-    return float(max(np.abs(pt).max() for pt, _, _ in fr)) * pad
+    return float(max(np.abs(f[0]).max() for f in fr)) * pad
 
 
 def render(name, fr, out_dir, n_strip=8, movie_frames=60, movie=True):
