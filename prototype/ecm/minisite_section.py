@@ -402,8 +402,13 @@ is held in the matrix rather than dissolved in it,
 def main():
     sh, br = _measured("03f_mesh_shear"), _measured("03g_mesh_breach")
     pr = _measured("03_mesh_contact")
+    # A NEW CLIP GETS A NEW FILENAME. `vertex_mpm_free.mp4` was named for the
+    # frictionless control it once played; when this card was repointed at a different
+    # run under the same name, every browser that had the page open kept serving the
+    # OLD bytes from cache and the swap looked like it had not happened. The name also
+    # now says what the card says.
     R3 = [
-        ("03_mesh_contact", "vertex_mpm_free", "press",
+        ("03_mesh_contact", "vertex_mpm_press", "press",
          f"the rig on its own: a triangulated surface pressed into a free MPM block and lifted off "
          f"again, {pr['contacts_max']} particles in contact at the deepest. The reaction really "
          f"returns to the mesh — momentum residual {pr['momentum_residual_max']:.1e} of the "
