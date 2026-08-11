@@ -284,37 +284,62 @@ so what binds is how fast a sentenced cell reaches the extrusion threshold (G14)
 \code{inhib\_sw} tightens, with \code{protr\_final} falling $1.095 \to 1.020$. Eq.~\eqref{eq:inhib}
 asserts a multiplicative shutdown and the tissue size follows it; the shape does not sharpen.
 
-\section*{6.\; Open items}
+\section*{6.\; Gate outcomes and open items}
+
+\textbf{G8 --- the engine is deterministic, and the trajectory still moved.} Two replicates of one
+spec, same seed, different names: \op{g8\_rep1} and \op{g8\_rep2} agree to every recorded digit
+(7099 cells, \code{protr\_peak} 1.175, \code{act\_max} 0.825). So a per-run comparison inside one
+build is exact, and the seed spread is the only noise floor within it. But both differ from the
+same spec's archived run (7261 cells, 1.176): a numerically equivalent refactor of
+\op{cell\_diffuse}'s coefficient vector and \op{cell\_react}'s delta shifted a chaotic trajectory
+by $2.2\%$ in cell count over 1800 frames. \textbf{Comparisons ACROSS that change are not exact;
+comparisons within a build are.}
+
+\textbf{G13 --- consistent, and not resolvable at this stride.} One named cell on a static sheet,
+four shrink rates. The death frames order as predicted ($\sim$150, 100, 100, 75 against $87$, $68$,
+$62$, $58$) and each exceeds its prediction, which is the shedding time
+Eq.~\eqref{eq:clear} does not include. But \code{metrics.npz} carries 25 samples for 601 frames --- a
+stride of 25 --- and the differences between rungs are of the same order. \textbf{The formula is not
+contradicted and is not confirmed.} Closing it needs the frame each marked cell crosses
+$c\,v_{\rm ref}$ recorded beside the frame it is extruded, which separates the two terms and does
+not depend on the sampling stride at all.
+
+\textbf{G16 --- closed, failed, and the direction is the finding.} Species B is the FINE map:
+15 domains at a spacing of $3.18$ cell diameters against A's 2 at $6.99$. $\chi$ sets this, not the
+diffusivity pair --- at $\chi=1.3$ with doubled diffusivities the field does not pattern at all
+(\code{act\_max} $0.0$). The requirement the gate stands for, that the two maps differ, holds at
+$2.2\times$.
 
 \begin{center}\small
-\begin{tabular}{@{}llp{7.6cm}l@{}}\toprule
+\begin{tabular}{@{}llp{7.4cm}l@{}}\toprule
 & \textbf{item} & \textbf{what closing it requires} & \textbf{state}\\\midrule
 G5  & the conservation bound holds &
-  \op{tsd\_cap10} and \op{tsd\_cap25} complete with a finite activator and
-  \code{apop\_spill} reported. & \PEND{running}\\
-G8  & the inhibitor's null is exact &
-  two replicates of one untouched spec. If they differ from each other, the engine is not
-  deterministic and no per-run comparison in the campaign is exact; if they agree, the
-  channel change perturbed a run that does not use it. & \PEND{running}\\
+  \op{tsd\_cap10} and \op{tsd\_cap25} complete with a finite activator and \code{apop\_spill}
+  reported. Both previously diverged to $-7.3\times10^{11}$ and $-2.4\times10^{23}$. & \PEND{running}\\
+G8  & runs are reproducible &
+  \PASS{deterministic within a build}; \FAIL{not across the channel refactor}. Any comparison
+  spanning it must be re-measured. & \FAIL{qualified}\\
 G13 & $\tau_{\rm clear}=\ln c/\ln(1-s)$ &
-  the death frame measures shrink time PLUS shedding time, and the formula is the first term
-  only. Separating them needs the frame each marked cell crosses $c\,v_{\rm ref}$ recorded
-  beside the frame it is extruded. & \FAIL{open}\\
-G16 & B's wavelength is coarser than A's &
-  FAILS as stated: at $\chi=0.4$ species~B holds 15 spots against A's 2, so B is the FINE map.
-  The requirement behind it --- that the two maps differ --- holds at $2.2\times$ in spacing. &
-  \FAIL{closed, failed}\\
+  a per-cell record of the crit-crossing frame, independent of the sampling stride. & \FAIL{open}\\
+G16 & the two maps differ &
+  \PASS{closed}: $2.2\times$ in spacing, with A coarse and B fine. & \PASS{done}\\
 G16c& the pair keeps both wavelengths &
-  per-species pattern metrics. Every chemistry metric read \code{chem[h0]}; the second species
-  is now measured on \code{chan 2} and reported under \code{b\_} keys. & \PEND{running}\\
+  \op{g16c\_pair} re-measured with the per-species instrument now that it exists. & \PEND{running}\\
 I4  & the slow ladder, unconfounded &
-  three runs with \code{inhib\_chan} absent, so death speed is the only variable. & \PEND{running}\\
+  three runs with \code{inhib\_chan} absent. & \PEND{running}\\
 I8  & \code{apop\_spill} is near zero on a healthy run &
-  any completed death run: the term is recorded per frame and carried into the summary. &
-  \PEND{running}\\
+  any completed death run; the term is now carried into the summary. & \PEND{running}\\
+G17--19 & any measurement-tier gate & a \code{units:} block. & \PEND{blocked}\\
 \bottomrule
 \end{tabular}
 \end{center}
+
+\textbf{The instrument for the second species now exists.} \code{b\_act\_max}, \code{b\_act\_cv},
+\code{b\_n\_spots}, \code{b\_spot\_spacing\_cells} and \code{b\_spot\_frac} are the channel-2 twins
+of the metrics that read channel 0, each declaring \code{requires} so they are UNDEFINED --- not
+zero --- when the second species is extinct. They are registered as diagnostics rather than
+admitted: a metric becomes admissible when a prediction may rest on it, and that requires it to
+reach a real run's summary, which no two-species run has done since they were added.
 
 \section*{7.\; What this licenses, and what it does not}
 
