@@ -401,18 +401,22 @@ is held in the matrix rather than dissolved in it,
 
 def main():
     sh, br = _measured("03f_mesh_shear"), _measured("03g_mesh_breach")
+    pr = _measured("03_mesh_contact")
     R3 = [
-        ("03c_mesh_contact_hole", "vertex_mpm_free", "press",
-         "a triangulated surface pressed into an MPM block against a rigid floor, then lifted off "
-         "again. The reaction really returns to the mesh (momentum residual 1.4e-7, float32 "
-         "precision) and friction changes the slip fourfold -- not MPM's automatic weld"),
+        ("03_mesh_contact", "vertex_mpm_free", "press",
+         f"the rig on its own: a triangulated surface pressed into a free MPM block and lifted off "
+         f"again, {pr['contacts_max']} particles in contact at the deepest. The reaction really "
+         f"returns to the mesh — momentum residual {pr['momentum_residual_max']:.1e} of the "
+         f"applied force, which is float32 precision — and friction cuts the tangential slip "
+         f"{pr['slip_frictionless'] / pr['slip_friction']:.1f}-fold against the same run at μ = 0, "
+         f"so the contact is a contact and not MPM's automatic weld"),
         ("03f_mesh_shear", "vertex_mpm_shear", "drag",
          f"the tangential half of the same law, as a loading rather than as a number. A sticky pad "
          f"presses {sh['indent_cells']:.1f} grid cells in and then travels "
          f"{sh['drag_box_units']:.2f} box units at that depth across a matrix pinned at its base: "
          f"it ploughs, heaps the material ahead of itself and shears what it drags over -- coloured "
          f"by von Mises, because a drag changes shape at constant volume. Momentum still balances "
-         f"to {sh['momentum_residual_max']:.0e} of the applied force across "
+         f"to {sh['momentum_residual_max']:.1e} of the applied force across "
          f"{sh['contacts_max']:,} contacts"),
         ("03g_mesh_breach", "vertex_mpm_breach", "breach",
          f"what a hole in the surface is FOR. The box is closed on all four sides and the matrix is "
@@ -499,8 +503,13 @@ def main():
     q = dict(tl=(0, 0, 0.5, 0.5), tr=(0.5, 0, 0.5, 0.5),
              bl=(0, 0.5, 0.5, 0.5), br=(0.5, 0.5, 0.5, 0.5))
     fib = _measured("04d_spheroid_fibres")
-    het = json.load(open(os.path.join(LOG, "05h_2_hetero_inhib10_bound1", "metrics.json")))
-    g46, hetr = het["G46"], het["heterogeneity"]["realistic: all rates vary"]
+    # THE RUN AT THE BELL'S PEAK, not the one ten times past it. `05h_2` sits at 10 K on the far
+    # shoulder and dissolves nothing, so the fourth panel of its clip is a sphere that never
+    # changes -- a card about making a hole, showing no hole. This one is at c_T = K.
+    het = json.load(open(os.path.join(LOG, "05h_1_hetero", "metrics.json")))
+    g46 = het["G46"]
+    hetr = het["heterogeneity"]["realistic: all rates vary"]
+    bell = het["heterogeneity"]["bell isolated: uniform MT1"]
     R5 = [
         ("04d_spheroid_fibres", "spheroid_fibres", "the spheroid loads the matrix",
          [q["tl"], q["tr"], q["br"]], dict(skip_top=0.06),
@@ -510,15 +519,15 @@ def main():
          f"radius {fib['cos2_measured_matched']:.3f} measured against {fib['cos2_affine']:.3f} "
          f"affine, from 1/3 isotropic — so the arrangement is fibrous and the response is not. 3D, "
          f"section, then the tissue alone"),
-        ("05h_2_hetero_inhib10_bound1", "bm_protease", "who is allowed to make a hole",
+        ("05h_1_hetero", "bm_protease", "who is allowed to make a hole",
          [q["tl"], q["tr"], q["bl"], q["br"]], dict(skip_top=0.10, skip_bot=0.12),
-         f"Four fields in turn: MT1-MMP expression, the matrix-BOUND inhibitor TIMP-3, the "
-         f"activation rate, and the sheet's own density. TIMP-2 both presents the zymogen and "
-         f"poisons the enzyme that must cut it, so activation is bell-shaped and peaks at "
-         f"c_T = K; this run sits at {het['inhib_over_K']:.0f}&thinsp;K, down the far side — the "
-         f"activation map is no longer a copy of its source "
-         f"(r = {g46['corr_activation_with_source']:.2f}, CV "
-         f"{hetr['act_cv']:.2f}) and nothing dissolves"),
+         f"Four panels in turn, and only the last two are computed: MT1-MMP expression per cell "
+         f"and the matrix-BOUND inhibitor TIMP-3 are prescribed sources, the activation rate is "
+         f"what the pair of them makes, and ρ/ρ₀ is the sheet being eaten. At the bell's peak "
+         f"(c_T = K) {100 * hetr['hole']:.0f}% of the sheet is gone; with MT1 made uniform the "
+         f"same bell dissolves {100 * bell['hole']:.0f}% — so the hole still needs the tethered "
+         f"enzyme's own pattern, which is why it is still "
+         f"r = {g46['corr_activation_with_source']:.2f} correlated with it"),
     ]
     runs5 = []
     for d, v, lbl, panels, kw, cap in R5:
