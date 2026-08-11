@@ -150,6 +150,27 @@ def i4(s):
     return name, base
 
 
+# --------------------------------------------------------------------------- G16b: revive species B
+# WHAT I ACTUALLY CHANGED FROM CEDRIC'S 2D SPEC, and it was two things, not one. His two-species
+# spec runs d_a 0.08, d_h 0.16, chi 0.4 with F 0.039, kk 0.058. I used d_a 0.16, d_h 0.32, chi 1.3
+# -- doubling the diffusivities AND raising chi by 3.25x. chi multiplies the whole diffusion term,
+# so the pair moved the operating point by 6.5x in effective diffusivity, and the field went
+# extinct. Reporting "B is coarser" would have been a claim about a dead map.
+#
+# THE WAVELENGTH IS SET BY THE RATIO d_h/d_a, NOT BY THE MAGNITUDE. That is the one thing Turing
+# fixes: the magnitude sets how fast the pattern develops and the ratio sets its scale. So the
+# sweep separates them -- b_ratio4 leaves the magnitude at A's and doubles only the RATIO, which
+# is the coarse map the design wanted; b_chi04 is Cedric's own numbers unmodified, which is the
+# control I should have run first.
+G16B = [
+    ("b_kinetics", dict(d_a=0.08, d_h=0.16, chi=1.3), "B's kinetics at A's diffusion: is F/kk alone survivable?"),
+    ("b_chi04",    dict(d_a=0.08, d_h=0.16, chi=0.4), "Cedric's 2D values, unmodified -- the control I skipped"),
+    ("b_ratio4",   dict(d_a=0.08, d_h=0.32, chi=1.3), "RATIO 4 at A's magnitude: coarse without moving the operating point"),
+    ("b_half_chi", dict(d_a=0.16, d_h=0.32, chi=0.65), "2x diffusivity with chi halved: same product as A"),
+    ("b_mag15",    dict(d_a=0.12, d_h=0.24, chi=1.3), "1.5x magnitude, ratio unchanged"),
+]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true")
@@ -159,6 +180,10 @@ def main():
     specs += [g16("species_a", dict(F=0.046, kk=0.062, rate=1.0), dict(d_a=0.08, d_h=0.16, chi=1.3)),
               g16("species_b", dict(F=0.039, kk=0.058, rate=1.0), dict(d_a=0.16, d_h=0.32, chi=1.3))]
     specs += [i4(s) for s in (0.05, 0.02, 0.01)]
+    for tag, diff, why in G16B:
+        n, sp = g16(tag, dict(F=0.039, kk=0.058, rate=1.0), diff)
+        sp["_gate"] = {"gate": "G16b", "species": tag, **diff, "why": why}
+        specs.append((n, sp))
 
     print(f"{'spec':<18}{'gate':<6}{'predicts':<34}{'ops':>4}  status")
     bad, names = 0, []

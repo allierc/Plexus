@@ -877,6 +877,37 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     # of is indistinguishable from one that works -- which is exactly how the -7.3e11 activator
     # went unnoticed for a whole series.
     summary["apop_spill"] = float(hist[-1].get("apop_spill") or 0.0) if hist else 0.0
+
+    # A METRIC COMPUTED ON A DEAD FIELD IS UNDEFINED, NOT ZERO -- and the difference is the whole
+    # of gate G16. Species B's activator ended at 0.0 and `n_spots_final` came back 1, against
+    # species A's 2. Read as a number that is "fewer spots", which is what the design predicted;
+    # read honestly it is "no spots", which is the opposite finding. The same number, two contrary
+    # meanings, and nothing in the record could tell them apart.
+    #
+    # So every quantity DERIVED FROM THE ACTIVATOR is set to None when the activator is extinct,
+    # and the names are listed. None already reads downstream as "absent"; the list says WHY it is
+    # absent, which is what lets the loop treat it as a missing measurement rather than a poor
+    # result. A zero that means "not measurable" is the most expensive kind of number a campaign
+    # can carry, because it is indistinguishable from evidence.
+    _ACT_DERIVED = ("n_spots", "spot_spacing_cells", "spot_frac", "spot_cells_max",
+                    "spot_cells_med", "grip", "corr_act_rad", "act_cv", "act_at_tip",
+                    "red_frac", "red_at_tip", "autocorr_hops_uncalibrated")
+    _amax = summary.get("act_max_peak")
+    if isinstance(_amax, (int, float)) and _amax <= 1e-6:
+        killed = []
+        for k in list(summary):
+            stem = k.rsplit("_", 1)[0] if "_" in k else k
+            if stem in _ACT_DERIVED or k in _ACT_DERIVED:
+                if summary[k] is not None:
+                    summary[k] = None
+                    killed.append(k)
+        summary["undefined_metrics"] = sorted(killed)
+        summary["undefined_why"] = (f"the activator never rose above {_amax:.3g}: every quantity "
+                                    f"derived from it is undefined on this run, not zero")
+        print(f"[{name}] ⚠ activator extinct (peak {_amax:.3g}) -- {len(killed)} derived "
+              f"metric(s) set to UNDEFINED rather than reported as numbers", flush=True)
+    else:
+        summary["undefined_metrics"] = []
     if summary["buf_full"] or summary["div_blocked"]:
         print(f"[{name}] RESERVOIR FULL at {summary.get('n_cells_final')} cells "
               f"(first refused division at frame {summary.get('div_blocked_first_frame')}) -- "

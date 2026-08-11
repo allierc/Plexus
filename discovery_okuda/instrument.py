@@ -105,7 +105,37 @@ def _wrap(cls):
         before = fingerprint(H)
         out = orig(self, H, mask)
         after = fingerprint(H)
-        acted = bool(out) or (before != after)
+        # A ZERO DELTA IS NOT AN ACTION, and `bool(out)` said it was. An operator returning a
+        # full-size tensor of zeros -- which is what EVERY lateral operator does when its parameter
+        # has put it outside the regime where it does anything -- scored `acted = True`, so the
+        # ledger reported it running on every frame of every run while it changed nothing.
+        #
+        # THIS IS THE GENERAL FORM OF A DEFECT THIS PROJECT HAS PAID FOR FIVE TIMES.
+        # `shape_to_chem` was edited 25 times across 13 rounds, 8 of them same-seed, and scored
+        # 100% acted while not changing the run by a single bit. `rd_interface_tension` ran 800
+        # frames at `a_sw = 1.0` -- cells strictly above the maximum, the empty set -- and was
+        # written off as inert twice without ever having fired. Species B's chemistry was extinct
+        # (act_max 0.0) in every two-species run, so its react operator returned ~0 forever and
+        # three downstream results were read as being about the mechanism.
+        #
+        # The distinction that matters is INERT versus REFUTED. "This operator changed nothing" is
+        # evidence about the OPERATING POINT; "this mechanism does not produce the effect" is
+        # evidence about the MECHANISM. Scoring the first as the second is how a campaign spends
+        # rounds refuting an operator that never ran, and the ledger is the only place that
+        # distinction can be made cheaply -- so it has to be made here rather than trusted to a
+        # reader downstream.
+        def _nonzero(o):
+            if not o:
+                return False
+            for v in (o.values() if isinstance(o, dict) else [o]):
+                try:
+                    if v is not None and bool((v != 0).any()):
+                        return True
+                except Exception:
+                    return True                    # not a tensor: assume it means something
+            return False
+
+        acted = _nonzero(out) or (before != after)
         led = getattr(H, "_acted", None)
         if led is None:
             led = {}
