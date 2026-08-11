@@ -1,8 +1,8 @@
 #!/usr/bin/env python
-"""test_05j -- can the sheet track a REAL epithelium? Four variants, one cause each.
+"""test_05n -- can the sheet track a REAL epithelium? Four variants, one cause each.
 
-    python test_05j_real_surface.py [--device cuda:0] [--frames 399]
-        ->  log/okuda_ECM/05j_{tether_smooth,tether_real,plaque_real,plaque_refine}/
+    python test_05n_real_surface.py [--device cuda:0] [--frames 399]
+        ->  log/okuda_ECM/05n_{tether_smooth,tether_real,plaque_real,plaque_refine}/
 
 WHY THIS EXISTS. 05's sheet has only ever tracked a smooth, analytically expanding icosphere, and
 G5's stretch fidelity of 0.9935 is a measurement against that. The real epithelium is different in
@@ -214,10 +214,10 @@ def main():
     for k in kinds:
         o = run(k, dev, frames, npz, scale, stride)
         allout[k] = o
-        d = os.path.join(LOG, f"05j_{k}")
+        d = os.path.join(LOG, f"05n_{k}")
         os.makedirs(d, exist_ok=True)
         json.dump(o, open(os.path.join(d, "metrics.json"), "w"), indent=1)
-        print(f"[05j] {k:14s} {'ran to the end' if o['failed_at'] is None else 'FAILED at frame %d' % o['failed_at']}"
+        print(f"[05n] {k:14s} {'ran to the end' if o['failed_at'] is None else 'FAILED at frame %d' % o['failed_at']}"
               f" | lam_geo {o['series']['lam_geo'][-1]:.3f} | q_min {o['q_min_first']:.3f} -> "
               f"{o['q_min_last']:.3f} | first crossing: {o['first_crossing']} | {o['wall_s']:.0f} s",
               flush=True)
@@ -243,12 +243,12 @@ def main():
     for i, a in enumerate(ax):
         _panel(a, "abcd"[i])
     fig.tight_layout()
-    out0 = os.path.join(LOG, "05j_tether_smooth", "gate.png")
+    out0 = os.path.join(LOG, "05n_tether_smooth", "gate.png")
     fig.savefig(out0, dpi=150, facecolor="white")
     for k in kinds[1:]:
-        fig.savefig(os.path.join(LOG, f"05j_{k}", "gate.png"), dpi=150, facecolor="white")
+        fig.savefig(os.path.join(LOG, f"05n_{k}", "gate.png"), dpi=150, facecolor="white")
     plt.close(fig)
-    print(f"[05j] -> {LOG}/05j_*", flush=True)
+    print(f"[05n] -> {LOG}/05j_*", flush=True)
 
 
 if __name__ == "__main__":

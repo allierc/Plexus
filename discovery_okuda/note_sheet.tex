@@ -875,18 +875,17 @@ G18e& $\rho=m/A$ equals $1/J$ & --- & an identity, not a test\\
 G28& the sheet stays OUTSIDE the epithelium (signed) & radial gap $>0$ &
      \PASS{$+4.3\times10^{-4}$} (was $-3.6\times10^{-3}$)\\
 G29& no plaque ends up on the wrong side & $0\%$ & \PASS{$0.0\%$} (was $89.6\%$)\\\midrule
-\multicolumn{4}{@{}l}{\textit{before \op{06}: the sheet on a REAL epithelium} (\op{05j}--\op{05m})}\\
-G30& \textbf{$\lambda^{\rm geo}$ does not depend on the adhesion's stiffness} & $\kappa_n$ over
+\multicolumn{4}{@{}l}{\textit{before \op{06}: the sheet on a REAL epithelium --- numbered from G40 to leave G30--G39 to the adhesion work} (\op{05n}, \op{05p}, \op{05q})}\\
+G40& \textbf{$\lambda^{\rm geo}$ does not depend on the adhesion's stiffness} & $\kappa_n$ over
      $8\times$ moves it $<5\%$ & \PASS{$0.0000$} ($4.455$ at every $\kappa_n$)\\
-G31& it tracks a real, dividing surface & $\lambda^{\rm geo}$ within $5\%$ of
-     $\sqrt{A_{\rm ep}(T)/A_{\rm ep}(0)}$, NOT of the radius ratio & \PEND{05l}\\
-G32& the mesh survives it & worst triangle quality $>0.2$ & \FAIL{$0.000$} (\op{05j}, no
-     secretion, no refinement)\\
-G33& $\rho$ held with \op{bm\_secrete} ON, on the real surface & within $10\%$ & \PEND{05l}\\
-G34& mean edge in band with \op{bm\_refine} ON, on the real surface & $[0.8,1.7]\times$ seeded &
-     \PEND{05l}\\
-G35& all four reported together every frame & $\lambda^{\rm geo}$, $\lambda^{\rm el}$, $\rho$, edge
-     & \PEND{05m}\\
+G41& it tracks a real, dividing surface & $\lambda^{\rm geo}$ within $5\%$ of
+     $\sqrt{A_{\rm ep}(T)/A_{\rm ep}(0)}$, NOT of the radius ratio & \PEND{05q}\\
+G42& the mesh survives it & worst triangle quality $>0.2$ & \FAIL{$0.000$} (\op{05n}, no secretion, no refinement)\\
+G43& $\rho$ held with \op{bm\_secrete} ON, on the real surface & within $10\%$ & \PEND{05q}\\
+G44& mean edge in band with \op{bm\_refine} ON, on the real surface & $[0.8,1.7]\times$ seeded &
+     \PEND{05q}\\
+G45& all four reported together every frame & $\lambda^{\rm geo}$, $\lambda^{\rm el}$, $\rho$, edge
+     & \PEND{05q}\\
 
 \midrule
 \multicolumn{4}{@{}l}{\textit{tearing} (\op{05d\_tear}) --- G19 is the test the MPM sheet never faced}\\
@@ -911,13 +910,13 @@ G27& dilution and turnover are comparable & ratio within $[0.3,3]$ &
 G28& the sheet stays OUTSIDE the epithelium (signed) & radial gap $>0$ &
      \PASS{$+2.7\times10^{-4}$}\\
 G29& no plaque on the wrong side & $0\%$ & \PASS{$0.0\%$}\\
-G30& receptor conserved: $N_f+\sum N_b$ moves only by $s_i$, $1/\tau_i$ & exact &
+G40& receptor conserved: $N_f+\sum N_b$ moves only by $s_i$, $1/\tau_i$ & exact &
      \PEND{05d}\\
-G31& bound fraction depends on LOAD, not on the frame & monotone in stress, plateaus &
+G41& bound fraction depends on LOAD, not on the frame & monotone in stress, plateaus &
      \PEND{05d}\\
-G32& slip rate monotone in $k_{\rm off}$, zero at $k_{\rm off}=0$ & separation &
+G42& slip rate monotone in $k_{\rm off}$, zero at $k_{\rm off}=0$ & separation &
      \PEND{05d}\\
-G33& the discrete-plaque model converges to the density model at high $\Sigma^{-2}$ & within $5\%$ &
+G43& the discrete-plaque model converges to the density model at high $\Sigma^{-2}$ & within $5\%$ &
      \PEND{05d}\\
 \bottomrule
 \end{tabularx}}

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-"""test_05k -- G30: is the sheet's tracking a property of the sheet, or of the spring?
+"""test_05p -- G30: is the sheet's tracking a property of the sheet, or of the spring?
 
-    python test_05k_stiffness.py [--device cuda:0] [--frames 399]
+    python test_05p_stiffness.py [--device cuda:0] [--frames 399]
         ->  log/okuda_ECM/05k_kn{...}/
 
 THE GATE, AND WHY IT IS THE FIRST ONE. A sheet can always be made to follow a growing tissue by
@@ -37,10 +37,10 @@ def main():
     out = {}
     for kn in (0.5e4, 1.0e4, 2.0e4, 4.0e4):
         o = J.run("tether_real", dev, frames, npz, scale, stride, kn=kn)
-        d = os.path.join(LOG, f"05k_kn{kn:g}"); os.makedirs(d, exist_ok=True)
+        d = os.path.join(LOG, f"05p_kn{kn:g}"); os.makedirs(d, exist_ok=True)
         json.dump(o, open(os.path.join(d, "metrics.json"), "w"), indent=1)
         out[kn] = o
-        print(f"[05k] kn={kn:8.0f}  lam_geo {o['series']['lam_geo'][-1]:6.3f}  "
+        print(f"[05p] kn={kn:8.0f}  lam_geo {o['series']['lam_geo'][-1]:6.3f}  "
               f"q_min {o['q_min_last']:.4f}  {'ran' if o['failed_at'] is None else 'FAILED %d' % o['failed_at']}",
               flush=True)
     lam = np.array([out[k]["series"]["lam_geo"][-1] for k in out])
@@ -58,11 +58,11 @@ def main():
         a.text(0.0, 1.03, "ab"[i], transform=a.transAxes, fontweight="bold", fontsize=11)
         a.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
-    for k in kk: fig.savefig(os.path.join(LOG, f"05k_kn{k:g}", "gate.png"), dpi=150, facecolor="white")
+    for k in kk: fig.savefig(os.path.join(LOG, f"05p_kn{k:g}", "gate.png"), dpi=150, facecolor="white")
     json.dump(dict(spread=spread, tissue_ratio=float(R),
                    lam={str(k): float(out[k]["series"]["lam_geo"][-1]) for k in out}),
-              open(os.path.join(LOG, f"05k_kn{kk[0]:g}", "G30.json"), "w"), indent=1)
-    print(f"[05k] -> {LOG}/05k_*", flush=True)
+              open(os.path.join(LOG, f"05p_kn{kk[0]:g}", "G30.json"), "w"), indent=1)
+    print(f"[05p] -> {LOG}/05p_*", flush=True)
 
 if __name__ == "__main__":
     main()
