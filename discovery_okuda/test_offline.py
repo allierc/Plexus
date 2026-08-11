@@ -937,7 +937,12 @@ def t_metrics_have_declared_producers():
     src = {}
     for mod, path in (("tissue_analysis", "../prototype/Tyssue/tissue_analysis.py"),
                       ("morphology", "../prototype/Tyssue/morphology.py"),
-                      ("pattern_scale", "pattern_scale.py"), ("run_one", "run_one.py")):
+                      ("pattern_scale", "pattern_scale.py"), ("run_one", "run_one.py"),
+                      # `measure_1frame` produces the whole chemistry family -- act_mean, act_cv,
+                      # act_max and their per-species `b_` twins -- and was absent from this map,
+                      # so any metric naming it as its producer was reported as having none. The
+                      # check was blind to a module rather than the module being unreachable.
+                      ("measure_1frame", "measure_1frame.py")):
         try:
             src[mod] = open(os.path.join(HERE, path)).read()
         except OSError:
@@ -966,8 +971,21 @@ def t_metrics_have_declared_producers():
         # A KEY CAN BE WRITTEN TWO WAYS. `m["shape_idx_p95"] = ...` and `dict(shape_idx_p95=...)`
         # are the same fact, and my first regex only saw the first -- so it reported six correct
         # producers as broken. Checking the detector before believing it.
-        if not re.search(r"[\"']" + re.escape(m.name) + r"[\"']|\b"
-                         + re.escape(m.name) + r"\s*=", src[mod]):
+        # A PREFIXED FAMILY IS SET BY A COMPREHENSION, NOT BY ITS NAME. The per-species metrics
+        # are emitted as `{f"b_{k}": v for k, v in <the same producer>.items()}`, so the literal
+        # string "b_act_max" appears nowhere and a name search reports a real producer as missing.
+        # Checking the STEM instead is the same guarantee: the module demonstrably emits the family,
+        # and the family demonstrably contains this key.
+        # A PREFIXED FAMILY IS EMITTED WHOLE. `{f"b_{k}": v for k, v in producer(...).items()}`
+        # forwards EVERY key the inner producer sets, so confirming the module emits the family is
+        # the whole guarantee -- searching for the stem as well adds nothing and passes or fails by
+        # coincidence: `n_spots` and `spot_spacing_cells` appear in a plot label in that file and
+        # `spot_frac` does not, which is why two of three passed a check that was testing nothing.
+        if m.name.startswith("b_") and re.search(r'f"b_\{k\}"', src[mod]):
+            continue
+        probe = m.name
+        if not re.search(r"[\"']" + re.escape(probe) + r"[\"']|\b"
+                         + re.escape(probe) + r"\s*=", src[mod]):
             unset.append(f"{m.name} not set anywhere in {mod}.py")
     check(not missing, f"producers that do not exist: {missing}")
     check(not unset, f"declared producers that never set their key: {unset}")

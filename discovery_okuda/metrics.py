@@ -1162,6 +1162,80 @@ class RayCrossMed(Metric):
 # analysis is a module, and splitting it into six classes would be this same mistake in reverse. They
 # are declared here so the registry still knows the keys exist and where they come from.
 
+# ---------------------------------------------------------------------------------------------
+# THE SECOND SPECIES. Every metric above reads `chem` column 0. A two-species run carries species A
+# in columns (0,1) and species B in (2,3), so without these the run reports one map and is silent
+# about the other -- and silence is indistinguishable from zero to whatever reads the summary next.
+# That is what made gate G16c unattemptable: the pair's second wavelength could not be measured at
+# all, so "do two species keep their separate wavelengths in one tissue" had no instrument.
+#
+# Each is the SAME reduction as its channel-0 twin, computed on channel 2 and prefixed `b_`, and
+# each declares `requires`: on a run with no second species, or one whose second species is
+# extinct, these are UNDEFINED rather than 0.
+def _b_alive(s):
+    v = s.get("b_act_max_peak")
+    return isinstance(v, (int, float)) and v > 1e-6
+
+
+@register
+class BActMax(Metric):
+    """Species B's activator maximum. The first thing to read on any two-species run: if this is
+    zero the second map does not exist and every other `b_` quantity is meaningless."""
+    # NOT ADMITTED YET, and the registry's own gates are why. A metric is admissible when a
+    # prediction may rest on it, and three checks enforce what that costs: it must have a producer
+    # that really sets the key, it must be documented, and it must REACH A REAL RUN'S SUMMARY. No
+    # two-species run has been measured since these were added, so the last is false and admitting
+    # them would turn three true gates red for a reason that is about the schedule, not the code.
+    # They become admitted once a run carries them -- which is the point at which a prediction on
+    # `b_n_spots` could actually be scored.
+    name, group, admitted = "b_act_max", "pattern", False
+    produced_by = "measure_1frame:chem_metrics_batch"
+    conditional = "absent on a single-species run (chem width 2)"
+    self_declining = True
+
+
+@register
+class BActCV(Metric):
+    """Species B's coefficient of variation -- flat field versus patterned, independent of scale."""
+    name, group, admitted = "b_act_cv", "pattern", False
+    produced_by = "measure_1frame:chem_metrics_batch"
+    conditional = "absent on a single-species run"
+    self_declining = True
+
+
+@register
+class BNSpots(Metric):
+    """Species B's domain count, by connected components on the same cell graph as `n_spots`.
+
+    THE PAIR (n_spots, b_n_spots) IS THE WAVELENGTH COMPARISON, and it is the only way to check
+    that a second species is a DIFFERENT map rather than a copy or a dead field. Measured alone on
+    a static sphere: A at chi 1.3 holds 2 domains, B at chi 0.4 holds 15."""
+    name, group, admitted = "b_n_spots", "pattern", False
+    produced_by = "tissue_analysis:frame_metrics"   # the b_ prefix is applied there
+    requires = staticmethod(_b_alive)
+    requires_why = "species B's activator never rose above 1e-6: it has no domains to count"
+
+
+@register
+class BSpotSpacing(Metric):
+    """Species B's spot spacing in cell diameters -- a pattern LENGTH, comparable with A's."""
+    name, group, admitted = "b_spot_spacing_cells", "pattern", False
+    produced_by = "tissue_analysis:frame_metrics"   # the b_ prefix is applied there
+    self_declining = True
+    conditional = "None below two spots, as for spot_spacing_cells"
+    requires = staticmethod(_b_alive)
+    requires_why = "species B's activator never rose above 1e-6: there is no spacing to measure"
+
+
+@register
+class BSpotFrac(Metric):
+    """Fraction of the surface species B's domains cover."""
+    name, group, admitted = "b_spot_frac", "pattern", False
+    produced_by = "tissue_analysis:frame_metrics"   # the b_ prefix is applied there
+    requires = staticmethod(_b_alive)
+    requires_why = "species B's activator never rose above 1e-6: nothing to take a fraction of"
+
+
 @register
 class NSpots(Metric):
     """How many activator spots, by connected components on the cell graph. Okuda's Fig. 5a shows about TEN

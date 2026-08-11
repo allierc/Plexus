@@ -202,6 +202,16 @@ def main():
         M[t, :nF] = True
     t0 = time.time()
     chem = chem_metrics_batch(A, M, a_sw=a_sw)
+    # SPECIES B'S OWN STATISTICS. `act_max`, `act_cv` and the rest are computed on channel 0, so a
+    # two-species run reported ONE species' chemistry and was silent about the other -- and
+    # "silent" is indistinguishable from "zero" for a reader. Without these, whether species B is
+    # even alive is unmeasurable, which is what blocked gate G16c. Same reduction, same batched
+    # pass, keys prefixed `b_`.
+    if chemf and chemf[0].shape[1] >= 3:
+        B = np.zeros((T, nFmax)); 
+        for t in range(T):
+            B[t, :hist[t]["nF"]] = chemf[t][:hist[t]["nF"], 2]
+        chem.update({f"b_{k}": v for k, v in chem_metrics_batch(B, M, a_sw=a_sw).items()})
     t_chem_batch = time.time() - t0
 
     t0 = time.time()
