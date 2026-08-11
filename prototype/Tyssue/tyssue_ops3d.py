@@ -1231,7 +1231,12 @@ class Apoptosis3D(Structural):
                 # is quietly violated is worse than one that reports where it failed, because the
                 # first is indistinguishable from a working one.
                 share = amt / float(len(live))
-                ceil = float(np.nanmax(cs[:nF, h0:h1])) if nF else 0.0
+                # TORCH, NOT NUMPY: `cs` is the cell state and lives on the GPU. `np.nanmax` on a
+                # CUDA tensor raises "can't convert cuda:0 device type tensor to numpy", which
+                # killed the two runs this bound exists to fix -- so the fix's first outing failed
+                # for a reason unrelated to the fix. Hoisted out of the per-neighbour loop too: it
+                # is a property of the field, not of the recipient.
+                ceil = float(torch.nan_to_num(cs[:nF, h0], nan=0.0).max()) if nF else 0.0
                 for g in live:
                     inc = share / float(V0f[g])
                     room = ceil - float(cs[g, h0])
@@ -1404,6 +1409,11 @@ class TopoSnapshot3D(Structural):
             # the whole point of an inhibitor -- an invisible mechanism is one nobody can check.
             # None-safe, so a run without an inhibitor records None and the renderer draws nothing.
             inhib=cp("inhib_frac"),
+            # THE CONSERVATION LAW'S OWN ERROR TERM. Material a dying cell could not bequeath
+            # without pushing a neighbour out of the integrator's basin is dropped and counted
+            # here rather than injected. It must be ~0 on a healthy run; a large value says the
+            # bequest is being refused, which is the diagnostic for the -7.3e11 divergence.
+            apop_spill=float(m.get("apop_spill", 0.0)),
             # THE TWO-POOL STATE, when `medioapical_myosin` is in the schedule. `myo_med` is the
             # AREAL density on each cell and `myo_amount` the AMOUNT on each half-edge; the pair is
             # what makes the conservation ledger measurable offline, since `myo` alone is normalised
