@@ -207,6 +207,63 @@ def seed_plaques(x_bm, x_ep, centre, target, seed=0):
     return node, vert, n_max
 
 
+def movie(d, name, npz, scale, stride, sheet_pos, P, band, cmap_colors, slab=0.022):
+    """The section: matrix strands, the epithelium's own cross-section, and the sheet on top of it.
+
+    A section and not a 3D view, because the question this run asks -- is the sheet where the tissue
+    is, and is it stretched more than the tissue stretched it -- is a question about a rim, and a rim
+    is what a cut shows.
+    """
+    from matplotlib.animation import FFMpegWriter
+    from matplotlib.collections import LineCollection
+    try:
+        import imageio_ffmpeg
+        matplotlib.rcParams["animation.ffmpeg_path"] = imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        pass
+    z = np.load(npz)
+    nmesh = len(z["mesh_frames"])
+    c = np.asarray(T4.CENTRE, np.float32)
+    per = 20
+    nf = P.shape[1] // per
+    mid0 = P[0][: nf * per].reshape(nf, per, 3).mean(1)
+    keep2d = np.nonzero(np.abs(mid0[:, 2] - c[2]) < slab)[0]
+    lim = 0.30
+    fig = plt.figure(figsize=(6.0, 6.0), facecolor="black")
+    wri = FFMpegWriter(fps=20, metadata={"title": name})
+    with wri.saving(fig, os.path.join(d, "movie.mp4"), dpi=110):
+        for (t, q) in sheet_pos:
+            ti = min(P.shape[0] - 1, t)
+            fig.clf()
+            a = fig.add_subplot(1, 1, 1, facecolor="black")
+            # the matrix, as strands, coloured by its stress band
+            S = P[ti][: nf * per].reshape(nf, per, 3)[keep2d]
+            B = np.median(band[ti][: nf * per].reshape(nf, per), axis=1).astype(int)[keep2d]
+            a.add_collection(LineCollection([q_[:, :2] for q_ in S], linewidths=0.7,
+                                            colors=[cmap_colors[int(b) % len(cmap_colors)]
+                                                    for b in B], alpha=0.85))
+            # the epithelium, from its own mesh
+            j = min(nmesh - 1, t // stride)
+            V = z[f"m{j}_pos"] * scale + c
+            es, et = z[f"m{j}_E_srce"], z[f"m{j}_E_trgt"]
+            sl = np.abs(0.5 * (V[es] + V[et])[:, 2] - c[2]) < slab
+            a.add_collection(LineCollection(
+                [np.stack([V[x][:2], V[y][:2]]) for x, y in zip(es[sl], et[sl])],
+                linewidths=0.5, colors="#e8dcc0", alpha=0.85))
+            # the sheet, as the dots it is, in the same slab
+            m = np.abs(q[:, 2] - c[2]) < slab
+            a.scatter(q[m][:, 0], q[m][:, 1], s=5.0, c="#2ecc71", marker=".", linewidths=0)
+            a.set_xlim(0.5 - lim, 0.5 + lim); a.set_ylim(0.5 - lim, 0.5 + lim)
+            a.set_aspect("equal"); a.axis("off")
+            a.text(0.02, 0.98, f"{name}   frame {t}", transform=a.transAxes, color="white",
+                   fontsize=10, va="top")
+            a.text(0.02, 0.94, "matrix (stress) / epithelium (cream) / sheet (green)",
+                   transform=a.transAxes, color="#aaa", fontsize=8, va="top")
+            wri.grab_frame()
+    fig.savefig(os.path.join(d, "3d.png"), dpi=110, facecolor="black")
+    plt.close(fig)
+
+
 def main():
     import plexus.operators                                          # noqa: F401
     from plexus import schema
@@ -247,8 +304,19 @@ def main():
     R_bm = torch.empty(ub.shape[0], device=dev, dtype=torch.float64)
     for i in range(0, ub.shape[0], 2048):
         R_bm[i:i + 2048] = r_ep[(ub[i:i + 2048] @ ue.T).argmax(dim=1)]
+    # SEPARATION 2: seed on a SMOOTHED radius field. `apical_map` already smooths R(theta,phi) once,
+    # wrapped in phi -- a max-per-bin map is jagged by construction and a sheet draped on it takes
+    # that jaggedness as its reference metric, so any later smoothing registers as strain the tissue
+    # never applied.
+    if "--smooth-seed" in sys.argv:
+        smap = torch.as_tensor(z["smap"][0], device=dev, dtype=torch.float64) * scale
+        nth, nph = smap.shape
+        th = torch.acos(ub[:, 2].clamp(-1, 1)); ph = torch.atan2(ub[:, 1], ub[:, 0]) % (2 * np.pi)
+        R_bm = smap[(th / np.pi * nth).long().clamp(0, nth - 1),
+                    (ph / (2 * np.pi) * nph).long().clamp(0, nph - 1)]
     sheet = BM.Sheet(subdiv=subdiv, R0=1.0, E=arg("--E", 400.0, float),
                      thickness=0.1 / BOX_UM, nu=0.3, tau_r=arg("--tau-r", 25.0, float),
+                     max_refine=arg("--max-refine", 0, int),   # SEPARATION 3
                      dev=dev, dtype=torch.float64)
     sheet.reseed(c + ub * (R_bm + l0)[:, None])
     # HOW MANY PLAQUES, AND THE HONEST STATEMENT OF WHAT THAT DENSITY IS. The literature spacing is
@@ -420,6 +488,11 @@ def main():
         a.spines[["top", "right"]].set_visible(False)
     fig.tight_layout(); fig.savefig(os.path.join(d, "gate.png"), dpi=150, facecolor="white")
     plt.close(fig)
+    import ecm_spec as ES
+    import test_02_ecm_block as T2
+    band, _ = T2.bands_from_vm(vm) if vm else (np.zeros((P.shape[0], P.shape[1]), np.uint8), 1.0)
+    if sheet_pos:
+        movie(d, name, npz, scale, stride, sheet_pos, P, np.asarray(band), ES.STRESS_COLORS)
     for k, v in m["gates"].items():
         print(f"[gate] {k}: {v}", flush=True)
     print(f"[06] -> {d}", flush=True)
