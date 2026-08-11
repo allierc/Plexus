@@ -871,6 +871,12 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     # the earlier total. The cell COUNT cannot substitute -- r019_02_apop_small went 2,000 -> 3,089
     # with death running, and r019_02_apop_low held at 2,000 with death running and nothing dying.
     summary["n_apop"] = int(max((h.get("n_apop") or 0) for h in hist)) if hist else 0
+    # THE CONSERVATION ERROR, SURFACED. `apop_spill` accumulates material a dying cell could not
+    # give away without pushing a neighbour outside the integrator's basin. It is monotone, so the
+    # last frame carries the total. Recorded because a conservation law nobody can read the error
+    # of is indistinguishable from one that works -- which is exactly how the -7.3e11 activator
+    # went unnoticed for a whole series.
+    summary["apop_spill"] = float(hist[-1].get("apop_spill") or 0.0) if hist else 0.0
     if summary["buf_full"] or summary["div_blocked"]:
         print(f"[{name}] RESERVOIR FULL at {summary.get('n_cells_final')} cells "
               f"(first refused division at frame {summary.get('div_blocked_first_frame')}) -- "
