@@ -57,7 +57,8 @@ def _ops(spec):
     return {o["op"]: o for o in spec["operators"]}
 
 
-def build(tag, *, death_chan=None, growth_chan=0, death_mode="chem_low", a_sw=0.25):
+def build(tag, *, death_chan=None, growth_chan=0, death_mode="chem_low", a_sw=0.25,
+          max_mark_frac=0.005, shrink_rate=0.05, after_frac=3.0, critical_frac=0.15):
     """`r001_03` + a second RD species. `death_chan=None` means species B only patterns growth."""
     spec = copy.deepcopy(yaml.safe_load(open(os.path.join(CONFIG, f"{BASE}.yaml"))))
     spec["general"]["name"] = tag
@@ -99,9 +100,10 @@ def build(tag, *, death_chan=None, growth_chan=0, death_mode="chem_low", a_sw=0.
             {"op": "apoptosis_3d", "at": "vertex", "cell_set": "cell",
              "p0": _ops(spec)["shape_energy_3d"].get("p0", 3.5),
              "mode": death_mode, "chan": int(death_chan), "a_sw": a_sw,
-             "max_mark_frac": 0.005, "min_age": 4, "shrink_rate": 0.05, "critical_frac": 0.15,
-             # A THIRD OF THE RUN, so species A has built a form before B starts removing it.
-             "after_frame": n_frames // 3})
+             "max_mark_frac": max_mark_frac, "min_age": 4, "shrink_rate": shrink_rate,
+             "critical_frac": critical_frac,
+             # A THIRD OF THE RUN by default, so species A has built a form before B removes any.
+             "after_frame": int(n_frames // after_frac)})
 
     # SCHEDULE ORDER IS translate.SCHEDULE_ORDER's, read from it rather than restated, with the
     # second species' operators sitting beside their own kind.
@@ -115,7 +117,8 @@ def build(tag, *, death_chan=None, growth_chan=0, death_mode="chem_low", a_sw=0.
         # `is not None`, NOT truthiness: chan 0 is a legal channel and `if death_chan` reported
         # "no death" for the ts_death_same_a variant while the operator had after_frame 600.
         "death_reads_chan": death_chan,
-        "death_after_frame": (n_frames // 3) if death_chan is not None else None,
+        "death_after_frame": int(n_frames // after_frac) if death_chan is not None else None,
+        "max_mark_frac": max_mark_frac, "shrink_rate": shrink_rate,
         "why": ("species A (chem 0,1) and species B (chem 2,3) are independent RD systems in one "
                 "buffer; B has 2x the diffusivities so its wavelength is coarser. A single-species "
                 "run cannot put growth and death in different places, because every operator reads "
@@ -143,15 +146,52 @@ VARIANTS = [
     ("ts_death_same_a", dict(death_chan=0, growth_chan=0)),
 ]
 
+# ---------------------------------------------------------------------------------------------
+# A LOT OF DEATH. Cedric, 11 August: "the death series has landed, I do not see much death, make a
+# new series with a lot of cell death."
+#
+# THE FIRST SERIES WAS CAP-LIMITED, NOT RULE-LIMITED, and it proved it by accident:
+# `ts_death_b_late` (a_sw 0.25) and `ts_death_b_sharp` (a_sw 0.5) came back BIT-IDENTICAL -- 301
+# deaths, 11,955 cells, every metric equal. Two different selection thresholds, one outcome. The
+# reason is `max_mark_frac = 0.005`: both thresholds propose far more cells than 0.5% of the
+# tissue, so the cap takes the worst 0.5% either way and the threshold never binds. Turning a_sw
+# up cannot produce more death; it only reorders a queue whose length is fixed elsewhere.
+#
+# So the ladder is on the CAP, and on the one other quantity that sets throughput. Deaths per unit
+# time are (how many are under sentence at once) / (how long each takes to clear), and the second
+# term is `shrink_rate`: a marked cell shrinks by that fraction per tick until it passes
+# `critical_frac x v_ref` and is extruded, so ~ln(0.15)/ln(1-rate) ticks at 37 for rate 0.05 and 12
+# for 0.15. Raising both multiplies.
+#
+# 301 deaths of ~12,000 cells is 2.5% of the tissue over 1,200 frames. The top of this ladder is
+# fifty times the cap and three times the clearing rate, which on the same tissue is a different
+# regime rather than more of the same -- and the r020 measurements say where it breaks: uncapped,
+# death took a parent from protr 1.513 to 1.131 with 1,660 of 7,424 cells dead. That is the wall
+# this ladder is meant to find, so the series is built to cross it rather than to stop short.
+DEATH_SERIES = [
+    ("tsd_cap02",      dict(death_chan=2, max_mark_frac=0.02)),
+    ("tsd_cap05",      dict(death_chan=2, max_mark_frac=0.05)),
+    ("tsd_cap10",      dict(death_chan=2, max_mark_frac=0.10)),
+    ("tsd_cap25",      dict(death_chan=2, max_mark_frac=0.25)),
+    # the same sentence, cleared three times faster: throughput without widening the queue, which
+    # separates "how many are dying" from "how fast each one goes"
+    ("tsd_cap10_fast", dict(death_chan=2, max_mark_frac=0.10, shrink_rate=0.15)),
+    # both levers at once, and death from a tenth of the way in rather than a third -- the most
+    # death this vocabulary can express short of removing the cap
+    ("tsd_max",        dict(death_chan=2, max_mark_frac=0.25, shrink_rate=0.15, after_frac=10.0)),
+]
+
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true")
+    ap.add_argument("--all", action="store_true", help="the first series too, not just the death ladder")
     a = ap.parse_args()
     sys.path.insert(0, HERE)
-    print(f"{'spec':<20}{'growth':>7}{'death':>7}{'after':>7}{'ops':>5}  gate")
+    print(f"{'spec':<20}{'death':>6}{'cap':>7}{'shrink':>7}{'after':>7}{'ops':>5}  gate")
     bad = 0
-    for tag, kw in VARIANTS:
+    todo = (VARIANTS + DEATH_SERIES) if a.all else DEATH_SERIES
+    for tag, kw in todo:
         spec = build(tag, **kw)
         with open(os.path.join(CONFIG, f"{tag}.yaml"), "w") as f:
             yaml.safe_dump(spec, f, sort_keys=False, default_flow_style=False)
@@ -163,9 +203,10 @@ def main():
             bad += bool(fails)
             note = "BROKEN " + ",".join(fails) if fails else "ok"
         ts = spec["_two_species"]
-        print(f"{tag:<20}{ts['growth_reads_chan']:>7}{str(ts['death_reads_chan']):>7}"
-              f"{str(ts['death_after_frame']):>7}{len(spec['operators']):>5}  {note}")
-    print(f"\n{len(VARIANTS)} specs -> {CONFIG}")
+        print(f"{tag:<20}{str(ts['death_reads_chan']):>6}{ts['max_mark_frac']:>7.3f}"
+              f"{ts['shrink_rate']:>7.2f}{str(ts['death_after_frame']):>7}"
+              f"{len(spec['operators']):>5}  {note}")
+    print(f"\n{len(todo)} specs -> {CONFIG}")
     return 1 if bad else 0
 
 
