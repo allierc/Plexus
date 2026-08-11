@@ -1,5 +1,5 @@
 """
-05q_gates -- G40 to G45 re-measured on the driver that actually works.
+05k_gates -- G40 to G45 re-measured on the driver that actually works.
 
 WHY THESE ARE RE-RUN AND NOT JUST RE-READ. G40 to G45 were written against `test_06_three_bodies`'
 vertex-plaque law -- one bond per tissue VERTEX, a per-plaque rest length, turnover retargeting --
@@ -81,7 +81,7 @@ def main():
 
     dev = arg("--device", str, "cuda:0" if torch.cuda.is_available() else "cpu")
     frames = arg("--frames", int, 401)
-    name = arg("--name", str, "05q_gates")
+    name = arg("--name", str, "05k_gates")
     d = os.path.join(B.LOG, name)
     os.makedirs(d, exist_ok=True)
 
@@ -96,7 +96,7 @@ def main():
     for kn in (2.5, 5.0, 10.0, 20.0):
         r = series(Rig06c(**{**P, "kn": kn}), frames, f"kn {kn:g}")
         sweep[kn] = r["lam_geo"][-1] if r["lam_geo"] else float("nan")
-        print(f"[05q] kappa_n {kn:5g}  lam_geo {sweep[kn]:.4f}", flush=True)
+        print(f"[05k] kappa_n {kn:5g}  lam_geo {sweep[kn]:.4f}", flush=True)
 
     lam = nom["lam_geo"][-1]
     ar = nom["area_ratio"][-1]
@@ -123,7 +123,7 @@ def main():
             "value": min(nom["gap"]), "threshold": 0.0, "pass": bool(min(nom["gap"]) > 0.0)},
     }
     for k, v in gates.items():
-        print(f"[05q] {'PASS' if v['pass'] else 'FAIL'}  {k}: {v['value']}", flush=True)
+        print(f"[05k] {'PASS' if v['pass'] else 'FAIL'}  {k}: {v['value']}", flush=True)
     json.dump({"run": name, "frames": frames, "gates": gates, "series": nom},
               open(os.path.join(d, "metrics.json"), "w"), indent=1)
 
@@ -151,7 +151,7 @@ def main():
         a.text(-0.16, 1.04, "abcd"[i], transform=a.transAxes, fontsize=13, fontweight="bold")
     fig.tight_layout()
     fig.savefig(os.path.join(d, "gates.png"), dpi=150, facecolor="white")
-    print(f"[05q] gates.png -> {d}", flush=True)
+    print(f"[05k] gates.png -> {d}", flush=True)
 
 
 if __name__ == "__main__":

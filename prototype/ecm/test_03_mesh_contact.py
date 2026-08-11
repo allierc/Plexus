@@ -490,6 +490,16 @@ def main():
         simplification="flat axis-aligned patch, so face lookup is O(1); a general mesh needs a BVH",
         measures=["momentum residual", "penetration depth in grid cells", "slip with and without "
                   "friction"],
+        # WHICH VARIANT THIS IS, in the spec and not only in `metrics.json`. The three runs of this
+        # rig differ by two flags, and without them here `03_mesh_contact` and
+        # `03c_mesh_contact_hole` wrote BYTE-IDENTICAL specs -- so the minisite, whose rule is that
+        # a clip opens the spec that produced it, showed the same spec under two different clips and
+        # a reader had no way to tell which run was on screen.
+        variant=dict(floor=floor, hole_r=hole,
+                     which=("free block" if floor is None else
+                            ("rigid floor, hole in the surface" if hole else "rigid floor")),
+                     loading=f"press at {rig.v_press:g} box units per unit time for 60% of the "
+                             f"run, then lift at {0.7 * rig.v_press:g}"),
         rig=dict(mesh_cell_over_dx=rig.cell_size / rig.dx, n_grid=rig.n_grid, particles=rig.N,
                  k_penalty=rig.k_pen, mu=rig.mu, dt=rig.dt)),
         open(os.path.join(d, "spec.yaml"), "w"), sort_keys=False)
