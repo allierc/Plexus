@@ -666,6 +666,10 @@ def _print_run_summary(sim: Spec, H: Hierarchy) -> None:
     ws = "[" + ", ".join(f"{float(w):g}" for w in H.world_size.tolist()) + "]"
     print(f"[engine] === {sim.name} ===  dim={H.dim}  world={ws}  boundary={sim.boundary}  "
           f"dt={sim.dt:g}  frames={sim.n_frames}", flush=True)
+    # THE PHYSICAL SCALE, printed with the run rather than left to a reader's assumption. A run with
+    # no `general.units:` block says so out loud, because "dimensionless" is a property of the model
+    # and not an oversight to be discovered later from a number that looked like micrometres.
+    print(f"[build] {sim.units.describe()}", flush=True)
     sets = "  ".join(f"{n}({int((l.occ > 0).sum().item())})" for n, l in H.levels.items())
     print(f"[engine] sets:      {sets or '—'}", flush=True)
     print(f"[engine] fields:    {'  '.join(H.fields) or '—'}", flush=True)
