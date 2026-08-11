@@ -810,6 +810,9 @@ class Apoptosis3D(Structural):
         self.n_max = int(params.get("n_max", 9))          # (crowded) die at this many neighbours
         self.n_min = int(params.get("n_min", 3))          # (lonely) die at this few
         #   only while the median cell has actually grown by stall_margin -- see _marked
+        # WHICH SPECIES DECIDES WHO DIES: 0 by default; 2 reads the second RD system, which is
+        # what lets one chemistry drive growth and another drive death in the same tissue.
+        self.chan = int(params.get("chan", 0))
         self.a_sw = float(params.get("a_sw", 0.25))               # fraction of the activator's own max
         self.shrink = float(params.get("shrink_rate", 0.04))
         self.crit = float(params.get("critical_frac", 0.12))      # x v_ref, the seed-time median
@@ -906,7 +909,7 @@ class Apoptosis3D(Structural):
             if clvl is None or "chem" not in getattr(clvl, "state_schema", {}):
                 return None
             h0, _ = clvl.state_schema["chem"]
-            return clvl.state[:nF, h0].detach().cpu().numpy()
+            return clvl.state[:nF, h0 + self.chan].detach().cpu().numpy()
         return None
 
     def _admit(self, flag, want, m, H, nF):
@@ -1075,7 +1078,7 @@ class Apoptosis3D(Structural):
             if clvl is None or "chem" not in getattr(clvl, "state_schema", {}):
                 return set()
             h0, _h1 = clvl.state_schema["chem"]
-            a = clvl.state[:nF, h0].detach().cpu().numpy()
+            a = clvl.state[:nF, h0 + self.chan].detach().cpu().numpy()
             amax = float(np.nanmax(a)) if a.size else 0.0
             if amax <= 1e-9:
                 return set()

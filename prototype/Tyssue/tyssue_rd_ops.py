@@ -126,6 +126,8 @@ class CellRDSeed(Structural):
         super().__init__(params, device)
         self.at = params.get("_at", "cell"); self.vat = params.get("vertex_set", "vertex")
         self.seed = int(params.get("seed", 0))
+        # WHICH SPECIES THIS SEEDER FILLS: 0 (columns 0,1) by default; 2 for a second RD system.
+        self.chan = int(params.get("chan", 0))
         self.mode = params.get("mode", "scatter")               # "noise" | "scatter" | "patch" | "cones"
         if self.mode not in self.MODES:
             raise ValueError(
@@ -184,7 +186,10 @@ class CellRDSeed(Structural):
             nucl = (torch.rand(nF, generator=g) < self.seed_frac).to(dev)
             a = torch.where(nucl, torch.full_like(a, 0.5), a)
             u = torch.where(nucl, torch.full_like(u, 0.25), u)
+        # SEEDED INTO THIS SPECIES' OWN COLUMNS. `chan` offsets from the schema's base, so a
+        # second seeder writes the second pair and leaves the first alone.
         h0, h1 = clvl.state_schema["chem"]
+        h0 = h0 + self.chan
         st = clvl.state.clone(); st[:nF, h0:h0 + 1] = a[:, None]
         if h1 - h0 > 1:
             st[:nF, h0 + 1:h0 + 2] = u[:, None]
@@ -220,6 +225,10 @@ class CellDiffuse(Lateral):
         self.at = params.get("_at", "cell")
         self.d_a = float(params["d_a"]); self.d_h = float(params["d_h"]); self.chi = float(params["chi"])
         self.norm = bool(params.get("norm", True))
+        # WHICH SPECIES THIS INSTANCE OWNS: 0 is the first pair (chem columns 0,1) and is the
+        # default, so every existing spec is unchanged. A second RD system lives at chan 2.
+        self.chan = int(params.get("chan", 0))
+
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
@@ -231,7 +240,16 @@ class CellDiffuse(Lateral):
         agg = torch.zeros_like(chem).index_add_(0, i, chem[j])
         deg = torch.zeros(N, device=chem.device, dtype=chem.dtype).index_add_(0, i, torch.ones_like(i, dtype=chem.dtype))
         lap = (agg / deg.clamp(min=1)[:, None] - chem) if self.norm else (agg - deg[:, None] * chem)
-        coef = torch.tensor([self.d_a, self.d_h], device=chem.device, dtype=chem.dtype) * self.chi
+        # A PER-COLUMN COEFFICIENT, so a second SPECIES can live in the same `chem` buffer at its
+        # own columns. This was `tensor([d_a, d_h])` -- exactly two entries -- which both assumed a
+        # width-2 chem and diffused whatever happened to be in those two columns. With `chan` the
+        # operator says WHICH pair it owns, and writes zeros everywhere else, so two instances at
+        # chan 0 and chan 2 are two independent reaction-diffusion systems that cannot leak into
+        # one another through the diffusion step.
+        coef = torch.zeros(chem.shape[1], device=chem.device, dtype=chem.dtype)
+        coef[self.chan] = self.d_a * self.chi
+        if self.chan + 1 < chem.shape[1]:
+            coef[self.chan + 1] = self.d_h * self.chi
         occ = lvl.occ[:, None] if getattr(lvl, "occ", None) is not None else 1.0
         return {self.at: (coef[None, :] * lap) * occ}
 
@@ -381,16 +399,27 @@ class CellReactGrayScott(Lateral):
         super().__init__(params, device)
         self.at = params.get("_at", "cell")
         self.F = float(params["F"]); self.kk = float(params["kk"]); self.rate = float(params.get("rate", 1.0))
+        # WHICH SPECIES THIS INSTANCE OWNS: 0 is the first pair (chem columns 0,1) and is the
+        # default, so every existing spec is unchanged. A second RD system lives at chan 2.
+        self.chan = int(params.get("chan", 0))
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
         chem = lvl.get("chem")
-        a = chem[:, 0]; u = chem[:, 1]
+        # `chan` NAMES THE PAIR THIS INSTANCE OWNS. It was hard-wired to columns 0 and 1, so a
+        # second species in the same buffer was unreachable: two `cell_react` operators would both
+        # have driven the same two columns and the second would simply have overwritten the first.
+        c = self.chan
+        a = chem[:, c]; u = chem[:, c + 1]
         uaa = u * a * a
         da = uaa - (self.F + self.kk) * a
         du = -uaa + self.F * (1.0 - u)
         occ = lvl.occ[:, None] if getattr(lvl, "occ", None) is not None else 1.0
-        return {self.at: self.rate * torch.stack([da, du], dim=1) * occ}
+        # zero in every column but this species', so the delta is additive with the other species'
+        out = torch.zeros_like(chem)
+        out[:, c] = self.rate * da
+        out[:, c + 1] = self.rate * du
+        return {self.at: out * occ}
 
 
 @register_operator("cell_react", set="cell", kind="lateral", family="fields", model="gierer_meinhardt")
@@ -471,6 +500,9 @@ class Grow3D(Structural):
         super().__init__(params, device)
         self.at = params.get("_at", "vertex"); self.cat = params.get("cell_set", "cell")
         self.rate = float(params.get("rate", 0.01)); self.a_sw = float(params.get("a_sw", 0.20))
+        # WHICH SPECIES GATES GROWTH: 0 (chem columns 0,1) by default, so existing specs are
+        # unchanged; 2 reads a second RD system living in the same buffer.
+        self.chan = int(params.get("chan", 0))
         self.hill = float(params.get("hill", 3.0)); self.cap = float(params.get("cap", 2.5))
         from tyssue_ops3d import _engine_owns_clock
         self.every = _engine_owns_clock(params); self._k = 0
@@ -512,8 +544,12 @@ class Grow3D(Structural):
         # also why `grow_3d` had to exist as a separate operator. a = 0 is the honest reading
         # of "there is no activator here"; the Hill term evaluates to 0 and the rho baseline stands.
         if "chem" in clvl.state_schema:
+            # `chan` PICKS THE SPECIES THAT GATES GROWTH. With two RD systems in one buffer this is
+            # what lets them do different jobs -- species 0 driving growth while species 1 drives
+            # death -- instead of both operators reading the same activator, which would be one
+            # mechanism wearing two names.
             h0, _h1 = clvl.state_schema["chem"]
-            a = clvl.state[:nF, h0].detach().to(dev)             # per-cell activator
+            a = clvl.state[:nF, h0 + self.chan].detach().to(dev)  # per-cell activator
         else:
             a = torch.zeros(nF, device=dev, dtype=m["V0f"].dtype)
         if "mg_scale" not in m or m["mg_scale"].shape[0] != nF:  # per-cell cumulative linear scale (capped)
