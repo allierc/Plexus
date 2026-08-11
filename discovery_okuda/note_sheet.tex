@@ -875,17 +875,21 @@ G18e& $\rho=m/A$ equals $1/J$ & --- & an identity, not a test\\
 G28& the sheet stays OUTSIDE the epithelium (signed) & radial gap $>0$ &
      \PASS{$+4.3\times10^{-4}$} (was $-3.6\times10^{-3}$)\\
 G29& no plaque ends up on the wrong side & $0\%$ & \PASS{$0.0\%$} (was $89.6\%$)\\\midrule
-\multicolumn{4}{@{}l}{\textit{before \op{06}: the sheet on a REAL epithelium --- numbered from G40 to leave G30--G39 to the adhesion work} (\op{05n}, \op{05p}, \op{05q})}\\
-G40& \textbf{$\lambda^{\rm geo}$ does not depend on the adhesion's stiffness} & $\kappa_n$ over
-     $8\times$ moves it $<5\%$ & \PASS{$0.0000$} ($4.455$ at every $\kappa_n$)\\
-G41& it tracks a real, dividing surface & $\lambda^{\rm geo}$ within $5\%$ of
-     $\sqrt{A_{\rm ep}(T)/A_{\rm ep}(0)}$, NOT of the radius ratio & \PEND{05q}\\
-G42& the mesh survives it & worst triangle quality $>0.2$ & \FAIL{$0.000$} (\op{05n}, no secretion, no refinement)\\
-G43& $\rho$ held with \op{bm\_secrete} ON, on the real surface & within $10\%$ & \PEND{05q}\\
-G44& mean edge in band with \op{bm\_refine} ON, on the real surface & $[0.8,1.7]\times$ seeded &
-     \PEND{05q}\\
-G45& all four reported together every frame & $\lambda^{\rm geo}$, $\lambda^{\rm el}$, $\rho$, edge
-     & \PEND{05q}\\
+\multicolumn{4}{@{}l}{\textit{before \op{06}: the sheet on a REAL epithelium} (\op{06c\_real\_driver},
+     \op{06d\_gates}) --- all six re-measured, see the note below the table}\\
+G40& $\lambda^{\rm geo}$ does not depend on the adhesion's stiffness & $\kappa_n$ over
+     $8\times$ moves it $<5\%$ & \PASS{$4.72\%$} --- but \emph{monotone}, $3.641\to3.817$\\
+G41& \textbf{it tracks a real, dividing surface} & $\lambda^{\rm geo}$ within $5\%$ of
+     $\sqrt{A_{\rm ep}(T)/A_{\rm ep}(0)}$, NOT of the radius ratio & \PASS{$1.40\%$}
+     ($3.713$ vs $3.766$)\\
+G42& the mesh survives it & worst triangle quality $>0.2$ & \PASS{$0.587$}\\
+G43& $\rho$ held with \op{bm\_secrete} ON, on the real surface & within $10\%$ &
+     \PEND{} \op{bm\_secrete} is rig-level in \op{05f}, not a method on \op{Sheet}\\
+G44& mean edge in band, no \op{bm\_refine} & $[0.8,1.7]\times$ seeded &
+     \FAIL{$3.63\times$} --- the size of the demand for refinement\\
+G45& all four reported together every frame & one frame axis, $401$ frames & \PASS{$401$}\\
+G46& the sheet stays OUTSIDE the real surface (G28 re-run) & signed gap $>0$ &
+     \FAIL{$-2.7\times10^{-3}$} on mean radii --- see the caveat\\
 
 \midrule
 \multicolumn{4}{@{}l}{\textit{tearing} (\op{05d\_tear}) --- G19 is the test the MPM sheet never faced}\\
@@ -929,6 +933,47 @@ distribution the nominal run measured}, never from a round number: run 127's \co
 above the largest load in its entire run ($0.017$), so a correctly wired mechanism was reported as a
 null.
 
+\smallskip
+\noindent\textbf{G40--G46 were certified twice, and the first certification is void.} They were first
+measured against a driver in which each plaque bound one tissue \emph{vertex}, carried its own rest
+length, and retargeted on turnover --- a scheme built for this note and for nothing else. It failed:
+worst triangle quality $0.000$, $\lambda^{\rm geo}$ at $9.46$, the sheet visibly collapsed to a third
+of the epithelium's radius. The diagnosis written from that failure --- that a real, dividing,
+bumpy surface with a vertex count going $396\to12{,}756$ is a different problem from a dilating
+icosphere --- was \emph{wrong}. \op{06c\_real\_driver} holds every value of \op{05b}'s certified rig
+and changes one thing, the driver, and the sheet tracks the real epithelium on the first attempt:
+$\lambda^{\rm geo}=3.713$ against an apical-area ratio of $3.766$, momentum $1.2\times10^{-16}$,
+$100\%$ of bonds held, $401$ frames, no divergence. \textbf{05b's own law --- bind to a \emph{face}
+with barycentric weights, one shared rest length --- was never the problem.} The three additions were.
+A gate measured against a discarded driver certifies nothing, so all six are re-run in \op{06d\_gates}
+and the numbers in the table are those.
+
+\smallskip
+\noindent Two of them are worth reading past their verdict. \textbf{G40 passes at $4.72\%$ against a
+$5\%$ threshold, but $\lambda^{\rm geo}$ is monotone in $\kappa_n$} ($3.641$, $3.713$, $3.769$,
+$3.817$ at $\kappa_n=2.5,5,10,20$): that is not scatter under a bound, it is the bond's compliance
+leaking into a number that is supposed to report the tissue's growth. The gate is passed and the
+mechanism it was written to exclude is present at $4.7\%$; a tighter threshold, or a stiffer adhesion,
+would turn it. \textbf{G46 reads mean radii, not the signed per-node distance to the triangle} --- on
+a bumpy surface the mean vertex radius sits outside the mean surface, so the measure is biased toward
+reporting the sheet as inside. The $-2.7\times10^{-3}$ is real enough to keep the gate open, but it
+is not yet the test G28 was: that one needs \op{05b}'s per-node signed standoff evaluated on the
+tissue's faces, which is the first thing \op{05q} should carry.
+
+
+\begin{figure}[H]\centering
+\includegraphics[width=\textwidth]{../log/okuda_ECM/06d_gates/gates.png}
+\caption{\op{06d\_gates}: G40--G46 on the real epithelium, \op{05b}'s rig with the driver swapped and
+nothing else changed. \textbf{a} \PASS{G41}: $\lambda^{\rm geo}$ (black) on the apical-area ratio
+$\sqrt{A_{\rm ep}(t)/A_{\rm ep}(0)}$ (green) to $1.40\%$ over $401$ frames --- the sheet is reporting
+the tissue's growth, and against the \emph{area}, since a dividing epithelium is not a sphere and the
+radius ratio would have been the wrong reference. \textbf{b} \PASS{G40} at $4.72\%$ over $8\times$ in
+$\kappa_n$, and the four points are monotone: passed, but the adhesion's compliance is in there.
+\textbf{c} \PASS{G42}: worst triangle quality $0.587$, far above the $0.2$ line, against $0.000$ for
+the vertex-plaque driver this replaces. \textbf{d} \FAIL{G44}: with no \op{bm\_refine} the mean edge
+reaches $3.63\times$ its seeded length, outside the band (green) --- the failure is expected and its
+value is the measurement, i.e. how much refinement a $3.77\times$ dilation of a real surface demands.}
+\end{figure}
 
 \begin{figure}[H]\centering
 \includegraphics[width=\textwidth]{../log/okuda_ECM/05a_sheet/metrics.png}
