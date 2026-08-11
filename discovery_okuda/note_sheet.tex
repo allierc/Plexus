@@ -25,57 +25,142 @@
 \date{\vspace{-0.9cm}\small \texttt{prototype/ecm/bm\_ops.py} $\cdot$
 \texttt{test\_05\_sheet.py} $\cdot$ \texttt{test\_05b\_plaque.py} $\cdot$
 \texttt{test\_05c\_remesh.py} $\cdot$ \texttt{test\_05e\_conserve.py} $\cdot$
-\texttt{log/okuda\_ECM/05a--05e} $\cdot$ 10 August 2026}
+\texttt{log/okuda\_ECM/05a--05c} \ (\texttt{05d--05f} archived, see \S4.2) $\cdot$ 10 August 2026}
 \setlength{\parindent}{0pt}\setlength{\parskip}{0.55em}
 \begin{document}\maketitle\vspace{-1.0cm}
 
 \section*{1.\; Mechanism}
 
+\textbf{What the object is.} A basement membrane is a sheet of crosslinked protein --- collagen~IV
+and laminin, with nidogen and perlecan --- about $100$ nm thick, that an epithelium secretes onto its
+own basal surface and then sits on. Every epithelium in the body has one. It is the boundary that
+makes a tissue a tissue: it separates epithelium from stroma, carries the mechanical load of the sheet
+above it, holds growth factors, passes solutes while stopping cells, and is the thing a tumour must
+breach to become invasive.
 
-A basement membrane enclosing a growing spheroid has to do two things that pull against each other:
-\emph{hold together as a material}, and \emph{keep covering a surface whose area goes up by an order of
-magnitude}. Sixty-six archived runs modelled it as MPM material and could do neither, for two reasons
-that turn out to be the same reason.
+\textbf{What it has to do, and why the two demands conflict.} It must \emph{hold together as a
+material}, which asks it to be stiff and continuous; and it must \emph{keep covering a surface that
+grows}, which for the spheroid modelled here means an area rising by a factor of eleven. Those pull
+against each other, and biology resolves them with three mechanisms rather than with a compromise in
+stiffness:
 
-\textbf{It could not report its own deformation.} In MPM the deformation gradient $\mathbf F$ is
-advected by the \emph{grid's} velocity gradient, so a node moved by anything that is not the grid --- an
-engine delta, a positional projection --- carries no record of having moved. Run 130 moved the sheet out
-with the epithelium by a factor of $3.44$ in radius, a strain of $2.44$, and its material reported
-$0.31$: thirteen per cent. Run 121 routed the same force through the grid, recovered $2.25$ of $2.30$,
-and paid for it with the standoff. A sheet whose strain is wrong by a factor of eight cannot be given a
-stiffness, cannot tear at a stress, cannot thin by an area ratio and cannot be told whether its adhesion
-is load-bearing --- every downstream question is unanswerable rather than merely inaccurate.
+\begin{itemize}\itemsep1pt
+\item \textbf{it is replaced while it is stretched.} Collagen~IV turns over on a half-life of
+      $3$--$10$ hours \cite{matsubayashi2020}, comparable to the time in which the tissue grows, so the
+      sheet enclosing a tripled radius is not the sheet that was there at the start.
+\item \textbf{it is attached, not merely adjacent.} Integrin clusters bind it to the cells beneath,
+      transmitting traction both ways and letting the sheet slide as the tissue rearranges underneath.
+\item \textbf{it fails where it is not resupplied.} A hole is not a stress concentration on a fixed
+      material; it is a place where removal beat deposition.
+\end{itemize}
 
-\textbf{It could not change size.} The number of MPM particles was fixed, so \op{basement\_membrane\_%
-secrete} added material that was never part of the sheet: run 128's $45{,}000$ new particles sat at
-standoff $-0.19$, a second shell in the lumen, and halved the reported strain.
+\textbf{The equations those mechanisms are, before any discretisation.} Each is a balance on a
+quantity carried per unit area of a deforming surface, and each has the same shape --- a material
+derivative, a source, a sink, and a dilution term that appears because the surface itself is growing:
 
-Both are consequences of the sheet not being an \emph{object with a topology}. This note builds it as
-one: a codimension-1 mesh whose deformation is measured rather than advected (\S2--\S3), whose material
-memory and supply are explicit (\S4), whose adhesion is a relation rather than a body (\S5), and whose
-\emph{size is a state variable} --- a reservoir of triangles with an occupancy flag (\S6). \S7 writes
-all of it as a Plexus2 container; \S8 is the gate table; \S9--\S10 are what the runs measured, including
-three gates that fail.
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}\toprule
+carried quantity & balance & what it decides\\\midrule
+sheet material $\rho$ & $\mathrm D\rho/\mathrm Dt = s-\rho/\tau_{\rm bm}-\rho\,\dot A/A$ &
+  whether the sheet thins, holds, or tears\\
+receptor $n_f$, bonds $n_b$ & binding kinetics with a load-dependent off-rate &
+  how hard it is held, and whether it slides\\
+momentum & $\gamma\dot{\mathbf x}=\mathbf f$, massless and overdamped &
+  where it sits and how fast it gets there\\
+\bottomrule
+\end{tabular}
+\end{center}
 
-\textbf{One distinction is load-bearing throughout, and an earlier draft of this note blurred it.}
-Refinement (\op{bm\_refine}) is a \emph{numerical} operation: it changes the triangulation and nothing
-else --- not the physical surface, not its material state, not its mass. Secretion, turnover and
-proteolysis (\op{bm\_secrete}, \op{bm\_remodel}, \op{bm\_degrade}) are \emph{biological} mechanisms that
-change what the sheet is made of and how much of it there is. They share an implementation substrate,
-the \code{occ} reservoir, and they share nothing else. Writing them as ``the same mechanism seen three
-times'' --- which the first draft did --- is exactly the confusion that lets a discretisation choice be
-read as a result, and it is the same error as the MPM sheet whose tearing was set by $\Delta x$.
-Everything a remesh must carry across unchanged is listed in \S6 and gated in \S8.
+\textbf{Why the mechanics is overdamped and not inertial.} At the scale of a membrane in tissue fluid
+the Reynolds number is $\sim\!10^{-10}$: inertia is not small, it is absent. The correct statement of
+motion is that velocity is proportional to force, and the consequence for everything downstream is
+that a \emph{stiffness has no meaning on its own} --- only the ratio $k/\gamma$, a relaxation rate,
+appears. The question a stiffness answers here is not ``how strong'' but ``does the sheet relax faster
+than the tissue grows''.
 
-The second reason to leave MPM is arithmetic and is in \code{note\_fibre} \S9: a basement membrane is
-$\sim\!100$~nm on a $\sim\!200\,\mu$m spheroid, one part in two thousand of the radius, so resolving it
-on a grid needs $\Delta x\approx3\times10^{-4}$ and a lattice of $3500^3$. It is not a thin solid we
-cannot afford. It is a \emph{surface}, and its thickness belongs in the constitutive law as a number,
-never in the geometry as a length.
+\textbf{What this becomes in Plexus2.} A model is sets $\times$ fields $\times$ operators $\times$
+schedule, and the biology above chooses all four. The sheet is a \emph{surface}, so it is a node set
+(\code{bm}) with a hyperedge set of triangles over it (\code{bm\_face}) that carries everything
+material; its thickness never becomes geometry, only a coefficient. Adhesion is a \emph{relation
+between two entities}, so it is an edge set (\code{plaque}) whose single operator returns a force to
+both ends and cannot get them out of step. The receptor belongs to the \emph{cell}, so it is a state
+on \code{cell}. And because the sheet gains and loses material, its \emph{size is a state variable}:
+the sets are allocated with a reserve and carry the framework's \code{occ} flag, exactly as MPM
+particles do for \op{cell\_grow}.
+
+\textbf{One distinction is load-bearing throughout this note.} \op{bm\_refine} --- changing the
+triangulation as the surface grows --- is a \emph{numerical} operation. It changes no physical
+quantity: not the surface, not the material state, not the mass. Secretion, turnover and proteolysis
+are \emph{biological} mechanisms that change what the sheet is made of and how much there is. They
+share an implementation substrate, the \code{occ} reservoir, and nothing else. Conflating them is what
+lets a discretisation choice be read as a result --- and the historical case is exactly that: the
+previous implementation of this sheet, as material points on a background grid, produced tearing that
+was set by the grid spacing rather than by any stress, on a sheet an eighth of a grid cell thick. \S4
+gives the gate that catches it and the measurement that passes it.
+
+\textbf{How the rest reads.} \S2 gives the equations from the coarsest statement down: the balance of
+forces on the surface, then the elasticity and the strain measure it needs, then the material budget,
+then the adhesion, then the discretisation. \S3 writes all of it as a Plexus2 container --- sets,
+states, operators, schedule. \S4 is the gate table: every claim in \S2 with a threshold fixed before
+the run and the number that came back.
 
 \section*{2.\; Equations and symbols}
 
+\textbf{The whole model, in one line, before any of it is expanded.} The sheet is a massless
+overdamped surface, so its equation of motion is a balance between the forces acting on it and the drag
+resisting them:
+%
+\begin{equation}
+\gamma\,\dot{\mathbf x} \;=\;
+\underbrace{\mathbf f_{\rm el}}_{\text{\S2.1: it is elastic}}
+\;+\;\underbrace{\mathbf f_{\rm adh}}_{\text{\S2.3: it is attached}}
+\;+\;\underbrace{\mathbf f_{\rm con}}_{\text{\S2.3: it is outside the cells}},
+\qquad
+\mathbf x\leftarrow\mathbf x+\Delta t\,M\,\mathbf f,\quad M=1/\gamma,
+\label{eq:motion}
+\end{equation}
+%
+alongside two budgets on quantities the surface carries --- its own material (\S2.2) and the bonds
+holding it (\S2.3) --- and one statement about the mesh that carries none of it (\S2.4).
 
+\textbf{The stability limit that follows, because it constrains every term above.} With no mass there
+is no wave speed, so the limit is a \emph{rate}:
+%
+\begin{equation}
+\boxed{\ \Delta t\,M\,\lambda_{\max}(\mathbf H)<2\ },
+\label{eq:step}
+\end{equation}
+%
+$\mathbf H$ being the Hessian of the energy. This is about twenty times weaker than the CFL an inertial
+sheet would carry, which is why a membrane ten to a hundred times stiffer than the stroma does not set
+the timestep for the whole model. $\lambda_{\max}$ is \emph{measured}, by power iteration on
+Hessian-vector products, and re-measured as the run proceeds: a St~Venant--Kirchhoff membrane's tangent
+stiffens as it stretches, and over $401$ frames it grew $19.1\times$ ($4.56\to87.2$), taking the substep
+count with it ($21\to194$). Fixing the substep count from the seeded value put the measured divergence
+threshold at $1.8$ instead of $2$, and the entire discrepancy was the Hessian having grown under the
+run's own load.
+
+\subsection*{2.1\; The elastic surface, and the strain measure it needs}
+
+The first term of Eq.~\eqref{eq:motion} is the sheet resisting being stretched. One constant-strain
+triangle per face, St~Venant--Kirchhoff, thickness entering only as a multiplier:
+%
+\begin{align}
+W_f &= A^0_f\Bigl[\mu\operatorname{tr}\bigl(\mathbf E_g^2\bigr)
+      +\tfrac{\Lambda}{2}\bigl(\operatorname{tr}\mathbf E_g\bigr)^2\Bigr],
+&\mathbf E_g&=\tfrac12\bigl(\mathbf C_{\rm el}-\mathbf I\bigr),
+&\mathbf f&=-\frac{\partial}{\partial\mathbf x}\sum_f W_f ,
+\label{eq:energy}\\[2pt]
+Y_2&=E\,T\quad\text{[force per unit \emph{length}]},
+&\mu&=\frac{Y_2}{2(1+\nu)},
+&\Lambda&=\frac{Y_2\,\nu}{1-\nu^2} .
+\label{eq:moduli}
+\end{align}
+%
+The force is the exact gradient, taken by automatic differentiation, so the force and the energy cannot
+disagree --- G4 checks it against a central finite difference and gets $5\times10^{-10}$ relative.
+
+\textbf{Which needs a strain measure, and this is the one the whole note is written in.}
 $\lambda$ is the quantity every other statement here is written in, and it is a \emph{per-triangle}
 number. For a face with nodes $\mathbf x_{0,1,2}$, take the two edge vectors from the first node now and
 in the reference configuration $\mathbf X$:
@@ -105,7 +190,7 @@ by} --- \code{lam} in \code{traj.npz}, \code{lam\_geo} in \code{metrics.json}. B
 read from where the nodes \emph{are} against where they \emph{were}, it is blind to what moved them: a
 node moved by a tether, a plaque, a grid or by hand is seen identically, and there is no path by which a
 displacement is applied and not counted. That is a property of Eq.~\eqref{eq:lambda} and not a result,
-which is why it can be certified in closed form (\S8, G1--G4) before any physics runs.
+which is why it can be certified in closed form (\S4, G1--G4) before any physics runs.
 
 \textbf{There are two $\lambda$'s and they must never be quoted as one.} The reference metric is either
 frozen at seeding or allowed to creep (\S4), giving
@@ -120,45 +205,6 @@ frozen at seeding or allowed to creep (\S4), giving
 %
 $\lambda^{\rm geo}$ is what the tissue did to the sheet; $\lambda^{\rm el}$ is what the material feels.
 With no remodelling they coincide. With remodelling they do not, and the gap is the mechanism.
-
-\subsection*{2.1\; The mechanics}
-
-
-One constant-strain triangle per face, St~Venant--Kirchhoff, thickness entering only as a multiplier:
-%
-\begin{align}
-W_f &= A^0_f\Bigl[\mu\operatorname{tr}\bigl(\mathbf E_g^2\bigr)
-      +\tfrac{\Lambda}{2}\bigl(\operatorname{tr}\mathbf E_g\bigr)^2\Bigr],
-&\mathbf E_g&=\tfrac12\bigl(\mathbf C_{\rm el}-\mathbf I\bigr),
-&\mathbf f&=-\frac{\partial}{\partial\mathbf x}\sum_f W_f ,
-\label{eq:energy}\\[2pt]
-Y_2&=E\,T\quad\text{[force per unit \emph{length}]},
-&\mu&=\frac{Y_2}{2(1+\nu)},
-&\Lambda&=\frac{Y_2\,\nu}{1-\nu^2} .
-\label{eq:moduli}
-\end{align}
-%
-The force is the exact gradient, taken by automatic differentiation, so the force and the energy cannot
-disagree --- G4 checks it against a central finite difference and gets $5\times10^{-10}$ relative.
-
-\textbf{Massless and overdamped, so the stability limit is a rate and not a wave speed:}
-%
-\begin{equation}
-\gamma\dot{\mathbf x}=\mathbf f,\qquad
-\mathbf x\leftarrow\mathbf x+\Delta t\,M\mathbf f,\quad M=1/\gamma,
-\qquad\text{stable iff}\quad\boxed{\ \Delta t\,M\,\lambda_{\max}(\mathbf H)<2\ }
-\label{eq:step}
-\end{equation}
-%
-with $\mathbf H$ the Hessian of Eq.~\eqref{eq:energy}. This is about twenty times weaker than the CFL
-an inertial sheet would carry, and it is why a sheet ten to a hundred times stiffer than the stroma does
-not set the timestep for the whole model. $\lambda_{\max}$ is \emph{measured}, by power iteration on
-Hessian-vector products, and re-measured every ten frames, because it is not a constant: a StVK
-membrane's tangent stiffens as it stretches, and over $401$ frames it grew $19.1\times$
-($4.56\to87.2$), taking the substep count with it ($21\to194$). The first version of the rig fixed the
-substep count from the seeded value and put the divergence threshold at $1.8$ instead of $2$ --- the
-entire discrepancy being the Hessian having grown under the run's own load. Held at a constant group
-$s=\Delta t M\lambda_{\max}$ instead, the sweep runs to $1.9$ and diverges at $2.1$.
 
 \subsection*{2.2\; Memory, stiffening, supply}
 
@@ -215,42 +261,141 @@ Eq.~\eqref{eq:massstate} with no source and an area $\times11.1$. \textbf{That n
 \op{bm\_secrete} has to hold flat}, and it is the reason a fixed particle budget was never going to
 work.
 
-\subsection*{2.3\; The plaque, which is a relation and not a body}
+\subsection*{2.3\; Adhesion: a receptor on the cell, bonds on the edge, ligand on the sheet}
 
+\begin{figure}[H]\centering
+\includegraphics[width=\textwidth]{fig_adhesion_scheme.pdf}
+\caption{\textbf{(a)} An integrin is a heterodimer; $20$--$50$ of them make a nanocluster
+$35$--$100$ nm across \cite{changede2017}; clusters group into adhesions of $\sim\!10^3$ integrins at a
+measured $\sim\!555$ nm centre-to-centre spacing \cite{nanoclusters2025}. The discrete \op{plaque} of
+05b was the MIDDLE level --- one cluster --- and at $41$k sheet nodes there are $25$ clusters and
+$\sim\!3000$ integrins per node, so that description was resolving something the mesh cannot see.
+\textbf{(b)} The three states, each on the entity it belongs to. Free receptor is the CELL's and is
+well mixed over its own basal face; bonds are a relation and live on the edge; ligand is sheet
+material and is already $\rho$.}
+\end{figure}
 
-An integrin plaque has no position of its own; it is an edge between two entities, and writing it as an
-edge set is what makes its reaction automatic --- one operator returns a delta to both endpoints, so the
-force the sheet feels and the force the cell feels cannot get out of step. Each plaque binds a membrane
-node to a \emph{barycentric point on an epithelial face}, $\mathbf p=\sum_k w_k\mathbf x^{\rm epi}_k$,
-which tracks the material as that face deforms:
-%
-\begin{align}
-\boldsymbol\ell&=\mathbf x^{\rm bm}-\mathbf p,\quad \ell=|\boldsymbol\ell|,\quad
-\hat{\mathbf n}=\boldsymbol\ell/\ell,
-&\mathbf f_n&=-\kappa_n(\ell-\ell_0)\hat{\mathbf n},
-\label{eq:plaque_n}\\
-\mathbf f_t&=-\xi\bigl(\mathbf v_{\rm bm}-\mathbf v_{\rm epi}\bigr)_{\parallel},
-&\mathbf f^{\rm epi}_k&=-w_k\bigl(\mathbf f_n+\mathbf f_t\bigr),
-\label{eq:plaque_t}
-\end{align}
-%
-at the measured density $\Sigma^{-2}$ with $\Sigma\approx7T$ and $\ell_0\approx0.3\,T$
-\cite{kanchanawong2010}.
+\textbf{A plaque is not an integrin; it is a cluster of them, and that hierarchy decides where every
+state goes.} An integrin is a single transmembrane heterodimer. Integrins do not act alone --- they
+assemble into \emph{nanoclusters} of $20$--$50$ molecules, $35$--$100$ nm across, which is what lets an
+adhesion carry load no single bond could \cite{changede2017} --- and those clusters group into an
+adhesion of order $10^3$ integrins, spaced $\sim\!555$ nm centre to centre by a cell-intrinsic
+mechanism rather than by the ligand \cite{nanoclusters2025}.
 
-\textbf{The tangential law is solved, not evaluated.} An explicit $-\xi\mathbf v$ is a stiffness of
-$\xi/\Delta t$, which \emph{grows} as the substep shrinks, so refining the step to stabilise it makes it
-worse --- the first version NaN'd on frame~0. Solving $\dot{\mathbf x}_\parallel=M(\mathbf f_\parallel+
-\xi\mathbf v^{\rm epi}_\parallel)$ for $\dot{\mathbf x}_\parallel$ instead gives
+\textbf{The arithmetic then decides the representation, and it decides against discrete plaques.} This
+sheet is $0.317$ mm$^2$ at the last frame. At the measured spacing that is $\sim\!1.03\times10^6$
+clusters --- against $40{,}962$ nodes. \textbf{Twenty-five clusters and $\sim\!3000$ integrins per
+node}, with a shot noise of $2\%$: above one object per element the discrete description is the
+approximation and the density is exact. 05b's $1166$ plaques were not a sparse sampling of adhesion,
+they were the wrong object by a factor of $883$.
+
+\textbf{So the receptor becomes a field, and it belongs to the cell.} An integrin is a protein in the
+\emph{cell's} basal plasma membrane; the sheet carries the \emph{ligand}. Three states, each on the
+entity that owns it:
+
+\smallskip
+{\footnotesize
+\begin{tabularx}{\textwidth}{@{}llL@{}}\toprule
+state & lives on & dynamics\\\midrule
+$N_f$, free receptor & \code{cell}, its basal face & $\dot N_f=s_i-N_f/\tau_i-\text{binding}
+  +\text{unbinding}$ --- production and internalisation, no flux term (below)\\
+$N_b$, bound bonds & \textbf{edge} \code{plaque}: \code{cell}$\to$\code{bm} & Eq.~\eqref{eq:clutch}:
+  a bond has two ends, so it is a relation and not a state of either body\\
+$\rho_L$, ligand & \code{bm\_face} & laminin is sheet material; this is $\rho$, already there\\
+\bottomrule
+\end{tabularx}}
+\smallskip
+
+\textbf{And putting the receptor on the cell removes the PDE rather than adding one.} The plasma
+membrane is continuous within a cell and interrupted at cell--cell junctions, so integrins do not
+diffuse between cells --- lateral transport between them is exocytosis and endocytosis, a per-cell
+source and sink, not a flux. \emph{Within} one cell, at $D\approx0.1\,\mu$m$^2$/s over a $600$ s frame,
+a receptor explores $\sqrt{4Dt}=15.5\,\mu$m against a $\sim\!10\,\mu$m cell: the basal face is
+\textbf{well mixed at our timestep}. So there is no Laplacian, no $\Delta t D/h^2<\tfrac12$ constraint
+--- which would have cost $\sim\!14$ substeps and, unlike the sheet's rate bound, would have
+\emph{tightened} at every refinement --- and the receptor obeys a per-cell ODE. The assumption is
+stated rather than silent: if a cell is ever resolved by more than one face, the diffusion term returns.
+
+The bonds themselves are the classical clutch, with Bell's force-dependent unbinding:
 %
 \begin{equation}
-\dot{\mathbf x}_\parallel=
-\frac{\dot{\mathbf x}^{\rm prov}_\parallel+M\xi\,\mathbf v^{\rm epi}_\parallel}{1+M\xi},
-\label{eq:implicit}
+\dot N_b = k_{\rm on}\,n_f\,\rho_L\Bigl(1-\frac{n_b}{n_{\max}}\Bigr)A
+ \;-\; k_{\rm off}(f)\,N_b,
+\qquad k_{\rm off}(f)=k^0_{\rm off}\,e^{f/f_b},
+\qquad n_b=\frac{N_b}{A},
+\label{eq:clutch}
 \end{equation}
 %
-unconditionally stable in $\xi$ and tending to no-slip as $\xi\to\infty$; the force actually applied is
-recovered from the solved velocity and handed to both bodies, so this costs nothing in the momentum
-gate.
+and the traction on the sheet is $\propto n_b$, with the reaction returned barycentrically to the
+cell's face exactly as \op{plaque\_pull} does now --- so G9 and G10 keep passing unchanged. \textbf{The
+\op{plaque} edge set survives and is reinterpreted}: one edge per sheet node, taken from the
+\op{bm\_contact} map, carrying a bond \emph{density} for its patch rather than standing for one
+cluster.
+
+
+\textbf{The force those bonds exert, and one sign that cost a run.} The normal law is a spring at the
+linkage's own rest length, scaled by how many bonds the patch is carrying, and the tangential law is
+friction against the relative velocity of sheet and cell:
+%
+\begin{align}
+\mathbf f_n &= -\,n_b\,\kappa_n\,(d-\ell_0)\,\hat{\mathbf n},
+&d &= (\mathbf x^{\rm bm}-\mathbf p)\cdot\hat{\mathbf n},
+&\mathbf f^{\rm epi}_k &= -w_k(\mathbf f_n+\mathbf f_t),
+\label{eq:plaque_n}\\[2pt]
+\dot{\mathbf x}_\parallel &=
+\frac{\dot{\mathbf x}^{\rm prov}_\parallel+M\xi\,\mathbf v^{\rm epi}_\parallel}{1+M\xi},
+&\xi &= n_b\kappa_b/k_{\rm off},
+&\mathbf f_t &= \xi\bigl(\mathbf v^{\rm epi}_\parallel-\dot{\mathbf x}_\parallel\bigr).
+\label{eq:implicit}
+\end{align}
+%
+$\hat{\mathbf n}$ is the epithelial face's \emph{outward} normal, not the line joining the two points,
+and that is a correctness fix rather than a refinement: along the line, the equilibrium
+$|\mathbf x^{\rm bm}-\mathbf p|=\ell_0$ is satisfied on \emph{either} side, so a sheet that has sunk
+through the epithelium sits at the same energy as one resting on it. 05e measured the consequence --- a
+sheet that started $5.96\times10^{-4}$ outside (which is $\ell_0$, correct) and ended
+$7.7\times10^{-3}$ \emph{inside}, thirteen $\ell_0$ through the cell layer --- while the standoff
+metric, being an unsigned distance, reported $+4.0\times10^{-3}$ throughout. \textbf{An unsigned
+quantity cannot answer a question about a side.}
+
+Eq.~\eqref{eq:implicit} is \emph{solved}, not evaluated: an explicit $-\xi\mathbf v$ is a stiffness of
+$\xi/\Delta t$, which \emph{grows} as the substep shrinks, so refining the step to stabilise it makes
+it worse. And a signed adhesion is still not sufficient --- with the sign fixed the sheet ended
+$89.6\%$ inside, because the missing statement is one no adhesion model contains:
+
+\begin{equation}
+\mathbf f^{\rm contact}_i=-k_c\,\min\bigl(d_i-\ell_0,\,0\bigr)\,\hat{\mathbf n}_i,
+\qquad\text{one-sided, at every node.}
+\label{eq:contact}
+\end{equation}
+
+\op{bm\_contact} says that a basement membrane cannot be \emph{inside} the cells. It holds at every
+node and not only where adhesion happens to be, it pushes out and never pulls in, and its reaction goes
+to the three vertices of the epithelial face so the momentum gate still covers it. It moved the signed
+standoff from $-9.87\times10^{-4}$ to $+1.97\times10^{-6}$ and the fraction of nodes on the wrong side
+from $89.6\%$ to $\mathbf{0.0\%}$. This is what the archived \op{cell\_exclude\_3d} did and got wrong:
+that operator \emph{projected} particles out, repositioning them without touching $\mathbf F$, which
+launders deformation --- run 88's sheet was carried outward as a decal at a strain of
+$7\times10^{-4}$ against a true stretch of $3.4$. A force cannot do that.
+
+\textbf{Three defects close at once, which is why this is a change of scheme and not an elaboration.}
+The standoff (G12) was $3.43\,\ell_0$ because $96\%$ of nodes were unanchored and the sheet sagged
+between plaques; a distributed traction has nothing to sag between. Slip (G13) was unmeasurable because
+a fixed barycentric anchor is a tangential pin --- slip \emph{is} bond turnover, the sheet advancing as
+$k_{\rm off}$ releases bonds that rebind ahead, and $\xi$ stops being a coefficient and becomes
+$n_b\kappa_b/k_{\rm off}$. And rupture was a clock because a fixed threshold on a monotonically rising
+load is reached by everyone eventually; $k_{\rm off}(f)$ gives a \emph{steady-state} bound fraction
+that depends on load, so ``fraction bound versus stress'' becomes a curve.
+
+\textbf{What is conserved, and therefore what is gated:} $N_f^{\rm cell}+\sum_{\rm edges}N_b$ changes
+only through $s_i$ and $1/\tau_i$ --- not by stretch, not by a remesh, not by binding, which merely
+moves receptor from one column to the other. That is the G18b treatment applied to receptor instead of
+mass.
+
+\textbf{The discrete plaque is not deleted; it is demoted to a refined patch.} Where individual rupture
+and turnover matter --- a crack tip, an invadopodium --- a locally refined mesh can resolve $\Sigma$
+and carry discrete clusters again. The gate on that is a convergence test: the discrete model at high
+density must reproduce the density model.
 
 \subsection*{2.4\; The reservoir: a sheet whose size is a state variable}
 
@@ -422,7 +567,16 @@ $\ell,\ell_0$ & current, rest length & of one plaque; $\ell_0=0.3\,T$\\
 $\kappa_n$ & \textbf{normal stiffness} & of the plaque (not the sheet's $Y_2$, not the tether's $\kappa$)\\
 $\xi$ & tangential friction & against RELATIVE velocity of sheet and epithelium\\
 $w_k$ & barycentric weights & of the attachment point in its epithelial face; also the reaction's weights\\
-$\Sigma$ & plaque spacing & $\approx7T$ measured; the density is $\Sigma^{-2}$\\
+$N_f$ & free receptor & integrins on ONE CELL's basal face; a number, not a density\\
+$N_b,\ n_b$ & bound bonds, bond density & on one \code{plaque} edge; $n_b=N_b/A$. The traction is
+  $\propto n_b$\\
+$\rho_L$ & ligand density & laminin on the sheet; this is $\rho$ of \S2.2 under its binding name\\
+$k_{\rm on},k^0_{\rm off},f_b$ & binding rate, unloaded off-rate, Bell force & $k_{\rm off}=k^0_{\rm
+  off}e^{f/f_b}$: load shortens a bond's life\\
+$n_{\max}$ & saturation & the most bonds a patch can carry\\
+$s_i,\tau_i$ & receptor production, internalisation time & of the CELL, not of the sheet\\
+$\Sigma$ & cluster spacing & centre-to-centre between integrin CLUSTERS, not between integrins;
+  $\sim\!555$ nm measured. Now sets $n_{\max}$, no longer a plaque COUNT\\
 $\kappa$ & tether stiffness & \op{05a} only: the one-sided spring the plaque replaces\\
 \bottomrule
 \end{tabular}}
@@ -442,19 +596,21 @@ same shape as \code{junction} $\subseteq$ \code{vertex}$^2$ and \code{plaque} $\
 makes Eq.~\eqref{eq:split} a local inheritance rule instead of an interpolation.
 
 \begin{center}\small
-\begin{tabular}{@{}llll@{}}\toprule
+\begin{tabularx}{\textwidth}{@{}p{2.0cm}p{3.4cm}p{3.6cm}L@{}}\toprule
 \textbf{set} & \textbf{kind} & \textbf{one element is} & \textbf{state it carries}\\\midrule
 \code{sheet}        & node, depth 0 & the membrane as an organ & total area, $\langle\rho\rangle$, live counts\\
 \quad\code{bm}      & node, depth 1 & one node of the membrane & \code{pos}, \code{vel}, \code{occ}\\
 \quad\code{bm\_face}& \textbf{hyperedge} $\subseteq$ \code{bm}$^3$ & one patch of membrane &
   $\mathbf D_m^{-1}$, $\mathbf C_0$, $A^0$, $\rho$, $Y_2$, age, \code{occ}\\\midrule
-\code{plaque}       & \textbf{edge} \code{cell}$\to$\code{bm} & one hemidesmosome &
-  $\ell_0$, $\kappa_n$, $\xi$, barycentric $w_k$, load, bound\\
+\code{cell}         & node (the epithelium) & one epithelial cell & \emph{(its own state)} plus
+  $N_f$, free integrin on its basal face\\
+\code{plaque}       & \textbf{edge} \code{cell}$\to$\code{bm} & one patch of adhesion, ONE PER SHEET
+  NODE --- not one cluster & $N_b$ bound bonds, $\ell_0$, $\kappa_n$, barycentric $w_k$, load\\
 \code{fibril}       & \textbf{edge} \code{bm}$\to$\code{ecm}  & one anchoring fibril & rest length, load\\
 \midrule
 \code{protease}     & field & MMP concentration & scalar, diffusing (drives \op{bm\_degrade})\\
 \bottomrule
-\end{tabular}
+\end{tabularx}
 \end{center}
 
 \textbf{Operators}, in Plexus2's taxonomy: \emph{Seed} creates a set, \emph{Lateral} moves state along
@@ -479,11 +635,19 @@ two be $O(1)$ flips.
   faces \cite{matsubayashi2020} & G24--G26\\
 \op{bm\_degrade}    & \textbf{Die}    & \code{bm\_face} & proteolysis, or $\rho$ below critical
   \cite{kelley2019} & G19--G23\\
-\op{plaque\_seed}   & Rewire  & \code{plaque}   & density $\Sigma^{-2}$, $\Sigma\approx7T$
-  \cite{kanchanawong2010}; turnover re-seeds & plaque spacing in $T$\\
+\op{integrin\_turnover} & Lateral & \code{cell} & $\dot N_f=s_i-N_f/\tau_i$: the cell makes and
+  recycles its own receptor. No flux term --- the basal face is well mixed & receptor conserved up to
+  $s_i$, $1/\tau_i$\\
+\op{plaque\_bind}   & Lateral & \code{plaque}   & Eq.~\eqref{eq:clutch}, with Bell's $k_{\rm off}(f)$
+  \cite{bell1978} & bound fraction vs LOAD, not vs frame\\
+\op{plaque\_seed}   & Rewire  & \code{plaque}   & one edge per sheet node, from the \op{bm\_contact}
+  map; rebuilt on refinement & one edge per live node, always\\
 \op{plaque\_pull}   & Lateral & \code{plaque}   & Eqs.~\eqref{eq:plaque_n}--\eqref{eq:implicit},
   \emph{with its reaction} & G9--G13\\
-\op{plaque\_rupture}& Rewire  & \code{plaque}   & the bond fails past a load & fraction bound vs.\ load\\
+\op{plaque\_rupture}& --- & --- & \emph{deleted}: rupture is now $k_{\rm off}(f)$ in
+  Eq.~\eqref{eq:clutch}, a rate, not a threshold & ---\\
+\op{bm\_contact}    & Lateral & \code{bm}, \code{cell} & Eq.~\eqref{eq:contact}: the cells exclude the
+  sheet, one-sided, at every node & G28: the sheet stays outside\\
 \op{fibril\_pull}   & Lateral & \code{fibril}   & the stroma is loaded \emph{through} the sheet
   \cite{keene1987} & stroma displacement, sheet present vs.\ absent\\
 \op{bm\_barrier}    & Exchange& \code{bm\_face}, fields & pores pass solutes, stop cells
@@ -514,6 +678,138 @@ different index sets in one step:
 
 The substep count is not a constant: it is set from the measured $\lambda_{\max}$ to hold
 $\Delta t M\lambda_{\max}$ at a chosen group below $2$ (\S3), which over a run means $21\to194$.
+
+
+\begin{figure}[H]\centering
+\includegraphics[width=\textwidth]{fig_sets_ops.pdf}
+\caption{\textbf{(a)} Every set and field, and which kind each is. A node set carries positions; an
+edge or hyperedge set is a \emph{relation} and carries state belonging to neither endpoint --- a
+junction to neither cell, a plaque to neither the cell nor the sheet, a triangle to none of its three
+nodes. \textbf{(b)} Every operator, on the set it acts on, coloured by kind. Anything carrying a
+\emph{force} sits on a set whose elements have positions; anything carrying \emph{mass or number} sits
+on the set that owns the quantity. \op{bm\_refine} is the only operator here that is numerical rather
+than biological.}
+\end{figure}
+
+\subsection*{3.1\; The two diffusible species, and the one that is not}
+
+Proteolysis introduces the first \emph{fields} in this model, and deciding which of the three species
+deserves to be one is not a modelling preference --- it is arithmetic.
+
+\smallskip
+{\footnotesize
+\begin{tabular}{@{}llll@{}}\toprule
+species & what it is & where it lives & why\\\midrule
+\textbf{MMP} & soluble MMP-2/9, $\sim\!72$ kDa, cuts collagen~IV &
+  \textbf{field} on \code{bm\_face} & it diffuses freely, $D\sim10$--$100\,\mu$m$^2$/s\\
+\textbf{TIMP} & soluble inhibitor, binds MMP $1{:}1$ &
+  \textbf{field} on \code{bm\_face} & likewise --- and it is the \emph{sink}\\
+\textbf{MT1-MMP} & membrane-type MMP14, transmembrane &
+  a per-\code{cell} \emph{state} & it never enters the extracellular space\\
+\bottomrule
+\end{tabular}}
+\smallskip
+
+\textbf{A soluble protease cannot open a hole, and the arithmetic says so before any run.} In one
+$600$~s frame a soluble MMP travels $\sqrt{4Dt}=155$--$490\,\mu$m, against a spheroid $318\,\mu$m
+across and a cell of $10\,\mu$m. It is therefore \emph{uniform over the entire sheet within a single
+frame}, and a uniform protease dissolves rather than perforates --- the same failure uniform
+starvation produced, for the same reason. Localising to one cell would need
+$D<0.042\,\mu$m$^2$/s, $240$--$2400\times$ slower than any protein of that size. That is not a
+parameter range, it is a different molecule, and the different molecule is MT1-MMP: \emph{tethered},
+acting where its cell put it. This is why focal basement-membrane breach is done by membrane-type MMPs
+and invadopodia rather than by soluble enzyme.
+
+\textbf{What makes the soluble field worth solving at all is the sink.} With
+$\mathrm Dc/\mathrm Dt = D\nabla_s^2c + s - k\,c$ the source decays over $\sqrt{D/k}$, so the field
+acquires a \emph{length} instead of filling the sphere --- and $k$ here is not a fitted decay but the
+reaction with TIMP. The breach diameter becomes a \emph{prediction} of the MMP/TIMP balance: a
+$10\,\mu$m breach needs an effective $k$ of $0.1$--$0.5\,$s$^{-1}$ (half-life $1.4$--$6.9$~s), a
+$50\,\mu$m breach $0.004$--$0.02\,$s$^{-1}$ ($35$--$170$~s). A number to check, not to choose.
+
+\textbf{Three new operators, and one costs what the others do not.} \op{protease\_secrete} (Lateral, on
+\code{cell}) is the source; \op{protease\_inhibit} (Exchange) is the $1{:}1$ reaction;
+\op{protease\_diffuse} (Exchange) is the only operator in this model carrying a \emph{spatial}
+coupling, and so the only one whose stability limit involves the mesh. Explicit diffusion needs
+$\Delta t D/h^2<\tfrac12$ --- at these $D$, $1{,}300$--$13{,}400$ substeps per frame, \emph{quadrupling
+at every $1\!\to\!4$ refinement}, unlike the sheet's own bound which is a rate and mesh-independent. It
+is therefore solved semi-implicitly, $(\mathbf I+\Delta t D\mathbf L)c=c_{\rm old}$ by conjugate
+gradient on a finite-volume face Laplacian: unconditionally stable, one solve per frame, indifferent
+to $h$.
+
+\textbf{The same argument applied to the integrin gives the opposite answer for the opposite reason.}
+A receptor is well mixed because it is \emph{confined} to one cell's basal face ($\sqrt{4Dt}=15.5\,\mu$m
+over a $10\,\mu$m cell) and needs no field; a soluble protease would be well mixed because it
+\emph{travels far}. \textbf{Confinement, not diffusivity, decides whether a species is worth resolving
+as a field.}
+
+
+
+\subsection*{Proteolysis, and the mechanism the literature forced}
+
+\op{05g\_degrade} put the three species on the entities the confinement argument assigns them and
+measured which one can make a hole. The answer was unambiguous and one-sided:
+
+\smallskip
+{\footnotesize
+\begin{tabular}{@{}lcccc@{}}\toprule
+arm & faces dead & under MT1 & elsewhere & sheet breached\\\midrule
+both arms      & $317$  & $317$ & $0$    & $6.2\%$\\
+soluble only   & $\mathbf 0$ & $0$ & $0$ & $0\%$\\
+tethered only  & $317$  & $317$ & $0$    & $6.2\%$\\
+no protease    & $0$    & $0$   & $0$    & $0\%$\\
+\textbf{no inhibitor} & $\mathbf{5120}$ & $317$ & $\mathbf{4803}$ & $\mathbf{100\%}$\\
+\bottomrule\end{tabular}}
+\smallskip
+
+The last row is the argument of \S3.1 as an experiment: \textbf{remove TIMP and the sheet dissolves
+entirely}, with $4803$ of the deaths nowhere near a cell that expresses MT1-MMP. With the inhibitor
+present the diffusible arm kills nothing at all and the tethered arm kills exactly its own footprint.
+A soluble protease has no length scale unless something quenches it.
+
+\textbf{Two defects that the runs found rather than the design.} First, neither field had a
+\emph{clearance} term, so TIMP accumulated without bound ($0.0318$ at frame $20$, $0.0438$ at frame
+$25$) --- its only sink was a $1{:}1$ reaction with an MMP twenty times scarcer, so there was no steady
+state for the pair to reach. A first-order clearance is not a refinement: the $\sqrt{D/k}$ that
+justifies solving the field \emph{is} that $k$. With it, both fields plateau and drift by
+$<10^{-4}$ over twenty frames. Second, a five-point sweep of the MMP:TIMP source ratio over a
+hundredfold range returned \emph{identically} $317$ dead at every point, because the direct tethered
+cut had been set $350\times$ larger than anything the soluble arm could contribute --- the sweep axis
+had no effect on the answer, and the holes were the source stencil in every case.
+
+\subsection*{TIMP-2 is the adaptor as well as the inhibitor, and that predicts a bell}
+
+The pure-inhibitor law of \op{05g} is half of the mechanism. In the canonical model
+\cite{karagiannis2004} TIMP-2 is the \emph{bridging adaptor} that makes activation possible: its
+C-terminus tethers proMMP-2 and its N-terminus binds MT1-MMP, and the prodomain is then cleaved by a
+\emph{second, TIMP-2-free} MT1-MMP \cite{sato2010}. TIMP-2 therefore both presents the zymogen and
+poisons the enzyme that must cut it, and the dose response is biphasic. The dissection is clean: an
+artificial receptor that tethers proMMP-2 \emph{without} inhibiting MT1-MMP has no descending limb
+\cite{cancerres2008}, so the fall-off is inhibition and not saturation.
+
+With $T$ the tethered enzyme and $K$ the MT1--TIMP dissociation constant, occupancy is Langmuir and the
+rate needs one occupied site and one free one:
+%
+\begin{equation}
+[\mathrm{MT1\!\cdot\!TIMP}]=T\frac{c_T/K}{1+c_T/K},\quad
+[\mathrm{MT1_{free}}]=\frac{T}{1+c_T/K},\quad
+\text{act}\;\propto\;T^2c_{\rm pro}\,\frac{c_T/K}{\bigl(1+c_T/K\bigr)^2},
+\label{eq:bell}
+\end{equation}
+%
+which is bell-shaped and \textbf{peaks at $c_T=K$}. Both the shape and the location are therefore
+predictions, and \op{05g}'s pure-inhibitor law cannot produce a peak at all --- it can only decay ---
+so one sweep distinguishes them and \op{05g} is the control.
+
+\textbf{Measured} (\op{05h\_ternary}, eight TIMP levels, four species): the activation rate rises and
+falls, $4.5\times10^{-2}\to6.2\times10^{-2}\to2.4\times10^{-2}\to7.5\times10^{-3}\to2.5\times10^{-3}$,
+and the pure-inhibitor control over the same sweep is monotone decreasing, as Eq.~\eqref{eq:bell}
+requires of it. Two arrangements had to be corrected before the curve could be read at all, and both
+are worth recording because they are measurement errors rather than modelling ones: the activation had
+to be made \emph{rate-limiting} (at a large $k_{\rm act}$ the whole zymogen pool converts every frame
+whatever TIMP does, and saturation erases the dose response); and the rate has to be read \emph{while
+the substrate still exists}, since at the TIMP levels where the mechanism works best it destroys every
+MT1-bearing face and a late-window average then reports exactly zero at the peak.
 
 \section*{4.\; Gates}
 
@@ -546,9 +842,11 @@ G9 & momentum, bookkeeping: $|\sum\mathbf f_{\rm bm}{+}\sum\mathbf f_{\rm epi}|/
 G10& momentum, motion: free pair, centroid drift & $<10^{-12}$ & \PASS{$4.4\times10^{-15}$}\\
 G11& control, no plaques: the sheet is not carried & $\lambda\approx1$ &
      $1.25$ vs $3.30$ (marginal)\\
-G12& standoff equals $\ell_0$ & $\ell/\ell_0\in[0.9,1.1]$ & \FAIL{$3.43$} (\S10)\\
-G13& slip: $\xi=0$ and $\xi>0$ must differ & any separation & \FAIL{none} (\S10)\\\midrule
-\multicolumn{4}{@{}l}{\textit{the reservoir} (\S6, \op{05c\_remesh}, \op{05e\_conserve})}\\
+G12& standoff equals $\ell_0$ & $\ell/\ell_0\in[0.9,1.1]$ & \FAIL{$3.43$} --- superseded by
+     \S2.3: $96\%$ of nodes were unanchored\\
+G13& slip: $\xi=0$ and $\xi>0$ must differ & any separation & \FAIL{none} --- a fixed anchor is a
+     pin; slip IS bond turnover\\\midrule
+\multicolumn{4}{@{}l}{\textit{the reservoir} (\S2.4, \op{05c\_remesh}, archived \op{05e})}\\
 G14& refining an UNLOADED sheet changes $\lambda$ & $<10^{-6}$ ($\sqrt\varepsilon$) &
      \PASS{$6.2\times10^{-9}$}\\
 G15& refining a LOADED sheet: $\lambda$ / area / energy & $10^{-12}$, $10^{-9}$, $10^{-6}$ &
@@ -564,6 +862,9 @@ G18c& plaque areal density held at $\Sigma^{-2}$ & within $10\%$ &
 G18d& a split does not move the surface: volume, area, centroid & $<10^{-12}$ rel. &
      \PASS{$2.6\times10^{-16}$, $0$, $9\times10^{-17}$}\\
 G18e& $\rho=m/A$ equals $1/J$ & --- & an identity, not a test\\
+G28& the sheet stays OUTSIDE the epithelium (signed) & radial gap $>0$ &
+     \PASS{$+4.3\times10^{-4}$} (was $-3.6\times10^{-3}$)\\
+G29& no plaque ends up on the wrong side & $0\%$ & \PASS{$0.0\%$} (was $89.6\%$)\\
 \midrule
 \multicolumn{4}{@{}l}{\textit{tearing} (\op{05d\_tear}) --- G19 is the test the MPM sheet never faced}\\
 G19& \textbf{same tear, same $\lambda$, under refinement} & onset $\lambda$ within $5\%$ &
@@ -575,11 +876,26 @@ G21& a hole stays open; the remesher does not heal it & exact &
 G22& control: criterion above the load kills nothing & exact & \PASS{$0$ of $81{,}920$}\\
 G23& the mesh is conforming with a hole in it & $0$ edges with $3$ faces & \PASS{$0$}\\\midrule
 \multicolumn{4}{@{}l}{\textit{supply} (\S4, \op{05f\_secrete})}\\
-G24& $\rho$ held flat while $A$ triples & within $10\%$ & \PEND{05f, running}\\
-G25& the added material is in the sheet; polarised follows the plaques & by construction; $r>0$ &
-     \PEND{05f, running}\\
-G26& starved tears, fed does not, at the same $\lambda$ & --- & \PEND{05f, running}\\
-G27& dilution and turnover are comparable & ratio within $[0.3,3]$ & \PEND{05f, running}\\
+G24& $\rho$ held flat while $A$ triples & within $10\%$ &
+     \PASS{$1.0046$} at area $\times11.2$ (starved $0.351$)\\
+G25& polarised deposition follows the plaques, uniform does not & $r$ separates &
+     \PASS{$+0.880$ vs $-0.053$}\\
+G26& starved tears, fed does not, at the same $\lambda$ & --- &
+     \PASS{$0$ vs $2515$ faces}\\
+G27& dilution and turnover are comparable & ratio within $[0.3,3]$ &
+     \FAIL{$0.238$} at $\tau_{\rm bm}\!=\!40$; $0.555$ at $93$\\\midrule
+\multicolumn{4}{@{}l}{\textit{adhesion as a density} (\S2.3, \op{05d}, to build)}\\
+G28& the sheet stays OUTSIDE the epithelium (signed) & radial gap $>0$ &
+     \PASS{$+2.7\times10^{-4}$}\\
+G29& no plaque on the wrong side & $0\%$ & \PASS{$0.0\%$}\\
+G30& receptor conserved: $N_f+\sum N_b$ moves only by $s_i$, $1/\tau_i$ & exact &
+     \PEND{05d}\\
+G31& bound fraction depends on LOAD, not on the frame & monotone in stress, plateaus &
+     \PEND{05d}\\
+G32& slip rate monotone in $k_{\rm off}$, zero at $k_{\rm off}=0$ & separation &
+     \PEND{05d}\\
+G33& the discrete-plaque model converges to the density model at high $\Sigma^{-2}$ & within $5\%$ &
+     \PEND{05d}\\
 \bottomrule
 \end{tabularx}}
 \smallskip
@@ -614,11 +930,11 @@ one operator, a delta to both endpoints, and the reaction cannot be half-impleme
 $4.4\times10^{-15}$ of the system's own size. \textbf{3} \FAIL{G12}: the standoff is $3.43\,\ell_0$
 and not $\ell_0$. \textbf{4} \FAIL{G13}: $\xi=0$ and $\xi>0$ do not separate, because a fixed
 barycentric anchor is a tangential pin. \textbf{5} rupture is a clock rather than a load, for want of
-turnover. \S10 is what each of those three costs.}
+turnover. \S4.2 is what each of those three costs, and \S2.3 is the scheme that replaces them.}
 \end{figure}
 
 \begin{figure}[H]\centering
-\includegraphics[width=\textwidth]{../log/okuda_ECM/05e_conserve/remesh_model.png}
+\includegraphics[width=\textwidth]{../log/okuda_ECM/_archive_05def/05e_conserve/remesh_model.png}
 \caption{\op{bm\_refine} and what it must carry (\op{05e\_conserve}). Red dash-dot lines are the two
 refinements, at frames $131$ and $353$. \textbf{Top left} \PASS{G18b}, \PASS{G18d}: $\sum_f m_f$ is
 flat through both splits and through an area that grows $\times11$ --- bit-identical --- while the
@@ -630,7 +946,20 @@ $\lambda$ (no step at the red lines) while the mean edge length is halved at eac
 \end{figure}
 
 \begin{figure}[H]\centering
-\includegraphics[width=\textwidth]{../log/okuda_ECM/05d_tear/metrics.png}
+\includegraphics[width=\textwidth]{../log/okuda_ECM/_archive_05def/05f_secrete/secrete_model.png}
+\caption{\op{bm\_secrete} (\op{05f\_secrete}), in the register of \S3's operator table: the operator
+names itself, states the equations it is, and every panel is a measurement that could have come back
+wrong. \textbf{Top left} \PASS{G24}: \op{fed} holds $\rho$ at $1.005$ while the area triples, against
+$0.351$ starved. \textbf{Top right} \FAIL{G27}: the two removal terms are \emph{not} the same size ---
+dilution is $0.238$ of turnover at $\tau_{\rm bm}=40$ frames. \textbf{Bottom left} \PASS{G26}, plotted
+against $\lambda$ and not against the frame, because ``starved tears and fed does not'' is a statement
+about supply only if the two are compared at the same deformation. \textbf{Bottom right} \PASS{G25}:
+polarised deposition ends at $r=+0.88$ with the plaques against uniform's $-0.05$, with the stretch
+correlation drawn beside it as the control that separates deposition from mechanics.}
+\end{figure}
+
+\begin{figure}[H]\centering
+\includegraphics[width=\textwidth]{../log/okuda_ECM/_archive_05def/05d_tear/metrics.png}
 \caption{\op{05d\_tear}: tearing, and the gate the MPM sheet was never given. \textbf{Bottom middle}
 \PASS{G19}: the same criterion at $5{,}115$ and $20{,}471$ faces tears at $\lambda^{\rm el}=2.110$ and
 $2.099$ --- $0.52\%$ apart, against a $5\%$ threshold --- so the tear is set by the material and not by
@@ -682,9 +1011,9 @@ $4.6\%$ & $7\,T$ (the measured $\Sigma$) & $+1.68\times10^{-2}$ & $-1.19\times10
 \bottomrule\end{tabular}}
 \smallskip
 
-At the density the literature measures --- plaques $\sim\!350$~nm across on $\sim\!700$~nm centres,
+At this model's plaque density --- which is NOT the density the literature measures, see \S2 ---
 which on this mesh is $4.6\%$ of the nodes --- the two-sided plaque sits $7\times$ closer to the surface
-than the one-sided tether did. The sign has flipped, and that is \S10.
+than the one-sided tether did. The sign has flipped, and that is \S4.2.
 
 \textbf{\op{05c\_remesh}} --- the same sheet with two levels of reserve ($81{,}920$ face slots,
 $40{,}962$ node slots), against the identical run with the reserve switched off. Refinement fires twice,
@@ -744,7 +1073,7 @@ would have hidden.
 \textbf{The standoff is $3.43\,\ell_0$, not $\ell_0$ (G12).} The sheet lags the expanding epithelium, so
 every plaque is \emph{extended} rather than sitting at its rest length, and the extension is what
 carries the sheet outward. $\ell_0$ therefore sets the standoff only in a quasi-static sheet; in a
-growing one it is $\ell_0$ plus a lag, and the lag is the same hoop stress \S9 isolates. The prediction
+growing one it is $\ell_0$ plus a lag, and the lag is the same hoop stress \S4.1 isolates. The prediction
 is sharp and is the next run: \op{05b} with $\tau_r=25$ should collapse $3.43\to\sim\!1$.
 
 \textbf{Friction is currently unmeasurable in this rig (G13).} With $\xi=0$ the sheet twisted
@@ -755,6 +1084,18 @@ face. $\xi$ can only set how fast the sheet equilibrates to a pin, never whether
 \textbf{Slip requires the anchor to move over the epithelial surface}, i.e. \op{plaque\_seed} as
 turnover. \S5 of \code{note\_spheroid\_bm\_ecm} asked for friction where what was needed was turnover;
 that is a correction to the design, and the run is what found it.
+
+\textbf{Turnover does not merely match growth --- it dominates it, and \S9 of
+\code{note\_spheroid\_bm\_ecm} says otherwise.} That note argues the two removal terms of the mass
+balance are the same size, ``turnover is not a correction to growth; it is the same size as growth,
+which is why the sheet can accommodate it at all''. Measured on the geometry rather than estimated:
+$\dot A/A$ has median $5.96\times10^{-3}$ per frame against $1/\tau_{\rm bm}=2.5\times10^{-2}$, a ratio
+of $\mathbf{0.238}$ --- turnover runs $4.2\times$ faster than dilution at the mid-range half-life, and
+$1.8\times$ faster ($0.555$) at $\tau_{\rm bm}=93$ frames, the $10$~h end. The claim therefore holds
+only near the slow end of the literature's $3$--$10$~h range, and the correct statement is that
+\emph{turnover dominates growth by a factor of two to four}. It is the same conclusion for the sheet ---
+a membrane that replaces itself faster than it is diluted can hold its density --- reached by a
+different margin than the note asserts.
 
 \textbf{Rupture is all-or-nothing for a structural reason.} At a threshold of $0.0052$, inside the
 measured load range (the nominal's p99 reaches $0.0120$), \emph{every} plaque broke. With a load that
@@ -787,14 +1128,39 @@ the two is what \op{05g} does.
 
 {\small
 \begin{thebibliography}{99}\setlength{\itemsep}{0pt}
+\bibitem{karagiannis2004} Karagiannis, E.D., Popel, A.S. (2004) A theoretical model of type I
+collagen proteolysis by matrix metalloproteinase (MMP) 2 and membrane type 1 MMP in the presence of
+tissue inhibitor of metalloproteinase 2. \emph{J. Biol. Chem.} \textbf{279}(37):39105--39114. --- the
+canonical ODE network for MT1-MMP / TIMP-2 / proMMP-2 / MMP-2, and the source of the reaction topology
+used here.
+\bibitem{sato2010} Sato, H., Takino, T. (2010) Coordinate action of membrane-type matrix
+metalloproteinase-1 (MT1-MMP) and MMP-2 enhances pericellular proteolysis and invasion.
+\emph{Cancer Sci.} \textbf{101}(4):843--847.
+\bibitem{cancerres2008} Activation of MMP-2 by MT1-MMP through an artificial receptor for proMMP-2
+generates active MMP-2. \emph{Cancer Res.} (2008) \textbf{68}(21):9096. --- the dissection showing the
+descending limb is MT1-MMP inhibition and not receptor saturation.
 \bibitem{stvk} Bonet, J., Wood, R.D. (2008) \emph{Nonlinear Continuum Mechanics for Finite Element
 Analysis}, 2nd ed. Cambridge University Press. --- the constant-strain-triangle membrane of \S3.
 \bibitem{candiello2007} Candiello, J., Balasubramani, M., Schreiber, E.M., Cole, G.J., Mayer, U.,
 Halfter, W., Lin, H. (2007) Biomechanical properties of native basement membranes.
 \emph{FEBS J.} \textbf{274}(11):2897--2908.
+\bibitem{bell1978} Bell, G.I. (1978) Models for the specific adhesion of cells to cells.
+\emph{Science} \textbf{200}(4342):618--627. --- the force-dependent off-rate
+$k_{\rm off}=k^0_{\rm off}e^{f/f_b}$ that makes rupture a load and not a clock.
+
+\bibitem{changede2017} Changede, R., Sheetz, M. (2017) Integrin and cadherin clusters: a robust
+way to organize adhesions for cell mechanics. \emph{BioEssays} \textbf{39}(1):1600123. --- nascent
+adhesions are $\sim\!100$ nm and contain $\sim\!50$ integrins; large adhesions are loose aggregates of
+such clusters.
+\bibitem{nanoclusters2025} \emph{Differential spatial regulation and activation of integrin
+nanoclusters inside focal adhesions.} eLife reviewed preprint 105270. --- STORM: nanocluster median
+size $35$--$40$ nm, centre-to-centre $\sim\!555$ nm, spacing set cell-intrinsically. Cited as a
+preprint.
 \bibitem{kanchanawong2010} Kanchanawong, P., Shtengel, G., Pasapera, A.M., Ramko, E.B., Davidson, M.W.,
 Hess, H.F., Waterman, C.M. (2010) Nanoscale architecture of integrin-based cell adhesions.
-\emph{Nature} \textbf{468}:580--584.
+\emph{Nature} \textbf{468}:580--584. --- iPALM, and it measures the VERTICAL architecture: a
+$\sim\!40$ nm integrin-to-actin core, actin peaking at $z=97$ nm. It contains no lateral plaque
+diameter and no lateral spacing, so it licenses $\ell_0$ and NOT $\Sigma$.
 \bibitem{matsubayashi2020} Matsubayashi, Y., S\'anchez-S\'anchez, B.J., Marcotti, S., Serna-Morales, E.,
 Dragu, A., D\'iaz-de-la-Loza, M.-C., Vizcay-Barrena, G., Fleck, R.A., Stramer, B.M. (2020) Rapid
 homeostatic turnover of embryonic ECM during tissue morphogenesis. \emph{Dev. Cell} \textbf{54}(1):33--42.
@@ -808,7 +1174,7 @@ Type VII collagen forms an extended network of anchoring fibrils. \emph{J. Cell 
 \textbf{104}(3):611--621.
 \bibitem{rivara1984} Rivara, M.-C. (1984) Algorithms for refining triangular grids suitable for adaptive
 and multigrid techniques. \emph{Int. J. Numer. Methods Eng.} \textbf{20}(4):745--756. --- the local
-alternative to the global $1\!\to\!4$ split of \S6, for when a crack tip needs it.
+alternative to the global $1\!\to\!4$ split of \S2.4, for when a crack tip needs it.
 \bibitem{okuda2013} Okuda, S., Inoue, Y., Eiraku, M., Sasai, Y., Adachi, T. (2013) Reversible network
 reconnection model for simulating large deformation in dynamic tissue morphogenesis.
 \emph{Biomech. Model. Mechanobiol.} \textbf{12}(4):627--644.

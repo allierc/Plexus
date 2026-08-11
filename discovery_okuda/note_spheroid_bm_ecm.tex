@@ -3,6 +3,7 @@
 \usepackage{amsmath,amssymb}
 \usepackage{booktabs}
 \usepackage{graphicx}
+\usepackage{float}
 \usepackage[T1]{fontenc}
 \usepackage{microtype}
 \usepackage[colorlinks,linkcolor=black,citecolor=black,urlcolor=blue]{hyperref}
@@ -195,7 +196,7 @@ column of MPM particles, and both lost the reaction.
 \end{center}
 
 \begin{center}\footnotesize
-\begin{tabular}{@{}lllp{4.2cm}p{3.0cm}@{}}\toprule
+\begin{tabularx}{\textwidth}{@{}p{3.0cm}p{1.5cm}p{1.7cm}Lp{2.6cm}@{}}\toprule
 \textbf{operator} & \textbf{kind} & \textbf{acts on} & \textbf{mechanism} & \textbf{where its gates
 are}\\\midrule
 \multicolumn{5}{@{}l}{\textit{epithelium}}\\
@@ -226,7 +227,7 @@ are}\\\midrule
   MLS-MPM \cite{sulsky1994,hu2018} & \code{note\_fibre} F1--F18\\
 \op{ecm\_growth\_gate\_3d} & Lateral & \code{cell} & Eq.~\eqref{eq:gate}
   \cite{helmlinger1997,montel2011} & \op{58}; open\\
-\bottomrule\end{tabular}
+\bottomrule\end{tabularx}
 \end{center}
 
 \textbf{One schedule, split at exactly one place.} Anything carrying a force runs inside the substep
@@ -242,7 +243,8 @@ whose membership changed mid-substep would be integrated against two different i
  \op{plaque\_rupture}\\[3pt]
 \text{substep }(\Delta t_{\rm sub}=\Delta t/8):\ \
 &\op{bm\_stiffness}\to\op{bm\_elastic}\to\op{plaque\_pull}\to\op{fibril\_pull}\\
-&\to\op{mpm\_strain}\to\op{mpm\_scatter}\to\op{mpm\_grid\_update}\to\op{mpm\_gather}
+&\quad\to\op{mpm\_strain}\to\op{mpm\_scatter}\\
+&\quad\to\op{mpm\_grid\_update}\to\op{mpm\_gather}
 \end{align*}
 
 \textbf{Four rules, each buying something specific.} \emph{The membrane never enters the grid} --- it
@@ -259,6 +261,138 @@ million particles.
 \textbf{And one thing this deletes.} \op{cell\_to\_ecm} and \op{cell\_exclude\_3d} go, because while
 the sheet is intact the basement membrane \emph{is} the interface (\S1). MPM fibres also stop being
 asked to act as ropes, which \code{note\_fibre} measured they cannot.
+
+
+\begin{figure}[H]\centering
+\includegraphics[width=\textwidth]{fig_sets_ops.pdf}
+\caption{\textbf{(a)} Every set and field, and which kind each is. A node set carries positions; an
+edge or hyperedge set is a \emph{relation} and carries state belonging to neither endpoint --- a
+junction to neither cell, a plaque to neither the cell nor the sheet, a triangle to none of its three
+nodes. \textbf{(b)} Every operator, on the set it acts on, coloured by kind. Anything carrying a
+\emph{force} sits on a set whose elements have positions; anything carrying \emph{mass or number} sits
+on the set that owns the quantity. \op{bm\_refine} is the only operator here that is numerical rather
+than biological.}
+\end{figure}
+
+\subsection*{3.1\; The two diffusible species, and the one that is not}
+
+Proteolysis introduces the first \emph{fields} in this model, and deciding which of the three species
+deserves to be one is not a modelling preference --- it is arithmetic.
+
+\smallskip
+{\footnotesize
+\begin{tabular}{@{}llll@{}}\toprule
+species & what it is & where it lives & why\\\midrule
+\textbf{MMP} & soluble MMP-2/9, $\sim\!72$ kDa, cuts collagen~IV &
+  \textbf{field} on \code{bm\_face} & it diffuses freely, $D\sim10$--$100\,\mu$m$^2$/s\\
+\textbf{TIMP} & soluble inhibitor, binds MMP $1{:}1$ &
+  \textbf{field} on \code{bm\_face} & likewise --- and it is the \emph{sink}\\
+\textbf{MT1-MMP} & membrane-type MMP14, transmembrane &
+  a per-\code{cell} \emph{state} & it never enters the extracellular space\\
+\bottomrule
+\end{tabular}}
+\smallskip
+
+\textbf{A soluble protease cannot open a hole, and the arithmetic says so before any run.} In one
+$600$~s frame a soluble MMP travels $\sqrt{4Dt}=155$--$490\,\mu$m, against a spheroid $318\,\mu$m
+across and a cell of $10\,\mu$m. It is therefore \emph{uniform over the entire sheet within a single
+frame}, and a uniform protease dissolves rather than perforates --- the same failure uniform
+starvation produced, for the same reason. Localising to one cell would need
+$D<0.042\,\mu$m$^2$/s, $240$--$2400\times$ slower than any protein of that size. That is not a
+parameter range, it is a different molecule, and the different molecule is MT1-MMP: \emph{tethered},
+acting where its cell put it. This is why focal basement-membrane breach is done by membrane-type MMPs
+and invadopodia rather than by soluble enzyme.
+
+\textbf{What makes the soluble field worth solving at all is the sink.} With
+$\mathrm Dc/\mathrm Dt = D\nabla_s^2c + s - k\,c$ the source decays over $\sqrt{D/k}$, so the field
+acquires a \emph{length} instead of filling the sphere --- and $k$ here is not a fitted decay but the
+reaction with TIMP. The breach diameter becomes a \emph{prediction} of the MMP/TIMP balance: a
+$10\,\mu$m breach needs an effective $k$ of $0.1$--$0.5\,$s$^{-1}$ (half-life $1.4$--$6.9$~s), a
+$50\,\mu$m breach $0.004$--$0.02\,$s$^{-1}$ ($35$--$170$~s). A number to check, not to choose.
+
+\textbf{Three new operators, and one costs what the others do not.} \op{protease\_secrete} (Lateral, on
+\code{cell}) is the source; \op{protease\_inhibit} (Exchange) is the $1{:}1$ reaction;
+\op{protease\_diffuse} (Exchange) is the only operator in this model carrying a \emph{spatial}
+coupling, and so the only one whose stability limit involves the mesh. Explicit diffusion needs
+$\Delta t D/h^2<\tfrac12$ --- at these $D$, $1{,}300$--$13{,}400$ substeps per frame, \emph{quadrupling
+at every $1\!\to\!4$ refinement}, unlike the sheet's own bound which is a rate and mesh-independent. It
+is therefore solved semi-implicitly, $(\mathbf I+\Delta t D\mathbf L)c=c_{\rm old}$ by conjugate
+gradient on a finite-volume face Laplacian: unconditionally stable, one solve per frame, indifferent
+to $h$.
+
+\textbf{The same argument applied to the integrin gives the opposite answer for the opposite reason.}
+A receptor is well mixed because it is \emph{confined} to one cell's basal face ($\sqrt{4Dt}=15.5\,\mu$m
+over a $10\,\mu$m cell) and needs no field; a soluble protease would be well mixed because it
+\emph{travels far}. \textbf{Confinement, not diffusivity, decides whether a species is worth resolving
+as a field.}
+
+
+
+\subsection*{Proteolysis, and the mechanism the literature forced}
+
+\op{05g\_degrade} put the three species on the entities the confinement argument assigns them and
+measured which one can make a hole. The answer was unambiguous and one-sided:
+
+\smallskip
+{\footnotesize
+\begin{tabular}{@{}lcccc@{}}\toprule
+arm & faces dead & under MT1 & elsewhere & sheet breached\\\midrule
+both arms      & $317$  & $317$ & $0$    & $6.2\%$\\
+soluble only   & $\mathbf 0$ & $0$ & $0$ & $0\%$\\
+tethered only  & $317$  & $317$ & $0$    & $6.2\%$\\
+no protease    & $0$    & $0$   & $0$    & $0\%$\\
+\textbf{no inhibitor} & $\mathbf{5120}$ & $317$ & $\mathbf{4803}$ & $\mathbf{100\%}$\\
+\bottomrule\end{tabular}}
+\smallskip
+
+The last row is the argument of \S3.1 as an experiment: \textbf{remove TIMP and the sheet dissolves
+entirely}, with $4803$ of the deaths nowhere near a cell that expresses MT1-MMP. With the inhibitor
+present the diffusible arm kills nothing at all and the tethered arm kills exactly its own footprint.
+A soluble protease has no length scale unless something quenches it.
+
+\textbf{Two defects that the runs found rather than the design.} First, neither field had a
+\emph{clearance} term, so TIMP accumulated without bound ($0.0318$ at frame $20$, $0.0438$ at frame
+$25$) --- its only sink was a $1{:}1$ reaction with an MMP twenty times scarcer, so there was no steady
+state for the pair to reach. A first-order clearance is not a refinement: the $\sqrt{D/k}$ that
+justifies solving the field \emph{is} that $k$. With it, both fields plateau and drift by
+$<10^{-4}$ over twenty frames. Second, a five-point sweep of the MMP:TIMP source ratio over a
+hundredfold range returned \emph{identically} $317$ dead at every point, because the direct tethered
+cut had been set $350\times$ larger than anything the soluble arm could contribute --- the sweep axis
+had no effect on the answer, and the holes were the source stencil in every case.
+
+\subsection*{TIMP-2 is the adaptor as well as the inhibitor, and that predicts a bell}
+
+The pure-inhibitor law of \op{05g} is half of the mechanism. In the canonical model
+\cite{karagiannis2004} TIMP-2 is the \emph{bridging adaptor} that makes activation possible: its
+C-terminus tethers proMMP-2 and its N-terminus binds MT1-MMP, and the prodomain is then cleaved by a
+\emph{second, TIMP-2-free} MT1-MMP \cite{sato2010}. TIMP-2 therefore both presents the zymogen and
+poisons the enzyme that must cut it, and the dose response is biphasic. The dissection is clean: an
+artificial receptor that tethers proMMP-2 \emph{without} inhibiting MT1-MMP has no descending limb
+\cite{cancerres2008}, so the fall-off is inhibition and not saturation.
+
+With $T$ the tethered enzyme and $K$ the MT1--TIMP dissociation constant, occupancy is Langmuir and the
+rate needs one occupied site and one free one:
+%
+\begin{equation}
+[\mathrm{MT1\!\cdot\!TIMP}]=T\frac{c_T/K}{1+c_T/K},\quad
+[\mathrm{MT1_{free}}]=\frac{T}{1+c_T/K},\quad
+\text{act}\;\propto\;T^2c_{\rm pro}\,\frac{c_T/K}{\bigl(1+c_T/K\bigr)^2},
+\label{eq:bell}
+\end{equation}
+%
+which is bell-shaped and \textbf{peaks at $c_T=K$}. Both the shape and the location are therefore
+predictions, and \op{05g}'s pure-inhibitor law cannot produce a peak at all --- it can only decay ---
+so one sweep distinguishes them and \op{05g} is the control.
+
+\textbf{Measured} (\op{05h\_ternary}, eight TIMP levels, four species): the activation rate rises and
+falls, $4.5\times10^{-2}\to6.2\times10^{-2}\to2.4\times10^{-2}\to7.5\times10^{-3}\to2.5\times10^{-3}$,
+and the pure-inhibitor control over the same sweep is monotone decreasing, as Eq.~\eqref{eq:bell}
+requires of it. Two arrangements had to be corrected before the curve could be read at all, and both
+are worth recording because they are measurement errors rather than modelling ones: the activation had
+to be made \emph{rate-limiting} (at a large $k_{\rm act}$ the whole zymogen pool converts every frame
+whatever TIMP does, and saturation erases the dose response); and the rate has to be read \emph{while
+the substrate still exists}, since at the TIMP levels where the mechanism works best it destroys every
+MT1-bearing face and a late-window average then reports exactly zero at the peak.
 
 \section*{4.\; Gates}
 
@@ -331,6 +465,17 @@ derived from what a basement membrane \emph{is}; that is what \code{note\_sheet}
 
 {\small
 \begin{thebibliography}{99}\setlength{\itemsep}{0pt}
+\bibitem{karagiannis2004} Karagiannis, E.D., Popel, A.S. (2004) A theoretical model of type I
+collagen proteolysis by matrix metalloproteinase (MMP) 2 and membrane type 1 MMP in the presence of
+tissue inhibitor of metalloproteinase 2. \emph{J. Biol. Chem.} \textbf{279}(37):39105--39114. --- the
+canonical ODE network for MT1-MMP / TIMP-2 / proMMP-2 / MMP-2, and the source of the reaction topology
+used here.
+\bibitem{sato2010} Sato, H., Takino, T. (2010) Coordinate action of membrane-type matrix
+metalloproteinase-1 (MT1-MMP) and MMP-2 enhances pericellular proteolysis and invasion.
+\emph{Cancer Sci.} \textbf{101}(4):843--847.
+\bibitem{cancerres2008} Activation of MMP-2 by MT1-MMP through an artificial receptor for proMMP-2
+generates active MMP-2. \emph{Cancer Res.} (2008) \textbf{68}(21):9096. --- the dissection showing the
+descending limb is MT1-MMP inhibition and not receptor saturation.
 \bibitem{sulsky1994} Sulsky, D., Chen, Z., Schreyer, H.L. (1994) A particle method for
 history-dependent materials. \emph{Comput. Methods Appl. Mech. Eng.} \textbf{118}:179--196.
 \bibitem{hu2018} Hu, Y. \emph{et al.} (2018) A moving least squares material point method with

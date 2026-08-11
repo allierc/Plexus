@@ -24,6 +24,8 @@ from typing import Optional
 
 import yaml
 
+from plexus.units import Units, parse as parse_units
+
 # importing plexus populates base + registry; operator modules register themselves
 from plexus.models import registry
 from plexus.models.base import KINDS, EMITS
@@ -79,6 +81,11 @@ class Spec:
     plotting: dict = field(default_factory=dict)     # render STYLE (colormap, point_size, ...) — read by plexus.plot
     record_cap: int = 10000                          # max recorded SET (position) frames; the trajectory is strided if n_frames exceeds it
     field_record_cap: int = 256                      # max recorded FIELD (grid) frames — fields are large, so a tighter cap
+    # THE PHYSICAL SCALE, declared once under `general.units:` and never inferred. Three base scales
+    # (length_um, time_s, force_nN) because mechanics needs three; everything else is derived (see
+    # plexus/units.py). Absent => the run is dimensionless and no result from it may carry a unit.
+    # `time_s` defaults to 1.0, i.e. THE CONVENTION IS THAT `dt` IS IN SECONDS.
+    units: "Units" = field(default_factory=lambda: Units(declared=False))
 
 
 _RESERVED = {"op", "at", "to", "from", "implementation", "model"}
@@ -315,4 +322,5 @@ def load(path: str) -> Spec:
         plotting=raw.get("plotting", {}),
         record_cap=int(gv("record_cap", 10000)),
         field_record_cap=int(gv("field_record_cap", 256)),
+        units=parse_units(gv("units", None)),
     )
