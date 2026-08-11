@@ -344,6 +344,13 @@ def main():
                      dev=dev, dtype=torch.float64)
     sheet.reseed(x0)
     node = sheet.live_nodes[node]
+    # --tether: 05's OWN driver, which is what 05 certified. Every node is pulled toward the
+    # smoothed surface instead of a sixth of them being pulled toward individual vertices. 05j ran
+    # this on the real tissue for 399 frames with the worst triangle going 0.974 -> 0.973, where the
+    # plaque driver takes it to 0.000 -- the sheet's edges span several cells, so chasing cell-scale
+    # features is what degenerates it. The plaques stay in the model and stay measured; they simply
+    # stop being the thing that has to carry the growth.
+    tether = "--tether" in sys.argv
     l0_vec = (sheet.x[node] - x_ep0[vert]).norm(dim=1).clone()
     plq = VertexPlaques(node, vert, l0_vec, kn=arg("--kn", 2.0e4, float),
                         xi=arg("--xi", 0.0, float))
@@ -368,6 +375,16 @@ def main():
     tau_p = arg("--plaque-tau", 5.0, float)          # frames; 5 x 600 s = 50 min, focal-adhesion-ish
     gen = torch.Generator().manual_seed(0)
     ub0 = torch.nn.functional.normalize(sheet.x[sheet.live_nodes] - c, dim=1).clone()
+    k_teth = arg("--k-tether", 2.0e4, float)
+    smap_all = torch.as_tensor(z["smap"], device=dev, dtype=torch.float64) * scale
+    _nth, _nph = smap_all.shape[1], smap_all.shape[2]
+    _th = torch.acos(ub[:, 2].clamp(-1, 1)); _ph = torch.atan2(ub[:, 1], ub[:, 0]) % (2 * np.pi)
+    _it = (_th / np.pi * _nth).long().clamp(0, _nth - 1)
+    _ip = (_ph / (2 * np.pi) * _nph).long().clamp(0, _nph - 1)
+
+    def smap_t(f):
+        return smap_all[min(f // stride, smap_all.shape[0] - 1)][_it, _ip]
+
     rec = {k: [] for k in ("frame", "momentum", "standoff", "lam_geo", "lam_el", "R_bm", "R_ep",
                            "n_sub", "cross_um", "cross_frac", "n_plaque", "slip_um")}
     sheet_pos = []
@@ -399,6 +416,10 @@ def main():
                 f_el = sheet.elastic_force(sheet.x)
             fb = torch.zeros_like(sheet.x)
             fb.index_add_(0, plq.node, f_n)
+            if tether:
+                # toward the smoothed surface at this frame, one target per node
+                Rt = smap_t(t)
+                fb = fb + k_teth * ((c + ub * (Rt + l0)[:, None]) - sheet.x)
             v_prov = sheet.M * (f_el + fb)
             fbs, fes = plq.scatter(f_n, sheet.x, x_ep)
             mom = max(mom, float((fbs.sum(0) + fes.sum(0)).norm())
