@@ -1657,7 +1657,7 @@ dividing surface is <code>mesh_contact</code>, with <code>seed_ecm</code> /
 <code>cell_to_ecm</code> / <code>cell_exclude_3d</code> / <code>ecm_stress</code> beside it.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
-    <video src="gallery/vertex_mpm_free.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/vertex_mpm_press.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">press<span class="sim-spec"><pre>what: particle-to-surface contact between a triangulated patch and an MPM block
 scheme: ICFEMP-style (Chen et al. 2015 CMAME 293:1); grid-node coupling (CFEMP, Lian
@@ -1668,6 +1668,11 @@ measures:
 - momentum residual
 - penetration depth in grid cells
 - slip with and without friction
+variant:
+  floor: null
+  hole_r: 0.0
+  which: free block
+  loading: press at 1 box units per unit time for 60% of the run, then lift at 0.7
 rig:
   mesh_cell_over_dx: 1.6800003051757812
   n_grid: 64
@@ -1675,7 +1680,7 @@ rig:
   k_penalty: 2.1457672119140625
   mu: 0.4
   dt: 0.0001</pre></span></span>
-      <span class="sim-cap">the rig on its own: a triangulated surface pressed into a free MPM block and lifted off again, 751 particles in contact at the deepest. The reaction really returns to the mesh — momentum residual 1.4e-07 of the applied force, which is float32 precision — and friction cuts the tangential slip 3.2-fold against the same run at μ = 0, so the contact is a contact and not MPM's automatic weld</span>
+      <span class="sim-cap">the rig on its own: a triangulated surface pressed into a free MPM block and lifted off again, 751 particles in contact at the deepest. The reaction really returns to the mesh — momentum residual 1.5e-07 of the applied force, which is float32 precision — and friction cuts the tangential slip 3.2-fold against the same run at μ = 0, so the contact is a contact and not MPM's automatic weld</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
