@@ -86,6 +86,38 @@ class Metric:
     admitted = True
     produced_by = ""
     conditional = ""
+    # THE CONDITION, EXECUTABLE. `conditional` above is prose and nothing evaluates it, so a metric
+    # could declare "refused on a dead field" and still report a number on a dead field -- which is
+    # exactly what happened: `n_spots` returned 1 for a species whose activator peaked at 0.0,
+    # against another species' 2. "Fewer spots" and "no spots" are the same number and opposite
+    # findings, and the docstring saying so changed nothing.
+    #
+    # This is the project's own recurring lesson in a new place. A rule that lives in a prompt is a
+    # suggestion; a limit in a comment stops describing the code; and a CONDITION IN A DOCSTRING IS
+    # A SUGGESTION TOO. `requires` is a callable over the run summary, so the registry can apply it
+    # and the metric declines by being ABSENT rather than by being zero.
+    #
+    # UNDEFINED IS NOT ZERO, and the difference has to be in the type rather than in a convention:
+    # `None > 1.3` raises TypeError and `predict.score` already turns an exception into
+    # `inconclusive`, whereas `0 > 1.3` is silently False and scores REFUTED. So writing None is
+    # what makes the language refuse to draw the conclusion, and writing 0 is what invites it.
+    # TWO KINDS OF ABSENCE, AND CONFLATING THEM MAKES A GATE THAT CRIES WOLF. My first version of
+    # the check below demanded a predicate from every metric with a `conditional` and flagged
+    # seven that were already correct, because they decline at COMPUTE time: `act_extinct_frame`
+    # is None while the activator is alive, and that absence IS the measurement. Nothing is wrong
+    # with them.
+    #
+    #   self_declining  the metric's own compute() returns None when it cannot be computed --
+    #                   fewer than two spots, no tube, no tip. It knows, so it declines.
+    #   requires        the metric computes FINE and the RESULT is meaningless because a field it
+    #                   depends on is dead. It cannot know; the run summary knows.
+    #
+    # Only the second can report a misleading number, and only the second needs a predicate. That
+    # is the whole distinction G16 turned on: `n_spots` computed perfectly and returned 1 on a
+    # field whose activator peaked at 0.0.
+    self_declining = False   # compute() itself returns None in the stated case
+    requires = None          # callable(summary) -> bool, or None for "always defined"
+    requires_why = ""        # what the caller should read when it fails
     withdrawn = ""
     headline = False
     SKIP = _MISSING
@@ -185,6 +217,29 @@ def bank():
     head = [m for m in all_metrics() if m.admitted and m.headline]
     rest = [m for m in all_metrics() if m.admitted and not m.headline]
     return {m.name: m.note() for m in head + rest}
+
+
+def undefined_in(summary):
+    """{metric name: why} for every metric whose declared requirement fails on this run.
+
+    Applied once, at the end of a run, so a quantity that cannot mean anything is ABSENT from the
+    summary rather than present and misleading. The names are recorded too: "absent because the
+    field it needs is dead" is a different fact from "absent because nobody measured it", and a
+    campaign that cannot tell them apart will read the first as the second.
+    """
+    out = {}
+    for m in all_metrics():
+        if not m.requires:
+            continue
+        try:
+            ok = bool(m.requires(summary))
+        except Exception:
+            continue                       # a requirement that cannot be evaluated does not refuse
+        if not ok:
+            for n in m.names():
+                if summary.get(n) is not None:
+                    out[n] = m.requires_why or m.conditional or "declared requirement not met"
+    return out
 
 
 def conditional_names():
@@ -817,6 +872,8 @@ class CorrActRad(Metric):
     name, group = "corr_act_rad", "coupling"
     headline = False   # superseded by `grip`; kept as a diagnostic
     conditional = "refused on a dead field -- needs act_cv > 0.05 and more than 8 live cells"
+    requires = lambda s: isinstance(s.get("act_max_peak"), (int, float)) and s["act_max_peak"] > 1e-06
+    requires_why = "the activator never rose above 1e-6: there is no pattern for this to describe"
 
     @classmethod
     def compute(cls, f):
@@ -848,6 +905,8 @@ class Grip(Metric):
     name, group = "grip", "coupling"
     headline = True
     conditional = "same refusal as corr_act_rad -- needs a live pattern"
+    requires = lambda s: isinstance(s.get("act_max_peak"), (int, float)) and s["act_max_peak"] > 1e-06
+    requires_why = "the activator never rose above 1e-6: there is no pattern to grip with"
 
     @classmethod
     def compute(cls, f):
@@ -927,6 +986,8 @@ class ActAtTip(Metric):
     asks directly. NO = 1.0 (no relation to shape);"""
     name, group = "act_at_tip", "coupling"
     conditional = "needs a pattern and a tip: same refusal as corr_act_rad"
+    requires = lambda s: isinstance(s.get("act_max_peak"), (int, float)) and s["act_max_peak"] > 1e-06
+    requires_why = "the activator never rose above 1e-6: no pattern, so no pattern-at-tip"
 
     @classmethod
     def compute(cls, f):
@@ -1119,6 +1180,7 @@ class SpotSpacingCells(Metric):
     solver rate; finding F009). NOT MEASURED below 2 spots: okuda_route measures it on 70% of
     samples, so read its _measured_frac first"""
     name, group = "spot_spacing_cells", "pattern"
+    self_declining = True
     produced_by = "pattern_scale:pattern_metrics"
     conditional = "None when the spot graph has no edges (fewer than two spots)"
 
@@ -1181,6 +1243,7 @@ class NTubes(Metric):
 class TubeDiam(Metric):
     """Tube diameter in cell diameters, when there is a tube to measure. NO = 0."""
     name, group = "tube_diam", "shape"
+    self_declining = True
     produced_by = "tissue_analysis:tube_diameter"
     conditional = "None when no tube is detected"
 
@@ -1190,6 +1253,7 @@ class RedAtTip(Metric):
     """The activated fraction among TIP cells specifically, from the cell census. NO = 0 -- which is also
     what it reads when nothing is activated at all, so read it beside red_frac."""
     name, group = "red_at_tip", "coupling"
+    self_declining = True
     produced_by = "tissue_analysis:cell_census"
     conditional = "needs a tip: absent when no protrusion is detected"
 
@@ -1224,6 +1288,7 @@ class ActAliveFrac(_RunScalar):
 class ActExtinctFrame(_RunScalar):
     """The frame the pattern died on. Everything measured after it describes a dead field."""
     name, group = "act_extinct_frame", "pattern"
+    self_declining = True
     conditional = "None while the activator is still alive"
 
 
@@ -1231,6 +1296,7 @@ class ActExtinctFrame(_RunScalar):
 class ActPeakFrame(_RunScalar):
     """The frame the activator peaked on."""
     name, group = "act_peak_frame", "pattern"
+    self_declining = True
     conditional = "None if the activator never rose"
 
 
@@ -1253,6 +1319,7 @@ class QDrop(_RunScalar):
     """How much protrusion did NOT survive a quasi-static relaxation: protr(end) - protr(relaxed). A
     shape that vanishes when the forcing stops was never a morphology."""
     name, group = "Q_drop", "apparatus"
+    self_declining = True
     conditional = "absent unless the relax probe ran (--q)"
 
 
@@ -1268,6 +1335,7 @@ class DivBlocked(_RunScalar):
 class DivBlockedFirstFrame(_RunScalar):
     """The frame the buffer first refused a division; everything after it is a run against a wall."""
     name, group = "div_blocked_first_frame", "apparatus"
+    self_declining = True
     conditional = "None unless division was blocked"
 
 
