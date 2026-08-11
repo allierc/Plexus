@@ -747,6 +747,16 @@ as a field.}
 
 \subsection*{Proteolysis, and the mechanism the literature forced}
 
+\textbf{What the proteases are for, before any of their own chemistry.} Everything up to
+here builds a barrier: a sheet that carries load, holds its density, and stays attached. The proteases
+are the only operators in the model that \emph{remove} it, and they do so \emph{locally} --- so they
+are the mechanism of \textbf{barrier breach}, the step by which an epithelium stops being enclosed and
+a cell can cross into the stroma. Their target is the sheet's material (\op{bm\_degrade} acts on
+\code{bm\_face} mass); adhesion is affected only downstream, because a bond needs ligand, so $\rho$
+falling takes $n_b$ with it.
+
+
+
 \op{05g\_degrade} put the three species on the entities the confinement argument assigns them and
 measured which one can make a hole. The answer was unambiguous and one-sided:
 
@@ -864,7 +874,20 @@ G18d& a split does not move the surface: volume, area, centroid & $<10^{-12}$ re
 G18e& $\rho=m/A$ equals $1/J$ & --- & an identity, not a test\\
 G28& the sheet stays OUTSIDE the epithelium (signed) & radial gap $>0$ &
      \PASS{$+4.3\times10^{-4}$} (was $-3.6\times10^{-3}$)\\
-G29& no plaque ends up on the wrong side & $0\%$ & \PASS{$0.0\%$} (was $89.6\%$)\\
+G29& no plaque ends up on the wrong side & $0\%$ & \PASS{$0.0\%$} (was $89.6\%$)\\\midrule
+\multicolumn{4}{@{}l}{\textit{before \op{06}: the sheet on a REAL epithelium} (\op{05j}--\op{05m})}\\
+G30& \textbf{$\lambda^{\rm geo}$ does not depend on the adhesion's stiffness} & $\kappa_n$ over
+     $8\times$ moves it $<5\%$ & \PASS{$0.0000$} ($4.455$ at every $\kappa_n$)\\
+G31& it tracks a real, dividing surface & $\lambda^{\rm geo}$ within $5\%$ of
+     $\sqrt{A_{\rm ep}(T)/A_{\rm ep}(0)}$, NOT of the radius ratio & \PEND{05l}\\
+G32& the mesh survives it & worst triangle quality $>0.2$ & \FAIL{$0.000$} (\op{05j}, no
+     secretion, no refinement)\\
+G33& $\rho$ held with \op{bm\_secrete} ON, on the real surface & within $10\%$ & \PEND{05l}\\
+G34& mean edge in band with \op{bm\_refine} ON, on the real surface & $[0.8,1.7]\times$ seeded &
+     \PEND{05l}\\
+G35& all four reported together every frame & $\lambda^{\rm geo}$, $\lambda^{\rm el}$, $\rho$, edge
+     & \PEND{05m}\\
+
 \midrule
 \multicolumn{4}{@{}l}{\textit{tearing} (\op{05d\_tear}) --- G19 is the test the MPM sheet never faced}\\
 G19& \textbf{same tear, same $\lambda$, under refinement} & onset $\lambda$ within $5\%$ &
@@ -1122,6 +1145,56 @@ fold, and a hole's rim has no line tension; there is no matrix and no \op{fibril
 removes the epithelium's direct push on the stroma; and the epithelium in \op{05b} is a driven
 icosphere, not the vertex model --- \op{mesh\_contact} certifies that interface separately, and joining
 the two is what \op{05g} does.
+
+
+\subsection*{Exit gates: what must be true before 06}
+
+The sheet is not ready to be joined to the matrix and the vertex model because of what it has passed;
+it is ready when the following are closed. These are stated \emph{before} the runs that test them, and
+each names the consequence of failing rather than a threshold to be relaxed afterwards. Three of them
+have never been run at all, which is a stronger reason to hold than any of the marginal results above.
+
+\smallskip
+{\footnotesize
+\begin{tabularx}{\textwidth}{@{}p{0.8cm}Lp{3.0cm}p{2.4cm}@{}}\toprule
+& \textbf{gate} & \textbf{threshold} & \textbf{status}\\\midrule
+\multicolumn{4}{@{}l}{\textit{A --- never run. The scheme rests on these and none has been tested.}}\\
+G59 & \textbf{the density adhesion reproduces the discrete one} where the discrete one is valid:
+      raise the plaque density until there is more than one cluster per node and the two models must
+      agree & standoff and traction within $5\%$ & \PEND{05j}\\
+G60 & the field integral $\sum_f c_fA_f$ is invariant across a $1\!\to\!4$ split & exact &
+      \PEND{05k}\\
+G61 & protease on a torn face is \emph{accounted}, not silently dropped & the balance closes &
+      \PEND{05k}\\
+G62 & the steady field profile is mesh-independent & $<5\%$ across one refinement & \PEND{05k}\\
+\midrule
+\multicolumn{4}{@{}l}{\textit{B --- measured and failing. Close or waive explicitly.}}\\
+G42 & the field's own length is resolved: $\sqrt{D/k}\ge 2h$ & hard & \FAIL{$0.05$ vs $h=0.076$}\\
+G55 & the bell peaks at $c_T=K$ & within $2\times$ & \FAIL{$2.03$} --- marginal\\
+G46 & the breach is \emph{larger} than its source, and the excess tracks $\sqrt{D/k}$ &
+      radius ratio $>1$ & \PEND{partly: 05h\_3 breaches under a UNIFORM source, so it is not a
+      stencil; the radius has never been measured}\\
+G63 & the sheet sits \emph{across} the bell, not on its shoulder & band fraction $>25\%$ &
+      \FAIL{$0.7$--$2.6\%$ in every 05h run}\\
+\midrule
+\multicolumn{4}{@{}l}{\textit{C --- required by 06 itself, and never attempted.}}\\
+G64 & every operator runs \emph{simultaneously} for the full $401$ frames: elasticity, remodelling,
+      contact, adhesion with turnover, secretion, refinement, proteolysis & no divergence, no
+      dissolution & \PEND{05m}\\
+G65 & momentum still closes with \emph{all} couplings summed (adhesion $+$ contact $+$ fibril) &
+      $<10\varepsilon$ & \PEND{05m}\\
+G66 & the cost is affordable: wall clock per frame at the final mesh with the matrix present &
+      reported, with the dominant term named & \PEND{05m}\\
+\bottomrule
+\end{tabularx}}
+\smallskip
+
+\textbf{G59 carries a stop condition} and it is the one to watch. If a discrete-plaque model at high
+density does not reproduce the bond-density model, then the density is not a coarse-graining of the
+discrete picture --- it is a different model wearing its name, and the whole of \S2.3 would have to be
+withdrawn rather than patched. Every other gate here can be waived with a stated reason; that one
+cannot.
+
 
 \section*{5.\; References}
 
