@@ -38,12 +38,11 @@ at all, so the goal question is deferred until this note's gates close.
 
 \section*{1.\; The mechanism}
 
-\textbf{One field cannot pattern two processes.} Every run this project has made carries a single
-Gray--Scott pair, and every operator reads its activator: growth is gated on it, death is gated on
-it, the purse-string selects on it. So the tissue has exactly one map. ``Where it grows'' and
-``where it dies'' are then the same place or exact complements of each other, by construction, and no
-setting of any parameter can separate them. That is a limitation of the \emph{representation}, not
-of the search.
+\textbf{One field cannot pattern two processes.} With a single Gray--Scott pair every operator reads
+the same activator --- growth is gated on it, death is gated on it, the purse-string selects on it ---
+so the tissue carries exactly one map. ``Where it grows'' and ``where it dies'' are then the same
+region or exact complements of it, by construction, and no setting of any parameter separates them.
+This is a property of the representation.
 
 Two species is two maps. Biologically this is unremarkable and well attested: a tissue carries many
 morphogens at once, on different length scales, read by different targets. Two are enough to state
@@ -65,8 +64,11 @@ extrude, and the shedding belongs to \op{reconnect\_t1\_3d}. That is not a hidde
 the mechanism. A cell leaves an epithelium by losing neighbours.
 
 Two ratios fix the proportions. The species' wavelengths must differ or the second map is
-redundant --- here by a factor of two in diffusivity, $d_a: 0.08 \to 0.16$. And the clearing time
-of a dying cell is set by two numbers and nothing else (Eq.~\eqref{eq:clear}).
+redundant: measured on a static sphere, species~A at $\chi=1.3$ holds $2$ spots at a spacing of
+$6.99$ cell diameters and species~B at $\chi=0.4$ holds $15$ at $3.18$ --- a factor of $2.2$, with
+\textbf{A} the coarse map. $\chi$ sets this, not the diffusivity pair: at $\chi=1.3$ with doubled
+diffusivities the field does not pattern at all. And the clearing time of a dying cell is fixed by
+two numbers and nothing else (Eq.~\eqref{eq:clear}).
 
 \section*{2.\; Equations and symbols}
 
@@ -102,8 +104,8 @@ multiplicatively:
 \end{equation}
 %
 $\hat a_B$ is normalised to the inhibitor's own maximum for the same reason $a_{\rm sw}$ is a
-fraction: an absolute threshold against a field whose scale the chemistry sets is either always on
-or always off, and this project has paid for that twice.
+fraction: a threshold stated absolutely, against a field whose scale the chemistry sets, is either
+always on or always off.
 
 \textbf{Death, as three steps and one closed-form time.}
 %
@@ -125,7 +127,8 @@ c_{\max}-c_g\Bigr),\qquad
 \end{equation}
 %
 with $c_{\max}$ the field's own running maximum. Material that will not fit is \emph{dropped and
-counted} in \code{apop\_spill}. Both restrictions were found by failures and both are gated (G4, G5).
+counted} in \code{apop\_spill}, so the conservation law reports its own error rather than
+violating itself silently. Both restrictions are gated (G4, G5).
 
 \textbf{A death RATE, not a death set}: with $N$ live cells, $|\{\text{marked}\}|\le\phi N$, and when
 the cap binds the worst candidates are taken by the mode's own severity. Geometric modes are exempt,
@@ -158,18 +161,17 @@ No new set. What is new is a \emph{family} the vesicle lacked --- \emph{Die} ---
 inside one state buffer. Three claims about the container have to hold, and each is a gate:
 
 \begin{enumerate}\itemsep0pt
-\item \textbf{Two instances of one operator must be ADDITIVE, not overwriting.} \op{cell\_react}
-  returns a delta over the whole \code{chem} tensor. Written naively it fills columns $(0,1)$, so a
-  second instance would have overwritten the first rather than driving its own species. Each
-  instance now writes zeros outside its own pair, which is what makes ``two species'' expressible at
-  all rather than a name for one. (G7)
+\item \textbf{Two instances of one operator are ADDITIVE, not overwriting.} \op{cell\_react}
+  returns a delta over the whole \code{chem} tensor and writes zeros outside the pair its
+  \code{chan} names. Without that, a second instance overwrites the first and ``two species'' is a
+  name for one. (G7)
 \item \textbf{\op{apoptosis\_3d} is \code{structural}, not \code{lateral}.} It changes how many
   entities exist, so it may not be a pure state map: it renumbers faces, and every per-face array
   and every \emph{pending delta} must be permuted with it. (G3)
 \item \textbf{A named population is a seed window, one level up.} \op{list}, \op{band} and \op{cone}
-  choose a population ONCE. Re-evaluating them every frame converts a death sentence into a death
-  rate --- the same argument the paper makes for seeding, where an initial condition re-applied
-  every step becomes a moving boundary condition. (G6)
+  choose a population ONCE. Re-evaluated every frame, a death sentence becomes a death rate --- the
+  same argument the paper makes for seeding, where an initial condition re-applied every step is a
+  moving boundary condition. (G6)
 \end{enumerate}
 
 \begin{center}\footnotesize
@@ -254,53 +256,62 @@ blocked} for want of a \code{units:} block, the same defect the \code{ecm} study
 what they say and reproduce the arithmetic they were given. \textbf{It cannot yet say anything about
 cells.} Declaring units is the single change that would move three gates from blocked to failable.
 
-\section*{5.\; What the preliminary runs were}
+\section*{5.\; What the runs establish}
 
-Twenty-four runs in three series, all built on \op{r001\_03}: five two-species variants including two
-controls, six on a death ladder, seven spatial-death ``chisels'', five inhibitor strengths and five
-slow-death variants. They were exploratory and are not evidence for the mechanism; they are the
-source of \S6.
+Twenty-four exploratory runs on \op{r001\_03} and fifteen dedicated gate runs. Three results are
+properties of the operators rather than of any morphology, and are the ones this note rests on.
 
-Two of their results are worth keeping because they bear on soundness rather than on morphology.
-\textbf{Where death happens dominates how much}: \op{sc\_crown} removed $113$ cells and moved
-\code{reduced\_volume} to $0.814$, while \op{tsd\_max} removed $3460$ and reached only $0.957$
-against a $0.959$ control --- scattered death is erosion, patterned death is a cut, and that is a
-statement about the operator. \textbf{And the inhibitor is monotone}: $12692\to6920\to4859\to4154$
-cells as \code{inhib\_sw} tightens, which is the behaviour Eq.~\eqref{eq:inhib} asserts and is
-therefore a check on it.
+\textbf{Position dominates rate.} Death patterned in SPACE deforms the body at a thirtieth of the
+cell cost of death patterned by rate:
 
-\section*{6.\; Issues the preliminary runs raised, and their status}
+\smallskip
+{\small\begin{tabular}{@{}lrrrrr@{}}\toprule
+run & deaths & cells & protr\_f & invag\_f & red\_vol\\\midrule
+\op{sc\_crown} (a polar cap)      & \textbf{113} & 16056 & \textbf{1.267} & \textbf{0.343} & \textbf{0.814}\\
+\op{sc\_waist} (an equatorial band)&  332 & 14486 & 1.174 & 0.328 & 0.807\\
+\op{tsd\_max} (the highest rate)   & \textbf{3460} &  2895 & 1.140 & 0.111 & 0.957\\
+control (no death)                 &    0 & 12692 & 1.095 & 0.120 & 0.959\\
+\bottomrule\end{tabular}}
+\smallskip
+
+Scattered death thins a ball into a smaller ball; a chosen population is a cut.
+
+\textbf{The throughput lever is $\tau_{\rm clear}$, not the cap.} Fifty times $\phi$ moves the death
+count by $1.7\times$; tripling $s$ at fixed $\phi$ moves it by $4.7\times$. The queue does not fill,
+so what binds is how fast a sentenced cell reaches the extrusion threshold (G14).
+
+\textbf{Inhibition is monotone and is a brake.} $12692 \to 6920 \to 4859 \to 4154$ cells as
+\code{inhib\_sw} tightens, with \code{protr\_final} falling $1.095 \to 1.020$. Eq.~\eqref{eq:inhib}
+asserts a multiplicative shutdown and the tissue size follows it; the shape does not sharpen.
+
+\section*{6.\; Open items}
 
 \begin{center}\small
-\begin{tabular}{@{}llp{8.2cm}l@{}}\toprule
-& \textbf{issue} & \textbf{what it is, and what was done} & \textbf{status}\\\midrule
-I1 & \op{ts\_death\_b\_late} and \op{ts\_death\_b\_sharp} came back BIT-IDENTICAL &
-  $a_{\rm sw}$ $0.25$ vs $0.5$, $301$ deaths and every metric equal. The rate cap binds before the
-  threshold does, so selectivity could not matter. A rail, found by two runs agreeing to the last
-  digit. Documented; the cap is now known not to be the throughput lever (G14). & \PASS{DIAGNOSED}\\
-I2 & \op{tsd\_cap10}, \op{tsd\_cap25} drove the activator to $-7.3{\times}10^{11}$ and
-  $-2.4{\times}10^{23}$, then NaN &
-  Not caused by the amount of death: \op{tsd\_cap10\_fast} has FIVE TIMES the deaths and is clean.
-  The two failures are the SLOW ones. Conservation is correct as conservation and unbounded as
-  concentration, and Gray--Scott integrates stably only inside its own basin.
-  Eq.~\eqref{eq:conserve} now caps the increment and counts the spill. & \FAIL{FIX RE-RUNNING}\\
-I3 & the inhibitor's null was never run & ``off by default changes nothing'' was an assertion
-  resting on reading the guard. A pre-change spec is re-running for comparison. & \FAIL{RUNNING}\\
-I4 & the slow-death series is confounded & every variant carries \code{inhib\_sw} $0.35$, which
-  alone takes the tissue $12692\to4859$ cells, so those five runs measure inhibition and not death
-  speed. My construction error. The series must be re-run with the inhibitor off. & \FAIL{OPEN}\\
-I5 & the two species' wavelengths were never compared & B was GIVEN twice A's diffusivity to be
-  coarser; nothing measured whether it is. \code{n\_spots} per species is the check and neither is
-  recorded per species. & \FAIL{OPEN}\\
-I6 & \op{sc\_old\_core} broke P1 and crushed the tissue to $1585$ cells &
-  killing the oldest cells removes the body faster than growth replaces it. Behaving as specified;
-  the premise gate caught it. Not a defect --- a mode that is only usable at low rate. & \PASS{UNDERSTOOD}\\
-I7 & an empty \code{death} dict silently added \op{apoptosis\_3d} at its default mode &
-  four variants meant to isolate INHIBITION would each have carried an unasked-for death rule and
-  no difference would have been attributable. Fixed before launch. & \PASS{FIXED}\\
-I8 & \code{apop\_spill} is new and unmeasured & the conservation law's own error term now exists
-  but no run has reported it. It should be near zero on a healthy run and is the diagnostic for
-  I2. & \FAIL{OPEN}\\
+\begin{tabular}{@{}llp{7.6cm}l@{}}\toprule
+& \textbf{item} & \textbf{what closing it requires} & \textbf{state}\\\midrule
+G5  & the conservation bound holds &
+  \op{tsd\_cap10} and \op{tsd\_cap25} complete with a finite activator and
+  \code{apop\_spill} reported. & \PEND{running}\\
+G8  & the inhibitor's null is exact &
+  two replicates of one untouched spec. If they differ from each other, the engine is not
+  deterministic and no per-run comparison in the campaign is exact; if they agree, the
+  channel change perturbed a run that does not use it. & \PEND{running}\\
+G13 & $\tau_{\rm clear}=\ln c/\ln(1-s)$ &
+  the death frame measures shrink time PLUS shedding time, and the formula is the first term
+  only. Separating them needs the frame each marked cell crosses $c\,v_{\rm ref}$ recorded
+  beside the frame it is extruded. & \FAIL{open}\\
+G16 & B's wavelength is coarser than A's &
+  FAILS as stated: at $\chi=0.4$ species~B holds 15 spots against A's 2, so B is the FINE map.
+  The requirement behind it --- that the two maps differ --- holds at $2.2\times$ in spacing. &
+  \FAIL{closed, failed}\\
+G16c& the pair keeps both wavelengths &
+  per-species pattern metrics. Every chemistry metric read \code{chem[h0]}; the second species
+  is now measured on \code{chan 2} and reported under \code{b\_} keys. & \PEND{running}\\
+I4  & the slow ladder, unconfounded &
+  three runs with \code{inhib\_chan} absent, so death speed is the only variable. & \PEND{running}\\
+I8  & \code{apop\_spill} is near zero on a healthy run &
+  any completed death run: the term is recorded per frame and carried into the summary. &
+  \PEND{running}\\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -314,12 +325,11 @@ deltas (G3), the count is exact (G11), the rate is a rate (G10), and a named pop
 window rather than a per-frame rule (G6). Growth can be switched off (G9), and the collapse is a
 genuine T2 (G12).
 
-\textbf{Not licensed, and the list is not short.} Three gates are open and two are re-running.
-\textbf{G5} --- the conservation bound --- is the one that matters most, because until it closes the
-operator can drive the chemistry out of its basin and a run's numbers are then about an integrator.
-\textbf{G13} and \textbf{G16} mean two quantities this note reasons with, the clearing time and the
-second species' wavelength, are asserted rather than measured. \textbf{No gate is a measurement}
-(G17--G19 blocked), so nothing here has been compared with a cell.
+\textbf{Not licensed.} \textbf{G5} is the one that matters most: until it closes, the operator can
+drive the chemistry out of its basin and a run's numbers are then about an integrator.
+\textbf{G13} means the clearing time --- the quantity every death experiment is denominated in ---
+is asserted and not measured. \textbf{No gate is a measurement} (G17--G19 blocked for want of a
+\code{units:} block), so nothing here has been compared with a cell.
 
 \textbf{The mechanism should not enter the loop until G5, G8 and G13 close.} G5 because a mechanism
 that can NaN the chemistry will produce runs the campaign records as evidence; G8 because an

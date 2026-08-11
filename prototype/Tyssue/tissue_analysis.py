@@ -181,7 +181,7 @@ def _discovery_path():
     return None
 
 
-def frame_metrics(pt, mt, act=None, a_sw=None):
+def frame_metrics(pt, mt, act=None, a_sw=None, act2=None):
     """All per-frame metrics in one dict, computed by the registry in `metrics.py`.
 
     THIS FUNCTION WAS 278 LINES and is now this. It was long for a structural reason, not because the
@@ -221,6 +221,15 @@ def frame_metrics(pt, mt, act=None, a_sw=None):
                                             torch.as_tensor(f.et), torch.as_tensor(f.ef), f.nF)
             m.update(pattern_metrics(np.asarray(act, float), f.es, f.et, f.ef, f.nF,
                                      cen=cen.numpy()))
+            # PER-SPECIES, when a second one exists. Every chemistry metric reads channel 0, so a
+            # two-species run reported one map and was silent about the other -- the second
+            # species' wavelength, which is the whole premise of running two, was unmeasurable.
+            # `pattern_metrics` already takes the field as an argument, so the second call costs
+            # one pass and the keys are prefixed `b_`.
+            if act2 is not None and len(act2) == f.nF:
+                m.update({f"b_{k}": v for k, v in
+                          pattern_metrics(np.asarray(act2, float), f.es, f.et, f.ef, f.nF,
+                                          cen=cen.numpy()).items()})
         except Exception as e:
             print(f"[metrics] pattern_scale failed: {type(e).__name__}: {e}")
 

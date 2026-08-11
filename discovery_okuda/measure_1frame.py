@@ -224,8 +224,13 @@ def main():
     from tissue_analysis import frame_metrics
     idx = np.unique(np.append(np.arange(0, T, a.mesh_stride), T - 1))
     t0 = time.time()
+    # CHANNEL 2 IS PASSED WHEN IT EXISTS. A two-species run carries species A in chem columns
+    # (0,1) and species B in (2,3); every metric read column 0, so B's pattern was never measured
+    # and the reason for running two species could not be checked. `b_`-prefixed keys carry it.
+    _has_b = chemf[0].shape[1] >= 3 if len(chemf) else False
     mesh = [frame_metrics(posf[t][:hist[t]["Nv"]].astype(np.float64), hist[t],
-                          act=chemf[t][:hist[t]["nF"], 0], a_sw=a_sw) for t in idx]
+                          act=chemf[t][:hist[t]["nF"], 0], a_sw=a_sw,
+                          act2=(chemf[t][:hist[t]["nF"], 2] if _has_b else None)) for t in idx]
     t_mesh = time.time() - t0
     print(f"[measure] mesh metrics, {len(idx)} frames (stride {a.mesh_stride}): {t_mesh:.1f} s "
           f"({1000*t_mesh/len(idx):.0f} ms/frame)", flush=True)
