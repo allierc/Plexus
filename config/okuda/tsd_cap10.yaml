@@ -1,0 +1,192 @@
+general:
+  name: tsd_cap10
+  seed: 0
+  n_frames: 1800
+  dt: 1.0
+  record_cap: 1802
+  record_every: 1
+  boundary: free
+  dim: 3
+  world:
+  - 80.0
+  - 80.0
+  - 80.0
+_run:
+  target_cells: 50000
+  seed_cells: 2000
+sets:
+  vertex:
+    n: 130004
+  cell:
+    n: 65004
+    state:
+      chem:
+        width: 4
+        integration: first_order
+      cen:
+        width: 3
+      area:
+        width: 1
+fields: {}
+operators:
+- op: seed_mesh_3d
+  at: vertex
+  cell_set: cell
+  before_frame: 1
+  n_cells: 2000
+  radius: 5.0
+  jitter: 0.15
+  seed: 0
+  vseed_cv: 0.15
+  p0: 3.5
+- op: cell_geometry_3d
+  at: cell
+- op: seed_cell_rd
+  at: cell
+  mode: scatter
+  n_spots: 1
+  cone_deg: 8.0
+  seed: 0
+  before_frame: 3
+  seed_frac: 0.06
+- op: seed_cell_rd
+  at: cell
+  before_frame: 3
+  chan: 2
+  mode: scatter
+  seed_frac: 0.12
+  seed: 7
+- op: cell_adjacency
+  at: cell
+- op: cell_diffuse
+  at: cell
+  implementation: graph_laplacian
+  d_a: 0.08
+  d_h: 0.16
+  chi: 1.3
+- op: cell_diffuse
+  at: cell
+  implementation: graph_laplacian
+  chan: 2
+  d_a: 0.16
+  d_h: 0.32
+  chi: 1.3
+- op: cell_react
+  at: cell
+  model: gray_scott
+  rate: 1.0
+  F: 0.046
+  kk: 0.062
+- op: cell_react
+  at: cell
+  model: gray_scott
+  chan: 2
+  F: 0.039
+  kk: 0.058
+  rate: 1.0
+- op: shape_to_chem
+  at: cell
+  model: curvature
+  vertex_set: vertex
+  beta: 0.5
+  F0: 0.046
+  rate: 1.0
+- op: grow_3d
+  at: vertex
+  cell_set: cell
+  rate: 0.000866
+  a_sw: 0.35
+  hill: 4.0
+  rho: 0.2
+  vth_frac: 2.5
+  after_frame: 100
+  conserve_amount: false
+  chan: 0
+- op: apoptosis_3d
+  at: vertex
+  cell_set: cell
+  p0: 3.5
+  mode: chem_low
+  chan: 2
+  a_sw: 0.25
+  max_mark_frac: 0.1
+  min_age: 4
+  shrink_rate: 0.05
+  critical_frac: 0.15
+  after_frame: 600
+- op: shape_energy_3d
+  at: vertex
+  p0: 3.5
+  K_A: 1.0
+  K_P: 1.0
+  Gamma: 0.4
+  Lambda: 0.5
+  K_V: 20.0
+  K_R: 0.0
+  K_bend: 0.0
+  K_lumen: 0.0
+  antiinv: 0.0
+  mu: 1.0
+  dt: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+- op: interface_line_tension_3d
+  at: vertex
+  cell_set: cell
+  K_purse: 1.0
+  a_sw: 0.6
+  eta: 0.05
+  iters: 4
+  after_frame: 100
+- op: reconnect_t1_3d
+  at: vertex
+  l_th_frac: 0.28
+  every: 1
+  max_flips: 300
+- op: divide_3d
+  at: vertex
+  factor: 2.0
+  cycle_cv: 0.15
+  p0: 3.5
+  every: 4
+  cell_set: cell
+  min_cycle: 4
+  max_cycle: 1000000000
+  after_frame: 100
+  orient_iface: false
+  orient_asw: 0.6
+  g1_ramp: false
+  engine_clock: true
+- op: topo_snapshot_3d
+  at: vertex
+  every: 1
+schedule:
+- seed_mesh_3d
+- cell_geometry_3d
+- seed_cell_rd
+- seed_cell_rd
+- cell_adjacency
+- cell_diffuse
+- cell_diffuse
+- cell_react
+- cell_react
+- shape_to_chem
+- grow_3d
+- apoptosis_3d
+- shape_energy_3d
+- interface_line_tension_3d
+- reconnect_t1_3d
+- divide_3d
+- topo_snapshot_3d
+_two_species:
+  base: r001_03
+  growth_reads_chan: 0
+  death_reads_chan: 2
+  death_after_frame: 600
+  max_mark_frac: 0.1
+  shrink_rate: 0.05
+  why: species A (chem 0,1) and species B (chem 2,3) are independent RD systems in
+    one buffer; B has 2x the diffusivities so its wavelength is coarser. A single-species
+    run cannot put growth and death in different places, because every operator reads
+    the same field.
