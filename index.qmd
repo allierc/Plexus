@@ -1675,7 +1675,7 @@ rig:
   k_penalty: 2.1457672119140625
   mu: 0.4
   dt: 0.0001</pre></span></span>
-      <span class="sim-cap">a triangulated surface pressed into an MPM block against a rigid floor, then lifted off again. The reaction really returns to the mesh (momentum residual 1.4e-7, float32 precision) and friction changes the slip fourfold -- not MPM's automatic weld</span>
+      <span class="sim-cap">the rig on its own: a triangulated surface pressed into a free MPM block and lifted off again, 751 particles in contact at the deepest. The reaction really returns to the mesh — momentum residual 1.4e-07 of the applied force, which is float32 precision — and friction cuts the tangential slip 3.2-fold against the same run at μ = 0, so the contact is a contact and not MPM's automatic weld</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1703,7 +1703,7 @@ measured:
   momentum_residual_max: 1.0260407079598801e-07
   penetration_max_cells: 1.4166336059570312
   compression: 0.1543962709619502</pre></span></span>
-      <span class="sim-cap">the tangential half of the same law, as a loading rather than as a number. A sticky pad presses 5.9 grid cells in and then travels 0.13 box units at that depth across a matrix pinned at its base: it ploughs, heaps the material ahead of itself and shears what it drags over -- coloured by von Mises, because a drag changes shape at constant volume. Momentum still balances to 1e-07 of the applied force across 820 contacts</span>
+      <span class="sim-cap">the tangential half of the same law, as a loading rather than as a number. A sticky pad presses 5.9 grid cells in and then travels 0.13 box units at that depth across a matrix pinned at its base: it ploughs, heaps the material ahead of itself and shears what it drags over -- coloured by von Mises, because a drag changes shape at constant volume. Momentum still balances to 1.0e-07 of the applied force across 820 contacts</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1911,7 +1911,7 @@ why: the bell peaks at c_T = K, so a VARYING TIMP field puts different regions a
 seeding: &#x27;smooth low-order modes, not per-cell noise: white noise at this D is averaged
   away inside one frame, which is how the uniform runs got a featureless field&#x27;
 reference: Karagiannis &amp; Popel (2004) J. Biol. Chem. 279(37):39105</pre></span></span>
-      <span class="sim-cap">Four fields in turn: MT1-MMP expression, the matrix-BOUND inhibitor TIMP-3, the activation rate, and the sheet's own density. TIMP-2 both presents the zymogen and poisons the enzyme that must cut it, so activation is bell-shaped and peaks at c_T = K; this run sits at 10&thinsp;K, down the far side — the activation map is no longer a copy of its source (r = 0.76, CV 1.21) and nothing dissolves</span>
+      <span class="sim-cap">Four panels in turn, and only the last two are computed: MT1-MMP expression per cell and the matrix-BOUND inhibitor TIMP-3 are prescribed sources, the activation rate is what the pair of them makes, and ρ/ρ₀ is the sheet being eaten. At the bell's peak (c_T = K) 25% of the sheet is gone; with MT1 made uniform the same bell dissolves 0% — so the hole still needs the tethered enzyme's own pattern, which is why it is still r = 0.90 correlated with it</span>
     </figcaption>
   </figure>
 </div>
