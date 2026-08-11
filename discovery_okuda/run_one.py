@@ -1131,6 +1131,13 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60, movie=True):
                   flush=True)
             return None
 
+    def inhib_of(mt):
+        """Cells whose growth a second morphogen has switched off -- recorded per frame by
+        topo_snapshot_3d. None on any run without an inhibitor, which is every run before
+        11 August, so the renderer draws nothing extra."""
+        d = mt.get("inhib")
+        return None if d is None else np.asarray(d)[:mt["nF"]]
+
     def dying_of(mt):
         """Cells marked to die and not yet extruded -- recorded per frame by topo_snapshot_3d.
         None on any run without apoptosis, which is every run before 9 August."""
@@ -1139,7 +1146,8 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60, movie=True):
 
     def draw3d(ax, pt, mt, a, cam, div=None, brk=None, classes=None):
         _draw(ax, pt, mt, 3.90, azim=cam["azim"], act=col(a), Lbox=L3,
-              divided=div, broken=brk, classes=classes, dying=dying_of(mt))
+              divided=div, broken=brk, classes=classes, dying=dying_of(mt),
+              inhib=inhib_of(mt))
         # _draw hardwires elev=18 as its last statement; re-aim afterwards to get the 2nd view.
         ax.view_init(elev=cam["elev"], azim=cam["azim"])
 
