@@ -102,7 +102,7 @@ it.**
 
 <h3>Interaction &amp; flocking</h3>
 <p class="opk">Lateral operators over a radius neighbour graph: a per-type force law (attraction–repulsion) and the three boids rules that sum to flocking.</p>
-<p class="opk-ref">Reference — attraction–repulsion and boids adapted from <a href="https://github.com/allierc/ParticleGraph">ParticleGraph</a> (Allier et&nbsp;al.); the Vicsek model after Vicsek et&nbsp;al. (1995).</p>
+<p class="opk-ref">Reference — boids is <a href="https://doi.org/10.1145/37402.37406">Reynolds (1987), <i>SIGGRAPH Comput. Graph.</i> 21(4):25–34</a>, the soft-core pair potential is <a href="https://doi.org/10.1103/PhysRevLett.96.104302">D’Orsogna et&nbsp;al. (2006), <i>Phys. Rev. Lett.</i> 96:104302</a>, and the alignment model is <a href="https://doi.org/10.1103/PhysRevLett.75.1226">Vicsek et&nbsp;al. (1995), <i>Phys. Rev. Lett.</i> 75:1226–1229</a>; the implementations are adapted from <a href="https://github.com/allierc/ParticleGraph">ParticleGraph</a> (Allier et&nbsp;al.).</p>
 <div class="sim-gallery">
   <figure class="sim-card">
     <video src="gallery/attraction.mp4" autoplay loop muted playsinline preload="metadata"></video>
@@ -358,7 +358,7 @@ descriptions:
 
 <h3>Turing — Gray–Scott reaction–diffusion</h3>
 <p class="opk">Reaction–diffusion on the cell–cell adjacency graph (<code>graph_diffuse</code> → <code>react</code>) — Turing's two-species activator–inhibitor system, on a 2D cell disc: the coral regime, a fine maze (small χ), and a diverging activator view (high → red, low → blue, balanced → white).</p>
-<p class="opk-ref">Reference — Gray–Scott and Brusselator reaction–diffusion, after their originating models.</p>
+<p class="opk-ref">Reference — the Gray–Scott system of <a href="https://doi.org/10.1016/0009-2509(83)80132-8">Gray &amp; Scott (1983), <i>Chem. Eng. Sci.</i> 38:29–43</a>, in the reaction–diffusion form and parameter map of <a href="https://doi.org/10.1126/science.261.5118.189">Pearson (1993), <i>Science</i> 261:189–192</a>; the Brusselator is <a href="https://doi.org/10.1063/1.1668896">Prigogine &amp; Lefever (1968), <i>J. Chem. Phys.</i> 48:1695–1700</a>.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
     <video src="gallery/turing_coral.mp4" autoplay loop muted playsinline preload="metadata"></video>
@@ -517,7 +517,7 @@ schedule:
 
 <h3>Epithelial mechanics — a true vertex model</h3>
 <p class="opk">An explicit vertex model, via <b>Tyssue</b>. Unlike a self-propelled Voronoi tissue (each cell a single point), here cells are polygons that <b>share junction vertices</b>, and those junction vertices — not the cell centres — are the mechanical degrees of freedom. An area + line-tension shape energy (<code>shape_energy</code>) relaxes the mesh toward force balance, with growth, division and cell death as explicit operations on the mesh.</p>
-<p class="opk-ref">Reference — the <a href="https://github.com/DamCB/tyssue">Tyssue</a> vertex-model library; active vertex model after Farhadifar et&nbsp;al. (2007).</p>
+<p class="opk-ref">Reference — the <a href="https://github.com/DamCB/tyssue">Tyssue</a> vertex-model library; active vertex model after Farhadifar et&nbsp;al. (2007), on the space-filling polyhedra of Honda et&nbsp;al. (2004), and the T1 exchanges are the reversible network reconnection of <a href="https://doi.org/10.1007/s10237-012-0430-7">Okuda et&nbsp;al. (2013), <i>Biomech. Model. Mechanobiol.</i> 12:627–644</a>.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
     <video src="gallery/tyssue_spheroid_00.mp4" autoplay loop muted playsinline preload="metadata"></video>
@@ -723,7 +723,7 @@ schedule:   # the order the operators run each frame
 
 <h3>Vertex + Turing — patterning &amp; shaping a growing tissue</h3>
 <p class="opk">Growth and reaction–diffusion on a deformable vertex shell: the tissue first proliferates by growth and division to a couple of thousand cells, then reaction–diffusion chemistry both <b>colours</b> the surface and <b>drives its shape</b> — each regime buckling the shell a different way.</p>
-<p class="opk-ref">Reference — growth on the <a href="https://github.com/DamCB/tyssue">Tyssue</a> vertex model; reaction–diffusion coupled to a vertex-model vesicle (our Turing × vertex prototype).</p>
+<p class="opk-ref">Reference — this is the experiment of <a href="https://www.nature.com/articles/s41598-018-20678-6">Okuda et&nbsp;al. (2018), <i>Sci. Rep.</i> 8:2386</a> — Turing patterning on a 3D vertex model — rebuilt as Plexus operators on the <a href="https://github.com/DamCB/tyssue">Tyssue</a> mesh; the chemistry is the Gray–Scott system cited in the Turing section above.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
     <video src="gallery/tyssue_vh_grow_divide.mp4" autoplay loop muted playsinline preload="metadata"></video>
@@ -1648,7 +1648,7 @@ through the same instant; the grey lines are the rigid floor and, in the last on
 (<a href="https://doi.org/10.1016/j.cma.2011.07.014">Lian, Zhang &amp; Liu 2011,
 <i>CMAME</i> 200:3482</a>) because that one needs the mesh and the grid to be comparable in size and
 ours are not; the solid is MLS-MPM
-(<a href="https://github.com/yuanming-hu/taichi_mpm">Hu et&nbsp;al. 2018</a>), the surface is the mesh
+(<a href="https://doi.org/10.1145/3197517.3201293">Hu et&nbsp;al. (2018), <i>ACM Trans. Graph.</i> 37(4):146</a>), the surface is the mesh
 of the 3D active vertex model of
 <a href="https://www.nature.com/articles/s41598-018-20678-6">Okuda et&nbsp;al. (2018)</a>. The
 implementation is ours (<code>prototype/ecm</code>): these three clips are the interface rig
@@ -1917,6 +1917,175 @@ seeding: &#x27;smooth low-order modes, not per-cell noise: white noise at this D
   away inside one frame, which is how the uniform runs got a featureless field&#x27;
 reference: Karagiannis &amp; Popel (2004) J. Biol. Chem. 279(37):39105</pre></span></span>
       <span class="sim-cap">Four panels in turn, and only the last two are computed: MT1-MMP expression per cell and the matrix-BOUND inhibitor TIMP-3 are prescribed sources, the activation rate is what the pair of them makes, and ρ/ρ₀ is the sheet being eaten. At the bell's peak (c_T = K) 25% of the sheet is gone; with MT1 made uniform the same bell dissolves 0% — so the hole still needs the tethered enzyme's own pattern, which is why it is still r = 0.90 correlated with it</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/spheroid_bm_ecm.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">all three at once<span class="sim-spec"><pre>what: &gt;-
+  06 -- one replayed epithelial spheroid with a fibre matrix outside it and a basement membrane on it,
+  drawn in one 2x2. Two solvers, one tissue, no force between them.
+
+bodies:
+  tissue: &gt;-
+    cellfix_B_new_f401, replayed: 396 vertices at frame 0 -&gt; 12,756 at the last, apical radius
+    4.66 -&gt; 17.58 tissue units (3.77x). It is a REPLAY -- it receives nothing back from either body.
+  matrix: &gt;-
+    06_spheroid_ecm (04d&#x27;s configuration renamed): 200,000 MPM particles on 10,000 fibres, loaded
+    through mesh_contact (03&#x27;s ICFEMP generalised to a curved moving surface). Solved separately;
+    this folder re-draws its traj.npz, it does not re-run it.
+  sheet: &gt;-
+    06c_real_driver&#x27;s rig (Rig06c = 05b with ONE variable changed, the driver): 2,562 nodes on 5,120
+    faces, 2,562 plaques bound to the tissue&#x27;s own FACES with barycentric weights and one shared rest
+    length. Solved here, 401 frames, into bm_frames.npz.
+
+no_coupling: &gt;-
+  THERE IS NO BM-ECM INTERACTION, AND IT IS DELIBERATE. Nothing gives the matrix the sheet&#x27;s reaction
+  or the sheet the matrix&#x27;s; fibril_pull -- the sheet -&gt; stroma arrow, B5 -- does not exist anywhere
+  yet. This is three bodies sharing one tissue, not three bodies in contact.
+
+frame_axis: &gt;-
+  mesh_contact steps the matrix once per kept mesh (mesh_stride = 2 pass-2 frames each), so a pass-2
+  frame is mapped back to its TISSUE frame and the sheet is drawn at that tissue frame. The two halves
+  are not assumed to share a clock; the map is read from the same cache and the same mesh_stride the
+  matrix ran against.
+
+panels:
+  top_left: the tissue inside the stressed matrix, 3D, fixed box 0.72 * L3 = 22.9 tissue units
+  top_right: the same, in cross-section
+  bottom_left: the basement membrane, coloured by lambda_geo, with the plaques at their ATTACHMENT
+    POINT on the epithelium and a limb section inset. Drawn by bm_panel.draw_bm through run_ecm&#x27;s new
+    `bm_draw` hook -- the slot run_ecm.render has always reserved for a membrane and left empty in
+    every interface run, because the BM here is a vertex-model sheet in another rig and not a third
+    MPM set.
+  bottom_right: the junction network, coloured by myosin
+
+sheet_numbers:
+  lam_geo: 3.7124 at frame 400 (1.0085 at frame 0)
+  momentum_residual_max: 1.16e-16
+  bound: 100.0% of 2,562 plaques, no rupture law in this configuration
+  standoff_end_box_units: -2.08e-3
+
+read_this_one_carefully: &gt;-
+  THE SHEET ENDS UP INSIDE THE EPITHELIUM. At frame 0 the median radial offset of a plaque&#x27;s sheet node
+  from its own attachment point is +0.071 tissue units (0% of plaques inside); by the last frame it is
+  -0.138, with 95.0% of the 2,562 plaques having the sheet INSIDE the epithelial face that holds it.
+  That is G46&#x27;s failure, visible: in the bottom-left panel it is the epithelium&#x27;s cream wireframe
+  showing at the silhouette of a membrane that should be outside it. It is a result of this rig, not of
+  the drawing -- the panel was checked against the same frame with the epithelium omitted.
+
+rendering_conventions:
+  camera: ecm_render.CAM_SIDE (elev 18, azim 30) in ALL FOUR panels, one fixed box for all of them
+  colour_full_scale: &gt;-
+    lambda_geo 1 -&gt; 4.440, the run&#x27;s MAXIMUM and not its p99. lam_geo is a ramp, not a fluctuating
+    field, so the p99 over every face and every frame (3.69) is a mid-run value and the last fifth of
+    the movie would render saturated -- flat, where the sheet is most stretched.
+  inset_window: &gt;-
+    +-2.916 tissue units, 3x the LAST frame&#x27;s median plaque gap (0.972; it is 0.071 at frame 0). Sized
+    on the standoff because that is what the section is about, and fixed off the last frame so the
+    window holds every frame.</pre></span></span>
+      <span class="sim-cap">The three bodies on one tissue: a replayed epithelium (396 vertices to 12,756, apical radius ×3.77), the fibre matrix outside it, and a membrane of 5,120 triangles held by 2,562 plaques on the epithelium's own faces. Four panels: the tissue in the stressed matrix, the same in section, the sheet by λ&#8202;=&#8202;1.01→3.71 with its plaques and a limb section, and the junctions by myosin. Nothing passes between the sheet and the matrix — they share the tissue, not a force — and by the last frame 95% of the plaques have the sheet INSIDE the face holding it, which is a failure of this rig and is why the next row exists</span>
+    </figcaption>
+  </figure>
+</div>
+<p class="opk"><b>And then the sheet's own fate.</b> The membrane above is fixed at the size it was
+seeded, on a tissue that quadruples — so it is stretched rather than grown, and it is never removed.
+These three switch on the two operators that change that: <b>refinement and secretion</b>, which let
+it keep up, and the <b>protease</b>, which takes it away. Same tissue replay, same matrix, same
+camera; one rig differs each time.</p>
+<div class="sim-gallery g3">
+  <figure class="sim-card">
+    <video src="gallery/bm_refine.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">the sheet keeps up<span class="sim-spec"><pre>what: &gt;-
+  06 with the sheet that GROWS: bm_refine and bm_secrete on, so the triangle and plaque counts climb
+  with the tissue instead of being fixed by the rig. Same tissue replay, same matrix trajectory, same
+  camera as 06_spheroid_bm_ecm.
+
+why: &gt;-
+  In 06_spheroid_bm_ecm the panel prints 5,120 triangles and 2,562 plaques on every frame of a run in
+  which the tissue quadruples. That is not a rendering fault: 06&#x27;s sheet is Rig06c = 05b&#x27;s rig, which
+  has no refinement, no secretion, and plaques seeded once. The price of it is G44&#x27;s own number -- the
+  mean edge reaches 3.63x its seeded length -- which is what the demand for bm_refine measures.
+
+rig: &gt;-
+  Rig05l = 05f (refinement, mass balance, tear) under the same RealDriver swap, at 05f&#x27;s published
+  values: max_refine 2, edge_trigger 1.45, reseed on, tau_bm 40, rho_crit 0. 401 frames.
+
+result:
+  faces: 5120 -&gt; 20480 (frame 121) -&gt; 81920 (frame 340)
+  nodes_and_plaques: 2562 -&gt; 40962 -- one adhesion patch per live sheet node, so refinement makes them
+  lam_geo: 1.009 -&gt; 3.946
+  G43_rho_within_10pc_with_bm_secrete: 0.70% PASS
+  G44_mean_edge_in_0.8_1.7x_with_bm_refine: 0.929x PASS
+
+these_are_the_gates_that_closed: &gt;-
+  G43 and G44 are the two that 05k measured as pending and failing with supply and refinement OFF, and
+  that 05l passed with them ON. This folder is those two numbers in a movie rather than in a table --
+  the same rig, the same values, the same 401 frames.
+
+rendering_note: &gt;-
+  The panel draws 1 plaque in 16 at the end (2,562 of 40,962) and says so in its label. At 40,962 dots
+  the surface is red rather than marked, at any dot size still visible, so the panel holds the NUMBER
+  of marks fixed and states the fraction.
+
+frame_axis: as 06_spheroid_bm_ecm -- pass-2 frame mapped to its tissue frame through mesh_stride
+no_coupling: unchanged and deliberate -- the sheet and the matrix share the tissue, not a force</pre></span></span>
+      <span class="sim-cap">With refinement and secretion on, the membrane grows with the tissue instead of being stretched by it: 5,120 → 81,920 triangles and 2,562 → 40,962 adhesion plaques, which brings the mean edge back to 0.93× its seeded length (3.63× with them off)</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/bm_breach_hole.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">a hole<span class="sim-spec"><pre>what: &gt;-
+  06 with the protease switched on at 05h_1_hetero&#x27;s published point: a hole opens in the basement
+  membrane of a growing spheroid. Same tissue replay, same matrix trajectory, same camera as
+  06_spheroid_bm_ecm -- one thing differs, the sheet&#x27;s rig.
+
+rig: &gt;-
+  Rig05m = 05h_1_hetero&#x27;s protease rig (MT1-MMP on the sheet activating proMMP2, TIMP-2 diffusible and
+  TIMP-3 immobile, bm_tear at rho_crit) under the same RealDriver swap that 06c and 05l use. 401
+  frames. Phase point unchanged from 05h_1: K_timp 1e-3, inhibitor/K 1.0, bound fraction 0.6,
+  k_deg 100, mt1_frac 0.25, hetero 1, rho_crit 0.35.
+
+result:
+  faces_torn: 2225 of 5120 (43.5%)
+  largest_connected_patch: 87.8% of the torn set (~1954 faces)
+  rho_min: 0.350, exactly on rho_crit
+  verdict: A HOLE (3-50% of faces gone, largest patch &gt;= 20 faces)
+
+why_the_criterion_was_revised: &gt;-
+  The threshold first written down asked for the largest patch to be 60% of the whole torn set -- i.e.
+  for ONE hole. The probe (in test_06_breach.py, --probe) showed that is not what this chemistry does:
+  MT1-MMP is a smooth random field, activation peaks in several places, and the sheet perforates in
+  several. The criterion was revised BEFORE either run was kept, and the original is recorded in the
+  script&#x27;s docstring with the reason.
+
+the_bell, from the probe: &gt;-
+  Inhibitor is NOT a monotone knob and the probe is the evidence. At inhibitor/K = 0 and = 10, ZERO
+  faces tear in 150 frames; at 1 (the peak) 39% do. That is the ternary complex: TIMP-2 is needed to
+  present proMMP2 to a free MT1-MMP, so both no inhibitor and excess inhibitor switch the cascade off.
+  The knob that does run monotonically is k_deg, which is why the two experiments differ in k_deg
+  (100 here, 300 in 06_breach_torn) and not in inhibitor.
+
+read_this_one_carefully: &gt;-
+  THE REMNANT DOES NOT STAY ON THE TISSUE. The median plaque gap goes from 0.073 to 3.82 tissue units
+  over the run, and the end frame shows the surviving sheet as filaments standing off the epithelium
+  rather than as a perforated shell lying on it. 05m certified the COUNTS (2,167 faces torn in 300
+  frames) and never rendered the geometry, so this is new and it is not yet explained: a torn sliver
+  has almost no bending stiffness and is dragged by a growing tissue through the plaques that still
+  hold it, which is a plausible mechanism and not a measurement.
+
+open_defect: &gt;-
+  PLAQUES ARE NOT CULLED WHEN FACES TEAR. The panel prints 2,562 plaques at frame 0 and 2,562 at frame
+  400, with 43.5% of the faces gone: the contact set is per NODE, and tearing removes faces, so a node
+  that belongs to no live face keeps holding onto the epithelium. Whether that is right depends on
+  what a plaque is a statement about -- integrin holding matrix, which is gone -- and nothing in the
+  ladder has decided it.
+
+frame_axis: as 06_spheroid_bm_ecm -- pass-2 frame mapped to its tissue frame through mesh_stride
+no_coupling: unchanged and deliberate -- the sheet and the matrix share the tissue, not a force</pre></span></span>
+      <span class="sim-cap">The protease switched on at the bell's peak: 43% of the sheet's 5,120 faces torn, and the largest connected patch is 88% of them. MT1-MMP is a smooth random field with several maxima, so the sheet perforates in several places rather than one</span>
     </figcaption>
   </figure>
 </div>
@@ -2317,7 +2486,7 @@ plotting:
 
 <h3>Stigmergy — Physarum slime (one species, a disc colony)</h3>
 <p class="opk">A set of agents coupled to a scalar field: agents deposit a trail, the field diffuses and decays, agents sense and steer up it — a self-reinforcing transport network (one schedule: <code>deposit → diffuse → decay → sense → steer</code>). Here a <b>single</b> species is seeded in a disc (<code>spawn: disc</code>), so the colony stays a bounded circular web; the three differ only in turn rate and sensor geometry.</p>
-<p class="opk-ref">Reference — the Physarum agent is adapted from <a href="https://github.com/SebLague/Slime-Simulation">Sebastian Lague’s Slime-Simulation</a>.</p>
+<p class="opk-ref">Reference — the model is <a href="https://doi.org/10.1162/artl.2010.16.2.16202">Jones (2010), <i>Artificial Life</i> 16(2):127–153</a>, whose sense-and-deposit agent this is; the implementation we adapted is <a href="https://github.com/SebLague/Slime-Simulation">Sebastian Lague’s Slime-Simulation</a>, and the name for the mechanism is Grassé’s (1959) stigmergy.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
     <video src="gallery/slime.mp4" autoplay loop muted playsinline preload="metadata"></video>
@@ -2488,7 +2657,7 @@ descriptions:
 
 <h3>Stigmergy — Physarum slime (many species, space-filling)</h3>
 <p class="opk">The <b>same</b> schedule, but agents are now seeded <b>uniformly</b> across the field (<code>spawn: random</code>) and split into 4–8 species, each depositing and sensing its own trail channel with cross-species inhibition (<code>cross: −1</code>). That is why this row looks so unlike the discs above: instead of one bounded colony, the networks fill the whole plane and segregate into distinct interwoven colours.</p>
-<p class="opk-ref">Reference — the Physarum agent is adapted from <a href="https://github.com/SebLague/Slime-Simulation">Sebastian Lague’s Slime-Simulation</a>.</p>
+<p class="opk-ref">Reference — the model is <a href="https://doi.org/10.1162/artl.2010.16.2.16202">Jones (2010), <i>Artificial Life</i> 16(2):127–153</a>, whose sense-and-deposit agent this is; the implementation we adapted is <a href="https://github.com/SebLague/Slime-Simulation">Sebastian Lague’s Slime-Simulation</a>, and the name for the mechanism is Grassé’s (1959) stigmergy.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
     <video src="gallery/slime_four.mp4" autoplay loop muted playsinline preload="metadata"></video>
@@ -2688,7 +2857,7 @@ descriptions:
 
 <h3>Strange attractors</h3>
 <p class="opk">A single lateral operator rides a whole cloud along a dissipative 3D chaotic flow ẋ = f(x); a tiny seed is stretched-and-folded until the cloud <em>is</em> the attractor. Ten systems ship; six shown.</p>
-<p class="opk-ref">Reference — each system cites its originating paper (Lorenz 1963, Rössler 1976, Sprott 1994, …).</p>
+<p class="opk-ref">Reference — <a href="https://doi.org/10.1175/1520-0469(1963)020%3C0130:DNF%3E2.0.CO;2">Lorenz (1963), <i>J. Atmos. Sci.</i> 20:130–141</a>; <a href="https://doi.org/10.1142/S0218127499001383">Thomas (1999), <i>Int. J. Bifurc. Chaos</i> 9:1889–1905</a>; <a href="https://doi.org/10.1103/PhysRevE.50.R647">Sprott (1994), <i>Phys. Rev. E</i> 50:R647–R650</a>; <a href="https://doi.org/10.1016/j.physleta.2009.07.088">Dadras &amp; Momeni (2009), <i>Phys. Lett. A</i> 373:3637–3642</a>. The Halvorsen and Aizawa systems have no primary paper we can point at — they are catalogued rather than published, Halvorsen in Sprott’s <i>Chaos and Time-Series Analysis</i> (2003) — and are named here as folklore rather than cited as literature.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
     <video src="gallery/attractor_lorenz.mp4" autoplay loop muted playsinline preload="metadata"></video>
