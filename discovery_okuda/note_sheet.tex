@@ -876,7 +876,7 @@ G28& the sheet stays OUTSIDE the epithelium (signed) & radial gap $>0$ &
      \PASS{$+4.3\times10^{-4}$} (was $-3.6\times10^{-3}$)\\
 G29& no plaque ends up on the wrong side & $0\%$ & \PASS{$0.0\%$} (was $89.6\%$)\\\midrule
 \multicolumn{4}{@{}l}{\textit{before \op{06}: the sheet on a REAL epithelium} (\op{06c\_real\_driver},
-     \op{06d\_gates}) --- all six re-measured, see the note below the table}\\
+     \op{05q\_gates}) --- all six re-measured, see the note below the table}\\
 G40& $\lambda^{\rm geo}$ does not depend on the adhesion's stiffness & $\kappa_n$ over
      $8\times$ moves it $<5\%$ & \PASS{$4.72\%$} --- but \emph{monotone}, $3.641\to3.817$\\
 G41& \textbf{it tracks a real, dividing surface} & $\lambda^{\rm geo}$ within $5\%$ of
@@ -945,7 +945,7 @@ and changes one thing, the driver, and the sheet tracks the real epithelium on t
 $\lambda^{\rm geo}=3.713$ against an apical-area ratio of $3.766$, momentum $1.2\times10^{-16}$,
 $100\%$ of bonds held, $401$ frames, no divergence. \textbf{05b's own law --- bind to a \emph{face}
 with barycentric weights, one shared rest length --- was never the problem.} The three additions were.
-A gate measured against a discarded driver certifies nothing, so all six are re-run in \op{06d\_gates}
+A gate measured against a discarded driver certifies nothing, so all six are re-run in \op{05q\_gates}
 and the numbers in the table are those.
 
 \smallskip
@@ -958,12 +958,12 @@ would turn it. \textbf{G46 reads mean radii, not the signed per-node distance to
 a bumpy surface the mean vertex radius sits outside the mean surface, so the measure is biased toward
 reporting the sheet as inside. The $-2.7\times10^{-3}$ is real enough to keep the gate open, but it
 is not yet the test G28 was: that one needs \op{05b}'s per-node signed standoff evaluated on the
-tissue's faces, which is the first thing \op{05q} should carry.
+tissue's faces, which is the first thing \op{05r\_standoff} should carry.
 
 
 \begin{figure}[H]\centering
-\includegraphics[width=\textwidth]{../log/okuda_ECM/06d_gates/gates.png}
-\caption{\op{06d\_gates}: G40--G46 on the real epithelium, \op{05b}'s rig with the driver swapped and
+\includegraphics[width=\textwidth]{../log/okuda_ECM/05q_gates/gates.png}
+\caption{\op{05q\_gates}: G40--G46 on the real epithelium, \op{05b}'s rig with the driver swapped and
 nothing else changed. \textbf{a} \PASS{G41}: $\lambda^{\rm geo}$ (black) on the apical-area ratio
 $\sqrt{A_{\rm ep}(t)/A_{\rm ep}(0)}$ (green) to $1.40\%$ over $401$ frames --- the sheet is reporting
 the tissue's growth, and against the \emph{area}, since a dividing epithelium is not a sphere and the
