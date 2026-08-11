@@ -51,16 +51,17 @@ LOST since seeding).
   compliance is leaking into a growth measure. Passed, mechanism present.
 - G41 lam_geo vs sqrt(A_ep(T)/A_ep(0)): **pass 1.40%**
 - G42 worst triangle quality > 0.2: **pass 0.587**
-- G43 rho within 10%, `bm_secrete` ON: 05l — 20-frame smoke passed at 0.031, full run unread
-- G44 mean edge in [0.8,1.7]x, `bm_refine` ON: 05l — smoke passed at 1.03x; without refinement it
-  fails at 3.63x, which is the size of the demand
+- G43 rho within 10%, `bm_secrete` ON: **pass 0.70%** (401 frames)
+- G44 mean edge in [0.8,1.7]x, `bm_refine` ON: **pass 0.929x** — the sheet refined twice,
+  5,120 -> 20,480 -> 81,920 faces. Without refinement the same run reaches 3.63x, which is what
+  the demand for `bm_refine` measures.
 - G46 signed standoff: **fail -2.7e-3**, but the measure compares MEAN RADII, which is biased on a
   bumpy surface. Needs 05b's per-node signed standoff on the tissue's faces before it means anything.
 
 ## Do this next
 
-1. Read `/tmp/05l.log` and `log/okuda_ECM/05l_G4*/metrics.json` — the full-run G43/G44 numbers were
-   never checked. It had refined twice (5,120 -> 20,480 -> 81,920 faces).
+1. Update `note_sheet.tex`: G43 and G44 now pass on the real surface (0.70%, 0.929x) and the table
+   still shows G43 pending and G44 failing. Figures are in `05l_G43_secrete/`, `05l_G44_refine/`.
 2. Wire `bm_panel.py` into the 2x2's bottom-left slot, which is currently blank. `draw_bm(...)` is
    written and previewed: `mode="lam"` colours the surface by lam_geo, `mode="mt1"` by MT1-MMP
    expression, both with red plaque dots at their ATTACHMENT POINT on the epithelium and a zoomed
