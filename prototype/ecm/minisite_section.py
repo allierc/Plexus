@@ -144,7 +144,7 @@ def split_concat(src, dst, recentre=True, skip_top=0.0):
 
 
 
-def crop_panel(src, dst, skip_top=0.09, skip_bot=0.14, pad=1.20):
+def crop_panel(src, dst, panel="left", skip_top=0.09, skip_bot=0.14, pad=1.20):
     """Keep the LEFT panel only, as a square window centred on what is drawn in it.
 
     THE MOVIE IS A CONTACT SHEET, NOT A CLIP. `log/okuda/*/movie.mp4` is drawn for reading a run:
@@ -157,6 +157,12 @@ def crop_panel(src, dst, skip_top=0.09, skip_bot=0.14, pad=1.20):
     elev 18" label above and the scale bar below. Measured between them, the box is the tissue's;
     the window is then clamped to stay inside those margins, so no frame of the result carries a
     caption the page has not written itself.
+
+    `panel="right"` takes the top view instead, for a run whose interesting face is on top. THE BOX
+    IS STILL MEASURED ON THE LEFT PANEL, and deliberately: the right one carries the section-ring
+    inset in its bottom corner, which is bright, is not the tissue, and drags any box measured
+    around it out to the frame edge. Both panels draw the same tissue at the same axes scale and
+    the same centre, so the left panel's window is the right one's window plus the offset.
     """
     ff = _exe("ffmpeg")
     w, h = _size(src)
@@ -168,6 +174,8 @@ def crop_panel(src, dst, skip_top=0.09, skip_bot=0.14, pad=1.20):
     side -= side % 2
     x = min(max(cx - side // 2, 0), half - side)
     y = min(max(cy - side // 2, top), h - bot - side)
+    if panel == "right":
+        x += w - half
     print(f"[minisite]   panel crop: {side}x{side} at ({x},{y}) of {w}x{h}", flush=True)
     cmd = [ff, "-y", "-loglevel", "error", "-i", src, "-vf", f"crop={side}:{side}:{x}:{y}",
            "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "20", dst]
@@ -242,26 +250,26 @@ def build(runs):
     """One row: the interface under the three loadings it has to survive -- press, drag, breach."""
     cards = "\n".join(card(v, n, sp, c) for _, v, n, sp, c in runs)
     return f"""{BEGIN}
-<h3>Vertex + MPM — a surface loading an extracellular matrix</h3>
+<h3>Vertex + MPM</h3>
 <p class="opk">Two Levels, two solvers, one interface: a <b>triangulated surface</b> with mass and
-springs — the vertex model's own geometry — pressed into a <b>material-point matrix</b> (the MLS-MPM
+springs — the vertex model's own geometry — pressed into a <b>block of MPM material</b> (the MLS-MPM
 cycle below), coupled particle-to-face so the reaction really returns to the mesh rather than being
-applied to the matrix alone. The three clips are the same rig under the three loadings that can break
-it. <b>Press</b>: the surface indents the matrix against a rigid floor and lifts off again, and the
-material has to push back and recover. <b>Drag</b>: a sticky pad presses to a fixed depth and then
-travels sideways over a matrix pinned at its base, so the load is tangential — it ploughs, heaps
-material ahead of itself and <b>shears</b> what it drags over, coloured by von Mises because a drag
-changes shape at constant volume and a volumetric colour is blank exactly where the physics is.
-<b>Breach</b>: the surface carries a hole and the box is closed on all four sides, so the matrix has
-nowhere to go but <b>through</b>, and it extrudes as a plug. Each clip plays the 3D view first, then
-a cross-section through the same instant; the grey lines are the rigid floor and, in the last one,
-the walls.</p>
+applied to the material alone. No tissue and no matrix here: this is the interface itself, on the
+smallest rig that can falsify it, under the three loadings that can break it. <b>Press</b>: the
+surface indents the block against a rigid floor and lifts off again, and the material has to push
+back and recover. <b>Drag</b>: a sticky pad presses to a fixed depth and then travels sideways over a
+block pinned at its base, so the load is tangential — it ploughs, heaps material ahead of itself and
+<b>shears</b> what it drags over, coloured by von Mises because a drag changes shape at constant
+volume and a volumetric colour is blank exactly where the physics is. <b>Breach</b>: the surface
+carries a hole and the box is closed on all four sides, so the material has nowhere to go but
+<b>through</b>, and it extrudes as a plug. Each clip plays the 3D view first, then a cross-section
+through the same instant; the grey lines are the rigid floor and, in the last one, the walls.</p>
 <p class="opk-ref">Reference — the contact is the ICFEMP particle-to-surface scheme of
 <a href="https://doi.org/10.1016/j.cma.2015.04.005">Chen, Qiu, Zhang &amp; Lian (2015),
 <i>Comput. Methods Appl. Mech. Engrg.</i> 293:1–19</a>, chosen over grid-node coupling
 (<a href="https://doi.org/10.1016/j.cma.2011.07.014">Lian, Zhang &amp; Liu 2011,
 <i>CMAME</i> 200:3482</a>) because that one needs the mesh and the grid to be comparable in size and
-ours are not; the matrix is MLS-MPM
+ours are not; the solid is MLS-MPM
 (<a href="https://github.com/yuanming-hu/taichi_mpm">Hu et&nbsp;al. 2018</a>), the surface is the mesh
 of the 3D active vertex model of
 <a href="https://www.nature.com/articles/s41598-018-20678-6">Okuda et&nbsp;al. (2018)</a>. The
@@ -297,9 +305,11 @@ species&nbsp;B has twice the diffusivities — so a coarser wavelength — and w
 cannot put growth and death in different places, because every operator reading it reads the same
 number in the same cell. <b>Blue is a cell already marked</b> — the mark is the only visible part,
 because a marked cell then shrinks at a fixed rate, is removed, and its neighbours close the gap by
-a T1 exchange, so what you see is the pattern of who is <i>about</i> to go. The three clips differ
-in one number, the ceiling on how much of the population may be under sentence at once: 2%, 5% and
-25% of the cells.</p>
+a T1 exchange, so what you see is the pattern of who is <i>about</i> to go. The first two clips
+differ in one number — the ceiling on how much of the population may be under sentence at once, 2%
+against 25% — and the third is the control that says why any of this needs a second field: with only
+one, death fires below a threshold on the very chemical that drives growth, so it lands in the
+<b>antiphase</b> of the growth pattern and nowhere else.</p>
 <div class="sim-gallery g3">
 {cards}
 </div>
@@ -361,39 +371,47 @@ def main():
     # magenta ball and neither growth spots nor death patches can be told apart on it (cap10's own
     # summary reports n_spots_final 0 and red_frac_final 0.0). A clip that shows nothing is not a
     # third point of a sweep, so the row is the three runs whose pattern survived.
+    # (run, clip, label, which panel of the two-view movie). `sc_antiphase` is the ONE-field
+    # control and its death network is drawn on the pole, so the top view is the one that shows it;
+    # the two-field runs are read from the side like every other clip on the page.
     R2 = [
-        ("tsd_cap02", "turing_death_cap02", "2% under sentence"),
-        ("tsd_cap05", "turing_death_cap05", "5% under sentence"),
-        ("tsd_max", "turing_death_max", "25%, and earlier"),
+        ("tsd_cap02", "turing_death_cap02", "two fields, 2% under sentence", "left"),
+        ("tsd_max", "turing_death_max", "two fields, 25% and earlier", "left"),
+        ("sc_antiphase", "turing_death_antiphase", "one field, in antiphase", "right"),
     ]
     def _cap2(run):
         s = json.load(open(os.path.join(LOG_OKUDA, run, "diag.json")))["summary"]
         extra = {
-            "tsd_cap02": "Death this rare is a speckle: single blue cells appear and are gone by "
-                         "the next frame, and the tissue grows as though nothing were removing it",
-            "tsd_cap05": "The marks now arrive in PATCHES rather than singly -- species B's "
-                         "wavelength made visible, since the cap is what decides how much of a "
-                         "low-B region may be under sentence together -- and the tissue still "
-                         "absorbs it: same final size as at 2%",
+            "tsd_cap02": "Death this rare is a speckle: single blue cells, gone by the next frame, "
+                         "and the tissue grows as though nothing were removing it",
             "tsd_max": "Death opens at frame 180 instead of 600 and marked cells shrink three "
                        "times faster, and the tissue this leaves is a QUARTER the size of the "
-                       "gentler runs'. Growth and death are patterned INDEPENDENTLY here, so this "
-                       "is not growth being slowed, it is a second field deciding how big the "
-                       "first one gets to build",
+                       "gentler run beside it. Growth and death are patterned INDEPENDENTLY here, "
+                       "so this is not growth being slowed down, it is a second field deciding how "
+                       "much of what the first one builds survives",
+            "sc_antiphase": "The control, and the reason for the second field: with ONE field, "
+                            "death has nowhere to be but where growth is not. It reads the same "
+                            "chemical the growth does and fires below a threshold on it, so the "
+                            "blue network is the exact complement of the red spots — a pattern "
+                            "nobody chose, drawn on the flanks between them. Top view, because "
+                            "that is the face the network is on",
         }[run]
         return (f"{s['cells_final']:,} cells at frame 1,800, from 2,000 seeded, "
-                f"{100 * s['red_frac_final']:.0f}% of them in the red (high-A) phase of the field "
-                f"that drives growth. {extra}. The shell stays a sphere throughout (reduced volume "
-                f"{s['reduced_volume_final']:.2f} at the end, where 1.0 is a perfect sphere)")
+                f"{100 * s['red_frac_final']:.0f}% of them in the red (high-activator) phase of the "
+                f"field that drives growth. {extra}. The shell stays a sphere throughout (reduced "
+                f"volume {s['reduced_volume_final']:.2f} at the end, where 1.0 is a perfect "
+                f"sphere)")
     runs2 = [(d, f"{v}.mp4", lbl,
-              os.path.join(LOG_OKUDA, d, "spec_run.yaml"), _cap2(d)) for d, v, lbl in R2]
-    for d, v, *_ in runs2:
+              os.path.join(LOG_OKUDA, d, "spec_run.yaml"), _cap2(d)) for d, v, lbl, _p in R2]
+    for d, v, _lbl, panel in R2:
         src = os.path.join(LOG_OKUDA, d, "movie.mp4")
         if not os.path.exists(src):
             sys.exit(f"no movie.mp4 for {d} -- run it before writing the page")
-        crop_panel(src, os.path.join(GAL, v))
-        print(f"[minisite] gallery/{v} <- okuda/{d}/movie.mp4  "
-              f"({os.path.getsize(os.path.join(GAL, v)) / 1e6:.1f} MB, side view, square, no label)")
+        crop_panel(src, os.path.join(GAL, v + ".mp4"), panel=panel,
+                   skip_bot=0.25 if panel == "right" else 0.14, pad=1.26)
+        print(f"[minisite] gallery/{v}.mp4 <- okuda/{d}/movie.mp4  "
+              f"({os.path.getsize(os.path.join(GAL, v + '.mp4')) / 1e6:.1f} MB, {panel} panel, "
+              f"square, no label)")
 
     import shutil
     for tgt, rendered in ((QMD, False), (DOCS, True)):
