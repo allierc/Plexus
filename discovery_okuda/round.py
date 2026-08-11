@@ -2106,7 +2106,21 @@ def check_pool(verbose=True):
 # pending instructions a person wrote for the campaign to pick up -- and it was tracked in git, which
 # is how I noticed: a `D` in git status after the first reset. An input a human wrote is exactly what a
 # reset must not be able to reach, and the rule is the same one that keeps round.md outside campaign/.
-KEEP_ON_RESET = ("instruction.md", "user_input.md",
+# `campaign.log` IS KEPT BECAUSE THE RESET WAS DELETING IT WHILE IT WAS OPEN. campaign_loop
+# installs a Tee on stdout pointing at campaign/campaign.log and THEN calls the reset, so the file
+# was unlinked with a live handle on it: on this NFS mount that means a silly-rename to
+# `.nfsXXXXXXXX`, so the log went on being written to an inode with no name anyone could find.
+# `campaign/campaign.log` therefore did not exist while the loop ran -- I spent two status checks
+# reading process and cluster state because the loop's own narration was invisible -- and the next
+# reset then tripped over its own orphan: "could not clear .nfs7c650b1019b8bdc7000002c3: [errno 16]
+# device or resource busy".
+#
+# It belongs on this list on the merits, not just to dodge the handle. The Tee's docstring says
+# THE TERMINAL IS NOT A RECORD: the log is the only copy of what the agents actually said, the
+# eye's sentences and the Critic's refusal reasons, none of which is in analysis.md. It opens in
+# append mode, so keeping it means the narration of a reset survives the reset -- which is exactly
+# the moment you most want to be able to read back.
+KEEP_ON_RESET = ("instruction.md", "user_input.md", "campaign.log",
                  "TEMPLATE_analysis.md", "TEMPLATE_memory.md")
 
 
