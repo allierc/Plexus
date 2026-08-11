@@ -1222,14 +1222,16 @@ species&nbsp;B has twice the diffusivities — so a coarser wavelength — and w
 cannot put growth and death in different places, because every operator reading it reads the same
 number in the same cell. <b>Blue is a cell already marked</b> — the mark is the only visible part,
 because a marked cell then shrinks at a fixed rate, is removed, and its neighbours close the gap by
-a T1 exchange, so what you see is the pattern of who is <i>about</i> to go. The three clips differ
-in one number, the ceiling on how much of the population may be under sentence at once: 2%, 5% and
-25% of the cells.</p>
+a T1 exchange, so what you see is the pattern of who is <i>about</i> to go. The first two clips
+differ in one number — the ceiling on how much of the population may be under sentence at once, 2%
+against 25% — and the third is the control that says why any of this needs a second field: with only
+one, death fires below a threshold on the very chemical that drives growth, so it lands in the
+<b>antiphase</b> of the growth pattern and nowhere else.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
     <video src="gallery/turing_death_cap02.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">2% under sentence<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">two fields, 2% under sentence<span class="sim-spec"><pre>general:
   name: tsd_cap02
   seed: 0
   n_frames: 1800
@@ -1421,211 +1423,13 @@ _two_species:
     one buffer; B has 2x the diffusivities so its wavelength is coarser. A single-species
     run cannot put growth and death in different places, because every operator reads
     the same field.</pre></span></span>
-      <span class="sim-cap">10,702 cells at frame 1,800, from 2,000 seeded, 24% of them in the red (high-A) phase of the field that drives growth. Death this rare is a speckle: single blue cells appear and are gone by the next frame, and the tissue grows as though nothing were removing it. The shell stays a sphere throughout (reduced volume 0.96 at the end, where 1.0 is a perfect sphere)</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/turing_death_cap05.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">5% under sentence<span class="sim-spec"><pre>general:
-  name: tsd_cap05
-  seed: 0
-  n_frames: 1800
-  dt: 1.0
-  record_cap: 1802
-  record_every: 1
-  boundary: free
-  dim: 3
-  world:
-  - 80.0
-  - 80.0
-  - 80.0
-_run:
-  target_cells: 50000
-  seed_cells: 2000
-sets:
-  vertex:
-    n: 130004
-  cell:
-    n: 65004
-    state:
-      chem:
-        width: 4
-        integration: first_order
-      cen:
-        width: 3
-      area:
-        width: 1
-fields: {}
-operators:
-- op: seed_mesh_3d
-  at: vertex
-  cell_set: cell
-  before_frame: 1
-  n_cells: 2000
-  radius: 5.0
-  jitter: 0.15
-  seed: 0
-  vseed_cv: 0.15
-  p0: 3.5
-- op: cell_geometry_3d
-  at: cell
-- op: seed_cell_rd
-  at: cell
-  mode: scatter
-  n_spots: 1
-  cone_deg: 8.0
-  seed: 0
-  before_frame: 3
-  seed_frac: 0.06
-- op: seed_cell_rd
-  at: cell
-  before_frame: 3
-  chan: 2
-  mode: scatter
-  seed_frac: 0.12
-  seed: 7
-- op: cell_adjacency
-  at: cell
-- op: cell_diffuse
-  at: cell
-  implementation: graph_laplacian
-  d_a: 0.08
-  d_h: 0.16
-  chi: 1.3
-- op: cell_diffuse
-  at: cell
-  implementation: graph_laplacian
-  chan: 2
-  d_a: 0.16
-  d_h: 0.32
-  chi: 1.3
-- op: cell_react
-  at: cell
-  model: gray_scott
-  rate: 1.0
-  F: 0.046
-  kk: 0.062
-- op: cell_react
-  at: cell
-  model: gray_scott
-  chan: 2
-  F: 0.039
-  kk: 0.058
-  rate: 1.0
-- op: shape_to_chem
-  at: cell
-  model: curvature
-  vertex_set: vertex
-  beta: 0.5
-  F0: 0.046
-  rate: 1.0
-- op: grow_3d
-  at: vertex
-  cell_set: cell
-  rate: 0.000866
-  a_sw: 0.35
-  hill: 4.0
-  rho: 0.2
-  vth_frac: 2.5
-  after_frame: 100
-  conserve_amount: false
-  chan: 0
-- op: apoptosis_3d
-  at: vertex
-  cell_set: cell
-  p0: 3.5
-  mode: chem_low
-  chan: 2
-  a_sw: 0.25
-  max_mark_frac: 0.05
-  min_age: 4
-  shrink_rate: 0.05
-  critical_frac: 0.15
-  after_frame: 600
-- op: shape_energy_3d
-  at: vertex
-  p0: 3.5
-  K_A: 1.0
-  K_P: 1.0
-  Gamma: 0.4
-  Lambda: 0.5
-  K_V: 20.0
-  K_R: 0.0
-  K_bend: 0.0
-  K_lumen: 0.0
-  antiinv: 0.0
-  mu: 1.0
-  dt: 1.0
-  relax_iters: 30
-  eta: 0.08
-  cap_frac: 0.12
-- op: interface_line_tension_3d
-  at: vertex
-  cell_set: cell
-  K_purse: 1.0
-  a_sw: 0.6
-  eta: 0.05
-  iters: 4
-  after_frame: 100
-- op: reconnect_t1_3d
-  at: vertex
-  l_th_frac: 0.28
-  every: 1
-  max_flips: 300
-- op: divide_3d
-  at: vertex
-  factor: 2.0
-  cycle_cv: 0.15
-  p0: 3.5
-  every: 4
-  cell_set: cell
-  min_cycle: 4
-  max_cycle: 1000000000
-  after_frame: 100
-  orient_iface: false
-  orient_asw: 0.6
-  g1_ramp: false
-  engine_clock: true
-- op: topo_snapshot_3d
-  at: vertex
-  every: 1
-schedule:
-- seed_mesh_3d
-- cell_geometry_3d
-- seed_cell_rd
-- seed_cell_rd
-- cell_adjacency
-- cell_diffuse
-- cell_diffuse
-- cell_react
-- cell_react
-- shape_to_chem
-- grow_3d
-- apoptosis_3d
-- shape_energy_3d
-- interface_line_tension_3d
-- reconnect_t1_3d
-- divide_3d
-- topo_snapshot_3d
-_two_species:
-  base: r001_03
-  growth_reads_chan: 0
-  death_reads_chan: 2
-  death_after_frame: 600
-  max_mark_frac: 0.05
-  shrink_rate: 0.05
-  why: species A (chem 0,1) and species B (chem 2,3) are independent RD systems in
-    one buffer; B has 2x the diffusivities so its wavelength is coarser. A single-species
-    run cannot put growth and death in different places, because every operator reads
-    the same field.</pre></span></span>
-      <span class="sim-cap">10,969 cells at frame 1,800, from 2,000 seeded, 24% of them in the red (high-A) phase of the field that drives growth. The marks now arrive in PATCHES rather than singly -- species B's wavelength made visible, since the cap is what decides how much of a low-B region may be under sentence together -- and the tissue still absorbs it: same final size as at 2%. The shell stays a sphere throughout (reduced volume 0.96 at the end, where 1.0 is a perfect sphere)</span>
+      <span class="sim-cap">10,702 cells at frame 1,800, from 2,000 seeded, 24% of them in the red (high-activator) phase of the field that drives growth. Death this rare is a speckle: single blue cells, gone by the next frame, and the tissue grows as though nothing were removing it. The shell stays a sphere throughout (reduced volume 0.96 at the end, where 1.0 is a perfect sphere)</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/turing_death_max.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">25%, and earlier<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">two fields, 25% and earlier<span class="sim-spec"><pre>general:
   name: tsd_max
   seed: 0
   n_frames: 1800
@@ -1817,33 +1621,204 @@ _two_species:
     one buffer; B has 2x the diffusivities so its wavelength is coarser. A single-species
     run cannot put growth and death in different places, because every operator reads
     the same field.</pre></span></span>
-      <span class="sim-cap">2,895 cells at frame 1,800, from 2,000 seeded, 14% of them in the red (high-A) phase of the field that drives growth. Death opens at frame 180 instead of 600 and marked cells shrink three times faster, and the tissue this leaves is a QUARTER the size of the gentler runs'. Growth and death are patterned INDEPENDENTLY here, so this is not growth being slowed, it is a second field deciding how big the first one gets to build. The shell stays a sphere throughout (reduced volume 0.96 at the end, where 1.0 is a perfect sphere)</span>
+      <span class="sim-cap">2,895 cells at frame 1,800, from 2,000 seeded, 14% of them in the red (high-activator) phase of the field that drives growth. Death opens at frame 180 instead of 600 and marked cells shrink three times faster, and the tissue this leaves is a QUARTER the size of the gentler run beside it. Growth and death are patterned INDEPENDENTLY here, so this is not growth being slowed down, it is a second field deciding how much of what the first one builds survives. The shell stays a sphere throughout (reduced volume 0.96 at the end, where 1.0 is a perfect sphere)</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/turing_death_antiphase.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">one field, in antiphase<span class="sim-spec"><pre>general:
+  name: sc_antiphase
+  seed: 0
+  n_frames: 1800
+  dt: 1.0
+  record_cap: 1802
+  record_every: 1
+  boundary: free
+  dim: 3
+  world:
+  - 80.0
+  - 80.0
+  - 80.0
+_run:
+  target_cells: 50000
+  seed_cells: 2000
+sets:
+  vertex:
+    n: 130004
+  cell:
+    n: 65004
+    state:
+      chem:
+        width: 2
+        integration: first_order
+      cen:
+        width: 3
+      area:
+        width: 1
+fields: {}
+operators:
+- op: seed_mesh_3d
+  at: vertex
+  cell_set: cell
+  before_frame: 1
+  n_cells: 2000
+  radius: 5.0
+  jitter: 0.15
+  seed: 0
+  vseed_cv: 0.15
+  p0: 3.5
+- op: cell_geometry_3d
+  at: cell
+- op: seed_cell_rd
+  at: cell
+  mode: scatter
+  n_spots: 1
+  cone_deg: 8.0
+  seed: 0
+  before_frame: 3
+  seed_frac: 0.06
+- op: cell_adjacency
+  at: cell
+- op: cell_diffuse
+  at: cell
+  implementation: graph_laplacian
+  d_a: 0.08
+  d_h: 0.16
+  chi: 1.3
+- op: cell_react
+  at: cell
+  model: gray_scott
+  rate: 1.0
+  F: 0.046
+  kk: 0.062
+- op: shape_to_chem
+  at: cell
+  model: curvature
+  vertex_set: vertex
+  beta: 0.5
+  F0: 0.046
+  rate: 1.0
+- op: grow_3d
+  at: vertex
+  cell_set: cell
+  rate: 0.000866
+  a_sw: 0.35
+  hill: 4.0
+  rho: 0.2
+  vth_frac: 2.5
+  after_frame: 100
+  conserve_amount: false
+- op: apoptosis_3d
+  at: vertex
+  cell_set: cell
+  p0: 3.5
+  max_mark_frac: 0.05
+  shrink_rate: 0.15
+  critical_frac: 0.15
+  min_age: 4
+  mode: chem_low
+  a_sw: 0.45
+  after_frame: 600
+- op: shape_energy_3d
+  at: vertex
+  p0: 3.5
+  K_A: 1.0
+  K_P: 1.0
+  Gamma: 0.4
+  Lambda: 0.5
+  K_V: 20.0
+  K_R: 0.0
+  K_bend: 0.0
+  K_lumen: 0.0
+  antiinv: 0.0
+  mu: 1.0
+  dt: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+- op: interface_line_tension_3d
+  at: vertex
+  cell_set: cell
+  K_purse: 1.0
+  a_sw: 0.6
+  eta: 0.05
+  iters: 4
+  after_frame: 100
+- op: reconnect_t1_3d
+  at: vertex
+  l_th_frac: 0.28
+  every: 1
+  max_flips: 300
+- op: divide_3d
+  at: vertex
+  factor: 2.0
+  cycle_cv: 0.15
+  p0: 3.5
+  every: 4
+  cell_set: cell
+  min_cycle: 4
+  max_cycle: 1000000000
+  after_frame: 100
+  orient_iface: false
+  orient_asw: 0.6
+  g1_ramp: false
+  engine_clock: true
+- op: topo_snapshot_3d
+  at: vertex
+  every: 1
+schedule:
+- seed_mesh_3d
+- cell_geometry_3d
+- seed_cell_rd
+- cell_adjacency
+- cell_diffuse
+- cell_react
+- shape_to_chem
+- grow_3d
+- apoptosis_3d
+- shape_energy_3d
+- interface_line_tension_3d
+- reconnect_t1_3d
+- divide_3d
+- topo_snapshot_3d
+_sculpt:
+  base: r001_03
+  death:
+    mode: chem_low
+    a_sw: 0.45
+  after_frame: 600
+  two_species: false
+  k_purse: null
+  asks: 'the finger hypothesis: grow at the spots, remove the flanks, and a bulge
+    should sharpen'</pre></span></span>
+      <span class="sim-cap">2,387 cells at frame 1,800, from 2,000 seeded, 25% of them in the red (high-activator) phase of the field that drives growth. The control, and the reason for the second field: with ONE field, death has nowhere to be but where growth is not. It reads the same chemical the growth does and fires below a threshold on it, so the blue network is the exact complement of the red spots — a pattern nobody chose, drawn on the flanks between them. Top view, because that is the face the network is on. The shell stays a sphere throughout (reduced volume 0.95 at the end, where 1.0 is a perfect sphere)</span>
     </figcaption>
   </figure>
 </div>
 <!-- END vertex-turing-death -->
 
 <!-- BEGIN vertex-mpm (generated by prototype/ecm/minisite_section.py) -->
-<h3 class="anchored">Vertex + MPM — a surface loading an extracellular matrix</h3>
+<h3 class="anchored">Vertex + MPM</h3>
 <p class="opk">Two Levels, two solvers, one interface: a <b>triangulated surface</b> with mass and
-springs — the vertex model's own geometry — pressed into a <b>material-point matrix</b> (the MLS-MPM
+springs — the vertex model's own geometry — pressed into a <b>block of MPM material</b> (the MLS-MPM
 cycle below), coupled particle-to-face so the reaction really returns to the mesh rather than being
-applied to the matrix alone. The three clips are the same rig under the three loadings that can break
-it. <b>Press</b>: the surface indents the matrix against a rigid floor and lifts off again, and the
-material has to push back and recover. <b>Drag</b>: a sticky pad presses to a fixed depth and then
-travels sideways over a matrix pinned at its base, so the load is tangential — it ploughs, heaps
-material ahead of itself and <b>shears</b> what it drags over, coloured by von Mises because a drag
-changes shape at constant volume and a volumetric colour is blank exactly where the physics is.
-<b>Breach</b>: the surface carries a hole and the box is closed on all four sides, so the matrix has
-nowhere to go but <b>through</b>, and it extrudes as a plug. Each clip plays the 3D view first, then
-a cross-section through the same instant; the grey lines are the rigid floor and, in the last one,
-the walls.</p>
+applied to the material alone. No tissue and no matrix here: this is the interface itself, on the
+smallest rig that can falsify it, under the three loadings that can break it. <b>Press</b>: the
+surface indents the block against a rigid floor and lifts off again, and the material has to push
+back and recover. <b>Drag</b>: a sticky pad presses to a fixed depth and then travels sideways over a
+block pinned at its base, so the load is tangential — it ploughs, heaps material ahead of itself and
+<b>shears</b> what it drags over, coloured by von Mises because a drag changes shape at constant
+volume and a volumetric colour is blank exactly where the physics is. <b>Breach</b>: the surface
+carries a hole and the box is closed on all four sides, so the material has nowhere to go but
+<b>through</b>, and it extrudes as a plug. Each clip plays the 3D view first, then a cross-section
+through the same instant; the grey lines are the rigid floor and, in the last one, the walls.</p>
 <p class="opk-ref">Reference — the contact is the ICFEMP particle-to-surface scheme of
 <a href="https://doi.org/10.1016/j.cma.2015.04.005">Chen, Qiu, Zhang &amp; Lian (2015),
 <i>Comput. Methods Appl. Mech. Engrg.</i> 293:1–19</a>, chosen over grid-node coupling
 (<a href="https://doi.org/10.1016/j.cma.2011.07.014">Lian, Zhang &amp; Liu 2011,
 <i>CMAME</i> 200:3482</a>) because that one needs the mesh and the grid to be comparable in size and
-ours are not; the matrix is MLS-MPM
+ours are not; the solid is MLS-MPM
 (<a href="https://github.com/yuanming-hu/taichi_mpm">Hu et&nbsp;al. 2018</a>), the surface is the mesh
 of the 3D active vertex model of
 <a href="https://www.nature.com/articles/s41598-018-20678-6">Okuda et&nbsp;al. (2018)</a>. The
