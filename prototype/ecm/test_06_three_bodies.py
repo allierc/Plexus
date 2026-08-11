@@ -427,6 +427,27 @@ def main():
         if t % max(1, frames // 120) == 0:
             sheet_pos.append((int(t), sheet.x[sheet.live_nodes].detach().cpu().numpy().copy()))
 
+    # --no-matrix: the sheet against the REAL tissue and nothing else. This exists to attribute a
+    # failure rather than to model anything. 05's sheet has only ever tracked a smooth, analytically
+    # expanding icosphere; here it tracks a surface that is bumpy and that GAINS VERTICES by
+    # division. If it fails at the same frame with the matrix removed, the failure is the sheet
+    # meeting that driver and belongs in 05; if it survives, the failure is in this assembly.
+    if "--no-matrix" in sys.argv:
+        class _L:                                     # the one thing on_frame reads off the engine
+            def get(self, _k):
+                return torch.zeros(1, 3, device=dev)
+        class _H:
+            def level(self, _n):
+                return _L()
+        t0 = time.time()
+        for t in range(frames):
+            on_frame(_H(), t)
+        print(f"[06] sheet-only: {time.time() - t0:.0f} s for {frames} frames", flush=True)
+        json.dump(dict(mode="no-matrix", frames=int(frames), series=rec),
+                  open(os.path.join(d, "metrics.json"), "w"), indent=1)
+        print(f"[06] -> {d}", flush=True)
+        return
+
     spec = T4.build(name, frames, npz, scale, n_particles=n_part, mesh_stride=stride)
     path = os.path.join(d, "spec.yaml")
     yaml.safe_dump(spec, open(path, "w"), sort_keys=False)
