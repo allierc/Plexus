@@ -503,6 +503,13 @@ class Grow3D(Structural):
         # WHICH SPECIES GATES GROWTH: 0 (chem columns 0,1) by default, so existing specs are
         # unchanged; 2 reads a second RD system living in the same buffer.
         self.chan = int(params.get("chan", 0))
+        # THE INHIBITOR: None = off, so every existing spec is unchanged. `inhib_sw` is a fraction
+        # of the inhibitor's OWN maximum and `inhib_hill` its sharpness, mirroring a_sw/hill.
+        _ic = params.get("inhib_chan", None)
+        self.inhib_chan = None if _ic is None else int(_ic)
+        self.inhib_sw = float(params.get("inhib_sw", 0.35))
+        self.inhib_hill = float(params.get("inhib_hill", 4.0))
+        self._inhib_applied = 0.0
         self.hill = float(params.get("hill", 3.0)); self.cap = float(params.get("cap", 2.5))
         from tyssue_ops3d import _engine_owns_clock
         self.every = _engine_owns_clock(params); self._k = 0
@@ -556,6 +563,36 @@ class Grow3D(Structural):
             m["mg_scale"] = torch.ones(nF, device=dev, dtype=m["V0f"].dtype)
             m["A0_init"] = m["A0"].clone(); m["P0_init"] = m["P0"].clone(); m["V0f_init"] = m["V0f"].clone()
         hillv = a ** self.hill / (self.a_sw ** self.hill + a ** self.hill + 1e-12)   # Hill activation in [0,1]
+        # A SECOND MORPHOGEN THAT STOPS GROWTH. Cedric, 11 August: "make variants where the blue
+        # morphogen stops cell growth, so that we see the blue and only red spots growing."
+        #
+        # Every growth law this campaign has run is purely ACTIVATING: `rate * (rho + hill(a))`, so
+        # the only thing a morphogen can do is make a cell grow FASTER, and the slowest a cell can
+        # grow is the rho baseline -- which is why six rounds produced broad lobes and never a
+        # finger. A bulge sharpens into a finger when the tissue grows at the tip AND STOPS at the
+        # flanks, and no single activating field can say "stop": it has no zero to reach.
+        #
+        # `inhib_chan` names a species whose HIGH values switch growth off, multiplicatively:
+        #
+        #     growth  <-  rate * (rho + hill(a_act)) * (1 - hill(a_inhib))
+        #
+        # so where the inhibitor is saturated the cell does not grow at all, baseline included.
+        # This is lateral inhibition, and it is a different mechanism from a sharper gate: `hill`
+        # narrows the shoulder of the activating curve, this puts a floor of ZERO under it.
+        if self.inhib_chan is not None and "chem" in clvl.state_schema:
+            _h0, _ = clvl.state_schema["chem"]
+            b = clvl.state[:nF, _h0 + self.inhib_chan].detach().to(dev).clamp(min=0.0)
+            # RELATIVE TO THE INHIBITOR'S OWN MAXIMUM, for the same reason a_sw is: an absolute
+            # threshold against a field whose scale the chemistry sets is either always on or
+            # always off, and this project has paid for that twice (rd_interface_tension, chem_low).
+            bmax = float(b.max()) if b.numel() else 0.0
+            if bmax > 1e-9:
+                bn = b / bmax
+                inh = bn ** self.inhib_hill / (self.inhib_sw ** self.inhib_hill
+                                               + bn ** self.inhib_hill + 1e-12)
+                m["inhib_frac"] = inh                     # recorded, so the renderer can show it
+                hillv = hillv * (1.0 - inh)
+                self._inhib_applied = float(inh.mean())
         s_prev = m["mg_scale"]                                    # per-cell scale BEFORE this tick (for the dilution rate)
         v_ref = float(m.get("v_ref", 1.0))                        # SEED-TIME MEDIAN cell volume (tyssue_ops3d:220)
         s = self._advance(m["mg_scale"], hillv, m, v_ref)         # <-- the rate law; models override THIS only

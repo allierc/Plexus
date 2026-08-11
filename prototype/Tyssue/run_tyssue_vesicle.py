@@ -107,10 +107,16 @@ INNER = 0.82                                                    # basal radius f
 # just-divided and magenta is the broken alarm. Blended at the same strength as the green so a
 # dying cell still reports how lit it is.
 C_DYING, DYING_ALPHA = (0.20, 0.45, 0.95), 0.72
+# GROWTH SWITCHED OFF BY A SECOND MORPHOGEN. A teal that cannot be mistaken for C_DYING's blue --
+# a cell whose growth is inhibited is alive and static, a dying cell is on its way out, and reading
+# one as the other would invert what the movie says. Blended rather than replacing the activator
+# colour, so a red spot that is ALSO inhibited still reads as lit; the whole question is where the
+# red and the teal overlap.
+C_INHIB, INHIB_ALPHA = (0.10, 0.70, 0.70), 0.65
 
 
 def _draw(ax, pos, mesh, p0, azim, act=None, inner=INNER, Lbox=None,
-          divided=None, broken=None, wall_shade=1.0, classes=None, dying=None):
+          divided=None, broken=None, wall_shade=1.0, classes=None, dying=None, inhib=None):
     """3D monolayer: each cell is a prism -- an apical face (outer), a basal face (inner), and lateral
     walls. Cells are coloured by ACTIVATION with the Turing white->red LUT (activation 0 -> white).
 
@@ -185,6 +191,9 @@ def _draw(ax, pos, mesh, p0, azim, act=None, inner=INNER, Lbox=None,
         if divided is not None and f < len(divided) and divided[f]:
             base = tuple((1.0 - DIVIDED_ALPHA) * np.array(base[:3])
                          + DIVIDED_ALPHA * np.array(C_DIVIDED)) + (1.0,)
+        if inhib is not None and f < len(inhib) and inhib[f] > 0.5:
+            # growth is off here: blend toward teal, keeping the activator's own brightness
+            base = tuple((1 - INHIB_ALPHA) * np.array(base[:3]) + INHIB_ALPHA * np.array(C_INHIB))
         if dying is not None and f < len(dying) and dying[f]:
             base = tuple((1.0 - DYING_ALPHA) * np.array(base[:3])
                          + DYING_ALPHA * np.array(C_DYING)) + (1.0,)

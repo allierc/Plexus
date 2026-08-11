@@ -1371,6 +1371,12 @@ class TopoSnapshot3D(Structural):
             # reason `age`/`ndiv` are: a renderer cannot colour by a quantity that only existed inside
             # one frame's forward pass. `cp` is None-safe, so a run without the operator records None.
             myo=cp("myo"),
+            # PER-CELL GROWTH INHIBITION, when a second morphogen is switching growth off. Recorded
+            # for exactly the reason `age` and `myo` are: a renderer cannot colour by a quantity
+            # that only existed inside one frame's forward pass, and "where is growth stopped" is
+            # the whole point of an inhibitor -- an invisible mechanism is one nobody can check.
+            # None-safe, so a run without an inhibitor records None and the renderer draws nothing.
+            inhib=cp("inhib_frac"),
             # THE TWO-POOL STATE, when `medioapical_myosin` is in the schedule. `myo_med` is the
             # AREAL density on each cell and `myo_amount` the AMOUNT on each half-edge; the pair is
             # what makes the conservation ledger measurable offline, since `myo` alone is normalised
