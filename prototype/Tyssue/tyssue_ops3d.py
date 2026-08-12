@@ -597,7 +597,7 @@ class Divide3D(Structural):
         # run in this campaign measured a counter rather than a tissue.
         ndone = 0
         daughter_mothers = []                                    # mother face index of each appended daughter (order)
-        bud_axis = None; a_cells = None                          # ORIENTED interface division: bud axis = centre->red tip
+        bud_axis = None; a_cells = None; orient_thr = None       # ORIENTED interface division: bud axis = centre->red tip
         if self.orient_iface and self.cell_set is not None:
             clvl0 = H.level(self.cell_set)
             if clvl0 is not None and "chem" in clvl0.state_schema:
@@ -610,7 +610,7 @@ class Divide3D(Structural):
                 # `divide_3d:orient_iface`, a named Okuda mechanism, could orient nothing and was
                 # behaviourally `hertwig`. A `set_impl ... orient_iface` edit was a silent no-op.
                 amax = float(a_cells.max()) if a_cells.size else 0.0
-                thr = self.orient_asw * amax
+                thr = orient_thr = self.orient_asw * amax
                 rc = [np.array([pos[v] for v in rings[f]]).mean(0) for f in range(nF)
                       if amax > 0 and a_cells[f] > thr
                       and rings[f] is not None and len(rings[f]) >= 3]
@@ -640,7 +640,14 @@ class Divide3D(Structural):
             try:                                                 # to the cell's longest axis -> compact daughters
                 _, _, vh = np.linalg.svd(P - c, full_matrices=False); u = vh[0]
                 n = c / (np.linalg.norm(c) + 1e-9)               # outward (radial) face normal on the sphere
-                if bud_axis is not None and a_cells is not None and f < len(a_cells) and a_cells[f] > self.orient_asw:
+                # THE SAME RELATIVE THRESHOLD THAT BUILT THE AXIS. This test used to read
+                # `a_cells[f] > self.orient_asw` -- the ABSOLUTE value -- while the axis above was
+                # already relative to `amax`, so the two disagreed about which cells are the bud.
+                # At orient_asw 0.6 on a field peaking at 1.47 the axis takes the top 40% and this
+                # took everything above 0.6, a different and larger set; on any run whose field
+                # peaks below orient_asw the axis exists and NO cell passes here, which is the
+                # silent-`hertwig` failure the comment above says was fixed.
+                if bud_axis is not None and orient_thr is not None and f < len(a_cells) and a_cells[f] > orient_thr:
                     ut = bud_axis - float(np.dot(bud_axis, n)) * n   # bud axis in this cell's tangent plane ->
                     if np.linalg.norm(ut) > 1e-6:                    # daughters separate ALONG the protrusion (extend the
                         u = ut / np.linalg.norm(ut)                  # wall) instead of by the cell's own long axis

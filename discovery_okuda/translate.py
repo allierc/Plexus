@@ -243,7 +243,17 @@ def _emit_rd_seed(g, n, ga):
     # `tip` REMOVED 6 August -- see seed_cell_rd's docstring. `amp` removed with it: the operator
     # reads no such parameter in any mode, so every spec this campaign wrote carried a number that
     # nothing looked at. Found by the UNREAD probe in one second, having survived 14 rounds.
-    ENGINE_MODE = {"cone": "cones", "spot": "cones", "scatter": "scatter"}
+    # `patch` AND `noise` ARE THE ENGINE'S, AND THE VOCABULARY COULD NOT REACH THEM. The operator
+    # accepts four modes -- noise | scatter | patch | cones -- and validates against exactly that
+    # list; this map offered three names covering two of them, so two initial conditions existed in
+    # the substrate and in no search the loop could run. They are not variations on scatter:
+    #   patch  activates one polar cap, so the tissue starts with ONE dominant domain instead of a
+    #          field of them -- the single-bud initial condition, chosen rather than emergent.
+    #   noise  seeds the uniform steady state plus noise and lets the instability pick the
+    #          wavelength itself. No seed at all: the pattern is spontaneous, which is the only
+    #          setting in which "the chemistry chose this many spots" is a result and not a setting.
+    ENGINE_MODE = {"cone": "cones", "spot": "cones", "scatter": "scatter",
+                   "patch": "patch", "noise": "noise"}
     d = {"op": "seed_cell_rd", "at": "cell", "mode": ENGINE_MODE[impl],
          "n_spots": int(_p(g, i, "n_spots"))}
     if impl == "scatter":
@@ -265,6 +275,16 @@ def _emit_rd_seed(g, n, ga):
              "seed_frac": float(_p(g, i, "seed_frac")), "before_frame": 3}
     elif impl == "cone":
         d["cone_deg"] = float(_p(g, i, "cone_deg"))
+    elif impl == "patch":
+        # ONE POLAR CAP. `patch_z` is the operator's own fraction of z_max, and `n_spots` means
+        # nothing here -- a patch is one domain by definition -- so it is not emitted, for the
+        # reason the scatter branch gives: a parameter in a spec that nothing reads looks like a
+        # setting that is doing something.
+        d = {"op": "seed_cell_rd", "at": "cell", "mode": "patch",
+             "patch_z": 0.6, "before_frame": 3}
+    elif impl == "noise":
+        # NO SEED. The steady state plus noise, as an initial condition, once.
+        d = {"op": "seed_cell_rd", "at": "cell", "mode": "noise", "noise": 0.04, "before_frame": 3}
     else:                                                     # a frozen spot -- the DOME control
         d["cone_deg"] = float(_p(g, i, "cone_deg"))
         d["before_frame"] = 3

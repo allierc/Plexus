@@ -37,7 +37,13 @@ shared:
   growth_rate: 0.000866        # the rate every campaign run has used
   vth_frac: 2.5
   divide_factor: 2.0           # of v_ref, the seed-time median cell volume
-  a_sw_gated: 0.35             # a FRACTION of the activator's own maximum
+  a_sw_gated: 0.35             # an ABSOLUTE value of the activator, not a fraction of its maximum.
+                               #   This line said "a FRACTION of the activator's own maximum" and
+                               #   the operator read it absolutely, so the gate's real position
+                               #   drifted with each run's chemistry: 0.24 of the field on the
+                               #   strongest of 154 runs and above all of it on 16. `a_sw_rel` on
+                               #   grow_3d now makes the fraction reading available, and the
+                               #   b_star_relgate member below is what measures which one fingers.
   a_sw_open: 0.0
   beta: 0.5                    # shape -> chemistry, the second arrow
   f0: 0.046
@@ -97,6 +103,66 @@ members:
   #     against a sphere and against a finger rather than against one arbitrary parent.
   - {name: b_gs_plain_soft_lo_death,    chem: gs, mat: gated, mech: plain,   gate: soft,  drive: lo, death: true}
   - {name: b_gs_shaping_sharp_hi_death, chem: gs, mat: gated, mech: shaping, gate: sharp, drive: hi, death: true}
+
+  # --- THE STAR, and everything bred from it. r013_05 is the only specimen in 196 runs with ARMS
+  #     rather than lobes: 11 tubes, reduced_volume 0.285 (deepest on file, 1.0 being a sphere),
+  #     grip 0.273 and invagination 0.617 (both campaign records), activator at the tips 7.4x the
+  #     cell mean. It reached that as a Route B leaf two edits from b_gs_shaping_soft_lo, and a
+  #     leaf is a dead end here: `_build_sweep` refuses a base that is not in the basis, so no
+  #     ladder has ever been run on the one composition that makes the shape the campaign wants.
+  #
+  #     THE MECHANISM, so the members below are variations on a claim and not on a lucky number:
+  #     K_V 80 makes a cell nearly incompressible, so growth cannot be absorbed by inflating one
+  #     cell and has to buckle the sheet; rate 0.5 halves the reaction so the spots stay far apart
+  #     (spacing 4.04 cells, 75 spots) and each one gets its own arm rather than merging into a
+  #     lobe. Both values sit outside the vocabulary box, which is a fact about the box.
+  - {name: b_star,           chem: gs, mat: gated, mech: shaping, gate: soft,  drive: lo,
+     set: {shape_energy_3d.K_V: 80.0, cell_react.rate: 0.5}}
+  - {name: b_star_sharp,     chem: gs, mat: gated, mech: shaping, gate: sharp, drive: lo,
+     set: {shape_energy_3d.K_V: 80.0, cell_react.rate: 0.5}}
+  - {name: b_star_death,     chem: gs, mat: gated, mech: shaping, gate: soft,  drive: lo, death: true,
+     set: {shape_energy_3d.K_V: 80.0, cell_react.rate: 0.5}}
+
+  # --- ORIENTED DIVISION, on the star. A named Okuda mechanism that has run ZERO times in 282
+  #     specs: every one carries `orient_iface: false`. Hertwig's rule splits a cell across its own
+  #     long axis, which makes compact daughters and therefore a lobe; orienting the septum along
+  #     the bud axis stacks daughters ALONG the arm, which is how an arm becomes a tube. Its
+  #     per-cell gate was reading an absolute threshold against a relative axis until 11 August, so
+  #     this is also the first run of the operator as written.
+  - {name: b_star_oriented,  chem: gs, mat: gated, mech: shaping, gate: soft,  drive: lo,
+     set: {shape_energy_3d.K_V: 80.0, cell_react.rate: 0.5,
+           divide_3d.orient_iface: true, divide_3d.orient_asw: 0.6}}
+
+  # --- THE SECOND ARROW, on the three features it has never read. `shape_to_chem` has run
+  #     `curvature` in all 275 specs and tension, apical_area and pressure in none, though all four
+  #     are implemented and each standardises its own feature so `beta` means the same thing in all
+  #     four. They are different biology: curvature is "the shape I already made", tension is
+  #     YAP/TAZ and Piezo1, pressure is compression. A tissue that patterns where it is STRETCHED
+  #     and one that patterns where it is BENT do not make the same object.
+  - {name: b_star_tension,   chem: gs, mat: gated, mech: shaping, gate: soft,  drive: lo,
+     set: {shape_energy_3d.K_V: 80.0, cell_react.rate: 0.5, shape_to_chem.model: tension}}
+  - {name: b_star_pressure,  chem: gs, mat: gated, mech: shaping, gate: soft,  drive: lo,
+     set: {shape_energy_3d.K_V: 80.0, cell_react.rate: 0.5, shape_to_chem.model: pressure}}
+  # beta < 0 is the operator's own stated hypothesis -- "the sign is a real hypothesis, not a
+  # convention, and both must be swept" -- and only the positive sign has ever run. Pattern AVOIDS
+  # the deformation: spots settle in the dimples instead of on the bulges, so the tissue should
+  # invaginate where it patterns rather than protrude.
+  - {name: b_star_avoid,     chem: gs, mat: gated, mech: shaping, gate: soft,  drive: lo,
+     set: {shape_energy_3d.K_V: 80.0, cell_react.rate: 0.5, shape_to_chem.beta: -0.5}}
+
+  # --- THE GATE ITSELF, as a fraction of the field rather than a value of it. See `a_sw_gated`
+  #     above: this is the member that decides which reading makes a finger, instead of the
+  #     question being settled by a comment.
+  - {name: b_star_relgate,   chem: gs, mat: gated, mech: shaping, gate: soft,  drive: lo,
+     set: {shape_energy_3d.K_V: 80.0, cell_react.rate: 0.5, grow_3d.a_sw_rel: true}}
+
+  # --- MULTI-TUBE SEEDING. Okuda's Fig 5 starts from N fixed radial activator cones, not from
+  #     scattered noise; `mode: cones` implements exactly that and has run 3 times in 308 specs,
+  #     none of them in this campaign. Six cones is six places an arm can start, chosen rather
+  #     than emergent -- which makes "how many tubes" a controlled variable for the first time.
+  - {name: b_star_cones,     chem: gs, mat: gated, mech: shaping, gate: soft,  drive: lo,
+     set: {shape_energy_3d.K_V: 80.0, cell_react.rate: 0.5,
+           seed_cell_rd.mode: cones, seed_cell_rd.n_spots: 6, seed_cell_rd.cone_deg: 8.0}}
 
   # --- the brusselator QUESTION: one base, carrying the gamma ladder. Not a column.
   #     WITHDRAWN 10 August, un-run: it was still going at 80 minutes when the rest of the basis

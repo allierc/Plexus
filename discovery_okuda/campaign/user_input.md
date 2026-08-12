@@ -106,5 +106,60 @@ cells dead). At 0.005 all six finish within a few percent of the parent with no 
   `replicate`, and scored against the copied prediction -- so re-proposing a known experiment
   survives and inflates the confirm rate. It was 5 of 7 Route B slots in r028 and 4 of 5 in r027.
   Replicates bound the seed floor; two per round is plenty.
-- **`add_op` has fired 30 times in this project's history and all 30 added the same operator**, none
-  since round 24. An operator nothing has exercised answers a question no retune can.
+- **The structural slot is `set_impl` now, not `add_op`.** `add_op` fired 30 times in the previous
+  campaign and 20 in this one, and all 50 added the same operator. That is not laziness: every
+  operator in the vocabulary has now been exercised, so there is nothing left for `add_op` to add,
+  and `coverage.operators_never_exercised` is empty — which made the coverage block read as
+  *satisfied* while `set_impl` had fired **zero** times in 196 runs and eleven of twenty-five
+  implementations had never run. `coverage.the_untried_edit` now says which of the two is live.
+
+## 7. The star, and the levers that were sitting unused behind it
+
+`r013_05` is the only run in 196 with **arms** rather than lobes: 11 tubes, `reduced_volume` 0.285
+(deepest on file, 1.0 being a sphere), `grip` 0.273 and `invagination` 0.617 (both campaign
+records), activator at the tips 7.4× the cell mean. Two edits from `b_gs_shaping_soft_lo`: `K_V` 80
+makes a cell nearly incompressible so growth has to buckle the sheet instead of inflating one cell,
+and `cell_react.rate` 0.5 halves the reaction so spots stay 4.04 cells apart and each gets its own
+arm. It is now a **basis member** (`b_star`), with eight variations, because a Route B leaf can
+carry no ladder — `_build_sweep` refuses a base that is not in the basis, so no sweep had ever been
+run on the one composition that makes the shape the campaign is looking for.
+
+**It scored zero on the seat meant for it.** `protrusion_aspect_max_final` reads 0.0 and
+`n_tips_final` 0 on eleven visible arms, and the `tube` seat's floor was `aspect_final ≥ 0.4`, so
+r013_05 could not take it and got in through `complex`, on grip. That seat is keyed on `n_tubes`
+now, which counts the arms at 11 — the same number the eye reports. This is standing law L3, filed
+since r006: *"the metric zeroes tips the picture shows."*
+
+**What had never been run**, all now in the basis and all reachable by `set_impl`:
+
+| mechanism | had run | why it is a different shape |
+|---|---|---|
+| `divide_3d:orient_iface` | 0 of 282 specs | Hertwig's rule makes compact daughters and therefore a lobe; orienting the septum along the bud axis stacks daughters ALONG the arm. This is how an arm becomes a tube. |
+| `shape_to_chem:tension` / `:pressure` / `:apical_area` | 0 of 275 | the chemistry has only ever read **curvature**. A tissue that patterns where it is stretched and one that patterns where it is bent are not the same object. |
+| `shape_to_chem.beta < 0` | 0 | the operator's own docstring: "the sign is a real hypothesis, not a convention, and both must be swept". Negative = pattern AVOIDS the deformation, so it should dimple where it patterns. |
+| `seed_cell_rd:patch` / `:noise` | unreachable | two of the engine's four seeding modes that the vocabulary did not offer at all. `patch` starts from ONE domain; `noise` seeds nothing and lets the instability pick the wavelength, which is the only setting in which "the chemistry chose this many spots" is a result rather than a setting. |
+| `seed_cell_rd:cones` | 3 of 308, none here | Okuda's own Fig 5 setup: N fixed radial cones, so "how many tubes" becomes a controlled variable. |
+
+## 8. Two threshold bugs, and the class they belong to
+
+Every threshold on a chemistry field in this substrate is relative to that field's own maximum —
+`interface_line_tension_3d.a_sw`, `extrusion_forcing_3d.a_sw`, `apoptosis_3d` chem_low. Two were
+not, and both silently weakened a mechanism rather than failing:
+
+- **`divide_3d`** built its bud axis from the top `orient_asw` **fraction** of the field and then
+  tested each cell against `orient_asw` as an **absolute** value. Different sets; and on any run
+  whose activator peaks below `orient_asw` the axis exists while no cell passes, so the operator
+  was behaviourally `hertwig` with nothing saying so. Fixed — `b_star_oriented` is the first run of
+  the operator as written.
+- **`grow_3d.a_sw`**, the campaign's main growth gate, is **absolute**, while `crew/basis.yaml` and
+  the inhibitor branch beside it both describe it as a fraction of the maximum. Measured over 154
+  runs the gate sat at 0.24 of the field on the strongest and above all of it on 16. Not silently
+  redefined — both readings are real mechanisms (absolute stops growing when the chemistry dies;
+  relative means the same thing in every run, which is what a sweepable lever must do), so
+  `a_sw_rel` makes the choice explicit and `b_star_relgate` is the member that measures it.
+
+The boxes were wrong too. `K_V`, `Lambda`, `l_th_frac` and `grow_3d.rate` were flagged
+`out_of_range` on **all 196 runs and every basis member**, because each box excluded the value the
+project actually runs at — so the sweep menu, which takes its two points from the box, could not
+propose the region the best result lives in. Widened, with the sampling basins pinned to the old
+widths so no robustness claim changes meaning. `out_of_range` now means something again.

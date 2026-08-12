@@ -52,9 +52,15 @@ predicted. Nothing in the engine forces these, so they are your discipline.
    Test one where it is weakest, or add the run that would settle an `UNTESTED` one. A law you
    **refute** is worth more than one you confirm.
 
-3. **One slot is STRUCTURAL** — `add_op`, `remove_op` or `set_impl` — unless `coverage` reports
-   nothing untried. An operator nothing has exercised answers a question no retune can, and the
-   coverage block names them for you.
+3. **One slot is STRUCTURAL, and `set_impl` is the one to reach for** — not `add_op`. Read
+   `coverage.the_untried_edit`, which says which of the two is the live constraint this round.
+   Every operator in the vocabulary has now been exercised, so `add_op` can only re-add something
+   the campaign already carries: it fired twenty times in 196 runs and all twenty added the same
+   operator. `set_impl` fired **zero** times in the same 196 runs, while eleven of twenty-five
+   implementations had never run — among them oriented division, which is how an arm becomes a
+   tube, and three of `shape_to_chem`'s four features, so the chemistry has only ever read
+   curvature and never tension, area or pressure. An untried implementation is a different
+   mechanism under the same contract; a retune is the same mechanism at a different number.
 
 Replicates are capped at **2 per round**; past that a duplicate is refused as a duplicate and you
 will see it in the refusals. They bound the seed floor, which is real work — but a round of
@@ -71,8 +77,16 @@ other slot:
  "claim": "what mechanism this tests, in one sentence",
  "predict": "protr_peak > 1.3",
  "intent": "confirmatory | adversarial | control | exploratory",
- "why": "why this is worth a GPU rather than the next idea"}
+ "why": "why this is worth a GPU rather than the next idea",
+ "chases": "r013_05"}
 ```
+
+`chases` is the run whose **unpredicted** result this slot is following up — the run id as it
+appears in `knowledge.md`'s `## SURPRISES`. Omit it (or `null`) on every slot that is not chasing
+one; at least one slot per round should carry it, and the round prints how many did. It is not a
+gate and a round with nothing surprising is a real round — it exists because "did the loop follow
+up its own surprises" was previously answerable only by reading thirteen rounds of prose, and the
+answer turned out to be "in three rounds of thirteen, no".
 
 **The five that matter**, one per question, and the ones to prefer in a prediction:
 `protr_peak` (is there a protrusion), `protrusion_aspect_max_peak` (a finger or a bulge),

@@ -34,10 +34,13 @@ quarantine). Those are the substrate and they have earned their size.
 """
 from __future__ import annotations
 
+import glob
 import json
 import os
 import sys
 import time
+
+import yaml
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 for _p in (HERE, os.path.join(HERE, "agents")):
@@ -895,6 +898,23 @@ def coverage(ctx):
             used_ops.add(o["op"])
             if o.get("impl"):
                 used_impls.add((o["op"], o["impl"]))
+    # WHAT RAN, NOT WHAT THE GRAPH SAYS RAN. `_graph(name)` rebuilds a composition and fills each
+    # node's `impl` from the vocabulary's default, so reading impls off the parents reported
+    # `seed_cell_rd:cone` for 205 runs whose emitted spec says `mode: scatter`. The spec is the
+    # authority -- it is what the engine was handed -- and each of these operators writes its
+    # implementation into a different key, so the mapping is stated rather than guessed.
+    IMPL_KEY = {"seed_cell_rd": "mode", "cell_react": "model", "shape_to_chem": "model",
+                "cell_diffuse": "implementation"}
+    for d in glob.glob(os.path.join(LOG_ROOT, "*", "spec_run.yaml")):
+        try:
+            with open(d) as f:
+                sp = yaml.safe_load(f) or {}
+        except Exception:
+            continue
+        for o in (sp.get("operators") or []):
+            op = o.get("op")
+            if op in IMPL_KEY and o.get(IMPL_KEY[op]):
+                used_impls.add((op, o[IMPL_KEY[op]]))
     untried = []
     for op, spec in OPERATORS.items():
         for impl in (spec.get("impls") or []):
@@ -913,6 +933,20 @@ def coverage(ctx):
         "implementations_never_tried": sorted(untried),
         "parents_never_built_from": sorted(p["name"] for p in (ctx.get("parents") or [])
                                            if p["name"] not in posed),
+        # WHICH OF THE TWO IS THE LIVE CONSTRAINT, said outright rather than left to be inferred
+        # from two lists. All thirteen operators are now exercised, so `operators_never_exercised`
+        # is EMPTY and the coverage block reads as satisfied -- while eleven of twenty-five
+        # implementations had never run and `set_impl` had fired ZERO times in 196 runs against
+        # `add_op`'s twenty, all twenty adding the same operator. An empty list and an unread one
+        # look identical in a report; this line distinguishes them.
+        "the_untried_edit": (
+            f"`set_impl` -- {len(untried)} implementations have never run and every operator has. "
+            f"Nothing is left to `add_op`, so a structural slot spent on it re-adds something the "
+            f"campaign already has."
+            if not (set(OPERATORS) - used_ops) and untried else
+            f"`add_op` -- {len(set(OPERATORS) - used_ops)} operators have never been exercised."
+            if (set(OPERATORS) - used_ops) else
+            "neither: every operator and every implementation has run at least once."),
         "note": ("an operator nothing exercises can only be reached with `add_op`; an untried "
                  "implementation with `set_impl`. Both are one edit and both answer a question no "
                  "retune can."),
@@ -1156,6 +1190,28 @@ def build_all(ctx):
     if len(out) < len(slots):
         print(T_.warn(f"[round] {len(slots) - len(out)} of {len(slots)} slot(s) dropped -- running "
                       f"the short batch of {len(out)}. A short round is a real round."))
+    # DID ANY SLOT CHASE THE SURPRISE? Counted, not asserted.
+    #
+    # `proposer.md` has told the Proposer since the campaign started that one slot must take a
+    # result from `knowledge.md`'s `## SURPRISES` and pose it as a mechanism. Traced properly it
+    # obeys about three rounds in four -- but r007, r008 and r010 spent no slot on their surprise
+    # and NOTHING NOTICED, because obedience to that instruction was only ever visible by reading
+    # thirteen rounds of prose side by side. `chases` is the Proposer naming the run it took the
+    # surprise from, so the answer is a field rather than an inference.
+    #
+    # IT WARNS, IT DOES NOT REFUSE. A round with no surprise worth chasing is a real round -- the
+    # Analyst is allowed to write `none this round` -- and refusing the batch would turn a missing
+    # sentence into sixteen lost runs. The campaign has already paid for gates that judge content:
+    # twelve of twelve runs refused in two consecutive rounds, see the note at the top of this
+    # function. A loud count is the whole mechanism.
+    b_only = [s for s in out if not s.get("sweep") and s.get("predict")]
+    chased = [s for s in b_only if s.get("chases")]
+    if b_only:
+        print((T_.ok if chased else T_.warn)(
+            f"[round] {len(chased)} of {len(b_only)} Route B slot(s) chase a surprise"
+            + (f": {', '.join(sorted({str(s['chases']) for s in chased}))}" if chased else
+               " -- NONE. An unpredicted result has no other route into the next round, and this "
+               "round is dropping every one the Analyst recorded.")))
     # ONE LINE PER ROUND, NOT ONE PER PARENT. That every pool parent sits outside its declared box on
     # at least one parameter is a standing FACT of this campaign -- it is in round.md, it is why the
     # menu offers a grid anchored on the parent rather than points from the range, and it has not
@@ -1643,7 +1699,7 @@ def _build_one(slot, rid, index, seen):
             "replicate": replicate, "claim_proposed": slot.get("claim_proposed"),
             "run_key": C._run_key(g),
             "comp_hash": h,
-            **{k: slot.get(k) for k in ("claim", "predict", "intent", "why")}}
+            **{k: slot.get(k) for k in ("claim", "predict", "intent", "why", "chases")}}
 
 
 def _restore_parent_params(name, parent, edit, spare_seeds=False):
