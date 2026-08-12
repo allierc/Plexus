@@ -171,7 +171,11 @@ def main():
     ap.add_argument("--edge-lw", type=float, default=EDGE_LW)
     ap.add_argument("--edge-shade", type=float, default=0.45)
     ap.add_argument("--out", default=OUT, help="filename, so two stroke settings can coexist")
+    ap.add_argument("--scalebar", action="store_true",
+                    help="draw the scale bar (off by default: a gallery clip carries no "
+                         "printing, and every card on the site crops it away)")
     a = ap.parse_args()
+    import run_one as _ro; _ro.SCALEBAR = a.scalebar
 
     runs = sorted(d for d in os.listdir(LOG)
                   if os.path.isdir(os.path.join(LOG, d))

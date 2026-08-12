@@ -99,7 +99,11 @@ def main():
     ap.add_argument("--edge-lw", type=float, default=EDGE_LW)
     ap.add_argument("--edge-shade", type=float, default=0.45)
     ap.add_argument("--force", action="store_true")
+    ap.add_argument("--scalebar", action="store_true",
+                    help="draw the scale bar (off by default: a gallery clip carries no "
+                         "printing, and every card on the site crops it away)")
     a = ap.parse_args()
+    import run_one as _ro; _ro.SCALEBAR = a.scalebar
 
     out_name = f"3d_{a.tag}.png"
     runs = sorted(d for d in os.listdir(LOG)
