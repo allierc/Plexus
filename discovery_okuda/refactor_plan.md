@@ -160,11 +160,38 @@ that is a finding about the schema, and better learned on day one than in round 
 | 2 | R7 in the Critic | replaying r001–r022's proposals through it refuses ≥60% and refuses **0** of the above-floor confirmations |
 | 3 | acts in the proposal schema; Proposer and Analyst rewritten | one round runs; every Route B slot names an act and a claim; the round prints the act mix |
 | 4 | claim genealogy rendered by `genealogy.py --claims` | a claim tree with ≥2 levels draws itself from the ledger |
-| 5 | fresh campaign, 10 rounds | the audit re-run shows: below-floor predictions <10%, ≥1 `transfer` and ≥1 `discriminate` executed, and at least one claim whose status CHANGED on evidence |
+| 5a | fresh campaign, **3 rounds (~6 h)** — REPRESENTATION | every Route B slot names an act and a claim; ≥2 distinct acts beyond `predict` appear; the ledger is well-formed. Fails here → stop, nothing downstream can work |
+| 5b | continue to **15–20 rounds (~30 h)** — ACCUMULATION | at least one claim **leaves `proposed`** (supported or refuted, either direction counts); evidence weight per claim is plotted over rounds; `transfer` executed at least once |
 
-Phase 5's gate is the real test and it is the one worth arguing about now, before any of it is
-built: if ten rounds produce no status change on any claim, the claim layer is bookkeeping and
-should be abandoned rather than defended.
+### Why phase 5 is split, and what was dropped from it
+
+The first draft asked for four things after ten rounds. Measured throughput says that was the wrong
+shape: **1.8 h a round, 15 runs of which 6 are Route B**, so ten rounds buy about sixty epistemic
+acts. Sixty is plenty for some of those criteria and structurally cannot deliver others.
+
+| criterion | limited by | verdict |
+|---|---|---|
+| below-floor < 10% | nothing — R7 enforces it by construction | **dropped**: free, therefore not a test |
+| a claim leaves `proposed` | throughput; ~3 consistent acts on one claim | kept, and reachable |
+| `transfer` executed | *availability*: needs a supported claim AND a second lineage where it is testable | kept, marginal |
+| `discriminate` executed | availability: needs two RIVAL claims to exist at all | **demoted to conditional** |
+
+`discriminate` is now an obligation that fires only when the precondition arises: *if two claims
+conflict, a slot must discriminate them*, and the audit reports whether the condition ever occurred.
+Never arising is itself a finding — it means the loop is not generating rival explanations, which is
+exactly the abduction gap the audit measured at zero.
+
+"Status changed" became "leaves `proposed`, in either direction" and is read off an evidence-weight
+curve rather than a boolean, so a failure still says something: whether the loop was accumulating
+slowly or not at all.
+
+**And the throughput itself moved.** `route_a.slots` 8 → 6 in `crew/flow.yaml`, which takes a round
+from 6 Route B acts to about 10 at no extra GPU. Route A can afford it: its ladders existed to find
+what value makes a mechanism work, and the most valuable thing they produced — the per-metric seed
+floors — is now measured and written down.
+
+A gate that can fail for reasons unrelated to what it is testing is a bad gate. These three changes
+are all of that kind.
 
 ## 9. What could go wrong, named in advance
 

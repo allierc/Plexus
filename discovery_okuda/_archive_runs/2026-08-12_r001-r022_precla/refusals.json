@@ -1,0 +1,15 @@
+{
+ "round": "r023",
+ "refused": [
+  {
+   "slot": 7,
+   "parent": "r016_03",
+   "edit": [
+    "set_param",
+    "seed_cell_rd0.cone_deg",
+    4.0
+   ],
+   "reason": "R6_DUPLICATE and this round's replicate budget is spent (2). This repeats an experiment already on file; propose a NEW one. Replicates exist to bound the seed spread, not to fill a batch -- they took 5 of 7 Route B slots in r028."
+  }
+ ]
+}
