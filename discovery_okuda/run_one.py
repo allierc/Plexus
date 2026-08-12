@@ -315,7 +315,75 @@ def protr_of(pos):
 
 
 # --------------------------------------------------------------------------- the run
+def _probe_device(device, name):
+    """Touch the GPU before anything else, and say WHERE and WHAT if it refuses.
+
+    Twelve of sixteen jobs in the first claim round died in nine seconds each with
+
+        torch.AcceleratorError: CUDA error: unknown error
+          at torch.Generator(device=device).manual_seed(sim.seed)   [engine.build]
+
+    and the traceback said nothing about which machine, which card, or whether the driver was
+    reachable at all -- so "the cluster is flaky" was as far as the diagnosis could go. That is the
+    same defect as a silent fallback: the failure reported, but not the one fact that would let
+    anyone act on it.
+
+    This forces CUDA initialisation HERE, where the message can carry the execution host, the
+    visible devices, the card and the driver's own version of events. It runs before the spec is
+    parsed, so a bad node costs seconds and names itself.
+
+    `cudaErrorUnknown` at generator creation is almost always the context failing to initialise --
+    a wedged or contended card, an ECC error, a driver/library mismatch on that host -- and not
+    anything the spec or this program did. The point of the probe is to make that visible rather
+    than to fix it: the job still dies, but it dies saying which host to drain.
+    """
+    import socket
+    host = socket.gethostname()
+    if not str(device).startswith("cuda"):
+        return
+    tag = f"[{name}] device probe on {host}"
+    try:
+        import torch
+        vis = os.environ.get("CUDA_VISIBLE_DEVICES", "(unset)")
+        avail = torch.cuda.is_available()
+        cnt = torch.cuda.device_count() if avail else 0
+        print(f"{tag}: torch {torch.__version__}, cuda avail={avail}, count={cnt}, "
+              f"CUDA_VISIBLE_DEVICES={vis}, asked for {device}", flush=True)
+        if not avail or cnt == 0:
+            raise RuntimeError(f"no CUDA device visible on {host} (count={cnt}, "
+                               f"CUDA_VISIBLE_DEVICES={vis})")
+        idx = int(str(device).split(":")[1]) if ":" in str(device) else 0
+        p = torch.cuda.get_device_properties(idx)
+        print(f"{tag}: {p.name}, {p.total_memory / 1e9:.0f} GB, capability {p.major}.{p.minor}, "
+              f"driver-reported free {torch.cuda.mem_get_info(idx)[0] / 1e9:.1f} GB", flush=True)
+        # THE TWO CALLS THAT ACTUALLY FAILED, in the order the engine makes them: a generator, then
+        # a real allocation and a kernel. Doing them here means the error surfaces with the lines
+        # above already printed.
+        torch.Generator(device=device).manual_seed(0)
+        _t = torch.ones(1024, device=device)
+        _ = float((_t * 2).sum())
+        del _t
+        torch.cuda.synchronize(idx)
+        print(f"{tag}: OK -- generator, allocation and kernel all succeeded", flush=True)
+    except Exception as e:
+        print(f"{tag}: FAILED {type(e).__name__}: {e}", flush=True)
+        try:
+            import subprocess
+            smi = subprocess.run(
+                ["nvidia-smi",
+                 "--query-gpu=index,name,driver_version,memory.used,memory.total,"
+                 "utilization.gpu,ecc.errors.uncorrected.volatile.total",
+                 "--format=csv,noheader"],
+                capture_output=True, text=True, timeout=30)
+            print(f"{tag}: nvidia-smi -> {(smi.stdout or smi.stderr or '(no output)').strip()}",
+                  flush=True)
+        except Exception as _s:
+            print(f"{tag}: nvidia-smi unavailable ({type(_s).__name__})", flush=True)
+        raise
+
+
 def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign="validation"):
+    _probe_device(device, name)
     S, engine_run = _lazy_engine()
     cfg_path = os.path.join(CONFIG_DIR, f"{name}.yaml")
     cfg = yaml.safe_load(open(cfg_path))
