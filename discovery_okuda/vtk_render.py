@@ -25,19 +25,30 @@ lost; the only thing it buys is a stronger sense of the mesh, and the mesh has i
 
 SEQUENCES, so a caller asks for a job and not for four commands:
 
+    0   kburns, no mesh -- ONE clip, and what the loop writes for every run
     1   evolve, with mesh
     2   evolve + kburns, with mesh
     3   evolve + kburns without mesh, then evolve + kburns with mesh -- all four
 
-WHAT IS AND IS NOT CARRIED OVER from `_draw`'s colour semantics. The activator LUT (white -> red)
-and magenta-for-non-finite are here, because those are measurements. The green just-divided wash,
-the blue dying wash and the teal inhibited wash are NOT yet, and a run that carries them will be
-drawn without them -- said here rather than discovered later, because a missing overlay in this
-project has twice been read as "the mechanism did not fire".
+THE COLOUR SEMANTICS carried over from `_draw`, and what each one means:
 
-    python vtk_render.py b_star --kburns --style flat
-    python vtk_render.py b_star --evolve  --style smooth
-    python vtk_render.py b_star --all                       both clips in both styles
+    white -> red   the activator. This is the measurement.
+    magenta        non-finite: not a cell any more.
+    green          a cell that has just divided.
+    blue           where the SECOND field acted -- marked a cell to die, or switched its growth
+                   off. Not how much of that field there is: `traj.npz` carries one activator
+                   channel, so this is an action and a card claiming a concentration would be
+                   claiming data we do not have.
+
+See `_marks` for the two rules that are not obvious: division needs `ndiv > 0` as well as a young
+`age`, or an untouched tissue is green in its opening frames; and inhibition is drawn only where
+the activator is LOW, because it covers 4,222 of 4,232 cells in `sc_inh_soft` and painting it
+outright erases the pattern the picture is about.
+
+    python vtk_render.py b_star                  sequence 0: the turning nomesh clip, what the
+                                                 loop writes for every run
+    python vtk_render.py b_star --seq 2          evolve + kburns with the mesh, for cell questions
+    python vtk_render.py b_star --seq 3          all four, for comparing styles
 """
 import argparse
 import json
@@ -72,12 +83,22 @@ EV_FPS = 12                # the archive holds ~60 recorded frames; 12 fps makes
 # THE NAMED JOBS. A caller asks for a sequence, not for four commands, so what a run produces is one
 # number in one place and the loop and the command line cannot drift apart.
 SEQUENCES = {
+    0: [("kburns", "nomesh")],
     1: [("evolve", "mesh")],
     2: [("evolve", "mesh"), ("kburns", "mesh")],
     3: [("evolve", "nomesh"), ("kburns", "nomesh"),
         ("evolve", "mesh"), ("kburns", "mesh")],
 }
-LOOP_SEQ = 3               # what run_one asks for; see the budget note in render_all()
+# 0, NOT 3. Cedric, 12 August: *"do not write four vtk mp4 in each folder but just the
+# vtk_kburns_nomesh.mp4."* Sequence 3 was chosen when the question was WHICH style to use; that is
+# settled, and four clips a run is 15 a round and several hundred a campaign, of which three are
+# never opened. The turning nomesh clip is the one that answers "what shape is this", which is what
+# a run is looked at for.
+#
+# The other sequences stay, because they are still the right answer by hand -- `--seq 2` when the
+# question is about CELLS, `--seq 3` when two styles need comparing again -- and any of them
+# rebuilds from `traj.npz` in seconds without re-simulating.
+LOOP_SEQ = 0               # what run_one asks for
 
 
 def _cmap():
@@ -357,8 +378,9 @@ def render_all(run, seq=LOOP_SEQ, size=None, quiet=False, fill=1.0):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("run")
-    ap.add_argument("--seq", type=int, default=3, choices=sorted(SEQUENCES),
-                    help="1 = evolve+mesh; 2 = +kburns; 3 = both, without mesh then with")
+    ap.add_argument("--seq", type=int, default=LOOP_SEQ, choices=sorted(SEQUENCES),
+                    help="0 = the turning nomesh clip (default, what the loop writes); "
+                         "1 = evolve+mesh; 2 = +kburns; 3 = all four")
     ap.add_argument("--size", type=int, default=SIZE)
     ap.add_argument("--fill", type=float, default=1.0,
                     help="fraction of the frame the run's own box fills; <1 pulls the camera back")
