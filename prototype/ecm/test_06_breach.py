@@ -67,6 +67,16 @@ RUNS = {
     "tiny": dict(name="06_hole_tiny", inhib=1.0, kdeg=150.0, frames=401,
                  what="a TINY stable hole: 1.2% of the sheet, one patch, arrested. From a localised "
                       "MT1-MMP source (a 20-degree cap) rather than from a random field"),
+    "tiny_off": dict(name="06_hole_tiny_off", inhib=1.0, kdeg=150.0, frames=401,
+                     what="the tiny stable hole, 45 degrees off the view axis so its rim reads as a "
+                          "rim rather than as a disc"),
+    "smaller": dict(name="06_hole_smaller", inhib=1.0, kdeg=200.0, frames=401,
+                    what="a 15-degree source: the smallest hole this chemistry can hold, one step "
+                         "above the diffusion length that stops it"),
+    "larger": dict(name="06_hole_larger", inhib=1.0, kdeg=150.0, frames=401,
+                   what="a 30-degree source: the same hole, wider"),
+    "largest": dict(name="06_hole_largest", inhib=1.0, kdeg=150.0, frames=401,
+                    what="a 45-degree source: a hole big enough to see the lumen through"),
     "stable": dict(name="06_hole_stable", inhib=1.0, kdeg=100.0, frames=401,
                    what="one hole that stops growing, in a sheet that is otherwise kept healthy by "
                         "bm_secrete and bm_refine"),
@@ -261,7 +271,7 @@ CAM_DIR = np.array([np.cos(np.radians(18.0)) * np.cos(np.radians(30.0)),
                     np.sin(np.radians(18.0))])
 
 
-def spot_field(rig, theta_deg, peak_over_mean=2.5, floor=0.02):
+def spot_field(rig, theta_deg, off_deg=0.0, peak_over_mean=2.5, floor=0.02):
     """Replace the random MT1-MMP field with ONE Gaussian cap of angular radius `theta_deg`.
 
     WHY A SPOT AND NOT A FIELD. The sweep over `smooth_field` showed the rate sets the hole's size and
@@ -283,7 +293,16 @@ def spot_field(rig, theta_deg, peak_over_mean=2.5, floor=0.02):
     """
     uc = rig.u_epi[rig.F_epi].mean(1)
     uc = uc / uc.norm(dim=1, keepdim=True).clamp_min(1e-30)
-    d = torch.as_tensor(CAM_DIR, device=rig.dev, dtype=rig.dtype)
+    # WHERE THE SPOT SITS. On the camera axis it faces the reader squarely, which is the right place to
+    # ASK whether a hole opens and the wrong place to see its shape: a cap seen face-on is a disc, and
+    # the rim, the standoff and the epithelium showing through it are all foreshortened onto each other.
+    # `off_deg` tilts it toward screen-up, so the hole is off the axis of the view and its rim reads as
+    # a rim. It is a rotation of the SOURCE, not of the camera -- every other panel keeps its framing.
+    from ecm_render import screen_basis
+    _d, _u, _v = screen_basis(18.0, 30.0)
+    a = float(np.radians(off_deg))
+    dv = np.cos(a) * np.asarray(CAM_DIR) + np.sin(a) * np.asarray(_v)
+    d = torch.as_tensor(dv, device=rig.dev, dtype=rig.dtype)
     d = d / d.norm()
     ang = torch.arccos((uc @ d).clamp(-1.0, 1.0))
     th = float(np.radians(theta_deg))
@@ -292,7 +311,7 @@ def spot_field(rig, theta_deg, peak_over_mean=2.5, floor=0.02):
     rig.s_timp_cell = torch.full_like(rig.mt1, float(rig.s_timp))
     rig.s_pro_cell = torch.full_like(rig.mt1, float(rig.s_pro))
     frac = float((rig.mt1 > 0.5 * peak).float().mean())
-    print(f"[field] SPOT theta {theta_deg} deg: peak {float(rig.mt1.max()):.4f} "
+    print(f"[field] SPOT theta {theta_deg} deg, {off_deg} deg off the view axis: peak {float(rig.mt1.max()):.4f} "
           f"({peak_over_mean}x the published mean {rig.mt1_frac}), floor {floor}, mean "
           f"{float(rig.mt1.mean()):.4f}; {100*frac:.2f}% of cells above half the peak "
           f"({int(frac * rig.F_epi.shape[0])} of {rig.F_epi.shape[0]}); inhibitor and proMMP2 uniform",
@@ -300,7 +319,8 @@ def spot_field(rig, theta_deg, peak_over_mean=2.5, floor=0.02):
     return rig
 
 
-def build(inhib, dev, kdeg=None, refine=False, modes=6, hetero=1.0, spot=0.0, seed_mt1=3):
+def build(inhib, dev, kdeg=None, refine=False, modes=6, hetero=1.0, spot=0.0, seed_mt1=3,
+          spot_off=0.0):
     """`refine` TURNS THE TWO CLOSED GATES ON INSIDE THE PROTEASE RUN. 05m runs with max_refine 0 and no
     reseeding, so the sheet thins everywhere as the tissue stretches it and rho crosses rho_crit for a
     reason that is not the chemistry -- which is why every small hole in the k_deg sweep keeps creeping
@@ -322,19 +342,19 @@ def build(inhib, dev, kdeg=None, refine=False, modes=6, hetero=1.0, spot=0.0, se
              mt1_frac=BASE["mt1_frac"], seed_mt1=int(seed_mt1))
     rig = Rig05m(**P, **A, **S, **X)
     if spot:
-        return spot_field(rig, float(spot))
+        return spot_field(rig, float(spot), float(spot_off))
     return rig if (int(modes) == 6 and float(hetero) == 1.0) else resharpen(rig, modes, hetero)
 
 
 def probe(dev, frames, inhibs, kdegs=(None,), refine=False, modes=6, hetero=1.0,
-          spot=0.0, seed_mt1=3):
+          spot=0.0, seed_mt1=3, spot_off=0.0):
     F0 = None
     print(f"[probe] {frames} frames each, on the real driver; thresholds: hole = 3-40% torn with the "
           f"largest patch >= 60% of it, torn apart = >= 80% torn", flush=True)
     out = []
     for q in inhibs:
       for kd in kdegs:
-        rig = build(q, dev, kd, refine, modes, hetero, spot, seed_mt1)
+        rig = build(q, dev, kd, refine, modes, hetero, spot, seed_mt1, spot_off)
         if F0 is None:
             F0 = rig.sheet.Fc.cpu().numpy().copy()
         t0 = time.time()
@@ -380,7 +400,7 @@ def probe(dev, frames, inhibs, kdegs=(None,), refine=False, modes=6, hetero=1.0,
 
 # =============================================================================================
 def solve(tag, dev, frames, inhib, kdeg, refine=False, modes=6, hetero=1.0, spot=0.0,
-          seed_mt1=3, keep_n=201):
+          seed_mt1=3, spot_off=0.0, keep_n=201):
     """Run one phase point and store everything the 2x2's BM panel needs, per frame.
 
     RAGGED ON PURPOSE. The face list shrinks as the sheet tears, so faces, the field on them and the
@@ -392,7 +412,7 @@ def solve(tag, dev, frames, inhib, kdeg, refine=False, modes=6, hetero=1.0, spot
     name = cfg["name"]
     d = os.path.join(B.LOG, name)
     os.makedirs(d, exist_ok=True)
-    rig = build(inhib, dev, kdeg, refine, modes, hetero, spot, seed_mt1)
+    rig = build(inhib, dev, kdeg, refine, modes, hetero, spot, seed_mt1, spot_off)
     F0 = rig.sheet.Fc.cpu().numpy().copy()
     n_face0 = F0.shape[0]
     keep = set(np.round(np.linspace(0, frames - 1, min(frames, keep_n))).astype(int).tolist())
@@ -442,6 +462,7 @@ def solve(tag, dev, frames, inhib, kdeg, refine=False, modes=6, hetero=1.0, spot
                         F0=F0.astype(np.int32), **store)
     json.dump(dict(run=name, what=cfg["what"], frames=len(T["t"]), inhib=inhib, kdeg=kdeg,
                    refine=refine, modes=modes, hetero=hetero, spot=spot, seed_mt1=seed_mt1,
+                   spot_off=spot_off,
                    # `kdeg` and `hetero` are arguments of THIS run, not defaults: BASE carries the
                    # published values and both are swept, so spreading them here would collide with
                    # the ones actually used -- which is how this line raised rather than lying.
@@ -508,7 +529,8 @@ def main():
               [float(k) for k in arg("--kdeg", str, "").split(",")] if "--kdeg" in sys.argv
               else (None,), refine="--refine" in sys.argv,
               modes=arg("--modes", int, 6), hetero=arg("--hetero", float, 1.0),
-              spot=arg("--spot", float, 0.0), seed_mt1=arg("--seed-mt1", int, 3))
+              spot=arg("--spot", float, 0.0), seed_mt1=arg("--seed-mt1", int, 3),
+              spot_off=arg("--spot-off", float, 0.0))
         return
     tag = arg("--run", str, "hole")
     inhib = arg("--inhib", float, RUNS[tag]["inhib"])
@@ -520,7 +542,7 @@ def main():
         d, _ = solve(tag, dev, arg("--frames", int, RUNS[tag]["frames"]), inhib, kdeg,
                      refine="--refine" in sys.argv, modes=arg("--modes", int, 6),
                      hetero=arg("--hetero", float, 1.0), spot=arg("--spot", float, 0.0),
-                     seed_mt1=arg("--seed-mt1", int, 3))
+                     seed_mt1=arg("--seed-mt1", int, 3), spot_off=arg("--spot-off", float, 0.0))
     render(d, movie_frames=arg("--movie-frames", int, 200), fps=arg("--fps", int, 20),
            movie="--no-movie" not in sys.argv)
     print(f"[06b] -> {d}", flush=True)

@@ -328,7 +328,152 @@ as a field.}
 
 
 
-\subsection*{Proteolysis, and the mechanism the literature forced}
+\subsection*{3.2\; The four species, written out}
+
+\textbf{This is the level the model actually reaches, so it is worth writing without abbreviation.}
+Everything above this point is mechanics: a surface with a strain energy, an adhesion with a rest
+length, a tissue that grows. Proteolysis is the first place the model is a \emph{chemistry} --- five
+molecular species, four of them proteins that the literature names, with concentrations that obey
+transport equations and a rate law taken from an assay rather than fitted to a picture. The claim
+being made by writing them out is a specific one: the breach in these runs is not a hole painted onto
+a mesh, it is the consequence of \emph{molecules being made, moving, binding one another, and cutting
+collagen~IV}, and every symbol below has a counterpart in a paper.
+
+\smallskip
+{\footnotesize
+\begin{tabular}{@{}lllll@{}}\toprule
+symbol & species & UniProt / EC & where it lives & transported?\\\midrule
+$T$      & MT1-MMP (MMP-14)   & P50281 & per-\code{cell} state, mapped to \code{bm\_face} & \textbf{no} --- transmembrane\\
+$c_P$    & proMMP-2, zymogen  & P08253 & \textbf{field} on \code{bm\_face} & yes, $D_M$\\
+$c_M$    & MMP-2, active      & EC 3.4.24.24 & \textbf{field} on \code{bm\_face} & yes, $D_M$\\
+$c_T$    & TIMP-2             & P16035 & \textbf{field} on \code{bm\_face} & yes, $D_T$\\
+$c_3$    & TIMP-3             & P35625 & per-\code{bm\_face} state & \textbf{no} --- ECM-bound\\
+\bottomrule\end{tabular}}
+\smallskip
+
+\textbf{The four equations.} All are written on the sheet's own surface, so $\nabla_s^2$ is the
+Laplace--Beltrami operator of the current \emph{deformed} triangulation and not of a flat chart; $s_P$,
+$s_T$, $s_3$ and $T$ are per-cell fields carried onto the faces each cell touches, so the epithelium
+decides where its enzymes go. Writing $x=(c_T+c_3)/K$ for the inhibitor's occupancy of the tethered
+enzyme:
+%
+\begin{align}
+\frac{\partial c_P}{\partial t}
+  &= \underbrace{D_M\nabla_s^2 c_P}_{\text{diffusion}}
+   + \underbrace{s_P(\mathbf x)}_{\text{secretion}}
+   - \underbrace{a(\mathbf x,t)}_{\text{activation}}
+   - \underbrace{c_P/\tau_P}_{\text{clearance}} \label{eq:pro}\\[2pt]
+\frac{\partial c_M}{\partial t}
+  &= D_M\nabla_s^2 c_M
+   + a(\mathbf x,t)
+   - \underbrace{k_i\,c_M\,(c_T+c_3)}_{\text{1:1 inhibition}}
+   - c_M/\tau_M \label{eq:mmp}\\[2pt]
+\frac{\partial c_T}{\partial t}
+  &= D_T\nabla_s^2 c_T + s_T(\mathbf x) - k_i\,c_M\,(c_T+c_3) - c_T/\tau_T \label{eq:timp}\\[2pt]
+\frac{\partial c_3}{\partial t}
+  &= \phantom{D_T\nabla_s^2 c_T +{}} s_3(\mathbf x) - c_3/\tau_3
+   \qquad\text{\emph{no diffusion term, and that is the whole point of it}} \label{eq:timp3}
+\end{align}
+%
+with the activation rate --- the ternary mechanism of \S\,``TIMP-2 is the adaptor'' --- carrying one
+\emph{occupied} and one \emph{free} MT1-MMP:
+%
+\begin{equation}
+a \;=\; \min\!\Bigl(\,k_{\rm act}\,T^2\,c_P\,\frac{x}{(1+x)^2}\,,\;\frac{c_P}{\Delta t}\Bigr),
+\qquad x=\frac{c_T+c_3}{K},
+\label{eq:act}
+\end{equation}
+%
+the clamp being the statement that a frame cannot activate more zymogen than it has. MT1-MMP has no
+equation of its own because it has no transport and no turnover here: $T(\mathbf x)$ is a per-cell
+state, set once and carried, which is exactly the modelling claim that a \emph{tethered} enzyme acts
+where its cell put it.
+
+\textbf{And the sheet is what they eat.} The two proteolytic arms --- soluble and tethered --- act on
+the areal mass of a face, and a face is removed when its density falls through a critical fraction of
+the seeded value:
+%
+\begin{equation}
+\frac{\partial m}{\partial t} = -\,k_{\rm deg}\bigl(c_M + s_{\rm MT1}\,T\bigr)\,m,
+\qquad
+\rho = \frac{m}{A},\qquad
+\text{face dies when }\ \rho/\rho_0 < \rho_{\rm crit}.
+\label{eq:degrade}
+\end{equation}
+%
+Eq.~\eqref{eq:degrade} is first-order in $m$, so mass decays exponentially under a steady enzyme and
+never goes negative; the discontinuity --- the \emph{hole} --- enters only through $\rho_{\rm crit}$,
+which is a material failure threshold and not a chemical one.
+
+\textbf{Two numbers decide whether any of this is resolvable, and one of them currently fails.} A
+reaction--diffusion field acquires a length $\sqrt{D/k}$, and that length has to be larger than the
+element it is solved on. Measured on the sheet at the published rates, $\sqrt{D/k}=0.05$ against an
+element size $h=0.076$: the chemistry's own length is \emph{below} the mesh, which is gate G42's
+failure and not a tuning matter. It has a visible consequence in \op{06}: an MT1 source narrower than
+about $20^\circ$ of arc tears nothing at all, because a spot smaller than $\sqrt{D/k}$ cannot hold a
+concentration against diffusion. \emph{The smallest hole this model can open is set by a diffusion
+length, not by a parameter.}
+
+\textbf{The numerics, and why only one of these operators is expensive.} Explicit diffusion needs
+$\Delta t\,D/h^2<\tfrac12$ --- $1{,}300$--$13{,}400$ substeps per frame at these $D$, quadrupling at
+every $1\!\to\!4$ refinement --- so Eqs.~\eqref{eq:pro}--\eqref{eq:timp} are stepped semi-implicitly,
+$(\mathbf I+\Delta t\,D\,\mathbf L)\,c = c_{\rm old}$, by conjugate gradient on a finite-volume face
+Laplacian with cotangent weights and face areas. That is unconditionally stable, one solve per frame,
+and indifferent to $h$. Eq.~\eqref{eq:timp3} needs no solve at all, which is the computational shadow
+of its biology: TIMP-3 is bound to the matrix, so it is a state and not a field.
+
+\textbf{Three honest defects in the discretisation, none of them cosmetic.} (i) In the inhibition
+reaction the immobile $c_3$ enters the rate but is not consumed by it --- only $c_M$ and $c_T$ are
+decremented --- so TIMP-3 acts as a non-depleting site; that is defensible for a matrix-bound
+inhibitor in excess and it is \emph{not} what Eq.~\eqref{eq:timp} says, which is why it is written
+here. (ii) The reaction is clamped against $c_M$ alone, so $c_T$ can be driven negative within a frame
+and is clipped at zero afterwards: the pair is not conserved at large $k_i\Delta t$. (iii) The
+per-frame operator splitting (secrete, diffuse, activate, inhibit, clear) is first-order, so all rates
+are per \emph{frame} and the box carries no seconds --- $D$ is converted once from $\mu$m$^2$/s
+through the run's declared \code{units:}, and no result may be quoted in seconds without it.
+
+\subsection*{3.3\; Myosin is an ODE, and saying so is the point}
+
+The tissue's contractility is written per \emph{junction}, and it is worth being exact about its
+mathematical type because the temptation is to call everything a PDE. Myosin here has \textbf{no
+spatial operator}: there is no $\nabla^2$, no flux between neighbouring junctions, and therefore no
+length scale of its own. It is a first-order relaxation toward a mechanically-set point,
+%
+\begin{equation}
+\frac{\mathrm d\,\mathrm{myo}_e}{\mathrm dt}
+  = \frac{1}{\tau}\Bigl(\mathrm{myo}^{\rm ss}_e - \mathrm{myo}_e\Bigr),
+\qquad
+\mathrm{myo}^{\rm ss}_e = \alpha\Bigl[\,1 + \sigma\beta\Bigl(\frac{g_e}{\langle g\rangle}-1\Bigr)\Bigr]_+,
+\qquad \mathrm{myo}_e\in[0,5],
+\label{eq:myosin}
+\end{equation}
+%
+one equation per live junction $e$, where $\alpha$ is the global activity (the in-silico
+blebbistatin), $\tau$ the recruitment time, $g_e$ the drive --- edge length, line tension
+$\Lambda\,\mathrm{myo}_e\,\ell_e$, or strain rate, chosen by \code{keyed\_on} --- and $\langle
+g\rangle$ its \emph{current} mean over live junctions. The sign $\sigma=+1$ is the destabilising
+choice: on a tension-keyed drive it is positive feedback, tauter $\to$ more myosin $\to$ tauter, which
+is the germband instability and raises the T1 rate; $\sigma=-1$ is tension homeostasis and is kept as
+the contrast.
+
+Three details in Eq.~\eqref{eq:myosin} are load-bearing. The reference $\langle g\rangle$ is the
+running mean and not a constant, because the tissue triples in radius and a fixed reference would call
+every junction ``stretched'' by the end --- myosin would then rise everywhere for a reason that is
+growth rather than tension. The activity $\alpha$ multiplies the \emph{set point} rather than the
+tension, so inhibition takes effect over $\tau$ the way a drug does instead of instantly. And the
+state is keyed to the junction's identity, so it survives a T1, a division and a cell death by
+construction rather than by bookkeeping: junctions that no longer exist are simply not written back.
+
+\textbf{So the model reaches the molecule in two different senses, and they are not equally strong.}
+The proteases are a genuine reaction--diffusion system on the deformed surface, with named species,
+measured dissociation constants and a rate law that predicts a bell rather than reproducing one.
+Myosin is a lumped per-junction activity with a mechanosensitive set point --- the right level for a
+vertex model, and one equation short of a molecular one, since it has no explicit motor binding, no
+phosphorylation state and no spatial transport. Both are written here at the same level of detail so
+the difference is visible instead of implied.
+
+
+\subsection*{3.4\; Proteolysis, and the mechanism the literature forced}
 
 \textbf{What the proteases are for, before any of their own chemistry.} Everything up to
 here builds a barrier: a sheet that carries load, holds its density, and stays attached. The proteases
@@ -370,7 +515,7 @@ hundredfold range returned \emph{identically} $317$ dead at every point, because
 cut had been set $350\times$ larger than anything the soluble arm could contribute --- the sweep axis
 had no effect on the answer, and the holes were the source stencil in every case.
 
-\subsection*{TIMP-2 is the adaptor as well as the inhibitor, and that predicts a bell}
+\subsection*{3.5\; TIMP-2 is the adaptor as well as the inhibitor, and that predicts a bell}
 
 The pure-inhibitor law of \op{05g} is half of the mechanism. In the canonical model
 \cite{karagiannis2004} TIMP-2 is the \emph{bridging adaptor} that makes activation possible: its
