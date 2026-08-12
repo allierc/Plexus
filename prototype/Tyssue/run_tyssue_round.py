@@ -638,7 +638,12 @@ def _cross_screen(ax, pos, mesh, act, seed_dir=None, inner=0.82, Lbox=None):
         for i in range(len(aps)):
             j = (i + 1) % len(aps)
             ax.add_patch(MplPoly(np.array([bas[i], aps[i], aps[j], bas[j]]), closed=True,
-                                 facecolor=cols[i], edgecolor="black", lw=0.4, zorder=1))
+                                 # SAME STROKE DECISION AS THE 3D VIEW, scaled by the same factor
+                                 # (0.4 -> 0.13, as 0.25 -> 0.08). This inset draws one RING of
+                                 # cells, and at 12,000 cells that ring is a few hundred quads
+                                 # around a small axes -- exactly the density where a fixed-width
+                                 # black outline stops separating cells and starts filling them.
+                                 facecolor=cols[i], edgecolor="black", lw=0.13, zorder=1))
     L = Lbox if Lbox is not None else 11.0
     ax.set_xlim(-L, L); ax.set_ylim(-L, L); ax.set_aspect("equal"); ax.axis("off")
 

@@ -57,9 +57,9 @@ CAM = dict(elev=18, azim=30)
 # montage tile is ~190 px wide and a 3d.png is 770, so a stroke that is invisible in one swallows
 # the cell in the other. Choose by looking at BOTH rows of a column, not at one panel.
 CHOICES = [
-    ("black 0.25 pt   CURRENT", dict(edge="black", edge_lw=0.25)),
+    ("black 0.25 pt   was the default until 12 Aug", dict(edge="black", edge_lw=0.25)),
     ("black 0.15 pt", dict(edge="black", edge_lw=0.15)),
-    ("black 0.08 pt", dict(edge="black", edge_lw=0.08)),
+    ("black 0.08 pt   CHOSEN -- run_tyssue_vesicle.EDGE_LW", dict(edge="black", edge_lw=0.08)),
     ("shaded x0.45, 0.25 pt", dict(edge="shaded", edge_lw=0.25, edge_shade=0.45)),
     ("shaded x0.45, 0.10 pt", dict(edge="shaded", edge_lw=0.10, edge_shade=0.45)),
     ("shaded x0.70, 0.25 pt", dict(edge="shaded", edge_lw=0.25, edge_shade=0.70)),
@@ -67,8 +67,8 @@ CHOICES = [
 ]
 # The four candidates. `black` is what every figure in this project has used; the rest differ from
 # it in the stroke ALONE, so any change between panels is the stroke and nothing else.
-STYLES = [("black 0.25 pt  (current)", dict(edge="black", edge_lw=0.25)),
-          ("black 0.08 pt", dict(edge="black", edge_lw=0.08)),
+STYLES = [("black 0.25 pt  (the old default)", dict(edge="black", edge_lw=0.25)),
+          ("black 0.08 pt  (chosen)", dict(edge="black", edge_lw=0.08)),
           ("shaded  (edge = face x 0.45)", dict(edge="shaded", edge_lw=0.25)),
           ("no stroke", dict(edge="none"))]
 ASPECT_MULT = 3.0                    # the same threshold apoptosis_3d field_high uses

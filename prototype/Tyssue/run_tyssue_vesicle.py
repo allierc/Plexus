@@ -102,6 +102,21 @@ def _mesh_from_build(n_cells=NCELLS):
 
 INNER = 0.82                                                    # basal radius fraction (thin monolayer wall)
 
+# THE CELL STROKE, AND WHY IT IS 0.08 AND NOT 0.25.
+#
+# It was 0.25 pt for the life of this project and that is wide enough to swallow a cell. A point is
+# a fixed length on the PAGE while a cell's projected area is not: 12,272 cells over a 7-inch
+# figure puts a cell at a few pixels across, and where a surface turns edge-on the projection
+# collapses further while the stroke does not. Measured on b_star, whose tissue is WHITE: mean
+# luminance of the body 100 of 255 at 0.25 pt against 148 at 0.08 -- so about half of what read as
+# "dark cells" was the outline averaged into them, and it read convincingly as a field of sliver
+# cells. The genuinely elongated cells on that specimen are 24 of 12,272.
+#
+# Cedric chose 0.08 black on 12 August from a seven-candidate sheet drawn at both the montage-tile
+# and the detail scale. ONE NUMBER, HERE, so every picture the project makes agrees: _draw is the
+# single renderer behind 3d.png, strip.png, movie.mp4, kburns.mp4, the montages and the figures.
+EDGE_LW = 0.08
+
 
 # MARKED TO DIE. Blue is the one hue left: white->red is the activator ramp, green is
 # just-divided and magenta is the broken alarm. Blended at the same strength as the green so a
@@ -117,7 +132,7 @@ C_INHIB, INHIB_ALPHA = (0.10, 0.70, 0.70), 0.65
 
 def _draw(ax, pos, mesh, p0, azim, act=None, inner=INNER, Lbox=None,
           divided=None, broken=None, wall_shade=1.0, classes=None, dying=None, inhib=None,
-          edge="black", edge_lw=0.25, edge_shade=0.45):
+          edge="black", edge_lw=EDGE_LW, edge_shade=0.45):
     """3D monolayer: each cell is a prism -- an apical face (outer), a basal face (inner), and lateral
     walls. Cells are coloured by ACTIVATION with the Turing white->red LUT (activation 0 -> white).
 
@@ -219,8 +234,9 @@ def _draw(ax, pos, mesh, p0, azim, act=None, inner=INNER, Lbox=None,
     # 24 of 12,272, in the far tail at aspect 15-60; the dark patches are thousands of ordinary
     # cells drawn too small.
     #
-    #   black     what every picture in this project has used. Kept as the default so no archived
-    #             figure changes meaning, and because at low cell counts it is the clearest.
+    #   black     the default, at EDGE_LW. Chosen 12 August over `shaded` and over no stroke, on a
+    #             seven-candidate sheet rendered at both the tile and the detail scale
+    #             (log/okuda/b_star/viz_options.png, discovery_okuda/edge_test.py --choose).
     #   shaded    the edge is the face colour darkened, so a boundary still separates two cells but
     #             a dense patch tends to the tissue's own colour instead of to black. The cell
     #             outlines survive where they are resolvable and dissolve where they are not, which
@@ -266,7 +282,8 @@ def _draw_cross(ax, pos, mesh, p0, level=0.0, act=None, inner=INNER, Lbox=None, 
         for i in range(len(ap)):                               # one filled quad per cell (white), edged black
             j = (i + 1) % len(ap)
             ax.add_patch(MplPoly(np.array([ba[i], ap[i], ap[j], ba[j]]), closed=True,
-                                 facecolor="white", edgecolor="black", lw=0.5, zorder=1))
+                                 # same decision as the 3D stroke above, scaled alike
+                                 facecolor="white", edgecolor="black", lw=0.16, zorder=1))
     L = Lbox if Lbox is not None else RADIUS * 2.1             # box so the section renders to scale with the 3D view
     ax.set_xlim(-L, L); ax.set_ylim(-L, L); ax.set_aspect("equal"); ax.axis("off")
 
