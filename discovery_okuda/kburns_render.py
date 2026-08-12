@@ -55,7 +55,7 @@ import matplotlib.pyplot as plt                                      # noqa: E40
 from matplotlib.animation import FFMpegWriter                        # noqa: E402
 
 from run_one import _scalebar, run_box                               # noqa: E402
-from run_tyssue_vesicle import _draw                                 # noqa: E402
+from run_tyssue_vesicle import _draw, EDGE_LW                        # noqa: E402
 
 OUT = "kburns.mp4"
 
@@ -110,7 +110,7 @@ def colour(act, mt):
 
 
 def kburns(name, run_dir, seconds=SECONDS, fps=25, zoom=0.55, dpi=110,
-           edge="black", edge_lw=0.25, edge_shade=0.45, out=OUT):
+           edge="black", edge_lw=EDGE_LW, edge_shade=0.45, out=OUT):
     fr = last_frame(run_dir)
     if fr is None:
         return "no traj.npz"
@@ -164,11 +164,11 @@ def main():
     ap.add_argument("--fps", type=int, default=25)
     ap.add_argument("--zoom", type=float, default=0.55, help="final box as a fraction of the run's")
     ap.add_argument("--force", action="store_true")
-    # THE STROKE, AS AN ARGUMENT. Measured on b_star's option sheet: the default black 0.25 pt
-    # leaves the body at mean luminance 100 of 255 on a WHITE tissue, because a fixed-width stroke
-    # around a few-pixel cell is most of the cell. See discovery_okuda/edge_test.py --choose.
+    # THE STROKE, AS AN ARGUMENT, defaulting to the renderer's own EDGE_LW so this cannot drift
+    # from what every other picture uses. The number was chosen on the option sheet in
+    # log/okuda/b_star/viz_options.png; see edge_test.py --choose and run_tyssue_vesicle.EDGE_LW.
     ap.add_argument("--edge", default="black", choices=["black", "shaded", "none"])
-    ap.add_argument("--edge-lw", type=float, default=0.25)
+    ap.add_argument("--edge-lw", type=float, default=EDGE_LW)
     ap.add_argument("--edge-shade", type=float, default=0.45)
     ap.add_argument("--out", default=OUT, help="filename, so two stroke settings can coexist")
     a = ap.parse_args()

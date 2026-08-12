@@ -35,7 +35,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt                                       # noqa: E402
 
 from run_one import _scalebar, run_box                                # noqa: E402
-from run_tyssue_vesicle import _draw                                  # noqa: E402
+from run_tyssue_vesicle import _draw, EDGE_LW                         # noqa: E402
 
 CAM = dict(elev=18, azim=30)
 
@@ -96,7 +96,7 @@ def main():
     ap.add_argument("patterns", nargs="*", default=["b_star*"])
     ap.add_argument("--tag", required=True, help="written as 3d_<tag>.png")
     ap.add_argument("--edge", default="black", choices=["black", "shaded", "none"])
-    ap.add_argument("--edge-lw", type=float, default=0.08)
+    ap.add_argument("--edge-lw", type=float, default=EDGE_LW)
     ap.add_argument("--edge-shade", type=float, default=0.45)
     ap.add_argument("--force", action="store_true")
     a = ap.parse_args()

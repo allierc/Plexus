@@ -161,7 +161,13 @@ def main():
     LW = max(2, int(2 * k))
     cw = TILE + 2 * PAD
     rh = TILE + LAB + GAP
-    W, H = int(ncol * cw), int((depth + 1) * rh + PAD)
+    # A HEADER, BECAUSE THE ROWS DO NOT MEAN WHAT THEY LOOK LIKE. Cedric, reading the first
+    # version: *"r017 r018 r019 r020 cannot be on the same row??"* They can, and they are: a row is
+    # EDIT DISTANCE from the root, not time. r016_03 was still a parent in r017, r018, r019 and
+    # r020, so its children carry four different round numbers and are all one edit away. A picture
+    # whose axis has to be explained in conversation is a picture that should say it itself.
+    HEAD = int(46 * k)
+    W, H = int(ncol * cw), int((depth + 1) * rh + PAD + HEAD)
     sheet = Image.new("RGB", (W, H), BG)
     dr = ImageDraw.Draw(sheet)
     f_name, f_edit = _font(int(13 * k)), _font(int(12 * k))
@@ -170,7 +176,7 @@ def main():
         return int(xs[n] * cw + cw / 2)
 
     def top_of(d):
-        return int(d * rh + PAD)
+        return int(d * rh + PAD + HEAD)
 
     # CONNECTORS FIRST, so the tiles are drawn over them and no line crosses a specimen.
     for n, d in order:
@@ -185,6 +191,19 @@ def main():
             dr.line([(cx_of(ch[0]), ym), (cx_of(ch[-1]), ym)], fill=LINE, width=LW)
         for c in ch:
             dr.line([(cx_of(c), ym), (cx_of(c), y1)], fill=LINE, width=LW)
+
+    f_head = _font(int(17 * k))
+    spread = {}
+    for n, _d in order:
+        for c in kids.get(n, []):
+            spread.setdefault(n, set()).add(c.split("_")[0])
+    worst = max(spread.items(), key=lambda kv: len(kv[1])) if spread else (None, set())
+    note = (f"rows are GENERATIONS -- edits from {a.root} -- NOT rounds.")
+    if worst[0] and len(worst[1]) > 1:
+        note += (f"   {worst[0]} was a parent in {', '.join(sorted(worst[1]))}, "
+                 f"so its {len(kids[worst[0]])} children share a row across "
+                 f"{len(worst[1])} rounds.")
+    dr.text((int(10 * k), int(12 * k)), note, fill=FG, font=f_head)
 
     drawn = 0
     for n, d in order:
