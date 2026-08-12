@@ -59,6 +59,9 @@ GPU = os.environ.get("PG_GPU", "1")              # gpu_l4 REJECTS jobs without -
 # latency is not a courtesy.
 PARALLEL = int(os.environ.get("PG_PARALLEL", "12"))
 PREFIX = "pg_"                                   # job-name prefix; all queue ops filter on it
+# Comma-separated hosts to keep jobs off. See the note in `_bsub_cmd`; empty is the normal state.
+EXCLUDE_HOSTS = [h.strip() for h in os.environ.get("PG_EXCLUDE_HOSTS", "e11u12").split(",")
+                 if h.strip()]
 
 
 # =============================================================================================
@@ -200,8 +203,18 @@ def _bsub_cmd(name, frames, do_q, campaign, rerender=False):
     out = cpath(os.path.join(LOGDIR, f"{name}{tag}.out"))
     err = out[:-4] + ".err"
     gpu = "-gpu num=1 " if GPU != "0" else ""
+    # HOSTS TO AVOID. `e11u12` was diagnosed on 12 August: nvidia-smi sees a healthy idle L4 with
+    # 23 GB free while torch reports `count=0` and CUDA context creation dies with
+    # `cudaErrorUnknown`, and the card's uncorrected volatile ECC count was CLIMBING between
+    # queries (0 -> 885,793 -> 885,810 over a few minutes). Twelve of sixteen jobs in one round
+    # landed there and died in nine seconds each; the four that landed elsewhere ran normally.
+    #
+    # This is a bandage over someone else's hardware and it is written to be removed: one name in
+    # `PG_EXCLUDE_HOSTS`, so the day the node is reset the exclusion goes away without touching
+    # this file, and until then the campaign stops spending slots on nine-second failures.
+    excl = "".join(f'-R "hname!={h}" ' for h in EXCLUDE_HOSTS if h)
     # do NOT `source` the LSF profile -- it hangs a non-interactive ssh; bsub is already on PATH
-    return (f"cd {cpath(HERE)} && bsub -n {NCPUS} {gpu}-q {QUEUE} -W {WALL} "
+    return (f"cd {cpath(HERE)} && bsub -n {NCPUS} {gpu}{excl}-q {QUEUE} -W {WALL} "
             f"-J {PREFIX}{(rerender + '_') if isinstance(rerender, str) else ('rr_' if rerender else '')}{name} -o {out} -e {err} "
             f"bash -l {cpath(script)}")
 
