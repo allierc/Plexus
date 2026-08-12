@@ -376,7 +376,7 @@ def _unread(spec):
     try:
         import plexus.operators                                          # noqa: F401
         import tyssue_ops3d, tyssue_rd_ops, tyssue_monolayer             # noqa: F401
-        import tyssue_shape_to_chem, tyssue_t1_ops3d                     # noqa: F401
+        import tyssue_shape_to_chem, tyssue_t1_ops3d, tyssue_cell_shape  # noqa: F401
         from op_probe import unread_params
     except Exception as e:
         return [f"(unread check unavailable: {type(e).__name__})"]

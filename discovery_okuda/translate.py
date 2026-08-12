@@ -165,6 +165,11 @@ SCHEDULE_ORDER = [
     # has sentenced, and the relaxation then sees both -- so a cell extruded this tick has its hole
     # closed this tick instead of leaving a raw gap for one frame. This is the order the dedicated
     # geometry tests certify (make_apop_geo.py: euler 2 at every frame, n_apop exactly the loss).
+    # THE PROBE RUNS IMMEDIATELY BEFORE DEATH, and the order is the mechanism. It measures the
+    # geometry the LAST relaxation produced, and `apoptosis_3d` reads what it published in the same
+    # tick; put it after the mechanics and death would be marking cells on a frame-old shape, which
+    # for a quantity that changes as fast as elongation is not the same experiment.
+    "cell_shape_probe",
     "grow_3d", "apoptosis_3d", "shape_energy_3d", "interface_line_tension_3d",
     "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d",
 ]
@@ -183,6 +188,7 @@ ENGINE_NAME = {
     "cell_react": "cell_react",
     "seed_cell_rd": "seed_cell_rd",
     "shape_to_chem": "shape_to_chem",
+    "cell_shape_probe": "cell_shape_probe",
     "interface_line_tension_3d": "interface_line_tension_3d",
 }
 
@@ -388,6 +394,12 @@ EMIT = {
         "op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": float(_p(g, n["id"], "l_th_frac")) * 7.0,
         "every": 1, "max_flips": 300},                          # D1
     "cell_geometry_3d": lambda g, n, ga: {"op": "cell_geometry_3d", "at": "cell"},
+    # THE `model` IS THE DESCRIPTOR AND THE `field` IS THE WIRE. Both are emitted: the model
+    # decides what is measured (shape index or ring aspect) and the field name is what a Die
+    # operator asks for. `elong` here and `field: elong` on apoptosis_3d is the entire coupling.
+    "cell_shape_probe": lambda g, n, ga: {
+        "op": "cell_shape_probe", "at": "cell", "vertex_set": "vertex",
+        "model": g.impl_of(n), "field": "elong"},
     "cell_adjacency": lambda g, n, ga: {"op": "cell_adjacency", "at": "cell"},
     # `implementation` MUST be emitted. Without it the spec silently runs the default
     # (graph_laplacian) while the composition hash records `interface_weighted` -- so the search

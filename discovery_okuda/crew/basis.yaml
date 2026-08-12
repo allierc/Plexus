@@ -164,6 +164,39 @@ members:
      set: {shape_energy_3d.K_V: 80.0, cell_react.rate: 0.5,
            seed_cell_rd.mode: cones, seed_cell_rd.n_spots: 6, seed_cell_rd.cone_deg: 8.0}}
 
+  # --- THE FLOWER. Cedric, 12 August, on `r016_01`: *"amazing like a flower."* Five BROAD ROUNDED
+  #     petals with red rims around a central crater -- and that is a different object from the
+  #     star, not a better one. The star makes thin arms; this makes wide flat lobes, and it holds
+  #     the campaign's deepest invagination (0.684) at 22,231 cells with only 2 tubes. Two
+  #     morphologies from one lineage, separated by three chemistry numbers.
+  #
+  #     THE THREE EDITS FROM `b_star`, in the order the campaign found them: kk 0.031 (r014_04)
+  #     moves Gray-Scott along Pearson's kill axis, rate 0.25 (r015_06) halves the reaction again
+  #     on top of the star's own halving -- so the pattern is four times slower than the basis --
+  #     and F0 0.023 (r016_01) halves the shape->chemistry feed. Slower chemistry against the same
+  #     near-incompressible mechanics: the spots have time to broaden before the sheet buckles, so
+  #     each one lifts a petal instead of pulling an arm.
+  - {name: b_flower,          chem: gs, mat: gated, mech: shaping, gate: soft, drive: lo,
+     set: {shape_energy_3d.K_V: 80.0, cell_react.rate: 0.25, cell_react.kk: 0.031,
+           shape_to_chem.F0: 0.023}}
+  # THE THREE VARIANTS, one per operator family, each asking whether the flower is CONTROLLABLE
+  # rather than whether it is better -- a shape you cannot steer is a specimen, not a mechanism.
+  #   Die     does removing cells deepen the crater, or collapse the petals?
+  #   Divide  oriented division turned nothing on the star (10 tubes against 9); on broad petals
+  #           it has an axis to align to that thin arms did not give it.
+  #   Seed    six cones gave the star exactly six arms. If it gives the flower six petals, petal
+  #           number is a controlled variable and the flower is a mechanism.
+  - {name: b_flower_death,    chem: gs, mat: gated, mech: shaping, gate: soft, drive: lo, death: true,
+     set: {shape_energy_3d.K_V: 80.0, cell_react.rate: 0.25, cell_react.kk: 0.031,
+           shape_to_chem.F0: 0.023}}
+  - {name: b_flower_oriented, chem: gs, mat: gated, mech: shaping, gate: soft, drive: lo,
+     set: {shape_energy_3d.K_V: 80.0, cell_react.rate: 0.25, cell_react.kk: 0.031,
+           shape_to_chem.F0: 0.023, divide_3d.orient_iface: true, divide_3d.orient_asw: 0.6}}
+  - {name: b_flower_cones,    chem: gs, mat: gated, mech: shaping, gate: soft, drive: lo,
+     set: {shape_energy_3d.K_V: 80.0, cell_react.rate: 0.25, cell_react.kk: 0.031,
+           shape_to_chem.F0: 0.023, seed_cell_rd.mode: cones, seed_cell_rd.n_spots: 6,
+           seed_cell_rd.cone_deg: 8.0}}
+
   # --- the brusselator QUESTION: one base, carrying the gamma ladder. Not a column.
   #     WITHDRAWN 10 August, un-run: it was still going at 80 minutes when the rest of the basis
   #     had finished, and was killed so the campaign could start. That is itself a measurement --
