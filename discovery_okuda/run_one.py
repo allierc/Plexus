@@ -57,8 +57,19 @@ LOG_DIR = os.path.join(ROOT, "log", "okuda")
 ARCHIVE = os.path.join(HERE, "_archive")
 
 
-def _scalebar(ax, Lbox, color="w", frac=0.25):
+# OFF BY DEFAULT, ON BY REQUEST. The bar earns its place in a figure and gets in the way of a
+# gallery clip, where the page writes the caption and the frame should carry no printing at all --
+# every card on the minisite is cropped to remove it. A module flag rather than an argument
+# threaded through nine call sites: `_scalebar` is called from run_one, kburns_render, restyle3d
+# and edge_test, and the question "does this picture carry a bar" is a property of the RUN, not of
+# each axes. Set it with `--scalebar` on any of those entry points, or `run_one.SCALEBAR = True`.
+SCALEBAR = False
+
+
+def _scalebar(ax, Lbox, color="w", frac=0.25, on=None):
     """A scale bar in the bottom-left, with the world length written on it.
+
+    Drawn only when `on` -- or, if `on` is None, the module's `SCALEBAR` -- is true.
 
     Cedric, 8 August: "the mp4 should have a scale bar bottom left with a number, and the eye
     agent should be aware of the scale bar through passing the camera zoom value."
@@ -78,6 +89,8 @@ def _scalebar(ax, Lbox, color="w", frac=0.25):
     It is a scale bar, not a caliper -- and a few percent is the difference between reading 53,000
     cells and reading 2,000.
     """
+    if not (SCALEBAR if on is None else on):
+        return
     span = 2.0 * float(Lbox)
     # a round number near `frac` of the view, so the label reads 1 / 2 / 5 x 10^n
     raw = span * frac

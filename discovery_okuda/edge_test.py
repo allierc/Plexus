@@ -162,7 +162,11 @@ def main():
     ap.add_argument("--zoom", type=float, default=0.42, help="detail box as a fraction of the full")
     ap.add_argument("--choose", action="store_true",
                     help="write <run>/viz_options.png -- the candidate strokes, to pick from")
+    ap.add_argument("--scalebar", action="store_true",
+                    help="draw the scale bar (off by default: a gallery clip carries no "
+                         "printing, and every card on the site crops it away)")
     a = ap.parse_args()
+    import run_one as _ro; _ro.SCALEBAR = a.scalebar
 
     if a.choose:
         return choose(a.run, a.zoom)
