@@ -147,7 +147,7 @@ biological organization. Rewire modifies the interaction graph, whereas Divide a
 Die modify the biological entities themselves. Together they form the elementary
 computational vocabulary of Plexus.
 
-![The elementary operator algebra of Plexus. Lateral, Aggregate, Broadcast and Exchange transform biological state. Rewire modifies biological relations, whereas Divide and Die modify biological entities. Complex biological models are obtained by composing these elementary operator families.](figures/fig_ops.png){width=100% fig-align="center"}
+![](figures/fig_ops.png){width=100% fig-align="center"}
 
 **Lateral.** Lateral operators describe interactions between entities belonging to
 the same set. Typical examples include mechanical forces between particles, adhesion
