@@ -221,7 +221,7 @@ def panels_concat(src, dst, panels, skip_top=0.0, skip_bot=0.0, pad=1.16):
         sys.exit(f"ffmpeg panels+concat failed for {dst}")
 
 
-def vtk_sequence(run_dir, dst, side=460, kb_seconds=5.0, crop=24):
+def vtk_sequence(run_dir, dst, side=460, kb_seconds=5.0, crop=24, kinds=("evolve", "kburns")):
     """The VTK sequence as one clip: without the mesh, then with it, each grown then turned.
 
     FOUR MOVEMENTS, ONE CARD. `vtk_render --seq 3` writes evolve/kburns x nomesh/mesh. Played in
@@ -239,7 +239,9 @@ def vtk_sequence(run_dir, dst, side=460, kb_seconds=5.0, crop=24):
     which is the price of not having a run name burnt into a gallery card.
     """
     ff = _exe("ffmpeg")
-    parts = [("evolve", "nomesh"), ("kburns", "nomesh"), ("evolve", "mesh"), ("kburns", "mesh")]
+    # `kinds` drops a movement for the runs that do not need it: a turntable earns its place on a
+    # shape with arms pointing at the lens, and adds nothing to a sphere that shrinks.
+    parts = [(k, st) for st in ("nomesh", "mesh") for k in ("evolve", "kburns") if k in kinds]
     srcs = [os.path.join(run_dir, f"vtk_{k}_{st}.mp4") for k, st in parts]
     missing = [os.path.basename(p) for p in srcs if not os.path.exists(p)]
     if missing:
@@ -263,12 +265,13 @@ def vtk_sequence(run_dir, dst, side=460, kb_seconds=5.0, crop=24):
     cmd = [ff, "-y", "-loglevel", "error"]
     for src in srcs:
         cmd += ["-i", src]
-    cmd += ["-filter_complex", ";".join(fc) + ";" + "".join(labels) + "concat=n=4:v=1[o]",
+    cmd += ["-filter_complex",
+            ";".join(fc) + ";" + "".join(labels) + f"concat=n={len(parts)}:v=1[o]",
             "-map", "[o]", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "26",
             "-movflags", "+faststart", dst]
     if subprocess.call(cmd) != 0 or not os.path.exists(dst):
         sys.exit(f"ffmpeg vtk sequence failed for {dst}")
-    print(f"[minisite]   {os.path.basename(run_dir)}: 4 VTK clips -> {side}x{side}, "
+    print(f"[minisite]   {os.path.basename(run_dir)}: {len(parts)} VTK clips -> {side}x{side}, "
           f"{_nframes(dst)} frames")
     return True
 
@@ -598,9 +601,9 @@ def main():
     # control and its death network is drawn on the pole, so the top view is the one that shows it;
     # the two-field runs are read from the side like every other clip on the page.
     R2 = [
-        ("sc_inh_soft", "turing_inhibit_v3", "B stops growth", "left"),
-        ("tsd_max", "turing_death_v3", "B kills", "left"),
-        ("sc_antiphase", "turing_antiphase_v3", "one field, in antiphase", "right"),
+        ("sc_inh_soft", "turing_inhibit_v5", "B stops growth", "left"),
+        ("tsd_max", "turing_death_v5", "B kills", "left"),
+        ("sc_antiphase", "turing_antiphase_v5", "one field, in antiphase", "right"),
     ]
     def _cap2(run):
         s = json.load(open(os.path.join(LOG_OKUDA, run, "diag.json")))["summary"]
@@ -839,9 +842,11 @@ def main():
         if os.path.exists(sp):
             # THE CLIP TOO, not only the spec: these three now play the VTK sequence like the
             # Turing rows, under a new name because their content changed.
-            new_v = f"{vid}_v3"
-            built = vtk_sequence(os.path.join(LOG_OKUDA, run), os.path.join(GAL, f"{new_v}.mp4"))
-            for old_v in (f"{vid}.mp4", f"{vid}_vtk.mp4", f"{vid}_v2.mp4", f"{new_v}.mp4"):
+            new_v = f"{vid}_v5"
+            built = vtk_sequence(os.path.join(LOG_OKUDA, run), os.path.join(GAL, f"{new_v}.mp4"),
+                                 kinds=("evolve",))
+            for old_v in (f"{vid}.mp4", f"{vid}_vtk.mp4", f"{vid}_v2.mp4", f"{vid}_v3.mp4",
+                          f"{new_v}.mp4"):
                 if any(f'<video src="gallery/{old_v}"' in open(f).read() for f, _ in
                        ((QMD, False), (DOCS, True))):
                     replace_card(old_v, nm, sp, cap, files=((QMD, False), (DOCS, True)),
@@ -873,7 +878,7 @@ def main():
                     f"{m['cells_final']:,}, and the shell stays a sphere (reduced volume "
                     f"{m['reduced_volume_final']:.2f})"),
          ("tyssue_vh_grow_divide.mp4", "turing_grow_divide_v3.mp4", "turing_grow_divide_v4.mp4")),
-        ("turing_morphogen_v4", "r003_07", "morphogen + growth",
+        ("turing_morphogen_v5", "r003_07", "morphogen + growth",
          lambda m: (f"The same chemistry driving growth where it peaks: {m['cells_final']:,} cells "
                     f"and the shell folds out of plane, protrusion peak {m['protr_peak']:.2f}, "
                     f"along a path that runs "
