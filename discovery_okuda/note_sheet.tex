@@ -966,6 +966,36 @@ whatever TIMP does, and saturation erases the dose response); and the rate has t
 the substrate still exists}, since at the TIMP levels where the mechanism works best it destroys every
 MT1-bearing face and a late-window average then reports exactly zero at the peak.
 
+
+\subsection*{3.6\; What this composition buys, and it is the argument for Plexus2}
+
+It is worth stopping to count what produced the breach, because the list is short. \textbf{One set}
+(\code{bm\_face}, carrying mass and a rest metric), \textbf{three fields} on it (proMMP-2, MMP-2,
+TIMP-2) with \textbf{one state} beside them (TIMP-3, which does not diffuse), \textbf{two operators}
+(a semi-implicit diffusion--reaction step, Eqs.~\eqref{eq:pro}--\eqref{eq:act}, and
+\op{bm\_degrade}, Eq.~\eqref{eq:degrade}), and \textbf{one threshold} $\rho_{\rm crit}$. That is the
+whole composition. What comes out of it is a \emph{localized, self-arresting perforation of a basement
+membrane}: a single hole whose area tracks the enzyme's own footprint over an order of magnitude
+($0.8\%$, $1.1\%$, $2.8\%$, $8.4\%$ of the sheet for sources of $15^\circ$, $20^\circ$, $30^\circ$ and
+$45^\circ$), which stops growing on its own ($+0.06\%$ of the sheet over the last third of a
+$401$-frame run), and which cannot be made arbitrarily small because below $\sqrt{D/k}$ the source can
+no longer hold a concentration.
+
+\textbf{Nothing in that list mentions a hole.} There is no perforation operator, no rim, no crack-tip
+law, no seeded defect and no rule that says where the sheet may fail --- the rim is simply the set of
+faces whose areal density fell through $\rho_{\rm crit}$, and the arrest is the enzyme running out of
+substrate against clearance and inhibition. Two of the phenotype's properties are outright
+\emph{predictions} of the composition rather than inputs to it: the bell (TIMP at zero and at $10K$
+both breach nothing, because the same molecule presents the zymogen and poisons the enzyme) and the
+lower bound on hole size (a diffusion length, which is why G42's failure --- $\sqrt{D/k}=0.05$ against
+$h=0.076$ --- is a statement about what this model can resolve and not a tuning matter).
+
+\textbf{What is an input, said plainly.} Where the enzyme sits. In the \op{06\_hole\_*} ladder MT1-MMP
+is placed as a cap of chosen angular radius, which is a statement about the epithelium and not about
+the membrane; in \op{06\_breach\_hole} and \op{06\_hole\_one} it is a smooth random field and even the
+location is emergent. Neither run paints a hole; both make an enzyme and let it work.
+
+
 \section*{4.\; Gates}
 
 
