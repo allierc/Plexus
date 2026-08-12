@@ -360,12 +360,6 @@ def build2(runs):
     cells in it. No heading of its own -- it is the same section with one more field in it."""
     cards = "\n".join(card(v, n, sp, c) for _, v, n, sp, c in runs)
     return f"""{BEGIN2}
-<p class="opk"><b>Two morphogens in competition.</b> A <b>second Gray–Scott system</b> on the same
-cells, coarser than the first and reading none of its numbers, opposing the growth the first one
-drives — by switching it off where the second peaks (the cell turns <b>teal</b>), or by marking the
-cell to die where it runs low (<b>blue</b>, until the cell shrinks away and its neighbours close the
-gap). The third clip is the control: with only <i>one</i> field the opposing rule has to read the
-very chemical that drives growth, so it can only land in its <b>antiphase</b>.</p>
 <div class="sim-gallery g3">
 {cards}
 </div>
@@ -376,9 +370,6 @@ def build4(runs):
     """Vertex + Turing, third row: the shapes one composition makes."""
     cards = "\n".join(card(v, n, sp, c) for _, v, n, sp, c in runs)
     return f"""{BEGIN4}
-<p class="opk"><b>And the shapes it makes.</b> One Gray–Scott field gating growth on the shell,
-with a <b>purse-string</b> tightening the interfaces the field marks — two chemistries of the same
-operator graph, and then the same graph with the purse-string taken out.</p>
 <div class="sim-gallery g3">
 {cards}
 </div>
@@ -492,19 +483,15 @@ def main():
         # SHORT. Each caption is one measured number and one sentence about what the clip shows;
         # the mechanism is in the paragraph above the row and does not need repeating three times.
         extra = {
-            "sc_inh_soft": f"Nothing dies: B switches growth OFF where it peaks, leaving fine red "
-                           f"spots growing inside broad teal regions that do not — "
-                           f"{s['n_spots_final']} spots, "
-                           f"{s['spot_spacing_cells_final']:.1f} cells apart. Soft end of the "
-                           f"ladder: growth is half off at 0.65 of the inhibitor's own maximum",
-            "tsd_max": "Here B kills instead, from frame 180 and up to a quarter of the "
-                       "population at once — under half the cells the inhibited run keeps, from "
-                       "the same growth law",
-            "sc_antiphase": "One field: death fires below a threshold on the chemical that drives "
-                            "growth, so the blue network is the complement of the red spots and "
-                            "could not have been anywhere else. Top view, where the network is",
+            "sc_inh_soft": f"B switches growth off where it peaks: red spots inside teal that does "
+                           f"not grow, {s['n_spots_final']} of them "
+                           f"{s['spot_spacing_cells_final']:.1f} cells apart",
+            "tsd_max": "B marks cells to die instead, from frame 180 — under half the cells the "
+                       "inhibited run keeps, from the same growth law",
+            "sc_antiphase": "One field: death fires where growth's own chemical is low, so it can "
+                            "only land between the spots. Top view, where the network is",
         }[run]
-        return f"{s['cells_final']:,} cells at frame 1,800, from 2,000 seeded. {extra}"
+        return f"{extra}. {s['cells_final']:,} cells from 2,000 seeded"
     runs2 = [(d, f"{v}.mp4", lbl,
               os.path.join(LOG_OKUDA, d, "spec_run.yaml"), _cap2(d)) for d, v, lbl, _p in R2]
     for d, v, _lbl, panel in R2:
@@ -526,14 +513,11 @@ def main():
         ("r017_00_ctrl", "turing_shape_noline", "no purse-string"),
     ]
     CAP4 = {
-        "r013_05": "Eight arms from one activator: {cells:,} cells, protrusion peak {pk}, and a "
-                   "reduced volume of {rv} where 1.0 is a sphere",
-        "r016_01": "The same operator graph at a different chemistry — the Gray–Scott k halved — "
-                   "and it lobes instead: {cells:,} cells, and the run passes through BRANCHED on "
-                   "its way ({path})",
-        "r017_00_ctrl": "The control with the interface tension removed, so growth acts alone: "
-                        "fewer cells ({cells:,}) and the longest arms of the three, protrusion "
-                        "peak {pk}, classified a tube",
+        "r013_05": "Eight arms from one activator: {cells:,} cells, protrusion peak {pk}",
+        "r016_01": "The same graph at half the Gray–Scott k, and it lobes and branches instead: "
+                   "{cells:,} cells",
+        "r017_00_ctrl": "The interface tension removed, so growth acts alone: {cells:,} cells and "
+                        "the longest arms of the three, peak {pk}",
     }
     runs4 = []
     for d, v, lbl in R4:
@@ -545,9 +529,7 @@ def main():
         crop_panel(src, os.path.join(GAL, f"{v}.mp4"), panel="left", pad=1.26)
         print(f"[minisite] gallery/{v}.mp4 <- okuda/{d}/movie.mp4  "
               f"({os.path.getsize(os.path.join(GAL, v + '.mp4')) / 1e6:.1f} MB, side view, square)")
-        cap = CAP4[d].format(cells=sm["cells_final"], pk=f"{sm['protr_peak']:.2f}",
-                             rv=f"{sm['reduced_volume_final']:.2f}",
-                             path=sm["morphology_path"].replace(" -> ", " → "))
+        cap = CAP4[d].format(cells=sm["cells_final"], pk=f"{sm['protr_peak']:.2f}")
         runs4.append((d, f"{v}.mp4", lbl,
                       os.path.join(LOG_OKUDA, d, "spec_run.yaml"), cap))
 
@@ -615,40 +597,35 @@ def main():
     R5 = [
         ("06_spheroid_bm_ecm", "spheroid_bm_ecm", "all three at once",
          [q["tl"], q["tr"], q["bl"], q["br"]], dict(skip_top=0.09),
-         "A replayed epithelium (396 vertices to 12,756), a fibre matrix outside it, and a "
-         "5,120-triangle membrane held on 2,562 plaques. Tissue in the matrix, section, sheet, "
-         "junctions \u2014 and no force between sheet and matrix: they share the tissue"),
+         "An epithelium of 396 vertices grown to 12,756, a fibre matrix outside it, and a "
+         "5,120-triangle membrane on 2,562 plaques. Sheet and matrix share the tissue, not a "
+         "force"),
         ("05h_1_hetero", "bm_protease", "who is allowed to make a hole",
          [q["tl"], q["tr"], q["bl"], q["br"]], dict(skip_top=0.10, skip_bot=0.12),
-         f"The concentrations, in balance. MT1-MMP is fixed per cell and seeded at the start; "
-         f"proMMP-2, MMP-2, TIMP-2 and TIMP-3 evolve, three of them through the diffusion solver "
-         f"and TIMP-3 by deposition and decay alone. At the bell's peak that balance still "
-         f"dissolves {100 * hetr['hole']:.0f}% of the sheet; with MT1 uniform, "
+         f"MT1-MMP is fixed per cell; proMMP-2, MMP-2, TIMP-2 and TIMP-3 evolve. At the bell's "
+         f"peak this dissolves {100 * hetr['hole']:.0f}% of the sheet; with MT1 uniform, "
          f"{100 * bell['hole']:.0f}%"),
     ] + ([] if not tiny else [
         # THE SHEET PANEL ALONE, as for the breach cards below: this run's other three panels are
         # the tissue and the matrix, which the first card already shows.
         ("06_hole_tiny_off", "bm_hole_tiny_off", "a hole that stops",
          [q["bl"]], dict(skip_top=0.09),
-         f"The balance broken in ONE place: {tiny['faces_torn']} of "
-         f"{tiny['faces_seeded']:,} faces, {tiny['rim_loops']} rim loop, and it has stopped. The "
-         f"size is the SOURCE's \u2014 a {tiny['spot']:.0f}\u00b0 cap of MT1-MMP, tilted "
-         f"{tiny['spot_off']:.0f}\u00b0 off the view axis so the rim reads as a rim"),
+         f"{tiny['faces_torn']} of {tiny['faces_seeded']:,} faces, {tiny['rim_loops']} rim "
+         f"loop, and it stops. The size is the source's: a {tiny['spot']:.0f}\u00b0 cap of "
+         f"MT1-MMP, tilted {tiny['spot_off']:.0f}\u00b0 so the rim reads as a rim"),
     ])
     R5b = ([] if not small else [
         ("06_hole_small", "bm_hole_small", "a bigger one, still arrested",
          [q["bl"]], dict(skip_top=0.09),
-         f"No cap this time, a random MT1-MMP field: {small['faces_torn']} faces gone "
-         f"({100 * small['torn_frac']:.0f}% of the sheet) in one patch with "
-         f"{small['rim_loops']} rim loops, and it too stops. Change only the seed and the same "
-         f"phase point tears 31.5% \u2014 a hole size here carries a spread of half its own value"),
+         f"A random field instead of a cap: {small['faces_torn']} faces in one patch, "
+         f"{100 * small['torn_frac']:.0f}% of the sheet, and it still stops. Change only the seed "
+         f"and the same point tears 31.5%"),
     ]) + ([] if not (hol and trn) else [
         ("06_breach_hole", "bm_breach_sheet", "one that does not",
          [q["bl"]], dict(skip_top=0.09),
-         f"The breach is as big as its activation patch and does not arrest: "
-         f"{100 * hol['torn_frac']:.0f}% of the sheet gone, "
-         f"{100 * hol['biggest_patch_frac']:.0f}% of it a single hole. At cutting rate "
-         f"{trn['kdeg']:.0f} it is {100 * trn['torn_frac']:.0f}% and the sheet is in pieces"),
+         f"This one does not stop: {100 * hol['torn_frac']:.0f}% of the sheet gone, "
+         f"{100 * hol['biggest_patch_frac']:.0f}% of it one hole. At cutting rate "
+         f"{trn['kdeg']:.0f} it is {100 * trn['torn_frac']:.0f}%"),
     ])
     runs5, runs5b = [], []
     for out, rows in ((runs5, R5), (runs5b, R5b)):
@@ -781,15 +758,18 @@ def _patch4(path, block, rendered=False):
     if rendered:
         block = block.replace("&#x27;", "'")
     s = open(path).read()
-    if BEGIN4 in s:
+    if BEGIN4 in s and s.index(BEGIN4) < s.index(BEGIN2):
         i, j = s.index(BEGIN4), s.index(END4) + len(END4)
         s = s[:i] + block + s[j:]
         what = "replaced"
     else:
-        if END2 not in s:
+        if BEGIN4 in s:                      # it exists, but after the row it should precede
+            i, j = s.index(BEGIN4), s.index(END4) + len(END4)
+            s = s[:i].rstrip("\n") + "\n" + s[j:].lstrip("\n")
+        if BEGIN2 not in s:
             sys.exit(f"second-field marker not found in {path}")
-        k = s.index(END2) + len(END2)
-        s = s[:k] + "\n\n" + block + s[k:]
+        k = s.index(BEGIN2)
+        s = s[:k] + block + "\n\n" + s[k:]
         what = "inserted"
     open(path, "w").write(s)
     print(f"[minisite] {os.path.relpath(path, ROOT)}: Vertex + Turing shapes row {what}")
