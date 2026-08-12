@@ -1,0 +1,71 @@
+[
+ {"parent": "r019_06", "edit": ["remove_op", "interface_line_tension_3d0"],
+  "claim": "purse-string is a modifier not the finger generator; remove it from the 2.296 finger as r016_03 did to r015_06",
+  "predict": "protrusion_aspect_max_peak > 25.018", "intent": "confirmatory",
+  "why": "tests the tension-modifier law on a second, stronger finger composition; r015_06 strengthened when stripped"},
+
+ {"parent": "r019_06", "edit": ["set_param", "grow_3d0.rate", 0.001732],
+  "claim": "L8 -- over-growing the finger past the ~5825 window trades the arm for a deep hollow fold",
+  "predict": "invagination_peak > 0.598", "intent": "adversarial",
+  "why": "L8 has 3 pts on b_star; untested on the r019_06 finger. REFUTED if aspect_final stays > 5"},
+
+ {"parent": "r019_06", "edit": ["set_param", "grow_3d0.rate", 0.000433],
+  "claim": "slower growth holds the finger inside the arm window at lower cell count",
+  "predict": "protr_peak > 2.0", "intent": "exploratory",
+  "why": "the finger lives only ~5500-5825 cells; halving rate may keep the arm rather than under-grow to a bud"},
+
+ {"parent": "r019_06", "edit": ["add_op", "cell_shape_probe", "shape_index"],
+  "claim": "exercise the one operator no run has ever used; read per-cell shape distortion on the buckled arm",
+  "predict": "shape_idx_p95_peak > 4.19", "intent": "exploratory",
+  "why": "cell_shape_probe is coverage.the_untried_edit; the structural slot, and it measures arm-cell shape directly"},
+
+ {"parent": "r016_03", "edit": ["set_param", "shape_to_chem0.F0", 0.092],
+  "claim": "L6/L10 -- doubling the feedback drive: does stronger geometry->chemistry sharpen the finger or over-brake growth into a bulge",
+  "predict": "protrusion_aspect_max_peak > 21.094", "intent": "adversarial",
+  "why": "F0 halved (0.023) lost the finger at a knee; the double is untested and the outcome is genuinely uncallable"},
+
+ {"parent": "r016_03", "edit": ["set_param", "cell_diffuse0.d_h", 0.32],
+  "claim": "raise inhibitor diffusion to coarsen toward Okuda's ~10-spot scale",
+  "predict": "n_spots_peak < 90", "intent": "exploratory",
+  "why": "d_h is an unrun wavelength lever on the finger; every prior coarsening knob left grip flat -- does d_h differ"},
+
+ {"parent": "r016_03", "edit": ["set_param", "seed_cell_rd0.cone_deg", 4.0],
+  "claim": "narrower seed cones localize the activator domain feeding the arm",
+  "predict": "protrusion_aspect_max_peak > 21.094", "intent": "exploratory",
+  "why": "cone_deg 4 untried on the tension-off finger; tighter seeding may sharpen the single arm"},
+
+ {"parent": "r021_02", "edit": ["remove_op", "apoptosis_3d0"],
+  "claim": "the grip record 0.351 co-occurred with death (n_apop 59) -- is death necessary for it, or over-growth alone",
+  "predict": "grip_peak > 0.30", "intent": "adversarial", "chases": "r021_02",
+  "why": "chases the campaign grip record; isolates whether apoptosis or the 7550-cell over-growth carries the coupling"},
+
+ {"parent": "r017_05", "edit": ["add_op", "apoptosis_3d", "default"],
+  "claim": "L11 -- apoptosis on the finger preserves the arm; its effect on the fold is non-monotone in death",
+  "predict": "invagination_peak > 0.754", "intent": "adversarial",
+  "why": "L11 OPEN with opposite signs at equal n_apop; the death twin of the deepest clean fold settles the direction"},
+
+ {"parent": "r017_05", "edit": ["set_param", "shape_to_chem0.F0", 0.023],
+  "claim": "the feedback knee reconfirmed on the purse-string-ON finger",
+  "predict": "protr_peak < 1.5", "intent": "confirmatory",
+  "why": "r016_01 lost the finger at F0 0.023 with tension off; confirm the knee is composition-independent"},
+
+ {"parent": "r021_03", "edit": ["remove_op", "shape_to_chem0"],
+  "claim": "L6 -- the feedback leg brakes growth; removing it un-brakes into uniform overshoot",
+  "predict": "cells_peak > 40000", "intent": "confirmatory",
+  "why": "reconfirms the growth-brake mechanism on a third seed. REFUTED if the finger survives or cells stay < 15000"},
+
+ {"parent": "r022_03", "edit": ["remove_op", "grow_3d0"],
+  "claim": "mechanics-only floor: the finger requires growth-buckling",
+  "predict": "protr_peak < 1.1", "intent": "control",
+  "why": "the required-growth control on the third finger seed; anchors that the arm is grown, not seeded"},
+
+ {"parent": "r016_03", "edit": ["set_param", "cell_diffuse0.d_h", 0.08],
+  "claim": "halve inhibitor diffusion -- finer, spikier chemistry",
+  "predict": "act_cv_peak > 5.13", "intent": "exploratory",
+  "why": "the coarsening slot's mirror; whether a finer field sharpens or dilutes the arm is uncalled"},
+
+ {"parent": "r021_02", "edit": ["remove_op", "interface_line_tension_3d0"],
+  "claim": "on the grip-record parent, strip the purse-string -- does grip 0.351 survive without line tension",
+  "predict": "grip_peak > 0.30", "intent": "adversarial",
+  "why": "pairs with slot 8 to attribute the grip record between apoptosis and purse-string on the same over-grown state"}
+]

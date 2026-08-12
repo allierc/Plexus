@@ -1,0 +1,88 @@
+[loop] terminal also written to /workspace/Plexus/discovery_okuda/campaign/campaign.log
+[loop] resume: continuing the campaign in campaign/
+[loop] plan: 1 recon + 39 composition round(s)
+
+------------------------------------------------------------------------------------------------
+[loop] round 1/40  mode=recon   spent so far: 842.1 agent-min over 3899 calls
+------------------------------------------------------------------------------------------------
+✓ [loop] round 1 exited 0 after 107.3 min wall, 0.0 min of agents
+
+------------------------------------------------------------------------------------------------
+[loop] round 2/40  mode=composition   spent so far: 842.1 agent-min over 3899 calls
+------------------------------------------------------------------------------------------------
+✓ [loop] round 2 exited 0 after 107.7 min wall, 0.0 min of agents
+
+------------------------------------------------------------------------------------------------
+[loop] round 3/40  mode=composition   spent so far: 842.1 agent-min over 3899 calls
+------------------------------------------------------------------------------------------------
+✓ [loop] round 3 exited 0 after 111.6 min wall, 0.0 min of agents
+
+------------------------------------------------------------------------------------------------
+[loop] round 4/40  mode=composition   spent so far: 842.1 agent-min over 3899 calls
+------------------------------------------------------------------------------------------------
+[loop] terminal also written to /workspace/Plexus/discovery_okuda/campaign/campaign.log
+[loop] resume: continuing the campaign in campaign/
+[loop] plan: 1 recon + 39 composition round(s)
+
+------------------------------------------------------------------------------------------------
+[loop] round 1/40  mode=recon   spent so far: 842.1 agent-min over 3899 calls
+------------------------------------------------------------------------------------------------
+[loop] terminal also written to /workspace/Plexus/discovery_okuda/campaign/campaign.log
+[loop] resume: continuing the campaign in campaign/
+[loop] plan: 1 recon + 39 composition round(s)
+
+------------------------------------------------------------------------------------------------
+[loop] round 1/40  mode=recon   spent so far: 842.1 agent-min over 3899 calls
+------------------------------------------------------------------------------------------------
+✓ [loop] round 1 exited 0 after 111.4 min wall, 0.0 min of agents
+
+------------------------------------------------------------------------------------------------
+[loop] round 2/40  mode=composition   spent so far: 842.1 agent-min over 3899 calls
+------------------------------------------------------------------------------------------------
+✓ [loop] round 2 exited 0 after 109.4 min wall, 0.0 min of agents
+
+------------------------------------------------------------------------------------------------
+[loop] round 3/40  mode=composition   spent so far: 842.1 agent-min over 3899 calls
+------------------------------------------------------------------------------------------------
+✓ [loop] round 3 exited 0 after 111.0 min wall, 0.0 min of agents
+
+------------------------------------------------------------------------------------------------
+[loop] round 4/40  mode=composition   spent so far: 842.1 agent-min over 3899 calls
+------------------------------------------------------------------------------------------------
+✓ [loop] round 4 exited 0 after 110.3 min wall, 0.0 min of agents
+
+------------------------------------------------------------------------------------------------
+[loop] round 5/40  mode=composition   spent so far: 842.1 agent-min over 3899 calls
+------------------------------------------------------------------------------------------------
+✓ [loop] round 5 exited 0 after 109.0 min wall, 0.0 min of agents
+
+------------------------------------------------------------------------------------------------
+[loop] round 6/40  mode=composition   spent so far: 842.1 agent-min over 3899 calls
+------------------------------------------------------------------------------------------------
+✓ [loop] round 6 exited 0 after 109.9 min wall, 0.0 min of agents
+
+------------------------------------------------------------------------------------------------
+[loop] round 7/40  mode=composition   spent so far: 842.1 agent-min over 3899 calls
+------------------------------------------------------------------------------------------------
+✓ [loop] round 7 exited 0 after 109.7 min wall, 0.0 min of agents
+
+------------------------------------------------------------------------------------------------
+[loop] round 8/40  mode=composition   spent so far: 842.1 agent-min over 3899 calls
+------------------------------------------------------------------------------------------------
+✓ [loop] round 8 exited 0 after 106.3 min wall, 0.0 min of agents
+
+------------------------------------------------------------------------------------------------
+[loop] round 9/40  mode=composition   spent so far: 842.1 agent-min over 3899 calls
+------------------------------------------------------------------------------------------------
+✓ [loop] round 9 exited 0 after 105.6 min wall, 0.0 min of agents
+
+------------------------------------------------------------------------------------------------
+[loop] round 10/40  mode=composition   spent so far: 842.1 agent-min over 3899 calls
+------------------------------------------------------------------------------------------------
+[loop] terminal also written to /workspace/Plexus/discovery_okuda/campaign/campaign.log
+[loop] resume: continuing the campaign in campaign/
+[loop] plan: 1 recon + 49 composition round(s)
+
+------------------------------------------------------------------------------------------------
+[loop] round 1/50  mode=recon   spent so far: 842.1 agent-min over 3899 calls
+------------------------------------------------------------------------------------------------
