@@ -2223,7 +2223,18 @@ def check_pool(verbose=True):
 # append mode, so keeping it means the narration of a reset survives the reset -- which is exactly
 # the moment you most want to be able to read back.
 KEEP_ON_RESET = ("instruction.md", "user_input.md", "campaign.log",
-                 "TEMPLATE_analysis.md", "TEMPLATE_memory.md")
+                 "TEMPLATE_analysis.md", "TEMPLATE_memory.md",
+                 # THE CLAIM LEDGER SURVIVES A RESET, and this line is the difference between a
+                 # fresh campaign and a lobotomised one. A reset forgets the SEARCH -- which runs
+                 # were bred from which -- and `claims.jsonl` is not the search, it is what the
+                 # campaign KNOWS. Deleting it would have wiped the thirteen seed claims on the
+                 # very first launch, leaving the Proposer with an `act` vocabulary and nothing to
+                 # act on, and the failure would have looked like the agents ignoring their
+                 # instructions rather than like an empty file.
+                 "claims.jsonl",
+                 # and its rendered view, so round 1's Proposer is not handed an empty history
+                 # before `claims_update` has had a chance to write one.
+                 "knowledge.md")
 
 
 def reset_campaign(quiet=False):
