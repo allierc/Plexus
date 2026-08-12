@@ -220,6 +220,62 @@ def panels_concat(src, dst, panels, skip_top=0.0, skip_bot=0.0, pad=1.16):
         sys.exit(f"ffmpeg panels+concat failed for {dst}")
 
 
+def evolve_then_kburns(run_dir, dst, panel="left", pad=1.26, skip_top=0.09, skip_bot=0.14):
+    """The run through time, then the finished specimen turned on the spot -- one clip.
+
+    TWO MOVIES THAT ANSWER DIFFERENT QUESTIONS. `movie.mp4` holds the camera still and moves
+    through time, which is the only way growth reads as growth (a per-frame autofit rescaled the
+    box 4.6x over a run and hid it). `kburns.mp4` holds time still at the last frame and moves the
+    camera, which is the only way an arm pointing at the lens reads as an arm. A card that plays
+    one of them is missing the other, and side by side they are two small movies; in sequence they
+    are the run and then its specimen, at one size.
+
+    BOTH HALVES ARE CROPPED OFF THEIR OWN TEXT. The Ken Burns render stamps the run name and a
+    scale bar -- correct for a figure, wrong for a card whose caption the page writes -- so it is
+    cropped square about its content between the same margins the evolve half uses.
+
+    ONE SIZE is the difficulty `concat` imposes: the Ken Burns half is scaled to whatever square
+    the evolve half measured, so the tissue stays the size the rest of the row draws it.
+    """
+    import shutil as _sh
+    import tempfile
+    mv = os.path.join(run_dir, "movie.mp4")
+    kb = os.path.join(run_dir, "kburns.mp4")
+    name = os.path.basename(run_dir)
+    ready = os.path.exists(kb)
+    if ready:
+        try:
+            _nframes(kb)
+        except Exception:
+            ready = False
+    if not ready:
+        print(f"[minisite] {name}: kburns.mp4 missing or still being written -- evolve only")
+        crop_panel(mv, dst, panel=panel, pad=pad, skip_top=skip_top, skip_bot=skip_bot)
+        return False
+    d = tempfile.mkdtemp(prefix="evkb_")
+    a, b = os.path.join(d, "a.mp4"), os.path.join(d, "b.mp4")
+    crop_panel(mv, a, panel=panel, pad=pad, skip_top=skip_top, skip_bot=skip_bot)
+    # MEASURED, NOT GUESSED: in a 770-px Ken Burns frame the run label occupies rows 104-119 and
+    # the scale bar 629-654, so the window has to start below 0.156 of the height and end above
+    # 0.185 from the bottom. The first pass used 0.08/0.12 and kept the label.
+    panels_concat(kb, b, [(0, 0, 1.0, 1.0)], skip_top=0.157, skip_bot=0.186, pad=1.02)
+    side = _size(a)[0]
+    na, nb = _nframes(a), _nframes(b)
+    ff = _exe("ffmpeg")
+    # `setsar=1` and one fps on both: concat refuses streams that disagree on either, and the two
+    # renderers never had to agree.
+    fc = (f"[0:v]fps=20,scale={side}:{side},setsar=1[a];"
+          f"[1:v]fps=20,scale={side}:{side},setsar=1[b];[a][b]concat=n=2:v=1[o]")
+    cmd = [ff, "-y", "-loglevel", "error", "-i", a, "-i", b, "-filter_complex", fc,
+           "-map", "[o]", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "24", dst]
+    ok = subprocess.call(cmd) == 0 and os.path.exists(dst)
+    _sh.rmtree(d, ignore_errors=True)
+    if not ok:
+        sys.exit(f"ffmpeg evolve+kburns concat failed for {dst}")
+    print(f"[minisite]   {name}: evolve {na} frames + ken burns {nb}, {side}x{side}")
+    return True
+
+
 def crop_panel(src, dst, panel="left", skip_top=0.09, skip_bot=0.14, pad=1.20):
     """Keep the LEFT panel only, as a square window centred on what is drawn in it.
 
@@ -489,9 +545,9 @@ def main():
     # control and its death network is drawn on the pole, so the top view is the one that shows it;
     # the two-field runs are read from the side like every other clip on the page.
     R2 = [
-        ("sc_inh_soft", "turing_two_inhibit", "B stops growth", "left"),
-        ("tsd_max", "turing_death_max", "B kills", "left"),
-        ("sc_antiphase", "turing_death_antiphase", "one field, in antiphase", "right"),
+        ("sc_inh_soft", "turing_inhibit_kb", "B stops growth", "left"),
+        ("tsd_max", "turing_death_kb", "B kills", "left"),
+        ("sc_antiphase", "turing_antiphase_kb", "one field, in antiphase", "right"),
     ]
     def _cap2(run):
         s = json.load(open(os.path.join(LOG_OKUDA, run, "diag.json")))["summary"]
@@ -513,9 +569,9 @@ def main():
         src = os.path.join(LOG_OKUDA, d, "movie.mp4")
         if not os.path.exists(src):
             sys.exit(f"no movie.mp4 for {d} -- run it before writing the page")
-        crop_panel(src, os.path.join(GAL, v + ".mp4"), panel=panel,
-                   skip_bot=0.25 if panel == "right" else 0.14, pad=1.26)
-        print(f"[minisite] gallery/{v}.mp4 <- okuda/{d}/movie.mp4  "
+        evolve_then_kburns(os.path.join(LOG_OKUDA, d), os.path.join(GAL, v + ".mp4"), panel=panel,
+                           skip_bot=0.25 if panel == "right" else 0.14, pad=1.26)
+        print(f"[minisite] gallery/{v}.mp4 <- okuda/{d}  "
               f"({os.path.getsize(os.path.join(GAL, v + '.mp4')) / 1e6:.1f} MB, {panel} panel, "
               f"square, no label)")
 
@@ -523,9 +579,9 @@ def main():
     def _sum(run):
         return json.load(open(os.path.join(LOG_OKUDA, run, "diag.json")))["summary"]
     R4 = [
-        ("r013_05", "turing_shape_flower", "purse-string, k = 0.062"),
-        ("r016_01", "turing_shape_lobes", "purse-string, k = 0.031"),
-        ("r017_00_ctrl", "turing_shape_noline", "no purse-string"),
+        ("r013_05", "turing_flower_kb", "purse-string, k = 0.062"),
+        ("r016_01", "turing_lobes_kb", "purse-string, k = 0.031"),
+        ("r017_00_ctrl", "turing_noline_kb", "no purse-string"),
     ]
     CAP4 = {
         "r013_05": "Eight arms from one activator: {cells:,} cells, protrusion peak {pk}",
@@ -541,8 +597,8 @@ def main():
             print(f"[minisite] {d}: no movie.mp4 -- card skipped")
             continue
         sm = _sum(d)
-        crop_panel(src, os.path.join(GAL, f"{v}.mp4"), panel="left", pad=1.26)
-        print(f"[minisite] gallery/{v}.mp4 <- okuda/{d}/movie.mp4  "
+        evolve_then_kburns(os.path.join(LOG_OKUDA, d), os.path.join(GAL, f"{v}.mp4"), pad=1.26)
+        print(f"[minisite] gallery/{v}.mp4 <- okuda/{d}  "
               f"({os.path.getsize(os.path.join(GAL, v + '.mp4')) / 1e6:.1f} MB, side view, square)")
         cap = CAP4[d].format(cells=sm["cells_final"], pk=f"{sm['protr_peak']:.2f}")
         runs4.append((d, f"{v}.mp4", lbl,
@@ -553,9 +609,9 @@ def main():
     # 0.5 against 0.75, with the growth rate, both diffusivities, F, k and the division rule
     # identical. That is what makes the pair a comparison rather than two shapes.
     R5r = [
-        ("r020_01", "turing_rate_folds", "reaction rate 0.75"),
-        ("r019_02", "turing_rate_arms", "reaction rate 0.5"),
-        ("r021_06", "turing_rate_spikes", "rate 0.25, growth doubled"),
+        ("r020_01", "turing_folds_kb", "reaction rate 0.75"),
+        ("r019_02", "turing_arms_kb", "reaction rate 0.5"),
+        ("r021_06", "turing_spikes_kb", "rate 0.25, growth doubled"),
     ]
     # ORDERED BY CHEMISTRY AGAINST GROWTH, fastest first, because that ratio is what the row is:
     # 0.75/8.66e-4, then 0.5/8.66e-4, then 0.25/1.73e-3 -- a sixfold range, and the shape goes from
@@ -576,8 +632,8 @@ def main():
             print(f"[minisite] {d}: no movie.mp4 -- card skipped")
             continue
         sm = _sum(d)
-        crop_panel(src, os.path.join(GAL, f"{v}.mp4"), panel="left", pad=1.26)
-        print(f"[minisite] gallery/{v}.mp4 <- okuda/{d}/movie.mp4  "
+        evolve_then_kburns(os.path.join(LOG_OKUDA, d), os.path.join(GAL, f"{v}.mp4"), pad=1.26)
+        print(f"[minisite] gallery/{v}.mp4 <- okuda/{d}  "
               f"({os.path.getsize(os.path.join(GAL, v + '.mp4')) / 1e6:.1f} MB, side view, square)")
         runs5r.append((d, f"{v}.mp4", lbl, os.path.join(LOG_OKUDA, d, "spec_run.yaml"),
                        CAP5[d].format(cells=sm["cells_final"])))

@@ -153,56 +153,77 @@ def _ssh_retry(cmd, timeout=90, tries=6):
 
 
 # --------------------------------------------------------------------------- submit
-def _job_script(name, frames, do_q, campaign):
+def _job_script(name, frames, do_q, campaign, rerender=False):
+    """The job's script. `rerender=True` swaps the simulation for a re-draw of a finished run.
+
+    WHY RE-RENDERING IS A CLUSTER JOB AT ALL. It costs no engine time -- `rerender.py` reads
+    `traj.npz` and redraws -- but a 60-frame movie of a 20,000-cell mesh is minutes of matplotlib
+    per run, single-threaded, and the tissue rows on the site are a dozen runs. One bsub each turns
+    an afternoon into the slowest single run. The job asks for the same slots as a simulation
+    because the render is what a simulation job spends its last minutes doing anyway.
+    """
     os.makedirs(LOGDIR, exist_ok=True)
-    script = os.path.join(LOGDIR, f"{name}.sh")
+    tag = f"_{rerender}" if isinstance(rerender, str) else ("_rr" if rerender else "")
+    script = os.path.join(LOGDIR, f"{name}{tag}.sh")
     q = " --q" if do_q else ""
     fr = f" --frames {frames}" if frames else ""
+    # `rerender` is a mode word, not a flag: "movie" re-draws the run through time, "kburns" turns
+    # the finished specimen on the spot. Both read `traj.npz` and neither touches the engine.
+    job = {"movie": f"conda run -n {ENV} python rerender.py --force {name}",
+           "kburns": f"conda run -n {ENV} python kburns_render.py --force {name}",
+           }.get(rerender if isinstance(rerender, str) else ("movie" if rerender else ""),
+                 f"conda run -n {ENV} python run_one.py {name}{fr}{q} "
+                 f"--device cuda:0 --campaign {campaign}")
     with open(script, "w") as f:
         f.write("\n".join([
             "#!/bin/bash -l",
             f"cd {cpath(HERE)}",
             f"export PYTHONPATH={cpath(SRC)}:{cpath(TYSSUE)}:{cpath(HERE)}",
             "export OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 OMP_NUM_THREADS=8",
-            f"conda run -n {ENV} python run_one.py {name}{fr}{q} "
-            f"--device cuda:0 --campaign {campaign}",
+            "export MPLBACKEND=Agg",
+            job,
         ]) + "\n")
     os.chmod(script, 0o755)
     return script
 
 
-def _bsub_cmd(name, frames, do_q, campaign):
-    script = _job_script(name, frames, do_q, campaign)
-    out = cpath(os.path.join(LOGDIR, f"{name}.out"))
+def _bsub_cmd(name, frames, do_q, campaign, rerender=False):
+    script = _job_script(name, frames, do_q, campaign, rerender=rerender)
+    tag = f"_{rerender}" if isinstance(rerender, str) else ("_rr" if rerender else "")
+    out = cpath(os.path.join(LOGDIR, f"{name}{tag}.out"))
     err = out[:-4] + ".err"
     gpu = "-gpu num=1 " if GPU != "0" else ""
     # do NOT `source` the LSF profile -- it hangs a non-interactive ssh; bsub is already on PATH
     return (f"cd {cpath(HERE)} && bsub -n {NCPUS} {gpu}-q {QUEUE} -W {WALL} "
-            f"-J {PREFIX}{name} -o {out} -e {err} bash -l {cpath(script)}")
+            f"-J {PREFIX}{(rerender + '_') if isinstance(rerender, str) else ('rr_' if rerender else '')}{name} -o {out} -e {err} "
+            f"bash -l {cpath(script)}")
 
 
-def submit(names, frames=None, do_q=False, campaign="campaign"):
+def submit(names, frames=None, do_q=False, campaign="campaign", rerender=False):
     """Fire all submissions DETACHED in one remote script; verify with --status/--wait."""
     os.makedirs(LOGDIR, exist_ok=True)
     runner = os.path.join(LOGDIR, "_submit.sh")
     with open(runner, "w") as f:
         f.write("#!/bin/bash -l\n"
-                + "\n".join(_bsub_cmd(n, frames, do_q, campaign) for n in names) + "\n")
+                + "\n".join(_bsub_cmd(n, frames, do_q, campaign, rerender) for n in names)
+                + "\n")
     os.chmod(runner, 0o755)
     logl = os.path.join(LOGDIR, "_submit.log")
     if os.path.exists(logl):
         os.replace(logl, logl + ".prev")     # a fresh log per submission, so IDs are unambiguous
     log = cpath(logl)
     _ssh(f"nohup bash {cpath(runner)} > {log} 2>&1 < /dev/null &", timeout=30)
-    print(f"[cluster] fired {len(names)} bsub(s) DETACHED on {SSH}:")
-    print(_wrap_names([PREFIX + n for n in names]))
+    print(f"[cluster] fired {len(names)} {'re-render ' if rerender else ''}bsub(s) DETACHED on "
+          f"{SSH}:")
+    pfx = (rerender + "_") if isinstance(rerender, str) else ("rr_" if rerender else "")
+    print(_wrap_names([PREFIX + pfx + n for n in names]))
     # The two explanatory lines that used to follow are gone from the terminal. The ssh
     # returning before bsub lands is why _ids_from_queue() exists, and that reasoning now lives
     # in the code rather than being reprinted every submission; the remote log path is in
     # LOGDIR for anyone who needs it.
     # `names` is passed so the QUEUE can be consulted when the log lags. Without it the
     # fallback has nothing to look up and the race stands.
-    return submitted_ids(wait_s=25, expect=len(names), names=names)
+    return submitted_ids(wait_s=25, expect=len(names), names=[pfx + n for n in names])
 
 
 def _wrap_names(names, width=92):
@@ -651,7 +672,8 @@ def kill():
 
 
 # --------------------------------------------------------------------------- throttled batch
-def run_batch(names, frames=None, do_q=False, campaign="campaign", parallel=None, poll=POLL_S):
+def run_batch(names, frames=None, do_q=False, campaign="campaign", parallel=None,
+              poll=POLL_S, rerender=False):
     """Submit the WHOLE batch at once and wait for it.
 
     WAVES REMOVED, 7 August. `parallel` chunked the batch and drained the queue between chunks,
@@ -660,8 +682,9 @@ def run_batch(names, frames=None, do_q=False, campaign="campaign", parallel=None
     already a scheduler -- chunking in front of it is a second, worse one that cannot see the
     partition. `parallel` is kept as an argument so existing callers do not break, and ignored.
     """
-    print(f"[cluster] {len(names)} runs, all submitted together")
-    ids = submit(names, frames=frames, do_q=do_q, campaign=campaign)
+    print(f"[cluster] {len(names)} {'re-renders' if rerender else 'runs'}, all submitted together")
+    ids = submit(names, frames=frames, do_q=do_q, campaign=campaign,
+                 rerender=rerender)
     # `wait_for_ids` returns a DICT: `not {...}` is always False, so testing the bare return would
     # silently never stop. Check the field.
     st = wait_for_ids(ids, poll=poll)
@@ -685,6 +708,10 @@ if __name__ == "__main__":
     ap.add_argument("--kill", action="store_true")
     ap.add_argument("--poll", type=int, default=60)
     ap.add_argument("--all", action="store_true", help="every config in config/okuda/")
+    ap.add_argument("--rerender", nargs="?", const="movie", default=None,
+                    choices=["movie", "kburns"],
+                    help="re-draw finished runs from traj.npz instead of simulating: "
+                         "movie.mp4 (default) or kburns.mp4")
     a = ap.parse_args()
 
     if a.status:
@@ -701,4 +728,4 @@ if __name__ == "__main__":
     if not names:
         ap.error("give config names, or --all / --status / --wait / --kill")
     run_batch(names, frames=a.frames, do_q=a.q, campaign=a.campaign, parallel=a.parallel,
-              poll=a.poll)
+              poll=a.poll, rerender=a.rerender)
