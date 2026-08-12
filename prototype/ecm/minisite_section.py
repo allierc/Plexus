@@ -595,12 +595,12 @@ def main():
     tiny = _metrics_or_none("06_hole_tiny_off")
     small = _metrics_or_none("06_hole_small")
     R5 = [
-        ("06_spheroid_bm_ecm", "spheroid_bm_ecm", "all three at once",
+        ("06_spheroid_bm_ecm", "spheroid_bm_ecm", "three entities, three solvers",
          [q["tl"], q["tr"], q["bl"], q["br"]], dict(skip_top=0.09),
          "An epithelium of 396 vertices grown to 12,756, a fibre matrix outside it, and a "
          "5,120-triangle membrane on 2,562 plaques. Sheet and matrix share the tissue, not a "
          "force"),
-        ("05h_1_hetero", "bm_protease", "who is allowed to make a hole",
+        ("05h_1_hetero", "bm_protease", "the molecular level",
          [q["tl"], q["tr"], q["bl"], q["br"]], dict(skip_top=0.10, skip_bot=0.12),
          f"MT1-MMP is fixed per cell; proMMP-2, MMP-2, TIMP-2 and TIMP-3 evolve. At the bell's "
          f"peak this dissolves {100 * hetr['hole']:.0f}% of the sheet; with MT1 uniform, "
@@ -608,20 +608,20 @@ def main():
     ] + ([] if not tiny else [
         # THE SHEET PANEL ALONE, as for the breach cards below: this run's other three panels are
         # the tissue and the matrix, which the first card already shows.
-        ("06_hole_tiny_off", "bm_hole_tiny_off", "a hole that stops",
+        ("06_hole_tiny_off", "bm_hole_tiny_off", "a self-arresting perforation",
          [q["bl"]], dict(skip_top=0.09),
          f"{tiny['faces_torn']} of {tiny['faces_seeded']:,} faces, {tiny['rim_loops']} rim "
          f"loop, and it stops. The size is the source's: a {tiny['spot']:.0f}\u00b0 cap of "
          f"MT1-MMP, tilted {tiny['spot_off']:.0f}\u00b0 so the rim reads as a rim"),
     ])
     R5b = ([] if not small else [
-        ("06_hole_small", "bm_hole_small", "a bigger one, still arrested",
+        ("06_hole_small", "bm_hole_small", "self-arresting, no cap",
          [q["bl"]], dict(skip_top=0.09),
          f"A random field instead of a cap: {small['faces_torn']} faces in one patch, "
          f"{100 * small['torn_frac']:.0f}% of the sheet, and it still stops. Change only the seed "
          f"and the same point tears 31.5%"),
     ]) + ([] if not (hol and trn) else [
-        ("06_breach_hole", "bm_breach_sheet", "one that does not",
+        ("06_breach_hole", "bm_breach_sheet", "not self-arresting",
          [q["bl"]], dict(skip_top=0.09),
          f"This one does not stop: {100 * hol['torn_frac']:.0f}% of the sheet gone, "
          f"{100 * hol['biggest_patch_frac']:.0f}% of it one hole. At cutting rate "
