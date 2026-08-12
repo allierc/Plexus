@@ -371,7 +371,7 @@ def build3(runs, runs2=()):
     """Spheroid + basement membrane + matrix, and the second row when there is one to show."""
     cards = "\n".join(card(v, n, sp, c) for _, v, n, sp, c in runs)
     row2 = "" if not runs2 else f"""
-<p class="opk">And the same chemistry with no small source to hold it:</p>
+<p class="opk">And with a random source rather than a cap \u2014 arrested, then not:</p>
 <div class="sim-gallery g3">
 {chr(10).join(card(v, n, sp, c) for _, v, n, sp, c in runs2)}
 </div>"""
@@ -531,38 +531,6 @@ def main():
     g46 = het["G46"]
     hetr = het["heterogeneity"]["realistic: all rates vary"]
     bell = het["heterogeneity"]["bell isolated: uniform MT1"]
-    tiny = _metrics_or_none("06_hole_tiny")
-    R5 = [
-        ("06_spheroid_bm_ecm", "spheroid_bm_ecm", "all three at once",
-         [q["tl"], q["tr"], q["bl"], q["br"]], dict(skip_top=0.09),
-         "A replayed epithelium (396 vertices to 12,756), a fibre matrix outside it, and a "
-         "5,120-triangle membrane held on 2,562 plaques. Tissue in the matrix, section, sheet, "
-         "junctions \u2014 and no force between sheet and matrix: they share the tissue"),
-        ("05h_1_hetero", "bm_protease", "who is allowed to make a hole",
-         [q["tl"], q["tr"], q["bl"], q["br"]], dict(skip_top=0.10, skip_bot=0.12),
-         f"The concentrations, in balance. MT1-MMP is fixed per cell and seeded at the start; "
-         f"proMMP-2, MMP-2, TIMP-2 and TIMP-3 evolve, three of them through the diffusion solver "
-         f"and TIMP-3 by deposition and decay alone. At the bell's peak that balance still "
-         f"dissolves {100 * hetr['hole']:.0f}% of the sheet; with MT1 uniform, "
-         f"{100 * bell['hole']:.0f}%"),
-    ] + ([] if not tiny else [
-        # THE SHEET PANEL ALONE, as for the breach card below it: this run's other three panels are
-        # the tissue and the matrix, which the first card already shows.
-        ("06_hole_tiny", "bm_hole_tiny", "a hole that stops",
-         [q["bl"]], dict(skip_top=0.09),
-         f"The balance broken in ONE place: {tiny['faces_torn']} of "
-         f"{tiny['faces_seeded']:,} faces, a single patch with {tiny['rim_loops']} rim loop, and "
-         f"it has stopped growing. It took a localised source \u2014 a "
-         f"{tiny['spot']:.0f}\u00b0 cap of MT1-MMP \u2014 and not a slower rate"),
-    ])
-    R5b = [] if not (hol and trn) else [
-        ("06_breach_hole", "bm_breach_sheet", "a hole that does not",
-         [q["bl"]], dict(skip_top=0.09),
-         f"Broken everywhere at once instead: a random MT1-MMP field, and the breach is as big "
-         f"as its activation patch \u2014 {100 * hol['torn_frac']:.0f}% of the sheet gone, "
-         f"{100 * hol['biggest_patch_frac']:.0f}% of it a single hole. At cutting rate "
-         f"{trn['kdeg']:.0f} it is {100 * trn['torn_frac']:.0f}% and the sheet is in pieces"),
-    ]
     def _clip(d, v, panels, kw):
         """Build one card's clip, or say plainly that the run is not ready.
 
@@ -571,6 +539,9 @@ def main():
         `moov` atom cuts into a broken clip rather than failing. `_nframes` reads the container, so
         a movie that cannot be counted is treated as absent -- and SAID to be absent, because a row
         that silently drops a card looks like a row that was only ever meant to be short.
+
+        DEFINED ABOVE THE ROW LISTS, not between them and the loop: twice now an edit that replaced
+        a row list from its first line to the loop has deleted this function with it.
         """
         src = os.path.join(LOG, d, "movie.mp4")
         if not os.path.exists(src):
@@ -587,6 +558,46 @@ def main():
               f"{len(panels)} panel{'s' if len(panels) > 1 else ''} in sequence, square, no label)")
         return True
 
+    tiny = _metrics_or_none("06_hole_tiny_off")
+    small = _metrics_or_none("06_hole_small")
+    R5 = [
+        ("06_spheroid_bm_ecm", "spheroid_bm_ecm", "all three at once",
+         [q["tl"], q["tr"], q["bl"], q["br"]], dict(skip_top=0.09),
+         "A replayed epithelium (396 vertices to 12,756), a fibre matrix outside it, and a "
+         "5,120-triangle membrane held on 2,562 plaques. Tissue in the matrix, section, sheet, "
+         "junctions \u2014 and no force between sheet and matrix: they share the tissue"),
+        ("05h_1_hetero", "bm_protease", "who is allowed to make a hole",
+         [q["tl"], q["tr"], q["bl"], q["br"]], dict(skip_top=0.10, skip_bot=0.12),
+         f"The concentrations, in balance. MT1-MMP is fixed per cell and seeded at the start; "
+         f"proMMP-2, MMP-2, TIMP-2 and TIMP-3 evolve, three of them through the diffusion solver "
+         f"and TIMP-3 by deposition and decay alone. At the bell's peak that balance still "
+         f"dissolves {100 * hetr['hole']:.0f}% of the sheet; with MT1 uniform, "
+         f"{100 * bell['hole']:.0f}%"),
+    ] + ([] if not tiny else [
+        # THE SHEET PANEL ALONE, as for the breach cards below: this run's other three panels are
+        # the tissue and the matrix, which the first card already shows.
+        ("06_hole_tiny_off", "bm_hole_tiny_off", "a hole that stops",
+         [q["bl"]], dict(skip_top=0.09),
+         f"The balance broken in ONE place: {tiny['faces_torn']} of "
+         f"{tiny['faces_seeded']:,} faces, {tiny['rim_loops']} rim loop, and it has stopped. The "
+         f"size is the SOURCE's \u2014 a {tiny['spot']:.0f}\u00b0 cap of MT1-MMP, tilted "
+         f"{tiny['spot_off']:.0f}\u00b0 off the view axis so the rim reads as a rim"),
+    ])
+    R5b = ([] if not small else [
+        ("06_hole_small", "bm_hole_small", "a bigger one, still arrested",
+         [q["bl"]], dict(skip_top=0.09),
+         f"No cap this time, a random MT1-MMP field: {small['faces_torn']} faces gone "
+         f"({100 * small['torn_frac']:.0f}% of the sheet) in one patch with "
+         f"{small['rim_loops']} rim loops, and it too stops. Change only the seed and the same "
+         f"phase point tears 31.5% \u2014 a hole size here carries a spread of half its own value"),
+    ]) + ([] if not (hol and trn) else [
+        ("06_breach_hole", "bm_breach_sheet", "one that does not",
+         [q["bl"]], dict(skip_top=0.09),
+         f"The breach is as big as its activation patch and does not arrest: "
+         f"{100 * hol['torn_frac']:.0f}% of the sheet gone, "
+         f"{100 * hol['biggest_patch_frac']:.0f}% of it a single hole. At cutting rate "
+         f"{trn['kdeg']:.0f} it is {100 * trn['torn_frac']:.0f}% and the sheet is in pieces"),
+    ])
     runs5, runs5b = [], []
     for out, rows in ((runs5, R5), (runs5b, R5b)):
         for d, v, lbl, panels, kw, cap in rows:
