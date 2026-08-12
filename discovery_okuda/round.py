@@ -1717,7 +1717,12 @@ def _build_one(slot, rid, index, seen):
             "replicate": replicate, "claim_proposed": slot.get("claim_proposed"),
             "run_key": C._run_key(g),
             "comp_hash": h,
-            **{k: slot.get(k) for k in ("claim", "predict", "intent", "why", "chases")}}
+            # `act` and `on` are what make an experiment a move against a CLAIM rather than a
+            # standalone number. They ride the same path as `intent` did -- but unlike `intent`,
+            # which was free text nothing ever counted, the act carries a required field the
+            # engine checks, so it cannot decay into a synonym for `predict`.
+            **{k: slot.get(k) for k in ("claim", "predict", "intent", "why", "chases",
+                                        "act", "on", "breaks_if", "rival", "precision")}}
 
 
 def _restore_parent_params(name, parent, edit, spare_seeds=False):
@@ -2409,6 +2414,67 @@ def campaign(rounds=1, mode="composition", n_slots=N_SLOTS, fresh=True):
             break
         print(f"[campaign] {rid}: {n} run(s) recorded")
     return out
+
+
+
+
+def claim_ledger(ctx):
+    """The claims the round may act on -- the Proposer's view of what is currently known.
+
+    THIS IS THE NODE THAT MAKES AN ACT POSSIBLE. Without it the Proposer is handed metrics and
+    parents and asked to produce knowledge, which is what the last campaign did: eleven STANDING
+    LAWS accumulated as prose in a file nothing could read back, and two of them contradicted each
+    other for six rounds because no role was ever shown both at once.
+
+    CONTESTED CLAIMS COME FIRST, because a contested claim is the only place a `discriminate` is
+    available and it is the act this loop has never performed. Then proposed, which is where the
+    seeds sit and where a `predict` or `falsify` buys the most. Supported and refuted are shown
+    last and briefly -- they are settled, and a slot spent re-confirming a supported claim is the
+    confirmatory habit the audit measured at a 16% validation rate.
+    """
+    try:
+        import claims as K
+    except Exception as e:
+        print(T_.warn(f"[round] claim ledger unavailable: {type(e).__name__}"))
+        return []
+    spec = K.load_spec()
+    cur, _hist = K.load()
+    if not cur:
+        return []
+    rank = {"contested": 0, "proposed": 1, "stale": 2, "supported": 3, "refuted": 4,
+            "superseded": 5}
+    out = []
+    for c in sorted(cur.values(), key=lambda c: (rank.get(c.get("status"), 9), c["id"])):
+        f, a = K.weigh(c, spec)
+        sc = c.get("scope") or {}
+        out.append({"id": c["id"], "statement": c["statement"], "kind": c["kind"],
+                    "status": c.get("status"), "weight_for": round(f, 2),
+                    "weight_against": round(a, 2),
+                    "scope_lineages": sc.get("lineages") or [], "scope_regimes": sc.get("regimes") or [],
+                    "n_evidence": len(c.get("evidence_for") or []) + len(c.get("evidence_against") or [])})
+    n_cont = sum(1 for c in out if c["status"] == "contested")
+    print(T_.quiet(f"[round] claim ledger: {len(out)} claims, {n_cont} contested"
+                   + (" -- `discriminate` is available" if n_cont else "")))
+    return out
+
+
+def metric_floors(ctx):
+    """Each metric's measured seed-to-seed spread, so a prediction can be scaled against it.
+
+    The Proposer was never told this and it is the single largest determinant of whether a slot
+    produces evidence: 65% of the last campaign's predictions asked for less than the floor of the
+    metric they were asked in, and those validated at 14% against 39% for the rest. R7 refuses them
+    now, but a rule that only says no is a rule the Proposer fights; this is the same number handed
+    over in time to be used.
+    """
+    try:
+        import critic as C
+        fl = dict(C._seed_floors())
+    except Exception as e:
+        print(T_.warn(f"[round] floors unavailable: {type(e).__name__}"))
+        return {}
+    return {k: v for k, v in sorted(fl.items(), key=lambda kv: -kv[1])}
+
 
 
 if __name__ == "__main__":

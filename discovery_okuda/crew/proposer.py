@@ -98,6 +98,20 @@ def run(bundle):
          bundle.get("refusals"), {"as_json": False, "limit": 20000}),
         ("Where the campaign stands, and what it is missing (the Grounder, last round)",
          bundle.get("grounding"), {"as_json": False, "limit": 20000}),
+        # THE TWO THINGS THE LAST CAMPAIGN NEVER TOLD THIS ROLE, and the audit measured the cost
+        # of both. The ledger: eleven STANDING LAWS lived as prose nothing could read back, so no
+        # slot could act ON one and two contradictory laws coexisted for six rounds. The floors:
+        # 65% of predictions asked for less than their metric's own seed-to-seed spread, and those
+        # validated at 14% against 39% for the rest. R7 refuses them now -- but a rule that only
+        # says no is a rule the role fights, so it gets the number in time to use it.
+        ("WHAT IS CURRENTLY CLAIMED -- contested first, because only a contested claim can be "
+         "`discriminate`d. Every Route B slot must name an `act` and the claim `on` which it acts",
+         bundle.get("claim_ledger"), {"as_json": True, "limit": 20000}),
+        ("THE SEED FLOOR OF EACH METRIC -- the spread between two runs of the SAME composition. A "
+         "prediction asking for less than this is refused by R7 before it runs; the floors span "
+         "fourteenfold, so the same 10% ask is an experiment in one metric and a coin toss in "
+         "another",
+         bundle.get("metric_floors"), {"as_json": True, "limit": 6000}),
         ("INSTRUCTIONS FROM THE OPERATOR -- these outrank anything above",
          bundle.get("user_input"), {"as_json": False, "limit": 30000}),
         (f"Your task", f"Propose {n - 1} slots (slot 0 is the control, already filled). "
