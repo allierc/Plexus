@@ -1,0 +1,113 @@
+# grow_divide -- r001_00_ctrl with growth that is not gated by a morphogen.
+#
+# NOT NAMED r001_*: that pattern is gitignored because `translate.write_config`
+# generates one per campaign slot per round -- outputs, not inputs. This is a
+# chosen recipe, like the other tracked ones, so it takes a name of its own.
+#
+# The control has divide_3d and no grow_3d, so nothing ever reaches the division
+# volume: 2 of 2,001 cells divided in 1,800 frames, and the site's 'grow & divide'
+# card drew a sphere doing nothing. `rho: 1.0, a_sw: 0.0` is the operator's own
+# uniform-growth regime -- every cell at the same rate, no chemistry deciding where.
+# The control itself is untouched: it is round 1's baseline and other runs are read
+# against it.
+general:
+  name: grow_divide
+  seed: 0
+  n_frames: 1800
+  dt: 1.0
+  record_cap: 1802
+  record_every: 1
+  boundary: free
+  dim: 3
+  world:
+  - 80.0
+  - 80.0
+  - 80.0
+_run:
+  target_cells: 50000
+  seed_cells: 2000
+sets:
+  vertex:
+    n: 130004
+  cell:
+    n: 65004
+    state:
+      chem:
+        width: 2
+        integration: first_order
+      cen:
+        width: 3
+      area:
+        width: 1
+fields: {}
+operators:
+- op: seed_mesh_3d
+  at: vertex
+  cell_set: cell
+  before_frame: 1
+  n_cells: 2000
+  radius: 5.0
+  jitter: 0.15
+  seed: 0
+  vseed_cv: 0.15
+  p0: 3.5
+- op: cell_geometry_3d
+  at: cell
+- op: shape_energy_3d
+  at: vertex
+  p0: 3.5
+  K_A: 1.0
+  K_P: 1.0
+  Gamma: 0.4
+  Lambda: 0.5
+  K_V: 20.0
+  K_R: 0.0
+  K_bend: 0.0
+  K_lumen: 0.0
+  antiinv: 0.0
+  mu: 1.0
+  dt: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+- op: reconnect_t1_3d
+  at: vertex
+  l_th_frac: 0.28
+  every: 1
+  max_flips: 300
+- op: grow_3d
+  at: vertex
+  cell_set: cell
+  rate: 0.000866
+  a_sw: 0.0
+  hill: 4.0
+  rho: 1.0
+  vth_frac: 2.5
+  after_frame: 100
+  conserve_amount: false
+- op: divide_3d
+  at: vertex
+  factor: 2.0
+  reset_noise: 0.12
+  cycle_cv: 0.15
+  p0: 3.5
+  every: 4
+  cell_set: cell
+  min_cycle: 4
+  max_cycle: 1000000000
+  after_frame: 100
+  orient_iface: false
+  orient_asw: 0.6
+  g1_ramp: false
+  engine_clock: true
+- op: topo_snapshot_3d
+  at: vertex
+  every: 1
+schedule:
+- seed_mesh_3d
+- cell_geometry_3d
+- shape_energy_3d
+- reconnect_t1_3d
+- grow_3d
+- divide_3d
+- topo_snapshot_3d
