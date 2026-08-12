@@ -553,14 +553,21 @@ def main():
     # 0.5 against 0.75, with the growth rate, both diffusivities, F, k and the division rule
     # identical. That is what makes the pair a comparison rather than two shapes.
     R5r = [
-        ("r019_02", "turing_rate_arms", "reaction rate 0.5"),
         ("r020_01", "turing_rate_folds", "reaction rate 0.75"),
+        ("r019_02", "turing_rate_arms", "reaction rate 0.5"),
+        ("r021_06", "turing_rate_spikes", "rate 0.25, growth doubled"),
     ]
+    # ORDERED BY CHEMISTRY AGAINST GROWTH, fastest first, because that ratio is what the row is:
+    # 0.75/8.66e-4, then 0.5/8.66e-4, then 0.25/1.73e-3 -- a sixfold range, and the shape goes from
+    # folded to thick-armed to thin-armed across it. The third run also reseeds, which is why its
+    # caption says to read the ratio rather than the shape.
     CAP5 = {
-        "r019_02": "Chemistry at half the growth's pace: thick arms, four of them counted as "
-                   "tubes. {cells:,} cells",
-        "r020_01": "The same composition with the chemistry half again as fast: the shell folds "
-                   "instead of forming arms, and carries {cells:,} cells",
+        "r020_01": "Chemistry fast against growth: the shell folds rather than forming arms, and "
+                   "carries {cells:,} cells",
+        "r019_02": "A third slower, and the folds become thick arms — four of them counted as "
+                   "tubes, at {cells:,} cells",
+        "r021_06": "Slower still, with growth doubled: five long thin arms, {cells:,} cells. This "
+                   "one reseeds as well, so it is the ratio that compares and not the shape",
     }
     runs5r = []
     for d, v, lbl in R5r:
