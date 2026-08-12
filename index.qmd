@@ -31,7 +31,7 @@ a common intermediate representation rather than competing modelling paradigms.
 ## Four concepts, seven operators
 
 The language is built around four fundamental concepts: **operators**, **sets**
-(collections of biological entities across scales — particles, cells, neurons,
+(collections of biological entities across scales — proteins, cells, neurons,
 synapses, tissues), the **states** each element carries, and **fields** (continuous
 quantities defined over space — morphogens, pressure, potentials). A biological model
 is a composition of operators acting on these objects.
