@@ -503,6 +503,13 @@ class Grow3D(Structural):
         # WHICH SPECIES GATES GROWTH: 0 (chem columns 0,1) by default, so existing specs are
         # unchanged; 2 reads a second RD system living in the same buffer.
         self.chan = int(params.get("chan", 0))
+        # IS `a_sw` A VALUE OF THE ACTIVATOR OR A FRACTION OF ITS MAXIMUM? Default False = the
+        # absolute reading every run in this project's history used, so no archived spec changes
+        # meaning. See the gate itself in `forward` for why both are real mechanisms. `a_live` is
+        # the floor below which a field counts as dead and the relative gate refuses to open --
+        # 1e-3 against activators that reach 0.6-1.5 when alive and 1e-9 when they have collapsed.
+        self.a_sw_rel = bool(params.get("a_sw_rel", False))
+        self.a_live = float(params.get("a_live", 1e-3))
         # THE INHIBITOR: None = off, so every existing spec is unchanged. `inhib_sw` is a fraction
         # of the inhibitor's OWN maximum and `inhib_hill` its sharpness, mirroring a_sw/hill.
         _ic = params.get("inhib_chan", None)
@@ -562,7 +569,32 @@ class Grow3D(Structural):
         if "mg_scale" not in m or m["mg_scale"].shape[0] != nF:  # per-cell cumulative linear scale (capped)
             m["mg_scale"] = torch.ones(nF, device=dev, dtype=m["V0f"].dtype)
             m["A0_init"] = m["A0"].clone(); m["P0_init"] = m["P0"].clone(); m["V0f_init"] = m["V0f"].clone()
-        hillv = a ** self.hill / (self.a_sw ** self.hill + a ** self.hill + 1e-12)   # Hill activation in [0,1]
+        # THE GATE'S HALF-POINT, AND WHAT IT IS A FRACTION OF.
+        #
+        # `a_sw` is ABSOLUTE by default: the Hill half-point sits at a fixed value of the activator
+        # and does not move when the field does. Every other threshold on a chemistry field in this
+        # substrate is relative to that field's own maximum -- `interface_line_tension_3d.a_sw`,
+        # `extrusion_forcing_3d.a_sw`, `apoptosis_3d` chem_low, `divide_3d.orient_asw` -- and two
+        # comments in this project (crew/basis.yaml on `a_sw_gated`, and the inhibitor branch
+        # twenty lines below) already describe THIS one as a fraction of the maximum. They were
+        # describing an intention, not the code.
+        #
+        # Both are defensible and they are not the same mechanism, so this is a switch and not a
+        # correction:
+        #   absolute  the gate stops opening when the chemistry dies. A field that decays to 1e-9
+        #             drives no growth, and the tissue goes static -- which is what the 16 runs
+        #             with act_max < a_sw did, honestly.
+        #   relative  the gate always selects the same TOP FRACTION of cells, so `a_sw` means the
+        #             same thing in a run peaking at 0.6 and one peaking at 1.5. That is what a
+        #             sweepable lever has to do; measured over 154 runs the absolute gate sat
+        #             anywhere from 0.24 of the field to above all of it.
+        # The floor is what keeps `relative` honest: without it, a field decayed to noise still has
+        # cells "above 35% of the maximum" and the tissue would grow on numerical dust forever.
+        thr = self.a_sw
+        if self.a_sw_rel:
+            amax = float(a.max()) if a.numel() else 0.0
+            thr = self.a_sw * amax if amax > self.a_live else float("inf")   # inf -> Hill term 0
+        hillv = a ** self.hill / (thr ** self.hill + a ** self.hill + 1e-12)   # Hill activation in [0,1]
         # A SECOND MORPHOGEN THAT STOPS GROWTH. Cedric, 11 August: "make variants where the blue
         # morphogen stops cell growth, so that we see the blue and only red spots growing."
         #

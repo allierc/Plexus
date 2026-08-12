@@ -383,8 +383,8 @@ OPERATORS = {
         #            Analyst has reported six times. NEVER EMITTED AT ALL (0 occurrences).
         # eta / cap_frac / smooth_* stay pinned: they are solver numerics, not mechanisms, and the
         # model/implementation split says a numerical choice is not an experiment.
-        params={"K_V": (1.0, 8.0, 6.0), "kappa_s": (0.05, 0.6, 0.2),
-                "Gamma": (0.0, 0.4, 0.05), "Lambda": (0.0, 0.3, 0.20),
+        params={"K_V": (1.0, 100.0, 20.0), "kappa_s": (0.05, 0.6, 0.2),
+                "Gamma": (0.0, 0.4, 0.05), "Lambda": (0.0, 1.0, 0.50),
                 "p0": (3.4, 4.2, 3.90), "h0": (0.05, 0.4, 0.40), "gamma": (0.0, 0.3, 0.06),
                 "K_bend": (0.0, 2.0, 0.0), "K_lumen": (0.0, 2.0, 0.0),
                 "K_A": (0.0, 4.0, 1.0), "K_P": (0.0, 4.0, 1.0), "K_R": (0.0, 0.2, 0.02),
@@ -393,7 +393,7 @@ OPERATORS = {
     "reconnect_t1_3d": dict(
         stage=1, role="topology", outputs=[], slots=[], needs=[],
         impls=["length_threshold"], impl_structural=False,
-        params={"l_th_frac": (0.01, 0.12, 0.04)}),
+        params={"l_th_frac": (0.01, 0.40, 0.28)}),
 
     # ---------------------------------------------------------------- Stage 2: growth & topology
     # `grow_3d` WAS HERE AND IS GONE. Cedric, 8 August: "it is a bummer to have two growth
@@ -424,7 +424,7 @@ OPERATORS = {
         # searchable space. Now ALPHA_CEIL, derived from the float32 overflow of a_sw**alpha in
         # the Hill function (see hill_alpha_ceiling). lo = 1.0 stays: below 1 the Hill switch has
         # infinite slope at the origin and stops being a switch.
-        params={"rate": (0.002, 0.03, 0.010), "a_sw": (A_SW_MIN, A_SW_MAX, A_SW_DEFAULT),
+        params={"rate": (0.0005, 0.03, 0.000866), "a_sw": (A_SW_MIN, A_SW_MAX, A_SW_DEFAULT),
                 "hill": (1.0, ALPHA_CEIL, 4.0),
                 # `rho` IS THE BASELINE EVERY CELL GROWS AT, and the tip:body ratio is
                 # (rho + 1) : rho. Its default was 0.0 -- an INFINITE ratio, a growing tip on a
@@ -609,7 +609,7 @@ OPERATORS = {
         # the activation a moving boundary condition rather than an initial condition -- so
         # "does the pattern grip the shape?" was asked of a pattern pinned to the shape -- and it
         # overwrote both chemistry channels every tick, annihilating shape_to_chem.
-        impls=["cone", "spot", "scatter"], impl_structural=True,
+        impls=["cone", "spot", "scatter", "patch", "noise"], impl_structural=True,
         params={"cone_deg": (4.0, 30.0, 8.0),
                 "seed_frac": (0.01, 0.30, 0.06),
                 "n_spots": (1, 8, 1)}),
@@ -661,6 +661,29 @@ def slots_of(op: str, impl: str):
 # Listed here: sigma pinned to the width of the OLD, pre-widening box, so this change is
 # basin-preserving by construction and no existing robustness claim changes meaning.
 PARAM_BASIN = {
+    # THE BOX WAS WRONG, NOT THE RUNS. Four parameters were flagged `out_of_range` on EVERY run
+    # this campaign ever produced -- all 196, plus every member of the basis -- because the
+    # declared box excluded the value the project actually operates at:
+    #
+    #     K_V         box (1, 8)        every run 20;  r013_05, the one specimen with arms, 80
+    #     Lambda      box (0, 0.3)      every run 0.5
+    #     l_th_frac   box (0.01, 0.12)  every run 0.28
+    #     grow rate   box (0.002, 0.03) every run 0.000866, BELOW the floor
+    #
+    # A range violated by one run in fifty is a warning; one violated by fifty in fifty is a
+    # measurement of the range. The cost was not cosmetic: the sweep menu takes its two points
+    # from `(lo, hi, default)`, so the loop could not propose the region its own best result
+    # lives in -- K_V 80 was ten times a ceiling no ladder could climb toward.
+    #
+    # THE BASIN IS PINNED TO THE OLD WIDTH, which is the whole reason these four lines are here.
+    # `basin_sigma` defaults to 0.15 x (hi - lo), so widening K_V to 100 would silently widen the
+    # perturbation used for robustness from +-1.05 to +-14.85 and every claim of the form "this
+    # survives a 15% perturbation" would change meaning underneath the archive. Same box, same
+    # basin: the admissible region moves and the question "is this result fragile" does not.
+    ("shape_energy_3d", "K_V"): 8.0 - 1.0,          # old box (1.0, 8.0)
+    ("shape_energy_3d", "Lambda"): 0.3 - 0.0,       # old box (0.0, 0.3)
+    ("reconnect_t1_3d", "l_th_frac"): 0.12 - 0.01,  # old box (0.01, 0.12)
+    ("grow_3d", "rate"): 0.03 - 0.002,              # old box (0.002, 0.03)
     ("grow_3d", "hill"): 8.0 - 1.0,        # old box (1.0, 8.0)
     ("cell_diffuse", "d_a"): 0.2 - 0.005,               # old box (0.005, 0.2)
     ("cell_diffuse", "d_h"): 2.0 - 0.1,                 # old box (0.1, 2.0)

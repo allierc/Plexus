@@ -1,0 +1,61 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\citation{matsubayashi2020}
+\newlabel{eq:motion}{{1}{2}{}{equation.1}{}}
+\newlabel{eq:step}{{2}{2}{}{equation.2}{}}
+\newlabel{eq:energy}{{3}{2}{}{equation.3}{}}
+\newlabel{eq:moduli}{{4}{2}{}{equation.4}{}}
+\newlabel{eq:frames}{{5}{2}{}{equation.5}{}}
+\newlabel{eq:lambda}{{6}{2}{}{equation.6}{}}
+\newlabel{eq:twolambda}{{7}{2}{}{equation.7}{}}
+\citation{changede2017}
+\citation{nanoclusters2025}
+\citation{changede2017}
+\citation{nanoclusters2025}
+\newlabel{eq:remodel}{{8}{3}{}{equation.8}{}}
+\newlabel{eq:mass}{{9}{3}{}{equation.9}{}}
+\newlabel{eq:massstate}{{10}{3}{}{equation.10}{}}
+\citation{changede2017}
+\citation{nanoclusters2025}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces \textbf  {(a)} An integrin is a heterodimer; $20$--$50$ of them make a nanocluster $35$--$100$ nm across \cite  {changede2017}; clusters group into adhesions of $\sim \!10^3$ integrins at a measured $\sim \!555$ nm centre-to-centre spacing \cite  {nanoclusters2025}. The discrete \texttt  {plaque} of 05b was the MIDDLE level --- one cluster --- and at $41$k sheet nodes there are $25$ clusters and $\sim \!3000$ integrins per node, so that description was resolving something the mesh cannot see. \textbf  {(b)} The three states, each on the entity it belongs to. Free receptor is the CELL's and is well mixed over its own basal face; bonds are a relation and live on the edge; ligand is sheet material and is already $\rho $.}}{4}{figure.1}\protected@file@percent }
+\newlabel{eq:clutch}{{11}{5}{}{equation.11}{}}
+\newlabel{eq:plaque_n}{{12}{5}{}{equation.12}{}}
+\newlabel{eq:implicit}{{13}{5}{}{equation.13}{}}
+\newlabel{eq:contact}{{14}{5}{}{equation.14}{}}
+\newlabel{eq:split}{{15}{6}{}{equation.15}{}}
+\newlabel{eq:Sk}{{16}{6}{}{equation.16}{}}
+\citation{matsubayashi2020}
+\citation{kelley2019}
+\citation{bell1978}
+\citation{keene1987}
+\citation{yurchenco2011}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces \textbf  {(a)} Every set and field, and which kind each is. A node set carries positions; an edge or hyperedge set is a \emph  {relation} and carries state belonging to neither endpoint --- a junction to neither cell, a plaque to neither the cell nor the sheet, a triangle to none of its three nodes. \textbf  {(b)} Every operator, on the set it acts on, coloured by kind. Anything carrying a \emph  {force} sits on a set whose elements have positions; anything carrying \emph  {mass or number} sits on the set that owns the quantity. \texttt  {bm\_refine} is the only operator here that is numerical rather than biological.}}{9}{figure.2}\protected@file@percent }
+\citation{karagiannis2004}
+\citation{sato2010}
+\citation{cancerres2008}
+\newlabel{eq:bell}{{17}{10}{}{equation.17}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces \texttt  {05q\_gates}: G40--G46 on the real epithelium, \texttt  {05b}'s rig with the driver swapped and nothing else changed. \textbf  {a} \textcolor {passgreen}{\textbf  {G41}}: $\lambda ^{\rm  geo}$ (black) on the apical-area ratio $\sqrt  {A_{\rm  ep}(t)/A_{\rm  ep}(0)}$ (green) to $1.40\%$ over $401$ frames --- the sheet is reporting the tissue's growth, and against the \emph  {area}, since a dividing epithelium is not a sphere and the radius ratio would have been the wrong reference. \textbf  {b} \textcolor {passgreen}{\textbf  {G40}} at $4.72\%$ over $8\times $ in $\kappa _n$, and the four points are monotone: passed, but the adhesion's compliance is in there. \textbf  {c} \textcolor {passgreen}{\textbf  {G42}}: worst triangle quality $0.587$, far above the $0.2$ line, against $0.000$ for the vertex-plaque driver this replaces. \textbf  {d} \textcolor {failred}{\textbf  {G44}}: with no \texttt  {bm\_refine} the mean edge reaches $3.63\times $ its seeded length, outside the band (green) --- the failure is expected and its value is the measurement, i.e. how much refinement a $3.77\times $ dilation of a real surface demands.}}{13}{figure.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces \texttt  {05a\_sheet}, the sheet alone on the recorded epithelial surface. \textbf  {a} \textcolor {passgreen}{\textbf  {G5}}: the measured $\lambda ^{\rm  geo}$ lies on the applied $R(t)/R(0)$ to $0.9935$, against $0.13$ for the MPM sheet moved by an engine delta; the two flat lines at $1.0000$ are \textcolor {passgreen}{\textbf  {G6}} ($\kappa =0$) and \textcolor {passgreen}{\textbf  {G7}} (a rigid drive), i.e. the measure invents no strain and does not mistake motion for deformation. \textbf  {b--c} remodelling: at $\tau _r=25$ frames the standoff improves $1026\times $ while $\lambda ^{\rm  geo}$ is unmoved --- the sheet still goes where the tissue puts it and stops fighting. \textbf  {f} \textcolor {passgreen}{\textbf  {G8}}: divergence at the predicted group $\Delta t M\lambda _{\max }=2$, measured, not assumed. \textbf  {g} the tangent stiffens $19\times $ over the run, which is why the bound has to be re-measured. \textbf  {h} the stiffening law as a ratio, since MPa is not a quantity this box has.}}{14}{figure.4}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces \texttt  {05b\_plaque}, the adhesion as an edge set. \textbf  {1} \textcolor {passgreen}{\textbf  {G9}}: the residual on the adhesion's own force pair sits at $1.4\times 10^{-16}$, i.e. at double-precision $\varepsilon $ --- one operator, a delta to both endpoints, and the reaction cannot be half-implemented. \textbf  {2} \textcolor {passgreen}{\textbf  {G10}}: the same claim as motion, with two free bodies whose mobility-weighted centroid drifts by $4.4\times 10^{-15}$ of the system's own size. \textbf  {3} \textcolor {failred}{\textbf  {G12}}: the standoff is $3.43\,\ell _0$ and not $\ell _0$. \textbf  {4} \textcolor {failred}{\textbf  {G13}}: $\xi =0$ and $\xi >0$ do not separate, because a fixed barycentric anchor is a tangential pin. \textbf  {5} rupture is a clock rather than a load, for want of turnover. \S  4.2 is what each of those three costs, and \S  2.3 is the scheme that replaces them.}}{14}{figure.5}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {6}{\ignorespaces \texttt  {bm\_refine} and what it must carry (\texttt  {05e\_conserve}). Red dash-dot lines are the two refinements, at frames $131$ and $353$. \textbf  {Top left} \textcolor {passgreen}{\textbf  {G18b}}, \textcolor {passgreen}{\textbf  {G18d}}: $\DOTSB \sum@ \slimits@ _f m_f$ is flat through both splits and through an area that grows $\times 11$ --- bit-identical --- while the volume and area grow because the tissue did. \textbf  {Top right} \textcolor {passgreen}{\textbf  {G18c}}: the plaque areal density is held at $0.996$ of $\Sigma ^{-2}$; the fixed-fraction rule 05b used ends at $0.145$. \textbf  {Bottom left} G18e: with nothing secreting, $m/A$ IS $1/J$ identically --- an identity, drawn because it is the baseline \texttt  {bm\_secrete} has to hold flat. \textbf  {Bottom right} the split is invisible in $\lambda $ (no step at the red lines) while the mean edge length is halved at each.}}{15}{figure.6}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {7}{\ignorespaces \texttt  {bm\_secrete} (\texttt  {05f\_secrete}), in the register of \S  3's operator table: the operator names itself, states the equations it is, and every panel is a measurement that could have come back wrong. \textbf  {Top left} \textcolor {passgreen}{\textbf  {G24}}: \texttt  {fed} holds $\rho $ at $1.005$ while the area triples, against $0.351$ starved. \textbf  {Top right} \textcolor {failred}{\textbf  {G27}}: the two removal terms are \emph  {not} the same size --- dilution is $0.238$ of turnover at $\tau _{\rm  bm}=40$ frames. \textbf  {Bottom left} \textcolor {passgreen}{\textbf  {G26}}, plotted against $\lambda $ and not against the frame, because ``starved tears and fed does not'' is a statement about supply only if the two are compared at the same deformation. \textbf  {Bottom right} \textcolor {passgreen}{\textbf  {G25}}: polarised deposition ends at $r=+0.88$ with the plaques against uniform's $-0.05$, with the stretch correlation drawn beside it as the control that separates deposition from mechanics.}}{15}{figure.7}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {8}{\ignorespaces \texttt  {05d\_tear}: tearing, and the gate the MPM sheet was never given. \textbf  {Bottom middle} \textcolor {passgreen}{\textbf  {G19}}: the same criterion at $5{,}115$ and $20{,}471$ faces tears at $\lambda ^{\rm  el}=2.110$ and $2.099$ --- $0.52\%$ apart, against a $5\%$ threshold --- so the tear is set by the material and not by the discretisation. \textbf  {Bottom left} \textcolor {passgreen}{\textbf  {G20}}, \textcolor {passgreen}{\textbf  {G22}}: onset moves with the criterion (frames $167$ / $227$ / $285$ at thresholds $1.8$ / $2.2$ / $2.6$) and a criterion above the largest stretch reached kills $0$ of $81{,}920$ faces --- which is the run-127 control, run on purpose. \textbf  {Top row} \textcolor {passgreen}{\textbf  {G17}}, \textcolor {passgreen}{\textbf  {G18}}: the reservoir holds the edge length at $0.84$ of seeded where a fixed mesh reaches $3.33$, and refinement improves the fidelity rather than merely preserving it.}}{16}{figure.8}\protected@file@percent }
+\bibcite{karagiannis2004}{1}
+\bibcite{sato2010}{2}
+\bibcite{cancerres2008}{3}
+\bibcite{stvk}{4}
+\bibcite{candiello2007}{5}
+\bibcite{bell1978}{6}
+\bibcite{changede2017}{7}
+\bibcite{nanoclusters2025}{8}
+\bibcite{kanchanawong2010}{9}
+\bibcite{matsubayashi2020}{10}
+\bibcite{kelley2019}{11}
+\bibcite{yurchenco2011}{12}
+\bibcite{keene1987}{13}
+\bibcite{rivara1984}{14}
+\bibcite{okuda2013}{15}
+\bibcite{hgo2000}{16}
+\gdef \@abspage@last{19}

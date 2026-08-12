@@ -220,6 +220,36 @@ RHO_UNGATED = 1.0            # `uniform` is gone from the basis; kept for a spec
 # the rate that made death survivable at all -- uncapped, five of six modes took r020_00_ctrl from
 # protr 1.513 / grip 0.228 to 1.131 / 0.049.
 
+def _apply_set(ops, overrides, name):
+    """A member's `set:` block -- `{op.key: value}` applied to the template it was built from.
+
+    WHY A GENERIC OVERRIDE AND NOT A NEW AXIS PER MECHANISM. The five axes above (chem, mat, mech,
+    gate, drive) are the ones the basis compares ACROSS; a member that exists to carry one untried
+    implementation is not a new column of that grid, it is one cell of it with one key changed.
+    Giving each such member its own axis would multiply the grid by two for every mechanism and
+    make fourteen members into two hundred, most of them meaningless combinations.
+
+    IT IS CHECKED, NOT TRUSTED. A key naming an operator the member does not carry is a silent
+    no-op -- `set: {apoptosis_3d.mode: crowding}` on a member with `death: false` would write
+    nothing and the member would run as its own twin. That is refused here rather than discovered
+    in the ledger. Whether the operator READS the key is a separate question, and `_unread` below
+    already answers it for every key in the spec, including these.
+    """
+    if not overrides:
+        return ops
+    by_op = {o["op"]: o for o in ops}
+    for dotted, val in overrides.items():
+        if "." not in dotted:
+            raise ValueError(f"{name}: `set` key {dotted!r} is not `op.key`")
+        op, key = dotted.split(".", 1)
+        if op not in by_op:
+            raise ValueError(f"{name}: `set` names {op!r}, which this member does not carry "
+                             f"(it has {sorted(by_op)}). An override that lands nowhere is a "
+                             f"member that silently duplicates another.")
+        by_op[op][key] = val
+    return ops
+
+
 def build(m):
     """One DECLARED MEMBER (a row of crew/basis.yaml `members:`) -> a full spec dict."""
     chem, mat, mech = m["chem"], m["mat"], m["mech"]
@@ -300,6 +330,8 @@ def build(m):
         {"op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": 0.28, "every": 1, "max_flips": 300},
         {"op": "topo_snapshot_3d", "at": "vertex", "every": 1},
     ]
+
+    ops = _apply_set(ops, m.get("set") or {}, m["name"])
 
     name = m["name"]
     return {

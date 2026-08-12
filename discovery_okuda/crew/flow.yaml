@@ -122,8 +122,24 @@ nodes:
         # than 2.0 because "a protrusion still there at the end" is the claim; 2.0 would be a seat
         # that has matched one run in ninety-four.
         tube:
-          where: {protrusion_aspect_max_final: 0.4}
-          score: {protrusion_aspect_max_final: 1.0, n_tubes_final: 0.5}
+          # NOT KEYED ON `protrusion_aspect_max_final`, WHICH CANNOT SEE A TUBE ON THIS SUBSTRATE.
+          # r013_05 is eleven arms with activator at their tips, 5.92 long and 2.11 across, and
+          # reads aspect_final 0.0 and n_tips_final 0. It could not take this seat and got into
+          # r014 through `complex`, on grip -- the one specimen closest to the campaign's stated
+          # objective, invisible to the objective's own metric. That is standing law L3, filed
+          # since r006 and never acted on: "the metric zeroes tips the picture shows".
+          # `n_tubes` comes from `tissue_analysis:tube_diameter`, is admitted and headline, and
+          # counts r013_05's arms at 11 -- the same number the eye reports. Aspect stays in the
+          # SCORE, where a run that has it ranks higher, but no longer in the gate, where it was
+          # excluding the seat's own best candidate.
+          #
+          # NOT `ta_tube_len_final`, though it measures exactly the quantity this seat wants and
+          # reads 5.92 on r013_05: that metric is WITHDRAWN -- "the instrument gate measured it to
+          # lie (F15/F16)" -- and a seat is not the place to quietly readmit a rejected instrument.
+          # The seat therefore counts arms and does not weigh their length; if length is worth
+          # having, the instrument has to be re-earned through the gate first.
+          where: {n_tubes_final: 2}
+          score: {n_tubes_final: 1.0, protrusion_aspect_max_final: 0.5}
         bud:
           # a BULGE, not a finger -- aspect counts against it, or this is just the tube seat again
           where: {protr_final: 1.10}
@@ -174,6 +190,19 @@ nodes:
         - b_gs_shaping_sharp_hi
         - b_gs_plain_soft_lo_death
         - b_gs_shaping_sharp_hi_death
+        # THE STAR AND WHAT IS BRED FROM IT -- see the block in crew/basis.yaml. Nine members, all
+        # on the one composition in 196 runs that made arms rather than lobes, each changing one
+        # mechanism that has never run: oriented division, tension/pressure feedback, a negative
+        # beta, the gate read as a fraction, and Okuda's own multi-cone seeding.
+        - b_star
+        - b_star_sharp
+        - b_star_death
+        - b_star_oriented
+        - b_star_tension
+        - b_star_pressure
+        - b_star_avoid
+        - b_star_relgate
+        - b_star_cones
   - id: history
     code: round.history
     args:
