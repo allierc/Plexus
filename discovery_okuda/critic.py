@@ -39,6 +39,7 @@ worth doing.
 from __future__ import annotations
 
 import math
+import os
 import re
 from dataclasses import dataclass
 
@@ -806,3 +807,87 @@ if __name__ == "__main__":
     for m in menu[:5]:
         print(f"    {m['label']:36} -> {m['yields']}")
     print("\ncritic OK")
+
+
+# =============================================================================================
+# R7 -- IS THE QUESTION ASKABLE?
+#
+# The epistemic audit of r001-r022 measured this loop's own reproducibility: every `replicate` slot
+# re-runs its parent's composition at a fresh seed, so the spread between the two IS the substrate's
+# noise. It is large and it is metric-dependent -- 2% on `protr`, 41% on `protrusion_aspect_max`.
+#
+# Against that, 65% of the campaign's predictions asked for a change SMALLER than the floor of the
+# metric they were asked in. Median ask 3%; median floor 20%. Five asked for a 0.0% change -- beat
+# the parent's exact value. Below the floor the loop validated at 14%, above it at 39%: the same
+# loop, the same scorer, and nearly three times the hit rate as soon as the question is answerable.
+#
+# So this is not a rule about being right. It is a rule about ASKING SOMETHING A SINGLE RUN CAN
+# ANSWER. A threshold finer than the noise is a coin toss with a number on it, and scoring it
+# `refuted` credits the loop with a falsification it never performed.
+#
+# WHY A RULE AND NOT AN INSTRUCTION. `user_input.md` told the Proposer that `add_op` had fired 30
+# times and all 30 added the same operator; the next campaign then did 20 for 20. A rule computes;
+# a paragraph negotiates.
+#
+# TWO EXITS, both of which must be declared rather than assumed. `replicate` is exempt because it is
+# ABOUT the floor -- refusing it would forbid the only experiment that measures the thing this rule
+# depends on. And a slot may declare `precision: true` with a replicate count, which is the honest
+# way to ask a fine question: not one run at a tighter threshold, but several at the same one.
+def check_resolution(slot, parent_metrics, floors=None):
+    """Rejection or None. `slot` carries `predict`, `act`/`intent` and optionally `precision`."""
+    import re as _re
+    pr = str((slot or {}).get("predict") or "")
+    m = _re.match(r"\s*([a-z_0-9]+)\s*([<>]=?)\s*([-0-9.eE+]+)", pr)
+    if not m:
+        return None                                   # no prediction to judge; other rules apply
+    act = (slot.get("act") or slot.get("intent") or "").lower()
+    if act in ("replicate", "precision") or slot.get("precision"):
+        return None
+    metric, thr = m.group(1), float(m.group(3))
+    base = (parent_metrics or {}).get(metric)
+    if not isinstance(base, (int, float)) or not base:
+        # UNKNOWN IS NOT REFUSED. With no parent value there is nothing to compare the ask against,
+        # and refusing on an absence would silently bar every prediction on a metric the parent did
+        # not report -- which includes every genuinely new measurement.
+        return None
+    if floors is None:
+        floors = _seed_floors()
+    f = floors.get(_metric_family(metric), floors.get("_default", 0.20))
+    rel = abs(thr - base) / abs(base)
+    if rel >= f:
+        return None
+    return Rejection(
+        "R7_BELOW_RESOLUTION",
+        "the predicted effect is smaller than this metric's own seed-to-seed spread, so one run "
+        "cannot answer it either way",
+        f"{metric}: parent {base:.4g}, threshold {thr:.4g} -- a {100 * rel:.1f}% change against a "
+        f"measured floor of {100 * f:.0f}%. Ask for a bigger effect, choose a metric with a "
+        f"tighter floor, or declare `precision: true` with the replicates that would make it "
+        f"readable.")
+
+
+def _metric_family(metric):
+    import re as _re
+    return _re.sub(r"_(peak|final|floor|span|trend|measured_frac)$", "", str(metric))
+
+
+_FLOOR_CACHE = {}
+
+
+def _seed_floors():
+    """The measured floors, from `epistemic_spec.md` -- the same file the audit re-measures into,
+    so the rule tightens as the campaign learns its own noise."""
+    if _FLOOR_CACHE:
+        return _FLOOR_CACHE
+    import re as _re
+    import yaml as _yaml
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "epistemic_spec.md")
+    try:
+        for b in _re.findall(r"```yaml\n(.*?)```", open(p).read(), _re.S):
+            d = _yaml.safe_load(b) or {}
+            if "seed_floor" in d:
+                _FLOOR_CACHE.update(d["seed_floor"]); break
+    except Exception:
+        pass
+    _FLOOR_CACHE.setdefault("_default", 0.20)
+    return _FLOOR_CACHE

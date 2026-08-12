@@ -1532,6 +1532,24 @@ def _build_sweep(slot, rid, index):
 
 def _build_one(slot, rid, index, seen):
     par, edit = slot.get("parent"), slot.get("edit")
+    # R7 FIRST, BEFORE THE GRAPH IS EVEN REBUILT, because it needs nothing but the prediction and
+    # the parent's own measurements -- and because a slot asking an unanswerable question should
+    # cost nothing at all, not a rebuild and a compile.
+    #
+    # Measured on r001-r022: this refuses 60% of non-replicate predictions and NOT ONE of the 17
+    # confirmations that were above their metric's floor. The ten confirmations it does remove all
+    # asked for less than the noise, four of them for a 0.0% change -- beat the parent's exact
+    # value -- which is a coin toss that happened to land right, and was scored as knowledge.
+    try:
+        _pm = (measure(par) or {}) if par else {}   # the same reader the `parents` node uses
+        _r7 = C.check_resolution(slot, _pm)
+        if _r7 is not None:
+            _refuse(index, slot, f"{_r7.code}: {_r7.detail}")
+            return None
+    except Exception as _e:
+        # A GUARD THAT CANNOT REFUSE A SLOT BY FAILING. If the parent's metrics cannot be read the
+        # question is unjudged, not unanswerable, and the slot proceeds to the rules that follow.
+        print(T_.quiet(f"[round] R7 not evaluated for slot {index}: {type(_e).__name__}"))
     try:
         g = _graph(par)
     except Exception as e:
