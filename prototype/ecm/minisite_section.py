@@ -313,36 +313,28 @@ def replace_card(video, name, spec_path, cap, files=(), new_video=None):
 
 
 def build(runs):
-    """One row: the interface under the three loadings it has to survive -- press, drag, breach."""
+    """One row: the interface under the three loadings it has to survive -- press, drag, breach.
+
+    SHORT, LIKE THE REST OF THE PAGE. The first version of this section ran to 1,200 characters of
+    prose against 140-400 everywhere else, and 400-character captions against 40-160: it read as a
+    note rather than as a card. What the loadings mean belongs in the run's spec, which every card
+    already opens; the caption's job is the one number that says whether it worked.
+    """
     cards = "\n".join(card(v, n, sp, c) for _, v, n, sp, c in runs)
     return f"""{BEGIN}
 <h3>Vertex + MPM</h3>
 <p class="opk">Two Levels, two solvers, one interface: a <b>triangulated surface</b> with mass and
-springs — the vertex model's own geometry — pressed into a <b>block of MPM material</b> (the MLS-MPM
-cycle below), coupled particle-to-face so the reaction really returns to the mesh rather than being
-applied to the material alone. No tissue and no matrix here: this is the interface itself, on the
-smallest rig that can falsify it, under the three loadings that can break it. <b>Press</b>: the
-surface indents the block against a rigid floor and lifts off again, and the material has to push
-back and recover. <b>Drag</b>: a sticky pad presses to a fixed depth and then travels sideways over a
-block pinned at its base, so the load is tangential — it ploughs, heaps material ahead of itself and
-<b>shears</b> what it drags over, coloured by von Mises because a drag changes shape at constant
-volume and a volumetric colour is blank exactly where the physics is. <b>Breach</b>: the surface
-carries a hole and the box is closed on all four sides, so the material has nowhere to go but
-<b>through</b>, and it extrudes as a plug. Each clip plays the 3D view first, then a cross-section
-through the same instant; the grey lines are the rigid floor and, in the last one, the walls.</p>
-<p class="opk-ref">Reference — the contact is the ICFEMP particle-to-surface scheme of
-<a href="https://doi.org/10.1016/j.cma.2015.04.005">Chen, Qiu, Zhang &amp; Lian (2015),
-<i>Comput. Methods Appl. Mech. Engrg.</i> 293:1–19</a>, chosen over grid-node coupling
-(<a href="https://doi.org/10.1016/j.cma.2011.07.014">Lian, Zhang &amp; Liu 2011,
-<i>CMAME</i> 200:3482</a>) because that one needs the mesh and the grid to be comparable in size and
-ours are not; the solid is MLS-MPM
-(<a href="https://doi.org/10.1145/3197517.3201293">Hu et&nbsp;al. (2018), <i>ACM Trans. Graph.</i> 37(4):146</a>), the surface is the mesh
-of the 3D active vertex model of
-<a href="https://www.nature.com/articles/s41598-018-20678-6">Okuda et&nbsp;al. (2018)</a>. The
-implementation is ours (<code>prototype/ecm</code>): these three clips are the interface rig
-<code>test_03_mesh_contact</code>, and the operator that carries the same scheme onto a curved,
-dividing surface is <code>mesh_contact</code>, with <code>seed_ecm</code> /
-<code>cell_to_ecm</code> / <code>cell_exclude_3d</code> / <code>ecm_stress</code> beside it.</p>
+springs, pressed into a <b>block of MPM material</b> and coupled particle-to-face, so the reaction
+returns to the mesh and not only to the material. Three loadings — <b>press</b>, <b>drag</b>,
+<b>breach</b>. Each clip plays the 3D view, then a cross-section.</p>
+<p class="opk-ref">Reference — contact:
+<a href="https://doi.org/10.1016/j.cma.2015.04.005">ICFEMP, Chen et&nbsp;al. (2015)</a>, chosen over
+grid-node coupling (<a href="https://doi.org/10.1016/j.cma.2011.07.014">Lian et&nbsp;al. 2011</a>),
+which needs mesh and grid cells of a size ours are not; solid:
+<a href="https://doi.org/10.1145/3197517.3201293">MLS-MPM, Hu et&nbsp;al. (2018)</a>; surface: the
+vertex mesh of
+<a href="https://www.nature.com/articles/s41598-018-20678-6">Okuda et&nbsp;al. (2018)</a>. Rig and
+operators ours (<code>prototype/ecm</code>).</p>
 <div class="sim-gallery g3">
 {cards}
 </div>
@@ -375,27 +367,32 @@ very chemical that drives growth, so it can only land in its <b>antiphase</b>.</
 {END2}"""
 
 
-def build3(runs):
-    """Spheroid + basement membrane + matrix: the three-entity model, one clip per thing it does."""
+def build3(runs, runs2=()):
+    """Spheroid + basement membrane + matrix, and the second row when there is one to show."""
     cards = "\n".join(card(v, n, sp, c) for _, v, n, sp, c in runs)
+    row2 = "" if not runs2 else f"""
+<p class="opk">And the same chemistry with no small source to hold it:</p>
+<div class="sim-gallery g3">
+{chr(10).join(card(v, n, sp, c) for _, v, n, sp, c in runs2)}
+</div>"""
     return f"""{BEGIN3}
 <h3>Spheroid + basement membrane + matrix</h3>
-<p class="opk">A spheroid growing in a matrix is <b>three</b> entities, not two, and the middle one
-is not a spacer. While the sheet is intact the epithelium never touches the stroma — load runs cell
-→ adhesion plaque → <b>basement membrane</b> → anchoring fibril → stroma — so a model in which the
-tissue <i>also</i> pushes the matrix directly counts the same push twice. Three clips: the assembly,
-the chemistry that can cut the sheet, and what is left of the sheet once it has.</p>
-<p class="opk-ref">Reference — load path and anchoring fibrils,
+<p class="opk">A spheroid in a matrix is <b>three</b> entities, not two. While the sheet is intact
+the epithelium never touches the stroma — load runs cell → adhesion plaque → <b>basement
+membrane</b> → anchoring fibril → stroma — so a model in which the tissue <i>also</i> pushes the
+matrix counts the same push twice. The three clips after the first are one argument: the proteases
+that can dissolve the sheet <b>in balance</b>, then that balance <b>broken locally</b>, and then not
+locally at all.</p>
+<p class="opk-ref">Reference — load path,
 <a href="https://doi.org/10.1083/jcb.104.3.611">Keene et&nbsp;al. (1987)</a>; adhesions are clusters
-at ~555&nbsp;nm spacing, <a href="https://doi.org/10.1002/bies.201600123">Changede &amp; Sheetz
-(2017)</a>; the protease network is
-<a href="https://doi.org/10.1074/jbc.M403627200">Karagiannis &amp; Popel (2004)</a> and the inhibitor
-is held in the matrix rather than dissolved in it,
-<a href="https://doi.org/10.1074/jbc.M000907200">Yu et&nbsp;al. (2000)</a>. Working note:
-<code>discovery_okuda/note_spheroid_bm_ecm.pdf</code>; runs, <code>log/okuda_ECM</code>.</p>
+at ~555&nbsp;nm, <a href="https://doi.org/10.1002/bies.201600123">Changede &amp; Sheetz (2017)</a>;
+protease network, <a href="https://doi.org/10.1074/jbc.M403627200">Karagiannis &amp; Popel
+(2004)</a>, with the inhibitor held in the matrix rather than dissolved in it,
+<a href="https://doi.org/10.1074/jbc.M000907200">Yu et&nbsp;al. (2000)</a>. Note:
+<code>discovery_okuda/note_spheroid_bm_ecm.pdf</code>.</p>
 <div class="sim-gallery g3">
 {cards}
-</div>
+</div>{row2}
 {END3}"""
 
 
@@ -408,28 +405,23 @@ def main():
     # OLD bytes from cache and the swap looked like it had not happened. The name also
     # now says what the card says.
     R3 = [
+        # A NEW CLIP GETS A NEW FILENAME. `vertex_mpm_free.mp4` was named for the frictionless
+        # control it once played; when this card was repointed at a different run under the same
+        # name, every browser that had the page open kept serving the OLD bytes from cache and the
+        # swap looked like it had not happened. The name also now says what the card says.
         ("03_mesh_contact", "vertex_mpm_press", "press",
-         f"the rig on its own: a triangulated surface pressed into a free MPM block and lifted off "
-         f"again, {pr['contacts_max']} particles in contact at the deepest. The reaction really "
-         f"returns to the mesh — momentum residual {pr['momentum_residual_max']:.1e} of the "
-         f"applied force, which is float32 precision — and friction cuts the tangential slip "
-         f"{pr['slip_frictionless'] / pr['slip_friction']:.1f}-fold against the same run at μ = 0, "
-         f"so the contact is a contact and not MPM's automatic weld"),
+         f"A free block, indented and released. {pr['contacts_max']} particles in contact at the "
+         f"deepest; momentum balances to {pr['momentum_residual_max']:.1e} of the applied force, "
+         f"and friction cuts the slip "
+         f"{pr['slip_frictionless'] / pr['slip_friction']:.1f}-fold against \u03bc = 0"),
         ("03f_mesh_shear", "vertex_mpm_shear", "drag",
-         f"the tangential half of the same law, as a loading rather than as a number. A sticky pad "
-         f"presses {sh['indent_cells']:.1f} grid cells in and then travels "
-         f"{sh['drag_box_units']:.2f} box units at that depth across a matrix pinned at its base: "
-         f"it ploughs, heaps the material ahead of itself and shears what it drags over -- coloured "
-         f"by von Mises, because a drag changes shape at constant volume. Momentum still balances "
-         f"to {sh['momentum_residual_max']:.1e} of the applied force across "
-         f"{sh['contacts_max']:,} contacts"),
+         f"Pressed {sh['indent_cells']:.1f} cells in, then dragged {sh['drag_box_units']:.2f} box "
+         f"units at that depth over a pinned base: it ploughs and shears. Von Mises, because a "
+         f"drag changes shape at constant volume"),
         ("03g_mesh_breach", "vertex_mpm_breach", "breach",
-         f"what a hole in the surface is FOR. The box is closed on all four sides and the matrix is "
-         f"nearly incompressible, so a press {br['indent_cells']:.1f} grid cells deep has no rim to "
-         f"escape through: it extrudes through the breach as a plug standing "
-         f"{br['plug_above_surface_cells']:.1f} cells proud of the plate. A penalty contact is not a "
-         f"wall -- {br['penetration_max_cells']:.1f} cells of matrix stand above the mesh elsewhere "
-         f"at the deepest press -- but that is where the plug's height has to be read against"),
+         f"Closed on all four sides and nearly incompressible, so the matrix leaves through the "
+         f"hole: a plug {br['plug_above_surface_cells']:.1f} cells proud of a plate that has "
+         f"descended {br['indent_cells']:.1f}"),
     ]
     def _spec(d):
         """`spec_run.yaml` where the engine wrote one, `spec.yaml` where the rig did.
@@ -539,50 +531,46 @@ def main():
     g46 = het["G46"]
     hetr = het["heterogeneity"]["realistic: all rates vary"]
     bell = het["heterogeneity"]["bell isolated: uniform MT1"]
+    tiny = _metrics_or_none("06_hole_tiny")
     R5 = [
         ("06_spheroid_bm_ecm", "spheroid_bm_ecm", "all three at once",
          [q["tl"], q["tr"], q["bl"], q["br"]], dict(skip_top=0.09),
-         "The three bodies on one tissue: a replayed epithelium (396 vertices to 12,756, apical "
-         "radius \u00d73.77), the fibre matrix outside it, and a membrane of 5,120 triangles held "
-         "by 2,562 plaques on the epithelium's own faces. Four panels: the tissue in the stressed "
-         "matrix, the same in section, the sheet by \u03bb&#8202;=&#8202;1.01\u21923.71 with its "
-         "plaques and a limb section, and the junctions by myosin. Nothing passes between the "
-         "sheet and the matrix \u2014 they share the tissue, not a force"),
+         "A replayed epithelium (396 vertices to 12,756), a fibre matrix outside it, and a "
+         "5,120-triangle membrane held on 2,562 plaques. Tissue in the matrix, section, sheet, "
+         "junctions \u2014 and no force between sheet and matrix: they share the tissue"),
         ("05h_1_hetero", "bm_protease", "who is allowed to make a hole",
          [q["tl"], q["tr"], q["bl"], q["br"]], dict(skip_top=0.10, skip_bot=0.12),
-         f"Four panels in turn, and only the last two are computed: MT1-MMP expression per cell "
-         f"and the matrix-BOUND inhibitor TIMP-3 are prescribed sources, the activation rate is "
-         f"what the pair of them makes, and \u03c1/\u03c1\u2080 is the sheet being eaten. At the "
-         f"bell's peak (c_T = K) {100 * hetr['hole']:.0f}% of the sheet is gone; with MT1 made "
-         f"uniform the same bell dissolves {100 * bell['hole']:.0f}% \u2014 so the hole still "
-         f"needs the tethered enzyme's own pattern, which is why it is still "
-         f"r = {g46['corr_activation_with_source']:.2f} correlated with it"),
-        # THE SHEET PANEL ALONE. The same run's other three panels are the tissue and the matrix,
-        # which the first card already shows; what is new here is what happens to the MEMBRANE, so
-        # the card plays that panel and nothing else.
-    ] + ([] if not (hol and trn) else [
-        ("06_breach_hole", "bm_breach_sheet", "the sheet, breached",
+         f"The concentrations, in balance. MT1-MMP is fixed per cell and seeded at the start; "
+         f"proMMP-2, MMP-2, TIMP-2 and TIMP-3 evolve, three of them through the diffusion solver "
+         f"and TIMP-3 by deposition and decay alone. At the bell's peak that balance still "
+         f"dissolves {100 * hetr['hole']:.0f}% of the sheet; with MT1 uniform, "
+         f"{100 * bell['hole']:.0f}%"),
+    ] + ([] if not tiny else [
+        # THE SHEET PANEL ALONE, as for the breach card below it: this run's other three panels are
+        # the tissue and the matrix, which the first card already shows.
+        ("06_hole_tiny", "bm_hole_tiny", "a hole that stops",
          [q["bl"]], dict(skip_top=0.09),
-         f"The same three bodies with the protease switched on, and only the membrane drawn: "
-         f"{100 * hol['torn_frac']:.0f}% of its {hol['faces_seeded']:,} faces gone, and "
-         f"{100 * hol['biggest_patch_frac']:.0f}% of them in ONE connected patch \u2014 a hole, "
-         f"not a perforation. Raising the cutting rate {hol['kdeg']:.0f} \u2192 "
-         f"{trn['kdeg']:.0f} takes it to {100 * trn['torn_frac']:.0f}% and the sheet stops being "
-         f"a sheet"),
+         f"The balance broken in ONE place: {tiny['faces_torn']} of "
+         f"{tiny['faces_seeded']:,} faces, a single patch with {tiny['rim_loops']} rim loop, and "
+         f"it has stopped growing. It took a localised source \u2014 a "
+         f"{tiny['spot']:.0f}\u00b0 cap of MT1-MMP \u2014 and not a slower rate"),
     ])
-    hol = json.load(open(os.path.join(LOG, "06_breach_hole", "metrics.json")))
-    # `06_breach_torn` has NO CARD -- it is read only so the hole card can say what the
-    # cutting rate does past the runaway point, from that run rather than from memory.
-    trn = json.load(open(os.path.join(LOG, "06_breach_torn", "metrics.json")))
-
-    def _clip(d, v, panels, kw, seq="panels"):
+    R5b = [] if not (hol and trn) else [
+        ("06_breach_hole", "bm_breach_sheet", "a hole that does not",
+         [q["bl"]], dict(skip_top=0.09),
+         f"Broken everywhere at once instead: a random MT1-MMP field, and the breach is as big "
+         f"as its activation patch \u2014 {100 * hol['torn_frac']:.0f}% of the sheet gone, "
+         f"{100 * hol['biggest_patch_frac']:.0f}% of it a single hole. At cutting rate "
+         f"{trn['kdeg']:.0f} it is {100 * trn['torn_frac']:.0f}% and the sheet is in pieces"),
+    ]
+    def _clip(d, v, panels, kw):
         """Build one card's clip, or say plainly that the run is not ready.
 
-        A HALF-WRITTEN MP4 IS NOT A MISSING ONE and the difference matters here: three of these
-        runs were still encoding when the row was written, and a file that exists without its
-        `moov` atom cuts into a broken clip rather than failing. `_nframes` reads the container,
-        so a movie that cannot be counted is treated as absent -- and SAID to be absent, because a
-        row that silently drops a card looks like a row that was only ever meant to have two.
+        A HALF-WRITTEN MP4 IS NOT A MISSING ONE and the difference matters here: these runs are
+        often still encoding when the page is regenerated, and a file that exists without its
+        `moov` atom cuts into a broken clip rather than failing. `_nframes` reads the container, so
+        a movie that cannot be counted is treated as absent -- and SAID to be absent, because a row
+        that silently drops a card looks like a row that was only ever meant to be short.
         """
         src = os.path.join(LOG, d, "movie.mp4")
         if not os.path.exists(src):
@@ -596,14 +584,15 @@ def main():
         panels_concat(src, os.path.join(GAL, f"{v}.mp4"), panels, **kw)
         print(f"[minisite] gallery/{v}.mp4 <- {d}/movie.mp4  "
               f"({os.path.getsize(os.path.join(GAL, v + '.mp4')) / 1e6:.1f} MB, {n} frames, "
-              f"{len(panels)} panels in sequence, square, no label)")
+              f"{len(panels)} panel{'s' if len(panels) > 1 else ''} in sequence, square, no label)")
         return True
 
-    runs5 = []
-    for d, v, lbl, panels, kw, cap in R5:
-        sp = _spec(d)
-        if sp and _clip(d, v, panels, kw):
-            runs5.append((d, f"{v}.mp4", lbl, sp, cap))
+    runs5, runs5b = [], []
+    for out, rows in ((runs5, R5), (runs5b, R5b)):
+        for d, v, lbl, panels, kw, cap in rows:
+            sp = _spec(d)
+            if sp and _clip(d, v, panels, kw):
+                out.append((d, f"{v}.mp4", lbl, sp, cap))
 
     import shutil
     for tgt, rendered in ((QMD, False), (DOCS, True)):
@@ -612,7 +601,7 @@ def main():
             continue
         _patch(tgt, build(runs), rendered=rendered)
         _patch2(tgt, build2(runs2), rendered=rendered)
-        _patch3(tgt, build3(runs5), rendered=rendered)
+        _patch3(tgt, build3(runs5, runs5b), rendered=rendered)
     # AND THE ONE HAND-WRITTEN CARD THIS SESSION REPLACED: "grow & divide" now plays the vertex
     # model on its own (`00_spheroid`), cropped to the tissue so the printed label is out of frame,
     # 3D first and the true cross-section second.
@@ -638,7 +627,7 @@ def main():
         # EVERY CARD'S CLIP, not just the ones that are new this time. Copying a subset once left
         # clips out of docs/gallery while the page that referenced them was patched -- cards
         # pointing at files the site did not have.
-        for d, v, *_ in runs + runs2 + runs5:
+        for d, v, *_ in runs + runs2 + runs5 + runs5b:
             shutil.copy2(os.path.join(GAL, v), os.path.join(DOCS_GAL, v))
         print("[minisite] videos copied into docs/gallery/")
     return
