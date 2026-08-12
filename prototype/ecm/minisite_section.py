@@ -14,6 +14,7 @@ from __future__ import annotations
 import html
 import json
 import os
+import re
 import subprocess
 import sys
 
@@ -886,20 +887,25 @@ def main():
                              os.path.join(DOCS_GAL, "turing_coral_v3.mp4"))
 
     if os.path.isdir(DOCS_GAL):
-                shutil.copy2(os.path.join(GAL, "turing_grow_divide_vtk.mp4"),
-                             os.path.join(DOCS_GAL, "turing_grow_divide_vtk.mp4"))
-
-    if os.path.isdir(DOCS_GAL):
-            _sh.copy2(os.path.join(GAL, "tyssue_spheroid_00.mp4"),
-                      os.path.join(DOCS_GAL, "tyssue_spheroid_00.mp4"))
-
-    if os.path.isdir(DOCS_GAL):
         # EVERY CARD'S CLIP, not just the ones that are new this time. Copying a subset once left
         # clips out of docs/gallery while the page that referenced them was patched -- cards
         # pointing at files the site did not have.
+        n = 0
         for d, v, *_ in runs + runs2 + runs4 + runs5r + runs5 + runs5b:
-            shutil.copy2(os.path.join(GAL, v), os.path.join(DOCS_GAL, v))
-        print("[minisite] videos copied into docs/gallery/")
+            src = os.path.join(GAL, v)
+            if not os.path.exists(src):
+                print(f"[minisite] {v}: not in gallery/ -- NOT copied to docs/")
+                continue
+            shutil.copy2(src, os.path.join(DOCS_GAL, v))
+            n += 1
+        print(f"[minisite] {n} videos copied into docs/gallery/")
+        # AND THEN CHECK: every clip the rendered page asks for has to be there. Copying is the
+        # last step and the one whose failure is invisible until the site 404s.
+        page = open(DOCS).read()
+        want = set(re.findall(r'gallery/([A-Za-z0-9_]+\.mp4)', page))
+        gone = sorted(w for w in want if not os.path.exists(os.path.join(DOCS_GAL, w)))
+        if gone:
+            sys.exit(f"docs/gallery is missing {len(gone)} clip(s) the page plays: {gone}")
     return
 
 
