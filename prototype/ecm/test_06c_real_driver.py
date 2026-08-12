@@ -76,7 +76,13 @@ class Rig06c(B.Rig05b):
         # re-seed the plaques against the tissue's own mesh; the sheet is untouched
         node, face, w, missed = B.seed_plaques(self.u_bm, self.u_epi, self.F_epi,
                                                fraction=P.get("fraction", 1.0))
-        self.plq = B.Plaques(node, face, w, P["l0"], P["kn"], P["xi"])
+        # `break_load` IS CARRIED OVER FROM THE PLAQUES THIS REPLACES, not left to the default.
+        # Re-seeding against the tissue's mesh builds a NEW `Plaques`, and the first version of this
+        # line passed l0, kn and xi and stopped -- so the rupture law silently became None. It did not
+        # fail loudly: a run asking for plaques that break at 5e-3 reported 100% bound with the median
+        # load at 9.7e-3, which reads as "the adhesion held" and means "the adhesion had no strength".
+        self.plq = B.Plaques(node, face, w, P["l0"], P["kn"], P["xi"],
+                             break_load=self.plq.break_load)
         self.n_plaque, self.missed = node.shape[0], missed
         self.n_sub = self._nsub()
         print(f"[06c] driver: tissue {self.nv0} vertices at frame 0 -> "

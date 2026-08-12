@@ -190,8 +190,13 @@ def remeasure(out_dir):
 
 
 # --------------------------------------------------------------------------- the pictures
-def rerender(out_dir, **kw):
-    """Redraw a finished run from `traj.npz` -- no GPU, no re-simulation."""
+def rerender(out_dir, dest=None, **kw):
+    """Redraw a finished run from `traj.npz` -- no GPU, no re-simulation.
+
+    `dest` writes the pictures somewhere ELSE than the run they are drawn from. 06 is that case: the
+    matrix half is `06_spheroid_ecm`, already solved and certified, and adding the basement-membrane
+    panel to it must not overwrite the movie that certification refers to.
+    """
     # `spec_run.yaml` IS THE RESOLVED SPEC AND IS PREFERRED, but the earliest runs in this ladder wrote
     # only `spec.yaml`, and a re-render that dies on a missing filename leaves the run stuck with a
     # picture already known to be wrong. Falling back is said out loud, because the two files can differ
@@ -248,7 +253,9 @@ def rerender(out_dir, **kw):
     # change it without touching the archived spec on disk.
     if "fps" in kw:
         spec.setdefault("plotting", {})["fps"] = int(kw.pop("fps"))
-    render(os.path.basename(out_dir.rstrip("/")), out, spec, out_dir, **kw)
+    d_out = dest or out_dir
+    os.makedirs(d_out, exist_ok=True)
+    render(os.path.basename(d_out.rstrip("/")), out, spec, d_out, **kw)
 
 
 def render_sphere(name, pos, hist, spec, out_dir, cmap, ax_i, centre, T,
@@ -340,7 +347,7 @@ def autoscale(raw, pct=99.0, sample=12):
 
 def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, fps=None,
            strip_only=False, frame_limit=None, stress_scale=None, block_scale=None,
-           membrane_scale=None):
+           membrane_scale=None, bm_draw=None):
     """The okuda artefact pair, with the matrix added: a 4-row strip and a 2-camera movie.
 
     ROWS OF THE STRIP, in the order `log/okuda/cellfix_B_new/strip.png` has them, plus one:
@@ -650,7 +657,13 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, f
     myo_sc = float(np.percentile(_myo, 98)) if _myo is not None and _myo.size else None
     if myo_sc:
         print(f"[{name}] myosin colour full-scale {myo_sc:.4g} (p98 over the run, fixed)", flush=True)
-    zoom = (mem_pos is not None) or any("myo" in m for _, m in meshes)
+    # `bm_draw` FILLS THE BOTTOM-LEFT FROM A SECOND RUN, and it is the only way this movie can show a
+    # basement membrane at all. The BM in these runs is not an MPM set inside this spec -- it is the
+    # vertex-model sheet of the 05 ladder, solved by its own rig against the SAME replayed tissue, with
+    # no BM-ECM coupling (deliberate: nothing here gives the sheet the matrix's reaction, or the matrix
+    # the sheet's). So the panel is handed in as a drawer over the pass-2 frame index, and the run that
+    # produced it is named in the panel's label rather than implied by the slot it fills.
+    zoom = (mem_pos is not None) or (bm_draw is not None) or any("myo" in m for _, m in meshes)
     if zoom:
         figm = plt.figure(figsize=(11.0, 11.0), facecolor="black")
         axs = figm.add_subplot(2, 2, 1, projection="3d", computed_zorder=False, facecolor="black")
@@ -716,7 +729,19 @@ def render(name, out, spec, out_dir, n_strip=8, movie_frames=None, movie=True, f
                 # nothing to put on the left. Drawing something else there (the matrix, the tissue
                 # again) would fill the slot the basement membrane is supposed to occupy with a
                 # different entity, which is how a movie comes to show four panels and three subjects.
-                if mem_pos is None:
+                if bm_draw is not None:
+                    # THE SHEET'S OWN INSET, NOT THIS FIGURE'S. `bm_panel.draw_bm` carries a
+                    # cross-section inset of its own, drawn inside its panel and on its own scale, so
+                    # `inz` -- which magnifies the MPM membrane -- is cleared rather than filled with a
+                    # second, differently-scaled view of the same sheet.
+                    # AND IT IS HANDED THE BOX, not left to choose one. `Lt` is the fixed extent the
+                    # other three panels use; a drawer that framed itself on its own subject would put
+                    # the same tissue at two apparent sizes in one figure, which is the camera defect
+                    # this file already fixed once for the bottom row.
+                    axz.clear(); axz.set_facecolor("black")
+                    inz.clear(); inz.set_axis_off(); inz.set_facecolor("black")
+                    bm_draw(axz, t, Lt)
+                elif mem_pos is None:
                     axz.clear(); axz.set_axis_off(); axz.set_facecolor("black")
                     inz.clear(); inz.set_axis_off(); inz.set_facecolor("black")
                 else:

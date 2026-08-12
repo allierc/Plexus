@@ -95,6 +95,30 @@ class RealDriver:
             cl.Nf = torch.full((self.F_epi.shape[0],), nf0, device=cl.Nf.device, dtype=cl.Nf.dtype)
             print(f"[{self.__class__.__name__}] receptor pool resized to {self.F_epi.shape[0]} cells at N_f {nf0:.4g} each",
                   flush=True)
+        # AND THE PER-CELL CHEMISTRY IS SIZED TO THE OLD EPITHELIUM TOO -- the fourth of these, and the
+        # worst, because it never crashed. 05h1 builds `mt1`, `s_timp_cell` and `s_pro_cell` as SMOOTH
+        # FIELDS over the epithelium's 1,280 icosphere faces. After the swap `_cell_to_face` reads them
+        # with `ct_face`, which indexes the tissue's 1,188 triangles -- in range, so no assert, and the
+        # values it returns belong to unrelated faces of a mesh that is gone. The smoothness is what is
+        # lost: on the real tissue the three maps became a random per-face permutation, so activation
+        # peaked on scattered single faces and the breach came out as dozens of small holes instead of
+        # the blob the field would have made. The fields are REBUILT on the new epithelium by 05h1's own
+        # construction, from the same seeds, rather than scattered across a correspondence nobody has.
+        if getattr(self, "mt1", None) is not None and self.mt1.shape[0] != self.F_epi.shape[0]:
+            from test_05h1_hetero import smooth_field
+            uc = self.u_epi[self.F_epi].mean(1)
+            uc = uc / uc.norm(dim=1, keepdim=True).clamp_min(1e-30)
+            h = float(getattr(self, "hetero", 0.0))
+            fld = (lambda sd: (1.0 - h) + h * 2.0 * smooth_field(uc, seed=sd, dev=dev, dtype=dt)
+                   ) if h > 0 else (lambda sd: torch.ones(uc.shape[0], device=dev, dtype=dt))
+            m = fld(self._seeds[0])
+            self.mt1 = m / m.mean().clamp_min(1e-30) * self.mt1_frac
+            self.s_timp_cell = self.s_timp * fld(self._seeds[1])
+            self.s_pro_cell = self.s_pro * fld(self._seeds[2])
+            assert self.mt1.shape[0] == self.F_epi.shape[0] == self.s_pro_cell.shape[0]
+            print(f"[{self.__class__.__name__}] per-cell chemistry rebuilt on the new epithelium: "
+                  f"mt1/s_timp/s_pro over {self.F_epi.shape[0]} cells, same seeds "
+                  f"{self._seeds}, hetero {h}", flush=True)
         self.n_plaque, self.missed = n_plq, missed
         self.n_sub = self._nsub()
         print(f"[{self.__class__.__name__}] real driver: {self.nv0} tissue vertices -> {self.F_epi.shape[0]} triangles, "
