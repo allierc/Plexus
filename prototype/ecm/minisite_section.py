@@ -601,7 +601,6 @@ def main():
     # control and its death network is drawn on the pole, so the top view is the one that shows it;
     # the two-field runs are read from the side like every other clip on the page.
     R2 = [
-        ("sc_inh_soft", "turing_inhibit_v5", "B stops growth", "left"),
         ("tsd_max", "turing_death_v5", "B kills", "left"),
         ("sc_antiphase", "turing_antiphase_v5", "one field, in antiphase", "right"),
     ]
@@ -610,9 +609,6 @@ def main():
         # SHORT. Each caption is one measured number and one sentence about what the clip shows;
         # the mechanism is in the paragraph above the row and does not need repeating three times.
         extra = {
-            "sc_inh_soft": f"B switches growth off where it peaks: red spots inside teal that does "
-                           f"not grow, {s['n_spots_final']} of them "
-                           f"{s['spot_spacing_cells_final']:.1f} cells apart",
             "tsd_max": "B marks cells to die instead, from frame 180 — under half the cells the "
                        "inhibited run keeps, from the same growth law",
             "sc_antiphase": "One field: death fires where growth's own chemical is low, so it can "
