@@ -74,12 +74,52 @@ other slot:
 ```json
 {"parent": "<run name from the parent set>",
  "edit": ["set_param", "reconnect_t1_3d.l_th_frac", 0.28],
- "claim": "what mechanism this tests, in one sentence",
- "predict": "protr_peak > 1.3",
- "intent": "confirmatory | adversarial | control | exploratory",
+ "act": "predict | falsify | replicate | bound | transfer | discriminate | induce",
+ "on": "C007",
+ "predict": "n_spots_final < 20",
  "why": "why this is worth a GPU rather than the next idea",
  "chases": "r013_05"}
 ```
+
+### `act` and `on` — what the experiment is FOR, and what it acts on
+
+Every Route B slot names an **act** and the **claim** it acts on, from `campaign/knowledge.md`,
+which is now a rendered view of the claim ledger. This is the change that matters this campaign:
+an experiment is no longer just an edit with a number attached, it is a move against a specific
+piece of knowledge, and the ledger records what the move did to it.
+
+| act | also supply | what it does to the claim |
+|---|---|---|
+| `predict` | `predict` | adds evidence, weighted by how far above the noise the ask is |
+| `falsify` | `predict`, `breaks_if` | same, but you must state the outcome that would BREAK it |
+| `replicate` | `repeats` | measures the floor; exempt from R7, because it is *about* the floor |
+| `bound` | `parameter`, `direction` | narrows or widens the claim's scope |
+| `transfer` | `lineage` | tests it on a lineage it was NOT learned on. Checked, not trusted. |
+| `discriminate` | `rival`, `predict` | one experiment that separates two claims. Moves BOTH. |
+| `induce` | `runs` | proposes a NEW claim from runs already on file |
+
+`induce` is how the ledger grows. If several runs show something no claim states, say so as a claim
+— statement, `kind` (mechanism, instrument or substrate_limit), and the scope you assert it over —
+and the Analyst will add it. A claim with no scope is refused, because a claim that cannot be
+scoped cannot be transferred, and transfer is the only route to high confidence.
+
+**`discriminate` when you can.** Two claims in the ledger contradict each other right now: C005 says
+`shape_to_chem.beta < 0` extinguishes the activator *whatever the morphotype*, C009 says it *depends
+on the base*. They coexisted for six rounds of the last campaign because nothing could pose the
+experiment that separates them. One slot can.
+
+### R7 — your prediction must be bigger than the noise
+
+A slot whose predicted effect is smaller than the measured seed-to-seed spread of its own metric is
+**refused before it runs**. This is not advice; it is a rule in the Critic, and over the last
+campaign it would have refused 60% of the predictions actually made — including four that asked for
+a **0.0% change**, i.e. to beat the parent's exact value.
+
+The floors are per metric and they span fourteenfold: `protr` moves 2% between two runs of the
+*same composition*, `n_cells` 29%, `protrusion_aspect_max` 41%. So the same 10% prediction is a real
+experiment in one metric and a coin toss in another. The parent block shows you each metric's floor.
+If you need to ask a fine question, do not sharpen the threshold — declare `"precision": true` and
+the replicates that would make the effect readable.
 
 `chases` is the run whose **unpredicted** result this slot is following up — the run id as it
 appears in `knowledge.md`'s `## SURPRISES`. Omit it (or `null`) on every slot that is not chasing

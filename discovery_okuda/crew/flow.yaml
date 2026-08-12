@@ -209,6 +209,18 @@ nodes:
         - b_flower_death
         - b_flower_oriented
         - b_flower_cones
+  # ---- WHAT IS CURRENTLY KNOWN, as objects the round can act on -------------------
+  # The last campaign handed the Proposer metrics and parents and asked it to produce knowledge.
+  # It produced eleven STANDING LAWS as prose in a file nothing read back, two of which
+  # contradicted each other for six rounds because no role was ever shown both at once. These two
+  # nodes are the fix: the ledger says what is claimed and how strongly, the floors say what a
+  # single run can resolve. Neither existed, and between them they are what an `act` needs.
+  - id: claim_ledger
+    code: round.claim_ledger
+
+  - id: metric_floors
+    code: round.metric_floors
+
   - id: history
     code: round.history
     args:
@@ -274,7 +286,7 @@ nodes:
   - id: proposer
     agent: proposer
     in: [parents, menu, metric_bank, coverage, diagnosis, history, refusals, user_input,
-         grounding]
+         grounding, claim_ledger, metric_floors]
     out: edits
 
   # ---- build, launch, measure ----------------------------------------------------

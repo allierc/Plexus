@@ -203,7 +203,11 @@ def mesh_of(pos, mt, act, lo=None, hi=None, show_div=True):
         # is makes a cell that is halfway halfway blue, and nothing jumps.
         w = (sup.astype(float) if act is None else sup * (1.0 - x)) [:, None]
         rgb = ((1.0 - w) * rgb.astype(float) + w * np.asarray(BLUE, float)).astype(np.uint8)
-    if kills is not None and kills.any():
+    # DEATH FOLLOWS DIVISION'S RULE, and for its reason: both name ONE CELL, so both need the cell
+    # to be visible. On the smooth surface a blue patch with no outlines marks a cell nobody can
+    # see. Suppression is not in this class -- it tints a whole REGION and reads with or without
+    # the outlines -- so it stays in both styles.
+    if show_div and kills is not None and kills.any():
         rgb[kills] = BLUE
     # GREEN ONLY WHERE BOTH ITS AXES EXIST. It marks ONE CELL that divided in the last four calls,
     # so it needs a before and an after -- which `kburns` does not have, being one frame held still

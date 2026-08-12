@@ -101,13 +101,108 @@ def _crop(im, thresh=12):
                     int(min(W, cx + half)), int(min(H, cy + half))))
 
 
+def _claim_tree(a):
+    """The knowledge tree: claims, their parents, their status and their weights."""
+    import claims as K
+    spec = K.load_spec()
+    cur, _ = K.load()
+    if not cur:
+        print("the claim ledger is empty"); return 1
+    kids = defaultdict(list)
+    for cid, c in cur.items():
+        for p in (c.get("parents") or []) or [None]:
+            kids[p].append(cid)
+    for k in kids:
+        kids[k].sort()
+    roots = sorted(kids.get(None, []))
+
+    xs, order, ctr = {}, [], [0]
+
+    def place(n, d):
+        order.append((n, d))
+        ch = kids.get(n, [])
+        if not ch:
+            xs[n] = ctr[0]; ctr[0] += 1
+        else:
+            for c in ch:
+                place(c, d + 1)
+            xs[n] = (xs[ch[0]] + xs[ch[-1]]) / 2.0
+
+    for r in roots:
+        place(r, 0)
+    depth = max(d for _, d in order)
+
+    TILE, k = a.tile, a.tile / 200.0
+    cw, rh = int(TILE * 1.35), int(TILE * 0.72)
+    W, H = int(ctr[0] * cw) + 20, int((depth + 1) * rh) + 40
+    sheet = Image.new("RGB", (W, H), BG)
+    dr = ImageDraw.Draw(sheet)
+    f_id, f_txt = _font(int(15 * k)), _font(int(11 * k))
+    COL = {"contested": (250, 190, 60), "supported": (120, 220, 120),
+           "refuted": (230, 90, 90), "proposed": (200, 200, 200),
+           "stale": (130, 130, 130), "superseded": (110, 90, 140)}
+
+    def cx(n): return int(xs[n] * cw + cw / 2) + 10
+    def ty(d): return int(d * rh) + 30
+
+    for n, d in order:
+        for c in kids.get(n, []):
+            ym = (ty(d) + int(TILE * 0.44) + ty(d + 1)) // 2
+            dr.line([(cx(n), ty(d) + int(TILE * 0.44)), (cx(n), ym)], fill=LINE, width=max(2, int(2 * k)))
+            dr.line([(cx(n), ym), (cx(c), ym)], fill=LINE, width=max(2, int(2 * k)))
+            dr.line([(cx(c), ym), (cx(c), ty(d + 1))], fill=LINE, width=max(2, int(2 * k)))
+    for n, d in order:
+        c = cur[n]
+        fo, ag = K.weigh(c, spec)
+        x, y = cx(n) - int(cw * 0.46), ty(d)
+        col = COL.get(c.get("status"), FG)
+        dr.rectangle([x, y, x + int(cw * 0.92), y + int(TILE * 0.44)], outline=col,
+                     width=max(2, int(2 * k)))
+        dr.text((x + 8, y + 5), f"{n}  {c.get('status')}", fill=col, font=f_id)
+        words, line, lines = c["statement"].split(), "", []
+        while words:
+            w = words.pop(0)
+            if len(line) + len(w) > 34:
+                lines.append(line); line = w
+            else:
+                line = (line + " " + w).strip()
+        lines.append(line)
+        for i, ln in enumerate(lines[:3]):
+            dr.text((x + 8, y + int(24 * k) + i * int(13 * k)), ln, fill=FG, font=f_txt)
+        # PLACED BELOW THE LAST LINE OF THE STATEMENT, not a fixed offset from the bottom: a
+        # three-line statement overlapped it and the two texts drew on top of each other.
+        dr.text((x + 8, y + int(24 * k) + len(lines[:3]) * int(13 * k) + int(4 * k)),
+                f"{c['kind']}   for {fo:.1f} / against {ag:.1f}", fill=DIM, font=f_txt)
+
+    out = a.out or os.path.join(LOG, "_gates", "genealogy_claims.png")
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    sheet.save(out)
+    lv = depth + 1
+    print(f"claim tree: {len(order)} claims over {lv} level(s), {len(roots)} root(s), "
+          f"{W}x{H} px")
+    print(f"  -> {os.path.relpath(out, ROOT)}")
+    return 0
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("root")
     ap.add_argument("--image", default="3d_c3.png")
     ap.add_argument("--tile", type=int, default=320)
     ap.add_argument("--out", default=None)
+    # PHASE 4 -- THE SECOND GENEALOGY. The composition tree answers "what was bred from what"; this
+    # answers "what was learned from what". Same renderer, same tidy layout, same generated-not-
+    # curated rule -- a claim's `parents` field is written by the Analyst when a claim derives
+    # another, exactly as a run's `parent` is written when a slot breeds from one.
+    #
+    # Tiles are TEXT, not pictures: a claim has no 3d.png. The panel carries the id, the status,
+    # the weights for and against, and the act that derived it.
+    ap.add_argument("--claims", action="store_true",
+                    help="draw the CLAIM tree from campaign/claims.jsonl instead of the run tree")
     a = ap.parse_args()
+
+    if a.claims:
+        return _claim_tree(a)
 
     by = _records()
     kids = defaultdict(list)
