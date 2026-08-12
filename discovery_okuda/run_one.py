@@ -520,7 +520,7 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
         from tissue_analysis import _cell_centroids
         series = []
         for t in np.unique(np.append(np.arange(0, T, ANALYSIS_STRIDE), T - 1)):
-            pos, mt, _ = fr[int(t)]
+            pos, mt, _ = fr[int(t)][:3]
             cen, rad, live = _cell_centroids(pos, mt)
             if live.sum() < 8:
                 continue
@@ -860,6 +860,24 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
         except Exception as e:
             print(f"[{name}] render failed: {type(e).__name__}: {e}", flush=True)
             traceback.print_exc()
+        # RECORDED IN THE SUMMARY, NOT ONLY PRINTED.
+        #
+        # The print above and its traceback go to the job's stdout, which lives on the cluster and
+        # is read by nobody -- so when a frame-tuple change broke `render`, every run in the batch
+        # finished green with a full diag.json, a full metrics.png and no movie, and the only thing
+        # that ever noticed was Cedric opening a folder and asking whether that was normal. A
+        # failure that reports somewhere unread has not reported.
+        #
+        # `missing` is empty on a healthy run, so it costs one key and reads as a fact rather than
+        # an alarm. It goes in the summary because the summary is what the loop, the collector and
+        # every montage script already open.
+        _missing = [f for f in ("strip.png", "3d.png") + (("movie.mp4",) if movie else ())
+                    if not os.path.exists(os.path.join(out_dir, f))]
+        summary["artefacts_missing"] = _missing
+        if _missing:
+            print(f"[{name}] ARTEFACTS MISSING: {', '.join(_missing)} -- recorded in diag.json. "
+                  f"traj.npz is written, so `python rerender.py {name}` rebuilds them without "
+                  f"re-simulating.", flush=True)
 
     # PREMISES, PASSIVE TIER -- on the run's own recorded series. Unlike the static gate this
     # cannot abort anything (the simulation already happened), so it goes LOUDLY into the record:
@@ -1209,7 +1227,7 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60, movie=True):
     fig = plt.figure(figsize=(4.4 * n_strip, 18.0))
     fig.patch.set_facecolor("black")
     for i, t in enumerate([int(round(f * (T - 1))) for f in np.linspace(0, 1, n_strip)]):
-        pt, mt, a = fr[t]
+        pt, mt, a = fr[t][:3]
         div, brk = faults_of(pt, mt)
         cls = classes_of(pt, mt)
         _a1 = fig.add_subplot(4, n_strip, i + 1, projection="3d")
@@ -1272,7 +1290,7 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60, movie=True):
     wri = FFMpegWriter(fps=10, metadata={"title": name})
     with wri.saving(figm, os.path.join(out_dir, "movie.mp4"), dpi=85):
         for t in keep:
-            pt, mt, a = fr[int(t)]
+            pt, mt, a = fr[int(t)][:3]
             div, brk = faults_of(pt, mt)
             draw3d(axs, pt, mt, a, CAM_SIDE, div, brk)
             draw3d(axt, pt, mt, a, CAM_TOP, div, brk)
@@ -1298,7 +1316,7 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60, movie=True):
     try:
         figE = plt.figure(figsize=(7.0, 7.0)); figE.patch.set_facecolor("black")
         axE = figE.add_subplot(111, projection="3d")
-        ptE, mtE, aE = fr[-1]
+        ptE, mtE, aE = fr[-1][:3]
         divE, brkE = faults_of(ptE, mtE)
         draw3d(axE, ptE, mtE, aE, CAM_SIDE, divE, brkE)
         axE.text2D(0.02, 0.96, f"{name}  frame {T - 1}", transform=axE.transAxes,
@@ -1346,7 +1364,7 @@ def mechanics(name, fr, cfg, out_dir, n=24):
     idx = np.unique(np.linspace(0, T - 1, min(n, T)).astype(int))
     rows, prev_cen = [], None
     for t in idx:
-        pos, mt, act = fr[int(t)]
+        pos, mt, act = fr[int(t)][:3]
         if mt.get("A0") is None or mt.get("V0f") is None:
             continue
         x = torch.tensor(pos, dtype=torch.float32)
