@@ -79,21 +79,56 @@ def _metric(name, key):
     return v if isinstance(v, (int, float)) else None
 
 
+def _ancestry(run):
+    """RUN and every ancestor, oldest first. One parent per record, so this is a chain."""
+    rec = os.path.join(HERE, "campaign", "records.jsonl")
+    by = {}
+    if os.path.exists(rec):
+        with open(rec) as f:
+            for line in f:
+                try:
+                    r = json.loads(line); by[r["name"]] = r
+                except Exception:
+                    pass
+    chain, n, seen = [], run, set()
+    while n and n not in seen:
+        seen.add(n); chain.append(n)
+        n = (by.get(n) or {}).get("parent")
+    if n:                      # a cycle cannot happen with one parent per record, but say so
+        print(f"  lineage stopped: {n} repeats")
+    return list(reversed(chain))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--glob", default="*", help="which runs, e.g. 'r01*' or 'sc_*'")
     ap.add_argument("--by", default=None, help="a summary metric to sort by, descending")
     ap.add_argument("--cols", type=int, default=0, help="0 = square-ish")
     ap.add_argument("--out", default=None)
+    ap.add_argument("--image", default="3d.png",
+                    help="which end-frame file to tile, e.g. 3d_c3.png from restyle3d.py")
+    # LINEAGE. `parent` is ONE name on every record, so a run's ancestry is a CHAIN and not a DAG:
+    # the campaign as a whole is a tree, but tracing any single run back gives a line. Ordered
+    # oldest first, so the sheet reads left to right as the edits that built the specimen, and
+    # `--by` is ignored -- the order IS the information.
+    ap.add_argument("--lineage", default=None, metavar="RUN",
+                    help="tile RUN and its ancestors, oldest first")
     a = ap.parse_args()
 
-    runs = sorted(d for d in os.listdir(LOG)
-                  if not d.startswith("_") and fnmatch(d, a.glob)
-                  and os.path.exists(os.path.join(LOG, d, "3d.png")))
+    if a.lineage:
+        runs = _ancestry(a.lineage)
+        missing = [r for r in runs if not os.path.exists(os.path.join(LOG, r, a.image))]
+        if missing:
+            print(f"  no {a.image} for: {', '.join(missing)}")
+        runs = [r for r in runs if r not in missing]
+    else:
+        runs = sorted(d for d in os.listdir(LOG)
+                      if not d.startswith("_") and fnmatch(d, a.glob)
+                      and os.path.exists(os.path.join(LOG, d, a.image)))
     if not runs:
-        print(f"no run matching {a.glob!r} has a 3d.png"); return 1
+        print(f"no run matching {a.glob!r} has a {a.image}"); return 1
 
-    if a.by:
+    if a.by and not a.lineage:
         vals = {r: _metric(r, a.by) for r in runs}
         # A RUN WITH NO VALUE IS NOT A RUN WITH ZERO -- it goes last and says so, rather than
         # sorting among the worst as though it had been measured and found wanting.
@@ -112,7 +147,7 @@ def main():
 
     for i, r in enumerate(runs):
         try:
-            with Image.open(os.path.join(LOG, r, "3d.png")) as im:
+            with Image.open(os.path.join(LOG, r, a.image)) as im:
                 im = im.convert("RGB")
                 im = _crop_to_content(im)
                 im.thumbnail((TILE, TILE), Image.LANCZOS)
