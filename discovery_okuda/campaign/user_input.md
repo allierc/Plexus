@@ -110,7 +110,7 @@ cells dead). At 0.005 all six finish within a few percent of the parent with no 
   campaign and 20 in this one, and all 50 added the same operator. That is not laziness: every
   operator in the vocabulary has now been exercised, so there is nothing left for `add_op` to add,
   and `coverage.operators_never_exercised` is empty — which made the coverage block read as
-  *satisfied* while `set_impl` had fired **zero** times in 196 runs and eleven of twenty-five
+  *satisfied* while `set_impl` had fired **once** in 196 runs against `add_op`'s 27, and 11 of 25
   implementations had never run. `coverage.the_untried_edit` now says which of the two is live.
 
 ## 7. The star, and the levers that were sitting unused behind it

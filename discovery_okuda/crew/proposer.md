@@ -56,7 +56,7 @@ predicted. Nothing in the engine forces these, so they are your discipline.
    `coverage.the_untried_edit`, which says which of the two is the live constraint this round.
    Every operator in the vocabulary has now been exercised, so `add_op` can only re-add something
    the campaign already carries: it fired twenty times in 196 runs and all twenty added the same
-   operator. `set_impl` fired **zero** times in the same 196 runs, while eleven of twenty-five
+   operator. `set_impl` fired **once** in the same 196 runs, while eleven of twenty-five
    implementations had never run — among them oriented division, which is how an arm becomes a
    tube, and three of `shape_to_chem`'s four features, so the chemistry has only ever read
    curvature and never tension, area or pressure. An untried implementation is a different
