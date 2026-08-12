@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  12 AUG 2026 07:04
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  12 AUG 2026 07:41
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -534,7 +534,7 @@ Package microtype Info: Loading generic protrusion settings for font family
 <fig_spheroid_bm_ecm.pdf, id=9, 708.24597pt x 332.44202pt>
 File: fig_spheroid_bm_ecm.pdf Graphic file (type pdf)
 <use fig_spheroid_bm_ecm.pdf>
-Package pdftex.def Info: fig_spheroid_bm_ecm.pdf  used on input line 58.
+Package pdftex.def Info: fig_spheroid_bm_ecm.pdf  used on input line 93.
 (pdftex.def)             Requested size: 495.07779pt x 232.38823pt.
 
 
@@ -542,148 +542,149 @@ Package pdftex.def Info: fig_spheroid_bm_ecm.pdf  used on input line 58.
 
 {/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}{/usr/share/texmf/fonts/enc/
 dvips/cm-super/cm-super-t1.enc}]
-Overfull \hbox (15.80396pt too wide) in paragraph at lines 149--164
+Overfull \hbox (15.80396pt too wide) in paragraph at lines 184--199
 [][] 
  []
 
 
 
 [2 <./fig_spheroid_bm_ecm.pdf>]
-Underfull \hbox (badness 1776) in paragraph at lines 230--230
+Underfull \hbox (badness 1776) in paragraph at lines 265--265
 []|\T1/cmr/bx/n/8 (+20) where its gates
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 230--230
+Underfull \hbox (badness 10000) in paragraph at lines 265--265
 []|\T1/cmtt/m/n/8 medioapical_myosin\T1/cmr/m/n/8 (+20) ,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 230--230
+Underfull \hbox (badness 10000) in paragraph at lines 265--265
 \T1/cmtt/m/n/8 junction_myosin\T1/cmr/m/n/8 (+20) ,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 230--230
+Underfull \hbox (badness 10000) in paragraph at lines 265--265
 []|\T1/cmr/m/n/8 (+20) Lateral,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 230--230
+Underfull \hbox (badness 10000) in paragraph at lines 265--265
 []|\T1/cmtt/m/n/8 cell\T1/cmr/m/n/8 (+20) ,
  []
 
 
-Underfull \hbox (badness 2359) in paragraph at lines 230--230
+Underfull \hbox (badness 2359) in paragraph at lines 265--265
 []|\T1/cmtt/m/n/8 note_junction \T1/cmr/m/n/8 (+20) J1--
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 230--230
+Underfull \hbox (badness 10000) in paragraph at lines 265--265
 []|\T1/cmtt/m/n/8 bm_secrete\T1/cmr/m/n/8 (+20) ,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 230--230
+Underfull \hbox (badness 10000) in paragraph at lines 265--265
 []|\T1/cmtt/m/n/8 note_sheet \T1/cmr/m/n/8 (+20) G24--
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 230--230
+Underfull \hbox (badness 10000) in paragraph at lines 265--265
 []|\T1/cmtt/m/n/8 bm_stiffness\T1/cmr/m/n/8 (+20) ,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 230--230
+Underfull \hbox (badness 10000) in paragraph at lines 265--265
 []|\T1/cmtt/m/n/8 plaque_seed\T1/cmr/m/n/8 (+20) ,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 230--230
+Underfull \hbox (badness 10000) in paragraph at lines 265--265
 \T1/cmtt/m/n/8 plaque_pull\T1/cmr/m/n/8 (+20) ,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 230--230
+Underfull \hbox (badness 10000) in paragraph at lines 265--265
 []|\T1/cmr/m/n/8 (+20) Rewire,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 230--230
+Underfull \hbox (badness 10000) in paragraph at lines 265--265
 []|\T1/cmtt/m/n/8 note_sheet \T1/cmr/m/n/8 (+20) G9--
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 230--230
+Underfull \hbox (badness 10000) in paragraph at lines 265--265
 []|\T1/cmtt/m/n/8 fibril_seed\T1/cmr/m/n/8 (+20) ,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 230--230
+Underfull \hbox (badness 10000) in paragraph at lines 265--265
 []|\T1/cmr/m/n/8 (+20) Rewire,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 230--230
+Underfull \hbox (badness 10000) in paragraph at lines 265--265
 []|\T1/cmtt/m/n/8 note_surface \T1/cmr/m/n/8 (+20) S1--
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 230--230
+Underfull \hbox (badness 10000) in paragraph at lines 265--265
 []|\T1/cmtt/m/n/8 bm_face\T1/cmr/m/n/8 (+20) ,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 230--230
+Underfull \hbox (badness 10000) in paragraph at lines 265--265
 []|\T1/cmtt/m/n/8 seed_ecm\T1/cmr/m/n/8 (+20) , \T1/cmtt/m/n/8 mpm_*\T1/cmr/m/n
 /8 (+20) ,
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 230--230
+Underfull \hbox (badness 10000) in paragraph at lines 265--265
 []|\T1/cmr/m/n/8 (+20) Seed, Ex-
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 230--230
+Underfull \hbox (badness 10000) in paragraph at lines 265--265
 \T1/cmr/m/n/8 (+20) change,
  []
 
 
-Overfull \hbox (2.61797pt too wide) in paragraph at lines 230--230
+Overfull \hbox (2.61797pt too wide) in paragraph at lines 265--265
 []|\T1/cmtt/m/n/8 mpm_particle| 
  []
 
 
-Overfull \hbox (92.28862pt too wide) detected at line 248
+Overfull \hbox (92.28862pt too wide) detected at line 283
 []
  []
 
-<fig_sets_ops.pdf, id=187, 600.20035pt x 316.11803pt>
-File: fig_sets_ops.pdf Graphic file (type pdf)
-<use fig_sets_ops.pdf>
-Package pdftex.def Info: fig_sets_ops.pdf  used on input line 267.
-(pdftex.def)             Requested size: 495.07779pt x 260.75235pt.
 
 
 [3]
+<fig_sets_ops.pdf, id=206, 600.20035pt x 316.11803pt>
+File: fig_sets_ops.pdf Graphic file (type pdf)
+<use fig_sets_ops.pdf>
+Package pdftex.def Info: fig_sets_ops.pdf  used on input line 302.
+(pdftex.def)             Requested size: 495.07779pt x 260.75235pt.
+
 
 [4 <./fig_sets_ops.pdf>]
 
 [5]
 
 [6]
-Overfull \hbox (7.8464pt too wide) in paragraph at lines 587--587
+Overfull \hbox (7.8464pt too wide) in paragraph at lines 622--622
 []|\T1/cmr/bx/n/7 (-20) threshold|  
  []
 
 
-Overfull \hbox (15.37885pt too wide) in paragraph at lines 587--587
+Overfull \hbox (15.37885pt too wide) in paragraph at lines 622--622
 []|\T1/cmr/m/n/7 (-20) displacement 
  []
 
 
-Overfull \hbox (6.35324pt too wide) in paragraph at lines 587--587
+Overfull \hbox (6.35324pt too wide) in paragraph at lines 622--622
 []|\T1/cmr/m/n/7 (-20) oblateness 
  []
 
@@ -702,11 +703,11 @@ Package rerunfilecheck Info: File `note_spheroid_bm_ecm.out' has not changed.
 (rerunfilecheck)             Checksum: D41D8CD98F00B204E9800998ECF8427E;0.
  ) 
 Here is how much of TeX's memory you used:
- 13865 strings out of 475102
- 211159 string characters out of 5764878
- 675847 words of memory out of 5000000
+ 13871 strings out of 475102
+ 211219 string characters out of 5764878
+ 677847 words of memory out of 5000000
  36264 multiletter control sequences out of 15000+600000
- 598363 words of font info for 285 fonts, out of 8000000 for 9000
+ 598543 words of font info for 288 fonts, out of 8000000 for 9000
  59 hyphenation exceptions out of 8191
  75i,15n,79p,1042b,612s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></us
@@ -747,7 +748,7 @@ r/sfti0900.pfb></usr/share/texmf/fonts/type1/public/cm-super/sfti1000.pfb></usr
 /share/texmf/fonts/type1/public/cm-super/sftt0800.pfb></usr/share/texmf/fonts/t
 ype1/public/cm-super/sftt0900.pfb></usr/share/texmf/fonts/type1/public/cm-super
 /sftt1000.pfb>
-Output written on note_spheroid_bm_ecm.pdf (9 pages, 802205 bytes).
+Output written on note_spheroid_bm_ecm.pdf (9 pages, 812601 bytes).
 PDF statistics:
  511 PDF objects out of 1000 (max. 8388607)
  308 compressed objects within 4 object streams

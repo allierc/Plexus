@@ -116,7 +116,8 @@ C_INHIB, INHIB_ALPHA = (0.10, 0.70, 0.70), 0.65
 
 
 def _draw(ax, pos, mesh, p0, azim, act=None, inner=INNER, Lbox=None,
-          divided=None, broken=None, wall_shade=1.0, classes=None, dying=None, inhib=None):
+          divided=None, broken=None, wall_shade=1.0, classes=None, dying=None, inhib=None,
+          edge="black", edge_lw=0.25, edge_shade=0.45):
     """3D monolayer: each cell is a prism -- an apical face (outer), a basal face (inner), and lateral
     walls. Cells are coloured by ACTIVATION with the Turing white->red LUT (activation 0 -> white).
 
@@ -206,7 +207,34 @@ def _draw(ax, pos, mesh, p0, azim, act=None, inner=INNER, Lbox=None,
             faces3d.append(np.array([ap[i], ap[(i + 1) % k], bp[(i + 1) % k], bp[i]])); cols.append(wall)
         faces3d.append(ap); cols.append(base)                   # apical face: shared mesh vertices -> tiles edge-to-edge,
         #                                                         a closed OPAQUE surface (no bevel gaps to see through)
-    pc = Poly3DCollection(faces3d, facecolors=cols, edgecolors=(0, 0, 0, 1.0), linewidths=0.25)
+    # THE EDGE STROKE IS A PARAMETER NOW, and it was the cause of a phenotype.
+    #
+    # Cedric, 12 August, zooming into b_star's left petal: *"we could consider that the sliver cells
+    # is more of a render issue... the edges in black."* He is right, and the arithmetic says so. A
+    # 0.25 pt stroke is a fixed width on the PAGE while a cell's projected area is not: 12,272 cells
+    # in a 7-inch figure puts a cell at a few pixels across, and where a petal turns edge-on the
+    # projection collapses further while the stroke does not. Past the point where the stroke is as
+    # wide as the cell, the mesh stops reading as cells with outlines and becomes a dark smear --
+    # which looks exactly like a field of slivers and is not one. The genuinely elongated cells are
+    # 24 of 12,272, in the far tail at aspect 15-60; the dark patches are thousands of ordinary
+    # cells drawn too small.
+    #
+    #   black     what every picture in this project has used. Kept as the default so no archived
+    #             figure changes meaning, and because at low cell counts it is the clearest.
+    #   shaded    the edge is the face colour darkened, so a boundary still separates two cells but
+    #             a dense patch tends to the tissue's own colour instead of to black. The cell
+    #             outlines survive where they are resolvable and dissolve where they are not, which
+    #             is what a microscope does too.
+    #   none      no stroke. The honest limit: at these densities the cell boundary is below the
+    #             pixel and drawing it is asserting a detail the image cannot carry.
+    if edge == "none":
+        _ec, _lw = "none", 0.0
+    elif edge == "shaded":
+        _ec = np.clip(np.asarray([matplotlib.colors.to_rgb(c) for c in cols]) * edge_shade, 0, 1)
+        _lw = edge_lw
+    else:
+        _ec, _lw = (0, 0, 0, 1.0), edge_lw
+    pc = Poly3DCollection(faces3d, facecolors=cols, edgecolors=_ec, linewidths=_lw)
     ax.add_collection3d(pc)
     L = Lbox if Lbox is not None else RADIUS * 1.0              # tight 3D box so the sphere renders to scale with the 2D ring
     ax.set_xlim(-L, L); ax.set_ylim(-L, L); ax.set_zlim(-L, L)

@@ -109,7 +109,8 @@ def colour(act, mt):
     return out
 
 
-def kburns(name, run_dir, seconds=SECONDS, fps=25, zoom=0.55, dpi=110):
+def kburns(name, run_dir, seconds=SECONDS, fps=25, zoom=0.55, dpi=110,
+           edge="black", edge_lw=0.25, edge_shade=0.45, out=OUT):
     fr = last_frame(run_dir)
     if fr is None:
         return "no traj.npz"
@@ -135,7 +136,7 @@ def kburns(name, run_dir, seconds=SECONDS, fps=25, zoom=0.55, dpi=110):
     ax = fig.add_subplot(111, projection="3d")
     wri = FFMpegWriter(fps=fps, codec="libx264",
                        extra_args=["-pix_fmt", "yuv420p", "-crf", "20"])
-    with wri.saving(fig, os.path.join(run_dir, OUT), dpi=dpi):
+    with wri.saving(fig, os.path.join(run_dir, out), dpi=dpi):
         for i in range(n):
             u = i / (n - 1)
             # A FULL TURN, so frame n-1 lands back on frame 0's azimuth and the clip loops.
@@ -143,7 +144,8 @@ def kburns(name, run_dir, seconds=SECONDS, fps=25, zoom=0.55, dpi=110):
             elev = 18.0 + 12.0 * np.sin(np.pi * u)         # up and back down, ending where it began
             L = L0 * (1.0 - (1.0 - zoom) * _ease(u))
             ax.clear()
-            _draw(ax, pos, mt, 3.90, azim=azim, act=col, Lbox=L, dying=dying)
+            _draw(ax, pos, mt, 3.90, azim=azim, act=col, Lbox=L, dying=dying,
+                  edge=edge, edge_lw=edge_lw, edge_shade=edge_shade)
             ax.view_init(elev=elev, azim=azim)             # _draw hardwires elev=18 as its last act
             ax.text2D(0.02, 0.96, name, transform=ax.transAxes, color="w", fontsize=10)
             # REDRAWN FROM THE CURRENT BOX, every frame. A zoom with a frozen scale bar is a lie
@@ -162,6 +164,13 @@ def main():
     ap.add_argument("--fps", type=int, default=25)
     ap.add_argument("--zoom", type=float, default=0.55, help="final box as a fraction of the run's")
     ap.add_argument("--force", action="store_true")
+    # THE STROKE, AS AN ARGUMENT. Measured on b_star's option sheet: the default black 0.25 pt
+    # leaves the body at mean luminance 100 of 255 on a WHITE tissue, because a fixed-width stroke
+    # around a few-pixel cell is most of the cell. See discovery_okuda/edge_test.py --choose.
+    ap.add_argument("--edge", default="black", choices=["black", "shaded", "none"])
+    ap.add_argument("--edge-lw", type=float, default=0.25)
+    ap.add_argument("--edge-shade", type=float, default=0.45)
+    ap.add_argument("--out", default=OUT, help="filename, so two stroke settings can coexist")
     a = ap.parse_args()
 
     runs = sorted(d for d in os.listdir(LOG)
@@ -173,10 +182,11 @@ def main():
     done = skip = fail = 0
     for r in runs:
         d = os.path.join(LOG, r)
-        if not a.force and os.path.exists(os.path.join(d, OUT)):
-            print(f"  {r:22s} has {OUT} already -- --force to redo"); skip += 1; continue
+        if not a.force and os.path.exists(os.path.join(d, a.out)):
+            print(f"  {r:22s} has {a.out} already -- --force to redo"); skip += 1; continue
         try:
-            msg = kburns(r, d, seconds=a.seconds, fps=a.fps, zoom=a.zoom)
+            msg = kburns(r, d, seconds=a.seconds, fps=a.fps, zoom=a.zoom, out=a.out,
+                         edge=a.edge, edge_lw=a.edge_lw, edge_shade=a.edge_shade)
         except Exception as e:
             msg = f"FAILED: {type(e).__name__}: {e}"
         if msg == "no traj.npz":
@@ -184,7 +194,7 @@ def main():
         elif msg.startswith("FAILED"):
             print(f"  {r:22s} {msg}"); fail += 1
         else:
-            print(f"  {r:22s} {msg} -> {OUT}"); done += 1
+            print(f"  {r:22s} {msg} -> {a.out}"); done += 1
     print(f"\n{done} written, {skip} already present, {fail} failed")
     return 0 if not fail else 1
 
