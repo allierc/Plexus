@@ -29,6 +29,41 @@ companions: \texttt{note\_junction}, \texttt{note\_fibre}, \texttt{note\_surface
 \setlength{\parindent}{0pt}\setlength{\parskip}{0.55em}
 \begin{document}\maketitle\vspace{-1.0cm}
 
+
+\section*{0.\; In two sentences}
+
+\textbf{What is built.} A growing epithelial spheroid, its basement membrane and the fibrous stroma
+around it are solved as \emph{three entities in three representations} --- the tissue as a
+\textbf{vertex model} ($396\!\to\!12{,}756$ vertices, $6{,}380$ cells, replayed here), the basement
+membrane as a \textbf{triangulated elastic mesh} ($5{,}120$ faces, refining to $81{,}920$) carrying
+protease \emph{fields} on its faces, and the stroma as an \textbf{MPM continuum} ($200{,}000$
+particles laid on $10{,}000$ fibres) --- and the model spans three levels of the same object: the
+\emph{tissue} (a spheroid that quadruples in area), the \emph{cell} (junctions with their own myosin,
+dividing, doing T1s, and deciding where their enzymes go), and the \emph{molecule} (MT1-MMP,
+proMMP-2, MMP-2, TIMP-2 and TIMP-3, with transport equations on the deformed sheet). Composed that
+way, a small set of operators produces a localized, self-arresting perforation of the membrane whose
+size is set by where the initiating enzyme sits.
+
+\textbf{What interacts, and what does not.} Of the three pairwise arrows, two exist and one does not:
+%
+\begin{center}\footnotesize
+\begin{tabular}{@{}lll@{}}\toprule
+pair & operator & status\\\midrule
+tissue $\to$ stroma & \op{mesh\_contact} (ICFEMP on a curved moving surface) &
+  momentum-conserving, \textbf{one-way}\\
+tissue $\leftrightarrow$ membrane & \op{plaque} (one edge set, both endpoints in one call) &
+  two-way, but absorbed by the replay\\
+membrane $\leftrightarrow$ stroma & \op{fibril\_pull} &
+  \textbf{does not exist}\\
+\bottomrule\end{tabular}
+\end{center}
+%
+\textbf{What remains} is therefore mostly interaction rather than mechanism: the missing
+membrane--stroma arrow; releasing the epithelium from its recording, since a replayed tissue cannot
+respond to a hole and so cannot be selected \emph{by} one; and the peel-off seen in every protease run,
+where the surviving membrane stands off the tissue instead of lying on it.
+
+
 \section*{1.\; Mechanism}
 
 An epithelial spheroid growing inside an extracellular matrix is \emph{three} entities and not two,
