@@ -592,7 +592,7 @@ nodes:
   - id: analyst
     agent: analyst
     in: [control, metrics, predictions, observations, observed, history, user_input,
-         route_a_results]
+         route_a_results, claim_ledger]
 
   - id: grounder
     agent: grounder
@@ -604,6 +604,20 @@ nodes:
   # said "'record' emits 'record' and NO node consumes it", and the honest answer is that its output
   # is a file rather than an edge. A terminal node has to say so, otherwise the check would have to
   # stay silent about every genuine dead end and would catch nothing.
+  # ---- THE ACTS BECOME EVIDENCE --------------------------------------------------
+  # This is the node that closes the loop the epistemic audit found open. Route B could pose
+  # experiments and the Analyst could write prose, and nothing carried the OUTCOME of an experiment
+  # back onto the knowledge it was performed against -- so eleven laws accumulated with no
+  # provenance and two contradictory ones coexisted for six rounds.
+  #
+  # It consumes `analyst`, which nothing consumed before: the role's own output was written to a
+  # file and dropped. Its `induce` block is now read from it, which is also what makes the edge
+  # real rather than declared.
+  - id: claims_update
+    code: round.claims_update
+    in: [specs, predictions, analyst]
+    writes: campaign/claims.jsonl + campaign/knowledge.md
+
   - id: record
     code: round.record_all
     in: [specs, metrics, predictions]

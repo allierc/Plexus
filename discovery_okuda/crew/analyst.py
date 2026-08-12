@@ -35,7 +35,7 @@ from . import _prompt
 
 ROLE = {
     "wants": ["metrics", "predictions", "observations", "observed", "history", "control"],
-    "writes": "analysis.md + knowledge.md",
+    "writes": "analysis.md (knowledge.md is RENDERED from the claim ledger, never written here)",
     "md": "analyst.md",
 }
 
@@ -73,9 +73,23 @@ def run(bundle):
          bundle.get("route_a_results"), {"limit": 60000}),
         ("INSTRUCTIONS FROM THE OPERATOR -- these outrank anything above",
          bundle.get("user_input"), {"as_json": False, "limit": 30000}),
-        ("Your task", f"Append this round's analysis to {a_md}, and append to {k_md} only what "
-                      f"survives the round, each fact with the number that makes it one. Write no "
-                      f"other file.", {"as_json": False}),
+        # `knowledge.md` IS NO LONGER YOURS TO WRITE. It is rendered from `campaign/claims.jsonl`
+        # after this node runs, and anything written here would be overwritten in the same round.
+        # Evidence is appended MECHANICALLY by `round.claims_update`: which claim came from the
+        # slot's `on` field, which direction from the scored outcome, and how much from the
+        # resolvability of the ask. None of the three is a judgement, and the audit's finding was
+        # that the judgements nobody checked were the ones that went wrong.
+        #
+        # What is left for this role is the one thing that IS a judgement: whether the round
+        # warrants a claim nobody has stated yet.
+        ("What is currently claimed -- do not restate these, act on them or add to them",
+         bundle.get("claim_ledger"), {"as_json": True, "limit": 20000}),
+        ("Your task", f"Append this round's analysis to {a_md}. Do NOT write {k_md}: it is "
+                      f"rendered from the claim ledger. If -- and only if -- this round shows "
+                      f"something no existing claim states, end your text with a fenced ```json "
+                      f"list of new claims, each with `statement`, `kind` (mechanism | instrument "
+                      f"| substrate_limit), `scope` ({{lineages, regimes}}) and optionally "
+                      f"`parents` and `mechanism`. Write no other file.", {"as_json": False}),
     ])
     ok, text = run_agent("analyst", prompt, ledger=bundle.get("ledger"))
     return text if ok else ""

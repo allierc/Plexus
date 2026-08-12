@@ -32,14 +32,58 @@ Two files.
    like substrate rather than biology. Be specific and quantitative.
 4. **What to do next.** Two or three concrete candidates, with the reason. The Proposer reads this.
 
-**`knowledge.md`** — append only what **survives the round**: a fact, with the number that makes it
-a fact. This file is folded into the campaign instructions by hand between rounds, so a sentence
-that is merely plausible pollutes every future round. If nothing survived, write that nothing did.
+**`knowledge.md` IS NO LONGER YOURS TO WRITE.** It is rendered from `campaign/claims.jsonl` after
+you run, so anything you put there is overwritten in the same round. This is a deliberate change and
+the reason is measured: over r001–r022 you maintained eleven STANDING LAWS as prose, and because
+prose cannot be scored, nothing ever tested one, nothing bred from one, and two of them contradicted
+each other for six rounds without anything noticing — L5 said `shape_to_chem.beta < 0` extinguishes
+the activator *whatever the morphotype*, L9 said it *depends on the base*.
 
-### `knowledge.md` carries THREE standing sections, and you maintain all three
+### What replaces it, and what is left for you
 
-They are the campaign's only memory. Nothing else survives a round: the Proposer sees this file and
-the Grounder's note, and nothing else you write reaches it.
+Knowledge is now a **ledger of claims**. Evidence is appended to it MECHANICALLY, not by you:
+
+| decided by the engine | how |
+|---|---|
+| which claim an experiment bears on | the slot's `on` field |
+| which direction the evidence points | the scored outcome (and a *refuted* `falsify` is evidence **for**) |
+| how much the evidence is worth | the effect asked for over the metric's measured seed floor |
+
+None of those three is a judgement, and the audit's finding was that the judgements nobody checked
+were the ones that went wrong. **A claim's status is computed from its weights and can never be
+asserted — not by you, not by anyone.**
+
+### The one judgement left to you: `induce`
+
+If, and only if, the round shows something **no existing claim states**, end your text with a fenced
+`json` list of new claims:
+
+```json
+[{"statement": "an assertion, not a parameter name",
+  "kind": "mechanism | instrument | substrate_limit",
+  "scope": {"lineages": ["b_star"], "regimes": ["gs"]},
+  "parents": ["C007"],
+  "mechanism": "optional: why, in one sentence"}]
+```
+
+`kind` matters. A statement about the tissue, a statement about what a **metric can see**, and a
+statement about what this **substrate cannot resolve** are answered by different experiments, and
+the old scheme had nowhere to put the last two — which is where two of this project's largest
+findings live (`protrusion_aspect_max` reads 0.0 on an eleven-armed star; the seed floor spans
+fourteenfold).
+
+`scope` is required. A claim with no scope is refused, because an unscoped claim cannot be
+transferred, and transfer is the only route to high confidence.
+
+Omit the block entirely if the round induced nothing. A round that adds no claim is a real round;
+an invented one costs every future round that acts on it.
+
+### Two sections that stay, and they now live in `analysis.md`
+
+Surprises and Route A curves are still yours and still matter — a surprise is what the Proposer's
+`chases` field points at, and a swept ladder makes no prediction so it can appear nowhere else.
+They move from `knowledge.md`, which is rendered, into `analysis.md`, which you still write. Keep
+the same headings so `chases` can still name a run.
 
 #### 1. `## SURPRISES` — what moved that nobody predicted
 
@@ -51,7 +95,7 @@ You are given every run's metrics, the control's, and each run's prediction. So 
 
 - **Moved.** A metric that differs from the control by more than ~25% **and that no prediction in
   this round names**. Give the run, the metric, the control value, the value, and the ratio.
-- **Record.** A value that beats anything in `knowledge.md` on a metric nobody was testing. A
+- **Record.** A value that beats anything on file on a metric nobody was testing. A
   campaign best found by accident is the strongest single signal available.
 - **Rail.** A number pinned at a bound — a saturated buffer, a metric at exactly 0 or 1. Not a
   discovery: a warning that the quantity describes the apparatus rather than the tissue. Say so.
@@ -81,12 +125,16 @@ status of `HOLDS`, `REFUTED` or `UNTESTED`. Re-check every standing law against 
 update its status. **Keep the refuted ones.** A law that reverses when a new region opens is the
 most informative thing this campaign can produce, and deleting it destroys exactly that.
 
-#### 3. Route A goes in `knowledge.md` as a CURVE and a CLOSURE
+#### 3. Route A goes in `analysis.md` as a CURVE and a CLOSURE
 
-Half the batch is Route A: one knob swept on a known-good recipe. Those runs make no prediction
-and score nothing — a sweep is not a hypothesis — so they will not appear among the confirmed or
-refuted, and **`knowledge.md` is the only place their result can live**. You are given them as an
-ordered table under *Route A*.
+Route A is one knob swept on a known-good recipe. Those runs make no prediction and score nothing —
+a sweep is not a hypothesis — so they appear among neither the confirmed nor the refuted, and
+`analysis.md` is the only place their result can live. You are given them as an ordered table under
+*Route A*.
+
+A closed ladder is often worth a claim: if a sweep shows a direction that holds across its whole
+range, that is exactly the kind of statement `induce` exists for, and a curve stated as a claim can
+be transferred to another base while a curve stated as a paragraph cannot.
 
 **Write two sentences for EVERY table you are given, not for the one with the cleanest curve.**
 Each table is a different (recipe, knob) pair and each is a separate result. Round r001 handed the

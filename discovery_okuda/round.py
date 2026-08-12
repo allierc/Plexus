@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import glob
 import json
+import re
 import os
 import sys
 import time
@@ -2474,6 +2475,179 @@ def metric_floors(ctx):
         print(T_.warn(f"[round] floors unavailable: {type(e).__name__}"))
         return {}
     return {k: v for k, v in sorted(fl.items(), key=lambda kv: -kv[1])}
+
+
+
+def claims_update(ctx):
+    """Turn this round's acts into evidence on the ledger, and re-render `knowledge.md`.
+
+    THE DIVISION OF LABOUR IS THE POINT. The epistemic audit's finding was not that the agents
+    reason badly -- it was that they ASSERT and nothing checks. So the engine does everything
+    mechanical here and the Analyst does only what needs judgement:
+
+        the engine decides   WHICH claim (the slot said `on`), WHICH DIRECTION (from the scored
+                             outcome), and HOW MUCH (resolvability: the effect asked for over the
+                             metric's measured floor). None of the three is an opinion.
+        the Analyst decides  whether the round warrants a NEW claim, and says so as an `induce`
+                             block. That is a judgement and it is the only one left here.
+
+    A claim's STATUS is never written by anyone: it is recomputed from the weights every time.
+
+    IDEMPOTENT. Evidence is keyed on (run, claim, act), so re-running a round -- which happens on a
+    resume -- adds nothing twice. A ledger that double-counts on a retry would inflate exactly the
+    quantity this design exists to keep honest.
+    """
+    try:
+        import claims as K
+        import critic as C
+    except Exception as e:
+        print(T_.warn(f"[claims] unavailable: {type(e).__name__}: {e}"))
+        return {}
+    spec = K.load_spec()
+    cur, _hist = K.load()
+    if not cur:
+        print(T_.quiet("[claims] ledger is empty -- nothing to act on"))
+        return {}
+
+    specs = ctx.get("specs") or []
+    preds = ctx.get("predictions") or {}
+    floors = C._seed_floors()
+    rid = ctx.get("round_id") or "r???"
+
+    # WHAT AN OUTCOME MEANS FOR THE CLAIM, per act. `falsify` is the inversion that matters: its
+    # prediction states what would BREAK the claim, so a CONFIRMED falsification is evidence
+    # AGAINST. Getting that backwards would silently invert the strongest act in the vocabulary.
+    DIRECTION = {
+        "predict":     {"confirmed": "for", "refuted": "against"},
+        "falsify":     {"confirmed": "against", "refuted": "for"},
+        "transfer":    {"confirmed": "for", "refuted": "against"},
+        "bound":       {"confirmed": "for", "refuted": "against"},
+        "discriminate": {"confirmed": "for", "refuted": "against"},
+    }
+
+    touched, added, skipped = {}, 0, []
+    for sp in specs:
+        act, cid = (sp.get("act") or "").lower(), sp.get("on")
+        if not act or not cid:
+            continue
+        if cid not in cur:
+            skipped.append(f"{sp['name']}: acts on {cid}, which is not in the ledger")
+            continue
+        c = touched.get(cid) or json.loads(json.dumps(cur[cid]))     # copy, then append
+        sc = preds.get(sp["name"]) or {}
+        outcome = sc.get("outcome")
+
+        if act == "replicate":
+            # NO DIRECTIONAL EVIDENCE. A replicate measures the floor; it does not argue for or
+            # against the claim, and counting it as support would let a claim be established by
+            # repetition alone -- which is the one thing the seed floor says repetition cannot do.
+            u = c.setdefault("uncertainty", {})
+            u["n_replicates"] = int(u.get("n_replicates", 0)) + 1
+            u["last_replicate"] = sp["name"]
+            touched[cid] = c
+            added += 1
+            continue
+
+        side = DIRECTION.get(act, {}).get(outcome)
+        if side is None:
+            # inconclusive, or an act with no directional meaning. Recorded, not scored: the audit
+            # showed `inconclusive` being read as `refuted`, which credits a falsification nobody
+            # performed.
+            skipped.append(f"{sp['name']}: {act} scored {outcome!r} -- no evidence either way")
+            continue
+
+        w, fl = 1.0, None
+        m = re.match(r"\s*([a-z_0-9]+)\s*[<>]=?\s*([-0-9.eE+]+)", str(sc.get("predict") or ""))
+        if m:
+            base = (measure(sp.get("parent")) or {}).get(m.group(1))
+            if isinstance(base, (int, float)) and base:
+                w, fl = K.resolvability(m.group(1), base, float(m.group(2)), floors)
+        else:
+            w = (spec.get("evidence", {}).get("default_weight", {})).get(act, 1.0)
+
+        key = (sp["name"], act)
+        field = f"evidence_{side}"
+        if any((e.get("run"), e.get("act")) == key for e in (c.get(field) or [])):
+            continue                                   # idempotent: the same act, already recorded
+        c.setdefault(field, []).append(
+            {"run": sp["name"], "act": act, "weight": round(float(w), 3), "round": rid,
+             "note": (sc.get("predict") or "")[:80]})
+        added += 1
+
+        # TRANSFER IS THE ONLY ACT THAT MAY WIDEN A SCOPE, and only on success -- `crew/claims.md`.
+        # Otherwise a claim quietly becomes universal, and a claim asserted everywhere cannot be
+        # falsified anywhere.
+        if act == "transfer" and outcome == "confirmed" and sp.get("lineage"):
+            lin = c.setdefault("scope", {}).setdefault("lineages", [])
+            if sp["lineage"] not in lin:
+                lin.append(sp["lineage"])
+        # DISCRIMINATE MOVES BOTH. The prediction is phrased as what THIS claim expects, so the
+        # rival takes the opposite sign.
+        if act == "discriminate" and sp.get("rival") in cur:
+            rid_c = sp["rival"]
+            rc = touched.get(rid_c) or json.loads(json.dumps(cur[rid_c]))
+            rfield = "evidence_against" if side == "for" else "evidence_for"
+            if not any((e.get("run"), e.get("act")) == key for e in (rc.get(rfield) or [])):
+                rc.setdefault(rfield, []).append(
+                    {"run": sp["name"], "act": "discriminate", "weight": round(float(w), 3),
+                     "round": rid, "note": f"lost to {cid}" if side == "for" else f"beat {cid}"})
+                touched[rid_c] = rc
+        touched[cid] = c
+
+    # NEW CLAIMS, from the Analyst's `induce` block. Validated before they land: a claim with no
+    # scope cannot be transferred, and transfer is the only route to high confidence.
+    induced = _induced_claims(ctx)
+    for nc in induced:
+        nc["id"] = K.next_id(cur)
+        nc.setdefault("status", "proposed")
+        nc.setdefault("created", rid)
+        nc.setdefault("derived_by", "induce")
+        probs = K.validate({**cur, nc["id"]: nc}, [nc], spec, None)
+        if probs:
+            print(T_.warn(f"[claims] induced claim refused: {probs[0]}"))
+            continue
+        cur[nc["id"]] = nc
+        touched[nc["id"]] = nc
+
+    moved = []
+    for cid, c in touched.items():
+        before = cur[cid].get("status")
+        c["status"] = K.status_for(c, spec)
+        c["round"] = rid
+        K.append(c)
+        cur[cid] = c
+        if c["status"] != before:
+            moved.append(f"{cid} {before} -> {c['status']}")
+
+    K.render(cur, spec)
+    n_new = len([1 for cid in touched if cid not in {x['id'] for x in _hist}])
+    print(T_.ok(f"[claims] {added} evidence entr{'y' if added == 1 else 'ies'} over "
+                f"{len(touched)} claim(s), {len(induced)} induced"
+                + (f"; STATUS MOVED: {', '.join(moved)}" if moved else "; no status changed")))
+    for s_ in skipped[:4]:
+        print(T_.quiet(f"[claims] {s_}"))
+    return {"evidence_added": added, "claims_touched": sorted(touched),
+            "induced": len(induced), "moved": moved}
+
+
+def _induced_claims(ctx):
+    """The `induce` block from the Analyst's text: a fenced json list, or nothing.
+
+    Parsed from the role's OUTPUT rather than read from a file it was asked to write, for the same
+    reason the Proposer's slots are: a file the agent may or may not have written is a silent
+    failure, and a block that is absent is simply an empty list.
+    """
+    txt = ctx.get("analyst") or ""
+    if not isinstance(txt, str) or "induce" not in txt.lower():
+        return []
+    for block in re.findall(r"```(?:json)?\s*(\[.*?\])\s*```", txt, re.S):
+        try:
+            d = json.loads(block)
+            if isinstance(d, list) and d and isinstance(d[0], dict) and "statement" in d[0]:
+                return d
+        except Exception:
+            continue
+    return []
 
 
 
