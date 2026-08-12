@@ -300,7 +300,7 @@ def plan(n_rounds, recon_rounds=1):
 
 MARKER = "<!-- LEARNED PATTERNS -->"
 
-CAMPAIGN_STATE = ("analysis.md", "memory.md", "knowledge.md", "lever_map.md",
+CAMPAIGN_STATE = ("analysis.md", "memory.md", "lever_map.md",
                   "causal_descriptions.md", "proposal.json", "state.json", "frontier.json",
                   "hypotheses.jsonl", "round_records.jsonl", "archivist.jsonl",
                   "llm_timing.jsonl", "peer_review.jsonl", "diagnoses.jsonl",
@@ -313,7 +313,21 @@ CAMPAIGN_STATE = ("analysis.md", "memory.md", "knowledge.md", "lever_map.md",
                   # IS cleared, so leaving the rendering behind states a backlog that no longer
                   # exists.
                   "batch_refusals.jsonl", "campaign.json", "operator_backlog.md",
-                  "logic_report.jsonl", "holes.jsonl", "claims.jsonl", "reservoir.jsonl",
+                  "logic_report.jsonl", "holes.jsonl", "reservoir.jsonl",
+                  # `claims.jsonl` AND `knowledge.md` ARE NOT ON THIS LIST, and both were, which
+                  # cost the claim campaign its first launch. `claims.jsonl` was listed for an
+                  # OLDER, unrelated file of the same name from a design that no longer exists; the
+                  # entry outlived its file and then deleted a different one. The clean start wiped
+                  # all thirteen seed claims, `claim_ledger` returned empty, and the Proposer would
+                  # have been handed an `act` vocabulary with nothing to act on -- a failure that
+                  # reads as the agents ignoring their instructions rather than as an empty file.
+                  #
+                  # This function's own docstring draws the line correctly: "Delete the campaign's
+                  # state so the next round is ROUND 1. NEVER THE RESEARCH RECORD." A reset forgets
+                  # the SEARCH -- which run was bred from which. The ledger is not the search, it is
+                  # what the campaign KNOWS, and `knowledge.md` is its rendered view. Both are the
+                  # research record, and `round.KEEP_ON_RESET` says the same thing; the two lists
+                  # disagreeing is what let this through.
                   # OR001 -- "apical constriction: a polarized line-tension" -- was filed by some
                   # earlier campaign, survived every clean start, and could never be closed
                   # because escalation.set_status is called only from escalation.py's own
