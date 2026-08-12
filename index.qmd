@@ -92,10 +92,10 @@ it.**
 .sim-card figcaption{margin-top:.4rem;line-height:1.3}
 .sim-name{font-weight:600;cursor:help;position:relative;border-bottom:1px dotted #999}
 .sim-cap{display:block;font-size:.84em;color:#777;margin-top:.12rem}
-.sim-spec{display:none;position:absolute;left:0;top:1.5em;z-index:40;width:max(340px,116%);max-height:420px;overflow:auto;
+.sim-spec{display:none;position:absolute;left:0;top:1.5em;z-index:40;width:max(460px,150%);max-width:min(760px,88vw);max-height:440px;overflow:auto;
   background:#1e1e1e;border-radius:7px;box-shadow:0 8px 28px rgba(0,0,0,.4);padding:.5rem .7rem;text-align:left;cursor:auto}
-.sim-name:hover .sim-spec,.sim-name:focus .sim-spec{display:block}
-.sim-spec pre{margin:0;font-size:.72em;line-height:1.3;white-space:pre;color:#e9e9e9;background:none;border:none;padding:0}
+.sim-name:hover .sim-spec,.sim-name:focus .sim-spec,.sim-name:focus-within .sim-spec{display:block}
+.sim-spec pre{margin:0;font-size:.72em;line-height:1.3;white-space:pre-wrap;overflow-wrap:anywhere;color:#e9e9e9;background:none;border:none;padding:0}
 .opk{font-size:.8em;color:#888;margin-bottom:.2rem}
 .opk-ref{font-size:.76em;color:#999;font-style:italic;margin:.1rem 0 .2rem}
 </style>
@@ -701,21 +701,289 @@ schedule:   # the order the operators run each frame
   <figure class="sim-card">
     <video src="gallery/apop_patch_big.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name">a dying big patch</span>
+      <span class="sim-name" tabindex="0">a dying big patch<span class="sim-spec"><pre>general:
+  name: apop_patch_big
+  seed: 0
+  n_frames: 900
+  dt: 1.0
+  record_cap: 902
+  record_every: 1
+  boundary: free
+  dim: 3
+  world:
+  - 80.0
+  - 80.0
+  - 80.0
+_run:
+  target_cells: 60000
+  seed_cells: 2000
+sets:
+  vertex:
+    n: 120000
+  cell:
+    n: 60000
+    state:
+      chem:
+        width: 2
+        integration: first_order
+      cen:
+        width: 3
+      area:
+        width: 1
+fields: {}
+operators:
+- op: seed_mesh_3d
+  at: vertex
+  cell_set: cell
+  before_frame: 1
+  n_cells: 2000
+  seed: 0
+  vseed_cv: 0.15
+  radius: 5.0
+  jitter: 0.15
+  p0: 3.5
+- op: cell_geometry_3d
+  at: cell
+- op: shape_energy_3d
+  at: vertex
+  K_A: 1.0
+  K_P: 1.0
+  K_V: 20.0
+  K_R: 0.0
+  Lambda: 0.5
+  Gamma: 0.4
+  p0: 3.5
+  mu: 1.0
+  dt: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+  K_bend: 0.0
+  K_lumen: 0.0
+- op: apoptosis_3d
+  at: vertex
+  cell_set: cell
+  p0: 3.5
+  mode: cone
+  cone_deg: 45.0
+  shrink_rate: 0.05
+  critical_frac: 0.15
+- op: reconnect_t1_3d
+  at: vertex
+  l_th_frac: 0.28
+  every: 1
+  max_flips: 300
+- op: topo_snapshot_3d
+  at: vertex
+  every: 1
+schedule:
+- seed_mesh_3d
+- cell_geometry_3d
+- shape_energy_3d
+- apoptosis_3d
+- reconnect_t1_3d
+- topo_snapshot_3d
+_basis:
+  chem: none
+  mat: static
+  mech: plain
+  grid: 4 chemistry x 2 material x 2 mechanics
+  why: chemistry=none, material=static, mechanics=plain -- one cell of the basis grid
+    written by make_basis.py; every value not on an axis is shared with the other
+    fifteen.</pre></span></span>
       <span class="sim-cap">seen from the pole: 293 cells (blue) are marked to die, and the surface is drawn <b>inward</b> where they go — an invagination, the one deformation growth cannot make</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/apop_rings9.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name">nine dying rings</span>
+      <span class="sim-name" tabindex="0">nine dying rings<span class="sim-spec"><pre>general:
+  name: apop_rings9
+  seed: 0
+  n_frames: 600
+  dt: 1.0
+  record_cap: 602
+  record_every: 1
+  boundary: free
+  dim: 3
+  world:
+  - 80.0
+  - 80.0
+  - 80.0
+_run:
+  target_cells: 60000
+  seed_cells: 2000
+sets:
+  vertex:
+    n: 120000
+  cell:
+    n: 60000
+    state:
+      chem:
+        width: 2
+        integration: first_order
+      cen:
+        width: 3
+      area:
+        width: 1
+fields: {}
+operators:
+- op: seed_mesh_3d
+  at: vertex
+  cell_set: cell
+  before_frame: 1
+  n_cells: 2000
+  seed: 0
+  vseed_cv: 0.15
+  radius: 5.0
+  jitter: 0.15
+  p0: 3.5
+- op: cell_geometry_3d
+  at: cell
+- op: shape_energy_3d
+  at: vertex
+  K_A: 1.0
+  K_P: 1.0
+  K_V: 20.0
+  K_R: 0.0
+  Lambda: 0.5
+  Gamma: 0.4
+  p0: 3.5
+  mu: 1.0
+  dt: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+  K_bend: 0.0
+  K_lumen: 0.0
+- op: apoptosis_3d
+  at: vertex
+  cell_set: cell
+  p0: 3.5
+  mode: band
+  band_deg: 4.0
+  shrink_rate: 0.05
+  critical_frac: 0.15
+  n_bands: 9
+- op: reconnect_t1_3d
+  at: vertex
+  l_th_frac: 0.28
+  every: 1
+  max_flips: 300
+- op: topo_snapshot_3d
+  at: vertex
+  every: 1
+schedule:
+- seed_mesh_3d
+- cell_geometry_3d
+- shape_energy_3d
+- apoptosis_3d
+- reconnect_t1_3d
+- topo_snapshot_3d
+_basis:
+  chem: none
+  mat: static
+  mech: plain
+  grid: 4 chemistry x 2 material x 2 mechanics
+  why: chemistry=none, material=static, mechanics=plain -- one cell of the basis grid
+    written by make_basis.py; every value not on an axis is shared with the other
+    fifteen.</pre></span></span>
       <span class="sim-cap">895 deaths in nine bands: the vesicle does not fall apart, it closes over every gap and shrinks</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/apop_half.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name">half the sheet</span>
+      <span class="sim-name" tabindex="0">half the sheet<span class="sim-spec"><pre>general:
+  name: apopgeo_half
+  seed: 0
+  n_frames: 600
+  dt: 1.0
+  record_cap: 602
+  record_every: 1
+  boundary: free
+  dim: 3
+  world:
+  - 80.0
+  - 80.0
+  - 80.0
+_run:
+  target_cells: 4000
+  seed_cells: 400
+sets:
+  vertex:
+    n: 8000
+  cell:
+    n: 4000
+    state:
+      chem:
+        width: 2
+        integration: first_order
+      cen:
+        width: 3
+      area:
+        width: 1
+fields: {}
+operators:
+- op: seed_mesh_3d
+  at: vertex
+  cell_set: cell
+  before_frame: 1
+  n_cells: 400
+  seed: 0
+  vseed_cv: 0.15
+  radius: 5.0
+  jitter: 0.15
+  p0: 3.5
+- op: cell_geometry_3d
+  at: cell
+- op: apoptosis_3d
+  at: vertex
+  cell_set: cell
+  p0: 3.5
+  shrink_rate: 0.05
+  critical_frac: 0.15
+  min_age: 0
+  mode: band
+  band_deg: 45.0
+  n_bands: 1
+- op: shape_energy_3d
+  at: vertex
+  K_A: 1.0
+  K_P: 1.0
+  K_V: 20.0
+  K_R: 0.0
+  Lambda: 0.5
+  Gamma: 0.4
+  p0: 3.5
+  mu: 1.0
+  dt: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+- op: reconnect_t1_3d
+  at: vertex
+  l_th_frac: 0.28
+  every: 1
+  max_flips: 300
+- op: topo_snapshot_3d
+  at: vertex
+  every: 1
+schedule:
+- seed_mesh_3d
+- cell_geometry_3d
+- apoptosis_3d
+- shape_energy_3d
+- reconnect_t1_3d
+- topo_snapshot_3d
+_apopgeo:
+  geometry: half
+  selector:
+    mode: band
+    band_deg: 45.0
+    n_bands: 1
+  why: death is the only mechanism in this composition, so the cell count can only
+    fall and n_apop must equal 400 - cells_final exactly</pre></span></span>
       <span class="sim-cap">285 of 400 cells extruded — the topology survives, and what is left is an ellipsoid pulled from a sphere</span>
     </figcaption>
   </figure>
@@ -1732,12 +2000,12 @@ measured:
 
 <!-- BEGIN spheroid-bm-ecm (generated by prototype/ecm/minisite_section.py) -->
 <h3>Spheroid + basement membrane + matrix</h3>
-<p class="opk">A spheroid in a matrix is <b>three</b> entities, not two. While the sheet is intact
-the epithelium never touches the stroma — load runs cell → adhesion plaque → <b>basement
-membrane</b> → anchoring fibril → stroma — so a model in which the tissue <i>also</i> pushes the
-matrix counts the same push twice. The three clips after the first are one argument: the proteases
-that can dissolve the sheet <b>in balance</b>, then that balance <b>broken locally</b>, and then not
-locally at all.</p>
+<p class="opk">Three entities, three representations: the <b>epithelium</b> is a vertex model, cells
+as polyhedra sharing walls; the <b>basement membrane</b> is a triangulated elastic sheet tied to it by
+adhesion plaques; the <b>stroma</b> is MPM material points laid out as fibres. Load runs cell →
+plaque → sheet → anchoring fibril → stroma, so while the sheet is intact the epithelium never
+touches the stroma. And the scales nest — tissue, cell, molecule: MT1-MMP is a state of the cell, and
+the proteases it feeds are fields on the sheet's own faces.</p>
 <p class="opk-ref">Reference — load path,
 <a href="https://doi.org/10.1083/jcb.104.3.611">Keene et&nbsp;al. (1987)</a>; adhesions are clusters
 at ~555&nbsp;nm, <a href="https://doi.org/10.1002/bies.201600123">Changede &amp; Sheetz (2017)</a>;

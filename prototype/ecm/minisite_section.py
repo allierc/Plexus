@@ -377,12 +377,12 @@ def build3(runs, runs2=()):
 </div>"""
     return f"""{BEGIN3}
 <h3>Spheroid + basement membrane + matrix</h3>
-<p class="opk">A spheroid in a matrix is <b>three</b> entities, not two. While the sheet is intact
-the epithelium never touches the stroma — load runs cell → adhesion plaque → <b>basement
-membrane</b> → anchoring fibril → stroma — so a model in which the tissue <i>also</i> pushes the
-matrix counts the same push twice. The three clips after the first are one argument: the proteases
-that can dissolve the sheet <b>in balance</b>, then that balance <b>broken locally</b>, and then not
-locally at all.</p>
+<p class="opk">Three entities, three representations: the <b>epithelium</b> is a vertex model, cells
+as polyhedra sharing walls; the <b>basement membrane</b> is a triangulated elastic sheet tied to it by
+adhesion plaques; the <b>stroma</b> is MPM material points laid out as fibres. Load runs cell →
+plaque → sheet → anchoring fibril → stroma, so while the sheet is intact the epithelium never
+touches the stroma. And the scales nest — tissue, cell, molecule: MT1-MMP is a state of the cell, and
+the proteases it feeds are fields on the sheet's own faces.</p>
 <p class="opk-ref">Reference — load path,
 <a href="https://doi.org/10.1083/jcb.104.3.611">Keene et&nbsp;al. (1987)</a>; adhesions are clusters
 at ~555&nbsp;nm, <a href="https://doi.org/10.1002/bies.201600123">Changede &amp; Sheetz (2017)</a>;
@@ -619,7 +619,30 @@ def main():
                      files=((QMD, False), (DOCS, True)),
                      new_video="tyssue_spheroid_00.mp4")
         import shutil as _sh
-        if os.path.isdir(DOCS_GAL):
+        # THREE CARDS THAT NEVER HAD A SPEC. `apop_patch_big`, `apop_rings9` and `apop_half` were
+    # written by hand with a bare <span class="sim-name">: no `tabindex`, no spec, so their titles
+    # are the only ones on the page that open nothing when you click them. The page's rule is that
+    # every clip opens the spec that produced it, and these three are the exception, not a choice.
+    # `apop_half` plays `apopgeo_half` -- identified by its own number, 400 - 285 extruded = the
+    # 115 cells that run's diagnostics report, and not by the clip's name.
+    for vid, nm, run, cap in (
+        ("apop_patch_big", "a dying big patch", "apop_patch_big",
+         "seen from the pole: 293 cells (blue) are marked to die, and the surface is drawn "
+         "<b>inward</b> where they go — an invagination, the one deformation growth cannot make"),
+        ("apop_rings9", "nine dying rings", "apop_rings9",
+         "895 deaths in nine bands: the vesicle does not fall apart, it closes over every gap and "
+         "shrinks"),
+        ("apop_half", "half the sheet", "apopgeo_half",
+         "285 of 400 cells extruded — the topology survives, and what is left is an ellipsoid "
+         "pulled from a sphere"),
+    ):
+        sp = os.path.join(LOG_OKUDA, run, "spec_run.yaml")
+        if os.path.exists(sp):
+            replace_card(f"{vid}.mp4", nm, sp, cap, files=((QMD, False), (DOCS, True)))
+        else:
+            print(f"[minisite] {run}: no spec_run.yaml -- {vid} keeps its bare title")
+
+    if os.path.isdir(DOCS_GAL):
             _sh.copy2(os.path.join(GAL, "tyssue_spheroid_00.mp4"),
                       os.path.join(DOCS_GAL, "tyssue_spheroid_00.mp4"))
 
