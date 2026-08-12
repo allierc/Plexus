@@ -858,26 +858,27 @@ def main():
     # since could redraw them; `b_gs_gated_shaping` stood in for coral for one commit and is
     # replaced here by the run Cedric picked, which is a labyrinth rather than patches.
     for clip, run, label, cap_fn, olds in (
-        ("turing_coral_v3", "r021_12", "coral",
+        ("turing_coral_v4", "r021_12", "coral",
          lambda m: (f"A Gray–Scott pattern riding a growing shell: red stripes wander across "
                     f"{m['cells_final']:,} cells and the shell stays round (protrusion peak "
                     f"{m['protr_peak']:.2f})"),
-         ("tyssue_vh_rd_coral.mp4", "turing_coral_v2.mp4", "turing_coral_v3.mp4")),
+         ("tyssue_vh_rd_coral.mp4", "turing_coral_v2.mp4", "turing_coral_v3.mp4",
+          "turing_coral_v4.mp4")),
         # `grow_divide` is `r001_00_ctrl` with growth that no morphogen gates (the operator's own
         # `rho: 1, a_sw: 0`). The control has divide_3d and NO grow_3d, so 2 of its 2,001 cells ever
         # divided and the card drew a sphere doing nothing; this one reaches 25,079 cells of which
         # 25,054 divided.
-        ("turing_grow_divide_v3", "grow_divide", "grow &amp; divide",
+        ("turing_grow_divide_v4", "grow_divide", "grow &amp; divide",
          lambda m: (f"Growth that no morphogen gates, and division following it: 2,000 cells to "
                     f"{m['cells_final']:,}, and the shell stays a sphere (reduced volume "
                     f"{m['reduced_volume_final']:.2f})"),
-         ("tyssue_vh_grow_divide.mp4", "turing_grow_divide_v3.mp4")),
-        ("turing_morphogen_v3", "r003_07", "morphogen + growth",
+         ("tyssue_vh_grow_divide.mp4", "turing_grow_divide_v3.mp4", "turing_grow_divide_v4.mp4")),
+        ("turing_morphogen_v4", "r003_07", "morphogen + growth",
          lambda m: (f"The same chemistry driving growth where it peaks: {m['cells_final']:,} cells "
                     f"and the shell folds out of plane, protrusion peak {m['protr_peak']:.2f}, "
                     f"along a path that runs "
                     f"{m['morphology_path'].replace(' -> ', ' → ')}"),
-         ("tyssue_okuda_lobed.mp4", "turing_morphogen_v3.mp4")),
+         ("tyssue_okuda_lobed.mp4", "turing_morphogen_v3.mp4", "turing_morphogen_v4.mp4")),
     ):
         rd = os.path.join(LOG_OKUDA, run)
         if not os.path.exists(os.path.join(rd, "traj.npz")):
@@ -895,8 +896,8 @@ def main():
             shutil.copy2(os.path.join(GAL, f"{clip}.mp4"), os.path.join(DOCS_GAL, f"{clip}.mp4"))
 
     if os.path.isdir(DOCS_GAL):
-                shutil.copy2(os.path.join(GAL, "turing_coral_v3.mp4"),
-                             os.path.join(DOCS_GAL, "turing_coral_v3.mp4"))
+                shutil.copy2(os.path.join(GAL, "turing_coral_v4.mp4"),
+                             os.path.join(DOCS_GAL, "turing_coral_v4.mp4"))
 
     if os.path.isdir(DOCS_GAL):
         # EVERY CARD'S CLIP, not just the ones that are new this time. Copying a subset once left
