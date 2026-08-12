@@ -80,6 +80,11 @@ def solve(d, dev, frames, keep_n=201):
                               .float().cpu().numpy())
             i += 1
 
+    from spec_06 import write_spec
+    write_spec(d, rig, name=os.path.basename(d), frames=frames, matrix_src=SRC,
+               extra=dict(kind="mechanical, refining", faces=[S["n_face"][0], S["n_face"][-1]],
+                          plaques=[S["n_plaque"][0], S["n_plaque"][-1]],
+                          lam_geo_end=S["lam"][-1]))
     np.savez_compressed(os.path.join(d, "bm_frames.npz"), n_kept=np.int32(i),
                         FE=rig.F_epi.cpu().numpy().astype(np.int32),
                         centre=rig.c.float().cpu().numpy(), scale=np.float64(rig.scale), **store)

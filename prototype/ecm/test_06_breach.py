@@ -456,6 +456,16 @@ def solve(tag, dev, frames, inhib, kdeg, refine=False, modes=6, hetero=1.0, spot
         tf = n_torn / float(n_face0)
         vd = verdict(tf, pf, n_torn)
 
+    from spec_06 import write_spec
+    write_spec(d, rig, name=name, frames=frames, matrix_src=SRC,
+               extra=dict(kind="protease", inhib=inhib, kdeg=kdeg, refine=refine, modes=modes,
+                          hetero=hetero, spot=spot, spot_off=spot_off, seed_mt1=seed_mt1,
+                          mt1_field=(f"single Gaussian cap, theta {spot} deg, {spot_off} deg off the "
+                                     f"view axis" if spot else
+                                     f"smooth_field, {int(modes)} modes, hetero {hetero}, "
+                                     f"seed {int(seed_mt1)}"),
+                          faces_torn=int(n_torn), torn_frac=float(tf), rim_loops=int(n_loops),
+                          verdict=vd))
     np.savez_compressed(os.path.join(d, "bm_frames.npz"), n_kept=np.int32(i),
                         FE=rig.F_epi.cpu().numpy().astype(np.int32),
                         centre=rig.c.float().cpu().numpy(), scale=np.float64(rig.scale),
