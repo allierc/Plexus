@@ -171,6 +171,9 @@ def _job_script(name, frames, do_q, campaign, rerender=False):
     # the finished specimen on the spot. Both read `traj.npz` and neither touches the engine.
     job = {"movie": f"conda run -n {ENV} python rerender.py --force {name}",
            "kburns": f"conda run -n {ENV} python kburns_render.py --force {name}",
+           # seq 3 = both styles, without the cell outlines then with: four clips, 1,020 frames,
+           # about 20 s of VTK against the 30-40 minutes the run itself cost.
+           "vtk": f"conda run -n {ENV} python vtk_render.py {name} --seq 3",
            }.get(rerender if isinstance(rerender, str) else ("movie" if rerender else ""),
                  f"conda run -n {ENV} python run_one.py {name}{fr}{q} "
                  f"--device cuda:0 --campaign {campaign}")
@@ -709,7 +712,7 @@ if __name__ == "__main__":
     ap.add_argument("--poll", type=int, default=60)
     ap.add_argument("--all", action="store_true", help="every config in config/okuda/")
     ap.add_argument("--rerender", nargs="?", const="movie", default=None,
-                    choices=["movie", "kburns"],
+                    choices=["movie", "kburns", "vtk"],
                     help="re-draw finished runs from traj.npz instead of simulating: "
                          "movie.mp4 (default) or kburns.mp4")
     a = ap.parse_args()
