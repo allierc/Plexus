@@ -115,6 +115,42 @@ def box_of(run, fr):
     return float(run_box([(p, m, a, None) for p, m, a in fr]))
 
 
+# THE TWO MARKS, and what they are read from. Neither is a second colour SCALE -- they are states
+# the archive already carries per cell, and they overwrite the activator colour where they are set:
+#   green   a cell that has just divided: `age` <= DIVIDED (reset to 0 by divide_3d) AND `ndiv` > 0,
+#           because `age` alone starts at 0 for every seeded cell and paints an untouched tissue
+#           green in the opening frames.
+#   blue    the second morphogen's ACTION on the cell -- `apop` where it marks the cell to die,
+#           `inhib` where it switches the cell's growth off. The field's concentration is not in
+#           `traj.npz` (one activator channel is), so this is where the second field acted and not
+#           how much of it there is; a card that says otherwise would be claiming data we do not have.
+DIVIDED = 4
+GREEN = (44, 160, 44)
+BLUE = (31, 119, 180)
+
+
+def _marks(mt, idx, nF):
+    """(divided, kills, suppresses) masks over the drawn faces, or None where unrecorded.
+
+    THE SECOND FIELD IS TWO DIFFERENT MARKS and they cannot share a rule. `apop` is rare and is the
+    event -- a cell sentenced to die -- so it takes the colour outright. `inhib` is nearly the whole
+    tissue (4,222 of 4,232 cells in `sc_inh_soft`), so painting it outright erases the activator
+    pattern the card is about: the run's own caption says "red spots inside teal that does not
+    grow", and a solid blue ball says nothing at all. It is drawn only where the activator is LOW,
+    which is where "does not grow" means something.
+    """
+    def col(k):
+        v = mt.get(k)
+        if v is None:
+            return None
+        a = np.asarray(v).ravel()
+        return a[:nF][idx] if a.size >= nF else None
+    age, ndiv = col("age"), col("ndiv")
+    div = None if age is None or ndiv is None else ((age <= DIVIDED) & (ndiv > 0))
+    kills, sup = col("apop"), col("inhib")
+    return div, (None if kills is None else kills > 0), (None if sup is None else sup > 0)
+
+
 def mesh_of(pos, mt, act, lo=None, hi=None):
     """The apical shell as PolyData with per-cell RGB. Rebuilt per frame: cells divide."""
     import pyvista as pv
@@ -133,7 +169,7 @@ def mesh_of(pos, mt, act, lo=None, hi=None):
     m = pv.PolyData(pos, faces=np.asarray(faces, np.int64))
     if act is None:
         rgb = np.full((len(idx), 3), 235, np.uint8)
-    else:
+    if act is not None:
         a = np.asarray(act, float)[:nF][idx]
         ok = np.isfinite(a)
         # THE RANGE IS THE RUN'S, NOT THE FRAME'S, on a movie -- otherwise every frame renormalises
@@ -144,6 +180,16 @@ def mesh_of(pos, mt, act, lo=None, hi=None):
         x = np.clip((a - _lo) / (_hi - _lo + 1e-9), 0, 1)
         rgb = (np.asarray(_cmap()(x))[:, :3] * 255).astype(np.uint8)
         rgb[~ok] = (255, 26, 217)                 # magenta: not a cell any more
+    div, kills, sup = _marks(mt, idx, nF)
+    # ORDER MATTERS: suppression is the background, death is the event, division is the rarest and
+    # shortest-lived (four calls), so each later mark may overwrite the one before it.
+    if sup is not None and sup.any():
+        low = sup if act is None else (sup & (x < 0.5))
+        rgb[low] = BLUE
+    if kills is not None and kills.any():
+        rgb[kills] = BLUE
+    if div is not None and div.any():
+        rgb[div] = GREEN
     m.cell_data["rgb"] = rgb
     return m
 
@@ -163,7 +209,15 @@ def add(p, m, style):
                       ambient=0.35, diffuse=0.75, specular=0.12, specular_power=18)
 
 
-def aim(p, L, azim=None, elev=None):
+def aim(p, L, azim=None, elev=None, fill=1.0):
+    """`fill` < 1 pulls the camera back: the run's box then occupies that fraction of the frame.
+
+    WHY IT IS NEEDED AT ALL, given the box is the run's own. `L` is set by the widest thing the run
+    ever reaches, so a star's box is its ARMS and its body looks small in it, while a run whose body
+    IS the widest thing -- a sphere that only grows, a vesicle that only shrinks -- fills the card
+    edge to edge and reads as a close-up. Same rule, different subject; the fraction is what makes
+    two such cards the same size on a page.
+    """
     e = np.radians(CAM["elev"] if elev is None else elev)
     a = np.radians(CAM["azim"] if azim is None else azim)
     d = np.array([np.cos(e) * np.cos(a), np.cos(e) * np.sin(a), np.sin(e)])
@@ -171,7 +225,7 @@ def aim(p, L, azim=None, elev=None):
     p.camera.focal_point = (0, 0, 0)
     p.camera.up = (0, 0, 1)
     p.camera.parallel_projection = True
-    p.camera.parallel_scale = L * 1.05
+    p.camera.parallel_scale = L * 1.05 / max(fill, 1e-3)
 
 
 def _ease(u):
@@ -187,7 +241,7 @@ def _plotter():
     return p
 
 
-def kburns(run, style, out):
+def kburns(run, style, out, fill=1.0):
     """The finished specimen, turned once and zoomed in. Geometry fixed, camera moving."""
     fr = frames_of(run)
     if not fr:
@@ -203,13 +257,13 @@ def kburns(run, style, out):
         u = i / (n - 1)
         aim(p, L0 * (1.0 - (1.0 - KB_ZOOM) * _ease(u)),
             azim=CAM["azim"] + 360.0 * u,                 # a FULL turn, so the clip loops
-            elev=CAM["elev"] + 12.0 * np.sin(np.pi * u))
+            elev=CAM["elev"] + 12.0 * np.sin(np.pi * u), fill=fill)
         p.write_frame()
     p.close()
     return f"{n} frames"
 
 
-def evolve(run, style, out):
+def evolve(run, style, out, fill=1.0):
     """The run through time, camera nailed down -- the successor to movie.mp4."""
     fr = frames_of(run)
     if not fr:
@@ -234,13 +288,13 @@ def evolve(run, style, out):
         actor = add(p, m, style)
         txt = p.add_text(f"{run}  {style}   frame {t + 1}/{len(fr)}   {int(mt['nF'])} cells",
                          position="upper_left", font_size=11, color="white")
-        aim(p, L)
+        aim(p, L, fill=fill)
         p.write_frame()
     p.close()
     return f"{len(fr)} frames"
 
 
-def render_all(run, seq=LOOP_SEQ, size=None, quiet=False):
+def render_all(run, seq=LOOP_SEQ, size=None, quiet=False, fill=1.0):
     """Run one named sequence for one finished run. Returns {filename: seconds}, {} if it cannot.
 
     CALLED BY THE LOOP AS WELL AS BY HAND, which is why it is a function and not just a `main`.
@@ -259,7 +313,7 @@ def render_all(run, seq=LOOP_SEQ, size=None, quiet=False):
     for kind, st in SEQUENCES[int(seq)]:
         out = os.path.join(d, f"vtk_{kind}_{st}.mp4")
         t0 = time.perf_counter()
-        msg = (kburns if kind == "kburns" else evolve)(run, st, out)
+        msg = (kburns if kind == "kburns" else evolve)(run, st, out, fill=fill)
         dt = time.perf_counter() - t0
         if msg == "no traj.npz":
             return {}
@@ -275,9 +329,11 @@ def main():
     ap.add_argument("--seq", type=int, default=3, choices=sorted(SEQUENCES),
                     help="1 = evolve+mesh; 2 = +kburns; 3 = both, without mesh then with")
     ap.add_argument("--size", type=int, default=SIZE)
+    ap.add_argument("--fill", type=float, default=1.0,
+                    help="fraction of the frame the run's own box fills; <1 pulls the camera back")
     a = ap.parse_args()
     t0 = time.perf_counter()
-    took = render_all(a.run, a.seq, a.size)
+    took = render_all(a.run, a.seq, a.size, fill=a.fill)
     if not took:
         print(f"{a.run}: no traj.npz -- nothing to render"); return 1
     print(f"\n  sequence {a.seq}: {len(took)} clips in {time.perf_counter() - t0:.1f} s total")
