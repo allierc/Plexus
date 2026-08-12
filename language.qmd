@@ -92,7 +92,7 @@ making operators typed morphisms between biological sets.
 ### Sets
 
 Sets represent collections of biological entities. Examples include genes, proteins,
-particles, cells, neurons, synapses, tissues, organs and organisms. Sets naturally
+cells, neurons, synapses, tissues, organs and organisms. Sets naturally
 organize into hierarchies reflecting biological organization. Genes regulate
 proteins, proteins determine cellular behaviour, cells assemble into tissues,
 tissues form organs, and organs compose organisms. Each level is represented
