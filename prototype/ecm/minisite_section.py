@@ -863,6 +863,15 @@ def main():
                     f"{m['cells_final']:,} cells and the shell stays round (protrusion peak "
                     f"{m['protr_peak']:.2f})"),
          ("tyssue_vh_rd_coral.mp4", "turing_coral_v2.mp4", "turing_coral_v3.mp4")),
+        # `grow_divide` is `r001_00_ctrl` with growth that no morphogen gates (the operator's own
+        # `rho: 1, a_sw: 0`). The control has divide_3d and NO grow_3d, so 2 of its 2,001 cells ever
+        # divided and the card drew a sphere doing nothing; this one reaches 25,079 cells of which
+        # 25,054 divided.
+        ("turing_grow_divide_v3", "grow_divide", "grow &amp; divide",
+         lambda m: (f"Growth that no morphogen gates, and division following it: 2,000 cells to "
+                    f"{m['cells_final']:,}, and the shell stays a sphere (reduced volume "
+                    f"{m['reduced_volume_final']:.2f})"),
+         ("tyssue_vh_grow_divide.mp4", "turing_grow_divide_v3.mp4")),
         ("turing_morphogen_v3", "r003_07", "morphogen + growth",
          lambda m: (f"The same chemistry driving growth where it peaks: {m['cells_final']:,} cells "
                     f"and the shell folds out of plane, protrusion peak {m['protr_peak']:.2f}, "
