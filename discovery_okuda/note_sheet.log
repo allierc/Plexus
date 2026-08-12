@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  11 AUG 2026 12:58
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  12 AUG 2026 07:21
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -608,586 +608,590 @@ Package pdftex.def Info: fig_sets_ops.pdf  used on input line 684.
 
 [9 <./fig_sets_ops.pdf>]
 
-Package tabularx Warning: X Columns too narrow (table too wide)
-(tabularx)                 on input line 926.
-
-
-
 [10]
-Overfull \hbox (30.86018pt too wide) in paragraph at lines 926--926
+
+[11]
+
+[12]
+
+Package tabularx Warning: X Columns too narrow (table too wide)
+(tabularx)                 on input line 1118.
+
+
+Overfull \hbox (30.86018pt too wide) in paragraph at lines 1118--1118
 []|\T1/cmr/bx/n/8 (-20) threshold|  
  []
 
 
-Overfull \hbox (9.35152pt too wide) in paragraph at lines 926--926
+Overfull \hbox (9.35152pt too wide) in paragraph at lines 1118--1118
 \OT1/cmr/m/n/8 (-20) 10[]$|  
  []
 
 
-Overfull \hbox (9.35152pt too wide) in paragraph at lines 926--926
+Overfull \hbox (9.35152pt too wide) in paragraph at lines 1118--1118
 \OT1/cmr/m/n/8 (-20) 10[]$|  
  []
 
 
-Overfull \hbox (13.01813pt too wide) in paragraph at lines 926--926
+Overfull \hbox (13.01813pt too wide) in paragraph at lines 1118--1118
 \OT1/cmr/m/n/8 (-20) 10[]$|  
  []
 
 
-Overfull \hbox (9.16818pt too wide) in paragraph at lines 926--926
+Overfull \hbox (9.16818pt too wide) in paragraph at lines 1118--1118
 \OT1/cmr/m/n/8 (-20) 10[]$ 
  []
 
 
-Overfull \hbox (3.0755pt too wide) in paragraph at lines 926--926
+Overfull \hbox (3.0755pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) rel.|  
  []
 
 
-Overfull \hbox (6.35838pt too wide) in paragraph at lines 926--926
+Overfull \hbox (6.35838pt too wide) in paragraph at lines 1118--1118
 \OT1/cmr/m/n/8 (-20) 0\OML/cmm/m/it/8 :\OT1/cmr/m/n/8 (-20) 95$|  
  []
 
 
-Overfull \hbox (18.42854pt too wide) in paragraph at lines 926--926
+Overfull \hbox (18.42854pt too wide) in paragraph at lines 1118--1118
 \OT1/cmr/m/n/8 (-20) 1\OML/cmm/m/it/8 :\OT1/cmr/m/n/8 (-20) 00000$|  
  []
 
 
-Overfull \hbox (18.42854pt too wide) in paragraph at lines 926--926
+Overfull \hbox (18.42854pt too wide) in paragraph at lines 1118--1118
 \OT1/cmr/m/n/8 (-20) 1\OML/cmm/m/it/8 :\OT1/cmr/m/n/8 (-20) 00000$|  
  []
 
 
-Overfull \hbox (12.83093pt too wide) in paragraph at lines 926--926
+Overfull \hbox (12.83093pt too wide) in paragraph at lines 1118--1118
 []|\T1/cmr/m/n/8 (-20) stable 
  []
 
 
-Overfull \hbox (8.14168pt too wide) in paragraph at lines 926--926
+Overfull \hbox (8.14168pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) NaN 
  []
 
 
-Overfull \hbox (12.58214pt too wide) in paragraph at lines 926--926
+Overfull \hbox (12.58214pt too wide) in paragraph at lines 1118--1118
 \OT1/cmr/m/n/8 (-20) 10 \OML/cmm/m/it/8 "[]$|  
  []
 
 
-Overfull \hbox (13.01813pt too wide) in paragraph at lines 926--926
+Overfull \hbox (13.01813pt too wide) in paragraph at lines 1118--1118
 \OT1/cmr/m/n/8 (-20) 10[]$|  
  []
 
 
-Overfull \hbox (5.43283pt too wide) in paragraph at lines 926--926
+Overfull \hbox (5.43283pt too wide) in paragraph at lines 1118--1118
 []|$\OML/cmm/m/it/8 ^^U \OMS/cmsy/m/n/8 ^^Y 
  []
 
 
-Overfull \hbox (14.89116pt too wide) in paragraph at lines 926--926
+Overfull \hbox (14.89116pt too wide) in paragraph at lines 1118--1118
 []|$\OML/cmm/m/it/8 `=`[] \OMS/cmsy/m/n/8 2 
  []
 
 
-Overfull \hbox (21.29025pt too wide) in paragraph at lines 926--926
+Overfull \hbox (21.29025pt too wide) in paragraph at lines 1118--1118
 \OT1/cmr/m/n/8 (-20) [0\OML/cmm/m/it/8 :\OT1/cmr/m/n/8 (-20) 9\OML/cmm/m/it/8 ;
  \OT1/cmr/m/n/8 (-20) 1\OML/cmm/m/it/8 :\OT1/cmr/m/n/8 (-20) 1]$|  
  []
 
 
-Overfull \hbox (4.13754pt too wide) in paragraph at lines 926--926
+Overfull \hbox (4.13754pt too wide) in paragraph at lines 1118--1118
 []|\T1/cmr/m/n/8 (-20) any 
  []
 
 
-Overfull \hbox (4.4718pt too wide) in paragraph at lines 926--926
+Overfull \hbox (4.4718pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) sep- 
  []
 
 
-Overfull \hbox (5.84468pt too wide) in paragraph at lines 926--926
+Overfull \hbox (5.84468pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) tion|  
  []
 
 
-Overfull \hbox (9.16818pt too wide) in paragraph at lines 926--926
+Overfull \hbox (9.16818pt too wide) in paragraph at lines 1118--1118
 \OT1/cmr/m/n/8 (-20) 10[]$ 
  []
 
 
-Overfull \hbox (7.99359pt too wide) in paragraph at lines 926--926
+Overfull \hbox (7.99359pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) ($[]$)|  
  []
 
 
-Overfull \hbox (14.57524pt too wide) in paragraph at lines 926--926
+Overfull \hbox (14.57524pt too wide) in paragraph at lines 1118--1118
 []|$\OT1/cmr/m/n/8 (-20) 10[]$\T1/cmr/m/n/8 (-20) , 
  []
 
 
-Overfull \hbox (10.48363pt too wide) in paragraph at lines 926--926
+Overfull \hbox (10.48363pt too wide) in paragraph at lines 1118--1118
 \OT1/cmr/m/n/8 (-20) 10[]$\T1/cmr/m/n/8 (-20) , 
  []
 
 
-Overfull \hbox (9.35152pt too wide) in paragraph at lines 926--926
+Overfull \hbox (9.35152pt too wide) in paragraph at lines 1118--1118
 \OT1/cmr/m/n/8 (-20) 10[]$|  
  []
 
 
-Overfull \hbox (10.70267pt too wide) in paragraph at lines 926--926
+Overfull \hbox (10.70267pt too wide) in paragraph at lines 1118--1118
 []|\T1/cmr/m/n/8 (-20) exact|  
  []
 
 
-Overfull \hbox (27.90146pt too wide) in paragraph at lines 926--926
+Overfull \hbox (27.90146pt too wide) in paragraph at lines 1118--1118
 []|$\OT1/cmr/m/n/8 (-20) [0\OML/cmm/m/it/8 :\OT1/cmr/m/n/8 (-20) 8\OML/cmm/m/it
 /8 ; \OT1/cmr/m/n/8 (-20) 1\OML/cmm/m/it/8 :\OT1/cmr/m/n/8 (-20) 7]\OMS/cmsy/m/
 n/8 ^^B$ 
  []
 
 
-Overfull \hbox (15.14427pt too wide) in paragraph at lines 926--926
+Overfull \hbox (15.14427pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) seeded|  
  []
 
 
-Overfull \hbox (3.0687pt too wide) in paragraph at lines 926--926
+Overfull \hbox (3.0687pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) the 
  []
 
 
-Overfull \hbox (8.852pt too wide) in paragraph at lines 926--926
+Overfull \hbox (8.852pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) fixed 
  []
 
 
-Overfull \hbox (15.6532pt too wide) in paragraph at lines 926--926
+Overfull \hbox (15.6532pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) mesh's|  
  []
 
 
-Overfull \hbox (10.70267pt too wide) in paragraph at lines 926--926
+Overfull \hbox (10.70267pt too wide) in paragraph at lines 1118--1118
 []|\T1/cmr/m/n/8 (-20) exact|  
  []
 
 
-Overfull \hbox (14.63531pt too wide) in paragraph at lines 926--926
+Overfull \hbox (14.63531pt too wide) in paragraph at lines 1118--1118
 []|\T1/cmr/m/n/8 (-20) within 
  []
 
 
-Overfull \hbox (6.34895pt too wide) in paragraph at lines 926--926
+Overfull \hbox (6.34895pt too wide) in paragraph at lines 1118--1118
 \OT1/cmr/m/n/8 (-20) 10%$|  
  []
 
 
-Overfull \hbox (12.8348pt too wide) in paragraph at lines 926--926
+Overfull \hbox (12.8348pt too wide) in paragraph at lines 1118--1118
 \OT1/cmr/m/n/8 (-20) 10[]$ 
  []
 
 
-Overfull \hbox (3.0755pt too wide) in paragraph at lines 926--926
+Overfull \hbox (3.0755pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) rel.|  
  []
 
 
-Overfull \hbox (12.3288pt too wide) in paragraph at lines 926--926
+Overfull \hbox (12.3288pt too wide) in paragraph at lines 1118--1118
 []|\T1/cmr/m/n/8 (-20) radial 
  []
 
 
-Overfull \hbox (4.4567pt too wide) in paragraph at lines 926--926
+Overfull \hbox (4.4567pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) gap 
  []
 
 
-Overfull \hbox (2.6089pt too wide) in paragraph at lines 926--926
+Overfull \hbox (2.6089pt too wide) in paragraph at lines 1118--1118
 []|$\OT1/cmr/m/n/8 (-20) 0%$|  
  []
 
 
-Overfull \hbox (1.51831pt too wide) in paragraph at lines 926--926
+Overfull \hbox (1.51831pt too wide) in paragraph at lines 1118--1118
 []|$\OML/cmm/m/it/8 ^^T[]$ 
  []
 
 
-Overfull \hbox (6.37459pt too wide) in paragraph at lines 926--926
+Overfull \hbox (6.37459pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) over 
  []
 
 
-Overfull \hbox (2.27834pt too wide) in paragraph at lines 926--926
+Overfull \hbox (2.27834pt too wide) in paragraph at lines 1118--1118
 \OT1/cmr/m/n/8 (-20) 8\OMS/cmsy/m/n/8 ^^B$ 
  []
 
 
-Overfull \hbox (13.51549pt too wide) in paragraph at lines 926--926
+Overfull \hbox (13.51549pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) moves 
  []
 
 
-Overfull \hbox (2.6089pt too wide) in paragraph at lines 926--926
+Overfull \hbox (2.6089pt too wide) in paragraph at lines 1118--1118
 \OT1/cmr/m/n/8 (-20) 5%$|  
  []
 
 
-Overfull \hbox (7.57144pt too wide) in paragraph at lines 926--926
+Overfull \hbox (7.57144pt too wide) in paragraph at lines 1118--1118
 []|$\OML/cmm/m/it/8 ^^U[]$ 
  []
 
 
-Overfull \hbox (14.32939pt too wide) in paragraph at lines 926--926
+Overfull \hbox (14.32939pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) within 
  []
 
 
-Overfull \hbox (2.25189pt too wide) in paragraph at lines 926--926
+Overfull \hbox (2.25189pt too wide) in paragraph at lines 1118--1118
 \OT1/cmr/m/n/8 (-20) 5%$ 
  []
 
 
-Overfull \hbox (56.9139pt too wide) in paragraph at lines 926--926
+Overfull \hbox (56.9139pt too wide) in paragraph at lines 1118--1118
 []$\T1/cmr/m/n/8 (-20) , 
  []
 
 
-Overfull \hbox (9.92592pt too wide) in paragraph at lines 926--926
+Overfull \hbox (9.92592pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) NOT 
  []
 
 
-Overfull \hbox (3.0687pt too wide) in paragraph at lines 926--926
+Overfull \hbox (3.0687pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) the 
  []
 
 
-Overfull \hbox (6.35362pt too wide) in paragraph at lines 926--926
+Overfull \hbox (6.35362pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) dius 
  []
 
 
-Overfull \hbox (1.21803pt too wide) in paragraph at lines 926--926
+Overfull \hbox (1.21803pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) tio|  
  []
 
 
-Overfull \hbox (10.98424pt too wide) in paragraph at lines 926--926
+Overfull \hbox (10.98424pt too wide) in paragraph at lines 1118--1118
 []|\T1/cmr/m/n/8 (-20) worst 
  []
 
 
-Overfull \hbox (1.65633pt too wide) in paragraph at lines 926--926
+Overfull \hbox (1.65633pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) tri- 
  []
 
 
-Overfull \hbox (1.64954pt too wide) in paragraph at lines 926--926
+Overfull \hbox (1.64954pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) an- 
  []
 
 
-Overfull \hbox (1.68071pt too wide) in paragraph at lines 926--926
+Overfull \hbox (1.68071pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) gle 
  []
 
 
-Overfull \hbox (8.35817pt too wide) in paragraph at lines 926--926
+Overfull \hbox (8.35817pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) qual- 
  []
 
 
-Overfull \hbox (0.89888pt too wide) in paragraph at lines 926--926
+Overfull \hbox (0.89888pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) ity 
  []
 
 
-Overfull \hbox (2.19333pt too wide) in paragraph at lines 926--926
+Overfull \hbox (2.19333pt too wide) in paragraph at lines 1118--1118
 \OT1/cmr/m/n/8 (-20) 0\OML/cmm/m/it/8 :\OT1/cmr/m/n/8 (-20) 2$|  
  []
 
 
-Overfull \hbox (14.63531pt too wide) in paragraph at lines 926--926
+Overfull \hbox (14.63531pt too wide) in paragraph at lines 1118--1118
 []|\T1/cmr/m/n/8 (-20) within 
  []
 
 
-Overfull \hbox (6.34895pt too wide) in paragraph at lines 926--926
+Overfull \hbox (6.34895pt too wide) in paragraph at lines 1118--1118
 \OT1/cmr/m/n/8 (-20) 10%$|  
  []
 
 
-Overfull \hbox (27.90146pt too wide) in paragraph at lines 926--926
+Overfull \hbox (27.90146pt too wide) in paragraph at lines 1118--1118
 []|$\OT1/cmr/m/n/8 (-20) [0\OML/cmm/m/it/8 :\OT1/cmr/m/n/8 (-20) 8\OML/cmm/m/it
 /8 ; \OT1/cmr/m/n/8 (-20) 1\OML/cmm/m/it/8 :\OT1/cmr/m/n/8 (-20) 7]\OMS/cmsy/m/
 n/8 ^^B$ 
  []
 
 
-Overfull \hbox (15.14427pt too wide) in paragraph at lines 926--926
+Overfull \hbox (15.14427pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) seeded|  
  []
 
 
-Overfull \hbox (3.99403pt too wide) in paragraph at lines 926--926
+Overfull \hbox (3.99403pt too wide) in paragraph at lines 1118--1118
 []|\T1/cmr/m/n/8 (-20) one 
  []
 
 
-Overfull \hbox (12.09747pt too wide) in paragraph at lines 926--926
+Overfull \hbox (12.09747pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) frame 
  []
 
 
-Overfull \hbox (6.79173pt too wide) in paragraph at lines 926--926
+Overfull \hbox (6.79173pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) axis, 
  []
 
 
-Overfull \hbox (2.84973pt too wide) in paragraph at lines 926--926
+Overfull \hbox (2.84973pt too wide) in paragraph at lines 1118--1118
 \OT1/cmr/m/n/8 (-20) 401$ 
  []
 
 
-Overfull \hbox (15.3824pt too wide) in paragraph at lines 926--926
+Overfull \hbox (15.3824pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) frames|  
  []
 
 
-Overfull \hbox (14.21893pt too wide) in paragraph at lines 926--926
+Overfull \hbox (14.21893pt too wide) in paragraph at lines 1118--1118
 []|\T1/cmr/m/n/8 (-20) signed 
  []
 
 
-Overfull \hbox (4.4567pt too wide) in paragraph at lines 926--926
+Overfull \hbox (4.4567pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) gap 
  []
 
 
-Overfull \hbox (10.28816pt too wide) in paragraph at lines 926--926
+Overfull \hbox (10.28816pt too wide) in paragraph at lines 1118--1118
 []|\T1/cmr/m/n/8 (-20) onset 
  []
 
 
-Overfull \hbox (14.32939pt too wide) in paragraph at lines 926--926
+Overfull \hbox (14.32939pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) within 
  []
 
 
-Overfull \hbox (2.6089pt too wide) in paragraph at lines 926--926
+Overfull \hbox (2.6089pt too wide) in paragraph at lines 1118--1118
 \OT1/cmr/m/n/8 (-20) 5%$|  
  []
 
 
-Overfull \hbox (27.12727pt too wide) in paragraph at lines 926--926
+Overfull \hbox (27.12727pt too wide) in paragraph at lines 1118--1118
 []|\T1/cmr/m/n/8 (-20) monotone 
  []
 
 
-Overfull \hbox (3.53136pt too wide) in paragraph at lines 926--926
+Overfull \hbox (3.53136pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) flat|  
  []
 
 
-Overfull \hbox (10.70267pt too wide) in paragraph at lines 926--926
+Overfull \hbox (10.70267pt too wide) in paragraph at lines 1118--1118
 []|\T1/cmr/m/n/8 (-20) exact|  
  []
 
 
-Overfull \hbox (10.70267pt too wide) in paragraph at lines 926--926
+Overfull \hbox (10.70267pt too wide) in paragraph at lines 1118--1118
 []|\T1/cmr/m/n/8 (-20) exact|  
  []
 
 
-Overfull \hbox (10.98029pt too wide) in paragraph at lines 926--926
+Overfull \hbox (10.98029pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) edges 
  []
 
 
-Overfull \hbox (7.38942pt too wide) in paragraph at lines 926--926
+Overfull \hbox (7.38942pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) with 
  []
 
 
-Overfull \hbox (8.8983pt too wide) in paragraph at lines 926--926
+Overfull \hbox (8.8983pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) faces|  
  []
 
 
-Overfull \hbox (14.63531pt too wide) in paragraph at lines 926--926
+Overfull \hbox (14.63531pt too wide) in paragraph at lines 1118--1118
 []|\T1/cmr/m/n/8 (-20) within 
  []
 
 
-Overfull \hbox (6.34895pt too wide) in paragraph at lines 926--926
+Overfull \hbox (6.34895pt too wide) in paragraph at lines 1118--1118
 \OT1/cmr/m/n/8 (-20) 10%$|  
  []
 
 
-Overfull \hbox (4.4718pt too wide) in paragraph at lines 926--926
+Overfull \hbox (4.4718pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) sep- 
  []
 
 
-Overfull \hbox (9.13641pt too wide) in paragraph at lines 926--926
+Overfull \hbox (9.13641pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) rates|  
  []
 
 
-Overfull \hbox (8.62747pt too wide) in paragraph at lines 926--926
+Overfull \hbox (8.62747pt too wide) in paragraph at lines 1118--1118
 []|\T1/cmr/m/n/8 (-20) ratio 
  []
 
 
-Overfull \hbox (14.32939pt too wide) in paragraph at lines 926--926
+Overfull \hbox (14.32939pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) within 
  []
 
 
-Overfull \hbox (14.76405pt too wide) in paragraph at lines 926--926
+Overfull \hbox (14.76405pt too wide) in paragraph at lines 1118--1118
 \OT1/cmr/m/n/8 (-20) [0\OML/cmm/m/it/8 :\OT1/cmr/m/n/8 (-20) 3\OML/cmm/m/it/8 ;
  \OT1/cmr/m/n/8 (-20) 3]$|  
  []
 
 
-Overfull \hbox (12.3288pt too wide) in paragraph at lines 926--926
+Overfull \hbox (12.3288pt too wide) in paragraph at lines 1118--1118
 []|\T1/cmr/m/n/8 (-20) radial 
  []
 
 
-Overfull \hbox (4.4567pt too wide) in paragraph at lines 926--926
+Overfull \hbox (4.4567pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) gap 
  []
 
 
-Overfull \hbox (2.6089pt too wide) in paragraph at lines 926--926
+Overfull \hbox (2.6089pt too wide) in paragraph at lines 1118--1118
 []|$\OT1/cmr/m/n/8 (-20) 0%$|  
  []
 
 
-Overfull \hbox (10.70267pt too wide) in paragraph at lines 926--926
+Overfull \hbox (10.70267pt too wide) in paragraph at lines 1118--1118
 []|\T1/cmr/m/n/8 (-20) exact|  
  []
 
 
-Overfull \hbox (27.12727pt too wide) in paragraph at lines 926--926
+Overfull \hbox (27.12727pt too wide) in paragraph at lines 1118--1118
 []|\T1/cmr/m/n/8 (-20) monotone 
  []
 
 
-Overfull \hbox (12.6744pt too wide) in paragraph at lines 926--926
+Overfull \hbox (12.6744pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) stress, 
  []
 
 
-Overfull \hbox (21.62157pt too wide) in paragraph at lines 926--926
+Overfull \hbox (21.62157pt too wide) in paragraph at lines 1118--1118
 \T1/cmr/m/n/8 (-20) plateaus|  
  []
 
 
-Overfull \hbox (29.031pt too wide) in paragraph at lines 926--926
+Overfull \hbox (29.031pt too wide) in paragraph at lines 1118--1118
 []|\T1/cmr/m/n/8 (-20) separation|  
  []
 
 
-Overfull \hbox (14.63531pt too wide) in paragraph at lines 926--926
+Overfull \hbox (14.63531pt too wide) in paragraph at lines 1118--1118
 []|\T1/cmr/m/n/8 (-20) within 
  []
 
 
-Overfull \hbox (2.6089pt too wide) in paragraph at lines 926--926
+Overfull \hbox (2.6089pt too wide) in paragraph at lines 1118--1118
 \OT1/cmr/m/n/8 (-20) 5%$|  
  []
 
 
-Overfull \hbox (50.032pt too wide) in alignment at lines 926--926
+Overfull \hbox (50.032pt too wide) in alignment at lines 1118--1118
 [][][][] 
  []
 
 
 
-[11]
+[13]
 Overfull \vbox (683.54648pt too high) has occurred while \output is active []
 
 
 
-[12]
-<../log/okuda_ECM/05q_gates/gates.png, id=323, 1120.185pt x 245.718pt>
-File: ../log/okuda_ECM/05q_gates/gates.png Graphic file (type png)
-<use ../log/okuda_ECM/05q_gates/gates.png>
-Package pdftex.def Info: ../log/okuda_ECM/05q_gates/gates.png  used on input li
-ne 965.
+[14]
+<../log/okuda_ECM/05k_gates/gates.png, id=351, 1120.185pt x 245.718pt>
+File: ../log/okuda_ECM/05k_gates/gates.png Graphic file (type png)
+<use ../log/okuda_ECM/05k_gates/gates.png>
+Package pdftex.def Info: ../log/okuda_ECM/05k_gates/gates.png  used on input li
+ne 1157.
 (pdftex.def)             Requested size: 495.07779pt x 108.59991pt.
-<../log/okuda_ECM/05a_sheet/metrics.png, id=325, 1257.498pt x 491.436pt>
+<../log/okuda_ECM/05a_sheet/metrics.png, id=353, 1257.498pt x 491.436pt>
 File: ../log/okuda_ECM/05a_sheet/metrics.png Graphic file (type png)
 <use ../log/okuda_ECM/05a_sheet/metrics.png>
 Package pdftex.def Info: ../log/okuda_ECM/05a_sheet/metrics.png  used on input 
-line 979.
+line 1171.
 (pdftex.def)             Requested size: 495.07779pt x 193.48145pt.
 
 
-[13 <../log/okuda_ECM/05q_gates/gates.png>]
-<../log/okuda_ECM/05b_plaque/metrics.png, id=334, 968.418pt x 491.436pt>
+[15 <../log/okuda_ECM/05k_gates/gates.png>]
+<../log/okuda_ECM/05b_plaque/metrics.png, id=360, 968.418pt x 491.436pt>
 File: ../log/okuda_ECM/05b_plaque/metrics.png Graphic file (type png)
 <use ../log/okuda_ECM/05b_plaque/metrics.png>
 Package pdftex.def Info: ../log/okuda_ECM/05b_plaque/metrics.png  used on input
- line 992.
+ line 1184.
 (pdftex.def)             Requested size: 495.07779pt x 251.22894pt.
-<../log/okuda_ECM/_archive_05def/05e_conserve/remesh_model.png, id=335, 1055.14
+<../log/okuda_ECM/_archive_05def/05e_conserve/remesh_model.png, id=361, 1055.14
 2pt x 433.62pt>
 File: ../log/okuda_ECM/_archive_05def/05e_conserve/remesh_model.png Graphic fil
 e (type png)
 <use ../log/okuda_ECM/_archive_05def/05e_conserve/remesh_model.png>
 Package pdftex.def Info: ../log/okuda_ECM/_archive_05def/05e_conserve/remesh_mo
-del.png  used on input line 1004.
+del.png  used on input line 1196.
 (pdftex.def)             Requested size: 495.07779pt x 203.45737pt.
 
 
-[14 <../log/okuda_ECM/05a_sheet/metrics.png> <../log/okuda_ECM/05b_plaque/metri
+[16 <../log/okuda_ECM/05a_sheet/metrics.png> <../log/okuda_ECM/05b_plaque/metri
 cs.png>]
-<../log/okuda_ECM/_archive_05def/05f_secrete/secrete_model.png, id=344, 1055.14
+<../log/okuda_ECM/_archive_05def/05f_secrete/secrete_model.png, id=370, 1055.14
 2pt x 433.62pt>
 File: ../log/okuda_ECM/_archive_05def/05f_secrete/secrete_model.png Graphic fil
 e (type png)
 <use ../log/okuda_ECM/_archive_05def/05f_secrete/secrete_model.png>
 Package pdftex.def Info: ../log/okuda_ECM/_archive_05def/05f_secrete/secrete_mo
-del.png  used on input line 1016.
+del.png  used on input line 1208.
 (pdftex.def)             Requested size: 495.07779pt x 203.45737pt.
-<../log/okuda_ECM/_archive_05def/05d_tear/metrics.png, id=345, 968.418pt x 491.
+<../log/okuda_ECM/_archive_05def/05d_tear/metrics.png, id=371, 968.418pt x 491.
 436pt>
 File: ../log/okuda_ECM/_archive_05def/05d_tear/metrics.png Graphic file (type p
 ng)
 <use ../log/okuda_ECM/_archive_05def/05d_tear/metrics.png>
 Package pdftex.def Info: ../log/okuda_ECM/_archive_05def/05d_tear/metrics.png  
-used on input line 1029.
+used on input line 1221.
 (pdftex.def)             Requested size: 495.07779pt x 251.22894pt.
 
 
-[15 <../log/okuda_ECM/_archive_05def/05e_conserve/remesh_model.png> <../log/oku
+[17 <../log/okuda_ECM/_archive_05def/05e_conserve/remesh_model.png> <../log/oku
 da_ECM/_archive_05def/05f_secrete/secrete_model.png>]
 
-[16 <../log/okuda_ECM/_archive_05def/05d_tear/metrics.png>]
+[18 <../log/okuda_ECM/_archive_05def/05d_tear/metrics.png>]
 
-[17]
-Underfull \hbox (badness 10000) in paragraph at lines 1233--1233
+[19]
+Underfull \hbox (badness 10000) in paragraph at lines 1425--1425
 []|[]\T1/cmr/m/n/8 (+20) partly: 05h_3
  []
 
 
-Underfull \hbox (badness 4899) in paragraph at lines 1233--1233
+Underfull \hbox (badness 4899) in paragraph at lines 1425--1425
 \T1/cmr/m/n/8 (+20) so it is not a
  []
 
 
-Underfull \hbox (badness 8056) in paragraph at lines 1233--1233
+Underfull \hbox (badness 8056) in paragraph at lines 1425--1425
 \T1/cmr/m/n/8 (+20) has never been
  []
 
 
 
-[18]
+[20]
 
-[19] (./note_sheet.aux)
+[21] (./note_sheet.aux)
  ***********
 LaTeX2e <2024-11-01> patch level 2
 L3 programming layer <2025-01-18>
@@ -1196,13 +1200,13 @@ Package rerunfilecheck Info: File `note_sheet.out' has not changed.
 (rerunfilecheck)             Checksum: D41D8CD98F00B204E9800998ECF8427E;0.
  ) 
 Here is how much of TeX's memory you used:
- 14147 strings out of 475102
- 216372 string characters out of 5764878
- 688191 words of memory out of 5000000
- 36401 multiletter control sequences out of 15000+600000
- 603680 words of font info for 347 fonts, out of 8000000 for 9000
+ 14175 strings out of 475102
+ 216649 string characters out of 5764878
+ 688104 words of memory out of 5000000
+ 36408 multiletter control sequences out of 15000+600000
+ 604171 words of font info for 353 fonts, out of 8000000 for 9000
  59 hyphenation exceptions out of 8191
- 75i,12n,79p,1316b,612s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 75i,15n,79p,1316b,612s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></us
 r/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx7.pfb></usr/share
 /texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx8.pfb></usr/share/texliv
@@ -1245,10 +1249,10 @@ fb></usr/share/texmf/fonts/type1/public/cm-super/sfti1000.pfb></usr/share/texmf
 /fonts/type1/public/cm-super/sftt0800.pfb></usr/share/texmf/fonts/type1/public/
 cm-super/sftt0900.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt1000.pf
 b>
-Output written on note_sheet.pdf (19 pages, 2068394 bytes).
+Output written on note_sheet.pdf (21 pages, 2096737 bytes).
 PDF statistics:
- 566 PDF objects out of 1000 (max. 8388607)
- 407 compressed objects within 5 object streams
- 64 named destinations out of 1000 (max. 500000)
+ 594 PDF objects out of 1000 (max. 8388607)
+ 433 compressed objects within 5 object streams
+ 73 named destinations out of 1000 (max. 500000)
  74793 words of extra memory for PDF output out of 89155 (max. 10000000)
 

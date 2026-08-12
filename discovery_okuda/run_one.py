@@ -104,6 +104,11 @@ def _lazy_engine():
     import plexus.operators                                          # noqa: F401
     import tyssue_ops3d, tyssue_rd_ops, tyssue_t1_ops3d, tyssue_monolayer, ckpt  # noqa: F401
     import tyssue_shape_to_chem                                       # noqa: F401
+    # AN OPERATOR THAT IS NOT IMPORTED IS NOT REGISTERED, and the spec naming it dies at compile
+    # with no hint that a missing import is the cause. Three of the four shape-gate runs failed
+    # here having written nothing but spec_run.yaml, while the fourth -- the only one without the
+    # probe -- ran fine.
+    import tyssue_cell_shape                                          # noqa: F401
     import plexus.schema as S
     from plexus.engine import run as engine_run
     import instrument

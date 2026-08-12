@@ -203,6 +203,12 @@ nodes:
         - b_star_avoid
         - b_star_relgate
         - b_star_cones
+        # THE FLOWER AND ITS THREE -- broad petals rather than thin arms, deepest invagination on
+        # file. See crew/basis.yaml; the variants ask Die, Divide and Seed whether it steers.
+        - b_flower
+        - b_flower_death
+        - b_flower_oriented
+        - b_flower_cones
   - id: history
     code: round.history
     args:

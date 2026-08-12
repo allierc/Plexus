@@ -794,6 +794,12 @@ class Apoptosis3D(Structural):
         self.mode = str(params.get("mode", "competition"))
         #   list|band|cone|small|stalled|chem_low
         #   LOCAL (vs neighbours): competition|smaller|dimmer|older|crowded|lonely
+        #   PUBLISHED FIELD: field_high|field_low -- see `_marked`. These two carry no criterion of
+        #   their own; `field` names a per-cell quantity some other operator measured and published
+        #   on the mesh, and `field_frac` is the multiple of its live MEDIAN that counts as
+        #   qualifying. Death stops needing a new branch for every new measurement.
+        self.field = str(params.get("field", "elong"))
+        self.field_frac = float(params.get("field_frac", 1.5))
         self.frac = float(params.get("frac", 0.04))
         self.cone_deg = float(params.get("cone_deg", 22.8))       # 10 cells across on a 2,000-cell ball
         self.band_deg = float(params.get("band_deg", 8.0))        # half-width of each ring
@@ -917,7 +923,16 @@ class Apoptosis3D(Structural):
                 return None
             h0, _ = clvl.state_schema["chem"]
             return clvl.state[:nF, h0 + self.chan].detach().cpu().numpy()
-        return None
+        # ANY FIELD PUBLISHED ON THE MESH, BY NAME. The four above are hard-coded because they are
+        # the engine's own bookkeeping (volume, birth volume, age, chemistry); anything an operator
+        # measures and publishes arrives here instead, so a new probe needs no branch of its own.
+        # `cell_shape_probe` writes `elong`; asking for a name nothing published returns None,
+        # which every caller reads as "unknown", never as zero.
+        v = m.get(what)
+        if v is None:
+            return None
+        v = v.detach().cpu().numpy() if hasattr(v, "detach") else np.asarray(v)
+        return v[:nF] if v.ndim == 1 and v.shape[0] >= nF else None
 
     def _admit(self, flag, want, m, H, nF):
         """Turn the mode's proposal into the marks actually TAKEN this tick.
@@ -978,17 +993,32 @@ class Apoptosis3D(Structural):
             return -self._nb(m, nF, np.ones(nF))[1][idx].astype(float)   # most crowded first
         if self.mode == "lonely":
             return self._nb(m, nF, np.ones(nF))[1][idx].astype(float)
+        if self.mode in ("field_high", "field_low"):
+            q = self._q(m, H, nF, self.field)
+            if q is None:
+                return None
+            # SMALLEST DIES FIRST is this method's contract, so `field_high` -- where the WORST
+            # offender is the largest value -- has to be negated or the cap would spare exactly
+            # the cells the mode exists to remove.
+            return (-q[idx]) if self.mode == "field_high" else q[idx]
         return None                                          # list/band/cone: a named population
 
     def _marked(self, m, H, nF):
         """The set of cell indices currently marked to die."""
         if self.mode == "list":
             return {c for c in self.cells if c < nF}
-        cen = m.get("cen_np")
-        if cen is None:                                            # per-cell centroid from the rings
-            return set()
-        r = np.linalg.norm(cen, axis=1) + 1e-12
-        u = cen / r[:, None]
+        # THE CENTROID IS A PRECONDITION OF TWO MODES, NOT OF DEATH. This guard used to stand here
+        # unconditionally -- `if cen is None: return set()` -- so every mode in the operator was
+        # silently gated behind a quantity only `band` and `cone` read. A geometric precondition
+        # that switches off a competition rule, or a probe-driven one, is the same defect as an
+        # absolute threshold on a relative field: the operator goes quiet for a reason unrelated to
+        # its own mechanism, and quiet is indistinguishable from "nothing qualified".
+        u = None
+        if self.mode in ("band", "cone"):
+            cen = m.get("cen_np")                                  # per-cell centroid from the rings
+            if cen is None:
+                return set()
+            u = cen / (np.linalg.norm(cen, axis=1) + 1e-12)[:, None]
         if self.mode == "band":                                    # `n_bands` latitude rings
             lat = np.degrees(np.arcsin(np.clip(u[:, 2], -1, 1)))   # -90 .. +90
             if self.n_bands <= 1:
@@ -1090,6 +1120,36 @@ class Apoptosis3D(Structural):
             if amax <= 1e-9:
                 return set()
             return set(np.where(a < self.a_sw * amax)[0].tolist())
+        if self.mode in ("field_high", "field_low"):
+            # DEATH PLUGGED ONTO A MEASUREMENT SOMEONE ELSE MADE, which is the whole point of the
+            # pair. Every other mode in this operator computes its own criterion internally --
+            # eleven bespoke measurements living inside one Die -- and the only one that did not
+            # was `chem_low`, which reads the `chem` another operator wrote. These two generalise
+            # that: name a field, and any operator that publishes it can drive death without a
+            # line changing here. `cell_shape_probe` publishes `elong`; the next probe will
+            # publish something else and this will already work.
+            q = self._q(m, H, nF, self.field)
+            if q is None:
+                # UNPUBLISHED IS NOT ZERO. No probe ran, or its precondition was absent -- either
+                # way nothing is known about these cells, and killing none of them is the only
+                # honest reading. Killing all of them is what a `0 > thr` comparison on a
+                # zero-filled array would have done for `field_low`.
+                return set()
+            ok = np.isfinite(q)
+            if not ok.any():
+                return set()
+            # RELATIVE TO THE FIELD'S OWN SPREAD, for the reason every threshold here is: `elong`
+            # is a shape index near 3.7 and an aspect near 1.5, two quantities with no common
+            # scale, and one `frac` has to mean the same thing on both. The reference is the
+            # MEDIAN of the live cells, not the max: one runaway cell must not set the scale of
+            # the quantity that exists to find it. `frac` 1.5 with mode field_high therefore reads
+            # "half again the typical cell".
+            med = float(np.median(q[ok]))
+            if not np.isfinite(med) or abs(med) < 1e-12:
+                return set()
+            thr = self.field_frac * med
+            hit = (q > thr) if self.mode == "field_high" else (q < thr)
+            return set(np.where(ok & hit)[0].tolist())
         return set()
 
     def forward(self, H, mask=None):

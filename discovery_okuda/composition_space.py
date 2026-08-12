@@ -550,6 +550,19 @@ OPERATORS = {
     # makes `=shape_to_chem:tension` a legal one-edit move, so the loop can run that comparison
     # itself rather than waiting for a human to hand-write four configs.
     # `force` and `size` are deliberately NOT implementations -- see the operator's docstring.
+    # A MEASUREMENT, AS AN OPERATOR. See tyssue_cell_shape.py: a Lateral that reads the mesh, writes
+    # one scalar per cell to the mesh under `elong`, and touches no state -- so adding it must leave
+    # a trajectory bit-identical. `role="probe"` is its own role so it is always legal to remove and
+    # so it can never be mistaken for the patterning arrow: it closes no loop, it reports.
+    #
+    # NO `params`. Both descriptors are parameter-free by construction -- P/sqrt(A) and an
+    # eigenvalue ratio have nothing to tune -- and the threshold that decides what counts as
+    # elongated belongs to whoever ACTS on the field, not to the instrument that reads it. Putting
+    # a cutoff here would make the measurement depend on the decision it is supposed to inform.
+    "cell_shape_probe": dict(
+        stage=3, role="probe", outputs=[], slots=[], needs=[],
+        impls=["shape_index", "aspect"], impl_structural=True,
+        params={}),
     "shape_to_chem": dict(
         stage=3, role="patterning", outputs=[], slots=[], needs=["adjacency"],
         impls=["curvature", "tension", "apical_area", "pressure"], impl_structural=True,
