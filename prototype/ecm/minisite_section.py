@@ -220,6 +220,58 @@ def panels_concat(src, dst, panels, skip_top=0.0, skip_bot=0.0, pad=1.16):
         sys.exit(f"ffmpeg panels+concat failed for {dst}")
 
 
+def vtk_sequence(run_dir, dst, side=460, kb_seconds=5.0, crop=24):
+    """The VTK sequence as one clip: without the mesh, then with it, each grown then turned.
+
+    FOUR MOVEMENTS, ONE CARD. `vtk_render --seq 3` writes evolve/kburns x nomesh/mesh. Played in
+    that order the card answers both questions a shape raises -- what it did (time moves, camera
+    still) and what it is (camera moves, time still) -- first as a surface and then as cells.
+
+    THE ROTATION IS RETIMED AND THE GROWTH IS NOT. Four clips at their own pace are 46 s, twice
+    what any other card on the page runs; and of the four, the two turns are the redundant pair --
+    the same revolution twice, once per style. Compressing those to `kb_seconds` each and leaving
+    the growth alone puts the card at 20 s without touching the part that only happens once.
+
+    THE LABEL IS CROPPED, not disabled: `vtk_render` stamps "<run> <style>" in the top-left, rows
+    5-20 of an 896 px frame, and the page writes its own captions. `crop` is taken off all four
+    sides so the frame stays square; at full zoom that costs the tissue about 3% of its height,
+    which is the price of not having a run name burnt into a gallery card.
+    """
+    ff = _exe("ffmpeg")
+    parts = [("evolve", "nomesh"), ("kburns", "nomesh"), ("evolve", "mesh"), ("kburns", "mesh")]
+    srcs = [os.path.join(run_dir, f"vtk_{k}_{st}.mp4") for k, st in parts]
+    missing = [os.path.basename(p) for p in srcs if not os.path.exists(p)]
+    if missing:
+        print(f"[minisite] {os.path.basename(run_dir)}: missing {missing} -- clip not rebuilt")
+        return False
+    w, h = _size(srcs[0])
+    c = min(crop, (min(w, h) - 2) // 2)
+    fc, labels = [], []
+    for n, ((kind, _st), src) in enumerate(zip(parts, srcs)):
+        # `setpts` before `fps`: retime first, then resample, or the frames are dropped at the old
+        # rate and the clip stutters.
+        rt = ""
+        if kind == "kburns":
+            dur = float(subprocess.check_output(
+                [_exe("ffprobe"), "-v", "error", "-show_entries", "format=duration",
+                 "-of", "csv=p=0", src]).decode().strip())
+            rt = f"setpts={kb_seconds / dur:.5f}*PTS,"
+        fc.append(f"[{n}:v]crop={w - 2 * c}:{h - 2 * c}:{c}:{c},{rt}fps=25,"
+                  f"scale={side}:{side}:flags=lanczos,setsar=1[v{n}]")
+        labels.append(f"[v{n}]")
+    cmd = [ff, "-y", "-loglevel", "error"]
+    for src in srcs:
+        cmd += ["-i", src]
+    cmd += ["-filter_complex", ";".join(fc) + ";" + "".join(labels) + "concat=n=4:v=1[o]",
+            "-map", "[o]", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "26",
+            "-movflags", "+faststart", dst]
+    if subprocess.call(cmd) != 0 or not os.path.exists(dst):
+        sys.exit(f"ffmpeg vtk sequence failed for {dst}")
+    print(f"[minisite]   {os.path.basename(run_dir)}: 4 VTK clips -> {side}x{side}, "
+          f"{_nframes(dst)} frames")
+    return True
+
+
 def evolve_then_kburns(run_dir, dst, panel="left", pad=1.26, skip_top=0.09, skip_bot=0.14):
     """The run through time, then the finished specimen turned on the spot -- one clip.
 
@@ -545,9 +597,9 @@ def main():
     # control and its death network is drawn on the pole, so the top view is the one that shows it;
     # the two-field runs are read from the side like every other clip on the page.
     R2 = [
-        ("sc_inh_soft", "turing_inhibit_kb", "B stops growth", "left"),
-        ("tsd_max", "turing_death_kb", "B kills", "left"),
-        ("sc_antiphase", "turing_antiphase_kb", "one field, in antiphase", "right"),
+        ("sc_inh_soft", "turing_inhibit_vtk", "B stops growth", "left"),
+        ("tsd_max", "turing_death_vtk", "B kills", "left"),
+        ("sc_antiphase", "turing_antiphase_vtk", "one field, in antiphase", "right"),
     ]
     def _cap2(run):
         s = json.load(open(os.path.join(LOG_OKUDA, run, "diag.json")))["summary"]
@@ -569,8 +621,7 @@ def main():
         src = os.path.join(LOG_OKUDA, d, "movie.mp4")
         if not os.path.exists(src):
             sys.exit(f"no movie.mp4 for {d} -- run it before writing the page")
-        evolve_then_kburns(os.path.join(LOG_OKUDA, d), os.path.join(GAL, v + ".mp4"), panel=panel,
-                           skip_bot=0.25 if panel == "right" else 0.14, pad=1.26)
+        vtk_sequence(os.path.join(LOG_OKUDA, d), os.path.join(GAL, v + ".mp4"))
         print(f"[minisite] gallery/{v}.mp4 <- okuda/{d}  "
               f"({os.path.getsize(os.path.join(GAL, v + '.mp4')) / 1e6:.1f} MB, {panel} panel, "
               f"square, no label)")
@@ -579,9 +630,9 @@ def main():
     def _sum(run):
         return json.load(open(os.path.join(LOG_OKUDA, run, "diag.json")))["summary"]
     R4 = [
-        ("r013_05", "turing_flower_kb", "purse-string, k = 0.062"),
-        ("r016_01", "turing_lobes_kb", "purse-string, k = 0.031"),
-        ("r017_00_ctrl", "turing_noline_kb", "no purse-string"),
+        ("r013_05", "turing_flower_vtk", "purse-string, k = 0.062"),
+        ("r016_01", "turing_lobes_vtk", "purse-string, k = 0.031"),
+        ("r017_00_ctrl", "turing_noline_vtk", "no purse-string"),
     ]
     CAP4 = {
         "r013_05": "Eight arms from one activator: {cells:,} cells, protrusion peak {pk}",
@@ -597,7 +648,7 @@ def main():
             print(f"[minisite] {d}: no movie.mp4 -- card skipped")
             continue
         sm = _sum(d)
-        evolve_then_kburns(os.path.join(LOG_OKUDA, d), os.path.join(GAL, f"{v}.mp4"), pad=1.26)
+        vtk_sequence(os.path.join(LOG_OKUDA, d), os.path.join(GAL, f"{v}.mp4"))
         print(f"[minisite] gallery/{v}.mp4 <- okuda/{d}  "
               f"({os.path.getsize(os.path.join(GAL, v + '.mp4')) / 1e6:.1f} MB, side view, square)")
         cap = CAP4[d].format(cells=sm["cells_final"], pk=f"{sm['protr_peak']:.2f}")
@@ -609,9 +660,9 @@ def main():
     # 0.5 against 0.75, with the growth rate, both diffusivities, F, k and the division rule
     # identical. That is what makes the pair a comparison rather than two shapes.
     R5r = [
-        ("r020_01", "turing_folds_kb", "reaction rate 0.75"),
-        ("r019_02", "turing_arms_kb", "reaction rate 0.5"),
-        ("r021_06", "turing_spikes_kb", "rate 0.25, growth doubled"),
+        ("r020_01", "turing_folds_vtk", "reaction rate 0.75"),
+        ("r019_02", "turing_arms_vtk", "reaction rate 0.5"),
+        ("r021_06", "turing_spikes_vtk", "rate 0.25, growth doubled"),
     ]
     # ORDERED BY CHEMISTRY AGAINST GROWTH, fastest first, because that ratio is what the row is:
     # 0.75/8.66e-4, then 0.5/8.66e-4, then 0.25/1.73e-3 -- a sixfold range, and the shape goes from
@@ -632,7 +683,7 @@ def main():
             print(f"[minisite] {d}: no movie.mp4 -- card skipped")
             continue
         sm = _sum(d)
-        evolve_then_kburns(os.path.join(LOG_OKUDA, d), os.path.join(GAL, f"{v}.mp4"), pad=1.26)
+        vtk_sequence(os.path.join(LOG_OKUDA, d), os.path.join(GAL, f"{v}.mp4"))
         print(f"[minisite] gallery/{v}.mp4 <- okuda/{d}  "
               f"({os.path.getsize(os.path.join(GAL, v + '.mp4')) / 1e6:.1f} MB, side view, square)")
         runs5r.append((d, f"{v}.mp4", lbl, os.path.join(LOG_OKUDA, d, "spec_run.yaml"),
@@ -785,9 +836,37 @@ def main():
     ):
         sp = os.path.join(LOG_OKUDA, run, "spec_run.yaml")
         if os.path.exists(sp):
-            replace_card(f"{vid}.mp4", nm, sp, cap, files=((QMD, False), (DOCS, True)))
+            # THE CLIP TOO, not only the spec: these three now play the VTK sequence like the
+            # Turing rows, under a new name because their content changed.
+            new_v = f"{vid}_vtk"
+            built = vtk_sequence(os.path.join(LOG_OKUDA, run), os.path.join(GAL, f"{new_v}.mp4"))
+            replace_card(f"{vid}.mp4", nm, sp, cap, files=((QMD, False), (DOCS, True)),
+                         new_video=f"{new_v}.mp4" if built else None)
+            if built and os.path.isdir(DOCS_GAL):
+                shutil.copy2(os.path.join(GAL, f"{new_v}.mp4"),
+                             os.path.join(DOCS_GAL, f"{new_v}.mp4"))
         else:
             print(f"[minisite] {run}: no spec_run.yaml -- {vid} keeps its bare title")
+
+    # THE "grow & divide" CARD, repointed at a run that can actually be re-rendered. It played
+    # `prototype/Tyssue`'s `tyssue_vh_K4_cv15_d4`, whose archive holds movies and specs and NO
+    # trajectory -- so the VTK renderer cannot redraw it at any price, and neither could the 0.08 pt
+    # pass before it. `r001_00_ctrl` is the campaign's own growth-and-division control: the same
+    # experiment (grow, divide, no patterning), with `traj.npz` beside it.
+    gd_run = os.path.join(LOG_OKUDA, "r001_00_ctrl")
+    if os.path.exists(os.path.join(gd_run, "traj.npz")):
+        gs = json.load(open(os.path.join(gd_run, "diag.json")))["summary"]
+        if vtk_sequence(gd_run, os.path.join(GAL, "turing_grow_divide_vtk.mp4")):
+            replace_card("tyssue_vh_grow_divide.mp4", "grow &amp; divide",
+                         os.path.join(gd_run, "spec_run.yaml"),
+                         f"Growth and division with nothing patterning them: "
+                         f"{gs['cells_final']:,} cells, and the shell is still a sphere "
+                         f"(reduced volume {gs['reduced_volume_final']:.2f})",
+                         files=((QMD, False), (DOCS, True)),
+                         new_video="turing_grow_divide_vtk.mp4")
+            if os.path.isdir(DOCS_GAL):
+                shutil.copy2(os.path.join(GAL, "turing_grow_divide_vtk.mp4"),
+                             os.path.join(DOCS_GAL, "turing_grow_divide_vtk.mp4"))
 
     if os.path.isdir(DOCS_GAL):
             _sh.copy2(os.path.join(GAL, "tyssue_spheroid_00.mp4"),
