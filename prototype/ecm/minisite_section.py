@@ -597,9 +597,9 @@ def main():
     # control and its death network is drawn on the pole, so the top view is the one that shows it;
     # the two-field runs are read from the side like every other clip on the page.
     R2 = [
-        ("sc_inh_soft", "turing_inhibit_vtk", "B stops growth", "left"),
-        ("tsd_max", "turing_death_vtk", "B kills", "left"),
-        ("sc_antiphase", "turing_antiphase_vtk", "one field, in antiphase", "right"),
+        ("sc_inh_soft", "turing_inhibit_v2", "B stops growth", "left"),
+        ("tsd_max", "turing_death_v2", "B kills", "left"),
+        ("sc_antiphase", "turing_antiphase_v2", "one field, in antiphase", "right"),
     ]
     def _cap2(run):
         s = json.load(open(os.path.join(LOG_OKUDA, run, "diag.json")))["summary"]
@@ -630,9 +630,9 @@ def main():
     def _sum(run):
         return json.load(open(os.path.join(LOG_OKUDA, run, "diag.json")))["summary"]
     R4 = [
-        ("r013_05", "turing_flower_vtk", "purse-string, k = 0.062"),
-        ("r016_01", "turing_lobes_vtk", "purse-string, k = 0.031"),
-        ("r017_00_ctrl", "turing_noline_vtk", "no purse-string"),
+        ("r013_05", "turing_flower_v2", "purse-string, k = 0.062"),
+        ("r016_01", "turing_lobes_v2", "purse-string, k = 0.031"),
+        ("r017_00_ctrl", "turing_noline_v2", "no purse-string"),
     ]
     CAP4 = {
         "r013_05": "Eight arms from one activator: {cells:,} cells, protrusion peak {pk}",
@@ -660,9 +660,9 @@ def main():
     # 0.5 against 0.75, with the growth rate, both diffusivities, F, k and the division rule
     # identical. That is what makes the pair a comparison rather than two shapes.
     R5r = [
-        ("r020_01", "turing_folds_vtk", "reaction rate 0.75"),
-        ("r019_02", "turing_arms_vtk", "reaction rate 0.5"),
-        ("r021_06", "turing_spikes_vtk", "rate 0.25, growth doubled"),
+        ("r020_01", "turing_folds_v2", "reaction rate 0.75"),
+        ("r019_02", "turing_arms_v2", "reaction rate 0.5"),
+        ("r021_06", "turing_spikes_v2", "rate 0.25, growth doubled"),
     ]
     # ORDERED BY CHEMISTRY AGAINST GROWTH, fastest first, because that ratio is what the row is:
     # 0.75/8.66e-4, then 0.5/8.66e-4, then 0.25/1.73e-3 -- a sixfold range, and the shape goes from
@@ -838,33 +838,54 @@ def main():
         if os.path.exists(sp):
             # THE CLIP TOO, not only the spec: these three now play the VTK sequence like the
             # Turing rows, under a new name because their content changed.
-            new_v = f"{vid}_vtk"
+            new_v = f"{vid}_v2"
             built = vtk_sequence(os.path.join(LOG_OKUDA, run), os.path.join(GAL, f"{new_v}.mp4"))
-            replace_card(f"{vid}.mp4", nm, sp, cap, files=((QMD, False), (DOCS, True)),
-                         new_video=f"{new_v}.mp4" if built else None)
+            for old_v in (f"{vid}.mp4", f"{vid}_vtk.mp4", f"{new_v}.mp4"):
+                if any(f'<video src="gallery/{old_v}"' in open(f).read() for f, _ in
+                       ((QMD, False), (DOCS, True))):
+                    replace_card(old_v, nm, sp, cap, files=((QMD, False), (DOCS, True)),
+                                 new_video=f"{new_v}.mp4" if built else None)
+                    break
             if built and os.path.isdir(DOCS_GAL):
                 shutil.copy2(os.path.join(GAL, f"{new_v}.mp4"),
                              os.path.join(DOCS_GAL, f"{new_v}.mp4"))
         else:
             print(f"[minisite] {run}: no spec_run.yaml -- {vid} keeps its bare title")
 
-    # THE "grow & divide" CARD, repointed at a run that can actually be re-rendered. It played
-    # `prototype/Tyssue`'s `tyssue_vh_K4_cv15_d4`, whose archive holds movies and specs and NO
-    # trajectory -- so the VTK renderer cannot redraw it at any price, and neither could the 0.08 pt
-    # pass before it. `r001_00_ctrl` is the campaign's own growth-and-division control: the same
-    # experiment (grow, divide, no patterning), with `traj.npz` beside it.
-    gd_run = os.path.join(LOG_OKUDA, "r001_00_ctrl")
-    if os.path.exists(os.path.join(gd_run, "traj.npz")):
-        gs = json.load(open(os.path.join(gd_run, "diag.json")))["summary"]
-        if vtk_sequence(gd_run, os.path.join(GAL, "turing_grow_divide_vtk.mp4")):
-            replace_card("tyssue_vh_grow_divide.mp4", "grow &amp; divide",
-                         os.path.join(gd_run, "spec_run.yaml"),
-                         f"Growth and division with nothing patterning them: "
-                         f"{gs['cells_final']:,} cells, and the shell is still a sphere "
-                         f"(reduced volume {gs['reduced_volume_final']:.2f})",
+    # THE "coral" CARD, repointed at a run that can be re-rendered. It played
+    # `prototype/Tyssue`'s `vh_K4_cv15_d4_rd_coral`, whose archive holds movies and specs and no
+    # trajectory -- so no renderer since can redraw it. `b_gs_gated_shaping` is the same phenomenon
+    # in the campaign's own hands: one Gray-Scott field gating growth, red patches on a lobed shell.
+    # THE "grow & divide" CARD GOES BACK to the clip it had. `r001_00_ctrl` has divide_3d and NO
+    # grow_3d, so 2 of 2,001 cells ever divided and the card drew a sphere doing nothing;
+    # `r001_00_ungated` -- the same control with uniform growth added -- is simulating, and this
+    # card is its own until that lands.
+    for old_v in ("turing_grow_divide_vtk.mp4", "tyssue_vh_grow_divide.mp4"):
+        if f'<video src="gallery/{old_v}"' in open(QMD).read():
+            replace_card(old_v, "grow &amp; divide",
+                         "prototype/Tyssue/archive/vh_K4_cv15_d4/spec.yaml",
+                         "a vesicle proliferates — every cell grows and divides until the shell "
+                         "reaches ~2000 cells",
                          files=((QMD, False), (DOCS, True)),
-                         new_video="turing_grow_divide_vtk.mp4")
+                         new_video="tyssue_vh_grow_divide.mp4")
+            break
+
+    cor = os.path.join(LOG_OKUDA, "b_gs_gated_shaping")
+    if os.path.exists(os.path.join(cor, "traj.npz")):
+        cs = json.load(open(os.path.join(cor, "diag.json")))["summary"]
+        if vtk_sequence(cor, os.path.join(GAL, "turing_coral_v2.mp4")):
+            replace_card("tyssue_vh_rd_coral.mp4", "coral",
+                         os.path.join(cor, "spec_run.yaml"),
+                         f"A Gray–Scott field gating growth: {cs['n_spots_final']} red patches on "
+                         f"a shell of {cs['cells_final']:,} cells, and the shell lobes where they "
+                         f"are (protrusion peak {cs['protr_peak']:.2f})",
+                         files=((QMD, False), (DOCS, True)),
+                         new_video="turing_coral_v2.mp4")
             if os.path.isdir(DOCS_GAL):
+                shutil.copy2(os.path.join(GAL, "turing_coral_v2.mp4"),
+                             os.path.join(DOCS_GAL, "turing_coral_v2.mp4"))
+
+    if os.path.isdir(DOCS_GAL):
                 shutil.copy2(os.path.join(GAL, "turing_grow_divide_vtk.mp4"),
                              os.path.join(DOCS_GAL, "turing_grow_divide_vtk.mp4"))
 

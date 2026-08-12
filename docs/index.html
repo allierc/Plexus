@@ -855,7 +855,7 @@ schedule:   # the order the operators run each frame
 <p class="opk-ref">Reference — apoptotic force driving epithelial folding after Monier et&nbsp;al., <i>Nature</i> <b>518</b>:245 (2015).</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
-    <video src="gallery/apop_patch_big_vtk.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/apop_patch_big_v2.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">a dying big patch<span class="sim-spec"><pre>general:
   name: apop_patch_big
@@ -951,7 +951,7 @@ _basis:
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/apop_rings9_vtk.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/apop_rings9_v2.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">nine dying rings<span class="sim-spec"><pre>general:
   name: apop_rings9
@@ -1048,7 +1048,7 @@ _basis:
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/apop_half_vtk.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/apop_half_v2.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">half the sheet<span class="sim-spec"><pre>general:
   name: apopgeo_half
@@ -1151,128 +1151,10 @@ _apopgeo:
 <p class="opk-ref">Reference — this is the experiment of <a href="https://www.nature.com/articles/s41598-018-20678-6">Okuda et&nbsp;al. (2018), <i>Sci. Rep.</i> 8:2386</a> — Turing patterning on a 3D vertex model — rebuilt as Plexus operators on the <a href="https://github.com/DamCB/tyssue">Tyssue</a> mesh; the chemistry is the Gray–Scott system cited in the Turing section above.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
-    <video src="gallery/turing_grow_divide_vtk.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/tyssue_vh_grow_divide.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">grow &amp; divide<span class="sim-spec"><pre>general:
-  name: r001_00_ctrl
-  seed: 0
-  n_frames: 1800
-  dt: 1.0
-  record_cap: 1802
-  record_every: 1
-  boundary: free
-  dim: 3
-  world:
-  - 80.0
-  - 80.0
-  - 80.0
-_run:
-  target_cells: 50000
-  seed_cells: 2000
-sets:
-  vertex:
-    n: 130004
-  cell:
-    n: 65004
-    state:
-      chem:
-        width: 2
-        integration: first_order
-      cen:
-        width: 3
-      area:
-        width: 1
-fields: {}
-operators:
-- op: seed_mesh_3d
-  at: vertex
-  cell_set: cell
-  before_frame: 1
-  n_cells: 2000
-  radius: 5.0
-  jitter: 0.15
-  seed: 0
-  vseed_cv: 0.15
-  p0: 3.5
-- op: cell_geometry_3d
-  at: cell
-- op: shape_energy_3d
-  at: vertex
-  p0: 3.5
-  K_A: 1.0
-  K_P: 1.0
-  Gamma: 0.4
-  Lambda: 0.5
-  K_V: 20.0
-  K_R: 0.0
-  K_bend: 0.0
-  K_lumen: 0.0
-  antiinv: 0.0
-  mu: 1.0
-  dt: 1.0
-  relax_iters: 30
-  eta: 0.08
-  cap_frac: 0.12
-- op: reconnect_t1_3d
-  at: vertex
-  l_th_frac: 0.28
-  every: 1
-  max_flips: 300
-- op: divide_3d
-  at: vertex
-  factor: 2.0
-  reset_noise: 0.12
-  cycle_cv: 0.15
-  p0: 3.5
-  every: 4
-  cell_set: cell
-  min_cycle: 4
-  max_cycle: 1000000000
-  after_frame: 100
-  orient_iface: false
-  orient_asw: 0.6
-  g1_ramp: false
-  engine_clock: true
-- op: topo_snapshot_3d
-  at: vertex
-  every: 1
-schedule:
-- seed_mesh_3d
-- cell_geometry_3d
-- shape_energy_3d
-- reconnect_t1_3d
-- divide_3d
-- topo_snapshot_3d
-_discovery:
-  comp_hash: Ca4940bd4902
-  structure:
-    operators:
-    - id: cell_geometry_3d0
-      op: cell_geometry_3d
-    - id: divide_3d0
-      op: divide_3d
-      impl: hertwig
-    - id: reconnect_t1_3d0
-      op: reconnect_t1_3d
-    - id: seed_mesh_3d0
-      op: seed_mesh_3d
-    - id: shape_energy_3d0
-      op: shape_energy_3d
-      impl: default
-    connections: []
-  region: mechanics-only (no growth)
-  defect_fixes:
-  - D1 engine owns the clock (every=1)
-  - D2 one global dt=1.0
-  - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">Growth and division with nothing patterning them: 2,001 cells, and the shell is still a sphere (reduced volume 0.99)</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card figure">
-    <video src="gallery/tyssue_vh_rd_coral.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">coral<span class="sim-spec"><pre>general:   # run-level settings
-  name: tyssue_vh_K4_cv15_d4_rd_coral   # run name (-&gt; archive/&lt;name&gt;/)
+      <span class="sim-name" tabindex="0">grow &amp; divide<span class="sim-spec"><pre>general:   # run-level settings
+  name: tyssue_vh_K4_cv15_d4   # run name (-&gt; archive/&lt;name&gt;/)
   seed: 0   # RNG seed
   n_frames: 500   # number of simulation frames
   dt: 1.0   # time step (a label: the bounded-Euler relaxation is per-frame)
@@ -1309,26 +1191,7 @@ operators:   # the operators to instantiate (each realises one mechanism)
   vseed_cv: 0.15
 - op: cell_geometry_3d
   at: cell   # the set this operator acts on
-- op: cell_adjacency
-  at: cell   # the set this operator acts on
-- op: cell_rd_seed
-  at: cell   # the set this operator acts on
-  seed: 0   # RNG seed
-  before_frame: 3   # run this operator once, before the given frame
-  mode: scatter
-  seed_frac: 0.06
-- op: cell_diffuse
-  at: cell   # the set this operator acts on
-  d_a: 0.08
-  d_h: 0.16
-  chi: 1.3
-- op: cell_react
-  at: cell   # the set this operator acts on
-  implementation: gray_scott
-  F: 0.055
-  kk: 0.062
-  rate: 1.0   # growth rate of the target area per frame
-- op: morphogen_growth_3d
+- op: grow_3d
   at: vertex   # the set this operator acts on
   cell_set: cell
   rate: 0.03   # growth rate of the target area per frame
@@ -1373,16 +1236,159 @@ operators:   # the operators to instantiate (each realises one mechanism)
 schedule:   # the order the operators run each frame
 - seed_mesh_3d
 - cell_geometry_3d
-- cell_adjacency
-- cell_rd_seed
-- cell_diffuse
-- cell_react
-- morphogen_growth_3d
+- grow_3d
 - shape_energy_3d
 - reconnect_t1_3d
 - divide_3d
 - topo_snapshot_3d</pre></span></span>
-      <span class="sim-cap">a Gray–Scott coral pattern rides the same growing vesicle — red stripes wander across the rounded cells</span>
+      <span class="sim-cap">a vesicle proliferates — every cell grows and divides until the shell reaches ~2000 cells</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/turing_coral_v2.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">coral<span class="sim-spec"><pre>general:
+  name: b_gs_gated_shaping
+  seed: 0
+  n_frames: 1800
+  dt: 1.0
+  record_cap: 1802
+  record_every: 1
+  boundary: free
+  dim: 3
+  world:
+  - 80.0
+  - 80.0
+  - 80.0
+_run:
+  target_cells: 60000
+  seed_cells: 2000
+sets:
+  vertex:
+    n: 120000
+  cell:
+    n: 60000
+    state:
+      chem:
+        width: 2
+        integration: first_order
+      cen:
+        width: 3
+      area:
+        width: 1
+fields: {}
+operators:
+- op: seed_mesh_3d
+  at: vertex
+  cell_set: cell
+  before_frame: 1
+  n_cells: 2000
+  seed: 0
+  vseed_cv: 0.15
+  radius: 5.0
+  jitter: 0.15
+  p0: 3.5
+- op: cell_geometry_3d
+  at: cell
+- op: cell_adjacency
+  at: cell
+- op: seed_cell_rd
+  at: cell
+  seed: 0
+  before_frame: 3
+  mode: scatter
+  seed_frac: 0.06
+- op: cell_diffuse
+  at: cell
+  implementation: graph_laplacian
+  d_a: 0.08
+  d_h: 0.16
+  chi: 1.3
+- op: cell_react
+  at: cell
+  model: gray_scott
+  F: 0.046
+  kk: 0.062
+  rate: 1.0
+- op: shape_to_chem
+  at: cell
+  model: curvature
+  vertex_set: vertex
+  beta: 0.5
+  F0: 0.046
+  rate: 1.0
+- op: grow_3d
+  at: vertex
+  cell_set: cell
+  rate: 0.000866
+  a_sw: 0.35
+  hill: 4.0
+  rho: 0.1
+  vth_frac: 2.5
+  after_frame: 100
+  conserve_amount: false
+- op: shape_energy_3d
+  at: vertex
+  K_A: 1.0
+  K_P: 1.0
+  K_V: 20.0
+  K_R: 0.0
+  Lambda: 0.5
+  Gamma: 0.4
+  p0: 3.5
+  mu: 1.0
+  dt: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+  K_bend: 0.02
+  K_lumen: 0.5
+- op: interface_line_tension_3d
+  at: vertex
+  cell_set: cell
+  K_purse: 1.0
+  a_sw: 0.6
+- op: divide_3d
+  at: vertex
+  cell_set: cell
+  factor: 2.0
+  cycle_cv: 0.15
+  min_cycle: 4
+  max_cycle: 1000000000
+  p0: 3.5
+  every: 4
+  engine_clock: true
+- op: reconnect_t1_3d
+  at: vertex
+  l_th_frac: 0.28
+  every: 1
+  max_flips: 300
+- op: topo_snapshot_3d
+  at: vertex
+  every: 1
+schedule:
+- seed_mesh_3d
+- cell_geometry_3d
+- cell_adjacency
+- seed_cell_rd
+- cell_diffuse
+- cell_react
+- shape_to_chem
+- grow_3d
+- shape_energy_3d
+- interface_line_tension_3d
+- divide_3d
+- reconnect_t1_3d
+- topo_snapshot_3d
+_basis:
+  chem: gs
+  mat: gated
+  mech: shaping
+  grid: 4 chemistry x 2 material x 2 mechanics
+  why: chemistry=gs, material=gated, mechanics=shaping -- one cell of the basis grid
+    written by make_basis.py; every value not on an axis is shared with the other
+    fifteen.</pre></span></span>
+      <span class="sim-cap">A Gray–Scott field gating growth: 75 red patches on a shell of 10,127 cells, and the shell lobes where they are (protrusion peak 1.22)</span>
     </figcaption>
   </figure>
   <figure class="sim-card figure">
@@ -1510,7 +1516,7 @@ schedule:   # the order the operators run each frame
 <!-- BEGIN vertex-turing-shapes (generated by prototype/ecm/minisite_section.py) -->
 <div class="sim-gallery g3">
   <figure class="sim-card">
-    <video src="gallery/turing_flower_vtk.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/turing_flower_v2.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">purse-string, k = 0.062<span class="sim-spec"><pre>general:
   name: r013_05
@@ -1707,7 +1713,7 @@ _discovery:
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/turing_lobes_vtk.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/turing_lobes_v2.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">purse-string, k = 0.031<span class="sim-spec"><pre>general:
   name: r016_01
@@ -1904,7 +1910,7 @@ _discovery:
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/turing_noline_vtk.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/turing_noline_v2.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">no purse-string<span class="sim-spec"><pre>general:
   name: r017_00_ctrl
@@ -2092,7 +2098,7 @@ _discovery:
 <!-- BEGIN vertex-turing-rate (generated by prototype/ecm/minisite_section.py) -->
 <div class="sim-gallery g3">
   <figure class="sim-card">
-    <video src="gallery/turing_folds_vtk.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/turing_folds_v2.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">reaction rate 0.75<span class="sim-spec"><pre>general:
   name: r020_01
@@ -2275,7 +2281,7 @@ _discovery:
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/turing_arms_vtk.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/turing_arms_v2.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">reaction rate 0.5<span class="sim-spec"><pre>general:
   name: r019_02
@@ -2458,7 +2464,7 @@ _discovery:
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/turing_spikes_vtk.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/turing_spikes_v2.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">rate 0.25, growth doubled<span class="sim-spec"><pre>general:
   name: r021_06
@@ -2646,7 +2652,7 @@ _discovery:
 <!-- BEGIN vertex-turing-second-field (generated by prototype/ecm/minisite_section.py) -->
 <div class="sim-gallery g3">
   <figure class="sim-card">
-    <video src="gallery/turing_inhibit_vtk.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/turing_inhibit_v2.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">B stops growth<span class="sim-spec"><pre>general:
   name: sc_inh_soft
@@ -2835,7 +2841,7 @@ _sculpt:
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/turing_death_vtk.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/turing_death_v2.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">B kills<span class="sim-spec"><pre>general:
   name: tsd_max
@@ -3033,7 +3039,7 @@ _two_species:
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/turing_antiphase_vtk.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/turing_antiphase_v2.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">one field, in antiphase<span class="sim-spec"><pre>general:
   name: sc_antiphase
