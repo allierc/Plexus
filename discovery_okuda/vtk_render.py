@@ -13,14 +13,21 @@ two different ways at 0:12 and 0:14 of a single rotation. VTK discards a fragmen
 per pixel, so the question cannot arise. It is also 29x faster on this mesh: 0.32 s a frame against
 9.33 (log/okuda/b_star/render_compare.png).
 
-TWO STYLES, both chosen from that sheet, because they answer different questions:
+SHADING IS ALWAYS SMOOTH. Cedric, 12 August: *"I do not want flat at all."* Flat shading gives
+every cell one normal, so a curved arm reads as a faceted cone and the surface's own curvature is
+lost; the only thing it buys is a stronger sense of the mesh, and the mesh has its own switch:
 
-    flat    per-cell colour with the cell outline drawn. The tissue is a MESH and this is the
-            picture that says so -- it is the direct successor to every figure the project has
-            made, and the one to read when the question is about cells.
-    smooth  interpolated shading, no outline. The picture that says the tissue is a SURFACE: an
-            arm reads as a round tube with light running down it, which a flat-shaded image cannot
-            express at all. The one to read when the question is about shape.
+    mesh     smooth-shaded surface WITH the cell outlines drawn on it. Read this when the question
+             is about cells -- who divided, how big, how many across a tube.
+    nomesh   the same surface with no outlines. Read this when the question is about SHAPE: an arm
+             reads as a round tube with light running down its length, and nothing competes with
+             the silhouette.
+
+SEQUENCES, so a caller asks for a job and not for four commands:
+
+    1   evolve, with mesh
+    2   evolve + kburns, with mesh
+    3   evolve + kburns without mesh, then evolve + kburns with mesh -- all four
 
 WHAT IS AND IS NOT CARRIED OVER from `_draw`'s colour semantics. The activator LUT (white -> red)
 and magenta-for-non-finite are here, because those are measurements. The green just-divided wash,
@@ -61,6 +68,16 @@ FPS = 25
 KB_SECONDS = 18.0          # one revolution; see kburns_render.SECONDS for why the length IS the speed
 KB_ZOOM = 0.55
 EV_FPS = 12                # the archive holds ~60 recorded frames; 12 fps makes that a 5 s clip
+
+# THE NAMED JOBS. A caller asks for a sequence, not for four commands, so what a run produces is one
+# number in one place and the loop and the command line cannot drift apart.
+SEQUENCES = {
+    1: [("evolve", "mesh")],
+    2: [("evolve", "mesh"), ("kburns", "mesh")],
+    3: [("evolve", "nomesh"), ("kburns", "nomesh"),
+        ("evolve", "mesh"), ("kburns", "mesh")],
+}
+LOOP_SEQ = 3               # what run_one asks for; see the budget note in render_all()
 
 
 def _cmap():
@@ -132,13 +149,18 @@ def mesh_of(pos, mt, act, lo=None, hi=None):
 
 
 def add(p, m, style):
-    kw = dict(scalars="rgb", rgb=True, lighting=True)
-    if style == "flat":
-        p.add_mesh(m, show_edges=True, edge_color="black", line_width=0.4,
-                   smooth_shading=False, ambient=0.45, diffuse=0.65, specular=0.05, **kw)
-    else:
-        p.add_mesh(m, show_edges=False, smooth_shading=True,
-                   ambient=0.35, diffuse=0.75, specular=0.12, specular_power=18, **kw)
+    """Add the shell and RETURN THE ACTOR, which is the whole reason this is not `p.clear()`.
+
+    `Plotter.clear()` removes every actor AND every light: measured 5 lights before, 0 after. So
+    `evolve` rendered its first frame lit and all fifty-nine others with no light source at all --
+    mean brightness 195.6 -> 238.9 and shading contrast 47.5 -> 33.5, a washed-out white body.
+    Cedric spotted it as "the last frame is different from the first, the first is better with
+    shading", which is exactly the frame-1-only-is-lit signature. Removing the one actor we added
+    leaves the lighting rig alone.
+    """
+    return p.add_mesh(m, scalars="rgb", rgb=True, lighting=True, smooth_shading=True,
+                      show_edges=(style == "mesh"), edge_color="black", line_width=0.4,
+                      ambient=0.35, diffuse=0.75, specular=0.12, specular_power=18)
 
 
 def aim(p, L, azim=None, elev=None):
@@ -200,51 +222,65 @@ def evolve(run, style, out):
     hi = float(max(np.nanmax(v) for v in vals)) if vals else 1.0
     p = _plotter()
     p.open_movie(out, framerate=EV_FPS, quality=8)
+    actor = txt = None
     for t, (pos, mt, act) in enumerate(fr):
         m = mesh_of(pos, mt, act, lo, hi)
         if m is None:
             continue
-        p.clear()                                  # topology changes every frame: cells divide
-        add(p, m, style)
-        p.add_text(f"{run}  {style}   frame {t + 1}/{len(fr)}   {int(mt['nF'])} cells",
-                   position="upper_left", font_size=11, color="white")
+        if actor is not None:
+            p.remove_actor(actor)                  # NOT p.clear(): that removes the lights too
+        if txt is not None:
+            p.remove_actor(txt)
+        actor = add(p, m, style)
+        txt = p.add_text(f"{run}  {style}   frame {t + 1}/{len(fr)}   {int(mt['nF'])} cells",
+                         position="upper_left", font_size=11, color="white")
         aim(p, L)
         p.write_frame()
     p.close()
     return f"{len(fr)} frames"
 
 
-def main():
+def render_all(run, seq=LOOP_SEQ, size=None, quiet=False):
+    """Run one named sequence for one finished run. Returns {filename: seconds}, {} if it cannot.
+
+    CALLED BY THE LOOP AS WELL AS BY HAND, which is why it is a function and not just a `main`.
+    Sequence 3 -- four clips, 1,020 frames -- measured at about 20 s on b_star's 12,272 cells,
+    against a run that costs 30-40 MINUTES of GPU. That is the budget test Cedric set ("3 in the
+    loop if it is less than one minute") and it passes with room to spare, so the loop asks for the
+    full set rather than a reduced one.
+    """
     global SIZE
-    ap = argparse.ArgumentParser()
-    ap.add_argument("run")
-    ap.add_argument("--style", default="flat", choices=["flat", "smooth"])
-    ap.add_argument("--kburns", action="store_true")
-    ap.add_argument("--evolve", action="store_true")
-    ap.add_argument("--all", action="store_true", help="both clips in both styles")
-    ap.add_argument("--size", type=int, default=SIZE)
-    a = ap.parse_args()
-
-    SIZE = a.size
-    jobs = []
-    if a.all:
-        for st in ("flat", "smooth"):
-            jobs += [("kburns", st), ("evolve", st)]
-    else:
-        if a.kburns:
-            jobs.append(("kburns", a.style))
-        if a.evolve:
-            jobs.append(("evolve", a.style))
-    if not jobs:
-        print("nothing asked for -- use --kburns, --evolve or --all"); return 1
-
-    d = os.path.join(LOG, a.run)
-    for kind, st in jobs:
+    if size:
+        SIZE = size
+    d = os.path.join(LOG, run)
+    if not os.path.exists(os.path.join(d, "traj.npz")):
+        return {}
+    took = {}
+    for kind, st in SEQUENCES[int(seq)]:
         out = os.path.join(d, f"vtk_{kind}_{st}.mp4")
         t0 = time.perf_counter()
-        msg = (kburns if kind == "kburns" else evolve)(a.run, st, out)
+        msg = (kburns if kind == "kburns" else evolve)(run, st, out)
         dt = time.perf_counter() - t0
-        print(f"  {kind:7s} {st:7s} {msg:12s} {dt:7.1f} s -> {os.path.relpath(out, ROOT)}")
+        if msg == "no traj.npz":
+            return {}
+        took[os.path.basename(out)] = dt
+        if not quiet:
+            print(f"  {kind:7s} {st:7s} {msg:12s} {dt:7.1f} s -> {os.path.relpath(out, ROOT)}")
+    return took
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("run")
+    ap.add_argument("--seq", type=int, default=3, choices=sorted(SEQUENCES),
+                    help="1 = evolve+mesh; 2 = +kburns; 3 = both, without mesh then with")
+    ap.add_argument("--size", type=int, default=SIZE)
+    a = ap.parse_args()
+    t0 = time.perf_counter()
+    took = render_all(a.run, a.seq, a.size)
+    if not took:
+        print(f"{a.run}: no traj.npz -- nothing to render"); return 1
+    print(f"\n  sequence {a.seq}: {len(took)} clips in {time.perf_counter() - t0:.1f} s total")
     return 0
 
 

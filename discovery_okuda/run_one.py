@@ -884,6 +884,38 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
                   f"traj.npz is written, so `python rerender.py {name}` rebuilds them without "
                   f"re-simulating.", flush=True)
 
+        # ---- THE VTK CLIPS, added 12 August, ALONGSIDE the matplotlib artefacts and not instead
+        # of them. `mplot3d` has no depth buffer -- it paints polygons back to front by mean z, so
+        # on a closed body half the faces point away from the camera and are drawn anyway, and
+        # which of them wins a tie changes with the angle. VTK is z-buffered per pixel and 29x
+        # faster (0.32 s a frame against 9.33); sequence 3 is four clips and 1,020 frames in about
+        # 21 s, against a run that costs 30-40 minutes of GPU.
+        #
+        # WHY THE MATPLOTLIB PATH STAYS. `strip.png` is what the Eye agent actually reads -- it
+        # takes a PNG and not an mp4 -- and `3d.png` is what every montage tiles. Dropping the old
+        # renderer before those two have a VTK source would blind a role and break the sheets, so
+        # the migration is additive until they do.
+        #
+        # IT CANNOT KILL A RUN. Everything above this point is already written; a missing clip is
+        # recorded like any other missing artefact and rebuilt later from traj.npz.
+        try:
+            sys.path.insert(0, HERE) if HERE not in sys.path else None
+            import vtk_render
+            _t0 = time.time()
+            _took = vtk_render.render_all(name, seq=vtk_render.LOOP_SEQ, quiet=True)
+            if _took:
+                summary["vtk_clips"] = sorted(_took)
+                print(f"[{name}] VTK seq {vtk_render.LOOP_SEQ}: {len(_took)} clips in "
+                      f"{time.time() - _t0:.1f} s ({', '.join(sorted(_took))})", flush=True)
+            else:
+                summary["vtk_clips"] = []
+                print(f"[{name}] VTK: nothing rendered (no traj.npz)", flush=True)
+        except Exception as _e:
+            summary["vtk_clips"] = []
+            summary.setdefault("artefacts_missing", []).append(f"vtk ({type(_e).__name__})")
+            print(f"[{name}] VTK clips skipped: {type(_e).__name__}: {str(_e)[:90]} -- "
+                  f"`python vtk_render.py {name}` rebuilds them from traj.npz", flush=True)
+
     # PREMISES, PASSIVE TIER -- on the run's own recorded series. Unlike the static gate this
     # cannot abort anything (the simulation already happened), so it goes LOUDLY into the record:
     # an Analyst that reads a summary without knowing the chemistry was extinct, or that the cells
