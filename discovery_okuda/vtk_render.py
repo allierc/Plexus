@@ -126,6 +126,7 @@ def box_of(run, fr):
 #           how much of it there is; a card that says otherwise would be claiming data we do not have.
 DIVIDED = 4
 GREEN = (44, 160, 44)
+GREEN_A = 0.5              # how much of the cell's own colour the division mark keeps
 BLUE = (31, 119, 180)
 
 
@@ -140,18 +141,30 @@ def _marks(mt, idx, nF):
     which is where "does not grow" means something.
     """
     def col(k):
+        """One per-cell state over the drawn faces, PADDED rather than dropped when it is short.
+
+        THE FLICKER THIS FIXES. A state is recorded before the frame's divisions are applied, so on
+        the frames where cells divided it is a few entries shorter than `nF` -- 3,867 against 3,884,
+        4,222 against 4,232. Dropping the whole mask on those frames, which is what returning None
+        did, made the blue vanish and come back every second or third frame of `sc_inh_soft`: not
+        the simulation changing its mind, an index guard throwing away 99.6% of a mask because
+        0.4% of it was missing. The cells the state does not cover are the ones just created, and
+        an unmarked new cell is the truthful default.
+        """
         v = mt.get(k)
         if v is None:
             return None
         a = np.asarray(v).ravel()
-        return a[:nF][idx] if a.size >= nF else None
+        if a.size < nF:
+            a = np.concatenate([a, np.zeros(nF - a.size, a.dtype)])
+        return a[:nF][idx]
     age, ndiv = col("age"), col("ndiv")
     div = None if age is None or ndiv is None else ((age <= DIVIDED) & (ndiv > 0))
     kills, sup = col("apop"), col("inhib")
     return div, (None if kills is None else kills > 0), (None if sup is None else sup > 0)
 
 
-def mesh_of(pos, mt, act, lo=None, hi=None):
+def mesh_of(pos, mt, act, lo=None, hi=None, show_div=True):
     """The apical shell as PolyData with per-cell RGB. Rebuilt per frame: cells divide."""
     import pyvista as pv
     from tyssue_topology_ops3d import rings_from_flat_3d
@@ -184,12 +197,26 @@ def mesh_of(pos, mt, act, lo=None, hi=None):
     # ORDER MATTERS: suppression is the background, death is the event, division is the rarest and
     # shortest-lived (four calls), so each later mark may overwrite the one before it.
     if sup is not None and sup.any():
-        low = sup if act is None else (sup & (x < 0.5))
-        rgb[low] = BLUE
+        # A BLEND, NOT A THRESHOLD. `x < 0.5` on a smooth activator field toggles every cell that
+        # sits near the line, so whole regions flipped blue and back between frames -- the same
+        # flicker as the dropped mask, from the other direction. Weighting by how LOW the activator
+        # is makes a cell that is halfway halfway blue, and nothing jumps.
+        w = (sup.astype(float) if act is None else sup * (1.0 - x)) [:, None]
+        rgb = ((1.0 - w) * rgb.astype(float) + w * np.asarray(BLUE, float)).astype(np.uint8)
     if kills is not None and kills.any():
         rgb[kills] = BLUE
-    if div is not None and div.any():
-        rgb[div] = GREEN
+    # GREEN ONLY WHERE BOTH ITS AXES EXIST. It marks ONE CELL that divided in the last four calls,
+    # so it needs a before and an after -- which `kburns` does not have, being one frame held still
+    # while the camera moves -- and it needs the cell to be visible, which `nomesh` does not give:
+    # on a smooth surface with no outlines a green patch names a cell nobody can see. So it is drawn
+    # in `evolve` + `mesh` and nowhere else. Blue is not subject to either: it marks a REGION, and a
+    # region reads on a smooth surface and in a single frame.
+    if show_div and div is not None and div.any():
+        # A TINT, NOT A REPAINT. Solid green throws away what the cell was -- its activator level,
+        # or the blue that says the second field is acting on it -- to say one bit: it just divided.
+        # Blended at GREEN_A the cell keeps its own colour and is legibly green over it.
+        rgb[div] = ((1.0 - GREEN_A) * rgb[div].astype(float)
+                    + GREEN_A * np.asarray(GREEN, float)).astype(np.uint8)
     m.cell_data["rgb"] = rgb
     return m
 
@@ -248,7 +275,7 @@ def kburns(run, style, out, fill=1.0):
         return "no traj.npz"
     L0 = box_of(run, fr)
     pos, mt, act = fr[-1]
-    m = mesh_of(pos, mt, act)
+    m = mesh_of(pos, mt, act, show_div=False)
     n = int(KB_SECONDS * FPS)
     p = _plotter(); add(p, m, style)
     p.add_text(f"{run}  {style}", position="upper_left", font_size=11, color="white")
@@ -278,7 +305,7 @@ def evolve(run, style, out, fill=1.0):
     p.open_movie(out, framerate=EV_FPS, quality=8)
     actor = txt = None
     for t, (pos, mt, act) in enumerate(fr):
-        m = mesh_of(pos, mt, act, lo, hi)
+        m = mesh_of(pos, mt, act, lo, hi, show_div=(style == "mesh"))
         if m is None:
             continue
         if actor is not None:

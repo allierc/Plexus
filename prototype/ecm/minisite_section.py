@@ -597,9 +597,9 @@ def main():
     # control and its death network is drawn on the pole, so the top view is the one that shows it;
     # the two-field runs are read from the side like every other clip on the page.
     R2 = [
-        ("sc_inh_soft", "turing_inhibit_v2", "B stops growth", "left"),
-        ("tsd_max", "turing_death_v2", "B kills", "left"),
-        ("sc_antiphase", "turing_antiphase_v2", "one field, in antiphase", "right"),
+        ("sc_inh_soft", "turing_inhibit_v3", "B stops growth", "left"),
+        ("tsd_max", "turing_death_v3", "B kills", "left"),
+        ("sc_antiphase", "turing_antiphase_v3", "one field, in antiphase", "right"),
     ]
     def _cap2(run):
         s = json.load(open(os.path.join(LOG_OKUDA, run, "diag.json")))["summary"]
@@ -630,9 +630,9 @@ def main():
     def _sum(run):
         return json.load(open(os.path.join(LOG_OKUDA, run, "diag.json")))["summary"]
     R4 = [
-        ("r013_05", "turing_flower_v2", "purse-string, k = 0.062"),
-        ("r016_01", "turing_lobes_v2", "purse-string, k = 0.031"),
-        ("r017_00_ctrl", "turing_noline_v2", "no purse-string"),
+        ("r013_05", "turing_flower_v3", "purse-string, k = 0.062"),
+        ("r016_01", "turing_lobes_v3", "purse-string, k = 0.031"),
+        ("r017_00_ctrl", "turing_noline_v3", "no purse-string"),
     ]
     CAP4 = {
         "r013_05": "Eight arms from one activator: {cells:,} cells, protrusion peak {pk}",
@@ -660,9 +660,9 @@ def main():
     # 0.5 against 0.75, with the growth rate, both diffusivities, F, k and the division rule
     # identical. That is what makes the pair a comparison rather than two shapes.
     R5r = [
-        ("r020_01", "turing_folds_v2", "reaction rate 0.75"),
-        ("r019_02", "turing_arms_v2", "reaction rate 0.5"),
-        ("r021_06", "turing_spikes_v2", "rate 0.25, growth doubled"),
+        ("r020_01", "turing_folds_v3", "reaction rate 0.75"),
+        ("r019_02", "turing_arms_v3", "reaction rate 0.5"),
+        ("r021_06", "turing_spikes_v3", "rate 0.25, growth doubled"),
     ]
     # ORDERED BY CHEMISTRY AGAINST GROWTH, fastest first, because that ratio is what the row is:
     # 0.75/8.66e-4, then 0.5/8.66e-4, then 0.25/1.73e-3 -- a sixfold range, and the shape goes from
@@ -838,9 +838,9 @@ def main():
         if os.path.exists(sp):
             # THE CLIP TOO, not only the spec: these three now play the VTK sequence like the
             # Turing rows, under a new name because their content changed.
-            new_v = f"{vid}_v2"
+            new_v = f"{vid}_v3"
             built = vtk_sequence(os.path.join(LOG_OKUDA, run), os.path.join(GAL, f"{new_v}.mp4"))
-            for old_v in (f"{vid}.mp4", f"{vid}_vtk.mp4", f"{new_v}.mp4"):
+            for old_v in (f"{vid}.mp4", f"{vid}_vtk.mp4", f"{vid}_v2.mp4", f"{new_v}.mp4"):
                 if any(f'<video src="gallery/{old_v}"' in open(f).read() for f, _ in
                        ((QMD, False), (DOCS, True))):
                     replace_card(old_v, nm, sp, cap, files=((QMD, False), (DOCS, True)),
@@ -873,17 +873,17 @@ def main():
     cor = os.path.join(LOG_OKUDA, "b_gs_gated_shaping")
     if os.path.exists(os.path.join(cor, "traj.npz")):
         cs = json.load(open(os.path.join(cor, "diag.json")))["summary"]
-        if vtk_sequence(cor, os.path.join(GAL, "turing_coral_v2.mp4")):
-            replace_card("tyssue_vh_rd_coral.mp4", "coral",
+        if vtk_sequence(cor, os.path.join(GAL, "turing_coral_v3.mp4")):
+            replace_card("turing_coral_v2.mp4" if 'gallery/turing_coral_v2.mp4' in open(QMD).read() else "tyssue_vh_rd_coral.mp4", "coral",
                          os.path.join(cor, "spec_run.yaml"),
                          f"A Gray–Scott field gating growth: {cs['n_spots_final']} red patches on "
                          f"a shell of {cs['cells_final']:,} cells, and the shell lobes where they "
                          f"are (protrusion peak {cs['protr_peak']:.2f})",
                          files=((QMD, False), (DOCS, True)),
-                         new_video="turing_coral_v2.mp4")
+                         new_video="turing_coral_v3.mp4")
             if os.path.isdir(DOCS_GAL):
-                shutil.copy2(os.path.join(GAL, "turing_coral_v2.mp4"),
-                             os.path.join(DOCS_GAL, "turing_coral_v2.mp4"))
+                shutil.copy2(os.path.join(GAL, "turing_coral_v3.mp4"),
+                             os.path.join(DOCS_GAL, "turing_coral_v3.mp4"))
 
     if os.path.isdir(DOCS_GAL):
                 shutil.copy2(os.path.join(GAL, "turing_grow_divide_vtk.mp4"),
