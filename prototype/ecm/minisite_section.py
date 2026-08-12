@@ -853,36 +853,39 @@ def main():
         else:
             print(f"[minisite] {run}: no spec_run.yaml -- {vid} keeps its bare title")
 
-    # THE "coral" CARD, repointed at a run that can be re-rendered. It played
-    # `prototype/Tyssue`'s `vh_K4_cv15_d4_rd_coral`, whose archive holds movies and specs and no
-    # trajectory -- so no renderer since can redraw it. `b_gs_gated_shaping` is the same phenomenon
-    # in the campaign's own hands: one Gray-Scott field gating growth, red patches on a lobed shell.
-    # THE "grow & divide" CARD GOES BACK to the clip it had. `r001_00_ctrl` has divide_3d and NO
-    # grow_3d, so 2 of 2,001 cells ever divided and the card drew a sphere doing nothing;
-    # `r001_00_ungated` -- the same control with uniform growth added -- is simulating, and this
-    # card is its own until that lands.
-    for old_v in ("turing_grow_divide_vtk.mp4", "tyssue_vh_grow_divide.mp4"):
-        if f'<video src="gallery/{old_v}"' in open(QMD).read():
-            replace_card(old_v, "grow &amp; divide",
-                         "prototype/Tyssue/archive/vh_K4_cv15_d4/spec.yaml",
-                         "a vesicle proliferates — every cell grows and divides until the shell "
-                         "reaches ~2000 cells",
-                         files=((QMD, False), (DOCS, True)),
-                         new_video="tyssue_vh_grow_divide.mp4")
-            break
+    # ROW 1 OF Vertex + Turing, on runs that can be re-rendered. Both cards played
+    # `prototype/Tyssue` archives that hold movies and specs and NO trajectory, so no renderer
+    # since could redraw them; `b_gs_gated_shaping` stood in for coral for one commit and is
+    # replaced here by the run Cedric picked, which is a labyrinth rather than patches.
+    for clip, run, label, cap_fn, olds in (
+        ("turing_coral_v3", "r021_12", "coral",
+         lambda m: (f"A Gray–Scott pattern riding a growing shell: red stripes wander across "
+                    f"{m['cells_final']:,} cells and the shell stays round (protrusion peak "
+                    f"{m['protr_peak']:.2f})"),
+         ("tyssue_vh_rd_coral.mp4", "turing_coral_v2.mp4", "turing_coral_v3.mp4")),
+        ("turing_morphogen_v3", "r003_07", "morphogen + growth",
+         lambda m: (f"The same chemistry driving growth where it peaks: {m['cells_final']:,} cells "
+                    f"and the shell folds out of plane, protrusion peak {m['protr_peak']:.2f}, "
+                    f"along a path that runs "
+                    f"{m['morphology_path'].replace(' -> ', ' → ')}"),
+         ("tyssue_okuda_lobed.mp4", "turing_morphogen_v3.mp4")),
+    ):
+        rd = os.path.join(LOG_OKUDA, run)
+        if not os.path.exists(os.path.join(rd, "traj.npz")):
+            print(f"[minisite] {run}: no traj.npz -- {label} card left as it is")
+            continue
+        sm = json.load(open(os.path.join(rd, "diag.json")))["summary"]
+        if not vtk_sequence(rd, os.path.join(GAL, f"{clip}.mp4")):
+            continue
+        for old_v in olds:
+            if f'<video src="gallery/{old_v}"' in open(QMD).read():
+                replace_card(old_v, label, os.path.join(rd, "spec_run.yaml"), cap_fn(sm),
+                             files=((QMD, False), (DOCS, True)), new_video=f"{clip}.mp4")
+                break
+        if os.path.isdir(DOCS_GAL):
+            shutil.copy2(os.path.join(GAL, f"{clip}.mp4"), os.path.join(DOCS_GAL, f"{clip}.mp4"))
 
-    cor = os.path.join(LOG_OKUDA, "b_gs_gated_shaping")
-    if os.path.exists(os.path.join(cor, "traj.npz")):
-        cs = json.load(open(os.path.join(cor, "diag.json")))["summary"]
-        if vtk_sequence(cor, os.path.join(GAL, "turing_coral_v3.mp4")):
-            replace_card("turing_coral_v2.mp4" if 'gallery/turing_coral_v2.mp4' in open(QMD).read() else "tyssue_vh_rd_coral.mp4", "coral",
-                         os.path.join(cor, "spec_run.yaml"),
-                         f"A Gray–Scott field gating growth: {cs['n_spots_final']} red patches on "
-                         f"a shell of {cs['cells_final']:,} cells, and the shell lobes where they "
-                         f"are (protrusion peak {cs['protr_peak']:.2f})",
-                         files=((QMD, False), (DOCS, True)),
-                         new_video="turing_coral_v3.mp4")
-            if os.path.isdir(DOCS_GAL):
+    if os.path.isdir(DOCS_GAL):
                 shutil.copy2(os.path.join(GAL, "turing_coral_v3.mp4"),
                              os.path.join(DOCS_GAL, "turing_coral_v3.mp4"))
 
