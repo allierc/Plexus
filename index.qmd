@@ -4208,13 +4208,15 @@ descriptions:
     <video src="gallery/nbody_cluster.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">N-body cluster<span class="sim-spec"><pre># nbody_cluster -- gravitational N-body collapse via the unified `squared_law` operator
-# (law: gravity, all_pairs). After Philip Mocz, &quot;Create Your Own N-body Simulation
-# (With Python)&quot; (2020), vendored at papers/nbody-python/ (MIT).
+# (law: gravity, all_pairs). After Philip Mocz, "Create Your Own N-body Simulation
+# (With Python)" (2020), vendored at papers/nbody-python/ (MIT).
 # N=10000 stars (dense), total mass ~20 (mass/star = 0.002), softened Newtonian gravity
 # (k=G=1, eps=0.1), OPEN boundary. A colder start (vel_init 0.5) + smaller dt make the
-# collapse into a bound, orbiting cluster read gradually rather than flashing past. The
+# collapse into a bound, orbiting cluster read gradually rather than flashing past. Run for
+# 16,000 frames (4x the first pass) because at 4,000 the cluster had only just formed: what it
+# DOES once bound -- whether it stays a cluster, spins up a bar, or evaporates -- is after that.
 # all-pairs O(N^2) force is fused with torch.compile (`compile: true`) so N=10000 is cheap.
-general: {name: nbody_cluster, seed: 17, n_frames: 4000, dt: 0.0006, boundary: free, world: [4.0, 4.0]}
+general: {name: nbody_cluster, seed: 17, n_frames: 16000, dt: 0.0006, boundary: free, world: [4.0, 4.0]}
 sets:
   star:
     n: 10000
@@ -4224,22 +4226,23 @@ fields: {}
 operators:
   - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.1, all_pairs: true, compile: true}
 schedule: [squared_law]
-plotting: {background: black, point_size: 2, colors: {s: [0.7, 0.7, 1.0]}}
+plotting: {background: black, point_size: 2, colors: {s: [0.7, 0.7, 1.0]}, movie_max_frames: 480}
+# 480 movie frames, not the default 120: over 16,000 frames a 120-frame movie is a slideshow of
+# four stills per collapse, and the two clumps merge between two of them.
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
   movie_star:
-    description: A large, uniform cloud of blue particles initially fills the entire frame. Over time,
-      the particles begin to migrate toward the center of the space, forming a dense, concentrated cluster.
-      This central mass undergoes internal structural changes, shifting from a square-like shape into
-      a more elongated, horizontal band. Finally, the cluster stabilizes into a distinct, dense horizontal
-      streak surrounded by a sparse halo of scattered points.
-    objects: The primary objects are thousands of tiny, light-blue dots representing individual particles.
-      Initially, these particles are distributed in a wide, square-shaped field across the black background.
-      As the simulation progresses, the particles aggregate into a central, multi-lobed cluster with a
-      high density. In the final frames, the particles form a singular, elongated horizontal structure
-      with a fuzzy, diffuse boundary.</pre></span></span>
-      <span class="sim-cap">mutual gravity — clumps merge hierarchically</span>
+    description: A dense cluster of blue particles begins as a horizontal, elongated structure with three
+      distinct peaks. Over time, the cluster undergoes a contraction and rotation, pulling inward toward
+      a central point. The three peaks merge into a single, more compact and vertically oriented mass.
+      By the final frame, the cluster has stabilized into a concentrated, roughly elliptical shape.
+    objects: The scene contains thousands of tiny, light-blue dots representing particles. These particles
+      are initially arranged in a loose, horizontal chain with three prominent concentrations. As the
+      simulation progresses, the particles move closer together, changing the topology from a multi-peaked
+      chain to a single unified cluster. The size of each individual particle remains constant throughout
+      the entire sequence.</pre></span></span>
+      <span class="sim-cap">mutual gravity — four clumps merge into one bound cluster, which stays bound inside a halo that keeps evaporating</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
