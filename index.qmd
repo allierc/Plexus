@@ -2105,51 +2105,67 @@ reference: Karagiannis &amp; Popel (2004) J. Biol. Chem. 279(37):39105</pre></sp
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/bm_hole_tiny.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/bm_hole_tiny_off.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">a hole that stops<span class="sim-spec"><pre>what: &gt;-
-  A TINY STABLE HOLE: 65 of 5,120 faces (1.3%), ONE connected patch, ONE rim loop over 23 edges, and it
-  has stopped -- growth over the last third of the run +0.06% of the seeded faces. The rest of the
-  basement membrane is intact at frame 400 while the tissue has quadrupled.
-
-how, and it was your lever: &gt;-
-  NOT a rate, and not the field&#x27;s mode count -- the INITIALISATION. Every earlier attempt drew MT1-MMP
-  from smooth_field, a random field with peaks all over the sheet, and then tried to make the hole small
-  by slowing the chemistry (k_deg) or sharpening the field (modes, hetero). None of that works, because
-  the field only chooses where the breach NUCLEATES and the rim then propagates until the activation
-  patch is exhausted -- so the smallest arrested hole is as big as that patch, 19% at the very best.
-  Replacing the field with ONE Gaussian cap of angular radius 20 degrees makes the source itself small,
-  and the hole is then the size of the source.
-
+  ONE hole of a controlled size, 20 degrees of source, 1.1% of the sheet gone (58 of 5,120
+  faces) in 1 rim loop(s). Part of a ladder -- 06_hole_smaller / 06_hole_tiny_off /
+  06_hole_larger / 06_hole_largest at 15, 20, 30 and 45 degrees -- run to show that the hole&#x27;s size
+  is the SOURCE&#x27;s size and not a rate.
 rig: &gt;-
-  Rig05m under the RealDriver swap, 401 frames, k_deg 150, inhibitor/K 1.0, bound 0.6, rho_crit 0.35,
-  max_refine 0. MT1-MMP is `spot_field(theta=20 deg)`: a cap centred on the CAMERA&#x27;s direction so the
-  hole faces the reader, peak held at 2.5x the published mean (the same local MT1 the random field
-  reaches), floor 2% of the peak, and the inhibitor and proMMP2 fields made uniform so that only one
-  thing is localised.
-
-there is a floor to how small, and it is the diffusion length: &gt;-
-  A 10-degree spot tears NOTHING at k_deg 80 and 11 faces at k_deg 150; the 20-degree spot tears 4 and
-  65. Below about 20 degrees the source is smaller than the length proMMP2 diffuses before it is used,
-  so no local concentration builds -- and G42 already recorded that this chemistry&#x27;s own length,
-  sqrt(D/k) = 0.05, is BELOW the sheet&#x27;s element size h = 0.076. A hole smaller than this one is not a
-  parameter away; it needs the chemistry resolved, which is G42&#x27;s failure and not a knob.
-
-two criteria, and they disagree here on purpose: &gt;-
-  `verdict` calls this "neither", because it was written for the big-hole runs and asks for &gt;= 3% of
-  faces gone. `stable_verdict` calls it STABLE HOLE: 1-20% torn, largest patch &gt;= 20 faces, growth over
-  the last third &lt;= 2%. Both are recorded rather than reconciled -- the first measures whether a breach
-  happened at the scale 05h1 was about, the second whether one is small and has stopped.</pre></span></span>
-      <span class="sim-cap">The balance broken in ONE place: 65 of 5,120 faces, a single patch with 1 rim loop, and it has stopped growing. It took a localised source — a 20° cap of MT1-MMP — and not a slower rate</span>
+  Rig05m under the RealDriver swap, 401 frames, k_deg 150, inhibitor/K 1.0, bound 0.6,
+  rho_crit 0.35, max_refine 0. MT1-MMP is a single Gaussian cap of angular radius 20 degrees with
+  its peak held at 2.5x the published mean; TIMP-2 and proMMP-2 sources uniform.
+off_axis: &gt;-
+  The cap is tilted 45 degrees off the camera&#x27;s own direction, toward screen-up. On the view axis a
+  cap is seen face-on and reads as a disc, with the rim, the standoff and the epithelium showing
+  through it all foreshortened onto each other. Off-axis the rim reads as a rim. It is the SOURCE
+  that is rotated, not the camera -- the other three panels keep 06&#x27;s framing.
+the ladder, all at 401 frames, all a single connected patch:
+  15deg: 39 faces (0.8%), 1 rim loop
+  20deg: 58 faces (1.1%), 1 rim loop
+  30deg: 144 faces (2.8%), 1 rim loop
+  45deg: 431 faces (8.4%), 2 rim loops
+  reading: &gt;-
+    the torn area tracks the cap&#x27;s area rather than k_deg, which is the point of the whole sweep that
+    preceded it: across 3/6/12/20 modes and hetero 1/2/3 on a RANDOM field, the rim always propagated
+    until the activation patch was exhausted, so the smallest arrested hole was 19% of the sheet. With
+    a localised source the hole is the source, from 0.8% upward.
+floor: &gt;-
+  Below about 15 degrees nothing survives to tear: a 10-degree cap gives 0 faces at k_deg 80 and 11 at
+  150, because the source is then shorter than sqrt(D/k) = 0.05 -- which G42 already records as being
+  below the sheet&#x27;s element size h = 0.076. The bottom of this ladder is a diffusion length, not a
+  parameter.</pre></span></span>
+      <span class="sim-cap">The balance broken in ONE place: 58 of 5,120 faces, 1 rim loop, and it has stopped. The size is the SOURCE's — a 20° cap of MT1-MMP, tilted 45° off the view axis so the rim reads as a rim</span>
     </figcaption>
   </figure>
 </div>
-<p class="opk">And the same chemistry with no small source to hold it:</p>
+<p class="opk">And with a random source rather than a cap — arrested, then not:</p>
 <div class="sim-gallery g3">
+  <figure class="sim-card">
+    <video src="gallery/bm_hole_small.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">a bigger one, still arrested<span class="sim-spec"><pre>what: &gt;-
+  The same experiment as 06_hole_one with ONE thing changed -- the random seed of the MT1-MMP field --
+  and it lands at 952 of 5,120 faces (18.6%) in one patch (99.6% of the torn set, 4 rim loops over 126
+  edges) against 31.5% for seed 3. It meets the stable-hole criterion: 19.0% torn at the probe, one
+  patch of 969, growth +1.54% over the last third.
+
+why it is worth a folder: &gt;-
+  THE REALISATION IS A PARAMETER. Identical rig, identical k_deg 80, identical 3-mode field at hetero 2
+  -- only seed_mt1 differs, 3 -&gt; 11 -- and the hole goes from a third of the sheet to a fifth. Seed 23
+  gives 20.3% at +0.76%. So any single number quoted for "the hole size at this phase point" carries a
+  spread of about half its own value, and the sweep table in 06_hole_one/what.yaml should be read with
+  that in mind.
+
+rig: Rig05m under RealDriver, 401 frames, k_deg 80, 3 modes, hetero 2.0, seed_mt1 11, rho_crit 0.35</pre></span></span>
+      <span class="sim-cap">No cap this time, a random MT1-MMP field: 952 faces gone (19% of the sheet) in one patch with 4 rim loops, and it too stops. Change only the seed and the same phase point tears 31.5% — a hole size here carries a spread of half its own value</span>
+    </figcaption>
+  </figure>
   <figure class="sim-card">
     <video src="gallery/bm_breach_sheet.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">a hole that does not<span class="sim-spec"><pre>what: &gt;-
+      <span class="sim-name" tabindex="0">one that does not<span class="sim-spec"><pre>what: &gt;-
   06 with the protease on at 05h_1_hetero&#x27;s published point: ONE hole opens in the basement membrane of
   a growing spheroid. Same tissue replay, same matrix trajectory, same camera as 06_spheroid_bm_ecm;
   the sheet&#x27;s rig is the only difference.
@@ -2170,7 +2186,7 @@ run_after_a_bug_fix: &gt;-
   of the torn set). RealDriver now rebuilds the fields on the new epithelium from the same seeds, and
   neighbouring cells differ by 3.3% of the field&#x27;s spread instead of by a random draw. 05m_protease
   carries the old defect and its breach pattern should not be trusted.</pre></span></span>
-      <span class="sim-cap">Broken everywhere at once instead: a random MT1-MMP field, and the breach is as big as its activation patch — 47% of the sheet gone, 97% of it a single hole. At cutting rate 300 it is 87% and the sheet is in pieces</span>
+      <span class="sim-cap">The breach is as big as its activation patch and does not arrest: 47% of the sheet gone, 97% of it a single hole. At cutting rate 300 it is 87% and the sheet is in pieces</span>
     </figcaption>
   </figure>
 </div>
