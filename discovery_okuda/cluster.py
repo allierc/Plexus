@@ -173,7 +173,11 @@ def _job_script(name, frames, do_q, campaign, rerender=False):
            "kburns": f"conda run -n {ENV} python kburns_render.py --force {name}",
            # seq 3 = both styles, without the cell outlines then with: four clips, 1,020 frames,
            # about 20 s of VTK against the 30-40 minutes the run itself cost.
-           "vtk": f"conda run -n {ENV} python vtk_render.py {name} --seq 3",
+           # `PG_VTK_ARGS` carries per-batch render options (e.g. `--fill 0.55`) without a
+           # second submitter: the runs whose body IS their camera box need the camera pulled back,
+           # and which runs those are is a property of the batch, not of the cluster.
+           "vtk": (f"conda run -n {ENV} python vtk_render.py {name} --seq 3 "
+                   f"{os.environ.get('PG_VTK_ARGS', '')}").rstrip(),
            }.get(rerender if isinstance(rerender, str) else ("movie" if rerender else ""),
                  f"conda run -n {ENV} python run_one.py {name}{fr}{q} "
                  f"--device cuda:0 --campaign {campaign}")
@@ -453,7 +457,12 @@ def _is_working(job_id, ids, min_frac=0.5):
 
 
 def wait_for_ids(ids, poll=POLL_S, timeout_h=24, straggler_factor=4.0, min_straggler_min=25,
-                 hard_cap_min=float(os.environ.get("PG_ROUND_CAP", "90"))):
+                 hard_cap_min=float(os.environ.get("PG_ROUND_CAP", "90")),
+                 # HOW LONG A STOPPED JOB IS GIVEN TO WRITE ITS RESULTS. Not a second cap on the
+                 # run -- the simulation is already over by then -- but on the assemble, measure
+                 # and render that follow. See the salvage block below for why this replaced a
+                 # flat 90 seconds.
+                 salvage_min=float(os.environ.get("PG_SALVAGE_MIN", "12"))):
     """Block until every submitted JOB ID reaches a terminal state. IDs, not names.
 
     STRAGGLER KILL -- why this is not optional for a weeks-long campaign.
@@ -527,8 +536,35 @@ def wait_for_ids(ids, poll=POLL_S, timeout_h=24, straggler_factor=4.0, min_strag
                       f"job(s) so the round can close. Each is SIGTERMed and salvages the frames "
                       f"it reached.", flush=True)
                 _ssh_retry("bkill -s TERM " + " ".join(still))
-                # a moment for run_one to catch the signal, assemble and write its diag
-                time.sleep(90)
+                # WAIT FOR THE SALVAGE, DO NOT GUESS AT IT. This was `time.sleep(90)`, and the
+                # comment beside it -- "Nothing is discarded: a SIGTERMed run salvages the frames
+                # it reached" -- was false for the whole campaign. Measured over r013-r021: 45 of
+                # 136 runs produced no metrics at all, 37 of them SIGTERMed here at 90-94 minutes,
+                # and `stopped_early` appears in ZERO of 330 records. Not one salvage ever landed.
+                #
+                # Ninety seconds was the reason. After the signal, run_one still has to assemble
+                # the trajectory, run tissue_analysis and morphology over it, write the metrics and
+                # render -- minutes of work on a 66,000-cell body, and FIVE runs of that batch died
+                # in `analysing` having completed all 1,800 frames, which is the same shortfall
+                # without the kill. A fixed sleep cannot know how big the tissue is; the file
+                # system can say when the work is done.
+                #
+                # So: poll for the diag.json each job owes, up to `salvage_min`. It returns the
+                # moment they have all landed, so a batch of small runs costs nothing extra, and a
+                # batch of enormous ones is given the time it actually needs.
+                _want = {i: id_to_name.get(i) for i in still}
+                _t1, _left = time.time(), dict(_want)
+                while _left and (time.time() - _t1) < salvage_min * 60:
+                    time.sleep(15)
+                    for _i, _n in list(_left.items()):
+                        if _n and os.path.exists(os.path.join(LOG_ROOT, _n, "diag.json")):
+                            del _left[_i]
+                _got = len(_want) - len(_left)
+                print(f"[cluster] salvage: {_got}/{len(_want)} stopped job(s) wrote a diag.json "
+                      f"in {(time.time() - _t1) / 60:.1f} min"
+                      + ("" if not _left else
+                         f"; {len(_left)} did not -- {', '.join(str(v) for v in _left.values())}"),
+                      flush=True)
                 killed |= set(still)
             return {"ok": not killed, "done": sorted(finished_at), "exit": [],
                     "killed": sorted(killed), "timed_out": False}

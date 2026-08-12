@@ -379,7 +379,7 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     class _Stopped(Exception):
         pass
 
-    _stop = {"hit": False}
+    _stop = {"hit": False, "why": None}
 
     def _on_signal(_sig, _frm):
         _stop["hit"] = True                      # do not raise here -- unwinding C code is unsafe
@@ -392,11 +392,46 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
 
     _live = {}
 
+    # THE RUNTIME CELL CEILING. A run that crosses it stops ITSELF, cleanly, through the same
+    # salvage path a SIGTERM uses -- so it lands as a complete diag.json over a shorter trajectory
+    # instead of as nothing.
+    #
+    # WHY A CEILING AND NOT A PREDICTION. The obvious fix was to refuse these compositions before
+    # they run, and it does not work: projecting wall time from `grow_3d.rate` gives a median of 26
+    # minutes for the runs that DIED and 26 for the runs that finished -- no discriminating power
+    # at all. The strongest single correlate of the final cell count is rate at 0.50 and K_V at
+    # -0.49, which is not enough to refuse on. What makes a run reach 66,000 cells is the
+    # interaction of growth, the activator gate and division, and the honest way to bound an
+    # interaction you cannot predict is to measure it while it runs.
+    #
+    # 25,000 IS WHERE THE EVIDENCE IS. Measured over r013-r021: the 91 runs that finished have a
+    # median of 6,194 cells and a maximum of 50,532; the 42 that died sit at a median of 65,684.
+    # A body past 25,000 has already answered "does this composition overgrow" -- everything after
+    # that is spent measuring a reservoir, and it is what pushes a run past the 90-minute round cap
+    # into producing nothing whatsoever. `_run.cell_ceiling: 0` in a spec turns it off for a run
+    # that genuinely wants to be enormous.
+    _ceiling = int(os.environ.get("OKUDA_CELL_CEILING",
+                                  (cfg.get("_run") or {}).get("cell_ceiling", 25000)))
+
     def _beat_or_stop(H, tick, phase="simulating", force=False):
         _live["H"] = H                            # on_frame is handed H; keep it for the salvage
         _beat(H, tick, phase=phase, force=force)
         if _stop["hit"]:
+            _stop["why"] = _stop.get("why") or "signal"
             raise _Stopped(tick)
+        if _ceiling > 0:
+            try:
+                _m = getattr(H.level("vertex"), "_mesh", None) or {}
+                if int(_m["nF"]) >= _ceiling:
+                    _stop["why"] = f"cell ceiling {_ceiling}"
+                    print(f"[{name}] CELL CEILING {_ceiling} reached at frame {tick} -- stopping "
+                          f"cleanly and keeping the trajectory so far. This run is evidence about "
+                          f"a tissue that grew to {_ceiling}, not a run that failed.", flush=True)
+                    raise _Stopped(tick)
+            except _Stopped:
+                raise
+            except Exception:
+                pass                              # never let the ceiling check take a run down
 
     stopped_early = None
     try:
@@ -408,8 +443,9 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
         # rows actually written: the recorded ticks at or before the stop
         _rows = sum(1 for _t in getattr(Hf, '_rec_index', {}) if _t <= stopped_early) or 1
         out = _E._assemble(Hf, *Hf._rec, n_rows=_rows)
-        print(f"[{name}] STOPPED EARLY at frame {stopped_early} -- assembling the trajectory "
-              f"reached so far; this run is evidence about those frames", flush=True)
+        print(f"[{name}] STOPPED EARLY at frame {stopped_early} ({_stop.get('why') or 'signal'}) "
+              f"-- assembling the trajectory reached so far; this run is evidence about those "
+              f"frames", flush=True)
     # THE LAST BEAT. The heartbeat fires from on_frame, so it stopped the instant the loop ended
     # -- and everything after this line (tissue_analysis, morphology, the movie, the strip) takes
     # minutes. A run that had FINISHED its 900 frames therefore went silent and was killed as
@@ -997,6 +1033,11 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
                # indistinguishable in the record, and every `_final` metric would silently mean
                # two different things.
                "stopped_early": stopped_early,
+               # AND WHY. `stopped_early` alone says a run is short; it does not say whether the
+               # clock ran out, a signal arrived, or the tissue hit its own ceiling -- and those
+               # are three different findings. A ceiling stop is a RESULT about an overgrowing
+               # composition; a signal stop is a fact about the queue.
+               "stopped_reason": (_stop.get("why") if stopped_early is not None else None),
                "run_id": rec.run_id},
               open(os.path.join(out_dir, "diag.json"), "w"), indent=1)
     return summary
