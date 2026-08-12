@@ -73,6 +73,13 @@ def solve_sheet(path, dev, frames, stride, break_load=None, kn=5.0, xi=0.0):
     if reached != frames:
         raise SystemExit(f"[06] the sheet DIVERGED at frame {reached} of {frames} -- no panel")
 
+    from spec_06 import write_spec
+    write_spec(os.path.dirname(path), rig, name=os.path.basename(os.path.dirname(path)),
+               frames=frames, matrix_src=SRC,
+               extra=dict(kind="mechanical", break_load=break_load, stride=stride,
+                          lam_geo_end=rig.res["lam_geo"][-1],
+                          momentum_max=max(rig.res["momentum"]),
+                          bound_end=rig.res["bound"][-1], standoff_end=rig.res["standoff"][-1]))
     F = rig.sheet.Fc.cpu().numpy().astype(np.int32)
     store = {}
     for i, (t, X, L, XE, nod, PP) in enumerate(kept):
