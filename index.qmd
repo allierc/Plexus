@@ -40,7 +40,7 @@ The central hypothesis of Plexus is that a large fraction of existing biological
 simulation models can be expressed as compositions of a small number of elementary
 operator families. The proposed algebra consists of **seven**:
 
-![The elementary operator algebra of Plexus. Lateral, Aggregate, Broadcast and Exchange transform biological state. Rewire modifies biological relations, whereas Divide and Die modify biological entities. Complex biological models are obtained by composing these elementary operator families.](figures/fig_ops.png){width=100% fig-align="center"}
+![](figures/fig_ops.png){width=100% fig-align="center"}
 
 - **Lateral** — interactions within a biological set.
 - **Aggregate ↑** and **Broadcast ↓** — many-to-one and one-to-many transformations
