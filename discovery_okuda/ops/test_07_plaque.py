@@ -115,9 +115,14 @@ def measure(run):
         # that is merely carried outward by a growing tissue has a length that changes and a slip of
         # zero; one whose anchor slides across the face it is bound to has both. Only the same
         # plaques can be compared, so this is skipped whenever the set changes size.
-        if prev is not None and prev[0].shape == a.shape:
-            S["slip"].append(float((np.linalg.norm((a - prev[0]) - (b - prev[1]), axis=1)
-                                    * um).mean()))
+        # COMPARE THE PLAQUES THAT EXIST IN BOTH FRAMES, not only runs where the count is constant.
+        # The set is append-only, so the first k entries are the same plaques; requiring equal shapes
+        # made this NaN on almost every frame of a run whose count changes at nearly every step --
+        # a panel with a curve in it that could not be drawn.
+        if prev is not None and len(prev[0]) and len(a):
+            k = min(len(prev[0]), len(a))
+            S["slip"].append(float((np.linalg.norm((a[:k] - prev[0][:k]) - (b[:k] - prev[1][:k]),
+                                                   axis=1) * um).mean()))
         else:
             S["slip"].append(float("nan"))
         prev = (a.copy(), b.copy())
@@ -268,8 +273,8 @@ def panel_plots(S, i, l0_um, W, H, dpi=100):
             a_.spines[sp].set_visible(False)
         for sp in ("bottom", "left"):
             a_.spines[sp].set_color("#888")
-        a_.tick_params(colors="#aaa", labelsize=6.5)
-        a_.set_xlabel("frame", color="#aaa", fontsize=6.5)
+        a_.tick_params(colors="#ccc", labelsize=10)
+        a_.set_xlabel("frame", color="#ccc", fontsize=10)
     ax[0, 0].set_xlabel("")                                # no label: it would shrink the cell the
     ax[0, 0].axis("off")                                   # 3D view is pasted into
 
@@ -281,23 +286,22 @@ def panel_plots(S, i, l0_um, W, H, dpi=100):
     A.axhline(l0_um, color="#3cc46a", lw=0.9, ls=":", label="$l_0$ = %.2f um" % l0_um)
     A.axhline(GATE_MULT * l0_um, color="#ff2d2d", lw=0.9, ls="--",
               label="G50 = 3$l_0$ = %.2f um" % (GATE_MULT * l0_um))
-    A.set_ylabel("plaque length, um", color="#ddd", fontsize=7.5)
-    A.legend(fontsize=5.6, labelcolor="#ccc", facecolor="black", edgecolor="#555", loc="upper left")
+    A.set_ylabel("plaque length, um", color="#eee", fontsize=11)
+    A.legend(fontsize=9, labelcolor="#ddd", facecolor="black", edgecolor="#555", loc="upper left")
 
     A = ax[0, 2]
     A.plot(t, S["n"], color="white", lw=1.6, label="all")
     A.plot(t, S["n_hold"], color="#7ab8ff", lw=1.2, label="holding a live face")
-    A.set_ylabel("plaques", color="#ddd", fontsize=7.5)
-    A.legend(fontsize=5.8, labelcolor="#ccc", facecolor="black", edgecolor="#555", loc="best")
+    A.set_ylabel("plaques", color="#eee", fontsize=11)
+    A.legend(fontsize=9, labelcolor="#ddd", facecolor="black", edgecolor="#555", loc="best")
 
     A = ax[0, 3]
     A.plot(t, 100.0 * np.asarray(S["over"]), color="#ff2d2d", lw=1.4)
-    A.set_ylabel("%% of plaques over 3$l_0$", color="#ddd", fontsize=7.5)
-    A.set_ylim(-2, 102)
+    A.set_ylabel("%% of plaques over 3$l_0$", color="#eee", fontsize=11)
 
     A = ax[1, 0]
     A.plot(t, S["slip"], color="#f0c04a", lw=1.3)
-    A.set_ylabel("slip of the two anchors\num per kept frame", color="#ddd", fontsize=7.5)
+    A.set_ylabel("slip of the two anchors\num per kept frame", color="#eee", fontsize=11)
 
     # ---- the three that answer "how far into the spheroid"
     pm, ps = np.asarray(S["pen_mean"]), np.asarray(S["pen_sd"])
@@ -308,25 +312,23 @@ def panel_plots(S, i, l0_um, W, H, dpi=100):
     # was in plots a RADIUS: two quantities on one axis, agreeing only by accident of scale.
     A.plot(t, S["pen_max"], color="#ff2d2d", lw=1.0, label="deepest")
     A.axhline(0.0, color="#3cc46a", lw=0.9, ls=":")
-    A.set_ylabel("membrane INTO the tissue, um\nmean$\\pm$SD (>0 = inside)", color="#ddd",
-                 fontsize=7.5)
-    A.legend(fontsize=5.8, labelcolor="#ccc", facecolor="black", edgecolor="#555", loc="best")
+    A.set_ylabel("membrane INTO the tissue, um\nmean$\\pm$SD (>0 = inside)", color="#eee", fontsize=11)
+    A.legend(fontsize=9, labelcolor="#ddd", facecolor="black", edgecolor="#555", loc="best")
 
     A = ax[1, 2]
     A.plot(t, 100.0 * np.asarray(S["pen_frac"]), color="#ff7ad9", lw=1.5)
-    A.set_ylabel("%% of plaques with the sheet\nINSIDE the epithelium", color="#ddd", fontsize=7.5)
-    A.set_ylim(-2, 102)
+    A.set_ylabel("%% of plaques with the sheet\nINSIDE the epithelium", color="#eee", fontsize=11)
 
     A = ax[1, 3]
     A.plot(t, S["r_epi"], color=[v / 255 for v in (232, 220, 190)], lw=1.5, label="epithelium")
     A.plot(t, S["r_bm"], color="#ff9a6a", lw=1.5, label="membrane")
-    A.set_ylabel("mean radius, um", color="#ddd", fontsize=7.5)
-    A.legend(fontsize=5.8, labelcolor="#ccc", facecolor="black", edgecolor="#555", loc="best")
+    A.set_ylabel("mean radius, um", color="#eee", fontsize=11)
+    A.legend(fontsize=9, labelcolor="#ddd", facecolor="black", edgecolor="#555", loc="best")
 
     for a_ in ax.ravel()[1:]:
         a_.axvline(t[i], color="#ffffff", lw=0.8, alpha=0.55)
     fig.text(0.5, 0.988, "07 plaque length and penetration -- an integrin cluster spans 0.04 um; "
-                         "$l_0$ = %.2f um" % l0_um, color="#ddd", fontsize=9, ha="center", va="top")
+                         "$l_0$ = %.2f um" % l0_um, color="#eee", fontsize=13, ha="center", va="top")
     fig.tight_layout(rect=(0, 0, 1, 0.972))
     fig.canvas.draw()
     img = np.asarray(fig.canvas.buffer_rgba())[:, :, :3].copy()
