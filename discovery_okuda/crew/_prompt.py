@@ -70,6 +70,25 @@ def schema():
     return t
 
 
+def strip_note():
+    """`strip.md` -- what the rendered contact sheet actually IS, shown to whoever looks at it.
+
+    A THIRD REFERENCE FILE, for the same reason as `schema()` above and with a sharper bill. The Eye
+    was shown `strip.png` for the whole campaign and never told what its four rows were, so it read
+    row 3 -- a per-frame contrast stretch of cell RADIUS -- as chemistry, and reported "a blue/yellow
+    field demixing into large domains" on run after run. That sentence describes a geometry panel
+    doing exactly what it is built to do on a sphere.
+
+    Kept out of `eye.md` because it describes the ARTEFACT, not the role: the Forecaster never sees a
+    strip and must not be given this, while anything else that ever looks at one should be.
+    """
+    t = _read(os.path.join(HERE, "strip.md"))
+    if not t:
+        print("[crew] strip.md is missing -- the eye is looking at four rows it has not been told "
+              "apart, and row 3 is not chemistry")
+    return t
+
+
 def block(title, payload, *, as_json=True, limit=None):
     """One labelled section of data. Empty payloads are dropped, not printed as 'None'.
 

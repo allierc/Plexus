@@ -126,7 +126,7 @@ shape: a sphere can be ruffled and a star can be smooth.
 ### chem
 
 
-**anchors:** `tips` `troughs` `crests` `spots` `stripes` `patches` `uniform` `banded` `absent` `scattered` `pole` `red` `green` `co-located` `anti-correlated` `complementary` `segregated` `overlapping`
+**anchors:** `tips` `troughs` `crests` `spots` `stripes` `patches` `uniform` `banded` `absent` `scattered` `pole` `first` `second` `co-located` `anti-correlated` `complementary` `segregated` `overlapping`
 
 Where the red is, **relative to the shape** — `at the tips`, `in the troughs`, `uniform`, `banded`,
 `one spot`, `absent`. Not how much of it there is. The relation is the informative part: activator
@@ -135,26 +135,42 @@ the same amount of red.
 
 ### A SECOND MORPHOGEN, WHEN THERE IS ONE
 
-Cedric, 13 August: *"at some point we will add a green morphogen, prepare it already."* The anchors
-above already carry it -- `red`, `green`, and the four words for how two species sit relative to
-each other: `co-located`, `anti-correlated`, `complementary`, `segregated`.
+Cedric, 13 August: *"at some point we will add a green morphogen, prepare it already"* -- and then,
+correcting it the same day: *"note the greens are the cell division, so I'm messing up with color...
+we will change when the two morphogens color are set up."*
 
-No second slot, deliberately. A slot that does not apply yet is a slot both roles fill with
-"absent", agree on for free, and inflate the score with -- so `chem` describes whatever morphogens
-are visible, one or two, in one line. When there is only red, name it or do not; when there are two,
-name both and say **how they relate**, because that is the whole content of a two-species system:
-Gray-Scott's activator and inhibitor are anti-correlated by construction, and a run where they come
-out co-located has broken something the campaign believes.
+**SO THE ANCHORS NAME NO COLOUR, AND THAT IS THE POINT.** They are `first` and `second` — the
+species, not the paint. The colour a species is drawn in is a RENDERER decision that has already
+changed once and is about to change again; the relation between two morphogens is a fact about the
+tissue. Binding the schema to a colour would mean that re-mapping the palette silently re-scores
+every run in the campaign, and the anchors would still look correct.
 
-    chem: red at the tips, green in the troughs, anti-correlated
-    chem: red spots, green uniform
-    chem: red and green co-located, both scattered
+**GREEN IS NOT A CHEMICAL.** On the tissue, a green tint marks a cell that has RECENTLY DIVIDED --
+`caption_wave.py`'s layout constant has said so all along, and the Eye has never been shown it. Do
+not put green in `chem`. A green cell belongs in `time` (division is still happening) or in `free`.
 
-THIS IS ALREADY LIVE, WHICH IS WHY IT IS WORTH PREPARING NOW RATHER THAN LATER. The strip already
-renders a second field for some compositions: on `b_bru_cones9` the Eye reported, unprompted and
-with nowhere to put it, *"blue/yellow field demixes into large domains"* -- an observation about a
-second species that fell into `free` because no slot could hold it. When the green morphogen lands,
-that observation belongs here and will be scored.
+No second slot for the second species, deliberately. A slot that does not apply yet is a slot both
+roles fill with "absent", agree on for free, and inflate the score with — so `chem` describes
+whatever chemistry is visible, one species or two, in one line. With one, say where it is. With two,
+say where each is and **how they relate**, because that relation is the whole content of a
+two-species system: Gray-Scott's activator and inhibitor are anti-correlated by construction, and a
+run where they come out co-located has broken something the campaign believes.
+
+    chem: at the tips, one spot per arm
+    chem: first at the tips, second in the troughs, anti-correlated
+    chem: first scattered spots, second uniform
+
+WHEN THE COLOURS ARE SETTLED, this section gets one line naming which colour is which species, and
+the anchors do not change.
+
+AND THE RENDER AUDIT OF 13 AUGUST SAYS THE COLOURS CANNOT SIMPLY BE CHOSEN. The hue circle on this
+artefact is full: red-to-maroon is the activator ramp, amber and yellow are the branch and tip
+classes, green is recent division, teal is growth inhibition, blue is marked-to-die and body-class,
+magenta is the alarm, black is background and cell edges, white is low activator. The only
+unclaimed band is a narrow deep violet, confused with the maroon top of the activator ramp at low
+luminance and with the alarm magenta at high. So **a second morphogen needs its own ROW, not its own
+hue** -- and the thing that has to change to give it one is the `[:3]` slice at `run_one.py:1389`,
+which currently discards `act_b` on every render call. See `crew/strip.md`.
 
 ### time
 
