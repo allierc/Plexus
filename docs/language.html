@@ -308,15 +308,16 @@ window.Quarto = {
 <section id="the-operator-algebra" class="level2">
 <h2 class="anchored" data-anchor-id="the-operator-algebra">The operator algebra</h2>
 <p>The language introduced in the previous section defines the objects manipulated by Plexus. We now define the elementary operator families from which biological models are constructed. The central hypothesis of Plexus is that a large fraction of existing biological simulation models can be expressed as compositions of a small number of elementary operator families. Rather than introducing a new operator for every biological phenomenon, Plexus identifies a compact operator algebra that can be reused across mechanics, signalling, metabolism, development and physiology.</p>
-<p>The proposed operator algebra consists of seven elementary families (see the figure below):</p>
+<p>The proposed operator algebra consists of eight elementary kinds (see the figure below):</p>
 <ul>
 <li><strong>Lateral</strong>: interactions within a biological set.</li>
 <li><strong>Aggregate</strong>: many-to-one transformations across biological scales.</li>
 <li><strong>Broadcast</strong>: one-to-many transformations across biological scales.</li>
 <li><strong>Exchange</strong>: transformations between sets and fields.</li>
+<li><strong>Field</strong>: a field’s own dynamics — diffusion, decay, reaction.</li>
 <li><strong>Rewire</strong>: modification of relations between biological entities.</li>
-<li><strong>Divide</strong>: creation of biological entities.</li>
-<li><strong>Die</strong>: removal of biological entities.</li>
+<li><strong>Structural</strong>: creation and removal of biological entities — <strong>Divide</strong> and <strong>Die</strong>.</li>
+<li><strong>Seed</strong>: the initial state, written once and never again.</li>
 </ul>
 <p>The first four families transform biological state while preserving the underlying biological organization. Rewire modifies the interaction graph, whereas Divide and Die modify the biological entities themselves. Together they form the elementary computational vocabulary of Plexus.</p>
 <div class="quarto-figure quarto-figure-center">

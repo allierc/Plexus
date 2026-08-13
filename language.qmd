@@ -131,21 +131,24 @@ number of elementary operator families. Rather than introducing a new operator f
 every biological phenomenon, Plexus identifies a compact operator algebra that can
 be reused across mechanics, signalling, metabolism, development and physiology.
 
-The proposed operator algebra consists of seven elementary families (see the figure
+The proposed operator algebra consists of eight elementary kinds (see the figure
 below):
 
 - **Lateral**: interactions within a biological set.
 - **Aggregate**: many-to-one transformations across biological scales.
 - **Broadcast**: one-to-many transformations across biological scales.
 - **Exchange**: transformations between sets and fields.
+- **Field**: a field's own dynamics — diffusion, decay, reaction.
 - **Rewire**: modification of relations between biological entities.
-- **Divide**: creation of biological entities.
-- **Die**: removal of biological entities.
+- **Structural**: creation and removal of biological entities — **Divide** and **Die**.
+- **Seed**: the initial state, written once and never again.
 
-The first four families transform biological state while preserving the underlying
-biological organization. Rewire modifies the interaction graph, whereas Divide and
-Die modify the biological entities themselves. Together they form the elementary
-computational vocabulary of Plexus.
+The first four kinds transform the state of a set while preserving the underlying
+biological organization, and Field does the same for a field. Rewire modifies the
+interaction graph, whereas Structural modifies the biological entities themselves.
+Seed stands apart: it writes what the others then evolve. Together they form the
+elementary computational vocabulary of Plexus, and the implementation recognises
+exactly these eight.
 
 ![](figures/fig_ops.png){width=100% fig-align="center"}
 
@@ -173,9 +176,15 @@ changing the entities themselves. They update neighbour graphs, contact networks
 developmental connectivity or other interaction structures, determining which
 entities participate in subsequent operator evaluations.
 
-**Divide and Die.** Living systems continuously modify their own composition. Divide
-creates new biological entities, whereas Die removes existing ones. These operators
-modify the biological organization itself rather than only its state.
+**Structural.** Living systems continuously modify their own composition. This kind has
+two operators: Divide creates new biological entities, whereas Die removes existing ones.
+They modify the biological organization itself rather than only its state.
+
+**Field.** Field operators are the self-dynamics of a continuous field — diffusion, decay,
+reaction — mapping a field to itself without touching any set.
+
+**Seed.** Seed operators write a set's initial state, once. They are gated to the first frame,
+so an initial condition cannot silently become a boundary condition applied at every step.
 
 ## Composing biological mechanisms
 

@@ -861,7 +861,7 @@ def render_operators() -> str:
                        "How state moves &mdash; grouped by family, in the visual language of the operator algebra")
     out.append("Each operator belongs to one of the elementary **families** of the "
                "[operator algebra](language.qmd) &mdash; Lateral, Aggregate, Broadcast, Exchange, "
-               "Rewire, Divide and Die; the logo marks the family (`paper/fig_ops.tex`). The registry "
+               "Field, Rewire, Structural (Divide and Die) and Seed; the logo marks the kind "
                "also exposes a **field** self-dynamics kind (a field&rsquo;s own update).")
     out.append("")
     for kind in KIND_ORDER:
