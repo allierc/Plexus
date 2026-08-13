@@ -269,11 +269,31 @@ METRIC_NOTES = metrics.notes()   # each quantity's note is its class docstring i
 # =================================================================================================
 # DERIVED. The bank is generated, so a quantity cannot be added without its six reductions and a
 # reduction cannot exist for a quantity nobody declared.
+# KNOWN is what the scorer can PARSE; `metrics.names()` is what a prediction may REST ON. The two
+# are deliberately different sizes: the archive is full of predictions written against names the
+# 13 August gate has since retired, and a prediction that can no longer be parsed cannot be
+# re-scored, re-read, or honestly retracted -- it just becomes an error in a log. So every name the
+# substrate has ever produced stays PARSEABLE here, and `admitted()` below is what refuses a NEW
+# one.
 KNOWN_METRICS = (
     tuple(q + s for q in SERIES_QUANTITIES for s in SUFFIXES)
     + SCALAR_QUANTITIES
     + REJECTED_METRICS
 )
+
+
+def admitted(name):
+    """May a NEW prediction rest on this name? The gated ten, plus their bare-name aliases.
+
+    THE GATE MOVED AND THIS FOLLOWED IT. Until 13 August `metrics.names()` returned 127 names
+    admitted by a hand-set flag; it now returns the ten that clear 3x their own measured seed floor
+    and span the five questions, re-derivable by `tools/audit_metric_bank.py`. Two of the retired
+    names -- `protrusion_aspect_max_final` and `n_tips_final` -- resolve 2.44x and 2.78x, and
+    together classify the campaign's own phenotype montage at 58.6% against a 53.1% baseline. A
+    prediction resting on either was a coin toss with a number on it.
+    """
+    n = ALIAS.get(name, name)
+    return n in metrics.names()
 
 # A BARE QUANTITY NAME MEANS `_final`, and it is an ALIAS rather than an admitted name. The
 # distinction matters twice: `t_no_final_twins` forbids a bank that holds both `act_cv` and
