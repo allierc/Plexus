@@ -15,10 +15,24 @@ role can substitute for, disagreeing with both the metric and the other roles on
 batch. And it is the CHEAPEST role in the loop -- 26 calls, 6.2 minutes, 3.7% of the round. Removing
 it would have saved 4% and cost the only channel that looks at the picture.
 
-IT IS HANDED THE METRICS ON PURPOSE, which is the one design choice here worth defending. A blind
-eye cannot say "the number says sphere and I see lobes", and that sentence is the whole reason to
-keep it. The risk is anchoring -- a model told the answer tends to agree with it -- so `eye.md`
-spends its opening paragraph on the fact that agreeing costs the campaign 4% for nothing.
+IT IS NO LONGER HANDED THE METRICS, and that reverses what this docstring used to defend, so the
+reversal is written here rather than deleted. The old argument was that a blind eye cannot say "the
+number says sphere and I see lobes". True, and the campaign is not giving that sentence up -- it is
+being computed instead of asked for. Since 13 August the eye writes the SIX SLOTS of
+`crew/description.md`, which land on the record beside the metrics, so a disagreement between what
+was seen and what was measured is arithmetic over two recorded columns and does not depend on the
+model noticing it.
+
+What the metrics could only ever do to the judgement is anchor it. Cedric, 13 August: *"the eye
+should only see the mp4 the strip with some overall instructions but not specific from the proposer,
+the spec."* The blindness is now load-bearing twice over: the eye's slots are half of the foresight
+score (`foresight.py`), and a score whose two halves can see each other measures their agreement
+rather than the campaign's understanding.
+
+WHAT STILL GETS THROUGH, AND WHY IT IS NOT A LEAK. The camera box. It is a property of the PICTURE,
+not of the OUTCOME -- the same fact the scale bar in the corner already carries in pixels -- and
+without it the eye cannot tell a 2,000-cell sphere from a 53,000-cell one, because the box is chosen
+per run so every run fills its own frame. It says how big the frame is, never what happened in it.
 """
 from __future__ import annotations
 
@@ -34,8 +48,13 @@ for _p in (ROOT, os.path.join(ROOT, "agents")):
 from . import _prompt
 
 ROLE = {
+    # `metrics` IS STILL WANTED, AND IT IS NOT SHOWN TO THE MODEL. The scale note below is built
+    # from `camera_lbox`, which lives in the metrics bundle -- so the node must still be given it or
+    # the eye loses the scale bar. What changed is that no metric reaches the PROMPT. Dropping it
+    # from `wants` would also trip the flow's own check, which refuses a node declaring an input its
+    # module never reads.
     "wants": ["item", "metrics"],
-    "writes": "one description per run",
+    "writes": "one six-slot description per run",
     "md": "eye.md",
 }
 
@@ -54,20 +73,6 @@ def _picture(run_dir):
         if os.path.exists(p):
             return p
     return None
-
-
-def _own(bundle, name):
-    """This run's metrics out of the batch's, whatever shape the round handed over.
-
-    THE ROLE SLICES, NOT THE ROUND. The round fans this node out over the run names and hands each
-    call the whole context, so `metrics` is {name: summary} for the entire batch. For the round to
-    slice it would have to know that `metrics` is keyed by the thing it fans out over -- exactly the
-    role knowledge it is built not to have.
-    """
-    m = bundle.get("metrics")
-    if isinstance(m, dict) and isinstance(m.get(name), dict):
-        return m[name]
-    return m
 
 
 def _scale_note(bundle, name):
@@ -120,16 +125,12 @@ def run(bundle):
         # has to go through it.
         ("The scale -- the camera box, and what the bar bottom-left means",
          _scale_note(bundle, name), {"as_json": False}),
-        # ITS OWN RUN'S METRICS, SLICED HERE. The round fans this node out over the run names and
-        # hands each call the WHOLE context, so `metrics` is {name: summary} for the entire batch --
-        # eleven summaries of 183 keys. The prompt came to 147,149 chars (~37k tokens) against a
-        # four-minute budget with an image read on top, and the call failed silently for every run:
-        # no line in the terminal, nothing in `observed`, and the Analyst never learned what the eye
-        # saw. Sliced, it is 25,768 chars.
-        #
-        # THE ROLE SLICES, NOT THE ROUND. The round would have to know that `metrics` is keyed by the
-        # thing it fans out over, which is exactly the role knowledge it is built not to have.
-        ("What the metrics say about this run", _own(bundle, name)),
+        # THE FORM, NOT THE METRICS. What used to sit here was this run's own measured summary; the
+        # docstring above says why it is gone. What replaces it is the schema, shown verbatim, so
+        # the eye and the Forecaster are answering one form and `foresight.py` is comparing two
+        # fillings of it rather than two essays.
+        ("The form you fill -- exactly these six lines and nothing else",
+         _prompt.schema(), {"as_json": False}),
     ])
         # QUIET PER CALL. A fanned-out node runs once per run, so `[eye] 0.2 min, tools: Readx1` printed
     # eleven identical lines while the round already reports `[round] eye: 11/11`. The eye's own words

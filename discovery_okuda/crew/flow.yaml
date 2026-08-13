@@ -263,7 +263,7 @@ nodes:
   # its hand-maintained sweep table IS the coverage -- so here it is derived once a round.
   - id: coverage
     code: round.coverage
-    in: [parents]
+    in: [parents, claim_ledger]
 
   # ---- propose -------------------------------------------------------------------
   # WHAT LAST ROUND PROPOSED AND COULD NOT RUN. Cedric, 6 August, reading three red `set_impl`
@@ -542,9 +542,33 @@ nodes:
       # memory rather than by an accident of how many cells the base happened to start with.
       sweep_cells: 100000
 
+  # ---- forecast: BEFORE the jobs, or it is not a forecast --------------------------
+  # Cedric, 13 August: "the prediction from the specs, is it a new agent take the specs, the
+  # knowledge and produce the same 3-4 sentences, max word limit."
+  #
+  # `planned` is the list `launch` is about to submit, emitted early so the Forecaster can fan out
+  # over it -- the engine keys a fan-out by its item, and a spec is a dict, so the names have to
+  # exist as their own list before the jobs do.
+  - id: planned
+    code: round.planned
+    in: [specs]
+
+  # NOT GIVEN THE METRICS, THE RUN, OR THE EYE. It fills crew/description.md's six slots from the
+  # spec and what the campaign believes, and that is the whole input. See crew/forecaster.md.
+  - id: forecaster
+    agent: forecaster
+    in: [specs, history, claim_ledger]
+    each: planned
+    out: forecast
+
+  # `forecast` IN THE LAUNCHER'S `in:` IS LOAD-BEARING AND IS NOT A DATA DEPENDENCY. `launch` does
+  # not read it. It is here so the topological sort cannot start a job until every forecast has been
+  # written -- because a forecast filed after the run is a postdiction, and the two are identical on
+  # disk. Deleting this one word would silently convert every foresight score in the campaign into a
+  # measurement of nothing, and the round would still complete and still print a number.
   - id: launch
     code: round.launch
-    in: [specs]
+    in: [specs, forecast]
     out: names
 
   - id: measure
@@ -573,6 +597,11 @@ nodes:
   # ---- observe: one call per run -------------------------------------------------
   # The only role that looks at the picture. It disagreed with both the metric and the text roles on
   # 2 of 10 runs last round, and it is the cheapest node here at 3.7% of the budget.
+  # BLIND SINCE 13 AUGUST. `metrics` is still in its `in:` and no metric reaches the prompt: the
+  # module builds the SCALE BAR note from `camera_lbox`, which lives in that bundle, and without it
+  # the eye cannot tell a 2,000-cell sphere from a 53,000-cell one because the camera box is chosen
+  # per run. The box is a property of the picture; the rest of the bundle is the answer, and
+  # crew/eye.py says why it is no longer shown.
   - id: eye
     agent: eye
     in: [metrics]
@@ -617,6 +646,16 @@ nodes:
     code: round.claims_update
     in: [specs, predictions, analyst]
     writes: campaign/claims.jsonl + campaign/knowledge.md
+
+  # ---- the score on the KNOWLEDGE, which nothing consumes -------------------------
+  # Terminal on purpose. Cedric, 13 August: "the discrepancies between prediction and eye should not
+  # govern the loop, because the eye might be wrong, and the knowledge too limited for the
+  # forecaster. I see it more like a score for the knowledge building." No `in:` in this file names
+  # `foresight`, and that absence is the design -- a thermometer, not a thermostat.
+  - id: foresight
+    code: round.foresight
+    in: [forecast, observed]
+    writes: campaign/foresight.jsonl
 
   - id: record
     code: round.record_all

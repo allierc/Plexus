@@ -67,6 +67,11 @@ def solve(d, dev, frames, keep_n=201):
         S["n_face"].append(int(rig.sheet.Fc.shape[0]))
         S["n_node"].append(int(X.shape[0]))
         S["n_plaque"].append(int(rig.ct_node.shape[0]))
+        cl = getattr(rig, "clutch", None)
+        if cl is not None and cl.Nb is not None:
+            S.setdefault("nb_mean", []).append(float(cl.Nb.mean()))
+            S.setdefault("nf_mean", []).append(float(cl.Nf.mean()))
+            S.setdefault("receptor_total", []).append(float(cl.Nb.sum() + cl.Nf.sum()))
         S["lam"].append(float(l1.mean()))
         if t in keep:
             store[f"t{i}"] = np.int32(t)
@@ -78,6 +83,16 @@ def solve(d, dev, frames, keep_n=201):
             store[f"n{i}"] = rig.ct_node.cpu().numpy().astype(np.int32)
             store[f"p{i}"] = ((rig.x_epi[rig.F_epi[rig.ct_face]] * rig.ct_w[:, :, None]).sum(1)
                               .float().cpu().numpy())
+            # THE INTEGRIN CONTENT, which no store has ever carried. Nb is the bond number of each
+            # plaque and Nf the free receptor pool of each epithelial cell; both live on the rig and
+            # were never written, so every diagnosis of these runs could say the number of PLAQUES
+            # was constant and nothing at all about the receptors inside them. G74 and G75 are
+            # unrunnable without these two arrays, and they are two lines.
+            cl = getattr(rig, "clutch", None)
+            if cl is not None and cl.Nb is not None:
+                store[f"nb{i}"] = cl.Nb.float().cpu().numpy()
+                store[f"nf{i}"] = cl.Nf.float().cpu().numpy()
+                store[f"cf{i}"] = rig.ct_face.cpu().numpy().astype(np.int32)
             i += 1
 
     from spec_06 import write_spec
@@ -106,6 +121,16 @@ def solve(d, dev, frames, keep_n=201):
           f"({'PASS' if 0.8 <= g44 <= 1.7 else 'FAIL'})", flush=True)
 
 
+def _cells(frames):
+    """The tissue's own cell count at these frames, from the replay cache."""
+    import glob
+    c = sorted(glob.glob(os.path.join(B.LOG, "_tissue", "cellfix_B_new_f401_x4_*.npz")))
+    if not c:
+        return None
+    nc = np.asarray(np.load(c[0], mmap_mode="r")["n_cells"])
+    return [int(nc[min(int(t), len(nc) - 1)]) for t in frames]
+
+
 def gate_png(S, g43, g44, path):
     fig, ax = plt.subplots(1, 3, figsize=(13.2, 3.6), facecolor="white")
     for a in ax:
@@ -113,12 +138,21 @@ def gate_png(S, g43, g44, path):
         for s in ("top", "right"):
             a.spines[s].set_visible(False)
         a.set_xlabel("frame")
-    ax[0].plot(S["t"], S["n_face"], color="black", lw=1.6)
-    ax[0].plot(S["t"], S["n_plaque"], color="#888888", lw=1.4)
+    # THE CELL COUNT BELONGS ON THIS PANEL. Faces and plaques are the SHEET's, and they are the two
+    # curves the run was watching -- but the whole 07 question is whether the adhesion follows the
+    # TISSUE, and that curve was not on the plot. Drawn here, the divergence is the finding: the cells
+    # rise smoothly by 31.9x while the plaques jump twice, and the ratio between them halves.
+    ax[0].plot(S["t"], S["n_face"], color="black", lw=1.6, label="sheet faces")
+    ax[0].plot(S["t"], S["n_plaque"], color="#888888", lw=1.4, label="plaques")
+    cc = _cells(S["t"])
+    if cc:
+        ax[0].plot(S["t"], cc, color="#c0392b", lw=1.6, ls="--", label="tissue cells")
     ax[0].set_yscale("log")
-    ax[0].set_ylabel("faces (black), plaques (grey)")
-    ax[0].text(0.03, 0.93, f"{S['n_face'][0]} -> {S['n_face'][-1]} faces", transform=ax[0].transAxes,
-               color="green", fontsize=10, va="top")
+    ax[0].set_ylabel("count (log)")
+    ax[0].legend(fontsize=7, frameon=False, loc="lower right")
+    ax[0].text(0.03, 0.93, f"{S['n_face'][0]} -> {S['n_face'][-1]} faces"
+               + (f";  cells {cc[0]} -> {cc[-1]}" if cc else ""), transform=ax[0].transAxes,
+               color="green", fontsize=9, va="top")
     ax[1].plot(S["t"], S["rho"], color="black", lw=1.6)
     ax[1].fill_between(S["t"], S["rho_p05"], S["rho_p95"], color="black", alpha=0.15, linewidth=0)
     ax[1].axhline(1.0, color="red", lw=0.9, ls=":")
