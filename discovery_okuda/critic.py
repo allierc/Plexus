@@ -891,3 +891,82 @@ def _seed_floors():
         pass
     _FLOOR_CACHE.setdefault("_default", 0.20)
     return _FLOOR_CACHE
+
+
+# =============================================================================================
+# R8 -- IS THE ACT A REAL ACT?
+#
+# `crew/claims.md` says an act must carry a field the engine checks "or it will decay into a
+# synonym for `predict`". Round 2 of the first claim campaign showed the decay is real and faster
+# than that: four of fourteen slots put the OLD `intent` vocabulary in the `act` field --
+# `exploratory`, with no claim and no prediction -- so they bypassed the claim layer entirely and
+# their compute produced nothing the ledger could read.
+#
+# Half of that was my omission and is fixed in the vocabulary rather than here: there was no
+# `explore` act, so a Proposer wanting to look somewhere had no legal way to say so and reached for
+# the word it knew. An ontology with no term for a common move does not prevent the move, it makes
+# it illegible. The other half is this rule.
+#
+# IT READS THE ACTS FROM `crew/claims.md`, so adding an act is a yaml edit and never a code change.
+# The same reason R7 reads its floors from `epistemic_spec.md`.
+def check_act(slot, claim_ids=None, acts=None):
+    """Rejection or None. Route B slots only -- a sweep carries no act and is not asked for one."""
+    if slot.get("sweep") or (slot.get("intent") == "sweep"):
+        return None
+    act = (slot.get("act") or "").strip().lower()
+    acts = acts or _acts_spec()
+    if not acts:
+        return None                                   # no spec readable: judge nothing
+    if not act:
+        return Rejection(
+            "R8_NO_ACT",
+            "a Route B slot must say what the experiment is FOR",
+            f"no `act`. One of: {', '.join(sorted(acts))}. See crew/claims.md.")
+    if act not in acts:
+        return Rejection(
+            "R8_UNKNOWN_ACT",
+            "the act is not in the vocabulary, so nothing downstream can act on its result",
+            f"`{act}` is not an act. One of: {', '.join(sorted(acts))}. "
+            f"(`exploratory`, `confirmatory` and `adversarial` were INTENTS in the old scheme; "
+            f"the nearest act is `explore`, which needs no claim.)")
+    spec = acts[act] or {}
+    need = list(spec.get("requires") or [])
+    # `claim` is spelled `on` in a slot -- the field names the claim the act bears on.
+    missing = []
+    for k in need:
+        got = slot.get("on") if k == "claim" else slot.get(k)
+        if k == "metric" or k == "threshold":
+            got = slot.get("predict")                 # both live in the one `predict` string
+        if got in (None, "", []):
+            missing.append(k)
+    if missing:
+        return Rejection(
+            "R8_ACT_MISSING_FIELD",
+            f"`{act}` cannot be carried out without the field(s) that define it",
+            f"missing {', '.join(sorted(set(missing)))}. {spec.get('effect', '')}".strip())
+    cid = slot.get("on")
+    if cid and claim_ids is not None and cid not in claim_ids:
+        return Rejection(
+            "R8_NO_SUCH_CLAIM",
+            "the act names a claim that is not in the ledger",
+            f"`{cid}` is not a claim id. The ledger holds: {', '.join(sorted(claim_ids))}.")
+    return None
+
+
+_ACTS_CACHE = {}
+
+
+def _acts_spec():
+    if _ACTS_CACHE:
+        return _ACTS_CACHE
+    import re as _re
+    import yaml as _yaml
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "crew", "claims.md")
+    try:
+        for b in _re.findall(r"```yaml\n(.*?)```", open(p).read(), _re.S):
+            d = _yaml.safe_load(b) or {}
+            if "acts" in d:
+                _ACTS_CACHE.update(d["acts"]); break
+    except Exception:
+        pass
+    return _ACTS_CACHE

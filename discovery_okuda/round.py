@@ -1542,6 +1542,18 @@ def _build_one(slot, rid, index, seen):
     # asked for less than the noise, four of them for a 0.0% change -- beat the parent's exact
     # value -- which is a coin toss that happened to land right, and was scored as knowledge.
     try:
+        # R8 BEFORE R7: an act that is not an act cannot be judged for resolution either, and the
+        # message should name the real problem rather than a consequence of it.
+        _ids = None
+        try:
+            import claims as _K
+            _ids = set((_K.load()[0] or {}))
+        except Exception:
+            pass
+        _r8 = C.check_act(slot, _ids)
+        if _r8 is not None:
+            _refuse(index, slot, f"{_r8.code}: {_r8.detail}")
+            return None
         _pm = (measure(par) or {}) if par else {}   # the same reader the `parents` node uses
         _r7 = C.check_resolution(slot, _pm)
         if _r7 is not None:

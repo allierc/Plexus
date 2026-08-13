@@ -103,6 +103,20 @@ checks — without that, an act is a label, and the audit already showed what ha
 
 ```yaml
 acts:
+  explore:
+    requires: []
+    claim_optional: true
+    effect: none -- it produces no evidence, and that is the point
+    note: >-
+      LOOKING, not testing. A slot that varies something to see what happens, with no claim it
+      bears on and no threshold it commits to. It is in the ontology because the alternative is
+      worse: the first claim round gave the Proposer no act for "I want to look here", and four of
+      fourteen slots answered by putting the OLD `intent` vocabulary in the `act` field --
+      `exploratory`, no claim, no prediction -- which bypassed the claim layer entirely and spent
+      their compute producing nothing the ledger could read. An ontology with no word for a common
+      move does not prevent the move; it makes it illegible.
+      It still owes the round a sentence: WHAT it varies and WHAT it will report. And its natural
+      successor is `induce` -- if the looking showed something, the next round can state it.
   predict:
     requires: [claim, metric, threshold]
     effect: adds evidence for or against, weighted by resolvability
