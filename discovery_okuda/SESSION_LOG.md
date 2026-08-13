@@ -46,7 +46,7 @@ Plexus spec`, targeting the same spec shape `run_tyssue_round.make()` produces.
 
 ### 🔴 FINDINGS — hour 1
 
-1. **`divide_3d` slots must be per-implementation.** `hertwig` splits normal to the cell's *own*
+1. **`cell_divide` slots must be per-implementation.** `hertwig` splits normal to the cell's *own*
    longest axis and needs no morphogen input; `orient_iface` stacks daughters along the bud axis
    and does. Declaring `axis` unconditionally made every hertwig composition look like it had a
    dangling (inert) slot, and the compiler correctly refused to run it. Fixed with `impl_slots`;
@@ -75,8 +75,8 @@ Plexus spec`, targeting the same spec shape `run_tyssue_round.make()` produces.
 ### ⚠ DECISIONS — hour 1
 
 - **Implementation choice is part of composition identity** when it changes the phenomenology
-  (`impl_structural=True`): the three reaction kinetics, `shape_energy_3d` default vs monolayer,
-  `divide_3d` hertwig vs orient_iface, `grow_3d` conserve-amount vs not. plexus2 says
+  (`impl_structural=True`): the three reaction kinetics, `cell_mechanics` default vs monolayer,
+  `cell_divide` hertwig vs orient_iface, `cell_grow` conserve-amount vs not. plexus2 says
   implementations "differ only in numerics", which holds for finite-difference vs spectral
   diffusion but *not* for Brusselator vs Gierer–Meinhardt. Recorded as a deliberate departure in
   the module docstring — the campaign must be able to ask "which kinetics".
@@ -115,12 +115,12 @@ not merely well-formed, they are accepted by the engine's validator.
 
 `ref_uniform_inflation` produced `positions=26 frames but topology=1`. Two causes, both mine:
 
-1. **`seed_mesh_3d` was emitted without `before_frame: 1`**, so it rebuilt the sphere *every
+1. **`mesh_seed` was emitted without `before_frame: 1`**, so it rebuilt the sphere *every
    tick*. `hist` lives inside `_mesh`, so re-seeding wiped the topology history each frame —
    leaving exactly one entry. Under the old `hist[min(t, len(hist)-1)]` clamp this would have
    rendered every frame's coordinates against **frame 0's connectivity** and produced a
    spectacular, entirely fictitious result. It failed loudly instead.
-2. **`grow_3d` was missing from `SCHEDULE_ORDER`**, so it sorted to position 999 — i.e.
+2. **`cell_grow` was missing from `SCHEDULE_ORDER`**, so it sorted to position 999 — i.e.
    growth ran *after* the recorder. Added a compile-time guard: any operator missing from
    `SCHEDULE_ORDER` is now a hard error rather than a silent last-place sort.
 
@@ -131,7 +131,7 @@ assertion cost nothing and caught a class of bug that previously cost days.
 
 `TopoSnapshot3D.__init__` keeps `self.every` **and** `self._k`, and gates on them, while the
 engine gates the same operator. The effective stride is the product. Confirmed by reading
-`tyssue_ops3d.py`. `translate.py` emits `every=1` so the product is 1, but **the operator-side
+`mesh_ops.py`. `translate.py` emits `every=1` so the product is 1, but **the operator-side
 counters must still be deleted** — the translation fix is necessary, not sufficient. Tracked as
 task 9.
 
@@ -165,7 +165,7 @@ keys we deliberately changed (`dt`, `every` — the D1/D2 fixes).
 
 ### 🔴 FINDING 7 — V9 caught a silent semantic bug plus 7 fidelity gaps
 
-The one that matters: **`seed_cell_rd.mode='cone'` vs the engine's `'cones'`.** My emitter used the
+The one that matters: **`cell_chem_seed.mode='cone'` vs the engine's `'cones'`.** My emitter used the
 singular; the engine matches on the plural, so the seeding mode was falling through to a different
 branch entirely. **Identical operator set, different mechanism** — precisely the class of defect
 V9 exists to catch, and invisible to V3.
@@ -188,7 +188,7 @@ Replayed `round_40_mc8` at its own 900 frames from the real homogenised checkpoi
 | aspect | ~7.5 | **3.22 peak / 2.42 final** |
 | cells | ~2700 | **3335** |
 
-The archived run had `divide_3d every=2` **and** a private `self._k` counter — effective period 4.
+The archived run had `cell_divide every=2` **and** a private `self._k` counter — effective period 4.
 The corrected config fires division **4× more often**. More cells, shorter tube. This is exactly
 the re-anchoring the handoff predicted (*"expect division counts to roughly double"*), and it is
 larger than predicted.
@@ -249,15 +249,15 @@ classes instrumented, idempotent.
 
 First test on `ref_uniform_inflation` reported **two** inert operators. Only one was real:
 
-- `divide_3d` — **true positive.** `after_frame = 100` but the smoke ran 25 frames, so division
+- `cell_divide` — **true positive.** `after_frame = 100` but the smoke ran 25 frames, so division
   genuinely never fired.
-- `grow_3d` — **false positive.** It writes the per-cell mechanical *targets* inside the
+- `cell_grow` — **false positive.** It writes the per-cell mechanical *targets* inside the
   mesh dict (`A0`, `P0`, `V0f`), which my fingerprint did not cover. A growth operator would have
   been reported inert on every run, invalidating perfectly good evidence.
 
 Fixed by folding every numeric array in the mesh dict into the fingerprint. Re-verified in both
-directions: at 25 frames `divide_3d` is correctly flagged; at 131 frames **all 6 operators act**
-(`divide_3d` 31×, `grow_3d` 131×) and the run is marked `valid_evidence: true`.
+directions: at 25 frames `cell_divide` is correctly flagged; at 131 frames **all 6 operators act**
+(`cell_divide` 31×, `cell_grow` 131×) and the run is marked `valid_evidence: true`.
 
 *This is the discipline the whole document is about, applied to the guard itself: verify the
 instrument before trusting the measurement.* A detector that cries wolf is worse than none,
@@ -390,7 +390,7 @@ The success criteria are authored **before** the search and are falsifiable:
 ```
 {"saturated": false, "inert_operators": [], "retention": 0.992,
  "valid_evidence": true, "aspect_final": 1.018, "n_cells_final": 5449, "frames": 131}
-D4 ok: all 6 scheduled operators acted ({'seed_mesh_3d': 1, 'divide_3d': 31, 'reconnect_t1_3d': 130} ...)
+D4 ok: all 6 scheduled operators acted ({'mesh_seed': 1, 'cell_divide': 31, 'edge_flip': 130} ...)
 ```
 
 Config → job script → detached bsub → queue → GPU → engine → D3 assertion → D4 ledger → metrics →
@@ -429,7 +429,7 @@ clock.* **Verified, and it was worse than stated.**
 
 ### 🔴 FINDING 12 — the per-call / per-frame trap, and a masked correction
 
-From `tyssue_ops3d`: `min_cycle`/`max_cycle` are counted in **division-calls** (`age` is
+From `mesh_ops`: `min_cycle`/`max_cycle` are counted in **division-calls** (`age` is
 "per-cell age in division-calls") and `max_div`/`max_div_frac` are **per-call** throttles. The
 archived configs passed `every: 2`, gated by the engine *and* by the operator's private `self._k`
 — product **4**. So `min_cycle=8` meant 32 frames and `max_div_frac=0.03` meant 0.0075/frame.
@@ -451,7 +451,7 @@ per-frame budget at nF = 1431 / 2700 / 4000 / 8000 / 16000. New **V10** gate che
 
 All five private clocks removed. `_engine_owns_clock()` forces the period to 1 and **raises** on
 `every > 1`, so the defect cannot return by configuration. `_k` survives only as a monotonic tick
-(`divide_3d` seeds an RNG from it). Verified: modules import, `every=2` refused.
+(`cell_divide` seeds an RNG from it). Verified: modules import, `every=2` refused.
 
 ### 🆕 The Metrologist — answering "which agent certifies the foundation, and which fixes code"
 
@@ -719,10 +719,10 @@ Consolidating the type guard into 12 enumerable rules (`critic.py`) immediately 
 `okuda_route`:
 
 ```
-R4_SLOT_NOT_ON_IMPL: divide_3d:hertwig has no `axis`
+R4_SLOT_NOT_ON_IMPL: cell_divide:hertwig has no `axis`
 ```
 
-The recipe connected morphogen → `divide_3d.axis` while the implementation was `hertwig`, which
+The recipe connected morphogen → `cell_divide.axis` while the implementation was `hertwig`, which
 splits on the cell's *own* long axis and exposes no such slot. `is_runnable()` checked only for
 **unrouted** slots, never for a connection into a slot the implementation does not have — so the
 edge compiled and was **silently ignored**, through 59/59 validation and a real cluster run.
@@ -939,7 +939,7 @@ lbl.startswith("-")`), reintroduced in Loop II.
 ### 🔴 FINDING 27 — the minisite Turing × vertex videos can no longer be regenerated
 
 Cedric asked to debug/reproduce the minisite Turing + vertex video before the week launch. The
-front-page section is generated by `prototype/Tyssue/archive_rounded.py` (two mp4s:
+front-page section is generated by `discovery_okuda/ops/archive_rounded.py` (two mp4s:
 `tyssue_vh_grow_divide`, `tyssue_vh_rd_coral`). It **hard-errors** under the D1 clock fix, because
 it passes `every: 2` and `_engine_owns_clock` now raises on any `every > 1`. But the **engine reads
 the same `every` key**, so the blanket raise also forbids the correct engine-owned cadence — the
@@ -993,7 +993,7 @@ identical, which is what confirms the D1 migration is `every: 2 → 4` (old true
 
 ### 🔴 FINDING 28 — a second lying tag, and it only lies when chemistry is present
 
-The coral video needed one more fix. `grow_3d` declares
+The coral video needed one more fix. `cell_grow` declares
 `MAY_MUTATE_INTEGRATED_STATE = False` and mutates it anyway (`conserve_amount` rescales
 `cell.chem` in place). The engine's integration invariant refused to run it. This is one of the
 four tags HANDOFF §4 flagged; now confirmed by execution rather than inference.
@@ -1078,7 +1078,7 @@ it could never accumulate. Verified: an opened stage gate now survives a restart
 |---|---|
 | **Done** | both minisite videos reproduce (MATCH); F28 second lying tag; F29 activator extinction; the rho/a_sw lever map + figure + FINDINGS.md; escalation path built and tested |
 | **Found** | the front-page "coral" is an extinct field rendered through a percentile stretch; `rho` not `a_sw` is the shaping lever; coupling and mesh integrity fail together — no clean window |
-| **Running** | round 2 slot `r002c_03_560039` (−cell_geometry_3d) — 35+ min vs 5–20 for its siblings, degrading exactly as the Reflection agent warned |
+| **Running** | round 2 slot `r002c_03_560039` (−cell_geometry) — 35+ min vs 5–20 for its siblings, degrading exactly as the Reflection agent warned |
 | **Next** | round 2 readout; progress reel; overlap the Proposer with cluster runs |
 | **Blocked** | nothing |
 
@@ -1096,7 +1096,7 @@ and the VLM caption of that run begins *"A small red region on a large white sph
 shrinks and disappears"*. That is the F29 signature. Checked `config/okuda/round_40_mc8.yaml`:
 
 ```yaml
-- op: grow_3d
+- op: cell_grow
   rate: 0.01
   rho: 0.0
   conserve_amount: true      # <-- the same dilution
@@ -1121,7 +1121,7 @@ and every impossibility claim about RD-driven tubes predates the discovery.
 
 ### 🔴 FINDING 31 — a degenerate slot could hold a round for 24 hours
 
-Round 2's `-cell_geometry_3d` knockout ran **45+ minutes against 5–20 for its five siblings**, with
+Round 2's `-cell_geometry` knockout ran **45+ minutes against 5–20 for its five siblings**, with
 empty stdout: degenerate, not crashed — precisely what the Reflection agent had flagged
 (*"may not degrade gracefully ... could go degenerate/uninterpretable"*). A composition search
 generates combinations no preset ever ran, so this is the normal case, not a rare one.
@@ -1193,7 +1193,7 @@ has collapsed to 0.5% of cells while its peak stays at 0.97. And the tip tells t
 | run | `ta_tip_act_final` | `protr_peak` |
 |---|---|---|
 | control | **0.27** | 4.03 |
-| −grow_3d | **0.80** | 1.03 |
+| −cell_grow | **0.80** | 1.03 |
 
 With growth on, the activator is *not at the tip*. That is a local effect — growth carries the
 activated region away from the protrusion it is supposed to drive — not a global decay, and
@@ -1221,12 +1221,12 @@ because the captions do not show a tube. That is the eye/number divergence defen
 composition round for the first time, and it is the difference between this round reporting "the
 control makes a tube (4.03)" and reporting the truth.
 
-The Critic separately refused `+grow_3d:uniform_ramp` as **not evidence** — the reservoir
+The Critic separately refused `+cell_grow:uniform_ramp` as **not evidence** — the reservoir
 saturated at 15002 cells. Two of six slots produced no evidence, and both said so loudly rather
 than returning a plausible number.
 
 **The dissociation result:** both knockouts collapse the protrusion (4.03 → 1.39 for −extrude,
-→ 1.03 for −grow_3d). The Proposer predicted −morphogen would leave it unchanged if
+→ 1.03 for −cell_grow). The Proposer predicted −morphogen would leave it unchanged if
 the protrusion were *forced*; it did not. Recorded as the round's one **surprise**. But the
 control is itself Watcher-vetoed, so the 4.03 baseline those ratios are measured against is
 suspect — the honest reading is *"both operators are necessary for whatever 4.03 is"*, and what
@@ -1287,7 +1287,7 @@ a rendering problem and it was not new: all 11 completed runs ended at exactly 5
 seeded count), protrusion 1.02 (a sphere) and activator 0.499 (= the seed amplitude). Nothing grew,
 divided or reacted in any of them. Bisection found three independent causes.
 
-D1  shape_energy_3d/monolayer had no rest state. Stripping the operator list one at a time: the
+D1  cell_mechanics/monolayer had no rest state. Stripping the operator list one at a time: the
     ball holds 5.000 exactly under every other operator and falls 5.00 -> 1.80 in 20 frames the
     moment the mechanics is added. gamma=0 gives 2.95, gamma=0 and kappa_s=0 gives 5.00 -- so both
     tension terms pull in and only the volume spring pushes out, and V_eq had been calibrated
@@ -1303,7 +1303,7 @@ D1  shape_energy_3d/monolayer had no rest state. Stripping the operator list one
     checkpoint (round_40_mc8 starts at radius 6.14) instead of seeding. The two quarantined runs
     that did seed with this implementation, r01_00_bd318e and r01_01_d1076f, have no diag.json.
 
-D5a chemistry integrated with the mechanics dt. cell_react and cell_diffuse EMIT=velocity into
+D5a chemistry integrated with the mechanics dt. cell_chem_react and cell_chem_diffuse EMIT=velocity into
     `chem`, so 300 frames bought 6 units of Gray-Scott time against the ~500 the validated minisite
     spec needs. Every "no pattern formed" reading was an artefact of the clock. Both are now scaled
     by 1/dt, leaving their ratio -- which selects the Turing wavelength -- untouched.
@@ -1337,7 +1337,7 @@ PHASE 2 (4 of 6).
   radius, which would make the spring chase the shell's own excursions and penalise a bud.
   Verified: rays cross exactly once at every frame where they previously crossed 13-17 times.
 
-  shape_to_chem: the missing arrow. ONE contract, FOUR implementations (curvature, tension,
+  cell_chem_from_shape: the missing arrow. ONE contract, FOUR implementations (curvature, tension,
   apical_area, pressure), because WHICH feature the chemistry listens to is the hypothesis, not a
   parameter -- comp_hash includes implementation and excludes theta. `force` and `size` refused,
   with reasons in the docstring. Feature standardised before beta touches it (the F009 lesson

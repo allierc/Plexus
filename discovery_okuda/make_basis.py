@@ -22,7 +22,7 @@ THE THREE AXES
 
   chemistry (4)   none | gray_scott | gierer_meinhardt | brusselator
                   `none` is not an empty slot -- it is the control that grows without patterning,
-                  which is what `cellfix_B_new` was for. `cell_react` also offers `brusselator`;
+                  which is what `cellfix_B_new` was for. `cell_chem_react` also offers `brusselator`;
                   two RD models plus a null says more than three RD models and no null.
 
   material (2)    static | uniform | gated -- two per chemistry column, see AXES
@@ -38,10 +38,10 @@ THE THREE AXES
   mechanics (2)   plain | shaping
                   plain: area/perimeter/volume elasticity only. shaping: plus dihedral bending
                   (K_bend), lumen incompressibility (K_lumen), and a line tension on the red/white
-                  interface (interface_line_tension_3d.K_purse) -- the three terms that can neck a lobe
+                  interface (interface_tension.K_purse) -- the three terms that can neck a lobe
                   into a finger.
 
-                  ALL TWELVE RUN `shape_energy_3d` WITH ITS DEFAULT MODEL, and that is a change.
+                  ALL TWELVE RUN `cell_mechanics` WITH ITS DEFAULT MODEL, and that is a change.
                   `coral_gate_div` ran `model: monolayer`, which reads k_v/kappa_s/h0/gamma and has
                   NO K_bend and NO K_lumen in its parameter list at all -- so those terms were not
                   merely missing from its spec, they were inexpressible in its model, and no edit
@@ -116,7 +116,7 @@ RHO_UNGATED = 1.0            # `uniform` is gone from the basis; kept for a spec
 # of the morphogen activity, that cells grow locally on red spot??" It is, and it was turned down
 # almost off. 0.1 is 11:1, and it centres every Route B run -- which inherits its parent's rho --
 # in the regime the campaign is about, instead of leaving that to Route A to find.
-                             # CHANGED on 8 August. `divide_3d`'s default model is now `sizer`, an
+                             # CHANGED on 8 August. `cell_divide`'s default model is now `sizer`, an
                              # ABSOLUTE threshold, where it used to be `factor x THIS CELL'S OWN
                              # BIRTH VOLUME`. Ginzberg, Kafri & Kirschner (Science 2015): "both the
                              # cell's target size and its actual size must be evaluated on absolute
@@ -133,7 +133,7 @@ RHO_UNGATED = 1.0            # `uniform` is gone from the basis; kept for a spec
 # `cellfix_B_new`, which grew x22.7 with them. It produced twelve bases carrying a growth operator
 # that raises its target and never moves the tissue, and premise P1 is the only thing that caught it.
 #
-# `grow_3d` writes a WISH (per-cell target volume); shape_energy_3d decides whether to grant it, by
+# `cell_grow` writes a WISH (per-cell target volume); cell_mechanics decides whether to grant it, by
 # minimising a sum of competing terms. K_V pays to reach the target volume; Lambda charges for total
 # edge length, and inflating a ball stretches every edge on it. cellfix_B_new had 200 cells; these
 # have 2000, so each cell is ~12x smaller and the sphere carries ~6000 short edges instead of ~600.
@@ -144,13 +144,13 @@ RHO_UNGATED = 1.0            # `uniform` is gone from the basis; kept for a spec
 #     K_V 8.0  Lambda 1.0   volume 509 -> 507   P1 BROKEN
 #     K_V 20.0 Lambda 0.5   volume 509 -> 759   all premises pass
 #
-# The archived recipes that DID grow at 2000 cells all ran `shape_energy_3d model: monolayer`, whose
+# The archived recipes that DID grow at 2000 cells all ran `cell_mechanics model: monolayer`, whose
 # Lambda defaults to 0.0 -- no edge-length bill at all, and k_v 6.0. That model cannot express
 # K_bend or K_lumen, which is why the basis is not on it; this is the same balance restated in the
 # default model's parameters.
 #
 # K_R = 0.0 differs from every archived spec, which ran 0.4. K_R is a radial spring to a fixed R0.
-# `grow_3d` does update R0 to the radius enclosing the target volume, so K_R would also transmit
+# `cell_grow` does update R0 to the radius enclosing the target volume, so K_R would also transmit
 # growth -- but measured side by side at 400 frames, K_R 0.0 and 0.4 gave 2018 vs 2019 cells: it is
 # not what moves the shell here. A basis whose job is to let a shape leave the sphere should not
 # carry a term that pays it to stay.
@@ -170,14 +170,14 @@ RHO_UNGATED = 1.0            # `uniform` is gone from the basis; kept for a spec
 # 2.80). Both come from the declared box in composition_space, which is where this campaign's
 # validated values live.
 # rate = 0.4, AND THE FIRST LAUNCH USED 1.0, WHICH CRITIC RULE R1d REFUSES ON MEASURED GROUNDS:
-# gierer_meinhardt WITH divide_3d must advance dt*rate <= 0.5 or "the activator diverges uniformly
+# gierer_meinhardt WITH cell_divide must advance dt*rate <= 0.5 or "the activator diverges uniformly
 # and the run measures an integrator, not a mechanism". At 1.0 the four gm members reached 53,000
 # cells with a PRISTINE mesh -- broken_frac 0.0, ray_single_frac 1.0, reduced_volume 0.97 -- and
 # premise P12 broken: the shell was perfect and the chemistry on it was not finite. The rule was
 # right and I walked across it; `round.py --check` refused all four as parents before the loop
 # could build on them, which is the only reason this is a corrected value and not a campaign.
 # THE THIRD RD MODEL, AND THE CAMPAIGN HAS NEVER RUN IT. Cedric, 8 August: "I think we miss RD
-# basis, got to 16 specs, add 4 to study RD mechanisms in route A." `cell_react` registers three
+# basis, got to 16 specs, add 4 to study RD mechanisms in route A." `cell_chem_react` registers three
 # models and the basis carried two, so "which reaction-diffusion mechanism" was an axis with a
 # hole in it -- and an axis the loop cannot vary is an axis it cannot learn anything about.
 #
@@ -203,15 +203,15 @@ RHO_UNGATED = 1.0            # `uniform` is gone from the basis; kept for a spec
 
 
 # THE DEATH AXIS, added 10 August, and it exists to make apoptosis REACHABLE rather than merely
-# legal. `apoptosis_3d` was injected into the vocabulary before round 25: it sat at row 0 of the
+# legal. `cell_die` was injected into the vocabulary before round 25: it sat at row 0 of the
 # Proposer's menu and was named by the `coverage` node as never exercised, for five rounds, and was
 # never once chosen -- because in its whole history the Proposer has issued 30 `add_op` edits and
 # all 30 added the same operator. Route A could not reach it either: `_build_sweep` refuses with
-# "route A base has no apoptosis_3d", so a mechanism absent from the basis cannot be swept, and the
+# "route A base has no cell_die", so a mechanism absent from the basis cannot be swept, and the
 # Route A plan is static and cannot add one.
 #
 # So a mechanism enters this campaign through the BASIS or not at all. The twin is taken on each of
-# the four Route A bases specifically, so `apoptosis_3d.mode` and `max_mark_frac` become sweepable
+# the four Route A bases specifically, so `cell_die.mode` and `max_mark_frac` become sweepable
 # ladders on the same parents everything else is measured against.
 #
 # `competition` is the mode: it needs no chemistry (so it is live on the b_none column too), it is
@@ -230,7 +230,7 @@ def _apply_set(ops, overrides, name):
     make fourteen members into two hundred, most of them meaningless combinations.
 
     IT IS CHECKED, NOT TRUSTED. A key naming an operator the member does not carry is a silent
-    no-op -- `set: {apoptosis_3d.mode: crowding}` on a member with `death: false` would write
+    no-op -- `set: {cell_die.mode: crowding}` on a member with `death: false` would write
     nothing and the member would run as its own twin. That is refused here rather than discovered
     in the ledger. Whether the operator READS the key is a separate question, and `_unread` below
     already answers it for every key in the spec, including these.
@@ -267,34 +267,34 @@ def build(m):
         raise ValueError("a gate with nothing to gate on")
 
     ops = [
-        {"op": "seed_mesh_3d", "at": "vertex", "cell_set": "cell", "before_frame": 1,
+        {"op": "mesh_seed", "at": "vertex", "cell_set": "cell", "before_frame": 1,
          "n_cells": SEED_CELLS, "seed": 0, "vseed_cv": 0.15, "radius": 5.0, "jitter": 0.15,
          "p0": 3.5},
-        {"op": "cell_geometry_3d", "at": "cell"},
+        {"op": "cell_geometry", "at": "cell"},
     ]
     if has_chem:
         ops += [
-            {"op": "cell_adjacency", "at": "cell"},
-            {"op": "seed_cell_rd", "at": "cell", "seed": 0, "before_frame": 3,
+            {"op": "cell_neighbours", "at": "cell"},
+            {"op": "cell_chem_seed", "at": "cell", "seed": 0, "before_frame": 3,
              "mode": "scatter", "seed_frac": 0.06},
-            {"op": "cell_diffuse", "at": "cell", "implementation": "graph_laplacian", **RD},
-            {"op": "cell_react", "at": "cell",
+            {"op": "cell_chem_diffuse", "at": "cell", "implementation": "graph_laplacian", **RD},
+            {"op": "cell_chem_react", "at": "cell",
              # `gm` IS GONE FROM THE BASIS. Every gierer_meinhardt member measured grip -0.002 --
              # no coupling between chemistry and shape at all -- so a column of them spent members
              # on tissue that cannot answer the campaign's question. Add it back as a member in
              # crew/basis.yaml if it is ever worth a base again.
              "model": {"gs": "gray_scott", "bru": "brusselator"}[chem],
              **{"gs": GS, "bru": BRU}[chem]},
-            # THE SECOND ARROW. shape_to_chem makes a bulging cell feed faster, so the loop closes:
+            # THE SECOND ARROW. cell_chem_from_shape makes a bulging cell feed faster, so the loop closes:
             # curvature -> feed -> activator -> growth gate -> curvature. Present in every
             # chemistry member, because `beta = 0` as the null is what `coral_gate` was for and the
             # `none` column is a stronger null than a zeroed coefficient.
-            {"op": "shape_to_chem", "at": "cell", "model": "curvature", "vertex_set": "vertex",
+            {"op": "cell_chem_from_shape", "at": "cell", "model": "curvature", "vertex_set": "vertex",
              "beta": BETA, "F0": F0, "rate": 1.0},
         ]
     if grows:
         ops.append(
-            {"op": "grow_3d", "at": "vertex", "cell_set": "cell",
+            {"op": "cell_grow", "at": "vertex", "cell_set": "cell",
              "rate": GROWTH_RATE, "a_sw": A_SW_GATED if gated else A_SW_OPEN, "hill": hill,
              "rho": (rho_gated if gated else RHO_UNGATED), "vth_frac": VTH_FRAC, "after_frame": 100,
              # P1: growth ADDS material here. conserve_amount redistributes it, which is what made
@@ -306,10 +306,10 @@ def build(m):
         # them for the cells it has sentenced, and the relaxation sees both in one tick, so a cell
         # extruded this frame has its hole closed this frame. Appending it after the recorder
         # instead measurably changed the outcome on a weak parent (grip 0.031 vs 0.110).
-        ops.append({"op": "apoptosis_3d", "at": "vertex", "cell_set": "cell", "p0": MECH["p0"],
+        ops.append({"op": "cell_die", "at": "vertex", "cell_set": "cell", "p0": MECH["p0"],
                     **DEATH})
     ops += [
-        {"op": "shape_energy_3d", "at": "vertex", **MECH,
+        {"op": "cell_mechanics", "at": "vertex", **MECH,
          **(SHAPING if shaping else {"K_bend": 0.0, "K_lumen": 0.0})},
     ]
     if shaping and has_chem:
@@ -317,18 +317,18 @@ def build(m):
         # "cells above 100% of the maximum" -- so the purse-string never fired in a single run of
         # the basis or of nineteen campaign rounds, and Route A's K_purse ladder measured nothing
         # four times over. A fraction of the activator's own maximum: 0.6 is the top 40%.
-        ops.append({"op": "interface_line_tension_3d", "at": "vertex", "cell_set": "cell",
+        ops.append({"op": "interface_tension", "at": "vertex", "cell_set": "cell",
                     "K_purse": K_PURSE, "a_sw": 0.6})
     ops += [
-        {"op": "divide_3d", "at": "vertex", "cell_set": "cell", "factor": DIVIDE_FACTOR,
+        {"op": "cell_divide", "at": "vertex", "cell_set": "cell", "factor": DIVIDE_FACTOR,
          # `reset_noise` IS NOT HERE, and the first draft copied it from coral_gate_div. It was
          # the legacy uniform jitter, read only when cycle_cv == 0, and it was REMOVED from
-         # divide_3d on 6 August -- so every spec still carrying it names a key nothing reads.
+         # cell_divide on 6 August -- so every spec still carrying it names a key nothing reads.
          # Caught by the unread gate below, which is the entire reason that gate exists.
          "cycle_cv": 0.15, "min_cycle": 4, "max_cycle": 10 ** 9, "p0": 3.5,
          "every": 4, "engine_clock": True},
-        {"op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": 0.28, "every": 1, "max_flips": 300},
-        {"op": "topo_snapshot_3d", "at": "vertex", "every": 1},
+        {"op": "edge_flip", "at": "vertex", "l_th_frac": 0.28, "every": 1, "max_flips": 300},
+        {"op": "topo_record", "at": "vertex", "every": 1},
     ]
 
     ops = _apply_set(ops, m.get("set") or {}, m["name"])
@@ -371,12 +371,12 @@ def grid():
 
 def _unread(spec):
     """Keys each operator in `spec` never looks up -- reported as `op.key UNREAD`."""
-    sys.path.insert(0, os.path.join(os.path.dirname(HERE), "prototype", "Tyssue"))
+    sys.path.insert(0, os.path.join(HERE, "ops"))
     sys.path.insert(0, os.path.join(os.path.dirname(HERE), "src"))
     try:
         import plexus.operators                                          # noqa: F401
-        import tyssue_ops3d, tyssue_rd_ops, tyssue_monolayer             # noqa: F401
-        import tyssue_shape_to_chem, tyssue_t1_ops3d, tyssue_cell_shape  # noqa: F401
+        import mesh_ops, chem_ops, monolayer_ops             # noqa: F401
+        import shape_chem_ops, t1_ops, shape_probe_ops  # noqa: F401
         from op_probe import unread_params
     except Exception as e:
         return [f"(unread check unavailable: {type(e).__name__})"]

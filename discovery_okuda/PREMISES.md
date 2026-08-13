@@ -19,7 +19,7 @@ something special, and then you must say so).
 A cell is mostly water. Its volume changes because it takes up or loses material, not because it
 rearranges what it already has. So a tissue that gets bigger has *added* something.
 
-*Constrains:* `grow_3d.rho` — the baseline growth floor.
+*Constrains:* `cell_grow.rho` — the baseline growth floor.
 *Check:* total tissue volume at the end > total tissue volume when growth started.
 *If violated:* a protrusion with `rho = 0` is made entirely of material taken from somewhere else
 in the same body. That is a deliberate ablation, not a setting — say so, and say what the rest of
@@ -30,7 +30,7 @@ the body gave up.
 Every cell in a proliferating epithelium grows, signal or no signal. A limb bud, a branch, a tube:
 the tip adds material faster, while the body keeps adding it too.
 
-*Constrains:* `rho` together with the `cell_react → grow_3d.gate` connection.
+*Constrains:* `rho` together with the `cell_chem_react → cell_grow.gate` connection.
 *Check:* if the gate is connected at all, then `rho > 0`.
 *If violated:* the tip-to-body growth ratio is infinite — a growing tip on a frozen body. No tissue
 does that.
@@ -40,7 +40,7 @@ does that.
 Roughly a doubling of birth volume, then mitosis. Cycle times vary, but tightly — order 10%, not a
 factor of two. Division itself adds nothing: two daughters sum to the mother.
 
-*Constrains:* `divide_3d.factor`, `min_cycle`, `cycle_cv`, and `grow_3d.vth_frac`.
+*Constrains:* `cell_divide.factor`, `min_cycle`, `cycle_cv`, and `cell_grow.vth_frac`.
 *Check:* **the growth ceiling must sit above the division trigger.** Mean cell volume must be
 roughly steady over the run, not drifting down.
 *Caught:* this is defect D5b. `vth_frac` capped a cell's target at 1.5× while `factor` demanded
@@ -52,7 +52,7 @@ impossible and the only divisions we ever saw came from a timeout.
 Concentration is amount over volume. Grow the volume and the concentration falls, with no chemistry
 involved. A reaction whose fixed point sits at zero is driven to extinction by growth alone.
 
-*Constrains:* `grow_3d.conserve_amount`.
+*Constrains:* `cell_grow.conserve_amount`.
 *Check:* with the chemistry switched off and growth on, every cell's concentration must fall.
 *If violated:* the tissue is manufacturing morphogen in proportion to its own growth, which feeds
 the tip from nothing.
@@ -104,7 +104,7 @@ from any point in space. Left alone it holds its shape. Surface tension is real 
 inward, but in a real tissue it is balanced — by cell volume, by lumen pressure, by cortical
 pressure. Nothing in a tissue implodes when you stop poking it.
 
-*Constrains:* `shape_energy_3d` — every inward term (`kappa_s`, `gamma`) needs a counterpart.
+*Constrains:* `cell_mechanics` — every inward term (`kappa_s`, `gamma`) needs a counterpart.
 *Check:* run the mechanics **alone**, with no growth, no chemistry, no division. The radius must
 hold.
 *Caught:* this is defect D1, and it is the cheapest test in this document. The ball fell from 5.00
@@ -151,7 +151,7 @@ topological event or a broken mesh, and we must say which.
 Cells swap neighbours when the interface between them shrinks to nothing and the swap lowers the
 energy. It is the rarest thing an epithelium does — not a per-frame housekeeping operation.
 
-*Constrains:* `reconnect_t1_3d`.
+*Constrains:* `edge_flip`.
 *Check:* T1 events per cell per unit time should be small, and each should follow a junction that
 really did collapse.
 *If violated:* T1s fired as maintenance are a remesher, not a mechanism, and any "the tissue
@@ -182,7 +182,7 @@ cells demand far more area than that sphere has. It has nowhere to go but throug
 Amount over volume. Neither term can be negative and neither can be infinite, so a concentration
 that goes negative or non-finite is arithmetic failing, not chemistry happening.
 
-*Constrains:* `cell_diffuse`, `cell_react` — the integrator, not the model.
+*Constrains:* `cell_chem_diffuse`, `cell_chem_react` — the integrator, not the model.
 *Check:* every recorded concentration is finite and >= 0.
 *If violated:* every downstream number is about the integrator. This is the check that caught the
 reaction running 50x too fast: the activator went 0.01 -> 1.41e6 -> NaN while spatially uniform.

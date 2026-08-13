@@ -86,14 +86,14 @@ COUNTED STRUCTURALLY, WHICH OVERSTATES IT. This counts a lever appearing on a pa
 
 The framework weights cross-context generalisation highest of all evidence (`per_block` 0.15, linear). A law tested on one lineage cannot exceed medium confidence however many times it is confirmed there.
 
-- `r001_03` applied `add_op:interface_line_tension_3d` on **b_gs_plain_soft_hi**, first seen on b_gs_plain_sharp_hi
+- `r001_03` applied `add_op:interface_tension` on **b_gs_plain_soft_hi**, first seen on b_gs_plain_sharp_hi
 - `r002_02` applied `set_param:cell_diffuse0.d_a` on **b_gs_shaping_soft_lo**, first seen on b_gs_plain_sharp_lo
 - `r002_04` applied `set_param:cell_diffuse0.d_a` on **b_gs_plain_sharp_hi**, first seen on b_gs_plain_sharp_lo, b_gs_shaping_soft_lo
 - `r002_05` applied `set_param:grow_3d0.rho` on **b_gs_plain_soft_hi**, first seen on b_gs_plain_soft_lo
-- `r003_02` applied `add_op:interface_line_tension_3d` on **b_gs_plain_sharp_lo**, first seen on b_gs_plain_sharp_hi, b_gs_plain_soft_hi
+- `r003_02` applied `add_op:interface_tension` on **b_gs_plain_sharp_lo**, first seen on b_gs_plain_sharp_hi, b_gs_plain_soft_hi
 - `r003_04` applied `set_param:cell_diffuse0.chi` on **b_gs_plain_sharp_hi**, first seen on b_gs_plain_soft_lo
 - `r003_06` applied `set_param:grow_3d0.rho` on **b_gs_plain_sharp_hi**, first seen on b_gs_plain_soft_hi, b_gs_plain_soft_lo
-- `r003_07` applied `add_op:apoptosis_3d` on **b_gs_plain_sharp_hi**, first seen on b_gs_plain_sharp_lo
+- `r003_07` applied `add_op:cell_die` on **b_gs_plain_sharp_hi**, first seen on b_gs_plain_sharp_lo
 - `r003_09` applied `set_param:apoptosis_3d0.max_mark_frac` on **b_gs_plain_soft_lo_death**, first seen on b_gs_shaping_sharp_hi_death
 - `r003_15` applied `set_param:shape_energy_3d0.Lambda` on **b_gs_shaping_soft_lo**, first seen on b_gs_plain_sharp_hi
 - `r004_02` applied `set_param:cell_diffuse0.d_h` on **b_gs_plain_sharp_hi**, first seen on b_gs_plain_soft_hi

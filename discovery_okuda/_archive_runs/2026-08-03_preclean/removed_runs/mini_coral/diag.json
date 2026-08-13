@@ -38,17 +38,17 @@
   "mech_migration": 0.37151
  },
  "acted": {
-  "seed_mesh_3d": 1,
-  "cell_geometry_3d": 496,
-  "cell_adjacency": 76,
-  "seed_cell_rd": 3,
-  "cell_diffuse": 501,
-  "cell_react": 501,
-  "grow_3d": 317,
-  "shape_energy_3d": 501,
-  "reconnect_t1_3d": 113,
-  "divide_3d": 126,
-  "topo_snapshot_3d": 501
+  "mesh_seed": 1,
+  "cell_geometry": 496,
+  "cell_neighbours": 76,
+  "cell_chem_seed": 3,
+  "cell_chem_diffuse": 501,
+  "cell_chem_react": 501,
+  "cell_grow": 317,
+  "cell_mechanics": 501,
+  "edge_flip": 113,
+  "cell_divide": 126,
+  "topo_record": 501
  },
  "premises": [
   {
@@ -113,7 +113,7 @@
    "tier": "passive",
    "premise": "the chemistry must not be silently extinguished",
    "status": "fail",
-   "detail": "the activator decayed to 0.000 of its peak (0.733 -> 0.000). The pattern is extinct, so every downstream reading is about a dead field. The usual cause is growth dilution: grow_3d.conserve_amount divides chem by (s/s_prev)^3 every frame a cell grows, and autocatalysis is quadratic, so it loses.",
+   "detail": "the activator decayed to 0.000 of its peak (0.733 -> 0.000). The pattern is extinct, so every downstream reading is about a dead field. The usual cause is growth dilution: cell_grow.conserve_amount divides chem by (s/s_prev)^3 every frame a cell grows, and autocatalysis is quadratic, so it loses.",
    "measured": {
     "peak": 0.7333,
     "end": 0.0,

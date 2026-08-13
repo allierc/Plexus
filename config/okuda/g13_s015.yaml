@@ -29,7 +29,7 @@ sets:
         width: 1
 fields: {}
 operators:
-- op: seed_mesh_3d
+- op: mesh_seed
   at: vertex
   cell_set: cell
   before_frame: 1
@@ -39,9 +39,9 @@ operators:
   radius: 5.0
   jitter: 0.15
   p0: 3.5
-- op: cell_geometry_3d
+- op: cell_geometry
   at: cell
-- op: apoptosis_3d
+- op: cell_die
   at: vertex
   cell_set: cell
   p0: 3.5
@@ -52,7 +52,7 @@ operators:
   critical_frac: 0.15
   min_age: 0
   after_frame: 50
-- op: shape_energy_3d
+- op: cell_mechanics
   at: vertex
   K_A: 1.0
   K_P: 1.0
@@ -66,21 +66,21 @@ operators:
   relax_iters: 30
   eta: 0.08
   cap_frac: 0.12
-- op: reconnect_t1_3d
+- op: edge_flip
   at: vertex
   l_th_frac: 0.28
   every: 1
   max_flips: 300
-- op: topo_snapshot_3d
+- op: topo_record
   at: vertex
   every: 1
 schedule:
-- seed_mesh_3d
-- cell_geometry_3d
-- apoptosis_3d
-- shape_energy_3d
-- reconnect_t1_3d
-- topo_snapshot_3d
+- mesh_seed
+- cell_geometry
+- cell_die
+- cell_mechanics
+- edge_flip
+- topo_record
 _gate:
   gate: G13
   shrink_rate: 0.15

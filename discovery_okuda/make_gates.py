@@ -51,14 +51,14 @@ MECH = dict(K_A=1.0, K_P=1.0, K_V=20.0, K_R=0.0, Lambda=0.5, Gamma=0.4, p0=3.5,
 
 def _shell(name, ops, extra=None):
     """The common envelope: a seeded vesicle, whatever operators the gate needs, and a recorder."""
-    base = [{"op": "seed_mesh_3d", "at": "vertex", "cell_set": "cell", "before_frame": 1,
+    base = [{"op": "mesh_seed", "at": "vertex", "cell_set": "cell", "before_frame": 1,
              "n_cells": N_CELLS, "seed": 0, "vseed_cv": 0.15, "radius": 5.0, "jitter": 0.15,
              "p0": 3.5},
-            {"op": "cell_geometry_3d", "at": "cell"}]
-    tail = [{"op": "shape_energy_3d", "at": "vertex", **MECH},
-            {"op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": 0.28, "every": 1,
+            {"op": "cell_geometry", "at": "cell"}]
+    tail = [{"op": "cell_mechanics", "at": "vertex", **MECH},
+            {"op": "edge_flip", "at": "vertex", "l_th_frac": 0.28, "every": 1,
              "max_flips": 300},
-            {"op": "topo_snapshot_3d", "at": "vertex", "every": 1}]
+            {"op": "topo_record", "at": "vertex", "every": 1}]
     allops = base + ops + tail
     from translate import SCHEDULE_ORDER
     rank = {n: i for i, n in enumerate(SCHEDULE_ORDER)}
@@ -92,7 +92,7 @@ def g13(s):
     c = 0.15
     tau = math.log(c) / math.log(1 - s)
     name = f"g13_s{int(s*100):03d}"
-    ops = [{"op": "apoptosis_3d", "at": "vertex", "cell_set": "cell", "p0": 3.5,
+    ops = [{"op": "cell_die", "at": "vertex", "cell_set": "cell", "p0": 3.5,
             "mode": "list", "cells": [137], "shrink_rate": s, "critical_frac": c,
             "min_age": 0, "after_frame": 50}]
     return name, _shell(name, ops, {"_gate": {
@@ -113,11 +113,11 @@ def g16(tag, chem, diff):
     runs, A's parameters and B's, and the gate is simply that B's count is the lower.
     """
     name = f"g16_{tag}"
-    ops = [{"op": "cell_adjacency", "at": "cell"},
-           {"op": "seed_cell_rd", "at": "cell", "seed": 0, "before_frame": 3,
+    ops = [{"op": "cell_neighbours", "at": "cell"},
+           {"op": "cell_chem_seed", "at": "cell", "seed": 0, "before_frame": 3,
             "mode": "scatter", "seed_frac": 0.12},
-           {"op": "cell_diffuse", "at": "cell", "implementation": "graph_laplacian", **diff},
-           {"op": "cell_react", "at": "cell", "model": "gray_scott", **chem}]
+           {"op": "cell_chem_diffuse", "at": "cell", "implementation": "graph_laplacian", **diff},
+           {"op": "cell_chem_react", "at": "cell", "model": "gray_scott", **chem}]
     return name, _shell(name, ops, {"_gate": {
         "gate": "G16", "species": tag, **chem, **diff,
         "why": "a static sphere, so n_spots is a property of the chemistry and not of the mesh. "
@@ -136,10 +136,10 @@ def i4(s):
     base = copy.deepcopy(yaml.safe_load(open(os.path.join(CONFIG, "sc_slow_94.yaml"))))
     base["general"]["name"] = name
     for o in base["operators"]:
-        if o["op"] == "grow_3d":
+        if o["op"] == "cell_grow":
             for k in ("inhib_chan", "inhib_sw", "inhib_hill"):
                 o.pop(k, None)                      # THE CONFOUND, removed
-        if o["op"] == "apoptosis_3d":
+        if o["op"] == "cell_die":
             o["shrink_rate"] = s
     base.pop("_sculpt", None)
     base["_gate"] = {"gate": "I4", "shrink_rate": s, "inhibitor": "OFF",
@@ -201,18 +201,18 @@ def g16c():
     """Both species in ONE tissue, each on its own channel. Do they keep their wavelengths?"""
     name, sp = G16C
     A, B = sp["A"], sp["B"]
-    ops = [{"op": "cell_adjacency", "at": "cell"},
-           {"op": "seed_cell_rd", "at": "cell", "seed": 0, "before_frame": 3,
+    ops = [{"op": "cell_neighbours", "at": "cell"},
+           {"op": "cell_chem_seed", "at": "cell", "seed": 0, "before_frame": 3,
             "mode": "scatter", "seed_frac": 0.12, "chan": 0},
-           {"op": "seed_cell_rd", "at": "cell", "seed": 7, "before_frame": 3,
+           {"op": "cell_chem_seed", "at": "cell", "seed": 7, "before_frame": 3,
             "mode": "scatter", "seed_frac": 0.12, "chan": 2},
-           {"op": "cell_diffuse", "at": "cell", "implementation": "graph_laplacian", "chan": 0,
+           {"op": "cell_chem_diffuse", "at": "cell", "implementation": "graph_laplacian", "chan": 0,
             **{k: A[k] for k in ("d_a", "d_h", "chi")}},
-           {"op": "cell_diffuse", "at": "cell", "implementation": "graph_laplacian", "chan": 2,
+           {"op": "cell_chem_diffuse", "at": "cell", "implementation": "graph_laplacian", "chan": 2,
             **{k: B[k] for k in ("d_a", "d_h", "chi")}},
-           {"op": "cell_react", "at": "cell", "model": "gray_scott", "chan": 0, "rate": 1.0,
+           {"op": "cell_chem_react", "at": "cell", "model": "gray_scott", "chan": 0, "rate": 1.0,
             **{k: A[k] for k in ("F", "kk")}},
-           {"op": "cell_react", "at": "cell", "model": "gray_scott", "chan": 2, "rate": 1.0,
+           {"op": "cell_chem_react", "at": "cell", "model": "gray_scott", "chan": 2, "rate": 1.0,
             **{k: B[k] for k in ("F", "kk")}}]
     return name, _shell(name, ops, {"_gate": {
         "gate": "G16c", "predicted_spacing_chan0": 6.99, "predicted_spacing_chan2": 3.18,

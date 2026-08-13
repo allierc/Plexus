@@ -79,7 +79,7 @@ class OperatorContract:
     default: str | None = None
     # WHICH AXIS EACH VARIANT VARIES. `model` = a different biological hypothesis at this slot;
     # `implementation` = the same biology computed differently. See the contract paragraph in
-    # plexus2.tex: conflating them left every finding recorded against `cell_react` actually
+    # plexus2.tex: conflating them left every finding recorded against `cell_chem_react` actually
     # about Gray-Scott, and the search unable to tell an experiment from a control.
     axis: dict = field(default_factory=dict)              # variant name -> "model" | "implementation"
 
@@ -176,7 +176,7 @@ def register_operator(*names: str, implementation: str | None = None,
                         f"operator {name!r} already has variant {impl!r} "
                         f"({contract.implementations[impl].__name__})")
                 # Variants of one contract must share its KIND. This is a weak guard and always
-                # was: all four `shape_to_chem` variants are `lateral` while each senses a
+                # was: all four `cell_chem_from_shape` variants are `lateral` while each senses a
                 # different physical quantity, so the check passed on four distinct biological
                 # hypotheses wearing one label. The `model`/`implementation` axis is what
                 # actually carries that distinction.
@@ -241,7 +241,7 @@ OPERATOR_FAMILIES = {
     "mpm",          # the MLS-MPM substep machinery (mpm_strain/scatter/gather/grid_update, mls_mpm_mechanics, apply_material_map)
     "coupling",     # cross-substrate transfer (agent_scatter, agent_gather, agent_remodel)
     "hierarchy",    # parent<->child plumbing (aggregate, broadcast)
-    "growth",       # structural population change (cell_divide, cell_grow)
+    "growth",       # structural population change (agent_divide, agent_grow)
     "topology",     # graph rewire (radius_graph)
 }
 

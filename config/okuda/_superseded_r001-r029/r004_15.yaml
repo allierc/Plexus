@@ -29,7 +29,7 @@ sets:
         width: 1
 fields: {}
 operators:
-- op: seed_mesh_3d
+- op: mesh_seed
   at: vertex
   cell_set: cell
   before_frame: 1
@@ -39,36 +39,36 @@ operators:
   radius: 5.0
   jitter: 0.15
   p0: 3.5
-- op: cell_geometry_3d
+- op: cell_geometry
   at: cell
-- op: cell_adjacency
+- op: cell_neighbours
   at: cell
-- op: seed_cell_rd
+- op: cell_chem_seed
   at: cell
   seed: 0
   before_frame: 3
   mode: scatter
   seed_frac: 0.06
-- op: cell_diffuse
+- op: cell_chem_diffuse
   at: cell
   implementation: graph_laplacian
   d_a: 0.08
   d_h: 0.16
   chi: 1.3
-- op: cell_react
+- op: cell_chem_react
   at: cell
   model: brusselator
   gamma: 0.05
   A: 1.0
   B: 3.0
-- op: shape_to_chem
+- op: cell_chem_from_shape
   at: cell
   model: curvature
   vertex_set: vertex
   beta: 0.5
   F0: 0.046
   rate: 1.0
-- op: grow_3d
+- op: cell_grow
   at: vertex
   cell_set: cell
   rate: 0.000866
@@ -78,7 +78,7 @@ operators:
   vth_frac: 2.5
   after_frame: 100
   conserve_amount: false
-- op: shape_energy_3d
+- op: cell_mechanics
   at: vertex
   K_A: 1.0
   K_P: 1.0
@@ -94,7 +94,7 @@ operators:
   cap_frac: 0.12
   K_bend: 0.0
   K_lumen: 0.0
-- op: divide_3d
+- op: cell_divide
   at: vertex
   cell_set: cell
   factor: 2.4
@@ -104,27 +104,27 @@ operators:
   p0: 3.5
   every: 4
   engine_clock: true
-- op: reconnect_t1_3d
+- op: edge_flip
   at: vertex
   l_th_frac: 0.28
   every: 1
   max_flips: 300
-- op: topo_snapshot_3d
+- op: topo_record
   at: vertex
   every: 1
 schedule:
-- seed_mesh_3d
-- cell_geometry_3d
-- cell_adjacency
-- seed_cell_rd
-- cell_diffuse
-- cell_react
-- shape_to_chem
-- grow_3d
-- shape_energy_3d
-- divide_3d
-- reconnect_t1_3d
-- topo_snapshot_3d
+- mesh_seed
+- cell_geometry
+- cell_neighbours
+- cell_chem_seed
+- cell_chem_diffuse
+- cell_chem_react
+- cell_chem_from_shape
+- cell_grow
+- cell_mechanics
+- cell_divide
+- edge_flip
+- topo_record
 _basis:
   chem: bru
   mat: gated

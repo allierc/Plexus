@@ -26,34 +26,34 @@ sets:
         width: 1
 fields: {}
 operators:
-- op: seed_mesh_3d
+- op: mesh_seed
   at: vertex
   cell_set: cell
   before_frame: 1
   n_cells: 2000
   vseed_cv: 0.15
-- op: cell_geometry_3d
+- op: cell_geometry
   at: cell
-- op: seed_cell_rd
+- op: cell_chem_seed
   at: cell
   mode: scatter
   seed_frac: 0.06
   before_frame: 1
-- op: cell_adjacency
+- op: cell_neighbours
   at: cell
-- op: cell_diffuse
+- op: cell_chem_diffuse
   at: cell
   implementation: graph_laplacian
   d_a: 0.08
   d_h: 0.16
   chi: 65.0
-- op: cell_react
+- op: cell_chem_react
   at: cell
   model: gray_scott
   rate: 50.0
   F: 0.055
   kk: 0.062
-- op: shape_energy_3d
+- op: cell_mechanics
   model: monolayer
   at: vertex
   k_v: 6.0
@@ -65,47 +65,47 @@ operators:
   relax_iters: 30
   eta: 0.08
   cap_frac: 0.12
-- op: reconnect_t1_3d
+- op: edge_flip
   at: vertex
   l_th_frac: 0.28
   every: 1
   max_flips: 300
-- op: topo_snapshot_3d
+- op: topo_record
   at: vertex
   every: 1
 schedule:
-- seed_mesh_3d
-- cell_geometry_3d
-- seed_cell_rd
-- cell_adjacency
-- cell_diffuse
-- cell_react
-- shape_energy_3d
-- reconnect_t1_3d
-- topo_snapshot_3d
+- mesh_seed
+- cell_geometry
+- cell_chem_seed
+- cell_neighbours
+- cell_chem_diffuse
+- cell_chem_react
+- cell_mechanics
+- edge_flip
+- topo_record
 _discovery:
   comp_hash: C08666c8bf72
   structure:
     operators:
     - id: cell_adjacency0
-      op: cell_adjacency
+      op: cell_neighbours
     - id: cell_diffuse0
-      op: cell_diffuse
+      op: cell_chem_diffuse
       impl: graph_laplacian
     - id: cell_geometry_3d0
-      op: cell_geometry_3d
+      op: cell_geometry
     - id: seed_cell_rd0
-      op: seed_cell_rd
+      op: cell_chem_seed
       impl: scatter
     - id: cell_react0
-      op: cell_react
+      op: cell_chem_react
       impl: gray_scott
     - id: reconnect_t1_3d0
-      op: reconnect_t1_3d
+      op: edge_flip
     - id: seed_mesh_3d0
-      op: seed_mesh_3d
+      op: mesh_seed
     - id: shape_energy_3d0
-      op: shape_energy_3d
+      op: cell_mechanics
       impl: monolayer
     connections: []
   region: mechanics-only (no growth)

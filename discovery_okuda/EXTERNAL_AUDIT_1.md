@@ -33,14 +33,14 @@ Three operators declare slots, and they are the entire morphogen -> mechanics ar
 
 | operator | slot | what it is |
 |---|---|---|
-| `grow_3d` | `gate` | **Okuda's actual mechanism** |
+| `cell_grow` | `gate` | **Okuda's actual mechanism** |
 | `extrude` | `site` | the forcing term |
-| `divide_3d:orient_iface` | `axis` | oriented division |
+| `cell_divide:orient_iface` | `axis` | oriented division |
 
 Breadth-first closure of the reachable one-edit space, using the menu's own filter:
 
     REACHABLE RUNNABLE compositions from seed:  9760
-       grow_3d                         0
+       cell_grow                         0
        extrude                                     0
        reachable compositions with ANY connection: 0
 
@@ -70,7 +70,7 @@ child carries the parent's hash — and `R6_DUPLICATE` refuses any seen hash. Me
 parameter moves refused**, even against a seen-list of one. `t_set_param` passes anyway, because
 it checks the move is OFFERED and never that it is ADMITTED.
 
-**Round 7 bought nothing either.** All four `shape_to_chem` runs ran at `beta: 0.0` — the
+**Round 7 bought nothing either.** All four `cell_chem_from_shape` runs ran at `beta: 0.0` — the
 operator's own declared null. `add_op` seeds every parameter at its default, so an operator whose
 default is its own null can never be tested, because the only way to raise it is a `set_param`
 move and those are all refused.
@@ -110,7 +110,7 @@ numbers.
    They are the only compositions in the repository that carry a wire.
 3. **Scope `R6_DUPLICATE` to structure**, so a retune is not refused as a duplicate of the
    mechanism it perturbs.
-4. Fix the `shape_energy_3d:monolayer` emitter, which drops every parameter it is given.
+4. Fix the `cell_mechanics:monolayer` emitter, which drops every parameter it is given.
 5. Arbitrate the phenotype: `morphology.classify` + the Biologist, not the analyst's word.
 6. `logic.py` independence: identical observables count as ONE observation, however many
    composition hashes produced them.

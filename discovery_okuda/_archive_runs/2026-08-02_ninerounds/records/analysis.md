@@ -183,7 +183,7 @@ Reservoir: 2766 of 104004 cells (3%) — not limiting.
 Specimen: valid — all hold
 Reader: phenotype=bud, specimen=MISSING
 Eye-check: supports
-Mutation: ('add_op', 'divide_3d', 'hertwig')
+Mutation: ('add_op', 'cell_divide', 'hertwig')
 Verdict: falsified — measured protr_peak=1.29, protr_final=1.29, ta_n_tubes_final=2, mech_p_ratio=0.641 against "protr_peak >= 1.3"
 Next: parent=Cdcf832a5061
 
@@ -373,7 +373,7 @@ Reservoir: 2545 of 104004 cells (2%) — not limiting.
 Specimen: ambiguous — P7
 Reader: phenotype=bud, specimen=MISSING
 Eye-check: supports
-Mutation: ('add_op', 'divide_3d', 'hertwig')
+Mutation: ('add_op', 'cell_divide', 'hertwig')
 Verdict: inconclusive — specimen ambiguous, so protr_peak=1.26, protr_final=1.22, ta_n_tubes_final=0, mech_p_ratio=4.48 describe the configuration and not a tissue
 Next: parent=Ceb5a08335c1
 
@@ -528,7 +528,7 @@ Reservoir: 2766 of 104004 cells (3%) — not limiting.
 Specimen: valid — all hold
 Reader: phenotype=bud, specimen=MISSING
 Eye-check: supports
-Mutation: ('add_op', 'divide_3d', 'hertwig')
+Mutation: ('add_op', 'cell_divide', 'hertwig')
 Verdict: supported — measured protr_peak=1.29, protr_final=1.29, ta_n_tubes_final=2, mech_p_ratio=0.641 against "protr_peak >= 1.10"
 Next: parent=C174e7675de5
 
@@ -712,7 +712,7 @@ Measured: protr_peak=1.179, protr_final=1.179, ta_n_tubes_final=2, mech_p_ratio=
 Reservoir: 2000 of 104004 cells (2%) — not limiting.
 Specimen: valid — all hold
 Reader: phenotype=bud, specimen=MISSING
-Eye-check: DISAGREES — The description shows a distinct protrusion/bud forming, which contradicts the claim that removing reconnect_t1_3d drops the bud (protr_peak <= 1.1).
+Eye-check: DISAGREES — The description shows a distinct protrusion/bud forming, which contradicts the claim that removing edge_flip drops the bud (protr_peak <= 1.1).
 Mutation: ('remove_op', 'reconnect_t1_3d0')
 Verdict: falsified — measured protr_peak=1.18, protr_final=1.18, ta_n_tubes_final=2, mech_p_ratio=8.73 against "protr_peak <= 1.1"
 Next: parent=C1fdee57724f

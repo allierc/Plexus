@@ -1,17 +1,17 @@
-"""cell_divide:volume_conserving -- oriented, volume-conserving stochastic cleavage.
+"""agent_divide:volume_conserving -- oriented, volume-conserving stochastic cleavage.
 
-A second IMPLEMENTATION of the registered `cell_divide` contract (structural / growth / cell),
+A second IMPLEMENTATION of the registered `agent_divide` contract (structural / growth / cell),
 translated from jax-morph's `Division` step. The forward biology is the SAME divide primitive the
-promoted isotropic `cell_divide` already realizes -- one alive cell becomes two as an independent
+promoted isotropic `agent_divide` already realizes -- one alive cell becomes two as an independent
 Bernoulli event with the per-cell hazard
 
     p_i = 1 - exp(-clip(division_rate_i, 0) * dt)      # = -expm1(-clip(rate,0)*dt)
 
 on a fixed capacity buffer, the daughter WAKING a dormant slot (occ 0 -> 1) and inheriting the
 mother's heritable per-cell fields. What this implementation REFINES over the default (the reason
-the entry files it `refinement` of cell_divide, not a bare `alias`):
+the entry files it `refinement` of agent_divide, not a bare `alias`):
 
-* VOLUME CONSERVATION, not mass doubling. The default cell_divide is confluent proliferation --
+* VOLUME CONSERVATION, not mass doubling. The default agent_divide is confluent proliferation --
   the daughter appears at the mother's radius, so tissue AREA grows per division. jax-morph is
   CLEAVAGE-stage division: the embryo does not grow, the cells just get smaller. BOTH daughters
   take radius r*m with m = 2^(-1/d) (`n_space_dim` = the world dim sets the exponent), so each
@@ -42,7 +42,7 @@ the entry files it `refinement` of cell_divide, not a bare `alias`):
 * CAPACITY is a hard wall, not a crash. If more cells divide than there are free slots the surplus
   dividers are silently DROPPED and tallied into the GLOBAL, running `division_overflow` counter --
   a reimplementer who RAISES on overflow diverges. This is numerics (a full-buffer guard), not
-  biology; the default cell_divide handles a full buffer by simply stopping.
+  biology; the default agent_divide handles a full buffer by simply stopping.
 
 NOT modelled (excluded so the refinement is not over-claimed): the straight-through / pathwise
 differentiability and the `logp` score are gradient-ESTIMATOR machinery -- an engine concern in
@@ -70,7 +70,7 @@ from plexus.models.base import Structural
 from plexus.models.registry import register_operator
 
 
-@register_operator("cell_divide", family="growth", set="cell", kind="structural",
+@register_operator("agent_divide", family="growth", set="cell", kind="structural",
                    implementation="volume_conserving")
 class CellDivideVolumeConserving(Structural):
     EMIT = None                                       # structural: wakes dormant slots, mutates occ/state in place; returns {} — no integrable delta

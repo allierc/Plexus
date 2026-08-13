@@ -1,4 +1,0 @@
-{
- "name": "vh_K4_cv15_d4_rd_coral",
- "error": "RuntimeError(\"operator 'grow_3d' wrote the integrated state of set 'cell' directly. A dynamics operator must RETURN a delta (the engine integrates it); only structural / derived-readout operators (MAY_MUTATE_INTEGRATED_STATE) may write state. (integration invariant)\")"
-}

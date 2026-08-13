@@ -184,7 +184,7 @@ def load(path: str) -> Spec:
         # `model:` and `implementation:` are separate keys and naming one where the other is meant
         # is refused by the contract. Gray-Scott and Brusselator are not two ways of computing one
         # reaction -- their parameter sets are disjoint -- so calling the swap an implementation
-        # made every finding recorded against `cell_react` silently a finding about Gray-Scott.
+        # made every finding recorded against `cell_chem_react` silently a finding about Gray-Scott.
         impl = o.get("implementation")
         modl = o.get("model")
         if impl is not None and modl is not None:

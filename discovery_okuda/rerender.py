@@ -34,7 +34,7 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 LOG = os.path.join(ROOT, "log", "okuda")
-for _p in (HERE, os.path.join(ROOT, "prototype", "Tyssue"), os.path.join(ROOT, "src")):
+for _p in (HERE, os.path.join(ROOT, "discovery_okuda", "ops"), os.path.join(ROOT, "src")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 

@@ -3,7 +3,7 @@
 
 WHY THIS EXISTS (finding F009)
 ================================================================================================
-`chi` was the campaign's pattern-scale knob, and it is not a scale. `cell_diffuse` applies a
+`chi` was the campaign's pattern-scale knob, and it is not a scale. `cell_chem_diffuse` applies a
 DEGREE-NORMALISED graph Laplacian -- "the mean of my neighbours, minus me" -- which contains no dx
 anywhere, so `d * chi` is a dimensionless per-frame mixing fraction. A rate. The operator
 nonetheless declares `PARAM_ROLES: chi = "spatial_scale"`, and measured on a 2000-cell ball chi
@@ -245,8 +245,8 @@ def pattern_metrics(act, es, et, ef, nF, alive=None, thr=None, **kw):
 # --------------------------------------------------------------------------- self-test
 if __name__ == "__main__":
     import sys
-    sys.path.insert(0, "/workspace/Plexus/prototype/Tyssue")
-    from tyssue_ops3d import build_sphere_mesh, face_geometry_3d
+    sys.path.insert(0, "/workspace/Plexus/discovery_okuda/ops")
+    from mesh_ops import build_sphere_mesh, face_geometry_3d
     import torch
     fails = []
 

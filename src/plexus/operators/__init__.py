@@ -54,8 +54,8 @@ from . import agent_gather       # noqa: F401  mpm_grid  -> agent set  (material
 from . import agent_remodel         # noqa: F401  agent set -> mpm stiffness (cells soften/rigidify tissue)
 from . import polarity_flow_align  # noqa: F401  mpm_grid -> agent heading (polarity-flow alignment; was flow_align)
 from . import polarity_align       # noqa: F401  agent -> agent heading (1st-order Vicsek polar alignment; was heading_align)
-from . import cell_divide           # noqa: F401  agent set structural: proliferation on a fixed buffer (occ)
-from . import cell_grow             # noqa: F401  mpm_particle structural: tissue growth by material-point addition
+from . import agent_divide           # noqa: F401  agent set structural: proliferation on a fixed buffer (occ)
+from . import agent_grow             # noqa: F401  mpm_particle structural: tissue growth by material-point addition
 from . import segmentation_seed     # noqa: F401  a measured instance segmentation -> the CELL level
 
 __all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion", "squared_law", "attractor_flow",

@@ -1,6 +1,6 @@
-"""apoptose (cell set, structural): stochastic cell death -- cell_divide's biological inverse.
+"""apoptose (cell set, structural): stochastic cell death -- agent_divide's biological inverse.
 
-Where `cell_divide` WAKES a dormant slot (occ 0 -> 1) to add a cell, `apoptose` RETIRES a live
+Where `agent_divide` WAKES a dormant slot (occ 0 -> 1) to add a cell, `apoptose` RETIRES a live
 one (occ 1 -> 0): each cell alive at the death decision independently draws a Bernoulli death
 event with the SAME per-cell hazard the division step uses,
 
@@ -8,7 +8,7 @@ event with the SAME per-cell hazard the division step uses,
 
 and a cell that draws 1 has its `alive` mask flipped False. The tunable is `death_rate`, a
 HERITABLE per-cell STATE field (not a constructor arg) -- an initial condition or an upstream
-controller sets it, exactly like the per-type `div_rate` that `cell_divide` reads. The `rate`
+controller sets it, exactly like the per-type `div_rate` that `agent_divide` reads. The `rate`
 param is only a uniform fallback when no `death_rate` buffer is present (default 0 -> inert).
 
 Routing (the `apoptose` contract, kind=structural, family=growth, set=cell, maps=[]): a single-set
@@ -26,8 +26,8 @@ Two things a reimplementer must get right (both from the source):
   an already-dead slot as freshly dead.
 
 * THE FREED SLOT IS NOT RECYCLED WITHIN THE STEP. Setting occ 1 -> 0 makes the slot dormant, but
-  `cell_divide`'s allocator (`occ == 0` slots) reuses it only on a LATER macro-step. Composition
-  order is load-bearing: run `cell_divide` BEFORE `apoptose` (divide-then-die) so a mother and her
+  `agent_divide`'s allocator (`occ == 0` slots) reuses it only on a LATER macro-step. Composition
+  order is load-bearing: run `agent_divide` BEFORE `apoptose` (divide-then-die) so a mother and her
   newborn daughters may all die in one step while no death-freed slot is repopulated that step --
   which keeps the per-step `death` lineage record intact.
 
@@ -43,7 +43,7 @@ Gradient-estimator note. In jax-morph the forward `died` draw is a straight-thro
 physical effect is a HARD boolean mask, so survival/death objectives take the SCORE-FUNCTION
 (REINFORCE) gradient through `Death.logp`, never a pathwise gradient through `alive`. Plexus's
 engine runs the forward EFFECT (the source's `replay`); the trace/`logp` scoring layer is not
-modelled here, exactly as `cell_divide` realises only the forward proliferation event.
+modelled here, exactly as `agent_divide` realises only the forward proliferation event.
 
 Distinct from the efflux-boundary `death` operator (candidates/death.py), which removes a cell when
 its centroid crosses a spatial exit line -- that is a geometric sink, this is a stochastic hazard.
@@ -105,19 +105,19 @@ class Apoptose(Structural):
             elig = elig & mask.to(torch.bool)
         p = p * elig.to(p.dtype)
 
-        # exact Bernoulli death draw (same generator convention as cell_divide), masked to eligible.
+        # exact Bernoulli death draw (same generator convention as agent_divide), masked to eligible.
         draw = torch.rand(buf, generator=getattr(H, "rng", None), device=dev)
         die = (draw < p) & elig
 
         # persistent per-step `death` record (float 0/1), OVERWRITTEN each macro-step, not
-        # accumulated. Lazily provisioned like cell_grow's grow_V.
+        # accumulated. Lazily provisioned like agent_grow's grow_V.
         if getattr(lvl, "death", None) is None:
             lvl.register_buffer("death", torch.zeros(buf, device=dev, dtype=p.dtype))
         lvl.death.zero_()
         lvl.death[die] = 1.0
 
         # EFFECT: flip alive -> dead by retiring the slot (occ 1 -> 0). The slot is NOT freed within
-        # the step -- cell_divide reuses `occ == 0` slots only on a LATER macro-step, so under the
+        # the step -- agent_divide reuses `occ == 0` slots only on a LATER macro-step, so under the
         # divide-then-die ordering the death record survives for lineage reconstruction.
         # occ is CLONED before the write. `grow_radius` multiplies its delta by
         # `lvl.occ[:, None]`, so the live mask is on the autograd tape; mutating it in

@@ -115,7 +115,7 @@ class Scoreboard:
           0 AUTHENTICATE.  Is it real or is it a broken mesh? For anything with unexpected
             TOPOLOGY this is decisive and cheap: no operator in this substrate can fuse surfaces,
             so the genus cannot legally change. A torus is a bug until an operator exists that is
-            allowed to make one. `tyssue_diag.mesh_genus` settles it.
+            allowed to make one. `diag_tools.mesh_genus` settles it.
           1 LOCALISE.     Vary the parameter and find where it appears and where it does not. A
             phenotype seen once is an anecdote; a phenotype with a boundary is a phenomenon. This
             is an ordinary Loop II sweep.

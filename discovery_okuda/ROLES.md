@@ -347,7 +347,7 @@ Two engine facts, both collected:
 
 | fact | who produces it | where it lands |
 |---|---|---|
-| divisions refused, array full, the frame it first bit | `divide_3d` → `run_one` summary | `reservoir` block → the `Reservoir:` line |
+| divisions refused, array full, the frame it first bit | `cell_divide` → `run_one` summary | `reservoir` block → the `Reservoir:` line |
 | buffer enlarged, or clamped at the memory budget | the launcher, before the run | same block, same line |
 
 A run stopped by its array is a **censored measurement** — a lower bound, not a destination. The

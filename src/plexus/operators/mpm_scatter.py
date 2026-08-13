@@ -133,7 +133,7 @@ class MPMScatter(Exchange):                 # (alias `p2g`, one migration cycle)
         affine = stress + mass[:, None, None] * C
 
         fx, weight, flat = bspline(X, inv_dx, offsets, g.shape, periodic)
-        # DORMANT particles (occ==0, e.g. a cell_grow reserve) contribute NOTHING to the grid:
+        # DORMANT particles (occ==0, e.g. a agent_grow reserve) contribute NOTHING to the grid:
         # mask the scatter weights by occupancy. Byte-identical when all particles are live.
         occ = getattr(p, "occ", None)
         if occ is not None:

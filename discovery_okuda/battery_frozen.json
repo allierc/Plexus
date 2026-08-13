@@ -1,6 +1,6 @@
 [
  {
-  "op": "cell_diffuse",
+  "op": "cell_chem_diffuse",
   "param": "chi",
   "verdict": "LIVE, no derivative",
   "rel": 9.473154949530654e-06,
@@ -8,7 +8,7 @@
   "note": "ValueError"
  },
  {
-  "op": "cell_diffuse",
+  "op": "cell_chem_diffuse",
   "param": "d_a",
   "verdict": "LIVE, no derivative",
   "rel": 9.624910848125216e-06,
@@ -16,7 +16,7 @@
   "note": "ValueError"
  },
  {
-  "op": "cell_diffuse",
+  "op": "cell_chem_diffuse",
   "param": "d_h",
   "verdict": "LIVE, no derivative",
   "rel": 7.648745806988658e-06,
@@ -24,7 +24,7 @@
   "note": "ValueError"
  },
  {
-  "op": "cell_react",
+  "op": "cell_chem_react",
   "param": "F",
   "verdict": "LIVE, no derivative",
   "rel": 2.525555293011124e-05,
@@ -32,7 +32,7 @@
   "note": "ValueError"
  },
  {
-  "op": "cell_react",
+  "op": "cell_chem_react",
   "param": "kk",
   "verdict": "LIVE, no derivative",
   "rel": 5.036752553727438e-05,
@@ -40,7 +40,7 @@
   "note": "ValueError"
  },
  {
-  "op": "cell_react",
+  "op": "cell_chem_react",
   "param": "rate",
   "verdict": "LIVE, no derivative",
   "rel": 1.4578763235429107e-05,
@@ -48,7 +48,7 @@
   "note": "ValueError"
  },
  {
-  "op": "shape_to_chem",
+  "op": "cell_chem_from_shape",
   "param": "F0",
   "verdict": "LIVE, no derivative",
   "rel": 2.1713514757752388e-05,
@@ -56,7 +56,7 @@
   "note": "ValueError"
  },
  {
-  "op": "shape_to_chem",
+  "op": "cell_chem_from_shape",
   "param": "beta",
   "verdict": "LIVE, no derivative",
   "rel": 9.174435084103376e-06,
@@ -64,7 +64,7 @@
   "note": "ValueError"
  },
  {
-  "op": "shape_to_chem",
+  "op": "cell_chem_from_shape",
   "param": "rate",
   "verdict": "LIVE, no derivative",
   "rel": 1.86584090424103e-05,
@@ -72,7 +72,7 @@
   "note": "ValueError"
  },
  {
-  "op": "grow_3d",
+  "op": "cell_grow",
   "param": "a_sw",
   "verdict": "LIVE, no derivative",
   "rel": 6.314643839180976e-06,
@@ -80,7 +80,7 @@
   "note": "ValueError"
  },
  {
-  "op": "grow_3d",
+  "op": "cell_grow",
   "param": "conserve_amount",
   "verdict": "LIVE, no derivative",
   "rel": 3.4426219363247497e-06,
@@ -88,7 +88,7 @@
   "note": ""
  },
  {
-  "op": "grow_3d",
+  "op": "cell_grow",
   "param": "dt",
   "verdict": "UNREAD",
   "rel": 0.0,
@@ -96,7 +96,7 @@
   "note": "never looked up"
  },
  {
-  "op": "grow_3d",
+  "op": "cell_grow",
   "param": "hill",
   "verdict": "LIVE, no derivative",
   "rel": 3.59155033657234e-06,
@@ -104,7 +104,7 @@
   "note": "ValueError"
  },
  {
-  "op": "grow_3d",
+  "op": "cell_grow",
   "param": "rate",
   "verdict": "LIVE, no derivative",
   "rel": 9.158234284496391e-06,
@@ -112,7 +112,7 @@
   "note": "ValueError"
  },
  {
-  "op": "grow_3d",
+  "op": "cell_grow",
   "param": "rho",
   "verdict": "LIVE, no derivative",
   "rel": 3.699884342953758e-06,
@@ -120,7 +120,7 @@
   "note": "ValueError"
  },
  {
-  "op": "grow_3d",
+  "op": "cell_grow",
   "param": "vth_frac",
   "verdict": "LIVE, no derivative",
   "rel": 7.011024052453133e-06,
@@ -128,7 +128,7 @@
   "note": "ValueError"
  },
  {
-  "op": "shape_energy_3d",
+  "op": "cell_mechanics",
   "param": "cap_frac",
   "verdict": "LIVE, no derivative",
   "rel": 1.0444092892545998e-05,
@@ -136,7 +136,7 @@
   "note": "ValueError"
  },
  {
-  "op": "shape_energy_3d",
+  "op": "cell_mechanics",
   "param": "dt",
   "verdict": "LIVE, no derivative",
   "rel": 2.19101520297636e-05,
@@ -144,7 +144,7 @@
   "note": "ValueError"
  },
  {
-  "op": "shape_energy_3d",
+  "op": "cell_mechanics",
   "param": "eta",
   "verdict": "LIVE, no derivative",
   "rel": 1.3364329784444891e-05,
@@ -152,7 +152,7 @@
   "note": "ValueError"
  },
  {
-  "op": "shape_energy_3d",
+  "op": "cell_mechanics",
   "param": "gamma",
   "verdict": "LIVE, no derivative",
   "rel": 3.536419860930622e-05,
@@ -160,7 +160,7 @@
   "note": "ValueError"
  },
  {
-  "op": "shape_energy_3d",
+  "op": "cell_mechanics",
   "param": "h0",
   "verdict": "LIVE, no derivative",
   "rel": 2.4911347396780714e-05,
@@ -168,7 +168,7 @@
   "note": "ValueError"
  },
  {
-  "op": "shape_energy_3d",
+  "op": "cell_mechanics",
   "param": "k_v",
   "verdict": "LIVE, no derivative",
   "rel": 2.149745785078244e-05,
@@ -176,7 +176,7 @@
   "note": "ValueError"
  },
  {
-  "op": "shape_energy_3d",
+  "op": "cell_mechanics",
   "param": "kappa_s",
   "verdict": "LIVE, no derivative",
   "rel": 5.153646747583675e-05,
@@ -184,7 +184,7 @@
   "note": "ValueError"
  },
  {
-  "op": "shape_energy_3d",
+  "op": "cell_mechanics",
   "param": "mu",
   "verdict": "LIVE, no derivative",
   "rel": 1.3364329784444891e-05,
@@ -192,7 +192,7 @@
   "note": "ValueError"
  },
  {
-  "op": "shape_energy_3d",
+  "op": "cell_mechanics",
   "param": "relax_iters",
   "verdict": "LIVE, no derivative",
   "rel": 4.796582998494472e-06,

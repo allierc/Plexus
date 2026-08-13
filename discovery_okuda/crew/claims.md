@@ -9,7 +9,7 @@ belongs where the person reading the conclusion can see it.
 The epistemic audit of r001–r022 found a loop that could write knowledge but not manipulate it. Its
 eleven STANDING LAWS lived in `knowledge.md` as prose, so nothing could score them, breed from them,
 or notice when two of them contradicted each other — and two of them do: **L5** asserts that
-`shape_to_chem.beta < 0` extinguishes the activator *morphotype-independent*, and **L9** asserts it
+`cell_chem_from_shape.beta < 0` extinguishes the activator *morphotype-independent*, and **L9** asserts it
 is *base-dependent*. Both sat in the same file for six rounds. No experiment was ever posed to
 separate them, because there was no object to pose it against.
 

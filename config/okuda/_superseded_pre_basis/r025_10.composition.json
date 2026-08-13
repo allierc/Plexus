@@ -2,47 +2,47 @@
  "ops": [
   {
    "id": "seed_mesh_3d0",
-   "op": "seed_mesh_3d",
+   "op": "mesh_seed",
    "impl": "fibonacci_sphere"
   },
   {
    "id": "cell_geometry_3d0",
-   "op": "cell_geometry_3d",
+   "op": "cell_geometry",
    "impl": "scatter_add"
   },
   {
    "id": "seed_cell_rd0",
-   "op": "seed_cell_rd",
+   "op": "cell_chem_seed",
    "impl": "cone"
   },
   {
    "id": "cell_adjacency0",
-   "op": "cell_adjacency",
+   "op": "cell_neighbours",
    "impl": "shared_edge"
   },
   {
    "id": "cell_diffuse0",
-   "op": "cell_diffuse",
+   "op": "cell_chem_diffuse",
    "impl": "graph_laplacian"
   },
   {
    "id": "cell_react0",
-   "op": "cell_react",
+   "op": "cell_chem_react",
    "impl": "gray_scott"
   },
   {
    "id": "grow_3d0",
-   "op": "grow_3d",
+   "op": "cell_grow",
    "impl": "hill_conserve_amount"
   },
   {
    "id": "shape_energy_3d0",
-   "op": "shape_energy_3d",
+   "op": "cell_mechanics",
    "impl": "monolayer"
   },
   {
    "id": "divide_3d0",
-   "op": "divide_3d",
+   "op": "cell_divide",
    "impl": "hertwig"
   }
  ],

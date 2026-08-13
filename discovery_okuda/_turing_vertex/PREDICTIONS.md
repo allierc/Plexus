@@ -4,7 +4,7 @@ Posed 2026-07-30 ~17:40 EDT, from reading the growth law only. Scored by `predic
 
 ## The mechanism claim under test
 
-`grow_3d` has two branches:
+`cell_grow` has two branches:
 
     s <- s * (1 + rate*(rho + hillv))          hillv = a^h/(a_sw^h + a^h)  in [0,1]
     rho > 0 :  s <- min(s, (vth_frac*v_ref/V0f_init)^(1/3))     # CAPPED  -- divide, don't bulge
@@ -101,7 +101,7 @@ Caveat recorded up front: `hollow_frac` is already 0.197 there, so morphology re
 waves is measured on a straining mesh and must be reported with the integrity number.
 
 Okuda's targets: thin tube (chi .01, gamma 100) · thick tube (.1, 1) · undulation (.1, 100) ·
-branching (.01, .01). Here chi = `cell_diffuse.chi`, gamma = `cell_react.rate`.
+branching (.01, .01). Here chi = `cell_chem_diffuse.chi`, gamma = `cell_chem_react.rate`.
 
 ### Wave F — `chi` (domain size). Okuda: tube diameter ∝ chi^(1/4)
 

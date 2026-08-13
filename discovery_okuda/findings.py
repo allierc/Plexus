@@ -203,11 +203,11 @@ def seed():
                 "force-balance/zero-stress distinction spelled out; its example withdrawn.",
         tags=["retracted", "biology"])
 
-    add("F006", "grow_3d never updates R0, so the radial spring in shape_energy_3d "
+    add("F006", "cell_grow never updates R0, so the radial spring in cell_mechanics "
                 "holds the shell at its seed radius while cell target volumes grow sixteenfold.",
         "standing", D,
-        evidence="Read from source: the radial term is tyssue_ops3d.py:85, R0 is set at seeding "
-                 ":217 and rescaled only by grow_3d :409. Fixing it (R0 from the enclosing "
+        evidence="Read from source: the radial term is mesh_ops.py:85, R0 is set at seeding "
+                 ":217 and rescaled only by cell_grow :409. Fixing it (R0 from the enclosing "
                  "sphere of the current TARGET volume) removes the self-intersection completely: "
                  "rays cross exactly once at every frame, reduced volume 0.985 -> 0.977 instead "
                  "of -> 0.229, mean cell volume flat instead of collapsing.",
@@ -217,7 +217,7 @@ def seed():
                 "penalise a growing bud -- the one shape the campaign exists to produce.",
         tags=["standing", "mechanism", "defect"])
 
-    add("F007", "grow_3d.conserve_amount extinguishes a Gray-Scott pattern.",
+    add("F007", "cell_grow.conserve_amount extinguishes a Gray-Scott pattern.",
         "standing", D,
         evidence="Dilution of 1% per step kills the activator within 250 steps in pure chemistry, "
                  "while the undiluted pattern reaches 53% coverage by step 250 and holds "
@@ -249,7 +249,7 @@ def seed():
     add("F009", "Our `chi` cannot be compared with Okuda's, because it is a solver rate labelled "
                 "as a spatial scale.",
         "standing", D,
-        evidence="cell_diffuse applies a DEGREE-NORMALISED graph Laplacian -- 'mean of my "
+        evidence="cell_chem_diffuse applies a DEGREE-NORMALISED graph Laplacian -- 'mean of my "
                  "neighbours minus me' -- which contains no dx at all, so d*chi is a dimensionless "
                  "per-frame mixing fraction. The operator nonetheless declares "
                  "PARAM_ROLES chi = 'spatial_scale'. Measured on a 2000-cell ball, chi does three "

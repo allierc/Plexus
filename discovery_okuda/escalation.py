@@ -219,7 +219,7 @@ if __name__ == "__main__":
         r = bl.file(OperatorRequest(
             rid=bl.next_rid(), round_id=4,
             mechanism="anisotropic line tension along a morphogen gradient",
-            why_inexpressible=("no registered operator EMITs a per-EDGE tension; `shape_energy_3d` "
+            why_inexpressible=("no registered operator EMITs a per-EDGE tension; `cell_mechanics` "
                                "reads a single scalar Lambda for the whole mesh, and the cell set "
                                "carries no edge-indexed state block to route into it"),
             wanted_for=("whether Okuda's tube needs oriented tension or only oriented growth -- "

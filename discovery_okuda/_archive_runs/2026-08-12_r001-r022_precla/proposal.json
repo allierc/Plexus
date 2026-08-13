@@ -39,7 +39,7 @@
   "predict": "grip_peak > 0.30", "intent": "adversarial", "chases": "r021_02",
   "why": "chases the campaign grip record; isolates whether apoptosis or the 7550-cell over-growth carries the coupling"},
 
- {"parent": "r017_05", "edit": ["add_op", "apoptosis_3d", "default"],
+ {"parent": "r017_05", "edit": ["add_op", "cell_die", "default"],
   "claim": "L11 -- apoptosis on the finger preserves the arm; its effect on the fold is non-monotone in death",
   "predict": "invagination_peak > 0.754", "intent": "adversarial",
   "why": "L11 OPEN with opposite signs at equal n_apop; the death twin of the deepest clean fold settles the direction"},

@@ -53,7 +53,7 @@ def presets():
         ("p0_390", dict(p0=3.90, v0=0.2)),   # fluid
         ("p0_410", dict(p0=4.10, v0=0.2)),   # deep fluid
         ("passive", dict(p0=3.90, v0=0.0)),  # control: no motility -> frozen even above p0*
-        ("grow",    dict(p0=3.85, v0=0.10, n0=90, buffer=300, div_rate=0.025)),  # cell_divide -> growing tissue
+        ("grow",    dict(p0=3.85, v0=0.10, n0=90, buffer=300, div_rate=0.025)),  # agent_divide -> growing tissue
     ]
     return [(n, dict(N=N, frames=800, dt=0.05, Dr=1.0, **d)) for n, d in P]
 
@@ -63,10 +63,10 @@ def make_sim(p):
     ops = [{"op": "vertex_tension", "at": "cell", "p0": p["p0"], "v0": p["v0"],
             "Dr": p["Dr"], "K_A": 1.0, "K_P": 1.0, "A0": 1.0, "mu": 1.0, "dt": p["dt"]}]
     sched = ["vertex_tension"]
-    if p.get("div_rate"):                                     # proliferation: cell_divide on the vertex tissue
+    if p.get("div_rate"):                                     # proliferation: agent_divide on the vertex tissue
         setcfg["buffer"] = p.get("buffer", 300)
-        ops.append({"op": "cell_divide", "at": "cell", "rate": p["div_rate"], "offset": 0.25, "max_occ": 0.95})
-        sched.append("cell_divide")
+        ops.append({"op": "agent_divide", "at": "cell", "rate": p["div_rate"], "offset": 0.25, "max_occ": 0.95})
+        sched.append("agent_divide")
     cfg = {
         "general": {"name": "spv", "seed": 1, "n_frames": p["frames"], "dt": p["dt"],
                     "boundary": "periodic", "world": [float(L), float(L)]},

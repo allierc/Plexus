@@ -189,12 +189,12 @@ def test_dedupe_admits_a_sweep_and_the_control():
     seen = {comp_hash(g), C._run_key(g)}
 
     # THROUGH `_resolve_edit`, WHICH IS THE PATH THE ROUND TAKES. My first version of this test
-    # applied the BARE target `reconnect_t1_3d.l_th_frac` directly, and all three sweep points
+    # applied the BARE target `edge_flip.l_th_frac` directly, and all three sweep points
     # collided on one run_key -- because the bare form writes a key no operator reads and changes
     # nothing. The test reproduced the bug it was written beside.
     for v in (0.30, 0.32, 0.34):
         with contextlib.redirect_stdout(io.StringIO()):
-            e = E._resolve_edit(g, ("set_param", "reconnect_t1_3d.l_th_frac", v))
+            e = E._resolve_edit(g, ("set_param", "edge_flip.l_th_frac", v))
             g2, _ = g.apply(e)
             ok, rej = C.admit(g2, seen_hashes=seen, edit_kind="set_param")
         check(e[1].startswith("reconnect_t1_3d0."), f"the bare target was not resolved: {e[1]}")
@@ -263,11 +263,11 @@ def test_a_child_differs_from_its_parent_by_exactly_the_edit():
     -- and re-emits from the projection. Measured on the round that ran:
 
         control vs its own parent (refute_coral_nocons -> r001_00_ctrl): 29 DIFFERENCES
-          reconnect_t1_3d.l_th_frac   0.35 -> 2.45      round 2 died of 1.96
-          reconnect_t1_3d.every          4 -> 1
-          seed_mesh_3d.radius          5.0 -> dropped
-          seed_mesh_3d.jitter         0.18 -> dropped
-          shape_energy_3d.K_R          0.4 -> 0.02
+          edge_flip.l_th_frac   0.35 -> 2.45      round 2 died of 1.96
+          edge_flip.every          4 -> 1
+          mesh_seed.radius          5.0 -> dropped
+          mesh_seed.jitter         0.18 -> dropped
+          cell_mechanics.K_R          0.4 -> 0.02
         and l_th_frac 0.28 -> 1.96 on both other parents.
 
     Every run executed the configuration the previous campaign died of, and five of eight were
@@ -294,12 +294,12 @@ def test_a_child_differs_from_its_parent_by_exactly_the_edit():
                 return o.get(key)
         return None
 
-    LOAD_BEARING = [("reconnect_t1_3d", "l_th_frac"), ("reconnect_t1_3d", "every"),
-                    ("reconnect_t1_3d", "max_flips"), ("seed_mesh_3d", "radius"),
-                    ("seed_mesh_3d", "jitter"), ("seed_mesh_3d", "p0"),
-                    ("seed_mesh_3d", "n_cells"), ("shape_energy_3d", "K_R"),
-                    ("divide_3d", "every"), ("divide_3d", "min_cycle"),
-                    ("grow_3d", "vth_frac")]
+    LOAD_BEARING = [("edge_flip", "l_th_frac"), ("edge_flip", "every"),
+                    ("edge_flip", "max_flips"), ("mesh_seed", "radius"),
+                    ("mesh_seed", "jitter"), ("mesh_seed", "p0"),
+                    ("mesh_seed", "n_cells"), ("cell_mechanics", "K_R"),
+                    ("cell_divide", "every"), ("cell_divide", "min_cycle"),
+                    ("cell_grow", "vth_frac")]
 
     for parent in ("refute_coral_nocons", "coral_gate"):
         with open(os.path.join(E.LOG_ROOT, parent, "spec_run.yaml")) as f:
@@ -315,11 +315,11 @@ def test_a_child_differs_from_its_parent_by_exactly_the_edit():
 
     # and a one-parameter edit changes exactly that parameter
     _sp, child = emitted({"parent": "coral_gate",
-                          "edit": ["set_param", "cell_diffuse.d_h", 0.08]}, 1)
+                          "edit": ["set_param", "cell_chem_diffuse.d_h", 0.08]}, 1)
     check(child is not None, "the one-edit child would not build")
     if child is not None:
-        check(val(child, "cell_diffuse", "d_h") == 0.08,
-              f"the edit did not land: d_h = {val(child, 'cell_diffuse', 'd_h')}")
+        check(val(child, "cell_chem_diffuse", "d_h") == 0.08,
+              f"the edit did not land: d_h = {val(child, 'cell_chem_diffuse', 'd_h')}")
         with open(os.path.join(E.LOG_ROOT, "coral_gate", "spec_run.yaml")) as f:
             pspec = yaml.safe_load(f)
         bad = [f"{op}.{k}" for op, k in LOAD_BEARING
@@ -432,8 +432,8 @@ def test_a_duplicate_becomes_a_reseeded_replicate():
 
     # and the COMPOSITION must be untouched -- a replicate that also changes a parameter is not one
     val = lambda spec, op, k: next((o.get(k) for o in spec["operators"] if o.get("op") == op), None)
-    for op, k in (("reconnect_t1_3d", "l_th_frac"), ("grow_3d", "rate"),
-                  ("seed_mesh_3d", "n_cells")):
+    for op, k in (("edge_flip", "l_th_frac"), ("cell_grow", "rate"),
+                  ("mesh_seed", "n_cells")):
         check(val(parent, op, k) == val(child, op, k),
               f"the replicate changed {op}.{k}: {val(parent, op, k)} -> {val(child, op, k)}")
 
@@ -579,7 +579,7 @@ def test_reservoir_gate_still_catches_1778():
     print("\nthe reservoir arithmetic still fires")
     import critic as C
     spec = {"sets": {"vertex": {"n": 3552}, "cell": {"n": 1800}},
-            "operators": [{"op": "seed_mesh_3d", "n_cells": 150}],
+            "operators": [{"op": "mesh_seed", "n_cells": 150}],
             "_run": {"target_cells": 4000}}
     codes = [r.code for r in C.check_reservoir(spec)]
     check("C3_RESERVOIR_TOO_SMALL" in codes,

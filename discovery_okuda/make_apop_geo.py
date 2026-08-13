@@ -12,8 +12,8 @@ needs. That is a pathway failure wearing the costume of a quiet selector.
 
 So these carry six operators and no others:
 
-    seed_mesh_3d -> cell_geometry_3d -> apoptosis_3d -> shape_energy_3d
-                 -> reconnect_t1_3d -> topo_snapshot_3d
+    mesh_seed -> cell_geometry -> cell_die -> cell_mechanics
+                 -> edge_flip -> topo_record
 
 No chemistry, no growth, no division. The cell count can only ever go DOWN, so `n_apop` and the
 count must agree exactly -- on a growing tissue they cannot be cross-checked at all, which is how
@@ -67,19 +67,19 @@ GEO = {
 
 def build(tag, apo):
     ops = [
-        {"op": "seed_mesh_3d", "at": "vertex", "cell_set": "cell", "before_frame": 1,
+        {"op": "mesh_seed", "at": "vertex", "cell_set": "cell", "before_frame": 1,
          "n_cells": N_CELLS, "seed": 0, "vseed_cv": 0.15, "radius": 5.0, "jitter": 0.15,
          "p0": 3.5},
-        {"op": "cell_geometry_3d", "at": "cell"},
+        {"op": "cell_geometry", "at": "cell"},
         # DEATH BEFORE THE MECHANICS, so a cell extruded this frame is relaxed this frame rather
         # than leaving a raw hole for one. The delta-renumbering fix means the position no longer
         # affects correctness -- it did until 9 August, and that is worth not relying on twice.
-        {"op": "apoptosis_3d", "at": "vertex", "cell_set": "cell", "p0": 3.5,
+        {"op": "cell_die", "at": "vertex", "cell_set": "cell", "p0": 3.5,
          "shrink_rate": 0.05, "critical_frac": 0.15, "min_age": 0, **apo},
-        {"op": "shape_energy_3d", "at": "vertex", **MECH},
-        {"op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": 0.28, "every": 1,
+        {"op": "cell_mechanics", "at": "vertex", **MECH},
+        {"op": "edge_flip", "at": "vertex", "l_th_frac": 0.28, "every": 1,
          "max_flips": 300},
-        {"op": "topo_snapshot_3d", "at": "vertex", "every": 1},
+        {"op": "topo_record", "at": "vertex", "every": 1},
     ]
     return {
         "general": {"name": tag, "seed": 0, "n_frames": FRAMES, "dt": 1.0,

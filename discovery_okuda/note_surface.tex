@@ -182,10 +182,10 @@ frame's mesh.
 {\footnotesize
 \begin{verbatim}
   schedule:
-    - aggregate -> seed_ecm
+    - aggregate -> ecm_seed
     - {substep_dt: 4.0e-4, steps: [mesh_contact, mpm_strain, mpm_scatter,
                                    mpm_grid_update, mpm_gather]}
-    - ecm_stress -> mesh_inside_count
+    - ecm_stress -> mesh_inside
 \end{verbatim}}
 \smallskip
 

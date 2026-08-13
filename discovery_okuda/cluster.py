@@ -33,7 +33,7 @@ import time
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
 SRC = os.path.join(ROOT, "src")
-TYSSUE = os.path.join(ROOT, "prototype", "Tyssue")
+TYSSUE = os.path.join(ROOT, "discovery_okuda", "ops")
 LOGDIR = os.path.join(ROOT, "log", "okuda", "_cluster")
 LOG_ROOT = os.path.join(ROOT, "log", "okuda")
 
@@ -482,7 +482,7 @@ def wait_for_ids(ids, poll=POLL_S, timeout_h=24, straggler_factor=4.0, min_strag
     ---------------------------------------------------------------------------------------
     A composition search deliberately generates combinations no preset ever ran, so some of them
     are degenerate. A degenerate one does not usually crash; it gets SLOW. Round 2's
-    `-cell_geometry_3d` knockout ran 45+ minutes against 5-20 for its five siblings, with empty
+    `-cell_geometry` knockout ran 45+ minutes against 5-20 for its five siblings, with empty
     stdout -- exactly what the Reflection agent had warned ("may not degrade gracefully ... could
     go degenerate/uninterpretable").
 

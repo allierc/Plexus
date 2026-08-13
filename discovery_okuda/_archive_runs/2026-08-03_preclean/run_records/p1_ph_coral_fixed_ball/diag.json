@@ -38,15 +38,15 @@
   "mech_migration": 0.01719
  },
  "acted": {
-  "seed_mesh_3d": 1,
-  "cell_geometry_3d": 401,
-  "seed_cell_rd": 401,
-  "cell_adjacency": 1,
-  "cell_diffuse": 401,
-  "cell_react": 401,
-  "shape_energy_3d": 401,
-  "reconnect_t1_3d": 14,
-  "topo_snapshot_3d": 401
+  "mesh_seed": 1,
+  "cell_geometry": 401,
+  "cell_chem_seed": 401,
+  "cell_neighbours": 1,
+  "cell_chem_diffuse": 401,
+  "cell_chem_react": 401,
+  "cell_mechanics": 401,
+  "edge_flip": 14,
+  "topo_record": 401
  },
  "run_id": "R7fc9cab2ab3edf1"
 }

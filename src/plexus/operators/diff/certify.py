@@ -3,7 +3,7 @@
 `audit.py` builds a SYNTHETIC Hierarchy and calls one operator once. That harness has now been
 wrong three times, and every time it invented a defect in an operator rather than reporting one:
 an empty neighbour graph condemned the whole interaction family, a division that never fired
-condemned `cell_divide`, and making the level's own tensor the leaf condemned every structural
+condemned `agent_divide`, and making the level's own tensor the leaf condemned every structural
 operator. A single-source measurement that keeps doing this is not a measurement.
 
 So this is the second source, and it shares NO code path with the first. It takes a real spec out

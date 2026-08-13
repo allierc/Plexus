@@ -58,7 +58,7 @@ predicted. Nothing in the engine forces these, so they are your discipline.
    the campaign already carries: it fired twenty times in 196 runs and all twenty added the same
    operator. `set_impl` fired **once** in the same 196 runs, while eleven of twenty-five
    implementations had never run — among them oriented division, which is how an arm becomes a
-   tube, and three of `shape_to_chem`'s four features, so the chemistry has only ever read
+   tube, and three of `cell_chem_from_shape`'s four features, so the chemistry has only ever read
    curvature and never tension, area or pressure. An untried implementation is a different
    mechanism under the same contract; a retune is the same mechanism at a different number.
 
@@ -73,7 +73,7 @@ other slot:
 
 ```json
 {"parent": "<run name from the parent set>",
- "edit": ["set_param", "reconnect_t1_3d.l_th_frac", 0.28],
+ "edit": ["set_param", "edge_flip.l_th_frac", 0.28],
  "act": "explore | predict | falsify | replicate | bound | transfer | discriminate | induce",
  "on": "C007",
  "predict": "n_spots_final < 20",
@@ -116,7 +116,7 @@ and the Analyst will add it. A claim with no scope is refused, because a claim t
 scoped cannot be transferred, and transfer is the only route to high confidence.
 
 **`discriminate` when you can.** Two claims in the ledger contradict each other right now: C005 says
-`shape_to_chem.beta < 0` extinguishes the activator *whatever the morphotype*, C009 says it *depends
+`cell_chem_from_shape.beta < 0` extinguishes the activator *whatever the morphotype*, C009 says it *depends
 on the base*. They coexisted for six rounds of the last campaign because nothing could pose the
 experiment that separates them. One slot can.
 

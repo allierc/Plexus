@@ -59,7 +59,7 @@ et al. 2018 report three morphologies out of this coupling: **tubes**, **undulat
   nothing elongates, detaches, or self-intersects." The numbers agree with the eye — `n_tubes` 0 and
   `protr_peak` 1.145. Treat `morphology` as a hint and the protrusion metrics as the fact.
 - **Gray–Scott needs a seed.** Its u = 1, v = 0 state is a *stable* fixed point: without
-  `seed_cell_rd` nothing ever happens.
+  `cell_chem_seed` nothing ever happens.
 - **A reservoir caps the tissue.** A closed trivalent sheet obeys V = 2F − 4, so a vertex buffer of
   size V caps the cell count at (V+4)/2 regardless of the biology. 3,552 vertices give exactly
   1,778 cells — the number that voided **59 runs across two batches**, both reported as findings
@@ -73,12 +73,12 @@ et al. 2018 report three morphologies out of this coupling: **tubes**, **undulat
 
 *Do not re-propose these. Each cost a round.*
 
-- **`divide_3d` + `shape_energy_3d:monolayer` is a broken pair.** The 2×2 table is filled: division
+- **`cell_divide` + `cell_mechanics:monolayer` is a broken pair.** The 2×2 table is filled: division
   alone is clean, monolayer alone is clean, together the division does not split the basal ring.
   This is a substrate bug, not a biological result. Avoid the pair until it is fixed.
 - **The declared search space contains none of the working recipes.** All six pool parents carry
-  out-of-range parameters: `l_th_frac` in 6/6 (0.35 vs a 0.12 ceiling), `shape_energy_3d.Lambda` in
-  3/6 (3 vs 0.3 — 10×), `grow_3d.rate` in 3/6 (below its floor), `a_sw` at 50 vs a
+  out-of-range parameters: `l_th_frac` in 6/6 (0.35 vs a 0.12 ceiling), `cell_mechanics.Lambda` in
+  3/6 (3 vs 0.3 — 10×), `cell_grow.rate` in 3/6 (below its floor), `a_sw` at 50 vs a
   ceiling of 6. So a `set_param` edit offered by the menu samples a region **no working recipe
   occupies**. Until the boxes are re-derived, treat a value inside the declared range as *unproven*
   rather than safe, and prefer edits that stay near a parent's own measured value.
@@ -86,18 +86,18 @@ et al. 2018 report three morphologies out of this coupling: **tubes**, **undulat
 - **Retunes filed as mechanisms.** 107 of 107 compositions verified parameter-blind, so a retune
   proposed as a new composition is refused before it runs and wastes the slot.
 - **`l_th_frac` at 1.96 destroys the tissue, and round 2 was entirely that.** Eleven of twelve
-  round-2 runs carried `reconnect_t1_3d.l_th_frac` at **1.96**, against **0.28–0.35 in every working
+  round-2 runs carried `edge_flip.l_th_frac` at **1.96**, against **0.28–0.35 in every working
   recipe**. At that value the T1 flip threshold is nearly twice the mean edge
   length, so every junction is eligible to flip every fourth frame: the mesh rearranges continuously,
   cannot hold a shape, drains volume, thins its cells and folds through itself (P1, P7, P11 broken,
   `valid_frac` 0.0, `protr_peak` railed at 1.001). **Proven by a one-parameter revert** to the
   parent's 0.28 — which is the evidence, and note that the declared range is *not*: the space declares
   `[0.01, 0.12]`, so 0.28 is outside it too and works perfectly. The twelfth run
-  had `l_th_frac` 0.28 and broke anyway — it carried `divide_3d` + `grow_3d`, already
+  had `l_th_frac` 0.28 and broke anyway — it carried `cell_divide` + `cell_grow`, already
   ruled out above.
 
   *A diagnosis that was offered and is FALSE, recorded so it is not proposed again:* "growth against a
-  frozen shell radius." `grow_3d` has rescaled `R0` from the target volume since
+  frozen shell radius." `cell_grow` has rescaled `R0` from the target volume since
   2026-07-31, five days before round 2 ran, and `r002c_03` broke P7 and P11 with **no growth operator
   at all** — a run that never grows cannot buckle from a growth radius. The claim was produced
   confidently from four runs' metrics by a role that had been given an empty history, and it is what
@@ -108,15 +108,15 @@ et al. 2018 report three morphologies out of this coupling: **tubes**, **undulat
 *The reference loop this campaign is measured against carries an explicit "things you must NOT change"
 list, and it is why its slots are never spent re-settling a question. Ours:*
 
-- **The seed cell count** (`seed_mesh_3d.n_cells`). Not an axis of the search: it is grounded on every
+- **The seed cell count** (`mesh_seed.n_cells`). Not an axis of the search: it is grounded on every
   slot so runs stay comparable, and a reservoir big enough for the target is checked before launch.
 - **The vertex and cell reservoir sizes.** Derived from the target cell count, never proposed. A
   closed trivalent sheet obeys V = 2F − 4, so a buffer is arithmetic, not a choice.
-- **`conserve_amount` on `grow_3d`.** Okuda Appendix A: the morphogen is an AMOUNT, so a
+- **`conserve_amount` on `cell_grow`.** Okuda Appendix A: the morphogen is an AMOUNT, so a
   growing cell must dilute its concentration. Turning it off silently creates mass every step.
 - **The frame count and the analysis stride.** Campaign-wide, so a metric measured on one run means
   the same as on another.
-- **`divide_3d` + `shape_energy_3d:monolayer` together** — a filled 2×2 table says the pair is a
+- **`cell_divide` + `cell_mechanics:monolayer` together** — a filled 2×2 table says the pair is a
   substrate bug (see *What is ruled out*).
 
 ## Two things about the operator space, added mid-campaign 2026-08-05
@@ -135,11 +135,11 @@ the claim that you expect a forced signature, and expect the eye to be asked whe
 grown or pushed. A `protr_peak` of 1.4 from a radial push would satisfy the campaign's threshold and
 answer none of its question.
 
-**The feedback leg is real but structurally invisible.** `shape_to_chem` (curvature / tension /
+**The feedback leg is real but structurally invisible.** `cell_chem_from_shape` (curvature / tension /
 apical_area / pressure) is the geometry → chemistry direction, and it works — it mutates the chemistry
-field in place, exactly as `cell_diffuse` does, which is why neither declares `outputs`. The
+field in place, exactly as `cell_chem_diffuse` does, which is why neither declares `outputs`. The
 consequence is only that the critic cannot verify *structurally* that the loop is closed: an
-`add_op shape_to_chem` will be admitted whether or not the chemistry it feeds actually exists
+`add_op cell_chem_from_shape` will be admitted whether or not the chemistry it feeds actually exists
 downstream. If you wire it, check that a reaction operator is present and that `beta` is non-zero —
 it was 0 in every pool parent until round 1, so the feedback had never once been switched on.
 

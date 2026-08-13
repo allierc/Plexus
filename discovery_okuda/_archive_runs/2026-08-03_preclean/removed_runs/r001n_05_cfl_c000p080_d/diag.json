@@ -48,15 +48,15 @@
   "div_blocked_first_frame": null
  },
  "acted": {
-  "seed_mesh_3d": 1,
-  "cell_geometry_3d": 536,
-  "cell_adjacency": 1,
-  "seed_cell_rd": 3,
-  "cell_diffuse": 901,
-  "cell_react": 901,
-  "shape_energy_3d": 901,
-  "reconnect_t1_3d": 1,
-  "topo_snapshot_3d": 901
+  "mesh_seed": 1,
+  "cell_geometry": 536,
+  "cell_neighbours": 1,
+  "cell_chem_seed": 3,
+  "cell_chem_diffuse": 901,
+  "cell_chem_react": 901,
+  "cell_mechanics": 901,
+  "edge_flip": 1,
+  "topo_record": 901
  },
  "premises": [
   {
@@ -64,7 +64,7 @@
    "tier": "static",
    "premise": "morphogen sets where/how fast, not whether",
    "status": "na",
-   "detail": "no grow_3d in this composition",
+   "detail": "no cell_grow in this composition",
    "measured": null,
    "grade": "usual",
    "stated_check": "if the gate is connected at all, then `rho > 0`.",
@@ -75,7 +75,7 @@
    "tier": "static",
    "premise": "a cell divides because it got big",
    "status": "na",
-   "detail": "needs both grow_3d and divide_3d",
+   "detail": "needs both cell_grow and cell_divide",
    "measured": null,
    "grade": "certain",
    "stated_check": "**the growth ceiling must sit above the division trigger.** Mean cell volume must be roughly steady over the run, not drifting down.",

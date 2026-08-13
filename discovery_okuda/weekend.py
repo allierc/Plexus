@@ -7,7 +7,7 @@ Does the tissue's SHAPE feeding back into its CHEMISTRY change the morphology, a
 WHICH shape feature the chemistry listens to?
 
 That is a mechanism question, not a parameter question, which is why the four features are
-IMPLEMENTATIONS of one contract and not four values of a knob (see tyssue_shape_to_chem). Swapping
+IMPLEMENTATIONS of one contract and not four values of a knob (see shape_chem_ops). Swapping
 curvature for tension is scored as a new mechanism; changing beta is not.
 
 THE DESIGN, and why it is shaped this way
@@ -24,7 +24,7 @@ THE DESIGN, and why it is shaped this way
   distinguish "this mechanism does X" from "this run did X".
 
   ABLATION IS PRESENT BY CONSTRUCTION.  The null is the subtractive direction, so a causal claim
-  about shape_to_chem has both directions available and passes critic.check_batch. That is not a
+  about cell_chem_from_shape has both directions available and passes critic.check_batch. That is not a
   coincidence -- the batch was built to satisfy the rule Phase 3 added.
 
 WHAT IS DIFFERENT FROM EVERY PREVIOUS BATCH
@@ -76,21 +76,21 @@ def base_config():
     c["general"]["record_cap"] = 402
     ops = {o["op"]: o for o in c["operators"]}
     # chemistry, at the calibrated values (F012)
-    rd = [{"op": "cell_adjacency", "at": "cell"},
-          {"op": "seed_cell_rd", "at": "cell", "seed": 0, "before_frame": 3,
+    rd = [{"op": "cell_neighbours", "at": "cell"},
+          {"op": "cell_chem_seed", "at": "cell", "seed": 0, "before_frame": 3,
            "mode": "scatter", "seed_frac": 0.06},
-          {"op": "cell_diffuse", "at": "cell", "d_a": 0.08, "d_h": 0.16, "chi": 1.3},
-          {"op": "cell_react", "at": "cell", "model": "gray_scott",
+          {"op": "cell_chem_diffuse", "at": "cell", "d_a": 0.08, "d_h": 0.16, "chi": 1.3},
+          {"op": "cell_chem_react", "at": "cell", "model": "gray_scott",
            "F": 0.046, "kk": 0.062, "rate": 1.0}]
-    order = ["seed_mesh_3d", "cell_geometry_3d", "cell_adjacency", "seed_cell_rd", "cell_diffuse",
-             "cell_react", "shape_to_chem", "grow_3d", "shape_energy_3d",
-             "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d"]
-    c["operators"] = [ops["seed_mesh_3d"], ops["cell_geometry_3d"]] + rd + \
-                     [ops["grow_3d"], ops["shape_energy_3d"],
-                      ops["reconnect_t1_3d"], ops["divide_3d"], ops["topo_snapshot_3d"]]
+    order = ["mesh_seed", "cell_geometry", "cell_neighbours", "cell_chem_seed", "cell_chem_diffuse",
+             "cell_chem_react", "cell_chem_from_shape", "cell_grow", "cell_mechanics",
+             "edge_flip", "cell_divide", "topo_record"]
+    c["operators"] = [ops["mesh_seed"], ops["cell_geometry"]] + rd + \
+                     [ops["cell_grow"], ops["cell_mechanics"],
+                      ops["edge_flip"], ops["cell_divide"], ops["topo_record"]]
     # the growth switch must be INSIDE the activator's range or the chemistry cannot shape anything
     for o in c["operators"]:
-        if o["op"] == "grow_3d":
+        if o["op"] == "cell_grow":
             o["a_sw"] = 0.25; o["rho"] = 0.35; o["hill"] = 4.0; o["vth_frac"] = 2.5
             # DILUTION OFF, and it is a declared choice with a measured reason (finding F007).
             # Growth dilutes what is inside a cell -- correct physics -- but Gray-Scott's activator
@@ -106,7 +106,7 @@ def base_config():
     # on the smoke run. Raising it is cheap next to discovering afterwards that the mechanics was
     # lagging the forces for the whole batch.
     for o in c["operators"]:
-        if o["op"] == "shape_energy_3d":
+        if o["op"] == "cell_mechanics":
             o["relax_iters"] = 60
     return c
 
@@ -116,15 +116,15 @@ def specs():
     b = base_config()
     for sd in SEEDS:
         # THE NULL. Same composition, feedback silent. This is also the subtractive direction that
-        # makes a causal claim about shape_to_chem legal under critic.check_batch.
+        # makes a causal claim about cell_chem_from_shape legal under critic.check_batch.
         c = copy.deepcopy(b)
-        c["operators"].insert(6, {"op": "shape_to_chem", "at": "cell", "model": "curvature",
+        c["operators"].insert(6, {"op": "cell_chem_from_shape", "at": "cell", "model": "curvature",
                                   "vertex_set": "vertex", "beta": 0.0, "F0": 0.046, "rate": 1.0})
         out.append((f"wk_null_s{sd}", c, sd, "NULL: shape feedback silent (beta = 0)"))
         for feat in FEATURES:
             for beta in BETAS:
                 c = copy.deepcopy(b)
-                c["operators"].insert(6, {"op": "shape_to_chem", "at": "cell",
+                c["operators"].insert(6, {"op": "cell_chem_from_shape", "at": "cell",
                                           "implementation": feat, "vertex_set": "vertex",
                                           "beta": beta, "F0": 0.046, "rate": 1.0})
                 sgn = "pos" if beta > 0 else "neg"

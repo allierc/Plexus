@@ -45,7 +45,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(ROOT, "src"))
-sys.path.insert(0, os.path.join(ROOT, "prototype", "Tyssue"))
+sys.path.insert(0, os.path.join(ROOT, "discovery_okuda", "ops"))
 
 from tissue_analysis import protrusion_ratio                            # noqa: E402  THE definition
 

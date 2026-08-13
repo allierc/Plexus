@@ -180,7 +180,7 @@ def _graph_from_run(name):
                 if not nm:
                     continue
                 # ONLY WHAT THE SEARCH SPACE KNOWS. A spec also carries INSTRUMENTATION --
-                # `topo_snapshot_3d` and friends -- which record the run and are not moves anyone
+                # `topo_record` and friends -- which record the run and are not moves anyone
                 # can make. Carrying them into a graph raises KeyError the moment legal_edits()
                 # asks for their role, and more importantly it would offer the Proposer edits on
                 # apparatus rather than on biology.
@@ -192,7 +192,7 @@ def _graph_from_run(name):
                 oid = f"{nm}{idx}"
                 # "default" IS NOT AN IMPLEMENTATION. A spec omits `implementation` when the
                 # operator has only one, so the name has to come from the space, not from a
-                # placeholder -- `seed_mesh_3d:default` compiles to nothing and refuses the parent.
+                # placeholder -- `mesh_seed:default` compiles to nothing and refuses the parent.
                 _impls = (_CS.OPERATORS[nm].get("impls") or ["default"])
                 _im = o.get("model") or o.get("implementation") or o.get("impl")
                 ops.append({"id": oid, "op": nm,
@@ -236,7 +236,7 @@ def _graph_from_run(name):
                         cands = [(a, b, sl) for a, b, sl in g._candidate_links()
                                  if b == nid and sl == slot]
                         if len(cands) > 1:
-                            # NOT A GUESS -- THE PIPELINE'S OWN ORDER. seed_cell_rd and cell_react
+                            # NOT A GUESS -- THE PIPELINE'S OWN ORDER. cell_chem_seed and cell_chem_react
                             # both "produce" morphogen because they both write the same shared
                             # field; there is no choice between them in the engine, only a
                             # sequence. The effective source for a consumer is the LAST producer
@@ -250,10 +250,10 @@ def _graph_from_run(name):
                             made = True
                     if not made:
                         break
-                # AND WIRE THE GATE THE SPEC SAYS IS THERE. `grow_3d.gate` is an OPTIONAL slot,
+                # AND WIRE THE GATE THE SPEC SAYS IS THERE. `cell_grow.gate` is an OPTIONAL slot,
                 # so `unrouted_slots()` never reports it and the loop above never considers it --
                 # a rebuilt parent therefore always came back with the gate unwired, whatever the
-                # run actually did. The physics was unaffected (grow_3d reads cell.chem directly,
+                # run actually did. The physics was unaffected (cell_grow reads cell.chem directly,
                 # so the Hill term fires either way), but `name_region()` decides gated-versus-
                 # ungated from `conns`, so EVERY rebuilt parent was labelled "uniform growth
                 # (ungated, rho baseline only)" -- including fifteen of sixteen slots in a round
@@ -263,9 +263,9 @@ def _graph_from_run(name):
                 # The spec carries the evidence: `a_sw > 0` means the Hill switch selects on the
                 # activator, which IS the gate. `a_sw = 0` means the switch is open and growth
                 # really is ungated. So the rebuild reads the parameter instead of guessing from
-                # the wiring it does not have -- and takes the last producer ahead of grow_3d, the
+                # the wiring it does not have -- and takes the last producer ahead of cell_grow, the
                 # same spec-order rule the ambiguous case above uses.
-                _grow = next((o for o in g.ops if o["op"] == "grow_3d"), None)
+                _grow = next((o for o in g.ops if o["op"] == "cell_grow"), None)
                 if _grow is not None and float(g.params.get(f"{_grow['id']}.a_sw", 0) or 0) > 0:
                     if not any(c["dst"] == _grow["id"] and c["slot"] == "gate" for c in g.conns):
                         _pos = {o["id"]: k for k, o in enumerate(g.ops)}

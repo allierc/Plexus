@@ -63,7 +63,7 @@ def t_no_subprocess():
     try:
         with quiet():
             ok, out = llm.run_agent("proposer", "LEGAL MOVES\nparent_index=0  edit=[\"add_op\", "
-                                                "\"divide_3d\", \"hertwig\"]  -> x", n_slots=4)
+                                                "\"cell_divide\", \"hertwig\"]  -> x", n_slots=4)
         check(ok, "the faked agent reported failure")
     finally:
         subprocess.Popen = real
@@ -217,7 +217,7 @@ def t_metrics_have_producers():
     _miss = [s for s in SUFFIXES if s[1:] not in _got]
     check(not _miss, "reduce_series does not return: " + ", ".join(_miss))
     src = ""
-    for d in (HERE, os.path.join(os.path.dirname(HERE), "prototype", "Tyssue")):
+    for d in (HERE, os.path.join(HERE, "ops")):
         for f in sorted(_glob.glob(os.path.join(d, "*.py"))):
             if os.path.basename(f) in ("predict.py", "test_offline.py"):
                 continue
@@ -935,8 +935,8 @@ def t_metrics_have_declared_producers():
     import re
     import metrics as MX
     src = {}
-    for mod, path in (("tissue_analysis", "../prototype/Tyssue/tissue_analysis.py"),
-                      ("morphology", "../prototype/Tyssue/morphology.py"),
+    for mod, path in (("tissue_analysis", "../discovery_okuda/ops/tissue_analysis.py"),
+                      ("morphology", "../discovery_okuda/ops/morphology.py"),
                       ("pattern_scale", "pattern_scale.py"), ("run_one", "run_one.py"),
                       # `measure_1frame` produces the whole chemistry family -- act_mean, act_cv,
                       # act_max and their per-species `b_` twins -- and was absent from this map,

@@ -1,6 +1,6 @@
 # Paste-ready prompt to open the 06 session
 
-Continue the ECM/BM/spheroid work in `/workspace/Plexus/prototype/ecm`, runs in
+Continue the ECM/BM/spheroid work in `/workspace/Plexus/discovery_okuda/ops`, runs in
 `/workspace/Plexus/log/okuda_ECM`. Python is
 `/workspace/.conda_envs/neural-graph-linux/bin/python` with `PYTHONPATH=/workspace/Plexus/src`.
 Last commit `65620e7f`. Two GPUs: cuda:0, cuda:1.

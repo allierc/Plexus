@@ -92,7 +92,7 @@ round-1 wk_ runs (n~36749); C-hash recipes stay at n~2000. Physical bud protr_pe
 
 NECESSARY: grow_3d0, divide_3d0. INERT on bud: reconnect_t1_3d0, cell_adjacency0, cell_geometry_3d0
 (P1_INERT gate; rd_interface_tension inert). SHAPE-ZEROING when removed: extrude0, vesicle_growth0.
-DESTABILISING: vesicle_growth uniform_ramp (explodes), cell_diffuse0 removal (diverges), divide_3d hertwig add
+DESTABILISING: vesicle_growth uniform_ramp (explodes), cell_diffuse0 removal (diverges), cell_divide hertwig add
 (1.295 late mesh degradation), morphogen driver tuned UP (r4) AND DOWN/clamped (r5, same runaway). cfl/RD =
 chemistry only, inert on shape. Single-op REMOVAL, the morphogen-TUNE family (both directions), the growth-RATE
 and size-gated DIVISION-THRESHOLD families are all EXHAUSTED. BLANK cell: a DIFFERENT base geometry is the only

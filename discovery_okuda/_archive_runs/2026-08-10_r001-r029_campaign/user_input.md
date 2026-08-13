@@ -76,13 +76,13 @@ topology frozen, pressure has no way to equilibrate between a bud and the body -
 `p_tube/p_body` mechanically, with no external force anywhere. That is the likelier reading of
 `mech_p_ratio` 2.284, and it is testable.
 
-**Do not credit any protrusion measured without `reconnect_t1_3d` until this is controlled.** A
+**Do not credit any protrusion measured without `edge_flip` until this is controlled.** A
 protrusion on a mesh that cannot rearrange may be a stretched sheet rather than remodelled tissue,
 and stretching is what premise P7 used to refuse before it was retired. `protrusion_aspect_max`
 1.748 with `tube_diam` 1.698, and the eye reading "fat rounded buds", fit stretching better than
 tubulation.
 
-The control is cheap and it is one slot: `r017_07` WITH `reconnect_t1_3d` restored, everything else
+The control is cheap and it is one slot: `r017_07` WITH `edge_flip` restored, everything else
 identical. If protr survives at ~1.6, the T1 removal was incidental and you have a real result. If
 it falls back toward 1.45, the protrusion was the frozen mesh and the last four rounds measured an
 artefact. Please run it, and report both numbers side by side.
@@ -121,9 +121,9 @@ got 2 buds at 262". A bud 262 cells across cannot become a thin tube -- the patt
 finer length scale before the mechanics can pull a finger out of it, and every round that grows a
 protrusion at the current spot size is going to produce another fat bud.
 
-The length scale is the chemistry's, not the mechanics'. Reach for it there: `cell_diffuse.d_a`
-and the `d_h/d_a` ratio set the Turing wavelength directly, `cell_react.F`/`kk` move Gray-Scott
-between spots and labyrinth, and `seed_cell_rd.cone_deg` sets it by hand as an initial condition
+The length scale is the chemistry's, not the mechanics'. Reach for it there: `cell_chem_diffuse.d_a`
+and the `d_h/d_a` ratio set the Turing wavelength directly, `cell_chem_react.F`/`kk` move Gray-Scott
+between spots and labyrinth, and `cell_chem_seed.cone_deg` sets it by hand as an initial condition
 (22.8 degrees is 10 cells across on a 2,000-cell sphere; smaller cones, more of them).
 
 Your own anticorrelation is the thing to break: "coarser-grips-harder", fifteen rounds of it --

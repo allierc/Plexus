@@ -171,7 +171,7 @@ SERIES_METRICS = {q: tuple(n for n in qs if metrics.REGISTRY[n].series
 # =================================================================================================
 # THE RUN-LEVEL SCALARS. Admitted only where NO reduction of a per-frame column can express them:
 # they come from a separate probe (mechanics, the quasi-static relaxation), from an operator's own
-# history (divide_3d's refusal counter), or from a whole-run predicate that is not one of the six.
+# history (cell_divide's refusal counter), or from a whole-run predicate that is not one of the six.
 # Each was checked to be actually WRITTEN into the summary before being kept here.
 SCALAR_METRICS = {q: tuple(n for n in qs if not metrics.REGISTRY[n].series
                                 and not metrics.REGISTRY[n].withdrawn)

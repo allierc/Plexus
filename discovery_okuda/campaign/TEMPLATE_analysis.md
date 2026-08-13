@@ -20,7 +20,7 @@
        Node/parent   the ANCESTRY is in the log. Without it a reader cannot tell a line of
                      descent from a scatter of attempts, and neither can the Archivist.
        Mutation      the DIFF from the parent, written out. "we changed the model" is not a
-                     mutation; `cell_react: gierer_meinhardt -> gray_scott` is.
+                     mutation; `cell_chem_react: gierer_meinhardt -> gray_scott` is.
        Hypothesis    quoted VERBATIM as it was posed, before the evidence. A hypothesis
                      paraphrased afterwards is a rationalisation.
        Verdict       supported | falsified | partial | inconclusive, WITH THE NUMBER that

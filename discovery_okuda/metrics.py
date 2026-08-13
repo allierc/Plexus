@@ -6,7 +6,7 @@ instead of a distributed code? add a registry to structure these classes."*
 
 WHAT WAS DISTRIBUTED, MEASURED. Adding one quantity meant editing six places, none of them adjacent:
 
-    computed              prototype/Tyssue/tissue_analysis.py (23 keys), pattern_scale.py (2),
+    computed              discovery_okuda/ops/tissue_analysis.py (23 keys), pattern_scale.py (2),
                           run_one.py (8)
     reduced over time     run_one.py -- the six suffixes
     admitted              predict.SERIES_QUANTITIES (24) x SUFFIXES (6) + SCALAR_QUANTITIES (8)
@@ -369,7 +369,7 @@ class Frame:
     def shape_idx(self):
         """(si, ok) -- the per-cell shape index and the mask of cells it is finite on."""
         def go():
-            from tyssue_ops3d import face_polygons_3d
+            from mesh_ops import face_polygons_3d
             _, area, _per, si = face_polygons_3d(self.pt, self.mt)
             return si, (self.np.isfinite(si) & (area > 1e-9))
         return self._cached("shape_idx", go)
@@ -411,7 +411,7 @@ class Frame:
     @property
     def genus_info(self):
         def go():
-            from tyssue_diag import mesh_genus
+            from diag_tools import mesh_genus
             return mesh_genus(self.mt)
         return self._cached("genus_info", go)
 
