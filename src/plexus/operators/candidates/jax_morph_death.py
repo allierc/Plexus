@@ -60,7 +60,7 @@ from plexus.models.base import Structural
 from plexus.models.registry import register_operator
 
 
-@register_operator("apoptose", family="growth", set="cell", kind="structural")
+@register_operator("apoptose", family="population", set="cell", kind="structural")
 class Apoptose(Structural):
     EMIT = None                                       # structural: retires live slots, mutates occ in place; returns {} — no integrable delta
     # typed signature (Plexus2 sec. 2.1): a morphism cell -> cell that reads the heritable

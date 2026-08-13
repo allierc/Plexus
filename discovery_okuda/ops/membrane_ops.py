@@ -120,7 +120,7 @@ class BasementMembraneNode:
         lvl.register_buffer("alive", torch.zeros(n, dtype=torch.bool, device=device))
 
 
-@register_operator("bm_seed", family="growth", set="particle", kind="seed")
+@register_operator("bm_seed", family="seed", set="particle", kind="seed")
 class BasementMembraneSeed(Structural):
     """Lay the membrane down ONCE, as a shell just OUTSIDE the epithelium's surface.
 
@@ -1001,7 +1001,7 @@ class IntegrinAdhesion(Lateral):
         return {lvl.name: acc}
 
 
-@register_operator("bm_remodel", family="growth", set="particle", kind="lateral")
+@register_operator("bm_remodel", family="population", set="particle", kind="lateral")
 class BasementMembraneRemodel(Lateral):
     """Crosslink turnover: the rest lengths creep toward the current ones, so the sheet can GROW.
 
@@ -1100,7 +1100,7 @@ class BasementMembraneRemodel(Lateral):
 
 
 
-@register_operator("mpm_boundary", family="mpm", set="field", kind="field")
+@register_operator("mpm_boundary", family="boundary", set="field", kind="field")
 class MPMTissueBoundary(FieldUpdate):
     """The growing epithelium as a MOVING no-slip boundary on the MPM grid.
 
@@ -1322,7 +1322,7 @@ class BasementMembraneContinuumStrain(Lateral):
 
 
 
-@register_operator("bm_contact", family="mechanics", set="particle", kind="lateral")
+@register_operator("bm_contact", family="boundary", set="particle", kind="lateral")
 class BasementMembraneContact(Lateral):
     """Non-penetration between the sheet and the epithelium, as a FORCE on each particle.
 
@@ -1446,7 +1446,7 @@ class BasementMembraneContact(Lateral):
 # is the force, `adhesion_turnover` is the rewire that breaks and re-forms.
 # ---------------------------------------------------------------------------------------------------
 
-@register_operator("adhesion_seed", family="growth", set="particle", kind="seed")
+@register_operator("adhesion_seed", family="seed", set="particle", kind="seed")
 class AdhesionSeed(Structural):
     """Place hemidesmosomes on the basal surface and bind each to the nearest membrane particle."""
 
@@ -1636,7 +1636,7 @@ class AdhesionTurnover(Rewire):
         return {}
 
 
-@register_operator("bm_repel", family="mechanics", set="particle", kind="lateral")
+@register_operator("bm_repel", family="boundary", set="particle", kind="lateral")
 class BasementMembraneRepel(Lateral):
     """Excluded volume between membrane nodes: push apart anything closer than l*, never pull.
 
@@ -1777,7 +1777,7 @@ class BasementMembraneRepel(Lateral):
         return {lvl.name: acc}
 
 
-@register_operator("bm_secrete", family="growth", set="particle", kind="structural")
+@register_operator("bm_secrete", family="population", set="particle", kind="structural")
 class BasementMembraneSecrete(Structural):
     """Lay down NEW membrane as the surface it sits on grows.
 

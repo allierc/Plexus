@@ -124,7 +124,7 @@ class TrailField(Field):
 # --------------------------------------------------------------------------- #
 #  slime -- the Update kernel: sense -> steer -> move -> deposit
 # --------------------------------------------------------------------------- #
-@register_operator("slime", set="cell", kind="exchange")
+@register_operator("slime", set="cell", kind="exchange", family="motion")
 class SlimeOperator(Exchange):
     """One agent step (Lague `Update`). Acts on `cell`, reading per-agent species
     parameters the engine broadcast from `types`. Self-propelled at fixed speed
@@ -261,7 +261,7 @@ def extract_trail_graph(grid, n_nodes=160, radius=0.06, thresh=0.12,
     return nodes, edges
 
 
-@register_operator("trail_graph", set="cell", kind="rewire")
+@register_operator("trail_graph", set="cell", kind="rewire", family="topology")
 class TrailGraphOperator(Rewire):
     """Structure operator (Rewire): builds a relation E -- a node+edge graph
     approximating the slime network -- from the trail field, and stores it on H

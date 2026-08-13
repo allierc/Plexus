@@ -207,7 +207,7 @@ def _engine_owns_clock(params, default=1):
 
 
 
-@register_operator("mesh_seed", set="vertex", kind="seed", family="growth")
+@register_operator("mesh_seed", set="vertex", kind="seed", family="seed")
 class SeedMesh3D(Structural):
     """Frame-0: build a closed spherical half-edge mesh (spherical Voronoi), write the 3D vertex
     positions, and stash the edge table + per-face targets (A0, P0) and the lumen target V0."""
@@ -449,7 +449,7 @@ class ShapeEnergy3D(Lateral):
 # VOLUME, so the same plateau is `vth_frac = max_scale ** 3`.
 
 
-@register_operator("cell_divide", set="vertex", kind="structural", family="growth")
+@register_operator("cell_divide", set="vertex", kind="structural", family="population")
 class Divide3D(Structural):
     """In-surface cell division on the vesicle -- the sheet-division analog (tyssue
     sheet_topology.cell_division) lifted to the closed sphere. A cell divides when its wedge volume
@@ -737,7 +737,7 @@ class Divide3D(Structural):
 
 
 
-@register_operator("cell_die", set="vertex", kind="structural", family="death")
+@register_operator("cell_die", set="vertex", kind="structural", family="population")
 class Apoptosis3D(Structural):
     """Cell elimination on the closed vesicle -- the DIE family, and the inverse of cell_divide.
 
@@ -1427,7 +1427,7 @@ class Apoptosis3D(Structural):
         return {}
 
 
-@register_operator("cell_divide", model="doubler", set="vertex", kind="structural", family="growth")
+@register_operator("cell_divide", model="doubler", set="vertex", kind="structural", family="population")
 class Divide3DDoubler(Divide3D):
     """Divide at `factor` x THIS CELL'S OWN BIRTH VOLUME -- the rule that was the default until
     8 August, kept because it is the null the sizer has to beat and because every result in this
@@ -1443,7 +1443,7 @@ class Divide3DDoubler(Divide3D):
         return v_now >= self.factor * jit * v_birth
 
 
-@register_operator("cell_divide", model="timer", set="vertex", kind="structural", family="growth")
+@register_operator("cell_divide", model="timer", set="vertex", kind="structural", family="population")
 class Divide3DTimer(Divide3D):
     """Divide on the CLOCK: `age >= cycle * jit` division-calls since birth, size ignored entirely.
 
@@ -1466,7 +1466,7 @@ class Divide3DTimer(Divide3D):
         return age >= self.cycle * jit
 
 
-@register_operator("topo_record", set="vertex", kind="structural", family="growth")
+@register_operator("topo_record", set="vertex", kind="structural", family="harness")
 class TopoSnapshot3D(Structural):
     """Record the current mesh (flat half-edge table + vertex count) each frame, so a growing/dividing
     vesicle -- whose topology changes over time -- can be rendered frame by frame."""

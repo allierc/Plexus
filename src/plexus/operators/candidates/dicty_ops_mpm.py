@@ -14,7 +14,7 @@ from plexus.models.base import Operator
 from plexus.models.registry import register_operator
 
 
-@register_operator("inflow_mpm", set="cell", kind="structural")
+@register_operator("inflow_mpm", set="cell", kind="structural", family="population")
 class InflowMPM(Operator):
     REQUIRES_PARAMS = ["rate"]
 

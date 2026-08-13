@@ -47,7 +47,7 @@ so the atlas files it as a REFINEMENT, not `new`. But the refinement FLIPS the k
 multiplier and REALIZES it by waking dormant MPM reserve particles -- whereas this mechanism is
 delta-emitting (it relaxes a scalar `radius` and mutates no state directly). Plexus's registry
 FORBIDS a second implementation of one contract from differing in kind (registry.py:131), so
-`@register_operator("agent_grow", kind="lateral", ...)` raises at import next to the shipped
+`@register_operator("agent_grow", kind="lateral", ..., family="population")` raises at import next to the shipped
 structural 'agent_grow'. That rejection is not an obstacle to route around -- it IS the breaking
 change the ledger exists to surface (a refinement that widens a signature silently invalidates
 every existing caller; here `kind` widening is hard-rejected). So the candidate registers under
@@ -70,7 +70,7 @@ from plexus.models.base import Lateral
 from plexus.models.registry import register_operator
 
 
-@register_operator("grow_radius", family="growth", set="cell", kind="lateral")
+@register_operator("grow_radius", family="population", set="cell", kind="lateral")
 class GrowRadius(Lateral):
     """Saturating (von Bertalanffy) per-cell radius growth as an exact-flow delta. A refinement
     of the shipped 'agent_grow' contract that cannot co-register under that name (kind flips

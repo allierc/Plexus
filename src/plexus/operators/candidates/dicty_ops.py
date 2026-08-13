@@ -32,7 +32,7 @@ from plexus.models.registry import register_operator
 EPS = 1e-6
 
 
-@register_operator("interact", set="cell", kind="lateral")
+@register_operator("interact", set="cell", kind="lateral", family="interaction")
 class Interact(Lateral):
     """Difference-of-Gaussians pairwise law among active cells (a velocity):
 
@@ -79,7 +79,7 @@ class Interact(Lateral):
         return {"cell": out}
 
 
-@register_operator("spring", set="cell", kind="lateral")
+@register_operator("spring", set="cell", kind="lateral", family="mechanics")
 class Spring(Lateral):
     """The user's dicty force law (cell_gnn ParticleSpringForce): linear-spring
     repulsion + sigmoid-gated adhesion, overdamped (returns a velocity).
@@ -131,7 +131,7 @@ class Spring(Lateral):
         return {"cell": out}
 
 
-@register_operator("inflow", set="cell", kind="structural")
+@register_operator("inflow", set="cell", kind="structural", family="population")
 class Inflow(Operator):
     """A SOURCE of cells entering the world (not proliferation): each tick wake ~`rate`
     dormant cell slots at INDEPENDENT positions -- uniformly across the domain (or within an
@@ -239,7 +239,7 @@ class Inflow(Operator):
         return {}
 
 
-@register_operator("relay", set="cell", kind="exchange")
+@register_operator("relay", set="cell", kind="exchange", family="signalling")
 class Relay(Operator):
     """Excitable cAMP RELAY (FitzHugh-Nagumo-style) on the `camp` field. Converts
     the passive diffuse+decay field into an EXCITABLE MEDIUM: a small cAMP bump
@@ -320,7 +320,7 @@ class Relay(Operator):
         return {}
 
 
-@register_operator("divide", set="cell", kind="structural")
+@register_operator("divide", set="cell", kind="structural", family="population")
 class Divide(Operator):
     """Proliferation on a dormant buffer: each tick wake ~`rate` dormant cell slots,
     each a copy of a random active cell displaced by ~`spread` (a body length), with
@@ -364,7 +364,7 @@ class Divide(Operator):
         return {}
 
 
-@register_operator("sense_adapt", set="cell", kind="exchange")
+@register_operator("sense_adapt", set="cell", kind="exchange", family="signalling")
 class SenseAdapt(Operator):
     """Chemotaxis up a field's gradient WITH per-cell desensitization (Batch 7
     candidate for breaking the model's single-attractor failure mode).
@@ -422,7 +422,7 @@ class SenseAdapt(Operator):
         return {"cell": accel}
 
 
-@register_operator("align", set="cell", kind="lateral")
+@register_operator("align", set="cell", kind="lateral", family="polarity")
 class Align(Operator):
     """Per-cell polarity with local velocity alignment + chemotactic bias (Batch 8
     candidate for stream-shaped recruitment).
@@ -508,7 +508,7 @@ class Align(Operator):
         return {"cell": out}
 
 
-@register_operator("inhib_op", set="cell", kind="exchange")
+@register_operator("inhib_op", set="cell", kind="exchange", family="signalling")
 class InhibOp(Operator):
     """Activator-inhibitor (Gierer-Meinhardt) inhibitor coupling (Batch 9 candidate
     for breaking the single-attractor by lateral inhibition).
@@ -557,7 +557,7 @@ class InhibOp(Operator):
         return {"cell": torch.zeros(N, 2, device=dev, dtype=pos.dtype)}
 
 
-@register_operator("sense_sat", set="cell", kind="exchange")
+@register_operator("sense_sat", set="cell", kind="exchange", family="signalling")
 class SenseSat(Operator):
     """Chemotaxis up `field` gradient with Hill saturation of effective gain
     by local cAMP concentration (Batch 13 candidate for breaking the single-
@@ -611,7 +611,7 @@ class SenseSat(Operator):
         return {"cell": accel}
 
 
-@register_operator("persistence", set="cell", kind="lateral")
+@register_operator("persistence", set="cell", kind="lateral", family="motion")
 class Persistence(Operator):
     """Per-cell motion-memory (Batch 10 candidate for stream-aware coalescence).
 
@@ -664,7 +664,7 @@ class Persistence(Operator):
         return {"cell": out}
 
 
-@register_operator("secrete_het", set="cell", kind="exchange")
+@register_operator("secrete_het", set="cell", kind="exchange", family="signalling")
 class SecreteHet(Exchange):
     """Per-cell heterogeneous secretion (Batch 19 candidate for breaking the
     5-7 mound ceiling).
@@ -734,7 +734,7 @@ class SecreteHet(Exchange):
         return {}
 
 
-@register_operator("decay_dens", set="cell", kind="structural")
+@register_operator("decay_dens", set="cell", kind="structural", family="fields")
 class DecayDens(Operator):
     """Density-coupled additional decay of a field (Batch 20 candidate for
     breaking the 5-7 mound ceiling via a FIELD-SIDE mechanism).
@@ -818,7 +818,7 @@ class DecayDens(Operator):
         return {}
 
 
-@register_operator("diff_dens", set="cell", kind="structural")
+@register_operator("diff_dens", set="cell", kind="structural", family="fields")
 class DiffDens(Operator):
     """Density-modulated effective diffusion of a field (Batch 21 candidate
     for breaking the 5-7 mound ceiling via a FIELD-SIDE TRANSPORT mechanism).
@@ -921,7 +921,7 @@ class DiffDens(Operator):
         return {}
 
 
-@register_operator("density_repel", set="cell", kind="lateral")
+@register_operator("density_repel", set="cell", kind="lateral", family="interaction")
 class DensityRepel(Operator):
     """Density-saturating short-range repulsion (Batch 25 candidate to break
     Est #82 runaway compaction).
@@ -1025,7 +1025,7 @@ class DensityRepel(Operator):
         return {"cell": accel}
 
 
-@register_operator("pulse_dens", set="cell", kind="structural")
+@register_operator("pulse_dens", set="cell", kind="structural", family="fields")
 class PulseDens(Operator):
     """Density-triggered local cAMP pulse (Batch 23 candidate — the LAST
     untested structural mechanism in the operator family after diff_dens

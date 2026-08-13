@@ -20,7 +20,7 @@ from plexus.models.base import Lateral
 from plexus.models.registry import register_operator
 
 
-@register_operator("death", set="cell", kind="lateral")
+@register_operator("death", set="cell", kind="lateral", family="population")
 class DeathOperator(Lateral):
     REQUIRES_PARAMS = ["x"]
 

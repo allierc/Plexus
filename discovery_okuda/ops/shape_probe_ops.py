@@ -107,7 +107,7 @@ class _ShapeProbeBase(Lateral):
         return {}
 
 
-@register_operator("cell_shape_probe", set="cell", kind="lateral", family="fields",
+@register_operator("cell_shape_probe", set="cell", kind="lateral", family="hierarchy",
                    model="shape_index")
 class ShapeIndexProbe(_ShapeProbeBase):
     """P / sqrt(A) per cell -- the quantity the vertex model itself minimises towards `p0`."""
@@ -123,7 +123,7 @@ class ShapeIndexProbe(_ShapeProbeBase):
         return out
 
 
-@register_operator("cell_shape_probe", set="cell", kind="lateral", family="fields",
+@register_operator("cell_shape_probe", set="cell", kind="lateral", family="hierarchy",
                    model="aspect")
 class AspectProbe(_ShapeProbeBase):
     """Longest over shortest axis of the cell ring -- "thin and elongated" as a number.

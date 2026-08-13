@@ -26,7 +26,7 @@ from plexus.models.registry import register_operator
 import squirmer
 
 
-@register_operator("squirmer_flow", set="organism", kind="exchange")
+@register_operator("squirmer_flow", set="organism", kind="exchange", family="motion")
 class SquirmerFlowOperator(Exchange):
     """Write the analytical squirmer velocity field onto the `flow` grid from the
     organism's pose + slip modes. The one operator the paper forces that has no
@@ -53,7 +53,7 @@ class SquirmerFlowOperator(Exchange):
         return {}
 
 
-@register_operator("slip", set="surface_node", kind="broadcast")
+@register_operator("slip", set="surface_node", kind="broadcast", family="boundary")
 class SlipOperator(Broadcast):
     """Broadcast organism pose to its surface nodes: position each node on the
     sphere surface and set its tangential slip vector (the 'wavy surface velocity',
@@ -92,7 +92,7 @@ class SlipOperator(Broadcast):
         return {}
 
 
-@register_operator("swim", set="organism", kind="lateral")
+@register_operator("swim", set="organism", kind="lateral", family="motion")
 class SwimOperator(Lateral):
     """Self-propulsion: a motile cell translates along its axis at U = (2/3) B_1.
     First-order (overdamped Stokes): the returned delta is a velocity. A sessile
@@ -115,7 +115,7 @@ class SwimOperator(Lateral):
         return {"organism": vel}
 
 
-@register_operator("absorb", set="surface_node", kind="exchange")
+@register_operator("absorb", set="surface_node", kind="exchange", family="boundary")
 class AbsorbOperator(Exchange):
     """Mouth uptake: the absorbing-cap boundary condition (c -> 0 over the feeding
     cap) plus the feeding objective. Each mouth node drives the local concentration
@@ -142,7 +142,7 @@ class AbsorbOperator(Exchange):
         return {}
 
 
-@register_operator("advect_particles", set="tracer", kind="exchange")
+@register_operator("advect_particles", set="tracer", kind="exchange", family="motion")
 class AdvectParticlesOperator(Exchange):
     """Passive tracers (food parcels) carried by the fluid: gather the flow velocity
     at each tracer and move with it. tracer <- flow. First-order (the parcel IS the
@@ -169,7 +169,7 @@ class AdvectParticlesOperator(Exchange):
         return {"tracer": vel}
 
 
-@register_operator("capture", set="tracer", kind="structural")
+@register_operator("capture", set="tracer", kind="structural", family="population")
 class CaptureOperator(Structural):
     """Phagotrophy: a food parcel that reaches the absorbing mouth cap is eaten
     (occupancy -> 0, parked off-domain) and counted in H.captured -- the discrete

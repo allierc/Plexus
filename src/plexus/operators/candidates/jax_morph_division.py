@@ -70,7 +70,7 @@ from plexus.models.base import Structural
 from plexus.models.registry import register_operator
 
 
-@register_operator("agent_divide", family="growth", set="cell", kind="structural",
+@register_operator("agent_divide", family="population", set="cell", kind="structural",
                    implementation="volume_conserving")
 class CellDivideVolumeConserving(Structural):
     EMIT = None                                       # structural: wakes dormant slots, mutates occ/state in place; returns {} — no integrable delta

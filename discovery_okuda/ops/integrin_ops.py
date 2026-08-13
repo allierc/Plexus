@@ -73,7 +73,7 @@ def _radius(M, u):
              (ph / (2 * math.pi) * nph).long().clamp(0, nph - 1)]
 
 
-@register_operator("integrin_seed", family="growth", set="particle", kind="structural")
+@register_operator("integrin_seed", family="seed", set="particle", kind="structural")
 class IntegrinSeed(Structural):
     """Lay the fibres down once: `layers` particles per fibre, from the surface outward by `length`."""
 

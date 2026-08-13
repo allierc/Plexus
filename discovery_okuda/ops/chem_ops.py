@@ -94,7 +94,7 @@ class CellAdjacency(Rewire):
         return {}
 
 
-@register_operator("cell_chem_seed", set="cell", kind="seed", family="growth")
+@register_operator("cell_chem_seed", set="cell", kind="seed", family="seed")
 class CellRDSeed(Structural):
     """Gray-Scott initial condition on the cell set: substrate u=1 everywhere, activator a=0 except
     a central spot (a=0.5, u=0.25) that nucleates the pattern. chem = [a, u].
@@ -468,7 +468,7 @@ class CellReactGiererMeinhardt(Lateral):
 # optional slot. With the gate open (`a_sw = 0`) the same operator is plain uniform growth. Naming
 # the gate in the operator made the optional half look mandatory, and made the sibling pair
 # unreadable -- `cell_grow` / `cell_divide` says what the schedule actually does.
-@register_operator("cell_grow", set="vertex", kind="structural", family="growth")
+@register_operator("cell_grow", set="vertex", kind="structural", family="population")
 class Grow3D(Structural):
     """Cell growth on the vesicle: each cell's targets (A0 / P0 / v_eq) grow at a per-cell rate,
     and the per-cell volume elasticity in cell_mechanics then inflates the cell by force balance.
@@ -690,7 +690,7 @@ class Grow3D(Structural):
 # epithelial TUBE -- a coherent structure -- and its tissue drifts toward the second picture.
 
 
-@register_operator("cell_grow", model="sizer", set="vertex", kind="structural", family="growth")
+@register_operator("cell_grow", model="sizer", set="vertex", kind="structural", family="population")
 class Grow3DSizer(Grow3D):
     """Growth rate falls with the cell's own size: small cells grow faster, large ones slower.
 
@@ -720,7 +720,7 @@ class Grow3DSizer(Grow3D):
         return s_prev * (1.0 + self.rate * (self.rho + hillv) * f)
 
 
-@register_operator("cell_grow", model="balance", set="vertex", kind="structural", family="growth")
+@register_operator("cell_grow", model="balance", set="vertex", kind="structural", family="population")
 class Grow3DBalance(Grow3D):
     """Size emerges from a synthesis/degradation balance, with no size sensor anywhere.
 
@@ -753,7 +753,7 @@ class Grow3DBalance(Grow3D):
         return (v_new / m["V0f_init"].clamp(min=1e-9)) ** (1.0 / 3.0)
 
 
-@register_operator("cell_grow", model="timer", set="vertex", kind="structural", family="growth")
+@register_operator("cell_grow", model="timer", set="vertex", kind="structural", family="population")
 class Grow3DTimer(Grow3D):
     """Grow at whatever rate lands the cell on its target size after `cycle_frames` frames.
 

@@ -128,7 +128,7 @@ class ECMLoad3D(Structural):
         return {}
 
 
-@register_operator("ecm_gate_growth", family="growth", set="vertex", kind="structural")
+@register_operator("ecm_gate_growth", family="population", set="vertex", kind="structural")
 class ECMGrowthGate3D(Structural):
     """The matrix's stress slows the CELL CYCLE where it presses hardest.
 

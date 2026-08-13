@@ -17,7 +17,7 @@ from plexus.models.base import Exchange
 from plexus.models.registry import register_operator
 
 
-@register_operator("secrete", set="cell", kind="exchange")
+@register_operator("secrete", set="cell", kind="exchange", family="signalling")
 class SecreteOperator(Exchange):
     REQUIRES_PARAMS = ["to", "rate"]
 
@@ -44,7 +44,7 @@ class SecreteOperator(Exchange):
         return {}                                 # no acceleration
 
 
-@register_operator("sense", set="cell", kind="exchange")
+@register_operator("sense", set="cell", kind="exchange", family="signalling")
 class SenseOperator(Exchange):
     REQUIRES_PARAMS = ["from", "gain"]
 

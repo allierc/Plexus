@@ -17,7 +17,7 @@ from plexus.models.base import Lateral
 from plexus.models.registry import register_operator
 
 
-@register_operator("adhesion", set="cell", kind="lateral")
+@register_operator("adhesion", set="cell", kind="lateral", family="interaction")
 class AdhesionOperator(Lateral):
     def __init__(self, params, device="cpu"):
         super().__init__()

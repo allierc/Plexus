@@ -142,7 +142,7 @@ def _compact_repulsion(r, sigma, eps, exponent: float, prefactor: float):
     return torch.where(base > 0.0, prefactor * eps * safe ** exponent, torch.zeros_like(base))
 
 
-@register_operator("mechanosense", family="mechanics", set="cell", kind="lateral")
+@register_operator("mechanosense", family="signalling", set="cell", kind="lateral")
 class Mechanosense(Lateral):
     r"""Per-cell Irving-Kirkwood virial pressure written into a transient ``stress`` field -- a pure
     (quasistatic) mechanosensor that reduces the SAME conservative pair law the mechanics uses to a

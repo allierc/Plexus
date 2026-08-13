@@ -16,7 +16,7 @@ from plexus.models.base import Lateral
 from plexus.models.registry import register_operator
 
 
-@register_operator("finish", set="cell", kind="lateral")
+@register_operator("finish", set="cell", kind="lateral", family="harness")
 class FinishOperator(Lateral):
     REQUIRES_PARAMS = ["x"]
 
