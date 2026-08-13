@@ -60,7 +60,18 @@ ROLE = {
 
 
 def _picture(run_dir):
-    """`strip.png` -- the frame montage, which is what can actually be LOOKED at.
+    """The frame montage, which is what can actually be LOOKED at. `shape_strip.png` FIRST.
+
+    TWO ARTEFACTS ARE LIVE AND THEY ARE NOT THE SAME PICTURE, which is why the order here matters
+    and why `strip.md` has to tell them apart. `shape_strip.png` (13 August) is ONE row of eight
+    224x224 VTK frames: the shape through time and nothing else. `strip.png` is the older four-row
+    matplotlib sheet, of which three rows are a second viewpoint, a per-frame contrast stretch of
+    cell radius, and a cross-section -- and on which the black per-cell stroke leaves only 4.5% of
+    b_star's pixels lit, against 28.9% on the new one.
+
+    The old sheet is NOT deleted and is NOT a mistake to fall back to: 399 runs on disk carry it,
+    `montage.py` tiles it, and a run whose shape frames failed still has it. It is simply second
+    choice, and the eye is told which one it got.
 
     NOT THE MOVIE. `Read` takes PNG and not mp4, so an eye pointed at movie.mp4 would either fail or
     describe a file it never opened. The old loop solved this differently and expensively:
@@ -68,7 +79,7 @@ def _picture(run_dir):
     the caption. The strip is already written by every run, is 1.6 MB of real frames, and needs no
     model load -- so the judging model looks at the tissue directly.
     """
-    for f in ("strip.png", "montage.png"):
+    for f in ("shape_strip.png", "strip.png", "montage.png"):
         p = os.path.join(run_dir, f)
         if os.path.exists(p):
             return p
@@ -120,6 +131,14 @@ def run(bundle):
     prompt = _prompt.build("eye", [
         ("The run", name, {"as_json": False}),
         ("The frames -- open this with the Read tool and look at it", pic, {"as_json": False}),
+        # WHICH ARTEFACT, NAMED. Two are live and they are different pictures; `strip.md` documents
+        # both and the eye cannot tell which it has from the path alone once it is reading pixels.
+        # An eye holding the four-row note while looking at the one-row sheet is the same class of
+        # error the note was written to end.
+        ("WHICH artefact you were given -- read the matching section of the note below",
+         ("shape_strip.png -- the NEW one-row shape sheet"
+          if os.path.basename(pic) == "shape_strip.png" else
+          f"{os.path.basename(pic)} -- the OLDER four-row sheet"), {"as_json": False}),
         # THE CAMERA, AS A NUMBER. Cedric, 8 August: "the eye agent should be aware of the scale
         # bar through passing the camera zoom value."
         #

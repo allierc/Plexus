@@ -88,6 +88,13 @@ SEQUENCES = {
     2: [("evolve", "mesh"), ("kburns", "mesh")],
     3: [("evolve", "nomesh"), ("kburns", "nomesh"),
         ("evolve", "mesh"), ("kburns", "mesh")],
+    # THE ONE THE SURROGATE WANTS. Cedric, 13 August, looking at a strip: *"we should just use first
+    # row... why not using vtk_evolve_nomesh.mp4."* An embedding of the tissue wants the SHAPE
+    # THROUGH TIME and nothing else -- no mesh strokes (they smear to a dark field at 20k cells), no
+    # turn-on-the-spot, and none of the strip's other three rows, of which one is a second viewpoint,
+    # one is a per-frame contrast stretch of radius, and one is a cross-section with a hardcoded
+    # hollow centre. Seq 1 is the nearest existing entry and draws the mesh; this is seq 1 without it.
+    4: [("evolve", "nomesh")],
 }
 # 0, NOT 3. Cedric, 12 August: *"do not write four vtk mp4 in each folder but just the
 # vtk_kburns_nomesh.mp4."* Sequence 3 was chosen when the question was WHICH style to use; that is

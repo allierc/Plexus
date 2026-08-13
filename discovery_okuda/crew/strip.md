@@ -1,4 +1,50 @@
-# What `strip.png` IS
+# What you are looking at
+
+**TWO ARTEFACTS ARE LIVE AND THEY ARE NOT THE SAME PICTURE.** Your prompt names which one you were
+given. Read that section and ignore the other.
+
+| | `shape_strip.png` (preferred) | `strip.png` (older) |
+|---|---|---|
+| shape | **one row, 8 columns** | four rows, 8 columns |
+| renderer | VTK, z-buffered | matplotlib, painter's algorithm |
+| per-cell outline | none | black stroke on every cell |
+| lit pixels, `b_star` | **28.9%** | 4.5% |
+
+If in doubt, count the rows: one row of eight round bodies is the new sheet; four stacked rows, the
+bottom one a thin outline, is the old one.
+
+---
+
+# `shape_strip.png` -- the shape sheet
+
+**One row, eight columns, each 224 x 224.** Written by `shape_frames.py` from the same `traj.npz`
+every other picture uses. Columns are TIME, first to last recorded frame. There is nothing else in
+it -- no second viewpoint, no derived label, no cross-section, no text, no scale bar.
+
+- **Colour is the activator only**, white -> red -> DARK MAROON, on one range held fixed across the
+  whole run (`shape_frames.py`, `act_lo`/`act_hi` in `shape.json`). **HIGH ACTIVATOR IS DARK, NOT
+  BRIGHT** -- the top of the ramp reads as near-black and the most *vivid* red is upper-middle. A
+  cell going from vivid red to dark brick is going UP. Say which way the BRIGHTNESS went.
+- **No division green and no dying blue** -- both are gated by `show_div`, which `nomesh` turns off
+  (`vtk_render.py:239`, `:247`). Measured across `apop_patch_big`'s eight frames, a run built around
+  cell death: 0.00% of lit pixels are either.
+- **TEAL / cyan IS DRAWN, and it means GROWTH SWITCHED OFF by an inhibitor.** It is *not* gated by
+  `show_div` (`vtk_render.py:228`) and it is not small: **52.6% of lit pixels on `sc_inh_hard`,
+  56.8% on `sc_inh_mid`**, against 0.00% on `b_star` and `apop_patch_big`. An inhibited cell is
+  **alive and static** -- not dying, not damaged. It is painted only where the activator is LOW, so
+  red spots showing through a teal body is the informative picture, not a contradiction.
+- **MAGENTA is still the alarm** -- a broken cell, or activator that is NaN so nothing was measured.
+- **Black is background only.** There are no cell outlines in this sheet, so a dark region inside
+  the body is shading, not a stroke and not a hole.
+- **The camera is the run's own box, held fixed across all eight columns**, so GROWTH WITHIN THE RUN
+  IS REAL: a body that gets bigger across the row genuinely grew. It is chosen per run, so size is
+  **not** comparable BETWEEN runs.
+- `shape.json` beside it records the frame indices and the cell count at each column, if the round
+  ever hands you those.
+
+---
+
+# `strip.png` -- the older four-row sheet
 
 Every claim here is checkable at the cited `file:line`, relative to `discovery_okuda/`. Mapped 13
 August by reading `run_one.render` and `ops/run_tyssue_vesicle._draw` and by pixel census on the 92
