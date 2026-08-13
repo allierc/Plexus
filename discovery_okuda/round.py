@@ -2044,6 +2044,26 @@ def morphology_of(ctx):
     return {n: (m or {}).get("morphology") for n, m in (ctx.get("metrics") or {}).items()}
 
 
+# WHAT A RECORD ROW DELIBERATELY OMITS. Everything else on a built slot is written, which is the
+# opposite of how this worked and the reason for the change.
+#
+# `record_all` used to enumerate the fields it kept -- an ALLOWLIST duplicated from what
+# `_build_one` returns, with nothing keeping the two in step. Add a field to a slot and it vanishes
+# from the record, silently, no error anywhere. It happened twice: `act` and `on` were on 14 of 14
+# proposal slots and 0 of 42 records, and `chases` went the same way, which is why the epistemic
+# audit reported surprise-chasing as zero while the Proposer was dutifully filling the field.
+#
+# That is the third duplicated declaration of "what counts" to bite this project in one day -- the
+# two reset keep-lists that disagreed and deleted the claim ledger, the seed floors defined in two
+# places, and this. A denylist cannot drift: a new field is recorded by default, and anything that
+# should NOT be is named here with its reason.
+RECORD_OMIT = {
+    "sweep",        # a build flag, not a property of the run
+    "route",        # ditto
+    "slot",         # the slot INDEX is meaningless once the row has a name
+}
+
+
 def record_all(ctx):
     """One row per run. The record is written by the engine, never by an agent."""
     os.makedirs(CAMPAIGN, exist_ok=True)
@@ -2052,18 +2072,15 @@ def record_all(ctx):
     with open(RECORDS, "a") as f:
         for s in (ctx.get("specs") or []):
             m = met.get(s["name"]) or {}
+            row = {k: v for k, v in s.items() if k not in RECORD_OMIT}
             # `run_id` IS WRITTEN even though this file is no longer merged into run_record's. A row
             # that cannot say which run it describes is a row that poisons whatever reads it next.
-            f.write(json.dumps({"round": rid, "name": s["name"], "run_id": s["name"],
-                                "parent": s.get("parent"),
-                                "edit": s.get("edit"), "claim": s.get("claim"),
-                                "intent": s.get("intent"), "comp_hash": s.get("comp_hash"),
-                                "out_of_range": s.get("out_of_range") or [],
-                                "replicate": bool(s.get("replicate")),
-                                "claim_proposed": s.get("claim_proposed"),
-                                "run_key": s.get("run_key"),
-                                "metrics": m, "premises_broken": m.get("premises_broken") or [],
-                                "scored": sc.get(s["name"])}, default=str) + "\n")
+            row.update({"round": rid, "name": s["name"], "run_id": s["name"],
+                        "replicate": bool(s.get("replicate")),
+                        "out_of_range": s.get("out_of_range") or [],
+                        "metrics": m, "premises_broken": m.get("premises_broken") or [],
+                        "scored": sc.get(s["name"])})
+            f.write(json.dumps(row, default=str) + "\n")
             n += 1
     return n
 
