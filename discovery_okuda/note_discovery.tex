@@ -916,119 +916,101 @@ calibrated. The name stayed on the list, and worse, it was in the short banner t
 agent \emph{``these are new, use them''}. It has been renamed to say what it is and marked as
 untrustworthy.
 
-\subsection*{What was built}
+\subsection*{The bank was 127 names measuring seven things}
+Every number in this campaign is read through a bank of \emph{admitted} metrics --- the names a
+prediction, a portfolio seat or a claim may rest on. It had grown to \textbf{127}, each admitted by
+a hand-set flag on its own class, and nothing had ever re-checked them.
+
+Measured over the 367 runs on disk, those 127 names carry a \textbf{participation ratio of 7.4}:
+seven and a half independent directions. Sixty pairs correlate above $|\rho|=0.95$ and
+\textbf{six pairs sit at exactly $1.000$} --- \code{act\_mean}, \code{act\_max}, \code{act\_cv},
+\code{corr\_act\_rad}, \code{act\_at\_tip} and \code{grip}, in their \code{\_measured\_frac} form,
+are one number under six names, because each records what fraction of frames was measurable and
+they are measured on the same frames.
+
+\subsection*{Admission is now a gate, not a flag}
+\code{tools/audit\_metric\_bank.py} re-derives the bank from the record and fails if the
+declaration has drifted. Two gates, in order:
+
 \begin{itemize}\itemsep2pt
-\item \textbf{The pattern, as numbers.} How much the chemical varies across cells
-      (\code{act\_sd}); the same divided by the average (\code{act\_cv}), which does not care
-      whether the overall level is collapsing or exploding, so it still means something when the
-      chemistry is running away; and what fraction of the tissue is switched on
-      (\code{act\_occupancy}). A frame counts as \emph{patterned} only if \emph{both} the
-      variation and the occupancy are real --- so one cell of four thousand blowing up, which
-      makes the variation enormous but the occupancy $0.01$, is correctly not a pattern. Over a
-      whole run: what fraction of it had a pattern at all, and the frame at which the pattern
-      last died.
-\item \textbf{A correlation is refused when there is nothing to correlate.} The chemistry-drives-
-      shape number reads a confident $0.294$ on that dead field --- a correlation of rounding
-      error, because the statistic is deliberately blind to scale and will happily report on
-      noise. It is now simply \emph{not measured} when the pattern is below the liveness
-      threshold, which makes ``does the pattern drive the shape'' come out \emph{inconclusive}
-      when there is no pattern. That is the honest answer. Given a planted signal --- chemical
-      painted onto the outermost 15\% of cells --- the instrument recovers it: $0.724$, and the
-      tip-enrichment measure reads $5.19$ against a null of $1.0$.
-\item \textbf{Telling a tube from a lumpy ball.} The elongation number in use is a ratio between
-      two points of the radius distribution, so it reads the same for one long tube and for a
-      broad bumpy sphere. The shape of the whole cell cloud --- long and thin, round, or
-      flattened --- now has its own three numbers. This is Okuda's own axis: tube, undulation,
-      branch.
-\item \textbf{The history channel, revived and widened.} Word-valued columns are skipped instead
-      of crashing. The list of curves allowed into a prompt held seven entries and \emph{not one
-      about the chemistry}; it now covers shape, cells, pattern and apparatus. And each curve
-      carries eight numbers across the run beside its one-word verdict --- because ``peaked''
-      describes a gentle rise and fall \emph{and} a spike to seventeen thousand followed by
-      extinction, and only the numbers say which. That run now reads
-      \code{0 0 0 0 1 0.013 0 0} for the fraction of switched-on cells: the flash Cedric saw,
-      written down.
-\item \textbf{Three checks so this cannot recur quietly.} Every approved measurement must have
-      something that actually computes it; every one must have a written definition, and no
-      definition may name a withdrawn measurement; and the history channel must survive a
-      word-valued column. Twenty-one checks pass.
+\item \textbf{Resolvability.} $(p_{90}-p_{10}) \, / \, (f \times p_{90}|y|) \ge 3$, where $f$ is
+      the metric's own measured seed floor. A
+      metric whose spread across the corpus does not clear its own \emph{measured} reproducibility
+      noise is not an instrument. The floors are the ones \code{critic.\_seed\_floors()} already
+      uses to refuse a prediction finer than the noise --- so a name the critic would always refuse
+      is no longer offered in the first place.
+\item \textbf{Span.} One representative per question-group first, then greedy max-min on
+      $|\rho|$. The group step is not decoration: run without it, pure orthogonality dropped
+      \emph{both} pattern metrics and left the question ``is there a pattern at all'' with no
+      instrument in the bank --- a blindness invisible because every remaining name looked healthy.
 \end{itemize}
 
-\subsection*{One name, one quantity}
-A \textbf{plain name} means a per-frame measurement: computed every sampled frame, classified over
-time, and reported at the last frame so a prediction can be scored against it. A \textbf{suffix}
-is only used when the number is \emph{not} simply the last frame, and says what it is instead ---
-the best value reached, or the last \emph{trustworthy} frame before the mesh tore.
+\noindent The denominator is $p_{90}|y|$ and not the median because \code{n\_tips\_final} and
+\code{protrusion\_aspect\_max\_final} have a median of \emph{zero}, and dividing by it reported
+them as resolving 1.7 billion times their noise. A scale that can vanish is not a scale.
 
-Thirteen duplicate names were deleted under that rule. They had been created by copying every
-per-frame measurement into the summary twice, so the same number appeared under two names. A set
-of measurements is a \emph{vocabulary}: doubling it without adding a quantity makes it harder to
-use and measures nothing new. The approved list went from 53 names to 40.
-
-\subsection*{Grouped by the question they answer}
-In round 2, all twelve predictions were written about elongation while every chemistry measurement
-sat unnamed. The approved list had reached the agent as one comma-separated line of fifty-three
-identifiers, and a flat list is a list you read the first entry of.
-
-Every approved measurement now sits in exactly one of five groups, phrased as questions:
-\emph{is it a tube; is it still made of cells; is there a pattern at all; does the pattern grip
-the shape; is this evidence at all}. Each is printed with the value it takes when the answer is
-\emph{no} --- because a prediction against a bare identifier is a guess. ``Variation above 0.3''
-means nothing until you know a dead field reads 0.00 and a live one reads about 1. The written
-definitions went from 6 to 38.
-
-\subsection*{How often to measure}
-The old rule gave \emph{every} run forty samples, however long it was. A 900-frame run was
-therefore sampled every 23 frames and a 300-frame run every 8 --- so ``the twelfth sample'' meant a
-different moment in each, and two runs could not be compared point by point, which is the one
-thing a history is for.
-
-It is now every 25 frames, always, with the last frame added. Measured cost: one frame of analysis
-takes $1.43$ seconds on a real 3{,}975-cell mesh, so
+\subsection*{Two of the four portfolio seats were keyed on instruments that do not measure}
+\code{protrusion\_aspect\_max\_final} resolves \textbf{2.44$\times$} its seed floor and
+\code{n\_tips\_final} \textbf{2.78$\times$} --- both under the bar. Those are the two names the
+\code{tube} and \code{branched} seats scored on. Asked to classify the campaign's own phenotype
+montage (\code{montage\_r013\_r021\_c3.png}, 367 runs, four visible classes: sphere, 1--3 arms,
+4--6, 7+), the two of them \emph{together} score:
 
 \begin{center}\small
 \begin{tabular}{@{}lrr@{}}
 \toprule
-sampling & frames analysed & cost per run \\
+predictors & accuracy & runs usable \\
 \midrule
-old rule (forty samples) & 40 & 57\,s \\
-\textbf{every 25 frames} & 37 & \textbf{53\,s} \\
-every 10 frames & 91 & 130\,s \\
-every frame & 901 & 21.4\,min \\
+majority-class baseline & 55.3\% & --- \\
+\code{protrusion\_aspect\_max\_final} + \code{n\_tips\_final} & \textbf{58.6\%} & 350 \\
+all 127 admitted names & 95.0\% & 258 \\
+\textbf{the gated ten} & \textbf{98.6\%} & 283 \\
+the ten, \code{n\_tubes\_final} removed & 91.5\% & 283 \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\noindent The new rule is \emph{cheaper} than the one it replaces. Measuring every 10 frames would
-give two and a half times the resolution in time for about 77 extra seconds a run --- roughly
-15 minutes on a twelve-run round --- which is the trade to make if ``when did the pattern die''
-needs answering to within ten frames rather than twenty-five.
+\noindent They cannot tell a flower from a sphere. Standing law L3 has said so in prose since
+round~6 --- \emph{``the metric zeroes tips the picture shows''} --- and this is the arithmetic.
+The \code{branched} seat's documented emptiness was therefore never evidence of no branch; it was a
+metric reading zero. Both seats are re-keyed, and the note that no admitted instrument separates a
+\emph{branch} from an \emph{arm} is recorded in \code{flow.yaml} rather than assumed away.
 
-\subsection*{What is still open}
-\begin{enumerate}\itemsep2pt
-\item \textbf{Which measurements to keep.} The per-frame table produces 64 numbers and much of it
-      is one quantity written twice --- three spellings of ``fraction of switched-on cells'', a
-      count and a fraction of the same fault, and two different ways of asking whether the
-      chemical sits at the tips, one of which was added this week without noticing the other. A
-      cut to 24 is drafted and is being checked against every consumer --- a figure panel, a
-      biological premise, a shape classifier --- before anything is deleted. One redundancy is
-      exact and confirmed; another that looked exact is wrong by 1\% at the precision stored, so
-      that measurement stays.
-\item \textbf{What to say about time.} With a single per-frame table at a fixed spacing, separate
-      measurements for start, middle and end stop being necessary: they become \emph{summaries}
-      of one history --- last value, best value, average, spread, trend. Which summaries are
-      worth their space in a prompt carrying 24 measurements is the open design question.
-\item \textbf{Telling the agents.} Approving a measurement makes a prediction about it
-      \emph{scorable}; a separate short list is what tells an agent the measurement \emph{exists}.
-      The new chemistry measurements were approved and not announced, so round 2 wrote every
-      prediction about elongation while they were computed for the first time and named by
-      nobody. The same fault as the others, one list over.
-\end{enumerate}
+\subsection*{The ten}
+\begin{center}\small
+\begin{tabular}{@{}llr@{}}
+\toprule
+metric & the question it answers & resolves \\
+\midrule
+\code{n\_tubes\_final}       & how many arms --- counts \code{r013\_05}'s at 11, as the eye does & 5.00$\times$ \\
+\code{protr\_final}          & is there a protrusion at all & 15.34$\times$ \\
+\code{grip\_final}           & does the pattern grip the shape & 3.31$\times$ \\
+\code{invagination\_final}   & inward: the axis Okuda's paper is about & 12.12$\times$ \\
+\code{corr\_act\_rad\_final} & chemistry against radius: the mechanism question & 6.14$\times$ \\
+\code{mech\_p\_ratio}        & apparatus: the only mechanics name in the bank & 5.00$\times$ \\
+\code{shape\_idx\_p95\_trend}& cells: which way cell shape moved as the clock ran out & 5.96$\times$ \\
+\code{act\_max\_trend}       & pattern: was the chemistry building or dying & 30.78$\times$ \\
+\code{gyr\_oblate\_floor}    & flattening, near-orthogonal to protrusion & 3.98$\times$ \\
+\code{shape\_idx\_p95\_span} & how far cell shape travelled over the run & 3.94$\times$ \\
+\bottomrule
+\end{tabular}
+\end{center}
 
-\textbf{What you get.} A loop that can state what it is looking at. The reviewing agent's
-objection to round 2 --- that five of its twelve experiments were reading a shape-to-chemistry
-feedback off a field that was already dead --- was, until this phase, an assertion no instrument
-could settle. It is now a number.
+\noindent \textbf{The ten beat the 127 and cover more runs}, because the 117 dropped names carry
+absences that shrink every row they touch. Removing \code{n\_tubes\_final} still leaves 91.5\%, so
+the set spans the phenotype rather than being one metric in a hat.
+
+The list is the gate's answer and not a preference: a hand-picked ten and the derived ten disagreed
+on three names, and the derived set won the only test that separates them --- classification with
+\code{n\_tubes\_final} removed, 91.5\% against 86.3\%.
+
+\subsection*{Nothing was deleted from the measurement}
+Every quantity still computes and still lands in \code{diag.json}. What changed is what a
+prediction may \emph{name}. That distinction is load-bearing beyond habit: the gate re-derives
+admission \emph{from the record}, so deleting the arithmetic would leave it unable to check its own
+answer next month. \code{predict.KNOWN\_METRICS} therefore still parses every name the substrate
+has ever produced --- an archived prediction that cannot be parsed cannot be re-scored or honestly
+retracted --- while \code{predict.admitted()} is what refuses a new one.
 \end{phasebox}
 
 \begin{phasebox}{Phase 11 --- An outside reviewer says no, and why \hfill \prog}

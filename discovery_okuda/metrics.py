@@ -154,25 +154,119 @@ def all_metrics(include_withdrawn=False):
     return [m for m in REGISTRY.values() if include_withdrawn or not m.withdrawn]
 
 
+# ============================================================ THE ADMITTED TEN
+# WHAT A PREDICTION, A SEAT, A CLAIM OR A SCORE MAY REST ON. Ten names, and the list is not a
+# preference -- it is the output of a gate, re-derivable from the record by
+# `tools/audit_metric_bank.py`, which fails if the declaration below drifts from what the data
+# supports.
+#
+# WHAT IT REPLACES. `admitted = True` on 24 series quantities x 6 suffixes plus 8 scalars: 127 names
+# present on enough runs to be usable. Measured over the 350 runs on disk, those 127 carry a
+# PARTICIPATION RATIO OF 7.4 -- seven and a half independent directions wearing 127 names. Sixty
+# pairs correlate above |rho| 0.95 and SIX PAIRS SIT AT EXACTLY 1.000: `act_mean`, `act_max`,
+# `act_cv`, `corr_act_rad`, `act_at_tip` and `grip`, all in their `_measured_frac` form, are one
+# number under six names, because they record what fraction of frames was measurable and they are
+# measured on the same frames.
+#
+# THE GATE, in the order it is applied:
+#
+#   1. RESOLVABILITY. A name is admitted only if its spread across the corpus exceeds its own
+#      MEASURED SEED FLOOR by 3x or more -- (p90 - p10) / (floor * p90|y|). The floors are the ones
+#      `critic._seed_floors()` already uses, measured over replicate pairs and ranging from 0.02
+#      (protr) to 0.41 (protrusion_aspect_max). A metric that moves less than its own noise is not
+#      an instrument, and R7 already refuses predictions written against one; this stops the name
+#      being offered in the first place.
+#
+#      p90|y| AND NOT THE MEDIAN, and the reason is a defect I wrote twice before catching it: the
+#      floors are relative, so the natural comparison is a relative spread -- but `n_tips_final` and
+#      `protrusion_aspect_max_final` have a MEDIAN OF ZERO, and dividing by it reported them as
+#      resolving 1.7 BILLION times their noise. A scale that can vanish is not a scale.
+#
+#   2. SPAN. Greedy max-min on |rho|: each further name is the one whose strongest correlation with
+#      those already admitted is weakest. Seeded with the campaign's own objectives so the bank
+#      measures what the loop is chasing rather than what happens to be orthogonal.
+#
+# WHAT THE GATE REJECTED, and this is the finding that made the refactor urgent:
+# `protrusion_aspect_max_final` resolves 2.44x its floor and `n_tips_final` 2.78x -- both under the
+# 3x bar. Those are the two names `crew/flow.yaml`'s `tube` and `branched` seats were keyed on.
+# Asked to classify the 100-run montage `log/okuda/_gates/montage_r013_r021_c3.png` into its four
+# visible classes (sphere / 1-3 arms / 4-6 / 7+), THE TWO OF THEM TOGETHER SCORE 58.6% AGAINST A
+# 53.1% MAJORITY BASELINE. They cannot tell a flower from a sphere. Standing law L3 has said so in
+# prose since round 6 -- "the metric zeroes tips the picture shows" -- and this is the arithmetic.
+#
+# WHAT THE TEN COST, measured on the same montage with a random forest at 5-fold CV:
+#
+#     majority baseline                       53.1%
+#     all 127 admitted names                  95.0%   (usable on 258 runs)
+#     THE TEN                                 98.9%   (usable on 281 runs)
+#     the ten minus n_tubes_final             87.5%   -- the set spans, it is not one metric in a hat
+#
+# The ten are BETTER than the 127 and cover more runs, because the 117 dropped names carry absences
+# that shrink every row they touch.
+#
+# NOTHING IS DELETED FROM THE MEASUREMENT. Every quantity below still computes and still lands in
+# `diag.json`; what changes is what a prediction may NAME. That distinction is the one this file
+# already draws between `admitted` and diagnostic, and it is load-bearing here for a reason beyond
+# habit: the gate re-derives admission FROM THE RECORD, so deleting the arithmetic would make the
+# gate unable to check its own answer next month.
+# WRITTEN BY THE GATE, NOT BY HAND. My hand-picked ten and the gate's disagreed on three names, and
+# the gate was right by the only test that separates them: classifying the 367-run corpus into the
+# four phenotype classes of `log/okuda/_gates/montage_r013_r021_c3.png` WITH `n_tubes_final`
+# REMOVED -- which measures whether the SET spans the phenotype rather than whether one metric does.
+# Hand-picked 86.3%, gate-derived 91.5%, against a 55.3% majority baseline. Regenerate with
+# `python tools/audit_metric_bank.py --update`.
+ADMITTED = (
+    # the campaign's objectives -- the five it reserves portfolio seats for, all clearing the bar
+    "n_tubes_final",         #  5.00x its seed floor. Counts r013_05's arms at 11, as the eye does.
+    "protr_final",           # 15.34x. Is there a protrusion at all.
+    "grip_final",            #  3.31x. Does the pattern grip the shape.
+    "invagination_final",    # 12.12x. Inward -- the axis Okuda's paper is about.
+    "corr_act_rad_final",    #  6.14x. Chemistry against radius: the mechanism question.
+    # one per remaining question-group, then greedy orthogonality
+    "mech_p_ratio",          # apparatus -- pressure ratio, the only mechanics name in the bank
+    "shape_idx_p95_trend",   # cells -- which way cell shape was moving when the clock ran out
+    "act_max_trend",         # pattern -- whether the chemistry was still building or dying
+    "gyr_oblate_floor",      #  3.98x. Flattening, near-orthogonal to protrusion.
+    "shape_idx_p95_span",    #  3.94x. How far cell shape travelled over the whole run.
+)
+
+# The bar the gate applies. Stated here rather than in the audit so the number a reader sees is the
+# number that ran; `tools/audit_metric_bank.py` imports it.
+RESOLVE_MIN = 3.0
+SPAN_MAX_RHO = 0.95
+
+
 def names():
-    """Every admitted metric name -- what a prediction may refer to."""
-    out = []
-    for m in all_metrics():
-        if m.admitted:
-            out.extend(m.names())
-    return tuple(out)
+    """The admitted metric names -- what a prediction may refer to. See ADMITTED above."""
+    return ADMITTED
+
+
+def admitted_quantities():
+    """The Metric classes behind ADMITTED, in that order and without duplicates.
+
+    ADMITTED names carry suffixes; a note, a group and a `requires` predicate belong to the
+    QUANTITY. This is the one place the two are joined, so nothing downstream has to strip a suffix
+    by hand -- which is how `_min` once shadowed `shape_idx_min`.
+    """
+    out, seen = [], set()
+    for n in ADMITTED:
+        m = quantity_of(n)
+        if m is not None and m.name not in seen:
+            seen.add(m.name)
+            out.append(m)
+    return out
 
 
 def notes():
     """{name: note} for every admitted quantity -- the bank handed to the Proposer."""
-    return {m.name: m.note() for m in all_metrics() if m.admitted}
+    return {m.name: m.note() for m in admitted_quantities()}
 
 
 def groups():
     """{slug: (question, [quantity, ...])} -- for a role told to lead with the question."""
     out = {}
     for slug, question in GROUPS.items():
-        qs = [m.name for m in all_metrics() if m.group == slug and m.admitted]
+        qs = [m.name for m in admitted_quantities() if m.group == slug]
         if qs:
             out[slug] = (question, qs)
     return out
@@ -202,7 +296,13 @@ def headline_metrics():
         act_cv                 is there a pattern at all
         corr_act_rad           does the pattern grip the shape -- the campaign's actual question
     """
-    return tuple(m.name for m in all_metrics() if m.headline)
+    # DERIVED FROM `ADMITTED`, NOT FROM THE `headline` FLAG. The flag advertised
+    # `protrusion_aspect_max` and `n_tubes` as two of the five a role should lead with -- and the
+    # gate has since rejected `protrusion_aspect_max_final` at 2.44x its own seed floor. A banner
+    # saying "these are the important ones" that names an instrument which cannot separate a flower
+    # from a sphere is worse than no banner: it is the campaign pointing its roles at noise.
+    # The first five of ADMITTED are the campaign's objectives; those are the headline.
+    return tuple(dict.fromkeys(quantity_of(n).name for n in ADMITTED[:5] if quantity_of(n)))
 
 
 def bank():
@@ -214,9 +314,10 @@ def bank():
     declared here. But they are not names a prediction should rest on, and handing all 67 to an agent
     is how a round turns into an argument about one diagnostic.
     """
-    head = [m for m in all_metrics() if m.admitted and m.headline]
-    rest = [m for m in all_metrics() if m.admitted and not m.headline]
-    return {m.name: m.note() for m in head + rest}
+    head = set(headline_metrics())
+    qs = admitted_quantities()
+    return {m.name: m.note() for m in
+            [m for m in qs if m.name in head] + [m for m in qs if m.name not in head]}
 
 
 def undefined_in(summary):

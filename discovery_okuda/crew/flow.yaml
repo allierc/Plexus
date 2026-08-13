@@ -138,12 +138,23 @@ nodes:
           # lie (F15/F16)" -- and a seat is not the place to quietly readmit a rejected instrument.
           # The seat therefore counts arms and does not weigh their length; if length is worth
           # having, the instrument has to be re-earned through the gate first.
+          # SCORED ON `protr_final`, NOT ON `protrusion_aspect_max_final`, since 13 August. The
+          # metric gate measured that name at 2.44x its own seed floor -- under the 3x bar -- and
+          # it, together with `n_tips_final`, classifies this campaign's own phenotype montage at
+          # 58.6% against a 53.1% majority baseline. It cannot tell a flower from a sphere, and it
+          # was HALF THIS SEAT'S SCORE. `protr_final` resolves 15.34x and is admitted.
           where: {n_tubes_final: 2}
-          score: {n_tubes_final: 1.0, protrusion_aspect_max_final: 0.5}
+          score: {n_tubes_final: 1.0, protr_final: 0.5}
         bud:
           # a BULGE, not a finger -- aspect counts against it, or this is just the tube seat again
+          # THE NEGATIVE ASPECT TERM IS GONE and nothing replaces it, which is a loss stated
+          # rather than papered over. "A bulge, not a finger" is exactly the distinction
+          # `protrusion_aspect_max` was for, and it is the distinction the gate says that metric
+          # cannot make. No admitted name separates a bud from a tube, so this seat now selects the
+          # best protrusion of any shape and the `tube` seat above takes the ones with arms. If the
+          # distinction is worth having, it needs an instrument that earns the 3x bar.
           where: {protr_final: 1.10}
-          score: {protr_final: 1.0, protrusion_aspect_max_final: -0.3}
+          score: {protr_final: 1.0, n_tubes_final: -0.3}
         branched:
           # LEGITIMATELY EMPTY, and left that way on purpose. A branch is two or more SUSTAINED
           # tips; n_tips_final is nonzero in two runs of eighty-one and reaches 1.0 in both, so
@@ -152,8 +163,17 @@ nodes:
           # filled it with lobes and made the portfolio look diverse while selecting for the same
           # thing twice. An empty seat falls through to the fill and costs nothing; it will seize
           # the first real branch the moment one exists, which a lobe-filled seat could not.
-          where: {n_tips_final: 2}
-          score: {n_tips_final: 1.0, protr_final: 0.5}
+          # RE-KEYED OFF `n_tips_final`, WHICH THE GATE RETIRED (2.78x its seed floor, under the
+          # 3x bar). This seat was already documented as legitimately empty -- "n_tips_final is
+          # nonzero in two runs of eighty-one" -- and now the reason is arithmetic rather than
+          # anecdotal: the metric does not resolve, so its zeros were never evidence of no branch.
+          #
+          # NOTHING IN THE ADMITTED TEN MEASURES BRANCHING. A branch is an arm that itself divides,
+          # and no instrument the campaign owns separates that from an arm that does not. So the
+          # seat is keyed on the nearest admitted quantity -- MANY arms -- and is honest that this
+          # is a proxy: four or more tubes is where a branch would have to appear if one ever did.
+          where: {n_tubes_final: 4}
+          score: {n_tubes_final: 1.0, protr_final: 0.5}
         complex:
           where: {grip_final: 0.05}
           score: {grip_final: 1.0, invagination_final: 0.5}
