@@ -1033,6 +1033,34 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
             print(f"[{name}] VTK clips skipped: {type(_e).__name__}: {str(_e)[:90]} -- "
                   f"`python vtk_render.py {name}` rebuilds them from traj.npz", flush=True)
 
+        # THE SHAPE FRAMES -- what the Eye now looks at, and what an encoder can read unmodified.
+        # Cedric, 13 August: *"we should use this strip.png from now on, put it in the loop."*
+        #
+        # It REPLACES `strip.png` as the eye's picture and does not delete it: the old sheet is
+        # still what `montage.py` tiles and what the 399 runs already on disk carry, and the eye
+        # falls back to it when these are absent. What it fixes is measured -- on b_star, lit pixels
+        # go 4.5% -> 28.9% of the frame, because three of the old sheet's four rows were a second
+        # viewpoint, a per-frame contrast stretch of cell radius, and a cross-section, and because
+        # the black per-cell stroke ate the body at 12,000 cells.
+        #
+        # 4.5 s on top of a 30-40 minute run, measured on b_star.
+        try:
+            import shape_frames
+            _t0 = time.time()
+            _sm = shape_frames.render_one(name, quiet=True)
+            if _sm:
+                summary["shape_frames"] = _sm["n_frames"]
+                print(f"[{name}] shape: {_sm['n_frames']} x {_sm['size']}px in "
+                      f"{time.time() - _t0:.1f} s -> shape/ + shape_strip.png", flush=True)
+            else:
+                summary["shape_frames"] = 0
+                summary.setdefault("artefacts_missing", []).append("shape (no traj.npz)")
+        except Exception as _e:
+            summary["shape_frames"] = 0
+            summary.setdefault("artefacts_missing", []).append(f"shape ({type(_e).__name__})")
+            print(f"[{name}] shape frames skipped: {type(_e).__name__}: {str(_e)[:90]} -- "
+                  f"`python shape_frames.py {name}` rebuilds them from traj.npz", flush=True)
+
     # PREMISES, PASSIVE TIER -- on the run's own recorded series. Unlike the static gate this
     # cannot abort anything (the simulation already happened), so it goes LOUDLY into the record:
     # an Analyst that reads a summary without knowing the chemistry was extinct, or that the cells

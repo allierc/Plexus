@@ -110,3 +110,8 @@ config/okuda/demo_*.yaml
 config/okuda/demo_*.composition.json
 config/okuda/tzz_*.yaml
 config/okuda/tzz_*.composition.json
+
+# JEPA feasibility test: embeddings and design matrices are regenerable from the runs
+discovery_okuda/jepa/*.npz
+discovery_okuda/jepa/hf/
+discovery_okuda/jepa/*_local/
