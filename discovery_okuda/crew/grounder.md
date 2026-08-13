@@ -50,9 +50,14 @@ kept.*
 
 | morphology | what the figure shows | the signature to look for |
 |---|---|---|
-| **tube** | a single elongated finger growing from the surface, roughly constant width, length several cell diameters | one dominant protrusion; `protr_peak` well above 1.3; `gyr_prolate` rising; the eye reporting a finger rather than a bulge |
-| **undulation** | many shallow waves over the whole surface, no single dominant feature | `shape_idx` elevated with `protr_peak` modest; multiple lobes in the movie; a spatial wavelength of a few cells |
-| **branching** | a tube that splits, giving two or more tips | protrusion count above one with sustained length; the eye reporting a split |
+| **tube** | a single elongated finger growing from the surface, roughly constant width, length several cell diameters | `n_tubes_final` 1; `protr_final` well above 1.3; the eye reporting a finger rather than a bulge |
+| **undulation** | many shallow waves over the whole surface, no single dominant feature | `shape_idx_p95_span` large with `protr_final` modest; `n_tubes_final` 0; multiple lobes in the movie |
+| **branching** | a tube that splits, giving two or more tips | **no admitted metric measures this.** `n_tips` was retired by the 13 August gate at 2.78x its own seed noise, so its zeros were never evidence of no branch. Read `n_tubes_final` 4 or more as *where a branch could be*, and settle it with the eye |
+
+*The signatures above name metrics from the admitted bank and nothing else. They used to name
+`protr_peak` and `shape_idx`, which the metric gate has since retired -- and `n_tips`, which cannot
+tell a flower from a sphere. A morphology table keyed on an instrument that does not resolve is a
+definition that cannot be applied.*
 
 **The spot scale, read off Fig. 5 rather than quoted.** Earlier versions of this file said the paper
 "reports about five spots on a 2000-cell ball". It does not — that phrase is nowhere in Okuda et al.

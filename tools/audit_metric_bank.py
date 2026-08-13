@@ -207,6 +207,40 @@ def main():
               f"It is admitted and it does not measure.")
     for k in missing:
         print(f"\n  FAIL {k}: not measurable on {MIN_RUNS}+ runs -- admitted and absent.")
+    # ---- DOES A ROLE STILL ADVERTISE A RETIRED NAME? The gate above checks the bank; this checks
+    # what the ROLES are told, which is where the real drift happened. On 13 August `analyst.md`
+    # named five metrics to lead with and the gate had retired ALL FIVE -- including one that
+    # cannot separate a flower from a sphere. A bank checked by arithmetic and a prompt written by
+    # hand are two declarations of one fact, which is this codebase's most expensive recurring
+    # defect.
+    #
+    # A CITATION IS NOT AN INSTRUCTION, and the two cannot be told apart by grep. A line quoting
+    # `protr_peak` 1.333 is a measurement taken before the gate and must stay; a line listing
+    # `protr_peak` among the names to prefer must not. The proxy: a retired name on a line with NO
+    # number beside it is probably an instruction. It is a warning, never a failure -- a check that
+    # cries wolf on the campaign's own history would be turned off within a week.
+    import glob as _g
+    old_names = set()
+    for m in M.all_metrics():
+        if m.admitted:
+            old_names |= set(m.names())
+    retired = old_names - set(M.ADMITTED)
+    rx = re.compile(r"\b(" + "|".join(re.escape(r) for r in sorted(retired)) + r")\b")
+    flagged = []
+    for f in sorted(_g.glob(os.path.join(OKUDA, "crew", "*.md")) + [os.path.join(OKUDA, "round.md")]):
+        for i, line in enumerate(open(f, errors="ignore").read().split("\n"), 1):
+            for mt in rx.finditer(line):
+                after = line[mt.end():mt.end() + 40]
+                if not re.search(r"\d", after):            # no number follows: reads as a name, not a datum
+                    flagged.append((os.path.relpath(f, ROOT), i, mt.group(1), line.strip()[:80]))
+    if flagged:
+        print(f"\n  {len(flagged)} line(s) in a role's instructions name a retired metric with no "
+              f"number beside it -- read them, they may be telling a role to use it:")
+        for f, i, n, line in flagged[:12]:
+            print(f"    {f}:{i}  {n}   {line}")
+    else:
+        print("\n  no role's instructions advertise a retired metric")
+
     if a.update:
         print("\nADMITTED = (\n" + "".join(f'    "{k}",\n' for k in derived) + ")")
     print(f"\n{'FAIL' if bad else 'PASS'}: {bad} admitted name(s) do not measure"
