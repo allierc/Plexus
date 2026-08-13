@@ -96,10 +96,21 @@ def load(run, src="06_spheroid_ecm"):
     p = os.path.join(d, "bm_frames.npz")
     if os.path.exists(p):
         bm = _bm(np.load(p))
+    # WHICH FIELD THE SHEET CARRIES, read off the run rather than guessed from the folder's name: the
+    # protease rigs record `kdeg` and colour by MT1-MMP, the mechanical ones colour by lambda_geo.
+    mode = "lam"
+    import json
+    mp = os.path.join(d, "metrics.json")
+    if os.path.exists(mp):
+        try:
+            mode = "mt1" if "kdeg" in json.load(open(mp)) else "lam"
+        except Exception:
+            pass
     myo = np.concatenate([np.asarray(m["myo"]).ravel() for _t, m in meshes if "myo" in m]) \
         if any("myo" in m for _t, m in meshes) else None
     return dict(pos=pos, band=band, centre=centre, scale=scale, meshes=meshes, per=per, L=L3,
                 bm=bm, mesh_frames=np.asarray([m[0] for m in Tis["meshes"]]), stride=st, out=d,
+                mode=mode,
                 myo_hi=(float(np.percentile(myo, 98)) if myo is not None and myo.size else None))
 
 
@@ -110,18 +121,20 @@ def _bm(z):
     if "n_kept" in z.files:
         n = int(z["n_kept"])
         t = np.array([int(z[f"t{i}"]) for i in range(n)])
-        X, F, L, PP = [], [], [], []
+        X, F, L, PP, ND = [], [], [], [], []
         for i in range(n):
             x, f, nd = tis(z[f"x{i}"]), z[f"f{i}"], z[f"n{i}"]
             used = np.unique(np.concatenate([f.reshape(-1), nd]) if nd.size else f.reshape(-1))
             rm = np.full(x.shape[0], -1, np.int64)
             rm[used] = np.arange(used.size)
             X.append(x[used]); F.append(rm[f]); L.append(z[f"v{i}"]); PP.append(tis(z[f"p{i}"]))
+            ND.append(rm[nd])
     else:
         t = np.asarray(z["frames"])
         X = list(tis(z["X"])); L = list(z["L"]); PP = list(tis(z["PP"]))
-        F = [np.asarray(z["F"])] * len(t)
-    return dict(t=t, X=X, F=F, L=L, PP=PP, vmax=max(float(np.max(v)) for v in L if v.size))
+        F = [np.asarray(z["F"])] * len(t); ND = list(np.asarray(z["nod"]))
+    return dict(t=t, X=X, F=F, L=L, PP=PP, ND=ND,
+                vmax=max(float(np.max(v)) for v in L if v.size))
 
 
 # =============================================================================================
@@ -220,15 +233,23 @@ def junction_poly(mt, pos, myo_hi=None):
     return poly
 
 
-def bm_poly(X, F, val, vmax, gamma=0.5):
-    """The sheet, coloured by its field on the same truncated ramp the matplotlib panel uses."""
+def bm_poly(X, F, val, vmax, mode="lam", gamma=0.5):
+    """The sheet, coloured by its field on the same truncated ramp the matplotlib panel uses.
+
+    `mode` IS NOT COSMETIC, IT IS THE ZERO OF THE SCALE. lambda_geo starts at 1 (an unstretched
+    surface) and MT1-MMP starts at 0, and this function hardcoded `val - 1`: on a protease run every
+    face then normalised negative, clipped to zero, and the membrane rendered BLACK -- a panel whose
+    field is its subject, showing none of it, in a picture that otherwise looked correct.
+    """
     import matplotlib
     import pyvista as pv
     from matplotlib.colors import ListedColormap
-    cm = ListedColormap(matplotlib.colormaps["magma"](np.linspace(0.0, 0.87, 256)))
+    lo = 1.0 if mode == "lam" else 0.0
+    base = "magma" if mode == "lam" else "viridis"
+    cm = ListedColormap(matplotlib.colormaps[base](np.linspace(0.0, 0.87, 256)))
     f = np.column_stack([np.full(F.shape[0], 3), F]).ravel()
     m = pv.PolyData(X, faces=np.asarray(f, np.int64))
-    x = np.clip((np.asarray(val) - 1.0) / max(vmax - 1.0, 1e-9), 0, 1) ** gamma
+    x = np.clip((np.asarray(val) - lo) / max(vmax - lo, 1e-9), 0, 1) ** gamma
     m.cell_data["rgb"] = (np.asarray(cm(x))[:, :3] * 255).astype(np.uint8)
     return m
 
@@ -298,22 +319,62 @@ def render(run, frames=None, still=False, src="06_spheroid_ecm", out_name=None, 
         if bm is not None:
             j = int(np.argmin(np.abs(bm["t"] - int(D["mesh_frames"][min(k, len(D["mesh_frames"])
                                                                         - 1)]))))
+            # THE MEMBRANE'S OWN MESH, AND NOTHING ELSE'S. This panel drew the epithelium as a
+            # wireframe for context, and by the last frame that wireframe IS the panel: the sheet
+            # ends up inside the tissue at 95% of its plaques, so the cell mesh sits in front of the
+            # membrane everywhere and the picture reads as an epithelium with red dots on it. The
+            # membrane gets its own triangulation instead -- `show_edges` on the sheet -- so the mesh
+            # in this panel is the one the panel is named after.
             if bm["F"][j].shape[0]:
-                p.add_mesh(bm_poly(bm["X"][j], bm["F"][j], bm["L"][j], bm["vmax"]),
+                p.add_mesh(bm_poly(bm["X"][j], bm["F"][j], bm["L"][j], bm["vmax"],
+                                   mode=D["mode"]),
                            scalars="rgb", rgb=True, smooth_shading=True, lighting=True,
+                           show_edges=True, edge_color="#3a1a14", line_width=0.35,
                            ambient=0.35, diffuse=0.75, specular=0.12, specular_power=18)
-            if tis is not None:
-                p.add_mesh(tis, color=[v / 255 for v in EPI_RGB], style="wireframe",
-                           line_width=0.4, opacity=0.45)
-            pp = bm["PP"][j]
-            if len(pp):
+            pp, nd = bm["PP"][j], bm["ND"][j]
+            if len(pp) and len(bm["F"][j]):
                 st = max(1, int(np.ceil(len(pp) / 2562.0)))
+                # A PLAQUE IS A LINK, SO IT IS DRAWN AS ONE -- and that is also what makes it
+                # visible. Its attachment point is on the EPITHELIUM, and by the last frame the sheet
+                # has sunk inside the tissue at 95% of them, so a point drawn there is correctly
+                # occluded by the membrane and the panel loses the very set it is about. The segment
+                # from the attachment point to the sheet node it holds ends ON the surface, so the
+                # outer end is always in view and the part that is buried reads as buried.
+                # ONLY THE PLAQUES THAT STILL HOLD MEMBRANE. The rigs do not cull the contact set
+                # when a face tears -- it is per NODE -- so a torn run ends with every plaque it
+                # started with, most of them holding a node that belongs to no live face and none of
+                # them short, because the remnant has also peeled off. Drawn in full that is 2,562
+                # long red links over a sheet that has lost a fifth of its faces, and the panel is
+                # unreadable. The set drawn here is the one that is still attached; the count of the
+                # rest is printed, so the defect is reported rather than hidden by the drawing.
+                liven = np.unique(bm["F"][j])
+                hold = np.isin(nd, liven)
+                if n == 0:
+                    print(f"[vtk_ecm] plaques: {int(hold.sum())} of {len(nd)} still hold a live "
+                          f"face; {int((~hold).sum())} hold nothing and are not drawn; 1 in "
+                          f"{max(1, int(np.ceil(max(int(hold.sum()), 1) / 800.0)))} of the rest "
+                          f"is drawn", flush=True)
+                nd, pp = nd[hold], pp[hold]
+                # AND A CAP ON HOW MANY ARE DRAWN. Once the sheet has peeled off, each link is a long
+                # segment rather than a short one, and two thousand of them cover the field the panel
+                # exists to show. 800 is enough to read the set as a set; the stride is stated.
+                st = max(1, int(np.ceil(max(len(pp), 1) / 800.0)))
+                if not len(pp):
+                    st = 1
+                a, b2 = pp[::st], bm["X"][j][nd[::st]]
+                seg = np.empty((2 * len(a), 3), float)
+                seg[0::2], seg[1::2] = a, b2
+                ln = np.column_stack([np.full(len(a), 2), np.arange(0, 2 * len(a), 2),
+                                      np.arange(1, 2 * len(a), 2)]).ravel()
+                p.add_mesh(pv.PolyData(seg, lines=np.asarray(ln, np.int64)),
+                           color=[v / 255 for v in PLQ_RGB], line_width=1.2, lighting=False)
+                p.add_points(pv.PolyData(b2), color=[v / 255 for v in PLQ_RGB],
+                             point_size=5.0, render_points_as_spheres=True)
                 # LARGER THAN THE MATPLOTLIB PANEL'S, and it can afford to be. There a dot was drawn
                 # over the sheet whatever its depth, so 2,562 of them at a legible size buried the
                 # field underneath; here VTK occludes a plaque behind the surface per pixel, so only
                 # the ones actually facing the reader are painted and the size can say what it is.
-                p.add_points(pv.PolyData(pp[::st]), color=[v / 255 for v in PLQ_RGB],
-                             point_size=5.0, render_points_as_spheres=True)
+
         _aim(p, L)
 
         p.subplot(1, 1)
