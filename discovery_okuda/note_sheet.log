@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  12 AUG 2026 07:21
+This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex 2026.7.2)  13 AUG 2026 11:07
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -1137,53 +1137,52 @@ File: ../log/okuda_ECM/05b_plaque/metrics.png Graphic file (type png)
 Package pdftex.def Info: ../log/okuda_ECM/05b_plaque/metrics.png  used on input
  line 1184.
 (pdftex.def)             Requested size: 495.07779pt x 251.22894pt.
-<../log/okuda_ECM/_archive_05def/05e_conserve/remesh_model.png, id=361, 1055.14
-2pt x 433.62pt>
-File: ../log/okuda_ECM/_archive_05def/05e_conserve/remesh_model.png Graphic fil
-e (type png)
-<use ../log/okuda_ECM/_archive_05def/05e_conserve/remesh_model.png>
-Package pdftex.def Info: ../log/okuda_ECM/_archive_05def/05e_conserve/remesh_mo
-del.png  used on input line 1196.
-(pdftex.def)             Requested size: 495.07779pt x 203.45737pt.
+
+Overfull \hbox (25.83167pt too wide) in paragraph at lines 1196--1196
+[]\T1/cmr/bx/n/8 (-20) figure miss-ing: \T1/cmtt/m/n/8 ../log/okuda_ECM/_archiv
+e_05def/05e_conserve/remesh_model.png\T1/cmr/m/n/8 (-20) .
+ []
+
 
 
 [16 <../log/okuda_ECM/05a_sheet/metrics.png> <../log/okuda_ECM/05b_plaque/metri
 cs.png>]
-<../log/okuda_ECM/_archive_05def/05f_secrete/secrete_model.png, id=370, 1055.14
-2pt x 433.62pt>
-File: ../log/okuda_ECM/_archive_05def/05f_secrete/secrete_model.png Graphic fil
-e (type png)
-<use ../log/okuda_ECM/_archive_05def/05f_secrete/secrete_model.png>
-Package pdftex.def Info: ../log/okuda_ECM/_archive_05def/05f_secrete/secrete_mo
-del.png  used on input line 1208.
-(pdftex.def)             Requested size: 495.07779pt x 203.45737pt.
-<../log/okuda_ECM/_archive_05def/05d_tear/metrics.png, id=371, 968.418pt x 491.
-436pt>
-File: ../log/okuda_ECM/_archive_05def/05d_tear/metrics.png Graphic file (type p
-ng)
-<use ../log/okuda_ECM/_archive_05def/05d_tear/metrics.png>
-Package pdftex.def Info: ../log/okuda_ECM/_archive_05def/05d_tear/metrics.png  
-used on input line 1221.
-(pdftex.def)             Requested size: 495.07779pt x 251.22894pt.
+Overfull \hbox (25.83167pt too wide) in paragraph at lines 1208--1208
+[]\T1/cmr/bx/n/8 (-20) figure miss-ing: \T1/cmtt/m/n/8 ../log/okuda_ECM/_archiv
+e_05def/05f_secrete/secrete_model.png\T1/cmr/m/n/8 (-20) .
+ []
 
 
-[17 <../log/okuda_ECM/_archive_05def/05e_conserve/remesh_model.png> <../log/oku
-da_ECM/_archive_05def/05f_secrete/secrete_model.png>]
 
-[18 <../log/okuda_ECM/_archive_05def/05d_tear/metrics.png>]
+[17]
+
+[18]
+Underfull \hbox (badness 10000) in paragraph at lines 1428--1428
+[]|[]$\OT1/cmr/m/n/8 (+20) 12\OML/cmm/m/it/8 :\OT1/cmr/m/n/8 (+20) 81 \OMS/cmsy
+/m/n/8 ! \OT1/cmr/m/n/8 (+20) 6\OML/cmm/m/it/8 :\OT1/cmr/m/n/8 (+20) 42$\T1/cmr
+/bx/n/8 (+20) ,
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 1428--1428
+[]|[]\T1/cmr/bx/n/8 (+20) median $\OT1/cmr/m/n/8 (+20) 17 \OML/cmm/m/it/8 l[]$\
+T1/cmr/bx/n/8 (+20) ,
+ []
+
+
 
 [19]
-Underfull \hbox (badness 10000) in paragraph at lines 1425--1425
+Underfull \hbox (badness 10000) in paragraph at lines 1488--1488
 []|[]\T1/cmr/m/n/8 (+20) partly: 05h_3
  []
 
 
-Underfull \hbox (badness 4899) in paragraph at lines 1425--1425
+Underfull \hbox (badness 4899) in paragraph at lines 1488--1488
 \T1/cmr/m/n/8 (+20) so it is not a
  []
 
 
-Underfull \hbox (badness 8056) in paragraph at lines 1425--1425
+Underfull \hbox (badness 8056) in paragraph at lines 1488--1488
 \T1/cmr/m/n/8 (+20) has never been
  []
 
@@ -1200,13 +1199,13 @@ Package rerunfilecheck Info: File `note_sheet.out' has not changed.
 (rerunfilecheck)             Checksum: D41D8CD98F00B204E9800998ECF8427E;0.
  ) 
 Here is how much of TeX's memory you used:
- 14175 strings out of 475102
- 216649 string characters out of 5764878
+ 14172 strings out of 475102
+ 215779 string characters out of 5764878
  688104 words of memory out of 5000000
- 36408 multiletter control sequences out of 15000+600000
- 604171 words of font info for 353 fonts, out of 8000000 for 9000
+ 36393 multiletter control sequences out of 15000+600000
+ 604532 words of font info for 359 fonts, out of 8000000 for 9000
  59 hyphenation exceptions out of 8191
- 75i,15n,79p,1316b,612s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 75i,15n,79p,1316b,610s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx10.pfb></us
 r/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx7.pfb></usr/share
 /texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmbx8.pfb></usr/share/texliv
@@ -1249,10 +1248,10 @@ fb></usr/share/texmf/fonts/type1/public/cm-super/sfti1000.pfb></usr/share/texmf
 /fonts/type1/public/cm-super/sftt0800.pfb></usr/share/texmf/fonts/type1/public/
 cm-super/sftt0900.pfb></usr/share/texmf/fonts/type1/public/cm-super/sftt1000.pf
 b>
-Output written on note_sheet.pdf (21 pages, 2096737 bytes).
+Output written on note_sheet.pdf (21 pages, 1467653 bytes).
 PDF statistics:
- 594 PDF objects out of 1000 (max. 8388607)
- 433 compressed objects within 5 object streams
+ 589 PDF objects out of 1000 (max. 8388607)
+ 434 compressed objects within 5 object streams
  73 named destinations out of 1000 (max. 500000)
- 74793 words of extra memory for PDF output out of 89155 (max. 10000000)
+ 74778 words of extra memory for PDF output out of 89155 (max. 10000000)
 

@@ -1193,7 +1193,7 @@ turnover. \S4.2 is what each of those three costs, and \S2.3 is the scheme that 
 \end{figure}
 
 \begin{figure}[H]\centering
-\includegraphics[width=\textwidth]{../log/okuda_ECM/_archive_05def/05e_conserve/remesh_model.png}
+\IfFileExists{../log/okuda_ECM/_archive_05def/05e_conserve/remesh_model.png}{\includegraphics[width=\textwidth]{../log/okuda_ECM/_archive_05def/05e_conserve/remesh_model.png}}{\fbox{\parbox{0.6\textwidth}{\footnotesize\textbf{figure missing:} \texttt{../log/okuda\_ECM/\_archive\_05def/05e\_conserve/remesh\_model.png}. Its run folder was deleted from \texttt{log/okuda\_ECM}; the figure is not regenerated here because the trajectory it was drawn from is gone too.}}}
 \caption{\op{bm\_refine} and what it must carry (\op{05e\_conserve}). Red dash-dot lines are the two
 refinements, at frames $131$ and $353$. \textbf{Top left} \PASS{G18b}, \PASS{G18d}: $\sum_f m_f$ is
 flat through both splits and through an area that grows $\times11$ --- bit-identical --- while the
@@ -1205,7 +1205,7 @@ $\lambda$ (no step at the red lines) while the mean edge length is halved at eac
 \end{figure}
 
 \begin{figure}[H]\centering
-\includegraphics[width=\textwidth]{../log/okuda_ECM/_archive_05def/05f_secrete/secrete_model.png}
+\IfFileExists{../log/okuda_ECM/_archive_05def/05f_secrete/secrete_model.png}{\includegraphics[width=\textwidth]{../log/okuda_ECM/_archive_05def/05f_secrete/secrete_model.png}}{\fbox{\parbox{0.6\textwidth}{\footnotesize\textbf{figure missing:} \texttt{../log/okuda\_ECM/\_archive\_05def/05f\_secrete/secrete\_model.png}. Its run folder was deleted from \texttt{log/okuda\_ECM}; the figure is not regenerated here because the trajectory it was drawn from is gone too.}}}
 \caption{\op{bm\_secrete} (\op{05f\_secrete}), in the register of \S3's operator table: the operator
 names itself, states the equations it is, and every panel is a measurement that could have come back
 wrong. \textbf{Top left} \PASS{G24}: \op{fed} holds $\rho$ at $1.005$ while the area triples, against
@@ -1218,7 +1218,7 @@ correlation drawn beside it as the control that separates deposition from mechan
 \end{figure}
 
 \begin{figure}[H]\centering
-\includegraphics[width=\textwidth]{../log/okuda_ECM/_archive_05def/05d_tear/metrics.png}
+\IfFileExists{../log/okuda_ECM/_archive_05def/05d_tear/metrics.png}{\includegraphics[width=\textwidth]{../log/okuda_ECM/_archive_05def/05d_tear/metrics.png}}{\fbox{\parbox{0.6\textwidth}{\footnotesize\textbf{figure missing:} \texttt{../log/okuda\_ECM/\_archive\_05def/05d\_tear/metrics.png}. Its run folder was deleted from \texttt{log/okuda\_ECM}; the figure is not regenerated here because the trajectory it was drawn from is gone too.}}}
 \caption{\op{05d\_tear}: tearing, and the gate the MPM sheet was never given. \textbf{Bottom middle}
 \PASS{G19}: the same criterion at $5{,}115$ and $20{,}471$ faces tears at $\lambda^{\rm el}=2.110$ and
 $2.099$ --- $0.52\%$ apart, against a $5\%$ threshold --- so the tear is set by the material and not by
@@ -1381,6 +1381,69 @@ fold, and a hole's rim has no line tension; there is no matrix and no \op{fibril
 removes the epithelium's direct push on the stroma; and the epithelium in \op{05b} is a driven
 icosphere, not the vertex model --- \op{mesh\_contact} certifies that interface separately, and joining
 the two is what \op{05g} does.
+
+
+
+\subsection*{4.4\; 07: the adhesion must follow the CELL, and the gates that say so}
+
+\textbf{What 06 measured, and why it forces a redesign rather than a threshold.} The plaques in every
+06 run are drawn as the links they are, and \op{07\_plaque\_length} puts numbers on them. On
+\op{06\_refine}, the best-behaved run in the ladder: the mean plaque is $11.9\,\mu$m and the longest
+$63.5\,\mu$m, against $l_0=0.70\,\mu$m and against the $40$~nm at which an integrin cluster actually
+sits below the actin it pulls on \cite{kanchanawong2010}. That is $90\times$ its own rest length and
+$1{,}600\times$ the protein. $97.6\%$ of the set is past $3l_0$. The adhesion at frame $400$ is not
+an adhesion.
+
+\textbf{And the count grows for the wrong reason.} \op{plaque\_seed} makes one edge per live
+\emph{sheet node}, so the set follows the MEMBRANE'S MESH: on \op{06\_refine} it changes at $2$ of
+$200$ intervals --- frames $122$ and $340$ --- the second by $+300\%$ in a single frame, while the
+tissue divides smoothly from $200$ to $6{,}380$ cells. The measurable consequence is that
+\textbf{plaques per cell falls from $12.81$ to $6.42$}: the adhesion density per cell halves over a
+run in which nothing about adhesion was changed. An integrin cluster is a structure of the CELL, so
+the set should be seeded on the cell, inherited at division, and refined only because the tissue
+divided --- not because the sheet's mesh did.
+
+\smallskip
+{\footnotesize
+\begin{tabularx}{\textwidth}{@{}p{0.9cm}Lp{3.5cm}p{2.6cm}@{}}\toprule
+& \textbf{gate} & \textbf{threshold, decided before the run} & \textbf{06\_refine today}\\\midrule
+G70 & \textbf{the plaque count follows the tissue, not the mesh}: plaques per cell holds its
+      seeded value & within $10\%$ for the whole run & \FAIL{$12.81\to6.42$, $-50\%$}\\
+G71 & \textbf{and it grows smoothly}, because cells divide one at a time: no kept-frame interval
+      changes the count by more than $5\%$ (at $6{,}380$ cells over $401$ frames a frame divides
+      about $0.25\%$ of them) & $\max\Delta n/n<5\%$ & \FAIL{$+300\%$ in one interval; $2$ steps in
+      $200$}\\
+G72 & \textbf{the length distribution is stationary}: a growing tissue must not stretch its
+      adhesions, it must make more of them & median in $[0.5,2]\,l_0$ and p99 $<4\,l_0$ at
+      \emph{every} frame & \FAIL{median $17\,l_0$, $97.6\%$ over $3l_0$}\\
+G73 & \textbf{a plaque born in a division starts at rest}. Without this G72 can be passed on paper
+      while every inherited plaque is still $60\,\mu$m long: division would copy the parent's
+      stretch instead of resetting it & length $<1.2\,l_0$ on the frame it first appears &
+      \PEND{no such operator exists}\\
+G74 & \textbf{the integrin content per plaque is stationary}: growth goes into the NUMBER of
+      clusters, not into the occupancy of each. Median $N_b$ per plaque against its seeded value &
+      within $[0.5,2]\times$ over the run & \PEND{$N_b$ is not recorded --- see below}\\
+G75 & \textbf{and division splits the bonds rather than creating them}: $N_f+\sum N_b$ moves only by
+      $s_i$ and $1/\tau_i$, re-run \emph{through} a division & exact, as G30 & \PEND{same}\\
+\bottomrule\end{tabularx}}
+\smallskip
+
+\textbf{G74 and G75 cannot be run today, and the reason is worth stating rather than working around.}
+The clutch's bond number $N_b$ and the free pool $N_f$ live on the rig and are never written to
+\code{bm\_frames.npz}, so no diagnosis of this store can say whether the integrins turn over --- only
+that the number of PLAQUES does not. Recording them is two lines in each rig's keep-tuple and is the
+first thing 07 should commit, before any rupture law is designed: otherwise the law gets tuned
+against a quantity nobody measured.
+
+\textbf{What this predicts, which is what makes it a gate and not a preference.} If the set is owned
+by the cell and inherited at division, plaque spacing stays tied to CELL size rather than to mesh
+size, and a new adhesion is seeded at the current geometry --- unstretched. The length distribution
+then has a mechanism to be stationary (G72) instead of being clipped by a threshold, which matters
+because \op{plaque\_rupture} was deliberately deleted: rupture is $k_{\rm off}(f)$, a rate, and
+re-introducing a length cut-off would undo that decision. \op{07\_plaque\_length} also measures the
+second reason a cut-off is wrong --- the two ends SLIDE, $0.31\,\mu$m per kept frame on
+\op{06\_refine} --- so a threshold would break a population that is not overstretched but merely
+displaced, and each break moves load onto its neighbours.
 
 
 \subsection*{Exit gates: what must be true before 06}
