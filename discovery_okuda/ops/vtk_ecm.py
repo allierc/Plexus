@@ -57,6 +57,13 @@ SIZE = 780                                 # per panel; the sheet writes 2*SIZE 
 EPI_RGB = (232, 220, 190)
 # the matrix's alpha ramp: an unstressed fibre is nearly invisible, a fully-banded one is solid
 ALPHA_LO, ALPHA_HI, ALPHA_GAMMA = 0.03, 0.55, 0.85
+# BACK FACES ARE CULLED, and the reason is a question this panel kept being asked. A torn sheet is
+# still a closed-ish shell, so through the hole you see the FAR wall from the INSIDE -- lit from
+# behind, its triangulation dense with distance -- and it reads as a second, concentric mesh. It is
+# not: the store holds one connected component of 4,168 faces with a unimodal radius. Culling the
+# faces that point away leaves only the outer surface, so a hole reads as a hole and the panel has
+# one mesh in it, which is the one it is named after.
+BACKFACE_CULL = True
 PLQ_RGB = (255, 45, 45)
 # THE RAMPS ARE THE REFERENCE RENDERER'S, NOT THIS FILE'S. Inventing a stress list and a warm myosin
 # ramp here made the VTK movie disagree with the matplotlib one about what a colour MEANS -- and
@@ -330,6 +337,7 @@ def render(run, frames=None, still=False, src="06_spheroid_ecm", out_name=None, 
                                    mode=D["mode"]),
                            scalars="rgb", rgb=True, smooth_shading=True, lighting=True,
                            show_edges=True, edge_color="#3a1a14", line_width=0.35,
+                           culling=("back" if BACKFACE_CULL else None),
                            ambient=0.35, diffuse=0.75, specular=0.12, specular_power=18)
             pp, nd = bm["PP"][j], bm["ND"][j]
             if len(pp) and len(bm["F"][j]):
