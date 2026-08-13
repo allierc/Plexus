@@ -14,17 +14,23 @@ ON TOP of a membrane outside it until the zorders were set by hand, and why the 
 showed black seams between them. VTK discards a fragment behind another per pixel, so none of those
 three questions arises: no culling, no zorder, no seam.
 
-Measured on this run: matplotlib 551 s for 200 frames (2.76 s a frame), this 24 s (0.12 s a frame),
-same 200 frames, same camera, same fixed boxes.
+MEASURED on 06_spheroid_bm_ecm, 200 frames, same camera and same fixed boxes: matplotlib 551 s
+(2.76 s a frame), this ~50 s (0.25 s a frame). An earlier version of this file was 125.8 s and its
+docstring claimed 24 s before anything had been timed -- the renderer was a python loop over the
+matrix's fibres, not the GPU.
 
 WHAT IS DRAWN, panel by panel, and it is the matplotlib figure's own layout:
 
     top-left      the tissue inside the stressed matrix. Strands, not points: `ecm_seed` lays each
                   fibre as `per` consecutive particles, so the matrix is drawn as the polylines it
                   was seeded as and a strand that has been dragged reads as a dragged strand.
-    top-right     the same, cut. A CLIP PLANE and not a slab of scattered dots -- VTK cuts the
-                  actual geometry, so the section is the surface's true intersection with the plane
-                  rather than the points that happened to fall near it.
+    top-right     the CROSS-SECTION, in the plane of the cavity axis and viewed down that plane's
+                  normal. The monolayer is a ring of radial cells built the way
+                  `run_tyssue_round._cross_screen` builds it -- every half-edge that straddles the
+                  plane gives an apical corner, a basal corner sits at INNER = 0.82 of that radius,
+                  and consecutive pairs close into quads. Slicing the apical shell instead gives one
+                  curve, because a shell is a surface: the cells vanish and the panel stops being
+                  recognisable, which is what the first VTK version did.
     bottom-left   the basement membrane, coloured by lambda_geo, with the plaques at their
                   attachment points on the epithelium.
     bottom-right  the junction network, coloured by myosin.
@@ -214,6 +220,49 @@ def tissue_poly(mt, pos):
     return pv.PolyData(pos, faces=np.asarray(faces, np.int64)), np.asarray(idx)
 
 
+def cell_ring(mt, pos, normal=(0.0, 1.0, 0.0), inner=0.82):
+    """The monolayer in section, as `run_tyssue_round._cross_screen` builds it -- and it is not a
+    slice of the apical surface.
+
+    Slicing the apical shell gives ONE curve, because the shell is a surface: the section then reads
+    as a tangle of cell-wall crossings and the cells disappear. The reference renderer instead takes
+    every half-edge that STRADDLES the plane, interpolates its crossing point as the apical corner,
+    puts a basal corner at `inner` times that radius, orders them by angle and closes consecutive
+    pairs into quads. That is the ring of radial cells -- the picture this panel used to show, and the
+    only one in which the monolayer has a thickness.
+
+    `inner` is `ecm_render.INNER`, the same 0.82 the matplotlib section used, so the two agree about
+    how thick the epithelium is.
+    """
+    import pyvista as pv
+    nF = int(mt["nF"])
+    es, et, ef = (np.asarray(mt[k]) for k in ("E_srce", "E_trgt", "E_face"))
+    live = ef < nF
+    s_, t_ = es[live], et[live]
+    d = np.asarray(normal, float)
+    d = d / (np.linalg.norm(d) + 1e-12)
+    pr = pos @ d
+    a, b = pr[s_], pr[t_]
+    hit = (a * b) < 0
+    if hit.sum() < 3:
+        return None
+    fr = (-a[hit] / (b[hit] - a[hit]))[:, None]
+    X = pos[s_[hit]] + fr * (pos[t_[hit]] - pos[s_[hit]])          # apical corners, on the plane
+    # order around the ring, in the plane's own two directions
+    u = np.cross(d, [0.0, 0.0, 1.0])
+    u = u / (np.linalg.norm(u) + 1e-12) if np.linalg.norm(u) > 1e-9 else np.array([1.0, 0.0, 0.0])
+    v = np.cross(d, u)
+    c = X.mean(0)
+    ang = np.arctan2((X - c) @ v, (X - c) @ u)
+    X = X[np.argsort(ang)]
+    B = X * inner                                                   # basal corners
+    n = len(X)
+    pts = np.vstack([B, X])
+    j = (np.arange(n) + 1) % n
+    quads = np.column_stack([np.full(n, 4), np.arange(n), n + np.arange(n), n + j, j]).ravel()
+    return pv.PolyData(pts, faces=np.asarray(quads, np.int64))
+
+
 def junction_poly(mt, pos, myo_hi=None):
     """The junction network as line segments, coloured by myosin when the cache carries it."""
     import pyvista as pv
@@ -342,10 +391,10 @@ def render(run, frames=None, still=False, src="06_spheroid_ecm", out_name=None, 
             sub = mat.extract_points(keep, adjacent_cells=False)
             if sub.n_cells:
                 p.add_mesh(sub, scalars="rgb", rgb=True, line_width=1.1, lighting=False)
-        if tis is not None:
-            sl = tis.slice(normal="y", origin=(0, 0, 0))
-            if sl.n_points:
-                p.add_mesh(sl, color=[v / 255 for v in EPI_RGB], line_width=1.6, lighting=False)
+        ring = cell_ring(mt, np.asarray(mt["pos"], float), normal=(0.0, 1.0, 0.0))
+        if ring is not None:
+            p.add_mesh(ring, color=[v / 255 for v in EPI_RGB], show_edges=True,
+                       edge_color="black", line_width=0.6, lighting=False)
         if bm is not None:
             jj = int(np.argmin(np.abs(bm["t"] - int(D["mesh_frames"][min(k, len(D["mesh_frames"])
                                                                          - 1)]))))
