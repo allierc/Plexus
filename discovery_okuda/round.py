@@ -77,7 +77,7 @@ CONTROL_SLOT = 0
 MENU_LIMIT = 40
 # THE SWEEP GRID, as factors of the PARENT's own value rather than points in a declared box. The
 # control loop's table reads {0, 1e-3, 1e-2 *parent*, 1e-1} -- a human-chosen grid around what works.
-# Ours cannot be hand-written for 24 quantities x 6 parents, but it can at least be anchored on the
+# Ours cannot be hand-written for a bank x 6 parents, but it can at least be anchored on the
 # parent instead of on a range that no working recipe respects.
 GRID_FACTORS = (0.5, 2.0)
 PARENT_LIMIT = 6
@@ -538,11 +538,16 @@ def grounding(ctx):
 
 
 def metric_bank(ctx):
-    """The 24 quantities a prediction may rest on, headline first.
+    """The quantities a prediction may rest on, headline first. TEN NAMES since 13 August.
 
     NOT ALL 67 THE REGISTRY DEFINES. `euler`, `broken_n`, `ray_single_frac` and the rest are measured
     and read by the premises, and handing them to a role is how a round becomes an argument about one
-    diagnostic. Cedric, 5 August: use the 24 we agreed on, and point the five that matter.
+    diagnostic. Cedric, 5 August: use the ones we agreed on, and point the five that matter.
+
+    THE NUMBER IS NOT WRITTEN HERE ANY MORE, and that is the point. This docstring said "the 24"
+    while `metrics.names()` returned 127, and on 13 August a gate cut it to 10 -- so a count in
+    prose has now been wrong in both directions. `metrics.ADMITTED` is the single declaration, and
+    `tools/audit_metric_bank.py` re-derives it from the record and fails if it drifts.
     """
     import metrics
     return {"lead with these five": list(metrics.headline_metrics()), **metrics.bank()}

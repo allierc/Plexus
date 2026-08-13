@@ -140,12 +140,21 @@ gate and a round with nothing surprising is a real round — it exists because "
 up its own surprises" was previously answerable only by reading thirteen rounds of prose, and the
 answer turned out to be "in three rounds of thirteen, no".
 
-**The five that matter**, one per question, and the ones to prefer in a prediction:
-`protr_peak` (is there a protrusion), `protrusion_aspect_max_peak` (a finger or a bulge),
-`n_tubes_peak` (did the instrument call it a tube), `act_cv_peak` (is there a pattern),
-`corr_act_rad_peak` (does the pattern grip the shape — the campaign's question). The bank holds 24
-quantities in all; a prediction on one of these five is worth more than a prediction on a diagnostic,
-because it moves the campaign rather than describing a run.
+**The metrics that matter are handed to you in this prompt, and are NOT listed here.** They were
+listed here until 13 August, and the list had gone stale without anyone noticing: it named five
+metrics to prefer, and a metric gate had retired all five. Two of them, `protrusion_aspect_max` and
+`n_tips`, resolve 2.44x and 2.78x their own measured seed noise -- under the 3x bar -- and together
+classify the campaign's own phenotype montage at 58.6% against a 53.1% baseline. A prediction
+written on either was a coin toss with a number on it.
+
+**THE BANK IS TEN NAMES**, down from 127, and the first five are the campaign's objectives -- one
+per question it asks. A prediction on one of those is worth more than a prediction on a diagnostic,
+because it moves the campaign rather than describing a run. The list is `metrics.ADMITTED`,
+re-derived from the record by `tools/audit_metric_bank.py`; read the bank block below for the
+question each name answers and the value it takes when the answer is *no*.
+
+**A number quoted from an older round may name a retired metric.** Those measurements are real and
+they stay on the record. A NEW prediction may only name what is in the bank you were handed.
 
 `predict` must name **one metric from the bank, one direction, one number**. It is recorded before
 the run and scored automatically afterwards. You may add a `REFUTED if ...` sentence; it is kept,

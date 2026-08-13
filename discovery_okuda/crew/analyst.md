@@ -161,38 +161,42 @@ growth knob is not going to be rescued by that knob, and the next round should s
 
 ## The metrics
 
-**Lead with these five, in this order, before any other number.** One per question the campaign asks.
-Reading them first is what stops a round becoming an argument about a single metric:
+**Lead with the headline metrics, in the order the bank gives them, before any other number.** One
+per question the campaign asks. Reading them first is what stops a round becoming an argument about
+a single metric.
 
-| | what it answers |
-|---|---|
-| `protr_peak` | is there a protrusion at all |
-| `protrusion_aspect_max_peak` | a finger or a bulge — the distinction no radius ratio can make |
-| `n_tubes_peak` | did the instrument call it a tube (zero across the whole campaign so far) |
-| `act_cv_peak` | is there a pattern at all |
-| `grip_peak` | does the pattern grip the shape, AND BY HOW MUCH — **the campaign's actual question** |
+**THE BANK IS HANDED TO YOU IN THIS PROMPT. IT IS NOT LISTED HERE.** It used to be, and on
+13 August the two came apart with nobody noticing: this file named five metrics to lead with, and a
+metric gate had retired ALL FIVE. Two of them -- `protrusion_aspect_max` and `n_tips` -- resolve
+2.44x and 2.78x their own measured seed noise, under the 3x bar, and together they classify the
+campaign's own phenotype montage at 58.6% against a 53.1% majority baseline. They cannot tell a
+flower from a sphere, and this file was telling you to lead with one of them.
 
-The bank holds **24 quantities × 6 reductions**. You do not need the rest of them to write a good
-analysis, and you should not go looking for one that makes a story work.
+So the list lives in exactly one place, `metrics.ADMITTED`, re-derived from the record by
+`tools/audit_metric_bank.py`, and reaches you as data. Read the bank block in this prompt: each name
+carries the question it answers and the value it takes when the answer is *no*.
 
-*Below, the same 24 grouped by question. `metrics.py` is the source of truth for what exists; every
-name here is checked against it by `test_offline.py`.*
+**Ten names, not 127.** The bank was 127 and carried a participation ratio of 7.4 -- seven and a
+half independent directions under 127 names, with six pairs at exactly rho = 1.000. You do not need
+more than the ten, and you should not go looking for a retired one that makes a story work.
 
-1. **Is it a tube?** — `protr_peak`, `protr_p99_peak`, `n_tubes_peak`, `protrusion_aspect_max_peak`,
-   `gyr_prolate_peak`. `protr` is a p95/median tail statistic: one long tube and a lumpy ball read
-   alike, so never conclude "tube" from it alone. `n_tubes` is 0 across the whole campaign.
-2. **Is it still made of cells?** — `cells_final`, `shape_idx_p95_peak`, `v_cell_mean_final`. A shape
-   index above ~5 means the mesh is being measured, not a tissue.
-3. **Is there a pattern at all?** — `act_cv_peak`, `act_alive_frac`, `n_spots_peak`, `red_frac_peak`.
-   `act_cv` under 0.05 is a dead or uniform field and everything downstream of it is noise.
-   `act_alive_frac` 1.0 means the pattern held for the whole run.
-4. **Does the pattern grip the shape?** — `grip_peak`, `corr_act_rad_peak`, `act_at_tip_peak`.
-   This is the campaign's actual question. **Lead with `grip`, not `corr_act_rad`:** grip is
-   `corr_act_rad x r_cv`, and Pearson alone normalises the amplitude away, so a perfectly
-   correlated 1% wobble scores the same as a tube. Measured over 273 runs of the previous
-   campaign, `r002_10` reported corr 0.922 -- its second-highest coupling -- on a SPHERE
-   (r_cv 0.081, protr 1.163). All are legitimately absent when there is no pattern or no tip; say
-   "not measurable" rather than treating a null as a zero.
+**A NUMBER QUOTED FROM AN OLDER ROUND MAY NAME A RETIRED METRIC.** `round.md`, `knowledge.md` and the
+claim ledger cite measurements taken before the gate -- `protr_peak` 1.333, `corr_act_rad_peak`
+0.739. Those are real measurements and they stay. What you may not do is write a NEW conclusion on a
+name that is not in the bank you were handed.
+
+**Two readings that do not change**, because they are about the arithmetic and not about which names
+are admitted:
+
+- `protr` is a p95/median tail statistic: one long tube and a lumpy ball read alike, so never
+  conclude "tube" from it alone.
+- **Lead with `grip`, not `corr_act_rad`**: grip is `corr_act_rad x r_cv`, and Pearson alone
+  normalises the amplitude away, so a perfectly correlated 1% wobble scores the same as a tube.
+  Measured over 273 runs of the previous campaign, `r002_10` reported corr 0.922 -- its
+  second-highest coupling -- on a SPHERE (r_cv 0.081, protr 1.163).
+
+All are legitimately absent when there is no pattern or no tip; say "not measurable" rather than
+treating a null as a zero.
 5. **Is this evidence at all?** — `valid_frac`, `premises_broken`, `buf_full`, `mech_p_ratio`. Read
    this group FIRST when anything looks surprising.
 

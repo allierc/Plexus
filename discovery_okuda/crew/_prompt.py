@@ -119,7 +119,7 @@ _OBJECTIVE = {"morphology", "morph_why", "morphology_path"}
 
 
 def bank_only(metrics):
-    """{run: summary} reduced to the 24 admitted quantities. What a ROLE is given.
+    """{run: summary} reduced to the admitted quantities -- TEN since 13 August. What a ROLE is given.
 
     THE ANALYST WAS SEEING A FIFTH OF THE ROUND. Ten runs at 183 keys each is 149,088 chars; the block
     limit cut it to 30,000 and said so -- "the role is not seeing 80% of it" -- and the conclusion for
