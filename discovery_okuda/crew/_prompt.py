@@ -53,6 +53,23 @@ def role_md(name):
     return t
 
 
+def schema():
+    """`description.md` -- the six-slot form, shown to the Eye and to the Forecaster and to nobody else.
+
+    A THIRD LAYER, AND IT EXISTS FOR ONE REASON: two roles must fill the SAME form or the comparison
+    between them measures the forms rather than the tissue. Copying the slots into `eye.md` and again
+    into `forecaster.md` would work exactly until someone edited one of them, and this codebase has
+    lost a week to a duplicated declaration five times -- two reset keep-lists, two seed-floor
+    definitions, an allowlist beside a denylist. So there is one copy, both roles are handed it, and
+    `foresight.py` parses what it specifies.
+    """
+    t = _read(os.path.join(HERE, "description.md"))
+    if not t:
+        print("[crew] description.md is missing -- the eye and the forecaster have no form to fill, "
+              "and foresight cannot score what comes back")
+    return t
+
+
 def block(title, payload, *, as_json=True, limit=None):
     """One labelled section of data. Empty payloads are dropped, not printed as 'None'.
 

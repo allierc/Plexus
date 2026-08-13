@@ -121,8 +121,36 @@ def measure(run):
         else:
             S["slip"].append(float("nan"))
         prev = (a.copy(), b.copy())
+    # the integrin arrays, when the run recorded them
+    if "n_kept" in z.files and "nb0" in z.files:
+        nbm, nfm, tot = [], [], []
+        for i in range(int(z["n_kept"])):
+            nb, nf = np.asarray(z[f"nb{i}"], float), np.asarray(z[f"nf{i}"], float)
+            nbm.append(float(np.median(nb))); nfm.append(float(np.mean(nf)))
+            tot.append(float(nb.sum() + nf.sum()))
+        S["nb_med"], S["nf_mean"], S["receptor_total"] = nbm, nfm, tot
+    S["cells"] = None
+    c = cells_per_frame(S["t"])
+    if c is not None:
+        S["cells"] = c.tolist()
     S["um_per_tissue_unit"], S["l0_um"] = um, l0_um
     return bm, S, um, l0_um
+
+
+def cells_per_frame(frames):
+    """The tissue's own cell count at each kept frame, from the cache the run was driven by.
+
+    G70 is a RATIO -- plaques per cell -- so it needs the denominator, and the denominator is not in
+    `bm_frames.npz`: the store holds the sheet, and the sheet does not know how many cells are under
+    it. `n_cells` is in the replay cache, indexed by tissue frame.
+    """
+    import glob
+    cands = sorted(glob.glob(os.path.join(LOG, "_tissue", "cellfix_B_new_f401_x4_*.npz")))
+    if not cands:
+        return None
+    z = np.load(cands[0], mmap_mode="r")
+    nc = np.asarray(z["n_cells"])
+    return np.asarray([int(nc[min(int(t), len(nc) - 1)]) for t in frames], float)
 
 
 def verdicts(S, l0_um):
@@ -140,10 +168,58 @@ def verdicts(S, l0_um):
             "times_an_integrin_cluster": max(S["max"]) / INTEGRIN_UM},
         "G51 the plaque count responds to overstretch": {
             "counts": sorted(set(S["n"])), "pass": bool(g51)},
-        "not measured": {
-            "integrin turnover": "the clutch's bond number Nb is on the rig and is never stored in "
-                                 "bm_frames.npz. It is absent here rather than assumed constant."},
     }
+
+
+def gates_07(S, l0_um):
+    """G70--G75, thresholds as written in note_sheet 4.4 BEFORE any of these runs."""
+    t = np.asarray(S["t"], float)
+    n = np.asarray(S["n"], float)
+    out = {}
+    # G70 -- plaques per cell holds its seeded value, within 10%
+    if S.get("cells") is not None:
+        ppc = n / np.maximum(np.asarray(S["cells"], float), 1.0)
+        dev = float(np.max(np.abs(ppc / ppc[0] - 1.0)))
+        out["G70 plaques per cell holds"] = dict(
+            seeded=float(ppc[0]), final=float(ppc[-1]), worst_deviation=dev,
+            threshold=0.10, pass_=bool(dev <= 0.10))
+    # G71 -- no kept-frame interval changes the count by more than 5%
+    step = np.abs(np.diff(n)) / np.maximum(n[:-1], 1.0)
+    out["G71 the count grows smoothly"] = dict(
+        max_step=float(step.max()) if step.size else 0.0, threshold=0.05,
+        n_steps=int((step > 1e-9).sum()), n_intervals=int(step.size),
+        pass_=bool(step.size and step.max() <= 0.05))
+    # G72 -- median in [0.5, 2] l0 and p99 < 4 l0 at EVERY frame
+    med, p99 = np.asarray(S["p50"]) / l0_um, np.asarray(S["p99"]) / l0_um
+    ok = bool(np.all((med >= 0.5) & (med <= 2.0) & (p99 < 4.0)))
+    out["G72 the length distribution is stationary"] = dict(
+        median_l0=[float(med.min()), float(med.max())], p99_l0=[float(p99.min()), float(p99.max())],
+        threshold="median in [0.5,2] l0, p99 < 4 l0, every frame", pass_=ok)
+    # G73 -- a plaque born in a division starts at rest. Measurable only where the count GREW.
+    born = S.get("born_len_l0")
+    out["G73 a new plaque starts at rest"] = (
+        dict(new_plaque_median_l0=born, threshold=1.2, pass_=bool(born is not None and born <= 1.2))
+        if born is not None else
+        dict(pass_=None, why="the count never grew by a mechanism that seeds ONE plaque, so there is "
+                             "no born-plaque population to measure"))
+    # G74 -- integrin content per plaque stationary
+    nb = S.get("nb_med")
+    if nb:
+        r = np.asarray(nb) / max(nb[0], 1e-12) if nb[0] > 0 else np.asarray(nb) / max(np.max(nb), 1e-12)
+        out["G74 integrin per plaque is stationary"] = dict(
+            median_Nb=[float(nb[0]), float(nb[-1])], ratio_range=[float(r.min()), float(r.max())],
+            threshold=[0.5, 2.0], pass_=bool(r.min() >= 0.5 and r.max() <= 2.0))
+    # G75 -- the receptor total moves only by the source and turnover
+    tot = S.get("receptor_total")
+    if tot:
+        tot = np.asarray(tot, float)
+        out["G75 division splits bonds, does not create them"] = dict(
+            total=[float(tot[0]), float(tot[-1])],
+            relative_change=float(abs(tot[-1] - tot[0]) / max(tot[0], 1e-12)),
+            note="with s_i = 0 and 1/tau_i = 0 this must be exact; any drift is receptors being "
+                 "created or destroyed by refinement",
+            pass_=None)
+    return out
 
 
 # =============================================================================================
@@ -267,11 +343,14 @@ def render(run, frames=None, W=2200, H=1150, fps=20):
     from PIL import Image
     D = V.load(run)
     bm, S, um, l0_um = measure(run)
-    d = os.path.join(LOG, OUT)
+    # INTO THE RUN'S OWN FOLDER. A diagnosis kept in a shared folder is one more place to look and
+    # one more thing to keep in step with the run it describes; the mp4, the json, the spec and the
+    # movie of the same experiment belong together.
+    d = os.path.join(LOG, run)
     os.makedirs(d, exist_ok=True)
     idx = (list(range(len(S["t"]))) if frames is None else
            [int(round(u)) for u in np.linspace(0, len(S["t"]) - 1, min(frames, len(S["t"])))])
-    out = os.path.join(d, f"{run}_plaque.mp4")
+    out = os.path.join(d, "plaque_gate.mp4")
     wr = imageio_ffmpeg.write_frames(out, (W, H), fps=fps, quality=7)
     wr.send(None)
     cell = None
@@ -287,8 +366,9 @@ def render(run, frames=None, W=2200, H=1150, fps=20):
         wr.send(np.ascontiguousarray(img))
     wr.close()
     V_ = verdicts(S, l0_um)
+    V_.update(gates_07(S, l0_um))
     json.dump(dict(run=run, gates=V_, um_per_tissue_unit=um, l0_um=l0_um, series=S),
-              open(os.path.join(d, f"{run}_plaque.json"), "w"), indent=1)
+              open(os.path.join(d, "plaque_gate.json"), "w"), indent=1)
     g = V_["G50 no plaque exceeds 3 l0"]
     print(f"[07] {run}: plaque length {S['mean'][0]:.2f} -> {S['mean'][-1]:.2f} um mean, "
           f"max {g['max_um']:.1f} um = {g['times_the_rest_length']:.0f} x l0 = "

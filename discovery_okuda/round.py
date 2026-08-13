@@ -34,8 +34,10 @@ quarantine). Those are the substrate and they have earned their size.
 """
 from __future__ import annotations
 
+import collections
 import glob
 import json
+import math
 import re
 import os
 import sys
@@ -134,8 +136,16 @@ def load_flow(path=FLOW):
             raise FlowError(f"{nid!r} names agent {n['agent']!r}, which is not in crew/")
         if "code" in n and not callable(globals().get(n["code"].split(".")[-1])):
             raise FlowError(f"{nid!r} names code {n['code']!r}, which round.py does not define")
-        if n.get("each") and n["each"] not in emits:
-            raise FlowError(f"{nid!r} fans out over {n['each']!r}, which no node emits")
+        if n.get("each"):
+            if n["each"] not in emits:
+                raise FlowError(f"{nid!r} fans out over {n['each']!r}, which no node emits")
+            # A FAN-OUT IS A CONSUMER. Only `in:` counted until 13 August, so a list emitted purely
+            # to be fanned over was reported as producer-with-no-consumer -- which is exactly
+            # backwards: `each:` is the strongest form of consumption in this graph, one call per
+            # item. It went unnoticed because the two nodes that fan out both happened to fan over
+            # `names`, which `measure` also takes as an `in:`. The first node whose list existed
+            # only to be fanned over (`planned`) hit it immediately.
+            consumed.add(n["each"])
         # AND AN AGENT MUST ACTUALLY READ WHAT IT DECLARES. The producer-with-no-consumer check
         # below is satisfied by a NAME: it verifies that every emitted key appears in some node's
         # `in:`, not that the node uses it. Three edges were fiction for 28 rounds -- the Proposer
@@ -874,6 +884,86 @@ def menu(ctx):
     return out
 
 
+def _visits(ctx):
+    """VISIT COUNTS over the arms a slot can choose, and the bonus each unvisited one carries.
+
+    CEDRIC, 13 AUGUST, ON WHAT THIS IS NOT: *"I do not want to give a value, but the number of visits
+    can be enough to make a change."* So there is no reward here, no estimated mean, and no
+    confidence interval -- which is why it is not a UCB and is not called one. UCB's entire content
+    is a bound on an ESTIMATED VALUE; with no value there is nothing to bound. This is coverage.
+
+    WHY COUNTS ALONE ARE ENOUGH, MEASURED. Round 1 of this campaign put **9 of 15 slots on one
+    parent** (`b_gs_plain_soft_lo`) while trying 11 distinct levers and 6 distinct acts -- so the
+    lever and act axes were healthy and the parent axis was not. The old campaign was worse and for
+    longer: `b_gs_plain_soft_lo` took 69 of 330 slots over 22 rounds. Neither failure is a failure to
+    judge value. Both are a failure to notice a count, and `max_per_lineage: 2` did not catch either
+    because a cap on SEATS says nothing about how many slots one seat's parent then absorbs.
+
+    `1/sqrt(1+n)` and not `1/(1+n)`: the second falls off so fast that the second visit to an arm is
+    already worth a fifth of the first, which would push the round toward pure round-robin over arms
+    the campaign has good reason to revisit. The square root is the same shape UCB's exploration term
+    has, minus the value it is added to.
+
+    IT IS REPORTED, NOT ENFORCED. This returns numbers to the Proposer's prompt; nothing here refuses
+    a slot. A hard quota would be a second `max_per_lineage` -- another cap chosen by hand, in a
+    second place, doing the job the first one already does badly.
+    """
+    rows = []
+    if os.path.exists(RECORDS):
+        with open(RECORDS) as f:
+            for line in f:
+                try:
+                    rows.append(json.loads(line))
+                except Exception:
+                    pass
+
+    def _lever(r):
+        e = r.get("edit")
+        return f"{e[0]}:{e[1]}" if isinstance(e, list) and len(e) >= 2 else None
+
+    # THE ARMS THAT COULD BE CHOSEN, not the arms that were. An arm counted only where it appears in
+    # the record can never have n = 0, so the one thing this is built to surface -- the never-tried
+    # option -- would be structurally invisible. Each family therefore declares its full set.
+    fams = {}
+    fams["parent"] = ([p["name"] for p in (ctx.get("parents") or [])],
+                      [r.get("parent") for r in rows])
+    try:
+        from critic import _acts_spec
+        acts = sorted(_acts_spec() or {})
+    except Exception:
+        acts = []
+    fams["act"] = (acts, [r.get("act") for r in rows])
+    fams["claim"] = ([c["id"] for c in (ctx.get("claim_ledger") or [])],
+                     [r.get("on") or r.get("claim_id") for r in rows])
+    fams["lever"] = (sorted({_lever(r) for r in rows if _lever(r)}),
+                     [_lever(r) for r in rows])
+
+    out = {"how": ("visits are counted over the WHOLE campaign, not this round. `bonus` is "
+                   "1/sqrt(1+visits), scaled so an arm nothing has tried reads 1.00. It is a "
+                   "coverage signal and not a score: no result, good or bad, moves it.")}
+    for fam, (available, used) in fams.items():
+        n = collections.Counter(u for u in used if u)
+        arms = sorted(set(available) | set(n))
+        if not arms:
+            continue
+        rank = sorted(arms, key=lambda a: (n.get(a, 0), a))
+        out[fam] = {
+            "visits": {a: n.get(a, 0) for a in rank},
+            "never_tried": [a for a in rank if not n.get(a, 0)],
+            "bonus": {a: round(1.0 / math.sqrt(1 + n.get(a, 0)), 2) for a in rank[:8]},
+        }
+        # THE CONCENTRATION, AS THE ONE NUMBER THAT EXPOSED THE DEFECT. A list of counts has to be
+        # read to be understood and nothing in the loop reads it; a share does not. 9 of 15 on one
+        # parent is legible at a glance in a way that {b_gs_plain_soft_lo: 9, ...} is not.
+        tot = sum(n.values())
+        if tot:
+            top, k = n.most_common(1)[0]
+            out[fam]["concentration"] = (
+                f"{k} of {tot} slots on `{top}` ({100 * k / tot:.0f}%), over {len(n)} distinct "
+                f"{fam}s used and {len(arms)} available")
+    return out
+
+
 def coverage(ctx):
     """What the campaign has NOT tried: unexercised operators, untried implementations, unused parents.
 
@@ -951,6 +1041,12 @@ def coverage(ctx):
         "note": ("an operator nothing exercises can only be reached with `add_op`; an untried "
                  "implementation with `set_impl`. Both are one edit and both answer a question no "
                  "retune can."),
+        # THE COUNTS, IN THE SAME NODE AND NOT A NEW ONE. The two halves answer the same question --
+        # what has this campaign not covered -- and the lists above are the categorical half ("never
+        # once") while `visits` is the graded half ("nine times against one"). Splitting them across
+        # two nodes would put one coverage concept in two places, which is the defect this codebase
+        # has now paid for five times.
+        "visits": _visits(ctx),
     }
 
 
@@ -1822,6 +1918,52 @@ def _restore_parent_params(name, parent, edit, spare_seeds=False):
     # test_round.py::test_a_child_differs_from_its_parent_by_exactly_the_edit and the count is on the
     # record. A failure to restore would be worth a line; succeeding is not.
     return restored
+
+
+def planned(ctx):
+    """The names about to be launched -- so the Forecaster can fan out over them BEFORE they run.
+
+    A ONE-LINE NODE THAT EXISTS FOR TWO STRUCTURAL REASONS, both worth the four lines.
+
+    The engine keys a fan-out by its item (`got[item] = v`), so the item has to be hashable and a
+    spec is a dict. `names` is the same list, but `names` is emitted by `launch` -- fanning the
+    Forecaster over it would put the forecast AFTER the runs, which is not a forecast. This is the
+    same list, available before.
+
+    And it is what lets `flow.yaml` give `launch` an `in:` of `[specs, forecast]`: the topological
+    sort then cannot start the jobs until every forecast is in. Enforcing the ordering in the graph
+    rather than by discipline matters because a postdiction is indistinguishable from a prediction
+    once both are files on disk.
+    """
+    return [s["name"] for s in (ctx.get("specs") or [])]
+
+
+def foresight(ctx):
+    """Forecast against observation, slot by slot -- the score on the KNOWLEDGE, consumed by nobody.
+
+    Cedric, 13 August: *"the discrepancies between prediction and eye should not govern the loop,
+    because the eye might be wrong, and the knowledge too limited for the forecaster. I see it more
+    like a score for the knowledge building."* So this node is terminal by design, not by accident:
+    it writes a file and prints a table, and no `in:` anywhere names it. `foresight.py` carries the
+    argument for why steering on it would be wrong.
+    """
+    import foresight as F
+    fc, ob = ctx.get("forecast"), ctx.get("observed")
+    if not fc or not ob:
+        # A MISSING HALF IS NOT A ZERO. Reporting 0.0 when the Forecaster failed would put a
+        # measurement failure on the same axis as a knowledge failure, and the campaign would read
+        # its own broken node as evidence that it understands nothing.
+        print(T_.warn(f"[round] foresight not measured: "
+                      f"{'no forecast' if not fc else ''}{' and ' if not fc and not ob else ''}"
+                      f"{'no observation' if not ob else ''}"))
+        return None
+    rs = F.round_score(fc, ob)
+    rs["round"] = ctx["round_id"]
+    print(F.render(rs))
+    os.makedirs(CAMPAIGN, exist_ok=True)
+    with open(os.path.join(CAMPAIGN, "foresight.jsonl"), "a") as f:
+        f.write(json.dumps(rs, default=str) + "\n")
+    return rs
 
 
 def launch(ctx):

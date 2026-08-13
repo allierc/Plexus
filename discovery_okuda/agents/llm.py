@@ -118,7 +118,7 @@ EXPENSIVE_TOOLS = ("Bash", "WebFetch", "WebSearch", "Task", "Agent", "NotebookEd
 # under-estimate while the caps are still unproven. They are replaced by this round's own measured
 # spend as soon as the role has been called once.
 EXPECTED_MIN = {"interpreter": 3.2, "reader": 1.1, "watcher": 0.3, "meta_review": 3.3,
-                "eye": 0.4, "analyst": 3.0,
+                "eye": 0.4, "analyst": 3.0, "forecaster": 1.0,
                 "proposer": 3.0, "archivist": 1.0, "diagnostician": 0.5, "reflection": 0.7,
                 "grounder": 0.1,
                 # added after "OVER CEILING at operator_request (3.0+8 > 10.0)" fired on a role
@@ -212,6 +212,13 @@ AGENT_BUDGETS = {
     # live round by checking this table against what eye.md tells the model to do: it said "watch it
     # with the Read tool" while the budget granted no tools at all.
     "eye":           ( 4,    6,  ["Read"]),                    # one run, one picture
+    # `forecaster` GETS NO TOOLS, and that is a design decision rather than an economy. Everything
+    # it may use is in its prompt -- the spec, knowledge.md, the ledger -- and a Read tool is a door
+    # to `log/okuda/<name>/`, where the frames of the very run it is forecasting would be sitting if
+    # the fan-out ever ran late. A forecast that peeked is indistinguishable on disk from one that
+    # did not, so the tool is withheld rather than the behaviour discouraged. Six slots is a short
+    # answer; the turns are for a model that thinks before it fills the form.
+    "forecaster":    ( 4,    6,  []),                          # one spec, six slots, before the GPU
     # `analyst` absorbs reader + interpreter + meta_review + collector + diagnostician: one call over
     # the whole batch, writing analysis.md and knowledge.md. Bigger than any of them because it does
     # all five jobs and the comparison between runs that none of them could see.

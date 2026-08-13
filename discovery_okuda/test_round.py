@@ -37,8 +37,12 @@ def test_crew_discovery():
     print("\ncrew discovery")
     import crew
     found = dict(crew.discover())
-    check(set(found) == {"proposer", "eye", "analyst", "grounder"},
-          f"exactly four roles discovered: {sorted(found)}")
+    # FIVE SINCE 13 AUGUST. `forecaster` fills crew/description.md's six slots from the spec and
+    # knowledge.md BEFORE the jobs are submitted, and the eye fills the same form from the frames
+    # after; foresight.py scores the pair. The set is asserted rather than the count so that adding
+    # a role is a decision -- which is the same reason the node count below is asserted.
+    check(set(found) == {"proposer", "eye", "analyst", "grounder", "forecaster"},
+          f"exactly five roles discovered: {sorted(found)}")
     for n, m in found.items():
         check(callable(m.run), f"{n}: has run()")
         check(os.path.exists(os.path.join(HERE, "crew", m.ROLE["md"])),
@@ -451,16 +455,29 @@ def test_the_live_flow_loads():
     # most strategic sentence into a file nothing read), and the four the audit required be visible
     # as nodes rather than buried in round.py. A flow that grows silently is how the old engine
     # reached 657 lines; a flow that grows in a commit that says which nodes and why is a design.
-    check(len(ids) == 23, f"23 nodes: {len(ids)}")
+    # 23 -> 26 -> 29. THE 26 WAS NEVER RECORDED, which is the drift this assertion exists to stop
+    # working exactly as designed and then being ignored: three nodes went in and the test was left
+    # failing rather than updated, so the guard was live and unread. The three added on 13 August
+    # are `planned` (the names, emitted before `launch` so the forecast can fan out over them),
+    # `forecaster`, and `foresight` (terminal -- it scores the knowledge and nothing consumes it).
+    check(len(ids) == 29, f"29 nodes: {len(ids)}")
     # a topological order: every dep appears before the node that needs it
     emits = {n.get("out", n["id"]): n["id"] for n in order}
     pos = {n["id"]: i for i, n in enumerate(order)}
     ok = all(pos[emits[d]] < pos[n["id"]] for n in order for d in (n.get("in") or []))
     check(ok, "every node comes after everything it needs")
     agents = [n["id"] for n in order if "agent" in n]
-    check(agents == ["proposer", "eye", "analyst", "grounder"],
-          f"four agents, in flow order: {agents}")
-    check(sum(1 for n in order if n.get("each")) == 1, "exactly one node fans out per run")
+    # THE ORDER IS THE ASSERTION, not the membership. `forecaster` must come BEFORE `eye` -- and
+    # before `launch`, which the next check pins -- because a forecast filed after its run is a
+    # postdiction and the two are indistinguishable once both are files on disk.
+    check(agents == ["proposer", "forecaster", "eye", "analyst", "grounder"],
+          f"five agents, in flow order: {agents}")
+    pos = {n["id"]: i for i, n in enumerate(order)}
+    check(pos["forecaster"] < pos["launch"],
+          "the forecast is written before the jobs are submitted, or it is not a forecast")
+    check(sum(1 for n in order if n.get("each")) == 2,
+          "two nodes fan out per run: the forecaster over the planned names, the eye over the "
+          "landed ones")
 
 
 def test_engine_is_blind():
@@ -503,7 +520,12 @@ def test_every_node_output_has_a_consumer():
     import round as E
     order = E.load_flow()
     emits = {n.get("out", n["id"]): n["id"] for n in order}
-    consumed = {d for n in order for d in (n.get("in") or [])}
+    # `each:` COUNTS AS CONSUMPTION, and this test had the same blind spot the engine did: a list
+    # emitted only to be fanned over read as producer-with-no-consumer. It went unnoticed while both
+    # fan-outs happened to use `names`, which `measure` also takes as an `in:`. `planned` exists
+    # only to be fanned over, and hit it at once -- in the engine and here, one defect in two places.
+    consumed = ({d for n in order for d in (n.get("in") or [])}
+                | {n["each"] for n in order if n.get("each")})
     for n in order:
         out = n.get("out", n["id"])
         terminal = ("agent" in n) or bool(n.get("writes"))
@@ -606,7 +628,12 @@ def test_round_runs_with_no_nodes_at_all():
         ctx = E.run_round("t000", only={"launch"})
     check("nothing to launch" in buf.getvalue(),
           "an empty batch says so rather than submitting")
-    check("launch ran with specs absent" in buf.getvalue(),
+    # BOTH ITS INPUTS, NAMED. `launch` took `[specs]` until 13 August and now takes
+    # `[specs, forecast]` -- the second is not a data dependency (the launcher never reads it) but
+    # an ORDERING one, so the topological sort cannot start a job before its forecast is written.
+    # The warning therefore lists two absent inputs, and asserting the whole line rather than a
+    # prefix is what keeps this test able to notice if that ordering edge is ever quietly dropped.
+    check("launch ran with specs, forecast absent" in buf.getvalue(),
           "and the round reports that the node ran on missing data")
 
 
