@@ -172,7 +172,7 @@ def split_concat(src, dst, recentre=True, skip_top=0.0):
 
 
 
-def panels_concat(src, dst, panels, skip_top=0.0, skip_bot=0.0, pad=1.16):
+def panels_concat(src, dst, panels, skip_top=0.0, skip_bot=0.0, pad=1.16, side=460):
     """Cut a grid movie into named panels and play them in SEQUENCE, each square on its own content.
 
     A GRID DOES NOT SURVIVE A GALLERY CARD. These runs are drawn to be READ -- three or four views
@@ -215,8 +215,13 @@ def panels_concat(src, dst, panels, skip_top=0.0, skip_bot=0.0, pad=1.16):
         labels.append(f"[p{n}]")
         print(f"[minisite]   panel {n}: {side}x{side} at ({x},{y}) of {w}x{h}", flush=True)
     fc = ";".join(parts) + ";" + "".join(labels) + f"concat=n={len(boxes)}:v=1[o]"
+    # SCALED TO THE PAGE'S OWN SIZE. The VTK sources are 1,568 px square; concatenating four of
+    # their quadrants unscaled put a single card at 17.8 MB, which is more than the rest of the
+    # gallery put together.
+    fc = fc.replace("[o]", "[c]") + f";[c]scale={side}:{side}:flags=lanczos[o]"
     cmd = [ff, "-y", "-loglevel", "error", "-i", src, "-filter_complex", fc,
-           "-map", "[o]", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "21", dst]
+           "-map", "[o]", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "24",
+           "-movflags", "+faststart", dst]
     if subprocess.call(cmd) != 0 or not os.path.exists(dst):
         sys.exit(f"ffmpeg panels+concat failed for {dst}")
 
@@ -643,9 +648,8 @@ def main():
     }
     runs4 = []
     for d, v, lbl in R4:
-        src = os.path.join(LOG_OKUDA, d, "movie.mp4")
-        if not os.path.exists(src):
-            print(f"[minisite] {d}: no movie.mp4 -- card skipped")
+        if not os.path.exists(os.path.join(LOG_OKUDA, d, "vtk_evolve_mesh.mp4")):
+            print(f"[minisite] {d}: no vtk_* clips -- card skipped")
             continue
         sm = _sum(d)
         vtk_sequence(os.path.join(LOG_OKUDA, d), os.path.join(GAL, f"{v}.mp4"))
@@ -678,9 +682,8 @@ def main():
     }
     runs5r = []
     for d, v, lbl in R5r:
-        src = os.path.join(LOG_OKUDA, d, "movie.mp4")
-        if not os.path.exists(src):
-            print(f"[minisite] {d}: no movie.mp4 -- card skipped")
+        if not os.path.exists(os.path.join(LOG_OKUDA, d, "vtk_evolve_mesh.mp4")):
+            print(f"[minisite] {d}: no vtk_* clips -- card skipped")
             continue
         sm = _sum(d)
         vtk_sequence(os.path.join(LOG_OKUDA, d), os.path.join(GAL, f"{v}.mp4"))
@@ -733,9 +736,14 @@ def main():
         DEFINED ABOVE THE ROW LISTS, not between them and the loop: twice now an edit that replaced
         a row list from its first line to the loop has deleted this function with it.
         """
-        src = os.path.join(LOG, d, "movie.mp4")
-        if not os.path.exists(src):
-            print(f"[minisite] {d}: no movie.mp4 yet -- card skipped")
+        # THE VTK RENDER WHERE THERE IS ONE. `log/okuda_ECM` is being re-rendered to
+        # `movie_vtk.mp4` -- z-buffered, lit, drawn from the same trajectory -- run by run, so the
+        # site takes whichever exists and prints which it used. A run that has both is a run whose
+        # `movie.mp4` is the one that stops being true first.
+        src = next((q for q in (os.path.join(LOG, d, "movie_vtk.mp4"),
+                                os.path.join(LOG, d, "movie.mp4")) if os.path.exists(q)), None)
+        if src is None:
+            print(f"[minisite] {d}: no movie.mp4 or movie_vtk.mp4 yet -- card skipped")
             return None
         try:
             n = _nframes(src)
@@ -743,7 +751,7 @@ def main():
             print(f"[minisite] {d}: movie.mp4 is still being written (no moov atom) -- card skipped")
             return None
         panels_concat(src, os.path.join(GAL, f"{v}.mp4"), panels, **kw)
-        print(f"[minisite] gallery/{v}.mp4 <- {d}/movie.mp4  "
+        print(f"[minisite] gallery/{v}.mp4 <- {d}/{os.path.basename(src)}  "
               f"({os.path.getsize(os.path.join(GAL, v + '.mp4')) / 1e6:.1f} MB, {n} frames, "
               f"{len(panels)} panel{'s' if len(panels) > 1 else ''} in sequence, square, no label)")
         return True
@@ -751,7 +759,7 @@ def main():
     tiny = _metrics_or_none("06_hole_tiny_off")
     small = _metrics_or_none("06_hole_small")
     R5 = [
-        ("06_spheroid_bm_ecm", "spheroid_bm_ecm", "three entities, three solvers",
+        ("06_spheroid_bm_ecm", "spheroid_bm_ecm_vtk", "three entities, three solvers",
          [q["tl"], q["tr"], q["bl"], q["br"]], dict(skip_top=0.09),
          "An epithelium of 396 vertices grown to 12,756, a fibre matrix outside it, and a "
          "5,120-triangle membrane on 2,562 plaques. Sheet and matrix share the tissue, not a "
@@ -764,20 +772,20 @@ def main():
     ] + ([] if not tiny else [
         # THE SHEET PANEL ALONE, as for the breach cards below: this run's other three panels are
         # the tissue and the matrix, which the first card already shows.
-        ("06_hole_tiny_off", "bm_hole_tiny_off", "a self-arresting perforation",
+        ("06_hole_tiny_off", "bm_hole_tiny_off_vtk", "a self-arresting perforation",
          [q["bl"]], dict(skip_top=0.09),
          f"{tiny['faces_torn']} of {tiny['faces_seeded']:,} faces, {tiny['rim_loops']} rim "
          f"loop, and it stops. The size is the source's: a {tiny['spot']:.0f}\u00b0 cap of "
          f"MT1-MMP, tilted {tiny['spot_off']:.0f}\u00b0 so the rim reads as a rim"),
     ])
     R5b = ([] if not small else [
-        ("06_hole_small", "bm_hole_small", "self-arresting, no cap",
+        ("06_hole_small", "bm_hole_small_vtk", "self-arresting, no cap",
          [q["bl"]], dict(skip_top=0.09),
          f"A random field instead of a cap: {small['faces_torn']} faces in one patch, "
          f"{100 * small['torn_frac']:.0f}% of the sheet, and it still stops. Change only the seed "
          f"and the same point tears 31.5%"),
     ]) + ([] if not (hol and trn) else [
-        ("06_breach_hole", "bm_breach_sheet", "not self-arresting",
+        ("06_breach_hole", "bm_breach_sheet_vtk", "not self-arresting",
          [q["bl"]], dict(skip_top=0.09),
          f"This one does not stop: {100 * hol['torn_frac']:.0f}% of the sheet gone, "
          f"{100 * hol['biggest_patch_frac']:.0f}% of it one hole. At cutting rate "
