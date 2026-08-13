@@ -264,6 +264,22 @@ def bm_poly(X, F, val, vmax, mode="lam", gamma=0.5):
 # =============================================================================================
 #  the 2x2
 # =============================================================================================
+def _aim_section(p, L):
+    """Looking ALONG the cut's normal, so a section is seen face-on.
+
+    THE TOP-RIGHT PANEL IS A CROSS-SECTION AND NOT A CUT SOLID. Clipping the geometry and keeping the
+    side camera shows the far half of a sphere from outside -- a bitten shape whose surface is still
+    the surface, which is why the panel stopped being recognisable as a section. A section is the
+    INTERSECTION with a plane, viewed down that plane's normal: the epithelium becomes a ring of cell
+    walls, the membrane a line inside it, and the matrix the strands that cross the slab.
+    """
+    p.camera.position = (0.0, -L * 3.2, 0.0)
+    p.camera.focal_point = (0.0, 0.0, 0.0)
+    p.camera.up = (0.0, 0.0, 1.0)
+    p.camera.parallel_projection = True
+    p.camera.parallel_scale = L * 1.05
+
+
 def _aim(p, L, clip=False):
     e, a = np.radians(CAM["elev"]), np.radians(CAM["azim"])
     d = np.array([np.cos(e) * np.cos(a), np.cos(e) * np.sin(a), np.sin(e)])
@@ -303,23 +319,42 @@ def render(run, frames=None, still=False, src="06_spheroid_ecm", out_name=None, 
         tis, _ = tissue_poly(mt, np.asarray(mt["pos"], float))
         mat = strands(q, D["band"][t], per, _ramps()[0])
 
-        for r, cc, cut in ((0, 0, False), (0, 1, True)):
-            p.subplot(r, cc)
-            p.set_background("black")
-            if mat is not None:
-                # OPACITY AND WIDTH, BECAUSE ALL TEN THOUSAND STRANDS ARE HERE. matplotlib capped
-                # itself at `max_lines=2500` for speed and drew a quarter of the matrix; VTK draws
-                # every one in a single call, so the cap is gone and the DENSITY has to come down
-                # instead -- at line_width 1 and 0.55 alpha the far side sums to an opaque blue wall
-                # and the tissue inside it disappears. This is the whole matrix, seen through.
-                mm = mat.clip(normal="y", origin=(0, 0, 0)) if cut else mat
-                p.add_mesh(mm, scalars="rgb", rgb=True, line_width=0.75, lighting=False)
-            if tis is not None:
-                tt = tis.clip(normal="y", origin=(0, 0, 0)) if cut else tis
-                p.add_mesh(tt, color=[v / 255 for v in EPI_RGB], smooth_shading=True,
-                           show_edges=True, edge_color="black", line_width=0.3,
-                           ambient=0.35, diffuse=0.75, specular=0.1)
-            _aim(p, L)
+        # ---- top-left: the tissue inside the stressed matrix, in 3D
+        p.subplot(0, 0)
+        p.set_background("black")
+        if mat is not None:
+            p.add_mesh(mat, scalars="rgb", rgb=True, line_width=0.75, lighting=False)
+        if tis is not None:
+            p.add_mesh(tis, color=[v / 255 for v in EPI_RGB], smooth_shading=True,
+                       show_edges=True, edge_color="black", line_width=0.3,
+                       ambient=0.35, diffuse=0.75, specular=0.1)
+        _aim(p, L)
+
+        # ---- top-right: the CROSS-SECTION, in the plane of the cavity axis
+        p.subplot(0, 1)
+        p.set_background("black")
+        slab = 0.055 / max(sc, 1e-12)                    # run_ecm.render's own slab, in tissue units
+        if mat is not None:
+            # A SLICED LINE SET IS A POINT CLOUD -- slicing the matrix would leave the dots where its
+            # strands happen to cross the plane, which is a picture of the plane and not of the
+            # matrix. The strands INSIDE the slab are drawn instead, so the section shows matter.
+            keep = np.abs(mat.points[:, 1]) < slab
+            sub = mat.extract_points(keep, adjacent_cells=False)
+            if sub.n_cells:
+                p.add_mesh(sub, scalars="rgb", rgb=True, line_width=1.1, lighting=False)
+        if tis is not None:
+            sl = tis.slice(normal="y", origin=(0, 0, 0))
+            if sl.n_points:
+                p.add_mesh(sl, color=[v / 255 for v in EPI_RGB], line_width=1.6, lighting=False)
+        if bm is not None:
+            jj = int(np.argmin(np.abs(bm["t"] - int(D["mesh_frames"][min(k, len(D["mesh_frames"])
+                                                                         - 1)]))))
+            if bm["F"][jj].shape[0]:
+                bs = bm_poly(bm["X"][jj], bm["F"][jj], bm["L"][jj], bm["vmax"],
+                             mode=D["mode"]).slice(normal="y", origin=(0, 0, 0))
+                if bs.n_points:
+                    p.add_mesh(bs, scalars="rgb", rgb=True, line_width=2.6, lighting=False)
+        _aim_section(p, L)
 
         p.subplot(1, 0)
         p.set_background("black")
