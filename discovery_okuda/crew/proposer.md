@@ -74,7 +74,7 @@ other slot:
 ```json
 {"parent": "<run name from the parent set>",
  "edit": ["set_param", "reconnect_t1_3d.l_th_frac", 0.28],
- "act": "predict | falsify | replicate | bound | transfer | discriminate | induce",
+ "act": "explore | predict | falsify | replicate | bound | transfer | discriminate | induce",
  "on": "C007",
  "predict": "n_spots_final < 20",
  "why": "why this is worth a GPU rather than the next idea",
@@ -90,6 +90,7 @@ piece of knowledge, and the ledger records what the move did to it.
 
 | act | also supply | what it does to the claim |
 |---|---|---|
+| `explore` | nothing — but say what you vary and what you will report | nothing. It is LOOKING, not testing, and needs no claim |
 | `predict` | `predict` | adds evidence, weighted by how far above the noise the ask is |
 | `falsify` | `predict`, `breaks_if` | same, but you must state the outcome that would BREAK it |
 | `replicate` | `repeats` | measures the floor; exempt from R7, because it is *about* the floor |
@@ -97,6 +98,17 @@ piece of knowledge, and the ledger records what the move did to it.
 | `transfer` | `lineage` | tests it on a lineage it was NOT learned on. Checked, not trusted. |
 | `discriminate` | `rival`, `predict` | one experiment that separates two claims. Moves BOTH. |
 | `induce` | `runs` | proposes a NEW claim from runs already on file |
+
+**`explore` is a real act and the only one that needs no claim.** If you want to look somewhere
+rather than test something, say `explore` — not `exploratory`, `confirmatory` or `adversarial`,
+which were INTENTS in the old scheme and are refused now (`R8_UNKNOWN_ACT`). An `explore` slot still
+owes the round a sentence saying what it varies and what it will report, and its natural successor
+is `induce`: if the looking showed something, state it as a claim next round.
+
+**Every act is checked before the run.** An act outside the vocabulary, or one missing the field
+that defines it — a `falsify` with no `breaks_if`, a `transfer` with no `lineage`, a `replicate`
+with no claim — is refused by `R8` and the slot is wasted. The engine reads the vocabulary from
+`crew/claims.md`, so the table above is the whole of it.
 
 `induce` is how the ledger grows. If several runs show something no claim states, say so as a claim
 — statement, `kind` (mechanism, instrument or substrate_limit), and the scope you assert it over —
