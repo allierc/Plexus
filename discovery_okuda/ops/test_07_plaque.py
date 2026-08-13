@@ -82,7 +82,8 @@ def measure(run):
     l0_um = L0_BOX * um_per_box
     z = np.load(os.path.join(d, "bm_frames.npz"))
     bm = V._bm(z)
-    S = {k: [] for k in ("t", "mean", "sd", "p50", "p99", "max", "n", "n_hold", "slip", "over")}
+    S = {k: [] for k in ("t", "mean", "sd", "p50", "p99", "max", "n", "n_hold", "slip", "over",
+                         "pen_mean", "pen_sd", "pen_max", "pen_frac", "r_bm", "r_epi")}
     prev = None
     for j in range(len(bm["t"])):
         X, nd, pp, F = bm["X"][j], bm["ND"][j], bm["PP"][j], bm["F"][j]
@@ -97,6 +98,19 @@ def measure(run):
         S["max"].append(float(d_um.max())); S["n"].append(int(len(nd)))
         S["n_hold"].append(int(live.sum()))
         S["over"].append(float((d_um > GATE_MULT * l0_um).mean()))
+        # HOW FAR THE SHEET HAS GONE INTO THE SPHEROID, signed and per plaque. A plaque's attachment
+        # point IS on the epithelium, so the radius of the sheet node minus the radius of its own
+        # attachment point is the offset of the membrane from the tissue at that point: POSITIVE is
+        # outside, where a basement membrane belongs, and NEGATIVE is inside it. This is the same
+        # quantity G46 is about, measured per plaque rather than on mean radii -- which is the bias
+        # G46's own caveat records.
+        r_a = np.linalg.norm(a, axis=1) * um
+        r_b = np.linalg.norm(b, axis=1) * um
+        pen = r_b - r_a                                 # >0 : the sheet is INSIDE the epithelium
+        S["pen_mean"].append(float(pen.mean())); S["pen_sd"].append(float(pen.std()))
+        S["pen_max"].append(float(pen.max()))
+        S["pen_frac"].append(float((pen > 0).mean()))
+        S["r_bm"].append(float(r_a.mean())); S["r_epi"].append(float(r_b.mean()))
         # THE SLIP: how far the two ends move RELATIVE to each other between kept frames. A plaque
         # that is merely carried outward by a growing tissue has a length that changes and a slip of
         # zero; one whose anchor slides across the face it is bound to has both. Only the same
@@ -163,49 +177,94 @@ def panel_bm(bm, j, L, mode, um, l0_um, size):
     return img[:, :, :3]
 
 
-def panel_plots(S, i, l0_um, size, dpi=100):
-    fig, ax = plt.subplots(2, 2, figsize=(size / dpi, size / dpi), facecolor="black", dpi=dpi)
-    t = S["t"]
-    for a in ax.ravel():
-        a.set_facecolor("black")
-        for s in ("top", "right"):
-            a.spines[s].set_visible(False)
-        for s in ("bottom", "left"):
-            a.spines[s].set_color("#888")
-        a.tick_params(colors="#aaa", labelsize=7)
-        a.set_xlabel("frame", color="#aaa", fontsize=7)
+def panel_plots(S, i, l0_um, W, H, dpi=100):
+    """The whole frame as ONE figure, 2 rows x 4 columns, with the top-left cell left EMPTY.
+
+    The 3D view is pasted into that cell afterwards. Building the grid this way -- rather than as two
+    images concatenated -- is what lets the render occupy one CELL instead of half the frame, which is
+    the point: seven panels of measurement beside one picture, not four beside one.
+    """
+    fig, ax = plt.subplots(2, 4, figsize=(W / dpi, H / dpi), facecolor="black", dpi=dpi)
+    t = np.asarray(S["t"])
+    for a_ in ax.ravel():
+        a_.set_facecolor("black")
+        for sp in ("top", "right"):
+            a_.spines[sp].set_visible(False)
+        for sp in ("bottom", "left"):
+            a_.spines[sp].set_color("#888")
+        a_.tick_params(colors="#aaa", labelsize=6.5)
+        a_.set_xlabel("frame", color="#aaa", fontsize=6.5)
+    ax[0, 0].set_xlabel("")                                # no label: it would shrink the cell the
+    ax[0, 0].axis("off")                                   # 3D view is pasted into
+
     m, sd = np.asarray(S["mean"]), np.asarray(S["sd"])
-    ax[0, 0].plot(t, m, color="white", lw=1.4)
-    ax[0, 0].fill_between(t, m - sd, m + sd, color="white", alpha=0.22, linewidth=0)
-    ax[0, 0].plot(t, S["max"], color="#ff5a3c", lw=1.0)
-    ax[0, 0].axhline(l0_um, color="#3cc46a", lw=0.9, ls=":")
-    ax[0, 0].axhline(GATE_MULT * l0_um, color="#ff2d2d", lw=0.9, ls="--")
-    ax[0, 0].set_ylabel("plaque length, um\nmean$\\pm$SD (white), max (orange)", color="#ddd",
-                        fontsize=7.5)
-    ax[0, 1].plot(t, S["n"], color="white", lw=1.6)
-    ax[0, 1].plot(t, S["n_hold"], color="#7ab8ff", lw=1.2)
-    ax[0, 1].set_ylabel("plaques: total (white)\nholding a live face (blue)", color="#ddd",
-                        fontsize=7.5)
-    ax[1, 0].plot(t, S["slip"], color="#f0c04a", lw=1.3)
-    ax[1, 0].set_ylabel("slip between the two anchors\num per kept frame", color="#ddd",
-                        fontsize=7.5)
-    ax[1, 1].plot(t, 100.0 * np.asarray(S["over"]), color="#ff2d2d", lw=1.4)
-    ax[1, 1].set_ylabel("%% of plaques over %.2f um (3 $l_0$)" % (GATE_MULT * l0_um), color="#ddd",
-                        fontsize=7.5)
-    ax[1, 1].set_ylim(-2, 102)
-    for a in ax.ravel():
-        a.axvline(t[i], color="#ffffff", lw=0.8, alpha=0.55)
-    fig.text(0.5, 0.985, "07 plaque length: an integrin cluster spans 0.04 um", color="#ddd",
-             fontsize=8.5, ha="center", va="top")
-    fig.tight_layout(rect=(0, 0, 1, 0.975))
+    A = ax[0, 1]
+    A.plot(t, m, color="white", lw=1.4, label="mean$\\pm$SD")
+    A.fill_between(t, m - sd, m + sd, color="white", alpha=0.22, linewidth=0)
+    A.plot(t, S["max"], color="#ff2d2d", lw=1.0, label="max")
+    A.axhline(l0_um, color="#3cc46a", lw=0.9, ls=":", label="$l_0$ = %.2f um" % l0_um)
+    A.axhline(GATE_MULT * l0_um, color="#ff2d2d", lw=0.9, ls="--",
+              label="G50 = 3$l_0$ = %.2f um" % (GATE_MULT * l0_um))
+    A.set_ylabel("plaque length, um", color="#ddd", fontsize=7.5)
+    A.legend(fontsize=5.6, labelcolor="#ccc", facecolor="black", edgecolor="#555", loc="upper left")
+
+    A = ax[0, 2]
+    A.plot(t, S["n"], color="white", lw=1.6, label="all")
+    A.plot(t, S["n_hold"], color="#7ab8ff", lw=1.2, label="holding a live face")
+    A.set_ylabel("plaques", color="#ddd", fontsize=7.5)
+    A.legend(fontsize=5.8, labelcolor="#ccc", facecolor="black", edgecolor="#555", loc="best")
+
+    A = ax[0, 3]
+    A.plot(t, 100.0 * np.asarray(S["over"]), color="#ff2d2d", lw=1.4)
+    A.set_ylabel("%% of plaques over 3$l_0$", color="#ddd", fontsize=7.5)
+    A.set_ylim(-2, 102)
+
+    A = ax[1, 0]
+    A.plot(t, S["slip"], color="#f0c04a", lw=1.3)
+    A.set_ylabel("slip of the two anchors\num per kept frame", color="#ddd", fontsize=7.5)
+
+    # ---- the three that answer "how far into the spheroid"
+    pm, ps = np.asarray(S["pen_mean"]), np.asarray(S["pen_sd"])
+    A = ax[1, 1]
+    A.plot(t, pm, color="#ff7ad9", lw=1.5)
+    A.fill_between(t, pm - ps, pm + ps, color="#ff7ad9", alpha=0.20, linewidth=0)
+    # THE DEEPEST NODE BELONGS ON THIS AXIS AND NOT BESIDE THE RADII. It is a DEPTH, and the panel it
+    # was in plots a RADIUS: two quantities on one axis, agreeing only by accident of scale.
+    A.plot(t, S["pen_max"], color="#ff2d2d", lw=1.0, label="deepest")
+    A.axhline(0.0, color="#3cc46a", lw=0.9, ls=":")
+    A.set_ylabel("membrane INTO the tissue, um\nmean$\\pm$SD (>0 = inside)", color="#ddd",
+                 fontsize=7.5)
+    A.legend(fontsize=5.8, labelcolor="#ccc", facecolor="black", edgecolor="#555", loc="best")
+
+    A = ax[1, 2]
+    A.plot(t, 100.0 * np.asarray(S["pen_frac"]), color="#ff7ad9", lw=1.5)
+    A.set_ylabel("%% of plaques with the sheet\nINSIDE the epithelium", color="#ddd", fontsize=7.5)
+    A.set_ylim(-2, 102)
+
+    A = ax[1, 3]
+    A.plot(t, S["r_epi"], color=[v / 255 for v in (232, 220, 190)], lw=1.5, label="epithelium")
+    A.plot(t, S["r_bm"], color="#ff9a6a", lw=1.5, label="membrane")
+    A.set_ylabel("mean radius, um", color="#ddd", fontsize=7.5)
+    A.legend(fontsize=5.8, labelcolor="#ccc", facecolor="black", edgecolor="#555", loc="best")
+
+    for a_ in ax.ravel()[1:]:
+        a_.axvline(t[i], color="#ffffff", lw=0.8, alpha=0.55)
+    fig.text(0.5, 0.988, "07 plaque length and penetration -- an integrin cluster spans 0.04 um; "
+                         "$l_0$ = %.2f um" % l0_um, color="#ddd", fontsize=9, ha="center", va="top")
+    fig.tight_layout(rect=(0, 0, 1, 0.972))
     fig.canvas.draw()
     img = np.asarray(fig.canvas.buffer_rgba())[:, :, :3].copy()
+    box = ax[0, 0].get_window_extent()
     plt.close(fig)
-    return img
+    # the top-left cell in PIXELS, y flipped: where the 3D view goes
+    x0, x1 = int(box.x0), int(box.x1)
+    y0, y1 = int(img.shape[0] - box.y1), int(img.shape[0] - box.y0)
+    return img, (x0, y0, x1, y1)
 
 
-def render(run, frames=None, size=780, fps=20):
+def render(run, frames=None, W=2200, H=1150, fps=20):
     import imageio_ffmpeg
+    from PIL import Image
     D = V.load(run)
     bm, S, um, l0_um = measure(run)
     d = os.path.join(LOG, OUT)
@@ -213,15 +272,19 @@ def render(run, frames=None, size=780, fps=20):
     idx = (list(range(len(S["t"]))) if frames is None else
            [int(round(u)) for u in np.linspace(0, len(S["t"]) - 1, min(frames, len(S["t"])))])
     out = os.path.join(d, f"{run}_plaque.mp4")
-    wr = imageio_ffmpeg.write_frames(out, (2 * size, size), fps=fps, quality=7)
+    wr = imageio_ffmpeg.write_frames(out, (W, H), fps=fps, quality=7)
     wr.send(None)
+    cell = None
     for i in idx:
-        left = panel_bm(bm, i, D["L"], D["mode"], um, l0_um, size)
-        right = panel_plots(S, i, l0_um, size)
-        if right.shape[0] != size:
-            from PIL import Image
-            right = np.asarray(Image.fromarray(right).resize((size, size)))
-        wr.send(np.ascontiguousarray(np.concatenate([left, right], axis=1)))
+        img, box = panel_plots(S, i, l0_um, W, H)
+        if cell is None:
+            cell = max(8, min(box[2] - box[0], box[3] - box[1]))
+        view = panel_bm(bm, i, D["L"], D["mode"], um, l0_um, cell)
+        # centred in its cell, so the picture keeps its square aspect inside a rectangular panel
+        cx = box[0] + (box[2] - box[0] - cell) // 2
+        cy = box[1] + (box[3] - box[1] - cell) // 2
+        img[cy:cy + cell, cx:cx + cell] = view
+        wr.send(np.ascontiguousarray(img))
     wr.close()
     V_ = verdicts(S, l0_um)
     json.dump(dict(run=run, gates=V_, um_per_tissue_unit=um, l0_um=l0_um, series=S),
