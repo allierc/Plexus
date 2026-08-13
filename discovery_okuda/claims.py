@@ -258,6 +258,12 @@ def main():
         runs = {json.loads(l)["name"] for l in open(RECORDS) if l.strip()}
 
     if a.validate or a.seed:
+        # SAY WHEN THE RUN CHECK COULD NOT RUN. `validate` skips the "does this run exist" test when
+        # `runs` is None, and it was None because records.jsonl had just been cleared for a fresh
+        # campaign -- so a ledger citing eight runs that had been DELETED validated clean. A check
+        # that silently does not happen is worse than one that fails.
+        if runs is None:
+            print("  ! records.jsonl absent -- evidence run ids were NOT checked against it")
         probs = validate(cur, hist, spec, runs)
         print(f"  {len(cur)} claims, {len(hist)} ledger lines, "
               f"{len(probs)} problem(s)")
