@@ -40,7 +40,7 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
-TYSSUE = os.path.join(ROOT, "prototype", "Tyssue")
+TYSSUE = os.path.join(ROOT, "discovery_okuda", "ops")
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(ROOT, "src"))
 sys.path.insert(0, TYSSUE)
@@ -115,13 +115,13 @@ def _scalebar(ax, Lbox, color="w", frac=0.25, on=None):
 def _lazy_engine():
     """Import the heavy stack only when we actually run (keeps validate_space fast)."""
     import plexus.operators                                          # noqa: F401
-    import tyssue_ops3d, tyssue_rd_ops, tyssue_t1_ops3d, tyssue_monolayer, ckpt  # noqa: F401
-    import tyssue_shape_to_chem                                       # noqa: F401
+    import mesh_ops, chem_ops, t1_ops, monolayer_ops, ckpt  # noqa: F401
+    import shape_chem_ops                                       # noqa: F401
     # AN OPERATOR THAT IS NOT IMPORTED IS NOT REGISTERED, and the spec naming it dies at compile
     # with no hint that a missing import is the cause. Three of the four shape-gate runs failed
     # here having written nothing but spec_run.yaml, while the fourth -- the only one without the
     # probe -- ran fine.
-    import tyssue_cell_shape                                          # noqa: F401
+    import shape_probe_ops                                          # noqa: F401
     import plexus.schema as S
     from plexus.engine import run as engine_run
     import instrument
@@ -190,7 +190,7 @@ def check_alignment(posf, hist, name=""):
         raise AssertionError(
             f"[D3] no topology history recorded for {name}: every frame would fall back to the "
             f"SEED mesh, so late-frame coordinates would be read against frame-0 connectivity. "
-            f"Schedule topo_snapshot_3d every=1; do not fall back.")
+            f"Schedule topo_record every=1; do not fall back.")
     T, H = len(posf), len(hist)
     if T != H:
         raise AssertionError(
@@ -478,7 +478,7 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     # instead of as nothing.
     #
     # WHY A CEILING AND NOT A PREDICTION. The obvious fix was to refuse these compositions before
-    # they run, and it does not work: projecting wall time from `grow_3d.rate` gives a median of 26
+    # they run, and it does not work: projecting wall time from `cell_grow.rate` gives a median of 26
     # minutes for the runs that DIED and 26 for the runs that finished -- no discriminating power
     # at all. The strongest single correlate of the final cell count is rate at 0.50 and K_V at
     # -0.49, which is not enough to refuse on. What makes a run reach 66,000 cells is the
@@ -562,7 +562,7 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     # built here, before the block below that used to read it. Read it first or every red_frac in
     # the every-frame table is measured against a default the simulation never used.
     GROWTH_SWITCH[0] = next((float(o["a_sw"]) for o in cfg.get("operators", [])
-                    if o.get("op") == "grow_3d" and "a_sw" in o), 1.5)
+                    if o.get("op") == "cell_grow" and "a_sw" in o), 1.5)
     per_frame = frame_metrics(fr)
     # THE EVERY-FRAME RECORD, ON DISK. `time_analysis.report` reads it beside metrics.npz, so the
     # trajectories an agent is shown carry the chemistry at full resolution while the mesh
@@ -843,7 +843,7 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     # there, so the summary the agents read carried no pattern number at all. The consequence is
     # the phase's headline finding: the run with the finest Turing field in the campaign is
     # recorded as `morphology=sphere, protr 1.003`, a null, because shape was measured and
-    # pattern was not. Identical in shape to the reservoir counters, which divide_3d also
+    # pattern was not. Identical in shape to the reservoir counters, which cell_divide also
     # computed and nobody carried.
     # READ FROM THE SERIES ON DISK, not from `per_frame`. The first wiring looked in `per_frame`, which does
     # not carry them: pattern_metrics is merged into the per-frame record by tissue_analysis and
@@ -1051,7 +1051,7 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     except Exception as e:
         print(f"[{name}] premise check unavailable: {type(e).__name__}: {e}", flush=True)
 
-    # THE RESERVOIR'S OWN REPORT. divide_3d counts the divisions it REFUSED for want of vertex
+    # THE RESERVOIR'S OWN REPORT. cell_divide counts the divisions it REFUSED for want of vertex
     # buffer and flags when the array is full, and until now both died on the mesh: the only way
     # anyone learned a run was capped was the Critic inferring it from n_cells afterwards, or a
     # human noticing the green stop two seconds into a movie.
@@ -1151,9 +1151,9 @@ def quasi_static_Q(cfg, cfg_path, device, protr_before, out_dir, Hf, relax_frame
     ckpt.save_state(Hf, ck)                                # the end state, positions + topology
 
     c2 = copy.deepcopy(cfg)
-    drop = {"grow_3d", "interface_line_tension_3d", "seed_cell_rd",
-            "divide_3d"}
-    seeders = {"seed_mesh_3d", "load_mesh_3d"}             # replaced by the end-state checkpoint
+    drop = {"cell_grow", "interface_tension", "cell_chem_seed",
+            "cell_divide"}
+    seeders = {"mesh_seed", "load_mesh_3d"}             # replaced by the end-state checkpoint
     c2["operators"] = [o for o in c2["operators"] if o["op"] not in drop | seeders]
     c2["schedule"] = [s for s in c2["schedule"] if s not in drop | seeders]
     c2["operators"].insert(0, {"op": "load_mesh_3d", "at": "vertex", "cell_set": "cell",
@@ -1318,14 +1318,14 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60, movie=True):
         alarm; zero in every frame measured so far, which is the point of showing it).
         """
         try:
-            from tyssue_diag import mesh_faults
+            from diag_tools import mesh_faults
             f = mesh_faults(pt, mt)
             # GREEN = RECENTLY DIVIDED, taken from the division event itself.
             # It used to come from the `sliver` mask (area far below the local mean) and was
             # simply wrong: on a 260-frame run with 101 divisions the sliver count was 0 in every
             # sampled frame, so nothing was ever green. A division makes two roughly equal halves
             # -- a daughter is ~50-70% of its neighbours -- while the sliver test looks below 15%,
-            # so it finds DEGENERATE cells, not new ones. `age` is reset to 0 by divide_3d, which
+            # so it finds DEGENERATE cells, not new ones. `age` is reset to 0 by cell_divide, which
             # is the event we actually mean.
             age = mt.get("age")
             if age is None:
@@ -1361,13 +1361,13 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60, movie=True):
 
     def inhib_of(mt):
         """Cells whose growth a second morphogen has switched off -- recorded per frame by
-        topo_snapshot_3d. None on any run without an inhibitor, which is every run before
+        topo_record. None on any run without an inhibitor, which is every run before
         11 August, so the renderer draws nothing extra."""
         d = mt.get("inhib")
         return None if d is None else np.asarray(d)[:mt["nF"]]
 
     def dying_of(mt):
-        """Cells marked to die and not yet extruded -- recorded per frame by topo_snapshot_3d.
+        """Cells marked to die and not yet extruded -- recorded per frame by topo_record.
         None on any run without apoptosis, which is every run before 9 August."""
         d = mt.get("apop")
         return None if d is None else (np.asarray(d)[:mt["nF"]] > 0)
@@ -1502,7 +1502,7 @@ def mechanics(name, fr, cfg, out_dir, n=24):
     """Per-cell FORCE / PRESSURE / TENSION / MIGRATION, from the trajectory we already have.
 
     `analyze_forces.run()` re-runs the simulation to get these; we do not need to. `cell_mechanics`
-    is a pure function of (positions, half-edge table, per-cell targets), and topo_snapshot_3d
+    is a pure function of (positions, half-edge table, per-cell targets), and topo_record
     already stores A0/P0/V0f in the mesh history -- so the fields come for free from the frames
     on disk. No doubled compute, and every job carries its own mechanical analysis.
 
@@ -1514,7 +1514,7 @@ def mechanics(name, fr, cfg, out_dir, n=24):
     """
     import torch
     from analyze_forces import cell_mechanics
-    se = next((o for o in cfg["operators"] if o["op"] == "shape_energy_3d"), {})
+    se = next((o for o in cfg["operators"] if o["op"] == "cell_mechanics"), {})
     kA, kP = se.get("K_A", 1.0), se.get("K_P", 1.0)
     kV = se.get("K_V", se.get("k_v", 4.0))
     Lam, Gam = se.get("Lambda", 0.2), se.get("Gamma", se.get("gamma", 0.05))

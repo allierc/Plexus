@@ -25,7 +25,7 @@ sets:
         width: 1
 fields: {}
 operators:
-- op: seed_mesh_3d
+- op: mesh_seed
   at: vertex
   cell_set: cell
   n_cells: 150
@@ -35,35 +35,35 @@ operators:
   seed: 0
   before_frame: 1
   vseed_cv: 0.15
-- op: cell_geometry_3d
+- op: cell_geometry
   at: cell
-- op: cell_adjacency
+- op: cell_neighbours
   at: cell
-- op: seed_cell_rd
+- op: cell_chem_seed
   at: cell
   seed: 0
   before_frame: 3
   mode: scatter
   seed_frac: 0.06
-- op: cell_diffuse
+- op: cell_chem_diffuse
   at: cell
   d_a: 0.08
   d_h: 0.16
   chi: 1.3
-- op: cell_react
+- op: cell_chem_react
   at: cell
   model: gray_scott
   F: 0.046
   kk: 0.062
   rate: 1.0
-- op: shape_to_chem
+- op: cell_chem_from_shape
   at: cell
   model: pressure
   vertex_set: vertex
   beta: 1.5
   F0: 0.046
   rate: 1.0
-- op: grow_3d
+- op: cell_grow
   at: vertex
   cell_set: cell
   rate: 0.03
@@ -72,7 +72,7 @@ operators:
   rho: 0.35
   vth_frac: 2.5
   conserve_amount: false
-- op: shape_energy_3d
+- op: cell_mechanics
   at: vertex
   p0: 3.5
   K_A: 1.0
@@ -86,13 +86,13 @@ operators:
   relax_iters: 60
   eta: 0.08
   cap_frac: 0.12
-- op: reconnect_t1_3d
+- op: edge_flip
   at: vertex
   l_th_frac: 0.35
   every: 4
   max_flips: 30
   engine_clock: true
-- op: divide_3d
+- op: cell_divide
   at: vertex
   factor: 2.0
   reset_noise: 0.12
@@ -105,22 +105,22 @@ operators:
   min_cycle: 4
   max_cycle: 12
   engine_clock: true
-- op: topo_snapshot_3d
+- op: topo_record
   at: vertex
   every: 1
 schedule:
-- seed_mesh_3d
-- cell_geometry_3d
-- cell_adjacency
-- seed_cell_rd
-- cell_diffuse
-- cell_react
-- shape_to_chem
-- grow_3d
-- shape_energy_3d
-- reconnect_t1_3d
-- divide_3d
-- topo_snapshot_3d
+- mesh_seed
+- cell_geometry
+- cell_neighbours
+- cell_chem_seed
+- cell_chem_diffuse
+- cell_chem_react
+- cell_chem_from_shape
+- cell_grow
+- cell_mechanics
+- edge_flip
+- cell_divide
+- topo_record
 _discovery:
   comp_hash: WK_wk_pressure_pos_s0
   region: shape->chemistry feedback

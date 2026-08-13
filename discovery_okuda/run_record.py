@@ -374,15 +374,15 @@ class Claim:
 
 # --------------------------------------------------------------------------- smoke test
 if __name__ == "__main__":
-    demo = {"operators": [{"id": "a", "op": "shape_energy_3d"}, {"id": "b", "op": "cell_diffuse"}],
+    demo = {"operators": [{"id": "a", "op": "cell_mechanics"}, {"id": "b", "op": "cell_chem_diffuse"}],
             "connections": []}
     r = RunRecord(demo, params={"kappa": 1.2}, seed=0)
-    r.set_acted({"shape_energy_3d": 350, "cell_diffuse": 0})          # cell_diffuse never acted
-    assert r.inert_operators() == ["cell_diffuse"]
+    r.set_acted({"cell_mechanics": 350, "cell_chem_diffuse": 0})          # cell_chem_diffuse never acted
+    assert r.inert_operators() == ["cell_chem_diffuse"]
     assert not r.is_valid_evidence, "a run with an inert operator is not evidence"
 
     r2 = RunRecord(demo, params={"kappa": 1.2}, seed=1)
-    r2.set_acted({"shape_energy_3d": 350, "cell_diffuse": 350})
+    r2.set_acted({"cell_mechanics": 350, "cell_chem_diffuse": 350})
     assert r2.is_valid_evidence
 
     r2.add_analysis("metric_v1", {"aspect": 7.5, "Q": 0.05})

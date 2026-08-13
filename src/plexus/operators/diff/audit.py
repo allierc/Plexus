@@ -319,7 +319,7 @@ def main():
     import plexus.operators  # noqa: F401   self-registers the library
     if a.candidates:
         # The atlas's specs run on THESE, not on the promoted defaults: `grow_radius` resolves to
-        # jax_morph_saturating_cell_growth, `cell_divide` to implementation `volume_conserving`.
+        # jax_morph_saturating_cell_growth, `agent_divide` to implementation `volume_conserving`.
         # Auditing only `plexus.operators` measures a set the atlas never runs.
         import importlib
         import os as _os

@@ -12,7 +12,7 @@ opposite findings: the first is a mesh that is failing, the second is what divis
 
 The distinction is only visible per CELL, and it is measurable here for a specific reason: this run
 has `n_apop` 0. Death renumbers faces through `keep`, so on a run with deaths a cell index is not a
-cell identity; with no deaths, `divide_3d` only ever APPENDS, so index i is the same cell for the
+cell identity; with no deaths, `cell_divide` only ever APPENDS, so index i is the same cell for the
 whole run and persistence can simply be counted.
 
 WHAT IS MEASURED, per recorded frame, per cell:
@@ -41,7 +41,7 @@ THIN_ASPECT = 4.0
 
 
 def rings_of(mt):
-    from tyssue_topology_ops3d import rings_from_flat_3d
+    from topology_ops import rings_from_flat_3d
     return rings_from_flat_3d(np.asarray(mt["E_srce"]), np.asarray(mt["E_trgt"]),
                               np.asarray(mt["E_face"]), int(mt["nF"]))
 
@@ -71,7 +71,7 @@ def per_cell(pos, mt):
 
 def main():
     run = sys.argv[1] if len(sys.argv) > 1 else "r013_05"
-    sys.path.insert(0, os.path.join(os.path.dirname(HERE), "prototype", "Tyssue"))
+    sys.path.insert(0, os.path.join(HERE, "ops"))
     d = os.path.join(LOG, run)
     z = np.load(os.path.join(d, "traj.npz"), allow_pickle=True)
     nfr = len([k for k in z.files if k.startswith("pos_")])

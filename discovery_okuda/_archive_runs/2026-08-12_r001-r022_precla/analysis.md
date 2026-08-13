@@ -33,7 +33,7 @@ metrics; chemistry NaN from frame 1635).
 - **Fewer, larger spots.** `n_spots_peak` ran 144–338 where Okuda's Fig. 5 wants ~10 of ~10
   cells. Every finger target is blocked until the pattern coarsens; F009 (no `dx`/χ scale)
   stands. Propose the coarsening knob before any more forcing.
-- **Push `apoptosis_3d.max_mark_frac` and `K_bend` past this round's window** — both raised
+- **Push `cell_die.max_mark_frac` and `K_bend` past this round's window** — both raised
   `protr` monotonically here with no premise broken; find where each breaks.
 - **Fix or flag the control chemistry read** before resting a grip claim on it.
 
@@ -140,7 +140,7 @@ pear, aspect ~1.09, "a bulge, not a finger." Two runs lost: `r004_11` (NaN, P12)
 
 ## 4. What to do next
 - **Neck `r004_06`.** Lowest cells / one spot / sustained aspect_final 2.207 is the closest the
-  campaign has come; add an inward/purse lever (`interface_line_tension_3d`, `apoptosis_3d`) at this
+  campaign has come; add an inward/purse lever (`interface_tension`, `cell_die`) at this
   low-N one-spot state and test whether the lobe necks.
 - **Combine the two grip routes:** low-N coarsening (`r004_06`) + high-N invagination (`r004_07`,
   reduced_volume 0.553) are different mechanisms reaching grip ~0.14 — pair-test them.
@@ -180,7 +180,7 @@ the round's `complex`-target result. `r005_01` goes the opposite way: `gyr_prola
 
 ## 4. What to do next
 - **Push `r005_04`'s invagination route.** grip 0.180 / reduced_volume 0.534 via deep folding at high
-  N is the campaign's best coupling. Add an inward lever (`apoptosis_3d`, `interface_line_tension_3d`)
+  N is the campaign's best coupling. Add an inward lever (`cell_die`, `interface_tension`)
   on this parent and test whether an arm necks.
 - **Stop sweeping vth_frac** — inert across 4/6/10 (protr 1.344/1.348/1.348). Closed.
 - **Re-anchor: the control changed.** r001–r004 grip ceiling ~0.14 is superseded by this parent
@@ -206,7 +206,7 @@ protr and grip both live on lobes/buds, never a sustained protrusion.
 
 ## 3. What went wrong
 `r006_02` P4 death (chemistry flashed once, mech_p_ratio 0). `r006_09` NaN crash frame 1635 (6th of
-the family); `r006_13`/`r006_15` empty. `r006_12`==`r006_14` bit-identical — divide_3d.factor 5 and 8
+the family); `r006_13`/`r006_15` empty. `r006_12`==`r006_14` bit-identical — cell_divide.factor 5 and 8
 measure the same 2000-cell tissue (saturated above factor 3): one wasted rung.
 
 ## 4. What to do next
@@ -215,7 +215,7 @@ measure the same 2000-cell tissue (saturated above factor 3): one wasted rung.
   aspect_final.
 - **Push K_bend above 0.3 on b_gs_shaping_soft_lo**, but watch act_cv (already 11.67 at 0.3) — a
   chemistry-death ceiling is near. One rung at 0.5.
-- **Stop sweeping divide_3d.factor** — inert above 3; closed at 3 values.
+- **Stop sweeping cell_divide.factor** — inert above 3; closed at 3 values.
 
 # Round r007
 
@@ -257,9 +257,9 @@ lobed/undulating ball; the eye calls three of them undulations the classifier mi
 
 ## 2. What was learned
 No Route-B prediction was posed, so nothing scored. The two sweeps ARE the round.
-- `grow_3d.hill` on `b_gs_plain_soft_lo` is near-INERT: 1/2/8 → protr 1.151/1.168/1.188,
+- `cell_grow.hill` on `b_gs_plain_soft_lo` is near-INERT: 1/2/8 → protr 1.151/1.168/1.188,
   grip 0.073/0.078/0.077, cells 7887/6998/7480. Faint monotone protr rise, grip flat. Close it.
-- `shape_energy_3d.K_lumen`=2 on `b_gs_shaping_soft_lo` (`r008_01`): protr 1.279, grip 0.0915,
+- `cell_mechanics.K_lumen`=2 on `b_gs_shaping_soft_lo` (`r008_01`): protr 1.279, grip 0.0915,
   10296 cells, red_frac 0.43 — round best on all three, but a faceted tetrahedral blob (eye).
   This CONTRADICTS the r007 K_lumen closure ("inert, lowers grip, use 0"): at 0/0.1/2 →
   grip 0.083/0.070/0.0915, protr 1.261/1.247/1.279 — non-monotone, 2 slightly beats 0.
@@ -270,7 +270,7 @@ loss, not biology. `r008_02` and `r008_03` report `mech_p_ratio` 0.0 with chemis
 (act_max 0.82) — a stalled ratio, not a dead field.
 
 ## 4. What to do next
-- **Stop sweeping `grow_3d.hill`** — inert (3 values).
+- **Stop sweeping `cell_grow.hill`** — inert (3 values).
 - **Re-open K_lumen upward**, since 2 mildly beats 0 on `b_gs_shaping_soft_lo` — one more rung
   (5) to see if it is a real weak riser or noise; predict grip <0.11.
 - **Escape Route A.** Six rounds of sweeps on plain/shaping recipes have not cleared protr 1.3.
@@ -305,7 +305,7 @@ r009_01/03/07 (act_mean_floor 5.6e-45, mech_p_ratio 0) wasted three Route-B slot
 ## 4. What to do next
 - **Lift r009_05, the new best, as a parent** (star, grip 0.190) and REPLICATE it at a second seed
   to bound the noise — its grip/invagination records are single-seed.
-- **Sweep grow_3d.rate upward** — it drove cells 3486→22565 and grip 0.041→0.105 monotone over 4×;
+- **Sweep cell_grow.rate upward** — it drove cells 3486→22565 and grip 0.041→0.105 monotone over 4×;
   the break is untested. Predict grip <0.12 (folding ceiling).
 - **Stop the chemistry deaths.** Three of eight Route-B slots died on activator extinction; diagnose
   before spending more.
@@ -337,13 +337,13 @@ notable specimens are a whole-body prolate egg (`r010_01`, gyr_prolate 4.923, pr
 `r010_08/09/10/15` empty. `r010_11` = P12 NaN crash from frame 1562 (9th such: r001_09/r002_08/
 r003_11/r004_11/r005_09/r006_09/r007_08/r009_10). `r010_03` chemistry death (P4 broken,
 act_mean_floor 5.6e-45, act_cv 33.97 rail, mech_p_ratio 0) — a settings failure, unscorable. Two
-grow_3d.rate Route-A rungs (0.003464/0.006928) crashed to empty: rate CRASHES b_gs_plain_soft_lo
+cell_grow.rate Route-A rungs (0.003464/0.006928) crashed to empty: rate CRASHES b_gs_plain_soft_lo
 above ~0.0017 (r009 ran clean at 0.001732).
 
 ## 4. What to do next
 - **Abandon this weak recipe family as a parent line** (control grip 0.078, half the r009 family);
   return to the high-N folding stars (r009_05 grip 0.190) that this round did not touch.
-- **Cap grow_3d.rate at 0.001732 on b_gs_plain_soft_lo** — higher values 0-archive; stop sweeping up.
+- **Cap cell_grow.rate at 0.001732 on b_gs_plain_soft_lo** — higher values 0-archive; stop sweeping up.
 - **K_purse 0.25 on b_gs_shaping_soft_lo is the protr optimum** (protr 1.263 vs 0→1.186, 3→1.214);
   test it as a Route-B ingredient rather than sweeping further.
 
@@ -377,7 +377,7 @@ were Route A or chemistry deaths.
 ## 4. What to do next
 - **`r011_04` and `r011_06` are the round's parents** — grown red-tipped stars, the best branched/
   complex specimens yet (invagination 0.593, reduced_volume 0.459 both campaign records). Add
-  `apoptosis_3d` to `r011_04` to test whether an inward fold narrows the broad arms toward tips.
+  `cell_die` to `r011_04` to test whether an inward fold narrows the broad arms toward tips.
 - **Retire b_bru_question outright** — not empty but inert-NaN at every rho; it cannot pattern.
 - **Do not sweep K_purse further** — grip peaks at 0.25 (0.083) and falls monotone to 6 (0.058).
 
@@ -416,7 +416,7 @@ ceiling, all refuted or dead:
 ## 4. What to do next
 - **Parents:** `r012_05` (grip 0.1903 star, n_tubes 6 → complex seat) and `r012_02` (invagination 0.608
   bilobed heart → bud/branched seat).
-- **To beat the 0.19 grip wall needs a NEW mechanism, not a retune** — add `apoptosis_3d` to `r012_05`
+- **To beat the 0.19 grip wall needs a NEW mechanism, not a retune** — add `cell_die` to `r012_05`
   and test whether an inward fold pushes grip past 0.19 (folding is the only route that has reached it).
 - **Use K_V 40 as a strong Route-A base** (protr 1.322 / grip 0.119, up from a dead K_V 10). Retire
   b_bru_question — NaN at vth_frac 6 as at every rho.
@@ -469,10 +469,10 @@ Control `r014_00` = r013_05 verbatim: protr 1.408, grip 0.273, invag 0.617, 1220
 
 ## 2. What was learned
 - **The star's arms are growth-buckling, not the purse-string.** `r014_01` removed
-  interface_line_tension_3d: n_tubes 11→8, grip 0.273→0.220, protr 1.408→1.337, invag 0.617→0.608,
+  interface_tension: n_tubes 11→8, grip 0.273→0.220, protr 1.408→1.337, invag 0.617→0.608,
   still a 6–8-petal rosette (eye). Line tension adds ~3 arms and ~0.05 grip; it is not what makes the
   star. Adversarial, confirmed.
-- **The feedback leg is INERT and beta<0 is a KILL SWITCH.** `r014_02` (set_impl shape_to_chem →
+- **The feedback leg is INERT and beta<0 is a KILL SWITCH.** `r014_02` (set_impl cell_chem_from_shape →
   apical_area) is bit-identical to curvature — beta=0, so the impl swap does nothing; the loop is not
   closed on b_star. Turning it on negative extinguishes the reaction: `r014_03` (star, beta −0.5) and
   `r014_07` (bud r011_04, beta −0.5) BOTH break P4, act extinct, invag collapses to 0.031/0.060. The
@@ -495,13 +495,13 @@ Control `r014_00` = r013_05 verbatim: protr 1.408, grip 0.273, invag 0.617, 1220
   all until the leg is shown active.
 
 ## 4. What to do next
-- **Sweep cell_react.kk between 0.031 and 0.062** on b_star to separate coarsening from the hot-run
+- **Sweep cell_chem_react.kk between 0.031 and 0.062** on b_star to separate coarsening from the hot-run
   side effect — is there a kk that spaces arms ~10 cells WITHOUT the +41% overgrowth?
 - **Do not re-run beta<0 at −0.5** on any live parent; it is a kill switch (L5). If the feedback leg
   is wanted, first raise beta from 0 by a small positive step and check the run still patterns.
 - **Re-issue the lost F0-gain and apoptosis-subtraction pair** (r009_05 F0 0.023, r009_02 remove
   apoptosis) — the fold-vs-apoptosis question is still unsettled and rode empty slots.
-- **Route A: cell_react.F/kk raise grip mildly** (F 0.06→0.091, kk 0.052→0.089 on b_gs_plain); Lambda
+- **Route A: cell_chem_react.F/kk raise grip mildly** (F 0.06→0.091, kk 0.052→0.089 on b_gs_plain); Lambda
   ≥1 still kills (Lambda 2 → cells frozen 2006, P1+P4).
 
 # Round r015
@@ -524,7 +524,7 @@ Everything else consolidated known facts.
   chases the extruding tips. This is a THIRD grip route: genuine fingers at low-N, out-gripping both
   low-N coarsening and high-N folding. Predicted grip>0.247, confirmed. **It is single-seed and its edit
   is not identifiable from the metrics I was given** — the tip-chasing hot pattern is the signature of a
-  closed geometry→chemistry feedback (shape_to_chem beta≠0) or of seed_cell_rd:cones, both firsts here.
+  closed geometry→chemistry feedback (cell_chem_from_shape beta≠0) or of cell_chem_seed:cones, both firsts here.
 - **Apoptosis subtracts from the fold.** `r015_04` (star death twin, n_apop 77): invag 0.617→0.601,
   grip 0.273→0.250, protr 1.408→1.367. Predicted invag>0.617, refuted. Reconfirms r001–r013 — apoptosis
   is active and does NOT drive the sheet inward here.
@@ -548,7 +548,7 @@ Everything else consolidated known facts.
   feedback, its neighbours in that family are the immediate map to fill.
 - **Sweep the mechanism once identified:** if feedback, raise beta from 0 in small positive steps
   (L5: −0.5 is a kill switch); if cones, sweep N to make "how many tubes" a controlled variable.
-- **Route A:** cell_react.kk on b_gs_plain is monotone (0.052/0.057/0.066 → cells 10302/8406/6101,
+- **Route A:** cell_chem_react.kk on b_gs_plain is monotone (0.052/0.057/0.066 → cells 10302/8406/6101,
   grip 0.089/0.080/0.074) — use low kk; stop sweeping b_bru_question.
 
 # Round r016 — THE FINGER GENERATOR ISOLATED
@@ -563,7 +563,7 @@ them.
 
 ## 2. What was learned — the finger, taken apart
 - **The purse-string is NOT the generator; the finger is growth-buckled.** `r016_03` REMOVED
-  `interface_line_tension_3d` from the finger and it SURVIVES and STRENGTHENS: protr_peak 1.83,
+  `interface_tension` from the finger and it SURVIVES and STRENGTHENS: protr_peak 1.83,
   `protrusion_aspect_max_final` **21.094** (new campaign record, prev 7.544), n_tips 2, n_tubes 6,
   morphology 'tube', red_at_tip 0.996, mech_p_ratio 2.511 (grown). The eye INDEPENDENTLY: "the first
   true protrusions I have seen — tapering pointed arms, genuine fingers." Predicted n_tubes<5,
@@ -572,11 +572,11 @@ them.
 - **This is a SECOND seed of the finger route — not a single-seed fluke.** r015_06 (seed A) and
   r016_03 (fresh seed, tension removed) both finger; the r015 replication worry is answered, and the
   strongest specimen is the ablated one.
-- **The closed `shape_to_chem` feedback leg IS required — and it BRAKES growth.** `r016_04` REMOVED
-  `shape_to_chem` → the finger collapses to a bulge (aspect 0.435, protr 1.088) AND growth runs away
+- **The closed `cell_chem_from_shape` feedback leg IS required — and it BRAKES growth.** `r016_04` REMOVED
+  `cell_chem_from_shape` → the finger collapses to a bulge (aspect 0.435, protr 1.088) AND growth runs away
   to **50532 cells** (campaign-largest patterning tissue, ~9× the finger's 5690) with the pattern
   washing UNIFORM (act_cv_final 0.0, red_frac 1.0). Predicted aspect<4, confirmed. So on r015_06
-  `shape_to_chem` is LIVE (beta≠0): r015_06 is the campaign's first CLOSED-FEEDBACK composition,
+  `cell_chem_from_shape` is LIVE (beta≠0): r015_06 is the campaign's first CLOSED-FEEDBACK composition,
   confirming the r015 hypothesis. Its removal un-brakes growth — a direct mechanism for the project's
   growth-overshoot (user §5).
 - **Halving the feedback (F0 0.046→0.023) also loses the finger.** `r016_01` protr 1.272 (predicted
@@ -585,7 +585,7 @@ them.
 - **Growth and division are needed, trivially.** `r016_02` (growth off): protr 1.015, 2006 cells,
   pattern faded (predicted <1.3, confirmed). `r016_06` (division off): 2000 cells, P4 broken
   (chemistry died), aspect 1.276 (predicted <4, confirmed).
-- **Apoptosis does not invaginate.** `r016_07` (star + apoptosis_3d, n_apop 85): invag_peak 0.605 <
+- **Apoptosis does not invaginate.** `r016_07` (star + cell_die, n_apop 85): invag_peak 0.605 <
   the star's 0.617 (predicted >0.617, refuted). Reconfirms r001–r015.
 
 ## 3. What went wrong
@@ -596,7 +596,7 @@ them.
 ## 4. What to do next
 - **Build the next round from `r016_03`, not r015_06** — it holds the aspect record 21.094 with the
   purse-string already removed, so the composition is simpler and stronger.
-- **Sweep `shape_to_chem.F0` (and beta, both signs) from r016_03** — the leg is now identified as the
+- **Sweep `cell_chem_from_shape.F0` (and beta, both signs) from r016_03** — the leg is now identified as the
   finger's generator. Predict aspect rises with F0 to a ceiling, collapses at F0=0 (r016_04) and at
   half (r016_01); L5 warns beta −0.5 is a kill switch, so step small.
 - **Re-issue `cones`** (lost) and **replicate r016_03** at 2 seeds to lock the 21.094 record.
@@ -678,7 +678,7 @@ One genuine variation (`r018_03`) coarsened it to fat buds; one death twin (`r01
 - **Identify and re-buckle `r018_03`.** It hit spot_spacing 23.85 (Okuda scale) with red_frac 3.8×
   control but lost the arm — restore the K_V/buckling lever on that coarsened pattern to test whether
   few coarse spots + incompressible cells finger instead of bud.
-- **Sweep `cell_diffuse.chi` on the finger.** `r018_14` is the campaign's FIRST chi value off the
+- **Sweep `cell_chem_diffuse.chi` on the finger.** `r018_14` is the campaign's FIRST chi value off the
   fixed 1.3 (chi 0.3 → n_spots 143, spot_spacing 2.78 — finest yet). chi is the untouched wavelength
   knob; sweep it UP to coarsen without the d_a death at 0.3.
 
@@ -711,7 +711,7 @@ but `r019_01` folds THROUGH itself (P11 broken, self-fold ~frame 1550). Two P4 c
 
 ## 3. What went wrong
 - 6 of 14 slots empty (43%) — the largest loss since r013/r014. `r019_04` (b_bru rho 0.5) and the two
-  grow_3d.rate rungs crashed to empty (rate ceiling ~0.0017 reconfirmed).
+  cell_grow.rate rungs crashed to empty (rate ceiling ~0.0017 reconfirmed).
 - `r019_03/05` P4 deaths — chemistry flashed once and died (act_max_final 0, sphere); b_star
   variations again destabilising the RD (reconfirms r017/r018).
 - `r019_15` patterned HOT with no NaN yet anti-grips — b_bru retired again, now for decoupling not
@@ -746,8 +746,8 @@ the finger's ~5500-cell window: OVER-grew (`r020_01` 24661, `r020_03` 17182, `r0
 - `r020_03` is the round's strongest specimen: 17182 cells, grip_peak 0.24678, **reduced_volume_final
   0.267 (campaign-deepest CLEAN, prev 0.283 r019_02)**, n_tubes 9, invag 0.607, all premises intact;
   eye "~7 red-tipped fingers, clearest protrusions." A `complex`/`branched` parent, folded not fingered.
-- Route A: `cell_diffuse.chi` 2.8 (`r020_12`) → 14 spots, nearest Okuda ~10 on file, grip flat 0.123.
-  `shape_to_chem.beta` −2 (`r020_14`) DECOUPLES (grip 0.0006, corr 0.033) with the activator ALIVE.
+- Route A: `cell_chem_diffuse.chi` 2.8 (`r020_12`) → 14 spots, nearest Okuda ~10 on file, grip flat 0.123.
+  `cell_chem_from_shape.beta` −2 (`r020_14`) DECOUPLES (grip 0.0006, corr 0.033) with the activator ALIVE.
 
 ## 3. What went wrong
 - `r020_07` P4 death (2224 cells, chemistry coalesces to 2 domains then extinct) and `r020_15` P4+P12
@@ -758,8 +758,8 @@ the finger's ~5500-cell window: OVER-grew (`r020_01` 24661, `r020_03` 17182, `r0
 
 ## 4. What to do next
 - **Hold cells at ~5500 and vary ONE mechanism** — every edit this round lost the finger by moving
-  cell count. Use the untried `set_impl` levers (user §7: `divide_3d:orient_iface`, `shape_to_chem:
-  tension/pressure`, `seed_cell_rd:cones`) at the finger's growth setting, not stronger growth.
+  cell count. Use the untried `set_impl` levers (user §7: `cell_divide:orient_iface`, `cell_chem_from_shape:
+  tension/pressure`, `cell_chem_seed:cones`) at the finger's growth setting, not stronger growth.
 - **`r020_03` (grip 0.247, reduced_vol 0.267) is the round's parent for `complex`/`branched`** — a
   clean deep-fold star; replicate at a fresh seed and name its edit before building on it.
 - **Stop pushing the finger harder.** n_tubes>6/n_tips>6 refuted four ways; the arm-count lever is not
@@ -780,7 +780,7 @@ reproduces the 2.296 finger; `r021_02` sets a new grip record on a NON-finger.
   count is not the growth lever (reconfirms r019/r020).
 - `r021_02` (invagination>0.598, confirmed 0.646) carries **grip 0.35083, a campaign record**, at 7550
   cells with aspect_final 0 — high grip WITHOUT the buckled arm, the first grip record off a finger.
-- `r021_12` `set_impl shape_to_chem` = a **null**: beta 0 gives a bold labyrinth on a perfect sphere,
+- `r021_12` `set_impl cell_chem_from_shape` = a **null**: beta 0 gives a bold labyrinth on a perfect sphere,
   grip 0.006, mech_p_ratio 0. The feedback leg is dead unless beta≠0 (Route A: beta 1 → grip 0.103).
 - `r021_06` (reduced_vol<0.40, confirmed 0.288) over-grows the finger to 21832 cells and folds deep and
   CLEAN (P11 intact) — L8 fold regime, rupture ceiling stochastic above 21.8k.
@@ -792,7 +792,7 @@ reproduces the 2.296 finger; `r021_02` sets a new grip record on a NON-finger.
 - Six empty slots + one NaN crash (`r021_15`): 7 of 14 lost, the round's real cost.
 
 ## 4. What to do next
-- **Sweep `shape_to_chem.beta` up from 1** on the finger base — the ONLY lever this round that lifted
+- **Sweep `cell_chem_from_shape.beta` up from 1** on the finger base — the ONLY lever this round that lifted
   grip off baseline (0.010→0.103 as beta 0→1) by coupling, not by wavelength. Find where it breaks.
 - **Cross beta≠0 feedback INTO the ~5500-cell finger** — the finger has a live feedback leg (r016);
   test whether stronger beta deepens its fold without losing the arm.
@@ -831,5 +831,5 @@ carry the round.
   0.507). Sweep `max_mark_frac` on the finger death twin — is the deep fold reproducible or seed luck?
 - **Stop re-seeding the finger control** — 3 slots this round restated it (05 bit-identical). Spend the
   seat on the `complex`/`bud` targets instead.
-- **`shape_to_chem.beta` SATURATES above 1** (2→grip 0.107 ≈ 1→0.103); stop sweeping beta up, push it
+- **`cell_chem_from_shape.beta` SATURATES above 1** (2→grip 0.107 ≈ 1→0.103); stop sweeping beta up, push it
   INTO the finger base instead.

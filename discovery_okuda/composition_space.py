@@ -21,7 +21,7 @@ for what happened over rounds 01-30 of the hand-run campaign.
 "differ only in numerics".  That holds for e.g. finite-difference vs spectral diffusion.  It does
 NOT hold for the three reaction kinetics: the record shows Brusselator decays or reorganises a
 seed, Gray-Scott holds it, and Gierer-Meinhardt amplifies it into a stable gradient peak -- three
-qualitatively different phenomenologies.  Same for shape_energy_3d default (mid-surface wedge
+qualitatively different phenomenologies.  Same for cell_mechanics default (mid-surface wedge
 volume) vs monolayer (true A*h volume, emergent bending).  Since the campaign must be able to ASK
 "which kinetics", implementation is part of composition identity and is flagged
 `impl_structural=True` on those operators.  This is a deliberate, recorded departure.
@@ -53,11 +53,11 @@ PORT_TYPES = ("morphogen", "adjacency", "geometry")
 #
 # ⚠ THE PER-CALL / PER-FRAME TRAP  (raised 2026-07-30 after FINDING 8)
 #
-# `divide_3d` counts `min_cycle` / `max_cycle` in DIVISION-CALLS (its own docstring: "a cell may
+# `cell_divide` counts `min_cycle` / `max_cycle` in DIVISION-CALLS (its own docstring: "a cell may
 # not divide before this many division-calls since birth"; `age` is "per-cell age in
 # division-calls"), and `max_div_frac` is a PER-CALL throttle. The archived configs passed
 # `every: 2`, which the ENGINE gated and the operator's private `self._k` ALSO gated -- product 4.
-# So in the archived runs `divide_3d.forward` executed once every FOUR frames:
+# So in the archived runs `cell_divide.forward` executed once every FOUR frames:
 #
 #     min_cycle = 8 calls      ==  32 frames        max_div_frac = 0.03/call  ==  0.0075/frame
 #
@@ -69,7 +69,7 @@ PORT_TYPES = ("morphogen", "adjacency", "geometry")
 # silently start every generated composition at a theta tuned for the wrong clock -- which is
 # exactly what FINDING 8 measured (aspect 7.5 -> 3.2, cells 2700 -> 3335).
 #
-# Because the factor is exact and only `divide_3d` carried `every: 2`, we do NOT need a re-tuning
+# Because the factor is exact and only `cell_divide` carried `every: 2`, we do NOT need a re-tuning
 # sweep: the archived working point is recoverable analytically by rescaling the per-call
 # quantities. That makes the D1 fix BEHAVIOUR-PRESERVING BY CONSTRUCTION, so any later change in
 # phenotype is attributable to the change that caused it rather than to the clock.
@@ -171,8 +171,8 @@ def check_dt_agreement():
     return True
 
 
-# ---------------------------------------------------------------- explicit diffusion (cell_diffuse)
-# tyssue_rd_ops.CellDiffuse.forward returns   coef * lap,  coef = [d_a, d_h] * chi
+# ---------------------------------------------------------------- explicit diffusion (cell_chem_diffuse)
+# chem_ops.CellDiffuse.forward returns   coef * lap,  coef = [d_a, d_h] * chi
 #   norm=True (the default, and the only mode translate emits):  lap = mean(neighbours) - self
 # and the engine integrates it explicitly:  engine.py  `new = new + dt * d`.
 # The degree-normalised Laplacian has eigenvalues in [-2, 0] AT ANY CELL DEGREE, so the per-step
@@ -189,7 +189,7 @@ def check_dt_agreement():
 DIFFUSION_STENCIL_GAIN = {
     "graph_laplacian": 1.0,   # DERIVED from source: `agg / deg - chem` is degree-normalised.
     "interface_weighted": None,   # NOT YET DERIVED -- that implementation is being written in
-    #   tyssue_rd_ops.py concurrently and its stencil has not been read. `None` means "we have not
+    #   chem_ops.py concurrently and its stencil has not been read. `None` means "we have not
     #   derived this", which is NOT the same as 1.0 and must never be silently rounded to it. The
     #   CFL is then evaluated at the most permissive gain (1.0) so we never BLOCK a composition on
     #   a number we did not derive, and T5_STENCIL_GAIN_UNDERIVED says so out loud.
@@ -202,7 +202,7 @@ def diffusion_cfl(d_a, d_h, chi, dt=None, stencil_gain=1.0):
     THE dt CANCELS, and leaving it in made this bound 50x too permissive.
 
     `translate` emits chi scaled by RD_PER_FRAME = 1/dt -- that is the D5a clock fix, which
-    exists because cell_react and cell_diffuse EMIT=velocity into `chem` and were therefore
+    exists because cell_chem_react and cell_chem_diffuse EMIT=velocity into `chem` and were therefore
     being integrated on the MECHANICS substep. So the engine receives chi/dt, and the step it
     actually takes is dt * (chi/dt) * d = chi * d. The dt divides out.
 
@@ -230,7 +230,7 @@ def chi_ceiling(d, dt=None, stencil_gain=1.0):
     return DIFFUSION_CFL_LIMIT / (float(d) * float(stencil_gain))
 
 
-# ---------------------------------------------------------------- explicit reaction (cell_react)
+# ---------------------------------------------------------------- explicit reaction (cell_chem_react)
 # THERE IS NO REACTION BOUND HERE, AND THAT IS A MEASURED RESULT, NOT AN OVERSIGHT.
 #
 # The obvious move is to reuse the diffusion argument on the stiffest LINEAR term of each
@@ -316,7 +316,7 @@ CHI_DEFAULT, D_A_DEFAULT, D_H_DEFAULT = 1.3, 0.08, 0.16
 MU_H_DEFAULT, F_DEFAULT, KK_DEFAULT = 1.0, 0.046, 0.062
 # a_sw IS A FRACTION OF THE ACTIVATOR'S OWN MAXIMUM, and this box still said (0.2, 6.0) --
 # the ABSOLUTE range from before the operator was changed, against a field whose median
-# maximum across 78 runs is 0.000. `extrude` was fixed to (0.3, 0.95); grow_3d was not, so
+# maximum across 78 runs is 0.000. `extrude` was fixed to (0.3, 0.95); cell_grow was not, so
 # every a_sw the loop could propose for growth sat above any value the activator reaches.
 # 0.0 IS INCLUDED DELIBERATELY: it is the gate held open, which is what uniform growth is
 # now that `vesicle_growth` is gone. A range that excluded it would make the degenerate
@@ -357,17 +357,17 @@ ALPHA_CEIL = hill_alpha_ceiling(A_SW_MAX)          # 49.5
 # params          -- (lo, hi, default); theta only, never part of identity
 OPERATORS = {
     # ---------------------------------------------------------------- Stage 1: substrate
-    "seed_mesh_3d": dict(
+    "mesh_seed": dict(
         stage=1, role="substrate", outputs=[], slots=[], needs=[],
         impls=["fibonacci_sphere", "checkpoint"], impl_structural=False,
         # `radius` and `jitter` were unreachable -- the INITIAL GEOMETRY itself. jitter breaks the
         # Fibonacci lattice, whose regularity was measured at 6.1x the shuffled null in the strain
-        # field (see prototype/ecm/HIERARCHY.md); leaving it unsearchable meant the lattice
+        # field (see discovery_okuda/ops/HIERARCHY.md); leaving it unsearchable meant the lattice
         # artefact could never be varied against.
         params={"n_cells": (150, 4000, 500),          # 4000 = Okuda's largest case (grounder.SETUP)
                 "radius": (2.0, 12.0, 5.0), "jitter": (0.0, 0.8, 0.15),   # 0.15 = the operator default; a different one here would silently re-geometry every parent on resume
                 "vseed_cv": (0.0, 0.5, 0.15)}),
-    "shape_energy_3d": dict(
+    "cell_mechanics": dict(
         stage=1, role="mechanics", outputs=["geometry"], slots=[], needs=[],
         impls=["default", "monolayer"], impl_structural=True,       # mid-surface vs true 3D volume
         # UNPINNED 6 August. Eight of this operator's terms were LITERALS in translate's emitter
@@ -390,27 +390,27 @@ OPERATORS = {
                 "K_A": (0.0, 4.0, 1.0), "K_P": (0.0, 4.0, 1.0), "K_R": (0.0, 0.2, 0.02),
                 "mu": (0.25, 4.0, 1.0),
                 "relax_iters": (10, 90, 30)}),
-    "reconnect_t1_3d": dict(
+    "edge_flip": dict(
         stage=1, role="topology", outputs=[], slots=[], needs=[],
         impls=["length_threshold"], impl_structural=False,
         params={"l_th_frac": (0.01, 0.40, 0.28)}),
 
     # ---------------------------------------------------------------- Stage 2: growth & topology
-    # `grow_3d` WAS HERE AND IS GONE. Cedric, 8 August: "it is a bummer to have two growth
+    # `cell_grow` WAS HERE AND IS GONE. Cedric, 8 August: "it is a bummer to have two growth
     # competing operators... definitely simplify this chain."
     #
     # It was not merely redundant, it was BROKEN IN COMPOSITION, and the loop built it twice --
-    # r001_07 and r002_03 each carry `grow_3d` and `grow_3d` scheduled four lines apart.
-    # Both write the same mesh targets, and they write them DIFFERENTLY: grow_3d multiplies
-    # (`V0f <- V0f * g^3`) while grow_3d assigns from its own snapshot (`V0f <- V0f_init * s^3`).
-    # grow_3d runs second, so every frame it overwrote the other's contribution outright. Two
+    # r001_07 and r002_03 each carry `cell_grow` and `cell_grow` scheduled four lines apart.
+    # Both write the same mesh targets, and they write them DIFFERENTLY: cell_grow multiplies
+    # (`V0f <- V0f * g^3`) while cell_grow assigns from its own snapshot (`V0f <- V0f_init * s^3`).
+    # cell_grow runs second, so every frame it overwrote the other's contribution outright. Two
     # operators, one silently discarded, and nothing in the record said so.
     #
-    # Nothing is lost: uniform body-wide inflation IS `grow_3d` with `rho = 1` and the gate open,
+    # Nothing is lost: uniform body-wide inflation IS `cell_grow` with `rho = 1` and the gate open,
     # which is the `uniform` column of the basis grid. The operator itself stays registered in
-    # tyssue_ops3d for the fifteen scripts outside this campaign that use it; it is simply not
+    # mesh_ops for the fifteen scripts outside this campaign that use it; it is simply not
     # something the loop may add to a composition any more.
-    "grow_3d": dict(                                         # growth; the activator is an OPTIONAL gate
+    "cell_grow": dict(                                         # growth; the activator is an OPTIONAL gate
         # `needs` IS EMPTY AND USED TO BE ["morphogen"]. That was true only while `vesicle_growth`
         # existed to cover the ungated case: with one growth operator the morphogen is a GATE on
         # the rate (`rate * (rho + Hill(a))`), and a gate is by definition optional -- open it
@@ -435,7 +435,7 @@ OPERATORS = {
                 # 9411.8 (x22.7). Default is 1.0: a 2:1 tip-to-body ratio, Okuda's regime, and a
                 # composition must now choose to freeze the body rather than starting frozen.
                 "rho": (0.0, 2.0, 1.0)}),
-    "divide_3d": dict(
+    "cell_divide": dict(
         # `hertwig` splits normal to the cell's OWN longest axis -> needs no morphogen input.
         # `orient_iface` stacks daughters along the bud axis -> needs the activator routed in.
         # Slots are therefore PER IMPLEMENTATION; declaring `axis` unconditionally would make
@@ -445,9 +445,9 @@ OPERATORS = {
         impls=["hertwig", "orient_iface"], impl_structural=True,   # long-axis vs bud-axis septum
         params={"cycle_cv": (0.05, 0.5, 0.40), "min_cycle": (2, 64, 16),   # 4 calls x 4
                 "max_cycle": (6, 10**9, 10**9),   # vcap: PROVISIONAL
-                # a FRACTION of the activator max now, not an absolute value -- see tyssue_ops3d
+                # a FRACTION of the activator max now, not an absolute value -- see mesh_ops
                 "orient_asw": (0.3, 0.95, 0.6)}),
-    "apoptosis_3d": dict(
+    "cell_die": dict(
         # THE DIE FAMILY, and the first mechanism in this vocabulary that deforms the sheet INWARD.
         # Every operator the campaign owned pushes outward -- growth inflates, division subdivides,
         # the purse-string was inert until 8 August -- and invagination is one of Okuda's three
@@ -460,8 +460,8 @@ OPERATORS = {
         # NO `impls`. The twelve modes are `model` variants in this project's sense -- different
         # biological hypotheses about WHY a cell is eliminated -- and they share the entire
         # mark/shed/extrude pathway, differing only in `_marked`. An `implementation` here is a
-        # registry key naming a separate CLASS (cell_diffuse has two), which these are not. Route A
-        # sweeps `mode` from the plan, exactly as it sweeps divide_3d's sizer/adder/timer.
+        # registry key naming a separate CLASS (cell_chem_diffuse has two), which these are not. Route A
+        # sweeps `mode` from the plan, exactly as it sweeps cell_divide's sizer/adder/timer.
         stage=2, role="death", outputs=[], slots=[], needs=[],
         impls=["default"], impl_structural=False,
         # `max_mark_frac` IS THE KNOB THAT MATTERS and the reason this operator is admissible at
@@ -479,7 +479,7 @@ OPERATORS = {
                 # the per-mode default lives on the operator (_STALL_DEFAULT); 0.7 is
                 # `competition`'s, which is the default mode
                 "stall_frac": (0.50, 0.95, 0.70)}),
-    "interface_line_tension_3d": dict(          # the purse-string alone; the forcing is NOT in this vocabulary
+    "interface_tension": dict(          # the purse-string alone; the forcing is NOT in this vocabulary
         stage=2, role="tension", outputs=[], slots=["site"], needs=["morphogen"],
         impls=["default"], impl_structural=False,
         # THE ENGINE OP CARRIES TWO TERMS AND THE SPACE EXPOSED ONE:
@@ -501,7 +501,7 @@ OPERATORS = {
         # `a_sw` is now a FRACTION OF THE ACTIVATOR'S OWN MAXIMUM -- 0.6 means "the top 40% of the
         # field is red" -- so it selects a set that exists at every operating point. It used to be
         # an absolute value declared (0.2, 6.0) against a field whose median maximum is 0.000, and
-        # the operator returned {} on all 800 frames of every run. See tyssue_rd_ops for the
+        # the operator returned {} on all 800 frames of every run. See chem_ops for the
         # measurement; a threshold relative to the field cannot be outside the field.
         # THE FORCING TERM IS GONE FROM THIS SPACE, not merely defaulted to zero. It used to be
         # `K_extrude: (0.0, 14.0, 0.0)` on this same operator: an energy that FALLS as red cells
@@ -509,7 +509,7 @@ OPERATORS = {
         # default of 0 made it harmless in practice and unreadable in principle -- `K_extrude`
         # measured 0.0 in all 78 specs that ever carried the operator, and the Grounder still
         # called r028 "the same extrude-forced star for a fourth round", on runs whose specs hold
-        # no such operator at all. It now lives in `extrusion_forcing_3d`, which this vocabulary
+        # no such operator at all. It now lives in `interface_push`, which this vocabulary
         # does not contain, so no edit the Proposer can write pushes anything. Running the forcing
         # is an explicit act outside the loop, which is what a control should cost.
         #
@@ -521,20 +521,20 @@ OPERATORS = {
                 "a_sw": (0.3, 0.95, 0.6)}),
 
     # ---------------------------------------------------------------- Stage 3: patterning
-    "cell_geometry_3d": dict(
+    "cell_geometry": dict(
         stage=3, role="readout", outputs=["geometry"], slots=[], needs=[],
         impls=["scatter_add"], impl_structural=False, params={}),
-    "cell_adjacency": dict(
+    "cell_neighbours": dict(
         stage=3, role="readout", outputs=["adjacency"], slots=[], needs=[],
         impls=["shared_edge"], impl_structural=False, params={}),
-    "cell_diffuse": dict(
+    "cell_chem_diffuse": dict(
         stage=3, role="patterning", outputs=[], slots=[], needs=["adjacency"],
         # TWO implementations, and the choice is STRUCTURAL. `graph_laplacian` couples every
         # neighbour equally; `interface_weighted` couples through the shared-interface area, so
         # the coupling follows the geometry the mechanics is deforming. Those are two different
-        # claims about how the morphogen moves, not two numerics -- the same reason cell_react's
+        # claims about how the morphogen moves, not two numerics -- the same reason cell_chem_react's
         # kinetics are structural (module docstring). Registering both with impl_structural=True
-        # makes ABLATING THE COUPLING a legal ONE-EDIT move (`=cell_diffuse:interface_weighted`),
+        # makes ABLATING THE COUPLING a legal ONE-EDIT move (`=cell_chem_diffuse:interface_weighted`),
         # so the loop can run that ablation itself instead of waiting for a human to hand-write it.
         impls=["graph_laplacian", "interface_weighted"], impl_structural=True,
         # d_a/d_h/chi: was (0.005,0.2)/(0.1,2.0)/(1.0,10.0) -- hand-written, and it put OKUDA'S
@@ -547,10 +547,10 @@ OPERATORS = {
     # morphology, was simply absent from the space. FOUR IMPLEMENTATIONS, structural, because WHICH
     # shape feature the chemistry listens to is the hypothesis and not a number: curvature-sensing
     # and tension-sensing are different biology and predict different things. impl_structural=True
-    # makes `=shape_to_chem:tension` a legal one-edit move, so the loop can run that comparison
+    # makes `=cell_chem_from_shape:tension` a legal one-edit move, so the loop can run that comparison
     # itself rather than waiting for a human to hand-write four configs.
     # `force` and `size` are deliberately NOT implementations -- see the operator's docstring.
-    # A MEASUREMENT, AS AN OPERATOR. See tyssue_cell_shape.py: a Lateral that reads the mesh, writes
+    # A MEASUREMENT, AS AN OPERATOR. See shape_probe_ops.py: a Lateral that reads the mesh, writes
     # one scalar per cell to the mesh under `elong`, and touches no state -- so adding it must leave
     # a trajectory bit-identical. `role="probe"` is its own role so it is always legal to remove and
     # so it can never be mistaken for the patterning arrow: it closes no loop, it reports.
@@ -563,14 +563,14 @@ OPERATORS = {
         stage=3, role="probe", outputs=[], slots=[], needs=[],
         impls=["shape_index", "aspect"], impl_structural=True,
         params={}),
-    "shape_to_chem": dict(
+    "cell_chem_from_shape": dict(
         stage=3, role="patterning", outputs=[], slots=[], needs=["adjacency"],
         impls=["curvature", "tension", "apical_area", "pressure"], impl_structural=True,
         # beta spans BOTH SIGNS and includes zero. Zero is the null and must stay reachable: without
         # it, "shape feeds back" is asserted rather than tested. The sign is a real hypothesis --
         # do deformed cells signal more, or less? -- so a one-sided box would silently answer it.
         params={"beta": (-3.0, 3.0, 0.0), "F0": (0.0, 0.12, 0.055)}),
-    "cell_react": dict(
+    "cell_chem_react": dict(
         stage=3, role="patterning", outputs=["morphogen"], slots=[], needs=["adjacency"],
         impls=["gierer_meinhardt", "gray_scott", "brusselator"], impl_structural=True,
         # rd_rate: was (0.2, 3.0) -- a factor of 15, where Okuda spans FOUR DECADES. lo = 0.0 is
@@ -610,7 +610,7 @@ OPERATORS = {
                 # 599 but the pattern weakens (act_cv_peak 4.14 -> 2.80). 0.1 is the measured knee
                 # and is the default here.
                 "sat": (0.0, 2.0, 0.1)}),
-    "seed_cell_rd": dict(                                     # the prescribed activation driver
+    "cell_chem_seed": dict(                                     # the prescribed activation driver
         stage=3, role="driver", outputs=["morphogen"], slots=[], needs=[],
         # `scatter` added 2026-07-31: it is the ONLY Gray-Scott seeding validated on this
         # substrate -- the minisite coral movie uses mode="scatter", seed_frac=0.06, and that is
@@ -621,7 +621,7 @@ OPERATORS = {
         # `tip` REMOVED 6 August: it re-seeded a cap at the outermost cell every frame, which makes
         # the activation a moving boundary condition rather than an initial condition -- so
         # "does the pattern grip the shape?" was asked of a pattern pinned to the shape -- and it
-        # overwrote both chemistry channels every tick, annihilating shape_to_chem.
+        # overwrote both chemistry channels every tick, annihilating cell_chem_from_shape.
         impls=["cone", "spot", "scatter", "patch", "noise"], impl_structural=True,
         params={"cone_deg": (4.0, 30.0, 8.0),
                 "seed_frac": (0.01, 0.30, 0.06),
@@ -639,7 +639,7 @@ OPERATORS = {
     # say so outside the loop.
 }
 
-# Slots may depend on the chosen implementation (see divide_3d).
+# Slots may depend on the chosen implementation (see cell_divide).
 def _emitted_params(graph, node):
     """The parameter names this node's implementation actually passes to the engine, or None.
 
@@ -693,19 +693,19 @@ PARAM_BASIN = {
     # perturbation used for robustness from +-1.05 to +-14.85 and every claim of the form "this
     # survives a 15% perturbation" would change meaning underneath the archive. Same box, same
     # basin: the admissible region moves and the question "is this result fragile" does not.
-    ("shape_energy_3d", "K_V"): 8.0 - 1.0,          # old box (1.0, 8.0)
-    ("shape_energy_3d", "Lambda"): 0.3 - 0.0,       # old box (0.0, 0.3)
-    ("reconnect_t1_3d", "l_th_frac"): 0.12 - 0.01,  # old box (0.01, 0.12)
-    ("grow_3d", "rate"): 0.03 - 0.002,              # old box (0.002, 0.03)
-    ("grow_3d", "hill"): 8.0 - 1.0,        # old box (1.0, 8.0)
-    ("cell_diffuse", "d_a"): 0.2 - 0.005,               # old box (0.005, 0.2)
-    ("cell_diffuse", "d_h"): 2.0 - 0.1,                 # old box (0.1, 2.0)
-    ("cell_diffuse", "chi"): 10.0 - 1.0,                # old box (1.0, 10.0)
-    ("cell_react", "rate"): 3.0 - 0.2,               # old box (0.2, 3.0)
-    ("cell_react", "gamma"): 100.0 - 0.1,               # old box (0.1, 100.0). Inherited, not
+    ("cell_mechanics", "K_V"): 8.0 - 1.0,          # old box (1.0, 8.0)
+    ("cell_mechanics", "Lambda"): 0.3 - 0.0,       # old box (0.0, 0.3)
+    ("edge_flip", "l_th_frac"): 0.12 - 0.01,  # old box (0.01, 0.12)
+    ("cell_grow", "rate"): 0.03 - 0.002,              # old box (0.002, 0.03)
+    ("cell_grow", "hill"): 8.0 - 1.0,        # old box (1.0, 8.0)
+    ("cell_chem_diffuse", "d_a"): 0.2 - 0.005,               # old box (0.005, 0.2)
+    ("cell_chem_diffuse", "d_h"): 2.0 - 0.1,                 # old box (0.1, 2.0)
+    ("cell_chem_diffuse", "chi"): 10.0 - 1.0,                # old box (1.0, 10.0)
+    ("cell_chem_react", "rate"): 3.0 - 0.2,               # old box (0.2, 3.0)
+    ("cell_chem_react", "gamma"): 100.0 - 0.1,               # old box (0.1, 100.0). Inherited, not
     #   endorsed -- the box above it is now open, so a basin MUST be stated explicitly, and
     #   restating the old one is the only choice that changes nothing else.
-    ("divide_3d", "max_cycle"): 0.0,                    # 1e9 is a SENTINEL for "no maximum", not a
+    ("cell_divide", "max_cycle"): 0.0,                    # 1e9 is a SENTINEL for "no maximum", not a
     #   tunable. The old rule gave it sigma = 1.5e8 and the clip then pinned half the draws back
     #   onto 1e9 -- noise that looked like sampling. Fixed = never perturbed.
 }
@@ -921,7 +921,7 @@ class CompositionGraph:
         for o in self.ops:
             nid, op, impl = o["id"], o["op"], self.impl_of(o)
 
-            if op == "cell_diffuse":
+            if op == "cell_chem_diffuse":
                 gain = DIFFUSION_STENCIL_GAIN.get(impl)
                 derived = gain is not None
                 if not derived:
@@ -963,10 +963,10 @@ class CompositionGraph:
                         f"(max diffusivity here is {diffusivity_ceiling(chi, stencil_gain=gain):.4g})",
                         derived))
 
-            # cell_react has NO stability condition on purpose: the candidate bound was measured
+            # cell_chem_react has NO stability condition on purpose: the candidate bound was measured
             # against the real operators and refuted. See "explicit reaction" above.
 
-            elif op == "grow_3d":
+            elif op == "cell_grow":
                 a_sw, alpha = self.theta(nid, "a_sw"), self.theta(nid, "hill")
                 ceil = hill_alpha_ceiling(a_sw)
                 if alpha > ceil:
@@ -1000,7 +1000,7 @@ class CompositionGraph:
         """Operators with a REQUIRED slot that nothing feeds -- present but disconnected, so inert.
 
         `opt_slots` ARE EXEMPT. A slot that may legally be empty is not a dangling wire, and
-        `grow_3d.gate` became one when `vesicle_growth` was deleted: the activator modulates the
+        `cell_grow.gate` became one when `vesicle_growth` was deleted: the activator modulates the
         growth rate, it does not enable it, so leaving it unwired selects the rho baseline rather
         than breaking the composition. Without this exemption the `uniform_inflation` reference
         recipe -- the degenerate control the search is meant to visit -- is unreachable.
@@ -1055,14 +1055,14 @@ class CompositionGraph:
                 # it was also being read as permission to hold TWO of them. Those are different
                 # claims, and conflating them put a second whole mechanics solver into a spec.
                 #
-                # MEASURED on round 1: the menu offered both `+shape_energy_3d:default` (add) and
-                # `=shape_energy_3d:default` (swap). The Proposer chose `add` and wrote the claim
+                # MEASURED on round 1: the menu offered both `+cell_mechanics:default` (add) and
+                # `=cell_mechanics:default` (swap). The Proposer chose `add` and wrote the claim
                 # for `swap` -- "swapping the monolayer shape energy for the default releases the
-                # in-plane constraint" -- and the spec came out with shape_energy_3d TWICE, two
+                # in-plane constraint" -- and the spec came out with cell_mechanics TWICE, two
                 # independent relaxation loops of 30 iterations each driving the same vertices.
                 # That composition is not the one the hypothesis is about, so the run could not
                 # have tested it. The previous batch had the same fault in three more slots, on
-                # `shape_to_chem`.
+                # `cell_chem_from_shape`.
                 #
                 # The way to change an implementation is `set_impl`. If a second instance is ever
                 # genuinely meaningful, that needs its own explicit flag; no operator declares one.
@@ -1274,7 +1274,7 @@ class CompositionGraph:
         a label that cannot see it cannot describe the composition it names.
         """
         base = self._region_core()
-        return f"{base} + death" if "apoptosis_3d" in set(self.op_names()) else base
+        return f"{base} + death" if "cell_die" in set(self.op_names()) else base
 
     def _region_core(self):
         """The region ignoring cell death -- see name_region."""
@@ -1291,8 +1291,8 @@ class CompositionGraph:
         ops = set(self.op_names())
         impls = {o["op"]: self.impl_of(o) for o in self.ops}
         _force_src = set()
-        local = "grow_3d" in ops
-        mono = impls.get("shape_energy_3d") == "monolayer"
+        local = "cell_grow" in ops
+        mono = impls.get("cell_mechanics") == "monolayer"
 
         def _feeds(dst_op, slot):
             """The OPERATORS wired into <dst_op>.<slot> in this graph."""
@@ -1300,29 +1300,29 @@ class CompositionGraph:
             return {self._op_of(c["src"]) for c in self.conns
                     if c["dst"] in dst and c["slot"] == slot}
 
-        _gate = _feeds("grow_3d", "gate") if local else set()
-        emergent = "cell_react" in _gate
-        driven = "seed_cell_rd" in _gate
+        _gate = _feeds("cell_grow", "gate") if local else set()
+        emergent = "cell_chem_react" in _gate
+        driven = "cell_chem_seed" in _gate
         # `forced` IS NOW ALWAYS FALSE, and saying so is the point. Until 10 August this operator
         # was `extrude` and carried BOTH a purse-string line tension (K_purse) and an outward
         # forcing term (K_extrude) under one name; the region vocabulary was built around that and
         # called any composition holding it "forced". The split left the label attached to the
         # SOUND half: `b_gs_shaping_sharp_hi` -- a purse-string and nothing else -- came back
         # labelled "emergent RD + forced extrusion", which is exactly the false verdict that cost
-        # four rounds of the last campaign. `extrusion_forcing_3d` is not in this vocabulary, so no
-        # composition the search can express is forced, and `interface_line_tension_3d` is
-        # mechanics like any other term in shape_energy_3d.
+        # four rounds of the last campaign. `interface_push` is not in this vocabulary, so no
+        # composition the search can express is forced, and `interface_tension` is
+        # mechanics like any other term in cell_mechanics.
         #
         # The branches below are kept rather than deleted: they are the only record of what the
         # forced regions were called, and restoring the operator would restore their meaning.
         # `forced` READS ITS WIRE TOO. It was `"extrude" in ops`, so a composition carrying the
         # forcing term -- the operator that made the only tube on this disk -- with its `site`
         # slot fed by nothing was filed under the sphere control's region.
-        _force_src = _feeds("extrusion_forcing_3d", "site") if "extrusion_forcing_3d" in ops else set()
+        _force_src = _feeds("interface_push", "site") if "interface_push" in ops else set()
         forced = bool(_force_src)
-        tension = "interface_line_tension_3d" in ops
+        tension = "interface_tension" in ops
         # AN UNFED GATE IS A REGIME, NOT A FAULT -- since `vesicle_growth` was deleted and its one
-        # job folded into `grow_3d`. This branch used to refuse outright, which was right when a
+        # job folded into `cell_grow`. This branch used to refuse outright, which was right when a
         # separate operator existed for ungated growth and wrong the moment it did not: the
         # `uniform_inflation` reference recipe, the degenerate control the search is supposed to
         # visit, stopped being nameable at all.
@@ -1336,7 +1336,7 @@ class CompositionGraph:
                 return "growth present but INERT (gate fed by nothing and rho = 0)"
             return "uniform growth (ungated, rho baseline only)"
 
-        if not (local or "grow_3d" in ops):
+        if not (local or "cell_grow" in ops):
             # A FORCING TERM IS NOT NOTHING. `extrude` is the operator that made the only tube on
             # this disk; a composition carrying it, wired, was filed under the sphere control's
             # own region because this branch tested growth alone.
@@ -1371,7 +1371,7 @@ class CompositionGraph:
             return "growth-driven emergent (target mechanism)"
         if local and not forced:
             return "growth-driven mid-surface"
-        if "grow_3d" in ops and not local:
+        if "cell_grow" in ops and not local:
             return "uniform inflation (no patterning)"
         return "unnamed"
 
@@ -1381,9 +1381,9 @@ def seed(kind="substrate"):
     """The seed the campaign grows from: a relaxing vesicle that does nothing."""
     if kind == "substrate":
         return CompositionGraph(ops=[
-            {"id": "seed_mesh_3d0", "op": "seed_mesh_3d", "impl": "fibonacci_sphere"},
-            {"id": "shape_energy_3d0", "op": "shape_energy_3d", "impl": "default"},
-            {"id": "reconnect_t1_3d0", "op": "reconnect_t1_3d", "impl": "length_threshold"},
+            {"id": "seed_mesh_3d0", "op": "mesh_seed", "impl": "fibonacci_sphere"},
+            {"id": "shape_energy_3d0", "op": "cell_mechanics", "impl": "default"},
+            {"id": "reconnect_t1_3d0", "op": "edge_flip", "impl": "length_threshold"},
         ])
     if kind == "empty":
         return CompositionGraph()
@@ -1400,27 +1400,27 @@ def reference_recipes():
     out = {}
 
     g = seed("substrate")
-    for op, impl in [("cell_geometry_3d", "scatter_add"), ("cell_adjacency", "shared_edge"),
-                     ("seed_cell_rd", "cone"), ("grow_3d", "hill_conserve_amount"),
-                     ("divide_3d", "orient_iface"), ("interface_line_tension_3d", "default")]:
+    for op, impl in [("cell_geometry", "scatter_add"), ("cell_neighbours", "shared_edge"),
+                     ("cell_chem_seed", "cone"), ("cell_grow", "hill_conserve_amount"),
+                     ("cell_divide", "orient_iface"), ("interface_tension", "default")]:
         g, _ = g.apply(("add_op", op, impl))
-    src = next(o["id"] for o in g.ops if o["op"] == "seed_cell_rd")
+    src = next(o["id"] for o in g.ops if o["op"] == "cell_chem_seed")
     g, _ = g.apply(("connect", src, next(o["id"] for o in g.ops
-                                         if o["op"] == "grow_3d"), "gate"))
-    g, _ = g.apply(("connect", src, next(o["id"] for o in g.ops if o["op"] == "interface_line_tension_3d"), "site"))
-    g, _ = g.apply(("connect", src, next(o["id"] for o in g.ops if o["op"] == "divide_3d"), "axis"))
+                                         if o["op"] == "cell_grow"), "gate"))
+    g, _ = g.apply(("connect", src, next(o["id"] for o in g.ops if o["op"] == "interface_tension"), "site"))
+    g, _ = g.apply(("connect", src, next(o["id"] for o in g.ops if o["op"] == "cell_divide"), "axis"))
     out["round40_mc8"] = g
 
     h = seed("substrate")
     h, _ = h.apply(("set_impl", "shape_energy_3d0", "monolayer"))
-    for op, impl in [("cell_geometry_3d", "scatter_add"), ("cell_adjacency", "shared_edge"),
-                     ("cell_react", "gierer_meinhardt"), ("cell_diffuse", "graph_laplacian"),
-                     ("grow_3d", "hill_conserve_amount"), ("divide_3d", "hertwig")]:
+    for op, impl in [("cell_geometry", "scatter_add"), ("cell_neighbours", "shared_edge"),
+                     ("cell_chem_react", "gierer_meinhardt"), ("cell_chem_diffuse", "graph_laplacian"),
+                     ("cell_grow", "hill_conserve_amount"), ("cell_divide", "hertwig")]:
         h, _ = h.apply(("add_op", op, impl))
-    rsrc = next(o["id"] for o in h.ops if o["op"] == "cell_react")
+    rsrc = next(o["id"] for o in h.ops if o["op"] == "cell_chem_react")
     h, _ = h.apply(("connect", rsrc, next(o["id"] for o in h.ops
-                                          if o["op"] == "grow_3d"), "gate"))
-    # NO morphogen -> divide_3d.axis here: `hertwig` splits on the cell's OWN longest axis and
+                                          if o["op"] == "cell_grow"), "gate"))
+    # NO morphogen -> cell_divide.axis here: `hertwig` splits on the cell's OWN longest axis and
     # exposes no `axis` slot. The earlier version made that connection anyway; it compiled and
     # was SILENTLY IGNORED. Caught by the consolidated Critic rule R4_SLOT_NOT_ON_IMPL.
     #
@@ -1430,9 +1430,9 @@ def reference_recipes():
     # second: a recipe named for his route was missing the half that makes it his. `curvature` is
     # the implementation his own framing implies; the other three are the alternative hypotheses,
     # and swapping them is a legal one-edit move rather than a dial.
-    h, _ = h.apply(("add_op", "shape_to_chem", "curvature"))
+    h, _ = h.apply(("add_op", "cell_chem_from_shape", "curvature"))
     # AND IT MUST BE INTEGRABLE, or the recipe named for the target cannot be run. As written it
-    # carried rd_rate = 1.0, which with divide_3d present advances dt*rate = 1.00 per step against
+    # carried rd_rate = 1.0, which with cell_divide present advances dt*rate = 1.00 per step against
     # R1d's derived limit of 0.5 -- so the Critic refused the one composition in this file that
     # holds Okuda's coupling, and it could not go on the frontier. Halving the rate satisfies the
     # limit without touching the mechanism: it is the same chemistry, integrated in steps the
@@ -1478,12 +1478,12 @@ def reference_recipes():
     # It is the "grows but cannot subdivide" corner -- where impossibility results come from.
     #
     # This used to read `("vesicle_growth", "uniform_ramp")`, and that operator is gone. Uniform
-    # inflation is not a second operator, it is `grow_3d` WITH THE GATE OPEN: rho = 1 gives every
+    # inflation is not a second operator, it is `cell_grow` WITH THE GATE OPEN: rho = 1 gives every
     # cell the same baseline rate and a_sw = 0 means the Hill term is never consulted. Writing the
     # control this way also makes it a real member of the same family as the gated recipes, so the
     # comparison between them is one parameter rather than two different mechanisms.
     u = seed("substrate")
-    for op, impl in [("grow_3d", "hill_no_conserve"), ("divide_3d", "hertwig")]:
+    for op, impl in [("cell_grow", "hill_no_conserve"), ("cell_divide", "hertwig")]:
         u, _ = u.apply(("add_op", op, impl))
     u = u.with_params({**u.params, "grow_3d0.rho": 1.0, "grow_3d0.a_sw": 0.0})
     out["uniform_inflation"] = u
@@ -1504,8 +1504,8 @@ def reference_recipes():
     # six modes tested and breaks no premise, where uncapped death took r020_00_ctrl from protr
     # 1.513 / grip 0.228 to 1.131 / 0.049.
     d = seed("substrate")
-    for op, impl in [("grow_3d", "hill_no_conserve"), ("divide_3d", "hertwig"),
-                     ("apoptosis_3d", "default")]:
+    for op, impl in [("cell_grow", "hill_no_conserve"), ("cell_divide", "hertwig"),
+                     ("cell_die", "default")]:
         d, _ = d.apply(("add_op", op, impl))
     d = d.with_params({**d.params, "grow_3d0.rho": 1.0, "grow_3d0.a_sw": 0.0,
                        "apoptosis_3d0.max_mark_frac": 0.005})
@@ -1531,15 +1531,15 @@ if __name__ == "__main__":
     # --- an implementation swap IS a mechanism edit ------------------------------------------
     g_mono, _ = g.apply(("set_impl", "shape_energy_3d0", "monolayer"))
     assert comp_hash(g_mono) != comp_hash(g)
-    print("[OK] shape_energy_3d default->monolayer changes identity (mid-surface vs true 3D volume)")
+    print("[OK] cell_mechanics default->monolayer changes identity (mid-surface vs true 3D volume)")
 
     # --- D4: preconditions are caught for FREE, before any cluster time ----------------------
-    bad, _ = g.apply(("add_op", "cell_diffuse", "graph_laplacian"))
-    print(f"\n[D4] cell_diffuse without cell_adjacency -> unmet={bad.unmet_preconditions()}")
+    bad, _ = g.apply(("add_op", "cell_chem_diffuse", "graph_laplacian"))
+    print(f"\n[D4] cell_chem_diffuse without cell_neighbours -> unmet={bad.unmet_preconditions()}")
     assert not bad.is_runnable()[0]
-    fixed, _ = bad.apply(("add_op", "cell_adjacency", "shared_edge"))
+    fixed, _ = bad.apply(("add_op", "cell_neighbours", "shared_edge"))
     assert fixed.is_runnable()[0]
-    print("[D4] + cell_adjacency -> runnable. This is the false-impossibility guard.")
+    print("[D4] + cell_neighbours -> runnable. This is the false-impossibility guard.")
 
     # --- the two reference recipes ------------------------------------------------------------
     print("\nreference recipes (both reachable by legal edits from the seed):")
@@ -1554,9 +1554,9 @@ if __name__ == "__main__":
 
     # --- the campaign's central ablation is a legal one-edit move ----------------------------
     r40 = refs["round40_mc8"]
-    ex = next(o["id"] for o in r40.ops if o["op"] == "interface_line_tension_3d")
+    ex = next(o["id"] for o in r40.ops if o["op"] == "interface_tension")
     ablated, _ = r40.apply(("remove_op", ex))
-    print(f"\n[central test] ablate `interface_line_tension_3d` -> {ablated.name_region()!r}  "
+    print(f"\n[central test] ablate `interface_tension` -> {ablated.name_region()!r}  "
           f"hash {comp_hash(r40)} -> {comp_hash(ablated)}")
     print("  Round 41 by hand; here it is one automatic necessity test on every composition.")
 
@@ -1588,10 +1588,10 @@ if __name__ == "__main__":
     print("\n" + "-" * 88)
     print("REACHABILITY -- Okuda's published values are inside the boxes")
     print("-" * 88)
-    for op, pn, val, what in [("grow_3d", "hill", 10.0, "growth-switch sharpness"),
-                              ("cell_diffuse", "d_h", 10.0, "inhibitor spread"),
-                              ("cell_react", "rate", 0.01, "chemistry speed, bottom decade"),
-                              ("cell_react", "rate", 100.0, "chemistry speed, top decade")]:
+    for op, pn, val, what in [("cell_grow", "hill", 10.0, "growth-switch sharpness"),
+                              ("cell_chem_diffuse", "d_h", 10.0, "inhibitor spread"),
+                              ("cell_chem_react", "rate", 0.01, "chemistry speed, bottom decade"),
+                              ("cell_chem_react", "rate", 100.0, "chemistry speed, top decade")]:
         lo, hi, d = OPERATORS[op]["params"][pn]
         assert lo <= val <= hi, f"{op}.{pn}={val} still unreachable"
         print(f"  {op}.{pn:8} = {val:<8g} in [{lo:g}, {hi:g}]  default still {d:g}   [{what}]")
@@ -1600,7 +1600,7 @@ if __name__ == "__main__":
     print("\n" + "-" * 88)
     print("DERIVED BOUND -- explicit diffusion, computed not hard-coded")
     print("-" * 88)
-    dif = next(o["id"] for o in ok_ref.ops if o["op"] == "cell_diffuse")
+    dif = next(o["id"] for o in ok_ref.ops if o["op"] == "cell_chem_diffuse")
     print(f"  at chi={CHI_DEFAULT:g}, dt={ENGINE_DT:g}: max diffusivity = "
           f"{diffusivity_ceiling(CHI_DEFAULT):g}   (1 / (dt*chi))")
     stable = ok_ref.with_params({**ok_ref.default_params(),
@@ -1618,9 +1618,9 @@ if __name__ == "__main__":
     print("ONE-EDIT SWAP -- the loop can ablate the coupling by itself")
     print("-" * 88)
     labels = [l for _, l in ok_ref.legal_edits(3)]
-    assert "=cell_diffuse:interface_weighted" in labels
+    assert "=cell_chem_diffuse:interface_weighted" in labels
     swapped, _ = ok_ref.apply(("set_impl", dif, "interface_weighted"))
-    print(f"  '=cell_diffuse:interface_weighted' in legal_edits: True")
+    print(f"  '=cell_chem_diffuse:interface_weighted' in legal_edits: True")
     print(f"  hash {comp_hash(ok_ref)} -> {comp_hash(swapped)}  (the swap IS a new hypothesis)")
     assert comp_hash(swapped) != comp_hash(ok_ref)
     for c in swapped.theta_conditions():
@@ -1643,7 +1643,7 @@ if __name__ == "__main__":
 # exactly RD_PER_FRAME.
 #
 # WHY IT IS 50x. `translate` emits chi * RD_PER_FRAME = chi/dt, which is the D5a clock fix -- it
-# exists because cell_react EMITs a velocity and is therefore integrated on the MECHANICS substep
+# exists because cell_chem_react EMITs a velocity and is therefore integrated on the MECHANICS substep
 # rather than once per frame. But there are 1/dt substeps in a frame, so the substep clock ALREADY
 # supplies the factor the fix adds. Applied on top, the reaction advances chi/dt per frame instead
 # of chi. At dt=1.0 the two are equal and nothing was visible; at dt=0.02 the reaction runs 50x

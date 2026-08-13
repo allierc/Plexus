@@ -30,15 +30,15 @@
   "mech_migration": 0.01007
  },
  "acted": {
-  "seed_mesh_3d": 1,
-  "cell_geometry_3d": 296,
-  "cell_adjacency": 1,
-  "seed_cell_rd": 3,
-  "cell_diffuse": 301,
-  "cell_react": 301,
-  "shape_energy_3d": 301,
-  "reconnect_t1_3d": 1,
-  "topo_snapshot_3d": 301
+  "mesh_seed": 1,
+  "cell_geometry": 296,
+  "cell_neighbours": 1,
+  "cell_chem_seed": 3,
+  "cell_chem_diffuse": 301,
+  "cell_chem_react": 301,
+  "cell_mechanics": 301,
+  "edge_flip": 1,
+  "topo_record": 301
  },
  "premises": [
   {
@@ -46,7 +46,7 @@
    "tier": "static",
    "premise": "morphogen sets where/how fast, not whether",
    "status": "na",
-   "detail": "no grow_3d in this composition",
+   "detail": "no cell_grow in this composition",
    "measured": null
   },
   {
@@ -54,7 +54,7 @@
    "tier": "static",
    "premise": "a cell divides because it got big",
    "status": "na",
-   "detail": "needs both grow_3d and divide_3d",
+   "detail": "needs both cell_grow and cell_divide",
    "measured": null
   },
   {

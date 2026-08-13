@@ -73,8 +73,8 @@ class MPMGather(Exchange):                  # (alias `g2p`, one migration cycle)
             Xn = torch.stack([torch.remainder(Xn[:, k], box[k]) for k in range(D)], dim=1)
         else:
             Xn = torch.stack([Xn[:, k].clamp(2 * dx, box[k] - 2 * dx) for k in range(D)], dim=1)
-        # DORMANT particles (occ==0, a cell_grow reserve) are FROZEN -- not advected -- so they sit as a
-        # compact reservoir until cell_grow activates + repositions them. Byte-identical when all are live.
+        # DORMANT particles (occ==0, a agent_grow reserve) are FROZEN -- not advected -- so they sit as a
+        # compact reservoir until agent_grow activates + repositions them. Byte-identical when all are live.
         occ = getattr(p, "occ", None)
         if occ is not None:
             live = occ > 0

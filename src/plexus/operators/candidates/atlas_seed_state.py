@@ -4,7 +4,7 @@ Read this before you consider promoting it: **this operator was not extracted fr
 It exists because a Plexus set's non-spatial state blocks start at zero and the engine has no
 per-block `init:` in the spec, so a cell whose `radius` is 0 cannot grow and a cell whose
 `division_rate` is 0 cannot divide. The Okuda track solves the same problem the same way
-(`seed_cell_rd` seeds the chemistry before frame 1); this is its general form.
+(`cell_chem_seed` seeds the chemistry before frame 1); this is its general form.
 
 It is deliberately kept in the anti-chamber and deliberately given no `family`: it carries no
 biological semantics, it must never appear in the atlas ledger as vocabulary extracted from

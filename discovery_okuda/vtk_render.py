@@ -61,7 +61,7 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 LOG = os.path.join(ROOT, "log", "okuda")
-for _p in (HERE, os.path.join(ROOT, "prototype", "Tyssue"), os.path.join(ROOT, "src")):
+for _p in (HERE, os.path.join(ROOT, "discovery_okuda", "ops"), os.path.join(ROOT, "src")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
@@ -138,7 +138,7 @@ def box_of(run, fr):
 
 # THE TWO MARKS, and what they are read from. Neither is a second colour SCALE -- they are states
 # the archive already carries per cell, and they overwrite the activator colour where they are set:
-#   green   a cell that has just divided: `age` <= DIVIDED (reset to 0 by divide_3d) AND `ndiv` > 0,
+#   green   a cell that has just divided: `age` <= DIVIDED (reset to 0 by cell_divide) AND `ndiv` > 0,
 #           because `age` alone starts at 0 for every seeded cell and paints an untouched tissue
 #           green in the opening frames.
 #   blue    the second morphogen's ACTION on the cell -- `apop` where it marks the cell to die,
@@ -188,7 +188,7 @@ def _marks(mt, idx, nF):
 def mesh_of(pos, mt, act, lo=None, hi=None, show_div=True):
     """The apical shell as PolyData with per-cell RGB. Rebuilt per frame: cells divide."""
     import pyvista as pv
-    from tyssue_topology_ops3d import rings_from_flat_3d
+    from topology_ops import rings_from_flat_3d
     nF = int(mt["nF"])
     es, et, ef = (np.asarray(mt[k]) for k in ("E_srce", "E_trgt", "E_face"))
     live = ef < nF

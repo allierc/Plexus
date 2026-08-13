@@ -5,7 +5,7 @@
  "topology": "full composition",
  "rows": [
   {
-   "op": "cell_diffuse",
+   "op": "cell_chem_diffuse",
    "param": "chi",
    "verdict": "LIVE, no derivative",
    "rel": 0.29064362546805605,
@@ -13,7 +13,7 @@
    "note": "ValueError"
   },
   {
-   "op": "cell_diffuse",
+   "op": "cell_chem_diffuse",
    "param": "d_a",
    "verdict": "LIVE, no derivative",
    "rel": 0.2885965672863764,
@@ -21,7 +21,7 @@
    "note": "ValueError"
   },
   {
-   "op": "cell_diffuse",
+   "op": "cell_chem_diffuse",
    "param": "d_h",
    "verdict": "LIVE, no derivative",
    "rel": 0.2918184644881812,
@@ -29,7 +29,7 @@
    "note": "ValueError"
   },
   {
-   "op": "cell_react",
+   "op": "cell_chem_react",
    "param": "F",
    "verdict": "LIVE, no derivative",
    "rel": 0.2889578235204755,
@@ -37,7 +37,7 @@
    "note": "ValueError"
   },
   {
-   "op": "cell_react",
+   "op": "cell_chem_react",
    "param": "kk",
    "verdict": "LIVE, no derivative",
    "rel": 0.2999196199006474,
@@ -45,7 +45,7 @@
    "note": "ValueError"
   },
   {
-   "op": "cell_react",
+   "op": "cell_chem_react",
    "param": "rate",
    "verdict": "LIVE, no derivative",
    "rel": 0.6424588700878676,
@@ -53,7 +53,7 @@
    "note": "ValueError"
   },
   {
-   "op": "shape_to_chem",
+   "op": "cell_chem_from_shape",
    "param": "F0",
    "verdict": "LIVE, no derivative",
    "rel": 0.28922326087545186,
@@ -61,7 +61,7 @@
    "note": "ValueError"
   },
   {
-   "op": "shape_to_chem",
+   "op": "cell_chem_from_shape",
    "param": "beta",
    "verdict": "LIVE, no derivative",
    "rel": 0.2942163243448441,
@@ -69,7 +69,7 @@
    "note": "ValueError"
   },
   {
-   "op": "shape_to_chem",
+   "op": "cell_chem_from_shape",
    "param": "rate",
    "verdict": "LIVE, no derivative",
    "rel": 0.28565499522333304,
@@ -77,7 +77,7 @@
    "note": "ValueError"
   },
   {
-   "op": "grow_3d",
+   "op": "cell_grow",
    "param": "a_sw",
    "verdict": "LIVE, no derivative",
    "rel": 0.30067476104225355,
@@ -85,7 +85,7 @@
    "note": "ValueError"
   },
   {
-   "op": "grow_3d",
+   "op": "cell_grow",
    "param": "conserve_amount",
    "verdict": "LIVE, no derivative",
    "rel": 0.2736745366040473,
@@ -93,7 +93,7 @@
    "note": ""
   },
   {
-   "op": "grow_3d",
+   "op": "cell_grow",
    "param": "dt",
    "verdict": "UNREAD",
    "rel": 0.0,
@@ -101,7 +101,7 @@
    "note": "never looked up"
   },
   {
-   "op": "grow_3d",
+   "op": "cell_grow",
    "param": "hill",
    "verdict": "LIVE, no derivative",
    "rel": 0.31083177754190977,
@@ -109,7 +109,7 @@
    "note": "ValueError"
   },
   {
-   "op": "grow_3d",
+   "op": "cell_grow",
    "param": "rate",
    "verdict": "LIVE, no derivative",
    "rel": 0.31370420584321296,
@@ -117,7 +117,7 @@
    "note": "ValueError"
   },
   {
-   "op": "grow_3d",
+   "op": "cell_grow",
    "param": "rho",
    "verdict": "LIVE, no derivative",
    "rel": 0.2877430736207616,
@@ -125,7 +125,7 @@
    "note": "ValueError"
   },
   {
-   "op": "grow_3d",
+   "op": "cell_grow",
    "param": "vth_frac",
    "verdict": "LIVE, no derivative",
    "rel": 0.30014565555069217,
@@ -133,7 +133,7 @@
    "note": "ValueError"
   },
   {
-   "op": "shape_energy_3d",
+   "op": "cell_mechanics",
    "param": "cap_frac",
    "verdict": "LIVE, no derivative",
    "rel": 0.31886736258114995,
@@ -141,7 +141,7 @@
    "note": "ValueError"
   },
   {
-   "op": "shape_energy_3d",
+   "op": "cell_mechanics",
    "param": "dt",
    "verdict": "LIVE, no derivative",
    "rel": 0.4166894689836162,
@@ -149,7 +149,7 @@
    "note": "ValueError"
   },
   {
-   "op": "shape_energy_3d",
+   "op": "cell_mechanics",
    "param": "eta",
    "verdict": "LIVE, no derivative",
    "rel": 0.3009100454539412,
@@ -157,7 +157,7 @@
    "note": "ValueError"
   },
   {
-   "op": "shape_energy_3d",
+   "op": "cell_mechanics",
    "param": "gamma",
    "verdict": "LIVE, no derivative",
    "rel": 0.3801064519478994,
@@ -165,7 +165,7 @@
    "note": "ValueError"
   },
   {
-   "op": "shape_energy_3d",
+   "op": "cell_mechanics",
    "param": "h0",
    "verdict": "LIVE, no derivative",
    "rel": 0.30543297082088344,
@@ -173,7 +173,7 @@
    "note": "ValueError"
   },
   {
-   "op": "shape_energy_3d",
+   "op": "cell_mechanics",
    "param": "k_v",
    "verdict": "LIVE, no derivative",
    "rel": 0.3911664000635829,
@@ -181,7 +181,7 @@
    "note": "ValueError"
   },
   {
-   "op": "shape_energy_3d",
+   "op": "cell_mechanics",
    "param": "kappa_s",
    "verdict": "LIVE, no derivative",
    "rel": 0.46918139320016294,
@@ -189,7 +189,7 @@
    "note": "ValueError"
   },
   {
-   "op": "shape_energy_3d",
+   "op": "cell_mechanics",
    "param": "mu",
    "verdict": "LIVE, no derivative",
    "rel": 0.3009100454539412,
@@ -197,7 +197,7 @@
    "note": "ValueError"
   },
   {
-   "op": "shape_energy_3d",
+   "op": "cell_mechanics",
    "param": "relax_iters",
    "verdict": "LIVE, no derivative",
    "rel": 0.3023841509985892,
@@ -205,7 +205,7 @@
    "note": ""
   },
   {
-   "op": "divide_3d",
+   "op": "cell_divide",
    "param": "cycle_cv",
    "verdict": "LIVE, no derivative",
    "rel": 0.2714170489714833,
@@ -213,7 +213,7 @@
    "note": "ValueError"
   },
   {
-   "op": "divide_3d",
+   "op": "cell_divide",
    "param": "engine_clock",
    "verdict": "ERROR",
    "rel": 0.0,
@@ -221,7 +221,7 @@
    "note": "ValueError: D1: operator-side `every=4` is no longer supported -- the engine owns the clock. (A private period multiplied the engine's, so `every: 2` meant once every 4 frames and every per-call quantity meant 4x what it said.) If this spec was written for the OLD semantics, its true period was 4x the engine's -- convert it and set `every: 16`. Then declare `engine_clock: true` beside it to confirm the period is now engine-owned."
   },
   {
-   "op": "divide_3d",
+   "op": "cell_divide",
    "param": "factor",
    "verdict": "LIVE, no derivative",
    "rel": 0.9777423840831146,
@@ -229,7 +229,7 @@
    "note": "ValueError"
   },
   {
-   "op": "divide_3d",
+   "op": "cell_divide",
    "param": "max_cycle",
    "verdict": "DEAD",
    "rel": 0.0,
@@ -237,7 +237,7 @@
    "note": ""
   },
   {
-   "op": "divide_3d",
+   "op": "cell_divide",
    "param": "min_cycle",
    "verdict": "LIVE, no derivative",
    "rel": 0.293091874016593,
@@ -245,7 +245,7 @@
    "note": ""
   },
   {
-   "op": "divide_3d",
+   "op": "cell_divide",
    "param": "p0",
    "verdict": "LIVE, no derivative",
    "rel": 0.0001357510881521183,
@@ -253,7 +253,7 @@
    "note": "ValueError"
   },
   {
-   "op": "divide_3d",
+   "op": "cell_divide",
    "param": "reset_noise",
    "verdict": "DEAD",
    "rel": 0.0,
@@ -261,7 +261,7 @@
    "note": ""
   },
   {
-   "op": "reconnect_t1_3d",
+   "op": "edge_flip",
    "param": "l_th_frac",
    "verdict": "LIVE, no derivative",
    "rel": 0.3578877574666659,
@@ -269,7 +269,7 @@
    "note": "ValueError"
   },
   {
-   "op": "reconnect_t1_3d",
+   "op": "edge_flip",
    "param": "max_flips",
    "verdict": "DEAD",
    "rel": 0.0,
@@ -277,7 +277,7 @@
    "note": ""
   },
   {
-   "op": "seed_cell_rd",
+   "op": "cell_chem_seed",
    "param": "n_spots",
    "verdict": "DEAD",
    "rel": 0.0,

@@ -22,7 +22,7 @@ ranking below hands that decision most of the way.
 THE RANKING, AND WHY IT WOULD HAVE FOUND THIS ONE. A value outside its own declared range is the
 first suspect, because the space itself says it should not be there. On r002c_00_9d40a8:
 
-    reconnect_t1_3d.l_th_frac   parent 0.28   child 1.96   declared range (0.01, 0.12)
+    edge_flip.l_th_frac   parent 0.28   child 1.96   declared range (0.01, 0.12)
 
 `l_th_frac` is "threshold as a fraction of the mean edge length". At 1.96 the flip threshold is
 nearly TWICE the mean edge, so every junction in the tissue is eligible to flip, every fourth
@@ -53,7 +53,7 @@ def spec_diff(parent_spec, child_spec):
     """Every way two emitted specs differ, as [(op, key, parent_value, child_value)].
 
     `None` on either side means the operator or key exists on only one of them -- which is itself a
-    difference worth testing, and the shape a missing `seed_cell_rd` or a dropped parameter takes.
+    difference worth testing, and the shape a missing `cell_chem_seed` or a dropped parameter takes.
     """
     pa, ch = _ops_by_id(parent_spec), _ops_by_id(child_spec)
     rows = []

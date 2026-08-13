@@ -118,7 +118,7 @@ from plexus.models.state import StateSchema
 # initial condition -- and nothing in the language could say so. Three hand-written parents
 # carried `before_frame: 3`; the whole campaign lineage carried nothing; both were equally
 # legal specs. The measured consequence: the chemistry was overwritten every tick, so
-# `shape_to_chem` could accumulate nothing, and 8 same-seed `beta` edits across 13 rounds
+# `cell_chem_from_shape` could accumulate nothing, and 8 same-seed `beta` edits across 13 rounds
 # moved the trajectory by EXACTLY zero while each was recorded as a refuted hypothesis.
 #
 # A `seed` operator is gated by the engine at frame 0 whatever the spec says (see
@@ -684,7 +684,7 @@ class Seed(Structural):
 
     A subclass of `Structural` because it does the same thing to the buffer -- writes state
     directly rather than returning a delta -- but a distinct KIND because it differs in the one
-    property that matters: WHEN. `divide_3d` and `apoptosis` change membership throughout a run;
+    property that matters: WHEN. `agent_divide` and `apoptosis` change membership throughout a run;
     a seed establishes the state the run starts from. Conflating the two is what allowed
     `cell_rd_seed mode: tip` to re-stamp an activation cap every frame, which made it a moving
     boundary condition and annihilated every operator writing to the same channel.

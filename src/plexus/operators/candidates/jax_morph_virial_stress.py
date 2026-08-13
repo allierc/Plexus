@@ -33,7 +33,7 @@ category the engine's frame-0 integration-invariant guard exempts via
 ``MAY_MUTATE_INTEGRATED_STATE``): ``stress`` is recomputed from the live configuration every
 macro-step and is transient (a daughter is born at the default, not the mother's value), so it is
 not integrated dynamics and not heritable. Schedule it upstream of the consumer (a gene network /
-``cell_divide`` gate); no operator INSIDE this library reads ``stress`` -- the consumer is an
+``agent_divide`` gate); no operator INSIDE this library reads ``stress`` -- the consumer is an
 external control input, exactly as in the paper.
 
 THE PAIR LAW IS A PLUG-IN (why this is a mechanoSENSOR, not a force). The source computes p_i in
@@ -66,7 +66,7 @@ change and break every caller relying on them being pure motion laws -- and the 
 different (a rank-0 sensed scalar vs a rank-1 integrated vector). NOT an alias of ``sense`` (that
 reads an ambient diffusible FIELD on a sensor fan and STEERS heading; this reduces over pairwise
 neighbours and writes a scalar state field -- different inputs, output, map, kind). NOT a refinement
-of ``cell_grow``'s ``stress_gain`` mechano-inhibition: that reads the MPM continuum DEFORMATION
+of ``agent_grow``'s ``stress_gain`` mechano-inhibition: that reads the MPM continuum DEFORMATION
 GRADIENT F and FUSES sense+respond inside one growth op; ``mechanosense`` is the DECOUPLED sensor
 producing a first-class, reusable ``stress`` field ANY consumer can read. Plexus expresses the
 mechano-RESPONSE but has no promoted mechano-SENSE contract; that absence is the new vocabulary.

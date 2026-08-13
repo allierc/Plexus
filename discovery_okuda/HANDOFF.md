@@ -13,7 +13,7 @@ Claude session with no prior context. Cedric is moving to a local ws1 session.
 | Design question answered | Promotion audited by 8 agents; verdict + evidence in §3 |
 | **User override** | Cedric directed: **promote properly, make HalfEdgeTopology first-class**, despite the audit's advice. §3 explains the conflict — resolve it with him. |
 | Note written | `paper/plexus2_discovery.tex` → `.pdf` (6pp, biologist-readable). **Committed.** |
-| M0 code work | **Barely started, then stopped.** Only `prototype/Tyssue/tests/test_baseline.py` + `tests/_baseline/{vesicle3d,rd}.json` exist. Nothing else was written. |
+| M0 code work | **Barely started, then stopped.** Only `discovery_okuda/ops/tests/test_baseline.py` + `tests/_baseline/{vesicle3d,rd}.json` exist. Nothing else was written. |
 | **RD promotion** | **NOT DONE — Cedric flagged this gap. See §5. It is a real unresolved language decision, not an oversight.** |
 | Git | ⚠️ **`main` has diverged: 51 local commits ahead, 21 behind origin.** See §7. All local work backed up to branch `m0-discovery-foundation`. |
 | Full plan | **§9** — M0 verify-the-instrument → M1 composition space → M2 loop harness → M3 the long run → M4 differentiable fit → M5 talk. Dates assume an M0 start that has not happened. |
@@ -27,7 +27,7 @@ Claude session with no prior context. Cedric is moving to a local ws1 session.
 > *A discovery loop that searches biological **mechanisms** (operator compositions), not parameters.*
 
 Demonstrated on the **Okuda et al. 2018 Turing-Vertex** tubulation/branching problem, using the
-vertex-mesh (AVM) backend in `prototype/Tyssue/`.
+vertex-mesh (AVM) backend in `discovery_okuda/ops/`.
 
 **Decisions already locked by Cedric (do not re-litigate):**
 
@@ -74,14 +74,14 @@ This conflict is **unresolved**. Present both sides; do not silently pick one.
 
 ```
 core registry alone            : 52 operators
-after importing prototype/Tyssue: 79 operators   (+27)
+after importing discovery_okuda/ops: 79 operators   (+27)
 ```
 The prototype modules call the **same** `@register_operator` from `plexus.models.registry`, resolve
 through the same `schema.load`, and run through the same `engine.run`. **Promotion moves files; it
 adds no capability.**
 
 Cost of faithful promotion: **19-33 days**. Core has *no* mesh/face/half-edge concept; a `Level`
-cannot grow; `divide_3d` re-indexes the mesh every division, contradicting `Level.lineage`. That is
+cannot grow; `cell_divide` re-indexes the mesh every division, contradicting `Level.lineage`. That is
 3-5 weeks of a ~15-week runway, for zero capability gain.
 
 ### The middle path I was executing when stopped
@@ -102,22 +102,22 @@ All four are documented in `paper/plexus2_discovery.tex` §6 in plain language.
 
 | # | Bug | Where | Why it's fatal for a *composition search* |
 |---|---|---|---|
-| 1 | **Clock double-gating.** Operators keep a private `self.every`/`self._k` while the engine *also* gates them → effective period `every²` | `tyssue_ops3d.py` `divide_3d` ~:399,:452; `grow_3d` ~:354,:362; `topo_snapshot_3d` ~:599,:605; `tyssue_t1_ops3d.py` `reconnect_t1_3d` ~:246,:252; `tyssue_rd_ops.py` `grow_3d` ~:293,:307 | Division across **all 316 archived runs** fired at a fraction of the advertised rate. Engine owns the clock (`src/plexus/engine.py` ~:688-689). Fixing this **re-anchors every baseline** — expect division counts to roughly double. |
+| 1 | **Clock double-gating.** Operators keep a private `self.every`/`self._k` while the engine *also* gates them → effective period `every²` | `mesh_ops.py` `cell_divide` ~:399,:452; `cell_grow` ~:354,:362; `topo_record` ~:599,:605; `t1_ops.py` `edge_flip` ~:246,:252; `chem_ops.py` `cell_grow` ~:293,:307 | Division across **all 316 archived runs** fired at a fraction of the advertised rate. Engine owns the clock (`src/plexus/engine.py` ~:688-689). Fixing this **re-anchors every baseline** — expect division counts to roughly double. |
 | 2 | **dt depends on the composition.** `dt = 1.0 if (cones and not rd) else 0.02` | `run_tyssue_round.py` ~:505 | The loop's flagship edit is add/remove RD — which under this rule *also* rescales chemical:mechanical time by **50×**. Every signalling verdict would be confounded. Fix: one global dt; stability handled *inside* the RD operator as substeps. |
-| 3 | **Silent mis-pairing.** `mt = hist[min(t, len(hist)-1)]` | `run_tyssue_round.py` ~:640 | This is the exact bug that produced the phantom **"97% hollow / global buckling"** result believed for days. It sits **in the fitness path**. Make it an assertion; add the length check inside `tube_analysis.frame_metrics`. Also `divide_3d` reservoir-exhaustion `break` (~`tyssue_ops3d.py:507`) silently caps runs → record `saturated: true` and hard-error. |
-| 4 | **Undeclared prerequisites → silent no-op.** | `cell_diffuse`←`cell_adjacency`; `grow_3d`←cell `chem` block; `shape_energy_3d`←seeded mesh; `divide_3d.local_relax`/`orient_iface`←`shape_energy_3d` same tick (undeclared `m["mech"]` written ~`tyssue_ops3d.py:281`, read ~:566) | **The most dangerous bug.** A composition search generates combos no preset ever ran. A silently-inert operator still returns metrics → recorded as **"this mechanism cannot produce tubes"** = a **false impossibility claim**, which decision #1 elevates to a headline result. Fix: `tyssue_preconditions.py` with `assert_preconditions()` + `did_work()` counters + `assert_all_acted()`. |
+| 3 | **Silent mis-pairing.** `mt = hist[min(t, len(hist)-1)]` | `run_tyssue_round.py` ~:640 | This is the exact bug that produced the phantom **"97% hollow / global buckling"** result believed for days. It sits **in the fitness path**. Make it an assertion; add the length check inside `tube_analysis.frame_metrics`. Also `cell_divide` reservoir-exhaustion `break` (~`mesh_ops.py:507`) silently caps runs → record `saturated: true` and hard-error. |
+| 4 | **Undeclared prerequisites → silent no-op.** | `cell_chem_diffuse`←`cell_neighbours`; `cell_grow`←cell `chem` block; `cell_mechanics`←seeded mesh; `cell_divide.local_relax`/`orient_iface`←`cell_mechanics` same tick (undeclared `m["mech"]` written ~`mesh_ops.py:281`, read ~:566) | **The most dangerous bug.** A composition search generates combos no preset ever ran. A silently-inert operator still returns metrics → recorded as **"this mechanism cannot produce tubes"** = a **false impossibility claim**, which decision #1 elevates to a headline result. Fix: `tyssue_preconditions.py` with `assert_preconditions()` + `did_work()` counters + `assert_all_acted()`. |
 
 ### Four tags that lie
-- `rd_interface_tension` `DIFFERENTIABLE` True→**False** (detaches ~`tyssue_rd_ops.py:384`; branches on `float(red.sum())` ~:381)
-- `face_divide` `SUPPORTED_DIMS` `[3,2]`→**`[2]`** (`ring_valid` is an xy shoelace, `tyssue_topology_ops.py:54-56`)
+- `rd_interface_tension` `DIFFERENTIABLE` True→**False** (detaches ~`chem_ops.py:384`; branches on `float(red.sum())` ~:381)
+- `face_divide` `SUPPORTED_DIMS` `[3,2]`→**`[2]`** (`ring_valid` is an xy shoelace, `topology_ops_2d.py:54-56`)
 - `morphogen_growth` — `kind` mis-tagged
-- `grow_3d` — `MAY_MUTATE_INTEGRATED_STATE` mis-declared
+- `cell_grow` — `MAY_MUTATE_INTEGRATED_STATE` mis-declared
 
 ### Contract compliance
 Only **5 of 30** registered implementations declare the five attributes
 `audit_operator_registry.py` enforces (`EMIT`, `SUPPORTED_DIMS`, `REQUIRES_PARAMS`,
-`MECHANISM_TAGS`, `PARAM_ROLES` in `cls.__dict__`). 25 fail. `divide_3d` and
-`grow_3d` have **zero** `PARAM_ROLES` for ~15 params.
+`MECHANISM_TAGS`, `PARAM_ROLES` in `cls.__dict__`). 25 fail. `cell_divide` and
+`cell_grow` have **zero** `PARAM_ROLES` for ~15 params.
 
 Plan: declare them **in place**, and add a `--prototype` flag to
 `tools/audit_operator_registry.py` so a prototype-resident operator can be **certified**
@@ -138,16 +138,16 @@ decay.py     @register_operator("decay",   family="fields", set="field", kind="f
 pacemaker.py, activation_pulse.py, scalar_field.py, prescribed_field.py
 ```
 
-**Prototype** (`prototype/Tyssue/tyssue_rd_ops.py`) — cell-set based:
+**Prototype** (`discovery_okuda/ops/chem_ops.py`) — cell-set based:
 ```
-cell_geometry_3d      set=cell   kind=aggregate   family=hierarchy
-cell_adjacency        set=cell   kind=rewire      family=topology
-seed_cell_rd          set=cell   kind=structural  family=growth
-cell_diffuse          set=cell   kind=lateral     family=fields
-cell_react            set=cell   kind=lateral     family=fields  impl=gray_scott
-cell_react            set=cell   kind=lateral     family=fields  impl=gierer_meinhardt
-cell_react            set=cell   kind=lateral     family=fields  impl=brusselator
-grow_3d   set=vertex kind=structural  family=growth
+cell_geometry      set=cell   kind=aggregate   family=hierarchy
+cell_neighbours        set=cell   kind=rewire      family=topology
+cell_chem_seed          set=cell   kind=structural  family=growth
+cell_chem_diffuse          set=cell   kind=lateral     family=fields
+cell_chem_react            set=cell   kind=lateral     family=fields  impl=gray_scott
+cell_chem_react            set=cell   kind=lateral     family=fields  impl=gierer_meinhardt
+cell_chem_react            set=cell   kind=lateral     family=fields  impl=brusselator
+cell_grow   set=vertex kind=structural  family=growth
 rd_interface_tension  set=vertex kind=lateral     family=mechanics
 ```
 Also `prototype/embryo_gray_scott/embryo_gray_scott_ops.py` (grid-based Gray-Scott, separate).
@@ -156,15 +156,15 @@ Also `prototype/embryo_gray_scott/embryo_gray_scott_ops.py` (grid-based Gray-Sco
 
 `registry.py` (~:133-137) **forbids one contract carrying implementations of differing KINDs.**
 - core `diffuse` is `kind=field` (a grid field diffusing)
-- `cell_diffuse` is `kind=lateral` (a graph Laplacian over a cell set)
+- `cell_chem_diffuse` is `kind=lateral` (a graph Laplacian over a cell set)
 
-So `cell_diffuse` **cannot** become an implementation of `diffuse`. Either:
-- **(a)** they are two distinct contracts (`diffuse` on fields, `cell_diffuse` on sets) — simple, but
+So `cell_chem_diffuse` **cannot** become an implementation of `diffuse`. Either:
+- **(a)** they are two distinct contracts (`diffuse` on fields, `cell_chem_diffuse` on sets) — simple, but
   arguably duplicates "diffusion" in the language; or
 - **(b)** the language grows a notion of one biological verb spanning field- and set-carriers —
   a **real plexus2 change**, and probably a paper-worthy one.
 
-Same question for `cell_react`: there is **no** core reaction contract, so promoting it *defines*
+Same question for `cell_chem_react`: there is **no** core reaction contract, so promoting it *defines*
 one. Note the three kinetics are already **three implementations of one contract**, which is the
 plexus2 contract/implementation split working exactly as designed — a nice talk beat.
 
@@ -187,7 +187,7 @@ Recommend raising it directly; it is a language question, not an engineering one
 - `paper/janelia_conference_abstract_2026.txt` — the submitted abstract, for reference.
 
 **Uncommitted, created by the stopped workflow:**
-- `prototype/Tyssue/tests/test_baseline.py` (15KB) + `tests/_baseline/{vesicle3d.json, rd.json}`
+- `discovery_okuda/ops/tests/test_baseline.py` (15KB) + `tests/_baseline/{vesicle3d.json, rd.json}`
   — a regression harness capturing a 3D vesicle run and an RD run. **Not reviewed by me. Verify
   it before trusting it**, in particular whether its recorded numbers pre- or post-date any bug fix
   (they pre-date all of them — nothing in §4 was fixed).
@@ -242,7 +242,7 @@ Both must survive → **merge, do not rebase**. I did **not** merge; it needs Ce
    re-anchoring explicitly with a note in the test file saying why.
 3. **Fix dt** (§4 #2) → one global dt = 0.02.
 4. **Assert, don't clamp** (§4 #3) → prove the assertion fires on a deliberately mis-strided case.
-5. **Preconditions** (§4 #4) → prove `cell_diffuse` without `cell_adjacency` raises a *named* error.
+5. **Preconditions** (§4 #4) → prove `cell_chem_diffuse` without `cell_neighbours` raises a *named* error.
 6. **HalfEdgeTopology** (per Gate 0a) — invariants as methods: `check_euler`, `check_faces_valid`,
    **`check_faces_simple`** (bow-tie), `check_orientation`, `check_manifold`. Keep
    `__getitem__`/`__setitem__` for incremental migration. **Must reproduce the baseline exactly.**
@@ -290,13 +290,13 @@ drafted and are prerequisites to trusting any metric.)*
 `okuda_composition_space.py`, modeled directly on the SMG one. The ops as typed graph nodes,
 stage-gated:
 
-- **Stage 1 substrate:** `seed_mesh_3d` / `load_mesh_3d`, `shape_energy_3d` (impl: `default` |
-  `monolayer`), `reconnect_t1_3d`
-- **Stage 2 growth coupling:** `grow_3d`, `grow_3d`, `divide_3d`
+- **Stage 1 substrate:** `mesh_seed` / `load_mesh_3d`, `cell_mechanics` (impl: `default` |
+  `monolayer`), `edge_flip`
+- **Stage 2 growth coupling:** `cell_grow`, `cell_grow`, `cell_divide`
   (`orient_iface` on/off), `face_growth`
-- **Stage 3 patterning + feedback:** `seed_cell_rd` (modes), `cell_react`
+- **Stage 3 patterning + feedback:** `cell_chem_seed` (modes), `cell_chem_react`
   (`gray_scott` | `gierer_meinhardt` | `brusselator` — already three interchangeable impls, which
-  is exactly the plexus2 contract paying off), `cell_diffuse`, `rd_interface_tension`,
+  is exactly the plexus2 contract paying off), `cell_chem_diffuse`, `rd_interface_tension`,
   `cell_differentiate`
 
 One legal edit per step (add / remove / connect / disconnect). **`comp_hash` excludes θ — so a
@@ -416,13 +416,13 @@ paper/plexus2.tex                       # the spec — SOURCE OF TRUTH
 paper/plexus2_discovery.tex/.pdf        # NEW: the discovery note (this work)
 paper/gland.tex                         # the three-loop method, written up (gland case)
 
-prototype/Tyssue/                       # the Okuda AVM backend (most mature prototype)
-  tyssue_ops3d.py                       # seed_mesh_3d, shape_energy_3d, grow_3d, divide_3d
-  tyssue_rd_ops.py                      # ALL the RD operators (see §5)
-  tyssue_t1_ops3d.py                    # reconnect_t1_3d
-  tyssue_topology_ops.py / _ops3d.py    # face_divide, apoptosis, t1_transition
-  tyssue_monolayer.py                   # shape_energy_3d impl="monolayer"
-  tyssue_cell_ops.py, ckpt.py
+discovery_okuda/ops/                       # the Okuda AVM backend (most mature prototype)
+  mesh_ops.py                       # mesh_seed, cell_mechanics, cell_grow, cell_divide
+  chem_ops.py                      # ALL the RD operators (see §5)
+  t1_ops.py                    # edge_flip
+  topology_ops_2d.py / _ops3d.py    # face_divide, apoptosis, t1_transition
+  monolayer_ops.py                   # cell_mechanics impl="monolayer"
+  cell_ops_2d.py, ckpt.py
   tube_analysis.py                      # the metric bank
   TRANSFER_PLAN.md                      # prior promotion analysis
   tests/test_baseline.py                # NEW, unreviewed

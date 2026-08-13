@@ -78,7 +78,7 @@ def build(tag, death, *, after_frac=3.0, two_species=False, k_purse=None, note="
     n_frames = int(spec["general"]["n_frames"])
     spec.pop("_discovery", None)
     for o in spec["operators"]:
-        o.pop("reset_noise", None)          # unread by divide_3d; rides in from the base
+        o.pop("reset_noise", None)          # unread by cell_divide; rides in from the base
 
     if two_species:
         # the coarse second map, exactly as make_two_species builds it
@@ -86,20 +86,20 @@ def build(tag, death, *, after_frac=3.0, two_species=False, k_purse=None, note="
         out = []
         for o in spec["operators"]:
             out.append(o)
-            if o["op"] == "seed_cell_rd":
-                out.append({"op": "seed_cell_rd", "at": "cell", "chan": 2, "seed": 7,
+            if o["op"] == "cell_chem_seed":
+                out.append({"op": "cell_chem_seed", "at": "cell", "chan": 2, "seed": 7,
                             "before_frame": o.get("before_frame", 3), "mode": "scatter",
                             "seed_frac": 0.12})
-            elif o["op"] == "cell_diffuse":
-                out.append({"op": "cell_diffuse", "at": "cell", "chan": 2,
+            elif o["op"] == "cell_chem_diffuse":
+                out.append({"op": "cell_chem_diffuse", "at": "cell", "chan": 2,
                             "implementation": o.get("implementation", "graph_laplacian"),
                             # chi 0.4, not 1.3: at 1.3 with doubled diffusivities gate G16
                             # measured this field EXTINCT (act_max 0.0). At Cedric's own value it
                             # patterns at 15 spots, spacing 3.18 -- FINER than A's 6.99, so the
                             # coarse map is A and the fine one is B.
                             "d_a": 0.08, "d_h": 0.16, "chi": 0.4})
-            elif o["op"] == "cell_react":
-                out.append({"op": "cell_react", "at": "cell", "chan": 2, "model": "gray_scott",
+            elif o["op"] == "cell_chem_react":
+                out.append({"op": "cell_chem_react", "at": "cell", "chan": 2, "model": "gray_scott",
                             "F": 0.039, "kk": 0.058, "rate": 1.0})
         spec["operators"] = out
 
@@ -108,20 +108,20 @@ def build(tag, death, *, after_frac=3.0, two_species=False, k_purse=None, note="
         # `rate * (rho + hill(a))` -- so the slowest a cell could grow was the rho baseline and
         # nothing could say STOP. A bulge sharpens into a finger when the tip grows and the flanks
         # do not, which needs a zero, and an activating field has none.
-        _ops(spec)["grow_3d"].update(inhib)
-    _ops(spec)["grow_3d"]["chan"] = int(growth_chan)
+        _ops(spec)["cell_grow"].update(inhib)
+    _ops(spec)["cell_grow"]["chan"] = int(growth_chan)
     if k_purse is not None:
-        _ops(spec)["interface_line_tension_3d"]["K_purse"] = float(k_purse)
+        _ops(spec)["interface_tension"]["K_purse"] = float(k_purse)
 
     # NO DEATH OPERATOR AT ALL when the variant asks for none. An empty `death` dict used to fall
-    # through to `apoptosis_3d`'s own default mode -- `competition` -- so the four variants meant to
+    # through to `cell_die`'s own default mode -- `competition` -- so the four variants meant to
     # isolate INHIBITION would each have carried a death rule nobody asked for, and any difference
     # between them and the control would have been unattributable. A mechanism that arrives by
     # default is the same defect as a parameter nothing reads.
     if death:
         spec["operators"].append(
-            {"op": "apoptosis_3d", "at": "vertex", "cell_set": "cell",
-             "p0": _ops(spec)["shape_energy_3d"].get("p0", 3.5),
+            {"op": "cell_die", "at": "vertex", "cell_set": "cell",
+             "p0": _ops(spec)["cell_mechanics"].get("p0", 3.5),
              "max_mark_frac": CAP, **(fast or FAST), **death,
              # LATE, so growth has built something to carve; from frame 0 it erodes a sphere.
              "after_frame": int(n_frames // after_frac)})

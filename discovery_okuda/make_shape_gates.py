@@ -16,7 +16,7 @@ possible reasons and the difference decides whether killing them is biology or v
               Nearly half of them were the integrator.
 
 Killing on elongation at 30 iterations would delete the second population along with the first and
-report a cleaner tissue -- the precise trap `tyssue_shape_to_chem` names when it refuses to
+report a cleaner tissue -- the precise trap `shape_chem_ops` names when it refuses to
 implement a `force` feature: *"an operator keyed on it would read numerical error as biology."* So
 the four runs below separate the two causes before letting death near them.
 
@@ -83,7 +83,7 @@ def build(name, cfg):
     ops = s["operators"]
 
     for o in ops:
-        if o["op"] == "shape_energy_3d":
+        if o["op"] == "cell_mechanics":
             o["relax_iters"] = int(cfg["relax"])
 
     if cfg["probe"]:
@@ -91,15 +91,15 @@ def build(name, cfg):
         # reports is the one the last relaxation actually produced. `translate.SCHEDULE_ORDER` puts
         # it there for compositions the loop builds; these are written by hand, so the same order
         # has to be written by hand or the two paths would run different experiments.
-        at = next((i for i, o in enumerate(ops) if o["op"] == "grow_3d"), len(ops))
+        at = next((i for i, o in enumerate(ops) if o["op"] == "cell_grow"), len(ops))
         ops.insert(at, copy.deepcopy(PROBE))
 
     if cfg["kill"]:
-        death = {"op": "apoptosis_3d", "at": "vertex", "cell_set": "cell",
+        death = {"op": "cell_die", "at": "vertex", "cell_set": "cell",
                  "p0": 3.5, "mode": "field_high", "field": "elong", "field_frac": FIELD_FRAC,
                  # the basis death block, so this differs from b_star_death in its CRITERION only
                  "max_mark_frac": 0.005, "min_age": 4, "shrink_rate": 0.05, "critical_frac": 0.15}
-        at = next((i for i, o in enumerate(ops) if o["op"] == "shape_energy_3d"), len(ops))
+        at = next((i for i, o in enumerate(ops) if o["op"] == "cell_mechanics"), len(ops))
         ops.insert(at, death)
 
     s["schedule"] = [o["op"] for o in ops]

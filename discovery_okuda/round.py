@@ -269,9 +269,9 @@ def _exec(node, ctx):
 # Each takes the context and returns what its `out:` names. Nothing here judges a result.
 
 # THE FORCING IS ITS OWN OPERATOR NOW, so this is a check on the OPERATOR SET, not on a parameter
-# buried inside a sound one. `extrusion_forcing_3d` is absent from composition_space, so nothing the
+# buried inside a sound one. `interface_push` is absent from composition_space, so nothing the
 # loop builds can contain it and this sorts only hand-written controls last.
-FORCING_TERMS = {"extrusion_forcing_3d": "K_extrude"}
+FORCING_TERMS = {"interface_push": "K_extrude"}
 
 
 def _is_forced(name, terms=None):
@@ -327,7 +327,7 @@ def parents(ctx):
     # A FORCED RUN IS EVIDENCE, NOT A PARENT -- decided by the COMPOSITION, not by a proxy.
     #
     # This first used `mech_p_ratio > 2` alone, on the reasoning that ~3 means forced and ~1 means
-    # grown. Measured on the very first round after `interface_line_tension_3d` was repaired: r001_01
+    # grown. Measured on the very first round after `interface_tension` was repaired: r001_01
     # carries `K_extrude: 4.0`, the operator fired 801 times, it reached protr_peak 1.352 with
     # n_tubes 2 -- the first run in the project's history to clear the tube threshold -- and its
     # `mech_p_ratio` read 0.622. The proxy did not fire. It ranked third only because it happened
@@ -571,7 +571,7 @@ CLOSURE_N = 4          # distinct values RUN before a parameter leaves the menu
 MAX_REPLICATES = 2
 _MAX_REPLICATES = MAX_REPLICATES   # published from the graph by build_all
 _REPLICATES = 0                    # consumed this round; reset by build_all
-BATTERY = os.path.join(HERE, "battery.json")     # written by prototype/Tyssue/op_probe.py --all
+BATTERY = os.path.join(HERE, "battery.json")     # written by discovery_okuda/ops/op_probe.py --all
 
 
 def _sweep_state(by_base=False, sweeps_only=False):
@@ -588,7 +588,7 @@ def _sweep_state(by_base=False, sweeps_only=False):
     The control sweeps a parameter to closure -- `W_L1` at 7 values, `lr_W`/`DAL`/`f_L2` at 5 --
     then writes `g_phi_norm CLOSED (5 values)` and never returns to it. Ours took ONE point per
     round and never came back to finish, so nothing ever closed and everything stayed
-    re-proposable forever. That is the whole mechanism behind `shape_to_chem.beta` being
+    re-proposable forever. That is the whole mechanism behind `cell_chem_from_shape.beta` being
     re-proposed 25 times across 13 rounds: it was never swept, so it was never closed.
 
     Closure is counted on values that were RUN, not proposed. A refused slot taught nothing and
@@ -596,7 +596,7 @@ def _sweep_state(by_base=False, sweeps_only=False):
     """
     # THIS CAMPAIGN'S RECORDS ONLY, not the archive. Closure used to read
     # `_archive/round_records.jsonl` too, which survives a reset -- so a FRESH campaign inherited
-    # the previous one's closures and started with `shape_to_chem.beta` already retired on
+    # the previous one's closures and started with `cell_chem_from_shape.beta` already retired on
     # [-2, -4, -8, 2]. Those four values were swept against an operator that was DEAD at the time
     # (`mode: tip` overwrote the channel it wrote to), on a substrate whose mechanics were pinned.
     # Closing a parameter on measurements taken through a broken instrument is worse than never
@@ -664,9 +664,9 @@ def _dead_params():
 
       UNREAD  the class never looks the key up, so it is inert in EVERY composition. Universal.
       DEAD    the class reads it, and it did not move THIS fixture. Not universal at all --
-              measured causes, all three benign: `divide_3d.max_cycle` defaults to 10^9 so its
-              ceiling cannot bind; `divide_3d.reset_noise` is only read when `cycle_cv == 0` and
-              this fixture sets it; `reconnect_t1_3d.max_flips` caps flips at 20 and this mesh
+              measured causes, all three benign: `cell_divide.max_cycle` defaults to 10^9 so its
+              ceiling cannot bind; `cell_divide.reset_noise` is only read when `cycle_cv == 0` and
+              this fixture sets it; `edge_flip.max_flips` caps flips at 20 and this mesh
               never reaches 20. Each is a real limiter that would bite on a busier mesh.
 
     So a DEAD verdict is withheld only on the fixture that produced it, and the reason travels
@@ -901,11 +901,11 @@ def coverage(ctx):
                 used_impls.add((o["op"], o["impl"]))
     # WHAT RAN, NOT WHAT THE GRAPH SAYS RAN. `_graph(name)` rebuilds a composition and fills each
     # node's `impl` from the vocabulary's default, so reading impls off the parents reported
-    # `seed_cell_rd:cone` for 205 runs whose emitted spec says `mode: scatter`. The spec is the
+    # `cell_chem_seed:cone` for 205 runs whose emitted spec says `mode: scatter`. The spec is the
     # authority -- it is what the engine was handed -- and each of these operators writes its
     # implementation into a different key, so the mapping is stated rather than guessed.
-    IMPL_KEY = {"seed_cell_rd": "mode", "cell_react": "model", "shape_to_chem": "model",
-                "cell_diffuse": "implementation"}
+    IMPL_KEY = {"cell_chem_seed": "mode", "cell_chem_react": "model", "cell_chem_from_shape": "model",
+                "cell_chem_diffuse": "implementation"}
     for d in glob.glob(os.path.join(LOG_ROOT, "*", "spec_run.yaml")):
         try:
             with open(d) as f:
@@ -1301,7 +1301,7 @@ def _resolve_edit(g, edit):
 
     THE SILENT NO-OP THIS CLOSES. `CompositionGraph.apply` implements set_param as
     `g.params[edit[1]] = edit[2]` with no validation, so a target naming an operator instead of a NODE
-    -- `interface_line_tension_3d.K_purse` rather than `interface_line_tension_3d0.K_purse` -- writes a key no
+    -- `interface_tension.K_purse` rather than `interface_line_tension_3d0.K_purse` -- writes a key no
     operator reads. The run then executes with the parent's value, is recorded as an experiment, and
     scores as one. The live Proposer wrote exactly that form on its first real call and `build`
     admitted all six slots; those seven runs would have been silent copies of their parent.
@@ -1346,8 +1346,8 @@ def _resolve_edit(g, edit):
 
     # EVERY VERB WHOSE ARGUMENT IS A NODE ID, not just set_param. The first version of this
     # resolved set_param only, and the live Proposer immediately wrote
-    # `('set_impl', 'cell_react', 'brusselator')` -- the operator, not the node. `apply` then asked
-    # `_op_of('cell_react')`, got None, and `slots_of(None, ...)` raised `KeyError: None`, which
+    # `('set_impl', 'cell_chem_react', 'brusselator')` -- the operator, not the node. `apply` then asked
+    # `_op_of('cell_chem_react')`, got None, and `slots_of(None, ...)` raised `KeyError: None`, which
     # reached the terminal as "not applicable: none". Three slots of round 1 died on it.
     #
     # Refusing would have been defensible; resolving is better, for the same reason it was for
@@ -1401,7 +1401,7 @@ def _refuse(index, slot, reason):
     found by hand, weeks later. This one was found by Cedric reading three red lines in a terminal
     and asking "does it get the message to rectify if necessary next round?" -- and the answer was
     no. The Proposer re-proposed the same refused edit for the same reason with nothing to tell it
-    otherwise, which is exactly how `shape_to_chem.beta` was re-proposed 25 times in 13 rounds.
+    otherwise, which is exactly how `cell_chem_from_shape.beta` was re-proposed 25 times in 13 rounds.
     """
     print(T_.no(f"[round] slot {index}: {reason}"))
     _REFUSED.append({"slot": index, "parent": (slot or {}).get("parent"),
@@ -1592,8 +1592,8 @@ def _build_one(slot, rid, index, seen):
         # One edit was never a principle, it was a simplification, and it made part of the search
         # space UNREACHABLE. `extrude` -- the forced-tube probe the Analyst asked for in rounds
         # 10, 11 and 12, and whose K_extrude the battery measured LIVE -- declares a `site` slot
-        # fed by `morphogen`, and TWO operators produce morphogen (`cell_react` and
-        # `seed_cell_rd`). With two candidates `add_op` will not guess a wiring, so the slot
+        # fed by `morphogen`, and TWO operators produce morphogen (`cell_chem_react` and
+        # `cell_chem_seed`). With two candidates `add_op` will not guess a wiring, so the slot
         # dangles, R3 refuses it, and the menu never offers it. `apply`'s own comment says a
         # `connect` edit "remains available to make it deliberately" -- but `connect` needs the
         # node to exist, and the node cannot be added, so under one edit that escape hatch does
@@ -1646,14 +1646,14 @@ def _build_one(slot, rid, index, seen):
     # A DUPLICATE BECOMES A REPLICATE. Cedric, 6 August: "loose this rule, change the seed instead."
     #
     # Refusing cost three of eleven slots in one round, and one of the three was a real experiment --
-    # `add_op grow_3d` proposed on three parents to test whether the operator's effect is general
+    # `add_op cell_grow` proposed on three parents to test whether the operator's effect is general
     # or parent-specific, which is what the lever map is FOR. But the deeper waste is that this campaign
     # has never once measured its own seed spread. The Analyst's standing instruction is that "a
     # difference smaller than the seed spread is not a difference", and there has never been a replicate
     # to measure that spread with -- so every difference reported so far rests on an unmeasured noise
     # floor.
     #
-    # The seeds are NOT in the theta hash (`seed_mesh_3d.seed` and `seed_cell_rd.seed` are undeclared,
+    # The seeds are NOT in the theta hash (`mesh_seed.seed` and `cell_chem_seed.seed` are undeclared,
     # so `_theta_hash` never sees them), which is why the replicate is admitted deliberately rather than
     # slipping past the check on a changed number.
     replicate = False
@@ -1702,7 +1702,7 @@ def _build_one(slot, rid, index, seen):
     # (the compile refusal, the short batch) off the top of the screen.
     # THE SLOT SAYS WHAT IT NOW IS. Cedric: "if the critic finds replicate it should set different seed
     # and mention that it is robustness test itself." Without this the record keeps the Proposer's
-    # original claim -- "coverage: grow_3d on the three best chemistry parents" -- on a run that
+    # original claim -- "coverage: cell_grow on the three best chemistry parents" -- on a run that
     # is no longer that experiment, and a reader six rounds later has no way to tell. The original text
     # is kept beside it rather than overwritten: it is why the slot was proposed, and that is worth
     # knowing even though it is no longer what the slot does.
@@ -1748,12 +1748,12 @@ def _restore_parent_params(name, parent, edit, spare_seeds=False):
     projection is lossy, and the loss is not cosmetic:
 
         CONTROL vs ITS OWN PARENT, refute_coral_nocons -> r001_00_ctrl: 29 DIFFERENCES
-          reconnect_t1_3d.l_th_frac   0.35 -> 2.45     round 2 died of 1.96
-          reconnect_t1_3d.every          4 -> 1        T1 flips every frame, not every fourth
-          seed_mesh_3d.radius          5.0 -> dropped  the seed geometry
-          seed_mesh_3d.jitter         0.18 -> dropped
-          seed_mesh_3d.p0              3.5 -> dropped
-          shape_energy_3d.K_R          0.4 -> 0.02
+          edge_flip.l_th_frac   0.35 -> 2.45     round 2 died of 1.96
+          edge_flip.every          4 -> 1        T1 flips every frame, not every fourth
+          mesh_seed.radius          5.0 -> dropped  the seed geometry
+          mesh_seed.jitter         0.18 -> dropped
+          mesh_seed.p0              3.5 -> dropped
+          cell_mechanics.K_R          0.4 -> 0.02
         and l_th_frac 0.28 -> 1.96 on BOTH other parents.
 
     So every run in round 1 executed the configuration the previous campaign died of, the control was
@@ -1817,7 +1817,7 @@ def _restore_parent_params(name, parent, edit, spare_seeds=False):
     # SILENT WHEN IT WORKS. Cedric: "if this is not an issue, it looks like one." This printed a line
     # per slot per round -- eleven of them, every round, saying the overlay had done exactly its job.
     # The rebuild is lossy for a KNOWN and unchanging reason (the space does not declare
-    # seed_mesh_3d.radius at all, and declares l_th_frac with a ceiling every working recipe exceeds),
+    # mesh_seed.radius at all, and declares l_th_frac with a ceiling every working recipe exceeds),
     # so the restore is the normal case, not an event. It is verified by
     # test_round.py::test_a_child_differs_from_its_parent_by_exactly_the_edit and the count is on the
     # record. A failure to restore would be worth a line; succeeding is not.
@@ -1961,8 +1961,8 @@ def route_a_results(ctx):
                                           for c in COLS) + "   premises")
         # A LADDER'S VALUES ARE NOT ALWAYS NUMBERS. `float()` here crashed the whole node --
         # "could not convert string to float: 'smaller'" -- the first time a categorical ladder
-        # reached it, and categorical ladders are the ones that matter most: `apoptosis_3d.mode`
-        # and `grow_3d.model` sweep MECHANISMS, where each value is a different biological
+        # reached it, and categorical ladders are the ones that matter most: `cell_die.mode`
+        # and `cell_grow.model` sweep MECHANISMS, where each value is a different biological
         # hypothesis rather than a point on a scale. Losing the node loses every sweep in the
         # batch, numeric ones included, and the Analyst is then handed nothing for half the round.
         #
@@ -2010,7 +2010,7 @@ def score(ctx):
         # operating point does not reach the mechanism".
         #
         # The two are different evidence and only one is about biology. Measured cost: at least 13
-        # of the previous campaign's 84 refutations were of `shape_to_chem` edits that never
+        # of the previous campaign's 84 refutations were of `cell_chem_from_shape` edits that never
         # changed the run by a bit, and `rd_interface_tension` was written off twice without ever
         # having fired. INCONCLUSIVE is the honest verdict and it is also the useful one -- it
         # leaves the hypothesis open and tells the Proposer to move the operating point rather

@@ -23,9 +23,9 @@
   `invagination_peak` reached only 0.41 (`r001_11`) — apoptosis is active yet no inward fold.
 
 ## STANDING LAWS
-- **L1** `shape_energy_3d.K_bend` raises BOTH `grip` and `protr` on `b_gs_shaping_soft_lo`.
+- **L1** `cell_mechanics.K_bend` raises BOTH `grip` and `protr` on `b_gs_shaping_soft_lo`.
   evidence: 0.03 → grip 0.083 / protr 1.233; 0.05 → grip 0.096 / protr 1.274. status: HOLDS (2 pts).
-- **L2** `apoptosis_3d.max_mark_frac` at 0.001–0.002 raises `protr` with no premise broken.
+- **L2** `cell_die.max_mark_frac` at 0.001–0.002 raises `protr` with no premise broken.
   evidence: 0.001 → protr 1.274; 0.002 → protr 1.342 (round best), cells flat ~17,500.
   status: HOLDS (2 pts, break untested above 0.002).
 - **L3** `protrusion_aspect_max_peak` and `n_tubes` do NOT discriminate a finger from a lobe.
@@ -33,15 +33,15 @@
   aspect_final 0.0, `n_tips` 0. status: HOLDS.
 
 ## Route A closures
-- **`grow_3d.rho` on `b_gs_plain_soft_lo`:** one value only, 0.05 → 5952 cells, protr 1.201,
+- **`cell_grow.rho` on `b_gs_plain_soft_lo`:** one value only, 0.05 → 5952 cells, protr 1.201,
   grip 0.079, premises intact. On `b_bru_question` rho 0.05 returned empty (crashed). NOT a curve —
   1 value each; sweep incomplete.
-- **`apoptosis_3d.mode` on `b_gs_plain_soft_lo_death`:** older → 6848 cells/protr 1.153;
+- **`cell_die.mode` on `b_gs_plain_soft_lo_death`:** older → 6848 cells/protr 1.153;
   smaller → 6813/protr 1.181. Mode is nearly inert on shape at this cap. 2 values.
-- **`apoptosis_3d.max_mark_frac` on `b_gs_shaping_sharp_hi_death`:** 0.001 → 17,446 cells/protr
+- **`cell_die.max_mark_frac` on `b_gs_shaping_sharp_hi_death`:** 0.001 → 17,446 cells/protr
   1.274; 0.002 → 17,505/protr 1.342/grip 0.090. Cells flat; protr rises. Use 0.002; break above it
   untested. 2 values.
-- **`shape_energy_3d.K_bend` on `b_gs_shaping_soft_lo`:** 0.03 → protr 1.233/grip 0.083;
+- **`cell_mechanics.K_bend` on `b_gs_shaping_soft_lo`:** 0.03 → protr 1.233/grip 0.083;
   0.05 → protr 1.274/grip 0.096. Both rise (see L1). Use 0.05; break above untested. 2 values.
 
 ## Facts established r002
@@ -64,7 +64,7 @@
   `invagination_peak` only 0.37; apoptosis does not fold the sheet inward at this cap.
 
 ## STANDING LAWS (r002 update)
-- **L2 REFUTED as monotone.** `apoptosis_3d.max_mark_frac` raises `protr` only up to ~0.01, then
+- **L2 REFUTED as monotone.** `cell_die.max_mark_frac` raises `protr` only up to ~0.01, then
   FALLS: 0.001→1.274, 0.002→1.342 (r001); 0.01→1.321, 0.02→1.246 (r002, b_gs_shaping_sharp_hi_death).
   Peaks near 0.01. status: REFUTED (non-monotone; earlier up-claim held only 0.001–0.002).
 - **L3 HOLDS.** `r002_01` aspect_peak 3.973, `r002_04` 2.672 — both buds by the eye, aspect_final 0.
@@ -72,15 +72,15 @@
   runs, cells 3463/5468/22245/41865 → grip 0.136/0.141/0.068/0.087. status: HOLDS (no run inverts).
 
 ## Route A closures (r002)
-- **`grow_3d.rho` on `b_gs_plain_soft_lo`:** 0.1→7261 cells/protr 1.176/grip 0.072;
+- **`cell_grow.rho` on `b_gs_plain_soft_lo`:** 0.1→7261 cells/protr 1.176/grip 0.072;
   0.25→12205/1.185/0.081. rho drives cell count but protr is FLAT (~1.18) — growth buys lobes, not
   elongation. Use for coarsening cell count only. 2 values.
-- **`apoptosis_3d.mode` on `b_gs_plain_soft_lo_death`:** crowded→6838 cells/protr 1.169;
+- **`cell_die.mode` on `b_gs_plain_soft_lo_death`:** crowded→6838 cells/protr 1.169;
   dimmer→6641/1.168. Mode inert on shape (reconfirms r001). CLOSED, 2 values.
-- **`apoptosis_3d.max_mark_frac` on `b_gs_shaping_sharp_hi_death`:** 0.01→15622 cells/protr 1.321/
+- **`cell_die.max_mark_frac` on `b_gs_shaping_sharp_hi_death`:** 0.01→15622 cells/protr 1.321/
   grip 0.104; 0.02→12428/1.246/0.085. protr and grip both FALL — the knob overshot here (see L2).
   Use ≤0.01. 2 values.
-- **`shape_energy_3d.K_bend` on `b_gs_shaping_soft_lo`:** 0.12→7810 cells/protr 1.320/grip 0.094.
+- **`cell_mechanics.K_bend` on `b_gs_shaping_soft_lo`:** 0.12→7810 cells/protr 1.320/grip 0.094.
   1 value this round; extends L1 upward (0.05→1.274 < 0.12→1.320). Break still untested. 1 value.
 
 ## Facts established r003
@@ -104,21 +104,21 @@
   mech_p_ratio 0 — a settings/death-twin failure, not biology.
 
 ## STANDING LAWS (r003 update)
-- **L1 REFUTED as monotone.** `shape_energy_3d.K_bend` on `b_gs_shaping_soft_lo` peaks near 0.12:
+- **L1 REFUTED as monotone.** `cell_mechanics.K_bend` on `b_gs_shaping_soft_lo` peaks near 0.12:
   0.03→1.233, 0.05→1.274, 0.12→1.320, 0.2→1.244 (`r003_08`). status: REFUTED (non-monotone).
 - **L3 HOLDS.** `r003_07` aspect_peak 3.169, `r003_06` 2.036 — both buds, aspect_final 0.
 - **L4 HOLDS.** 6 more runs, no inversion: cells 3518/5302/8773 → grip 0.136/0.137/0.134;
   11936/30134 → grip 0.080/0.087.
 
 ## Route A closures (r003)
-- **`grow_3d.rho` on `b_gs_plain_soft_lo`:** 0.5→30134 cells/protr 1.189/grip 0.087 (`r003_10`).
+- **`cell_grow.rho` on `b_gs_plain_soft_lo`:** 0.5→30134 cells/protr 1.189/grip 0.087 (`r003_10`).
   With r002 (0.1→7261, 0.25→12205): rho drives cells monotonically but protr is FLAT ~1.18 across
   the whole range — growth buys cells/lobes, never elongation. CLOSED, 3 values. Stop sweeping rho.
-- **`shape_energy_3d.K_bend` on `b_gs_shaping_soft_lo`:** 0.2→3544 cells/protr 1.244/grip 0.080
+- **`cell_mechanics.K_bend` on `b_gs_shaping_soft_lo`:** 0.2→3544 cells/protr 1.244/grip 0.080
   (`r003_08`). Protr FELL from the 0.12 peak (see L1). Use ~0.12; CLOSED above it. 4 values total.
-- **`shape_energy_3d.Lambda` on `b_gs_shaping_soft_lo`:** 0.3→11936 cells/protr 1.186/grip 0.080
+- **`cell_mechanics.Lambda` on `b_gs_shaping_soft_lo`:** 0.3→11936 cells/protr 1.186/grip 0.080
   (`r003_15`). 1 value; sweep incomplete.
-- **`apoptosis_3d.max_mark_frac` on `b_gs_plain_soft_lo_death`:** 0.001→6876 cells/protr 1.174/
+- **`cell_die.max_mark_frac` on `b_gs_plain_soft_lo_death`:** 0.001→6876 cells/protr 1.174/
   grip 0.081 (`r003_09`), premises intact. 1 value; extends nothing new.
 
 ## Facts established r004
@@ -145,15 +145,15 @@
   `r004_07` reaches grip 0.147 at 14809 cells by invagination, a second mechanism.
 
 ## Route A closures (r004)
-- **`shape_energy_3d.Lambda` on `b_gs_shaping_soft_lo`:** 0.45→11443 cells/protr 1.210/grip 0.069;
+- **`cell_mechanics.Lambda` on `b_gs_shaping_soft_lo`:** 0.45→11443 cells/protr 1.210/grip 0.069;
   0.6→7106/1.330/grip 0.103; 0.8→2794/1.197/grip 0.041 (pattern collapses — `act_cv` 17.3, `corr`
   −0.012). Lambda drives cells DOWN monotone; protr and grip PEAK at 0.6. Use 0.6; chemistry dies at
   0.8. With r003 (0.3→11936): CLOSED, 4 values.
-- **`grow_3d.vth_frac` on `b_gs_plain_soft_lo`:** 4→10803 cells/protr 1.344/grip 0.125; 6→10822/
+- **`cell_grow.vth_frac` on `b_gs_plain_soft_lo`:** 4→10803 cells/protr 1.344/grip 0.125; 6→10822/
   1.348/0.124. INERT — identical across the range. CLOSED, 2 values. Stop sweeping vth_frac.
-- **`grow_3d.rho` on `b_bru_question`:** both 0.05 and 0.1 returned empty (crashed). Base rules
+- **`cell_grow.rho` on `b_bru_question`:** both 0.05 and 0.1 returned empty (crashed). Base rules
   itself out — do not reuse `b_bru_question`.
-- **`apoptosis_3d.max_mark_frac` on `b_gs_plain_soft_lo_death`:** 0.002→6962 cells/protr 1.171/grip
+- **`cell_die.max_mark_frac` on `b_gs_plain_soft_lo_death`:** 0.002→6962 cells/protr 1.171/grip
   0.080. 1 value, consistent with r003; extends nothing.
 
 ## Facts established r005
@@ -187,18 +187,18 @@
   0.0158 at 6580 cells (LOW). High-N folding now reaches higher grip than low-N coarsening.
 
 ## Route A closures (r005)
-- **`grow_3d.vth_frac` on `b_gs_plain_soft_lo`:** 10→10822 cells/protr 1.348/grip 0.124. With r004
+- **`cell_grow.vth_frac` on `b_gs_plain_soft_lo`:** 10→10822 cells/protr 1.348/grip 0.124. With r004
   (4→1.344, 6→1.348): INERT across 4/6/10. CLOSED, 3 values. Stop sweeping vth_frac.
-- **`shape_energy_3d.K_bend` on `b_gs_shaping_soft_lo`:** 0→10516 cells/protr 1.234/grip 0.070;
+- **`cell_mechanics.K_bend` on `b_gs_shaping_soft_lo`:** 0→10516 cells/protr 1.234/grip 0.070;
   0.005→10620/1.208/0.077. Both below the 0.12 peak (L1); protr flat, grip near-flat at the low end.
   Use ~0.12. CLOSED region 0–0.005.
-- **`apoptosis_3d.max_mark_frac` on `b_gs_plain_soft_lo_death`:** 0.01→6595 cells/protr 1.159/grip
+- **`cell_die.max_mark_frac` on `b_gs_plain_soft_lo_death`:** 0.01→6595 cells/protr 1.159/grip
   0.075/n_apop 332; 0.02→5855/1.171/0.073/n_apop 932. Cells fall, protr near-flat, no invagination
   (≤0.21). Reconfirms L2 non-monotone plateau near 0.01. 2 values.
-- **`divide_3d.factor` on `b_gs_plain_soft_lo`:** 2.4→3493 cells/protr 1.106/grip 0.048/v_cell_mean
+- **`cell_divide.factor` on `b_gs_plain_soft_lo`:** 2.4→3493 cells/protr 1.106/grip 0.048/v_cell_mean
   0.458. 1 value; low division → few cells but lowest protr/grip of the round (fat cells, weak lobing).
   Sweep incomplete.
-- **`grow_3d.rho` on `b_bru_question`:** 0.05 and 0.1 both empty (crashed) again — base RULED OUT
+- **`cell_grow.rho` on `b_bru_question`:** 0.05 and 0.1 both empty (crashed) again — base RULED OUT
   (reconfirms r001/r004). Do not reuse `b_bru_question`.
 
 ## Facts established r006
@@ -216,7 +216,7 @@
 ## SURPRISES (r006)
 - **`r006_11` act_cv_peak 11.67** vs control 2.20 (5.3×) — the round's spikiest chemistry (4 spots
   final, spot_spacing 14.19 cells, closest to Okuda's ~10-spot scale), unpredicted (round tested aspect).
-- **`r006_12` and `r006_14` bit-identical** (divide_3d.factor 5 vs 8 → both 2000 cells / protr 1.063) —
+- **`r006_12` and `r006_14` bit-identical** (cell_divide.factor 5 vs 8 → both 2000 cells / protr 1.063) —
   a rail: division saturates above factor 3, the two Route-A rungs measure the same tissue.
 - `r006_09` P12 NaN crash from frame 1635 (6th: r001_09/r002_08/r003_11/r004_11/r005_09); r006_13/15 empty.
 - `r006_02` P4 death: act_max_final 0, mech_p_ratio 0 — chemistry flashed once and died.
@@ -227,9 +227,9 @@
   low-N `r006_11` 0.151 at 2661 cells — folding route out-grips coarsening route again (r005_04).
 
 ## Route A closures (r006)
-- **`divide_3d.factor` on `b_gs_plain_soft_lo`:** 3→2156 cells/protr 1.064/grip 0.032; 5→2000/1.063/0.032;
+- **`cell_divide.factor` on `b_gs_plain_soft_lo`:** 3→2156 cells/protr 1.064/grip 0.032; 5→2000/1.063/0.032;
   8→2000/1.063/0.032. INERT above 3 (5 and 8 bit-identical). CLOSED, 3 values. Stop sweeping factor.
-- **`shape_energy_3d.K_bend` on `b_gs_shaping_soft_lo`:** 0.08→9129 cells/protr 1.298/grip 0.098;
+- **`cell_mechanics.K_bend` on `b_gs_shaping_soft_lo`:** 0.08→9129 cells/protr 1.298/grip 0.098;
   0.3→2661/protr 1.432/grip 0.151/act_cv 11.674. Higher K_bend → fewer cells, higher protr+grip, but
   chemistry destabilises (act_cv 11.7). Use ~0.3; break in act_cv above it. 2 values, sweep open upward.
 
@@ -262,11 +262,11 @@
   low-N→high-grip claim is route-dependent, not general.
 
 ## Route A closures (r007)
-- **`grow_3d.a_sw` on `b_gs_plain_soft_lo`:** 0.1→18632 cells/protr 1.236/grip 0.107; 0.2→12631/1.238/
+- **`cell_grow.a_sw` on `b_gs_plain_soft_lo`:** 0.1→18632 cells/protr 1.236/grip 0.107; 0.2→12631/1.238/
   0.100; 0.5→4471/1.133/0.058; 0.7→3076/1.098/0.041. a_sw (activation switch width) drives cells,
   protr AND grip all DOWN monotone — a low switch width grows more tissue and grips harder. Use a_sw
   0.1; no break, chemistry intact throughout. CLOSED, 4 values.
-- **`shape_energy_3d.K_lumen` on `b_gs_shaping_soft_lo`:** 0→10119 cells/protr 1.261/grip 0.083;
+- **`cell_mechanics.K_lumen` on `b_gs_shaping_soft_lo`:** 0→10119 cells/protr 1.261/grip 0.083;
   0.1→10352/1.247/grip 0.070. Near-inert — K_lumen slightly LOWERS protr and grip. Use 0. 2 values.
 
 ## Facts established r008
@@ -283,10 +283,10 @@
 - **L3 HOLDS.** No aspect signal this round to test it — aspect_final 0 on all 5 runs.
 
 ## Route A closures (r008)
-- **`grow_3d.hill` on `b_gs_plain_soft_lo`:** 1→7887 cells/protr 1.151/grip 0.073;
+- **`cell_grow.hill` on `b_gs_plain_soft_lo`:** 1→7887 cells/protr 1.151/grip 0.073;
   2→6998/1.168/0.078; 8→7480/1.188/0.077. Near-INERT — faint monotone protr rise, grip flat.
   CLOSED, 3 values. Stop sweeping hill.
-- **`shape_energy_3d.K_lumen` on `b_gs_shaping_soft_lo`:** 2→10296 cells/protr 1.279/grip 0.0915.
+- **`cell_mechanics.K_lumen` on `b_gs_shaping_soft_lo`:** 2→10296 cells/protr 1.279/grip 0.0915.
   With r007 (0→1.261/0.083; 0.1→1.247/0.070): NON-MONOTONE, 2 mildly beats 0 on protr AND grip —
   REVISES the r007 "use 0, lowers grip" closure. 3 values; one rung (5) left to confirm or reject.
 
@@ -320,18 +320,18 @@
   low-N coarsening — matches r005_04/r006_06/r007's a_sw inversion.
 
 ## Route A closures (r009)
-- **`grow_3d.rate` on `b_gs_plain_soft_lo`:** 0.000433→3486 cells/protr 1.079/grip 0.041;
+- **`cell_grow.rate` on `b_gs_plain_soft_lo`:** 0.000433→3486 cells/protr 1.079/grip 0.041;
   0.001732→22565/1.270/0.105. rate drives cells ×6.5 and protr AND grip UP monotone — the growth
   lever that also lifts grip (unlike rho, which left protr flat). Break untested above 0.001732.
   2 values, sweep OPEN upward.
-- **`grow_3d.hill` on `b_gs_plain_soft_lo`:** 16→7902 cells/protr 1.213/grip 0.082. With r008
+- **`cell_grow.hill` on `b_gs_plain_soft_lo`:** 16→7902 cells/protr 1.213/grip 0.082. With r008
   (1/2/8 → protr 1.151/1.168/1.188, grip flat ~0.076): INERT across 1–16. CLOSED, 4 values.
-- **`shape_energy_3d.K_lumen` on `b_gs_shaping_soft_lo`:** 8→10100 cells/protr 1.249/grip 0.080.
+- **`cell_mechanics.K_lumen` on `b_gs_shaping_soft_lo`:** 8→10100 cells/protr 1.249/grip 0.080.
   With r007/r008 (0/0.1/2 → grip 0.083/0.070/0.0915, protr 1.261/1.247/1.279): grip capped ~0.09,
   protr non-monotone peaks at 2. Use 2. CLOSED 0–8, 4 values.
-- **`interface_line_tension_3d.K_purse` on `b_gs_shaping_soft_lo`:** 0→6917 cells/protr 1.186/
+- **`interface_tension.K_purse` on `b_gs_shaping_soft_lo`:** 0→6917 cells/protr 1.186/
   grip 0.079 — the purse-string at 0 = baseline. 1 value; sweep open.
-- **`grow_3d.rho` on `b_bru_question`:** empty (crashed) again — base RULED OUT (reconfirms
+- **`cell_grow.rho` on `b_bru_question`:** empty (crashed) again — base RULED OUT (reconfirms
   r001/r004/r005). Do not reuse `b_bru_question`.
 
 ## Facts established r010
@@ -364,15 +364,15 @@
   whole-body egg, `r010_05` aspect_peak 1.41 a bud. aspect_peak/n_tubes ≠ finger.
 
 ## Route A closures (r010)
-- **`cell_react.F` on `b_gs_plain_soft_lo`:** 0.03→5413 cells/protr 1.155/grip 0.068 (`r010_14`).
+- **`cell_chem_react.F` on `b_gs_plain_soft_lo`:** 0.03→5413 cells/protr 1.155/grip 0.068 (`r010_14`).
   1 value; sweep incomplete.
-- **`grow_3d.rate` on `b_gs_plain_soft_lo`:** 0.003464 and 0.006928 both EMPTY (crashed). With r009
+- **`cell_grow.rate` on `b_gs_plain_soft_lo`:** 0.003464 and 0.006928 both EMPTY (crashed). With r009
   (0.000433/0.001732 ran clean): rate CRASHES this base above ~0.0017. Ceiling found. Do not exceed
   0.001732 on b_gs_plain_soft_lo.
-- **`interface_line_tension_3d.K_purse` on `b_gs_shaping_soft_lo`:** 0.25→8620 cells/protr 1.263/
+- **`interface_tension.K_purse` on `b_gs_shaping_soft_lo`:** 0.25→8620 cells/protr 1.263/
   grip 0.083 (`r010_12`); 3→10739/1.214/0.062 (`r010_13`). With r009 (0→6917/1.186/0.079): K_purse
   raises cells monotone; protr PEAKS at 0.25 then falls, grip falls. Use 0.25. 3 values.
-- **`grow_3d.rho` on `b_bru_question`:** empty (crashed) again — base RULED OUT (reconfirms
+- **`cell_grow.rho` on `b_bru_question`:** empty (crashed) again — base RULED OUT (reconfirms
   r001/r004/r005/r009). Do not reuse `b_bru_question`.
 
 ## Facts established r011
@@ -408,15 +408,15 @@
   13172 is the highest-N high-grip on file). No clean monotone; route-dependent, as r007/r009.
 
 ## Route A closures (r011)
-- **`grow_3d.rho` on `b_bru_question`:** 0.05→60066 cells/protr 1.030/grip 0.003; 0.1→47291/1.020/
+- **`cell_grow.rho` on `b_bru_question`:** 0.05→60066 cells/protr 1.030/grip 0.003; 0.1→47291/1.020/
   0.003; 0.25→45352/1.016/0.003 — all P4+P12 (NaN). rho near-INERT on cell count; base grows huge
   inert tissue, chemistry diverges every value. CLOSED, 3 values — RETIRE base.
-- **`cell_react.F` on `b_gs_plain_soft_lo`:** 0.038→6142 cells/protr 1.185/grip 0.077. With r010
+- **`cell_chem_react.F` on `b_gs_plain_soft_lo`:** 0.038→6142 cells/protr 1.185/grip 0.077. With r010
   (0.03→5413/1.155/0.068): F raises cells, protr, grip mildly monotone. 2 values, open.
-- **`interface_line_tension_3d.K_purse` on `b_gs_shaping_soft_lo`:** 6→10973 cells/protr 1.165/grip
+- **`interface_tension.K_purse` on `b_gs_shaping_soft_lo`:** 6→10973 cells/protr 1.165/grip
   0.058. With r009/r010 (0→0.079, 0.25→0.083, 3→0.062): grip peaks at 0.25, falls monotone to 6.
   Use 0.25. CLOSED 0–6, 4 values.
-- **`shape_energy_3d.K_V` on `b_gs_shaping_soft_lo`:** 5→2010 cells/protr 1.012/grip 0/P1 broken/
+- **`cell_mechanics.K_V` on `b_gs_shaping_soft_lo`:** 5→2010 cells/protr 1.012/grip 0/P1 broken/
   act_cv 21.9. K_V 5 freezes growth (cells flat 2000) and kills the pattern. 1 value; sweep down.
 
 ## Facts established r012
@@ -450,15 +450,15 @@
   monotone, route-dependent (as r007/r009/r011).
 
 ## Route A closures (r012)
-- **`shape_energy_3d.K_V` on `b_gs_shaping_soft_lo`:** 10→2004 cells/protr 1.044/grip −0.000/P4
+- **`cell_mechanics.K_V` on `b_gs_shaping_soft_lo`:** 10→2004 cells/protr 1.044/grip −0.000/P4
   (growth frozen, chemistry dead); 40→12748/1.322/grip 0.119; 80→12755/1.303/grip 0.096. Strong
   lever with a THRESHOLD between 10 and 40 — below ~10 growth freezes and the pattern dies (reconfirms
   r011 K_V 5→2010/P1), 40 is the peak, 80 plateaus/slightly falls. Use 40. 3 values (+r011's 5).
-- **`grow_3d.vth_frac` on `b_bru_question`:** 4→empty (crashed); 6→32246 cells/protr 1.020/grip
+- **`cell_grow.vth_frac` on `b_bru_question`:** 4→empty (crashed); 6→32246 cells/protr 1.020/grip
   0.003/P4+P12 (act_cv 179, NaN). Huge inert tissue that cannot pattern — RETIRE (reconfirms r011).
-- **`grow_3d.rho` on `b_bru_question`:** 0.5→empty (crashed). Base ruled out (reconfirms
+- **`cell_grow.rho` on `b_bru_question`:** 0.5→empty (crashed). Base ruled out (reconfirms
   r001/r004/r005/r009/r010).
-- **`grow_3d.rate` on `b_gs_plain_soft_lo`:** 0.003464 and 0.006928 both empty (crashed) — reconfirms
+- **`cell_grow.rate` on `b_gs_plain_soft_lo`:** 0.003464 and 0.006928 both empty (crashed) — reconfirms
   the r010 ceiling ~0.0017. Do not exceed.
 
 ## Facts established r013
@@ -495,38 +495,38 @@
   file; high-N folding out-grips low-N coarsening again (r005_04/r006_06/r009/r011/r012).
 
 ## Route A closures (r013)
-- **`shape_energy_3d.Lambda` on `b_gs_shaping_soft_lo`:** 0→12318 cells/protr 1.257/grip 0.093;
+- **`cell_mechanics.Lambda` on `b_gs_shaping_soft_lo`:** 0→12318 cells/protr 1.257/grip 0.093;
   0.2→12166/1.238/0.096; 1→2688/1.189/grip 0.071/act_cv 16.77 (chemistry destabilizes, cells collapse
   to 2688). protr/grip near-flat 0–0.2, pattern dies at 1. Use ≤0.2. With r003/r004 (0.3/0.45/0.6/0.8
   peaked at 0.6): CLOSED at the low end.
-- **`cell_react.F` on `b_gs_plain_soft_lo`:** 0.054→7638 cells/protr 1.185/grip 0.087. With r010/r011
+- **`cell_chem_react.F` on `b_gs_plain_soft_lo`:** 0.054→7638 cells/protr 1.185/grip 0.087. With r010/r011
   (0.03→1.155/0.068, 0.038→1.185/0.077): F raises cells and grip mildly monotone. 3 values.
-- **`grow_3d.rate` on `b_gs_plain_soft_lo`:** 0.003464 and 0.006928 both empty again — reconfirms the
+- **`cell_grow.rate` on `b_gs_plain_soft_lo`:** 0.003464 and 0.006928 both empty again — reconfirms the
   r010 ceiling ~0.0017.
-- **`b_bru_question` (`grow_3d.rho` 0.5, `vth_frac` 4):** empty (crashed) — base RULED OUT, reconfirmed.
+- **`b_bru_question` (`cell_grow.rho` 0.5, `vth_frac` 4):** empty (crashed) — base RULED OUT, reconfirmed.
 
 ## Facts established r014
 - **`r013_05` (the star) is seed-floor-robust, not a fluke.** `r014_02` — a set_impl edit that turned
   out inert — is **bit-identical** to the verbatim control `r014_00`: grip 0.273, invag 0.617,
   reduced_volume 0.285, n_tubes 11, 12201 cells all reproduce exactly. The campaign records stand.
 - **The star's arms are growth-buckling; the purse-string adds ~3 arms, not the star.** `r014_01`
-  removed `interface_line_tension_3d` from r013_05: n_tubes 11→8, grip 0.273→0.220, protr 1.408→1.337,
+  removed `interface_tension` from r013_05: n_tubes 11→8, grip 0.273→0.220, protr 1.408→1.337,
   invag 0.617→0.608 — still a 6–8-petal rosette (eye). Line tension is a modifier, not the generator.
-- **The shape_to_chem feedback leg is INERT on b_star (beta=0).** `r014_02` `set_impl shape_to_chem →
+- **The cell_chem_from_shape feedback leg is INERT on b_star (beta=0).** `r014_02` `set_impl cell_chem_from_shape →
   apical_area` is bit-identical to the curvature control — the impl swap changes nothing because
   beta=0, so the loop is not closed. Any feedback-geometry claim requires beta≠0 first.
-- **Halving `cell_react.kk` 0.062→0.031 coarsens to Okuda's ~10-cell scale but runs the reaction
+- **Halving `cell_chem_react.kk` 0.062→0.031 coarsens to Okuda's ~10-cell scale but runs the reaction
   hot.** `r014_04`: spot_spacing_cells 4.04→12.01 (Okuda scale reached), but cells 12201→17182 (+41%),
   red_frac_peak 0.472→0.814, act_max 1.47→2.19, grip 0.247, protr 1.358. Eye: 7–9 red-tipped pointed
   arms ("first clear multi-armed protrusion field"). kk is the wavelength lever but NOT clean —
   coupled to activator amplitude and overgrowth.
-- **A mechanics leg at low growth does not finger r007_03.** Adding `interface_line_tension_3d`
+- **A mechanics leg at low growth does not finger r007_03.** Adding `interface_tension`
   (`r014_05`, aspect_peak 1.082, eye: never protrudes, worse than r007_03's own aspect_final 1.636)
   or halving kk (`r014_06`, aspect 1.091, broad lobes) both refuted aspect>2.152. The Okuda-envelope
   tube hypothesis is falsified on both routes.
 
 ## SURPRISES (r014)
-- **`r014_02` bit-identical to control** — `set_impl shape_to_chem → apical_area` is a no-op RAIL:
+- **`r014_02` bit-identical to control** — `set_impl cell_chem_from_shape → apical_area` is a no-op RAIL:
   the feedback operator did literally nothing (beta=0), so the impl choice is unmeasurable here.
 - **`r014_04` red_frac_peak 0.814** vs control 0.472 (1.7×) and **cells 17182** vs 12201 (1.4×) —
   round's reddest, largest tissue, UNPREDICTED (the round posed spot_spacing). Halving kk runs hot.
@@ -537,18 +537,18 @@
 ## STANDING LAWS (r014 update)
 - **L3 HOLDS.** `r014_04` eye "clear multi-armed protrusion field / pointed fingers", yet
   aspect_final 0, n_tips 0. The metric still zeroes the tips the picture shows.
-- **L5 (new) — `shape_to_chem.beta = −0.5` extinguishes the activator, morphotype-independent.**
+- **L5 (new) — `cell_chem_from_shape.beta = −0.5` extinguishes the activator, morphotype-independent.**
   evidence: `r014_03` (star r013_05) P4 broken, invag 0.617→0.031, act extinct; `r014_07` (bud
   r011_04) P4 broken, invag 0.593→0.060. Negative feedback at this magnitude is a kill switch, not a
   dimple. status: HOLDS (2 runs). Sweep beta small (±0.05) before trusting the sign as a fold lever.
 
 ## Route A closures (r014)
-- **`cell_react.F` on `b_gs_plain_soft_lo`:** 0.06→7929 cells/protr 1.188/grip 0.091. With
+- **`cell_chem_react.F` on `b_gs_plain_soft_lo`:** 0.06→7929 cells/protr 1.188/grip 0.091. With
   r010/r011/r013 (0.03→0.068, 0.038→0.077, 0.054→0.087): F raises cells and grip mildly monotone.
   4 values, no break — extend or use ~0.06.
-- **`cell_react.kk` on `b_gs_plain_soft_lo`:** 0.052→10302 cells/protr 1.185/grip 0.089 — FIRST kk
-  value on this base, ≈ cell_react.F's effect. 1 value; sweep open.
-- **`shape_energy_3d.Lambda` on `b_gs_shaping_soft_lo`:** 2→2006 cells/protr 1.018/grip −0.000/act_cv
+- **`cell_chem_react.kk` on `b_gs_plain_soft_lo`:** 0.052→10302 cells/protr 1.185/grip 0.089 — FIRST kk
+  value on this base, ≈ cell_chem_react.F's effect. 1 value; sweep open.
+- **`cell_mechanics.Lambda` on `b_gs_shaping_soft_lo`:** 2→2006 cells/protr 1.018/grip −0.000/act_cv
   9.74/P1+P4 (growth frozen, pattern dead). Reconfirms r013 (Lambda 1→2688 dead). Use ≤0.2; Lambda≥1
   kills. CLOSED upward.
 
@@ -566,8 +566,8 @@
   `act_at_tip_peak` 8.95, `red_at_tip` 0.979 — chemistry chases the extruding tips; `mech_p_ratio`
   3.765. Predicted grip>0.247, CONFIRMED. **SINGLE SEED — the edit that made it is not identified from
   metrics; REPLICATE and name the composition before building on it** (the coarse tip-chasing pattern +
-  hot activator is the signature of a closed geometry→chemistry feedback, `shape_to_chem` beta≠0, or of
-  `seed_cell_rd:cones` — either would be the first of its kind here).
+  hot activator is the signature of a closed geometry→chemistry feedback, `cell_chem_from_shape` beta≠0, or of
+  `cell_chem_seed:cones` — either would be the first of its kind here).
 - **Apoptosis DEGRADES the star's fold, does not deepen it.** `r015_04` death twin of the star:
   n_apop 77, invagination 0.617→**0.601**, grip 0.273→0.250, protr 1.408→1.367. Predicted invag>0.617,
   REFUTED. Reconfirms r001–r013: apoptosis active, no inward fold.
@@ -596,24 +596,24 @@
   cell-count-bound; the finger route out-grips both. status: HOLDS as route-dependent, now 3 routes.
 
 ## Route A closures (r015)
-- **`cell_react.kk` on `b_gs_plain_soft_lo`:** 0.057→8406 cells/protr 1.175/grip 0.080; 0.066→6101/
+- **`cell_chem_react.kk` on `b_gs_plain_soft_lo`:** 0.057→8406 cells/protr 1.175/grip 0.080; 0.066→6101/
   1.161/0.074. With r014 (0.052→10302/1.185/0.089): kk UP → cells DOWN, protr and grip mildly DOWN
   monotone. Use low kk ~0.052. 3 values, no break.
-- **`divide_3d.factor` on `b_bru_question`:** 2.4→32333 cells/protr 1.027/grip −0.004/corr −0.210/
+- **`cell_divide.factor` on `b_bru_question`:** 2.4→32333 cells/protr 1.027/grip −0.004/corr −0.210/
   red_frac 0.939/act_cv 1.41 — patterns cleanly but ANTI-grips. RETIRE reconfirmed (no NaN this time).
-- **`grow_3d.rho`/`vth_frac` on `b_bru_question`, `grow_3d.rate` on `b_gs_plain_soft_lo`:** empty
+- **`cell_grow.rho`/`vth_frac` on `b_bru_question`, `cell_grow.rate` on `b_gs_plain_soft_lo`:** empty
   (crashed). rate ceiling ~0.0017 reconfirmed; b_bru RULED OUT reconfirmed.
 
 ## Facts established r016 — THE FINGER GENERATOR ISOLATED
-- **The finger's arm is GROWTH-BUCKLING + a LIVE `shape_to_chem` feedback leg; the purse-string is
+- **The finger's arm is GROWTH-BUCKLING + a LIVE `cell_chem_from_shape` feedback leg; the purse-string is
   only a modifier.** Ablation of the finger `r015_06` (baseline: protr 2.199, aspect_final 7.544,
   ~5690 cells):
-  - remove `interface_line_tension_3d` (`r016_03`): finger SURVIVES & STRENGTHENS — protr_peak 1.83,
+  - remove `interface_tension` (`r016_03`): finger SURVIVES & STRENGTHENS — protr_peak 1.83,
     `protrusion_aspect_max_final` **21.094** (new campaign record, prev 7.544 r015_06), n_tips 2,
     n_tubes 6, morphology 'tube', red_at_tip 0.996, mech_p_ratio 2.511 (grown), eye "first true
     protrusions, tapering pointed arms." Tension is a modifier (as on star r014_01), not the generator.
-  - remove `shape_to_chem` (`r016_04`): finger → bulge (aspect 0.435, protr 1.088) AND growth runs
-    away to **50532 cells** with pattern UNIFORM (act_cv_final 0.0, red_frac 1.0). So `shape_to_chem`
+  - remove `cell_chem_from_shape` (`r016_04`): finger → bulge (aspect 0.435, protr 1.088) AND growth runs
+    away to **50532 cells** with pattern UNIFORM (act_cv_final 0.0, red_frac 1.0). So `cell_chem_from_shape`
     is LIVE (beta≠0) on r015_06 — the campaign's first CLOSED-FEEDBACK composition — and it BRAKES
     growth; removing it un-brakes it (~9× the finger's 5690 cells).
   - halve feedback F0 0.046→0.023 (`r016_01`): finger lost, protr 1.272, cells 22231, aspect_peak
@@ -622,7 +622,7 @@
     2000 cells, P4 broken. Both trivially required.
 - **The finger route is SEED-ROBUST, not a single-seed fluke.** r015_06 (seed A) and r016_03 (fresh
   seed, tension removed) both finger — answers the r015 replication worry; the ablated seed is stronger.
-- **Apoptosis does not invaginate (reconfirmed).** `r016_07` (star r013_05 + apoptosis_3d, n_apop
+- **Apoptosis does not invaginate (reconfirmed).** `r016_07` (star r013_05 + cell_die, n_apop
   85): invag_peak 0.605 < the star's 0.617.
 
 ## SURPRISES (r016)
@@ -631,7 +631,7 @@
 - **`r016_04` cells 50532** vs finger 5690 (~9×) — campaign-largest patterning tissue, UNPREDICTED
   (posed aspect<4); pattern washes uniform (act_cv_final 0.0). Removing the feedback leg un-brakes
   growth — a mechanism for the project's growth-overshoot.
-- **`r016_15` `corr_act_rad_final` −0.284 / grip −0.006** (b_bru_question, divide_3d.factor 3, 6122
+- **`r016_15` `corr_act_rad_final` −0.284 / grip −0.006** (b_bru_question, cell_divide.factor 3, 6122
   cells) — anti-grip reconfirmed (matches r015_15).
 - `r016_11` P4+P12 NaN (act_max 3.3e9, b_bru vth_frac 4) — apparatus rail.
 
@@ -640,22 +640,22 @@
   picture agree again.
 - **L4 HOLDS — finger route.** aspect_final 21.094 at 5511 cells (`r016_03`); finger route out-grips
   folding and is now seed-robust.
-- **L6 (new) — the `shape_to_chem` feedback leg both MAKES the finger and BRAKES growth.** evidence:
+- **L6 (new) — the `cell_chem_from_shape` feedback leg both MAKES the finger and BRAKES growth.** evidence:
   remove it (`r016_04`) → aspect 7.544→0.435 AND cells 5690→50532 uniform; halve F0 (`r016_01`) →
   protr 2.199→1.272, cells→22231. status: HOLDS (2 runs). Sweep F0/beta both signs from r016_03.
 - **L5 UNTESTED this round** (no negative-beta run).
 
 ## Route A closures (r016)
-- **`cell_react.kk` on `b_gs_plain_soft_lo`:** 0.07→5351 cells/protr 1.164/grip 0.068 (`r016_12`).
+- **`cell_chem_react.kk` on `b_gs_plain_soft_lo`:** 0.07→5351 cells/protr 1.164/grip 0.068 (`r016_12`).
   With r014/r015 (0.052→10302/0.089, 0.057→8406/0.080, 0.066→6101/0.074): kk UP → cells DOWN, grip
   DOWN monotone. Use low kk ~0.052. CLOSED, 4 values.
-- **`cell_diffuse.d_a` on `b_gs_plain_soft_lo`:** 0.02→6909 cells/protr 1.181/grip 0.036/act_cv_peak
+- **`cell_chem_diffuse.d_a` on `b_gs_plain_soft_lo`:** 0.02→6909 cells/protr 1.181/grip 0.036/act_cv_peak
   3.228/n_spots_final 446 (`r016_14`) — FIRST d_a value, finest pattern and lowest grip of the base.
   1 value, sweep open.
-- **`divide_3d.factor` on `b_bru_question`:** 3→6122 cells/protr 1.035/grip −0.006/corr_act_rad
+- **`cell_divide.factor` on `b_bru_question`:** 3→6122 cells/protr 1.035/grip −0.006/corr_act_rad
   −0.284 (`r016_15`) — patterns cleanly but ANTI-grips (reconfirms r015_15). RETIRE base.
-- **`grow_3d.vth_frac` on `b_bru_question`:** 4→32246 cells, P4+P12 NaN (`r016_11`); `grow_3d.rho`
-  0.5 and `grow_3d.rate` empty (crashed). b_bru RULED OUT reconfirmed.
+- **`cell_grow.vth_frac` on `b_bru_question`:** 4→32246 cells, P4+P12 NaN (`r016_11`); `cell_grow.rho`
+  0.5 and `cell_grow.rate` empty (crashed). b_bru RULED OUT reconfirmed.
 
 ## Facts established r017
 - **The finger is seed-robust at 3 seeds and out-folds the star.** `r017_05` reproduces `r015_06`
@@ -686,23 +686,23 @@
   — both fingers by eye AND metric.
 - **L4 HOLDS — finger route, now the DEEPEST fold too.** `r017_05` invagination 0.754 at 5690 cells
   out-folds the 12201-cell star (0.617). High grip AND deep fold both live on the low-N finger.
-- **L7 (new) — `cell_diffuse.d_a` is the wavelength/coarsening lever on b_gs_plain: higher d_a →
+- **L7 (new) — `cell_chem_diffuse.d_a` is the wavelength/coarsening lever on b_gs_plain: higher d_a →
   fewer, wider spots, higher grip.** evidence: d_a 0.02→n_spots 446/grip 0.036 (r016_14), 0.04→250/
   0.056 (r017_13), 0.16→9/0.119 (r017_15, spot_spacing 21.15 = Okuda scale). status: HOLDS (3 values,
   grip monotone up, n_spots monotone down).
 
 ## Route A closures (r017)
-- **`cell_diffuse.d_a` on `b_gs_plain_soft_lo`:** 0.04→8121 cells/protr 1.159/grip 0.056/n_spots 250;
+- **`cell_chem_diffuse.d_a` on `b_gs_plain_soft_lo`:** 0.04→8121 cells/protr 1.159/grip 0.056/n_spots 250;
   0.16→3407/1.327/grip 0.119/invag 0.560/n_spots 9/spot_spacing 21.15 (bilobed bud, eye). With r016_14
   (0.02→6909/1.181/0.036/n_spots 446): d_a UP → n_spots DOWN monotone (coarsens), grip UP monotone,
   protr non-monotone (min at 0.04). At 0.16 reaches Okuda ~10-spot scale — the clean wavelength knob
   (cleaner than kk, which coupled to overgrowth, r014). Use high d_a; grip 0.119 = bud, not finger.
   3 values, open upward.
-- **`divide_3d.factor` on `b_bru_question`:** 5→2024 cells/v_cell 0.607/protr 1.018/grip −0.001;
+- **`cell_divide.factor` on `b_bru_question`:** 5→2024 cells/v_cell 0.607/protr 1.018/grip −0.001;
   8→2000/0.608/1.018/corr −0.167 — division SATURATED (both ~2000, cells 0.608), anti-grip. RETIRE
   reconfirmed (r006/r015/r016).
-- **`grow_3d.vth_frac` on `b_bru_question`:** 10→32246 cells, P4+P12 NaN (act_cv 179). RETIRE reconfirmed.
-- **`grow_3d.rate` on `b_gs_plain_soft_lo`:** 0.003464/0.006928 empty (crashed) — ceiling ~0.0017
+- **`cell_grow.vth_frac` on `b_bru_question`:** 10→32246 cells, P4+P12 NaN (act_cv 179). RETIRE reconfirmed.
+- **`cell_grow.rate` on `b_gs_plain_soft_lo`:** 0.003464/0.006928 empty (crashed) — ceiling ~0.0017
   reconfirmed (r010/r012/r013).
 
 ## Facts established r018
@@ -737,20 +737,20 @@
 ## STANDING LAWS (r018 update)
 - **L3 REFUTED (reconfirmed).** Control finger aspect_final 21.094 + eye "genuine fingers".
 - **L4 HOLDS — finger route.** aspect_final 21.094 at 5511 cells; seed-floor-0 across 4 slots.
-- **L7 HOLDS, ceiling found.** `cell_diffuse.d_a` 0.3 → P4 death (`r018_12`, 2051 cells, extinct
+- **L7 HOLDS, ceiling found.** `cell_chem_diffuse.d_a` 0.3 → P4 death (`r018_12`, 2051 cells, extinct
   ~frame 220). Wavelength knob dies between 0.16 (r017, alive, n_spots 9) and 0.3. Use ≤0.16.
 - **L5 (negative beta kill switch) UNTESTED this round.**
 
 ## Route A closures (r018)
-- **`cell_diffuse.chi` on `b_gs_plain_soft_lo`:** 0.3→4488 cells/protr 1.257/grip 0.100/act_cv 3.455/
+- **`cell_chem_diffuse.chi` on `b_gs_plain_soft_lo`:** 0.3→4488 cells/protr 1.257/grip 0.100/act_cv 3.455/
   n_spots 143/spot_spacing 2.78/reduced_vol 0.752 (`r018_14`). The FIRST chi value off the
   campaign-wide fixed 1.3 (see campaign §F009). chi 0.3 makes the FINEST pattern on file — chi is a
   wavelength lever, low chi → many fine spots. 1 value; sweep UP (chi>1.3) to coarsen toward Okuda.
-- **`cell_diffuse.d_a` on `b_gs_plain_soft_lo`:** 0.3→2051 cells/protr 1.014/grip 0.000/P4 dead
+- **`cell_chem_diffuse.d_a` on `b_gs_plain_soft_lo`:** 0.3→2051 cells/protr 1.014/grip 0.000/P4 dead
   (`r018_12`). Extends L7: d_a alive at 0.16, dead at 0.3 — ceiling between. CLOSED upward at 0.3.
-- **`grow_3d.a_sw` on `b_bru_question`:** 0.5→29974 cells/P4+P12 NaN (`r018_15`, act_max NaN, act_cv
+- **`cell_grow.a_sw` on `b_bru_question`:** 0.5→29974 cells/P4+P12 NaN (`r018_15`, act_max NaN, act_cv
   173). b_bru RULED OUT reconfirmed (grows huge inert tissue, cannot pattern).
-- **`grow_3d.rate` on `b_gs_plain_soft_lo`:** 0.003464/0.006928 empty (crashed) — ceiling ~0.0017
+- **`cell_grow.rate` on `b_gs_plain_soft_lo`:** 0.003464/0.006928 empty (crashed) — ceiling ~0.0017
   reconfirmed.
 
 ## Facts established r019
@@ -759,7 +759,7 @@
   n_tubes_peak 7, corr_act_rad_peak 0.927, reduced_volume_final 0.417, mech_p_ratio 3.746. Eye: "5–6
   sharp fingers grow from sphere." A stronger low-N finger sibling of the control; its edit is NOT
   identifiable from metrics — REPLICATE and name it. mech_p_ratio 3.746 is NOT forcing (no
-  extrusion_forcing_3d in the space, user §3) — grown.
+  interface_push in the space, user §3) — grown.
 - **New campaign invagination = `r019_01` invagination_peak 0.978 BUT P11 broken** (self-intersecting
   mesh, not a clean tissue): 23527 cells, reduced_volume_final 0.288, grip_peak 0.251, protr 1.557 — a
   multi-armed star that over-grows and folds THROUGH itself at ~frame 1550 (eye). The clean
@@ -792,15 +792,15 @@
   self-fold). Cell count is the arm-vs-fold lever with a rupture ceiling near 23k. status: HOLDS (3 pts).
 
 ## Route A closures (r019)
-- **`cell_diffuse.chi` on `b_gs_plain_soft_lo`:** 0.65→6649 cells/protr 1.198/grip 0.079/n_spots 187/
+- **`cell_chem_diffuse.chi` on `b_gs_plain_soft_lo`:** 0.65→6649 cells/protr 1.198/grip 0.079/n_spots 187/
   reduced_vol 0.777; 2→6986/1.164/0.077/n_spots 29/0.799. chi UP (0.65→2) COARSENS n_spots 187→29 but
   protr and grip stay FLAT (~1.18/0.078). With r018 (chi 0.3→143): chi 2 is nearest Okuda's ~10 (29
   spots) yet still 3× too many and grip never lifts off baseline. Use chi 2 for coarsening only; sweep
   open above 2.
-- **`grow_3d.a_sw` on `b_bru_question`:** 0.1/0.2 empty (crashed); 0.7→23883 cells/protr 1.023/grip
+- **`cell_grow.a_sw` on `b_bru_question`:** 0.1/0.2 empty (crashed); 0.7→23883 cells/protr 1.023/grip
   0.002/act_cv 1.357 — grows huge, patterns HOT (act_max 9.31, no NaN this time) but fully decoupled.
   b_bru RULED OUT reconfirmed (anti-grip, not NaN; matches r015_15/r017). Retire.
-- **`grow_3d.rate` on `b_gs_plain_soft_lo`** (0.003464/0.006928) and **`grow_3d.rho` on
+- **`cell_grow.rate` on `b_gs_plain_soft_lo`** (0.003464/0.006928) and **`cell_grow.rho` on
   `b_bru_question`** (0.5): both empty — rate ceiling ~0.0017 and b_bru ruled out, both reconfirmed.
 
 ## Facts established r020
@@ -822,7 +822,7 @@
   n_tips_peak>6, refuted at 0).
 - **`r020_14` grip 0.0006 / corr_act_rad_final 0.033 with a LIVE 43-spot pattern** (act_cv 1.825,
   act_max 0.942) — a fully DECOUPLED live pattern on a sphere: the geometry ignores the chemistry.
-  UNPREDICTED (Route A, shape_to_chem.beta −2).
+  UNPREDICTED (Route A, cell_chem_from_shape.beta −2).
 - **`r020_01` cells 24661** vs control 5511 (4.5×), reduced_volume 0.308 heavy crumple-fold yet
   aspect_final 0, P11 INTACT — over-growth above r019_01's 23527-cell tear without rupturing.
   UNPREDICTED (posed n_tubes). The L8 rupture ceiling is stochastic near 23–25k, not a hard line.
@@ -836,17 +836,17 @@
   lost the arm (aspect_final 0 at 3144→24661 cells). High grip AND the arm both require the window.
 - **L8 HOLDS, rupture ceiling NOT clean.** `r020_01` 24661 cells → reduced_volume 0.308, P11 intact,
   ABOVE r019_01's 23527-cell tear. Rupture near 23–25k is stochastic, not a hard threshold.
-- **L9 (new) — `shape_to_chem.beta` < 0 is base-dependent: KILLS on b_star, DECOUPLES on b_gs_plain.**
+- **L9 (new) — `cell_chem_from_shape.beta` < 0 is base-dependent: KILLS on b_star, DECOUPLES on b_gs_plain.**
   evidence: r014 beta −0.5 on b_star → P4, activator extinct (L5); `r020_14` beta −2 on b_gs_plain →
   activator ALIVE (act_max 0.942) but grip 0.0006 / corr 0.033. status: HOLDS (2 bases).
 
 ## Route A closures (r020)
-- **`cell_diffuse.chi` on `b_gs_plain_soft_lo`:** 2.8→6194 cells/protr 1.229/grip 0.123/n_spots_final
+- **`cell_chem_diffuse.chi` on `b_gs_plain_soft_lo`:** 2.8→6194 cells/protr 1.229/grip 0.123/n_spots_final
   14/spot_spacing 11.01/reduced_vol 0.696 (`r020_12`). With r018/r019 (0.3→143, 0.65→187, 2→29): chi UP
   COARSENS n_spots monotone; 2.8 = 14 spots, NEAREST Okuda's ~10 on file, but grip stays FLAT ~0.12
   across the whole range. Use chi 2.8 for coarsening only; grip never lifts off baseline. CLOSED, 4
   values — the wavelength knob does not buy coupling.
-- **`shape_to_chem.beta` on `b_gs_plain_soft_lo`:** −2→3276 cells/protr 1.034/grip 0.0006/corr_act_rad
+- **`cell_chem_from_shape.beta` on `b_gs_plain_soft_lo`:** −2→3276 cells/protr 1.034/grip 0.0006/corr_act_rad
   0.033/act_cv 1.825, chemistry ALIVE (act_max 0.942, `r020_14`). Negative beta DECOUPLES the pattern
   from the shape (grip→0) WITHOUT extinguishing the activator on this base (see L9). 1 value; sweep
   small negative to find where decoupling begins.
@@ -862,9 +862,9 @@
   14.719, n_tips_peak 6, mech_p_ratio 3.746 (grown), eye "genuine sharp radial spikes." Predicted
   n_tips_peak>6 → refuted at 6. r019_06 is now the campaign's 2nd named finger composition (with the
   5511-cell control), confirmed at 2 seeds; both live in the ~5500–5825-cell window (L4).
-- **`shape_to_chem` is DEAD at beta 0 on b_gs_plain — a labyrinth, not a coupled field.** `r021_12`
+- **`cell_chem_from_shape` is DEAD at beta 0 on b_gs_plain — a labyrinth, not a coupled field.** `r021_12`
   (beta 0): grip 0.006, mech_p_ratio 0, eye "clearest Turing stripe/labyrinth field the campaign has
-  shown" on a perfect sphere — chemistry patterns, mechanics never respond. The `set_impl shape_to_chem`
+  shown" on a perfect sphere — chemistry patterns, mechanics never respond. The `set_impl cell_chem_from_shape`
   edit changed nothing measurable (null). Direct evidence the feedback leg needs beta≠0 (reconfirms L6).
 - **Over-grown finger folds deep and CLEAN at 21832 cells.** `r021_06`: reduced_volume_final 0.288,
   grip 0.283, invagination 0.816, 23 spots, aspect_final 0, P11 INTACT. Predicted reduced_volume<0.40 →
@@ -889,12 +889,12 @@
 - **L4 HOLDS — finger route is a ~5500–5825-cell window, now seed-robust at TWO compositions.**
   `r021_03` = `r019_06` replicated (protr 2.296, 5825 cells); the 5511-cell control the other.
 - **L8 HOLDS, rupture ceiling stochastic.** `r021_06` 21832 cells → reduced_volume 0.288, P11 intact.
-- **L10 (new) — `shape_to_chem` coupling scales with beta on b_gs_plain; beta 0 = decoupled labyrinth.**
+- **L10 (new) — `cell_chem_from_shape` coupling scales with beta on b_gs_plain; beta 0 = decoupled labyrinth.**
   evidence: beta 0→grip 0.006/corr flat (`r021_12`), beta 1→grip 0.103/corr_act_rad_peak 0.834
   (`r021_14`); with r020 beta −2→grip 0.0006. status: HOLDS (3 pts, positive beta buys grip).
 
 ## Route A closures (r021)
-- **`shape_to_chem.beta` on `b_gs_plain_soft_lo`:** 0→4199 cells/protr 1.027/grip 0.010/act_cv 2.202
+- **`cell_chem_from_shape.beta` on `b_gs_plain_soft_lo`:** 0→4199 cells/protr 1.027/grip 0.010/act_cv 2.202
   (labyrinth, decoupled, `r021_12`); 1→7775/1.230/grip 0.103/corr_act_rad_peak 0.834/red_frac 0.461
   (`r021_14`). beta 0→1 raises cells, protr AND grip monotone (0.010→0.103); with r020 (−2→0.0006), grip
   is monotone in beta across [−2,1]. Positive beta couples pattern to shape — the wavelength knobs never
@@ -929,7 +929,7 @@
   `r022_02` eye "fingers" reads aspect_final 0 at 6280 cells (over the window).
 - **L4 HOLDS — finger window ~5500–5825, now seed-robust at 3 seeds** (`r022_03`). `r022_02` 6280 cells
   → arm gone; grip still climbs (0.221).
-- **L10 REVISED — `shape_to_chem.beta` coupling SATURATES above beta 1.** beta 0/1/2 → grip
+- **L10 REVISED — `cell_chem_from_shape.beta` coupling SATURATES above beta 1.** beta 0/1/2 → grip
   0.006/0.103/0.107 (`r021_12`/`r021_14`/`r022_13`); monotone up to 1, FLAT above. status: HOLDS,
   plateau found — stop sweeping beta up.
 - **L11 (new) — apoptosis on the finger preserves the arm but its effect on the fold is NOT monotone
@@ -938,9 +938,9 @@
   n_apop) — needs a max_mark_frac ladder on the finger death twin.
 
 ## Route A closures (r022)
-- **`shape_to_chem.beta` on `b_gs_plain_soft_lo`:** 2→8763 cells/protr 1.235/grip 0.107/n_spots 49/
+- **`cell_chem_from_shape.beta` on `b_gs_plain_soft_lo`:** 2→8763 cells/protr 1.235/grip 0.107/n_spots 49/
   reduced_vol 0.692 (`r022_13`). With r020/r021 (−2→0.0006, 0→0.010, 1→0.103): grip monotone to beta 1
   then FLAT (2≈1). Use beta 1; SATURATES above. CLOSED upward, 4 values.
-- **`shape_to_chem.F0` on `b_gs_plain_soft_lo`:** 0.02→5801 cells/protr 1.108/grip 0.043/mech_p_ratio
+- **`cell_chem_from_shape.F0` on `b_gs_plain_soft_lo`:** 0.02→5801 cells/protr 1.108/grip 0.043/mech_p_ratio
   0.0 (`r022_15`). Halving F0 kills the coupling (no mechanical response), matching r016_01's knee
   (0.023→finger lost). Feedback needs ~full F0. 1 value, knee reconfirmed.

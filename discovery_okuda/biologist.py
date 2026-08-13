@@ -88,7 +88,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
 sys.path.insert(0, HERE)
 sys.path.insert(0, os.path.join(ROOT, "src"))
-sys.path.insert(0, os.path.join(ROOT, "prototype", "Tyssue"))
+sys.path.insert(0, os.path.join(ROOT, "discovery_okuda", "ops"))
 
 CONFIG_DIR = os.path.join(ROOT, "config", "okuda")
 LOG_DIR = os.path.join(ROOT, "log", "okuda")
@@ -219,10 +219,10 @@ def p2_gate_implies_baseline(cfg):
     """#2 A morphogen sets WHERE and HOW FAST, not WHETHER. If growth is gated on a signal at all,
     ungated cells must still grow -- otherwise the tip-to-body growth ratio is infinite, which is
     a tissue whose body is frozen while its tip builds itself out of nothing."""
-    o = _ops(cfg).get("grow_3d")
+    o = _ops(cfg).get("cell_grow")
     if o is None:
         return R("P2", "static", "morphogen sets where/how fast, not whether", "na",
-                 "no grow_3d in this composition")
+                 "no cell_grow in this composition")
     rho, a_sw = float(o.get("rho", 0.0)), float(o.get("a_sw", 0.2))
     # a_sw far above any reachable activator means the switch is DISABLED -- growth is uniform and
     # the premise does not bite. Gray-Scott's activator cannot exceed ~1.
@@ -241,15 +241,15 @@ def p2_gate_implies_baseline(cfg):
 
 
 def p3_ceiling_above_trigger(cfg):
-    """#3 A cell divides because it got big. grow_3d caps a cell's target volume at
-    vth_frac*v_ref; divide_3d fires at factor*Vbirth. If the CEILING sits below the TRIGGER, no
+    """#3 A cell divides because it got big. cell_grow caps a cell's target volume at
+    vth_frac*v_ref; cell_divide fires at factor*Vbirth. If the CEILING sits below the TRIGGER, no
     cell can ever divide by reaching size and every division comes from the max_cycle stopwatch.
     This is defect D5b, and it was present in the minisite config too."""
     ops = _ops(cfg)
-    g, d = ops.get("grow_3d"), ops.get("divide_3d")
+    g, d = ops.get("cell_grow"), ops.get("cell_divide")
     if g is None or d is None:
         return R("P3", "static", "a cell divides because it got big", "na",
-                 "needs both grow_3d and divide_3d")
+                 "needs both cell_grow and cell_divide")
     vth, fac = float(g.get("vth_frac", 1.35)), float(d.get("factor", 2.0))
     if float(g.get("rho", 0.0)) <= 0 and float(g.get("a_sw", 0.2)) > 1.0:
         return R("P3", "static", "a cell divides because it got big", "na",
@@ -273,7 +273,7 @@ def p5_biology_advances_in_biological_time(cfg):
     and every 'no pattern formed' reading in the campaign was an artefact of the clock."""
     ops = _ops(cfg)
     dt = float(cfg.get("general", {}).get("dt", 1.0))
-    react = ops.get("cell_react")
+    react = ops.get("cell_chem_react")
     if react is None:
         return R("P5", "static", "mechanics is fast, biology is slow", "na",
                  "no chemistry in this composition")
@@ -297,7 +297,7 @@ def p1_tissue_gains_material(cfg, s):
     with more material than it started with. Unmeasurable before 2026-07-31: only the CVs of cell
     area and volume were recorded, never the totals."""
     ops = _ops(cfg)
-    g = ops.get("grow_3d") or ops.get("grow_3d")
+    g = ops.get("cell_grow") or ops.get("cell_grow")
     if g is None or float(g.get("rate", 0.0)) <= 0:
         return R("P1", "passive", "cells grow by taking material in", "na", "no growth operator")
     v = _col(s, "V_total")
@@ -374,7 +374,7 @@ def p3b_mean_cell_volume_holds(cfg, s):
     epithelium the MEAN cell volume returns to itself. A monotone collapse means the tissue is
     fragmenting faster than it grows -- cell number rising while each cell shrinks."""
     ops = _ops(cfg)
-    if "divide_3d" not in ops:
+    if "cell_divide" not in ops:
         return R("P3b", "passive", "mean cell volume holds under proliferation", "na",
                  "no division in this composition")
     v = _col(s, "v_cell_mean")
@@ -398,9 +398,9 @@ def _activator_zero_is_a_fixed_point(cfg):
     """Why a = 0 CANNOT leave zero in this composition -- or None if it can.
 
     DERIVED, one line of algebra per kinetics, evaluated at a = 0 with the run's own parameters
-    (tyssue_rd_ops.py, the three `cell_react` implementations). `chem` is declared with no initial
+    (chem_ops.py, the three `cell_chem_react` implementations). `chem` is declared with no initial
     value, so it starts at zero; a seeding operator is the only other source of activator, and
-    shape_to_chem writes the SUBSTRATE column only (chem[:, 1]), never the activator.
+    cell_chem_from_shape writes the SUBSTRATE column only (chem[:, 1]), never the activator.
 
         gray_scott        da = u a^2 - (F + kk) a          -> da(0) = 0 for any u. ALWAYS fixed.
         gierer_meinhardt  da = rho a^2/h - mu_a a + a0     -> da(0) = a0. Fixed ONLY at a0 == 0.
@@ -410,13 +410,13 @@ def _activator_zero_is_a_fixed_point(cfg):
                           hard-coded in translate._emit_react. NEVER fixed. Measured from zero:
                           a -> 0.26 in 50 steps, and on to the homogeneous steady state a = A.
 
-    So "no seed_cell_rd" is NOT the condition. Gating on it would silence this check on two of
+    So "no cell_chem_seed" is NOT the condition. Gating on it would silence this check on two of
     the three reactions in the bank, in exactly the case it exists for.
     """
     ops = _ops(cfg)
-    if "seed_cell_rd" in ops:
+    if "cell_chem_seed" in ops:
         return None                                    # something did seed; zero is a real failure
-    react = ops.get("cell_react") or {}
+    react = ops.get("cell_chem_react") or {}
     impl = react.get("model") or react.get("implementation")
     if impl == "gray_scott":
         return ("no seeding operator, and gray_scott's da = u*a^2 - (F+kk)*a is homogeneous in a, "
@@ -431,7 +431,7 @@ def p4_chemistry_not_extinguished(cfg, s):
     """#4/D10 Growing a cell dilutes what is inside it -- and Gray-Scott's activator is sustained
     by a QUADRATIC term, so a steady multiplicative loss beats it. Measured: 1% dilution per step
     extinguishes the pattern within 250 steps. This is why the coral never worked."""
-    if "cell_react" not in _ops(cfg):
+    if "cell_chem_react" not in _ops(cfg):
         return R("P4", "passive", "the chemistry must not be silently extinguished", "na",
                  "no chemistry in this composition")
     a = _col(s, "act_max")
@@ -447,7 +447,7 @@ def p4_chemistry_not_extinguished(cfg, s):
             # so it starts at zero; with no seeding operator the activator can only stay there if
             # a = 0 is an EXACT FIXED POINT of the chosen kinetics. That is a property of the
             # KINETICS, not of the seeding, which is why this gate reads the implementation and
-            # NOT merely `seed_cell_rd not in ops` -- see the helper: two of the three reactions
+            # NOT merely `cell_chem_seed not in ops` -- see the helper: two of the three reactions
             # leave zero on their own, and for those a peak of zero still means the reaction
             # never ran, which is exactly what this branch was written to catch.
             # `na` would be a lie: the premise APPLIES and its answer is that this composition
@@ -475,7 +475,7 @@ def p4_chemistry_not_extinguished(cfg, s):
     return R("P4", "passive", "the chemistry must not be silently extinguished", "fail",
              f"the activator decayed to {ratio:.3f} of its peak ({peak:.3f} -> {a[-1]:.3f}). The "
              f"pattern is extinct, so every downstream reading is about a dead field. The usual "
-             f"cause is growth dilution: grow_3d.conserve_amount divides chem by "
+             f"cause is growth dilution: cell_grow.conserve_amount divides chem by "
              f"(s/s_prev)^3 every frame a cell grows, and autocatalysis is quadratic, so it "
              f"loses.", dict(peak=peak, end=float(a[-1]), ratio=ratio))
 
@@ -484,14 +484,14 @@ def p12_concentrations_are_physical(cfg, s):
     """A molecular concentration is non-negative and finite. There is no such thing as -0.26 of a
     substrate.
 
-    Nothing in the engine enforced this, and it is how the shape_to_chem operator failed on its
+    Nothing in the engine enforced this, and it is how the cell_chem_from_shape operator failed on its
     first end-to-end run: the substrate went to -0.261 at frame 15, and only THEN did Gray-Scott
     diverge to +/-inf by frame 25. The negative concentration was the diagnosis and it was sitting
     in the state ten frames before anything looked wrong. A run that reaches a negative
     concentration has left the model, and every number after that point is arithmetic on a state
     the model does not define.
     """
-    if "cell_react" not in _ops(cfg):
+    if "cell_chem_react" not in _ops(cfg):
         return R("P12", "passive", "a concentration is non-negative and finite", "na",
                  "no chemistry in this composition")
     lo = _col(s, "act_min")
@@ -679,19 +679,19 @@ def p6_resting_vesicle_rests(cfg, device="cpu", frames=40, tol=0.03):
     import copy
     import tempfile
     import yaml
-    import plexus.operators, tyssue_ops3d, tyssue_rd_ops, tyssue_t1_ops3d, tyssue_monolayer, ckpt  # noqa
+    import plexus.operators, mesh_ops, chem_ops, t1_ops, monolayer_ops, ckpt  # noqa
     import plexus.schema as S
     from plexus.engine import run as engine_run
 
-    keep = {"seed_mesh_3d", "load_mesh_3d", "shape_energy_3d", "cell_geometry_3d",
-            "topo_snapshot_3d"}
+    keep = {"mesh_seed", "load_mesh_3d", "cell_mechanics", "cell_geometry",
+            "topo_record"}
     d = copy.deepcopy(cfg)
     d.pop("_discovery", None)
     d["general"]["n_frames"] = frames
     d["general"]["record_cap"] = frames + 2
     d["operators"] = [o for o in d["operators"] if o["op"] in keep]
     d["schedule"] = [x for x in d.get("schedule", []) if x in keep]
-    if not any(o["op"] == "shape_energy_3d" for o in d["operators"]):
+    if not any(o["op"] == "cell_mechanics" for o in d["operators"]):
         return R("P6", "probe", "a resting vesicle rests", "na", "no mechanics in this composition")
     fn = tempfile.mktemp(suffix=".yaml")
     yaml.safe_dump(d, open(fn, "w"), sort_keys=False)
@@ -1137,13 +1137,13 @@ def certify():
         print(f"  [off] {'P5 chemistry on the mechanics clock (D5a)':48} RETIRED in crew/flow.yaml")
     else:
         stale = {"general": {"dt": 0.02, "n_frames": 300},
-                 "operators": [{"op": "cell_react", "rate": 1.0}]}
+                 "operators": [{"op": "cell_chem_react", "rate": 1.0}]}
         r = p5_biology_advances_in_biological_time(stale)
         ok = r.status == "fail"; bad += not ok
         print(f"  [{'ok ' if ok else 'BAD'}] {'P5 chemistry on the mechanics clock (D5a)':48} -> "
               f"{r.status:9} (want fail)")
         fixed = {"general": {"dt": 0.02, "n_frames": 500},
-                 "operators": [{"op": "cell_react", "rate": 50.0}]}
+                 "operators": [{"op": "cell_chem_react", "rate": 50.0}]}
         r = p5_biology_advances_in_biological_time(fixed)
         ok = r.status == "pass"; bad += not ok
         print(f"  [{'ok ' if ok else 'BAD'}] {'P5 chemistry rescaled by 1/dt':48} -> "
@@ -1158,7 +1158,7 @@ def certify():
     print(f"  [{'ok ' if ok else 'BAD'}] {'P8 shape index above the floor':48} -> "
           f"{r.status:9} (want pass)")
     # P2 gated growth with no baseline
-    r = p2_gate_implies_baseline({"operators": [{"op": "grow_3d", "rho": 0.0,
+    r = p2_gate_implies_baseline({"operators": [{"op": "cell_grow", "rho": 0.0,
                                                  "a_sw": 0.3}]})
     ok = r.status == "fail"; bad += not ok
     print(f"  [{'ok ' if ok else 'BAD'}] {'P2 gated growth with rho=0':48} -> "
@@ -1170,18 +1170,18 @@ def certify():
     flat = [{"frame": i, "act_max": 0.0, "act_min": 0.0} for i in range(50)]
     for lbl, react, want in (
             ("P4 zero activator, gray_scott, no seed",
-             {"op": "cell_react", "model": "gray_scott", "F": 0.046, "kk": 0.062},
+             {"op": "cell_chem_react", "model": "gray_scott", "F": 0.046, "kk": 0.062},
              "censored"),
             ("P4 zero activator, GM a0=0, no seed",
-             {"op": "cell_react", "model": "gierer_meinhardt", "a0": 0.0}, "censored"),
+             {"op": "cell_chem_react", "model": "gierer_meinhardt", "a0": 0.0}, "censored"),
             ("P4 zero activator, GM a0=0.01, no seed",
-             {"op": "cell_react", "model": "gierer_meinhardt", "a0": 0.01}, "fail"),
+             {"op": "cell_chem_react", "model": "gierer_meinhardt", "a0": 0.01}, "fail"),
             ("P4 zero activator, brusselator, no seed",
-             {"op": "cell_react", "model": "brusselator", "gamma": 0.3}, "fail"),
+             {"op": "cell_chem_react", "model": "brusselator", "gamma": 0.3}, "fail"),
             ("P4 zero activator WITH a seed present",
-             {"op": "cell_react", "model": "gray_scott", "F": 0.046, "kk": 0.062},
+             {"op": "cell_chem_react", "model": "gray_scott", "F": 0.046, "kk": 0.062},
              "fail")):
-        ops = [react] + ([{"op": "seed_cell_rd", "mode": "scatter"}] if "WITH" in lbl else [])
+        ops = [react] + ([{"op": "cell_chem_seed", "mode": "scatter"}] if "WITH" in lbl else [])
         r = p4_chemistry_not_extinguished({"operators": ops}, flat)
         ok = r.status == want; bad += not ok
         print(f"  [{'ok ' if ok else 'BAD'}] {lbl:48} -> {r.status:9} (want {want})")

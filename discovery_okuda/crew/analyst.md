@@ -36,7 +36,7 @@ Two files.
 you run, so anything you put there is overwritten in the same round. This is a deliberate change and
 the reason is measured: over r001–r022 you maintained eleven STANDING LAWS as prose, and because
 prose cannot be scored, nothing ever tested one, nothing bred from one, and two of them contradicted
-each other for six rounds without anything noticing — L5 said `shape_to_chem.beta < 0` extinguishes
+each other for six rounds without anything noticing — L5 said `cell_chem_from_shape.beta < 0` extinguishes
 the activator *whatever the morphotype*, L9 said it *depends on the base*.
 
 ### What replaces it, and what is left for you

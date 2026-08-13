@@ -21,18 +21,18 @@ operators:
   cell_set: cell
   jitter: 0.18
   n_cells: 200
-  op: seed_mesh_3d
+  op: mesh_seed
   p0: 3.5
   radius: 5.0
   seed: 0
   vseed_cv: 0.15
 - at: cell
-  op: cell_geometry_3d
+  op: cell_geometry
 - a_sw: 50.0
   at: vertex
   cell_set: cell
   hill: 4.0
-  op: grow_3d
+  op: cell_grow
   rate: 0.003457
   rho: 1.0
   vth_frac: 1.4
@@ -47,7 +47,7 @@ operators:
   dt: 1.0
   eta: 0.08
   mu: 1.0
-  op: shape_energy_3d
+  op: cell_mechanics
   p0: 3.5
   relax_iters: 30
 - at: vertex
@@ -55,7 +55,7 @@ operators:
   every: 4
   l_th_frac: 0.35
   max_flips: 30
-  op: reconnect_t1_3d
+  op: edge_flip
 - at: vertex
   cell_set: cell
   cycle_cv: 0.15
@@ -64,20 +64,20 @@ operators:
   factor: 2.0
   max_cycle: 1000000000
   min_cycle: 4
-  op: divide_3d
+  op: cell_divide
   p0: 3.5
   reset_noise: 0.12
 - at: vertex
   every: 1
-  op: topo_snapshot_3d
+  op: topo_record
 schedule:
-- seed_mesh_3d
-- cell_geometry_3d
-- grow_3d
-- shape_energy_3d
-- reconnect_t1_3d
-- divide_3d
-- topo_snapshot_3d
+- mesh_seed
+- cell_geometry
+- cell_grow
+- cell_mechanics
+- edge_flip
+- cell_divide
+- topo_record
 sets:
   cell:
     n: 3200

@@ -163,7 +163,7 @@ $P$ & particles per strand & $60$ in 02b--02f, $20$ in 02g--02i and in the spher
 \begin{verbatim}
   fields:  mpm_grid: {n_grid: 64}                     # dx = 0.0156; a strand is 5.8 cells long
   operators:
-    - {op: seed_ecm,    at: mpm_particle, fibre_len: 0.09-0.12, per_strand: 20}
+    - {op: ecm_seed,    at: mpm_particle, fibre_len: 0.09-0.12, per_strand: 20}
     - {op: mpm_scatter, at: mpm_particle, drag: 8.0, store_stress: true}
     - {op: ecm_stress,  at: mpm_particle, measure: vonmises}
   schedule:

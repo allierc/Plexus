@@ -7,7 +7,7 @@ holds the arithmetic and the file format and nothing else.
 WHY THIS EXISTS, in one measurement. The epistemic audit of r001-r022 found 126 predictions, 95
 refutations and eleven STANDING LAWS -- and the laws were paragraphs. Nothing scored them, nothing
 bred from them, and nothing noticed that two of them contradict each other: L5 says
-`shape_to_chem.beta < 0` extinguishes the activator *morphotype-independent*, L9 says it is
+`cell_chem_from_shape.beta < 0` extinguishes the activator *morphotype-independent*, L9 says it is
 *base-dependent*. They sat in the same file for six rounds and no experiment was ever posed to
 separate them, because there was no object to pose one against.
 

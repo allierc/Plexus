@@ -22,7 +22,7 @@ operators:
   ckpt: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda/r001n_09_cellfix_A_old/ckpt_end.npz
   before_frame: 1
 - at: cell
-  op: cell_geometry_3d
+  op: cell_geometry
 - Gamma: 0.4
   K_A: 1.0
   K_P: 1.0
@@ -34,7 +34,7 @@ operators:
   dt: 1.0
   eta: 0.08
   mu: 1.0
-  op: shape_energy_3d
+  op: cell_mechanics
   p0: 3.5
   relax_iters: 30
 - at: vertex
@@ -42,16 +42,16 @@ operators:
   every: 4
   l_th_frac: 0.35
   max_flips: 30
-  op: reconnect_t1_3d
+  op: edge_flip
 - at: vertex
   every: 1
-  op: topo_snapshot_3d
+  op: topo_record
 schedule:
 - load_mesh_3d
-- cell_geometry_3d
-- shape_energy_3d
-- reconnect_t1_3d
-- topo_snapshot_3d
+- cell_geometry
+- cell_mechanics
+- edge_flip
+- topo_record
 sets:
   cell:
     n: 36986

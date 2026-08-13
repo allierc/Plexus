@@ -41,7 +41,7 @@ import sys
 import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-TYSSUE = os.path.join(os.path.dirname(HERE), "prototype", "Tyssue")
+TYSSUE = os.path.join(HERE, "ops")
 for _p in (HERE, os.path.join(HERE, "agents"), TYSSUE):
     if _p not in sys.path:
         sys.path.insert(0, _p)
@@ -61,7 +61,7 @@ def check(cond, msg):
 
 def base_sphere(n=N_CELLS, jitter=JITTER, seed=0):
     """The one mesh everything else deforms. Radius 1, centred on the origin."""
-    from tyssue_ops3d import build_sphere_mesh
+    from mesh_ops import build_sphere_mesh
     verts, es, et, ef, nF = build_sphere_mesh(n, r=1.0, jitter=jitter, seed=seed)
     return np.asarray(verts, float), {"E_srce": es, "E_trgt": et, "E_face": ef, "nF": nF}
 
@@ -239,7 +239,7 @@ def multi_tube(n=5, length=1.9, waist=0.24, cap=None, area_frac=0.34, **kw):
     if cap is None:
         # (1 - cap)/2 per cap x n = area_frac  ->  cap = 1 - 2*area_frac/n
         cap = float(np.clip(1.0 - 2.0 * area_frac / max(int(n), 1), 0.55, 0.97))
-    from tyssue_ops3d import fib_sphere
+    from mesh_ops import fib_sphere
     v, mt = base_sphere(**kw)
     v = np.asarray(v, float).copy()
     axes = np.asarray(fib_sphere(int(n), 1.0), float)
@@ -557,7 +557,7 @@ def test_the_pattern_metrics_on_a_spotted_field():
     # legitimately merge into one, so the fixture could not distinguish an undercount from a merge. A
     # Fibonacci arrangement is maximally separated by construction, so the answer IS six and any other
     # count is the metric's error rather than the fixture's ambiguity.
-    from tyssue_ops3d import fib_sphere
+    from mesh_ops import fib_sphere
     seeds = np.asarray(fib_sphere(6, 1.0), float)
     act = np.exp(14.0 * (u @ seeds.T)).max(axis=1)
     act /= act.max()

@@ -49,15 +49,15 @@
   "div_blocked_first_frame": null
  },
  "acted": {
-  "seed_mesh_3d": 1,
-  "cell_geometry_3d": 611,
-  "cell_adjacency": 1,
-  "cell_react": 901,
-  "shape_to_chem": 901,
+  "mesh_seed": 1,
+  "cell_geometry": 611,
+  "cell_neighbours": 1,
+  "cell_chem_react": 901,
+  "cell_chem_from_shape": 901,
   "vesicle_growth": 901,
-  "grow_3d": 801,
-  "shape_energy_3d": 901,
-  "topo_snapshot_3d": 901
+  "cell_grow": 801,
+  "cell_mechanics": 901,
+  "topo_record": 901
  },
  "premises": [
   {
@@ -79,7 +79,7 @@
    "tier": "static",
    "premise": "a cell divides because it got big",
    "status": "na",
-   "detail": "needs both grow_3d and divide_3d",
+   "detail": "needs both cell_grow and cell_divide",
    "measured": null,
    "grade": "certain",
    "stated_check": "**the growth ceiling must sit above the division trigger.** Mean cell volume must be roughly steady over the run, not drifting down.",
@@ -130,7 +130,7 @@
    "tier": "passive",
    "premise": "the chemistry must not be silently extinguished",
    "status": "fail",
-   "detail": "the activator decayed to -0.002 of its peak (1409576.125 -> -2220.931). The pattern is extinct, so every downstream reading is about a dead field. The usual cause is growth dilution: grow_3d.conserve_amount divides chem by (s/s_prev)^3 every frame a cell grows, and autocatalysis is quadratic, so it loses.",
+   "detail": "the activator decayed to -0.002 of its peak (1409576.125 -> -2220.931). The pattern is extinct, so every downstream reading is about a dead field. The usual cause is growth dilution: cell_grow.conserve_amount divides chem by (s/s_prev)^3 every frame a cell grows, and autocatalysis is quadratic, so it loses.",
    "measured": {
     "peak": 1409576.125,
     "end": -2220.9309,

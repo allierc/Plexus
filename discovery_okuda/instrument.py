@@ -111,7 +111,7 @@ def _wrap(cls):
         # ledger reported it running on every frame of every run while it changed nothing.
         #
         # THIS IS THE GENERAL FORM OF A DEFECT THIS PROJECT HAS PAID FOR FIVE TIMES.
-        # `shape_to_chem` was edited 25 times across 13 rounds, 8 of them same-seed, and scored
+        # `cell_chem_from_shape` was edited 25 times across 13 rounds, 8 of them same-seed, and scored
         # 100% acted while not changing the run by a single bit. `rd_interface_tension` ran 800
         # frames at `a_sw = 1.0` -- cells strictly above the maximum, the empty set -- and was
         # written off as inert twice without ever having fired. Species B's chemistry was extinct
@@ -170,9 +170,9 @@ if __name__ == "__main__":
     import sys
     HERE = os.path.dirname(os.path.abspath(__file__))
     ROOT = os.path.abspath(os.path.join(HERE, ".."))
-    sys.path[:0] = [os.path.join(ROOT, "src"), os.path.join(ROOT, "prototype", "Tyssue"), HERE]
+    sys.path[:0] = [os.path.join(ROOT, "src"), os.path.join(ROOT, "discovery_okuda", "ops"), HERE]
     import plexus.operators                                          # noqa: F401
-    import tyssue_ops3d, tyssue_rd_ops, tyssue_t1_ops3d, tyssue_monolayer, ckpt  # noqa: F401
+    import mesh_ops, chem_ops, t1_ops, monolayer_ops, ckpt  # noqa: F401
     install()
     from plexus.models import registry as R
     n = sum(1 for _, c in R._OPERATOR_REGISTRY.items()

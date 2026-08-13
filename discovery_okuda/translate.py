@@ -14,9 +14,9 @@ from the one our evidence is about.
 DEFECT FIXES APPLIED AT TRANSLATION -- every generated config is born correct
 --------------------------------------------------------------------------------------------
 D1  clock double-gating.  The engine gates operators AND several operators kept a private
-    `every`, so the effective period was every^2 (a `divide_3d every=2` fired every 4). We emit
+    `every`, so the effective period was every^2 (a `cell_divide every=2` fired every 4). We emit
     every=1 and let the engine own the clock. NOTE: the operator-side private counters must ALSO
-    be deleted in prototype/Tyssue -- this fix is necessary but not sufficient on its own.
+    be deleted in discovery_okuda/ops -- this fix is necessary but not sufficient on its own.
 
 D2  composition-dependent dt.  run_tyssue_round.make() sets
         dt = 1.0 if (cones and not rd) else 0.02
@@ -26,7 +26,7 @@ D2  composition-dependent dt.  run_tyssue_round.make() sets
 
 D3  recording-stride mismatch.  Vertex positions and mesh topology were recorded on different
     strides; the analysis then paired one frame's coordinates with another frame's connectivity
-    and reported phantom inverted cells. We pin topo_snapshot_3d every=1 and record_cap so both
+    and reported phantom inverted cells. We pin topo_record every=1 and record_cap so both
     series have equal length, and the runner asserts it.
 """
 from __future__ import annotations
@@ -41,11 +41,11 @@ from composition_space import (DIVIDE_CALL_PERIOD_BEFORE_D1, OPERATORS,
                                CompositionGraph, seed)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-TYSSUE = os.path.abspath(os.path.join(HERE, "..", "prototype", "Tyssue"))
+TYSSUE = os.path.abspath(os.path.join(HERE, "ops"))
 # REPO-RELATIVE. The devcontainer mounts the NFS export at /workspace and the cluster mounts the
 # SAME export at /groups/saalfeld/home/allierc/Graph, so an absolute path baked into a TRACKED
 # config is portable to exactly one of the two. run_one.py resolves this against its own location.
-CKPT = os.path.join("prototype", "Tyssue", "archive", "smoke_hom", "ckpt.npz")
+CKPT = os.path.join("discovery_okuda", "ops", "assets", "smoke_hom", "ckpt.npz")
 
 # THE RESERVOIRS ARE NO LONGER CONSTANTS. They are derived from the cell count the run is aiming
 # at, because a closed sheet is trivalent and Euler fixes V = 2F - 4: a vertex reservoir of size V
@@ -119,7 +119,7 @@ DT_GLOBAL = 1.0
 # D5  THE CHEMISTRY RAN 50x TOO SLOW, AND THE CELLS COULD NEVER DIVIDE.
 # ------------------------------------------------------------------------------------------------
 # dt=0.02 is the MECHANICS substep -- the vesicle relaxes toward force balance many times per
-# biological event. But cell_react and cell_diffuse both EMIT=velocity into `chem`, so the engine
+# biological event. But cell_chem_react and cell_chem_diffuse both EMIT=velocity into `chem`, so the engine
 # integrated the chemistry with that same dt: 300 frames bought 300*0.02 = 6 units of Gray-Scott
 # time, against the ~500 the validated minisite spec (dt=1.0, 500 frames) needed. The activator sat
 # at its seed value for the whole run and every measured "no pattern" was an artefact of the clock.
@@ -129,7 +129,7 @@ DT_GLOBAL = 1.0
 # MEASURED 2026-08-01, and this factor is now 1.0. The reasoning that made it 1/dt was right
 # about the disease and wrong about the cure.
 #
-# cell_react and cell_diffuse EMIT a velocity, so the engine integrates them on the MECHANICS
+# cell_chem_react and cell_chem_diffuse EMIT a velocity, so the engine integrates them on the MECHANICS
 # SUBSTEP rather than once per frame -- that was D5a, and it was real. The fix multiplied chi and
 # rate by 1/dt to restore one time unit per frame. But there are 1/dt SUBSTEPS in a frame, so the
 # substep clock ALREADY supplies that factor: advancing chi per substep across 1/dt substeps of
@@ -148,8 +148,8 @@ DT_GLOBAL = 1.0
 # anything, and composition_space.reaction_advance is the quantity it bounds.
 RD_PER_FRAME = 1.0 / DT_GLOBAL
 
-# The growth ceiling must sit ABOVE the division trigger. `grow_3d` caps each cell's
-# target volume at vth_frac*v_ref, while `divide_3d` fires at factor*Vbirth -- and vth_frac was
+# The growth ceiling must sit ABOVE the division trigger. `cell_grow` caps each cell's
+# target volume at vth_frac*v_ref, while `cell_divide` fires at factor*Vbirth -- and vth_frac was
 # 1.5 against factor 2.0, so a cell's target could never reach the size that makes it divide.
 # Volume-triggered division was arithmetically impossible; the only divisions ever seen came from
 # the max_cycle timeout. Deriving the ceiling from the trigger keeps them from drifting apart.
@@ -159,37 +159,37 @@ GROWTH_CEILING = DIV_FACTOR * 1.25    # 25% headroom so cells cross the trigger,
 # The engine executes the schedule in this order regardless of graph insertion order: readouts
 # first, then patterning, then growth, then mechanics, then topology, then recording.
 SCHEDULE_ORDER = [
-    "load_mesh_3d", "seed_mesh_3d", "cell_geometry_3d",
-    "seed_cell_rd", "cell_adjacency", "cell_diffuse", "cell_react", "shape_to_chem",
+    "load_mesh_3d", "mesh_seed", "cell_geometry",
+    "cell_chem_seed", "cell_neighbours", "cell_chem_diffuse", "cell_chem_react", "cell_chem_from_shape",
     # DEATH BEFORE THE MECHANICS. Growth sets the targets, death overrides them for the cells it
     # has sentenced, and the relaxation then sees both -- so a cell extruded this tick has its hole
     # closed this tick instead of leaving a raw gap for one frame. This is the order the dedicated
     # geometry tests certify (make_apop_geo.py: euler 2 at every frame, n_apop exactly the loss).
     # THE PROBE RUNS IMMEDIATELY BEFORE DEATH, and the order is the mechanism. It measures the
-    # geometry the LAST relaxation produced, and `apoptosis_3d` reads what it published in the same
+    # geometry the LAST relaxation produced, and `cell_die` reads what it published in the same
     # tick; put it after the mechanics and death would be marking cells on a frame-old shape, which
     # for a quantity that changes as fast as elongation is not the same experiment.
     "cell_shape_probe",
-    "grow_3d", "apoptosis_3d", "shape_energy_3d", "interface_line_tension_3d",
-    "reconnect_t1_3d", "divide_3d", "topo_snapshot_3d",
+    "cell_grow", "cell_die", "cell_mechanics", "interface_tension",
+    "edge_flip", "cell_divide", "topo_record",
 ]
 
 # composition-space operator -> engine operator name
 ENGINE_NAME = {
-    "seed_mesh_3d": None,             # resolved by implementation (see _emit_seed)
-    "shape_energy_3d": "shape_energy_3d",
-    "reconnect_t1_3d": "reconnect_t1_3d",
-    "grow_3d": "grow_3d",
-    "divide_3d": "divide_3d",
-    "apoptosis_3d": "apoptosis_3d",
-    "cell_geometry_3d": "cell_geometry_3d",
-    "cell_adjacency": "cell_adjacency",
-    "cell_diffuse": "cell_diffuse",
-    "cell_react": "cell_react",
-    "seed_cell_rd": "seed_cell_rd",
-    "shape_to_chem": "shape_to_chem",
+    "mesh_seed": None,             # resolved by implementation (see _emit_seed)
+    "cell_mechanics": "cell_mechanics",
+    "edge_flip": "edge_flip",
+    "cell_grow": "cell_grow",
+    "cell_divide": "cell_divide",
+    "cell_die": "cell_die",
+    "cell_geometry": "cell_geometry",
+    "cell_neighbours": "cell_neighbours",
+    "cell_chem_diffuse": "cell_chem_diffuse",
+    "cell_chem_react": "cell_chem_react",
+    "cell_chem_seed": "cell_chem_seed",
+    "cell_chem_from_shape": "cell_chem_from_shape",
     "cell_shape_probe": "cell_shape_probe",
-    "interface_line_tension_3d": "interface_line_tension_3d",
+    "interface_tension": "interface_tension",
 }
 
 
@@ -209,10 +209,10 @@ def _emit_seed(g, n, ga):
     if impl == "checkpoint":
         return {"op": "load_mesh_3d", "at": "vertex", "cell_set": "cell",
                 "ckpt": CKPT, "before_frame": 1}
-    # `before_frame: 1` is MANDATORY: without it seed_mesh_3d rebuilds the sphere every tick,
+    # `before_frame: 1` is MANDATORY: without it mesh_seed rebuilds the sphere every tick,
     # wiping `_mesh` -- and `hist` lives inside `_mesh`, so the topology history is destroyed and
     # the D3 alignment assertion fires. (Found by that assertion on the first real run.)
-    return {"op": "seed_mesh_3d", "at": "vertex", "cell_set": "cell", "before_frame": 1,
+    return {"op": "mesh_seed", "at": "vertex", "cell_set": "cell", "before_frame": 1,
             "n_cells": int(_p(g, n["id"], "n_cells")),
             "radius": float(_p(g, n["id"], "radius")),
             "jitter": float(_p(g, n["id"], "jitter")),
@@ -223,14 +223,14 @@ def _emit_seed(g, n, ga):
 def _emit_shape_energy(g, n, ga):
     i = n["id"]
     if g.impl_of(n) == "monolayer":
-        return {"op": "shape_energy_3d", "model": "monolayer", "at": "vertex",
+        return {"op": "cell_mechanics", "model": "monolayer", "at": "vertex",
                 "k_v": float(_p(g, i, "K_V")), "kappa_s": float(_p(g, i, "kappa_s")),
                 "h0": float(_p(g, i, "h0")), "gamma": float(_p(g, i, "gamma")),
                 "mu": float(_p(g, i, "mu")), "dt": DT_GLOBAL,
                 "relax_iters": int(_p(g, i, "relax_iters")),
                 "K_bend": float(_p(g, i, "K_bend")), "K_lumen": float(_p(g, i, "K_lumen")),
                 "eta": 0.08, "cap_frac": 0.12}          # eta/cap_frac: solver numerics, not knobs
-    return {"op": "shape_energy_3d", "at": "vertex",
+    return {"op": "cell_mechanics", "at": "vertex",
             "p0": float(_p(g, i, "p0")),
             "K_A": float(_p(g, i, "K_A")), "K_P": float(_p(g, i, "K_P")),
             "Gamma": float(_p(g, i, "Gamma")), "Lambda": float(_p(g, i, "Lambda")),
@@ -246,7 +246,7 @@ def _emit_rd_seed(g, n, ga):
     i, impl = n["id"], g.impl_of(n)
     # the engine's mode name for a fixed-angle cone is "cones" (plural). Emitting "cone" here
     # silently fell through to a different seeding mode -- caught by the V9 parameter check.
-    # `tip` REMOVED 6 August -- see seed_cell_rd's docstring. `amp` removed with it: the operator
+    # `tip` REMOVED 6 August -- see cell_chem_seed's docstring. `amp` removed with it: the operator
     # reads no such parameter in any mode, so every spec this campaign wrote carried a number that
     # nothing looked at. Found by the UNREAD probe in one second, having survived 14 rounds.
     # `patch` AND `noise` ARE THE ENGINE'S, AND THE VOCABULARY COULD NOT REACH THEM. The operator
@@ -260,24 +260,24 @@ def _emit_rd_seed(g, n, ga):
     #          setting in which "the chemistry chose this many spots" is a result and not a setting.
     ENGINE_MODE = {"cone": "cones", "spot": "cones", "scatter": "scatter",
                    "patch": "patch", "noise": "noise"}
-    d = {"op": "seed_cell_rd", "at": "cell", "mode": ENGINE_MODE[impl],
+    d = {"op": "cell_chem_seed", "at": "cell", "mode": ENGINE_MODE[impl],
          "n_spots": int(_p(g, i, "n_spots"))}
     if impl == "scatter":
         # random seeds over the whole shell -- the validated minisite condition. n_spots/amp are
         # meaningless here, so do not emit them: an ignored parameter in a spec reads as if it
         # were doing something.
         # `before_frame: 1` IS THE WHOLE POINT OF A SCATTER SEED. It is an INITIAL CONDITION, and
-        # without the guard the engine re-applies it on every tick -- and seed_cell_rd sits BEFORE
-        # cell_diffuse and cell_react in the schedule, so each frame went: overwrite the chemistry
+        # without the guard the engine re-applies it on every tick -- and cell_chem_seed sits BEFORE
+        # cell_chem_diffuse and cell_chem_react in the schedule, so each frame went: overwrite the chemistry
         # with the seed, let the reaction advance it by one step, overwrite it again. The activator
         # was pinned for the entire campaign. The signature in the record is unmistakable once you
-        # look: the acted-ledger shows seed_cell_rd firing 501 times in a 500-frame run, and
+        # look: the acted-ledger shows cell_chem_seed firing 501 times in a 500-frame run, and
         # act_max varies by 1.2e-3 across the whole run -- exactly one step of Gray-Scott.
         # `cone` maintains a source and is not an initial condition either. This one is.
         # (That note used to read "`tip` re-seeds every frame ON PURPOSE" -- the defect was
         # diagnosed here, fixed for `scatter`, and left standing for `tip`, which is the mode the
         # whole campaign then ran on.)
-        d = {"op": "seed_cell_rd", "at": "cell", "mode": "scatter",
+        d = {"op": "cell_chem_seed", "at": "cell", "mode": "scatter",
              "seed_frac": float(_p(g, i, "seed_frac")), "before_frame": 3}
     elif impl == "cone":
         d["cone_deg"] = float(_p(g, i, "cone_deg"))
@@ -286,11 +286,11 @@ def _emit_rd_seed(g, n, ga):
         # nothing here -- a patch is one domain by definition -- so it is not emitted, for the
         # reason the scatter branch gives: a parameter in a spec that nothing reads looks like a
         # setting that is doing something.
-        d = {"op": "seed_cell_rd", "at": "cell", "mode": "patch",
+        d = {"op": "cell_chem_seed", "at": "cell", "mode": "patch",
              "patch_z": 0.6, "before_frame": 3}
     elif impl == "noise":
         # NO SEED. The steady state plus noise, as an initial condition, once.
-        d = {"op": "seed_cell_rd", "at": "cell", "mode": "noise", "noise": 0.04, "before_frame": 3}
+        d = {"op": "cell_chem_seed", "at": "cell", "mode": "noise", "noise": 0.04, "before_frame": 3}
     else:                                                     # a frozen spot -- the DOME control
         d["cone_deg"] = float(_p(g, i, "cone_deg"))
         d["before_frame"] = 3
@@ -299,7 +299,7 @@ def _emit_rd_seed(g, n, ga):
 
 def _emit_react(g, n, ga):
     i, impl = n["id"], g.impl_of(n)
-    base = {"op": "cell_react", "at": "cell", "model": impl,
+    base = {"op": "cell_chem_react", "at": "cell", "model": impl,
             "rate": float(_p(g, i, "rate")) * RD_PER_FRAME}   # D5: physical time, not substeps
     if impl == "gierer_meinhardt":
         # `sat` MUST BE EMITTED OR IT DOES NOT EXIST. It was added to OPERATORS' tunable table and
@@ -323,7 +323,7 @@ def _emit_react(g, n, ga):
 
 def _emit_growth(g, n, ga):
     i = n["id"]
-    return {"op": "grow_3d", "at": "vertex", "cell_set": "cell",
+    return {"op": "cell_grow", "at": "vertex", "cell_set": "cell",
             "rate": float(_p(g, i, "rate")), "a_sw": float(_p(g, i, "a_sw")),
             "hill": float(_p(g, i, "hill")), "rho": float(_p(g, i, "rho")),
             # `dt` REMOVED 6 August: Grow3D has no `self.dt` and never looks the key up.
@@ -336,7 +336,7 @@ def _emit_growth(g, n, ga):
 
 def _emit_divide(g, n, ga):
     i = n["id"]
-    return {"op": "divide_3d", "at": "vertex", "factor": DIV_FACTOR, "reset_noise": 0.12,
+    return {"op": "cell_divide", "at": "vertex", "factor": DIV_FACTOR, "reset_noise": 0.12,
             "cycle_cv": float(_p(g, i, "cycle_cv")), "p0": 3.90,
             "every": 1,                                        # D1: the ENGINE owns the clock
             # max_div is ALSO per-call, and cap_div = max(max_div, max_div_frac*nF) makes it a
@@ -351,9 +351,9 @@ def _emit_divide(g, n, ga):
 
 def _emit_interface_tension(g, n, ga):
     i = n["id"]
-    # NO `K_extrude`. The forcing is a separate operator (`extrusion_forcing_3d`) that this
+    # NO `K_extrude`. The forcing is a separate operator (`interface_push`) that this
     # vocabulary does not contain, so there is no key here to set and nothing to default to zero.
-    return {"op": "interface_line_tension_3d", "at": "vertex", "cell_set": "cell",
+    return {"op": "interface_tension", "at": "vertex", "cell_set": "cell",
             "K_purse": float(_p(g, i, "K_purse")),
             "a_sw": float(_p(g, i, "a_sw")), "eta": 0.05, "iters": 4, "after_frame": ga}
 
@@ -361,7 +361,7 @@ def _emit_interface_tension(g, n, ga):
 def _emit_apoptosis(g, n, ga):
     i = n["id"]
     # `mode` IS NOT A COMPOSITION-SPACE PARAMETER, so it is not read through _p: the twelve modes
-    # are `model` variants, and Route A sweeps them from the plan the way it sweeps divide_3d's
+    # are `model` variants, and Route A sweeps them from the plan the way it sweeps cell_divide's
     # sizer/adder/timer. The operator's own default (`competition`) is what an `add_op` writes, and
     # it is a firing rule on purpose -- the previous default, `list` with no `cells`, could never
     # fire, and an operator that is inert by construction is the failure this campaign exists to
@@ -369,10 +369,10 @@ def _emit_apoptosis(g, n, ga):
     #
     # `p0` MATCHES THE MECHANICS, not the operator's own default. A dying cell's target perimeter
     # is rebuilt from its shrinking volume through the shape index, so a p0 that disagrees with
-    # shape_energy_3d's would have the two operators pulling the same cell toward two different
+    # cell_mechanics's would have the two operators pulling the same cell toward two different
     # shapes.
-    p0 = next((float(_p(g, m["id"], "p0")) for m in g.ops if m["op"] == "shape_energy_3d"), 3.72)
-    return {"op": "apoptosis_3d", "at": "vertex", "cell_set": "cell", "p0": p0,
+    p0 = next((float(_p(g, m["id"], "p0")) for m in g.ops if m["op"] == "cell_mechanics"), 3.72)
+    return {"op": "cell_die", "at": "vertex", "cell_set": "cell", "p0": p0,
             "max_mark_frac": float(_p(g, i, "max_mark_frac")),
             "min_age": int(_p(g, i, "min_age")),
             "shrink_rate": float(_p(g, i, "shrink_rate")),
@@ -382,38 +382,38 @@ def _emit_apoptosis(g, n, ga):
 
 
 EMIT = {
-    "seed_mesh_3d": _emit_seed,
-    "apoptosis_3d": _emit_apoptosis,
-    "shape_energy_3d": _emit_shape_energy,
-    "seed_cell_rd": _emit_rd_seed,
-    "cell_react": _emit_react,
-    "grow_3d": _emit_growth,
-    "divide_3d": _emit_divide,
-    "interface_line_tension_3d": _emit_interface_tension,
-    "reconnect_t1_3d": lambda g, n, ga: {
-        "op": "reconnect_t1_3d", "at": "vertex", "l_th_frac": float(_p(g, n["id"], "l_th_frac")) * 7.0,
+    "mesh_seed": _emit_seed,
+    "cell_die": _emit_apoptosis,
+    "cell_mechanics": _emit_shape_energy,
+    "cell_chem_seed": _emit_rd_seed,
+    "cell_chem_react": _emit_react,
+    "cell_grow": _emit_growth,
+    "cell_divide": _emit_divide,
+    "interface_tension": _emit_interface_tension,
+    "edge_flip": lambda g, n, ga: {
+        "op": "edge_flip", "at": "vertex", "l_th_frac": float(_p(g, n["id"], "l_th_frac")) * 7.0,
         "every": 1, "max_flips": 300},                          # D1
-    "cell_geometry_3d": lambda g, n, ga: {"op": "cell_geometry_3d", "at": "cell"},
+    "cell_geometry": lambda g, n, ga: {"op": "cell_geometry", "at": "cell"},
     # THE `model` IS THE DESCRIPTOR AND THE `field` IS THE WIRE. Both are emitted: the model
     # decides what is measured (shape index or ring aspect) and the field name is what a Die
-    # operator asks for. `elong` here and `field: elong` on apoptosis_3d is the entire coupling.
+    # operator asks for. `elong` here and `field: elong` on cell_die is the entire coupling.
     "cell_shape_probe": lambda g, n, ga: {
         "op": "cell_shape_probe", "at": "cell", "vertex_set": "vertex",
         "model": g.impl_of(n), "field": "elong"},
-    "cell_adjacency": lambda g, n, ga: {"op": "cell_adjacency", "at": "cell"},
+    "cell_neighbours": lambda g, n, ga: {"op": "cell_neighbours", "at": "cell"},
     # `implementation` MUST be emitted. Without it the spec silently runs the default
     # (graph_laplacian) while the composition hash records `interface_weighted` -- so the search
     # would log a DISTINCT hypothesis that is byte-identical to its control. That is exactly the
     # "silent no-op recorded as evidence" failure this campaign exists to eliminate, and it would
     # have made the shape-to-chemistry ABLATION -- the whole reason the operator was written --
     # report "no effect" while never once running the new code.
-    "cell_diffuse": lambda g, n, ga: {
-        "op": "cell_diffuse", "at": "cell", "implementation": g.impl_of(n),
+    "cell_chem_diffuse": lambda g, n, ga: {
+        "op": "cell_chem_diffuse", "at": "cell", "implementation": g.impl_of(n),
         "d_a": float(_p(g, n["id"], "d_a")),
         "d_h": float(_p(g, n["id"], "d_h")),
         "chi": float(_p(g, n["id"], "chi")) * RD_PER_FRAME},        # D5: scaled WITH the reaction
-    "shape_to_chem": lambda g, n, ga: {
-        "op": "shape_to_chem", "at": "cell", "model": g.impl_of(n),
+    "cell_chem_from_shape": lambda g, n, ga: {
+        "op": "cell_chem_from_shape", "at": "cell", "model": g.impl_of(n),
         "vertex_set": "vertex",
         "beta": float(_p(g, n["id"], "beta")), "F0": float(_p(g, n["id"], "F0")),
         # the feedback is chemistry and must run on the SAME clock as the reaction it modulates,
@@ -428,7 +428,7 @@ EMIT = {
 # EMPTY, AND IT STAYS EMPTY. This mapped four graph-side names onto four engine-side names --
 # rd_rate/rate, alpha/hill, mono_gamma/gamma, l_th/l_th_frac -- and every consumer that did not
 # consult it silently read None. That is not a translation problem, it is TWO NAMES FOR ONE THING,
-# and the alias table was the workaround rather than the fix. R1d asked for `rate`, `cell_react`
+# and the alias table was the workaround rather than the fix. R1d asked for `rate`, `cell_chem_react`
 # declared `rd_rate`, and so it refused every gierer_meinhardt-with-division composition
 # unconditionally for weeks while printing "rate None".
 #
@@ -440,7 +440,7 @@ _ALIASED = {}
 def _assert_params_consumed(graph, node, spec_op):
     """A parameter that was SET and is not passed to the engine must not be silently dropped.
 
-    THE DEFECT THIS CLOSES, found by the pre-launch on 1 August. `cell_react` accepts `F` and
+    THE DEFECT THIS CLOSES, found by the pre-launch on 1 August. `cell_chem_react` accepts `F` and
     `kk` -- they are Gray-Scott's parameters -- and the emitter forwards them only when the
     implementation IS Gray-Scott. Setting them on a Gierer-Meinhardt node was accepted by the
     vocabulary, accepted by the Critic, recorded in the composition, and then discarded at
@@ -457,7 +457,7 @@ def _assert_params_consumed(graph, node, spec_op):
     defaults = OPERATORS.get(node["op"], {}).get("params", {})
     # Only a DELIBERATE setting can be a lie. `graph.params` also carries vocabulary defaults,
     # and a default sitting unused on an implementation that ignores it is harmless noise --
-    # `cell_react` offers Gray-Scott's F and Gierer-Meinhardt's mu_h from one contract, and
+    # `cell_chem_react` offers Gray-Scott's F and Gierer-Meinhardt's mu_h from one contract, and
     # whichever implementation is chosen leaves the other's defaults untouched. What must never
     # pass is a value someone CHANGED and the engine never saw.
     set_here = set()
@@ -507,7 +507,7 @@ def _assert_rd_stable(ops, dt, name=""):
 
     A stability limit that is widened by one phase and relied upon by another has to be a CHECK.
     """
-    d = next((o for o in ops if o.get("op") == "cell_diffuse"), None)
+    d = next((o for o in ops if o.get("op") == "cell_chem_diffuse"), None)
     if d is None:
         return
     chi = float(d.get("chi", 1.0))
@@ -526,7 +526,7 @@ def _assert_rd_stable(ops, dt, name=""):
 
 # ============================================================================ RUN-TO-RUN SEEDING
 # THE DEFECT: `general.seed` was written into every spec and read by NOTHING. Both stochastic
-# operators take a `seed` parameter -- seed_mesh_3d for the vertex jitter, seed_cell_rd for which
+# operators take a `seed` parameter -- mesh_seed for the vertex jitter, cell_chem_seed for which
 # cells are nucleated -- and the translator passed neither. So a batch of "three seeds" was three
 # copies of one run: measured on 2026-08-01, seeds 0/1/2 at seed_frac 0.06 gave act_max 0.501,
 # 0.501, 0.501 and red_frac 0.374, 0.374, 0.374 -- bit-identical to three decimal places.
@@ -536,15 +536,15 @@ def _assert_rd_stable(ops, dt, name=""):
 # composition again differently. Every spread this campaign has quoted across seeds describes the
 # floating-point reproducibility of one trajectory.
 SEED_SENTINEL = "__RUN_SEED__"
-SEEDED_OPS = ("seed_mesh_3d", "seed_cell_rd")
+SEEDED_OPS = ("mesh_seed", "cell_chem_seed")
 
 
 def _seed_the_run(ops, seed_):
     """Give every stochastic operator this run's seed, and refuse if none would take it.
 
     ONE seed, shared, because that is what the working specs do. `archive_rounded.py`,
-    `archive_vh_rd_coral.py` and `run_tyssue_fig5.py` all pass the same SEED to seed_mesh_3d and
-    seed_cell_rd. I first offset them per operator, reasoning that the mesh jitter and the
+    `archive_vh_rd_coral.py` and `run_tyssue_fig5.py` all pass the same SEED to mesh_seed and
+    cell_chem_seed. I first offset them per operator, reasoning that the mesh jitter and the
     nucleation are independent draws -- true, and beside the point: a composition that reproduces
     an archived run has to draw the same numbers it did, and the archive's convention is shared.
     Departing from it would have made every reproduction check compare two different experiments,
@@ -582,7 +582,7 @@ def to_spec(graph: CompositionGraph, *, name="okuda", frames=350, seed_=0, grow_
     # what tells us where it starts; a checkpoint start carries its own count and falls back.
     seed_cells = None
     for node in graph.ops:
-        if node["op"] == "seed_mesh_3d":
+        if node["op"] == "mesh_seed":
             seed_cells = int(_p(graph, node["id"], "n_cells"))
     if seed_cells is not None:
         vbuf, cbuf, target_cells = _reservoirs(seed_cells, frames)
@@ -603,7 +603,7 @@ def to_spec(graph: CompositionGraph, *, name="okuda", frames=350, seed_=0, grow_
 
     # D3: topology must be recorded on the SAME stride as positions, and this is asserted
     # downstream. This is the fix for the phantom "97% hollow" result.
-    ops.append({"op": "topo_snapshot_3d", "at": "vertex", "every": record_every})
+    ops.append({"op": "topo_record", "at": "vertex", "every": record_every})
 
     unordered = sorted({o["op"] for o in ops} - set(SCHEDULE_ORDER))
     if unordered:
@@ -678,8 +678,8 @@ def from_preset(p: dict) -> CompositionGraph:
     the campaign is searching a space that does not contain our own evidence.
     """
     g = CompositionGraph(ops=[
-        {"id": "seed_mesh_3d0", "op": "seed_mesh_3d", "impl": "checkpoint"},
-        {"id": "cell_geometry_3d0", "op": "cell_geometry_3d", "impl": "scatter_add"},
+        {"id": "seed_mesh_3d0", "op": "mesh_seed", "impl": "checkpoint"},
+        {"id": "cell_geometry_3d0", "op": "cell_geometry", "impl": "scatter_add"},
     ])
     add = lambda gg, op, impl: gg.apply(("add_op", op, impl))[0]
 
@@ -687,35 +687,35 @@ def from_preset(p: dict) -> CompositionGraph:
     rd = bool(p.get("rd", False))
 
     if cones:
-        g = add(g, "seed_cell_rd", p.get("seed_mode", "cones").replace("cones", "cone"))
+        g = add(g, "cell_chem_seed", p.get("seed_mode", "cones").replace("cones", "cone"))
     if rd or not cones:
-        g = add(g, "cell_adjacency", "shared_edge")
-        g = add(g, "cell_diffuse", "graph_laplacian")
-        g = add(g, "cell_react", p.get("rd_impl", "brusselator"))
+        g = add(g, "cell_neighbours", "shared_edge")
+        g = add(g, "cell_chem_diffuse", "graph_laplacian")
+        g = add(g, "cell_chem_react", p.get("rd_impl", "brusselator"))
         if not cones:
-            g = add(g, "seed_cell_rd", "spot")
+            g = add(g, "cell_chem_seed", "spot")
 
-    g = add(g, "grow_3d",
+    g = add(g, "cell_grow",
             "hill_conserve_amount" if p.get("conserve_amount", True) else "hill_no_conserve")
-    g = add(g, "shape_energy_3d", "monolayer" if p.get("monolayer") else "default")
+    g = add(g, "cell_mechanics", "monolayer" if p.get("monolayer") else "default")
     # ONLY THE PURSE-STRING SURVIVES THE SPLIT. A preset asking for K_extrude is asking for
-    # `extrusion_forcing_3d`, which is not in this vocabulary -- an archived forcing control cannot
+    # `interface_push`, which is not in this vocabulary -- an archived forcing control cannot
     # be replayed through the search space, and should not be.
     if p.get("K_purse", 0.0) > 0:
         g = add(g, "0", "default")
-    g = add(g, "reconnect_t1_3d", "length_threshold")
-    g = add(g, "divide_3d", "orient_iface" if p.get("orient_iface") else "hertwig")
+    g = add(g, "edge_flip", "length_threshold")
+    g = add(g, "cell_divide", "orient_iface" if p.get("orient_iface") else "hertwig")
 
     # route the morphogen: whichever node produces it feeds growth (+ axis / site if present)
     src = next((o["id"] for o in g.ops if "morphogen" in OPERATORS[o["op"]]["outputs"]), None)
     if src is None:
         return g
-    for dst_op, slot in (("grow_3d", "gate"), ("divide_3d", "axis"),
-                         ("interface_line_tension_3d", "site")):
+    for dst_op, slot in (("cell_grow", "gate"), ("cell_divide", "axis"),
+                         ("interface_tension", "site")):
         dst = next((o["id"] for o in g.ops if o["op"] == dst_op), None)
         if dst is None:
             continue
-        if dst_op == "divide_3d" and not p.get("orient_iface"):
+        if dst_op == "cell_divide" and not p.get("orient_iface"):
             continue                                            # hertwig uses the cell's own axis
         g = g.apply(("connect", src, dst, slot))[0]
 
@@ -725,33 +725,33 @@ def from_preset(p: dict) -> CompositionGraph:
     pm["_run.frames"] = int(p.get("frames", 350))
     node = lambda op: next((o["id"] for o in g.ops if o["op"] == op), None)
     mapping = [
-        ("shape_energy_3d", "K_V", p.get("K_V")), ("shape_energy_3d", "relax_iters", p.get("relax")),
-        ("shape_energy_3d", "kappa_s", p.get("kappa_s")), ("shape_energy_3d", "h0", p.get("h0")),
-        ("grow_3d", "rate", p.get("rate")), ("grow_3d", "a_sw", p.get("a_sw")),
-        ("grow_3d", "hill", p.get("hill")), ("grow_3d", "rho", p.get("rho")),
-        ("divide_3d", "cycle_cv", p.get("cycle_cv")),
+        ("cell_mechanics", "K_V", p.get("K_V")), ("cell_mechanics", "relax_iters", p.get("relax")),
+        ("cell_mechanics", "kappa_s", p.get("kappa_s")), ("cell_mechanics", "h0", p.get("h0")),
+        ("cell_grow", "rate", p.get("rate")), ("cell_grow", "a_sw", p.get("a_sw")),
+        ("cell_grow", "hill", p.get("hill")), ("cell_grow", "rho", p.get("rho")),
+        ("cell_divide", "cycle_cv", p.get("cycle_cv")),
         # CLOCK RE-ANCHORING: these are per-CALL in the operator and the archived configs ran
-        # divide_3d once every 4 frames. Rescale so the replay preserves the archived
+        # cell_divide once every 4 frames. Rescale so the replay preserves the archived
         # wall-clock behaviour under the corrected clock (see composition_space header).
-        ("divide_3d", "min_cycle",
+        ("cell_divide", "min_cycle",
          (p["min_cycle"] * DIVIDE_CALL_PERIOD_BEFORE_D1) if p.get("min_cycle") else None),
-        ("divide_3d", "max_cycle",
+        ("cell_divide", "max_cycle",
          (p["max_cycle"] * DIVIDE_CALL_PERIOD_BEFORE_D1)
          if (p.get("max_cycle") and p["max_cycle"] < 10**8) else None),
-        ("shape_energy_3d", "Gamma", p.get("Gamma")), ("shape_energy_3d", "Lambda", p.get("Lambda")),
-        ("shape_energy_3d", "p0", p.get("p0")),
-        ("interface_line_tension_3d", "a_sw", p.get("iface_asw", p.get("a_sw"))),
-        ("divide_3d", "orient_asw", p.get("orient_asw", p.get("a_sw"))),
-        ("seed_cell_rd", "n_spots", p.get("spots")),
-        ("cell_react", "F", p.get("F")), ("cell_react", "kk", p.get("kk")),
-        ("cell_react", "mu_h", p.get("mu_h")),
-        ("shape_energy_3d", "gamma", p.get("gamma")),
-        ("cell_diffuse", "chi", p.get("chi")), ("cell_diffuse", "d_a", p.get("d_a")),
-        ("cell_diffuse", "d_h", p.get("d_h")),
-        ("cell_react", "rate", p.get("rate")), ("cell_react", "a0", p.get("a0")),
-        ("cell_react", "gamma", p.get("gamma")),
-        ("seed_cell_rd", "cone_deg", p.get("cone_deg")),
-        ("reconnect_t1_3d", "l_th_frac", p.get("l_th_frac")),
+        ("cell_mechanics", "Gamma", p.get("Gamma")), ("cell_mechanics", "Lambda", p.get("Lambda")),
+        ("cell_mechanics", "p0", p.get("p0")),
+        ("interface_tension", "a_sw", p.get("iface_asw", p.get("a_sw"))),
+        ("cell_divide", "orient_asw", p.get("orient_asw", p.get("a_sw"))),
+        ("cell_chem_seed", "n_spots", p.get("spots")),
+        ("cell_chem_react", "F", p.get("F")), ("cell_chem_react", "kk", p.get("kk")),
+        ("cell_chem_react", "mu_h", p.get("mu_h")),
+        ("cell_mechanics", "gamma", p.get("gamma")),
+        ("cell_chem_diffuse", "chi", p.get("chi")), ("cell_chem_diffuse", "d_a", p.get("d_a")),
+        ("cell_chem_diffuse", "d_h", p.get("d_h")),
+        ("cell_chem_react", "rate", p.get("rate")), ("cell_chem_react", "a0", p.get("a0")),
+        ("cell_chem_react", "gamma", p.get("gamma")),
+        ("cell_chem_seed", "cone_deg", p.get("cone_deg")),
+        ("edge_flip", "l_th_frac", p.get("l_th_frac")),
     ]
     for op, pname, val in mapping:
         nid = node(op)

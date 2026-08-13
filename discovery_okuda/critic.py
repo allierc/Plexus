@@ -59,9 +59,9 @@ class Rejection:
 
 # ============================================================================ BATCH rules
 def _op_identity(name):
-    """Operator identity, with the NODE INDEX stripped: divide_3d0 and divide_3d are one operator.
+    """Operator identity, with the NODE INDEX stripped: divide_3d0 and cell_divide are one operator.
 
-    `add_op` names the operator (`divide_3d`) and `remove_op` names the NODE (`divide_3d0`), so
+    `add_op` names the operator (`cell_divide`) and `remove_op` names the NODE (`divide_3d0`), so
     without this the two directions of the same experiment never matched. A1 then refused a
     necessity claim whose ablation was sitting in the same batch -- a false refusal of a correct
     proposal, which is the expensive way to fail. It was invisible because check_batch has never
@@ -72,8 +72,8 @@ def _op_identity(name):
 
 
 def _touched_operator(edit):
-    """The operator an edit acts on, or None. Edits look like ('add_op','cell_react','gray_scott')
-    or a string '+cell_react' / '-cell_react' / '=cell_react:tension'."""
+    """The operator an edit acts on, or None. Edits look like ('add_op','cell_chem_react','gray_scott')
+    or a string '+cell_chem_react' / '-cell_chem_react' / '=cell_chem_react:tension'."""
     if isinstance(edit, (tuple, list)) and len(edit) >= 2:
         return _op_identity(edit[1])
     e = str(edit).strip()
@@ -289,10 +289,10 @@ def check_static(graph, seen_hashes=(), edit_kind=None):
     # R1b -- ONE OPERATOR OF EACH KIND. A composition holding the same operator twice is not a
     # richer model, it is two solvers driving the same state and a hypothesis about neither.
     #
-    # MEASURED on round 1 of the rebuilt loop. `legal_edits` offered both `+shape_energy_3d:default`
-    # and `=shape_energy_3d:default`; the Proposer took the ADD and wrote the claim for the SWAP
+    # MEASURED on round 1 of the rebuilt loop. `legal_edits` offered both `+cell_mechanics:default`
+    # and `=cell_mechanics:default`; the Proposer took the ADD and wrote the claim for the SWAP
     # ("swapping the monolayer shape energy for the default releases the in-plane constraint").
-    # The spec came out with shape_energy_3d twice -- two independent relaxation loops of thirty
+    # The spec came out with cell_mechanics twice -- two independent relaxation loops of thirty
     # iterations each, driving the same vertices. Whatever that run measured, it was not the
     # composition the hypothesis named.
     #
@@ -318,10 +318,10 @@ def check_static(graph, seen_hashes=(), edit_kind=None):
     try:
         from composition_space import REACTION_PER_FRAME_LIMIT, reaction_advance
 
-        # `chi` is the RD timescale and it lives on cell_diffuse in this operator set; the
+        # `chi` is the RD timescale and it lives on cell_chem_diffuse in this operator set; the
         # reaction is what it destabilises. Both are checked so a relocation cannot silence this.
         for o in graph.ops:
-            if o["op"] not in ("cell_diffuse", "cell_react"):
+            if o["op"] not in ("cell_chem_diffuse", "cell_chem_react"):
                 continue
             chi = _param(graph, o["id"], "chi")
             if chi is None:
@@ -341,7 +341,7 @@ def check_static(graph, seen_hashes=(), edit_kind=None):
 
     # R1e -- THE TISSUE MUST FIT IN ITS ARRAY. Derived, like R1c/R1d, and for the same reason:
     # what makes a run meaningless here is not a number outside a typed range, it is that the
-    # experiment cannot happen. `divide_3d` divides a FRACTION of the population per call, so the
+    # experiment cannot happen. `cell_divide` divides a FRACTION of the population per call, so the
     # cell count is exponential by construction and the only thing that ever stops it is the
     # vertex reservoir.
     #
@@ -355,8 +355,8 @@ def check_static(graph, seen_hashes=(), edit_kind=None):
     # saturation is a measurement of the reservoir. Lower max_div_frac, raise `every`, shorten the
     # run, or size the reservoir for the projection -- all four are legal answers.
     try:
-        _seed = next((o for o in graph.ops if o["op"] == "seed_mesh_3d"), None)
-        _div = next((o for o in graph.ops if o["op"] == "divide_3d"), None)
+        _seed = next((o for o in graph.ops if o["op"] == "mesh_seed"), None)
+        _div = next((o for o in graph.ops if o["op"] == "cell_divide"), None)
         if _seed is not None and _div is not None:
             _p = graph.params
             n0 = float(_p.get(f"{_seed['id']}.n_cells", 2000))
@@ -375,10 +375,10 @@ def check_static(graph, seen_hashes=(), edit_kind=None):
             # THE RATE IS THE GROWTH RATE, so that is what this projects. The division
             # throttles are gone: every cell that reaches DIV_FACTOR x its birth volume divides.
             # So the population doubles roughly every ln(2)/rate frames, where `rate` is how fast
-            # grow_3d inflates a cell -- and the reservoir question becomes "how many
+            # cell_grow inflates a cell -- and the reservoir question becomes "how many
             # doublings does this run get".
-            _gro = next((o for o in graph.ops if o["op"] in ("grow_3d",
-                                                             "grow_3d")), None)
+            _gro = next((o for o in graph.ops if o["op"] in ("cell_grow",
+                                                             "cell_grow")), None)
             grate = float(_p.get(f"{_gro['id']}.rate", 0) or 0) if _gro else 0.0
             if grate > 0 and calls > 0 and cap > 0:
                 import math as _m
@@ -436,7 +436,7 @@ def check_static(graph, seen_hashes=(), edit_kind=None):
                     impl = graph.impl_of(o["id"])
                 except Exception:
                     impl = None
-            if o["op"] != "cell_react" or impl != "gierer_meinhardt":
+            if o["op"] != "cell_chem_react" or impl != "gierer_meinhardt":
                 continue
             # ONLY WITH DIVISION. The Diagnostician asked for a blanket refusal of
             # gierer_meinhardt above this step, and that guard would have refused r002c_04 --
@@ -446,7 +446,7 @@ def check_static(graph, seen_hashes=(), edit_kind=None):
             # every GM composition that also divides took damage at frame 115, five out of five,
             # at the SAME frame; the one that does not divide is clean. A guard aimed at the
             # kinetics would have killed the finding it was meant to protect.
-            if not any(x["op"] == "divide_3d" for x in graph.ops):
+            if not any(x["op"] == "cell_divide" for x in graph.ops):
                 continue
             # THE PARAMETER IS CALLED rd_rate. This asked for `rate`, always got None, and fell
             # back to 1.0 -- so R1d refused EVERY gierer_meinhardt-with-division composition
@@ -466,11 +466,11 @@ def check_static(graph, seen_hashes=(), edit_kind=None):
                     "an autocatalytic reaction stepped past its explicit-Euler limit -- the "
                     "activator diverges uniformly and the run measures an integrator, not a "
                     "mechanism",
-                    f"gierer_meinhardt WITH divide_3d advances dt*rate = {step:.2f} per step "
+                    f"gierer_meinhardt WITH cell_divide advances dt*rate = {step:.2f} per step "
                     f"against a limit of {AUTOCATALYTIC_STEP_LIMIT} (dt {DT_GLOBAL}, rate "
                     f"{rate}). Five such runs took damage at frame 115, all five at the same "
                     f"frame. Lower `rate`, use gray_scott, or drop division -- gierer_meinhardt "
-                    f"without divide_3d is stable at this step and is the best run on record."))
+                    f"without cell_divide is stable at this step and is the best run on record."))
 
     # R2 -- PRECONDITIONS. An operator whose required port type is produced by nothing will
     # silently no-op. This is the rule that prevents FALSE IMPOSSIBILITY claims, and it is the
@@ -555,15 +555,15 @@ def check_static(graph, seen_hashes=(), edit_kind=None):
     h = comp_hash(graph)
     _seen = set(seen_hashes)
     # THE KEY IS ALWAYS `_run_key`, AND THIS USED TO DEPEND ON THE EDIT KIND. A structural edit was
-    # keyed on `comp_hash`, which is parameter-blind -- so `add_op grow_3d` proposed on THREE
+    # keyed on `comp_hash`, which is parameter-blind -- so `add_op cell_grow` proposed on THREE
     # different parents produced one hash and two of the three slots were refused. Measured on the
     # relaunched round 1:
     #
-    #   _keep/r001_02   + grow_3d   Caa2255d08b2@6420561ce7   built
-    #   coral_gate      + grow_3d   Caa2255d08b2@a3dd27bbc7   REFUSED, and it is a different run
-    #   repair_l_th_frac+ grow_3d   Caa2255d08b2@a3dd27bbc7   refused, correctly -- same as above
+    #   _keep/r001_02   + cell_grow   Caa2255d08b2@6420561ce7   built
+    #   coral_gate      + cell_grow   Caa2255d08b2@a3dd27bbc7   REFUSED, and it is a different run
+    #   repair_l_th_frac+ cell_grow   Caa2255d08b2@a3dd27bbc7   refused, correctly -- same as above
     #
-    # The Proposer's stated intent was "coverage: grow_3d" across the three best chemistry
+    # The Proposer's stated intent was "coverage: cell_grow" across the three best chemistry
     # parents -- testing whether an operator's effect is general or parent-specific, which is the
     # experiment the lever map is FOR. Refusing it treated "same mechanism" as "same experiment".
     #
@@ -590,11 +590,11 @@ def range_notes(graph):
 
     Measured across the starting pool:
 
-        reconnect_t1_3d.l_th_frac   6/6 runs   0.35 vs [0.01, 0.12]     3x the ceiling
-        shape_energy_3d.Lambda      3/6        3 vs [0, 0.3]           10x
-        grow_3d.rate    3/6        0.000866 vs floor 0.002
-        grow_3d.a_sw    1/6        50 vs [0.2, 6]           8x
-        cell_diffuse.d_h            1/6        2 vs [0, 0.346]          6x
+        edge_flip.l_th_frac   6/6 runs   0.35 vs [0.01, 0.12]     3x the ceiling
+        cell_mechanics.Lambda      3/6        3 vs [0, 0.3]           10x
+        cell_grow.rate    3/6        0.000866 vs floor 0.002
+        cell_grow.a_sw    1/6        50 vs [0.2, 6]           8x
+        cell_chem_diffuse.d_h            1/6        2 vs [0, 0.346]          6x
 
     So the declared box does not contain a single working point, and the consequence is worse than a
     bad gate: the menu handed to the Proposer samples `set_param` INSIDE those boxes, so the search
@@ -674,7 +674,7 @@ def check_reservoir(spec, graph=None, frames=None):
 
     seed_cells = None
     for o in spec.get("operators", []):
-        if o.get("op") in ("seed_mesh_3d",) and o.get("n_cells"):
+        if o.get("op") in ("mesh_seed",) and o.get("n_cells"):
             seed_cells = int(o["n_cells"])
     if seed_cells is None:
         return out                      # a checkpoint start carries its own count
@@ -716,7 +716,7 @@ def observations(summary):
                             information and costs the round. The premise DETAIL is the most useful
                             output in the system -- "volume went 522.1 -> 312.9" -- so it now goes
                             to the next proposal through repair.py instead.
-      P1_INERT_OPERATOR     an operator that changed nothing is a FINDING. "cell_diffuse did
+      P1_INERT_OPERATOR     an operator that changed nothing is a FINDING. "cell_chem_diffuse did
                             nothing at D=0.002" is knowledge; refusing the run deletes it.
       P3_CHEMISTRY_DIVERGED nan metrics cannot be scored as confirmed or refuted anyway -- the
                             arithmetic already refuses itself, so the gate was ceremony.
@@ -787,19 +787,19 @@ if __name__ == "__main__":
     print(f"  okuda_route -> admit={ok} {rej}")
 
     print("\n-- R2: an operator whose precondition nothing satisfies --")
-    bad, _ = seed("substrate").apply(("add_op", "cell_diffuse", "graph_laplacian"))
+    bad, _ = seed("substrate").apply(("add_op", "cell_chem_diffuse", "graph_laplacian"))
     print(" ", check_static(bad))
 
     print("\n-- R3: present but unconnected == inert, and looks deliberate --")
-    d, _ = seed("substrate").apply(("add_op", "seed_cell_rd", "cone"))
-    d, _ = d.apply(("add_op", "grow_3d", "hill_conserve_amount"))
+    d, _ = seed("substrate").apply(("add_op", "cell_chem_seed", "cone"))
+    d, _ = d.apply(("add_op", "cell_grow", "hill_conserve_amount"))
     print(" ", [r for r in check_static(d) if r.code == "R3_DANGLING_SLOT"])
 
     print("\n-- R6: a re-run is a replicate, not a hypothesis --")
     print(" ", [r for r in check_static(g, seen_hashes=[comp_hash(g)]) if r.code == "R6_DUPLICATE"])
 
     print("\n-- P1: static checks cannot see this one --")
-    print(" ", check_posthoc({"inert_operators": ["cell_diffuse"], "saturated": False}))
+    print(" ", check_posthoc({"inert_operators": ["cell_chem_diffuse"], "saturated": False}))
 
     print("\n-- the generative role: the menu handed to the Proposer --")
     menu = legal_menu(seed("substrate"), max_stage=3)

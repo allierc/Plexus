@@ -84,20 +84,20 @@ def build(tag, *, death_chan=None, growth_chan=0, death_mode="chem_low", a_sw=0.
         out.append(o)
         # species B is seeded, diffused and reacted immediately after A's own operator, so the two
         # systems advance on the same clock and in the same order
-        if o["op"] == "seed_cell_rd":
-            out.append({"op": "seed_cell_rd", "at": "cell", "before_frame": o.get("before_frame", 3),
+        if o["op"] == "cell_chem_seed":
+            out.append({"op": "cell_chem_seed", "at": "cell", "before_frame": o.get("before_frame", 3),
                         "chan": 2, **SEED_B})
-        elif o["op"] == "cell_diffuse":
-            out.append({"op": "cell_diffuse", "at": "cell",
+        elif o["op"] == "cell_chem_diffuse":
+            out.append({"op": "cell_chem_diffuse", "at": "cell",
                         "implementation": o.get("implementation", "graph_laplacian"),
                         "chan": 2, **DIFFUSE_B})
-        elif o["op"] == "cell_react":
-            out.append({"op": "cell_react", "at": "cell", "model": "gray_scott",
+        elif o["op"] == "cell_chem_react":
+            out.append({"op": "cell_chem_react", "at": "cell", "model": "gray_scott",
                         "chan": 2, **SPECIES_B})
     spec["operators"] = out
 
-    _ops(spec)["grow_3d"]["chan"] = int(growth_chan)
-    # `reset_noise` is not read by divide_3d and rides in from the base spec; the unread gate
+    _ops(spec)["cell_grow"]["chan"] = int(growth_chan)
+    # `reset_noise` is not read by cell_divide and rides in from the base spec; the unread gate
     # refuses the spec while it is there, and it is not a key this experiment wants.
     for o in spec["operators"]:
         o.pop("reset_noise", None)
@@ -107,8 +107,8 @@ def build(tag, *, death_chan=None, growth_chan=0, death_mode="chem_low", a_sw=0.
         # die where species B is BELOW a fraction of its own maximum -- i.e. between B's domains --
         # so B's pattern is a map of where the tissue is spared.
         spec["operators"].append(
-            {"op": "apoptosis_3d", "at": "vertex", "cell_set": "cell",
-             "p0": _ops(spec)["shape_energy_3d"].get("p0", 3.5),
+            {"op": "cell_die", "at": "vertex", "cell_set": "cell",
+             "p0": _ops(spec)["cell_mechanics"].get("p0", 3.5),
              "mode": death_mode, "chan": int(death_chan), "a_sw": a_sw,
              "max_mark_frac": max_mark_frac, "min_age": 4, "shrink_rate": shrink_rate,
              "critical_frac": critical_frac,

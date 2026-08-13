@@ -10,7 +10,7 @@ is the test battery.
     V4  DEFECT FIXES     every emitted config carries the D1/D2/D3 fixes
     V5  PRECONDITIONS    a composition that would silently no-op is REFUSED, not run  (D4)
     V6  IDENTITY         theta never changes comp_hash; an implementation swap always does
-    V7  ABLATION         the campaign's central test (remove `interface_line_tension_3d`) is one legal edit
+    V7  ABLATION         the campaign's central test (remove `interface_tension`) is one legal edit
     V8  COVERAGE         every operator in the vocabulary is exercised by >=1 emitted config
 
     python validate_space.py            # battery only (seconds, no simulation)
@@ -116,7 +116,7 @@ def main():
                 _, hand = rtr.make(presets[name])
                 hand_ops = {o["op"] for o in hand["operators"]}
                 ours = {o["op"] for o in specs[name]["operators"]}
-                # load_mesh_3d/seed_mesh_3d are the same role
+                # load_mesh_3d/mesh_seed are the same role
                 missing, extra = hand_ops - ours, ours - hand_ops
                 check(f"V3 {name}", not missing,
                       f"missing={sorted(missing)} extra={sorted(extra)}" if (missing or extra)
@@ -132,14 +132,14 @@ def main():
     # check compares the actual numbers, excluding the keys we DELIBERATELY changed.
     print("\nV9 PARAMETER FIDELITY -- same numbers, not just same operators?")
     # dt/every: the D1/D2 fixes. min_cycle/max_cycle/max_div_frac: the CLOCK RE-ANCHORING --
-    # they are per-CALL in the operator and the archived configs ran divide_3d once every 4
+    # they are per-CALL in the operator and the archived configs ran cell_divide once every 4
     # frames, so preserving the archived behaviour REQUIRES different numbers. V10 checks the
     # factor is exactly right; V9 must not flag it as a fidelity failure.
     # `ckpt`: PORTABILITY. make() bakes an absolute /workspace path; a tracked config must run
     # both in the devcontainer and on the cluster, which mount the same export at different
     # prefixes, so we emit a repo-relative path resolved by run_one against its own location.
     # `vth_frac`: THE D5b FIX. The archived recipes cap a cell's target volume at 1.5x while
-    # divide_3d fires at 2.0x -- the ceiling sits BELOW the trigger, so volume-triggered division
+    # cell_divide fires at 2.0x -- the ceiling sits BELOW the trigger, so volume-triggered division
     # was arithmetically impossible and every division ever seen came from the max_cycle timeout.
     # The ceiling is now derived from the trigger (2.0 x 1.25 = 2.5). The space is right and the
     # archive is wrong, so this divergence is deliberate. Listed rather than back-fitted into the
@@ -147,7 +147,7 @@ def main():
     DELIBERATE = {"dt", "every", "max_cycle", "record_every",
                   "min_cycle", "ckpt", "vth_frac",
                   # `chi`/`rate`: THE D5a FIX, guarded by V11 below exactly as V10 guards the
-                  # divide clock. Both are rescaled by 1/dt because cell_react and cell_diffuse
+                  # divide clock. Both are rescaled by 1/dt because cell_chem_react and cell_chem_diffuse
                   # EMIT=velocity into `chem`, so the engine was integrating the chemistry with
                   # the MECHANICS substep -- 300 frames bought 6 units of reaction time instead
                   # of ~500. Exempt here, verified there; an exemption nobody checks is a hole.
@@ -189,8 +189,8 @@ def main():
                 continue
             try:
                 _, hand = rtr.make(presets[name])
-                h = next((o for o in hand["operators"] if o["op"] == "divide_3d"), None)
-                o = next((o for o in specs[name]["operators"] if o["op"] == "divide_3d"), None)
+                h = next((o for o in hand["operators"] if o["op"] == "cell_divide"), None)
+                o = next((o for o in specs[name]["operators"] if o["op"] == "cell_divide"), None)
                 if not h or not o:
                     continue
                 bad = []
@@ -209,14 +209,14 @@ def main():
     for name, cfg in specs.items():
         dt_ok = cfg["general"]["dt"] == T.DT_GLOBAL
         every_ok = all(o.get("every", 1) == 1 for o in cfg["operators"])
-        topo = next((o for o in cfg["operators"] if o["op"] == "topo_snapshot_3d"), None)
+        topo = next((o for o in cfg["operators"] if o["op"] == "topo_record"), None)
         stride_ok = topo is not None and topo["every"] == cfg["general"]["record_every"]
         check(f"V4 {name}", dt_ok and every_ok and stride_ok,
               f"dt={cfg['general']['dt']} every_all_1={every_ok} stride_match={stride_ok}")
 
     # ---------------------------------------------------------------- V5 preconditions
     print("\nV5 PRECONDITIONS -- is a silently-inert composition REFUSED?  (D4)")
-    bad, _ = seed("substrate").apply(("add_op", "cell_diffuse", "graph_laplacian"))
+    bad, _ = seed("substrate").apply(("add_op", "cell_chem_diffuse", "graph_laplacian"))
     check("V5 unmet-precondition detected", len(bad.unmet_preconditions()) == 1,
           str(bad.unmet_preconditions()))
     refused = False
@@ -227,13 +227,13 @@ def main():
     check("V5 compilation refuses it", refused,
           "a composition that would no-op never reaches the cluster")
 
-    # THE ANCHOR MOVED FROM `grow_3d.gate` TO `interface_line_tension_3d.site`, and it had to. The gate is now an
+    # THE ANCHOR MOVED FROM `cell_grow.gate` TO `interface_tension.site`, and it had to. The gate is now an
     # `opt_slots` entry -- leaving it unwired selects the rho baseline, which is uniform growth and
     # a legal composition -- so a test that proved dangling slots are caught by pointing at the one
-    # slot that is allowed to dangle would pass forever without testing anything. `interface_line_tension_3d.site`
+    # slot that is allowed to dangle would pass forever without testing anything. `interface_tension.site`
     # is still required: the forcing term with nothing selecting the cells it pushes is inert.
-    dangling, _ = seed("substrate").apply(("add_op", "seed_cell_rd", "cone"))
-    dangling, _ = dangling.apply(("add_op", "interface_line_tension_3d", "default"))
+    dangling, _ = seed("substrate").apply(("add_op", "cell_chem_seed", "cone"))
+    dangling, _ = dangling.apply(("add_op", "interface_tension", "default"))
     check("V5 dangling slot detected", len(dangling.unrouted_slots()) >= 1,
           f"{dangling.unrouted_slots()} -- present but disconnected == inert")
 
@@ -245,17 +245,17 @@ def main():
     check("V6 theta does not change identity",
           comp_hash(g.with_params(g.sample_params(rng))) == comp_hash(g),
           "a retune provably cannot pose as a new hypothesis")
-    se = next((o["id"] for o in g.ops if o["op"] == "shape_energy_3d"), None)
+    se = next((o["id"] for o in g.ops if o["op"] == "cell_mechanics"), None)
     if se:
         g2, _ = g.apply(("set_impl", se, "monolayer"))
         check("V6 impl swap DOES change identity", comp_hash(g2) != comp_hash(g),
               "mid-surface vs true 3D volume is a mechanism edit")
 
     # ---------------------------------------------------------------- V7 the central ablation
-    print("\nV7 CENTRAL ABLATION -- `interface_line_tension_3d` removable by one legal edit?")
+    print("\nV7 CENTRAL ABLATION -- `interface_tension` removable by one legal edit?")
     r40 = graphs.get("ref_round40_mc8")
     if r40:
-        ex = next((o["id"] for o in r40.ops if o["op"] == "interface_line_tension_3d"), None)
+        ex = next((o["id"] for o in r40.ops if o["op"] == "interface_tension"), None)
         if ex:
             ab, _ = r40.apply(("remove_op", ex))
             ok, why = ab.is_runnable()
@@ -279,7 +279,7 @@ def main():
                 hb = {o["op"]: o for o in hand["operators"]}
                 sb = {o["op"]: o for o in specs[name]["operators"]}
                 bad = []
-                for op, key in (("cell_diffuse", "chi"), ("cell_react", "rate")):
+                for op, key in (("cell_chem_diffuse", "chi"), ("cell_chem_react", "rate")):
                     if op not in hb or op not in sb or hb[op].get(key) is None:
                         continue
                     want = hb[op][key] * RD_PER_FRAME
@@ -290,14 +290,14 @@ def main():
                 # diffusion to reaction, so rescaling both by the same factor must leave it
                 # alone. If only one moved, the clock fix would have silently retuned the
                 # pattern -- a far worse bug than the one it repaired.
-                if ("cell_diffuse" in hb and "cell_react" in hb
-                        and hb["cell_diffuse"].get("chi") and hb["cell_react"].get("rate")
-                        and sb.get("cell_react", {}).get("rate")):
-                    r_hand = hb["cell_diffuse"]["chi"] / hb["cell_react"]["rate"]
-                    r_spec = sb["cell_diffuse"]["chi"] / sb["cell_react"]["rate"]
+                if ("cell_chem_diffuse" in hb and "cell_chem_react" in hb
+                        and hb["cell_chem_diffuse"].get("chi") and hb["cell_chem_react"].get("rate")
+                        and sb.get("cell_chem_react", {}).get("rate")):
+                    r_hand = hb["cell_chem_diffuse"]["chi"] / hb["cell_chem_react"]["rate"]
+                    r_spec = sb["cell_chem_diffuse"]["chi"] / sb["cell_chem_react"]["rate"]
                     if abs(r_hand - r_spec) > 1e-6 * max(1.0, r_hand):
                         bad.append(f"ratio changed {r_hand:.4f} -> {r_spec:.4f}")
-                if "cell_diffuse" in hb or "cell_react" in hb:
+                if "cell_chem_diffuse" in hb or "cell_chem_react" in hb:
                     check(f"V11 {name}", not bad,
                           "; ".join(bad) if bad else
                           f"both x{RD_PER_FRAME:.0f}, wavelength ratio unchanged")

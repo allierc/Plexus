@@ -30,22 +30,22 @@ operators:
   cell_set: cell
   ckpt: /groups/saalfeld/home/allierc/Graph/Plexus/log/okuda/r001n_07_cfl_c000p020_d/ckpt_end.npz
   before_frame: 1
-- op: cell_geometry_3d
+- op: cell_geometry
   at: cell
-- op: cell_adjacency
+- op: cell_neighbours
   at: cell
-- op: cell_diffuse
+- op: cell_chem_diffuse
   at: cell
   d_a: 0.08
   d_h: 5.0
   chi: 0.02
-- op: cell_react
+- op: cell_chem_react
   at: cell
   model: gray_scott
   F: 0.046
   kk: 0.062
   rate: 1.0
-- op: shape_energy_3d
+- op: cell_mechanics
   at: vertex
   p0: 3.5
   K_A: 1.0
@@ -59,24 +59,24 @@ operators:
   relax_iters: 30
   eta: 0.08
   cap_frac: 0.12
-- op: reconnect_t1_3d
+- op: edge_flip
   at: vertex
   l_th_frac: 0.35
   every: 4
   max_flips: 30
   engine_clock: true
-- op: topo_snapshot_3d
+- op: topo_record
   at: vertex
   every: 1
 schedule:
 - load_mesh_3d
-- cell_geometry_3d
-- cell_adjacency
-- cell_diffuse
-- cell_react
-- shape_energy_3d
-- reconnect_t1_3d
-- topo_snapshot_3d
+- cell_geometry
+- cell_neighbours
+- cell_chem_diffuse
+- cell_chem_react
+- cell_mechanics
+- edge_flip
+- topo_record
 _discovery:
   comp_hash: MINI_coral_fixed
   region: Turing chemistry alone on a rigid 2000-cell ball

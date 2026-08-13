@@ -40,18 +40,18 @@ radius"). The CODE implements the saturating exponential relaxation above with N
 smooth asymptote -- so a reimplementer following the prose would produce the wrong dynamics. We
 translate the code, because the differential test compares us to the running source.
 
-REFINEMENT of the registered 'cell_grow' contract -- and why it CANNOT co-register under that
-name. This is the same biology as the shipped 'cell_grow' (a cell grows toward a maximum size),
+REFINEMENT of the registered 'agent_grow' contract -- and why it CANNOT co-register under that
+name. This is the same biology as the shipped 'agent_grow' (a cell grows toward a maximum size),
 so the atlas files it as a REFINEMENT, not `new`. But the refinement FLIPS the kind: shipped
-'cell_grow' is `structural` (EMIT=None, `forward()` returns {}) -- it advances a rest-VOLUME
+'agent_grow' is `structural` (EMIT=None, `forward()` returns {}) -- it advances a rest-VOLUME
 multiplier and REALIZES it by waking dormant MPM reserve particles -- whereas this mechanism is
 delta-emitting (it relaxes a scalar `radius` and mutates no state directly). Plexus's registry
 FORBIDS a second implementation of one contract from differing in kind (registry.py:131), so
-`@register_operator("cell_grow", kind="lateral", ...)` raises at import next to the shipped
-structural 'cell_grow'. That rejection is not an obstacle to route around -- it IS the breaking
+`@register_operator("agent_grow", kind="lateral", ...)` raises at import next to the shipped
+structural 'agent_grow'. That rejection is not an obstacle to route around -- it IS the breaking
 change the ledger exists to surface (a refinement that widens a signature silently invalidates
 every existing caller; here `kind` widening is hard-rejected). So the candidate registers under
-the distinct name `grow_radius`; promoting it is a curator decision about whether 'cell_grow'
+the distinct name `grow_radius`; promoting it is a curator decision about whether 'agent_grow'
 should widen to admit a delta-emitting radius realization. Note also that the entry's
 contract.kind "field" reads as "delta-emitting"; the concrete Plexus `field` kind is grid
 self-dynamics that returns {} (diffuse/decay) and cannot emit this per-cell delta -- `lateral`
@@ -73,7 +73,7 @@ from plexus.models.registry import register_operator
 @register_operator("grow_radius", family="growth", set="cell", kind="lateral")
 class GrowRadius(Lateral):
     """Saturating (von Bertalanffy) per-cell radius growth as an exact-flow delta. A refinement
-    of the shipped 'cell_grow' contract that cannot co-register under that name (kind flips
+    of the shipped 'agent_grow' contract that cannot co-register under that name (kind flips
     structural -> delta-emitting; see the module docstring). Translated from
     papers/jax-morph/jax_morph/physics/growth.py:23."""
 

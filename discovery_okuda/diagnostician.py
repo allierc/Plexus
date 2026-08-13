@@ -109,11 +109,11 @@ def spec_params(run):
     except Exception:
         return {}
     o = {x["op"]: x for x in c.get("operators", [])}
-    d, r = o.get("cell_diffuse", {}), o.get("cell_react", {})
+    d, r = o.get("cell_chem_diffuse", {}), o.get("cell_chem_react", {})
     return {"dt": c.get("general", {}).get("dt"), "chi": d.get("chi") or r.get("chi"),
             "d_a": d.get("d_a"), "d_h": d.get("d_h"), "rate": r.get("rate"),
             "react": r.get("model") or r.get("implementation"),
-            "n_cells": (o.get("seed_mesh_3d") or {}).get("n_cells")}
+            "n_cells": (o.get("mesh_seed") or {}).get("n_cells")}
 
 
 def nearest_passing(fail_runs, log_dir=LOG):

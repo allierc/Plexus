@@ -5,7 +5,7 @@ Paste everything below the line into a fresh session, working directory `/worksp
 ---
 
 We are building an epithelial spheroid growing inside an extracellular matrix, as Plexus2 operators,
-in `/workspace/Plexus/prototype/ecm` with runs in `/workspace/Plexus/log/okuda_ECM`. Four pieces are
+in `/workspace/Plexus/discovery_okuda/ops` with runs in `/workspace/Plexus/log/okuda_ECM`. Four pieces are
 finished and each was built on its own testbench first, measured against a control, written into its
 own note, and only then combined. **Your job is the fifth piece: the basement membrane.** Build it on
 its own testbench. Do not touch `04` until the sheet stands up on its own.
@@ -19,7 +19,7 @@ its own testbench. Do not touch `04` until the sheet stands up on its own.
   and its adhesion an explicit relation; §7 is `04`, the run you will eventually feed.
 - `discovery_okuda/note_junction.pdf` §8 and `note_fibre.pdf` §9 — the two specs that already fix the
   schedule, the substep and the matrix around you.
-- `prototype/ecm/HANDOVER.md` — the corrections section at the top. Every claim in it was checked
+- `discovery_okuda/ops/HANDOVER.md` — the corrections section at the top. Every claim in it was checked
   against the engine and several did not survive; read it as a list of ways this exact problem has
   already produced convincing wrong answers.
 
@@ -35,7 +35,7 @@ its own testbench. Do not touch `04` until the sheet stands up on its own.
 - **A positional update launders deformation.** A particle moved by the engine delta never passes
   through the grid, so **F** misses the motion: run 130 reported 0.31 of a true stretch of 2.44 (13%)
   while run 121, routed through the grid, reported 2.25 of 2.30 (98%).
-- **The interface exists and conserves momentum.** `mesh_contact` (`prototype/ecm/mesh_contact_ops.py`)
+- **The interface exists and conserves momentum.** `mesh_contact` (`discovery_okuda/ops/mesh_contact_ops.py`)
   does particle-to-surface contact against the spheroid's own moving, re-meshed surface: momentum
   residual 1.2×10⁻⁷ max / 1.5×10⁻⁸ median (float32 precision), penetration 0.82 grid cells, and its
   lookup is certified against brute force by `selftest()` before any run uses it.
@@ -118,8 +118,8 @@ Each operator needs a measurement that can come back wrong:
 
 ## What NOT to reuse
 
-`membrane_ops.py` (134 KB) is the archived line — `seed_basement_membrane`,
-`basement_membrane_bond`, `integrin_adhesion`, `adhesion_pull`, `basement_membrane_secrete` and the
+`membrane_ops.py` (134 KB) is the archived line — `bm_seed`,
+`bm_bond`, `integrin_adhesion`, `adhesion_pull`, `bm_secrete` and the
 rest are the operators of the sixty-six runs in §8, i.e. the sheet that stalled. Do not import them
 and do not extend them. Start a new `bm_ops.py`; take names and lessons from that file, not code.
 `integrin_ops.py` is the MPM-fibre integrin refuted by runs 142–151 and is likewise a record, not a
@@ -149,7 +149,7 @@ dependency. What you DO build on: `mesh_contact_ops.py` (the certified interface
 ```bash
 PY=/workspace/.conda_envs/neural-graph-linux/bin/python      # default python3 has no torch
 export PYTHONPATH=/workspace/Plexus/src
-cd /workspace/Plexus/prototype/ecm
+cd /workspace/Plexus/discovery_okuda/ops
 $PY mesh_contact_ops.py --device cuda:0                      # the certification pattern to copy
 ```
 

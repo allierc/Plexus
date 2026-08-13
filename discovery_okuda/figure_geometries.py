@@ -25,7 +25,7 @@ import sys
 import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-TYSSUE = os.path.join(os.path.dirname(HERE), "prototype", "Tyssue")
+TYSSUE = os.path.join(HERE, "ops")
 for _p in (HERE, os.path.join(HERE, "agents"), TYSSUE):
     if _p not in sys.path:
         sys.path.insert(0, _p)

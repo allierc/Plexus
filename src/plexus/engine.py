@@ -450,7 +450,7 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
             _build_edge_set(H, sname, s, device)
             continue
         per = int(s["per_parent"]); radius = float(s.get("radius", 0.02))
-        reserve = int(s.get("grow_reserve", 0))         # DORMANT particles/parent (occ=0) for cell_grow to wake
+        reserve = int(s.get("grow_reserve", 0))         # DORMANT particles/parent (occ=0) for agent_grow to wake
         per_tot = per + reserve
         _, render, depth = _entity_meta(sname)         # render hints + depth from the registry
         schema = _resolve_schema(s, H.dim)             # StateSchema: pos/vel default (like top-level sets), or a `state:` block
@@ -757,7 +757,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     Two things an inverse caller should know. The recorded trajectory is always detached: it is a
     side-channel for plotting and scoring, never a path for the gradient, which lives in the
     returned `H`. And a structural operator must apply its writes FUNCTIONALLY (clone, write,
-    publish) or it severs the tape for everything downstream of it -- see `cell_divide`.
+    publish) or it severs the tape for everything downstream of it -- see `agent_divide`.
     """
     H = build(sim, device)                    # 1) build the Hierarchy: every set (level) + field, from the spec
     H.emit_order = _resolve_emit(sim, H)      # 2) per-set integration order (velocity=1st-order / acceleration=2nd), from the ops' EMIT
@@ -845,7 +845,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                     # frame, `mpm_scatter` saw a body force of 20 / 40 / 60 / 80 where the same operator
                     # at frame level gives a flat 20 / 20 / 20 / 20. Anything stiff enough to need
                     # per-substep evaluation was therefore ramping 1x to Nx within every frame -- the
-                    # ECM prototype's `basement_membrane_contact` did exactly that from run 110 on.
+                    # ECM prototype's `bm_contact` did exactly that from run 110 on.
                     # Snapshotting and restoring keeps the documented behaviour intact (a frame-level
                     # delta, e.g. gravity, persists across the loop and is seen identically by every
                     # substep) and makes an inner-schedule force what it reads as: recomputed at the

@@ -23,7 +23,7 @@ carry nothing because it has no field for their conditions and no bucket for the
 
 | specimen | what it shows |
 |---|---|
-| `bud-with-fission-neck-VALID` (r008c_02) | a clean bud with a constricting neck **after `divide_3d` was removed** — refuted "division is NECESSARY", a claim still asserted in memory.md two rounds later |
+| `bud-with-fission-neck-VALID` (r008c_02) | a clean bud with a constricting neck **after `cell_divide` was removed** — refuted "division is NECESSARY", a claim still asserted in memory.md two rounds later |
 | `best-valid-1.295-2tubes` (r007c_02) | the campaign ceiling on a sound specimen. Set in round 3, never exceeded in seven later rounds |
 | `multilobe-coarse-spots-VALID` (r009c_01) | a few coarse chemical domains → a multi-lobed body. Recorded as `morphology=unclear, tubes=1` — the metrics undersell it |
 | `finest-Turing-pattern-but-PERFECT-SPHERE` (r009c_05) | the best pattern in the campaign and **zero** deformation. Recorded as a null (`sphere`, 1.003). The instrument cannot see the pattern, so it reported absence of effect |

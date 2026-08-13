@@ -37,7 +37,7 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 LOG = os.path.join(ROOT, "log", "okuda")
-for _p in (HERE, os.path.join(ROOT, "prototype", "Tyssue"), os.path.join(ROOT, "src")):
+for _p in (HERE, os.path.join(ROOT, "discovery_okuda", "ops"), os.path.join(ROOT, "src")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
@@ -47,7 +47,7 @@ import matplotlib.pyplot as plt                                       # noqa: E4
 
 from run_one import _scalebar, run_box                                # noqa: E402
 from run_tyssue_vesicle import _draw                                  # noqa: E402
-from tyssue_topology_ops3d import rings_from_flat_3d                  # noqa: E402
+from topology_ops import rings_from_flat_3d                  # noqa: E402
 
 CAM = dict(elev=18, azim=30)
 
@@ -71,7 +71,7 @@ STYLES = [("black 0.25 pt  (the old default)", dict(edge="black", edge_lw=0.25))
           ("black 0.08 pt  (chosen)", dict(edge="black", edge_lw=0.08)),
           ("shaded  (edge = face x 0.45)", dict(edge="shaded", edge_lw=0.25)),
           ("no stroke", dict(edge="none"))]
-ASPECT_MULT = 3.0                    # the same threshold apoptosis_3d field_high uses
+ASPECT_MULT = 3.0                    # the same threshold cell_die field_high uses
 
 
 def last_frame(run):

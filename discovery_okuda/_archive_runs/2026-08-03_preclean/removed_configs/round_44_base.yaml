@@ -29,24 +29,24 @@ operators:
 - op: load_mesh_3d
   at: vertex
   cell_set: cell
-  ckpt: prototype/Tyssue/archive/smoke_hom/ckpt.npz
+  ckpt: discovery_okuda/ops/archive/smoke_hom/ckpt.npz
   before_frame: 1
-- op: cell_geometry_3d
+- op: cell_geometry
   at: cell
-- op: seed_cell_rd
+- op: cell_chem_seed
   at: cell
   mode: cones
   n_spots: 1
   amp: 2.0
   cone_deg: 20.0
-- op: cell_adjacency
+- op: cell_neighbours
   at: cell
-- op: cell_diffuse
+- op: cell_chem_diffuse
   at: cell
   d_a: 0.05
   d_h: 0.7
   chi: 4.0
-- op: cell_react
+- op: cell_chem_react
   at: cell
   model: gierer_meinhardt
   rate: 1.0
@@ -54,7 +54,7 @@ operators:
   mu_a: 1.0
   mu_h: 1.0
   a0: 0.0
-- op: grow_3d
+- op: cell_grow
   at: vertex
   cell_set: cell
   rate: 0.01
@@ -65,7 +65,7 @@ operators:
   after_frame: 80
   dt: 0.02
   conserve_amount: true
-- op: shape_energy_3d
+- op: cell_mechanics
   at: vertex
   p0: 3.9
   K_A: 1.0
@@ -81,12 +81,12 @@ operators:
   relax_iters: 30
   eta: 0.08
   cap_frac: 0.12
-- op: reconnect_t1_3d
+- op: edge_flip
   at: vertex
   l_th_frac: 0.28
   every: 1
   max_flips: 300
-- op: divide_3d
+- op: cell_divide
   at: vertex
   factor: 2.0
   reset_noise: 0.12
@@ -103,61 +103,61 @@ operators:
   orient_iface: true
   orient_asw: 1.2
   g1_ramp: false
-- op: topo_snapshot_3d
+- op: topo_record
   at: vertex
   every: 1
 schedule:
 - load_mesh_3d
-- cell_geometry_3d
-- seed_cell_rd
-- cell_adjacency
-- cell_diffuse
-- cell_react
-- grow_3d
-- shape_energy_3d
-- reconnect_t1_3d
-- divide_3d
-- topo_snapshot_3d
+- cell_geometry
+- cell_chem_seed
+- cell_neighbours
+- cell_chem_diffuse
+- cell_chem_react
+- cell_grow
+- cell_mechanics
+- edge_flip
+- cell_divide
+- topo_record
 _discovery:
   comp_hash: Cf77b4802cd2
   structure:
     operators:
     - id: cell_adjacency0
-      op: cell_adjacency
+      op: cell_neighbours
     - id: cell_diffuse0
-      op: cell_diffuse
+      op: cell_chem_diffuse
     - id: cell_geometry_3d0
-      op: cell_geometry_3d
+      op: cell_geometry
     - id: seed_cell_rd0
-      op: seed_cell_rd
+      op: cell_chem_seed
       impl: cone
     - id: cell_react0
-      op: cell_react
+      op: cell_chem_react
       impl: gierer_meinhardt
     - id: divide_3d0
-      op: divide_3d
+      op: cell_divide
       impl: orient_iface
     - id: extrude0
       op: extrude
     - id: grow_3d0
-      op: grow_3d
+      op: cell_grow
       impl: hill_conserve_amount
     - id: reconnect_t1_3d0
-      op: reconnect_t1_3d
+      op: edge_flip
     - id: seed_mesh_3d0
-      op: seed_mesh_3d
+      op: mesh_seed
     - id: shape_energy_3d0
-      op: shape_energy_3d
+      op: cell_mechanics
       impl: default
     connections:
-    - src_op: seed_cell_rd
-      dst_op: divide_3d
+    - src_op: cell_chem_seed
+      dst_op: cell_divide
       slot: axis
-    - src_op: seed_cell_rd
+    - src_op: cell_chem_seed
       dst_op: extrude
       slot: site
-    - src_op: seed_cell_rd
-      dst_op: grow_3d
+    - src_op: cell_chem_seed
+      dst_op: cell_grow
       slot: gate
   region: emergent RD + forced extrusion
   defect_fixes:

@@ -4,9 +4,9 @@ Causal links the record carries directly: `parent` (descent) and `chases` (an un
 
 | From | Mode | To | Mode | Type | Edit |
 |---|---|---|---|---|---|
-| b_gs_plain_sharp_hi | — | r001_01 | exploratory | descent | add_op:interface_line_tension_3d |
-| b_gs_plain_sharp_lo | — | r001_02 | adversarial | descent | add_op:apoptosis_3d |
-| b_gs_plain_soft_hi | — | r001_03 | exploratory | descent | add_op:interface_line_tension_3d |
+| b_gs_plain_sharp_hi | — | r001_01 | exploratory | descent | add_op:interface_tension |
+| b_gs_plain_sharp_lo | — | r001_02 | adversarial | descent | add_op:cell_die |
+| b_gs_plain_soft_hi | — | r001_03 | exploratory | descent | add_op:interface_tension |
 | b_gs_plain_sharp_lo | — | r001_04 | adversarial | descent | set_param:cell_react0.F |
 | b_gs_plain_soft_lo | — | r001_05 | exploratory | descent | set_param:cell_diffuse0.chi |
 | b_gs_plain_soft_hi | — | r001_06 | confirmatory | descent | set_param:grow_3d0.a_sw |
@@ -25,7 +25,7 @@ Causal links the record carries directly: `parent` (descent) and `chases` (an un
 | r001_07 | — | r002_04 | adversarial | descent | set_param:cell_diffuse0.d_a |
 | r001_06 | — | r002_05 | confirmatory | descent | set_param:grow_3d0.rho |
 | r001_02 | — | r002_06 | exploratory | descent | remove_op:divide_3d0 |
-| r001_06 | — | r002_07 | adversarial | descent | add_op:interface_line_tension_3d |
+| r001_06 | — | r002_07 | adversarial | descent | add_op:interface_tension |
 | b_bru_question | — | r002_08 | sweep | descent | set_param:grow_3d0.rho |
 | b_gs_shaping_soft_lo | — | r002_09 | sweep | descent | set_param:shape_energy_3d0.K_bend |
 | b_gs_plain_soft_lo_death | — | r002_10 | sweep | descent | set_param:apoptosis_3d0.mode |
@@ -34,13 +34,13 @@ Causal links the record carries directly: `parent` (descent) and `chases` (an un
 | b_gs_shaping_sharp_hi_death | — | r002_13 | sweep | descent | set_param:apoptosis_3d0.max_mark_frac |
 | b_gs_plain_soft_lo | — | r002_14 | sweep | descent | set_param:grow_3d0.rho |
 | b_gs_plain_soft_lo | — | r002_15 | sweep | descent | set_param:grow_3d0.rho |
-| r002_04 | — | r003_01 | exploratory | descent | add_op:interface_line_tension_3d |
-| r002_01 | — | r003_02 | confirmatory | descent | add_op:interface_line_tension_3d |
+| r002_04 | — | r003_01 | exploratory | descent | add_op:interface_tension |
+| r002_01 | — | r003_02 | confirmatory | descent | add_op:interface_tension |
 | r002_04 | — | r003_03 | adversarial | descent | set_param:shape_energy_3d0.Lambda |
 | r002_04 | — | r003_04 | exploratory | descent | set_param:cell_diffuse0.chi |
 | r002_04 | — | r003_05 | exploratory | descent | set_param:cell_diffuse0.d_a |
 | r002_04 | — | r003_06 | confirmatory | descent | set_param:grow_3d0.rho |
-| r002_04 | — | r003_07 | exploratory | descent | add_op:apoptosis_3d |
+| r002_04 | — | r003_07 | exploratory | descent | add_op:cell_die |
 | b_gs_shaping_soft_lo | — | r003_08 | sweep | descent | set_param:shape_energy_3d0.K_bend |
 | b_gs_plain_soft_lo_death | — | r003_09 | sweep | descent | set_param:apoptosis_3d0.max_mark_frac |
 | b_gs_plain_soft_lo | — | r003_10 | sweep | descent | set_param:grow_3d0.rho |
@@ -51,7 +51,7 @@ Causal links the record carries directly: `parent` (descent) and `chases` (an un
 | b_gs_shaping_soft_lo | — | r003_15 | sweep | descent | set_param:shape_energy_3d0.Lambda |
 | r002_04 | — | r004_01 | replicate | descent | set_param:cell_diffuse0.d_a |
 | r002_04 | — | r004_02 | confirmatory | descent | set_param:cell_diffuse0.d_h |
-| r003_04 | — | r004_03 | exploratory | descent | add_op:interface_line_tension_3d |
+| r003_04 | — | r004_03 | exploratory | descent | add_op:interface_tension |
 | r002_01 | — | r004_04 | replicate | descent | set_param:cell_diffuse0.d_a |
 | r002_04 | — | r004_05 | exploratory | descent | set_param:shape_to_chem0.beta |
 | r002_04 | — | r004_06 | adversarial | descent | set_param:shape_to_chem0.beta |
@@ -64,8 +64,8 @@ Causal links the record carries directly: `parent` (descent) and `chases` (an un
 | b_gs_shaping_soft_lo | — | r004_13 | sweep | descent | set_param:shape_energy_3d0.Lambda |
 | b_gs_shaping_soft_lo | — | r004_14 | sweep | descent | set_param:shape_energy_3d0.Lambda |
 | b_gs_shaping_soft_lo | — | r004_15 | sweep | descent | set_param:shape_energy_3d0.Lambda |
-| r003_07 | — | r005_01 | adversarial | descent | add_op:interface_line_tension_3d |
-| r004_10 | — | r005_02 | exploratory | descent | add_op:interface_line_tension_3d |
+| r003_07 | — | r005_01 | adversarial | descent | add_op:interface_tension |
+| r004_10 | — | r005_02 | exploratory | descent | add_op:interface_tension |
 | r004_10 | — | r005_03 | confirmatory | descent | set_param:cell_diffuse0.d_a |
 | r004_10 | — | r005_04 | exploratory | descent | set_param:cell_diffuse0.d_h |
 | r004_10 | — | r005_06 | exploratory | descent | set_impl:shape_to_chem0:tension |
@@ -77,9 +77,9 @@ Causal links the record carries directly: `parent` (descent) and `chases` (an un
 | b_gs_plain_soft_lo_death | — | r005_13 | sweep | descent | set_param:apoptosis_3d0.max_mark_frac |
 | b_gs_plain_soft_lo_death | — | r005_14 | sweep | descent | set_param:apoptosis_3d0.max_mark_frac |
 | b_gs_plain_soft_lo | — | r005_15 | sweep | descent | set_param:divide_3d0.factor |
-| r005_04 | — | r006_01 | adversarial | descent | add_op:interface_line_tension_3d |
-| r002_04 | — | r006_02 | replicate | descent | add_op:interface_line_tension_3d |
-| r004_07 | — | r006_03 | confirmatory | descent | add_op:apoptosis_3d |
+| r005_04 | — | r006_01 | adversarial | descent | add_op:interface_tension |
+| r002_04 | — | r006_02 | replicate | descent | add_op:interface_tension |
+| r004_07 | — | r006_03 | confirmatory | descent | add_op:cell_die |
 | r002_04 | — | r006_04 | exploratory | descent | set_param:seed_cell_rd0.cone_deg |
 | r004_07 | — | r006_05 | adversarial | descent | remove_op:divide_3d0 |
 | r005_04 | — | r006_06 | confirmatory | descent | set_param:cell_diffuse0.chi |
@@ -92,7 +92,7 @@ Causal links the record carries directly: `parent` (descent) and `chases` (an un
 | b_bru_question | — | r006_13 | sweep | descent | set_param:grow_3d0.rho |
 | b_gs_plain_soft_lo | — | r006_14 | sweep | descent | set_param:divide_3d0.factor |
 | b_bru_question | — | r006_15 | sweep | descent | set_param:grow_3d0.rho |
-| r005_04 | — | r007_02 | replicate | descent | add_op:interface_line_tension_3d |
+| r005_04 | — | r007_02 | replicate | descent | add_op:interface_tension |
 | r004_10 | — | r007_03 | adversarial | descent | set_param:grow_3d0.a_sw |
 | r006_11 | — | r007_04 | exploratory | descent | set_param:shape_energy_3d0.Gamma |
 | r006_11 | — | r007_05 | exploratory | descent | set_param:cell_diffuse0.chi |
@@ -114,8 +114,8 @@ Causal links the record carries directly: `parent` (descent) and `chases` (an un
 | b_bru_question | — | r008_06 | sweep | descent | set_param:grow_3d0.rho |
 | b_bru_question | — | r008_07 | sweep | descent | set_param:grow_3d0.rho |
 | b_bru_question | — | r008_08 | sweep | descent | set_param:grow_3d0.rho |
-| r007_06 | — | r009_01 | adversarial | descent | add_op:interface_line_tension_3d |
-| r005_04 | — | r009_02 | exploratory | descent | add_op:apoptosis_3d |
+| r007_06 | — | r009_01 | adversarial | descent | add_op:interface_tension |
+| r005_04 | — | r009_02 | exploratory | descent | add_op:cell_die |
 | r006_11 | — | r009_03 | confirmatory | descent | set_param:cell_react0.F |
 | r007_06 | — | r009_04 | confirmatory | descent | set_param:cell_diffuse0.chi |
 | r006_06 | — | r009_05 | replicate | descent | set_param:cell_diffuse0.chi |
@@ -129,9 +129,9 @@ Causal links the record carries directly: `parent` (descent) and `chases` (an un
 | b_gs_plain_soft_lo | — | r009_13 | sweep | descent | set_param:grow_3d0.rate |
 | b_gs_shaping_soft_lo | — | r009_14 | sweep | descent | set_param:interface_line_tension_3d0.K_purse |
 | b_gs_plain_soft_lo | — | r009_15 | sweep | descent | set_param:grow_3d0.rate |
-| r009_02 | — | r010_01 | adversarial | descent | add_op:interface_line_tension_3d |
-| r009_05 | — | r010_02 | replicate | descent | add_op:interface_line_tension_3d |
-| r007_06 | — | r010_03 | replicate | descent | add_op:interface_line_tension_3d |
+| r009_02 | — | r010_01 | adversarial | descent | add_op:interface_tension |
+| r009_05 | — | r010_02 | replicate | descent | add_op:interface_tension |
+| r007_06 | — | r010_03 | replicate | descent | add_op:interface_tension |
 | r006_11 | — | r010_05 | exploratory | descent | set_param:seed_cell_rd0.cone_deg |
 | r007_06 | — | r010_06 | confirmatory | descent | set_param:seed_cell_rd0.cone_deg |
 | r009_02 | — | r010_07 | adversarial | descent | remove_op:grow_3d0 |
@@ -143,13 +143,13 @@ Causal links the record carries directly: `parent` (descent) and `chases` (an un
 | b_gs_shaping_soft_lo | — | r010_13 | sweep | descent | set_param:interface_line_tension_3d0.K_purse |
 | b_gs_plain_soft_lo | — | r010_14 | sweep | descent | set_param:cell_react0.F |
 | b_bru_question | — | r010_15 | sweep | descent | set_param:grow_3d0.rho |
-| r007_06 | — | r011_01 | exploratory | descent | add_op:interface_line_tension_3d |
-| r007_03 | — | r011_02 | exploratory | descent | add_op:interface_line_tension_3d |
+| r007_06 | — | r011_01 | exploratory | descent | add_op:interface_tension |
+| r007_03 | — | r011_02 | exploratory | descent | add_op:interface_tension |
 | r007_06 | — | r011_03 | confirmatory | descent | set_param:cell_diffuse0.chi |
 | r009_02 | — | r011_04 | confirmatory | descent | set_param:cell_diffuse0.chi |
 | r006_11 | — | r011_05 | confirmatory | descent | set_param:shape_energy_3d0.K_V |
 | r009_05 | — | r011_06 | exploratory | descent | set_param:shape_to_chem0.beta |
-| r006_06 | — | r011_07 | replicate | descent | add_op:apoptosis_3d |
+| r006_06 | — | r011_07 | replicate | descent | add_op:cell_die |
 | b_gs_plain_soft_lo | — | r011_08 | sweep | descent | set_param:grow_3d0.rate |
 | b_bru_question | — | r011_09 | sweep | descent | set_param:grow_3d0.rho |
 | b_gs_shaping_soft_lo | — | r011_10 | sweep | descent | set_param:interface_line_tension_3d0.K_purse |
@@ -158,9 +158,9 @@ Causal links the record carries directly: `parent` (descent) and `chases` (an un
 | b_gs_shaping_soft_lo | — | r011_13 | sweep | descent | set_param:shape_energy_3d0.K_V |
 | b_gs_plain_soft_lo | — | r011_14 | sweep | descent | set_param:cell_react0.F |
 | b_bru_question | — | r011_15 | sweep | descent | set_param:grow_3d0.rho |
-| r011_04 | — | r012_01 | exploratory | descent | add_op:interface_line_tension_3d |
-| r009_05 | — | r012_02 | replicate | descent | add_op:interface_line_tension_3d |
-| r011_06 | — | r012_03 | exploratory | descent | add_op:apoptosis_3d |
+| r011_04 | — | r012_01 | exploratory | descent | add_op:interface_tension |
+| r009_05 | — | r012_02 | replicate | descent | add_op:interface_tension |
+| r011_06 | — | r012_03 | exploratory | descent | add_op:cell_die |
 | r007_06 | — | r012_04 | adversarial | descent | remove_op:shape_to_chem0 |
 | r009_02 | — | r012_05 | replicate | descent | remove_op:apoptosis_3d0 |
 | r011_06 | — | r012_06 | confirmatory | descent | set_param:shape_to_chem0.beta |
@@ -172,10 +172,10 @@ Causal links the record carries directly: `parent` (descent) and `chases` (an un
 | b_gs_shaping_soft_lo | — | r012_13 | sweep | descent | set_param:shape_energy_3d0.K_V |
 | b_bru_question | — | r012_14 | sweep | descent | set_param:grow_3d0.vth_frac |
 | b_gs_shaping_soft_lo | — | r012_15 | sweep | descent | set_param:shape_energy_3d0.K_V |
-| r011_04 | — | r013_01 | adversarial | descent | add_op:interface_line_tension_3d |
+| r011_04 | — | r013_01 | adversarial | descent | add_op:interface_tension |
 | r012_15 | — | r013_02 | adversarial | descent | remove_op:interface_line_tension_3d0 |
 | r009_02 | — | r013_03 | adversarial | descent | set_param:apoptosis_3d0.min_age |
-| r011_06 | — | r013_04 | replicate | descent | add_op:apoptosis_3d |
+| r011_06 | — | r013_04 | replicate | descent | add_op:cell_die |
 | r012_15 | — | r013_05 | exploratory | descent | set_param:cell_react0.rate |
 | r011_04 | — | r013_06 | confirmatory | descent | set_param:seed_cell_rd0.cone_deg |
 | r012_15 | — | r013_07 | exploratory | descent | set_param:seed_cell_rd0.cone_deg |
@@ -191,7 +191,7 @@ Causal links the record carries directly: `parent` (descent) and `chases` (an un
 | r013_05 | — | r014_02 | exploratory | descent | set_impl:shape_to_chem0:apical_area |
 | r013_05 | — | r014_03 | adversarial | descent | set_param:shape_to_chem0.beta |
 | r013_05 | — | r014_04 | confirmatory | descent | set_param:cell_react0.kk |
-| r007_03 | — | r014_05 | replicate | descent | add_op:interface_line_tension_3d |
+| r007_03 | — | r014_05 | replicate | descent | add_op:interface_tension |
 | r007_03 | — | r014_06 | confirmatory | descent | set_param:cell_react0.kk |
 | r011_04 | — | r014_07 | adversarial | descent | set_param:shape_to_chem0.beta |
 | b_gs_plain_soft_lo | — | r014_08 | sweep | descent | set_param:grow_3d0.rate |
@@ -204,7 +204,7 @@ Causal links the record carries directly: `parent` (descent) and `chases` (an un
 | b_gs_plain_soft_lo | — | r014_15 | sweep | descent | set_param:cell_react0.kk |
 | r013_05 | — | r015_02 | exploratory | descent | set_impl:seed_cell_rd0:patch |
 | r013_05 | — | r015_03 | adversarial | descent | remove_op:grow_3d0 |
-| r013_05 | — | r015_04 | adversarial | descent | add_op:apoptosis_3d |
+| r013_05 | — | r015_04 | adversarial | descent | add_op:cell_die |
 | r014_04 | — | r015_06 | confirmatory | descent | set_param:cell_react0.rate |
 | b_gs_plain_soft_lo | — | r015_08 | sweep | descent | set_param:grow_3d0.rate |
 | b_gs_plain_soft_lo | — | r015_09 | sweep | descent | set_param:grow_3d0.rate |
@@ -219,7 +219,7 @@ Causal links the record carries directly: `parent` (descent) and `chases` (an un
 | r015_06 | — | r016_03 | adversarial | descent | remove_op:interface_line_tension_3d0 |
 | r015_06 | — | r016_04 | exploratory | descent | remove_op:shape_to_chem0 |
 | r015_06 | — | r016_06 | adversarial | descent | remove_op:divide_3d0 |
-| r013_05 | — | r016_07 | replicate | descent | add_op:apoptosis_3d |
+| r013_05 | — | r016_07 | replicate | descent | add_op:cell_die |
 | b_gs_plain_soft_lo | — | r016_08 | sweep | descent | set_param:grow_3d0.rate |
 | b_bru_question | — | r016_09 | sweep | descent | set_param:grow_3d0.rho |
 | b_gs_plain_soft_lo | — | r016_10 | sweep | descent | set_param:grow_3d0.rate |
@@ -248,7 +248,7 @@ Causal links the record carries directly: `parent` (descent) and `chases` (an un
 | r016_03 | — | r018_04 | replicate | descent | set_param:cell_react0.rate |
 | r013_05 | — | r018_05 | adversarial | descent | set_param:cell_react0.rate |
 | r016_03 | — | r018_06 | confirmatory | descent | set_param:seed_cell_rd0.cone_deg |
-| r016_03 | — | r018_07 | adversarial | descent | add_op:apoptosis_3d |
+| r016_03 | — | r018_07 | adversarial | descent | add_op:cell_die |
 | b_gs_plain_soft_lo | — | r018_08 | sweep | descent | set_param:grow_3d0.rate |
 | b_gs_plain_soft_lo | — | r018_09 | sweep | descent | set_param:grow_3d0.rate |
 | b_bru_question | — | r018_10 | sweep | descent | set_param:grow_3d0.rho |
@@ -286,7 +286,7 @@ Causal links the record carries directly: `parent` (descent) and `chases` (an un
 | b_gs_plain_soft_lo | — | r020_14 | sweep | descent | set_param:shape_to_chem0.beta |
 | b_bru_question | — | r020_15 | sweep | descent | set_param:grow_3d0.hill |
 | r019_06 | — | r021_01 | replicate | descent | remove_op:interface_line_tension_3d0 |
-| r019_06 | — | r021_02 | adversarial | descent | add_op:apoptosis_3d |
+| r019_06 | — | r021_02 | adversarial | descent | add_op:cell_die |
 | r019_06 | — | r021_03 | exploratory | descent | set_param:seed_cell_rd0.cone_deg |
 | r016_03 | — | r021_04 | exploratory | descent | add_op:cell_shape_probe |
 | r016_03 | — | r021_05 | exploratory | descent | set_param:cell_diffuse0.d_h |
@@ -303,7 +303,7 @@ Causal links the record carries directly: `parent` (descent) and `chases` (an un
 | r019_06 | — | r022_03 | exploratory | descent | set_impl:seed_cell_rd0:patch |
 | r016_03 | — | r022_05 | adversarial | descent | set_impl:cell_diffuse0:interface_weighted |
 | r021_02 | — | r022_06 | replicate | descent | remove_op:interface_line_tension_3d0 |
-| r017_05 | — | r022_07 | adversarial | descent | add_op:apoptosis_3d |
+| r017_05 | — | r022_07 | adversarial | descent | add_op:cell_die |
 | b_bru_question | — | r022_08 | sweep | descent | set_param:grow_3d0.rho |
 | b_gs_plain_soft_lo | — | r022_09 | sweep | descent | set_param:grow_3d0.rate |
 | b_gs_plain_soft_lo | — | r022_10 | sweep | descent | set_param:grow_3d0.rate |

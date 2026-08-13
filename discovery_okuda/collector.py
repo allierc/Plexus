@@ -122,7 +122,7 @@ def collect_run(name, hyp=None, summary=None):
         "acted": diag.get("acted", MISSING),
         # --- the ENGINE, which is an instrument and not an agent --------------------------
         # Its output is measurement, so it is collected exactly as the Biologist's verdicts and
-        # the Critic's refusals are. It reached nobody before this: divide_3d counted the
+        # the Critic's refusals are. It reached nobody before this: cell_divide counted the
         # divisions it refused and flagged a full array, run_one recorded them, and the round
         # record -- the one thing every downstream role reads -- did not carry them. A run that
         # stopped at 98.5% of its buffer looked, to every agent, exactly like a run that stopped.

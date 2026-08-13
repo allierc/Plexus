@@ -27,11 +27,11 @@ operators:
   A0: 1.0
   mu: 1.0
   dt: 0.05
-- op: cell_divide
+- op: agent_divide
   at: cell
   rate: 0.025
   offset: 0.25
   max_occ: 0.95
 schedule:
 - vertex_tension
-- cell_divide
+- agent_divide
