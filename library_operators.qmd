@@ -26,7 +26,7 @@ resources:
 ```
 
 
-Each operator belongs to one of the elementary **families** of the [operator algebra](language.qmd) &mdash; Lateral, Aggregate, Broadcast, Exchange, Rewire, Divide and Die; the logo marks the family (`paper/fig_ops.tex`). The registry also exposes a **field** self-dynamics kind (a field&rsquo;s own update).
+Each operator declares one of the elementary **kinds** of the [operator algebra](language.qmd) &mdash; Lateral, Aggregate, Broadcast, Exchange, Field, Rewire, Structural (Divide and Die) and Seed; the logo marks the kind (`paper/fig_ops.tex`).
 
 ## <img class="kind-h" src="figures/icons/lateral.png"> Lateral <span class="kind-sym">$\mathcal{O}_E$</span>
 

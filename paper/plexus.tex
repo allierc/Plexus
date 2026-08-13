@@ -462,14 +462,17 @@ schedule: [synapse_ode, synaptic_current, neuron_voltage]
 A GNN is an \textbf{operator} $\mathcal{O}$: a map on \textbf{state}
 (Section~\ref{sec:state}) dispatched by the relation it acts on --- it reads named
 blocks of a set's state and returns a derivative on others. Equivalently, an operator
-changes exactly one of the three things the container holds
-(Fig.~\ref{fig:ops}): the \textbf{state} on the nodes, the \textbf{relations}
-between them, or the \textbf{entities} themselves. \textbf{Four dynamics operators}
-move \emph{state} along a fixed structure, one per relation the container admits,
-each returning a time-derivative contribution. \textbf{Rewire} changes the
-\emph{relations} --- the edge set $E$, which nodes interact. \textbf{Divide} and
-\textbf{Die} change the \emph{entities} --- the node set $|S_k|$, which nodes
-exist. Those last three return no state delta. The four dynamics operators:
+changes exactly one of the things the container holds
+(Fig.~\ref{fig:ops}): the \textbf{state} on the nodes, the \textbf{field} itself, the
+\textbf{relations} between them, or the \textbf{entities} themselves. \textbf{Four dynamics
+operators} move \emph{state} along a fixed structure, one per relation the container admits,
+each returning a time-derivative contribution. \textbf{Field} operators are a field's own
+dynamics --- diffusion, decay, reaction --- mapping field to field. \textbf{Rewire} changes the
+\emph{relations} --- the edge set $E$, which nodes interact. \textbf{Structural} operators change
+the \emph{entities} --- the node set $|S_k|$, which nodes exist: \textbf{Divide} and \textbf{Die}
+are its two members. \textbf{Seed} writes the initial state once, at $t=0$. All but the first four
+return no state delta. Eight kinds in all, and the implementation
+(\code{plexus.models.base.KINDS}) recognises exactly these. The four dynamics operators:
 \begin{align*}
 \textbf{Lateral}\quad   & \mathcal{O}_E,\ E\subseteq S_k\times S_k
   &&\text{(ODE interaction $+$ graph Laplacian)}\\
@@ -533,7 +536,7 @@ five: it neither moves state nor changes who exists --- it maintains the
 \emph{how} they interact (Lateral) is also what turns a dense $O(N^2)$ force law
 into $O(|E|)$ message passing and lets several lateral operators share one graph.
 
-\paragraph{Divide and Die (entities).} The dynamics operators move \emph{state}
+\paragraph{Structural: Divide and Die (entities).} The dynamics operators move \emph{state}
 and Rewire moves \emph{relations}, both while the node set stays fixed; living
 matter also rewrites its own membership. \textbf{Divide}
 $\mathcal{B}: x \mapsto \{x',x''\}$ (proliferation) and \textbf{Die}
@@ -587,28 +590,50 @@ Everything else assumes the cells it acts on already exist.
   \draw[a] (rc)--(rn1); \draw[a] (rc)--(rn2);
 \end{scope}
 \node[below=1mm of RW,align=center]{\textbf{Rewire}\\$\mathcal{R}\!:E$};
-\begin{scope}[shift={(160mm,0)},local bounding box=DV]
+\begin{scope}[shift={(128mm,0)},local bounding box=FD]
+  \node[g] (f1){}; \node[g,right=0mm of f1](f2){}; \node[g,below=0mm of f1](f3){};
+  \node[g,below=0mm of f2](f4){};
+  \draw[a] ($(f1.center)+(0,1mm)$) to[bend left=25] ($(f2.center)+(0,1mm)$);
+  \draw[a] ($(f3.center)-(0,1mm)$) to[bend right=25] ($(f4.center)-(0,1mm)$);
+\end{scope}
+\node[below=1mm of FD,align=center]{\textbf{Field}\\$\partial_t c$};
+\begin{scope}[shift={(192mm,0)},local bounding box=DV]
   \node[n] (m){};
   \node[n,below=6mm of m,xshift=-5.5mm](g3){}; \node[n,below=6mm of m,xshift=5.5mm](g4){};
   \draw[a] (m)--(g3); \draw[a] (m)--(g4);
 \end{scope}
-\node[below=1mm of DV,align=center]{\textbf{Divide}\\$w\!\to\!\tfrac{w}{2},\tfrac{w}{2}$};
-\begin{scope}[shift={(190mm,0)},local bounding box=DE]
+\node[below=1mm of DV,align=center] (DVL) {\textbf{Divide}\\$w\!\to\!\tfrac{w}{2},\tfrac{w}{2}$};
+\begin{scope}[shift={(222mm,0)},local bounding box=DE]
   \node[n,densely dashed,fill=cset!3] (z){};
   \node[right=8mm of z] (nul) {$\varnothing$};
   \draw[a] (z)--(nul);
 \end{scope}
-\node[below=1mm of DE,align=center]{\textbf{Die}\\$w\!\to\!0$};
+\node[below=1mm of DE,align=center] (DEL) {\textbf{Die}\\$w\!\to\!0$};
+% ONE KIND, TWO OPERATORS: `structural` is the registry's name for the kind that changes the node
+% set, and Divide and Die are its members -- drawn inside it rather than beside it.
+\begin{scope}[on background layer]
+  \node[draw=cgray,densely dashed,rounded corners=1mm,inner sep=3.2mm,
+        fit=(DV)(DE)(DVL)(DEL)] (STR) {};
+\end{scope}
+\node[anchor=north,align=center,cgray] at ($(STR.south)-(0,1.2mm)$){\textbf{Structural}\\$|S_k|$};
+\begin{scope}[shift={(258mm,0)},local bounding box=SD]
+  \node (sv) at (0,0) {$\varnothing$};
+  \node[n] (s1) at (10mm,1.5mm){}; \node[n] (s2) at (13mm,-4mm){};
+  \draw[a] (sv)--(s1); \draw[a] (sv)--(s2);
+\end{scope}
+\node[below=1mm of SD,align=center]{\textbf{Seed}\\$t=0$};
 \end{tikzpicture}}
-\caption{The operators, grouped by what they change. The first four are
-\emph{dynamics}: they move \emph{state} along a fixed structure --- \emph{Lateral}
+\caption{The eight operator kinds, grouped by what they change. The first four are
+\emph{dynamics}: they move a set's \emph{state} along a fixed structure --- \emph{Lateral}
 within a set; \emph{Aggregate}/\emph{Broadcast} along a map (the parent map $\pi$, or a \code{pre}/\code{post} map);
 \emph{Exchange} to/from a field (P2G/G2P and the metabolite--reaction graph are
-both Exchange). The last three return no state delta: \emph{Rewire} changes the
-\emph{relations} --- the edge set $E$, which nodes interact (a radius graph rebuilt
-each tick, dashed cutoff); \emph{Divide} and \emph{Die} change the \emph{entities}
---- the node set $|S_k|$, cell division and death on a fixed buffer with
-per-element occupancy $w$.}
+both Exchange). \emph{Field} is a field's own dynamics --- diffusion, decay, reaction ---
+field to field, returning no set delta. The rest return no state delta either: \emph{Rewire}
+changes the \emph{relations} --- the edge set $E$, which nodes interact (a radius graph rebuilt
+each tick, dashed cutoff); \emph{Structural} changes the \emph{entities} --- the node set
+$|S_k|$, and its two operators are \emph{Divide} and \emph{Die} (dashed box), cell division and
+death on a fixed buffer with per-element occupancy $w$; \emph{Seed} writes the initial state
+once, at $t=0$, and never again.}
 \label{fig:ops}
 \end{figure}
 
@@ -1711,7 +1736,8 @@ The language is the simulation specification. It provides a symbolic vocabulary 
 describing sets, their state, fields, maps, and schedules.
 
 The calculus is the collection of operators acting on those objects. Lateral,
-Aggregate, Broadcast, Exchange, Rewire, Divide, and Die are the primitive
+Aggregate, Broadcast, Exchange, Field, Rewire, Structural (Divide and Die), and
+Seed are the primitive
 transformations from which larger biological mechanisms are assembled.
 
 The engine plays the role of an interpreter, turning symbolic descriptions into

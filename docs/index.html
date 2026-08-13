@@ -176,7 +176,7 @@ window.Quarto = {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#four-concepts-seven-operators" id="toc-four-concepts-seven-operators" class="nav-link active" data-scroll-target="#four-concepts-seven-operators">Four concepts, seven operators</a></li>
+  <li><a href="#four-concepts-eight-operators" id="toc-four-concepts-eight-operators" class="nav-link active" data-scroll-target="#four-concepts-eight-operators">Four concepts, eight operators</a></li>
   <li><a href="#composing-mechanisms" id="toc-composing-mechanisms" class="nav-link" data-scroll-target="#composing-mechanisms">Composing mechanisms</a></li>
   <li><a href="#what-it-looks-like" id="toc-what-it-looks-like" class="nav-link" data-scroll-target="#what-it-looks-like">What it looks like</a></li>
   <li><a href="#agentic-mechanistic-discovery" id="toc-agentic-mechanistic-discovery" class="nav-link" data-scroll-target="#agentic-mechanistic-discovery">Agentic mechanistic discovery</a></li>
@@ -210,10 +210,10 @@ window.Quarto = {
 <p>We introduce <strong>Plexus</strong>, a typed intermediate representation for biological mechanisms. Rather than defining yet another simulator, Plexus defines a common language whose primary objects are <strong>biological operators</strong>. Every operator specifies the biological entities it acts upon, the states it requires, the relations between these entities, and one or more numerical implementations. The Plexus research program has three objectives. First, to define an <strong>algebra of biological operators</strong>. Second, to <strong>decompose the existing corpus</strong> of simulation models into this common language. Third, to construct <strong>differentiable implementations</strong> of these operators so that mechanistic models can be directly inferred from biological data.</p>
 <p>Just as compilers separate programming languages from their implementations through an <strong>intermediate representation</strong>, Plexus separates biological mechanisms from their numerical implementations. Every operator is defined by a <strong>typed signature</strong> — <em>what</em> biological transformation it performs — and one or more <strong>implementations</strong> — <em>how</em> it is numerically realized. The signature is the biological contract; the implementation is a numerical choice.</p>
 <p>Every operator may admit multiple implementations satisfying the same signature: a mechanical interaction by Material Point Methods, finite elements, vertex or phase-field models; a signalling operator by Hodgkin–Huxley equations, Neural ODEs or graph neural networks. Because a mechanism is stated once, independently of its solver, existing simulation frameworks become <strong>complementary backends</strong> implementing a common intermediate representation rather than competing modelling paradigms.</p>
-<section id="four-concepts-seven-operators" class="level2">
-<h2 class="anchored" data-anchor-id="four-concepts-seven-operators">Four concepts, seven operators</h2>
+<section id="four-concepts-eight-operators" class="level2">
+<h2 class="anchored" data-anchor-id="four-concepts-eight-operators">Four concepts, eight operators</h2>
 <p>The language is built around four fundamental concepts: <strong>operators</strong>, <strong>sets</strong> (collections of biological entities across scales — proteins, cells, neurons, synapses, tissues), the <strong>states</strong> each element carries, and <strong>fields</strong> (continuous quantities defined over space — morphogens, pressure, potentials). A biological model is a composition of operators acting on these objects.</p>
-<p>The central hypothesis of Plexus is that a large fraction of existing biological simulation models can be expressed as compositions of a small number of elementary operator families. The proposed algebra consists of <strong>seven</strong>:</p>
+<p>The central hypothesis of Plexus is that a large fraction of existing biological simulation models can be expressed as compositions of a small number of elementary operator kinds. The proposed algebra consists of <strong>eight</strong>:</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
 <p><img src="figures/fig_ops.png" class="img-fluid figure-img" style="width:100.0%"></p>
@@ -223,10 +223,12 @@ window.Quarto = {
 <li><strong>Lateral</strong> — interactions within a biological set.</li>
 <li><strong>Aggregate ↑</strong> and <strong>Broadcast ↓</strong> — many-to-one and one-to-many transformations across biological scales.</li>
 <li><strong>Exchange</strong> — transformations between sets and fields.</li>
+<li><strong>Field</strong> — a field’s own dynamics: diffusion, decay, reaction.</li>
 <li><strong>Rewire</strong> — modification of relations between biological entities.</li>
-<li><strong>Divide</strong> and <strong>Die</strong> — creation and removal of biological entities.</li>
+<li><strong>Structural</strong> — creation and removal of biological entities: <strong>Divide</strong> and <strong>Die</strong>.</li>
+<li><strong>Seed</strong> — the initial state, written once and never again.</li>
 </ul>
-<p>The first four families transform biological state while preserving the underlying organization; Rewire modifies the interaction graph; Divide and Die modify the entities themselves. The full algebra — with typed signatures and the reference implementation — is on <strong><a href="./language.html">The language</a></strong>.</p>
+<p>The first four kinds transform the state of a set and Field that of a field, all while preserving the underlying organization; Rewire modifies the interaction graph; Structural modifies the entities themselves; Seed writes what the others evolve. The full algebra — with typed signatures and the reference implementation — is on <strong><a href="./language.html">The language</a></strong>.</p>
 </section>
 <section id="composing-mechanisms" class="level2">
 <h2 class="anchored" data-anchor-id="composing-mechanisms">Composing mechanisms</h2>
@@ -5085,7 +5087,7 @@ descriptions:
 <section id="read-the-blueprint" class="level2">
 <h2 class="anchored" data-anchor-id="read-the-blueprint">Read the blueprint</h2>
 <ul>
-<li><strong><a href="./language.html">The language</a></strong> — the full framework mirrored section by section: the four concepts, the seven-family operator algebra, numerical implementations, mechanistic inverse modelling, agentic discovery, and the operator atlas.</li>
+<li><strong><a href="./language.html">The language</a></strong> — the full framework mirrored section by section: the four concepts, the eight-kind operator algebra, numerical implementations, mechanistic inverse modelling, agentic discovery, and the operator atlas.</li>
 <li><strong><a href="./optimization.html">Optimization</a></strong> — a slime-style foraging colony tuned end-to-end by a black-box search over its spec, from maze to porous-pillar navigation.</li>
 <li><strong><a href="./inverse.html">Inverse problem</a></strong> — fitting a Physarum network to a target by gradient descent through the operators.</li>
 </ul>
