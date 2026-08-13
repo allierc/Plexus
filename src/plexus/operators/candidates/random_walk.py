@@ -14,7 +14,7 @@ from plexus.models.base import Lateral
 from plexus.models.registry import register_operator
 
 
-@register_operator("random_walk", set="cell", kind="lateral")
+@register_operator("random_walk", set="cell", kind="lateral", family="motion")
 class RandomWalkOperator(Lateral):
     def __init__(self, params, device="cpu"):
         super().__init__()

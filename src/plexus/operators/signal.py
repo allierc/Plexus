@@ -32,7 +32,7 @@ _ACT = {
 }
 
 
-@register_operator("signal", family="interaction", set="neuron", kind="lateral")
+@register_operator("signal", family="signalling", set="neuron", kind="lateral")
 class Signal(Lateral):
     EMIT = "velocity"                     # first-order voltage ODE (dv/dt); engine integrates the `voltage` coordinate
     # typed signature (Plexus2 sec. 2.1): a morphism from (neuron, synapse) to neuron,

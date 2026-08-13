@@ -97,7 +97,7 @@ def _read(fld, centers, weights, ssz):
     return (contrib * inwin[:, None, :].float()).sum(-1)                   # [N, S]
 
 
-@register_operator("sense", family="fields", set="cell", kind="exchange")
+@register_operator("sense", family="signalling", set="cell", kind="exchange")
 class Sense(Exchange):
     EMIT = None                                 # writes `heading` in place (steering); returns {} — not an integrable delta
     SUPPORTED_DIMS = [2, 3]                      # dimension-generic (heading is a [N,D] unit vector)

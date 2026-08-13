@@ -40,7 +40,7 @@ from plexus.models.registry import register_operator
 PLATE_CONTACT: list = []
 
 
-@register_operator("plate_confine", family="mechanics", set="vertex", kind="structural")
+@register_operator("plate_confine", family="boundary", set="vertex", kind="structural")
 class PlateConfine3D(Structural):
     """Confine a set between two rigid plates normal to `axis`, at `centre` +/- `gap_half`."""
 

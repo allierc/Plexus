@@ -76,7 +76,7 @@ def _bilinear_periodic(field, xs, ys, nx, ny):
 # --------------------------------------------------------------------------- #
 #  1. Gray-Scott reaction-diffusion  (FIELD self-update)
 # --------------------------------------------------------------------------- #
-@register_operator("reaction_diffusion", set="field", kind="exchange")
+@register_operator("reaction_diffusion", set="field", kind="exchange", family="fields")
 class ReactionDiffusion(Operator):
     """Gray-Scott two-species reaction-diffusion on a 2-channel MultiField.
 
@@ -130,7 +130,7 @@ class ReactionDiffusion(Operator):
 # --------------------------------------------------------------------------- #
 #  2. Acoustic wave in a heterogeneous medium  (FIELD self-update, leapfrog)
 # --------------------------------------------------------------------------- #
-@register_operator("wave_acoustic", set="field", kind="exchange")
+@register_operator("wave_acoustic", set="field", kind="exchange", family="fields")
 class WaveAcoustic(Operator):
     """First-order acoustic system on a 3-channel MultiField [p, u, v]:
 
@@ -215,7 +215,7 @@ class WaveAcoustic(Operator):
 # --------------------------------------------------------------------------- #
 #  3. Active matter: Vicsek self-propelled particles  (SET lateral) + rewire
 # --------------------------------------------------------------------------- #
-@register_operator("radius_graph", set="active", kind="rewire")
+@register_operator("radius_graph", set="active", kind="rewire", family="topology")
 class RadiusGraph(Operator):
     """Rebuild the lateral relation E each tick: all pairs within cutoff R
     (periodic torus). This is Plexus `Rewire` -- it changes WHO interacts, returns
@@ -243,7 +243,7 @@ class RadiusGraph(Operator):
         return {}
 
 
-@register_operator("active_matter", set="active", kind="lateral")
+@register_operator("active_matter", set="active", kind="lateral", family="motion")
 class ActiveMatter(Operator):
     """Vicsek self-propulsion: align each particle's heading to the mean heading of
     its graph neighbours (a graph Laplacian on the rewired radius graph), add
@@ -287,7 +287,7 @@ class ActiveMatter(Operator):
 # --------------------------------------------------------------------------- #
 #  4. Coupling: chemotaxis  (EXCHANGE, field -> set)  -- the "mix" primitive
 # --------------------------------------------------------------------------- #
-@register_operator("chemotaxis", set="active", kind="exchange")
+@register_operator("chemotaxis", set="active", kind="exchange", family="signalling")
 class Chemotaxis(Operator):
     """Set<->field coupling: each particle climbs the gradient of a field channel
     (the `gather` half of Exchange). Returns a velocity delta the engine adds to the
@@ -318,7 +318,7 @@ class Chemotaxis(Operator):
 #  5. Multi-species slime: deposit + diffuse + affinity-weighted trail following
 #     (Physarum, ported from prototype/slime, MIXED with active_matter alignment)
 # --------------------------------------------------------------------------- #
-@register_operator("deposit", set="active", kind="exchange")
+@register_operator("deposit", set="active", kind="exchange", family="fields")
 class Deposit(Operator):
     """Each agent lays trail into ITS OWN species channel (the slime scatter half).
     Mutates the field, returns {} -- like MPM's P2G.
@@ -342,7 +342,7 @@ class Deposit(Operator):
         return {}
 
 
-@register_operator("trail_diffuse", set="field", kind="exchange")
+@register_operator("trail_diffuse", set="field", kind="exchange", family="fields")
 class TrailDiffuse(Operator):
     """Per-channel trail diffusion + evaporation (the slime field self-update):
     g <- (g + dt*D*lap(g)) * (1-decay), clamped >=0. Mutates field, returns {}.
@@ -367,7 +367,7 @@ class TrailDiffuse(Operator):
         return {}
 
 
-@register_operator("trail_follow", set="active", kind="exchange")
+@register_operator("trail_follow", set="active", kind="exchange", family="signalling")
 class TrailFollow(Operator):
     """Affinity-weighted trail following (the slime gather, generalized). Each agent
     of species s climbs the gradient of the WEIGHTED trail W[s] . trail[:], where the
@@ -402,7 +402,7 @@ class TrailFollow(Operator):
         return {"active": vel}
 
 
-@register_operator("slime", set="active", kind="exchange")
+@register_operator("slime", set="active", kind="exchange", family="motion")
 class Slime(Operator):
     """Multi-species Physarum agent step (Jones 2010 / Lague), with a full affinity
     MATRIX and an optional neighbour-alignment term -- i.e. SLIME + ACTIVE-MATTER
@@ -491,7 +491,7 @@ class Slime(Operator):
 #     on a fluid MultiField with channels [vx, vy, T, dye]. Each is one operator;
 #     the solver is the SCHEDULE, not a monolith.
 # --------------------------------------------------------------------------- #
-@register_operator("advect", set="field", kind="exchange")
+@register_operator("advect", set="field", kind="exchange", family="fields")
 class Advect(Operator):
     """Semi-Lagrangian transport: backtrace each cell along the velocity and resample
     (unconditionally stable). Advects the listed channels by the velocity channels
@@ -527,7 +527,7 @@ class Advect(Operator):
         return {}
 
 
-@register_operator("poisson_solve", set="field", kind="exchange")
+@register_operator("poisson_solve", set="field", kind="exchange", family="fields")
 class PoissonSolve(Operator):
     """The elliptic solve: make the velocity divergence-free (incompressibility) by
     Leray projection u <- u - grad(lap^{-1} div u), done EXACTLY in Fourier space for
@@ -559,7 +559,7 @@ class PoissonSolve(Operator):
         return {}
 
 
-@register_operator("body_force", set="field", kind="exchange")
+@register_operator("body_force", set="field", kind="exchange", family="mechanics")
 class BodyForce(Operator):
     """Buoyancy / gravity: add g*(scalar - ref) to a velocity channel (Boussinesq).
     g>0 makes a high-`scalar` region rise (hot plume, RB convection); g<0 makes it
@@ -584,7 +584,7 @@ class BodyForce(Operator):
         return {}
 
 
-@register_operator("diffuse", set="field", kind="exchange")
+@register_operator("diffuse", set="field", kind="exchange", family="fields")
 class Diffuse(Operator):
     """Laplacian diffusion (viscosity on velocity, or scalar diffusivity) on the
     listed channels: g[c] <- g[c] + dt*D*lap(g[c]). Periodic, grid units.
@@ -606,7 +606,7 @@ class Diffuse(Operator):
         return {}
 
 
-@register_operator("cool", set="field", kind="exchange")
+@register_operator("cool", set="field", kind="exchange", family="fields")
 class Cool(Operator):
     """Local radiative relaxation: scalar -> target at `rate` (the source term of
     the_well/turbulent_radiative_layer). Generalises reaction_diffusion's reaction.
@@ -628,7 +628,7 @@ class Cool(Operator):
         return {}
 
 
-@register_operator("advect_particles", set="active", kind="exchange")
+@register_operator("advect_particles", set="active", kind="exchange", family="motion")
 class AdvectParticles(Operator):
     """Carry a particle SET by a fluid velocity FIELD: sample (vx,vy) at each
     particle and return it as a velocity delta (a set<->field gather). Sums with

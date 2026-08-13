@@ -83,7 +83,7 @@ class LabelImageField(Field):
         return self.grid[0][gx, gy]
 
 
-@register_operator("seed_from_segmentation", family="mpm", set="particle", kind="exchange")
+@register_operator("seed_from_segmentation", family="seed", set="particle", kind="exchange")
 class SeedFromSegmentation(Exchange):
     """Populate tissue -> cell -> particle from a measured instance segmentation. Runs once."""
 

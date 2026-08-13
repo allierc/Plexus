@@ -228,21 +228,34 @@ def operators_of_kind(kind: str) -> dict[str, type]:
 
 
 # The closed set of operator FAMILIES -- a conceptual taxonomy over the registry (not a
-# directory layout). Every core operator declares `family=` in @register_operator; the
-# audit (tools/audit_operator_registry.py) fails if a family is missing or not in this set,
-# so families do not proliferate. This turns the flat registry into a browsable taxonomy:
-#   operators_by_family("mechanics") -> {active_force, active_stress, gravity, ...}
+# directory layout). Every operator declares `family=`; `tools/audit_operator_registry.py`
+# fails if one is missing or not in this set, so families cannot proliferate.
+#
+# ROLE, NOT DATA MOVEMENT, and that is the whole division of labour between the two axes.
+# `kind` (base.KINDS) says HOW an operator moves data -- lateral, exchange, aggregate. A family
+# says WHAT IT IS FOR. `kind` is useless for spotting redundancy because 62 of 157 operators are
+# `lateral`; the family axis is where the duplication shows.
+#
+# REBUILT 13 August, from a census rather than from intent. The previous set was ten families,
+# 62 of 157 operators declared none, `death` was in use and undeclared, and the audit this
+# comment describes DID NOT EXIST -- so nothing had ever failed. Two of the old ten also
+# duplicated the kind axis (`death` against kind=structural, `topology` against kind=rewire);
+# they stay only where they name a role that `kind` does not.
 OPERATOR_FAMILIES = {
-    "motion",       # individual self-propulsion + kinematics (glide, drag, bounce, velocity_cruise, sediment)
-    "interaction",  # neighbour/pairwise forces (attraction_repulsion, squared_law, cohesion, separation, velocity_align)
-    "polarity",     # heading steering (polarity_align, polarity_flow_align)
-    "fields",       # scalar/vector field ops (diffuse, decay, deposit, sense, chemotax, activation_pulse, pacemaker, playback)
-    "mechanics",    # body forces / active stress on the continuum (active_force, active_stress, gravity, mpm_anchor, mpm_spin)
-    "mpm",          # the MLS-MPM substep machinery (mpm_strain/scatter/gather/grid_update, mls_mpm_mechanics, apply_material_map)
-    "coupling",     # cross-substrate transfer (agent_scatter, agent_gather, agent_remodel)
-    "hierarchy",    # parent<->child plumbing (aggregate, broadcast)
-    "growth",       # structural population change (agent_divide, agent_grow)
-    "topology",     # graph rewire (radius_graph)
+    "seed",          # establish initial state on a set
+    "population",    # the set gains or loses members: divide, die, grow, enter, be eaten
+    "mechanics",     # internal force, stress, elasticity and relaxation of a body
+    "interaction",   # neighbour and pairwise forces between members of a set
+    "motion",        # self-propulsion, kinematics, and the decision rules that drive them
+    "polarity",      # heading and orientation
+    "fields",        # scalar/vector field evolution -- diffusion, decay, advection, sources
+    "signalling",    # secretion and sensing between an entity and its surroundings
+    "topology",      # rewiring the graph or the mesh
+    "hierarchy",     # parent<->child plumbing and cross-scale readouts
+    "coupling",      # transfer between two substrates
+    "boundary",      # confinement, contact, absorption, slip at a surface
+    "mpm",           # the MLS-MPM substep machinery
+    "harness",       # bookkeeping and scaffolding that is not biology
 }
 
 

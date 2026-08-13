@@ -54,7 +54,7 @@ def _as_circles(spec):
     return [[float(spec[0]), float(spec[1]), float(spec[2])]]
 
 
-@register_operator("colony", set="cell", kind="lateral")
+@register_operator("colony", set="cell", kind="lateral", family="motion")
 class ColonyOperator(Lateral):
     REQUIRES_PARAMS = ["home", "food"]
 

@@ -67,7 +67,7 @@ PRESSURE_HISTORY: list = []
 
 
 # --------------------------------------------------------------------------- seeding
-@register_operator("ecm_seed", family="growth", set="particle", kind="seed")
+@register_operator("ecm_seed", family="seed", set="particle", kind="seed")
 class ECMSeed(Structural):
     """Lay the matrix out ONCE, at frame 0: the box minus a cavity, as fibres.
 
@@ -635,7 +635,7 @@ class CellToECMReplay(Lateral):
         return {self.at: acc * lvl.occ[:, None].float()}
 
 
-@register_operator("cell_exclude", family="mechanics", set="particle", kind="structural")
+@register_operator("cell_exclude", family="boundary", set="particle", kind="structural")
 class CellExclude3D(Structural):
     """No matrix particle may be INSIDE the tissue. A hard non-penetration constraint.
 

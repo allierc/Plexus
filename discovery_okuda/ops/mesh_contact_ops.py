@@ -110,7 +110,7 @@ def _neighbours(it, ph, G):
     return torch.stack(out, 2).reshape(it.shape[0], 9)                # [n,9]
 
 
-@register_operator("mesh_contact", family="mechanics", set="particle", kind="lateral")
+@register_operator("mesh_contact", family="boundary", set="particle", kind="lateral")
 class MeshContact(Lateral):
     """Particle-to-surface contact against a replayed triangulated tissue.
 
