@@ -27,14 +27,32 @@ a model told the answer tends to find it.
 
 So there is nothing here to agree with. Report the tissue.
 
+## What you are looking at
+
+`strip.png` is **four rows by eight columns**. Columns are TIME; the four rows are four renderings
+of the SAME body at that moment. **`crew/strip.md` is handed to you with every call and it is
+authoritative** -- read it before you read the picture, because two of the four rows do not mean
+what they look like:
+
+- **row 3 is GEOMETRY, not chemistry.** Its blue/amber/yellow is a per-frame contrast stretch of
+  each cell's distance from the centre. On a body with 0.5% radial variation -- a sphere -- it still
+  paints large blue, amber and yellow domains. Reporting that as a chemical field separating is the
+  single most common error made on this artefact, and it was made on nearly every run of the
+  campaign before the note existed.
+- **green is not a chemical.** It marks a cell that DIVIDED RECENTLY.
+- **high activator is DARK maroon, not bright red.** "The red got stronger" is ambiguous at the top
+  of the scale; say which way the brightness went.
+
 ## What to look for
 
 - **Shape, over time.** Does it stay a sphere? Does it elongate, fold, lobe, tube, branch? Note
   *when* -- early, halfway, only at the end.
 - **Protrusions specifically.** A genuine finger or tube growing out of the surface is the thing
   this campaign is looking for. Distinguish it from a bulge, a wobble, and a dent.
-- **The chemistry.** Spots? Stripes? A single flash and then nothing? Uniform colour is not a
-  pattern. Where the red sits relative to the shape is the informative part.
+- **The chemistry, on rows 1, 2 and 4 only.** Spots? Stripes? A single flash and then nothing?
+  Uniform colour is not a pattern. Where the red sits relative to the shape is the informative part.
+  Only ONE chemical species is ever drawn; anything else coloured is a state flag, and `strip.md`
+  says which.
 - **The end state.** Does it settle, keep growing, oscillate, or fall apart?
 - **Anything that looks like a bug rather than biology.** Self-intersection, cells inverting, a
   piece detaching, geometry appearing at the frame edge, the whole thing collapsing to a point.

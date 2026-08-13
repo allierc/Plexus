@@ -79,10 +79,17 @@ def _scale_note(bundle, name):
     """One sentence the eye can act on: the view half-width, and the warning it implies."""
     m = (bundle.get("metrics") or {}).get(name) or {}
     L = m.get("camera_lbox")
-    base = ("Each panel carries a scale bar bottom-left labelled with its length in world units. "
-            "The camera is FIXED for the whole run and chosen PER RUN, so every run fills its own "
-            "frame: two movies can look the same size and differ tenfold. Never call a run larger "
-            "or smaller than another from the picture alone -- read the bar.")
+    # "READ THE BAR" WAS STALE AND UNCONDITIONAL. `run_one.SCALEBAR` has been False since commit
+    # 0a2f8277 (run_one.py:66) and no entry point sets it, so every strip rendered from then on has
+    # NO BAR -- while this sentence told the eye to read one on every run. An instruction to consult
+    # something that is not there is worse than silence: it invites the model to invent the reading.
+    # The 92 strips already on disk DO carry a bar, so both cases are live and the sentence has to
+    # name both.
+    base = ("The camera is FIXED for the whole run and chosen PER RUN, so every run fills its own "
+            "frame: two runs can look the same size and differ tenfold. Older strips carry a white "
+            "scale bar bottom-left of each panel; strips rendered recently DO NOT. If you can see a "
+            "bar, read it. If you cannot, the only scale you have is the number below -- and if "
+            "that is absent too, SIZE IS NOT IN THE IMAGE and you must not claim it.")
     if L is None:
         return base + " (this run did not record its camera box)"
     return (f"{base} This run's 3D panels span {2 * float(L):g} world units edge to edge "
@@ -123,7 +130,13 @@ def run(bundle):
         # it has been asked to compare runs for the whole campaign. The bar bottom-left carries
         # the world length; this line carries the same fact in words, so a judgement about SIZE
         # has to go through it.
-        ("The scale -- the camera box, and what the bar bottom-left means",
+        # WHAT THE FOUR ROWS ARE. Added 13 August after a render audit found the eye had been
+        # describing row 3 -- a per-frame contrast stretch of cell radius -- as a chemical field,
+        # on essentially every run of the campaign. It is the artefact's own documentation and it
+        # goes to whoever looks at the artefact.
+        ("What you are looking at -- the panels and every colour, with what each one means",
+         _prompt.strip_note(), {"as_json": False}),
+        ("The scale -- the camera box, and whether there is a bar at all",
          _scale_note(bundle, name), {"as_json": False}),
         # THE FORM, NOT THE METRICS. What used to sit here was this run's own measured summary; the
         # docstring above says why it is gone. What replaces it is the schema, shown verbatim, so
