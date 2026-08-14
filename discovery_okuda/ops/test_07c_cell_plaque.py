@@ -54,6 +54,7 @@ _WEIGHTS = torch.tensor([[0.34, 0.33, 0.33], [0.50, 0.30, 0.20], [0.50, 0.20, 0.
                          [0.20, 0.40, 0.40], [0.60, 0.20, 0.20], [0.25, 0.35, 0.40]],
                         dtype=torch.float64)
 
+_FAN = 8            # wedges per cell to test; a vertex-model cell has about six
 NAME = "07c_cell_plaque"
 SRC = "06_spheroid_ecm"
 
@@ -83,9 +84,18 @@ def surface_tris(pos, srce, trgt, face, nF, nv):
 class Rig07c(Rig05l):
     """05l with the epithelium as CELLS, and an adhesion that divides with them."""
 
-    def __init__(self, N0=12, **P):
+    def __init__(self, N0=12, Nf0=3.0, **P):
         super().__init__(**P)
         self.N0 = int(N0)
+        # THE RECEPTOR BUDGET PER CELL, and it is a parameter because it turned out to be the thing
+        # holding three gates shut. At the inherited 3.0 a cell's twelve clusters share three
+        # receptors: measured on 07e, the free pool falls 2.73 -> 0.114 per cell and a plaque holds a
+        # MEDIAN OF 0.0125 BONDS, so the adhesion's stiffness is 5 x 0.0125 = 0.06 against the
+        # sheet's elastic rate of ~4.5 -- one and a half percent of what it is pulling on. The 3.0
+        # dates from the icosphere era, when a patch was one sheet node and nobody asked what it
+        # contained. A plaque IS an integrin cluster of 20-50 (Kanchanawong 2010) and a cell carries
+        # hundreds, so a few hundred per cell is the biological number.
+        self.Nf0 = float(Nf0)
         z = self.z
         self.nv_of = [int(z[f"m{j}_pos"].shape[0]) for j in range(self.n_mesh)]
         self.nF_of = [int(z[f"m{j}_nF"]) for j in range(self.n_mesh)]
@@ -332,23 +342,63 @@ class Rig07c(Rig05l):
         rank = torch.as_tensor(np.arange(cells_np.size) - first, device=self.dev)
         kmax = int(rank.max().item()) + 1
 
-        rep = torch.zeros(self._nF, dtype=torch.long, device=self.dev)
-        rep[self.cell_of_tri] = torch.arange(self.cell_of_tri.numel(), device=self.dev)
-        tri = self.F_epi[rep[cells_t]]
-        cen = self.x_epi[tri[:, 0]]
+        # THE ATTACHMENT POINT GOES UNDER THE NODE, not at the cell's centre. Giving every plaque of
+        # a cell the same triangle with spread barycentric weights anchors them all at the middle of
+        # the cell while their sheet ends are the twelve nearest nodes -- so the outer ones reach
+        # SIDEWAYS by about a cell radius, five microns, and the link they form is diagonal across
+        # the cell rather than radial across the 40 nm a cluster spans. Measured: with a binding
+        # distance of 3 l0 = 2.1 um, 2,200 of 2,400 plaques were out of reach at seeding, one per cell
+        # surviving. Here each node's own direction is ray-cast against the wedges of ITS cell -- the
+        # half-edge triangles the surface table already holds -- and the plaque binds the wedge that
+        # contains it, with that ray's barycentric weights. The link is then radial by construction.
+        # the cell's wedges, as a padded table: sort the triangles by cell, rank each within its
+        # cell, and scatter. A vertex-model cell has about six half-edges, so `_FAN` = 8 covers it.
+        cot = self.cell_of_tri
+        order = torch.argsort(cot)
+        cs = cot[order]
+        counts = torch.bincount(cs, minlength=self._nF)
+        starts = torch.cumsum(counts, 0) - counts
+        rank_in = torch.arange(cs.numel(), device=self.dev) - starts[cs]
+        room = rank_in < _FAN
+        fan = torch.zeros((self._nF, _FAN), dtype=torch.long, device=self.dev)
+        fan[cs[room], rank_in[room]] = order[room]
+        tri_fan = self.F_epi[fan]                   # (nF, FAN, 3)
+        # the sheet node each plaque takes: the k-th most nearly overhead LIVE node, k being its rank
+        # within its cell, so a cell's clusters are distinct patches rather than copies
+        cen = self.x_epi[self.F_epi[fan[cells_t, 0], 0]]
         u = cen - self.c
         u = u / u.norm(dim=1, keepdim=True).clamp_min(1e-30)
         us = self.sheet.x - self.c
         us = us / us.norm(dim=1, keepdim=True).clamp_min(1e-30)
-        # the k-th most nearly-overhead LIVE sheet node, k being the plaque's rank in its cell
         ln = self.sheet.live_nodes
         top = torch.topk(u @ us[ln].T, k=min(kmax, ln.numel()), dim=1).indices
         node = ln[top.gather(1, rank.clamp(max=top.shape[1] - 1)[:, None]).squeeze(1)]
-        w = _WEIGHTS.to(self.dev, self.dtype)[rank % _WEIGHTS.shape[0]]
+        U = self.u_epi[tri_fan]                                  # unit directions of each wedge
+        Minv = torch.linalg.pinv(U[cells_t].transpose(-1, -2))    # (P, FAN, 3, 3)
+        un = (self.sheet.x[node] - self.c)
+        un = un / un.norm(dim=1, keepdim=True).clamp_min(1e-30)
+        bc = torch.einsum("pkij,pj->pki", Minv, un)              # (P, FAN, 3)
+        good = bc.min(dim=2).values                              # the wedge that contains the ray
+        pick = good.argmax(dim=1)
+        tri = tri_fan[cells_t, pick]
+        w = bc[torch.arange(bc.shape[0], device=self.dev), pick].clamp_min(0.0)
+        w = w / w.sum(1, keepdim=True).clamp_min(1e-30)
 
+        # A PLAQUE IS ONLY CREATED WHERE THE MEMBRANE IS WITHIN REACH. `bind_max` is in rest lengths;
+        # beyond it an integrin cannot span the gap, so no cluster forms and the cell simply has fewer
+        # than N0 until the sheet comes close enough. Default is infinite, which is 07c's behaviour.
+        bmax = getattr(self, "bind_max", float("inf")) * self.plq.l0 if hasattr(self, "plq") else \
+            getattr(self, "bind_max", float("inf")) * 6.0e-4
+        if np.isfinite(bmax):
+            att = (self.x_epi[tri] * w[:, :, None]).sum(1)
+            near = (self.sheet.x[node] - att).norm(dim=1) <= bmax
+            if not bool(near.all()):
+                node, cells_t, w, tri = node[near], cells_t[near], w[near], tri[near]
+                if not node.numel():
+                    return
         if fresh:
             self.ct_node, self.ct_face, self.ct_w, self.ct_tri = node, cells_t, w, tri
-            self.clutch.provision(node.numel(), self._nF, Nf0=3.0)
+            self.clutch.provision(node.numel(), self._nF, Nf0=self.Nf0)
             return
         self.ct_node = torch.cat([self.ct_node, node])
         self.ct_face = torch.cat([self.ct_face, cells_t])
