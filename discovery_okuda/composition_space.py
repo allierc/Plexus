@@ -622,7 +622,15 @@ OPERATORS = {
         # the activation a moving boundary condition rather than an initial condition -- so
         # "does the pattern grip the shape?" was asked of a pattern pinned to the shape -- and it
         # overwrote both chemistry channels every tick, annihilating cell_chem_from_shape.
-        impls=["cone", "spot", "scatter", "patch", "noise"], impl_structural=True,
+        # `cones`, NOT `cone`, AND `spot` NEVER EXISTED. `CellRDSeed.MODES` is
+        # ("scatter", "noise", "patch", "cones") -- so a `set_impl` to `cone` or `spot` raised
+        # ValueError in __init__, and `cones`, the mode that lights N fixed radial activation cones
+        # so N tubes grow out of them (Okuda Fig 5, and this campaign's stated objective), WAS NEVER
+        # OFFERED. Measured over the runs on disk when this was found: 291 used `scatter`, 5 used
+        # `cones`, and all 5 of those were hand-written basis specs. The loop could not reach its own
+        # target mechanism for the whole campaign because the vocabulary spelled it in the singular.
+        # `tools/audit_operator_impls.py` now fails on any offered mode outside a class's MODES.
+        impls=["cones", "scatter", "patch", "noise"], impl_structural=True,
         params={"cone_deg": (4.0, 30.0, 8.0),
                 "seed_frac": (0.01, 0.30, 0.06),
                 "n_spots": (1, 8, 1)}),
