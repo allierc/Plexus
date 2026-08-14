@@ -99,7 +99,7 @@ def panel_eye(ax, bg):
 
 
 def panel_vars(ax, bg):
-    """Every symbol of section 4.6, in the order the signal meets them.
+    """Every symbol of section 5, in the order the signal meets them.
 
     Stacked top to bottom rather than wrapped over two rows: the signal path
     is a straight line, so the picture should be one too. The earlier
