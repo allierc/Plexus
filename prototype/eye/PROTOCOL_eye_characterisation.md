@@ -5,6 +5,27 @@ fit a differentiable 6-muscle plant that the connectome controller is trained
 through. Written to be run unchanged on any eye variant — F, G, whatever comes
 next — so nothing here should need re-deriving per eye.
 
+## Three things that are easy to get wrong
+
+Each is detailed in its own stage below; they are collected here because each
+has already cost us a dataset or a fit.
+
+**Hold length is derived per eye** from stage 0's measured settling time,
+`max(2.0 s, 1.5 × settling)` — it is not fixed at 2.0 s. A fixed constant is
+exactly how eyes A–E ended up fitted entirely from transients: their holds ran
+0.19 s, 1.27 s and 0.24 s against a settling time of 1.28 s, so not one of them
+had stopped moving when it was sampled, and the resulting "static curve" had a
+negative slope at the origin.
+
+**Keep the raw runs.** The `curves.npz` behind eyes A–E were deleted and that
+fit is no longer reproducible — the coefficients survive in `plant.npz`, but
+nothing can be re-derived, re-plotted or re-checked from them.
+
+**Stage-1 levels are `{0.10, 0.25, 0.50, 0.75, 1.00}`**, not four evenly
+spaced ones, because eye F's nonlinearity is strongly convex: LR's local gain
+rose 6.9× from `u = 0` to `u = 1`. The low end carries the shape, and it is
+also where a tracking controller actually operates.
+
 ## The model this feeds, in one paragraph
 
 The eye is taken to be a **static map followed by linear mechanics**. Six
