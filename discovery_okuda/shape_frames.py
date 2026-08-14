@@ -39,8 +39,11 @@ FOUR DECISIONS, each of which changes what the encoder sees:
 
 WHAT IT WRITES, per run:
 
-    shape/000.png .. shape/00N.png    224x224 RGB, no text, no bar. What the encoder reads.
-    shape_strip.png                   the same N frames in one row. What a human reads.
+    shape_strip.png                   the N frames in one row, losslessly. THE ARTEFACT THAT STAYS.
+    shape/000.png .. shape/00N.png    224x224 RGB, one per timepoint -- what an image encoder would
+                                      read. DELETED once the strip is written, unless --keep-frames:
+                                      the encoder route was set aside and the strip holds the same
+                                      pixels.
     shape.json                        n_frames, size, supersample, camera box, frame indices, the
                                       cell count at each -- so a later reader never has to guess
                                       what it is looking at or re-derive the mapping to traj.npz.
@@ -54,6 +57,7 @@ The strip is free: the frames are already in memory. Two products, one render pa
 from __future__ import annotations
 
 import argparse
+import glob
 import json
 import os
 import sys
@@ -86,7 +90,8 @@ def _pick(n, k):
     return [int(round(i * (n - 1) / (k - 1))) for i in range(k)]
 
 
-def render_one(run, n_frames=N_FRAMES, size=OUT_SIZE, ss=SUPERSAMPLE, force=False, quiet=False):
+def render_one(run, n_frames=N_FRAMES, size=OUT_SIZE, ss=SUPERSAMPLE, force=False, quiet=False,
+               keep_frames=False):
     """-> dict written to shape.json, or None if the run cannot be rendered."""
     import vtk_render as V
     from PIL import Image
@@ -147,6 +152,22 @@ def render_one(run, n_frames=N_FRAMES, size=OUT_SIZE, ss=SUPERSAMPLE, force=Fals
     for j, im in enumerate(tiles):
         sheet.paste(im, (j * size, 0))
     sheet.save(os.path.join(d, "shape_strip.png"))
+
+    # THE PER-FRAME PNGs GO ONCE THE STRIP EXISTS. Cedric, 14 August: "folder shape in rxxx_xxx
+    # should be deleted once used." They were written as an encoder's input -- 224 px native, one
+    # file per timepoint so every frame gets the whole token grid -- and the encoder route was set
+    # aside: a randomly-initialised ViT matched pretrained CLIP on this data, and the surrogate that
+    # survived reads METRICS, not pictures. `shape_strip.png` holds the same eight frames losslessly
+    # side by side, so nothing visual is lost and `--keep-frames` puts them back the moment an
+    # encoder needs them. 18 MB across 107 runs at the time this was added; the point is the clutter
+    # in every run directory rather than the bytes.
+    if not keep_frames:
+        for q in glob.glob(os.path.join(out_dir, "*.png")):
+            os.remove(q)
+        try:
+            os.rmdir(out_dir)
+        except OSError:
+            pass
 
     meta = {"run": run, "n_frames": len(tiles), "size": size, "supersample": ss, "style": STYLE,
             "camera_lbox": float(L), "frame_index": idx[:len(tiles)], "n_cells": cells,
@@ -230,6 +251,8 @@ def main():
     ap.add_argument("--size", type=int, default=OUT_SIZE)
     ap.add_argument("--supersample", type=int, default=SUPERSAMPLE)
     ap.add_argument("--force", action="store_true")
+    ap.add_argument("--keep-frames", action="store_true", dest="keep_frames",
+                    help="keep shape/NNN.png -- what an image encoder would read")
     a = ap.parse_args()
 
     if a.submit:
@@ -241,7 +264,8 @@ def main():
     t0, ok, skip = time.perf_counter(), 0, []
     for r in runs:
         try:
-            m = render_one(r, a.frames, a.size, a.supersample, force=a.force)
+            m = render_one(r, a.frames, a.size, a.supersample, force=a.force,
+                           keep_frames=a.keep_frames)
         except Exception as e:
             print(f"  {r:52s} FAILED: {type(e).__name__}: {str(e)[:90]}")
             skip.append(r)

@@ -245,16 +245,26 @@ def draw(rid, vol, src, order, edges, pos, dep, fps, secs):
             dr.text((30, 60), "MEASURED from flow_trace.jsonl" if src == "measured"
                     else "RECONSTRUCTED from artefacts -- an approximation",
                     fill=(90, 200, 120) if src == "measured" else (215, 150, 60), font=fsm)
-            dr.text((30, 84), "ring: purple = an LLM role, grey = code.   "
-                              "ball = what it emitted.   edge: green carried, grey unmeasured",
-                    fill=DIM, font=fv)
+            dr.text((30, 84), "ring: purple = an LLM role, grey = code.   ball = what it emitted "
+                              "(grey = unmeasurable).   edge: green carried, RED = ends in a node "
+                              "that produced nothing", fill=DIM, font=fv)
             for a, b, k in edges:
                 (x0, y0), (x1, y1) = pos[a], pos[b]
                 on = lit.get((a, b))
-                col = PEND if on is None else (LIVE if on is True else
-                                              UNK if on == "?" else DEAD)
+                # AN EDGE THAT ENDS IN A DEAD NODE IS RED, however much its source sent. Cedric,
+                # 14 August. Colouring an edge by its SOURCE answers "did anything leave", which is
+                # the wrong question: the interesting failure is information that ARRIVES and dies,
+                # and that is exactly the shape of every defect this loop has had -- the Analyst's
+                # seven claims travelled a healthy edge into a parser that could not read them. The
+                # blockage is drawn at the point of death now, so a red line points AT the node to
+                # look at rather than away from it.
+                dv = vol.get(b)
+                dead_end = on is not None and dv is not None and not dv[0]
+                col = (DEAD if dead_end else
+                       PEND if on is None else
+                       LIVE if on is True else UNK if on == "?" else DEAD)
                 dr.line([(x0 + NODE_R, y0), (x1 - NODE_R, y1)], fill=col,
-                        width=3 if on is True else 1)
+                        width=3 if (on is True or dead_end) else 1)
             for nid, (x, y) in pos.items():
                 vv = vol.get(nid)
                 c, empty = (0, True) if vv is None else vv
@@ -262,9 +272,15 @@ def draw(rid, vol, src, order, edges, pos, dep, fps, secs):
                 node = next(n for n in order if n["id"] == nid)
                 ring = (95, 95, 110) if node.get("agent") is None else (150, 130, 220)
                 dr.ellipse([x - NODE_R, y - NODE_R, x + NODE_R, y + NODE_R], outline=ring, width=2)
+                # AND AN UNMEASURED NODE IS GREY, NOT RED. It was drawn red whenever anything
+                # flowed into it: inbound volume gives it a ball, and its own `empty` flag defaults
+                # true when nothing could size it -- so `control`, `observations` and `morphology`
+                # were accused of producing nothing on every frame while their own labels said
+                # "unmeasured" two lines below. The picture contradicted itself.
                 if got:
                     r = rad(got)
-                    dr.ellipse([x - r, y - r, x + r, y + r], fill=LIVE if not empty else DEAD)
+                    dr.ellipse([x - r, y - r, x + r, y + r],
+                               fill=UNK if vv is None else (LIVE if not empty else DEAD))
                 lab = nid if len(nid) < 22 else nid[:21]
                 wlab = dr.textlength(lab, font=fsm)
                 dr.text((x - wlab / 2, y + NODE_R + 6), lab, fill=FG if got else DIM, font=fsm)
