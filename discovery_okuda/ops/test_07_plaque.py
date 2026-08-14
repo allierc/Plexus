@@ -72,9 +72,12 @@ INTEGRIN_UM = 0.04                 # Kanchanawong 2010: the integrin layer sits 
 
 
 # =============================================================================================
+_run_dir = [None]                # the folder `measure` is working on, for `cells_per_frame`
+
+
 def measure(run):
     """Every per-frame number this diagnosis rests on, in MICRONS, from the run's own spec."""
-    d = os.path.join(LOG, run)
+    d = _run_dir[0] = os.path.join(LOG, run)
     sp = yaml.safe_load(open(os.path.join(d, "spec.yaml")))
     um_per_box = float(sp["general"]["units"]["length_um"])
     box_per_tis = float(sp["sets"]["epithelium"]["box_scale"])
@@ -150,6 +153,20 @@ def cells_per_frame(frames):
     it. `n_cells` is in the replay cache, indexed by tissue frame.
     """
     import glob
+    # THE RUN'S OWN COUNT FIRST. The cache is indexed by TISSUE frame and this reads it at the SHEET
+    # frame, which is only the same number while the rig steps the replay once per frame. 07h does
+    # not: at frame 400 the rig held 6,077 cells and the cache's entry 400 says 4,070, a factor 1.49,
+    # and G70 -- plaques per cell -- read 17.84 against a true 11.95. Any rig that writes its own
+    # `cells` series into `metrics.json` is believed over the cache.
+    if _run_dir[0]:
+        f = os.path.join(_run_dir[0], "metrics.json")
+        if os.path.exists(f):
+            s = json.load(open(f)).get("series", {})
+            if s.get("cells") and s.get("t"):
+                by_t = dict(zip(s["t"], s["cells"]))
+                got = [by_t.get(int(t)) for t in frames]
+                if all(g is not None for g in got):
+                    return np.asarray(got, float)
     cands = sorted(glob.glob(os.path.join(LOG, "_tissue", "cellfix_B_new_f401_x4_*.npz")))
     if not cands:
         return None
