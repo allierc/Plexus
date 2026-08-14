@@ -68,6 +68,22 @@ ANCHOR_OLD = "<h3>Turing × vertex — patterning &amp; shaping a growing tissue
 ANCHOR_NEW = "<h3>Vertex + Turing — patterning &amp; shaping a growing tissue</h3>"
 
 
+def _run_dir(name):
+    """A run's directory, live or archived.
+
+    Rounds 1-22 were moved into `log/okuda/_archive_r001-r022_<date>/` on 12 August, which is why
+    two rows of the Vertex + Turing section quietly stopped rebuilding: the runs had not been
+    deleted, they had been filed. Their artefacts -- `traj.npz`, `diag.json`, the `vtk_*` clips --
+    moved with them, so a card only needs to know where to look.
+    """
+    live = os.path.join(LOG_OKUDA, name)
+    if os.path.isdir(live):
+        return live
+    import glob as _glob
+    hits = sorted(_glob.glob(os.path.join(LOG_OKUDA, "_archive_*", name)))
+    return hits[0] if hits else live
+
+
 def _find_block(s, name):
     """(start, end) of the block called `name`, whatever path its marker names -- or None.
 
@@ -649,7 +665,7 @@ def main():
 
     # ---- Vertex + Turing, third row: two chemistries and one ablation ----
     def _sum(run):
-        return json.load(open(os.path.join(LOG_OKUDA, run, "diag.json")))["summary"]
+        return json.load(open(os.path.join(_run_dir(run), "diag.json")))["summary"]
     R4 = [
         ("r013_05", "turing_flower_v3", "purse-string, k = 0.062"),
         ("r016_01", "turing_lobes_v3", "purse-string, k = 0.031"),
@@ -664,16 +680,16 @@ def main():
     }
     runs4 = []
     for d, v, lbl in R4:
-        if not os.path.exists(os.path.join(LOG_OKUDA, d, "vtk_evolve_mesh.mp4")):
+        if not os.path.exists(os.path.join(_run_dir(d), "vtk_evolve_mesh.mp4")):
             print(f"[minisite] {d}: no vtk_* clips -- card skipped")
             continue
         sm = _sum(d)
-        vtk_sequence(os.path.join(LOG_OKUDA, d), os.path.join(GAL, f"{v}.mp4"))
+        vtk_sequence(_run_dir(d), os.path.join(GAL, f"{v}.mp4"))
         print(f"[minisite] gallery/{v}.mp4 <- okuda/{d}  "
               f"({os.path.getsize(os.path.join(GAL, v + '.mp4')) / 1e6:.1f} MB, side view, square)")
         cap = CAP4[d].format(cells=sm["cells_final"], pk=f"{sm['protr_peak']:.2f}")
         runs4.append((d, f"{v}.mp4", lbl,
-                      os.path.join(LOG_OKUDA, d, "spec_run.yaml"), cap))
+                      os.path.join(_run_dir(d), "spec_run.yaml"), cap))
 
     # ---- Vertex + Turing, fourth row: the same composition at two reaction rates ----
     # ONE PARAMETER APART, and it is the only thing the two runs do not share: Gray-Scott `rate`
@@ -698,14 +714,14 @@ def main():
     }
     runs5r = []
     for d, v, lbl in R5r:
-        if not os.path.exists(os.path.join(LOG_OKUDA, d, "vtk_evolve_mesh.mp4")):
+        if not os.path.exists(os.path.join(_run_dir(d), "vtk_evolve_mesh.mp4")):
             print(f"[minisite] {d}: no vtk_* clips -- card skipped")
             continue
         sm = _sum(d)
-        vtk_sequence(os.path.join(LOG_OKUDA, d), os.path.join(GAL, f"{v}.mp4"))
+        vtk_sequence(_run_dir(d), os.path.join(GAL, f"{v}.mp4"))
         print(f"[minisite] gallery/{v}.mp4 <- okuda/{d}  "
               f"({os.path.getsize(os.path.join(GAL, v + '.mp4')) / 1e6:.1f} MB, side view, square)")
-        runs5r.append((d, f"{v}.mp4", lbl, os.path.join(LOG_OKUDA, d, "spec_run.yaml"),
+        runs5r.append((d, f"{v}.mp4", lbl, os.path.join(_run_dir(d), "spec_run.yaml"),
                        CAP5[d].format(cells=sm["cells_final"])))
 
     # ---- the three-entity section: spheroid, basement membrane, matrix ----
@@ -886,18 +902,26 @@ def main():
                     f"{m['cells_final']:,}, and the shell stays a sphere (reduced volume "
                     f"{m['reduced_volume_final']:.2f})"),
          ("tyssue_vh_grow_divide.mp4", "turing_grow_divide_v3.mp4", "turing_grow_divide_v4.mp4")),
-        ("turing_morphogen_v5", "r003_07", "morphogen + growth",
-         lambda m: (f"The same chemistry driving growth where it peaks: {m['cells_final']:,} cells "
-                    f"and the shell folds out of plane, protrusion peak {m['protr_peak']:.2f}, "
-                    f"along a path that runs "
-                    f"{m['morphology_path'].replace(' -> ', ' → ')}"),
-         ("tyssue_okuda_lobed.mp4", "turing_morphogen_v3.mp4", "turing_morphogen_v4.mp4")),
+        # `r005_06`, re-run 13 August: growth gated by the activator, and the arms are where the
+        # activator sits. `diag.json` reports `cells_final: null` on this run -- the analysis pass
+        # left it unset -- so the count is read from `progress.json`, which is the same number the
+        # renderer prints on the last frame (4,764).
+        ("turing_morphogen_v6", "r005_06", "morphogen + growth",
+         lambda m: (f"Growth gated by the activator, and the arms grow where it sits: "
+                    f"{m['cells']:,} cells with {m['tubes']} of them counted as tubes, "
+                    f"protrusion peak {m['peak']}"),
+         ("tyssue_okuda_lobed.mp4", "turing_morphogen_v3.mp4", "turing_morphogen_v4.mp4",
+          "turing_morphogen_v5.mp4", "turing_morphogen_v6.mp4")),
     ):
-        rd = os.path.join(LOG_OKUDA, run)
+        rd = _run_dir(run)
         if not os.path.exists(os.path.join(rd, "traj.npz")):
             print(f"[minisite] {run}: no traj.npz -- {label} card left as it is")
             continue
         sm = json.load(open(os.path.join(rd, "diag.json")))["summary"]
+        if run == "r005_06":
+            pr = json.load(open(os.path.join(rd, "progress.json")))
+            sm = {"cells": sm.get("cells_final") or pr["n_cells"],
+                  "tubes": sm.get("n_tubes_final"), "peak": f"{sm['protr_peak']:.2f}"}
         if not vtk_sequence(rd, os.path.join(GAL, f"{clip}.mp4")):
             continue
         for old_v in olds:
