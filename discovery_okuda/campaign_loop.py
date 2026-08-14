@@ -33,6 +33,10 @@ of those is how the last two batches were spent.
     python campaign_loop.py --rounds 200 --batch 6      # the week
     python campaign_loop.py --status                    # what happened so far
 """
+
+# cd /workspace/Plexus/discovery_okuda
+# /workspace/.conda_envs/neural-graph-linux/bin/python -u campaign_loop.py --rounds 5 --batch 16
+
 from __future__ import annotations
 
 import argparse

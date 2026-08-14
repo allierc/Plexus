@@ -111,7 +111,16 @@ config/okuda/demo_*.composition.json
 config/okuda/tzz_*.yaml
 config/okuda/tzz_*.composition.json
 
-# JEPA feasibility test: embeddings and design matrices are regenerable from the runs
-discovery_okuda/jepa/*.npz
-discovery_okuda/jepa/hf/
-discovery_okuda/jepa/*_local/
+# The JEPA feasibility scratch is GONE, not ignored: `discovery_okuda/surrogate.py` rebuilds its
+# design matrix from the run directories on every call, so a 2.9 GB cache of embeddings, model
+# weights and one-off agent scripts was a second copy of something derivable -- and 32 of its files
+# (HuggingFace lock files among them) had been committed. The pattern stays so a stray re-run does
+# not re-commit them.
+discovery_okuda/jepa/
+
+# LaTeX build artefacts beside the notes -- the .tex and .pdf are tracked, the rest is regenerable
+discovery_okuda/*.aux
+discovery_okuda/*.log
+discovery_okuda/*.out
+discovery_okuda/*.fls
+discovery_okuda/*.fdb_latexmk
