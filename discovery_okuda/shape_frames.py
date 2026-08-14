@@ -164,7 +164,12 @@ def corpus():
     """Every run with a traj.npz, current and archived, as paths relative to LOG."""
     import glob
     out = []
-    for pat in ("*/traj.npz", "_archive*/*/traj.npz"):
+    # `_gates/*` WAS MISSED BY THE FIRST GLOB and it is not an empty corner: 17 runs, every one with
+    # a traj.npz, and they are the instrument-gate specimens -- the runs the campaign uses to decide
+    # whether a metric may be trusted. A pattern list that names two directories and silently omits a
+    # third is the same shape as an allowlist, which is why the corpus is now three patterns and the
+    # count is printed.
+    for pat in ("*/traj.npz", "_archive*/*/traj.npz", "_gates/*/traj.npz"):
         for p in glob.glob(os.path.join(LOG, pat)):
             out.append(os.path.relpath(os.path.dirname(p), LOG))
     return sorted(set(out))
