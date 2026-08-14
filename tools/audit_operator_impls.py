@@ -151,6 +151,25 @@ def main():
         if missing or unoffered:
             print(f"  {op:20s} {how:8s} {', '.join(missing) or '-':30s} "
                   f"{', '.join(unoffered) or '-'}")
+        # A TRANSLATION LAYER MAY SIT BETWEEN THE VOCABULARY AND THE CLASS, and this audit could
+        # not see it. `translate._emit_rd_seed` maps ENGINE_MODE = {"cone": "cones", "spot":
+        # "cones", ...} -- so `cone` is a legitimate vocabulary name for the engine's `cones`, and
+        # `spot` is a SECOND name for the same mode emitting a different spec. Comparing the two
+        # declarations directly reported both as non-existent, I renamed them on that report, and
+        # the rename deleted a control and broke every slot using the mode (`KeyError: 'cones'`
+        # inside translate, C2_COMPILE_FAILED at the Critic).
+        #
+        # So a name the translator knows is NOT missing. This is still not a full check -- only
+        # running the emit path would be -- and it says so rather than pretending.
+        try:
+            import translate as _T
+            import inspect as _i
+            _src = _i.getsource(_T)
+            mapped = set(re.findall(r'["\']([a-z_0-9]+)["\']\s*:\s*["\'][a-z_0-9]+["\']', _src))
+        except Exception:
+            mapped = set()
+        missing = [m for m in missing if m not in mapped]
+
         # FATAL ONLY WHERE THE CHECK IS EXACT. A class with a `MODES` tuple has ENUMERATED its
         # implementations, so an offered name outside it provably raises at construction. A
         # variant-registered operator is looser: the vocabulary legitimately names an implementation
