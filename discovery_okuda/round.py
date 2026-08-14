@@ -2014,7 +2014,7 @@ def foresight(ctx):
                       f"{'no forecast' if not fc else ''}{' and ' if not fc and not ob else ''}"
                       f"{'no observation' if not ob else ''}"))
         return None
-    rs = F.round_score(fc, ob)
+    rs = F.round_score(fc, ob, flow=ctx.get("_flow"))
     rs["round"] = ctx["round_id"]
     print(F.render(rs))
     os.makedirs(CAMPAIGN, exist_ok=True)
@@ -2638,7 +2638,7 @@ def campaign(rounds=1, mode="composition", n_slots=N_SLOTS, fresh=True):
         print(f"\n{'=' * 78}\n[campaign] ROUND {int(_n) if _n else '?'}  ({rid})   "
               f"-- {k + 1} of {rounds} this run, {mode}, {n_slots} slots\n{'=' * 78}")
         try:
-            ctx = run_round(rid, mode=mode, n_slots=n_slots)
+            ctx = run_round(rid, mode=mode, n_slots=n_slots, flow=a.flow)
         except FlowError as e:
             print(f"[campaign] the flow is not runnable: {e}")
             break
@@ -2931,6 +2931,7 @@ if __name__ == "__main__":
     ap.add_argument("--round", default=None, help="force a round id instead of deriving it")
     ap.add_argument("--resume", action="store_true",
                     help="continue the campaign on disk instead of resetting it (a launch resets)")
+    ap.add_argument("--flow", default=None, help="an alternative agent graph (default crew/flow.yaml)")
     ap.add_argument("--check", action="store_true", help="validate the flow and the pool, then exit")
     a = ap.parse_args()
     if a.check:
@@ -2984,6 +2985,6 @@ if __name__ == "__main__":
             print(f"  flow REFUSED: {e}")
             sys.exit(1)
     elif a.round:
-        run_round(a.round, mode=a.mode, n_slots=a.batch)
+        run_round(a.round, mode=a.mode, n_slots=a.batch, flow=a.flow)
     else:
         campaign(rounds=a.rounds, mode=a.mode, n_slots=a.batch, fresh=not a.resume)

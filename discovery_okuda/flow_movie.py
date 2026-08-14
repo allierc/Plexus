@@ -42,14 +42,14 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 LOG = os.environ.get("OKUDA_LOG", os.path.join(ROOT, "log", "okuda"))
 CAMPAIGN = os.path.join(HERE, "campaign")
-OUT = os.path.join(LOG, "_gates", "flow")
+OUT = os.path.join(LOG, "analysis", "flow")
 for _p in (HERE,):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-W, H = 1600, 896      # both divisible by 8: ffmpeg silently resizes otherwise, and a
+W, H = 1920, 1080      # both divisible by 8: ffmpeg silently resizes otherwise, and a
                       # resized frame is a picture nobody chose
-NODE_R, BALL_MAX = 26, 15
+NODE_R, BALL_MAX = 30, 17
 BG, FG, DIM = (8, 8, 12), (238, 238, 242), (120, 120, 132)
 LIVE, DEAD, PEND = (70, 210, 120), (150, 46, 46), (52, 52, 62)
 UNK = (96, 96, 112)     # measurable only from a trace: not empty, not proven to carry
@@ -70,6 +70,35 @@ def graph():
     return order, edges
 
 
+def collapse(order, edges):
+    """Fold a fan-in of single-consumer nodes into one drawn node. THE PICTURE, NOT THE GRAPH.
+
+    Measured on the live graph: 29 nodes, 56 edges, and FIFTEEN nodes have exactly one consumer --
+    seven of them feeding only the Proposer, four only the Analyst. Those two fan-ins are 20 of the
+    56 edges and they are the crossing spaghetti that makes the movie unreadable.
+
+    THE NODES ARE NOT MERGED, ONLY DRAWN TOGETHER, and the distinction is the lesson of this whole
+    week. If `menu`, `coverage` and `diagnosis` became one `briefing` node in flow.yaml, a broken
+    `coverage` would be INVISIBLE: the briefing is non-empty, the edge lights green, and the loop
+    loses exactly the diagnostic that caught the Analyst writing seven claims into the wrong file.
+    The granularity IS the check. So the machine stays granular and the picture collapses.
+
+    A group still reports its members and their individual sizes, and an EMPTY member turns the
+    whole group red -- otherwise collapsing would hide the one thing worth seeing.
+    """
+    import collections
+    cons = collections.defaultdict(set)
+    for a, b, _k in edges:
+        cons[a].add(b)
+    groups = collections.defaultdict(list)
+    for n in order:
+        c = cons[n["id"]]
+        if len(c) == 1 and not any(a == n["id"] for a, _b, _k in edges if len(cons[a]) > 1):
+            groups[next(iter(c))].append(n["id"])
+    # only worth collapsing when it actually removes clutter
+    return {k: v for k, v in groups.items() if len(v) >= 3}
+
+
 def layout(order, edges):
     """x = topological depth, y = spread within the depth. Left to right, as asked."""
     dep = {n["id"]: 0 for n in order}
@@ -83,7 +112,7 @@ def layout(order, edges):
     for d, ids in cols.items():
         for i, nid in enumerate(ids):
             x = 90 + d * (W - 200) / max(nx - 1, 1)
-            y = 90 + (i + 0.5) * (H - 240) / max(len(ids), 1)
+            y = 110 + (i + 0.5) * (H - 300) / max(len(ids), 1)
             pos[nid] = (x, y)
     return pos, dep
 
@@ -189,9 +218,13 @@ def draw(rid, vol, src, order, edges, pos, dep, fps, secs):
     """-> [PIL frames]. Depth by depth, so the eye reads it left to right."""
     from PIL import Image, ImageDraw, ImageFont
     try:
-        f = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 13)
-        fb = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 21)
-        fsm = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 10)
+        # BIG ENOUGH TO READ AT THE SIZE IT IS WATCHED. The first render used 10 px labels on a
+        # 1600 px frame -- legible in a still at 100%, illegible in a moving picture, which is the
+        # only way this file is ever looked at.
+        f = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 17)
+        fb = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 30)
+        fsm = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 16)
+        fv = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 14)
     except Exception:
         f = fb = fsm = ImageFont.load_default()
 
@@ -208,9 +241,13 @@ def draw(rid, vol, src, order, edges, pos, dep, fps, secs):
             u = (t + 1) / per
             im = Image.new("RGB", (W, H), BG)
             dr = ImageDraw.Draw(im)
-            dr.text((28, 22), f"{rid}", fill=FG, font=fb)
-            dr.text((28, 50), f"{'MEASURED from flow_trace.jsonl' if src == 'measured' else 'RECONSTRUCTED from artefacts -- an approximation'}",
+            dr.text((30, 22), f"{rid}", fill=FG, font=fb)
+            dr.text((30, 60), "MEASURED from flow_trace.jsonl" if src == "measured"
+                    else "RECONSTRUCTED from artefacts -- an approximation",
                     fill=(90, 200, 120) if src == "measured" else (215, 150, 60), font=fsm)
+            dr.text((30, 84), "ring: purple = an LLM role, grey = code.   "
+                              "ball = what it emitted.   edge: green carried, grey unmeasured",
+                    fill=DIM, font=fv)
             for a, b, k in edges:
                 (x0, y0), (x1, y1) = pos[a], pos[b]
                 on = lit.get((a, b))
@@ -228,13 +265,14 @@ def draw(rid, vol, src, order, edges, pos, dep, fps, secs):
                 if got:
                     r = rad(got)
                     dr.ellipse([x - r, y - r, x + r, y + r], fill=LIVE if not empty else DEAD)
-                lab = nid if len(nid) < 15 else nid[:14]
-                dr.text((x - NODE_R, y + NODE_R + 4), lab, fill=FG if got else DIM, font=fsm)
-                if vv is None:
-                    dr.text((x - NODE_R, y + NODE_R + 16), "unmeasured", fill=UNK, font=fsm)
-                elif c:
-                    dr.text((x - NODE_R, y + NODE_R + 16),
-                            f"{c/1000:.1f}k" if c >= 1000 else str(c), fill=DIM, font=fsm)
+                lab = nid if len(nid) < 22 else nid[:21]
+                wlab = dr.textlength(lab, font=fsm)
+                dr.text((x - wlab / 2, y + NODE_R + 6), lab, fill=FG if got else DIM, font=fsm)
+                sub = "unmeasured" if vv is None else \
+                      (f"{c/1000:.1f}k" if c >= 1000 else str(c)) if c else "EMPTY"
+                colr = UNK if vv is None else (DIM if c else DEAD)
+                wsub = dr.textlength(sub, font=fv)
+                dr.text((x - wsub / 2, y + NODE_R + 26), sub, fill=colr, font=fv)
             for a, b, k in step:
                 vv = vol.get(a)
                 if vv is None:
@@ -254,10 +292,10 @@ def draw(rid, vol, src, order, edges, pos, dep, fps, secs):
                     acc.setdefault(a, (vol.get(a) or (0, 0))[0])
             dead = [f"{a}->{b}" for (a, b), on in lit.items() if on is False]
             unk = sum(1 for on in lit.values() if on == "?")
-            dr.text((28, H - 40), f"edges carrying nothing: {len(dead)}"
-                    + (f"   unmeasured: {unk}" if unk else ""), fill=DEAD, font=f)
+            dr.text((30, H - 52), f"edges carrying nothing: {len(dead)}"
+                    + (f"    unmeasured: {unk}" if unk else ""), fill=DEAD, font=f)
             if dead:
-                dr.text((28, H - 22), ", ".join(dead[:6])[:150], fill=DIM, font=fsm)
+                dr.text((30, H - 28), ", ".join(dead[:6])[:150], fill=DIM, font=fv)
             frames.append(im)
     frames += [frames[-1]] * int(fps * 0.8)
     return frames
@@ -268,11 +306,28 @@ def main():
     ap.add_argument("--round", default=None)
     ap.add_argument("--fps", type=int, default=14)
     ap.add_argument("--secs", type=float, default=4.0)
+    ap.add_argument("--full", action="store_true",
+                    help="draw every node; the default folds single-consumer fan-ins")
     a = ap.parse_args()
 
     import imageio.v2 as imageio
     import numpy as np
     order, edges = graph()
+    grp = {} if a.full else collapse(order, edges)
+    if grp:
+        member = {m: f"[{k}] {len(v)} inputs" for k, v in grp.items() for m in v}
+        keep = [n for n in order if n["id"] not in member]
+        for k, v in grp.items():
+            keep.insert(0, {"id": f"[{k}] {len(v)} inputs", "_members": v})
+        seen, e2 = set(), []
+        for x, y, kk in edges:
+            x2, y2 = member.get(x, x), member.get(y, y)
+            if x2 != y2 and (x2, y2) not in seen:
+                seen.add((x2, y2))
+                e2.append((x2, y2, kk))
+        order, edges = keep, e2
+        print(f"  collapsed {sum(len(v) for v in grp.values())} single-consumer nodes into "
+              f"{len(grp)} group(s); --full draws them all")
     pos, dep = layout(order, edges)
     rids = [a.round] if a.round else rounds()
     if not rids:
@@ -285,6 +340,13 @@ def main():
         src = "measured" if vol else "reconstructed"
         if not vol:
             vol = reconstruct(rid)
+        # a group's volume is its members', and ONE empty member marks the group empty
+        for n in order:
+            if n.get("_members"):
+                mv = [vol.get(m) for m in n["_members"]]
+                known = [x for x in mv if x is not None]
+                vol[n["id"]] = None if not known else (
+                    sum(c for c, _e in known), any(e for _c, e in known))
         fr = draw(rid, vol, src, order, edges, pos, dep, a.fps, a.secs)
         p = os.path.join(OUT, f"flow_{rid}.mp4")
         imageio.mimsave(p, [np.asarray(x) for x in fr], fps=a.fps, quality=8,

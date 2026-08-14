@@ -198,7 +198,7 @@ def main():
     print(f"  VTK {vtk.vtkVersion.GetVTKVersion()}, "
           f"VTK_DEFAULT_OPENGL_WINDOW={os.environ.get('VTK_DEFAULT_OPENGL_WINDOW')}\n")
 
-    tmp = os.path.join(LOG, "_gates", f"_rc_{a.run}")
+    tmp = os.path.join(LOG, "analysis", f"_rc_{a.run}")
     os.makedirs(tmp, exist_ok=True)
     made = []
     for i, (label, fn) in enumerate(BACKENDS):

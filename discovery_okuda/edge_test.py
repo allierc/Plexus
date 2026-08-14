@@ -209,7 +209,7 @@ def main():
             if ci == 0:
                 ax.text2D(0.02, 0.03, rlab, transform=ax.transAxes, color="w", fontsize=11)
             _scalebar(ax, box)
-    out = os.path.join(LOG, "_gates", f"edge_test_{a.run}.png")
+    out = os.path.join(LOG, "analysis", f"edge_test_{a.run}.png")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     fig.savefig(out, dpi=115, facecolor="black", bbox_inches="tight")
     plt.close(fig)

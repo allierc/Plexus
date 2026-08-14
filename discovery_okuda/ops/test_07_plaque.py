@@ -366,7 +366,14 @@ def render(run, frames=None, W=2200, H=1150, fps=20):
         cy = box[1] + (box[3] - box[1] - cell) // 2
         img[cy:cy + cell, cx:cx + cell] = view
         wr.send(np.ascontiguousarray(img))
+        last = img
     wr.close()
+    # THE END STATE AS A STILL. A movie is what you watch once; the last frame is what goes in a note
+    # and what anyone compares between runs, and extracting it afterwards with ffmpeg is a second way
+    # of producing the same picture -- which is how two renderers came to disagree about a colour.
+    import imageio.v2 as iio
+    iio.imwrite(os.path.join(d, "plaque_gate.png"), np.ascontiguousarray(last))
+    print(f"[07] -> {os.path.join(d, 'plaque_gate.png')}", flush=True)
     V_ = verdicts(S, l0_um)
     V_.update(gates_07(S, l0_um))
     json.dump(dict(run=run, gates=V_, um_per_tissue_unit=um, l0_um=l0_um, series=S),
