@@ -157,7 +157,7 @@ def panel_vars(ax, bg):
         r"$\ddot\theta+2\zeta_\theta\omega_\theta\dot\theta"
         r"+\omega_\theta^{2}\theta=\omega_\theta^{2}\,\Phi_\theta(u_\theta)$"
         "   (and the same in $\\varphi$)",
-        r"eye plant, one per axis;  $\Phi,\ \omega_n,\ \zeta$ frozen")
+        r"the eye, one per axis;  $\Phi,\ \omega_n,\ \zeta$ frozen")
     down(0.232, 0.200)
 
     # --- out -------------------------------------------------------------
