@@ -1,0 +1,6 @@
+  File "/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/run_bench.py", line 277
+    tendon_gap=a.tendon_gap)
+    ^^^^^^^^^^^^^^^^^^^^^^^
+SyntaxError: keyword argument repeated: tendon_gap
+
+ERROR conda.cli.main_run:execute(124): `conda run python archive/run_bench.py --tag run_06_gap12 --pair --tendon-gap 0.012 --hold 500 --rest 250 --frames 1800 --device cuda:0` failed. (See above for error)

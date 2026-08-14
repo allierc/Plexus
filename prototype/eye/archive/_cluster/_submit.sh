@@ -1,0 +1,2 @@
+#!/bin/bash -l
+cd /groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye && bsub -n 8 -gpu num=1 -R "hname!=e11u12" -q gpu_l4 -W 240 -J eye_run_07 -o /groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/_cluster/run_07.out -e /groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/_cluster/run_07.err bash -l /groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/_cluster/run_07.sh

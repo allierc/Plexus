@@ -1,0 +1,26 @@
+{
+  "model": "F",
+  "muscle": "LR",
+  "k_sleeve": 0.0,
+  "width_scale": 1.0,
+  "thick_scale": 1.0,
+  "tag": "anch_k100k",
+  "pose_deg": [
+    5.944,
+    0.08,
+    3.774
+  ],
+  "settle_ptp_deg": [
+    0.044,
+    0.0717,
+    0.0406
+  ],
+  "settled": false,
+  "shortening_pct": 22.27,
+  "delivered_pct": 23.8,
+  "end_to_end_shortening_pct": 1.69,
+  "origin_cap_moved": 0.00087,
+  "tendon_cap_moved": 0.00537,
+  "radius_drift_pct": -0.007,
+  "seconds": 197.8
+}

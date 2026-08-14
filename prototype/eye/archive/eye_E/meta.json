@@ -1,0 +1,32 @@
+{
+  "label": "E",
+  "variant": "eye_p3c_drive",
+  "short": "stronger drive",
+  "description": "D with the drive amplitude raised 60 -> 67",
+  "runs": [
+    {
+      "dir": "t29_probe_LR",
+      "muscle": "LR"
+    },
+    {
+      "dir": "t30_probe_IR",
+      "muscle": "IR"
+    },
+    {
+      "dir": "t31_probe_SO",
+      "muscle": "SO"
+    },
+    {
+      "dir": "t32_probe_SR",
+      "muscle": "SR"
+    },
+    {
+      "dir": "t33_probe_IO",
+      "muscle": "IO"
+    },
+    {
+      "dir": "t34_probe_MR",
+      "muscle": "MR"
+    }
+  ]
+}

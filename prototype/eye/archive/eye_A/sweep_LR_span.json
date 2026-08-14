@@ -1,0 +1,251 @@
+{
+  "model": "A",
+  "muscle": "LR",
+  "hold_s": 1.8,
+  "target_deg": [
+    20.0,
+    25.0
+  ],
+  "cells": [
+    {
+      "gain": 1.0,
+      "youngs": 240.0,
+      "A_over_E": 0.25,
+      "abduction_deg": 3.959,
+      "gaze_deg": [
+        3.959,
+        -0.012,
+        -0.076
+      ],
+      "settle_ptp_deg": [
+        0.1201,
+        0.0043,
+        0.0094
+      ],
+      "shortening_pct": 10.54,
+      "radius_drift_pct": -0.01,
+      "shell_spread_growth": 0.05,
+      "seconds": 958.1
+    },
+    {
+      "gain": 2.0,
+      "youngs": 240.0,
+      "A_over_E": 0.5,
+      "abduction_deg": -170.428,
+      "gaze_deg": [
+        -170.428,
+        -17.813,
+        -84.614
+      ],
+      "settle_ptp_deg": [
+        7.1556,
+        4.5913,
+        356.7871
+      ],
+      "shortening_pct": 82.85,
+      "radius_drift_pct": -80.272,
+      "shell_spread_growth": 32.02,
+      "seconds": 1089.4
+    },
+    {
+      "gain": 4.0,
+      "youngs": 240.0,
+      "A_over_E": 1.0,
+      "abduction_deg": 4.414,
+      "gaze_deg": [
+        4.414,
+        3.203,
+        -3.353
+      ],
+      "settle_ptp_deg": [
+        0.073,
+        0.0324,
+        0.1117
+      ],
+      "shortening_pct": 94.55,
+      "radius_drift_pct": -64.488,
+      "shell_spread_growth": 61.68,
+      "seconds": 1051.7
+    },
+    {
+      "gain": 7.0,
+      "youngs": 240.0,
+      "A_over_E": 1.75,
+      "abduction_deg": 1.202,
+      "gaze_deg": [
+        1.202,
+        -0.065,
+        -0.248
+      ],
+      "settle_ptp_deg": [
+        0.0048,
+        0.0022,
+        0.0112
+      ],
+      "shortening_pct": 89.7,
+      "radius_drift_pct": -9.178,
+      "shell_spread_growth": 48.297,
+      "seconds": 1027.1
+    },
+    {
+      "gain": 1.0,
+      "youngs": 480.0,
+      "A_over_E": 0.125,
+      "abduction_deg": 1.795,
+      "gaze_deg": [
+        1.795,
+        -0.003,
+        -0.033
+      ],
+      "settle_ptp_deg": [
+        0.0263,
+        0.001,
+        0.0022
+      ],
+      "shortening_pct": 9.37,
+      "radius_drift_pct": -0.006,
+      "shell_spread_growth": -0.003,
+      "seconds": 930.4
+    },
+    {
+      "gain": 2.0,
+      "youngs": 480.0,
+      "A_over_E": 0.25,
+      "abduction_deg": 3.906,
+      "gaze_deg": [
+        3.906,
+        -0.008,
+        -0.075
+      ],
+      "settle_ptp_deg": [
+        0.0747,
+        0.001,
+        0.0051
+      ],
+      "shortening_pct": 10.92,
+      "radius_drift_pct": -0.013,
+      "shell_spread_growth": 0.054,
+      "seconds": 953.9
+    },
+    {
+      "gain": 4.0,
+      "youngs": 480.0,
+      "A_over_E": 0.5,
+      "abduction_deg": 9.657,
+      "gaze_deg": [
+        9.657,
+        -2.0,
+        -1.414
+      ],
+      "settle_ptp_deg": [
+        0.78,
+        0.5007,
+        2.9823
+      ],
+      "shortening_pct": 91.29,
+      "radius_drift_pct": -84.355,
+      "shell_spread_growth": 23.838,
+      "seconds": 1174.3
+    },
+    {
+      "gain": 7.0,
+      "youngs": 480.0,
+      "A_over_E": 0.875,
+      "abduction_deg": -2.369,
+      "gaze_deg": [
+        -2.369,
+        -0.799,
+        0.687
+      ],
+      "settle_ptp_deg": [
+        0.0105,
+        0.0079,
+        0.0121
+      ],
+      "shortening_pct": 88.01,
+      "radius_drift_pct": -5.874,
+      "shell_spread_growth": 34.215,
+      "seconds": 970.6
+    },
+    {
+      "gain": 1.0,
+      "youngs": 960.0,
+      "A_over_E": 0.0625,
+      "abduction_deg": 0.829,
+      "gaze_deg": [
+        0.829,
+        0.001,
+        -0.008
+      ],
+      "settle_ptp_deg": [
+        0.0166,
+        0.0011,
+        0.0009
+      ],
+      "shortening_pct": 8.73,
+      "radius_drift_pct": -0.003,
+      "shell_spread_growth": -0.006,
+      "seconds": 894.2
+    },
+    {
+      "gain": 2.0,
+      "youngs": 960.0,
+      "A_over_E": 0.125,
+      "abduction_deg": 1.679,
+      "gaze_deg": [
+        1.679,
+        -0.004,
+        -0.022
+      ],
+      "settle_ptp_deg": [
+        0.041,
+        0.0017,
+        0.0006
+      ],
+      "shortening_pct": 9.55,
+      "radius_drift_pct": -0.004,
+      "shell_spread_growth": 0.004,
+      "seconds": 920.9
+    },
+    {
+      "gain": 4.0,
+      "youngs": 960.0,
+      "A_over_E": 0.25,
+      "abduction_deg": 3.864,
+      "gaze_deg": [
+        3.864,
+        -0.009,
+        -0.075
+      ],
+      "settle_ptp_deg": [
+        0.1036,
+        0.002,
+        0.0045
+      ],
+      "shortening_pct": 11.26,
+      "radius_drift_pct": -0.014,
+      "shell_spread_growth": 0.066,
+      "seconds": 946.6
+    },
+    {
+      "gain": 7.0,
+      "youngs": 960.0,
+      "A_over_E": 0.4375,
+      "abduction_deg": -1.493,
+      "gaze_deg": [
+        -1.493,
+        0.073,
+        0.113
+      ],
+      "settle_ptp_deg": [
+        0.0004,
+        0.0005,
+        0.0004
+      ],
+      "shortening_pct": 83.43,
+      "radius_drift_pct": -1.837,
+      "shell_spread_growth": 15.268,
+      "seconds": 925.2
+    }
+  ]
+}

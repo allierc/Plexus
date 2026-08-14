@@ -1,0 +1,26 @@
+Traceback (most recent call last):
+  File "/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/sweep_buckle.py", line 131, in <module>
+    run(a.model, a.k_sleeve, a.width_scale, a.thick_scale, a.muscle, a.device,
+  File "/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/sweep_buckle.py", line 110, in run
+    json.dump(res, fh, indent=2)
+  File "/groups/saalfeld/home/allierc/miniforge3/envs/connectome-gnn/lib/python3.12/json/__init__.py", line 179, in dump
+    for chunk in iterable:
+                 ^^^^^^^^
+  File "/groups/saalfeld/home/allierc/miniforge3/envs/connectome-gnn/lib/python3.12/json/encoder.py", line 432, in _iterencode
+    yield from _iterencode_dict(o, _current_indent_level)
+  File "/groups/saalfeld/home/allierc/miniforge3/envs/connectome-gnn/lib/python3.12/json/encoder.py", line 406, in _iterencode_dict
+    yield from chunks
+  File "/groups/saalfeld/home/allierc/miniforge3/envs/connectome-gnn/lib/python3.12/json/encoder.py", line 439, in _iterencode
+    o = _default(o)
+        ^^^^^^^^^^^
+  File "/groups/saalfeld/home/allierc/miniforge3/envs/connectome-gnn/lib/python3.12/json/encoder.py", line 180, in default
+    raise TypeError(f'Object of type {o.__class__.__name__} '
+TypeError: Object of type float32 is not JSON serializable
+
+ERROR conda.cli.main_run:execute(124): `conda run python sweep_buckle.py --model F --k_bone 300000 --width-scale 2.0 --tag anch_k300k_w20 --device cuda:0` failed. (See above for error)
+/groups/saalfeld/home/allierc/miniforge3/envs/connectome-gnn/lib/python3.12/site-packages/numpy/lib/_function_base_impl.py:4653: RuntimeWarning: invalid value encountered in subtract
+  diff_b_a = subtract(b, a)
+free(): invalid next size (normal)
+/scratch/allierc/tmpbsfwuv6j: line 3: 505318 Aborted                 (core dumped) python sweep_buckle.py --model F --k_bone 300000 --width-scale 2.0 --tag anch_k300k_w20 --device cuda:0
+
+ERROR conda.cli.main_run:execute(124): `conda run python sweep_buckle.py --model F --k_bone 300000 --width-scale 2.0 --tag anch_k300k_w20 --device cuda:0` failed. (See above for error)

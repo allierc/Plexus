@@ -1,0 +1,103 @@
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@e11u06>
+Subject: Job 153422746: <eye_bench_run_01> in cluster <Janelia> Exited
+
+Job <eye_bench_run_01> was submitted from host <e02u30> by user <allierc> in cluster <Janelia> at Fri Aug 14 16:38:00 2026
+Job was executed on host(s) <8*e11u06>, in queue <gpu_l4>, as user <allierc> in cluster <Janelia> at Fri Aug 14 16:39:01 2026
+</groups/saalfeld/home/allierc> was used as the home directory.
+</groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye> was used as the working directory.
+Started at Fri Aug 14 16:39:01 2026
+Terminated at Fri Aug 14 16:39:06 2026
+Results reported at Fri Aug 14 16:39:06 2026
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+bash -l /groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/_cluster/bench_run_01.sh
+------------------------------------------------------------
+
+Exited with exit code 2.
+
+Resource usage summary:
+
+    CPU time :                                   2.50 sec.
+    Max Memory :                                 23 MB
+    Average Memory :                             14.67 MB
+    Total Requested Memory :                     122880.00 MB
+    Delta Memory :                               122857.00 MB
+    Max Swap :                                   -
+    Max Processes :                              5
+    Max Threads :                                6
+    Run time :                                   5 sec.
+    Turnaround time :                            66 sec.
+
+The output (if any) is above this job summary.
+
+
+
+PS:
+
+Read file </groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/_cluster/bench_run_01.err> for stderr output of this job.
+
+[bench run_01] 900 frames, E 240.0, A 67.0
+[engine] 900 sim frames -> recording 901 set frames (stride 1), fields every 1 steps (<= 4000)
+[engine] === bench_run_01 ===  dim=3  world=[1, 1, 1]  boundary=wall  dt=0.003  frames=900
+[build] units: NONE DECLARED -- this run is dimensionless and no result from it may be quoted with a unit
+[engine] sets:      eye(1)  muscle(1)  bone(1)  mpm_particle(40000)  muscle_particle(9000)  bone_particle(16000)
+[engine] fields:    mpm_grid
+[engine] operators: anatomy: eye_anatomy, bone_block, muscle_morphogenesis   hierarchy: eye_pose, muscle_geometry   signalling: muscle_probe   mechanics: muscle_contract, pin_region, pin_region   motion: drag, drag   mpm: mpm_strain, mpm_strain, mpm_strain, mpm_scatter, mpm_scatter, mpm_scatter, mpm_grid_update, mpm_gather, mpm_gather, mpm_gather
+[eye_anatomy] ovoid a=0.105 c=0.105 (ratio 1.00); 40000 points, 6767 on the shell, 0 in the lens
+[bone_block] 16000 points, [0.1 0.4 0.4] -> [0.24 0.6  0.6 ], E 1600.0
+[muscle_morphogenesis:tube] 9000 points, length 0.3170, radius 0.022, E 240.0
+[bench run_01] path -12.88%  end-to-end -6.73%  DELIVERED 0.1191  anchor slip 0.424  [249.9s]
+    [render] 0/151
+    [render] 40/151
+    [render] 80/151
+    [render] 120/151
+[bench run_01] -> /groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/experiment/run_01/run_01.mp4
+
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@h08u04>
+Subject: Job 153422938: <eye_bench_run_01> in cluster <Janelia> Done
+
+Job <eye_bench_run_01> was submitted from host <e02u30> by user <allierc> in cluster <Janelia> at Fri Aug 14 16:42:01 2026
+Job was executed on host(s) <8*h08u04>, in queue <gpu_l4>, as user <allierc> in cluster <Janelia> at Fri Aug 14 16:42:22 2026
+</groups/saalfeld/home/allierc> was used as the home directory.
+</groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye> was used as the working directory.
+Started at Fri Aug 14 16:42:22 2026
+Terminated at Fri Aug 14 16:46:50 2026
+Results reported at Fri Aug 14 16:46:50 2026
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+bash -l /groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/_cluster/bench_run_01.sh
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   271.89 sec.
+    Max Memory :                                 2519 MB
+    Average Memory :                             1523.74 MB
+    Total Requested Memory :                     122880.00 MB
+    Delta Memory :                               120361.00 MB
+    Max Swap :                                   -
+    Max Processes :                              7
+    Max Threads :                                75
+    Run time :                                   268 sec.
+    Turnaround time :                            289 sec.
+
+The output (if any) is above this job summary.
+
+
+
+PS:
+
+Read file </groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/_cluster/bench_run_01.err> for stderr output of this job.
+

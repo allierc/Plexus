@@ -1,0 +1,24 @@
+[
+  {
+    "stage": "9",
+    "muscles": [
+      "LR"
+    ],
+    "level": [
+      0.5
+    ],
+    "pose_deg": [
+      2.2664,
+      -1.5872,
+      -0.1464
+    ],
+    "settle_ptp_deg": [
+      0.4764,
+      0.1596,
+      0.1528
+    ],
+    "settled": false,
+    "hold_s": 0.35,
+    "seconds": 164.1
+  }
+]

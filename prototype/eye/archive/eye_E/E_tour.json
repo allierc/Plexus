@@ -1,0 +1,117 @@
+{
+  "label": "E",
+  "built_from": "E_IO_t33_probe_IO_spec.yaml",
+  "hold": 70,
+  "rest": 45,
+  "lead": 40,
+  "a_hi": 1.0,
+  "tonic": 0.14,
+  "order": [
+    "LR",
+    "SR",
+    "MR",
+    "IR",
+    "SO",
+    "IO"
+  ],
+  "n_frames": 790,
+  "seconds": 1495.2,
+  "per_muscle": {
+    "LR": {
+      "window": [
+        40,
+        110
+      ],
+      "gaze_excursion_deg": [
+        18.489,
+        -0.783,
+        0.006
+      ],
+      "peak_abs_deg": [
+        18.489,
+        0.783,
+        0.309
+      ]
+    },
+    "SR": {
+      "window": [
+        155,
+        225
+      ],
+      "gaze_excursion_deg": [
+        -20.883,
+        9.671,
+        1.363
+      ],
+      "peak_abs_deg": [
+        21.236,
+        9.671,
+        1.379
+      ]
+    },
+    "MR": {
+      "window": [
+        270,
+        340
+      ],
+      "gaze_excursion_deg": [
+        -15.588,
+        1.45,
+        1.077
+      ],
+      "peak_abs_deg": [
+        15.588,
+        3.713,
+        1.077
+      ]
+    },
+    "IR": {
+      "window": [
+        385,
+        455
+      ],
+      "gaze_excursion_deg": [
+        15.603,
+        -14.239,
+        -2.939
+      ],
+      "peak_abs_deg": [
+        16.205,
+        14.239,
+        3.186
+      ]
+    },
+    "SO": {
+      "window": [
+        500,
+        570
+      ],
+      "gaze_excursion_deg": [
+        2.791,
+        -2.586,
+        4.883
+      ],
+      "peak_abs_deg": [
+        2.791,
+        3.109,
+        4.883
+      ]
+    },
+    "IO": {
+      "window": [
+        615,
+        685
+      ],
+      "gaze_excursion_deg": [
+        -1.232,
+        2.845,
+        -9.216
+      ],
+      "peak_abs_deg": [
+        1.232,
+        3.146,
+        9.216
+      ]
+    }
+  }
+}

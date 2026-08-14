@@ -1,0 +1,118 @@
+[bench run_05] 900 frames, E 240.0, A 67.0
+[engine] 900 sim frames -> recording 901 set frames (stride 1), fields every 1 steps (<= 4000)
+[engine] === bench_run_05 ===  dim=3  world=[1, 1, 1]  boundary=wall  dt=0.003  frames=900
+[build] units: NONE DECLARED -- this run is dimensionless and no result from it may be quoted with a unit
+[engine] sets:      eye(1)  muscle(2)  bone(1)  orbit(1)  mpm_particle(40000)  muscle_particle(18000)  bone_particle(16000)
+[engine] fields:    mpm_grid
+[engine] operators: anatomy: eye_anatomy, bone_block, muscle_morphogenesis   hierarchy: eye_pose, muscle_geometry   signalling: muscle_probe   mechanics: muscle_contract, pin_region, orbit_socket   motion: drag, drag   mpm: mpm_strain, mpm_strain, mpm_strain, mpm_scatter, mpm_scatter, mpm_scatter, mpm_grid_update, mpm_gather, mpm_gather, mpm_gather
+[eye_anatomy] ovoid a=0.105 c=0.105 (ratio 1.00); 40000 points, 6767 on the shell, 0 in the lens
+[bone_block] 16000 points, [0.1 0.4 0.4] -> [0.24 0.6  0.6 ], E 1600.0
+[muscle_morphogenesis:tube] 18000 points, length 0.3396, radius 0.022, E 240.0
+
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@h08u10>
+Subject: Job 153423284: <eye_bench_run_05> in cluster <Janelia> Exited
+
+Job <eye_bench_run_05> was submitted from host <e02u30> by user <allierc> in cluster <Janelia> at Fri Aug 14 17:10:37 2026
+Job was executed on host(s) <8*h08u10>, in queue <gpu_l4>, as user <allierc> in cluster <Janelia> at Fri Aug 14 17:10:46 2026
+</groups/saalfeld/home/allierc> was used as the home directory.
+</groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye> was used as the working directory.
+Started at Fri Aug 14 17:10:46 2026
+Terminated at Fri Aug 14 17:10:57 2026
+Results reported at Fri Aug 14 17:10:57 2026
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+bash -l /groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/_cluster/bench_run_05.sh
+------------------------------------------------------------
+
+Exited with exit code 1.
+
+Resource usage summary:
+
+    CPU time :                                   6.21 sec.
+    Max Memory :                                 361 MB
+    Average Memory :                             272.60 MB
+    Total Requested Memory :                     122880.00 MB
+    Delta Memory :                               122519.00 MB
+    Max Swap :                                   -
+    Max Processes :                              7
+    Max Threads :                                8
+    Run time :                                   13 sec.
+    Turnaround time :                            20 sec.
+
+The output (if any) is above this job summary.
+
+
+
+PS:
+
+Read file </groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/_cluster/bench_run_05.err> for stderr output of this job.
+
+[bench run_05] 1800 frames, E 240.0, A 67.0
+[engine] 1800 sim frames -> recording 1801 set frames (stride 1), fields every 1 steps (<= 4000)
+[engine] === bench_run_05 ===  dim=3  world=[1, 1, 1]  boundary=wall  dt=0.003  frames=1800
+[build] units: NONE DECLARED -- this run is dimensionless and no result from it may be quoted with a unit
+[engine] sets:      eye(1)  muscle(2)  bone(1)  orbit(1)  mpm_particle(40000)  muscle_particle(18000)  bone_particle(16000)
+[engine] fields:    mpm_grid
+[engine] operators: anatomy: eye_anatomy, bone_block, muscle_morphogenesis   hierarchy: eye_pose, muscle_geometry   signalling: muscle_probe   mechanics: muscle_contract, pin_region, orbit_socket   motion: drag, drag   mpm: mpm_strain, mpm_strain, mpm_strain, mpm_scatter, mpm_scatter, mpm_scatter, mpm_grid_update, mpm_gather, mpm_gather, mpm_gather
+[eye_anatomy] ovoid a=0.105 c=0.105 (ratio 1.00); 40000 points, 6767 on the shell, 0 in the lens
+[bone_block] 16000 points, [0.1 0.4 0.4] -> [0.24 0.6  0.6 ], E 1600.0
+[muscle_morphogenesis:tube] 18000 points, length 0.3396, radius 0.022, E 240.0
+[bench run_05] path -19.28%  end-to-end -13.65%  DELIVERED 1.323  anchor slip 0.9128  [530.0s]
+    [render] 0/301
+    [render] 40/301
+    [render] 80/301
+    [render] 120/301
+    [render] 160/301
+    [render] 200/301
+    [render] 240/301
+    [render] 280/301
+[bench run_05] -> /groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/experiment/run_05/run_05.mp4
+
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@h08u20>
+Subject: Job 153423285: <eye_bench_run_05> in cluster <Janelia> Done
+
+Job <eye_bench_run_05> was submitted from host <e02u30> by user <allierc> in cluster <Janelia> at Fri Aug 14 17:11:52 2026
+Job was executed on host(s) <8*h08u20>, in queue <gpu_l4>, as user <allierc> in cluster <Janelia> at Fri Aug 14 17:12:04 2026
+</groups/saalfeld/home/allierc> was used as the home directory.
+</groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye> was used as the working directory.
+Started at Fri Aug 14 17:12:04 2026
+Terminated at Fri Aug 14 17:21:14 2026
+Results reported at Fri Aug 14 17:21:14 2026
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+bash -l /groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/_cluster/bench_run_05.sh
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   565.39 sec.
+    Max Memory :                                 4292 MB
+    Average Memory :                             2138.50 MB
+    Total Requested Memory :                     122880.00 MB
+    Delta Memory :                               118588.00 MB
+    Max Swap :                                   -
+    Max Processes :                              7
+    Max Threads :                                75
+    Run time :                                   551 sec.
+    Turnaround time :                            562 sec.
+
+The output (if any) is above this job summary.
+
+
+
+PS:
+
+Read file </groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/_cluster/bench_run_05.err> for stderr output of this job.
+

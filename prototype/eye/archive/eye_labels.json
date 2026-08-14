@@ -1,0 +1,37 @@
+[
+  {
+    "label": "A",
+    "variant": "eye_probe_c_a",
+    "short": "soft tissue",
+    "n_runs": 7,
+    "description": "sclera Young's 300, tendon 9 / bone-cap 40 \u2014 the softest globe; the earliest configuration"
+  },
+  {
+    "label": "B",
+    "variant": "eye_probe_baseline_fixmat",
+    "short": "stiffened",
+    "n_runs": 7,
+    "description": "same geometry as A, materials raised: sclera 420, tendon 45, bone cap 130. The reference eye"
+  },
+  {
+    "label": "C",
+    "variant": "eye_p3a_length",
+    "short": "longer straps",
+    "n_runs": 6,
+    "description": "B with the muscle gap widened 0.020 -> 0.042 and the strap fraction 0.55 -> 0.95: more contractile length, so the largest travel"
+  },
+  {
+    "label": "D",
+    "variant": "eye_p3b_pulley",
+    "short": "pulley",
+    "n_runs": 6,
+    "description": "C plus a muscle_sleeve constraint (k 2500, c 30, free 0.70-0.88) \u2014 a connective-tissue pulley holding the strap against the globe"
+  },
+  {
+    "label": "E",
+    "variant": "eye_p3c_drive",
+    "short": "stronger drive",
+    "n_runs": 6,
+    "description": "D with the drive amplitude raised 60 -> 67"
+  }
+]

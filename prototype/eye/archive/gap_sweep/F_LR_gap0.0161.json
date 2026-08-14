@@ -1,0 +1,19 @@
+{
+  "model": "F",
+  "muscle": "LR",
+  "gap": 0.0161,
+  "pose_deg": [
+    6.108,
+    -1.943,
+    3.49
+  ],
+  "settle_ptp_deg": [
+    0.0461,
+    0.037,
+    0.0182
+  ],
+  "settled": true,
+  "shortening_pct": 30.81,
+  "radius_drift_pct": -0.003,
+  "seconds": 326.0
+}

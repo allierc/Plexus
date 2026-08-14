@@ -1,0 +1,848 @@
+[
+  {
+    "model": "F",
+    "muscle": "LR",
+    "muscle_index": 0,
+    "built_from": "baseline_spec.yaml",
+    "dt": 0.003,
+    "stride": 6,
+    "sample_ms": 18.0,
+    "levels": [
+      1.0,
+      0.75,
+      0.5,
+      0.25
+    ],
+    "hold_s": 2.0,
+    "lead_s": 0.5,
+    "tail_s": 2.0,
+    "n_frames": 3502,
+    "tonic": 0.14,
+    "seconds": 3802.5,
+    "baseline_gaze_deg": [
+      0.5385,
+      -0.787,
+      -0.7721
+    ],
+    "settling_time_s": 1.28,
+    "per_level": [
+      {
+        "level": 1.0,
+        "window_s": [
+          0.501,
+          2.502
+        ],
+        "act_settled": 1.0,
+        "gaze_settled_deg": [
+          6.7132,
+          -2.6592,
+          3.083
+        ],
+        "gaze_minus_baseline_deg": [
+          6.1747,
+          -1.8722,
+          3.8551
+        ],
+        "sd_deg": [
+          0.0138,
+          0.0104,
+          0.0055
+        ],
+        "peak_to_peak_deg": [
+          0.0522,
+          0.0413,
+          0.02
+        ]
+      },
+      {
+        "level": 0.75,
+        "window_s": [
+          2.502,
+          4.503
+        ],
+        "act_settled": 0.75,
+        "gaze_settled_deg": [
+          4.2355,
+          -1.9576,
+          1.6009
+        ],
+        "gaze_minus_baseline_deg": [
+          3.697,
+          -1.1706,
+          2.373
+        ],
+        "sd_deg": [
+          0.0037,
+          0.0033,
+          0.0004
+        ],
+        "peak_to_peak_deg": [
+          0.0138,
+          0.0127,
+          0.0018
+        ]
+      },
+      {
+        "level": 0.5,
+        "window_s": [
+          4.503,
+          6.504
+        ],
+        "act_settled": 0.5,
+        "gaze_settled_deg": [
+          2.543,
+          -1.3642,
+          0.4161
+        ],
+        "gaze_minus_baseline_deg": [
+          2.0045,
+          -0.5772,
+          1.1882
+        ],
+        "sd_deg": [
+          0.0028,
+          0.0015,
+          0.0002
+        ],
+        "peak_to_peak_deg": [
+          0.0104,
+          0.0057,
+          0.0008
+        ]
+      },
+      {
+        "level": 0.25,
+        "window_s": [
+          6.504,
+          8.505
+        ],
+        "act_settled": 0.25,
+        "gaze_settled_deg": [
+          1.1737,
+          -0.8148,
+          -0.6106
+        ],
+        "gaze_minus_baseline_deg": [
+          0.6353,
+          -0.0278,
+          0.1615
+        ],
+        "sd_deg": [
+          0.0026,
+          0.0013,
+          0.0001
+        ],
+        "peak_to_peak_deg": [
+          0.0095,
+          0.0048,
+          0.0004
+        ]
+      }
+    ]
+  },
+  {
+    "model": "F",
+    "muscle": "SR",
+    "muscle_index": 1,
+    "built_from": "baseline_spec.yaml",
+    "dt": 0.003,
+    "stride": 6,
+    "sample_ms": 18.0,
+    "levels": [
+      0.6,
+      0.45,
+      0.3,
+      0.15
+    ],
+    "hold_s": 2.0,
+    "lead_s": 0.5,
+    "tail_s": 2.0,
+    "n_frames": 3502,
+    "tonic": 0.14,
+    "seconds": 1569.7,
+    "baseline_gaze_deg": [
+      0.5385,
+      -0.787,
+      -0.7721
+    ],
+    "settling_time_s": 1.28,
+    "per_level": [
+      {
+        "level": 0.6,
+        "window_s": [
+          0.501,
+          2.502
+        ],
+        "act_settled": 0.6,
+        "gaze_settled_deg": [
+          -0.5231,
+          0.1459,
+          -3.3941
+        ],
+        "gaze_minus_baseline_deg": [
+          -1.0616,
+          0.9329,
+          -2.6221
+        ],
+        "sd_deg": [
+          0.0023,
+          0.0032,
+          0.0017
+        ],
+        "peak_to_peak_deg": [
+          0.008,
+          0.011,
+          0.0061
+        ]
+      },
+      {
+        "level": 0.45,
+        "window_s": [
+          2.502,
+          4.503
+        ],
+        "act_settled": 0.45,
+        "gaze_settled_deg": [
+          -0.2027,
+          -0.194,
+          -2.5682
+        ],
+        "gaze_minus_baseline_deg": [
+          -0.7412,
+          0.593,
+          -1.7961
+        ],
+        "sd_deg": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "peak_to_peak_deg": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "level": 0.3,
+        "window_s": [
+          4.503,
+          6.504
+        ],
+        "act_settled": 0.3,
+        "gaze_settled_deg": [
+          0.1185,
+          -0.4779,
+          -1.7961
+        ],
+        "gaze_minus_baseline_deg": [
+          -0.4199,
+          0.3091,
+          -1.024
+        ],
+        "sd_deg": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "peak_to_peak_deg": [
+          0.0,
+          0.0001,
+          0.0
+        ]
+      },
+      {
+        "level": 0.15,
+        "window_s": [
+          6.504,
+          8.505
+        ],
+        "act_settled": 0.15,
+        "gaze_settled_deg": [
+          0.4313,
+          -0.7309,
+          -1.0744
+        ],
+        "gaze_minus_baseline_deg": [
+          -0.1072,
+          0.0561,
+          -0.3023
+        ],
+        "sd_deg": [
+          0.0003,
+          0.0005,
+          0.0
+        ],
+        "peak_to_peak_deg": [
+          0.0012,
+          0.0019,
+          0.0
+        ]
+      }
+    ]
+  },
+  {
+    "model": "F",
+    "muscle": "MR",
+    "muscle_index": 2,
+    "built_from": "baseline_spec.yaml",
+    "dt": 0.003,
+    "stride": 6,
+    "sample_ms": 18.0,
+    "levels": [
+      1.0,
+      0.75,
+      0.5,
+      0.25
+    ],
+    "hold_s": 2.0,
+    "lead_s": 0.5,
+    "tail_s": 2.0,
+    "n_frames": 3502,
+    "tonic": 0.14,
+    "seconds": 3908.8,
+    "baseline_gaze_deg": [
+      0.5385,
+      -0.787,
+      -0.7721
+    ],
+    "settling_time_s": 1.28,
+    "per_level": [
+      {
+        "level": 1.0,
+        "window_s": [
+          0.501,
+          2.502
+        ],
+        "act_settled": 1.0,
+        "gaze_settled_deg": [
+          -1.2142,
+          -1.2226,
+          -0.958
+        ],
+        "gaze_minus_baseline_deg": [
+          -1.7527,
+          -0.4356,
+          -0.1859
+        ],
+        "sd_deg": [
+          0.0016,
+          0.0011,
+          0.0
+        ],
+        "peak_to_peak_deg": [
+          0.0054,
+          0.0041,
+          0.0
+        ]
+      },
+      {
+        "level": 0.75,
+        "window_s": [
+          2.502,
+          4.503
+        ],
+        "act_settled": 0.75,
+        "gaze_settled_deg": [
+          -0.5546,
+          -1.03,
+          -0.9463
+        ],
+        "gaze_minus_baseline_deg": [
+          -1.0931,
+          -0.2429,
+          -0.1742
+        ],
+        "sd_deg": [
+          0.0009,
+          0.0012,
+          0.0
+        ],
+        "peak_to_peak_deg": [
+          0.0028,
+          0.0039,
+          0.0
+        ]
+      },
+      {
+        "level": 0.5,
+        "window_s": [
+          4.503,
+          6.504
+        ],
+        "act_settled": 0.5,
+        "gaze_settled_deg": [
+          -0.1058,
+          -0.8795,
+          -0.9449
+        ],
+        "gaze_minus_baseline_deg": [
+          -0.6443,
+          -0.0925,
+          -0.1728
+        ],
+        "sd_deg": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "peak_to_peak_deg": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "level": 0.25,
+        "window_s": [
+          6.504,
+          8.505
+        ],
+        "act_settled": 0.25,
+        "gaze_settled_deg": [
+          0.2826,
+          -0.7218,
+          -0.9493
+        ],
+        "gaze_minus_baseline_deg": [
+          -0.2559,
+          0.0652,
+          -0.1772
+        ],
+        "sd_deg": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "peak_to_peak_deg": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      }
+    ]
+  },
+  {
+    "model": "F",
+    "muscle": "IR",
+    "muscle_index": 3,
+    "built_from": "baseline_spec.yaml",
+    "dt": 0.003,
+    "stride": 6,
+    "sample_ms": 18.0,
+    "levels": [
+      1.0,
+      0.75,
+      0.5,
+      0.25
+    ],
+    "hold_s": 2.0,
+    "lead_s": 0.5,
+    "tail_s": 2.0,
+    "n_frames": 3502,
+    "tonic": 0.14,
+    "seconds": 1375.0,
+    "baseline_gaze_deg": [
+      0.5385,
+      -0.787,
+      -0.7721
+    ],
+    "settling_time_s": 1.28,
+    "per_level": [
+      {
+        "level": 1.0,
+        "window_s": [
+          0.501,
+          2.502
+        ],
+        "act_settled": 1.0,
+        "gaze_settled_deg": [
+          1.4924,
+          -3.5266,
+          -0.6646
+        ],
+        "gaze_minus_baseline_deg": [
+          0.9539,
+          -2.7396,
+          0.1074
+        ],
+        "sd_deg": [
+          0.005,
+          0.0051,
+          0.0001
+        ],
+        "peak_to_peak_deg": [
+          0.0174,
+          0.0197,
+          0.0004
+        ]
+      },
+      {
+        "level": 0.75,
+        "window_s": [
+          2.502,
+          4.503
+        ],
+        "act_settled": 0.75,
+        "gaze_settled_deg": [
+          1.1244,
+          -2.387,
+          -0.8386
+        ],
+        "gaze_minus_baseline_deg": [
+          0.586,
+          -1.6,
+          -0.0665
+        ],
+        "sd_deg": [
+          0.0027,
+          0.0018,
+          0.0
+        ],
+        "peak_to_peak_deg": [
+          0.0074,
+          0.0051,
+          0.0
+        ]
+      },
+      {
+        "level": 0.5,
+        "window_s": [
+          4.503,
+          6.504
+        ],
+        "act_settled": 0.5,
+        "gaze_settled_deg": [
+          0.8509,
+          -1.6276,
+          -0.945
+        ],
+        "gaze_minus_baseline_deg": [
+          0.3124,
+          -0.8405,
+          -0.1729
+        ],
+        "sd_deg": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "peak_to_peak_deg": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "level": 0.25,
+        "window_s": [
+          6.504,
+          8.505
+        ],
+        "act_settled": 0.25,
+        "gaze_settled_deg": [
+          0.6195,
+          -0.9877,
+          -1.0452
+        ],
+        "gaze_minus_baseline_deg": [
+          0.081,
+          -0.2007,
+          -0.2731
+        ],
+        "sd_deg": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "peak_to_peak_deg": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      }
+    ]
+  },
+  {
+    "model": "F",
+    "muscle": "SO",
+    "muscle_index": 4,
+    "built_from": "baseline_spec.yaml",
+    "dt": 0.003,
+    "stride": 6,
+    "sample_ms": 18.0,
+    "levels": [
+      1.0,
+      0.75,
+      0.5,
+      0.25
+    ],
+    "hold_s": 2.0,
+    "lead_s": 0.5,
+    "tail_s": 2.0,
+    "n_frames": 3502,
+    "tonic": 0.14,
+    "seconds": 1382.9,
+    "baseline_gaze_deg": [
+      0.5385,
+      -0.787,
+      -0.7721
+    ],
+    "settling_time_s": 1.28,
+    "per_level": [
+      {
+        "level": 1.0,
+        "window_s": [
+          0.501,
+          2.502
+        ],
+        "act_settled": 1.0,
+        "gaze_settled_deg": [
+          -0.1352,
+          1.1995,
+          1.6761
+        ],
+        "gaze_minus_baseline_deg": [
+          -0.6737,
+          1.9865,
+          2.4482
+        ],
+        "sd_deg": [
+          0.0011,
+          0.0007,
+          0.0134
+        ],
+        "peak_to_peak_deg": [
+          0.0043,
+          0.0022,
+          0.0453
+        ]
+      },
+      {
+        "level": 0.75,
+        "window_s": [
+          2.502,
+          4.503
+        ],
+        "act_settled": 0.75,
+        "gaze_settled_deg": [
+          0.1015,
+          0.4596,
+          0.6971
+        ],
+        "gaze_minus_baseline_deg": [
+          -0.437,
+          1.2466,
+          1.4692
+        ],
+        "sd_deg": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "peak_to_peak_deg": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "level": 0.5,
+        "window_s": [
+          4.503,
+          6.504
+        ],
+        "act_settled": 0.5,
+        "gaze_settled_deg": [
+          0.2296,
+          -0.0988,
+          -0.0977
+        ],
+        "gaze_minus_baseline_deg": [
+          -0.3089,
+          0.6882,
+          0.6744
+        ],
+        "sd_deg": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "peak_to_peak_deg": [
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "level": 0.25,
+        "window_s": [
+          6.504,
+          8.505
+        ],
+        "act_settled": 0.25,
+        "gaze_settled_deg": [
+          0.3484,
+          -0.5701,
+          -0.7529
+        ],
+        "gaze_minus_baseline_deg": [
+          -0.1901,
+          0.2169,
+          0.0192
+        ],
+        "sd_deg": [
+          0.0001,
+          0.0001,
+          0.0
+        ],
+        "peak_to_peak_deg": [
+          0.0003,
+          0.0002,
+          0.0
+        ]
+      }
+    ]
+  },
+  {
+    "model": "F",
+    "muscle": "IO",
+    "muscle_index": 5,
+    "built_from": "baseline_spec.yaml",
+    "dt": 0.003,
+    "stride": 6,
+    "sample_ms": 18.0,
+    "levels": [
+      1.0,
+      0.75,
+      0.5,
+      0.25
+    ],
+    "hold_s": 2.0,
+    "lead_s": 0.5,
+    "tail_s": 2.0,
+    "n_frames": 3502,
+    "tonic": 0.14,
+    "seconds": 1379.4,
+    "baseline_gaze_deg": [
+      0.5385,
+      -0.787,
+      -0.7721
+    ],
+    "settling_time_s": 1.28,
+    "per_level": [
+      {
+        "level": 1.0,
+        "window_s": [
+          0.501,
+          2.502
+        ],
+        "act_settled": 1.0,
+        "gaze_settled_deg": [
+          1.7687,
+          -5.1372,
+          -11.8565
+        ],
+        "gaze_minus_baseline_deg": [
+          1.2303,
+          -4.3502,
+          -11.0844
+        ],
+        "sd_deg": [
+          0.0052,
+          0.0097,
+          0.0333
+        ],
+        "peak_to_peak_deg": [
+          0.0193,
+          0.0254,
+          0.105
+        ]
+      },
+      {
+        "level": 0.75,
+        "window_s": [
+          2.502,
+          4.503
+        ],
+        "act_settled": 0.75,
+        "gaze_settled_deg": [
+          1.4314,
+          -3.1934,
+          -7.513
+        ],
+        "gaze_minus_baseline_deg": [
+          0.893,
+          -2.4064,
+          -6.7409
+        ],
+        "sd_deg": [
+          0.0012,
+          0.0007,
+          0.0158
+        ],
+        "peak_to_peak_deg": [
+          0.0042,
+          0.0021,
+          0.052
+        ]
+      },
+      {
+        "level": 0.5,
+        "window_s": [
+          4.503,
+          6.504
+        ],
+        "act_settled": 0.5,
+        "gaze_settled_deg": [
+          1.0487,
+          -1.9908,
+          -4.553
+        ],
+        "gaze_minus_baseline_deg": [
+          0.5102,
+          -1.2038,
+          -3.7809
+        ],
+        "sd_deg": [
+          0.0007,
+          0.0002,
+          0.0161
+        ],
+        "peak_to_peak_deg": [
+          0.0023,
+          0.0007,
+          0.0523
+        ]
+      },
+      {
+        "level": 0.25,
+        "window_s": [
+          6.504,
+          8.505
+        ],
+        "act_settled": 0.25,
+        "gaze_settled_deg": [
+          0.6622,
+          -1.0494,
+          -2.0559
+        ],
+        "gaze_minus_baseline_deg": [
+          0.1237,
+          -0.2624,
+          -1.2838
+        ],
+        "sd_deg": [
+          0.0003,
+          0.0002,
+          0.0107
+        ],
+        "peak_to_peak_deg": [
+          0.0008,
+          0.0006,
+          0.0346
+        ]
+      }
+    ]
+  }
+]

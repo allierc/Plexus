@@ -1,0 +1,44 @@
+{
+  "label": "F",
+  "variant": "eye_fish_larva",
+  "short": "measured larva",
+  "description": "the 96 hpf plant as traced off Fig. 12.1A: obliques from the rostral orbit onto the dorsal/ventral faces, SR+IR+MR from one caudal plate, LR from outside the orbit onto the caudal sclera; globe 0.676; per-muscle widths",
+  "plant": "fish_larva",
+  "anatomy": "measured off Fig. 12.1A (Tulenko & Currie 2020, after Easter & Nicola 1996) + Kasprick et al. 2011",
+  "params": {
+    "plant": "fish_larva",
+    "k_sleeve": 0.0
+  },
+  "runs": [
+    {
+      "muscle": "LR",
+      "scratch_dir": "t36_probe_LR",
+      "seconds": 411.3
+    },
+    {
+      "muscle": "SR",
+      "scratch_dir": "t37_probe_SR",
+      "seconds": 410.1
+    },
+    {
+      "muscle": "MR",
+      "scratch_dir": "t38_probe_MR",
+      "seconds": 399.3
+    },
+    {
+      "muscle": "IR",
+      "scratch_dir": "t39_probe_IR",
+      "seconds": 400.8
+    },
+    {
+      "muscle": "SO",
+      "scratch_dir": "t40_probe_SO",
+      "seconds": 395.8
+    },
+    {
+      "muscle": "IO",
+      "scratch_dir": "t41_probe_IO",
+      "seconds": 403.3
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "tag": "run_06_touch",
+  "muscle_youngs": 240.0,
+  "contract": 67.0,
+  "A_over_E": 0.2792,
+  "muscle_radius": 0.022,
+  "k_bone": 9000.0,
+  "tendon_gap": 0.0,
+  "rest_length": 0.32762,
+  "path_shortening_pct": 19.75,
+  "end_to_end_shortening_pct": 14.17,
+  "transmission": 1.3498,
+  "anchor_slip": 0.8654,
+  "seconds": 535.8
+}

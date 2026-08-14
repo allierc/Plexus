@@ -1,0 +1,52 @@
+[G] 4 phases, 3550 frames (10.7 s)
+[engine] 3550 sim frames -> recording 3551 set frames (stride 1), fields every 3551 steps (<= 1)
+[engine] === eye_G_blend_synergies ===  dim=3  world=[1, 1, 1]  boundary=wall  dt=0.003  frames=3550
+[build] units: NONE DECLARED -- this run is dimensionless and no result from it may be quoted with a unit
+[engine] sets:      eye(1)  muscle(6)  orbit(1)  mpm_particle(45000)  muscle_particle(13200)
+[engine] fields:    mpm_grid
+[engine] operators: anatomy: blend_globe, blend_muscles   hierarchy: eye_pose, muscle_geometry   signalling: muscle_probe   mechanics: muscle_contract, bone_anchor, muscle_sleeve, orbit_socket   motion: drag, drag   mpm: mpm_strain, mpm_strain, mpm_scatter, mpm_scatter, mpm_grid_update, mpm_gather, mpm_gather
+[blend] cutting 260802_s2_EYE_MUSCLES_MODEL.blend -> /workspace/Plexus/prototype/eye/archive/run_03/blend_parts
+
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@e11u08>
+Subject: Job 153423300: <eye_G_synergies> in cluster <Janelia> Exited
+
+Job <eye_G_synergies> was submitted from host <e02u30> by user <allierc> in cluster <Janelia> at Fri Aug 14 17:29:15 2026
+Job was executed on host(s) <8*e11u08>, in queue <gpu_l4>, as user <allierc> in cluster <Janelia> at Fri Aug 14 17:29:16 2026
+</groups/saalfeld/home/allierc> was used as the home directory.
+</groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye> was used as the working directory.
+Started at Fri Aug 14 17:29:16 2026
+Terminated at Fri Aug 14 17:29:28 2026
+Results reported at Fri Aug 14 17:29:28 2026
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+bash -l /groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/_cluster/G_synergies.sh
+------------------------------------------------------------
+
+Exited with exit code 1.
+
+Resource usage summary:
+
+    CPU time :                                   6.98 sec.
+    Max Memory :                                 333 MB
+    Average Memory :                             216.20 MB
+    Total Requested Memory :                     122880.00 MB
+    Delta Memory :                               122547.00 MB
+    Max Swap :                                   -
+    Max Processes :                              6
+    Max Threads :                                7
+    Run time :                                   14 sec.
+    Turnaround time :                            13 sec.
+
+The output (if any) is above this job summary.
+
+
+
+PS:
+
+Read file </groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/_cluster/G_synergies.err> for stderr output of this job.
+

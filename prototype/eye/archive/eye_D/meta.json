@@ -1,0 +1,32 @@
+{
+  "label": "D",
+  "variant": "eye_p3b_pulley",
+  "short": "pulley",
+  "description": "C plus a muscle_sleeve constraint (k 2500, c 30, free 0.70-0.88) \u2014 a connective-tissue pulley holding the strap against the globe",
+  "runs": [
+    {
+      "dir": "t23_probe_LR",
+      "muscle": "LR"
+    },
+    {
+      "dir": "t24_probe_IR",
+      "muscle": "IR"
+    },
+    {
+      "dir": "t25_probe_SR",
+      "muscle": "SR"
+    },
+    {
+      "dir": "t26_probe_MR",
+      "muscle": "MR"
+    },
+    {
+      "dir": "t27_probe_SO",
+      "muscle": "SO"
+    },
+    {
+      "dir": "t28_probe_IO",
+      "muscle": "IO"
+    }
+  ]
+}

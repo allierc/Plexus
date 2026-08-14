@@ -1,0 +1,257 @@
+{
+  "n_frames": 395,
+  "range_hvt_deg": [
+    5.86,
+    5.17,
+    7.84
+  ],
+  "mean_settle_error_deg": 12.5,
+  "tracking_rms_deg": [
+    14.43,
+    7.07,
+    3.46
+  ],
+  "tracking_settled_rms_deg": [
+    13.96,
+    6.6,
+    2.99
+  ],
+  "max_settle_error_deg": 24.71,
+  "recruitment_correct": "3/4",
+  "centroid_drift_max_frac_radius": 0.0828,
+  "radius_mean_pct": -0.06,
+  "radius_worst_pct": 0.09,
+  "radius_spread_pct": 5.03,
+  "strain_p99": 0.0236,
+  "strain_max": 0.2834,
+  "vonmises_p99": 4.721,
+  "activation_range": [
+    0.021,
+    1.0
+  ],
+  "max_shortening_pct": {
+    "LR": 18.87,
+    "SR": 20.39,
+    "MR": 19.87,
+    "IR": 15.46,
+    "SO": 24.12,
+    "IO": 24.55
+  },
+  "peak_shortening_pct": 24.55,
+  "muscle_strain_p99": 0.3061,
+  "holds": [
+    {
+      "frames": [
+        0,
+        65
+      ],
+      "kind": "primary",
+      "command_hvt": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "achieved_hvt": [
+        0.0,
+        -0.1,
+        0.04
+      ],
+      "error_deg": 0.11,
+      "recruited": [
+        "SR",
+        "LR"
+      ],
+      "recruit_ok": null,
+      "activation": {
+        "LR": 0.153,
+        "SR": 0.158,
+        "MR": 0.14,
+        "IR": 0.14,
+        "SO": 0.14,
+        "IO": 0.14
+      }
+    },
+    {
+      "frames": [
+        65,
+        130
+      ],
+      "kind": "abduction",
+      "command_hvt": [
+        25.0,
+        0.0,
+        0.0
+      ],
+      "achieved_hvt": [
+        1.41,
+        1.79,
+        -0.28
+      ],
+      "error_deg": 23.66,
+      "recruited": [
+        "LR",
+        "SR"
+      ],
+      "recruit_ok": true,
+      "activation": {
+        "LR": 1.0,
+        "SR": 0.801,
+        "MR": 0.14,
+        "IR": 0.14,
+        "SO": 0.219,
+        "IO": 0.14
+      }
+    },
+    {
+      "frames": [
+        130,
+        195
+      ],
+      "kind": "adduction",
+      "command_hvt": [
+        -25.0,
+        0.0,
+        0.0
+      ],
+      "achieved_hvt": [
+        -0.44,
+        -0.18,
+        -2.76
+      ],
+      "error_deg": 24.71,
+      "recruited": [
+        "MR",
+        "IO"
+      ],
+      "recruit_ok": true,
+      "activation": {
+        "LR": 0.155,
+        "SR": 0.155,
+        "MR": 0.986,
+        "IR": 0.693,
+        "SO": 0.603,
+        "IO": 0.985
+      }
+    },
+    {
+      "frames": [
+        195,
+        260
+      ],
+      "kind": "elevation",
+      "command_hvt": [
+        0.0,
+        16.0,
+        0.0
+      ],
+      "achieved_hvt": [
+        -3.18,
+        0.08,
+        -0.8
+      ],
+      "error_deg": 16.25,
+      "recruited": [
+        "SR",
+        "SO"
+      ],
+      "recruit_ok": true,
+      "activation": {
+        "LR": 0.685,
+        "SR": 1.0,
+        "MR": 0.237,
+        "IR": 0.14,
+        "SO": 0.727,
+        "IO": 0.14
+      }
+    },
+    {
+      "frames": [
+        260,
+        325
+      ],
+      "kind": "intorsion",
+      "command_hvt": [
+        0.0,
+        0.0,
+        9.0
+      ],
+      "achieved_hvt": [
+        -1.57,
+        2.77,
+        3.54
+      ],
+      "error_deg": 6.32,
+      "recruited": [
+        "IR",
+        "SO"
+      ],
+      "recruit_ok": false,
+      "activation": {
+        "LR": 0.21,
+        "SR": 0.146,
+        "MR": 0.14,
+        "IR": 0.544,
+        "SO": 0.488,
+        "IO": 0.141
+      }
+    },
+    {
+      "frames": [
+        325,
+        395
+      ],
+      "kind": "primary",
+      "command_hvt": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "achieved_hvt": [
+        -0.89,
+        -0.42,
+        3.84
+      ],
+      "error_deg": 3.97,
+      "recruited": [
+        "LR",
+        "SR"
+      ],
+      "recruit_ok": null,
+      "activation": {
+        "LR": 0.243,
+        "SR": 0.233,
+        "MR": 0.14,
+        "IR": 0.14,
+        "SO": 0.14,
+        "IO": 0.14
+      }
+    }
+  ],
+  "geometry": {
+    "source": "260802_s2_EYE_MUSCLES_MODEL.blend",
+    "side": "R",
+    "scale": 0.16768,
+    "axial_ratio": 0.7178,
+    "semi_axes": [
+      0.1241,
+      0.1059,
+      0.0825
+    ],
+    "rest_lengths": {
+      "LR": 0.1577,
+      "SR": 0.1561,
+      "MR": 0.1961,
+      "IR": 0.1667,
+      "SO": 0.2006,
+      "IO": 0.2133
+    },
+    "muscle_volumes": {
+      "LR": 1.48875e-05,
+      "SR": 2.25246e-05,
+      "MR": 1.45764e-05,
+      "IR": 2.28027e-05,
+      "SO": 2.5405e-05,
+      "IO": 2.91811e-05
+    }
+  }
+}

@@ -19,9 +19,11 @@ from __future__ import annotations
 
 import copy
 
+import numpy as np
 import yaml
 
 import eye_anatomy as EA
+import fish_anatomy as FA
 
 
 # --------------------------------------------------------------------------- #
@@ -90,13 +92,60 @@ def build_spec(name="eye_zebrafish", preset="atlas", n_particles=45000, n_muscle
                n_frames=None, sclera_youngs=420.0, vitreous_youngs=45.0, choroid_youngs=130.0,
                muscle_youngs=60.0, mus_width=0.034, mus_thickness=0.021, mus_arc=30.0,
                mus_gap=0.038, mus_embed=-0.014, mus_frac=0.88, oblique_strength=None,
-               program=None, seed=0):
-    """The full spec as a plain dict, ready for `yaml.safe_dump` + `plexus.schema.load`."""
+               plant="mammal", axial_ratio=None, program=None, seed=0):
+    """The full spec as a plain dict, ready for `yaml.safe_dump` + `plexus.schema.load`.
+
+    `plant` selects WHOSE ANATOMY the operators are handed:
+
+        "mammal"      the original guess in `eye_anatomy`: four recti from an annulus
+                      of Zinn, obliques behind the equator, a trochlea, globe 0.82
+        "fish_larva"  measured off Fig. 12.1A of Tulenko & Currie -- obliques from the
+                      rostral orbit onto the dorsal and ventral faces, SR/IR/MR from
+                      one caudal plate, LR from outside the orbit onto the caudal
+                      sclera, globe 0.676, per-muscle widths
+        "fish_adult"  the same globe with Kasprick's adult insertions: all six on the
+                      sclera-corneal junction, SO sharing SR's station and IO sharing
+                      IR's
+
+    Nothing about the plant reaches the operators except through these params, so a
+    plant is a set of numbers in the spec, not a branch in the code.
+    """
     p = dict(PRESETS.get(preset, PRESETS["atlas"]))
     n_frames = int(n_frames if n_frames is not None else p["n_frames"])
     prog = program if program is not None else PROGRAMS[p["program"]]
     cx, cy, cz = EA.GLOBE_CENTER
-    belly = [[round(float(v), 4) for v in b] for b in EA.belly_centers()]
+
+    fish = plant.startswith("fish")
+    if fish:
+        stage = plant.split("_", 1)[1]
+        ins_dirs = FA.insertion_dirs(stage)
+        org_world = FA.origins_world(stage)
+        mus_width = [float(v) for v in FA.strap_widths()]
+        mus_thickness = float(FA.strap_thickness())
+        # the fish's origins are real and distinct bones, so the whole muscle is
+        # drawn: `frac` existed only to stop four mammalian recti piling onto one apex
+        mus_frac = 1.0
+        # let each muscle's wrap be set by where its bone is (tangent construction),
+        # and ride closer to the sclera: these bellies are a third the thickness the
+        # mammalian straps were, so a 0.365 a_eq stand-off held them out in mid-orbit
+        mus_arc = None
+        mus_gap = 0.0161
+        mus_embed = -0.013
+        strengths = [float(v) for v in FA.peak_tensions()]
+        lens = FA.lens()
+        lens_center = [0.0, 0.0, float(lens["center_axial"] * FA.axial_ratio())]
+        lens_radius = float(lens["radius"])
+        ratio = float(FA.axial_ratio() if axial_ratio is None else axial_ratio)
+    else:
+        ins_dirs = EA.insertion_dirs()
+        org_world = EA.origins_world()
+        strengths = _strengths(oblique_strength)
+        lens_center = list(EA.LENS_CENTER)
+        lens_radius = EA.LENS_RADIUS
+        ratio = float(EA.AXIAL_RATIO if axial_ratio is None else axial_ratio)
+    belly = [[round(float(v), 4) for v in b]
+             for b in 0.5 * (np.asarray(org_world)
+                             + np.asarray(EA.GLOBE_CENTER)[None, :] + EA.A_EQ * ins_dirs)]
 
     spec = {
         "general": {
@@ -168,14 +217,19 @@ def build_spec(name="eye_zebrafish", preset="atlas", n_particles=45000, n_muscle
         "operators": [
             # anatomy: once, at frame 0
             {"op": "eye_anatomy", "at": "mpm_particle", "before_frame": 1,
-             "center": [cx, cy, cz], "a_eq": EA.A_EQ, "axial_ratio": EA.AXIAL_RATIO,
-             "lens_youngs": EA.LENS_YOUNGS, "cornea_youngs": 320.0},
+             "center": [cx, cy, cz], "a_eq": EA.A_EQ, "axial_ratio": ratio,
+             "lens_youngs": EA.LENS_YOUNGS, "cornea_youngs": 320.0,
+             "lens_center": [float(v) for v in lens_center],
+             "lens_radius": float(lens_radius)},
             {"op": "muscle_morphogenesis", "at": "muscle_particle", "before_frame": 1,
-             "center": [cx, cy, cz], "a_eq": EA.A_EQ, "c_ax": EA.C_AX,
-             "width": float(mus_width), "thickness": float(mus_thickness),
-             "arc_deg": float(mus_arc), "gap": float(mus_gap), "embed": float(mus_embed),
-             "frac": float(mus_frac),
-             "youngs": float(muscle_youngs)},
+             "center": [cx, cy, cz], "a_eq": EA.A_EQ, "c_ax": EA.A_EQ * ratio,
+             "width": mus_width if isinstance(mus_width, list) else float(mus_width),
+             "thickness": (mus_thickness if isinstance(mus_thickness, list)
+                           else float(mus_thickness)),
+             "arc_deg": None if mus_arc is None else float(mus_arc), "gap": float(mus_gap), "embed": float(mus_embed),
+             "frac": float(mus_frac), "youngs": float(muscle_youngs),
+             "insertions": [[round(float(v), 5) for v in d] for d in ins_dirs],
+             "origins": [[round(float(v), 5) for v in o] for o in org_world]},
             # readouts
             {"op": "eye_pose", "at": "eye", "child": "mpm_particle", "shell_min": 0.86},
             {"op": "muscle_geometry", "at": "muscle", "child": "muscle_particle", "eye": "eye"},
@@ -186,14 +240,14 @@ def build_spec(name="eye_zebrafish", preset="atlas", n_particles=45000, n_muscle
              "tau": float(tau)},
             {"op": "muscle_contract", "at": "muscle_particle", "muscles": "muscle",
              "amplitude": float(contract), "stretch_activation": float(stretch_activation),
-             "strength": _strengths(oblique_strength)},
+             "strength": strengths},
             # boundary conditions
             {"op": "bone_anchor", "at": "muscle_particle", "k": float(k_bone), "c": float(c_bone)},
             {"op": "muscle_sleeve", "at": "muscle_particle", "k": float(k_sleeve),
              "c": float(c_sleeve), "free_from": float(sleeve_free[0]),
              "free_to": float(sleeve_free[1])},
             {"op": "orbit_socket", "at": "mpm_particle", "orbit": "orbit",
-             "k": float(k_socket), "damp": 12.0, "radius": EA.CUP_RADIUS,
+             "k": float(k_socket), "damp": 12.0, "radius": EA.A_EQ + 0.007,
              "aperture": EA.CUP_APERTURE_DEG, "k_fat": float(k_fat), "c_fat": float(c_fat)},
             {"op": "drag", "at": "mpm_particle", "k": float(drag), "emit": "mpm_acceleration"},
             {"op": "drag", "at": "muscle_particle", "k": float(muscle_drag),
@@ -201,10 +255,15 @@ def build_spec(name="eye_zebrafish", preset="atlas", n_particles=45000, n_muscle
             # the decomposed MLS-MPM cycle, over BOTH bodies, into ONE grid
             {"op": "mpm_strain", "at": "mpm_particle"},
             {"op": "mpm_strain", "at": "muscle_particle"},
+            # `polar: higham` -- the fixed-corotated stress needs the rotation from F = R S,
+            # and a batched 3x3 SVD costs a microsecond per particle per substep: measured
+            # on this plant it was 44.7 ms of mpm_scatter's 46.4 ms, i.e. most of the run.
+            # The Newton polar iteration gives the same rotation to float32 (the gaze
+            # trajectory agrees to 1e-6 deg) at half the wall clock for the whole simulation.
             {"op": "mpm_scatter", "at": "mpm_particle", "to": "mpm_grid",       # resets the grid
-             "drag": 0.0, "a_max": 200},
+             "drag": 0.0, "a_max": 200, "polar": "higham"},
             {"op": "mpm_scatter", "at": "muscle_particle", "to": "mpm_grid",    # adds to it
-             "implementation": "accumulate", "drag": 0.0, "a_max": 200},
+             "implementation": "accumulate", "drag": 0.0, "a_max": 200, "polar": "higham"},
             {"op": "mpm_grid_update", "at": "mpm_grid", "wall_damp": 1.0},
             {"op": "mpm_gather", "at": "mpm_particle", "from": "mpm_grid", "wall_damp": 1.0,
              "wall_contact": 0.02, "vmax": 1000000000.0},

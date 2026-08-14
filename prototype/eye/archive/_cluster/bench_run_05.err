@@ -1,0 +1,26 @@
+Traceback (most recent call last):
+  File "/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/experiment/run_bench.py", line 318, in <module>
+    main()
+  File "/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/experiment/run_bench.py", line 289, in main
+    _, cap = run_eye.capture_run(sim, a.device, stride=a.stride)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/run_eye.py", line 159, in capture_run
+    H, _ = engine_run(sim, out_path=None, device=device, on_frame=hook, progress=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/../../src/plexus/engine.py", line 866, in run
+    _run_token(token, tick)
+  File "/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/../../src/plexus/engine.py", line 806, in _run_token
+    deltas = ob(H, _selector_mask(H, sel))   # call the operator: forward() runs, returns {set: delta} (or {})
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/groups/saalfeld/home/allierc/miniforge3/envs/connectome-gnn/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1775, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/groups/saalfeld/home/allierc/miniforge3/envs/connectome-gnn/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1786, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/probe_ops.py", line 196, in forward
+    d_act = (cmd - a) / self.tau
+             ~~~~^~~
+RuntimeError: The size of tensor a (6) must match the size of tensor b (2) at non-singleton dimension 0
+
+ERROR conda.cli.main_run:execute(124): `conda run python experiment/run_bench.py --tag run_05 --pair --hold 500 --rest 250 --frames 1800 --frames 900 --device cuda:0` failed. (See above for error)

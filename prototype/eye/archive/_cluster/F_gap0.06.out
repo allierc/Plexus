@@ -1,0 +1,58 @@
+[gap 0.06] LR at u=1, hold 2.0s
+[engine] 834 sim frames -> recording 835 set frames (stride 1), fields every 835 steps (<= 1)
+[engine] === eye_F_fish_larva_stair_LR ===  dim=3  world=[1, 1, 1]  boundary=wall  dt=0.003  frames=834
+[build] units: NONE DECLARED -- this run is dimensionless and no result from it may be quoted with a unit
+[engine] sets:      eye(1)  muscle(6)  orbit(1)  mpm_particle(45000)  muscle_particle(13200)
+[engine] fields:    mpm_grid
+[engine] operators: anatomy: eye_anatomy, muscle_morphogenesis   hierarchy: eye_pose, muscle_geometry   signalling: muscle_probe   mechanics: muscle_contract, bone_anchor, muscle_sleeve, orbit_socket   motion: drag, drag   mpm: mpm_strain, mpm_strain, mpm_scatter, mpm_scatter, mpm_grid_update, mpm_gather, mpm_gather
+[eye_anatomy] ovoid a=0.115 c=0.078 (ratio 0.68); 45000 points, 7656 on the shell, 1938 in the lens
+[muscle_morphogenesis] 6 muscles x 2200 points; rest lengths LR=0.233 SR=0.524 MR=0.517 IR=0.554 SO=0.147 IO=0.197
+    [vtk] 0/140
+    [vtk] 40/140
+    [vtk] 80/140
+    [vtk] 120/140
+[gap 0.06] pose [1.82, -0.574, 0.008] deg  settled=True  shortening 24.59%  radius drift -0.015%  [322.2s]
+
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@e11u22>
+Subject: Job 153421059: <eye_F_gap0.06> in cluster <Janelia> Done
+
+Job <eye_F_gap0.06> was submitted from host <e02u30> by user <allierc> in cluster <Janelia> at Fri Aug 14 10:18:03 2026
+Job was executed on host(s) <8*e11u22>, in queue <gpu_l4>, as user <allierc> in cluster <Janelia> at Fri Aug 14 10:18:03 2026
+</groups/saalfeld/home/allierc> was used as the home directory.
+</groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye> was used as the working directory.
+Started at Fri Aug 14 10:18:03 2026
+Terminated at Fri Aug 14 10:23:44 2026
+Results reported at Fri Aug 14 10:23:44 2026
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+bash -l /groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/_cluster/F_gap0.06.sh
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   351.27 sec.
+    Max Memory :                                 1884 MB
+    Average Memory :                             1462.09 MB
+    Total Requested Memory :                     122880.00 MB
+    Delta Memory :                               120996.00 MB
+    Max Swap :                                   -
+    Max Processes :                              7
+    Max Threads :                                75
+    Run time :                                   343 sec.
+    Turnaround time :                            341 sec.
+
+The output (if any) is above this job summary.
+
+
+
+PS:
+
+Read file </groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/_cluster/F_gap0.06.err> for stderr output of this job.
+

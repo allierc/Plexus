@@ -1,0 +1,15 @@
+{
+  "tag": "run_06_gap6",
+  "muscle_youngs": 240.0,
+  "contract": 67.0,
+  "A_over_E": 0.2792,
+  "muscle_radius": 0.022,
+  "k_bone": 9000.0,
+  "tendon_gap": 0.006,
+  "rest_length": 0.32162,
+  "path_shortening_pct": 20.37,
+  "end_to_end_shortening_pct": 14.9,
+  "transmission": 1.3188,
+  "anchor_slip": 0.806,
+  "seconds": 532.7
+}
