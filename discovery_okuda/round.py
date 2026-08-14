@@ -1632,6 +1632,27 @@ def _build_sweep(slot, rid, index):
             "replicate": False, "route": "A"}
 
 
+def _replicate_seed(name):
+    """A seed unique to this run, and stable if the round is re-run.
+
+    `1000 + index` WAS NOT A SEED, IT WAS A SLOT NUMBER. Two replicates in the same slot of
+    different rounds got the identical value -- measured on this campaign: `r003_01` and `r004_01`
+    both carry `general.seed = 1001`, R6 fired on both, both were re-seeded, and their `traj.npz`
+    are BYTE-IDENTICAL. The one mechanism built to measure the campaign's seed spread was producing
+    a spread of exactly zero, and the 60 "replicate pairs" a seed-floor computation found last week
+    all differed by 0.0 for this reason. Every floor in `epistemic_spec.md` had to be read from an
+    older file because this corpus cannot re-derive them.
+
+    DERIVED FROM THE RUN NAME, which already encodes round and slot and is unique by construction.
+    Deterministic, so re-running a round reproduces it; `md5` rather than `hash()` because Python
+    salts `hash()` per process and a seed that changes between invocations is not reproducible.
+    Never 0 -- that is the non-replicate default, and a replicate landing on it would be
+    indistinguishable from a run that was never re-seeded.
+    """
+    import hashlib
+    return 1 + int(hashlib.md5(str(name).encode()).hexdigest()[:8], 16) % 999_983
+
+
 def _build_one(slot, rid, index, seen):
     par, edit = slot.get("parent"), slot.get("edit")
     # R7 FIRST, BEFORE THE GRAPH IS EVEN REBUILT, because it needs nothing but the prediction and
@@ -1788,7 +1809,7 @@ def _build_one(slot, rid, index, seen):
         _refuse(index, slot, f"refused {[r.code for r in bad]} -- {bad[0].detail}")
         return None
     try:
-        T.write_config(g, name, frames=_FRAMES, seed_=(1000 + index if replicate else 0))
+        T.write_config(g, name, frames=_FRAMES, seed_=(_replicate_seed(name) if replicate else 0))
         _restore_parent_params(name, par, edit, spare_seeds=replicate)
     except Exception as e:
         _refuse(index, slot, f"spec would not write: {e}")
