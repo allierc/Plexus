@@ -101,74 +101,71 @@ def panel_eye(ax, bg):
 def panel_vars(ax, bg):
     """Every symbol of section 4.6, in the order the signal meets them.
 
-    Two rows rather than one: the circuit equation and the plant equation are
-    each too wide to share a row with the maps on either side, and shrinking
-    them to fit is how a schematic stops being readable at print size.
+    Stacked top to bottom rather than wrapped over two rows: the signal path
+    is a straight line, so the picture should be one too. The earlier
+    two-row layout needed a curved arrow to get from the end of the first row
+    back to the start of the second, which is a connector carrying no
+    information.
     """
     fg = "white" if bg == "black" else "#111111"
     dim = "#555555" if bg == "white" else "#aaaaaa"
     ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis("off")
 
-    def box(x, y, w, h, fill, title, sub, fs=10.0):
-        ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle="round,pad=0.012",
+    X, W, H = 0.055, 0.89, 0.135          # boxes share one column
+    CX = X + W / 2
+
+    def box(y, fill, title, sub, fs=11.0):
+        ax.add_patch(FancyBboxPatch((X, y), W, H, boxstyle="round,pad=0.012",
                                     linewidth=1.0, edgecolor="0.45",
                                     facecolor=fill, zorder=2))
-        ax.text(x + w / 2, y + h * 0.66, title, ha="center", va="center",
+        ax.text(CX, y + H * 0.64, title, ha="center", va="center",
                 fontsize=fs, color="#111111", zorder=3)
-        ax.text(x + w / 2, y + h * 0.24, sub, ha="center", va="center",
-                fontsize=8.0, color="#333333", zorder=3)
+        ax.text(CX, y + H * 0.24, sub, ha="center", va="center",
+                fontsize=8.2, color="#333333", zorder=3)
 
-    def arrow(x0, y0, x1, y1, rad=0.0):
-        ax.add_patch(FancyArrowPatch((x0, y0), (x1, y1), color="0.35",
-                                     arrowstyle="-|>", mutation_scale=13,
-                                     lw=1.3, zorder=4,
-                                     connectionstyle=f"arc3,rad={rad}"))
+    def down(y0, y1):
+        ax.add_patch(FancyArrowPatch((CX, y0), (CX, y1), color="0.35",
+                                     arrowstyle="-|>", mutation_scale=14,
+                                     lw=1.4, zorder=4))
 
-    ax.text(0.5, 0.99, "symbols, in the order the signal meets them",
-            ha="center", va="top", fontsize=10, color=dim)
+    # --- in --------------------------------------------------------------
+    ax.text(CX, 0.965, r"$(\dot x,\dot y)$", ha="center", va="center",
+            fontsize=14, color=fg)
+    ax.text(CX, 0.922, "target velocity  (the only input)", ha="center",
+            va="center", fontsize=8.2, color=dim)
+    down(0.900, 0.868)
 
-    # --- row 1: input, the input map, the circuit -------------------------
-    y1, h = 0.60, 0.21
-    ax.text(0.012, y1 + h / 2, r"$(\dot x,\dot y)$", ha="left", va="center",
-            fontsize=13, color=fg)
-    ax.text(0.012, y1 - 0.015, "target velocity\n(the only input)",
-            ha="left", va="top", fontsize=8, color=dim)
-    arrow(0.105, y1 + h / 2, 0.145, y1 + h / 2)
-
-    box(0.145, y1, 0.235, h, "#c7d8e8",
+    box(0.733, "#c7d8e8",
         r"$\mathbf{I}=\hat W^{\rm in}\,(\dot x,\dot y)^{\!\top}$",
         r"AF5 afferents,  $\hat W^{\rm in}\!\in\mathbb{R}^{N\times 2}$")
-    arrow(0.380, y1 + h / 2, 0.420, y1 + h / 2)
+    down(0.733, 0.701)
 
-    box(0.420, y1, 0.565, h, "#cfe8d2",
+    box(0.566, "#cfe8d2",
         r"$\tau_i\dot v_i=-v_i+\sum_j \hat W_{ij}\,{\rm ReLU}(v_j)+I_i$",
         r"INTG recurrent core,  "
-        r"$\hat W_{ij}=|\hat S_{ij}|\,{\rm sign}(W^{\rm con}_{ij})$",
-        fs=11.0)
+        r"$\hat W_{ij}=|\hat S_{ij}|\,{\rm sign}(W^{\rm con}_{ij})$")
+    down(0.566, 0.534)
 
-    # --- row 2: the readout, the plant, the gaze --------------------------
-    y2 = 0.20
-    arrow(0.70, y1 - 0.012, 0.28, y2 + h + 0.012, rad=0.22)
-
-    box(0.145, y2, 0.315, h, "#ddd0f0",
+    box(0.399, "#ddd0f0",
         r"$u_\theta=m_{\rm LR}-m_{\rm MR}$,   "
         r"$u_\varphi=m_{\rm SR}-m_{\rm IR}$",
         r"$\mathbf{m}=[\hat W^{\rm out}\mathbf{r}]_+\ \geq 0$,  "
         r"$\hat W^{\rm out}\!\in\mathbb{R}^{4\times N}$")
-    arrow(0.460, y2 + h / 2, 0.500, y2 + h / 2)
+    down(0.399, 0.367)
 
-    box(0.500, y2, 0.375, h, "#f6e6ce",
+    box(0.232, "#f6e6ce",
         r"$\ddot\theta+2\zeta_\theta\omega_\theta\dot\theta"
-        r"+\omega_\theta^{2}\theta=\omega_\theta^{2}\,\Phi_\theta(u_\theta)$",
-        r"eye plant, one per axis;  $\Phi,\ \omega_n,\ \zeta$ frozen",
-        fs=11.0)
-    arrow(0.875, y2 + h / 2, 0.915, y2 + h / 2)
+        r"+\omega_\theta^{2}\theta=\omega_\theta^{2}\,\Phi_\theta(u_\theta)$"
+        "   (and the same in $\\varphi$)",
+        r"eye plant, one per axis;  $\Phi,\ \omega_n,\ \zeta$ frozen")
+    down(0.232, 0.200)
 
-    ax.text(0.988, y2 + h / 2, r"$(\theta,\varphi)$", ha="right", va="center",
-            fontsize=13, color=fg)
-    ax.text(0.988, y2 - 0.015, "gaze angles (deg)", ha="right", va="top",
-            fontsize=8, color=dim)
-    ax.text(0.5, 0.045,
+    # --- out -------------------------------------------------------------
+    ax.text(CX, 0.163, r"$(\theta,\varphi)$", ha="center", va="center",
+            fontsize=14, color=fg)
+    ax.text(CX, 0.120, "gaze angles (deg)", ha="center", va="center",
+            fontsize=8.2, color=dim)
+    ax.text(CX, 0.048,
             r"loss  $\mathcal{L}=\sum_t\|(\theta,\varphi)-"
             r"(\theta^\star\!,\varphi^\star)\|_2$"
             "        supervision is on the gaze, after the plant",
@@ -183,8 +180,8 @@ def main():
     p.add_argument("--bg", default="white", choices=["white", "black"])
     a = p.parse_args()
 
-    fig, ax = plt.subplots(1, 2, figsize=(15.5, 5.8), facecolor=a.bg,
-                           gridspec_kw=dict(width_ratios=[1.0, 1.75],
+    fig, ax = plt.subplots(1, 2, figsize=(13.6, 7.6), facecolor=a.bg,
+                           gridspec_kw=dict(width_ratios=[1.0, 1.30],
                                             wspace=0.05))
     for x in ax:
         x.set_facecolor(a.bg)
