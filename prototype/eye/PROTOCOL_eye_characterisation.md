@@ -49,7 +49,28 @@ characterisation fixes it.
 | eye | horizontal span | vertical span | verdict |
 |---|---|---|---|
 | C `eye_p3a_length` | 30° (−15.0 / +15.1) | 18° | passes |
-| F | **7.9°** (−1.75 / +6.17) | not yet measured | **fails, 3.2× short** |
+| F | **7.9°** (−1.75 / +6.17) | 6.3° (−4.35 / +1.99) | **fails, 3.2× short** |
+
+Span is quoted from single-muscle extremes. Allowing full co-activation of
+every muscle in the helpful direction — which also swings the other two axes,
+so it is a generous bound rather than a usable range — eye F reaches 10.8°
+horizontal and 11.4° vertical, so horizontal still fails by 2.3×.
+
+Two other stage-0 outcomes on eye F are worth recording as failure modes this
+protocol is meant to catch, because neither is visible once the data is
+pooled:
+
+- **SR diverged** — 69.2° vertical with 13.5° peak-to-peak. That is a
+  simulation blow-up, not a measurement, and it has to be diagnosed rather
+  than excluded, because stage 2 drives muscles in pairs and whatever caused
+  it will reappear there.
+- **Torsion is the largest axis**: 14.9° range against 7.9° horizontal, with
+  IO alone producing −11.08°. A plant that twists twice as far as it looks
+  sideways has its straps pulling tangentially rather than in the plane of
+  rotation. Related: SO elevates (+1.99) and IO depresses (−4.35), which is
+  the reverse of the textbook action of both. It is not a sign convention —
+  IR depresses correctly — so check the two obliques' insertions in
+  `eye_anatomy.MUSCLES` before anything else is fitted.
 
 If stage 0 below fails the gate, stop and change the eye rather than
 continuing. The known lever is strap geometry: B → C widened the muscle gap
