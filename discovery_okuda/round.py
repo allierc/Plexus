@@ -201,6 +201,36 @@ def load_flow(path=FLOW):
     return order
 
 
+def _trace(rid, node, value):
+    """One line per node per round: what it emitted, how big, and to whom.
+
+    THE GRAPH COULD NOT SAY WHERE INFORMATION DIED. Its load-time check proves every emitted name is
+    named by some `in:`, which is a statement about the SHAPE of the graph and says nothing about
+    whether anything travelled. The Analyst wrote 7 claims into a file for 13 rounds while the
+    `analyst -> claims_update` edge sat there, well-formed and empty, and the check passed every
+    time. An edge that exists and carries nothing is invisible to a topology check by construction.
+
+    So the round now measures it. `chars` is the serialised size of what the node emitted and `n` is
+    how many items, if it emitted a collection -- crude, and enough to tell "produced nothing" from
+    "produced 40 KB nobody read". `flow_movie.py` animates it.
+
+    NEVER FATAL. A trace that can break a round is a trace that gets deleted the first time it does.
+    """
+    try:
+        v = value
+        n = len(v) if isinstance(v, (list, tuple, dict, str)) else (1 if v is not None else 0)
+        txt = v if isinstance(v, str) else json.dumps(v, default=str)
+        rec = {"round": rid, "node": node["id"], "out": node.get("out", node["id"]),
+               "in": node.get("in") or [], "each": node.get("each"),
+               "agent": node.get("agent"), "writes": node.get("writes"),
+               "chars": len(txt or ""), "n": n, "empty": not v}
+        os.makedirs(CAMPAIGN, exist_ok=True)
+        with open(os.path.join(CAMPAIGN, "flow_trace.jsonl"), "a") as f:
+            f.write(json.dumps(rec) + "\n")
+    except Exception:
+        pass
+
+
 def run_round(round_id, mode="composition", ledger=None, n_slots=N_SLOTS, flow=None, only=None):
     """Execute the flow. The whole round, and this function knows no role's name.
 
@@ -248,6 +278,7 @@ def run_round(round_id, mode="composition", ledger=None, n_slots=N_SLOTS, flow=N
             # completed step -- so the reason is printed and the value stays absent.
             print(f"[round] {nid} FAILED: {type(e).__name__}: {e}")
             ctx[out] = None
+        _trace(round_id, node, ctx.get(out))
         if absent:
             print(f"[round] {nid} ran with {', '.join(absent)} absent")
 
