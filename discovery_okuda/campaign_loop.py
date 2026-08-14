@@ -219,7 +219,7 @@ def _cost_so_far():
     return tot
 
 
-def run_round(batch, frames, mode="composition", timeout_min=180, resume=False):
+def run_round(batch, frames, mode="composition", timeout_min=180, resume=False, flow=None):
     """One round, as a subprocess. A round that dies must not take the driver with it.
 
     `--resume` IS NOT OPTIONAL AFTER THE FIRST ROUND. round.py's rule is "a launch resets" -- it
@@ -234,6 +234,8 @@ def run_round(batch, frames, mode="composition", timeout_min=180, resume=False):
     through round.py directly. Fixing the gate is what exposed it.
     """
     cmd = [PY, os.path.join(HERE, "round.py"), "--mode", mode, "--batch", str(batch)]
+    if flow:
+        cmd += ["--flow", flow]
     if resume:
         cmd += ["--resume"]
     if frames:
@@ -611,6 +613,12 @@ if __name__ == "__main__":
                     help="downgrade terminal exits (2, 3, 4) to warnings and continue. For "
                          "testing the LOOP: a stop rule written for a campaign doing science "
                          "halts one that is being debugged. A repeated crash still stops.")
+    # THE GRAPH IS A FILE, SO IT SHOULD BE AN ARGUMENT. `round.run_round` has always taken
+    # `flow=`; nothing passed it, so the only way to test a different agent graph was to edit the
+    # one file every round reads -- which makes an A/B impossible to run and impossible to undo.
+    # Archive a graph, write another, pass it here.
+    ap.add_argument("--flow", default=None, metavar="YAML",
+                    help="an alternative agent graph (default crew/flow.yaml)")
     ap.add_argument("--status", action="store_true")
     a = ap.parse_args()
     # Module scope (this is inside `if __name__ == "__main__"`), so a plain rebind is

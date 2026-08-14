@@ -98,12 +98,19 @@ def main():
     ap.add_argument("--budget", type=int, default=150)
     ap.add_argument("--every", type=int, default=10)
     ap.add_argument("--batched", action="store_true")
+    # THE POOL HAS TO HOLD WHAT THE TRIGGER ASKS FOR. The batched refiner converges on
+    # the edge target rather than stopping at a split budget, and holding a tissue that
+    # grows 4x in radius at 1.45x the seeded edge needs about 16x the faces -- which is
+    # 81,920, exactly what max_refine=2 allocates, so it ran out. This is sizing, not
+    # physics: the same mesh, with room to exist.
+    ap.add_argument("--max-refine", dest="max_refine", type=int, default=3)
     ap.add_argument("--name", default=NAME)
     a = ap.parse_args()
     d = os.path.join(B.LOG, a.name)
     os.makedirs(d, exist_ok=True)
     P = dict(subdiv=4, E=400.0, thickness=2.0e-3, nu=0.3, kn=5.0, sigma_T=7.0, zeta=20.0,
-             s_target=1.0, k_drive=50.0, dev=a.device, max_refine=2, edge_trigger=1.45,
+             s_target=1.0, k_drive=50.0, dev=a.device, max_refine=a.max_refine,
+             edge_trigger=1.45,
              reseed=True, tau_bm=40.0, rho_crit=0.0)
     rig = Rig07d(N0=a.N0, split_budget=a.budget, every=a.every, batched=a.batched, **P)
     S = {k: [] for k in ("t", "cells", "plaques", "ppc", "nb_med", "nf_mean", "receptor_total",
@@ -114,6 +121,10 @@ def main():
         if not rig.alive():
             print(f"[07d] DIVERGED at {t}", flush=True)
             break
+        if t % 20 == 0:
+            print(f"[07e] frame {t:4d}  faces {rig.sheet.m:7d}  nodes {rig.sheet.n:7d}  "
+                  f"cells {rig._nF:5d}  plaques {rig.ct_node.numel():7d}  "
+                  f"splits {rig._splits:7d}  {time.time()-t0:6.0f}s", flush=True)
         if t % 2 == 0:
             nb = rig.clutch.Nb
             l1, _ = rig.sheet.stretch_geo()

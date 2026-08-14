@@ -174,7 +174,7 @@ def _claim_tree(a):
         dr.text((x + 8, y + int(24 * k) + len(lines[:3]) * int(13 * k) + int(4 * k)),
                 f"{c['kind']}   for {fo:.1f} / against {ag:.1f}", fill=DIM, font=f_txt)
 
-    out = a.out or os.path.join(LOG, "_gates", "genealogy_claims.png")
+    out = a.out or os.path.join(LOG, "analysis", "genealogy_claims.png")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     sheet.save(out)
     lv = depth + 1
@@ -318,7 +318,7 @@ def main():
         if lab:
             dr.text((x, y + TILE + int(18 * k)), lab[:26], fill=DIM, font=f_edit)
 
-    out = a.out or os.path.join(LOG, "_gates", f"genealogy_{a.root}.png")
+    out = a.out or os.path.join(LOG, "analysis", f"genealogy_{a.root}.png")
     os.makedirs(os.path.dirname(out), exist_ok=True)
     sheet.save(out, optimize=True)
     print(f"{a.root}: {len(order)} runs over {depth + 1} generations, {drawn} with a picture "

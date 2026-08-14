@@ -250,7 +250,7 @@ def main():
         dr.text(((i % cols) * cw + PAD, (i // cols) * ch + PAD + TILE + 2), txt[:34],
                 fill=FG, font=f)
 
-    out = a.out or os.path.join(LOG, "_gates",
+    out = a.out or os.path.join(LOG, "analysis",
                                 f"montage_{a.glob.strip('*') or 'all'}"
                                 f"{'_by_' + a.by if a.by else ''}.png".replace("*", ""))
     os.makedirs(os.path.dirname(out), exist_ok=True)

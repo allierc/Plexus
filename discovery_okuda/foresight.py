@@ -272,9 +272,30 @@ def split(blob, node):
     return out
 
 
-def round_score(forecast_blob, observed_blob):
+def fanout_tags(flow=None):
+    """(forecast tag, observation tag) -- the NODE IDS, read from the graph rather than typed here.
+
+    `split()` parses the engine's fan-out join, which is keyed by the NODE'S OWN ID -- so these two
+    strings couple this file to one particular graph. They were literals, and a `flow_v2.yaml` that
+    renamed either node would have produced a foresight score of "0 runs scored" with no error: the
+    parse simply matches nothing. Silent, and indistinguishable from a Forecaster that failed.
+
+    Found by asking what actually blocks testing a second agent graph. The answer was: two strings.
+    """
+    try:
+        import round as R
+        order = R.load_flow(flow or R.FLOW)
+        fc = next((n["id"] for n in order if n.get("agent") == "forecaster"), "forecaster")
+        ey = next((n["id"] for n in order if n.get("agent") == "eye"), "eye")
+        return fc, ey
+    except Exception:
+        return "forecaster", "eye"
+
+
+def round_score(forecast_blob, observed_blob, flow=None):
     """The round -> per-run scores and the round's mean. What `round.foresight` files."""
-    F, O = split(forecast_blob, "forecaster"), split(observed_blob, "eye")
+    fc, ey = fanout_tags(flow)
+    F, O = split(forecast_blob, fc), split(observed_blob, ey)
     V = vocab()
     runs, means = {}, []
     for name in sorted(set(F) & set(O)):

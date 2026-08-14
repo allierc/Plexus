@@ -28,7 +28,8 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 LOG = os.path.join(os.path.dirname(HERE), "log", "okuda")
 CONFIG = os.path.join(os.path.dirname(HERE), "config", "okuda")
-OUT = os.path.join(LOG, "_gates")
+OUT = os.path.join(LOG, "analysis")   # analysis OUTPUT; the gate RUN dirs stay in _gates, whose
+                                     # leading underscore is what keeps them out of every montage
 
 import matplotlib
 matplotlib.use("Agg")

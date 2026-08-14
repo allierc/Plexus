@@ -8,6 +8,7 @@
 THE SET, and a folder is not finished until it holds all of it:
 
     spec.yaml          what was solved            (spec_06, written by the rig at solve time)
+    plaque_gate.png    the diagnosis's end state  (its last frame, written by the same code path)
     metrics.json       what it measured
     gate.png           the gates, as a picture
     vtk_test.png       the 2x2 at the end frame   (vtk_ecm)
@@ -37,7 +38,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 LOG = os.path.abspath(os.path.join(HERE, "..", "..", "log", "okuda_ECM"))
 PY = sys.executable
 WANT = ["spec.yaml", "metrics.json", "gate.png", "vtk_test.png", "movie_vtk.mp4",
-        "plaque_gate.mp4", "plaque_gate.json"]
+        "plaque_gate.mp4", "plaque_gate.png", "plaque_gate.json"]
 
 
 def state(d):
@@ -67,7 +68,7 @@ def do(name, force=False, movie_frames=200):
         run([PY, "vtk_ecm.py", name, "--still", "--out", "vtk_test.png"])
     if force or not h["movie_vtk.mp4"]:
         run([PY, "vtk_ecm.py", name, "--frames", str(movie_frames), "--fps", "20"])
-    if force or not h["plaque_gate.mp4"]:
+    if force or not h["plaque_gate.mp4"] or not h["plaque_gate.png"]:
         run([PY, "test_07_plaque.py", name, "--fps", "20"])
     miss = [f for f, ok in state(d).items() if f in WANT and not ok]
     print(f"[std] {name}: {'complete' if not miss else 'still missing ' + ', '.join(miss)}",
