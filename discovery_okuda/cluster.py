@@ -341,6 +341,29 @@ def submitted_ids(wait_s=25, expect=None, names=None):
     if expect is not None and len(ids) < expect:
         print(f"[cluster] ⚠ only {len(ids)}/{expect} bsubs reported an ID, and the queue shows "
               f"none of them live. The batch did NOT land.")
+        # AND SAY WHY, BECAUSE THE CAUSE HAS BEEN THE SAME THREE TIMES AND IT IS ONE SSH AWAY.
+        # A long-running loop inherits SSH_AUTH_SOCK at launch. When the VS Code session reloads
+        # the agent behind that socket dies, the socket FILE survives, and every bsub fails with
+        # `Permission denied (publickey)` -- while the round completes, reports `exited 0`, and the
+        # driver counts it as an empty round. Measured cost on 14 August: FOUR rounds, 58 minutes
+        # of wall clock and four Proposer/Forecaster/Analyst passes, producing nothing, before the
+        # backstop was due to fire. Twice more before that.
+        #
+        # The backstop is not the fix. A round that cannot reach the cluster should say the reason
+        # in the terminal the moment it happens, not be inferred from a run of empty rounds.
+        if len(ids) == 0:
+            probe = _ssh("echo ok", timeout=25)
+            out = ((probe.stdout or "") + (probe.stderr or "")).strip()
+            if "ok" not in out:
+                print(f"[cluster] ✗ SSH TO {SSH} IS NOT WORKING: {out[:160]}")
+                if "publickey" in out or "denied" in out.lower():
+                    print(f"[cluster]   This is a DEAD SSH AGENT, not a cluster problem. This "
+                          f"process holds SSH_AUTH_SOCK={os.environ.get('SSH_AUTH_SOCK')} , which "
+                          f"was valid when it launched. Restart the loop from a terminal opened "
+                          f"AFTER the last VS Code reload; nothing else will fix it.")
+            else:
+                print(f"[cluster]   ssh itself is fine, so the bsubs were rejected by LSF. "
+                      f"Check the queue name ({QUEUE}) and `bqueues`.")
     return ids
 
 
