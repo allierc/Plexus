@@ -1,0 +1,26 @@
+{
+  "model": "F",
+  "muscle": "LR",
+  "k_sleeve": 0.0,
+  "width_scale": 1.5,
+  "thick_scale": 1.0,
+  "tag": "anch_k300k_w15",
+  "pose_deg": [
+    -2.813,
+    7.875,
+    -3.474
+  ],
+  "settle_ptp_deg": [
+    0.2816,
+    0.1221,
+    0.0406
+  ],
+  "settled": false,
+  "shortening_pct": 9.27,
+  "delivered_pct": 27.0,
+  "end_to_end_shortening_pct": 11.05,
+  "origin_cap_moved": 0.02379,
+  "tendon_cap_moved": 0.03861,
+  "radius_drift_pct": -3.569,
+  "seconds": 206.6
+}

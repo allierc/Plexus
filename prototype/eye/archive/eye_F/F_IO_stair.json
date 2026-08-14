@@ -1,0 +1,141 @@
+{
+  "model": "F",
+  "muscle": "IO",
+  "muscle_index": 5,
+  "built_from": "baseline_spec.yaml",
+  "dt": 0.003,
+  "stride": 6,
+  "sample_ms": 18.0,
+  "levels": [
+    1.0,
+    0.75,
+    0.5,
+    0.25
+  ],
+  "hold_s": 2.0,
+  "lead_s": 0.5,
+  "tail_s": 2.0,
+  "n_frames": 3502,
+  "tonic": 0.14,
+  "seconds": 1379.4,
+  "baseline_gaze_deg": [
+    0.5385,
+    -0.787,
+    -0.7721
+  ],
+  "settling_time_s": 1.28,
+  "per_level": [
+    {
+      "level": 1.0,
+      "window_s": [
+        0.501,
+        2.502
+      ],
+      "act_settled": 1.0,
+      "gaze_settled_deg": [
+        1.7687,
+        -5.1372,
+        -11.8565
+      ],
+      "gaze_minus_baseline_deg": [
+        1.2303,
+        -4.3502,
+        -11.0844
+      ],
+      "sd_deg": [
+        0.0052,
+        0.0097,
+        0.0333
+      ],
+      "peak_to_peak_deg": [
+        0.0193,
+        0.0254,
+        0.105
+      ]
+    },
+    {
+      "level": 0.75,
+      "window_s": [
+        2.502,
+        4.503
+      ],
+      "act_settled": 0.75,
+      "gaze_settled_deg": [
+        1.4314,
+        -3.1934,
+        -7.513
+      ],
+      "gaze_minus_baseline_deg": [
+        0.893,
+        -2.4064,
+        -6.7409
+      ],
+      "sd_deg": [
+        0.0012,
+        0.0007,
+        0.0158
+      ],
+      "peak_to_peak_deg": [
+        0.0042,
+        0.0021,
+        0.052
+      ]
+    },
+    {
+      "level": 0.5,
+      "window_s": [
+        4.503,
+        6.504
+      ],
+      "act_settled": 0.5,
+      "gaze_settled_deg": [
+        1.0487,
+        -1.9908,
+        -4.553
+      ],
+      "gaze_minus_baseline_deg": [
+        0.5102,
+        -1.2038,
+        -3.7809
+      ],
+      "sd_deg": [
+        0.0007,
+        0.0002,
+        0.0161
+      ],
+      "peak_to_peak_deg": [
+        0.0023,
+        0.0007,
+        0.0523
+      ]
+    },
+    {
+      "level": 0.25,
+      "window_s": [
+        6.504,
+        8.505
+      ],
+      "act_settled": 0.25,
+      "gaze_settled_deg": [
+        0.6622,
+        -1.0494,
+        -2.0559
+      ],
+      "gaze_minus_baseline_deg": [
+        0.1237,
+        -0.2624,
+        -1.2838
+      ],
+      "sd_deg": [
+        0.0003,
+        0.0002,
+        0.0107
+      ],
+      "peak_to_peak_deg": [
+        0.0008,
+        0.0006,
+        0.0346
+      ]
+    }
+  ]
+}

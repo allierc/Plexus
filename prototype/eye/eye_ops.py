@@ -156,6 +156,13 @@ class EyeAnatomy(Rewire):
         self.axial_ratio = float(params.get("axial_ratio", EA.AXIAL_RATIO))
         self.lens_youngs = float(params.get("lens_youngs", EA.LENS_YOUNGS))
         self.cornea_youngs = float(params.get("cornea_youngs", 320.0))
+        # the lens is CONFIG too: measured off Fig. 12.1A it is r = 0.35 of the
+        # equatorial semi-axis centred 0.49 of the AXIAL semi-axis out, i.e. its
+        # outer surface reaches the cornea. The guessed value sat it further back.
+        self.lens_center = [float(x) for x in params.get("lens_center", EA.LENS_CENTER)]
+        self.lens_radius = float(params.get("lens_radius", EA.LENS_RADIUS))
+        self.pupil_deg = float(params.get("pupil_deg", EA.PUPIL_DEG))
+        self.iris_deg = float(params.get("iris_deg", EA.IRIS_DEG))
         self.nu = float(params.get("poisson", 0.2))
         self._done = False
 
@@ -181,24 +188,24 @@ class EyeAnatomy(Rewire):
         tissue = torch.where(rn > EA.R_VITREOUS, torch.full_like(tissue, self.CHOROID), tissue)
         tissue = torch.where(rn > EA.R_INNER, torch.full_like(tissue, self.SCLERA), tissue)
         # the lens: a hard ball pushed anteriorly (zebrafish lenses nearly touch the cornea)
-        lc = _t(EA.LENS_CENTER, dev)
-        in_lens = ((local / self.a_eq) - lc).norm(dim=1) < EA.LENS_RADIUS
+        lc = _t(self.lens_center, dev)
+        in_lens = ((local / self.a_eq) - lc).norm(dim=1) < self.lens_radius
         tissue = torch.where(in_lens, torch.full_like(tissue, self.LENS), tissue)
         # cosmetic anterior surface: pupil disc, iris ring, golden iridophore flecks
         polar = torch.rad2deg(torch.acos(d[:, 2].clamp(-1.0, 1.0)))
         azim = torch.rad2deg(torch.atan2(d[:, 1], d[:, 0])) % 360.0
         shell = rn > EA.R_SHELL
-        on_iris = shell & (polar < EA.IRIS_DEG) & (polar >= EA.PUPIL_DEG)
+        on_iris = shell & (polar < self.iris_deg) & (polar >= self.pupil_deg)
         fleck = torch.zeros_like(on_iris)
         for a0 in EA.IRIS_FLECK_DEG:
             da = (azim - float(a0) + 180.0) % 360.0 - 180.0
             fleck = fleck | (on_iris & (da.abs() < EA.IRIS_FLECK_WIDTH_DEG))
-        tissue = torch.where(shell & (polar < EA.PUPIL_DEG), torch.full_like(tissue, self.PUPIL), tissue)
+        tissue = torch.where(shell & (polar < self.pupil_deg), torch.full_like(tissue, self.PUPIL), tissue)
         tissue = torch.where(on_iris, torch.full_like(tissue, self.IRIS), tissue)
         tissue = torch.where(fleck, torch.full_like(tissue, self.FLECK), tissue)
         # the cornea is the anterior CAP of the shell -- it covers pupil+iris optically but
         # mechanically it is the stiff anterior wall, so it is a MATERIAL band under them.
-        cornea = (rn > EA.R_INNER) & (polar < EA.IRIS_DEG + 6.0)
+        cornea = (rn > EA.R_INNER) & (polar < self.iris_deg + 6.0)
 
         # --- per-region Lame parameters (the deformability the movie shows) ------ #
         mu_l, la_l = self._lame(self.lens_youngs)

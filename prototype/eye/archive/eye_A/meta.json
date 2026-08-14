@@ -1,0 +1,36 @@
+{
+  "label": "A",
+  "variant": "eye_probe_c_a",
+  "short": "soft tissue",
+  "description": "sclera Young's 300, tendon 9 / bone-cap 40 \u2014 the softest globe; the earliest configuration",
+  "runs": [
+    {
+      "dir": "t03_c_a",
+      "muscle": "c_a"
+    },
+    {
+      "dir": "t04_probe_LR",
+      "muscle": "LR"
+    },
+    {
+      "dir": "t05_probe_IR",
+      "muscle": "IR"
+    },
+    {
+      "dir": "t06_probe_SR",
+      "muscle": "SR"
+    },
+    {
+      "dir": "t07_probe_SO",
+      "muscle": "SO"
+    },
+    {
+      "dir": "t08_probe_MR",
+      "muscle": "MR"
+    },
+    {
+      "dir": "t09_probe_IO",
+      "muscle": "IO"
+    }
+  ]
+}

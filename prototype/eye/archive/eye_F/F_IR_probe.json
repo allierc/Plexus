@@ -1,0 +1,14 @@
+{
+  "muscle": "IR",
+  "a_hi": 1.0,
+  "tonic": 0.14,
+  "t_on": 60,
+  "t_off": 240,
+  "n_frames": 320,
+  "baseline": "t39_probe_IR",
+  "gaze_range_deg": [
+    2.258,
+    4.247,
+    1.066
+  ]
+}

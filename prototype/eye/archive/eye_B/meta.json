@@ -1,0 +1,36 @@
+{
+  "label": "B",
+  "variant": "eye_probe_baseline_fixmat",
+  "short": "stiffened",
+  "description": "same geometry as A, materials raised: sclera 420, tendon 45, bone cap 130. The reference eye",
+  "runs": [
+    {
+      "dir": "t10_baseline_fixmat",
+      "muscle": "baseline_fixmat"
+    },
+    {
+      "dir": "t11_probe_IR",
+      "muscle": "IR"
+    },
+    {
+      "dir": "t12_probe_SO",
+      "muscle": "SO"
+    },
+    {
+      "dir": "t13_probe_IO",
+      "muscle": "IO"
+    },
+    {
+      "dir": "t14_probe_LR",
+      "muscle": "LR"
+    },
+    {
+      "dir": "t15_probe_SR",
+      "muscle": "SR"
+    },
+    {
+      "dir": "t16_probe_MR",
+      "muscle": "MR"
+    }
+  ]
+}

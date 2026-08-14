@@ -1,0 +1,23 @@
+{
+  "model": "F",
+  "muscle": "LR",
+  "k_sleeve": 0.0,
+  "width_scale": 2.0,
+  "thick_scale": 1.0,
+  "tag": "w20",
+  "pose_deg": [
+    6.507,
+    -1.136,
+    -1.183
+  ],
+  "settle_ptp_deg": [
+    0.0269,
+    0.0148,
+    0.0041
+  ],
+  "settled": true,
+  "shortening_pct": 26.48,
+  "delivered_pct": 21.9,
+  "radius_drift_pct": -0.01,
+  "seconds": 204.9
+}

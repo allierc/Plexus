@@ -1,0 +1,1947 @@
+{
+  "blend": "/workspace/Plexus/prototype/eye/260802_s2_EYE_MUSCLES_MODEL.blend",
+  "subsurf": false,
+  "frame_note": "head axes: +x animal's right, +y caudal, +z dorsal; eye frame rows = (caudal, dorsal, lateral)",
+  "eyes": {
+    "L": {
+      "globe_center": [
+        -0.8618,
+        2.1633,
+        -0.1329
+      ],
+      "globe_semi_axes": [
+        0.6878,
+        0.5751,
+        0.4682
+      ],
+      "globe_radius_mean": 0.5709,
+      "frame": [
+        [
+          -0.2562,
+          0.9666,
+          0.0
+        ],
+        [
+          0.0732,
+          0.0194,
+          0.9971
+        ],
+        [
+          -0.9639,
+          -0.2554,
+          0.0757
+        ]
+      ],
+      "frame_det": -1.0
+    },
+    "R": {
+      "globe_center": [
+        0.8618,
+        2.1633,
+        -0.1329
+      ],
+      "globe_semi_axes": [
+        0.6878,
+        0.5751,
+        0.4682
+      ],
+      "globe_radius_mean": 0.5709,
+      "frame": [
+        [
+          0.2562,
+          0.9666,
+          0.0
+        ],
+        [
+          -0.0732,
+          0.0194,
+          0.9971
+        ],
+        [
+          0.9639,
+          -0.2554,
+          0.0757
+        ]
+      ],
+      "frame_det": 1.0
+    }
+  },
+  "muscle_names": {
+    "Cylinder.001": "IR",
+    "Cylinder.002": "IO",
+    "Cylinder.003": "SR",
+    "Cylinder.004": "MR",
+    "Cylinder.005": "SO",
+    "Cylinder.006": "LR"
+  },
+  "muscle_evidence": [
+    {
+      "object": "Cylinder.001",
+      "key": "IR",
+      "long_name": "inferior rectus",
+      "origin_caudal": 2.638,
+      "insertion_eye": [
+        -0.172,
+        -0.985,
+        0.004
+      ],
+      "rot_eye": [
+        -0.872,
+        0.15,
+        -0.467
+      ],
+      "contact_insertion": 0.065,
+      "contact_origin": 0.2781,
+      "length": 0.9944
+    },
+    {
+      "object": "Cylinder.002",
+      "key": "IO",
+      "long_name": "inferior oblique",
+      "origin_caudal": 1.296,
+      "insertion_eye": [
+        -0.835,
+        -0.505,
+        0.218
+      ],
+      "rot_eye": [
+        -0.513,
+        0.858,
+        0.023
+      ],
+      "contact_insertion": 0.0479,
+      "contact_origin": 0.585,
+      "length": 1.2721
+    },
+    {
+      "object": "Cylinder.003",
+      "key": "SR",
+      "long_name": "superior rectus",
+      "origin_caudal": 2.676,
+      "insertion_eye": [
+        0.314,
+        0.944,
+        -0.101
+      ],
+      "rot_eye": [
+        0.93,
+        -0.328,
+        -0.169
+      ],
+      "contact_insertion": 0.1042,
+      "contact_origin": 0.2998,
+      "length": 0.9312
+    },
+    {
+      "object": "Cylinder.004",
+      "key": "MR",
+      "long_name": "medial rectus",
+      "origin_caudal": 2.606,
+      "insertion_eye": [
+        -0.952,
+        0.159,
+        -0.263
+      ],
+      "rot_eye": [
+        0.226,
+        0.942,
+        -0.249
+      ],
+      "contact_insertion": 0.0792,
+      "contact_origin": 0.2886,
+      "length": 1.1697
+    },
+    {
+      "object": "Cylinder.005",
+      "key": "SO",
+      "long_name": "superior oblique",
+      "origin_caudal": 1.201,
+      "insertion_eye": [
+        -0.352,
+        0.931,
+        -0.099
+      ],
+      "rot_eye": [
+        0.344,
+        0.031,
+        -0.938
+      ],
+      "contact_insertion": 0.0677,
+      "contact_origin": 0.5724,
+      "length": 1.1963
+    },
+    {
+      "object": "Cylinder.006",
+      "key": "LR",
+      "long_name": "lateral rectus",
+      "origin_caudal": 2.658,
+      "insertion_eye": [
+        0.976,
+        0.179,
+        0.126
+      ],
+      "rot_eye": [
+        0.206,
+        -0.945,
+        -0.253
+      ],
+      "contact_insertion": 0.041,
+      "contact_origin": 0.2727,
+      "length": 0.9406
+    }
+  ],
+  "parts": [
+    {
+      "part": "bone_basal_plate_005_L",
+      "group": "bone",
+      "side": "L",
+      "blender_object": "basal plate.005",
+      "n_vert": 3942,
+      "n_tri": 7880,
+      "centroid": [
+        -0.7043,
+        2.4298,
+        0.5672
+      ],
+      "bbox_min": [
+        -1.0028,
+        1.6563,
+        0.4121
+      ],
+      "bbox_max": [
+        -0.4157,
+        2.7754,
+        0.7899
+      ],
+      "volume": 0.013236
+    },
+    {
+      "part": "bone_basal_plate_005_R",
+      "group": "bone",
+      "side": "R",
+      "blender_object": "basal plate.005",
+      "n_vert": 3942,
+      "n_tri": 7880,
+      "centroid": [
+        0.7052,
+        2.4298,
+        0.5672
+      ],
+      "bbox_min": [
+        0.4165,
+        1.6563,
+        0.4121
+      ],
+      "bbox_max": [
+        1.0037,
+        2.7754,
+        0.7899
+      ],
+      "volume": 0.013236
+    },
+    {
+      "part": "bone_basal_plate_006_R",
+      "group": "bone",
+      "side": "R",
+      "blender_object": "basal plate.006",
+      "n_vert": 2541,
+      "n_tri": 5036,
+      "centroid": [
+        1.0559,
+        2.8855,
+        0.2185
+      ],
+      "bbox_min": [
+        0.9339,
+        2.7274,
+        -0.0566
+      ],
+      "bbox_max": [
+        1.1691,
+        3.0491,
+        0.4351
+      ],
+      "volume": 0.001805
+    },
+    {
+      "part": "bone_basal_plate_007_L",
+      "group": "bone",
+      "side": "L",
+      "blender_object": "basal plate.007",
+      "n_vert": 2541,
+      "n_tri": 5036,
+      "centroid": [
+        -1.0551,
+        2.8855,
+        0.2185
+      ],
+      "bbox_min": [
+        -1.1682,
+        2.7274,
+        -0.0566
+      ],
+      "bbox_max": [
+        -0.9331,
+        3.0491,
+        0.4351
+      ],
+      "volume": 0.001805
+    },
+    {
+      "part": "bone_basal_plate_008_R",
+      "group": "bone",
+      "side": "R",
+      "blender_object": "basal plate.008",
+      "n_vert": 5316,
+      "n_tri": 10628,
+      "centroid": [
+        0.4791,
+        1.9848,
+        -0.7021
+      ],
+      "bbox_min": [
+        0.1708,
+        1.4461,
+        -0.8576
+      ],
+      "bbox_max": [
+        0.6877,
+        2.6577,
+        -0.4856
+      ],
+      "volume": 0.005429
+    },
+    {
+      "part": "bone_basal_plate_009_L",
+      "group": "bone",
+      "side": "L",
+      "blender_object": "basal plate.009",
+      "n_vert": 5316,
+      "n_tri": 10628,
+      "centroid": [
+        -0.4782,
+        1.9848,
+        -0.7021
+      ],
+      "bbox_min": [
+        -0.6868,
+        1.4461,
+        -0.8576
+      ],
+      "bbox_max": [
+        -0.1699,
+        2.6577,
+        -0.4856
+      ],
+      "volume": 0.005429
+    },
+    {
+      "part": "bone_basal_plate_010_R",
+      "group": "bone",
+      "side": "R",
+      "blender_object": "basal plate.010",
+      "n_vert": 6150,
+      "n_tri": 12296,
+      "centroid": [
+        0.4132,
+        4.3557,
+        0.5
+      ],
+      "bbox_min": [
+        0.0442,
+        4.0356,
+        0.155
+      ],
+      "bbox_max": [
+        0.7282,
+        4.7278,
+        0.8592
+      ],
+      "volume": 0.012342
+    },
+    {
+      "part": "bone_basal_plate_011_L",
+      "group": "bone",
+      "side": "L",
+      "blender_object": "basal plate.011",
+      "n_vert": 6150,
+      "n_tri": 12296,
+      "centroid": [
+        -0.4123,
+        4.3557,
+        0.5
+      ],
+      "bbox_min": [
+        -0.7273,
+        4.0356,
+        0.155
+      ],
+      "bbox_max": [
+        -0.0434,
+        4.7278,
+        0.8592
+      ],
+      "volume": 0.012317
+    },
+    {
+      "part": "bone_basal_plate_012_R",
+      "group": "bone",
+      "side": "R",
+      "blender_object": "basal plate.012",
+      "n_vert": 11802,
+      "n_tri": 23704,
+      "centroid": [
+        0.0004,
+        1.1758,
+        -0.6012
+      ],
+      "bbox_min": [
+        -0.5547,
+        0.779,
+        -0.9195
+      ],
+      "bbox_max": [
+        0.5556,
+        1.5684,
+        -0.3084
+      ],
+      "volume": 0.042239
+    },
+    {
+      "part": "bone_basal_plate_013_R",
+      "group": "bone",
+      "side": "R",
+      "blender_object": "basal plate.013",
+      "n_vert": 4744,
+      "n_tri": 9316,
+      "centroid": [
+        0.7034,
+        2.8998,
+        -0.2907
+      ],
+      "bbox_min": [
+        0.3466,
+        2.6658,
+        -0.4831
+      ],
+      "bbox_max": [
+        1.0584,
+        3.0603,
+        -0.1403
+      ],
+      "volume": -0.01395
+    },
+    {
+      "part": "bone_basal_plate_014_L",
+      "group": "bone",
+      "side": "L",
+      "blender_object": "basal plate.014",
+      "n_vert": 4744,
+      "n_tri": 9316,
+      "centroid": [
+        -0.7025,
+        2.8998,
+        -0.2907
+      ],
+      "bbox_min": [
+        -1.0576,
+        2.6658,
+        -0.4831
+      ],
+      "bbox_max": [
+        -0.3458,
+        3.0603,
+        -0.1403
+      ],
+      "volume": -0.013952
+    },
+    {
+      "part": "bone_basal_plate_015_R",
+      "group": "bone",
+      "side": "R",
+      "blender_object": "basal plate.015",
+      "n_vert": 4531,
+      "n_tri": 8936,
+      "centroid": [
+        1.0311,
+        3.7602,
+        -0.1757
+      ],
+      "bbox_min": [
+        0.8132,
+        3.3548,
+        -0.2372
+      ],
+      "bbox_max": [
+        1.1622,
+        4.1567,
+        -0.0906
+      ],
+      "volume": 0.009345
+    },
+    {
+      "part": "bone_basal_plate_016_L",
+      "group": "bone",
+      "side": "L",
+      "blender_object": "basal plate.016",
+      "n_vert": 4531,
+      "n_tri": 8936,
+      "centroid": [
+        -1.0302,
+        3.7602,
+        -0.1757
+      ],
+      "bbox_min": [
+        -1.1614,
+        3.3548,
+        -0.2372
+      ],
+      "bbox_max": [
+        -0.8124,
+        4.1567,
+        -0.0906
+      ],
+      "volume": 0.009344
+    },
+    {
+      "part": "bone_basal_plate_017_R",
+      "group": "bone",
+      "side": "R",
+      "blender_object": "basal plate.017",
+      "n_vert": 675,
+      "n_tri": 1260,
+      "centroid": [
+        0.6994,
+        2.7845,
+        -0.7451
+      ],
+      "bbox_min": [
+        0.6076,
+        2.7409,
+        -0.8334
+      ],
+      "bbox_max": [
+        0.8022,
+        2.8191,
+        -0.6569
+      ],
+      "volume": 0.004192
+    },
+    {
+      "part": "bone_basal_plate_018_L",
+      "group": "bone",
+      "side": "L",
+      "blender_object": "basal plate.018",
+      "n_vert": 675,
+      "n_tri": 1260,
+      "centroid": [
+        -0.6985,
+        2.7845,
+        -0.7451
+      ],
+      "bbox_min": [
+        -0.8014,
+        2.7409,
+        -0.8334
+      ],
+      "bbox_max": [
+        -0.6068,
+        2.8191,
+        -0.6569
+      ],
+      "volume": 0.004193
+    },
+    {
+      "part": "bone_basal_plate_019_L",
+      "group": "bone",
+      "side": "L",
+      "blender_object": "basal plate.019",
+      "n_vert": 3128,
+      "n_tri": 6248,
+      "centroid": [
+        -0.3404,
+        3.3797,
+        -0.6275
+      ],
+      "bbox_min": [
+        -0.679,
+        2.9643,
+        -0.7342
+      ],
+      "bbox_max": [
+        -0.0474,
+        3.8187,
+        -0.391
+      ],
+      "volume": 0.004145
+    },
+    {
+      "part": "bone_basal_plate_019_R",
+      "group": "bone",
+      "side": "R",
+      "blender_object": "basal plate.019",
+      "n_vert": 3128,
+      "n_tri": 6248,
+      "centroid": [
+        0.3412,
+        3.3797,
+        -0.6275
+      ],
+      "bbox_min": [
+        0.0482,
+        2.9643,
+        -0.7342
+      ],
+      "bbox_max": [
+        0.6799,
+        3.8187,
+        -0.391
+      ],
+      "volume": 0.004145
+    },
+    {
+      "part": "bone_basal_plate_021_L",
+      "group": "bone",
+      "side": "L",
+      "blender_object": "basal plate.021",
+      "n_vert": 3948,
+      "n_tri": 7888,
+      "centroid": [
+        -0.3606,
+        3.0267,
+        -0.6522
+      ],
+      "bbox_min": [
+        -0.6874,
+        2.5293,
+        -0.752
+      ],
+      "bbox_max": [
+        -0.0681,
+        3.5573,
+        -0.3663
+      ],
+      "volume": 0.005145
+    },
+    {
+      "part": "bone_basal_plate_021_R",
+      "group": "bone",
+      "side": "R",
+      "blender_object": "basal plate.021",
+      "n_vert": 3948,
+      "n_tri": 7888,
+      "centroid": [
+        0.3614,
+        3.0267,
+        -0.6522
+      ],
+      "bbox_min": [
+        0.0689,
+        2.5293,
+        -0.752
+      ],
+      "bbox_max": [
+        0.6883,
+        3.5573,
+        -0.3663
+      ],
+      "volume": 0.005145
+    },
+    {
+      "part": "bone_basal_plate_025_R",
+      "group": "bone",
+      "side": "R",
+      "blender_object": "basal plate.025",
+      "n_vert": 3653,
+      "n_tri": 7302,
+      "centroid": [
+        0.6678,
+        2.4238,
+        -0.7176
+      ],
+      "bbox_min": [
+        0.5077,
+        1.9143,
+        -0.8409
+      ],
+      "bbox_max": [
+        0.9507,
+        2.9769,
+        -0.4007
+      ],
+      "volume": 0.005221
+    },
+    {
+      "part": "bone_basal_plate_026_L",
+      "group": "bone",
+      "side": "L",
+      "blender_object": "basal plate.026",
+      "n_vert": 3653,
+      "n_tri": 7302,
+      "centroid": [
+        -0.6669,
+        2.4238,
+        -0.7176
+      ],
+      "bbox_min": [
+        -0.9499,
+        1.9143,
+        -0.8409
+      ],
+      "bbox_max": [
+        -0.5068,
+        2.9769,
+        -0.4007
+      ],
+      "volume": 0.005221
+    },
+    {
+      "part": "bone_basal_plate_027_L",
+      "group": "bone",
+      "side": "L",
+      "blender_object": "basal plate.027",
+      "n_vert": 9627,
+      "n_tri": 19176,
+      "centroid": [
+        -0.0019,
+        1.218,
+        -0.0399
+      ],
+      "bbox_min": [
+        -0.4573,
+        0.8884,
+        -0.151
+      ],
+      "bbox_max": [
+        0.4535,
+        1.5021,
+        0.129
+      ],
+      "volume": 0.021485
+    },
+    {
+      "part": "bone_basal_plate_029_L",
+      "group": "bone",
+      "side": "L",
+      "blender_object": "basal plate.029",
+      "n_vert": 3150,
+      "n_tri": 6200,
+      "centroid": [
+        -0.1732,
+        2.2819,
+        -0.2585
+      ],
+      "bbox_min": [
+        -0.3319,
+        1.9456,
+        -0.347
+      ],
+      "bbox_max": [
+        -0.0157,
+        2.6338,
+        -0.1595
+      ],
+      "volume": -0.003917
+    },
+    {
+      "part": "bone_basal_plate_029_R",
+      "group": "bone",
+      "side": "R",
+      "blender_object": "basal plate.029",
+      "n_vert": 42389,
+      "n_tri": 84331,
+      "centroid": [
+        0.0133,
+        3.4357,
+        -0.128
+      ],
+      "bbox_min": [
+        -1.0021,
+        1.4666,
+        -0.347
+      ],
+      "bbox_max": [
+        1.003,
+        4.5412,
+        0.2449
+      ],
+      "volume": 0.109906
+    },
+    {
+      "part": "bone_basal_plate_030_L",
+      "group": "bone",
+      "side": "L",
+      "blender_object": "basal plate.030",
+      "n_vert": 4617,
+      "n_tri": 9187,
+      "centroid": [
+        -0.3717,
+        2.1995,
+        -0.856
+      ],
+      "bbox_min": [
+        -0.6721,
+        1.7056,
+        -0.9567
+      ],
+      "bbox_max": [
+        -0.0016,
+        2.7795,
+        -0.7523
+      ],
+      "volume": 0.010096
+    },
+    {
+      "part": "bone_basal_plate_030_R",
+      "group": "bone",
+      "side": "R",
+      "blender_object": "basal plate.030",
+      "n_vert": 4617,
+      "n_tri": 9187,
+      "centroid": [
+        0.3726,
+        2.1995,
+        -0.856
+      ],
+      "bbox_min": [
+        0.0024,
+        1.7056,
+        -0.9567
+      ],
+      "bbox_max": [
+        0.673,
+        2.7795,
+        -0.7523
+      ],
+      "volume": 0.010096
+    },
+    {
+      "part": "bone_basal_plate_031_L",
+      "group": "bone",
+      "side": "L",
+      "blender_object": "basal plate.031",
+      "n_vert": 9810,
+      "n_tri": 19616,
+      "centroid": [
+        -0.2644,
+        3.9183,
+        -0.567
+      ],
+      "bbox_min": [
+        -0.5516,
+        3.5236,
+        -0.6988
+      ],
+      "bbox_max": [
+        -0.0328,
+        4.2202,
+        -0.2513
+      ],
+      "volume": 0.003777
+    },
+    {
+      "part": "bone_basal_plate_031_R",
+      "group": "bone",
+      "side": "R",
+      "blender_object": "basal plate.031",
+      "n_vert": 9810,
+      "n_tri": 19616,
+      "centroid": [
+        0.2379,
+        3.9226,
+        -0.5756
+      ],
+      "bbox_min": [
+        0.0063,
+        3.5258,
+        -0.6965
+      ],
+      "bbox_max": [
+        0.5173,
+        4.2407,
+        -0.2877
+      ],
+      "volume": 0.003706
+    },
+    {
+      "part": "bone_basal_plate_034_L",
+      "group": "bone",
+      "side": "L",
+      "blender_object": "basal plate.034",
+      "n_vert": 2788,
+      "n_tri": 5572,
+      "centroid": [
+        -0.3441,
+        3.6998,
+        -0.6012
+      ],
+      "bbox_min": [
+        -0.676,
+        3.2807,
+        -0.7308
+      ],
+      "bbox_max": [
+        -0.056,
+        4.0333,
+        -0.3291
+      ],
+      "volume": 0.003197
+    },
+    {
+      "part": "bone_basal_plate_034_R",
+      "group": "bone",
+      "side": "R",
+      "blender_object": "basal plate.034",
+      "n_vert": 2788,
+      "n_tri": 5572,
+      "centroid": [
+        0.3449,
+        3.6998,
+        -0.6012
+      ],
+      "bbox_min": [
+        0.0568,
+        3.2807,
+        -0.7308
+      ],
+      "bbox_max": [
+        0.6768,
+        4.0333,
+        -0.3291
+      ],
+      "volume": 0.003197
+    },
+    {
+      "part": "bone_basal_plate_039_L",
+      "group": "bone",
+      "side": "L",
+      "blender_object": "basal plate.039",
+      "n_vert": 4364,
+      "n_tri": 8720,
+      "centroid": [
+        -0.3755,
+        2.6407,
+        -0.6476
+      ],
+      "bbox_min": [
+        -0.6977,
+        2.0202,
+        -0.748
+      ],
+      "bbox_max": [
+        -0.0604,
+        3.2656,
+        -0.3849
+      ],
+      "volume": 0.006219
+    },
+    {
+      "part": "bone_basal_plate_039_R",
+      "group": "bone",
+      "side": "R",
+      "blender_object": "basal plate.039",
+      "n_vert": 4364,
+      "n_tri": 8720,
+      "centroid": [
+        0.3764,
+        2.6407,
+        -0.6476
+      ],
+      "bbox_min": [
+        0.0612,
+        2.0202,
+        -0.748
+      ],
+      "bbox_max": [
+        0.6985,
+        3.2656,
+        -0.3849
+      ],
+      "volume": 0.006219
+    },
+    {
+      "part": "bone_basal_plate_043_R",
+      "group": "bone",
+      "side": "R",
+      "blender_object": "basal plate.043",
+      "n_vert": 5840,
+      "n_tri": 11676,
+      "centroid": [
+        0.0004,
+        2.4059,
+        -0.672
+      ],
+      "bbox_min": [
+        -0.2149,
+        1.1843,
+        -0.7427
+      ],
+      "bbox_max": [
+        0.2157,
+        3.4222,
+        -0.5641
+      ],
+      "volume": 0.02105
+    },
+    {
+      "part": "bone_basal_plate_044_R",
+      "group": "bone",
+      "side": "R",
+      "blender_object": "basal plate.044",
+      "n_vert": 7028,
+      "n_tri": 13792,
+      "centroid": [
+        0.9345,
+        3.1716,
+        -0.1773
+      ],
+      "bbox_min": [
+        0.5639,
+        2.9727,
+        -0.4813
+      ],
+      "bbox_max": [
+        1.1576,
+        3.3876,
+        0.0604
+      ],
+      "volume": 0.017589
+    },
+    {
+      "part": "bone_basal_plate_045_L",
+      "group": "bone",
+      "side": "L",
+      "blender_object": "basal plate.045",
+      "n_vert": 7028,
+      "n_tri": 13792,
+      "centroid": [
+        -0.9337,
+        3.1716,
+        -0.1773
+      ],
+      "bbox_min": [
+        -1.1568,
+        2.9727,
+        -0.4813
+      ],
+      "bbox_max": [
+        -0.563,
+        3.3876,
+        0.0604
+      ],
+      "volume": 0.01759
+    },
+    {
+      "part": "bone_basal_plate_046_L",
+      "group": "bone",
+      "side": "L",
+      "blender_object": "basal plate.046",
+      "n_vert": 848,
+      "n_tri": 1692,
+      "centroid": [
+        -0.7528,
+        3.7864,
+        0.1494
+      ],
+      "bbox_min": [
+        -1.2055,
+        3.1757,
+        -0.2557
+      ],
+      "bbox_max": [
+        -0.2179,
+        4.3917,
+        0.8088
+      ],
+      "volume": 0.461459
+    },
+    {
+      "part": "bone_basal_plate_047_R",
+      "group": "bone",
+      "side": "R",
+      "blender_object": "basal plate.047",
+      "n_vert": 848,
+      "n_tri": 1692,
+      "centroid": [
+        0.7527,
+        3.7864,
+        0.1494
+      ],
+      "bbox_min": [
+        0.2177,
+        3.1758,
+        -0.2556
+      ],
+      "bbox_max": [
+        1.2056,
+        4.3917,
+        0.8088
+      ],
+      "volume": 0.46154
+    },
+    {
+      "part": "bone_notochord_L",
+      "group": "bone",
+      "side": "L",
+      "blender_object": "notochord",
+      "n_vert": 21906,
+      "n_tri": 43812,
+      "centroid": [
+        -0.0022,
+        10.72,
+        0.1563
+      ],
+      "bbox_min": [
+        -0.1858,
+        3.2271,
+        -0.3444
+      ],
+      "bbox_max": [
+        0.1814,
+        19.3308,
+        0.6484
+      ],
+      "volume": 0.948366
+    },
+    {
+      "part": "central_nervous_system",
+      "group": "cns",
+      "side": "L",
+      "blender_object": "central nervous system",
+      "n_vert": 20958,
+      "n_tri": 41912,
+      "centroid": [
+        -0.002,
+        11.5511,
+        0.4265
+      ],
+      "bbox_min": [
+        -0.9881,
+        1.122,
+        -0.2406
+      ],
+      "bbox_max": [
+        0.9841,
+        19.2447,
+        1.0736
+      ],
+      "volume": 3.511379
+    },
+    {
+      "part": "L_cornea",
+      "group": "eye",
+      "side": "L",
+      "blender_object": "cornea",
+      "n_vert": 513,
+      "n_tri": 1022,
+      "centroid": [
+        -1.4142,
+        2.0169,
+        -0.0895
+      ],
+      "bbox_min": [
+        -1.5548,
+        1.4612,
+        -0.6137
+      ],
+      "bbox_max": [
+        -1.101,
+        2.6528,
+        0.4145
+      ],
+      "volume": 0.017433
+    },
+    {
+      "part": "L_lens",
+      "group": "eye",
+      "side": "L",
+      "blender_object": "lens",
+      "n_vert": 482,
+      "n_tri": 960,
+      "centroid": [
+        -1.2372,
+        2.0287,
+        -0.1106
+      ],
+      "bbox_min": [
+        -1.4902,
+        1.7761,
+        -0.3636
+      ],
+      "bbox_max": [
+        -0.9841,
+        2.2812,
+        0.1424
+      ],
+      "volume": 0.067635
+    },
+    {
+      "part": "L_retina",
+      "group": "eye",
+      "side": "L",
+      "blender_object": "retina",
+      "n_vert": 514,
+      "n_tri": 1024,
+      "centroid": [
+        -0.8618,
+        2.1633,
+        -0.1329
+      ],
+      "bbox_min": [
+        -1.4693,
+        1.3961,
+        -0.7526
+      ],
+      "bbox_max": [
+        -0.4238,
+        2.8646,
+        0.5025
+      ],
+      "volume": 0.430056
+    },
+    {
+      "part": "R_cornea",
+      "group": "eye",
+      "side": "R",
+      "blender_object": "cornea",
+      "n_vert": 513,
+      "n_tri": 1022,
+      "centroid": [
+        1.4142,
+        2.0169,
+        -0.0895
+      ],
+      "bbox_min": [
+        1.101,
+        1.4612,
+        -0.6137
+      ],
+      "bbox_max": [
+        1.5548,
+        2.6528,
+        0.4145
+      ],
+      "volume": 0.017433
+    },
+    {
+      "part": "R_lens",
+      "group": "eye",
+      "side": "R",
+      "blender_object": "lens",
+      "n_vert": 482,
+      "n_tri": 960,
+      "centroid": [
+        1.2372,
+        2.0287,
+        -0.1106
+      ],
+      "bbox_min": [
+        0.9841,
+        1.7761,
+        -0.3636
+      ],
+      "bbox_max": [
+        1.4902,
+        2.2812,
+        0.1424
+      ],
+      "volume": 0.067635
+    },
+    {
+      "part": "R_retina",
+      "group": "eye",
+      "side": "R",
+      "blender_object": "retina",
+      "n_vert": 514,
+      "n_tri": 1024,
+      "centroid": [
+        0.8618,
+        2.1633,
+        -0.1329
+      ],
+      "bbox_min": [
+        0.4238,
+        1.3961,
+        -0.7526
+      ],
+      "bbox_max": [
+        1.4693,
+        2.8646,
+        0.5025
+      ],
+      "volume": 0.430056
+    },
+    {
+      "part": "L_IO",
+      "group": "muscle",
+      "side": "L",
+      "blender_object": "Cylinder.002",
+      "n_vert": 1120,
+      "n_tri": 2236,
+      "centroid": [
+        -0.4522,
+        1.4864,
+        -0.2656
+      ],
+      "bbox_min": [
+        -0.9281,
+        1.2388,
+        -0.5002
+      ],
+      "bbox_max": [
+        -0.025,
+        1.7154,
+        0.0208
+      ],
+      "volume": 0.006188,
+      "muscle_key": "IO",
+      "long_name": "inferior oblique",
+      "length": 1.2721,
+      "chord": 1.0021,
+      "insertion": [
+        -0.881,
+        1.6536,
+        -0.4174
+      ],
+      "origin": [
+        -0.0422,
+        1.2961,
+        -0.0015
+      ],
+      "insertion_eye": [
+        -0.835,
+        -0.505,
+        0.218
+      ],
+      "pull_eye": [
+        -0.662,
+        -0.378,
+        -0.647
+      ],
+      "rot_axis_eye": [
+        -0.513,
+        0.858,
+        0.023
+      ],
+      "insertion_depth": 1.023,
+      "contact_insertion": 0.0479,
+      "contact_origin": 0.585
+    },
+    {
+      "part": "L_IR",
+      "group": "muscle",
+      "side": "L",
+      "blender_object": "Cylinder.001",
+      "n_vert": 1120,
+      "n_tri": 2236,
+      "centroid": [
+        -0.5241,
+        2.3721,
+        -0.4528
+      ],
+      "bbox_min": [
+        -0.913,
+        2.0381,
+        -0.6568
+      ],
+      "bbox_max": [
+        -0.281,
+        2.6788,
+        -0.193
+      ],
+      "volume": 0.004836,
+      "muscle_key": "IR",
+      "long_name": "inferior rectus",
+      "length": 0.9944,
+      "chord": 0.8338,
+      "insertion": [
+        -0.8738,
+        2.0926,
+        -0.5061
+      ],
+      "origin": [
+        -0.3093,
+        2.638,
+        -0.2251
+      ],
+      "insertion_eye": [
+        -0.172,
+        -0.985,
+        0.004
+      ],
+      "pull_eye": [
+        0.306,
+        -0.577,
+        -0.757
+      ],
+      "rot_axis_eye": [
+        -0.872,
+        0.15,
+        -0.467
+      ],
+      "insertion_depth": 0.666,
+      "contact_insertion": 0.065,
+      "contact_origin": 0.2781
+    },
+    {
+      "part": "L_LR",
+      "group": "muscle",
+      "side": "L",
+      "blender_object": "Cylinder.006",
+      "n_vert": 1376,
+      "n_tri": 2748,
+      "centroid": [
+        -0.6426,
+        2.7955,
+        -0.1104
+      ],
+      "bbox_min": [
+        -1.1586,
+        2.6336,
+        -0.2433
+      ],
+      "bbox_max": [
+        -0.3164,
+        2.9091,
+        0.1185
+      ],
+      "volume": 0.003155,
+      "muscle_key": "LR",
+      "long_name": "lateral rectus",
+      "length": 0.9406,
+      "chord": 0.8539,
+      "insertion": [
+        -1.1298,
+        2.8479,
+        0.0078
+      ],
+      "origin": [
+        -0.3228,
+        2.6582,
+        -0.1969
+      ],
+      "insertion_eye": [
+        0.976,
+        0.179,
+        0.126
+      ],
+      "pull_eye": [
+        -0.106,
+        0.236,
+        -0.966
+      ],
+      "rot_axis_eye": [
+        0.206,
+        -0.945,
+        -0.253
+      ],
+      "insertion_depth": 1.311,
+      "contact_insertion": 0.041,
+      "contact_origin": 0.2727
+    },
+    {
+      "part": "L_MR",
+      "group": "muscle",
+      "side": "L",
+      "blender_object": "Cylinder.004",
+      "n_vert": 1600,
+      "n_tri": 3196,
+      "centroid": [
+        -0.3061,
+        2.1184,
+        -0.1577
+      ],
+      "bbox_min": [
+        -0.5312,
+        1.5447,
+        -0.2467
+      ],
+      "bbox_max": [
+        -0.197,
+        2.6195,
+        0.0129
+      ],
+      "volume": 0.003092,
+      "muscle_key": "MR",
+      "long_name": "medial rectus",
+      "length": 1.1697,
+      "chord": 1.081,
+      "insertion": [
+        -0.5003,
+        1.5598,
+        -0.0347
+      ],
+      "origin": [
+        -0.2855,
+        2.6062,
+        -0.2002
+      ],
+      "insertion_eye": [
+        -0.952,
+        0.159,
+        -0.263
+      ],
+      "pull_eye": [
+        0.472,
+        -0.33,
+        -0.818
+      ],
+      "rot_axis_eye": [
+        0.226,
+        0.942,
+        -0.249
+      ],
+      "insertion_depth": 1.244,
+      "contact_insertion": 0.0792,
+      "contact_origin": 0.2886
+    },
+    {
+      "part": "L_SO",
+      "group": "muscle",
+      "side": "L",
+      "blender_object": "Cylinder.005",
+      "n_vert": 1120,
+      "n_tri": 2236,
+      "centroid": [
+        -0.3838,
+        1.5523,
+        0.2564
+      ],
+      "bbox_min": [
+        -0.7509,
+        1.1796,
+        -0.0028
+      ],
+      "bbox_max": [
+        -0.0908,
+        2.0181,
+        0.5049
+      ],
+      "volume": 0.005388,
+      "muscle_key": "SO",
+      "long_name": "superior oblique",
+      "length": 1.1963,
+      "chord": 1.06,
+      "insertion": [
+        -0.7058,
+        1.9805,
+        0.433
+      ],
+      "origin": [
+        -0.1248,
+        1.2011,
+        0.0105
+      ],
+      "insertion_eye": [
+        -0.352,
+        0.931,
+        -0.099
+      ],
+      "pull_eye": [
+        -0.849,
+        0.437,
+        -0.297
+      ],
+      "rot_axis_eye": [
+        0.344,
+        0.031,
+        -0.938
+      ],
+      "insertion_depth": 1.077,
+      "contact_insertion": 0.0677,
+      "contact_origin": 0.5724
+    },
+    {
+      "part": "L_SR",
+      "group": "muscle",
+      "side": "L",
+      "blender_object": "Cylinder.003",
+      "n_vert": 1120,
+      "n_tri": 2236,
+      "centroid": [
+        -0.4876,
+        2.5066,
+        0.1713
+      ],
+      "bbox_min": [
+        -0.8646,
+        2.2889,
+        -0.1821
+      ],
+      "bbox_max": [
+        -0.2806,
+        2.7232,
+        0.437
+      ],
+      "volume": 0.004777,
+      "muscle_key": "SR",
+      "long_name": "superior rectus",
+      "length": 0.9312,
+      "chord": 0.8005,
+      "insertion": [
+        -0.8165,
+        2.3475,
+        0.3614
+      ],
+      "origin": [
+        -0.2989,
+        2.6762,
+        -0.1533
+      ],
+      "insertion_eye": [
+        0.314,
+        0.944,
+        -0.101
+      ],
+      "pull_eye": [
+        -0.11,
+        0.19,
+        -0.976
+      ],
+      "rot_axis_eye": [
+        0.93,
+        -0.328,
+        -0.169
+      ],
+      "insertion_depth": 0.927,
+      "contact_insertion": 0.1042,
+      "contact_origin": 0.2998
+    },
+    {
+      "part": "R_IO",
+      "group": "muscle",
+      "side": "R",
+      "blender_object": "Cylinder.002",
+      "n_vert": 1120,
+      "n_tri": 2236,
+      "centroid": [
+        0.4522,
+        1.4864,
+        -0.2656
+      ],
+      "bbox_min": [
+        0.025,
+        1.2388,
+        -0.5002
+      ],
+      "bbox_max": [
+        0.9281,
+        1.7154,
+        0.0208
+      ],
+      "volume": 0.00619,
+      "muscle_key": "IO",
+      "long_name": "inferior oblique",
+      "length": 1.2721,
+      "chord": 1.0021,
+      "insertion": [
+        0.881,
+        1.6536,
+        -0.4174
+      ],
+      "origin": [
+        0.0422,
+        1.2961,
+        -0.0015
+      ],
+      "insertion_eye": [
+        -0.835,
+        -0.505,
+        0.218
+      ],
+      "pull_eye": [
+        -0.662,
+        -0.378,
+        -0.647
+      ],
+      "rot_axis_eye": [
+        0.513,
+        -0.858,
+        -0.023
+      ],
+      "insertion_depth": 1.023,
+      "contact_insertion": 0.0479,
+      "contact_origin": 0.585
+    },
+    {
+      "part": "R_IR",
+      "group": "muscle",
+      "side": "R",
+      "blender_object": "Cylinder.001",
+      "n_vert": 1120,
+      "n_tri": 2236,
+      "centroid": [
+        0.5241,
+        2.3721,
+        -0.4528
+      ],
+      "bbox_min": [
+        0.281,
+        2.0381,
+        -0.6568
+      ],
+      "bbox_max": [
+        0.913,
+        2.6788,
+        -0.193
+      ],
+      "volume": 0.004837,
+      "muscle_key": "IR",
+      "long_name": "inferior rectus",
+      "length": 0.9944,
+      "chord": 0.8338,
+      "insertion": [
+        0.8738,
+        2.0926,
+        -0.5061
+      ],
+      "origin": [
+        0.3093,
+        2.638,
+        -0.2251
+      ],
+      "insertion_eye": [
+        -0.172,
+        -0.985,
+        0.004
+      ],
+      "pull_eye": [
+        0.306,
+        -0.577,
+        -0.757
+      ],
+      "rot_axis_eye": [
+        0.872,
+        -0.15,
+        0.467
+      ],
+      "insertion_depth": 0.666,
+      "contact_insertion": 0.065,
+      "contact_origin": 0.2781
+    },
+    {
+      "part": "R_LR",
+      "group": "muscle",
+      "side": "R",
+      "blender_object": "Cylinder.006",
+      "n_vert": 1376,
+      "n_tri": 2748,
+      "centroid": [
+        0.6426,
+        2.7955,
+        -0.1104
+      ],
+      "bbox_min": [
+        0.3164,
+        2.6336,
+        -0.2433
+      ],
+      "bbox_max": [
+        1.1586,
+        2.9091,
+        0.1185
+      ],
+      "volume": 0.003158,
+      "muscle_key": "LR",
+      "long_name": "lateral rectus",
+      "length": 0.9406,
+      "chord": 0.8539,
+      "insertion": [
+        1.1298,
+        2.8479,
+        0.0078
+      ],
+      "origin": [
+        0.3228,
+        2.6582,
+        -0.1969
+      ],
+      "insertion_eye": [
+        0.976,
+        0.179,
+        0.126
+      ],
+      "pull_eye": [
+        -0.106,
+        0.236,
+        -0.966
+      ],
+      "rot_axis_eye": [
+        -0.206,
+        0.945,
+        0.253
+      ],
+      "insertion_depth": 1.311,
+      "contact_insertion": 0.041,
+      "contact_origin": 0.2727
+    },
+    {
+      "part": "R_MR",
+      "group": "muscle",
+      "side": "R",
+      "blender_object": "Cylinder.004",
+      "n_vert": 1600,
+      "n_tri": 3196,
+      "centroid": [
+        0.3061,
+        2.1184,
+        -0.1577
+      ],
+      "bbox_min": [
+        0.197,
+        1.5447,
+        -0.2467
+      ],
+      "bbox_max": [
+        0.5312,
+        2.6195,
+        0.0129
+      ],
+      "volume": 0.003092,
+      "muscle_key": "MR",
+      "long_name": "medial rectus",
+      "length": 1.1697,
+      "chord": 1.081,
+      "insertion": [
+        0.5003,
+        1.5598,
+        -0.0347
+      ],
+      "origin": [
+        0.2855,
+        2.6062,
+        -0.2002
+      ],
+      "insertion_eye": [
+        -0.952,
+        0.159,
+        -0.263
+      ],
+      "pull_eye": [
+        0.472,
+        -0.33,
+        -0.818
+      ],
+      "rot_axis_eye": [
+        -0.226,
+        -0.942,
+        0.249
+      ],
+      "insertion_depth": 1.244,
+      "contact_insertion": 0.0792,
+      "contact_origin": 0.2886
+    },
+    {
+      "part": "R_SO",
+      "group": "muscle",
+      "side": "R",
+      "blender_object": "Cylinder.005",
+      "n_vert": 1120,
+      "n_tri": 2236,
+      "centroid": [
+        0.3838,
+        1.5523,
+        0.2564
+      ],
+      "bbox_min": [
+        0.0908,
+        1.1796,
+        -0.0028
+      ],
+      "bbox_max": [
+        0.7509,
+        2.0181,
+        0.5049
+      ],
+      "volume": 0.005389,
+      "muscle_key": "SO",
+      "long_name": "superior oblique",
+      "length": 1.1963,
+      "chord": 1.06,
+      "insertion": [
+        0.7058,
+        1.9805,
+        0.433
+      ],
+      "origin": [
+        0.1248,
+        1.2011,
+        0.0105
+      ],
+      "insertion_eye": [
+        -0.352,
+        0.931,
+        -0.099
+      ],
+      "pull_eye": [
+        -0.849,
+        0.437,
+        -0.297
+      ],
+      "rot_axis_eye": [
+        -0.344,
+        -0.031,
+        0.938
+      ],
+      "insertion_depth": 1.077,
+      "contact_insertion": 0.0677,
+      "contact_origin": 0.5724
+    },
+    {
+      "part": "R_SR",
+      "group": "muscle",
+      "side": "R",
+      "blender_object": "Cylinder.003",
+      "n_vert": 1120,
+      "n_tri": 2236,
+      "centroid": [
+        0.4876,
+        2.5066,
+        0.1713
+      ],
+      "bbox_min": [
+        0.2806,
+        2.2889,
+        -0.1821
+      ],
+      "bbox_max": [
+        0.8646,
+        2.7232,
+        0.437
+      ],
+      "volume": 0.004778,
+      "muscle_key": "SR",
+      "long_name": "superior rectus",
+      "length": 0.9312,
+      "chord": 0.8005,
+      "insertion": [
+        0.8165,
+        2.3475,
+        0.3614
+      ],
+      "origin": [
+        0.2989,
+        2.6762,
+        -0.1533
+      ],
+      "insertion_eye": [
+        0.314,
+        0.944,
+        -0.101
+      ],
+      "pull_eye": [
+        -0.11,
+        0.19,
+        -0.976
+      ],
+      "rot_axis_eye": [
+        -0.93,
+        0.328,
+        0.169
+      ],
+      "insertion_depth": 0.927,
+      "contact_insertion": 0.1042,
+      "contact_origin": 0.2998
+    }
+  ]
+}

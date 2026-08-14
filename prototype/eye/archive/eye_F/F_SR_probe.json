@@ -1,0 +1,14 @@
+{
+  "muscle": "SR",
+  "a_hi": 1.0,
+  "tonic": 0.14,
+  "t_on": 60,
+  "t_off": 240,
+  "n_frames": 320,
+  "baseline": "t37_probe_SR",
+  "gaze_range_deg": [
+    4.813,
+    12.208,
+    14.216
+  ]
+}

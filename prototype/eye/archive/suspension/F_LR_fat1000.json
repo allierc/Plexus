@@ -1,0 +1,22 @@
+{
+  "model": "F",
+  "muscle": "LR",
+  "tonic": 0.14,
+  "k_fat": 1000.0,
+  "k_socket": 5000.0,
+  "tag": "fat1000",
+  "pose_deg": [
+    6.144,
+    -1.962,
+    3.484
+  ],
+  "settle_ptp_deg": [
+    0.0458,
+    0.0401,
+    0.0221
+  ],
+  "settled": true,
+  "shortening_pct": 30.85,
+  "radius_drift_pct": -0.004,
+  "seconds": 194.3
+}

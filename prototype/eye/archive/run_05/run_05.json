@@ -1,0 +1,14 @@
+{
+  "tag": "run_05",
+  "muscle_youngs": 240.0,
+  "contract": 67.0,
+  "A_over_E": 0.2792,
+  "muscle_radius": 0.022,
+  "k_bone": 9000.0,
+  "rest_length": 0.33962,
+  "path_shortening_pct": 19.28,
+  "end_to_end_shortening_pct": 13.65,
+  "transmission": 1.323,
+  "anchor_slip": 0.9128,
+  "seconds": 530.0
+}

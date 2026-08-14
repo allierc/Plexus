@@ -43,6 +43,7 @@ from plexus.models.base import Lateral, Aggregate, Exchange, Rewire
 from plexus.models.registry import register_operator, register_entity
 from plexus.models.entities import MPMParticle
 from plexus.operators.mpm_grid import stencil_offsets, bspline, sub_dt
+from plexus.operators.mpm_scatter import _polar_higham
 
 import eye_anatomy as EA
 
@@ -82,6 +83,45 @@ def _radical_inverse(n, base):
     return out
 
 
+def _tangent_arc_deg(centre, n_hat, tang, origin, a, c, gap, lo=20.0, hi=150.0, n=600):
+    """How far the muscle wraps before a straight line to its origin leaves the globe.
+
+    Walk the arc of contact from the insertion. At each point compare the direction to
+    the origin with the ovoid's outward normal: while the origin lies 'below' the local
+    tangent plane the muscle is still wrapping, and the moment it rises above it the
+    muscle can go straight. That crossing is the tangent point, and the arc ends there,
+    so belly and arc meet with the same direction instead of at a corner.
+
+    Solved by sampling rather than in closed form: the surface is an ovoid offset by
+    `gap`, not a sphere, and 600 samples over 150 degrees resolves the crossing to a
+    quarter of a degree -- far finer than any anatomy this is built from.
+
+    `lo` is a MINIMUM wrap, and it is not cosmetic. The tendon is embedded in the sclera
+    and the belly rides `gap` clear of it, so the path must climb embed -> gap somewhere;
+    give it less than about 20 degrees of arc to do that in and the climb is nearly
+    radial, which is a sharper corner than the one the tangent construction removed.
+    """
+    org = np.asarray(origin, float)
+    phis = np.radians(np.linspace(lo, hi, n))
+    dirs = np.cos(phis)[:, None] * n_hat[None, :] + np.sin(phis)[:, None] * tang[None, :]
+    dirs /= np.linalg.norm(dirs, axis=1, keepdims=True)
+    pts = centre[None, :] + (_ovoid_radius(dirs, a, c) + gap)[:, None] * dirs
+    loc = pts - centre[None, :]
+    nrm = np.stack([loc[:, 0] / a ** 2, loc[:, 1] / a ** 2, loc[:, 2] / c ** 2], 1)
+    nrm /= np.linalg.norm(nrm, axis=1, keepdims=True)
+    d = org[None, :] - pts
+    d /= np.linalg.norm(d, axis=1, keepdims=True).clip(1e-12)
+    f = (d * nrm).sum(1)                       # < 0 while still wrapping
+    above = np.nonzero(f >= 0.0)[0]
+    if above.size == 0:
+        return float(hi)                       # origin sits inside the stand-off shell
+    i = int(above[0])
+    if i == 0:
+        return float(lo)
+    w = f[i - 1] / (f[i - 1] - f[i])           # linear crossing between the two samples
+    return float(np.degrees(phis[i - 1] + w * (phis[i] - phis[i - 1])))
+
+
 def strap_path(centre, n_ins, origin, a, c, arc_deg, gap_prox, embed, frac=0.55, n_arc=48):
     """The centreline of one muscle, from ORIGIN (s=0) to INSERTION (s=1).
 
@@ -91,6 +131,15 @@ def strap_path(centre, n_ins, origin, a, c, arc_deg, gap_prox, embed, frac=0.55,
     the globe, so grid contact does not glue the whole arc down and freeze the rotation) to
     `embed` at the insertion, which is NEGATIVE -- the tendon bites into the sclera, so the
     shared grid welds the two bodies exactly where a tendon is anchored.
+
+    `arc_deg=None` LETS THE GEOMETRY CHOOSE THE ARC. With a fixed arc the belly is stuck on
+    at whatever angle it happens to arrive, and the join is a corner -- clearly visible as a
+    kink in MR and LR, whose origins lie almost in line with their insertions and so need
+    almost no wrap. Instead the belly is made TANGENT to the stand-off surface: the muscle
+    wraps only as far as the point where a straight line to its origin grazes the globe, and
+    leaves along that line. The path is then smooth by construction, the arc is a consequence
+    of where the bone is rather than a knob, and a muscle whose origin is far away comes out
+    straight -- which is what the drawing shows.
     """
     n_hat = np.asarray(n_ins, float)
     n_hat = n_hat / np.linalg.norm(n_hat)
@@ -99,6 +148,8 @@ def strap_path(centre, n_ins, origin, a, c, arc_deg, gap_prox, embed, frac=0.55,
     tang = to_org - np.dot(to_org, n_hat) * n_hat
     nt = np.linalg.norm(tang)
     tang = tang / nt if nt > 1e-9 else np.cross(n_hat, [0.0, 0.0, 1.0])
+    if arc_deg is None:
+        arc_deg = _tangent_arc_deg(centre, n_hat, tang, origin, a, c, gap_prox)
     phis = np.radians(np.linspace(0.0, arc_deg, n_arc))
     dirs = np.cos(phis)[:, None] * n_hat[None, :] + np.sin(phis)[:, None] * tang[None, :]
     dirs = dirs / np.linalg.norm(dirs, axis=1, keepdims=True)
@@ -186,9 +237,19 @@ class MuscleMorphogenesis(Rewire):
         self.center = np.asarray(params.get("center", EA.GLOBE_CENTER), float)
         self.a = float(params.get("a_eq", EA.A_EQ))
         self.c = float(params.get("c_ax", EA.C_AX))
-        self.width = float(params.get("width", 0.034))
-        self.thickness = float(params.get("thickness", 0.021))
-        self.arc_deg = float(params.get("arc_deg", 30.0))
+        # The plant's attachments are CONFIG, not a constant of this module: the
+        # mammalian guess in `eye_anatomy` and the plant measured off Fig. 12.1A in
+        # `fish_anatomy` are the same operator with different numbers.
+        self.insertions = params.get("insertions", None)      # [6,3] unit directions
+        self.origins = params.get("origins", None)            # [6,3] world points
+        # width/thickness may be one number or one per muscle. Per muscle is what
+        # makes a measured plant work: a muscle's force is its cross-section, so
+        # giving each band its traced width IS giving it its strength.
+        self.width = params.get("width", 0.034)
+        self.thickness = params.get("thickness", 0.021)
+        _ad = params.get("arc_deg", 30.0)
+        # None -> let the tangent construction choose the wrap (see strap_path)
+        self.arc_deg = None if _ad is None else float(_ad)
         self.frac = float(params.get("frac", 0.88))     # distal fraction kept (pulley origin)
         self.gap = float(params.get("gap", 0.038))
         self.embed = float(params.get("embed", -0.013))
@@ -205,8 +266,12 @@ class MuscleMorphogenesis(Rewire):
         dev = p.state.device
         par = p.parent.detach().cpu().numpy()
         M = int(par.max()) + 1
-        n_ins_all = EA.insertion_dirs()
-        org_all = EA.origins_world()
+        n_ins_all = np.asarray(self.insertions if self.insertions is not None
+                               else EA.insertion_dirs(), float)
+        org_all = np.asarray(self.origins if self.origins is not None
+                             else EA.origins_world(), float)
+        wid_all = np.broadcast_to(np.asarray(self.width, float), (M,)).astype(float)
+        thk_all = np.broadcast_to(np.asarray(self.thickness, float), (M,)).astype(float)
 
         X = np.zeros((p.n, 3))
         fib = np.zeros((p.n, 3))
@@ -236,14 +301,14 @@ class MuscleMorphogenesis(Rewire):
             b_hat /= np.linalg.norm(b_hat, axis=1, keepdims=True).clip(1e-12)
             r_hat = np.cross(t_hat, b_hat)
             tap = _taper(sv)
-            off = (0.5 * self.width * tap * rr * np.cos(th))[:, None] * b_hat \
-                + (0.5 * self.thickness * tap * rr * np.sin(th))[:, None] * r_hat
+            off = (0.5 * wid_all[mi] * tap * rr * np.cos(th))[:, None] * b_hat \
+                + (0.5 * thk_all[mi] * tap * rr * np.sin(th))[:, None] * r_hat
             X[sel] = pts[k] + off
             fib[sel] = t_hat
             sarr[sel] = sv
             # true strap volume -> per-particle volume (the ball-seeded value is meaningless)
             ds = L / len(pts)
-            vol = float(np.sum(0.25 * np.pi * self.width * self.thickness * _taper(
+            vol = float(np.sum(0.25 * np.pi * wid_all[mi] * thk_all[mi] * _taper(
                 np.linspace(0, 1, len(pts))) ** 2 * ds))
             pvol[sel] = vol / n
 
@@ -507,6 +572,8 @@ class MPMScatterAccumulate(Exchange):
         self.dt_sub = float(params.get("dt_sub", 2e-4))
         self.drag = float(params.get("drag", 0.0))
         self.a_max = float(params.get("a_max", 200.0))
+        self.polar = str(params.get("polar", "svd")).lower()
+        self.polar_iters = int(params.get("polar_iters", 6))
         self.store_stress = bool(params.get("store_stress", False))   # see plexus.operators.mpm_scatter
 
     def forward(self, H, mask=None):
@@ -531,11 +598,18 @@ class MPMScatterAccumulate(Exchange):
         F, C, mass = p.F, p.C, p.mass
         eye = torch.eye(D, device=dev).expand(p.n, D, D)
         J = torch.linalg.det(F)
-        U, S, Vh = torch.linalg.svd(F)
-        U = U.clone(); Vh = Vh.clone()
-        U[torch.det(U) < 0, :, -1] *= -1
-        Vh[torch.det(Vh) < 0, -1, :] *= -1
-        R = U @ Vh
+        # The same polar rotation, and the same choice of how to get it, as the stock
+        # `mpm_scatter` -- see its `polar` param. A batched 3x3 SVD costs about a
+        # microsecond per particle per substep and dominated this operator's cost; the
+        # Newton iteration agrees with it to float32 at a seventh of the price.
+        if self.polar == "higham":
+            R = _polar_higham(F, self.polar_iters)
+        else:
+            U, S, Vh = torch.linalg.svd(F)
+            U = U.clone(); Vh = Vh.clone()
+            U[torch.det(U) < 0, :, -1] *= -1
+            Vh[torch.det(Vh) < 0, -1, :] *= -1
+            R = U @ Vh
         stress = 2 * p.mu[:, None, None] * ((F - R) @ F.transpose(-2, -1)) \
             + eye * (p.la * J * (J - 1))[:, None, None]
         act = getattr(p, "active_stress", None)          # PER-SET active stress (muscle)

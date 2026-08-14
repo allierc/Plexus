@@ -1,0 +1,24 @@
+[
+  {
+    "name": "baseline",
+    "substep": 0.00012,
+    "n_grid": 112,
+    "n_particles": 45000,
+    "n_substeps": 25,
+    "strap_cells": 2.14,
+    "particles_per_cell": 7.44,
+    "pose_deg": [
+      6.1077,
+      -1.943,
+      3.4898
+    ],
+    "settle_ptp_deg": [
+      0.0461,
+      0.037,
+      0.0182
+    ],
+    "seconds": 325.0,
+    "n_frames": 834,
+    "s_per_frame": 0.3897
+  }
+]

@@ -124,3 +124,7 @@ discovery_okuda/*.log
 discovery_okuda/*.out
 discovery_okuda/*.fls
 discovery_okuda/*.fdb_latexmk
+
+# the .blend cut is a cache: parts.npz is already ignored, and the PLY exports
+# regenerate from it with `read_blend.py --ply`
+prototype/eye/archive/run_03/blend_parts/meshes/

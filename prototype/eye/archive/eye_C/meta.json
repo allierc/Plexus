@@ -1,0 +1,32 @@
+{
+  "label": "C",
+  "variant": "eye_p3a_length",
+  "short": "longer straps",
+  "description": "B with the muscle gap widened 0.020 -> 0.042 and the strap fraction 0.55 -> 0.95: more contractile length, so the largest travel",
+  "runs": [
+    {
+      "dir": "t17_probe_LR",
+      "muscle": "LR"
+    },
+    {
+      "dir": "t18_probe_IR",
+      "muscle": "IR"
+    },
+    {
+      "dir": "t19_probe_SR",
+      "muscle": "SR"
+    },
+    {
+      "dir": "t20_probe_MR",
+      "muscle": "MR"
+    },
+    {
+      "dir": "t21_probe_SO",
+      "muscle": "SO"
+    },
+    {
+      "dir": "t22_probe_IO",
+      "muscle": "IO"
+    }
+  ]
+}
