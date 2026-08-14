@@ -86,7 +86,7 @@ def run(bundle):
          bundle.get("claim_ledger"), {"as_json": True, "limit": 20000}),
         ("Your task", f"Append this round's analysis to {a_md}. Do NOT write {k_md}: it is "
                       f"rendered from the claim ledger. If -- and only if -- this round shows "
-                      f"something no existing claim states, end your text with a fenced ```json "
+                      f"something no existing claim states, put IN YOUR REPLY a fenced ```json "
                       f"list of new claims, each with `statement`, `kind` (mechanism | instrument "
                       f"| substrate_limit), `scope` ({{lineages, regimes}}) and optionally "
                       f"`parents` and `mechanism`. Write no other file.", {"as_json": False}),

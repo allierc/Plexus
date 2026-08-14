@@ -2805,6 +2805,11 @@ def claims_update(ctx):
     # NEW CLAIMS, from the Analyst's `induce` block. Validated before they land: a claim with no
     # scope cannot be transferred, and transfer is the only route to high confidence.
     induced = _induced_claims(ctx)
+    # ALREADY ON THE LEDGER IS NOT NEW. The statement is the identity -- ids are assigned here, so
+    # two runs of the same round would otherwise mint C014 and C015 for one finding. This is also
+    # what makes reading the whole of `analysis.md` safe rather than a source of duplicates.
+    have = {str(c.get("statement", "")).strip() for c in cur.values()}
+    induced = [c for c in induced if str(c.get("statement", "")).strip() not in have]
     for nc in induced:
         nc["id"] = K.next_id(cur)
         nc.setdefault("status", "proposed")
@@ -2839,23 +2844,49 @@ def claims_update(ctx):
 
 
 def _induced_claims(ctx):
-    """The `induce` block from the Analyst's text: a fenced json list, or nothing.
+    """Every `induce` block the Analyst wrote -- from its REPLY and from `analysis.md`.
 
-    Parsed from the role's OUTPUT rather than read from a file it was asked to write, for the same
-    reason the Proposer's slots are: a file the agent may or may not have written is a silent
-    failure, and a block that is absent is simply an empty list.
+    THIRTEEN ROUNDS INDUCED ZERO CLAIMS AND THE ANALYST WAS NOT AT FAULT. It wrote them, correctly
+    formatted, every round -- `analysis.md` holds six fenced blocks, one of them the finding that
+    `interface_tension` is inert on protrusion, which a human re-derived by hand a week later from
+    identical trajectories. They never reached the ledger, for two reasons:
+
+      THE BLOCK WENT TO THE FILE, THE PARSER READ THE REPLY. The role's task says both "append this
+      round's analysis to analysis.md" AND "end YOUR TEXT with a fenced json list". The Analyst
+      resolved the ambiguity the natural way -- its text is the analysis, and the analysis is the
+      file -- and returned a summary. This function read the summary.
+
+      AND IT RETURNED THE FIRST BLOCK, NOT ALL OF THEM. `return d` inside the loop, so even reading
+      the file it would have re-offered round 1's claim in every round that followed.
+
+    BOTH SOURCES ARE READ NOW, and re-reading is harmless because `claims_update` refuses a claim
+    whose statement is already on the ledger. Reading only the reply is one formatting choice away
+    from silence, and the cost of that silence was the campaign's entire inductive output.
     """
-    txt = ctx.get("analyst") or ""
-    if not isinstance(txt, str) or "induce" not in txt.lower():
-        return []
-    for block in re.findall(r"```(?:json)?\s*(\[.*?\])\s*```", txt, re.S):
+    out, seen = [], set()
+    src = [ctx.get("analyst") or ""]
+    a_md = os.path.join(CAMPAIGN, "analysis.md")
+    if os.path.exists(a_md):
         try:
-            d = json.loads(block)
-            if isinstance(d, list) and d and isinstance(d[0], dict) and "statement" in d[0]:
-                return d
-        except Exception:
+            src.append(open(a_md, errors="ignore").read())
+        except OSError:
+            pass
+    for txt in src:
+        if not isinstance(txt, str):
             continue
-    return []
+        for block in re.findall(r"```(?:json)?\s*(\[.*?\])\s*```", txt, re.S):
+            try:
+                d = json.loads(block)
+            except Exception:
+                continue
+            if not isinstance(d, list):
+                continue
+            for c in d:
+                if isinstance(c, dict) and c.get("statement") \
+                        and c["statement"] not in seen:
+                    seen.add(c["statement"])
+                    out.append(c)
+    return out
 
 
 
