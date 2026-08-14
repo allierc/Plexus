@@ -55,8 +55,16 @@ asserted — not by you, not by anyone.**
 
 ### The one judgement left to you: `induce`
 
-If, and only if, the round shows something **no existing claim states**, end your text with a fenced
-`json` list of new claims:
+If, and only if, the round shows something **no existing claim states**, put a fenced `json` list of
+new claims **IN YOUR REPLY** -- the message you return, not only inside `analysis.md`.
+
+**BOTH, IF YOU LIKE, BUT THE REPLY IS WHAT IS READ.** For thirteen rounds this instruction said
+"end your text", you reasonably read "your text" as the analysis you were writing, and every induced
+claim went into `analysis.md` and nowhere else. The round parses the REPLY, so the ledger recorded
+zero induced claims in thirteen rounds while seven were sitting in the file -- including that
+`interface_tension` is inert on protrusion, and that `grip` separates a finger from a bud where
+`n_tubes` cannot. Both were re-derived by hand a week later. The round now reads the file as well,
+so nothing is lost either way; the reply is still the channel to use.
 
 ```json
 [{"statement": "an assertion, not a parameter name",
