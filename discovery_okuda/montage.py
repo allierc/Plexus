@@ -99,6 +99,78 @@ def _ancestry(run):
     return list(reversed(chain))
 
 
+def _identical(runs):
+    """-> ([cluster, ...], {run: label}) for runs whose traj.npz is byte-for-byte the same.
+
+    WHY THE TRAJECTORY AND NOT THE METRICS. Two runs can agree on every admitted metric and be
+    different experiments; only an identical trajectory proves the substrate did the same thing
+    twice. It is also the cheapest possible check -- one md5 per run, no parsing.
+
+    AND WHY THE LABEL NAMES THE DIFFERENCE. Three collisions in this campaign, three distinct
+    causes: `r003_01`/`r004_01` differ in NOTHING (a re-proposal a round apart that the dedupe
+    missed); `r002_01`/`r004_02` differ only in `comp_hash` and `src_op`, which are provenance and
+    not physics; `r004_12`/`r004_13` differ in `vth_frac`, which turns out to be INERT on that
+    composition. "Duplicate" would have flattened three different bugs into one word.
+    """
+    import hashlib
+    import yaml
+    h = {}
+    for r in runs:
+        p = os.path.join(LOG, r, "traj.npz")
+        if not os.path.exists(p):
+            continue
+        with open(p, "rb") as fh:
+            h.setdefault(hashlib.md5(fh.read()).hexdigest(), []).append(r)
+    clusters = [v for v in h.values() if len(v) > 1]
+
+    def flat(d, pre=""):
+        """Flatten a spec, keying an operator by its NAME and not its position in the list.
+
+        THE POSITIONAL VERSION LIED, and it lied confidently. `operators[2]` is a different operator
+        in two specs whose schedules differ, so comparing `operators[2].K_A` across them reported
+        the entire mechanics block as differing when both specs carried IDENTICAL mechanics -- and
+        the label read "INERT: Gamma,K_A,K_P,K_R,K_V,K_bend,K_lumen,K_purse,Lambda" on a pair whose
+        only real difference was `cone_deg`. A diff keyed on position measures the ordering, not the
+        parameters.
+        """
+        out = {}
+        if isinstance(d, dict):
+            for k, v in d.items():
+                if k != "name":
+                    out.update(flat(v, pre + "." + str(k)))
+        elif isinstance(d, list):
+            for i, v in enumerate(d):
+                # an operator entry is keyed by op name (+ an index for a repeated operator)
+                tag = f"[{v['op']}]" if isinstance(v, dict) and "op" in v else f"[{i}]"
+                out.update(flat(v, pre + tag))
+        else:
+            out[pre] = d
+        return out
+
+    why = {}
+    for c in clusters:
+        fs = []
+        for r in c:
+            try:
+                fs.append(flat(yaml.safe_load(open(os.path.join(LOG, r, "spec_run.yaml")))))
+            except Exception:
+                fs.append({})
+        allk = set().union(*[set(f) for f in fs]) if fs else set()
+        diff = sorted({k.split(".")[-1] for k in allk if len({f.get(k) for f in fs}) > 1})
+        # PROVENANCE IS NOT PHYSICS. A pair differing only in these ran the same experiment and the
+        # dedupe key was reading a serial number.
+        prov = {"comp_hash", "src_op", "run_key", "parent"}
+        if not diff:
+            tag = "SAME SPEC"
+        elif set(diff) <= prov:
+            tag = "PROVENANCE ONLY: " + ",".join(diff)
+        else:
+            tag = "INERT: " + ",".join(d for d in diff if d not in prov)
+        for r in c:
+            why[r] = tag
+    return clusters, why
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--glob", default="*", help="which runs, e.g. 'r01*' or 'sc_*'")
@@ -113,6 +185,14 @@ def main():
     # `--by` is ignored -- the order IS the information.
     ap.add_argument("--lineage", default=None, metavar="RUN",
                     help="tile RUN and its ancestors, oldest first")
+    # THE SHEET MUST BE ABLE TO ACCUSE THE RUN. Cedric spotted `r004_12` and `r004_13` as an
+    # identical pair by eye, in a 53-tile montage, and they were: same `traj.npz` to the byte from
+    # two specs differing in `vth_frac`. A human found in one glance what no check was looking for,
+    # and the campaign had already spent 6 of 50 runs on three such clusters. So the sheet computes
+    # it now -- runs whose trajectory is bit-identical are grouped adjacent and labelled with the
+    # reason they collided, which is not the same reason each time.
+    ap.add_argument("--identical", action="store_true",
+                    help="group runs with a bit-identical traj.npz and label why they collided")
     a = ap.parse_args()
 
     if a.lineage:
@@ -128,7 +208,16 @@ def main():
     if not runs:
         print(f"no run matching {a.glob!r} has a {a.image}"); return 1
 
-    if a.by and not a.lineage:
+    if a.identical and not a.lineage:
+        clusters, why = _identical(runs)
+        # duplicates first and adjacent, then everything else -- the sheet is FOR the collisions
+        order = [r for c in clusters for r in c] + [r for r in runs if not any(r in c for c in clusters)]
+        runs = order
+        cap = {r: why.get(r, "") for r in runs}
+        n_dup = sum(len(c) for c in clusters)
+        print(f"{n_dup} of {len(runs)} runs share a trajectory with another, in {len(clusters)} "
+              f"cluster(s)" if clusters else "no two runs share a trajectory")
+    elif a.by and not a.lineage:
         vals = {r: _metric(r, a.by) for r in runs}
         # A RUN WITH NO VALUE IS NOT A RUN WITH ZERO -- it goes last and says so, rather than
         # sorting among the worst as though it had been measured and found wanting.
