@@ -83,6 +83,17 @@ fourteenfold).
 `scope` is required. A claim with no scope is refused, because an unscoped claim cannot be
 transferred, and transfer is the only route to high confidence.
 
+**A CLAIM THAT SCOPES OR REFINES AN EXISTING ONE IS NEW.** This bar has been read as "a brand-new
+mechanism" and that is too high: in thirteen rounds it produced seven claims. *"C007 holds on
+`b_gs_plain` and fails on `b_star`"* is not a restatement of C007 -- it is the boundary of C007, it
+is falsifiable, and it is the kind of statement the framework weights highest, because a law tested
+on one lineage cannot exceed medium confidence however many times it is confirmed there. Give it
+`parents: ["C007"]` and it is recorded as a refinement rather than a rival.
+
+The same goes for a claim about the LOOP rather than the tissue -- `kind: harness`. "This parameter
+is inert on this composition", "these two runs are bit-identical", "this metric was measured before
+the gate changed". Those invalidate parts of the record and there is nowhere else for them to live.
+
 Omit the block entirely if the round induced nothing. A round that adds no claim is a real round;
 an invented one costs every future round that acts on it.
 

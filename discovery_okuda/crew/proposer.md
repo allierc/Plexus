@@ -156,6 +156,18 @@ question each name answers and the value it takes when the answer is *no*.
 **A number quoted from an older round may name a retired metric.** Those measurements are real and
 they stay on the record. A NEW prediction may only name what is in the bank you were handed.
 
+**`induce` COSTS ALMOST NOTHING AND YOU HAVE NEVER USED IT.** Across 183 slots of this campaign the
+acts break down `falsify` 36, `explore` 35, `transfer` 13, `predict` 9, `bound` 9, `discriminate` 3,
+and **`induce` 0**. It is in the vocabulary, it requires only `runs`, and its effect is *"creates a
+new claim from runs already on file"* -- so it asks a question the record has ALREADY ANSWERED and
+does not need a new simulation to settle.
+
+Use it when you notice, while reading the round, something the record shows and no claim states. The
+campaign has thirteen claims and all thirteen were written by hand before it started; in thirteen
+rounds it has induced none. A slot spent turning an existing result into a stated, falsifiable claim
+is worth more than a fourth variation on a knob, because every later round can act on a claim and
+nothing can act on a result nobody wrote down.
+
 `predict` must name **one metric from the bank, one direction, one number**. It is recorded before
 the run and scored automatically afterwards. You may add a `REFUTED if ...` sentence; it is kept,
 but the assertion before it is what gets checked.

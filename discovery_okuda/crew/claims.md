@@ -45,7 +45,28 @@ kind:
   mechanism:      "a statement about the modelled biology: what causes what in the tissue"
   instrument:     "a statement about a METRIC or an observation: what it can and cannot see"
   substrate_limit: "a statement about the model or solver: what this substrate cannot express or resolve"
+  harness:        "a statement about the LOOP ITSELF: what the machinery does, fails to do, or
+                   invalidates about its own record"
 ```
+
+`harness` WAS ADDED 14 AUGUST AND IT REPLACES A SECOND FILE. A `campaign/TEMPLATE_memory.md` has
+existed since 3 August describing a state document for exactly this material -- traps, operational
+facts, closed lines -- and nothing has ever written it. The obvious fix was to restore its writer;
+the better one is that these findings ARE claims and belong in the ledger with everything else:
+
+    "the replicate seed was the slot index, so two replicates in the same slot of different rounds
+     were bit-identical and the campaign measured a seed spread of exactly zero"
+    "20% of runs produce a trajectory bit-identical to another run's"
+    "cell_grow.vth_frac is inert on the b_bru_question composition"
+
+Every one of those was found by hand this week, none fits `mechanism`, `instrument` or
+`substrate_limit`, and every one INVALIDATES PART OF THE RECORD -- which is precisely why it needs
+evidence, a status and a supersession history rather than a line in a file nobody diffs. A second
+store of "what the campaign knows" is also how the previous loop ended up holding two contradictory
+standing laws for six rounds.
+
+A `harness` claim's `scope` names the machinery it is about -- `{"lineages": [], "regimes":
+["loop"]}` is legitimate -- because a defect in the loop has no lineage.
 
 ## status — and it may only move on evidence
 
