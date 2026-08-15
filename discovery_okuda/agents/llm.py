@@ -78,6 +78,20 @@ USAGE_LOG = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file_
 # (its own docstring below says so) and the Eye-check DESCRIBES; neither infers. So they, and only
 # they, drop to the fast model. Everything absent from this map keeps the session default.
 FAST_MODEL = os.environ.get("OKUDA_FAST_MODEL", "claude-haiku-4-5-20251001")
+
+# REASONING EFFORT, HIGH BY DEFAULT. Cedric, 14 August: "I want to set to high" -> "by default
+# high". The CLI takes low | medium | high | xhigh | max.
+#
+# WHAT IT COSTS, so the default is a decision and not a drift: effort is thinking time, and this
+# loop already negotiates that three other ways -- a per-role turn cap, a per-role timeout, and a
+# per-role model. A round is 8 LLM calls against a 60-90 minute wall clock dominated by 15 GPU
+# jobs, so minutes of extra thinking on the Proposer and the Analyst are free in wall-clock terms
+# and are spent exactly where the judgement is.
+#
+# A ROLE ON `FAST_MODEL` IS EXEMPT. Haiku is chosen for the roles that do not reason -- the Reader
+# LABELS and the Watcher turns text into JSON -- and raising effort on them would undo the reason
+# they were put there.
+DEFAULT_EFFORT = "high"
 AGENT_MODEL = {
     "reader":  FAST_MODEL,      # reads numbers + caption + strip, returns a LABEL
     "watcher": FAST_MODEL,      # text -> JSON, no tools, no judgement
@@ -643,7 +657,7 @@ def run_agent(agent, prompt, ledger=None, **over):
             # every word around it.
             prompt = _BREVITY_BLOCK.sub("", prompt).rstrip()
             prompt = f"{prompt}\n\n{tool_note(agent)}\n\n{brevity(agent)}"
-        ok, out = run_claude(prompt, timeout_min=tmin, allowed_tools=tools,
+        ok, out = run_claude(prompt, agent=agent, timeout_min=tmin, allowed_tools=tools,
                              max_turns=turns, **over)
     finally:
         _METER_DEPTH -= 1
@@ -843,7 +857,7 @@ def last_usage():
 
 
 def run_claude(prompt, timeout_min=DEFAULT_TIMEOUT_MIN, allowed_tools=None, cwd=None,
-               max_turns=60, quiet=False, model=None):
+               max_turns=60, quiet=False, model=None, agent=None):
     """Run the Claude CLI as a subprocess. Returns (ok, text).
 
     A timeout is NOT an error to be swallowed: it returns ok=False with whatever was produced,
@@ -898,6 +912,23 @@ def run_claude(prompt, timeout_min=DEFAULT_TIMEOUT_MIN, allowed_tools=None, cwd=
         cmd += ["--disallowedTools", *_deny]
     if model:
         cmd[1:1] = ["--model", model]
+    # REASONING EFFORT, per role, from the environment. Cedric, 14 August: "how can I select in the
+    # loop the effort of the claude agent, I want to set to high."
+    #
+    # NOT A CONSTANT IN THIS FILE, because effort trades directly against wall clock and this loop
+    # already has a turn cap, a timeout and a per-role model doing the same negotiation. `high` on
+    # the Proposer and the Analyst is where the judgement is; `high` on a role that fills six slots
+    # from a picture buys nothing and costs minutes on a fan-out that runs once per run.
+    #
+    #     OKUDA_EFFORT=high                     every role
+    #     OKUDA_EFFORT_PROPOSER=high            one role, overrides the above
+    #
+    # A role on FAST_MODEL is left alone: haiku is chosen precisely because those roles do not
+    # reason, and raising effort on them would undo the reason they were put there.
+    _eff = (os.environ.get(f"OKUDA_EFFORT_{agent.upper()}") if agent else None) \
+        or os.environ.get("OKUDA_EFFORT", DEFAULT_EFFORT)
+    if _eff and model != FAST_MODEL:
+        cmd[1:1] = ["--effort", _eff]
     lines, t0 = [], time.time()
     _LAST_USAGE.clear()
     try:
