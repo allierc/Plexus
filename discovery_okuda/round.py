@@ -72,6 +72,12 @@ FLOW = os.path.join(HERE, "crew", "flow.yaml")
 # carries the procedure and the judgement, config carries the numbers. A value the engine must OBEY
 # should not be parsed out of prose, where it can silently drift from the number that actually ran.
 N_SLOTS = 16          # 8 route B + 8 route A (route_a.slots in crew/flow.yaml)
+# THE SAME NUMBER campaign_loop.EMPTY_STOP uses, and it lives here because THIS is where the
+# condition is now detected. Two rounds that launch and measure nothing is a broken pipe, not a run
+# of bad luck: the batch either reaches the cluster or it does not.
+EMPTY_ROUNDS_STOP = 2
+EMPTY_EXIT = 5        # campaign_loop.EMPTY_EXIT -- the driver's own empty-round branch
+_EMPTY = []           # per-round "measured nothing", for the trailing streak
 FRAMES = 900
 CONTROL_SLOT = 0
 MENU_LIMIT = 40
@@ -2652,7 +2658,33 @@ def campaign(rounds=1, mode="composition", n_slots=N_SLOTS, fresh=True):
             # the menu are unchanged, so continuing burns a Proposer call per round to no effect.
             print("[campaign] the round launched nothing -- stopping rather than repeating it")
             break
-        print(f"[campaign] {rid}: {n} run(s) recorded")
+
+        # LAUNCHED IS NOT MEASURED, AND THAT DISTINCTION COST 41 ROUNDS. `launch` returns its names
+        # whether or not a single bsub landed, so `n` was 15 on rounds that produced nothing at all.
+        # The round then returned normally, exited 0, and `campaign_loop`'s entire empty-round
+        # guard -- EMPTY_STOP=4, NO_COMPUTE_STOP=3, all of it behind `if code == EMPTY_EXIT` -- was
+        # never reached. `consecutive_empty` was never even incremented.
+        #
+        # MEASURED ON 14 AUGUST: r012 through r052. Forty-one consecutive rounds, every one
+        # launching 15 names and scoring zero, each burning a Proposer, a Forecaster, an Eye, an
+        # Analyst and a Grounder. The Grounder itself wrote "r050 is the 38th consecutive execution
+        # loss" -- the loop could SAY it and could not ACT on it, because the exit code said success.
+        #
+        # This is the producer-with-no-consumer defect at the process level: the driver's guard was
+        # well-formed and unreachable. The count that matters is runs with METRICS.
+        got = len(ctx.get("metrics") or {})
+        _EMPTY.append(got == 0)
+        if got == 0:
+            run = sum(1 for x in reversed(_EMPTY) if x)   # trailing streak
+            print(T_.warn(f"[campaign] {rid}: launched {n}, MEASURED NONE "
+                          f"({run} round(s) in a row)"))
+            if run >= EMPTY_ROUNDS_STOP:
+                print(T_.no(f"[campaign] STOPPING: {run} rounds launched a batch and measured "
+                            f"nothing. The jobs are not landing -- check the cluster and the ssh "
+                            f"agent (see cluster.submitted_ids, which names the usual cause)."))
+                sys.exit(EMPTY_EXIT)
+            continue
+        print(f"[campaign] {rid}: {n} run(s) recorded, {got} measured")
     return out
 
 
