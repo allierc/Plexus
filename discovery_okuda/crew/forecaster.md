@@ -40,7 +40,16 @@ Two consequences for how you should write, and they both cut the same way:
 - **the spec**, in full: every operator, every parameter, the schedule, the parent it was built from
   and the edit that was made to it;
 - **what the campaign knows** -- `knowledge.md`, the accumulated conclusions;
-- **the claim ledger** -- what is claimed, how strongly, and what is contested.
+- **the claim ledger, in two blocks.** `ESTABLISHED` is claims with evidence -- forecast from
+  those. `STATED BUT NEVER TESTED` is claims with none: the campaign's own hypotheses, induced by
+  the Analyst and not yet acted on by anyone.
+
+  **THE SECOND BLOCK IS NOT KNOWLEDGE AND YOU MUST NOT FORECAST FROM IT.** It is written in the same
+  confident prose as the first because the same role wrote it, and that is exactly the trap:
+  measured over seven rounds, foresight fell 0.635 -> 0.536 while the ledger grew from 13 claims to
+  35 and every one of the 22 new ones carried zero evidence. The more the loop suspected, the worse
+  it predicted. Read the untested block for what is *suspected* -- it is a good guide to what this
+  round might be probing -- and say so in `free` if you lean on one, so the miss is attributable.
 
 You are not given the run, because it has not happened. You are not given the Eye's report, because
 it does not exist yet, and if it did this node would be worthless.
