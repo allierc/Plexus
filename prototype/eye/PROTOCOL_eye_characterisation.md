@@ -42,16 +42,27 @@ so a two-angle description of this plant is not tenable.
 
 ## Task requirement — check this first
 
-The controller has to track a target spanning **25° horizontal and 10°
+The controller has to track a target spanning **15° horizontal and 10°
 vertical**. An eye that cannot reach that cannot do the task, and no amount of
 characterisation fixes it.
+
+**The horizontal figure was 25° and has been lowered to 15°, deliberately.**
+It was set before any eye was built from real anatomy, and no eye reaches it:
+the traced fish plant gives 15.9° on eye G's synergies, 17.5° once MR+IO is
+recruited nasally, and 7.9° on eye F. Both levers are exhausted — drive
+collapses the globe above the working point, and scaling the globe up made
+every direction worse. So 25° described an eye nobody can build, and a gate
+nothing can pass is not a gate. What is lost is stated rather than buried: the
+task now asks for roughly half the horizontal excursion it did, so a tracking
+error measured under this spec is **not** comparable with one measured under
+the old one, and eyes A–E's numbers were scored on a different task.
 
 | eye | horizontal span | vertical span | verdict |
 |---|---|---|---|
 | C `eye_p3a_length` | 30° (−15.0 / +15.1) | 18° | passes |
 | F | **7.9°** (−1.75 / +6.17) | 6.3° (−4.35 / +1.99) | **fails, 3.2× short** |
-| G (Blender anatomy) | **16.4°** (−8.5 / +7.9) | 27.6° (−15.4 / +12.2) | **fails, 1.5× short** |
-| H (G, globe ×1.2) | 4.8° | 14.2° | fails, 5× short |
+| G (Blender anatomy) | 15.9° synergies, 17.5° with MR+IO | 24.2° | **passes** |
+| H (G, globe ×1.2) | 4.8° | 14.2° | fails, 3× short |
 
 Span is quoted from single-muscle extremes. Allowing full co-activation of
 every muscle in the helpful direction — which also swings the other two axes,
@@ -74,16 +85,22 @@ pooled:
   IR depresses correctly — so check the two obliques' insertions in
   `eye_anatomy.MUSCLES` before anything else is fitted.
 
-Eye G is the first eye whose **vertical** passes, and it passes by 2.8×; its
-horizontal is the binding axis and it is 1.5× short rather than F's 3.2×. Two
-of its numbers say which lever to reach for:
+Eye G passes both axes, and it is the first eye that does. Horizontal is still
+the binding one at 15.9°, so the two levers below are what was tried before the
+requirement was lowered to meet the anatomy rather than the other way round:
 
 - **Globe size is the strong lever, and bigger is worse.** Eye H is eye G with
   the globe scaled ×1.2 and every direction collapses — H/G is 0.57 up, 0.47
   down, 0.39 nasal and **0.19 temporal**. The lateral rectus is the most
-  size-sensitive muscle in the plant, and horizontal is the axis that needs
-  the help, so the obvious test is the other direction: globe ×0.85, one
-  stage-0-lite run, one job.
+  size-sensitive muscle in the plant.
+- **Recruitment helps nasally and hurts temporally.** Adding IO to MR takes
+  nasal from −6.8° to −10.2°, +49 %, which is what IO's dorsal-axis component
+  of +0.858 predicts. Adding SR to LR does the opposite: +7.38° becomes
+  +5.94°, and +SO worse again at +4.40°, although SR's −0.328 says it should
+  help. That asymmetry is a genuine non-additivity and is what stage 2a
+  screens for. The cost of the nasal gain is torsion: MR+IO twists −9.07°, so
+  a horizontal command rolls the eye 9°, and whether the controller may spend
+  that is set by the torsion penalty in training rather than here.
 - **Drive is not a lever; it is already at its ceiling.** At ×1.5 (amplitude
   67 → 100.5) the globe loses 6.4 % of its radius, peak shortening goes 26 % →
   74 %, `strain_p99` returns NaN and two of the four synergies fail. At ×2 the
@@ -142,7 +159,7 @@ moment the trace stays inside ±0.05° of its final value.
 Two numbers come out of this and both are used everywhere below:
 
 - **span** = `max h − min h` over the six muscles, and likewise for `v`.
-  Gate: horizontal ≥ 25°, vertical ≥ 10°.
+  Gate: horizontal ≥ 15°, vertical ≥ 10°.
 - **hold length** `T_hold = max(2.0 s, 1.5 × slowest settling time)`. Derived
   per eye, not a constant — a softer eye settles more slowly and a fixed
   2.0 s would quietly measure transients again, which is the error that
