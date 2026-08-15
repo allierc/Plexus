@@ -66,6 +66,8 @@ LOG_OKUDA = os.path.join(ROOT, "log", "okuda")
 # now has two vertex-model couplings on it, so both are named the same way round.
 ANCHOR_OLD = "<h3>Turing × vertex — patterning &amp; shaping a growing tissue</h3>"
 ANCHOR_NEW = "<h3>Vertex + Turing — patterning &amp; shaping a growing tissue</h3>"
+# The section Vertex + MPM now follows: the interface reads better once MLS-MPM has been introduced.
+MPM_SECTION = "<h3>Continuum mechanics — MLS-MPM</h3>"
 
 
 def _run_dir(name):
@@ -971,15 +973,17 @@ def _patch(path, block, rendered=False):
         s = s[:i] + block + s[j:]
         what = "replaced"
     else:
-        anchor = anchor_old if anchor_old in s else anchor_new
+        # AFTER THE MLS-MPM SECTION, not after Vertex + Turing: the interface is read once the
+        # solver it couples to has been introduced. A section is placed after another by finding
+        # the NEXT h3 -- a section ends where the following one begins, and inserting straight
+        # after a heading would land inside that section's own prose.
+        anchor = MPM_SECTION if not rendered else MPM_SECTION.replace("<h3>", '<h3 class="anchored">')
         if anchor not in s:
-            sys.exit(f"anchor heading not found in {path}")
-        # AFTER the anchor section, which ends at the `</div>` closing its gallery -- i.e. just before
-        # the next h3. Inserting straight after the heading would put this section INSIDE the previous
-        # one's prose.
+            sys.exit(f"the MLS-MPM heading was not found in {path}")
         k = s.index(anchor)
         tag = "<h3" if rendered else "<h3>"
-        nxt = s.index(tag, k + len(anchor))
+        nxt = s.find(tag, k + len(anchor))
+        nxt = len(s) if nxt < 0 else nxt
         s = s[:nxt] + block + "\n\n" + s[nxt:]
         what = "inserted"
     s = s.replace(anchor_old, anchor_new)
@@ -1081,10 +1085,13 @@ def _patch3(path, block, rendered=False):
         s = s[:i] + block + s[j:]
         what = "replaced"
     else:
-        if END not in s:
-            sys.exit(f"vertex-mpm end marker not found in {path}")
-        k = s.index(END) + len(END)
-        s = s[:k] + "\n\n" + block + s[k:]
+        # ANCHORED ON THE MLS-MPM HEADING, not on the Vertex + MPM block: that block has moved
+        # after MLS-MPM, and chaining to it would drag this section along behind it.
+        anchor = MPM_SECTION if not rendered else MPM_SECTION.replace("<h3>", '<h3 class="anchored">')
+        if anchor not in s:
+            sys.exit(f"the MLS-MPM heading was not found in {path}")
+        k = s.index(anchor)
+        s = s[:k] + block + "\n\n" + s[k:]
         what = "inserted"
     open(path, "w").write(s)
     print(f"[minisite] {os.path.relpath(path, ROOT)}: spheroid/BM/matrix section {what}")
