@@ -79,19 +79,24 @@ USAGE_LOG = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file_
 # they, drop to the fast model. Everything absent from this map keeps the session default.
 FAST_MODEL = os.environ.get("OKUDA_FAST_MODEL", "claude-haiku-4-5-20251001")
 
-# REASONING EFFORT, HIGH BY DEFAULT. Cedric, 14 August: "I want to set to high" -> "by default
-# high". The CLI takes low | medium | high | xhigh | max.
+# REASONING EFFORT. The CLI takes low | medium | high | xhigh | max, and this loop passed it NEVER
+# until 14 August -- so every call in every previous campaign ran at whatever the session default
+# was, unrecorded, and no round can now say what effort produced it.
 #
-# WHAT IT COSTS, so the default is a decision and not a drift: effort is thinking time, and this
-# loop already negotiates that three other ways -- a per-role turn cap, a per-role timeout, and a
-# per-role model. A round is 8 LLM calls against a 60-90 minute wall clock dominated by 15 GPU
-# jobs, so minutes of extra thinking on the Proposer and the Analyst are free in wall-clock terms
-# and are spent exactly where the judgement is.
+# MEDIUM. Cedric asked for high, then for medium once the cost was on the table. Both are
+# defensible and the reason to write the number down is that neither is obvious: effort is thinking
+# tokens, this loop makes 8 calls a round against a 60-90 minute wall clock dominated by 15 GPU
+# jobs, so raising it is cheap in TIME and not in tokens. Medium is the setting that leaves the
+# per-role timeouts (`proposer` 5 min, `analyst` 10) with headroom they were measured against.
 #
-# A ROLE ON `FAST_MODEL` IS EXEMPT. Haiku is chosen for the roles that do not reason -- the Reader
-# LABELS and the Watcher turns text into JSON -- and raising effort on them would undo the reason
-# they were put there.
-DEFAULT_EFFORT = "high"
+# Raise it where the judgement is, per role, rather than globally:
+#     OKUDA_EFFORT=high                every role
+#     OKUDA_EFFORT_PROPOSER=high       one role, and it beats the global
+#
+# A ROLE ON `FAST_MODEL` IS SKIPPED -- though as of today that is no live role: `reader` and
+# `watcher` were deleted in Phase 12, and the five that remain (proposer, forecaster, eye, analyst,
+# grounder) are all on the session model. The guard stays because the map does.
+DEFAULT_EFFORT = "medium"
 AGENT_MODEL = {
     "reader":  FAST_MODEL,      # reads numbers + caption + strip, returns a LABEL
     "watcher": FAST_MODEL,      # text -> JSON, no tools, no judgement
