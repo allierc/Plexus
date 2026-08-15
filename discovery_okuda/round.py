@@ -2716,7 +2716,16 @@ def claim_ledger(ctx):
     rank = {"contested": 0, "proposed": 1, "stale": 2, "supported": 3, "refuted": 4,
             "superseded": 5}
     out = []
-    for c in sorted(cur.values(), key=lambda c: (rank.get(c.get("status"), 9), c["id"])):
+    # AN UNTESTED CLAIM COMES BEFORE A WELL-WORN ONE, within its status band. Measured 15 August:
+    # the loop had induced 13 claims and every one sat at ZERO evidence while C007 carried 25 rows
+    # and C004 17. It had started making claims and had not started testing its own -- the acts
+    # kept landing on the seeded ten because those were the ones the ledger led with. Ordering by
+    # evidence count inside each band puts a claim nobody has acted on in front of a claim the
+    # campaign has argued about for ten rounds, which is where a slot buys the most.
+    def _ev(c):
+        return len(c.get("evidence_for") or []) + len(c.get("evidence_against") or [])
+
+    for c in sorted(cur.values(), key=lambda c: (rank.get(c.get("status"), 9), _ev(c), c["id"])):
         f, a = K.weigh(c, spec)
         sc = c.get("scope") or {}
         out.append({"id": c["id"], "statement": c["statement"], "kind": c["kind"],

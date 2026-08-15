@@ -156,6 +156,13 @@ question each name answers and the value it takes when the answer is *no*.
 **A number quoted from an older round may name a retired metric.** Those measurements are real and
 they stay on the record. A NEW prediction may only name what is in the bank you were handed.
 
+**AND TEST THE CLAIMS THE LOOP MADE, NOT ONLY THE ONES IT WAS GIVEN.** Measured 15 August: 13 of
+the ledger's 26 claims were induced by this campaign, and ALL THIRTEEN sat at zero evidence while
+C007 carried 25 rows and C004 seventeen. The loop had learned to make claims and had not learned to
+test its own. A claim with no evidence is where a slot buys the most -- it can move from `proposed`
+to `contested` or `supported` in one round, where a fourteenth act on C007 moves nothing. The ledger
+you are handed now lists untested claims FIRST within each status band; prefer them.
+
 **`induce` COSTS ALMOST NOTHING AND YOU HAVE NEVER USED IT.** Across 183 slots of this campaign the
 acts break down `falsify` 36, `explore` 35, `transfer` 13, `predict` 9, `bound` 9, `discriminate` 3,
 and **`induce` 0**. It is in the vocabulary, it requires only `runs`, and its effect is *"creates a
