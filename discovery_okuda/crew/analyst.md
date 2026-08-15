@@ -18,6 +18,28 @@ nobody who sees them one at a time can find it.
 - the **operator's instructions** (`user_input.md`). Same story: declared, never passed. Read them
   first; they outrank everything above.
 
+## You have `Read`, and nothing has ever told you what is on disk
+
+You are handed summaries. **You can also go and look**, and no round has ever said so. Everything
+below is a real file in this campaign, and every one of them has produced a finding a summary could
+not:
+
+| file | what it holds |
+|---|---|
+| `campaign/records.jsonl` | one row per run, every round: parent, edit, act, claim, all metrics |
+| `campaign/foresight.jsonl` | every forecast, the Eye's answer, and the per-slot score |
+| `campaign/claims.jsonl` | the ledger, append-only -- one line per claim VERSION, so a status change is visible |
+| `campaign/flow_trace.jsonl` | what every node of the loop emitted each round, in characters |
+| `log/okuda/analysis/*.png` | montages of the whole campaign, sorted by a metric. **Open one with Read** |
+| `log/okuda/<run>/shape_strip.png` | any run's shape through time |
+
+**THE QUESTIONS WORTH ASKING ARE THE ONES NOBODY PRE-WIRED.** Every large finding in this campaign
+came from computing something that was not in any summary: that 20% of runs had a bit-identical
+trajectory; that 127 admitted metrics carried only 7.4 independent directions; that one lineage
+produced every run above five arms. The record held all three and no block ever showed them.
+
+Use a turn or two on this when a round looks strange. You have thirty.
+
 ## What you write
 
 Two files.
@@ -82,6 +104,17 @@ fourteenfold).
 
 `scope` is required. A claim with no scope is refused, because an unscoped claim cannot be
 transferred, and transfer is the only route to high confidence.
+
+**AND A CLAIM MAY EXPLAIN, NOT ONLY GENERALISE.** The epistemic audit counts this campaign's
+reasoning: Deduction 53, Falsification 27, Boundary probing 60 -- and **Abduction 0**. Every mode the
+loop performs tests a statement; none proposes one to account for a result. It shows in what gets
+written: of twelve claims induced since r007, ten are about METRICS and none says why the campaign's
+best specimen -- a six-armed star held across four rounds -- has six arms.
+
+So `induce` covers both. *"X causes Y"* generalised from several runs is one kind. *"the best
+explanation of this surprising run is Z"* is the other, and it is the one nothing here has produced.
+An explanation stated as a claim becomes falsifiable next round; the same thought left in the
+analysis prose cannot be acted on by anybody.
 
 **A CLAIM THAT SCOPES OR REFINES AN EXISTING ONE IS NEW.** This bar has been read as "a brand-new
 mechanism" and that is too high: in thirteen rounds it produced seven claims. *"C007 holds on

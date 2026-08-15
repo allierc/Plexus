@@ -107,6 +107,8 @@ def run(bundle):
         ("WHAT IS CURRENTLY CLAIMED -- contested first, because only a contested claim can be "
          "`discriminate`d. Every Route B slot must name an `act` and the claim `on` which it acts",
          bundle.get("claim_ledger"), {"as_json": True, "limit": 20000}),
+        ("THE CAMPAIGN AS A SERIES -- across rounds, not just this one",
+         bundle.get("trends")),
         ("THE SEED FLOOR OF EACH METRIC -- the spread between two runs of the SAME composition. A "
          "prediction asking for less than this is refused by R7 before it runs; the floors span "
          "fourteenfold, so the same 10% ask is an experiment in one metric and a coin toss in "

@@ -2690,6 +2690,112 @@ def campaign(rounds=1, mode="composition", n_slots=N_SLOTS, fresh=True):
 
 
 
+def track_record(ctx):
+    """What the Analyst's OWN claims came to. The one thing it has never been told.
+
+    IT HAS INDUCED 27 CLAIMS AND LEARNED THE FATE OF NONE. Every round it is handed the ledger and
+    asked whether anything new is worth stating -- and the ledger it reads never distinguishes the
+    claims it wrote from the thirteen it was seeded with, nor says which of its own were acted on.
+    Measured 15 August: 25 of 27 induced claims had never been tested by any slot, and nothing in
+    the loop had ever said so to the role that wrote them.
+
+    A REVIEWER WHO NEVER LEARNS WHICH OF ITS CLAIMS SURVIVED CANNOT CALIBRATE. This is the eighth
+    producer-with-no-consumer in this campaign and it is on the loop's own output: `claims.jsonl`
+    carries `derived_by`, `created` and every evidence row, and no node has ever read them back to
+    their author.
+
+    NOT GIVEN TO THE FORECASTER, deliberately. Cedric, 13 August: showing a forecaster its own
+    scores makes it "learn distribution and sample from it not looking at the knowledge" -- and the
+    concern is currently correct as arithmetic, because a constant forecast scores 0.488 against the
+    Forecaster's 0.448. Feedback would be a gradient straight to predicting the mode. That channel
+    waits until the score is a SKILL score over the base rate, where collapsing earns zero.
+    """
+    try:
+        import claims as K
+    except Exception:
+        return {}
+    cur, _h = K.load()
+    mine = [c for c in cur.values() if c.get("derived_by") == "induce"]
+    if not mine:
+        return {}
+
+    def _ev(c):
+        return len(c.get("evidence_for") or []) + len(c.get("evidence_against") or [])
+
+    tested = [c for c in mine if _ev(c)]
+    out = {
+        "you have induced": len(mine),
+        "of those, tested by some later slot": len(tested),
+        "never tested": [f"{c['id']} ({c.get('created')}): {c['statement'][:90]}"
+                         for c in sorted(mine, key=lambda c: c["id"]) if not _ev(c)][:12],
+        "tested, and what happened": [
+            f"{c['id']} -> {c.get('status')} on {_ev(c)} row(s): {c['statement'][:80]}"
+            for c in sorted(tested, key=lambda c: c["id"])],
+        "note": ("a claim nobody tests is a sentence. If a statement of yours has sat untested for "
+                 "several rounds, either it was not worth stating or it was not stated in a form "
+                 "anything can act on -- one metric, one direction, one number is what a later "
+                 "slot needs."),
+    }
+    print(T_.quiet(f"[round] track record: {len(mine)} induced, {len(tested)} ever tested"))
+    return out
+
+
+def trends(ctx):
+    """The campaign as a SERIES, not as this round. Every role sees only its own round otherwise.
+
+    THE PATTERNS THAT MATTER ARE ALL CROSS-ROUND and nothing in the loop could see one. Foresight
+    fell 0.635 -> 0.501 over ten rounds; the ledger grew 13 -> 40 claims while 32 stayed untested;
+    one lineage produced every run above five arms. A human found each of those by computing it by
+    hand from files the loop had already written. None of it is expensive -- it is four series over
+    jsonl that is on disk -- and no round had ever been shown a single one.
+    """
+    import glob as _g
+    out = {}
+    fp = os.path.join(CAMPAIGN, "foresight.jsonl")
+    if os.path.exists(fp):
+        fs = []
+        for line in open(fp):
+            try:
+                d = json.loads(line)
+                fs.append((d.get("round"), d.get("foresight")))
+            except Exception:
+                pass
+        out["foresight by round"] = dict(fs[-12:])
+        out["foresight note"] = ("how well the campaign's own knowledge predicted the round before "
+                                 "it ran. A constant 'always a sphere' forecast scores about 0.49 "
+                                 "on this corpus, so that is the number to beat, not zero.")
+    rows = []
+    if os.path.exists(RECORDS):
+        for line in open(RECORDS):
+            try:
+                rows.append(json.loads(line))
+            except Exception:
+                pass
+    if rows:
+        by = collections.OrderedDict()
+        for r in rows:
+            by.setdefault(str(r.get("round")), []).append(r)
+        out["acts by round"] = {k: dict(collections.Counter(x.get("act") for x in v if x.get("act")))
+                                for k, v in list(by.items())[-8:]}
+        best = {}
+        for k, v in by.items():
+            vals = [(x.get("metrics") or {}).get("n_tubes_final") for x in v]
+            vals = [x for x in vals if isinstance(x, (int, float))]
+            if vals:
+                best[k] = max(vals)
+        out["best n_tubes_final by round"] = dict(list(best.items())[-12:])
+    try:
+        import claims as K
+        cur, _h = K.load()
+        ev = sum(1 for c in cur.values()
+                 if (c.get("evidence_for") or []) + (c.get("evidence_against") or []))
+        out["ledger"] = {"claims": len(cur), "with evidence": ev,
+                         "stated but never tested": len(cur) - ev}
+    except Exception:
+        pass
+    return out
+
+
 def claim_ledger(ctx):
     """The claims the round may act on -- the Proposer's view of what is currently known.
 
