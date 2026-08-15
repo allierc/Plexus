@@ -135,7 +135,13 @@ class Rig07d(Rig07c):
         return super()._epi_anchor(t)
 
 
-def main():
+def build(cls=None, extra=None, add_args=None, pass_args=(), default_name=None, **over):
+    """Parse this ladder's arguments, build `cls`, and run it.
+
+    `add_args` registers a rig's OWN options on the same parser and `pass_args` names which of them
+    reach its constructor, so a descendant adds a knob without owning a parser or a loop.
+    """
+    cls = cls or Rig07d
     ap = argparse.ArgumentParser()
     ap.add_argument("--device", default="cuda:0")
     ap.add_argument("--frames", type=int, default=401)
@@ -152,16 +158,30 @@ def main():
     # 81,920, exactly what max_refine=2 allocates, so it ran out. This is sizing, not
     # physics: the same mesh, with room to exist.
     ap.add_argument("--max-refine", dest="max_refine", type=int, default=3)
-    ap.add_argument("--name", default=NAME)
+    ap.add_argument("--name", default=default_name or NAME)
+    if add_args:
+        add_args(ap)
     a = ap.parse_args()
+    over.update({k: getattr(a, k) for k in pass_args})
     d = os.path.join(B.LOG, a.name)
     os.makedirs(d, exist_ok=True)
-    P = dict(subdiv=4, E=400.0, thickness=2.0e-3, nu=0.3, kn=5.0, sigma_T=7.0, zeta=20.0,
+    kw = dict(subdiv=4, E=400.0, thickness=2.0e-3, nu=0.3, kn=5.0, sigma_T=7.0, zeta=20.0,
              s_target=1.0, k_drive=50.0, dev=a.device, max_refine=a.max_refine,
              edge_trigger=1.45,
-             reseed=True, tau_bm=40.0, rho_crit=0.0)
-    rig = Rig07d(N0=a.N0, Nf0=a.Nf0, split_budget=a.budget, every=a.every,
-                 batched=a.batched, cull_below=a.cull_below, bind_max=a.bind_max, **P)
+              reseed=True, tau_bm=40.0, rho_crit=0.0)
+    kw.update(over)
+    rig = cls(N0=a.N0, Nf0=a.Nf0, split_budget=a.budget, every=a.every,
+              batched=a.batched, cull_below=a.cull_below, bind_max=a.bind_max, **kw)
+    return run(rig, a, d, extra=extra)
+
+
+def run(rig, a, d, extra=None):
+    """The loop, the store, the two mesh gates and the spec -- shared by every rig in this ladder.
+
+    07d, 07e, 07g and 07h were made by substituting strings into one another and had begun to drift:
+    the same loop existed four times, so a fix to the store or a new series had to be made four times
+    and was not. The rig is the only thing that differs between them, so the rig is the argument.
+    """
     S = {k: [] for k in ("t", "cells", "plaques", "ppc", "nb_med", "nf_mean", "receptor_total",
                          "lam", "n_face", "n_node", "edge", "splits")}
     store, i, t0 = {}, 0, time.time()
@@ -220,8 +240,8 @@ def main():
     json.dump(res, open(os.path.join(d, "metrics.json"), "w"), indent=1)
     from spec_06 import write_spec
     write_spec(d, rig, name=a.name, frames=a.frames, matrix_src=SRC,
-               extra=dict(kind="cell-owned adhesion + local refinement", N0=a.N0,
-                          split_budget=a.budget, splits=int(rig._splits)))
+               extra={**dict(kind="cell-owned adhesion + local refinement", N0=a.N0,
+                             split_budget=a.budget, splits=int(rig._splits)), **(extra or {})})
     g, h = res["G78"], res["G44"]
     print(f"[07d] {len(S['t'])} kept frames in {time.time()-t0:.0f}s -- faces {S['n_face'][0]} -> "
           f"{S['n_face'][-1]} in {rig._splits} bisections, cells {S['cells'][0]} -> "
@@ -230,6 +250,10 @@ def main():
     print(f"[07d] G78 {'PASS' if g['passed'] else 'FAIL'} (max step {100*g['max_step']:.1f}%, moves "
           f"on {g['steps_that_move']} of {g['of']}), G44 {'PASS' if h['passed'] else 'FAIL'} "
           f"(edge {h['range'][0]:.3f}..{h['range'][1]:.3f}x) -> {d}", flush=True)
+
+
+def main():
+    build()
 
 
 if __name__ == "__main__":

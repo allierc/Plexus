@@ -443,17 +443,22 @@ def render(run, frames=None, still=False, src="06_spheroid_ecm", out_name=None, 
                 hold = np.isin(nd, liven)
                 if n == 0:
                     print(f"[vtk_ecm] plaques: {int(hold.sum())} of {len(nd)} still hold a live "
-                          f"face; {int((~hold).sum())} hold nothing and are not drawn; 1 in "
-                          f"{max(1, int(np.ceil(max(int(hold.sum()), 1) / 800.0)))} of the rest "
-                          f"is drawn", flush=True)
-                nd, pp = nd[hold], pp[hold]
-                # AND A CAP ON HOW MANY ARE DRAWN. Once the sheet has peeled off, each link is a long
-                # segment rather than a short one, and two thousand of them cover the field the panel
-                # exists to show. 800 is enough to read the set as a set; the stride is stated.
-                st = max(1, int(np.ceil(max(len(pp), 1) / 800.0)))
-                if not len(pp):
-                    st = 1
-                a, b2 = pp[::st], bm["X"][j][nd[::st]]
+                          f"face; {int((~hold).sum())} hold nothing and are not drawn; the "
+                          f"first {min(int(hold.sum()), 800)} of the rest are drawn, and they are "
+                          f"the SAME plaques at every frame", flush=True)
+                # AND A CAP ON HOW MANY ARE DRAWN, ON THE SAME PLAQUES EVERY FRAME. Once the sheet
+                # has peeled off, each link is a long segment rather than a short one, and two
+                # thousand of them cover the field the panel exists to show; 800 is enough to read
+                # the set as a set. But a cap taken as `[::ceil(n/800)]` picks a DIFFERENT one-in-N
+                # sample whenever the count changes, and in 07h the count runs 2,389 -> 72,606, so
+                # the stride runs 3 -> 91 and every link in the panel blinks -- the movie reads as
+                # adhesion appearing and vanishing when `plaque_identity` measures 98.3% of the set
+                # persisting frame to frame and a median drift of 0.13 deg. The contact arrays are
+                # append-only, so the FIRST 800 entries are the same 800 plaques from the first frame
+                # to the last: a fixed sample, carried by the tissue, which is what the panel is for.
+                keep = np.flatnonzero(hold)[:800]
+                nd, pp = nd[keep], pp[keep]
+                a, b2 = pp, bm["X"][j][nd]
                 seg = np.empty((2 * len(a), 3), float)
                 seg[0::2], seg[1::2] = a, b2
                 ln = np.column_stack([np.full(len(a), 2), np.arange(0, 2 * len(a), 2),
