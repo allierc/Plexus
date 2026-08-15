@@ -238,6 +238,19 @@ nodes:
   - id: claim_ledger
     code: round.claim_ledger
 
+  # WHAT THE ANALYST'S OWN CLAIMS CAME TO. It has induced 27 and been told the fate of none: 25 had
+  # never been tested by any slot and nothing in the loop said so to the role that wrote them. A
+  # reviewer that never learns which of its claims survived cannot calibrate what is worth stating.
+  - id: track_record
+    code: round.track_record
+
+  # THE CAMPAIGN AS A SERIES. Every role sees its own round and nothing else, and every pattern that
+  # has mattered was cross-round -- foresight falling 0.635 -> 0.501 over ten rounds, the ledger
+  # growing 13 -> 40 with 32 untested, one lineage producing every run above five arms. All of it
+  # was computed BY HAND from files the loop had already written.
+  - id: trends
+    code: round.trends
+
   - id: metric_floors
     code: round.metric_floors
 
@@ -306,7 +319,7 @@ nodes:
   - id: proposer
     agent: proposer
     in: [parents, menu, metric_bank, coverage, diagnosis, history, refusals, user_input,
-         grounding, claim_ledger, metric_floors]
+         grounding, claim_ledger, metric_floors, trends]
     out: edits
 
   # ---- build, launch, measure ----------------------------------------------------
@@ -641,7 +654,7 @@ nodes:
   - id: analyst
     agent: analyst
     in: [control, metrics, predictions, observations, observed, history, user_input,
-         route_a_results, claim_ledger]
+         route_a_results, claim_ledger, track_record, trends]
 
   - id: grounder
     agent: grounder

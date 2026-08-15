@@ -84,6 +84,10 @@ def run(bundle):
         # warrants a claim nobody has stated yet.
         ("What is currently claimed -- do not restate these, act on them or add to them",
          bundle.get("claim_ledger"), {"as_json": True, "limit": 20000}),
+        ("YOUR OWN TRACK RECORD -- the claims you induced and what became of them",
+         bundle.get("track_record")),
+        ("THE CAMPAIGN AS A SERIES -- what has been happening across rounds, not just this one",
+         bundle.get("trends")),
         ("Your task", f"Append this round's analysis to {a_md}. Do NOT write {k_md}: it is "
                       f"rendered from the claim ledger. If -- and only if -- this round shows "
                       f"something no existing claim states, put IN YOUR REPLY a fenced ```json "

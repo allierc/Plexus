@@ -460,7 +460,10 @@ def test_the_live_flow_loads():
     # failing rather than updated, so the guard was live and unread. The three added on 13 August
     # are `planned` (the names, emitted before `launch` so the forecast can fan out over them),
     # `forecaster`, and `foresight` (terminal -- it scores the knowledge and nothing consumes it).
-    check(len(ids) == 29, f"29 nodes: {len(ids)}")
+    # 29 -> 31 on 15 August: `track_record` (what the Analyst's own claims came to -- it had
+    # induced 27 and been told the fate of none) and `trends` (the campaign as a series -- every
+    # pattern that has mattered was cross-round and no role could see one).
+    check(len(ids) == 31, f"31 nodes: {len(ids)}")
     # a topological order: every dep appears before the node that needs it
     emits = {n.get("out", n["id"]): n["id"] for n in order}
     pos = {n["id"]: i for i, n in enumerate(order)}
