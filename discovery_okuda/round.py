@@ -1845,6 +1845,32 @@ def _build_one(slot, rid, index, seen):
     if not ok:
         _refuse(index, slot, f"refused {[r.code for r in bad]} -- {bad[0].detail}")
         return None
+
+    # AND A SLOT THAT ASKS TO REPLICATE IS RE-SEEDED WHETHER OR NOT R6 SAW A DUPLICATE.
+    #
+    # There was no path from the Proposer's own `act: replicate` to a fresh seed -- only from R6
+    # catching an ACCIDENTAL duplicate. So the eight slots that deliberately asked to bound the seed
+    # floor all ran at `general.seed = 0`, the same value their parent ran at: `r007_08` asked
+    # whether its parent's n_tubes 5 was a threshold flicker and was handed the parent's seed to
+    # answer it with. Deliberate replication was the one thing this mechanism could not do.
+    #
+    # Whether the parent is bit-identical is not even reliably knowable here: `seen` holds the
+    # hashes of runs on file, so an unrecorded parent leaves R6 silent and the copy is exact and
+    # unremarked. The declaration is the reliable signal, and it costs the same budget -- a round
+    # that spends every slot re-running is not a round, however sincerely each slot meant it.
+    forced = replicate
+    if not replicate and str(slot.get("act") or "").strip().lower() == "replicate":
+        if _REPLICATES >= _MAX_REPLICATES:
+            _refuse(index, slot,
+                    f"`act: replicate` and this round's replicate budget is spent "
+                    f"({_MAX_REPLICATES}). Replicates bound the seed floor; they do not fill a "
+                    f"batch. Propose an experiment that changes something.")
+            return None
+        _REPLICATES += 1
+        replicate = True
+        print(T_.quiet(f"[round] slot {index} asked to replicate {par} -- re-seeded "
+                       f"({_REPLICATES}/{_MAX_REPLICATES} this round), so the pair differs by "
+                       f"nothing but its seed"))
     try:
         T.write_config(g, name, frames=_FRAMES, seed_=(_replicate_seed(name) if replicate else 0))
         _restore_parent_params(name, par, edit, spare_seeds=replicate)
@@ -1865,7 +1891,11 @@ def _build_one(slot, rid, index, seen):
     # is no longer that experiment, and a reader six rounds later has no way to tell. The original text
     # is kept beside it rather than overwritten: it is why the slot was proposed, and that is worth
     # knowing even though it is no longer what the slot does.
-    if replicate:
+    #
+    # ONLY WHEN R6 FORCED IT. A slot that declared `act: replicate` already knows what it is and said
+    # so in its own words; overwriting its claim with this boilerplate would delete the one thing the
+    # relabelling exists to preserve -- why the run was proposed.
+    if forced:
         slot = dict(slot)
         slot["claim_proposed"] = slot.get("claim")
         slot["intent"] = "replicate"
