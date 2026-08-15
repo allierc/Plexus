@@ -86,8 +86,20 @@ def run(bundle):
         # is a conclusion the campaign already reached and would be forecasting blind without.
         ("The spec that is about to run", spec),
         ("What the campaign knows", bundle.get("history"), {"as_json": False}),
-        ("The claim ledger -- what is claimed, how strongly, and what is contested",
-         bundle.get("claim_ledger")),
+        # SPLIT BY WHETHER ANYTHING HAS EVER TESTED IT, and this is not presentation -- it is the
+        # difference between knowledge and a sentence. Measured 15 August: foresight fell
+        # monotonically 0.635 -> 0.536 over seven rounds while the ledger grew from 13 claims to 35,
+        # and every one of the 22 new ones carried ZERO EVIDENCE. They are the loop's own
+        # hypotheses, written in the same confident prose as the established ones, and the
+        # Forecaster had no way to tell them apart -- so the more the loop induced, the more
+        # untested assertions it forecast from. A ledger that grows faster than it is tested makes
+        # predictions worse, and it did.
+        ("ESTABLISHED -- claims with evidence. Forecast from these",
+         [c for c in (bundle.get("claim_ledger") or []) if c.get("n_evidence")]),
+        ("STATED BUT NEVER TESTED -- no evidence either way. These are the campaign's own "
+         "hypotheses, not its findings: read them for what the loop SUSPECTS, and do not treat "
+         "any of them as a reason to expect something",
+         [c for c in (bundle.get("claim_ledger") or []) if not c.get("n_evidence")]),
         ("The form you fill -- exactly these six lines and nothing else",
          _prompt.schema(), {"as_json": False}),
     ])

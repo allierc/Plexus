@@ -206,7 +206,20 @@ def render(cur, spec, path=None):
         cs = sorted(by.get(st, []), key=lambda c: c["id"])
         if not cs:
             continue
-        L.append(f"\n## {st.upper()}  ({len(cs)})\n")
+        # THE HEADING SAYS WHAT THE STATUS MEANS FOR A READER, not just its name. `PROPOSED` reads
+        # like a section of findings; it is the opposite -- claims nothing has tested. Measured
+        # 15 August: 26 of 35 claims sat there, every one written in the same confident prose as the
+        # established ones, and the Forecaster's accuracy fell monotonically 0.635 -> 0.536 as the
+        # block grew. This file is handed to every role, so an unlabelled section of hypotheses is
+        # 26 assertions presented as knowledge.
+        _WHAT = {"contested": "evidence BOTH ways -- the campaign disagrees with itself here",
+                 "supported": "evidence for, none against",
+                 "proposed": "STATED, NEVER TESTED -- no evidence either way. Hypotheses, not "
+                             "findings: do not reason from these as if they were established",
+                 "stale": "evidence exists but predates a change that may invalidate it",
+                 "refuted": "evidence against, and it stood",
+                 "superseded": "replaced by a later claim"}
+        L.append(f"\n## {st.upper()}  ({len(cs)}) — {_WHAT.get(st, '')}\n")
         for c in cs:
             f, a = weigh(c, spec)
             L.append(f"### {c['id']} — {c['statement']}")
