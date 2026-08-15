@@ -1,0 +1,54 @@
+[engine] 1112 sim frames -> recording 1113 set frames (stride 1), fields every 1113 steps (<= 1)
+[engine] === eye_G_blend_stair_SR ===  dim=3  world=[1, 1, 1]  boundary=wall  dt=0.003  frames=1112
+[build] units: NONE DECLARED -- this run is dimensionless and no result from it may be quoted with a unit
+[engine] sets:      eye(1)  muscle(6)  orbit(1)  mpm_particle(45000)  muscle_particle(13200)
+[engine] fields:    mpm_grid
+[engine] operators: anatomy: blend_globe, blend_muscles   hierarchy: eye_pose, muscle_geometry   signalling: muscle_probe   mechanics: muscle_contract, bone_anchor, muscle_sleeve, orbit_socket   motion: drag, drag   mpm: mpm_strain, mpm_strain, mpm_scatter, mpm_scatter, mpm_grid_update, mpm_gather, mpm_gather
+[blend_globe] side R (frame det +1), scale 0.1677 sim/blend, semi-axes [0.1241, 0.1059, 0.0825] (axial/equatorial 0.718); 45000 points, volume 0.00241, 13347 on the shell, 5941 lens, 1482 cornea
+[blend_muscles] side R (frame det +1), scale 0.1677 sim/blend, semi-axes [0.1241, 0.1059, 0.0825] (axial/equatorial 0.718); 6 straps x 2200 points; standoff +0.008 / embed -0.006; rest lengths LR=0.143(moved 16%, tendon +0.0000 in) SR=0.150(moved 26%, tendon +0.0011 in) MR=0.180(moved 0%, tendon +0.0000 in) IR=0.159(moved 36%, tendon +0.0012 in) SO=0.177(moved 0%, tendon +0.0002 in) IO=0.169(moved 17%, tendon +0.0010 in)
+[surface] camera turns on 40 of 187 frames; held still on 147 while a muscle contracts
+[hold SR0.5_IO0.5] pose [-2.0011, 1.1264, -3.3375] settled=True p-p [0.0007, 0.0014, 0.0002] [283.5s]
+
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@h08u04>
+Subject: Job 153426174: <eye_G_s2a_SR_IO> in cluster <Janelia> Done
+
+Job <eye_G_s2a_SR_IO> was submitted from host <e02u30> by user <allierc> in cluster <Janelia> at Sat Aug 15 11:02:03 2026
+Job was executed on host(s) <8*h08u04>, in queue <gpu_l4>, as user <allierc> in cluster <Janelia> at Sat Aug 15 11:02:03 2026
+</groups/saalfeld/home/allierc> was used as the home directory.
+</groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye> was used as the working directory.
+Started at Sat Aug 15 11:02:03 2026
+Terminated at Sat Aug 15 11:06:59 2026
+Results reported at Sat Aug 15 11:06:59 2026
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+bash -l /groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/_cluster/G_s2a_SR_IO.sh
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   300.39 sec.
+    Max Memory :                                 3235 MB
+    Average Memory :                             1670.83 MB
+    Total Requested Memory :                     122880.00 MB
+    Delta Memory :                               119645.00 MB
+    Max Swap :                                   -
+    Max Processes :                              7
+    Max Threads :                                75
+    Run time :                                   298 sec.
+    Turnaround time :                            296 sec.
+
+The output (if any) is above this job summary.
+
+
+
+PS:
+
+Read file </groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/_cluster/G_s2a_SR_IO.err> for stderr output of this job.
+

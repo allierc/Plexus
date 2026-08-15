@@ -1,0 +1,120 @@
+{
+  "n_frames": 1540,
+  "program": "pairs",
+  "synergies": {
+    "LR+SR": {
+      "label": "LR+SR",
+      "window": [
+        40,
+        240
+      ],
+      "gaze_excursion_deg": [
+        5.94,
+        6.13,
+        -3.38
+      ],
+      "peak_abs_deg": [
+        5.94,
+        6.32,
+        3.38
+      ],
+      "expected": "vertical +",
+      "ok": true
+    },
+    "MR+IO": {
+      "label": "MR+IO",
+      "window": [
+        400,
+        600
+      ],
+      "gaze_excursion_deg": [
+        -10.16,
+        1.67,
+        -9.07
+      ],
+      "peak_abs_deg": [
+        10.72,
+        1.67,
+        9.07
+      ],
+      "expected": "horizontal -",
+      "ok": true
+    },
+    "LR+SR+SO": {
+      "label": "LR+SR+SO",
+      "window": [
+        760,
+        960
+      ],
+      "gaze_excursion_deg": [
+        4.4,
+        10.76,
+        5.78
+      ],
+      "peak_abs_deg": [
+        4.72,
+        11.02,
+        6.35
+      ],
+      "expected": "vertical +",
+      "ok": true
+    },
+    "MR+IO+IR": {
+      "label": "MR+IO+IR",
+      "window": [
+        1120,
+        1320
+      ],
+      "gaze_excursion_deg": [
+        -9.74,
+        -9.52,
+        -5.02
+      ],
+      "peak_abs_deg": [
+        10.03,
+        9.86,
+        5.3
+      ],
+      "expected": "horizontal -",
+      "ok": true
+    }
+  },
+  "radius_worst_pct": 0.08,
+  "strain_p99": 0.0245,
+  "peak_shortening_pct": 26.72,
+  "max_shortening_pct": {
+    "LR": 19.92,
+    "SR": 20.98,
+    "MR": 22.01,
+    "IR": 18.65,
+    "SO": 26.04,
+    "IO": 26.72
+  },
+  "geometry": {
+    "source": "260802_s2_EYE_MUSCLES_MODEL.blend",
+    "side": "R",
+    "scale": 0.16768,
+    "axial_ratio": 0.7178,
+    "semi_axes": [
+      0.1241,
+      0.1059,
+      0.0825
+    ],
+    "rest_lengths": {
+      "LR": 0.1577,
+      "SR": 0.1561,
+      "MR": 0.1961,
+      "IR": 0.1667,
+      "SO": 0.2006,
+      "IO": 0.2133
+    },
+    "muscle_volumes": {
+      "LR": 1.48875e-05,
+      "SR": 2.25246e-05,
+      "MR": 1.45764e-05,
+      "IR": 2.28027e-05,
+      "SO": 2.5405e-05,
+      "IO": 2.91811e-05
+    }
+  }
+}

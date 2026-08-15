@@ -216,7 +216,7 @@ def azimuth_schedule(cap, turns=1.0, still_margin=0.03, still_above=None, az0=0.
 
 def render(cap, dt, out_mp4, out_strip=None, fps=30, size=(1600, 1200), turns=1.0,
            quality=8, globe_alpha=0.30, strip_n=5, still_margin=0.03, still_above=None,
-           az0=0.0):
+           az0=0.0, side="R", inflate=1.0, blend=None, parts=None):
     """The movie: every captured frame, the camera orbiting only between contractions."""
     import imageio.v2 as iio
 

@@ -79,23 +79,26 @@ G_MECHANICS = dict(
 #  the spec
 # --------------------------------------------------------------------------- #
 def build_spec(preset="probe", n_particles=45000, side="R", blend=BM.DEFAULT_BLEND,
-               parts=BM.DEFAULT_PARTS, name="eye_G_blend", **kw):
+               parts=BM.DEFAULT_PARTS, name="eye_G_blend", inflate=1.0, standoff=0.008,
+               embed=-0.006, bone=False, n_bone=18000, **kw):
     """Model F's spec with the two anatomy operators replaced by the blend seeds."""
     params = dict(G_MECHANICS)
     params.update(kw)
     spec = ES.build_spec(name=name, preset=preset, n_particles=n_particles,
                          plant="fish_larva", **params)
     pl = BM.plant(blend=blend, parts_dir=parts, side=side, a_eq=EA.A_EQ,
-                  center=EA.GLOBE_CENTER, keys=EA.MUSCLE_KEYS)
+                  center=EA.GLOBE_CENTER, keys=EA.MUSCLE_KEYS, inflate=inflate)
 
     # RELATIVE to the prototype dir, so the same spec runs here and on the cluster
     seed_common = dict(blend=os.path.relpath(os.path.abspath(blend), HERE),
                        parts=os.path.relpath(os.path.abspath(parts), HERE), side=side,
-                       a_eq=float(EA.A_EQ), center=[float(x) for x in EA.GLOBE_CENTER])
+                       a_eq=float(EA.A_EQ), center=[float(x) for x in EA.GLOBE_CENTER],
+                       inflate=float(inflate))
     globe_seed = dict(op="blend_globe", at="mpm_particle", before_frame=1, **seed_common,
                       lens_youngs=float(EA.LENS_YOUNGS), cornea_youngs=320.0)
     muscle_seed = dict(op="blend_muscles", at="muscle_particle", before_frame=1, **seed_common,
                        keys=list(EA.MUSCLE_KEYS), cap=0.10,
+                       standoff=float(standoff), embed=float(embed),
                        youngs=float(params["muscle_youngs"]))
 
     ops = []
@@ -117,7 +120,72 @@ def build_spec(preset="probe", n_particles=45000, side="R", blend=BM.DEFAULT_BLE
     for o in spec["operators"]:
         if o["op"] == "orbit_socket":
             o["radius"] = round(float(pl["semi"][:2].mean() + 0.007), 5)
+    if bone:
+        spec = add_bone(spec, n_bone=n_bone)
     return spec, pl
+
+
+def add_bone(spec, n_bone=18000, youngs=1600.0, pad=1.45, density=2.0):
+    """Replace the origin SPRING with an origin BODY, pinned -- model I.
+
+    `bone_anchor` is a penalty: it yields under exactly the load it exists to resist.
+    Measured on the minimal rig in `archive/run_bench.py` (bone -> muscle -> ball, nothing
+    else to absorb the pull), the anchored cap slid 0.063 world off its bone while the load
+    moved 0.0007 -- 99% of the contraction lost -- and stiffening does not fix it: at
+    k = 300 000 the run destabilised before the slip stopped.
+
+    So the origin gets a BODY and the body gets pinned: one bone nodule per muscle,
+    swallowing its anchored cap (`bone_from_origins`), held as a kinematic constraint
+    rather than a spring (`pin_region [clamp]`: pos <- rest, vel <- 0 every step), and
+    joined to the SAME MLS-MPM grid the globe and the muscles share. The muscle is then
+    held the way its tendon is -- by material overlap through the grid -- and the spring is
+    deleted rather than tuned. On the rig: slip 99% -> 28%, delivery 0.119 -> 0.275.
+
+    The rigidity comes from the PINNING, not from the modulus: `youngs` is capped near 2000
+    by the substep, and a stiffer nodule buys nothing.
+
+    This is the ONLY change from model G. Seating the tendons deeper is a separate
+    experiment (it made the span worse, 5.9 -> 3.8 deg, in the run that tried both), and
+    `archive/run07_ops.py` keeps that operator for when it is measured on its own.
+    """
+    import sys as _sys
+    _sys.path.insert(0, os.path.join(HERE, "archive"))
+    import bench_ops   # noqa: F401  pin_region[clamp]; MUST come first -- both modules
+    import run07_ops   # noqa: F401  bone_from_origins; define `bone_particle`
+
+    centre = list(spec["sets"]["eye"]["start"][0])
+    spec["sets"]["bone"] = {"n": 1, "start": [centre],
+                            "types": {"bone": {"fraction": 1.0, "youngs": float(youngs)}}}
+    spec["sets"]["bone_particle"] = {"parent": "bone", "per_parent": int(n_bone),
+                                     "radius": 0.05, "density": float(density)}
+    ops = []
+    for o in spec["operators"]:
+        if o["op"] == "bone_anchor":
+            continue                                   # replaced by a body, not tuned
+        ops.append(o)
+        if o["op"] == "blend_muscles":
+            ops.append({"op": "bone_from_origins", "at": "bone_particle", "before_frame": 1,
+                        "muscles": "muscle_particle", "youngs": float(youngs), "pad": float(pad)})
+            ops.append({"op": "pin_region", "implementation": "clamp", "at": "bone_particle",
+                        "axis": 0, "beyond": -1e9})
+    for o in list(ops):                                # the bone joins the shared grid
+        if o["op"] == "mpm_strain" and o.get("at") == "muscle_particle":
+            ops.append({"op": "mpm_strain", "at": "bone_particle"})
+        if o["op"] == "mpm_scatter" and o.get("at") == "muscle_particle":
+            ops.append({"op": "mpm_scatter", "at": "bone_particle", "to": "mpm_grid",
+                        "implementation": "accumulate", "drag": 0.0, "a_max": 200})
+        if o["op"] == "mpm_gather" and o.get("at") == "muscle_particle":
+            ops.append({"op": "mpm_gather", "at": "bone_particle", "from": "mpm_grid",
+                        "wall_damp": 1.0, "wall_contact": 0.02, "vmax": 1e9})
+    spec["operators"] = ops
+    sched = []
+    for t in spec["schedule"]:
+        if isinstance(t, dict) or t != "bone_anchor":
+            sched.append(t)
+        if t == "blend_muscles":
+            sched += ["bone_from_origins", "pin_region"]
+    spec["schedule"] = sched
+    return spec
 
 
 # --------------------------------------------------------------------------- #
@@ -134,6 +202,18 @@ def main():
     ap.add_argument("--hold", type=int, default=70, help="frames each synergy is contracted")
     ap.add_argument("--rest", type=int, default=45, help="frames between synergies")
     ap.add_argument("--a-hi", type=float, default=1.0, help="activation of a driven muscle")
+    ap.add_argument("--contract", type=float, default=G_MECHANICS["contract"],
+                    help="peak active stress in muscle_contract (the traction; G uses 67)")
+    ap.add_argument("--inflate", type=float, default=1.0,
+                    help="grow the GLOBE by this factor about its centre, leaving the straps "
+                         "where they are (1.2 buries the tendon tips inside the sclera)")
+    ap.add_argument("--bone", action="store_true",
+                    help="model I: pin the origins with a bone BODY instead of bone_anchor")
+    ap.add_argument("--n-bone", type=int, default=18000, help="bone particles, all six nodules")
+    ap.add_argument("--standoff", type=float, default=0.008,
+                    help="clearance the muscle belly keeps from the globe surface")
+    ap.add_argument("--embed", type=float, default=-0.006,
+                    help="how deep the tendon cap sits INSIDE the surface (negative)")
     ap.add_argument("--particles", type=int, default=45000)
     ap.add_argument("--side", default="R", choices=("L", "R"))
     ap.add_argument("--blend", default=BM.DEFAULT_BLEND)
@@ -166,7 +246,9 @@ def main():
 
     os.makedirs(args.out, exist_ok=True)
     spec, pl = build_spec(preset=args.preset, n_particles=args.particles, side=args.side,
-                          blend=args.blend)
+                          blend=args.blend, contract=args.contract, inflate=args.inflate,
+                          standoff=args.standoff, embed=args.embed,
+                          bone=args.bone, n_bone=args.n_bone)
     probe = None
     if args.program == "pairs":
         groups = PG.PAIRS if not args.groups else [
@@ -200,7 +282,11 @@ def main():
     np.savez_compressed(os.path.join(args.out, f"{args.label}_curves.npz"),
                         **{k: v for k, v in cap.items() if k not in ("gpos", "gvel")})
     if probe is not None:
-        per = PG.report(cap, probe, labels=labels)
+        # custom groups are not the four cardinal synergies, so the direction each one is
+        # SUPPOSED to move is not known in advance: fall back to reporting the dominant axis
+        # rather than scoring against a prior that does not apply.
+        per = PG.report(cap, probe, labels=labels,
+                        expect=None if not args.groups else [])
         diag = dict(n_frames=int(sim.n_frames), program="pairs", synergies=per,
                     radius_worst_pct=round(float(100.0 * np.max(np.abs(cap["radius"] - 1.0))), 2),
                     strain_p99=round(float(np.percentile(cap["cut_strain"], 99)), 4),
@@ -230,7 +316,8 @@ def main():
         mp4 = os.path.join(args.out, f"{args.label}.mp4" if args.label != "baseline" else "movie.mp4")
         png = os.path.splitext(mp4)[0].replace("movie", "strip") + ".png"
         R = render_surface_vtk if args.renderer == "surface" else render_orbit_vtk
-        R.render(cap, sim.dt, mp4, png, turns=args.turns, az0=args.az, side=args.side)
+        R.render(cap, sim.dt, mp4, png, turns=args.turns, az0=args.az, side=args.side,
+                 inflate=args.inflate)
         print(f"[eye_G] {mp4}\n[eye_G] {png}")
 
 

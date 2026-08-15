@@ -132,11 +132,18 @@ class BlendFrame:
     normalize radii the way `eye_anatomy` did, and reports the scale it chose.
     """
 
-    def __init__(self, manifest, arrays, side="R", a_eq=EA.A_EQ, center=EA.GLOBE_CENTER):
+    def __init__(self, manifest, arrays, side="R", a_eq=EA.A_EQ, center=EA.GLOBE_CENTER,
+                 inflate=1.0):
         if side not in manifest["eyes"]:
             raise ValueError(f"side {side!r} not in the cut; have {sorted(manifest['eyes'])}")
         e = manifest["eyes"][side]
         self.side = side
+        # INFLATE scales the GLOBE only, about its own centre, leaving the six straps
+        # exactly where the artist drew them. It is the one knob that changes which tissue
+        # the insertions are in: at 1.0 the tendon tips graze the sclera, at 1.2 the globe
+        # has grown out past them and they sit inside it, so the shared MLS-MPM grid welds
+        # tendon to sclera over a volume instead of at a surface.
+        self.inflate = float(inflate)
         self.R = np.asarray(e["frame"], float)              # rows: caudal, dorsal, lateral
         self.det = float(np.linalg.det(self.R))
         self.c_blend = np.asarray(e["globe_center"], float)
@@ -150,17 +157,23 @@ class BlendFrame:
         self.equatorial = float(self.semi_blend[:2].mean())
         self.axial_ratio = float(self.semi_blend[2] / self.equatorial)
         self.scale = float(a_eq) / self.equatorial
-        self.semi = self.semi_blend * self.scale            # sim units
+        self.semi = self.semi_blend * self.scale * self.inflate       # sim units, AS BUILT
 
     def __call__(self, X):
-        """[n,3] blend points -> [n,3] sim points."""
+        """[n,3] blend points -> [n,3] sim points. Muscles, bones: everything but the globe."""
         return self.center[None, :] + self.scale * ((np.asarray(X, float) - self.c_blend) @ self.R.T)
 
+    def globe(self, X):
+        """The same map for the GLOBE's meshes, with `inflate` applied about its centre."""
+        return self.center[None, :] + (self.scale * self.inflate) * (
+            (np.asarray(X, float) - self.c_blend) @ self.R.T)
+
     def describe(self):
+        infl = "" if abs(self.inflate - 1.0) < 1e-9 else f", globe inflated x{self.inflate:.2f}"
         return (f"side {self.side} (frame det {self.det:+.0f}"
                 f"{', reflected' if self.det < 0 else ''}), scale {self.scale:.4f} sim/blend, "
                 f"semi-axes {np.round(self.semi, 4).tolist()} (axial/equatorial "
-                f"{self.axial_ratio:.3f})")
+                f"{self.axial_ratio:.3f}){infl}")
 
 
 # --------------------------------------------------------------------------- #
@@ -450,6 +463,7 @@ class BlendGlobe(Seed):
         self.cornea_youngs = float(params.get("cornea_youngs", 320.0))
         self.pupil_deg = float(params.get("pupil_deg", EA.PUPIL_DEG))
         self.iris_deg = float(params.get("iris_deg", EA.IRIS_DEG))
+        self.inflate = float(params.get("inflate", 1.0))       # grow the globe, not the straps
         self.density = float(params.get("density", 1.0))
         self.nu = float(params.get("poisson", 0.2))
         self._done = False
@@ -463,10 +477,10 @@ class BlendGlobe(Seed):
         p = H.level(self.at)
         dev = p.state.device
         d, man = load_cut(self.blend, self.parts_dir)
-        fr = BlendFrame(man, d, self.side, self.a_eq, self.center)
+        fr = BlendFrame(man, d, self.side, self.a_eq, self.center, self.inflate)
 
         def mesh(part):
-            return fr(d[f"{part}__v"]), np.asarray(d[f"{part}__f"], np.int64)
+            return fr.globe(d[f"{part}__v"]), np.asarray(d[f"{part}__f"], np.int64)
 
         retina, cornea, lens = (mesh(f"{self.side}_{k}") for k in ("retina", "cornea", "lens"))
         X, vol = fill_meshes([retina, cornea, lens], p.n, device=dev)
@@ -583,6 +597,7 @@ class BlendMuscles(Seed):
         # artist's geometry exactly, welds and all -- see `relieve_overlap`.
         self.standoff = float(params.get("standoff", 0.008))
         self.embed = float(params.get("embed", -0.006))
+        self.inflate = float(params.get("inflate", 1.0))       # must match blend_globe
         self.bins = int(params.get("bins", 14))            # match `muscle_geometry`'s readout
         self._done = False
 
@@ -592,13 +607,15 @@ class BlendMuscles(Seed):
         p = H.level(self.at)
         dev = p.state.device
         d, man = load_cut(self.blend, self.parts_dir)
-        fr = BlendFrame(man, d, self.side, self.a_eq, self.center)
+        fr = BlendFrame(man, d, self.side, self.a_eq, self.center, self.inflate)
         par = p.parent.detach().cpu().numpy()
         M = int(par.max()) + 1
         if M != len(self.keys):
             raise ValueError(f"the spec has {M} muscles but {len(self.keys)} keys: {self.keys}")
 
-        shell = [(fr(d[f"{self.side}_{k}__v"]), np.asarray(d[f"{self.side}_{k}__f"], np.int64))
+        # the globe as BUILT (inflated), because that is the surface the straps meet
+        shell = [(fr.globe(d[f"{self.side}_{k}__v"]),
+                  np.asarray(d[f"{self.side}_{k}__f"], np.int64))
                  for k in ("retina", "cornea")]
         X = np.zeros((p.n, 3))
         fib = np.zeros((p.n, 3))
@@ -631,7 +648,16 @@ class BlendMuscles(Seed):
             sarr[sel] = s
             pvol[sel] = vol / sel.size
             rest_len[mi] = L
-            report.append(f"{key}={L:.3f}({100 * moved:.0f}% moved)")
+            # HOW FAR THE INSERTION SITS INSIDE THE GLOBE -- the quantity this whole
+            # geometry argument is about, so it is measured and printed, not assumed.
+            tip = pts[s > 1.0 - self.cap]
+            inside = 0.0
+            if len(tip):
+                loc = tip - np.asarray(self.center)[None, :]
+                r = np.linalg.norm(loc, axis=1).clip(1e-12)
+                rs = surface_radius(self.center, loc / r[:, None], shell, device=dev)
+                inside = float(np.mean(np.maximum(rs - r, 0.0)))
+            report.append(f"{key}={L:.3f}(moved {100 * moved:.0f}%, tendon {inside:+.4f} in)")
 
         new = p.state.clone()
         pa, pb = p.state_schema["pos"]
@@ -663,7 +689,7 @@ class BlendMuscles(Seed):
 #  what the spec needs to know about the blend, without running the engine
 # --------------------------------------------------------------------------- #
 def plant(blend=DEFAULT_BLEND, parts_dir=DEFAULT_PARTS, side="R",
-          a_eq=EA.A_EQ, center=EA.GLOBE_CENTER, keys=None):
+          a_eq=EA.A_EQ, center=EA.GLOBE_CENTER, keys=None, inflate=1.0):
     """Where the muscles start and how big the globe is, in SIM units.
 
     `eye_spec` writes a `start` position per muscle so the engine seeds each strap's points
@@ -671,7 +697,7 @@ def plant(blend=DEFAULT_BLEND, parts_dir=DEFAULT_PARTS, side="R",
     (cup radius, globe semi-axes). Read by `run_eye_G.build_spec`.
     """
     d, man = load_cut(blend, parts_dir)
-    fr = BlendFrame(man, d, side, a_eq, center)
+    fr = BlendFrame(man, d, side, a_eq, center, inflate)
     keys = list(keys or MUSCLE_KEYS)
     rec = {r["part"]: r for r in man["parts"]}
     starts, lengths = [], []

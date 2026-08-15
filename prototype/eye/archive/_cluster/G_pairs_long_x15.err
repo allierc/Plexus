@@ -1,0 +1,3 @@
+/groups/saalfeld/home/allierc/miniforge3/envs/connectome-gnn/lib/python3.12/site-packages/numpy/lib/_function_base_impl.py:4653: RuntimeWarning: invalid value encountered in subtract
+  diff_b_a = subtract(b, a)
+

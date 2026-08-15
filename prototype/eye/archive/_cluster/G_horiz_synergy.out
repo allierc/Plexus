@@ -1,0 +1,184 @@
+[eye_G] archive/eye_G/horiz_synergy_spec.yaml
+[eye_G] side R (frame det +1), scale 0.1677 sim/blend, semi-axes [0.1241, 0.1059, 0.0825] (axial/equatorial 0.718)
+[eye_G] muscle volumes (sim units^3): LR=1.49e-05  SR=2.25e-05  MR=1.46e-05  IR=2.28e-05  SO=2.54e-05  IO=2.92e-05
+[engine] 1540 sim frames -> recording 1541 set frames (stride 1), fields every 1541 steps (<= 1)
+[engine] === eye_G_blend_synergies ===  dim=3  world=[1, 1, 1]  boundary=wall  dt=0.003  frames=1540
+[build] units: NONE DECLARED -- this run is dimensionless and no result from it may be quoted with a unit
+[engine] sets:      eye(1)  muscle(6)  orbit(1)  mpm_particle(45000)  muscle_particle(13200)
+[engine] fields:    mpm_grid
+[engine] operators: anatomy: blend_globe, blend_muscles   hierarchy: eye_pose, muscle_geometry   signalling: muscle_probe   mechanics: muscle_contract, bone_anchor, muscle_sleeve, orbit_socket   motion: drag, drag   mpm: mpm_strain, mpm_strain, mpm_scatter, mpm_scatter, mpm_grid_update, mpm_gather, mpm_gather
+[blend_globe] side R (frame det +1), scale 0.1677 sim/blend, semi-axes [0.1241, 0.1059, 0.0825] (axial/equatorial 0.718); 45000 points, volume 0.00241, 13347 on the shell, 5941 lens, 1482 cornea
+[blend_muscles] side R (frame det +1), scale 0.1677 sim/blend, semi-axes [0.1241, 0.1059, 0.0825] (axial/equatorial 0.718); 6 straps x 2200 points; standoff +0.008 / embed -0.006; rest lengths LR=0.143(moved 16%, tendon +0.0000 in) SR=0.150(moved 26%, tendon +0.0011 in) MR=0.180(moved 0%, tendon +0.0000 in) IR=0.159(moved 36%, tendon +0.0012 in) SO=0.177(moved 0%, tendon +0.0002 in) IO=0.169(moved 17%, tendon +0.0010 in)
+
+  what each synergy did (open loop, so this is the geometry talking):
+    LR+SR  LR+SR                                      gaze [5.94, 6.13, -3.38]  expected vertical +   OK
+    MR+IO  MR+IO                                      gaze [-10.16, 1.67, -9.07]  expected horizontal - OK
+    LR+SR+SO LR+SR+SO                                   gaze [4.4, 10.76, 5.78]  expected vertical +   OK
+    MR+IO+IR MR+IO+IR                                   gaze [-9.74, -9.52, -5.02]  expected horizontal - OK
+{
+  "n_frames": 1540,
+  "program": "pairs",
+  "synergies": {
+    "LR+SR": {
+      "label": "LR+SR",
+      "window": [
+        40,
+        240
+      ],
+      "gaze_excursion_deg": [
+        5.94,
+        6.13,
+        -3.38
+      ],
+      "peak_abs_deg": [
+        5.94,
+        6.32,
+        3.38
+      ],
+      "expected": "vertical +",
+      "ok": true
+    },
+    "MR+IO": {
+      "label": "MR+IO",
+      "window": [
+        400,
+        600
+      ],
+      "gaze_excursion_deg": [
+        -10.16,
+        1.67,
+        -9.07
+      ],
+      "peak_abs_deg": [
+        10.72,
+        1.67,
+        9.07
+      ],
+      "expected": "horizontal -",
+      "ok": true
+    },
+    "LR+SR+SO": {
+      "label": "LR+SR+SO",
+      "window": [
+        760,
+        960
+      ],
+      "gaze_excursion_deg": [
+        4.4,
+        10.76,
+        5.78
+      ],
+      "peak_abs_deg": [
+        4.72,
+        11.02,
+        6.35
+      ],
+      "expected": "vertical +",
+      "ok": true
+    },
+    "MR+IO+IR": {
+      "label": "MR+IO+IR",
+      "window": [
+        1120,
+        1320
+      ],
+      "gaze_excursion_deg": [
+        -9.74,
+        -9.52,
+        -5.02
+      ],
+      "peak_abs_deg": [
+        10.03,
+        9.86,
+        5.3
+      ],
+      "expected": "horizontal -",
+      "ok": true
+    }
+  },
+  "radius_worst_pct": 0.08,
+  "strain_p99": 0.0245,
+  "peak_shortening_pct": 26.72,
+  "max_shortening_pct": {
+    "LR": 19.92,
+    "SR": 20.98,
+    "MR": 22.01,
+    "IR": 18.65,
+    "SO": 26.04,
+    "IO": 26.72
+  },
+  "geometry": {
+    "source": "260802_s2_EYE_MUSCLES_MODEL.blend",
+    "side": "R",
+    "scale": 0.16768,
+    "axial_ratio": 0.7178,
+    "semi_axes": [
+      0.1241,
+      0.1059,
+      0.0825
+    ],
+    "rest_lengths": {
+      "LR": 0.1577,
+      "SR": 0.1561,
+      "MR": 0.1961,
+      "IR": 0.1667,
+      "SO": 0.2006,
+      "IO": 0.2133
+    },
+    "muscle_volumes": {
+      "LR": 1.48875e-05,
+      "SR": 2.25246e-05,
+      "MR": 1.45764e-05,
+      "IR": 2.28027e-05,
+      "SO": 2.5405e-05,
+      "IO": 2.91811e-05
+    }
+  }
+}
+[surface] camera turns on 219 of 515 frames; held still on 296 while a muscle contracts
+[eye_G] archive/eye_G/horiz_synergy.mp4
+[eye_G] archive/eye_G/horiz_synergy.png
+
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@h08u06>
+Subject: Job 153426096: <eye_G_horiz_synergy> in cluster <Janelia> Done
+
+Job <eye_G_horiz_synergy> was submitted from host <e02u30> by user <allierc> in cluster <Janelia> at Sat Aug 15 10:34:12 2026
+Job was executed on host(s) <8*h08u06>, in queue <gpu_l4>, as user <allierc> in cluster <Janelia> at Sat Aug 15 10:34:13 2026
+</groups/saalfeld/home/allierc> was used as the home directory.
+</groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye> was used as the working directory.
+Started at Sat Aug 15 10:34:13 2026
+Terminated at Sat Aug 15 10:45:19 2026
+Results reported at Sat Aug 15 10:45:19 2026
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+bash -l /groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/_cluster/G_horiz_synergy.sh
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   702.26 sec.
+    Max Memory :                                 4135 MB
+    Average Memory :                             2113.04 MB
+    Total Requested Memory :                     122880.00 MB
+    Delta Memory :                               118745.00 MB
+    Max Swap :                                   -
+    Max Processes :                              7
+    Max Threads :                                75
+    Run time :                                   669 sec.
+    Turnaround time :                            667 sec.
+
+The output (if any) is above this job summary.
+
+
+
+PS:
+
+Read file </groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/_cluster/G_horiz_synergy.err> for stderr output of this job.
+

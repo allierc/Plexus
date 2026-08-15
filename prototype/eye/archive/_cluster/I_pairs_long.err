@@ -1,0 +1,19 @@
+/groups/saalfeld/home/allierc/miniforge3/envs/connectome-gnn/bin/python: can't open file '/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/run_03/read_blend.py': [Errno 2] No such file or directory
+Traceback (most recent call last):
+  File "/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/run_eye_G.py", line 321, in <module>
+    main()
+  File "/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/run_eye_G.py", line 315, in main
+    R.render(cap, sim.dt, mp4, png, turns=args.turns, az0=args.az, side=args.side,
+  File "/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/render_surface_vtk.py", line 210, in render
+    scene = SurfaceScene(cap, side=side, blend=blend, parts=parts, size=size,
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/render_surface_vtk.py", line 92, in __init__
+    d, man = BM.load_cut(blend or BM.DEFAULT_BLEND, parts or BM.DEFAULT_PARTS)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/blend_mpm_ops.py", line 120, in load_cut
+    subprocess.run([sys.executable, READER, "--blend", blend, "--out", parts_dir],
+  File "/groups/saalfeld/home/allierc/miniforge3/envs/connectome-gnn/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/groups/saalfeld/home/allierc/miniforge3/envs/connectome-gnn/bin/python', '/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/run_03/read_blend.py', '--blend', '/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/260802_s2_EYE_MUSCLES_MODEL.blend', '--out', '/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/run_03/blend_parts']' returned non-zero exit status 2.
+
+ERROR conda.cli.main_run:execute(124): `conda run python run_eye_G.py --program pairs --hold 200 --rest 160 --stride 3 --bone --out archive/eye_I --label pairs_long --turns 0 --az 25 --device cuda:0` failed. (See above for error)

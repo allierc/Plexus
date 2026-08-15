@@ -1,0 +1,120 @@
+{
+  "n_frames": 1540,
+  "program": "pairs",
+  "synergies": {
+    "SR+SO": {
+      "label": "up (SR+SO, the two dorsal insertions)",
+      "window": [
+        40,
+        240
+      ],
+      "gaze_excursion_deg": [
+        -0.89,
+        6.99,
+        5.68
+      ],
+      "peak_abs_deg": [
+        0.89,
+        6.99,
+        5.68
+      ],
+      "expected": "vertical +",
+      "ok": true
+    },
+    "IR+IO": {
+      "label": "down (IR+IO, the two ventral insertions)",
+      "window": [
+        400,
+        600
+      ],
+      "gaze_excursion_deg": [
+        -2.74,
+        -7.13,
+        -4.93
+      ],
+      "peak_abs_deg": [
+        2.74,
+        7.13,
+        4.93
+      ],
+      "expected": "vertical -",
+      "ok": true
+    },
+    "LR": {
+      "label": "temporal (LR, the caudal insertion)",
+      "window": [
+        760,
+        960
+      ],
+      "gaze_excursion_deg": [
+        2.65,
+        1.21,
+        0.4
+      ],
+      "peak_abs_deg": [
+        2.65,
+        1.49,
+        0.59
+      ],
+      "expected": "horizontal +",
+      "ok": true
+    },
+    "MR": {
+      "label": "nasal (MR, the rostral insertion)",
+      "window": [
+        1120,
+        1320
+      ],
+      "gaze_excursion_deg": [
+        -3.06,
+        0.83,
+        -0.16
+      ],
+      "peak_abs_deg": [
+        3.06,
+        0.83,
+        0.16
+      ],
+      "expected": "horizontal -",
+      "ok": true
+    }
+  },
+  "radius_worst_pct": 0.09,
+  "strain_p99": 0.0263,
+  "peak_shortening_pct": 20.89,
+  "max_shortening_pct": {
+    "LR": 7.78,
+    "SR": 12.88,
+    "MR": 8.66,
+    "IR": 8.27,
+    "SO": 20.89,
+    "IO": 17.48
+  },
+  "geometry": {
+    "source": "260802_s2_EYE_MUSCLES_MODEL.blend",
+    "side": "R",
+    "scale": 0.16768,
+    "axial_ratio": 0.7178,
+    "semi_axes": [
+      0.149,
+      0.127,
+      0.0991
+    ],
+    "rest_lengths": {
+      "LR": 0.1577,
+      "SR": 0.1561,
+      "MR": 0.1961,
+      "IR": 0.1667,
+      "SO": 0.2006,
+      "IO": 0.2133
+    },
+    "muscle_volumes": {
+      "LR": 1.48875e-05,
+      "SR": 2.25246e-05,
+      "MR": 1.45764e-05,
+      "IR": 2.28027e-05,
+      "SO": 2.5405e-05,
+      "IO": 2.91811e-05
+    }
+  }
+}

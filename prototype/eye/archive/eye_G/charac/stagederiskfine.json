@@ -1,0 +1,24 @@
+[
+  {
+    "stage": "deriskfine",
+    "muscles": [
+      "LR"
+    ],
+    "level": [
+      1.0
+    ],
+    "pose_deg": [
+      7.3461,
+      -0.164,
+      -1.3406
+    ],
+    "settle_ptp_deg": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "settled": true,
+    "hold_s": 3.0,
+    "seconds": 463.3
+  }
+]

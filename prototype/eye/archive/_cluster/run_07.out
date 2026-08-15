@@ -1,0 +1,72 @@
+[run_07] 3550 frames (10.7 s), 4 synergies
+[engine] 3550 sim frames -> recording 3551 set frames (stride 1), fields every 3551 steps (<= 1)
+[engine] === eye_G_run07 ===  dim=3  world=[1, 1, 1]  boundary=wall  dt=0.003  frames=3550
+[build] units: NONE DECLARED -- this run is dimensionless and no result from it may be quoted with a unit
+[engine] sets:      eye(1)  muscle(6)  orbit(1)  bone(1)  mpm_particle(45000)  muscle_particle(13200)  bone_particle(18000)
+[engine] fields:    mpm_grid
+[engine] operators: anatomy: blend_globe, blend_muscles, seat_attachments, bone_from_origins   mechanics: pin_region, muscle_contract, muscle_sleeve, orbit_socket   hierarchy: eye_pose, muscle_geometry   signalling: muscle_probe   motion: drag, drag   mpm: mpm_strain, mpm_strain, mpm_scatter, mpm_scatter, mpm_grid_update, mpm_gather, mpm_gather, mpm_strain, mpm_scatter, mpm_gather
+[blend_globe] side R (frame det +1), scale 0.1677 sim/blend, semi-axes [0.1241, 0.1059, 0.0825] (axial/equatorial 0.718); 45000 points, volume 0.00241, 13347 on the shell, 5941 lens, 1482 cornea
+[blend_muscles] side R (frame det +1), scale 0.1677 sim/blend, semi-axes [0.1241, 0.1059, 0.0825] (axial/equatorial 0.718); 6 straps x 2200 points; standoff +0.008 / embed -0.006; rest lengths LR=0.143(16% moved) SR=0.150(26% moved) MR=0.180(0% moved) IR=0.159(36% moved) SO=0.177(0% moved) IO=0.169(17% moved)
+[seat_attachments] tendons seated +0.012 inside the surface (they were -0.0007 +- 0.0048 from it); moved 99% of tendon points and 26% of belly points
+[bone_from_origins] 6 nodules, radii 0.015 0.016 0.018 0.017 0.021 0.028
+
+phase  muscles   settled (h,v,t) deg        wanted   verdict
+up     LR+SO     [2.743, -0.491, -0.403]    v+       no
+down   IR+IO     [-1.671, -3.172, -0.117]   v-       YES
+right  LR        [-0.236, 1.885, -0.459]    h+       no
+left   MR        [0.279, 0.615, -0.111]     h-       no
+
+[run_07] span 3.8 h / 4.7 v deg (eye_G measured 5.9 / 6.0), 1/4 synergies correct, gate FAIL  [1141.0s]
+    [vtk] 0/593
+    [vtk] 40/593
+    [vtk] 80/593
+    [vtk] 120/593
+    [vtk] 160/593
+    [vtk] 200/593
+    [vtk] 240/593
+    [vtk] 280/593
+    [vtk] 320/593
+
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@h08u04>
+Subject: Job 153423405: <eye_run_07> in cluster <Janelia> Exited
+
+Job <eye_run_07> was submitted from host <e02u30> by user <allierc> in cluster <Janelia> at Fri Aug 14 18:09:59 2026
+Job was executed on host(s) <8*h08u04>, in queue <gpu_l4>, as user <allierc> in cluster <Janelia> at Fri Aug 14 18:09:59 2026
+</groups/saalfeld/home/allierc> was used as the home directory.
+</groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye> was used as the working directory.
+Started at Fri Aug 14 18:09:59 2026
+Terminated at Fri Aug 14 18:29:31 2026
+Results reported at Fri Aug 14 18:29:31 2026
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+bash -l /groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/_cluster/run_07.sh
+------------------------------------------------------------
+
+Exited with exit code 134.
+
+Resource usage summary:
+
+    CPU time :                                   1202.00 sec.
+    Max Memory :                                 6601 MB
+    Average Memory :                             3139.50 MB
+    Total Requested Memory :                     122880.00 MB
+    Delta Memory :                               116279.00 MB
+    Max Swap :                                   -
+    Max Processes :                              7
+    Max Threads :                                75
+    Run time :                                   1173 sec.
+    Turnaround time :                            1172 sec.
+
+The output (if any) is above this job summary.
+
+
+
+PS:
+
+Read file </groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/_cluster/run_07.err> for stderr output of this job.
+

@@ -1,0 +1,23 @@
+{
+  "eye": "G",
+  "n_holds": 30,
+  "span_h": 15.879999999999999,
+  "span_v": 24.23,
+  "gate_pass": true,
+  "gate_required": [
+    15.0,
+    10.0
+  ],
+  "T_hold": 2.835,
+  "settled_tolerance_deg": 0.05,
+  "n_unsettled": 0,
+  "settling_time_s": {
+    "MR": 1.674,
+    "SR": 1.746,
+    "LR": 1.71,
+    "IO": 1.692,
+    "SO": 1.71,
+    "IR": 1.89
+  },
+  "pair_residuals": []
+}

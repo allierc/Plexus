@@ -1,0 +1,6 @@
+/groups/saalfeld/home/allierc/miniforge3/envs/connectome-gnn/lib/python3.12/site-packages/numpy/lib/_function_base_impl.py:4653: RuntimeWarning: invalid value encountered in subtract
+  diff_b_a = subtract(b, a)
+free(): invalid next size (normal)
+/scratch/allierc/tmpwmc_4gph: line 3: 3702459 Aborted                 (core dumped) python archive/run_07.py --tag run_07 --device cuda:0
+
+ERROR conda.cli.main_run:execute(124): `conda run python archive/run_07.py --tag run_07 --device cuda:0` failed. (See above for error)

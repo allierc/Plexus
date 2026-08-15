@@ -22,6 +22,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "..", "src")); sys.path.insert(0, HERE)
 import numpy as np, yaml
 import plexus.operators, eye_ops, muscle_ops, probe_ops   # noqa: F401
+# BLEND-SEEDED EYES (G and later) name `blend_globe` / `blend_muscles` in their spec, so the
+# registry has to know them before `load_spec` -- without this import a hold on eye_G fails
+# at schema validation, which is the one thing that made this script F-only.
+import blend_mpm_ops as BM                               # noqa: F401
+import render_surface_vtk                                # noqa: F401  the per-hold movie
 import eye_anatomy as EA, run_eye
 from plexus.schema import load as load_spec
 from plexus.models.registry import register_operator
@@ -49,6 +54,11 @@ def main():
     ap.add_argument("--tail-s", type=float, default=0.2)
     ap.add_argument("--stage", default="1")
     ap.add_argument("--stride", type=int, default=6)
+    ap.add_argument("--substep", type=float, default=SUBSTEP,
+                    help="MLS-MPM substep; the derisk pair compares this against the spec's")
+    ap.add_argument("--movie", dest="movie", action="store_true", default=True,
+                    help="write a VTK surface mp4 of the hold (default)")
+    ap.add_argument("--no-movie", dest="movie", action="store_false")
     ap.add_argument("--device", default="cuda:0")
     a = ap.parse_args()
     if len(a.level) != len(a.muscles):
@@ -75,7 +85,7 @@ def main():
             o["step_frames"] = int(round(a.ramp_s / dt))
     for step in s["schedule"]:
         if isinstance(step, dict) and "substep_dt" in step:
-            step["substep_dt"] = SUBSTEP
+            step["substep_dt"] = a.substep
 
     o = outdir(folder)
     tag = "_".join(f"{m}{u:g}" for m, u in zip(a.muscles, a.level))
@@ -100,6 +110,21 @@ def main():
                         muscles=np.array(EA.MUSCLE_KEYS),
                         level=np.array(a.level, np.float32),
                         driven=np.array(a.muscles))
+    if a.movie:
+        # one movie per hold, drawn through the .blend geometry. The eye is scanned anatomy
+        # now, so "is this hold sane" is a question you answer by LOOKING at the strap that
+        # was driven -- and a blown-up hold is obvious in a frame and invisible in a mean.
+        infl = float(next((o for o in s["operators"] if o["op"] == "blend_globe"),
+                          {}).get("inflate", 1.0))
+        side = str(next((o for o in s["operators"] if o["op"] == "blend_globe"),
+                        {}).get("side", "R"))
+        try:
+            render_surface_vtk.render(cap, dt, os.path.join(runs, f"s{a.stage}_{tag}.mp4"),
+                                      os.path.join(runs, f"s{a.stage}_{tag}.png"),
+                                      turns=0.0, az0=25.0, side=side, inflate=infl)
+        except Exception as exc:                      # a movie must never lose a measurement
+            print(f"[hold {tag}] movie skipped: {exc}", flush=True)
+
     win = (t >= (lead + hold) * dt - 0.25 * a.hold_s) & (t <= (lead + hold) * dt)
     base = g[t <= lead * dt]
     base = base[-1] if len(base) else g[0]
@@ -110,7 +135,13 @@ def main():
                settled=bool(ptp.max() <= SETTLED_TOL),
                hold_s=a.hold_s, seconds=round(time.time() - t0, 1))
     if a.stage == "0":
-        row["settling_s"] = round(settling_time(t[t >= lead * dt], g[t >= lead * dt]), 3)
+        # WITHIN THE HOLD, not to the end of the run: the tail releases the drive and the eye
+        # returns to rest, so a window that includes it takes the RELEASED pose as `final`
+        # and reports the whole hold as "still settling" -- which is what it did, giving all
+        # six muscles an identical 3.195 s. T_hold is derived from this number, so the error
+        # propagates into every later stage as holds twice as long as they need to be.
+        hw = (t >= lead * dt) & (t <= (lead + hold) * dt)
+        row["settling_s"] = round(settling_time(t[hw], g[hw]), 3)
     # append to this stage's table, one file per stage so parallel jobs do not collide badly
     jf = os.path.join(o, f"stage{a.stage}.json")
     rows = json.load(open(jf)) if os.path.exists(jf) else []

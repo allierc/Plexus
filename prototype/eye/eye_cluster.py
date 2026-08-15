@@ -112,12 +112,16 @@ PY = "python"
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("target", nargs="?", default=None,
-                    choices=["gap", "derisk", "stage1", "suspension", "buckle", "anchor", "bench", "synergies", "pairs", "run07"])
+                    choices=["gap", "derisk", "stage1", "suspension", "buckle", "anchor", "bench", "synergies", "pairs", "pairs_x2", "pairs_H", "pairs_I", "run07"])
     ap.add_argument("--model", default="F")
     ap.add_argument("--tags", nargs="*", default=None,
                     help="for `bench`: which archive/ rig runs to build")
     ap.add_argument("--render-only", action="store_true",
                     help="for `bench`: re-draw from each run's cached capture")
+    ap.add_argument("--traction", type=float, default=1.5,
+                    help="for `pairs_x2`: multiple of G's peak active stress (67)")
+    ap.add_argument("--inflate", type=float, default=1.1,
+                    help="for `pairs_H`: how much the globe is grown about its own centre")
     ap.add_argument("--status", action="store_true")
     ap.add_argument("--wait", action="store_true")
     ap.add_argument("--kill", action="store_true")
@@ -177,6 +181,39 @@ def main():
         # clear, at the validated substep -- the three things runs 01-06 measured.
         cells = a.tags or ["run_07"]
         jobs = [(t, f"{PY} archive/run_07.py --tag {t} --device cuda:0") for t in cells]
+    elif a.target == "pairs_x2":
+        # The same synergy run with the TRACTION DOUBLED (peak active stress 67 -> 134):
+        # a twin of pairs_long, identical in every other number, so the pair of movies
+        # isolates what the drive amplitude buys on scanned anatomy.
+        # x2 is NOT a data point: the globe deviated 16% in radius (0.07% at x1), strain
+        # went NaN and SR/MR/SO folded to 67-86% shortening. The multiplier is an argument
+        # so the plant can be walked up to where it breaks instead of jumped past it.
+        mult = a.traction
+        tag = f"x{mult:g}".replace(".", "")
+        jobs = [(f"G_pairs_long_{tag}",
+                 f"{PY} run_eye_G.py --program pairs --hold 200 --rest 160 --stride 3 "
+                 f"--contract {67.0 * mult:g} --turns 0 --az 25 "
+                 f"--label pairs_long_{tag} --device cuda:0")]
+    elif a.target == "pairs_H":
+        # MODEL H -- eye_G's twin with the GLOBE INFLATED 20% about its own centre and the
+        # straps left where the artist drew them, so every tendon cap ends up INSIDE the
+        # sclera (0.006-0.015 sim units deep) instead of grazing it. The shared MLS-MPM
+        # grid then welds tendon to globe over a volume rather than across a gap, which is
+        # a different contact and so, possibly, a different plant. Same synergy sequence,
+        # same holds, same camera as archive/eye_G/pairs_long.mp4 -- a twin, one knob apart.
+        jobs = [(f"H_pairs_long_i{a.inflate:g}".replace(".", ""),
+                 f"{PY} run_eye_G.py --program pairs --hold 200 --rest 160 --stride 3 "
+                 f"--inflate {a.inflate:g} --embed -0.025 --out archive/eye_H "
+                 f"--label pairs_long --turns 0 --az 25 --device cuda:0")]
+    elif a.target == "pairs_I":
+        # MODEL I -- eye_G's twin with the origins HELD RATHER THAN SPRUNG: `bone_anchor`
+        # deleted, one pinned bone nodule per muscle joined to the shared grid instead.
+        # ONE change from G (the tendon end is untouched), so whatever the synergies gain
+        # is attributable to the attachment and to nothing else.
+        jobs = [("I_pairs_long",
+                 f"{PY} run_eye_G.py --program pairs --hold 200 --rest 160 --stride 3 "
+                 f"--bone --out archive/eye_I --label pairs_long "
+                 f"--turns 0 --az 25 --device cuda:0")]
     elif a.target == "synergies":
         jobs = [(f"{M}_synergies", f"{PY} run_synergies.py --model {M} --device cuda:0")]
     elif a.target == "gap":

@@ -44,15 +44,26 @@ sys.path.insert(0, os.path.join(HERE, "..", "..", "src"))
 sys.path.insert(0, HERE)
 
 import numpy as np
+import yaml
 
 import eye_anatomy as EA
 import eye_cluster as CL
 
-LEVELS = [0.10, 0.25, 0.50, 0.75, 1.00]      # not four even ones: the low end carries the shape
+LEVELS = [0.10, 0.25, 0.50, 1.00]             # weighted low: the nonlinearity lives near 0
 SCREEN_LEVEL = 0.5                            # stage 2a, every pair at one point
-GRID_LEVELS = [0.25, 0.50, 0.75]              # stage 2b, flagged pairs only
+GRID_LEVELS = [0.35, 0.75]                    # stage 2b, flagged pairs only: a 2x2
 PAIR_TOL = 0.20                               # deg: four times the settled tolerance
-GATE_H, GATE_V = 25.0, 10.0                   # deg, from the task
+
+# THE GATE, as of eye G (set 2026-08-15, by the session that owns the controller).
+# It was 25 deg horizontal, taken from the tracking task. No geometric lever reaches it on
+# scanned anatomy and all of them have now been measured: globe x1.2 loses 81% of the
+# temporal excursion and x0.9 / x0.85 collapse the nasal one (8.5 -> 2.1 -> 0.7 deg) while
+# horizontal stays ~15; drive is at its ceiling (x1.5 and x2 blow the MPM up); pinning the
+# origins costs 6-19%. Eye G reaches ~16 deg horizontal and 27.6 vertical WITH ALL FOUR
+# SYNERGIES CORRECT, and that is accepted as the plant. The gate stays in the script -- it
+# still catches an eye that cannot move at all -- but it now encodes what this plant does
+# rather than what the first draft of the task hoped for.
+GATE_H, GATE_V = 15.0, 10.0                   # deg
 SETTLED_TOL = 0.05                            # deg peak-to-peak
 
 
@@ -61,7 +72,14 @@ def eye_name(folder):
 
 
 def outdir(folder):
-    d = os.path.join(HERE, "archive", f"characterise_{eye_name(folder)}")
+    """Where this eye's characterisation lands: INSIDE the eye's own archive, as `charac/`.
+
+    Everything about one eye stays in one directory -- the spec it was run from, the
+    synergy movie, every hold's spec / curves / mp4, and the protocol's assembled files --
+    so an eye can be handed over, or deleted, as a unit.
+    """
+    f = folder if os.path.isabs(folder) else os.path.join(HERE, folder)
+    d = os.path.join(f, "charac")
     os.makedirs(d, exist_ok=True)
     return d
 
@@ -85,7 +103,27 @@ def t_hold(folder, default=2.0):
 
 
 def gate(folder, quiet=False):
-    """(passes, span_h, span_v) from stage 0's results, or (None, ...) if it has not run."""
+    """(passes, span_h, span_v) -- the USABLE workspace, preferring stage 0-lite.
+
+    The protocol tests the gate on the union of the four synergy excursions, because that
+    is the workspace a controller can actually command: no single extraocular muscle of a
+    fish eye moves it along a cardinal axis, so single-muscle extremes systematically
+    understate the reachable range. On eye G the two differ by 1.7 deg horizontal (15.9
+    against 14.2), which straddles the threshold -- so which one is used has to be stated
+    rather than left to whichever file happens to exist.
+    """
+    f = folder if os.path.isabs(folder) else os.path.join(HERE, folder)
+    lite = os.path.join(f, "pairs_long_diag.json")
+    if os.path.exists(lite):
+        exc = [v["gaze_excursion_deg"] for v in json.load(open(lite))["synergies"].values()]
+        h = [e[0] for e in exc] + [0.0]
+        v = [e[1] for e in exc] + [0.0]
+        span_h, span_v = max(h) - min(h), max(v) - min(v)
+        ok = span_h >= GATE_H and span_v >= GATE_V
+        if not quiet:
+            print(f"[gate] stage 0-lite synergies: horizontal {span_h:.1f} deg (need {GATE_H}), "
+                  f"vertical {span_v:.1f} (need {GATE_V}) -> {'PASS' if ok else 'FAIL'}")
+        return ok, span_h, span_v
     p = os.path.join(outdir(folder), "stage0.json")
     if not os.path.exists(p):
         return None, None, None
@@ -101,6 +139,58 @@ def gate(folder, quiet=False):
 
 
 # --------------------------------------------------------------------------- the stages
+def jobs_stage0lite(folder, model):
+    """ONE run: the four cardinal SYNERGIES in a single simulation -- the gate.
+
+    SR+SO up, IR+IO down, LR temporal, MR nasal, driven open loop by
+    `probe_ops.muscle_probe [groups]` (see `probe_groups.py`). It answers, for one job,
+    both questions a per-muscle sweep cannot: whether the scanned geometry moves the eye
+    where the anatomy claims -- no single extraocular muscle of a fish eye moves it along
+    a cardinal axis, so only a synergy can be scored against a direction written down in
+    advance -- and what the usable workspace is. If this fails the gate, change the eye
+    rather than characterise it.
+    """
+    return [(f"{model}_s0lite",
+             f"python run_eye_G.py --program pairs --hold 200 --rest 160 --stride 3 "
+             f"--out {folder} --label pairs_long --turns 0 --az 25 --device cuda:0")]
+
+
+def jobs_derisk(folder, model):
+    """4 short jobs to run BEFORE the ~65: does the pipeline hold together on THIS eye?
+
+    Cheap answers to the three things that would waste a whole fan-out:
+
+      substep   the production substep (2.0e-4, validated on eye F) against the one this
+                eye's own spec was integrated at. If a hold's settled pose differs by more
+                than the settled tolerance, the cheap substep is not safe on this geometry
+                and every later stage has to use the spec's.
+      loading   that a BLEND-seeded spec loads and runs through `run_hold` at all --
+                `blend_globe` / `blend_muscles` have to be registered, and this is the
+                first stage that would find out.
+      the gate  the synergy run on the two deflated globes, because eye G fails the
+                horizontal gate at 16.4 deg and globe size is the strongest lever known
+                (eye H, globe x1.2, lost 81% of the temporal excursion -- so the test is
+                the other direction).
+    """
+    spec = yaml.safe_load(open(_spec_of(os.path.join(HERE, folder))))
+    fine = next((st["substep_dt"] for st in spec["schedule"]
+                 if isinstance(st, dict) and "substep_dt" in st), 1.2e-4)
+    jobs = [(f"{model}_dr_substep_prod",
+             f"python run_hold.py --folder {folder} --muscles LR --level 1.0 --hold-s 3.0 "
+             f"--stage derisk --substep 2.0e-4 --device cuda:0"),
+            (f"{model}_dr_substep_fine",
+             f"python run_hold.py --folder {folder} --muscles LR --level 1.0 --hold-s 3.0 "
+             f"--stage deriskfine --substep {fine:g} --device cuda:0")]
+    for infl in (0.85, 0.90):
+        tag = f"{infl:g}".replace("0.", "p")
+        out = f"archive/eye_{model}{tag}"
+        jobs.append((f"{model}_dr_globe{tag}",
+                     f"python run_eye_G.py --program pairs --hold 200 --rest 160 --stride 3 "
+                     f"--inflate {infl:g} --out {out} --label pairs_long --turns 0 --az 25 "
+                     f"--device cuda:0"))
+    return jobs
+
+
 def jobs_stage0(folder, model):
     """6 runs: every muscle at full drive, held 3 s, from rest. Gate + settling time."""
     return [(f"{model}_s0_{m}",
@@ -168,7 +258,8 @@ def _load(o, name):
     return json.load(open(p)) if os.path.exists(p) else []
 
 
-STAGES = {"0": jobs_stage0, "1": jobs_stage1, "2a": jobs_stage2a, "2b": jobs_stage2b}
+STAGES = {"derisk": jobs_derisk, "0lite": jobs_stage0lite, "0": jobs_stage0,
+          "1": jobs_stage1, "2a": jobs_stage2a, "2b": jobs_stage2b}
 
 
 def collect(folder):
@@ -228,7 +319,7 @@ def main():
     if a.stage is None:
         ap.error("give --stage {0,1,2a,2b} or --collect")
 
-    if a.stage != "0":
+    if a.stage not in ("0", "0lite", "derisk"):
         ok, sh, sv = gate(folder)
         if ok is None:
             print("[gate] stage 0 has not been run for this eye. Run --stage 0 first: the hold "
@@ -239,7 +330,10 @@ def main():
                   f"horizontal and {GATE_V} vertical; this eye reaches {sh:.1f} and {sv:.1f}. "
                   f"Change the eye, not the measurement. (--force overrides.)")
             return
-    jobs = STAGES[a.stage](folder, model)
+    # the job command must carry a RELATIVE folder: the cluster mounts this repo under
+    # /groups/... and the devcontainer under /workspace, and the job script cds to the
+    # prototype before running. An absolute path here is the one that does not survive.
+    jobs = STAGES[a.stage](os.path.relpath(folder, HERE), model)
     if not jobs:
         print(f"[stage {a.stage}] nothing to submit")
         return

@@ -1,0 +1,184 @@
+[eye_G] archive/eye_H/pairs_long_spec.yaml
+[eye_G] side R (frame det +1), scale 0.1677 sim/blend, semi-axes [0.149, 0.127, 0.0991] (axial/equatorial 0.718), globe inflated x1.20
+[eye_G] muscle volumes (sim units^3): LR=1.49e-05  SR=2.25e-05  MR=1.46e-05  IR=2.28e-05  SO=2.54e-05  IO=2.92e-05
+[engine] 1540 sim frames -> recording 1541 set frames (stride 1), fields every 1541 steps (<= 1)
+[engine] === eye_G_blend_synergies ===  dim=3  world=[1, 1, 1]  boundary=wall  dt=0.003  frames=1540
+[build] units: NONE DECLARED -- this run is dimensionless and no result from it may be quoted with a unit
+[engine] sets:      eye(1)  muscle(6)  orbit(1)  mpm_particle(45000)  muscle_particle(13200)
+[engine] fields:    mpm_grid
+[engine] operators: anatomy: blend_globe, blend_muscles   hierarchy: eye_pose, muscle_geometry   signalling: muscle_probe   mechanics: muscle_contract, bone_anchor, muscle_sleeve, orbit_socket   motion: drag, drag   mpm: mpm_strain, mpm_strain, mpm_scatter, mpm_scatter, mpm_grid_update, mpm_gather, mpm_gather
+[blend_globe] side R (frame det +1), scale 0.1677 sim/blend, semi-axes [0.149, 0.127, 0.0991] (axial/equatorial 0.718), globe inflated x1.20; 45000 points, volume 0.00417, 13347 on the shell, 5941 lens, 1482 cornea
+[blend_muscles] side R (frame det +1), scale 0.1677 sim/blend, semi-axes [0.149, 0.127, 0.0991] (axial/equatorial 0.718), globe inflated x1.20; 6 straps x 2200 points; standoff +0.008 / embed -0.025; rest lengths LR=0.169(moved 70%, tendon +0.0112 in) SR=0.168(moved 48%, tendon +0.0151 in) MR=0.184(moved 21%, tendon +0.0060 in) IR=0.181(moved 63%, tendon +0.0150 in) SO=0.184(moved 20%, tendon +0.0130 in) IO=0.184(moved 40%, tendon +0.0144 in)
+
+  what each synergy did (open loop, so this is the geometry talking):
+    SR+SO  up (SR+SO, the two dorsal insertions)      gaze [-0.89, 6.99, 5.68]  expected vertical +   OK
+    IR+IO  down (IR+IO, the two ventral insertions)   gaze [-2.74, -7.13, -4.93]  expected vertical -   OK
+    LR     temporal (LR, the caudal insertion)        gaze [2.65, 1.21, 0.4]  expected horizontal + OK
+    MR     nasal (MR, the rostral insertion)          gaze [-3.06, 0.83, -0.16]  expected horizontal - OK
+{
+  "n_frames": 1540,
+  "program": "pairs",
+  "synergies": {
+    "SR+SO": {
+      "label": "up (SR+SO, the two dorsal insertions)",
+      "window": [
+        40,
+        240
+      ],
+      "gaze_excursion_deg": [
+        -0.89,
+        6.99,
+        5.68
+      ],
+      "peak_abs_deg": [
+        0.89,
+        6.99,
+        5.68
+      ],
+      "expected": "vertical +",
+      "ok": true
+    },
+    "IR+IO": {
+      "label": "down (IR+IO, the two ventral insertions)",
+      "window": [
+        400,
+        600
+      ],
+      "gaze_excursion_deg": [
+        -2.74,
+        -7.13,
+        -4.93
+      ],
+      "peak_abs_deg": [
+        2.74,
+        7.13,
+        4.93
+      ],
+      "expected": "vertical -",
+      "ok": true
+    },
+    "LR": {
+      "label": "temporal (LR, the caudal insertion)",
+      "window": [
+        760,
+        960
+      ],
+      "gaze_excursion_deg": [
+        2.65,
+        1.21,
+        0.4
+      ],
+      "peak_abs_deg": [
+        2.65,
+        1.49,
+        0.59
+      ],
+      "expected": "horizontal +",
+      "ok": true
+    },
+    "MR": {
+      "label": "nasal (MR, the rostral insertion)",
+      "window": [
+        1120,
+        1320
+      ],
+      "gaze_excursion_deg": [
+        -3.06,
+        0.83,
+        -0.16
+      ],
+      "peak_abs_deg": [
+        3.06,
+        0.83,
+        0.16
+      ],
+      "expected": "horizontal -",
+      "ok": true
+    }
+  },
+  "radius_worst_pct": 0.09,
+  "strain_p99": 0.0263,
+  "peak_shortening_pct": 20.89,
+  "max_shortening_pct": {
+    "LR": 7.78,
+    "SR": 12.88,
+    "MR": 8.66,
+    "IR": 8.27,
+    "SO": 20.89,
+    "IO": 17.48
+  },
+  "geometry": {
+    "source": "260802_s2_EYE_MUSCLES_MODEL.blend",
+    "side": "R",
+    "scale": 0.16768,
+    "axial_ratio": 0.7178,
+    "semi_axes": [
+      0.149,
+      0.127,
+      0.0991
+    ],
+    "rest_lengths": {
+      "LR": 0.1577,
+      "SR": 0.1561,
+      "MR": 0.1961,
+      "IR": 0.1667,
+      "SO": 0.2006,
+      "IO": 0.2133
+    },
+    "muscle_volumes": {
+      "LR": 1.48875e-05,
+      "SR": 2.25246e-05,
+      "MR": 1.45764e-05,
+      "IR": 2.28027e-05,
+      "SO": 2.5405e-05,
+      "IO": 2.91811e-05
+    }
+  }
+}
+[surface] camera turns on 219 of 515 frames; held still on 296 while a muscle contracts
+[eye_G] archive/eye_H/pairs_long.mp4
+[eye_G] archive/eye_H/pairs_long.png
+
+
+------------------------------------------------------------
+Sender: LSF System <lsfadmin@h08u20>
+Subject: Job 153423563: <eye_H_pairs_long> in cluster <Janelia> Done
+
+Job <eye_H_pairs_long> was submitted from host <e02u30> by user <allierc> in cluster <Janelia> at Fri Aug 14 18:40:23 2026
+Job was executed on host(s) <8*h08u20>, in queue <gpu_l4>, as user <allierc> in cluster <Janelia> at Fri Aug 14 18:40:23 2026
+</groups/saalfeld/home/allierc> was used as the home directory.
+</groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye> was used as the working directory.
+Started at Fri Aug 14 18:40:23 2026
+Terminated at Fri Aug 14 18:51:50 2026
+Results reported at Fri Aug 14 18:51:50 2026
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+bash -l /groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/_cluster/H_pairs_long.sh
+------------------------------------------------------------
+
+Successfully completed.
+
+Resource usage summary:
+
+    CPU time :                                   724.97 sec.
+    Max Memory :                                 4138 MB
+    Average Memory :                             2184.61 MB
+    Total Requested Memory :                     122880.00 MB
+    Delta Memory :                               118742.00 MB
+    Max Swap :                                   -
+    Max Processes :                              7
+    Max Threads :                                75
+    Run time :                                   688 sec.
+    Turnaround time :                            687 sec.
+
+The output (if any) is above this job summary.
+
+
+
+PS:
+
+Read file </groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/_cluster/H_pairs_long.err> for stderr output of this job.
+

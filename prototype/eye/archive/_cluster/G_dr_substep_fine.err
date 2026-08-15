@@ -1,0 +1,45 @@
+Traceback (most recent call last):
+  File "/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/run_hold.py", line 153, in <module>
+    main()
+  File "/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/run_hold.py", line 68, in main
+    spec = yaml.safe_load(open(_spec_of(folder)))
+                               ^^^^^^^^^^^^^^^^
+  File "/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/characterise_eye.py", line 76, in _spec_of
+    raise FileNotFoundError(f"{folder} holds no spec.yaml -- not an eye archive")
+FileNotFoundError: /workspace/Plexus/prototype/eye/archive/eye_G holds no spec.yaml -- not an eye archive
+
+ERROR conda.cli.main_run:execute(124): `conda run python run_hold.py --folder /workspace/Plexus/prototype/eye/archive/eye_G --muscles LR --level 1.0 --hold-s 3.0 --stage deriskfine --substep 0.00012 --device cuda:0` failed. (See above for error)
+no bpy interpreter at /workspace/.conda_envs/bpy-env/bin/python
+make one with:
+  python3 -m venv /workspace/.conda_envs/bpy-env
+  /workspace/.conda_envs/bpy-env/bin/pip install bpy==5.2.0 numpy matplotlib
+Traceback (most recent call last):
+  File "/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/run_hold.py", line 153, in <module>
+    main()
+  File "/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/run_hold.py", line 100, in main
+    _, cap = run_eye.capture_run(sim, a.device, stride=a.stride)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/run_eye.py", line 159, in capture_run
+    H, _ = engine_run(sim, out_path=None, device=device, on_frame=hook, progress=False)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/../../src/plexus/engine.py", line 866, in run
+    _run_token(token, tick)
+  File "/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/../../src/plexus/engine.py", line 806, in _run_token
+    deltas = ob(H, _selector_mask(H, sel))   # call the operator: forward() runs, returns {set: delta} (or {})
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/groups/saalfeld/home/allierc/miniforge3/envs/connectome-gnn/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1775, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/groups/saalfeld/home/allierc/miniforge3/envs/connectome-gnn/lib/python3.12/site-packages/torch/nn/modules/module.py", line 1786, in _call_impl
+    return forward_call(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/blend_mpm_ops.py", line 479, in forward
+    d, man = load_cut(self.blend, self.parts_dir)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/blend_mpm_ops.py", line 120, in load_cut
+    subprocess.run([sys.executable, READER, "--blend", blend, "--out", parts_dir],
+  File "/groups/saalfeld/home/allierc/miniforge3/envs/connectome-gnn/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/groups/saalfeld/home/allierc/miniforge3/envs/connectome-gnn/bin/python', '/groups/saalfeld/home/allierc/Graph/Plexus/prototype/eye/archive/run_03/read_blend.py', '--blend', '/workspace/Plexus/prototype/eye/260802_s2_EYE_MUSCLES_MODEL.blend', '--out', '/workspace/Plexus/prototype/eye/archive/run_03/blend_parts']' returned non-zero exit status 1.
+
+ERROR conda.cli.main_run:execute(124): `conda run python run_hold.py --folder archive/eye_G --muscles LR --level 1.0 --hold-s 3.0 --stage deriskfine --substep 0.00012 --device cuda:0` failed. (See above for error)

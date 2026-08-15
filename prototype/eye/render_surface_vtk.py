@@ -83,14 +83,14 @@ class SurfaceScene:
     """The blend's meshes, skinned to the run's particles, in one translucent-globe scene."""
 
     def __init__(self, cap, side="R", blend=None, parts=None, size=(1600, 1200),
-                 globe_alpha=GLOBE_ALPHA, span=None):
+                 globe_alpha=GLOBE_ALPHA, span=None, inflate=1.0):
         self.cap = cap
         self.tissue = np.asarray(cap["tissue"])
         self.mus_parent = np.asarray(cap["mus_parent"])
         self.centre0 = np.asarray(cap["centre"][0], float)
 
         d, man = BM.load_cut(blend or BM.DEFAULT_BLEND, parts or BM.DEFAULT_PARTS)
-        fr = BM.BlendFrame(man, d, side, EA.A_EQ, EA.GLOBE_CENTER)
+        fr = BM.BlendFrame(man, d, side, EA.A_EQ, EA.GLOBE_CENTER, inflate)
         shell0 = np.asarray(cap["shell"][0], float)
         mus0 = np.asarray(cap["mus_pos"][0], float)
 
@@ -106,7 +106,7 @@ class SurfaceScene:
             key = f"{side}_{part}"
             if f"{key}__v" not in d:
                 continue
-            V = fr(d[f"{key}__v"])
+            V = fr.globe(d[f"{key}__v"])           # the globe is drawn as BUILT (inflated)
             mesh = _poly(V, d[f"{key}__f"])
             skin = Skin(V, shell0)
             mesh["rgb"] = np.clip(PALETTE[skin.nearest(self.tissue)], 0, 1).astype(np.float32)
@@ -202,13 +202,13 @@ class SurfaceScene:
 
 def render(cap, dt, out_mp4, out_strip=None, fps=30, size=(1600, 1200), turns=1.0,
            quality=8, globe_alpha=GLOBE_ALPHA, strip_n=5, still_margin=0.03,
-           still_above=None, az0=0.0, side="R", blend=None, parts=None):
+           still_above=None, az0=0.0, side="R", blend=None, parts=None, inflate=1.0):
     """Same signature as `render_orbit_vtk.render`, so the two are interchangeable."""
     import imageio.v2 as iio
 
     n = len(cap["frame"])
     scene = SurfaceScene(cap, side=side, blend=blend, parts=parts, size=size,
-                         globe_alpha=globe_alpha)
+                         globe_alpha=globe_alpha, inflate=inflate)
     az, moving = azimuth_schedule(cap, turns=turns, still_margin=still_margin,
                                   still_above=still_above, az0=az0)
     print(f"[surface] camera turns on {int((~moving).sum())} of {n} frames; "
