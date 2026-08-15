@@ -21,6 +21,8 @@ channel: the plant, measured rather than assumed.
 """
 from __future__ import annotations
 
+import os
+
 import numpy as np
 import torch
 
@@ -389,6 +391,51 @@ class MuscleProbeHoldVector(MuscleProbeStaircase):
             d_act = d_act * mask.float()
         self.last = {"commanded": cmd.detach().cpu().numpy().copy()}
         return {self.at: d_act[:, None]}
+
+
+@register_operator("muscle_probe", implementation="playback",
+                   family="signalling", set="muscle", kind="lateral")
+class MuscleProbePlayback(MuscleProbeHoldVector):
+    """Play a RECORDED activation trace through the plant, one row per frame.
+
+    The probes above generate their own command; this one is given it. That is what a
+    closed-loop controller needs: the circuit trained in `connectome-gnn-cx` emits six
+    non-negative drives per timestep against a reduced eye, and the only way to see
+    what the REAL plant does with them is to hand the same trace back to the MPM.
+
+        trace   path to an .npy of shape (n_frames, n_muscle), values in [0, 1]
+
+    The trace is played verbatim -- no ramp, no lead, no release -- because it already
+    is a continuous command and re-shaping it would no longer be the controller's
+    output. Frames past its end hold the last row, so a spec may run long.
+    """
+
+    REQUIRES_PARAMS = ["trace"]
+    PARAM_ROLES = dict(MuscleProbeHoldVector.PARAM_ROLES,
+                       trace="recorded_activation_npy")
+
+    def __init__(self, params, device="cpu"):
+        params = dict(params)
+        params.setdefault("muscles", [])
+        params.setdefault("levels_vec", [])
+        super().__init__(params, device)
+        path = str(params["trace"])
+        if not os.path.isabs(path):
+            path = os.path.join(os.path.dirname(os.path.abspath(__file__)), path)
+        self.trace = np.asarray(np.load(path), dtype=np.float64)
+        if self.trace.ndim != 2:
+            raise ValueError(f"muscle_probe[playback]: {path} is {self.trace.shape}, "
+                             "expected (n_frames, n_muscle)")
+
+    def n_frames(self):
+        return int(len(self.trace))
+
+    def levels_all(self, frame: float, n=None) -> np.ndarray:
+        row = self.trace[int(np.clip(frame, 0, len(self.trace) - 1))]
+        n = EA.N_MUSCLE if n is None else int(n)
+        cmd = np.full(n, self.tonic)
+        cmd[:min(n, len(row))] = row[:min(n, len(row))]
+        return cmd
 
 
 @register_operator("muscle_probe", implementation="groups",
