@@ -31,6 +31,24 @@ def check(cond, msg):
         FAIL.append(msg)
 
 
+def pool_parents(n=2):
+    """The first `n` pool entries that are actually on disk. Read, never hard-coded.
+
+    TWO TESTS NAMED `coral_gate` AND `refute_coral_nocons` AND BOTH RAN GREEN FOR WEEKS BEFORE
+    FAILING FOR A REASON THAT HAS NOTHING TO DO WITH WHAT THEY ASSERT: the runs left the pool and
+    then the disk, so one test raised FileNotFoundError and the other `'NoneType' has no attribute
+    'ops'` -- neither of which says "your fixture is gone". What they check is a property of A POOL
+    PARENT, so the fixture belongs in `crew/flow.yaml` beside the pool the loop actually uses.
+    """
+    import round as E
+    for node in E.load_flow():
+        if node["id"] == "parents":
+            names = [x for x in ((node.get("args") or {}).get("pool") or [])
+                     if os.path.exists(os.path.join(E.LOG_ROOT, x, "spec_run.yaml"))]
+            return names[:n]
+    return []
+
+
 # ---------------------------------------------------------------- the crew contract
 
 def test_crew_discovery():
@@ -188,9 +206,15 @@ def test_dedupe_admits_a_sweep_and_the_control():
     import critic as C
     import round as E
     from run_record import comp_hash
+    parent = pool_parents(1)[0]
     with contextlib.redirect_stdout(io.StringIO()):
-        g = build.graph_from_run("coral_gate")
+        g = build.graph_from_run(parent)
     seen = {comp_hash(g), C._run_key(g)}
+    # THE RESOLVED TARGET IS A NODE ID IN THIS GRAPH, whichever pool parent the flow offers. The
+    # assertion used to spell `reconnect_t1_3d0.`, which was the coral pool's name for the operator
+    # and is `edge_flip0.` in the current one -- a test that hard-codes the fixture's spelling
+    # fails when the fixture changes and says nothing about `_resolve_edit`.
+    node_ids = {o["id"] for o in g.ops}
 
     # THROUGH `_resolve_edit`, WHICH IS THE PATH THE ROUND TAKES. My first version of this test
     # applied the BARE target `edge_flip.l_th_frac` directly, and all three sweep points
@@ -201,12 +225,12 @@ def test_dedupe_admits_a_sweep_and_the_control():
             e = E._resolve_edit(g, ("set_param", "edge_flip.l_th_frac", v))
             g2, _ = g.apply(e)
             ok, rej = C.admit(g2, seen_hashes=seen, edit_kind="set_param")
-        check(e[1].startswith("reconnect_t1_3d0."), f"the bare target was not resolved: {e[1]}")
+        check(e[1].split(".")[0] in node_ids, f"the bare target was not resolved: {e[1]}")
         check(ok, f"a sweep at l_th_frac={v} was refused as a duplicate: {[r.code for r in rej]}")
 
     # and an edit naming nothing must not become a run
     with contextlib.redirect_stdout(io.StringIO()) as buf:
-        r = E._build_one({"parent": "coral_gate", "edit": ["set_param", "no_such_op.k", 1.0]},
+        r = E._build_one({"parent": parent, "edit": ["set_param", "no_such_op.k", 1.0]},
                          "tzz", 1, set())
     check(r is None, "an edit whose target does not exist was built into a run")
     check("changed nothing" in buf.getvalue(),
@@ -305,7 +329,7 @@ def test_a_child_differs_from_its_parent_by_exactly_the_edit():
                     ("cell_divide", "every"), ("cell_divide", "min_cycle"),
                     ("cell_grow", "vth_frac")]
 
-    for parent in ("refute_coral_nocons", "coral_gate"):
+    for parent in pool_parents(2):
         with open(os.path.join(E.LOG_ROOT, parent, "spec_run.yaml")) as f:
             pspec = yaml.safe_load(f)
         _sp, ctrl = emitted({"parent": parent}, E.CONTROL_SLOT)

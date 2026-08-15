@@ -944,6 +944,33 @@ def check_act(slot, claim_ids=None, acts=None):
             "R8_ACT_MISSING_FIELD",
             f"`{act}` cannot be carried out without the field(s) that define it",
             f"missing {', '.join(sorted(set(missing)))}. {spec.get('effect', '')}".strip())
+    # A REPLICATE THAT ALSO EDITS SOMETHING IS NOT A REPLICATE.
+    #
+    # `r007_08` declared `act: replicate` and gave as its reason *"is n_tubes 5 on r005_10 real or a
+    # threshold flicker (C020)? A fresh seed bounds the floor of the campaign's best tube count"* --
+    # then carried `set_param cell_chem_react0.rate 0.5` alongside it. It ran, it came back with
+    # n_tubes 7 against the parent's 5, and that difference is unattributable: the seed changed and
+    # the reaction rate changed, and the run was proposed to separate exactly those two.
+    #
+    # This is why the epistemic audit reads Replication 8, validation 0%. Eight slots asked to
+    # measure the seed floor and not one of them re-ran anything: the seed floor every R7 refusal in
+    # this campaign is judged against still comes from an older corpus, because this one has never
+    # produced a pair that differs by nothing but its seed.
+    #
+    # REFUSED RATHER THAN SILENTLY STRIPPED. Dropping the edit would grant a run the Proposer did not
+    # ask for and dropping the act would score a confounded run as a `predict`; only the Proposer
+    # knows which half it meant.
+    if act == "replicate":
+        _e = slot.get("edit")
+        if _e and str(tuple(_e)[0]).lower() not in ("control", "none", "null", "ctrl", "replicate"):
+            return Rejection(
+                "R8_REPLICATE_WITH_EDIT",
+                "a replicate re-runs an experiment unchanged at a new seed -- an edit alongside it "
+                "confounds the seed spread with the edit's effect",
+                f"`act: replicate` on {slot.get('parent')} but the slot also carries `edit: {_e}`. "
+                f"Either drop the edit (the run is then the parent at a fresh seed, which is what "
+                f"bounds the floor) or drop the act and say what the edit is FOR.")
+
     cid = slot.get("on")
     if cid and claim_ids is not None and cid not in claim_ids:
         return Rejection(

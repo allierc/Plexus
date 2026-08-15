@@ -101,6 +101,8 @@ log/okuda_ECM/
 # -- and the authoritative copy of a run's spec is `spec_run.yaml` inside the run's own directory. The
 # reference recipes (coral_gate, cfl_*, wk_*, repair_*) stay tracked: those are chosen starting points.
 config/okuda/r[0-9][0-9][0-9]_*.yaml
+# AND WHERE clean_start() PUTS THEM. Same files, same reason, one directory deeper.
+config/okuda/_archive_*/
 config/okuda/r[0-9][0-9][0-9]_*.composition.json
 config/okuda/r[0-9][0-9][0-9]c_*.yaml
 config/okuda/r[0-9][0-9][0-9]c_*.composition.json

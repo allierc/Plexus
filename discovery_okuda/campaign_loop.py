@@ -36,6 +36,7 @@ of those is how the last two batches were spent.
 
 # cd /workspace/Plexus/discovery_okuda
 # /workspace/.conda_envs/neural-graph-linux/bin/python -u campaign_loop.py --rounds 5 --batch 16
+# OKUDA_EFFORT_PROPOSER=high python -u campaign_loop.py --rounds 50 --batch 16
 
 from __future__ import annotations
 
@@ -343,6 +344,41 @@ CAMPAIGN_STATE = ("analysis.md", "memory.md", "lever_map.md",
                   "operator_requests.jsonl")
 
 
+def _repoint_evidence(tag):
+    """Say which campaign an evidence run came from, before its name is handed out again.
+
+    Rewrites `r001_02` -> `arch<date>/r001_02` in every `evidence_for`/`evidence_against` entry of
+    live ledger. Display-only: `claims.weigh` counts entries and reads `weight`/`act`, and nothing
+    anywhere opens the directory -- so the prefix costs nothing and is the only thing standing
+    between the old campaign's evidence and the new campaign's identically-named runs.
+    """
+    import json
+    import re
+    p = os.path.join(CAMP, "claims.jsonl")
+    if not os.path.exists(p):
+        return 0
+    pat = re.compile(r"^r\d{3}_")
+    rows, n = [], 0
+    for line in open(p):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            r = json.loads(line)
+        except Exception:
+            continue
+        for side in ("evidence_for", "evidence_against"):
+            for e in (r.get(side) or []):
+                if isinstance(e, dict) and pat.match(str(e.get("run") or "")):
+                    e["run"] = f"{tag}/{e['run']}"
+                    n += 1
+        rows.append(r)
+    if n:
+        open(p, "w").write("".join(json.dumps(r) + "\n" for r in rows))
+        print(f"[loop] clean start: {n} evidence citation(s) re-pointed at {tag}")
+    return n
+
+
 def clean_start():
     """Delete the campaign's state so the next round is ROUND 1. Never the research record.
 
@@ -354,19 +390,61 @@ def clean_start():
 
     `_archive*`, `q_quarantine.jsonl`, the TEMPLATE files and `user_input.md` are NOT campaign
     state -- they are the research record and the instructions -- and are never touched.
+
+    THE RUN-DIR PATTERNS MATCHED NOTHING FOR THE WHOLE OF THE LAST CAMPAIGN. They were
+    `log/okuda/r0??n_*` and `r0??c_*`, from a naming scheme -- `r001n_00`, round-then-lane -- that
+    no longer exists; runs are `r001_00`. Measured 15 August: 151 run directories and 236 configs
+    on disk, glob matches ZERO. So "clean start" cleared the counter and left the entire previous
+    campaign in the namespace the new one was about to write into, where `r001_00` opens the old
+    `r001_00`'s directory and `_seen()` refuses the new round's slots as duplicates of a campaign
+    that no longer exists. The one time it appeared to work, I had deleted the directories by hand.
+    Two consequences, both fixed here:
+
+    MOVED, NEVER DELETED. A run directory is the research record by the same test as the ledger --
+    15 GB of trajectories, and one of them is the six-armed star. `shutil.move` within `log/okuda`
+    is a rename, so archiving 151 runs costs no time and no disk.
+
+    AND THE LEDGER'S EVIDENCE IS RE-POINTED. The seeded claims cite `r001_02` 88 times, and the
+    campaign starting tomorrow will have an `r001_02` of its own. Nothing resolves an evidence run
+    to a directory -- they are read by a human and counted by `weigh` -- so the fix is to say which
+    campaign each one came from before the name is reused. Without it the ledger silently attributes
+    the old campaign's evidence to the new campaign's runs.
     """
     import glob
+    import shutil
+    from datetime import date
     removed = []
+    stamp = date.today().isoformat()
+    root = os.path.dirname(HERE)
+
+    # THE RECORD IS ARCHIVED FIRST, so a failure part-way leaves it in two places rather than none.
+    runs = sorted(glob.glob(os.path.join(root, "log", "okuda", "r[0-9][0-9][0-9]_*")))
+    cfgs = sorted(glob.glob(os.path.join(root, "config", "okuda", "r[0-9][0-9][0-9]_*")))
+    rec = [f for f in ("records.jsonl", "foresight.jsonl", "flow_trace.jsonl", "campaign_loop.jsonl")
+           if os.path.exists(os.path.join(CAMP, f))]
+    if runs or cfgs or rec:
+        rounds = sorted({os.path.basename(p).split("_")[0] for p in runs}) or ["r000"]
+        tag = f"{rounds[0]}-{rounds[-1]}_{stamp}"
+        a_log = os.path.join(root, "log", "okuda", f"_archive_{tag}")
+        a_cfg = os.path.join(root, "config", "okuda", f"_archive_{tag}")
+        a_cmp = os.path.join(CAMP, "_archive", tag)
+        for d in (a_log, a_cfg, a_cmp):
+            os.makedirs(d, exist_ok=True)
+        for p in runs:
+            shutil.move(p, os.path.join(a_log, os.path.basename(p)))
+        for p in cfgs:
+            shutil.move(p, os.path.join(a_cfg, os.path.basename(p)))
+        for f in rec:
+            shutil.move(os.path.join(CAMP, f), os.path.join(a_cmp, f))
+        _repoint_evidence(f"arch{stamp}")
+        print(f"[loop] clean start: archived {len(runs)} run(s), {len(cfgs)} config(s) and "
+              f"{len(rec)} record file(s) to _archive_{tag}")
+
     for f in CAMPAIGN_STATE:
         p = os.path.join(CAMP, f)
         if os.path.exists(p):
             os.remove(p)
             removed.append(f)
-    for pat in ("log/okuda/r0??n_*", "log/okuda/r0??c_*",
-                "config/okuda/r0*.yaml", "config/okuda/r0*.composition.json"):
-        for p in glob.glob(os.path.join(os.path.dirname(HERE), pat)):
-            import shutil
-            shutil.rmtree(p, ignore_errors=True) if os.path.isdir(p) else os.remove(p)
     # THE LEARNED-PATTERNS BLOCK IS STATE, NOT INSTRUCTION. instruction.md is preserved because
     # the standing brief above the marker is genuinely an instruction -- but everything below
     # `<!-- LEARNED PATTERNS -->` is rewritten by the Meta-review every round
