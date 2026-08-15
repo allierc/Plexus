@@ -52,7 +52,10 @@ except Exception as e:             # a plant that does not need it still runs
 ARCHIVE = os.path.join(HERE, "archive")
 K = {k: i for i, k in enumerate(EA.MUSCLE_KEYS)}
 # (name, muscles, the axis and sign expected, in the (h, v, t) readout)
-PHASES = [("up", ["LR", "SO"], (1, +1)),
+# SR, not LR: the elevators are the two DORSAL insertions. The lateral rectus was here by
+# a typo and it is also the temporal phase below, so "up" was driving a horizontal muscle
+# and one muscle was doing two jobs. `probe_groups.PAIRS` is the same list, measured.
+PHASES = [("up", ["SR", "SO"], (1, +1)),
           ("down", ["IR", "IO"], (1, -1)),
           ("right", ["LR"], (0, +1)),
           ("left", ["MR"], (0, -1))]

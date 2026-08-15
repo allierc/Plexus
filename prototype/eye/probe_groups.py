@@ -48,7 +48,7 @@ def report(cap, probe, labels=None, expect=None) -> dict:
     g = np.asarray(cap["gaze"], float)
     frames = np.asarray(cap["frame"])
     labels = labels or PAIR_LABELS
-    expect = expect or PAIR_EXPECT
+    expect = PAIR_EXPECT if expect is None else expect
     out = {}
     for slot, grp in enumerate(probe.groups):
         t_on, t_off = probe.window(slot)

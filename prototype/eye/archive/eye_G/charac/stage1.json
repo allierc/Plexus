@@ -1,0 +1,530 @@
+[
+  {
+    "stage": "1",
+    "muscles": [
+      "LR"
+    ],
+    "level": [
+      0.25
+    ],
+    "pose_deg": [
+      0.3109,
+      0.1068,
+      0.0393
+    ],
+    "settle_ptp_deg": [
+      0.0043,
+      0.0084,
+      0.0036
+    ],
+    "settled": true,
+    "hold_s": 2.835,
+    "seconds": 276.8
+  },
+  {
+    "stage": "1",
+    "muscles": [
+      "LR"
+    ],
+    "level": [
+      0.1
+    ],
+    "pose_deg": [
+      -0.6425,
+      0.158,
+      0.2007
+    ],
+    "settle_ptp_deg": [
+      0.0275,
+      0.0134,
+      0.0004
+    ],
+    "settled": true,
+    "hold_s": 2.835,
+    "seconds": 279.3
+  },
+  {
+    "stage": "1",
+    "muscles": [
+      "LR"
+    ],
+    "level": [
+      1.0
+    ],
+    "pose_deg": [
+      7.3755,
+      -0.1751,
+      -1.3597
+    ],
+    "settle_ptp_deg": [
+      0.0021,
+      0.0089,
+      0.0001
+    ],
+    "settled": true,
+    "hold_s": 2.835,
+    "seconds": 280.3
+  },
+  {
+    "stage": "1",
+    "muscles": [
+      "SR"
+    ],
+    "level": [
+      0.5
+    ],
+    "pose_deg": [
+      -0.9676,
+      2.1163,
+      -0.565
+    ],
+    "settle_ptp_deg": [
+      0.0006,
+      0.0044,
+      0.0025
+    ],
+    "settled": true,
+    "hold_s": 2.835,
+    "seconds": 281.4
+  },
+  {
+    "stage": "1",
+    "muscles": [
+      "SR"
+    ],
+    "level": [
+      0.25
+    ],
+    "pose_deg": [
+      -0.5685,
+      0.6721,
+      -0.0267
+    ],
+    "settle_ptp_deg": [
+      0.0116,
+      0.0124,
+      0.0003
+    ],
+    "settled": true,
+    "hold_s": 2.835,
+    "seconds": 281.7
+  },
+  {
+    "stage": "1",
+    "muscles": [
+      "SR"
+    ],
+    "level": [
+      0.1
+    ],
+    "pose_deg": [
+      -0.3833,
+      -0.0093,
+      0.2015
+    ],
+    "settle_ptp_deg": [
+      0.0017,
+      0.001,
+      0.0087
+    ],
+    "settled": true,
+    "hold_s": 2.835,
+    "seconds": 284.9
+  },
+  {
+    "stage": "1",
+    "muscles": [
+      "SR"
+    ],
+    "level": [
+      1.0
+    ],
+    "pose_deg": [
+      -2.0135,
+      7.0842,
+      -2.3653
+    ],
+    "settle_ptp_deg": [
+      0.0185,
+      0.0109,
+      0.0084
+    ],
+    "settled": true,
+    "hold_s": 2.835,
+    "seconds": 286.7
+  },
+  {
+    "stage": "1",
+    "muscles": [
+      "LR"
+    ],
+    "level": [
+      0.5
+    ],
+    "pose_deg": [
+      2.2313,
+      0.0207,
+      -0.3085
+    ],
+    "settle_ptp_deg": [
+      0.0015,
+      0.0053,
+      0.0051
+    ],
+    "settled": true,
+    "hold_s": 2.835,
+    "seconds": 287.1
+  },
+  {
+    "stage": "1",
+    "muscles": [
+      "IR"
+    ],
+    "level": [
+      0.5
+    ],
+    "pose_deg": [
+      -1.0674,
+      -2.9124,
+      1.5439
+    ],
+    "settle_ptp_deg": [
+      0.0027,
+      0.0065,
+      0.0003
+    ],
+    "settled": true,
+    "hold_s": 2.835,
+    "seconds": 290.5
+  },
+  {
+    "stage": "1",
+    "muscles": [
+      "SO"
+    ],
+    "level": [
+      1.0
+    ],
+    "pose_deg": [
+      -1.4586,
+      3.9506,
+      8.6603
+    ],
+    "settle_ptp_deg": [
+      0.0037,
+      0.0239,
+      0.002
+    ],
+    "settled": true,
+    "hold_s": 2.835,
+    "seconds": 290.8
+  },
+  {
+    "stage": "1",
+    "muscles": [
+      "IR"
+    ],
+    "level": [
+      0.25
+    ],
+    "pose_deg": [
+      -0.6515,
+      -0.7529,
+      0.5591
+    ],
+    "settle_ptp_deg": [
+      0.0031,
+      0.0019,
+      0.0
+    ],
+    "settled": true,
+    "hold_s": 2.835,
+    "seconds": 292.9
+  },
+  {
+    "stage": "1",
+    "muscles": [
+      "IR"
+    ],
+    "level": [
+      0.1
+    ],
+    "pose_deg": [
+      -0.3571,
+      0.4715,
+      0.0014
+    ],
+    "settle_ptp_deg": [
+      0.0064,
+      0.0058,
+      0.0001
+    ],
+    "settled": true,
+    "hold_s": 2.835,
+    "seconds": 290.1
+  },
+  {
+    "stage": "1",
+    "muscles": [
+      "IR"
+    ],
+    "level": [
+      1.0
+    ],
+    "pose_deg": [
+      -2.2971,
+      -8.3893,
+      4.0059
+    ],
+    "settle_ptp_deg": [
+      0.0284,
+      0.0133,
+      0.0047
+    ],
+    "settled": true,
+    "hold_s": 2.835,
+    "seconds": 295.8
+  },
+  {
+    "stage": "1",
+    "muscles": [
+      "IO"
+    ],
+    "level": [
+      1.0
+    ],
+    "pose_deg": [
+      -4.0519,
+      -2.8795,
+      -8.2126
+    ],
+    "settle_ptp_deg": [
+      0.0295,
+      0.0172,
+      0.001
+    ],
+    "settled": true,
+    "hold_s": 2.835,
+    "seconds": 293.2
+  },
+  {
+    "stage": "1",
+    "muscles": [
+      "IO"
+    ],
+    "level": [
+      0.1
+    ],
+    "pose_deg": [
+      -0.2821,
+      0.259,
+      0.4526
+    ],
+    "settle_ptp_deg": [
+      0.0229,
+      0.0023,
+      0.0002
+    ],
+    "settled": true,
+    "hold_s": 2.835,
+    "seconds": 294.0
+  },
+  {
+    "stage": "1",
+    "muscles": [
+      "IO"
+    ],
+    "level": [
+      0.5
+    ],
+    "pose_deg": [
+      -1.5505,
+      -0.8773,
+      -2.5745
+    ],
+    "settle_ptp_deg": [
+      0.0015,
+      0.0014,
+      0.0
+    ],
+    "settled": true,
+    "hold_s": 2.835,
+    "seconds": 294.4
+  },
+  {
+    "stage": "1",
+    "muscles": [
+      "SO"
+    ],
+    "level": [
+      0.5
+    ],
+    "pose_deg": [
+      -0.879,
+      1.4061,
+      2.8198
+    ],
+    "settle_ptp_deg": [
+      0.021,
+      0.0075,
+      0.0014
+    ],
+    "settled": true,
+    "hold_s": 2.835,
+    "seconds": 296.6
+  },
+  {
+    "stage": "1",
+    "muscles": [
+      "SO"
+    ],
+    "level": [
+      0.25
+    ],
+    "pose_deg": [
+      -0.5358,
+      0.5375,
+      0.9108
+    ],
+    "settle_ptp_deg": [
+      0.0077,
+      0.0066,
+      0.0013
+    ],
+    "settled": true,
+    "hold_s": 2.835,
+    "seconds": 299.9
+  },
+  {
+    "stage": "1",
+    "muscles": [
+      "MR"
+    ],
+    "level": [
+      1.0
+    ],
+    "pose_deg": [
+      -6.8336,
+      3.5147,
+      -0.1888
+    ],
+    "settle_ptp_deg": [
+      0.0242,
+      0.0086,
+      0.0028
+    ],
+    "settled": true,
+    "hold_s": 2.835,
+    "seconds": 298.4
+  },
+  {
+    "stage": "1",
+    "muscles": [
+      "SO"
+    ],
+    "level": [
+      0.1
+    ],
+    "pose_deg": [
+      -0.3809,
+      0.0173,
+      -0.0765
+    ],
+    "settle_ptp_deg": [
+      0.0017,
+      0.0025,
+      0.0121
+    ],
+    "settled": true,
+    "hold_s": 2.835,
+    "seconds": 302.8
+  },
+  {
+    "stage": "1",
+    "muscles": [
+      "MR"
+    ],
+    "level": [
+      0.5
+    ],
+    "pose_deg": [
+      -2.6242,
+      1.4536,
+      -0.0052
+    ],
+    "settle_ptp_deg": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "settled": true,
+    "hold_s": 2.835,
+    "seconds": 300.4
+  },
+  {
+    "stage": "1",
+    "muscles": [
+      "IO"
+    ],
+    "level": [
+      0.25
+    ],
+    "pose_deg": [
+      -0.7538,
+      -0.1842,
+      -0.6579
+    ],
+    "settle_ptp_deg": [
+      0.0051,
+      0.0018,
+      0.0039
+    ],
+    "settled": true,
+    "hold_s": 2.835,
+    "seconds": 303.8
+  },
+  {
+    "stage": "1",
+    "muscles": [
+      "MR"
+    ],
+    "level": [
+      0.25
+    ],
+    "pose_deg": [
+      -0.9394,
+      0.4414,
+      0.1352
+    ],
+    "settle_ptp_deg": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "settled": true,
+    "hold_s": 2.835,
+    "seconds": 338.2
+  },
+  {
+    "stage": "1",
+    "muscles": [
+      "MR"
+    ],
+    "level": [
+      0.1
+    ],
+    "pose_deg": [
+      -0.3084,
+      0.064,
+      0.1506
+    ],
+    "settle_ptp_deg": [
+      0.0206,
+      0.0181,
+      0.0047
+    ],
+    "settled": true,
+    "hold_s": 2.835,
+    "seconds": 341.8
+  }
+]

@@ -114,24 +114,26 @@ operators:
 - op: blend_globe
   at: mpm_particle
   before_frame: 1
-  blend: /workspace/Plexus/prototype/eye/260802_s2_EYE_MUSCLES_MODEL.blend
-  parts: /workspace/Plexus/prototype/eye/archive/run_03/blend_parts
+  blend: 260802_s2_EYE_MUSCLES_MODEL.blend
+  parts: archive/run_03/blend_parts
   side: R
   a_eq: 0.115
   center: &id001
   - 0.5
   - 0.5
   - 0.46
+  inflate: 1.0
   lens_youngs: 520.0
   cornea_youngs: 320.0
 - op: blend_muscles
   at: muscle_particle
   before_frame: 1
-  blend: /workspace/Plexus/prototype/eye/260802_s2_EYE_MUSCLES_MODEL.blend
-  parts: /workspace/Plexus/prototype/eye/archive/run_03/blend_parts
+  blend: 260802_s2_EYE_MUSCLES_MODEL.blend
+  parts: archive/run_03/blend_parts
   side: R
   a_eq: 0.115
   center: *id001
+  inflate: 1.0
   keys:
   - LR
   - SR
@@ -140,6 +142,8 @@ operators:
   - SO
   - IO
   cap: 0.1
+  standoff: 0.008
+  embed: -0.006
   youngs: 240.0
 - op: eye_pose
   at: eye
