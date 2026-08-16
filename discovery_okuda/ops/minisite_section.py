@@ -758,36 +758,27 @@ def main():
             print(f"[minisite] {run}: no census.json -- its card cannot quote counts")
             return None
 
-    cen = _census("07i_ramp")
-    hol = _metrics_or_none("06_breach_hole")
-    # `06_breach_torn` HAS NO CARD -- it is read so the breach card can say what the cutting rate
-    # does past the runaway point, from that run rather than from memory.
-    trn = _metrics_or_none("06_breach_torn")
     def _clip(d, v, panels, kw):
         """Build one card's clip, or say plainly that the run is not ready.
 
-        A HALF-WRITTEN MP4 IS NOT A MISSING ONE and the difference matters here: these runs are
-        often still encoding when the page is regenerated, and a file that exists without its
-        `moov` atom cuts into a broken clip rather than failing. `_nframes` reads the container, so
-        a movie that cannot be counted is treated as absent -- and SAID to be absent, because a row
-        that silently drops a card looks like a row that was only ever meant to be short.
+        A HALF-WRITTEN MP4 IS NOT A MISSING ONE: these runs are often still encoding when the page
+        is regenerated, and a file without its `moov` atom cuts into a broken clip rather than
+        failing. `_nframes` reads the container, so a movie that cannot be counted is treated as
+        absent -- and SAID to be absent, because a row that silently drops a card looks like a row
+        that was only ever meant to be short.
 
-        DEFINED ABOVE THE ROW LISTS, not between them and the loop: twice now an edit that replaced
-        a row list from its first line to the loop has deleted this function with it.
+        DEFINED BEFORE THE ROW LISTS. Three times now an edit that replaced a row list from its
+        first line to the loop has taken this function with it.
         """
-        # THE VTK RENDER WHERE THERE IS ONE. `log/okuda_ECM` is being re-rendered to
-        # `movie_vtk.mp4` -- z-buffered, lit, drawn from the same trajectory -- run by run, so the
-        # site takes whichever exists and prints which it used. A run that has both is a run whose
-        # `movie.mp4` is the one that stops being true first.
-        src = next((q for q in (os.path.join(LOG, d, "movie_vtk.mp4"),
-                                os.path.join(LOG, d, "movie.mp4")) if os.path.exists(q)), None)
+        src = next((x for x in (os.path.join(LOG, d, "movie_vtk.mp4"),
+                                os.path.join(LOG, d, "movie.mp4")) if os.path.exists(x)), None)
         if src is None:
             print(f"[minisite] {d}: no movie.mp4 or movie_vtk.mp4 yet -- card skipped")
             return None
         try:
             n = _nframes(src)
         except Exception:
-            print(f"[minisite] {d}: movie.mp4 is still being written (no moov atom) -- card skipped")
+            print(f"[minisite] {d}: movie is still being written (no moov atom) -- card skipped")
             return None
         panels_concat(src, os.path.join(GAL, f"{v}.mp4"), panels, **kw)
         print(f"[minisite] gallery/{v}.mp4 <- {d}/{os.path.basename(src)}  "
@@ -795,40 +786,46 @@ def main():
               f"{len(panels)} panel{'s' if len(panels) > 1 else ''} in sequence, square, no label)")
         return True
 
-    tiny = _metrics_or_none("06_hole_tiny_off")
-    small = _metrics_or_none("06_hole_small")
-    R5 = [
-        ("07i_ramp", "spheroid_bm_ecm_07i2", "three entities, three solvers",
-         [q["tl"], q["tr"], q["bl"], q["br"]], dict(skip_top=0.0),
-         (f"{cen['epi_cell']['min']:,.0f} cells to {cen['epi_cell']['max']:,.0f}, and every level "
-          f"grows with them: the membrane from {cen['bm_face']['min']:,.0f} faces to "
-          f"{cen['bm_face']['max']:,.0f}, its adhesions from {cen['plaque']['min']:,.0f} plaques "
-          f"to {cen['plaque']['max']:,.0f}, and {cen['bond']['last']:,.0f} integrin bonds under "
-          f"load at the end" if cen else
-          "An epithelium growing inside a fibre matrix, with a triangulated membrane between "
-          "them")),
-    ] + ([] if not tiny else [
-        # THE SHEET PANEL ALONE, as for the breach cards below: this run's other three panels are
-        # the tissue and the matrix, which the first card already shows.
-        ("06_hole_tiny_off", "bm_hole_tiny_off_vtk", "a self-arresting perforation",
-         [q["bl"]], dict(skip_top=0.09),
-         f"{tiny['faces_torn']} of {tiny['faces_seeded']:,} faces, {tiny['rim_loops']} rim "
-         f"loop, and it stops. The size is the source's: a {tiny['spot']:.0f}\u00b0 cap of "
-         f"MT1-MMP, tilted {tiny['spot_off']:.0f}\u00b0 so the rim reads as a rim"),
-    ])
-    R5b = ([] if not small else [
-        ("06_hole_small", "bm_hole_small_vtk", "self-arresting, no cap",
-         [q["bl"]], dict(skip_top=0.09),
-         f"A random field instead of a cap: {small['faces_torn']} faces in one patch, "
-         f"{100 * small['torn_frac']:.0f}% of the sheet, and it still stops. Change only the seed "
-         f"and the same point tears 31.5%"),
-    ]) + ([] if not (hol and trn) else [
-        ("06_breach_hole", "bm_breach_sheet_vtk", "not self-arresting",
-         [q["bl"]], dict(skip_top=0.09),
-         f"This one does not stop: {100 * hol['torn_frac']:.0f}% of the sheet gone, "
-         f"{100 * hol['biggest_patch_frac']:.0f}% of it one hole. At cutting rate "
-         f"{trn['kdeg']:.0f} it is {100 * trn['torn_frac']:.0f}%"),
-    ])
+    cen = _census("07i_ramp")
+
+    def _hole(run):
+        """`hole_metrics.json`: how much of the sheet is gone, in how many pieces, and whether it
+        stopped. Read per run so a caption cannot outlive the run that earned it -- the 06 cards
+        this replaces said "still stops" and every 07 run reports `arrested: false`."""
+        try:
+            return json.load(open(os.path.join(LOG, run, "hole_metrics.json")))
+        except (OSError, ValueError):
+            print(f"[minisite] {run}: no hole_metrics.json -- card skipped")
+            return None
+
+    QUAD = [q["tl"], q["tr"], q["bl"], q["br"]]
+    R5 = [("07i_ramp", "spheroid_bm_ecm_07i2", "three entities, three solvers", QUAD,
+           dict(skip_top=0.0),
+           (f"{cen['epi_cell']['min']:,.0f} cells to {cen['epi_cell']['max']:,.0f}, and every "
+            f"level grows with them: the membrane from {cen['bm_face']['min']:,.0f} faces to "
+            f"{cen['bm_face']['max']:,.0f}, its adhesions from {cen['plaque']['min']:,.0f} plaques "
+            f"to {cen['plaque']['max']:,.0f}, and {cen['bond']['last']:,.0f} integrin bonds under "
+            f"load at the end" if cen else
+            "An epithelium growing inside a fibre matrix, with a triangulated membrane between "
+            "them"))]
+    # THE MEMBRANE PANEL ALONE for the three breach cards: their other three panels are the tissue
+    # and the matrix, which the first card already shows.
+    for run, clip, label, phrase in (
+            ("07k_breach_hole", "bm_07k_breach_hole", "a breach that opens",
+             "the sheet perforates where the enzyme is"),
+            ("07j_hole_tiny", "bm_07j_hole_tiny", "the smallest one",
+             "a localised source, and the hole stays small"),
+            ("07k_breach_torn", "bm_07k_breach_torn", "and one that runs away",
+             "the same chemistry with nothing holding it")):
+        hm = _hole(run)
+        if hm is None:
+            continue
+        R5.append((run, clip, label, [q["bl"]], dict(skip_top=0.0),
+                   f"{phrase}: {100 * hm['torn_frac_final']:.1f}% of the faces gone by frame "
+                   f"{hm['frames']}, in {hm['rim_loops_final']} rim loops, the first at frame "
+                   f"{hm['first_torn_frame']}. It has not arrested — the torn fraction still "
+                   f"creeps {100 * hm['creep_over_last_third']:.1f} points over the last third"))
+    R5b = []
     runs5, runs5b = [], []
     for out, rows in ((runs5, R5), (runs5b, R5b)):
         for d, v, lbl, panels, kw, cap in rows:
