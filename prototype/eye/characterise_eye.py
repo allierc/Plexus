@@ -253,13 +253,54 @@ def jobs_stage2b(folder, model):
     return jobs
 
 
+def jobs_stage6d(folder, model, n=64):
+    """A 6-D SOBOL sweep -- what to do when every pair interacts.
+
+    Stage 2a screened all fifteen pairs and flagged ALL FIFTEEN: residuals 0.09-1.03 deg
+    against a 0.20 tolerance, concentrated in horizontal, up to ~13% of a typical
+    excursion. That is not measurement noise -- the numerical floor is 0.03 deg, measured
+    as the same hold at two substeps -- so this plant is genuinely sub-additive and the
+    protocol says stop and re-plan rather than expand.
+
+    The re-plan: stage 2b would spend 60 holds on 15 bilinear terms and would still never
+    leave the pairwise faces of the cube. A quadratic in six drives has 27 coefficients
+    (6 linear, 6 square, 15 cross), so a Sobol design over the whole [0,1]^6 identifies the
+    same interactions from ~50 points AND samples the interior, where a controller
+    commanding three or four muscles at once actually operates. Sobol rather than random:
+    it is deterministic, so the design is in the file rather than in a seed. 64 rather than
+    50 because Sobol's balance properties hold at powers of two.
+    """
+    from scipy.stats import qmc
+    T = t_hold(folder)
+    pts = qmc.Sobol(d=EA.N_MUSCLE, scramble=True, seed=0).random(n)
+    jobs = []
+    for k, u in enumerate(np.round(pts, 3)):
+        lv = " ".join(f"{v:g}" for v in u)
+        jobs.append((f"{model}_s6d_{k:03d}",
+                     f"python run_hold.py --folder {folder} "
+                     f"--muscles {' '.join(EA.MUSCLE_KEYS)} --level {lv} "
+                     f"--hold-s {T} --stage 6d --no-movie --device cuda:0"))
+    return jobs
+
+
 def _load(o, name):
+    """A stage's rows: the per-hold files written by `run_hold`, plus any legacy table.
+
+    Per-hold files are the source of truth (see run_hold on the lost-update race); the
+    stage<N>.json tables are kept readable for the holds that predate them.
+    """
+    stage = name.replace("stage", "").replace(".json", "")
+    rows = [json.load(open(f)) for f in sorted(glob.glob(os.path.join(o, "rows", f"s{stage}_*.json")))]
+    seen = {(tuple(r["muscles"]), tuple(r["level"])) for r in rows}
     p = os.path.join(o, name)
-    return json.load(open(p)) if os.path.exists(p) else []
+    for r in (json.load(open(p)) if os.path.exists(p) else []):
+        if (tuple(r["muscles"]), tuple(r["level"])) not in seen:
+            rows.append(r)
+    return rows
 
 
 STAGES = {"derisk": jobs_derisk, "0lite": jobs_stage0lite, "0": jobs_stage0,
-          "1": jobs_stage1, "2a": jobs_stage2a, "2b": jobs_stage2b}
+          "1": jobs_stage1, "2a": jobs_stage2a, "2b": jobs_stage2b, "6d": jobs_stage6d}
 
 
 def collect(folder):
