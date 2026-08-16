@@ -272,7 +272,18 @@ AGENT_BUDGETS = {
 # project 10,600 output tokens for a round of that shape, which is 2.5 minutes of generation; the
 # remaining budget is tool use and thinking. A ceiling of 10 is therefore roughly 4x the projected
 # generation cost, which is slack, not a squeeze.
-ROUND_LLM_BUDGET_MIN = float(os.environ.get("PLEXUS_ROUND_LLM_MIN", 10.0))
+#
+# AND RAISED TO 45 WHEN THE METER WAS RECONNECTED, because the round it was set for no longer
+# exists. The 10 was measured on a round of EIGHT calls; this one fans two roles out over the
+# batch, so a 16-slot round makes 2 + 16 forecasts + 16 eye reports = 34 calls. At the measured
+# priors in EXPECTED_MIN -- proposer 3.0, analyst 3.0, forecaster 1.0, eye 0.4 -- that projects
+# ~28 min, so 10 would have been breached on every round from the first one metered.
+#
+# A CEILING THAT ALWAYS FIRES IS NOISE, and this file's own note on `note_overrun` says why that
+# matters: noise is how a real breach stops being read. 45 is ~1.6x the projection and PROVISIONAL
+# -- the meter has been dead since 5 August, so nobody knows what this round shape really costs.
+# Reset it from the first three metered rounds rather than from this arithmetic.
+ROUND_LLM_BUDGET_MIN = float(os.environ.get("PLEXUS_ROUND_LLM_MIN", 45.0))
 
 # What to do when the ceiling would be breached. Default "warn": the call RUNS, the breach is
 # recorded and printed, and the round report carries `budget_exceeded: true`.
