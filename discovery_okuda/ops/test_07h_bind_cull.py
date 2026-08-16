@@ -183,7 +183,7 @@ def run(rig, a, d, extra=None):
     and was not. The rig is the only thing that differs between them, so the rig is the argument.
     """
     S = {k: [] for k in ("t", "cells", "plaques", "ppc", "nb_med", "nf_mean", "receptor_total",
-                         "lam", "n_face", "n_node", "edge", "splits")}
+                         "lam", "n_face", "n_node", "edge", "splits", "n_sub")}
     store, i, t0 = {}, 0, time.time()
     for t in range(a.frames):
         rig.frame(t)
@@ -209,6 +209,11 @@ def run(rig, a, d, extra=None):
             S["edge"].append(float((X[rig.sheet.Ed[:, 1]]
                                     - X[rig.sheet.Ed[:, 0]]).norm(dim=1).mean()) / rig.e0)
             S["splits"].append(int(rig._splits))
+            # THE SUBSTEP COUNT IS NOT A CONSTANT and census.py had to take it from a seeded rig
+            # because no run recorded it: it tracks lambda_max of the elastic Hessian, which rises
+            # with stretch (05a: 21 -> 194 over 401 frames), so every per-frame cost quoted from the
+            # seeded value is a lower bound. One int a frame settles it.
+            S["n_sub"].append(int(rig.n_sub))
             att = (rig.x_epi[rig.ct_tri] * rig.ct_w[:, :, None]).sum(1)
             for k, v in (("t", np.int32(t)), ("x", X.float().cpu().numpy()),
                          ("f", rig.sheet.Fc.cpu().numpy().astype(np.int32)),
