@@ -30,10 +30,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import eye_anatomy as EA                                  # noqa: E402
 
-DRIVEN = ("LR", "MR")          # the horizontal pair this circuit innervates
-# The vertical pair is in the plant and in the prototype readout, but has no
-# motor pool in the 285-cell selection: SR/IR are innervated by OMN, which is
-# outside it. Drawn faint for that reason, not because the plant lacks them.
+# All six are commanded now. The readout emits one non-negative drive per muscle
+# and the static map is a function of all six, so there is no faint half of the
+# picture any more -- which is the whole difference between this model and the
+# push-pull one it replaced.
+DRIVEN = ("LR", "SR", "MR", "IR", "SO", "IO")
 
 
 def insertion(m):
@@ -79,7 +80,7 @@ def panel_eye(ax, bg):
                 alpha=1.0 if on else 0.4, zorder=6)
         lab = d * 2.02
         ax.text(lab[0], lab[1],
-                f"{m['key']}\ndriven" if on else m["key"],
+                m["key"],
                 color=col if on else (fg if bg == "black" else "#7a7a7a"),
                 fontsize=10 if on else 8.5, fontweight="bold" if on else "normal",
                 ha="center", va="center", zorder=7,
@@ -99,77 +100,79 @@ def panel_eye(ax, bg):
 
 
 def panel_vars(ax, bg):
-    """Every symbol of section 5, in the order the signal meets them.
+    """Every symbol of section 4, in the order the signal meets them.
 
-    Stacked top to bottom rather than wrapped over two rows: the signal path
-    is a straight line, so the picture should be one too. The earlier
-    two-row layout needed a curved arrow to get from the end of the first row
-    back to the start of the second, which is a connector carrying no
-    information.
+    Stacked top to bottom because the signal path is a straight line. Six stages
+    now rather than four: the static map and the mechanics are separate blocks,
+    since one is measured from holds and the other from transients, and the output
+    is three angles rather than two.
     """
     fg = "white" if bg == "black" else "#111111"
     dim = "#555555" if bg == "white" else "#aaaaaa"
     ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis("off")
 
-    X, W, H = 0.055, 0.89, 0.135          # boxes share one column
+    X, W, H = 0.045, 0.91, 0.108
     CX = X + W / 2
 
-    def box(y, fill, title, sub, fs=11.0):
-        ax.add_patch(FancyBboxPatch((X, y), W, H, boxstyle="round,pad=0.012",
+    def box(y, fill, title, sub, fs=10.5):
+        ax.add_patch(FancyBboxPatch((X, y), W, H, boxstyle="round,pad=0.010",
                                     linewidth=1.0, edgecolor="0.45",
                                     facecolor=fill, zorder=2))
         ax.text(CX, y + H * 0.64, title, ha="center", va="center",
                 fontsize=fs, color="#111111", zorder=3)
         ax.text(CX, y + H * 0.24, sub, ha="center", va="center",
-                fontsize=8.2, color="#333333", zorder=3)
+                fontsize=7.8, color="#333333", zorder=3)
 
     def down(y0, y1):
         ax.add_patch(FancyArrowPatch((CX, y0), (CX, y1), color="0.35",
-                                     arrowstyle="-|>", mutation_scale=14,
-                                     lw=1.4, zorder=4))
+                                     arrowstyle="-|>", mutation_scale=13,
+                                     lw=1.3, zorder=4))
 
-    # --- in --------------------------------------------------------------
-    ax.text(CX, 0.965, r"$(\dot x,\dot y)$", ha="center", va="center",
-            fontsize=14, color=fg)
-    ax.text(CX, 0.922, "target velocity  (the only input)", ha="center",
-            va="center", fontsize=8.2, color=dim)
-    down(0.900, 0.868)
+    ax.text(CX, 0.972, r"$(\dot x,\dot y)$", ha="center", va="center",
+            fontsize=13, color=fg)
+    ax.text(CX, 0.936, "target velocity  (the only input)", ha="center",
+            va="center", fontsize=7.8, color=dim)
+    down(0.918, 0.895)
 
-    box(0.733, "#c7d8e8",
+    box(0.787, "#c7d8e8",
         r"$\mathbf{I}=\hat W^{\rm in}\,(\dot x,\dot y)^{\!\top}$",
         r"AF5 afferents,  $\hat W^{\rm in}\!\in\mathbb{R}^{N\times 2}$")
-    down(0.733, 0.701)
+    down(0.787, 0.764)
 
-    box(0.566, "#cfe8d2",
+    box(0.656, "#cfe8d2",
         r"$\tau_i\dot v_i=-v_i+\sum_j \hat W_{ij}\,{\rm ReLU}(v_j)+I_i$",
         r"INTG recurrent core,  "
-        r"$\hat W_{ij}=|\hat S_{ij}|\,{\rm sign}(W^{\rm con}_{ij})$")
-    down(0.566, 0.534)
+        r"$\hat W_{ij}=|\hat S_{ij}|\,{\rm sign}(W^{\rm con}_{ij})$", fs=11.0)
+    down(0.656, 0.633)
 
-    box(0.399, "#ddd0f0",
-        r"$u_\theta=m_{\rm LR}-m_{\rm MR}$,   "
-        r"$u_\varphi=m_{\rm SR}-m_{\rm IR}$",
-        r"$\mathbf{m}=[\hat W^{\rm out}\mathbf{r}]_+\ \geq 0$,  "
-        r"$\hat W^{\rm out}\!\in\mathbb{R}^{4\times N}$")
-    down(0.399, 0.367)
+    box(0.525, "#ddd0f0",
+        r"$\mathbf{m}=[\hat W^{\rm out}\mathbf{r}]_+\ \geq 0$",
+        r"six muscle drives,  $\hat W^{\rm out}\!\in\mathbb{R}^{6\times N}$"
+        "   (LR SR MR IR SO IO)")
+    down(0.525, 0.502)
 
-    box(0.232, "#f6e6ce",
-        r"$\ddot\theta+2\zeta_\theta\omega_\theta\dot\theta"
-        r"+\omega_\theta^{2}\theta=\omega_\theta^{2}\,\Phi_\theta(u_\theta)$"
-        "   (and the same in $\\varphi$)",
-        r"the eye, one per axis;  $\Phi,\ \omega_n,\ \zeta$ frozen")
-    down(0.232, 0.200)
+    box(0.394, "#f6e6ce",
+        r"$x^{k}_{\infty}=\sum_i a^{k}_i m_i+\sum_{i\leq j} b^{k}_{ij} m_i m_j$",
+        r"static map, measured;  $k\in\{\theta,\varphi,\psi\}$,  27 coefficients each")
+    down(0.394, 0.371)
 
-    # --- out -------------------------------------------------------------
-    ax.text(CX, 0.163, r"$(\theta,\varphi)$", ha="center", va="center",
-            fontsize=14, color=fg)
-    ax.text(CX, 0.120, "gaze angles (deg)", ha="center", va="center",
-            fontsize=8.2, color=dim)
-    ax.text(CX, 0.048,
-            r"loss  $\mathcal{L}=\sum_t\|(\theta,\varphi)-"
-            r"(\theta^\star\!,\varphi^\star)\|_2$"
-            "        supervision is on the gaze, after the plant",
-            ha="center", va="center", fontsize=10, color=fg)
+    box(0.263, "#f4d6e6",
+        r"$\ddot{\mathbf{x}}+C\dot{\mathbf{x}}+K\mathbf{x}=K\mathbf{x}_\infty$",
+        r"mechanics, fitted;  $C,K\in\mathbb{R}^{3\times3}$, both frozen", fs=11.0)
+    down(0.263, 0.240)
+
+    ax.text(CX, 0.203, r"$(\theta,\varphi,\psi)$", ha="center", va="center",
+            fontsize=13, color=fg)
+    ax.text(CX, 0.167, "gaze angles: horizontal, vertical, torsion", ha="center",
+            va="center", fontsize=7.8, color=dim)
+    ax.text(CX, 0.088,
+            r"loss  $\mathcal{L}=\frac{1}{T}\sum_t[(\theta-\theta^\star)^2"
+            r"+(\varphi-\varphi^\star)^2]"
+            r"+\lambda_\psi\frac{1}{T}\sum_t\psi^2$",
+            ha="center", va="center", fontsize=10.5, color=fg)
+    ax.text(CX, 0.036,
+            "two angles matched to the target, the third penalised toward zero",
+            ha="center", va="center", fontsize=8.2, color=dim)
 
 
 def main():
