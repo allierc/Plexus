@@ -51,7 +51,7 @@ MODES = {
 }
 
 
-class Rig07k(I.Rig07i, CellChem, Rig05m):
+class Rig07k(CellChem, I.Rig07i, Rig05m):
     """07i's gated adhesion, 05m's proteases, a random source rebuilt per cell."""
 
     def __init__(self, **P):
