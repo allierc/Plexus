@@ -83,9 +83,11 @@ def panel_eye(ax, bg):
                       label=f"{m}   {d['action'][m]}")
                for m in order if m in d["action"]]
     leg = ax.legend(handles=handles, loc="upper left",
-                    bbox_to_anchor=(-0.01, 1.005), frameon=False, fontsize=11,
-                    labelspacing=0.75, handlelength=1.5, handletextpad=0.7,
-                    borderpad=0.2)
+                    bbox_to_anchor=(0.005, 1.0), frameon=False, fontsize=8.5,
+                    labelspacing=0.5, handlelength=1.1, handletextpad=0.5,
+                    borderpad=0.15)
+    for h in leg.legend_handles:
+        h.set_linewidth(4.5)
     # the legend sits on the render, which is black whatever the figure ground is
     for t in leg.get_texts():
         t.set_color("white")
@@ -186,9 +188,11 @@ def main():
     panel_eye(ax[0], a.bg)
     panel_vars(ax[1], a.bg)
     fg = "white" if a.bg == "black" else "black"
-    for x, L in zip(ax, "ab"):
-        x.text(0.0, 1.0, L, transform=x.transAxes, fontsize=14,
-               fontweight="bold", va="top", ha="left", color=fg)
+    # above and left of each panel, not inside it: panel (a) is a black render, so
+    # a label at (0, 1) in axes coordinates was black on black and invisible
+    for x, L, dx in zip(ax, "ab", (-0.02, -0.06)):
+        x.text(dx, 1.035, L, transform=x.transAxes, fontsize=17,
+               fontweight="bold", va="bottom", ha="left", color=fg)
     fig.savefig(a.out, dpi=170, facecolor=a.bg, bbox_inches="tight")
     print("wrote", a.out)
     print("driven:", ", ".join(DRIVEN),
