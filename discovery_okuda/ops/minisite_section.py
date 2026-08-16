@@ -552,12 +552,13 @@ def build3(runs, runs2=()):
 </div>"""
     return f"""{BEGIN3}
 <h3>Spheroid + basement membrane + matrix</h3>
-<p class="opk">Three entities, three representations: the <b>epithelium</b> is a vertex model, cells
-as polyhedra sharing walls; the <b>basement membrane</b> is a triangulated elastic sheet tied to it by
-adhesion plaques; the <b>stroma</b> is MPM material points laid out as fibres. Load runs cell →
-plaque → sheet → anchoring fibril → stroma, so while the sheet is intact the epithelium never
-touches the stroma. And the scales nest — tissue, cell, molecule: MT1-MMP is a state of the cell, and
-the proteases it feeds are fields on the sheet's own faces.</p>
+<p class="opk">The demonstration here is that <b>three levels interact</b> in one composition.
+<b>Molecules</b>: four proteases (MT1-MMP, proMMP-2, MMP-2, TIMP-2/3) as fields on the membrane's own
+faces, integrins as bonds that load and unbind under force, myosin on the junctions. <b>Cells</b>: a
+vertex model, polyhedra sharing walls, dividing, each deciding where its enzyme sits and owning its
+own adhesions. <b>Tissue</b>: a spheroid whose growth stretches a triangulated elastic membrane into
+an MPM stroma. Each level is written where it belongs and none is a parameter of another — which is
+why a cell's enzyme choice ends as a hole of a particular size in a sheet the cell never touches.</p>
 <p class="opk-ref">Reference — load path,
 <a href="https://doi.org/10.1083/jcb.104.3.611">Keene et&nbsp;al. (1987)</a>; adhesions are clusters
 at ~555&nbsp;nm, <a href="https://doi.org/10.1002/bies.201600123">Changede &amp; Sheetz (2017)</a>;
