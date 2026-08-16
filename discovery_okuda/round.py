@@ -245,6 +245,31 @@ def run_round(round_id, mode="composition", ledger=None, n_slots=N_SLOTS, flow=N
     """
     t0 = time.time()
     order = load_flow(flow or FLOW)
+    # THE ONE THING NEEDED TO MAKE THE AGENT-TIME LEDGER EXIST, and it is the mirror of the defect
+    # this campaign keeps finding: not a producer nobody consumes, but a CONSUMER WITH NO PRODUCER.
+    #
+    # All five roles already pass `ledger=bundle.get("ledger")`; `BudgetLedger.record` already
+    # appends every call to `_metrology/llm_usage.jsonl`; `campaign_loop._cost_so_far` already
+    # reads it and filters to this campaign's roles. Every part was written and connected -- and
+    # neither call site of `run_round` ever passed a ledger, so `ctx["ledger"]` was None, `record`
+    # was never reached, and the file has had no row since 5 AUGUST. The driver printed "spent so
+    # far: 0.0 agent-min over 0 calls" at the head of all eleven rounds of a live campaign, which
+    # reads as "the agents are free" rather than "nothing is counting", and `--minutes-ceiling`
+    # could not fire whatever it was set to.
+    #
+    # PER ROUND, because `BudgetLedger.round` and `round_spent` reset per round by construction and
+    # `_ROUND_LEDGER` must point at the round in progress for a bypassing call to be attributed.
+    if ledger is None:
+        try:
+            from llm import BudgetLedger
+            ledger = BudgetLedger(path=os.path.join(CAMPAIGN, "llm_timing.jsonl"),
+                                  round_id=round_id)
+        except Exception as e:
+            # NOT FATAL AND NOT SILENT. Accounting that cannot be set up must not cost a round of
+            # science -- but a round that runs unmetered has to say so, because the alternative is
+            # the last eleven: a zero that looks like a measurement.
+            print(T_.warn(f"[round] NO AGENT-TIME LEDGER ({type(e).__name__}: {e}) -- this round's "
+                          f"agent minutes will not be recorded"))
     ctx = {"round_id": round_id, "mode": mode, "ledger": ledger, "n_slots": n_slots,
            "out_dir": CAMPAIGN, "log_root": LOG_ROOT}
 
