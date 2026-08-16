@@ -116,6 +116,23 @@ explanation of this surprising run is Z"* is the other, and it is the one nothin
 An explanation stated as a claim becomes falsifiable next round; the same thought left in the
 analysis prose cannot be acted on by anybody.
 
+**STATE A MECHANISM CLAIM SO THAT ONE ROUND COULD TEST IT.** One metric, one direction, one number,
+and — this is the part that is always missing — **one lineage it has not been seen on**. A claim
+whose thresholds and run ids are baked in from the runs that produced it is a measurement written
+in the past tense: a `predict` on it replicates what already happened rather than risking anything.
+Of the 17 claims induced over eleven rounds, 3 were ever acted on, and the four mechanism claims
+among them each name their own base and no other.
+
+**A `harness` CLAIM IS ADDRESSED TO THE HUMAN, AND YOU SHOULD KNOW THAT WHEN YOU WRITE ONE.** Every
+act that produces evidence needs a metric and a threshold, a parameter and a direction, a lineage or
+a rival — a statement about the LOOP has none of those, so no slot can ever test one and none ever
+will. That is not a reason to stop writing them: this campaign's 16% duplicate leak was correctly
+detected four times, in four separate rounds, as `harness` claims C018, C023, C026 and C030, and
+that detection was right. It is a reason to write them as instructions to a person rather than as
+hypotheses awaiting evidence, and to say what you would have the machinery do differently. What was
+measurable in that finding is now measured for you and arrives as `KNOBS MEASURED TO CHANGE NOTHING`
+— if it disagrees with what you concluded, say so; you had the trajectories and it has the hashes.
+
 **A CLAIM THAT SCOPES OR REFINES AN EXISTING ONE IS NEW.** This bar has been read as "a brand-new
 mechanism" and that is too high: in thirteen rounds it produced seven claims. *"C007 holds on
 `b_gs_plain` and fails on `b_star`"* is not a restatement of C007 -- it is the boundary of C007, it

@@ -115,10 +115,24 @@ with no claim — is refused by `R8` and the slot is wasted. The engine reads th
 and the Analyst will add it. A claim with no scope is refused, because a claim that cannot be
 scoped cannot be transferred, and transfer is the only route to high confidence.
 
-**`discriminate` when you can.** Two claims in the ledger contradict each other right now: C005 says
-`cell_chem_from_shape.beta < 0` extinguishes the activator *whatever the morphotype*, C009 says it *depends
-on the base*. They coexisted for six rounds of the last campaign because nothing could pose the
-experiment that separates them. One slot can.
+**`discriminate` when you can.** Where two claims in the ledger contradict each other, one slot can
+separate them, and nothing else in the loop will. Read the ledger for a live pair — do not go
+looking for the one this paragraph used to name, because a worked example written into an
+instruction file becomes the answer to a question nobody asked again: this text named C005 and C009
+by id for the whole of the last campaign, and 42 of the 45 acts that cited any claim cited one of
+the 13 seeded ones.
+
+**TEST THE CAMPAIGN'S OWN CLAIMS, NOT ONLY THE ONES IT WAS SEEDED WITH.** Over eleven rounds the
+loop induced 17 claims and acted on 3 of them; 16 of the 17 carry no evidence at all. A claim
+nobody tests is a sentence. `WHICH CLAIMS THE LOOP HAS INDUCED AND NOBODY HAS TESTED` is in your
+prompt for that reason — and if a claim there cannot be tested as written, say so in that slot's
+`why` and state the version that could, because "unactionable as worded" is itself worth knowing.
+
+**A SWEEP CAN CARRY AN ACT.** Route A slots have always been recorded with no `act` and no `on`, so
+60 of 137 runs — 44% of the campaign's GPU — produced response curves that no claim could ever cite.
+A sweep that walks the knob a claim is about IS a `bound` act: give it `act: "bound"`, the claim
+`on`, and the `direction` you expect. You know which claim your own sweep bears on; nothing else in
+the loop can infer it.
 
 ### R7 — your prediction must be bigger than the noise
 

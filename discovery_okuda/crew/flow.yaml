@@ -251,6 +251,29 @@ nodes:
   - id: trends
     code: round.trends
 
+  # WHAT THE SUBSTRATE HAS BEEN MEASURED TO IGNORE. 25 of 152 runs produced a trajectory
+  # byte-identical to another run's -- ~16% of the GPU -- because the edit named a knob the physics
+  # does not read. R6 cannot see it: the specs differ, only the trajectories do not. The Analyst
+  # detected it four times (C018, C023, C026, C030, all `kind: harness`) and no act in the
+  # vocabulary can bear on a harness claim, so four correct detections had no addressee. This node
+  # is the addressee. It REPORTS, it does not refuse: a Proposer that reads the list needs no rule.
+  - id: inert
+    code: round.inert
+
+  # WHERE THE CAMPAIGN HAS AND HAS NOT BEEN. The loop has a ledger (what it believes) and a
+  # portfolio (what to build on) and has never had a MAP. Equal-width cells over the measured range
+  # of two admitted metrics, so nothing here declares a threshold; an empty cell is a fact, and
+  # whether it is unreachable or merely unvisited is the Proposer's judgement.
+  - id: occupancy
+    code: round.occupancy
+
+  # THE ANALYST'S PROSE, WHICH REACHED NOBODY. 444 lines over ten rounds whose only reader was the
+  # regex that lifts a fenced JSON block out of it; `history` is rendered from the ledger, not from
+  # this. Last round's, necessarily -- the Analyst runs at the end of a round and the Proposer at
+  # the start, so a same-round edge would be a cycle.
+  - id: last_analysis
+    code: round.last_analysis
+
   - id: metric_floors
     code: round.metric_floors
 
@@ -318,8 +341,14 @@ nodes:
 
   - id: proposer
     agent: proposer
+    # `track_record`, `inert`, `occupancy` and `last_analysis` ADDED 16 AUGUST, and all four are the
+    # same defect: the round computed a fact and handed it to a role that could not act on it, or
+    # to nobody. track_record told the ANALYST that nobody tests its claims -- the Proposer is the
+    # only role that can; inert was not computed at all; occupancy did not exist; and the Analyst's
+    # reasoning died in analysis.md. Facts to the role that decides, rather than rules in the engine.
     in: [parents, menu, metric_bank, coverage, diagnosis, history, refusals, user_input,
-         grounding, claim_ledger, metric_floors, trends]
+         grounding, claim_ledger, metric_floors, trends, track_record, inert, occupancy,
+         last_analysis]
     out: edits
 
   # ---- build, launch, measure ----------------------------------------------------
@@ -654,7 +683,7 @@ nodes:
   - id: analyst
     agent: analyst
     in: [control, metrics, predictions, observations, observed, history, user_input,
-         route_a_results, claim_ledger, track_record, trends]
+         route_a_results, claim_ledger, track_record, trends, inert, occupancy]
 
   - id: grounder
     agent: grounder

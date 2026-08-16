@@ -109,6 +109,24 @@ def run(bundle):
          bundle.get("claim_ledger"), {"as_json": True, "limit": 20000}),
         ("THE CAMPAIGN AS A SERIES -- across rounds, not just this one",
          bundle.get("trends")),
+        # FOUR FACTS THE ROLE THAT DECIDES HAS NEVER BEEN GIVEN, added 16 August. Each was already
+        # computed, or computable, and went to nobody -- which is this campaign's recurring defect,
+        # now on its ninth instance. They are FACTS, not rules: nothing here refuses a slot.
+        ("WHICH CLAIMS THE LOOP HAS INDUCED AND NOBODY HAS TESTED. You are the only role that can "
+         "test one. Measured over eleven rounds: 42 of the 45 acts that cited a claim cited one of "
+         "the 13 SEEDED claims, and 3 cited the 17 the campaign induced itself",
+         bundle.get("track_record"), {"as_json": True, "limit": 8000}),
+        ("KNOBS MEASURED TO CHANGE NOTHING -- runs whose trajectories came out byte-identical. "
+         "Moving one of these on the composition it was measured on spends a GPU run to reproduce a "
+         "file that is already on disk. 25 of 152 runs went this way",
+         bundle.get("inert"), {"as_json": True, "limit": 8000}),
+        ("WHERE THE CAMPAIGN HAS AND HAS NOT BEEN -- its own coverage of the two headline metrics. "
+         "An empty cell is not a target and nothing scores you for filling one; it is the question "
+         "of whether nobody has aimed there or the physics cannot go there",
+         bundle.get("occupancy"), {"as_json": True, "limit": 8000}),
+        ("WHAT THE ANALYST CONCLUDED LAST ROUND, in its own words. Its claims reach you through the "
+         "ledger; everything else it reasoned reached nobody until now",
+         bundle.get("last_analysis"), {"as_json": False, "limit": 8000}),
         ("THE SEED FLOOR OF EACH METRIC -- the spread between two runs of the SAME composition. A "
          "prediction asking for less than this is refused by R7 before it runs; the floors span "
          "fourteenfold, so the same 10% ask is an experiment in one metric and a coin toss in "

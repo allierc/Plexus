@@ -88,6 +88,14 @@ def run(bundle):
          bundle.get("track_record")),
         ("THE CAMPAIGN AS A SERIES -- what has been happening across rounds, not just this one",
          bundle.get("trends")),
+        # THE TWO FACTS THAT ANSWER CLAIMS YOU KEPT WRITING. `inert` is C018/C023/C026/C030
+        # MEASURED rather than suspected -- you filed the duplicate finding in four separate rounds
+        # and, since no act can bear on a `harness` claim, nothing ever came back. It comes back
+        # here. `occupancy` is the campaign's own coverage, which no role has ever seen.
+        ("KNOBS MEASURED TO CHANGE NOTHING -- identical trajectories, and what the specs differ in",
+         bundle.get("inert"), {"as_json": True, "limit": 8000}),
+        ("WHERE THE CAMPAIGN HAS AND HAS NOT BEEN -- coverage of the two headline metrics",
+         bundle.get("occupancy"), {"as_json": True, "limit": 8000}),
         ("Your task", f"Append this round's analysis to {a_md}. Do NOT write {k_md}: it is "
                       f"rendered from the claim ledger. If -- and only if -- this round shows "
                       f"something no existing claim states, put IN YOUR REPLY a fenced ```json "
