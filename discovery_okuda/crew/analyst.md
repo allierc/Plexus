@@ -123,6 +123,16 @@ in the past tense: a `predict` on it replicates what already happened rather tha
 Of the 17 claims induced over eleven rounds, 3 were ever acted on, and the four mechanism claims
 among them each name their own base and no other.
 
+**EVERY CLAIM YOU HAVE WRITTEN ABOUT `act_max_trend` IS A FAILURE MODE.** C022, C024, C031 and C033
+all say some version of *"here is another way it dies"* — extinction, decoupling, extinction on a
+plain base. None of them says what happens when it does not die. The archive is binned on exactly
+that axis, and across 147 runs the best run per cell goes **3, 4 where the activator is dying and
+12, 11, 11 where it survives**. Say what that shows, in whatever form survives your own scrutiny —
+including that it shows nothing, if the confound you find is real (these are not matched pairs, and
+the bands differ in more than the activator). What is not defensible is four claims about one
+quantity, all negative, and no statement about the positive case that the campaign's own coverage
+puts in front of you.
+
 **A `harness` CLAIM IS ADDRESSED TO THE HUMAN, AND YOU SHOULD KNOW THAT WHEN YOU WRITE ONE.** Every
 act that produces evidence needs a metric and a threshold, a parameter and a direction, a lineage or
 a rival — a statement about the LOOP has none of those, so no slot can ever test one and none ever
