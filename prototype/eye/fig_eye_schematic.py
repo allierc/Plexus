@@ -35,6 +35,8 @@ import eye_anatomy as EA                                  # noqa: E402
 # picture any more -- which is the whole difference between this model and the
 # push-pull one it replaced.
 DRIVEN = ("LR", "SR", "MR", "IR", "SO", "IO")
+# the renderer's own strap colours, so the labels match the picture
+MUS_COLOR = {m["key"]: m["color"] for m in EA.MUSCLES}
 
 
 def insertion(m):
@@ -47,55 +49,42 @@ def insertion(m):
 
 
 def panel_eye(ax, bg):
+    """Eye G itself, drawn by the surface renderer, not a schematic of it.
+
+    This panel used to be a circle with six straps placed from the analytic
+    ``eye_anatomy`` table. Eye G's geometry is scanned rather than generated and
+    its muscles do not sit where that table puts them --- the obliques run from the
+    rostral orbit with no trochlea, which is why SO elevates here and IO depresses,
+    the reverse of the mammalian arrangement a schematic would imply. So the panel
+    now shows the render, and ``fig_eyeG_anterior.py`` supplies both the image and
+    the projected label positions so they cannot drift from the geometry.
+    """
+    import json
+    import matplotlib.image as mpimg
     fg = "white" if bg == "black" else "#111111"
-    ax.set_aspect("equal"); ax.axis("off")
-    ax.set_xlim(-2.25, 2.25); ax.set_ylim(-2.62, 2.25)
-
-    # globe, seen down the corneal axis
-    ax.add_patch(Circle((0, 0), 1.0, facecolor="#eef2f6" if bg == "white"
-                        else "#20242a", edgecolor=fg, lw=1.4, zorder=2))
-    ax.add_patch(Circle((0, 0), 0.42, facecolor="#cfd8e3" if bg == "white"
-                        else "#2b313a", edgecolor=fg, lw=0.9, zorder=3))
-    ax.add_patch(Circle((0, 0), 0.17, facecolor=fg, edgecolor="none", zorder=4))
-    ax.text(0, -1.28, "globe, viewed down the corneal axis",
-            ha="center", va="top", color=fg, fontsize=8.5)
-
-    for m in EA.MUSCLES:
-        p = insertion(m)
-        d = np.array([p[0], p[1]])
-        n = np.linalg.norm(d)
-        if n < 1e-6:
-            continue
-        d = d / n
-        on = m["key"] in DRIVEN
-        col = m["color"] if bg == "black" else m["color"]
-        # strap from the insertion outward toward the orbital apex
-        r0 = 0.97 * np.array([p[0], p[1]])
-        r1 = d * 1.85
-        ax.plot([r0[0], r1[0]], [r0[1], r1[1]],
-                color=col, lw=6.5 if on else 3.0,
-                alpha=1.0 if on else 0.35, solid_capstyle="round",
-                zorder=5 if on else 1)
-        ax.plot(*r0, "o", color=col, ms=7 if on else 4.5,
-                alpha=1.0 if on else 0.4, zorder=6)
-        lab = d * 2.02
-        ax.text(lab[0], lab[1],
-                m["key"],
-                color=col if on else (fg if bg == "black" else "#7a7a7a"),
-                fontsize=10 if on else 8.5, fontweight="bold" if on else "normal",
-                ha="center", va="center", zorder=7,
-                bbox=dict(boxstyle="round,pad=0.22", facecolor=bg,
-                          edgecolor="none", alpha=0.85))
-
-    # the two axes the model uses. Both labels sit at the far end of their
-    # arrow, not at its middle, so neither lands on a muscle label.
-    ax.annotate("", xy=(1.35, -2.22), xytext=(-1.35, -2.22),
-                arrowprops=dict(arrowstyle="<->", color=fg, lw=1.2))
-    ax.text(0, -2.32, r"horizontal gaze $\theta$   (abduction $+$, LR)",
-            ha="center", va="top", color=fg, fontsize=9)
-    ax.annotate("", xy=(-1.68, 1.35), xytext=(-1.68, -1.35),
-                arrowprops=dict(arrowstyle="<->", color=fg, lw=1.2))
-    ax.text(-1.68, 1.45, r"vertical gaze $\varphi$", ha="center", va="bottom",
+    png = os.path.join(HERE, "fig_eyeG_anterior.png")
+    meta = png.replace(".png", ".json")
+    ax.axis("off")
+    if not (os.path.isfile(png) and os.path.isfile(meta)):
+        ax.text(0.5, 0.5, "run fig_eyeG_anterior.py first", ha="center",
+                va="center", color=fg, fontsize=11)
+        return
+    img = mpimg.imread(png)
+    ax.imshow(img)
+    H, W = img.shape[:2]
+    d = json.load(open(meta))
+    # the two obliques project to the same rostral point, so they are nudged apart
+    NUDGE = {"SO": (-0.06, -0.09), "IO": (-0.06, +0.03),
+             "MR": (-0.04, +0.07), "LR": (-0.07, 0.0), "SR": (-0.02, -0.03)}
+    for m, (x, y) in d["labels"].items():
+        dx, dy = NUDGE.get(m, (0.0, 0.0))
+        left = (x + dx) < 0.5
+        ax.text((x + dx) * W, (y + dy) * H, f"{m}  {d['action'][m]}",
+                color=MUS_COLOR.get(m, fg), fontsize=11, fontweight="bold",
+                ha="left" if not left else "right", va="center",
+                path_effects=None)
+    ax.text(0.5, -0.02, "eye G at rest, near-anterior view --- scanned geometry, "
+            "not a schematic", transform=ax.transAxes, ha="center", va="top",
             color=fg, fontsize=9)
 
 
