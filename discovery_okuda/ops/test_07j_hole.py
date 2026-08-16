@@ -99,14 +99,22 @@ class CellChem:
         return float((self.mt1 > 0.5 * peak).float().mean())
 
     def _build_epi(self, j):
-        # the cells changed, so the source has to be asked again -- of the cells that exist now
+        """The cells changed, so the source is asked again -- of the cells that exist now.
+
+        CELLCHEM MUST COME FIRST IN THE BASES. `_build_epi` is DEFINED by `Rig07c`, so a mixin listed
+        after it never gets the call: C3 puts Rig07c ahead and Rig07c is the definition, not a
+        forwarder. Listed after `Rig07d`, this override was silently dead -- `mt1` stayed 200 long
+        while the cells passed 200, and the first division indexed it out of bounds. That is a CUDA
+        device-side assert twenty frames in, which is the loud version of the same fault that made
+        05h1's fields a permutation with no error at all.
+        """
         out = super()._build_epi(j)
         if getattr(self, "_spot", None) is not None:
             self._respot()
         return out
 
 
-class Rig07j(H.Rig07d, CellChem, Rig05m):
+class Rig07j(CellChem, H.Rig07d, Rig05m):
     """07h's adhesion and refinement, 05m's proteases, 06_hole_tiny's source."""
 
     def __init__(self, spot=SPOT, spot_off=0.0, **P):
