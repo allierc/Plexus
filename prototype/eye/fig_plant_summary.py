@@ -5,7 +5,7 @@ Those files no longer exist for eyes A-E — the archive was pruned after the
 fit was made — so that figure cannot be re-rendered, while the fit itself
 survives in ``plant.npz`` / ``plant_v.npz`` (per-variant static coefficients,
 mechanics and residual). This script draws everything those two files can
-support, in the symbols of section 4.6 of the oculomotor note:
+support, in the symbols of section 5 of the oculomotor note:
 
   (a) the static nonlinearity Phi_theta of every eye, plus Phi_phi of the one
       the controller is coupled to;
@@ -79,7 +79,7 @@ def main():
 
     D = load()
     labels = sorted(D["h"])
-    fig, ax = plt.subplots(1, 3, figsize=(15.5, 4.3))
+    fig, ax = plt.subplots(1, 3, figsize=(15.5, 4.8))
     u = np.linspace(-1, 1, 400)
 
     # --- (a) the static nonlinearity of every eye -------------------------
@@ -94,9 +94,7 @@ def main():
     ax[0].axhline(0, color="0.85", lw=0.8); ax[0].axvline(0, color="0.85", lw=0.8)
     ax[0].set_xlabel(r"signed command  $u_\theta$   ($+$LR / $-$MR)")
     ax[0].set_ylabel(r"$\Phi_\theta(u_\theta)$   (deg)")
-    ax[0].set_title("static nonlinearity, monotone by construction",
-                    fontsize=10)
-    ax[0].legend(frameon=False, fontsize=8, loc="upper left")
+    ax[0].legend(frameon=False, fontsize=11, loc="upper left")
 
     # --- (b) step response of the coupled eye, both axes ------------------
     for axis, ls in (("h", "-"), ("v", "--")):
@@ -115,9 +113,7 @@ def main():
     ax[1].axhline(0, color="0.85", lw=0.8)
     ax[1].set_xlabel("time (s)")
     ax[1].set_ylabel(r"gaze  $\theta$,  $\varphi$   (deg)")
-    ax[1].set_title(f"eye {a.eye}: step response, and the overshoot only "
-                    "inertia can make", fontsize=10)
-    ax[1].legend(frameon=False, fontsize=8, loc="lower right", ncol=2)
+    ax[1].legend(frameon=False, fontsize=10.5, loc="lower right", ncol=2)
 
     # --- (c) reachable travel per axis ------------------------------------
     x = np.arange(len(labels))
@@ -128,14 +124,21 @@ def main():
                      abs(phi(D[axis][L]["coef"], +1.0))) if L in D[axis] else 0.0
                  for L in labels]
         ax[2].bar(x + off, reach, 0.36, color=col, label=nm)
-    ax[2].set_xticks(x); ax[2].set_xticklabels([f"eye {L}" for L in labels])
+    ax[2].set_xticks(x); ax[2].set_xticklabels([f"eye {L}" for L in labels], fontsize=12.5)
     ax[2].set_ylabel(r"reachable travel  $\min|\Phi(\pm 1)|$   (deg)")
-    ax[2].set_title("the workspace is per axis, and it binds the task",
-                    fontsize=10)
-    ax[2].legend(frameon=False, fontsize=9)
+    ax[2].legend(frameon=False, fontsize=11)
 
-    for x_ in ax:
+    # Same dress as Figure 1 and the pulse-step figure: white ground, spines left
+    # and bottom only, a bold letter above left, no title inside the panel.
+    for k, x_ in enumerate(ax):
         x_.spines[["top", "right"]].set_visible(False)
+        for sp in ("left", "bottom"):
+            x_.spines[sp].set_color("black"); x_.spines[sp].set_linewidth(1.0)
+        x_.tick_params(labelsize=12.5, colors="black", width=1.0)
+        x_.xaxis.label.set_size(14); x_.yaxis.label.set_size(14)
+        x_.xaxis.label.set_color("black"); x_.yaxis.label.set_color("black")
+        x_.text(-0.13, 1.06, "abc"[k], transform=x_.transAxes, color="black",
+                fontsize=17, fontweight="bold", va="top", ha="left")
     fig.tight_layout()
     fig.savefig(a.out, dpi=165, bbox_inches="tight")
     print("wrote", a.out)
