@@ -116,14 +116,36 @@ def resolvability(metric, parent_value, threshold, fl=None):
     return min(1.0, rel / f) if f else 1.0, f
 
 
-def weigh(claim, spec):
-    """(for, against) total weight."""
+def inherited(e):
+    """Is this evidence row from a campaign that is no longer running?
+
+    `campaign_loop._repoint_evidence` prefixes every citation with `arch<date>/` when it archives a
+    campaign, so the test is the prefix; `campaign: prev` is honoured too for rows stamped after
+    this was written.
+
+    WHY IT MATTERS ARITHMETICALLY. 155 of the ledger's 198 evidence rows -- 78% -- name runs from
+    the previous campaign, and they arrived already carrying weight on BOTH sides. A row this
+    campaign cannot re-measure, cannot argue with and cannot point at a run in its own
+    `records.jsonl` is not evidence FOR THIS CAMPAIGN; it is where the seed claims came from.
+    """
+    return str(e.get("run") or "").startswith("arch") or e.get("campaign") == "prev"
+
+
+def weigh(claim, spec, prior=False):
+    """(for, against) total weight. This campaign's own evidence by default.
+
+    `prior=True` returns the INHERITED total instead -- kept, rendered, and worth nothing toward
+    status. Zeroed rather than down-weighted: a fraction of an argument this campaign never had is
+    still an argument it never had.
+    """
     ev = spec.get("evidence", {})
     dw = ev.get("default_weight", {})
     tot = {}
     for side in ("evidence_for", "evidence_against"):
         s = 0.0
         for e in (claim.get(side) or []):
+            if bool(inherited(e)) != bool(prior):
+                continue
             w = e.get("weight")
             if w is None:
                 w = dw.get(e.get("act", "predict"), 1.0)
@@ -133,18 +155,51 @@ def weigh(claim, spec):
 
 
 def status_for(claim, spec):
-    """What the evidence says the status should be -- computed, never asserted by an agent."""
+    """What the evidence says the status should be -- computed, never asserted by an agent.
+
+    DECISIVE FIRST. `contested` used to be tested BEFORE `supported` and `refuted`, which made it
+    ABSORBING: one contrary row of weight 1.0 froze a claim there forever, however much evidence
+    accumulated afterwards. Measured on the live ledger, 15 August: C013 stood at for 30.0 /
+    against 13.0 -- net +17 -- and read `contested`; so did C004 (+7), C011 (-14), C010 (-9) and
+    C007 (-5). Six of the eleven claims carrying any evidence had a decisive net and the function
+    could not say so, and the whole ledger reported `0 supported, 0 refuted` for eleven rounds.
+    That was never a fact about the science.
+
+    Worse, it was the ledger's HEAD: `crew/proposer.md` sends `discriminate` acts at contested
+    claims, so the loop spent 42 of its 45 claim-bearing acts on 13 seeded claims whose status was
+    mathematically unreachable.
+
+    So the order is now: decisive, then contested as the RESIDUAL -- both sides substantial and
+    NEITHER decisive, which is what the word was always supposed to mean and is exactly the state
+    a `discriminate` act is for.
+
+    NO SIXTH STATUS. A "supported but argued" claim is already legible: the render prints
+    `for 10.0 / against 1.0` beside every claim. Adding `supported_contested` would mean a new
+    entry in the status vocabulary, the transitions table and the render order -- three more places
+    to drift -- to say something two numbers already say.
+    """
     ev = spec.get("evidence", {})
     f, a = weigh(claim, spec)
     if claim.get("status") == "superseded":
         return "superseded"
-    if f >= ev.get("contested_min", 0.75) and a >= ev.get("contested_min", 0.75):
-        return "contested"
-    if a - f >= ev.get("refute_threshold", 1.5):
-        return "refuted"
     if f - a >= ev.get("support_threshold", 2.0):
         return "supported"
-    return "proposed" if claim.get("status") in (None, "proposed", "stale") else claim["status"]
+    if a - f >= ev.get("refute_threshold", 1.5):
+        return "refuted"
+    if f >= ev.get("contested_min", 0.75) and a >= ev.get("contested_min", 0.75):
+        return "contested"
+    # AND IT MAY FALL BACK. The old last line preserved any stored status that was not `proposed`,
+    # which quietly made the function part-computed and part-remembered: C005, C009 and C010 have
+    # ONE own-campaign evidence row between them and still read `contested`, because they were
+    # stored contested when their inherited evidence still counted. A status that survives the
+    # disqualification of the evidence that produced it is an assertion, which is the one thing
+    # this ledger exists not to store.
+    #
+    # `refuted` DOES NOT FALL BACK, and that is not an exception to the rule -- it is Popper's
+    # asymmetry, already written into the transitions table: a refuted claim is revived only by
+    # SUPERSEDING it with a descendant that carries its own scope, never by quietly ageing out of
+    # the state.
+    return claim["status"] if claim.get("status") in ("refuted",) else "proposed"
 
 
 # --------------------------------------------------------------------------- validation
@@ -175,7 +230,10 @@ def validate(cur, hist, spec, runs=None):
         if runs is not None:
             for side in ("evidence_for", "evidence_against"):
                 for e in (c.get(side) or []):
-                    if e.get("run") and e["run"] not in runs:
+                    # AN ARCHIVED RUN IS *SUPPOSED* NOT TO BE IN THIS CAMPAIGN'S RECORDS -- that is
+                    # what makes it inherited, and it is why its weight is zero. Checking it here
+                    # reported 155 problems that were the fix working.
+                    if e.get("run") and not inherited(e) and e["run"] not in runs:
                         out.append(f"{cid}: {side} names run {e['run']}, not in records.jsonl")
     # transitions, over the history of each id
     seq = {}
@@ -205,9 +263,14 @@ def render(cur, spec, path=None):
          "Evidence runs written `arch<date>/<run>` are from an ARCHIVED campaign — the runs are on "
          "disk under `log/okuda/_archive_*<date>/<run>`, and the `r001_02` of the campaign now "
          "running is a DIFFERENT run.\n"]
+    # GROUPED BY THE COMPUTED STATUS, NOT THE STORED ONE. The stored field is only refreshed when a
+    # round runs `claims_update`, so between the arithmetic changing and the next round landing this
+    # file said `CONTESTED (8)` while `status_for` said supported 3 / refuted 2 / proposed 25. A
+    # rendered view that can disagree with the function it renders is a second source of truth --
+    # the exact defect the ledger replaced prose to avoid.
     by = {}
     for c in cur.values():
-        by.setdefault(c.get("status", "proposed"), []).append(c)
+        by.setdefault(status_for(c, spec), []).append(c)
     for st in order:
         cs = sorted(by.get(st, []), key=lambda c: c["id"])
         if not cs:
@@ -218,21 +281,35 @@ def render(cur, spec, path=None):
         # established ones, and the Forecaster's accuracy fell monotonically 0.635 -> 0.536 as the
         # block grew. This file is handed to every role, so an unlabelled section of hypotheses is
         # 26 assertions presented as knowledge.
-        _WHAT = {"contested": "evidence BOTH ways -- the campaign disagrees with itself here",
-                 "supported": "evidence for, none against",
-                 "proposed": "STATED, NEVER TESTED -- no evidence either way. Hypotheses, not "
-                             "findings: do not reason from these as if they were established",
+        # THE HEADINGS FOLLOW THE ARITHMETIC. `supported` no longer means "none against" and
+        # `proposed` no longer means "no evidence": a claim leaves `proposed` only when its net
+        # clears a threshold, so one contrary row is a claim that has been argued with and not
+        # settled -- which reads very differently to a role deciding what to spend a slot on.
+        _WHAT = {"contested": "substantial weight BOTH ways and NEITHER decisive -- the campaign "
+                              "disagrees with itself here, and one `discriminate` slot can settle it",
+                 "supported": "net evidence for, past the threshold. Any weight against is shown "
+                              "beside it",
+                 "proposed": "NOT SETTLED -- no evidence, or evidence that has not reached a "
+                             "decisive net either way. Hypotheses, not findings: do not reason "
+                             "from these as if they were established",
                  "stale": "evidence exists but predates a change that may invalidate it",
                  "refuted": "evidence against, and it stood",
                  "superseded": "replaced by a later claim"}
         L.append(f"\n## {st.upper()}  ({len(cs)}) — {_WHAT.get(st, '')}\n")
         for c in cs:
             f, a = weigh(c, spec)
+            pf, pa = weigh(c, spec, prior=True)
             L.append(f"### {c['id']} — {c['statement']}")
             sc = c.get("scope") or {}
             L.append(f"*{c['kind']}* | scope: lineages {sc.get('lineages') or '—'}, "
                      f"regimes {sc.get('regimes') or '—'} | "
                      f"weight **for {f:.1f} / against {a:.1f}**"
+                     # THE PRIOR IS SHOWN AND NEVER SUMMED IN. Without this line the fix is
+                     # cosmetic: a reader who sees only the own-campaign weights on a seeded claim
+                     # cannot tell "nobody has tested this" from "this was tested and came out
+                     # even", and those call for opposite experiments.
+                     + (f" | *prior (archived campaign, worth 0): for {pf:.0f} / against {pa:.0f}*"
+                        if (pf or pa) else "")
                      + (f" | parents {', '.join(c['parents'])}" if c.get("parents") else "")
                      + ("  | *seeded*" if c.get("seeded") else ""))
             if c.get("mechanism"):

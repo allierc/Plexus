@@ -220,18 +220,44 @@ def _trace(rid, node, value):
     how many items, if it emitted a collection -- crude, and enough to tell "produced nothing" from
     "produced 40 KB nobody read". `flow_movie.py` animates it.
 
+    AND `empty` WAS NOT ENOUGH. It catches a node that emits nothing; it cannot catch a node that
+    emits the SAME THING every round, which is the same defect wearing a payload. Found by hand on
+    16 August: `control` returned the four characters `null` in ten rounds out of ten and `record`
+    two characters in ten -- both non-empty by this test, both carrying no information at all. So
+    the line now carries a hash of the value, and a node whose hash has not changed in three rounds
+    says so, once, in the round it crosses that line. That is the general form of the two defects a
+    human found by reading eleven rounds of trace side by side.
+
     NEVER FATAL. A trace that can break a round is a trace that gets deleted the first time it does.
     """
     try:
+        import hashlib
         v = value
         n = len(v) if isinstance(v, (list, tuple, dict, str)) else (1 if v is not None else 0)
         txt = v if isinstance(v, str) else json.dumps(v, default=str)
+        h = hashlib.md5((txt or "").encode()).hexdigest()[:10]
         rec = {"round": rid, "node": node["id"], "out": node.get("out", node["id"]),
                "in": node.get("in") or [], "each": node.get("each"),
                "agent": node.get("agent"), "writes": node.get("writes"),
-               "chars": len(txt or ""), "n": n, "empty": not v}
+               "chars": len(txt or ""), "n": n, "empty": not v, "hash": h}
         os.makedirs(CAMPAIGN, exist_ok=True)
-        with open(os.path.join(CAMPAIGN, "flow_trace.jsonl"), "a") as f:
+        p = os.path.join(CAMPAIGN, "flow_trace.jsonl")
+        # THE WARNING IS COMPUTED FROM THE FILE, not from state carried in the process, because a
+        # round is one subprocess: nothing in memory survives to the round that would notice.
+        prev = []
+        if os.path.exists(p):
+            for line in open(p):
+                try:
+                    r = json.loads(line)
+                except Exception:
+                    continue
+                if r.get("node") == node["id"] and r.get("round") != rid:
+                    prev.append(r.get("hash"))
+        if len(prev) >= 2 and all(x == h for x in prev[-2:]):
+            print(T_.warn(f"[flow] {node['id']} has emitted the IDENTICAL value for "
+                          f"{len(prev[-3:]) + 1} rounds ({rec['chars']} chars). A constant is not "
+                          f"information: either it is a rail, or the node is dead."))
+        with open(p, "a") as f:
             f.write(json.dumps(rec) + "\n")
     except Exception:
         pass
@@ -1124,18 +1150,42 @@ def diagnosis(ctx):
     excellent diagnoses since round 1 -- "volume went 522.1 -> 312.9", "the top 5% of cells reach
     shape index 5.83" -- and every one was spent on a REFUSAL. This node is the edge that carries them
     to the role that can act on them.
+
+    AND IT CARRIED NOTHING FOR ELEVEN ROUNDS -- 0 chars, every round, so `_prompt.block` dropped the
+    section and the Proposer has never seen a diagnosis. Not for lack of data: 15 of 137 records
+    carry `premises_broken` AND a parent. It was reading `ctx["parents"]`, which is the PORTFOLIO --
+    the six or so runs worth building on -- and a run that broke a premise is exactly the run the
+    portfolio ranks last. The one place a broken premise is guaranteed not to appear is the set this
+    node was searching.
+
+    SO IT READS THE ROUND THAT JUST FINISHED. "Why last round's tissue broke" is a question about
+    last round's RUNS, not about the parents chosen from them.
     """
     from repair import brief, repair_leads
-    for p in (ctx.get("parents") or []):
-        if not (p.get("premises_broken") and p.get("parent")):
-            continue
+    rows = []
+    if os.path.exists(RECORDS):
+        for line in open(RECORDS):
+            try:
+                r = json.loads(line)
+            except Exception:
+                continue
+            if r.get("premises_broken") and r.get("parent"):
+                rows.append(r)
+    if not rows:
+        return ""
+    # THE MOST RECENT ROUND THAT BROKE ANYTHING, newest first -- an older break is a different
+    # question and the Proposer has one round to act.
+    rows.sort(key=lambda r: str(r.get("name")), reverse=True)
+    for p in rows[:6]:
         try:
             ps, cs = _spec(p["parent"]), _spec(p["name"])
             if ps and cs:
-                return brief(p["parent"], p["name"],
-                             repair_leads(ps, cs, p["premises_broken"]), p["premises_broken"])
+                out = brief(p["parent"], p["name"],
+                            repair_leads(ps, cs, p["premises_broken"]), p["premises_broken"])
+                if out:
+                    return out
         except Exception as e:
-            print(f"[round] no diagnosis for {p['name']}: {e}")
+            print(T_.quiet(f"[round] no diagnosis for {p['name']}: {type(e).__name__}: {e}"))
     return ""
 
 
@@ -1734,7 +1784,18 @@ def _build_one(slot, rid, index, seen):
             _ids = set((_K.load()[0] or {}))
         except Exception:
             pass
-        _r8 = C.check_act(slot, _ids)
+        # THE CONTROL IS NOT AN ACT, AND JUDGING IT AS ONE DELETED IT FROM EVERY ROUND.
+        #
+        # `build_all` constructs slot 0 itself -- `{"parent": pars[0]["name"]}`, the parent
+        # unchanged -- so it carries no `act`, no `on` and no prediction, because it makes none.
+        # R8 refused it as R8_NO_ACT in all ten rounds of this campaign, which is why `control_of`
+        # found nothing and the Analyst's "The control" block has been empty since the campaign
+        # began: the loop was building its own reference run and then throwing it away.
+        #
+        # Asking what a control is FOR is a category error the act vocabulary cannot answer. It is
+        # the round's noise floor -- the number every other difference in the batch is measured
+        # against -- and it is engine-built, not proposed, so there is no agent to instruct.
+        _r8 = C.check_act(slot, _ids) if index != CONTROL_SLOT else None
         if _r8 is not None:
             _refuse(index, slot, f"{_r8.code}: {_r8.detail}")
             return None
@@ -2184,9 +2245,37 @@ def measure(name):
 
 
 def control_of(ctx):
-    for s in (ctx.get("specs") or []):
-        if s.get("slot") == CONTROL_SLOT:
-            return (ctx.get("metrics") or {}).get(s["name"])
+    """This round's control run, measured. The reference every other difference is read against.
+
+    IT RETURNED `null` IN TEN ROUNDS OUT OF TEN and nothing said so. The Analyst's first prompt
+    block is "The control", and it has never once contained a run: `_prompt.block` drops an empty
+    payload, so the role was silently handed a round with no reference and went on to compare runs
+    to each other.
+
+    TWO BUGS, and the matcher was the smaller one. `slot == CONTROL_SLOT` misses a control whose
+    slot index the batch renumbered -- `_build_one` names it `<rid>_00_ctrl` and the name is the
+    durable identity -- so the name test is added here. But the deeper one is that slot 0 IS OFTEN
+    ABSENT: the Proposer's batch begins at slot 01 in eight of ten rounds, so there was no control
+    to find. That cannot be repaired by looking harder, so this says which of the two happened.
+    """
+    specs = list(ctx.get("specs") or [])
+    met = ctx.get("metrics") or {}
+    for s in specs:
+        if s.get("slot") == CONTROL_SLOT or str(s.get("name", "")).endswith(("_00", "_00_ctrl")):
+            m = met.get(s["name"])
+            if m:
+                return {"run": s["name"], "parent": s.get("parent"), "metrics": m,
+                        "what it is": "the parent unchanged at a fresh seed. Any difference in "
+                                      "this round smaller than the gap between THIS run and its "
+                                      "parent is inside the noise."}
+            print(T_.warn(f"[round] control {s['name']} was built but not measured -- "
+                          f"this round has no noise reference"))
+            return None
+    # SAID, NOT SWALLOWED. A round without a control is a round whose differences cannot be sized,
+    # and the Analyst is about to be asked to size them.
+    print(T_.warn(f"[round] NO CONTROL SLOT in this batch of {len(specs)} -- nothing runs the "
+                  f"parent unchanged, so no difference this round can be compared to the seed "
+                  f"spread. Slot {CONTROL_SLOT} is the control by convention."))
     return None
 
 
@@ -2795,6 +2884,153 @@ def track_record(ctx):
     return out
 
 
+def inert(ctx):
+    """Which knobs this substrate has been MEASURED to ignore, and on which parent.
+
+    A FACT, NOT A REFUSAL, and that distinction is the whole design. 25 of 152 runs in this campaign
+    produced a trajectory byte-identical to another run's -- ~16% of the GPU -- and every cluster
+    has the same cause: the edit named a knob the physics does not read. `cell_grow.vth_frac` at
+    4.0, 6.0 and 10.0 give one trajectory; so do `cell_chem_seed.cone_deg` at 4 and 16,
+    `cell_divide.factor` at 5 and 8, and `set_impl` on `cell_chem_from_shape0`.
+
+    THE STRUCTURAL DEDUPE CANNOT SEE THIS. R6 hashes the composition and its parameters, and those
+    genuinely differ -- a `set_param` to a value the solver ignores changes the spec and not the
+    physics. Most of the clusters are parent/child pairs, so nothing was repeated; something was
+    changed that was not a change.
+
+    AND THE ANALYST FOUND IT FOUR TIMES. C018 (r004), C023 (r007), C026 (r009), C030 (r010), all
+    `kind: harness`, all saying the duplicates persist -- and no act in the vocabulary can bear on a
+    harness claim, so four correct detections had no addressee. This node is that addressee: it
+    computes what the Analyst could only assert, and hands it to the role that chooses the edits.
+
+    WHY NOT A CRITIC RULE. Cedric, 16 August: *"as much as possible do not write hard coded rule,
+    only if the agent can not handle them otherwise through instructions"*. The Proposer cannot
+    md5 a trajectory -- so the loop measures. It CAN read a list and not propose from it -- so the
+    loop does not refuse. If the list is read and the duplicates stop, the rule was never needed;
+    if they continue for three rounds with the list in the prompt, that is the evidence that earns
+    a refusal, and `refusals` already exists to carry it.
+
+    HASHES ARE CACHED because a trajectory is ~100 MB and the tree is 15 GB: re-md5-ing every run
+    each round would cost more wall clock than the agents do. The cache key is (size, mtime).
+    """
+    import hashlib
+    import yaml as _y
+    cache_p = os.path.join(CAMPAIGN, "traj_hash.json")
+    cache = {}
+    if os.path.exists(cache_p):
+        try:
+            cache = json.load(open(cache_p))
+        except Exception:
+            cache = {}
+    runs = sorted(d for d in os.listdir(LOG_ROOT)
+                  if not d.startswith("_") and os.path.exists(os.path.join(LOG_ROOT, d, "traj.npz")))
+    by_hash, fresh = {}, 0
+    for r in runs:
+        p = os.path.join(LOG_ROOT, r, "traj.npz")
+        try:
+            st = os.stat(p)
+            key = [st.st_size, int(st.st_mtime)]
+            got = cache.get(r)
+            if not (got and got[:2] == key):
+                with open(p, "rb") as fh:
+                    got = key + [hashlib.md5(fh.read()).hexdigest()]
+                cache[r] = got
+                fresh += 1
+            by_hash.setdefault(got[2], []).append(r)
+        except Exception:
+            continue
+    try:
+        json.dump(cache, open(cache_p, "w"))
+    except Exception:
+        pass
+
+    clusters = [v for v in by_hash.values() if len(v) > 1]
+    if not clusters:
+        print(T_.quiet(f"[round] inert: no identical trajectories over {len(runs)} runs "
+                       f"({fresh} newly hashed)"))
+        return {}
+
+    def _flat(d, pre=""):
+        """A spec flattened with operators keyed by NAME. Positional keys compare the ordering."""
+        out = {}
+        if isinstance(d, dict):
+            for k, v in d.items():
+                if k != "name":
+                    out.update(_flat(v, pre + "." + str(k)))
+        elif isinstance(d, list):
+            for i, v in enumerate(d):
+                tag = f"[{v['op']}]" if isinstance(v, dict) and "op" in v else f"[{i}]"
+                out.update(_flat(v, pre + tag))
+        else:
+            out[pre] = d
+        return out
+
+    # WHAT IS NOT A KNOB. `seed` and the provenance fields are not physics; an operator's identity
+    # fields (`op`, `id`, `at`, `field`, `model`, `vertex_set`) travel WITH the operator rather than
+    # being set independently; and `schedule[i]` shifts for every entry after an inserted operator,
+    # so adding one probe reported six "inert knobs" that were the schedule renumbering itself.
+    _PROV = {"comp_hash", "src_op", "run_key", "parent", "seed"}
+    _IDENT = {"op", "id", "at", "field", "model", "vertex_set", "name"}
+    rows, seen = [], set()
+    for c in sorted(clusters):
+        specs = []
+        for r in c:
+            try:
+                specs.append(_flat(_y.safe_load(open(os.path.join(LOG_ROOT, r, "spec_run.yaml")))))
+            except Exception:
+                specs.append({})
+        allk = set().union(*[set(s) for s in specs]) if specs else set()
+        diff = [k for k in allk if len({s.get(k) for s in specs}) > 1 and ".schedule[" not in k]
+
+        def _op_of(k):
+            return k.split("[")[-1].split("]")[0] if "[" in k else ""
+
+        # AN OPERATOR PRESENT IN ONE SPEC AND ABSENT IN ANOTHER is one finding -- "adding this
+        # operator changed nothing" -- not one finding per parameter it carries. Reporting the
+        # parameters instead said `cell_shape_probe.at`, `.field`, `.impl`, `.model` and three more
+        # about a single `add_op`, and buried the four real inert knobs under them.
+        whole = {o for o in {_op_of(k) for k in diff} if o
+                 and all(_op_of(k) != o or any(s.get(k) is None for s in specs) for k in diff)}
+        for o in sorted(whole):
+            key = f"add_op {o}"
+            if key not in seen:
+                seen.add(key)
+                rows.append({"edit": key, "identical_runs": c,
+                             "note": "the operator is in one spec and not the other, and the "
+                                     "trajectory is the same either way"})
+        knobs = sorted({(_op_of(k), k.split(".")[-1]) for k in diff
+                        if _op_of(k) and _op_of(k) not in whole
+                        and k.split(".")[-1] not in (_PROV | _IDENT)})
+        for op, kn in knobs:
+            key = f"{op}.{kn}"
+            if key in seen:
+                continue
+            seen.add(key)
+            vals = sorted({str(s.get(k)) for k in diff for s in specs
+                           if _op_of(k) == op and k.split(".")[-1] == kn})
+            rows.append({"knob": key, "identical_runs": c, "values_tried": vals[:6]})
+    # DERIVED, SO REWRITTEN. Unlike records.jsonl this is not a log of what happened; it is the
+    # current answer to "what does not matter", recomputed from the trajectories every round.
+    try:
+        with open(os.path.join(CAMPAIGN, "inert.jsonl"), "w") as fh:
+            for r in rows:
+                fh.write(json.dumps(r) + "\n")
+    except Exception:
+        pass
+    n_runs = sum(len(c) for c in clusters)
+    print(T_.warn(f"[round] inert: {n_runs} of {len(runs)} runs share a trajectory with another "
+                  f"-- {len(rows)} knob(s) measured to do nothing: "
+                  f"{', '.join(r.get('knob') or r.get('edit') for r in rows[:6])}"))
+    return {"knobs measured to change NOTHING": rows,
+            "how this was measured": (f"{n_runs} of {len(runs)} runs on disk have a byte-identical "
+                                      f"traj.npz to another run. The knob named is the only thing "
+                                      f"their specs differ in, so the substrate does not read it."),
+            "what to do with it": ("do not spend a slot moving one of these on the composition it "
+                                   "was measured on -- the run is already on disk under another "
+                                   "name. If you believe a knob is inert only in a regime, say so "
+                                   "in `why` and propose the value that would show it.")}
+
+
 def trends(ctx):
     """The campaign as a SERIES, not as this round. Every role sees only its own round otherwise.
 
@@ -2846,9 +3082,140 @@ def trends(ctx):
                  if (c.get("evidence_for") or []) + (c.get("evidence_against") or []))
         out["ledger"] = {"claims": len(cur), "with evidence": ev,
                          "stated but never tested": len(cur) - ev}
+        # WHOSE CLAIMS THE CAMPAIGN ACTUALLY TESTS. Measured over r001-r011: 42 of the 45 acts that
+        # cite a claim cite one of the 13 SEEDED ones, and 3 cite the 17 the loop induced itself.
+        # That is not visible from any single round, and it is the difference between a campaign
+        # that is learning and one that is re-litigating what it was handed.
+        seeded = {i for i, c in cur.items() if c.get("seeded")}
+        on = collections.Counter(r.get("on") for r in rows if r.get("on"))
+        out["acts on claims"] = {
+            "on the seeded claims": sum(v for k, v in on.items() if k in seeded),
+            "on claims this campaign induced": sum(v for k, v in on.items() if k not in seeded),
+            "never acted on": [i for i in sorted(cur) if i not in on][:14]}
+    except Exception:
+        pass
+    # WHICH ADMITTED METRICS HAVE NEVER CARRIED A PREDICTION. Six of the ten, over eleven rounds:
+    # every scored prediction in the campaign names one of four metrics, so most of the bank is
+    # measured, rendered, read -- and never put at risk. A fact, not a rule: the Proposer decides
+    # whether a metric is unused because it is uninformative or because nobody reached for it.
+    try:
+        import metrics as _M
+        used = collections.Counter()
+        for r in rows:
+            p = str(r.get("predict") or "")
+            for m in _M.ADMITTED:
+                if m in p:
+                    used[m] += 1
+        out["admitted metrics, and how often a prediction rested on each"] = {
+            m: used.get(m, 0) for m in _M.ADMITTED}
+        never = [m for m in _M.ADMITTED if not used.get(m)]
+        if never:
+            out["metrics NEVER predicted on"] = never
     except Exception:
         pass
     return out
+
+
+def last_analysis(ctx):
+    """What the Analyst wrote at the end of the round before this one. Prose, not JSON.
+
+    THE LOOP'S ONLY FREE-FORM REASONING DIED IN A FILE. `analysis.md` is 444 lines over ten rounds
+    and its only reader is `_induced_claims`, a regex that lifts one fenced JSON block out of it.
+    `history` -- the block every role is handed as "what the campaign knows" -- reads `knowledge.md`,
+    which is rendered from the ledger. So everything the Analyst reasoned that did not fit a claim
+    schema reached nobody, including the sentences it wrote ABOUT the round the Proposer is about to
+    build on.
+
+    LAST ROUND'S, NOT THIS ROUND'S, and that is forced rather than chosen: the Analyst runs at the
+    end of the round and the Proposer at the start, so a same-round edge is a cycle. Read from disk
+    at the top of the round, exactly as `history` and `track_record` are.
+
+    TRUNCATED FROM THE FRONT. The Analyst is instructed to lead with what it thinks matters.
+    """
+    p = os.path.join(CAMPAIGN, "analysis.md")
+    if not os.path.exists(p):
+        return ""
+    try:
+        txt = open(p).read().strip()
+    except Exception:
+        return ""
+    if not txt:
+        return ""
+    return txt[:6000]
+
+
+def occupancy(ctx):
+    """Where this campaign has been in phenotype space, and -- the point -- where it has not.
+
+    THE LOOP HAS NO OBJECTIVE. It has a ledger, which records what it believes, and a portfolio,
+    which ranks what to build on; neither says what the campaign is FOR. `crew/flow.yaml` already
+    carries the shape of one -- `parents.targets` reserves a seat for tube / bud / branched /
+    complex, one of which has been empty since the campaign began -- but that is a selection rule,
+    not a map, and nothing has ever shown any role which regions of the space are unvisited.
+
+    THE BINS ARE DERIVED, NOT DECLARED. Equal-width cells over the range this campaign has actually
+    measured, so nothing here asserts what a tube is or where a threshold sits. An empty cell means
+    "no run has landed here", which is a fact; whether it is empty because it is unreachable, or
+    because nobody has tried, is the Proposer's judgement and not this function's.
+
+    NOT A REWARD. Cedric, 16 August: as little hardcoded rule as possible. So the loop computes the
+    occupancy and shows it; it does not score a slot for filling a cell, and no gate reads this.
+    """
+    rows = []
+    if os.path.exists(RECORDS):
+        for line in open(RECORDS):
+            try:
+                r = json.loads(line)
+            except Exception:
+                continue
+            if r.get("metrics"):
+                rows.append(r)
+    if not rows:
+        return {}
+    AX = ("protr_final", "n_tubes_final")
+    NB = 4
+    vals = {a: [float(r["metrics"][a]) for r in rows
+                if isinstance((r.get("metrics") or {}).get(a), (int, float))] for a in AX}
+    if not all(vals[a] for a in AX):
+        return {}
+    lo = {a: min(vals[a]) for a in AX}
+    hi = {a: max(vals[a]) for a in AX}
+    grid = collections.Counter()
+    best = {}
+    for r in rows:
+        m = r.get("metrics") or {}
+        try:
+            b = []
+            for a in AX:
+                span = (hi[a] - lo[a]) or 1.0
+                b.append(min(NB - 1, int((float(m[a]) - lo[a]) / span * NB)))
+            cell = tuple(b)
+        except Exception:
+            continue
+        grid[cell] += 1
+        if cell not in best or float(m[AX[0]]) > float((best[cell][1] or {}).get(AX[0], -9e9)):
+            best[cell] = (r["name"], m)
+
+    def _lab(a, i):
+        span = (hi[a] - lo[a]) or 1.0
+        return f"{lo[a] + span * i / NB:.3g}-{lo[a] + span * (i + 1) / NB:.3g}"
+
+    cells, empty = {}, []
+    for i in range(NB):
+        for j in range(NB):
+            k = f"{AX[0]} {_lab(AX[0], i)} x {AX[1]} {_lab(AX[1], j)}"
+            n = grid.get((i, j), 0)
+            if n:
+                cells[k] = {"runs": n, "best": best[(i, j)][0]}
+            else:
+                empty.append(k)
+    print(T_.quiet(f"[round] occupancy: {len(cells)} of {NB * NB} cells occupied over "
+                   f"{len(rows)} runs"))
+    return {"axes": list(AX), "bins": f"{NB}x{NB}, equal width over the measured range",
+            "occupied": cells, "EMPTY -- no run has ever landed here": empty,
+            "what this is": ("the campaign's own coverage of the two headline metrics. It is a map, "
+                             "not a target: an empty cell may be unreachable physics or may be "
+                             "somewhere nobody has aimed. Nothing scores you for filling one.")}
 
 
 def claim_ledger(ctx):

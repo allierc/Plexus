@@ -84,9 +84,16 @@ transitions:
   # from -> the states it may enter. A refuted claim can be revived only by superseding it with a
   # descendant, which forces the revival to be a NEW claim with its own scope rather than a quiet
   # re-assertion of the old one.
+  #
+  # AND EVERY NON-TERMINAL STATE MAY FALL BACK TO `proposed`, added 16 August with the
+  # inherited-evidence fix. Status is a pure function of the evidence that COUNTS, and evidence can
+  # now be disqualified wholesale: the archived campaign's 155 rows stopped counting in one commit,
+  # and three claims that read `contested` turned out to rest on a single own-campaign row each.
+  # Without this edge the ledger would have kept asserting a state whose evidence had just been
+  # withdrawn -- which is exactly the failure the append-only design was built to prevent.
   proposed:   [supported, contested, refuted, stale, superseded]
-  supported:  [contested, refuted, superseded, stale]
-  contested:  [supported, refuted, superseded, stale]
+  supported:  [proposed, contested, refuted, superseded, stale]
+  contested:  [proposed, supported, refuted, superseded, stale]
   refuted:    [superseded]
   stale:      [proposed, supported, contested, refuted, superseded]
   superseded: []
