@@ -798,7 +798,7 @@ def main():
     tiny = _metrics_or_none("06_hole_tiny_off")
     small = _metrics_or_none("06_hole_small")
     R5 = [
-        ("07i_ramp", "spheroid_bm_ecm_07i", "three entities, three solvers",
+        ("07i_ramp", "spheroid_bm_ecm_07i2", "three entities, three solvers",
          [q["tl"], q["tr"], q["bl"], q["br"]], dict(skip_top=0.0),
          (f"{cen['epi_cell']['min']:,.0f} cells to {cen['epi_cell']['max']:,.0f}, and every level "
           f"grows with them: the membrane from {cen['bm_face']['min']:,.0f} faces to "
