@@ -1945,6 +1945,19 @@ def _build_one(slot, rid, index, seen):
     # unremarked. The declaration is the reliable signal, and it costs the same budget -- a round
     # that spends every slot re-running is not a round, however sincerely each slot meant it.
     forced = replicate
+    # AND THE CONTROL IS A REPLICATE BY DEFINITION -- the comment fifty lines up says so: "two runs
+    # of one composition at two seeds bound the noise floor, which is the number every other
+    # difference in the round has to clear." It was being written at `seed_=0`, the same seed its
+    # parent ran at, so it came out BYTE-IDENTICAL and measured a seed spread of exactly zero.
+    #
+    # INVISIBLE UNTIL THE CONTROL STARTED RUNNING. R8 refused slot 0 for the whole previous
+    # campaign, so the copy was never made; repairing that (16 August) turned the missing control
+    # into a duplicate one, and the montage found it the same day: 6 of the 10 identical-trajectory
+    # clusters involve a `_00_ctrl`, and `r005_03 = r006_00_ctrl = r007_00_ctrl = r008_00_ctrl =
+    # r008_01` is five runs of one trajectory. A fix that restores a run must also give it the one
+    # property that makes it worth running.
+    if index == CONTROL_SLOT:
+        replicate = True
     if not replicate and str(slot.get("act") or "").strip().lower() == "replicate":
         if _REPLICATES >= _MAX_REPLICATES:
             _refuse(index, slot,
