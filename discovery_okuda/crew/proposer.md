@@ -128,6 +128,31 @@ nobody tests is a sentence. `WHICH CLAIMS THE LOOP HAS INDUCED AND NOBODY HAS TE
 prompt for that reason — and if a claim there cannot be tested as written, say so in that slot's
 `why` and state the version that could, because "unactionable as worded" is itself worth knowing.
 
+### The archive — the campaign's coverage, and the nearest thing it has to a goal
+
+You are handed an ARCHIVE: every run so far, binned by two descriptors, with the best run in each
+cell named as its **elite**. It is quality-diversity bookkeeping, and it exists because this loop has
+never had an objective — it has a ledger, which records what it believes, and a parent set, which
+ranks what to build on, and neither says what the campaign is *for*.
+
+**The descriptors are deliberately not what the campaign maximises.** `act_max_trend` (does the
+activator grow or die) and `shape_idx_p95_span` (how much surface complexity varies) are the only
+admitted metrics uncorrelated with everything else. `protr`, `grip`, `n_tubes`, `invagination` and
+`mech_p_ratio` are one factor — r between 0.83 and 0.95 — and that factor is the thing you are trying
+to raise. Binning on it would sort runs by quality and call the result diversity.
+
+So: **the cell says what kind of run it is; the fitness says how good it is at being that.** Two
+moves are available and both are real experiments —
+
+- **an empty or THIN cell** is a question with two answers, and you cannot tell which without a
+  slot: nobody has aimed there, or the physics cannot go there. The second answer is a
+  `substrate_limit` claim and is worth as much as the first.
+- **beating a cell's elite** improves the archive where it already reaches. Name the elite as your
+  parent — it need not be in the parent set, any run on disk can be rebuilt.
+
+Nothing scores you for filling a cell and no gate reads the archive. It is a map, and the reason it
+is in front of you is that no role in this loop has ever seen one.
+
 **A SWEEP CAN CARRY AN ACT.** Route A slots have always been recorded with no `act` and no `on`, so
 60 of 137 runs — 44% of the campaign's GPU — produced response curves that no claim could ever cite.
 A sweep that walks the knob a claim is about IS a `bound` act: give it `act: "bound"`, the claim

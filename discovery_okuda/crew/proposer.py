@@ -120,9 +120,10 @@ def run(bundle):
          "Moving one of these on the composition it was measured on spends a GPU run to reproduce a "
          "file that is already on disk. 25 of 152 runs went this way",
          bundle.get("inert"), {"as_json": True, "limit": 8000}),
-        ("WHERE THE CAMPAIGN HAS AND HAS NOT BEEN -- its own coverage of the two headline metrics. "
-         "An empty cell is not a target and nothing scores you for filling one; it is the question "
-         "of whether nobody has aimed there or the physics cannot go there",
+        ("THE ARCHIVE -- every run this campaign has made, binned by two descriptors that are NOT what "
+         "it is trying to maximise, with the best run in each cell named. An empty or THIN cell is "
+         "a question, not a target: nobody has aimed there, or the physics cannot go there. To "
+         "improve a cell, build on its elite -- naming it as a parent is enough",
          bundle.get("occupancy"), {"as_json": True, "limit": 8000}),
         ("WHAT THE ANALYST CONCLUDED LAST ROUND, in its own words. Its claims reach you through the "
          "ledger; everything else it reasoned reached nobody until now",

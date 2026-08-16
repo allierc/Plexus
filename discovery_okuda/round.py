@@ -3158,8 +3158,29 @@ def occupancy(ctx):
     "no run has landed here", which is a fact; whether it is empty because it is unreachable, or
     because nobody has tried, is the Proposer's judgement and not this function's.
 
-    NOT A REWARD. Cedric, 16 August: as little hardcoded rule as possible. So the loop computes the
-    occupancy and shows it; it does not score a slot for filling a cell, and no gate reads this.
+    THE DESCRIPTOR IS NOT THE FITNESS, and getting that wrong is how MAP-Elites degenerates into a
+    ranking. My first version binned on `protr_final x n_tubes_final`. Measured over the 123 runs
+    carrying all ten admitted metrics: protr <-> grip r = +0.93, grip <-> invagination +0.95,
+    protr <-> invagination +0.94, n_tubes <-> grip +0.90, protr <-> mech_p_ratio +0.88. SIX of the
+    ten admitted metrics are one factor -- "how structured is it" -- and that factor is exactly what
+    the campaign is trying to maximise. A grid on it is a diagonal: 10 of 16 cells occupied, all
+    along the line, and "diversity" that is quality under another name.
+
+    SO THE AXES ARE THE TWO THAT MEASURE SOMETHING ELSE. `act_max_trend` (does the activator grow or
+    die over the run) and `shape_idx_p95_span` (how much surface complexity varies during it) are
+    the only admitted metrics with no |r| > 0.5 against anything. `gyr_oblate_floor` is the third
+    uncorrelated one and takes 13 distinct values across 123 runs -- too degenerate to bin.
+
+    THREE BINS PER AXIS, NOT FOUR, because a bin narrower than the metric's seed floor sorts
+    replicates of one composition into different cells. `shape_idx_p95_span` spans 0.048-0.282
+    against a 20% floor, which is about eight noise widths: three bins is honest, five is not.
+
+    FITNESS IS LEXICOGRAPHIC (n_tubes, protr) -- the campaign's own goal, tubes first and the finer
+    metric breaking ties. It ranks runs WITHIN a cell and never decides which cell they land in.
+
+    NOT A GATE. Cedric, 16 August: as little hardcoded rule as possible. The loop computes the
+    archive and shows it; nothing scores a slot for filling a cell, and the elites are named so the
+    Proposer can build on one -- `_build_one` rebuilds any run on disk, so naming it is enough.
     """
     rows = []
     if os.path.exists(RECORDS):
@@ -3172,14 +3193,34 @@ def occupancy(ctx):
                 rows.append(r)
     if not rows:
         return {}
-    AX = ("protr_final", "n_tubes_final")
-    NB = 4
+    AX = ("act_max_trend", "shape_idx_p95_span")
+    FIT = ("n_tubes_final", "protr_final")
+    NB = 3
     vals = {a: [float(r["metrics"][a]) for r in rows
                 if isinstance((r.get("metrics") or {}).get(a), (int, float))] for a in AX}
     if not all(vals[a] for a in AX):
         return {}
     lo = {a: min(vals[a]) for a in AX}
     hi = {a: max(vals[a]) for a in AX}
+    # WHAT THE EYE SAID ABOUT EACH RUN, so a cell has a caption a human recognises from the montage.
+    # The metric axes decide WHERE a run sits -- reproducible, and a rerun lands in the same cell --
+    # and the Eye's words say what is actually there.
+    seen = {}
+    fp = os.path.join(CAMPAIGN, "foresight.jsonl")
+    if os.path.exists(fp):
+        for line in open(fp):
+            try:
+                d = json.loads(line)
+            except Exception:
+                continue
+            for run, v in (d.get("runs") or {}).items():
+                o = v.get("observed") or {}
+                if o.get("form"):
+                    seen[run] = f"{o.get('form')} / {str(o.get('topology'))[:40]}"
+
+    def _fit(m):
+        return tuple(float(m.get(k)) if isinstance(m.get(k), (int, float)) else -9e9 for k in FIT)
+
     grid = collections.Counter()
     best = {}
     for r in rows:
@@ -3193,29 +3234,45 @@ def occupancy(ctx):
         except Exception:
             continue
         grid[cell] += 1
-        if cell not in best or float(m[AX[0]]) > float((best[cell][1] or {}).get(AX[0], -9e9)):
+        if cell not in best or _fit(m) > _fit(best[cell][1]):
             best[cell] = (r["name"], m)
 
     def _lab(a, i):
         span = (hi[a] - lo[a]) or 1.0
-        return f"{lo[a] + span * i / NB:.3g}-{lo[a] + span * (i + 1) / NB:.3g}"
+        return f"{lo[a] + span * i / NB:.3g}..{lo[a] + span * (i + 1) / NB:.3g}"
 
     cells, empty = {}, []
     for i in range(NB):
         for j in range(NB):
-            k = f"{AX[0]} {_lab(AX[0], i)} x {AX[1]} {_lab(AX[1], j)}"
+            k = f"{AX[0]} {_lab(AX[0], i)} | {AX[1]} {_lab(AX[1], j)}"
             n = grid.get((i, j), 0)
             if n:
-                cells[k] = {"runs": n, "best": best[(i, j)][0]}
+                nm, m = best[(i, j)]
+                cells[k] = {"runs": n, "elite": nm,
+                            "elite fitness": {f: m.get(f) for f in FIT},
+                            "the eye called it": seen.get(nm, "not described")}
             else:
                 empty.append(k)
-    print(T_.quiet(f"[round] occupancy: {len(cells)} of {NB * NB} cells occupied over "
-                   f"{len(rows)} runs"))
-    return {"axes": list(AX), "bins": f"{NB}x{NB}, equal width over the measured range",
+    # A CELL WITH ONE RUN IS NOT A COVERED CELL. With every cell occupied -- which it is, 9 of 9 --
+    # "empty" stops being the interesting question and "thin" becomes it: two cells hold a single
+    # run each, so their elite is also their only sample and nothing separates it from noise.
+    thin = {k: v["runs"] for k, v in cells.items() if v["runs"] <= 2}
+    print(T_.quiet(f"[round] archive: {len(cells)} of {NB * NB} cells occupied over {len(rows)} "
+                   f"runs, {len(thin)} of them on 1-2 runs; best-in-cell by {FIT[0]}"))
+    return {"descriptor axes -- WHERE a run sits": list(AX),
+            "why these two": ("they are the only admitted metrics uncorrelated with everything "
+                              "else. protr, grip, n_tubes, invagination and mech_p_ratio are one "
+                              "factor (r 0.83-0.95) and that factor is what the campaign is trying "
+                              "to maximise -- binning on it would make this a ranking, not a map"),
+            "fitness -- HOW GOOD a run is inside its cell": f"{FIT[0]}, ties broken by {FIT[1]}",
+            "bins": f"{NB}x{NB}, equal width over the measured range",
             "occupied": cells, "EMPTY -- no run has ever landed here": empty,
-            "what this is": ("the campaign's own coverage of the two headline metrics. It is a map, "
-                             "not a target: an empty cell may be unreachable physics or may be "
-                             "somewhere nobody has aimed. Nothing scores you for filling one.")}
+            "THIN -- one or two runs, so the cell's elite is also its only sample": thin,
+            "what to do with it": ("an empty cell is a question: is it unreachable physics, or has "
+                                   "nobody aimed there? Either answer is worth a slot, and the "
+                                   "second is worth more. To improve a cell, build on its elite -- "
+                                   "naming it as a parent is enough, it need not be in the parent "
+                                   "set. Nothing scores you for filling a cell.")}
 
 
 def claim_ledger(ctx):

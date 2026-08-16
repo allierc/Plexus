@@ -551,7 +551,7 @@ def build3(runs, runs2=()):
 {chr(10).join(card(v, n, sp, c) for _, v, n, sp, c in runs2)}
 </div>"""
     return f"""{BEGIN3}
-<h3>Spheroid + basement membrane + matrix</h3>
+<h3>Three levels in one composition</h3>
 <p class="opk">The demonstration here is that <b>three levels interact</b> in one composition.
 <b>Molecules</b>: four proteases (MT1-MMP, proMMP-2, MMP-2, TIMP-2/3) as fields on the membrane's own
 faces, integrins as bonds that load and unbind under force, myosin on the junctions. <b>Cells</b>: a
@@ -748,6 +748,17 @@ def main():
             print(f"[minisite] {run}: no readable metrics.json (running?) -- its card is skipped")
             return None
 
+    def _census(run):
+        """`census.py`'s per-entity min/mean/max/last, or None. The numbers in the first card's
+        caption are counted from the store at every kept frame -- quoting them from here rather
+        than typing them is the same rule the specs follow."""
+        try:
+            return json.load(open(os.path.join(LOG, run, "census.json")))["entities"]
+        except (OSError, ValueError, KeyError):
+            print(f"[minisite] {run}: no census.json -- its card cannot quote counts")
+            return None
+
+    cen = _census("07i_ramp")
     hol = _metrics_or_none("06_breach_hole")
     # `06_breach_torn` HAS NO CARD -- it is read so the breach card can say what the cutting rate
     # does past the runaway point, from that run rather than from memory.
@@ -787,11 +798,15 @@ def main():
     tiny = _metrics_or_none("06_hole_tiny_off")
     small = _metrics_or_none("06_hole_small")
     R5 = [
-        ("06_spheroid_bm_ecm", "spheroid_bm_ecm_vtk", "three entities, three solvers",
-         [q["tl"], q["tr"], q["bl"], q["br"]], dict(skip_top=0.09),
-         "An epithelium of 396 vertices grown to 12,756, a fibre matrix outside it, and a "
-         "5,120-triangle membrane on 2,562 plaques. Sheet and matrix share the tissue, not a "
-         "force"),
+        ("07i_ramp", "spheroid_bm_ecm_07i", "three entities, three solvers",
+         [q["tl"], q["tr"], q["bl"], q["br"]], dict(skip_top=0.0),
+         (f"{cen['epi_cell']['min']:,.0f} cells to {cen['epi_cell']['max']:,.0f}, and every level "
+          f"grows with them: the membrane from {cen['bm_face']['min']:,.0f} faces to "
+          f"{cen['bm_face']['max']:,.0f}, its adhesions from {cen['plaque']['min']:,.0f} plaques "
+          f"to {cen['plaque']['max']:,.0f}, and {cen['bond']['last']:,.0f} integrin bonds under "
+          f"load at the end" if cen else
+          "An epithelium growing inside a fibre matrix, with a triangulated membrane between "
+          "them")),
     ] + ([] if not tiny else [
         # THE SHEET PANEL ALONE, as for the breach cards below: this run's other three panels are
         # the tissue and the matrix, which the first card already shows.

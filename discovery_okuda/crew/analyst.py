@@ -94,7 +94,8 @@ def run(bundle):
         # here. `occupancy` is the campaign's own coverage, which no role has ever seen.
         ("KNOBS MEASURED TO CHANGE NOTHING -- identical trajectories, and what the specs differ in",
          bundle.get("inert"), {"as_json": True, "limit": 8000}),
-        ("WHERE THE CAMPAIGN HAS AND HAS NOT BEEN -- coverage of the two headline metrics",
+        ("THE ARCHIVE -- the campaign binned by two descriptors uncorrelated with its objective, best "
+         "run per cell. Read the elites down a column: what changes with the descriptor?",
          bundle.get("occupancy"), {"as_json": True, "limit": 8000}),
         ("Your task", f"Append this round's analysis to {a_md}. Do NOT write {k_md}: it is "
                       f"rendered from the claim ledger. If -- and only if -- this round shows "
