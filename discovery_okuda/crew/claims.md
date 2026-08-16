@@ -6,12 +6,10 @@ belongs where the person reading the conclusion can see it.
 
 ## Why a claim is an object and not a paragraph
 
-The epistemic audit of r001–r022 found a loop that could write knowledge but not manipulate it. Its
-eleven STANDING LAWS lived in `knowledge.md` as prose, so nothing could score them, breed from them,
-or notice when two of them contradicted each other — and two of them do: **L5** asserts that
-`cell_chem_from_shape.beta < 0` extinguishes the activator *morphotype-independent*, and **L9** asserts it
-is *base-dependent*. Both sat in the same file for six rounds. No experiment was ever posed to
-separate them, because there was no object to pose it against.
+A loop can write knowledge and still be unable to manipulate it. When the campaign's standing laws
+lived in `knowledge.md` as prose, nothing could score them, breed from them, or notice when two of
+them contradicted each other — and two did, for six rounds, because there was no object to pose the
+separating experiment against.
 
 A claim here is that object: a statement with a scope it is asserted over, evidence weighted by
 whether the experiments supporting it could resolve what they asked, a status that changes on
@@ -34,11 +32,10 @@ schema:
 
 ## kind — what sort of thing is being claimed
 
-Not decoration. Two of this project's largest findings are not about biology at all, and under the
-old scheme they had nowhere to live: `protrusion_aspect_max` reads 0.0 on an eleven-armed star, and
-the seed floor spans fourteenfold across metrics. The BM note's terminal finding — *smaller holes
-need the chemistry resolved, not tuned* — is a third. A claim about the instrument and a claim about
-the tissue are answered by different experiments and must not be mixed.
+Not decoration. Some of this project's largest findings are not about biology at all — a metric
+that reads zero on the best specimen it was built to detect, a seed floor spanning more than tenfold
+across metrics — and under a one-kind scheme they had nowhere to live. A claim about the instrument
+and a claim about the tissue are answered by different experiments and must not be mixed.
 
 ```yaml
 kind:
@@ -49,21 +46,12 @@ kind:
                    invalidates about its own record"
 ```
 
-`harness` WAS ADDED 14 AUGUST AND IT REPLACES A SECOND FILE. A `campaign/TEMPLATE_memory.md` has
-existed since 3 August describing a state document for exactly this material -- traps, operational
-facts, closed lines -- and nothing has ever written it. The obvious fix was to restore its writer;
-the better one is that these findings ARE claims and belong in the ledger with everything else:
-
-    "the replicate seed was the slot index, so two replicates in the same slot of different rounds
-     were bit-identical and the campaign measured a seed spread of exactly zero"
-    "20% of runs produce a trajectory bit-identical to another run's"
-    "cell_grow.vth_frac is inert on the b_bru_question composition"
-
-Every one of those was found by hand this week, none fits `mechanism`, `instrument` or
-`substrate_limit`, and every one INVALIDATES PART OF THE RECORD -- which is precisely why it needs
+`harness` REPLACES A SECOND STORE. Findings like *"the replicate seed was the slot index, so two
+replicates were bit-identical and the measured seed spread was zero"*, *"a fifth of runs produce a
+trajectory identical to another run's"*, *"this parameter is inert on this composition"* fit none of
+the other three kinds, and every one INVALIDATES PART OF THE RECORD — which is exactly why it needs
 evidence, a status and a supersession history rather than a line in a file nobody diffs. A second
-store of "what the campaign knows" is also how the previous loop ended up holding two contradictory
-standing laws for six rounds.
+store of "what the campaign knows" is how a loop ends up holding two contradictory laws at once.
 
 A `harness` claim's `scope` names the machinery it is about -- `{"lineages": [], "regimes":
 ["loop"]}` is legitimate -- because a defect in the loop has no lineage.
@@ -73,9 +61,9 @@ A `harness` claim's `scope` names the machinery it is about -- `{"lineages": [],
 ```yaml
 status:
   proposed:   "asserted, not yet weighed. Every seeded claim starts here."
-  supported:  "net evidence for, above the threshold"
-  contested:  "substantial weight on BOTH sides -- the most interesting state, and the one that
-               makes a `discriminate` act available"
+  supported:  "net evidence for, above the threshold. Weight against may be present"
+  contested:  "substantial weight on BOTH sides and NEITHER side decisive -- the residual case,
+               and the one that makes a `discriminate` act available"
   refuted:    "net evidence against, above the threshold"
   superseded: "replaced by a descendant claim; keeps its evidence and names its replacement"
   stale:      "no evidence added for `stale_after` rounds -- shown to the Proposer as a debt"
@@ -85,12 +73,10 @@ transitions:
   # descendant, which forces the revival to be a NEW claim with its own scope rather than a quiet
   # re-assertion of the old one.
   #
-  # AND EVERY NON-TERMINAL STATE MAY FALL BACK TO `proposed`, added 16 August with the
-  # inherited-evidence fix. Status is a pure function of the evidence that COUNTS, and evidence can
-  # now be disqualified wholesale: the archived campaign's 155 rows stopped counting in one commit,
-  # and three claims that read `contested` turned out to rest on a single own-campaign row each.
-  # Without this edge the ledger would have kept asserting a state whose evidence had just been
-  # withdrawn -- which is exactly the failure the append-only design was built to prevent.
+  # AND EVERY NON-TERMINAL STATE MAY FALL BACK TO `proposed`. Status is a pure function of the
+  # evidence that COUNTS, and evidence can be disqualified wholesale -- an archived campaign's rows
+  # stop counting the moment its runs leave the record. Without this edge the ledger would keep
+  # asserting a state whose evidence had just been withdrawn.
   proposed:   [supported, contested, refuted, stale, superseded]
   supported:  [proposed, contested, refuted, superseded, stale]
   contested:  [proposed, supported, refuted, superseded, stale]
@@ -101,9 +87,8 @@ transitions:
 
 ## Evidence, and why it is weighted rather than counted
 
-This is where the audit's two findings meet. 65% of the old campaign's predictions asked for a
-change smaller than their own metric's seed-to-seed spread, so ten such confirmations are not ten
-confirmations — they are ten coin tosses. Every piece of evidence therefore carries a **resolvability
+Most of one campaign's predictions asked for a change smaller than their own metric's seed-to-seed
+spread, and ten such confirmations are not ten confirmations — they are ten coin tosses. Every piece of evidence therefore carries a **resolvability
 weight**: how large the effect asked for was, relative to the certified floor of the metric it was
 asked in, capped at 1.
 
@@ -138,11 +123,10 @@ acts:
     note: >-
       LOOKING, not testing. A slot that varies something to see what happens, with no claim it
       bears on and no threshold it commits to. It is in the ontology because the alternative is
-      worse: the first claim round gave the Proposer no act for "I want to look here", and four of
-      fourteen slots answered by putting the OLD `intent` vocabulary in the `act` field --
-      `exploratory`, no claim, no prediction -- which bypassed the claim layer entirely and spent
-      their compute producing nothing the ledger could read. An ontology with no word for a common
-      move does not prevent the move; it makes it illegible.
+      worse: with no act for "I want to look here", slots reach for a word outside the vocabulary,
+      bypass the claim layer entirely, and spend their compute producing nothing the ledger can
+      read. An ontology with no word for a common move does not prevent the move; it makes it
+      illegible.
       It still owes the round a sentence: WHAT it varies and WHAT it will report. And its natural
       successor is `induce` -- if the looking showed something, the next round can state it.
   predict:
@@ -168,7 +152,7 @@ acts:
   discriminate:
     requires: [claim, rival, metric, threshold]
     effect: moves the status of BOTH claims
-    note: "available only when two claims conflict. L5 and L9 conflict today."
+    note: "available only when two claims conflict -- read the ledger for a live pair."
   induce:
     requires: [runs]
     effect: creates a new claim from runs already on file
@@ -179,7 +163,7 @@ acts:
 ```yaml
 wellformed:
   - "statement is non-empty and does not merely name a parameter: it must assert something"
-  - "kind is one of the three"
+  - "kind is one of the four"
   - "scope names at least one lineage OR one regime -- an unscoped claim cannot be transferred,
      and transfer is the only route to high confidence"
   - "status is legal, and any change from the previous line is a legal transition"
