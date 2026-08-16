@@ -3052,16 +3052,16 @@ run:
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/bm_hole_tiny_off_vtk.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/bm_07k_breach_hole.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">a self-arresting perforation<span class="sim-spec"><pre>general:
-  name: 06_hole_tiny_off
-  rig: Rig05m
-  module: test_05m_protease
+      <span class="sim-name" tabindex="0">a breach that opens<span class="sim-spec"><pre>general:
+  name: 07k_breach_hole
+  rig: Rig07k
+  module: __main__
   frames: 401
   device: cuda:0
   dtype: float64
-  git_commit: be18b5d7
+  git_commit: f439d2d6
   units:
     length_um: 1171.0
     time_s: 600.0
@@ -3070,10 +3070,10 @@ run:
       here may be quoted in nN.
 sets:
   bm_node:
-    n: 2562
+    n: 163842
     subdiv: 4
   bm_face:
-    n: 5120
+    n: 83269
     thickness_um: 0.1
     carries:
     - mass
@@ -3086,11 +3086,11 @@ sets:
     driver: replay
     cache: log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_c4a5698982.npz
     vertices_frame0: 396
-    nodes: 596
-    triangles: 1188
+    nodes: 14798
+    triangles: 29592
     box_scale: 0.008527021940730722
   plaque:
-    n: 2562
+    n: 57570
     law: one adhesion patch per live sheet node, clutch kinetics
     stale_plq_attr: 104
 material:
@@ -3100,251 +3100,10 @@ material:
     thickness_box: 0.002
     rho0: 1.0
     beta_stiffening: 0.0
-    mobility: 2.0925446580802998
+    mobility: 2.0927428325816706
     tau_relax: 0.0
     substep_target: 1.0
-    max_refine: 0
-    edge_trigger: 1.45
-    tau_bm: 40.0
-    rho_crit: 0.35
-    secretion_mode: homeostatic
-  adhesion:
-    k_drive: 50.0
-chemistry:
-  K_timp: 0.001
-  k_act: 0.5
-  k_inhib: 200.0
-  k_deg: 150.0
-  s_pro: 0.002
-  s_timp: 5.0e-05
-  s_timp3: 1.4999999999999999e-05
-  s_mmp: 0.0
-  s_mt1: 0.0
-  mt1_frac: 0.25
-  hetero: 1.0
-  tau_pro: 8.0
-  tau_mmp: 8.0
-  tau_timp: 8.0
-  tau_timp3: 40.0
-  D_mmp_box2_per_frame: 0.013126795362740758
-  D_timp_box2_per_frame: 0.013126795362740758
-  species:
-    MT1-MMP: per-cell state, tethered, no transport
-    proMMP2: field on bm_face, D_mmp
-    MMP2: field on bm_face, D_mmp
-    TIMP2: field on bm_face, D_timp
-    TIMP3: per-face state, no transport
-  mt1_field: single Gaussian cap, theta 20.0 deg, 45.0 deg off the view axis
-operators:
-- bm_elastic (StVK on the rest metric)
-- &#x27;plaque (edge set: bm_node -&gt; epithelial face)&#x27;
-- epi_drive (replay toward the recorded surface)
-- bm_secrete (homeostatic)
-- protease_secrete
-- protease_diffuse (semi-implicit, face Laplacian)
-- protease_activate (ternary, bell)
-- protease_inhibit (1:1)
-- bm_degrade
-- bm_tear (rho/rho0 &lt; rho_crit)
-rendered_against:
-  matrix: 06_spheroid_ecm
-  note: &#x27;the 2x2&#x27;&#x27;s other three panels come from this run&#x27;&#x27;s traj.npz, re-drawn and never re-run: there
-    is no BM-ECM coupling, so nothing here reaches the matrix.&#x27;
-run:
-  kind: protease
-  backfilled: true
-  faces_torn: 58
-  torn_frac: 0.011328125
-  rim_loops: 1
-  verdict: neither
-  mt1_field: single Gaussian cap, theta 20.0 deg, 45.0 deg off the view axis
-  inhib: 1.0
-  kdeg: 150.0
-  refine: false
-  modes: 6
-  hetero: 1.0
-  spot: 20.0
-  spot_off: 45.0
-  seed_mt1: 3
-  rho_crit: 0.35</pre></span></span>
-      <span class="sim-cap">58 of 5,120 faces, 1 rim loop, and it stops. The size is the source's: a 20° cap of MT1-MMP, tilted 45° so the rim reads as a rim</span>
-    </figcaption>
-  </figure>
-</div>
-<p class="opk">And with a random source rather than a cap — arrested, then not:</p>
-<div class="sim-gallery g3">
-  <figure class="sim-card">
-    <video src="gallery/bm_hole_small_vtk.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">self-arresting, no cap<span class="sim-spec"><pre>general:
-  name: 06_hole_small
-  rig: Rig05m
-  module: test_05m_protease
-  frames: 401
-  device: cuda:0
-  dtype: float64
-  git_commit: be18b5d7
-  units:
-    length_um: 1171.0
-    time_s: 600.0
-    force_nN: null
-    note: 1 box = length_um across; 1 frame = time_s. force is NOT declared by these rigs, so no result
-      here may be quoted in nN.
-sets:
-  bm_node:
-    n: 2562
-    subdiv: 4
-  bm_face:
-    n: 5120
-    thickness_um: 0.1
-    carries:
-    - mass
-    - rest metric
-    - proMMP2
-    - MMP2
-    - TIMP2
-    - TIMP3
-  epithelium:
-    driver: replay
-    cache: log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_c4a5698982.npz
-    vertices_frame0: 396
-    nodes: 596
-    triangles: 1188
-    box_scale: 0.008527021940730722
-  plaque:
-    n: 2562
-    law: one adhesion patch per live sheet node, clutch kinetics
-    stale_plq_attr: 104
-material:
-  sheet:
-    youngs: 400.0
-    poisson: 0.3
-    thickness_box: 0.002
-    rho0: 1.0
-    beta_stiffening: 0.0
-    mobility: 2.092757364168427
-    tau_relax: 0.0
-    substep_target: 1.0
-    max_refine: 0
-    edge_trigger: 1.45
-    tau_bm: 40.0
-    rho_crit: 0.35
-    secretion_mode: homeostatic
-  adhesion:
-    k_drive: 50.0
-chemistry:
-  K_timp: 0.001
-  k_act: 0.5
-  k_inhib: 200.0
-  k_deg: 80.0
-  s_pro: 0.002
-  s_timp: 5.0e-05
-  s_timp3: 1.4999999999999999e-05
-  s_mmp: 0.0
-  s_mt1: 0.0
-  mt1_frac: 0.25
-  hetero: 1.0
-  tau_pro: 8.0
-  tau_mmp: 8.0
-  tau_timp: 8.0
-  tau_timp3: 40.0
-  D_mmp_box2_per_frame: 0.013126795362740758
-  D_timp_box2_per_frame: 0.013126795362740758
-  species:
-    MT1-MMP: per-cell state, tethered, no transport
-    proMMP2: field on bm_face, D_mmp
-    MMP2: field on bm_face, D_mmp
-    TIMP2: field on bm_face, D_timp
-    TIMP3: per-face state, no transport
-  mt1_field: smooth_field, 3 modes, hetero 2.0, seed 11
-operators:
-- bm_elastic (StVK on the rest metric)
-- &#x27;plaque (edge set: bm_node -&gt; epithelial face)&#x27;
-- epi_drive (replay toward the recorded surface)
-- bm_secrete (homeostatic)
-- protease_secrete
-- protease_diffuse (semi-implicit, face Laplacian)
-- protease_activate (ternary, bell)
-- protease_inhibit (1:1)
-- bm_degrade
-- bm_tear (rho/rho0 &lt; rho_crit)
-rendered_against:
-  matrix: 06_spheroid_ecm
-  note: &#x27;the 2x2&#x27;&#x27;s other three panels come from this run&#x27;&#x27;s traj.npz, re-drawn and never re-run: there
-    is no BM-ECM coupling, so nothing here reaches the matrix.&#x27;
-run:
-  kind: protease
-  backfilled: true
-  faces_torn: 952
-  torn_frac: 0.1859375
-  rim_loops: 4
-  verdict: A HOLE
-  mt1_field: smooth_field, 3 modes, hetero 2.0, seed 11
-  inhib: 1.0
-  kdeg: 80.0
-  refine: false
-  modes: 3
-  hetero: 2.0
-  spot: 0.0
-  spot_off: null
-  seed_mt1: 11
-  rho_crit: 0.35</pre></span></span>
-      <span class="sim-cap">A random field instead of a cap: 952 faces in one patch, 19% of the sheet, and it still stops. Change only the seed and the same point tears 31.5%</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/bm_breach_sheet_vtk.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">not self-arresting<span class="sim-spec"><pre>general:
-  name: 06_breach_hole
-  rig: Rig05m
-  module: test_05m_protease
-  frames: 401
-  device: cuda:0
-  dtype: float64
-  git_commit: be18b5d7
-  units:
-    length_um: 1171.0
-    time_s: 600.0
-    force_nN: null
-    note: 1 box = length_um across; 1 frame = time_s. force is NOT declared by these rigs, so no result
-      here may be quoted in nN.
-sets:
-  bm_node:
-    n: 2562
-    subdiv: 4
-  bm_face:
-    n: 5120
-    thickness_um: 0.1
-    carries:
-    - mass
-    - rest metric
-    - proMMP2
-    - MMP2
-    - TIMP2
-    - TIMP3
-  epithelium:
-    driver: replay
-    cache: log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_c4a5698982.npz
-    vertices_frame0: 396
-    nodes: 596
-    triangles: 1188
-    box_scale: 0.008527021940730722
-  plaque:
-    n: 2562
-    law: one adhesion patch per live sheet node, clutch kinetics
-    stale_plq_attr: 104
-material:
-  sheet:
-    youngs: 400.0
-    poisson: 0.3
-    thickness_box: 0.002
-    rho0: 1.0
-    beta_stiffening: 0.0
-    mobility: 2.0926640284033255
-    tau_relax: 0.0
-    substep_target: 1.0
-    max_refine: 0
+    max_refine: 3
     edge_trigger: 1.45
     tau_bm: 40.0
     rho_crit: 0.35
@@ -3375,12 +3134,13 @@ chemistry:
     MMP2: field on bm_face, D_mmp
     TIMP2: field on bm_face, D_timp
     TIMP3: per-face state, no transport
-  mt1_field: smooth_field, 6 modes, hetero 1.0, seed 3
+  mt1_field: smooth random field, 6 modes, rebuilt per cell
 operators:
 - bm_elastic (StVK on the rest metric)
 - &#x27;plaque (edge set: bm_node -&gt; epithelial face)&#x27;
 - epi_drive (replay toward the recorded surface)
 - bm_secrete (homeostatic)
+- bm_refine (1-&gt;4 split, edge_trigger 1.45)
 - protease_secrete
 - protease_diffuse (semi-implicit, face Laplacian)
 - protease_activate (ternary, bell)
@@ -3392,23 +3152,237 @@ rendered_against:
   note: &#x27;the 2x2&#x27;&#x27;s other three panels come from this run&#x27;&#x27;s traj.npz, re-drawn and never re-run: there
     is no BM-ECM coupling, so nothing here reaches the matrix.&#x27;
 run:
-  kind: protease
-  backfilled: true
-  faces_torn: 2414
-  torn_frac: 0.471484375
-  rim_loops: null
-  verdict: A HOLE
-  mt1_field: smooth_field, 6 modes, hetero 1.0, seed 3
-  inhib: 1.0
+  kind: protease + gated cell-owned adhesion
+  N0: 12
+  split_budget: 150
+  splits: 78392
+  twin_of: 06_hole
+  mt1_field: smooth random field, 6 modes, rebuilt per cell
   kdeg: 100.0
-  refine: null
-  modes: null
+  what: the rate whose hole did not stop</pre></span></span>
+      <span class="sim-cap">the sheet perforates where the enzyme is: 7.7% of the faces gone by frame 187, in 54 rim loops, the first at frame 40. It has not arrested — the torn fraction still creeps 0.9 points over the last third</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/bm_07j_hole_tiny.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">the smallest one<span class="sim-spec"><pre>general:
+  name: 07j_hole_tiny
+  rig: Rig07j
+  module: __main__
+  frames: 401
+  device: cuda:0
+  dtype: float64
+  git_commit: 3745f162
+  units:
+    length_um: 1171.0
+    time_s: 600.0
+    force_nN: null
+    note: 1 box = length_um across; 1 frame = time_s. force is NOT declared by these rigs, so no result
+      here may be quoted in nN.
+sets:
+  bm_node:
+    n: 163842
+    subdiv: 4
+  bm_face:
+    n: 105203
+    thickness_um: 0.1
+    carries:
+    - mass
+    - rest metric
+    - proMMP2
+    - MMP2
+    - TIMP2
+    - TIMP3
+  epithelium:
+    driver: replay
+    cache: log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_c4a5698982.npz
+    vertices_frame0: 396
+    nodes: 18227
+    triangles: 36450
+    box_scale: 0.008527021940730722
+  plaque:
+    n: 72246
+    law: one adhesion patch per live sheet node, clutch kinetics
+    stale_plq_attr: 104
+material:
+  sheet:
+    youngs: 400.0
+    poisson: 0.3
+    thickness_box: 0.002
+    rho0: 1.0
+    beta_stiffening: 0.0
+    mobility: 2.0928763253739784
+    tau_relax: 0.0
+    substep_target: 1.0
+    max_refine: 3
+    edge_trigger: 1.45
+    tau_bm: 40.0
+    rho_crit: 0.35
+    secretion_mode: homeostatic
+  adhesion:
+    k_drive: 50.0
+chemistry:
+  K_timp: 0.001
+  k_act: 0.5
+  k_inhib: 200.0
+  k_deg: 150.0
+  s_pro: 0.002
+  s_timp: 5.0e-05
+  s_timp3: 1.4999999999999999e-05
+  s_mmp: 0.0
+  s_mt1: 0.0
+  mt1_frac: 0.25
   hetero: 1.0
-  spot: null
-  spot_off: null
-  seed_mt1: null
-  rho_crit: 0.35</pre></span></span>
-      <span class="sim-cap">This one does not stop: 47% of the sheet gone, 97% of it one hole. At cutting rate 300 it is 87%</span>
+  tau_pro: 8.0
+  tau_mmp: 8.0
+  tau_timp: 8.0
+  tau_timp3: 40.0
+  D_mmp_box2_per_frame: 0.013126795362740758
+  D_timp_box2_per_frame: 0.013126795362740758
+  species:
+    MT1-MMP: per-cell state, tethered, no transport
+    proMMP2: field on bm_face, D_mmp
+    MMP2: field on bm_face, D_mmp
+    TIMP2: field on bm_face, D_timp
+    TIMP3: per-face state, no transport
+  mt1_field: single Gaussian cap, theta 20.0 deg
+operators:
+- bm_elastic (StVK on the rest metric)
+- &#x27;plaque (edge set: bm_node -&gt; epithelial face)&#x27;
+- epi_drive (replay toward the recorded surface)
+- bm_secrete (homeostatic)
+- bm_refine (1-&gt;4 split, edge_trigger 1.45)
+- protease_secrete
+- protease_diffuse (semi-implicit, face Laplacian)
+- protease_activate (ternary, bell)
+- protease_inhibit (1:1)
+- bm_degrade
+- bm_tear (rho/rho0 &lt; rho_crit)
+rendered_against:
+  matrix: 06_spheroid_ecm
+  note: &#x27;the 2x2&#x27;&#x27;s other three panels come from this run&#x27;&#x27;s traj.npz, re-drawn and never re-run: there
+    is no BM-ECM coupling, so nothing here reaches the matrix.&#x27;
+run:
+  kind: protease + cell-owned adhesion
+  N0: 12
+  split_budget: 150
+  splits: 100524
+  twin_of: 06_hole_tiny
+  mt1_field: single Gaussian cap, theta 20.0 deg</pre></span></span>
+      <span class="sim-cap">a localised source, and the hole stays small: 2.0% of the faces gone by frame 201, in 6 rim loops, the first at frame 34. It has not arrested — the torn fraction still creeps 1.6 points over the last third</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/bm_07k_breach_torn.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">and one that runs away<span class="sim-spec"><pre>general:
+  name: 07k_breach_torn
+  rig: Rig07k
+  module: __main__
+  frames: 401
+  device: cuda:0
+  dtype: float64
+  git_commit: f439d2d6
+  units:
+    length_um: 1171.0
+    time_s: 600.0
+    force_nN: null
+    note: 1 box = length_um across; 1 frame = time_s. force is NOT declared by these rigs, so no result
+      here may be quoted in nN.
+sets:
+  bm_node:
+    n: 163842
+    subdiv: 4
+  bm_face:
+    n: 15321
+    thickness_um: 0.1
+    carries:
+    - mass
+    - rest metric
+    - proMMP2
+    - MMP2
+    - TIMP2
+    - TIMP3
+  epithelium:
+    driver: replay
+    cache: log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_c4a5698982.npz
+    vertices_frame0: 396
+    nodes: 18227
+    triangles: 36450
+    box_scale: 0.008527021940730722
+  plaque:
+    n: 44065
+    law: one adhesion patch per live sheet node, clutch kinetics
+    stale_plq_attr: 104
+material:
+  sheet:
+    youngs: 400.0
+    poisson: 0.3
+    thickness_box: 0.002
+    rho0: 1.0
+    beta_stiffening: 0.0
+    mobility: 2.0929465195534434
+    tau_relax: 0.0
+    substep_target: 1.0
+    max_refine: 3
+    edge_trigger: 1.45
+    tau_bm: 40.0
+    rho_crit: 0.35
+    secretion_mode: homeostatic
+  adhesion:
+    k_drive: 50.0
+chemistry:
+  K_timp: 0.001
+  k_act: 0.5
+  k_inhib: 200.0
+  k_deg: 300.0
+  s_pro: 0.002
+  s_timp: 5.0e-05
+  s_timp3: 1.4999999999999999e-05
+  s_mmp: 0.0
+  s_mt1: 0.0
+  mt1_frac: 0.25
+  hetero: 1.0
+  tau_pro: 8.0
+  tau_mmp: 8.0
+  tau_timp: 8.0
+  tau_timp3: 40.0
+  D_mmp_box2_per_frame: 0.013126795362740758
+  D_timp_box2_per_frame: 0.013126795362740758
+  species:
+    MT1-MMP: per-cell state, tethered, no transport
+    proMMP2: field on bm_face, D_mmp
+    MMP2: field on bm_face, D_mmp
+    TIMP2: field on bm_face, D_timp
+    TIMP3: per-face state, no transport
+  mt1_field: smooth random field, 6 modes, rebuilt per cell
+operators:
+- bm_elastic (StVK on the rest metric)
+- &#x27;plaque (edge set: bm_node -&gt; epithelial face)&#x27;
+- epi_drive (replay toward the recorded surface)
+- bm_secrete (homeostatic)
+- bm_refine (1-&gt;4 split, edge_trigger 1.45)
+- protease_secrete
+- protease_diffuse (semi-implicit, face Laplacian)
+- protease_activate (ternary, bell)
+- protease_inhibit (1:1)
+- bm_degrade
+- bm_tear (rho/rho0 &lt; rho_crit)
+rendered_against:
+  matrix: 06_spheroid_ecm
+  note: &#x27;the 2x2&#x27;&#x27;s other three panels come from this run&#x27;&#x27;s traj.npz, re-drawn and never re-run: there
+    is no BM-ECM coupling, so nothing here reaches the matrix.&#x27;
+run:
+  kind: protease + gated cell-owned adhesion
+  N0: 12
+  split_budget: 150
+  splits: 14467
+  twin_of: 06_torn
+  mt1_field: smooth random field, 6 modes, rebuilt per cell
+  kdeg: 300.0
+  what: the rate that destroyed the membrane</pre></span></span>
+      <span class="sim-cap">the same chemistry with nothing holding it: 86.6% of the faces gone by frame 201, in 36 rim loops, the first at frame 14. It has not arrested — the torn fraction still creeps 1.5 points over the last third</span>
     </figcaption>
   </figure>
 </div>
