@@ -34,6 +34,17 @@ Two consequences for how you should write, and they both cut the same way:
   smooth / uniform / grows throughout` will score well over a batch and carry no information at all.
   If that is genuinely what the spec implies, write it -- but write it because the mechanism says
   so, not because it is safe.
+- **AND YOU ARE CURRENTLY WRONG IN THE OPPOSITE DIRECTION.** Measured over 137 scored runs: you
+  wrote `lobed sphere` 87 times where the Eye most often saw `sphere`, and `ruffled` or `dimpled`
+  105 times against the Eye's 88 `smooth`. Your two weakest slots are the two you embellish --
+  `surface` 0.25 and `chem` 0.28, against `count` 0.70 and `topology` 0.64. You are predicting the
+  interesting outcome and getting a smooth ball.
+
+  The fix is NOT to predict spheres more often; that is the cautious forecast this page already
+  refuses, and a form filled from the base rate teaches the campaign nothing. It is to earn the
+  structure: **name, in `free`, the mechanism that would produce the surface or the chemistry you
+  are about to write.** If you cannot name one -- if the answer is "this parent's children usually
+  look bumpy" -- then you do not have a reason, and the honest form says `smooth`.
 
 ## What you are given
 

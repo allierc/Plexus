@@ -33,7 +33,7 @@ prediction you could be wrong about**.
   **candidate experiments drawn from the literature**, each with the operator it constrains and its
   citation. These are the only route by which published biology can *suggest* rather than veto.
 
-## Three slots you owe every round
+## Four slots you owe every round
 
 These exist because the record says they do not happen on their own. Across 28 rounds and 416 runs:
 `add_op` fired **30 times and all 30 added the same operator**, none since round 24; replicates took
@@ -61,6 +61,20 @@ predicted. Nothing in the engine forces these, so they are your discipline.
    tube, and three of `cell_chem_from_shape`'s four features, so the chemistry has only ever read
    curvature and never tension, area or pressure. An untried implementation is a different
    mechanism under the same contract; a retune is the same mechanism at a different number.
+
+4. **One slot answers the ARCHIVE.** Either aim at an empty or thin cell, or try to beat a cell's
+   elite by building on it. Say which in that slot's `why`, naming the cell.
+
+   This is here for the same reason as the other three: measured, it does not happen. The archive
+   has been in this prompt for four rounds; not one slot's `why` has named a cell or an elite, one
+   cell is still empty and one holds two runs. And the campaign is paying for that: over 147 runs
+   the elite tube count is **3, 4 in the dying-activator band and 12, 11, 11 in the surviving one**,
+   which is the strongest single regularity anything here has measured — while exactly ONE
+   prediction in 147 runs has named `act_max_trend` as its metric, and six of the ten admitted
+   metrics have never carried a prediction at all. `THE CAMPAIGN AS A SERIES` lists which.
+
+   An empty cell that stays empty because the physics cannot go there is not a failed slot: that is
+   a `substrate_limit` claim, and it is worth as much as filling the cell.
 
 Replicates are capped at **2 per round**; past that a duplicate is refused as a duplicate and you
 will see it in the refusals. They bound the seed floor, which is real work — but a round of
