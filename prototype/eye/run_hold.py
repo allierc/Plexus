@@ -142,13 +142,13 @@ def main():
         # propagates into every later stage as holds twice as long as they need to be.
         hw = (t >= lead * dt) & (t <= (lead + hold) * dt)
         row["settling_s"] = round(settling_time(t[hw], g[hw]), 3)
-    # append to this stage's table, one file per stage so parallel jobs do not collide badly
-    jf = os.path.join(o, f"stage{a.stage}.json")
-    rows = json.load(open(jf)) if os.path.exists(jf) else []
-    rows = [r for r in rows if not (r["muscles"] == row["muscles"] and r["level"] == row["level"])]
-    rows.append(row)
-    with open(jf, "w") as fh:
-        json.dump(rows, fh, indent=2)
+    # ONE FILE PER HOLD, not one per stage. Read-modify-write on a shared table is a
+    # lost-update race the moment the stage is wider than the partition: 64 Sobol jobs ran
+    # concurrently and 63 rows survived. Each job now owns its own row file and `collect`
+    # assembles them, so the number of rows equals the number of jobs by construction.
+    rows_dir = os.path.join(o, "rows"); os.makedirs(rows_dir, exist_ok=True)
+    with open(os.path.join(rows_dir, f"s{a.stage}_{tag}.json"), "w") as fh:
+        json.dump(row, fh, indent=2)
     print(f"[hold {tag}] pose {row['pose_deg']} settled={row['settled']} "
           f"p-p {row['settle_ptp_deg']} [{row['seconds']}s]", flush=True)
     if a.stage == "0":
