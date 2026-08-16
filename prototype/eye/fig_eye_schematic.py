@@ -71,18 +71,24 @@ def panel_eye(ax, bg):
         return
     img = mpimg.imread(png)
     ax.imshow(img)
-    H, W = img.shape[:2]
     d = json.load(open(meta))
-    # the two obliques project to the same rostral point, so they are nudged apart
-    NUDGE = {"SO": (-0.06, -0.09), "IO": (-0.06, +0.03),
-             "MR": (-0.04, +0.07), "LR": (-0.07, 0.0), "SR": (-0.02, -0.03)}
-    for m, (x, y) in d["labels"].items():
-        dx, dy = NUDGE.get(m, (0.0, 0.0))
-        left = (x + dx) < 0.5
-        ax.text((x + dx) * W, (y + dy) * H, f"{m}  {d['action'][m]}",
-                color=MUS_COLOR.get(m, fg), fontsize=11, fontweight="bold",
-                ha="left" if not left else "right", va="center",
-                path_effects=None)
+    # A legend rather than labels on the straps. Six labels placed at their own
+    # projected positions collide in the rostral corner, where four of the six
+    # muscles converge, and no amount of nudging separates them without lying
+    # about where they are. The colours are the renderer's own, so the mapping
+    # from swatch to strap is exact.
+    from matplotlib.lines import Line2D
+    order = ["LR", "MR", "SR", "IR", "SO", "IO"]
+    handles = [Line2D([], [], color=MUS_COLOR[m], lw=7, solid_capstyle="round",
+                      label=f"{m}   {d['action'][m]}")
+               for m in order if m in d["action"]]
+    leg = ax.legend(handles=handles, loc="upper left",
+                    bbox_to_anchor=(-0.01, 1.005), frameon=False, fontsize=11,
+                    labelspacing=0.75, handlelength=1.5, handletextpad=0.7,
+                    borderpad=0.2)
+    # the legend sits on the render, which is black whatever the figure ground is
+    for t in leg.get_texts():
+        t.set_color("white")
     ax.text(0.5, -0.02, "eye G at rest, near-anterior view --- scanned geometry, "
             "not a schematic", transform=ax.transAxes, ha="center", va="top",
             color=fg, fontsize=9)
