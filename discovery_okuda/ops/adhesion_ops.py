@@ -96,7 +96,12 @@ class Clutch:
         freely, so k_off has nothing to act on. The load per bond is independent of how many bonds
         share it, which is what lets Bell's law read a force that means something.
         """
-        dvec = (x_bm - p) - self.l0 * nhat + self.D
+        # `l0` MAY BE PER PLAQUE. It is a scalar for every rig up to 07k and a vector for 07l, where
+        # myosin sets each cell's adhesion rest length. It is broadcast HERE rather than stored as a
+        # column, because every other consumer -- the culls, the gates -- compares it against a flat
+        # per-plaque length, and a stored (P,1) turns those comparisons into (P,P).
+        l0 = self.l0[:, None] if torch.is_tensor(self.l0) and self.l0.dim() == 1 else self.l0
+        dvec = (x_bm - p) - l0 * nhat + self.D
         f = -(self.Nb[:, None] * self.kappa_b) * dvec
         return f, self.kappa_b * dvec.norm(dim=1)
 
