@@ -183,6 +183,14 @@ def _theta_hash(graph, base=False):
         for k, v in (graph.params or {}).items():
             if not k.startswith("_run.") and isinstance(v, (int, float)) and k in eff:
                 eff[k] = float(v)
+        # THE WINDOWS ARE PART OF THE OPERATING POINT. They have no entry in `OPERATORS[...].params`
+        # -- they are not tunables of an operator, they are WHEN it acts -- so the loop above skips
+        # them, and two runs differing only in where a stage boundary falls would hash identically
+        # and the second be refused as a duplicate. A staged run is not the same experiment as the
+        # unstaged one it was built from.
+        for k, v in (graph.params or {}).items():
+            if k.endswith((".after_frame", ".before_frame")) and isinstance(v, (int, float)):
+                eff[k] = float(v)
         items = sorted((k, round(v, 9)) for k, v in eff.items())
     except Exception:
         return ""
@@ -300,15 +308,36 @@ def check_static(graph, seen_hashes=(), edit_kind=None):
     # exists because that is only ONE path: a graph can also be hand-written, restored from a
     # frontier file, or built by an edit sequence nobody enumerated. A guard that lives only in
     # the generator is a guard against one way of being wrong.
+    #
+    # UNLESS THEIR WINDOWS ARE DISJOINT, added with `set_window`. The rule's own reason is "two
+    # solvers driving one state" and "the two then run in sequence EVERY FRAME" -- both of which
+    # stop being true when one instance stops where the other starts. Two instances gated to
+    # [0, 900) and [900, inf) are never both active on any tick: that is not a duplicate, it is one
+    # operator in two stages, and it is the only way this vocabulary can express a parameter that
+    # CHANGES partway through a run.
+    #
+    # The rule fired on the first staged composition ever built here, which is the expected shape of
+    # this kind of defect: an identity check written when every run was one program refuses the
+    # first run that is two.
     from collections import Counter
+
+    def _win(nid):
+        return (float(graph.params.get(f"{nid}.after_frame", 0) or 0),
+                float(graph.params.get(f"{nid}.before_frame", float("inf")) or float("inf")))
+
+    def _overlapping(nodes):
+        w = sorted(_win(n["id"]) for n in nodes)
+        return any(w[i][1] > w[i + 1][0] for i in range(len(w) - 1))
+
     for op, n in Counter(o["op"] for o in graph.ops).items():
-        if n > 1:
+        if n > 1 and _overlapping([o for o in graph.ops if o["op"] == op]):
             out.append(Rejection(
                 "R1b_DUPLICATE_OPERATOR",
                 "the same operator twice is two solvers driving one state, not a richer model",
-                f"{op} appears {n} times. To change an implementation use `set_impl`, which "
-                f"REPLACES it; `add_op` adds a second instance and the two then run in sequence "
-                f"every frame."))
+                f"{op} appears {n} times with OVERLAPPING windows, so both act on the same ticks. "
+                f"To change an implementation use `set_impl`, which REPLACES it. To stage one -- a "
+                f"parameter that changes partway through the run -- give the instances disjoint "
+                f"windows with `set_window`, and they are admitted."))
 
     # R1c -- REACTION STABILITY. There was a CFL bound on diffusion and none on the reaction,
     # and round 1 of the rebuilt loop died of the second while satisfying the first: the activator

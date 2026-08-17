@@ -329,6 +329,15 @@ A_SW_MIN, A_SW_MAX, A_SW_DEFAULT = 0.0, 0.95, 0.35
 # a delayed run is mostly delay.
 GROW_AFTER_DEFAULT, GROW_AFTER_MIN, GROW_AFTER_MAX = 100, 0, 600
 
+# WHERE A STAGE BOUNDARY MAY FALL, as fractions of a standard run. Thirds and half: a boundary in
+# the first tenth is a delay (which `grow_after` already expresses) and one in the last tenth is a
+# perturbation of an established shape, which is a different experiment and wants its own edit.
+WINDOW_BASE = 1800
+WINDOW_CUTS = (1 / 3, 1 / 2, 2 / 3)
+# Windowing these does not stage an experiment, it breaks the run: nothing seeds, nothing measures
+# geometry, nothing records.
+_NO_WINDOW = {"mesh_seed", "cell_geometry", "cell_neighbours", "topo_record", "cell_chem_seed"}
+
 # MEASURED CEILINGS, from the 2026-08-01 certification sweep on L4 (cfl_certify + 14 cluster
 # runs at 300 frames). The divergence wall sits below the formula's 1.0 -- points at CFL 0.50 and
 # 0.65 went non-finite -- so the limit is set where the engine was actually observed to hold.
@@ -1182,6 +1191,22 @@ class CompositionGraph:
             if GROW_AFTER_MIN <= v <= GROW_AFTER_MAX and v != _ga:
                 edits.append((("set_param", "_run.grow_after", int(v)),
                               f"@delay chem->growth={v:d} frames"))
+        # WINDOWS, offered on the operators a stage boundary can meaningfully fall between. Not on
+        # the substrate or the recorders: gating `mesh_seed`, `cell_geometry`, `cell_neighbours` or
+        # `topo_record` off does not stage an experiment, it breaks the run.
+        for o in self.ops:
+            if o["op"] in _NO_WINDOW:
+                continue
+            cur_a = self.params.get(f"{o['id']}.after_frame")
+            cur_b = self.params.get(f"{o['id']}.before_frame")
+            for frac in WINDOW_CUTS:
+                cut = int(round(WINDOW_BASE * frac))
+                if cur_b != cut:
+                    edits.append((("set_window", o["id"], cur_a, cut),
+                                  f"|{o['op']} only BEFORE frame {cut}"))
+                if cur_a != cut:
+                    edits.append((("set_window", o["id"], cut, cur_b),
+                                  f"|{o['op']} only AFTER frame {cut}"))
         for src, dst, slot in self._candidate_links():
             edits.append((("connect", src, dst, slot),
                           f"~{self._op_of(src)}->{self._op_of(dst)}.{slot}"))
@@ -1265,6 +1290,30 @@ class CompositionGraph:
             # so, not because an agent was asked to be careful.
             g.params = dict(g.params)
             g.params[edit[1]] = edit[2]
+        elif kind == "set_window":
+            # WHEN AN OPERATOR IS ALLOWED TO ACT, as (after, before) in frames. The engine has
+            # always gated every operator on `after_frame <= tick < before_frame`
+            # (`src/plexus/engine.py`), and the loop used it for two things only: seeding, and the
+            # single global growth delay. Everything else ran for the whole run because nothing
+            # could say otherwise.
+            #
+            # WHAT IT BUYS is not another parameter but another KIND of experiment. A composition
+            # is a point -- what acts. A composition with windows is a PROGRAM -- what acts when --
+            # and morphogenesis is staged: pattern, then elongate, then branch. Okuda's phase
+            # diagram is points in (chi, gamma); a staged run is a path through it, and no edit in
+            # this vocabulary could express a path.
+            #
+            # A PIECEWISE PARAMETER SCHEDULE IS TWO INSTANCES WITH COMPLEMENTARY WINDOWS: add a
+            # second `cell_chem_diffuse`, set its `d_a`, and window the two so one stops where the
+            # other starts. That needs no new machinery -- `_new_id` already numbers instances and
+            # specs on disk already carry two of an operator -- so `set_window` is the whole of it.
+            nid, after, before = edit[1], edit[2], edit[3]
+            g.params = dict(g.params)
+            for key, v in ((f"{nid}.after_frame", after), (f"{nid}.before_frame", before)):
+                if v is None:
+                    g.params.pop(key, None)
+                else:
+                    g.params[key] = int(v)
         elif kind == "set_impl":
             for o in g.ops:
                 if o["id"] == edit[1]:
