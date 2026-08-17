@@ -56,3 +56,18 @@ plotting: {background: black, colors: {red: [1.0, 0.30, 0.25], blue: [0.30, 0.55
            # face-on and ends nearly edge-on -- the tails read as 3D structure.
            camera_azim: 0.7, camera_elev: 0.25, camera_elev_end: 1.1, camera_turns: 0.15,
            camera_zoom: 0.15, camera_pan: [0.03, 0.02]}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_star:
+    description: Two distinct clusters of particles, one red and one blue, begin as separate, compact
+      spheres. As time progresses, the clusters begin to rotate and stretch into spiral shapes while moving
+      toward each other. The two spirals eventually collide and intertwine, creating a complex, turbulent
+      mixture of red and blue points. In the final frames, the particles have merged into a single, chaotic
+      cloud where the two colors are heavily overlapped and diffused.
+    objects: The scene contains two primary sets of particles, one colored red and the other colored blue.
+      Initially, the red particles form a large, solid circular mass in the lower-left, while the blue
+      particles form a smaller, slightly elongated oval in the upper-right. As the simulation evolves,
+      both sets transform into elongated, spiral-shaped structures that maintain their respective colors.
+      By the end of the sequence, the particles are distributed in a dense, overlapping cluster where
+      the red and blue points are intermingled.

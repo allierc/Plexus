@@ -918,20 +918,30 @@ def _splat3d_movie(img, bg, azim0, turns, rock, zoom_amp, T, out_base,
     from matplotlib.animation import FuncAnimation
     stride = max(1, T // max_frames)
     frames = list(range(0, T, stride))
-    fig, ax = plt.subplots(figsize=(5, 5)); ax.axis("off"); fig.patch.set_facecolor(bg)
-    fig.tight_layout(pad=0)
 
     def render(i):
         return img(i, _cam_azim(azim0, turns, rock, i, T), _cam_zoom(zoom_amp, i, T),
                    _cam_elev(elev0, elev_end, i, T), _cam_pan(pan_end, i, T))
 
-    im = ax.imshow(render(0))
+    # ONE OUTPUT PIXEL PER SPLAT PIXEL: the figure is sized from the frame the renderer actually
+    # produced (`splat_res`), not a fixed 5 in x 150 dpi. That fixed pair wrote every 3D clip at
+    # 750 px, so a spec asking for `splat_res: 820` had its frames resampled DOWN -- paying for
+    # the finer render and then throwing the detail away. h264 + yuv420p needs even dimensions.
+    frame0 = render(0)
+    res = int(frame0.shape[0]); res -= res % 2
+    # dpi 1, size in "inches" = pixels: figsize x dpi has to land on an EXACT even pixel count or
+    # libx264 refuses the stream, and the obvious (8.2 in x 100 dpi) rounds to 819.
+    dpi = 1
+    fig = plt.figure(figsize=(res, res), dpi=dpi)
+    ax = fig.add_axes([0.0, 0.0, 1.0, 1.0]); ax.axis("off"); fig.patch.set_facecolor(bg)
+
+    im = ax.imshow(frame0)
 
     def upd(i):
         im.set_data(render(i)); return im,
 
     anim = FuncAnimation(fig, upd, frames=frames, interval=50)
-    out = _save_anim(anim, out_base, bg, fps=fps); plt.close(fig)
+    out = _save_anim(anim, out_base, bg, fps=fps, dpi=dpi); plt.close(fig)
     print(f"[plot] 3D splat movie -> {os.path.basename(out)}", flush=True)
 
 
