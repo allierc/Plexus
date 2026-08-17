@@ -1819,6 +1819,30 @@ def _build_one(slot, rid, index, seen):
     except Exception as e:
         _refuse(index, slot, f"parent {par!r} cannot be rebuilt: {e}")
         return None
+    # R9 -- IS THIS EDIT ALREADY MEASURED TO DO NOTHING HERE? Checked on the PARENT's graph, which
+    # is the right one: `comp_hash` is parameter-blind, so a `set_param` child carries its parent's
+    # hash, and a slot refused here costs no rebuild and no compile.
+    try:
+        from run_record import comp_hash as _ch
+        _rows = []
+        _ip = os.path.join(CAMPAIGN, "inert.jsonl")
+        if os.path.exists(_ip):
+            for _line in open(_ip):
+                try:
+                    _rows.append(json.loads(_line))
+                except Exception:
+                    pass
+        if _rows and edit and g is not None:
+            _edits = [tuple(edit)] if isinstance(edit[0], str) else [tuple(x) for x in edit]
+            for _e in _edits:
+                _r9 = C.check_inert(_e, _ch(g), _rows)
+                if _r9 is not None:
+                    _refuse(index, slot, f"{_r9.code}: {_r9.detail}")
+                    return None
+    except Exception as _e:
+        # A GUARD THAT CANNOT REFUSE A SLOT BY FAILING, for the reason R7's does not: an unreadable
+        # inert list means the question is unasked, not answered.
+        print(T_.quiet(f"[round] R9 not evaluated for slot {index}: {type(_e).__name__}: {_e}"))
     # `graph_from_run` RETURNS None RATHER THAN RAISING when a run has no recoverable spec, so the
     # except above never saw it and this slot went on to call `.roles()` on None. Losing the slot
     # is correct; losing the round to an AttributeError is not.
@@ -3011,6 +3035,19 @@ def inert(ctx):
     # fields (`op`, `id`, `at`, `field`, `model`, `vertex_set`) travel WITH the operator rather than
     # being set independently; and `schedule[i]` shifts for every entry after an inserted operator,
     # so adding one probe reported six "inert knobs" that were the schedule renumbering itself.
+    # THE COMPOSITION EACH CLUSTER SAT ON, so the fact is "this knob does nothing HERE" and not a
+    # campaign-wide ban earned by one lineage: `vth_frac` does nothing where growth never reaches
+    # its threshold and everything where it does. `comp_hash` is parameter-blind, which is exactly
+    # the granularity a claim about a knob has.
+    _rec = {}
+    if os.path.exists(RECORDS):
+        for line in open(RECORDS):
+            try:
+                r = json.loads(line)
+            except Exception:
+                continue
+            if r.get("name"):
+                _rec[r["name"]] = r
     _PROV = {"comp_hash", "src_op", "run_key", "parent", "seed"}
     _IDENT = {"op", "id", "at", "field", "model", "vertex_set", "name"}
     rows, seen = [], set()
@@ -3033,11 +3070,12 @@ def inert(ctx):
         # about a single `add_op`, and buried the four real inert knobs under them.
         whole = {o for o in {_op_of(k) for k in diff} if o
                  and all(_op_of(k) != o or any(s.get(k) is None for s in specs) for k in diff)}
+        hashes = sorted({h for r in c for h in [(_rec.get(r) or {}).get("comp_hash")] if h})
         for o in sorted(whole):
             key = f"add_op {o}"
             if key not in seen:
                 seen.add(key)
-                rows.append({"edit": key, "identical_runs": c,
+                rows.append({"edit": key, "identical_runs": c, "comp_hash": hashes,
                              "note": "the operator is in one spec and not the other, and the "
                                      "trajectory is the same either way"})
         knobs = sorted({(_op_of(k), k.split(".")[-1]) for k in diff
@@ -3050,7 +3088,8 @@ def inert(ctx):
             seen.add(key)
             vals = sorted({str(s.get(k)) for k in diff for s in specs
                            if _op_of(k) == op and k.split(".")[-1] == kn})
-            rows.append({"knob": key, "identical_runs": c, "values_tried": vals[:6]})
+            rows.append({"knob": key, "identical_runs": c, "comp_hash": hashes,
+                         "values_tried": vals[:6]})
     # DERIVED, SO REWRITTEN. Unlike records.jsonl this is not a log of what happened; it is the
     # current answer to "what does not matter", recomputed from the trajectories every round.
     try:

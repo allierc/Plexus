@@ -980,6 +980,70 @@ def check_act(slot, claim_ids=None, acts=None):
     return None
 
 
+# =============================================================================================
+# R9 -- HAS THIS KNOB ALREADY BEEN MEASURED TO DO NOTHING HERE?
+#
+# THE RULE THE EVIDENCE EARNED, and it was not written until it had. `round.inert` computes, from
+# byte-identical trajectories, which knob a pair of runs differ in -- so "this parameter changes
+# nothing on this composition" is a MEASUREMENT, not an opinion. That list has been in the
+# Proposer's prompt since r012, stated plainly, with the runs that prove it. Ten rounds later, 8 of
+# the 17 identical-trajectory clusters contain a run from r012 or after, on the same knobs.
+#
+# The order matters and it is the campaign's own principle: compute the fact, show it, and only
+# write a rule when the fact has been shown and ignored. A gate written first would have been a
+# guess about what the substrate reads; this one is arithmetic over trajectories.
+#
+# KEYED ON THE COMPOSITION, not on the knob alone. `vth_frac` does nothing where growth never
+# reaches its threshold and everything where it does, so a campaign-wide ban earned by one lineage
+# would remove a real experiment. `comp_hash` is parameter-blind, which is exactly the granularity
+# of "this knob does nothing HERE".
+#
+# AND ONLY INSIDE THE MEASURED SPAN. A knob inert between 4 and 10 may still do something at 100 --
+# nothing here has measured that, and refusing it would be the gate claiming knowledge it does not
+# have. Outside the span the slot runs, and the refusal message says why it was let through.
+def check_inert(edit, comp_hash, rows=None):
+    """Rejection or None. `rows` is `campaign/inert.jsonl`, re-derived every round."""
+    if not edit or not rows:
+        return None
+    e = list(edit) if isinstance(edit, (list, tuple)) else [edit]
+    if not e or not isinstance(e[0], str):
+        return None                                   # a multi-edit slot: judged per its parts above
+    verb = e[0]
+    if verb == "add_op":
+        key = f"add_op {e[1]}"
+    elif verb in ("set_param", "set_impl") and len(e) >= 3:
+        node = str(e[1]).rpartition(".")[0] if verb == "set_param" else str(e[1])
+        knob = str(e[1]).rpartition(".")[2] if verb == "set_param" else "impl"
+        key = f"{node.rstrip('0123456789')}.{knob}"
+    else:
+        return None
+    for r in rows:
+        if (r.get("knob") or r.get("edit")) != key:
+            continue
+        hs = r.get("comp_hash") or []
+        if hs and comp_hash and comp_hash not in hs:
+            continue                                  # measured inert on a DIFFERENT composition
+        vals = r.get("values_tried") or []
+        if verb == "set_param" and vals:
+            try:
+                nums = sorted(float(v) for v in vals)
+                v = float(e[2])
+                if not (nums[0] <= v <= nums[-1]):
+                    return None                       # outside the span nothing has measured
+            except (TypeError, ValueError):
+                pass
+        runs = r.get("identical_runs") or []
+        return Rejection(
+            "R9_INERT_KNOB",
+            "this knob has been MEASURED to change nothing on this composition -- the run already "
+            "exists under another name",
+            f"`{key}` was tried at {', '.join(map(str, vals)) or 'these settings'} and the "
+            f"trajectories came out byte-identical: {', '.join(runs[:4])}. Spend the slot on "
+            f"something the substrate reads, or move this knob OUTSIDE that range and say why it "
+            f"should matter there.")
+    return None
+
+
 _ACTS_CACHE = {}
 
 
