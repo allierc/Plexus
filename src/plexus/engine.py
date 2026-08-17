@@ -116,6 +116,112 @@ def _spawn3d(mode: str, n: int, box, radius: float, rng, device: str, thickness:
     return pos, head
 
 
+def _spawn_pair3d(n: int, box, radius: float, rng, device: str, thickness: float = 0.0,
+                  separation: float = 0.0, offset: float = 0.0, tilt: float = 0.0):
+    """TWO flat discs, placed for an ENCOUNTER -- the `two_disks` 3D spawn mode.
+
+    Group 0 is centred at `(cx - separation/2, cy - offset/2, cz)` and group 1 at
+    `(cx + separation/2, cy + offset/2, cz)`, so `separation` is the initial distance BETWEEN
+    THE TWO DISC CENTRES along x and `offset` is the impact parameter along y (0 = head-on).
+    Group 1's plane is tilted by `tilt` RADIANS ABOUT THE X-AXIS, so the two discs are not
+    coplanar (an inclined encounter, after Toomre & Toomre 1972). Each disc is a uniform-area
+    xy disc of `radius` with out-of-plane Gaussian `thickness`, exactly as `spawn: disk`.
+
+    The pair is ONE set (not two), because that is what makes the two galaxies feel each other:
+    `squared_law all_pairs` sums over the whole set, so mutual gravity is the same operator that
+    holds each disc together. Returns (pos [n,3], head [n,3], group id [n] in {0,1},
+    rot [2,3,3]) -- `rot` is each group's plane rotation, which the velocity IC needs to put the
+    orbits in the disc's own plane rather than in xy.
+    """
+    box = torch.as_tensor(box, dtype=torch.float32, device=device)
+    c = box * 0.5
+    ct, st = math.cos(tilt), math.sin(tilt)
+    rot = torch.tensor([[[1., 0., 0.], [0., 1., 0.], [0., 0., 1.]],
+                        [[1., 0., 0.], [0., ct, -st], [0., st, ct]]], device=device)
+    counts = (n // 2, n - n // 2)
+    centres = torch.stack([
+        c + torch.tensor([-0.5 * separation, -0.5 * offset, 0.0], device=device),
+        c + torch.tensor([+0.5 * separation, +0.5 * offset, 0.0], device=device)])
+    pos, gid = [], []
+    for g, k in enumerate(counts):
+        r = torch.sqrt(torch.rand(k, generator=rng, device=device)) * radius   # uniform-area disc
+        th = torch.rand(k, generator=rng, device=device) * 2 * math.pi
+        z = thickness * torch.randn(k, generator=rng, device=device) if thickness > 0 else torch.zeros(k, device=device)
+        local = torch.stack([r * torch.cos(th), r * torch.sin(th), z], 1)
+        pos.append(local @ rot[g].T + centres[g])                             # tilt, then translate
+        gid.append(torch.full((k,), g, dtype=torch.long, device=device))
+    pos = torch.cat(pos); gid = torch.cat(gid)
+    head = torch.randn(n, 3, generator=rng, device=device)
+    head = head / head.norm(dim=1, keepdim=True).clamp(min=1e-9)
+    # NOT clamped into the box: `boundary: free` is unbounded and the pair must be free to
+    # merge and throw tails outside it. (`_spawn3d` clamps because a bounded run needs it.)
+    return pos, head, gid, rot
+
+
+def _orbit_groups(vinit, lvl, n, D, rng, device):
+    """`circular_orbit` for a set placed as GROUPS (`two_disks`): each group orbits ITS OWN
+    centre, in ITS OWN plane, and is then launched at the other one.
+
+    Per group: the enclosed mass M(<r) is summed over THAT GROUP only (the companion's mass is
+    not inside the disc), radius and tangent are measured in the group's plane (`spawn_group_rot`),
+    and `central_mass` parks that group's first particle at its centre as a core. `approach` is
+    the bulk speed added along the SEPARATION AXIS (x, the axis `two_disks` separates on), which
+    is what makes the encounter a grazing passage rather than a plunge: the launch is parallel to
+    x while the discs are offset in y, so the pair carries angular momentum L = spawn_offset x
+    v_rel and its pericentre is set by that offset. Aiming the launch AT the companion instead
+    gives L = 0 -- the two discs fall straight through each other, merge on contact, and throw
+    debris in every direction instead of tails. `approach` near sqrt(2 G M_tot / d) is a parabolic
+    (just-bound) passage, below it the pair is bound and returns to merge. `spins: [s0, s1]`
+    overrides the shared `spin` per group, so one disc can turn retrograde.
+    """
+    G_const = float(vinit.get("G", 1.0)); spin = float(vinit.get("spin", 1.0))
+    soft = float(vinit.get("softening", 0.05)); jitter = float(vinit.get("jitter", 0.0))
+    cmass = float(vinit.get("central_mass", 0.0)); approach = float(vinit.get("approach", 0.0))
+    spins = list(vinit.get("spins", []) or [])
+    gid = lvl.spawn_group[:n]; rot = lvl.spawn_group_rot
+    ngroups = int(gid.max().item()) + 1
+    mbuf = getattr(lvl, "mass", None)
+    m = mbuf[:n].clone() if mbuf is not None else torch.ones(n, device=device)
+    st = lvl.state.clone(); px0, px1 = lvl.state_schema["pos"]
+    idxs = [torch.nonzero(gid == g, as_tuple=False).flatten() for g in range(ngroups)]
+    if cmass > 0.0:                                  # a core per group, parked at the group's centre
+        for g, idx in enumerate(idxs):
+            i0 = int(idx[0])
+            m[i0] = cmass
+            if mbuf is not None:
+                lvl.mass[i0] = cmass
+            st[i0, px0:px1] = st[idx, px0:px1].mean(0)
+        lvl.state = st
+    pos = lvl.get("pos")[:n]
+    centres = torch.stack([pos[idx].mean(0) for idx in idxs])
+    vel = torch.zeros(n, D, device=device)
+    for g, idx in enumerate(idxs):
+        R = pos[idx] - centres[g]
+        nrm = rot[g][:, 2]                            # the disc's normal (its own spin axis)
+        Rp = R - (R @ nrm)[:, None] * nrm[None, :]    # in-plane part: the orbital radius
+        rr = Rp.norm(dim=-1).clamp(min=1e-9)
+        order = torch.argsort(rr)
+        m_cum = torch.zeros(idx.numel(), device=device)
+        m_cum[order] = torch.cumsum(m[idx][order], 0)          # M(<r) inside THIS disc
+        v_circ = (spins[g] if g < len(spins) else spin) * \
+            torch.sqrt((G_const * m_cum.clamp(min=0)) / rr.clamp(min=soft))
+        tang = torch.linalg.cross(nrm.expand_as(Rp), Rp)       # CCW about the disc normal
+        tang = tang / tang.norm(dim=-1, keepdim=True).clamp(min=1e-9)
+        v = v_circ[:, None] * tang
+        bulk = torch.zeros(D, device=device)
+        if approach > 0.0:
+            # PARALLEL TO THE SEPARATION AXIS (x), not aimed at the companion: the y offset is
+            # then a true impact parameter and the passage grazes.
+            bulk[0] = approach * torch.sign((centres.mean(0) - centres[g])[0])
+            v = v + bulk[None, :]
+        if jitter > 0.0:
+            v = v + jitter * torch.randn(idx.numel(), D, generator=rng, device=device)
+        vel[idx] = v
+        if cmass > 0.0:                               # the core rides with the disc, without spin
+            vel[int(idx[0])] = bulk
+    return vel
+
+
 def _init_velocity(vinit, lvl, world_size, rng, device):
     """Initial velocity for a top-level set from its `vel_init` spec (a DICT mode).
 
@@ -142,6 +248,11 @@ def _init_velocity(vinit, lvl, world_size, rng, device):
         v = float(vinit.get("speed", 0.0))
         return (torch.rand(n, D, generator=rng, device=device) - 0.5) * (2 * v)
     if mode == "circular_orbit":
+        # a set placed as two discs (`spawn: two_disks`) orbits PER GROUP: each disc about its
+        # own centre, in its own plane, plus the encounter velocity. The grouping is read from
+        # the placement that made it -- no separation/tilt number is repeated here.
+        if getattr(lvl, "spawn_group", None) is not None:
+            return _orbit_groups(vinit, lvl, n, D, rng, device)
         G = float(vinit.get("G", 1.0)); spin = float(vinit.get("spin", 1.0))
         soft = float(vinit.get("softening", 0.05)); jitter = float(vinit.get("jitter", 0.0))
         mbuf = getattr(lvl, "mass", None)
@@ -396,10 +507,21 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         state = torch.zeros(buffer, dim, device=device)
         has_pos = "pos" in schema                      # spatial sets place positions; a non-spatial set (voltage,...) does not
         head = None
+        gid = None                                     # group id per particle (only the pair spawns)
+        grot = None
         if has_pos:
             px0, px1 = schema["pos"]
             if "spawn" in s:
-                if D == 3:                             # 3D agent: vector heading; ball / thin `disk` spawn
+                if D == 3 and s["spawn"] in ("two_disks", "disk_pair"):
+                    # a PAIR of discs in one set: two galaxies that feel each other through the
+                    # same all-pairs law that holds each of them together.
+                    pos, head, gid, grot = _spawn_pair3d(
+                        n, H.world_size, float(s.get("spawn_radius", 0.3)), H.rng, device,
+                        thickness=float(s.get("spawn_thickness", 0.0)),
+                        separation=float(s.get("spawn_separation", 0.0)),
+                        offset=float(s.get("spawn_offset", 0.0)),
+                        tilt=float(s.get("spawn_tilt", 0.0)))
+                elif D == 3:                           # 3D agent: vector heading; ball / thin `disk` spawn
                     pos, head = _spawn3d(s["spawn"], n, H.world_size,
                                          float(s.get("spawn_radius", 0.3)), H.rng, device,
                                          thickness=float(s.get("spawn_thickness", 0.0)))
@@ -427,6 +549,13 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
             hbuf = torch.zeros(buffer, head.shape[1], device=device)
             hbuf[:n] = head
             lvl.register_buffer("heading", hbuf)
+        if gid is not None:
+            # the placement records WHICH DISC each particle came from, and the plane it was
+            # placed in; `vel_init` reads both, so the orbit is set in the disc's own plane.
+            gbuf = torch.zeros(buffer, dtype=torch.long, device=device)
+            gbuf[:n] = gid
+            lvl.register_buffer("spawn_group", gbuf)
+            lvl.spawn_group_rot = grot
         _assign_types(lvl, s, H, device)
         lvl.types_raw = s.get("types")          # raw per-type config (layers/material/block) for child provisioning
         if isinstance(vinit, dict) and "vel" in schema:
@@ -791,11 +920,39 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     H._rec_index = rec_index          # tick -> row, so a salvage can truncate
     _print_run_summary(sim, H)
 
+    # THE i-th TOKEN RUNS THE i-th INSTANCE. Matching by NAME alone ran every instance of an
+    # operator at every schedule position bearing that name, so a spec carrying an operator TWICE
+    # applied the active one TWICE PER TICK -- two tokens, each scanning both instances. With one
+    # instance (almost every spec) the two rules are identical; with two they differ by a factor of
+    # two on the physics.
+    #
+    # FOUND ON A STAGED RUN, 17 August. A composition split into two stages -- the same operator at
+    # two parameter settings with disjoint frame windows, which is the only way this vocabulary can
+    # express a parameter that CHANGES partway through -- integrated its reaction-diffusion and its
+    # mechanics at double rate from frame 0: the surface was self-intersecting by frame 25 and the
+    # enclosed volume reached 3e6 by frame 300. The windows were correct and the gate was correct;
+    # each token was simply running both instances and only the in-window one did anything.
+    #
+    # IT ALSO AFFECTS THE TWO-SPECIES SPECS ALREADY ON DISK, which carry two `cell_chem_diffuse`,
+    # two `cell_chem_react` and two `cell_chem_seed` with no windows at all: both instances were
+    # meant to run once each per tick and each has been running twice.
+    _by_token = {}
+    for _i, (_nm, *_rest) in enumerate(inst):
+        _by_token.setdefault(_nm, []).append(_i)
+    _seen_this_tick = {}
+
     def _run_token(token, tick):
-        """Run every operator instance named `token` (one schedule token) once,
-        enforcing the first-tick integration-invariant guard on non-opted-out operators."""
-        for nm, ob, sel, (after_frame, before_frame, every) in inst:
-            if nm != token:
+        """Run the operator instance this schedule position names, enforcing the first-tick
+        integration-invariant guard on non-opted-out operators."""
+        _n = _seen_this_tick.get(token, 0)
+        _seen_this_tick[token] = _n + 1
+        _idx = _by_token.get(token) or []
+        # A token with no instance of its own falls back to every instance of that name, which is
+        # the old behaviour and the right answer when a schedule names an operator more often than
+        # the spec instantiates it.
+        _want = {_idx[_n]} if _n < len(_idx) else set(_idx)
+        for _j, (nm, ob, sel, (after_frame, before_frame, every)) in enumerate(inst):
+            if nm != token or _j not in _want:
                 continue
             if not (after_frame <= tick < before_frame):
                 continue                                 # engine-level frame gate (skip = no delta, no RNG drawn)
@@ -830,6 +987,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
         for tick in ticks:                           # one tick = one pass of the schedule + integrate
             H.frame = tick                           # current tick (read by prescribed fields, e.g. playback)
             H.zero_delta()
+            _seen_this_tick.clear()                  # token occurrence -> instance, per tick
             for step in sim.schedule:                # operators accumulate per-set deltas
                 # a micro-loop `{substep_dt: <dt_sub>, steps: [...]}`: run the inner operators
                 # once per substep at `dt_sub` (e.g. the MPM strain->P2G->grid->G2P cycle). The
