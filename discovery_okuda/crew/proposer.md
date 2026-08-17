@@ -79,8 +79,16 @@ other slot:
  "on": "<claim id>",
  "predict": "n_spots_final < 20",
  "why": "why this is worth a GPU rather than the next idea",
- "chases": "<run id whose unpredicted result this follows up, or null>"}
+ "chases": "<run id whose unpredicted result this follows up, or null>",
+ "frames": 3000}
 ```
+
+`frames` is optional and is the GROWING time you want, in frames. Omit it and the slot runs the
+campaign's own length. It is clamped to the campaign length below and to a ceiling above, and the
+round cap scales with it so a longer run is not killed for being long. A chemistry-to-growth delay
+is paid back ON TOP of this, so the two are independent requests. Ask for it when the question is
+about a LATE state -- what a shape settles into, whether growth arrests -- and not as a way to make
+a weak result larger.
 
 ### `act` and `on` — what the experiment is FOR, and what it acts on
 

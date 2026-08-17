@@ -760,9 +760,32 @@ def run_batch(names, frames=None, do_q=False, campaign="campaign", parallel=None
     print(f"[cluster] {len(names)} {'re-renders' if rerender else 'runs'}, all submitted together")
     ids = submit(names, frames=frames, do_q=do_q, campaign=campaign,
                  rerender=rerender)
+    # THE CAP HAS TO SCALE WITH THE LONGEST RUN IN THE BATCH, or asking for a longer run is a way to
+    # lose it. `hard_cap_min` exists to stop a degenerate composition eating the round -- it is a
+    # bound on WASTE, not on length -- and at a flat 90 minutes a deliberately longer run is killed
+    # for doing exactly what it was asked to do, salvaging partial frames and recording
+    # `stopped_early`. So the cap is read from what the specs actually ask for: the campaign's own
+    # 1800 keeps the 90 it was tuned for, and a 3000-frame run gets proportionally more.
+    _cap = None
+    try:
+        import yaml as _y
+        _cfg = os.path.abspath(os.path.join(HERE, "..", "config", "okuda"))
+        _fr = []
+        for _n in names:
+            _p = os.path.join(_cfg, f"{_n}.yaml")
+            if os.path.exists(_p):
+                _g = (_y.safe_load(open(_p)) or {}).get("general") or {}
+                if _g.get("n_frames"):
+                    _fr.append(int(_g["n_frames"]))
+        if _fr and max(_fr) > 1800:
+            _cap = float(os.environ.get("PG_ROUND_CAP", "90")) * max(_fr) / 1800.0
+            print(f"[cluster] longest run in this batch is {max(_fr)} frames, so the round cap is "
+                  f"{_cap:.0f} min rather than the usual 90")
+    except Exception as _e:
+        print(f"[cluster] could not size the cap from the specs ({type(_e).__name__}) -- default")
     # `wait_for_ids` returns a DICT: `not {...}` is always False, so testing the bare return would
     # silently never stop. Check the field.
-    st = wait_for_ids(ids, poll=poll)
+    st = wait_for_ids(ids, poll=poll) if _cap is None else wait_for_ids(ids, poll=poll, hard_cap_min=_cap)
     if not st["ok"]:
         print(f"[cluster] batch did not complete cleanly "
               f"(exit={st['exit']} killed={st['killed']} timed_out={st['timed_out']})")
