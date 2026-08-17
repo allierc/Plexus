@@ -202,3 +202,38 @@ the price of the comparison being clean.
 
 Do not spend the whole batch on it. Two or three slots a round for two or three rounds is enough to
 know whether it matters.
+
+## 10. LONGER RUNS — and a correction to section 9
+
+Cedric, 17 August 2026.
+
+**I want to see what ~3000 frames yields**, especially now that growth can be delayed against the
+chemistry. Every run in this campaign has been the same length, so every conclusion here is about
+what a shape looks like at frame 1800 — not about what it settles into. A shape still growing at the
+end and a shape that arrested are different results, and at a fixed length they can be
+indistinguishable.
+
+**A slot may now ask.** Put `"frames": 3000` on it. It is the GROWING time; a chemistry-to-growth
+delay is paid back on top, so `frames 3000` with `grow_after 400` runs 3300. The cluster's round cap
+scales with the request, so a long run is no longer killed for being long.
+
+**The correction, and it matters for how you read the delay results.** Section 9's runs were WRITTEN
+with the extra frames and SUBMITTED with the campaign's 1800 — the submit flag overrode the spec, so
+`r012_01` was configured for 2100 and its trajectory ends at 1800. Every delayed run in r012–r020
+lost exactly the growing time the pairing existed to give back. So the negative result — delay 400
+gives 11 arms where the parent gave 13 — is confounded with truncation, which is the artefact the
+pairing was written to avoid. **It is fixed, and the delay question is open again.** Re-run at least
+one delay comparison now that a delayed run keeps its growth time, before concluding anything about
+waiting.
+
+**What I would like to see:**
+
+- a **long run on a good parent** — 3000 frames, no other change — against the same parent at 1800.
+  Does the shape keep going, arrest, or fall apart? That comparison alone is worth a slot.
+- the **delay re-tested at proper length**: `frames 3000` with `grow_after` 400–600, against the same
+  parent at `frames 3000` and the default delay. Same growing time on both sides, so the difference
+  is the delay.
+- one run long enough to answer **whether arms keep elongating or the tissue runs out of cells**.
+
+Two or three slots a round. A long run costs proportionally more GPU and the round takes
+proportionally longer, so do not make a whole batch of them.

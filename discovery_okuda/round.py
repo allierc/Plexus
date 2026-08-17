@@ -80,6 +80,10 @@ EMPTY_ROUNDS_STOP = 2
 EMPTY_EXIT = 5        # campaign_loop.EMPTY_EXIT -- the driver's own empty-round branch
 _EMPTY = []           # per-round "measured nothing", for the trailing streak
 FRAMES = 900
+# THE LONGEST A SLOT MAY ASK FOR. A run is billed in wall clock and the cluster's hard cap kills
+# whatever is still going, so an unbounded `frames` request loses a slot rather than lengthening it.
+# 3000 is a bit under twice the campaign's 1800, and the cap scales with it.
+FRAMES_MAX = 3000
 CONTROL_SLOT = 0
 MENU_LIMIT = 40
 # THE SWEEP GRID, as factors of the PARENT's own value rather than points in a declared box. The
@@ -2009,13 +2013,23 @@ def _build_one(slot, rid, index, seen):
     #
     # THE GPU COST IS THE HONEST PART OF THIS: +300 frames on an 1800-frame run is about +17% wall
     # clock, and it is the price of the comparison being about the delay.
+    # AND A SLOT MAY ASK FOR A LONGER RUN. `frames` is the GROWING time it wants; the delay is added
+    # on top by the line below, so the two are independent requests and neither eats the other.
+    # Clamped rather than refused: below the campaign default it would be a shorter run masquerading
+    # as a comparable one, and above FRAMES_MAX it is a GPU bill nobody agreed to.
     try:
+        _req = int(slot.get("frames") or 0)
+        _base = min(max(_req, _FRAMES), FRAMES_MAX) if _req else _FRAMES
         _ga = int(g.params.get("_run.grow_after", CS.GROW_AFTER_DEFAULT))
-        _frames = _FRAMES + max(0, _ga - CS.GROW_AFTER_DEFAULT)
+        _frames = _base + max(0, _ga - CS.GROW_AFTER_DEFAULT)
+        if _req and _base != _req:
+            print(T_.warn(f"[round] {name}: asked for {_req} frames, clamped to {_base} "
+                          f"(the campaign runs {_FRAMES}, the ceiling is {FRAMES_MAX})"))
         if _frames != _FRAMES:
-            print(T_.quiet(f"[round] {name}: chem->growth delay {_ga} frames, so the run is "
-                           f"{_frames} frames rather than {_FRAMES} -- same growing time as a "
-                           f"run delayed by {CS.GROW_AFTER_DEFAULT}"))
+            print(T_.quiet(f"[round] {name}: {_base} growing frames"
+                           + (f" + {_ga - CS.GROW_AFTER_DEFAULT} paying back a chem->growth delay "
+                              f"of {_ga}" if _ga != CS.GROW_AFTER_DEFAULT else "")
+                           + f" = {_frames} frames, against the campaign's {_FRAMES}"))
         T.write_config(g, name, frames=_frames,
                        seed_=(_replicate_seed(name) if replicate else 0))
         _restore_parent_params(name, par, edit, spare_seeds=replicate)
@@ -2068,6 +2082,7 @@ def _build_one(slot, rid, index, seen):
             # standalone number. They ride the same path as `intent` did -- but unlike `intent`,
             # which was free text nothing ever counted, the act carries a required field the
             # engine checks, so it cannot decay into a synonym for `predict`.
+            "frames": _frames,
             **{k: slot.get(k) for k in ("claim", "predict", "intent", "why", "chases",
                                         "act", "on", "breaks_if", "rival", "precision")}}
 
@@ -2230,7 +2245,22 @@ def launch(ctx):
     # frame count and then the job was SUBMITTED with `--frames 900`, which overrides it. Raising
     # frames in the graph did nothing, silently, and the graph is where campaign decisions are
     # supposed to live. A producer with no consumer, hidden because both are called "frames".
-    frames = None if ctx.get("mode") == "recon" else _FRAMES
+    # THE SPEC IS THE AUTHORITY ON ITS OWN LENGTH, and passing `_FRAMES` here overrode it.
+    #
+    # `_job_script` appends `--frames N` whenever this is not None, and that flag beats the
+    # `general.n_frames` in the run's own yaml. Every spec is written by `write_config(frames=...)`
+    # already, so the batch-wide value was at best a duplicate -- and once a run needed its OWN
+    # length it became a silent truncation. Measured 17 August: `r012_01` was written with
+    # n_frames 2100 to pay back a 400-frame chemistry delay, was submitted with `--frames 1800`,
+    # and its trajectory ends at tick 1800. Every delayed run in r012-r020 lost exactly the growing
+    # time the pairing existed to give back, so the delay experiment measured truncation -- the
+    # artefact the pairing was written to avoid.
+    #
+    # The comment fifty lines up says this in the other direction ("the spec was WRITTEN with the
+    # declared frame count and then SUBMITTED with --frames 900, which overrides it") and the fix
+    # then was to pass `_FRAMES`. That closed the mismatch by making the override correct instead
+    # of by removing it, which works exactly as long as every run wants the same length.
+    frames = None
     ok = cluster.run_batch(names, frames=frames, campaign="campaign")
     if not ok:
         print(T_.warn("[round] the batch did not complete cleanly -- waiting for the survivors"))
