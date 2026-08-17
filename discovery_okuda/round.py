@@ -50,6 +50,7 @@ for _p in (HERE, os.path.join(HERE, "agents")):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
+import composition_space as CS
 import crew
 import critic as C
 import term as T_
@@ -1594,7 +1595,12 @@ def _fingerprint(g):
     dict genuinely differed while nothing the engine reads had moved. A fingerprint that counts a key
     no operator will ever look at is measuring the record instead of the experiment.
     """
-    ids = {o["id"] for o in g.ops}
+    # AND THE RUN-LEVEL KEYS, which belong to no node and are read by every emitter. `_run.grow_after`
+    # is the delay between the chemistry and the mechanics: it lands as `after_frame` on growth,
+    # division and interface tension, so changing it changes three operators at once -- and the
+    # node-scoped test above called that "the target does not exist" and refused the slot. The rule
+    # is "params the simulation will read", not "params attached to a node".
+    ids = {o["id"] for o in g.ops} | {"_run"}
     return (repr(sorted((o["id"], o.get("op"), o.get("impl")) for o in g.ops)),
             repr(sorted(map(str, g.conns or []))),
             repr(sorted((k, str(v)) for k, v in (g.params or {}).items()
@@ -1970,8 +1976,24 @@ def _build_one(slot, rid, index, seen):
         print(T_.quiet(f"[round] slot {index} asked to replicate {par} -- re-seeded "
                        f"({_REPLICATES}/{_MAX_REPLICATES} this round), so the pair differs by "
                        f"nothing but its seed"))
+    # A DELAYED RUN GETS ITS GROWTH TIME BACK. `_run.grow_after` holds the chemistry-to-mechanics
+    # delay, and every frame of it is a frame the tissue is not growing. At a fixed 1800 the only
+    # thing a delay sweep would measure is the truncation: a run delayed to 400 has 22% less growth
+    # than its parent and reads smaller on every size metric for that reason alone. So the run is
+    # lengthened by whatever the delay exceeds the campaign's default, and the two runs get the same
+    # number of GROWING frames.
+    #
+    # THE GPU COST IS THE HONEST PART OF THIS: +300 frames on an 1800-frame run is about +17% wall
+    # clock, and it is the price of the comparison being about the delay.
     try:
-        T.write_config(g, name, frames=_FRAMES, seed_=(_replicate_seed(name) if replicate else 0))
+        _ga = int(g.params.get("_run.grow_after", CS.GROW_AFTER_DEFAULT))
+        _frames = _FRAMES + max(0, _ga - CS.GROW_AFTER_DEFAULT)
+        if _frames != _FRAMES:
+            print(T_.quiet(f"[round] {name}: chem->growth delay {_ga} frames, so the run is "
+                           f"{_frames} frames rather than {_FRAMES} -- same growing time as a "
+                           f"run delayed by {CS.GROW_AFTER_DEFAULT}"))
+        T.write_config(g, name, frames=_frames,
+                       seed_=(_replicate_seed(name) if replicate else 0))
         _restore_parent_params(name, par, edit, spare_seeds=replicate)
     except Exception as e:
         _refuse(index, slot, f"spec would not write: {e}")
@@ -2080,6 +2102,13 @@ def _restore_parent_params(name, parent, edit, spare_seeds=False):
     if edit and edit[0] == "set_param" and "." in str(edit[1]):
         node, _, key = str(edit[1]).rpartition(".")
         spared = (node.rstrip("0123456789"), key)
+        # A RUN-LEVEL EDIT LANDS ON SEVERAL OPERATORS AT ONCE, so sparing one (op, key) pair is not
+        # enough. `_run.grow_after` is emitted as `after_frame` on growth, division AND interface
+        # tension; the first version of this spared nothing, the overlay put the parent's 100 back
+        # on `cell_grow`, and the child ran with the delay applied to two of its three gated
+        # operators -- an experiment that is not the one anybody proposed.
+        if node == "_run" and key == "grow_after":
+            spare = set(spare) | {"after_frame"}
 
     pops = {}
     for o in (pspec.get("operators") or []):

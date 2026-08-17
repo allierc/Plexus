@@ -323,6 +323,12 @@ MU_H_DEFAULT, F_DEFAULT, KK_DEFAULT = 1.0, 0.046, 0.062
 # control unreachable in the very space that is supposed to contain it.
 A_SW_MIN, A_SW_MAX, A_SW_DEFAULT = 0.0, 0.95, 0.35
 
+# HOW LONG THE CHEMISTRY PATTERNS BEFORE ANYTHING MECHANICAL READS IT, in frames. Emitted as
+# `after_frame` on growth, division and interface tension. 100 is what every base carries and what
+# the frame budget was set against; the ceiling is a third of a standard 1800-frame run, past which
+# a delayed run is mostly delay.
+GROW_AFTER_DEFAULT, GROW_AFTER_MIN, GROW_AFTER_MAX = 100, 0, 600
+
 # MEASURED CEILINGS, from the 2026-08-01 certification sweep on L4 (cfl_certify + 14 cluster
 # runs at 300 frames). The divergence wall sits below the formula's 1.0 -- points at CFL 0.50 and
 # 0.65 went non-finite -- so the limit is set where the engine was actually observed to hold.
@@ -1151,6 +1157,31 @@ class CompositionGraph:
                     if math.isfinite(v) and lo <= v <= hi and abs(v - cur) > 1e-9:
                         edits.append((("set_param", f"{o['id']}.{pname}", v),
                                       f"@{o['op']}.{pname}={v:g}"))
+        # THE DELAY BETWEEN CHEMISTRY AND GROWTH, which the substrate has always supported and the
+        # menu has never offered. `_run.grow_after` is passed to every emitter and becomes
+        # `after_frame` on the gated operators -- growth, division and interface tension do nothing
+        # until that frame, so the reaction-diffusion field has that long to pattern before anything
+        # mechanical reads it.
+        #
+        # IT HAS BEEN 100 ON 240 OF 260 RUNS. One value, every base, since the bases were written --
+        # a rail in this loop's own vocabulary, and invisible because it is a RUN-level parameter
+        # rather than an operator's, so the per-node loop above could never reach it. Only
+        # `cell_die.after_frame` was ever varied, and only by hand.
+        #
+        # IT IS NOT A DETAIL. Measured on the pool: activator contrast decays from the seed and
+        # settles around a CV of 0.7-0.8, and at frame 100 it is still 1.2-1.5 -- and on the shaping
+        # bases it is still oscillating. The pattern growth reads is not the pattern the chemistry
+        # converges to, so the onset time is a mechanism knob, not a setup constant.
+        #
+        # OFFERED AS AN INTEGER GRID, because a delay is a frame count. `round._build_one` extends
+        # `n_frames` by whatever the delay exceeds the campaign default, so a delayed run keeps the
+        # growth time it would otherwise lose -- otherwise every delayed run reads as smaller and
+        # the comparison measures the truncation instead of the delay.
+        _ga = int(self.params.get("_run.grow_after", GROW_AFTER_DEFAULT))
+        for v in (max(0, _ga // 2), _ga * 2, _ga * 4):
+            if GROW_AFTER_MIN <= v <= GROW_AFTER_MAX and v != _ga:
+                edits.append((("set_param", "_run.grow_after", int(v)),
+                              f"@delay chem->growth={v:d} frames"))
         for src, dst, slot in self._candidate_links():
             edits.append((("connect", src, dst, slot),
                           f"~{self._op_of(src)}->{self._op_of(dst)}.{slot}"))

@@ -263,7 +263,15 @@ def add(p, m, style):
     shading", which is exactly the frame-1-only-is-lit signature. Removing the one actor we added
     leaves the lighting rig alone.
     """
-    return p.add_mesh(m, scalars="rgb", rgb=True, lighting=True, smooth_shading=True,
+    return p.add_mesh(m, scalars="rgb", rgb=True, lighting=True,
+                      # `flat` ADDED 16 AUGUST, and it is a reversal of the note at the top of this
+                      # file, asked for by name. One normal per cell, so each cell is a facet and
+                      # the mesh reads through the shading with no stroke drawn: an outline is a
+                      # constant 0.4 px whatever the cell's size, which at montage scale merges into
+                      # a grey wash, while a facet scales with the cell it belongs to.
+                      # The cost stands as written: a curved arm reads as a faceted cone. `nomesh`
+                      # remains the default and the loop's own choice for the shape question.
+                      smooth_shading=(style != "flat"),
                       show_edges=(style == "mesh"), edge_color="black", line_width=0.4,
                       ambient=0.35, diffuse=0.75, specular=0.12, specular_power=18)
 
@@ -351,6 +359,40 @@ def evolve(run, style, out, fill=1.0):
         p.write_frame()
     p.close()
     return f"{len(fr)} frames"
+
+
+def still(run, style="flat", out=None, fill=1.0, frame=-1, label=True):
+    """The last frame as ONE image -- the VTK successor to `3d.png`.
+
+    `3d.png` IS THE MOST-READ PICTURE IN THIS PROJECT and it was the only one still drawn by
+    matplotlib. Every montage tiles it, the forecast graph puts it in each node, and `Read` opens it
+    -- while the movies moved to VTK months ago for a reason this still inherits: matplotlib sorts
+    faces by depth (painter's algorithm) and draws back-facing ones anyway, so on a star's end frame
+    thousands of hidden faces are painted and which one wins a tie depends on the angle. A z-buffer
+    cannot have that argument. The same mesh renders about 29x faster and lights the frame properly:
+    28.9% of pixels lit against 4.5%.
+
+    FLAT BY DEFAULT HERE, and only here. `nomesh` stays the loop's choice for the movies, where the
+    question is the silhouette and a faceted cone would lose the curvature. A still that is going to
+    be tiled at ~190 px is a different question: at that size a 0.4 px outline is a grey wash and
+    smooth shading is a smooth blob, while facets scale with the cells they belong to, so the mesh
+    is legible in a thumbnail without drawing a single line.
+    """
+    fr = frames_of(run)
+    if not fr:
+        return "no traj.npz"
+    L = box_of(run, fr)
+    pos, mt, act = fr[frame][:3]
+    m = mesh_of(pos, mt, act, show_div=(style == "mesh"))
+    p = _plotter()
+    add(p, m, style)
+    if label:
+        p.add_text(f"{run}  frame {len(fr) - 1 if frame == -1 else frame}",
+                   position="upper_left", font_size=11, color="white")
+    aim(p, L, fill=fill)
+    p.screenshot(out or os.path.join(LOG, run, "3d.png"))
+    p.close()
+    return f"{len(fr)} frames, drew {frame}"
 
 
 def render_all(run, seq=LOOP_SEQ, size=None, quiet=False, fill=1.0):

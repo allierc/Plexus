@@ -163,3 +163,42 @@ The boxes were wrong too. `K_V`, `Lambda`, `l_th_frac` and `cell_grow.rate` were
 project actually runs at — so the sweep menu, which takes its two points from the box, could not
 propose the region the best result lives in. Widened, with the sampling basins pinned to the old
 widths so no robustness claim changes meaning. `out_of_range` now means something again.
+
+## 9. THE DELAY BETWEEN CHEMISTRY AND GROWTH — spend slots on this
+
+Cedric, 16 August 2026. I want this route tried, and it is the one thing in this file that is an
+instruction rather than a context note.
+
+**The idea.** Let the reaction–diffusion field pattern for longer before anything mechanical reads
+it. Growth and division currently switch on while the activator is still equilibrating, so the
+pattern they amplify is not the pattern the chemistry converges to. Give the chemistry time, and
+the tissue may find shapes it cannot reach when the two run together from the start.
+
+**The knob is `_run.grow_after`**, in frames, offered in the menu as
+`@delay chem->growth=<n> frames`. It becomes `after_frame` on `cell_grow`, `cell_divide` and
+`interface_tension` at once — all three do nothing until that frame. Range 0–600.
+
+**Why it is worth slots, in numbers.** It has been **100 on 240 of the 260 runs on disk** and could
+not be proposed until now: it is a run-level parameter, so the per-operator menu had no way to reach
+it. One value across a whole campaign is a rail, not a setting. And 100 is early: activator contrast
+decays from the seed and settles around a CV of 0.7–0.8, while at frame 100 it is still 1.2–1.5, and
+on the shaping bases it is still oscillating.
+
+**Frames are handled for you.** A delayed run is lengthened by exactly the extra delay — delay 400
+runs 2100 frames instead of 1800 — so it has the same number of GROWING frames as its parent. The
+comparison is about the delay and not about truncation. It costs proportionally more GPU; that is
+the price of the comparison being clean.
+
+**What I would like to see:**
+
+- the delay swept on **more than one base**, because "wait longer" plausibly does different things
+  to a plain GS base and to a shaping one — and the shaping bases are the ones still oscillating at
+  frame 100, so they are where the effect should be largest;
+- at least one slot at a **long** delay (400–600), not only the cautious doubling to 200;
+- one **`bound`** act on it: which delay, if any, changes the phenotype rather than the numbers;
+- and a claim either way. If waiting changes nothing, that is a `mechanism` claim worth as much as
+  the positive result — it would say the pattern growth reads is already the final pattern, and
+  every argument in this campaign about pattern-then-shape would need rewriting.
+
+Do not spend the whole batch on it. Two or three slots a round for two or three rounds is enough to
+know whether it matters.
