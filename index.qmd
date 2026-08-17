@@ -2217,11 +2217,11 @@ _discovery:
     </figcaption>
   </figure>
   <figure class="sim-card">
-    <video src="gallery/turing_arms_v3.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <video src="gallery/turing_arms_r020ctrl.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
       <span class="sim-name" tabindex="0">reaction rate 0.5<span class="sim-spec"><pre>general:
-  name: r019_02
-  seed: 0
+  name: r020_00_ctrl
+  seed: 851651
   n_frames: 1800
   dt: 1.0
   record_cap: 1802
@@ -2257,7 +2257,7 @@ operators:
   n_cells: 2000
   radius: 5.0
   jitter: 0.15
-  seed: 0
+  seed: 851651
   vseed_cv: 0.15
   p0: 3.5
 - op: cell_geometry
@@ -2267,7 +2267,7 @@ operators:
   mode: scatter
   n_spots: 1
   cone_deg: 8.0
-  seed: 0
+  seed: 851651
   before_frame: 3
   seed_frac: 0.06
 - op: cell_neighbours
@@ -2282,8 +2282,8 @@ operators:
   at: cell
   model: gray_scott
   rate: 0.5
-  F: 0.046
-  kk: 0.031
+  F: 0.023
+  kk: 0.062
 - op: cell_chem_from_shape
   at: cell
   model: curvature
@@ -2291,15 +2291,20 @@ operators:
   beta: 0.5
   F0: 0.046
   rate: 1.0
+- op: cell_shape_probe
+  at: cell
+  vertex_set: vertex
+  model: shape_index
+  field: elong
 - op: cell_grow
   at: vertex
   cell_set: cell
-  rate: 0.000866
+  rate: 0.001732
   a_sw: 0.35
-  hill: 4.0
+  hill: 8.0
   rho: 0.1
   vth_frac: 2.5
-  after_frame: 100
+  after_frame: 400
   conserve_amount: false
 - op: cell_mechanics
   at: vertex
@@ -2308,16 +2313,24 @@ operators:
   K_P: 1.0
   Gamma: 0.4
   Lambda: 0.5
-  K_V: 80.0
+  K_V: 40.0
   K_R: 0.0
-  K_bend: 0.02
-  K_lumen: 0.5
+  K_bend: 0.0
+  K_lumen: 0.0
   antiinv: 0.0
   mu: 1.0
   dt: 1.0
   relax_iters: 30
   eta: 0.08
   cap_frac: 0.12
+- op: interface_tension
+  at: vertex
+  cell_set: cell
+  K_purse: 1.0
+  a_sw: 0.6
+  eta: 0.05
+  iters: 4
+  after_frame: 400
 - op: edge_flip
   at: vertex
   l_th_frac: 0.28
@@ -2333,7 +2346,7 @@ operators:
   cell_set: cell
   min_cycle: 4
   max_cycle: 1000000000
-  after_frame: 100
+  after_frame: 400
   orient_iface: false
   orient_asw: 0.6
   g1_ramp: false
@@ -2349,54 +2362,64 @@ schedule:
 - cell_chem_diffuse
 - cell_chem_react
 - cell_chem_from_shape
+- cell_shape_probe
 - cell_grow
 - cell_mechanics
+- interface_tension
 - edge_flip
 - cell_divide
 - topo_record
 _discovery:
-  comp_hash: Cb1d43f47b83
+  comp_hash: C37faf0d5d06
   structure:
     operators:
-    - id: cell_adjacency0
-      op: cell_neighbours
-    - id: cell_diffuse0
+    - id: cell_chem_diffuse0
       op: cell_chem_diffuse
       impl: graph_laplacian
-    - id: cell_geometry_3d0
-      op: cell_geometry
-    - id: cell_react0
-      op: cell_chem_react
-      impl: gray_scott
-    - id: divide_3d0
-      op: cell_divide
-      impl: hertwig
-    - id: grow_3d0
-      op: cell_grow
-      impl: hill_conserve_amount
-    - id: reconnect_t1_3d0
-      op: edge_flip
-    - id: seed_cell_rd0
-      op: cell_chem_seed
-      impl: cone
-    - id: seed_mesh_3d0
-      op: mesh_seed
-    - id: shape_energy_3d0
-      op: cell_mechanics
-      impl: default
-    - id: shape_to_chem0
+    - id: cell_chem_from_shape0
       op: cell_chem_from_shape
       impl: curvature
+    - id: cell_chem_react0
+      op: cell_chem_react
+      impl: gray_scott
+    - id: cell_chem_seed0
+      op: cell_chem_seed
+      impl: cone
+    - id: cell_divide0
+      op: cell_divide
+      impl: hertwig
+    - id: cell_geometry0
+      op: cell_geometry
+    - id: cell_grow0
+      op: cell_grow
+      impl: hill_conserve_amount
+    - id: cell_mechanics0
+      op: cell_mechanics
+      impl: default
+    - id: cell_neighbours0
+      op: cell_neighbours
+    - id: cell_shape_probe0
+      op: cell_shape_probe
+      impl: shape_index
+    - id: edge_flip0
+      op: edge_flip
+    - id: interface_tension0
+      op: interface_tension
+    - id: mesh_seed0
+      op: mesh_seed
     connections:
     - src_op: cell_chem_react
       dst_op: cell_grow
       slot: gate
-  region: growth-driven emergent (target mechanism)
+    - src_op: cell_chem_react
+      dst_op: interface_tension
+      slot: site
+  region: emergent RD + purse-string
   defect_fixes:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">A third slower, and the folds become thick arms — four of them counted as tubes, at 16,828 cells</span>
+      <span class="sim-cap">The same reaction rate with the purse-string on: 12,223 cells drawn into 13 arms, protrusion peak 1.79</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
