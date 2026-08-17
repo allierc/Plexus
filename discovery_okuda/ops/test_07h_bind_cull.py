@@ -214,6 +214,11 @@ def run(rig, a, d, extra=None):
             # with stretch (05a: 21 -> 194 over 401 frames), so every per-frame cost quoted from the
             # seeded value is a lower bound. One int a frame settles it.
             S["n_sub"].append(int(rig.n_sub))
+            # A RIG MAY HAVE SERIES OF ITS OWN. 07l carries myosin, which no earlier rig has and
+            # which its gates are written on; asking the rig rather than widening this dict keeps the
+            # loop shared and lets the next one add a state without touching it.
+            for k, v in (rig.extra_series() if hasattr(rig, "extra_series") else {}).items():
+                S.setdefault(k, []).append(float(v))
             att = (rig.x_epi[rig.ct_tri] * rig.ct_w[:, :, None]).sum(1)
             for k, v in (("t", np.int32(t)), ("x", X.float().cpu().numpy()),
                          ("f", rig.sheet.Fc.cpu().numpy().astype(np.int32)),

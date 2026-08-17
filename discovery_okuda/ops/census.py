@@ -189,26 +189,56 @@ def _mpm(sp):
     return None
 
 
+CHEM = [("MT1-MMP -> faces", "the tethered enzyme, carried from the cells that express it onto the "
+                             "faces they touch; it does NOT diffuse", "bm_face", 1),
+        ("proMMP-2 secretion", "dpro/dt += s_pro(cell) carried through the contact map", "bm_face", 1),
+        ("TIMP-2 secretion", "dtimp/dt += s_timp(cell), same carry", "bm_face", 1),
+        ("TIMP-3 deposition", "immobile: deposited, then cleared as exp(-dt/tau_timp3)", "bm_face", 1),
+        ("proMMP-2 diffusion", "implicit cotangent Laplacian on the deformed sheet", "bm_face", 3),
+        ("MMP-2 diffusion", "implicit cotangent Laplacian", "bm_face", 3),
+        ("TIMP-2 diffusion", "implicit cotangent Laplacian", "bm_face", 3),
+        ("ternary activation", "k_act (mt1 occ)(mt1 free) pro, occ = x/(1+x), x = (T2+T3)/K -- the "
+                               "bell that peaks at c_T = K", "bm_face", 1),
+        ("MMP-TIMP inhibition", "r = k_inhib mmp (timp + t3) dt, capped at mmp", "bm_face", 1),
+        ("MMP degradation of the sheet", "dm/dt -= k_deg mmp m: the mass the tear law reads",
+         "bm_face", 1)]
+
+
+def chem_laws(ent, rig):
+    """The protease chemistry, IF this rig carries it. Detected on the object, not assumed."""
+    import torch
+    if rig is None or not torch.is_tensor(getattr(rig, "mt1", None)):
+        return []
+    F = ent["bm_face"]["mean"]
+    return [dict(name=n, law=w, per=p, evals=F, pairs=k * F, tick="every substep")
+            for n, w, p, k in CHEM]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("run", nargs="?", default="07i_ramp")
     ap.add_argument("--contact-per-node", type=float, default=None,
                     help="measured on the seeded rig if not given")
     ap.add_argument("--n-sub", type=int, default=None)
+    ap.add_argument("--module", default="test_07i_ramp",
+                    help="the module whose rig this run used; its `main` is not called")
+    ap.add_argument("--cls", default=None, help="the rig class, default the module's only Rig07*")
     a = ap.parse_args()
     d, ent, per_cell, nk = entities(a.run)
     sp = yaml.safe_load(open(os.path.join(d, "spec.yaml")))
 
     cpn, nsub, how = a.contact_per_node, a.n_sub, "given on the command line"
     if cpn is None or nsub is None:
-        import test_07i_ramp as I                                       # noqa: F401
-        import test_07h_bind_cull as H
-        rig = H.Rig07d.__new__(H.Rig07d)                                # only for the class, below
-        del rig
+        import importlib
+        m = importlib.import_module(a.module)
+        cls = getattr(m, a.cls) if a.cls else next(
+            getattr(m, k) for k in vars(m) if k.startswith("Rig07") and k[5:].isdigit() is False
+            and isinstance(getattr(m, k), type) and getattr(m, k).__module__ == m.__name__)
         kw = dict(subdiv=4, E=400.0, thickness=2.0e-3, nu=0.3, kn=5.0, sigma_T=7.0, zeta=20.0,
                   s_target=1.0, k_drive=50.0, dev="cuda:0", max_refine=3, edge_trigger=1.45,
                   reseed=True, tau_bm=40.0, rho_crit=0.0)
-        r = I.Rig07i(N0=12, Nf0=300.0, split_budget=150, every=10, batched=True, **kw)
+        kw.update(getattr(m, "CENSUS_KW", {}))
+        r = cls(N0=12, Nf0=300.0, split_budget=150, every=10, batched=True, **kw)
         r.frame(0)
         cpn = float(r.cx_node.numel()) / float(r.sheet.n) if cpn is None else cpn
         nsub = int(r.n_sub) if nsub is None else nsub
@@ -216,7 +246,7 @@ def main():
         pen = int(r.contact()[2])          # the steric law acts only on nodes inside a wedge
         FLD = fields(r)
 
-    L = laws(ent, cpn, nsub)
+    L = laws(ent, cpn, nsub) + chem_laws(ent, r if "r" in dir() else None)
     sub_evals = sum(x["evals"] for x in L if x["tick"] == "every substep")
     sub_pairs = sum(x["pairs"] for x in L if x["tick"] == "every substep")
     once = sum(x["evals"] for x in L if x["tick"] == "once a frame")

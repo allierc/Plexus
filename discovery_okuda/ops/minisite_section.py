@@ -704,12 +704,12 @@ def main():
         runs4.append((d, f"{v}.mp4", lbl, os.path.join(rd, "spec_run.yaml"), cap))
 
     # ---- Vertex + Turing, fourth row: the same composition at two reaction rates ----
-    # ONE PARAMETER APART, and it is the only thing the two runs do not share: Gray-Scott `rate`
-    # 0.5 against 0.75, with the growth rate, both diffusivities, F, k and the division rule
-    # identical. That is what makes the pair a comparison rather than two shapes.
+    # THE ROW IS THE CHEMISTRY-TO-GROWTH RATIO, read left to right. It is NOT a one-knob pair:
+    # the middle card also has `interface_tension` (purse-string, K_purse 1.0) on and twice the
+    # growth rate, which its own title and caption say, so the row is not read as rate alone.
     R5r = [
         ("r020_01", "turing_folds_v3", "reaction rate 0.75"),
-        ("r020_00_ctrl", "turing_arms_r020ctrl", "reaction rate 0.5"),
+        ("r020_00_ctrl", "turing_arms_r020ctrl", "rate 0.5, purse-string on"),
         ("r021_06", "turing_spikes_v3", "rate 0.25, growth doubled"),
     ]
     # ORDERED BY CHEMISTRY AGAINST GROWTH, fastest first, because that ratio is what the row is:
