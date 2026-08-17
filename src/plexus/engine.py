@@ -164,19 +164,21 @@ def _orbit_groups(vinit, lvl, n, D, rng, device):
 
     Per group: the enclosed mass M(<r) is summed over THAT GROUP only (the companion's mass is
     not inside the disc), radius and tangent are measured in the group's plane (`spawn_group_rot`),
-    and `central_mass` parks that group's first particle at its centre as a core. `approach` is
-    the bulk speed added along the SEPARATION AXIS (x, the axis `two_disks` separates on), which
-    is what makes the encounter a grazing passage rather than a plunge: the launch is parallel to
-    x while the discs are offset in y, so the pair carries angular momentum L = spawn_offset x
-    v_rel and its pericentre is set by that offset. Aiming the launch AT the companion instead
-    gives L = 0 -- the two discs fall straight through each other, merge on contact, and throw
-    debris in every direction instead of tails. `approach` near sqrt(2 G M_tot / d) is a parabolic
-    (just-bound) passage, below it the pair is bound and returns to merge. `spins: [s0, s1]`
-    overrides the shared `spin` per group, so one disc can turn retrograde.
+    and `central_mass` parks that group's first particle at its centre as a core.
+
+    The encounter itself is two half-speeds added to every star of a disc: `approach` along the
+    separation axis (closing) and `swirl` perpendicular to it (orbiting). Together they fix the
+    pair's orbit exactly -- its energy from |v_rel| = 2 sqrt(approach^2 + swirl^2) against the
+    parabolic sqrt(2 G M_tot / d) (below it the pair is bound and returns to merge), and its
+    PERICENTRE from L = 2 x separation x swirl. The angular momentum has to come from `swirl`:
+    offsetting the two discs and aiming them at each other still gives L = 0, which is a plunge --
+    they fall through each other, merge on contact, and throw debris everywhere instead of tails.
+    `spins: [s0, s1]` overrides the shared `spin` per group, so one disc can turn retrograde.
     """
     G_const = float(vinit.get("G", 1.0)); spin = float(vinit.get("spin", 1.0))
     soft = float(vinit.get("softening", 0.05)); jitter = float(vinit.get("jitter", 0.0))
     cmass = float(vinit.get("central_mass", 0.0)); approach = float(vinit.get("approach", 0.0))
+    swirl = float(vinit.get("swirl", 0.0))
     spins = list(vinit.get("spins", []) or [])
     gid = lvl.spawn_group[:n]; rot = lvl.spawn_group_rot
     ngroups = int(gid.max().item()) + 1
@@ -209,10 +211,20 @@ def _orbit_groups(vinit, lvl, n, D, rng, device):
         tang = tang / tang.norm(dim=-1, keepdim=True).clamp(min=1e-9)
         v = v_circ[:, None] * tang
         bulk = torch.zeros(D, device=device)
+        side = torch.sign((centres[g] - centres.mean(0))[0])       # -1 = the low-x disc, +1 = high-x
         if approach > 0.0:
-            # PARALLEL TO THE SEPARATION AXIS (x), not aimed at the companion: the y offset is
-            # then a true impact parameter and the passage grazes.
-            bulk[0] = approach * torch.sign((centres.mean(0) - centres[g])[0])
+            # PARALLEL TO THE SEPARATION AXIS (x), not aimed at the companion: `approach` is the
+            # RADIAL (closing) half-speed and `swirl` below is the TANGENTIAL one.
+            bulk[0] = -side * approach
+        if swirl != 0.0:
+            # the tangential half-speed, perpendicular to the separation axis: this is what sets
+            # the pair's orbital angular momentum L = separation x v_rel = 2 x separation x swirl,
+            # and so its PERICENTRE. `swirl` positive puts L along +z, the same way the discs turn
+            # (spin > 0), i.e. a PROGRADE encounter -- the case that raises tails, since the stars
+            # on the near side of each disc are then dragged along by the companion instead of
+            # sweeping past it. `swirl: 0` is a head-on plunge: L = 0, pericentre 0, prompt merger.
+            bulk[1] = side * swirl
+        if approach > 0.0 or swirl != 0.0:
             v = v + bulk[None, :]
         if jitter > 0.0:
             v = v + jitter * torch.randn(idx.numel(), D, generator=rng, device=device)

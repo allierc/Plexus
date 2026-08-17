@@ -173,11 +173,26 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
             # re-centre and size the render to the trajectory's own extent (+margin); a
             # bounded run (extent ~ box) is left exactly as before.
             flat = pos.reshape(-1, D)
-            lo, hi = flat.min(0), flat.max(0)
-            extent = (hi - lo).astype(np.float32)
-            if bool((extent > box * 1.02).any()):
-                box = extent * 1.06
+            # `frame_percentile: p` frames to the CENTRAL p% of the particles instead of the
+            # absolute extent, so a handful of escapers cannot set the scale for everything else.
+            # A galaxy encounter throws ~20% of its stars out to several times the size of what is
+            # worth looking at: framed on the extent, the two discs come out 130 px wide in an
+            # 820 px frame. Unset (the default) = the absolute extent, unchanged.
+            fp = style.get("frame_percentile")
+            if fp is not None:
+                q = 0.5 * (100.0 - float(fp))
+                lo = np.percentile(flat, q, axis=0).astype(np.float32)
+                hi = np.percentile(flat, 100.0 - q, axis=0).astype(np.float32)
+                box = ((hi - lo) * 1.06).astype(np.float32)
                 pos = pos - 0.5 * (lo + hi)[None, None, :] + 0.5 * box[None, None, :]
+                # and NOT the extent test below: the escapers are exactly what this excluded, so
+                # re-measuring min/max here would hand the frame straight back to them.
+            else:
+                lo, hi = flat.min(0), flat.max(0)
+                extent = (hi - lo).astype(np.float32)
+                if bool((extent > box * 1.02).any()):
+                    box = extent * 1.06
+                    pos = pos - 0.5 * (lo + hi)[None, None, :] + 0.5 * box[None, None, :]
             # colour by own type (charge palette), else by PARENT cell -- mapped through
             # the parent set's type palette so a contained MPM set inherits its material
             # colour (jelly/water/snow), falling back to a distinct hue per parent body.
@@ -884,8 +899,12 @@ def _splat3d_outputs(pos, occ, rgb, box, data_dir, sname, style, movie, T, size_
     print(f"[plot] {sname} (3D splat): {os.path.basename(evo)}, {os.path.basename(fin)}", flush=True)
 
     if movie:
+        # `movie_max_frames` was read by the 2D path and DROPPED here, so every 3D clip was 180
+        # frames whatever its spec asked for: a 911-frame run came out as 183 frames, and the
+        # closest approach of a galaxy pair passed in two of them.
         _splat3d_movie(img, bg, azim0, turns, rock, zoom_amp, T,
                        os.path.join(data_dir, f"movie_{sname}"), fps=int(style.get("fps", 15)),
+                       max_frames=int(style.get("movie_max_frames", 180)),
                        elev0=elev0, elev_end=elev_end, pan_end=pan_end)
 
 
