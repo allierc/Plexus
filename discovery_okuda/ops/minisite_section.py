@@ -70,20 +70,28 @@ ANCHOR_NEW = "<h3>Vertex + Turing — patterning &amp; shaping a growing tissue<
 MPM_SECTION = "<h3>Continuum mechanics — MLS-MPM</h3>"
 
 
-def _run_dir(name):
-    """A run's directory, live or archived.
+def _run_dir(name, need=()):
+    """A run's directory, live or archived, preferring one that HOLDS the files `need` names.
 
     Rounds 1-22 were moved into `log/okuda/_archive_r001-r022_<date>/` on 12 August, which is why
     two rows of the Vertex + Turing section quietly stopped rebuilding: the runs had not been
     deleted, they had been filed. Their artefacts -- `traj.npz`, `diag.json`, the `vtk_*` clips --
     moved with them, so a card only needs to know where to look.
+
+    `need` exists because the discovery loop RE-USES slot names: a fresh `r013_05` appears in
+    `log/okuda/` for a different simulation, carrying no `vtk_*` clips, and taking it on name
+    alone dropped four cards off the page at once. When `need` is given, the first candidate
+    holding all of it wins -- live, then archives newest-named first -- so the card keeps both
+    the clip and the `spec_run.yaml` of the run the clip was rendered from, not a namesake's.
     """
-    live = os.path.join(LOG_OKUDA, name)
-    if os.path.isdir(live):
-        return live
     import glob as _glob
-    hits = sorted(_glob.glob(os.path.join(LOG_OKUDA, "_archive_*", name)))
-    return hits[0] if hits else live
+    live = os.path.join(LOG_OKUDA, name)
+    cands = ([live] if os.path.isdir(live) else []) + \
+        sorted(_glob.glob(os.path.join(LOG_OKUDA, "_archive_*", name)), reverse=True)
+    for c in cands:
+        if all(os.path.exists(os.path.join(c, f)) for f in need):
+            return c
+    return cands[0] if cands else live
 
 
 def _find_block(s, name):
@@ -667,8 +675,9 @@ def main():
               f"square, no label)")
 
     # ---- Vertex + Turing, third row: two chemistries and one ablation ----
-    def _sum(run):
-        return json.load(open(os.path.join(_run_dir(run), "diag.json")))["summary"]
+    VTK = ("vtk_evolve_mesh.mp4",)          # what a vtk card needs, and how its run is resolved
+    def _sum(run, rd=None):
+        return json.load(open(os.path.join(rd or _run_dir(run), "diag.json")))["summary"]
     R4 = [
         ("r013_05", "turing_flower_v3", "purse-string, k = 0.062"),
         ("r016_01", "turing_lobes_v3", "purse-string, k = 0.031"),
@@ -683,16 +692,16 @@ def main():
     }
     runs4 = []
     for d, v, lbl in R4:
-        if not os.path.exists(os.path.join(_run_dir(d), "vtk_evolve_mesh.mp4")):
+        rd = _run_dir(d, need=VTK)
+        if not os.path.exists(os.path.join(rd, "vtk_evolve_mesh.mp4")):
             print(f"[minisite] {d}: no vtk_* clips -- card skipped")
             continue
-        sm = _sum(d)
-        vtk_sequence(_run_dir(d), os.path.join(GAL, f"{v}.mp4"))
+        sm = _sum(d, rd)
+        vtk_sequence(rd, os.path.join(GAL, f"{v}.mp4"))
         print(f"[minisite] gallery/{v}.mp4 <- okuda/{d}  "
               f"({os.path.getsize(os.path.join(GAL, v + '.mp4')) / 1e6:.1f} MB, side view, square)")
         cap = CAP4[d].format(cells=sm["cells_final"], pk=f"{sm['protr_peak']:.2f}")
-        runs4.append((d, f"{v}.mp4", lbl,
-                      os.path.join(_run_dir(d), "spec_run.yaml"), cap))
+        runs4.append((d, f"{v}.mp4", lbl, os.path.join(rd, "spec_run.yaml"), cap))
 
     # ---- Vertex + Turing, fourth row: the same composition at two reaction rates ----
     # ONE PARAMETER APART, and it is the only thing the two runs do not share: Gray-Scott `rate`
@@ -700,7 +709,7 @@ def main():
     # identical. That is what makes the pair a comparison rather than two shapes.
     R5r = [
         ("r020_01", "turing_folds_v3", "reaction rate 0.75"),
-        ("r019_02", "turing_arms_v3", "reaction rate 0.5"),
+        ("r020_00_ctrl", "turing_arms_r020ctrl", "reaction rate 0.5"),
         ("r021_06", "turing_spikes_v3", "rate 0.25, growth doubled"),
     ]
     # ORDERED BY CHEMISTRY AGAINST GROWTH, fastest first, because that ratio is what the row is:
@@ -710,22 +719,29 @@ def main():
     CAP5 = {
         "r020_01": "Chemistry fast against growth: the shell folds rather than forming arms, and "
                    "carries {cells:,} cells",
-        "r019_02": "A third slower, and the folds become thick arms — four of them counted as "
-                   "tubes, at {cells:,} cells",
+        # `diag.json` leaves `cells_final` unset on this run, so the count comes from
+        # `progress.json` -- the same number the renderer prints on the last frame.
+        "r020_00_ctrl": "The same reaction rate with the purse-string on: {cells:,} cells drawn "
+                        "into {tubes} arms, protrusion peak {peak}",
         "r021_06": "Slower still, with growth doubled: five long thin arms, {cells:,} cells. This "
                    "one reseeds as well, so it is the ratio that compares and not the shape",
     }
     runs5r = []
     for d, v, lbl in R5r:
-        if not os.path.exists(os.path.join(_run_dir(d), "vtk_evolve_mesh.mp4")):
+        rd = _run_dir(d, need=VTK)
+        if not os.path.exists(os.path.join(rd, "vtk_evolve_mesh.mp4")):
             print(f"[minisite] {d}: no vtk_* clips -- card skipped")
             continue
-        sm = _sum(d)
-        vtk_sequence(_run_dir(d), os.path.join(GAL, f"{v}.mp4"))
+        sm = _sum(d, rd)
+        vtk_sequence(rd, os.path.join(GAL, f"{v}.mp4"))
         print(f"[minisite] gallery/{v}.mp4 <- okuda/{d}  "
               f"({os.path.getsize(os.path.join(GAL, v + '.mp4')) / 1e6:.1f} MB, side view, square)")
-        runs5r.append((d, f"{v}.mp4", lbl, os.path.join(_run_dir(d), "spec_run.yaml"),
-                       CAP5[d].format(cells=sm["cells_final"])))
+        cells = sm.get("cells_final")
+        if not cells:
+            cells = json.load(open(os.path.join(rd, "progress.json")))["n_cells"]
+        runs5r.append((d, f"{v}.mp4", lbl, os.path.join(rd, "spec_run.yaml"),
+                       CAP5[d].format(cells=cells, tubes=sm.get("n_tubes_final"),
+                                      peak=f"{sm['protr_peak']:.2f}")))
 
     # ---- the three-entity section: spheroid, basement membrane, matrix ----
     # PANEL GEOMETRY IS A PROPERTY OF THE RUN'S RENDERER, so it is written down beside the run.
@@ -928,7 +944,7 @@ def main():
          ("tyssue_okuda_lobed.mp4", "turing_morphogen_v3.mp4", "turing_morphogen_v4.mp4",
           "turing_morphogen_v5.mp4", "turing_morphogen_v6.mp4")),
     ):
-        rd = _run_dir(run)
+        rd = _run_dir(run, need=("traj.npz", "vtk_evolve_mesh.mp4"))
         if not os.path.exists(os.path.join(rd, "traj.npz")):
             print(f"[minisite] {run}: no traj.npz -- {label} card left as it is")
             continue

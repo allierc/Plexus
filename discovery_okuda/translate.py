@@ -595,6 +595,19 @@ def to_spec(graph: CompositionGraph, *, name="okuda", frames=350, seed_=0, grow_
         if emit is None:
             raise ValueError(f"no backend emitter for operator {node['op']!r}")
         spec_op = emit(graph, node, grow_after)
+        # THE WINDOW, STAMPED BEFORE THE CONSUMED-PARAMS ASSERT, or that assert fires on it: it
+        # holds that a value someone SET and the engine never saw is a lie, and a window is exactly
+        # such a value until this line puts it in the emitted op.
+        # STAMPED HERE RATHER THAN INSIDE EACH EMITTER. `set_window` writes `<node>.after_frame` and
+        # `<node>.before_frame` onto the graph, and the engine gates every operator on
+        # `after_frame <= tick < before_frame`. Applied here rather than inside each emitter so a
+        # window works on ALL fourteen operators the moment the edit exists, instead of on the ones
+        # somebody remembered to thread it through -- which is how `grow_after` ended up reaching
+        # three operators and no others.
+        for _k in ("after_frame", "before_frame"):
+            _v = graph.params.get(f"{node['id']}.{_k}")
+            if _v is not None:
+                spec_op[_k] = int(_v)
         _assert_params_consumed(graph, node, spec_op)
         ops.append(spec_op)
 
