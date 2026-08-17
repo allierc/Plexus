@@ -2370,7 +2370,7 @@ _discovery:
   <figure class="sim-card">
     <video src="gallery/turing_arms_r020ctrl.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">reaction rate 0.5<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">rate 0.5, purse-string on<span class="sim-spec"><pre>general:
   name: r020_00_ctrl
   seed: 851651
   n_frames: 1800
@@ -4687,9 +4687,9 @@ plotting:
   </figure>
 </div>
 
-<h3 class="anchored">Inverse-square law — self-gravity &amp; electrostatics</h3>
-<p class="opk">One <code>squared_law</code> operator, two regimes: <code>law: gravity</code> (mass, always attract, all-pairs) collapses a disc into a galaxy; <code>law: coulomb</code> (signed charge, like-repel) is a plasma.</p>
-<p class="opk-ref">Reference — softened self-gravity after Philip Mocz’s <em>Create Your Own N-body Simulation</em> (2020); Coulomb after <a href="https://github.com/allierc/ParticleGraph">ParticleGraph</a>.</p>
+<h3 class="anchored">Inverse-square law — self-gravity</h3>
+<p class="opk">One <code>squared_law</code> operator with <code>law: gravity</code> — mass, always attracting, summed over every pair. It collapses a disc into a galaxy, and because the sum runs over the whole set, two galaxies in one set pull on each other through that same operator: a collision needs no second law.</p>
+<p class="opk-ref">Reference — softened self-gravity after Philip Mocz’s <em>Create Your Own N-body Simulation</em> (2020); the encounter geometry after Toomre &amp; Toomre, <em>Galactic Bridges and Tails</em> (1972).</p>
 <div class="sim-gallery g3">
   <figure class="sim-card figure">
     <video src="gallery/inverse_square.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
@@ -4867,100 +4867,153 @@ descriptions:
       <span class="sim-cap">mutual gravity — four clumps merge into one bound cluster, which stays bound inside a halo that keeps evaporating</span>
     </figcaption>
   </figure>
-  <figure class="sim-card figure">
-    <video src="gallery/coulomb_3.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+  <figure class="sim-card">
+    <video src="gallery/galaxy_collision_3d.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">Coulomb plasma<span class="sim-spec"><pre># coulomb_3 -- Coulomb (electrostatic inverse-square) via the unified `squared_law` operator.
-# charges [2, 1, -1]; ported from ParticleGraph Coulomb (PDE_E).
-# squared_law law=coulomb (default): 2nd-derivative + add-aggregated over the neighbour graph;
-# like charges repel, opposite attract. `charge` is a per-type parameter the engine broadcasts
-# to a per-particle buffer the operator reads.
-general: {name: coulomb_3, seed: 0, n_frames: 32000, dt: 0.0000003, boundary: periodic}
+      <span class="sim-name" tabindex="0">two galaxies, grazing<span class="sim-spec"><pre># galaxy_collision_3d -- TWO 3D galaxies on a grazing prograde passage. The same `squared_law`
+# (law: gravity, all_pairs) that holds one disc together is what pulls the two discs into each
+# other: the pair is ONE set with two types, not two sets, and that is the point -- an all-pairs
+# law sums over the whole set, so mutual gravity between the galaxies is not a second operator.
+#
+# Initialization stays a SPEC concern (no operator): `spawn: two_disks` places two flat discs
+# `spawn_separation` apart along x, the second tilted `spawn_tilt` radians out of the first&#x27;s
+# plane; `vel_init: {mode: circular_orbit}` then spins EACH disc about its own centre in its own
+# plane (from that disc&#x27;s enclosed mass + its `central_mass` core) and adds the encounter velocity
+# as two half-speeds -- `approach` closing along the separation axis, `swirl` tangential to it.
+#
+# THE ORBIT IS DESIGNED BACKWARDS FROM ITS PERICENTRE. With G = 1 and M_tot = 3.0 (two galaxies of
+# core 0.75 + disc 0.75), v_rel = 2*sqrt(0.18^2 + 0.26^2) = 0.63 against the parabolic
+# sqrt(2 G M_tot / 6) = 1.00, and L = 2 * 6 * 0.26 = 3.12, which is the bound orbit a = 5.0,
+# e = 0.59: pericentre 2.0 = 1.7 DISC RADII, period 40.6 time units, first passage at t = 8.7 and
+# the second at t = 30 -- both inside the 40 time units this run covers (10000 frames x dt 0.004).
+# The angular momentum has to come from `swirl`: offsetting the discs and aiming them at each
+# other leaves L = 0, and a pilot of that plunges to pericentre 0.4, shreds both discs and unbinds
+# half the stars. A prograde passage at ~2 disc radii is the tail-raising case, after Toomre &amp;
+# Toomre, &quot;Galactic Bridges and Tails&quot; (1972). Softened gravity is Mocz&#x27;s, vendored at
+# papers/nbody-python/ (MIT).
+#
+# `type_layout: split_x` types the set by x, and at frame 0 the two discs are disjoint in x (each
+# 2.4 wide, 6.0 apart), so the low-x disc is `red` and the high-x disc is `blue`: the colours ARE
+# the two galaxies, and every later mixing of red into blue is stars changing galaxy.
+general: {name: galaxy_collision_3d, seed: 2, n_frames: 10000, dt: 0.004, boundary: free, dim: 3,
+          world: [12.0, 12.0, 12.0], record_cap: 1000}
 sets:
-  particle:
-    n: 960
-    vel_init: 0.0001
-    types:
-      q_p2: {fraction: 0.3333, charge: 2}
-      q_p1: {fraction: 0.3333, charge: 1}
-      q_n1: {fraction: 0.3334, charge: -1}
+  star:
+    n: 25000
+    spawn: two_disks                                # two flat discs, one tilted, placed to meet
+    spawn_radius: 1.2                               # disc radius (each galaxy)
+    spawn_thickness: 0.06                           # out-of-plane scatter: a thin disc, not a sheet
+    spawn_separation: 6.0                           # distance between the two disc centres at frame 0
+    spawn_offset: 0.0                               # no lateral offset: `swirl` carries the angular momentum
+    spawn_tilt: 0.6                                 # the blue disc&#x27;s plane, tilted 0.6 rad about x
+    type_layout: split_x                            # low-x disc -&gt; red, high-x disc -&gt; blue
+    vel_init: {mode: circular_orbit, G: 1.0, spin: 0.90, softening: 0.15,
+               central_mass: 0.75, jitter: 0.06, approach: 0.18, swirl: 0.26}
+    types:                                          # 12500 stars per galaxy: disc mass 0.75 each
+      red:  {fraction: 0.5, mass: 0.00006}
+      blue: {fraction: 0.5, mass: 0.00006}
 fields: {}
 operators:
-  - {op: radius_graph, at: particle, radius: 0.15, min_radius: 0.001}
-  - {op: squared_law,  at: particle, law: coulomb, clamp: 1000000.0}
-schedule: [radius_graph, squared_law]
-plotting:
-  background: black
-  size_by: charge          # point size ~ |charge|
-  colors:                  # ParticleGraph PDE_E colour code (by type index)
-    q_p2: [1, 1, 1]
-    q_p1: [0, 0.5, 0.75]
-    q_n1: [1, 0, 0]
-  point_size: 9.0
+  # softening 0.15 = 1/8 of a disc radius: the pericentre is 2.0, so the two cores never come
+  # near it, and halving dt to 0.002 reproduces the same trajectory to three digits.
+  - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.15, all_pairs: true, compile: true}
+schedule: [squared_law]
+plotting: {background: black, colors: {red: [1.0, 0.30, 0.25], blue: [0.30, 0.55, 1.0]},
+           splat_size: 1.1, splat_res: 820, movie_max_frames: 1000, fps: 25,
+           # frame to the central 90% of the stars: the ~20% thrown out by the passage reach
+           # several times the size of what is worth watching, and framing on the full extent
+           # would leave the two discs 130 px wide in an 820 px frame.
+           frame_percentile: 90,
+           # camera pitch SWEEP: 0.25 rad -&gt; 1.1 rad (~63 deg), so the encounter starts near
+           # face-on and ends nearly edge-on -- the tails read as 3D structure.
+           camera_azim: 0.7, camera_elev: 0.25, camera_elev_end: 1.1, camera_turns: 0.15,
+           camera_zoom: 0.15, camera_pan: [0.03, 0.02]}
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
-  movie_particle:
-    description: The video shows a static field of multicolored particles against a black background.
-      There is no movement or evolution of the particles across the four keyframes. The distribution of
-      the dots remains constant throughout the entire sequence. The scene represents a steady-state distribution
-      of discrete points.
-    objects: 'The scene contains three distinct sets of small, circular particles: red, blue, and white.
-      These particles are distributed randomly across the entire frame without any specific geometric
-      arrangement or connection. Each particle is uniform in size and appears as a single pixel or a small
-      cluster of pixels. The colors are vibrant and contrast sharply against the solid black background.'</pre></span></span>
-      <span class="sim-cap">the same operator, now with signed charge — like charges repel and opposite attract, screening into a plasma</span>
+  movie_star:
+    description: Two distinct clusters of particles, one red and one blue, begin as separate, compact
+      spheres. As time progresses, the clusters begin to rotate and stretch into spiral shapes while moving
+      toward each other. The two spirals eventually collide and intertwine, creating a complex, turbulent
+      mixture of red and blue points. In the final frames, the particles have merged into a single, chaotic
+      cloud where the two colors are heavily overlapped and diffused.
+    objects: The scene contains two primary sets of particles, one colored red and the other colored blue.
+      Initially, the red particles form a large, solid circular mass in the lower-left, while the blue
+      particles form a smaller, slightly elongated oval in the upper-right. As the simulation evolves,
+      both sets transform into elongated, spiral-shaped structures that maintain their respective colors.
+      By the end of the sequence, the particles are distributed in a dense, overlapping cluster where
+      the red and blue points are intermingled.</pre></span></span>
+      <span class="sim-cap">the same law between two discs: their centres pass 1.65 apart at t&nbsp;=&nbsp;9.2, 1.4 disc radii, which raises tidal tails and takes 17% of the 25,000 stars out of both galaxies</span>
     </figcaption>
   </figure>
-  <figure class="sim-card figure">
-    <video src="gallery/coulomb_6_3d.mp4" autoplay="" loop="" muted="" playsinline="" preload="metadata"></video>
+  <figure class="sim-card">
+    <video src="gallery/galaxy_merger_3d.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">Coulomb (3D)<span class="sim-spec"><pre># coulomb_6_3d -- Coulomb (electrostatic inverse-square) in a 3D box via the unified `squared_law`.
-# charges [1, -1, 2, -2, 3, -3]; ported from ParticleGraph Coulomb (PDE_E).
-# squared_law law=coulomb (default): 2nd-derivative + add-aggregated; like charges repel, opposite attract.
-general: {name: coulomb_6_3d, seed: 0, n_frames: 128000, dt: 0.000024, boundary: free, dim: 3, world: [1.0, 1.0, 1.0]}
+      <span class="sim-name" tabindex="0">two galaxies, head-on<span class="sim-spec"><pre># galaxy_merger_3d -- the SAME two galaxies, head-on: one knob apart from `galaxy_collision_3d`
+# (`swirl: 0.26` -&gt; `0.0`), and that knob is the encounter&#x27;s angular momentum. L = 0 makes the
+# orbit radial, so the pericentre is 0 instead of 2.0 disc radii: the two discs fall straight
+# through each other, the cores sink and merge on the first passage, and what is left is one
+# spheroidal remnant with red and blue stars mixed through it and a debris halo -- no tails, since
+# there is no orbital rotation to swing the stripped stars into one. Same operator, same discs,
+# same masses, same `approach`: only L differs. (`approach` 0.25 rather than 0.18 keeps |v_rel|
+# 0.50 -- still half the parabolic 1.00 at separation 6, so the pair is bound.)
+#
+# Initialization stays a SPEC concern (no operator): `spawn: two_disks` places two flat discs
+# `spawn_separation` apart along x, the second tilted `spawn_tilt` radians out of the first&#x27;s
+# plane; `vel_init: {mode: circular_orbit}` then spins EACH disc about its own centre in its own
+# plane (from that disc&#x27;s enclosed mass + its `central_mass` core) and adds the encounter velocity
+# as two half-speeds -- `approach` closing along the separation axis, `swirl` tangential to it.
+#
+# `type_layout: split_x` types the set by x, and at frame 0 the two discs are disjoint in x (each
+# 2.4 wide, 6.0 apart), so the low-x disc is `red` and the high-x disc is `blue`: the colours ARE
+# the two galaxies, and every later mixing of red into blue is stars changing galaxy.
+general: {name: galaxy_merger_3d, seed: 2, n_frames: 10000, dt: 0.004, boundary: free, dim: 3,
+          world: [12.0, 12.0, 12.0], record_cap: 1000}
 sets:
-  particle:
-    n: 960
-    vel_init: 0.0001
-    types:
-      q_p1: {fraction: 0.1667, charge: 1}
-      q_n1: {fraction: 0.1667, charge: -1}
-      q_p2: {fraction: 0.1667, charge: 2}
-      q_n2: {fraction: 0.1667, charge: -2}
-      q_p3: {fraction: 0.1667, charge: 3}
-      q_n3: {fraction: 0.1665, charge: -3}
+  star:
+    n: 25000
+    spawn: two_disks                                # two flat discs, one tilted, placed to meet
+    spawn_radius: 1.2                               # disc radius (each galaxy)
+    spawn_thickness: 0.06                           # out-of-plane scatter: a thin disc, not a sheet
+    spawn_separation: 6.0                           # distance between the two disc centres at frame 0
+    spawn_offset: 0.0                               # head-on: no offset and no swirl, so L = 0
+    spawn_tilt: 0.6                                 # the blue disc&#x27;s plane, tilted 0.6 rad about x
+    type_layout: split_x                            # low-x disc -&gt; red, high-x disc -&gt; blue
+    vel_init: {mode: circular_orbit, G: 1.0, spin: 0.90, softening: 0.15,
+               central_mass: 0.75, jitter: 0.06, approach: 0.25, swirl: 0.0}
+    types:                                          # 12500 stars per galaxy: disc mass 0.75 each
+      red:  {fraction: 0.5, mass: 0.00006}
+      blue: {fraction: 0.5, mass: 0.00006}
 fields: {}
 operators:
-  - {op: radius_graph, at: particle, radius: 0.15, min_radius: 0.001}
-  - {op: squared_law,  at: particle, law: coulomb, clamp: 1000000.0}
-schedule: [radius_graph, squared_law]
-plotting:
-  background: black
-  size_by: charge          # point size ~ |charge|
-  colors:                  # ParticleGraph PDE_E colour code (by type index)
-    q_p1: [1, 1, 1]
-    q_n1: [0, 0.5, 0.75]
-    q_p2: [1, 0, 0]
-    q_n2: [0.75, 0, 0]
-    q_p3: [0.5, 0.5, 0.5]
-    q_n3: [0.5, 0.5, 0.5]
-  splat_size: 2.6
-  splat_res: 820
+  # softening 0.15 = 1/8 of a disc radius. Here the cores DO meet, so this is what keeps the
+  # core-core force finite; halving dt to 0.002 reproduces the same trajectory to three digits.
+  - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.15, all_pairs: true, compile: true}
+schedule: [squared_law]
+plotting: {background: black, colors: {red: [1.0, 0.30, 0.25], blue: [0.30, 0.55, 1.0]},
+           splat_size: 1.1, splat_res: 820, movie_max_frames: 1000, fps: 25,
+           # frame to the central 90% of the stars: the ~20% thrown out by the passage reach
+           # several times the size of what is worth watching, and framing on the full extent
+           # would leave the two discs 130 px wide in an 820 px frame.
+           frame_percentile: 90,
+           # camera pitch SWEEP: 0.25 rad -&gt; 1.1 rad (~63 deg), so the encounter starts near
+           # face-on and ends nearly edge-on -- the tails read as 3D structure.
+           camera_azim: 0.7, camera_elev: 0.25, camera_elev_end: 1.1, camera_turns: 0.15,
+           camera_zoom: 0.15, camera_pan: [0.03, 0.02]}
 
 # --- auto: video descriptions (gemma-4-12B) ---
 descriptions:
-  movie_particle:
-    description: A cluster of particles begins in a highly compact, organized spherical arrangement. Over
-      time, the particles begin to move outward from the center, causing the cluster to expand. The expansion
-      becomes increasingly chaotic as the particles spread further into the surrounding space. By the
-      final frame, the cluster has significantly loosened, with many individual particles drifting away
-      from the core.
-    objects: The scene contains a large collection of small, spherical particles. These particles are
-      primarily colored in shades of red, grey, and light blue. They are initially arranged in a dense,
-      interconnected cluster at the center of the frame. As the simulation progresses, the particles maintain
-      their individual shapes but lose their tight spatial connection.</pre></span></span>
-      <span class="sim-cap">a 3D charged cloud expanding in space</span>
+  movie_star:
+    description: The simulation begins with two distinct, solid spheres of red and blue color. These spheres
+      rapidly disintegrate into a cloud of individual particles that begin to move and interact. As the
+      particles expand, they form complex, intertwined structures that resemble swirling nebulae or turbulent
+      fluids. Over time, the particles become increasingly dense and chaotic, eventually forming a large,
+      overlapping cluster of red and blue points.
+    objects: The scene contains two primary sets of particles, one colored red and the other colored blue.
+      Initially, the red particles are clustered into a single, large, spherical mass. The blue particles
+      start as a smaller, slightly elongated oval shape. As the simulation progresses, both sets of particles
+      disperse into thousands of tiny, individual points that occupy a shared three-dimensional space.</pre></span></span>
+      <span class="sim-cap">one knob apart — the encounter's angular momentum set to zero, so the discs fall straight through each other at t&nbsp;=&nbsp;5.7: no tails, one remnant, red and blue mixed evenly through its core, and 48% of the stars thrown out into a halo</span>
     </figcaption>
   </figure>
 </div>

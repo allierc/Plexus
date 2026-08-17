@@ -49,3 +49,16 @@ plotting: {background: black, colors: {red: [1.0, 0.30, 0.25], blue: [0.30, 0.55
            # face-on and ends nearly edge-on -- the tails read as 3D structure.
            camera_azim: 0.7, camera_elev: 0.25, camera_elev_end: 1.1, camera_turns: 0.15,
            camera_zoom: 0.15, camera_pan: [0.03, 0.02]}
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_star:
+    description: The simulation begins with two distinct, solid spheres of red and blue color. These spheres
+      rapidly disintegrate into a cloud of individual particles that begin to move and interact. As the
+      particles expand, they form complex, intertwined structures that resemble swirling nebulae or turbulent
+      fluids. Over time, the particles become increasingly dense and chaotic, eventually forming a large,
+      overlapping cluster of red and blue points.
+    objects: The scene contains two primary sets of particles, one colored red and the other colored blue.
+      Initially, the red particles are clustered into a single, large, spherical mass. The blue particles
+      start as a smaller, slightly elongated oval shape. As the simulation progresses, both sets of particles
+      disperse into thousands of tiny, individual points that occupy a shared three-dimensional space.
