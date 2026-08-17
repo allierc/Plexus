@@ -39,6 +39,10 @@ GATES, decided before the run:
                                          if myosin were uniform this would be a scale factor and the
                                          operator would not be earning its place
     G82  it does not break the adhesion  G70 and G72 still pass with myosin pulling on the membrane
+    G83  the membrane stays whole         not one face is removed over 401 frames, and the minimum
+                                          areal density under the cap stays above zero -- degradation
+                                          is balanced by secretion, which is what makes this a
+                                          nominal and not a damage experiment
 """
 from __future__ import annotations
 
@@ -58,7 +62,7 @@ from test_07j_hole import CellChem                                       # noqa:
 from test_05m_protease import Rig05m                                     # noqa: E402
 
 NAME = "07l_nominal"
-SPOT = 20.0                        # 06_hole_tiny's cap: the self-arresting point
+SPOT = 20.0                        # 06_hole_tiny's cap, as the site of local thinning
 KDEG = 150.0
 
 
@@ -116,8 +120,11 @@ class Rig07l(CellChem, I.Rig07i, Rig05m):
         """What G80--G82 are scored on, per kept frame."""
         m = self.myo
         l0 = self._l0_scalar * (1.0 - self.a_myo * (m[self.ct_face] - 1.0)).clamp(0.2, 1.5)
+        rho = self.sheet.areal_density() / self.sheet.rho0
         return dict(myo_med=float(m.median()), myo_p95=float(torch.quantile(m, 0.95)),
                     myo_min=float(m.min()), myo_max=float(m.max()),
+                    rho_min=float(rho.min()) if rho.numel() else 1.0,
+                    rho_p05=float(torch.quantile(rho, 0.05)) if rho.numel() > 1 else 1.0,
                     l0_cv=float(l0.std() / max(self._l0_scalar, 1e-30)),
                     l0_mean_over_l0=float(l0.mean() / max(self._l0_scalar, 1e-30)))
 
@@ -153,7 +160,14 @@ def main():
                        myosin="per cell, recruited by junction strain rate, sets the adhesion's "
                               "rest length",
                        mt1_field=f"single Gaussian cap, theta {SPOT} deg", kdeg=KDEG),
-            rho_crit=BR.RHO_CRIT, s_mode="homeostatic",
+            # THE NOMINAL DOES NOT TEAR. `bm_tear` removes a face where rho falls below rho_crit, and
+            # 06, 07j and 07k exist to show exactly that; a nominal with a hole in it is a damage
+            # experiment wearing the wrong name. At rho_crit = 0 the operator is still composed and
+            # still evaluated -- it simply never has a face to remove -- so the four proteases run in
+            # full, MT1-MMP still eats mass under the cap, and `bm_secrete` replenishes it. What the
+            # run shows is then the BALANCE of degradation against repair on an INTACT sheet, which
+            # is what a nominal should show. The perforated variants keep rho_crit = 0.35.
+            rho_crit=0.0, s_mode="homeostatic",
             kappa_b=5.0, k_on=0.6, k_off0=0.05, f_bell=3.0e-3,
             K_timp=BR.BASE["K"], hetero=BR.BASE["hetero"],
             s_timp=1.0 * BR.BASE["K"] * (1.0 - BR.BASE["bound"]) / 8.0,
