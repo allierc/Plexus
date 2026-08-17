@@ -1,0 +1,58 @@
+# galaxy_collision_3d -- TWO 3D galaxies on a grazing prograde passage. The same `squared_law`
+# (law: gravity, all_pairs) that holds one disc together is what pulls the two discs into each
+# other: the pair is ONE set with two types, not two sets, and that is the point -- an all-pairs
+# law sums over the whole set, so mutual gravity between the galaxies is not a second operator.
+#
+# Initialization stays a SPEC concern (no operator): `spawn: two_disks` places two flat discs
+# `spawn_separation` apart along x, the second tilted `spawn_tilt` radians out of the first's
+# plane; `vel_init: {mode: circular_orbit}` then spins EACH disc about its own centre in its own
+# plane (from that disc's enclosed mass + its `central_mass` core) and adds the encounter velocity
+# as two half-speeds -- `approach` closing along the separation axis, `swirl` tangential to it.
+#
+# THE ORBIT IS DESIGNED BACKWARDS FROM ITS PERICENTRE. With G = 1 and M_tot = 3.0 (two galaxies of
+# core 0.75 + disc 0.75), v_rel = 2*sqrt(0.18^2 + 0.26^2) = 0.63 against the parabolic
+# sqrt(2 G M_tot / 6) = 1.00, and L = 2 * 6 * 0.26 = 3.12, which is the bound orbit a = 5.0,
+# e = 0.59: pericentre 2.0 = 1.7 DISC RADII, period 40.6 time units, first passage at t = 8.7 and
+# the second at t = 30 -- both inside the 40 time units this run covers (10000 frames x dt 0.004).
+# The angular momentum has to come from `swirl`: offsetting the discs and aiming them at each
+# other leaves L = 0, and a pilot of that plunges to pericentre 0.4, shreds both discs and unbinds
+# half the stars. A prograde passage at ~2 disc radii is the tail-raising case, after Toomre &
+# Toomre, "Galactic Bridges and Tails" (1972). Softened gravity is Mocz's, vendored at
+# papers/nbody-python/ (MIT).
+#
+# `type_layout: split_x` types the set by x, and at frame 0 the two discs are disjoint in x (each
+# 2.4 wide, 6.0 apart), so the low-x disc is `red` and the high-x disc is `blue`: the colours ARE
+# the two galaxies, and every later mixing of red into blue is stars changing galaxy.
+general: {name: galaxy_collision_3d, seed: 2, n_frames: 10000, dt: 0.004, boundary: free, dim: 3,
+          world: [12.0, 12.0, 12.0], record_cap: 1000}
+sets:
+  star:
+    n: 25000
+    spawn: two_disks                                # two flat discs, one tilted, placed to meet
+    spawn_radius: 1.2                               # disc radius (each galaxy)
+    spawn_thickness: 0.06                           # out-of-plane scatter: a thin disc, not a sheet
+    spawn_separation: 6.0                           # distance between the two disc centres at frame 0
+    spawn_offset: 0.0                               # no lateral offset: `swirl` carries the angular momentum
+    spawn_tilt: 0.6                                 # the blue disc's plane, tilted 0.6 rad about x
+    type_layout: split_x                            # low-x disc -> red, high-x disc -> blue
+    vel_init: {mode: circular_orbit, G: 1.0, spin: 0.90, softening: 0.15,
+               central_mass: 0.75, jitter: 0.06, approach: 0.18, swirl: 0.26}
+    types:                                          # 12500 stars per galaxy: disc mass 0.75 each
+      red:  {fraction: 0.5, mass: 0.00006}
+      blue: {fraction: 0.5, mass: 0.00006}
+fields: {}
+operators:
+  # softening 0.15 = 1/8 of a disc radius: the pericentre is 2.0, so the two cores never come
+  # near it, and halving dt to 0.002 reproduces the same trajectory to three digits.
+  - {op: squared_law, at: star, law: gravity, k: 1.0, softening: 0.15, all_pairs: true, compile: true}
+schedule: [squared_law]
+plotting: {background: black, colors: {red: [1.0, 0.30, 0.25], blue: [0.30, 0.55, 1.0]},
+           splat_size: 1.1, splat_res: 820, movie_max_frames: 1000, fps: 25,
+           # frame to the central 90% of the stars: the ~20% thrown out by the passage reach
+           # several times the size of what is worth watching, and framing on the full extent
+           # would leave the two discs 130 px wide in an 820 px frame.
+           frame_percentile: 90,
+           # camera pitch SWEEP: 0.25 rad -> 1.1 rad (~63 deg), so the encounter starts near
+           # face-on and ends nearly edge-on -- the tails read as 3D structure.
+           camera_azim: 0.7, camera_elev: 0.25, camera_elev_end: 1.1, camera_turns: 0.15,
+           camera_zoom: 0.15, camera_pan: [0.03, 0.02]}
