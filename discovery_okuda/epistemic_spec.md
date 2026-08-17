@@ -29,29 +29,57 @@ corpus:
 
 ## The seed floor
 
-Measured, not assumed: every `intent: replicate` run re-runs its parent's composition at a fresh
-seed, so the spread between a replicate and its parent IS this substrate's reproducibility. Median
-absolute relative difference over 21 replicate/parent pairs, r001–r022.
+Measured, not assumed: a replicate re-runs its parent's composition at a fresh seed, so the spread
+between the two IS this substrate's reproducibility. Median absolute relative difference over the
+replicate/parent pairs on file.
 
 A prediction that asks for a change smaller than the floor of its own metric is not a prediction.
-It is a coin toss with a number on it, and the audit reports it as such.
+It is a coin toss with a number on it, R7 refuses it, and the audit reports it as such.
+
+RE-MEASURED 17 AUGUST, ON THIS CAMPAIGN'S OWN PAIRS, and the numbers below are those. The previous
+values came from an older corpus and R7 has been enforcing them ever since -- against a substrate
+that does not have them. The two disagreed in BOTH directions, which is the reason this was worth
+doing rather than leaving alone:
+
+    grip           0.30 -> 0.058   R7 was refusing questions FIVE TIMES finer than the noise allows
+    corr_act_rad   0.15 -> 0.053   the same, threefold
+    n_cells        0.29 -> 0.158   the same, twofold
+    act_max        0.06 -> 0.013
+    n_spots        0.13 -> 0.333   R7 was ADMITTING questions this substrate cannot answer
+    spot_spacing   0.15 -> 0.214   the same
+
+WHY IT COULD BE RE-MEASURED NOW AND NOT BEFORE. The control slot was refused by R8 in every round of
+the previous campaign -- it carries no `act`, because it is the parent unchanged and makes no
+prediction -- so the campaign built its own reference run and threw it away, and had no seed pair to
+measure. Once R8 stopped judging the control and the control was written at a FRESH seed, every
+round produces one pair on whatever composition it is building from: 34 replications against 12 at
+the halfway point.
+
+METRICS WITH FEWER THAN THREE PAIRS KEEP THEIR OLD VALUE and are marked, because a floor from two
+pairs is not a floor. `epistemic_audit.py` prints measured against declared every run, so this table
+can be checked rather than trusted -- and re-measured again when the corpus is larger.
 
 ```yaml
 seed_floor:                 # median |Δ| / parent, MEASURED over replicate pairs
+  # re-measured 17 August over this campaign's r001-r020 pairs
+  n_spots: 0.33
+  spot_spacing_cells: 0.21
+  n_cells: 0.16
+  cells: 0.16
+  n_tubes: 0.12
+  invagination: 0.08
+  grip: 0.06
+  corr_act_rad: 0.05
+  protr: 0.013
+  act_max: 0.013
+  # NOT re-measured: fewer than three replicate pairs carried these, so the older corpus's value
+  # stands. `protrusion_aspect_max` and `n_tips` are retired from the admitted bank in any case --
+  # they resolve at 2.44x and 2.78x their own noise, under the 3x bar -- and are kept only so a
+  # number quoted from an older round can still be judged.
   protrusion_aspect_max: 0.41
   n_tips: 0.36
-  grip: 0.30
-  n_cells: 0.29
-  cells: 0.29
-  n_tubes: 0.20
   act_cv: 0.17
-  spot_spacing_cells: 0.15
-  corr_act_rad: 0.15
-  n_spots: 0.13
   gyr_prolate: 0.08
-  invagination: 0.08
-  act_max: 0.06
-  protr: 0.02
   reduced_volume: 0.02
   _default: 0.20            # used, and named in the output, when a metric has no measured floor
 ```
