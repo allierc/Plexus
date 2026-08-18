@@ -303,6 +303,47 @@ def path_coordinate(pts, seed_pt, k=12):
     return 1.0 - d / max(d.max(), 1e-12), idx
 
 
+def smooth_material_coord(pts, s, idx, iters=8, lam=0.5):
+    """Smooth the material coordinate s, not the fibre field f.
+
+    f = grad(s) / ||grad(s)||, so a noisy s gives a noisy f, and smoothing f afterwards
+    patches the symptom in vector space (three noisy numbers) rather than the cause (one
+    noisy scalar). This smooths first:
+
+        s -> s~ -> grad(s~) -> f~ = grad(s~) / ||grad(s~)||
+
+    which is `fibre_from_s` called on s~ instead of s -- the same construction, fed a
+    cleaner field. Ported verbatim (same iteration, same endpoint treatment) from
+    `archive/eye_G/viz_muscle_fibre_construction.py::smooth_material_coord`, which measures
+    it against the raw field; this is the version that actually feeds the simulation.
+
+    s~ is k-NN GRAPH Laplacian smoothing, `iters` rounds of
+
+        s <- (1 - lam) s + lam * mean_{j in kNN(p)} s_j
+
+    over the SAME neighbourhood `idx` (from `path_coordinate`'s k-NN graph) that
+    `fibre_from_s` differentiates over, not an isotropic blur: a Euclidean blur radius can
+    reach across a fold in the strap, where two points close in space sit far apart along
+    the fibre, and would blend their very different s values into a wrong local gradient.
+
+    The endpoint constraint -- s = 0 at the origin, s = 1 at the insertion -- is not
+    enforced by pinning particular particles, but by an affine RESCALE after smoothing so
+    min(s~) = 0 and max(s~) = 1 exactly. Smoothing can only pull extreme values toward the
+    mean, never past it, so the arg-min/arg-max are unchanged in identity, only their
+    neighbourhood is denoised.
+    """
+    if iters <= 0 or len(s) < 3:
+        return s
+    nbr = idx[:, 1:]                                   # idx[:, 0] is self
+    s_sm = s.copy()
+    for _ in range(int(iters)):
+        s_sm = (1.0 - lam) * s_sm + lam * s_sm[nbr].mean(axis=1)
+    lo, hi = s_sm.min(), s_sm.max()
+    if hi - lo < 1e-12:
+        return s
+    return (s_sm - lo) / (hi - lo)
+
+
 def fibre_from_s(pts, s, idx, ridge=1e-9):
     """[n,3] unit fibre directions: the local gradient of the fibre coordinate.
 
@@ -406,7 +447,8 @@ def fill_meshes(meshes, n, oversample=3.0, max_rounds=8, device=None):
         raise RuntimeError(f"fill_meshes: only {len(X)} of {n} points landed inside "
                            f"after {n_try} candidates ({100.0 * n_hit / max(n_try, 1):.1f}% fill)")
     vol = box_vol * n_hit / max(n_try, 1)
-    return X[:n], vol
+    fill_pct = 100.0 * n_hit / max(n_try, 1)
+    return X[:n], vol, fill_pct
 
 
 # --------------------------------------------------------------------------- #
@@ -483,7 +525,7 @@ class BlendGlobe(Seed):
             return fr.globe(d[f"{part}__v"]), np.asarray(d[f"{part}__f"], np.int64)
 
         retina, cornea, lens = (mesh(f"{self.side}_{k}") for k in ("retina", "cornea", "lens"))
-        X, vol = fill_meshes([retina, cornea, lens], p.n, device=dev)
+        X, vol, fill_pct = fill_meshes([retina, cornea, lens], p.n, device=dev)
 
         c = np.asarray(self.center, float)
         loc = X - c[None, :]
@@ -534,9 +576,12 @@ class BlendGlobe(Seed):
         p.register_buffer("rest", torch.as_tensor(loc, dtype=torch.float32, device=dev))
         p.register_buffer("rest_dir", torch.as_tensor(dirs, dtype=torch.float32, device=dev))
         p.register_buffer("rest_rn", torch.as_tensor(rn, dtype=torch.float32, device=dev))
-        print(f"[blend_globe] {fr.describe()}; {p.n} points, volume {vol:.5f}, "
+        print(f"[blend_globe] {fr.describe()}", flush=True)
+        print(f"[blend_globe] {p.n} points, volume {vol:.5f}, "
               f"{int(shell.sum())} on the shell, {int(in_lens.sum())} lens, "
               f"{int(in_cornea.sum())} cornea", flush=True)
+        print(f"[blend_globe] \033[1m\033[32mfill {fill_pct:.1f}%\033[0m "
+              f"of the bounding box was inside the mesh", flush=True)
         self._done = True
         return {}
 
@@ -599,6 +644,9 @@ class BlendMuscles(Seed):
         self.embed = float(params.get("embed", -0.006))
         self.inflate = float(params.get("inflate", 1.0))       # must match blend_globe
         self.bins = int(params.get("bins", 14))            # match `muscle_geometry`'s readout
+        # smooth s before differentiating it into f, not f after -- see smooth_material_coord
+        self.smooth_iters = int(params.get("smooth_iters", 0))     # 0 = off (raw geodesic s)
+        self.smooth_lambda = float(params.get("smooth_lambda", 0.5))
         self._done = False
 
     def forward(self, H, mask=None):
@@ -628,7 +676,7 @@ class BlendMuscles(Seed):
             part = f"{self.side}_{key}"
             V = fr(d[f"{part}__v"])
             F = np.asarray(d[f"{part}__f"], np.int64)
-            pts, vol = fill_meshes([(V, F)], sel.size, device=dev)
+            pts, vol, fill_pct = fill_meshes([(V, F)], sel.size, device=dev)
 
             # the INSERTION, measured in the cut, is where the fibre coordinate starts
             ins = fr(d[f"{part}__centreline__v"])[0]
@@ -639,6 +687,9 @@ class BlendMuscles(Seed):
                 s, idx = path_coordinate(pts, ins)          # the push is small, but s is cheap
             else:
                 moved = 0.0
+            if self.smooth_iters > 0:
+                s = smooth_material_coord(pts, s, idx, iters=self.smooth_iters,
+                                          lam=self.smooth_lambda)
             L, empty = binned_length(pts, s, self.bins)
             if empty:
                 print(f"[blend_muscles] WARNING {key}: {empty} of {self.bins} bins empty -- "
@@ -657,7 +708,8 @@ class BlendMuscles(Seed):
                 r = np.linalg.norm(loc, axis=1).clip(1e-12)
                 rs = surface_radius(self.center, loc / r[:, None], shell, device=dev)
                 inside = float(np.mean(np.maximum(rs - r, 0.0)))
-            report.append(f"{key}={L:.3f}(moved {100 * moved:.0f}%, tendon {inside:+.4f} in)")
+            report.append(f"{key}={L:.3f} (fill \033[1m\033[32m{fill_pct:.1f}%\033[0m, "
+                          f"moved {100 * moved:.0f}%, tendon {inside:+.4f} in)")
 
         new = p.state.clone()
         pa, pb = p.state_schema["pos"]
@@ -678,9 +730,15 @@ class BlendMuscles(Seed):
         m = H.level(p.parent_name)
         m.register_buffer("rest_length",
                           torch.as_tensor(rest_len, dtype=torch.float32, device=dev))
-        print(f"[blend_muscles] {fr.describe()}; {M} straps x {p.n // M} points; "
-              f"standoff {self.standoff:+.3f} / embed {self.embed:+.3f}; rest lengths "
-              + " ".join(report), flush=True)
+        print(f"[blend_muscles] {fr.describe()}", flush=True)
+        print(f"[blend_muscles] {M} straps x {p.n // M} points; "
+              f"standoff {self.standoff:+.3f} / embed {self.embed:+.3f}", flush=True)
+        smooth_msg = (f"iters={self.smooth_iters}, lambda={self.smooth_lambda:.2f}"
+                     if self.smooth_iters > 0 else "off (raw geodesic s)")
+        print(f"[blend_muscles] fibre smoothing: {smooth_msg}", flush=True)
+        print("[blend_muscles] rest lengths:", flush=True)
+        for line in report:
+            print(f"    {line}", flush=True)
         self._done = True
         return {}
 

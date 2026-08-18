@@ -73,7 +73,7 @@ def eye_c_now(H):
 
 
 def capture_run(sim, device, stride=3, n_shell=26000, n_cut=16000, n_mus=14000,
-                n_grid_pts=9000, seed=0):
+                n_grid_pts=9000, seed=0, progress=True):
     keys = ("frame", "shell", "cut_pos", "cut_strain", "cut_vm",
             "mus_pos", "mus_strain", "mus_vm", "act", "tension", "length",
             "ins", "pull", "axis", "gaze", "target", "centre", "gpos", "gvel",
@@ -156,7 +156,7 @@ def capture_run(sim, device, stride=3, n_shell=26000, n_cut=16000, n_mus=14000,
         rec["radius"].append(float(r_now.mean()))
         rec["radius_spread"].append(float(r_now.std()))
 
-    H, _ = engine_run(sim, out_path=None, device=device, on_frame=hook, progress=False)
+    H, _ = engine_run(sim, out_path=None, device=device, on_frame=hook, progress=progress)
     out = {k: (np.asarray(v) if k not in ("gpos", "gvel") else v) for k, v in rec.items()}
     out["tissue"] = idx["tissue"]
     out["mus_parent"] = idx["mus_parent"]

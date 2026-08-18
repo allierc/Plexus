@@ -1,0 +1,70 @@
+{
+  "n_frames": 12,
+  "range_hvt_deg": [
+    0.01,
+    0.02,
+    0.01
+  ],
+  "mean_settle_error_deg": null,
+  "tracking_rms_deg": [
+    0.07,
+    0.01,
+    0.0
+  ],
+  "tracking_settled_rms_deg": [
+    0.07,
+    0.01,
+    0.0
+  ],
+  "max_settle_error_deg": null,
+  "recruitment_correct": "n/a",
+  "centroid_drift_max_frac_radius": 0.064,
+  "radius_mean_pct": -0.05,
+  "radius_worst_pct": 0.06,
+  "radius_spread_pct": 5.02,
+  "strain_p99": 0.0023,
+  "strain_max": 0.0186,
+  "vonmises_p99": 0.574,
+  "activation_range": [
+    0.021,
+    0.134
+  ],
+  "max_shortening_pct": {
+    "LR": 2.59,
+    "SR": 2.29,
+    "MR": 2.72,
+    "IR": 1.91,
+    "SO": 2.4,
+    "IO": 2.3
+  },
+  "peak_shortening_pct": 2.72,
+  "muscle_strain_p99": 0.0415,
+  "holds": [],
+  "geometry": {
+    "source": "260802_s2_EYE_MUSCLES_MODEL.blend",
+    "side": "R",
+    "scale": 0.16768,
+    "axial_ratio": 0.7178,
+    "semi_axes": [
+      0.1241,
+      0.1059,
+      0.0825
+    ],
+    "rest_lengths": {
+      "LR": 0.1577,
+      "SR": 0.1561,
+      "MR": 0.1961,
+      "IR": 0.1667,
+      "SO": 0.2006,
+      "IO": 0.2133
+    },
+    "muscle_volumes": {
+      "LR": 1.48875e-05,
+      "SR": 2.25246e-05,
+      "MR": 1.45764e-05,
+      "IR": 2.28027e-05,
+      "SO": 2.5405e-05,
+      "IO": 2.91811e-05
+    }
+  }
+}

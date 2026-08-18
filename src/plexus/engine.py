@@ -990,7 +990,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     if progress:                                     # live progress bar over the simulated frames
         try:
             from tqdm import tqdm
-            ticks = tqdm(ticks, desc=f"[generate] {sim.name}", unit="frame", dynamic_ncols=True, leave=False)
+            ticks = tqdm(ticks, desc=f"[generate] {sim.name}", unit="frame", dynamic_ncols=True, ncols=140, leave=False)
         except ImportError:
             pass
     # the tape is OFF unless the caller asked for it (see the docstring): generation pays no
