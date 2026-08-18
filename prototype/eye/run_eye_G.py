@@ -80,7 +80,8 @@ G_MECHANICS = dict(
 # --------------------------------------------------------------------------- #
 def build_spec(preset="probe", n_particles=45000, side="R", blend=BM.DEFAULT_BLEND,
                parts=BM.DEFAULT_PARTS, name="eye_G_blend", inflate=1.0, standoff=0.008,
-               embed=-0.006, bone=False, n_bone=18000, **kw):
+               embed=-0.006, bone=False, n_bone=18000, smooth_iters=0, smooth_lambda=0.5,
+               **kw):
     """Model F's spec with the two anatomy operators replaced by the blend seeds."""
     params = dict(G_MECHANICS)
     params.update(kw)
@@ -99,7 +100,8 @@ def build_spec(preset="probe", n_particles=45000, side="R", blend=BM.DEFAULT_BLE
     muscle_seed = dict(op="blend_muscles", at="muscle_particle", before_frame=1, **seed_common,
                        keys=list(EA.MUSCLE_KEYS), cap=0.10,
                        standoff=float(standoff), embed=float(embed),
-                       youngs=float(params["muscle_youngs"]))
+                       youngs=float(params["muscle_youngs"]),
+                       smooth_iters=int(smooth_iters), smooth_lambda=float(smooth_lambda))
 
     ops = []
     for o in spec["operators"]:
@@ -214,6 +216,20 @@ def main():
                     help="clearance the muscle belly keeps from the globe surface")
     ap.add_argument("--embed", type=float, default=-0.006,
                     help="how deep the tendon cap sits INSIDE the surface (negative)")
+    ap.add_argument("--eye-youngs", type=float, default=None,
+                    help="set sclera/choroid/vitreous ALL to this one value (a uniform globe; "
+                         "overrides the three flags below)")
+    ap.add_argument("--sclera-youngs", type=float, default=G_MECHANICS["sclera_youngs"])
+    ap.add_argument("--vitreous-youngs", type=float, default=G_MECHANICS["vitreous_youngs"])
+    ap.add_argument("--choroid-youngs", type=float, default=G_MECHANICS["choroid_youngs"])
+    ap.add_argument("--muscle-youngs", type=float, default=G_MECHANICS["muscle_youngs"],
+                    help="muscle passive stiffness E (240 in eye G; A/E = 67/240 = 0.28)")
+    ap.add_argument("--smooth-iters", type=int, default=0,
+                    help="Laplacian-smooth the fibre coordinate s BEFORE differentiating it "
+                         "into f=grad(s)/|grad(s)| -- s->s~->f~, not f smoothed after the "
+                         "fact; k-NN graph, s=0/s=1 endpoints preserved by rescale. 0 = off")
+    ap.add_argument("--smooth-lambda", type=float, default=0.5,
+                    help="smoothing step size per iteration, s <- (1-lam)s + lam*mean(nbrs)")
     ap.add_argument("--particles", type=int, default=45000)
     ap.add_argument("--side", default="R", choices=("L", "R"))
     ap.add_argument("--blend", default=BM.DEFAULT_BLEND)
@@ -245,10 +261,18 @@ def main():
         return
 
     os.makedirs(args.out, exist_ok=True)
+    sclera = vitreous = choroid = None
+    if args.eye_youngs is not None:
+        sclera = vitreous = choroid = args.eye_youngs
     spec, pl = build_spec(preset=args.preset, n_particles=args.particles, side=args.side,
                           blend=args.blend, contract=args.contract, inflate=args.inflate,
                           standoff=args.standoff, embed=args.embed,
-                          bone=args.bone, n_bone=args.n_bone)
+                          bone=args.bone, n_bone=args.n_bone,
+                          sclera_youngs=sclera if sclera is not None else args.sclera_youngs,
+                          vitreous_youngs=vitreous if vitreous is not None else args.vitreous_youngs,
+                          choroid_youngs=choroid if choroid is not None else args.choroid_youngs,
+                          muscle_youngs=args.muscle_youngs,
+                          smooth_iters=args.smooth_iters, smooth_lambda=args.smooth_lambda)
     probe = None
     if args.program == "pairs":
         groups = PG.PAIRS if not args.groups else [
@@ -299,6 +323,12 @@ def main():
         for k, v in per.items():
             print(f"    {k:6s} {v['label']:42s} gaze {v['gaze_excursion_deg']}  "
                   f"expected {v['expected']:12s} {'OK' if v['ok'] else 'NO'}")
+        h = [v["gaze_excursion_deg"][0] for v in per.values()] + [0.0]
+        v_ = [v["gaze_excursion_deg"][1] for v in per.values()] + [0.0]
+        span_h, span_v = max(h) - min(h), max(v_) - min(v_)
+        GREEN, BOLD, RESET = "\033[32m", "\033[1m", "\033[0m"
+        print(f"\n  {BOLD}{GREEN}workspace: {span_h:.1f} deg horizontal x "
+              f"{span_v:.1f} deg vertical{RESET}\n")
     else:
         diag = run_eye.diagnose(cap, sim)
     diag["geometry"] = dict(source=os.path.basename(args.blend), side=args.side,
@@ -323,3 +353,14 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# python run_eye_G.py --program pairs --eye-youngs 240 --label E240 --hold 200 --rest 160 --turns 0 --az 25
+
+# # muscle passive stiffness E (default 240)
+# python run_eye_G.py --program pairs --muscle-youngs 180 --label E_mus180 ...
+
+# # peak active stress A (default 67) — already existed as --contract
+# python run_eye_G.py --program pairs --contract 90 --label A90 ...
+
+# # both together, e.g. to hold A/E fixed while scaling
+# python run_eye_G.py --program pairs --contract 50 --muscle-youngs 178 --label ratio_hold ...

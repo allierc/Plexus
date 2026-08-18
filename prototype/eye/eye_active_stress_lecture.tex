@@ -1,0 +1,972 @@
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[margin=2.6cm]{geometry}
+\usepackage{amsmath,amssymb,bm}
+\usepackage{xcolor}
+\usepackage{microtype}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{tcolorbox}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{graphicx}
+\usepackage{float}
+\hypersetup{colorlinks=true,linkcolor=blue!55!black,urlcolor=blue!55!black}
+\setlength{\parskip}{0.65em}
+\setlength{\parindent}{0pt}
+\definecolor{accent}{RGB}{35,78,105}
+\definecolor{soft}{RGB}{239,244,247}
+\definecolor{codebg}{RGB}{247,248,249}
+\definecolor{codeframe}{RGB}{180,190,198}
+\newcommand{\dd}{\,\mathrm d}
+\newcommand{\vect}[1]{\bm{#1}}
+\newcommand{\sig}{\boldsymbol{\sigma}}
+\newcommand{\grad}{\nabla}
+\lstset{basicstyle=\ttfamily\scriptsize, numbers=left, numberstyle=\tiny\color{gray}, stepnumber=1, numbersep=7pt, frame=single, rulecolor=\color{codeframe}, backgroundcolor=\color{codebg}, breaklines=true, breakatwhitespace=false, columns=fullflexible, keepspaces=true, showstringspaces=false, upquote=true, tabsize=4}
+\title{\textbf{Active Muscle Stress in the MPM Eye}\\
+\large A lecture-note derivation from activation to eye motion}
+\author{Plexus prototype / Eye G}
+\date{18 August 2026}
+\begin{document}
+\maketitle
+
+\begin{tcolorbox}[colback=soft,colframe=accent,title=What this note derives]
+A muscle activation in the Eye G model is not converted directly into a force acting on the globe. The activation first creates an \emph{active Cauchy stress} inside the muscle material. The stress is anisotropic and acts along the local muscle-fibre direction. In an MLS-MPM step, the divergence of that stress enters the particle-to-grid momentum transfer. Because the active stress is tapered to zero at the muscle ends, the distributed internal traction is equivalent, at the scale of the whole muscle, to pulling its two endpoints toward one another. If one endpoint is attached to bone and the other is attached to the sclera, the resulting tension shortens the muscle and therefore moves the eye.
+\end{tcolorbox}
+
+\begin{tcolorbox}[colback=white,colframe=accent,title=The MPM feedback loop in one picture]
+The easiest coarse description of MPM is a feedback loop between deformation and stress. At time $t$, each material particle already carries its current deformation gradient $F_p^t$. The constitutive model turns that deformation into passive elastic stress, while muscle activation contributes an additional active stress. The total stress is then converted into momentum changes on the MPM grid. The updated grid velocity is gathered back to the particles, producing a new local velocity gradient and therefore a new deformation gradient at the next substep. In symbols, the causal loop is
+\begin{equation}
+F_p^t \;\longrightarrow\; \sig_p^t \;\longrightarrow\; \text{grid momentum} \;\longrightarrow\; \mathbf v_p^{t+\Delta t},C_p^{t+\Delta t} \;\longrightarrow\; F_p^{t+\Delta t}.
+\label{eq:mpm-loop}
+\end{equation}
+There is no simultaneous circularity in the calculation: the simulation advances one time step at a time. The deformation already present at time $t$ determines the stress used to compute the motion during the next increment, and that motion changes the deformation carried into the next increment.
+
+For a passive material, deformation creates restoring elastic stress. In an activated muscle, there is also a second entry into the loop: active stress can be non-zero even when $F_p=I$, so activation can initiate contraction. The subsequent deformation then generates passive elastic resistance. In the eye, the observed shortening and rotation are therefore the result of a competition between active contractile stress and passive material, attachment, contact, and surrounding-eye resistance.
+\end{tcolorbox}
+
+\section*{1. Start with the biological quantity: activation}
+For each muscle $m$, the model carries a scalar activation
+\begin{equation}
+ a_m \in [0,1].
+\label{eq:auto1}
+\end{equation}
+Activation is a dimensionless control variable. It says how strongly the muscle is being driven, but by itself it is not yet a mechanical force. To turn activation into mechanics, the model multiplies it by a peak active-stress scale $A$ and by spatial factors that describe where along the muscle the force is generated.
+
+For a material point $p$ that belongs to muscle $m$, let $s_p\in[0,1]$ denote the fibre coordinate, with $s=0$ at the proximal origin and $s=1$ at the distal insertion. The Eye G model uses a taper
+\begin{equation}
+T(s)=\sqrt{\sin(\pi s)},
+\label{eq:auto2}
+\end{equation}
+so that activation is zero at both ends and maximal in the belly. The point also carries a unit fibre direction $\vect f_p$. In the appendix, $\vect f_p$ is obtained from the gradient of the geodesic fibre coordinate.
+
+The active amplitude at the point is therefore
+\begin{equation}
+ g_p = A\,w_m\,a_m\,T(s_p),
+\label{eq:auto3}
+\end{equation}
+where $w_m$ is a dimensionless per-muscle strength weight. Eye G uses $w_m=1$ for the scanned eye. Here $A$ is the peak active stress (67 in Eye G), not the affine momentum-transfer matrix $A_p$ introduced later.
+
+\section*{2. Convert activation into an active stress tensor}
+A muscle does not pull equally in every spatial direction. It develops tension primarily along its fibres. The simplest tensor that represents this is the outer product
+\begin{equation}
+\vect f_p\vect f_p^{\mathsf T}.
+\label{eq:auto4}
+\end{equation}
+This is not a norm and it is not a direction vector. It is a $3\times3$ tensor constructed from the direction vector. If
+\begin{equation}
+\vect f_p=
+\begin{bmatrix}
+ f_x\\ f_y\\ f_z
+\end{bmatrix},
+\qquad
+\vect f_p\vect f_p^{\mathsf T}=
+\begin{bmatrix}
+ f_x^2 & f_xf_y & f_xf_z\\
+ f_yf_x & f_y^2 & f_yf_z\\
+ f_zf_x & f_zf_y & f_z^2
+\end{bmatrix}.
+\label{eq:auto5}
+\end{equation}
+For normalized $\vect f_p$, this is the projector onto the fibre axis. Applied to any vector $\vect d$,
+\begin{equation}
+\bigl(\vect f_p\vect f_p^{\mathsf T}\bigr)\vect d
+=
+\vect f_p\bigl(\vect f_p\cdot\vect d\bigr).
+\label{eq:auto6}
+\end{equation}
+So the active stress
+\begin{equation}
+\sig^{\rm act}_p=g_p\,\vect f_p\vect f_p^{\mathsf T}
+\label{eq:auto7}
+\end{equation}
+means: \textbf{produce tensile stress only along the local fibre axis $\vect f_p$}. Importantly,
+\begin{equation}
+(-\vect f_p)(-\vect f_p)^{\mathsf T}=\vect f_p\vect f_p^{\mathsf T},
+\label{eq:auto8}
+\end{equation}
+so fibre orientation has no physical arrowhead: $+\vect f_p$ and $-\vect f_p$ represent the same muscle axis. The tensor is therefore sensitive to the local fibre \emph{axis}, not to an arbitrary choice of arrow direction.
+
+The active stress used in Eye G is
+\begin{equation}
+\sig^{\rm act}_p
+=
+A\,w_m\,a_m\,T(s_p)\,
+\bigl[1+\beta(\lambda_p-1)\bigr]_+\,
+\vect f_p\vect f_p^{\mathsf T},
+\label{eq:active-stress}
+\end{equation}
+Here $F_p$ is the particle's \emph{deformation gradient}, a $3\times3$ tensor that maps an infinitesimal material vector from the particle's reference configuration into its current deformed configuration. It is the local measure of deformation carried by the MPM particle: stretching, compression, shear, and rotation are all represented in $F_p$. It is therefore not a stress tensor. The vector $F_p\vect f_p$ is the current image of the reference fibre direction, and its norm gives the current fibre stretch. During the MPM rollout, $F_p$ is updated from the local velocity-gradient state at every substep, so it changes as the eye deforms.
+
+where $\lambda_p=\|F_p\vect f_p\|$ is the current fibre stretch and $[z]_+=\max(z,0)$. The term in square brackets is a force--length correction. It compares the current fibre length with its reference length. At initialization $F_p=I$ and $\vect f_p$ is normalized, so $\lambda_p=1$ and the factor equals one. During an MPM rollout, $F_p$ changes with deformation, so $\lambda_p$ can change from one time step to the next: $\lambda_p>1$ means that the material fibre has stretched, while $\lambda_p<1$ means that it has shortened. If $\beta>0$, the factor $1+\beta(\lambda_p-1)$ therefore increases the active stress when the fibre is stretched and decreases it when the fibre is shortened; the positive-part operator $[\cdot]_+$ prevents the factor from becoming negative. This is a simple linear phenomenological force--length modulation, not a full physiological bell-shaped muscle force--length curve. Crucially, this mechanism is switched off in Eye G: $\beta=0$. Thus $\lambda_p$ still evolves because the eye deforms, but it has no effect on the active-stress magnitude in the present Eye G model. In Eye G, the active stress therefore depends on activation, taper and fibre direction, but not on instantaneous fibre stretch.
+
+For Eye G, $\beta=0$, so Eq.~\eqref{eq:active-stress} reduces to
+\begin{equation}
+\sig^{\rm act}_p
+=
+A\,w_m\,a_m\,T(s_p)\,
+\vect f_p\vect f_p^{\mathsf T}.
+\label{eq:active-stress-eyeG}
+\end{equation}
+Thus the active stress has a clear interpretation: its magnitude is set by activation and local taper, and its direction is the muscle fibre direction.
+
+For Eye G, $A=67$ and the muscle Young's modulus is $E_{\rm muscle}=240$, so the dimensionless active-stress scale is
+\begin{equation}
+\frac{A}{E_{\rm muscle}}=\frac{67}{240}\approx0.28.
+\label{eq:auto9}
+\end{equation}
+This ratio is useful because it compares the maximum active stress with the passive stiffness scale of the same muscle.
+
+\subsection*{Eye G: active stress versus passive stiffness}
+The two numbers $A=67$ and $E_{\rm muscle}=240$ should be read as two different mechanical scales. $A$ is the maximum local active stress generated by a fully activated muscle particle at the centre of the muscle when $w_m=1$, $T(s)=1$, and the force--length factor is one. It is therefore the amplitude of the contractile stress source. $E_{\rm muscle}=240$ is the Young's modulus of the passive muscle material. It sets the scale of the elastic stress that appears when the material is deformed away from its reference configuration. The ratio
+\begin{equation}
+\chi_{\rm active/passive}=\frac{A}{E_{\rm muscle}}=\frac{67}{240}\approx0.279,
+\label{eq:active-passive-ratio}
+\end{equation}
+is a useful dimensionless measure of how large the available active stress is compared with the muscle's passive elastic stiffness scale.
+
+\begin{figure}[H]
+\centering
+% Both renders are 1600x1100 with a matching VERTICAL scalar bar on the right
+% (viz_muscle_fibre_construction.py used to default to a horizontal bar along
+% the bottom, which ate into the frame's height instead of its width, so the
+% eye itself printed at two different scales even at equal canvas size).
+% Same aspect ratio, so width alone is enough to match them. Left panel is the
+% --smooth render: s is smoothed (k=12, 30 rounds, lambda=0.6, rescaled to
+% [0,1]) before differentiating, not the raw f_p field -- see
+% smooth_material_coord in viz_muscle_fibre_construction.py.
+\includegraphics[width=0.46\textwidth]{archive/eye_G/viz_muscle_fibres_dense_smooth.png}\hfill
+\includegraphics[width=0.46\textwidth]{archive/eye_G/viz_muscle_taper.png}
+\caption{Left: the fibre direction field $\vect f_p$ on the six muscle straps. Right: the active-stress taper $T(s_p)$ along the fibre coordinate, zero at the bony origin and the scleral insertion, peaking over the belly.}
+\end{figure}
+
+This ratio is \emph{not} a prediction that the muscle shortens by 28\%. Young's modulus and active stress have the same units, but the resulting strain also depends on the geometry of the muscle, its cross-sectional area, the fibre taper, its attachments, the stiffness of the surrounding eye, contact, and the full nonlinear MPM dynamics. A useful first intuition is nevertheless that, for a fixed active stress, increasing $E_{\rm muscle}$ makes a given deformation harder to produce, whereas decreasing $E_{\rm muscle}$ makes the same active stress more effective at deforming the muscle. In other words, $A$ is the strength of the internal contraction and $E$ is the resistance offered by the material itself.
+
+For Eye G the passive stiffness varies strongly across the eye, so the muscle does not contract against a single uniform elastic background. The scanned model uses $E=240$ for the muscle straps, while the globe is heterogeneous: $E=45$ for the soft core/vitreous region, $E=130$ at intermediate depth, and $E=420$ in the sclera. The cornea is $E=320$ and the lens is $E=520$. The model also contains explicit attachment and surrounding-tissue stiffnesses: the orbit/socket uses approximately $k=5000$, orbital fat $k=4000$, and the tendon/bone anchoring $k=9000$. These are different kinds of parameters from Young's modulus, so they should not be compared by taking their numerical ratios directly; $E$ is a material stress--strain scale, whereas $k$ is a penalty/attachment stiffness in the force law.
+
+The Eye G values also show why ``more active stress'' does not simply mean ``more useful eye motion.'' The characterised muscle amplitude is $A=67$. Increasing the drive by $1.5\times$ moves the active stress scale toward $100.5$, but the observed response is not a $1.5\times$ increase in useful eye rotation. In the Eye G tests, that increase causes substantial nonlinear deformation: the globe loses about $6.4\%$ of its radius, peak muscle shortening rises from about $26\%$ to about $74\%$, and the simulation enters a regime with numerical failure indicators. This is the practical consequence of the competition represented by
+\begin{equation}
+\sigma_p=\sigma_p^{\rm el}+\sigma_p^{\rm act}.
+\label{eq:stress-competition}
+\end{equation}
+At moderate activation, active stress produces contraction while passive elasticity and the surrounding eye return forces oppose deformation. At excessive activation, the active term can drive the material into large strains, contact changes and numerical instability before proportional anatomical motion is obtained.
+
+Thus the most useful interpretation of the Eye G numbers is not ``67 versus 240'', but the hierarchy they create:
+\begin{equation}
+\text{active stress scale}
+\quad\text{versus}\quad
+\text{muscle elastic scale}
+\quad\text{versus}\quad
+\text{surrounding-eye and attachment constraints}.
+\label{eq:mechanical-hierarchy}
+\end{equation}
+The eye rotation that we ultimately observe is the result of all three acting together.
+
+\subsection*{Material and mechanical levers that change Eye G dynamics}
+
+\paragraph{Coarse view: what makes the eye turn farther, and what makes it move faster?}
+A useful first question is not ``which parameter is the muscle strength?'' but rather: \emph{which parameter changes the achievable gaze, and which parameter changes the time course by which the eye reaches it?} At coarse scale, the gaze excursion is controlled by the competition between active contractile stress, mechanical leverage, and passive resistance:
+\begin{equation}
+\boxed{\text{gaze amplitude}\;\sim\;\frac{\text{active muscle drive}\times\text{mechanical leverage}}{\text{passive mechanical resistance}}}.
+\label{eq:gaze-amplitude-levers}
+\end{equation}
+For Eye G, increasing the peak active stress $A$ generally increases the available contractile drive and tends to increase excursion; increasing muscle or surrounding-eye stiffness tends to reduce the deformation produced by that drive. Changing muscle length, fibre path or insertion position changes the mechanical leverage, so the same stress can produce a different torque about the eye centre. Mass and inertia are different: they mainly influence how rapidly the eye accelerates and decelerates rather than its ideal static equilibrium, although coupled nonlinear dynamics can make the separation imperfect.
+
+The corresponding coarse view of the transient response is
+\begin{equation}
+\boxed{\text{gaze dynamics}\;\sim\;\text{active drive, inertia, stiffness, damping, and endpoint constraints}}.
+\label{eq:gaze-dynamics-levers}
+\end{equation}
+Thus there are two useful classes of lever. Parameters such as $A$, passive stiffnesses, endpoint geometry and insertion geometry strongly affect how far the eye can be driven. Parameters such as mass, rotational inertia, damping and stiffness also affect how fast it gets there, how much it overshoots, and how much lag is produced. The present Eye G force--length coefficient is a special case: $\beta=0$, so instantaneous fibre stretch does not currently modulate the active-stress magnitude.
+
+\paragraph{Exhaustive inventory of the mechanical levers}
+The following inventory expands that coarse picture into the individual parameters used by the Eye G model.
+
+\textbf{Peak active stress $A$.} $A=67$ sets the amplitude of the active contractile stress at a fully activated muscle particle in the belly when $w_m=1$, $T(s)=1$, and the force--length factor is one. Increasing $A$ increases the stress available to shorten the muscle and therefore generally increases the torque transmitted to the eye, until contact, excessive deformation or numerical limits intervene.
+
+\textbf{Muscle Young's modulus $E_{\rm muscle}$.} Eye G uses $E_{\rm muscle}=240$. It sets the passive elastic stress scale of the muscle through the Lam'e parameters. Increasing $E_{\rm muscle}$ makes a given active stress harder to convert into deformation; decreasing it makes the muscle more compliant. The dimensionless comparison $A/E_{\rm muscle}=67/240\approx0.28$ is useful, but it is not a prediction of 28\% shortening because geometry and loading determine the actual deformation.
+
+\textbf{Force--length coefficient $\beta$.} The factor $[1+\beta(\lambda_p-1)]_+$ can modulate active stress as the fibre stretches or shortens. In the present Eye G model $\beta=0$, so this lever is intentionally switched off. If enabled, it would provide an additional dynamic feedback from fibre deformation into active stress.
+
+\textbf{Muscle length, cross-section, volume and fibre path.} These geometric quantities determine where the active stress is distributed, how much material is accelerated, how the muscle deforms, and what line of action and moment arm it presents to the eye. A change in muscle length therefore affects more than one mechanism at once: mass, stiffness distribution, curvature, and endpoint geometry can all change.
+
+\textbf{Insertion geometry and endpoint constraints.} The proximal origin determines where the reaction is supplied by bone; the distal insertion determines where the muscle traction enters the sclera. Their positions and orientations set the torque arm. The endpoint stiffnesses determine how much the attachments themselves yield rather than transmitting load to the eye. Consequently, two muscles with the same $A$, $E$ and activation can produce different eye rotations.
+
+\textbf{Muscle mass and density.} Eye G uses density $\rho=1$ for the scanned soft tissues and assigns each particle $m_p=\rho V_p^0$. Because the six muscles have different anatomical volumes, they have different total masses despite the same density. With a fixed particle count, they also have different particle reference volumes and therefore different particle masses. Increasing muscle mass mainly increases inertia and therefore slows the response to a given active stress; it does not directly increase the stress generated at a fixed activation.
+
+\textbf{Eye mass and rotational inertia.} The globe and its attached tissues have inertia. More mass, or a larger effective moment of inertia about the relevant rotation axis, means that a given muscle torque produces less angular acceleration. These parameters therefore primarily affect transient timing, overshoot and lag rather than the static equilibrium when the same stiffness and active stress are retained.
+
+\textbf{Eye tissue Young's moduli.} The eye is heterogeneous. Eye G uses $E=45$ for the soft core/vitreous region, $E=130$ at intermediate depth, $E=420$ for sclera, $E=320$ for cornea and $E=520$ for lens, while the muscle straps use $E=240$. These elastic moduli control how much each tissue deforms under load and therefore how much of a muscle contraction appears as globe rotation rather than local deformation.
+
+\textbf{Socket, orbital fat, and bone/tendon stiffness.} Eye G includes explicit stiffnesses of approximately $k=5000$ for the socket/orbit, $k=4000$ for orbital fat, and $k=9000$ for proximal tendon/bone anchoring. These $k$ values are not Young's moduli and should not be compared numerically with $E$: they belong to explicit penalty or attachment force laws. Increasing them generally makes the corresponding constraint yield less and can transmit more of the muscle load into globe motion, while decreasing them allows more local compliance.
+
+\textbf{Transverse sleeve and path constraints.} The optional sleeve penalizes displacement and velocity perpendicular to the local fibre while leaving axial shortening relatively free. It therefore changes the route by which the muscle deforms - especially buckling and lateral displacement - without directly prescribing how much it shortens. It can strongly change the efficiency with which active contraction produces useful eye rotation.
+
+\textbf{Damping.} Damping does not primarily determine the static gaze produced by a held activation, but it changes how the eye approaches that state: it controls the amount and duration of oscillation and therefore affects overshoot, settling time and apparent lag.
+
+The complete coarse-to-detailed hierarchy can therefore be summarized as
+\begin{equation}
+\boxed{\text{active stress}\;\rightarrow\;\text{muscle deformation}\;\rightarrow\;\text{endpoint loading}\;\rightarrow\;\text{eye deformation and rotation}},
+\label{eq:material-levers}
+\end{equation}
+while mass, rotational inertia and damping mainly control how rapidly the response unfolds, and passive stiffnesses, geometry and endpoint constraints control how strongly motion is resisted and where the system settles. Numerical parameters such as grid spacing, MPM substep size and numerical damping are separate from these biological and material levers: they can change computed stability or temporal resolution without representing a change in the modeled Eye G material itself.
+
+\section*{3. Add active stress to the passive elastic stress}
+The total stress carried by the muscle particles is the sum
+\begin{equation}
+\sig_p=\sig^{\rm el}_p+\sig^{\rm act}_p.
+\label{eq:auto10}
+\end{equation}
+The passive part in the model is fixed-corotated elasticity. In the appendix it is written
+\begin{equation}
+\sig^{\rm el}_p
+=
+2\mu_p(F_p-R_p)F_p^{\mathsf T}
++
+\lambda_p^{\rm L}J_p(J_p-1)I,
+\label{eq:elastic}
+\end{equation}
+with $R_p$ the polar rotation, $J_p=\det F_p$, and Lam\'e parameters determined from Young's modulus and Poisson ratio.
+
+The distinction is important. Passive elasticity resists deformation; active stress is the internal contractile action that drives deformation. The observed shortening is the result of their competition.
+
+\section*{4. How stress becomes a force in MPM}
+In the MLS-MPM discretisation, internal forces are not applied as separate point forces. Instead, each material point transfers momentum to the background grid. For a grid node $i$ and particle $p$, the affine particle-to-grid transfer is
+\begin{equation}
+(m\vect v)_i \mathrel{+}= w_{ip}\left[m_p\vect v_p + A_p(\vect x_i-\vect x_p)\right],
+\label{eq:p2g}
+\end{equation}
+Here $m_p$ is the mass represented by material particle $p$. In Eye G it is defined from the particle reference volume and the assigned material density,
+\begin{equation}
+m_p=\rho V_p^0.
+\label{eq:particle-mass}
+\end{equation}
+For the scanned soft tissues Eye G uses the same density $\rho=1$, while preserving the measured differences in anatomical volume. Thus muscles with different scanned volumes have different total masses even though their material density is identical; with a fixed particle count, their per-particle reference volumes and therefore their per-particle masses also differ. The $m_p$ in Eq.~\eqref{eq:p2g} is therefore not a unit weight inserted for convenience: it carries the inertia represented by the volume assigned to particle $p$.
+with
+\begin{equation}
+A_p=m_pC_p-\frac{4\,\Delta t_{\rm sub}}{\Delta x^2}V_p^0\sig_p.
+\label{eq:affine}
+\end{equation}
+Here $w_{ip}$ is the \textbf{particle-to-grid interpolation weight}, also called the MPM \textbf{shape-function weight}. It is the value of the quadratic B-spline basis connecting particle $p$ to grid node $i$: nearby nodes receive a large fraction of the particle contribution and nodes outside the local support receive zero. In three dimensions the quadratic basis has support on three nodes per coordinate, so one particle communicates with a local $3\times3\times3=27$-node neighbourhood. The weight is numerical rather than material: it does not represent a force or stiffness; it specifies how particle information is distributed onto the temporary grid.
+
+The matrix $A_p$ is the \textbf{APIC/MLS-MPM particle affine momentum tensor}. It is not itself the stress tensor. It packages two effects that both vary linearly with the node offset $(\vect x_i-\vect x_p)$:
+\begin{equation}
+A_p=\underbrace{m_pC_p}_{\text{affine velocity contribution}}
+-\underbrace{\frac{4\,\Delta t_{\rm sub}}{\Delta x^2}V_p^0\sig_p}_{\text{stress contribution}}.
+\label{eq:affine-expanded}
+\end{equation}
+Here $C_p$ is the particle\textquotesingle s \textbf{local affine velocity-gradient matrix}. It is a $3\times3$ matrix that describes how the velocity varies in a small neighbourhood of particle $p$. Locally, the APIC representation may be read as
+\begin{equation}
+\mathbf v(\mathbf x) \approx \mathbf v_p + C_p(\mathbf x-\mathbf x_p),
+\label{eq:apic-velocity}
+\end{equation}
+so, in the continuum interpretation,
+\begin{equation}
+C_p \approx \nabla\mathbf v\big|_p \;=\;\begin{bmatrix}
+\partial v_x/\partial x & \partial v_x/\partial y & \partial v_x/\partial z\\[2pt]
+\partial v_y/\partial x & \partial v_y/\partial y & \partial v_y/\partial z\\[2pt]
+\partial v_z/\partial x & \partial v_z/\partial y & \partial v_z/\partial z
+\end{bmatrix}_p .
+\label{eq:velocity-gradient}
+\end{equation}
+The diagonal entries describe local extension or compression rates along the coordinate axes, while off-diagonal entries contribute to local shear and rotation. In APIC/MLS-MPM, $C_p$ is reconstructed from the grid-to-particle velocity field, so calling it exactly $\nabla\mathbf v$ is an approximation: it is the best local affine representation carried by the particle. Its units are inverse time. By contrast, $F_p$ is the accumulated deformation gradient: $C_p$ describes how the material is moving now, while $F_p$ records how it has deformed over time. The deformation update used by the MPM integrator is $F_p^{t+\Delta t}=(I+\Delta t\,C_p)F_p^t$. Here $V_p^0$ is the particle\textquotesingle s reference volume, $\Delta x$ is the \textbf{three-dimensional MPM grid spacing} (the distance between neighboring grid nodes), and $\Delta t_{\rm sub}$ is the MPM substep. The appearance of $\Delta x^2$ below does \textbf{not} mean that the simulation is two-dimensional: the square comes from the spatial derivative and quadratic B-spline MLS-MPM discretization of the stress divergence. Eye G is fully three-dimensional; its grid is $112^3$, giving $\Delta x\approx8.9\times10^{-3}$ for the unit box. Multiplication by the offset converts this particle-level matrix into the contribution appropriate to a particular grid node:
+\begin{equation}
+\begin{aligned}
+A_p(\vect x_i-\vect x_p)
+&=m_pC_p(\vect x_i-\vect x_p)\\
+&\quad-\frac{4\,\Delta t_{\rm sub}}{\Delta x^2}V_p^0\sig_p(\vect x_i-\vect x_p).
+\end{aligned}
+\label{eq:affine-times-offset}
+\end{equation}
+The first term preserves the local affine variation of velocity around the particle; the second converts internal stress into a spatially antisymmetric momentum transfer. Equation~\eqref{eq:p2g} then multiplies the complete contribution by $w_{ip}$ before adding it to node $i$.
+
+
+The active contribution is obtained by inserting only $\sig^{\rm act}_p$ into Eq.~\eqref{eq:affine}:
+\begin{equation}
+A_p^{\rm act}
+=-\frac{4\,\Delta t_{\rm sub}}{\Delta x^2}V_p^0\sig_p^{\rm act}.
+\end{equation}
+Using Eq.~\eqref{eq:active-stress-eyeG},
+\begin{equation}
+A_p^{\rm act}
+=-\frac{4\,\Delta t_{\rm sub}V_p^0}{\Delta x^2}
+\,g_p\,\vect f_p\vect f_p^{\mathsf T}.
+\label{eq:active-affine}
+\end{equation}
+The active impulse deposited on node $i$ is therefore proportional to
+\begin{equation}
+A_p^{\rm act}(\vect x_i-\vect x_p)
+=
+-\frac{4\,\Delta t_{\rm sub}V_p^0g_p}{\Delta x^2}
+\,\vect f_p\bigl(\vect f_p\cdot(\vect x_i-\vect x_p)\bigr).
+\label{eq:rank-one-force}
+\end{equation}
+Equation~\\eqref{eq:rank-one-force} is the active-muscle specialization of the stress part of $A_p$.  Because $\\sig_p^{\\rm act}=g_p\\vect f_p\\vect f_p^{\\mathsf T}$ is rank one, applying it to the node offset first projects that offset onto the fibre axis and then returns a vector along the same axis.  Thus the active stress cannot directly push sideways relative to the local fibre: its node-level momentum contribution is axial.
+
+This is the key mechanical step. The scalar product
+\begin{equation}
+\vect f_p\cdot(\vect x_i-\vect x_p)
+\label{eq:auto11}
+\end{equation}
+measures how far the grid node lies ahead of or behind the particle along the fibre. The resulting vector is parallel to $\vect f_p$, and its sign reverses on opposite sides of the particle. Nodes ahead of the particle are therefore pulled back toward it, while nodes behind are pulled forward. The stress field consequently produces a local inward pull along the fibre.
+
+\section*{5. From distributed stress to endpoint tension}
+Consider a straight muscle segment with fibre coordinate $s$ and cross-sectional area $S$. In a one-dimensional approximation, the axial active stress is
+\begin{equation}
+\sigma_{\parallel}(s)=g(s).
+\label{eq:auto12}
+\end{equation}
+The corresponding axial force is
+\begin{equation}
+F(s)=S\,\sigma_{\parallel}(s).
+\label{eq:auto13}
+\end{equation}
+Mechanical equilibrium says that the distributed internal force density is the spatial derivative of this axial force,
+\begin{equation}
+f_{\rm body}(s)=\frac{\dd F}{\dd s},
+\label{eq:auto14}
+\end{equation}
+up to the sign convention used for stress divergence.
+
+Because the Eye G taper satisfies
+\begin{equation}
+T(0)=T(1)=0,
+\label{eq:auto15}
+\end{equation}
+the active stress rises from zero near the origin, reaches a maximum in the belly, and falls back to zero near the insertion. This taper is important: the active term is a distributed stress field rather than a point force applied at an endpoint. Its divergence produces internal forces throughout the strap, with opposite signs on the two sides of each material point. The local result is always an inward pull along the fibre.
+
+The endpoint interpretation appears when that distributed stress field is connected to anatomy. In a continuum description, the traction acting across any internal cut with normal $\vect n$ is
+\begin{equation}
+\vect t=\sig\vect n.
+\label{eq:auto16}
+\end{equation}
+For a cut normal to the local fibre, $\vect n=\pm\vect f$, the axial component is approximately
+\begin{equation}
+\vect t=\pm\sigma_{\parallel}\vect f.
+\label{eq:auto17}
+\end{equation}
+Thus an imaginary cut through the muscle has two equal-and-opposite axial tractions. Those tractions are transmitted through the elastic muscle toward the proximal and distal attachments. The physical endpoint caps then determine where that contraction can go: the proximal attachment is held by bone, while the embedded distal attachment transmits the resulting tension to the globe. In this sense, the muscle behaves at the anatomical scale like a tension element whose active stress tries to reduce the distance between its attachments, even though no point muscle force'' is prescribed in the MPM equations.
+
+\section*{6. Why the endpoints determine whether the eye moves}
+The two ends of a muscle do not play the same geometric role. In the Eye G model, the proximal end is attached to bone, while the distal end is embedded at the sclera. The proximal attachment supplies a reference position; the distal attachment transfers the muscle's contraction to the globe.
+
+\textbf{Proximal endpoint.} The bone-side cap is anchored to a fixed anatomical origin. In the penalty formulation, particles in the proximal region experience
+\begin{equation}
+\vect a=k(\vect x^{\rm rest}-\vect x)-c\vect v,
+\label{eq:auto18}
+\end{equation}
+which pulls them back toward their rest location and damps their motion. The alternative pinning implementation makes this attachment kinematic: the selected region is reset to its rest position each substep.
+
+\textbf{Distal endpoint.} The insertion is treated differently. The muscle belly is kept a small clearance away from the globe so that the shared MPM grid does not weld the whole muscle to the sclera. Only the distal cap is embedded. Thus the active tension generated throughout the strap is transmitted to the globe mainly through a localized insertion rather than through accidental contact along the muscle length.
+
+The shared grid is what lets this work mechanically. Globe and muscles occupy different particle sets, but their particles communicate through the same grid. Momentum deposited by the muscle is transferred to the common grid and then back to the globe where the insertion provides mechanical coupling. The bone-side attachment prevents the whole muscle from simply translating. The result is therefore a relative contraction: the muscle deforms between a comparatively fixed origin and a moving insertion, and that insertion transmits the load to the globe. The eye moves because the active stress has changed the momentum balance of the coupled mechanical system.
+
+\section*{6a. From material points to interacting biological bodies}
+
+An MPM particle should not be pictured as an independent bead in a cloud. It is a moving sample of continuum material: it carries position and velocity, but also mass, reference volume, deformation gradient $F_p$, material parameters and, in the eye, biological information such as muscle identity and fibre direction. A Plexus entity such as the globe or the lateral rectus is therefore represented mechanically by many such material samples. The particles do not need permanent springs connecting them. Instead, their collective identity as an elastic body is recovered at every MPM substep by the cycle particle $\rightarrow$ grid $\rightarrow$ particle. During P2G, neighboring particles deposit mass, momentum and stress contributions onto common grid nodes. The grid therefore reconstructs a local continuum momentum field from the discrete samples. After forces have changed this field, G2P returns the resulting motion to the particles and updates their deformation gradients. Deformation is remembered by $F_p$, and the constitutive law converts that deformation back into elastic stress on the following step. The repeated loop
+\begin{equation}
+\text{motion}\rightarrow F_p\rightarrow\text{stress}\rightarrow\text{grid momentum}\rightarrow\text{motion}
+\label{eq:auto19}
+\end{equation}
+is what makes thousands of moving material points behave as a deformable globe or muscle rather than as an unstructured particle cloud.
+
+This also explains how one Plexus entity can mechanically move another without either losing its identity. The globe and each muscle are separate entities and their particles retain different material parameters, fibre fields and biological roles, but they scatter onto the same MPM grid. When an activated muscle develops the rank-one stress $\boldsymbol{\sigma}^{\rm act}=g\,\vect f\vect f^{\mathsf T}$, that stress changes momentum on the grid nodes supporting the muscle. At the insertion, scleral particles have overlapping grid support and therefore participate in the same local momentum update. When velocities are gathered back from the grid, the scleral particles acquire motion generated by the contracting muscle. Thus the mechanical causal chain is
+\begin{equation}
+\text{muscle activation}\rightarrow
+\text{active stress}\rightarrow
+\text{shared grid momentum}\rightarrow
+\text{scleral motion}\rightarrow
+\text{globe rotation}.
+\label{eq:auto20}
+\end{equation}
+No explicit force is applied from a \texttt{muscle'' object to an }eye'' object. The interaction emerges one level below the entities, from momentum exchange between their material discretizations.
+
+The endpoints determine what that internally generated contraction can accomplish. At the proximal end, the muscle is constrained relative to bone; at the distal end, its insertion is mechanically coupled to the sclera. Active stress therefore cannot simply translate the whole strap through space. Shortening between the two constrained regions instead loads the attachments, so the distal attachment pulls on the globe while the proximal attachment supplies the reaction. Because the insertion lies away from the globe's centre, this traction generates a torque and rotates the eye. Importantly, the active-stress taper makes the active term vanish at the mathematical ends of the fibre: the attachment force is not an artificial endpoint force inserted by hand, but stress transmitted through the passive elastic material from the active muscle belly into its attachments.
+
+Contact requires a further distinction. A shared-grid MPM calculation strongly couples materials whose particles contribute to the same grid nodes, but this should not be interpreted as a universal guarantee that different bodies can never interpenetrate. In the present Eye G formulation, excessive overlap between muscle and globe behaves approximately as a weld: the two populations exchange momentum so strongly that relative sliding is suppressed. This is why the scanned muscle belly is seeded with a finite standoff from the globe while only the distal cap is embedded into the sclera. The same numerical mechanism is useful at the insertion, where attachment is wanted, and undesirable along the belly, where biological sliding is wanted. A more general contact formulation would explicitly distinguish nonpenetration, separation, sticking and frictional sliding rather than obtaining these behaviours primarily from geometry and shared-grid coupling.
+
+Finally, deformation, fracture and collision should not be conflated. Elasticity allows an entity to change shape while its deformation gradient continues to transmit restoring stress through the material. Tearing requires an additional damage or fracture rule that weakens or removes that stress transmission once a failure criterion is reached. After separation, the resulting pieces may still interact through a contact law. MPM therefore provides the bottom-up mechanical substrate, while distinct constitutive, damage and contact mechanisms determine whether material locally behaves as one deformable body, separates into pieces, or collides with another body. In Plexus terms, entity identity describes \emph{what biological object a material sample belongs to}, whereas the MPM operators determine \emph{how those objects exchange momentum and deform in space}.
+
+\section*{7. How stiffness and elasticity control shortening}
+Active stress does not prescribe a fixed shortening distance. Shortening emerges from the balance between the active stress and the passive elastic resistance. A useful first scaling is
+\begin{equation}
+\varepsilon_{\rm act}\sim\frac{\sigma_{\rm act}}{E},
+\label{eq:auto21}
+\end{equation}
+where $\varepsilon_{\rm act}$ is a characteristic strain and $E$ is Young's modulus. If the active stress is held fixed and $E$ is increased, the same muscle develops less strain: the muscle becomes harder to shorten. If $E$ is decreased, the same active stress produces more deformation. In a soft-body eye, however, excessive softness is not automatically better: the strap can buckle, over-stretch, or deform in directions that do not contribute usefully to rotation.
+
+Elasticity also determines how the muscle stores and returns mechanical energy. During activation, part of the active work is spent deforming the passive tissue. When activation changes, that stored elastic energy contributes to the transient response. Consequently, the active-to-passive ratio $A/E$ controls not only how much a muscle can shorten but also how sharply the system responds. In Eye G, $A/E_{\rm muscle}\approx0.28$ is already large enough to produce substantial shortening, while increasing the drive beyond the characterised regime causes severe deformation and numerical problems rather than simply producing a proportionally larger eye rotation. The eye is therefore constrained jointly by anatomy, active stress, passive stiffness, and numerical resolution.
+
+\section*{8. The complete causal chain}
+The whole mechanism can now be read as a sequence:
+\begin{tcolorbox}[colback=soft,colframe=accent]
+\centering
+\textbf{activation} $\rightarrow$ \textbf{active stress} $\rightarrow$ \textbf{stress divergence}\par
+$\rightarrow$ \textbf{grid momentum transfer} $\rightarrow$ \textbf{attachment loading}\par
+$\rightarrow$ \textbf{muscle shortening} $\rightarrow$ \textbf{scleral force} $\rightarrow$ \textbf{eye rotation}
+\end{tcolorbox}
+No stage is a prescribed move the eye'' command. The model specifies local activation, fibre geometry, material stress, attachment, and MPM coupling. The eye motion is the resulting solution of the mechanical system.
+
+\begin{tcolorbox}[colback=soft,colframe=accent,title=Interpretation for Plexus]
+The important modelling abstraction is therefore not \texttt{muscle force'' but }active stress emitted on a material field.'' This keeps contraction local, anisotropic, geometry-aware, and compatible with the same MPM machinery used for passive elasticity. Endpoint forces and eye motion are emergent consequences of stress transmission and attachment. That is exactly the kind of mechanism that a Plexus operator should expose without hard-coding the final anatomical outcome.
+\end{tcolorbox}
+
+
+
+\appendix
+\section{Appendix: the MPM implementation, equation by equation}
+
+This appendix connects the continuum equations in the lecture note to the actual Plexus implementation used by the Eye G prototype. The goal is not to reproduce complete source files, but to show the decisive lines for each mathematical operation. The listings use the current public \texttt{main} branch. The file and repository location are given in each caption so that the code can be inspected in context. The code is shown in small script font with source line numbers corresponding to the current files.
+
+A useful way to read the implementation is as a four-stage MPM cycle:
+\begin{equation}
+\text{material update}
+\rightarrow
+\text{particle-to-grid scatter}
+\rightarrow
+\text{grid solve}
+\rightarrow
+\text{grid-to-particle gather}.
+\label{eq:auto22}
+\end{equation}
+The muscle-specific operators sit on top of this cycle: \texttt{muscle\_morphogenesis} establishes the material geometry, \texttt{muscle\_geometry} measures the current body, \texttt{muscle\_contract} writes active stress, and \texttt{bone\_anchor} constrains the proximal cap.
+
+\subsection{Where the particle fibre direction \texorpdfstring{$\vect f_p$}{f_p} is first computed}
+
+For the scanned Eye G eye, the particle-wise fibre direction is not guessed by
+\texttt{muscle\_contract}. It is created during the \texttt{blend\_muscles} Seed
+operator in \texttt{prototype/eye/blend\_mpm\_ops.py}. The sequence is important. First,
+\texttt{path\_coordinate} assigns every sampled muscle particle a material coordinate
+$s_p$ by computing a shortest-path distance through the particle cloud from the
+insertion and flipping it so that $s=0$ is the proximal origin and $s=1$ is the distal
+insertion. Then \texttt{fibre\_from\_s} computes a local gradient of that scalar field.
+The resulting normalized gradient is the actual particle-wise fibre vector $\vect f_p$
+used later by \texttt{muscle\_contract}. The public implementation explicitly describes
+this as a local gradient construction: the least-squares relation
+$(\vect x_j-\vect x_i)\!\cdot\!\vect g_i=s_j-s_i$ is solved over each particle's
+neighbourhood, and the normalized solution is stored as the fibre direction.
+
+Thus the construction is bottom-up:
+\begin{equation}
+\text{scanned muscle surface}
+\;\longrightarrow\;
+\{\vect x_p\}
+\;\longrightarrow\;
+\{s_p\}
+\;\longrightarrow\;
+\{\nabla s_p\}
+\;\longrightarrow\;
+\{\vect f_p\}.
+\label{eq:auto23}
+\end{equation}
+This is particularly important for bent muscles. A single global tangent would fail
+when the strap wraps around the globe; the gradient of the geodesic coordinate changes
+locally, so each particle obtains its own fibre axis. The implementation itself records
+that this replaced a straight-axis construction that produced an empty centreline bin
+for SR and a grossly incorrect length.
+
+\begin{lstlisting}[caption={\texttt{prototype/eye/blend\_mpm\_ops.py}: geodesic material coordinate $s_p$ and the local fibre direction $\vect f_p$. Source lines 2037--2112 on the current \texttt{main} branch.},label={lst:fibre-from-s}]
+def path_coordinate(pts, seed_pt, k=12):
+    tree = cKDTree(pts)
+    dist, idx = tree.query(pts, k=k + 1)
+    rows = np.repeat(np.arange(len(pts)), k)
+    G = csr_matrix((dist[:, 1:].ravel(),
+                    (rows, idx[:, 1:].ravel())),
+                   shape=(len(pts), len(pts)))
+    G = G.maximum(G.T)
+    src = np.argsort(((pts - np.asarray(seed_pt)[None, :]) ** 2).sum(1))[:max(8, len(pts) // 200)]
+    d = dijkstra(G, directed=False, indices=src, min_only=True)
+    d[~np.isfinite(d)] = d[np.isfinite(d)].max()
+    return 1.0 - d / max(d.max(), 1e-12), idx
+
+def fibre_from_s(pts, s, idx, ridge=1e-9):
+    dx = pts[idx[:, 1:]] - pts[:, None, :]
+    ds = s[idx[:, 1:]] - s[:, None]
+    A = np.einsum('nki,nkj->nij', dx, dx) + ridge * np.eye(3)[None]
+    b = np.einsum('nki,nk->ni', dx, ds)
+    g = np.linalg.solve(A, b[..., None])[..., 0]
+    return g / np.linalg.norm(g, axis=1, keepdims=True).clip(1e-12)
+\end{lstlisting}
+
+The key calculation is the least-squares gradient. For one particle $i$ and its
+neighbours $j$, we seek a vector $\vect g_i$ satisfying
+\begin{equation}
+(\vect x_j-\vect x_i)\cdot\vect g_i \approx s_j-s_i.
+\label{eq:auto24}
+\end{equation}
+If the scalar field $s$ increases along the muscle, then $\vect g_i$ points toward
+increasing $s$, namely from origin toward insertion. The code solves the normal equations
+for this local gradient and then normalizes it:
+\begin{equation}
+\vect f_p
+=
+\frac{\nabla s_p}{\|\nabla s_p\|}.
+\label{eq:auto25}
+\end{equation}
+Because the calculation uses the local neighbourhood rather than a single centreline
+segment, the direction can rotate continuously as the muscle bends. This is the quantity
+that later enters $\vect f_p\vect f_p^{\mathsf T}$.
+
+The actual call that creates the field and the persistent particle buffer occurs inside
+\texttt{BlendMuscles.forward}. The material coordinate is recomputed after the optional
+standoff/embedding correction, and then the normalized local fibre direction is written
+into the particle state.
+
+\begin{lstlisting}[caption={\texttt{prototype/eye/blend\_mpm\_ops.py}: creation and storage of the particle fibre field. Source lines 2624--2698.},label={lst:fibre-buffer}]
+pts, vol = fill_meshes([(V, F)], sel.size, device=dev)
+ins = fr(d[f"{part}__centreline__v"])[0]
+s, idx = path_coordinate(pts, ins)
+
+if self.standoff != 0.0 or self.embed != 0.0:
+    pts, moved = relieve_overlap(
+        pts, s, self.center, shell,
+        self.standoff, self.embed,
+        self.cap, device=dev,
+    )
+    s, idx = path_coordinate(pts, ins)
+
+X[sel] = pts
+fib[sel] = fibre_from_s(pts, s, idx)
+sarr[sel] = s
+
+p.register_buffer(
+    "fibre",
+    torch.as_tensor(fib, dtype=torch.float32, device=dev),
+)
+p.register_buffer(
+    "s",
+    torch.as_tensor(sarr, dtype=torch.float32, device=dev),
+)
+\end{lstlisting}
+
+The final storage line is the bridge to the dynamics. Once the Seed has run, every
+muscle particle carries its own $s_p$ and $\vect f_p$. The later contractile operator does
+not reconstruct the fibre direction; it simply reads the stored field:
+
+\begin{lstlisting}[caption={\texttt{prototype/eye/muscle\_ops.py}: the dynamics operator reads the stored particle fibre field. Source lines 2371--2388.},label={lst:fibre-read}]
+p = H.level(self.at)
+m = H.level(self.muscles)
+
+if not hasattr(p, "fibre"):
+    return {}
+
+act = m.get("act")[:, 0].clamp(min=0.0)[p.parent]
+f = p.fibre
+gate = self.amplitude * self._strength_t[p.parent] * act
+if self.taper:
+    gate = gate * torch.sin(math.pi * p.s.clamp(0, 1)).clamp(min=0.0) ** 0.5
+\end{lstlisting}
+
+This gives the precise answer to ``where does $\vect f_p$ first exist?'' for the scanned
+Eye G implementation: it is first computed by \texttt{fibre\_from\_s} inside the
+\texttt{blend\_muscles} Seed, then stored as the \texttt{fibre} buffer on the
+\texttt{muscle\_particle} set. \texttt{muscle\_contract} consumes that same particle-wise
+field and forms the active-stress tensor from it. The repository documentation describes
+\texttt{blend\_muscles} as the Seed that gives muscle particles their fibre coordinate and
+local fibre direction, while \texttt{muscle\_contract} is the later exchange operator that
+uses the field to generate active stress.\cite{github:blend,github:contract}
+
+\subsection{Active-stress amplitude and fibre tensor}
+
+The equation
+\begin{equation}
+g_p=A\,w_m\,a_m\,T(s_p)
+\label{eq:auto26}
+\end{equation}
+is implemented by the \texttt{muscle\_contract} operator. Activation is first broadcast from the parent muscle to its material points through the \texttt{parent} map; the taper then removes active stress from the tendon regions.
+
+\begin{lstlisting}[caption={\texttt{prototype/eye/muscle\_ops.py}: activation, amplitude, and tendon taper.},label={lst:active-gate}]
+act = m.get("act")[:, 0].clamp(min=0.0)[p.parent]
+f = p.fibre
+gate = self.amplitude * self._strength_t[p.parent] * act
+if self.taper:
+    gate = gate * torch.sin(math.pi * p.s.clamp(0, 1)).clamp(min=0.0) ** 0.5
+\end{lstlisting}
+
+The full tensor equation
+\begin{equation}
+\boldsymbol{\sigma}^{\rm act}_p
+=
+A\,w_m\,a_m\,T(s_p)
+\bigl[1+\beta(\lambda_p-1)\bigr]_+
+\mathbf f_p\mathbf f_p^{\mathsf T}
+\label{eq:auto27}
+\end{equation}
+then appears directly as a rank-one outer product. Here the optional force--length factor is evaluated from the deformation gradient.
+
+\begin{lstlisting}[caption={\texttt{prototype/eye/muscle\_ops.py}: fibre stretch, force--length factor, and rank-one active stress.},label={lst:active-stress-code}]
+if self.stretch_activation != 0.0:
+    lam = torch.bmm(p.F, f[:, :, None]).squeeze(-1).norm(dim=1).clamp(min=1e-6)
+    gate = gate * (1.0 + self.stretch_activation * (lam - 1.0)).clamp(min=0.0)
+if mask is not None:
+    gate = gate * mask.float()
+p.active_stress = gate[:, None, None] * (f[:, :, None] * f[:, None, :])
+\end{lstlisting}
+
+For Eye G, \texttt{stretch\_activation=0}, so the two force--length lines are inactive and the implemented tensor is exactly the Eye G equation with the square-root sine taper.
+
+\subsection{Building the passive elastic stress}
+
+The passive fixed-corotated stress used in the lecture note is
+\begin{equation}
+\boldsymbol{\sigma}^{\rm el}
+=
+2\mu(F-R)F^{\mathsf T}
++
+\lambda J(J-1)I.
+\label{eq:auto28}
+\end{equation}
+The implementation constructs the proper polar rotation $R$ from the deformation gradient, computes $J=\det(F)$, and then evaluates the stress tensor.
+
+\begin{lstlisting}[caption={\texttt{prototype/eye/muscle\_ops.py}: 3-D polar rotation and fixed-corotated stress for the muscle body.},label={lst:elastic-stress-code}]
+F, C, mass = p.F, p.C, p.mass
+eye = torch.eye(D, device=dev).expand(p.n, D, D)
+J = torch.linalg.det(F)
+U, S, Vh = torch.linalg.svd(F)
+U = U.clone(); Vh = Vh.clone()
+U[torch.det(U) < 0, :, -1] *= -1
+Vh[torch.det(Vh) < 0, -1, :] *= -1
+R = U @ Vh
+stress = 2 * p.mu[:, None, None] * ((F - R) @ F.transpose(-2, -1)) \
+         + eye * (p.la * J * (J - 1))[:, None, None]
+\end{lstlisting}
+
+The stock particle scatter implements the same constitutive equation. The muscle-specific implementation differs only in where it reads the active stress.
+
+\subsection{Adding the active stress to the material stress}
+
+The total stress is
+\begin{equation}
+\boldsymbol{\sigma}_p
+=
+\boldsymbol{\sigma}^{\rm el}_p
++
+\boldsymbol{\sigma}^{\rm act}_p.
+\label{eq:auto29}
+\end{equation}
+The exact implementation is the addition below.
+
+\begin{lstlisting}[caption={\texttt{prototype/eye/muscle\_ops.py}: active stress is added before momentum scatter.},label={lst:stress-sum-code}]
+stress = 2 * p.mu[:, None, None] * ((F - R) @ F.transpose(-2, -1)) \\
+         + eye * (p.la * J * (J - 1))[:, None, None]
+act = getattr(p, "active_stress", None)
+if act is not None:
+    stress = stress + act
+\end{lstlisting}
+
+This is the precise implementation of the conceptual statement that contraction enters the same mechanical stress balance as passive elasticity rather than appearing as an externally prescribed force on the eye.
+
+\subsection{Deformation-gradient update}
+
+The kinematic update used by the decomposed MLS-MPM implementation is
+\begin{equation}
+F^{n+1}=(I+\Delta t\,C)F^n.
+\label{eq:auto30}
+\end{equation}
+The operator \texttt{mpm\_strain} writes this update directly.
+
+\begin{lstlisting}[caption={\texttt{src/plexus/operators/mpm\_strain.py}: deformation-gradient update.},label={lst:F-update-code}]
+dt = sub_dt(H, self.dt_sub)
+D = p.F.shape[-1]
+eye = torch.eye(D, device=dev).expand(p.n, D, D)
+F = (eye + dt * p.C) @ p.F
+\end{lstlisting}
+
+This matters because the active force--length law, when enabled, reads the current fibre stretch from this evolving $F$. The same $F$ is also the state from which passive elastic stress is recomputed.
+
+\subsection{From stress to the affine particle-to-grid momentum matrix}
+
+The MLS-MPM affine transfer uses
+\begin{equation}
+A_p=m_pC_p-\frac{4\Delta t_{\rm sub}}{\Delta x^2}V_p^0\boldsymbol{\tau}_p,
+\label{eq:auto31}
+\end{equation}
+where the implementation variable called \texttt{stress} is the Kirchhoff-form stress used by the scatter kernel. The active contribution therefore has the form
+\begin{equation}
+A_p^{\rm act}
+=
+-\frac{4\Delta t_{\rm sub}}{\Delta x^2}V_p^0\boldsymbol{\sigma}^{\rm act}_p
+\label{eq:auto32}
+\end{equation}
+in the simplified notation of the lecture derivation.
+
+\begin{lstlisting}[caption={\texttt{prototype/eye/muscle\_ops.py}: stress-to-affine conversion and particle momentum.},label={lst:affine-code}]
+stress = (-dt * 4 * inv_dx * inv_dx) * p.p_vol[:, None, None] * stress
+affine = stress + mass[:, None, None] * C
+fx, weight, flat = bspline(X, inv_dx, offsets, g.shape, periodic)
+dpos_phys = (offsets[None] - fx[:, None, :]) * dx
+mom = mass[:, None, None] * V[:, None, :] \\
+       + (affine[:, None] @ dpos_phys[..., None]).squeeze(-1)
+\end{lstlisting}
+
+The same logic is used by the stock \texttt{mpm\_scatter}; the Eye G muscle implementation changes the destination from replacement to accumulation so that more than one particle body can contribute to the same grid.
+
+\subsection{Quadratic B-spline support: how a particle talks to several grid nodes}
+
+The background field is local because each particle contributes only to its $3^D$-node stencil. The kernel is the quadratic B-spline. The implementation first finds the base grid cell and then constructs the three one-dimensional weights.
+
+\begin{lstlisting}[caption={\texttt{src/plexus/operators/mpm\_grid.py}: quadratic B-spline weights and $3^D$ stencil.},label={lst:bspline-code}]
+base = (X * inv_dx - 0.5).floor().long()
+fx = X * inv_dx - base.float()
+w = torch.stack([0.5 * (1.5 - fx) ** 2,
+                 0.75 - (fx - 1) ** 2,
+                 0.5 * (fx - 0.5) ** 2], dim=1)
+weight = torch.ones(X.shape[0], offsets.shape[0], device=X.device)
+for k in range(D):
+    weight = weight * w[:, oidx[:, k], k]
+\end{lstlisting}
+
+This local interpolation is what makes an entity a continuum-like body at the numerical level: neighboring particles deposit overlapping contributions to the same grid nodes instead of evolving as isolated point masses.
+
+\subsection{Accumulating two biological entities on one shared grid}
+
+The key coupling step for the eye is not a special \texttt{muscle-to-eye'' force. The muscle scatter is registered as a second implementation named }accumulate and adds its mass and momentum to the grid already populated by the globe.
+
+\begin{lstlisting}[caption={\texttt{prototype/eye/muscle\_ops.py}: multi-body particle-to-grid accumulation on the shared MPM field.},label={lst:accumulate-code}]
+gm = torch.zeros(g.n_cells, device=dev)
+gmv = torch.zeros(g.n_cells, D, device=dev)
+gm.index_add_(0, flat, (weight * mass[:, None]).reshape(-1))
+gmv.index_add_(0, flat, (weight[..., None] * mom).reshape(-1, D))
+g.m = g.m + gm
+g.mv = g.mv + gmv
+\end{lstlisting}
+
+The lines above are the implementation of the bottom-up entity coupling described in the lecture note. Globe particles and muscle particles remain different Plexus sets, but they contribute to the same field. The grid is therefore the intermediate mechanical representation through which the bodies exchange momentum.
+
+\subsection{Grid momentum becomes grid velocity}
+
+After all participating particle sets have scattered, the grid update computes velocity from momentum divided by mass:
+\begin{equation}
+\mathbf v_i=\frac{(m\mathbf v)_i}{m_i}.
+\label{eq:auto33}
+\end{equation}
+The central line is:
+
+\begin{lstlisting}[caption={\texttt{src/plexus/operators/mpm\_grid\_update.py}: grid momentum-to-velocity step.},label={lst:grid-velocity-code}]
+gm, gmv, gc = g.m, g.mv, g.c
+gv = gmv / gm.clamp(min=1e-10)[:, None]
+\end{lstlisting}
+
+The grid operator then applies boundary conditions and stores \texttt{g.v} for the gather stage.
+
+\subsection{Grid-to-particle gather and advection}
+
+The grid velocity returns to the material particles using the same B-spline support. The implementation computes a weighted sum of grid velocities and then advects the particle position:
+\begin{equation}
+\mathbf x^{n+1}_p
+=
+\mathbf x^n_p+\Delta t\,\mathbf v^{n+1}_p.
+\label{eq:auto34}
+\end{equation}
+
+\begin{lstlisting}[caption={\texttt{src/plexus/operators/mpm\_gather.py}: weighted grid-to-particle velocity and advection.},label={lst:gather-code}]
+gvn = g.v[flat].view(p.n, S, D)
+new_V = (weight[..., None] * gvn).sum(1)
+dpos_grid = offsets[None] - fx[:, None, :]
+new_C = 4 * inv_dx * (weight[..., None, None] * \\
+         (gvn[..., :, None] @ dpos_grid[..., None, :])).sum(1)
+Xn = torch.nan_to_num(X + dt * new_V, nan=0.5)
+\end{lstlisting}
+
+This completes the material-grid-material loop. The entity has not been converted into an anonymous cloud: its particles retain their parent identity, material parameters, fibre directions, and deformation state while the grid provides the transient momentum mediator.
+
+\subsection{Proximal endpoint: the bone anchor}
+
+The proximal endpoint law in the lecture note is
+\begin{equation}
+\mathbf a
+=
+ k(\mathbf x^{\rm rest}-\mathbf x)-c\mathbf v.
+\label{eq:auto35}
+\end{equation}
+The \texttt{bone\_anchor} operator implements this exactly on the tagged origin cap.
+
+\begin{lstlisting}[caption={\texttt{prototype/eye/muscle\_ops.py}: proximal endpoint restoring force and damping.},label={lst:anchor-code}]
+sel = getattr(p, self.flag, None)
+s = sel.float()[:, None]
+acc = (self.k * (p.rest - p.get("pos")) - self.c * p.get("vel")) * s
+if mask is not None:
+    acc = acc * mask[:, None].float()
+return {self.at: acc}
+\end{lstlisting}
+
+Because this operator emits an acceleration into the particle set, the anchor does not prescribe a new position directly. It supplies the reaction required to resist the muscle's active contraction.
+
+\subsection{Distal endpoint: the insertion is created geometrically}
+
+The distal attachment is not a separate point-force equation. The scanned geometry or analytic morphology places the tendon cap inside the globe, while the muscle belly is held at a standoff. The \texttt{blend\_muscles} seed stores the two endpoint masks that later operators use:
+
+\begin{lstlisting}[caption={\texttt{prototype/eye/blend\_mpm\_ops.py}: tendon and proximal-cap labels established during seeding.},label={lst:tendon-cap-code}]
+p.register_buffer("anchored", torch.as_tensor(sarr < self.cap, device=dev))
+p.register_buffer("tendon", torch.as_tensor(sarr > 1.0 - self.cap, device=dev))
+p.register_buffer("active_stress", torch.zeros(p.n, 3, 3, device=dev))
+\end{lstlisting}
+
+In the scanned Eye G geometry, the seed also explicitly records the standoff and embed parameters. This is what separates desired insertion coupling from unwanted belly overlap with the sclera. The code comments describe the intended consequence: the tendon cap is the region where shared-grid coupling should act strongly, while the belly must remain clear.
+
+\subsection{How stiffness enters the code}
+
+The lecture note uses the constitutive relationship
+\begin{equation}
+\mu=\frac{E}{2(1+
+u)},
+\qquad
+\lambda=\frac{E
+u}{(1+
+u)(1-2
+u)}.
+\label{eq:auto36}
+\end{equation}
+For the scanned muscle seed, these parameters are written directly from the specified Young's modulus and Poisson ratio:
+
+\begin{lstlisting}[caption={\texttt{prototype/eye/blend\_mpm\_ops.py}: Young's modulus to Lamé parameters; particle volume and mass.},label={lst:lame-code}]
+mu = self.youngs / (2 * (1 + self.nu))
+la = self.youngs * self.nu / ((1 + self.nu) * (1 - 2 * self.nu))
+p.mu = torch.full((p.n,), mu, device=dev)
+p.la = torch.full((p.n,), la, device=dev)
+p.p_vol = torch.as_tensor(pvol, dtype=torch.float32, device=dev)
+p.mass = p.p_vol * self.density
+\end{lstlisting}
+
+This is why the ratio $A/E$ is a meaningful first control parameter. \texttt{A} sets the magnitude of the contractile stress, while \texttt{E} sets the passive resistance encoded in the Lamé parameters. The resulting shortening is therefore an equilibrium property of the coupled active-plus-elastic material, not a distance prescribed by \texttt{muscle\_contract}.
+
+\subsection{Measuring shortening rather than prescribing it}
+
+The muscle length used by the eye model is read from the material points themselves. The centreline is reconstructed by binning points along the fibre coordinate and summing the segment lengths:
+
+\begin{lstlisting}[caption={\texttt{prototype/eye/muscle\_ops.py}: current muscle length is an aggregate readout from material-point positions.},label={lst:length-code}]
+acc = torch.zeros(M * B, 3, device=dev).index_add_(0, key, X)
+cnt = torch.zeros(M * B, device=dev).index_add_(0, key, torch.ones_like(p.s))
+cen = (acc / cnt.clamp(min=1.0)[:, None]).view(M, B, 3)
+seg = (cen[:, 1:] - cen[:, :-1]).norm(dim=2)
+length = seg.sum(1)
+new[:, la:lb] = length[:, None]
+\end{lstlisting}
+
+This is an important conceptual closure: \texttt{muscle\_contract} does not contain an equation saying ``shorten the muscle by $q$ percent. It produces stress. \texttt{muscle\_geometry} then measures whatever length the mechanical system produced.
+
+\subsection{Optional transverse sleeve: preventing buckling without preventing shortening}
+
+The prototype also contains a useful demonstration of how an additional mechanical constraint can change deformation without changing the basic contractile mechanism. The sleeve penalises only displacement perpendicular to the local fibre, leaving shortening along the fibre free:
+\begin{equation}
+\mathbf d_\perp
+=
+\mathbf d-(\mathbf d\cdot\mathbf f)\mathbf f,
+\qquad
+\mathbf a_\perp=-k\mathbf d_\perp-c\mathbf v_\perp.
+\label{eq:auto37}
+\end{equation}
+
+\begin{lstlisting}[caption={\texttt{prototype/eye/muscle\_ops.py}: transverse sleeve constraint; axial shortening is left unpenalised.},label={lst:sleeve-code}]
+f = p.fibre
+d = p.get("pos") - p.rest
+v = p.get("vel")
+d_perp = d - (d * f).sum(1, keepdim=True) * f
+v_perp = v - (v * f).sum(1, keepdim=True) * f
+w = 1.0 - ((p.s - self.free_from) / \\
+    max(self.free_to - self.free_from, 1e-6)).clamp(0.0, 1.0)
+acc = (-self.k * d_perp - self.c * v_perp) * w[:, None]
+\end{lstlisting}
+
+This operator is a useful teaching example because it shows that stiffness'' is not one scalar concept at the whole-organ level. Axial stiffness controls resistance to shortening; transverse stiffness controls path stability and buckling. The current prototype deliberately separates those roles.
+
+\subsection{One complete code-level causal chain}
+
+The complete implementation can therefore be read as the following sequence:
+
+\begin{tcolorbox}[colback=codebg,colframe=codeframe]
+\centering\scriptsize
+\texttt{muscle\_contract}
+$\rightarrow$
+\texttt{mpm\_scatter[accumulate]}
+$\rightarrow$
+\texttt{mpm\_grid\_update}
+$\rightarrow$
+\texttt{mpm\_gather}
+\\[3pt]
+$\rightarrow$
+\texttt{muscle\_geometry / eye\_pose}
+\end{tcolorbox}
+with \texttt{bone\_anchor} and \texttt{muscle\_sleeve} supplying boundary and path constraints. The important Plexus principle is that none of these operators contains the statement rotate the eye.'' The rotation is a downstream consequence of local active stress, constitutive response, shared-grid momentum exchange, and anatomical attachments.
+
+\subsection{Source map sorted by implementation}
+
+The same mapping is more useful when read in the order in which the code is organized. First come the prototype-local operators that add the eye-specific constitutive and boundary behavior; then the stock Plexus MPM operators that provide the generic particle--grid mechanics. Within each implementation, the entries follow their physical role in the calculation.
+
+\begin{center}
+\small
+\begin{tabular}{p{0.34\textwidth}p{0.58\textwidth}}
+\toprule
+\textbf{Implementation} & \textbf{Equation / mechanism}\\
+\midrule
+\multicolumn{2}{l}{\texttt{prototype/eye/muscle\_ops.py}}\\[2pt]
+\texttt{MuscleContract} & Activation and spatial taper $T(s)$; active stress $\boldsymbol{\sigma}^{\rm act}=g\,\mathbf f\mathbf f^{\mathsf T}$; force--length factor when enabled.\\
+\texttt{MPMScatterAccumulate} & Passive fixed-corotated stress; total stress; stress $\to$ affine momentum; particle $\to$ shared grid; accumulation from multiple bodies.\\
+\texttt{BoneAnchor} & Proximal endpoint penalty force and damping.\\
+\texttt{MuscleGeometry} & Fibre geometry, local shortening and muscle-level readouts.\\
+\texttt{MuscleSleeve} & Transverse displacement/velocity penalty; leaves axial shortening comparatively free.\\
+\midrule
+\multicolumn{2}{l}{\texttt{prototype/eye/blend\_mpm\_ops.py}}\\[2pt]
+\texttt{BlendMuscles} & Distal tendon/insertion mask, fibre coordinate $s$, standoff from globe, embedding of the distal cap.\\
+Stiffness/material setup & Young's modulus $E$, Poisson ratio $
+u$, Lam\'e parameters $\mu,\lambda$, particle reference volume and mass.\\
+\midrule
+\multicolumn{2}{l}{\texttt{src/plexus/operators/mpm\_strain.py}}\\[2pt]
+\texttt{MPMStrain} & Deformation-gradient evolution $F^{n+1}=(I+\Delta t\,C)F^n$.\\
+\midrule
+\multicolumn{2}{l}{\texttt{src/plexus/operators/mpm\_grid.py} / \texttt{mpm\_scatter.py}}\\[2pt]
+Stock scatter operators & Quadratic B-spline particle-to-grid transfer and grid-node mass/momentum accumulation.\\
+\midrule
+\multicolumn{2}{l}{\texttt{src/plexus/operators/mpm\_grid\_update.py}}\\[2pt]
+Grid update & External forces, damping, walls, and conversion from grid momentum to grid velocity.\\
+\midrule
+\multicolumn{2}{l}{\texttt{src/plexus/operators/mpm\_gather.py}}\\[2pt]
+Grid gather & Quadratic B-spline grid-to-particle velocity interpolation and particle advection.\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The source files are public in the Plexus repository. In particular, the current prototype explicitly describes \texttt{mpm\_grid} as a shared background field and \texttt{mpm\_scatter[accumulate]} as the mechanism by which two particle sets contribute to the same grid; the \texttt{muscle\_contract} operator stores active stress on the muscle particle set rather than applying a force directly to the globe.
+
+\section*{Code provenance for the fibre construction}
+The fibre-construction snippets in this appendix correspond to the public Plexus
+implementation inspected on 18 August 2026. In \texttt{blend\_mpm\_ops.py},
+\texttt{path\_coordinate} and \texttt{fibre\_from\_s} are the functions that create
+$s_p$ and $\vect f_p$, \texttt{BlendMuscles.forward} calls them and registers the
+resulting \texttt{fibre} buffer, and \texttt{muscle\_contract} reads that buffer during
+the dynamical step. See the repository pages for
+\texttt{prototype/eye/blend\_mpm\_ops.py} and
+\texttt{prototype/eye/muscle\_ops.py}. These implementation details are the basis for
+the line-numbered listings above.
+
+\begin{thebibliography}{9}
+\bibitem{github:blend}
+Allier, C. E., \emph{Plexus}, \texttt{prototype/eye/blend\_mpm\_ops.py},
+current \texttt{main} branch, inspected 18 August 2026.
+
+\bibitem{github:contract}
+Allier, C. E., \emph{Plexus}, \texttt{prototype/eye/muscle\_ops.py},
+current \texttt{main} branch, inspected 18 August 2026.
+\end{thebibliography}
+\end{document}

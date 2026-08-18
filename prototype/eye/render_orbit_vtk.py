@@ -31,6 +31,7 @@ sweep is gated on the drive (see `azimuth_schedule`), and `turns=0` LOCKS the ca
 """
 from __future__ import annotations
 
+from tqdm import tqdm
 import numpy as np
 import pyvista as pv
 
@@ -229,7 +230,7 @@ def render(cap, dt, out_mp4, out_strip=None, fps=30, size=(1600, 1200), turns=1.
     strip_at = set(np.linspace(0, n - 1, strip_n).round().astype(int).tolist())
     strip = []
     with iio.get_writer(out_mp4, fps=fps, quality=quality, macro_block_size=None) as w:
-        for k in range(n):
+        for k in tqdm(range(n), desc="[render]", unit="frame", dynamic_ncols=True, ncols=140, leave=False):
             img = scene.frame(k, float(az[k]), dt)
             w.append_data(img)
             if k in strip_at:

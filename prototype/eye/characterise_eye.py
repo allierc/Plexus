@@ -307,7 +307,10 @@ def collect(folder):
     """Assemble the protocol's output files from whatever runs have landed."""
     o = outdir(folder)
     rows = []
-    for name in ("stage0.json", "stage1.json", "stage2a.json", "stage2b.json"):
+    # every stage that measures a HOLD, which is what holds.npz is. `derisk` is excluded on
+    # purpose: it re-measures one hold at two substeps to check the integrator, so pooling it
+    # would put the same command in the table twice.
+    for name in ("stage0.json", "stage1.json", "stage2a.json", "stage2b.json", "stage6d.json"):
         rows += _load(o, name)
     if not rows:
         print(f"[collect] nothing in {o} yet")
