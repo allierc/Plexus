@@ -588,16 +588,16 @@ def main():
         # name, every browser that had the page open kept serving the OLD bytes from cache and the
         # swap looked like it had not happened. The name also now says what the card says.
         ("03_mesh_contact", "vertex_mpm_press", "press",
-         f"A free block, indented and released. {pr['contacts_max']} particles in contact at the "
+         f"a free block, indented and released. {pr['contacts_max']} particles in contact at the "
          f"deepest; momentum balances to {pr['momentum_residual_max']:.1e} of the applied force, "
          f"and friction cuts the slip "
          f"{pr['slip_frictionless'] / pr['slip_friction']:.1f}-fold against \u03bc = 0"),
         ("03f_mesh_shear", "vertex_mpm_shear", "drag",
-         f"Pressed {sh['indent_cells']:.1f} cells in, then dragged {sh['drag_box_units']:.2f} box "
+         f"pressed {sh['indent_cells']:.1f} cells in, then dragged {sh['drag_box_units']:.2f} box "
          f"units at that depth over a pinned base: it ploughs and shears. Von Mises, because a "
          f"drag changes shape at constant volume"),
         ("03g_mesh_breach", "vertex_mpm_breach", "breach",
-         f"Closed on all four sides and nearly incompressible, so the matrix leaves through the "
+         f"closed on all four sides and nearly incompressible, so the matrix leaves through the "
          f"hole: a plug {br['plug_above_surface_cells']:.1f} cells proud of a plate that has "
          f"descended {br['indent_cells']:.1f}"),
     ]
@@ -651,9 +651,11 @@ def main():
         # SHORT. Each caption is one measured number and one sentence about what the clip shows;
         # the mechanism is in the paragraph above the row and does not need repeating three times.
         extra = {
-            "tsd_max": "B marks cells to die instead, from frame 180 — under half the cells the "
-                       "inhibited run keeps, from the same growth law",
-            "sc_antiphase": "One field: death fires where growth's own chemical is low, so it can "
+            # NAMED, not lower-cased: `B` is the second Gray-Scott species, so the sentence is
+            # reworded to open on an ordinary word instead of demoting the species to "b".
+            "tsd_max": "the second field marks cells to die instead, from frame 180 — under half "
+                       "the cells the inhibited run keeps, from the same growth law",
+            "sc_antiphase": "one field: death fires where growth's own chemical is low, so it can "
                             "only land between the spots. Top view, where the network is",
         }[run]
         return f"{extra}. {s['cells_final']:,} cells from 2,000 seeded"
@@ -678,10 +680,10 @@ def main():
         ("r017_00_ctrl", "turing_noline_v3", "no purse-string"),
     ]
     CAP4 = {
-        "r013_05": "Eight arms from one activator: {cells:,} cells, protrusion peak {pk}",
-        "r016_01": "The same graph at half the Gray–Scott k, and it lobes and branches instead: "
+        "r013_05": "eight arms from one activator: {cells:,} cells, protrusion peak {pk}",
+        "r016_01": "the same graph at half the Gray–Scott k, and it lobes and branches instead: "
                    "{cells:,} cells",
-        "r017_00_ctrl": "The interface tension removed, so growth acts alone: {cells:,} cells and "
+        "r017_00_ctrl": "the interface tension removed, so growth acts alone: {cells:,} cells and "
                         "the longest arms of the three, peak {pk}",
     }
     runs4 = []
@@ -711,13 +713,13 @@ def main():
     # folded to thick-armed to thin-armed across it. The third run also reseeds, which is why its
     # caption says to read the ratio rather than the shape.
     CAP5 = {
-        "r020_01": "Chemistry fast against growth: the shell folds rather than forming arms, and "
+        "r020_01": "chemistry fast against growth: the shell folds rather than forming arms, and "
                    "carries {cells:,} cells",
         # `diag.json` leaves `cells_final` unset on this run, so the count comes from
         # `progress.json` -- the same number the renderer prints on the last frame.
-        "r020_00_ctrl": "The same reaction rate with the purse-string on: {cells:,} cells drawn "
+        "r020_00_ctrl": "the same reaction rate with the purse-string on: {cells:,} cells drawn "
                         "into {tubes} arms, protrusion peak {peak}",
-        "r021_06": "Slower still, with growth doubled: five long thin arms, {cells:,} cells. This "
+        "r021_06": "slower still, with growth doubled: five long thin arms, {cells:,} cells. This "
                    "one reseeds as well, so it is the ratio that compares and not the shape",
     }
     runs5r = []
@@ -923,7 +925,7 @@ def main():
     # replaced here by the run Cedric picked, which is a labyrinth rather than patches.
     for clip, run, label, cap_fn, olds in (
         ("turing_coral_v4", "r021_12", "coral",
-         lambda m: (f"A Gray–Scott pattern riding a growing shell: red stripes wander across "
+         lambda m: (f"a Gray–Scott pattern riding a growing shell: red stripes wander across "
                     f"{m['cells_final']:,} cells and the shell stays round (protrusion peak "
                     f"{m['protr_peak']:.2f})"),
          ("tyssue_vh_rd_coral.mp4", "turing_coral_v2.mp4", "turing_coral_v3.mp4",
@@ -933,7 +935,7 @@ def main():
         # divided and the card drew a sphere doing nothing; this one reaches 25,079 cells of which
         # 25,054 divided.
         ("turing_grow_divide_v4", "grow_divide", "grow &amp; divide",
-         lambda m: (f"Growth that no morphogen gates, and division following it: 2,000 cells to "
+         lambda m: (f"growth that no morphogen gates, and division following it: 2,000 cells to "
                     f"{m['cells_final']:,}, and the shell stays a sphere (reduced volume "
                     f"{m['reduced_volume_final']:.2f})"),
          ("tyssue_vh_grow_divide.mp4", "turing_grow_divide_v3.mp4", "turing_grow_divide_v4.mp4")),
