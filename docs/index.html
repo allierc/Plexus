@@ -1039,7 +1039,7 @@ _basis:
   why: chemistry=none, material=static, mechanics=plain -- one cell of the basis grid
     written by make_basis.py; every value not on an axis is shared with the other
     fifteen.</pre></span></span>
-      <span class="sim-cap">repeated cell death closes the vesicle and shrinks it</span>
+      <span class="sim-cap">895 deaths in nine bands: the vesicle does not fall apart, it closes over every gap and shrinks</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1135,7 +1135,7 @@ _apopgeo:
     n_bands: 1
   why: death is the only mechanism in this composition, so the cell count can only
     fall and n_apop must equal 400 - cells_final exactly</pre></span></span>
-      <span class="sim-cap">cell extrusion reshapes the tissue while topology survives</span>
+      <span class="sim-cap">285 of 400 cells extruded — the topology survives, and what is left is an ellipsoid pulled from a sphere</span>
     </figcaption>
   </figure>
 </div>
@@ -1249,7 +1249,7 @@ schedule:
 - cell_grow
 - cell_divide
 - topo_record</pre></span></span>
-      <span class="sim-cap">growth + division expand the tissue while keeping it round</span>
+      <span class="sim-cap">Growth that no morphogen gates, and division following it: 2,000 cells to 25,079, and the shell stays a sphere (reduced volume 1.00)</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1395,7 +1395,7 @@ _basis:
   why: chemistry=gs, material=gated, mechanics=plain -- one cell of the basis grid
     written by make_basis.py; every value not on an axis is shared with the other
     fifteen.</pre></span></span>
-      <span class="sim-cap">Turing patterning on a growing shell</span>
+      <span class="sim-cap">A Gray–Scott pattern riding a growing shell: red stripes wander across 4,199 cells and the shell stays round (protrusion peak 1.03)</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1795,7 +1795,7 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">one activator grows eight arms</span>
+      <span class="sim-cap">Eight arms from one activator: 12,201 cells, protrusion peak 1.41</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1992,7 +1992,7 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">slower reaction produces lobes and branches</span>
+      <span class="sim-cap">The same graph at half the Gray–Scott k, and it lobes and branches instead: 22,231 cells</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -2175,7 +2175,7 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">without interface tension, growth forms longer arms</span>
+      <span class="sim-cap">The interface tension removed, so growth acts alone: 5,511 cells and the longest arms of the three, peak 1.83</span>
     </figcaption>
   </figure>
 </div>
@@ -2363,7 +2363,7 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">fast chemistry folds the growing shell</span>
+      <span class="sim-cap">Chemistry fast against growth: the shell folds rather than forming arms, and carries 24,661 cells</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -2569,7 +2569,7 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">purse-string tension draws the tissue into arms</span>
+      <span class="sim-cap">The same reaction rate with the purse-string on: 12,223 cells drawn into 13 arms, protrusion peak 1.79</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -2752,7 +2752,7 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">slower reaction + faster growth produces thin arms</span>
+      <span class="sim-cap">Slower still, with growth doubled: five long thin arms, 21,832 cells. This one reseeds as well, so it is the ratio that compares and not the shape</span>
     </figcaption>
   </figure>
 </div>
@@ -2763,7 +2763,7 @@ _discovery:
   <figure class="sim-card">
     <video src="gallery/turing_death_v5.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">B kills<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">cell death<span class="sim-spec"><pre>general:
   name: tsd_max
   seed: 0
   n_frames: 1800
@@ -2955,7 +2955,7 @@ _two_species:
     one buffer; B has 2x the diffusivities so its wavelength is coarser. A single-species
     run cannot put growth and death in different places, because every operator reads
     the same field.</pre></span></span>
-      <span class="sim-cap">cell death replaces growth in the patterned tissue</span>
+      <span class="sim-cap">B marks cells to die instead, from frame 180 — under half the cells the inhibited run keeps, from the same growth law. 2,895 cells from 2,000 seeded</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -3126,7 +3126,7 @@ _sculpt:
   k_purse: null
   asks: 'the finger hypothesis: grow at the spots, remove the flanks, and a bulge
     should sharpen'</pre></span></span>
-      <span class="sim-cap">death follows the low-growth regions between pattern spots</span>
+      <span class="sim-cap">One field: death fires where growth's own chemical is low, so it can only land between the spots. Top view, where the network is. 2,387 cells from 2,000 seeded</span>
     </figcaption>
   </figure>
 </div>
@@ -3134,7 +3134,7 @@ _sculpt:
 
 <!-- BEGIN spheroid-bm-ecm (generated by discovery_okuda/ops/minisite_section.py) -->
 <h3 class="anchored">Spheroid + basement membrane + extracellular matrix</h3>
-<p class="opk">Cells grow a spheroid, deform its basement membrane, and interact with the surrounding matrix.</p>
+<p class="opk">Cells grow a spheroid, deform its basement membrane, and interact with the surrounding matrix. At the lowest level, these interactions are governed by proteases, integrins and myosins dynamics.</p>
 <p class="opk-ref">Reference — load path,
 <a href="https://doi.org/10.1083/jcb.104.3.611">Keene et&nbsp;al. (1987)</a>; adhesions are clusters
 at ~555&nbsp;nm, <a href="https://doi.org/10.1002/bies.201600123">Changede &amp; Sheetz (2017)</a>;
@@ -3146,7 +3146,7 @@ protease network, <a href="https://doi.org/10.1074/jbc.M403627200">Karagiannis &
   <figure class="sim-card">
     <video src="gallery/spheroid_bm_ecm_07i2.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">three entities, three solvers<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">from tissue to cells to proteins<span class="sim-spec"><pre>general:
   name: 07i_ramp
   rig: Rig07i
   module: __main__
@@ -3221,7 +3221,7 @@ run:
   <figure class="sim-card">
     <video src="gallery/bm_07k_breach_hole.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">a breach that opens<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">small holes in the membrane<span class="sim-spec"><pre>general:
   name: 07k_breach_hole
   rig: Rig07k
   module: __main__
@@ -3327,13 +3327,13 @@ run:
   mt1_field: smooth random field, 6 modes, rebuilt per cell
   kdeg: 100.0
   what: the rate whose hole did not stop</pre></span></span>
-      <span class="sim-cap">enzymatic degradation opens multiple membrane holes</span>
+      <span class="sim-cap">the sheet perforates wherever the enzyme sits: 7.7% of its faces gone by frame 187, through 54 separate openings, the first at frame 40</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/bm_07j_hole_tiny.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">the smallest one<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">larger hole in the membrane<span class="sim-spec"><pre>general:
   name: 07j_hole_tiny
   rig: Rig07j
   module: __main__
@@ -3437,13 +3437,13 @@ run:
   splits: 100524
   twin_of: 06_hole_tiny
   mt1_field: single Gaussian cap, theta 20.0 deg</pre></span></span>
-      <span class="sim-cap">a local source creates a small membrane hole</span>
+      <span class="sim-cap">one localised source instead: 2.0% of the faces gone, but through only 6 openings — 2.3x as much of the sheet per opening as the card at left</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
     <video src="gallery/bm_07k_breach_torn.mp4" autoplay loop muted playsinline preload="metadata"></video>
     <figcaption>
-      <span class="sim-name" tabindex="0">and one that runs away<span class="sim-spec"><pre>general:
+      <span class="sim-name" tabindex="0">membrane tears apart<span class="sim-spec"><pre>general:
   name: 07k_breach_torn
   rig: Rig07k
   module: __main__
@@ -3549,7 +3549,7 @@ run:
   mt1_field: smooth random field, 6 modes, rebuilt per cell
   kdeg: 300.0
   what: the rate that destroyed the membrane</pre></span></span>
-      <span class="sim-cap">without restraint, degradation tears the membrane</span>
+      <span class="sim-cap">the same chemistry with nothing holding it: 87% of the faces gone by frame 201, the first as early as frame 14, and still tearing at the end</span>
     </figcaption>
   </figure>
 </div>
@@ -3987,7 +3987,7 @@ rig:
   k_penalty: 2.1457672119140625
   mu: 0.4
   dt: 0.0001</pre></span></span>
-      <span class="sim-cap">indentation, release and friction in a solid block</span>
+      <span class="sim-cap">A free block, indented and released. 751 particles in contact at the deepest; momentum balances to 1.5e-07 of the applied force, and friction cuts the slip 3.2-fold against μ = 0</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -4015,7 +4015,7 @@ measured:
   momentum_residual_max: 1.0260407079598801e-07
   penetration_max_cells: 1.4166336059570312
   compression: 0.1543962709619502</pre></span></span>
-      <span class="sim-cap">a block ploughs and shears over a pinned base</span>
+      <span class="sim-cap">Pressed 5.9 cells in, then dragged 0.13 box units at that depth over a pinned base: it ploughs and shears. Von Mises, because a drag changes shape at constant volume</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -4045,7 +4045,7 @@ measured:
   momentum_residual_max: 1.324563153324408e-07
   penetration_max_cells: 1.9284839630126953
   compression: 0.22596009093189695</pre></span></span>
-      <span class="sim-cap">an incompressible material is squeezed through a hole</span>
+      <span class="sim-cap">Closed on all four sides and nearly incompressible, so the matrix leaves through the hole: a plug 3.2 cells proud of a plate that has descended 6.3</span>
     </figcaption>
   </figure>
 </div>
