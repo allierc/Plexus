@@ -559,14 +559,8 @@ def build3(runs, runs2=()):
 {chr(10).join(card(v, n, sp, c) for _, v, n, sp, c in runs2)}
 </div>"""
     return f"""{BEGIN3}
-<h3>Three levels in one composition</h3>
-<p class="opk">The demonstration here is that <b>three levels interact</b> in one composition.
-<b>Molecules</b>: four proteases (MT1-MMP, proMMP-2, MMP-2, TIMP-2/3) as fields on the membrane's own
-faces, integrins as bonds that load and unbind under force, myosin on the junctions. <b>Cells</b>: a
-vertex model, polyhedra sharing walls, dividing, each deciding where its enzyme sits and owning its
-own adhesions. <b>Tissue</b>: a spheroid whose growth stretches a triangulated elastic membrane into
-an MPM stroma. Each level is written where it belongs and none is a parameter of another — which is
-why a cell's enzyme choice ends as a hole of a particular size in a sheet the cell never touches.</p>
+<h3>Spheroid + basement membrane + extracellular matrix</h3>
+<p class="opk">Cells grow a spheroid, deform its basement membrane, and interact with the surrounding matrix. At the lowest level, these interactions are governed by proteases, integrins and myosins dynamics.</p>
 <p class="opk-ref">Reference — load path,
 <a href="https://doi.org/10.1083/jcb.104.3.611">Keene et&nbsp;al. (1987)</a>; adhesions are clusters
 at ~555&nbsp;nm, <a href="https://doi.org/10.1002/bies.201600123">Changede &amp; Sheetz (2017)</a>;
@@ -649,7 +643,7 @@ def main():
     # control and its death network is drawn on the pole, so the top view is the one that shows it;
     # the two-field runs are read from the side like every other clip on the page.
     R2 = [
-        ("tsd_max", "turing_death_v5", "B kills", "left"),
+        ("tsd_max", "turing_death_v5", "cell death", "left"),
         ("sc_antiphase", "turing_antiphase_v5", "one field, in antiphase", "right"),
     ]
     def _cap2(run):
@@ -815,32 +809,42 @@ def main():
             return None
 
     QUAD = [q["tl"], q["tr"], q["bl"], q["br"]]
-    R5 = [("07i_ramp", "spheroid_bm_ecm_07i2", "three entities, three solvers", QUAD,
+    R5 = [("07i_ramp", "spheroid_bm_ecm_07i2", "from tissue to cells to proteins", QUAD,
            dict(skip_top=0.0),
-           (f"{cen['epi_cell']['min']:,.0f} cells to {cen['epi_cell']['max']:,.0f}, and every "
-            f"level grows with them: the membrane from {cen['bm_face']['min']:,.0f} faces to "
-            f"{cen['bm_face']['max']:,.0f}, its adhesions from {cen['plaque']['min']:,.0f} plaques "
-            f"to {cen['plaque']['max']:,.0f}, and {cen['bond']['last']:,.0f} integrin bonds under "
-            f"load at the end" if cen else
-            "An epithelium growing inside a fibre matrix, with a triangulated membrane between "
-            "them"))]
+           "cells, basement membrane and matrix grow together")]
     # THE MEMBRANE PANEL ALONE for the three breach cards: their other three panels are the tissue
     # and the matrix, which the first card already shows.
-    for run, clip, label, phrase in (
-            ("07k_breach_hole", "bm_07k_breach_hole", "a breach that opens",
-             "the sheet perforates where the enzyme is"),
-            ("07j_hole_tiny", "bm_07j_hole_tiny", "the smallest one",
-             "a localised source, and the hole stays small"),
-            ("07k_breach_torn", "bm_07k_breach_torn", "and one that runs away",
-             "the same chemistry with nothing holding it")):
-        hm = _hole(run)
+    # A RIM LOOP IS ONE OPENING, so `torn_frac_final / rim_loops_final` is how much of the sheet
+    # each opening took: that ratio, not the total loss, is what separates "many small holes" from
+    # "one larger hole". 07j loses LESS of the membrane than 07k_breach_hole and still earns the
+    # word larger, because it loses it through six openings instead of fifty-four.
+    breach = {r: _hole(r) for r in ("07k_breach_hole", "07j_hole_tiny", "07k_breach_torn")}
+    def _per_loop(run):
+        hm = breach.get(run)
+        return None if not hm or not hm["rim_loops_final"] else \
+            hm["torn_frac_final"] / hm["rim_loops_final"]
+    ratio = (_per_loop("07j_hole_tiny") / _per_loop("07k_breach_hole")
+             if _per_loop("07j_hole_tiny") and _per_loop("07k_breach_hole") else None)
+    for run, clip, label, capfn in (
+            ("07k_breach_hole", "bm_07k_breach_hole", "small holes in the membrane",
+             lambda hm: (f"the sheet perforates wherever the enzyme sits: "
+                         f"{100 * hm['torn_frac_final']:.1f}% of its faces gone by frame "
+                         f"{hm['frames']}, through {hm['rim_loops_final']} separate openings, the "
+                         f"first at frame {hm['first_torn_frame']}")),
+            ("07j_hole_tiny", "bm_07j_hole_tiny", "larger hole in the membrane",
+             lambda hm: (f"one localised source instead: {100 * hm['torn_frac_final']:.1f}% of the "
+                         f"faces gone, but through only {hm['rim_loops_final']} openings — "
+                         + (f"{ratio:.1f}x as much of the sheet per opening as the card at left"
+                            if ratio else "far fewer, each far bigger"))),
+            ("07k_breach_torn", "bm_07k_breach_torn", "membrane tears apart",
+             lambda hm: (f"the same chemistry with nothing holding it: "
+                         f"{100 * hm['torn_frac_final']:.0f}% of the faces gone by frame "
+                         f"{hm['frames']}, the first as early as frame "
+                         f"{hm['first_torn_frame']}, and still tearing at the end"))):
+        hm = breach.get(run)
         if hm is None:
             continue
-        R5.append((run, clip, label, [q["bl"]], dict(skip_top=0.0),
-                   f"{phrase}: {100 * hm['torn_frac_final']:.1f}% of the faces gone by frame "
-                   f"{hm['frames']}, in {hm['rim_loops_final']} rim loops, the first at frame "
-                   f"{hm['first_torn_frame']}. It has not arrested — the torn fraction still "
-                   f"creeps {100 * hm['creep_over_last_third']:.1f} points over the last third"))
+        R5.append((run, clip, label, [q["bl"]], dict(skip_top=0.0), capfn(hm)))
     R5b = []
     runs5, runs5b = [], []
     for out, rows in ((runs5, R5), (runs5b, R5b)):
