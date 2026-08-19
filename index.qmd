@@ -152,7 +152,7 @@ descriptions:
       particles are initially scattered randomly but eventually form large, circular clusters. Each cluster
       features a dark, empty center surrounded by a dense ring of multicolored particles. The final topology
       consists of a repeating, honeycomb-like pattern of these interconnected circular structures.</pre></span></span>
-      <span class="sim-cap">a Lateral interaction — a per-type force law sorts the types into cells</span>
+      <span class="sim-cap">per-type interaction sorts particles into cells</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -314,7 +314,7 @@ descriptions:
       are colored in a variety of hues, including white, red, blue, green, orange, and pink. Initially,
       the particles are arranged in a random, scattered topology across the entire frame. As the simulation
       progresses, they form dense, concentric circular clusters that stand out against the black background.</pre></span></span>
-      <span class="sim-cap">three Lateral rules — cohesion, alignment, separation — compose into flocking</span>
+      <span class="sim-cap">cohesion + alignment + separation produce flocking</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -353,7 +353,7 @@ descriptions:
       a flow field. Each individual triangle is uniform in size and color, providing a consistent visual
       representation of the data. The topology of the objects changes as they aggregate into dense regions
       and disperse into more scattered formations.</pre></span></span>
-      <span class="sim-cap">a Lateral alignment operator — self-propelled agents order into a polar swarm</span>
+      <span class="sim-cap">alignment orders self-propelled agents into a swarm</span>
     </figcaption>
   </figure>
 </div>
@@ -410,7 +410,7 @@ schedule:
 - aggregate_seed
 - graph_diffuse
 - react</pre></span></span>
-      <span class="sim-cap">graph-diffusion + reaction — the coral regime (F=0.055)</span>
+      <span class="sim-cap">reaction–diffusion forms a coral pattern</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -461,7 +461,7 @@ schedule:
 - aggregate_seed
 - graph_diffuse
 - react</pre></span></span>
-      <span class="sim-cap">the same reaction (F=0.037) at half the diffusion coupling χ — a finer-wavelength maze</span>
+      <span class="sim-cap">weaker coupling produces a finer maze</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -512,7 +512,7 @@ schedule:
 - aggregate_seed
 - graph_diffuse
 - react</pre></span></span>
-      <span class="sim-cap">Turing's activator–inhibitor as a diverging map — activator high (red), low (blue), balanced (white)</span>
+      <span class="sim-cap">activator–inhibitor pattern shown as a field</span>
     </figcaption>
   </figure>
 </div>
@@ -611,7 +611,7 @@ schedule:   # the order the operators run each frame
 - apoptosis
 - t1_transition
 - topo_snapshot</pre></span></span>
-      <span class="sim-cap">programmed cell death — targeted cells shrink out of the sheet and their neighbours close the gap</span>
+      <span class="sim-cap">cell death creates a local gap that closes</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -692,7 +692,7 @@ schedule:   # the order the operators run each frame
 - cell_morphogen
 - morphogen_growth
 - shape_energy</pre></span></span>
-      <span class="sim-cap">a morphogen raises the target area in a central patch, so the sheet bulges outward there</span>
+      <span class="sim-cap">local growth produces a tissue bulge</span>
     </figcaption>
   </figure>
 </div>
@@ -890,7 +890,7 @@ _basis:
   why: chemistry=none, material=static, mechanics=plain -- one cell of the basis grid
     written by make_basis.py; every value not on an axis is shared with the other
     fifteen.</pre></span></span>
-      <span class="sim-cap">895 deaths in nine bands: the vesicle does not fall apart, it closes over every gap and shrinks</span>
+      <span class="sim-cap">repeated cell death closes the vesicle and shrinks it</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -986,13 +986,13 @@ _apopgeo:
     n_bands: 1
   why: death is the only mechanism in this composition, so the cell count can only
     fall and n_apop must equal 400 - cells_final exactly</pre></span></span>
-      <span class="sim-cap">285 of 400 cells extruded — the topology survives, and what is left is an ellipsoid pulled from a sphere</span>
+      <span class="sim-cap">cell extrusion reshapes the tissue while topology survives</span>
     </figcaption>
   </figure>
 </div>
 
-<h3>Vertex + Turing — patterning &amp; shaping a growing tissue</h3>
-<p class="opk">Growth and reaction–diffusion on a deformable vertex shell: the tissue first proliferates by growth and division to a couple of thousand cells, then reaction–diffusion chemistry both <b>colours</b> the surface and <b>drives its shape</b> — each regime buckling the shell a different way.</p>
+<h3>Growing tissue + Turing pattern</h3>
+<p class="opk">Cells grow and divide while reaction–diffusion patterns the tissue and shapes its surface.</p>
 <p class="opk-ref">Reference — this is the experiment of <a href="https://www.nature.com/articles/s41598-018-20678-6">Okuda et&nbsp;al. (2018), <i>Sci. Rep.</i> 8:2386</a> — Turing patterning on a 3D vertex model — rebuilt as Plexus operators on the <a href="https://github.com/DamCB/tyssue">Tyssue</a> mesh; the chemistry is the Gray–Scott system cited in the Turing section above.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
@@ -1099,7 +1099,7 @@ schedule:
 - cell_grow
 - cell_divide
 - topo_record</pre></span></span>
-      <span class="sim-cap">Growth that no morphogen gates, and division following it: 2,000 cells to 25,079, and the shell stays a sphere (reduced volume 1.00)</span>
+      <span class="sim-cap">growth + division expand the tissue while keeping it round</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1245,7 +1245,7 @@ _basis:
   why: chemistry=gs, material=gated, mechanics=plain -- one cell of the basis grid
     written by make_basis.py; every value not on an axis is shared with the other
     fifteen.</pre></span></span>
-      <span class="sim-cap">A Gray–Scott pattern riding a growing shell: red stripes wander across 4,199 cells and the shell stays round (protrusion peak 1.03)</span>
+      <span class="sim-cap">Turing patterning on a growing shell</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1442,7 +1442,7 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">Growth gated by the activator, and the arms grow where it sits: 4,764 cells with 6 of them counted as tubes, protrusion peak 1.52</span>
+      <span class="sim-cap">activator-gated growth creates arms</span>
     </figcaption>
   </figure>
 </div>
@@ -1645,7 +1645,7 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">Eight arms from one activator: 12,201 cells, protrusion peak 1.41</span>
+      <span class="sim-cap">one activator grows eight arms</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -1842,7 +1842,7 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">The same graph at half the Gray–Scott k, and it lobes and branches instead: 22,231 cells</span>
+      <span class="sim-cap">slower reaction produces lobes and branches</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -2025,7 +2025,7 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">The interface tension removed, so growth acts alone: 5,511 cells and the longest arms of the three, peak 1.83</span>
+      <span class="sim-cap">without interface tension, growth forms longer arms</span>
     </figcaption>
   </figure>
 </div>
@@ -2213,7 +2213,7 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">Chemistry fast against growth: the shell folds rather than forming arms, and carries 24,661 cells</span>
+      <span class="sim-cap">fast chemistry folds the growing shell</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -2419,7 +2419,7 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">The same reaction rate with the purse-string on: 12,223 cells drawn into 13 arms, protrusion peak 1.79</span>
+      <span class="sim-cap">purse-string tension draws the tissue into arms</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -2602,7 +2602,7 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride</pre></span></span>
-      <span class="sim-cap">Slower still, with growth doubled: five long thin arms, 21,832 cells. This one reseeds as well, so it is the ratio that compares and not the shape</span>
+      <span class="sim-cap">slower reaction + faster growth produces thin arms</span>
     </figcaption>
   </figure>
 </div>
@@ -2805,7 +2805,7 @@ _two_species:
     one buffer; B has 2x the diffusivities so its wavelength is coarser. A single-species
     run cannot put growth and death in different places, because every operator reads
     the same field.</pre></span></span>
-      <span class="sim-cap">B marks cells to die instead, from frame 180 — under half the cells the inhibited run keeps, from the same growth law. 2,895 cells from 2,000 seeded</span>
+      <span class="sim-cap">cell death replaces growth in the patterned tissue</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -2976,21 +2976,15 @@ _sculpt:
   k_purse: null
   asks: &#x27;the finger hypothesis: grow at the spots, remove the flanks, and a bulge
     should sharpen&#x27;</pre></span></span>
-      <span class="sim-cap">One field: death fires where growth's own chemical is low, so it can only land between the spots. Top view, where the network is. 2,387 cells from 2,000 seeded</span>
+      <span class="sim-cap">death follows the low-growth regions between pattern spots</span>
     </figcaption>
   </figure>
 </div>
 <!-- END vertex-turing-second-field -->
 
 <!-- BEGIN spheroid-bm-ecm (generated by discovery_okuda/ops/minisite_section.py) -->
-<h3>Three levels in one composition</h3>
-<p class="opk">The demonstration here is that <b>three levels interact</b> in one composition.
-<b>Molecules</b>: four proteases (MT1-MMP, proMMP-2, MMP-2, TIMP-2/3) as fields on the membrane's own
-faces, integrins as bonds that load and unbind under force, myosin on the junctions. <b>Cells</b>: a
-vertex model, polyhedra sharing walls, dividing, each deciding where its enzyme sits and owning its
-own adhesions. <b>Tissue</b>: a spheroid whose growth stretches a triangulated elastic membrane into
-an MPM stroma. Each level is written where it belongs and none is a parameter of another — which is
-why a cell's enzyme choice ends as a hole of a particular size in a sheet the cell never touches.</p>
+<h3>Spheroid + basement membrane + extracellular matrix</h3>
+<p class="opk">Cells grow a spheroid, deform its basement membrane, and interact with the surrounding matrix.</p>
 <p class="opk-ref">Reference — load path,
 <a href="https://doi.org/10.1083/jcb.104.3.611">Keene et&nbsp;al. (1987)</a>; adhesions are clusters
 at ~555&nbsp;nm, <a href="https://doi.org/10.1002/bies.201600123">Changede &amp; Sheetz (2017)</a>;
@@ -3071,7 +3065,7 @@ run:
   N0: 12
   split_budget: 150
   splits: 102944</pre></span></span>
-      <span class="sim-cap">200 cells to 6,077, and every level grows with them: the membrane from 5,120 faces to 108,064, its adhesions from 2,400 plaques to 72,400, and 54,794 integrin bonds under load at the end</span>
+      <span class="sim-cap">cells, basement membrane and matrix grow together</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -3183,7 +3177,7 @@ run:
   mt1_field: smooth random field, 6 modes, rebuilt per cell
   kdeg: 100.0
   what: the rate whose hole did not stop</pre></span></span>
-      <span class="sim-cap">the sheet perforates where the enzyme is: 7.7% of the faces gone by frame 187, in 54 rim loops, the first at frame 40. It has not arrested — the torn fraction still creeps 0.9 points over the last third</span>
+      <span class="sim-cap">enzymatic degradation opens multiple membrane holes</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -3293,7 +3287,7 @@ run:
   splits: 100524
   twin_of: 06_hole_tiny
   mt1_field: single Gaussian cap, theta 20.0 deg</pre></span></span>
-      <span class="sim-cap">a localised source, and the hole stays small: 2.0% of the faces gone by frame 201, in 6 rim loops, the first at frame 34. It has not arrested — the torn fraction still creeps 1.6 points over the last third</span>
+      <span class="sim-cap">a local source creates a small membrane hole</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -3405,7 +3399,7 @@ run:
   mt1_field: smooth random field, 6 modes, rebuilt per cell
   kdeg: 300.0
   what: the rate that destroyed the membrane</pre></span></span>
-      <span class="sim-cap">the same chemistry with nothing holding it: 86.6% of the faces gone by frame 201, in 36 rim loops, the first at frame 14. It has not arrested — the torn fraction still creeps 1.5 points over the last third</span>
+      <span class="sim-cap">without restraint, degradation tears the membrane</span>
     </figcaption>
   </figure>
 </div>
@@ -3474,7 +3468,7 @@ descriptions:
   movie_mpm_particle:
     description: Initially, three distinct clusters of particles are arranged in a linear sequence along a diagonal axis. Over time, the central blue cluster begins to expand and flatten, spreading across the bottom plane of the bounding box. The green and white clusters remain relatively stationary as the blue cluster grows to encompass the area beneath them. By the final frame, the blue particles form a large, thin sheet on the floor while the green and white clusters sit atop it.
     objects: &#x27;There are three primary clusters of particles: one green, one blue, and one white. The green cluster is a compact, roughly spherical mass located on the left side of the scene. The white cluster is a similar compact, spherical mass located on the right side of the scene. The blue cluster starts as a compact sphere in the center but transforms into a large, flat, two-dimensional sheet that covers the bottom of the cube.&#x27;</pre></span></span>
-      <span class="sim-cap">Exchange particle↔grid (MLS-MPM) — elastic, fluid, and granular matter in one solver</span>
+      <span class="sim-cap">particles + grid: one solver for many materials</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -3534,7 +3528,7 @@ descriptions:
     objects: The scene contains thousands of small, individual blue dots representing particles. These particles are arranged in a roughly uniform, two-dimensional distribution across a white background. Each particle is approximately the same size and maintains a consistent blue color throughout the sequence. The particles are not connected to one another, forming a discrete point cloud rather than a continuous field.
 plotting:
   background: black</pre></span></span>
-      <span class="sim-cap">an exchange field sets per-region stiffness (four quadrants); each pacemaker pulse contracts the tissue inward, then it relaxes elastically between beats</span>
+      <span class="sim-cap">material map + active contraction</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -3643,7 +3637,7 @@ descriptions:
       green, blue, and orange. As the simulation progresses, the individual hexagons merge into a massive,
       interconnected cloud of tiny points. The final state shows a large, flat surface of points with
       varying heights and intricate, nested color patterns.</pre></span></span>
-      <span class="sim-cap">a deep body of water sloshes, settles, and fills the tank</span>
+      <span class="sim-cap">water sloshes, settles and fills the tank</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -3693,7 +3687,7 @@ plotting:
   colors: {elastic: [0.95, 0.55, 0.2], visco: [0.38, 0.10, 0.52]}   # elastic=orange, viscoelastic=DARK PURPLE
   fps: 30                # movie playback frames/sec (NEW plotting param; lower = slower bouncing)
   movie_max_frames: 600  # keep up to 600 recorded frames -&gt; ~20 s smooth (was 120 -&gt; ~4 s)</pre></span></span>
-      <span class="sim-cap">two balls, same stiffness — the elastic one (orange) rings, the viscoelastic one (purple) creeps and damps</span>
+      <span class="sim-cap">elastic and viscoelastic materials respond differently</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -3749,7 +3743,7 @@ descriptions:
   movie_mpm_particle:
     description: A blue cluster of particles initially occupies the upper half of a cubic volume. Over time, the cluster descends toward the bottom surface, gradually flattening into a thin layer. A smaller, spherical cluster of grey particles is positioned directly beneath the blue mass and is eventually enveloped by it. By the final frame, the blue particles have spread out to cover the entire bottom face of the cube.
     objects: The primary object is a large, dense cluster of blue particles that changes shape from a cube to a flat sheet. A secondary, smaller spherical cluster of grey particles is located in the center of the cube. Both sets of particles are contained within a large, transparent white wireframe cube. The blue particles are significantly more numerous and larger in total volume than the grey particles.</pre></span></span>
-      <span class="sim-cap">grid boundary conditions — material pours and piles around an obstacle</span>
+      <span class="sim-cap">material flows around an obstacle</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -3799,7 +3793,7 @@ descriptions:
     objects: The scene contains two distinct sets of particles, one blue and one orange. Initially, the blue and orange particles are arranged in two separate, adjacent circular clusters. As the simulation progresses, the particles reorganize into a single spherical topology. The final object is a single sphere composed of both blue and orange particles of uniform size.
 plotting:
   background: black</pre></span></span>
-      <span class="sim-cap">grid-level surface tension — two drops coalesce</span>
+      <span class="sim-cap">surface tension makes two drops merge</span>
     </figcaption>
   </figure>
 </div>
@@ -3843,7 +3837,7 @@ rig:
   k_penalty: 2.1457672119140625
   mu: 0.4
   dt: 0.0001</pre></span></span>
-      <span class="sim-cap">A free block, indented and released. 751 particles in contact at the deepest; momentum balances to 1.5e-07 of the applied force, and friction cuts the slip 3.2-fold against μ = 0</span>
+      <span class="sim-cap">indentation, release and friction in a solid block</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -3871,7 +3865,7 @@ measured:
   momentum_residual_max: 1.0260407079598801e-07
   penetration_max_cells: 1.4166336059570312
   compression: 0.1543962709619502</pre></span></span>
-      <span class="sim-cap">Pressed 5.9 cells in, then dragged 0.13 box units at that depth over a pinned base: it ploughs and shears. Von Mises, because a drag changes shape at constant volume</span>
+      <span class="sim-cap">a block ploughs and shears over a pinned base</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -3901,7 +3895,7 @@ measured:
   momentum_residual_max: 1.324563153324408e-07
   penetration_max_cells: 1.9284839630126953
   compression: 0.22596009093189695</pre></span></span>
-      <span class="sim-cap">Closed on all four sides and nearly incompressible, so the matrix leaves through the hole: a plug 3.2 cells proud of a plate that has descended 6.3</span>
+      <span class="sim-cap">an incompressible material is squeezed through a hole</span>
     </figcaption>
   </figure>
 </div>
@@ -3964,7 +3958,7 @@ descriptions:
       internal structure. Surrounding the central mass are numerous thin, thread-like strands that radiate
       outward in all directions. All objects are a consistent teal-green color and are set against a solid
       black background.</pre></span></span>
-      <span class="sim-cap">exchange + lateral — deposit into a field, sense it, steer up it: a self-organizing network</span>
+      <span class="sim-cap">deposit, sense and steer form a self-organizing network</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -4017,7 +4011,7 @@ descriptions:
       a neural network or a microscopic biological structure. Surrounding this central mass are several
       thin, faint blue lines that radiate outward like spokes. The color of the filaments is a consistent
       medium blue, contrasting sharply against the solid black background.</pre></span></span>
-      <span class="sim-cap">the same operators, tighter turning — curled, looping trails</span>
+      <span class="sim-cap">tighter turning produces curled trails</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -4073,7 +4067,7 @@ descriptions:
       in a spherical topology, transitioning from a random distribution to a structured lattice. The filaments
       are thin, elongated, and interconnected, forming a dense mesh in the center. The overall structure
       is large relative to the frame, occupying most of the central space with radiating extensions.</pre></span></span>
-      <span class="sim-cap">the same operators, low turning — thin, radiating filaments</span>
+      <span class="sim-cap">low turning produces radiating filaments</span>
     </figcaption>
   </figure>
 </div>
@@ -4139,7 +4133,7 @@ descriptions:
       lines are colored in a repeating palette of cyan, magenta, yellow, and green. Each line is of a
       uniform, small thickness, creating a delicate thread-like appearance. The lines are interconnected
       in a non-linear topology, filling the entire frame with a chaotic yet harmonious structure.</pre></span></span>
-      <span class="sim-cap">four types over four trail channels, one shared schedule</span>
+      <span class="sim-cap">four types share four trail channels</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -4203,7 +4197,7 @@ descriptions:
       These lines are colored in a vibrant palette of pink, orange, yellow, and cyan. Each line follows
       a winding, non-linear path, creating a complex web-like topology. The lines are uniform in thickness
       and are distributed evenly across the entire field of view.</pre></span></span>
-      <span class="sim-cap">six types coupled through cross-inhibition — richer networks</span>
+      <span class="sim-cap">cross-inhibition produces richer networks</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -4273,7 +4267,7 @@ descriptions:
       loops. The filaments exhibit a vibrant color palette including shades of cyan, magenta, yellow,
       and orange. Each individual filament is very small in width but spans across large portions of the
       frame, creating a high-frequency texture.</pre></span></span>
-      <span class="sim-cap">eight types — the most restrained deposit, the most finely channelled web</span>
+      <span class="sim-cap">eight types produce a fine channelled web</span>
     </figcaption>
   </figure>
 </div>
@@ -4321,7 +4315,7 @@ plotting:
   camera_elev: 0.95
   camera_elev_end: 1.4
   camera_turns: 0.08</pre></span></span>
-      <span class="sim-cap">a Lateral flow ẋ = f(x) — the Lorenz butterfly</span>
+      <span class="sim-cap">Lorenz flow</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -4363,7 +4357,7 @@ plotting:
   camera_elev: 0.7
   camera_elev_end: 1.2
   camera_turns: 0.4</pre></span></span>
-      <span class="sim-cap">the same operator, Halvorsen flow — a folded three-armed knot</span>
+      <span class="sim-cap">Halvorsen flow</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -4405,7 +4399,7 @@ plotting:
   camera_elev: 0.9
   camera_elev_end: 1.3
   camera_turns: 0.4</pre></span></span>
-      <span class="sim-cap">the same operator, Aizawa flow — a spiked, banded sphere</span>
+      <span class="sim-cap">Aizawa flow</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -4447,7 +4441,7 @@ plotting:
   camera_elev: 0.7
   camera_elev_end: 1.2
   camera_turns: 0.4</pre></span></span>
-      <span class="sim-cap">the same operator, Sprott B flow — a symmetric twin-scroll</span>
+      <span class="sim-cap">Sprott B flow</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -4489,7 +4483,7 @@ plotting:
   camera_elev: 0.7
   camera_elev_end: 1.2
   camera_turns: 0.4</pre></span></span>
-      <span class="sim-cap">the same operator, Dadras flow — a swooping multi-wing</span>
+      <span class="sim-cap">Dadras flow</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -4531,7 +4525,7 @@ plotting:
   camera_elev: 0.7
   camera_elev_end: 1.2
   camera_turns: 0.5</pre></span></span>
-      <span class="sim-cap">the same operator, Thomas flow — a woven cage of loops</span>
+      <span class="sim-cap">Thomas flow</span>
     </figcaption>
   </figure>
 </div>
@@ -4578,7 +4572,7 @@ descriptions:
       sphere. As the simulation progresses, the particles separate into elongated, curved streams and
       wispy filaments that radiate from the center. The background is a solid black void, providing high
       contrast for the evolving white particle field.</pre></span></span>
-      <span class="sim-cap">a Lateral all-pairs 1/r² law — self-gravity condenses a disc into a galaxy</span>
+      <span class="sim-cap">self-gravity condenses a disc into a galaxy</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -4625,7 +4619,7 @@ descriptions:
       circular cluster. As the simulation evolves, the topology changes from a dense core to a sparse,
       irregular cloud with trailing filaments. The size of the individual particles remains constant,
       but the overall volume occupied by the group increases dramatically over time.</pre></span></span>
-      <span class="sim-cap">the same operator, in 3D from an orbiting camera</span>
+      <span class="sim-cap">the same gravity field in 3D</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -4672,7 +4666,7 @@ descriptions:
       circular cluster. As the simulation evolves, the topology changes from a dense core to a sparse,
       irregular cloud with trailing filaments. The size of the individual particles remains constant,
       but the overall volume occupied by the group increases dramatically over time.</pre></span></span>
-      <span class="sim-cap">the same law with a heavier central mass</span>
+      <span class="sim-cap">a heavier central mass reshapes the disc</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -4713,7 +4707,7 @@ descriptions:
       simulation progresses, the particles move closer together, changing the topology from a multi-peaked
       chain to a single unified cluster. The size of each individual particle remains constant throughout
       the entire sequence.</pre></span></span>
-      <span class="sim-cap">mutual gravity — four clumps merge into one bound cluster, which stays bound inside a halo that keeps evaporating</span>
+      <span class="sim-cap">mutual gravity merges four clumps into one cluster</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -4792,7 +4786,7 @@ descriptions:
       both sets transform into elongated, spiral-shaped structures that maintain their respective colors.
       By the end of the sequence, the particles are distributed in a dense, overlapping cluster where
       the red and blue points are intermingled.</pre></span></span>
-      <span class="sim-cap">the same law between two discs: their centres pass 1.65 apart at t&nbsp;=&nbsp;9.2, 1.4 disc radii, which raises tidal tails and takes 17% of the 25,000 stars out of both galaxies</span>
+      <span class="sim-cap">two galaxies interact and form tidal tails</span>
     </figcaption>
   </figure>
   <figure class="sim-card">
@@ -4907,26 +4901,6 @@ descriptions:
 
 
 
-
-## Agentic mechanistic discovery
-
-The explicit representation of biological mechanisms transforms scientific discovery
-from a parameter optimization problem into a **language exploration problem**. Because
-mechanisms are explicit operators rather than simulator-specific code, they are
-directly accessible to agentic systems. Plexus organizes this as three loops, each at
-a different level of abstraction:
-
-- **Loop I — Understanding.** Decompose an existing simulator into Plexus operators,
-  recovering an explicit mechanistic description from opaque code.
-- **Loop II — Fitting.** Fit the resulting composition to observations through its
-  differentiable implementations, preserving the link between parameters and
-  mechanisms.
-- **Loop III — Discovery.** Read the residual: propose new operators, compare
-  competing mechanistic hypotheses, and extend the algebra when existing mechanisms
-  fall short.
-
-The language itself becomes the object of discovery — new biological knowledge is a
-new operator, not merely a tuned parameter.
 
 ## Read the blueprint
 
