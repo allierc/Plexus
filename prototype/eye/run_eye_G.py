@@ -81,7 +81,7 @@ G_MECHANICS = dict(
 def build_spec(preset="probe", n_particles=45000, side="R", blend=BM.DEFAULT_BLEND,
                parts=BM.DEFAULT_PARTS, name="eye_G_blend", inflate=1.0, standoff=0.008,
                embed=-0.006, bone=False, n_bone=18000, smooth_iters=0, smooth_lambda=0.5,
-               **kw):
+               taper=True, strength=None, **kw):
     """Model F's spec with the two anatomy operators replaced by the blend seeds."""
     params = dict(G_MECHANICS)
     params.update(kw)
@@ -109,6 +109,11 @@ def build_spec(preset="probe", n_particles=45000, side="R", blend=BM.DEFAULT_BLE
             ops.append(globe_seed)
         elif o["op"] == "muscle_morphogenesis":
             ops.append(muscle_seed)
+        elif o["op"] == "muscle_contract":
+            o = dict(o, taper=bool(taper))
+            if strength is not None:
+                o["strength"] = [float(v) for v in strength]
+            ops.append(o)
         else:
             ops.append(o)
     spec["operators"] = ops
@@ -209,6 +214,9 @@ def main():
     ap.add_argument("--inflate", type=float, default=1.0,
                     help="grow the GLOBE by this factor about its centre, leaving the straps "
                          "where they are (1.2 buries the tendon tips inside the sclera)")
+    ap.add_argument("--k-bone", type=float, default=G_MECHANICS["k_bone"],
+                    help="bone_anchor SPRING stiffness (9000 in eye G); no effect with --bone, "
+                         "which deletes the spring for a pinned rigid body instead")
     ap.add_argument("--bone", action="store_true",
                     help="model I: pin the origins with a bone BODY instead of bone_anchor")
     ap.add_argument("--n-bone", type=int, default=18000, help="bone particles, all six nodules")
@@ -230,9 +238,34 @@ def main():
                          "fact; k-NN graph, s=0/s=1 endpoints preserved by rescale. 0 = off")
     ap.add_argument("--smooth-lambda", type=float, default=0.5,
                     help="smoothing step size per iteration, s <- (1-lam)s + lam*mean(nbrs)")
+    ap.add_argument("--k-sleeve", type=float, default=G_MECHANICS["k_sleeve"],
+                    help="orbital-pulley transverse constraint (0 = off, the G default). "
+                         "Penalizes displacement PERPENDICULAR to the fibre only, leaving "
+                         "axial shortening free -- this is the anti-buckling mechanism: "
+                         "muscle_ops.MuscleSleeve, built after the obliques folded to "
+                         "55-70% of their length under load with nothing holding their path")
+    ap.add_argument("--c-sleeve", type=float, default=G_MECHANICS["c_sleeve"])
+    ap.add_argument("--sleeve-free", type=float, nargs=2, default=[0.70, 0.88],
+                    metavar=("FROM", "TO"),
+                    help="fibre-coordinate range over which the sleeve tapers to fully free "
+                         "(the tendon end must stay free to follow the globe's rotation)")
+    ap.add_argument("--taper", default="on", choices=("on", "off"),
+                    help="muscle_contract's T(s)=sin(pi s)^0.5 gate, zero at both caps, "
+                         "peak over the belly (on, the default); 'off' activates the "
+                         "whole muscle uniformly including the caps")
+    ap.add_argument("--lr-strength", type=float, default=1.0,
+                    help="per-muscle strength MULTIPLIER on LR only (the other five stay "
+                         "at fish_anatomy's measured-cross-section weight of 1.0); the "
+                         "geometry's own volumes already carry relative strength, so this "
+                         "is a deliberate departure from it, not a correction")
     ap.add_argument("--particles", type=int, default=45000)
     ap.add_argument("--side", default="R", choices=("L", "R"))
     ap.add_argument("--blend", default=BM.DEFAULT_BLEND)
+    ap.add_argument("--parts", default=None,
+                    help="where the .blend's cut (parts.npz/parts.json) is cached; defaults "
+                         "to <out>/blend_parts, so a second --blend never overwrites the "
+                         "first eye's cut just because they both fell back to the same "
+                         "global default")
     ap.add_argument("--out", default=OUT_DIR)
     ap.add_argument("--label", default="baseline")
     ap.add_argument("--device", default="cuda:0" if torch.cuda.is_available() else "cpu")
@@ -245,6 +278,11 @@ def main():
     ap.add_argument("--az", type=float, default=25.0,
                     help="camera azimuth in degrees (0 = straight at the pupil)")
     ap.add_argument("--frames", type=int, default=None, help="override n_frames (a quick look)")
+    ap.add_argument("--instrument", action="store_true",
+                    help="mechanism-discrimination diagnostics per muscle (axial/transverse "
+                         "stress, insertion torque decomposition, bone reaction) -- see "
+                         "run_eye._instrument_frame. Off by default: it costs an extra pass "
+                         "over the muscle particles every captured frame.")
     ap.add_argument("--spec-only", action="store_true")
     ap.add_argument("--no-movie", action="store_true")
     ap.add_argument("--rerender", default=None, metavar="CURVES.NPZ",
@@ -254,9 +292,11 @@ def main():
     if args.rerender:                        # the movie is a view of the capture, not of the run
         cap = {k: v for k, v in np.load(args.rerender).items()}
         stem = args.rerender.replace("_curves.npz", "")
+        parts_dir = args.parts or os.path.join(args.out, "blend_parts")
         mp4 = stem + ".mp4"
         R = render_surface_vtk if args.renderer == "surface" else render_orbit_vtk
-        R.render(cap, 0.003, mp4, stem + ".png", turns=args.turns, az0=args.az)
+        R.render(cap, 0.003, mp4, stem + ".png", turns=args.turns, az0=args.az,
+                 side=args.side, blend=args.blend, parts=parts_dir)
         print(f"[eye_G] {mp4}")
         return
 
@@ -264,15 +304,22 @@ def main():
     sclera = vitreous = choroid = None
     if args.eye_youngs is not None:
         sclera = vitreous = choroid = args.eye_youngs
+    parts_dir = args.parts or os.path.join(args.out, "blend_parts")
     spec, pl = build_spec(preset=args.preset, n_particles=args.particles, side=args.side,
-                          blend=args.blend, contract=args.contract, inflate=args.inflate,
+                          blend=args.blend, parts=parts_dir,
+                          contract=args.contract, inflate=args.inflate,
                           standoff=args.standoff, embed=args.embed,
                           bone=args.bone, n_bone=args.n_bone,
                           sclera_youngs=sclera if sclera is not None else args.sclera_youngs,
                           vitreous_youngs=vitreous if vitreous is not None else args.vitreous_youngs,
                           choroid_youngs=choroid if choroid is not None else args.choroid_youngs,
                           muscle_youngs=args.muscle_youngs,
-                          smooth_iters=args.smooth_iters, smooth_lambda=args.smooth_lambda)
+                          smooth_iters=args.smooth_iters, smooth_lambda=args.smooth_lambda,
+                          k_bone=args.k_bone, taper=(args.taper == "on"),
+                          strength=([args.lr_strength, 1.0, 1.0, 1.0, 1.0, 1.0]
+                                    if args.lr_strength != 1.0 else None),
+                          k_sleeve=args.k_sleeve, c_sleeve=args.c_sleeve,
+                          sleeve_free=tuple(args.sleeve_free))
     probe = None
     if args.program == "pairs":
         groups = PG.PAIRS if not args.groups else [
@@ -302,7 +349,8 @@ def main():
         return
 
     sim = load_spec(spec_path)
-    H, cap = run_eye.capture_run(sim, device=args.device, stride=args.stride)
+    H, cap = run_eye.capture_run(sim, device=args.device, stride=args.stride,
+                                 instrument=args.instrument)
     np.savez_compressed(os.path.join(args.out, f"{args.label}_curves.npz"),
                         **{k: v for k, v in cap.items() if k not in ("gpos", "gvel")})
     if probe is not None:
@@ -329,6 +377,47 @@ def main():
         GREEN, BOLD, RESET = "\033[32m", "\033[1m", "\033[0m"
         print(f"\n  {BOLD}{GREEN}workspace: {span_h:.1f} deg horizontal x "
               f"{span_v:.1f} deg vertical{RESET}\n")
+
+        if args.instrument:
+            # each muscle is judged in ITS OWN driven window -- the settled 40% of the hold
+            # where the group containing it was actually pulling, `run_eye.diagnose`'s
+            # convention -- not averaged over the whole run, most of which it is at tonic.
+            fr = cap["frame"]
+            table = {}
+            for mi, key in enumerate(EA.MUSCLE_KEYS):
+                slot = next((s for s, g in enumerate(probe.groups) if mi in g), None)
+                if slot is None:
+                    continue
+                t_on, t_off = probe.window(slot)
+                sel = (fr >= t_on + 0.6 * (t_off - t_on)) & (fr <= t_off)
+                if sel.sum() < 2:
+                    continue
+                L0, Lt = cap["rest_length"][mi], cap["length"][sel, mi]
+                axial = float(cap["mus_axial"][sel, mi].mean())
+                trans = float(cap["mus_transverse"][sel, mi].mean())
+                table[key] = dict(
+                    path_shortening_pct=round(float(100.0 * (1.0 - Lt.min() / L0)), 2),
+                    axial_stress=round(axial, 4),
+                    transverse_stress=round(trans, 4),
+                    transverse_over_axial=round(trans / max(axial, 1e-9), 3),
+                    tau_desired=round(float(np.abs(cap["tau_desired"][sel, mi]).mean()), 6),
+                    tau_orth=round(float(cap["tau_orth"][sel, mi].mean()), 6),
+                    eta_torque=round(float(cap["eta_torque"][sel, mi].mean()), 4),
+                    bone_reaction=round(float(np.nanmean(cap["bone_reaction"][sel, mi])), 6))
+            table["_whole_eye"] = dict(span_h_deg=round(span_h, 2), span_v_deg=round(span_v, 2))
+            with open(os.path.join(args.out, f"{args.label}_instrument_table.json"), "w") as fh:
+                json.dump(table, fh, indent=2)
+            print("  mechanism table (each muscle, its own driven window):")
+            print(f"    {'muscle':6s}{'short%':>8s}{'axial':>8s}{'trans':>8s}{'t/a':>6s}"
+                  f"{'tau_des':>10s}{'tau_orth':>10s}{'eta':>6s}{'F_bone':>10s}")
+            for key, row in table.items():
+                if key == "_whole_eye":
+                    continue
+                print(f"    {key:6s}{row['path_shortening_pct']:8.1f}{row['axial_stress']:8.3f}"
+                      f"{row['transverse_stress']:8.3f}{row['transverse_over_axial']:6.2f}"
+                      f"{row['tau_desired']:10.2e}{row['tau_orth']:10.2e}"
+                      f"{row['eta_torque']:6.2f}{row['bone_reaction']:10.2e}")
+            print()
     else:
         diag = run_eye.diagnose(cap, sim)
     diag["geometry"] = dict(source=os.path.basename(args.blend), side=args.side,
@@ -347,7 +436,7 @@ def main():
         png = os.path.splitext(mp4)[0].replace("movie", "strip") + ".png"
         R = render_surface_vtk if args.renderer == "surface" else render_orbit_vtk
         R.render(cap, sim.dt, mp4, png, turns=args.turns, az0=args.az, side=args.side,
-                 inflate=args.inflate)
+                 inflate=args.inflate, blend=args.blend, parts=parts_dir)
         print(f"[eye_G] {mp4}\n[eye_G] {png}")
 
 

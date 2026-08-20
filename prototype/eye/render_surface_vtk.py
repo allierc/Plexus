@@ -79,6 +79,12 @@ class Skin:
         """Per-vertex value taken from the closest bound particle (for the tissue colours)."""
         return np.asarray(values)[self.idx[:, 0]]
 
+    def scalar(self, values):
+        """Per-vertex INTERPOLATION of a per-particle scalar (e.g. stress), same
+        inverse-square weights as `deform` -- smoother than `nearest`, and correct for a
+        field that varies continuously over the mesh rather than a discrete label."""
+        return np.einsum('vk,vk->v', self.w, np.asarray(values, float)[self.idx])
+
 
 class SurfaceScene:
     """The blend's meshes, skinned to the run's particles, in one translucent-globe scene."""

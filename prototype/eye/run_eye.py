@@ -67,17 +67,172 @@ def _scalars(p, sel):
     return strain, vm
 
 
+def _cauchy_stress(p, sel):
+    """Full [n,3,3] Cauchy stress tensor -- passive elastic + active, if the set carries
+    `active_stress` -- for a subset of particles. `_scalars` returns only its von Mises
+    invariant; this is the same construction (matches `mpm_scatter`'s fixed-corotated term
+    exactly) kept as a tensor, because axial/transverse decomposition needs the whole thing.
+
+    `mpm_scatter` adds `active_stress` to the KIRCHHOFF-like term (`tau = J sigma`) before
+    the Cauchy conversion it does for `store_stress`; the same order is used here so a
+    muscle's active pull and its passive elasticity are combined before, not after,
+    dividing by J.
+    """
+    F = p.F[sel]
+    Ft = F.transpose(-2, -1)
+    I3 = torch.eye(3, device=F.device)
+    U, S, Vh = torch.linalg.svd(F)
+    U = U.clone(); Vh = Vh.clone()
+    U[torch.det(U) < 0, :, -1] *= -1
+    Vh[torch.det(Vh) < 0, -1, :] *= -1
+    R = U @ Vh
+    J = torch.linalg.det(F)
+    tau = 2 * p.mu[sel][:, None, None] * ((F - R) @ Ft) \
+        + I3 * (p.la[sel] * J * (J - 1))[:, None, None]
+    act = getattr(p, "active_stress", None)
+    if act is not None:
+        tau = tau + act[sel]
+    tau = 0.5 * (tau + tau.transpose(-2, -1))
+    return tau / J.abs().clamp(min=1e-9)[:, None, None]
+
+
+def _fibre_stress_particles(q, sel):
+    """Per-PARTICLE (axial, transverse) stress against each particle's own fibre direction --
+    the same construction `_instrument_frame` uses for its per-muscle aggregate (sigma_par,p
+    = f_p^T sigma_p f_p, sigma_perp,p = sqrt(||sigma_p||_F^2 - sigma_par,p^2)), left
+    un-aggregated so a mesh can be coloured by it. Unlike that function's `mus_axial` /
+    `mus_transverse` (six numbers, one per muscle, gated behind `--instrument`), this is
+    cheap enough (no tendon/torque/bone-reaction pass) to capture on every run alongside
+    `mus_vm`. `axial` can be negative (compression); `transverse` cannot."""
+    f = q.fibre[sel]
+    sig = _cauchy_stress(q, sel)
+    axial = torch.einsum("ni,nij,nj->n", f, sig, f)
+    frob2 = (sig ** 2).sum((1, 2))
+    transverse = (frob2 - axial ** 2).clamp(min=0).sqrt()
+    return axial, transverse
+
+
+def _instrument_frame(H, q, m, eye_c, sim_dt, n_muscle, bone_kc):
+    """The mechanism-discrimination diagnostics: for each muscle, WHY did a boundary
+    condition (spring vs pinned origin) change the gaze span, not just BY HOW MUCH.
+
+    Four quantities per muscle, each [n_muscle]:
+
+      mus_axial, mus_transverse   sigma_par,p = f_p^T sigma_p f_p  (the fibre-aligned normal
+          stress) and sigma_perp,p = sqrt(||sigma_p||_F^2 - sigma_par,p^2) (everything else
+          in the tensor -- shear and off-axis normal stress), volume-weighted mean per
+          muscle over ALL its particles (`_cauchy_stress` above). A muscle that is bending
+          or shearing instead of pulling shows sigma_perp rising without sigma_par rising to
+          match.
+
+      tau_desired, tau_orth, eta_torque   the torque this muscle delivers to the globe,
+          from its TENDON particles only (`q.tendon`, the distal cap `blend_muscles` tapers
+          the active drive to zero over -- the region actually welded to the sclera).
+          Each tendon particle's contribution is treated as a traction on a cross-section
+          normal to the fibre, F_p = sigma_p f_p * A_p with A_p = p_vol_p^(2/3) an AREA
+          PROXY (particle volume has no natural cross-section without assuming a shape;
+          this is for the BONE VS NO-BONE RATIO, not a calibrated newton). Summing
+          (x_p - eye_centre) x F_p over the cap gives tau_m; `muscle_geometry`'s own
+          `axis` (measured every frame from the muscle's current insertion and pull
+          direction -- not tabulated) is the rotation this muscle SHOULD be producing, so
+          tau_desired = tau_m . axis and tau_orth = tau_m - tau_desired*axis are the useful
+          and wasted parts of the SAME torque, and eta_torque = |tau_desired| / |tau_m| is
+          the fraction that is not wasted.
+
+      bone_reaction   the load the origin attachment is carrying, estimated two different
+          ways because the two boundary conditions do not expose the same quantity.
+          SPRING (`bone_anchor` present): its own force law, F = mass*(k(rest-pos) -
+          c*vel), summed over each muscle's anchored cap -- the exact force that operator
+          applies, not an estimate. PINNED (`--bone`, a `bone_particle` set present
+          instead): `pin_region [clamp]` resets pos/vel to rest ONCE per outer frame and
+          then lets the 25 MLS-MPM substeps drift it via the shared grid before the next
+          reset, so nothing computes a Lagrange multiplier. The momentum the nodule
+          accumulated over that drift, divided by the frame `dt`, is used as a reaction
+          PROXY -- how hard the muscle would have had to pull to move an ideally rigid bone
+          that fast. The two estimators are not on the same absolute scale; only their
+          size relative to the insertion force, within one boundary condition, is meant to
+          be compared.
+    """
+    dev = q.state.device
+    par = q.parent
+    f = q.fibre
+    sig = _cauchy_stress(q, torch.ones(q.n, dtype=torch.bool, device=dev))
+    sig_par = torch.einsum("ni,nij,nj->n", f, sig, f)
+    frob2 = (sig ** 2).sum((1, 2))
+    sig_perp = (frob2 - sig_par ** 2).clamp(min=0).sqrt()
+
+    vol = q.p_vol
+    axial = torch.zeros(n_muscle, device=dev)
+    transverse = torch.zeros(n_muscle, device=dev)
+    tau_desired = torch.zeros(n_muscle, device=dev)
+    tau_orth = torch.zeros(n_muscle, device=dev)
+    eta = torch.zeros(n_muscle, device=dev)
+
+    tendon = getattr(q, "tendon", None)
+    A_p = vol.clamp(min=1e-12) ** (2.0 / 3.0)
+    F_p = torch.einsum("nij,nj->ni", sig, f) * A_p[:, None]
+    r_p = q.get("pos") - eye_c[None, :]
+    trq_p = torch.cross(r_p, F_p, dim=1)
+
+    for mi in range(n_muscle):
+        sel = par == mi
+        w = vol[sel].clamp(min=1e-12)
+        wsum = w.sum().clamp(min=1e-12)
+        axial[mi] = (sig_par[sel] * w).sum() / wsum
+        transverse[mi] = (sig_perp[sel] * w).sum() / wsum
+        if tendon is not None:
+            tsel = sel & tendon
+            if tsel.any():
+                tau_m = trq_p[tsel].sum(0)
+                axis_m = m.axis[mi]
+                td = torch.dot(tau_m, axis_m)
+                orth_vec = tau_m - td * axis_m
+                tau_desired[mi] = td
+                tau_orth[mi] = orth_vec.norm()
+                tau_norm = tau_m.norm().clamp(min=1e-9)
+                eta[mi] = td.abs() / tau_norm
+
+    bone_reaction = torch.full((n_muscle,), float("nan"), device=dev)
+    if bone_kc is not None and hasattr(q, "rest") and hasattr(q, "anchored"):
+        k, c = bone_kc                                      # the SPRING case: bone_anchor's own law
+        acc = k * (q.rest - q.get("pos")) - c * q.get("vel")
+        F_bone_p = q.mass[:, None] * acc
+        for mi in range(n_muscle):
+            sel = (par == mi) & q.anchored
+            if sel.any():
+                bone_reaction[mi] = F_bone_p[sel].sum(0).norm()
+    elif "bone_particle" in H.levels:                       # the PINNED case: momentum / dt proxy
+        bp = H.levels["bone_particle"]
+        per = bp.n // n_muscle
+        vel = bp.get("vel")
+        for mi in range(n_muscle):
+            block = vel[mi * per:(mi + 1) * per]
+            mass_block = bp.mass[mi * per:(mi + 1) * per]
+            bone_reaction[mi] = (mass_block[:, None] * block).sum(0).norm() / max(sim_dt, 1e-9)
+
+    return (axial.detach().cpu().numpy(), transverse.detach().cpu().numpy(),
+            tau_desired.detach().cpu().numpy(), tau_orth.detach().cpu().numpy(),
+            eta.detach().cpu().numpy(), bone_reaction.detach().cpu().numpy())
+
+
 def eye_c_now(H):
     """The globe's live centroid (the pose readout has already written it this tick)."""
     return H.levels["eye"].get("pos")[0]
 
 
 def capture_run(sim, device, stride=3, n_shell=26000, n_cut=16000, n_mus=14000,
-                n_grid_pts=9000, seed=0, progress=True):
+                n_grid_pts=9000, seed=0, progress=True, instrument=False):
+    """`instrument=True` adds the mechanism-discrimination diagnostics of `_instrument_frame`
+    (per-muscle axial/transverse stress, insertion torque, bone reaction) -- off by default so
+    every other caller of `capture_run` pays nothing for it. See that function's docstring."""
     keys = ("frame", "shell", "cut_pos", "cut_strain", "cut_vm",
-            "mus_pos", "mus_strain", "mus_vm", "act", "tension", "length",
+            "mus_pos", "mus_strain", "mus_vm", "mus_axial_p", "mus_trans_p",
+            "act", "tension", "length",
             "ins", "pull", "axis", "gaze", "target", "centre", "gpos", "gvel",
             "radius", "radius_spread")
+    if instrument:
+        keys = keys + ("mus_axial", "mus_transverse", "tau_desired", "tau_orth",
+                       "eta_torque", "bone_reaction")
     rec = {k: [] for k in keys}
     idx = {}
     rng = np.random.default_rng(seed)
@@ -86,6 +241,8 @@ def capture_run(sim, device, stride=3, n_shell=26000, n_cut=16000, n_mus=14000,
     # requiring every run to be closed-loop.
     prog = next((o.params["program"] for o in sim.operators if o.op == "oculomotor_drive"), None)
     cmd = eye_ops.OculomotorDrive({"program": prog}, "cpu") if prog is not None else None
+    _ba = next((o for o in sim.operators if o.op == "bone_anchor"), None)
+    bone_kc = (float(_ba.params["k"]), float(_ba.params.get("c", 40.0))) if _ba is not None else None
 
     def _pick(mask_t, k):
         ii = torch.nonzero(mask_t, as_tuple=False).flatten().cpu().numpy()
@@ -113,6 +270,7 @@ def capture_run(sim, device, stride=3, n_shell=26000, n_cut=16000, n_mus=14000,
         X, Y = p.get("pos"), q.get("pos")
         c_strain, c_vm = _scalars(p, cu)
         m_strain, m_vm = _scalars(q, mu_i)
+        m_axial, m_trans = _fibre_stress_particles(q, mu_i)
 
         # THE GLOBE'S RADIUS, per shell point, as a ratio to its own rest radius. The globe is
         # an ovoid, so an absolute radius means nothing; the ratio is shape-agnostic. Its MEAN
@@ -141,6 +299,8 @@ def capture_run(sim, device, stride=3, n_shell=26000, n_cut=16000, n_mus=14000,
         rec["mus_pos"].append(f32(Y[mu_i]))
         rec["mus_strain"].append(f32(m_strain))
         rec["mus_vm"].append(f32(m_vm))
+        rec["mus_axial_p"].append(f32(m_axial))
+        rec["mus_trans_p"].append(f32(m_trans))
         rec["act"].append(f32(m.get("act")[:, 0]))
         rec["tension"].append(f32(m.get("tension")[:, 0]))
         rec["length"].append(f32(m.get("length")[:, 0]))
@@ -155,6 +315,15 @@ def capture_run(sim, device, stride=3, n_shell=26000, n_cut=16000, n_mus=14000,
         rec["gvel"].append(f32(gm))
         rec["radius"].append(float(r_now.mean()))
         rec["radius_spread"].append(float(r_now.std()))
+        if instrument:
+            axial, transverse, tau_d, tau_o, eta, bone_r = _instrument_frame(
+                H, q, m, eye_c_now(H), sim.dt, EA.N_MUSCLE, bone_kc)
+            rec["mus_axial"].append(axial)
+            rec["mus_transverse"].append(transverse)
+            rec["tau_desired"].append(tau_d)
+            rec["tau_orth"].append(tau_o)
+            rec["eta_torque"].append(eta)
+            rec["bone_reaction"].append(bone_r)
 
     H, _ = engine_run(sim, out_path=None, device=device, on_frame=hook, progress=progress)
     out = {k: (np.asarray(v) if k not in ("gpos", "gvel") else v) for k, v in rec.items()}
