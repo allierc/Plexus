@@ -1500,7 +1500,29 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60, movie=True):
     # panel among 32; the movie ends on it but cannot be opened by `Read`, which is how every
     # automated reader in this loop looks at a picture. This is the run's outcome as a single
     # image, drawn with the same fixed camera and the same scale bar as everything else.
+    # DRAWN BY VTK SINCE 20 AUGUST, matplotlib only if that fails. This was the last picture in the
+    # project still drawn by the painter's-algorithm renderer, and it is the MOST READ one: every
+    # montage tiles it, the forecast graph puts it in each node, and `Read` opens it. matplotlib
+    # sorts faces by depth and draws back-facing ones anyway, so on a star's end frame thousands of
+    # hidden faces are painted and which one wins a tie depends on the angle; a z-buffer cannot have
+    # that argument. Measured on the same mesh: 0.5 s a frame against 9.3, and 28.9% of pixels lit
+    # against 4.5%.
+    #
+    # FLAT SHADING HERE AND NOWHERE ELSE. Cedric refused flat for the movies on 12 August -- a
+    # curved arm reads as a faceted cone -- and asked for it here, which is the case it fits: a
+    # still that will be tiled at ~190 px in a montage, where a 0.4 px cell outline is a grey wash
+    # and a smooth body is a featureless blob, while facets scale with the cells they belong to.
+    _vtk_ok = False
     try:
+        import vtk_render as _V
+        _V.still(name, style="flat", out=os.path.join(out_dir, "3d.png"))
+        _vtk_ok = True
+    except Exception as _e:
+        print(f"[{name}] 3d.png: VTK failed ({type(_e).__name__}: {str(_e)[:60]}), "
+              f"falling back to matplotlib", flush=True)
+    try:
+        if _vtk_ok:
+            raise StopIteration                       # the picture is written; skip the fallback
         figE = plt.figure(figsize=(7.0, 7.0)); figE.patch.set_facecolor("black")
         axE = figE.add_subplot(111, projection="3d")
         ptE, mtE, aE = fr[-1][:3]
@@ -1512,6 +1534,8 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60, movie=True):
         figE.savefig(os.path.join(out_dir, "3d.png"), dpi=110, facecolor="black",
                      bbox_inches="tight")
         plt.close(figE)
+    except StopIteration:
+        pass
     except Exception as _e:
         # SAID, NOT SWALLOWED: a missing 3d.png reads downstream as "the run had no end state".
         print(f"[{name}] 3d.png not written: {type(_e).__name__}: {str(_e)[:80]}", flush=True)
