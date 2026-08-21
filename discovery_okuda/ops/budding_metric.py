@@ -44,7 +44,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 LOG = os.path.abspath(os.path.join(HERE, "..", "..", "log", "okuda_ECM"))
 
-N_BIN = 48                         # bins along the axis; ~2 cells wide at the end of a run
+N_BIN = 12                         # EQUAL-COUNT bins along the axis, so every one fills
 LOBE_MIN = 0.02                    # a neck is only a number once there is something to have a neck
 
 
@@ -71,13 +71,19 @@ def profile(x, c, d):
     lo, hi = 0.0, h_max
     if hi <= lo:
         return bud, float("nan"), R, h_max, None
-    e = np.linspace(lo, hi, N_BIN + 1)
-    k = np.clip(np.digitize(h, e) - 1, 0, N_BIN - 1)
-    rp = np.full(N_BIN, np.nan)
-    for j in range(N_BIN):
-        m = (k == j) & (h >= lo)
-        if m.sum() >= 8:
-            rp[j] = np.percentile(perp[m], 90)
+    # EQUAL-COUNT BINS, NOT EQUAL-WIDTH. 48 fixed bins with an 8-vertex floor returns nan for every
+    # tissue this is meant to measure: a 600-vertex vesicle whose bud is three vertices per axial bin
+    # never fills one, so `neck_ratio` was nan on all three of the archived fingers -- a shape
+    # qualifier that could not qualify a shape. Twelve bins of equal COUNT always fill.
+    m0 = h > lo
+    if int(m0.sum()) < 24:
+        return bud, float("nan"), R, h_max, None
+    hs, ps = h[m0], perp[m0]
+    o = np.argsort(hs)
+    hs, ps = hs[o], ps[o]
+    parts = np.array_split(np.arange(hs.size), N_BIN)
+    rp = np.array([np.percentile(ps[i], 90) for i in parts])
+    e = np.append(np.array([hs[i].mean() for i in parts]), hs[-1])
     if bud <= LOBE_MIN or np.all(~np.isfinite(rp)):
         return bud, float("nan"), R, h_max, rp
     # the waist is looked for OUTSIDE the body: beyond the sphere's own shoulder at h = R

@@ -42,102 +42,125 @@ from test_08a_protrusion import KDEG, OFF_PHI, OFF_THETA, SPOT, Rig08a   # noqa:
 
 GATE_SRC = "08a_hole_rot"          # the phase-1 run whose ligation map every variant reads
 
-MAP = None                         # filled in build_tissue: the ligation map this run reads
+# THE OPERATING POINT IS THE ONE THAT WAS MEASURED, not the one that was predicted. A 23-agent
+# design pass read the operator sources and then RAN the arms; three of its tissues are on disk and
+# read bud_excess +0.959, +1.117 and +1.191 against a reference tissue's +0.002 and a noise floor of
+# +/-0.04 across 80 archived runs. Two numbers differ from the settings this file first carried and
+# each was measured alone over 401 frames: `p_ref` 1.0 -> 0.8 with `sharp` 2.0 -> 1.0 (which also
+# converts a tapering finger into a constant-calibre tube), and `mesh_seed.vseed_cv` 0.15 -> 0.02.
+#
+# `vseed_cv` IS THE BODY-QUIESCENCE LEVER AND IT IS NOT THE OBVIOUS ONE. The seed cells keep their
+# volume draw for all 401 frames because they rarely divide, so the spread of that draw -- not
+# `cell_divide.cycle_cv` -- decides how much of the BODY drifts over the division threshold on its
+# own: cycle_cv 0.15 -> 0.03 changed 69 divisions into 67, while vseed_cv 0.15 -> 0.02 cut body
+# divisions from 34 to 15. A quiet body is what makes a bud legible.
+SENSE_P_REF, SENSE_SHARP = 0.8, 1.0
+A_SW, HILL = 0.25, 4.0
 
 
-# `sharp`, `a_sw` AND `hill` ARE SET BY MEASUREMENT, not by taste. The map has real bin-to-bin
-# scatter -- at frame 0 a bin holds 2.5 sheet faces -- so a normal cell's deficit reaches 0.6 raw, and
-# at the first setting tried (sharp 2, a_sw 0.3, hill 4) the Hill returned 0.70 for such a cell: the
-# BULK was being read as bare and the tissue reached 751 cells by frame 40 where the reference has
-# 203. Scanned over the map itself, sharp 2 / a_sw 0.5 / hill 6 puts the 95th percentile of the bulk's
-# own scatter at Hill = 0.0000 and the hole's core at 0.92 -- a 10x growth contrast that fires on 0.7%
-# of directions, which is the hole's own solid angle.
-def _sense(sharp=2.0):
-    """`bm_sense` before `cell_grow`, so the morphogen the growth law reads is this frame's."""
+def _sense(map_name="bm_gate.npz", p_ref=SENSE_P_REF, sharp=SENSE_SHARP):
+    """`bm_sense` immediately before `cell_grow`, so the morphogen is this frame's.
+
+    Inserted after `cell_geometry`, which puts it ahead of `cell_grow`'s Hill AND ahead of
+    `cell_divide.orient_iface`'s septum axis -- both read `cell.chem`, which is the whole reason the
+    deficit is written as a morphogen rather than used to gate growth directly.
+    """
     return [dict(module="bm_sense_ops", after="cell_geometry",
-                 op=dict(op="bm_sense", at="vertex", cell_set="cell", map=None,
-                         p_ref=1.0, sharp=sharp, chan=0))]
+                 op=dict(op="bm_sense", at="vertex", cell_set="cell", map=map_name,
+                         p_ref=p_ref, sharp=sharp, chan=0))]
 
 
-# THE GROWTH CONTRAST IS ONE PARAMETER. `cell_grow` is rate * (rho + Hill(a)): the membrane-covered
-# bulk has a = 0 and grows at rate * rho, a cell over the hole has a -> 1 and grows at
-# rate * (rho + 1). Holding the bulk at cellfix_B_new's own 0.03 means rate = 0.03 / rho, and the
-# contrast is then (1 + rho) / rho -- 11x at rho = 0.1, 21x at rho = 0.05. Compensating the rate is
-# what makes this an experiment rather than a slowdown: without it the whole spheroid nearly stops
-# and the "bud" is the rest of the tissue failing to grow.
-RATE0 = 0.03
-
-
-def _grow(rho, a_sw=0.50, hill=6.0):
-    return {"rho": rho, "rate": round(RATE0 / rho, 5), "a_sw": a_sw, "hill": hill, "chan": 0}
+def _grow(rate, rho):
+    """`cell_grow` is rate * (rho + Hill(a)): the bulk has a = 0 and grows at rate * rho, a cell over
+    the hole has a -> 1 and grows at rate * (rho + 1). `vth_frac` 4.0 keeps the sizer reachable now
+    that `max_cycle`'s backstop is gone."""
+    return {"rate": rate, "rho": rho, "a_sw": A_SW, "hill": HILL, "chan": 0, "vth_frac": 4.0}
 
 
 # `max_cycle` IS A BACKSTOP AND cellfix_B_new SETS IT SHORT. mesh_ops says it outright -- "past
 # max_cycle, which is a backstop and must be set long or it becomes the rate". At 12 division-calls
-# with `every: 4` every cell divides at least every 48 frames whatever its volume, which puts a floor
-# under the bulk's proliferation and caps any growth contrast at about 3x however hard the morphogen
-# pushes. Raising it lets the gate be the rate, which is the thing being tested.
-NO_BACKSTOP = {"max_cycle": 10 ** 9}
-# OKUDA'S TUBE MECHANISM. `orient_iface` orients an ACTIVATED cell's septum along the axis from the
-# vesicle centre to the activated tip, so daughters STACK into a protrusion instead of spreading it
-# flat across the surface. It reads `cell.chem` -- which is exactly why the deficit is written there
-# as a morphogen rather than used to gate growth directly -- and `orient_asw` is a fraction of the
-# field's own maximum, so 0.5 selects the half of the activated patch nearest the hole.
-ORIENT = {"orient_iface": True, "orient_asw": 0.5, "cell_set": "cell"}
+# with `every: 4` every cell divides within 48 frames whatever its volume, putting a floor under the
+# braked body and capping any contrast at about 3x. `g1_ramp` gives each daughter its ACTUAL birth
+# volume as its target instead of half the mother's, which is what stops K_V driving the tiny faces of
+# a fast-proliferating tip into inverted caps.
+DIVIDE = {"max_cycle": 10 ** 6, "orient_iface": True, "orient_asw": 0.5, "cell_set": "cell",
+          "g1_ramp": True}
+QUIET = {"vseed_cv": 0.02}
 
 VARIANTS = {
-    "sense": dict(
-        why="the membrane deficit as a morphogen, gating growth through cell_grow's own Hill: "
-            "11x where the hole is, the bulk held at its reference rate",
-        append_ops=_sense(), op_overrides={"cell_grow": _grow(0.10),
-                                           "cell_divide": dict(NO_BACKSTOP)}),
-    "sense_orient": dict(
-        why="the same, plus Okuda's oriented division: daughters stack along the bud axis instead "
-            "of spreading the extra cells flat",
-        append_ops=_sense(), op_overrides={"cell_grow": _grow(0.10),
-                                           "cell_divide": dict(NO_BACKSTOP, **ORIENT)}),
-    "orient_free": dict(
-        why="the same, with the radial spring off -- K_R holds the vesicle spherical and a bud has "
-            "to fight it",
-        append_ops=_sense(), op_overrides={"cell_grow": _grow(0.10),
-                                           "cell_divide": dict(NO_BACKSTOP, **ORIENT),
-                                           "cell_mechanics": {"K_R": 0.0}}),
-    "bud_max": dict(
-        why="everything: 21x contrast, oriented division, no radial spring, and r023_15's own "
-            "mechanics -- volume-stiff and low line tension, which is what let a neck survive there",
-        append_ops=_sense(sharp=3.0),
-        op_overrides={"cell_grow": _grow(0.05),
-                      "cell_divide": dict(NO_BACKSTOP, **ORIENT),
-                      "cell_mechanics": {"K_R": 0.0, "K_V": 20.0, "Lambda": 0.5}}),
-    "control": dict(
-        why="THE NULL. Identical to bud_max except that the map has its spatial pattern removed, so "
-            "every cell reads the same deficit. Any bud that survives this is not the membrane's.",
-        flat_map=True, append_ops=_sense(sharp=3.0),
-        op_overrides={"cell_grow": _grow(0.05),
-                      "cell_divide": dict(NO_BACKSTOP, **ORIENT),
-                      "cell_mechanics": {"K_R": 0.0, "K_V": 20.0, "Lambda": 0.5}}),
+    "s1_finger": dict(
+        why="THE MEASURED ARM: the membrane deficit as a morphogen, a quiet body, oriented division. "
+            "Both of its edits are on disk as finished tissues reading +0.959 and +1.191",
+        append_ops=_sense(),
+        op_overrides={"mesh_seed": dict(QUIET), "cell_grow": _grow(0.0055, 0.05),
+                      "cell_mechanics": {"K_R": 0.0, "K_V": 20.0, "Lambda": 0.5},
+                      "cell_divide": dict(DIVIDE)}),
+    "s2_big": dict(
+        why="the same mechanism with the body allowed to grow -- body volume x20 over the run, so "
+            "the bud is large in ABSOLUTE size and the mesh can resolve its neck",
+        buffer_x=6, append_ops=_sense(),
+        op_overrides={"mesh_seed": dict(QUIET), "cell_grow": _grow(0.025, 0.10),
+                      "cell_mechanics": {"K_R": 0.1, "K_V": 20.0, "Lambda": 0.5},
+                      "cell_divide": dict(DIVIDE)}),
+    "s3_both": dict(
+        why="both readings of the same map at once: the deficit releases the hole and "
+            "ecm_gate_growth brakes the intact membrane. The most contrast and the most confounded",
+        buffer_x=6, append_ops=_sense(),
+        load_or_build=dict(gate_npz="bm_gate.npz", gate_p_half=0.32, gate_hill=12.0,
+                           gate_floor=0.5, gate_smooth_frames=5, gate_smooth_phi=15.0),
+        op_overrides={"mesh_seed": dict(QUIET), "cell_grow": _grow(0.025, 0.15),
+                      "cell_mechanics": {"K_R": 0.1, "K_V": 20.0, "Lambda": 0.5},
+                      "cell_divide": dict(DIVIDE)}),
+    "s4_myo": dict(
+        why="s1 plus junction myosin -- the only localisable line tension in the code -- to pull a "
+            "waist and turn a tube into a bud with a real neck",
+        append_ops=_sense(),
+        load_or_build=dict(myosin=1.0, myo_beta=2.0, myo_tau=20.0, myo_new=1.0,
+                           myo_keyed_on="tension", myo_destabilising=1),
+        # `Lam`/`Gam` ARE NOT TYPOS. tissue.py hands junction_myosin its mechanics constants under
+        # the keys "K_P", "Lam", "Gam" while the spec file carries "Lambda"/"Gamma", so as shipped
+        # the myosin tension term reads defaults instead of this run's values. Setting both spellings
+        # is a workaround for that mismatch and is verified by reading, not by running -- the log must
+        # show junction_myosin instantiating and MYO_SKIPPED must stay empty, or the frame relaxed
+        # without myosin and the arm is a silent null.
+        op_overrides={"mesh_seed": dict(QUIET), "cell_grow": _grow(0.0055, 0.05),
+                      "cell_mechanics": {"K_R": 0.0, "K_V": 20.0, "Lambda": 0.5,
+                                         "Lam": 0.5, "Gam": 0.4},
+                      "cell_divide": dict(DIVIDE)}),
+    "s5_rot180": dict(
+        why="THE CONTROL, and a stronger one than a flat map: s1 to the last digit with the hole "
+            "moved 180 degrees in longitude. The bud must move with it or it is not the membrane's",
+        append_ops=_sense(map_name="bm_gate_phi180.npz"),
+        op_overrides={"mesh_seed": dict(QUIET), "cell_grow": _grow(0.0055, 0.05),
+                      "cell_mechanics": {"K_R": 0.0, "K_V": 20.0, "Lambda": 0.5},
+                      "cell_divide": dict(DIVIDE)}),
 }
 
 
 def build_tissue(v, frames, device):
-    gate = os.path.join(B.LOG, GATE_SRC, "bm_gate.npz")
-    if not os.path.exists(gate):
-        raise SystemExit(f"[08b] no ligation map at {gate} -- run phase 1 first")
-    if v.get("flat_map"):
-        # THE NULL'S MAP IS THE REAL ONE WITH ITS PATTERN REMOVED, not a constant pulled out of the
-        # air: same mean, same frames, same normalisation, no spatial structure. So the control run
-        # differs from the experiment in exactly one thing.
-        import numpy as np
-        z = np.load(gate)
-        P = np.asarray(z["pmap"], np.float32)
-        flat = np.repeat(np.repeat(P.mean(axis=(1, 2))[:, None, None], P.shape[1], 1), P.shape[2], 2)
-        gate = os.path.join(B.LOG, GATE_SRC, "bm_gate_flat.npz")
-        np.savez_compressed(gate, pmap=flat.astype(np.float32),
-                            note=np.str_("the ligation map with its spatial pattern removed"))
-        print(f"[08b] NULL: flat map written to {os.path.basename(gate)}", flush=True)
-    ap_ = [dict(e, op=dict(e["op"], map=gate)) for e in (v.get("append_ops") or [])]
-    kw = dict(frames=frames, device=device, buffer_x=4)
+    """The pass-2 tissue: the reference spec with this variant's overrides, built or reused.
+
+    `load_or_build` hashes op_overrides and append_ops into the cache key, so two variants cannot
+    collide on one tissue -- a bug this ladder's history records twice, once where a caps+plane run
+    silently loaded the caps-only tissue and reported its semi-axes to three decimals.
+    """
+    def _m(name):
+        f = os.path.join(B.LOG, GATE_SRC, name)
+        if not os.path.exists(f):
+            raise SystemExit(f"[08b] no map at {f} -- run 08a phase 1 first")
+        return f
+
+    ap_ = [dict(e, op=dict(e["op"], map=_m(e["op"]["map"]))) for e in (v.get("append_ops") or [])]
+    # THE RESERVOIR IS SIZED PER VARIANT. At the reference buffer `cell_divide` refused 5,546
+    # divisions for want of vertex rows -- its own message says "capped by its array, not by its
+    # biology -- every later measurement describes the reservoir". A bud measured against a full
+    # array is a measurement of the array. This is a memory allocation: it changes what the run is
+    # ALLOWED to do, not what it is trying to do. The quiet-body arms need very little (their
+    # tissues end at 288-360 cells); the growing-body arms need x6.
+    kw = dict(frames=frames, device=device, buffer_x=v.get("buffer_x", 4))
     kw.update(v.get("load_or_build", {}))
+    if kw.get("gate_npz"):
+        kw["gate_npz"] = _m(kw["gate_npz"])
     path = TIS.load_or_build(op_overrides=v.get("op_overrides") or None,
                              append_ops=ap_ or None, **kw)
     print(f"[08b] tissue -> {os.path.relpath(path, B.LOG)}", flush=True)
