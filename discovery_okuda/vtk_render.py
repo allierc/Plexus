@@ -113,9 +113,13 @@ def _cmap():
     return LinearSegmentedColormap.from_list("wr", ["white", "#d62728"])
 
 
-def frames_of(run):
-    """Every recorded (pos, mesh, act) of a finished run, from the archive `movie.mp4` uses."""
-    p = os.path.join(LOG, run, "traj.npz")
+def frames_of(run, traj=None):
+    """Every recorded (pos, mesh, act) of a finished run, from the archive `movie.mp4` uses.
+
+    `traj` overrides the file, so a MID-RUN snapshot -- one frame written in the same format by
+    `run_one._live_snapshot` -- renders through exactly this path and needs no special case.
+    """
+    p = traj or os.path.join(LOG, run, "traj.npz")
     if not os.path.exists(p):
         return None
     z = np.load(p, allow_pickle=True)
@@ -361,7 +365,7 @@ def evolve(run, style, out, fill=1.0):
     return f"{len(fr)} frames"
 
 
-def still(run, style="flat", out=None, fill=1.0, frame=-1, label=True):
+def still(run, style="flat", out=None, fill=1.0, frame=-1, label=True, traj=None):
     """The last frame as ONE image -- the VTK successor to `3d.png`.
 
     `3d.png` IS THE MOST-READ PICTURE IN THIS PROJECT and it was the only one still drawn by
@@ -378,7 +382,7 @@ def still(run, style="flat", out=None, fill=1.0, frame=-1, label=True):
     smooth shading is a smooth blob, while facets scale with the cells they belong to, so the mesh
     is legible in a thumbnail without drawing a single line.
     """
-    fr = frames_of(run)
+    fr = frames_of(run, traj)
     if not fr:
         return "no traj.npz"
     L = box_of(run, fr)
