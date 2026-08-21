@@ -180,7 +180,57 @@ def _heartbeat(name, t0, every=10):
                 os.fsync(fh.fileno())
         except Exception:
             pass                                  # a heartbeat must never take the run down
+        _live_snapshot(name, d, H, tick)
     return beat
+
+
+# HOW OFTEN THE RUNNING SHAPE IS WRITTEN, in frames. 0 turns it off.
+LIVE_EVERY = int(os.environ.get("OKUDA_LIVE_EVERY", "200"))
+_LIVE_LAST = [-1]
+
+
+def _live_snapshot(name, d, H, tick):
+    """`live.npz` + `3d_live.png`: what the tissue looks like RIGHT NOW.
+
+    A run's geometry lives in memory until the end -- `traj.npz` is written by the archive step, so
+    a directory mid-run holds `progress.json` and `spec_run.yaml` and nothing else. That was fine
+    when a run took 40 minutes. These take hours: `stage2_bud_noceil` was four hours in, at frame
+    2030 of 3600, and the only thing anybody could say about its shape was a cell count.
+
+    ONE FRAME, IN THE TRAJECTORY'S OWN FORMAT, so `vtk_render` reads it with no special case --
+    `pos_0`, `mesh_0`, `act_0`, `ticks`. The render is flat VTK, the same as `3d.png`, so the live
+    picture and the final one are directly comparable rather than two conventions.
+
+    EVERY FAILURE HERE IS SWALLOWED. A snapshot that can take a four-hour run down is worse than no
+    snapshot, and a render is far more likely to fail on a compute node than a numpy save.
+    """
+    if LIVE_EVERY <= 0 or tick - _LIVE_LAST[0] < LIVE_EVERY:
+        return
+    _LIVE_LAST[0] = tick
+    try:
+        import numpy as _np
+        m = getattr(H.level("vertex"), "_mesh", None) or {}
+        pos = H.level("vertex").state[:int(m["Nv"])].detach().cpu().numpy()
+        act = None
+        try:
+            clvl = H.level("cell")
+            ci, _ = clvl.state_schema["chem"]
+            act = clvl.state[:int(m["nF"]), ci].detach().cpu().numpy()
+        except Exception:
+            pass
+        z = {"ticks": _np.array([int(tick)]), "pos_0": _np.asarray(pos, _np.float32),
+             "mesh_0": _np.array({k: m[k] for k in m if k != "hist"}, dtype=object)}
+        if act is not None:
+            z["act_0"] = _np.asarray(act, _np.float32)
+        _np.savez_compressed(os.path.join(d, "live.npz"), **z)
+    except Exception:
+        return
+    try:
+        import vtk_render as _V
+        _V.still(name, style="flat", out=os.path.join(d, "3d_live.png"),
+                 traj=os.path.join(d, "live.npz"), label=True)
+    except Exception:
+        pass
 
 
 # --------------------------------------------------------------------------- D3: assert alignment
