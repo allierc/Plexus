@@ -204,6 +204,26 @@ CHEM = [("MT1-MMP -> faces", "the tethered enzyme, carried from the cells that e
          "bm_face", 1)]
 
 
+MYO = [("myosin recruitment", "dm/dt = k_rec max(0, eps_dot) - (m - 1)/tau_myo, per cell, where "
+                               "eps_dot is the mean stretch rate of that cell's own junctions",
+        "epi_cell", 1),
+       ("junction strain rate", "one length and one difference per wedge, scattered to its cell",
+        "epi_wedge", 1),
+       ("myosin -> adhesion", "l0_eff = l0 (1 - a_myo (m - 1)) on every plaque the cell owns",
+        "plaque", 1)]
+
+
+def myo_laws(ent, rig):
+    """Myosin, IF this rig steps it. 07l does; nothing before it did."""
+    import torch
+    if rig is None or not torch.is_tensor(getattr(rig, "myo", None)):
+        return []
+    n = {"epi_cell": ent["epi_cell"]["mean"], "epi_wedge": ent["epi_wedge"]["mean"],
+         "plaque": ent["plaque"]["mean"]}
+    return [dict(name=a, law=b, per=c, evals=n[c], pairs=k * n[c], tick="once a frame")
+            for a, b, c, k in MYO]
+
+
 def chem_laws(ent, rig):
     """The protease chemistry, IF this rig carries it. Detected on the object, not assumed."""
     import torch
@@ -246,7 +266,8 @@ def main():
         pen = int(r.contact()[2])          # the steric law acts only on nodes inside a wedge
         FLD = fields(r)
 
-    L = laws(ent, cpn, nsub) + chem_laws(ent, r if "r" in dir() else None)
+    _rig = r if "r" in dir() else None
+    L = laws(ent, cpn, nsub) + chem_laws(ent, _rig) + myo_laws(ent, _rig)
     sub_evals = sum(x["evals"] for x in L if x["tick"] == "every substep")
     sub_pairs = sum(x["pairs"] for x in L if x["tick"] == "every substep")
     once = sum(x["evals"] for x in L if x["tick"] == "once a frame")

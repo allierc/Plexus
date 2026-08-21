@@ -50,8 +50,15 @@ CACHE = os.path.join(LOG, "_tissue")
 # was archived into `_superseded_pre_basis` by the Phase-12 basis refactor; the path here still pointed
 # at where it used to be, so `load_or_build` worked on a cache hit and died on a rebuild. The constant
 # names where the file IS -- one path, not a search over two.
-CELL_SPEC = os.path.join(ROOT, "log", "okuda", "_archive", "_superseded_pre_basis",
-                         "cellfix_B_new", "spec_run.yaml")
+# THE REFERENCE SPEC MOVED WHEN THE LOOP WAS ARCHIVED, and nothing noticed because the tissue cache
+# already existed: `load_or_build` only opens this file when it has to BUILD, so a rebuild -- which is
+# exactly what a growth-gated pass 2 needs -- would have died on a path that had been wrong for weeks.
+# Both locations are tried and the failure names them.
+_SPECS = (os.path.join(ROOT, "log", "okuda", "_archive", "_superseded_pre_basis",
+                       "cellfix_B_new", "spec_run.yaml"),
+          os.path.join(ROOT, "discovery_okuda", "_archive_runs", "2026-08-03_preclean",
+                       "run_records", "cellfix_B_new", "spec_run.yaml"))
+CELL_SPEC = next((p for p in _SPECS if os.path.exists(p)), _SPECS[0])
 
 # 32 x 64 rather than 48 x 96. The map has to be resolved by the VERTICES PRESENT, and the opening
 # frames have ~1,200 of them: 4,608 bins left two thirds of the sphere empty and filled from a row
@@ -129,7 +136,7 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap
           myo_keyed_on="length", myo_destabilising=1,
           myo_model="one_pool", myo_k_on=0.05, myo_tau_med=20.0, myo_k_ex=0.05, myo_beta_T=0.0,
           myo_ring=0.0, myo_new_rel=True,
-          map_theta=N_THETA, map_phi=N_PHI):
+          map_theta=N_THETA, map_phi=N_PHI, op_overrides=None, append_ops=None):
     import t1_ops as _T1
     _T1.T1_TRACE.clear()                       # per build, so a rebuild never inherits a previous run's
     """Run cellfix_B_new verbatim and write the cache.
@@ -160,6 +167,31 @@ def build(frames, device, out_npz, n_render=RENDER_FRAMES, buffer_x=1, plate_gap
         from tube_analysis import _cell_centroids
 
     spec = yaml.safe_load(open(CELL_SPEC))
+    # THE REFERENCE PARAMETERS, OVERRIDDEN BY NAME. `plate_gap`, `gate_npz` and the rest ADD operators;
+    # this changes the ones already there, which is the only way to ask questions like "does the radial
+    # term hold a bud back" without forking the spec file. Applied here, before anything is appended,
+    # so an override and an added operator cannot fight over the same dict. An operator named in the
+    # overrides that is not in the spec is an ERROR and not a no-op: silently ignoring it is how a
+    # sweep measures one tissue five times and prints five identical rows.
+    for opname, kv in (op_overrides or {}).items():
+        hit = [o for o in spec["operators"] if o.get("op") == opname]
+        if not hit:
+            raise SystemExit(f"[tissue] op_overrides names '{opname}', which is not in {CELL_SPEC}; "
+                             f"the spec has {sorted({o['op'] for o in spec['operators']})}")
+        for o in hit:
+            o.update(kv)
+        print(f"[tissue] {opname}: " + ", ".join(f"{k}={v}" for k, v in kv.items()), flush=True)
+    for entry in (append_ops or []):
+        # AN OPERATOR THAT IS NOT IMPORTED IS NOT REGISTERED, and the engine's failure for an unknown
+        # op name is not obviously "you forgot an import". The entry names its own module.
+        if entry.get("module"):
+            import importlib
+            importlib.import_module(entry["module"])
+        op, after = dict(entry["op"]), entry.get("after")
+        spec["operators"].append(op)
+        i = (spec["schedule"].index(after) + 1) if after in spec["schedule"] else len(spec["schedule"])
+        spec["schedule"].insert(i, op["op"])
+        print(f"[tissue] + {op['op']} after {after}", flush=True)
     spec["general"]["n_frames"] = int(frames)
     spec["general"]["name"] = "cellfix_B_new_for_ecm"
     if buffer_x != 1:
@@ -355,7 +387,8 @@ def load_or_build(frames=401, device="cuda:0", name="cellfix_B_new", rebuild=Fal
                   myo_keyed_on="length", myo_destabilising=1,
                   myo_model="one_pool", myo_k_on=0.05, myo_tau_med=20.0, myo_k_ex=0.05,
                   myo_beta_T=0.0, myo_ring=0.0, myo_new_rel=True,
-                  myo_new=1.0, map_theta=N_THETA, map_phi=N_PHI):
+                  myo_new=1.0, map_theta=N_THETA, map_phi=N_PHI,
+                  op_overrides=None, append_ops=None):
     """The cache path, built if missing. Frames are part of the filename: a 401-frame tissue and a
     120-frame one are different tissues, and silently reusing one for the other would be a run
     whose movie stops before the thing it was testing happened."""
@@ -405,12 +438,19 @@ def load_or_build(frames=401, device="cuda:0", name="cellfix_B_new", rebuild=Fal
     # dies on a pass-1 spec that is no longer on disk -- which is exactly what happened at 18:35.
     if (map_theta, map_phi) != (N_THETA, N_PHI):
         cfg["map_theta"], cfg["map_phi"] = map_theta, map_phi
+    # ADDED ONLY WHEN PRESENT, for the reason every other conditional key above is: unconditionally it
+    # rehashes every cache ever written. Two tissues that differ in one operator parameter MUST differ
+    # in their key, which is what this is for.
+    if op_overrides:
+        cfg["op_overrides"] = repr(sorted((k, sorted(v.items())) for k, v in op_overrides.items()))
+    if append_ops:
+        cfg["append_ops"] = repr(append_ops)
     for key, path in (("gate", gate_npz), ("load", load_npz)):
         if path is not None:
             sz = os.path.getsize(path) if os.path.exists(path) else 0
             cfg[key] = f"{os.path.abspath(path)}:{sz}"
     if any(v is not None for v in (plate_gap, gate_npz, load_npz, myosin)) \
-            or (map_theta, map_phi) != (N_THETA, N_PHI):
+            or (map_theta, map_phi) != (N_THETA, N_PHI) or op_overrides or append_ops:
         tag += "_" + hashlib.sha1(repr(sorted(cfg.items())).encode()).hexdigest()[:10]
     tag += tag_extra
     out = os.path.join(CACHE, f"{tag}.npz")
@@ -424,7 +464,8 @@ def load_or_build(frames=401, device="cuda:0", name="cellfix_B_new", rebuild=Fal
               myo_destabilising=myo_destabilising, myo_model=myo_model, myo_k_on=myo_k_on,
               myo_tau_med=myo_tau_med, myo_k_ex=myo_k_ex, myo_beta_T=myo_beta_T,
               myo_ring=myo_ring, myo_new_rel=myo_new_rel,
-              map_theta=map_theta, map_phi=map_phi)
+              map_theta=map_theta, map_phi=map_phi,
+              op_overrides=op_overrides, append_ops=append_ops)
     else:
         z = np.load(out)
         print(f"[tissue] reusing {os.path.relpath(out, ROOT)}  "

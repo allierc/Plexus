@@ -135,7 +135,8 @@ class Rig07d(Rig07c):
         return super()._epi_anchor(t)
 
 
-def build(cls=None, extra=None, add_args=None, pass_args=(), default_name=None, **over):
+def build(cls=None, extra=None, add_args=None, pass_args=(), default_name=None,
+          return_rig=False, **over):
     """Parse this ladder's arguments, build `cls`, and run it.
 
     `add_args` registers a rig's OWN options on the same parser and `pass_args` names which of them
@@ -172,7 +173,8 @@ def build(cls=None, extra=None, add_args=None, pass_args=(), default_name=None, 
     kw.update(over)
     rig = cls(N0=a.N0, Nf0=a.Nf0, split_budget=a.budget, every=a.every,
               batched=a.batched, cull_below=a.cull_below, bind_max=a.bind_max, **kw)
-    return run(rig, a, d, extra=extra)
+    run(rig, a, d, extra=extra)
+    return rig if return_rig else None
 
 
 def run(rig, a, d, extra=None):
