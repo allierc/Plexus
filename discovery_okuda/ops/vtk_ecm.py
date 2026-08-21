@@ -353,6 +353,26 @@ def _aim(p, L, clip=False):
     p.camera.parallel_scale = L * 1.05
 
 
+def _bm_frame(bm, mesh_frames, k, stride):
+    """The membrane entry for this mesh frame -- ALIGNED, or the caller is told it is not.
+
+    THE PANELS ONCE RAN ON DIFFERENT CLOCKS. The 2x2 draws three bodies recorded on three schedules:
+    the tissue mesh from the tissue cache, the matrix from another run's `traj.npz`, and the membrane
+    from this run's `bm_frames.npz`. They have to be resampled onto one frame, and this was a bare
+    `argmin(|bm_t - mesh_frame|)`. Nearest-neighbour has no notion of OUT OF RANGE: ask it for frame
+    401 when the membrane store stops at 258 -- which is what a run that diverged leaves behind -- and
+    it returns 258, silently, for every frame after. On 08b_s2_big that was 71 of 200 frames of a live
+    tissue beside a dead membrane, and it looked like a result: "the membrane deformed and the
+    spheroid did not".
+
+    So the lookup now returns the gap it had to jump. Anything beyond one mesh stride is not the same
+    moment and the caller must not draw the two side by side as though it were.
+    """
+    want = int(mesh_frames[min(k, len(mesh_frames) - 1)])
+    j = int(np.argmin(np.abs(bm["t"] - want)))
+    return j, abs(int(bm["t"][j]) - want)
+
+
 def render(run, frames=None, still=False, src="06_spheroid_ecm", out_name=None, fps=20,
            spin=0):
     import imageio_ffmpeg
@@ -434,8 +454,7 @@ def render(run, frames=None, still=False, src="06_spheroid_ecm", out_name=None, 
             p.add_mesh(ring, color=[v / 255 for v in EPI_RGB], show_edges=True,
                        edge_color="black", line_width=0.6, lighting=False)
         if bm is not None:
-            jj = int(np.argmin(np.abs(bm["t"] - int(D["mesh_frames"][min(k, len(D["mesh_frames"])
-                                                                         - 1)]))))
+            jj, _gap = _bm_frame(bm, D["mesh_frames"], k, D["stride"])
             if bm["F"][jj].shape[0]:
                 bs = bm_poly(bm["X"][jj], bm["F"][jj], bm["L"][jj], bm["vmax"],
                              mode=D["mode"]).slice(normal="y", origin=(0, 0, 0))
@@ -446,8 +465,16 @@ def render(run, frames=None, still=False, src="06_spheroid_ecm", out_name=None, 
         p.subplot(1, 0)
         p.set_background("black")
         if bm is not None:
-            j = int(np.argmin(np.abs(bm["t"] - int(D["mesh_frames"][min(k, len(D["mesh_frames"])
-                                                                        - 1)]))))
+            j, gap = _bm_frame(bm, D["mesh_frames"], k, D["stride"])
+            # THE GUARANTEE, CHECKED EVERY FRAME rather than argued once. The cap above should make
+            # this unreachable; it is here because the cap is a computation and this is the property
+            # the cap exists to give, and a panel that silently shows two different moments is the
+            # one failure of this figure that cannot be seen by looking at it.
+            if gap > 2 * max(int(D["stride"]), 1):
+                raise SystemExit(
+                    f"[vtk_ecm] mesh frame {int(D['mesh_frames'][min(k, len(D['mesh_frames'])-1)])} "
+                    f"has no membrane entry within {2 * max(int(D['stride']), 1)} frames (nearest is "
+                    f"{int(bm['t'][j])}, gap {gap}). The two panels would be at different times.")
             # THE MEMBRANE'S OWN MESH, AND NOTHING ELSE'S. This panel drew the epithelium as a
             # wireframe for context, and by the last frame that wireframe IS the panel: the sheet
             # ends up inside the tissue at 95% of its plaques, so the cell mesh sits in front of the
