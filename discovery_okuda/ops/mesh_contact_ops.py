@@ -232,8 +232,18 @@ class MeshContact(Lateral):
         # the most slack for, since they are found from any of their three corners.
         rA, rB, rC = (A.norm(dim=1), B.norm(dim=1), C.norm(dim=1))
         rmin = torch.minimum(torch.minimum(rA, rB), rC).clamp_min(1e-9)
+        # BY THE FACE'S OWN RADIUS, NOT ITS NEAREST CORNER'S. `rmin` is the minimum corner radius, so
+        # one vertex near the centroid sends a face's apparent angular size to infinity -- and a
+        # budded tissue has them: measured on 08b_s2_big's final mesh, rmin reaches 0.14 against a
+        # median radius of 14.7, which put the 99.9th percentile of `ang` at 6.19 RADIANS (355 deg)
+        # and collapsed `nrow` to its floor of 4. That is ~32 bins for 184,974 triangles, ~5,800 to a
+        # bin, which destroys this structure's own premise ("a triangle spans at most one bin") and
+        # makes the query allocate [n, 9K] with K ~ 5,800. On a sphere rmin ~ rmed so it never showed:
+        # on the reference tissue both forms give 0.0586 rad and the same 53 rows.
+        rmed = torch.maximum(torch.minimum(torch.maximum(rA, rB), torch.maximum(rB, rC)),
+                             torch.minimum(rA, rC)).clamp_min(1e-20)     # the MEDIAN corner radius
         ang = (torch.maximum((B - A).norm(dim=1),
-                             torch.maximum((C - A).norm(dim=1), (C - B).norm(dim=1))) / rmin)
+                             torch.maximum((C - A).norm(dim=1), (C - B).norm(dim=1))) / rmed)
         a999 = float(torch.quantile(ang.float(), 0.999))
         nrow = int(min(200, max(4, math.floor(math.pi / max(a999, 1e-3)))))
         G = _grid(nrow, dev)
