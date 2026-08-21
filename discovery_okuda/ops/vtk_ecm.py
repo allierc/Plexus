@@ -151,7 +151,7 @@ def _bm(z):
     if "n_kept" in z.files:
         n = int(z["n_kept"])
         t = np.array([int(z[f"t{i}"]) for i in range(n)])
-        X, F, L, PP, ND = [], [], [], [], []
+        X, F, L, PP, ND, MJ = [], [], [], [], [], []
         for i in range(n):
             x, f, nd = tis(z[f"x{i}"]), z[f"f{i}"], z[f"n{i}"]
             used = np.unique(np.concatenate([f.reshape(-1), nd]) if nd.size else f.reshape(-1))
@@ -159,11 +159,12 @@ def _bm(z):
             rm[used] = np.arange(used.size)
             X.append(x[used]); F.append(rm[f]); L.append(z[f"v{i}"]); PP.append(tis(z[f"p{i}"]))
             ND.append(rm[nd])
+            MJ.append(int(z[f"mj{i}"]) if f"mj{i}" in z.files else -1)
     else:
         t = np.asarray(z["frames"])
         X = list(tis(z["X"])); L = list(z["L"]); PP = list(tis(z["PP"]))
-        F = [np.asarray(z["F"])] * len(t); ND = list(np.asarray(z["nod"]))
-    return dict(t=t, X=X, F=F, L=L, PP=PP, ND=ND,
+        F = [np.asarray(z["F"])] * len(t); ND = list(np.asarray(z["nod"])); MJ = []
+    return dict(t=t, X=X, F=F, L=L, PP=PP, ND=ND, MJ=np.asarray(MJ if MJ else [-1] * len(t)),
                 vmax=max(float(np.max(v)) for v in L if v.size))
 
 
@@ -383,6 +384,15 @@ def _bm_frame(bm, mesh_frames, k, stride):
     So the lookup now returns the gap it had to jump. Anything beyond one mesh stride is not the same
     moment and the caller must not draw the two side by side as though it were.
     """
+    # THE RECORDED KEY FIRST. `mj` is the mesh index the rig was actually replaying when it wrote
+    # that entry, so where it exists the join is exact and nothing has to be inferred.
+    mj = bm.get("MJ")
+    if mj is not None and len(mj) and int(np.max(mj)) >= 0:
+        hit = np.nonzero(mj == k)[0]
+        if hit.size:
+            return int(hit[0]), 0
+        return int(np.argmin(np.abs(mj - k))), int(abs(int(mj[int(np.argmin(np.abs(mj - k)))]) - k)
+                                                   * max(int(stride), 1))
     want = int(mesh_frames[min(k, len(mesh_frames) - 1)])
     j = int(np.argmin(np.abs(bm["t"] - want)))
     return j, abs(int(bm["t"][j]) - want)
