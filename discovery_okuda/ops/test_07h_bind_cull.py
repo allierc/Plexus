@@ -231,7 +231,16 @@ def run(rig, a, d, extra=None):
                          ("p", att.float().cpu().numpy()),
                          ("nb", nb.float().cpu().numpy()),
                          ("nf", rig.clutch.Nf.float().cpu().numpy()),
-                         ("cf", rig.ct_face.cpu().numpy().astype(np.int32))):
+                         ("cf", rig.ct_face.cpu().numpy().astype(np.int32)),
+                         # THE JOIN KEY, RECORDED RATHER THAN INFERRED. Every body in the 2x2 is
+                         # written on its own cadence -- the tissue keeps 200 meshes of 401, this
+                         # store keeps every second frame, the matrix comes from another run -- so
+                         # the renderer used to recover the correspondence with a nearest-frame
+                         # argmin. Nearest-neighbour has no notion of out-of-range: on a run that
+                         # diverged it clamped, and 71 of 200 rendered frames put a live tissue
+                         # beside a dead membrane. The rig KNOWS which mesh it is replaying, so it
+                         # writes it down and the renderer joins on it exactly.
+                         ("mj", np.int32(getattr(rig, "_mesh_j", -1)))):
                 store[f"{k}{i}"] = v
             i += 1
     np.savez_compressed(os.path.join(d, "bm_frames.npz"), n_kept=np.int32(i),
