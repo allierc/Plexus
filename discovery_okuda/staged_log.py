@@ -156,7 +156,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--print", dest="show", action="store_true")
     a = ap.parse_args()
-    names = sorted(d for d in os.listdir(LOG) if d.startswith("stage_"))
+    # `stage`, NOT `stage_`: the second wave of runs is named `stage2_*` and this log reported
+    # "0 staged run(s)" for a day while eleven of them sat on disk.
+    names = sorted(d for d in os.listdir(LOG) if d.startswith("stage"))
     rows = [read(n) for n in names]
     os.makedirs(OUT, exist_ok=True)
     with open(os.path.join(OUT, "staged.jsonl"), "w") as fh:

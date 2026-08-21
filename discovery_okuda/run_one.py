@@ -1463,6 +1463,30 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60, movie=True):
               flush=True)
         return
 
+    # ONE PANEL, VTK, WITH THE CELL OUTLINES. Cedric, 21 August: *"change the render of the
+    # movie.mp4, use one panel and use vtk mesh"*.
+    #
+    # The layout below is two matplotlib 3D viewpoints plus a cross-section inset, drawn by the
+    # painter's algorithm -- which sorts faces by depth and paints back-facing ones anyway, so on a
+    # star's end frame thousands of hidden faces are painted and which one wins a tie changes with
+    # the angle. `vtk_render.evolve` is the z-buffered single-panel successor and already exists:
+    # same fixed camera for the whole run, so growth within the run is real rather than a camera
+    # move. `mesh` rather than `nomesh` because the outlines are what make cell-scale events --
+    # who divided, how many cells across a tube -- legible in a movie.
+    #
+    # The matplotlib layout stays as the fallback: it needs no VTK and no GPU-side render, so a
+    # node where pyvista cannot open a window still produces a movie rather than nothing.
+    _mp4 = os.path.join(out_dir, "movie.mp4")
+    _movie_done = False
+    try:
+        import vtk_render as _V
+        _V.evolve(name, "mesh", _mp4)
+        print(f"[{name}] movie.mp4 <- vtk evolve, one panel, mesh", flush=True)
+        _movie_done = True
+    except Exception as _e:
+        print(f"[{name}] movie: VTK failed ({type(_e).__name__}: {str(_e)[:60]}), "
+              f"falling back to the matplotlib layout", flush=True)
+
     # movie: the two 3D viewpoints side by side + the cross-section inset (bottom-right).
     # Laid out here rather than via make_movie_axes, which only makes the single-view layout.
     figm = plt.figure(figsize=(10.0, 5.2))
@@ -1474,26 +1498,27 @@ def render(name, fr, out_dir, n_strip=8, movie_frames=60, movie=True):
     axin.set_facecolor("none")
     axin.patch.set_alpha(0.0)
     keep = np.unique(np.linspace(0, T - 1, min(movie_frames, T)).astype(int))
-    wri = FFMpegWriter(fps=10, metadata={"title": name})
-    with wri.saving(figm, os.path.join(out_dir, "movie.mp4"), dpi=85):
-        for t in keep:
-            pt, mt, a = fr[int(t)][:3]
-            div, brk = faults_of(pt, mt)
-            draw3d(axs, pt, mt, a, CAM_SIDE, div, brk)
-            draw3d(axt, pt, mt, a, CAM_TOP, div, brk)
-            # _draw calls ax.clear(), which drops the label -- re-stamp it every frame.
-            axs.text2D(0.02, 0.96, "side  elev 18", transform=axs.transAxes, color="w",
-                       fontsize=9)
-            axt.text2D(0.02, 0.96, "top  elev 88", transform=axt.transAxes, color="w", fontsize=9)
-            # THE SCALE. `_draw` clears the axes every frame, so this is re-stamped like the
-            # labels above. Both 3D panels share L3, the one box held for the whole run.
-            _scalebar(axs, L3)
-            _scalebar(axt, L3)
-            _cross_screen(axin, pt, mt, col(a), seed_dir=_cross_axis(pt, None),
-                          Lbox=L2)              # cross-section, minisite convention
-            axin.axis("off")
-            _scalebar(axin, L2)                 # its own box: the inset is 2.05x the 3D view
-            wri.grab_frame()
+    if not _movie_done:
+        wri = FFMpegWriter(fps=10, metadata={"title": name})
+        with wri.saving(figm, os.path.join(out_dir, "movie.mp4"), dpi=85):
+            for t in keep:
+                pt, mt, a = fr[int(t)][:3]
+                div, brk = faults_of(pt, mt)
+                draw3d(axs, pt, mt, a, CAM_SIDE, div, brk)
+                draw3d(axt, pt, mt, a, CAM_TOP, div, brk)
+                # _draw calls ax.clear(), which drops the label -- re-stamp it every frame.
+                axs.text2D(0.02, 0.96, "side  elev 18", transform=axs.transAxes, color="w",
+                           fontsize=9)
+                axt.text2D(0.02, 0.96, "top  elev 88", transform=axt.transAxes, color="w", fontsize=9)
+                # THE SCALE. `_draw` clears the axes every frame, so this is re-stamped like the
+                # labels above. Both 3D panels share L3, the one box held for the whole run.
+                _scalebar(axs, L3)
+                _scalebar(axt, L3)
+                _cross_screen(axin, pt, mt, col(a), seed_dir=_cross_axis(pt, None),
+                              Lbox=L2)              # cross-section, minisite convention
+                axin.axis("off")
+                _scalebar(axin, L2)                 # its own box: the inset is 2.05x the 3D view
+                wri.grab_frame()
     plt.close(figm)
     # 3d.png -- THE LAST FRAME, ALONE, AT FULL SIZE. Cedric, 8 August: "add one 3d.png end frame
     # of mp4". The strip is eight thumbnails across a 4-row grid, so the final state is one small
