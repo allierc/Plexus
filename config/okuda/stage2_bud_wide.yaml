@@ -1,5 +1,5 @@
 general:
-  name: stage2_tips_hard
+  name: stage2_bud_wide
   seed: 0
   n_frames: 3600
   dt: 1.0
@@ -57,6 +57,14 @@ operators:
   d_a: 0.08
   d_h: 0.16
   chi: 1.3
+  before_frame: 1800
+- op: cell_chem_diffuse
+  at: cell
+  implementation: graph_laplacian
+  d_a: 0.24
+  d_h: 0.16
+  chi: 1.3
+  after_frame: 1800
 - op: cell_chem_react
   at: cell
   model: gray_scott
@@ -90,7 +98,7 @@ operators:
   at: vertex
   cell_set: cell
   rate: 0.006
-  a_sw: 0.9
+  a_sw: 0.5
   hill: 8.0
   rho: 0.0
   vth_frac: 2.5
@@ -121,6 +129,15 @@ operators:
   eta: 0.05
   iters: 4
   after_frame: 100
+  before_frame: 1800
+- op: interface_tension
+  at: vertex
+  cell_set: cell
+  K_purse: 0.0
+  a_sw: 0.6
+  eta: 0.05
+  iters: 4
+  after_frame: 1800
 - op: edge_flip
   at: vertex
   l_th_frac: 0.28
@@ -166,12 +183,14 @@ schedule:
 - cell_chem_seed
 - cell_neighbours
 - cell_chem_diffuse
+- cell_chem_diffuse
 - cell_chem_react
 - cell_chem_from_shape
 - cell_shape_probe
 - cell_grow
 - cell_grow
 - cell_mechanics
+- interface_tension
 - interface_tension
 - edge_flip
 - cell_divide
@@ -233,7 +252,11 @@ _staged:
   changes:
     cell_grow:
       rho: 0.0
-      a_sw: 0.9
+      a_sw: 0.5
       rate: 0.006
     cell_divide:
       min_cycle: 6
+    interface_tension:
+      K_purse: 0.0
+    cell_chem_diffuse:
+      d_a: 0.24

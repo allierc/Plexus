@@ -38,15 +38,17 @@ operators:
   jitter: 0.15
   seed: 0
   vseed_cv: 0.15
+  p0: 3.5
 - op: cell_geometry
   at: cell
 - op: cell_chem_seed
   at: cell
-  mode: cones
+  mode: scatter
   n_spots: 1
   cone_deg: 8.0
-  before_frame: 3
   seed: 0
+  before_frame: 3
+  seed_frac: 0.06
 - op: cell_neighbours
   at: cell
 - op: cell_chem_diffuse
@@ -82,7 +84,7 @@ operators:
   rho: 0.1
   vth_frac: 2.5
   after_frame: 100
-  conserve_amount: true
+  conserve_amount: false
   before_frame: 1800
 - op: cell_grow
   at: vertex
@@ -93,7 +95,7 @@ operators:
   rho: 0.0
   vth_frac: 2.5
   after_frame: 1800
-  conserve_amount: true
+  conserve_amount: false
 - op: cell_mechanics
   at: vertex
   p0: 3.5
@@ -121,7 +123,7 @@ operators:
   after_frame: 100
 - op: edge_flip
   at: vertex
-  l_th_frac: 1.9600000000000002
+  l_th_frac: 0.28
   every: 1
   max_flips: 300
 - op: cell_divide
@@ -129,23 +131,24 @@ operators:
   factor: 2.0
   reset_noise: 0.12
   cycle_cv: 0.15
-  p0: 3.9
-  every: 1
+  p0: 3.5
+  every: 4
   cell_set: cell
-  min_cycle: 16
+  min_cycle: 4
   max_cycle: 1000000000
   after_frame: 100
   orient_iface: false
   orient_asw: 0.6
   g1_ramp: false
+  engine_clock: true
   before_frame: 1800
 - op: cell_divide
   at: vertex
   factor: 2.0
   reset_noise: 0.12
   cycle_cv: 0.15
-  p0: 3.9
-  every: 1
+  p0: 3.5
+  every: 4
   cell_set: cell
   min_cycle: 8
   max_cycle: 1000000000
@@ -153,6 +156,7 @@ operators:
   orient_iface: false
   orient_asw: 0.6
   g1_ramp: false
+  engine_clock: true
 - op: topo_record
   at: vertex
   every: 1
@@ -174,7 +178,7 @@ schedule:
 - cell_divide
 - topo_record
 _discovery:
-  comp_hash: Cc0c48e8a06f
+  comp_hash: C37faf0d5d06
   structure:
     operators:
     - id: cell_chem_diffuse0
@@ -192,15 +196,9 @@ _discovery:
     - id: cell_divide0
       op: cell_divide
       impl: hertwig
-    - id: cell_divide1
-      op: cell_divide
-      impl: hertwig
     - id: cell_geometry0
       op: cell_geometry
     - id: cell_grow0
-      op: cell_grow
-      impl: hill_conserve_amount
-    - id: cell_grow1
       op: cell_grow
       impl: hill_conserve_amount
     - id: cell_mechanics0
@@ -229,3 +227,13 @@ _discovery:
   - D1 engine owns the clock (every=1)
   - D2 one global dt=1.0
   - D3 topo_snapshot every=1 == position stride
+_staged:
+  parent: r010_00_ctrl
+  switch: 1800
+  changes:
+    cell_grow:
+      rho: 0.0
+      a_sw: 0.6
+      rate: 0.0035
+    cell_divide:
+      min_cycle: 8
