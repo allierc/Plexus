@@ -96,6 +96,21 @@ def load(run, src="06_spheroid_ecm"):
     scale = float(op.get("scale", 1.0))
     surf = (op.get("tissue") or op.get("surface")).replace(
         "/groups/saalfeld/home/allierc/Graph", "/workspace")
+    # THE RUN'S OWN TISSUE, NOT THE MATRIX RUN'S. This path comes from `06_spheroid_ecm`'s spec
+    # because that is where the matrix was seeded against a surface, and for every run up to 07 it was
+    # also the tissue being replayed -- one tissue, one path, no ambiguity. The 08 series broke that:
+    # each variant BUILDS its own pass-2 tissue with the growth gate in its schedule, and nothing told
+    # the renderer. So three of the four panels drew the reference tissue -- aspect 1.007 -> 1.027, a
+    # sphere at every frame -- beside a membrane from a run whose actual tissue went to aspect 3.190
+    # and radial CV 0.731. The picture said "the membrane deformed and the spheroid did not" when the
+    # spheroid was the one thing in the figure that had not been simulated.
+    own = os.path.join(LOG, "_tissue", str((yaml.safe_load(
+        open(os.path.join(d, "spec.yaml"))).get("run") or {}).get("tissue", "")) ) \
+        if os.path.exists(os.path.join(d, "spec.yaml")) else ""
+    if own and os.path.exists(own) and os.path.abspath(own) != os.path.abspath(surf):
+        print(f"[vtk_ecm] this run built its own tissue: drawing {os.path.basename(own)}, not the "
+              f"matrix run's {os.path.basename(surf)}", flush=True)
+        surf = own
     Tis = RD.load_tissue(surf, scale)
     z = np.load(os.path.join(ds, "traj.npz"))
     pos, band = np.asarray(z["pos"]), np.asarray(z["stress"])
