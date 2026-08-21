@@ -353,14 +353,35 @@ def _aim(p, L, clip=False):
     p.camera.parallel_scale = L * 1.05
 
 
-def render(run, frames=None, still=False, src="06_spheroid_ecm", out_name=None, fps=20):
+def render(run, frames=None, still=False, src="06_spheroid_ecm", out_name=None, fps=20,
+           spin=0):
     import imageio_ffmpeg
     import pyvista as pv
     D = load(run, src)
     pv.OFF_SCREEN = True
     n_all = len(D["meshes"])
+    # NEITHER PANEL MAY OUTLIVE THE OTHER. The membrane frame is chosen as the BM store's nearest
+    # entry to this mesh's own tissue frame, which is right while both bodies cover the same span and
+    # silently wrong when they do not: a run that DIVERGED stops writing membrane frames while the
+    # tissue cache still holds all 401, so `argmin` clamps to the last one and the movie shows a live
+    # tissue beside a membrane frozen on its final -- already blown-up -- snapshot. On 08b_s2_big
+    # that was the last third of the movie, and it reads as "the membrane went blobby while the
+    # spheroid stayed round" when what happened is that the membrane stopped existing.
+    mf = np.asarray(D["mesh_frames"])
+    t_last = int(np.max(D["bm"]["t"])) if len(D["bm"]["t"]) else int(mf[-1])
+    keep = int(np.searchsorted(mf, t_last, side="right"))
+    if keep < n_all:
+        print(f"[vtk_ecm] the membrane store ends at frame {t_last} and the tissue runs to "
+              f"{int(mf[-1])}: {n_all - keep} of {n_all} mesh frames dropped so the two panels stay "
+              f"on the same frame", flush=True)
+        n_all = max(keep, 1)
     idx = (list(range(n_all)) if frames is None else
            [int(round(u)) for u in np.linspace(0, n_all - 1, min(frames, n_all))])
+    # A TURN AT THE END, because a still of a bud is a silhouette and a silhouette of a taper and of
+    # a bulb are the same picture. The geometry is held at the last frame and only the camera moves.
+    spin_from = len(idx)
+    if spin and not still:
+        idx = idx + [idx[-1]] * int(spin)
     if still:
         # THE LAST FRAME, like `3d.png`. A still of frame 0 is a small sphere in an untouched matrix
         # and says nothing about the run; the end state is what anyone looks at first, and it is the
@@ -374,7 +395,10 @@ def render(run, frames=None, still=False, src="06_spheroid_ecm", out_name=None, 
         wr = imageio_ffmpeg.write_frames(out, (2 * SIZE, 2 * SIZE), fps=fps, quality=7)
         wr.send(None)
     t0 = time.time()
+    azim0 = CAM["azim"]                 # the base, captured ONCE -- read inside the loop it compounds
     for n, k in enumerate(idx):
+        CAM["azim"] = (azim0 if n < spin_from else
+                       azim0 + 360.0 * (n - spin_from) / max(len(idx) - spin_from, 1))
         t, mt = D["meshes"][k]
         q = (D["pos"][t] - c) / max(sc, 1e-12)                      # matrix in tissue units
         p = pv.Plotter(off_screen=True, window_size=(2 * SIZE, 2 * SIZE), shape=(2, 2),
@@ -506,6 +530,7 @@ def render(run, frames=None, still=False, src="06_spheroid_ecm", out_name=None, 
         if still:
             import imageio.v2 as iio
             iio.imwrite(out, img)
+            CAM["azim"] = azim0
             print(f"[vtk_ecm] {out}  (frame {t})", flush=True)
             return out
         wr.send(np.ascontiguousarray(img[:, :, :3]))
@@ -513,6 +538,7 @@ def render(run, frames=None, still=False, src="06_spheroid_ecm", out_name=None, 
             print(f"[vtk_ecm] first frame in {time.time()-t0:.2f}s ({len(idx)} to draw)", flush=True)
     wr.close()
     dt = time.time() - t0
+    CAM["azim"] = azim0
     print(f"[vtk_ecm] {out}  ({len(idx)} frames @ {fps} fps, {dt:.1f}s, "
           f"{dt/max(len(idx),1):.3f}s a frame)", flush=True)
     return out
@@ -525,9 +551,14 @@ def main():
     ap.add_argument("--frames", type=int, default=None)
     ap.add_argument("--fps", type=int, default=20)
     ap.add_argument("--still", action="store_true")
+    # A TURN AT THE END. A silhouette of a taper and a silhouette of a bulb are the same picture, so
+    # the last frame is held and the camera walks a full circle around it.
+    ap.add_argument("--spin", type=int, default=0,
+                    help="frames of 360-degree turn appended after the last frame")
     ap.add_argument("--out", default=None)
     a = ap.parse_args()
-    render(a.run, frames=a.frames, still=a.still, src=a.src, out_name=a.out, fps=a.fps)
+    render(a.run, frames=a.frames, still=a.still, src=a.src, out_name=a.out, fps=a.fps,
+           spin=a.spin)
 
 
 if __name__ == "__main__":
