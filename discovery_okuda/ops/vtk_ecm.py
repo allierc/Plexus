@@ -63,6 +63,8 @@ SIZE = 780                                 # per panel; the sheet writes 2*SIZE 
 EPI_RGB = (232, 220, 190)
 # the matrix's alpha ramp: an unstressed fibre is nearly invisible, a fully-banded one is solid
 ALPHA_LO, ALPHA_HI, ALPHA_GAMMA = 0.03, 0.55, 0.85
+MONO_RGB = "3c3c3c"                 # the matrix as dark grey felt, stress on alpha
+MONO_LO, MONO_HI = 0.10, 0.85       # visible unloaded, solid where the band is high
 # BACK FACES ARE CULLED, and the reason is a question this panel kept being asked. A torn sheet is
 # still a closed-ish shell, so through the hole you see the FAR wall from the INSIDE -- lit from
 # behind, its triangulation dense with distance -- and it reads as a second, concentric mesh. It is
@@ -153,7 +155,7 @@ def _bm(z):
 # =============================================================================================
 #  geometry -> PolyData
 # =============================================================================================
-def strands(q, band, per, cmap):
+def strands(q, band, per, cmap, mono=None):
     """The matrix as the polylines `ecm_seed` laid down, coloured by its stress band.
 
     ONE PolyData FOR THE WHOLE MATRIX, AND NO PYTHON LOOP OVER FIBRES. 10,000 fibres as 10,000
@@ -190,10 +192,22 @@ def strands(q, band, per, cmap):
     # and not "this part of it is loaded". Alpha rising with the band lets the unstressed bulk fall
     # back toward the background while a loaded strand stays legible through it, and RGBA is per
     # cell, so this costs one array and no extra draw call.
-    lut = (np.asarray(cmap, float) * 255).astype(np.uint8)
     cb = np.clip(np.maximum(b[ia, ja], b[ia, ja + 1]).astype(int), 0, len(cmap) - 1)
-    a8 = (ALPHA_LO + (ALPHA_HI - ALPHA_LO) * (cb / max(len(cmap) - 1, 1)) ** ALPHA_GAMMA)
-    poly.cell_data["rgb"] = np.column_stack([lut[cb], (255 * a8).astype(np.uint8)])
+    frac = cb / max(len(cmap) - 1, 1)
+    if mono is None:
+        lut = (np.asarray(cmap, float) * 255).astype(np.uint8)[cb]
+        a8 = ALPHA_LO + (ALPHA_HI - ALPHA_LO) * frac ** ALPHA_GAMMA
+    else:
+        # MONOCHROME: THE STRESS IS THE TRANSPARENCY AND NOTHING ELSE. With hue carrying the band as
+        # well, an unloaded matrix is drawn in the ramp's dark end AT the ramp's low alpha, so at
+        # frame 0 -- when nothing is loaded yet -- the panel is very nearly empty and the fibres the
+        # tissue is about to push into cannot be seen at all. Here every fibre is the same dark grey
+        # and only its opacity moves, so the unstressed matrix reads as a visible grey felt from the
+        # first frame and a loaded strand brightens out of it by becoming solid rather than by
+        # changing colour. `MONO_LO` is what makes it visible at the start and is the whole point.
+        lut = np.tile(np.asarray(_hex(mono), np.uint8), (len(cb), 1))
+        a8 = MONO_LO + (MONO_HI - MONO_LO) * frac ** ALPHA_GAMMA
+    poly.cell_data["rgb"] = np.column_stack([lut, (255 * a8).astype(np.uint8)])
     return poly
 
 
@@ -366,7 +380,7 @@ def render(run, frames=None, still=False, src="06_spheroid_ecm", out_name=None, 
         p = pv.Plotter(off_screen=True, window_size=(2 * SIZE, 2 * SIZE), shape=(2, 2),
                        border=False)
         tis, _ = tissue_poly(mt, np.asarray(mt["pos"], float))
-        mat = strands(q, D["band"][t], per, _ramps()[0])
+        mat = strands(q, D["band"][t], per, _ramps()[0], mono=MONO_RGB)
 
         # ---- top-left: the tissue inside the stressed matrix, in 3D
         p.subplot(0, 0)
