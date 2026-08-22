@@ -1,0 +1,164 @@
+{
+ "ops": [
+  {
+   "id": "mesh_seed0",
+   "op": "mesh_seed",
+   "impl": "fibonacci_sphere"
+  },
+  {
+   "id": "cell_geometry0",
+   "op": "cell_geometry",
+   "impl": "scatter_add"
+  },
+  {
+   "id": "cell_chem_seed0",
+   "op": "cell_chem_seed",
+   "impl": "cone"
+  },
+  {
+   "id": "cell_neighbours0",
+   "op": "cell_neighbours",
+   "impl": "shared_edge"
+  },
+  {
+   "id": "cell_chem_diffuse0",
+   "op": "cell_chem_diffuse",
+   "impl": "graph_laplacian"
+  },
+  {
+   "id": "cell_chem_react0",
+   "op": "cell_chem_react",
+   "impl": "gray_scott"
+  },
+  {
+   "id": "cell_chem_from_shape0",
+   "op": "cell_chem_from_shape",
+   "impl": "curvature"
+  },
+  {
+   "id": "cell_shape_probe0",
+   "op": "cell_shape_probe",
+   "impl": "shape_index"
+  },
+  {
+   "id": "cell_grow0",
+   "op": "cell_grow",
+   "impl": "hill_conserve_amount"
+  },
+  {
+   "id": "cell_mechanics0",
+   "op": "cell_mechanics",
+   "impl": "default"
+  },
+  {
+   "id": "interface_tension0",
+   "op": "interface_tension",
+   "impl": "default"
+  },
+  {
+   "id": "edge_flip0",
+   "op": "edge_flip",
+   "impl": "length_threshold"
+  },
+  {
+   "id": "cell_divide0",
+   "op": "cell_divide",
+   "impl": "hertwig"
+  },
+  {
+   "id": "cell_grow1",
+   "op": "cell_grow",
+   "impl": "hill_conserve_amount"
+  }
+ ],
+ "conns": [
+  {
+   "src": "cell_chem_react0",
+   "dst": "interface_tension0",
+   "slot": "site"
+  },
+  {
+   "src": "cell_chem_react0",
+   "dst": "cell_grow0",
+   "slot": "gate"
+  }
+ ],
+ "params": {
+  "mesh_seed0.cell_set": "cell",
+  "mesh_seed0.before_frame": 1,
+  "mesh_seed0.n_cells": 2000,
+  "mesh_seed0.radius": 5.0,
+  "mesh_seed0.jitter": 0.15,
+  "mesh_seed0.seed": 851651,
+  "mesh_seed0.vseed_cv": 0.15,
+  "cell_chem_seed0.mode": "scatter",
+  "cell_chem_seed0.n_spots": 1,
+  "cell_chem_seed0.cone_deg": 8.0,
+  "cell_chem_seed0.before_frame": 3,
+  "cell_chem_seed0.seed_frac": 0.06,
+  "cell_chem_diffuse0.d_a": 0.08,
+  "cell_chem_diffuse0.d_h": 0.16,
+  "cell_chem_diffuse0.chi": 1.3,
+  "cell_chem_react0.model": "gray_scott",
+  "cell_chem_react0.rate": 0.5,
+  "cell_chem_react0.F": 0.023,
+  "cell_chem_react0.kk": 0.062,
+  "cell_chem_from_shape0.model": "curvature",
+  "cell_chem_from_shape0.vertex_set": "vertex",
+  "cell_chem_from_shape0.beta": 0.5,
+  "cell_chem_from_shape0.F0": 0.046,
+  "cell_chem_from_shape0.rate": 1.0,
+  "cell_shape_probe0.vertex_set": "vertex",
+  "cell_shape_probe0.model": "shape_index",
+  "cell_shape_probe0.field": "elong",
+  "cell_grow0.cell_set": "cell",
+  "cell_grow0.rate": 0.001732,
+  "cell_grow0.a_sw": 0.35,
+  "cell_grow0.hill": 8.0,
+  "cell_grow0.rho": 0.1,
+  "cell_grow0.vth_frac": 2.5,
+  "cell_grow0.after_frame": 400,
+  "cell_grow0.conserve_amount": false,
+  "cell_mechanics0.p0": 3.5,
+  "cell_mechanics0.K_A": 1.0,
+  "cell_mechanics0.K_P": 1.0,
+  "cell_mechanics0.Gamma": 0.4,
+  "cell_mechanics0.Lambda": 0.5,
+  "cell_mechanics0.K_V": 40.0,
+  "cell_mechanics0.K_R": 0.0,
+  "cell_mechanics0.K_bend": 0.0,
+  "cell_mechanics0.K_lumen": 0.0,
+  "cell_mechanics0.antiinv": 0.0,
+  "cell_mechanics0.mu": 1.0,
+  "cell_mechanics0.dt": 1.0,
+  "cell_mechanics0.relax_iters": 30,
+  "cell_mechanics0.eta": 0.08,
+  "cell_mechanics0.cap_frac": 0.12,
+  "interface_tension0.cell_set": "cell",
+  "interface_tension0.K_purse": 1.0,
+  "interface_tension0.a_sw": 0.6,
+  "interface_tension0.eta": 0.05,
+  "interface_tension0.iters": 4,
+  "interface_tension0.after_frame": 400,
+  "edge_flip0.l_th_frac": 0.28,
+  "edge_flip0.max_flips": 300,
+  "cell_divide0.factor": 2.0,
+  "cell_divide0.reset_noise": 0.12,
+  "cell_divide0.cycle_cv": 0.15,
+  "cell_divide0.p0": 3.5,
+  "cell_divide0.cell_set": "cell",
+  "cell_divide0.after_frame": 400,
+  "cell_divide0.orient_iface": false,
+  "cell_divide0.orient_asw": 0.6,
+  "cell_divide0.g1_ramp": false,
+  "cell_grow1.rate": 0.006,
+  "cell_grow1.a_sw": 0.9,
+  "cell_grow1.hill": 8.0,
+  "cell_grow1.rho": 0.0,
+  "cell_grow1.cell_set": "cell",
+  "cell_grow1.vth_frac": 2.5,
+  "cell_grow1.conserve_amount": false,
+  "cell_grow0.before_frame": 1350,
+  "cell_grow1.after_frame": 1350
+ }
+}

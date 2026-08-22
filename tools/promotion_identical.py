@@ -67,24 +67,37 @@ sys.path.insert(0, OKUDA)
 # runs this promotion has to reproduce; inventing a fresh spec for the comparison would be
 # comparing the promotion against a case neither side has ever run.
 # =============================================================================================
+# `frames=None` means RUN THE SPEC AT ITS OWN LENGTH. The short rows are regression rows -- the
+# same 100 frames every time, so the digest is a number that can be quoted and re-checked. The
+# full-length rows are the SCENES: four of them are the minisite's own death figures, and they are
+# run to the end because a gate whose archive stops at frame 100 cannot show the deformation it
+# claims to be testing.
 PAIRS = [
-    # phase   spec                    side A          side B       what it exercises
-    (0,  "b_null_plain",          "okuda@HEAD",   "okuda",   "mesh_seed, cell_mechanics, edge_flip, topo_record"),
+    # phase   spec               frames  side A         side B     what it exercises
+    (0,  "b_null_plain",           100, "okuda@HEAD",  "okuda",  "mesh_seed, cell_mechanics, edge_flip, topo_record"),
     # A DEATH SPEC, because `b_null_plain` never calls `cell_die` -- its ledger is cell_divide 26,
     # cell_geometry 83, cell_mechanics 101, edge_flip 27, mesh_seed 1, topo_record 101 and no death
     # at all. Removal is the first operation in this engine that MOVES A ROW, so a renumber change
     # gated only on that spec passes without executing a line of what changed.
-    (0,  "apop_one",              "okuda@HEAD",   "okuda",   "+ cell_die -> H.renumber_set (state, occ, delta, block deltas)"),
-    (0.5, "ecm_block",            "okuda@HEAD",   "okuda",   "mpm_scatter/gather/grid_update/strain, ecm_seed, ecm_stress"),
-    ("B", "b_gs_plain_soft_lo",   "okuda",        "core",    "+ cell_chem_seed/diffuse/react, cell_geometry, cell_neighbours"),
-    ("B", "b_star",               "okuda",        "core",    "+ cell_grow, cell_divide, interface_tension, cell_chem_from_shape"),
-    ("C", "01c_tissue",           "okuda",        "core",    "junction_myosin (both pools), junction_sync, cytokinetic_ring"),
-    ("D", "04_spheroid_ecm_pass2", "okuda",       "core",    "mesh_contact, mesh_inside, ecm_*, bm_*"),
+    (0,  "apop_one",               100, "okuda@HEAD",  "okuda",  "+ cell_die -> H.renumber_set: ONE row moves"),
+    # ---- the death scenes. One row moved is the correctness case and it is not the hard case.
+    # `renumber_set` is a GATHER through `keep`, and the four rows below ask progressively more of
+    # it: 200 rows out of order, then a patch, then nine bands, then most of the sheet. Each is an
+    # existing okuda spec run at its own length, and each is a figure on the minisite -- so the
+    # archive under `log/promotion/<spec>/` is both the gate's evidence and the scene itself.
+    (0,  "apop_many",             None, "okuda@HEAD",  "okuda",  "200 SCATTERED deaths -- an interleaved `keep`, not a truncation"),
+    (0,  "apop_patch_big",        None, "okuda@HEAD",  "okuda",  "293 of 2000 in a 45-deg cap -> the surface is drawn INWARD (invagination 0.0369)"),
+    (0,  "apop_rings9",           None, "okuda@HEAD",  "okuda",  "895 of 2000 in nine bands -> closes over every gap, stays a sphere (red_vol 0.9813)"),
+    (0,  "apopgeo_half",          None, "okuda@HEAD",  "okuda",  "285 of 400 above the equator -> topology survives, sphere -> ellipsoid (gyr_prolate 1.869)"),
+    (0.5, "ecm_block",            None, "okuda@HEAD",  "okuda",  "mpm_scatter/gather/grid_update/strain, ecm_seed, ecm_stress"),
+    ("B", "b_gs_plain_soft_lo",    100, "okuda",       "core",   "+ cell_chem_seed/diffuse/react, cell_geometry, cell_neighbours"),
+    ("B", "b_star",                100, "okuda",       "core",   "+ cell_grow, cell_divide, interface_tension, cell_chem_from_shape"),
+    ("C", "01c_tissue",            100, "okuda",       "core",   "junction_myosin (both pools), junction_sync, cytokinetic_ring"),
+    ("D", "04_spheroid_ecm_pass2", 100, "okuda",       "core",   "mesh_contact, mesh_inside, ecm_*, bm_*"),
 ]
 
-# HOW LONG A COMPARISON RUN IS. Short enough to sit in a per-phase loop, long enough that the
-# mechanisms have acted: a 100-frame vertex run has divided and flipped, a 100-frame chemistry run
-# has patterned. Overridden per pair only where 100 frames would not reach the mechanism at all.
+# The default for a row that asks for neither: short enough to sit in a per-phase loop, long enough
+# that the mechanisms have acted (a 100-frame vertex run has divided and flipped).
 FRAMES = int(os.environ.get("PROMO_FRAMES", "100"))
 
 
@@ -140,8 +153,9 @@ def _spec_copy(spec, run_name, frames, cfg_dir=None):
     cfg = yaml.safe_load(open(src))
     cfg["general"] = dict(cfg.get("general") or {})
     cfg["general"]["name"] = run_name
-    cfg["general"]["n_frames"] = int(frames)
-    cfg["general"]["record_cap"] = int(frames) + 2
+    if frames is not None:                      # None = the spec's own length (the scene rows)
+        cfg["general"]["n_frames"] = int(frames)
+        cfg["general"]["record_cap"] = int(frames) + 2
     os.makedirs(cfg_dir, exist_ok=True)
     dst = os.path.join(cfg_dir, f"{run_name}.yaml")
     yaml.safe_dump(cfg, open(dst, "w"), sort_keys=False)
@@ -167,8 +181,9 @@ def _bsub_lines(pair_dir, spec, side, run_name, frames):
                 # THE DETERMINISM ASSERTION travels with the job, not with the submitter: the run
                 # happens on another machine and a flag set here would not reach it.
                 "export PLEXUS_STRICT_DETERMINISM=1",
-                f"conda run -n {C.ENV} python run_one.py {run_name} --frames {frames} "
-                f"--device cuda:0 --campaign promotion",
+                f"conda run -n {C.ENV} python run_one.py {run_name}"
+                + (f" --frames {frames}" if frames is not None else "")
+                + " --device cuda:0 --campaign promotion",
             ]) + "\n")
     else:
         script = os.path.join(pair_dir, f"{run_name}.sh")
@@ -294,7 +309,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--phase", default=None, help="only the pairs of one phase (0, 0.5, B, C, D)")
     ap.add_argument("--all", action="store_true")
-    ap.add_argument("--frames", type=int, default=FRAMES)
+    ap.add_argument("--frames", type=int, default=None,
+                help="override every row's length; default = the row's own")
     ap.add_argument("--compare-only", action="store_true",
                     help="do not submit; compare what is already in log/promotion/")
     ap.add_argument("--wait-min", type=float, default=90.0)
@@ -306,9 +322,12 @@ def main():
 
     os.makedirs(OUT, exist_ok=True)
     jobs = []
-    for phase, spec, sa, sb, what in pairs:
+    for phase, spec, nfr, sa, sb, what in pairs:
+        # --frames on the command line overrides every row; otherwise the row decides, and
+        # `None` on the row means the spec's own `general.n_frames`.
+        frames = a.frames if a.frames is not None else nfr
         try:
-            names, pd = run_pair(phase, spec, sa, sb, what, a.frames, submit=not a.compare_only)
+            names, pd = run_pair(phase, spec, sa, sb, what, frames, submit=not a.compare_only)
         except FileNotFoundError as e:
             print(f"  [{spec}] SKIPPED: {e}")
             continue
@@ -325,8 +344,13 @@ def main():
         print(f"  waiting for {2 * len(jobs)} job(s)...", flush=True)
         t0 = time.time()
         while time.time() - t0 < a.wait_min * 60:
+            # `_ssh` RETURNS A `CompletedProcess`, NOT THE OUTPUT. `str()` of one begins
+            # "CompletedProcess(args=[...", never "0", so the queue test was false on every poll and
+            # the loop always ran to `--wait-min` -- which is the real reason `collect` never ran and
+            # `log/promotion/<spec>/` held scripts and no mp4. An ssh timeout returns None, and an
+            # unreachable login node is NOT an empty queue, so that reads as "still waiting".
             st = C._ssh("bjobs -w 2>/dev/null | grep -c promo_ || true", timeout=30)
-            queue_empty = str(st).strip().startswith("0")
+            queue_empty = st is not None and (st.stdout or "").strip().startswith("0")
             landed = all(os.path.exists(os.path.join(_side_paths(side)[2], rn, "traj.npz"))
                          if side.startswith("okuda") else True
                          for *_r, names, _pd in jobs for side, rn in names.values())

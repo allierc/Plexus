@@ -13,6 +13,8 @@ general:
 sets:
   vertex:
     n: 30000
+    mesh: half_edge
+    cell_set: cell
   cell:
     n: 16000
     state:

@@ -400,6 +400,37 @@ def _build_edge_set(H, sname: str, s: dict, device: str) -> None:
     H.add_level(lvl)
 
 
+def _build_mesh(lvl, s: dict, device: str) -> None:
+    """Allocate the set's half-edge table if it declares one (`mesh: half_edge`).
+
+    THE TABLE IS EMPTY AND THAT IS THE POINT. Nothing here knows what surface the run wants -- a
+    sphere, an imported segmentation, a plate -- and inventing one would be `build` doing a seed
+    operator's job (see `build`'s own docstring on that split). What `build` does is what it does
+    for every other set: ALLOCATE THE CONTAINER AND DECLARE ITS SHAPE, so that by the time any
+    operator runs, `H.level('vertex').mesh` exists, is the right type, and answers `n_faces == 0`
+    rather than `AttributeError`. `mesh_seed` then FILLS it.
+
+    Before this, a Level had no idea it carried a surface: `grep -rn "_mesh" src/plexus/` returned
+    nothing at all, while roughly forty consumers -- the mechanics, the T1s, the chemistry, the
+    recorder, the salvage, the D4 fingerprint, the renderers -- read an attribute one operator
+    happened to set. A spec could schedule `cell_mechanics` with no `mesh_seed` and get
+    `AttributeError: 'Level' object has no attribute '_mesh'` from inside an autograd pass.
+
+    `cell_set` IS RECORDED HERE because a face of the mesh IS a cell, and that pairing was declared
+    nowhere: `mesh_ops` takes it as an operator parameter twice and `edge_flip` falls back to the
+    literal string "cell". Declared once on the set, it can be defaulted from the level instead of
+    repeated on every operator that crosses between the two -- which is how `edge_flip` came to
+    renumber a set it never said it needed.
+    """
+    kind = s.get("mesh")
+    if kind is None:
+        return
+    from plexus.models.mesh import MeshTable
+    z = torch.empty(0, dtype=torch.long, device=device)
+    lvl.mesh = MeshTable(E_srce=z, E_trgt=z.clone(), E_face=z.clone(), nF=0, Nv=0)
+    lvl.mesh_cell_set = s.get("cell_set")
+
+
 def _entity_class(sname: str):
     """The registered entity class for a set name, or None. An entity MAY define a
     `provision(lvl, parent, s, H, device)` classmethod to allocate domain-specific
@@ -593,6 +624,7 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         lvl = Level(sname, depth=depth, state=state, occ=occ, state_schema=schema)
         lvl.render = render
         lvl.vmax = float(s["vmax"]) if "vmax" in s else None    # optional per-tick cell speed cap
+        _build_mesh(lvl, s, device)                             # `mesh: half_edge` -> an empty table to fill
         if head is not None:
             # heading is a unit VECTOR [., D] in every dimension (the universal
             # orientation representation read by glide / bounce / sense).
@@ -673,6 +705,7 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         lvl = Level(sname, depth=depth, state=state, occ=occ, state_schema=schema,
                     parent=parent_idx, parent_name=pname, role=s.get("role"))
         lvl.render = render
+        _build_mesh(lvl, s, device)                # a CONTAINED set may carry the surface too
         _assign_types(lvl, s, H, device)
         # an entity may provision domain-specific per-node buffers (e.g. mpm_particle's
         # F/C/mass/mu/la/p_vol + block-fill) -- read off the parent's per-type config.
