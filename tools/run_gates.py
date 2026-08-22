@@ -207,6 +207,15 @@ def _convert(val, fn, cfg):
         k = float(u["length_um"])
     elif kind == "time":
         k = float(u["time_s"]) / 3600.0                      # frames -> hours
+    elif kind == "stress":
+        # DERIVED, never declared: a stress is force/length^2, so it comes from the two base scales
+        # and cannot be quoted without BOTH. `plexus.units` is the one place that arithmetic lives.
+        from plexus.units import parse as _parse_units
+        U = _parse_units(u)
+        if U.stress_Pa is None:
+            raise KeyError("a stress row needs `force_nN` as well as `length_um`; the spec declares "
+                           "only one of them, so the number has no Pa to be quoted in")
+        k = float(U.stress_Pa)
     else:
         raise KeyError(kind)
     return [x * k for x in val] if isinstance(val, list) else val * k
