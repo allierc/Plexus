@@ -150,6 +150,20 @@ class MeshTable(dict):
     #   apop_spill   material a death could not bequeath     (cell_die) -- must stay ~0
     SCALAR_RECORD = ("n_t1", "n_apop", "div_blocked", "apop_spill")
 
+    # PER-HALF-EDGE STATE, and it is a THIRD ragged length. `myo` has one entry per half-edge, not
+    # per face and not per row, so it cannot ride in `FACE_RECORD` (which drops anything shorter
+    # than `nF` and truncates anything longer) and it cannot share the face offsets. Without it,
+    # every myosin row of gate 01 -- the dispersion, the hot fraction, the pinning to `activity` --
+    # is uncomputable from a core run, which is eight of that gate's fifteen rows.
+    #
+    # IT IS RECORDED AFTER `junction_sync` FOR A REASON. `edge_flip` rewires the arrays and
+    # `cell_divide` lengthens them, both AFTER `junction_myosin` wrote `myo` for the arrays as they
+    # were: on the 401-frame nominal, 56 of 200 snapshots carried a myosin array 6 to 1,356 entries
+    # short of the edge arrays, and every reader indexes it positionally. The engine records at the
+    # END of the tick, so what lands here is the re-keyed array -- and
+    # `myosin_array_aligned_with_half_edges` is the bookkeeping row that says so.
+    EDGE_RECORD = ("myo", "myo_amount")
+
     def snapshot(self, face_record=None):
         """One recorded frame: the three half-edge arrays, the two counts, and the per-face state.
 
@@ -173,6 +187,15 @@ class MeshTable(dict):
             a = _np(v).ravel()
             if a.shape[0] >= nF:                    # a stale short array is dropped, not padded
                 out[nm] = a[:nF].astype(np.float32)
+        nE = len(out["E_srce"])
+        for nm in (self.EDGE_RECORD):
+            v = self.get(nm)
+            if v is None:
+                continue
+            a = _np(v).ravel()
+            # A SHORT ARRAY IS RECORDED AS SHORT, NOT PADDED. Padding would make the alignment row
+            # pass on exactly the frames it exists to catch.
+            out["e_" + nm] = a.astype(np.float32) if a.shape[0] == nE else a.astype(np.float32)
         for nm in self.SCALAR_RECORD:
             v = self.get(nm)
             if v is not None and np.ndim(v) == 0:

@@ -110,7 +110,15 @@ def data_generate(
                 # the operators' own SCALAR counters: one value per row, not a ragged column
                 for col in sorted(c for c in cols if c.startswith("scalar_")):
                     flat[f"{sname}__mesh_{col}"] = np.asarray([m[col] for m in ms], np.float64)
-                for col in sorted(c for c in cols if not c.startswith("scalar_")):
+                # per-HALF-EDGE columns ride `mesh_offsets`; per-FACE columns ride
+                # `mesh_face_offsets`. A column whose per-row length does not match the store it
+                # would ride is written with its OWN offsets rather than silently mis-sliced.
+                for col in sorted(c for c in cols if c.startswith("e_")):
+                    lens = [len(m[col]) for m in ms]
+                    flat[f"{sname}__mesh_{col}"] = np.concatenate([m[col] for m in ms]).astype(np.float32)
+                    flat[f"{sname}__mesh_{col}_offsets"] = np.cumsum([0] + lens).astype(np.int64)
+                for col in sorted(c for c in cols
+                                  if not c.startswith("scalar_") and not c.startswith("e_")):
                     flat[f"{sname}__mesh_{col}"] = (np.concatenate([m[col] for m in ms])
                                                     .astype(np.float32))
             if d.get("node_type") is not None:

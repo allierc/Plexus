@@ -1256,7 +1256,12 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                                             ("E_srce", "E_trgt", "E_face", "nF", "Nv")} for m in ms])
                 for col in sorted(c for c in _cols if c.startswith("scalar_")):
                     _put(mg, col, np.asarray([m[col] for m in ms], np.float64))
-                for col in sorted(c for c in _cols if not c.startswith("scalar_")):
+                for col in sorted(c for c in _cols if c.startswith("e_")):
+                    _put(mg, col, np.concatenate([m[col] for m in ms]).astype(np.float32))
+                    _put(mg, col + "_offsets",
+                         np.cumsum([0] + [len(m[col]) for m in ms]).astype(np.int64))
+                for col in sorted(c for c in _cols
+                                  if not c.startswith("scalar_") and not c.startswith("e_")):
                     _put(mg, col, np.concatenate([m[col] for m in ms]).astype(np.float32))
         for fn, fd in out["fields"].items():
             g = root.create_group(fn)

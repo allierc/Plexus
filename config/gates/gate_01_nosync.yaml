@@ -1,0 +1,328 @@
+# gate_01_nosync -- the control for `junction_sync`: everything gate 00 has, minus the re-keying operator
+#
+# GENERATED FROM `config/gates/gate_00_spheroid.yaml` by `tools/make_gate_01_arms.py`, and generated
+# rather than written so that the ONLY difference from the control is the operator under test. A
+# contrast whose control differs in a second place is not a contrast, and two hand-copied 100-line
+# specs differ in a second place within a week.
+#
+# WHAT WAS REMOVED: junction_sync
+general:
+  name: gate_01_nosync
+  seed: 0
+  n_frames: 401
+  dt: 1.0
+  record_cap: 403
+  boundary: free
+  dim: 3
+  world:
+  - 50.0
+  - 50.0
+  - 50.0
+  units:
+    length_um: 10.0
+    time_s: 600.0
+plotting:
+  background: black
+sets:
+  vertex:
+    n: 25584
+    mesh: half_edge
+    cell_set: cell
+  cell:
+    n: 12800
+    state:
+      area:
+        width: 1
+      cen:
+        width: 3
+      chem:
+        width: 2
+        integration: first_order
+fields: {}
+operators:
+- op: mesh_seed
+  at: vertex
+  before_frame: 1
+  cell_set: cell
+  n_cells: 200
+  radius: 5.0
+  jitter: 0.18
+  p0: 3.5
+  seed: 0
+  vseed_cv: 0.15
+- op: cell_geometry
+  at: cell
+- op: cell_grow
+  at: vertex
+  cell_set: cell
+  rate: 0.003457
+  rho: 1.0
+  a_sw: 50.0
+  hill: 4.0
+  vth_frac: 2.5
+- op: junction_myosin
+  at: vertex
+  activity: 1.0
+  tau: 20.0
+  beta: 1.0
+  myo_new: 1.0
+  dt: 1.0
+  inherit: true
+  keyed_on: length
+  destabilising: true
+  k_perim: 1.0
+  lam: 0.0
+  gam: 0.0
+- op: cell_mechanics
+  at: vertex
+  K_A: 1.0
+  K_P: 1.0
+  K_V: 2.0
+  K_R: 0.4
+  Lambda: 3.0
+  Gamma: 0.4
+  p0: 3.5
+  mu: 1.0
+  dt: 1.0
+  relax_iters: 30
+  eta: 0.08
+  cap_frac: 0.12
+- op: edge_flip
+  at: vertex
+  every: 4
+  engine_clock: true
+  l_th_frac: 0.35
+  max_flips: 30
+- op: cell_divide
+  at: vertex
+  cell_set: cell
+  every: 4
+  engine_clock: true
+  factor: 2.0
+  cycle_cv: 0.15
+  min_cycle: 4
+  max_cycle: 1000000000
+  p0: 3.5
+  reset_noise: 0.12
+- op: topo_record
+  at: vertex
+  every: 1
+schedule:
+- mesh_seed
+- cell_geometry
+- cell_grow
+- junction_myosin
+- cell_mechanics
+- edge_flip
+- cell_divide
+- topo_record
+
+# =====================================================================================
+#  GATE 01 -- per-junction myosin: state living on a RELATION, and what it does.
+#
+#  ITS SPEC IS THIS FILE, and its two other arms are `gate_00_spheroid` (the full tissue) and
+#  `gate_01_nomyosin` (no belt at all). Gate 00 and the myosin arm of gate 01 are THE SAME NINE
+#  OPERATORS on the same seed for the same 401 frames -- so declaring them as two gates with two
+#  runs would burn the GPU twice to compare a file with itself. Gate 00 measures the epithelium;
+#  gate 01 measures what lives on its junctions; and `arms:` is how one run serves both.
+#
+#  WHY MYOSIN IS THE HARD CASE FOR THE PROMOTION. Every other state in this model lives on a BODY
+#  -- a vertex, a cell. Myosin lives on a CONTACT, so its array is indexed by half-edge, it is
+#  written before the frame's topology operators rewire that index, and it has to be re-keyed
+#  afterwards by `junction_sync`. That is a third ragged length in the recorder, an operator whose
+#  entire job is bookkeeping, and a per-frame alignment invariant -- none of which a per-body state
+#  ever needed. `myosin_array_aligned_with_half_edges` is the row that says the re-keying happened.
+# =====================================================================================
+_gate:
+  id: "01_junction"
+  question: >
+    Does a myosin belt on the cell-cell contacts change how often cells exchange neighbours, is the
+    myosin localised rather than merely present, and is the operator that only re-keys it
+    trajectory-neutral?
+  operators_exercised: [junction_myosin, junction_sync, mesh_seed, cell_geometry, cell_grow,
+                        cell_mechanics, edge_flip, cell_divide, topo_record]
+  arms:
+    full: gate_00_spheroid          # the nine-operator tissue, with the belt AND the re-keying
+    nomyosin: gate_01_nomyosin      # the same tissue with no belt at all
+  # `self` is this file: the belt WITHOUT `junction_sync`.
+
+  measures:
+
+    # ------------- bookkeeping ------------------------------------------------------
+    - name: myosin_array_aligned_with_half_edges
+      tier: bookkeeping
+      basis: identity
+      fn: myosin_aligned
+      arm: full
+      reduce: max
+      assert: {eq: 0}
+      unit: "entries of disagreement between the myosin array and the half-edge table"
+      why: >
+        THE ROW THIS GATE WAS BUILT AROUND. `junction_myosin` writes `myo` for the half-edge arrays
+        as they were, and `edge_flip` and `cell_divide` rewire and lengthen them inside the same
+        tick. On the archived 401-frame nominal, 56 of 200 snapshots carried a myosin array 6 to
+        1,356 entries short of the edge arrays -- and every reader indexes it positionally, so each
+        of those frames coloured, averaged and thresholded the wrong junctions. `junction_sync`
+        re-keys it by vertex pair. This asserts the re-keying happened, on every recorded frame.
+
+    - name: myosin_unaligned_without_sync
+      tier: bookkeeping
+      basis: identity
+      fn: myosin_aligned
+      reduce: max
+      assert: {ge: 0}
+      unit: "entries of disagreement, worst frame, with junction_sync REMOVED"
+      why: >
+        THE POSITIVE CONTROL FOR THE ROW ABOVE, and the reason this arm is run at all. A gate that
+        only ever checks the aligned case cannot distinguish "the re-keying works" from "the
+        misalignment never happens here". `ge: 0` is trivially true and deliberately so: the number
+        is what is wanted, not the verdict, and it is reported beside its aligned twin.
+
+    - name: cell_count_never_falls
+      tier: bookkeeping
+      basis: identity
+      fn: cell_count_delta
+      arm: full
+      reduce: min
+      assert: {ge: 0}
+      unit: "cells lost between consecutive frames"
+      why: "No death operator is in this schedule; the count can only rise."
+
+    # ------------- closed form -------------------------------------------------------
+    - name: euler_characteristic
+      tier: closed_form
+      basis: analytic
+      fn: euler_closed
+      arm: full
+      reduce: all
+      assert: {eq: 2}
+      unit: "V - E + F"
+      why: >
+        Carried from gate 00 onto the myosin arm, because a belt that pulls hard enough to tear the
+        sheet would show here and nowhere else in this table.
+
+    - name: junction_sync_is_trajectory_neutral
+      tier: closed_form
+      basis: analytic
+      fn: pos_max_delta
+      arms: [full, self]
+      reduce: last
+      assert: {eq: 0.0}
+      unit: "maximum vertex displacement between the two arms, over every recorded frame"
+      why: >
+        `junction_sync` RE-KEYS A BOOKKEEPING ARRAY AND MUST MOVE NOTHING. Its analytic value is
+        exactly zero -- not "small" -- because it writes only `m["myo"]` and no operator reads
+        `myo` between it and the end of the tick. If this is not zero the operator is doing physics
+        it does not declare, and every myosin number in this table is then measuring a different
+        tissue from gate 00's. The repeatability floor of this platform is zero, so `eq: 0.0` is a
+        criterion and not an aspiration.
+
+    # ------------- reference: regression pins ----------------------------------------
+    - name: t1_total
+      tier: measurement
+      basis: reference
+      fn: t1_total
+      arm: full
+      reduce: last
+      assert: {eq: 1499}
+      unit: "neighbour exchanges over 401 frames"
+      why: "`edge_flip`'s own counter on the belted tissue. The same pin gate 00 carries."
+
+    - name: t1_rate_per_cell_per_frame
+      tier: measurement
+      basis: reference
+      fn: t1_rate_per_cell_per_frame
+      arm: full
+      reduce: last
+      assert: {within: [0.00105, 0.0004]}
+      unit: "neighbour exchanges per cell per frame"
+      why: >
+        The gate's headline observable, and the one myosin is supposed to move. 1,499 exchanges over
+        400 intervals with a mean of ~3,560 live cells. Banded rather than pinned because it is a
+        ratio of three run-dependent numbers; `t1_total` above is the exact pin.
+
+    - name: mean_junction_length_fold
+      tier: measurement
+      basis: reference
+      fn: mean_junction_length_fold
+      arm: full
+      reduce: last
+      assert: {within: [0.63, 0.08]}
+      unit: "x the frame-0 mean junction length"
+      why: >
+        A tissue that grows 35-fold in area while dividing 6,714 times must end with SHORTER
+        contacts, not longer ones -- the cells are smaller. 0.63 is the archived value; the band is
+        wide because a mean over 20,000 junctions moves with the division schedule.
+
+    # ------------- measurement, with the belt against no belt ------------------------
+    - name: myosin_is_localised_not_merely_present
+      tier: measurement
+      basis: reference
+      fn: myosin_dispersion
+      arm: full
+      args: {pct: 98}
+      reduce: last
+      assert: {ge: 1.20}
+      unit: "p98 / mean myosin over the live junctions"
+      why: >
+        THE MEAN SAYS NOTHING. `junction_myosin` pins the tissue mean near `activity` by
+        construction, so "there is myosin" is true of any run with the operator in it. A belt that
+        is DOING something has a tail: 1.42 in the archive. Below 1.20 the operator is present and
+        inert, which is the failure mode the campaign spent four rounds not detecting elsewhere.
+
+    - name: tissue_mean_myosin_pinned_to_activity
+      tier: measurement
+      basis: reference
+      fn: myosin_mean
+      arm: full
+      reduce: last
+      assert: {within: [1.0, 0.08]}
+      unit: "x the declared activity (activity = 1.0)"
+      why: >
+        The other half of the row above: the mean must stay pinned while the tail grows. If the mean
+        drifts, the dispersion ratio is measuring the denominator.
+
+    - name: hot_junction_fraction
+      tier: measurement
+      basis: reference
+      fn: hot_junction_fraction
+      arm: full
+      args: {above: 1.5}
+      reduce: last
+      assert: {ge: 0.02}
+      unit: "fraction of live junctions above 1.5x the tissue mean"
+      why: >
+        Localisation stated as a count rather than as a ratio, because a single extreme junction can
+        carry a p98. At least 2% of contacts must be hot for "the belt is localised" to describe the
+        tissue rather than an outlier.
+
+    - name: belt_suppresses_intercalation
+      tier: measurement
+      basis: reference
+      fn: t1_rate_delta
+      arms: [full, nomyosin]
+      reduce: last
+      assert: {lt: 0.0}
+      unit: "difference in neighbour exchanges per cell per frame, belt minus no belt"
+      why: >
+        THE GATE'S ACTUAL QUESTION, and it needs two runs. `keyed_on: length` homogenises junction
+        lengths, so it should SUPPRESS T1s; a tension-keyed belt is the destabilising one the
+        germband-extension literature describes and would produce them. Both move junction-length CV
+        the same way, so CV cannot tell them apart and this can. Measured at frame 120 on the
+        archived tissue: 69 flips with the belt against 126 without, a 1.8-fold difference. The sign
+        is the claim; the magnitude is a reference pin the promoted run sets.
+
+    # ------------- literature ---------------------------------------------------------
+    - name: junction_lifetime_hours
+      tier: measurement
+      basis: literature
+      fn: junction_persistence
+      arm: full
+      reduce: mean
+      assert: {interval: [0.90, 1.0]}
+      unit: "fraction of contacts surviving from one frame (10 min) to the next"
+      why: >
+        A cell-cell contact in a confluent epithelium is stable over minutes and turns over on the
+        scale of an hour or more, so at 600 s a frame the frame-to-frame survival must be high --
+        below 0.90 the tissue is remodelling every contact within ten minutes, which no epithelium
+        does. Only sayable because `units:` declares 1 frame = 600 s.
