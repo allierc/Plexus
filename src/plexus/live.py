@@ -75,7 +75,12 @@ def snapshot(H, tick, n_frames, out_dir, name="", sname=None):
         fig = plt.figure(figsize=(6.2, 6.2), facecolor="black")
         if D >= 3:
             ax = fig.add_subplot(111, projection="3d", facecolor="black")
-            r = float(np.abs(pos[:, :3]).max()) * 1.05 or 1.0
+            # FRAMED ON THE CLOUD, NOT ON THE ORIGIN. A vertex mesh is centred on 0 and
+            # `abs(pos).max()` frames it correctly; an MPM domain is [0,1]^3 and the same rule puts
+            # the body in a corner at a third of the frame -- which is what gate 02's first live
+            # picture looked like. Centring on the cloud's own centroid works for both.
+            c3 = pos[:, :3].mean(0)
+            r = float(np.abs(pos[:, :3] - c3).max()) * 1.08 or 1.0
             if m is not None:
                 # THE SURFACE, not a point cloud: the ring of each face, drawn as a polygon. A cloud
                 # of 20,000 vertices reads as a fuzzy ball whatever the tissue is doing, which is
@@ -90,7 +95,8 @@ def snapshot(H, tick, n_frames, out_dir, name="", sname=None):
                 ax.add_collection3d(pc)
             else:
                 ax.scatter(pos[:, 0], pos[:, 1], pos[:, 2], s=1.0, c="#dcdcdc", depthshade=False)
-            ax.set_xlim(-r, r); ax.set_ylim(-r, r); ax.set_zlim(-r, r)
+            ax.set_xlim(c3[0] - r, c3[0] + r); ax.set_ylim(c3[1] - r, c3[1] + r)
+            ax.set_zlim(c3[2] - r, c3[2] + r)
             ax.set_axis_off(); ax.set_box_aspect((1, 1, 1))
             put = ax.text2D
         else:

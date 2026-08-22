@@ -1,0 +1,215 @@
+# GATE 02 -- a block of extracellular matrix, dropped.
+#
+# WHY DROP IT. The matrix has only ever been seen doing one thing in this prototype -- being pushed
+# outward by a growing ball -- and that loads it in one direction, slowly, everywhere at once.
+# Nothing in those runs reveals whether its fibres carry stress the way a fibrous material should,
+# because there is no moment at which the load arrives. A block falling under gravity and hitting a
+# floor has one: the impact is a front that travels up through the material, the fibres nearest the
+# floor take it first, and the block either rebounds (it is elastic and the stress is transient) or
+# slumps (it is not).
+#
+# WHAT IT EXERCISES: ecm_seed (fibres, not a homogeneous type-fill), the four-step MLS-MPM cycle
+# (mpm_strain / mpm_scatter / mpm_grid_update / mpm_gather) at 16 substeps a frame, ecm_stress, the
+# parent-level body force `gravity`, and `aggregate` as the parent's centroid readout.
+#
+# LIFTED FROM `discovery_okuda/ops/test_02_ecm_block.py::build`, which is the one rig of the five
+# that already returned a spec dict. Five edits, each named:
+#   * `n_frames: 720`, not the rig's 360 default. BOTH archived runs are 720, and the first apex is
+#     at frame 287 with the second and third impacts at 419 and 611 -- a 360-frame run cannot see
+#     the restitution sequence the gate is about.
+#   * `ecm_stress scale: 0.045`, not 2e-5. Against a peak |J-1| of 0.378, 2e-5 pins essentially
+#     every particle at band 7 from the impact on: the colour saturates and the front stops being
+#     visible exactly where it is strongest. The rig threw the run-time band away and re-banded post
+#     hoc from its own p99 (0.0449 on 02b); this declares that value instead of discarding work.
+#   * `plotting:` at the TOP LEVEL. `schema.load` reads `raw.get("plotting", {})` directly, so a
+#     block nested under `general:` is parsed, ignored, and silently lost.
+#   * `record_cap: 722`, declared rather than defaulted, so the stride is visibly 1.
+#   * `units: {length_um: 1172.33}`. The box calibration from
+#     `log/okuda_ECM/0u_units/units.json`: the 1x1x1 domain is 1.17 mm across. `time_s` is NOT
+#     declared -- this run's dt is 3.2 ms of simulation time with no clock calibrated against a real
+#     gel, and a time row here would be a number wearing a unit.
+#
+# THE CAVITY IS EMPTY AND MUST BE. Nothing in this run fills it; it is where the spheroid goes in
+# gate 04, and matrix seeded where the ball will be is in contact before the clock starts.
+
+general:
+  name: gate_02_ecm_block
+  seed: 0
+  n_frames: 720
+  dt: 0.0032
+  record_cap: 722
+  boundary: wall
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  units:
+    length_um: 1172.3329425556858
+
+plotting:
+  background: black
+  up_axis: 1
+  box_frame: true
+
+sets:
+  # THE MPM PARENT. Its accumulated delta is what `mpm_scatter` reads as `a_ext`, so `gravity` is
+  # declared once on one element and moves ninety thousand. Its position is a derived centroid,
+  # written by `aggregate`.
+  cell:
+    n: 1
+    start: [[0.5, 0.44, 0.5]]        # the declared cube's centre
+    types: &eight
+      # EIGHT IDENTICAL MATERIALS. They exist to give the renderer eight palette slots for
+      # `ecm_stress`'s band index, which is written into `node_type`. Every one carries the same
+      # Young's modulus, so the index is decoration and cannot change the physics it is drawing.
+      s0: {fraction: 0.125, youngs: 120.0}
+      s1: {fraction: 0.125, youngs: 120.0}
+      s2: {fraction: 0.125, youngs: 120.0}
+      s3: {fraction: 0.125, youngs: 120.0}
+      s4: {fraction: 0.125, youngs: 120.0}
+      s5: {fraction: 0.125, youngs: 120.0}
+      s6: {fraction: 0.125, youngs: 120.0}
+      s7: {fraction: 0.125, youngs: 120.0}
+  mpm_particle:
+    parent: cell
+    per_parent: 90000
+    radius: 0.48
+    density: 1.0
+    types: *eight
+
+fields:
+  mpm_grid: {frame: mpm_grid, n_grid: 64}
+
+operators:
+  - {op: aggregate, at: cell}
+  # A CUBE OF FIBRES, not a cube of points: a `block:` type-fill would give homogeneous material and
+  # the whole question is whether STRANDS carry a front differently. 1500 strands of 60 particles.
+  - {op: ecm_seed, at: mpm_particle, centre: [0.5, 0.44, 0.5],
+     block: [0.30, 0.28, 0.30, 0.70, 0.60, 0.70],
+     cavity_r: 0.07, cavity_h: 0.07, axis: 1, cavity_sphere: true, margin: 0.02,
+     n_fibres: 1500, fibre_len: 0.09, align: 0.0, align_dir: [1.0, 0.0, 0.0], seed: 0}
+  # THE ONLY DRIVE IN THE RUN. Slow (g = 2.5, not the stock 16) and close to the floor, because the
+  # subject is the stress and not the fall: at 16 the block crosses the box in a dozen frames and the
+  # fibres go from black to saturated between two of them.
+  - {op: gravity, at: cell, g: 2.5}
+  - {op: ecm_stress, at: mpm_particle, scale: 0.045, bands: 8, measure: vol}
+  - {op: mpm_strain, at: mpm_particle}
+  - {op: mpm_scatter, at: mpm_particle, to: mpm_grid, drag: 0.05, a_max: 300.0}
+  - {op: mpm_grid_update, at: mpm_grid, wall_damp: 0.7}
+  - {op: mpm_gather, at: mpm_particle, from: mpm_grid, wall_damp: 0.7, wall_contact: 0.04,
+     vmax: 1.0e9}
+
+# SIXTEEN SUBSTEPS A FRAME: dt 3.2e-3 over substep_dt 2e-4. The CFL ceiling for MPM is
+# dt < dx / sqrt(E/rho); at dx = 1/64 and E = 120 that is 1.6e-3, so 2e-4 has an 8x margin.
+schedule:
+  - aggregate
+  - ecm_seed
+  - gravity
+  - ecm_stress
+  - {substep_dt: 2.0e-4, steps: [mpm_strain, mpm_scatter, mpm_grid_update, mpm_gather]}
+
+_gate:
+  id: "02_ecm_block"
+  question: >
+    Dropped from a quarter of the box, does a cube of matrix fibres fall at the gravity it was given,
+    stay inside the domain, and rebound rather than slump?
+  operators_exercised: [aggregate, ecm_seed, gravity, ecm_stress, mpm_strain, mpm_scatter,
+                        mpm_grid_update, mpm_gather]
+  cross_check:
+    archived_runs: [log/okuda_ECM/02b_ecm_block_bounce, log/okuda_ECM/02c_ecm_block_vonmises]
+    note: >
+      There is no log/okuda_ECM/02_ecm_block/ on disk -- the rig's default name was never run to
+      completion. The two archived runs are 720 frames with the same physics and differ only in the
+      stress READOUT (02c sets store_stress and measure: vonmises). Their kinematics is this gate's
+      reference; their stress is not, because `store_stress` is off here.
+
+  measures:
+
+    # ------------- bookkeeping -------------------------------------------------------
+    - name: particle_count
+      tier: bookkeeping
+      basis: identity
+      fn: particle_count
+      reduce: all
+      assert: {eq: 90000}
+      unit: "material points"
+      why: >
+        No operator in this schedule creates or destroys a particle, so the count is a constant by
+        construction. It is the cheapest detector of an occupancy mask that drifted.
+
+    - name: no_particle_outside_the_domain
+      tier: bookkeeping
+      basis: identity
+      fn: out_of_box
+      reduce: max
+      assert: {eq: 0}
+      unit: "material points outside the clamp, worst frame"
+      why: >
+        `mpm_gather` clamps every particle to [2dx, 1-2dx]. A particle outside it does not mean the
+        material moved -- it means the clamp did not run. This is a statement about the code.
+
+    - name: no_nan
+      tier: bookkeeping
+      basis: identity
+      fn: nonfinite_count
+      reduce: max
+      assert: {eq: 0}
+      unit: "non-finite coordinates"
+      why: >
+        An MPM run that goes unstable produces NaN positions rather than an exception, and every
+        later row would then be quietly reading them.
+
+    # ------------- closed form: the physics it was GIVEN ------------------------------
+    - name: free_fall_acceleration
+      tier: closed_form
+      basis: analytic
+      fn: free_fall_acceleration
+      args: {dt: 0.0032, axis: 1, frames: 60}
+      reduce: last
+      assert: {within: [-2.5, 0.05]}
+      unit: "box units per second squared"
+      why: >
+        THE ROW THIS GATE EXISTS FOR. The spec hands `gravity` g = 2.5 and nothing else acts until
+        the block reaches the floor, so a quadratic fit to the centroid over the opening frames must
+        return -2.5. It is not a test of matrices -- it is a test of whether a force declared once
+        per tick and consumed by SIXTEEN substeps is applied once or sixteen times, which is exactly
+        the error the paper names ("a force applied once per substep where it should be applied once
+        per step") and which would read here as -40.0 rather than -2.5.
+
+    # ------------- reference: a regression pin ----------------------------------------
+    - name: lowest_centroid
+      tier: measurement
+      basis: reference
+      fn: min_centroid_height
+      reduce: last
+      assert: {interval: [0.05, 0.30]}
+      unit: "box units above the floor at the deepest point of the impact"
+      why: >
+        A band rather than a pin, and deliberately wide: the cube's underside starts at 0.28 and the
+        floor's reflective slab is 3 cells (0.047) thick, so anything below 0.05 is a block that went
+        through the floor and anything above 0.30 is a block that never arrived. Narrowing it needs
+        the promoted reference, which this run is.
+
+    - name: rebound_happens
+      tier: measurement
+      basis: reference
+      fn: centroid_height
+      reduce: last
+      assert: {gt: 0.05}
+      unit: "box units, final centroid height"
+      why: >
+        The gate's actual question in one number: an elastic gel settles and holds, a failed one
+        collapses onto the floor. Below 0.05 the block is a puddle inside the wall slab.
+
+    # ------------- literature: the model against something measured -------------------
+    - name: strand_length_um
+      tier: measurement
+      basis: literature
+      fn: strand_length_um
+      args: {per_strand: 60}
+      reduce: first
+      assert: {interval: [20.0, 500.0]}
+      unit: "um, mean fibre end-to-end length at frame 0"
+      why: >
+        `fibre_len: 0.09` of a 1172 um box is 105 um. A collagen fibril bundle in a reconstituted gel
+        is tens to hundreds of micrometres between crosslinks, so this is the row that says the
+        seeded microstructure is a matrix and not a mesh of the wrong scale. ONLY POSSIBLE because
+        `units:` declares the box; without it the number is 0.09 of nothing.

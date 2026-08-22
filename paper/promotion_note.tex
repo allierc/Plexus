@@ -371,8 +371,9 @@ B-core & the core runs the model with no okuda import, bit-identical & \dn\\
 C  & \code{junction\_ops.py} & \dn\\
 D  & \code{ecm\_ops.py}, \code{membrane\_ops.py}, \code{contact\_ops.py} & \dn\\
 0b & MPM regrouped into \code{mpm\_ops.py} & \ns\\
-gate 00 & lifted into \code{config/gates/}, run from core, \textbf{17/17 green} & \dn\\
-gates 01--04 & lifted; 03 needs a seeder and four operators & \fl\\
+gates 00, 02 & lifted into \code{config/gates/}, run from core, \textbf{24/24 green} & \dn\\
+gates 01, 04 & liftable; 8 and 6 rows blocked on per-half-edge myosin + a replay & \fl\\
+gate 03 & not liftable: needs a seeder, four operators and massed vertex dynamics & \ns\\
 0b/E & core regrouped into ten modules; VTK is the engine's renderer & \dn\\
 F  & the three minisite scenes under \code{config/atlas/} & \ns\\
 G  & replication: \code{r010\_00\_ctrl} and \code{b\_star} as twin runs & \ns\\

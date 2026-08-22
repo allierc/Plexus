@@ -39,6 +39,30 @@ import numpy as np
 
 
 # ============================================================================== the facade
+class _Lazy:
+    """`np.load`'s NpzFile DECOMPRESSES THE WHOLE ARRAY ON EVERY `z[key]`, and that is not a
+    micro-optimisation to fix.
+
+    `ParticleTraj.pos(t)` was written as `self.z["mpm_particle__pos"][t]` -- which re-reads all 778 MB
+    of a 720-row MPM trajectory to take one row. Five measures x 720 rows is 2,800 GB of decompression
+    for a table that should take seconds, and the grading ran past ten minutes with nothing to show.
+    One dict, read once per key.
+    """
+
+    def __init__(self, z):
+        self._z, self._c = z, {}
+
+    def __contains__(self, k): return k in self._z.files
+
+    @property
+    def files(self): return self._z.files
+
+    def __getitem__(self, k):
+        if k not in self._c:
+            self._c[k] = self._z[k]
+        return self._c[k]
+
+
 class Traj:
     """Seven accessors. Everything else in this file is written against these."""
 
@@ -57,7 +81,7 @@ class CoreTraj(Traj):
     """The core's `trajectory.npz`."""
 
     def __init__(self, path, set_name=None, cell_set=None):
-        self.z = np.load(path)
+        self.z = _Lazy(np.load(path))
         f = self.z.files
         if set_name is None:
             c = [k[: -len("__mesh_nF")] for k in f if k.endswith("__mesh_nF")]
@@ -107,6 +131,57 @@ class CoreTraj(Traj):
     def scalar(self, name, t):
         k = f"{self.s}__mesh_scalar_{name}"
         return float(self.z[k][t]) if k in self.z.files else None
+
+
+class ParticleTraj(Traj):
+    """A core trajectory with NO MESH: an MPM set and its parent, which is gates 02 and 03.
+
+    `CoreTraj` raises on a file with no `__mesh_nF`, and rightly -- eleven of gate 00's rows would
+    silently become uncomputable rather than failing. A particle gate needs a different reader, not
+    a `CoreTraj` with the mesh accessors returning None, because "the mesh is empty" and "there is
+    no mesh" are different facts and only one of them is a defect.
+    """
+
+    def __init__(self, path, set_name=None):
+        self.z = _Lazy(np.load(path))
+        if set_name is None:
+            c = [k[: -len("__pos")] for k in self.z.files if k.endswith("__pos")]
+            # the biggest positional set is the material; the parent is a single centroid
+            set_name = max(c, key=lambda k: self.z[f"{k}__pos"].shape[1]) if c else None
+        if set_name is None:
+            raise ValueError(f"{path} has no positional set")
+        self.s = set_name
+        self.parent = next((k[: -len("__pos")] for k in self.z.files
+                            if k.endswith("__pos") and k[: -len("__pos")] != set_name), None)
+        self.path = path
+
+    def n_rows(self): return int(self.z[f"{self.s}__pos"].shape[0])
+    def nF(self, t): return int(self.occ(self.s, t).sum())
+    def nV(self, t): return self.nF(t)
+
+    def pos(self, t):
+        o = self.occ(self.s, t)
+        p = self.z[f"{self.s}__pos"][t]
+        return np.asarray(p[o] if o is not None else p, float)
+
+    def half_edges(self, t):
+        raise KeyError("this gate's trajectory has no mesh -- a topology row does not belong in it")
+
+    def face_col(self, name, t): return None
+    def state(self, block, t):
+        k = f"{self.s}__{block}"
+        return np.asarray(self.z[k][t], float) if k in self.z.files else None
+
+    def occ(self, set_name, t):
+        k = f"{set_name}__occ"
+        return np.asarray(self.z[k][t], bool) if k in self.z.files else None
+
+    def scalar(self, name, t): return None
+
+    def parent_pos(self, t):
+        if self.parent is None:
+            return self.pos(t).mean(0)
+        return np.asarray(self.z[f"{self.parent}__pos"][t][0], float)
 
 
 class OkudaTraj(Traj):
@@ -166,6 +241,13 @@ class OkudaTraj(Traj):
         return self.ticks.index(int(tick))
 
 
+def _core(path):
+    """`CoreTraj` if the file carries a mesh, `ParticleTraj` if it does not."""
+    z = np.load(path)
+    return (CoreTraj(path) if any(k.endswith("__mesh_nF") for k in z.files)
+            else ParticleTraj(path))
+
+
 def open_traj(path_or_dir):
     """A `Traj` over whichever layout is at this path."""
     p = path_or_dir
@@ -174,9 +256,9 @@ def open_traj(path_or_dir):
             return OkudaTraj(os.path.join(p, "traj.npz"))
         for root, _d, files in os.walk(p):
             if "trajectory.npz" in files:
-                return CoreTraj(os.path.join(root, "trajectory.npz"))
+                return _core(os.path.join(root, "trajectory.npz"))
         raise FileNotFoundError(f"no trajectory under {p}")
-    return OkudaTraj(p) if os.path.basename(p) != "trajectory.npz" else CoreTraj(p)
+    return OkudaTraj(p) if os.path.basename(p) != "trajectory.npz" else _core(p)
 
 
 # ============================================================================== helpers
@@ -484,7 +566,83 @@ def spheroid_diameter(T, **kw):
     return [2.0 * r for r in apical_radius(T)]
 
 
+# ============================================================================== particle measures
+def particle_count(T, **kw):
+    return [T.nF(t) for t in range(T.n_rows())]
+
+
+def out_of_box(T, lo=0.03125, hi=0.96875, **kw):
+    """Particles outside the clamp `mpm_gather` enforces, `[2dx, 1-2dx]` at n_grid 64.
+
+    THE CLAMP IS THE OPERATOR'S OWN, so a particle outside it means the clamp did not run, not that
+    the material moved: this is a bookkeeping row about the code, not a statement about the block.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        p = T.pos(t)
+        out.append(int(((p < lo) | (p > hi)).any(axis=1).sum()))
+    return out
+
+
+def centroid_height(T, axis=1, **kw):
+    """The block's centre of mass along `axis`. Every particle carries the same mass here (one
+    `p_vol` from a uniform seed), so the mean position IS the centre of mass."""
+    return [float(T.pos(t)[:, axis].mean()) for t in range(T.n_rows())]
+
+
+def free_fall_acceleration(T, dt=0.0032, axis=1, frames=60, **kw):
+    """The acceleration of the centroid over the opening frames, in box units per second squared.
+
+    THE CLOSED-FORM ROW OF THIS GATE, in the paper's exact sense: does the implementation reproduce
+    the physics it was GIVEN? The spec hands `gravity` g = 2.5 and nothing else acts until the block
+    reaches the floor, so the centroid must follow y0 - g t^2 / 2 and a quadratic fit must return
+    -2.5. It is not a statement about matrices; it is a statement about whether a force declared once
+    per tick and consumed by sixteen substeps is applied once or sixteen times -- which is precisely
+    the error the paper names, "a force applied once per substep where it should be applied once per
+    step", and which would show up here as -40.0 rather than -2.5.
+
+    `frames` is bounded well before the first impact (frame ~287 in the archived runs).
+    """
+    y = np.asarray(centroid_height(T, axis=axis)[:frames], float)
+    t = np.arange(len(y)) * float(dt)
+    if len(y) < 3:
+        return [0.0]
+    c = np.polyfit(t, y, 2)                      # y = c0 t^2 + c1 t + c2  ->  a = 2 c0
+    return [float(2.0 * c[0])]
+
+
+def min_centroid_height(T, axis=1, **kw):
+    return [min(centroid_height(T, axis=axis))]
+
+
+def strand_length(T, per_strand=60, **kw):
+    """Mean end-to-end length of the seeded fibres, in box units.
+
+    `ecm_seed` lays `n_fibres` strands of `per_strand` CONTIGUOUS particles, so strand i is the slice
+    [i*per_strand : (i+1)*per_strand] and its end-to-end length is the distance between the two ends.
+    Measured at frame 0 this is the seeded fibre length; later it is what the deformation did to it.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        p = T.pos(t)
+        n = (len(p) // per_strand) * per_strand
+        q = p[:n].reshape(-1, per_strand, 3)
+        out.append(float(np.linalg.norm(q[:, -1] - q[:, 0], axis=1).mean()))
+    return out
+
+
+def strand_length_um(T, per_strand=60, **kw):
+    return strand_length(T, per_strand=per_strand)
+
+
 MEASURES = {
+    "particle_count": particle_count,
+    "out_of_box": out_of_box,
+    "centroid_height": centroid_height,
+    "free_fall_acceleration": free_fall_acceleration,
+    "min_centroid_height": min_centroid_height,
+    "strand_length": strand_length,
+    "strand_length_um": strand_length_um,
     "cell_count": cell_count,
     "cell_count_delta": cell_count_delta,
     "vertex_count": vertex_count,
@@ -513,6 +671,7 @@ MEASURES = {
 # spec's `units:` block and RAISES if none is declared -- which is what stops a dimensionless run
 # from quoting a micrometre. A name absent from here is dimensionless by declaration.
 PHYSICAL = {
+    "strand_length_um": ("length", "um"),
     "doubling_time_hours": ("time", "hours"),
     "mean_cell_diameter_um": ("length", "um"),
     "spheroid_diameter_um": ("length", "um"),
