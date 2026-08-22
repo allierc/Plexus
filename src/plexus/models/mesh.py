@@ -116,19 +116,48 @@ class MeshTable(dict):
             self[nm] = a.to(dev)[idx.clamp(max=max(a.shape[0] - 1, 0))].to(dt)
 
     # ---------------------------------------------------------------- recording
-    def snapshot(self):
-        """One recorded frame of topology: the three arrays and the two counts, as numpy.
+    # THE PER-FACE NAMES A PICTURE NEEDS, and this list is why `snapshot` is not topology-only.
+    #
+    # A renderer cannot colour by a quantity that only existed inside one frame's forward pass. The
+    # VTK renderer's four colours are the activator (from the CELL SET's `chem`, which the recorder
+    # already keeps), plus three marks that live ON THE MESH and nowhere else: `age`+`ndiv` say a
+    # cell has just divided, `apop` says the second field marked it to die, `inhib` says the second
+    # field switched its growth off. Record topology alone and every core-side movie is a plain
+    # white surface -- which is exactly the difference between okuda's `movie.mp4` and the
+    # matplotlib fallback the core wrote before this.
+    #
+    # `A0`/`P0`/`V0f` come too because `analyze_forces` reconstructs the energy from them offline,
+    # and re-deriving a target from a position is not the same number.
+    #
+    # EVERY NAME IS OPTIONAL. A run without an inhibitor has no `inhib`; the key is simply absent
+    # from the snapshot, and the reader draws nothing -- which is the same None-safe contract
+    # `topo_record`'s `cp()` has always had.
+    FACE_RECORD = ("A0", "P0", "V0f", "age", "ndiv", "apop", "inhib", "myo_med")
 
-        Exactly what `topo_record` appends to `hist` today, and deliberately nothing more -- the
-        per-face state is not snapshotted, because `hist` never carried it and every offline reader
-        (the renderers, `tissue_analysis`, the cross-scale metrics) is written against that shape.
+    def snapshot(self, face_record=None):
+        """One recorded frame: the three half-edge arrays, the two counts, and the per-face state.
+
+        The topology part is exactly what `topo_record` appends to `hist`, so every offline reader
+        written against that shape is unaffected; the per-face part is a SUBSET of what `hist`
+        carries, chosen by `FACE_RECORD` rather than by "whatever happens to be in the table",
+        because the table's namespace is open and a snapshot of all of it would grow without
+        bound the moment an operator cached something there.
         """
         def _np(x):
             if torch is not None and torch.is_tensor(x):
                 return x.detach().cpu().numpy()
             return np.asarray(x)
-        return dict(E_srce=_np(self["E_srce"]), E_trgt=_np(self["E_trgt"]),
-                    E_face=_np(self["E_face"]), nF=int(self["nF"]), Nv=int(self["Nv"]))
+        out = dict(E_srce=_np(self["E_srce"]), E_trgt=_np(self["E_trgt"]),
+                   E_face=_np(self["E_face"]), nF=int(self["nF"]), Nv=int(self["Nv"]))
+        nF = out["nF"]
+        for nm in (face_record if face_record is not None else self.FACE_RECORD):
+            v = self.get(nm)
+            if v is None:
+                continue
+            a = _np(v).ravel()
+            if a.shape[0] >= nF:                    # a stale short array is dropped, not padded
+                out[nm] = a[:nF].astype(np.float32)
+        return out
 
 
 def is_mesh(obj) -> bool:

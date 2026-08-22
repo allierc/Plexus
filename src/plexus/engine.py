@@ -1247,10 +1247,15 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
             if ms:                                              # the ragged half-edge history
                 mg = g.create_group("mesh")
                 _put(mg, "offsets", np.cumsum([0] + [len(m["E_srce"]) for m in ms]))
+                _put(mg, "face_offsets", np.cumsum([0] + [int(m["nF"]) for m in ms]))
                 _put(mg, "nF", np.asarray([m["nF"] for m in ms], np.int64))
                 _put(mg, "Nv", np.asarray([m["Nv"] for m in ms], np.int64))
                 for col in ("E_srce", "E_trgt", "E_face"):
                     _put(mg, col, np.concatenate([m[col] for m in ms]).astype(np.int64))
+                for col in sorted(set.intersection(*[{k for k in m if k not in
+                                                      ("E_srce", "E_trgt", "E_face", "nF", "Nv")}
+                                                     for m in ms])):
+                    _put(mg, col, np.concatenate([m[col] for m in ms]).astype(np.float32))
         for fn, fd in out["fields"].items():
             g = root.create_group(fn)
             _put(g, "grid", fd["grid"])

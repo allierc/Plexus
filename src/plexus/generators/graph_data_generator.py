@@ -94,9 +94,22 @@ def data_generate(
                 flat[f"{sname}__mesh_offsets"] = off
                 flat[f"{sname}__mesh_nF"] = np.asarray([m["nF"] for m in ms], np.int64)
                 flat[f"{sname}__mesh_Nv"] = np.asarray([m["Nv"] for m in ms], np.int64)
+                # A SECOND SET OF OFFSETS, because the per-face arrays are indexed by FACE and the
+                # half-edge columns by HALF-EDGE, and the two ragged lengths are different numbers
+                # (roughly 6 half-edges per face). One offsets array for both would silently slice
+                # the wrong rows out of the myosin.
+                foff = np.cumsum([0] + [int(m["nF"]) for m in ms]).astype(np.int64)
+                flat[f"{sname}__mesh_face_offsets"] = foff
                 for col in ("E_srce", "E_trgt", "E_face"):
                     flat[f"{sname}__mesh_{col}"] = (np.concatenate([m[col] for m in ms])
                                                     .astype(np.int64))
+                # the per-face state the renderer colours by -- only the names that are PRESENT in
+                # every recorded row, so a partial column cannot be sliced with the full offsets
+                for col in sorted(set.intersection(*[{k for k in m if k not in
+                                                      ("E_srce", "E_trgt", "E_face", "nF", "Nv")}
+                                                     for m in ms]) if ms else ()):
+                    flat[f"{sname}__mesh_{col}"] = (np.concatenate([m[col] for m in ms])
+                                                    .astype(np.float32))
             if d.get("node_type") is not None:
                 flat[f"{sname}__node_type"] = d["node_type"]
             if d.get("parent") is not None:                  # containment: child -> parent index
