@@ -16,6 +16,7 @@ import torch
 from scipy.spatial import SphericalVoronoi
 
 from plexus.models.base import Lateral, Structural
+from plexus.models.mesh import MeshTable
 from plexus.models.registry import register_operator
 
 # Every frame whose relaxation ran WITHOUT the per-junction myosin because the array and the half-edge
@@ -244,7 +245,13 @@ class SeedMesh3D(Structural):
             dj = np.clip(1.0 + self.vseed_cv * np.random.default_rng(self.seed + 101).standard_normal(nF), 0.4, 1.8)
         else:
             dj = np.ones(nF)                                     # all cells born in phase (synchronised)
-        lvl._mesh = dict(E_srce=est, E_trgt=ett, E_face=eft, nF=nF, Nv=Nv,
+        # A `MeshTable`, WHICH IS A `dict` -- see `plexus.models.mesh`. Every reader is unchanged
+        # by construction: the type still passes `isinstance(m, dict)` (which the D4 acted-ledger
+        # tests, and whose failure would score every mesh-only operator as inert), still iterates,
+        # still takes `get`/`setdefault`/`m[k] = v` on an open namespace. What it adds is a name for
+        # the thing, a place for the carry and the snapshot to live, and an engine that knows it
+        # exists -- `grep -rn "_mesh" src/plexus/` returned NOTHING before this.
+        lvl._mesh = MeshTable(E_srce=est, E_trgt=ett, E_face=eft, nF=nF, Nv=Nv,
                          A0=torch.full((nF,), A0, dtype=dt, device=dev),
                          P0=torch.full((nF,), P0, dtype=dt, device=dev),
                          alive=torch.ones(nF, dtype=dt, device=dev),
