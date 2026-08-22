@@ -55,7 +55,12 @@ Operators
   So a dynamics operator that self-Euler-steps `pos` is a category error; the
   engine guards against it on the first frame.
 
-  Six kinds, dispatched by the relation an operator acts on:
+  Eight kinds. Seven are DYNAMICS, dispatched by the relation an operator acts
+  on; `seed` is not one of the seven -- it is a separate LIFECYCLE PHASE (see
+  `Seed` below and `docs/` for the full model: `x_0 = S(theta_S)`, then
+  `x_{t+1} = Phi(x_t; theta_D)`). A seed operator never appears in a model's
+  `schedule:` and is never dispatched by the per-tick loop; it runs once, via
+  `engine.seed()`, before the dynamics loop starts.
 
   | kind        | relation              | examples                              |
   |-------------|-----------------------|---------------------------------------|
@@ -63,8 +68,10 @@ Operators
   | `aggregate` | children -> parent    | particles -> cell centroid            |
   | `broadcast` | parent -> children    | cell decision -> particle force       |
   | `exchange`  | set <-> field / set   | P2G/G2P, secrete/sense, reaction      |
+  | `field`     | field -> field        | diffuse, decay, react, playback       |
   | `structural`| changes |S_k| / membership | divide, duplicate, die           |
   | `rewire`    | rebuilds E (edge_index)   | membrane ring, neighbour graph    |
+  | `seed`      | writes x_0, once, before dynamics | mesh/tissue placement, field IC |
 
   `params` is the operator's spec line merged with its field refs (`to`/`from`);
   operators read their tunables from it in `__init__`. The `mask` is the live
@@ -95,23 +102,24 @@ import torch.nn as nn
 from plexus.models.state import StateSchema
 
 
-# The recognised operator kinds (dispatch tags), grouped by what they change:
-# the *dynamics* kinds (lateral / aggregate / broadcast / exchange) move a SET's
+# The recognised operator kinds (dispatch tags). SEVEN are DYNAMICS kinds, grouped by
+# what they change: `lateral` / `aggregate` / `broadcast` / `exchange` move a SET's
 # STATE and return a delta; `field` is a FIELD's own self-dynamics (diffuse / decay /
 # react / playback -- field->field, mutates the field, returns {}); `exchange` couples
 # a SET to a field (set->field deposit, field->set sense/chemotaxis); `rewire` changes
-# the RELATIONS (the edge set E); `structural` changes the ENTITIES (the node set |S|);
-# `seed` WRITES THE INITIAL STATE, once, and never again.
-# Naming them lets the registry enumerate "what can change the state, the field, the
-# relation, or the set".
+# the RELATIONS (the edge set E); `structural` changes the ENTITIES (the node set |S|)
+# DURING the run (divide, extrude, apoptosis). The eighth, `seed`, is not a dynamics
+# kind at all: it WRITES THE INITIAL STATE, once, before any dynamics kind runs -- see
+# `Seed` below, and `docs/` for the two-phase model this implements:
+# `x_0 = S(theta_S)`, then `x_{t+1} = Phi(x_t; theta_D)`.
 #
-# WHY `seed` IS A KIND AND NOT A FLAVOUR OF `structural`. Added 6 August, and the argument
-# is a measured failure rather than a taxonomy preference.
+# WHY `seed` IS ITS OWN KIND, SEPARATE FROM `structural`, NOT A FLAVOUR OF IT. Added 6
+# August; the argument is a measured failure rather than a taxonomy preference.
 #
-# `structural` conflated two acts that differ in the one property that matters: establishing
-# the initial state (once) and changing membership as the simulation runs (divide, extrude,
-# apoptosis -- throughout). Both mutate in place and return nothing, so the purity contract
-# could not tell them apart, and neither could the engine.
+# `structural` used to conflate two acts that differ in the one property that matters:
+# establishing the initial state (once) and changing membership as the simulation runs
+# (divide, extrude, apoptosis -- throughout). Both mutate in place and return nothing, so
+# the purity contract could not tell them apart, and neither could the engine.
 #
 # The cost of that was `cell_rd_seed mode: tip`. It re-stamped an activation cap on the
 # outermost cell EVERY frame, which makes it a moving boundary condition rather than an
@@ -121,10 +129,12 @@ from plexus.models.state import StateSchema
 # `cell_chem_from_shape` could accumulate nothing, and 8 same-seed `beta` edits across 13 rounds
 # moved the trajectory by EXACTLY zero while each was recorded as a refuted hypothesis.
 #
-# A `seed` operator is gated by the engine at frame 0 whatever the spec says (see
-# engine._schedule), so a per-frame initialiser is now UNEXPRESSIBLE rather than merely
-# discouraged. This is the same move as EMIT making the engine own integration: a discipline
-# every spec had to remember becomes a guarantee the language provides.
+# A `seed` operator runs exactly once, in `engine.seed()`, before the dynamics `schedule:`
+# starts -- not "gated to the opening frames of the schedule", a genuinely separate
+# lifecycle phase a spec cannot express seed operators inside of. A per-frame initialiser
+# is UNEXPRESSIBLE rather than merely discouraged. This is the same move as EMIT making the
+# engine own integration: a discipline every spec had to remember becomes a guarantee the
+# language provides.
 KINDS = ("lateral", "aggregate", "broadcast", "exchange", "field", "structural", "rewire",
          "seed")
 
@@ -673,26 +683,38 @@ class FieldUpdate(Operator):
 
 class Structural(Operator):
     """Changes cardinality / membership (divide, duplicate, die) on a fixed buffer
-    via occupancy. May emit per-node deltas during a gradual transition (e.g.
-    mitosis) and only relabel membership at completion; returns `{}` otherwise."""
+    via occupancy, DURING the dynamics phase. May emit per-node deltas during a
+    gradual transition (e.g. mitosis) and only relabel membership at completion;
+    returns `{}` otherwise. A dynamics kind: appears in `schedule:`, runs every
+    tick it is scheduled for, for the length of the run."""
     KIND = "structural"
     MAY_MUTATE_INTEGRATED_STATE = True             # waking/retiring slots rewrites the state buffer
 
 
-class Seed(Structural):
-    """WRITES THE INITIAL STATE, once, and never again.
+class Seed(Operator):
+    """WRITES THE INITIAL STATE, once, before any dynamics runs. NOT a dynamics
+    kind and NOT a `Structural` -- the two were merged once (Seed subclassed
+    Structural) and that inheritance is exactly the taxonomy error this class
+    now exists to rule out.
 
-    A subclass of `Structural` because it does the same thing to the buffer -- writes state
-    directly rather than returning a delta -- but a distinct KIND because it differs in the one
-    property that matters: WHEN. `agent_divide` and `apoptosis` change membership throughout a run;
-    a seed establishes the state the run starts from. Conflating the two is what allowed
-    `cell_rd_seed mode: tip` to re-stamp an activation cap every frame, which made it a moving
-    boundary condition and annihilated every operator writing to the same channel.
+    A `Seed` and a `Structural` op both write a buffer directly rather than
+    returning a delta, so the low-level mechanics MAY overlap (both can call
+    `Level.spawn`, both set `MAY_MUTATE_INTEGRATED_STATE = True`) -- but they do
+    not share a semantic ancestor, because they differ in the one property that
+    matters: WHEN, not HOW. `agent_divide` and `apoptosis` (`Structural`) change
+    membership throughout a run; a `Seed` establishes the state the run starts
+    from and then never runs again. Conflating the two via inheritance is what
+    let `cell_rd_seed mode: tip` re-stamp an activation cap every frame -- a
+    `Structural` subclass has no way to say "and never again" -- annihilating
+    every operator writing to the same channel.
 
-    The engine gates `kind="seed"` to `SEED_WINDOW` ticks whatever the spec says, so the
-    guarantee is the language's rather than each spec's to remember.
+    A `Seed` operator is not scheduled at all: it runs exactly once, in
+    `engine.seed()`, before `engine.run()`'s dynamics loop starts. It never
+    appears in a model's `schedule:`, and the schema rejects a spec where it
+    does. The guarantee is the language's to keep, not each spec's to remember.
     """
     KIND = "seed"
+    MAY_MUTATE_INTEGRATED_STATE = True             # establishing x_0 IS writing the state buffer
 
 
 class Rewire(Operator):

@@ -156,6 +156,24 @@ def register_operator(*names: str, implementation: str | None = None,
         for k, v in tags.items():
             setattr(cls, k.upper(), v)
         cls.REGISTERED_NAMES = list(names)
+        # kind == "seed" <=> Seed namespace: `family="seed"` is itself a claim that an
+        # operator establishes x_0 (see OPERATOR_FAMILIES's own comment on "seed"), so an
+        # operator that makes that claim on the family axis while declaring a DIFFERENT
+        # kind (structural / exchange / lateral / ...) is exactly the masquerade this
+        # invariant exists to catch: its numerical implementation may reuse another
+        # kind's mechanism, but that must not let it skip the seed lifecycle guarantees
+        # (never scheduled as dynamics, runs once, before frame 0). The reverse is NOT
+        # enforced: `kind="seed"` with a domain-specific family (e.g. "anatomy") is the
+        # intended orthogonal use of the two axes -- kind says WHEN/HOW, family says
+        # WHAT FOR -- so a seed operator need not also spell "seed" on the family axis.
+        # This is a warning, not a hard error: several existing discovery_okuda operators
+        # (e.g. integrin_seed) already have this mismatch and that codebase is not in
+        # scope for this refactor yet, so import must not break on them.
+        if tags.get("family") == "seed" and tags.get("kind") != "seed":
+            print(
+                f"[warn] operator {names[0]!r}: family=\"seed\" claims this establishes "
+                f"the initial state, but kind={tags.get('kind')!r} -- a seed masquerading "
+                f"as a dynamics kind. Should be registered with kind=\"seed\".")
         impl = model or implementation or "default"
         axis = "model" if model is not None else "implementation"
         cls.IMPLEMENTATION = impl
@@ -225,6 +243,36 @@ def operators_at_level(level: str) -> dict[str, type]:
 
 def operators_of_kind(kind: str) -> dict[str, type]:
     return {n: c for n, c in _OPERATOR_REGISTRY.items() if getattr(c, "KIND", None) == kind}
+
+
+# --------------------------------------------------------------------------- #
+#  Seed discovery -- the authoritative "what can establish x_0" query
+# --------------------------------------------------------------------------- #
+# `operators_of_kind("seed")` already answers this, but the agentic discovery loop
+# (discovery_okuda) needs to ask "what can establish x_0?" as distinctly as it asks
+# "what can evolve x_t?", and a bare `operators_of_kind("seed")` call reads no
+# differently from any other kind query at the call site. These three names exist
+# so that distinction is visible in the code that asks it, not just in the string
+# literal passed to a generic query -- one authoritative representation (base.KINDS
+# + this registry), not something an agent has to infer from an operator's name
+# containing "seed" or a `MAY_MUTATE_INTEGRATED_STATE` flag it shares with
+# `structural` and with derived-readout operators.
+def is_seed(name: str) -> bool:
+    """Whether the operator registered as `name` establishes x_0 (`kind == "seed"`)."""
+    return getattr(_OPERATOR_REGISTRY.get(name), "KIND", None) == "seed"
+
+
+def seed_operators() -> dict[str, type]:
+    """All operators that establish x_0 -- `operators_of_kind("seed")` under a name
+    that says what the query is for."""
+    return operators_of_kind("seed")
+
+
+def seed_contracts() -> dict[str, OperatorContract]:
+    """The full contracts (signature + every implementation) of every seed operator,
+    for the discovery loop to query "what can establish x_0?" without walking the
+    default-implementation registry by hand."""
+    return {n: c for n, c in _OP_CONTRACTS.items() if c.kind == "seed"}
 
 
 # The closed set of operator FAMILIES -- a conceptual taxonomy over the registry (not a
