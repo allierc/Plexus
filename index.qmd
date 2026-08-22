@@ -28,13 +28,17 @@ or graph neural networks. Because a mechanism is stated once, independently of i
 solver, existing simulation frameworks become **complementary backends** implementing
 a common intermediate representation rather than competing modelling paradigms.
 
-## A language
+## The language
 
-The language is built around four fundamental concepts: **operators**, **sets**
-(collections of biological entities across scales — proteins, cells, neurons,
-synapses, tissues), the **states** each element carries, and **fields** (continuous
-quantities defined over space — morphogens, pressure, potentials). A biological model
-is a composition of operators acting on these objects.
+Plexus defines a typed language for expressing biological mechanisms independently of
+their numerical realization. The language is built around four fundamental concepts:
+**operators**, **sets**, **states**, and **fields**. Biological models are therefore
+represented as compositions of operators acting on discrete and continuous biological
+objects rather than simulator-specific algorithms.
+
+A **set** is a collection of biological entities at one scale — proteins, cells, neurons,
+synapses, tissues; the **state** is what each element of a set carries; a **field** is a
+continuous quantity defined over space — a morphogen, a pressure, a potential.
 
 The central hypothesis of Plexus is that a large fraction of existing biological
 simulation models can be expressed as compositions of a small number of elementary
@@ -55,6 +59,16 @@ The first four kinds transform the state of a set and Field that of a field, all
 preserving the underlying organization; Rewire modifies the interaction graph; Structural
 modifies the entities themselves; Seed writes what the others evolve. The full algebra — with typed signatures and the reference
 implementation — is on **[The language](language.qmd)**.
+
+Because the language is explicit, a model is a **plain-text file and nothing else**:
+the spec behind every clip on this page *is* the simulation — its sets, its fields, its
+operators and the order they run in — and running it means handing that file to an engine
+that interprets it. No part of the mechanism hides in code. That separation between the
+language and its implementation is the point: the same spec can be executed by different
+numerical realizations without rewriting the biology, and a mechanism can be swapped,
+compared or fitted as text. It also changes who can write one — composing a model from a
+small set of bricks asks for no simulator engineering — and because a spec is text with a
+fixed grammar, a language model can draft one from a description written in plain English.
 
 ## Composing mechanisms
 

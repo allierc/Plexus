@@ -172,7 +172,7 @@ window.Quarto = {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#a-language" id="toc-a-language" class="nav-link active" data-scroll-target="#a-language">A language</a></li>
+  <li><a href="#the-language" id="toc-the-language" class="nav-link active" data-scroll-target="#the-language">The language</a></li>
   <li><a href="#composing-mechanisms" id="toc-composing-mechanisms" class="nav-link" data-scroll-target="#composing-mechanisms">Composing mechanisms</a></li>
   <li><a href="#composing-hierarchy" id="toc-composing-hierarchy" class="nav-link" data-scroll-target="#composing-hierarchy">Composing hierarchy</a></li>
   <li><a href="#what-it-looks-like" id="toc-what-it-looks-like" class="nav-link" data-scroll-target="#what-it-looks-like">What it looks like</a></li>
@@ -205,9 +205,10 @@ window.Quarto = {
 <p>We introduce <strong>Plexus</strong>, a typed intermediate representation for biological mechanisms. Rather than defining yet another simulator, Plexus defines a common language whose primary objects are <strong>biological operators</strong>. Every operator specifies the biological entities it acts upon, the states it requires, the relations between these entities, and one or more numerical implementations. The Plexus research program has three objectives. First, to define an <strong>algebra of biological operators</strong>. Second, to <strong>decompose the existing corpus</strong> of simulation models into this common language. Third, to construct <strong>differentiable implementations</strong> of these operators so that mechanistic models can be directly inferred from biological data.</p>
 <p>Just as compilers separate programming languages from their implementations through an <strong>intermediate representation</strong>, Plexus separates biological mechanisms from their numerical implementations. Every operator is defined by a <strong>typed signature</strong> — <em>what</em> biological transformation it performs — and one or more <strong>implementations</strong> — <em>how</em> it is numerically realized. The signature is the biological contract; the implementation is a numerical choice.</p>
 <p>Every operator may admit multiple implementations satisfying the same signature: a mechanical interaction by Material Point Methods, finite elements, vertex or phase-field models; a signalling operator by Hodgkin–Huxley equations, Neural ODEs or graph neural networks. Because a mechanism is stated once, independently of its solver, existing simulation frameworks become <strong>complementary backends</strong> implementing a common intermediate representation rather than competing modelling paradigms.</p>
-<section id="a-language" class="level2">
-<h2 class="anchored" data-anchor-id="a-language">A language</h2>
-<p>The language is built around four fundamental concepts: <strong>operators</strong>, <strong>sets</strong> (collections of biological entities across scales — proteins, cells, neurons, synapses, tissues), the <strong>states</strong> each element carries, and <strong>fields</strong> (continuous quantities defined over space — morphogens, pressure, potentials). A biological model is a composition of operators acting on these objects.</p>
+<section id="the-language" class="level2">
+<h2 class="anchored" data-anchor-id="the-language">The language</h2>
+<p>Plexus defines a typed language for expressing biological mechanisms independently of their numerical realization. The language is built around four fundamental concepts: <strong>operators</strong>, <strong>sets</strong>, <strong>states</strong>, and <strong>fields</strong>. Biological models are therefore represented as compositions of operators acting on discrete and continuous biological objects rather than simulator-specific algorithms.</p>
+<p>A <strong>set</strong> is a collection of biological entities at one scale — proteins, cells, neurons, synapses, tissues; the <strong>state</strong> is what each element of a set carries; a <strong>field</strong> is a continuous quantity defined over space — a morphogen, a pressure, a potential.</p>
 <p>The central hypothesis of Plexus is that a large fraction of existing biological simulation models can be expressed as compositions of a small number of elementary operator kinds. The proposed algebra consists of <strong>eight</strong>:</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
@@ -224,6 +225,7 @@ window.Quarto = {
 <li><strong>Seed</strong> — the initial state, written once and never again.</li>
 </ul>
 <p>The first four kinds transform the state of a set and Field that of a field, all while preserving the underlying organization; Rewire modifies the interaction graph; Structural modifies the entities themselves; Seed writes what the others evolve. The full algebra — with typed signatures and the reference implementation — is on <strong><a href="./language.html">The language</a></strong>.</p>
+<p>Because the language is explicit, a model is a <strong>plain-text file and nothing else</strong>: the spec behind every clip on this page <em>is</em> the simulation — its sets, its fields, its operators and the order they run in — and running it means handing that file to an engine that interprets it. No part of the mechanism hides in code. That separation between the language and its implementation is the point: the same spec can be executed by different numerical realizations without rewriting the biology, and a mechanism can be swapped, compared or fitted as text. It also changes who can write one — composing a model from a small set of bricks asks for no simulator engineering — and because a spec is text with a fixed grammar, a language model can draft one from a description written in plain English.</p>
 </section>
 <section id="composing-mechanisms" class="level2">
 <h2 class="anchored" data-anchor-id="composing-mechanisms">Composing mechanisms</h2>
