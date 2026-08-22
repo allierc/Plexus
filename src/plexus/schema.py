@@ -1,7 +1,8 @@
 """The spec schema: load + VALIDATE -- the contract gatekeeper.
 
 A complete Plexus run is a single declarative `spec.yaml` (`general`, `sets`,
-`fields`, `operators` (+ selectors), `schedule`, `plotting`). This module is the
+`fields`, `seed` (optional -- x_0, once, before dynamics), `operators`
+(+ selectors), `schedule`, `plotting`). This module is the
 schema: it parses the file into typed objects (`Spec`, `OpSpec`, `Selector`) and
 fails loudly with a precise message if anything is off -- an unregistered
 operator, an unknown set/field reference, a malformed selector, type fractions
@@ -66,13 +67,16 @@ class OpSpec:
 @dataclass
 class Spec:
     name: str
-    seed: int
+    seed: int                       # RNG seed (general.seed) -- NOT the seed: PHASE below;
+                                     # kept as `seed` for back-compat, disambiguated by type.
     n_frames: int
     dt: float
     sets: dict
     fields: dict
     operators: list[OpSpec]
     schedule: list
+    seed_ops: list[OpSpec] = field(default_factory=list)   # the seed: section (x_0), NOT
+                                                            # a schedule -- see `engine.seed()`
     obstacles: list = field(default_factory=list)   # wall rectangles [x0,y0,x1,y1] or discs [cx,cy,r]
     boundary: str = "wall"                           # 'wall' (clamp) or 'periodic' (torus)
     world: float = 1.0                               # domain width (= world_size[0]); legacy 2D scalar
@@ -177,9 +181,22 @@ def load(path: str) -> Spec:
                     raise ValueError(f"edge-set {sname!r}: each edge must be [pre, post] or "
                                      f"[pre, post, weight], got {e!r}")
 
-    # --- operators: names registered, valid KIND, selectors + fields exist -- #
-    ops = []
-    for o in raw["operators"]:
+    # --- shared operator-line resolution, used for both `operators:` and the
+    # `seed:` section: names registered, valid KIND, selectors + fields exist,
+    # capability contract satisfied. Returns (cls, kind, OpSpec). ------------ #
+    def types_in_chain(set_name):
+        # a required property may live on the set's types or be inherited from a
+        # parent set (mpm acts on particles but reads `youngs` off the cell type)
+        seen = set()
+        while set_name and set_name not in seen:
+            seen.add(set_name)
+            ts = raw["sets"][set_name].get("types")
+            if ts:
+                return set_name, ts
+            set_name = raw["sets"][set_name].get("parent")
+        return None, {}
+
+    def resolve_op_line(o):
         name = o["op"]
         # `model:` and `implementation:` are separate keys and naming one where the other is meant
         # is refused by the contract. Gray-Scott and Brusselator are not two ways of computing one
@@ -243,17 +260,6 @@ def load(path: str) -> Spec:
                 raise ValueError(
                     f"operator {name!r} requires param {req!r} (declared in "
                     f"{cls.__name__}.REQUIRES_PARAMS); add it to the operator line.")
-        # a required property may live on the set's types or be inherited from a
-        # parent set (mpm acts on particles but reads `youngs` off the cell type)
-        def types_in_chain(set_name):
-            seen = set()
-            while set_name and set_name not in seen:
-                seen.add(set_name)
-                ts = raw["sets"][set_name].get("types")
-                if ts:
-                    return set_name, ts
-                set_name = raw["sets"][set_name].get("parent")
-            return None, {}
         for prop in getattr(cls, "REQUIRES_TYPE_PROPS", []):
             owner, set_types = types_in_chain(sel.set)
             if not set_types:
@@ -266,7 +272,53 @@ def load(path: str) -> Spec:
                         f"operator {name!r} requires property {prop!r} on every type of "
                         f"{owner!r}; missing on type {tname!r}. "
                         f"(declared in {cls.__name__}.REQUIRES_TYPE_PROPS)")
-        ops.append(OpSpec(op=name, on=sel, to=o.get("to"), frm=o.get("from"), impl=(modl or impl), params=params))
+        opspec = OpSpec(op=name, on=sel, to=o.get("to"), frm=o.get("from"),
+                        impl=(modl or impl), params=params)
+        return cls, kind, opspec
+
+    # --- operators: names registered, valid KIND, selectors + fields exist -- #
+    ops = []
+    _legacy_seed_ops = set()          # kind="seed" operators declared the old way -- see below
+    for o in raw["operators"]:
+        cls, kind, opspec = resolve_op_line(o)
+        ops.append(opspec)
+        if kind == "seed":
+            _legacy_seed_ops.add(opspec.op)
+
+    # --- seed: establishes x_0, once, before any dynamics (Model = S then Phi) #
+    # A distinct, optional section. Rules (rejected at load, not special-cased by
+    # the engine at run time):
+    #   - every line here must resolve to a kind="seed" operator (a dynamics
+    #     operator declared in `seed:` is a category error, not a convenience);
+    #   - a seed line may not carry a dynamic scheduling control (`every`,
+    #     `before_frame`, `after_frame`) -- those are schedule concepts, and
+    #     seed has no schedule: it runs exactly once, always;
+    #   - a seed-kind operator declared here may not ALSO appear in `schedule:`
+    #     (checked below, once `op_names`/seed names are both known).
+    _SEED_ONLY_FORBIDDEN = ("every", "before_frame", "after_frame")
+    seed_ops = []
+    for o in raw.get("seed", []):
+        cls, kind, opspec = resolve_op_line(o)
+        if kind != "seed":
+            raise ValueError(
+                f"seed: {o['op']!r} has kind {kind!r}, not \"seed\" -- only operators that "
+                f"establish x_0 may be declared in the seed: section. A dynamics operator "
+                f"belongs in operators:/schedule:.")
+        bad = [k for k in _SEED_ONLY_FORBIDDEN if k in o]
+        if bad:
+            raise ValueError(
+                f"seed: {o['op']!r} sets {bad}, a dynamic scheduling control -- seed has no "
+                f"schedule, it runs exactly once. Remove {bad} from this seed: line.")
+        seed_ops.append(opspec)
+
+    # A seed-kind operator declared under `operators:` is the deprecated (pre-`seed:`)
+    # spelling: still accepted so existing specs are not broken in one pass (see
+    # SEED_MIGRATION.md), but warned about, and it is exactly what the next check
+    # (seed in schedule:) would reject if that operator is ALSO scheduled.
+    if _legacy_seed_ops:
+        print(f"[warn] deprecated: {sorted(_legacy_seed_ops)} declared in operators: with "
+              f"kind=\"seed\" -- move to the seed: section (see SEED_MIGRATION.md). Still "
+              f"accepted for now via the legacy engine seed-window path.")
 
     # --- warn about per-type properties no operator reads (typo guard) ------ #
     used_props = set()
@@ -288,6 +340,7 @@ def load(path: str) -> Spec:
     # `{substep_dt: <dt>, steps: [...]}` whose inner tokens run once per substep; the count
     # is round(general.dt / dt). (e.g. the MPM strain->P2G->grid->G2P cycle.)
     op_names = {o.op for o in ops}
+    seed_op_names = {o.op for o in seed_ops}       # new-style seed:, excluded from schedule
     for step in raw["schedule"]:
         if isinstance(step, dict) and "substep" in step:
             raise ValueError("the `{substep: N, dt: X}` schedule form was removed; write "
@@ -302,6 +355,15 @@ def load(path: str) -> Spec:
         for tok in tokens:
             if tok in _BUILTIN_STEPS:
                 continue
+            # A seed: operator is never dispatched by the schedule loop -- engine.seed()
+            # runs it once, before engine.run() starts. Declaring it here too is not a
+            # convenience, it is the exact bug `seed:` exists to make unrepresentable (see
+            # the KINDS comment in base.py): a seed re-running on the schedule's terms.
+            if tok in seed_op_names:
+                raise ValueError(
+                    f"schedule step {tok!r} is a seed: operator (kind=\"seed\") -- seed runs "
+                    f"exactly once, before the schedule, via engine.seed(). Remove it from "
+                    f"schedule: (and from operators:, if declared there too).")
             if tok not in op_names:
                 raise ValueError(f"schedule step {tok!r} is not a declared operator or builtin")
 
@@ -314,6 +376,7 @@ def load(path: str) -> Spec:
         fields=raw["fields"],
         operators=ops,
         schedule=raw["schedule"],
+        seed_ops=seed_ops,
         obstacles=gv("obstacles", []),
         boundary=gv("boundary", "wall"),
         world=world_size[0],

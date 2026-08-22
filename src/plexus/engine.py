@@ -1,19 +1,34 @@
-"""The generic engine: build a Hierarchy from a validated spec, run the schedule.
+"""The generic engine: build a Hierarchy from a validated spec, seed it, run
+the dynamics schedule. Three lifecycle phases, in order:
+
+    build(sim)          -- allocate every set/field the spec declares (+ the
+                            spec-level `sets:` placement/velocity/type/edge
+                            keys -- see `build`'s own docstring for why those
+                            stay data the engine interprets, not operators)
+    seed(H, sim)         -- run `sim.seed_ops` (the seed: section) EXACTLY
+                            ONCE: x_0 = S(theta_S). Not a loop, not gated by
+                            frame number -- there is no frame number yet.
+    run(sim)             -- calls build() then seed() then iterates the
+                            dynamics schedule: x_{t+1} = Phi(x_t; theta_D).
 
 This is the *interpreter* of the spec language. It contains NO spec-specific
-logic: it builds the sets the spec declares, instantiates the registered
-operators it names, and iterates the schedule. The build is three passes --
-top-level sets, then contained sets (the typed containment graph), then fields.
-
-Every operator is dispatched the same way (by name); the engine never special-
-cases a kind. The seven kinds split by what they touch: the set-dynamics kinds
+logic beyond that split. Every DYNAMICS operator is dispatched the same way
+(by name); the engine never special-cases a kind within `run`'s schedule loop.
+The seven dynamics kinds split by what they touch: the set-dynamics kinds
 (lateral / aggregate / broadcast / exchange) return a per-level delta the engine
 sums and integrates once per tick (order -- 1st vs 2nd derivative -- from each
 operator's `EMIT`); `field` operators mutate a field in place; `rewire`
-rebuilds a relation; `structural` changes the entity set. The integration
-invariant -- only `_integrate` writes pos/vel, unless an operator declares
-`MAY_MUTATE_INTEGRATED_STATE` (structural / derived-readout) -- is enforced per operator on
-frame 0.
+rebuilds a relation; `structural` changes the entity set. The eighth kind,
+`seed`, is not dispatched by `run` at all -- see `seed()` below. The
+integration invariant -- only `_integrate` writes pos/vel, unless an operator
+declares `MAY_MUTATE_INTEGRATED_STATE` (seed / structural / derived-readout) --
+is enforced per operator on frame 0 of whichever phase runs it.
+
+LEGACY COMPATIBILITY. A `kind="seed"` operator declared the pre-`seed:` way
+(under `operators:`, referenced in `schedule:`) is still accepted: `run`'s
+`_seed_window`/`_gate` mechanism, unchanged, still confines it to the opening
+frames. `schema.py` warns this spelling is deprecated; it is not yet rejected,
+per the migration order in SEED_MIGRATION.md. New specs should use `seed:`.
 """
 from __future__ import annotations
 
@@ -494,6 +509,18 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
     then let the entity provision domain-specific per-node buffers (e.g. mpm_particle's F/C/mass).
     Pass 3 -- continuous FIELDS: a pure-state grid bound to one set (one channel per coupled
     type) whose dynamics live entirely in the deposit/diffuse/decay/sense operators.
+
+    THIS PASSES ALLOCATE-AND-PLACE, NOT "AND SEED". `spawn`/`start`/`vel_init`/`types` are
+    declarative DATA on `sets:`, read here rather than expressed as `seed:` operators, on
+    purpose (`_init_velocity`'s own note: initialization here is a SPEC concern, so a
+    physics-aware IC -- `vel_init: {mode: circular_orbit}` reading every mass and position --
+    is data the engine interprets, not procedural code a spec author writes). This is
+    DIFFERENT from a `seed:` operator (`seed()` below): both establish x_0 once, before any
+    dynamics, but `build`'s x_0 is declared per-set inline with the set, while a `seed:`
+    operator is a registered, reusable MECHANISM (mesh construction, segmentation import,
+    reaction-diffusion patterning) that several sets or specs can share. Use `sets:` keys for
+    a placement rule; reach for `seed:` when the initialization needs the same registry,
+    contract and reuse machinery as a dynamics operator, not a spec dialect of its own.
     """
     H = Hierarchy()
     H.config = sim
@@ -668,6 +695,48 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
 
 
 # --------------------------------------------------------------------------- #
+#  seed: x_0 = S(theta_S), executed exactly once, before any dynamics
+# --------------------------------------------------------------------------- #
+def seed(H: Hierarchy, sim: Spec, device: str = "cpu") -> None:
+    """Run `sim.seed_ops` (the spec's `seed:` section) exactly once.
+
+    Not a loop, not a window, not gated by a frame number: there is no frame
+    number yet -- `H.frame` is set to 0 for the duration, since a seed operator
+    may legitimately read it (e.g. a prescribed field sampling its own t=0
+    slice), but nothing here iterates. Each seed operator runs ONE forward()
+    call, contract-identical to a dynamics operator's (`forward(H, mask) ->
+    {level: delta}`), so a seed CAN return a delta (e.g. an initial settle
+    nudge) -- accumulated and integrated once, same as a normal tick -- but the
+    common case (`MAY_MUTATE_INTEGRATED_STATE=True`, writes state directly,
+    returns `{}`) needs no integration step to take effect.
+
+    `sim.seed_ops` is empty for every spec written before the `seed:` section
+    existed; `seed()` is then a no-op, and `run()`'s legacy `_seed_window`
+    mechanism (unchanged) is what confines an old-style `kind="seed"` operator
+    still declared under `operators:`/`schedule:` to the opening frames.
+    """
+    if not sim.seed_ops:
+        return
+    H.frame = 0
+    H.zero_delta()
+    for o in sim.seed_ops:
+        cls = get_operator(o.op, variant=o.impl)
+        if getattr(cls, "KIND", None) != "seed":
+            # schema.py already rejects this at load time; re-checked here because
+            # `seed()` is a public entry point callable without going through load().
+            raise RuntimeError(
+                f"seed: {o.op!r} resolved to kind={getattr(cls, 'KIND', None)!r}, not "
+                f"\"seed\" -- refusing to run a dynamics operator as a seed.")
+        op = cls({**o.params, "to": o.to, "from": o.frm, "_at": o.on.set}, device)
+        deltas = op(H, _selector_mask(H, o.on))
+        block = getattr(op, "INTEGRAND", None)
+        for lvlname, d in deltas.items():
+            H.add_delta(lvlname, d, block)
+    if any(torch.count_nonzero(d) for d in H._delta.values()):
+        _integrate(H, sim.dt)
+
+
+# --------------------------------------------------------------------------- #
 #  selectors: resolve to a live boolean mask, every tick
 # --------------------------------------------------------------------------- #
 def _coerce(s: str):
@@ -830,12 +899,19 @@ SEED_MAX = 10          # a seed runs on the opening frames; it can never span th
 
 
 def _seed_window(sim):
-    """How many opening frames a `seed` operator runs for -- read from the spec in one pass.
+    """LEGACY COMPATIBILITY ONLY -- the pre-`seed:`-section mechanism, kept so a `kind="seed"`
+    operator still declared under `operators:`/`schedule:` (deprecated; schema.py warns) keeps
+    working exactly as before. `seed()` (above) is the current mechanism: a spec using `seed:`
+    has `sim.seed_ops` populated, `seed()` runs those once before this window logic ever
+    matters, and schema.py's schedule validation refuses to let a `seed:`-declared operator
+    reach `run()`'s schedule at all. This function only ever sees the operators that DIDN'T
+    make that move yet.
 
-    The largest `before_frame` any seed declares (1 if none does), capped at SEED_MAX. That is
-    the whole rule. A model may take a few frames to establish its state -- the working parents
-    use 3, while a mesh relaxes -- but no model can ask an initial condition to run for the
-    length of the trajectory, which is what `cell_rd_seed mode: tip` did on all 900 frames.
+    How many opening frames a legacy `kind="seed"` operator runs for -- read from the spec in
+    one pass. The largest `before_frame` any such seed declares (1 if none does), capped at
+    SEED_MAX. A model may take a few frames to establish its state -- the working parents use
+    3, while a mesh relaxes -- but no model can ask an initial condition to run for the length
+    of the trajectory, which is what `cell_rd_seed mode: tip` did on all 900 frames.
     """
     declared = [int(o.params["before_frame"]) for o in sim.operators
                 if getattr(get_operator(o.op, variant=o.impl), "KIND", None) == "seed"
@@ -901,6 +977,7 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
     publish) or it severs the tape for everything downstream of it -- see `agent_divide`.
     """
     H = build(sim, device)                    # 1) build the Hierarchy: every set (level) + field, from the spec
+    seed(H, sim, device)                      # 1.5) x_0 = S(theta_S): the seed: section, exactly once
     H.emit_order = _resolve_emit(sim, H)      # 2) per-set integration order (velocity=1st-order / acceleration=2nd), from the ops' EMIT
     # 3) instantiate each operator ONCE -> (op_name, live instance, selector, frame-window); its params
     #    carry the field refs (to/from) + the set name (_at), and the frame gate (after_frame/before_frame)

@@ -42,7 +42,7 @@ import os
 
 import torch
 
-from plexus.models.base import Field, Exchange
+from plexus.models.base import Field, Seed
 from plexus.models.registry import register_field, register_operator
 from plexus.paths import graphs_data_path
 
@@ -83,15 +83,23 @@ class LabelImageField(Field):
         return self.grid[0][gx, gy]
 
 
-@register_operator("seed_from_segmentation", family="seed", set="particle", kind="exchange")
-class SeedFromSegmentation(Exchange):
-    """Populate tissue -> cell -> particle from a measured instance segmentation. Runs once."""
+@register_operator("seed_from_segmentation", family="seed", set="particle", kind="seed")
+class SeedFromSegmentation(Seed):
+    """Populate tissue -> cell -> particle from a measured instance segmentation. Runs once.
+
+    Was `kind="exchange"` (an `Exchange` subclass reusing the field-sampling machinery for
+    its numerics) with a `family="seed"` tag that already said what it actually was; the
+    mismatch let it masquerade as ordinary dynamics and skip the seed lifecycle guarantees
+    (never scheduled, runs once, before frame 0) -- exactly the case `Seed` exists to rule
+    out. The numerics (reading a field, scattering onto particles) are unchanged; only the
+    lifecycle classification is corrected.
+    """
 
     EMIT = None
-    # STRUCTURAL, not dynamics. It establishes the configuration -- where the cells are and which
-    # particles belong to them -- and writes the state buffer directly to do it. The engine's
-    # integration invariant forbids that for a force, correctly, so the exemption is declared here
-    # and paid for by running exactly once.
+    # It establishes the configuration -- where the cells are and which particles belong to
+    # them -- and writes the state buffer directly to do it. The engine's integration
+    # invariant forbids that for a dynamics operator, correctly; a Seed is exempted because
+    # establishing x_0 IS writing the state buffer (see base.Seed).
     MAY_MUTATE_INTEGRATED_STATE = True
     REQUIRES_PARAMS = ["from"]
     SUPPORTED_DIMS = [2]
