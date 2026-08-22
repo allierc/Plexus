@@ -1,49 +1,11 @@
-"""glide -- set (lateral). Self-propulsion: glide along the heading at constant speed (overdamped, first-order; the heading-kinematic sibling of `cruise`).
+"""glide -- MOVED to `plexus.operators.motion_ops`.
 
-A first-derivative dynamics operator: it returns a velocity delta
-`v_i = move_speed_i * heading_i` and lets the ENGINE integrate the position
-(`pos += dt * v`), exactly like attraction_repulsion returns a dpos. It does NOT
-touch `pos`, and it is purely propulsion -- domain/obstacle reflection is a separate
-`bounce` operator (run before glide), so this stays one concern.
+Kept as a re-export because thirty files import it by bare module name -- `run_one.py`,
+`instrument.py`, `vtk_render.py`, `metrics.py` and twenty archive/analysis scripts -- and the
+campaign is still running against them. PRIVATE NAMES ARE RE-EXPORTED TOO: `_carry_face_state`,
+`_engine_owns_clock` and friends are called across module boundaries in okuda, so a shim that
+exported only the public surface would break at the first T1.
 
-Dimension-generic (the dimension contract): `heading` is a unit VECTOR [N, D] in
-every dimension, so `vel = speed * heading` is the same law in 2D and 3D -- no
-`cos/sin` special case. Replaces the old scalar-angle 2D law and the `advance_3d`
-counterpart with one operator.
-
-Renamed from the prototype `motility` (it is the slime "move" step).
+New code should import from `plexus.operators.motion_ops`.
 """
-from __future__ import annotations
-
-import torch
-
-from plexus.models.base import Lateral
-from plexus.models.registry import register_operator
-
-
-@register_operator("glide", family="motion", set="cell", kind="lateral")
-class Glide(Lateral):
-    EMIT = "velocity"             # emits a velocity; the ENGINE integrates pos
-    SUPPORTED_DIMS = [2, 3]                      # dimension-generic (heading is a [N,D] unit vector)
-    REQUIRES_PARAMS = []                        # no required params — speed from `move_speed` type prop; noise optional
-    MECHANISM_TAGS = ["self_propulsion", "motility", "active_brownian"]
-    REQUIRES_TYPE_PROPS = ["move_speed"]
-    PARAM_ROLES = {"noise": "translational_noise"}
-    REFERENCE = "Plexus (this work)."
-
-    def __init__(self, params, device="cpu"):
-        super().__init__(params, device)
-        self.noise = float(params.get("noise", 0.0))      # isotropic translational noise (active Brownian; off by default)
-        self.at = params.get("_at", "cell")
-
-    def forward(self, H, mask=None):
-        lvl = H.level(self.at)
-        dev = lvl.state.device
-        N = lvl.n
-        h = lvl.heading                                   # [N, D] unit heading vector
-        spd = lvl.move_speed                              # [N]
-        m = (mask.float() if mask is not None else torch.ones(N, device=dev)) * lvl.occ
-        vel = spd[:, None] * h                            # move along the heading
-        if self.noise > 0.0:                              # glide + noise = an active Brownian walker
-            vel = vel + self.noise * torch.randn(N, h.shape[-1], generator=getattr(H, "rng", None), device=dev)
-        return {self.at: vel * m[:, None]}
+from plexus.operators.motion_ops import *          # noqa: F401,F403

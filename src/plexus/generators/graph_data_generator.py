@@ -105,9 +105,12 @@ def data_generate(
                                                     .astype(np.int64))
                 # the per-face state the renderer colours by -- only the names that are PRESENT in
                 # every recorded row, so a partial column cannot be sliced with the full offsets
-                for col in sorted(set.intersection(*[{k for k in m if k not in
-                                                      ("E_srce", "E_trgt", "E_face", "nF", "Nv")}
-                                                     for m in ms]) if ms else ()):
+                cols = set.intersection(*[{k for k in m if k not in
+                                           ("E_srce", "E_trgt", "E_face", "nF", "Nv")} for m in ms])
+                # the operators' own SCALAR counters: one value per row, not a ragged column
+                for col in sorted(c for c in cols if c.startswith("scalar_")):
+                    flat[f"{sname}__mesh_{col}"] = np.asarray([m[col] for m in ms], np.float64)
+                for col in sorted(c for c in cols if not c.startswith("scalar_")):
                     flat[f"{sname}__mesh_{col}"] = (np.concatenate([m[col] for m in ms])
                                                     .astype(np.float32))
             if d.get("node_type") is not None:

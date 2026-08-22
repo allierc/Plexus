@@ -1,82 +1,11 @@
-"""active_stress -- the STRESS constitutive law: an activation field -> per-particle active stress.
+"""active_stress -- MOVED to `plexus.operators.agent_ops`.
 
-(Renamed from `pulse_to_active_stress`, kept as a transitional alias: the operator names the
-MECHANISM, not the source -- the activation `from:` field may be a pulse, calcium, or voltage.)
+Kept as a re-export because thirty files import it by bare module name -- `run_one.py`,
+`instrument.py`, `vtk_render.py`, `metrics.py` and twenty archive/analysis scripts -- and the
+campaign is still running against them. PRIVATE NAMES ARE RE-EXPORTED TOO: `_carry_face_state`,
+`_engine_owns_clock` and friends are called across module boundaries in okuda, so a shim that
+exported only the public surface would break at the first T1.
 
-The mechanical alternative to `active_force` (the FORCE law). Instead of injecting a
-per-particle body force F = amplitude * a(x) * d(x) (which pushes each particle OUT along d and
-elastically recoils -> short CLOSED out-and-back loops), this writes a per-particle ACTIVE STRESS
-
-    sigma_active(x) = - amplitude * a(x) * n(x) n(x)^T      (n = unit contraction axis)
-
-onto the side-channel `H.active_stress` (the same `H.part_accel` idiom). The MLS-MPM `p2g` scatter
-ADDS it to the fixed-corotated elastic stress before forming the affine momentum matrix, so the
-tissue feels the stress only through its DIVERGENCE: a patch under uniform -A nn^T SHORTENS along n
-and is stretched/sheared by its neighbours. Interior forces appear only where A or n vary, plus at
-the boundary -- coordinated shortening / shear (the "direction map = contraction AXIS" reading),
-not a pointwise push. This is the standard cardiac active-stress formulation.
-
-`kind=exchange`, `EMIT=None` (the stress is consumed by the MPM substep, never engine-
-integrated). forward() returns NO delta (`{}`) -- it only sets the `H.active_stress` side-channel,
-which `p2g` reads via `getattr(H, "active_stress", None)` (default off: absent -> pure elastic).
+New code should import from `plexus.operators.agent_ops`.
 """
-from __future__ import annotations
-
-import torch
-
-from plexus.models.base import Exchange
-from plexus.models.registry import register_operator
-
-
-@register_operator("active_stress", "pulse_to_active_stress", family="mechanics", set="particle", kind="exchange")
-class ActiveStress(Exchange):                    # (alias `pulse_to_active_stress` for one migration cycle)
-    EMIT = None                         # stress is consumed by the MPM substep, not integrated
-    SUPPORTED_DIMS = [2]                 # 2D — contraction axis n and n n^T are 2-vectors / 2x2
-    REQUIRES_PARAMS = ["from", "direction_from"]
-    MECHANISM_TAGS = ["active_contraction", "active_stress_tensor", "directed_active_stress"]
-    PARAM_ROLES = {"amplitude": "active_stress_gain", "direction_from": "contraction_axis_field"}
-    REFERENCE = "Simha, R. A. & Ramaswamy, S. (2002). Phys. Rev. Lett. 89:058101; Marchetti, M. C. et al. (2013). Rev. Mod. Phys. 85:1143."
-
-    def __init__(self, params, device="cpu"):
-        super().__init__(params, device)
-        self.field_name = params.get("from")
-        self.amplitude = float(params.get("amplitude", 50.0))
-        self.channel = int(params.get("channel", 0))
-        self.direction_from = params.get("direction_from")
-        if self.direction_from is None:
-            raise ValueError("active_stress needs `direction_from:` "
-                             "(a vector_grid field giving the contraction axis n)")
-        self.at = params.get("_at", "particle")
-        # FRANK-STARLING (length-dependent tension, NHS/Niederer form): scale contraction by local fibre
-        # stretch lambda -> T *= 1 + stretch_activation*(lambda-1). 0 = OFF (byte-identical). Real cardiomyocytes
-        # contract HARDER when stretched; a stretch-REGULATED size lever (bigger loops without the runaway
-        # overshoot of raw amplitude/gain), aimed at the size<->direction frontier.
-        self.stretch_activation = float(params.get("stretch_activation", 0.0))
-
-    def forward(self, H, mask=None):
-        lvl = H.level(self.at)
-        pos = lvl.get("pos")
-        fld = H.fields[self.field_name]
-
-        a = fld.sample(pos, self.channel)                                         # [N] activation a(x)
-        n = H.fields[self.direction_from].sample(pos)                             # [N, 2] contraction axis
-        n = n / n.norm(dim=1, keepdim=True).clamp(min=1e-9)                        # unit
-        gate = (a * lvl.occ).clamp(min=0.0)                                       # only inactive=0 particles off
-        gain = getattr(lvl, "gain", None)                                         # optional per-particle gain map
-        if gain is not None:                                                      # (apply_material_map target=gain)
-            gate = gate * gain                                                    # spatially-structured contraction gain
-        if mask is not None:
-            gate = gate * mask.float()
-        if self.stretch_activation != 0.0:                                        # FRANK-STARLING length-dependent tension
-            F = getattr(lvl, "F", None)                                           # per-particle deformation gradient [N,2,2]
-            if F is not None:
-                lam = torch.bmm(F, n[:, :, None]).squeeze(-1).norm(dim=1).clamp(min=1e-6)   # fibre stretch lambda = |F n|
-                gate = gate * (1.0 + self.stretch_activation * (lam - 1.0)).clamp(min=0.0)  # T *= 1+beta*(lambda-1)
-        nn = n[:, :, None] * n[:, None, :]                                        # [N, 2, 2]  n n^T
-        # Active TENSION along the fibre axis n (cardiac convention sigma_a = +T n n^T): added to the
-        # elastic stress it SHORTENS the tissue along n. (The p2g scaling carries the MPM sign; this
-        # sign is fixed empirically so axis n => contraction ALONG n, see active_stress_test.)
-        sigma = (self.amplitude * gate)[:, None, None] * nn                        # +A a n n^T
-        # side-channel for p2g (same idiom as H.part_accel); overwritten each frame, read every substep.
-        H.active_stress = sigma
-        return {}                                                                 # no body-force delta
+from plexus.operators.agent_ops import *          # noqa: F401,F403

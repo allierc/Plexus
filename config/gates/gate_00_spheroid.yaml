@@ -1,0 +1,367 @@
+# GATE 00 -- the epithelium alone: growth, division and intercalation on a closed surface.
+# No basement membrane, no matrix, no adhesion. This is the tissue every later gate must leave alone.
+#
+# WHY THIS FILE EXISTS. The gate used to be `discovery_okuda/ops/test_00_spheroid.py`, which BUILT its
+# spec imperatively, LOADED a cached tissue rather than running one, and REPORTED numbers rather than
+# asserting them. A threshold you cannot read before the run is not a threshold, and a spec that lives
+# inside a script cannot be diffed, reviewed or reused. Both halves are files now: the model here, the
+# thresholds under `_gate:` below.
+#
+# PROVENANCE, and it was reconstructed rather than found. The rig loads
+# `log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_2cedf4bcc6.npz`, which `tissue.build(frames=401,
+# buffer_x=4, myosin=1.0)` wrote from `config/okuda/_superseded_pre_basis/cellfix_B_new.yaml`. Every
+# parameter below is that file's, with `tissue.build`'s three documented edits applied: the two
+# reservoirs multiplied by 4, `junction_myosin` inserted before `cell_mechanics`, and `junction_sync`
+# appended after the topology operators.
+#
+# THE DISCRIMINATOR IS `cell_grow.rate`. A second candidate parent exists --
+# `discovery_okuda/_archive_runs/2026-08-03_preclean/run_records/cellfix_B_new/spec_run.yaml`, which
+# `tissue.py` falls back to today -- and it says `rate: 0.03` with `vertex n: 41616`. It is a DIFFERENT
+# MODEL: it reaches 1451 cells by frame 60 against the cache's 227. The caches were written on
+# 2026-08-10, when `CELL_SPEC` still resolved to the pre-basis copy; the fallback was added on
+# 2026-08-20. Gating against the wrong parent would fail a correct run.
+
+general:
+  name: gate_00_spheroid
+  seed: 0
+  n_frames: 401
+  dt: 1.0
+  # > n_frames + 1, so `sstride` is 1 and every tick is recorded (engine._setup_recording). A smaller
+  # cap strides silently, and every per-tick ledger row below would then be measuring a difference
+  # across five frames while claiming to measure one.
+  record_cap: 403
+  boundary: free
+  dim: 3
+  world: [50.0, 50.0, 50.0]
+  # THE PHYSICAL SCALE, so a threshold can be stated in micrometres instead of in mesh units. From
+  # `log/okuda_ECM/0u_units/units.json`: one tissue length unit is 10 um (a cell diameter of ~8.6 um
+  # at the end of this run), and one frame is 600 s -- 4.93 doublings over 401 frames puts the cell
+  # cycle at 13.1 h, inside the 12-24 h a cultured epithelial cell takes.
+  #
+  # `force_nN` IS DELIBERATELY ABSENT. This spec's mechanics is defined up to an overall scale: only
+  # force RATIOS are meaningful in it, and `plexus.units` says so rather than inventing one. A row
+  # that tried to quote a stress would raise instead of printing a number.
+  units:
+    length_um: 10.0
+    time_s: 600.0
+
+# TOP LEVEL, not under `general:`. `schema.load` reads `raw.get("plotting", {})` directly, so a
+# `plotting:` nested under `general:` is parsed, ignored and silently lost.
+plotting:
+  background: black
+
+sets:
+  vertex:
+    # 6396 x 4. At the reference 6396 the run refuses 1,723 divisions for want of vertex buffer and
+    # the tissue coasts to the end at a fixed 3,170 cells -- the last quarter of the movie shows an
+    # epithelium that stopped proliferating because of an ARRAY, not because of its biology.
+    # `buffer_x` is a memory allocation: it changes what the run is ALLOWED to do, not what it tries.
+    n: 25584
+    # MANDATORY, and not decoration. `engine._setup_recording` builds `rec_mesh` from
+    # `lvl.mesh is not None` BEFORE the first tick, so without these two keys the trajectory carries
+    # no `vertex__mesh_*` arrays at all and eleven of the rows below become uncomputable rather than
+    # failing. Verified dynamics-neutral: `seed_mesh` fills the engine's table in place
+    # (`m.clear(); m.update(seeded)`) rather than rebinding a new one.
+    mesh: half_edge
+    cell_set: cell
+  cell:
+    n: 12800                      # 3200 x 4
+    state:
+      area: {width: 1}
+      cen:  {width: 3}
+      # INERT HERE and kept for layout fidelity with the reference: no chemistry operator is in this
+      # schedule, so `chem` stays identically zero. `cell_grow` does not need it -- it has an explicit
+      # no-chemistry branch, because no chemistry means UNIFORM growth, not no growth.
+      chem: {width: 2, integration: first_order}
+
+fields: {}                        # required key; the loader raises without it
+
+operators:
+  # `kind: seed` declared under `operators:` is the DEPRECATED spelling and the loader says so. It
+  # stays here rather than moving to a `seed:` section because migrating it is a behaviour change
+  # that has to be twin-tested against this gate's own reference first -- which is what this gate is
+  # for. `before_frame: 1` is redundant today (the window defaults to 1) and is a real guard: the
+  # window is the MAX over every declared seed, so a future co-seed would widen this one's.
+  - {op: mesh_seed, at: vertex, before_frame: 1, cell_set: cell,
+     n_cells: 200, radius: 5.0, jitter: 0.18, p0: 3.5, seed: 0, vseed_cv: 0.15}
+  - {op: cell_geometry, at: cell}
+  - {op: cell_grow, at: vertex, cell_set: cell, rate: 0.003457, rho: 1.0,
+     a_sw: 50.0, hill: 4.0, vth_frac: 2.5}
+  # BEFORE `cell_mechanics`, because the energy reads `m["myo"]` in the frame it is written. After it,
+  # the relaxation would use the previous frame's myosin -- on a 20-frame timescale, a lag nobody
+  # would notice and everybody would inherit.
+  #
+  # `lam` AND `gam` ARE 0.0, AND THAT IS NOT A TYPO. `tissue.build` reads them off `cell_mechanics`
+  # with `_se.get("Lam")` / `_se.get("Gam")` while the spec spells them `Lambda` / `Gamma`, so the
+  # defaults 0.0 win and the archived tissue was built with them. Latent today because
+  # `keyed_on: length` never evaluates the tension branch -- written out explicitly so the first
+  # person to set `keyed_on: tension` sees a zero instead of inheriting a tissue no run ever had.
+  - {op: junction_myosin, at: vertex, activity: 1.0, tau: 20.0, beta: 1.0, myo_new: 1.0,
+     dt: 1.0, inherit: true, keyed_on: length, destabilising: true,
+     k_perim: 1.0, lam: 0.0, gam: 0.0}
+  - {op: cell_mechanics, at: vertex, K_A: 1.0, K_P: 1.0, K_V: 2.0, K_R: 0.4,
+     Lambda: 3.0, Gamma: 0.4, p0: 3.5, mu: 1.0, dt: 1.0,
+     relax_iters: 30, eta: 0.08, cap_frac: 0.12}
+  # `max_flips: 30` IS A RAIL, not a headroom: 32 of the 101 calls sit on it and deliver about two
+  # thirds of the run's flips. Gated explicitly by `t1_rail_fraction` below rather than left for a
+  # reader to discover, because a T1 rate measured against a cap is a property of the cap.
+  - {op: edge_flip, at: vertex, every: 4, engine_clock: true, l_th_frac: 0.35, max_flips: 30}
+  - {op: cell_divide, at: vertex, cell_set: cell, every: 4, engine_clock: true,
+     factor: 2.0, cycle_cv: 0.15, min_cycle: 4, max_cycle: 1000000000, p0: 3.5,
+     reset_noise: 0.12}
+  # AFTER the topology operators. `edge_flip` rewires the half-edge arrays and `cell_divide` lengthens
+  # them, both after `junction_myosin` wrote `m["myo"]` for the arrays as they were -- so without this
+  # the record holds this frame's edges beside last writing's myosin. Measured on the 401-frame
+  # nominal: 56 of 200 snapshots carried a myosin array 6 to 1,356 entries short of the edge arrays,
+  # and every reader indexes it positionally.
+  - {op: junction_sync, at: vertex, myo_new: 1.0, inherit: true}
+  - {op: topo_record, at: vertex, every: 1}
+
+schedule: [mesh_seed, cell_geometry, cell_grow, junction_myosin, cell_mechanics,
+           edge_flip, cell_divide, junction_sync, topo_record]
+
+# =====================================================================================
+#  THE GATE. Read by `tools/run_gates.py`; inert to the loader, which has no unknown-key
+#  rejection. Every threshold here is written BEFORE the run that is graded against it,
+#  and `tools/run_gates.py --freeze-reference` records a sha1 of this block so that
+#  "declared before the run" is auditable rather than merely asserted.
+#
+#  TIERS ARE THE PAPER'S (plexus2.tex):
+#     bookkeeping  does the code do what the operator says?
+#     closed_form  does the implementation reproduce the physics it was GIVEN?
+#     measurement  does the model agree with something OBSERVED IN CELLS?
+#  and `basis:` says where the number comes from, because a threshold copied off a
+#  previous run of the same code is a REGRESSION PIN, not a measurement, however much it
+#  looks like one:
+#     identity   true by construction if the code is right
+#     analytic   a value derivable on paper
+#     reference  a previous run of this same model -- pins a regression, claims no biology
+#     literature a number measured in cells, with its source
+# =====================================================================================
+_gate:
+  id: "00_spheroid"
+  question: >
+    Does an epithelium of 200 cells grow, divide and intercalate on a closed surface for 401 frames
+    without tearing, losing a cell, or running out of its own array?
+  operators_exercised: [mesh_seed, cell_geometry, cell_grow, junction_myosin, cell_mechanics,
+                        edge_flip, cell_divide, junction_sync, topo_record]
+  cross_check:
+    # NOT `log/okuda_ECM/00_spheroid/metrics.json`. That file reports 6,076 cells / fold 3.5577 /
+    # aspect 1.0213 / 1,384 T1s, which belongs to the `_PRESYNC` sibling cache, not to the cache the
+    # rig actually loads. Gating against 6,076 would fail a correct run.
+    tissue_cache: log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_2cedf4bcc6.npz
+    cells_end: 6914
+    r_apical_start: 4.654547567476855
+    r_apical_end: 17.969511832897478
+    t1_total: 1499
+
+  measures:
+
+    # ------------- bookkeeping: does the code do what the operator says? -------------
+    - name: seed_cell_count
+      tier: bookkeeping
+      basis: identity
+      fn: cell_count
+      reduce: first
+      assert: {eq: 200}
+      unit: "cells at frame 0"
+      why: "`mesh_seed` declares n_cells: 200. Every fold below is a fold OF this number."
+
+    - name: cell_count_never_falls
+      tier: bookkeeping
+      basis: identity
+      fn: cell_count_delta
+      reduce: min
+      assert: {ge: 0}
+      unit: "cells lost between consecutive frames"
+      why: >
+        No death operator is in this schedule, so the count can only rise. The one path that can
+        lose a cell is edge_flip's face-drop branch, which reindexes every per-face array; a single
+        lost cell means it fired and something did not follow it.
+
+    - name: occupancy_matches_topology
+      tier: bookkeeping
+      basis: identity
+      fn: occ_vs_mesh
+      reduce: max
+      assert: {eq: 0}
+      unit: "cells or vertices of disagreement, worst frame"
+      why: >
+        `occ` is what every downstream reader uses to find the live subset of a 25,584-slot
+        reservoir, and `nF`/`Nv` is what the mesh operators use. Disagree by one and a reader
+        averages over a dead slot -- silently, and plausibly.
+
+    - name: topology_delta_ledger
+      tier: bookkeeping
+      basis: identity
+      fn: topology_ledger
+      reduce: max
+      assert: {eq: 0}
+      unit: "|dV - 2*dF| + |dE - 3*dF| per recorded tick, worst tick"
+      why: >
+        A septum through a face adds exactly 2 vertices, 3 edges and 1 face; a T1 adds none of the
+        three. This is the ledger of the two operators the gate is about, and it is the cheapest
+        detector of edge_flip dropping a face (dF = -1 with dV = 0).
+
+    - name: no_nan
+      tier: bookkeeping
+      basis: identity
+      fn: nonfinite_count
+      reduce: max
+      assert: {eq: 0}
+      unit: "non-finite entries in positions or per-cell state"
+      why: >
+        `cell_mechanics` passes its gradient through `nan_to_num`, so a blown-up relaxation launders
+        itself rather than raising. This is the only place it surfaces.
+
+    - name: reservoir_headroom
+      tier: bookkeeping
+      basis: identity
+      fn: reservoir_fraction
+      reduce: max
+      assert: {le: 0.95}
+      unit: "fraction of the vertex reservoir in use at the fullest frame"
+      why: >
+        Stated as a fraction of the BUFFER on purpose, and it is the one row here that is about the
+        machine rather than the tissue: the reference peaks at 0.540 of 25,584, and the whole reason
+        `buffer_x` is 4 is that at 1.0 the run refuses 1,723 divisions and stops being biology.
+        0.95 is where the refusals begin, not where the reference sits -- a threshold at 0.55 would
+        be a transcription of the answer.
+
+    # ------------- closed form: does it reproduce the physics it was given? ----------
+    - name: euler_characteristic
+      tier: closed_form
+      basis: analytic
+      fn: euler_closed
+      reduce: all
+      assert: {eq: 2}
+      unit: "V - E + F"
+      why: >
+        The analytic value for a closed orientable genus-0 surface. Growth, division and T1 each
+        preserve it by construction, so any other integer means the sheet tore, self-glued or grew a
+        handle. Only valid on a CLOSED surface: on an open patch the half-edge shortcut counts
+        boundary half-edges as unpaired and returns nonsense.
+
+    - name: vertex_valence
+      tier: closed_form
+      basis: analytic
+      fn: valence_fraction
+      args: {valence: 3}
+      reduce: min
+      assert: {eq: 1.0}
+      unit: "fraction of live vertices that are trivalent"
+      why: >
+        A generic cellular surface is trivalent, and neither a T1 nor an edge-midpoint septum changes
+        a vertex's valence. A degree-4 vertex is the signature of a division that did not finish.
+
+    - name: mean_neighbours_per_cell
+      tier: closed_form
+      basis: analytic
+      fn: mean_neighbours_residual
+      reduce: max
+      assert: {lt: 1.0e-9}
+      unit: "|2E/F - (6 - 12/F)| neighbouring cells per cell"
+      why: >
+        Euler's theorem for a trivalent closed cellular surface -- "the average epithelial cell has
+        six neighbours". HONEST CAVEAT, carried into the note: this is a RESTATEMENT of chi = 2 plus
+        valence 3, not independent evidence, and it says nothing about whether this tissue's
+        neighbour DISTRIBUTION resembles a real epithelium.
+
+    # ------------- reference: a regression pin. Claims no biology. -------------------
+    - name: final_cell_count
+      tier: measurement
+      basis: reference
+      fn: cell_count
+      reduce: last
+      assert: {eq: 6914}
+      unit: "cells at frame 401"
+      why: >
+        The cache's own value, reproduced frame by frame. Exact rather than banded because the
+        repeatability floor of this platform is ZERO -- measured on b_star over 1,800 frames with
+        division and T1 in the loop -- so a band would only hide a real change.
+
+    - name: apical_radius_fold
+      tier: measurement
+      basis: reference
+      fn: apical_radius_fold
+      reduce: last
+      assert: {within: [3.8607, 0.002]}
+      unit: "x the frame-0 apical radius"
+      why: >
+        17.9695 / 4.6545. A tolerance rather than an equality because this one is a ratio of two
+        floats reduced across every live vertex, and the last bits of a mean over 13,824 vertices
+        are not the thing being tested.
+
+    - name: aspect_ratio
+      tier: measurement
+      basis: reference
+      fn: aspect_ratio
+      reduce: last
+      assert: {within: [1.0193, 0.01]}
+      unit: "equatorial radius / axial radius"
+      why: >
+        The tissue is meant to stay round while it grows 35-fold in area. 1% is the band inside which
+        no later gate's operator may move it -- that is what makes this row useful to gates 01-04
+        rather than only to this one.
+
+    - name: t1_total
+      tier: measurement
+      basis: reference
+      fn: t1_total
+      reduce: last
+      assert: {eq: 1499}
+      unit: "neighbour exchanges over the run"
+      why: >
+        The count the `edge_flip` rail delivers on this tissue. Exact, for the same reason
+        `final_cell_count` is exact.
+
+    - name: t1_rail_fraction
+      tier: measurement
+      basis: reference
+      fn: t1_rail_fraction
+      args: {max_flips: 30}
+      reduce: last
+      assert: {le: 0.40}
+      unit: "fraction of edge_flip calls that hit max_flips"
+      why: >
+        THE ROW THAT SAYS THE T1 RATE IS NOT FREE. 32 of 101 calls sit on the cap and deliver about
+        two thirds of the flips, so `t1_total` is partly a property of `max_flips: 30`. Declared and
+        bounded rather than left implicit; if a promotion pushes this above 0.40 the T1 numbers stop
+        meaning what they say.
+
+    # ------------- literature: does the model agree with something seen in cells? ----
+    - name: cell_cycle_hours
+      tier: measurement
+      basis: literature
+      fn: doubling_time_hours
+      reduce: last
+      assert: {interval: [12.0, 24.0]}
+      unit: "hours per cell cycle"
+      why: >
+        200 -> 6,914 cells is 5.11 doublings; at 600 s a frame, 401 frames is 66.8 h, so the mean
+        cycle is 13.1 h. A cultured epithelial cell divides every 12-24 h. THE ONLY REASON THIS ROW
+        CAN EXIST is the `units:` block above -- without it this is a number, not a duration.
+
+    - name: mean_cell_diameter_um
+      tier: measurement
+      basis: literature
+      fn: mean_cell_diameter_um
+      reduce: last
+      assert: {interval: [5.0, 15.0]}
+      unit: "um, sqrt of the mean apical area"
+      why: >
+        An epithelial cell is about 8.5 um across. This is the row that would catch a tissue that
+        grew by inflating its cells instead of by dividing them -- the two are indistinguishable in
+        `apical_radius_fold` and differ by a factor of 5 here.
+
+    - name: spheroid_diameter_um
+      tier: measurement
+      basis: literature
+      fn: spheroid_diameter_um
+      reduce: last
+      assert: {interval: [100.0, 500.0]}
+      unit: "um"
+      why: >
+        2 x 17.97 x 10 um = 359 um. A cultured spheroid is 100-500 um before its core goes hypoxic
+        and the model, which has no nutrient field, stops being about anything real. This row is the
+        boundary of the model's own validity, stated in the unit that makes it checkable.

@@ -168,8 +168,18 @@ form the paper prescribes -- one name, one contract, several bodies.
   about on every import: a seed that masquerades as a dynamics kind skips the seed lifecycle
   guarantees. Fixed when `integrin_ops` moves, not before -- it is a behaviour change.
 * **`topo_record` stores its history INSIDE the mesh** (`m.setdefault("hist", [])`), so the table the
-  engine now owns grows without bound for the length of the run. Phase 0 step 5 moves it to the
-  engine's recorder; the operator then has nothing left to do and retires.
+  engine now owns grows without bound for the length of the run. Phase 0 step 5 moved the recording
+  to the engine (`rec_mesh` + `MeshTable.snapshot`); the operator still dual-writes `hist`, and
+  retires when its readers move over.
+* **`config/material/material_cell_grow_aniso.yaml` and its sibling name `cell_grow` in a 2D spec.**
+  They have never worked: `cell_grow` was not registered in core before this promotion, so they
+  failed with *not in registry*, and now they fail with *supports dims [3], not dim=2* -- a better
+  message for the same broken spec. They almost certainly mean `agent_grow`, the core's 2D
+  growth operator, but "almost certainly" is not a migration and whoever wrote them should say.
+* **`plexus.operators.<one-operator-module>` is imported by name from five prototype scripts** --
+  `prototype/eye/muscle_ops.py`, three files under `prototype/cardio_cells/`, and
+  `prototype/inverse_slime/operators.py` reach for `mpm_grid`, `deposit` and `diffuse`. That is why
+  the core regrouping leaves re-export shims behind instead of deleting the files.
 
 ## Regenerating the table
 

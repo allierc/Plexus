@@ -1,78 +1,11 @@
-"""Analytic attraction-repulsion: a smooth, per-type pairwise interaction law.
+"""attraction_repulsion -- MOVED to `plexus.operators.interaction_ops`.
 
-A Lateral operator over a neighbour graph. For a receiver particle i of type t,
-summed over its neighbours j (the edges left by a `rewire` operator such as
-`radius_graph`):
+Kept as a re-export because thirty files import it by bare module name -- `run_one.py`,
+`instrument.py`, `vtk_render.py`, `metrics.py` and twenty archive/analysis scripts -- and the
+campaign is still running against them. PRIVATE NAMES ARE RE-EXPORTED TOO: `_carry_face_state`,
+`_engine_owns_clock` and friends are called across module boundaries in okuda, so a shim that
+exported only the public surface would break at the first T1.
 
-    f(r) = p1 * exp(-r^(2 p2) / 2σ²)  -  p3 * exp(-r^(2 p4) / 2σ²)      (a length)
-    dpos_i = Σ_j  f(r_ij) * (pos_j - pos_i)                            (a velocity)
-
-with p = [p1,p2,p3,p4] the per-type parameters and σ a global width. The first
-Gaussian is the long-range pull, the second the short-range push; their balance
-gives type-specific phases (clusters, networks, lattices). First-derivative law:
-returns a velocity (`EMIT = velocity`; overdamped, engine-integrated).
-
-This is message passing on `Level.edge_index` (O(E), scales to 1e4-1e5 nodes), not
-a dense O(N^2) matrix. Per-type parameters come from the spec's `types:` block
-(each type carries `p`), assembled by the engine into `Level.type_params`.
+New code should import from `plexus.operators.interaction_ops`.
 """
-from __future__ import annotations
-
-import torch
-
-from plexus.models.base import Lateral
-from plexus.models.registry import register_operator
-from plexus.geometry import minimum_image
-
-
-@register_operator("attraction_repulsion", family="interaction", set="particle", kind="lateral")
-class AttractionRepulsion(Lateral):
-    EMIT = "velocity"             # emits a velocity (overdamped law)
-    SUPPORTED_DIMS = [2, 3]                      # dimension-generic (reads D = pos.shape[-1])
-    REQUIRES_PARAMS = ["sigma"]                 # the cutoff lives on the radius_graph rewire op
-    REQUIRES_TYPE_PROPS = ["p"]                 # per-type force-law params [p1,p2,p3,p4]
-    # mechanism-search metadata: the long-range Gaussian (p1,p2) is the pull, the
-    # short-range Gaussian (p3,p4) the push; their balance sets the phase.
-    MECHANISM_TAGS = ["long_range_attraction", "short_range_repulsion", "coarsening", "lattice_forming"]
-    PARAM_ROLES = {"sigma": "interaction_length", "noise": "exploration_noise",
-                   "p": "[pull_strength, pull_range, push_strength, push_range] per type"}
-    REFERENCE = "D'Orsogna, M. R. et al. (2006). Self-propelled particles with soft-core interactions. Phys. Rev. Lett. 96:104302."
-
-    def __init__(self, params, device="cpu"):
-        super().__init__(params, device)
-        self.sigma = float(params["sigma"])
-        self.aggr = params.get("aggr", "mean")               # mean (default, matches the reference) or sum
-        self.noise = float(params.get("noise", 0.0))         # isotropic velocity noise (off by default)
-        self.at = params.get("_at", "particle")
-
-    def forward(self, H, mask=None):
-        lvl = H.level(self.at)
-        pos = lvl.get("pos")
-        occ = lvl.occ
-        N, D = pos.shape[0], pos.shape[-1]
-        ei = lvl.edge_index                                  # [2, E]: row0 = receiver i, row1 = neighbour j
-        if ei.numel() == 0:
-            return {self.at: torch.zeros(N, D, device=pos.device)}
-        i, j = ei[0], ei[1]
-
-        d = minimum_image(pos[j] - pos[i], getattr(H, "periodic", False),
-                          getattr(H, "world_size", getattr(H, "world_width", 1.0)))   # j - i  [E, D]
-        r2 = (d * d).sum(-1)                                  # [E]
-        p = lvl.type_params[lvl.node_type[i]]                # receiver-type params [E, 4]
-        s2 = 2.0 * self.sigma ** 2
-        f = (p[:, 0] * torch.exp(-(r2 ** p[:, 1]) / s2)
-             - p[:, 2] * torch.exp(-(r2 ** p[:, 3]) / s2))   # [E]
-        f = f * occ[j]                                       # ignore dormant neighbours
-
-        dpos = torch.zeros(N, D, device=pos.device)
-        dpos.index_add_(0, i, f[:, None] * d)                # aggregate at the receiver
-        if self.aggr == "mean":                              # average over neighbours (density-independent)
-            deg = torch.zeros(N, device=pos.device).index_add_(0, i, occ[j])
-            dpos = dpos / deg.clamp(min=1.0)[:, None]
-        dpos = dpos * occ[:, None]
-        if self.noise > 0.0:                                 # exploratory noise on the overdamped velocity
-            dpos = dpos + self.noise * torch.randn(N, D, generator=getattr(H, "rng", None),
-                                                   device=pos.device) * occ[:, None]
-        if mask is not None:
-            dpos = dpos * mask[:, None].float()
-        return {self.at: dpos}
+from plexus.operators.interaction_ops import *          # noqa: F401,F403

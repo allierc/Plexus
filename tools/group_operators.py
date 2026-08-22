@@ -220,6 +220,129 @@ Ours are not: a cell is 0.73 dx and the basement membrane 0.1 dx, so both bodies
 grid cell and the grid hands them ONE velocity -- the weld that `test_03_mesh_contact` measured.
 """''',
     ),
+    # ---------------------------------------------------------------------------------------
+    # PHASE 0b / E: regrouping the CORE's own one-operator files. Same rule, same script, and the
+    # same twin gate -- a regrouping that moves a byte is a regrouping that broke something. The
+    # sources here live in src/plexus/operators/ rather than discovery_okuda/ops/, so `src_dir`
+    # says where to read them.
+    dict(
+        target="src/plexus/operators/mpm_ops.py",
+        src_dir="src/plexus/operators",
+        sources=["mpm_grid.py", "mpm_scatter.py", "mpm_grid_update.py", "mpm_gather.py",
+                 "mpm_strain.py", "mpm_anchor.py", "mpm_spin.py", "material_map.py", "mpm.py"],
+        module="plexus.operators.mpm_ops",
+        doc='''"""MLS-MPM, as one module: the grid, the four-step cycle, and the two forces on it.
+
+    mpm_grid            the background FIELD and the quadratic B-spline kernel (not an operator)
+    mpm_scatter (p2g)   particle -> grid: mass, momentum, and the internal stress impulse
+    mpm_grid_update     grid -> grid: the solve, gravity, and the wall conditions
+    mpm_gather (g2p)    grid -> particle: velocity, the affine C, and advection
+    mpm_strain          particle -> particle: F update and the material's response
+    mpm_anchor          a spring to a rest position, for a body that must not drift
+    mpm_spin            a prescribed angular velocity
+    apply_material_map  a per-particle material assignment from a map
+    mls_mpm_mechanics   the FENCED transitional oracle: the whole cycle in one operator
+
+THE ORACLE IS STILL HERE AND IS STILL FENCED. `mls_mpm_mechanics` does in one operator what the
+four above do in four, and it exists so the decomposition can be checked against something. It is
+not the recommended path and it is not what a new spec should schedule.
+
+WHY THE GRID IS IN THE SAME FILE. `stencil_offsets`, `bspline` and `sub_dt` were imported from
+`mpm_grid` by seven other files, so the kernel that defines the discretisation was a private
+detail of one of nine siblings. Every MPM operator's substep -- and the CFL ceiling that bounds it,
+dt < dx / sqrt(E/rho) -- is now readable in one place.
+
+TWO REJECTED NEIGHBOURS ARE NOT HERE. `mpm_boundary` (kinematic, momentum not conserved, standoff
+set by the stencil width) and `bm_strain` stay in discovery_okuda; see membrane_ops and AUDIT.md.
+"""''',
+    ),
+    dict(
+        target="src/plexus/operators/motion_ops.py",
+        src_dir="src/plexus/operators",
+        sources=["drag.py", "glide.py", "sediment.py", "attractor_flow.py", "velocity_cruise.py",
+                 "bounce.py", "gravity.py"],
+        module="plexus.operators.motion_ops",
+        doc='''"""How a body moves when nothing else is acting on it: damping, drift, walls, gravity.
+
+    drag            velocity-proportional damping -- the overdamped limit's other half
+    glide           move along the heading at a fixed speed
+    velocity_cruise (cruise) relax the speed toward a target without touching the direction
+    sediment        a settling velocity
+    attractor_flow  a prescribed vector field (Lorenz, Rossler, ... ) as the velocity
+    gravity         a uniform body force
+    bounce          the wall and obstacle response
+
+These are the operators with no INTERACTION in them: each reads one element's own state and writes
+one element's own delta. Grouping them is what makes that visible -- and makes it obvious when a
+new operator does not belong.
+"""''',
+    ),
+    dict(
+        target="src/plexus/operators/interaction_ops.py",
+        src_dir="src/plexus/operators",
+        sources=["attraction_repulsion.py", "squared_law.py", "cohesion.py", "separation.py",
+                 "velocity_align.py", "stillinger_weber.py", "graph.py"],
+        module="plexus.operators.interaction_ops",
+        doc='''"""Pairwise laws, and the relation they act over.
+
+    radius_graph          the relation: who is near whom (a rewire, and it comes first)
+    attraction_repulsion  the two-term law the prototype scenarios are built on
+    squared_law           inverse-square: gravity between bodies, Coulomb between charges
+    cohesion / separation / velocity_align    the three boids terms, one operator each
+    stillinger_weber      a three-body potential with an angular term (autograd)
+
+THE GRAPH IS IN THIS FILE ON PURPOSE. Every law below it reads `edge_index`, and which relation
+they read is the single most consequential thing about a spec that uses them -- a cutoff radius
+changes a flock into a crystal. It is not a utility that happens to live elsewhere.
+"""''',
+    ),
+    dict(
+        target="src/plexus/operators/field_ops.py",
+        src_dir="src/plexus/operators",
+        sources=["scalar_field.py", "deposit.py", "diffuse.py", "decay.py", "sense.py",
+                 "chemotax.py", "prescribed_field.py", "pacemaker.py", "activation_pulse.py",
+                 "signal.py"],
+        module="plexus.operators.field_ops",
+        doc='''"""A continuum bound to a set: what writes into it, what happens inside it, what reads it.
+
+    deposit        set -> field   (a cell lays a trail)
+    diffuse        field -> field (finite_difference | spectral)
+    decay          field -> field
+    sense          field -> set   (a cell reads the value under it)
+    chemotax       field -> set   (and moves up the gradient)
+    playback       a PRESCRIBED field: a video or a measured stack, not a solved one
+    pacemaker / activation_pulse   an excitable field's source terms
+    signal         set -> set along an edge-set (the synapse case)
+
+THE FOUR-STEP SHAPE IS THE POINT OF THE GROUPING. deposit / diffuse / decay / sense is one
+mechanism written as four operators so that each can be swapped, and reading them apart is how a
+spec ends up depositing into a field nothing senses.
+"""''',
+    ),
+    dict(
+        target="src/plexus/operators/agent_ops.py",
+        src_dir="src/plexus/operators",
+        sources=["agent_divide.py", "agent_grow.py", "agent_scatter.py", "agent_gather.py",
+                 "agent_remodel.py", "polarity_align.py", "polarity_flow_align.py",
+                 "active_force.py", "active_stress.py", "aggregate.py", "broadcast.py",
+                 "segmentation_seed.py"],
+        module="plexus.operators.agent_ops",
+        doc='''"""Agents in a material: the two-way coupling, the population, and the scale maps.
+
+    agent_scatter (agent_to_mpm)  agent -> grid: the agent deforms the material
+    agent_gather  (mpm_to_agent)  grid -> agent: the material drags and confines the agent
+    agent_remodel                 agent -> material stiffness: cells soften or rigidify tissue
+    agent_divide / agent_grow     the population, on a fixed buffer with occupancy
+    polarity_align (heading_align) / polarity_flow_align (flow_align)   where an agent points
+    active_force / active_stress  a pulse becomes a contraction or a stress
+    aggregate / broadcast         the two SCALE maps: child -> parent, parent -> child
+    seed_from_segmentation        a measured instance segmentation becomes the cell level
+
+THE PAIR THAT MATTERS is `agent_scatter` / `agent_gather`: they are the same coupling read in two
+directions, and they must be scheduled together. Splitting them across files is how a spec comes to
+push on a material that never pushes back.
+"""''',
+    ),
 ]
 
 # ------------------------------------------------------------------- import rewrites, applied in order
@@ -241,6 +364,13 @@ REWRITES = [
     (r"^(\s*)from mesh_ops import ", r"\1from plexus.operators.vertex_ops import ", "ecm_ops"),
     (r"^(\s*)from mesh_ops import ", r"\1from plexus.operators.vertex_ops import ", "membrane_ops"),
     (r"^(\s*)from mesh_ops import ", r"\1from plexus.operators.vertex_ops import ", "contact_ops"),
+    # THE GRID MOVES INTO THE MODULE THAT USES IT. Inside `mpm_ops` the import is now a self-import
+    # -- and not merely redundant: `mpm_grid.py` becomes a shim that re-exports FROM `mpm_ops`, so
+    # leaving the line in would make the module import itself through its own shim and deadlock at
+    # first import.
+    (r"^from plexus\.operators\.mpm_grid import ([^\n]+)\n",
+     r"# (was `from plexus.operators.mpm_grid import \1`) -- same module now\n", "mpm_ops"),
+    (r"plexus\.operators\.mpm_grid", "plexus.operators.mpm_ops", "agent_ops"),
 ]
 
 
@@ -364,7 +494,8 @@ def build(group, dry=False):
     # new spec can reach them from core. `--verify` counts them as "held back", not as a difference.
     group["_held"] = {}
     for s in group["sources"]:
-        d, imp, body = _split(os.path.join(OPS, s))
+        d, imp, body = _split(os.path.join(ROOT, group.get("src_dir", ""), s)
+                              if group.get("src_dir") else os.path.join(OPS, s))
         body, held = _hold_back(body, group.get("exclude") or [], s)
         # KEYED BY SOURCE. A group-wide dict wrote `bm_strain` into `integrin_ops.py`'s shim as well
         # as `membrane_ops.py`'s, and the second registration raised
@@ -446,7 +577,8 @@ PRIVATE_BLOCK = '''from {module} import (          # noqa: F401  the underscored
 
 def shim(group):
     for s in group["sources"]:
-        path = os.path.join(OPS, s)
+        path = os.path.join(ROOT, group.get("src_dir", ""), s) if group.get("src_dir") \
+            else os.path.join(OPS, s)
         _d, _i, body = _split(path)
         priv = sorted({n.name for n in ast.parse(body).body
                        if isinstance(n, (ast.FunctionDef, ast.ClassDef)) and n.name.startswith("_")}
@@ -477,8 +609,10 @@ def main():
         # concatenate the shims and overwrite the real module with 24 lines of imports. The tool
         # refuses rather than "succeeding": a move that silently empties the module it moved is the
         # worst possible failure here, because every spec would still load and register nothing.
+        _sdir = os.path.join(ROOT, g["src_dir"]) if g.get("src_dir") else OPS
         already = [x for x in g["sources"]
-                   if "-- MOVED to `" in open(os.path.join(OPS, x)).read()[:400]]
+                   if not os.path.exists(os.path.join(_sdir, x))
+                   or "-- MOVED to `" in open(os.path.join(_sdir, x)).read()[:400]]
         if already:
             print(f"  {g['target']}: already moved ({', '.join(already)}) -- skipped")
             continue
@@ -491,14 +625,14 @@ def main():
     return 0
 
 
-def _pre_move_text(src, max_back=40):
+def _pre_move_text(src, rel_dir="discovery_okuda/ops", max_back=40):
     """The last committed version of `discovery_okuda/ops/<src>` that was NOT already a shim.
 
     `HEAD:` is the wrong thing to read once the move is committed: the file there IS the shim, and
     comparing a shim against the module it points at reports everything as missing. Walking back to
     the last real version is what makes `--verify` still mean something a week later.
     """
-    rel = f"discovery_okuda/ops/{src}"
+    rel = f"{rel_dir}/{src}"
     revs = subprocess.run(["git", "-C", ROOT, "rev-list", f"-{max_back}", "HEAD", "--", rel],
                           capture_output=True, text=True, timeout=60).stdout.split()
     for rev in revs:
@@ -524,8 +658,10 @@ def verify():
             continue
         target = open(os.path.join(ROOT, g["target"])).read()
         for src in g["sources"]:
-            path = os.path.join(OPS, src)
-            text = _pre_move_text(src) or (open(path).read() if os.path.exists(path) else "")
+            path = (os.path.join(ROOT, g["src_dir"], src) if g.get("src_dir")
+                    else os.path.join(OPS, src))
+            text = (_pre_move_text(src, g.get("src_dir", "discovery_okuda/ops"))
+                    or (open(path).read() if os.path.exists(path) else ""))
             if not text or "-- MOVED to `" in text[:400]:
                 print(f"    {src}: no pre-move source found in history -- cannot verify")
                 continue

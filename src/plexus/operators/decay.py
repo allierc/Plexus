@@ -1,33 +1,11 @@
-"""decay -- field -> field. Linear evaporation of a scalar field.
+"""decay -- MOVED to `plexus.operators.field_ops`.
 
-c <- max(0, c - k*dt). Without decay the deposited trail would only accumulate;
-decay is what lets unused filaments fade so the network coarsens (stigmergy).
-Writes the field in place; returns {}.
+Kept as a re-export because thirty files import it by bare module name -- `run_one.py`,
+`instrument.py`, `vtk_render.py`, `metrics.py` and twenty archive/analysis scripts -- and the
+campaign is still running against them. PRIVATE NAMES ARE RE-EXPORTED TOO: `_carry_face_state`,
+`_engine_owns_clock` and friends are called across module boundaries in okuda, so a shim that
+exported only the public surface would break at the first T1.
+
+New code should import from `plexus.operators.field_ops`.
 """
-from __future__ import annotations
-
-from plexus.models.base import FieldUpdate
-from plexus.models.registry import register_operator
-
-
-@register_operator("decay", family="fields", set="field", kind="field")
-class Decay(FieldUpdate):
-    """field -> field: acts on the field named by `at:` (no set involved)."""
-
-    EMIT = None                                # field->field: writes the grid in place (evaporation); returns {} — no integrable delta
-    SUPPORTED_DIMS = [2, 3]                     # elementwise evaporation, dimension-agnostic
-    REQUIRES_PARAMS = []                        # no required params — field target from `at:`; `rate` optional
-    MECHANISM_TAGS = ["evaporation", "field_decay", "stigmergy"]
-    PARAM_ROLES = {"rate": "evaporation_rate"}
-    REFERENCE = "Plexus (this work)."
-
-    def __init__(self, params, device="cpu"):
-        super().__init__(params, device)
-        self.field_name = params.get("_at") or params.get("to")   # the field at `at:`
-        self.rate = float(params.get("rate", 0.012))    # evaporation per unit time
-
-    def forward(self, H, mask=None):
-        fld = H.fields[self.field_name]
-        dt = float(getattr(H.config, "dt", 1.0))
-        fld.grid = (fld.grid - self.rate * dt).clamp(min=0.0)
-        return {}
+from plexus.operators.field_ops import *          # noqa: F401,F403
