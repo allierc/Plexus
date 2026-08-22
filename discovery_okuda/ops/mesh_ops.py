@@ -42,12 +42,21 @@ def _carry_face_state(m, keep, dt, dev):
     way must be an INTENSIVE quantity -- a density, a concentration, an age. Carrying an extensive
     one (an amount, a mass) doubles it at every division. `medioapical_myosin` stores an areal density
     for exactly this reason.
+
+    ONE IMPLEMENTATION, FOUR CALLERS. The body of this moved to `MeshTable.reindex_faces` so the
+    carry is a property of the mesh rather than a helper each topology operator has to remember to
+    call -- `edge_flip` did not, for its whole life, and dropped the medioapical myosin every time a
+    flip lost a face. The semantics here are unchanged, clamp included.
     """
-    names = m.get("face_carry")
-    if not names:
+    if not m.get("face_carry"):
         return
+    if hasattr(m, "reindex_faces"):
+        m.reindex_faces(keep, dt=dt, dev=dev)
+        return
+    # A BARE DICT still reaches this: four operator self-tests build fake meshes as plain dicts and
+    # must keep working, and every archived run predates the table.
     idx = torch.as_tensor(np.asarray(keep, np.int64), device=dev)
-    for nm in sorted(names):
+    for nm in sorted(m.get("face_carry") or ()):
         a = m.get(nm)
         if a is None:
             continue

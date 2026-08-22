@@ -27,6 +27,7 @@ from __future__ import annotations
 import numpy as np
 import torch
 
+import mesh_ops as _mesh_ops
 from plexus.models.base import Rewire
 from plexus.models.registry import register_operator
 
@@ -312,6 +313,18 @@ class ReconnectT1_3D(Rewire):
                                              dtype=m[_nm].dtype, device=m[_nm].device)
             if isinstance(m.get("apop_flag"), np.ndarray):
                 m["apop_flag"] = np.asarray([m["apop_flag"][i] for i in keep], np.float64)
+            # AND THE OPEN NAMES, which this branch has never carried. The tuple above is the
+            # CLOSED list every topology operator knows; `face_carry` is the open one an operator
+            # declares for itself, and `cell_divide` and `cell_die` have routed it through
+            # `_carry_face_state` since it existed. This one did not, so a flip that lost a face
+            # left `medioapical_myosin`'s per-face density indexed against faces that had moved --
+            # the same defect class as per-half-edge myosin before `junction_sync`, one level up.
+            #
+            # UNREACHABLE IN THE GATED RUN, and asserted so: this branch needs `nF2 != nF`, which
+            # `_ring_ok` refuses to produce (it rejects any new ring below three sides). The fix is
+            # covered by `tools/test_mesh_carry.py` instead, which constructs the condition.
+            _mesh_ops._carry_face_state(m, keep, m["A0"].dtype if "A0" in m else torch.float32,
+                                        m["E_srce"].device)
             # THE CELL STATE AND THE PENDING DELTAS FOLLOW TOO, and leaving them behind is the
             # same defect cell_die had: `chem` is indexed by face, and the engine zeroes its
             # delta accumulator once per TICK and integrates at the END of the schedule, so
