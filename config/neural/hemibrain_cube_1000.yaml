@@ -1,0 +1,128 @@
+# hemibrain_cube_1000 -- ~1000 real neurons, a synthetic connectome, and a rendered volume.
+#
+# THREE REPRESENTATIONS OF ONE SYSTEM, which is what this spec exists to demonstrate:
+#
+#     graph        the `synapse` edge-set: 20,259 connections carrying W_e
+#     entities     the `neuron` set: 1,002 somas at their real hemibrain positions
+#     field        `neural_activity`: a 128^3 grid, the assembly's collective activity
+#
+# and none of the three is the "real" one. The mechanism runs on the entities and the graph;
+# the field is an OBSERVATION of them (operators/observation.py), and it is what a continuum
+# model downstream consumes.
+#
+#     brain
+#     └── assembly                       <- the field belongs at this scale
+#         ├── neuron   x_i, r_i          <- from NeuPrint, frozen by plexus.io.neuprint
+#         └── synapse  W_ij              <- synthetic, frozen by plexus.io.connectome
+#
+# WHERE THE ANATOMY COMES FROM. `plexus.io.neuprint` bisected a cube of hemibrain:v1.2.1 until
+# it held ~1000 traced neurons carrying a soma: 1,002 neurons in a 44.5 um cube at voxel
+# (9, 26472, 25771). The manifest records the dataset, the query and every body id, so the
+# selection is auditable; this spec names the manifest, never the query.
+#
+# WHERE THE WIRING COMES FROM. `plexus.io.connectome`, exponential kernel, p = 0.02,
+# lambda = 850 vox (6.8 um), g = 1.5, seed 0 -> 20,259 edges, mean in-degree 20.2. The
+# distance kernel is deliberate: a uniformly-wired network renders to a SPATIALLY WHITE field,
+# which is a poor continuum dataset. See io/connectome.py.
+#
+# UNITS. `length_um` is MEASURED -- the world box is exactly the cube the importer chose, and
+# the manifest says it is 44.509 um across, so a voxel of the 128^3 grid is 0.348 um.
+# `time_s` is NOT measured: it is the modelling choice that one simulation time unit is one
+# second, so dt = 0.05 is a 50 ms step and a = 1 is a 1 s membrane time constant. Declared
+# rather than left implicit, and flagged here so no one reads the second number as the first.
+general:
+  name: hemibrain_cube_1000
+  seed: 0
+  n_frames: 400
+  dt: 0.05
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  boundary: wall
+  record_cap: 401           # every frame of the 1,002 voltages: 400 x 1002 x 4 B = 1.6 MB
+  field_record_cap: 128     # 128^3 x 4 B = 8 MB per field frame -> ~101 frames, ~0.8 GB
+  units:
+    length_um: 44.509375    # the cube's side; the world box IS the cube (manifest.region.side_um)
+    time_s: 1.0             # a CHOICE, not a measurement -- see the note above
+
+sets:
+  brain:
+    n: 1
+
+  assembly:
+    parent: brain
+    per_parent: 1
+
+  # the state layout comes from the registered `neuron` entity: pos (fixed geometry),
+  # voltage (the integrated coordinate), omega (external modulation, unused here).
+  neuron:
+    parent: assembly
+    per_parent: 1002        # must equal the manifest's count -- neural_seed refuses a mismatch
+    # FOUR PARAMETER TYPES. These are DYNAMICAL types (the p vector of the update equation),
+    # not the ~200 anatomical cell types the manifest carries; the seed records those as a
+    # `cell_type_id` buffer for provenance, and wiring them to p is a later step.
+    #   p = [a, b, g, s, w, h]
+    types:
+      slow_quiet:  {fraction: 0.25, p: [1.0, 0.0, 1.2, 0.5, 1.00, 0.0]}
+      slow_bursty: {fraction: 0.25, p: [1.0, 0.0, 1.2, 1.6, 0.50, 0.0]}
+      fast_quiet:  {fraction: 0.25, p: [2.5, 0.0, 1.2, 0.5, 2.00, 0.0]}
+      fast_bursty: {fraction: 0.25, p: [2.5, 0.0, 1.2, 1.6, 0.25, 0.0]}
+
+  synapse:
+    parent: brain
+    edge_set: true
+    pre: neuron
+    post: neuron
+    edges_file: neural_regions/hemibrain_cube_1000/connectome.npz   # edge_index [2, E] + weights [E]
+
+fields:
+  # the OBSERVATION, at the assembly's scale. 128^3 is the nominal 3D resolution of the Well
+  # datasets Walrus trains on (supernova_explosion_128); MHD_64 is the 64^3 tier.
+  neural_activity:
+    frame: grid
+    res: 128
+    components: 1
+    couples_to: assembly
+
+seed:
+  # x_0: the somas at their hemibrain positions, mapped affinely into the unit box.
+  - op: neural_seed
+    at: neuron
+    region: hemibrain_cube_1000        # -> graphs_data/neural_regions/<name> (an INPUT tree)
+    v0_mean: 0.0
+    v0_sd: 0.5              # a spread, so x = 0 is not a fixed point
+
+operators:
+  - op: neuron_update       # phi: -a x + b + s tanh(x)
+    at: neuron
+    model: leaky_tanh
+    noise: 0.01
+
+  - op: neuron_signal       # psi: g * SUM_e W_e psi(x_pre)
+    at: neuron
+    model: type_pairwise
+    edge_set: synapse
+    activation: tanh
+
+  - op: aggregate           # the assembly's mean voltage, along the containment map
+    at: assembly
+    child: neuron
+    block: voltage
+    into: activity
+
+  - op: voxelize            # the neurons -> the 128^3 field. A representation, not a mechanism.
+    at: neuron
+    to: neural_activity
+    block: voltage
+    kernel: gaussian
+    sigma: 1.5              # voxels, so it follows `res`; 1.5 vox = 0.52 um at this scale
+    normalize: none         # an activity DENSITY (bright where dense AND active). See voxelize.
+
+schedule:
+  - neuron_update
+  - neuron_signal
+  - aggregate
+  - voxelize
+
+plotting:
+  background: black
+  point_size: 4.0

@@ -18,8 +18,9 @@ other is how anyone can tell which one a spec is getting.
     interaction_ops      pairwise laws, and the relation they act over
     field_ops            a continuum bound to a set: deposit / diffuse / decay / sense
     agent_ops            agents in a material: the two-way coupling, population, scale maps
-    neural               a recurrent circuit: the local update, the signalling through W, and
-                         the external field that modulates it
+    neural               a recurrent circuit: the seed that places a connectome region, the
+                         local update, the signalling through W, and the field modulating it
+    observation          NOT a mechanism: how the state is looked at (voxelize)
 
 EVERY OLD MODULE NAME STILL IMPORTS. `plexus.operators.drag`, `plexus.operators.mpm_grid` and the
 rest are re-export shims, because five prototypes reach for them by name -- `prototype/eye`,
@@ -58,9 +59,11 @@ from . import ecm_ops               # noqa: F401  ecm_seed/stress/from_cell, cel
 from . import membrane_ops          # noqa: F401  bm_*, adhesion_*, integrin_*
 from . import contact_ops           # noqa: F401  mesh_contact, mesh_inside, surface_track,
 #                                                 plate_confine, bm_sense, ecm_load, ecm_gate_growth
-from . import neural                # noqa: F401  neuron_update (phi), neuron_signal (psi: shared |
-#                                                 type_pre | type_pairwise), neuron_field_input (Omega)
+from . import neural                # noqa: F401  neural_seed, neuron_update (phi), neuron_signal
+#                                                 (psi: shared | type_pre | type_pairwise),
+#                                                 neuron_field_input (Omega)
+from . import observation           # noqa: F401  voxelize -- a REPRESENTATION, not a mechanism
 
 __all__ = ["interaction_ops", "motion_ops", "field_ops", "mpm_ops", "agent_ops",
            "vertex_ops", "diffusion_reaction", "junction_ops", "ecm_ops", "membrane_ops",
-           "contact_ops", "neural"]
+           "contact_ops", "neural", "observation"]
