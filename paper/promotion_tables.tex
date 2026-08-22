@@ -145,6 +145,19 @@ gate & row & tier & basis & declared & measured & \\\midrule\endhead
 \code{00\_spheroid} & \code{cell\_cycle\_hours} & measurement & literature & interval [12.0, 24.0] & 13.0752 & \textcolor{good}{pass}\\
 \code{00\_spheroid} & \code{mean\_cell\_diameter\_um} & measurement & literature & interval [5.0, 15.0] & 7.66072 & \textcolor{good}{pass}\\
 \code{00\_spheroid} & \code{spheroid\_diameter\_um} & measurement & literature & interval [100.0, 500.0] & 359.39 & \textcolor{good}{pass}\\
+\code{01\_junction} & \code{myosin\_array\_aligned\_with\_half\_edges} & bookkeeping & identity & eq 0 & 0 & \textcolor{good}{pass}\\
+\code{01\_junction} & \code{myosin\_unaligned\_without\_sync} & bookkeeping & identity & ge 0 & 2106 & \textcolor{good}{pass}\\
+\code{01\_junction} & \code{cell\_count\_never\_falls} & bookkeeping & identity & ge 0 & 0 & \textcolor{good}{pass}\\
+\code{01\_junction} & \code{euler\_characteristic} & closed form & analytic & eq 2 & 2 & \textcolor{good}{pass}\\
+\code{01\_junction} & \code{junction\_sync\_is\_trajectory\_neutral} & closed form & analytic & eq 0.0 & 0 & \textcolor{good}{pass}\\
+\code{01\_junction} & \code{t1\_total} & measurement & reference & eq 1499 & 1499 & \textcolor{good}{pass}\\
+\code{01\_junction} & \code{t1\_rate\_per\_cell\_per\_frame} & measurement & reference & within [0.0022, 0.0004] & 0.00215415 & \textcolor{good}{pass}\\
+\code{01\_junction} & \code{mean\_junction\_length\_fold} & measurement & reference & within [0.63, 0.08] & 0.629382 & \textcolor{good}{pass}\\
+\code{01\_junction} & \code{myosin\_is\_localised\_not\_merely\_present} & measurement & reference & ge 1.2 & 1.42286 & \textcolor{good}{pass}\\
+\code{01\_junction} & \code{tissue\_mean\_myosin\_pinned\_to\_activity} & measurement & reference & within [1.0, 0.08] & 1.01573 & \textcolor{good}{pass}\\
+\code{01\_junction} & \code{myosin\_accumulates\_on\_long\_junctions} & measurement & analytic & gt 0.1 & 0.638981 & \textcolor{good}{pass}\\
+\code{01\_junction} & \code{belt\_suppresses\_intercalation} & measurement & reference & lt 0.0 & -0.000504828 & \textcolor{good}{pass}\\
+\code{01\_junction} & \code{junction\_lifetime\_hours} & measurement & literature & interval [0.9, 1.0] & 0.992582 & \textcolor{good}{pass}\\
 \code{02\_ecm\_block} & \code{particle\_count} & bookkeeping & identity & eq 90000 & 90000 & \textcolor{good}{pass}\\
 \code{02\_ecm\_block} & \code{no\_particle\_outside\_the\_domain} & bookkeeping & identity & eq 0 & 0 & \textcolor{good}{pass}\\
 \code{02\_ecm\_block} & \code{no\_nan} & bookkeeping & identity & eq 0 & 0 & \textcolor{good}{pass}\\
@@ -156,9 +169,9 @@ gate & row & tier & basis & declared & measured & \\\midrule\endhead
 \end{longtable}
 \end{center}
 
-\noindent\textbf{13 of 24 rows are verification} (bookkeeping or closed form, 54\%); 7 pin a regression against a previous run of this same model; and \textbf{4 compare the model with something observed in cells} (17\%). The paper reports roughly two thirds bookkeeping-or-closed-form for the \code{ecm} study; this table looks better than that only because \code{basis} separates the regression pins out of the measurement tier, where they would otherwise sit and read as biology.
+\noindent\textbf{18 of 37 rows are verification} (bookkeeping or closed form, 49\%); 13 pin a regression against a previous run of this same model; and \textbf{5 compare the model with something observed in cells} (14\%). The paper reports roughly two thirds bookkeeping-or-closed-form for the \code{ecm} study; this table looks better than that only because \code{basis} separates the regression pins out of the measurement tier, where they would otherwise sit and read as biology.
 
 
-\noindent Outcomes: {'PASS': 24}.
+\noindent Outcomes: {'PASS': 37}.
 
 }
