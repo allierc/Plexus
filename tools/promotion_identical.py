@@ -132,6 +132,17 @@ PAIRS = [
     # own noise fails on runs that are correct, and a gate looser than it passes runs that are not.
     ("R", "b_star",              None, 0.0, "okuda",       "okuda",  "1800 f, 2000->12272 cells, twice -- MEASURED FLOOR 0.0"),
     ("R", "b_null_plain",        None, 0.0, "okuda",       "okuda",  "1800 f, twice -- MEASURED FLOOR 0.0"),
+    # ---- G: EVERY LIFTED GATE, AS A TWIN RUN. The gates grade the CORE against thresholds; that
+    # says the core is right about the numbers a human wrote down, and it does NOT say the core and
+    # okuda agree. These rows are the missing half: the same gate spec through `run_one.py` and
+    # through `Plexus_Main.py`, both fresh, both on gpu_l4, compared array by array. A gate is only
+    # promoted when both are true.
+    ("G", "gates/gate_00_spheroid",     None, 0.0, "okuda", "core", "the growth line: seed, geometry, grow, belt, mechanics, T1, divide, sync"),
+    ("G", "gates/gate_01_nosync",       None, 0.0, "okuda", "core", "gate 01's own arm: the belt WITHOUT the re-keying operator"),
+    ("G", "gates/gate_01_nomyosin",     None, 0.0, "okuda", "core", "gate 01's contrast arm: the same tissue with no belt"),
+    ("G", "gates/gate_02_ecm_block",    None, 0.0, "okuda", "core", "MLS-MPM: ecm_seed, the four-step cycle, ecm_stress, gravity"),
+    ("G", "gates/gate_04_tissue",       None, 0.0, "okuda", "core", "two-pool myosin + cytokinetic ring -- gate 04's regenerated pass 1"),
+    ("G", "gates/gate_04_spheroid_ecm", None, 0.0, "okuda", "core", "mesh_contact + mesh_inside against a prescribed surface"),
     ("C", "01c_tissue",          None, 0.0, "okuda",       "core",   "junction_myosin (both pools), junction_sync, cytokinetic_ring"),
     ("D", "04_spheroid_ecm_pass2", None, 0.0, "okuda",     "core",   "mesh_contact, mesh_inside, ecm_*, bm_*"),
 ]
@@ -177,6 +188,43 @@ def _side_paths(side):
     return home, os.path.join(root, "config", "okuda"), os.path.join(root, "log", "okuda")
 
 
+def _spec_src(spec):
+    """The source yaml for a PAIRS row, and the stem its run names are built from.
+
+    `folder/name` reads `config/<folder>/<name>.yaml`, which is how a row names a spec outside the
+    okuda corpus -- the four lifted gates live in `config/gates/`. A bare name is an okuda spec,
+    which is what every row was until the gates arrived, so nothing existing changes.
+    """
+    if "/" in spec:
+        folder, name = spec.split("/", 1)
+        return os.path.join(ROOT, "config", folder, f"{name}.yaml"), name
+    return os.path.join(CFG_OKUDA, f"{spec}.yaml"), spec
+
+
+def _stag(spec):
+    """A spec as a filesystem-safe stem: `gates/gate_00_spheroid` -> `gates_gate_00_spheroid`."""
+    return spec.replace("/", "_")
+
+
+def _abspath_operator_files(cfg):
+    """Rewrite an operator's file-valued parameters to absolute paths.
+
+    A GATE SPEC WRITES THEM RELATIVE (`log/gates/_tissue/gate_04_tissue.npz`) so the file reads the
+    same on any checkout, and the core runner resolves them from the repo root. The okuda side runs
+    with `cd discovery_okuda`, so the same relative path points one directory too deep and
+    `mesh_contact` dies on a missing file -- AFTER the scheduler has granted a GPU. Absolute here, so
+    both sides read the same bytes.
+    """
+    for o in cfg.get("operators", []) or []:
+        for k in ("tissue", "load", "gate_npz", "ckpt", "map", "surface"):
+            v = o.get(k)
+            if isinstance(v, str) and v and not os.path.isabs(v):
+                cand = os.path.join(ROOT, v)
+                if os.path.exists(cand):
+                    o[k] = cand
+    return cfg
+
+
 def _spec_copy(spec, run_name, frames, cfg_dir=None):
     """`config/okuda/<run_name>.yaml`: the pair's spec at the comparison length, under its own name.
 
@@ -187,10 +235,14 @@ def _spec_copy(spec, run_name, frames, cfg_dir=None):
     renaming cannot move a byte. The first row of the table is the check on that claim.
     """
     cfg_dir = cfg_dir or CFG_OKUDA
-    src = os.path.join(CFG_OKUDA, f"{spec}.yaml")
+    src, _stem = _spec_src(spec)
     if not os.path.exists(src):
-        raise FileNotFoundError(f"{src} -- the comparison reuses okuda specs; this one is missing")
-    cfg = yaml.safe_load(open(src))
+        raise FileNotFoundError(f"{src} -- this row's spec is missing")
+    cfg = _abspath_operator_files(yaml.safe_load(open(src)))
+    # `_gate:` IS THE GATE'S THRESHOLD TABLE, not part of the model. It is dropped from the copy so
+    # the twin run compares the SPEC and nothing else -- and so a grader cannot mistake a promotion
+    # run for a graded gate run.
+    cfg.pop("_gate", None)
     cfg["general"] = dict(cfg.get("general") or {})
     cfg["general"]["name"] = run_name
     if frames is not None:                      # None = the spec's own length (the scene rows)
@@ -393,11 +445,11 @@ def run_pair(phase, spec, side_a, side_b, what, frames, submit=True):
     to finish would silently be compared against the first's leftovers. A gate that can overwrite
     its own reference is not a gate."""
     import cluster as C
-    pair_dir = os.path.join(OUT, f"{_ptag(phase)}_{spec}")
+    pair_dir = os.path.join(OUT, f"{_ptag(phase)}_{_stag(spec)}")
     os.makedirs(pair_dir, exist_ok=True)
     names = {}
     for tag, side in (("A", side_a), ("B", side_b)):
-        run_name = f"promo_{_ptag(phase)}_{spec}_{tag}"
+        run_name = f"promo_{_ptag(phase)}_{_stag(spec)}_{tag}"
         names[tag] = (side, run_name)
         if submit:
             # THE CORE SIDE NEEDS A SPEC TOO, and in its own folder: `Plexus_Main.py -o generate
