@@ -75,6 +75,7 @@ class Traj:
     def state(self, block, t): raise NotImplementedError     # [nF, width] or None
     def occ(self, set_name, t): raise NotImplementedError    # [buffer] bool
     def scalar(self, name, t): return None                   # an operator's own counter, or None
+    def edge_col(self, name, t): return None                 # per-HALF-EDGE state, or None
 
 
 class CoreTraj(Traj):
@@ -131,6 +132,23 @@ class CoreTraj(Traj):
     def scalar(self, name, t):
         k = f"{self.s}__mesh_scalar_{name}"
         return float(self.z[k][t]) if k in self.z.files else None
+
+    def edge_col(self, name, t):
+        """A per-HALF-EDGE column, sliced with ITS OWN offsets.
+
+        A third ragged length, and the reason it carries its own offsets rather than sharing
+        `mesh_offsets`: `junction_myosin` writes `myo` for the arrays as they were BEFORE the
+        frame's topology operators, so on a frame with a division or a flip the array is a few
+        entries short of the half-edge table. Sharing offsets would slice the next frame's myosin
+        into this one, silently. `myosin_array_aligned_with_half_edges` is the row that asserts the
+        lengths agree; this accessor must not paper over the case it tests.
+        """
+        k = f"{self.s}__mesh_e_{name}"
+        ko = k + "_offsets"
+        if k not in self.z.files or ko not in self.z.files:
+            return None
+        o = self.z[ko]
+        return np.asarray(self.z[k][int(o[t]):int(o[t + 1])], float)
 
 
 class ParticleTraj(Traj):
@@ -230,6 +248,10 @@ class OkudaTraj(Traj):
     def scalar(self, name, t):
         v = self._mesh(t).get(name)
         return None if v is None or np.ndim(v) != 0 else float(v)
+
+    def edge_col(self, name, t):
+        v = self._mesh(t).get(name)
+        return None if v is None or np.ndim(v) == 0 else np.asarray(v, float).ravel()
 
     def row_of(self, tick):
         if self.ticks is None:
@@ -566,6 +588,133 @@ def spheroid_diameter(T, **kw):
     return [2.0 * r for r in apical_radius(T)]
 
 
+# ============================================================================== junction measures
+def _edges(T, t):
+    """(vi, vj, length) over the LIVE half-edges of row t, and the half-edge index they came from."""
+    p, (es, et, ef) = T.pos(t), T.half_edges(t)
+    live = np.asarray(ef) < T.nF(t)
+    a, b = np.asarray(es)[live], np.asarray(et)[live]
+    return a, b, np.linalg.norm(p[b] - p[a], axis=1), live
+
+
+def myosin_aligned(T, name="myo", **kw):
+    """|len(myo) - len(E_srce)| per row. A BOOKKEEPING row, and the one that made it necessary.
+
+    `junction_myosin` writes `myo` for the half-edge arrays as they were, and `edge_flip` and
+    `cell_divide` then rewire and lengthen them within the same tick. On the 401-frame nominal, 56
+    of 200 archived snapshots carried a myosin array 6 to 1,356 entries short of the edge arrays,
+    and every reader indexes it positionally -- so each of those frames coloured, averaged and
+    thresholded the wrong junctions. `junction_sync` re-keys it by vertex pair; this asserts the
+    re-keying happened.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        v = T.edge_col(name, t)
+        es, _et, _ef = T.half_edges(t)
+        out.append(0 if v is None else abs(len(v) - len(es)))
+    return out
+
+
+def myosin_mean(T, name="myo", **kw):
+    out = []
+    for t in range(T.n_rows()):
+        v = T.edge_col(name, t)
+        _a, _b, _l, live = _edges(T, t)
+        out.append(0.0 if v is None or len(v) < len(live)
+                   else float(np.asarray(v)[live].mean()))
+    return out
+
+
+def myosin_dispersion(T, name="myo", pct=98, **kw):
+    """p98 / mean over the live junctions -- how UNEVEN the myosin is.
+
+    The mean is pinned near `activity` by construction, so it says nothing; a belt that is doing
+    something has a tail. This is the number that separates "myosin is present" from "myosin is
+    localised", and the two have completely different mechanics.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        v = T.edge_col(name, t)
+        _a, _b, _l, live = _edges(T, t)
+        if v is None or len(v) < len(live):
+            out.append(0.0); continue
+        w = np.asarray(v)[live]
+        m = float(w.mean())
+        out.append(float(np.percentile(w, pct) / m) if m > 1e-12 else 0.0)
+    return out
+
+
+def hot_junction_fraction(T, name="myo", above=1.5, **kw):
+    out = []
+    for t in range(T.n_rows()):
+        v = T.edge_col(name, t)
+        _a, _b, _l, live = _edges(T, t)
+        if v is None or len(v) < len(live):
+            out.append(0.0); continue
+        w = np.asarray(v)[live]
+        m = float(w.mean())
+        out.append(float((w > above * m).mean()) if m > 1e-12 else 0.0)
+    return out
+
+
+def mean_junction_length(T, **kw):
+    return [float(_edges(T, t)[2].mean()) for t in range(T.n_rows())]
+
+
+def mean_junction_length_fold(T, **kw):
+    L = mean_junction_length(T)
+    return [x / max(L[0], 1e-12) for x in L]
+
+
+def junction_persistence(T, lag=1, **kw):
+    """Fraction of a row's junctions that were also junctions `lag` recorded rows earlier.
+
+    A tissue that intercalates loses junctions; one that only grows keeps them and adds more. This
+    separates the two, which cell count and radius cannot.
+    """
+    out, prev = [], None
+    for t in range(T.n_rows()):
+        a, b, _l, _live = _edges(T, t)
+        cur = set(map(tuple, np.sort(np.stack([a, b], 1), axis=1).tolist()))
+        out.append(1.0 if prev is None else float(len(cur & prev) / max(len(prev), 1)))
+        prev = cur
+    return out
+
+
+def pos_max_delta(A, B, **kw):
+    """max |pos_A - pos_B| over every row both sides recorded -- the two-arm neutrality row.
+
+    Refuses rather than truncates when the two arms disagree in length or in live count: two runs
+    that are not the same length are not a controlled comparison, and silently comparing the first
+    N rows of each is how a neutrality claim comes to be about a prefix.
+    """
+    n = min(A.n_rows(), B.n_rows())
+    if A.n_rows() != B.n_rows():
+        raise ValueError(f"the two arms recorded {A.n_rows()} and {B.n_rows()} rows")
+    worst = 0.0
+    for t in range(n):
+        pa, pb = A.pos(t), B.pos(t)
+        if pa.shape != pb.shape:
+            raise ValueError(f"row {t}: {pa.shape} live vertices against {pb.shape}")
+        worst = max(worst, float(np.abs(pa - pb).max()))
+    return [worst]
+
+
+def t1_rate_delta(A, B, **kw):
+    """(T1 per cell per frame in A) - (in B). Negative means A suppresses intercalation."""
+    def rate(T):
+        n = T.n_rows()
+        cells = float(np.mean([T.nF(t) for t in range(n)]))
+        return t1_total(T)[-1] / max(cells * max(n - 1, 1), 1e-9)
+    return [rate(A) - rate(B)]
+
+
+def t1_rate_per_cell_per_frame(T, **kw):
+    n = T.n_rows()
+    cells = float(np.mean([T.nF(t) for t in range(n)]))
+    return [t1_total(T)[-1] / max(cells * max(n - 1, 1), 1e-9)]
+
+
 # ============================================================================== particle measures
 def particle_count(T, **kw):
     return [T.nF(t) for t in range(T.n_rows())]
@@ -636,6 +785,16 @@ def strand_length_um(T, per_strand=60, **kw):
 
 
 MEASURES = {
+    "myosin_aligned": myosin_aligned,
+    "myosin_mean": myosin_mean,
+    "myosin_dispersion": myosin_dispersion,
+    "hot_junction_fraction": hot_junction_fraction,
+    "mean_junction_length": mean_junction_length,
+    "mean_junction_length_fold": mean_junction_length_fold,
+    "junction_persistence": junction_persistence,
+    "pos_max_delta": pos_max_delta,
+    "t1_rate_delta": t1_rate_delta,
+    "t1_rate_per_cell_per_frame": t1_rate_per_cell_per_frame,
     "particle_count": particle_count,
     "out_of_box": out_of_box,
     "centroid_height": centroid_height,

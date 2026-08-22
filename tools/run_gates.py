@@ -57,11 +57,18 @@ sys.path[:0] = [os.path.join(ROOT, "tools"), os.path.join(ROOT, "src")]
 
 import gate_measures as GM                                            # noqa: E402
 
-# A UNIT STRING THAT NAMES THE MESH IS REFUSED. The paper's rule is that a threshold belongs in the
-# unit of the phenomenon, and the mechanical form of that rule is this list: "0.82 grid cells" sounds
-# small and is 15 um, nearly two cell diameters. `fraction of the ... reservoir` is the one allowed
-# machine unit, because a row about the ARRAY is honestly about the array.
-_MESH_UNITS = ("grid cell", " dx", "lattice", "slot", "half-edge")
+# A UNIT STRING THAT NAMES THE MESH IS REFUSED -- ON A MEASUREMENT ROW. The paper's rule is that a
+# threshold belongs in the unit of the phenomenon, and the mechanical form of that rule is this list:
+# "0.82 grid cells" sounds small and is 15 um, nearly two cell diameters.
+#
+# IT DOES NOT APPLY TO A BOOKKEEPING ROW, and the first version of this check got that wrong: it
+# refused gate 01's `myosin_array_aligned_with_half_edges`, whose unit is "entries of disagreement
+# between the myosin array and the half-edge table". That row IS about the array -- it asserts that
+# `junction_sync` re-keyed a per-half-edge store after the topology moved under it -- and stating it
+# in cells or micrometres would be the dishonest version. The same goes for `reservoir_headroom`,
+# which is a fraction of a buffer because the question is about the buffer. The rule is that a claim
+# about the WORLD may not be denominated in the mesh; a claim about the CODE must be.
+_MESH_UNITS = ("grid cell", " dx", "lattice", " slot")
 
 
 def _sha1(o):
@@ -88,6 +95,11 @@ def preflight(path, cfg):
         S.load(path)
     except Exception as e:
         bad.append(f"the spec does not load: {type(e).__name__}: {str(e)[:120]}")
+    known_specs = {yaml.safe_load(open(q))["general"]["name"]
+                   for q in glob.glob(os.path.join(CFG, "*.yaml"))}
+    for label, spec_name in (g.get("arms") or {}).items():
+        if spec_name not in known_specs:
+            bad.append(f"arm {label!r} names spec {spec_name!r}, which is not in config/gates/")
     seen = set()
     for m in g.get("measures", []):
         n = m.get("name", "?")
@@ -104,8 +116,12 @@ def preflight(path, cfg):
             if not m.get(k):
                 bad.append(f"{n}: no {k}:")
         u = str(m.get("unit", "")).lower()
-        if any(t in u for t in _MESH_UNITS):
-            bad.append(f"{n}: unit {m['unit']!r} is a unit of the MESH, not of the phenomenon")
+        if m.get("tier") == "measurement" and any(t in u for t in _MESH_UNITS):
+            bad.append(f"{n}: a MEASUREMENT row may not be denominated in the mesh "
+                       f"({m['unit']!r}); state it in the unit of the phenomenon")
+        for w in (m.get("arms") or ([m["arm"]] if m.get("arm") else [])):
+            if w != "self" and w not in (g.get("arms") or {}):
+                bad.append(f"{n}: arm {w!r} is not declared in _gate.arms")
         a = m.get("assert") or {}
         if len(a) != 1 or next(iter(a)) not in GM.ASSERTS:
             bad.append(f"{n}: assert {a!r} must be exactly one of {sorted(GM.ASSERTS)}")
@@ -196,9 +212,31 @@ def _convert(val, fn, cfg):
     return [x * k for x in val] if isinstance(val, list) else val * k
 
 
+def open_arms(cfg):
+    """{label: Traj} for a gate's arms, plus `self` for its own spec.
+
+    A CONTRAST NEEDS TWO RUNS, and gate 01's whole question is a contrast: does a tissue with a
+    myosin belt intercalate LESS than the same tissue without one, and is `junction_sync` -- which
+    only re-keys a bookkeeping array -- trajectory-neutral? Neither is answerable from one
+    trajectory, and a gate that answered them from one would be comparing a number with a memory.
+
+    An arm names another spec in `config/gates/`, so an arm is itself a declared, runnable file and
+    not a variant hidden inside the grader.
+    """
+    out = {"self": GM.open_traj(data_dir_of(cfg["general"]["name"]))}
+    for label, spec_name in (cfg["_gate"].get("arms") or {}).items():
+        d = data_dir_of(spec_name)
+        if not os.path.isdir(d):
+            out[label] = None                     # a missing arm blocks its rows; it does not pass
+            continue
+        out[label] = GM.open_traj(d)
+    return out
+
+
 def grade(path, cfg, traj_dir):
     g = cfg["_gate"]
-    T = GM.open_traj(traj_dir)
+    arms = open_arms(cfg)
+    T = arms["self"]
     rows, n_fail, n_block, n_turned = [], 0, 0, 0
     for m in g["measures"]:
         row = dict(name=m["name"], tier=m["tier"], basis=m["basis"], unit=m["unit"],
@@ -211,7 +249,18 @@ def grade(path, cfg, traj_dir):
             rows.append(row)
             continue
         try:
-            series = GM.MEASURES[m["fn"]](T, **m.get("args", {}))
+            # A row may name ONE arm (`arm:`) or TWO (`arms: [a, b]`); the default is the gate's own
+            # trajectory. A row whose arm did not run is BLOCKED, never passed.
+            want = m.get("arms") or ([m["arm"]] if m.get("arm") else ["self"])
+            sel = [arms.get(w) for w in want]
+            if any(x is None for x in sel):
+                missing = [w for w, x in zip(want, sel) if x is None]
+                row.update(outcome="BLOCKED", value=None,
+                           blocked_by=f"arm(s) {missing} have not been run")
+                n_block += 1
+                rows.append(row)
+                continue
+            series = GM.MEASURES[m["fn"]](*sel, **m.get("args", {}))
             val = GM.REDUCERS[row["reduce"]](series)
             val = _convert(val, m["fn"], cfg)
             kind, arg = next(iter(m["assert"].items()))
