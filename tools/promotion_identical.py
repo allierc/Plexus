@@ -90,8 +90,14 @@ PAIRS = [
     (0,  "apop_rings9",           None, "okuda@HEAD",  "okuda",  "895 of 2000 in nine bands -> closes over every gap, stays a sphere (red_vol 0.9813)"),
     (0,  "apopgeo_half",          None, "okuda@HEAD",  "okuda",  "285 of 400 above the equator -> topology survives, sphere -> ellipsoid (gyr_prolate 1.869)"),
     (0.5, "ecm_block",            None, "okuda@HEAD",  "okuda",  "mpm_scatter/gather/grid_update/strain, ecm_seed, ecm_stress"),
-    ("B", "b_gs_plain_soft_lo",    100, "okuda",       "core",   "+ cell_chem_seed/diffuse/react, cell_geometry, cell_neighbours"),
-    ("B", "b_star",                100, "okuda",       "core",   "+ cell_grow, cell_divide, interface_tension, cell_chem_from_shape"),
+    # ---- Phase B: the nine okuda operator files became two modules in `src/plexus/operators/`.
+    # Side A is okuda BEFORE the move, side B okuda AFTER it -- so what is under test is the move
+    # itself, through the runner that has always driven these operators. `--phase B-core` then runs
+    # the same specs through `Plexus_Main.py`, which is the claim that core can do this alone.
+    ("B", "b_gs_plain_soft_lo",    100, "okuda@HEAD",  "okuda",  "+ seed_cell_chem/diffuse/react, cell_geometry, cell_neighbours"),
+    ("B", "b_star",                100, "okuda@HEAD",  "okuda",  "+ cell_grow, cell_divide, interface_tension, cell_chem_from_shape"),
+    ("B-core", "b_gs_plain_soft_lo", 100, "okuda",     "core",   "the same run, from the core registry with no okuda import"),
+    ("B-core", "b_star",             100, "okuda",     "core",   "the same run, from the core registry with no okuda import"),
     ("C", "01c_tissue",            100, "okuda",       "core",   "junction_myosin (both pools), junction_sync, cytokinetic_ring"),
     ("D", "04_spheroid_ecm_pass2", 100, "okuda",       "core",   "mesh_contact, mesh_inside, ecm_*, bm_*"),
 ]
@@ -376,8 +382,21 @@ def main():
         print(f"  {r['phase']:6s} {r['spec']:26s} {r['a']:12s} {r['b']:8s} "
               f"{r['digest_a']:18s} {r['digest_b']:18s} "
               + ("IDENTICAL" if r["ok"] else f"DIFFER -- {r['why']}"))
-    json.dump(rows, open(os.path.join(OUT, "promotion_identical.json"), "w"), indent=1)
-    print(f"\n  {len(rows) - bad}/{len(rows)} identical -> "
+    # ONE FILE PER PHASE, PLUS A MERGED ONE. A single `promotion_identical.json` was overwritten by
+    # whichever phase ran last, so the archive held one phase's rows and read as if it held all of
+    # them -- the same silent-truncation failure the mp4 collection had.
+    tag = str(a.phase) if a.phase is not None else "all"
+    json.dump(rows, open(os.path.join(OUT, f"promotion_identical_{tag}.json"), "w"), indent=1)
+    merged = {}
+    for f in sorted(os.listdir(OUT)):
+        if f.startswith("promotion_identical_") and f.endswith(".json"):
+            for r in json.load(open(os.path.join(OUT, f))):
+                merged[(r["phase"], r["spec"])] = r
+    allrows = [merged[k] for k in sorted(merged)]
+    json.dump(allrows, open(os.path.join(OUT, "promotion_identical.json"), "w"), indent=1)
+    n_ok = sum(1 for r in allrows if r["ok"])
+    print(f"\n  {len(rows) - bad}/{len(rows)} identical this run; "
+          f"{n_ok}/{len(allrows)} across every phase on record -> "
           f"{os.path.relpath(os.path.join(OUT, 'promotion_identical.json'), ROOT)}")
     return 1 if bad else 0
 

@@ -88,7 +88,9 @@ def test_edge_flip_branch_carries_open_names():
     After: it calls the same carry every other topology operator calls.
     """
     print("\nthe face-drop branch carries the open names")
-    src = open(os.path.join(ROOT, "discovery_okuda", "ops", "t1_ops.py")).read()
+    # `discovery_okuda/ops/t1_ops.py` is a re-export shim since the Phase-B move; the T1 itself now
+    # lives beside the mesh operators it always depended on.
+    src = open(os.path.join(ROOT, "src", "plexus", "operators", "vertex_ops.py")).read()
     i = src.find("a flip left")
     j = src.find("THE CELL STATE AND THE PENDING DELTAS", i)
     branch = src[i:j]

@@ -58,6 +58,14 @@ from . import agent_divide           # noqa: F401  agent set structural: prolife
 from . import agent_grow             # noqa: F401  mpm_particle structural: tissue growth by material-point addition
 from . import segmentation_seed     # noqa: F401  a measured instance segmentation -> the CELL level
 
+# THE 3D VERTEX MODEL AND ITS CHEMISTRY, promoted from `discovery_okuda/ops/`. Two modules rather
+# than the nine files they arrived in, because the two implementations of `cell_mechanics` -- and of
+# `cell_divide`, `cell_grow`, `cell_chem_react` -- can only be compared when they are on one screen.
+# `discovery_okuda/ops/{mesh_ops,t1_ops,monolayer_ops,chem_ops,shape_chem_ops,shape_probe_ops}.py`
+# are re-export shims: thirty files still import them by bare module name.
+from . import vertex_ops            # noqa: F401  seed_mesh, cell_mechanics, cell_divide, cell_die, edge_flip, topo_record
+from . import diffusion_reaction    # noqa: F401  seed_cell_chem, cell_chem_diffuse/react, cell_geometry, cell_grow, ...
+
 __all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion", "squared_law", "attractor_flow",
            "cohesion", "velocity_align", "separation", "velocity_cruise", "drag",
            "scalar_field", "deposit", "diffuse", "decay", "sense", "glide", "bounce",
@@ -65,4 +73,5 @@ __all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion", "squared_l
            "pacemaker", "activation_pulse", "active_force", "active_stress",
            "mpm_spin", "mpm_anchor", "material_map", "mpm",
            "mpm_grid", "mpm_strain", "mpm_scatter", "mpm_grid_update", "mpm_gather",
-           "agent_scatter", "agent_gather", "agent_remodel", "polarity_flow_align", "polarity_align"]
+           "agent_scatter", "agent_gather", "agent_remodel", "polarity_flow_align", "polarity_align",
+           "vertex_ops", "diffusion_reaction"]
