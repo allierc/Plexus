@@ -35,6 +35,7 @@ import torch
 from plexus.models.base import FieldUpdate, Lateral, Rewire, Structural
 from plexus.models.entities import MPMParticle
 from plexus.models.registry import register_entity, register_operator
+from plexus.models.state import spatial_schema
 from plexus.models.base import Lateral, Structural
 
 
@@ -52,8 +53,11 @@ MEMBRANE_STRAIN: list = []       # per-particle bond strain, for the renderer
 
 
 @register_entity(
+    # `spatial_schema` (a `dim -> StateSchema` callable), NOT the legacy 2D dict this used to
+    # carry: the registry is now consulted, and the basement-membrane specs are `dim: 3`.
+    # See `models/entities.py` for the contract.
     "basement_membrane_particle", depth=0,
-    state_schema={"pos": (0, 2), "vel": (2, 4)},
+    state_schema=spatial_schema,
     render={"color_by": "node_type", "arrows": None},
 )
 class BasementMembraneParticle:
@@ -1926,8 +1930,9 @@ class BasementMembraneCrosslink(Rewire):
 # FROM `discovery_okuda/ops/integrin_ops.py` -- integrin_ops -- the integrin as MPM MATERIAL rather than as a force with a target.
 # ==========================================================================================================
 @register_entity(
+    # `spatial_schema`, not the legacy 2D dict -- see `basement_membrane_particle` above.
     "integrin_particle", depth=0,
-    state_schema={"pos": (0, 2), "vel": (2, 4)},
+    state_schema=spatial_schema,
     render={"color_by": "node_type", "arrows": None},
 )
 class IntegrinParticle:

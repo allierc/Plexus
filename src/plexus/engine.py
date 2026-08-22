@@ -342,30 +342,75 @@ def _field_colors(H: Hierarchy, sim: Spec, fld) -> np.ndarray:
     return np.array([[float(x) for x in col[:3]] for col in cols], np.float32)
 
 
-def _entity_meta(sname: str) -> tuple[dict, dict, int]:
-    """(state_schema, render, depth) for a set name, from the entity registry,
-    falling back to the position+velocity default for unregistered names. `depth`
-    is the hierarchy-depth integer (was the overloaded `level`)."""
+def _entity_schema(decl, dim: int) -> StateSchema | None:
+    """An entity's declared `STATE_SCHEMA`, resolved for this run's `dim` -- or None when
+    the entity declares nothing the engine may honour.
+
+    Three forms, and only two of them are a schema (the contract is written out in
+    `models/entities.py`):
+
+        StateSchema           a fixed layout, dimension-independent.
+        dim -> StateSchema    a CALLABLE, resolved here with the run's dimension. Every
+                              spatial entity uses `spatial_schema`.
+        {block: (c0, c1)}     the LEGACY dict -> None. A hint, never a schema.
+
+    THE LEGACY DICT RETURNS None DELIBERATELY, and this is the load-bearing line of the
+    change. Those dicts are all written `{"pos": (0, 2), "vel": (2, 4)}` -- two hard-coded
+    dimensions, from before the `dim` contract -- and they were never read, so nothing ever
+    caught it. Honouring one now would size a 3D set's state at four columns instead of six
+    and truncate `pos`/`vel` to (x, y) with no error raised anywhere: `mpm_block`,
+    `basement_membrane_particle` and `integrin_particle` are all used by `dim: 3` specs.
+    So the dict keeps meaning exactly what it has always meant -- nothing to the engine --
+    and a spatial entity declares `spatial_schema` instead.
+    """
+    if decl is None:
+        return None
+    if isinstance(decl, StateSchema):
+        return decl
+    if callable(decl):
+        return decl(dim)
+    return None                                    # legacy {block: (c0, c1)} dict: a hint only
+
+
+def _entity_meta(sname: str, dim: int = 2) -> tuple[StateSchema | None, dict, int]:
+    """(state_schema, render, depth) for a set name, from the entity registry. `schema` is
+    None when the name is unregistered or the entity declares no honourable schema -- the
+    caller then falls back to `spatial_schema(dim)`. `depth` is the hierarchy-depth integer
+    (was the overloaded `level`)."""
     try:
         ent = get_entity(sname)
-        schema = getattr(ent, "STATE_SCHEMA", None) or DEFAULT_STATE_SCHEMA
+        schema = _entity_schema(getattr(ent, "STATE_SCHEMA", None), dim)
         render = getattr(ent, "RENDER", None) or DEFAULT_RENDER
         depth = getattr(ent, "DEPTH", None)
         depth = depth if depth is not None else 0
     except KeyError:
-        schema, render, depth = DEFAULT_STATE_SCHEMA, DEFAULT_RENDER, 0
+        schema, render, depth = None, DEFAULT_RENDER, 0
     return schema, render, depth
 
 
-def _resolve_schema(s: dict, D: int) -> StateSchema:
-    """The set's StateSchema (the fifth primitive). A set that declares its own
-    `state:` block gets that schema (non-spatial: voltage, calcium, gating, ...);
-    every other set gets the dimension-aware pos/vel spatial default -- byte-identical
-    to the old hard-coded `{'pos': (0,D), 'vel': (D,2D)}`. Entity STATE_SCHEMAs stay
-    render/level hints (the spatial ones are 2D-encoded and dimension-specialized, so
-    the engine still sizes spatial state dimension-aware, not from the registry)."""
+def _resolve_schema(s: dict, D: int, sname: str | None = None) -> StateSchema:
+    """The set's StateSchema (the fifth primitive), in precedence order:
+
+        1. the set's own `state:` block          -- the spec always wins;
+        2. the ENTITY's declared schema           -- declared once in `models/entities.py`;
+        3. `spatial_schema(D)`                    -- the dimension-aware pos/vel default.
+
+    STEP 2 IS NEW AND IT IS WHY THIS FUNCTION TAKES A NAME. Until now the registry was never
+    consulted at all -- the body was steps 1 and 3 -- so every `state_schema=` in the entity
+    registry was dead code, and an entity could not declare its own layout however carefully
+    it wrote one. A `neuron` whose `pos` is fixed geometry and whose `voltage` is the
+    integrated coordinate cannot be expressed by step 3, and restating it in every yaml is
+    exactly what a registry is for.
+
+    Step 3 is unchanged and still catches every current set: the six entities that carried a
+    legacy 2D dict now declare `spatial_schema`, which returns precisely what step 3 would
+    have -- so no existing spec moves a byte (`promotion_identical.py --phase A`)."""
     if "state" in s:
         return schema_from_spec(s["state"])
+    if sname is not None:
+        ent_schema, _render, _depth = _entity_meta(sname, D)
+        if ent_schema is not None:
+            return ent_schema
     return spatial_schema(D)
 
 
@@ -379,7 +424,7 @@ def _build_edge_set(H, sname: str, s: dict, device: str) -> None:
     E = len(edges)
     pre = torch.tensor([int(e[0]) for e in edges], dtype=torch.long, device=device)
     post = torch.tensor([int(e[1]) for e in edges], dtype=torch.long, device=device)
-    schema = _resolve_schema(s, H.dim)
+    schema = _resolve_schema(s, H.dim, sname)
     state = torch.zeros(E, schema.dim, device=device)
     # optional per-edge weights -> the `w` block (a fixed synaptic parameter): a parallel
     # `weights: [...]` list, or a 3rd element of each edge `[pre, post, w]`.
@@ -391,7 +436,7 @@ def _build_edge_set(H, sname: str, s: dict, device: str) -> None:
         state[:, w0:w1] = torch.tensor([float(x) for x in weights], device=device).reshape(E, w1 - w0)
     occ = torch.ones(E, device=device)
     parent_idx = torch.zeros(E, dtype=torch.long, device=device)
-    _, render, depth = _entity_meta(sname)
+    _, render, depth = _entity_meta(sname, H.dim)
     lvl = Level(sname, depth=depth, state=state, occ=occ, state_schema=schema,
                 parent=parent_idx, parent_name=s["parent"],
                 pre=pre, post=post, pre_name=s["pre"], post_name=s["post"], role=s.get("role"))
@@ -582,8 +627,8 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         n = int(s["n"])
         D = H.dim
         buffer = int(s.get("buffer", n))               # allocated slots (occupancy marks live subset)
-        _, render, depth = _entity_meta(sname)         # render hints + depth from the registry
-        schema = _resolve_schema(s, D)                 # StateSchema: pos/vel default, or the set's `state:` block
+        _, render, depth = _entity_meta(sname, D)      # render hints + depth from the registry
+        schema = _resolve_schema(s, D, sname)          # StateSchema: `state:` block, else the entity's, else pos/vel
         dim = schema.dim
         state = torch.zeros(buffer, dim, device=device)
         has_pos = "pos" in schema                      # spatial sets place positions; a non-spatial set (voltage,...) does not
@@ -663,8 +708,8 @@ def build(sim: Spec, device: str = "cpu") -> Hierarchy:
         per = int(s["per_parent"]); radius = float(s.get("radius", 0.02))
         reserve = int(s.get("grow_reserve", 0))         # DORMANT particles/parent (occ=0) for agent_grow to wake
         per_tot = per + reserve
-        _, render, depth = _entity_meta(sname)         # render hints + depth from the registry
-        schema = _resolve_schema(s, H.dim)             # StateSchema: pos/vel default (like top-level sets), or a `state:` block
+        _, render, depth = _entity_meta(sname, H.dim)  # render hints + depth from the registry
+        schema = _resolve_schema(s, H.dim, sname)      # StateSchema: `state:` block, else the entity's, else pos/vel
         dim = schema.dim
         has_pos = "pos" in schema                                 # spatial child: scatter in space; non-spatial (voltage,...) child: no placement
         Np = parent.n * per_tot                                   # `per` live + `reserve` dormant per parent slot
