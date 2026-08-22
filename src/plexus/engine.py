@@ -39,8 +39,19 @@ import numpy as np
 import torch
 
 # bit-reproducible runs: deterministic scatter/index_add (else GPU atomics differ)
+#
+# `warn_only` IS THE DEFAULT AND IT DOWNGRADES SILENTLY. A kernel with no deterministic
+# implementation warns once and runs the nondeterministic path anyway, so a run can be
+# irreproducible while this line says the opposite -- and an irreproducible kernel is exactly where
+# two runs of one spec stop matching. Ordinary runs keep the lenient setting, because a warning is
+# better than a crash in the middle of a campaign.
+#
+# `PLEXUS_STRICT_DETERMINISM=1` turns the downgrade into an exception, and the promotion gate
+# (`tools/promotion_identical.py`) sets it on both sides: a comparison that passes because a kernel
+# quietly went nondeterministic has proved nothing, so it must fail loudly instead.
 os.environ.setdefault("CUBLAS_WORKSPACE_CONFIG", ":4096:8")
-torch.use_deterministic_algorithms(True, warn_only=True)
+STRICT_DETERMINISM = os.environ.get("PLEXUS_STRICT_DETERMINISM", "") not in ("", "0", "false")
+torch.use_deterministic_algorithms(True, warn_only=not STRICT_DETERMINISM)
 
 from plexus.models.base import Hierarchy, Level
 from plexus.models.state import spatial_schema, schema_from_spec, StateSchema, BOUNDARY_WORLD
