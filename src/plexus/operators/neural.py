@@ -48,9 +48,13 @@ smoke spec is expressible. Types are the intended case; the fallback is not the 
 """
 from __future__ import annotations
 
+import json
+import os
+
+import numpy as np
 import torch
 
-from plexus.models.base import Exchange, Lateral
+from plexus.models.base import Exchange, Lateral, Seed
 from plexus.models.registry import register_operator
 # the activation table is shared with the fused `signal` operator rather than re-tabulated:
 # relu / tanh / softplus / sigmoid / identity, by name.
@@ -348,3 +352,147 @@ class NeuronFieldInput(Exchange):
         st[:, c0:c1] = val[:, None]
         lvl.state = st
         return {}
+
+
+# --------------------------------------------------------------------------- #
+#  the seed -- x_0 from a frozen connectome region
+# --------------------------------------------------------------------------- #
+@register_operator("neural_seed", family="seed", set="neuron", kind="seed")
+class NeuralSeed(Seed):
+    """Establish x_0 for a neuron set from a frozen NeuPrint REGION MANIFEST.
+
+    It writes three things and nothing else: each neuron's POSITION (its soma, mapped from
+    dataset voxels into the world box), its INITIAL VOLTAGE, and the connectome PROVENANCE
+    (body id, cell-type id) as per-node buffers.
+
+    IT DOES NOT QUERY ANYTHING. The region was selected once, offline, by
+    `plexus.io.neuprint`, which bisected a cube until it held about the requested number of
+    neurons and wrote down which ones they were. A seed that re-ran the selection would make
+    the identity of the neurons a function of the server's contents on the day the spec was
+    run, so two runs of one spec could be two different circuits. What the spec names is a
+    manifest; what the manifest names is a dataset, a query, a cube and a list of body ids.
+
+    THE MAPPING INTO THE WORLD BOX IS AFFINE AND ISOTROPIC: `(xyz - bounds_lo) / side`, so the
+    cube becomes the unit box and a distance ratio is preserved. `side_um` in the manifest is
+    therefore exactly the `general.units.length_um` a spec should declare -- the world box IS
+    the cube, and that is the one number that makes a micrometre statement about this run
+    possible at all.
+
+    ORDER MATTERS AND IS CHECKED. The manifest's row order is the neuron index order, and it
+    is the same order `plexus.io.connectome` used to build `edge_index`. A mismatch in count
+    between the manifest and the set is refused rather than truncated, because silently
+    seeding the first N of a different region is indistinguishable, in the output, from
+    seeding the right one.
+    """
+
+    EMIT = None                        # writes x_0 directly; returns {}
+    INPUTS = ["neuron"]
+    OUTPUTS = ["neuron"]
+    READS = []                         # reads a file, not state
+    WRITES = ["pos", "voltage"]
+    MAPS = []
+    SUPPORTED_DIMS = [2, 3]            # the manifest is 3D; a 2D world takes the first two axes
+    DIFFERENTIABLE = False             # establishes x_0 from data; nothing to differentiate
+    MAY_MUTATE_INTEGRATED_STATE = True # a seed writes the state buffer -- that is what a seed is
+    REQUIRES_PARAMS = ["region"]
+    MECHANISM_TAGS = ["connectome", "anatomy", "initial_condition", "neuprint"]
+    PARAM_ROLES = {"region": "frozen_region_manifest_dir", "v0_sd": "initial_voltage_spread",
+                   "v0_mean": "initial_voltage_mean"}
+    REFERENCE = ("Region frozen by plexus.io.neuprint from a NeuPrint server "
+                 "(Scheffer et al. 2020, hemibrain; https://neuprint.janelia.org).")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "neuron")
+        self.region = params["region"]
+        self.v0_mean = float(params.get("v0_mean", 0.0))
+        self.v0_sd = float(params.get("v0_sd", 0.5))   # a spread, so v = 0 is not a fixed point
+
+    def _load(self):
+        # `region_path` owns the convention (a bare name -> graphs_data/neural_regions/<name>),
+        # so the importer that WRITES a region and the seed that READS it cannot disagree about
+        # where one lives -- which they did, once, and the seed looked in the output tree.
+        from plexus.io.neuprint import region_path
+        root = region_path(self.region)
+        man = json.load(open(os.path.join(root, "manifest.json")))
+        z = np.load(os.path.join(root, "neurons.npz"), allow_pickle=True)
+        return root, man, z
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        root, man, z = self._load()
+        # NANOMETRES, not voxels: on an anisotropic dataset (fish2 is 16/16/15 nm) a voxel
+        # cube is a cuboid, so the importer crops in nm and stores both. Placing neurons from
+        # `xyz_vox` would stretch the region along z by 6.7% with nothing to show for it.
+        xyz = np.asarray(z["xyz_nm"], np.float64)
+        lo = np.asarray(z["bounds_lo_nm"], np.float64)
+        side = float(z["bounds_side_nm"])
+        n = xyz.shape[0]
+        if n != lvl.n:
+            raise ValueError(
+                f"neural_seed: the region {root} holds {n} neurons but the set {self.at!r} has "
+                f"{lvl.n} slots. Set `per_parent` (or `n`) to {n} -- seeding a prefix would run "
+                f"a different circuit than the one the manifest and the connectome describe.")
+        D = H.dim
+        unit = (xyz - lo) / side                                   # the cube -> the unit box
+        dev = lvl.state.device
+        st = lvl.state.clone()                                     # clone-and-reassign: autograd-safe
+        px0, px1 = lvl.state_schema["pos"]
+        st[:, px0:px1] = torch.as_tensor(unit[:, :D], dtype=st.dtype, device=dev)
+        vx0, vx1 = lvl.state_schema["voltage"]
+        v0 = self.v0_mean + self.v0_sd * torch.randn(
+            (n, vx1 - vx0), generator=getattr(H, "rng", None), device=dev, dtype=st.dtype)
+        st[:, vx0:vx1] = v0
+        lvl.state = st
+        # provenance, as per-node buffers rather than as state: a body id is an identity, not a
+        # quantity, and nothing integrates it.
+        lvl.register_buffer("body_id", torch.as_tensor(np.asarray(z["body_id"], np.int64),
+                                                       device=dev))
+        lvl.register_buffer("cell_type_id", torch.as_tensor(np.asarray(z["type_id"], np.int64),
+                                                            device=dev))
+        lvl.cell_type_names = [str(t) for t in np.asarray(z["type_names"], dtype=object)]
+        lvl.region_manifest = man
+        r = man["region"]
+        # THE REGION'S PHYSICAL SIZE HAS TO LAND SOMEWHERE, and both places matter.
+        H.region = r                                # (1) on the Hierarchy, so every downstream
+        #                                                 consumer -- the volume metadata, the
+        #                                                 Well adapter, a plot axis -- reads the
+        #                                                 same number instead of re-deriving it.
+        self._check_units(H, r)                     # (2) against the spec's own declaration.
+        print(f"[neural_seed] {n} neurons from {man['source']['dataset']} -- cube of "
+              f"{r['side_um']:.3f} um at {np.round(lo).astype(int).tolist()} nm, "
+              f"{len(lvl.cell_type_names)} cell types", flush=True)
+        return {}
+
+    @staticmethod
+    def _check_units(H, r):
+        """The world box IS the cube, so `general.units.length_um` MUST equal the manifest's
+        `side_um`. Checked, not assumed.
+
+        WHY THIS IS NOT PEDANTRY. `length_um` is the one number that converts every result of
+        this run into micrometres, and a spec carries it as a literal -- copied by hand from a
+        manifest, at some point in the past. Re-run the importer with a different `--target`
+        and the cube changes size while the literal does not, and from then on every distance
+        the run reports is wrong by that ratio with nothing to show for it. The paper's own
+        example of this failure is a membrane that turned out to be 24x too thick once the box
+        was calibrated. So: if the spec declares units, they are compared against the region
+        the seed actually loaded, and a mismatch stops the run.
+
+        An UNDECLARED unit block is not an error -- a dimensionless mechanism study is a legal
+        and honest state -- but it is worth saying what the number WOULD have been, because
+        the manifest knows and the reader is one line away from being able to use it.
+        """
+        u = getattr(getattr(H, "config", None), "units", None)
+        side = float(r["side_um"])
+        if u is None or not getattr(u, "declared", False):
+            print(f"[neural_seed] units: NONE DECLARED -- this region is {side:.4f} um across; "
+                  f"`general.units: {{length_um: {side:.6f}}}` would make that quotable.",
+                  flush=True)
+            return
+        got = float(u.length_um)
+        if abs(got - side) > 1e-6 * max(side, 1.0):
+            raise ValueError(
+                f"neural_seed: the spec declares general.units.length_um = {got:.6f} but the "
+                f"region it loads is {side:.6f} um across. The world box IS the cube, so these "
+                f"are the same number; they differ by a factor {got / side:.4f}, which is the "
+                f"factor by which every micrometre this run reports would be wrong.")

@@ -414,26 +414,64 @@ def _resolve_schema(s: dict, D: int, sname: str | None = None) -> StateSchema:
     return spatial_schema(D)
 
 
+def _edges_from_file(path: str):
+    """(pre, post, weights) from an `.npz` holding `edge_index` [2, E] and optional `weights` [E].
+
+    WHY A FILE AT ALL, given the inline `edges:` list was chosen for determinism. It still is:
+    an npz is just as frozen as a literal, and it is the SAME array the generator wrote. What
+    the literal cannot do is scale. A connectome over 1,000 neurons at 1% connectivity is
+    10,000 connections, and 10,000 two-element YAML sequences is a 20,000-line spec that no
+    one reads and git cannot diff. The rule this keeps is the one that matters -- the spec
+    records WHICH connectome, not a procedure for inventing one at load time.
+
+    ONE KEY, ONE PATH. `edges_file:` is resolved through `graphs_data_path` exactly as
+    `PrescribedField` resolves `source:`; there is no search order to reason about.
+    """
+    from plexus.paths import graphs_data_path
+    p = path if os.path.isabs(path) else graphs_data_path(path)
+    if not os.path.exists(p):
+        raise FileNotFoundError(f"edges_file {path!r} -> {p} does not exist")
+    z = np.load(p)
+    if "edge_index" not in z.files:
+        raise ValueError(f"edges_file {p} has no 'edge_index' array (has: {z.files})")
+    ei = np.asarray(z["edge_index"])
+    if ei.ndim != 2 or ei.shape[0] != 2:
+        raise ValueError(f"edges_file {p}: edge_index must be [2, E], got {ei.shape}")
+    w = np.asarray(z["weights"]).reshape(-1) if "weights" in z.files else None
+    if w is not None and w.shape[0] != ei.shape[1]:
+        raise ValueError(f"edges_file {p}: {w.shape[0]} weights for {ei.shape[1]} edges")
+    return ei[0], ei[1], w
+
+
 def _build_edge_set(H, sname: str, s: dict, device: str) -> None:
     """Build an EDGE-SET: a set whose elements are connections, joined to endpoint sets
-    by `pre`/`post` incidence maps. `edges` is an inline `[[pre, post], ...]` list (PR2:
-    inline for determinism; a connectome loader is a later PR). The edge-set is contained
-    in `parent` (e.g. the network) and carries its own `state:` schema (usually
+    by `pre`/`post` incidence maps. The connections come from an inline
+    `edges: [[pre, post], ...]` list or, for anything connectome-sized, from
+    `edges_file: <path.npz>` (`edge_index` [2, E] + optional `weights` [E]). The edge-set is
+    contained in `parent` (e.g. the network) and carries its own `state:` schema (usually
     non-spatial). All edges are owned by the parent's slot 0 (a single network)."""
-    edges = s["edges"]
-    E = len(edges)
-    pre = torch.tensor([int(e[0]) for e in edges], dtype=torch.long, device=device)
-    post = torch.tensor([int(e[1]) for e in edges], dtype=torch.long, device=device)
+    if s.get("edges_file"):
+        pre_a, post_a, w_a = _edges_from_file(s["edges_file"])
+        E = int(pre_a.shape[0])
+        pre = torch.as_tensor(np.ascontiguousarray(pre_a), dtype=torch.long, device=device)
+        post = torch.as_tensor(np.ascontiguousarray(post_a), dtype=torch.long, device=device)
+        weights = None if w_a is None else np.ascontiguousarray(w_a, dtype=np.float32)
+    else:
+        edges = s["edges"]
+        E = len(edges)
+        pre = torch.tensor([int(e[0]) for e in edges], dtype=torch.long, device=device)
+        post = torch.tensor([int(e[1]) for e in edges], dtype=torch.long, device=device)
+        # optional per-edge weights -> the `w` block (a fixed synaptic parameter): a parallel
+        # `weights: [...]` list, or a 3rd element of each edge `[pre, post, w]`.
+        weights = s.get("weights")
+        if weights is None and all(len(e) >= 3 for e in edges):
+            weights = [e[2] for e in edges]
     schema = _resolve_schema(s, H.dim, sname)
     state = torch.zeros(E, schema.dim, device=device)
-    # optional per-edge weights -> the `w` block (a fixed synaptic parameter): a parallel
-    # `weights: [...]` list, or a 3rd element of each edge `[pre, post, w]`.
-    weights = s.get("weights")
-    if weights is None and all(len(e) >= 3 for e in edges):
-        weights = [e[2] for e in edges]
     if weights is not None and "w" in schema:
         w0, w1 = schema["w"]
-        state[:, w0:w1] = torch.tensor([float(x) for x in weights], device=device).reshape(E, w1 - w0)
+        state[:, w0:w1] = torch.as_tensor(
+            np.asarray(weights, dtype=np.float32), device=device).reshape(E, w1 - w0)
     occ = torch.ones(E, device=device)
     parent_idx = torch.zeros(E, dtype=torch.long, device=device)
     _, render, depth = _entity_meta(sname, H.dim)

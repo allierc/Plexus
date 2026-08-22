@@ -1,0 +1,135 @@
+# zebrafish_cube_1000 -- 1,000 real larval-zebrafish neurons, a synthetic connectome,
+# and a 128^3 rendered activity volume.
+#
+# THREE REPRESENTATIONS OF ONE SYSTEM, which is what this spec exists to demonstrate:
+#
+#     graph        the `synapse` edge-set: 20,067 connections carrying W_e
+#     entities     the `neuron` set: 1,000 somas at their real fish2 positions
+#     field        `neural_activity`: a 128^3 grid of the assembly's collective activity
+#
+# and none of the three is the "real" one. The mechanism runs on the entities and the graph;
+# the field is an OBSERVATION of them (operators/observation.py), and it is what a continuum
+# model downstream (Walrus) consumes.
+#
+#     brain
+#     └── assembly                       <- the field belongs at this scale
+#         ├── neuron   x_i, r_i          <- fish2, frozen by plexus.io.neuprint
+#         └── synapse  W_ij              <- synthetic, frozen by plexus.io.connectome
+#
+# THE ANATOMY. fish2 on https://neuprint-fish2.janelia.org.
+# Larval zebrafish (Petrucco et al. 2023 lineage). ANISOTROPIC: 16/16/15 nm. Somas are Anchor/Orphan, not Traced -- filter on synapse count instead.
+# Selection rule: status=None, min_synapses=1
+# -- fish2 somas are Anchor/Orphan rather than Traced, so "is a neuron" is "has a soma and at
+# least one synapse" (150,764 of 177,513 bodies pass).
+#
+# THE CUBE IS A CUBE BECAUSE IT WAS CROPPED IN NANOMETRES. fish2 voxels are
+# [16.0, 16.0, 15.0] nm -- anisotropic -- so the region is 45.389 um on
+# every side while spanning 2837 x 2837 x 3026
+# VOXELS. Cropping in voxels would have produced a cuboid labelled a cube, 6.7% short in z.
+#
+# THE WIRING. plexus.io.connectome, exponential kernel, p = 0.02, lambda = 7443 nm
+# (7.4 um), g = 1.5, seed 0 -> 20,067 edges,
+# mean in-degree 20.1. The distance kernel is deliberate: a uniformly-wired
+# network renders to a SPATIALLY WHITE field, which is a poor continuum dataset.
+#
+# UNITS. `length_um` is MEASURED: the world box IS the cube, and the manifest says it is
+# 45.389160 um across, so one voxel of the 128^3 grid is 0.3546 um.
+# `neural_seed` CHECKS this number against the region it loads and refuses a mismatch.
+# `time_s` is NOT measured -- it is the choice that one simulation time unit is one second.
+general:
+  name: zebrafish_cube_1000
+  seed: 0
+  n_frames: 400
+  dt: 0.05
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  boundary: wall
+  record_cap: 401
+  field_record_cap: 128     # 128^3 x 4 B = 8 MB per field frame -> ~101 frames, ~0.8 GB
+  units:
+    length_um: 45.38916015625
+    time_s: 1.0
+
+sets:
+  brain:
+    n: 1
+  assembly:
+    parent: brain
+    per_parent: 1
+  neuron:
+    parent: assembly
+    per_parent: 1000
+    # DYNAMICAL types (the p vector), not the anatomical cell types -- fish2 names almost none
+    # (4 of 1000 bodies here carry a `type`), and the seed keeps those as a
+    # `cell_type_id` buffer for provenance.
+    #   p = [a, b, g, s, w, h]
+    types:
+      slow_quiet:  {fraction: 0.25, p: [1.0, 0.0, 1.2, 0.5, 1.00, 0.0]}
+      slow_bursty: {fraction: 0.25, p: [1.0, 0.0, 1.2, 1.6, 0.50, 0.0]}
+      fast_quiet:  {fraction: 0.25, p: [2.5, 0.0, 1.2, 0.5, 2.00, 0.0]}
+      fast_bursty: {fraction: 0.25, p: [2.5, 0.0, 1.2, 1.6, 0.25, 0.0]}
+  synapse:
+    parent: brain
+    edge_set: true
+    pre: neuron
+    post: neuron
+    edges_file: neural_regions/zebrafish_cube_1000/connectome.npz
+
+fields:
+  # the OBSERVATION, at the assembly's scale. 128^3 is the nominal 3D resolution of the Well
+  # datasets Walrus trains on (supernova_explosion_128); MHD_64 is the 64^3 tier.
+  neural_activity:
+    frame: grid
+    res: 128
+    components: 1
+    couples_to: assembly
+
+seed:
+  - op: neural_seed
+    at: neuron
+    region: zebrafish_cube_1000
+    v0_mean: 0.0
+    v0_sd: 0.5
+
+operators:
+  - op: neuron_update
+    at: neuron
+    model: leaky_tanh
+    noise: 0.01
+  - op: neuron_signal
+    at: neuron
+    model: type_pairwise
+    edge_set: synapse
+    activation: tanh
+  - op: aggregate
+    at: assembly
+    child: neuron
+    block: voltage
+    into: activity
+  - op: voxelize
+    at: neuron
+    to: neural_activity
+    block: voltage
+    kernel: gaussian
+    # SIGMA IS SET FROM THE NEURON SPACING, not chosen. MEASURED on this region: the median
+    # nearest-neighbour soma distance is 3.967 um = 11.2 voxels. A kernel narrower than that
+    # cannot produce a field -- at sigma = 1.5 vox (FWHM 1.25 um) the splats never touch and
+    # the 128^3 grid holds 1,000 isolated dots in empty space, which renders as a point cloud
+    # and is a poor training target for a model of CONTINUUM dynamics. sigma = 6 vox gives
+    # FWHM 5.01 um > 3.97 um, so neighbouring kernels overlap and the result is continuous.
+    #
+    # The scale hierarchy this puts in the volume, smallest to largest:
+    #     voxel 0.355 um  <  sigma 2.13 um  <  NN spacing 3.97 um  <~  FWHM 5.01 um
+    #                     <  connectome lambda 7.44 um  <  cube 45.39 um
+    sigma: 6.0
+    normalize: none
+
+schedule:
+  - neuron_update
+  - neuron_signal
+  - aggregate
+  - voxelize
+
+plotting:
+  background: black
+  point_size: 4.0

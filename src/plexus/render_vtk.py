@@ -685,6 +685,15 @@ def skeleton_lines(region, max_neurons=200, stride=1, seed=0):
         seg = seg[inside[seg[:, 0]] & inside[seg[:, 1]]]         # clip to the cube
         if len(seg) == 0:
             continue
+        # COMPACT TO THE POINTS THE SURVIVING SEGMENTS ACTUALLY USE. Clipping the segments is
+        # not enough: a PolyData carrying the un-clipped points still has the un-clipped
+        # BOUNDS, and 96% of these nodes are outside the cube (a soma is in the region, its
+        # arbour crosses the brain). `reset_camera` then frames the whole arbour field and the
+        # in-cube anatomy renders as a small blob beside the volume -- which is exactly what
+        # the first 4x4 montage showed.
+        used, seg = np.unique(seg, return_inverse=True)
+        seg = seg.reshape(-1, 2)
+        xyz = xyz[used]
         pts.append(xyz)
         lines.append(np.column_stack([np.full(len(seg), 2), seg + off]))
         off += len(xyz)
@@ -694,3 +703,66 @@ def skeleton_lines(region, max_neurons=200, stride=1, seed=0):
     poly = pv.PolyData(np.ascontiguousarray(np.concatenate(pts)))
     poly.lines = np.concatenate(lines).ravel()
     return poly, {"neurons": len(files), "segments": kept, "segments_before_clip": total}
+
+
+def evolve_skeleton_activity(run_dir, out, region, field="neural_activity", n_arbours=100,
+                             cmap="viridis", opacity=0.95, line_width=1.6, fill=0.92,
+                             label=None, fps=None):
+    """The morphology, carrying the activity: SWC neurites coloured by the field at each node.
+
+    WHY NOT SKELETONS *AND* A VOLUME IN ONE SCENE. Measured: they do not composite. VTK's GPU
+    ray-cast volume mapper draws after and over translucent polygonal geometry, so half a
+    million faintly-drawn line segments vanish entirely behind the volume -- at every opacity
+    tried, and with 8-layer depth peeling enabled (which applies to translucent polygons, not
+    to the volume). The 4x4 montage in `log/promotion/` is that measurement. So the two are
+    separate products: `evolve_volume` for the field a continuum model consumes, and this for
+    the anatomy a reader recognises.
+
+    THIS IS THE CONVENTION OF THE REFERENCE FIGURE, not a new one. connectome-gnn's
+    `figures/zebrafish/fig_zebrafish_anatomy_3d_voltage_anim.py` draws the skeleton segments
+    and puts the activity ON them (a faint base pass, then a coloured overlay on the lit
+    segments) rather than beside them. The same idea in 3D: one line set, coloured per node.
+
+    `n_arbours` IS A REAL LIMIT AND IS DRAWN IN THE FRAME. All 1,000 arbours of this region
+    fill the cube solid -- 514,949 in-cube segments render as an opaque mass with no
+    morphology visible at all. 100 is dense but legible; 25 shows individual neurites.
+    """
+    from matplotlib import colormaps
+    import pyvista as pv
+    z = _traj(run_dir)
+    g = np.asarray(z[f"{field}__grid"], np.float32)
+    if g.ndim == 5:
+        g = g[:, 0]
+    lo, hi = _range(np.abs(g), 0.0, 99.9)
+    poly, meta = skeleton_lines(region, max_neurons=n_arbours)
+    if poly is None:
+        return "no skeletons"
+    P = np.asarray(poly.points)
+    R = g.shape[1]
+    idx = np.clip((P * R).astype(int), 0, R - 1)                 # nearest voxel per node
+    cm = colormaps[cmap]
+    name = label or os.path.basename(run_dir.rstrip("/"))
+    p = _plotter()
+    p.open_movie(out, framerate=fps or EV_FPS, quality=8)
+    actor = txt = None
+    for t in range(g.shape[0]):
+        a = np.abs(g[t])[idx[:, 0], idx[:, 1], idx[:, 2]]
+        x = np.clip((a - lo) / max(hi - lo, 1e-12), 0, 1)
+        poly["rgb"] = (np.asarray(cm(x))[:, :3] * 255).astype(np.uint8)
+        if actor is not None:
+            p.remove_actor(actor)
+        if txt is not None:
+            p.remove_actor(txt)
+        actor = p.add_mesh(poly, scalars="rgb", rgb=True, opacity=opacity,
+                           line_width=line_width, lighting=False)
+        txt = p.add_text(f"{name}  skeletons coloured by |{field}|   frame {t + 1}/{g.shape[0]}"
+                         f"   {meta['neurons']} of 1000 arbours, {meta['segments'] // 1000}k "
+                         f"segments in cube   clim [{lo:.2f}, {hi:.2f}]",
+                         position="upper_left", font_size=10, color="white")
+        if t == 0:
+            p.camera_position = "iso"
+            p.reset_camera()
+            p.camera.zoom(fill)
+        p.write_frame()
+    p.close()
+    return f"{g.shape[0]} frames, {meta['neurons']} arbours, {meta['segments']} segments"

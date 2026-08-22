@@ -214,12 +214,30 @@ def load(path: str) -> Spec:
                     raise ValueError(f"edge-set {sname!r} needs a `{role}:` endpoint set")
                 if s[role] not in raw["sets"]:
                     raise ValueError(f"edge-set {sname!r} `{role}: {s[role]}` is not a declared set")
-            if "edges" not in s or not isinstance(s["edges"], list) or not s["edges"]:
-                raise ValueError(f"edge-set {sname!r} needs a non-empty inline `edges: [[pre, post], ...]` list")
-            for e in s["edges"]:
-                if not (isinstance(e, (list, tuple)) and len(e) in (2, 3)):
-                    raise ValueError(f"edge-set {sname!r}: each edge must be [pre, post] or "
-                                     f"[pre, post, weight], got {e!r}")
+            # the connections: an inline list, or an `.npz` for anything connectome-sized.
+            # EXACTLY ONE of the two, because a spec that gives both is a spec whose author
+            # believes two different things about which connectome it runs.
+            has_inline, has_file = "edges" in s, bool(s.get("edges_file"))
+            if has_inline and has_file:
+                raise ValueError(
+                    f"edge-set {sname!r} gives both `edges:` and `edges_file:` -- name one. "
+                    f"The file is the connectome; an inline list beside it is a second answer "
+                    f"to the same question.")
+            if not has_inline and not has_file:
+                raise ValueError(f"edge-set {sname!r} needs `edges: [[pre, post], ...]` or "
+                                 f"`edges_file: <path.npz>` (edge_index [2, E] + weights [E])")
+            if has_file:
+                if "weights" in s:
+                    raise ValueError(
+                        f"edge-set {sname!r} sets `weights:` beside `edges_file:` -- the weights "
+                        f"belong in the npz, next to the edges they weight.")
+            else:
+                if not isinstance(s["edges"], list) or not s["edges"]:
+                    raise ValueError(f"edge-set {sname!r} needs a non-empty inline `edges: [[pre, post], ...]` list")
+                for e in s["edges"]:
+                    if not (isinstance(e, (list, tuple)) and len(e) in (2, 3)):
+                        raise ValueError(f"edge-set {sname!r}: each edge must be [pre, post] or "
+                                         f"[pre, post, weight], got {e!r}")
 
     # --- shared operator-line resolution, used for both `operators:` and the
     # `seed:` section: names registered, valid KIND, selectors + fields exist,
