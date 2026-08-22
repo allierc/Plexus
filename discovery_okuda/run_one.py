@@ -130,6 +130,7 @@ def _lazy_engine():
 
 
 HEARTBEAT_SECONDS = 30      # write at least this often, however slow the frames are
+_BEAT_FRAMES = [0]          # the run's frame count, so the live stride can be a FRACTION of it
 
 
 def _heartbeat(name, t0, every=10):
@@ -180,16 +181,20 @@ def _heartbeat(name, t0, every=10):
                 os.fsync(fh.fileno())
         except Exception:
             pass                                  # a heartbeat must never take the run down
-        _live_snapshot(name, d, H, tick)
+        _live_snapshot(name, d, H, tick, n_frames=_BEAT_FRAMES[0])
     return beat
 
 
-# HOW OFTEN THE RUNNING SHAPE IS WRITTEN, in frames. 0 turns it off.
-LIVE_EVERY = int(os.environ.get("OKUDA_LIVE_EVERY", "200"))
+# HOW OFTEN THE RUNNING SHAPE IS WRITTEN. A FRACTION OF THE RUN, not a fixed frame count: 200 frames
+# is 11% of an 1800-frame run and 33% of a 600-frame one, so the short runs got three pictures and
+# the long ones nine, for no reason anyone chose. 0.1 gives ten either way. `OKUDA_LIVE_EVERY` still
+# overrides with an absolute frame count, and 0 turns it off.
+LIVE_FRAC = float(os.environ.get("OKUDA_LIVE_FRAC", "0.1"))
+LIVE_EVERY = int(os.environ.get("OKUDA_LIVE_EVERY", "0"))       # 0 = derive it from LIVE_FRAC
 _LIVE_LAST = [-1]
 
 
-def _live_snapshot(name, d, H, tick):
+def _live_snapshot(name, d, H, tick, n_frames=0):
     """`live.npz` + `3d_live.png`: what the tissue looks like RIGHT NOW.
 
     A run's geometry lives in memory until the end -- `traj.npz` is written by the archive step, so
@@ -204,9 +209,19 @@ def _live_snapshot(name, d, H, tick):
     EVERY FAILURE HERE IS SWALLOWED. A snapshot that can take a four-hour run down is worse than no
     snapshot, and a render is far more likely to fail on a compute node than a numpy save.
     """
-    if LIVE_EVERY <= 0 or tick - _LIVE_LAST[0] < LIVE_EVERY:
+    every = LIVE_EVERY or max(1, int(round(n_frames * LIVE_FRAC))) or 200
+    if every <= 0 or tick - _LIVE_LAST[0] < every:
         return
     _LIVE_LAST[0] = tick
+    # `3d.png` ITSELF, by the same helper the core generator uses -- so `A/3d.png` and `B/3d.png`
+    # are the same kind of picture, with the frame number top-left, and can be put side by side
+    # while both sides are still running. The VTK `3d_live.png` below stays: it is the better
+    # render, and it is the one that matches the final. This is the one whose NAME is stable.
+    try:
+        from plexus.live import snapshot as _core_live
+        _core_live(H, tick, n_frames, d, name=name)
+    except Exception:
+        pass
     try:
         import numpy as _np
         m = getattr(H.level("vertex"), "_mesh", None) or {}
@@ -465,6 +480,10 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
     yaml.safe_dump(cfg, open(tmp, "w"), sort_keys=False)
     cfg_path = tmp
 
+    # the live snapshot's stride is a FRACTION of the run, so the heartbeat has to know how long it
+    # is -- a module cell rather than a parameter, because `_beat` is handed only (H, tick).
+    _BEAT_FRAMES[0] = int(cfg["general"]["n_frames"])
+
     print(f"[{name}] comp={disc.get('comp_hash')} region={disc.get('region')!r} "
           f"frames={cfg['general']['n_frames']} dt={cfg['general']['dt']} device={device}",
           flush=True)
@@ -573,7 +592,9 @@ def run_config(name, frames=None, device="cpu", movie=True, do_q=False, campaign
         stopped_early = int(getattr(e, "args", [0])[0] or 0)
         # rows actually written: the recorded ticks at or before the stop
         _rows = sum(1 for _t in getattr(Hf, '_rec_index', {}) if _t <= stopped_early) or 1
-        out = _E._assemble(Hf, *Hf._rec, n_rows=_rows)
+        # `rec_mesh` by KEYWORD -- `H._rec` is a positional tuple and adding a sixth element to it
+        # would push `rec_fields` into the `n_rows` slot, so a salvaged run would return one row.
+        out = _E._assemble(Hf, *Hf._rec, n_rows=_rows, rec_mesh=getattr(Hf, "_rec_mesh", None))
         print(f"[{name}] STOPPED EARLY at frame {stopped_early} ({_stop.get('why') or 'signal'}) "
               f"-- assembling the trajectory reached so far; this run is evidence about those "
               f"frames", flush=True)

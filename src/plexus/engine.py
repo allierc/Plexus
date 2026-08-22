@@ -887,7 +887,8 @@ def _setup_recording(sim: Spec, H: Hierarchy):
     long runs: SET frames (positions) keep <= `record_cap` (spec, default 10000); FIELD frames
     -- each a full [C,nx,ny(,nz)] grid, so far larger -- keep <= `field_record_cap` (spec,
     default 256). The stride is 1 (EVERY frame kept) when n_frames <= the cap, and the FINAL
-    frame is always recorded. Returns (rec_index, rec_sets, occ_sets, fstride, rec_fields)."""
+    frame is always recorded. Returns
+    (rec_index, rec_sets, occ_sets, rec_state, rec_mesh, fstride, rec_fields)."""
     set_cap = int(getattr(sim, "record_cap", 10000))          # max recorded SET (position) frames (spec-tunable)
     sstride = max(1, (sim.n_frames + set_cap) // set_cap)     # 1 if n_frames <= cap, else sub-sample to ~set_cap frames
     rec_ticks = sorted(set(range(0, sim.n_frames + 1, sstride)) | {sim.n_frames})   # ticks recorded (last always in)
@@ -908,10 +909,21 @@ def _setup_recording(sim: Spec, H: Hierarchy):
             rec_state[name] = {b.name: np.zeros((n_rec, lvl.n, b.width), np.float32) for b in blocks}
     field_cap = int(getattr(sim, "field_record_cap", 256))   # fields are large grids -> a tighter, spec-tunable cap
     fstride = max(1, (sim.n_frames + field_cap) // field_cap)
+    # THE TOPOLOGY, PER RECORDED ROW. A mesh set's `nF`/`Nv` and half-edge table change every time a
+    # cell divides or dies, so this cannot be a rectangular array -- it is a list, one snapshot per
+    # recorded row, exactly what `MeshTable.snapshot()` returns.
+    #
+    # WHY THE ENGINE AND NOT `topo_record`. That operator appends its history INSIDE the mesh table
+    # (`m.setdefault("hist", [])`), so the structure the engine now owns grows without bound for the
+    # length of the run, and every consumer of the table walks past a list of every frame it has
+    # ever had. Recording is the recorder's job. `topo_record` still runs and still writes `hist`;
+    # this is the dual write that lets it retire once the readers move over.
+    rec_mesh: dict[str, list] = {name: [] for name, lvl in H.levels.items()
+                                 if getattr(lvl, "mesh", None) is not None}
     rec_fields: dict[str, list] = {fn: [] for fn in H.fields}
     print(f"[engine] {sim.n_frames} sim frames -> recording {n_rec} set frames (stride {sstride}), "
           f"fields every {fstride} steps (<= {field_cap})", flush=True)
-    return rec_index, rec_sets, occ_sets, rec_state, fstride, rec_fields
+    return rec_index, rec_sets, occ_sets, rec_state, rec_mesh, fstride, rec_fields
 
 
 def _print_run_summary(sim: Spec, H: Hierarchy) -> None:
@@ -964,7 +976,7 @@ def _seed_window(sim):
 
 
 
-def _assemble(H, sim, rec_sets, occ_sets, rec_state, rec_fields, n_rows=None):
+def _assemble(H, sim, rec_sets, occ_sets, rec_state, rec_fields, n_rows=None, rec_mesh=None):
     """The recorded trajectory, from whatever the buffers hold.
 
     Split out of `run` so a partial run can be salvaged: `on_frame` receives H every tick, and a
@@ -984,6 +996,12 @@ def _assemble(H, sim, rec_sets, occ_sets, rec_state, rec_fields, n_rows=None):
                            # non-spatial recorded blocks (voltage, calcium, ...); None for a pos/vel set
                            "state": ({k: _cut(v) for k, v in rec_state[name].items()}
                                      if rec_state.get(name) else None),
+                           # the recorded HALF-EDGE TABLE, one snapshot per row; None for a set
+                           # that declares no mesh. A LIST, not an array: nF and Nv change under
+                           # division and death, so the rows are ragged by construction.
+                           "mesh": ((rec_mesh or {}).get(name) or None
+                                    if n_rows is None else
+                                    ((rec_mesh or {}).get(name) or [None])[:max(1, int(n_rows))]),
                            "node_type": (H.level(name).node_type.cpu().numpy()
                                          if hasattr(H.level(name), "node_type") else None),
                            "type_names": getattr(H.level(name), "type_names", None),
@@ -1047,9 +1065,14 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
              o.on,
              _gate(o))                                   # multi-rate cadence: run only when tick % every == 0
             for o in sim.operators]
-    rec_index, rec_sets, occ_sets, rec_state, fstride, rec_fields = _setup_recording(sim, H)
+    rec_index, rec_sets, occ_sets, rec_state, rec_mesh, fstride, rec_fields = _setup_recording(sim, H)
     # LIVE BUFFERS ON H, so an interrupted run can still be assembled -- see _assemble.
+    # THE SALVAGE HANDLE. `run_one.py:576` does `_E._assemble(Hf, *Hf._rec, n_rows=_rows)` when a
+    # run is stopped early, so this tuple is a POSITIONAL contract with a caller outside this file:
+    # `rec_mesh` is passed by keyword and NOT added here, because inserting it would silently shift
+    # `rec_fields` into the `n_rows` slot and every salvaged run would come back with one row.
     H._rec = (sim, rec_sets, occ_sets, rec_state, rec_fields)
+    H._rec_mesh = rec_mesh                      # salvage reaches it by name, not by position
     H._rec_index = rec_index          # tick -> row, so a salvage can truncate
     _print_run_summary(sim, H)
 
@@ -1168,6 +1191,8 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
                     if name in rec_state:                            # non-pos recorded state blocks (voltage, ...)
                         for bname, arr in rec_state[name].items():
                             arr[ri] = lvl.get(bname).detach().cpu().numpy()
+                    if name in rec_mesh and lvl.mesh:                # the half-edge table, per row
+                        rec_mesh[name].append(lvl.mesh.snapshot())
             if H.fields and (tick % fstride == 0 or tick == sim.n_frames):
                 for fn, fld in H.fields.items():
                     if not getattr(fld, "RECORD", True):     # transient scratch fields (e.g. mpm_grid) are not recorded
@@ -1178,23 +1203,57 @@ def run(sim: Spec, out_path: str | None = None, device: str = "cpu",
             if on_frame is not None:
                 on_frame(H, tick)
 
-    out = _assemble(H, sim, rec_sets, occ_sets, rec_state, rec_fields)
+    out = _assemble(H, sim, rec_sets, occ_sets, rec_state, rec_fields, rec_mesh=rec_mesh)
 
     if out_path is not None:
         import zarr
+
+        def _put(g, key, data):
+            """Write one array, on zarr 2 OR zarr 3.
+
+            `Group.create_dataset(name, data=...)` is the zarr-2 spelling; zarr 3 kept the method,
+            deprecated it, and made `shape` a REQUIRED keyword -- so the call raises
+            `TypeError: AsyncGroup.create_dataset() missing 1 required keyword-only argument:
+            'shape'`. The devcontainer has zarr 2.18.7 and the cluster has 3.1.5, so every core
+            generation on the cluster died AFTER the whole simulation had run and BEFORE the npz was
+            written: 25 minutes of GPU, a `simulation.zarr` holding one empty group, and no
+            trajectory. `create_array` is the zarr-3 name; `g[key] = data` is the fallback that
+            works on both.
+            """
+            data = np.asarray(data)
+            try:
+                a = g.create_array(name=key, shape=data.shape, dtype=data.dtype)
+                a[...] = data
+                return
+            except (AttributeError, TypeError):
+                pass
+            try:
+                g.create_dataset(key, data=data)
+                return
+            except TypeError:
+                g.create_dataset(key, shape=data.shape, dtype=data.dtype)[...] = data
+
         root = zarr.open_group(out_path, mode="w")
         for name in H.levels:
             g = root.create_group(name)
             if out["sets"][name]["pos"] is not None:            # spatial: the pos trajectory
-                g.create_dataset("pos", data=out["sets"][name]["pos"])
-            g.create_dataset("occ", data=out["sets"][name]["occ"])
+                _put(g, "pos", out["sets"][name]["pos"])
+            _put(g, "occ", out["sets"][name]["occ"])
             if out["sets"][name]["state"] is not None:          # non-spatial state blocks -> state/<block>
                 sg = g.create_group("state")
                 for bname, arr in out["sets"][name]["state"].items():
-                    sg.create_dataset(bname, data=arr)
+                    _put(sg, bname, arr)
+            ms = out["sets"][name].get("mesh")
+            if ms:                                              # the ragged half-edge history
+                mg = g.create_group("mesh")
+                _put(mg, "offsets", np.cumsum([0] + [len(m["E_srce"]) for m in ms]))
+                _put(mg, "nF", np.asarray([m["nF"] for m in ms], np.int64))
+                _put(mg, "Nv", np.asarray([m["Nv"] for m in ms], np.int64))
+                for col in ("E_srce", "E_trgt", "E_face"):
+                    _put(mg, col, np.concatenate([m[col] for m in ms]).astype(np.int64))
         for fn, fd in out["fields"].items():
             g = root.create_group(fn)
-            g.create_dataset("grid", data=fd["grid"])
-            g.create_dataset("colors", data=fd["colors"])
+            _put(g, "grid", fd["grid"])
+            _put(g, "colors", fd["colors"])
         root.attrs.update(name=sim.name, seed=sim.seed, world=H.world_width)
     return H, out
