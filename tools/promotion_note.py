@@ -105,28 +105,47 @@ def operator_table():
 
 
 def gate_table():
-    """The okuda_ECM gates 00-04, from log/gates/gate_table.json once they run."""
+    """The lifted gates, from `log/gates/gate_table.json` -- the roll-up `run_gates.py` writes.
+
+    THE TABLE CARRIES `basis` AS WELL AS `tier`, because the paper's third tier asks whether the
+    model agrees with something OBSERVED IN CELLS and a threshold copied off a previous run of the
+    same code is not that. Reporting the two together is the only way the fraction at the bottom
+    means anything.
+    """
     p = os.path.join(ROOT, "log", "gates", "gate_table.json")
     if not os.path.exists(p):
-        return ("% log/gates/gate_table.json does not exist yet -- the gates have not been lifted\n"
-                "\\noindent\\textit{The okuda\\_ECM gates have not yet been run from the promoted "
-                "registry; this table is written by \\code{tools/run\\_gates.py}.}\n")
-    data = json.load(open(p))
-    L = [r"\begin{center}\small", r"\begin{longtable}{@{}lllrrl@{}}\toprule",
-         r"gate & measure & tier & declared & measured & outcome\\\midrule\endhead"]
-    tiers = {}
-    for g in data:
-        for m in g["measures"]:
-            tiers[m["tier"]] = tiers.get(m["tier"], 0) + 1
-            mark = (r"\textcolor{good}{pass}" if m["pass"] else r"\textcolor{bad}{\textbf{FAIL}}")
-            L.append(f"\\code{{{_esc(g['gate'])}}} & \\code{{{_esc(m['name'])}}} & {_esc(m['tier'])} & "
-                     f"{_esc(m['declared'])} & {_esc(m['measured'])} & {mark}\\\\")
+        return ("\\noindent\\textit{No gate has been run from the promoted registry yet; this "
+                "table is written by \\code{tools/run\\_gates.py}.}\n")
+    doc = json.load(open(p))
+    MARK = {"PASS": r"\textcolor{good}{pass}", "FAIL": r"\textcolor{bad}{\textbf{FAIL}}",
+            "BLOCKED": r"\textcolor{grey}{blocked}", "KNOWN_RED": r"\textcolor{warn}{known-red}",
+            "TURNED_GREEN": r"\textcolor{warn}{\textbf{turned green}}",
+            "INFRA_FAIL": r"\textcolor{bad}{\textbf{infra}}"}
+    L = [r"\begin{center}\scriptsize", r"\begin{longtable}{@{}llllrrl@{}}\toprule",
+         r"gate & row & tier & basis & declared & measured & \\\midrule\endhead"]
+    for t in doc.get("tables", []):
+        for m in t["measures"]:
+            k, a = next(iter(m["assertion"].items()))
+            v = m.get("value")
+            vs = ("--" if v is None else
+                  (json.dumps(v, default=str)[:30] if isinstance(v, dict)
+                   else (f"{v:.6g}" if isinstance(v, float) else str(v))))
+            L.append(f"\\code{{{_esc(t['gate'])}}} & \\code{{{_esc(m['name'])}}} & "
+                     f"{_esc(m['tier'].replace('_', ' '))} & {_esc(m['basis'])} & "
+                     f"{_esc(k)} {_esc(a)} & {_esc(vs)} & {MARK.get(m['outcome'], m['outcome'])}\\\\")
     L += [r"\bottomrule", r"\end{longtable}", r"\end{center}"]
-    tot = sum(tiers.values()) or 1
-    ver = tiers.get("bookkeeping", 0) + tiers.get("closed_form", 0)
-    L.append(f"\n\\noindent\\textbf{{{ver} of {tot} rows are verification}} (bookkeeping or closed "
-             f"form) and {tot - ver} are measurement --- {100 * ver / tot:.0f}\\% of this table "
-             f"asks whether the code does what it says, not whether the model agrees with cells.\n")
+    s = doc.get("split", {})
+    if s:
+        L.append(
+            f"\n\\noindent\\textbf{{{s['verification']} of {s['rows']} rows are verification}} "
+            f"(bookkeeping or closed form, {100 * s['verification_frac']:.0f}\\%); "
+            f"{s['regression_pins']} pin a regression against a previous run of this same model; "
+            f"and \\textbf{{{s['observed_in_cells']} compare the model with something observed in "
+            f"cells}} ({100 * s['observed_frac']:.0f}\\%). The paper reports roughly two thirds "
+            f"bookkeeping-or-closed-form for the \\code{{ecm}} study; this table looks better than "
+            f"that only because \\code{{basis}} separates the regression pins out of the "
+            f"measurement tier, where they would otherwise sit and read as biology.\n")
+        L.append(f"\n\\noindent Outcomes: {_esc(doc.get('outcomes', {}))}.\n")
     return "\n".join(L) + "\n"
 
 

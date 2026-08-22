@@ -317,13 +317,45 @@ ECM, membrane or contact operator, so 34 of the operators just promoted have no 
   over, so the two can always be diffed.
 \end{itemize}
 
-\paragraph{The tiers are the paper's.} \emph{Bookkeeping} asks whether the code does what the
-operator says. \emph{Closed form} asks whether the implementation reproduces the physics it was
-\emph{given}. \emph{Measurement} asks whether the model agrees with something observed in cells ---
-and that tier is only available once the model declares its units, because before a \code{units:}
-block a comparison with a measurement is a comparison between a number and a quantity. None of the
-okuda specs declares units. That is stated here rather than worked around, and it bounds what this
-gate table can claim.
+\paragraph{The tiers are the paper's, and \code{basis} is the column that keeps them honest.}
+\emph{Bookkeeping} asks whether the code does what the operator says. \emph{Closed form} asks whether
+the implementation reproduces the physics it was \emph{given}. \emph{Measurement} asks whether the
+model agrees with something observed in cells. A threshold copied off a previous run of the same code
+is none of those three --- it is a \emph{regression pin} --- and left in the measurement tier it reads
+as biology. So every row also declares \code{basis: identity | analytic | reference | literature},
+and the fraction at the foot of the table is reported against both.
+
+\paragraph{And the measurement tier turns out to be available.} \code{general.units:} is declared in
+\code{schema.py}, parsed through \code{plexus/units.py}, and its calibration is already on disk:
+\code{log/okuda\_ECM/0u\_units/units.json} gives one tissue length unit $=10\,\mu$m and one frame
+$=600$\,s. So gate~00 carries three rows in the unit of the phenomenon rather than of the mesh: a
+$13.08$\,h cell cycle against the $12$--$24$\,h a cultured epithelial cell takes; a $7.66\,\mu$m cell
+against $5$--$15$; a $359\,\mu$m spheroid against the $100$--$500\,\mu$m at which a real one's core
+goes hypoxic and this model, which has no nutrient field, stops being about anything. Preflight
+\emph{refuses} a physical row on a spec with no \code{units:} block, and refuses any \code{unit:}
+string that names the mesh --- ``$0.82$ grid cells'' sounds small and is $15\,\mu$m.
+
+\paragraph{Gate 00 was reconstructed, and that was the hard part.} \code{test\_00\_spheroid.py} does
+not run a tissue, it \emph{loads} one, so the model had to be recovered from the cache's provenance.
+Two candidate parents exist and they are \emph{different models}: the pre-basis
+\code{cellfix\_B\_new.yaml} says \code{rate: 0.003457} and is what the cache was built from, while
+the \code{\_archive\_runs} copy \code{tissue.py} falls back to today says \code{rate: 0.03} and
+reaches $1{,}451$ cells by frame $60$ against the cache's $227$. Gating against the wrong parent
+would fail a correct run. The reconstruction is confirmed by the run itself: $6{,}914$ cells exactly,
+apical-radius fold $3.86064$ against the cache's $3.8607$, aspect $1.01931$ against $1.0193$.
+
+\paragraph{Its first run failed five rows and four of them were the measuring code}, which is what a
+gate is for. \code{apical\_radius} was a mean where the reference is a median; \code{aspect\_ratio}
+was a gyration tensor where the reference is a percentile pair; \code{mean\_cell\_diameter} fanned
+its triangles from the body's centroid instead of each face's and read $50.9\,\mu$m for a cell that
+is $7.66$; and \code{t1\_total} reconstructed the count as ``new edges minus three per new face'',
+which is wrong because a division \emph{splits} two edges --- five pairs appear and two vanish --- so
+it read $16{,}169$ against $1{,}499$. Excluding divisions by geometry instead of by arithmetic gave
+$2{,}890$, still not $1{,}499$, because a 3D reversible network reconnection rewires more than the
+one edge it is named for. Two numbers each right about a different quantity is the worst kind of
+disagreement: neither side is wrong and the row is meaningless. So the engine now records the
+operators' own counters --- \code{MeshTable.SCALAR\_RECORD}: \code{n\_t1}, \code{n\_apop},
+\code{div\_blocked}, \code{apop\_spill} --- and the row reads $1{,}499$.
 
 \gatetable
 
@@ -339,8 +371,9 @@ B-core & the core runs the model with no okuda import, bit-identical & \dn\\
 C  & \code{junction\_ops.py} & \dn\\
 D  & \code{ecm\_ops.py}, \code{membrane\_ops.py}, \code{contact\_ops.py} & \dn\\
 0b & MPM regrouped into \code{mpm\_ops.py} & \ns\\
-gates & 00--04 lifted into \code{config/gates/}, run into \code{log/gates/} & \fl\\
-E  & regroup the remaining core; VTK as the engine's renderer & \ns\\
+gate 00 & lifted into \code{config/gates/}, run from core, \textbf{17/17 green} & \dn\\
+gates 01--04 & lifted; 03 needs a seeder and four operators & \fl\\
+0b/E & core regrouped into ten modules; VTK is the engine's renderer & \dn\\
 F  & the three minisite scenes under \code{config/atlas/} & \ns\\
 G  & replication: \code{r010\_00\_ctrl} and \code{b\_star} as twin runs & \ns\\
 \bottomrule
