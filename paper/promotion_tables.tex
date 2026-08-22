@@ -24,21 +24,18 @@ R & \code{b\_star} & 1800 & okuda & okuda & \code{beb6fb24fe86dcde} & \textcolor
 \begin{center}\scriptsize
 \begin{longtable}{@{}lllllp{3.1cm}@{}}\toprule
 module & operator & family & kind & set & implementations / alias\\\midrule\endhead
-\code{activation\_pulse.py} & \code{activation\_pulse} & fields & field & field & \\
-\code{active\_force.py} & \code{active\_force} & mechanics & exchange & particle & alias pulse\_to\_contraction\\
-\code{active\_stress.py} & \code{active\_stress} & mechanics & exchange & particle & alias pulse\_to\_active\_stress\\
-\code{agent\_divide.py} & \code{agent\_divide} & population & structural & cell & \\
-\code{agent\_gather.py} & \code{agent\_gather} & coupling & exchange & cell & alias mpm\_to\_agent\\
-\code{agent\_grow.py} & \code{agent\_grow} & population & structural & cell & \\
-\code{agent\_remodel.py} & \code{agent\_remodel} & coupling & exchange & cell & \\
-\code{agent\_scatter.py} & \code{agent\_scatter} & coupling & exchange & cell & alias agent\_to\_mpm\\
-\code{aggregate.py} & \code{aggregate} & hierarchy & aggregate & cell & \\
-\code{attraction\_repulsion.py} & \code{attraction\_repulsion} & interaction & lateral & particle & \\
-\code{attractor\_flow.py} & \code{attractor\_flow} & motion & lateral & particle & \\
-\code{bounce.py} & \code{bounce} & boundary & lateral & cell & \\
-\code{broadcast.py} & \code{broadcast} & hierarchy & broadcast & particle & \\
-\code{chemotax.py} & \code{chemotax} & fields & exchange & particle & \\
-\code{cohesion.py} & \code{cohesion} & interaction & lateral & particle & \\
+\code{agent\_ops.py} & \code{active\_force} & mechanics & exchange & particle & alias pulse\_to\_contraction\\
+\code{agent\_ops.py} & \code{active\_stress} & mechanics & exchange & particle & alias pulse\_to\_active\_stress\\
+\code{agent\_ops.py} & \code{agent\_divide} & population & structural & cell & \\
+\code{agent\_ops.py} & \code{agent\_gather} & coupling & exchange & cell & alias mpm\_to\_agent\\
+\code{agent\_ops.py} & \code{agent\_grow} & population & structural & cell & \\
+\code{agent\_ops.py} & \code{agent\_remodel} & coupling & exchange & cell & \\
+\code{agent\_ops.py} & \code{agent\_scatter} & coupling & exchange & cell & alias agent\_to\_mpm\\
+\code{agent\_ops.py} & \code{aggregate} & hierarchy & aggregate & cell & \\
+\code{agent\_ops.py} & \code{broadcast} & hierarchy & broadcast & particle & \\
+\code{agent\_ops.py} & \code{polarity\_align} & polarity & exchange & cell & alias heading\_align\\
+\code{agent\_ops.py} & \code{polarity\_flow\_align} & polarity & exchange & cell & alias flow\_align\\
+\code{agent\_ops.py} & \code{seed\_from\_segmentation} & seed & seed & particle & \\
 \code{contact\_ops.py} & \code{bm\_sense} & signalling & structural & vertex & \\
 \code{contact\_ops.py} & \code{ecm\_gate\_growth} & population & structural & vertex & \\
 \code{contact\_ops.py} & \code{ecm\_load} & mechanics & structural & vertex & \\
@@ -46,9 +43,6 @@ module & operator & family & kind & set & implementations / alias\\\midrule\endh
 \code{contact\_ops.py} & \code{mesh\_inside} & hierarchy & lateral & particle & \\
 \code{contact\_ops.py} & \code{plate\_confine} & boundary & structural & vertex & \\
 \code{contact\_ops.py} & \code{surface\_track} & hierarchy & structural & particle & \\
-\code{decay.py} & \code{decay} & fields & field & field & \\
-\code{deposit.py} & \code{deposit} & fields & exchange & cell & \\
-\code{diffuse.py} & \code{diffuse} & fields & field & field & finite\_difference, spectral\\
 \code{diffusion\_reaction.py} & \code{cell\_chem\_diffuse} & fields & lateral & cell & graph\_laplacian, interface\_weighted\\
 \code{diffusion\_reaction.py} & \code{cell\_chem\_from\_shape} & fields & lateral & cell & apical\_area, curvature, pressure, tension\\
 \code{diffusion\_reaction.py} & \code{cell\_chem\_react} & fields & lateral & cell & brusselator, gierer\_meinhardt, gray\_scott\\
@@ -59,21 +53,32 @@ module & operator & family & kind & set & implementations / alias\\\midrule\endh
 \code{diffusion\_reaction.py} & \code{interface\_push} & mechanics & lateral & vertex & \\
 \code{diffusion\_reaction.py} & \code{interface\_tension} & mechanics & lateral & vertex & \\
 \code{diffusion\_reaction.py} & \code{seed\_cell\_chem} & seed & seed & cell & alias cell\_chem\_seed\\
-\code{drag.py} & \code{drag} & motion & lateral & particle & \\
 \code{ecm\_ops.py} & \code{block\_seed} & seed & seed & particle & \\
 \code{ecm\_ops.py} & \code{block\_stress} & hierarchy & lateral & particle & \\
 \code{ecm\_ops.py} & \code{cell\_exclude} & boundary & structural & particle & \\
 \code{ecm\_ops.py} & \code{ecm\_from\_cell} & mechanics & lateral & particle & replay, sphere\\
 \code{ecm\_ops.py} & \code{ecm\_seed} & seed & seed & particle & \\
 \code{ecm\_ops.py} & \code{ecm\_stress} & hierarchy & lateral & particle & \\
-\code{glide.py} & \code{glide} & motion & lateral & cell & \\
-\code{graph.py} & \code{radius\_graph} & topology & rewire & particle & \\
-\code{gravity.py} & \code{gravity} & mechanics & lateral & cell & \\
+\code{field\_ops.py} & \code{activation\_pulse} & fields & field & field & \\
+\code{field\_ops.py} & \code{chemotax} & fields & exchange & particle & \\
+\code{field\_ops.py} & \code{decay} & fields & field & field & \\
+\code{field\_ops.py} & \code{deposit} & fields & exchange & cell & \\
+\code{field\_ops.py} & \code{diffuse} & fields & field & field & finite\_difference, spectral\\
+\code{field\_ops.py} & \code{pacemaker} & fields & field & field & \\
+\code{field\_ops.py} & \code{playback} & harness & field & field & \\
+\code{field\_ops.py} & \code{sense} & signalling & exchange & cell & \\
+\code{field\_ops.py} & \code{signal} & signalling & lateral & neuron & \\
+\code{interaction\_ops.py} & \code{attraction\_repulsion} & interaction & lateral & particle & \\
+\code{interaction\_ops.py} & \code{cohesion} & interaction & lateral & particle & \\
+\code{interaction\_ops.py} & \code{radius\_graph} & topology & rewire & particle & \\
+\code{interaction\_ops.py} & \code{separation} & interaction & lateral & particle & \\
+\code{interaction\_ops.py} & \code{squared\_law} & interaction & lateral & particle & \\
+\code{interaction\_ops.py} & \code{stillinger\_weber} & interaction & lateral & particle & autograd\\
+\code{interaction\_ops.py} & \code{velocity\_align} & interaction & lateral & particle & alias alignment\\
 \code{junction\_ops.py} & \code{cytokinetic\_ring} & mechanics & structural & vertex & \\
 \code{junction\_ops.py} & \code{junction\_myosin} & mechanics & structural & vertex & default, two\_pool\\
 \code{junction\_ops.py} & \code{junction\_sync} & mechanics & rewire & vertex & \\
 \code{junction\_ops.py} & \code{medioapical\_myosin} & mechanics & lateral & cell & \\
-\code{material\_map.py} & \code{apply\_material\_map} & mpm & exchange & particle & \\
 \code{membrane\_ops.py} & \code{adhesion\_pull} & mechanics & exchange & particle & \\
 \code{membrane\_ops.py} & \code{adhesion\_seed} & seed & seed & particle & \\
 \code{membrane\_ops.py} & \code{adhesion\_turnover} & topology & rewire & particle & \\
@@ -91,26 +96,21 @@ module & operator & family & kind & set & implementations / alias\\\midrule\endh
 \code{membrane\_ops.py} & \code{integrin\_seed} & seed & structural & particle & \\
 \code{membrane\_ops.py} & \code{integrin\_track} & mechanics & structural & particle & \\
 \textcolor{bad}{\textbf{okuda}}~\code{membrane\_ops.py} & \code{mpm\_boundary} & boundary & field & field & \\
-\code{mpm.py} & \code{mls\_mpm\_mechanics} & mpm & exchange & particle & \\
-\code{mpm\_anchor.py} & \code{mpm\_anchor} & mechanics & lateral & particle & \\
-\code{mpm\_gather.py} & \code{mpm\_gather} & mpm & exchange & particle & alias g2p\\
-\code{mpm\_grid\_update.py} & \code{mpm\_grid\_update} & mpm & field & field & \\
-\code{mpm\_scatter.py} & \code{mpm\_scatter} & mpm & exchange & particle & alias p2g\\
-\code{mpm\_spin.py} & \code{mpm\_spin} & mechanics & lateral & particle & \\
-\code{mpm\_strain.py} & \code{mpm\_strain} & mpm & lateral & particle & \\
-\code{pacemaker.py} & \code{pacemaker} & fields & field & field & \\
-\code{polarity\_align.py} & \code{polarity\_align} & polarity & exchange & cell & alias heading\_align\\
-\code{polarity\_flow\_align.py} & \code{polarity\_flow\_align} & polarity & exchange & cell & alias flow\_align\\
-\code{prescribed\_field.py} & \code{playback} & harness & field & field & \\
-\code{sediment.py} & \code{sediment} & motion & lateral & cell & \\
-\code{segmentation\_seed.py} & \code{seed\_from\_segmentation} & seed & seed & particle & \\
-\code{sense.py} & \code{sense} & signalling & exchange & cell & \\
-\code{separation.py} & \code{separation} & interaction & lateral & particle & \\
-\code{signal.py} & \code{signal} & signalling & lateral & neuron & \\
-\code{squared\_law.py} & \code{squared\_law} & interaction & lateral & particle & \\
-\code{stillinger\_weber.py} & \code{stillinger\_weber} & interaction & lateral & particle & autograd\\
-\code{velocity\_align.py} & \code{velocity\_align} & interaction & lateral & particle & alias alignment\\
-\code{velocity\_cruise.py} & \code{velocity\_cruise} & motion & lateral & particle & alias cruise\\
+\code{motion\_ops.py} & \code{attractor\_flow} & motion & lateral & particle & \\
+\code{motion\_ops.py} & \code{bounce} & boundary & lateral & cell & \\
+\code{motion\_ops.py} & \code{drag} & motion & lateral & particle & \\
+\code{motion\_ops.py} & \code{glide} & motion & lateral & cell & \\
+\code{motion\_ops.py} & \code{gravity} & mechanics & lateral & cell & \\
+\code{motion\_ops.py} & \code{sediment} & motion & lateral & cell & \\
+\code{motion\_ops.py} & \code{velocity\_cruise} & motion & lateral & particle & alias cruise\\
+\code{mpm\_ops.py} & \code{apply\_material\_map} & mpm & exchange & particle & \\
+\code{mpm\_ops.py} & \code{mls\_mpm\_mechanics} & mpm & exchange & particle & \\
+\code{mpm\_ops.py} & \code{mpm\_anchor} & mechanics & lateral & particle & \\
+\code{mpm\_ops.py} & \code{mpm\_gather} & mpm & exchange & particle & alias g2p\\
+\code{mpm\_ops.py} & \code{mpm\_grid\_update} & mpm & field & field & \\
+\code{mpm\_ops.py} & \code{mpm\_scatter} & mpm & exchange & particle & alias p2g\\
+\code{mpm\_ops.py} & \code{mpm\_spin} & mechanics & lateral & particle & \\
+\code{mpm\_ops.py} & \code{mpm\_strain} & mpm & lateral & particle & \\
 \code{vertex\_ops.py} & \code{cell\_die} & population & structural & vertex & \\
 \code{vertex\_ops.py} & \code{cell\_divide} & population & structural & vertex & default, doubler, timer\\
 \code{vertex\_ops.py} & \code{cell\_mechanics} & mechanics & lateral & vertex & default, monolayer\\
@@ -125,6 +125,33 @@ module & operator & family & kind & set & implementations / alias\\\midrule\endh
 
 }
 \newcommand{\gatetable}{%
-% log/gates/gate_table.json does not exist yet -- the gates have not been lifted
-\noindent\textit{The okuda\_ECM gates have not yet been run from the promoted registry; this table is written by \code{tools/run\_gates.py}.}
+\begin{center}\scriptsize
+\begin{longtable}{@{}llllrrl@{}}\toprule
+gate & row & tier & basis & declared & measured & \\\midrule\endhead
+\code{00\_spheroid} & \code{seed\_cell\_count} & bookkeeping & identity & eq 200 & 200 & \textcolor{good}{pass}\\
+\code{00\_spheroid} & \code{cell\_count\_never\_falls} & bookkeeping & identity & ge 0 & 0 & \textcolor{good}{pass}\\
+\code{00\_spheroid} & \code{occupancy\_matches\_topology} & bookkeeping & identity & eq 0 & 0 & \textcolor{good}{pass}\\
+\code{00\_spheroid} & \code{topology\_delta\_ledger} & bookkeeping & identity & eq 0 & 0 & \textcolor{good}{pass}\\
+\code{00\_spheroid} & \code{no\_nan} & bookkeeping & identity & eq 0 & 0 & \textcolor{good}{pass}\\
+\code{00\_spheroid} & \code{reservoir\_headroom} & bookkeeping & identity & le 0.95 & 0.540338 & \textcolor{good}{pass}\\
+\code{00\_spheroid} & \code{euler\_characteristic} & closed form & analytic & eq 2 & 2 & \textcolor{good}{pass}\\
+\code{00\_spheroid} & \code{vertex\_valence} & closed form & analytic & eq 1.0 & 1 & \textcolor{good}{pass}\\
+\code{00\_spheroid} & \code{mean\_neighbours\_per\_cell} & closed form & analytic & lt 1e-09 & 0 & \textcolor{good}{pass}\\
+\code{00\_spheroid} & \code{final\_cell\_count} & measurement & reference & eq 6914 & 6914 & \textcolor{good}{pass}\\
+\code{00\_spheroid} & \code{apical\_radius\_fold} & measurement & reference & within [3.8607, 0.002] & 3.86064 & \textcolor{good}{pass}\\
+\code{00\_spheroid} & \code{aspect\_ratio} & measurement & reference & within [1.0193, 0.01] & 1.01931 & \textcolor{good}{pass}\\
+\code{00\_spheroid} & \code{t1\_total} & measurement & reference & eq 1499 & 1499 & \textcolor{good}{pass}\\
+\code{00\_spheroid} & \code{t1\_rail\_fraction} & measurement & reference & le 0.4 & 0.369048 & \textcolor{good}{pass}\\
+\code{00\_spheroid} & \code{cell\_cycle\_hours} & measurement & literature & interval [12.0, 24.0] & 13.0752 & \textcolor{good}{pass}\\
+\code{00\_spheroid} & \code{mean\_cell\_diameter\_um} & measurement & literature & interval [5.0, 15.0] & 7.66072 & \textcolor{good}{pass}\\
+\code{00\_spheroid} & \code{spheroid\_diameter\_um} & measurement & literature & interval [100.0, 500.0] & 359.39 & \textcolor{good}{pass}\\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\noindent\textbf{9 of 17 rows are verification} (bookkeeping or closed form, 53\%); 5 pin a regression against a previous run of this same model; and \textbf{3 compare the model with something observed in cells} (18\%). The paper reports roughly two thirds bookkeeping-or-closed-form for the \code{ecm} study; this table looks better than that only because \code{basis} separates the regression pins out of the measurement tier, where they would otherwise sit and read as biology.
+
+
+\noindent Outcomes: {'PASS': 17}.
+
 }
