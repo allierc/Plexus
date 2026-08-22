@@ -145,13 +145,20 @@ gate & row & tier & basis & declared & measured & \\\midrule\endhead
 \code{00\_spheroid} & \code{cell\_cycle\_hours} & measurement & literature & interval [12.0, 24.0] & 13.0752 & \textcolor{good}{pass}\\
 \code{00\_spheroid} & \code{mean\_cell\_diameter\_um} & measurement & literature & interval [5.0, 15.0] & 7.66072 & \textcolor{good}{pass}\\
 \code{00\_spheroid} & \code{spheroid\_diameter\_um} & measurement & literature & interval [100.0, 500.0] & 359.39 & \textcolor{good}{pass}\\
+\code{02\_ecm\_block} & \code{particle\_count} & bookkeeping & identity & eq 90000 & 90000 & \textcolor{good}{pass}\\
+\code{02\_ecm\_block} & \code{no\_particle\_outside\_the\_domain} & bookkeeping & identity & eq 0 & 0 & \textcolor{good}{pass}\\
+\code{02\_ecm\_block} & \code{no\_nan} & bookkeeping & identity & eq 0 & 0 & \textcolor{good}{pass}\\
+\code{02\_ecm\_block} & \code{free\_fall\_acceleration} & closed form & analytic & within [-2.5, 0.05] & -2.48784 & \textcolor{good}{pass}\\
+\code{02\_ecm\_block} & \code{lowest\_centroid} & measurement & reference & interval [0.05, 0.3] & 0.1537 & \textcolor{good}{pass}\\
+\code{02\_ecm\_block} & \code{rebound\_happens} & measurement & reference & gt 0.05 & 0.204168 & \textcolor{good}{pass}\\
+\code{02\_ecm\_block} & \code{strand\_length\_um} & measurement & literature & interval [20.0, 500.0] & 105.853 & \textcolor{good}{pass}\\
 \bottomrule
 \end{longtable}
 \end{center}
 
-\noindent\textbf{9 of 17 rows are verification} (bookkeeping or closed form, 53\%); 5 pin a regression against a previous run of this same model; and \textbf{3 compare the model with something observed in cells} (18\%). The paper reports roughly two thirds bookkeeping-or-closed-form for the \code{ecm} study; this table looks better than that only because \code{basis} separates the regression pins out of the measurement tier, where they would otherwise sit and read as biology.
+\noindent\textbf{13 of 24 rows are verification} (bookkeeping or closed form, 54\%); 7 pin a regression against a previous run of this same model; and \textbf{4 compare the model with something observed in cells} (17\%). The paper reports roughly two thirds bookkeeping-or-closed-form for the \code{ecm} study; this table looks better than that only because \code{basis} separates the regression pins out of the measurement tier, where they would otherwise sit and read as biology.
 
 
-\noindent Outcomes: {'PASS': 17}.
+\noindent Outcomes: {'PASS': 24}.
 
 }
