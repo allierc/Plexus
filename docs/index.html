@@ -172,7 +172,7 @@ window.Quarto = {
     <h2 id="toc-title">On this page</h2>
    
   <ul>
-  <li><a href="#four-concepts-eight-operators" id="toc-four-concepts-eight-operators" class="nav-link active" data-scroll-target="#four-concepts-eight-operators">Four concepts, eight operators</a></li>
+  <li><a href="#a-language" id="toc-a-language" class="nav-link active" data-scroll-target="#a-language">A language</a></li>
   <li><a href="#composing-mechanisms" id="toc-composing-mechanisms" class="nav-link" data-scroll-target="#composing-mechanisms">Composing mechanisms</a></li>
   <li><a href="#composing-hierarchy" id="toc-composing-hierarchy" class="nav-link" data-scroll-target="#composing-hierarchy">Composing hierarchy</a></li>
   <li><a href="#what-it-looks-like" id="toc-what-it-looks-like" class="nav-link" data-scroll-target="#what-it-looks-like">What it looks like</a></li>
@@ -205,8 +205,8 @@ window.Quarto = {
 <p>We introduce <strong>Plexus</strong>, a typed intermediate representation for biological mechanisms. Rather than defining yet another simulator, Plexus defines a common language whose primary objects are <strong>biological operators</strong>. Every operator specifies the biological entities it acts upon, the states it requires, the relations between these entities, and one or more numerical implementations. The Plexus research program has three objectives. First, to define an <strong>algebra of biological operators</strong>. Second, to <strong>decompose the existing corpus</strong> of simulation models into this common language. Third, to construct <strong>differentiable implementations</strong> of these operators so that mechanistic models can be directly inferred from biological data.</p>
 <p>Just as compilers separate programming languages from their implementations through an <strong>intermediate representation</strong>, Plexus separates biological mechanisms from their numerical implementations. Every operator is defined by a <strong>typed signature</strong> — <em>what</em> biological transformation it performs — and one or more <strong>implementations</strong> — <em>how</em> it is numerically realized. The signature is the biological contract; the implementation is a numerical choice.</p>
 <p>Every operator may admit multiple implementations satisfying the same signature: a mechanical interaction by Material Point Methods, finite elements, vertex or phase-field models; a signalling operator by Hodgkin–Huxley equations, Neural ODEs or graph neural networks. Because a mechanism is stated once, independently of its solver, existing simulation frameworks become <strong>complementary backends</strong> implementing a common intermediate representation rather than competing modelling paradigms.</p>
-<section id="four-concepts-eight-operators" class="level2">
-<h2 class="anchored" data-anchor-id="four-concepts-eight-operators">Four concepts, eight operators</h2>
+<section id="a-language" class="level2">
+<h2 class="anchored" data-anchor-id="a-language">A language</h2>
 <p>The language is built around four fundamental concepts: <strong>operators</strong>, <strong>sets</strong> (collections of biological entities across scales — proteins, cells, neurons, synapses, tissues), the <strong>states</strong> each element carries, and <strong>fields</strong> (continuous quantities defined over space — morphogens, pressure, potentials). A biological model is a composition of operators acting on these objects.</p>
 <p>The central hypothesis of Plexus is that a large fraction of existing biological simulation models can be expressed as compositions of a small number of elementary operator kinds. The proposed algebra consists of <strong>eight</strong>:</p>
 <div class="quarto-figure quarto-figure-center">
@@ -640,7 +640,7 @@ sets:
         width: 1
 fields: {}
 operators:
-- op: mesh_seed
+- op: seed_mesh
   at: vertex
   cell_set: cell
   before_frame: 1
@@ -685,7 +685,7 @@ operators:
   at: vertex
   every: 1
 schedule:
-- mesh_seed
+- seed_mesh
 - cell_geometry
 - cell_mechanics
 - cell_die
@@ -736,7 +736,7 @@ sets:
         width: 1
 fields: {}
 operators:
-- op: mesh_seed
+- op: seed_mesh
   at: vertex
   cell_set: cell
   before_frame: 1
@@ -782,7 +782,7 @@ operators:
   at: vertex
   every: 1
 schedule:
-- mesh_seed
+- seed_mesh
 - cell_geometry
 - cell_mechanics
 - cell_die
@@ -833,7 +833,7 @@ sets:
         width: 1
 fields: {}
 operators:
-- op: mesh_seed
+- op: seed_mesh
   at: vertex
   cell_set: cell
   before_frame: 1
@@ -878,7 +878,7 @@ operators:
   at: vertex
   every: 1
 schedule:
-- mesh_seed
+- seed_mesh
 - cell_geometry
 - cell_die
 - cell_mechanics
@@ -936,7 +936,7 @@ sets:
         width: 1
 fields: {}
 operators:
-- op: mesh_seed
+- op: seed_mesh
   at: vertex
   cell_set: cell
   before_frame: 1
@@ -999,7 +999,7 @@ operators:
   at: vertex
   every: 1
 schedule:
-- mesh_seed
+- seed_mesh
 - cell_geometry
 - cell_mechanics
 - edge_flip
@@ -1043,7 +1043,7 @@ sets:
         width: 1
 fields: {}
 operators:
-- op: mesh_seed
+- op: seed_mesh
   at: vertex
   cell_set: cell
   before_frame: 1
@@ -1057,7 +1057,7 @@ operators:
   at: cell
 - op: cell_neighbours
   at: cell
-- op: cell_chem_seed
+- op: seed_cell_chem
   at: cell
   seed: 0
   before_frame: 3
@@ -1127,10 +1127,10 @@ operators:
   at: vertex
   every: 1
 schedule:
-- mesh_seed
+- seed_mesh
 - cell_geometry
 - cell_neighbours
-- cell_chem_seed
+- seed_cell_chem
 - cell_chem_diffuse
 - cell_chem_react
 - cell_chem_from_shape
@@ -1392,7 +1392,7 @@ sets:
         width: 1
 fields: {}
 operators:
-- op: mesh_seed
+- op: seed_mesh
   at: vertex
   cell_set: cell
   before_frame: 1
@@ -1404,7 +1404,7 @@ operators:
   p0: 3.5
 - op: cell_geometry
   at: cell
-- op: cell_chem_seed
+- op: seed_cell_chem
   at: cell
   mode: scatter
   n_spots: 1
@@ -1492,9 +1492,9 @@ operators:
   at: vertex
   every: 1
 schedule:
-- mesh_seed
+- seed_mesh
 - cell_geometry
-- cell_chem_seed
+- seed_cell_chem
 - cell_neighbours
 - cell_chem_diffuse
 - cell_chem_react
@@ -1530,10 +1530,10 @@ _discovery:
     - id: reconnect_t1_3d0
       op: edge_flip
     - id: seed_cell_rd0
-      op: cell_chem_seed
+      op: seed_cell_chem
       impl: cone
     - id: seed_mesh_3d0
-      op: mesh_seed
+      op: seed_mesh
     - id: shape_energy_3d0
       op: cell_mechanics
       impl: default
@@ -1589,7 +1589,7 @@ sets:
         width: 1
 fields: {}
 operators:
-- op: mesh_seed
+- op: seed_mesh
   at: vertex
   cell_set: cell
   before_frame: 1
@@ -1601,7 +1601,7 @@ operators:
   p0: 3.5
 - op: cell_geometry
   at: cell
-- op: cell_chem_seed
+- op: seed_cell_chem
   at: cell
   mode: scatter
   n_spots: 1
@@ -1689,9 +1689,9 @@ operators:
   at: vertex
   every: 1
 schedule:
-- mesh_seed
+- seed_mesh
 - cell_geometry
-- cell_chem_seed
+- seed_cell_chem
 - cell_neighbours
 - cell_chem_diffuse
 - cell_chem_react
@@ -1727,10 +1727,10 @@ _discovery:
     - id: reconnect_t1_3d0
       op: edge_flip
     - id: seed_cell_rd0
-      op: cell_chem_seed
+      op: seed_cell_chem
       impl: cone
     - id: seed_mesh_3d0
-      op: mesh_seed
+      op: seed_mesh
     - id: shape_energy_3d0
       op: cell_mechanics
       impl: default
@@ -1786,7 +1786,7 @@ sets:
         width: 1
 fields: {}
 operators:
-- op: mesh_seed
+- op: seed_mesh
   at: vertex
   cell_set: cell
   before_frame: 1
@@ -1798,7 +1798,7 @@ operators:
   p0: 3.5
 - op: cell_geometry
   at: cell
-- op: cell_chem_seed
+- op: seed_cell_chem
   at: cell
   mode: scatter
   n_spots: 1
@@ -1878,9 +1878,9 @@ operators:
   at: vertex
   every: 1
 schedule:
-- mesh_seed
+- seed_mesh
 - cell_geometry
-- cell_chem_seed
+- seed_cell_chem
 - cell_neighbours
 - cell_chem_diffuse
 - cell_chem_react
@@ -1913,10 +1913,10 @@ _discovery:
     - id: reconnect_t1_3d0
       op: edge_flip
     - id: seed_cell_rd0
-      op: cell_chem_seed
+      op: seed_cell_chem
       impl: cone
     - id: seed_mesh_3d0
-      op: mesh_seed
+      op: seed_mesh
     - id: shape_energy_3d0
       op: cell_mechanics
       impl: default
@@ -1974,7 +1974,7 @@ sets:
         width: 1
 fields: {}
 operators:
-- op: mesh_seed
+- op: seed_mesh
   at: vertex
   cell_set: cell
   before_frame: 1
@@ -1986,7 +1986,7 @@ operators:
   p0: 3.5
 - op: cell_geometry
   at: cell
-- op: cell_chem_seed
+- op: seed_cell_chem
   at: cell
   mode: scatter
   n_spots: 1
@@ -2066,9 +2066,9 @@ operators:
   at: vertex
   every: 1
 schedule:
-- mesh_seed
+- seed_mesh
 - cell_geometry
-- cell_chem_seed
+- seed_cell_chem
 - cell_neighbours
 - cell_chem_diffuse
 - cell_chem_react
@@ -2101,10 +2101,10 @@ _discovery:
     - id: reconnect_t1_3d0
       op: edge_flip
     - id: seed_cell_rd0
-      op: cell_chem_seed
+      op: seed_cell_chem
       impl: cone
     - id: seed_mesh_3d0
-      op: mesh_seed
+      op: seed_mesh
     - id: shape_energy_3d0
       op: cell_mechanics
       impl: default
@@ -2157,7 +2157,7 @@ sets:
         width: 1
 fields: {}
 operators:
-- op: mesh_seed
+- op: seed_mesh
   at: vertex
   cell_set: cell
   before_frame: 1
@@ -2169,7 +2169,7 @@ operators:
   p0: 3.5
 - op: cell_geometry
   at: cell
-- op: cell_chem_seed
+- op: seed_cell_chem
   at: cell
   mode: scatter
   n_spots: 1
@@ -2262,9 +2262,9 @@ operators:
   at: vertex
   every: 1
 schedule:
-- mesh_seed
+- seed_mesh
 - cell_geometry
-- cell_chem_seed
+- seed_cell_chem
 - cell_neighbours
 - cell_chem_diffuse
 - cell_chem_react
@@ -2290,7 +2290,7 @@ _discovery:
       op: cell_chem_react
       impl: gray_scott
     - id: cell_chem_seed0
-      op: cell_chem_seed
+      op: seed_cell_chem
       impl: cone
     - id: cell_divide0
       op: cell_divide
@@ -2313,7 +2313,7 @@ _discovery:
     - id: interface_tension0
       op: interface_tension
     - id: mesh_seed0
-      op: mesh_seed
+      op: seed_mesh
     connections:
     - src_op: cell_chem_react
       dst_op: cell_grow
@@ -2363,7 +2363,7 @@ sets:
         width: 1
 fields: {}
 operators:
-- op: mesh_seed
+- op: seed_mesh
   at: vertex
   cell_set: cell
   before_frame: 1
@@ -2375,7 +2375,7 @@ operators:
   p0: 3.5
 - op: cell_geometry
   at: cell
-- op: cell_chem_seed
+- op: seed_cell_chem
   at: cell
   mode: scatter
   n_spots: 1
@@ -2455,9 +2455,9 @@ operators:
   at: vertex
   every: 1
 schedule:
-- mesh_seed
+- seed_mesh
 - cell_geometry
-- cell_chem_seed
+- seed_cell_chem
 - cell_neighbours
 - cell_chem_diffuse
 - cell_chem_react
@@ -2490,10 +2490,10 @@ _discovery:
     - id: reconnect_t1_3d0
       op: edge_flip
     - id: seed_cell_rd0
-      op: cell_chem_seed
+      op: seed_cell_chem
       impl: cone
     - id: seed_mesh_3d0
-      op: mesh_seed
+      op: seed_mesh
     - id: shape_energy_3d0
       op: cell_mechanics
       impl: default
@@ -2889,428 +2889,6 @@ _sculpt:
 </div>
 <!-- END vertex-turing-second-field -->
 
-<!-- BEGIN spheroid-bm-ecm (generated by discovery_okuda/ops/minisite_section.py) -->
-<h3 class="anchored">Spheroid + basement membrane + extracellular matrix</h3>
-<p class="opk">Cells grow a spheroid, deform its basement membrane, and interact with the surrounding matrix. At the lowest level, these interactions are governed by proteases, integrins and myosins dynamics.</p>
-<p class="opk-ref">Reference — load path,
-<a href="https://doi.org/10.1083/jcb.104.3.611">Keene et&nbsp;al. (1987)</a>; adhesions are clusters
-at ~555&nbsp;nm, <a href="https://doi.org/10.1002/bies.201600123">Changede &amp; Sheetz (2017)</a>;
-protease network, <a href="https://doi.org/10.1074/jbc.M403627200">Karagiannis &amp; Popel
-(2004)</a>, with the inhibitor held in the matrix rather than dissolved in it,
-<a href="https://doi.org/10.1074/jbc.M000907200">Yu et&nbsp;al. (2000)</a>. Note:
-<code>discovery_okuda/note_spheroid_bm_ecm.pdf</code>.</p>
-<div class="sim-gallery g3">
-  <figure class="sim-card">
-    <video src="gallery/spheroid_bm_ecm_07i2.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">from tissue to cells to proteins<span class="sim-spec"><pre>general:
-  name: 07i_ramp
-  rig: Rig07i
-  module: __main__
-  frames: 401
-  device: cuda:0
-  dtype: float64
-  git_commit: 2a2ea638
-  units:
-    length_um: 1171.0
-    time_s: 600.0
-    force_nN: null
-    note: 1 box = length_um across; 1 frame = time_s. force is NOT declared by these rigs, so no result
-      here may be quoted in nN.
-sets:
-  bm_node:
-    n: 163842
-    subdiv: 4
-  bm_face:
-    n: 108064
-    thickness_um: 0.1
-    carries:
-    - mass
-    - rest metric
-  epithelium:
-    driver: replay
-    cache: log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_c4a5698982.npz
-    vertices_frame0: 396
-    nodes: 18227
-    triangles: 36450
-    box_scale: 0.008527021940730722
-  plaque:
-    n: 72400
-    law: one adhesion patch per live sheet node, clutch kinetics
-    stale_plq_attr: 104
-material:
-  sheet:
-    youngs: 400.0
-    poisson: 0.3
-    thickness_box: 0.002
-    rho0: 1.0
-    beta_stiffening: 0.0
-    mobility: 2.0926834120197926
-    tau_relax: 0.0
-    substep_target: 1.0
-    max_refine: 3
-    edge_trigger: 1.45
-    tau_bm: 40.0
-    rho_crit: 0.0
-    secretion_mode: homeostatic
-  adhesion:
-    k_drive: 50.0
-operators:
-- bm_elastic (StVK on the rest metric)
-- 'plaque (edge set: bm_node -&gt; epithelial face)'
-- epi_drive (replay toward the recorded surface)
-- bm_secrete (homeostatic)
-- bm_refine (1-&gt;4 split, edge_trigger 1.45)
-rendered_against:
-  matrix: 06_spheroid_ecm
-  note: 'the 2x2''s other three panels come from this run''s traj.npz, re-drawn and never re-run: there
-    is no BM-ECM coupling, so nothing here reaches the matrix.'
-run:
-  seeding: 'staggered: at most `ramp` new plaques per cell per frame'
-  cull: no bonds and out of reach, OR beyond cull_l0 rest lengths
-  kind: cell-owned adhesion + local refinement
-  N0: 12
-  split_budget: 150
-  splits: 102944</pre></span></span>
-      <span class="sim-cap">cells, basement membrane and matrix grow together</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/bm_07k_breach_hole.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">small holes in the membrane<span class="sim-spec"><pre>general:
-  name: 07k_breach_hole
-  rig: Rig07k
-  module: __main__
-  frames: 401
-  device: cuda:0
-  dtype: float64
-  git_commit: f439d2d6
-  units:
-    length_um: 1171.0
-    time_s: 600.0
-    force_nN: null
-    note: 1 box = length_um across; 1 frame = time_s. force is NOT declared by these rigs, so no result
-      here may be quoted in nN.
-sets:
-  bm_node:
-    n: 163842
-    subdiv: 4
-  bm_face:
-    n: 83269
-    thickness_um: 0.1
-    carries:
-    - mass
-    - rest metric
-    - proMMP2
-    - MMP2
-    - TIMP2
-    - TIMP3
-  epithelium:
-    driver: replay
-    cache: log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_c4a5698982.npz
-    vertices_frame0: 396
-    nodes: 14798
-    triangles: 29592
-    box_scale: 0.008527021940730722
-  plaque:
-    n: 57570
-    law: one adhesion patch per live sheet node, clutch kinetics
-    stale_plq_attr: 104
-material:
-  sheet:
-    youngs: 400.0
-    poisson: 0.3
-    thickness_box: 0.002
-    rho0: 1.0
-    beta_stiffening: 0.0
-    mobility: 2.0927428325816706
-    tau_relax: 0.0
-    substep_target: 1.0
-    max_refine: 3
-    edge_trigger: 1.45
-    tau_bm: 40.0
-    rho_crit: 0.35
-    secretion_mode: homeostatic
-  adhesion:
-    k_drive: 50.0
-chemistry:
-  K_timp: 0.001
-  k_act: 0.5
-  k_inhib: 200.0
-  k_deg: 100.0
-  s_pro: 0.002
-  s_timp: 5.0e-05
-  s_timp3: 1.4999999999999999e-05
-  s_mmp: 0.0
-  s_mt1: 0.0
-  mt1_frac: 0.25
-  hetero: 1.0
-  tau_pro: 8.0
-  tau_mmp: 8.0
-  tau_timp: 8.0
-  tau_timp3: 40.0
-  D_mmp_box2_per_frame: 0.013126795362740758
-  D_timp_box2_per_frame: 0.013126795362740758
-  species:
-    MT1-MMP: per-cell state, tethered, no transport
-    proMMP2: field on bm_face, D_mmp
-    MMP2: field on bm_face, D_mmp
-    TIMP2: field on bm_face, D_timp
-    TIMP3: per-face state, no transport
-  mt1_field: smooth random field, 6 modes, rebuilt per cell
-operators:
-- bm_elastic (StVK on the rest metric)
-- 'plaque (edge set: bm_node -&gt; epithelial face)'
-- epi_drive (replay toward the recorded surface)
-- bm_secrete (homeostatic)
-- bm_refine (1-&gt;4 split, edge_trigger 1.45)
-- protease_secrete
-- protease_diffuse (semi-implicit, face Laplacian)
-- protease_activate (ternary, bell)
-- protease_inhibit (1:1)
-- bm_degrade
-- bm_tear (rho/rho0 &lt; rho_crit)
-rendered_against:
-  matrix: 06_spheroid_ecm
-  note: 'the 2x2''s other three panels come from this run''s traj.npz, re-drawn and never re-run: there
-    is no BM-ECM coupling, so nothing here reaches the matrix.'
-run:
-  kind: protease + gated cell-owned adhesion
-  N0: 12
-  split_budget: 150
-  splits: 78392
-  twin_of: 06_hole
-  mt1_field: smooth random field, 6 modes, rebuilt per cell
-  kdeg: 100.0
-  what: the rate whose hole did not stop</pre></span></span>
-      <span class="sim-cap">the sheet perforates wherever the enzyme sits: 7.7% of its faces gone by frame 187, through 54 separate openings, the first at frame 40</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/bm_07j_hole_tiny.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">larger hole in the membrane<span class="sim-spec"><pre>general:
-  name: 07j_hole_tiny
-  rig: Rig07j
-  module: __main__
-  frames: 401
-  device: cuda:0
-  dtype: float64
-  git_commit: 3745f162
-  units:
-    length_um: 1171.0
-    time_s: 600.0
-    force_nN: null
-    note: 1 box = length_um across; 1 frame = time_s. force is NOT declared by these rigs, so no result
-      here may be quoted in nN.
-sets:
-  bm_node:
-    n: 163842
-    subdiv: 4
-  bm_face:
-    n: 105203
-    thickness_um: 0.1
-    carries:
-    - mass
-    - rest metric
-    - proMMP2
-    - MMP2
-    - TIMP2
-    - TIMP3
-  epithelium:
-    driver: replay
-    cache: log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_c4a5698982.npz
-    vertices_frame0: 396
-    nodes: 18227
-    triangles: 36450
-    box_scale: 0.008527021940730722
-  plaque:
-    n: 72246
-    law: one adhesion patch per live sheet node, clutch kinetics
-    stale_plq_attr: 104
-material:
-  sheet:
-    youngs: 400.0
-    poisson: 0.3
-    thickness_box: 0.002
-    rho0: 1.0
-    beta_stiffening: 0.0
-    mobility: 2.0928763253739784
-    tau_relax: 0.0
-    substep_target: 1.0
-    max_refine: 3
-    edge_trigger: 1.45
-    tau_bm: 40.0
-    rho_crit: 0.35
-    secretion_mode: homeostatic
-  adhesion:
-    k_drive: 50.0
-chemistry:
-  K_timp: 0.001
-  k_act: 0.5
-  k_inhib: 200.0
-  k_deg: 150.0
-  s_pro: 0.002
-  s_timp: 5.0e-05
-  s_timp3: 1.4999999999999999e-05
-  s_mmp: 0.0
-  s_mt1: 0.0
-  mt1_frac: 0.25
-  hetero: 1.0
-  tau_pro: 8.0
-  tau_mmp: 8.0
-  tau_timp: 8.0
-  tau_timp3: 40.0
-  D_mmp_box2_per_frame: 0.013126795362740758
-  D_timp_box2_per_frame: 0.013126795362740758
-  species:
-    MT1-MMP: per-cell state, tethered, no transport
-    proMMP2: field on bm_face, D_mmp
-    MMP2: field on bm_face, D_mmp
-    TIMP2: field on bm_face, D_timp
-    TIMP3: per-face state, no transport
-  mt1_field: single Gaussian cap, theta 20.0 deg
-operators:
-- bm_elastic (StVK on the rest metric)
-- 'plaque (edge set: bm_node -&gt; epithelial face)'
-- epi_drive (replay toward the recorded surface)
-- bm_secrete (homeostatic)
-- bm_refine (1-&gt;4 split, edge_trigger 1.45)
-- protease_secrete
-- protease_diffuse (semi-implicit, face Laplacian)
-- protease_activate (ternary, bell)
-- protease_inhibit (1:1)
-- bm_degrade
-- bm_tear (rho/rho0 &lt; rho_crit)
-rendered_against:
-  matrix: 06_spheroid_ecm
-  note: 'the 2x2''s other three panels come from this run''s traj.npz, re-drawn and never re-run: there
-    is no BM-ECM coupling, so nothing here reaches the matrix.'
-run:
-  kind: protease + cell-owned adhesion
-  N0: 12
-  split_budget: 150
-  splits: 100524
-  twin_of: 06_hole_tiny
-  mt1_field: single Gaussian cap, theta 20.0 deg</pre></span></span>
-      <span class="sim-cap">one localised source instead: 2.0% of the faces gone, but through only 6 openings — 2.3x as much of the sheet per opening as the card at left</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/bm_07k_breach_torn.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">membrane tears apart<span class="sim-spec"><pre>general:
-  name: 07k_breach_torn
-  rig: Rig07k
-  module: __main__
-  frames: 401
-  device: cuda:0
-  dtype: float64
-  git_commit: f439d2d6
-  units:
-    length_um: 1171.0
-    time_s: 600.0
-    force_nN: null
-    note: 1 box = length_um across; 1 frame = time_s. force is NOT declared by these rigs, so no result
-      here may be quoted in nN.
-sets:
-  bm_node:
-    n: 163842
-    subdiv: 4
-  bm_face:
-    n: 15321
-    thickness_um: 0.1
-    carries:
-    - mass
-    - rest metric
-    - proMMP2
-    - MMP2
-    - TIMP2
-    - TIMP3
-  epithelium:
-    driver: replay
-    cache: log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_c4a5698982.npz
-    vertices_frame0: 396
-    nodes: 18227
-    triangles: 36450
-    box_scale: 0.008527021940730722
-  plaque:
-    n: 44065
-    law: one adhesion patch per live sheet node, clutch kinetics
-    stale_plq_attr: 104
-material:
-  sheet:
-    youngs: 400.0
-    poisson: 0.3
-    thickness_box: 0.002
-    rho0: 1.0
-    beta_stiffening: 0.0
-    mobility: 2.0929465195534434
-    tau_relax: 0.0
-    substep_target: 1.0
-    max_refine: 3
-    edge_trigger: 1.45
-    tau_bm: 40.0
-    rho_crit: 0.35
-    secretion_mode: homeostatic
-  adhesion:
-    k_drive: 50.0
-chemistry:
-  K_timp: 0.001
-  k_act: 0.5
-  k_inhib: 200.0
-  k_deg: 300.0
-  s_pro: 0.002
-  s_timp: 5.0e-05
-  s_timp3: 1.4999999999999999e-05
-  s_mmp: 0.0
-  s_mt1: 0.0
-  mt1_frac: 0.25
-  hetero: 1.0
-  tau_pro: 8.0
-  tau_mmp: 8.0
-  tau_timp: 8.0
-  tau_timp3: 40.0
-  D_mmp_box2_per_frame: 0.013126795362740758
-  D_timp_box2_per_frame: 0.013126795362740758
-  species:
-    MT1-MMP: per-cell state, tethered, no transport
-    proMMP2: field on bm_face, D_mmp
-    MMP2: field on bm_face, D_mmp
-    TIMP2: field on bm_face, D_timp
-    TIMP3: per-face state, no transport
-  mt1_field: smooth random field, 6 modes, rebuilt per cell
-operators:
-- bm_elastic (StVK on the rest metric)
-- 'plaque (edge set: bm_node -&gt; epithelial face)'
-- epi_drive (replay toward the recorded surface)
-- bm_secrete (homeostatic)
-- bm_refine (1-&gt;4 split, edge_trigger 1.45)
-- protease_secrete
-- protease_diffuse (semi-implicit, face Laplacian)
-- protease_activate (ternary, bell)
-- protease_inhibit (1:1)
-- bm_degrade
-- bm_tear (rho/rho0 &lt; rho_crit)
-rendered_against:
-  matrix: 06_spheroid_ecm
-  note: 'the 2x2''s other three panels come from this run''s traj.npz, re-drawn and never re-run: there
-    is no BM-ECM coupling, so nothing here reaches the matrix.'
-run:
-  kind: protease + gated cell-owned adhesion
-  N0: 12
-  split_budget: 150
-  splits: 14467
-  twin_of: 06_torn
-  mt1_field: smooth random field, 6 modes, rebuilt per cell
-  kdeg: 300.0
-  what: the rate that destroyed the membrane</pre></span></span>
-      <span class="sim-cap">the same chemistry with nothing holding it: 87% of the faces gone by frame 201, the first as early as frame 14, and still tearing at the end</span>
-    </figcaption>
-  </figure>
-</div>
-<!-- END spheroid-bm-ecm -->
 
 <h3 class="anchored">Continuum mechanics — MLS-MPM</h3>
 <p class="opk">The same particle Level, now a material: the decomposed MLS-MPM cycle (strain → scatter → grid solve → gather) carries elastic, fluid, and granular bodies. Each clip plays the default <b>material</b> render; most also show the run coloured by <b>deformation</b> (‖F‖), then <b>stress</b>.</p>
@@ -3807,6 +3385,429 @@ measured:
   </figure>
 </div>
 <!-- END vertex-mpm -->
+
+<!-- BEGIN spheroid-bm-ecm (generated by discovery_okuda/ops/minisite_section.py) -->
+<h3 class="anchored">Spheroid + basement membrane + extracellular matrix</h3>
+<p class="opk">Cells grow a spheroid, deform its basement membrane, and interact with the surrounding matrix. At the lowest level, these interactions are governed by proteases, integrins and myosins dynamics.</p>
+<p class="opk-ref">Reference — load path,
+<a href="https://doi.org/10.1083/jcb.104.3.611">Keene et&nbsp;al. (1987)</a>; adhesions are clusters
+at ~555&nbsp;nm, <a href="https://doi.org/10.1002/bies.201600123">Changede &amp; Sheetz (2017)</a>;
+protease network, <a href="https://doi.org/10.1074/jbc.M403627200">Karagiannis &amp; Popel
+(2004)</a>, with the inhibitor held in the matrix rather than dissolved in it,
+<a href="https://doi.org/10.1074/jbc.M000907200">Yu et&nbsp;al. (2000)</a>. Note:
+<code>discovery_okuda/note_spheroid_bm_ecm.pdf</code>.</p>
+<div class="sim-gallery g3">
+  <figure class="sim-card">
+    <video src="gallery/spheroid_bm_ecm_07i2.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">from tissue to cells to proteins<span class="sim-spec"><pre>general:
+  name: 07i_ramp
+  rig: Rig07i
+  module: __main__
+  frames: 401
+  device: cuda:0
+  dtype: float64
+  git_commit: 2a2ea638
+  units:
+    length_um: 1171.0
+    time_s: 600.0
+    force_nN: null
+    note: 1 box = length_um across; 1 frame = time_s. force is NOT declared by these rigs, so no result
+      here may be quoted in nN.
+sets:
+  bm_node:
+    n: 163842
+    subdiv: 4
+  bm_face:
+    n: 108064
+    thickness_um: 0.1
+    carries:
+    - mass
+    - rest metric
+  epithelium:
+    driver: replay
+    cache: log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_c4a5698982.npz
+    vertices_frame0: 396
+    nodes: 18227
+    triangles: 36450
+    box_scale: 0.008527021940730722
+  plaque:
+    n: 72400
+    law: one adhesion patch per live sheet node, clutch kinetics
+    stale_plq_attr: 104
+material:
+  sheet:
+    youngs: 400.0
+    poisson: 0.3
+    thickness_box: 0.002
+    rho0: 1.0
+    beta_stiffening: 0.0
+    mobility: 2.0926834120197926
+    tau_relax: 0.0
+    substep_target: 1.0
+    max_refine: 3
+    edge_trigger: 1.45
+    tau_bm: 40.0
+    rho_crit: 0.0
+    secretion_mode: homeostatic
+  adhesion:
+    k_drive: 50.0
+operators:
+- bm_elastic (StVK on the rest metric)
+- 'plaque (edge set: bm_node -&gt; epithelial face)'
+- epi_drive (replay toward the recorded surface)
+- bm_secrete (homeostatic)
+- bm_refine (1-&gt;4 split, edge_trigger 1.45)
+rendered_against:
+  matrix: 06_spheroid_ecm
+  note: 'the 2x2''s other three panels come from this run''s traj.npz, re-drawn and never re-run: there
+    is no BM-ECM coupling, so nothing here reaches the matrix.'
+run:
+  seeding: 'staggered: at most `ramp` new plaques per cell per frame'
+  cull: no bonds and out of reach, OR beyond cull_l0 rest lengths
+  kind: cell-owned adhesion + local refinement
+  N0: 12
+  split_budget: 150
+  splits: 102944</pre></span></span>
+      <span class="sim-cap">cells, basement membrane and matrix grow together</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/bm_07k_breach_hole.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">small holes in the membrane<span class="sim-spec"><pre>general:
+  name: 07k_breach_hole
+  rig: Rig07k
+  module: __main__
+  frames: 401
+  device: cuda:0
+  dtype: float64
+  git_commit: f439d2d6
+  units:
+    length_um: 1171.0
+    time_s: 600.0
+    force_nN: null
+    note: 1 box = length_um across; 1 frame = time_s. force is NOT declared by these rigs, so no result
+      here may be quoted in nN.
+sets:
+  bm_node:
+    n: 163842
+    subdiv: 4
+  bm_face:
+    n: 83269
+    thickness_um: 0.1
+    carries:
+    - mass
+    - rest metric
+    - proMMP2
+    - MMP2
+    - TIMP2
+    - TIMP3
+  epithelium:
+    driver: replay
+    cache: log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_c4a5698982.npz
+    vertices_frame0: 396
+    nodes: 14798
+    triangles: 29592
+    box_scale: 0.008527021940730722
+  plaque:
+    n: 57570
+    law: one adhesion patch per live sheet node, clutch kinetics
+    stale_plq_attr: 104
+material:
+  sheet:
+    youngs: 400.0
+    poisson: 0.3
+    thickness_box: 0.002
+    rho0: 1.0
+    beta_stiffening: 0.0
+    mobility: 2.0927428325816706
+    tau_relax: 0.0
+    substep_target: 1.0
+    max_refine: 3
+    edge_trigger: 1.45
+    tau_bm: 40.0
+    rho_crit: 0.35
+    secretion_mode: homeostatic
+  adhesion:
+    k_drive: 50.0
+chemistry:
+  K_timp: 0.001
+  k_act: 0.5
+  k_inhib: 200.0
+  k_deg: 100.0
+  s_pro: 0.002
+  s_timp: 5.0e-05
+  s_timp3: 1.4999999999999999e-05
+  s_mmp: 0.0
+  s_mt1: 0.0
+  mt1_frac: 0.25
+  hetero: 1.0
+  tau_pro: 8.0
+  tau_mmp: 8.0
+  tau_timp: 8.0
+  tau_timp3: 40.0
+  D_mmp_box2_per_frame: 0.013126795362740758
+  D_timp_box2_per_frame: 0.013126795362740758
+  species:
+    MT1-MMP: per-cell state, tethered, no transport
+    proMMP2: field on bm_face, D_mmp
+    MMP2: field on bm_face, D_mmp
+    TIMP2: field on bm_face, D_timp
+    TIMP3: per-face state, no transport
+  mt1_field: smooth random field, 6 modes, rebuilt per cell
+operators:
+- bm_elastic (StVK on the rest metric)
+- 'plaque (edge set: bm_node -&gt; epithelial face)'
+- epi_drive (replay toward the recorded surface)
+- bm_secrete (homeostatic)
+- bm_refine (1-&gt;4 split, edge_trigger 1.45)
+- protease_secrete
+- protease_diffuse (semi-implicit, face Laplacian)
+- protease_activate (ternary, bell)
+- protease_inhibit (1:1)
+- bm_degrade
+- bm_tear (rho/rho0 &lt; rho_crit)
+rendered_against:
+  matrix: 06_spheroid_ecm
+  note: 'the 2x2''s other three panels come from this run''s traj.npz, re-drawn and never re-run: there
+    is no BM-ECM coupling, so nothing here reaches the matrix.'
+run:
+  kind: protease + gated cell-owned adhesion
+  N0: 12
+  split_budget: 150
+  splits: 78392
+  twin_of: 06_hole
+  mt1_field: smooth random field, 6 modes, rebuilt per cell
+  kdeg: 100.0
+  what: the rate whose hole did not stop</pre></span></span>
+      <span class="sim-cap">the sheet perforates wherever the enzyme sits: 7.7% of its faces gone by frame 187, through 54 separate openings, the first at frame 40</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/bm_07j_hole_tiny.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">larger hole in the membrane<span class="sim-spec"><pre>general:
+  name: 07j_hole_tiny
+  rig: Rig07j
+  module: __main__
+  frames: 401
+  device: cuda:0
+  dtype: float64
+  git_commit: 3745f162
+  units:
+    length_um: 1171.0
+    time_s: 600.0
+    force_nN: null
+    note: 1 box = length_um across; 1 frame = time_s. force is NOT declared by these rigs, so no result
+      here may be quoted in nN.
+sets:
+  bm_node:
+    n: 163842
+    subdiv: 4
+  bm_face:
+    n: 105203
+    thickness_um: 0.1
+    carries:
+    - mass
+    - rest metric
+    - proMMP2
+    - MMP2
+    - TIMP2
+    - TIMP3
+  epithelium:
+    driver: replay
+    cache: log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_c4a5698982.npz
+    vertices_frame0: 396
+    nodes: 18227
+    triangles: 36450
+    box_scale: 0.008527021940730722
+  plaque:
+    n: 72246
+    law: one adhesion patch per live sheet node, clutch kinetics
+    stale_plq_attr: 104
+material:
+  sheet:
+    youngs: 400.0
+    poisson: 0.3
+    thickness_box: 0.002
+    rho0: 1.0
+    beta_stiffening: 0.0
+    mobility: 2.0928763253739784
+    tau_relax: 0.0
+    substep_target: 1.0
+    max_refine: 3
+    edge_trigger: 1.45
+    tau_bm: 40.0
+    rho_crit: 0.35
+    secretion_mode: homeostatic
+  adhesion:
+    k_drive: 50.0
+chemistry:
+  K_timp: 0.001
+  k_act: 0.5
+  k_inhib: 200.0
+  k_deg: 150.0
+  s_pro: 0.002
+  s_timp: 5.0e-05
+  s_timp3: 1.4999999999999999e-05
+  s_mmp: 0.0
+  s_mt1: 0.0
+  mt1_frac: 0.25
+  hetero: 1.0
+  tau_pro: 8.0
+  tau_mmp: 8.0
+  tau_timp: 8.0
+  tau_timp3: 40.0
+  D_mmp_box2_per_frame: 0.013126795362740758
+  D_timp_box2_per_frame: 0.013126795362740758
+  species:
+    MT1-MMP: per-cell state, tethered, no transport
+    proMMP2: field on bm_face, D_mmp
+    MMP2: field on bm_face, D_mmp
+    TIMP2: field on bm_face, D_timp
+    TIMP3: per-face state, no transport
+  mt1_field: single Gaussian cap, theta 20.0 deg
+operators:
+- bm_elastic (StVK on the rest metric)
+- 'plaque (edge set: bm_node -&gt; epithelial face)'
+- epi_drive (replay toward the recorded surface)
+- bm_secrete (homeostatic)
+- bm_refine (1-&gt;4 split, edge_trigger 1.45)
+- protease_secrete
+- protease_diffuse (semi-implicit, face Laplacian)
+- protease_activate (ternary, bell)
+- protease_inhibit (1:1)
+- bm_degrade
+- bm_tear (rho/rho0 &lt; rho_crit)
+rendered_against:
+  matrix: 06_spheroid_ecm
+  note: 'the 2x2''s other three panels come from this run''s traj.npz, re-drawn and never re-run: there
+    is no BM-ECM coupling, so nothing here reaches the matrix.'
+run:
+  kind: protease + cell-owned adhesion
+  N0: 12
+  split_budget: 150
+  splits: 100524
+  twin_of: 06_hole_tiny
+  mt1_field: single Gaussian cap, theta 20.0 deg</pre></span></span>
+      <span class="sim-cap">one localised source instead: 2.0% of the faces gone, but through only 6 openings — 2.3x as much of the sheet per opening as the card at left</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/bm_07k_breach_torn.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">membrane tears apart<span class="sim-spec"><pre>general:
+  name: 07k_breach_torn
+  rig: Rig07k
+  module: __main__
+  frames: 401
+  device: cuda:0
+  dtype: float64
+  git_commit: f439d2d6
+  units:
+    length_um: 1171.0
+    time_s: 600.0
+    force_nN: null
+    note: 1 box = length_um across; 1 frame = time_s. force is NOT declared by these rigs, so no result
+      here may be quoted in nN.
+sets:
+  bm_node:
+    n: 163842
+    subdiv: 4
+  bm_face:
+    n: 15321
+    thickness_um: 0.1
+    carries:
+    - mass
+    - rest metric
+    - proMMP2
+    - MMP2
+    - TIMP2
+    - TIMP3
+  epithelium:
+    driver: replay
+    cache: log/okuda_ECM/_tissue/cellfix_B_new_f401_x4_c4a5698982.npz
+    vertices_frame0: 396
+    nodes: 18227
+    triangles: 36450
+    box_scale: 0.008527021940730722
+  plaque:
+    n: 44065
+    law: one adhesion patch per live sheet node, clutch kinetics
+    stale_plq_attr: 104
+material:
+  sheet:
+    youngs: 400.0
+    poisson: 0.3
+    thickness_box: 0.002
+    rho0: 1.0
+    beta_stiffening: 0.0
+    mobility: 2.0929465195534434
+    tau_relax: 0.0
+    substep_target: 1.0
+    max_refine: 3
+    edge_trigger: 1.45
+    tau_bm: 40.0
+    rho_crit: 0.35
+    secretion_mode: homeostatic
+  adhesion:
+    k_drive: 50.0
+chemistry:
+  K_timp: 0.001
+  k_act: 0.5
+  k_inhib: 200.0
+  k_deg: 300.0
+  s_pro: 0.002
+  s_timp: 5.0e-05
+  s_timp3: 1.4999999999999999e-05
+  s_mmp: 0.0
+  s_mt1: 0.0
+  mt1_frac: 0.25
+  hetero: 1.0
+  tau_pro: 8.0
+  tau_mmp: 8.0
+  tau_timp: 8.0
+  tau_timp3: 40.0
+  D_mmp_box2_per_frame: 0.013126795362740758
+  D_timp_box2_per_frame: 0.013126795362740758
+  species:
+    MT1-MMP: per-cell state, tethered, no transport
+    proMMP2: field on bm_face, D_mmp
+    MMP2: field on bm_face, D_mmp
+    TIMP2: field on bm_face, D_timp
+    TIMP3: per-face state, no transport
+  mt1_field: smooth random field, 6 modes, rebuilt per cell
+operators:
+- bm_elastic (StVK on the rest metric)
+- 'plaque (edge set: bm_node -&gt; epithelial face)'
+- epi_drive (replay toward the recorded surface)
+- bm_secrete (homeostatic)
+- bm_refine (1-&gt;4 split, edge_trigger 1.45)
+- protease_secrete
+- protease_diffuse (semi-implicit, face Laplacian)
+- protease_activate (ternary, bell)
+- protease_inhibit (1:1)
+- bm_degrade
+- bm_tear (rho/rho0 &lt; rho_crit)
+rendered_against:
+  matrix: 06_spheroid_ecm
+  note: 'the 2x2''s other three panels come from this run''s traj.npz, re-drawn and never re-run: there
+    is no BM-ECM coupling, so nothing here reaches the matrix.'
+run:
+  kind: protease + gated cell-owned adhesion
+  N0: 12
+  split_budget: 150
+  splits: 14467
+  twin_of: 06_torn
+  mt1_field: smooth random field, 6 modes, rebuilt per cell
+  kdeg: 300.0
+  what: the rate that destroyed the membrane</pre></span></span>
+      <span class="sim-cap">the same chemistry with nothing holding it: 87% of the faces gone by frame 201, the first as early as frame 14, and still tearing at the end</span>
+    </figcaption>
+  </figure>
+</div>
+<!-- END spheroid-bm-ecm -->
 
 <h3 class="anchored">Stigmergy — Physarum slime (one species, a disc colony)</h3>
 <p class="opk">A set of agents coupled to a scalar field: agents deposit a trail, the field diffuses and decays, agents sense and steer up it — a self-reinforcing transport network (one schedule: <code>deposit → diffuse → decay → sense → steer</code>). Here a <b>single</b> species is seeded in a disc (<code>spawn: disc</code>), so the colony stays a bounded circular web; the three differ only in turn rate and sensor geometry.</p>
