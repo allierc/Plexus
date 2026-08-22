@@ -140,9 +140,16 @@ PAIRS = [
     ("G", "gates/gate_00_spheroid",     None, 0.0, "okuda", "core", "the growth line: seed, geometry, grow, belt, mechanics, T1, divide, sync"),
     ("G", "gates/gate_01_nosync",       None, 0.0, "okuda", "core", "gate 01's own arm: the belt WITHOUT the re-keying operator"),
     ("G", "gates/gate_01_nomyosin",     None, 0.0, "okuda", "core", "gate 01's contrast arm: the same tissue with no belt"),
-    ("G", "gates/gate_02_ecm_block",    None, 0.0, "okuda", "core", "MLS-MPM: ecm_seed, the four-step cycle, ecm_stress, gravity"),
+    # ---- THE TWO MPM GATES HAVE NO OKUDA TWIN, and that is a fact about okuda's runner rather
+    # than a gap in the promotion. `run_one.py` reads `H.level("vertex")` in three places -- the
+    # heartbeat, the live snapshot and the cell ceiling -- so a spec with no mesh set dies with
+    # `KeyError: 'vertex'` before frame 0. okuda is a MESH HARNESS; gates 02 and 04-pass-2 are pure
+    # MPM. So the comparison available for them is core against core across a commit, which is a
+    # real regression check, and it is labelled as that instead of being dressed up as agreement
+    # with okuda. `cc52f512` is the commit at which every operator had landed in core.
+    ("G", "gates/gate_02_ecm_block",    None, 0.0, "core@cc52f512", "core", "MLS-MPM: ecm_seed, the four-step cycle, ecm_stress, gravity (no okuda twin: mesh-free)"),
     ("G", "gates/gate_04_tissue",       None, 0.0, "okuda", "core", "two-pool myosin + cytokinetic ring -- gate 04's regenerated pass 1"),
-    ("G", "gates/gate_04_spheroid_ecm", None, 0.0, "okuda", "core", "mesh_contact + mesh_inside against a prescribed surface"),
+    ("G", "gates/gate_04_spheroid_ecm", None, 0.0, "core@cc52f512", "core", "mesh_contact + mesh_inside on a prescribed surface (no okuda twin: mesh-free)"),
     ("C", "01c_tissue",          None, 0.0, "okuda",       "core",   "junction_myosin (both pools), junction_sync, cytokinetic_ring"),
     ("D", "04_spheroid_ecm_pass2", None, 0.0, "okuda",     "core",   "mesh_contact, mesh_inside, ecm_*, bm_*"),
 ]
@@ -170,6 +177,19 @@ def _worktree(ref):
     return d
 
 
+def _side_root(side):
+    """The repository root a side runs from: this working tree, or a git worktree at `<ref>`.
+
+    ONE FUNCTION FOR BOTH SIDE FAMILIES, so `core@<ref>` gets what `okuda@<ref>` already had. It is
+    needed because `run_one.py` CANNOT RUN A MESH-FREE SPEC: it reads `H.level("vertex")` in three
+    places and dies with `KeyError: 'vertex'` on a pure-MPM gate. So for gate 02 there is no
+    okuda-versus-core twin to be had -- okuda's runner is a mesh harness -- and the comparison that
+    IS available is core against core across a commit, which is a real regression check and is
+    stated as that rather than dressed up as agreement with okuda.
+    """
+    return _worktree(side.split("@", 1)[1]) if "@" in side else ROOT
+
+
 def _side_paths(side):
     """(home, config dir, log dir) for a side.
 
@@ -178,13 +198,8 @@ def _side_paths(side):
     into the main tree's config and the worktree job died on a missing file, which is the honest
     failure -- the two sides must not share anything the comparison could smuggle state through.
     """
-    if side == "okuda":
-        home = OKUDA
-    elif side.startswith("okuda@"):
-        home = os.path.join(_worktree(side.split("@", 1)[1]), "discovery_okuda")
-    else:                                                     # core
-        home = ROOT
-    root = ROOT if side == "core" else os.path.dirname(home)
+    root = _side_root(side)
+    home = os.path.join(root, "discovery_okuda") if side.startswith("okuda") else root
     return home, os.path.join(root, "config", "okuda"), os.path.join(root, "log", "okuda")
 
 
@@ -212,16 +227,23 @@ def _abspath_operator_files(cfg):
     A GATE SPEC WRITES THEM RELATIVE (`log/gates/_tissue/gate_04_tissue.npz`) so the file reads the
     same on any checkout, and the core runner resolves them from the repo root. The okuda side runs
     with `cd discovery_okuda`, so the same relative path points one directory too deep and
-    `mesh_contact` dies on a missing file -- AFTER the scheduler has granted a GPU. Absolute here, so
-    both sides read the same bytes.
+    `mesh_contact` dies on a missing file -- AFTER the scheduler has granted a GPU.
+
+    AND THE ABSOLUTE PATH MUST BE THE CLUSTER'S, NOT THIS CONTAINER'S. The first version wrote
+    `/workspace/Plexus/log/gates/_tissue/gate_04_tissue.npz`, which does not exist on a compute node:
+    the same tree is `/groups/saalfeld/home/allierc/Graph/Plexus/...` there. `cluster.cpath` is the
+    one translation, and it is the same one every `bsub` line already goes through -- so the two
+    were disagreeing about where the repository is, which is a thing that can only fail on the
+    cluster and always after the GPU has been granted.
     """
+    import cluster as C
     for o in cfg.get("operators", []) or []:
         for k in ("tissue", "load", "gate_npz", "ckpt", "map", "surface"):
             v = o.get(k)
             if isinstance(v, str) and v and not os.path.isabs(v):
                 cand = os.path.join(ROOT, v)
                 if os.path.exists(cand):
-                    o[k] = cand
+                    o[k] = C.cpath(cand)
     return cfg
 
 
@@ -282,8 +304,8 @@ def _bsub_lines(pair_dir, spec, side, run_name, frames):
         with open(script, "w") as f:
             f.write("\n".join([
                 "#!/bin/bash -l",
-                f"cd {C.cpath(ROOT)}",
-                f"export PYTHONPATH={C.cpath(os.path.join(ROOT, 'src'))}",
+                f"cd {C.cpath(home)}",
+                f"export PYTHONPATH={C.cpath(os.path.join(home, 'src'))}",
                 "export OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 OMP_NUM_THREADS=8",
                 "export MPLBACKEND=Agg",
                 "export PLEXUS_STRICT_DETERMINISM=1",
@@ -457,7 +479,7 @@ def run_pair(phase, spec, side_a, side_b, what, frames, submit=True):
             # side's copy is how side A once died on a missing file while side B passed.
             _spec_copy(spec, run_name, frames, cfg_dir=(
                 _side_paths(side)[1] if side.startswith("okuda")
-                else os.path.join(ROOT, "config", "promotion")))
+                else os.path.join(_side_root(side), "config", "promotion")))
     if submit:
         lines = [_bsub_lines(pair_dir, spec, side, rn, frames) for side, rn in names.values()]
         runner = os.path.join(pair_dir, "_submit.sh")

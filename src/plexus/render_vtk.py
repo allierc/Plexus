@@ -78,6 +78,22 @@ GREEN = (44, 160, 44)
 GREEN_A = 0.5              # how much of the cell's own colour the division mark keeps
 BLUE = (31, 119, 180)
 
+# THE DIVISION PAIR, AS TWO COLOURS RATHER THAN ONE. A just-divided cell used to be tinted green --
+# which says "a division happened here" and cannot say WHICH TWO CELLS it produced. On a sheet where
+# several cells divide in the same four-frame window the green patches merge and the pairing is
+# unreadable, and the pairing is the thing: a division that hands its daughter the wrong share of
+# the mother's area, or puts the septum in the wrong place, looks exactly like a healthy one until
+# you can see the two halves apart.
+#
+# MOTHER BLUE, DAUGHTER RED, and the assignment is not arbitrary. `cell_divide` keeps the mother at
+# her own face index and APPENDS the daughter at `nF`, so a cell whose index is at or beyond the
+# PREVIOUS frame's face count is new. That is the only frame-local way to tell them apart, and it is
+# why `evolve` threads `prev_nF` through and `kburns`/`still` do not draw the pair at all -- one held
+# frame has no previous frame to be new with respect to.
+MOTHER = (31, 119, 180)    # blue
+DAUGHTER = (214, 39, 40)   # red
+PAIR_A = 0.62              # how much of the pair colour is laid over the cell's own
+
 
 # --------------------------------------------------------------------------- reading a run
 def _okuda_frames(path):
@@ -174,8 +190,14 @@ def _cmap():
     return LinearSegmentedColormap.from_list("wr", ["white", "#d62728"])
 
 
-def _marks(mt, idx, nF):
-    """(divided, kills, suppresses) masks over the drawn faces, or None where unrecorded.
+def _marks(mt, idx, nF, prev_nF=None):
+    """(mother, daughter, kills, suppresses) masks over the drawn faces, None where unrecorded.
+
+    `mother`/`daughter` SPLIT WHAT WAS ONE `divided` MASK, using the previous frame's face count:
+    every face at or beyond `prev_nF` was appended this frame and is therefore a daughter, and the
+    rest of the just-divided set are the mothers they came from. With `prev_nF=None` -- a single
+    held frame, which is all `kburns` and `still` have -- both come back None and nothing is drawn,
+    because a pair cannot be identified without a before.
 
     THE SECOND FIELD IS TWO DIFFERENT MARKS and they cannot share a rule. `apop` is rare and is the
     event -- a cell sentenced to die -- so it takes the colour outright. `inhib` is nearly the whole
@@ -204,11 +226,29 @@ def _marks(mt, idx, nF):
         return a[:nF][idx]
     age, ndiv = col("age"), col("ndiv")
     div = None if age is None or ndiv is None else ((age <= DIVIDED) & (ndiv > 0))
+    mother = daughter = None
+    if prev_nF is not None:
+        # A DAUGHTER IS IDENTIFIED BY ITS INDEX ALONE, and it has to be. The first version asked for
+        # `div & new` -- a just-divided cell that is also newly appended -- and drew ZERO daughters
+        # on every frame. The reason is the same one-frame staleness that makes `col()` pad: `age`
+        # and `ndiv` are written by the operators BEFORE the frame's divisions are applied, so on a
+        # dividing frame the arrays are `nF_prev` long, the new faces are padded with zeros, and
+        # `ndiv > 0` is False for exactly the cells that were just created. The `div` set is
+        # therefore the MOTHERS and can never contain a daughter.
+        #
+        # So the daughter test is `index >= prev_nF`, which is what `cell_divide` guarantees by
+        # appending, and it needs no per-cell state at all. Over a trajectory recorded at stride 1
+        # that is "born this tick"; over a decimated archive it is "born since the previous drawn
+        # frame", which is the honest reading of a picture that skips frames.
+        new = np.asarray(idx, int) >= int(prev_nF)
+        daughter = new
+        mother = (div & ~new) if div is not None else None
     kills, sup = col("apop"), col("inhib")
-    return div, (None if kills is None else kills > 0), (None if sup is None else sup > 0)
+    return (mother, daughter,
+            (None if kills is None else kills > 0), (None if sup is None else sup > 0))
 
 
-def mesh_of(pos, mt, act, lo=None, hi=None, show_div=True):
+def mesh_of(pos, mt, act, lo=None, hi=None, show_div=True, prev_nF=None):
     """The apical shell as PolyData with per-cell RGB. Rebuilt per frame: cells divide."""
     import pyvista as pv
     from plexus.models.topology import rings_from_flat_3d
@@ -237,9 +277,12 @@ def mesh_of(pos, mt, act, lo=None, hi=None, show_div=True):
         x = np.clip((a - _lo) / (_hi - _lo + 1e-9), 0, 1)
         rgb = (np.asarray(_cmap()(x))[:, :3] * 255).astype(np.uint8)
         rgb[~ok] = (255, 26, 217)                 # magenta: not a cell any more
-    div, kills, sup = _marks(mt, idx, nF)
-    # ORDER MATTERS: suppression is the background, death is the event, division is the rarest and
-    # shortest-lived (four calls), so each later mark may overwrite the one before it.
+    mother, daughter, kills, sup = _marks(mt, idx, nF, prev_nF)
+    # ORDER MATTERS, and it changed with the division pair. Suppression is the background; the
+    # DIVISION PAIR comes next; DEATH is last and wins outright. Death last because a cell sentenced
+    # to die is the rarer and more consequential event, and because blue is also the mother's colour
+    # -- if a dying cell had just divided, the two marks would otherwise be the same blue and the
+    # picture would say "mother" where it means "about to be extruded".
     if sup is not None and sup.any():
         # A BLEND, NOT A THRESHOLD. `x < 0.5` on a smooth activator field toggles every cell that
         # sits near the line, so whole regions flipped blue and back between frames -- the same
@@ -247,6 +290,14 @@ def mesh_of(pos, mt, act, lo=None, hi=None, show_div=True):
         # is makes a cell that is halfway halfway blue, and nothing jumps.
         w = (sup.astype(float) if act is None else sup * (1.0 - x)) [:, None]
         rgb = ((1.0 - w) * rgb.astype(float) + w * np.asarray(BLUE, float)).astype(np.uint8)
+    # THE PAIR, BEFORE DEATH. Blended rather than painted for the reason the green tint was: solid
+    # colour throws away what the cell WAS -- its activator level, or the blue that says the second
+    # field is acting on it -- to say one bit. At PAIR_A the cell keeps a readable share of its own
+    # colour and the two halves are still unmistakably a red one and a blue one.
+    for mask, col_ in ((mother, MOTHER), (daughter, DAUGHTER)):
+        if show_div and mask is not None and mask.any():
+            rgb[mask] = ((1.0 - PAIR_A) * rgb[mask].astype(float)
+                         + PAIR_A * np.asarray(col_, float)).astype(np.uint8)
     # DEATH FOLLOWS DIVISION'S RULE, and for its reason: both name ONE CELL, so both need the cell
     # to be visible. On the smooth surface a blue patch with no outlines marks a cell nobody can
     # see. Suppression is not in this class -- it tints a whole REGION and reads with or without
@@ -259,12 +310,8 @@ def mesh_of(pos, mt, act, lo=None, hi=None, show_div=True):
     # on a smooth surface with no outlines a green patch names a cell nobody can see. So it is drawn
     # in `evolve` + `mesh` and nowhere else. Blue is not subject to either: it marks a REGION, and a
     # region reads on a smooth surface and in a single frame.
-    if show_div and div is not None and div.any():
-        # A TINT, NOT A REPAINT. Solid green throws away what the cell was -- its activator level,
-        # or the blue that says the second field is acting on it -- to say one bit: it just divided.
-        # Blended at GREEN_A the cell keeps its own colour and is legibly green over it.
-        rgb[div] = ((1.0 - GREEN_A) * rgb[div].astype(float)
-                    + GREEN_A * np.asarray(GREEN, float)).astype(np.uint8)
+    # (the single-colour green tint this replaced is kept in `GREEN`/`GREEN_A` for a caller that
+    # wants "a division happened" without the pairing -- nothing in the core asks for it now.)
     m.cell_data["rgb"] = rgb
     return m
 
@@ -363,8 +410,10 @@ def evolve(run_dir, style, out, fill=1.0, label=None):
     p = _plotter()
     p.open_movie(out, framerate=EV_FPS, quality=8)
     actor = txt = None
+    prev_nF = None
     for t, (pos, mt, act) in enumerate(fr):
-        m = mesh_of(pos, mt, act, lo, hi, show_div=(style == "mesh"))
+        m = mesh_of(pos, mt, act, lo, hi, show_div=(style == "mesh"), prev_nF=prev_nF)
+        prev_nF = int(mt["nF"])
         if m is None:
             continue
         if actor is not None:
@@ -442,3 +491,206 @@ def available():
         return True
     except Exception:
         return False
+
+
+# ==========================================================================================
+#  POINT CLOUDS AND VOLUMES -- the neural products.
+#
+#  The three products above (kburns / evolve / still) all draw a MESH: a closed cellular
+#  surface with per-face colour. A neural run has neither. It has a cloud of somas carrying a
+#  scalar, and a regular grid rendered from them, and the two want different renderers -- a
+#  point splat and a volume ray-cast. What they SHARE with the mesh products is everything
+#  around the picture: `_plotter` (off-screen, black, 8x MSAA), `aim` (the camera framing),
+#  `p.open_movie` (the mp4 writer), `EV_FPS`. Those are called, not copied.
+#
+#  VIRIDIS, not the white->red activator ramp of `mesh_of`. The activator is a concentration
+#  with a floor at zero, so a ramp from white reads correctly; a membrane potential is signed
+#  and centred, and a perceptually-uniform map is what lets a reader compare two frames.
+# ==========================================================================================
+def _traj(run_dir):
+    """The core `trajectory.npz` of a run directory."""
+    for root, _d, files in os.walk(run_dir):
+        if "trajectory.npz" in files:
+            return np.load(os.path.join(root, "trajectory.npz"), allow_pickle=True)
+    raise FileNotFoundError(f"no trajectory.npz under {run_dir}")
+
+
+def _range(a, lo_q=0.5, hi_q=99.5):
+    """One colour range for the WHOLE clip, from percentiles rather than min/max.
+
+    Per-frame normalisation would make a strengthening pattern look constant -- the same
+    reason `evolve` fixes its activator range. Percentiles rather than extrema because a
+    single runaway neuron would otherwise compress every other value into one colour."""
+    f = np.asarray(a, np.float64).ravel()
+    f = f[np.isfinite(f)]
+    return float(np.percentile(f, lo_q)), float(np.percentile(f, hi_q))
+
+
+def evolve_points(run_dir, out, set_name="neuron", block="voltage", cmap="viridis",
+                  point_size=9.0, fill=0.95, label=None, fps=None):
+    """The neurons themselves: one sphere per soma at its real position, coloured by `block`.
+
+    This is the picture that says whether the SEED did its job -- the cloud has the shape of
+    the region it was cropped from, or it does not."""
+    import pyvista as pv
+    from matplotlib import colormaps
+    z = _traj(run_dir)
+    pos = np.asarray(z[f"{set_name}__pos"], np.float64)          # [T, N, D]
+    val = np.asarray(z[f"{set_name}__{block}"], np.float64)[..., 0]   # [T, N]
+    occ = np.asarray(z[f"{set_name}__occ"])
+    lo, hi = _range(val)
+    cm = colormaps[cmap]
+    name = label or os.path.basename(run_dir.rstrip("/"))
+    L = float(np.nanmax(np.abs(pos))) * 1.05
+    p = _plotter()
+    p.open_movie(out, framerate=fps or EV_FPS, quality=8)
+    actor = txt = None
+    for t in range(pos.shape[0]):
+        live = occ[t] > 0
+        cloud = pv.PolyData(np.ascontiguousarray(pos[t][live]))
+        x = np.clip((val[t][live] - lo) / max(hi - lo, 1e-12), 0, 1)
+        cloud["rgb"] = (np.asarray(cm(x))[:, :3] * 255).astype(np.uint8)
+        if actor is not None:
+            p.remove_actor(actor)                                # NOT p.clear(): keeps the lights
+        if txt is not None:
+            p.remove_actor(txt)
+        actor = p.add_points(cloud, scalars="rgb", rgb=True, render_points_as_spheres=True,
+                             point_size=point_size, lighting=True)
+        txt = p.add_text(f"{name}  {block}  frame {t + 1}/{pos.shape[0]}   "
+                         f"{int(live.sum())} neurons   [{lo:.2f}, {hi:.2f}]",
+                         position="upper_left", font_size=11, color="white")
+        # `aim` frames a box CENTRED ON THE ORIGIN, which is what every mesh run is. A neural
+        # region is mapped into the UNIT BOX [0,1]^3, so aiming at a half-width of max|pos|
+        # put the cloud in the top corner of the frame. `reset_camera` frames the actual
+        # bounds instead, which is correct for either convention.
+        p.camera_position = "iso"
+        p.reset_camera()
+        p.camera.zoom(fill)
+        p.write_frame()
+    p.close()
+    return f"{pos.shape[0]} frames, {pos.shape[1]} neurons, range [{lo:.3f}, {hi:.3f}]"
+
+
+def evolve_volume(run_dir, out, field="neural_activity", cmap="viridis", fill=0.95,
+                  label=None, fps=None, opacity="sigmoid_5",
+                  skeletons=None, skel_neurons=1000, skel_opacity=0.16, skel_width=1.0):
+    """The 128^3 rendered activity, ray-cast as a volume -- the cube a transformer would see.
+
+    THE OPACITY TRANSFER FUNCTION IS PART OF THE PICTURE AND NOT A STYLE CHOICE. A volume
+    render shows what the transfer function lets through; a linear ramp on a field whose mass
+    sits near zero shows fog. `sigmoid_5` keeps the low-magnitude bulk transparent so the
+    active structure is what is visible, and it is named in the frame so the reader knows
+    which map produced the picture they are looking at."""
+    z = _traj(run_dir)
+    key = f"{field}__grid"
+    if key not in z.files:
+        raise KeyError(f"{key} not in the trajectory (fields: "
+                       f"{[k for k in z.files if k.endswith('__grid')]})")
+    g = np.asarray(z[key], np.float32)                           # [T, C, nx, ny, nz]
+    if g.ndim == 5:
+        g = g[:, 0]
+    lo, hi = _range(np.abs(g), 0.0, 99.9)
+    name = label or os.path.basename(run_dir.rstrip("/"))
+    import pyvista as pv
+    p = _plotter()
+    # THE ANATOMY GOES IN ONCE, BEFORE THE LOOP, because it does not move. Rebuilding half a
+    # million line segments per frame would dominate the render for a picture that is
+    # identical in every frame; the volume actor is the only thing swapped.
+    skel_note = ""
+    if skeletons:
+        poly, meta = skeleton_lines(skeletons, max_neurons=skel_neurons)
+        if poly is not None:
+            p.add_mesh(poly, color="white", opacity=skel_opacity, line_width=skel_width,
+                       lighting=False)
+            frac = meta["segments"] / max(meta["segments_before_clip"], 1)
+            skel_note = (f"   skeletons {meta['neurons']}n {meta['segments'] // 1000}k seg "
+                         f"({frac:.0%} in cube)")
+            print(f"[render] skeletons: {meta}", flush=True)
+    p.open_movie(out, framerate=fps or EV_FPS, quality=8)
+    actor = txt = None
+    for t in range(g.shape[0]):
+        vol = pv.ImageData(dimensions=np.asarray(g[t].shape) + 1)
+        vol.cell_data["a"] = np.abs(g[t]).ravel(order="F")
+        if actor is not None:
+            p.remove_actor(actor)
+        if txt is not None:
+            p.remove_actor(txt)
+        actor = p.add_volume(vol, scalars="a", cmap=cmap, opacity=opacity,
+                             clim=[lo, hi], show_scalar_bar=False)
+        txt = p.add_text(f"{name}  |{field}|  {'x'.join(str(s) for s in g[t].shape)}   "
+                         f"frame {t + 1}/{g.shape[0]}   opacity={opacity}   "
+                         f"clim [{lo:.2f}, {hi:.2f}]{skel_note}",
+                         position="upper_left", font_size=10, color="white")
+        if t == 0:
+            p.camera_position = "iso"
+            p.reset_camera()
+            p.camera.zoom(fill)
+        p.write_frame()
+    p.close()
+    return f"{g.shape[0]} frames, {'x'.join(str(s) for s in g[0].shape)}, range [{lo:.3f}, {hi:.3f}]"
+
+
+def skeleton_lines(region, max_neurons=200, stride=1, seed=0):
+    """SWC skeletons of a frozen region, as ONE `pv.PolyData` of line segments in the unit box.
+
+    THREE THINGS HAVE TO HAPPEN AND ALL THREE ARE EASY TO GET WRONG.
+
+    1. THE TRANSFORM. `fetch_skeleton` returns DATASET VOXELS, while the region's cube is
+       defined in nanometres, so a segment must go through the same `scale_nm`/`offset_nm` the
+       importer recorded before it can be compared with a soma. Checked on this region: the
+       first node of body 100003774 maps to within 300 nm of its own recorded soma.
+
+    2. THE CLIP. A neuron's arbour is far larger than the cube its SOMA fell in -- body
+       100003774 spans 10,700 voxels in x against the cube's 2,837. Drawing the arbours
+       unclipped would put the anatomy an order of magnitude outside the volume and shrink the
+       volume to nothing. Segments with either endpoint outside the unit box are dropped.
+
+    3. THE BUDGET. 1,000 skeletons at a median 13,460 nodes is 13.5M segments. Rather than
+       thin every neuron into a dashed line, a deterministic SUBSET is drawn at full
+       resolution: a partial arbour still reads as an arbour, a dashed one reads as noise.
+       `max_neurons` is what was drawn and is reported, so the picture never implies more
+       morphology than it shows.
+    """
+    import glob
+    import json
+    import pyvista as pv
+    from plexus.io.neuprint import region_path
+    root = region_path(region)
+    man = json.load(open(os.path.join(root, "manifest.json")))
+    r, vx = man["region"], man["source"]["voxel_to_nm"]
+    sc, of = np.asarray(vx["scale_nm"], float), np.asarray(vx["offset_nm"], float)
+    lo, side = np.asarray(r["bounds_lo_nm"], float), float(r["side_nm"])
+    files = sorted(glob.glob(os.path.join(root, "skeletons", "*.swc")))
+    if max_neurons and len(files) > max_neurons:                 # deterministic subset
+        idx = np.random.default_rng(seed).choice(len(files), max_neurons, replace=False)
+        files = [files[i] for i in sorted(idx)]
+    pts, lines, kept, total = [], [], 0, 0
+    off = 0
+    for f in files:
+        a = np.loadtxt(f, comments="#", ndmin=2)
+        if a.size == 0:
+            continue
+        xyz = (a[:, 2:5] * sc + of - lo) / side                  # voxels -> nm -> unit box
+        rid = a[:, 0].astype(np.int64)
+        par = a[:, 6].astype(np.int64)
+        pos_of = {int(k): i for i, k in enumerate(rid)}
+        seg = np.array([[pos_of[int(p)], i] for i, p in enumerate(par)
+                        if int(p) in pos_of], dtype=np.int64)
+        total += len(seg)
+        if stride > 1:
+            seg = seg[::stride]
+        if len(seg) == 0:
+            continue
+        inside = np.all((xyz >= 0) & (xyz <= 1), axis=1)
+        seg = seg[inside[seg[:, 0]] & inside[seg[:, 1]]]         # clip to the cube
+        if len(seg) == 0:
+            continue
+        pts.append(xyz)
+        lines.append(np.column_stack([np.full(len(seg), 2), seg + off]))
+        off += len(xyz)
+        kept += len(seg)
+    if not pts:
+        return None, {"neurons": 0, "segments": 0}
+    poly = pv.PolyData(np.ascontiguousarray(np.concatenate(pts)))
+    poly.lines = np.concatenate(lines).ravel()
+    return poly, {"neurons": len(files), "segments": kept, "segments_before_clip": total}
