@@ -232,14 +232,15 @@ window.Quarto = {
 </section>
 <section id="composing-hierarchy" class="level2">
 <h2 class="anchored" data-anchor-id="composing-hierarchy">Composing hierarchy</h2>
-<p>The second axis of composition is <strong>scale</strong>. A set may be <em>contained</em> in another — proteins in a cell, cells in a tissue, tissues in an organism — and containment is an explicit map <span class="math inline">\(\pi\)</span> from children to parent, not a convention buried in the code. Each level carries its own state, its own operators and its own rate, so no level is a parameter of the level above it.</p>
+<p>A set may be contained in another — proteins in a cell, cells in a tissue, tissues in an organism — through an explicit child → parent map. Importantly, a parent may contain several distinct sets: the same cell can contain receptors, signalling proteins, cytoskeletal elements and particles. These sets remain distinct objects, with their own state and operators, while sharing the same parent. Each level can also run at its own rate: no level is reduced to a parameter of the one above it.</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
-<p><img src="figures/fig_hier.png" class="img-fluid figure-img" style="width:42.0%"></p>
+<p><img src="figures/fig_hier.png" class="img-fluid figure-img" style="width:80.0%"></p>
 </figure>
 </div>
-<p>Exactly two operator kinds cross that map. <strong>Aggregate ↑</strong> reads a parent from its children — a cell’s position as the centroid of its particles, a neuron’s input as the sum of its synapses. <strong>Broadcast ↓</strong> writes children from their parent — a containment spring, or a material property handed down to every particle a cell owns. Fields are bound to a level too, and <strong>Exchange</strong> couples a set to the field at its own scale, so a morphogen grid, a mechanical grid and a metabolite pool coexist without ever becoming the same object. The same eight kinds run at every level: there is no per-scale engine, and adding a level adds no machinery.</p>
-<p>What the hierarchy buys is a mechanism written at one scale producing a phenomenon at another that nobody wrote down. In the spheroid section below, each cell decides only where its own protease sits; the enzyme dissolves the faces of a triangulated membrane no cell ever touches; and the hole that opens is what decides where the tissue buds — 7.7% of the membrane’s faces through 54 separate openings in one run, 87% in another, from the same operator graph.</p>
+<p>Operators can act within a level or across levels. Within a cell, for example, operators may couple receptors → signalling proteins → cytoskeleton. Across the containment map, <strong>Aggregate ↑</strong> builds parent state from children — a cell position from its particles, or a neuron input from its synapses — while <strong>Broadcast ↓</strong> propagates parent state to children — a material property to every particle owned by a cell, or a constraint imposed by the parent.</p>
+<p>Fields are level-specific too. <strong>Exchange</strong> couples a set to a field at the appropriate level, allowing a protein concentration field, a cellular morphogen field and a tissue mechanical grid to coexist as distinct objects.</p>
+<p>The consequence is that proteins → cells → tissues is not a pipeline of separate simulators. It is one compositional graph: multiple sets may coexist inside each parent, operators connect them locally, and Aggregate/Broadcast connect the levels. The same operator kinds are reused throughout; adding another biological scale requires no new engine.</p>
 </section>
 <section id="what-it-looks-like" class="level2">
 <h2 class="anchored" data-anchor-id="what-it-looks-like">What it looks like</h2>

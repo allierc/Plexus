@@ -1,3 +1,11 @@
+% fig_hier -- containment, in the visual language of fig_ops: a WIDE strip, blue for sets, green
+% for fields, red for operators, a bold name + its symbol underneath. Read left to right = coarser.
+%
+% THE POINT THE FIGURE HAS TO MAKE is that a parent holds SEVERAL DISTINCT SETS, not one kind of
+% child: the cell at S1 contains receptors, signalling proteins and cytoskeleton, drawn as three
+% different marks, each its own set with its own state. Red arrows are operators -- within a level
+% (receptor -> signalling -> cytoskeleton) and across it (Aggregate up, Broadcast down). Green is a
+% field, bound to one level and reached by Exchange.
 \documentclass[border=5pt]{standalone}
 \usepackage{amsmath,amssymb}
 \usepackage{xcolor}
@@ -10,19 +18,108 @@
 \begin{document}
 \begin{tikzpicture}[
   font=\footnotesize,
-  set/.style={draw=cset,thick,rounded corners,fill=cset!10,minimum width=30mm,minimum height=9mm},
-  leaf/.style={draw=cset,rounded corners,fill=cset!4,minimum width=26mm,minimum height=8mm},
-  cont/.style={-{Stealth[length=2.6mm]},cset,thick},
+  % one MARK per set, so "distinct set" is visible at a glance and survives being shrunk
+  recept/.style={circle,draw=cset,thick,fill=white,minimum size=3.4mm,inner sep=0pt},
+  sig/.style={circle,draw=cset,fill=cset!35,minimum size=3.0mm,inner sep=0pt},
+  cyto/.style={draw=cset,fill=cset!12,minimum width=4.6mm,minimum height=1.3mm,inner sep=0pt},
+  tiny/.style={circle,draw=cset,fill=cset!25,minimum size=2.0mm,inner sep=0pt},
+  cellbox/.style={draw=cset,thick,rounded corners=2.5pt,fill=cset!5,inner sep=1.3mm},
+  lab/.style={font=\scriptsize,color=cgray},
+  ttl/.style={font=\bfseries},
+  fld/.style={draw=cfield,fill=cfield!12,minimum size=3.6mm,inner sep=0pt},
+  op/.style={-{Stealth[length=2.2mm]},cop,thick},
+  ex/.style={{Stealth[length=1.8mm]}-{Stealth[length=1.8mm]},cfield,semithick},
 ]
-\node[set] (org)  at (0,6.0) {organism $S_3$};
-\node[set] (pop)  at (0,4.0) {population $S_2$};
-\node[set] (cell) at (0,2.0) {cell $S_1$};
-\node[leaf] (part) at (0,0.0) {protein $S_0$};
-\node[leaf] (mol)  at (-3.4,0.0) {metabolite $S_0$};
-\draw[cont] (part) -- (cell);
-\draw[cont] (mol.north) -- (cell.south west);
-\node[cset,font=\scriptsize] at (-1.25,0.85) {$\pi_0$};   % maps both leaves into the cell
-\draw[cont] (cell) -- node[right,font=\scriptsize,pos=0.5]{$\pi_1$} (pop);
-\draw[cont] (pop)  -- node[right,font=\scriptsize,pos=0.5]{$\pi_2$} (org);
+
+% =========== S0: three distinct sets, and operators BETWEEN them ============
+\node[recept] (r0) at (0,0.86) {};
+\node[sig]    (s0) at (0,0.16) {};
+\node[cyto]   (k0) at (0,-0.52) {};
+\node[lab,right=1.4mm of r0] {receptors};
+\node[lab,right=1.4mm of s0] {signalling proteins};
+\node[lab,right=1.4mm of k0] {cytoskeleton};
+\draw[op] (r0) -- (s0);
+\draw[op] (s0) -- (k0);
+\node[fld] (fld0) at (0,-1.16) {};
+\node[lab,right=1.4mm of fld0] {concentration field};
+\draw[ex] (fld0) -- (k0);
+\node[ttl] at (0.85,-1.78) {molecules};
+\node[lab] at (0.85,-2.14) {$S_0$};
+
+% =========== S1: ONE cell holding all three of those sets ==================
+\begin{scope}[shift={(5.6,0)}]
+  \node[recept,minimum size=2.4mm] (r1) at (-0.34,0.72) {};
+  \node[recept,minimum size=2.4mm] (r1b) at ( 0.30,0.74) {};
+  \node[sig,minimum size=2.2mm]    (s1) at (-0.06,0.42) {};
+  \node[sig,minimum size=2.2mm]    (s1b) at ( 0.26,0.30) {};
+  \node[cyto,minimum width=3.4mm]  (k1) at (-0.10,0.06) {};
+  \begin{scope}[on background layer]
+    \node[cellbox,fit=(r1)(r1b)(s1)(s1b)(k1)] (cellA) {};
+  \end{scope}
+  \node[lab,right=1.2mm of cellA] {epithelial cell};
+  \node[sig,minimum size=2.2mm] (n1) at (-0.10,-0.62) {};
+  \node[sig,minimum size=2.2mm] (n2) at ( 0.22,-0.52) {};
+  \begin{scope}[on background layer]
+    \node[cellbox,fit=(n1)(n2)] (cellB) {};
+  \end{scope}
+  \node[lab,right=1.2mm of cellB] {neuron};
+  \node[fld] (fld1) at (0.02,-1.16) {};
+  \node[lab,right=1.4mm of fld1] {morphogen field};
+  \draw[ex] (fld1) -- (cellB);
+  \node[ttl] at (0.02,-1.78) {cells};
+  \node[lab] at (0.02,-2.14) {$S_1$};
+\end{scope}
+
+% =========== S2: tissues, each holding cells ===============================
+\begin{scope}[shift={(11.0,0)}]
+  \node[tiny] (t1a) at (-0.30,0.74) {};
+  \node[tiny] (t1b) at ( 0.00,0.86) {};
+  \node[tiny] (t1c) at ( 0.30,0.72) {};
+  \node[tiny] (t1d) at (-0.14,0.46) {};
+  \node[tiny] (t1e) at ( 0.18,0.44) {};
+  \begin{scope}[on background layer]
+    \node[cellbox,fit=(t1a)(t1b)(t1c)(t1d)(t1e)] (tisA) {};
+  \end{scope}
+  \node[lab,right=1.2mm of tisA] {epithelium};
+  \node[tiny] (t2a) at (-0.26,-0.60) {};
+  \node[tiny] (t2b) at ( 0.04,-0.48) {};
+  \node[tiny] (t2c) at ( 0.30,-0.64) {};
+  \begin{scope}[on background layer]
+    \node[cellbox,fit=(t2a)(t2b)(t2c)] (tisB) {};
+  \end{scope}
+  \node[lab,right=1.2mm of tisB] {matrix};
+  \node[fld] (fld2) at (0.02,-1.16) {};
+  \node[lab,right=1.4mm of fld2] {mechanical grid};
+  \draw[ex] (fld2) -- (tisB);
+  \node[ttl] at (0.02,-1.78) {tissues};
+  \node[lab] at (0.02,-2.14) {$S_2$};
+\end{scope}
+
+% =========== S3 ============================================================
+\begin{scope}[shift={(16.1,0)}]
+  \node[tiny] (o1) at (-0.22,0.24) {};
+  \node[tiny] (o2) at ( 0.04,0.38) {};
+  \node[tiny] (o3) at ( 0.28,0.16) {};
+  \begin{scope}[on background layer]
+    \node[cellbox,fit=(o1)(o2)(o3)] (org) {};
+  \end{scope}
+  \node[ttl] at (0.02,-1.78) {organism};
+  \node[lab] at (0.02,-2.14) {$S_3$};
+\end{scope}
+
+% =========== the two operators that cross a level ==========================
+\draw[op] (2.55,0.55) to[bend left=15] (4.35,0.55);
+\draw[op] (4.35,-0.72) to[bend left=15] (2.55,-0.72);
+\node[font=\bfseries\scriptsize,color=cop] at (3.45,1.36) {Aggregate$\uparrow$};
+\node[font=\scriptsize,color=cop]          at (3.45,1.00) {$\textstyle\sum_{\pi}$};
+\node[font=\bfseries\scriptsize,color=cop] at (3.45,-1.46) {Broadcast$\downarrow$};
+\node[font=\scriptsize,color=cop]          at (3.45,-1.10) {$\pi^{*}$};
+\foreach \x in {8.45, 13.75}{
+  \draw[op] (\x-0.85,0.55) to[bend left=15]
+        node[above,font=\scriptsize,color=cop]{$\textstyle\sum_{\pi}$} (\x+0.85,0.55);
+  \draw[op] (\x+0.85,-0.72) to[bend left=15]
+        node[below,font=\scriptsize,color=cop]{$\pi^{*}$} (\x-0.85,-0.72);
+}
+
 \end{tikzpicture}
 \end{document}
