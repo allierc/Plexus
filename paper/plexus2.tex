@@ -112,7 +112,7 @@ neurons, or how cells relate to a continuous field. Plexus incorporates maps int
 \subsection{Sets}
 
 Sets represent collections of biological entities. Examples include genes,
-proteins, particles, cells, neurons, synapses, tissues, organs and organisms.
+proteins, cells, neurons, synapses, tissues, organs and organisms.
 Sets naturally organize into hierarchies reflecting biological organization.
 Genes regulate proteins, proteins determine cellular behaviour, cells assemble
 into tissues, tissues form organs, and organs compose organisms. Each level is
@@ -125,7 +125,7 @@ organ-level physiology.
 
 Every element of a set carries a state describing its current biological
 condition. While sets define \emph{what} biological entities exist, states
-define \emph{what each entity carries}. The state schema is specific to each set. A particle may carry position, velocity and deformation gradient; a neuron membrane voltage and calcium; a cell polarity, stiffness and gene-expression levels; a synapse conductance and plastic weight.
+define \emph{what each entity carries}. The state schema is specific to each set. A protein may carry position, binding state and the load it bears; a material point position, velocity and deformation gradient; a neuron membrane voltage and calcium; a cell polarity, stiffness and gene-expression levels; a synapse conductance and plastic weight.
 Operators transform states. They consume selected state variables and produce
 updates to others, while leaving the underlying biological entities unchanged.
 
@@ -256,14 +256,14 @@ are obtained by composing these elementary operator families.
 
 \paragraph{Lateral.}
 Lateral operators describe interactions between entities belonging to the same
-set. Typical examples include mechanical forces between particles, adhesion
+set. Typical examples include mechanical forces between proteins, adhesion
 between neighbouring cells, electrical communication between neurons, or
 biochemical interactions within a metabolic network.
 
 \paragraph{Aggregate.}
 Aggregate operators propagate information from many entities to a higher level
 of biological organization. Examples include computing cellular properties from
-their constituent particles or accumulating synaptic currents acting on a
+their constituent proteins or accumulating synaptic currents acting on a
 neuron.
 
 \paragraph{Broadcast.}

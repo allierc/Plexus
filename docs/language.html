@@ -286,7 +286,7 @@ window.Quarto = {
 <li>the state variables consumed and produced,</li>
 <li>the maps relating the participating sets.</li>
 </ul>
-<p>Maps define the relations required by the mechanism. They determine, for example, which particle belongs to which cell, which synapses connect which neurons, or how cells relate to a continuous field. Plexus incorporates maps into the operator, making operators typed morphisms between biological sets.</p>
+<p>Maps define the relations required by the mechanism. They determine, for example, which protein belongs to which cell, which synapses connect which neurons, or how cells relate to a continuous field. Plexus incorporates maps into the operator, making operators typed morphisms between biological sets.</p>
 </section>
 <section id="sets" class="level3">
 <h3 class="anchored" data-anchor-id="sets">Sets</h3>
@@ -294,7 +294,7 @@ window.Quarto = {
 </section>
 <section id="states" class="level3">
 <h3 class="anchored" data-anchor-id="states">States</h3>
-<p>Every element of a set carries a state describing its current biological condition. While sets define <em>what</em> biological entities exist, states define <em>what each entity carries</em>. The state schema is specific to each set. A particle may carry position, velocity and deformation gradient; a neuron membrane voltage and calcium; a cell polarity, stiffness and gene-expression levels; a synapse conductance and plastic weight. Operators transform states. They consume selected state variables and produce updates to others, while leaving the underlying biological entities unchanged.</p>
+<p>Every element of a set carries a state describing its current biological condition. While sets define <em>what</em> biological entities exist, states define <em>what each entity carries</em>. The state schema is specific to each set. A protein may carry position, binding state and the load it bears; a material point position, velocity and deformation gradient; a neuron membrane voltage and calcium; a cell polarity, stiffness and gene-expression levels; a synapse conductance and plastic weight. Operators transform states. They consume selected state variables and produce updates to others, while leaving the underlying biological entities unchanged.</p>
 </section>
 <section id="fields" class="level3">
 <h3 class="anchored" data-anchor-id="fields">Fields</h3>
@@ -321,8 +321,8 @@ window.Quarto = {
 <p><img src="figures/fig_ops.png" class="img-fluid figure-img" style="width:100.0%"></p>
 </figure>
 </div>
-<p><strong>Lateral.</strong> Lateral operators describe interactions between entities belonging to the same set. Typical examples include mechanical forces between particles, adhesion between neighbouring cells, electrical communication between neurons, or biochemical interactions within a metabolic network.</p>
-<p><strong>Aggregate.</strong> Aggregate operators propagate information from many entities to a higher level of biological organization. Examples include computing cellular properties from their constituent particles or accumulating synaptic currents acting on a neuron.</p>
+<p><strong>Lateral.</strong> Lateral operators describe interactions between entities belonging to the same set. Typical examples include mechanical forces between proteins, adhesion between neighbouring cells, electrical communication between neurons, or biochemical interactions within a metabolic network.</p>
+<p><strong>Aggregate.</strong> Aggregate operators propagate information from many entities to a higher level of biological organization. Examples include computing cellular properties from their constituent proteins or accumulating synaptic currents acting on a neuron.</p>
 <p><strong>Broadcast.</strong> Broadcast operators perform the complementary transformation, propagating information from higher organizational levels toward their constituents. Aggregate and Broadcast therefore define the upward and downward flow of information across biological scales.</p>
 <p><strong>Exchange.</strong> Exchange operators couple discrete biological entities with continuous fields. Typical examples include secretion, sensing, transport, uptake, or particle–grid transfer.</p>
 <p><strong>Rewire.</strong> Rewire operators modify the relations between biological entities without changing the entities themselves. They update neighbour graphs, contact networks, developmental connectivity or other interaction structures, determining which entities participate in subsequent operator evaluations.</p>
