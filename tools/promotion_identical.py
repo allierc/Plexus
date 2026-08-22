@@ -514,7 +514,12 @@ def main():
             # "CompletedProcess(args=[...", never "0", so the queue test was false on every poll and
             # the loop always ran to `--wait-min`. An ssh timeout returns None, and an unreachable
             # login node is NOT an empty queue, so that reads as "still waiting".
-            st = C._ssh("bjobs -w 2>/dev/null | grep -c promo_ || true", timeout=30)
+            # COUNT ONLY THIS RUN'S JOBS. `grep -c promo_` counts every promotion job in the
+            # queue, so a `--phase 0` waiter whose twelve jobs had all finished sat blocked for
+            # twenty minutes on two `--phase B-core` jobs it has nothing to do with. Two phases in
+            # flight at once is the normal case, not the exception.
+            mine = "|".join(rn for *_r, names, _pd in jobs for _side, rn in names.values())
+            st = C._ssh(f"bjobs -w 2>/dev/null | grep -cE '{mine}' || true", timeout=30)
             queue_empty = st is not None and (st.stdout or "").strip().startswith("0")
             landed = all(_landed(side, rn, pd)
                          for *_r, names, pd in jobs for side, rn in names.values())

@@ -121,6 +121,105 @@ produce the morphology the search was looking for). One name over both cost four
 verdicts about a term that measured 0.0 in all 78 specs that ever carried it. See OKUDA_PROMOTION.md.
 """''',
     ),
+    dict(
+        target="src/plexus/operators/junction_ops.py",
+        sources=["junction_ops.py", "medioapical_ops.py"],
+        module="plexus.operators.junction_ops",
+        doc='''"""Myosin, and the two places a cell can put it: on its junctions or across its apex.
+
+    junction_myosin      per-junction myosin -- `default` (one pool) and `two_pool`
+    junction_sync        keep the per-junction store aligned with the half-edge table
+    medioapical_myosin   the APICAL pool: an areal density on the face, not on its edges
+    cytokinetic_ring     the contractile ring a dividing cell closes on its own septum
+
+WHY THE TWO FILES ARE ONE. `medioapical_ops` imported `junction_ops` as `JO` and called six of its
+private helpers -- `_live_edges`, `_lookup`, `_scatter_full`, `edge_tension` -- because the two-pool
+model is not a different mechanism, it is the SAME junction bookkeeping with a second reservoir on
+the face. Splitting them across files meant the shared half of the model was private to one of them.
+
+WHICH POOL A SPEC GETS is chosen by `tissue.py`'s `myo_model`, through the `implementation` axis on
+one contract, which is the paper's rule and not a switch statement: `junction_myosin[default]` and
+`junction_myosin[two_pool]` are two bodies under one name.
+"""''',
+    ),
+    dict(
+        target="src/plexus/operators/ecm_ops.py",
+        sources=["ecm_ops.py", "block_ops.py"],
+        module="plexus.operators.ecm_ops",
+        doc='''"""The extracellular matrix as MPM material, and the stiff blocks that confine it.
+
+    ecm_seed        the box MINUS a cavity, as aligned fibres, once at frame 0
+    ecm_stress      |J-1| (or the deviatoric / von Mises variant), banded, so the front is visible
+    ecm_from_cell   the epithelium's surface as a moving boundary -- `replay` and `sphere`
+    cell_exclude    the hard backstop: no matrix particle inside the lumen
+    block_seed      two slabs beyond a free gap, as a SECOND MPM set ~130x stiffer
+    block_stress    the block's own strain, at its own full scale
+
+`ecm_seed` AND `block_seed` ARE NOT REDUNDANT and are not merged: one fills the complement of a
+cavity with aligned fibres, the other fills two slabs with a jittered lattice. Same family, same
+module, different geometry. `ecm_stress` and `block_stress` ARE the same body and are marked for
+merging -- see OKUDA_PROMOTION.md; what keeps them apart today is a MODULE-LEVEL history list per
+set, and moving that onto the Level is what lets one operator serve both.
+"""''',
+    ),
+    dict(
+        target="src/plexus/operators/membrane_ops.py",
+        sources=["membrane_ops.py", "integrin_ops.py"],
+        module="plexus.operators.membrane_ops",
+        exclude=["MPMTissueBoundary", "BasementMembraneContinuumStrain"],
+        doc='''"""The basement membrane: a crosslinked shell between the epithelium and the stroma.
+
+    bm_seed / bm_bond / bm_crosslink / bm_unbond / bm_remodel / bm_secrete
+                        the sheet, its network, and how the network turns over
+    bm_contact / bm_repel                   it does not pass through what it rests on
+    adhesion_seed / adhesion_pull / adhesion_turnover
+                        the sheet's grip on the epithelium, and how that grip renews
+    integrin_adhesion   MEMBRANE -> EPITHELIUM: each particle is pulled back to the angular
+                        position it was seeded on, so a surface whose radius triples stretches its
+                        bonds by ~R -- the loading a real basement membrane feels under growth
+    integrin_seed / integrin_pull / integrin_track
+                        MATRIX -> MEMBRANE: fibres seeded outward, each bound at its tip to the
+                        nearest membrane particle, with the cell end prescribed
+
+THE TWO INTEGRIN FAMILIES ARE ONE HOP APART IN THE SAME CHAIN AND ARE NOT THE SAME THING. The shared
+prefix is what invites the confusion, so they are here together with that sentence at the top rather
+than in two files where nobody compares them.
+
+TWO OPERATORS DID NOT COME. `mpm_boundary` and `bm_strain` stay in `discovery_okuda/ops/membrane_ops.py`
+and are registered only there, so archived specs still run and no new spec can reach them from core.
+`mpm_boundary` overwrites grid-node velocity -- kinematic, momentum not conserved, the reaction
+discarded -- and its standoff is set by the B-spline stencil width, measured across `recover`
+0/2/6/20 as 46.6%/3.8%/11.5%/13.9% of the sheet inside the tissue against standoffs
++0.0006/+0.0124/+0.0088/+0.0069, never reaching the 0 -> +0.002 that would mean "just touching".
+`integrin_track` is the constraint it should have been. `bm_strain` is, in AUDIT's words, "not a
+mechanism".
+
+THE RESOLUTION LIMIT TRAVELS WITH THE COUPLING. At `n_grid 48`, `dx = 0.021` against a 0.002-thick
+sheet: one grid cell holds ~16 membrane particles, so the coupling strength here was set by grid
+resolution and not by a measured adhesion.
+"""''',
+    ),
+    dict(
+        target="src/plexus/operators/contact_ops.py",
+        sources=["mesh_contact_ops.py", "bm_sense_ops.py", "plate_ops.py", "surface_ops.py",
+                 "load_ops.py"],
+        module="plexus.operators.contact_ops",
+        doc='''"""Where a triangulated surface meets a continuum, and what each tells the other.
+
+    mesh_contact      the vertex mesh pushes MPM particles out of itself, and feels the reaction
+    mesh_inside       which particles are inside the closed surface -- the test the contact needs
+    surface_track     the surface's own moving frame, kept across division and death
+    plate_confine     a rigid half-space (a projection; `block_seed` is the material version)
+    bm_sense          the epithelium reads the membrane it is resting on
+    ecm_load          the load the matrix puts back on the tissue
+    ecm_gate_growth   and what that load does to growth -- entry condition `'mg_scale' in m`
+
+WHY NOT GRID-BASED CONTACT. CFEMP (Lian et al. 2011, CMAME 200:3482) resolves contact by comparing
+the two bodies' velocities at shared grid nodes, and needs mesh and grid to be comparable in size.
+Ours are not: a cell is 0.73 dx and the basement membrane 0.1 dx, so both bodies live inside one
+grid cell and the grid hands them ONE velocity -- the weld that `test_03_mesh_contact` measured.
+"""''',
+    ),
 ]
 
 # ------------------------------------------------------------------- import rewrites, applied in order
@@ -135,6 +234,13 @@ REWRITES = [
     (r"_mesh_ops\.", "", "vertex_ops"),
     # diffusion_reaction still needs the vertex module, by its new absolute name
     (r"^(\s*)from mesh_ops import ", r"\1from plexus.operators.vertex_ops import ", "diffusion_reaction"),
+    # junction_ops + medioapical_ops become one file: `JO` was the sibling, now it is `self`
+    (r"^import junction_ops as JO\n", "", "junction_ops"),
+    (r"\bJO\.", "", "junction_ops"),
+    (r"^(\s*)from mesh_ops import ", r"\1from plexus.operators.vertex_ops import ", "junction_ops"),
+    (r"^(\s*)from mesh_ops import ", r"\1from plexus.operators.vertex_ops import ", "ecm_ops"),
+    (r"^(\s*)from mesh_ops import ", r"\1from plexus.operators.vertex_ops import ", "membrane_ops"),
+    (r"^(\s*)from mesh_ops import ", r"\1from plexus.operators.vertex_ops import ", "contact_ops"),
 ]
 
 
@@ -200,6 +306,26 @@ def _toplevel_defs(body):
     return out
 
 
+def _hold_back(body, exclude, src):
+    """Cut the named top-level definitions out of `body`. Returns (body, {name: source_text})."""
+    if not exclude:
+        return body, {}
+    lines = body.splitlines(keepends=True)
+    defs = _toplevel_defs(body)
+    held, cut = {}, []
+    for name in exclude:
+        if name not in defs:
+            continue
+        a, b, _dump = defs[name]
+        held[name] = "".join(lines[a - 1:b])
+        cut.append((a, b, name))
+    for a, b, name in sorted(cut, reverse=True):
+        lines[a - 1:b] = [f"# `{name}` is NOT PROMOTED -- see AUDIT.md. It stays in "
+                          f"discovery_okuda/ops/{src}.\n"]
+        print(f"    held back `{name}` from {src} -- registered in okuda only")
+    return "".join(lines), held
+
+
 def _drop_identical_duplicates(bodies):
     seen, out = {}, []
     for s, body in bodies:
@@ -232,8 +358,19 @@ def _drop_identical_duplicates(bodies):
 def build(group, dry=False):
     tag = os.path.basename(group["target"])[:-3]
     docs, imports, bodies = [], [], []
+    # OPERATORS THAT ARE NOT PROMOTED. `AUDIT.md` rejects `mpm_boundary` and `bm_strain`, and a
+    # rejection has to be visible in the code rather than only in a document: their classes are cut
+    # out of the module that moves and left in the okuda file, so archived specs still run and no
+    # new spec can reach them from core. `--verify` counts them as "held back", not as a difference.
+    group["_held"] = {}
     for s in group["sources"]:
         d, imp, body = _split(os.path.join(OPS, s))
+        body, held = _hold_back(body, group.get("exclude") or [], s)
+        # KEYED BY SOURCE. A group-wide dict wrote `bm_strain` into `integrin_ops.py`'s shim as well
+        # as `membrane_ops.py`'s, and the second registration raised
+        # `operator 'bm_strain' already has variant 'default'` -- so importing okuda died outright.
+        if held:
+            group["_held"][s] = held
         docs.append((s, d))
         imports.extend(imp)
         bodies.append((s, _rewrite(body, tag)))
@@ -292,6 +429,16 @@ from {module} import *          # noqa: F401,F403
 # The private re-export block, emitted only when there ARE private names: a `from X import (\n#
 # (none))` swallows its own closing paren inside the comment and the shim will not parse -- which
 # would break every one of the thirty importers at once, loudly but for the silliest reason.
+HELD_HEADER = '''
+
+# =============================================================================================
+# NOT PROMOTED: {names}. `AUDIT.md` rejects them, so they were cut out of the module that moved to
+# `src/plexus/operators/` and left here. They are still registered -- an archived spec that names
+# one still runs -- but no spec can reach them from the core registry, and there is no alias to
+# find them by. A rejection that lives only in a markdown file is a rejection that the next reader
+# re-promotes by accident.
+# ============================================================================================='''
+
 PRIVATE_BLOCK = '''from {module} import (          # noqa: F401  the underscored names okuda reaches for
 {names})
 '''
@@ -307,8 +454,13 @@ def shim(group):
                          for t in n.targets if isinstance(t, ast.Name) and t.id.startswith("_")})
         block = (PRIVATE_BLOCK.format(module=group["module"],
                                       names=",\n".join(f"    {p}" for p in priv)) if priv else "")
+        text = SHIM.format(name=s[:-3], module=group["module"], privates=block)
+        held = (group.get("_held") or {}).get(s, {})
+        if held:
+            text += (HELD_HEADER.format(names=", ".join(f"`{k}`" for k in sorted(held)))
+                     + "\n\n" + "\n\n".join(held[k] for k in sorted(held)) + "\n")
         with open(path, "w") as f:
-            f.write(SHIM.format(name=s[:-3], module=group["module"], privates=block))
+            f.write(text)
         print(f"    shim {s} -> {group['module']}"
               + (f"  (+{len(priv)} private name(s))" if priv else ""))
 
@@ -321,6 +473,15 @@ def main():
     if a.verify:
         return verify()
     for g in GROUPS:
+        # IDEMPOTENT. Once a group has moved, its sources are re-export shims -- re-running would
+        # concatenate the shims and overwrite the real module with 24 lines of imports. The tool
+        # refuses rather than "succeeding": a move that silently empties the module it moved is the
+        # worst possible failure here, because every spec would still load and register nothing.
+        already = [x for x in g["sources"]
+                   if "-- MOVED to `" in open(os.path.join(OPS, x)).read()[:400]]
+        if already:
+            print(f"  {g['target']}: already moved ({', '.join(already)}) -- skipped")
+            continue
         build(g, dry=a.dry)
         if not a.dry:
             shim(g)
@@ -328,6 +489,24 @@ def main():
         print("\n  now: add the modules to src/plexus/operators/__init__.py, then run\n"
               "       python tools/group_operators.py --verify")
     return 0
+
+
+def _pre_move_text(src, max_back=40):
+    """The last committed version of `discovery_okuda/ops/<src>` that was NOT already a shim.
+
+    `HEAD:` is the wrong thing to read once the move is committed: the file there IS the shim, and
+    comparing a shim against the module it points at reports everything as missing. Walking back to
+    the last real version is what makes `--verify` still mean something a week later.
+    """
+    rel = f"discovery_okuda/ops/{src}"
+    revs = subprocess.run(["git", "-C", ROOT, "rev-list", f"-{max_back}", "HEAD", "--", rel],
+                          capture_output=True, text=True, timeout=60).stdout.split()
+    for rev in revs:
+        t = subprocess.run(["git", "-C", ROOT, "show", f"{rev}:{rel}"],
+                           capture_output=True, text=True, timeout=60).stdout
+        if t and "-- MOVED to `" not in t[:400]:
+            return t
+    return ""
 
 
 def verify():
@@ -338,15 +517,18 @@ def verify():
     source file held, decorators included, searched for as a substring of the target. If the move
     changed one character inside one function body, this says which function and which file.
     """
-    ok, bad, dropped = 0, [], []
+    ok, bad, dropped, heldb = 0, [], [], []
     for g in GROUPS:
+        if not os.path.exists(os.path.join(ROOT, g["target"])):
+            print(f"  {g['target']}: not built yet -- skipped")
+            continue
         target = open(os.path.join(ROOT, g["target"])).read()
         for src in g["sources"]:
             path = os.path.join(OPS, src)
-            text = subprocess.run(["git", "-C", ROOT, "show", f"HEAD:discovery_okuda/ops/{src}"],
-                                  capture_output=True, text=True, timeout=60).stdout
-            if not text:                                  # not yet committed as a shim; read on disk
-                text = open(path).read()
+            text = _pre_move_text(src) or (open(path).read() if os.path.exists(path) else "")
+            if not text or "-- MOVED to `" in text[:400]:
+                print(f"    {src}: no pre-move source found in history -- cannot verify")
+                continue
             lines = text.splitlines(keepends=True)
             for n in ast.parse(text).body:
                 if not isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
@@ -355,12 +537,15 @@ def verify():
                 chunk = _rewrite(chunk, os.path.basename(g["target"])[:-3])
                 if chunk in target:
                     ok += 1
+                elif n.name in (g.get("exclude") or []):
+                    heldb.append(f"{src}:{n.name}")       # deliberately not promoted (AUDIT.md)
                 elif n.name in ALLOW_DUPLICATE and ALLOW_DUPLICATE[n.name] != src:
                     dropped.append(f"{src}:{n.name}")     # a duplicate resolved by ALLOW_DUPLICATE
                 else:
                     bad.append(f"{src}:{n.name}")
     print(f"  {ok} definition(s) moved verbatim"
           + (f"; {len(dropped)} dropped by decision ({', '.join(dropped)})" if dropped else "")
+          + (f"; {len(heldb)} held back by AUDIT ({', '.join(heldb)})" if heldb else "")
           + (f"; {len(bad)} DIFFER: {bad}" if bad else ""))
     return 1 if bad else 0
 
