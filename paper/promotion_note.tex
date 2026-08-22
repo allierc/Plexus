@@ -392,6 +392,33 @@ experiment into its own control, so it is written out rather than inferred'', wh
 a threshold reasoned from intuition rather than from the update rule did here. The row is
 \code{basis: analytic} now, because the sign follows from the rule and needs no previous run.
 
+\paragraph{Gate 04's replay input is regenerated, which is as far as ``never replay'' can go here.}
+The rule cannot mean solving both subsystems in one schedule: the tissue's clock is $600$\,s a frame
+and the matrix's is $3.2$\,ms, a ratio of about $10^5$, so a live coupling would need on the order of
+$100{,}000$ matrix frames per tissue frame. What it does reach is the \emph{input}, and there it
+changed everything --- gate 04 read a 32.7\,MB npz built in August, uncommitted, whose parent spec no
+longer resolves (\code{tissue.CELL\_SPEC} now gives \code{rate: 0.03} against the \code{0.003457}
+that made it). \code{config/gates/gate\_04\_tissue.yaml} is that pass declared, and
+\code{tools/export\_tissue.py} writes its recorded surface into the layout \code{mesh\_contact}
+consumes. The regeneration is exact --- $200 \to 6{,}380$ cells, median radius
+$4.6622 \to 17.5848$, every per-mesh key including \code{myo\_med} --- which is how we know the
+declared spec is the one that built the cache. It works only because the engine's recorder is now a
+\emph{superset} of what the cache carried: \code{FACE\_RECORD}, \code{EDGE\_RECORD} and the
+operators' own counters.
+
+\paragraph{And gate 04 is red on one row, declared red rather than widened.} A prescribed surface
+makes non-penetration \emph{analytic}: the tissue's radius is known per frame, so ``no matrix inside
+the epithelium'' is exactly $\min |p - c| \ge$ that radius, needing no stress, no contact counter and
+no module global. The nearest material point ends at $0.1354$ of the box against a prescribed
+$0.150$. As a fraction that is $0.0146$ and reads as a rounding error. In micrometres it is
+$17.1\,\mu$m against an epithelial cell diameter of $8.6$ --- the matrix indents the tissue by two
+cell bodies. This is the paper's own worked example of why the measurement tier needs a
+\code{units:} block, and the same quantity was once reported as ``$0.82$ grid cells'', sounded small,
+and was described as an improvement. What would fix it is not a threshold: \code{mesh\_contact} is a
+penalty, a force proportional to depth, so a steady load always produces a steady overlap, and
+\code{k\_frac} is already at $0.15$ of the explicit stability ceiling. A barrier formulation removes
+the overlap by construction --- a change to the operator, in its own commit, with its own twin run.
+
 \gatetable
 
 \section{Status}
@@ -406,8 +433,7 @@ B-core & the core runs the model with no okuda import, bit-identical & \dn\\
 C  & \code{junction\_ops.py} & \dn\\
 D  & \code{ecm\_ops.py}, \code{membrane\_ops.py}, \code{contact\_ops.py} & \dn\\
 0b & MPM regrouped into \code{mpm\_ops.py} & \ns\\
-gates 00, 01, 02 & lifted into \code{config/gates/}, run from core, \textbf{37/37 green} & \dn\\
-gate 04 & liftable; 6 rows blocked on a 32\,MB uncommitted replay & \fl\\
+gates 00, 01, 02, 04 & lifted into \code{config/gates/}, run from core, \textbf{44 pass, 1 known-red} & \dn\\
 gate 03 & not liftable: needs a seeder, four operators and massed vertex dynamics & \ns\\
 0b/E & core regrouped into ten modules; VTK is the engine's renderer & \dn\\
 F  & the three minisite scenes under \code{config/atlas/} & \ns\\

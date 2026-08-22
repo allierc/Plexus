@@ -111,6 +111,9 @@ module & operator & family & kind & set & implementations / alias\\\midrule\endh
 \code{mpm\_ops.py} & \code{mpm\_scatter} & mpm & exchange & particle & alias p2g\\
 \code{mpm\_ops.py} & \code{mpm\_spin} & mechanics & lateral & particle & \\
 \code{mpm\_ops.py} & \code{mpm\_strain} & mpm & lateral & particle & \\
+\code{neural.py} & \code{neuron\_field\_input} & signalling & exchange & neuron & \\
+\code{neural.py} & \code{neuron\_signal} & signalling & lateral & neuron & shared, type\_pairwise, type\_pre\\
+\code{neural.py} & \code{neuron\_update} & signalling & lateral & neuron & leaky\_tanh\\
 \code{vertex\_ops.py} & \code{cell\_die} & population & structural & vertex & \\
 \code{vertex\_ops.py} & \code{cell\_divide} & population & structural & vertex & default, doubler, timer\\
 \code{vertex\_ops.py} & \code{cell\_mechanics} & mechanics & lateral & vertex & default, monolayer\\
@@ -121,7 +124,7 @@ module & operator & family & kind & set & implementations / alias\\\midrule\endh
 \end{longtable}
 \end{center}
 
-\noindent\textbf{91 of 93 canonical operator names resolve into \code{src/plexus/}.} The remainder are the two \code{AUDIT.md} rejects, registered in \code{discovery\_okuda} only.
+\noindent\textbf{94 of 96 canonical operator names resolve into \code{src/plexus/}.} The remainder are the two \code{AUDIT.md} rejects, registered in \code{discovery\_okuda} only.
 
 }
 \newcommand{\gatetable}{%
@@ -165,13 +168,21 @@ gate & row & tier & basis & declared & measured & \\\midrule\endhead
 \code{02\_ecm\_block} & \code{lowest\_centroid} & measurement & reference & interval [0.05, 0.3] & 0.1537 & \textcolor{good}{pass}\\
 \code{02\_ecm\_block} & \code{rebound\_happens} & measurement & reference & gt 0.05 & 0.204168 & \textcolor{good}{pass}\\
 \code{02\_ecm\_block} & \code{strand\_length\_um} & measurement & literature & interval [20.0, 500.0] & 105.853 & \textcolor{good}{pass}\\
+\code{04\_spheroid\_ecm} & \code{particle\_count} & bookkeeping & identity & eq 200000 & 200000 & \textcolor{good}{pass}\\
+\code{04\_spheroid\_ecm} & \code{no\_particle\_outside\_the\_domain} & bookkeeping & identity & eq 0 & 0 & \textcolor{good}{pass}\\
+\code{04\_spheroid\_ecm} & \code{no\_nan} & bookkeeping & identity & eq 0 & 0 & \textcolor{good}{pass}\\
+\code{04\_spheroid\_ecm} & \code{cavity\_is\_clear\_at\_seeding} & closed form & analytic & ge 0.045 & 0.0452006 & \textcolor{good}{pass}\\
+\code{04\_spheroid\_ecm} & \code{matrix\_is\_pushed\_out\_not\_through} & closed form & analytic & ge 0.1 & 0.135435 & \textcolor{good}{pass}\\
+\code{04\_spheroid\_ecm} & \code{contact\_penetration\_um} & measurement & literature & le 10.0 & 17.0751 & \textcolor{warn}{known-red}\\
+\code{04\_spheroid\_ecm} & \code{matrix\_is\_pushed\_not\_flicked} & measurement & reference & interval [0.01, 0.3] & 0.0128411 & \textcolor{good}{pass}\\
+\code{04\_spheroid\_ecm} & \code{matrix\_stress\_Pa} & measurement & literature & interval [10.0, 1000.0] & 13.3333 & \textcolor{good}{pass}\\
 \bottomrule
 \end{longtable}
 \end{center}
 
-\noindent\textbf{18 of 37 rows are verification} (bookkeeping or closed form, 49\%); 13 pin a regression against a previous run of this same model; and \textbf{5 compare the model with something observed in cells} (14\%). The paper reports roughly two thirds bookkeeping-or-closed-form for the \code{ecm} study; this table looks better than that only because \code{basis} separates the regression pins out of the measurement tier, where they would otherwise sit and read as biology.
+\noindent\textbf{23 of 45 rows are verification} (bookkeeping or closed form, 51\%); 14 pin a regression against a previous run of this same model; and \textbf{7 compare the model with something observed in cells} (16\%). The paper reports roughly two thirds bookkeeping-or-closed-form for the \code{ecm} study; this table looks better than that only because \code{basis} separates the regression pins out of the measurement tier, where they would otherwise sit and read as biology.
 
 
-\noindent Outcomes: {'PASS': 37}.
+\noindent Outcomes: {'KNOWN\_RED': 1, 'PASS': 44}.
 
 }

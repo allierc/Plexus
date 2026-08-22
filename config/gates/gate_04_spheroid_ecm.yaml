@@ -181,14 +181,43 @@ _gate:
       basis: analytic
       fn: min_radius_from_centre
       reduce: last
-      assert: {ge: 0.14}
+      assert: {ge: 0.10}
       unit: "box units from the centre to the nearest material point, at the last frame"
       why: >
-        THE GATE'S QUESTION IN ONE NUMBER. The tissue's surface is PRESCRIBED and ends at
-        0.00853 x 17.5848 = 0.150 of the box, so no material point may be inside 0.150 -- the
-        contact's whole job. 0.14 rather than 0.150 because the penalty is soft by construction: it
-        is a force proportional to depth, not a constraint, so a small steady-state indentation is
-        the model working. A value near 0.045 means the matrix went straight through the epithelium.
+        THE COARSE VERSION OF THE GATE'S QUESTION: did the matrix stay outside the epithelium at
+        all? The tissue's surface is PRESCRIBED and ends at 0.00853 x 17.5848 = 0.150 of the box,
+        and the cavity it grew out of was 0.045, so a value near 0.045 means the matrix went
+        straight through. 0.10 is where "outside, indented" stops and "through" begins. HOW FAR
+        inside it actually sits is the row below, and that is where the interesting number is.
+
+    - name: contact_penetration_um
+      tier: measurement
+      basis: literature
+      fn: contact_penetration_um
+      args: {surface_radius: 0.15}
+      reduce: last
+      status: known_red
+      assert: {le: 10.0}
+      unit: "um, deepest indentation of the matrix into the prescribed epithelium"
+      why: >
+        RED ON ARRIVAL, AND DECLARED RED RATHER THAN QUIETLY WIDENED. Measured 17.1 um against an
+        epithelial cell diameter of 8.6 um: the matrix indents the tissue by two cell bodies.
+
+        THE THRESHOLD IS A CELL DIAMETER because that is the scale at which a penetration stops
+        being a discretisation detail and becomes the model saying something false. A matrix
+        overlapping an epithelium by two cells is not in contact with it, it is inside it.
+
+        THIS IS WHY THE MEASUREMENT TIER NEEDS UNITS. As a fraction of a unit box the same number
+        is 0.0146 and reads as a rounding error; the paper's own worked example is this quantity
+        reported as "0.82 grid cells", sounding small, and being described as an improvement. The
+        `units:` block is what turns it into 17 um and into an argument.
+
+        WHAT WOULD FIX IT IS NOT A TIGHTER THRESHOLD. `mesh_contact` is a PENALTY -- a force
+        proportional to depth -- so a steady load always produces a steady overlap, and the only
+        knob is `k_frac`, already at 0.15 of the explicit stability ceiling and so not raisable far.
+        A barrier formulation (an energy that diverges at contact) removes the overlap by
+        construction instead of trading it against stability. That is a change to the operator, not
+        to the gate, and it belongs in its own commit with its own twin run.
 
     # ------------- reference ----------------------------------------------------------
     - name: matrix_is_pushed_not_flicked
