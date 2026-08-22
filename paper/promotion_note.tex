@@ -357,6 +357,41 @@ disagreement: neither side is wrong and the row is meaningless. So the engine no
 operators' own counters --- \code{MeshTable.SCALAR\_RECORD}: \code{n\_t1}, \code{n\_apop},
 \code{div\_blocked}, \code{apop\_spill} --- and the row reads $1{,}499$.
 
+\paragraph{And gate 01's did the same thing twice, which is the point of having them.}
+Myosin is the hard case for this promotion because it is the only state in the model that lives on a
+\emph{relation} rather than on a body: its array is indexed by half-edge, it is written before the
+frame's topology operators rewire that index, and \code{junction\_sync} has to re-key it afterwards.
+On the archived 401-frame run, 56 of 200 snapshots carried a myosin array 6 to 1{,}356 entries short
+of the edge arrays --- and every reader indexes it positionally, so each of those frames coloured,
+averaged and thresholded the wrong junctions. The gate asserts the alignment on the belted arm
+($0$) and reports it on the arm with the re-keying removed ($2{,}106$), so the check has a positive
+control rather than only a green light. \code{junction\_sync} itself is asserted
+\emph{trajectory-neutral at exactly zero} --- not ``small'' --- because it writes only
+\code{m["myo"]} and nothing reads it before the tick ends; the measured maximum vertex displacement
+between the two arms is $0.0$.
+
+Two of its rows failed on the first grading and both were the threshold. \code{t1\_rate} had been
+derived by dividing $1{,}499$ exchanges by the \emph{final} cell count instead of the mean over the
+run --- the tissue spends most of its frames small --- and read $0.00215$ against a demand for
+$0.00105$; the archive says $0.002206$, so the measurement was right to $2\%$ and the arithmetic
+behind the threshold was not. And \code{hot\_junction\_fraction} asked for at least $2\%$ of
+junctions above $1.5\times$ the mean while its own sibling asserted $p_{98}/\text{mean} \ge 1.20$:
+those are not two checks, they are a contradiction, since $p_{98} = 1.42$ means exactly $2\%$ lie
+above $1.42$ and so at most $2\%$ can lie above $1.5$. A row that cannot pass while its neighbour
+passes is not strict, it is wrong. It was replaced by one that is independent --- the correlation
+between a junction's myosin and its length, which separates a length-keyed belt from a tension-keyed
+one where the dispersion cannot, because both keyings raise the dispersion identically.
+
+\paragraph{And that replacement failed too, with the sign backwards.} I asserted $r < -0.10$,
+reasoning that a belt contracts short junctions. It measured $+0.639$. The operator's own comment
+settles it: \emph{``length-keyed, $+$: longer $\to$ more myosin $\to$ shorter. Negative feedback on
+length''} --- the target is $a\,(1 + \beta(\ell/\bar{\ell} - 1))$, linear and increasing in $\ell$,
+so the correlation must be positive, and it is below $+1$ only because the myosin relaxes toward that
+target over 20 frames. The same comment warns that ``getting this backwards silently converts the
+experiment into its own control, so it is written out rather than inferred'', which is precisely what
+a threshold reasoned from intuition rather than from the update rule did here. The row is
+\code{basis: analytic} now, because the sign follows from the rule and needs no previous run.
+
 \gatetable
 
 \section{Status}
@@ -371,8 +406,8 @@ B-core & the core runs the model with no okuda import, bit-identical & \dn\\
 C  & \code{junction\_ops.py} & \dn\\
 D  & \code{ecm\_ops.py}, \code{membrane\_ops.py}, \code{contact\_ops.py} & \dn\\
 0b & MPM regrouped into \code{mpm\_ops.py} & \ns\\
-gates 00, 02 & lifted into \code{config/gates/}, run from core, \textbf{24/24 green} & \dn\\
-gates 01, 04 & liftable; 8 and 6 rows blocked on per-half-edge myosin + a replay & \fl\\
+gates 00, 01, 02 & lifted into \code{config/gates/}, run from core, \textbf{37/37 green} & \dn\\
+gate 04 & liftable; 6 rows blocked on a 32\,MB uncommitted replay & \fl\\
 gate 03 & not liftable: needs a seeder, four operators and massed vertex dynamics & \ns\\
 0b/E & core regrouped into ten modules; VTK is the engine's renderer & \dn\\
 F  & the three minisite scenes under \code{config/atlas/} & \ns\\

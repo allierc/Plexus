@@ -234,12 +234,14 @@ _gate:
       fn: t1_rate_per_cell_per_frame
       arm: full
       reduce: last
-      assert: {within: [0.00105, 0.0004]}
+      assert: {within: [0.0022, 0.0004]}
       unit: "neighbour exchanges per cell per frame"
       why: >
-        The gate's headline observable, and the one myosin is supposed to move. 1,499 exchanges over
-        400 intervals with a mean of ~3,560 live cells. Banded rather than pinned because it is a
-        ratio of three run-dependent numbers; `t1_total` above is the exact pin.
+        The gate's headline observable, and the one myosin is supposed to move. From the archived
+        `metrics.json`: 0.002206. THE FIRST VERSION OF THIS ROW SAID 0.00105 AND FAILED, because the
+        threshold was derived by dividing 1,499 exchanges by the FINAL cell count (~3,560) instead of
+        by the mean over the run (~1,735) -- the tissue spends most of its frames small. The measured
+        0.002154 agrees with the archive to 2%; the arithmetic behind the threshold did not.
 
     - name: mean_junction_length_fold
       tier: measurement
@@ -282,19 +284,43 @@ _gate:
         The other half of the row above: the mean must stay pinned while the tail grows. If the mean
         drifts, the dispersion ratio is measuring the denominator.
 
-    - name: hot_junction_fraction
+    - name: myosin_accumulates_on_long_junctions
       tier: measurement
-      basis: reference
-      fn: hot_junction_fraction
+      basis: analytic
+      fn: myosin_length_correlation
       arm: full
-      args: {above: 1.5}
       reduce: last
-      assert: {ge: 0.02}
-      unit: "fraction of live junctions above 1.5x the tissue mean"
+      assert: {gt: 0.10}
+      unit: "Pearson r between a junction's myosin and its length"
       why: >
-        Localisation stated as a count rather than as a ratio, because a single extreme junction can
-        carry a p98. At least 2% of contacts must be hot for "the belt is localised" to describe the
-        tissue rather than an outlier.
+        THE ROW THAT SAYS WHICH BELT THIS IS, and its sign comes from the operator's own comment
+        rather than from an intuition about belts:
+
+            length-keyed, +   longer -> more myosin -> shorter.  Negative feedback ON LENGTH.
+            tension-keyed, +  tauter -> more myosin -> tauter.   POSITIVE feedback ON TENSION.
+
+        With `keyed_on: length` and `destabilising: true` the target is
+        `activity * (1 + beta*(length/<length> - 1))`, which is LINEAR AND INCREASING in length, so
+        the correlation must be positive; it is not +1 only because `myo` relaxes toward that target
+        over 20 frames. Measured 0.639. A tension-keyed belt would not produce it, because tension is
+        not monotone in length -- which is what makes this row discriminate where
+        `myosin_is_localised` cannot: both keyings raise the dispersion identically.
+
+        I HAD THE SIGN BACKWARDS ON THE FIRST PASS and asserted `lt: -0.10`, reasoning from "a belt
+        contracts short junctions" instead of from the code. The row failed at +0.639 and the model
+        was right. The operator's comment says the same thing about itself -- "getting this backwards
+        silently converts the experiment into its own control, so it is written out rather than
+        inferred" -- which is exactly what a threshold reasoned from intuition did here.
+
+        It is `basis: analytic` and not `reference`: the SIGN follows from the update rule, so this
+        row would hold on any tissue, and no previous run is needed to justify it.
+
+        IT REPLACED A ROW THAT CONTRADICTED ITS OWN SIBLING. `hot_junction_fraction` asked for at
+        least 2% of junctions above 1.5x the mean while `myosin_is_localised` asserts p98/mean >=
+        1.20. Those are not two independent checks: p98 = 1.42 means exactly 2% lie above 1.42, so at
+        most 2% can lie above 1.5 and the pair could never both hold. It measured 0.0079 against a
+        demand for 0.02. A row that cannot pass while its neighbour passes is not strict, it is
+        wrong.
 
     - name: belt_suppresses_intercalation
       tier: measurement

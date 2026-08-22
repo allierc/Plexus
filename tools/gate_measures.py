@@ -657,6 +657,36 @@ def hot_junction_fraction(T, name="myo", above=1.5, **kw):
     return out
 
 
+def myosin_length_correlation(T, name="myo", **kw):
+    """Pearson r between a junction's myosin and its LENGTH, over the live junctions.
+
+    THE ROW THAT DISTINGUISHES THE TWO BELTS, and it is independent of the dispersion row in a way
+    `hot_junction_fraction` was not. `junction_myosin` has two keyings: `length` accumulates myosin
+    on SHORT junctions, which homogenises lengths and suppresses intercalation; `tension` is the
+    destabilising one the germband-extension literature describes and produces T1s. Both raise the
+    dispersion identically -- so a "myosin is localised" row cannot tell them apart, and this can:
+    the length-keyed belt gives a NEGATIVE correlation, the tension-keyed one does not.
+
+    WHY IT REPLACED `hot_junction_fraction`. That row asked for at least 2% of junctions above 1.5x
+    the mean while its sibling asserted p98/mean >= 1.20. The two are not independent, they are in
+    CONTRADICTION: p98 = 1.42 means, by the definition of a 98th percentile, that exactly 2% of
+    junctions are above 1.42 -- so at most 2% can be above 1.5, and the pair could never both hold.
+    It measured 0.0079 against a demand for 0.02. A gate row that cannot pass while its neighbour
+    passes is not a strict row, it is a wrong one.
+    """
+    out = []
+    for t in range(T.n_rows()):
+        v = T.edge_col(name, t)
+        _a, _b, L, live = _edges(T, t)
+        if v is None or len(v) < len(live):
+            out.append(0.0); continue
+        w = np.asarray(v)[live]
+        if w.std() < 1e-12 or L.std() < 1e-12:
+            out.append(0.0); continue
+        out.append(float(np.corrcoef(w, L)[0, 1]))
+    return out
+
+
 def mean_junction_length(T, **kw):
     return [float(_edges(T, t)[2].mean()) for t in range(T.n_rows())]
 
@@ -789,6 +819,7 @@ MEASURES = {
     "myosin_mean": myosin_mean,
     "myosin_dispersion": myosin_dispersion,
     "hot_junction_fraction": hot_junction_fraction,
+    "myosin_length_correlation": myosin_length_correlation,
     "mean_junction_length": mean_junction_length,
     "mean_junction_length_fold": mean_junction_length_fold,
     "junction_persistence": junction_persistence,
