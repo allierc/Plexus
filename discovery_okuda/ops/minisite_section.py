@@ -68,6 +68,9 @@ ANCHOR_OLD = "<h3>Turing × vertex — patterning &amp; shaping a growing tissue
 ANCHOR_NEW = "<h3>Vertex + Turing — patterning &amp; shaping a growing tissue</h3>"
 # The section Vertex + MPM now follows: the interface reads better once MLS-MPM has been introduced.
 MPM_SECTION = "<h3>Continuum mechanics — MLS-MPM</h3>"
+# The Vertex + MPM block's end marker: the spheroid section is placed after it, because a spheroid
+# stretching a membrane into an MPM stroma is built on the two solvers those sections introduce.
+END_MPM = "<!-- END vertex-mpm -->"
 
 
 def _run_dir(name, need=()):
@@ -646,8 +649,8 @@ def main():
         ("tsd_max", "turing_death_v5", "cell death", "left"),
         ("sc_antiphase", "turing_antiphase_v5", "one field, in antiphase", "right"),
     ]
-    def _cap2(run):
-        s = json.load(open(os.path.join(LOG_OKUDA, run, "diag.json")))["summary"]
+    def _cap2(run, rd):
+        s = json.load(open(os.path.join(rd, "diag.json")))["summary"]
         # SHORT. Each caption is one measured number and one sentence about what the clip shows;
         # the mechanism is in the paragraph above the row and does not need repeating three times.
         extra = {
@@ -659,16 +662,27 @@ def main():
                             "only land between the spots. Top view, where the network is",
         }[run]
         return f"{extra}. {s['cells_final']:,} cells from 2,000 seeded"
-    runs2 = [(d, f"{v}.mp4", lbl,
-              os.path.join(LOG_OKUDA, d, "spec_run.yaml"), _cap2(d)) for d, v, lbl, _p in R2]
-    for d, v, _lbl, panel in R2:
-        src = os.path.join(LOG_OKUDA, d, "movie.mp4")
-        if not os.path.exists(src):
-            sys.exit(f"no movie.mp4 for {d} -- run it before writing the page")
-        vtk_sequence(os.path.join(LOG_OKUDA, d), os.path.join(GAL, v + ".mp4"))
-        print(f"[minisite] gallery/{v}.mp4 <- okuda/{d}  "
-              f"({os.path.getsize(os.path.join(GAL, v + '.mp4')) / 1e6:.1f} MB, {panel} panel, "
-              f"square, no label)")
+    # A RUN THAT IS GONE MUST NOT REBUILD THIS ROW. `tsd_max` was deleted from `log/okuda` and
+    # from every archive, and reading its `diag.json` took the whole generator down; rebuilding the
+    # row without it would have been worse, since the block is replaced wholesale and the card
+    # would have vanished from a page that still plays its clip perfectly well. So: if any run of
+    # the row is unresolvable, the row is left exactly as the page has it, and the reason is said.
+    dirs2 = {d: _run_dir(d, need=("diag.json",)) for d, _v, _l, _p in R2}
+    missing2 = [d for d, rd in dirs2.items() if not os.path.exists(os.path.join(rd, "diag.json"))]
+    runs2 = []
+    if missing2:
+        print(f"[minisite] second-field row NOT rebuilt: no run left for {', '.join(missing2)} "
+              f"(the page keeps the cards it already has)")
+    else:
+        runs2 = [(d, f"{v}.mp4", lbl, os.path.join(dirs2[d], "spec_run.yaml"), _cap2(d, dirs2[d]))
+                 for d, v, lbl, _p in R2]
+        for d, v, _lbl, panel in R2:
+            if not os.path.exists(os.path.join(dirs2[d], "movie.mp4")):
+                sys.exit(f"no movie.mp4 for {d} -- run it before writing the page")
+            vtk_sequence(dirs2[d], os.path.join(GAL, v + ".mp4"))
+            print(f"[minisite] gallery/{v}.mp4 <- okuda/{d}  "
+                  f"({os.path.getsize(os.path.join(GAL, v + '.mp4')) / 1e6:.1f} MB, {panel} panel, "
+                  f"square, no label)")
 
     # ---- Vertex + Turing, third row: two chemistries and one ablation ----
     VTK = ("vtk_evolve_mesh.mp4",)          # what a vtk card needs, and how its run is resolved
@@ -861,7 +875,8 @@ def main():
             print("[minisite] no docs/index.html -- source updated only; run `quarto render`")
             continue
         _patch(tgt, build(runs), rendered=rendered)
-        _patch2(tgt, build2(runs2), rendered=rendered)
+        if runs2:                       # empty when a run of that row is gone -- leave the page's
+            _patch2(tgt, build2(runs2), rendered=rendered)
         _patch4(tgt, build4(runs4), rendered=rendered)
         _patch5(tgt, build5(runs5r), rendered=rendered)
         _patch3(tgt, build3(runs5, runs5b), rendered=rendered)
@@ -1120,13 +1135,14 @@ def _patch3(path, block, rendered=False):
         s = s[:i] + block + s[j:]
         what = "replaced"
     else:
-        # ANCHORED ON THE MLS-MPM HEADING, not on the Vertex + MPM block: that block has moved
-        # after MLS-MPM, and chaining to it would drag this section along behind it.
-        anchor = MPM_SECTION if not rendered else MPM_SECTION.replace("<h3>", '<h3 class="anchored">')
-        if anchor not in s:
-            sys.exit(f"the MLS-MPM heading was not found in {path}")
-        k = s.index(anchor)
-        s = s[:k] + block + "\n\n" + s[k:]
+        # AFTER the Vertex + MPM block's END marker: this section is built ON those two solvers
+        # (the vertex tissue and the MPM matrix), so it is read once both have been shown. Anchored
+        # on the marker rather than on a heading, so re-running cannot reorder the page.
+        tail = END_MPM
+        if tail not in s:
+            sys.exit(f"the Vertex + MPM block end marker was not found in {path}")
+        k = s.index(tail) + len(tail)
+        s = s[:k] + "\n\n" + block + s[k:]
         what = "inserted"
     open(path, "w").write(s)
     print(f"[minisite] {os.path.relpath(path, ROOT)}: spheroid/BM/matrix section {what}")
