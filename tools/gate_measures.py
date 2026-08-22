@@ -814,6 +814,58 @@ def strand_length_um(T, per_strand=60, **kw):
     return strand_length(T, per_strand=per_strand)
 
 
+def min_radius_from_centre(T, centre=(0.5, 0.5, 0.5), **kw):
+    """The closest any material point comes to the domain centre, per frame.
+
+    THE NON-PENETRATION STATEMENT, in the one form a prescribed surface allows. `mesh_contact`
+    replays a tissue whose radius is known per frame, so "no matrix inside the epithelium" is
+    exactly "min |p - centre| >= the tissue's radius". It needs no stress, no contact counter and no
+    module global -- only the positions the trajectory already holds.
+    """
+    c = np.asarray(centre, float)
+    return [float(np.linalg.norm(T.pos(t) - c, axis=1).min()) for t in range(T.n_rows())]
+
+
+def median_displacement(T, **kw):
+    """Median |p(t) - p(0)| over the material points that are present at both ends.
+
+    A MEDIAN, not a mean: a handful of points flicked out of a contact zone move by a box width and
+    would carry a mean on their own. The failure this guards against is a matrix that is being
+    FLICKED rather than pushed -- measured once at k = 4000, where the median displacement collapsed
+    from 0.085 to 0.0005 while the peak grew, because a huge acceleration on the contact layer
+    accelerates that layer out of the zone before it can transmit anything to the material behind.
+    """
+    p0 = T.pos(0)
+    out = []
+    for t in range(T.n_rows()):
+        p = T.pos(t)
+        n = min(len(p), len(p0))
+        out.append(float(np.median(np.linalg.norm(p[:n] - p0[:n], axis=1))))
+    return out
+
+
+def final_stress_p99_Pa(T, band_scale=2.0, bands=8, pct=99, **kw):
+    """p99 of the final frame's von Mises stress, from the recorded colour band.
+
+    THE BAND IS WHAT REACHES DISK, and it is a lossy readout: `ecm_stress` writes
+    `round(clip(vm / band_scale, 0, 1) * (bands - 1))` into `node_type`, so the stress is recovered
+    as `band * band_scale / (bands - 1)` and is quantised to `band_scale / (bands - 1)` = 0.286
+    stress units. That is coarse and it is stated rather than hidden: this row can distinguish 100 Pa
+    from 1000 Pa, which is what its literature interval asks, and it cannot resolve 10%.
+
+    IT IS THE FINAL FRAME ONLY, because `node_type` is a per-node buffer written once into the npz
+    rather than a per-frame array -- the run's last state. A stress TRACE would need `ecm_stress` to
+    publish into a recorded state block instead of into a colour channel and a module global.
+    """
+    z, sname = getattr(T, "z", None), getattr(T, "s", None)
+    k = f"{sname}__node_type"
+    if z is None or k not in z.files:
+        raise KeyError("no node_type in this trajectory -- ecm_stress did not run, or the writer "
+                       "did not record it")
+    band = np.asarray(z[k], float)
+    return [float(np.percentile(band, pct) * band_scale / max(bands - 1, 1))]
+
+
 MEASURES = {
     "myosin_aligned": myosin_aligned,
     "myosin_mean": myosin_mean,
@@ -833,6 +885,9 @@ MEASURES = {
     "min_centroid_height": min_centroid_height,
     "strand_length": strand_length,
     "strand_length_um": strand_length_um,
+    "min_radius_from_centre": min_radius_from_centre,
+    "median_displacement": median_displacement,
+    "final_stress_p99_Pa": final_stress_p99_Pa,
     "cell_count": cell_count,
     "cell_count_delta": cell_count_delta,
     "vertex_count": vertex_count,
@@ -862,6 +917,7 @@ MEASURES = {
 # from quoting a micrometre. A name absent from here is dimensionless by declaration.
 PHYSICAL = {
     "strand_length_um": ("length", "um"),
+    "final_stress_p99_Pa": ("stress", "Pa"),
     "doubling_time_hours": ("time", "hours"),
     "mean_cell_diameter_um": ("length", "um"),
     "spheroid_diameter_um": ("length", "um"),
