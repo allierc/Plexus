@@ -1,55 +1,11 @@
-"""aggregate -- children -> parent. Reduce a contained set onto its parent.
+"""aggregate -- MOVED to `plexus.operators.agent_ops`.
 
-The `centroid` reduction: a parent's position is the occupancy-weighted mean of its
-children's positions (a cell's position = the centroid of its particles). This is a
-DERIVED readout, not an integrated force, so it writes the parent's position directly
-and declares MAY_MUTATE_INTEGRATED_STATE to opt out of the integration guard; returns {}.
+Kept as a re-export because thirty files import it by bare module name -- `run_one.py`,
+`instrument.py`, `vtk_render.py`, `metrics.py` and twenty archive/analysis scripts -- and the
+campaign is still running against them. PRIVATE NAMES ARE RE-EXPORTED TOO: `_carry_face_state`,
+`_engine_owns_clock` and friends are called across module boundaries in okuda, so a shim that
+exported only the public surface would break at the first T1.
+
+New code should import from `plexus.operators.agent_ops`.
 """
-from __future__ import annotations
-
-import torch
-
-from plexus.models.base import Aggregate
-from plexus.models.registry import register_operator
-
-
-@register_operator("aggregate", family="hierarchy", set="cell", kind="aggregate")
-class Centroid(Aggregate):
-    EMIT = None                                    # readout: writes parent `pos` in place (MAY_MUTATE_INTEGRATED_STATE); returns {} — no integrable delta
-    # typed signature (Plexus2 sec. 2.1): children -> parent along the `parent` map.
-    INPUTS = ["particle"]                          # the contained (child) set
-    OUTPUTS = ["cell"]                             # the parent set it writes
-    READS = ["pos"]
-    WRITES = ["pos"]                               # parent centroid position (a derived readout)
-    MAPS = ["parent"]                              # reduce along the parent (containment) map
-    SUPPORTED_DIMS = [2, 3]                         # occupancy-weighted centroid is dimension-generic
-    REQUIRES_PARAMS = []                            # no required params — `child` defaults to the first contained set
-    MECHANISM_TAGS = ["centroid", "reduction", "hierarchical_readout"]
-    PARAM_ROLES = {"child": "source_child_set"}
-    REFERENCE = "Battaglia, P. W. et al. (2018). Relational inductive biases, deep learning, and graph networks. arXiv:1806.01261."
-    MAY_MUTATE_INTEGRATED_STATE = True             # writes the parent's derived position (a readout)
-
-    def __init__(self, params, device="cpu"):
-        super().__init__(params, device)
-        self.at = params.get("_at", "cell")
-        self.child = params.get("child")           # optional: which contained set (default: first child)
-
-    def forward(self, H, mask=None):
-        parent = H.level(self.at)
-        kids = H.children(self.at)
-        if not kids:
-            return {}
-        child = H.level(self.child) if self.child else H.level(kids[0])
-        pidx = child.parent                        # [Nc] parent slot per child
-        if pidx.numel() == 0:
-            return {}
-        dev = parent.state.device
-        px0, px1 = parent.state_schema["pos"]; D = H.dim   # spatial dim (the global contract; == px1 - px0)
-        cpos = child.get("pos"); cocc = child.occ
-        s = torch.zeros(parent.n, D, device=dev).index_add_(0, pidx, cpos * cocc[:, None])
-        w = torch.zeros(parent.n, device=dev).index_add_(0, pidx, cocc)
-        centroid = s / w.clamp(min=1.0)[:, None]
-        new = parent.state.clone()                 # only live parents take the readout
-        new[:, px0:px1] = torch.where(parent.occ[:, None] > 0, centroid, parent.state[:, px0:px1])
-        parent.state = new
-        return {}
+from plexus.operators.agent_ops import *          # noqa: F401,F403

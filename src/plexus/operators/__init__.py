@@ -1,82 +1,62 @@
-"""Operator library. Importing this package self-registers every operator into
-the registry (each module calls `@register_operator`). The engine imports this so
-a spec's operator names resolve; `registry.catalog_summary()` then lists them.
+"""The operator library. Importing this package self-registers every operator.
 
-Start small: the analytic attraction_repulsion law only. Port more (mpm,
-secrete/sense, the grow/divide line) into new one-concern modules here as we
-scale up.
+TEN MODULES, GROUPED BY MECHANISM, where there were fifty-five files holding one operator each.
+That directory was unreadable in a specific way rather than merely long: to find out what acts on an
+MPM particle you opened eight files, and the eight could not be compared because they were never on
+the screen together. The two implementations of `cell_mechanics` -- the 3D AVM and the monolayer --
+are the case that settles it: they are one contract with two bodies, and reading them one after the
+other is how anyone can tell which one a spec is getting.
+
+    vertex_ops           the 3D vertex model: seed, geometry, mechanics, grow, divide, die, T1
+    diffusion_reaction   chemistry on the cell GRAPH, and the two shape<->chemistry couplings
+    junction_ops         myosin, on junctions and across the apex, plus the cytokinetic ring
+    ecm_ops              the matrix as MPM material, and the stiff blocks that confine it
+    membrane_ops         the basement membrane, its crosslink network, and the integrin links
+    contact_ops          where a triangulated surface meets a continuum, both directions
+    mpm_ops              MLS-MPM: the grid, the four-step cycle, and the forces on it
+    motion_ops           how a body moves with nothing acting on it: drag, glide, walls, gravity
+    interaction_ops      pairwise laws, and the relation they act over
+    field_ops            a continuum bound to a set: deposit / diffuse / decay / sense
+    agent_ops            agents in a material: the two-way coupling, population, scale maps
+
+EVERY OLD MODULE NAME STILL IMPORTS. `plexus.operators.drag`, `plexus.operators.mpm_grid` and the
+rest are re-export shims, because five prototypes reach for them by name -- `prototype/eye`,
+`prototype/cardio_cells` (three files) and `prototype/inverse_slime`. They are not imported here:
+each is covered by the module it points at, and importing both would register nothing twice but
+would put the old names back in the reader's way.
+
+WHAT IS NOT IN THE CORE. `mpm_boundary` and `bm_strain` are registered in `discovery_okuda` only.
+`AUDIT.md` rejects both -- the first overwrites grid-node velocity, so the constraint is kinematic
+and its standoff is set by the B-spline stencil width; the second is "not a mechanism" -- and a
+rejection that lives only in a markdown file is one the next reader re-promotes by accident.
 """
 from __future__ import annotations
 
-from . import graph                 # noqa: F401  registers radius_graph (rewire)
-from . import aggregate             # noqa: F401  children -> parent reduction (centroid)
-from . import broadcast             # noqa: F401  parent -> children lift (containment)
-from . import attraction_repulsion  # noqa: F401  registers attraction_repulsion (lateral, 1st-derivative)
-from . import squared_law                # noqa: F401  registers squared_law (lateral, 2nd-derivative: Coulomb electrostatics OR Newtonian gravity)
-from . import stillinger_weber       # noqa: F401  SW two+three-body tetrahedral potential (mW water/Si/Ge; 1st many-body force)
-from . import attractor_flow         # noqa: F401  registers attractor_flow (lateral, 1st-derivative: strange-attractor ODE flow dx/dt = f(x))
-from . import cohesion              # noqa: F401  boids steering rule (lateral, 2nd-derivative)
-from . import velocity_align       # noqa: F401  Vicsek velocity alignment (nominal); boids = special case (was alignment)
-from . import separation            # noqa: F401  boids steering rule (lateral, 2nd-derivative)
-from . import velocity_cruise      # noqa: F401  Vicsek self-propulsion to speed v0 (2nd-order; was cruise)
-from . import drag                  # noqa: F401  registers drag (lateral, 2nd-derivative)
-# field-coupled primitives (the slime/Physarum decomposition: 1 set + 1 scalar field)
-from . import scalar_field          # noqa: F401  registers the `grid` scalar field
-from . import deposit               # noqa: F401  set -> field
-from . import diffuse               # noqa: F401  field -> field
-from . import decay                 # noqa: F401  field -> field
-from . import sense                 # noqa: F401  field -> set, sensor-fan steering (2D/3D, vector heading)
-from . import glide                # noqa: F401  slime self-propulsion: glide along the heading (1st-order, overdamped)
-from . import bounce                # noqa: F401  set -> wall/obstacle reflection (2D/3D specular re-head)
-from . import prescribed_field      # noqa: F401  registers the `prescribed` field + playback
-from . import chemotax              # noqa: F401  field -> set gradient coupling; emit: velocity|mpm_acceleration (merges chemotaxis+chemo_force)
-from . import gravity               # noqa: F401  cell-level body force (feeds the MPM substep)
-from . import sediment              # noqa: F401  agent-level per-type directional drift (differential sedimentation)
-# active-stimulus decomposition (clock -> activation field -> contraction -> MPM):
-from . import pacemaker             # noqa: F401  periodic scalar clock p(t) -> H.signals (field)
-from . import activation_pulse      # noqa: F401  clocked activation field: shared-clock profile OR per-pixel delayed wave (merges pulse_stimulus+phase_delay_pulse)
-from . import active_force          # noqa: F401  activation gradient -> per-particle force (exchange; alias pulse_to_contraction)
-from . import active_stress         # noqa: F401  activation -> per-particle active stress -A nn^T (exchange; alias pulse_to_active_stress)
-from . import mpm_spin              # noqa: F401  drive MPM body toward slow solid-body rotation (lateral)
-from . import mpm_anchor            # noqa: F401  substrate/boundary rest-anchor k*(rest-pos) (lateral)
-from . import material_map          # noqa: F401  image field + apply_material_map (per-particle stiffness)
-from . import signal               # noqa: F401  passive connectome signalling (lateral, 1st-order voltage ODE)
-from . import mpm                   # noqa: F401  FENCED TRANSITIONAL oracle: MLS-MPM mechanics (mls_mpm_mechanics)
-# Phase-3 decomposition of the oracle -- one file per operator + the shared grid field:
-from . import mpm_grid              # noqa: F401  the mpm_grid background FIELD + B-spline kernel
-from . import mpm_strain            # noqa: F401  particle -> particle  (F + material update)
-from . import mpm_scatter        # noqa: F401  particle -> mpm_grid   (scatter; was p2g)
-from . import mpm_grid_update       # noqa: F401  mpm_grid -> mpm_grid    (grid solve + BCs)
-from . import mpm_gather         # noqa: F401  mpm_grid -> particle    (gather + advect; was g2p)
-# active-matter <-> MPM two-way coupling (agents dragged/confined by + deforming the material):
-from . import agent_scatter      # noqa: F401  agent set -> mpm_grid   (agents deform material; was agent_to_mpm)
-from . import agent_gather       # noqa: F401  mpm_grid  -> agent set  (material drags + confines agents; was mpm_to_agent)
-from . import agent_remodel         # noqa: F401  agent set -> mpm stiffness (cells soften/rigidify tissue)
-from . import polarity_flow_align  # noqa: F401  mpm_grid -> agent heading (polarity-flow alignment; was flow_align)
-from . import polarity_align       # noqa: F401  agent -> agent heading (1st-order Vicsek polar alignment; was heading_align)
-from . import agent_divide           # noqa: F401  agent set structural: proliferation on a fixed buffer (occ)
-from . import agent_grow             # noqa: F401  mpm_particle structural: tissue growth by material-point addition
-from . import segmentation_seed     # noqa: F401  a measured instance segmentation -> the CELL level
+# --- the mechanism modules -------------------------------------------------------------------
+from . import interaction_ops       # noqa: F401  radius_graph, attraction_repulsion, squared_law,
+#                                                 cohesion, separation, velocity_align, stillinger_weber
+from . import motion_ops            # noqa: F401  drag, glide, velocity_cruise, sediment,
+#                                                 attractor_flow, gravity, bounce
+from . import field_ops             # noqa: F401  the grid field, deposit, diffuse, decay, sense,
+#                                                 chemotax, playback, pacemaker, activation_pulse, signal
+from . import mpm_ops               # noqa: F401  mpm_grid + p2g/grid_update/g2p/strain, anchor,
+#                                                 spin, apply_material_map, and the fenced oracle
+from . import agent_ops             # noqa: F401  agent_scatter/gather/remodel, agent_divide/grow,
+#                                                 polarity, active force+stress, aggregate/broadcast,
+#                                                 seed_from_segmentation
+from . import vertex_ops            # noqa: F401  seed_mesh, cell_mechanics, cell_divide, cell_die,
+#                                                 edge_flip, topo_record
+from . import diffusion_reaction    # noqa: F401  seed_cell_chem, cell_chem_diffuse/react,
+#                                                 cell_geometry, cell_grow, cell_chem_from_shape,
+#                                                 cell_shape_probe, interface_tension/push
+from . import junction_ops          # noqa: F401  junction_myosin (default|two_pool), junction_sync,
+#                                                 medioapical_myosin, cytokinetic_ring
+from . import ecm_ops               # noqa: F401  ecm_seed/stress/from_cell, cell_exclude,
+#                                                 block_seed/stress
+from . import membrane_ops          # noqa: F401  bm_*, adhesion_*, integrin_*
+from . import contact_ops           # noqa: F401  mesh_contact, mesh_inside, surface_track,
+#                                                 plate_confine, bm_sense, ecm_load, ecm_gate_growth
 
-# THE 3D VERTEX MODEL AND ITS CHEMISTRY, promoted from `discovery_okuda/ops/`. Two modules rather
-# than the nine files they arrived in, because the two implementations of `cell_mechanics` -- and of
-# `cell_divide`, `cell_grow`, `cell_chem_react` -- can only be compared when they are on one screen.
-# `discovery_okuda/ops/{mesh_ops,t1_ops,monolayer_ops,chem_ops,shape_chem_ops,shape_probe_ops}.py`
-# are re-export shims: thirty files still import them by bare module name.
-from . import vertex_ops            # noqa: F401  seed_mesh, cell_mechanics, cell_divide, cell_die, edge_flip, topo_record
-from . import diffusion_reaction    # noqa: F401  seed_cell_chem, cell_chem_diffuse/react, cell_geometry, cell_grow, ...
-from . import junction_ops          # noqa: F401  junction_myosin (default|two_pool), junction_sync, medioapical_myosin, cytokinetic_ring
-from . import ecm_ops               # noqa: F401  ecm_seed/stress/from_cell, cell_exclude, block_seed/stress
-from . import membrane_ops          # noqa: F401  bm_*, adhesion_*, integrin_* (minus what AUDIT rejects)
-from . import contact_ops           # noqa: F401  mesh_contact, mesh_inside, surface_track, plate_confine, bm_sense, ecm_load
-
-__all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion", "squared_law", "attractor_flow",
-           "cohesion", "velocity_align", "separation", "velocity_cruise", "drag",
-           "scalar_field", "deposit", "diffuse", "decay", "sense", "glide", "bounce",
-           "prescribed_field", "chemotax", "gravity", "sediment",
-           "pacemaker", "activation_pulse", "active_force", "active_stress",
-           "mpm_spin", "mpm_anchor", "material_map", "mpm",
-           "mpm_grid", "mpm_strain", "mpm_scatter", "mpm_grid_update", "mpm_gather",
-           "agent_scatter", "agent_gather", "agent_remodel", "polarity_flow_align", "polarity_align",
+__all__ = ["interaction_ops", "motion_ops", "field_ops", "mpm_ops", "agent_ops",
            "vertex_ops", "diffusion_reaction", "junction_ops", "ecm_ops", "membrane_ops",
            "contact_ops"]

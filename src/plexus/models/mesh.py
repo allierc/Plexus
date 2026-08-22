@@ -134,6 +134,22 @@ class MeshTable(dict):
     # `topo_record`'s `cp()` has always had.
     FACE_RECORD = ("A0", "P0", "V0f", "age", "ndiv", "apop", "inhib", "myo_med")
 
+    # THE OPERATORS' OWN COUNTERS, which are scalars on the table and not per-face arrays -- so
+    # `FACE_RECORD` cannot carry them, and without them a gate has to INFER what an operator already
+    # knows.
+    #
+    # THAT INFERENCE IS WHERE GATE 00 WENT WRONG. `t1_total` was reconstructed from the topology as
+    # "edges newly formed between two pre-existing vertices" and returned 2,890 against `edge_flip`'s
+    # own 1,499: about two new such edges per accepted reconnection, because a 3D RNR rewires more
+    # than the one edge it is named for. Both numbers are correct about different quantities, which
+    # is the worst kind of disagreement -- neither side is wrong and the row is meaningless.
+    #
+    #   n_t1         accepted reconnections, cumulative      (edge_flip)
+    #   n_apop       extrusions, cumulative                  (cell_die)
+    #   div_blocked  divisions refused for want of buffer    (cell_divide)
+    #   apop_spill   material a death could not bequeath     (cell_die) -- must stay ~0
+    SCALAR_RECORD = ("n_t1", "n_apop", "div_blocked", "apop_spill")
+
     def snapshot(self, face_record=None):
         """One recorded frame: the three half-edge arrays, the two counts, and the per-face state.
 
@@ -157,6 +173,10 @@ class MeshTable(dict):
             a = _np(v).ravel()
             if a.shape[0] >= nF:                    # a stale short array is dropped, not padded
                 out[nm] = a[:nF].astype(np.float32)
+        for nm in self.SCALAR_RECORD:
+            v = self.get(nm)
+            if v is not None and np.ndim(v) == 0:
+                out["scalar_" + nm] = float(v)
         return out
 
 

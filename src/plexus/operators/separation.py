@@ -1,44 +1,11 @@
-"""separation -- a boids steering rule (Lateral, second-derivative).
+"""separation -- MOVED to `plexus.operators.interaction_ops`.
 
-Avoid crowding at short range: `-a3 * w^s_i * mean_j (pos_j - pos_i)/|d_ij|^2`, with
-the per-receiver weight `w^s` the type's named `separation` property. The 1/|d|^2
-relies on the radius graph's `min_radius` so coincident neighbours don't blow up. One
-of the three rules whose deltas the engine sums to make a flock; see also cohesion,
-alignment.
+Kept as a re-export because thirty files import it by bare module name -- `run_one.py`,
+`instrument.py`, `vtk_render.py`, `metrics.py` and twenty archive/analysis scripts -- and the
+campaign is still running against them. PRIVATE NAMES ARE RE-EXPORTED TOO: `_carry_face_state`,
+`_engine_owns_clock` and friends are called across module boundaries in okuda, so a shim that
+exported only the public surface would break at the first T1.
+
+New code should import from `plexus.operators.interaction_ops`.
 """
-from __future__ import annotations
-
-from plexus.models.base import Lateral
-from plexus.models.registry import register_operator
-from plexus.geometry import neighbour_mean
-
-
-@register_operator("separation", family="interaction", set="particle", kind="lateral")
-class Separation(Lateral):
-    EMIT = "acceleration"
-    SUPPORTED_DIMS = [2, 3]                          # neighbour_mean is N-D; the rule is dimension-generic
-    REQUIRES_PARAMS = []                             # no required params — `scale` optional (separation is a type prop)
-    REQUIRES_TYPE_PROPS = ["separation"]
-    MECHANISM_TAGS = ["short_range_repulsion", "collision_avoidance"]
-    PARAM_ROLES = {"scale": "separation_strength"}
-    REFERENCE = "Reynolds, C. W. (1987). Flocks, herds and schools. SIGGRAPH Comput. Graph. 21(4):25-34."
-
-    def __init__(self, params, device="cpu"):
-        super().__init__(params, device)
-        self.a = float(params.get("scale", 1e-8))       # PDE_B separation scale a3
-        self.at = params.get("_at", "particle")
-
-    def forward(self, H, mask=None):
-        lvl = H.level(self.at)
-        w = lvl.separation
-
-        def msg(i, j, d):
-            d2 = (d * d).sum(-1, keepdim=True)          # |d|^2 (> 0 via the graph's min_radius)
-            return -w[i, None] * self.a * d / d2
-
-        acc = neighbour_mean(lvl.get("pos"), lvl.occ, lvl.edge_index,
-                             getattr(H, "periodic", False),
-                             getattr(H, "world_size", getattr(H, "world_width", 1.0)), msg)
-        if mask is not None:
-            acc = acc * mask[:, None].float()
-        return {self.at: acc}
+from plexus.operators.interaction_ops import *          # noqa: F401,F403

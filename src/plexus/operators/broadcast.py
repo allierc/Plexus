@@ -1,47 +1,11 @@
-"""broadcast -- parent -> children. Lift a parent quantity onto its children.
+"""broadcast -- MOVED to `plexus.operators.agent_ops`.
 
-The `containment` lift: each child gets a velocity delta `stiffness * (parent_pos -
-child_pos)` -- pulled toward its parent's (e.g. aggregated centroid) position, so a
-cell holds its particles together. Unlike `aggregate` (a derived readout that writes
-the parent), this RETURNS a delta on the children that the engine integrates.
+Kept as a re-export because thirty files import it by bare module name -- `run_one.py`,
+`instrument.py`, `vtk_render.py`, `metrics.py` and twenty archive/analysis scripts -- and the
+campaign is still running against them. PRIVATE NAMES ARE RE-EXPORTED TOO: `_carry_face_state`,
+`_engine_owns_clock` and friends are called across module boundaries in okuda, so a shim that
+exported only the public surface would break at the first T1.
+
+New code should import from `plexus.operators.agent_ops`.
 """
-from __future__ import annotations
-
-import torch
-
-from plexus.models.base import Broadcast
-from plexus.models.registry import register_operator
-
-
-@register_operator("broadcast", family="hierarchy", set="particle", kind="broadcast")
-class BroadcastLift(Broadcast):
-    EMIT = "velocity"            # emits a velocity; the engine integrates
-    # typed signature (Plexus2 sec. 2.1): parent -> children along the `parent` map.
-    INPUTS = ["cell"]                           # the parent set
-    OUTPUTS = ["particle"]                       # the child set it lifts onto
-    READS = ["pos"]
-    WRITES = ["pos"]                             # velocity delta pulling each child toward its parent
-    MAPS = ["parent"]                            # lift along the parent (containment) map
-    SUPPORTED_DIMS = [2, 3]                     # dimension-generic: the lift is `stiffness*(parent_pos - child_pos)` in N-D
-    REQUIRES_PARAMS = ["stiffness"]
-    MECHANISM_TAGS = ["containment", "hierarchical_coupling", "spring"]
-    PARAM_ROLES = {"stiffness": "containment_strength"}
-    REFERENCE = "Battaglia, P. W. et al. (2018). arXiv:1806.01261 (graph-network broadcast)."
-
-    def __init__(self, params, device="cpu"):
-        super().__init__(params, device)
-        self.k = float(params.get("stiffness", 1.0))
-        self.at = params.get("_at", "particle")
-
-    def forward(self, H, mask=None):
-        child = H.level(self.at)
-        dev = child.state.device
-        pname = getattr(child, "parent_name", None)
-        if pname is None:
-            return {self.at: torch.zeros_like(child.get("pos"))}   # no parent -> zero delta (matches pos dim, 2D/3D)
-        parent = H.level(pname)
-        ppos = parent.get("pos")[child.parent]     # each child's parent position
-        vel = self.k * (ppos - child.get("pos")) * child.occ[:, None]
-        if mask is not None:
-            vel = vel * mask[:, None].float()
-        return {self.at: vel}
+from plexus.operators.agent_ops import *          # noqa: F401,F403

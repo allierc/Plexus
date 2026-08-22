@@ -1,53 +1,11 @@
-"""gravity -- a uniform body force at the cell level.
+"""gravity -- MOVED to `plexus.operators.motion_ops`.
 
-Applies the same acceleration to every selected cell and RETURNS it as a delta
-`{cell: a}`. In an MPM scene the cell is a derived aggregate (its position is the
-centroid of its particles), so the engine does not integrate it; instead the
-`mls_mpm_mechanics` operator reads the cell's accumulated delta and feeds it into
-the substep as the external body force `a_ext`. So gravity is an ordinary operator
--- it does not touch `pos`/`vel`, it just contributes a force.
+Kept as a re-export because thirty files import it by bare module name -- `run_one.py`,
+`instrument.py`, `vtk_render.py`, `metrics.py` and twenty archive/analysis scripts -- and the
+campaign is still running against them. PRIVATE NAMES ARE RE-EXPORTED TOO: `_carry_face_state`,
+`_engine_owns_clock` and friends are called across module boundaries in okuda, so a shim that
+exported only the public surface would break at the first T1.
 
-The *bounce* of a dropped soft body is NOT a force here: it is the emergent elastic
-response when the body compresses against the reflective floor (grid velocity into a
-wall is clamped to zero, the fixed-corotated stress springs it back). Stiffer
-`youngs` -> livelier bounce; `drag` on the mpm operator sets how fast it decays.
-
-Default direction is -y (down). Override `gx`/`gy` for an incline or sideways pull
-(e.g. a tilted-gravity slosh).
+New code should import from `plexus.operators.motion_ops`.
 """
-from __future__ import annotations
-
-import torch
-
-from plexus.models.base import Lateral
-from plexus.models.registry import register_operator
-
-
-@register_operator("gravity", family="mechanics", set="cell", kind="lateral")
-class GravityOperator(Lateral):
-    EMIT = "mpm_acceleration"                  # a body accel the MPM substep consumes as a_ext;
-    # NOT engine-integrated on the cell (the cell is a centroid readout), so `cell` never
-    # enters H.emit_order and the engine never advects it under gravity.
-    SUPPORTED_DIMS = [2, 3]                           # uniform body force is dimension-generic
-    REQUIRES_PARAMS = []                              # no required params — direction/magnitude optional (default -y down)
-    PARAM_ROLES = {"g": "gravity_magnitude", "gx": "gravity_x", "gy": "gravity_y"}
-    REFERENCE = "Newton, I. (1687). Philosophiae Naturalis Principia Mathematica."
-    MECHANISM_TAGS = ["body_force", "uniform_acceleration"]
-
-    def __init__(self, params, device="cpu"):
-        super().__init__(params, device)
-        self.at = params.get("_at", "cell")              # the set this acts on (engine-injected)
-        self.g = float(params.get("g", 10.0))            # magnitude (world units / time^2)
-        self.gx = float(params.get("gx", 0.0))           # x-component (default 0)
-        self.gy = float(params.get("gy", -self.g))       # y-component (default -g: down)
-
-    def forward(self, H, mask=None):
-        cell = H.level(self.at)
-        dev = cell.state.device
-        D = int(getattr(H, "dim", 2))                    # gravity is a D-vector; -y (axis 1) is "down"
-        accel = torch.zeros(cell.n, D, device=dev)
-        accel[:, 0] = self.gx
-        accel[:, 1] = self.gy
-        if mask is not None:
-            accel = accel * mask.float()[:, None]
-        return {cell.name: accel}
+from plexus.operators.motion_ops import *          # noqa: F401,F403

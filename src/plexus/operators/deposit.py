@@ -1,63 +1,11 @@
-"""deposit -- set -> field. Each agent adds to the field at its own pixel.
+"""deposit -- MOVED to `plexus.operators.field_ops`.
 
-The stigmergy write: agent i adds `amount*dt` to channel `node_type[i]` (its own
-species) at the pixel under its position, clamped to 1 (the shader's `min(1,...)`).
-This is the only place the agents imprint the trail they then sense.
+Kept as a re-export because thirty files import it by bare module name -- `run_one.py`,
+`instrument.py`, `vtk_render.py`, `metrics.py` and twenty archive/analysis scripts -- and the
+campaign is still running against them. PRIVATE NAMES ARE RE-EXPORTED TOO: `_carry_face_state`,
+`_engine_owns_clock` and friends are called across module boundaries in okuda, so a shim that
+exported only the public surface would break at the first T1.
+
+New code should import from `plexus.operators.field_ops`.
 """
-from __future__ import annotations
-
-import torch
-
-from plexus.models.base import Exchange
-from plexus.models.registry import register_operator
-
-
-@register_operator("deposit", family="fields", set="cell", kind="exchange")
-class Deposit(Exchange):
-    """object -> field. Writes `to:` field in place; returns {}."""
-
-    EMIT = None                                # set->field: scatters onto the grid in place (stigmergy write); returns {} — no integrable delta
-    # typed signature (Plexus2 sec. 2.1): set -> field (Exchange). The true output is
-    # the `to:` field grid, not set state, so WRITES (set-state blocks) is empty and the
-    # field coupling is the "field" map.
-    INPUTS = ["cell"]
-    OUTPUTS = []                               # writes the `to:` field, no set-state output
-    READS = ["pos"]
-    WRITES = []                                # no set-state block written (the grid is mutated in place)
-    MAPS = ["field"]                           # Exchange: a scatter map onto the `to:` field
-    SUPPORTED_DIMS = [2, 3]                     # N-D scatter onto the grid field
-    REQUIRES_PARAMS = ["to"]
-    MECHANISM_TAGS = ["deposition", "stigmergy", "field_write"]
-    PARAM_ROLES = {"amount": "deposit_rate"}
-    REFERENCE = "Grasse, P.-P. (1959). La reconstruction du nid et les coordinations interindividuelles (stigmergy). Insectes Sociaux 6:41-80."
-
-    def __init__(self, params, device="cpu"):
-        super().__init__(params, device)
-        self.field_name = params.get("to")
-        self.amount = float(params.get("amount", 0.9))
-        self.at = params.get("_at", "cell")
-
-    def forward(self, H, mask=None):
-        lvl = H.level(self.at)
-        dev = lvl.state.device
-        N = lvl.n
-        fld = H.fields[self.field_name]
-        pos = lvl.get("pos")                                      # [N, D] (D = 2 or 3)
-        D = pos.shape[1]
-        nt = lvl.node_type
-        dt = float(getattr(H.config, "dt", 1.0))
-        m = (mask.float() if mask is not None else torch.ones(N, device=dev)) * lvl.occ
-
-        gidx = fld.pix(*[pos[:, k] for k in range(D)])           # D-tuple of voxel indices
-        # channel-major, row-major flat index over the N-D grid (== the 2D
-        # `nt*(nx*ny) + gx*ny + gy` exactly when D == 2).
-        ravel = torch.zeros(N, dtype=torch.long, device=dev)
-        stride = 1
-        for k in reversed(range(D)):
-            ravel = ravel + gidx[k] * stride
-            stride *= fld.shape[k]
-        flat = nt * stride + ravel                               # stride == prod(shape)
-        amt = torch.full((N,), self.amount * dt, device=dev) * m
-        fld.grid.view(-1).index_add_(0, flat, amt)
-        fld.grid.clamp_(max=1.0)
-        return {}
+from plexus.operators.field_ops import *          # noqa: F401,F403
