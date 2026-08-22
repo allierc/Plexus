@@ -557,6 +557,18 @@ class ActiveStress(Exchange):                    # (alias `pulse_to_active_stres
 # ==========================================================================================================
 @register_operator("aggregate", family="hierarchy", set="cell", kind="aggregate")
 class Centroid(Aggregate):
+    """children -> parent: the occupancy-weighted mean of a child block, along the `parent` map.
+
+    THE READOUT IS ONE STEP BEHIND THE ROW IT IS RECORDED IN, and that is a property of the
+    schedule rather than of this operator, so it is worth stating where someone reading the
+    output will look. `run` evaluates the whole schedule, THEN integrates, THEN records
+    (`engine.py`: `_integrate(H, sim.dt)` followed by `rec_index.get(tick)`). An operator inside
+    the schedule therefore sees the state at the START of the tick. Measured on
+    `config/neural/ctrnn_assemblies.yaml`: `assembly.activity[t]` equals the mean of
+    `neuron.voltage[t-1]` to 1e-6 (float32), and differs from the mean at row `t` by up to 0.22.
+    Neither number is wrong; reading the first as the second is.
+    """
+
     EMIT = None                                    # readout: writes parent `pos` in place (MAY_MUTATE_INTEGRATED_STATE); returns {} — no integrable delta
     # typed signature (Plexus2 sec. 2.1): children -> parent along the `parent` map.
     INPUTS = ["particle"]                          # the contained (child) set
@@ -564,10 +576,11 @@ class Centroid(Aggregate):
     READS = ["pos"]
     WRITES = ["pos"]                               # parent centroid position (a derived readout)
     MAPS = ["parent"]                              # reduce along the parent (containment) map
-    SUPPORTED_DIMS = [2, 3]                         # occupancy-weighted centroid is dimension-generic
+    SUPPORTED_DIMS = [2, 3]                         # occupancy-weighted mean is dimension-generic
     REQUIRES_PARAMS = []                            # no required params — `child` defaults to the first contained set
     MECHANISM_TAGS = ["centroid", "reduction", "hierarchical_readout"]
-    PARAM_ROLES = {"child": "source_child_set"}
+    PARAM_ROLES = {"child": "source_child_set", "block": "aggregated_child_block",
+                   "into": "target_parent_block"}
     REFERENCE = "Battaglia, P. W. et al. (2018). Relational inductive biases, deep learning, and graph networks. arXiv:1806.01261."
     MAY_MUTATE_INTEGRATED_STATE = True             # writes the parent's derived position (a readout)
 
@@ -575,6 +588,17 @@ class Centroid(Aggregate):
         super().__init__(params, device)
         self.at = params.get("_at", "cell")
         self.child = params.get("child")           # optional: which contained set (default: first child)
+        # WHICH BLOCK IS AGGREGATED. `pos` by default, so every existing spec is unchanged and the
+        # operator is still the centroid it was named for. The mechanism was never about position:
+        # it is an occupancy-weighted mean of a child block along the `parent` map, and hard-coding
+        # `pos` is what stopped a `neural_assembly` reading the mean voltage of its neurons. Same
+        # contract, same kind, one more knob -- a refinement of the signature, not a new operator.
+        #
+        # TWO NAMES, because the block often means something different one scale up: a neuron's
+        # `voltage` aggregates into an assembly's `activity`. `into` defaults to `block`, so the
+        # centroid case stays a single word.
+        self.block = params.get("block", "pos")            # the CHILD block being reduced
+        self.into = params.get("into", self.block)         # the PARENT block it is written to
 
     def forward(self, H, mask=None):
         parent = H.level(self.at)
@@ -586,8 +610,22 @@ class Centroid(Aggregate):
         if pidx.numel() == 0:
             return {}
         dev = parent.state.device
-        px0, px1 = parent.state_schema["pos"]; D = H.dim   # spatial dim (the global contract; == px1 - px0)
-        cpos = child.get("pos"); cocc = child.occ
+        if self.block not in child.state_schema:
+            raise ValueError(
+                f"aggregate: child set {child.name!r} has no state block {self.block!r} to reduce "
+                f"(it has: {', '.join(child.state_schema)}).")
+        if self.into not in parent.state_schema:
+            raise ValueError(
+                f"aggregate: parent set {parent.name!r} has no state block {self.into!r} to write "
+                f"(it has: {', '.join(parent.state_schema)}).")
+        px0, px1 = parent.state_schema[self.into]
+        cw0, cw1 = child.state_schema[self.block]
+        if (px1 - px0) != (cw1 - cw0):
+            raise ValueError(
+                f"aggregate: {child.name}.{self.block} is {cw1 - cw0} wide but "
+                f"{parent.name}.{self.into} is {px1 - px0}.")
+        D = px1 - px0
+        cpos = child.get(self.block); cocc = child.occ
         s = torch.zeros(parent.n, D, device=dev).index_add_(0, pidx, cpos * cocc[:, None])
         w = torch.zeros(parent.n, device=dev).index_add_(0, pidx, cocc)
         centroid = s / w.clamp(min=1.0)[:, None]

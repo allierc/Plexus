@@ -47,7 +47,10 @@ import math
 import torch
 
 from plexus.models.registry import register_entity
-from plexus.models.state import spatial_schema
+from plexus.models.state import (
+    Block, StateSchema, spatial_schema,
+    NONE, FIRST_ORDER, BOUNDARY_FREE, BOUNDARY_WORLD,
+)
 
 
 @register_entity(
@@ -203,6 +206,127 @@ class MPMParticle:
 )
 class Cell:
     """A set of particles/molecules; its position is an aggregate of its children."""
+
+
+# --------------------------------------------------------------------------- #
+#  The neural sets: neuron, the assembly that contains them, and the synapse.
+#
+#  THREE THINGS ARE KEPT APART HERE, and the separation is the point rather than a
+#  tidiness preference:
+#
+#    IDENTITY   what the neuron IS -- a connectome root id, a cell type, a NeuPrint
+#               key. Dataclass fields on the entity class. Not numerical state.
+#    GEOMETRY   where it is -- `pos`. A neuron does not MOVE, so `pos` is fixed
+#               geometry (`integration: none`), not an integrated coordinate. A
+#               skeleton/mesh, when one is imported, is a further attachment and
+#               still not state.
+#    DYNAMICS   what it DOES -- `voltage`, and the per-type parameters of its update
+#               equation. This is the only part an operator integrates.
+#
+#  Keeping geometry out of the dynamics is what later makes "does the mechanism
+#  depend on morphology?" a question that can be asked at all: morphology can be
+#  attached, removed or varied without touching the neural state.
+# --------------------------------------------------------------------------- #
+def neuron_schema(dim: int) -> StateSchema:
+    """`pos` (fixed geometry) | `voltage` (the integrated coordinate) | `omega` (an
+    external modulation channel).
+
+    `voltage` IS THE COORDINATE, not `pos`, and that inversion is the whole reason a
+    neuron cannot use `spatial_schema`. `StateSchema.coordinate` returns the first
+    `second_order_coordinate` and otherwise the first `first_order` block, so declaring
+    `pos` as `none` and `voltage` as `first_order` makes the engine integrate the
+    voltage and leave the position alone -- and sizes the set's delta accumulator to
+    one column instead of `dim`. A spatial set is a body that moves and carries state;
+    a neuron is a state that sits still.
+
+    `omega` is the per-neuron value of an external field Omega_i(t) (see
+    `operators/neural.py`). It is `none`-integrated -- written by an exchange operator,
+    never advanced -- and unrecorded, since it is an input the run already knows.
+    """
+    return StateSchema([
+        Block("pos", dim, role="geometry", integration=NONE, boundary=BOUNDARY_WORLD),
+        Block("voltage", 1, role="coordinate", integration=FIRST_ORDER, boundary=BOUNDARY_FREE),
+        Block("omega", 1, role="modulation", integration=NONE, boundary=BOUNDARY_FREE,
+              record=False),
+    ])
+
+
+def assembly_schema(dim: int) -> StateSchema:
+    """`pos` (the assembly's location) | `activity` (a readout of its neurons).
+
+    An assembly is NOT a new computational primitive -- it is a set at another scale,
+    related to its neurons by the same `parent` containment map that relates particles
+    to a cell. `activity` is `none`-integrated because it is a derived readout written
+    by an aggregate operator, not a state with dynamics of its own.
+    """
+    return StateSchema([
+        Block("pos", dim, role="geometry", integration=NONE, boundary=BOUNDARY_WORLD),
+        Block("activity", 1, role="readout", integration=NONE, boundary=BOUNDARY_FREE),
+    ])
+
+
+def synapse_schema(dim: int) -> StateSchema:
+    """`w` -- one fixed weight per connection. The CONNECTIVITY MATRIX, in sparse form.
+
+    W is a first-class mechanistic object, not an implementation detail: it is what an
+    inverse model reconstructs. So it lives where the language can see it -- as the
+    state of an EDGE-SET whose elements are connections, joined to the neuron set by
+    the `pre`/`post` incidence maps -- rather than as a dense tensor hidden inside an
+    operator. Everything a synapse might later grow (plasticity, a delay, a
+    transmitter type, a geometry) is another block here, and none of it disturbs the
+    neuron abstraction.
+    """
+    return StateSchema([
+        Block("w", 1, role="weight", integration=NONE, boundary=BOUNDARY_FREE, record=False),
+    ])
+
+
+@register_entity(
+    "neuron", depth=0,
+    state_schema=neuron_schema,
+    render={"color_by": "node_type", "arrows": None},
+)
+class Neuron:
+    """A neuron's biological identity and structural metadata -- NOT its dynamic state.
+
+    The numerical quantities live in the `Level`'s state tensor under `neuron_schema`
+    above; the per-type parameters of its update equation live in the set's `types:`
+    table (`lvl.type_params[lvl.node_type]`). What belongs HERE is what a connectome
+    knows about the cell and a simulation does not derive: which neuron it is, and what
+    it is called.
+
+    These fields are populated by an importer (a NeuPrint / FlyWire reader), not by the
+    engine, and are absent for a synthetic network -- which is why they all default to
+    None rather than being required.
+    """
+
+    root_id: int | None = None            # connectome body/root id
+    cell_type: str | None = None          # e.g. "EPG", "T4a", "L1"
+    neuprint_id: str | None = None        # source key, when imported from a NeuPrint server
+
+
+@register_entity(
+    "neural_assembly", "assembly", depth=1,
+    state_schema=assembly_schema,
+    render={"color_by": "node_type", "arrows": None},
+)
+class NeuralAssembly:
+    """A group of neurons, as an ordinary contained set one scale up.
+
+    Deliberately not a special class: `brain -> assembly -> neuron -> synapse` uses the
+    same containment machinery as `organism -> tissue -> cell -> particle`, which is
+    what makes the neural case a test of the hierarchy claim rather than a subsystem
+    bolted beside it.
+    """
+
+
+@register_entity(
+    "synapse", depth=0,
+    state_schema=synapse_schema,
+    render={"color_by": "node_type", "arrows": None},
+)
+class Synapse:
+    """A connection between two neurons: an EDGE-SET element carrying the weight W_e."""
 
 
 # default for any set whose name is not a registered entity. Kept as the legacy dict
