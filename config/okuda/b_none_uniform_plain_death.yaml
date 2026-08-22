@@ -17,6 +17,8 @@ _run:
 sets:
   vertex:
     n: 120000
+    mesh: half_edge
+    cell_set: cell
   cell:
     n: 60000
     state:

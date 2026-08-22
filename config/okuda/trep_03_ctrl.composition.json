@@ -1,0 +1,59 @@
+{
+ "ops": [
+  {
+   "id": "mesh_seed0",
+   "op": "mesh_seed",
+   "impl": "fibonacci_sphere"
+  },
+  {
+   "id": "cell_geometry0",
+   "op": "cell_geometry",
+   "impl": "scatter_add"
+  },
+  {
+   "id": "cell_mechanics0",
+   "op": "cell_mechanics",
+   "impl": "default"
+  },
+  {
+   "id": "cell_divide0",
+   "op": "cell_divide",
+   "impl": "hertwig"
+  },
+  {
+   "id": "edge_flip0",
+   "op": "edge_flip",
+   "impl": "length_threshold"
+  }
+ ],
+ "conns": [],
+ "params": {
+  "mesh_seed0.cell_set": "cell",
+  "mesh_seed0.before_frame": 1,
+  "mesh_seed0.n_cells": 2000,
+  "mesh_seed0.seed": 0,
+  "mesh_seed0.vseed_cv": 0.15,
+  "mesh_seed0.radius": 5.0,
+  "mesh_seed0.jitter": 0.15,
+  "cell_mechanics0.K_A": 1.0,
+  "cell_mechanics0.K_P": 1.0,
+  "cell_mechanics0.K_V": 20.0,
+  "cell_mechanics0.K_R": 0.0,
+  "cell_mechanics0.Lambda": 0.5,
+  "cell_mechanics0.Gamma": 0.4,
+  "cell_mechanics0.p0": 3.5,
+  "cell_mechanics0.mu": 1.0,
+  "cell_mechanics0.dt": 1.0,
+  "cell_mechanics0.relax_iters": 30,
+  "cell_mechanics0.eta": 0.08,
+  "cell_mechanics0.cap_frac": 0.12,
+  "cell_mechanics0.K_bend": 0.0,
+  "cell_mechanics0.K_lumen": 0.0,
+  "cell_divide0.cell_set": "cell",
+  "cell_divide0.factor": 2.0,
+  "cell_divide0.cycle_cv": 0.15,
+  "cell_divide0.p0": 3.5,
+  "edge_flip0.l_th_frac": 0.28,
+  "edge_flip0.max_flips": 300
+ }
+}

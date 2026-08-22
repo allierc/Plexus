@@ -94,7 +94,9 @@ class CellAdjacency(Rewire):
         return {}
 
 
-@register_operator("cell_chem_seed", set="cell", kind="seed", family="seed")
+# CANONICAL `seed_cell_chem`, ALIAS `cell_chem_seed` -- see `mesh_ops.SeedMesh3D` for why both
+# spellings must resolve: 320 specs use the first and the rest use the second.
+@register_operator("seed_cell_chem", "cell_chem_seed", set="cell", kind="seed", family="seed")
 class CellRDSeed(Structural):
     """Gray-Scott initial condition on the cell set: substrate u=1 everywhere, activator a=0 except
     a central spot (a=0.5, u=0.25) that nucleates the pattern. chem = [a, u].

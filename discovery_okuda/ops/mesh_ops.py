@@ -217,7 +217,14 @@ def _engine_owns_clock(params, default=1):
 
 
 
-@register_operator("mesh_seed", set="vertex", kind="seed", family="seed")
+# CANONICAL NAME `seed_mesh`, ALIAS `mesh_seed`, and the alias is not politeness -- 324 of the 461
+# specs in `config/okuda/` say `op: seed_mesh` and 137 say `op: mesh_seed`, so whichever way this
+# reads, half the corpus fails to load. It fails LOUDLY (`ValueError: operator 'seed_mesh' not in
+# registry`) and it fails today: the campaign specs were migrated to the post-seed-refactor
+# `seed_<noun>` convention -- the one core already uses for `seed_from_segmentation` -- while the
+# okuda classes kept the old spelling, so 325 specs, including every `r0*` the campaign has ever
+# written, could not be run at all. `seed_cell_chem` (320 specs) had the same break.
+@register_operator("seed_mesh", "mesh_seed", set="vertex", kind="seed", family="seed")
 class SeedMesh3D(Structural):
     """Frame-0: build a closed spherical half-edge mesh (spherical Voronoi), write the 3D vertex
     positions, and stash the edge table + per-face targets (A0, P0) and the lumen target V0."""
@@ -260,7 +267,15 @@ class SeedMesh3D(Structural):
         # still takes `get`/`setdefault`/`m[k] = v` on an open namespace. What it adds is a name for
         # the thing, a place for the carry and the snapshot to live, and an engine that knows it
         # exists -- `grep -rn "_mesh" src/plexus/` returned NOTHING before this.
-        lvl._mesh = MeshTable(E_srce=est, E_trgt=ett, E_face=eft, nF=nF, Nv=Nv,
+        #
+        # FILLED, NOT REBOUND, when the set declared `mesh: half_edge`. `engine._build_mesh`
+        # allocated the table during `build`, and rebinding here would hand every consumer a
+        # DIFFERENT OBJECT from the one the engine allocated -- which is the whole failure mode the
+        # declaration exists to end: anything that took a reference before the seed ran (the
+        # recorder, a probe, the salvage) would keep writing into an orphan. So the seed writes
+        # THROUGH the existing table when there is one, and only creates one for a spec that has
+        # not declared it yet (456 of the 458 okuda specs, at the time of writing).
+        seeded = dict(E_srce=est, E_trgt=ett, E_face=eft, nF=nF, Nv=Nv,
                          A0=torch.full((nF,), A0, dtype=dt, device=dev),
                          P0=torch.full((nF,), P0, dtype=dt, device=dev),
                          alive=torch.ones(nF, dtype=dt, device=dev),
@@ -273,6 +288,11 @@ class SeedMesh3D(Structural):
                          R0=float(np.linalg.norm(verts, axis=1).mean()), verts0=verts,
                          # RESERVOIR fixed sizes for the compiled mechanics (verts<=Nbuf; faces~V/2; half-edges~3V)
                          Nv_max=Nbuf, nF_max=Nbuf // 2 + 64, Ebuf=4 * Nbuf)
+        m = getattr(lvl, "_mesh", None)
+        if isinstance(m, MeshTable):
+            m.clear(); m.update(seeded)          # the engine's table, filled in place
+        else:
+            lvl._mesh = MeshTable(**seeded)      # spec has no `mesh:` declaration yet
         return {}
 
 
