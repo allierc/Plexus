@@ -499,6 +499,60 @@ class Hierarchy(nn.Module):
             db = self._delta_blocks.setdefault(level_name, {})
             db[block] = delta.clone() if block not in db else db[block] + delta
 
+    def renumber_set(self, level_name: str, keep, n_new: int | None = None) -> bool:
+        """Permute a set's rows through `keep` (new index -> old index). Returns True if it acted.
+
+        WHY THE ENGINE OWNS THIS. Removal is the first operation in this engine that MOVES A ROW --
+        `cell_divide` appends, so every existing cell keeps its index, and nothing before apoptosis
+        and face-dropping T1s ever renumbered anything. When they arrived, each wrote its own
+        renumber, and each had to remember every store the engine keeps per set: the state, the
+        occupancy, the coordinate delta accumulator, and the extra first-order block deltas.
+
+        THE ONE THEY BOTH GOT WRONG is the last. `_delta_blocks` is keyed by LEVEL NAME
+        (`add_delta`: `self._delta_blocks.setdefault(level_name, {})`), and both call sites guard on
+        `isinstance(key, tuple) and key[0] == cell_set` -- always False, so the extra blocks are
+        never permuted. It is inert only because `chem` happens to be the cell set's COORDINATE
+        block today and therefore travels in `_delta`; the moment a model declares a second
+        `first_order` block on that set, its deltas scramble on every death.
+
+        AND THE COORDINATE ONE IS NOT HYPOTHETICAL. The engine zeroes the accumulator once per TICK
+        and integrates at the END of the schedule, so the chemistry deposits early and the engine
+        applies last; an operator that renumbers in between leaves every delta pointing at a
+        different cell. Measured before it was fixed: the activator reached -0.1529 at frame 50 on
+        every mode that killed anything, while the no-death control never left 0.0000.
+
+        THE TAIL OF `state` IS LEFT AS IT WAS, deliberately -- the call sites clone, write `[:n]`,
+        and leave the rest stale, and `occ` is what says those rows are not there. Zeroing it would
+        be a different behaviour, and the promotion is gated on bit-equality.
+        """
+        import numpy as _np
+        lvl = self.levels.get(level_name) if hasattr(self.levels, "get") else None
+        if lvl is None or getattr(lvl, "state", None) is None:
+            return False
+        n = int(len(keep) if n_new is None else n_new)
+        idx = torch.as_tensor(_np.asarray(keep), dtype=torch.long, device=lvl.state.device)
+        if lvl.state.shape[0] < n:
+            return False
+        st = lvl.state.clone()
+        st[:n] = lvl.state[idx]
+        lvl.state = st
+        if getattr(lvl, "occ", None) is not None:
+            occ = torch.zeros(lvl.state.shape[0], device=lvl.state.device)
+            occ[:n] = 1.0
+            lvl.occ = occ
+        d = self._delta.get(level_name)
+        if d is not None:
+            k = idx.to(d.device)
+            d[:n] = d[k]
+            d[n:] = 0.0
+        for _b, t in (self._delta_blocks.get(level_name) or {}).items():
+            if t is None:
+                continue
+            k = idx.to(t.device)
+            t[:n] = t[k]
+            t[n:] = 0.0
+        return True
+
     def block_deltas(self, level_name: str) -> dict:
         """Accumulated deltas for a set's EXTRA (non-coordinate) dynamical blocks: {block: tensor}."""
         return self._delta_blocks.get(level_name, {})

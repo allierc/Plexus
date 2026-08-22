@@ -1394,12 +1394,10 @@ class Apoptosis3D(Structural):
             # arrives from the reaction/diffusion step operating on a mesh a death has just
             # perturbed, not from this reindex. Ruled out by experiment as well: removing
             # cell_chem_from_shape left it at -0.0948, and quartering chi left it at -0.0689.
-            cst = clvl.state.clone()
-            cst[:nF2] = clvl.state[torch.as_tensor(keep, device=clvl.state.device)]
-            clvl.state = cst
-            if getattr(clvl, "occ", None) is not None:
-                cocc = torch.zeros(clvl.state.shape[0], device=clvl.state.device)
-                cocc[:nF2] = 1.0; clvl.occ = cocc
+            # ONE ENGINE CALL: state, occupancy, the coordinate delta accumulator AND the extra
+            # first-order block deltas, which the hand-rolled version below never reached (its
+            # guard tests `isinstance(key, tuple)` and `_delta_blocks` is keyed by level NAME).
+            H.renumber_set(self.cat, keep, n_new=nF2)
         # THE PENDING DELTAS MUST BE RENUMBERED TOO, AND THIS IS THE BUG THAT BROKE P12 ON EVERY
         # RUN WHERE A CELL DIED.
         #
@@ -1420,21 +1418,7 @@ class Apoptosis3D(Structural):
         # in the schedule. Confirmed independently by moving apoptosis ahead of the chemistry --
         # act_min held at 0.0000 for the whole run and P12 and P4 both cleared -- but that is a
         # discipline every spec would have to remember, and this is the guarantee instead.
-        try:
-            _d = getattr(H, "_delta", None)
-            if isinstance(_d, dict) and self.cat in _d and _d[self.cat] is not None:
-                _kt = torch.as_tensor(keep, device=_d[self.cat].device, dtype=torch.long)
-                _d[self.cat][:nF2] = _d[self.cat][_kt]
-                _d[self.cat][nF2:] = 0.0
-            _db = getattr(H, "_delta_blocks", None)
-            if isinstance(_db, dict):
-                for _k, _v in _db.items():
-                    if isinstance(_k, tuple) and _k and _k[0] == self.cat and _v is not None:
-                        _kt = torch.as_tensor(keep, device=_v.device, dtype=torch.long)
-                        _v[:nF2] = _v[_kt]; _v[nF2:] = 0.0
-        except Exception as _e:
-            print(f"[cell_die] could not renumber the pending deltas "
-                  f"({type(_e).__name__}) -- chemistry may be scrambled this tick", flush=True)
+        # (the deltas were renumbered by `H.renumber_set` above, together with the state)
         m["n_apop"] = int(m.get("n_apop", 0)) + gone
         # LOUD, because a death is not recoverable and the count must be auditable against the
         # cell count: nF -> nF2 should differ by exactly `gone` and by nothing else.

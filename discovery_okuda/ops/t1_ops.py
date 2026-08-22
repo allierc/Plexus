@@ -339,30 +339,15 @@ class ReconnectT1_3D(Rewire):
             # the same operator on a NON-growing tissue held act_min at exactly 0.0000.
             # edge_flip declares no `cell_set`, so the cell level is looked up by name and
             # a model without one simply skips this -- H.level raises rather than returning None.
-            try:
-                _cl = H.level(getattr(self, "cat", None) or "cell")
-            except Exception:
-                _cl = None
-            _kt = torch.as_tensor(keep, device=dev, dtype=torch.long)
-            if _cl is not None and getattr(_cl, "state", None) is not None \
-                    and _cl.state.shape[0] >= nF:
-                _cs = _cl.state.clone()
-                _cs[:nF2] = _cl.state[_kt.to(_cl.state.device)]
-                _cl.state = _cs
-                if getattr(_cl, "occ", None) is not None:
-                    _oc = torch.zeros(_cl.state.shape[0], device=_cl.state.device)
-                    _oc[:nF2] = 1.0; _cl.occ = _oc
-            _cname = getattr(self, "cat", None) or "cell"
-            _d = getattr(H, "_delta", None)
-            if isinstance(_d, dict) and _d.get(_cname) is not None:
-                _k2 = _kt.to(_d[_cname].device)
-                _d[_cname][:nF2] = _d[_cname][_k2]; _d[_cname][nF2:] = 0.0
-            _db = getattr(H, "_delta_blocks", None)
-            if isinstance(_db, dict):
-                for _bk, _bv in _db.items():
-                    if isinstance(_bk, tuple) and _bk and _bk[0] == _cname and _bv is not None:
-                        _k2 = _kt.to(_bv.device)
-                        _bv[:nF2] = _bv[_k2]; _bv[nF2:] = 0.0
+            # ONE ENGINE CALL, for the same reason `cell_die` makes it: state, occupancy, the
+            # coordinate delta accumulator and the extra first-order block deltas are four stores
+            # the engine keeps per set, and a renumber that forgets one scrambles it silently. The
+            # version this replaces forgot the fourth -- its guard tested `isinstance(key, tuple)`
+            # while `_delta_blocks` is keyed by level NAME, so the branch could never run.
+            #
+            # `edge_flip` declares no `cell_set`, so the cell level is looked up by name and a model
+            # without one simply skips: `renumber_set` returns False rather than raising.
+            H.renumber_set(getattr(self, "cat", None) or "cell", keep, n_new=nF2)
         m["E_srce"] = torch.as_tensor(es2, device=dev)
         m["E_trgt"] = torch.as_tensor(et2, device=dev)
         m["E_face"] = torch.as_tensor(ef2, device=dev)

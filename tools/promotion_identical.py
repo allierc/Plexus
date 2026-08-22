@@ -70,6 +70,11 @@ sys.path.insert(0, OKUDA)
 PAIRS = [
     # phase   spec                    side A          side B       what it exercises
     (0,  "b_null_plain",          "okuda@HEAD",   "okuda",   "mesh_seed, cell_mechanics, edge_flip, topo_record"),
+    # A DEATH SPEC, because `b_null_plain` never calls `cell_die` -- its ledger is cell_divide 26,
+    # cell_geometry 83, cell_mechanics 101, edge_flip 27, mesh_seed 1, topo_record 101 and no death
+    # at all. Removal is the first operation in this engine that MOVES A ROW, so a renumber change
+    # gated only on that spec passes without executing a line of what changed.
+    (0,  "apop_one",              "okuda@HEAD",   "okuda",   "+ cell_die -> H.renumber_set (state, occ, delta, block deltas)"),
     (0.5, "ecm_block",            "okuda@HEAD",   "okuda",   "mpm_scatter/gather/grid_update/strain, ecm_seed, ecm_stress"),
     ("B", "b_gs_plain_soft_lo",   "okuda",        "core",    "+ cell_chem_seed/diffuse/react, cell_geometry, cell_neighbours"),
     ("B", "b_star",               "okuda",        "core",    "+ cell_grow, cell_divide, interface_tension, cell_chem_from_shape"),
