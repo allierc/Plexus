@@ -184,6 +184,7 @@ class Level(nn.Module):
         post: Optional[torch.Tensor] = None,        # [E] INCIDENCE map to the post-endpoint set (edge-set only)
         pre_name: Optional[str] = None,             # the set `pre` indexes into (e.g. neuron)
         post_name: Optional[str] = None,            # the set `post` indexes into (e.g. neuron)
+        mesh=None,                                  # a MeshTable, when the set declares `mesh: half_edge`
     ):
         super().__init__()
         self.name = name
@@ -197,6 +198,12 @@ class Level(nn.Module):
         # ordinary set, so this is inert for every existing (spatial) spec.
         self.pre_name = pre_name
         self.post_name = post_name
+        # THE HALF-EDGE TABLE, when the set declares one. A set whose elements are mesh VERTICES
+        # carries a topology that is not expressible as `edge_index`: faces, per-face targets, and
+        # an ORDERING that is the geometry (see `plexus.models.mesh`). It lived as a private
+        # attribute an operator invented -- `grep -rn "_mesh" src/plexus/` found nothing -- while
+        # about forty consumers read it.
+        self.mesh = mesh
         # State is first-class: normalize a legacy {block:(c0,c1)} dict into a StateSchema
         # (the shim). A StateSchema is still dict-indexable (schema['pos'] == (c0,c1)), so
         # `get('pos')` and every legacy call site are unchanged.
@@ -272,6 +279,19 @@ class Level(nn.Module):
     # A `structural` operator (divide / duplicate / die) orchestrates these
     # instead of hand-scanning occupancy and hand-initialising buffers. They keep
     # tensor shapes constant (a fixed buffer); `occ` marks the live subset.
+    # `_mesh` IS THE NAME EVERY EXISTING CONSUMER USES, and there are about forty of them across
+    # six surfaces -- operators, the recorder, the salvage, the D4 fingerprint, the renderers, the
+    # offline metrics. Renaming them all in one commit would be a rename storm against a gate that
+    # is bit-equality, so the engine's attribute is `mesh` and `_mesh` is an alias that keeps every
+    # reader and `mesh_seed`'s assignment working unchanged.
+    @property
+    def _mesh(self):
+        return self.mesh
+
+    @_mesh.setter
+    def _mesh(self, value):
+        self.mesh = value
+
     def per_node_buffers(self):
         """Yield (name, tensor) for every registered buffer indexed by node, so a
         structural op touches them all uniformly. Excludes the relation

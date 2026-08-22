@@ -142,6 +142,46 @@ def load(path: str) -> Spec:
                 raise ValueError(
                     f"set {sname!r} buffer={buf} is smaller than its initial size {live0}; "
                     f"a structural (divide/duplicate) run needs buffer >= initial.")
+        # optional `mesh:` -- the set's elements carry a half-edge surface (see `plexus.models.mesh`).
+        #
+        # VALIDATED HERE AND LOUDLY, because the failure mode of not validating is silence: before
+        # this, `mesh: half-edge` (a hyphen) or `mesh:` on the wrong set parsed clean, allocated
+        # nothing, and the run proceeded with a spec that claimed a topology it did not have.
+        mk = s.get("mesh")
+        if mk is not None:
+            from plexus.models.mesh import MESH_KINDS
+            if mk not in MESH_KINDS:
+                raise ValueError(
+                    f"set {sname!r}: mesh {mk!r} is not a known mesh kind "
+                    f"(expected one of: {', '.join(MESH_KINDS)})")
+            if s.get("pre") is not None or s.get("post") is not None:
+                raise ValueError(
+                    f"set {sname!r} declares `mesh:` and is an EDGE-SET (it has pre/post). An "
+                    f"edge-set's elements are connections; a mesh's are vertices.")
+            if int(raw.get("general", {}).get("dim", 2)) != 3:
+                raise ValueError(
+                    f"set {sname!r} declares `mesh: {mk}` but the model is "
+                    f"{raw.get('general', {}).get('dim')}D -- every mesh operator declares "
+                    f"SUPPORTED_DIMS = [3].")
+            # THE FACE<->CELL PAIRING IS DECLARED NOWHERE TODAY. A face of the mesh IS a cell, and
+            # every operator that crosses between them takes the cell set as an OPERATOR PARAMETER
+            # (`mesh_ops` twice, `edge_flip` falling back to the literal string "cell"). So the
+            # pairing is repeated per operator, defaulted in one place, and stated in none -- which
+            # is how `edge_flip` came to renumber a set it never declared it needed.
+            cs = s.get("cell_set")
+            if cs is None:
+                raise ValueError(
+                    f"set {sname!r} declares `mesh: {mk}` but no `cell_set:`. A face of the mesh "
+                    f"IS a cell, and the pairing must be declared once here rather than repeated "
+                    f"as a parameter on every operator that crosses between them.")
+            if cs == sname:
+                raise ValueError(
+                    f"set {sname!r} declares `cell_set: {cs}` -- itself. The mesh lives on the "
+                    f"VERTEX set and its faces are the CELL set; they are two different sets.")
+            if cs not in raw["sets"]:
+                raise ValueError(f"set {sname!r} declares `cell_set: {cs}`, which is not a set in "
+                                 f"this spec (have: {', '.join(sorted(raw['sets']))})")
+
         # optional `state:` block -- the set's StateSchema (the fifth primitive). Absent =>
         # the spatial pos/vel default. Each entry is a width (int) or {width, integration,
         # boundary, role, record}. Validate here so a malformed schema fails at load.

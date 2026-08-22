@@ -67,17 +67,26 @@ def registered() -> dict:
 
 
 def builtins_() -> list:
-    """Names the engine's catalog defines directly (not through the operator decorator)."""
-    try:
-        from plexus.models import catalog
-    except Exception:
-        return []
-    names = set()
-    for attr in ("OPERATORS", "BUILTINS", "CATALOG"):
-        obj = getattr(catalog, attr, None)
-        if isinstance(obj, dict):
-            names |= set(obj)
-    return sorted(names)
+    """Empty, and kept as a stub so the JSON keeps its shape.
+
+    IT NEVER REPORTED ANYTHING. It imported `plexus.models.catalog` -- the scaffolding-era porting
+    WORKLIST, whose own docstring said it "is NOT imported alongside the validated package (it would
+    re-register those names)" -- and looked for `OPERATORS`/`BUILTINS`/`CATALOG` dicts it did not
+    define. So it returned [] by two independent routes: the import raised
+    `ValueError: Entity name 'particle' already registered` whenever the real library was loaded
+    first (which it always is), and the attributes were absent anyway. Both baselines record
+    `"builtins": []`.
+
+    The worklist is DONE -- the file it planned now exists as `plexus/operators/`, 53 operators in
+    46 modules -- and only 2 of its 25 stub names still exist live. It has been deleted; the
+    vocabulary moved on around it (`divide`/`die` -> `agent_divide`/`agent_grow`, `neighbour_graph`
+    -> `radius_graph`, `p2g_g2p` -> `mpm_scatter`/`mpm_gather`, `secrete_sense` -> `deposit`/`sense`,
+    `centroid` -> `aggregate`), and its docstring still advertised "the full seven-kind operator
+    vocabulary" after `base.KINDS` became eight -- `seed` was added and the sentence was not.
+
+    The registry itself is the catalogue: `registered()` above reads it.
+    """
+    return []
 
 
 def build() -> dict:
