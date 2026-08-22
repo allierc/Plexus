@@ -75,6 +75,32 @@ new mechanism is therefore adding a new operator to the schedule, never editing 
 engine — and because nothing is mutated in place, gradients propagate through the
 composition and the whole rollout stays **differentiable**.
 
+## Composing hierarchy
+
+The second axis of composition is **scale**. A set may be *contained* in another —
+proteins in a cell, cells in a tissue, tissues in an organism — and containment is an
+explicit map $\pi$ from children to parent, not a convention buried in the code. Each
+level carries its own state, its own operators and its own rate, so no level is a
+parameter of the level above it.
+
+![](figures/fig_hier.png){width=42% fig-align="center"}
+
+Exactly two operator kinds cross that map. **Aggregate ↑** reads a parent from its
+children — a cell's position as the centroid of its particles, a neuron's input as the
+sum of its synapses. **Broadcast ↓** writes children from their parent — a containment
+spring, or a material property handed down to every particle a cell owns. Fields are
+bound to a level too, and **Exchange** couples a set to the field at its own scale, so a
+morphogen grid, a mechanical grid and a metabolite pool coexist without ever becoming the
+same object. The same eight kinds run at every level: there is no per-scale engine, and
+adding a level adds no machinery.
+
+What the hierarchy buys is a mechanism written at one scale producing a phenomenon at
+another that nobody wrote down. In the spheroid section below, each cell decides only
+where its own protease sits; the enzyme dissolves the faces of a triangulated membrane no
+cell ever touches; and the hole that opens is what decides where the tissue buds — 7.7% of
+the membrane's faces through 54 separate openings in one run, 87% in another, from the
+same operator graph.
+
 ## What it looks like
 
 Qualitatively different dynamical systems, all expressed in the same operator

@@ -174,6 +174,7 @@ window.Quarto = {
   <ul>
   <li><a href="#four-concepts-eight-operators" id="toc-four-concepts-eight-operators" class="nav-link active" data-scroll-target="#four-concepts-eight-operators">Four concepts, eight operators</a></li>
   <li><a href="#composing-mechanisms" id="toc-composing-mechanisms" class="nav-link" data-scroll-target="#composing-mechanisms">Composing mechanisms</a></li>
+  <li><a href="#composing-hierarchy" id="toc-composing-hierarchy" class="nav-link" data-scroll-target="#composing-hierarchy">Composing hierarchy</a></li>
   <li><a href="#what-it-looks-like" id="toc-what-it-looks-like" class="nav-link" data-scroll-target="#what-it-looks-like">What it looks like</a></li>
   <li><a href="#read-the-blueprint" id="toc-read-the-blueprint" class="nav-link" data-scroll-target="#read-the-blueprint">Read the blueprint</a></li>
   </ul>
@@ -228,6 +229,17 @@ window.Quarto = {
 <h2 class="anchored" data-anchor-id="composing-mechanisms">Composing mechanisms</h2>
 <p>Biological models are expressed as compositions of elementary operators. Plexus represents a model as an ordered sequence of operator applications — a <strong>schedule</strong> — specifying both the order and the frequency with which operators are evaluated. Formally, one simulation step is the composition <span class="math inline">\(\Phi = \mathcal{O}_n \circ \cdots \circ \mathcal{O}_1\)</span>, whose repeated application generates the system dynamics <span class="math inline">\(x_{t+1}=\Phi(x_t)\)</span>. Different operators may evolve on different time scales — mechanical interactions every step, diffusion, growth or division less often — so a model is a <em>multi-rate</em> composition of biological mechanisms rather than a monolithic solver.</p>
 <p>Operators are <strong>pure</strong> transformations: rather than modifying state in place, each returns its contribution <span class="math inline">\(\Delta_i\)</span> to the system evolution, and the complete update <span class="math inline">\(\Delta = \sum_i \Delta_i\)</span> is passed to the numerical implementation. Introducing a new mechanism is therefore adding a new operator to the schedule, never editing the engine — and because nothing is mutated in place, gradients propagate through the composition and the whole rollout stays <strong>differentiable</strong>.</p>
+</section>
+<section id="composing-hierarchy" class="level2">
+<h2 class="anchored" data-anchor-id="composing-hierarchy">Composing hierarchy</h2>
+<p>The second axis of composition is <strong>scale</strong>. A set may be <em>contained</em> in another — proteins in a cell, cells in a tissue, tissues in an organism — and containment is an explicit map <span class="math inline">\(\pi\)</span> from children to parent, not a convention buried in the code. Each level carries its own state, its own operators and its own rate, so no level is a parameter of the level above it.</p>
+<div class="quarto-figure quarto-figure-center">
+<figure class="figure">
+<p><img src="figures/fig_hier.png" class="img-fluid figure-img" style="width:42.0%"></p>
+</figure>
+</div>
+<p>Exactly two operator kinds cross that map. <strong>Aggregate ↑</strong> reads a parent from its children — a cell’s position as the centroid of its particles, a neuron’s input as the sum of its synapses. <strong>Broadcast ↓</strong> writes children from their parent — a containment spring, or a material property handed down to every particle a cell owns. Fields are bound to a level too, and <strong>Exchange</strong> couples a set to the field at its own scale, so a morphogen grid, a mechanical grid and a metabolite pool coexist without ever becoming the same object. The same eight kinds run at every level: there is no per-scale engine, and adding a level adds no machinery.</p>
+<p>What the hierarchy buys is a mechanism written at one scale producing a phenomenon at another that nobody wrote down. In the spheroid section below, each cell decides only where its own protease sits; the enzyme dissolves the faces of a triangulated membrane no cell ever touches; and the hole that opens is what decides where the tissue buds — 7.7% of the membrane’s faces through 54 separate openings in one run, 87% in another, from the same operator graph.</p>
 </section>
 <section id="what-it-looks-like" class="level2">
 <h2 class="anchored" data-anchor-id="what-it-looks-like">What it looks like</h2>
