@@ -102,262 +102,6 @@ it.**
 .opk-ref{font-size:.76em;color:#999;font-style:italic;margin:.1rem 0 .2rem}
 </style>
 
-<h3>Interaction &amp; flocking</h3>
-<p class="opk">Lateral operators over a radius neighbour graph: a per-type force law (attraction–repulsion) and the three boids rules that sum to flocking.</p>
-<p class="opk-ref">Reference — boids is <a href="https://doi.org/10.1145/37402.37406">Reynolds (1987), <i>SIGGRAPH Comput. Graph.</i> 21(4):25–34</a>, the soft-core pair potential is <a href="https://doi.org/10.1103/PhysRevLett.96.104302">D’Orsogna et&nbsp;al. (2006), <i>Phys. Rev. Lett.</i> 96:104302</a>, and the alignment model is <a href="https://doi.org/10.1103/PhysRevLett.75.1226">Vicsek et&nbsp;al. (1995), <i>Phys. Rev. Lett.</i> 75:1226–1229</a>; the implementations are adapted from <a href="https://github.com/allierc/ParticleGraph">ParticleGraph</a> (Allier et&nbsp;al.).</p>
-<div class="sim-gallery">
-  <figure class="sim-card">
-    <video src="gallery/attraction.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">attraction–repulsion<span class="sim-spec"><pre># Full match to ParticleGraph arbitrary_3_1: 3 types, 30000 particles, sigma=0.005,
-# max_radius=0.075, periodic, first_derivative, dt=0.1, 250 frames. Now feasible
-# because attraction_repulsion runs on a radius neighbour graph (O(E)), not dense.
-general:
-  name: arbitrary_3
-  seed: 0
-  n_frames: 250
-  dt: 0.1
-  boundary: periodic
-
-sets:
-  particle:
-    n: 30000
-    types:
-      t0: {fraction: 0.34, p: [1.6233, 1.0413, 1.6012, 1.5615]}
-      t1: {fraction: 0.33, p: [1.7667, 1.8308, 1.0855, 1.9055]}
-      t2: {fraction: 0.33, p: [1.7226, 1.7850, 1.0584, 1.8579]}
-
-fields: {}
-
-operators:
-  - {op: radius_graph,         at: particle, radius: 0.075}
-  - {op: attraction_repulsion, at: particle, sigma: 0.005}
-
-schedule: [radius_graph, attraction_repulsion]
-
-plotting:                      # render STYLE (read by plexus.plot; engine ignores it)
-  background: black
-  colormap: tab10
-  point_size: 2.0
-
-# --- auto: video descriptions (gemma-4-12B) ---
-descriptions:
-  movie_particle:
-    description: The simulation begins with a dense, uniform distribution of multicolored particles across
-      the entire field. Over time, the particles begin to aggregate into distinct, circular clusters with
-      dark centers. These clusters grow in size and number as the particles organize into a cellular-like
-      structure. By the final frame, the particles have formed a highly structured network of interconnected
-      circular domains.
-    objects: The scene contains thousands of tiny, individual particles in blue, green, and orange. These
-      particles are initially scattered randomly but eventually form large, circular clusters. Each cluster
-      features a dark, empty center surrounded by a dense ring of multicolored particles. The final topology
-      consists of a repeating, honeycomb-like pattern of these interconnected circular structures.</pre></span></span>
-      <span class="sim-cap">per-type interaction sorts particles into cells</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/boids.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">boids<span class="sim-spec"><pre># Exact reproduction of ParticleGraph boids reference graphs_data/boids/boids:
-# 1792 particles, 16 types (112 each), 4000 frames, min_radius=0.001,
-# max_radius=0.04, dt=0.5, periodic, 2nd_derivative, mean aggregation.
-# Per-type p = [cohesion, alignment, separation].
-general:
-  name: boids_16
-  seed: 0
-  n_frames: 16000
-  dt: 0.5
-  boundary: periodic
-
-sets:
-  particle:
-    n: 1792
-    vel_init: 0.0004
-    types:
-      t00:
-        {
-          fraction: 0.0625,
-          cohesion: 27.600000381469727,
-          alignment: 92.5,
-          separation: 48.20000076293945,
-        }
-      t01:
-        {
-          fraction: 0.0625,
-          cohesion: 32.0,
-          alignment: 51.79999923706055,
-          separation: 29.799999237060547,
-        }
-      t02:
-        {
-          fraction: 0.0625,
-          cohesion: 23.600000381469727,
-          alignment: 35.0,
-          separation: 13.5,
-        }
-      t03:
-        {
-          fraction: 0.0625,
-          cohesion: 3.299999952316284,
-          alignment: 76.4000015258789,
-          separation: 13.0,
-        }
-      t04:
-        {
-          fraction: 0.0625,
-          cohesion: 94.0,
-          alignment: 78.69999694824219,
-          separation: 30.799999237060547,
-        }
-      t05:
-        {
-          fraction: 0.0625,
-          cohesion: 81.4000015258789,
-          alignment: 34.599998474121094,
-          separation: 2.200000047683716,
-        }
-      t06:
-        {
-          fraction: 0.0625,
-          cohesion: 3.0999999046325684,
-          alignment: 40.5,
-          separation: 17.0,
-        }
-      t07:
-        {
-          fraction: 0.0625,
-          cohesion: 88.80000305175781,
-          alignment: 7.199999809265137,
-          separation: 29.799999237060547,
-        }
-      t08:
-        {
-          fraction: 0.0625,
-          cohesion: 32.70000076293945,
-          alignment: 76.80000305175781,
-          separation: 26.100000381469727,
-        }
-      t09:
-        {
-          fraction: 0.0625,
-          cohesion: 14.5,
-          alignment: 56.79999923706055,
-          separation: 27.600000381469727,
-        }
-      t10:
-        {
-          fraction: 0.0625,
-          cohesion: 63.29999923706055,
-          alignment: 99.9000015258789,
-          separation: 13.899999618530273,
-        }
-      t11:
-        {
-          fraction: 0.0625,
-          cohesion: 32.5,
-          alignment: 25.200000762939453,
-          separation: 24.399999618530273,
-        }
-      t12:
-        {
-          fraction: 0.0625,
-          cohesion: 97.5999984741211,
-          alignment: 56.5,
-          separation: 12.100000381469727,
-        }
-      t13:
-        {
-          fraction: 0.0625,
-          cohesion: 62.20000076293945,
-          alignment: 9.100000381469727,
-          separation: 28.299999237060547,
-        }
-      t14:
-        {
-          fraction: 0.0625,
-          cohesion: 76.4000015258789,
-          alignment: 52.900001525878906,
-          separation: 32.0,
-        }
-      t15:
-        {
-          fraction: 0.0625,
-          cohesion: 48.099998474121094,
-          alignment: 54.400001525878906,
-          separation: 30.700000762939453,
-        }
-
-fields: {}
-
-operators:
-  - { op: radius_graph, at: particle, radius: 0.04, min_radius: 0.001 }
-  - { op: cohesion, at: particle } # boids decomposed: the three steering rules
-  - { op: velocity_align, at: particle, per_type: true } # are separate operators; the engine sums them
-  - { op: separation, at: particle }
-
-schedule: [radius_graph, cohesion, velocity_align, separation]
-
-plotting:
-  background: black
-  colormap: tab20
-  point_size: 6.0
-
-# --- auto: video descriptions (gemma-4-12B) ---
-descriptions:
-  movie_particle:
-    description: The simulation begins with a dense, uniform distribution of multi-colored particles across
-      a black background. Over time, the particles begin to aggregate into distinct, circular clusters
-      of varying sizes. These clusters appear to form and dissolve dynamically, with some growing larger
-      while others shrink or dissipate. By the final frame, the particles are organized into several prominent,
-      high-density circular formations surrounded by a sparse field of individual dots.
-    objects: The scene contains thousands of small, circular particles of uniform size. These particles
-      are colored in a variety of hues, including white, red, blue, green, orange, and pink. Initially,
-      the particles are arranged in a random, scattered topology across the entire frame. As the simulation
-      progresses, they form dense, concentric circular clusters that stand out against the black background.</pre></span></span>
-      <span class="sim-cap">cohesion + alignment + separation produce flocking</span>
-    </figcaption>
-  </figure>
-  <figure class="sim-card">
-    <video src="gallery/active_matter.mp4" autoplay loop muted playsinline preload="metadata"></video>
-    <figcaption>
-      <span class="sim-name" tabindex="0">active matter (Vicsek)<span class="sim-spec"><pre># vicsek_flock -- Vicsek active matter (radius_graph + alignment + cruise): low noise -&gt; polar order (phi-&gt;1)
-# Reproduces a prototype/well active-matter regime. Refs: Vicsek et al., PRL 75 (1995);
-# The Well (Ohana et al., NeurIPS 2024). Ordered flock.
-general: {name: vicsek_flock, seed: 0, n_frames: 1200, dt: 0.25, boundary: periodic}
-sets:
-  particle:
-    n: 2000
-    vel_init: 0.005
-fields: {}
-operators:
-  - {op: radius_graph, at: particle, radius: 0.05}
-  - {op: velocity_align,    at: particle, a: 0.5}          # Vicsek nominal (gate=none, per_type=false)
-  - {op: velocity_cruise,  at: particle, v0: 0.005, noise: 0.001, chirality: 0.0}
-schedule: [radius_graph, velocity_align, velocity_cruise]
-plotting:
-  background: black
-  marker: triangle
-  triangle_size: 0.01
-  colormap: tab10
-
-# --- auto: video descriptions (gemma-4-12B) ---
-descriptions:
-  movie_particle:
-    description: The simulation shows a collection of blue triangular particles moving in a complex, fluid-like
-      motion. Over time, the particles form swirling patterns and dense clusters that shift and evolve
-      across the black background. The flow exhibits turbulent characteristics, with some areas showing
-      high concentration and others remaining sparse. The overall movement suggests a dynamic system governed
-      by collective behavior or fluid dynamics.
-    objects: The scene contains numerous small, blue triangular particles distributed across a black field.
-      These particles are arranged in irregular, swirling clusters and elongated filaments that suggest
-      a flow field. Each individual triangle is uniform in size and color, providing a consistent visual
-      representation of the data. The topology of the objects changes as they aggregate into dense regions
-      and disperse into more scattered formations.</pre></span></span>
-      <span class="sim-cap">alignment orders self-propelled agents into a swarm</span>
-    </figcaption>
-  </figure>
-</div>
-
 <h3>Turing — Gray–Scott reaction–diffusion</h3>
 <p class="opk">Reaction–diffusion on the cell–cell adjacency graph (<code>graph_diffuse</code> → <code>react</code>) — Turing's two-species activator–inhibitor system, on a 2D cell disc: the coral regime, a fine maze (small χ), and a diverging activator view (high → red, low → blue, balanced → white).</p>
 <p class="opk-ref">Reference — the Gray–Scott system of <a href="https://doi.org/10.1016/0009-2509(83)80132-8">Gray &amp; Scott (1983), <i>Chem. Eng. Sci.</i> 38:29–43</a>, in the reaction–diffusion form and parameter map of <a href="https://doi.org/10.1126/science.261.5118.189">Pearson (1993), <i>Science</i> 261:189–192</a>; the Brusselator is <a href="https://doi.org/10.1063/1.1668896">Prigogine &amp; Lefever (1968), <i>J. Chem. Phys.</i> 48:1695–1700</a>.</p>
@@ -4526,6 +4270,262 @@ plotting:
   camera_elev_end: 1.2
   camera_turns: 0.5</pre></span></span>
       <span class="sim-cap">Thomas flow</span>
+    </figcaption>
+  </figure>
+</div>
+
+<h3>Interaction &amp; flocking</h3>
+<p class="opk">Lateral operators over a radius neighbour graph: a per-type force law (attraction–repulsion) and the three boids rules that sum to flocking.</p>
+<p class="opk-ref">Reference — boids is <a href="https://doi.org/10.1145/37402.37406">Reynolds (1987), <i>SIGGRAPH Comput. Graph.</i> 21(4):25–34</a>, the soft-core pair potential is <a href="https://doi.org/10.1103/PhysRevLett.96.104302">D’Orsogna et&nbsp;al. (2006), <i>Phys. Rev. Lett.</i> 96:104302</a>, and the alignment model is <a href="https://doi.org/10.1103/PhysRevLett.75.1226">Vicsek et&nbsp;al. (1995), <i>Phys. Rev. Lett.</i> 75:1226–1229</a>; the implementations are adapted from <a href="https://github.com/allierc/ParticleGraph">ParticleGraph</a> (Allier et&nbsp;al.).</p>
+<div class="sim-gallery">
+  <figure class="sim-card">
+    <video src="gallery/attraction.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">attraction–repulsion<span class="sim-spec"><pre># Full match to ParticleGraph arbitrary_3_1: 3 types, 30000 particles, sigma=0.005,
+# max_radius=0.075, periodic, first_derivative, dt=0.1, 250 frames. Now feasible
+# because attraction_repulsion runs on a radius neighbour graph (O(E)), not dense.
+general:
+  name: arbitrary_3
+  seed: 0
+  n_frames: 250
+  dt: 0.1
+  boundary: periodic
+
+sets:
+  particle:
+    n: 30000
+    types:
+      t0: {fraction: 0.34, p: [1.6233, 1.0413, 1.6012, 1.5615]}
+      t1: {fraction: 0.33, p: [1.7667, 1.8308, 1.0855, 1.9055]}
+      t2: {fraction: 0.33, p: [1.7226, 1.7850, 1.0584, 1.8579]}
+
+fields: {}
+
+operators:
+  - {op: radius_graph,         at: particle, radius: 0.075}
+  - {op: attraction_repulsion, at: particle, sigma: 0.005}
+
+schedule: [radius_graph, attraction_repulsion]
+
+plotting:                      # render STYLE (read by plexus.plot; engine ignores it)
+  background: black
+  colormap: tab10
+  point_size: 2.0
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The simulation begins with a dense, uniform distribution of multicolored particles across
+      the entire field. Over time, the particles begin to aggregate into distinct, circular clusters with
+      dark centers. These clusters grow in size and number as the particles organize into a cellular-like
+      structure. By the final frame, the particles have formed a highly structured network of interconnected
+      circular domains.
+    objects: The scene contains thousands of tiny, individual particles in blue, green, and orange. These
+      particles are initially scattered randomly but eventually form large, circular clusters. Each cluster
+      features a dark, empty center surrounded by a dense ring of multicolored particles. The final topology
+      consists of a repeating, honeycomb-like pattern of these interconnected circular structures.</pre></span></span>
+      <span class="sim-cap">per-type interaction sorts particles into cells</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/boids.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">boids<span class="sim-spec"><pre># Exact reproduction of ParticleGraph boids reference graphs_data/boids/boids:
+# 1792 particles, 16 types (112 each), 4000 frames, min_radius=0.001,
+# max_radius=0.04, dt=0.5, periodic, 2nd_derivative, mean aggregation.
+# Per-type p = [cohesion, alignment, separation].
+general:
+  name: boids_16
+  seed: 0
+  n_frames: 16000
+  dt: 0.5
+  boundary: periodic
+
+sets:
+  particle:
+    n: 1792
+    vel_init: 0.0004
+    types:
+      t00:
+        {
+          fraction: 0.0625,
+          cohesion: 27.600000381469727,
+          alignment: 92.5,
+          separation: 48.20000076293945,
+        }
+      t01:
+        {
+          fraction: 0.0625,
+          cohesion: 32.0,
+          alignment: 51.79999923706055,
+          separation: 29.799999237060547,
+        }
+      t02:
+        {
+          fraction: 0.0625,
+          cohesion: 23.600000381469727,
+          alignment: 35.0,
+          separation: 13.5,
+        }
+      t03:
+        {
+          fraction: 0.0625,
+          cohesion: 3.299999952316284,
+          alignment: 76.4000015258789,
+          separation: 13.0,
+        }
+      t04:
+        {
+          fraction: 0.0625,
+          cohesion: 94.0,
+          alignment: 78.69999694824219,
+          separation: 30.799999237060547,
+        }
+      t05:
+        {
+          fraction: 0.0625,
+          cohesion: 81.4000015258789,
+          alignment: 34.599998474121094,
+          separation: 2.200000047683716,
+        }
+      t06:
+        {
+          fraction: 0.0625,
+          cohesion: 3.0999999046325684,
+          alignment: 40.5,
+          separation: 17.0,
+        }
+      t07:
+        {
+          fraction: 0.0625,
+          cohesion: 88.80000305175781,
+          alignment: 7.199999809265137,
+          separation: 29.799999237060547,
+        }
+      t08:
+        {
+          fraction: 0.0625,
+          cohesion: 32.70000076293945,
+          alignment: 76.80000305175781,
+          separation: 26.100000381469727,
+        }
+      t09:
+        {
+          fraction: 0.0625,
+          cohesion: 14.5,
+          alignment: 56.79999923706055,
+          separation: 27.600000381469727,
+        }
+      t10:
+        {
+          fraction: 0.0625,
+          cohesion: 63.29999923706055,
+          alignment: 99.9000015258789,
+          separation: 13.899999618530273,
+        }
+      t11:
+        {
+          fraction: 0.0625,
+          cohesion: 32.5,
+          alignment: 25.200000762939453,
+          separation: 24.399999618530273,
+        }
+      t12:
+        {
+          fraction: 0.0625,
+          cohesion: 97.5999984741211,
+          alignment: 56.5,
+          separation: 12.100000381469727,
+        }
+      t13:
+        {
+          fraction: 0.0625,
+          cohesion: 62.20000076293945,
+          alignment: 9.100000381469727,
+          separation: 28.299999237060547,
+        }
+      t14:
+        {
+          fraction: 0.0625,
+          cohesion: 76.4000015258789,
+          alignment: 52.900001525878906,
+          separation: 32.0,
+        }
+      t15:
+        {
+          fraction: 0.0625,
+          cohesion: 48.099998474121094,
+          alignment: 54.400001525878906,
+          separation: 30.700000762939453,
+        }
+
+fields: {}
+
+operators:
+  - { op: radius_graph, at: particle, radius: 0.04, min_radius: 0.001 }
+  - { op: cohesion, at: particle } # boids decomposed: the three steering rules
+  - { op: velocity_align, at: particle, per_type: true } # are separate operators; the engine sums them
+  - { op: separation, at: particle }
+
+schedule: [radius_graph, cohesion, velocity_align, separation]
+
+plotting:
+  background: black
+  colormap: tab20
+  point_size: 6.0
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The simulation begins with a dense, uniform distribution of multi-colored particles across
+      a black background. Over time, the particles begin to aggregate into distinct, circular clusters
+      of varying sizes. These clusters appear to form and dissolve dynamically, with some growing larger
+      while others shrink or dissipate. By the final frame, the particles are organized into several prominent,
+      high-density circular formations surrounded by a sparse field of individual dots.
+    objects: The scene contains thousands of small, circular particles of uniform size. These particles
+      are colored in a variety of hues, including white, red, blue, green, orange, and pink. Initially,
+      the particles are arranged in a random, scattered topology across the entire frame. As the simulation
+      progresses, they form dense, concentric circular clusters that stand out against the black background.</pre></span></span>
+      <span class="sim-cap">cohesion + alignment + separation produce flocking</span>
+    </figcaption>
+  </figure>
+  <figure class="sim-card">
+    <video src="gallery/active_matter.mp4" autoplay loop muted playsinline preload="metadata"></video>
+    <figcaption>
+      <span class="sim-name" tabindex="0">active matter (Vicsek)<span class="sim-spec"><pre># vicsek_flock -- Vicsek active matter (radius_graph + alignment + cruise): low noise -&gt; polar order (phi-&gt;1)
+# Reproduces a prototype/well active-matter regime. Refs: Vicsek et al., PRL 75 (1995);
+# The Well (Ohana et al., NeurIPS 2024). Ordered flock.
+general: {name: vicsek_flock, seed: 0, n_frames: 1200, dt: 0.25, boundary: periodic}
+sets:
+  particle:
+    n: 2000
+    vel_init: 0.005
+fields: {}
+operators:
+  - {op: radius_graph, at: particle, radius: 0.05}
+  - {op: velocity_align,    at: particle, a: 0.5}          # Vicsek nominal (gate=none, per_type=false)
+  - {op: velocity_cruise,  at: particle, v0: 0.005, noise: 0.001, chirality: 0.0}
+schedule: [radius_graph, velocity_align, velocity_cruise]
+plotting:
+  background: black
+  marker: triangle
+  triangle_size: 0.01
+  colormap: tab10
+
+# --- auto: video descriptions (gemma-4-12B) ---
+descriptions:
+  movie_particle:
+    description: The simulation shows a collection of blue triangular particles moving in a complex, fluid-like
+      motion. Over time, the particles form swirling patterns and dense clusters that shift and evolve
+      across the black background. The flow exhibits turbulent characteristics, with some areas showing
+      high concentration and others remaining sparse. The overall movement suggests a dynamic system governed
+      by collective behavior or fluid dynamics.
+    objects: The scene contains numerous small, blue triangular particles distributed across a black field.
+      These particles are arranged in irregular, swirling clusters and elongated filaments that suggest
+      a flow field. Each individual triangle is uniform in size and color, providing a consistent visual
+      representation of the data. The topology of the objects changes as they aggregate into dense regions
+      and disperse into more scattered formations.</pre></span></span>
+      <span class="sim-cap">alignment orders self-propelled agents into a swarm</span>
     </figcaption>
   </figure>
 </div>

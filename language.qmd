@@ -85,7 +85,7 @@ implementations specify *how* it is numerically realized. The signature specifie
 - the maps relating the participating sets.
 
 Maps define the relations required by the mechanism. They determine, for example,
-which particle belongs to which cell, which synapses connect which neurons, or how
+which protein belongs to which cell, which synapses connect which neurons, or how
 cells relate to a continuous field. Plexus incorporates maps into the operator,
 making operators typed morphisms between biological sets.
 
@@ -104,8 +104,9 @@ physiology.
 
 Every element of a set carries a state describing its current biological condition.
 While sets define *what* biological entities exist, states define *what each entity
-carries*. The state schema is specific to each set. A particle may carry position,
-velocity and deformation gradient; a neuron membrane voltage and calcium; a cell
+carries*. The state schema is specific to each set. A protein may carry position,
+binding state and the load it bears; a material point position, velocity and
+deformation gradient; a neuron membrane voltage and calcium; a cell
 polarity, stiffness and gene-expression levels; a synapse conductance and plastic
 weight. Operators transform states. They consume selected state variables and
 produce updates to others, while leaving the underlying biological entities
@@ -153,13 +154,13 @@ exactly these eight.
 ![](figures/fig_ops.png){width=100% fig-align="center"}
 
 **Lateral.** Lateral operators describe interactions between entities belonging to
-the same set. Typical examples include mechanical forces between particles, adhesion
+the same set. Typical examples include mechanical forces between proteins, adhesion
 between neighbouring cells, electrical communication between neurons, or biochemical
 interactions within a metabolic network.
 
 **Aggregate.** Aggregate operators propagate information from many entities to a
 higher level of biological organization. Examples include computing cellular
-properties from their constituent particles or accumulating synaptic currents acting
+properties from their constituent proteins or accumulating synaptic currents acting
 on a neuron.
 
 **Broadcast.** Broadcast operators perform the complementary transformation,
