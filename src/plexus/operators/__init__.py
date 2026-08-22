@@ -65,6 +65,10 @@ from . import segmentation_seed     # noqa: F401  a measured instance segmentati
 # are re-export shims: thirty files still import them by bare module name.
 from . import vertex_ops            # noqa: F401  seed_mesh, cell_mechanics, cell_divide, cell_die, edge_flip, topo_record
 from . import diffusion_reaction    # noqa: F401  seed_cell_chem, cell_chem_diffuse/react, cell_geometry, cell_grow, ...
+from . import junction_ops          # noqa: F401  junction_myosin (default|two_pool), junction_sync, medioapical_myosin, cytokinetic_ring
+from . import ecm_ops               # noqa: F401  ecm_seed/stress/from_cell, cell_exclude, block_seed/stress
+from . import membrane_ops          # noqa: F401  bm_*, adhesion_*, integrin_* (minus what AUDIT rejects)
+from . import contact_ops           # noqa: F401  mesh_contact, mesh_inside, surface_track, plate_confine, bm_sense, ecm_load
 
 __all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion", "squared_law", "attractor_flow",
            "cohesion", "velocity_align", "separation", "velocity_cruise", "drag",
@@ -74,4 +78,5 @@ __all__ = ["graph", "aggregate", "broadcast", "attraction_repulsion", "squared_l
            "mpm_spin", "mpm_anchor", "material_map", "mpm",
            "mpm_grid", "mpm_strain", "mpm_scatter", "mpm_grid_update", "mpm_gather",
            "agent_scatter", "agent_gather", "agent_remodel", "polarity_flow_align", "polarity_align",
-           "vertex_ops", "diffusion_reaction"]
+           "vertex_ops", "diffusion_reaction", "junction_ops", "ecm_ops", "membrane_ops",
+           "contact_ops"]
