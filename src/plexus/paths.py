@@ -87,6 +87,11 @@ _PRE_FOLDER_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("promotion",   ()),
     ("gates",       ()),
     ("atlas",       ()),
+    # THE NEURAL FOLDER. Recurrent circuits: a `neuron` set, a `synapse` edge-set carrying the
+    # connectivity matrix, and the assemblies that contain them (`operators/neural.py`). Trigger
+    # substrings are given because these specs are named for what they model -- `ctrnn_*`,
+    # `assemblies_*` -- rather than for the folder, unlike the three above.
+    ("neural",      ("neural", "ctrnn", "assemblies", "connectome")),
 ]
 _VALID_PRE_FOLDERS = {f for f, _ in _PRE_FOLDER_RULES}
 

@@ -1,0 +1,353 @@
+# ctrnn_assemblies -- a continuous-time recurrent circuit as a Plexus composition.
+#
+# THE MODEL (Allier et al., "Graph neural networks uncover structure and function underlying the
+# activity of neural assemblies", eqn. simulation):
+#
+#     dx_i/dt = -x_i/tau_i + s_i tanh(x_i) + g_i Omega_i(t) SUM_j W_ij psi_ij(x_j)
+#
+# expressed as TWO operators whose deltas the engine sums -- `neuron_update` (the local update
+# phi) and `neuron_signal` (the pairwise signalling psi through W) -- plus `neuron_field_input`,
+# which samples the external field Omega onto each neuron before psi reads it.
+#
+# THE HIERARCHY IS ORDINARY CONTAINMENT, and that is the point of running this model here at all:
+#
+#     brain -> assembly -> neuron        the same `parent` map that relates particles to a cell
+#     synapse                            an EDGE-SET whose elements are connections (pre/post)
+#
+# An assembly is not a new primitive; it is a set at another scale. The connectivity matrix is not
+# a dense tensor inside an operator; it is the `w` state of the synapse set.
+#
+# UNITS: none declared -- this run is dimensionless. tau, g and dt are numbers, and no result from
+# it may be quoted with a unit. Stated here rather than left to be inferred from a plot axis.
+#
+# GENERATED connectivity: 3 assemblies of 8, p_within=0.45 / p_cross=0.10, weights ~ N(0, 1/sqrt(N))
+# with within-assembly coupling boosted 1.8x, seed 7. Inline because the language has no
+# `edges_file:` yet -- which is what caps this demo at 24 neurons.
+general:
+  name: ctrnn_assemblies
+  seed: 0
+  n_frames: 600
+  dt: 0.1
+  dim: 2
+  world: 1.0
+  boundary: wall
+
+sets:
+  brain:
+    n: 1
+
+  # one scale up from the neuron: a group, with a position and a readout of its own
+  assembly:
+    parent: brain
+    per_parent: 3
+    radius: 0.30
+
+  # the neuron's state layout is NOT written here -- it comes from the registered `neuron`
+  # entity (models/entities.py): pos (fixed geometry), voltage (the integrated coordinate),
+  # omega (the external modulation channel).
+  neuron:
+    parent: assembly
+    per_parent: 8
+    radius: 0.10
+    # FOUR NEURON TYPES, differing in the parameters of the update equation.
+    #   p = [a, b, g, s, w, h]
+    #       a decay (1/tau) | b offset | g gain | s self-coupling | w psi width | h psi threshold
+    types:
+      slow_quiet:  {fraction: 0.25, p: [0.5, 0.0, 4.0, 0.5, 1.00, 0.0]}
+      slow_bursty: {fraction: 0.25, p: [0.5, 0.0, 4.0, 2.0, 0.50, 0.0]}
+      fast_quiet:  {fraction: 0.25, p: [2.0, 0.0, 4.0, 0.5, 2.00, 0.0]}
+      fast_bursty: {fraction: 0.25, p: [2.0, 0.0, 4.0, 2.0, 0.25, 0.0]}
+
+  # the connectivity matrix, in the language: one element per connection, joined to the neuron
+  # set by the `pre`/`post` incidence maps, carrying W_e in its `w` block.
+  synapse:
+    parent: brain
+    edge_set: true
+    pre: neuron
+    post: neuron
+    edges:
+    - [0, 1]
+    - [0, 2]
+    - [0, 4]
+    - [0, 5]
+    - [0, 6]
+    - [0, 7]
+    - [0, 16]
+    - [1, 0]
+    - [1, 3]
+    - [1, 5]
+    - [1, 6]
+    - [1, 7]
+    - [1, 22]
+    - [2, 1]
+    - [2, 11]
+    - [2, 17]
+    - [2, 21]
+    - [3, 1]
+    - [3, 2]
+    - [3, 6]
+    - [3, 7]
+    - [3, 16]
+    - [4, 1]
+    - [4, 5]
+    - [4, 6]
+    - [4, 7]
+    - [4, 8]
+    - [4, 10]
+    - [4, 11]
+    - [4, 13]
+    - [5, 1]
+    - [5, 2]
+    - [5, 4]
+    - [5, 7]
+    - [5, 9]
+    - [6, 2]
+    - [6, 4]
+    - [6, 5]
+    - [6, 7]
+    - [6, 23]
+    - [7, 5]
+    - [8, 1]
+    - [8, 10]
+    - [8, 11]
+    - [8, 13]
+    - [8, 15]
+    - [9, 0]
+    - [9, 1]
+    - [9, 12]
+    - [9, 13]
+    - [10, 12]
+    - [10, 13]
+    - [10, 14]
+    - [11, 8]
+    - [11, 9]
+    - [11, 10]
+    - [11, 13]
+    - [11, 16]
+    - [11, 22]
+    - [12, 8]
+    - [12, 9]
+    - [12, 10]
+    - [12, 15]
+    - [13, 3]
+    - [13, 8]
+    - [13, 9]
+    - [13, 10]
+    - [13, 14]
+    - [14, 8]
+    - [14, 10]
+    - [14, 11]
+    - [14, 15]
+    - [15, 5]
+    - [15, 9]
+    - [15, 10]
+    - [15, 11]
+    - [15, 12]
+    - [16, 2]
+    - [16, 19]
+    - [16, 20]
+    - [16, 21]
+    - [17, 2]
+    - [17, 8]
+    - [17, 9]
+    - [17, 16]
+    - [17, 21]
+    - [17, 22]
+    - [17, 23]
+    - [18, 1]
+    - [18, 14]
+    - [18, 19]
+    - [18, 21]
+    - [18, 23]
+    - [19, 8]
+    - [19, 9]
+    - [19, 15]
+    - [19, 18]
+    - [19, 21]
+    - [19, 22]
+    - [20, 3]
+    - [20, 22]
+    - [21, 2]
+    - [21, 16]
+    - [21, 18]
+    - [21, 22]
+    - [21, 23]
+    - [22, 1]
+    - [22, 10]
+    - [22, 17]
+    - [22, 18]
+    - [22, 19]
+    - [22, 21]
+    - [22, 23]
+    - [23, 2]
+    - [23, 19]
+    - [23, 22]
+    weights:
+    - 0.311031
+    - 0.432936
+    - 0.408545
+    - 0.155841
+    - 0.145048
+    - 0.068093
+    - 0.106344
+    - -0.235972
+    - 0.232241
+    - 0.091278
+    - -0.346765
+    - -0.206732
+    - -0.170652
+    - -0.544204
+    - -0.088414
+    - -0.281047
+    - 0.012281
+    - -0.192113
+    - -0.725248
+    - -0.232829
+    - -0.481761
+    - 0.328662
+    - 0.516146
+    - -0.377321
+    - 0.414707
+    - 0.315618
+    - 0.031125
+    - 0.117429
+    - 0.054892
+    - 0.076829
+    - 0.269534
+    - 0.201546
+    - 0.892859
+    - 0.130484
+    - -0.556868
+    - -0.178898
+    - 0.08602
+    - 0.015839
+    - -0.325105
+    - -0.478181
+    - 0.080421
+    - -0.178019
+    - -0.003527
+    - 0.305926
+    - -0.17009
+    - 0.094887
+    - -0.120744
+    - 0.047696
+    - -0.258034
+    - -0.102719
+    - 0.286584
+    - 0.27467
+    - 0.490032
+    - 0.242439
+    - -0.245432
+    - 0.534365
+    - 0.327621
+    - 0.020768
+    - 0.029371
+    - -0.286953
+    - -0.146411
+    - -0.357948
+    - 0.084454
+    - -0.059532
+    - -0.229981
+    - -0.000128
+    - -0.000182
+    - 0.064618
+    - 0.096451
+    - 0.102476
+    - 0.607934
+    - 0.35688
+    - -0.170443
+    - 0.282257
+    - 0.313624
+    - 0.198351
+    - -0.089416
+    - 0.140062
+    - 0.192621
+    - 0.038202
+    - 0.241259
+    - -0.223991
+    - -0.012903
+    - -0.155084
+    - -0.552639
+    - 0.073309
+    - -0.014998
+    - 0.605679
+    - 0.149921
+    - 0.060079
+    - -0.029493
+    - 0.250439
+    - -0.897423
+    - -0.075968
+    - -0.223157
+    - 0.011654
+    - 0.519584
+    - -0.259014
+    - -1.053285
+    - 0.466394
+    - -0.044516
+    - -0.222123
+    - 0.209012
+    - 0.771105
+    - 0.153581
+    - 0.184692
+    - 0.010774
+    - 0.157452
+    - -0.036572
+    - 0.275283
+    - 0.684358
+    - -0.20376
+    - -0.196604
+    - -0.420049
+    - 0.053883
+    - -0.261859
+
+fields:
+  # Omega(x, y, t): a travelling activation that scales what a neuron hears from the network.
+  # A plain grid field driven by an operator the library already has.
+  omega:
+    frame: grid
+    res: 64
+    components: 1
+
+operators:
+  - op: activation_pulse
+    at: omega
+    period: 120
+    duration: 60
+    radius: 0.35
+    center: [0.3, 0.5]
+
+  - op: neuron_field_input        # Omega -> the neuron's `omega` block. MUST precede neuron_signal.
+    at: neuron
+    from: omega
+    offset: 1.0                   # baseline 1 = unmodulated, the reference's own convention
+
+  - op: neuron_update             # phi: -a x + b + s tanh(x)
+    at: neuron
+    model: leaky_tanh
+    noise: 0.02
+
+  - op: neuron_signal             # psi: g * Omega * SUM_e W_e psi(x_pre)
+    at: neuron
+    model: type_pairwise          # the receiver's width, the sender's threshold and linear term
+    edge_set: synapse
+    activation: tanh
+    field: omega
+
+  # the cross-scale readout: each assembly's `activity` is the mean voltage of its neurons,
+  # reduced along the SAME `parent` containment map that gives a cell its centroid.
+  - op: aggregate
+    at: assembly
+    child: neuron
+    block: voltage
+    into: activity
+
+schedule:
+  - activation_pulse
+  - neuron_field_input
+  - neuron_update
+  - neuron_signal
+  - aggregate
+
+plotting:
+  background: black
+  point_size: 6.0
