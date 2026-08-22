@@ -1,0 +1,350 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.3cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{good}{HTML}{1B7F3B}
+\definecolor{warn}{HTML}{B26B00}
+\definecolor{bad}{HTML}{B3261E}
+\definecolor{grey}{HTML}{666666}
+
+\newcommand{\code}[1]{\texttt{\small #1}}
+\newcommand{\dn}{\textcolor{good}{\textbf{done}}}
+\newcommand{\fl}{\textcolor{warn}{\textbf{in flight}}}
+\newcommand{\ns}{\textcolor{grey}{not started}}
+
+\titleformat{\section}{\large\bfseries}{\thesection.}{0.6em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection}{0.6em}{}
+\setlist{leftmargin=1.2em,itemsep=2pt,topsep=3pt}
+
+\input{promotion_tables}
+
+\title{\vspace{-1.6cm}\textbf{Promoting \code{discovery\_okuda} into \code{src/plexus}}\\[2pt]
+\large the 3D vertex model becomes part of the language, and what had to be true for that}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+\vspace{-1.1cm}
+
+\section{What this is}
+
+\code{discovery\_okuda} held the 3D active vertex model, reaction--diffusion on the cell graph, the
+junction and medioapical myosin pools, and the whole basement-membrane / extracellular-matrix stack:
+52 registered operator names across 21 files, and behind them \code{log/okuda} and
+\code{log/okuda\_ECM}. None of it was in the framework \code{paper/plexus2.tex} describes. The core's
+own \code{src/plexus/operators/} carried 43 names in 45 one-operator files, and not one mesh or
+chemistry operator among them.
+
+This note is the record of moving that vocabulary into the core, written as each phase landed rather
+than summarised afterwards. Its structure follows the paper's four parts --- mechanism, equations and
+symbols, the Plexus2 container, gates --- with one section per phase, and its gate tables are
+generated from the run record by \code{tools/promotion\_note.py} rather than transcribed.
+
+\paragraph{The two things that had to be true.} A promotion of this size is only checkable if it can
+be shown to change nothing. Two gates run on every phase.
+
+\begin{enumerate}
+\item \textbf{The twin run.} The spec is run in okuda \emph{first}, and its twin is run in the
+  codebase; previous okuda results are never the reference, because okuda is still moving. Both
+  sides are submitted \emph{together}, as two \code{bsub} jobs on \code{gpu\_l4}, and the comparison
+  is array by array, bit for bit, reduced to one sha1 per side.
+\item \textbf{The okuda\_ECM gates 00--04}, each assigned to the phase that enables it, each with a
+  table of thresholds declared \emph{before} the promoted run. \S\ref{sec:gates}.
+\end{enumerate}
+
+\section{Phase 0 --- the engine}
+
+\subsection{The half-edge mesh becomes an engine concept}
+
+A closed cellular surface is stored as a flat half-edge table: three parallel \code{int64} arrays
+\code{E\_srce}, \code{E\_trgt}, \code{E\_face}, plus the counts \code{nF} (faces $=$ cells) and
+\code{Nv}. Face $f$'s ring is recovered by walking the table and appending \code{E\_srce[k]} for
+every $k$ with \code{E\_face[k] == f}, \emph{in table order}. That ordering \emph{is} the geometry:
+\code{rings\_from\_flat\_3d} never reads \code{E\_trgt}, never sorts and never validates, so a sort,
+a compaction, or a scatter-into-reservoir by any future writer produces garbage rings in silence.
+
+Before this promotion the table was a private attribute one operator invented ---
+\code{grep -rn "\_mesh" src/plexus/} returned nothing at all --- while roughly forty consumers read
+it: the chemistry, the mechanics, the T1s, the cross-scale contact operators, the recorder, the
+salvage, the instrument's fingerprint, the renderers. A spec could schedule \code{cell\_mechanics}
+without \code{mesh\_seed} and die of \code{AttributeError} from inside an autograd pass.
+
+It is now declared and allocated:
+
+\begin{center}\small
+\begin{tabular}{@{}ll@{}}\toprule
+\code{sets: \{vertex: \{mesh: half\_edge, cell\_set: cell\}\}} & the declaration\\
+\code{plexus.models.mesh.MeshTable} & the table, a \code{dict} subclass\\
+\code{plexus.models.topology} & its algorithms (rings, edge split, face division)\\
+\code{engine.\_build\_mesh} & allocates an \emph{empty} table in \code{build}'s pass 1\\
+\code{seed\_mesh} & \emph{fills} it, rather than rebinding a new one\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Why it subclasses \code{dict}, and this is not a style choice.}
+\code{discovery\_okuda/instrument.py:43} reads \code{if isinstance(m, dict):}. That is the acted
+ledger --- the thing that decides whether an operator \emph{did anything} --- wrapped in a bare
+\code{except Exception: return ()}. A \code{MutableMapping} that is not a \code{dict} subclass fails
+that test silently, the fingerprint collapses to \code{()}, and every operator whose only effect is
+on the mesh (\code{cell\_grow} writing \code{V0f}, \code{cell\_divide} changing \code{nF},
+\code{junction\_myosin} writing \code{myo}) scores zero acts. The campaign then stamps
+\code{valid\_evidence: False} on runs that were fine.
+
+\paragraph{And the namespace stays open, deliberately.} Five keys are reserved; everything else is an
+extension namespace, because three live mechanisms depend on a name being \emph{absent}:
+\code{cell\_shape\_probe} publishes a field and then deletes it (absent means ``no cell dies'';
+zero-filled would mean ``kill everything''), \code{ecm\_gate\_growth}'s entire entry condition is
+\code{'mg\_scale' in m}, and the apoptosis discriminator resolves whatever name its spec gives it.
+
+\paragraph{The carry was written four times.} Permuting every per-face array through \code{keep} is
+one operation, and it existed in \code{cell\_divide}, in \code{cell\_die}, in
+\code{\_carry\_face\_state} and in \code{edge\_flip} --- and the fourth copy silently omitted the
+medioapical myosin, because a per-face state added by one operator has to be known to every topology
+operator and that one did not get the memo. It is now \code{MeshTable.reindex\_faces}, and the
+renumber of the paired \emph{cell} set is \code{Hierarchy.renumber\_set}, which moves all four stores
+the engine keeps per set. The fourth, \code{\_delta\_blocks}, is the one both hand-rolled versions
+missed: they guarded on \code{isinstance(key, tuple)} while \code{add\_delta} keys by level
+\emph{name}. It is inert today only because \code{chem} happens to be the cell set's coordinate
+block, so its deltas travel in \code{\_delta}; a second \code{first\_order} block on that set makes
+it live.
+
+\subsection{The recorder keeps the topology}
+
+\code{topo\_record} appended its history \emph{inside} the mesh table
+(\code{m.setdefault("hist", [])}), so the structure the engine now owns grew without bound for the
+length of the run and every consumer walked past a list of every frame it had ever had. The engine
+records it: one \code{MeshTable.snapshot()} per recorded row, written to both zarr and npz as a
+ragged store with \emph{no pickle} --- the three half-edge columns concatenated, plus row offsets,
+plus \code{nF}/\code{Nv} per row. Euler now computes off the core's own trajectory file,
+\[
+  V - E + F \;=\; \mathtt{Nv}[t] \;-\; \tfrac{1}{2}\big(\mathtt{off}[t{+}1] - \mathtt{off}[t]\big)
+  \;+\; \mathtt{nF}[t] \;=\; 2 ,
+\]
+which is what gate~00's closed-form row needs and what \code{topo\_record} could not give it.
+
+\subsection{Two bugs that destroyed finished work}
+
+\begin{itemize}
+\item \code{Group.create\_dataset(name, data=...)} is the zarr-2 spelling. zarr~3 kept the method,
+  deprecated it, and made \code{shape} a \emph{required} keyword, so every core generation on the
+  cluster (zarr 3.1.5) died \emph{after} the whole simulation had run and \emph{before} the npz was
+  written --- 25 minutes of GPU, an empty \code{simulation.zarr}, no trajectory. The devcontainer
+  has zarr 2.18.7, which is why it never appeared in development.
+\item The npz writer put \code{d["pos"]} in unconditionally. A mesh model's \code{cell} set has no
+  \code{pos} block at all --- it carries \code{chem}, \code{cen}, \code{area} --- so \code{None} went
+  in as a 0-d \emph{object} array and every read of the file died on \code{allow\_pickle}. Worse, the
+  recorded blocks were not written at all: a reaction--diffusion run wrote a trajectory with no
+  reaction in it.
+\end{itemize}
+
+\subsection{325 of 461 specs did not load}
+
+Not ``would eventually fail'': \code{ValueError: operator 'seed\_mesh' not in registry}, for every
+\code{r0*} the campaign had ever written. The specs had been migrated to the post-seed-refactor
+\code{seed\_<noun>} convention --- the one core already uses for \code{seed\_from\_segmentation} ---
+and the okuda classes had not, so the corpus split 324/137 across two spellings of one operator and
+the larger half was dead. Both spellings resolve now: canonical \code{seed\_mesh} and
+\code{seed\_cell\_chem}, aliases \code{mesh\_seed} and \code{cell\_chem\_seed}. 460 of 461 load; the
+one that does not names \code{morphogen\_growth\_3d}, which is stale in a different way and is
+recorded rather than guessed at.
+
+\section{Phases A--D --- the operators}
+
+\code{tools/group\_operators.py} moved them, and the choice to write a script rather than edit by
+hand is the reason bit-equality is a reachable claim across 3{,}800 lines. It hoists each source's
+imports, rewrites the ones that named a sibling by bare module name, and concatenates the bodies
+under a banner. Nothing inside a function body is touched. \code{--verify} compares \emph{text}:
+every top-level definition's exact source, decorators included, searched for as a substring of the
+module it landed in.
+
+That verify earned itself on the first run. \code{ClassDef.lineno} is the line of the \code{class}
+keyword, not of the \code{@register\_operator(...)} above it, so taking it as the start of the body
+dropped the decorator off the \emph{first} class in every file: \code{cell\_geometry} silently left
+the registry and 461 specs stopped loading. The counting check --- ``70 names, looks right'' --- had
+passed.
+
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}\toprule
+from & to & lines\\\midrule
+\code{topology\_ops.py} & \code{src/plexus/models/topology.py} & 218\\
+\code{mesh\_ops + t1\_ops + monolayer\_ops} & \code{operators/vertex\_ops.py} & 2183\\
+\code{chem\_ops + shape\_chem\_ops + shape\_probe\_ops} & \code{operators/diffusion\_reaction.py} & 1490\\
+\code{junction\_ops + medioapical\_ops} & \code{operators/junction\_ops.py} & 856\\
+\code{ecm\_ops + block\_ops} & \code{operators/ecm\_ops.py} & 864\\
+\code{membrane\_ops + integrin\_ops} & \code{operators/membrane\_ops.py} & 2187\\
+\code{mesh\_contact + bm\_sense + plate + surface + load} & \code{operators/contact\_ops.py} & 1183\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{The shims are load-bearing.} Thirty files import \code{mesh\_ops} / \code{chem\_ops} /
+\code{topology\_ops} by bare module name --- \code{run\_one.py}, \code{instrument.py},
+\code{vtk\_render.py}, \code{metrics.py} and twenty archive and analysis scripts --- and the campaign
+is still running against them. Each moved file is a re-export, \emph{private names included}:
+\code{t1\_ops} calls \code{\_carry\_face\_state} and \code{analyze\_forces} reaches for
+\code{\_engine\_owns\_clock}.
+
+\paragraph{Two operators did not come.} \code{mpm\_boundary} and \code{bm\_strain} are rejected by
+\code{AUDIT.md}, and a rejection that lives only in a markdown file is one the next reader
+re-promotes by accident. Their classes are \emph{cut out} of the module that moved and left in
+\code{discovery\_okuda/ops/membrane\_ops.py} under a banner saying why: an archived spec that names
+one still runs, and no spec can reach either from the core registry. \code{mpm\_boundary} overwrites
+grid-node velocity, so the constraint is kinematic --- momentum not conserved, the reaction
+discarded --- and its standoff is set by the B-spline stencil width, measured across \code{recover}
+$0/2/6/20$ as $46.6\%/3.8\%/11.5\%/13.9\%$ of the sheet inside the tissue against standoffs
+$+0.0006/+0.0124/+0.0088/+0.0069$, never reaching the $0 \to +0.002$ that would mean ``just
+touching''. \code{integrin\_track} is the constraint it should have been. \code{bm\_strain} is, in
+AUDIT's words, ``not a mechanism''.
+
+\subsection{Redundancy: the four merge candidates, settled by reading them}
+
+\begin{itemize}
+\item \textbf{\code{interface\_tension} $+$ \code{interface\_push} --- do not merge.} They were one
+  operator, \code{rd\_interface\_tension}, carrying
+  $K_{\text{purse}}\sum_{\text{iface}} \ell_e \;-\; K_{\text{extrude}}\sum_{\text{red}} a\,r$. The
+  first term is ordinary vertex-model physics; the second does not model a force, it pays the tissue
+  to produce the morphology the campaign was searching for. One name over both cost four rounds:
+  \code{K\_extrude} measured $0.0$ in all 78 specs that ever carried the operator, so nothing was
+  ever forced, and the Grounder still reported a round as ``the same extrude-forced star for a
+  fourth round'' on three runs whose specs contain no such operator. The split \emph{is} the fix.
+\item \textbf{\code{ecm\_stress} / \code{block\_stress} --- merge, in Phase D.} Same body. They
+  differ in two defaults --- \code{scale} $0.15$ for the matrix against $0.004$ for the block, which
+  is right, since the block is ${\sim}130\times$ stiffer --- and in \emph{which module-level history
+  list} they append to. That list is the only reason the duplicate exists.
+\item \textbf{\code{ecm\_seed} / \code{block\_seed} --- do not merge.} Box-minus-a-cavity with
+  aligned fibres against two slabs of jittered lattice. Same family, different geometry.
+\item \textbf{\code{integrin\_adhesion} vs \code{integrin\_pull}/\code{seed}/\code{track} --- do not
+  merge.} One is membrane$\to$epithelium, the other matrix$\to$membrane. The shared prefix is the
+  problem, not the code; they go in one module with that sentence at the top of it.
+\end{itemize}
+
+\subsection{The inventory}
+
+\optable
+
+\section{The twin-run gate}\label{sec:twin}
+
+\paragraph{The protocol, stated exactly.} \emph{Run the spec in okuda first, and run the twin spec in
+the codebase. Do not use previous okuda results --- they can be updated. Run both on the L4 cluster
+node, in parallel.} Nothing already sitting in \code{log/okuda} is ever the reference: those
+artefacts were produced by whatever okuda was on the day they were written, and \code{round.py} runs
+campaigns into that tree while \code{staged.py} writes into it by hand. A promotion checked against a
+stale file proves that the file has not changed, which is not the question.
+
+\paragraph{What counts as identical.} The two writers differ --- okuda's \code{RunArchive} writes
+\code{traj.npz} (\code{pos\_i}, \code{act\_i}), the core writes \code{trajectory.npz}
+(\code{<set>\_\_pos}, \code{<set>\_\_occ}, \code{<set>\_\_chem}) --- so a file hash cannot match and
+is not the test. What makes the two comparable at all is that okuda's own frames come out of
+\code{engine.\_assemble}: \code{run\_one.py:593} reads \code{out["sets"]["vertex"]["pos"]} and
+\code{out["sets"]["cell"]["state"]["chem"]}, the same structure the core writes. So okuda's
+\code{pos\_i} \emph{is} the core's \code{vertex\_\_pos[t]} cropped to the live prefix, and
+\code{act\_i} \emph{is} \code{cell\_\_chem[t][:nF,0]}. okuda keeps the ${\sim}60$ frames its movie
+draws and stores their row indices in \code{ticks}; the core keeps every row; the okuda side is read
+first and its \code{ticks} select the core's rows.
+
+\paragraph{The repeatability floor is zero, and it was measured.} Byte-identity is only the right
+criterion if the platform can deliver it, and over 1{,}800 frames that is not obvious: one differing
+mantissa bit can move an \code{edge\_flip} decision ($\ell < \code{l\_th\_frac}\cdot\bar{\ell}$) and
+from then on the two runs have \emph{different topology}, at which point ``max $|\Delta|$'' is not
+small, it is meaningless. So \code{--phase R} runs the identical spec, the identical code and the
+identical commit \emph{twice}, as two separate jobs. \code{b\_star} at 1{,}800 frames, growing 2{,}000
+cells to 12{,}272 through division and T1: \code{beb6fb24fe86dcde} both times, $\max|\Delta| = 0.0$
+exactly, no first differing bit, over 120 arrays per run. The floor is zero, so \code{tol = 0} is a
+real criterion at full length and every row keeps it. A tolerance would have to be justified by a
+floor above zero; there is not one.
+
+\paragraph{Determinism is asserted, not assumed.} \code{engine.py} sets
+\code{torch.use\_deterministic\_algorithms(True, warn\_only=True)}, and \code{warn\_only} silently
+downgrades any kernel with no deterministic implementation --- which is exactly where two runs of one
+spec stop matching. Each side runs with \code{PLEXUS\_STRICT\_DETERMINISM=1}, which turns the
+downgrade into an exception, so a side that dies of it \emph{fails} rather than passing on a
+comparison it never earned.
+
+\twintable
+
+\noindent Every row runs at its spec's own length. 100 frames was too short to test anything
+structural: \code{b\_star}'s topology keeps changing past frame 800, so a 100-frame gate green-lights
+a promotion that has not run one of the divisions and flips it claims to preserve.
+
+\paragraph{Which row is the actual claim.} The \code{okuda@HEAD} vs \code{okuda} rows compare okuda
+before the change to okuda after it: they prove the \emph{move} changed no bytes, which is necessary
+and is not the question. The \code{B-core} rows are the claim --- \code{Plexus\_Main.py -o generate}
+against \code{run\_one.py}, different runner, different recorder, different writer, the core registry
+with no okuda import on one side. \code{b\_star}'s \code{B-core} digest is the same hex the
+repeatability pair produced, so the core run, the okuda run and two independent repeats of the okuda
+run all agree bit for bit, positions and chemistry alike.
+
+\paragraph{Four of the rows are the minisite's death scenes}, run to their own length rather than
+truncated, because a gate whose archive stops before the deformation cannot show what it claims to
+test. A $45^\circ$ cap of 293 cells draws the surface \emph{inward} --- an invagination, the one
+deformation growth cannot make; nine bands of 895 deaths close over every gap and the vesicle stays a
+sphere at reduced volume $0.981$; 285 of 400 cells above the equator leave an ellipsoid pulled from a
+sphere at \code{gyr\_prolate} $1.869$, with the topology intact. \code{apop\_many} is the only new
+spec in the set, and it exists because one row moved is not the hard case for a renumber: its 200
+deaths are spread along the Fibonacci spiral by a stride of 10, so \code{keep} is interleaved rather
+than a contiguous block --- the case a renumber written as a truncation passes and one written as a
+gather has to get right.
+
+\section{The okuda\_ECM gates 00--04}\label{sec:gates}
+
+\paragraph{What they were.} Not assert-scripts. \code{test\_00\_spheroid.py} writes a
+\code{spec.yaml} saying what it did, a \code{metrics.json} and some plots --- it \emph{reports}. Its
+``spec'' is built imperatively in Python, and its output lands wherever the script chose under
+\code{log/okuda\_ECM/}. And not one of the 461 specs in \code{config/okuda/} names a single junction,
+ECM, membrane or contact operator, so 34 of the operators just promoted have no declared spec at all.
+
+\paragraph{What they become.} Two dedicated homes, and a threshold that exists before the run.
+
+\begin{itemize}
+\item \code{config/gates/} --- one yaml per gate, lifted out of the script, carrying the sets, the
+  operators, the schedule, the frame count, the seed, \emph{and} the declared thresholds with their
+  tier. The spec becomes the gate's definition rather than a side effect of running it, which is what
+  makes a threshold auditable before the run.
+\item \code{log/gates/<gate>/} --- the promoted run's outputs: \code{metrics.json}, the gate table as
+  written, the plots, the movie. \code{log/okuda\_ECM/} stays as the okuda side and is not written
+  over, so the two can always be diffed.
+\end{itemize}
+
+\paragraph{The tiers are the paper's.} \emph{Bookkeeping} asks whether the code does what the
+operator says. \emph{Closed form} asks whether the implementation reproduces the physics it was
+\emph{given}. \emph{Measurement} asks whether the model agrees with something observed in cells ---
+and that tier is only available once the model declares its units, because before a \code{units:}
+block a comparison with a measurement is a comparison between a number and a quantity. None of the
+okuda specs declares units. That is stated here rather than worked around, and it bounds what this
+gate table can claim.
+
+\gatetable
+
+\section{Status}
+
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}\toprule
+phase & what & state\\\midrule
+0  & mesh as an engine concept; recorder; determinism; live snapshot & \dn\\
+A  & \code{OKUDA\_PROMOTION.md}: 50 names, contracts, merge verdicts & \dn\\
+B  & \code{vertex\_ops.py}, \code{diffusion\_reaction.py}, \code{models/topology.py} & \dn\\
+B-core & the core runs the model with no okuda import, bit-identical & \dn\\
+C  & \code{junction\_ops.py} & \dn\\
+D  & \code{ecm\_ops.py}, \code{membrane\_ops.py}, \code{contact\_ops.py} & \dn\\
+0b & MPM regrouped into \code{mpm\_ops.py} & \ns\\
+gates & 00--04 lifted into \code{config/gates/}, run into \code{log/gates/} & \fl\\
+E  & regroup the remaining core; VTK as the engine's renderer & \ns\\
+F  & the three minisite scenes under \code{config/atlas/} & \ns\\
+G  & replication: \code{r010\_00\_ctrl} and \code{b\_star} as twin runs & \ns\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\end{document}
