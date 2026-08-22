@@ -826,6 +826,22 @@ def min_radius_from_centre(T, centre=(0.5, 0.5, 0.5), **kw):
     return [float(np.linalg.norm(T.pos(t) - c, axis=1).min()) for t in range(T.n_rows())]
 
 
+def contact_penetration_um(T, surface_radius=0.15, centre=(0.5, 0.5, 0.5), **kw):
+    """How far the nearest material point sits INSIDE the prescribed surface, at the last frame.
+
+    THE NUMBER THAT ONLY MEANS SOMETHING IN MICROMETRES. As a fraction of a unit box a penetration of
+    0.0146 reads as a rounding error; at this calibration it is 17 um, which is two cell diameters.
+    That conversion is the paper's own worked example of why the measurement tier needs a `units:`
+    block -- the same quantity was once reported as "0.82 grid cells", sounded small, and was
+    described as an improvement.
+
+    Returned in SIMULATION units; the row's `unit: um` converts it through the spec's `units:`.
+    """
+    c = np.asarray(centre, float)
+    t = T.n_rows() - 1
+    return [max(0.0, float(surface_radius) - float(np.linalg.norm(T.pos(t) - c, axis=1).min()))]
+
+
 def median_displacement(T, **kw):
     """Median |p(t) - p(0)| over the material points that are present at both ends.
 
@@ -886,6 +902,7 @@ MEASURES = {
     "strand_length": strand_length,
     "strand_length_um": strand_length_um,
     "min_radius_from_centre": min_radius_from_centre,
+    "contact_penetration_um": contact_penetration_um,
     "median_displacement": median_displacement,
     "final_stress_p99_Pa": final_stress_p99_Pa,
     "cell_count": cell_count,
@@ -918,6 +935,7 @@ MEASURES = {
 PHYSICAL = {
     "strand_length_um": ("length", "um"),
     "final_stress_p99_Pa": ("stress", "Pa"),
+    "contact_penetration_um": ("length", "um"),
     "doubling_time_hours": ("time", "hours"),
     "mean_cell_diameter_um": ("length", "um"),
     "spheroid_diameter_um": ("length", "um"),
