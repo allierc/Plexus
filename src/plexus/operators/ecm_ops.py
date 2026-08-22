@@ -20,6 +20,7 @@ from plexus.models.base import Lateral, Structural
 from plexus.models.registry import register_operator
 from plexus.models.entities import MPMParticle
 from plexus.models.registry import register_entity, register_operator
+from plexus.models.state import spatial_schema
 
 
 # ==========================================================================================================
@@ -722,8 +723,12 @@ BLOCK_RAW: list = []            # the un-banded scalar -- see `ecm_ops.STRESS_RA
 
 # --------------------------------------------------------------------------- the entity
 @register_entity(
+    # `spatial_schema` (a `dim -> StateSchema` callable), NOT the legacy `{"pos": (0, 2),
+    # "vel": (2, 4)}` dict this used to carry. The registry is now consulted by
+    # `engine._resolve_schema`, and this set runs in 3D specs -- an honoured 2D dict would
+    # have truncated its state. See `models/entities.py` for the full contract.
     "mpm_block", depth=0,
-    state_schema={"pos": (0, 2), "vel": (2, 4)},
+    state_schema=spatial_schema,
     render={"color_by": "node_type", "arrows": None},
 )
 class MPMBlock:

@@ -6,8 +6,36 @@ blocks (`lvl.get('pos')`, `lvl.get('vel')`) instead of hardcoding `[:, :2]`; the
 plotter reads `render` (color-by, arrows) so it draws generically. A new entity
 declares its layout here once and everyone downstream just works.
 
-  state_schema : {block_name: (start_col, end_col)}  -- contiguous, defines the dim
+  state_schema : how this entity's state is laid out (see the three forms below)
   render       : {color_by: <per-node int field>, arrows: <vector block or None>}
+
+THE THREE ACCEPTED FORMS OF `state_schema`, and only two of them are honoured:
+
+  StateSchema           a fixed layout, dimension-independent -- for a set whose
+                        state does not scale with the world's dimension.
+  dim -> StateSchema    a CALLABLE, resolved at build time with the run's `dim`.
+                        This is what every spatial entity uses: `spatial_schema`.
+  {block: (c0, c1)}     the LEGACY dict. A hint only. NEVER honoured as a schema.
+
+WHY THE LEGACY DICT IS NOT HONOURED, which is the whole reason this file changed.
+Until this commit the engine never consulted the registry at all: `_resolve_schema`
+was `if "state" in s: ... else spatial_schema(D)`, and all three `_entity_meta` call
+sites threw the schema away (`_, render, depth = ...`). So every dict here was dead
+code -- and, being written `{"pos": (0, 2), "vel": (2, 4)}`, it was dead code that
+hard-codes TWO dimensions. The engine has been dimension-generic since the `dim`
+contract landed, and six entities in `src/plexus/` carried that 2D dict while being
+used in 3D runs (`mpm_block`, `basement_membrane_particle`, `integrin_particle` are
+all ECM/membrane sets, and those specs are `dim: 3`). Making the registry live and
+honouring the dict would therefore have TRUNCATED every one of those runs from
+`[pos_xyz | vel_xyz]` to `[pos_xy | vel_xy]` -- silently, since a shorter state
+tensor raises nothing. So the dict stays a hint, the callable is the way to declare
+a spatial layout, and the six that carried a dict are ported below and in
+`ecm_ops` / `membrane_ops`. `spatial_schema(D)` is exactly what the engine already
+substituted for them, so the port moves no byte -- which is what makes it checkable
+by bit-equality (`tools/promotion_identical.py --phase A`) rather than by argument.
+
+(`prototype/eye/muscle_ops.py` still carries one; it is outside `src/plexus/` and is
+left for its own commit.)
 
 Importing this module registers the entities. The engine imports it alongside the
 operator library.
@@ -19,11 +47,12 @@ import math
 import torch
 
 from plexus.models.registry import register_entity
+from plexus.models.state import spatial_schema
 
 
 @register_entity(
     "particle", depth=0,
-    state_schema={"pos": (0, 2), "vel": (2, 4)},
+    state_schema=spatial_schema,                 # dim -> StateSchema (pos|vel, D-wide each)
     render={"color_by": "node_type", "arrows": "vel"},
 )
 class Particle:
@@ -42,7 +71,7 @@ def _lame(E, nu: float = _NU):
 
 @register_entity(
     "mpm_particle", depth=0,
-    state_schema={"pos": (0, 2), "vel": (2, 4)},
+    state_schema=spatial_schema,                 # dim -> StateSchema; MLS-MPM runs in 2D and 3D
     render={"color_by": "node_type", "arrows": None},
 )
 class MPMParticle:
@@ -169,13 +198,16 @@ class MPMParticle:
 
 @register_entity(
     "cell", depth=1,
-    state_schema={"pos": (0, 2), "vel": (2, 4)},
+    state_schema=spatial_schema,                 # dim -> StateSchema
     render={"color_by": "node_type", "arrows": "vel"},
 )
 class Cell:
     """A set of particles/molecules; its position is an aggregate of its children."""
 
 
-# default for any set whose name is not a registered entity
+# default for any set whose name is not a registered entity. Kept as the legacy dict
+# because it is a HINT, in the same sense as the dicts described at the top of this
+# file: the engine's fallback for an unregistered name is `spatial_schema(dim)`, not
+# this. Anything reading it gets the 2D shape of the default spatial layout.
 DEFAULT_STATE_SCHEMA = {"pos": (0, 2), "vel": (2, 4)}
 DEFAULT_RENDER = {"color_by": "node_type", "arrows": None}
