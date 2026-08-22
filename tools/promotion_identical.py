@@ -315,18 +315,34 @@ def main():
         jobs.append((phase, spec, sa, sb, what, names, pd))
 
     if not a.compare_only and jobs:
+        # WAIT ON THE ARTEFACTS, NOT ONLY ON THE QUEUE. `bjobs` empties when the SIMULATION ends and
+        # the run then spends minutes writing metrics, the strip and two mp4s; a compare fired at
+        # that moment reads a directory with no `traj.npz` in it and reports DIFFER. Worse, if the
+        # wrapper is interrupted before this loop returns, `collect` never runs and the outputs stay
+        # in each side's own tree -- which is how `log/promotion/apop_one/` ended up holding six
+        # scripts and no mp4 while both runs had finished perfectly.
         import cluster as C
         print(f"  waiting for {2 * len(jobs)} job(s)...", flush=True)
         t0 = time.time()
         while time.time() - t0 < a.wait_min * 60:
             st = C._ssh("bjobs -w 2>/dev/null | grep -c promo_ || true", timeout=30)
-            if str(st).strip().startswith("0"):
+            queue_empty = str(st).strip().startswith("0")
+            landed = all(os.path.exists(os.path.join(_side_paths(side)[2], rn, "traj.npz"))
+                         if side.startswith("okuda") else True
+                         for *_r, names, _pd in jobs for side, rn in names.values())
+            if queue_empty and landed:
                 break
             time.sleep(60)
 
     rows, bad = [], 0
     for phase, spec, sa, sb, what, names, pd in jobs:
         dirs = collect(spec, names, pd)
+        # THE MP4 IS PART OF THE EVIDENCE. A digest says two runs differ; the movie says HOW, and a
+        # gate whose only output is a hex string sends you back to the cluster to find out.
+        for t, d in dirs.items():
+            mp4 = [f for f in sorted(os.listdir(d)) if f.endswith(".mp4")] if os.path.isdir(d) else []
+            if not mp4:
+                print(f"  [{spec}] {t}: no mp4 collected -- the run may not have finished rendering")
         ok, da, db, why = compare(dirs["A"], dirs["B"])
         bad += 0 if ok else 1
         rows.append(dict(phase=str(phase), spec=spec, a=sa, b=sb, ok=bool(ok),
