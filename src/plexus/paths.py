@@ -73,6 +73,20 @@ _PRE_FOLDER_RULES: list[tuple[str, tuple[str, ...]]] = [
     ("divide",      ("divide", "grow", "mitosis", "morula")),
     ("forage",      ("forage", "maze", "race", "graze")),
     ("gravity",     ("gravity",)),
+    # THE PROMOTION'S THREE FOLDERS, added because the CLI refused them and the refusal was correct:
+    # `validate_pre_folder` only admits a known simulation TYPE, and a folder that is not on this
+    # list cannot be run by `Plexus_Main.py` at all. `atlas_cc3d` and `atlas_jax` work around it with
+    # their own `run_spec.py`; the promotion should not, because the whole point is that the core
+    # runs these.
+    #   promotion  the twin-run gate's specs (tools/promotion_identical.py)
+    #   gates      the okuda_ECM gates 00-04, lifted out of their scripts into declared specs
+    #   atlas      the minisite scenes rebuilt in the promoted vocabulary
+    # No trigger substrings: these are named by folder (`promotion/<name>`), never inferred from a
+    # config name, because inferring "gates" from a name containing "gate" is how a spec ends up in
+    # a folder nobody chose.
+    ("promotion",   ()),
+    ("gates",       ()),
+    ("atlas",       ()),
 ]
 _VALID_PRE_FOLDERS = {f for f, _ in _PRE_FOLDER_RULES}
 
