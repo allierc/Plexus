@@ -515,6 +515,24 @@ def _traj(run_dir):
     raise FileNotFoundError(f"no trajectory.npz under {run_dir}")
 
 
+def _grid(a):
+    """A scalar volume as `pv.ImageData` SPANNING THE UNIT BOX, which is where the sets live.
+
+    `pv.ImageData(dimensions=...)` defaults to spacing 1.0, so a 128^3 field would occupy world
+    coordinates 0..128 while every Plexus set sits in 0..1. Mixed in one scene the geometry is
+    then 128x too small and off in a corner -- which is exactly what happened, and what was
+    misdiagnosed as "the volume mapper does not composite with geometry". It composites fine;
+    the two were never in the same space. Setting the spacing is the whole fix.
+    """
+    import pyvista as pv
+    n = np.asarray(a.shape)
+    g = pv.ImageData(dimensions=n + 1)
+    g.spacing = tuple(1.0 / n)
+    g.origin = (0.0, 0.0, 0.0)
+    g.cell_data["a"] = np.ascontiguousarray(a).ravel(order="F")
+    return g
+
+
 def _range(a, lo_q=0.5, hi_q=99.5):
     """One colour range for the WHOLE clip, from percentiles rather than min/max.
 
@@ -609,8 +627,7 @@ def evolve_volume(run_dir, out, field="neural_activity", cmap="viridis", fill=0.
     p.open_movie(out, framerate=fps or EV_FPS, quality=8)
     actor = txt = None
     for t in range(g.shape[0]):
-        vol = pv.ImageData(dimensions=np.asarray(g[t].shape) + 1)
-        vol.cell_data["a"] = np.abs(g[t]).ravel(order="F")
+        vol = _grid(np.abs(g[t]))
         if actor is not None:
             p.remove_actor(actor)
         if txt is not None:
@@ -664,7 +681,7 @@ def skeleton_lines(region, max_neurons=200, stride=1, seed=0):
     if max_neurons and len(files) > max_neurons:                 # deterministic subset
         idx = np.random.default_rng(seed).choice(len(files), max_neurons, replace=False)
         files = [files[i] for i in sorted(idx)]
-    pts, lines, kept, total = [], [], 0, 0
+    pts, lines, owner, kept, total = [], [], [], 0, 0
     off = 0
     for f in files:
         a = np.loadtxt(f, comments="#", ndmin=2)
@@ -695,6 +712,7 @@ def skeleton_lines(region, max_neurons=200, stride=1, seed=0):
         seg = seg.reshape(-1, 2)
         xyz = xyz[used]
         pts.append(xyz)
+        owner.append(np.full(len(xyz), len(pts) - 1, dtype=np.int64))
         lines.append(np.column_stack([np.full(len(seg), 2), seg + off]))
         off += len(xyz)
         kept += len(seg)
@@ -702,7 +720,18 @@ def skeleton_lines(region, max_neurons=200, stride=1, seed=0):
         return None, {"neurons": 0, "segments": 0}
     poly = pv.PolyData(np.ascontiguousarray(np.concatenate(pts)))
     poly.lines = np.concatenate(lines).ravel()
-    return poly, {"neurons": len(files), "segments": kept, "segments_before_clip": total}
+    # WHICH NEURON EACH NODE BELONGS TO. Without it the only colour available for a neurite is
+    # the voxelized FIELD sampled at that point -- which is the smoothed sum over every nearby
+    # neuron, not this neuron's own state. An arbour coloured by the field and a soma coloured
+    # by voltage are two different quantities on two different scales wearing one colour map.
+    poly["owner"] = np.concatenate(owner)
+    # THE BODY IDS ARE RETURNED, not just the count. A caller drawing somas beside these
+    # arbours has to draw the SAME neurons, and reconstructing the subset from `max_neurons`
+    # and a seed at the call site is how two layers of one picture come to disagree.
+    body_ids = [int(os.path.splitext(os.path.basename(f))[0]) for f in files]
+    body_ids = [body_ids[i] for i in range(len(files))]
+    return poly, {"neurons": len(files), "segments": kept, "segments_before_clip": total,
+                  "body_ids": body_ids}
 
 
 def evolve_skeleton_activity(run_dir, out, region, field="neural_activity", n_arbours=100,
@@ -766,3 +795,105 @@ def evolve_skeleton_activity(run_dir, out, region, field="neural_activity", n_ar
         p.write_frame()
     p.close()
     return f"{g.shape[0]} frames, {meta['neurons']} arbours, {meta['segments']} segments"
+
+
+def evolve_neural(run_dir, out, region, field="neural_activity", n_arbours=None,
+                  soma=True, volume=True, cmap="viridis", line_width=0.15, point_size=2.5,
+                  dendrite_opacity=0.30, soma_spheres=False,
+                  fill=0.92, label=None, fps=None,
+                  vol_opacity=(0, 0.01, 0.03, 0.07, 0.16)):
+    """Soma, dendrites and the rendered volume, in one clip -- by COMPOSITING TWO PASSES.
+
+    ONE SCENE, and the story of why that took three tries is worth keeping. The skeletons at
+    first did not appear at all, and the conclusion drawn was that VTK's ray-cast volume mapper
+    cannot composite with polygonal geometry. That was WRONG. `pv.ImageData` defaults to
+    spacing 1.0, so the 128^3 volume occupied world 0..128 while the sets occupy 0..1: the
+    anatomy was 128x too small and outside the frame, not occluded. `_grid` sets the spacing,
+    and volume, lines and points then depth-composite correctly in a single render.
+
+    THE COLOUR IS ONE QUANTITY ON ONE SCALE. Soma and dendrite are both coloured by the
+    NEURON'S OWN |voltage|, with one clim. Colouring the arbour by the voxelized field instead
+    -- which is what the first version did -- puts two different quantities on two different
+    scales under one colour map: the field at a neurite is the smoothed sum over every nearby
+    neuron, not that neuron's state. `skeleton_lines` returns a per-node `owner` so each
+    arbour can carry its own neuron's value.
+
+    LAYER ORDER IS SOMA FIRST, DENDRITES SECOND, both in the geometry pass -- the cell bodies
+    are the entities the model actually integrates, and the arbours are context.
+
+    `n_arbours=None` draws every neuron in the region. All 1,000 of them at `line_width=0.35`
+    is dense but legible; at the 1.4 this started from it was an opaque felt.
+    """
+    import json
+    import imageio_ffmpeg
+    import pyvista as pv
+    from matplotlib import colormaps
+    from plexus.io.neuprint import region_path
+
+    z = _traj(run_dir)
+    g = np.asarray(z[f"{field}__grid"], np.float32)
+    if g.ndim == 5:
+        g = g[:, 0]
+    lo, hi = _range(np.abs(g), 0.0, 99.9)
+    R = g.shape[1]
+    cm = colormaps[cmap]
+
+    def _rgb(v, a, b):
+        return (np.asarray(cm(np.clip((v - a) / max(b - a, 1e-12), 0, 1)))[:, :3] * 255).astype(np.uint8)
+
+    poly, meta = skeleton_lines(region, max_neurons=n_arbours)
+    own = np.asarray(poly["owner"])                         # which neuron each node belongs to
+
+    root = region_path(region)
+    man = json.load(open(os.path.join(root, "manifest.json")))["region"]
+    nz = np.load(os.path.join(root, "neurons.npz"), allow_pickle=True)
+    spos = (np.asarray(nz["xyz_nm"], float) - np.asarray(man["bounds_lo_nm"])) / man["side_nm"]
+    bid = np.asarray(nz["body_id"])
+    sv = np.asarray(z["neuron__voltage"], np.float32)[..., 0]                  # [T_set, N]
+    tv = np.linspace(0, sv.shape[0] - 1, g.shape[0]).round().astype(int)       # field row -> set row
+    pos_of = {int(b): i for i, b in enumerate(bid)}
+    arbour_row = np.array([pos_of[int(b)] for b in np.asarray(meta["body_ids"])])
+    if n_arbours:
+        keep = np.isin(bid, np.asarray(meta["body_ids"]))
+        spos, sv_s = spos[keep], sv[:, keep]
+    else:
+        sv_s = sv
+    vlo, vhi = _range(np.abs(sv), 0.0, 99.5)                # ONE clim, both layers
+
+    name = label or os.path.basename(run_dir.rstrip("/"))
+    W = SIZE
+    writer = imageio_ffmpeg.write_frames(out, (W, W), fps=fps or EV_FPS, quality=8)
+    writer.send(None)
+    cam = None
+    for t in range(g.shape[0]):
+        v = sv[tv[t]]
+        p = _plotter()
+        # dendrites first (context), then somas on top (the entities the model integrates)
+        poly["rgb"] = _rgb(v[arbour_row][own], vlo, vhi)
+        p.add_mesh(poly, scalars="rgb", rgb=True, opacity=dendrite_opacity,
+                   line_width=line_width, lighting=False)
+        if soma:
+            c = pv.PolyData(np.ascontiguousarray(spos))
+            c["rgb"] = _rgb(sv_s[tv[t]], vlo, vhi)
+            p.add_points(c, scalars="rgb", rgb=True, render_points_as_spheres=soma_spheres,
+                         point_size=point_size, lighting=soma_spheres)
+        if volume:
+            p.add_volume(_grid(np.abs(g[t])), scalars="a", cmap=cmap,
+                         opacity=list(vol_opacity), clim=[lo, hi], show_scalar_bar=False)
+        p.add_text(f"{name}  soma + dendrites{' + 128^3 volume' if volume else ''}   "
+                   f"frame {t + 1}/{g.shape[0]}   {meta['neurons']} arbours, "
+                   f"{meta['segments'] // 1000}k segments in cube   "
+                   f"|voltage| clim [{vlo:.2f}, {vhi:.2f}] on both layers",
+                   position="upper_left", font_size=10, color="white")
+        if cam is None:
+            p.camera_position = "iso"
+            p.reset_camera()
+            p.camera.zoom(fill)
+            cam = p.camera_position
+        else:
+            p.camera_position = cam
+        writer.send(np.ascontiguousarray(np.asarray(p.screenshot(return_img=True))[..., :3]))
+        p.close()
+    writer.close()
+    return (f"{g.shape[0]} frames, {meta['neurons']} arbours, {meta['segments']} segments, "
+            f"soma={soma} volume={volume}")
