@@ -113,6 +113,42 @@ def test_snapshot_is_topology_only():
           "counts are ints, arrays are numpy -- the shape every offline reader expects")
 
 
+def test_renumber_set_moves_every_store():
+    """`H.renumber_set` permutes the four stores the engine keeps per set.
+
+    The fourth -- `_delta_blocks` -- is the one both hand-rolled versions missed: they guarded on
+    `isinstance(key, tuple)` while `add_delta` keys it by level NAME. It is inert today only because
+    `chem` happens to be the cell set's COORDINATE block (verified on `b_gs_plain_soft_lo`), so its
+    deltas travel in `_delta`; a second `first_order` block on that set makes it live.
+    """
+    print("\nrenumber_set moves state, occ, delta and block deltas")
+    import torch as T
+    from plexus.models.base import Hierarchy
+    H = Hierarchy.__new__(Hierarchy)          # no engine needed: only the stores are exercised
+    H._delta, H._delta_blocks = {}, {}
+
+    class _L:
+        pass
+    lvl = _L()
+    lvl.state = T.tensor([[0.0], [1.0], [2.0], [3.0]])
+    lvl.occ = T.ones(4)
+    H.levels = {"cell": lvl}
+    H._delta["cell"] = T.tensor([[10.0], [11.0], [12.0], [13.0]])
+    H._delta_blocks["cell"] = {"myo": T.tensor([[20.0], [21.0], [22.0], [23.0]])}
+
+    H.renumber_set("cell", [3, 1], n_new=2)
+    check(lvl.state[:2].flatten().tolist() == [3.0, 1.0], f"state: {lvl.state[:2].flatten().tolist()}")
+    check(lvl.occ.tolist() == [1.0, 1.0, 0.0, 0.0], f"occ: {lvl.occ.tolist()}")
+    check(H._delta["cell"].flatten().tolist() == [13.0, 11.0, 0.0, 0.0],
+          f"coordinate delta: {H._delta['cell'].flatten().tolist()}")
+    check(H._delta_blocks["cell"]["myo"].flatten().tolist() == [23.0, 21.0, 0.0, 0.0],
+          f"BLOCK delta, which neither hand-rolled version reached: "
+          f"{H._delta_blocks['cell']['myo'].flatten().tolist()}")
+    check(lvl.state[2:].flatten().tolist() == [2.0, 3.0],
+          "the tail of `state` is left stale, as the call sites left it -- `occ` says it is not there")
+    check(H.renumber_set("nosuchset", [0]) is False, "an absent set is skipped, not raised on")
+
+
 if __name__ == "__main__":
     for fn in [v for k, v in sorted(globals().items()) if k.startswith("test_")]:
         fn()
