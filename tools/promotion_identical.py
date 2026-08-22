@@ -19,6 +19,24 @@ core writes `trajectory.npz` (`<set>__pos`, `<set>__occ`) -- so a file hash cann
 the test. What is compared is ARRAY BY ARRAY, BIT FOR BIT (`a.tobytes() == b.tobytes()`) over every
 recorded frame, reduced to one sha1 per side so a run records as a single number.
 
+    THE REPEATABILITY FLOOR IS ZERO, AND IT WAS MEASURED
+    ----------------------------------------------------
+Byte-identity is only the right criterion if the platform can deliver it, and over 1,800 frames --
+with division, T1 and chemistry in the loop, growing 2,000 cells to 12,272 -- that is not obvious:
+one differing mantissa bit can move an `edge_flip` decision (`l < l_th_frac * mean_l`) and from then
+on the two runs have DIFFERENT TOPOLOGY, at which point "max |delta|" is not small, it is meaningless.
+So it was measured rather than assumed. `--phase R` runs the identical spec, the identical code and
+the identical commit TWICE, as two separate cluster jobs:
+
+    b_star        1800 frames, 2000 -> 12,272 cells   beb6fb24fe86dcde == beb6fb24fe86dcde
+    b_null_plain  1800 frames                          14aab859c575fe25 == 14aab859c575fe25
+
+    max |delta| = 0.0 exactly, first differing bit: none, over 120 arrays per run.
+
+The floor is ZERO, so `tol = 0` is a real criterion at full length and not an aspiration, and every
+row keeps it. A tolerance would have to be justified by a floor above zero; there isn't one. Re-run
+`--phase R` if the queue, the driver or the GPU model changes -- that is what would move it.
+
     DETERMINISM IS ASSERTED, NOT ASSUMED
     ------------------------------------
 `plexus/engine.py` sets `torch.use_deterministic_algorithms(True, warn_only=True)` -- "bit-
@@ -73,33 +91,49 @@ sys.path.insert(0, OKUDA)
 # run to the end because a gate whose archive stops at frame 100 cannot show the deformation it
 # claims to be testing.
 PAIRS = [
-    # phase   spec               frames  side A         side B     what it exercises
-    (0,  "b_null_plain",           100, "okuda@HEAD",  "okuda",  "mesh_seed, cell_mechanics, edge_flip, topo_record"),
-    # A DEATH SPEC, because `b_null_plain` never calls `cell_die` -- its ledger is cell_divide 26,
-    # cell_geometry 83, cell_mechanics 101, edge_flip 27, mesh_seed 1, topo_record 101 and no death
-    # at all. Removal is the first operation in this engine that MOVES A ROW, so a renumber change
-    # gated only on that spec passes without executing a line of what changed.
-    (0,  "apop_one",               100, "okuda@HEAD",  "okuda",  "+ cell_die -> H.renumber_set: ONE row moves"),
+    # phase   spec               frames tol   side A         side B     what it exercises
+    #
+    # `frames=None` MEANS THE SPEC'S OWN LENGTH, and that is now the default for every row. 100
+    # frames was too short to be a test of anything structural: `b_star`'s topology keeps changing
+    # past frame 800, so a 100-frame gate green-lights a promotion that has not yet run a single one
+    # of the divisions and flips it is supposed to preserve. These specs are 600 and 1,800 frames
+    # long because that is how long the mechanisms take.
+    #
+    # `tol` IS AN ABSOLUTE TOLERANCE ON POSITION in the spec's own units (world 80.0, cells of
+    # radius ~5); 0 means byte-identical. It is set from the MEASURED repeatability floor -- the
+    # `R` rows below -- and not from a number that looked reasonable.
+    (0,  "b_null_plain",         None, 0.0, "okuda@HEAD",  "okuda",  "mesh_seed, cell_mechanics, edge_flip, topo_record"),
+    # A DEATH SPEC, because `b_null_plain` never calls `cell_die`. Removal is the first operation in
+    # this engine that MOVES A ROW, so a renumber change gated only on that spec passes without
+    # executing a line of what changed.
+    (0,  "apop_one",             None, 0.0, "okuda@HEAD",  "okuda",  "+ cell_die -> H.renumber_set: ONE row moves"),
     # ---- the death scenes. One row moved is the correctness case and it is not the hard case.
-    # `renumber_set` is a GATHER through `keep`, and the four rows below ask progressively more of
-    # it: 200 rows out of order, then a patch, then nine bands, then most of the sheet. Each is an
-    # existing okuda spec run at its own length, and each is a figure on the minisite -- so the
-    # archive under `log/promotion/<spec>/` is both the gate's evidence and the scene itself.
-    (0,  "apop_many",             None, "okuda@HEAD",  "okuda",  "200 SCATTERED deaths -- an interleaved `keep`, not a truncation"),
-    (0,  "apop_patch_big",        None, "okuda@HEAD",  "okuda",  "293 of 2000 in a 45-deg cap -> the surface is drawn INWARD (invagination 0.0369)"),
-    (0,  "apop_rings9",           None, "okuda@HEAD",  "okuda",  "895 of 2000 in nine bands -> closes over every gap, stays a sphere (red_vol 0.9813)"),
-    (0,  "apopgeo_half",          None, "okuda@HEAD",  "okuda",  "285 of 400 above the equator -> topology survives, sphere -> ellipsoid (gyr_prolate 1.869)"),
-    (0.5, "ecm_block",            None, "okuda@HEAD",  "okuda",  "mpm_scatter/gather/grid_update/strain, ecm_seed, ecm_stress"),
-    # ---- Phase B: the nine okuda operator files became two modules in `src/plexus/operators/`.
-    # Side A is okuda BEFORE the move, side B okuda AFTER it -- so what is under test is the move
-    # itself, through the runner that has always driven these operators. `--phase B-core` then runs
-    # the same specs through `Plexus_Main.py`, which is the claim that core can do this alone.
-    ("B", "b_gs_plain_soft_lo",    100, "okuda@HEAD",  "okuda",  "+ seed_cell_chem/diffuse/react, cell_geometry, cell_neighbours"),
-    ("B", "b_star",                100, "okuda@HEAD",  "okuda",  "+ cell_grow, cell_divide, interface_tension, cell_chem_from_shape"),
-    ("B-core", "b_gs_plain_soft_lo", 100, "okuda",     "core",   "the same run, from the core registry with no okuda import"),
-    ("B-core", "b_star",             100, "okuda",     "core",   "the same run, from the core registry with no okuda import"),
-    ("C", "01c_tissue",            100, "okuda",       "core",   "junction_myosin (both pools), junction_sync, cytokinetic_ring"),
-    ("D", "04_spheroid_ecm_pass2", 100, "okuda",       "core",   "mesh_contact, mesh_inside, ecm_*, bm_*"),
+    # `renumber_set` is a GATHER through `keep`, and these four ask progressively more of it: 200
+    # rows out of order, then a patch, then nine bands, then most of the sheet. Each is an existing
+    # okuda spec and each is a figure on the minisite, so `log/promotion/<spec>/` is both the gate's
+    # evidence and the scene itself.
+    (0,  "apop_many",            None, 0.0, "okuda@HEAD",  "okuda",  "200 SCATTERED deaths -- an interleaved `keep`, not a truncation"),
+    (0,  "apop_patch_big",       None, 0.0, "okuda@HEAD",  "okuda",  "293 of 2000 in a 45-deg cap -> the surface is drawn INWARD (invagination 0.0369)"),
+    (0,  "apop_rings9",          None, 0.0, "okuda@HEAD",  "okuda",  "895 of 2000 in nine bands -> closes over every gap, stays a sphere (red_vol 0.9813)"),
+    (0,  "apopgeo_half",         None, 0.0, "okuda@HEAD",  "okuda",  "285 of 400 above the equator -> topology survives, sphere -> ellipsoid (gyr_prolate 1.869)"),
+    (0.5, "ecm_block",           None, 0.0, "okuda@HEAD",  "okuda",  "mpm_scatter/gather/grid_update/strain, ecm_seed, ecm_stress"),
+    # ---- Phase B: nine okuda operator files became two modules in `src/plexus/operators/`. Side A
+    # is okuda BEFORE the move, side B okuda AFTER it, so what is under test is the MOVE, through
+    # the runner that has always driven these operators. That is a necessary step and NOT the claim
+    # the promotion is making -- `B-core` below is.
+    ("B", "b_gs_plain_soft_lo",  None, 0.0, "okuda@HEAD",  "okuda",  "+ seed_cell_chem/diffuse/react, cell_geometry, cell_neighbours"),
+    ("B", "b_star",              None, 0.0, "okuda@HEAD",  "okuda",  "+ cell_grow, cell_divide, interface_tension, cell_chem_from_shape"),
+    # ---- B-core: THE ACTUAL CLAIM. `Plexus_Main.py -o generate` against `run_one.py`. Different
+    # runner, different recorder, different writer -- the same numbers.
+    ("B-core", "b_gs_plain_soft_lo", None, 0.0, "okuda",   "core",   "the same run, from the core registry, no okuda import"),
+    ("B-core", "b_star",             None, 0.0, "okuda",   "core",   "the same run, from the core registry, no okuda import"),
+    # ---- R: THE REPEATABILITY FLOOR. Same spec, same code, same commit, same queue -- twice. Any
+    # tolerance above must be set from what this measures, because a gate tighter than the platform's
+    # own noise fails on runs that are correct, and a gate looser than it passes runs that are not.
+    ("R", "b_star",              None, 0.0, "okuda",       "okuda",  "1800 f, 2000->12272 cells, twice -- MEASURED FLOOR 0.0"),
+    ("R", "b_null_plain",        None, 0.0, "okuda",       "okuda",  "1800 f, twice -- MEASURED FLOOR 0.0"),
+    ("C", "01c_tissue",          None, 0.0, "okuda",       "core",   "junction_myosin (both pools), junction_sync, cytokinetic_ring"),
+    ("D", "04_spheroid_ecm_pass2", None, 0.0, "okuda",     "core",   "mesh_contact, mesh_inside, ecm_*, bm_*"),
 ]
 
 # The default for a row that asks for neither: short enough to sit in a per-phase loop, long enough
@@ -213,11 +247,27 @@ def _bsub_lines(pair_dir, spec, side, run_name, frames):
 
 
 # ---------------------------------------------------------------------------------- comparison
-def _arrays(d):
+def _arrays(d, ticks=None):
     """Every recorded array of a run, in a fixed order, whichever writer produced it.
 
-    Returns [(label, ndarray)]. Reading BOTH layouts here is what lets an okuda run and a core run
-    be compared at all: the file names and the key names differ, the numbers must not.
+    Returns (labelled_arrays, ticks). THE TWO WRITERS RECORD THE SAME ROWS, which is what makes an
+    okuda run and a core run comparable at all rather than merely similar:
+
+        run_one.py:593    posf  = out["sets"]["vertex"]["pos"]
+                          chemf = out["sets"]["cell"]["state"]["chem"]
+
+    -- okuda's own frames come straight out of `engine._assemble`, the same structure
+    `graph_data_generator` writes to `trajectory.npz`. So okuda's `pos_i` IS core's
+    `vertex__pos[t]`, cropped to the live prefix, and `act_i` IS `cell__chem[t][:nF, 0]`.
+
+    WHAT DIFFERS IS ONLY THE SUBSAMPLE. okuda keeps ~60 frames (the ones the movie draws) and stores
+    their row indices in `ticks`; core keeps every recorded row. So the okuda side is read first, its
+    `ticks` are handed to the core side, and the same rows are compared. Comparing "all of A against
+    all of B" would report 60 arrays against 1801 and call a correct promotion a failure.
+
+    THE LIVE CROP IS A PREFIX, not a scatter: `mesh_seed` sets `occ[:Nv] = 1`, `cell_divide` appends,
+    and `cell_die` renumbers the CELL set only -- the vertex set is never holed. So `occ.sum()` is
+    the prefix length okuda sliced with, and `[:n]` reproduces it exactly.
     """
     out = []
     p_ok = os.path.join(d, "traj.npz")
@@ -226,19 +276,31 @@ def _arrays(d):
         if "trajectory.npz" in files:
             p_core = os.path.join(root, "trajectory.npz")
             break
-    if os.path.exists(p_ok):                                   # okuda: pos_i / act_i per frame
+    if os.path.exists(p_ok):                                   # okuda: pos_i / act_i per kept frame
         z = np.load(p_ok, allow_pickle=True)
         n = sum(1 for k in z.files if k.startswith("pos_"))
         for i in range(n):
             out.append((f"pos_{i}", np.asarray(z[f"pos_{i}"])))
             if f"act_{i}" in z.files:
                 out.append((f"act_{i}", np.asarray(z[f"act_{i}"])))
-    elif p_core:                                               # core: <set>__pos / <set>__occ
+        return out, (np.asarray(z["ticks"]).tolist() if "ticks" in z.files else None)
+    if p_core:                                                 # core: <set>__pos / __occ / __<block>
         z = np.load(p_core, allow_pickle=True)
-        for k in sorted(z.files):
+        vp, vo = z.get("vertex__pos"), z.get("vertex__occ")
+        ch, co = z.get("cell__chem"), z.get("cell__occ")
+        if vp is not None:
+            rows = ticks if ticks is not None else range(vp.shape[0])
+            for i, t in enumerate(rows):
+                nv = int(np.asarray(vo[t]).sum()) if vo is not None else vp.shape[1]
+                out.append((f"pos_{i}", np.asarray(vp[t][:nv], np.float32)))
+                if ch is not None:
+                    nf = int(np.asarray(co[t]).sum()) if co is not None else ch.shape[1]
+                    out.append((f"act_{i}", np.asarray(ch[t][:nf, 0], np.float32)))
+            return out, list(rows)
+        for k in sorted(z.files):                              # a non-mesh core run: whatever it wrote
             if k.endswith(("__pos", "__occ", "__state")):
                 out.append((k, np.asarray(z[k])))
-    return out
+    return out, None
 
 
 def _digest(arrs):
@@ -251,23 +313,67 @@ def _digest(arrs):
     return h.hexdigest()[:16]
 
 
-def compare(dir_a, dir_b):
-    """(ok, digest_a, digest_b, first_difference). The first difference is NAMED, because "they
-    differ" sends you to read two 60-frame trajectories and "pos_37 differs in 12 of 4002 rows,
-    max |delta| 3.1e-07" sends you to one operator."""
-    A, B = _arrays(dir_a), _arrays(dir_b)
+def tb_is_core(d):
+    """A core run writes `trajectory.npz` and no `traj.npz`."""
+    if os.path.exists(os.path.join(d, "traj.npz")):
+        return False
+    return any("trajectory.npz" in f for _r, _d, f in os.walk(d))
+
+
+def compare(dir_a, dir_b, tol=0.0):
+    """(ok, digest_a, digest_b, report). `report` is a dict, always -- not only on failure.
+
+    BYTE-IDENTITY IS THE DEFAULT AND IT IS NOT ALWAYS THE RIGHT QUESTION. Over 100 frames two runs of
+    one spec on one GPU agree to the last mantissa bit, so `tol=0` is a real test. Over 1,800 frames
+    with division and T1 in the loop, a single differing bit can move a flip decision -- `edge_flip`
+    thresholds on `l < l_th_frac * mean_l` -- and from then on the two runs have DIFFERENT TOPOLOGY,
+    at which point "max |delta|" is not small, it is meaningless: the arrays no longer describe the
+    same cells. So the report says WHERE the two part company (the first differing frame) as well as
+    how far apart they end, and a run's tolerance has to be set against a MEASURED repeatability
+    floor -- two runs of the identical spec on the identical code -- not against a number somebody
+    liked. `--phase R` measures that floor.
+
+    `tol` is an ABSOLUTE tolerance on position, in the spec's own length units (`world: 80.0` here,
+    cells of radius ~5). `tol=0` means byte-identical.
+    """
+    A, ta = _arrays(dir_a)
+    B, tb = _arrays(dir_b, ticks=ta if (ta is not None and tb_is_core(dir_b)) else None)
+    rep = dict(n_arrays_a=len(A), n_arrays_b=len(B), tol=tol, ticks=len(ta or []))
     if not A or not B:
-        return False, _digest(A), _digest(B), f"no arrays on {'A' if not A else 'B'} side"
+        rep["why"] = f"no arrays on the {'A' if not A else 'B'} side"
+        return False, _digest(A), _digest(B), rep
     if len(A) != len(B):
-        return False, _digest(A), _digest(B), f"{len(A)} arrays vs {len(B)}"
-    for (la, a), (lb, b) in zip(A, B):
+        rep["why"] = f"{len(A)} arrays vs {len(B)} -- the runs are not the same length"
+        return False, _digest(A), _digest(B), rep
+
+    first_bit, first_over_tol, worst, worst_at = None, None, 0.0, ""
+    n_shape = 0
+    for i, ((la, a), (lb, b)) in enumerate(zip(A, B)):
         if a.shape != b.shape:
-            return False, _digest(A), _digest(B), f"{la}: shape {a.shape} vs {b.shape}"
+            n_shape += 1
+            if first_bit is None:
+                first_bit = la
+            if first_over_tol is None:
+                first_over_tol = f"{la}: shape {a.shape} vs {b.shape}"
+            continue
         if np.ascontiguousarray(a).tobytes() != np.ascontiguousarray(b).tobytes():
+            if first_bit is None:
+                first_bit = la
             d = np.abs(a.astype(np.float64) - b.astype(np.float64))
-            return (False, _digest(A), _digest(B),
-                    f"{la}: {int((d > 0).sum())} of {d.size} differ, max |delta| {d.max():.3g}")
-    return True, _digest(A), _digest(B), ""
+            m = float(d.max())
+            if m > worst:
+                worst, worst_at = m, la
+            if m > tol and first_over_tol is None:
+                first_over_tol = (f"{la}: {int((d > 0).sum())} of {d.size} differ, "
+                                  f"max |delta| {m:.3g} > tol {tol:g}")
+    rep.update(first_differing_bit=first_bit, max_abs_delta=worst, max_at=worst_at,
+               n_shape_mismatches=n_shape)
+    ok = (first_bit is None) if tol == 0 else (first_over_tol is None)
+    rep["why"] = "" if ok else (first_over_tol or f"first bit differs at {first_bit}")
+    if first_bit is not None and ok:
+        rep["note"] = (f"NOT bit-identical (first at {first_bit}) but within tol: "
+                       f"max |delta| {worst:.3g} at {worst_at}")
+    return ok, _digest(A), _digest(B), rep
 
 
 def _side_dir(pair_dir, side):
@@ -275,16 +381,31 @@ def _side_dir(pair_dir, side):
 
 
 # ---------------------------------------------------------------------------------- the run
+def _ptag(phase):
+    """A phase as a filesystem-safe prefix: `0` -> "0", `0.5` -> "0p5", `B-core` -> "B_core"."""
+    return str(phase).replace(".", "p").replace("-", "_")
+
+
 def run_pair(phase, spec, side_a, side_b, what, frames, submit=True):
+    """THE PHASE IS PART OF THE NAME, and it has to be. `--phase R` runs `b_star` with BOTH sides on
+    the working tree, while `--phase B` runs the same spec with side A on a worktree: the two would
+    write into `log/okuda/promo_b_star_B` and into `log/promotion/b_star/` together, and the second
+    to finish would silently be compared against the first's leftovers. A gate that can overwrite
+    its own reference is not a gate."""
     import cluster as C
-    pair_dir = os.path.join(OUT, spec)
+    pair_dir = os.path.join(OUT, f"{_ptag(phase)}_{spec}")
     os.makedirs(pair_dir, exist_ok=True)
     names = {}
     for tag, side in (("A", side_a), ("B", side_b)):
-        run_name = f"promo_{spec}_{tag}"
+        run_name = f"promo_{_ptag(phase)}_{spec}_{tag}"
         names[tag] = (side, run_name)
-        if submit and side.startswith("okuda"):
-            _spec_copy(spec, run_name, frames, cfg_dir=_side_paths(side)[1])
+        if submit:
+            # THE CORE SIDE NEEDS A SPEC TOO, and in its own folder: `Plexus_Main.py -o generate
+            # promotion/<name>` resolves to `config/promotion/<name>.yaml`. Writing only the okuda
+            # side's copy is how side A once died on a missing file while side B passed.
+            _spec_copy(spec, run_name, frames, cfg_dir=(
+                _side_paths(side)[1] if side.startswith("okuda")
+                else os.path.join(ROOT, "config", "promotion")))
     if submit:
         lines = [_bsub_lines(pair_dir, spec, side, rn, frames) for side, rn in names.values()]
         runner = os.path.join(pair_dir, "_submit.sh")
@@ -298,16 +419,43 @@ def run_pair(phase, spec, side_a, side_b, what, frames, submit=True):
     return names, pair_dir
 
 
+def _landed(side, run_name, pair_dir):
+    """Has this side written the file the comparison reads?"""
+    return os.path.exists(_out_path(side, run_name, pair_dir))
+
+
+def _out_path(side, run_name, pair_dir):
+    if side.startswith("okuda"):
+        return os.path.join(_side_paths(side)[2], run_name, "traj.npz")
+    return os.path.join(pair_dir, "graphs_data", "promotion", run_name, "trajectory.npz")
+
+
+def _collect_live(names, pair_dir):
+    """Mirror every side that has landed, now, without waiting for its partner."""
+    for tag, (side, run_name) in names.items():
+        if not _landed(side, run_name, pair_dir):
+            continue
+        src = os.path.dirname(_out_path(side, run_name, pair_dir))
+        dst = os.path.join(pair_dir, tag)
+        if os.path.abspath(src) == os.path.abspath(dst):
+            continue
+        try:
+            shutil.copytree(src, dst, dirs_exist_ok=True)
+        except Exception as e:                    # a file being written under us is not a failure
+            print(f"    [{os.path.basename(pair_dir)}/{tag}] partial mirror ({type(e).__name__})")
+
+
 def collect(spec, names, pair_dir):
     """Copy each side's output into the pair directory, so the comparison reads from one place and
     the okuda tree is left alone."""
     for tag, (side, run_name) in names.items():
         dst = os.path.join(pair_dir, tag)
-        if side.startswith("okuda"):
-            src = os.path.join(_side_paths(side)[2], run_name)
-            if os.path.isdir(src) and os.path.abspath(src) != os.path.abspath(dst):
-                shutil.rmtree(dst, ignore_errors=True)
-                shutil.copytree(src, dst)
+        src = (os.path.join(_side_paths(side)[2], run_name) if side.startswith("okuda")
+               # the core runner writes under `--output_root/graphs_data/<pre_folder>/<name>/`
+               else os.path.join(pair_dir, "graphs_data", "promotion", run_name))
+        if os.path.isdir(src) and os.path.abspath(src) != os.path.abspath(dst):
+            shutil.rmtree(dst, ignore_errors=True)
+            shutil.copytree(src, dst)
     return {t: os.path.join(pair_dir, t) for t in names}
 
 
@@ -320,6 +468,9 @@ def main():
     ap.add_argument("--compare-only", action="store_true",
                     help="do not submit; compare what is already in log/promotion/")
     ap.add_argument("--wait-min", type=float, default=90.0)
+    ap.add_argument("--tol", type=float, default=None,
+                    help="override every row's absolute position tolerance "
+                         "(0 = byte-identical, which is every row's default)")
     a = ap.parse_args()
 
     pairs = [p for p in PAIRS if a.all or (a.phase is not None and str(p[0]) == str(a.phase))]
@@ -328,7 +479,7 @@ def main():
 
     os.makedirs(OUT, exist_ok=True)
     jobs = []
-    for phase, spec, nfr, sa, sb, what in pairs:
+    for phase, spec, nfr, tol, sa, sb, what in pairs:
         # --frames on the command line overrides every row; otherwise the row decides, and
         # `None` on the row means the spec's own `general.n_frames`.
         frames = a.frames if a.frames is not None else nfr
@@ -337,7 +488,7 @@ def main():
         except FileNotFoundError as e:
             print(f"  [{spec}] SKIPPED: {e}")
             continue
-        jobs.append((phase, spec, sa, sb, what, names, pd))
+        jobs.append((phase, spec, tol, sa, sb, what, names, pd))
 
     if not a.compare_only and jobs:
         # WAIT ON THE ARTEFACTS, NOT ONLY ON THE QUEUE. `bjobs` empties when the SIMULATION ends and
@@ -347,25 +498,32 @@ def main():
         # in each side's own tree -- which is how `log/promotion/apop_one/` ended up holding six
         # scripts and no mp4 while both runs had finished perfectly.
         import cluster as C
-        print(f"  waiting for {2 * len(jobs)} job(s)...", flush=True)
+        print(f"  waiting for {2 * len(jobs)} job(s); each side is MIRRORED INTO "
+              f"log/promotion/ AS SOON AS IT LANDS...", flush=True)
         t0 = time.time()
         while time.time() - t0 < a.wait_min * 60:
+            # MIRROR WHAT IS THERE, EVERY POLL. Collecting only after the LAST job finished meant
+            # `log/promotion/R_b_star/` and `B_core_b_star/` sat empty for half an hour while four of
+            # the six sides had already written their movies -- there was nothing to look at, and no
+            # way to tell a slow run from a dead one. `_collect_live` copies each side the moment its
+            # `traj.npz`/`trajectory.npz` exists, and it is cheap to repeat: `shutil.copytree` onto a
+            # side that has not changed is one stat per file.
+            for _p, _sp, _t, _sa, _sb, _w, names, pd in jobs:
+                _collect_live(names, pd)
             # `_ssh` RETURNS A `CompletedProcess`, NOT THE OUTPUT. `str()` of one begins
             # "CompletedProcess(args=[...", never "0", so the queue test was false on every poll and
-            # the loop always ran to `--wait-min` -- which is the real reason `collect` never ran and
-            # `log/promotion/<spec>/` held scripts and no mp4. An ssh timeout returns None, and an
-            # unreachable login node is NOT an empty queue, so that reads as "still waiting".
+            # the loop always ran to `--wait-min`. An ssh timeout returns None, and an unreachable
+            # login node is NOT an empty queue, so that reads as "still waiting".
             st = C._ssh("bjobs -w 2>/dev/null | grep -c promo_ || true", timeout=30)
             queue_empty = st is not None and (st.stdout or "").strip().startswith("0")
-            landed = all(os.path.exists(os.path.join(_side_paths(side)[2], rn, "traj.npz"))
-                         if side.startswith("okuda") else True
-                         for *_r, names, _pd in jobs for side, rn in names.values())
+            landed = all(_landed(side, rn, pd)
+                         for *_r, names, pd in jobs for side, rn in names.values())
             if queue_empty and landed:
                 break
             time.sleep(60)
 
     rows, bad = [], 0
-    for phase, spec, sa, sb, what, names, pd in jobs:
+    for phase, spec, tol, sa, sb, what, names, pd in jobs:
         dirs = collect(spec, names, pd)
         # THE MP4 IS PART OF THE EVIDENCE. A digest says two runs differ; the movie says HOW, and a
         # gate whose only output is a hex string sends you back to the cluster to find out.
@@ -373,15 +531,17 @@ def main():
             mp4 = [f for f in sorted(os.listdir(d)) if f.endswith(".mp4")] if os.path.isdir(d) else []
             if not mp4:
                 print(f"  [{spec}] {t}: no mp4 collected -- the run may not have finished rendering")
-        ok, da, db, why = compare(dirs["A"], dirs["B"])
+        ok, da, db, rep = compare(dirs["A"], dirs["B"], tol=a.tol if a.tol is not None else tol)
         bad += 0 if ok else 1
-        rows.append(dict(phase=str(phase), spec=spec, a=sa, b=sb, ok=bool(ok),
-                         digest_a=da, digest_b=db, why=why, what=what))
+        rows.append(dict(phase=str(phase), spec=spec, a=sa, b=sb, ok=bool(ok), tol=rep["tol"],
+                         digest_a=da, digest_b=db, why=rep["why"], report=rep, what=what))
     print(f"\n  {'phase':6s} {'spec':26s} {'A':12s} {'B':8s} {'A digest':18s} {'B digest':18s} result")
     for r in rows:
         print(f"  {r['phase']:6s} {r['spec']:26s} {r['a']:12s} {r['b']:8s} "
               f"{r['digest_a']:18s} {r['digest_b']:18s} "
-              + ("IDENTICAL" if r["ok"] else f"DIFFER -- {r['why']}"))
+              + ("IDENTICAL" if r["ok"] and not r["report"].get("first_differing_bit")
+                 else ("WITHIN TOL -- " + r["report"]["note"]) if r["ok"]
+                 else f"DIFFER -- {r['why']}"))
     # ONE FILE PER PHASE, PLUS A MERGED ONE. A single `promotion_identical.json` was overwritten by
     # whichever phase ran last, so the archive held one phase's rows and read as if it held all of
     # them -- the same silent-truncation failure the mp4 collection had.

@@ -28,6 +28,7 @@ def data_generate(
     device: str = "cpu",
     erase: bool = False,
     save: bool = True,
+    live_every_frac: float | None = 0.1,
 ) -> tuple[str, dict]:
     """forward-simulate `sim` and write its trajectory under
     graphs_data/<pre_folder>/<sim.name>/. Returns (data_dir, out).
@@ -46,15 +47,56 @@ def data_generate(
     print(f"[generate] {folder}/{sim.name}: {sim.n_frames} frames, "
           f"sets={ {k: int(v.get('n', 0)) for k, v in sim.sets.items() if 'n' in v} } -> {data_dir}",
           flush=True)
-    H, out = run(sim, out_path=out_path, device=device, progress=True)
+    # THE LIVE SNAPSHOT, ON BY DEFAULT. A 1,800-frame run writes nothing anyone can look at for
+    # half an hour; this rewrites `3d.png` in the data directory every 10% of the frames, with the
+    # frame number on it, so the run can be watched rather than only waited for. Off with
+    # `live_every_frac=None`. The matplotlib import is inside `plexus.live.snapshot`, so this module
+    # still imports no plotting stack -- see its own docstring on why that matters.
+    on_frame = None
+    if live_every_frac:
+        from plexus.live import every_n, snapshot
+        _stride = every_n(sim.n_frames, live_every_frac)
+
+        def on_frame(H, tick, _d=data_dir, _n=sim.n_frames, _name=sim.name, _s=_stride):
+            if tick % _s == 0 or tick == _n:
+                snapshot(H, tick, _n, _d, name=_name)
+
+    H, out = run(sim, out_path=out_path, device=device, progress=True, on_frame=on_frame)
 
     # also save a light, framework-agnostic .npz (positions/occupancy per set) so
     # downstream code need not depend on zarr to read a generated dataset back.
     if save:
         flat = {}
         for sname, d in out["sets"].items():
-            flat[f"{sname}__pos"] = d["pos"]
+            # A SET NEED NOT HAVE POSITIONS. The vertex model's `cell` set carries `chem`, `cen` and
+            # `area` and no `pos` block at all, so `d["pos"]` is None -- and writing None into an
+            # npz makes a 0-d OBJECT array, which `np.load` then refuses without `allow_pickle`.
+            # Every read of that file died on `cell__pos`, including `plot.py`'s own.
+            if d["pos"] is not None:
+                flat[f"{sname}__pos"] = d["pos"]
+            # AND ITS RECORDED BLOCKS WERE NOT WRITTEN AT ALL. `_assemble` fills `state` with every
+            # block the schema marks recorded -- the morphogen concentrations, the per-cell area,
+            # the centroid -- and the npz writer dropped the lot, so a reaction-diffusion run wrote
+            # a trajectory with no chemistry in it. The zarr path had them; the npz is what every
+            # offline reader actually opens.
+            for bname, arr in (d.get("state") or {}).items():
+                flat[f"{sname}__{bname}"] = arr
             flat[f"{sname}__occ"] = d["occ"]
+            # THE RECORDED TOPOLOGY, FLATTENED -- and flattened rather than pickled on purpose. A
+            # list of per-row dicts goes into an npz only as a 0-d object array, and `np.load`
+            # refuses those without `allow_pickle=True`, which every reader would then have to pass
+            # and which makes a trajectory file executable. So: the three half-edge columns
+            # concatenated end to end, plus the row offsets, plus nF/Nv per row. Row t's table is
+            # `E_srce[off[t]:off[t+1]]`.
+            ms = d.get("mesh")
+            if ms:
+                off = np.cumsum([0] + [len(m["E_srce"]) for m in ms]).astype(np.int64)
+                flat[f"{sname}__mesh_offsets"] = off
+                flat[f"{sname}__mesh_nF"] = np.asarray([m["nF"] for m in ms], np.int64)
+                flat[f"{sname}__mesh_Nv"] = np.asarray([m["Nv"] for m in ms], np.int64)
+                for col in ("E_srce", "E_trgt", "E_face"):
+                    flat[f"{sname}__mesh_{col}"] = (np.concatenate([m[col] for m in ms])
+                                                    .astype(np.int64))
             if d.get("node_type") is not None:
                 flat[f"{sname}__node_type"] = d["node_type"]
             if d.get("parent") is not None:                  # containment: child -> parent index
@@ -66,6 +108,7 @@ def data_generate(
         np.savez(os.path.join(data_dir, "trajectory.npz"), world=out["world"],
                  world_size=out["world_size"], **flat)
 
-    nrec = next(iter(out["sets"].values()))["pos"].shape[0]
+    # count the rows off a set that HAS them -- `occ` is recorded for every set, spatial or not
+    nrec = next(iter(out["sets"].values()))["occ"].shape[0]
     print(f"[generate] done: {nrec} recorded frames -> {data_dir}", flush=True)
     return data_dir, out
