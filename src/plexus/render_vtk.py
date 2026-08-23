@@ -402,10 +402,10 @@ def _ease(u):
     return u * u * (3.0 - 2.0 * u)
 
 
-def _plotter():
+def _plotter(size=None):
     import pyvista as pv
     pv.OFF_SCREEN = True
-    p = pv.Plotter(off_screen=True, window_size=(SIZE, SIZE))
+    p = pv.Plotter(off_screen=True, window_size=(size or SIZE, size or SIZE))
     p.set_background("black")
     p.enable_anti_aliasing("msaa", multi_samples=8)
     return p
@@ -559,6 +559,45 @@ def _traj(run_dir):
         if "trajectory.npz" in files:
             return np.load(os.path.join(root, "trajectory.npz"), allow_pickle=True)
     raise FileNotFoundError(f"no trajectory.npz under {run_dir}")
+
+
+# DARK GREY -> GREEN, the palette of the reference anatomy figure
+# (connectome-gnn/figures/zebrafish/fig_zebrafish_anatomy_3d_voltage_anim.py: a faint grey base
+# pass with a green overlay whose alpha follows the per-neuron z-score). Here it is ONE
+# per-vertex RGBA rather than two draw passes, which is the same idea and one actor.
+#
+# WHY ALPHA CARRIES THE ACTIVITY TOO, and not colour alone. In a cube where the tissue is
+# nearly space-filling, a colour-only map paints every voxel of a 500,000-segment felt and the
+# active neurites are lost inside it. Making quiet tissue TRANSPARENT as well as dim removes it
+# from the frame instead of merely darkening it, and what is left is the structure that is
+# active. `alpha_gamma > 1` biases that further: it keeps the mid-range faint so only the top
+# of the distribution reads as solid.
+GREY_GREEN = ("#2a2d2e", "#3f6b52", "#39ff7a")
+
+
+def _rgba(x, lo, hi, colors=GREY_GREEN, a_lo=0.03, a_hi=0.95, gamma=1.6):
+    """[N, 4] uint8 RGBA: colour AND opacity both driven by |x| against one clim."""
+    from matplotlib.colors import LinearSegmentedColormap
+    cm = LinearSegmentedColormap.from_list("gg", list(colors))
+    u = np.clip((np.abs(np.asarray(x)) - lo) / max(hi - lo, 1e-12), 0, 1)
+    rgb = (np.asarray(cm(u))[:, :3] * 255).astype(np.uint8)
+    a = ((a_lo + (a_hi - a_lo) * u ** gamma) * 255).astype(np.uint8)
+    return np.concatenate([rgb, a[:, None]], axis=1)
+
+
+def _downsample(im, k):
+    """Box-average an image by an integer factor -- the second half of supersampling.
+
+    WHY SUPERSAMPLE AT ALL. A dendrite is drawn as a LINE, and OpenGL clamps line width to a
+    1-pixel minimum: at 896x896 every `line_width` below 1.0 renders identically, which is why
+    an earlier 0.15 / 0.25 / 0.35 sweep produced three indistinguishable images. The only way
+    to make a line thinner than a pixel is to make the pixel smaller -- render at k times the
+    size and average down, so a 1-pixel line becomes a 1/k-pixel line with the coverage carried
+    as intensity instead of width. It also antialiases half a million overlapping segments,
+    which MSAA alone does not do well at this density.
+    """
+    h, w = im.shape[:2]
+    return im.reshape(h // k, k, w // k, k, im.shape[2]).mean(axis=(1, 3)).astype(np.uint8)
 
 
 def _grid(a):
@@ -845,7 +884,13 @@ def evolve_skeleton_activity(run_dir, out, region, field="neural_activity", n_ar
 
 def evolve_neural(run_dir, out, region, field="neural_activity", n_arbours=None,
                   soma=True, volume=True, cmap="viridis", line_width=1.0,
-                  dendrite_opacity=0.30, dendrite_stride=8, soma_radius_um=2.5,
+                  dendrites=True, dendrite_opacity=0.30, dendrite_stride=8,
+                  soma_radius_um=2.5, supersample=1, palette="grey_green",
+                  # a_lo = 0 and a HARD gamma: a quiet soma is fully transparent rather than
+                  # faintly drawn. ~200 spheres at alpha 0.06 accumulate along a ray into
+                  # exactly the haze that made solid spheres look Gaussian; at alpha 0 they
+                  # contribute nothing and what is left in the frame is spheres.
+                  dend_alpha=(0.02, 0.85, 1.8), soma_alpha=(0.0, 1.0, 5.0),
                   fill=0.92, label=None, fps=None,
                   vol_opacity=(0, 0.006, 0.018, 0.045, 0.10)):
     """Soma, dendrites and the rendered volume, in one clip -- by COMPOSITING TWO PASSES.
@@ -913,34 +958,53 @@ def evolve_neural(run_dir, out, region, field="neural_activity", n_arbours=None,
     # what the tissue actually looks like: median soma spacing here is 3.97 um.
     side_um = float(man["side_um"])
     _cloud = pv.PolyData(np.ascontiguousarray(spos))
-    _ball = pv.Sphere(radius=soma_radius_um / side_um, theta_resolution=10, phi_resolution=10)
+    # 24 SEGMENTS, NOT 10. At 10 the silhouette is a visible decagon once a soma covers more
+    # than a few pixels, and a faceted ball under a low alpha reads as a soft blob rather than
+    # a sphere -- which is what "a mix of sphere and gaussian" was.
+    _ball = pv.Sphere(radius=soma_radius_um / side_um, theta_resolution=24, phi_resolution=24)
 
     name = label or os.path.basename(run_dir.rstrip("/"))
+    ss = max(1, int(supersample))
     W = SIZE
     writer = imageio_ffmpeg.write_frames(out, (W, W), fps=fps or EV_FPS, quality=8)
     writer.send(None)
     cam = None
     for t in range(g.shape[0]):
         v = sv[tv[t]]
-        p = _plotter()
+        p = _plotter(SIZE * ss)
+        # translucent geometry must sort by depth against itself, not by draw order
+        p.enable_depth_peeling(12)
+        gg = palette == "grey_green"
         # dendrites first (context), then somas on top (the entities the model integrates)
-        poly["rgb"] = _rgb(v[arbour_row][own], vlo, vhi)
-        p.add_mesh(poly, scalars="rgb", rgb=True, opacity=dendrite_opacity,
-                   line_width=line_width, lighting=False)
+        if dendrites:
+            if gg:
+                poly["rgba"] = _rgba(v[arbour_row][own], vlo, vhi, a_lo=dend_alpha[0],
+                                     a_hi=dend_alpha[1], gamma=dend_alpha[2])
+                p.add_mesh(poly, scalars="rgba", rgb=True, line_width=line_width, lighting=False)
+            else:
+                poly["rgb"] = _rgb(v[arbour_row][own], vlo, vhi)
+                p.add_mesh(poly, scalars="rgb", rgb=True, opacity=dendrite_opacity,
+                           line_width=line_width, lighting=False)
         if soma:
-            _cloud["rgb"] = _rgb(sv_s[tv[t]], vlo, vhi)
+            key = "rgba" if gg else "rgb"
+            _cloud[key] = (_rgba(sv_s[tv[t]], vlo, vhi, a_lo=soma_alpha[0], a_hi=soma_alpha[1],
+                                 gamma=soma_alpha[2]) if gg else _rgb(sv_s[tv[t]], vlo, vhi))
             balls = _cloud.glyph(geom=_ball, scale=False, orient=False)
-            p.add_mesh(balls, scalars="rgb", rgb=True, lighting=True, smooth_shading=True,
-                       ambient=0.35, diffuse=0.75, specular=0.15)
+            p.add_mesh(balls, scalars=key, rgb=True, lighting=True, smooth_shading=True,
+                       ambient=0.30, diffuse=0.80, specular=0.15)
         if volume:
             p.add_volume(_grid(np.abs(g[t])), scalars="a", cmap=cmap,
                          opacity=list(vol_opacity), clim=[lo, hi], show_scalar_bar=False)
-        p.add_text(f"{name}  soma + dendrites{' + 128^3 volume' if volume else ''}   "
-                   f"frame {t + 1}/{g.shape[0]}   {meta['neurons']} arbours, "
-                   f"{meta['segments'] // 1000}k segments (1/{dendrite_stride})   "
-                   f"soma r={soma_radius_um} um   "
-                   f"|voltage| clim [{vlo:.2f}, {vhi:.2f}] on both layers",
-                   position="upper_left", font_size=10, color="white")
+        layers = " + ".join([x for x, on in (("soma", soma), ("dendrites", dendrites),
+                                             ("128^3 volume", volume)) if on])
+        seg_txt = (f"{meta['segments'] // 1000}k segments (1/{dendrite_stride})   "
+                   if dendrites else "")
+        soma_txt = f"soma r={soma_radius_um} um   " if soma else ""
+        p.add_text(f"{name}  {layers}   frame {t + 1}/{g.shape[0]}   "
+                   f"{meta['neurons']} arbours   {seg_txt}{soma_txt}"
+                   + (f"ss{ss}x   " if ss > 1 else "")
+                   + f"|voltage| clim [{vlo:.2f}, {vhi:.2f}]",
+                   position="upper_left", font_size=10 * ss, color="white")
         if cam is None:
             p.camera_position = "iso"
             p.reset_camera()
@@ -948,8 +1012,11 @@ def evolve_neural(run_dir, out, region, field="neural_activity", n_arbours=None,
             cam = p.camera_position
         else:
             p.camera_position = cam
-        writer.send(np.ascontiguousarray(np.asarray(p.screenshot(return_img=True))[..., :3]))
+        frame = np.asarray(p.screenshot(return_img=True))[..., :3]
+        if ss > 1:
+            frame = _downsample(frame, ss)
+        writer.send(np.ascontiguousarray(frame))
         p.close()
     writer.close()
     return (f"{g.shape[0]} frames, {meta['neurons']} arbours, {meta['segments']} segments, "
-            f"soma={soma} volume={volume}")
+            f"soma={soma} dendrites={dendrites} volume={volume}")
