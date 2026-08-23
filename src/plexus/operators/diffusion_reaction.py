@@ -29,6 +29,31 @@ from plexus.models.base import Aggregate, Lateral, Rewire, Structural
 from plexus.models.registry import register_operator
 from plexus.models.base import Lateral
 from plexus.operators.vertex_ops import face_geometry_3d
+
+
+def _chan(params, who):
+    """The FIRST COLUMN of the `chem` pair this instance owns -- validated, because it is a column
+    index and reads like a species index.
+
+    A Gray-Scott system occupies TWO adjacent columns: `cell_chem_react` takes `a = chem[:, c]` and
+    `u = chem[:, c + 1]`, and `cell_chem_diffuse` writes `coef[c] = d_a * chi`, `coef[c+1] =
+    d_h * chi`. So the second species lives at `chan: 2`, not `chan: 1`. Nothing used to check
+    that, and `chan: 1` is the natural thing to write: it would have given the second species
+    columns 1 and 2, putting its activator ON THE FIRST SPECIES' SUBSTRATE. Both systems would
+    then run, both would look alive, and they would be silently driving one shared column -- a
+    coupling nobody wrote and nobody could see in the output.
+    """
+    c = int(params.get("chan", 0))
+    if c < 0 or c % 2:
+        raise ValueError(
+            f"{who}: chan={c} is not the start of a chem PAIR. `chan` is a COLUMN index, not a "
+            f"species index -- each Gray-Scott system owns two adjacent columns (a at chan, u at "
+            f"chan+1), so species 0 is chan 0, species 1 is chan 2, species 2 is chan 4. "
+            f"chan={c} would overlap the neighbouring pair and silently couple the two systems "
+            f"through a shared column. Use chan={max(0, c - c % 2)} or {max(0, c - c % 2) + 2}.")
+    return c
+
+
 from plexus.models.topology import rings_from_flat_3d
 
 
@@ -140,7 +165,7 @@ class CellRDSeed(Structural):
         self.at = params.get("_at", "cell"); self.vat = params.get("vertex_set", "vertex")
         self.seed = int(params.get("seed", 0))
         # WHICH SPECIES THIS SEEDER FILLS: 0 (columns 0,1) by default; 2 for a second RD system.
-        self.chan = int(params.get("chan", 0))
+        self.chan = _chan(params, type(self).__name__)
         self.mode = params.get("mode", "scatter")               # "noise" | "scatter" | "patch" | "cones"
         if self.mode not in self.MODES:
             raise ValueError(
@@ -240,7 +265,7 @@ class CellDiffuse(Lateral):
         self.norm = bool(params.get("norm", True))
         # WHICH SPECIES THIS INSTANCE OWNS: 0 is the first pair (chem columns 0,1) and is the
         # default, so every existing spec is unchanged. A second RD system lives at chan 2.
-        self.chan = int(params.get("chan", 0))
+        self.chan = _chan(params, type(self).__name__)
 
 
     def forward(self, H, mask=None):
@@ -414,7 +439,7 @@ class CellReactGrayScott(Lateral):
         self.F = float(params["F"]); self.kk = float(params["kk"]); self.rate = float(params.get("rate", 1.0))
         # WHICH SPECIES THIS INSTANCE OWNS: 0 is the first pair (chem columns 0,1) and is the
         # default, so every existing spec is unchanged. A second RD system lives at chan 2.
-        self.chan = int(params.get("chan", 0))
+        self.chan = _chan(params, type(self).__name__)
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
@@ -515,7 +540,7 @@ class Grow3D(Structural):
         self.rate = float(params.get("rate", 0.01)); self.a_sw = float(params.get("a_sw", 0.20))
         # WHICH SPECIES GATES GROWTH: 0 (chem columns 0,1) by default, so existing specs are
         # unchanged; 2 reads a second RD system living in the same buffer.
-        self.chan = int(params.get("chan", 0))
+        self.chan = _chan(params, type(self).__name__)
         # IS `a_sw` A VALUE OF THE ACTIVATOR OR A FRACTION OF ITS MAXIMUM? Default False = the
         # absolute reading every run in this project's history used, so no archived spec changes
         # meaning. See the gate itself in `forward` for why both are real mechanisms. `a_live` is
