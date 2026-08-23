@@ -23,6 +23,11 @@
 # THE RADIUS IS SET FROM THE DENSITY, not guessed. 4000 cells on a disc of radius 19 is one cell per
 # pi*19^2/4000 = 0.283 area units, so the mean spacing is about 0.60. `radius: 0.95` takes roughly
 # the first ring of neighbours -- about 6 per cell, which is what `k: 6` was asking for.
+# RENDERING POLICY LIVES IN THE SPEC, NOT IN THE RENDERER. `point_size` is read by
+# `plexus.plot` (`_point_size`), whose default is 8.0 for any set under 4,000 -- a number chosen
+# for sparse particle clouds, not for a disc that fills the frame. The movie canvas is 8 inches at
+# dpi 200, so the disc spans about 1,230 px and 4,000 cells sit ~17 px apart; at the default the
+# dots came out ~10 px and the sheet read as a scatter plot of itself. 26 puts them just touching.
 general:
   name: turing2d_two
   seed: 0
@@ -103,3 +108,6 @@ schedule:
 - cell_chem_diffuse
 - cell_chem_react
 - cell_chem_react
+plotting:
+  background: black
+  point_size: 26

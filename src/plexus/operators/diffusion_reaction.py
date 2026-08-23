@@ -31,35 +31,60 @@ from plexus.models.base import Lateral
 from plexus.operators.vertex_ops import face_geometry_3d
 
 
-def _chan(params, who):
-    """The FIRST COLUMN of the `chem` pair this instance owns -- validated, because it is a column
-    index and reads like a species index.
+def _chan(params, who, n_species=2):
+    """The FIRST COLUMN of the contiguous species span this instance owns.
 
-    A Gray-Scott system occupies TWO adjacent columns: `cell_chem_react` takes `a = chem[:, c]` and
-    `u = chem[:, c + 1]`, and `cell_chem_diffuse` writes `coef[c] = d_a * chi`, `coef[c+1] =
-    d_h * chi`. So the second species lives at `chan: 2`, not `chan: 1`. Nothing used to check
-    that, and `chan: 1` is the natural thing to write: it would have given the second species
-    columns 1 and 2, putting its activator ON THE FIRST SPECIES' SUBSTRATE. Both systems would
-    then run, both would look alive, and they would be silently driving one shared column -- a
-    coupling nobody wrote and nobody could see in the output.
+    `chan` IS A COLUMN INDEX, NOT A SPECIES INDEX, and it reads like one. A reaction model occupies
+    `n_species` ADJACENT columns of `chem` -- Gray-Scott two (a, u), May-Leonard three (u, v, w),
+    a coupled pair of Gray-Scott systems four -- so the second two-species system starts at
+    `chan: 2`, not `chan: 1`. `chan: 1` is the natural thing to write and would have put the second
+    system's activator ON THE FIRST SYSTEM'S SUBSTRATE: both would run, both would look alive, and
+    they would be driving one shared column through a coupling nobody wrote.
+
+    THE OLD RULE WAS "chan MUST BE EVEN" and it was wrong the moment a three-species model existed:
+    May-Leonard tiles at 0, 3, 6, and an even-only guard rejects a correct spec while accepting
+    `chan: 2` for a three-species system, which overlaps. The rule is now "a multiple of this
+    model's own width", which is the actual tiling, and it degrades to the even rule for the
+    two-species models that are all there used to be.
+
+    The BOUNDS check cannot happen here -- `chem`'s width is not known until forward -- so it is
+    `_span` that raises on a span running off the end of the buffer.
     """
     c = int(params.get("chan", 0))
-    if c < 0 or c % 2:
+    n = int(n_species)
+    if c < 0 or (n > 0 and c % n):
+        ok = [i * n for i in range(4)]
         raise ValueError(
-            f"{who}: chan={c} is not the start of a chem PAIR. `chan` is a COLUMN index, not a "
-            f"species index -- each Gray-Scott system owns two adjacent columns (a at chan, u at "
-            f"chan+1), so species 0 is chan 0, species 1 is chan 2, species 2 is chan 4. "
-            f"chan={c} would overlap the neighbouring pair and silently couple the two systems "
-            f"through a shared column. Use chan={max(0, c - c % 2)} or {max(0, c - c % 2) + 2}.")
+            f"{who}: chan={c} does not start a {n}-species span. `chan` is a COLUMN index, not a "
+            f"species index -- this model owns {n} adjacent columns of `chem`, so its systems tile "
+            f"at {ok}... A chan that is not a multiple of {n} overlaps the neighbouring system and "
+            f"silently couples the two through a shared column.")
     return c
 
 
-from plexus.models.topology import rings_from_flat_3d
+def _span(chem, chan, n, who):
+    """The `n` columns starting at `chan`, or a loud failure -- the bounds half of `_chan`."""
+    if chan + n > chem.shape[1]:
+        raise ValueError(
+            f"{who}: needs columns {chan}..{chan + n - 1} of `chem` but the block is only "
+            f"{chem.shape[1]} wide. Widen `sets.<set>.state.chem.width` to at least {chan + n}.")
+    return [chem[:, chan + k] for k in range(n)]
 
 
-# ==========================================================================================================
-# FROM `discovery_okuda/ops/chem_ops.py` -- chem_ops -- live Turing reaction-diffusion ON the cell set (Goal 2). Forked from the
-# ==========================================================================================================
+def _emit(chem, chan, terms, rate, occ):
+    """A delta that is ZERO IN EVERY COLUMN THIS INSTANCE DOES NOT OWN.
+
+    That is what makes two reaction instances additive rather than mutually overwriting: the engine
+    sums operator deltas, so an instance which wrote its own columns and left the others UNSET
+    would be fine, but one that wrote zeros over another's work would silently erase it. Building
+    the full-width zero tensor and filling only this span is the cheap way to be certain.
+    """
+    out = torch.zeros_like(chem)
+    for k, t in enumerate(terms):
+        out[:, chan + k] = rate * t
+    return out * occ
+
+
 @register_operator("cell_geometry", set="cell", kind="aggregate", family="hierarchy")
 class CellGeometry3D(Aggregate):
     """AGGREGATE the 3D vertex mesh -> per-cell centroid + area (the cross-scale readout the RD needs:
@@ -133,6 +158,7 @@ class CellAdjacency(Rewire):
 # spellings must resolve: 320 specs use the first and the rest use the second.
 @register_operator("seed_cell_chem", "cell_chem_seed", set="cell", kind="seed", family="seed")
 class CellRDSeed(Structural):
+    N_SPECIES = 2
     """Gray-Scott initial condition on the cell set: substrate u=1 everywhere, activator a=0 except
     a central spot (a=0.5, u=0.25) that nucleates the pattern. chem = [a, u].
 
@@ -165,7 +191,9 @@ class CellRDSeed(Structural):
         self.at = params.get("_at", "cell"); self.vat = params.get("vertex_set", "vertex")
         self.seed = int(params.get("seed", 0))
         # WHICH SPECIES THIS SEEDER FILLS: 0 (columns 0,1) by default; 2 for a second RD system.
-        self.chan = _chan(params, type(self).__name__)
+        # HOW MANY COLUMNS THIS SEEDER FILLS. Two unless told otherwise, so nothing archived moves.
+        self.n_species = int(params.get("n_species", self.N_SPECIES))
+        self.chan = _chan(params, type(self).__name__, self.n_species)
         self.mode = params.get("mode", "scatter")               # "noise" | "scatter" | "patch" | "cones"
         if self.mode not in self.MODES:
             raise ValueError(
@@ -245,16 +273,28 @@ class CellRDSeed(Structural):
         # SEEDED INTO THIS SPECIES' OWN COLUMNS. `chan` offsets from the schema's base, so a
         # second seeder writes the second pair and leaves the first alone.
         h0, h1 = clvl.state_schema["chem"]
-        h0 = h0 + self.chan
-        st = clvl.state.clone(); st[:nF, h0:h0 + 1] = a[:, None]
-        if h1 - h0 > 1:
-            st[:nF, h0 + 1:h0 + 2] = u[:, None]
+        base = h0 + self.chan
+        st = clvl.state.clone()
+        st[:nF, base:base + 1] = a[:, None]
+        if h1 - base > 1:
+            st[:nF, base + 1:base + 2] = u[:, None]
+        # A SPAN WIDER THAN TWO gets the remaining species seeded the same way the first was, from
+        # the SAME generator, so a three-species May-Leonard start is three independent random
+        # fields rather than one field and two zeros. Two zeros is not a neutral initial condition
+        # for a competition model -- it is extinction, and the run would decide nothing.
+        for _k in range(2, self.n_species):
+            if h1 - base > _k:
+                _v = (0.04 * torch.rand(nF, generator=g)).to(dev)
+                _nu = (torch.rand(nF, generator=g) < self.seed_frac).to(dev)
+                st[:nF, base + _k:base + _k + 1] = torch.where(
+                    _nu, torch.full_like(_v, 0.5), _v)[:, None]
         clvl.state = st
         return {}
 
 
 @register_operator("cell_chem_diffuse", set="cell", kind="lateral", family="fields", implementation="graph_laplacian")
 class CellDiffuse(Lateral):
+    N_SPECIES = 2
     """`graph_laplacian` implementation of cell_chem_diffuse: PURELY COMBINATORIAL diffusion of the two
     morphogens between neighbouring cells (forked from Turing_vertex `graph_diffuse`). `norm=True` uses
     the degree-normalised Laplacian (eigenvalues in [-2,0]) so an explicit step is stable at any cell
@@ -270,7 +310,7 @@ class CellDiffuse(Lateral):
     The name is not new: discovery/composition_space.py has always listed this impl as
     "graph_laplacian" -- it was registered as the anonymous "default", so the two disagreed."""
     SUPPORTED_DIMS = [2, 3]; EMIT = "velocity"; INTEGRAND = "chem"; DIFFERENTIABLE = True
-    REQUIRES_PARAMS = ["d_a", "d_h", "chi"]
+    REQUIRES_PARAMS = ["chi"]
     INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem"]; WRITES = ["chem"]; MAPS = ["edge_index"]
     MECHANISM_TAGS = ["diffusion", "graph_laplacian", "turing"]
     REFERENCE = "Fick, A. (1855). Ueber Diffusion. Ann. Phys. 170:59-86; Turing, A. M. (1952). Phil. Trans. R. Soc. B 237:37-72."
@@ -279,11 +319,27 @@ class CellDiffuse(Lateral):
     def __init__(self, params, device="cpu"):
         super().__init__(params, device)
         self.at = params.get("_at", "cell")
-        self.d_a = float(params["d_a"]); self.d_h = float(params["d_h"]); self.chi = float(params["chi"])
+        # A DIFFUSIVITY PER SPECIES, because two is not the only width. `d_a`/`d_h` name the roles
+        # of the two Gray-Scott species and cannot express three (May-Leonard) or four (a coupled
+        # pair), and FitzHugh-Nagumo needs one of them to be exactly ZERO -- only `u` diffuses
+        # there, `v` has no Laplacian at all. `d: [..]` is the general spelling and its LENGTH
+        # declares the span; `d_a`/`d_h` remain the two-species one and every archived spec keeps
+        # working unchanged.
+        _d = params.get("d")
+        if _d is not None:
+            self.d = [float(x) for x in _d]
+        elif "d_a" in params and "d_h" in params:
+            self.d = [float(params["d_a"]), float(params["d_h"])]
+        else:
+            raise ValueError(f"{type(self).__name__}: needs either `d: [..]` (one diffusivity per "
+                             f"species) or both `d_a` and `d_h` (the two-species spelling).")
+        self.d_a, self.d_h = self.d[0], (self.d[1] if len(self.d) > 1 else self.d[0])
+        self.N_SPECIES = len(self.d)          # instance attribute: shadows the class default of 2
+        self.chi = float(params["chi"])
         self.norm = bool(params.get("norm", True))
         # WHICH SPECIES THIS INSTANCE OWNS: 0 is the first pair (chem columns 0,1) and is the
         # default, so every existing spec is unchanged. A second RD system lives at chan 2.
-        self.chan = _chan(params, type(self).__name__)
+        self.chan = _chan(params, type(self).__name__, self.N_SPECIES)
 
 
     def forward(self, H, mask=None):
@@ -302,10 +358,10 @@ class CellDiffuse(Lateral):
         # operator says WHICH pair it owns, and writes zeros everywhere else, so two instances at
         # chan 0 and chan 2 are two independent reaction-diffusion systems that cannot leak into
         # one another through the diffusion step.
+        _span(chem, self.chan, len(self.d), type(self).__name__)      # bounds, loudly
         coef = torch.zeros(chem.shape[1], device=chem.device, dtype=chem.dtype)
-        coef[self.chan] = self.d_a * self.chi
-        if self.chan + 1 < chem.shape[1]:
-            coef[self.chan + 1] = self.d_h * self.chi
+        for _k, _dk in enumerate(self.d):
+            coef[self.chan + _k] = _dk * self.chi
         occ = lvl.occ[:, None] if getattr(lvl, "occ", None) is not None else 1.0
         return {self.at: (coef[None, :] * lap) * occ}
 
@@ -440,6 +496,7 @@ class CellDiffuseInterfaceWeighted(Lateral):
 
 @register_operator("cell_chem_react", set="cell", kind="lateral", family="fields", model="gray_scott")
 class CellReactGrayScott(Lateral):
+    N_SPECIES = 2
     """Gray-Scott autocatalysis on the cell set (forked from Turing_vertex `react`), chem = [a, u]:
         da/dt =  u a^2 - (F + kk) a      (a = activator / autocatalyst)
         du/dt = -u a^2 + F (1 - u)       (u = substrate)
@@ -457,7 +514,7 @@ class CellReactGrayScott(Lateral):
         self.F = float(params["F"]); self.kk = float(params["kk"]); self.rate = float(params.get("rate", 1.0))
         # WHICH SPECIES THIS INSTANCE OWNS: 0 is the first pair (chem columns 0,1) and is the
         # default, so every existing spec is unchanged. A second RD system lives at chan 2.
-        self.chan = _chan(params, type(self).__name__)
+        self.chan = _chan(params, type(self).__name__, self.N_SPECIES)
 
     def forward(self, H, mask=None):
         lvl = H.level(self.at)
@@ -476,6 +533,121 @@ class CellReactGrayScott(Lateral):
         out[:, c] = self.rate * da
         out[:, c + 1] = self.rate * du
         return {self.at: out * occ}
+
+
+@register_operator("cell_chem_react", set="cell", kind="lateral", family="fields",
+                   model="rock_paper_scissor")
+class CellReactRPS(Lateral):
+    """May-Leonard cyclic competition -- THREE species, each suppressing the next. chem = [u, v, w]:
+
+        p = u + v + w
+        du/dt = u (1 - p - a v)
+        dv/dt = v (1 - p - a w)
+        dw/dt = w (1 - p - a u)
+
+    Every species is limited by the TOTAL population `p` (shared resource) and additionally
+    suppressed by ONE named rival, cyclically: u loses to v, v to w, w to u. Nothing dominates, so
+    the fixed point is unstable and the field breaks into travelling domains -- spirals on a
+    2D sheet -- rather than settling. That is the qualitative difference from Gray-Scott, whose
+    pattern is stationary once formed.
+
+    `a` IS THE ASYMMETRY AND IT IS THE WHOLE MODEL. At a = 0 the three species merely compete for
+    the shared resource `p` and the outcome is neutral coexistence; the cyclic term is what makes
+    the dynamics non-transitive, and its size sets how fast domains invade one another.
+
+    THIS IS NOT A COUPLING OPERATOR. The cyclic term is intrinsic to May-Leonard, not a cross term
+    bolted onto three independent logistic species, so it belongs in the model rather than in a
+    separate `cell_chem_couple`. Selecting it is a biological decision, which is why it is a
+    `model=` and not an `implementation=`.
+    """
+    N_SPECIES = 3
+    SUPPORTED_DIMS = [2, 3]; EMIT = "velocity"; INTEGRAND = "chem"; DIFFERENTIABLE = True
+    INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem"]; WRITES = ["chem"]; MAPS = []
+    MECHANISM_TAGS = ["reaction", "competition", "cyclic_dominance", "non_transitive",
+                      "may_leonard", "rock_paper_scissor"]
+    PARAM_ROLES = {"a": "cyclic_suppression", "rate": "reaction_time_scale"}
+    REFERENCE = ("May, R. M. & Leonard, W. J. (1975). SIAM J. Appl. Math. 29:243-253; "
+                 "Reichenbach, T., Mobilia, M. & Frey, E. (2007). Nature 448:1046-1049.")
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cell")
+        # 0.6 is the value the ParticleGraph `RD_RPS` generator ran, kept so the two agree.
+        self.a = float(params.get("a", 0.6))
+        self.rate = float(params.get("rate", 1.0))
+        self.chan = _chan(params, type(self).__name__, self.N_SPECIES)
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        chem = lvl.get("chem")
+        u, v, w = _span(chem, self.chan, 3, type(self).__name__)
+        p = u + v + w
+        terms = (u * (1.0 - p - self.a * v),
+                 v * (1.0 - p - self.a * w),
+                 w * (1.0 - p - self.a * u))
+        occ = lvl.occ[:, None] if getattr(lvl, "occ", None) is not None else 1.0
+        return {self.at: _emit(chem, self.chan, terms, self.rate, occ)}
+
+
+@register_operator("cell_chem_react", set="cell", kind="lateral", family="fields",
+                   model="gray_scott_coupled")
+class CellReactGrayScottCoupled(Lateral):
+    """TWO Gray-Scott systems that compete for each other's activator. chem = [a1, u1, a2, u2]:
+
+        da1/dt =  u1 a1^2 - (F1 + k1) a1 - g a1 a2
+        du1/dt = -u1 a1^2 + F1 (1 - u1)
+        da2/dt =  u2 a2^2 - (F2 + k2) a2 - g a2 a1
+        du2/dt = -u2 a2^2 + F2 (1 - u2)
+
+    AT g = 0 THIS IS EXACTLY TWO INDEPENDENT SYSTEMS, term for term, and that is the test: a run at
+    g = 0 must reproduce a pair of `gray_scott` instances bit for bit. Anything else means the
+    refactor moved something.
+
+    WHY ONE OPERATOR AND NOT TWO PLUS A CROSS TERM. A cross term reads columns the instance does
+    not own, which breaks the rule that makes two reaction instances additive -- each writes zeros
+    outside its own span. So a coupled model owns the whole four-column span. The consequence for a
+    spec is that `cell_chem_react` is named ONCE in the schedule here, where the uncoupled
+    two-species specs name it twice: the engine binds the i-th occurrence to the i-th instance, so
+    naming it twice with one instance declared would run this operator twice and double its delta.
+
+    THE COUPLING IS ACTIVATOR-ACTIVATOR, the mildest of the three plausible choices (the others
+    being a shared substrate, and B inhibiting A's autocatalysis). It is symmetric and it is a
+    LOSS to both -- `-g a1 a2` in each -- so it removes activator where the two patterns overlap
+    and leaves them alone where they do not. The visible consequence is exclusion: the two motifs
+    stop being able to occupy the same cells, which is exactly what superposing two independent
+    systems cannot show.
+    """
+    N_SPECIES = 4
+    SUPPORTED_DIMS = [2, 3]; EMIT = "velocity"; INTEGRAND = "chem"; DIFFERENTIABLE = True
+    REQUIRES_PARAMS = ["F", "kk"]
+    INPUTS = ["cell"]; OUTPUTS = ["cell"]; READS = ["chem"]; WRITES = ["chem"]; MAPS = []
+    MECHANISM_TAGS = ["reaction", "autocatalysis", "turing", "gray_scott", "competition", "coupled"]
+    PARAM_ROLES = {"F": "feed_rate", "kk": "kill_rate", "F2": "feed_rate_2", "kk2": "kill_rate_2",
+                   "gamma": "cross_suppression", "rate": "reaction_time_scale"}
+    REFERENCE = "Gray, P. & Scott, S. K. (1984). Chem. Eng. Sci. 39:1087-1097 (coupling: this work)."
+
+    def __init__(self, params, device="cpu"):
+        super().__init__(params, device)
+        self.at = params.get("_at", "cell")
+        self.F = float(params["F"]); self.kk = float(params["kk"])
+        # SYSTEM B FALLS BACK TO SYSTEM A's PARAMETERS. Two identical systems that differ only by
+        # their coupling is the control this model exists to be compared against.
+        self.F2 = float(params.get("F2", self.F)); self.kk2 = float(params.get("kk2", self.kk))
+        self.gamma = float(params.get("gamma", 0.0))
+        self.rate = float(params.get("rate", 1.0))
+        self.chan = _chan(params, type(self).__name__, self.N_SPECIES)
+
+    def forward(self, H, mask=None):
+        lvl = H.level(self.at)
+        chem = lvl.get("chem")
+        a1, u1, a2, u2 = _span(chem, self.chan, 4, type(self).__name__)
+        x = self.gamma * a1 * a2
+        terms = (u1 * a1 * a1 - (self.F + self.kk) * a1 - x,
+                 -u1 * a1 * a1 + self.F * (1.0 - u1),
+                 u2 * a2 * a2 - (self.F2 + self.kk2) * a2 - x,
+                 -u2 * a2 * a2 + self.F2 * (1.0 - u2))
+        occ = lvl.occ[:, None] if getattr(lvl, "occ", None) is not None else 1.0
+        return {self.at: _emit(chem, self.chan, terms, self.rate, occ)}
 
 
 @register_operator("cell_chem_react", set="cell", kind="lateral", family="fields", model="gierer_meinhardt")
@@ -525,6 +697,9 @@ class CellReactGiererMeinhardt(Lateral):
 # unreadable -- `cell_grow` / `cell_divide` says what the schedule actually does.
 @register_operator("cell_grow", set="vertex", kind="structural", family="population")
 class Grow3D(Structural):
+    # READS one species' activator; the span it points into is two wide because a Gray-Scott
+    # system is. It never writes chem, so this only has to name the right column.
+    N_SPECIES = 2
     """Cell growth on the vesicle: each cell's targets (A0 / P0 / v_eq) grow at a per-cell rate,
     and the per-cell volume elasticity in cell_mechanics then inflates the cell by force balance.
     This operator moves no vertex itself -- it raises what the cells ASK for, and the mechanics
@@ -558,7 +733,7 @@ class Grow3D(Structural):
         self.rate = float(params.get("rate", 0.01)); self.a_sw = float(params.get("a_sw", 0.20))
         # WHICH SPECIES GATES GROWTH: 0 (chem columns 0,1) by default, so existing specs are
         # unchanged; 2 reads a second RD system living in the same buffer.
-        self.chan = _chan(params, type(self).__name__)
+        self.chan = _chan(params, type(self).__name__, self.N_SPECIES)
         # IS `a_sw` A VALUE OF THE ACTIVATOR OR A FRACTION OF ITS MAXIMUM? Default False = the
         # absolute reading every run in this project's history used, so no archived spec changes
         # meaning. See the gate itself in `forward` for why both are real mechanisms. `a_live` is
