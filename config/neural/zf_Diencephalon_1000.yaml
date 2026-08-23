@@ -1,0 +1,56 @@
+# zf_Diencephalon_1000 -- 1017 larval-zebrafish neurons of the Diencephalon, a synthetic connectome,
+# and a 128^3 rendered activity volume. One of four regions differing ONLY in anatomy: the
+# wiring rule, the dynamics and the render are identical, so what differs between the four
+# movies is where in the brain the somas came from.
+#
+# fish2 on neuprint-fish2.janelia.org, ROI = Diencephalon (1017 of the region's somas fell
+# in the cube). Cropped in NANOMETRES -- fish2 voxels are 16/16/15 nm, so this is 49.779 um
+# on every side while spanning 3111 x 3111 x 3319 voxels.
+# Wiring: exponential kernel, p=0.02, lambda=7845 nm (7.8 um), g=1.5,
+# seed 0 -> 20911 edges, mean in-degree 20.6.
+general:
+  name: zf_Diencephalon_1000
+  seed: 0
+  n_frames: 400
+  dt: 0.05
+  dim: 3
+  world: [1.0, 1.0, 1.0]
+  boundary: wall
+  record_cap: 401
+  field_record_cap: 128
+  units:
+    length_um: 49.779296875
+    time_s: 1.0
+sets:
+  brain: {n: 1}
+  assembly: {parent: brain, per_parent: 1}
+  neuron:
+    parent: assembly
+    per_parent: 1017
+    types:
+      slow_quiet:  {fraction: 0.25, p: [1.0, 0.0, 1.2, 0.5, 1.00, 0.0]}
+      slow_bursty: {fraction: 0.25, p: [1.0, 0.0, 1.2, 1.6, 0.50, 0.0]}
+      fast_quiet:  {fraction: 0.25, p: [2.5, 0.0, 1.2, 0.5, 2.00, 0.0]}
+      fast_bursty: {fraction: 0.25, p: [2.5, 0.0, 1.2, 1.6, 0.25, 0.0]}
+  synapse:
+    parent: brain
+    edge_set: true
+    pre: neuron
+    post: neuron
+    edges_file: neural_regions/zf_Diencephalon_1000/connectome.npz
+fields:
+  neural_activity: {frame: grid, res: 128, components: 1, couples_to: assembly}
+seed:
+  - op: neural_seed
+    at: neuron
+    region: zf_Diencephalon_1000
+    v0_mean: 0.0
+    v0_sd: 0.5
+operators:
+  - {op: neuron_update, at: neuron, model: leaky_tanh, noise: 0.01}
+  - {op: neuron_signal, at: neuron, model: type_pairwise, edge_set: synapse, activation: tanh}
+  - {op: aggregate, at: assembly, child: neuron, block: voltage, into: activity}
+  - {op: voxelize, at: neuron, to: neural_activity, block: voltage, kernel: gaussian,
+      sigma: 6.0, normalize: none}
+schedule: [neuron_update, neuron_signal, aggregate, voxelize]
+plotting: {background: black, point_size: 4.0}
