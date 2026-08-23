@@ -52,6 +52,47 @@ def _live_pos(H, sname):
     return pos[lvl.active.detach().cpu().numpy()], None
 
 
+def dot_area_pt2(pos, span_data, fig_px, dpi, fill=0.9, cap=(1.0, 400.0)):
+    """Scatter `s` (an AREA in points^2) such that a dot spans `fill` of the LOCAL SPACING.
+
+    THE PROBLEM THIS REPLACES. `point_size` was a constant in the spec, so the same number that
+    made a 4,000-cell disc read as a sheet made a 1,000-cell one read as dinner plates and a
+    40,000-cell one as dust. Dot size is not a property of the picture, it is a property of the
+    picture RELATIVE TO THE SPACING, and the spacing changes whenever the population does -- which
+    for a growing tissue is every frame.
+
+    IT IS MEASURED, NOT ESTIMATED FROM DENSITY. `sqrt(area / n)` needs a hull, is wrong for any
+    non-convex or non-uniform layout, and is biased at the boundary. The MEDIAN NEAREST-NEIGHBOUR
+    DISTANCE is the quantity "nearly touching" actually refers to, it needs no hull, and the median
+    shrugs off the edge cells that have fewer neighbours than the interior.
+
+    THE CONVERSION IS EXACT, so the result is invariant to figure size and dpi as well as to n:
+    data -> px is `fig_px / span_data`, px -> pt is `72 / dpi`, and `s` is an area, hence squared.
+    A caller that changes the canvas from 6.2in at 110 dpi to 8in at 200 dpi therefore gets the
+    same apparent dot, which is what makes the live snapshot and the movie agree.
+
+    `fill` = 1.0 is exactly touching. 0.9 leaves a hairline so the population reads as flat while
+    the individual dots stay countable, which is the look these plots want.
+    """
+    q = np.asarray(pos, float)[:, :2]
+    if len(q) < 2 or span_data <= 0:
+        return 12.0
+    try:
+        from scipy.spatial import cKDTree
+        # k=2 because the nearest neighbour of a point is itself at distance 0
+        nn = cKDTree(q).query(q, k=2)[0][:, 1]
+    except Exception:
+        i = np.random.default_rng(0).choice(len(q), size=min(len(q), 1500), replace=False)
+        dd = np.linalg.norm(q[i][:, None, :] - q[i][None, :, :], axis=-1)
+        np.fill_diagonal(dd, np.inf)
+        nn = dd.min(1)
+    sp = float(np.median(nn[np.isfinite(nn)])) if np.isfinite(nn).any() else 0.0
+    if sp <= 0:
+        return 12.0
+    pt = sp * (float(fig_px) / float(span_data)) * (72.0 / float(dpi))
+    return float(np.clip((fill * pt) ** 2, *cap))
+
+
 def chem_rgb(chem, nF=None):
     """(rgb [n,3], [max per species]) from a `chem` array -- THE ONE COLOUR LAW for RD output.
 
@@ -161,13 +202,14 @@ def snapshot(H, tick, n_frames, out_dir, name="", sname=None):
             # section is -- has NOTHING to show but its chemistry: the cells never move, so a grey
             # scatter is the identical picture at frame 1 and frame 6000.
             fc, _clim = _face_colours(H, len(pos))
-            # SIZED FROM THE COUNT, so the dots nearly touch and the disc reads as a sheet rather
-            # than as a scatter plot of it. `s` is an AREA in points^2, so holding the covered
-            # FRACTION fixed means s ~ 1/n; 22 is the value that fills the 4,000-cell disc. The
-            # clamp keeps a 200-cell run from drawing dinner plates and a 100,000-cell one from
-            # drawing nothing.
+            # SIZED FROM THE MEASURED SPACING, not from the count. `22 * 4000/n` assumed the
+            # points were spread over a fixed area, so it was right for this disc and wrong for
+            # any other layout -- and wrong every frame of a growing tissue. `dot_area_pt2`
+            # measures the median nearest-neighbour distance and converts it exactly, so the dots
+            # stay "nearly touching" whatever n, whatever the world box, whatever the canvas.
+            _span = 2.0 * float(np.abs(pos[:, :2] - pos[:, :2].mean(0)).max()) * 1.08 or 1.0
             ax.scatter(pos[:, 0], pos[:, 1],
-                       s=float(np.clip(22.0 * 4000.0 / max(len(pos), 1), 3.0, 90.0)),
+                       s=dot_area_pt2(pos, _span, 6.2 * 110, 110),
                        c=(fc if fc is not None else "#dcdcdc"), linewidths=0)
             ax.set_aspect("equal"); ax.set_axis_off()
             put = ax.text

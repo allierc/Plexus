@@ -24,11 +24,12 @@
 # pi*19^2/4000 = 0.283 area units, so the mean spacing is about 0.60. `radius: 0.95` takes roughly
 # the first ring of neighbours -- about 6 per cell, which is what `k: 6` was asking for.
 # FOUR species: two Gray-Scott systems that suppress each other's activator (gamma 1.0). At gamma 0 this is exactly turing2d_two; the difference IS the coupling.
-# RENDERING POLICY LIVES IN THE SPEC, NOT IN THE RENDERER. `point_size` is read by
-# `plexus.plot` (`_point_size`), whose default is 8.0 for any set under 4,000 -- a number chosen
-# for sparse particle clouds, not for a disc that fills the frame. The movie canvas is 8 inches at
-# dpi 200, so the disc spans about 1,230 px and 4,000 cells sit ~17 px apart; at the default the
-# dots came out ~10 px and the sheet read as a scatter plot of itself. 26 puts them just touching.
+# THE DOT SIZE IS MEASURED, NOT DECLARED. `dot_fill` is the fraction of the LOCAL SPACING a dot
+# spans -- 1.0 is exactly touching, 0.9 leaves a hairline so the sheet reads as flat while the
+# individual cells stay countable. The renderer measures the median nearest-neighbour distance and
+# converts it for whatever canvas it is drawing on, so the same value holds at 1,000 cells and at
+# 16,000, on the live snapshot and in the movie. `point_size` still overrides it absolutely, but
+# an absolute size is a promise about a population count that a growing tissue breaks every frame.
 general:
   name: turing2d_coupled
   seed: 0
@@ -91,4 +92,4 @@ schedule:
 - cell_chem_react
 plotting:
   background: black
-  point_size: 26
+  dot_fill: 0.9
