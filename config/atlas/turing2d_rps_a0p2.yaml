@@ -1,14 +1,11 @@
-# THE WORKING POINT IS ParticleGraph's, MEASURED NOT GUESSED: d = 0.02, chi = 1.0, rate 0.05,
-# a = 0.6, 4,000 frames. Two things carried it. The initial condition must sit ON the simplex --
-# `init_mesh` case 'RD_Mesh' does rand(n,3) then divides by the row sum, so u+v+w = 1 exactly --
-# because the logistic factor is (1 - p - a*rival) and starting at p = 0.175 leaves 0.83 of net
-# growth for everyone, so the run climbs to the simplex instead of competing on it. And the
-# diffusion must be small: at an effective 0.13 every domain merged into one disc-spanning wave
-# (sd 0.012 / 0.112 / 0.131); at 0.02 the domains drop below the disc and spirals appear
-# (sd 0.354 / 0.395 / 0.371). d = 0.05 works too, so the result is not knife-edge -- the IC was
-# the parameter that mattered.
+# turing2d_rps_a0p2 -- May-Leonard at a = 0.2: weak dominance -- broad slow domains, spirals barely wound.
+#
+# ONLY `a` CHANGES, from `turing2d_rps`'s 0.6 (ParticleGraph's value). `a` is the CYCLIC
+# suppression -- how hard each species leans on the one it dominates -- and it is the whole model:
+# at a = 0 the three merely share the resource `p` and coexist neutrally, with nothing to break the
+# symmetry and no spiral to form.
 general:
-  name: turing2d_rps
+  name: turing2d_rps_a0p2
   seed: 0
   n_frames: 4000
   record_cap: 602
@@ -54,7 +51,7 @@ operators:
 - op: cell_chem_react
   at: cell
   model: rock_paper_scissor
-  a: 0.6
+  a: 0.2
   rate: 0.05
 schedule:
 - cell_chem_seed

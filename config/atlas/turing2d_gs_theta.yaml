@@ -1,0 +1,68 @@
+# turing2d_gs_theta -- Gray-Scott at Pearson point theta: worms and loops coexisting with spots.
+#
+# ONE PARAMETER PAIR CHANGES, (F, kk) = (0.038, 0.061). Everything else -- the disc, the 4,000 cells,
+# the adjacency, chi 4.0, d_a 0.08 / d_h 0.16 -- is `turing2d_disc_chi4`'s, so the sweep isolates
+# the reaction and nothing else. Derived from that file rather than rebuilt beside it, which is the
+# lesson `turing2d_coupled` cost: a variant meant to differ in one parameter must come FROM its
+# control.
+#
+# THE BASIS IS PEARSON'S OWN DIAGRAM and it transfers because the diffusivity ratio does. Pearson
+# integrates Du = 2e-5 for the substrate against Dv = 1e-5 for the activator -- the substrate twice
+# the activator -- and d_h / d_a = 0.16 / 0.08 is the same 2. A ratio of 2 is what makes his (F, k)
+# labels mean here what they mean there.
+general:
+  name: turing2d_gs_theta
+  seed: 0
+  n_frames: 6000
+  record_cap: 602
+  dt: 1.0
+  dim: 2
+  boundary: free
+  world:
+  - 49.4
+  - 49.4
+sets:
+  cell:
+    n: 4000
+    spawn: sunflower
+    spawn_radius: 19.0
+    state:
+      pos:
+        width: 2
+        integration: none
+        boundary: free
+      chem:
+        width: 2
+        integration: first_order
+        boundary: free
+fields: {}
+operators:
+- op: cell_chem_seed
+  at: cell
+  seed: 0
+  before_frame: 3
+  mode: scatter
+  seed_frac: 0.12
+- op: radius_graph
+  at: cell
+  radius: 0.95
+- op: cell_chem_diffuse
+  at: cell
+  implementation: graph_laplacian
+  d_a: 0.08
+  d_h: 0.16
+  chi: 4.0
+- op: cell_chem_react
+  at: cell
+  model: gray_scott
+  F: 0.038
+  kk: 0.061
+  rate: 1.0
+schedule:
+- cell_chem_seed
+- radius_graph
+- cell_chem_diffuse
+- cell_chem_react
+plotting:
+  background: black
+  dot_fill: 0.9
