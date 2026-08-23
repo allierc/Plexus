@@ -109,6 +109,12 @@ operators:
   # 10 = 6000 / (602 - 1). `vertex_spheroid` never hit this because its cap exceeds its frame count
   # and both clocks are 1.
   every: 10
+  # `engine_clock: true` IS NOT OPTIONAL HERE. `_engine_owns_clock` returns 1 for any
+  # operator that does not declare it, so `every: 10` alone was silently discarded and the
+  # topology went on recording every tick -- the D3 misalignment survived the fix that was
+  # supposed to remove it. The flag asserts the period is written for the engine-owned
+  # clock rather than for the old operator-side one, which meant every*every.
+  engine_clock: true
 schedule:
 - mesh_seed
 - cell_geometry

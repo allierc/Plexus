@@ -131,6 +131,12 @@ operators:
   # 1800 frames records positions every 3rd tick (601 rows) while `every: 1` recorded 1801 topology
   # rows, and D3 refuses the pair. 3 = 1800 / (602 - 1).
   every: 3
+  # `engine_clock: true` IS NOT OPTIONAL HERE. `_engine_owns_clock` returns 1 for any
+  # operator that does not declare it, so `every: 3` alone was silently discarded and the
+  # topology went on recording every tick -- the D3 misalignment survived the fix that was
+  # supposed to remove it. The flag asserts the period is written for the engine-owned
+  # clock rather than for the old operator-side one, which meant every*every.
+  engine_clock: true
 schedule:
 - mesh_seed
 - cell_geometry
