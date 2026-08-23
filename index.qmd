@@ -119,7 +119,7 @@ it.**
 </style>
 
 <h3>Turing — Gray–Scott reaction–diffusion</h3>
-<p class="opk">Reaction–diffusion on the cell–cell adjacency graph (<code>graph_diffuse</code> → <code>react</code>) — Turing's two-species activator–inhibitor system, on a 2D cell disc: the coral regime, a fine maze (small χ), and a diverging activator view (high → red, low → blue, balanced → white).</p>
+<p class="opk">The simplest composition: cells carrying two molecular states, coupled by diffusion between neighbouring cells and by local activator–inhibitor reactions within each cell. The same biological entities participate in two mechanisms whose composition generates spatial patterning. Shown on a 2D cell disc are the coral regime, a fine maze, and a diverging activator regime.</p>
 <p class="opk-ref">Reference — the Gray–Scott system of <a href="https://doi.org/10.1016/0009-2509(83)80132-8">Gray &amp; Scott (1983), <i>Chem. Eng. Sci.</i> 38:29–43</a>, in the reaction–diffusion form and parameter map of <a href="https://doi.org/10.1126/science.261.5118.189">Pearson (1993), <i>Science</i> 261:189–192</a>; the Brusselator is <a href="https://doi.org/10.1063/1.1668896">Prigogine &amp; Lefever (1968), <i>J. Chem. Phys.</i> 48:1695–1700</a>.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
@@ -277,8 +277,8 @@ schedule:
   </figure>
 </div>
 
-<h3>Epithelial mechanics — a true vertex model</h3>
-<p class="opk">An explicit vertex model, via <b>Tyssue</b>. Unlike a self-propelled Voronoi tissue (each cell a single point), here cells are polygons that <b>share junction vertices</b>, and those junction vertices — not the cell centres — are the mechanical degrees of freedom. An area + line-tension shape energy (<code>shape_energy</code>) relaxes the mesh toward force balance, with growth, division and cell death as explicit operations on the mesh.</p>
+<h3>Epithelial mechanics — a vertex model</h3>
+<p class="opk">A more structured representation of epithelial cells and their shared junctions. Cells are polygons whose boundaries share vertices, making junction geometry itself part of the biological state. Area elasticity and junction tension couple neighbouring cells and relax the tissue toward mechanical equilibrium, while growth, division and cell death modify its organization. Here the same cellular entities therefore carry geometry, interact mechanically, and change their topology over time.</p>
 <p class="opk-ref">Reference — active vertex model after Farhadifar et&nbsp;al. (2007), on the space-filling polyhedra of Honda et&nbsp;al. (2004), and the T1 exchanges are the reversible network reconnection of <a href="https://doi.org/10.1007/s10237-012-0430-7">Okuda et&nbsp;al. (2013), <i>Biomech. Model. Mechanobiol.</i> 12:627–644</a>.</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
@@ -457,7 +457,8 @@ schedule:   # the order the operators run each frame
   </figure>
 </div>
 
-<p class="opk">Cell death as a <b>sculptor</b>, not as cleanup. Death is one of the eight elementary operator families, and it was the only one this vesicle lacked: growth inflates and division subdivides, so every mechanism it owned pushed the surface <b>outward</b>. A dying cell shrinks, sheds its neighbours through T1 exchanges until it is a triangle, and is then extruded by a T2 collapse — the sheet closing over the gap by force balance alone. Cells marked to die are drawn <b>blue</b>. Removing 71&nbsp;% of the cells leaves the surface closed, Euler&nbsp;2, with no broken face.</p>
+<h3>Cell death — sculpting an epithelial surface</h3>
+<p class="opk">Morphogenesis emerges from the composition of mechanisms acting on the same epithelial cells. Growth expands the surface, division changes its cellular resolution, while cell death removes material and allows the tissue to contract and reshape. A dying cell progressively shrinks and loses neighbours before being extruded, while the surrounding junction mechanics close the sheet. Here, adding a single operator changes the behaviour of the composed system: removing 71% of the cells can reshape the vesicle while preserving a closed surface.</p>
 <p class="opk-ref">Reference — apoptotic force driving epithelial folding after Monier et&nbsp;al., <i>Nature</i> <b>518</b>:245 (2015).</p>
 <div class="sim-gallery g3">
   <figure class="sim-card">
