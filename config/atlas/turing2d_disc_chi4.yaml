@@ -1,0 +1,78 @@
+# turing2d_disc_chi4 -- Gray-Scott on a FLAT DISC of cells, the minisite's Turing section in the
+# promoted vocabulary.
+#
+# WHY THIS FILE EXISTS. The three clips under "Turing -- Gray-Scott reaction-diffusion" on the front
+# page (`turing2d_coral`, `turing2d_chi_small`, `turing2d_two_species`) exist ONLY as text inlined
+# in `index.qmd`'s hover panels -- there is no yaml for them anywhere in the tree -- and they are
+# written against operators that were never promoted: `aggregate_seed` (mode `disc`), `graph_diffuse`
+# and `react`, the Turing_vertex names. So the section had no runnable spec in the core at all.
+#
+# WHAT REPLACES THE MISSING SEEDER. `aggregate_seed mode: disc` did three things at once: place the
+# cells on a disc, build a k=6 neighbour graph, and seed the activator. In the promoted vocabulary
+# those are three separate concerns and each already exists:
+#
+#     placement  -> `spawn: sunflower` + `spawn_radius`, which the ENGINE owns (engine.py `_spawn`).
+#                   Sunflower rather than `disc`: `disc` draws uniformly at random, which clumps,
+#                   and a Turing wavelength measured on a clumped lattice is measuring the clumps.
+#                   The Vogel golden-angle spiral covers the disc evenly.
+#     adjacency  -> `radius_graph`, which writes the `edge_index` that `cell_chem_diffuse` reads.
+#                   A RADIUS, not a k: kNN on an even lattice and a radius cut agree, and the radius
+#                   is the physical statement -- "cells exchange with cells this close".
+#     chemistry  -> `cell_chem_seed mode: scatter`, the promoted seeder.
+#
+# THE RADIUS IS SET FROM THE DENSITY, not guessed. 4000 cells on a disc of radius 19 is one cell per
+# pi*19^2/4000 = 0.283 area units, so the mean spacing is about 0.60. `radius: 0.95` takes roughly
+# the first ring of neighbours -- about 6 per cell, which is what `k: 6` was asking for.
+general:
+  name: turing2d_disc_chi4
+  seed: 0
+  n_frames: 6000
+  record_cap: 602
+  dt: 1.0
+  dim: 2
+  boundary: free
+  world:
+  - 49.4
+  - 49.4
+sets:
+  cell:
+    n: 4000
+    spawn: sunflower
+    spawn_radius: 19.0
+    state:
+      pos:
+        width: 2
+        integration: none
+        boundary: free
+      chem:
+        width: 2
+        integration: first_order
+        boundary: free
+fields: {}
+operators:
+- op: cell_chem_seed
+  at: cell
+  seed: 0
+  before_frame: 3
+  mode: scatter
+  seed_frac: 0.12
+- op: radius_graph
+  at: cell
+  radius: 0.95
+- op: cell_chem_diffuse
+  at: cell
+  implementation: graph_laplacian
+  d_a: 0.08
+  d_h: 0.16
+  chi: 4.0
+- op: cell_chem_react
+  at: cell
+  model: gray_scott
+  F: 0.055
+  kk: 0.062
+  rate: 1.0
+schedule:
+- cell_chem_seed
+- radius_graph
+- cell_chem_diffuse
+- cell_chem_react
