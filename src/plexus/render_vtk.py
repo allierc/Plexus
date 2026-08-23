@@ -530,6 +530,97 @@ def still(run_dir, style="flat", out=None, fill=1.0, frame=-1, label=True, traj=
     return f"{len(fr)} frames, drew {frame}"
 
 
+def compare(dir_a, dir_b, out, style="mesh", fill=1.0, labels=("A", "B"), title="",
+            max_frames=None):
+    """A and B SIDE BY SIDE in one clip, stepped together. This is the comparison artefact.
+
+    WHY IT IS NEEDED AT ALL, given both sides already have their own movie. Cedric: "I do not see
+    the comparison folder". Two directories each holding a movie is not a comparison -- it is two
+    movies, and telling them apart means opening both, scrubbing to the same moment, and holding one
+    in your head. A digest says whether they agree; this says WHERE and HOW they differ when they do,
+    which is the question a digest cannot answer and the only reason to keep the pixels at all.
+
+    BOTH PANELS DRAW THE SAME FRAME INDEX, subsampled identically, on a SHARED camera box -- the max
+    of the two -- because a per-side box would silently rescale one panel and make a size difference
+    invisible. If the two sides record different numbers of rows (okuda keeps ~60, the core keeps
+    every tick) each is subsampled to the same count first, so panel k of the left is panel k of the
+    right in RUN time, not in row index.
+    """
+    import pyvista as pv
+    fa, ta = frames_of(dir_a), _frames_ticks.value
+    fb, tb = frames_of(dir_b), _frames_ticks.value
+    if not fa or not fb:
+        return "no trajectory on " + ("A" if not fa else "B")
+    n = min(MAX_EVOLVE_FRAMES if max_frames is None else int(max_frames), len(fa), len(fb))
+    ia = np.unique(np.linspace(0, len(fa) - 1, n).astype(int))
+    ib = np.unique(np.linspace(0, len(fb) - 1, n).astype(int))
+    n = min(len(ia), len(ib))
+    L = max(box_of(dir_a, fa), box_of(dir_b, fb))
+    # one activator range across BOTH sides, for the same reason one camera box: a per-side range
+    # would normalise away exactly the difference the picture exists to show.
+    vals = [np.asarray(a, float) for f in (fa, fb) for _p, _m, a in f if a is not None]
+    lo = float(min(np.nanmin(v) for v in vals)) if vals else 0.0
+    hi = float(max(np.nanmax(v) for v in vals)) if vals else 1.0
+
+    pv.OFF_SCREEN = True
+    p = pv.Plotter(off_screen=True, window_size=(2 * SIZE, SIZE), shape=(1, 2), border=False)
+    p.set_background("black")
+    p.enable_anti_aliasing("msaa", multi_samples=8)
+    p.open_movie(out, framerate=EV_FPS, quality=8)
+    nFa = [int(m["nF"]) for _q, m, _a in fa]
+    nFb = [int(m["nF"]) for _q, m, _a in fb]
+    keep = [None, None]
+    for k in range(n):
+        for col, (fr, idx, nFs, tk, lab) in enumerate(
+                ((fa, ia, nFa, ta, labels[0]), (fb, ib, nFb, tb, labels[1]))):
+            t = int(idx[k])
+            p.subplot(0, col)
+            if keep[col] is not None:
+                p.remove_actor(keep[col])
+            pos, mt, act = fr[t]
+            m = mesh_of(pos, mt, act, lo, hi, show_div=(style == "mesh"),
+                        prev_nF=_pair_reference(t, nFs, tk, PAIR_TICKS))
+            if m is None:
+                continue
+            keep[col] = add(p, m, style)
+            p.add_text(f"{lab}   frame {t + 1}/{len(fr)}   {int(mt['nF'])} cells",
+                       position="upper_left", font_size=10, color="white", name=f"t{col}")
+            aim(p, L, fill=fill)
+        if title:
+            p.subplot(0, 0)
+            p.add_text(title, position="lower_left", font_size=9, color="#9a9a9a", name="ttl")
+        p.write_frame()
+    p.close()
+    return f"{n} paired frames"
+
+
+def compare_still(dir_a, dir_b, out, style="flat", fill=1.0, labels=("A", "B"), title=""):
+    """The last frame of both sides, side by side. The still the movie is scrubbed from."""
+    import pyvista as pv
+    fa = frames_of(dir_a)
+    fb = frames_of(dir_b)
+    if not fa or not fb:
+        return "no trajectory on " + ("A" if not fa else "B")
+    L = max(box_of(dir_a, fa), box_of(dir_b, fb))
+    pv.OFF_SCREEN = True
+    p = pv.Plotter(off_screen=True, window_size=(2 * SIZE, SIZE), shape=(1, 2), border=False)
+    p.set_background("black")
+    p.enable_anti_aliasing("msaa", multi_samples=8)
+    for col, (fr, lab) in enumerate(((fa, labels[0]), (fb, labels[1]))):
+        p.subplot(0, col)
+        pos, mt, act = fr[-1]
+        add(p, mesh_of(pos, mt, act, show_div=False), style)
+        p.add_text(f"{lab}   frame {len(fr)}   {int(mt['nF'])} cells",
+                   position="upper_left", font_size=10, color="white")
+        aim(p, L, fill=fill)
+    if title:
+        p.subplot(0, 0)
+        p.add_text(title, position="lower_left", font_size=9, color="#9a9a9a")
+    p.screenshot(out)
+    p.close()
+    return "ok"
+
+
 def render_all(run_dir, seq=LOOP_SEQ, size=None, quiet=False, fill=1.0, name=None):
     """Run one named sequence for one finished run directory. {} if there is nothing to render.
 
