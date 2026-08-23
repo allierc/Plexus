@@ -52,46 +52,54 @@ def _live_pos(H, sname):
     return pos[lvl.active.detach().cpu().numpy()], None
 
 
-def _face_colours(H, nF):
-    """Per-face RGB from the cell set's activator, or None when there is no chemistry to show.
+def chem_rgb(chem, nF=None):
+    """(rgb [n,3], [max per species]) from a `chem` array -- THE ONE COLOUR LAW for RD output.
 
-    WHY THE LIVE PICTURE NEEDS THIS. The faces were drawn `facecolor="#dcdcdc"`, a constant, so the
-    snapshot showed GEOMETRY ONLY. On a reaction-diffusion run the geometry barely moves -- a coral
-    spheroid at frame 600 looks like a coral spheroid at frame 6000 -- and the one question worth
-    asking during the twenty-five minutes it takes is whether the pattern is forming. The answer
-    was not in the picture: every `3d.png` of every Turing run came out a plain white ball, and the
-    only way to find out was to wait for the movie.
+    Lives here, and is imported by `plexus.plot`, because the alternative is two copies that drift:
+    the live snapshot and the movie of the same run showed DIFFERENT PICTURES of the same numbers
+    for exactly that reason -- `movie_cell.mp4` never read `chem` at all and drew every cell in
+    matplotlib's default tab10 blue, so a two-species Turing run rendered as a uniform blue disc.
+    This function takes a numpy array and no matplotlib, so either caller can use it.
 
-    TWO SPECIES GET TWO CHANNELS. A four-wide `chem` is two independent Gray-Scott pairs (columns
-    0,1 and 2,3 -- see `_chan`), so species A drives RED and species B drives BLUE and a cell where
-    both are present goes magenta. With one pair it is red alone. That makes the two-species runs
-    legible at a glance, which is the whole reason they exist.
+    WHITE IS QUIET, COLOUR IS ACTIVITY -- subtractive, not additive. Building up from black made an
+    inactive cell near-black on a black canvas: the disc read as red specks in a void, the tissue
+    was invisible, and there was no way to see WHERE the pattern was not.
 
-    PER-FRAME NORMALISATION, DELIBERATELY, and it is the opposite of what the movie does. `evolve`
-    fixes its range over the whole run so a strengthening pattern does not look static. A live
-    snapshot has no whole run yet -- it cannot know the final maximum -- and a fixed guess would
-    render the first snapshots black. So each frame is scaled to its own range and the range is
-    printed in the caption, which says what the colour means instead of implying a constant scale.
+    TWO SPECIES, TWO CHANNELS. Columns 0,1 are the first Gray-Scott pair and 2,3 the second (see
+    `_chan`), so A takes green and blue away leaving red, B takes red and green leaving blue. A
+    cell carrying both loses everything and would go pure black, indistinguishable from the canvas,
+    so the floor stops at 0.14 -- "both species here" is the most interesting cell on the plot and
+    it stays a dark dot rather than a hole.
     """
-    for s, l in H.levels.items():
+    a = np.asarray(chem, float)
+    if a.ndim != 2 or a.shape[1] < 2:
+        return None, []
+    n = a.shape[0] if nF is None else int(nF)
+    a = a[:n]
+    hi, band = [], []
+    for ch in (0, 2):
+        if a.shape[1] > ch:
+            v = np.where(np.isfinite(a[:, ch]), a[:, ch], 0.0)
+            top = float(v.max())
+            hi.append(top)
+            band.append(np.clip(v / top, 0, 1) if top > 1e-9 else np.zeros(n))
+        else:
+            band.append(np.zeros(n))
+    A, B = band
+    f = 0.86
+    cols = np.stack([1.0 - f * B, 1.0 - f * np.maximum(A, B), 1.0 - f * A], axis=1)
+    return np.clip(cols, 0, 1), hi
+
+
+def _face_colours(H, nF):
+    """`chem_rgb` for the first set that carries a `chem` block, or (None, []) when none does."""
+    for _s, l in H.levels.items():
         if "chem" not in getattr(l, "state_schema", {}):
             continue
         c = l.get("chem")
         if c is None or c.shape[0] < nF:
             continue
-        a = c[:nF].detach().cpu().numpy()
-        cols = np.zeros((nF, 3), float)
-        hi = []
-        for ch, band in ((0, 0), (2, 2)):                 # species A -> red, species B -> blue
-            if a.shape[1] > ch:
-                v = a[:, ch]
-                v = np.where(np.isfinite(v), v, 0.0)
-                top = float(v.max())
-                hi.append(top)
-                if top > 1e-9:
-                    cols[:, band] = np.clip(v / top, 0, 1)
-        cols = 0.16 + 0.84 * cols                          # a floor, so an inactive cell is still a cell
-        return np.clip(cols, 0, 1), hi
+        return chem_rgb(c.detach().cpu().numpy(), nF)
     return None, []
 
 
@@ -153,7 +161,13 @@ def snapshot(H, tick, n_frames, out_dir, name="", sname=None):
             # section is -- has NOTHING to show but its chemistry: the cells never move, so a grey
             # scatter is the identical picture at frame 1 and frame 6000.
             fc, _clim = _face_colours(H, len(pos))
-            ax.scatter(pos[:, 0], pos[:, 1], s=6.0,
+            # SIZED FROM THE COUNT, so the dots nearly touch and the disc reads as a sheet rather
+            # than as a scatter plot of it. `s` is an AREA in points^2, so holding the covered
+            # FRACTION fixed means s ~ 1/n; 22 is the value that fills the 4,000-cell disc. The
+            # clamp keeps a 200-cell run from drawing dinner plates and a 100,000-cell one from
+            # drawing nothing.
+            ax.scatter(pos[:, 0], pos[:, 1],
+                       s=float(np.clip(22.0 * 4000.0 / max(len(pos), 1), 3.0, 90.0)),
                        c=(fc if fc is not None else "#dcdcdc"), linewidths=0)
             ax.set_aspect("equal"); ax.set_axis_off()
             put = ax.text

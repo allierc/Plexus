@@ -258,6 +258,18 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
             color = cmap(nt % cmap.N)
         else:
             color = None
+        # THE CHEMISTRY WINS WHEN THERE IS ANY. Without this the set fell through to `color = None`
+        # and `_movie` drew every element in its hardcoded "#1f77b4" -- so a two-species Turing disc
+        # rendered as a uniform tab10 blue, the same numbers the live `2d.png` was drawing as a red
+        # and blue pattern. Same law, one function: `plexus.live.chem_rgb`.
+        if f"{sname}__chem" in d.files:
+            from plexus.live import chem_rgb
+            _ch = np.asarray(d[f"{sname}__chem"])
+            if _ch.ndim == 3 and _ch.shape[2] >= 2:
+                _cf = [chem_rgb(_ch[t])[0] for t in range(_ch.shape[0])]
+                if all(x is not None for x in _cf):
+                    color = np.stack(_cf)              # [T, N, 3] -- per FRAME, not per node
+                    bg = "black"
         # a container set (parent of a denser child set) is drawn as its MERGED child
         # cloud -- colour the particles by parent cell, then fuse them into one smooth
         # blob per cell -- instead of a bare centroid dot.
@@ -292,7 +304,11 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
                 _draw_obstacles(ax, obstacles)
                 ax.set_xlim(0, W); ax.set_ylim(0, 1); ax.set_aspect("equal"); ax.axis("off"); return
             live = occ[i]
-            c = (color[live] if color is not None else "#1f77b4")
+            # PER-FRAME OR PER-NODE. A chemistry colour is [T, N, 3] and changes every frame; a
+            # type palette is [N, 3] and does not. The static montage draws frame `i`, so it has to
+            # pick the same way the movie does or it indexes the TIME axis with a node mask.
+            c = ("#1f77b4" if color is None else
+                 (color[i][live] if np.ndim(color) == 3 else color[live]))
             ax.set_facecolor(bg)
             if marker == "triangle":
                 u = _frame_dir(pos, i, periodic, wsize)[live]
@@ -1096,15 +1112,18 @@ def _movie(pos, occ, color, s, W, T, out_base, max_frames: int = 120, bg: str = 
             return pc,
     else:
         sm = (s * 1.6 if np.ndim(s) else s * 1.6)         # crisper dots at the larger canvas
+        # A PER-FRAME COLOUR ARRAY IS [T, N, 3]; a per-node one is [N, 3]. The chemistry changes
+        # every frame and the type palette does not, so both have to be expressible.
+        _pf = color is not None and np.ndim(color) == 3
         sc = ax.scatter(pos[0, :, 0], pos[0, :, 1], s=sm, linewidths=0,
-                        c=(color if color is not None else "#1f77b4"))
+                        c=((color[0] if _pf else color) if color is not None else "#1f77b4"))
         _draw_obstacles(ax, obstacles)
 
         def upd(i):
             live = occ[i]
             sc.set_offsets(pos[i, live])
             if color is not None:
-                sc.set_color(color[live])
+                sc.set_color(color[i][live] if _pf else color[live])
             return sc,
 
     anim = FuncAnimation(fig, upd, frames=frames, interval=50)
