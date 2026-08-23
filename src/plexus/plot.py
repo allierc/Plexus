@@ -85,9 +85,24 @@ def _typed_palette(sim, sname: str, style: dict):
     return pal, sf
 
 
-def _point_size(style: dict, n: int) -> float:
+def _point_size(style: dict, n: int, pos=None, span=None, fig_px=None, dpi=None) -> float:
+    """Scatter `s`. An explicit `point_size` wins; otherwise it is MEASURED from the spacing.
+
+    The old table -- 8.0 under 4,000 points, 4.0 under 12,000, 2.0 above -- is a step function of
+    the COUNT and knows nothing about the area the points occupy, so the same n reads as a dense
+    sheet or as dust depending on the world box, and a growing tissue crosses a step mid-run and
+    changes dot size for no reason the viewer can see. `plexus.live.dot_area_pt2` measures the
+    median nearest-neighbour distance instead and converts it exactly for this canvas, so a dot
+    always spans `dot_fill` of the local spacing. Same function the live snapshot uses, so the two
+    pictures of one run finally agree.
+
+    The table is kept as the fallback for callers that have no positions to measure.
+    """
     if "point_size" in style:
         return float(style["point_size"])
+    if pos is not None and span:
+        from plexus.live import dot_area_pt2
+        return dot_area_pt2(pos, span, fig_px, dpi, fill=float(style.get("dot_fill", 0.9)))
     return 8.0 if n <= 4000 else (4.0 if n <= 12000 else 2.0)
 
 
@@ -348,6 +363,8 @@ def plot_dataset(sim: Spec, pre_folder: str, movie: bool = False) -> str:
                               fps=mov_fps, max_frames=mov_maxf)
             else:
                 _movie(pos, occ, color, s, W, T, os.path.join(data_dir, f"movie_{sname}"),
+                       dot_fill=(None if "point_size" in style
+                                 else float(style.get("dot_fill", 0.9))),
                        bg=bg, obstacles=obstacles, marker=marker, periodic=periodic, world=wsize,
                        tri=(tri_L, tri_w, tri_lw), fps=mov_fps, max_frames=mov_maxf)
 
@@ -1083,6 +1100,7 @@ def _merged_movie(cpos, par, ncell, W, cmap, T, out_base, max_frames: int = 120,
 
 
 def _movie(pos, occ, color, s, W, T, out_base, max_frames: int = 120, bg: str = "white",
+           dot_fill=None,
            obstacles=None, marker="dot", periodic=False, world=None, tri=(0.016, 0.01, 0.6),
            fps: int = 25) -> None:
     """Render a movie of a set's trajectory (mp4 via ffmpeg, else gif). `marker`: 'dot'
@@ -1111,7 +1129,14 @@ def _movie(pos, occ, color, s, W, T, out_base, max_frames: int = 120, bg: str = 
                 pc.set_edgecolor(color[live])
             return pc,
     else:
-        sm = (s * 1.6 if np.ndim(s) else s * 1.6)         # crisper dots at the larger canvas
+        # MEASURED FOR THIS CANVAS when `dot_fill` is set, otherwise the old x1.6 fudge -- which
+        # existed only to compensate for a count-based size table tuned on the smaller montage
+        # figure. A measured size already knows the canvas, so scaling it again would undo that.
+        if dot_fill is not None and not np.ndim(s):
+            from plexus.live import dot_area_pt2
+            sm = dot_area_pt2(pos[0], wx, 8.0 * (wx / wy) * 200, 200, fill=float(dot_fill))
+        else:
+            sm = s * 1.6
         # A PER-FRAME COLOUR ARRAY IS [T, N, 3]; a per-node one is [N, 3]. The chemistry changes
         # every frame and the type palette does not, so both have to be expressible.
         _pf = color is not None and np.ndim(color) == 3
