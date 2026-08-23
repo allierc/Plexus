@@ -11,13 +11,13 @@
 general:
   name: zf_Forebrain_1000
   seed: 0
-  n_frames: 400
+  n_frames: 2000
   dt: 0.05
   dim: 3
   world: [1.0, 1.0, 1.0]
   boundary: wall
-  record_cap: 401
-  field_record_cap: 128
+  record_cap: 2001
+  field_record_cap: 250
   units:
     length_um: 48.8037109375
     time_s: 1.0

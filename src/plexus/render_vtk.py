@@ -1032,7 +1032,7 @@ def evolve_neural(run_dir, out, region, field="neural_activity", n_arbours=None,
         seg_txt = (f"{meta['segments'] // 1000}k segments (1/{dendrite_stride})   "
                    if dendrites else "")
         soma_txt = f"soma r={soma_radius_um} um   " if soma else ""
-        p.add_text(f"{name}  {layers}   frame {t + 1}/{g.shape[0]}   "
+        p.add_text(f"{name}  {layers}   frame {t + 1}/{n_frames}   "
                    f"{meta['neurons']} arbours   {seg_txt}{soma_txt}"
                    + (f"ss{ss}x   " if ss > 1 else "")
                    + f"|voltage| clim [{vlo:.2f}, {vhi:.2f}]",
