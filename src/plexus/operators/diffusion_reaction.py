@@ -192,10 +192,28 @@ class CellRDSeed(Structural):
         return np.stack([np.cos(theta) * np.sin(phi), np.sin(theta) * np.sin(phi), np.cos(phi)], 1)
 
     def forward(self, H, mask=None):
-        clvl = H.level(self.at); vlvl = H.level(self.vat); m = getattr(vlvl, "_mesh", None)
-        if m is None or "chem" not in clvl.state_schema:
+        clvl = H.level(self.at)
+        # A MESH IS NOT REQUIRED, AND ASKING FOR ONE BY NAME WAS FATAL. This read
+        # `H.level(self.vat)` unconditionally, so a spec with no `vertex` set died on
+        # `KeyError: 'vertex'` -- and `SUPPORTED_DIMS` says [2, 3], so a flat 2D run is supposed to
+        # be legal. All this operator wants from the mesh is nF, THE NUMBER OF CELLS; `scatter` and
+        # `noise` use no geometry whatever, and `patch`/`cones` already guard on `"cen" in
+        # state_schema` and fall back to a uniform 0.02 without it. On a mesh-free set the cell
+        # level IS the population, so its own occupancy answers the only question being asked.
+        # `in` rather than `.get`: `H.levels` is an `nn.ModuleDict`, which has no `.get` -- the
+        # exact trap that silently disabled `renumber_set`.
+        vlvl = H.levels[self.vat] if self.vat in H.levels else None
+        m = getattr(vlvl, "_mesh", None) if vlvl is not None else None
+        if "chem" not in clvl.state_schema:
             return {}
-        nF = m["nF"]; dev = clvl.state.device
+        if m is not None:
+            nF = m["nF"]
+        else:
+            occ = getattr(clvl, "occ", None)
+            nF = int(occ.sum().item()) if occ is not None else int(clvl.state.shape[0])
+            if nF <= 0:
+                return {}
+        dev = clvl.state.device
         g = torch.Generator(device="cpu"); g.manual_seed(self.seed)
         if self.mode == "patch":                                # localized activation source (a bud/tube driver)
             a = torch.full((nF,), 0.02, device=dev)

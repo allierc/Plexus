@@ -148,7 +148,13 @@ def snapshot(H, tick, n_frames, out_dir, name="", sname=None):
             put = ax.text2D
         else:
             ax = fig.add_subplot(111, facecolor="black")
-            ax.scatter(pos[:, 0], pos[:, 1], s=1.0, c="#dcdcdc")
+            # THE 2D BRANCH CARRIES THE CHEMISTRY TOO. It hardcoded "#dcdcdc" for the same reason
+            # the 3D branch did, and a flat RD run -- which is what the whole minisite Turing
+            # section is -- has NOTHING to show but its chemistry: the cells never move, so a grey
+            # scatter is the identical picture at frame 1 and frame 6000.
+            fc, _clim = _face_colours(H, len(pos))
+            ax.scatter(pos[:, 0], pos[:, 1], s=6.0,
+                       c=(fc if fc is not None else "#dcdcdc"), linewidths=0)
             ax.set_aspect("equal"); ax.set_axis_off()
             put = ax.text
         n_live = (int(m["nF"]) if m is not None else len(pos))
@@ -158,17 +164,21 @@ def snapshot(H, tick, n_frames, out_dir, name="", sname=None):
         if _clim:
             # THE SCALE, STATED. The colours are normalised per frame (see `_face_colours`), so the
             # picture is meaningless without the number it was divided by.
-            ax.text2D(0.02, 0.94, "  ".join(
+            put(0.02, 0.94, "  ".join(
                 f"{'AB'[i]} max {v:.4g}" for i, v in enumerate(_clim)),
                 transform=ax.transAxes, color="#b0b0b0", fontsize=8, va="top")
         fig.subplots_adjust(0, 0, 1, 1)
         # `.tmp` LAST WOULD PICK THE FORMAT FROM THE EXTENSION and matplotlib refuses "tmp"; the
         # temporary name has to keep the `.png` suffix.
-        tmp = os.path.join(out_dir, ".3d.partial.png")
+        # NAMED FOR THE DIMENSION IT DRAWS. A 2D run wrote a file called `3d.png` showing a flat
+        # scatter, which is a small lie that costs a reader real time when four runs sit in one
+        # directory and only some of them are flat.
+        stem = "3d" if D >= 3 else "2d"
+        tmp = os.path.join(out_dir, f".{stem}.partial.png")
         fig.savefig(tmp, dpi=110, facecolor="black")
         plt.close(fig)
-        os.replace(tmp, os.path.join(out_dir, "3d.png"))     # atomic: never a half-written PNG
-        return os.path.join(out_dir, "3d.png")
+        os.replace(tmp, os.path.join(out_dir, f"{stem}.png"))   # atomic: never a half-written PNG
+        return os.path.join(out_dir, f"{stem}.png")
     except Exception as e:
         print(f"[live] snapshot at frame {tick} skipped ({type(e).__name__}: {str(e)[:70]})",
               flush=True)

@@ -388,7 +388,16 @@ def suite_turing():
         ("turing_coral",      "the one-species baseline: chem width 2, F 0.046 / kk 0.062"),
         ("turing_two_scale",  "two species, SAME reaction, activator range 32x apart"),
         ("turing_two_regime", "two species, SAME diffusion, coral point vs self-replicating spots"),
-        ("turing_two_both",   "two species differing in scale AND regime"))]
+        ("turing_two_both",   "two species differing in scale AND regime"),
+        # ---- FLAT, which is what the minisite's Turing section actually is. Its three clips are
+        # `dim: 2` and are written against operators that were never promoted (`aggregate_seed`
+        # mode disc, `graph_diffuse`, `react`), so the section had no runnable core spec at all.
+        # `turing2d_disc` rebuilds it from promoted parts: `spawn: sunflower` for the placement,
+        # `radius_graph` for the adjacency, `cell_chem_seed` for the chemistry.
+        ("turing2d_disc",      "flat disc, 4000 cells, chi 1.3"),
+        ("turing2d_disc_chi4", "the same disc at chi 4.0 -- the right value on THIS graph is not "
+                               "yet measured, so both are run rather than one guessed"),
+        ("turing2d_two",       "two species on the flat disc: the 2D twin of turing_two_both"))]
 
 
 SUITES = {"ECM": suite_ecm, "BASE": suite_base, "MINISITE": suite_minisite,
