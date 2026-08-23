@@ -101,7 +101,14 @@ operators:
   max_flips: 30
 - op: topo_record
   at: vertex
-  every: 1
+  # THE TOPOLOGY MUST BE RECORDED ON THE SAME CLOCK AS THE POSITIONS, and 1 is not that clock.
+  # `record_cap: 602` against 6000 frames makes the engine record positions every 10th tick (601
+  # rows); `every: 1` recorded 6001 topology rows. `run_one`'s D3 check refuses the pair outright:
+  # "positions=601 frames but topology=6001 ... pairs each frame's coordinates with ANOTHER frame's
+  # connectivity and fabricates inverted cells", so the okuda side of this scene has never run.
+  # 10 = 6000 / (602 - 1). `vertex_spheroid` never hit this because its cap exceeds its frame count
+  # and both clocks are 1.
+  every: 10
 schedule:
 - mesh_seed
 - cell_geometry

@@ -483,6 +483,7 @@ def _spec_copy(spec, run_name, frames, cfg_dir=None):
     # the twin run compares the SPEC and nothing else -- and so a grader cannot mistake a promotion
     # run for a graded gate run.
     cfg.pop("_gate", None)
+    _check_record_clocks(cfg, spec)
     cfg["general"] = dict(cfg.get("general") or {})
     cfg["general"]["name"] = run_name
     if frames is not None:                      # None = the spec's own length (the scene rows)
@@ -552,6 +553,41 @@ def _okuda_entry(pair_dir, cfg_dir, run_name):
                 "registers are absent and this run cannot be a twin of anything: {_e!r}')\n\n"
                 'runpy.run_path("run_one.py", run_name="__main__")\n')
     return path
+
+
+def _check_record_clocks(cfg, spec):
+    """Refuse a spec whose TOPOLOGY and POSITIONS record on different clocks.
+
+    `run_one.py`'s D3 check already catches this -- and catches it AFTER the run, which is the
+    problem. `atlas/turing_coral` burned a 6,000-frame job to reach
+
+        [D3] recording misalignment: positions=601 frames but topology=6001. do() silently clamped
+        this with hist[min(t, len(hist)-1)], which pairs each frame's coordinates with ANOTHER
+        frame's connectivity and fabricates inverted cells.
+
+    and `atlas/turing_grow_divide` burned an 1,800-frame one for the same reason. The engine derives
+    the position stride from `record_cap` (`ceil(n_frames / (record_cap - 1))`) while `topo_record`
+    carries its own `every`, so the two are set in different places by different people and nothing
+    compared them until the run was over. Two seconds here saves the job.
+
+    IT IS A WARNING, NOT A REFUSAL, because the core side tolerates the mismatch -- it records the
+    mesh through the engine's recorder rather than through `topo_record`'s `hist` -- so a core-only
+    row is legitimately unaffected, and turning this into an exception would block rows that work.
+    """
+    g = cfg.get("general") or {}
+    nf, cap = g.get("n_frames"), g.get("record_cap")
+    if not nf or not cap or cap > nf + 1:                 # cap above the frame count => stride 1
+        return
+    stride = -(-int(nf) // max(1, int(cap) - 1))          # what engine._setup_recording will pick
+    for o in cfg.get("operators") or []:
+        if isinstance(o, dict) and o.get("op") == "topo_record":
+            every = int(o.get("every", 1) or 1)
+            if every != stride:
+                print(f"  [{spec}] WARNING: topo_record every={every} but the engine will record "
+                      f"positions every {stride} ticks ({nf} frames, record_cap {cap}). The okuda "
+                      f"side will record {nf // every + 1} topology rows against {nf // stride + 1} "
+                      f"position rows and die on the D3 alignment check. Set `every: {stride}`, or "
+                      f"raise record_cap above {nf + 1} to put both clocks on 1.", flush=True)
 
 
 def _bsub_lines(pair_dir, spec, side, run_name, frames):

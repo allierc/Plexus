@@ -127,7 +127,10 @@ operators:
   reset_noise: 0.12
 - op: topo_record
   at: vertex
-  every: 1
+  # SAME CLOCK AS THE POSITIONS -- see the note in `turing_coral.yaml`. `record_cap: 602` against
+  # 1800 frames records positions every 3rd tick (601 rows) while `every: 1` recorded 1801 topology
+  # rows, and D3 refuses the pair. 3 = 1800 / (602 - 1).
+  every: 3
 schedule:
 - mesh_seed
 - cell_geometry
