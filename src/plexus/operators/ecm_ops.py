@@ -46,7 +46,12 @@ PRESSURE_HISTORY: list = []
 
 
 # --------------------------------------------------------------------------- seeding
-@register_operator("ecm_seed", family="seed", set="particle", kind="seed")
+# CANONICAL `ecm_seed`, ALIAS `seed_ecm` -- the same split that killed `seed_mesh`, in the other
+# direction. The rename landed in f5a09a30 and 50 of the archived `log/okuda_ECM/*/spec.yaml` still
+# say `seed_ecm`, so EVERY ONE of them failed to load with `operator 'seed_ecm' not in registry` --
+# the entire 02, 04 and 05 gate series, unrunnable and therefore uncomparable. A rename that leaves
+# the corpus behind is a rename that deletes the corpus.
+@register_operator("ecm_seed", "seed_ecm", family="seed", set="particle", kind="seed")
 class ECMSeed(Structural):
     """Lay the matrix out ONCE, at frame 0: the box minus a cavity, as fibres.
 
