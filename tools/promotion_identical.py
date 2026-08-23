@@ -160,6 +160,15 @@ PAIRS = [
     ("REP", "r010_00_ctrl",      None, 0.0, "okuda",       "core",   "a campaign control: 14 operators, 1800 frames"),
     ("REP", "r020_00_ctrl",      None, 0.0, "okuda",       "core",   "round 20's control -- the best composition the search produced"),
     ("REP", "r023_07",           None, 0.0, "okuda",       "core",   "15 operators; the run whose rerun reproduced it exactly (n_tubes 12, protr 1.765)"),
+    # ---- BISECT: r023_07 against okuda BEFORE the promotion. The REP row compared current-okuda
+    # to current-core and they agreed -- but the archived run of the same spec is healthy (12,608
+    # cells, no extinction) and both of mine are NaN from frame 889 (2,995 cells). A twin where both
+    # sides are current cannot see a change that moved BOTH sides. This is the row that can.
+    # THE VERIFICATION ROW for the renumber_set fix: the pristine pre-promotion tree against the
+    # current one, on the spec that exposed it. This must be IDENTICAL, and it is the only row that
+    # can say so -- every other comparison has both sides on the current tree, which is exactly how
+    # a change that moved BOTH sides stayed invisible for nineteen green rows.
+    ("BISECT", "r023_07",        None, 0.0, "okuda@0da57dd0", "core", "pristine baseline vs the fixed core"),
     ("C", "01c_tissue",          None, 0.0, "okuda",       "core",   "junction_myosin (both pools), junction_sync, cytokinetic_ring"),
     ("D", "04_spheroid_ecm_pass2", None, 0.0, "okuda",     "core",   "mesh_contact, mesh_inside, ecm_*, bm_*"),
 ]
@@ -354,6 +363,19 @@ def _spec_copy(spec, run_name, frames, cfg_dir=None):
     if not os.path.exists(src):
         raise FileNotFoundError(f"{src} -- this row's spec is missing")
     cfg = _abspath_operator_files(yaml.safe_load(open(src)))
+    # THE SEED OPERATORS GET THEIR ORIGINAL SPELLING, on both sides. `config/okuda/*.yaml` carries
+    # `seed_mesh` / `seed_cell_chem` / `seed_ecm` since the seed refactor; a PRE-PROMOTION worktree
+    # registers only `mesh_seed` / `cell_chem_seed` / `ecm_seed` and dies at load with
+    # `operator 'seed_mesh' not in registry`. The current tree accepts both -- the new name is an
+    # alias for the same class -- so writing the old one gives both sides the identical operator and
+    # costs the current side nothing. Without this, every comparison against a pristine baseline
+    # fails for a reason that has nothing to do with what is being compared.
+    _BACK = {"seed_mesh": "mesh_seed", "seed_cell_chem": "cell_chem_seed", "seed_ecm": "ecm_seed"}
+    for _o in cfg.get("operators", []) or []:
+        if _o.get("op") in _BACK:
+            _o["op"] = _BACK[_o["op"]]
+    cfg["schedule"] = [_BACK.get(x, x) if isinstance(x, str) else x
+                       for x in (cfg.get("schedule") or [])]
     # `_gate:` IS THE GATE'S THRESHOLD TABLE, not part of the model. It is dropped from the copy so
     # the twin run compares the SPEC and nothing else -- and so a grader cannot mistake a promotion
     # run for a graded gate run.
@@ -634,8 +656,14 @@ def collect(spec, names, pair_dir):
                # the core runner writes under `--output_root/graphs_data/<pre_folder>/<name>/`
                else os.path.join(pair_dir, "graphs_data", "promotion", run_name))
         if os.path.isdir(src) and os.path.abspath(src) != os.path.abspath(dst):
+            # `dirs_exist_ok` because the rmtree above CAN LEAVE THE DIRECTORY STANDING and say
+            # nothing: `log/` is an NFS bind-mount, and NFS silly-renames a file that is still open
+            # to `.nfsXXXX` instead of unlinking it, so the parent cannot be removed and
+            # `ignore_errors=True` swallows exactly that failure. The next line then raised
+            # FileExistsError -- AFTER the verdict had been computed and printed, so a run that had
+            # already decided IDENTICAL still exited on a traceback.
             shutil.rmtree(dst, ignore_errors=True)
-            shutil.copytree(src, dst)
+            shutil.copytree(src, dst, dirs_exist_ok=True)
     return {t: os.path.join(pair_dir, t) for t in names}
 
 

@@ -148,7 +148,8 @@ class MeshTable(dict):
     #   n_apop       extrusions, cumulative                  (cell_die)
     #   div_blocked  divisions refused for want of buffer    (cell_divide)
     #   apop_spill   material a death could not bequeath     (cell_die) -- must stay ~0
-    SCALAR_RECORD = ("n_t1", "n_apop", "div_blocked", "apop_spill")
+    #   renumber_failed  a renumber that did not act -- MUST be 0; see Hierarchy.renumber_set
+    SCALAR_RECORD = ("n_t1", "n_apop", "div_blocked", "apop_spill", "renumber_failed")
 
     # PER-HALF-EDGE STATE, and it is a THIRD ragged length. `myo` has one entry per half-edge, not
     # per face and not per row, so it cannot ride in `FACE_RECORD` (which drops anything shorter

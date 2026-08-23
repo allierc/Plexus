@@ -57,15 +57,15 @@
     \node[cellbox,fit=(r1)(r1b)(s1)(s1b)(k1)] (cellA) {};
   \end{scope}
   \node[lab,right=1.2mm of cellA] {epithelial cell};
-  \node[sig,minimum size=2.2mm] (n1) at (-0.10,-0.62) {};
-  \node[sig,minimum size=2.2mm] (n2) at ( 0.22,-0.52) {};
-  \begin{scope}[on background layer]
-    \node[cellbox,fit=(n1)(n2)] (cellB) {};
-  \end{scope}
-  \node[lab,right=1.2mm of cellB] {neuron};
+  % THE NEURON BOX IS GONE. It sat at y=-0.55 as a second cell-level set, and the Exchange arrow
+  % reached the morphogen field through it. The point S1 has to make -- one parent holding SEVERAL
+  % DISTINCT SETS -- is already made by `cellA`, which holds receptors, signalling proteins and
+  % cytoskeleton; S2's epithelium + matrix makes the sibling-sets point at the next level up. The
+  % neuron made neither point twice over and cost the panel a mark the caption never named. The
+  % Exchange now binds the field to the cell it actually couples to.
   \node[fld] (fld1) at (0.02,-1.16) {};
   \node[lab,right=1.4mm of fld1] {morphogen field};
-  \draw[ex] (fld1) -- (cellB);
+  \draw[ex] (fld1) -- (cellA);
   \node[ttl] at (0.02,-1.78) {cells};
   \node[lab] at (0.02,-2.14) {$S_1$};
 \end{scope}

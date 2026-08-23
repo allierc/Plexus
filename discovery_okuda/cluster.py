@@ -60,7 +60,11 @@ GPU = os.environ.get("PG_GPU", "1")              # gpu_l4 REJECTS jobs without -
 PARALLEL = int(os.environ.get("PG_PARALLEL", "12"))
 PREFIX = "pg_"                                   # job-name prefix; all queue ops filter on it
 # Comma-separated hosts to keep jobs off. See the note in `_bsub_cmd`; empty is the normal state.
-EXCLUDE_HOSTS = [h.strip() for h in os.environ.get("PG_EXCLUDE_HOSTS", "e11u12").split(",")
+# h08u02 ADDED 2026-08-23. Every job that has wedged in this promotion wedged there, and only
+# there: two sanity runs stalled at frame 60 for four hours, and a BISECT run wrote one live frame
+# and nothing for four more. They stay in RUN, produce no heartbeat, and hold the slot until the
+# wall clock. A node that accepts work and does not do it is worse than one that refuses.
+EXCLUDE_HOSTS = [h.strip() for h in os.environ.get("PG_EXCLUDE_HOSTS", "e11u12,h08u02").split(",")
                  if h.strip()]
 
 

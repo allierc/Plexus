@@ -1433,7 +1433,15 @@ class Apoptosis3D(Structural):
             # ONE ENGINE CALL: state, occupancy, the coordinate delta accumulator AND the extra
             # first-order block deltas, which the hand-rolled version below never reached (its
             # guard tests `isinstance(key, tuple)` and `_delta_blocks` is keyed by level NAME).
-            H.renumber_set(self.cat, keep, n_new=nF2)
+            if not H.renumber_set(self.cat, keep, n_new=nF2):
+                # LOUD, BECAUSE THE SILENT VERSION COST A WEEK. This returned False on every call
+                # for the whole promotion and both call sites discarded it; the code it replaced at
+                # least printed a warning. The counter also rides `MeshTable.SCALAR_RECORD`, so a
+                # gate row can assert it stayed zero instead of a human having to read a log.
+                m["renumber_failed"] = int(m.get("renumber_failed", 0)) + 1
+                print(f"[cell_die] renumber_set({self.cat!r}) DID NOT ACT -- the cell state, its "
+                      f"occupancy and its pending deltas are now mis-indexed against the mesh, and "
+                      f"the chemistry will scramble from here", flush=True)
         # THE PENDING DELTAS MUST BE RENUMBERED TOO, AND THIS IS THE BUG THAT BROKE P12 ON EVERY
         # RUN WHERE A CELL DIED.
         #
@@ -1906,7 +1914,11 @@ class ReconnectT1_3D(Rewire):
             #
             # `edge_flip` declares no `cell_set`, so the cell level is looked up by name and a model
             # without one simply skips: `renumber_set` returns False rather than raising.
-            H.renumber_set(getattr(self, "cat", None) or "cell", keep, n_new=nF2)
+            _cat = getattr(self, "cat", None) or "cell"
+            if not H.renumber_set(_cat, keep, n_new=nF2):
+                m["renumber_failed"] = int(m.get("renumber_failed", 0)) + 1
+                print(f"[edge_flip] renumber_set({_cat!r}) DID NOT ACT after a face drop -- the "
+                      f"cell state is now mis-indexed against the mesh", flush=True)
         m["E_srce"] = torch.as_tensor(es2, device=dev)
         m["E_trgt"] = torch.as_tensor(et2, device=dev)
         m["E_face"] = torch.as_tensor(ef2, device=dev)
