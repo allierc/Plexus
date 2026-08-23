@@ -138,14 +138,18 @@ def data_dir_of(name):
     return graphs_data_path("gates", name)
 
 
-def submit_cluster(path, cfg, force=False):
+def submit_cluster(path, cfg, force=False, pre_folder="gates"):
     """Submit the gate to gpu_l4 and return the job name. Same node type, same environment and the
     same `PLEXUS_STRICT_DETERMINISM=1` as the twin-run harness, so a gate and a twin row are
     comparable rather than merely both green."""
     sys.path.insert(0, os.path.join(ROOT, "discovery_okuda"))
     import cluster as C
     name = cfg["general"]["name"]
-    out = os.path.join(LOG, cfg["_gate"]["id"])
+    # `pre_folder` IS EXPLICIT because `plexus.paths` gives `gates` and `atlas` no trigger
+    # substrings on purpose: a spec is routed by the folder its caller names, never inferred from
+    # a name that happens to contain the word. Inferring "gates" from a name containing "gate" is
+    # how a spec ends up in a folder nobody chose.
+    out = os.path.join(ROOT, "log", pre_folder, cfg["_gate"]["id"])
     os.makedirs(out, exist_ok=True)
     sh = os.path.join(out, "run.sh")
     with open(sh, "w") as f:
@@ -159,17 +163,17 @@ def submit_cluster(path, cfg, force=False):
             # gates the whole PLOT block on it, so the gate would land with a trajectory and no
             # `3d.png` and no movie -- and a gate whose only output is a table sends you back to
             # the cluster to find out what a red row looks like.
-            f"conda run -n {C.ENV} python Plexus_Main.py -o generate gates/{name} "
+            f"conda run -n {C.ENV} python Plexus_Main.py -o generate {pre_folder}/{name} "
             f"--device cuda:0" + (" --force" if force else ""),
         ]) + "\n")
     os.chmod(sh, 0o755)
     o = C.cpath(os.path.join(out, "run.out"))
     gpu = "-gpu num=1 " if C.GPU != "0" else ""
     excl = "".join(f'-R "hname!={h}" ' for h in C.EXCLUDE_HOSTS if h)
-    cmd = (f"bsub -n {C.NCPUS} {gpu}{excl}-q {C.QUEUE} -W {C.WALL} -J gate_{name} "
+    cmd = (f"bsub -n {C.NCPUS} {gpu}{excl}-q {C.QUEUE} -W {C.WALL} -J {pre_folder}_{name} "
            f"-o {o} -e {o[:-4]}.err bash -l {C.cpath(sh)}")
     C._ssh(cmd, timeout=60)
-    return f"gate_{name}"
+    return f"{pre_folder}_{name}"
 
 
 def run_one(path, cfg, device="cuda:0", force=False):

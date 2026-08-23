@@ -150,6 +150,15 @@ PAIRS = [
     ("G", "gates/gate_02_ecm_block",    None, 0.0, "core@cc52f512", "core", "MLS-MPM: ecm_seed, the four-step cycle, ecm_stress, gravity (no okuda twin: mesh-free)"),
     ("G", "gates/gate_04_tissue",       None, 0.0, "okuda", "core", "two-pool myosin + cytokinetic ring -- gate 04's regenerated pass 1"),
     ("G", "gates/gate_04_spheroid_ecm", None, 0.0, "core@cc52f512", "core", "mesh_contact + mesh_inside on a prescribed surface (no okuda twin: mesh-free)"),
+    # ---- REP: REPLICATION, on specs the CAMPAIGN wrote rather than specs a human did.
+    # Every row above tests a spec somebody chose for the promotion; these three were emitted by
+    # `round.py` from its own search, carry 14-15 operators apiece, and are the compositions the
+    # okuda work actually produced. A promotion that reproduces its own test set and not the corpus
+    # it was built from has reproduced the tests. They also exercise the two RENAMED seed operators
+    # (`seed_mesh`, `seed_cell_chem`) on the corpus that uses them, which is 324 of the 461 specs.
+    ("REP", "r010_00_ctrl",      None, 0.0, "okuda",       "core",   "a campaign control: 14 operators, 1800 frames"),
+    ("REP", "r020_00_ctrl",      None, 0.0, "okuda",       "core",   "round 20's control -- the best composition the search produced"),
+    ("REP", "r023_07",           None, 0.0, "okuda",       "core",   "15 operators; the run whose rerun reproduced it exactly (n_tubes 12, protr 1.765)"),
     ("C", "01c_tissue",          None, 0.0, "okuda",       "core",   "junction_myosin (both pools), junction_sync, cytokinetic_ring"),
     ("D", "04_spheroid_ecm_pass2", None, 0.0, "okuda",     "core",   "mesh_contact, mesh_inside, ecm_*, bm_*"),
 ]
@@ -360,15 +369,28 @@ def _arrays(d, ticks=None):
         return out, (np.asarray(z["ticks"]).tolist() if "ticks" in z.files else None)
     if p_core:                                                 # core: <set>__pos / __occ / __<block>
         z = np.load(p_core, allow_pickle=True)
-        vp, vo = z.get("vertex__pos"), z.get("vertex__occ")
-        ch, co = z.get("cell__chem"), z.get("cell__occ")
+        vp = z["vertex__pos"] if "vertex__pos" in z.files else None
+        ch = z["cell__chem"] if "cell__chem" in z.files else None
+        # THE CROP IS THE MESH'S `nF`/`Nv`, NOT `occ.sum()`, and the difference is not pedantic.
+        # okuda's own frame builder slices `posf[t][:mt["Nv"]]` and `chemf[t][:mt["nF"], 0]`, so a
+        # comparison that crops by occupancy is comparing a different number of cells and reports a
+        # DIFFER on two runs that agree. It did: `r023_07` came back
+        # "act_20: shape (2529,) vs (2530,)" while the two sides' `nF` was 2529 at every single
+        # recorded tick.
+        #
+        # THE ONE-CELL GAP IS REAL, THOUGH, and is now a gate row rather than a mystery: on the core
+        # side `cell__occ.sum()` leads `nF` by exactly one on 23 of 1801 rows, always at a death, and
+        # never by more. `vertex__occ.sum()` matches `Nv` on all 1801. So the cell set's occupancy
+        # and the mesh's face count are updated in a different order on the tick a cell is extruded.
+        mnf = z["vertex__mesh_nF"] if "vertex__mesh_nF" in z.files else None
+        mnv = z["vertex__mesh_Nv"] if "vertex__mesh_Nv" in z.files else None
         if vp is not None:
             rows = ticks if ticks is not None else range(vp.shape[0])
             for i, t in enumerate(rows):
-                nv = int(np.asarray(vo[t]).sum()) if vo is not None else vp.shape[1]
+                nv = int(mnv[t]) if mnv is not None else vp.shape[1]
                 out.append((f"pos_{i}", np.asarray(vp[t][:nv], np.float32)))
                 if ch is not None:
-                    nf = int(np.asarray(co[t]).sum()) if co is not None else ch.shape[1]
+                    nf = int(mnf[t]) if mnf is not None else ch.shape[1]
                     out.append((f"act_{i}", np.asarray(ch[t][:nf, 0], np.float32)))
             return out, list(rows)
         for k in sorted(z.files):                              # a non-mesh core run: whatever it wrote
@@ -552,6 +574,22 @@ def main():
         print("  no pair selected -- use --phase or --all"); return 2
 
     os.makedirs(OUT, exist_ok=True)
+    # THE RUN LOG GOES IN THE ARCHIVE. Cedric: "you must archive in log/promotion". The harness's own
+    # stdout was going to /tmp, so the one record of WHICH rows were submitted, when, and what the
+    # table said lived outside the directory that is supposed to hold the evidence -- and /tmp does
+    # not survive a container restart.
+    _tag = str(a.phase) if a.phase is not None else "all"
+    _log = open(os.path.join(OUT, f"run_{_ptag(_tag)}.log"), "a")
+
+    class _Tee:
+        def write(self, x):
+            sys.__stdout__.write(x); _log.write(x); _log.flush()
+
+        def flush(self):
+            sys.__stdout__.flush(); _log.flush()
+
+    sys.stdout = _Tee()
+    print(f"\n=== phase {_tag}: {len(pairs)} pair(s)", flush=True)
     jobs = []
     for phase, spec, nfr, tol, sa, sb, what in pairs:
         # --frames on the command line overrides every row; otherwise the row decides, and
