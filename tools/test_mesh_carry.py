@@ -115,7 +115,13 @@ def test_snapshot_is_topology_only():
     # renderer cannot colour by a quantity that existed only inside one frame's forward pass. The
     # assertion is the CONTRACT, not the shape of one fixture: reserved keys always, plus exactly
     # those FACE_RECORD names the table actually holds.
-    want = {"E_srce", "E_trgt", "E_face", "nF", "Nv"} | (set(MeshTable.FACE_RECORD) & set(m))
+    # THE CONTRACT INCLUDES THE ALIASES. `FACE_RECORD` names `apop`/`inhib`; the table holds
+    # `apop_flag`/`inhib_frac`, and `snapshot` bridges them through `FACE_ALIAS`. Intersecting
+    # `FACE_RECORD` with the table's own keys therefore under-counts by exactly the two names that
+    # had never been recorded at all -- so the naive form of this assertion was green while the
+    # dying-cell flag was missing from every run, and went red when that was fixed.
+    want = {"E_srce", "E_trgt", "E_face", "nF", "Nv"} | {
+        nm for nm in MeshTable.FACE_RECORD if MeshTable.FACE_ALIAS.get(nm, nm) in m}
     check(set(s) == want, f"keys: {sorted(s)} vs expected {sorted(want)}")
     check(isinstance(s["nF"], int) and isinstance(s["E_srce"], np.ndarray),
           "counts are ints, arrays are numpy -- the shape every offline reader expects")
