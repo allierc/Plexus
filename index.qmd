@@ -14,19 +14,23 @@ to **decompose the existing corpus** of simulation models into this common langu
 Third, to construct **differentiable implementations** of these operators so that
 mechanistic models can be directly inferred from biological data.
 
-Just as compilers separate programming languages from their implementations
-through an **intermediate representation**, Plexus separates biological mechanisms
-from their numerical implementations. Every operator is defined by a **typed
-signature** — *what* biological transformation it performs — and one or more
-**implementations** — *how* it is numerically realized. The signature is the
-biological contract; the implementation is a numerical choice.
+Biological systems must be decomposed not only into operators, but also into the
+entities on which those operators act. These entities are heterogeneous — receptors,
+signalling proteins, cells, extracellular matrices, tissues, fields — and are organized
+across biological levels. Plexus makes this organization explicit as a compositional
+hierarchy: each level carries its own entities and states, operators act between entities
+within a level, and **Aggregate ↑** and **Broadcast ↓** connect levels by mapping state
+upward and downward. Decomposition therefore does not flatten biology into a single
+collection of variables; it preserves the organization through which mechanisms at one
+level are composed with mechanisms at another.
 
-Every operator may admit multiple implementations satisfying the same signature: a
-mechanical interaction by Material Point Methods, finite elements, vertex or
-phase-field models; a signalling operator by Hodgkin–Huxley equations, Neural ODEs
-or graph neural networks. Because a mechanism is stated once, independently of its
-solver, existing simulation frameworks become **complementary backends** implementing
-a common intermediate representation rather than competing modelling paradigms.
+The purpose of this decomposition is ultimately recomposition: to construct complete
+mechanistic models from reusable entities and operators. Making such compositions
+executable requires strong structural choices. Plexus separates the language that
+specifies the biological model from the code that interprets and executes it. The
+language declares entities, states, relations, hierarchy and operators; the interpreter
+resolves this description into concrete numerical implementations and schedules their
+execution.
 
 ## The language
 
