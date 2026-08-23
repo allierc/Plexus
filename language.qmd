@@ -222,7 +222,7 @@ cytoskeletal elements and particles. These sets remain distinct objects, with th
 state and operators, while sharing the same parent. Each level can also run at its own
 rate: no level is reduced to a parameter of the one above it.
 
-![](figures/fig_hier.png){width=80% fig-align="center"}
+![](figures/fig_hier.png){width=70% fig-align="center"}
 
 Operators can act within a level or across levels. Within a cell, for example, operators
 may couple receptors → signalling proteins → cytoskeleton. Across the containment map,

@@ -1,6 +1,9 @@
 % fig_hier -- containment, in the visual language of fig_ops: a WIDE strip, blue for sets, green
 % for fields, red for operators, a bold name + its symbol underneath. Read left to right = coarser.
 %
+% Three levels only: molecules, cells, tissues. The organism panel held one box of anonymous dots
+% and no set of its own, so it showed the containment map repeating rather than anything new.
+%
 % THE POINT THE FIGURE HAS TO MAKE is that a parent holds SEVERAL DISTINCT SETS, not one kind of
 % child: the cell at S1 contains receptors, signalling proteins and cytoskeleton, drawn as three
 % different marks, each its own set with its own state. Red arrows are operators -- within a level
@@ -95,18 +98,6 @@
   \node[lab] at (0.02,-2.14) {$S_2$};
 \end{scope}
 
-% =========== S3 ============================================================
-\begin{scope}[shift={(16.1,0)}]
-  \node[tiny] (o1) at (-0.22,0.24) {};
-  \node[tiny] (o2) at ( 0.04,0.38) {};
-  \node[tiny] (o3) at ( 0.28,0.16) {};
-  \begin{scope}[on background layer]
-    \node[cellbox,fit=(o1)(o2)(o3)] (org) {};
-  \end{scope}
-  \node[ttl] at (0.02,-1.78) {organism};
-  \node[lab] at (0.02,-2.14) {$S_3$};
-\end{scope}
-
 % =========== the two operators that cross a level ==========================
 \draw[op] (2.55,0.55) to[bend left=15] (4.35,0.55);
 \draw[op] (4.35,-0.72) to[bend left=15] (2.55,-0.72);
@@ -114,7 +105,7 @@
 \node[font=\scriptsize,color=cop]          at (3.45,1.00) {$\textstyle\sum_{\pi}$};
 \node[font=\bfseries\scriptsize,color=cop] at (3.45,-1.46) {Broadcast$\downarrow$};
 \node[font=\scriptsize,color=cop]          at (3.45,-1.10) {$\pi^{*}$};
-\foreach \x in {8.45, 13.75}{
+\foreach \x in {8.45}{
   \draw[op] (\x-0.85,0.55) to[bend left=15]
         node[above,font=\scriptsize,color=cop]{$\textstyle\sum_{\pi}$} (\x+0.85,0.55);
   \draw[op] (\x+0.85,-0.72) to[bend left=15]

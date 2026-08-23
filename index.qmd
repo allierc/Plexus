@@ -87,7 +87,7 @@ composition and the whole rollout stays **differentiable**.
 
 A set may be contained in another — proteins in a cell, cells in a tissue, tissues in an organism — through an explicit child → parent map. Importantly, a parent may contain several distinct sets: the same cell can contain receptors, signalling proteins, cytoskeletal elements and particles. These sets remain distinct objects, with their own state and operators, while sharing the same parent. Each level can also run at its own rate: no level is reduced to a parameter of the one above it.
 
-![](figures/fig_hier.png){width=80% fig-align="center"}
+![](figures/fig_hier.png){width=70% fig-align="center"}
 
 Operators can act within a level or across levels. Within a cell, for example, operators may couple receptors → signalling proteins → cytoskeleton. Across the containment map, **Aggregate ↑** builds parent state from children — a cell position from its particles, or a neuron input from its synapses — while **Broadcast ↓** propagates parent state to children — a material property to every particle owned by a cell, or a constraint imposed by the parent.
 
