@@ -64,6 +64,14 @@ KB_SECONDS = 18.0          # one revolution; the length IS the speed
 KB_ZOOM = 0.55
 EV_FPS = 12                # ~60 recorded frames -> a 5 s clip
 
+# HOW MANY FRAMES AN `evolve` CLIP DRAWS, AND WHY IT IS CAPPED. okuda's archive keeps ~60 of a run's
+# rows; the core's trajectory keeps every one -- 1,801 on `r023_07`. Uncapped, the two sides of a
+# promotion pair produce a 5-second clip and a 2.5-minute one of the same run, which cannot be
+# compared frame for frame by the eye they are for, and the core side takes twenty minutes to draw.
+# Capped, both sides subsample the same way (`linspace`, first and last always in) and land on the
+# same count, so `A/vtk_evolve_mesh.mp4` and `B/vtk_evolve_mesh.mp4` step through the run together.
+MAX_EVOLVE_FRAMES = 60
+
 # (kind, style) per sequence, so a caller asks for a JOB and not for four commands.
 SEQUENCES = {
     0: [("kburns", "nomesh")],
@@ -155,24 +163,29 @@ def _core_frames(path, set_name=None, cell_set=None, chan=0):
     if cell_set is None:
         cc = [k[:-len("__chem")] for k in z.files if k.endswith("__chem")]
         cell_set = cc[0] if cc else None
+    # EVERY ARRAY IS READ ONCE. `np.load` returns an NpzFile whose `z[key]` DECOMPRESSES THE WHOLE
+    # ARRAY on every access, so reading one row inside a loop over 1,801 rows re-reads the entire
+    # column 1,801 times. On `r023_07`'s 6.7 GB trajectory that is terabytes of decompression and the
+    # render never finishes -- it is the same defect `gate_measures._Lazy` exists for, and it was
+    # here too.
     pos = z[f"{set_name}__pos"]
     nF, Nv = z[f"{set_name}__mesh_nF"], z[f"{set_name}__mesh_Nv"]
     off, foff = z[f"{set_name}__mesh_offsets"], z[f"{set_name}__mesh_face_offsets"]
-    face_cols = [k.split("__mesh_")[1] for k in z.files
-                 if "__mesh_" in k and k.startswith(set_name)
+    E = {c: z[f"{set_name}__mesh_E_{c}"] for c in ("srce", "trgt", "face")}
+    face_cols = {k.split("__mesh_")[1]: z[k] for k in z.files
+                 if k.startswith(set_name + "__mesh_")
                  and k.split("__mesh_")[1] not in ("E_srce", "E_trgt", "E_face", "nF", "Nv",
-                                                   "offsets", "face_offsets")]
+                                                   "offsets", "face_offsets")
+                 and not k.split("__mesh_")[1].startswith(("scalar_", "e_"))}
     chem = z[f"{cell_set}__chem"] if cell_set and f"{cell_set}__chem" in z.files else None
     out = []
     for t in range(len(nF)):
         a, b = int(off[t]), int(off[t + 1])
         fa, fb = int(foff[t]), int(foff[t + 1])
-        mt = {"E_srce": z[f"{set_name}__mesh_E_srce"][a:b],
-              "E_trgt": z[f"{set_name}__mesh_E_trgt"][a:b],
-              "E_face": z[f"{set_name}__mesh_E_face"][a:b],
+        mt = {"E_srce": E["srce"][a:b], "E_trgt": E["trgt"][a:b], "E_face": E["face"][a:b],
               "nF": int(nF[t]), "Nv": int(Nv[t])}
-        for c in face_cols:
-            mt[c] = z[f"{set_name}__mesh_{c}"][fa:fb]
+        for c, arr in face_cols.items():
+            mt[c] = arr[fa:fb]
         act = None if chem is None else np.asarray(chem[t][:int(nF[t]), chan], float)
         out.append((np.asarray(pos[t][:int(Nv[t])], float), mt, act))
     return out
@@ -435,11 +448,18 @@ def kburns(run_dir, style, out, fill=1.0, label=None):
     return f"{n} frames"
 
 
-def evolve(run_dir, style, out, fill=1.0, label=None):
+def evolve(run_dir, style, out, fill=1.0, label=None, max_frames=None):
     """The run through time, camera nailed down."""
     fr = frames_of(run_dir)
     if not fr:
         return "no trajectory"
+    ticks_all = _frames_ticks.value
+    cap = MAX_EVOLVE_FRAMES if max_frames is None else int(max_frames)
+    if cap and len(fr) > cap:
+        keep = np.unique(np.linspace(0, len(fr) - 1, cap).astype(int))
+        fr = [fr[i] for i in keep]
+        _frames_ticks.value = ([ticks_all[i] for i in keep] if ticks_all is not None
+                               else keep.tolist())
     L = box_of(run_dir, fr)
     name = label or os.path.basename(run_dir.rstrip("/"))
     # ONE ACTIVATOR RANGE FOR THE WHOLE CLIP, taken over every recorded frame. Per-frame
@@ -922,11 +942,22 @@ def evolve_neural(run_dir, out, region, field="neural_activity", n_arbours=None,
     from plexus.io.neuprint import region_path
 
     z = _traj(run_dir)
-    g = np.asarray(z[f"{field}__grid"], np.float32)
-    if g.ndim == 5:
-        g = g[:, 0]
-    lo, hi = _range(np.abs(g), 0.0, 99.9)
-    R = g.shape[1]
+    # THE FRAME COUNT COMES FROM WHAT IS DRAWN. A field frame is a 128^3 grid -- 8.4 MB -- so
+    # the engine strides it hard (`field_record_cap`), while the per-neuron voltage is 4 kB a
+    # frame and is kept in full. Driving an anatomy-only clip off the field rows therefore threw
+    # away 95% of the time resolution of data it never reads: a 2,000-frame run rendered as 125
+    # frames. The field is loaded only when the volume is actually drawn.
+    sv_all = np.asarray(z["neuron__voltage"], np.float32)[..., 0]              # [T_set, N]
+    if volume:
+        g = np.asarray(z[f"{field}__grid"], np.float32)
+        if g.ndim == 5:
+            g = g[:, 0]
+        n_frames = g.shape[0]
+        R = g.shape[1]
+        lo, hi = _range(np.abs(g), 0.0, 99.9)
+    else:
+        g, R, lo, hi = None, None, 0.0, 1.0
+        n_frames = sv_all.shape[0]
     cm = colormaps[cmap]
 
     def _rgb(v, a, b):
@@ -940,8 +971,9 @@ def evolve_neural(run_dir, out, region, field="neural_activity", n_arbours=None,
     nz = np.load(os.path.join(root, "neurons.npz"), allow_pickle=True)
     spos = (np.asarray(nz["xyz_nm"], float) - np.asarray(man["bounds_lo_nm"])) / man["side_nm"]
     bid = np.asarray(nz["body_id"])
-    sv = np.asarray(z["neuron__voltage"], np.float32)[..., 0]                  # [T_set, N]
-    tv = np.linspace(0, sv.shape[0] - 1, g.shape[0]).round().astype(int)       # field row -> set row
+    sv = sv_all
+    tv = (np.linspace(0, sv.shape[0] - 1, n_frames).round().astype(int)
+          if volume else np.arange(n_frames))                                  # row -> set row
     pos_of = {int(b): i for i, b in enumerate(bid)}
     arbour_row = np.array([pos_of[int(b)] for b in np.asarray(meta["body_ids"])])
     if n_arbours:
@@ -969,7 +1001,7 @@ def evolve_neural(run_dir, out, region, field="neural_activity", n_arbours=None,
     writer = imageio_ffmpeg.write_frames(out, (W, W), fps=fps or EV_FPS, quality=8)
     writer.send(None)
     cam = None
-    for t in range(g.shape[0]):
+    for t in range(n_frames):
         v = sv[tv[t]]
         p = _plotter(SIZE * ss)
         # translucent geometry must sort by depth against itself, not by draw order
@@ -1018,5 +1050,5 @@ def evolve_neural(run_dir, out, region, field="neural_activity", n_arbours=None,
         writer.send(np.ascontiguousarray(frame))
         p.close()
     writer.close()
-    return (f"{g.shape[0]} frames, {meta['neurons']} arbours, {meta['segments']} segments, "
+    return (f"{n_frames} frames, {meta['neurons']} arbours, {meta['segments']} segments, "
             f"soma={soma} dendrites={dendrites} volume={volume}")

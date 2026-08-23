@@ -11,13 +11,22 @@ phase & spec & frames & A & B & digest & outcome\\\midrule
 0 & \code{b\_null\_plain} & 1800 & okuda@HEAD & okuda & \code{14aab859c575fe25} & \textcolor{good}{\textbf{identical}}\\
 B-core & \code{b\_gs\_plain\_soft\_lo} & 1800 & okuda & core & \code{906afc1a3931063a} & \textcolor{good}{\textbf{identical}}\\
 B-core & \code{b\_star} & 1800 & okuda & core & \code{beb6fb24fe86dcde} & \textcolor{good}{\textbf{identical}}\\
+G & \code{gates/gate\_00\_spheroid} &  & okuda & core & \code{d4390d31c7ebcb08} & \textcolor{good}{\textbf{identical}}\\
+G & \code{gates/gate\_01\_nomyosin} &  & okuda & core & \code{61d748a488849b0f} & \textcolor{good}{\textbf{identical}}\\
+G & \code{gates/gate\_01\_nosync} &  & okuda & core & \code{d4390d31c7ebcb08} & \textcolor{good}{\textbf{identical}}\\
+G & \code{gates/gate\_02\_ecm\_block} &  & core@cc52f512 & core & \code{fb581cac8ca12897} & \textcolor{good}{\textbf{identical}}\\
+G & \code{gates/gate\_04\_spheroid\_ecm} &  & core@cc52f512 & core & \code{48f55062b31ff12e} & \textcolor{good}{\textbf{identical}}\\
+G & \code{gates/gate\_04\_tissue} &  & okuda & core & \code{10d6da16beb7a4a4} & \textcolor{good}{\textbf{identical}}\\
+REP & \code{r010\_00\_ctrl} & 1800 & okuda & core & \code{84474fdc9f047e7c} & \textcolor{good}{\textbf{identical}}\\
+REP & \code{r020\_00\_ctrl} & 1800 & okuda & core & \code{ca9f59e7cf16d25e} & \textcolor{good}{\textbf{identical}}\\
+REP & \code{r023\_07} & 1800 & okuda & core & \code{5b6848aafcf4a1a3} & \textcolor{good}{\textbf{identical}}\\
 R & \code{b\_null\_plain} & 1800 & okuda & okuda & \code{14aab859c575fe25} & \textcolor{good}{\textbf{identical}}\\
 R & \code{b\_star} & 1800 & okuda & okuda & \code{beb6fb24fe86dcde} & \textcolor{good}{\textbf{identical}}\\
 \bottomrule
 \end{tabular}
 \end{center}
 
-\noindent\textbf{10 of 10 rows identical.}
+\noindent\textbf{19 of 19 rows identical.}
 
 }
 \newcommand{\optable}{%
@@ -111,9 +120,11 @@ module & operator & family & kind & set & implementations / alias\\\midrule\endh
 \code{mpm\_ops.py} & \code{mpm\_scatter} & mpm & exchange & particle & alias p2g\\
 \code{mpm\_ops.py} & \code{mpm\_spin} & mechanics & lateral & particle & \\
 \code{mpm\_ops.py} & \code{mpm\_strain} & mpm & lateral & particle & \\
+\code{neural.py} & \code{neural\_seed} & seed & seed & neuron & \\
 \code{neural.py} & \code{neuron\_field\_input} & signalling & exchange & neuron & \\
 \code{neural.py} & \code{neuron\_signal} & signalling & lateral & neuron & shared, type\_pairwise, type\_pre\\
 \code{neural.py} & \code{neuron\_update} & signalling & lateral & neuron & leaky\_tanh\\
+\code{observation.py} & \code{voxelize} & harness & exchange & neuron & \\
 \code{vertex\_ops.py} & \code{cell\_die} & population & structural & vertex & \\
 \code{vertex\_ops.py} & \code{cell\_divide} & population & structural & vertex & default, doubler, timer\\
 \code{vertex\_ops.py} & \code{cell\_mechanics} & mechanics & lateral & vertex & default, monolayer\\
@@ -124,7 +135,7 @@ module & operator & family & kind & set & implementations / alias\\\midrule\endh
 \end{longtable}
 \end{center}
 
-\noindent\textbf{94 of 96 canonical operator names resolve into \code{src/plexus/}.} The remainder are the two \code{AUDIT.md} rejects, registered in \code{discovery\_okuda} only.
+\noindent\textbf{96 of 98 canonical operator names resolve into \code{src/plexus/}.} The remainder are the two \code{AUDIT.md} rejects, registered in \code{discovery\_okuda} only.
 
 }
 \newcommand{\gatetable}{%
