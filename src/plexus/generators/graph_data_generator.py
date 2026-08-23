@@ -103,23 +103,25 @@ def data_generate(
                 for col in ("E_srce", "E_trgt", "E_face"):
                     flat[f"{sname}__mesh_{col}"] = (np.concatenate([m[col] for m in ms])
                                                     .astype(np.int64))
-                # the per-face state the renderer colours by -- only the names that are PRESENT in
-                # every recorded row, so a partial column cannot be sliced with the full offsets
-                cols = set.intersection(*[{k for k in m if k not in
-                                           ("E_srce", "E_trgt", "E_face", "nF", "Nv")} for m in ms])
+                from plexus.models.mesh import mesh_row_columns
+                # the per-face state the renderer colours by. THE UNION of the names any row
+                # carries, zero-filled where a row lacks one -- see `mesh_row_columns`, which
+                # records why the intersection this replaced deleted `apop`, `age` and `ndiv` from
+                # entire runs and made an apoptosis scene render as a plain ball.
+                scal, edge, face, fill = mesh_row_columns(ms)
                 # the operators' own SCALAR counters: one value per row, not a ragged column
-                for col in sorted(c for c in cols if c.startswith("scalar_")):
-                    flat[f"{sname}__mesh_{col}"] = np.asarray([m[col] for m in ms], np.float64)
+                for col in scal:
+                    flat[f"{sname}__mesh_{col}"] = np.asarray([fill(m, col) for m in ms], np.float64)
                 # per-HALF-EDGE columns ride `mesh_offsets`; per-FACE columns ride
                 # `mesh_face_offsets`. A column whose per-row length does not match the store it
                 # would ride is written with its OWN offsets rather than silently mis-sliced.
-                for col in sorted(c for c in cols if c.startswith("e_")):
-                    lens = [len(m[col]) for m in ms]
-                    flat[f"{sname}__mesh_{col}"] = np.concatenate([m[col] for m in ms]).astype(np.float32)
-                    flat[f"{sname}__mesh_{col}_offsets"] = np.cumsum([0] + lens).astype(np.int64)
-                for col in sorted(c for c in cols
-                                  if not c.startswith("scalar_") and not c.startswith("e_")):
-                    flat[f"{sname}__mesh_{col}"] = (np.concatenate([m[col] for m in ms])
+                for col in edge:
+                    vals = [fill(m, col) for m in ms]
+                    flat[f"{sname}__mesh_{col}"] = np.concatenate(vals).astype(np.float32)
+                    flat[f"{sname}__mesh_{col}_offsets"] = (
+                        np.cumsum([0] + [len(v) for v in vals]).astype(np.int64))
+                for col in face:
+                    flat[f"{sname}__mesh_{col}"] = (np.concatenate([fill(m, col) for m in ms])
                                                     .astype(np.float32))
             if d.get("node_type") is not None:
                 flat[f"{sname}__node_type"] = d["node_type"]
