@@ -401,8 +401,21 @@ def suite_turing():
         # ---- the two new reaction MODELS. Both need a span that is not a pair, which is why the
         # `chan`-must-be-even rule had to become "a multiple of this model's own width" first.
         ("turing2d_rps",       "May-Leonard cyclic competition: THREE species, travelling domains"),
-        ("turing2d_coupled",   "FOUR species: two Gray-Scott systems suppressing each other "
-                               "(gamma 1.0). At gamma 0 it reduces to turing2d_two bit for bit."))]
+        ("turing2d_coupled",   "FOUR species: two Gray-Scott systems suppressing each other. "
+                               "At gamma 0 it reduces to turing2d_two bit for bit."),
+        # ---- THE PARAMETER SWEEPS. Six two-species points from Pearson's own (F, k) diagram,
+        # which transfers because d_h/d_a = 2 is his Du/Dv; three three-species points sweeping
+        # the cyclic suppression. Each is DERIVED from the control that already patterns, so one
+        # parameter differs and the motif is attributable to it.
+        ("turing2d_gs_delta",  "GS Pearson delta: self-replicating spots"),
+        ("turing2d_gs_beta",   "GS Pearson beta: spatiotemporal chaos, worms that never settle"),
+        ("turing2d_gs_eta",    "GS Pearson eta: isolated stationary spots"),
+        ("turing2d_gs_kappa",  "GS Pearson kappa: holes rather than spots"),
+        ("turing2d_gs_lambda", "GS Pearson lambda: stationary labyrinth"),
+        ("turing2d_gs_theta",  "GS Pearson theta: worms and loops with spots"),
+        ("turing2d_rps_a0p2",  "RPS a=0.2: weak dominance, broad slow domains"),
+        ("turing2d_rps_a1p2",  "RPS a=1.2: strong dominance, tight spirals"),
+        ("turing2d_rps_a2p0",  "RPS a=2.0: invasion fronts outrun the spiral cores"))]
 
 
 SUITES = {"ECM": suite_ecm, "BASE": suite_base, "MINISITE": suite_minisite,
