@@ -183,7 +183,7 @@ class CellRDSeed(Structural):
     """
     SUPPORTED_DIMS = [2, 3]; DIFFERENTIABLE = False; MAY_MUTATE_INTEGRATED_STATE = True
     MECHANISM_TAGS = ["initial_condition", "gray_scott"]
-    MODES = ("scatter", "noise", "patch", "cones")
+    MODES = ("scatter", "noise", "patch", "cones", "simplex")
     REFERENCE = "Plexus (this work); cone seeding after Okuda, S. et al. (2018). Sci. Rep. 8:2386."
 
     def __init__(self, params, device="cpu"):
@@ -258,6 +258,19 @@ class CellRDSeed(Structural):
                 cosmax = (d @ dirs.T).max(dim=1).values
                 a = torch.where(cosmax > float(np.cos(np.radians(self.cone_deg))), torch.ones(nF, device=dev), a)
             u = torch.ones(nF, device=dev)
+        elif self.mode == "simplex":
+            # A SYMMETRIC START FOR A COMPETITION MODEL. Every other mode here is a Gray-Scott
+            # initial condition: activator in column 0, SUBSTRATE = 1 in column 1. Feed that to
+            # May-Leonard, where column 1 is just the second competitor, and the run begins with
+            # v at 0.9 against u and w at 0.07 -- not a competition, a landslide. Measured: v
+            # dominates immediately, w cyclically beats v, and the field collapses to w = 1
+            # everywhere with zero spatial variance. No motif can emerge from that and none did.
+            #
+            # `simplex` gives all n species the same small random field, so no species starts
+            # ahead and the cyclic term decides the outcome. The scale is set so p = sum stays
+            # below 1, which is where May-Leonard's logistic term is still positive.
+            a = None
+            u = None
         elif self.mode == "noise":                              # Brusselator: homogeneous steady state + noise
             a = (self.A + self.noise * torch.randn(nF, generator=g)).to(dev)
             u = (self.B / self.A + self.noise * torch.randn(nF, generator=g)).to(dev)
@@ -275,13 +288,21 @@ class CellRDSeed(Structural):
         h0, h1 = clvl.state_schema["chem"]
         base = h0 + self.chan
         st = clvl.state.clone()
+        # SIMPLEX WRITES EVERY SPECIES AND RETURNS -- it has no activator/substrate pair to write,
+        # which is the whole point of it, so it must run BEFORE the `a`/`u` write rather than after.
+        if self.mode == "simplex":
+            for _k in range(self.n_species):
+                if h1 - base > _k:
+                    _v = (0.05 + 0.25 * torch.rand(nF, generator=g)).to(dev) / max(self.n_species, 1)
+                    st[:nF, base + _k:base + _k + 1] = _v[:, None]
+            clvl.state = st
+            return {}
         st[:nF, base:base + 1] = a[:, None]
         if h1 - base > 1:
             st[:nF, base + 1:base + 2] = u[:, None]
         # A SPAN WIDER THAN TWO gets the remaining species seeded the same way the first was, from
-        # the SAME generator, so a three-species May-Leonard start is three independent random
-        # fields rather than one field and two zeros. Two zeros is not a neutral initial condition
-        # for a competition model -- it is extinction, and the run would decide nothing.
+        # the SAME generator, so a three-species start is three independent random fields rather
+        # than one field and two zeros -- two zeros is extinction, not a neutral start.
         for _k in range(2, self.n_species):
             if h1 - base > _k:
                 _v = (0.04 * torch.rand(nF, generator=g)).to(dev)

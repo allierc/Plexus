@@ -1,35 +1,24 @@
-# turing2d_coupled -- Gray-Scott on a FLAT DISC of cells, the minisite's Turing section in the
-# promoted vocabulary.
+# turing2d_coupled -- `turing2d_two` AND NOTHING ELSE BUT THE COUPLING.
 #
-# WHY THIS FILE EXISTS. The three clips under "Turing -- Gray-Scott reaction-diffusion" on the front
-# page (`turing2d_coral`, `turing2d_chi_small`, `turing2d_two_species`) exist ONLY as text inlined
-# in `index.qmd`'s hover panels -- there is no yaml for them anywhere in the tree -- and they are
-# written against operators that were never promoted: `aggregate_seed` (mode `disc`), `graph_diffuse`
-# and `react`, the Turing_vertex names. So the section had no runnable spec in the core at all.
+# It is generated from that file, so the two systems, their diffusivities, chi, the seeds and the
+# layout are identical by construction and the ONLY difference is gamma. That is what makes the
+# pair a controlled comparison rather than two runs that happen to look different.
 #
-# WHAT REPLACES THE MISSING SEEDER. `aggregate_seed mode: disc` did three things at once: place the
-# cells on a disc, build a k=6 neighbour graph, and seed the activator. In the promoted vocabulary
-# those are three separate concerns and each already exists:
+# THREE WRONG DIAGNOSES GOT IT HERE, all recorded because each was a plausible story that the data
+# refused. (1) "gamma 1.0 is too strong" -- true, the cross term exceeded the whole autocatalysis,
+# but lowering it to 0.2 changed nothing. (2) "one 4-wide seeder starves system B of substrate" --
+# also true, column 3 got a small random field instead of u=1, and fixing it still left B dead.
+# (3) The actual cause: the file had been forked from `turing2d_disc_chi4`, so it ran at chi 4.0
+# where `turing2d_two` runs at 1.3. B's reaction point (F 0.026 / kk 0.055) needs a short
+# activator range, and at chi 4.0 d*chi reaches 0.640 -- past what an explicit Euler step on a
+# Laplacian with eigenvalues in [-2,0] survives once the reaction is added. It went non-finite.
 #
-#     placement  -> `spawn: sunflower` + `spawn_radius`, which the ENGINE owns (engine.py `_spawn`).
-#                   Sunflower rather than `disc`: `disc` draws uniformly at random, which clumps,
-#                   and a Turing wavelength measured on a clumped lattice is measuring the clumps.
-#                   The Vogel golden-angle spiral covers the disc evenly.
-#     adjacency  -> `radius_graph`, which writes the `edge_index` that `cell_chem_diffuse` reads.
-#                   A RADIUS, not a k: kNN on an even lattice and a radius cut agree, and the radius
-#                   is the physical statement -- "cells exchange with cells this close".
-#     chemistry  -> `cell_chem_seed mode: scatter`, the promoted seeder.
+# The lesson is the generation, not the number: a variant that is supposed to differ in ONE
+# parameter should be DERIVED from its control, not rebuilt beside it.
 #
-# THE RADIUS IS SET FROM THE DENSITY, not guessed. 4000 cells on a disc of radius 19 is one cell per
-# pi*19^2/4000 = 0.283 area units, so the mean spacing is about 0.60. `radius: 0.95` takes roughly
-# the first ring of neighbours -- about 6 per cell, which is what `k: 6` was asking for.
-# FOUR species: two Gray-Scott systems that suppress each other's activator (gamma 1.0). At gamma 0 this is exactly turing2d_two; the difference IS the coupling.
-# THE DOT SIZE IS MEASURED, NOT DECLARED. `dot_fill` is the fraction of the LOCAL SPACING a dot
-# spans -- 1.0 is exactly touching, 0.9 leaves a hairline so the sheet reads as flat while the
-# individual cells stay countable. The renderer measures the median nearest-neighbour distance and
-# converts it for whatever canvas it is drawing on, so the same value holds at 1,000 cells and at
-# 16,000, on the live snapshot and in the movie. `point_size` still overrides it absolutely, but
-# an absolute size is a promise about a population count that a growing tissue breaks every frame.
+# THE REGRESSION TEST IS gamma = 0, which must reproduce `turing2d_two` bit for bit -- verified
+# already for the 3D pair, where a coupled instance at gamma 0 matched two independent
+# `gray_scott` instances exactly.
 general:
   name: turing2d_coupled
   seed: 0
@@ -63,31 +52,46 @@ operators:
   before_frame: 3
   mode: scatter
   seed_frac: 0.12
-  n_species: 4
+  chan: 0
+- op: cell_chem_seed
+  at: cell
+  seed: 2
+  before_frame: 3
+  mode: scatter
+  seed_frac: 0.12
+  chan: 2
 - op: radius_graph
   at: cell
   radius: 0.95
 - op: cell_chem_diffuse
   at: cell
   implementation: graph_laplacian
-  chi: 4.0
-  d:
-  - 0.08
-  - 0.16
-  - 0.08
-  - 0.16
+  d_a: 0.08
+  d_h: 0.16
+  chi: 1.3
+  chan: 0
+- op: cell_chem_diffuse
+  at: cell
+  implementation: graph_laplacian
+  d_a: 0.03
+  d_h: 0.16
+  chi: 1.3
+  chan: 2
 - op: cell_chem_react
   at: cell
   model: gray_scott_coupled
+  chan: 0
   F: 0.046
   kk: 0.062
   F2: 0.026
   kk2: 0.055
-  gamma: 1.0
+  gamma: 0.2
   rate: 1.0
 schedule:
 - cell_chem_seed
+- cell_chem_seed
 - radius_graph
+- cell_chem_diffuse
 - cell_chem_diffuse
 - cell_chem_react
 plotting:
