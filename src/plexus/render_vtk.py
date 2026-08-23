@@ -567,10 +567,16 @@ def compare(dir_a, dir_b, out, style="mesh", fill=1.0, labels=("A", "B"), title=
     p.set_background("black")
     p.enable_anti_aliasing("msaa", multi_samples=8)
     p.open_movie(out, framerate=EV_FPS, quality=8)
+    # ONE LABEL FOR BOTH PANELS, but each side keeps ITS OWN ticks for `_pair_reference`. The two are
+    # different questions: "what time is this frame" is shared, because the panels are aligned; "what
+    # was nF a few ticks ago on THIS side" is per-side, and feeding it the other side's tick array
+    # would silently mis-date the just-divided highlight.
+    _lab_tk, _lab_idx = (ta, ia) if _has_ticks(ta) else (tb, ib)
     nFa = [int(m["nF"]) for _q, m, _a in fa]
     nFb = [int(m["nF"]) for _q, m, _a in fb]
     keep = [None, None]
     for k in range(n):
+        when = _when(_lab_tk, int(_lab_idx[k]), max(len(fa), len(fb)))
         for col, (fr, idx, nFs, tk, lab) in enumerate(
                 ((fa, ia, nFa, ta, labels[0]), (fb, ib, nFb, tb, labels[1]))):
             t = int(idx[k])
@@ -583,7 +589,7 @@ def compare(dir_a, dir_b, out, style="mesh", fill=1.0, labels=("A", "B"), title=
             if m is None:
                 continue
             keep[col] = add(p, m, style)
-            p.add_text(f"{lab}   frame {t + 1}/{len(fr)}   {int(mt['nF'])} cells",
+            p.add_text(f"{lab}   {when}   {int(mt['nF'])} cells",
                        position="upper_left", font_size=10, color="white", name=f"t{col}")
             aim(p, L, fill=fill)
         if title:
@@ -594,11 +600,42 @@ def compare(dir_a, dir_b, out, style="mesh", fill=1.0, labels=("A", "B"), title=
     return f"{n} paired frames"
 
 
+def _when(tk, t, n_rows):
+    """WHEN this panel is, in SIMULATION TIME rather than in row index.
+
+    THE TWO SIDES DO NOT RECORD AT THE SAME RATE. okuda's `RunArchive` keeps about sixty rows --
+    gate 00 recorded ticks [0, 6, 13, ... 394, 401] -- while the core keeps every tick, 402 of them.
+    The comparison has always aligned them correctly, by okuda's own `ticks`; but the caption printed
+    the ROW INDEX, so the two panels of a byte-identical run read "frame 60" beside "frame 402" and
+    invited the one conclusion the picture exists to rule out. Both were tick 401. A label that makes
+    a correct comparison look misaligned costs more than no label.
+
+    ONE SIDE'S TICKS LABEL BOTH PANELS. okuda writes a `ticks` array; the core's `trajectory.npz`
+    does not, so read literally the core panel can only say "row 402/402" -- which restates the very
+    row index that caused the confusion. The panels are aligned BY CONSTRUCTION (the comparison
+    selects core rows through okuda's own `ticks`), so the tick either side reports is the tick both
+    are at, and `compare`/`compare_still` pass the one that exists for both. Falls back to the row
+    index, and says so, only when NEITHER side recorded ticks.
+    """
+    try:
+        return f"tick {int(np.asarray(tk).ravel()[t])}"
+    except Exception:
+        return f"row {t + 1}/{n_rows} (no ticks)"
+
+
+def _has_ticks(t):
+    """Whether a side recorded a tick array at all -- see `_when`."""
+    try:
+        return bool(np.asarray(t).ravel().size)
+    except Exception:
+        return False
+
+
 def compare_still(dir_a, dir_b, out, style="flat", fill=1.0, labels=("A", "B"), title=""):
     """The last frame of both sides, side by side. The still the movie is scrubbed from."""
     import pyvista as pv
-    fa = frames_of(dir_a)
-    fb = frames_of(dir_b)
+    fa, ta = frames_of(dir_a), _frames_ticks.value
+    fb, tb = frames_of(dir_b), _frames_ticks.value
     if not fa or not fb:
         return "no trajectory on " + ("A" if not fa else "B")
     L = max(box_of(dir_a, fa), box_of(dir_b, fb))
@@ -606,11 +643,13 @@ def compare_still(dir_a, dir_b, out, style="flat", fill=1.0, labels=("A", "B"), 
     p = pv.Plotter(off_screen=True, window_size=(2 * SIZE, SIZE), shape=(1, 2), border=False)
     p.set_background("black")
     p.enable_anti_aliasing("msaa", multi_samples=8)
+    _lab_tk, _lab_n = (ta, len(fa)) if _has_ticks(ta) else (tb, len(fb))
+    when = _when(_lab_tk, _lab_n - 1, _lab_n)
     for col, (fr, lab) in enumerate(((fa, labels[0]), (fb, labels[1]))):
         p.subplot(0, col)
         pos, mt, act = fr[-1]
         add(p, mesh_of(pos, mt, act, show_div=False), style)
-        p.add_text(f"{lab}   frame {len(fr)}   {int(mt['nF'])} cells",
+        p.add_text(f"{lab}   {when}   {int(mt['nF'])} cells",
                    position="upper_left", font_size=10, color="white")
         aim(p, L, fill=fill)
     if title:
@@ -693,21 +732,68 @@ def _traj(run_dir):
 # of the distribution reads as solid.
 GREY_GREEN = ("#2a2d2e", "#3f6b52", "#39ff7a")
 
+# elongation-confidence bins (on `neurite_elong`). Four is enough to read as a gradient and
+# cheap enough that the extra actors do not show in the frame time.
+_BINS = ((0.00, 0.72), (0.72, 0.82), (0.82, 0.90), (0.90, 1.01))
 
-def _rgba(x, lo, hi, colors=GREY_GREEN, a_lo=0.03, a_hi=0.95, gamma=1.6):
-    """[N, 4] uint8 RGBA: colour AND opacity both driven by |x| against one clim."""
+
+def _rgba(x, lo, hi, colors=GREY_GREEN, a_lo=0.03, a_hi=0.95, gamma=1.6, knee=None):
+    """[N, 4] uint8 RGBA: colour AND opacity both driven by |x| against one clim.
+
+    TWO OPACITY CURVES, and the power law is the wrong one for cell bodies.
+
+    `gamma` alone is `u**gamma`, which has no threshold: it is small everywhere below 1 and only
+    approaches opaque as u approaches the very top of the clim. Measured on these four runs at
+    gamma = 5, the median soma sits at alpha 0.0002 and the 90th percentile at 0.05 -- so a soma
+    at the 90th percentile of activity is 95% transparent, which is why the ACTIVE ones looked
+    too faint. Raising `a_hi` does not help; the curve is flat where the somas actually are.
+
+    `knee=(t0, t1)` is a SMOOTHSTEP instead: fully transparent below t0, fully opaque above t1,
+    and a smooth Hermite ramp between. That is the shape the eye wants for "off below a value,
+    increasingly on above it" -- a real threshold with no hard edge, and the opaque end is
+    actually reached rather than approached.
+    """
     from matplotlib.colors import LinearSegmentedColormap
     cm = LinearSegmentedColormap.from_list("gg", list(colors))
     u = np.clip((np.abs(np.asarray(x)) - lo) / max(hi - lo, 1e-12), 0, 1)
     rgb = (np.asarray(cm(u))[:, :3] * 255).astype(np.uint8)
-    a = ((a_lo + (a_hi - a_lo) * u ** gamma) * 255).astype(np.uint8)
-    return np.concatenate([rgb, a[:, None]], axis=1)
+    if knee is not None:
+        t0, t1 = float(knee[0]), float(knee[1])
+        w = np.clip((u - t0) / max(t1 - t0, 1e-12), 0.0, 1.0)
+        f = w * w * (3.0 - 2.0 * w)                       # smoothstep
+        a = a_lo + (a_hi - a_lo) * f
+    else:
+        a = a_lo + (a_hi - a_lo) * u ** gamma
+    return np.concatenate([rgb, (a * 255).astype(np.uint8)[:, None]], axis=1)
+
+
+def _tetra(radius, elong=1.0):
+    """A tetrahedron with ONE VERTEX ON +X, optionally STRETCHED along that axis.
+
+    `vtkGlyph3D` aligns a glyph's +X axis with the per-point vector, so the glyph has to have a
+    well-defined nose along +X or "aligned with the direction" means nothing. `pv.Tetrahedron`
+    is built in an arbitrary orientation; this one is apex-first by construction: the apex sits
+    at (r, 0, 0) and the opposite face is the equilateral triangle at x = -r/3, circumradius
+    2*sqrt(2)*r/3. A tetrahedron is also the cheapest solid that is CHIRAL ENOUGH to read as
+    pointing -- a sphere shows no direction and a cylinder shows an axis but not a sense.
+    """
+    import pyvista as pv
+    r, e = float(radius), float(elong)
+    rb = 2.0 * np.sqrt(2.0) / 3.0 * r
+    ang = np.array([0.0, 2.0 * np.pi / 3.0, 4.0 * np.pi / 3.0])
+    # `elong` scales the X extent ONLY, so the glyph becomes a dart pointing along the neuron's
+    # own axis. A regular tetrahedron shows a direction; an elongated one shows it at a glance,
+    # because the eye reads aspect ratio far faster than it reads which vertex is nearest.
+    pts = np.vstack([[r * e, 0.0, 0.0],
+                     np.column_stack([np.full(3, -r * e / 3.0), rb * np.cos(ang), rb * np.sin(ang)])])
+    faces = np.hstack([[3, 0, 1, 2], [3, 0, 2, 3], [3, 0, 3, 1], [3, 1, 3, 2]])
+    return pv.PolyData(pts, faces)
 
 
 def _downsample(im, k):
     """Box-average an image by an integer factor -- the second half of supersampling.
 
-    WHY SUPERSAMPLE AT ALL. A dendrite is drawn as a LINE, and OpenGL clamps line width to a
+    WHY SUPERSAMPLE AT ALL. A neurite is drawn as a LINE, and OpenGL clamps line width to a
     1-pixel minimum: at 896x896 every `line_width` below 1.0 renders identically, which is why
     an earlier 0.15 / 0.25 / 0.35 sweep produced three indistinguishable images. The only way
     to make a line thinner than a pixel is to make the pixel smaller -- render at k times the
@@ -853,6 +939,11 @@ def evolve_volume(run_dir, out, field="neural_activity", cmap="viridis", fill=0.
 
 def skeleton_lines(region, max_neurons=200, stride=1, seed=0):
     """SWC skeletons of a frozen region, as ONE `pv.PolyData` of line segments in the unit box.
+
+    NEURITES, NOT DENDRITES. A NeuPrint skeleton is the WHOLE arbour of a body -- dendrite and
+    axon together, with no compartment labels to separate them (fish2's SWC `type` column has
+    zero `type == 1` soma rows, so nothing in the file distinguishes the two). Calling the layer
+    "dendrites" would claim a split the data does not contain.
 
     THREE THINGS HAVE TO HAPPEN AND ALL THREE ARE EASY TO GET WRONG.
 
@@ -1003,16 +1094,28 @@ def evolve_skeleton_activity(run_dir, out, region, field="neural_activity", n_ar
 
 def evolve_neural(run_dir, out, region, field="neural_activity", n_arbours=None,
                   soma=True, volume=True, cmap="viridis", line_width=1.0,
-                  dendrites=True, dendrite_opacity=0.30, dendrite_stride=8,
-                  soma_radius_um=2.5, supersample=1, palette="grey_green",
+                  neurites=True, neurite_opacity=0.30, neurite_stride=8,
+                  # 3.0 um for the TETRA and it is not a soma size. A regular tetrahedron of
+                  # circumradius r has ~12% of the volume of a sphere of radius r, so 3.0 is
+                  # roughly the volume-match to the 1.5 um sphere this replaced -- and a tetra
+                  # pointing at the camera collapses to a small triangle, so the number is
+                  # chosen for legibility, not as a claim about how big a cell body is. The
+                  # 2.5 um sphere WAS such a claim; this is not.
+                  soma_radius_um=2.4, soma_elong=2.5,
+                  supersample=1, palette="grey_green", soma_glyph="tetra",
                   # a_lo = 0 and a HARD gamma: a quiet soma is fully transparent rather than
                   # faintly drawn. ~200 spheres at alpha 0.06 accumulate along a ray into
                   # exactly the haze that made solid spheres look Gaussian; at alpha 0 they
                   # contribute nothing and what is left in the frame is spheres.
-                  dend_alpha=(0.02, 0.85, 1.8), soma_alpha=(0.0, 1.0, 5.0),
+                  neurite_alpha=(0.02, 0.85, 1.8), soma_alpha=(0.0, 1.0, 5.0),
+                  # HARDCODED SOMA KNEE. u = 0.35 is the 75th percentile of |voltage| on these
+                  # runs and u = 0.80 is about the 98th, so three quarters of the cell bodies
+                  # are invisible and the top few per cent are solid -- which is the contrast
+                  # the power law could not produce (it left the 90th percentile at alpha 0.05).
+                  soma_knee=(0.35, 0.80),
                   fill=0.92, label=None, fps=None,
                   vol_opacity=(0, 0.006, 0.018, 0.045, 0.10)):
-    """Soma, dendrites and the rendered volume, in one clip -- by COMPOSITING TWO PASSES.
+    """Soma, neurites and the rendered volume, in one clip -- by COMPOSITING TWO PASSES.
 
     ONE SCENE, and the story of why that took three tries is worth keeping. The skeletons at
     first did not appear at all, and the conclusion drawn was that VTK's ray-cast volume mapper
@@ -1021,7 +1124,7 @@ def evolve_neural(run_dir, out, region, field="neural_activity", n_arbours=None,
     anatomy was 128x too small and outside the frame, not occluded. `_grid` sets the spacing,
     and volume, lines and points then depth-composite correctly in a single render.
 
-    THE COLOUR IS ONE QUANTITY ON ONE SCALE. Soma and dendrite are both coloured by the
+    THE COLOUR IS ONE QUANTITY ON ONE SCALE. Soma and neurite are both coloured by the
     NEURON'S OWN |voltage|, with one clim. Colouring the arbour by the voxelized field instead
     -- which is what the first version did -- puts two different quantities on two different
     scales under one colour map: the field at a neurite is the smoothed sum over every nearby
@@ -1062,7 +1165,7 @@ def evolve_neural(run_dir, out, region, field="neural_activity", n_arbours=None,
     def _rgb(v, a, b):
         return (np.asarray(cm(np.clip((v - a) / max(b - a, 1e-12), 0, 1)))[:, :3] * 255).astype(np.uint8)
 
-    poly, meta = skeleton_lines(region, max_neurons=n_arbours, stride=dendrite_stride)
+    poly, meta = skeleton_lines(region, max_neurons=n_arbours, stride=neurite_stride)
     own = np.asarray(poly["owner"])                         # which neuron each node belongs to
 
     root = region_path(region)
@@ -1092,7 +1195,31 @@ def evolve_neural(run_dir, out, region, field="neural_activity", n_arbours=None,
     # 24 SEGMENTS, NOT 10. At 10 the silhouette is a visible decagon once a soma covers more
     # than a few pixels, and a faceted ball under a low alpha reads as a soft blob rather than
     # a sphere -- which is what "a mix of sphere and gaussian" was.
-    _ball = pv.Sphere(radius=soma_radius_um / side_um, theta_resolution=24, phi_resolution=24)
+    # THE SOMA GLYPH CARRIES A DIRECTION, so it is a tetrahedron and not a ball. The neuron's
+    # `neurite_dir` -- the axis its arbour is most extended along, computed once by
+    # `plexus.io.neuprint.compute_neurite_directions` and stored in the neuron state -- is
+    # real, measured, per-cell information that a sphere throws away. On these regions the
+    # first principal axis carries a median 82-91% of each arbour's variance, and the axes are
+    # far from isotropic (Tectum's mean |component| is 0.24 / 0.85 / 0.29 against the 0.58 of
+    # isotropy), so the orientations are a signal and not noise.
+    if soma_glyph == "tetra":
+        _ball = _tetra(soma_radius_um / side_um, elong=soma_elong)
+        # ELONGATION IS GATED ON HOW AXIAL THE ARBOUR ACTUALLY IS, so the dart's length is its
+        # own confidence. `neurite_elong` is the fraction of the arbour's variance carried by
+        # the axis being drawn: at 0.95 the cell is essentially a line and the direction means
+        # what it says; at 0.70 the arbour is a bush and the axis is the best of several poor
+        # answers. Drawing both as the same needle asserts a precision only one of them has.
+        # 26% of these neurons sit below 0.75. Binned rather than per-glyph because vtkGlyph3D
+        # scales isotropically -- one actor per bin is the cheap way to vary a SHAPE per point.
+        _el = np.asarray(nz["neurite_elong"], np.float32) if "neurite_elong" in nz.files else None
+        if _el is not None and n_arbours:
+            _el = _el[keep]
+        _ball = pv.Sphere(radius=soma_radius_um / side_um, theta_resolution=24, phi_resolution=24)
+    _ndir = np.asarray(nz["neurite_dir"], np.float32) if "neurite_dir" in nz.files else None
+    if _ndir is not None and n_arbours:
+        _ndir = _ndir[keep]
+    if _ndir is not None:
+        _cloud["neurite_dir"] = np.ascontiguousarray(_ndir[:, :3])
 
     name = label or os.path.basename(run_dir.rstrip("/"))
     ss = max(1, int(supersample))
@@ -1106,30 +1233,65 @@ def evolve_neural(run_dir, out, region, field="neural_activity", n_arbours=None,
         # translucent geometry must sort by depth against itself, not by draw order
         p.enable_depth_peeling(12)
         gg = palette == "grey_green"
-        # dendrites first (context), then somas on top (the entities the model integrates)
-        if dendrites:
+        # neurites first (context), then somas on top (the entities the model integrates)
+        if neurites:
             if gg:
-                poly["rgba"] = _rgba(v[arbour_row][own], vlo, vhi, a_lo=dend_alpha[0],
-                                     a_hi=dend_alpha[1], gamma=dend_alpha[2])
+                poly["rgba"] = _rgba(v[arbour_row][own], vlo, vhi, a_lo=neurite_alpha[0],
+                                     a_hi=neurite_alpha[1], gamma=neurite_alpha[2])
                 p.add_mesh(poly, scalars="rgba", rgb=True, line_width=line_width, lighting=False)
             else:
                 poly["rgb"] = _rgb(v[arbour_row][own], vlo, vhi)
-                p.add_mesh(poly, scalars="rgb", rgb=True, opacity=dendrite_opacity,
+                p.add_mesh(poly, scalars="rgb", rgb=True, opacity=neurite_opacity,
                            line_width=line_width, lighting=False)
         if soma:
             key = "rgba" if gg else "rgb"
             _cloud[key] = (_rgba(sv_s[tv[t]], vlo, vhi, a_lo=soma_alpha[0], a_hi=soma_alpha[1],
-                                 gamma=soma_alpha[2]) if gg else _rgb(sv_s[tv[t]], vlo, vhi))
-            balls = _cloud.glyph(geom=_ball, scale=False, orient=False)
-            p.add_mesh(balls, scalars=key, rgb=True, lighting=True, smooth_shading=True,
-                       ambient=0.30, diffuse=0.80, specular=0.15)
+                                 gamma=soma_alpha[2], knee=soma_knee)
+                           if gg else _rgb(sv_s[tv[t]], vlo, vhi))
+            # `orient="neurite_dir"` rotates each glyph so its +X nose follows that neuron's
+            # own axis. A neuron with no skeleton has a zero vector and vtk leaves it unrotated,
+            # which is the right default -- unoriented, not hidden.
+            if soma_glyph == "tetra" and _ndir is not None and _el is not None:
+                balls = None
+                for lo_e, hi_e in _BINS:
+                    m = (_el >= lo_e) & (_el < hi_e)
+                    if not m.any():
+                        continue
+                    w = np.clip((0.5 * (lo_e + hi_e) - 0.70) / (0.92 - 0.70), 0.0, 1.0)
+                    w = w * w * (3.0 - 2.0 * w)                   # smoothstep on confidence
+                    sub = _cloud.extract_points(np.flatnonzero(m), adjacent_cells=False)
+                    g = sub.glyph(geom=_tetra(soma_radius_um / side_um,
+                                              elong=1.0 + (soma_elong - 1.0) * w),
+                                  scale=False, orient="neurite_dir")
+                    balls = g if balls is None else balls.merge(g)
+            elif soma_glyph == "tetra" and _ndir is not None:
+                balls = _cloud.glyph(geom=_ball, scale=False, orient="neurite_dir")
+            else:
+                balls = _cloud.glyph(geom=_ball, scale=False, orient=False)
+            # FACETED, NOT SPECULAR. `smooth_shading=False` gives every face its own normal, so
+            # the four faces of a tetra take four brightnesses and the solid reads as a solid --
+            # that is the "shadow". `specular=0` removes the highlight, which is the part that
+            # looked like plastic: a specular lobe moves with the camera, so it says where the
+            # light is rather than anything about the neuron. Diffuse is kept low against a high
+            # ambient so the form is legible without the facet brightness competing with the
+            # activity the colour encodes.
+            # BACK-FACE CULLING IS WHAT MAKES IT READ AS A SOLID. The glyphs are alpha-blended
+            # (the knee leaves mid-activity somas translucent), so without culling the two rear
+            # faces show THROUGH the two front ones and their brightnesses average out -- the
+            # tetra collapses into one flat triangle, which is exactly what it looked like. With
+            # `culling="back"` only the front faces draw, so a viewer sees the 2-3 that face
+            # them, each at its own diffuse brightness, and the form is legible even at alpha
+            # 0.5. (A tetrahedron has FOUR faces, never five, and at most three can face the
+            # camera at once.)
+            p.add_mesh(balls, scalars=key, rgb=True, lighting=True, smooth_shading=False,
+                       ambient=0.20, diffuse=0.80, specular=0.0, culling="back")
         if volume:
             p.add_volume(_grid(np.abs(g[t])), scalars="a", cmap=cmap,
                          opacity=list(vol_opacity), clim=[lo, hi], show_scalar_bar=False)
-        layers = " + ".join([x for x, on in (("soma", soma), ("dendrites", dendrites),
+        layers = " + ".join([x for x, on in (("soma", soma), ("neurites", neurites),
                                              ("128^3 volume", volume)) if on])
-        seg_txt = (f"{meta['segments'] // 1000}k segments (1/{dendrite_stride})   "
-                   if dendrites else "")
+        seg_txt = (f"{meta['segments'] // 1000}k segments (1/{neurite_stride})   "
+                   if neurites else "")
         soma_txt = f"soma r={soma_radius_um} um   " if soma else ""
         p.add_text(f"{name}  {layers}   frame {t + 1}/{n_frames}   "
                    f"{meta['neurons']} arbours   {seg_txt}{soma_txt}"
@@ -1150,4 +1312,4 @@ def evolve_neural(run_dir, out, region, field="neural_activity", n_arbours=None,
         p.close()
     writer.close()
     return (f"{n_frames} frames, {meta['neurons']} arbours, {meta['segments']} segments, "
-            f"soma={soma} dendrites={dendrites} volume={volume}")
+            f"soma={soma} neurites={neurites} volume={volume}")

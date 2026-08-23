@@ -320,7 +320,56 @@ def suite_base(n_want=20):
              f"{k} operators, {f} frames") for k, f, n in pick]
 
 
-SUITES = {"ECM": suite_ecm, "BASE": suite_base}
+# =============================================================================================
+# THE MINISITE'S OWN SCENES, grouped by the four headings they appear under on the front page.
+#
+# WHY THESE AND NOT A SAMPLE. `suite_base` picks twenty rows spread across the archive by operator
+# and frame count -- good coverage, but nobody has ever LOOKED at most of them. These are the clips
+# on the front page: if the promotion changed one of them, it changed the thing a reader judges the
+# project by, and it would be found by a visitor rather than by a gate.
+#
+# THE 2D TURING SCENES ARE NOT HERE, and that is a gap, not an oversight. The three clips under
+# "Turing -- Gray-Scott reaction-diffusion" (`turing2d_coral`, `turing2d_chi_small`,
+# `turing2d_two_species`) exist ONLY as text inlined in `index.qmd`'s hover panels -- there is no
+# yaml for them anywhere in the tree -- and they are `dim: 2` with no mesh, so `run_one.py` cannot
+# run them at all (it reads `H.level("vertex")` in three places). They have no pristine twin that
+# could exist. `atlas/turing_coral` is the mesh-backed Gray-Scott scene and stands in for the
+# section's MECHANISM; it is not the same clip and is not labelled as one.
+_MINISITE = [
+    # section on the front page                     spec
+    ("Turing -- Gray-Scott",                        "atlas/turing_coral"),
+    ("Epithelial mechanics -- a vertex model",      "atlas/vertex_spheroid"),
+    ("Epithelial mechanics -- a vertex model",      "cellfix_B_new"),
+    ("Cell death -- sculpting an epithelial surface", "apop_patch_big"),
+    ("Cell death -- sculpting an epithelial surface", "apop_rings9"),
+    ("Cell death -- sculpting an epithelial surface", "apopgeo_half"),
+    ("Growing tissue + Turing pattern",             "atlas/turing_grow_divide"),
+    ("Growing tissue + Turing pattern",             "grow_divide"),
+    ("Growing tissue + Turing pattern",             "r021_12"),
+    # THE FOLDER IS NAMED because two different models carry this name. `_superseded_r001-r029`'s
+    # copy is "uniform growth (ungated, rho baseline only)" with `connections: []` and `impl: spot`;
+    # this one is the gated route -- `impl: cone` plus `cell_chem_react -> cell_grow.gate` -- which
+    # is what the minisite's own inlined spec for the "morphogen + growth" clip shows. An ungated
+    # run under that caption would be a different experiment wearing the right label.
+    ("Growing tissue + Turing pattern",             "okuda/_superseded_pre_basis/r005_06"),
+    ("Growing tissue + Turing pattern",             "r013_05"),
+    ("Growing tissue + Turing pattern",             "r016_01"),
+    ("Growing tissue + Turing pattern",             "r017_00_ctrl"),
+    ("Growing tissue + Turing pattern",             "r020_01"),
+    ("Growing tissue + Turing pattern",             "r020_00_ctrl"),
+    ("Growing tissue + Turing pattern",             "r021_06"),
+    ("Growing tissue + Turing pattern",             "tsd_max"),
+    ("Growing tissue + Turing pattern",             "sc_antiphase"),
+]
+
+
+def suite_minisite():
+    """Every front-page scene that HAS a pristine twin, at its own length, pristine against core."""
+    return [("MINISITE", spec, None, 0.0, "okuda@0da57dd0", "core", section)
+            for section, spec in _MINISITE]
+
+
+SUITES = {"ECM": suite_ecm, "BASE": suite_base, "MINISITE": suite_minisite}
 
 
 def _spec_src(spec):
@@ -339,7 +388,30 @@ def _spec_src(spec):
     if "/" in spec:
         folder, name = spec.split("/", 1)
         return os.path.join(ROOT, "config", folder, f"{name}.yaml"), name
-    return os.path.join(CFG_OKUDA, f"{spec}.yaml"), spec
+    flat = os.path.join(CFG_OKUDA, f"{spec}.yaml")
+    if os.path.exists(flat):
+        return flat, spec
+    # THE CORPUS HAS SUBFOLDERS, and three front-page scenes live in them: `cellfix_B_new` and
+    # `r005_06` under `_superseded_pre_basis/`, `r021_06` under `_superseded_r001-r029/`. A bare
+    # name is searched one level down rather than hard-coded here, because hard-coding a path is
+    # how a row silently starts running a different file when the corpus is reorganised.
+    #
+    # IT REFUSES TO GUESS. Two files of one name are two DIFFERENT MODELS, not two copies: gate 00's
+    # header records exactly this trap -- `cellfix_B_new` has a second candidate parent that says
+    # `rate: 0.03` against the real one's 0.003457 and reaches 1451 cells by frame 60 against 227.
+    # Picking the alphabetically-first would have gated a correct run against the wrong tissue. So
+    # an ambiguous name raises and the caller names the folder explicitly with `folder/name`.
+    hits = sorted(glob.glob(os.path.join(CFG_OKUDA, "*", f"{spec}.yaml")))
+    if len(hits) == 1:
+        return hits[0], spec
+    if len(hits) > 1:
+        rel = [os.path.relpath(h, ROOT) for h in hits]
+        raise SystemExit(
+            f"  spec {spec!r} is AMBIGUOUS -- {len(hits)} files carry that name and they are not\n"
+            f"  copies of one model:\n    " + "\n    ".join(rel) +
+            f"\n  Name the folder explicitly in the row, e.g. "
+            f"{os.path.basename(os.path.dirname(hits[0]))}/{spec}.")
+    return flat, spec
 
 
 def _stag(spec):
@@ -415,6 +487,66 @@ def _spec_copy(spec, run_name, frames, cfg_dir=None):
     return dst
 
 
+# WHICH OKUDA MODULE REGISTERS AN OPERATOR `run_one.py` HAS NEVER IMPORTED.
+#
+# `run_one.py` imports a HARDCODED list -- `mesh_ops, chem_ops, t1_ops, monolayer_ops, ckpt,
+# shape_chem_ops, shape_probe_ops` -- and that list has never contained `junction_ops`, at the
+# pristine baseline or at HEAD. In okuda the junction operators are registered in exactly one place:
+# `ops/tissue.py:221` does `import junction_ops` at the moment it INSERTS `junction_myosin` into a
+# spec it is building. So okuda's junction specs have only ever run through `tissue.build()`, never
+# through `run_one.py` -- which is why the archived gate-00 rig LOADS a cached tissue instead of
+# simulating one, and why gate 00's okuda side died with `operator 'junction_myosin' not in
+# registry` the first time it was asked to run for real.
+#
+# The registration is the same class under the same name either way, so importing the module is not
+# a behaviour change; it is the same line `tissue.py` runs. It is done from a launcher in the PAIR
+# DIRECTORY rather than by editing `run_one.py`, because side A is a pristine worktree and the whole
+# value of it is that nothing edits it.
+#
+# ONLY THE MODULES A SPEC ACTUALLY NEEDS ARE IMPORTED. An unconditional import would put extra
+# registrations into every run in the suite, including the phase-0 rows that are already green, and
+# "it should not matter" is the reasoning that produced the last defect.
+_OKUDA_OP_MODULE = {
+    "junction_myosin": "junction_ops", "junction_sync": "junction_ops",
+    "medioapical_myosin": "medioapical_ops", "cytokinetic_ring": "medioapical_ops",
+}
+
+
+def _okuda_entry(pair_dir, cfg_dir, run_name):
+    """The okuda side's entry point: `run_one.py`, or a launcher that registers what it omits.
+
+    Returns a path to run instead of `run_one.py`. When the spec needs nothing extra the answer IS
+    `run_one.py` and no launcher is written, so the overwhelming majority of rows keep running the
+    exact command they always ran.
+    """
+    try:
+        cfg = yaml.safe_load(open(os.path.join(cfg_dir, f"{run_name}.yaml")))
+    except Exception:
+        return "run_one.py"
+    names = {o.get("op") for o in (cfg.get("operators") or []) if isinstance(o, dict)}
+    need = sorted({_OKUDA_OP_MODULE[n] for n in names if n in _OKUDA_OP_MODULE})
+    if not need:
+        return "run_one.py"
+    path = os.path.join(pair_dir, f"_launch_{run_name}.py")
+    with open(path, "w") as f:
+        f.write('"""Register the okuda op modules `run_one.py` does not import, then run it.\n\n'
+                'Written by tools/promotion_identical.py. `run_one.py` is executed under\n'
+                '`__name__ == "__main__"` with sys.argv untouched, so it parses its own arguments\n'
+                'exactly as it does when invoked directly.\n"""\n'
+                "import runpy\n\n"
+                f"for _m in {need!r}:\n"
+                "    try:\n"
+                "        __import__(_m)\n"
+                "    except Exception as _e:\n"
+                # LOUD, because a launcher that silently failed to register would hand the run
+                # straight to `operator '...' not in registry` several seconds later, and the
+                # traceback would name the spec rather than the import that was supposed to fix it.
+                "        raise SystemExit(f'[launch] {_m} did not import, so the operators it \\\n"
+                "registers are absent and this run cannot be a twin of anything: {_e!r}')\n\n"
+                'runpy.run_path("run_one.py", run_name="__main__")\n')
+    return path
+
+
 def _bsub_lines(pair_dir, spec, side, run_name, frames):
     """The bsub command for one side. Both sides go into ONE remote script, so they are submitted
     together and the scheduler runs them at the same time -- 'in parallel' is a property of the
@@ -422,6 +554,7 @@ def _bsub_lines(pair_dir, spec, side, run_name, frames):
     import cluster as C
     home, _cfg, _log = _side_paths(side)
     if side.startswith("okuda"):
+        entry = _okuda_entry(pair_dir, _cfg, run_name)
         script = os.path.join(pair_dir, f"{run_name}.sh")
         with open(script, "w") as f:
             f.write("\n".join([
@@ -434,7 +567,7 @@ def _bsub_lines(pair_dir, spec, side, run_name, frames):
                 # THE DETERMINISM ASSERTION travels with the job, not with the submitter: the run
                 # happens on another machine and a flag set here would not reach it.
                 "export PLEXUS_STRICT_DETERMINISM=1",
-                f"conda run -n {C.ENV} python run_one.py {run_name}"
+                f"conda run -n {C.ENV} python {C.cpath(entry)} {run_name}"
                 + (f" --frames {frames}" if frames is not None else "")
                 + " --device cuda:0 --campaign promotion",
             ]) + "\n")
